@@ -73,10 +73,18 @@
   `current-only=0`，并消除基线 3 项既有失败。
 - [x] (integration) claim 投影硬化后完整聚焦 SQLite 202/202、隔离 PostgreSQL 16 专项 24/24。
 - [x] (operations) 实现已提交、推送并创建 PR #108；PR 当前 OPEN/MERGEABLE，生产未改动。
+- [x] (application) 修复定时赛果审核 prepare 异常未终态化：原 token CAS 写 `failed`，并增加每 5 分钟的
+  严格过期 claim sweeper；发布 writer 门禁本身保持不变。
+- [x] (operations) 新增 preview/SHA-bound/apply 历史收口命令；任一活租约、畸形 token、已有 selector/bundle/
+  terminal/finished 或 manifest 漂移时整批零写。
+- [x] (integration) 新增 SQLite 契约与 PostgreSQL sweeper×迟到 worker/manifest×新 claim 并发测试；本变更
+  聚焦套件 SQLite 232/232、PostgreSQL 28/28 通过。
 
 ## 最终生产发布
 
-- [ ] (operations) 取得用户对 PR #108 合并及生产部署的最终确认。
+- [ ] (operations) 先创建并验证独立生产备份，再用候选镜像 preview 及精确 manifest SHA 将 14 条历史
+  `claimed` 收口为 `failed/stale_claim_reconciled`；验证 claimed=0、delivery/业务数据零写和旧队列不变。
+- [ ] (operations) 取得用户对修复后精确 PR #108 合并及生产部署的最终确认。
 - [ ] (operations) 合并后绑定精确 revision/tree/archive/image，建立隔离 release；不得在 1,710 项 dirty 的
   `/opt/umanewsbot` checkout 直接 pull、checkout 或清理。
 - [ ] (operations) 创建 PostgreSQL custom-format 备份，记录权限/大小/SHA 并通过 `pg_restore --list`。

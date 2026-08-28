@@ -17,6 +17,20 @@
   `race_sync_v2=0`、旧 `race_live=7543`，web/worker/Beat/db/redis/nginx/onebot 均在线。下一步必须先对
   14 条 claimed review 做单独、受审的生产状态核验与精确收口；门禁回到 0 后才能重新取得发布窗口并从
   PR 合并前检查重新开始。
+- 代码根因是 `run_scheduled_prepare()` 只在 prepare 正常返回后 CAS 写终态；prepare 异常会让 run 永久停在
+  `claimed`。旧 catch-up 仅处理缺失 slot，不会终态化这些既有行。14 行均已确认租约过期、cursor 只有
+  claim token、selector/bundle/terminal/finished 为空，但该形态仍须按异常处理，不能降低 writer 门禁。
+- 当前 worktree 已新增三层防复发：prepare exception 由原 token 写 `failed/prepare_exception`；每 5 分钟
+  sweeper 仅收口严格空证据的过期 claim；历史命令要求 preview canonical manifest SHA，并在单事务锁住
+  全部 claimed 行重算，任一活跃/畸形/漂移即整批零写。收口不生成 bundle、delivery 或赛果投影。
+- 变更聚焦验证为 SQLite 232/232、PostgreSQL 28/28；Django check、migration drift、compileall、三份
+  Compose、diff 与 secret scan 通过。额外扩展套件的 9 failures/2 errors 已在原 PR head 对应模块逐项
+  复现，不是本补丁引入。当前尚未 commit/push、未写生产；下一步是全 PR 独立复审，再创建已验证备份并
+  精确收口 14 行，最后只为合并部署请求一次确认。
+- 首轮独立补丁 review 的 2 P1 + 1 P2 已处理：历史修复授权已按用户当前明确指令写回；failed slot retry
+  会清空旧 attempt terminal 字段；固定 PostgreSQL advisory transaction lock 串行化 manifest apply 与新
+  claim 创建；manifest SHA 同时绑定 eligibility，避免 preview 后 lease 跨过期边界而静默改变 apply 范围。
+  新增重试、eligibility drift 与真实 phantom-claim 并发测试已纳入上述 232/28。
 
 ## 2026-08-20 赛事数据自动同步 R0 已通过独立代码评审，保持默认关闭
 

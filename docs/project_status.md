@@ -8,7 +8,16 @@
   静默门禁发现 `RaceResultReviewRun(status="claimed")=14`，因此按约定立即停止。
 - 失败清理后旧 Beat 已恢复，五个赛事写入开关仍为 `false`，`race_sync_v2=0`，旧
   `race_live=7543` 未触碰。当前阻塞项是对 14 条历史 claim 的独立核验与受审精确收口；不得绕过门禁继续
-  PR 合并、备份、迁移或分阶段启用。
+  PR 合并、迁移或分阶段启用。
+- 根因已收敛：旧 scheduler 在取得 20 分钟 claim 后，`prepare_review_bundle` 抛出异常时没有 exception
+  terminalization；后续 catch-up 也不会清理由历史 slot 留下的行。发布门禁正确地按所有 `claimed` 计数，
+  所以 14 条租约虽已过期仍必须阻断，而不能被当作 inactive 忽略。
+- 本地已实现原 token 异常终态、5 分钟严格 sweeper 和 SHA-bound 历史修复命令；畸形/活跃/已有证据行会
+  整批阻断。首轮独立 review 的 retry 旧终态残留和 manifest phantom claim 已以字段复位及 PostgreSQL
+  advisory transaction lock 修复，manifest SHA 也绑定 eligibility；聚焦 SQLite 232/232、PostgreSQL 28/28、
+  Django/migration/Compose/compile/diff 静态门禁通过；
+  扩展套件中的既有红灯已在原 PR head 精确复现，当前差异未新增失败。尚待文档闭合、全 PR 独立复审、
+  生产备份与 14 行精确收口。
 
 ## 2026-08-20 赛事数据自动同步 R0 已通过独立代码评审，保持默认关闭
 

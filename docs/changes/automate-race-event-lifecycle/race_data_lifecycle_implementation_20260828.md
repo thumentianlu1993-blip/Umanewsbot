@@ -7,8 +7,9 @@
 写入仍由总开关、分项开关、冻结 standing policy、来源 proof、路由 digest、容量上限和数据库控制面
 共同约束，仓库默认保持关闭。
 
-实现已提交并创建 PR #108。本轮未部署、未迁移生产数据库、未启用生产开关。生产动作必须在 PR
-合并并绑定精确 revision 后，另行取得最终确认。
+实现已提交并创建 PR #108。首次发布预检因 14 条租约已过期但仍为 `claimed` 的历史赛果审核 run 安全
+停止；PR 尚未合并，本轮未迁移生产数据库、未启用生产开关。补丁已增加异常终态、严格 sweeper 与
+SHA-bound 历史收口命令；完成全 PR 复审及历史收口后，生产部署仍须绑定精确 revision 并取得最终确认。
 
 ## 2. 自动化链路
 
@@ -91,6 +92,9 @@ enrollment、due checkpoints、policy census/blocker 和 route drift，并固定
   以及 claim 被替换/过期/data-kind 越权时的 canonical 零写入；
 - 隔离 PostgreSQL 16 专项：24/24 通过，覆盖行锁、并发幂等、唯一约束、raw cleanup、migration 和
   superseded claim 的真实 PostgreSQL 零投影；
+- 历史 claim 修复纳入后，完整聚焦 SQLite 为 232/232、PostgreSQL 为 28/28；新增覆盖 prepare exception
+  token CAS、5 分钟 sweeper、畸形/活跃 claim 整批阻断、manifest drift、命令重放、迟到 worker 以及
+  manifest apply 与新 claim 创建的真实并发；
 - zero-write dry-run：通过，数据库 hash 不变。
 - 相邻扩展回归：claim 硬化后当前分支筛除 PostgreSQL-only 运行 684 项，结果为
   `9 failures / 39 errors / 4 skipped`；同日、同镜像、同配置的 `origin/main@2833558a` 共同模块基线为
@@ -126,3 +130,16 @@ Beat 验收，最后才可按确认的灰度顺序启用。
 一级止损是关闭 `RACE_DATA_SYNC_ENABLED`、`RACE_DATA_SYNC_FUTURE_DISCOVERY_ENABLED`、
 `RACE_DATA_SYNC_LIFECYCLE_APPLY_ENABLED` 和各 apply/public 开关；已经形成的 revision 与 transition 保留，
 不得通过批量反向状态或降级结果回滚。
+
+## 9. 历史 claim 根因与修复边界
+
+旧 `run_scheduled_prepare()` 在建立 20 分钟 claim 后，只在 `prepare_review_bundle()` 正常返回时写终态；
+异常会保留 claimed，catch-up 又只补缺失 slot，因此生产累计 14 条空证据的过期 claim。发布 writer 门禁
+统计所有 claimed 是正确行为，本补丁没有增加“租约过期即忽略”的例外。
+
+防复发采用两条路径：当前 worker 的 prepare exception 仅由原 token CAS 写 `failed/prepare_exception`；
+Beat 每 5 分钟运行 sweeper，仅将标准空证据且租约过期的 claim 写为
+`failed/lease_expired_without_terminal`。历史生产收口使用同一服务的 preview/apply 命令，preview 对全部
+claimed 行生成 canonical manifest，apply 要求精确 SHA 并锁定重算，写入
+`failed/stale_claim_reconciled`。三条路径都不创建 bundle、delivery 或赛果业务投影；任何非标准形态继续
+fail closed。

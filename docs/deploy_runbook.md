@@ -8752,3 +8752,20 @@ RACE_DATA_RAW_ARTIFACT_ROOTS=/run/race-data-sync
 - 运行 task 在 provider 网络请求后写 schedule/racecard/result 前必须重新验证 exact claim、expiry、
   generations、entry/route/plan SHA、checkpoint version 和 data-kind。验收至少注入一次 superseded/expired
   claim，确认 canonical/revision/projection 与新 claim 均不变；只看到 HTTP 200 或 raw receipt 不算通过。
+
+### 2026-08-28 历史赛果审核 claim 的精确收口步骤
+
+1. 保持 PR 未合并、全部新赛事写入开关关闭；停止 Beat，并确认普通 worker active/reserved/scheduled、
+   `celery`、`race_sync_v2`、external/historical/P0 writer 全部为 0。只读取并记录 `race_live`，不得消费。
+2. 从待复审的精确 PR head 构建隔离候选镜像；只运行
+   `reconcile_stale_race_result_review_claims` preview，保存 JSON、文件 SHA 和其中的 manifest SHA。
+3. preview 必须恰为已核验的 14 个 run，`eligible_count=14`、`blocked_count=0`；出现活租约、异常 cursor、
+   selector/bundle/terminal/finished 证据或行集合漂移时立即停止并恢复 Beat。
+4. 创建 PostgreSQL custom-format 备份，验证 regular file、0600、非空、SHA-256 和 `pg_restore --list`；
+   备份后 free disk 仍须不低于 8 GiB。
+5. 使用同一候选镜像执行 `--apply --expected-manifest-sha256=<preview digest>`。命令在单事务锁定全部
+   claimed 行；错误 SHA 或任何行漂移必须整批零写。
+6. 写后核对 14 行均为 `failed/stale_claim_reconciled`、lease 清空且原 cursor 保留，claimed=0；bundle、
+   delivery、pending-event、赛果/赛事业务表和三队列前后指纹必须一致，尤其 `race_live=7543` 不变。
+7. 恢复旧 Beat，重新跑完整 writer 静默、服务、HTTP、日志与磁盘门禁。该动作只解除历史状态泄漏，
+   不构成 PR 合并、migration 或新自动化启用授权。

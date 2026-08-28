@@ -3102,3 +3102,15 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
   这样所有存在候选的地区在有限轮次内都有机会执行，不会因全局 budget 长期饥饿。
 - network 前容量不是“正数配置即通过”：必须在 `RaceDataTransportCapacityLedger` 原子预留 provider/region/day
   请求和最大响应字节，并同时验证 artifact root、high-water、hold 与 free disk。失败只消耗零网络请求。
+
+# 2026-08-28 过期赛果审核 claim 必须显式失败终态，发布门禁不忽略
+
+- 用户已在发现 14 条阻塞后明确授权按本方案处理历史 claim 并修复防复发逻辑；该授权只覆盖备份、精确
+  manifest 收口和验证，不覆盖修复后 PR 的最终合并、部署、migration 或自动化启用。
+- `claimed` 表示仍有写入所有权，租约过期不等于业务终态；发布门禁继续统计全部 claimed，不增加
+  “expired 即安全”的旁路。
+- prepare 异常由仍持有原 token 的 worker 写 `failed/prepare_exception`；独立 sweeper 只处理租约过期且
+  从未形成 selector、bundle、terminal 或 finished 证据的标准空 claim。其他形态保持 claimed 并告警。
+- 历史修复采用 preview canonical manifest SHA + apply 事务锁/CAS，两阶段绑定全部 claimed 行；任一漂移
+  整批零写。收口状态使用 `failed/stale_claim_reconciled`，不使用会误示“没有目标”的 `noop`。
+- 自动收口只解决运行记录泄漏，不触发重跑。具体 slot 的 retry 是独立运维动作，沿用现有显式入口与门禁。

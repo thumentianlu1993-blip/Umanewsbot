@@ -892,6 +892,9 @@ CELERY_TASK_ROUTES = {
     "stable.tasks.advance_race_data_sync_lifecycle_task": {"queue": "celery"},
     "stable.tasks.advance_race_event_lifecycle_task": {"queue": "celery"},
     "stable.tasks.scheduled_race_result_review_task": {"queue": "celery"},
+    "stable.tasks.reconcile_stale_race_result_review_claims_task": {
+        "queue": "celery"
+    },
 }
 CELERY_TASK_ANNOTATIONS = {
     "stable.tasks.scheduled_race_result_review_task": {
@@ -970,6 +973,11 @@ CELERY_BEAT_SCHEDULE = {
     "scheduled-race-result-review": {
         "task": "stable.tasks.scheduled_race_result_review_task",
         "schedule": crontab(minute=30, hour="6,18"),
+    },
+    "reconcile-stale-race-result-review-claims": {
+        "task": "stable.tasks.reconcile_stale_race_result_review_claims_task",
+        "schedule": crontab(minute="*/5"),
+        "options": {"queue": "celery", "expires": 240},
     },
     "discover-p0-racecard-urls": {
         "task": "stable.tasks.discover_p0_racecard_urls_task",

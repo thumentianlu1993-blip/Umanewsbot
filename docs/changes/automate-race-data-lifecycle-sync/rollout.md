@@ -11,7 +11,14 @@
 - runtime 仅有旧版 `RACE_DATA_SYNC_ENABLED=false` 与 provider/region/field 三个空集合键；本 change 新增的
   scheduler/network/apply/capacity 等键尚不存在。现有 lifecycle 为 `true/enforce`，race-live network/scheduler
   关闭。
-- 尚未合并、备份、迁移、部署或开启任何新开关；等待用户唯一一次最终生产确认。
+- 尚未合并、备份、迁移、部署或开启任何新开关。发布硬门禁另发现 14 条租约过期但仍为 `claimed` 的
+  历史赛果审核 run。用户随后已明确授权“按方案处理历史 claim 并修复代码”，因此历史收口属于本次独立
+  获准的数据修复包；先按精确 manifest、已验证备份和单事务命令执行。PR 全量代码复审完成后，仅在真正
+  合并/部署/启用前再请求一次最终生产确认。
+
+历史收口不得通过修改 writer 门禁或忽略过期 lease 完成。只有 selector/bundle/terminal/finished 全空且
+cursor 形态精确的已过期 claim 可转为 `failed/stale_claim_reconciled`；任何活租约、异常字段或 SHA 漂移
+立即停止，Beat 恢复原状且所有新写入开关继续关闭。
 
 ## 2. 用户覆盖的旧门禁
 

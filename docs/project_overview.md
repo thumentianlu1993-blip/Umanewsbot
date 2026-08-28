@@ -240,6 +240,10 @@ owner/claim CAS 决定是否形成公开 projection。The Racing API 只提供�
 `provisional_result`；官方来源的独立 evidence 才能支持后续 `official_result` 或
 `corrected_result`。
 
+定时赛果审核运行记录也采用显式终态：prepare 异常由原 token CAS 写 `failed`，租约过期且没有形成
+selector、bundle 或 terminal 证据的空 claim 由严格 sweeper 收口。发布门禁仍统计所有 claimed；畸形、
+活跃或已有证据的记录不会因租约过期被忽略，历史修复必须绑定 canonical manifest SHA 并整批事务执行。
+
 首个公开候选只覆盖英国 event `924` 的已存 shadow revision，使用无网络、可哈希的
 promotion/disable/restore manifest。暂定赛果可以先公开，但页面必须清晰显示“暂定”与
 “尚待官方来源复核”；BHA 当前只采用人工浏览器复核和离线 evidence receipt，不自动抓取，

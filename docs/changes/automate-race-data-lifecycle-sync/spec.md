@@ -271,3 +271,18 @@ identity/route digest、预期 owner/generation 和精确 before state，可反�
 - 错绑赛事、跨 event 写入、manual lock 覆盖、重复 current revision、无证据公开均为 0；
 - 关闭任一 provider/cohort/field/public flag 后，新写入在一个 selector 周期内停止；
 - 所有写入都有 observation、revision/field decision、来源合同摘要和可验证回滚路径。
+
+## 16. 定时赛果审核 claim 的异常终态
+
+- `RaceResultReviewRun` 在 prepare 抛出异常时，只有仍持有原 `claim_token` 的 worker 可以把该 run 写成
+  `failed/prepare_exception`，清空租约并记录完成时间；不得保存异常正文、credential 或 header。
+- 独立 sweeper 每 5 分钟检查已过期 claim。只有 cursor 精确为单一非空 `claim_token`，并且 selector、bundle、
+  terminal summary 与 finished time 全空的记录，才可自动终态化为 `failed/lease_expired_without_terminal`。
+- 任何未过期租约、缺失/畸形 token、已有 selector/bundle/terminal/finished 证据都必须阻断自动收口，继续让
+  writer activity 门禁失败；不得把门禁改为忽略过期 claim。
+- 历史生产修复必须先生成包含 run ID、slot、租约、字段摘要和行更新时间的 canonical manifest；apply 在
+  单事务锁定 claim namespace 与全部 `claimed` 行并重算同一 SHA，任一漂移或异常行都整批零写；并发新
+  claim 只能在该事务提交后创建。
+- 精确历史收口使用 `failed/stale_claim_reconciled`，保留原 cursor 供审计；如需重跑具体 slot，必须另行显式
+  调用已有 slot retry。retry 在新 claim 建立时清空上一 attempt 的 terminal 字段，不得由收口命令顺带生成
+  bundle、delivery 或业务赛果写入。

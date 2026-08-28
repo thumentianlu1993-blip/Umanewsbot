@@ -128,6 +128,21 @@ def scheduled_race_result_review_task() -> dict:
 
 
 @shared_task
+def reconcile_stale_race_result_review_claims_task() -> dict:
+    if not getattr(settings, "RACE_RESULT_REVIEW_ENABLED", False):
+        return {"enabled": False, "status": "disabled"}
+    from stable.services.scheduled_race_result_review import (
+        reconcile_expired_review_claims,
+    )
+
+    receipt = reconcile_expired_review_claims(
+        now=timezone.now(),
+        reason_code="lease_expired_without_terminal",
+    )
+    return {"enabled": True, "status": "completed", **receipt}
+
+
+@shared_task
 def discover_p0_racecard_urls_task() -> dict:
     """Publish the current P0 official racecard URL document.
 

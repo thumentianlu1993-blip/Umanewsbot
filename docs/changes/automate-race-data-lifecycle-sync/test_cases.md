@@ -104,3 +104,21 @@ DB_ENGINE=postgres python manage.py test \
 
 另需：`manage.py check`、`makemigrations --check --dry-run`、Python compileall、三份 Compose config、
 `git diff --check`、secret scan、zero-write full-config audit、与 `origin/main` 的扩展回归失败集合归因。
+
+## 10. 定时赛果审核 claim 异常收口
+
+48. prepare 抛出异常时，原 token 精确写 `failed/prepare_exception`、清租约且不落异常正文；token 已被新 owner
+    替换时旧 worker 零写。
+49. sweeper 只终态化租约过期、cursor 合同正确且 selector/bundle/terminal/finished 全空的 claim；审核总开关
+    关闭时任务零写。
+50. 未过期、token 畸形或已有任一证据的 claim 阻断自动收口；与合格行混合时人工 apply 整批回滚。
+51. management command 默认只预览，apply 必须绑定 64 位 manifest SHA；错误 SHA 零写，正确 SHA 精确收口，
+    重放返回空 manifest 且不重复修改。
+52. PostgreSQL 并发覆盖 sweeper 先取得终态后旧 prepare worker 只能返回 `lease_lost`，不能覆盖 `failed`。
+53. Beat 每 5 分钟调度 sweeper、任务固定普通 `celery` 队列且消息 240 秒过期。
+54. PostgreSQL advisory transaction lock 必须串行化 manifest apply 与新 slot claim 创建；apply 锁内的
+    `remaining_claimed_count=0` 不能被并发 phantom claim 绕过。
+55. failed slot 显式 retry 在进入 prepare 前清空上一 attempt 的 selector/bundle/terminal/finished 字段；若新
+    attempt 再次超时，sweeper 仍能识别标准空 claim。
+56. manifest SHA 同时绑定 eligible IDs 与 blocked reason；活租约在 preview 后变为过期也必须 SHA drift，
+    不能在未复核新 eligibility 的情况下 apply。

@@ -516,3 +516,16 @@ audit hold bytes 单独计量且不可被 cleanup 删除；hold 超预算、clea
 5. R4：唯一 lifecycle/public transactional API、独立 reference SLO/告警、地区灰度和 correction watch。
 
 R1/R2/R3 都不得绕过 R0 的 registry/checkpoint/queue。R3 在 R4 前不自动公开，不直接改变赛事状态。
+
+## 18. 旧赛果审核 claim 收口
+
+定时审核的运行态仍以 `claimed -> prepared/noop/notified` 为正常链路，但所有 prepare 异常必须由原 token
+CAS 写入 `failed`。独立 sweeper 只处理“租约过期且从未形成 selector、bundle 或 terminal”的严格形态，
+并使用同一 CAS 清租约；它不触发 selector、网络、bundle、邮件或赛果投影。
+
+人工生产修复分 preview/apply 两步。preview 对全部 `claimed` 行生成 canonical manifest SHA，cursor 只输出
+摘要；apply 要求调用者回传精确 SHA，在 PostgreSQL 事务内 `select_for_update` 全部 claimed 行后重算。
+同一事务先取得固定 advisory namespace lock，所有 slot 创建/重领也先取得该锁，避免 preview 行锁之外的
+phantom claim。活租约、字段漂移或非空证据会使整个事务失败。显式 retry 会清空上一 attempt 的终态字段，
+保证新 attempt 硬超时后仍可由 sweeper 识别。发布 writer 门禁继续无条件统计 `status=claimed`，因此异常
+形态不会被“过期即忽略”掩盖。
