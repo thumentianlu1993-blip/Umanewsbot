@@ -3068,3 +3068,17 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
   active verify、Beat-last 顺序执行。
 - apply freshness 固定 24 小时；runtime validity 固定为最晚 race datetime +30 分钟 +24 小时。一级止损
   永远是无需 manifest 的 false/off；已合法推进的公开状态不自动反向修改。
+
+# 2026-08-28 赛事数据自动化采用 standing policy、确定性来源仲裁和动态 cadence
+
+- 用户本轮明确要求完整自动闭环并覆盖此前逐阶段/逐场确认约束；因此未来公开赛事由一年期冻结 standing
+  policy 自动纳管，不再逐场确认。生产部署仍是独立的最终确认点，代码合并不自动扩大生产权限。
+- 来源等级固定为 `licensed_api=300 > official_operator=200 > trusted_publisher=100`。更高等级覆盖低等级；
+  同等级使用 observation 时间和 provider key 稳定决胜；manual lock 永不被自动化覆盖。
+- The Racing API 是新增联网主链，单 task 最多 3 请求；官网层本轮只消费既有 HKJC/France Galop 导入，
+  未经独立 proof 不新增官网网络抓取。API 未找到赛果时才依次尝试官方导入和地区可信第三方 receipt。
+- 赛时和出马表远期最多间隔 12 小时，临赛加密；状态按 T/T+30 推进；赛果自 T+3 起抓取并在确认后继续
+  7 天更正观察。所有 checkpoint 由 claim completion 原子生成后继，避免固定 Beat 与 worker 重复派发。
+- 来源报告名次与内部唯一排序分离：`reported_finish_position` 保留 dead heat，`finish_position` 保持既有
+  唯一约束。更正追加 immutable revision，不就地覆盖证据。
+- 公开页面不显示来源等级、provisional/official 或人工复核标签；这些字段保留为内部仲裁、审计和回滚依据。

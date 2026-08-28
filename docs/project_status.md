@@ -2906,3 +2906,14 @@ P0 马信息补全专项的模型交接文档见
   claim，赛事仍为 `scheduled`、applied transition 为 0。
 - 下一验收是 event 186/187 各自的 T 与 T+30 状态/审计/缓存观察；完整恢复点和运行证据见 change 的
   `release_report.md`。
+
+# 2026-08-28 赛事数据全生命周期自动化等待 PR 与生产确认
+
+- 代码侧已经完成未来赛事自动发现、赛时/出马表动态同步、赛事状态推进、赛后结果与更正链；无需逐场
+  人工确认，公开页不展示来源或 provisional/official 标签。
+- 来源优先级为 licensed API > 官方导入 > 可信第三方；The Racing API 为联网主链，官网网络抓取未在
+  没有独立 proof 的情况下扩张。
+- migration 0075、Compose/Beat/worker 配置、冻结 standing policy、只读审计命令和回滚边界已齐备；
+  所有开关默认 false、容量默认 0。
+- 本地验证为 169/169，zero-write dry-run 前后数据库 SHA 不变。当前未发布或改动生产；下一步是提交 PR，
+  PR 完成后只再请求一次绑定精确 revision 的生产部署确认。

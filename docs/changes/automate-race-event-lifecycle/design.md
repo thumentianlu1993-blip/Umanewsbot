@@ -546,3 +546,17 @@ Celery/Beat/worker/Compose。阶段 B/D 后续预计
 触及 `race_events.py`、`race_live_*` 与 provider registry；阶段 C 预计触及 `automation.py`、
 `validation.py`、`publishing_windows.py`、news models/tasks/admin。
 具体实现前必须再次做 hunk overlap preflight。
+
+## 13. 2026-08-28 目标驱动的统一实现定稿
+
+用户本轮明确要求完成整条自动生命周期，并允许覆盖本文早期按阶段逐次确认的设计门禁。实现因此统一为：
+
+- future discovery + standing policy 自动纳管未来公开赛事；
+- `race_sync_v2` projection owner 独占字段投影，claim/complete 以 generation/token/plan SHA 做 CAS；
+- licensed API、官方导入、可信第三方使用 300/200/100 确定性仲裁；
+- race time/racecard 最慢 12 小时一次，临赛加密；result 自 T+3 起轮询并保留 7 天 correction watch；
+- lifecycle 在 T/T+30 推进，postponed 和无时间赛事不误推；
+- immutable revision 保存原始与更正赛果，公开页统一显示“赛果”。
+
+生产门禁没有被代码实现替代：全部新开关默认关闭、容量默认 0，最终部署仍需绑定合并 revision 的确认。
+完整实现、dry-run 和发布说明见 `race_data_lifecycle_implementation_20260828.md`。

@@ -33,6 +33,7 @@ def audited_test_roster():
     entry = pipeline.RaceDataProviderRosterEntry(
         provider="jra",
         regions=("japan",),
+        enabled_regions=("japan",),
         source_class="official_operator",
         adapter_status="implemented",
         transport_enabled=True,
@@ -163,6 +164,7 @@ class RaceDataSyncR0ModelContractTests(TestCase):
 class RaceDataSyncR0MigrationAdoptionTests(TransactionTestCase):
     migrate_from = [("stable", "0073_lifecycle_enforce_registry")]
     migrate_to = [("stable", "0074_race_data_sync_r0_control_plane")]
+    migrate_latest = [("stable", "0075_race_data_source_priority_and_reported_position")]
 
     def setUp(self):
         super().setUp()
@@ -208,7 +210,7 @@ class RaceDataSyncR0MigrationAdoptionTests(TransactionTestCase):
         self.apps = executor.loader.project_state(self.migrate_to).apps
 
     def tearDown(self):
-        MigrationExecutor(connection).migrate(self.migrate_to)
+        MigrationExecutor(connection).migrate(self.migrate_latest)
         super().tearDown()
 
     def test_only_deterministic_scope_is_adopted(self):
@@ -273,6 +275,7 @@ class RaceDataSyncR0FlagContractTests(SimpleTestCase):
         schedule = app_settings.build_race_data_sync_beat_schedule(
             scheduler_enabled=True,
             future_discovery_enabled=True,
+            lifecycle_apply_enabled=True,
         )
         self.assertEqual(
             schedule["select-due-race-data-sync"]["options"]["queue"],
@@ -281,6 +284,10 @@ class RaceDataSyncR0FlagContractTests(SimpleTestCase):
         self.assertEqual(
             schedule["discover-future-race-data-sync"]["options"]["queue"],
             "race_sync_v2",
+        )
+        self.assertEqual(
+            schedule["advance-race-data-sync-lifecycle"]["options"]["queue"],
+            "celery",
         )
 
     def test_slice_a_roster_v2_exposes_identity_and_data_kind_contract(self):
@@ -293,14 +300,17 @@ class RaceDataSyncR0FlagContractTests(SimpleTestCase):
         for entry in roster.entries:
             with self.subTest(provider=entry.provider):
                 self.assertTrue(entry.identity_namespaces)
-                self.assertEqual(
-                    set(entry.data_kinds),
-                    {"race_time", "racecard", "result"},
+                expected_kinds = (
+                    {"result"}
+                    if entry.provider
+                    in {"sporting_life", "zeturf", "horse_racing_nation"}
+                    else {"race_time", "racecard", "result"}
                 )
-                if entry.adapter_status == "implemented":
+                self.assertEqual(set(entry.data_kinds), expected_kinds)
+                if entry.adapter_status == "implemented" and entry.proof_digest:
                     self.assertRegex(entry.proof_digest, r"\A[0-9a-f]{64}\Z")
                 else:
-                    self.assertEqual(entry.proof_digest, "")
+                    self.assertIn(entry.proof_digest, {"", entry.contract_digest})
         self.assertIsNone(
             roster.resolve_route(
                 provider="jra",
@@ -567,6 +577,49 @@ class RaceDataSyncEnrollmentControlTests(TestCase):
         self.assertEqual(decision.reason_code, "checkpoint_cas_stale")
         tracking = models.RaceEventLiveTracking.objects.get(event=self.event)
         self.assertEqual(tracking.active_attempt_token, claim.attempt_token)
+
+    def test_successful_claim_schedules_dynamic_successors_and_releases_parent(self):
+        self._acquire()
+        claim = race_data_sync_control.claim_due_enrollments(
+            now=NOW,
+            batch_size=10,
+            ttl_seconds=60,
+            enabled_providers=("jra",),
+            enabled_regions=("japan",),
+            enabled_data_kinds=("race_time", "racecard", "result"),
+        )[0]
+        decision = race_data_sync_control.complete_race_data_sync_claim(
+            event_id=claim.event_id,
+            expected_enrollment_generation=claim.enrollment_generation,
+            expected_owner_generation=claim.owner_generation,
+            expected_claim_generation=claim.claim_generation,
+            attempt_token=claim.attempt_token,
+            checkpoint_plan=claim.checkpoint_plan,
+            expected_enrollment_entry_sha256=claim.enrollment_entry_sha256,
+            expected_plan_sha256=claim.plan_sha256,
+            observation_hashes={"racecard": SHA_B},
+            source_updated_at_by_kind={"racecard": NOW},
+            now=NOW + timedelta(seconds=1),
+        )
+        self.assertEqual(decision.action, "complete")
+        tracking = models.RaceEventLiveTracking.objects.get(event=self.event)
+        self.assertEqual(tracking.active_attempt_token, "")
+        self.assertIsNone(tracking.claim_expires_at)
+        checkpoints = {
+            checkpoint.data_kind: checkpoint
+            for checkpoint in tracking.provider_checkpoints.all()
+        }
+        self.assertEqual(
+            checkpoints["racecard"].next_poll_at,
+            NOW + timedelta(hours=1, seconds=1),
+        )
+        self.assertEqual(checkpoints["racecard"].last_observation_hash, SHA_B)
+        self.assertEqual(checkpoints["racecard"].consecutive_failures, 0)
+        self.assertEqual(
+            checkpoints["result"].next_poll_at,
+            self.event.race_datetime + timedelta(minutes=3),
+        )
+        self.assertEqual(tracking.next_poll_at, NOW + timedelta(hours=1, seconds=1))
 
     def test_stale_provider_task_cannot_release_newer_claim(self):
         self._acquire()
@@ -1271,7 +1324,7 @@ class RaceDataSyncCensusManifestTests(TestCase):
         self.assertEqual(by_slug[locked.slug].reason_code, "manual_lock_present")
         self.assertEqual(sum(census.classification_counts.values()), 4)
 
-    def test_census_rejects_ambiguous_standing_policy_route(self):
+    def test_census_selects_the_only_admitted_route_from_multiple_policy_routes(self):
         event = create_event(slug="census-route-ambiguous")
         self._identity(event)
         policy = self._policy()
@@ -1290,11 +1343,9 @@ class RaceDataSyncCensusManifestTests(TestCase):
             cutoff=NOW,
             horizon_days=30,
         )
-        self.assertEqual(census.entries[0].classification, "blocked")
-        self.assertEqual(
-            census.entries[0].reason_code,
-            "standing_policy_route_ambiguous",
-        )
+        self.assertEqual(census.entries[0].classification, "eligible")
+        self.assertEqual(census.entries[0].provider, "jra")
+        self.assertEqual(census.entries[0].source_identity_id, event.source_identities.get().pk)
 
     def test_future_discovery_builds_bounded_proposal_without_writes(self):
         for number in range(25):
@@ -1318,7 +1369,7 @@ class RaceDataSyncCensusManifestTests(TestCase):
         self.assertEqual(len(proposal.manifest.payload["entries"]), 20)
         self.assertFalse(models.RaceDataSyncEnrollment.objects.exists())
 
-    def test_hourly_future_discovery_loads_exact_policy_and_stays_read_only(self):
+    def test_hourly_future_discovery_loads_exact_policy_and_auto_enrolls(self):
         event = create_event(slug="future-hourly-task")
         self._identity(event)
         raw = json.dumps(
@@ -1345,10 +1396,16 @@ class RaceDataSyncCensusManifestTests(TestCase):
                 from stable.tasks import discover_future_race_data_sync_task
 
                 result = discover_future_race_data_sync_task()
-        self.assertEqual(result["status"], "proposal_ready")
+        self.assertEqual(result["status"], "enrollment_applied")
         self.assertEqual(result["selected_event_ids"], (event.pk,))
+        self.assertEqual(result["decision_counts"], {"acquired": 1})
         self.assertRegex(result["census_sha256"], r"\A[0-9a-f]{64}\Z")
-        self.assertFalse(models.RaceDataSyncEnrollment.objects.exists())
+        enrollment = models.RaceDataSyncEnrollment.objects.get(event=event)
+        self.assertEqual(enrollment.state, models.RaceDataSyncEnrollmentState.ENROLLED)
+        self.assertEqual(
+            models.RaceEventProjectionControl.objects.get(event=event).write_owner,
+            models.RaceEventProjectionWriteOwner.DATA_SYNC,
+        )
 
     @override_settings(
         RACE_DATA_SYNC_ENABLED=False,

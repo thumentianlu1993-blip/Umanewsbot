@@ -215,6 +215,9 @@ RACE_DATA_SYNC_RESULT_PUBLIC_ENABLED = env_bool(
 RACE_DATA_SYNC_CORRECTION_APPLY_ENABLED = env_bool(
     "RACE_DATA_SYNC_CORRECTION_APPLY_ENABLED", False
 )
+RACE_DATA_SYNC_LIFECYCLE_APPLY_ENABLED = env_bool(
+    "RACE_DATA_SYNC_LIFECYCLE_APPLY_ENABLED", False
+)
 RACE_DATA_SYNC_SELECTOR_BATCH_SIZE = int(
     env("RACE_DATA_SYNC_SELECTOR_BATCH_SIZE", "100")
 )
@@ -843,6 +846,9 @@ RACE_RESULT_REVIEW_ROUTE_REGISTRY = env(
     "RACE_RESULT_REVIEW_ROUTE_REGISTRY",
     "/app/runtime/policies/race_result_review/source_routes_v1.json",
 )
+RACE_DATA_SYNC_REFERENCE_REGISTRY_SHA256 = env(
+    "RACE_DATA_SYNC_REFERENCE_REGISTRY_SHA256", ""
+)
 RACE_RESULT_REVIEW_RECIPIENT = env("RACE_RESULT_REVIEW_NOTIFY_EMAILS", "")
 RACE_RESULT_REVIEW_LOOKBACK_HOURS = int(
     env("RACE_RESULT_REVIEW_LOOKBACK_HOURS", "72")
@@ -876,6 +882,7 @@ CELERY_TASK_ROUTES = {
     "stable.tasks.monitor_race_live_sla_task": {"queue": "race_live"},
     "stable.tasks.sync_race_event_provider_task": {"queue": "race_sync_v2"},
     "stable.tasks.discover_future_race_data_sync_task": {"queue": "race_sync_v2"},
+    "stable.tasks.advance_race_data_sync_lifecycle_task": {"queue": "celery"},
     "stable.tasks.advance_race_event_lifecycle_task": {"queue": "celery"},
     "stable.tasks.scheduled_race_result_review_task": {"queue": "celery"},
 }
@@ -925,7 +932,10 @@ def build_race_live_beat_schedule(
 
 
 def build_race_data_sync_beat_schedule(
-    *, scheduler_enabled: bool, future_discovery_enabled: bool = False
+    *,
+    scheduler_enabled: bool,
+    future_discovery_enabled: bool = False,
+    lifecycle_apply_enabled: bool = False,
 ) -> dict:
     schedule = {}
     if scheduler_enabled:
@@ -939,6 +949,12 @@ def build_race_data_sync_beat_schedule(
             "task": "stable.tasks.discover_future_race_data_sync_task",
             "schedule": crontab(minute=17),
             "options": {"queue": "race_sync_v2", "expires": 3300},
+        }
+    if scheduler_enabled and lifecycle_apply_enabled:
+        schedule["advance-race-data-sync-lifecycle"] = {
+            "task": "stable.tasks.advance_race_data_sync_lifecycle_task",
+            "schedule": crontab(minute="*"),
+            "options": {"queue": "celery", "expires": 55},
         }
     return schedule
 
@@ -1033,6 +1049,7 @@ CELERY_BEAT_SCHEDULE.update(
     build_race_data_sync_beat_schedule(
         scheduler_enabled=RACE_DATA_SYNC_SCHEDULER_ENABLED,
         future_discovery_enabled=RACE_DATA_SYNC_FUTURE_DISCOVERY_ENABLED,
+        lifecycle_apply_enabled=RACE_DATA_SYNC_LIFECYCLE_APPLY_ENABLED,
     )
 )
 

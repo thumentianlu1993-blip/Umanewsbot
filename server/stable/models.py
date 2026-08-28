@@ -2367,6 +2367,7 @@ class RaceEventRevisionItem(TimestampedModel):
     )
     source_order = models.PositiveIntegerField(null=True, blank=True)
     internal_order = models.PositiveIntegerField()
+    reported_finish_position = models.PositiveSmallIntegerField(null=True, blank=True)
     official_finish_position = models.PositiveSmallIntegerField(null=True, blank=True)
     status = models.CharField(
         max_length=24,
@@ -3367,6 +3368,7 @@ class RaceEventRunner(TimestampedModel):
 class RaceEventResult(TimestampedModel):
     event = models.ForeignKey(RaceEvent, on_delete=models.CASCADE, related_name="results")
     finish_position = models.PositiveSmallIntegerField()
+    reported_finish_position = models.PositiveSmallIntegerField(null=True, blank=True)
     official_finish_position = models.PositiveSmallIntegerField(null=True, blank=True)
     horse_number = models.CharField(max_length=32, blank=True)
     horse_name = models.CharField(max_length=255)
@@ -5939,6 +5941,7 @@ class RaceEventFieldAuthority(TimestampedModel):
     subject_key = models.CharField(max_length=255)
     field_name = models.CharField(max_length=64)
     authority_level = models.PositiveSmallIntegerField(default=0)
+    source_class = models.CharField(max_length=32, blank=True)
     source_key = models.CharField(max_length=128, blank=True)
     source_url = models.CharField(max_length=1000, blank=True)
     external_id = models.CharField(max_length=255, blank=True)

@@ -120,6 +120,7 @@ class TheRacingApiFreeSourceProofTests(SimpleTestCase):
                 "united_kingdom": "gb",
                 "france": "fr",
                 "hong_kong": "hk",
+                "ireland": "ire",
                 "japan": "jpn",
                 "united_states": "usa",
             },
@@ -262,7 +263,7 @@ class TheRacingApiFreeSourceProofTests(SimpleTestCase):
 
             cases = (
                 ("missing", registry, digest, None, 3),
-                ("invalid", registry, digest, "ireland", 3),
+                ("invalid", registry, digest, "australia", 3),
                 (
                     "registry-budget",
                     limited_registry,

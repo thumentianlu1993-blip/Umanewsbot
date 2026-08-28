@@ -8671,3 +8671,26 @@ activation 必须产生新的 ID。范围外 enforce control 在 scanner claim �
   active verifier、runtime coherence、scanner smoke、Celery/HTTP/日志验收均通过。
 - 当前信任根精确为 event `186,187`，activation ID=`fb222bb1…010e`；race-live 保持关闭。逐时间点
   观察与完整路径见 `docs/changes/lifecycle-enforce-canary/release_report.md`。
+
+## 2026-08-28 赛事数据全生命周期发布步骤（等待最终生产确认）
+
+本节只描述发布顺序，不构成部署授权。必须先取得 PR 合并后的精确 revision/image 和用户最终确认。
+
+1. 只读确认 production revision、三服务镜像、数据库版本、现有 lifecycle/race-live 控制面、queue、
+   policy/registry 文件和全部 `RACE_DATA_SYNC_*` 环境变量；任何 unknown 均停止。
+2. 完成 custom-format PostgreSQL 备份，记录 SHA-256，并以 `pg_restore --list` 验证可读。
+3. 先以所有新增开关 `false`、全部容量 `0` 发布 web/worker/Beat，运行 migration
+   `0075_race_data_source_priority_and_reported_position`；验证三服务 revision/settings 完全一致。
+4. 运行 `manage.py audit_race_data_sync`，必须为 `would_write=false`，并核对 standing policy SHA
+   `60fe9230ca0e97d69a8406118b5d346649239f3f0699efe9a1d0c63972e44ba4`、TRA registry SHA
+   `24981f62e30e83e58fc82d4247560af35e4041b05857c287bd64430d0f2e2ecc`、`route_drift=[]`。
+5. 先配置精确 provider/region/data-kind allowlist、host/request/event/enrollment/checkpoint/revision 容量，
+   保持 network/apply/public/lifecycle/future discovery 关闭，再次审计。
+6. 灰度顺序：scheduler + future discovery census -> network + time/racecard apply -> lifecycle apply ->
+   result apply -> result public/correction apply。每一步分别检查 run terminal state、claim completion、
+   provider 请求数、not-found/fallback reason、revision/projection 数、公开页和错误率。
+7. 一级止损关闭总开关、future discovery、lifecycle 和全部 apply/public 开关；保留 revision/transition，
+   不批量反向状态、不降级已确认结果。数据库 reverse migration 仅在单独授权、备份和审计保留确认后执行。
+
+部署验收命令、dry-run 证据和已知官网 transport 边界见
+`docs/changes/automate-race-event-lifecycle/race_data_lifecycle_implementation_20260828.md`。

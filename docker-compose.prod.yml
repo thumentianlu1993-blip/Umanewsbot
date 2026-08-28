@@ -21,7 +21,7 @@ services:
       RACE_LIVE_MONITOR_ENABLED: ${RACE_LIVE_MONITOR_ENABLED:-false}
       RACE_LIVE_ENABLED_REGIONS: ${RACE_LIVE_ENABLED_REGIONS:-}
       RACE_LIVE_TRA_REGISTRY_FILE: ${RACE_LIVE_TRA_REGISTRY_FILE:-/app/runtime/policies/race_live/source_registry_the_racing_api_free.json}
-      RACE_LIVE_TRA_REGISTRY_SHA256: ${RACE_LIVE_TRA_REGISTRY_SHA256:-7aca49ff1df7573ebfe6a9e403eefca5c9e64d8ee18d8d3be383d67803db550a}
+      RACE_LIVE_TRA_REGISTRY_SHA256: ${RACE_LIVE_TRA_REGISTRY_SHA256:-24981f62e30e83e58fc82d4247560af35e4041b05857c287bd64430d0f2e2ecc}
     volumes:
       - static_data:/app/server/staticfiles
       - media_data:/app/server/media
@@ -87,6 +87,8 @@ services:
       - app_logs:/app/logs
       - ./runtime/secrets:/run/secrets:ro
       - ./runtime/race_data_sync:/run/race-data-sync:rw
+      - ./runtime/policies/race_data_sync:/app/runtime/policies/race_data_sync:ro
+      - race_result_review_data:/app/runtime/race_result_review
     restart: unless-stopped
     depends_on:
       redis:

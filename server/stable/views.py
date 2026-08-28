@@ -3709,27 +3709,8 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
     )
     if current_result_revision and live_public_read.visible:
         tracking = getattr(event, "live_tracking", None)
-        if current_result_revision.conflict_status == "pending":
-            status_label = "赛果待复核"
-            status_detail = "不同来源的赛果存在差异，正在复核"
-        else:
-            status_label, status_detail = {
-                "provisional": ("暂定赛果", "尚待官方来源复核"),
-                "official": ("正式赛果", ""),
-                "corrected": ("赛果已更正", ""),
-            }.get(
-                current_result_revision.phase,
-                ("赛果更新", ""),
-            )
         live_result_status = {
-            "label": status_label,
-            "detail": status_detail,
             "phase": current_result_revision.phase,
-            "source_label": (
-                "官方来源"
-                if current_result_revision.source_authority == "official"
-                else "补充来源"
-            ),
             "published_at": current_result_revision.published_at,
             "is_stale": bool(
                 tracking
@@ -3766,29 +3747,7 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
         if hide_live_results
         else _attach_result_display_positions(list(event.results.all()))
     )
-    result_section_label = "正式赛果"
-    if results and all(result.official_finish_position is None for result in results):
-        from stable.services.scheduled_race_result_review import (
-            compute_reviewed_row_digest,
-        )
-
-        current_digest = compute_reviewed_row_digest(
-            [
-                {
-                    "finish_position": result.finish_position,
-                    "horse_number": result.horse_number,
-                    "horse_name": result.horse_name,
-                    "running_status": result.running_status,
-                }
-                for result in results
-            ]
-        )
-        if any(
-            approval.authority == "human_reviewed_reference"
-            and approval.reviewed_row_digest == current_digest
-            for approval in event.result_review_approvals.all()
-        ):
-            result_section_label = "已人工审核赛果"
+    result_section_label = "赛果"
     history_winners = _series_history_winners(
         event,
         exclude_result_event_id=event.pk if hide_live_results else None,

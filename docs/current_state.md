@@ -6163,3 +6163,20 @@ v3 首次 prepare 在请求预算 `60/60` 时由 HRN 空候选连带阻断 Equib
 - 下一观察点为 event 186 的 `2026-08-11 16:05/16:35`、event 187 的
   `2026-08-13 18:55/19:25`（北京时间）。完整证据见
   `docs/changes/lifecycle-enforce-canary/release_report.md`。
+
+# 2026-08-28 赛事数据全生命周期自动化已完成本地实现与零写 dry-run
+
+- clean worktree 分支 `codex/implement-race-data-lifecycle-sync` 已闭环未来赛事自动发现、赛时补全、
+  出马表每日不少于两次的动态更新、T/T+30 状态推进、T+3 起赛果抓取、不可变 revision、并列名次和
+  7 天更正观察；无需逐场人工确认，公开页统一显示“赛果”且不暴露内部来源等级。
+- 来源仲裁固定为 The Racing API/其他 licensed API > 已导入官网事实 > 可信第三方。The Racing API
+  是本轮唯一新增联网主适配器；HKJC/France Galop 官网层只消费既有官方导入，未把网站条款误当成
+  新 transport 授权。主 API result not-found 后才按官方、Sporting Life/ZEturf/HRN 顺序 fallback。
+- 新 migration 为 `0075_race_data_source_priority_and_reported_position`；standing policy SHA 为
+  `60fe9230ca0e97d69a8406118b5d346649239f3f0699efe9a1d0c63972e44ba4`，TRA registry SHA 为
+  `24981f62e30e83e58fc82d4247560af35e4041b05857c287bd64430d0f2e2ecc`。全部新开关默认关闭、容量默认 0。
+- 聚焦回归 `169/169`、Django check、migration drift 和 compileall 均通过。全新临时 SQLite dry-run
+  返回 `configuration_status=ready / route_drift=[] / would_write=false`，审计前后数据库 SHA 同为
+  `3339d40728f8b0eb4310e97efb6f169f3f4c52625fa8a3b6c94bd2e3492caea0`；容量合同为 `valid`。
+- 当前尚未 commit、push、PR、部署、迁移生产或开启任何新 flag。实现和发布边界详见
+  `docs/changes/automate-race-event-lifecycle/race_data_lifecycle_implementation_20260828.md`。

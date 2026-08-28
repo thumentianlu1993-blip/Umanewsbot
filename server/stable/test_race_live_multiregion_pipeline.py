@@ -29,7 +29,7 @@ class TheRacingApiRegistryV2ContractTests(SimpleTestCase):
     def _payload(self):
         return json.loads(TRA_REGISTRY.read_text(encoding="utf-8"))
 
-    def test_registry_v2_has_exact_five_region_codes_and_route_contracts(self):
+    def test_registry_v2_has_reviewed_region_codes_and_route_contracts(self):
         payload = self._payload()
 
         self.assertEqual(payload.get("schema_version"), 2)
@@ -39,6 +39,7 @@ class TheRacingApiRegistryV2ContractTests(SimpleTestCase):
                 "united_kingdom": "gb",
                 "france": "fr",
                 "hong_kong": "hk",
+                "ireland": "ire",
                 "japan": "jpn",
                 "united_states": "usa",
             },
@@ -739,7 +740,7 @@ class RaceLiveRegistryImageContractTests(SimpleTestCase):
         ).hexdigest()
         self.assertEqual(
             registry_sha,
-            "7aca49ff1df7573ebfe6a9e403eefca5c9e64d8ee18d8d3be383d67803db550a",
+            "24981f62e30e83e58fc82d4247560af35e4041b05857c287bd64430d0f2e2ecc",
         )
         for relative_path in (
             ".env.example",

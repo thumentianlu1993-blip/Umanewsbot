@@ -18,6 +18,12 @@ from django.db.models import Q
 from django.utils import timezone
 
 from stable import models
+from stable.services.race_data_sync_policy import (
+    arbitrate_source_value,
+    normalize_source_class,
+    source_priority,
+)
+from stable.services.race_event_public_cache import invalidate_public_race_cache
 
 
 _SHA256_LENGTH = 64
@@ -331,6 +337,7 @@ class RaceDataSyncFlags:
 class RaceDataProviderRosterEntry:
     provider: str
     regions: tuple[str, ...]
+    enabled_regions: tuple[str, ...]
     source_class: str
     adapter_status: str
     transport_enabled: bool
@@ -373,6 +380,7 @@ class RaceDataProviderRoster:
                 for entry in self.entries
                 if entry.provider == provider
                 and region in entry.regions
+                and region in entry.enabled_regions
                 and field_name in entry.allowed_fields
                 and entry.adapter_status == "implemented"
                 and entry.transport_enabled
@@ -397,6 +405,7 @@ class RaceDataProviderRoster:
                 for entry in self.entries
                 if entry.provider == provider
                 and region in entry.regions
+                and region in entry.enabled_regions
                 and identity_namespace in entry.identity_namespaces
                 and data_kind in entry.enabled_data_kinds
                 and entry.adapter_status == "implemented"
@@ -447,18 +456,26 @@ _ROSTER_DEFINITIONS = (
     ("equibase", ("united_states",), "official_operator", "proof_required"),
     ("france_galop", ("france",), "official_operator", "proof_required"),
     ("hkjc", ("hong_kong",), "official_operator", "proof_required"),
-    ("horse_racing_nation", ("united_states",), "trusted_publisher", "proof_required"),
+    ("horse_racing_nation", ("united_states",), "trusted_publisher", "implemented"),
     ("hri", ("ireland",), "official_operator", "proof_required"),
     ("jra", ("japan_jra",), "official_operator", "proof_required"),
     ("nar", ("japan_nar",), "official_operator", "proof_required"),
-    ("sporting_life", ("ireland", "united_kingdom"), "trusted_publisher", "proof_required"),
+    ("sporting_life", ("united_kingdom",), "trusted_publisher", "implemented"),
     (
         "the_racing_api",
-        ("france", "hong_kong", "ireland", "united_kingdom", "united_states"),
+        (
+            "france",
+            "hong_kong",
+            "ireland",
+            "japan_jra",
+            "japan_nar",
+            "united_kingdom",
+            "united_states",
+        ),
         "licensed_api",
         "implemented",
     ),
-    ("zeturf", ("france",), "trusted_publisher", "proof_required"),
+    ("zeturf", ("france",), "trusted_publisher", "implemented"),
 )
 _EVENT_REGION_BY_CONTRACT_REGION = {
     "hong_kong": models.RacingRegion.HONG_KONG,
@@ -492,6 +509,7 @@ def _provider_roster_digest(
                 {
                     "provider": entry.provider,
                     "regions": list(entry.regions),
+                    "enabled_regions": list(entry.enabled_regions),
                     "source_class": entry.source_class,
                     "adapter_status": entry.adapter_status,
                     "contract_version": entry.contract_version,
@@ -587,6 +605,63 @@ def build_race_data_provider_roster(
         allowed_path_prefixes: tuple[str, ...] = ()
         request_budget = 0
         minimum_interval_seconds = 1
+        proof_digest = ""
+        if provider == "the_racing_api":
+            terminal_markers = ("complete", "official", "result")
+            allowed_hosts = ("api.theracingapi.com",)
+            allowed_path_prefixes = (
+                "/v1/racecards/free",
+                "/v1/results/today/free",
+            )
+            request_budget = 3
+            minimum_interval_seconds = 2
+            configured_proof_digest = str(
+                getattr(settings, "RACE_LIVE_TRA_REGISTRY_SHA256", "") or ""
+            )
+            if (
+                len(configured_proof_digest) == _SHA256_LENGTH
+                and all(
+                    char in "0123456789abcdef"
+                    for char in configured_proof_digest
+                )
+            ):
+                proof_digest = configured_proof_digest
+        elif provider in {
+            "sporting_life",
+            "zeturf",
+            "horse_racing_nation",
+        }:
+            identity_namespaces = (f"{provider}-race-v1", provider)
+            data_kinds = (models.RaceDataSyncDataKind.RESULT,)
+            terminal_markers = ("complete",)
+            reference_route = {
+                "sporting_life": ("sportinglife.com", "/racing/results/"),
+                "zeturf": ("zeturf.fr", "/fr/course-du-jour/"),
+                "horse_racing_nation": (
+                    "horseracingnation.com",
+                    "/entries-results/",
+                ),
+            }[provider]
+            allowed_hosts = (reference_route[0],)
+            allowed_path_prefixes = (reference_route[1],)
+            request_budget = 1
+            minimum_interval_seconds = 2
+            configured_proof_digest = str(
+                getattr(
+                    settings,
+                    "RACE_DATA_SYNC_REFERENCE_REGISTRY_SHA256",
+                    "",
+                )
+                or ""
+            )
+            if (
+                len(configured_proof_digest) == _SHA256_LENGTH
+                and all(
+                    char in "0123456789abcdef"
+                    for char in configured_proof_digest
+                )
+            ):
+                proof_digest = configured_proof_digest
         contract_digest = _canonical_sha256(
             {
                 "provider": provider,
@@ -610,6 +685,9 @@ def build_race_data_provider_roster(
             and set(regions).intersection(flags.regions)
             and adapter_status == "implemented"
         )
+        enabled_regions = tuple(
+            region for region in regions if region in flags.regions
+        )
         runtime_fields = tuple(
             field
             for field in _ROSTER_ALLOWED_FIELDS
@@ -626,17 +704,14 @@ def build_race_data_provider_roster(
             RaceDataProviderRosterEntry(
                 provider=provider,
                 regions=regions,
+                enabled_regions=enabled_regions,
                 source_class=source_class,
                 adapter_status=adapter_status,
                 transport_enabled=runtime_provider_enabled,
                 apply_enabled=runtime_apply_enabled,
                 contract_version=contract_version,
                 contract_digest=contract_digest,
-                allowed_fields=(
-                    runtime_fields
-                    if runtime_apply_enabled
-                    else _ROSTER_ALLOWED_FIELDS
-                ),
+                allowed_fields=_ROSTER_ALLOWED_FIELDS,
                 identity_namespaces=identity_namespaces,
                 data_kinds=data_kinds,
                 enabled_data_kinds=enabled_data_kinds,
@@ -646,7 +721,7 @@ def build_race_data_provider_roster(
                 request_budget=request_budget,
                 minimum_interval_seconds=minimum_interval_seconds,
                 automation_allowed=automation_allowed,
-                proof_digest=contract_digest if adapter_status == "implemented" else "",
+                proof_digest=proof_digest,
             )
         )
     roster_entries = tuple(entries)
@@ -1046,13 +1121,11 @@ def _reconcile_racecard_observation_atomic(
     observation_id: int,
     expected_event_id: int,
     allow_schedule_apply: bool,
+    allow_racecard_apply: bool,
     task_id: str,
     run_id: str,
 ) -> RacecardReconciliationDecision:
-    """Apply non-schedule racecard fields under source and identity checks."""
-
-    if allow_schedule_apply:
-        return RacecardReconciliationDecision("rejected", "slice_c_required")
+    """Apply admitted racecard and schedule fields under source arbitration."""
     with transaction.atomic():
         observation = (
             models.RaceResultObservation.objects.select_for_update()
@@ -1193,7 +1266,7 @@ def _reconcile_racecard_observation_atomic(
                 "rejected", "runtime_admission_closed", expected_event_id, observation.pk
             )
         existing_changes = models.RaceEventFieldChange.objects.filter(
-            observation=observation, operation_mode="slice_a"
+            observation=observation
         )
         processed_fields = set(
             existing_changes.values_list(
@@ -1219,8 +1292,12 @@ def _reconcile_racecard_observation_atomic(
                 "rejected", "event_missing", expected_event_id, observation.pk
             )
         audit = _audit_defaults(observation=observation, task_id=task_id, run_id=run_id)
+        candidate_watermark = observation.source_updated_at or observation.observed_at
+        candidate_source_class = normalize_source_class(
+            provenance.get("source_class")
+        )
         aggregate = "replayed"
-        participants = list(payload["participants"])
+        participants = list(payload["participants"]) if allow_racecard_apply else []
         seen: set[str] = set()
         validated_participants: list[tuple[str, str, dict[str, Any]]] = []
         for row in participants:
@@ -1319,9 +1396,6 @@ def _reconcile_racecard_observation_atomic(
                 )
             locks = runner.manual_lock_flags if isinstance(runner.manual_lock_flags, dict) else {}
             subject_key = runner.external_runner_id or external_runner_id
-            candidate_watermark = (
-                observation.source_updated_at or observation.observed_at
-            )
             runner_field_applied = False
             for field_name, proposed in candidate_fields.items():
                 old_value = None if created else getattr(runner, field_name)
@@ -1336,51 +1410,26 @@ def _reconcile_racecard_observation_atomic(
                         "value_sha256": "",
                     },
                 )
-                decision = (
-                    "applied"
-                    if created or old_value != proposed
-                    else "replayed"
+                arbitration = arbitrate_source_value(
+                    current_source_key=authority.source_key,
+                    current_source_class=authority.source_class,
+                    current_observed_at=authority.observed_at,
+                    candidate_source_key=source.source_key,
+                    candidate_source_class=candidate_source_class,
+                    candidate_observed_at=candidate_watermark,
+                    has_current_value=not created and old_value not in (None, ""),
+                    values_equal=not created and old_value == proposed,
+                    manual_locked=(
+                        locks.get(field_name) is True or authority.manual_lock
+                    ),
                 )
-                reason = ""
-                if not created and old_value != proposed:
-                    if locks.get(field_name) is True or authority.manual_lock:
-                        decision = "needs_review"
-                        reason = "manual_lock"
-                    elif (
-                        not created
-                        and authority.source_key
-                        and authority.source_key != source.source_key
-                    ):
-                        decision = "needs_review"
-                        reason = "cross_source_conflict"
-                    elif (
-                        authority.source_key == source.source_key
-                        and authority.observed_at is not None
-                        and candidate_watermark <= authority.observed_at
-                    ):
-                        decision = "needs_review"
-                        reason = "stale_source_version"
-                applied = decision == "applied"
-                if decision == "needs_review":
-                    raise _RacecardNeedsReview(
-                        reason=reason,
-                        event_id=event.pk,
-                        observation_id=observation.pk,
-                        changes=(
-                            {
-                                "event": event,
-                                "subject_type": models.RaceEventFieldSubjectType.PARTICIPANT,
-                                "subject_key": external_runner_id,
-                                "field_name": field_name,
-                                "old_value": old_value,
-                                "new_value": proposed,
-                                "applied": False,
-                                "decision": "needs_review",
-                                "rejection_reason": reason,
-                                **audit,
-                            },
-                        ),
-                    )
+                applied = arbitration.apply
+                decision = "applied" if applied else (
+                    "replayed"
+                    if arbitration.reason_code == "idempotent_replay"
+                    else "rejected"
+                )
+                reason = arbitration.reason_code
                 models.RaceEventFieldChange.objects.create(
                     event=event,
                     subject_type=models.RaceEventFieldSubjectType.PARTICIPANT,
@@ -1390,7 +1439,9 @@ def _reconcile_racecard_observation_atomic(
                     new_value=proposed,
                     applied=applied,
                     decision=decision,
-                    rejection_reason=reason,
+                    rejection_reason=(
+                        "" if applied or decision == "replayed" else reason
+                    ),
                     **audit,
                 )
                 if applied:
@@ -1398,7 +1449,6 @@ def _reconcile_racecard_observation_atomic(
                     runner_field_applied = True
                     if aggregate != "needs_review":
                         aggregate = "applied"
-                # Legacy authority_level is deliberately never read or changed.
                 if (
                     applied
                     or not authority.source_key
@@ -1410,6 +1460,10 @@ def _reconcile_racecard_observation_atomic(
                         )
                     )
                 ):
+                    authority.authority_level = source_priority(
+                        candidate_source_class
+                    )
+                    authority.source_class = candidate_source_class
                     authority.source_key = source.source_key
                     authority.source_url = source.canonical_url
                     authority.external_id = external_runner_id
@@ -1421,6 +1475,8 @@ def _reconcile_racecard_observation_atomic(
                     ).hexdigest()
                     authority.save(
                         update_fields=(
+                            "authority_level",
+                            "source_class",
                             "source_key",
                             "source_url",
                             "external_id",
@@ -1440,44 +1496,66 @@ def _reconcile_racecard_observation_atomic(
             }
             runner.save()
 
-        schedule_candidates: dict[str, Any] = {}
-        if "off_time" in payload:
-            schedule_candidates["race_datetime"] = payload["off_time"]
-        if "local_start_time" in payload:
-            schedule_candidates["local_start_time"] = payload["local_start_time"]
-        elif (
-            payload.get("off_time")
-            and event.timezone_name
-            and "local_start_time" in set(allowed_fields)
-        ):
+        candidate_timezone = str(
+            payload.get("timezone_name") or event.timezone_name or ""
+        ).strip()
+        try:
+            candidate_zone = ZoneInfo(candidate_timezone)
+        except (KeyError, ValueError):
+            candidate_zone = None
+        parsed_off: datetime | None = None
+        if payload.get("off_time"):
             try:
                 parsed_off = datetime.fromisoformat(
                     str(payload["off_time"]).replace("Z", "+00:00")
                 )
-                schedule_candidates["local_start_time"] = (
-                    parsed_off.astimezone(ZoneInfo(event.timezone_name))
-                    .time()
-                    .replace(tzinfo=None)
-                    .isoformat()
-                )
-            except (ValueError, KeyError):
-                pass
-        if "timezone_name" in payload:
-            schedule_candidates["timezone_name"] = payload["timezone_name"]
+                if parsed_off.tzinfo is None or parsed_off.utcoffset() is None:
+                    parsed_off = None
+            except ValueError:
+                parsed_off = None
+        schedule_candidates: dict[str, Any] = {}
+        if parsed_off is not None:
+            schedule_candidates["race_datetime"] = parsed_off
+        if candidate_zone is not None and "timezone_name" in payload:
+            schedule_candidates["timezone_name"] = candidate_timezone
+        if "local_start_time" in payload:
+            try:
+                schedule_candidates["local_start_time"] = datetime.strptime(
+                    str(payload["local_start_time"]), "%H:%M:%S"
+                ).time()
+            except ValueError:
+                try:
+                    schedule_candidates["local_start_time"] = datetime.strptime(
+                        str(payload["local_start_time"]), "%H:%M"
+                    ).time()
+                except ValueError:
+                    pass
+        elif parsed_off is not None and candidate_zone is not None:
+            schedule_candidates["local_start_time"] = (
+                parsed_off.astimezone(candidate_zone).time().replace(tzinfo=None)
+            )
+        if parsed_off is not None and candidate_zone is not None:
+            schedule_candidates["local_date"] = parsed_off.astimezone(
+                candidate_zone
+            ).date()
         if payload.get("race_status") in models.RaceEventStatus.values:
             schedule_candidates["status"] = payload["race_status"]
         old_schedule_values = {
-            "race_datetime": (
-                event.race_datetime.isoformat() if event.race_datetime else None
-            ),
-            "local_start_time": (
-                event.local_start_time.isoformat()
-                if event.local_start_time
-                else None
-            ),
-            "timezone_name": event.timezone_name,
-            "status": event.status,
+            field_name: getattr(event, field_name)
+            for field_name in (
+                "race_datetime",
+                "local_date",
+                "local_start_time",
+                "timezone_name",
+                "status",
+            )
         }
+        schedule_changed = False
+        locks = (
+            event.manual_lock_flags
+            if isinstance(event.manual_lock_flags, dict)
+            else {}
+        )
         for field_name, candidate_value in schedule_candidates.items():
             if (
                 models.RaceEventFieldSubjectType.EVENT,
@@ -1485,18 +1563,180 @@ def _reconcile_racecard_observation_atomic(
                 field_name,
             ) in processed_fields:
                 continue
+            authority, _ = models.RaceEventFieldAuthority.objects.select_for_update().get_or_create(
+                event=event,
+                subject_type=models.RaceEventFieldSubjectType.EVENT,
+                subject_key=str(event.pk),
+                field_name=field_name,
+                defaults={
+                    "authority_level": 0,
+                    "source_class": "",
+                    "source_key": "",
+                    "value_sha256": "",
+                },
+            )
+            old_value = old_schedule_values[field_name]
+            arbitration = arbitrate_source_value(
+                current_source_key=authority.source_key,
+                current_source_class=authority.source_class,
+                current_observed_at=authority.observed_at,
+                candidate_source_key=source.source_key,
+                candidate_source_class=candidate_source_class,
+                candidate_observed_at=candidate_watermark,
+                has_current_value=old_value is not None and old_value != "",
+                values_equal=old_value == candidate_value,
+                manual_locked=(
+                    locks.get(field_name) is True or authority.manual_lock
+                ),
+            )
+            contract_field_name = {
+                "race_datetime": "off_time",
+                "local_date": "off_time",
+                "local_start_time": "local_start_time",
+                "timezone_name": "timezone_name",
+                "status": "status",
+            }[field_name]
+            field_admitted = contract_field_name in admitted_fields
+            applied = bool(
+                allow_schedule_apply and field_admitted and arbitration.apply
+            )
+            decision = (
+                "applied"
+                if applied
+                else (
+                    "replayed"
+                    if arbitration.reason_code == "idempotent_replay"
+                    else "rejected"
+                )
+            )
+            rejection_reason = ""
+            if not applied and decision != "replayed":
+                rejection_reason = (
+                    "schedule_apply_disabled"
+                    if not allow_schedule_apply
+                    else (
+                        "runtime_admission_closed"
+                        if not field_admitted
+                        else arbitration.reason_code
+                    )
+                )
+            rendered_old = (
+                old_value.isoformat()
+                if hasattr(old_value, "isoformat")
+                else old_value
+            )
+            rendered_candidate = (
+                candidate_value.isoformat()
+                if hasattr(candidate_value, "isoformat")
+                else candidate_value
+            )
+            schedule_audit = {**audit, "operation_mode": "slice_c"}
             models.RaceEventFieldChange.objects.create(
                 event=event,
                 subject_type=models.RaceEventFieldSubjectType.EVENT,
                 subject_key=str(event.pk),
                 field_name=field_name,
-                old_value=old_schedule_values[field_name],
-                new_value=candidate_value,
-                applied=False,
-                decision="rejected",
-                rejection_reason="slice_c_required",
-                **audit,
+                old_value=rendered_old,
+                new_value=rendered_candidate,
+                applied=applied,
+                decision=decision,
+                rejection_reason=rejection_reason,
+                **schedule_audit,
             )
+            if not applied:
+                continue
+            setattr(event, field_name, candidate_value)
+            schedule_changed = True
+            authority.authority_level = source_priority(candidate_source_class)
+            authority.source_class = candidate_source_class
+            authority.source_key = source.source_key
+            authority.source_url = source.canonical_url
+            authority.external_id = source.external_race_id
+            authority.observed_at = candidate_watermark
+            authority.value_sha256 = hashlib.sha256(
+                json.dumps(
+                    rendered_candidate,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                ).encode("utf-8")
+            ).hexdigest()
+            authority.save(
+                update_fields=(
+                    "authority_level",
+                    "source_class",
+                    "source_key",
+                    "source_url",
+                    "external_id",
+                    "observed_at",
+                    "value_sha256",
+                    "updated_at",
+                )
+            )
+        if schedule_changed:
+            event.save(
+                update_fields=tuple(schedule_candidates) + ("updated_at",)
+            )
+            lifecycle = models.RaceEventLifecycleControl.objects.select_for_update().filter(
+                event=event
+            ).first()
+            if lifecycle is not None:
+                lifecycle.schedule_generation += 1
+                lifecycle.claim_token = ""
+                lifecycle.claim_expires_at = None
+                lifecycle.next_refresh_at = event.race_datetime or timezone.now()
+                lifecycle.last_source_key = source.source_key
+                lifecycle.save(
+                    update_fields=(
+                        "schedule_generation",
+                        "claim_token",
+                        "claim_expires_at",
+                        "next_refresh_at",
+                        "last_source_key",
+                        "updated_at",
+                    )
+                )
+            if event.status != old_schedule_values["status"]:
+                schedule_generation = (
+                    lifecycle.schedule_generation if lifecycle is not None else 0
+                )
+                models.RaceEventLifecycleTransition.objects.get_or_create(
+                    dedupe_key=(
+                        f"data-sync-source:{event.pk}:{observation.pk}:"
+                        f"{event.status}"
+                    ),
+                    defaults={
+                        "event": event,
+                        "from_status": old_schedule_values["status"],
+                        "to_status": event.status,
+                        "reason_code": "provider_status_update",
+                        "effective_at": candidate_watermark,
+                        "source_authority": candidate_source_class,
+                        "source_key": source.source_key,
+                        "source_url": source.canonical_url,
+                        "trigger_task": task_id,
+                        "run_id": run_id,
+                        "schedule_generation": schedule_generation,
+                        "record_kind": (
+                            models.RaceEventLifecycleTransitionKind.APPLIED
+                        ),
+                        "metadata": {
+                            "observation_id": observation.pk,
+                            "normalized_sha256": observation.normalized_sha256,
+                        },
+                    },
+                )
+                tracking_state = {
+                    models.RaceEventStatus.SCHEDULED: models.RaceEventLiveState.SCHEDULED,
+                    models.RaceEventStatus.POSTPONED: models.RaceEventLiveState.SCHEDULED,
+                    models.RaceEventStatus.FINISHED: models.RaceEventLiveState.AWAITING_RESULT,
+                }.get(event.status)
+                if tracking_state:
+                    models.RaceEventLiveTracking.objects.filter(event=event).update(
+                        state=tracking_state,
+                        updated_at=timezone.now(),
+                    )
+            transaction.on_commit(invalidate_public_race_cache)
+            aggregate = "applied"
         return RacecardReconciliationDecision(
             aggregate,
             f"racecard_{aggregate}",
@@ -1510,6 +1750,7 @@ def reconcile_racecard_observation(
     observation_id: int,
     expected_event_id: int,
     allow_schedule_apply: bool,
+    allow_racecard_apply: bool = True,
     task_id: str,
     run_id: str,
 ) -> RacecardReconciliationDecision:
@@ -1518,6 +1759,7 @@ def reconcile_racecard_observation(
             observation_id=observation_id,
             expected_event_id=expected_event_id,
             allow_schedule_apply=allow_schedule_apply,
+            allow_racecard_apply=allow_racecard_apply,
             task_id=task_id,
             run_id=run_id,
         )

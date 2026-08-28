@@ -23,6 +23,7 @@ from django.db import transaction
 from stable import models
 from stable.services import race_data_sync_control
 from stable.services.race_data_sync_pipeline import resolve_race_data_provider_route
+from stable.services.race_data_sync_policy import source_priority
 
 
 _SHA_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -36,6 +37,8 @@ _RUNTIME_SWITCHES = (
     "RACE_DATA_SYNC_RESULT_APPLY_ENABLED",
     "RACE_DATA_SYNC_RESULT_PUBLIC_ENABLED",
     "RACE_DATA_SYNC_CORRECTION_APPLY_ENABLED",
+    "RACE_DATA_SYNC_LIFECYCLE_APPLY_ENABLED",
+    "RACE_DATA_SYNC_FUTURE_DISCOVERY_ENABLED",
 )
 _MANIFEST_PAYLOAD_FIELDS = {
     "schema_version",
@@ -443,6 +446,50 @@ def build_race_data_enrollment_census(
             item for item in policy.routes if item.country_region == event.country_region
         )
         route = matching_routes[0] if len(matching_routes) == 1 else None
+        source = None
+        if len(matching_routes) > 1:
+            ranked_routes = []
+            for candidate_route in matching_routes:
+                candidate_binding = resolve_race_data_provider_route(
+                    provider=candidate_route.provider,
+                    region=candidate_route.region_code,
+                    identity_namespace=candidate_route.identity_namespace,
+                    data_kinds=candidate_route.data_kinds,
+                )
+                candidate_sources = [
+                    candidate
+                    for candidate in event.source_identities.all()
+                    if candidate.source_key == candidate_route.provider
+                    and candidate.region_code == candidate_route.region_code
+                    and candidate.identity_namespace
+                    == candidate_route.identity_namespace
+                ]
+                if (
+                    candidate_binding is None
+                    or candidate_route.route_digest
+                    != candidate_binding.route_digest
+                    or len(candidate_sources) != 1
+                    or race_data_sync_control.source_admission_reason(
+                        source=candidate_sources[0],
+                        route_digest=candidate_route.route_digest,
+                        data_kinds=candidate_route.data_kinds,
+                        now=cutoff,
+                    )
+                ):
+                    continue
+                ranked_routes.append(
+                    (
+                        -source_priority(candidate_binding.entry.source_class),
+                        candidate_route.provider,
+                        candidate_route.region_code,
+                        candidate_route,
+                        candidate_sources[0],
+                    )
+                )
+            if ranked_routes:
+                _priority, _provider, _region, route, source = sorted(
+                    ranked_routes, key=lambda item: item[:3]
+                )[0]
         route_binding = (
             resolve_race_data_provider_route(
                 provider=route.provider,
@@ -453,7 +500,6 @@ def build_race_data_enrollment_census(
             if route is not None
             else None
         )
-        source = None
         reason = ""
         classification = "eligible"
         if not (policy.valid_from <= cutoff < policy.valid_until):
@@ -468,7 +514,7 @@ def build_race_data_enrollment_census(
             reason = "manual_lock_present"
         elif not matching_routes:
             reason = "standing_policy_route_missing"
-        elif len(matching_routes) > 1:
+        elif len(matching_routes) > 1 and route is None:
             reason = "standing_policy_route_ambiguous"
         elif route_binding is None:
             reason = "provider_route_unavailable"
@@ -481,13 +527,17 @@ def build_race_data_enrollment_census(
         }:
             reason = "writer_owner_conflict"
         else:
-            candidates = [
-                candidate
-                for candidate in event.source_identities.all()
-                if candidate.source_key == route.provider
-                and candidate.region_code == route.region_code
-                and candidate.identity_namespace == route.identity_namespace
-            ]
+            candidates = (
+                [source]
+                if source is not None
+                else [
+                    candidate
+                    for candidate in event.source_identities.all()
+                    if candidate.source_key == route.provider
+                    and candidate.region_code == route.region_code
+                    and candidate.identity_namespace == route.identity_namespace
+                ]
+            )
             if len(candidates) != 1:
                 reason = "source_identity_missing" if not candidates else "source_identity_ambiguous"
             else:
@@ -512,7 +562,7 @@ def build_race_data_enrollment_census(
                     ):
                         classification = "enrolled"
                     else:
-                        reason = "enrollment_drift"
+                        classification = "eligible"
         if reason:
             classification = "blocked"
         snapshot = _event_snapshot(
@@ -707,8 +757,10 @@ def apply_race_data_enrollment_manifest(
     expected_manifest_sha256: str,
     current_commit: str,
     now: datetime,
+    allow_runtime_open: bool = False,
 ) -> tuple[race_data_sync_control.ControlDecision, ...]:
-    _assert_runtime_closed()
+    if not allow_runtime_open:
+        _assert_runtime_closed()
     _require_aware(now, "now")
     if _SHA_RE.fullmatch(expected_manifest_sha256 or "") is None:
         raise ValueError("expected_manifest_sha256 is invalid")

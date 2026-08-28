@@ -31,6 +31,8 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         if not options["confirm_network_proof"]:
             raise CommandError("必须显式传入 --confirm-network-proof")
+        if not options["region"]:
+            raise CommandError("schema v2 proof 必须显式提供 region")
         try:
             result = run_the_racing_api_free_proof(
                 secret_env_file=options["secret_env_file"],

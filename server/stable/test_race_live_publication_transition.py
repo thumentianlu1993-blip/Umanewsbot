@@ -449,15 +449,15 @@ class RaceLivePublicationTransitionTests(TestCase):
                 reverse("public-race-calendar"),
                 {"tab": "all"},
             )
-        self.assertContains(detail, "暂定赛果")
-        self.assertContains(detail, "尚待官方来源复核")
-        self.assertContains(detail, "补充来源")
-        self.assertContains(detail, "冠军 · 暂定")
+        self.assertContains(detail, "<h2>赛果</h2>", html=True)
+        self.assertNotContains(detail, "暂定赛果")
+        self.assertNotContains(detail, "补充来源")
+        self.assertContains(detail, "WINNER · 冠军")
         for index, participant in enumerate(self.participants, start=1):
             self.assertContains(detail, participant.canonical_name)
             self.assertContains(detail, f"Jockey {index}")
             self.assertNotContains(detail, f"Forbidden Trainer {index}")
-        self.assertNotContains(detail, "正式赛果")
+        self.assertNotContains(detail, "官方来源")
         self.assertNotContains(detail, "更正赛果")
         self.assertContains(calendar, "Winner")
         verification = verify_race_live_publication_transition(

@@ -22,6 +22,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import Min, Q
 
 from stable import models
+from stable.services.race_data_sync_policy import calculate_next_poll_at
 
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -419,7 +420,35 @@ def acquire_enrollment(
                         "registry_digest",
                         "updated_at",
                     )
-                )
+                    )
+        lifecycle, _ = models.RaceEventLifecycleControl.objects.select_for_update().get_or_create(
+            event=event,
+            defaults={
+                "mode": models.RaceEventLifecycleMode.ENFORCE,
+                "schedule_generation": 1,
+                "next_refresh_at": event.race_datetime or now,
+                "enrollment_manifest_sha256": manifest_sha256,
+                "manifest_data": {},
+            },
+        )
+        lifecycle.mode = models.RaceEventLifecycleMode.ENFORCE
+        if lifecycle.schedule_generation < 1:
+            lifecycle.schedule_generation = 1
+        lifecycle.next_refresh_at = event.race_datetime or now
+        lifecycle.enrollment_manifest_sha256 = manifest_sha256
+        lifecycle.manifest_data = {
+            **(
+                lifecycle.manifest_data
+                if isinstance(lifecycle.manifest_data, dict)
+                else {}
+            ),
+            "race_data_sync": {
+                "entry_sha256": entry_sha256,
+                "owner_generation": next_generation,
+            },
+        }
+        lifecycle.manual_pause_reason = ""
+        lifecycle.save()
         return ControlDecision("acquired", "", event_id, next_generation)
 
 
@@ -525,14 +554,6 @@ def rotate_enrollment(
             return ControlDecision(
                 "rejected", "owner_cas_stale", event_id, control.owner_generation
             )
-        if (
-            enrollment.source_identity_id != source.pk
-            or enrollment.standing_policy_digest != standing_policy_digest
-            or enrollment.route_digest != route_digest
-        ):
-            return ControlDecision(
-                "rejected", "enrollment_baseline_drift", event_id, control.owner_generation
-            )
         if tracking.active_attempt_token and (
             tracking.claim_expires_at is None or tracking.claim_expires_at > now
         ):
@@ -564,6 +585,9 @@ def rotate_enrollment(
             )
         )
         enrollment.event_snapshot_sha256 = event_snapshot_sha256
+        enrollment.source_identity = source
+        enrollment.standing_policy_digest = standing_policy_digest
+        enrollment.route_digest = route_digest
         enrollment.projection_owner_generation = next_generation
         enrollment.enrollment_generation = next_generation
         enrollment.manifest_sha256 = successor_manifest_sha256
@@ -573,6 +597,9 @@ def rotate_enrollment(
         enrollment.save(
             update_fields=(
                 "event_snapshot_sha256",
+                "source_identity",
+                "standing_policy_digest",
+                "route_digest",
                 "projection_owner_generation",
                 "enrollment_generation",
                 "manifest_sha256",
@@ -628,8 +655,10 @@ def rotate_enrollment(
                 )
         models.RaceEventLiveProviderCheckpoint.objects.filter(
             tracking=tracking,
+        ).exclude(
             source_key=source.source_key,
-        ).exclude(data_kind__in=normalized_kinds).update(next_poll_at=None, updated_at=now)
+            data_kind__in=normalized_kinds,
+        ).update(next_poll_at=None, updated_at=now)
         next_due = (
             models.RaceEventLiveProviderCheckpoint.objects.filter(tracking=tracking)
             .aggregate(next_poll_at=Min("next_poll_at"))["next_poll_at"]
@@ -733,6 +762,13 @@ def disenroll(
         enrollment.retired_at = now
         enrollment.save(
             update_fields=("state", "reason_code", "retired_at", "updated_at")
+        )
+        models.RaceEventLifecycleControl.objects.filter(event=event).update(
+            mode=models.RaceEventLifecycleMode.OFF,
+            next_refresh_at=None,
+            claim_token="",
+            claim_expires_at=None,
+            updated_at=now,
         )
         return ControlDecision(
             "released", "", event_id, control.owner_generation
@@ -1813,6 +1849,206 @@ def fail_race_data_sync_claim(
         )
         return ControlDecision(
             "failed", reason_code, event_id, tracking.claim_generation
+        )
+
+
+def complete_race_data_sync_claim(
+    *,
+    event_id: int,
+    expected_enrollment_generation: int,
+    expected_owner_generation: int,
+    expected_claim_generation: int,
+    attempt_token: str,
+    checkpoint_plan: Iterable[dict[str, str | int]],
+    expected_enrollment_entry_sha256: str,
+    expected_plan_sha256: str,
+    now: datetime,
+    observation_hashes: dict[str, str] | None = None,
+    source_updated_at_by_kind: dict[str, datetime | None] | None = None,
+) -> ControlDecision:
+    """Complete one exact claim and schedule its dynamic successor checkpoints."""
+
+    _require_aware(now, "now")
+    if not isinstance(attempt_token, str) or _TOKEN_RE.fullmatch(attempt_token) is None:
+        raise ValueError("attempt_token is invalid")
+    _require_sha(expected_enrollment_entry_sha256, "expected_enrollment_entry_sha256")
+    _require_sha(expected_plan_sha256, "expected_plan_sha256")
+    frozen_plan = tuple(checkpoint_plan)
+    if not frozen_plan:
+        raise ValueError("checkpoint_plan is empty")
+    observation_hashes = observation_hashes or {}
+    source_updated_at_by_kind = source_updated_at_by_kind or {}
+    for value in observation_hashes.values():
+        _require_sha(value, "observation_hash")
+    for value in source_updated_at_by_kind.values():
+        if value is not None:
+            _require_aware(value, "source_updated_at")
+
+    with transaction.atomic():
+        event = (
+            models.RaceEvent.objects.select_for_update(of=("self",))
+            .filter(pk=event_id)
+            .first()
+        )
+        if event is None:
+            return ControlDecision("rejected", "claim_subject_missing", event_id)
+        control = (
+            models.RaceEventProjectionControl.objects.select_for_update()
+            .filter(event=event)
+            .first()
+        )
+        tracking = (
+            models.RaceEventLiveTracking.objects.select_for_update()
+            .filter(event=event)
+            .first()
+        )
+        enrollment = (
+            models.RaceDataSyncEnrollment.objects.select_for_update()
+            .filter(event=event)
+            .first()
+        )
+        if control is None or tracking is None or enrollment is None:
+            return ControlDecision("rejected", "claim_subject_missing", event_id)
+        if (
+            control.write_owner != models.RaceEventProjectionWriteOwner.DATA_SYNC
+            or control.owner_generation != expected_owner_generation
+            or enrollment.state != models.RaceDataSyncEnrollmentState.ENROLLED
+            or enrollment.enrollment_generation != expected_enrollment_generation
+            or tracking.claim_generation != expected_claim_generation
+            or tracking.active_attempt_token != attempt_token
+        ):
+            return ControlDecision(
+                "rejected", "claim_cas_stale", event_id, tracking.claim_generation
+            )
+        computed_plan_sha256 = _claim_plan_sha256(
+            event_id=event_id,
+            enrollment_generation=expected_enrollment_generation,
+            owner_generation=expected_owner_generation,
+            claim_generation=expected_claim_generation,
+            attempt_token=attempt_token,
+            enrollment_entry_sha256=expected_enrollment_entry_sha256,
+            route_digest=enrollment.route_digest,
+            checkpoint_plan=frozen_plan,
+        )
+        if (
+            enrollment.entry_sha256 != expected_enrollment_entry_sha256
+            or computed_plan_sha256 != expected_plan_sha256
+        ):
+            return ControlDecision(
+                "rejected", "claim_plan_drift", event_id, tracking.claim_generation
+            )
+        planned_source_keys = {
+            row.get("source_key") for row in frozen_plan if isinstance(row, dict)
+        }
+        planned_kinds = {
+            row.get("data_kind") for row in frozen_plan if isinstance(row, dict)
+        }
+        if (
+            len(planned_source_keys) != 1
+            or any(kind not in models.RaceDataSyncDataKind.values for kind in planned_kinds)
+        ):
+            return ControlDecision(
+                "rejected", "claim_plan_drift", event_id, tracking.claim_generation
+            )
+        checkpoints = list(
+            models.RaceEventLiveProviderCheckpoint.objects.select_for_update()
+            .filter(
+                tracking=tracking,
+                source_key__in=planned_source_keys,
+                data_kind__in=planned_kinds,
+            )
+            .order_by("source_key", "data_kind")
+        )
+        current_plan = tuple(
+            {
+                "source_key": checkpoint.source_key,
+                "data_kind": checkpoint.data_kind,
+                "lock_version": checkpoint.lock_version,
+            }
+            for checkpoint in checkpoints
+        )
+        if current_plan != frozen_plan:
+            return ControlDecision(
+                "rejected", "checkpoint_cas_stale", event_id, tracking.claim_generation
+            )
+
+        result_confirmed = event.result_confirmed_at is not None
+        for checkpoint in checkpoints:
+            checkpoint.last_attempt_at = now
+            checkpoint.last_success_at = now
+            checkpoint.consecutive_failures = 0
+            checkpoint.circuit_reason = ""
+            checkpoint.next_poll_at = calculate_next_poll_at(
+                data_kind=checkpoint.data_kind,
+                now=now,
+                race_datetime=(
+                    None
+                    if event.status == models.RaceEventStatus.POSTPONED
+                    and checkpoint.data_kind
+                    in {
+                        models.RaceDataSyncDataKind.RACE_TIME,
+                        models.RaceDataSyncDataKind.RACECARD,
+                    }
+                    else event.race_datetime
+                ),
+                result_confirmed=result_confirmed,
+                event_terminal=(
+                    event.status == models.RaceEventStatus.CANCELLED
+                    or (
+                        event.status == models.RaceEventStatus.FINISHED
+                        and checkpoint.data_kind
+                        != models.RaceDataSyncDataKind.RESULT
+                    )
+                ),
+            )
+            if checkpoint.data_kind in observation_hashes:
+                checkpoint.last_observation_hash = observation_hashes[
+                    checkpoint.data_kind
+                ]
+            if checkpoint.data_kind in source_updated_at_by_kind:
+                checkpoint.last_source_updated_at = source_updated_at_by_kind[
+                    checkpoint.data_kind
+                ]
+            checkpoint.lock_version += 1
+            checkpoint.save(
+                update_fields=(
+                    "last_attempt_at",
+                    "last_success_at",
+                    "consecutive_failures",
+                    "circuit_reason",
+                    "next_poll_at",
+                    "last_observation_hash",
+                    "last_source_updated_at",
+                    "lock_version",
+                    "updated_at",
+                )
+            )
+
+        parent_due = (
+            models.RaceEventLiveProviderCheckpoint.objects.filter(tracking=tracking)
+            .aggregate(next_poll_at=Min("next_poll_at"))["next_poll_at"]
+        )
+        tracking.active_attempt_token = ""
+        tracking.claim_expires_at = None
+        tracking.next_poll_at = parent_due
+        tracking.last_success_at = now
+        tracking.consecutive_failures = 0
+        tracking.circuit_reason = ""
+        tracking.lock_version += 1
+        tracking.save(
+            update_fields=(
+                "active_attempt_token",
+                "claim_expires_at",
+                "next_poll_at",
+                "last_success_at",
+                "consecutive_failures",
+                "circuit_reason",
+                "lock_version",
+                "updated_at",
+            )
+        )
+        return ControlDecision(
+            "complete", "", event_id, tracking.claim_generation
         )
 
 

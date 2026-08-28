@@ -821,7 +821,7 @@ class ScheduledRaceResultReviewDatabaseContractTests(TestCase):
                         output.getvalue(),
                     )
 
-    def test_public_detail_distinguishes_human_reviewed_from_official_results(self):
+    def test_public_detail_does_not_label_result_source_class(self):
         service = _scheduled_service(self)
         human = self._event(
             "human-reviewed-public-label",
@@ -871,10 +871,10 @@ class ScheduledRaceResultReviewDatabaseContractTests(TestCase):
         human_response = self.client.get(human.public_path)
         official_response = self.client.get(official.public_path)
 
-        self.assertContains(human_response, "已人工审核赛果")
-        self.assertNotContains(human_response, "正式赛果")
-        self.assertContains(official_response, "正式赛果")
-        self.assertNotContains(official_response, "已人工审核赛果")
+        for response in (human_response, official_response):
+            self.assertContains(response, "<h2>赛果</h2>", html=True)
+            self.assertNotContains(response, "正式赛果")
+            self.assertNotContains(response, "已人工审核赛果")
 
 
 class ScheduledRaceResultReviewGreenIntegrationTests(TestCase):

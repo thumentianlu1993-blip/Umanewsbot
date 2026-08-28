@@ -419,3 +419,13 @@ fixture TCP 入口证明密码、身份与 read-only default，再允许旧镜�
 赛名或模糊文本直接合并。只有精确日期、场地、公制距离、名次和结果事实全部一致且不存在 race number/
 event 冲突时才采用跨来源 fallback；多解与不完整事实继续人工阻断。正式导入在写前验证合并后的出赛数与
 受审来源计数守恒，并把首次写入和重复提交使用的身份语义锁定为同一实现。
+
+## 赛事数据全生命周期自动化
+
+未来公开赛事现在具有一条统一的 `race_sync_v2` 数据链：standing policy 自动发现并纳管赛事，provider
+checkpoint 动态抓取赛时、出马表和赛果，lifecycle control 在 T/T+30 推进状态，immutable revision
+投影到公开赛果并继续观察更正。远期赛时/出马表间隔不超过 12 小时，临赛和赛后自动加密。
+
+来源仲裁统一为 licensed racing API > 已导入官方赛事事实 > 可信第三方；公开页不暴露来源或内部确认
+阶段。自动链由来源 proof、固定路由 digest、standing policy、CAS generation、请求/数据库容量和独立
+kill-switch 约束，仓库默认关闭，生产启用必须绑定精确发布版本并另行确认。

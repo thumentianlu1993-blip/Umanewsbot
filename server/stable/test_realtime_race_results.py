@@ -2851,6 +2851,7 @@ class RaceLiveTheRacingApiFreeRunnerTests(TestCase):
                 "united_kingdom": "gb",
                 "france": "fr",
                 "hong_kong": "hk",
+                "ireland": "ire",
                 "japan": "jpn",
                 "united_states": "usa",
             },
@@ -4217,27 +4218,32 @@ class RaceLivePublicStatusTests(TestCase):
             )
         return event
 
-    def test_published_provisional_result_is_clearly_labeled_unofficial(self):
+    def test_published_result_has_no_public_source_or_phase_label(self):
         event = self._event_with_revision("p" * 8, "provisional")
-        response = self.client.get(reverse("public-race-detail", args=[event.year, event.slug]))
+        with patch("stable.views.timezone.now", return_value=self.NOW):
+            response = self.client.get(
+                reverse("public-race-detail", args=[event.year, event.slug])
+            )
 
-        self.assertContains(response, "暂定赛果")
-        self.assertContains(response, "尚待官方来源复核")
-        self.assertContains(response, "补充来源")
-        self.assertContains(response, "07-20 22:00")
-        self.assertContains(response, "冠军 · 暂定")
-        self.assertNotContains(response, "赛果已确认")
+        self.assertContains(response, "<h2>赛果</h2>", html=True)
+        self.assertNotContains(response, "暂定赛果")
+        self.assertNotContains(response, "补充来源")
+        self.assertNotContains(response, "官方来源")
+        self.assertContains(response, "WINNER · 冠军")
 
-    def test_official_corrected_conflict_and_stale_labels_are_distinct(self):
+    def test_result_phases_share_one_public_label_and_stale_warning_remains(self):
         official = self._event_with_revision("o" * 8, "official")
         corrected = self._event_with_revision("c" * 8, "corrected")
         conflict = self._event_with_revision("f" * 8, "official", conflict=True)
         stale = self._event_with_revision("s" * 8, "official", stale=True)
 
-        self.assertContains(self.client.get(official.public_path), "正式赛果")
-        self.assertContains(self.client.get(corrected.public_path), "赛果已更正")
-        self.assertContains(self.client.get(conflict.public_path), "赛果待复核")
         with patch("stable.views.timezone.now", return_value=self.NOW):
+            for event in (official, corrected, conflict):
+                response = self.client.get(event.public_path)
+                self.assertContains(response, "<h2>赛果</h2>", html=True)
+                self.assertNotContains(response, "正式赛果")
+                self.assertNotContains(response, "赛果已更正")
+                self.assertNotContains(response, "赛果待复核")
             self.assertContains(self.client.get(stale.public_path), "数据可能已过期")
 
     def test_safe_authorization_phase_extension_keeps_current_official_visible(self):
@@ -4378,7 +4384,7 @@ class RaceLivePublicStatusTests(TestCase):
 
         with patch("stable.views.timezone.now", return_value=self.NOW):
             baseline = self.client.get(event.public_path)
-        self.assertContains(baseline, "暂定赛果")
+        self.assertContains(baseline, "<h2>赛果</h2>", html=True)
         self.assertContains(baseline, "Fixture Winner")
 
         for scope_type, scope_key in scopes:
@@ -4394,7 +4400,6 @@ class RaceLivePublicStatusTests(TestCase):
 
                 with patch("stable.views.timezone.now", return_value=self.NOW):
                     hidden = self.client.get(event.public_path)
-                self.assertNotContains(hidden, "暂定赛果")
                 self.assertNotContains(hidden, "Fixture Winner")
                 self.assertIsNone(hidden.context["live_result_status"])
                 self.assertEqual(list(hidden.context["results"]), [])
@@ -4404,7 +4409,7 @@ class RaceLivePublicStatusTests(TestCase):
                 policy.save(update_fields=("mode", "version", "updated_at"))
                 with patch("stable.views.timezone.now", return_value=self.NOW):
                     restored = self.client.get(event.public_path)
-                self.assertContains(restored, "暂定赛果")
+                self.assertContains(restored, "<h2>赛果</h2>", html=True)
                 self.assertContains(restored, "Fixture Winner")
 
     def test_policy_off_also_hides_materialized_live_results_from_calendar(self):

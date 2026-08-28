@@ -211,3 +211,24 @@ run/payload/receipt 审计；它不应需要回滚任何公开赛事、赛果、
 NOT REVIEWED FOR CODE / NOT DEPLOYED`
 
 本轮方案通过后也只进入阶段 B0.1“等待实现确认”，不是发布、联网或生产写入授权。
+
+## 9. 2026-08-28 全链路实现发布状态
+
+用户本轮已明确授权完整代码实现、dry-run 和 PR，并明确只在最后一次生产部署前确认。因此早期按 A/B/C/D
+逐阶段等待实现确认的状态由本节更新；生产权限边界仍保持不变。
+
+当前状态：`IMPLEMENTED / TESTED 169/169 / ZERO-WRITE DRY-RUN PASSED / NOT DEPLOYED`。
+
+建议生产启用顺序：
+
+1. 合并 PR 后绑定精确 revision/image；完成备份、`pg_restore --list` 和 migration 0075；
+2. 全部新开关关闭、容量为 0 发布，验证 web/worker/Beat 和只读审计；
+3. 配置固定 registry/policy SHA、provider/region/data-kind allowlist 与正容量；
+4. 启用 scheduler + future discovery，先观察 census/enrollment/route drift；
+5. 启用 network + race time/racecard apply；
+6. 启用 lifecycle；
+7. 启用 result apply/public，最后启用 correction apply；
+8. 每阶段分别观察 terminal state、claim、provider 请求、fallback、revision、projection、公开页和错误率。
+
+任一异常关闭总开关、future discovery、lifecycle 和全部 apply/public 开关。不得批量反向赛事状态或覆盖
+immutable revisions。完整门禁见 `race_data_lifecycle_implementation_20260828.md` 和项目 deploy runbook。

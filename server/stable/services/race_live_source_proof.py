@@ -42,6 +42,7 @@ _REGION_CODES = {
     "united_kingdom": "gb",
     "france": "fr",
     "hong_kong": "hk",
+    "ireland": "ire",
     "japan": "jpn",
     "united_states": "usa",
 }
