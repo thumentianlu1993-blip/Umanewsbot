@@ -322,6 +322,6 @@
 - [x] (operations) 增加只读 `audit_race_data_sync` 和 standing policy renderer。
 - [x] (integration) 完成 169/169 聚焦回归、Django check、migration drift、compileall。
 - [x] (operations) 完成隔离数据库全配置 zero-write dry-run，审计前后 SHA-256 一致。
-- [ ] (operations) 提交、推送并创建 PR，记录精确 commit/PR。
+- [x] (operations) 已以实现 commit `e6ec0e6e` 提交并推送，创建 PR #108；随后仅追加本状态回写。
 - [ ] (operations) 在 PR 合并后取得绑定精确 revision/image、migration、policy/registry SHA 和开关清单的
   最终生产部署确认。

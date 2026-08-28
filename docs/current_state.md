@@ -6178,5 +6178,6 @@ v3 首次 prepare 在请求预算 `60/60` 时由 HRN 空候选连带阻断 Equib
 - 聚焦回归 `169/169`、Django check、migration drift 和 compileall 均通过。全新临时 SQLite dry-run
   返回 `configuration_status=ready / route_drift=[] / would_write=false`，审计前后数据库 SHA 同为
   `3339d40728f8b0eb4310e97efb6f169f3f4c52625fa8a3b6c94bd2e3492caea0`；容量合同为 `valid`。
-- 当前尚未 commit、push、PR、部署、迁移生产或开启任何新 flag。实现和发布边界详见
+- 实现 commit `e6ec0e6e` 已推送并创建 PR #108；尚未合并、部署、迁移生产或开启任何新 flag。
+  实现和发布边界详见
   `docs/changes/automate-race-event-lifecycle/race_data_lifecycle_implementation_20260828.md`。
