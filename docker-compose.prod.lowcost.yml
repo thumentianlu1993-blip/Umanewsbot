@@ -24,7 +24,7 @@ services:
       RACE_LIVE_MONITOR_ENABLED: ${RACE_LIVE_MONITOR_ENABLED:-false}
       RACE_LIVE_ENABLED_REGIONS: ${RACE_LIVE_ENABLED_REGIONS:-}
       RACE_LIVE_TRA_REGISTRY_FILE: ${RACE_LIVE_TRA_REGISTRY_FILE:-/app/runtime/policies/race_live/source_registry_the_racing_api_free.json}
-      RACE_LIVE_TRA_REGISTRY_SHA256: ${RACE_LIVE_TRA_REGISTRY_SHA256:-7aca49ff1df7573ebfe6a9e403eefca5c9e64d8ee18d8d3be383d67803db550a}
+      RACE_LIVE_TRA_REGISTRY_SHA256: ${RACE_LIVE_TRA_REGISTRY_SHA256:-3bac3b644c631ed165b8430343822b2c70c5a88c5036b63dcb557c83c0e0a6da}
     volumes:
       - static_data:/app/server/staticfiles
       - media_data:/app/server/media
@@ -63,7 +63,7 @@ services:
       RACE_LIVE_MONITOR_ENABLED: ${RACE_LIVE_MONITOR_ENABLED:-false}
       RACE_LIVE_ENABLED_REGIONS: ${RACE_LIVE_ENABLED_REGIONS:-}
       RACE_LIVE_TRA_REGISTRY_FILE: ${RACE_LIVE_TRA_REGISTRY_FILE:-/app/runtime/policies/race_live/source_registry_the_racing_api_free.json}
-      RACE_LIVE_TRA_REGISTRY_SHA256: ${RACE_LIVE_TRA_REGISTRY_SHA256:-7aca49ff1df7573ebfe6a9e403eefca5c9e64d8ee18d8d3be383d67803db550a}
+      RACE_LIVE_TRA_REGISTRY_SHA256: ${RACE_LIVE_TRA_REGISTRY_SHA256:-3bac3b644c631ed165b8430343822b2c70c5a88c5036b63dcb557c83c0e0a6da}
     volumes:
       - media_data:/app/server/media
       - app_logs:/app/logs
@@ -101,13 +101,49 @@ services:
       RACE_LIVE_MONITOR_ENABLED: ${RACE_LIVE_MONITOR_ENABLED:-false}
       RACE_LIVE_ENABLED_REGIONS: ${RACE_LIVE_ENABLED_REGIONS:-}
       RACE_LIVE_TRA_REGISTRY_FILE: ${RACE_LIVE_TRA_REGISTRY_FILE:-/app/runtime/policies/race_live/source_registry_the_racing_api_free.json}
-      RACE_LIVE_TRA_REGISTRY_SHA256: ${RACE_LIVE_TRA_REGISTRY_SHA256:-7aca49ff1df7573ebfe6a9e403eefca5c9e64d8ee18d8d3be383d67803db550a}
+      RACE_LIVE_TRA_REGISTRY_SHA256: ${RACE_LIVE_TRA_REGISTRY_SHA256:-3bac3b644c631ed165b8430343822b2c70c5a88c5036b63dcb557c83c0e0a6da}
     volumes:
       - media_data:/app/server/media
       - app_logs:/app/logs
       - ./runtime/secrets:/run/secrets:ro
       - ./runtime/race_live_racecards:/run/race-live/racecards:rw
       - ./runtime/race_live_publications:/run/race-live/publications:rw
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      web:
+        condition: service_started
+
+  race_sync_v2_worker:
+    image: umanewsbot:prod
+    command: /app/deploy/docker/start-race-data-sync-worker.sh
+    cpus: ${RACE_DATA_SYNC_WORKER_CPUS:-0.25}
+    mem_limit: ${RACE_DATA_SYNC_WORKER_MEMORY_LIMIT:-384M}
+    env_file:
+      - .env
+    environment:
+      DB_ENGINE: postgres
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      RACE_DATA_SYNC_ENABLED: ${RACE_DATA_SYNC_ENABLED:-false}
+      RACE_DATA_SYNC_SCHEDULER_ENABLED: ${RACE_DATA_SYNC_SCHEDULER_ENABLED:-false}
+      RACE_DATA_SYNC_ALLOW_NETWORK: ${RACE_DATA_SYNC_ALLOW_NETWORK:-false}
+      RACE_DATA_SYNC_SCHEDULE_APPLY_ENABLED: ${RACE_DATA_SYNC_SCHEDULE_APPLY_ENABLED:-false}
+      RACE_DATA_SYNC_RACECARD_APPLY_ENABLED: ${RACE_DATA_SYNC_RACECARD_APPLY_ENABLED:-false}
+      RACE_DATA_SYNC_RESULT_APPLY_ENABLED: ${RACE_DATA_SYNC_RESULT_APPLY_ENABLED:-false}
+      RACE_DATA_SYNC_RESULT_PUBLIC_ENABLED: ${RACE_DATA_SYNC_RESULT_PUBLIC_ENABLED:-false}
+      RACE_DATA_SYNC_CORRECTION_APPLY_ENABLED: ${RACE_DATA_SYNC_CORRECTION_APPLY_ENABLED:-false}
+      RACE_DATA_SYNC_LIFECYCLE_APPLY_ENABLED: ${RACE_DATA_SYNC_LIFECYCLE_APPLY_ENABLED:-false}
+      RACE_DATA_SYNC_REFERENCE_REGISTRY_SHA256: ${RACE_DATA_SYNC_REFERENCE_REGISTRY_SHA256:-}
+    volumes:
+      - app_logs:/app/logs
+      - ./runtime/secrets:/run/secrets:ro
+      - ./runtime/race_data_sync:/run/race-data-sync:rw
+      - ./runtime/policies/race_data_sync:/app/runtime/policies/race_data_sync:ro
+      - race_result_review_data:/app/runtime/race_result_review
     restart: unless-stopped
     depends_on:
       db:
@@ -137,7 +173,7 @@ services:
       RACE_LIVE_MONITOR_ENABLED: ${RACE_LIVE_MONITOR_ENABLED:-false}
       RACE_LIVE_ENABLED_REGIONS: ${RACE_LIVE_ENABLED_REGIONS:-}
       RACE_LIVE_TRA_REGISTRY_FILE: ${RACE_LIVE_TRA_REGISTRY_FILE:-/app/runtime/policies/race_live/source_registry_the_racing_api_free.json}
-      RACE_LIVE_TRA_REGISTRY_SHA256: ${RACE_LIVE_TRA_REGISTRY_SHA256:-7aca49ff1df7573ebfe6a9e403eefca5c9e64d8ee18d8d3be383d67803db550a}
+      RACE_LIVE_TRA_REGISTRY_SHA256: ${RACE_LIVE_TRA_REGISTRY_SHA256:-3bac3b644c631ed165b8430343822b2c70c5a88c5036b63dcb557c83c0e0a6da}
     volumes:
       - app_logs:/app/logs
       - race_result_review_data:/app/runtime/race_result_review

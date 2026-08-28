@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail closed unless a rollback target carries the reviewed migrations through 0073."""
+"""Fail closed unless a rollback target carries the reviewed migrations through 0075."""
 
 from __future__ import annotations
 
@@ -18,6 +18,8 @@ EXPECTED_MIGRATION_PATHS = (
     "server/stable/migrations/0071_historical_calendar_release_b.py",
     "server/stable/migrations/0072_add_extended_racing_regions.py",
     "server/stable/migrations/0073_lifecycle_enforce_registry.py",
+    "server/stable/migrations/0074_race_data_sync_r0_control_plane.py",
+    "server/stable/migrations/0075_race_data_source_priority_and_reported_position.py",
 )
 
 

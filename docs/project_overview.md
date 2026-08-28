@@ -1,5 +1,22 @@
 # 项目总览
 
+截至 2026-08-29，PR `#108` 候选已覆盖 future discovery、时间/出马表、lifecycle、赛果公开与更正，
+并使用 `data_sync` 持久 owner、exact enrollment/source/route、provider checkpoint、DB snapshot single-flight、
+`race_sync_v2` 隔离 worker 和证据绑定的 publication audit。历史 prepare exception 留下的 14 条过期
+claim 已有 SHA-bound、advisory-lock-bound 的精确收口候选；不生成 bundle/delivery/赛果。全 diff 审查
+发现的 migration `0075`、公开读取、shadow promotion、门禁重放、exact TRA source、snapshot
+retention、终态 polling 和 T+30 alert 问题已修复并通过 SQLite/PostgreSQL 聚焦门禁。最终增量又把
+future discovery/cleanup 绑定总开关、覆盖完整 snapshot lease 并消除公开批量读取 source N+1；完整
+diff 独立复审最终为 `No findings`，本地发布门禁全绿。生产仍为
+revision `2833558a…56c` / leaf `0073`，PR 未合并，新写入全关，`race_sync_v2=0`，旧
+`race_live=7543` 保持不动。候选 `dd67c789…8aa0` 已在停止 Beat 的关闭态窗口创建并验证 custom
+backup，以 SHA-bound manifest 把 14 条过期空证据 claim 精确收口为 failed；claimed 已归零，队列、
+审批、赛果、投递和 pending 集合不变，旧 Beat 已恢复。既有 lifecycle `enabled/enforce + 6 controls`
+保持原授权状态；新 data-sync lifecycle 和其余新开关仍关闭。当前尚未 migration、合并、部署或启用，
+等待一次最终发布确认。
+
+## 历史背景（以下状态以各段日期为准）
+
 八地区链路与 migration `0072` 已关闭态发布；当前生产代码 revision 为 PR `#98` 的精确 merge SHA
 `127d4833…9528`，统一 image 为 `sha256:37f84597…8852`。2025 范围暂收缩为日本、中国香港、英国、法国和美国，
 并通过 source-bound participant batch 接入既有 P0 补全、审核、release 与 verifier。首批日本 r2 已
@@ -229,6 +246,10 @@ owner/claim CAS 决定是否形成公开 projection。The Racing API 只提供�
 `provisional_result`；官方来源的独立 evidence 才能支持后续 `official_result` 或
 `corrected_result`。
 
+定时赛果审核运行记录也采用显式终态：prepare 异常由原 token CAS 写 `failed`，租约过期且没有形成
+selector、bundle 或 terminal 证据的空 claim 由严格 sweeper 收口。发布门禁仍统计所有 claimed；畸形、
+活跃或已有证据的记录不会因租约过期被忽略，历史修复必须绑定 canonical manifest SHA 并整批事务执行。
+
 首个公开候选只覆盖英国 event `924` 的已存 shadow revision，使用无网络、可哈希的
 promotion/disable/restore manifest。暂定赛果可以先公开，但页面必须清晰显示“暂定”与
 “尚待官方来源复核”；BHA 当前只采用人工浏览器复核和离线 evidence receipt，不自动抓取，
@@ -408,3 +429,18 @@ fixture TCP 入口证明密码、身份与 read-only default，再允许旧镜�
 赛名或模糊文本直接合并。只有精确日期、场地、公制距离、名次和结果事实全部一致且不存在 race number/
 event 冲突时才采用跨来源 fallback；多解与不完整事实继续人工阻断。正式导入在写前验证合并后的出赛数与
 受审来源计数守恒，并把首次写入和重复提交使用的身份语义锁定为同一实现。
+
+## 赛事数据全生命周期自动化
+
+未来公开赛事现在具有一条统一的 `race_sync_v2` 数据链：standing policy 自动发现并纳管赛事，provider
+checkpoint 动态抓取赛时、出马表和赛果，lifecycle control 在 T/T+30 推进状态，immutable revision
+投影到公开赛果并继续观察更正。远期赛时/出马表间隔不超过 12 小时，临赛和赛后自动加密。
+
+来源仲裁统一为 licensed racing API > 已导入官方赛事事实 > 可信第三方；公开页不暴露来源或内部确认
+阶段。自动链由来源 proof、固定路由 digest、standing policy、CAS generation、请求/数据库容量和独立
+kill-switch 约束，仓库默认关闭，生产启用必须绑定精确发布版本并另行确认。
+
+批量 racecard/当日 results 在短 TTL 内按地区和日期共享完整分页快照；赛后历史结果只走 registry 明确
+登记的 race-id 路由。无终态标记的结果只形成内部 provisional revision，正式/更正公开还必须覆盖完整
+canonical runner roster。只有结果型 fallback 与现有 runner 通过马号和规范化马名形成唯一全双射时，
+才可在同一事务补足来源身份；缺行、多解和来源合同漂移均保持零公开写入。

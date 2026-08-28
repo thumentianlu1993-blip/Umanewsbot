@@ -9,15 +9,26 @@ import os
 from pathlib import Path
 import stat
 import tempfile
-from typing import Any, Mapping
+from typing import Any, Iterable, Mapping
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, Sum
 from django.utils import timezone
 
 from stable import models
+from stable.services.race_data_sync_control import (
+    RaceDataSyncClaim,
+    lock_and_validate_race_data_sync_claim_for_apply,
+)
+from stable.services.race_data_sync_policy import (
+    arbitrate_source_value,
+    calculate_next_poll_at,
+    normalize_source_class,
+    source_priority,
+)
+from stable.services.race_event_public_cache import invalidate_public_race_cache
 
 
 _SHA256_LENGTH = 64
@@ -90,13 +101,279 @@ class RacecardReconciliationDecision:
     reason: str
     event_id: int | None = None
     observation_id: int | None = None
+    claim_invalidated: bool = False
 
 
 @dataclass(frozen=True)
 class RawCleanupResult:
     cleaned: int
+    cleaned_bytes: int
     held: int
     skipped: int
+
+
+@dataclass(frozen=True)
+class RaceDataSyncCapacityLimits:
+    raw_max_compressed_bytes: int
+    raw_max_uncompressed_bytes: int
+    provider_region_daily_bytes: int
+    provider_region_daily_requests: int
+    artifact_high_water_bytes: int
+    artifact_low_water_bytes: int
+    min_free_disk_bytes: int
+    cleanup_max_rows: int
+    cleanup_max_bytes: int
+    hold_alert_bytes: int
+
+    @classmethod
+    def from_settings(cls) -> "RaceDataSyncCapacityLimits":
+        limits = cls(
+            raw_max_compressed_bytes=int(
+                getattr(settings, "RACE_DATA_RAW_MAX_COMPRESSED_BYTES", 0)
+            ),
+            raw_max_uncompressed_bytes=int(
+                getattr(settings, "RACE_DATA_RAW_MAX_UNCOMPRESSED_BYTES", 0)
+            ),
+            provider_region_daily_bytes=int(
+                getattr(settings, "RACE_DATA_RAW_DAILY_PROVIDER_REGION_BYTES", 0)
+            ),
+            provider_region_daily_requests=int(
+                getattr(settings, "RACE_DATA_RAW_DAILY_PROVIDER_REGION_REQUESTS", 0)
+            ),
+            artifact_high_water_bytes=int(
+                getattr(settings, "RACE_DATA_RAW_ROOT_HIGH_WATER_BYTES", 0)
+            ),
+            artifact_low_water_bytes=int(
+                getattr(settings, "RACE_DATA_RAW_ROOT_LOW_WATER_BYTES", 0)
+            ),
+            min_free_disk_bytes=int(
+                getattr(settings, "RACE_DATA_RAW_MIN_FREE_DISK_BYTES", 0)
+            ),
+            cleanup_max_rows=int(
+                getattr(settings, "RACE_DATA_RAW_CLEANUP_MAX_ROWS", 0)
+            ),
+            cleanup_max_bytes=int(
+                getattr(settings, "RACE_DATA_RAW_CLEANUP_MAX_BYTES", 0)
+            ),
+            hold_alert_bytes=int(
+                getattr(settings, "RACE_DATA_RAW_HOLD_ALERT_BYTES", 0)
+            ),
+        )
+        positive = (
+            limits.raw_max_compressed_bytes,
+            limits.raw_max_uncompressed_bytes,
+            limits.provider_region_daily_bytes,
+            limits.provider_region_daily_requests,
+            limits.artifact_high_water_bytes,
+            limits.artifact_low_water_bytes,
+            limits.min_free_disk_bytes,
+            limits.cleanup_max_rows,
+            limits.cleanup_max_bytes,
+            limits.hold_alert_bytes,
+        )
+        if any(value <= 0 for value in positive):
+            raise ValueError("race data capacity limits must be positive")
+        if limits.raw_max_uncompressed_bytes < limits.raw_max_compressed_bytes:
+            raise ValueError("race data raw payload limits are inconsistent")
+        if limits.artifact_high_water_bytes <= limits.artifact_low_water_bytes:
+            raise ValueError("race data artifact watermarks are inconsistent")
+        return limits
+
+
+@dataclass(frozen=True)
+class RaceDataSyncCapacityDecision:
+    allowed: bool
+    reason_code: str
+
+
+def evaluate_race_data_capacity(
+    *,
+    limits: RaceDataSyncCapacityLimits,
+    proposed_compressed_bytes: int,
+    proposed_uncompressed_bytes: int,
+    provider_region_daily_bytes: int,
+    provider_region_daily_requests: int,
+    artifact_root_bytes: int,
+    free_disk_bytes: int,
+    hold_bytes: int,
+    capacity_circuit_open: bool,
+    cleanup_failed: bool,
+) -> RaceDataSyncCapacityDecision:
+    """Pure pre-transport capacity admission.
+
+    Callers reserve their worst-case payload sizes.  A rejection must happen
+    before constructing transport or issuing a network request.
+    """
+
+    counters = (
+        proposed_compressed_bytes,
+        proposed_uncompressed_bytes,
+        provider_region_daily_bytes,
+        provider_region_daily_requests,
+        artifact_root_bytes,
+        free_disk_bytes,
+        hold_bytes,
+    )
+    if any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in counters):
+        raise ValueError("race data capacity counters are invalid")
+    if cleanup_failed:
+        return RaceDataSyncCapacityDecision(False, "artifact_capacity_cleanup_failed")
+    if hold_bytes >= limits.hold_alert_bytes:
+        return RaceDataSyncCapacityDecision(False, "artifact_capacity_hold_exceeded")
+    if capacity_circuit_open and artifact_root_bytes > limits.artifact_low_water_bytes:
+        return RaceDataSyncCapacityDecision(False, "artifact_capacity_circuit_open")
+    if proposed_compressed_bytes > limits.raw_max_compressed_bytes:
+        return RaceDataSyncCapacityDecision(False, "artifact_payload_compressed_too_large")
+    if proposed_uncompressed_bytes > limits.raw_max_uncompressed_bytes:
+        return RaceDataSyncCapacityDecision(False, "artifact_payload_uncompressed_too_large")
+    if (
+        provider_region_daily_bytes + proposed_compressed_bytes
+        > limits.provider_region_daily_bytes
+    ):
+        return RaceDataSyncCapacityDecision(False, "artifact_daily_bytes_exceeded")
+    if provider_region_daily_requests + 1 > limits.provider_region_daily_requests:
+        return RaceDataSyncCapacityDecision(False, "artifact_daily_requests_exceeded")
+    if artifact_root_bytes + proposed_compressed_bytes > limits.artifact_high_water_bytes:
+        return RaceDataSyncCapacityDecision(False, "artifact_root_high_water")
+    if free_disk_bytes - proposed_compressed_bytes < limits.min_free_disk_bytes:
+        return RaceDataSyncCapacityDecision(False, "artifact_min_free_disk")
+    return RaceDataSyncCapacityDecision(True, "")
+
+
+def inspect_race_data_artifact_capacity(
+    *, artifact_roots: tuple[str, ...]
+) -> tuple[int, int]:
+    if not artifact_roots:
+        raise ValueError("race data artifact roots are not configured")
+    total_bytes = 0
+    free_bytes: list[int] = []
+    for raw_root in artifact_roots:
+        root = Path(raw_root)
+        try:
+            root_stat = root.lstat()
+        except OSError as exc:
+            raise ValueError("race data artifact root is unavailable") from exc
+        if root.is_symlink() or not stat.S_ISDIR(root_stat.st_mode):
+            raise ValueError("race data artifact root is unsafe")
+        try:
+            filesystem = os.statvfs(root)
+        except OSError as exc:
+            raise ValueError("race data artifact filesystem is unavailable") from exc
+        free_bytes.append(filesystem.f_bavail * filesystem.f_frsize)
+        for directory, directory_names, filenames in os.walk(
+            root, followlinks=False
+        ):
+            directory_path = Path(directory)
+            directory_names[:] = [
+                name
+                for name in directory_names
+                if not (directory_path / name).is_symlink()
+            ]
+            for filename in filenames:
+                candidate = directory_path / filename
+                try:
+                    candidate_stat = candidate.lstat()
+                except OSError:
+                    continue
+                if stat.S_ISREG(candidate_stat.st_mode) and not candidate.is_symlink():
+                    total_bytes += candidate_stat.st_size
+    return total_bytes, min(free_bytes)
+
+
+def reserve_race_data_transport_capacity(
+    *,
+    provider: str,
+    region_code: str,
+    now: datetime,
+    proposed_requests: int,
+    max_response_bytes_per_request: int,
+) -> RaceDataSyncCapacityDecision:
+    """Atomically reserve a provider/region daily budget before transport."""
+
+    if not isinstance(now, datetime) or timezone.is_naive(now):
+        raise ValueError("now must be aware")
+    if (
+        not isinstance(provider, str)
+        or not provider
+        or provider != provider.strip()
+        or len(provider) > 64
+        or not isinstance(region_code, str)
+        or not region_code
+        or region_code != region_code.strip()
+        or len(region_code) > 32
+    ):
+        raise ValueError("capacity scope is invalid")
+    if (
+        isinstance(proposed_requests, bool)
+        or not isinstance(proposed_requests, int)
+        or not 1 <= proposed_requests <= 100
+        or isinstance(max_response_bytes_per_request, bool)
+        or not isinstance(max_response_bytes_per_request, int)
+        or max_response_bytes_per_request <= 0
+    ):
+        raise ValueError("capacity reservation is invalid")
+    limits = RaceDataSyncCapacityLimits.from_settings()
+    if max_response_bytes_per_request > limits.raw_max_compressed_bytes:
+        return RaceDataSyncCapacityDecision(
+            False, "artifact_payload_compressed_too_large"
+        )
+    proposed_bytes = proposed_requests * max_response_bytes_per_request
+    artifact_bytes, free_disk_bytes = inspect_race_data_artifact_capacity(
+        artifact_roots=tuple(
+            str(value)
+            for value in getattr(settings, "RACE_DATA_RAW_ARTIFACT_ROOTS", ())
+            if str(value)
+        )
+    )
+    hold_bytes = int(
+        models.RaceResultObservation.objects.filter(
+            field_provenance__raw_hold=True,
+            raw_size_bytes__isnull=False,
+        ).aggregate(total=Sum("raw_size_bytes"))["total"]
+        or 0
+    )
+    if hold_bytes >= limits.hold_alert_bytes:
+        return RaceDataSyncCapacityDecision(
+            False, "artifact_capacity_hold_exceeded"
+        )
+    if artifact_bytes + proposed_bytes > limits.artifact_high_water_bytes:
+        return RaceDataSyncCapacityDecision(False, "artifact_root_high_water")
+    if free_disk_bytes - proposed_bytes < limits.min_free_disk_bytes:
+        return RaceDataSyncCapacityDecision(False, "artifact_min_free_disk")
+
+    with transaction.atomic():
+        ledger, _created = (
+            models.RaceDataTransportCapacityLedger.objects.select_for_update()
+            .get_or_create(
+                provider=provider,
+                region_code=region_code,
+                usage_date=now.date(),
+            )
+        )
+        if (
+            ledger.request_count + proposed_requests
+            > limits.provider_region_daily_requests
+        ):
+            return RaceDataSyncCapacityDecision(
+                False, "artifact_daily_requests_exceeded"
+            )
+        if (
+            ledger.budgeted_response_bytes + proposed_bytes
+            > limits.provider_region_daily_bytes
+        ):
+            return RaceDataSyncCapacityDecision(
+                False, "artifact_daily_bytes_exceeded"
+            )
+        ledger.request_count += proposed_requests
+        ledger.budgeted_response_bytes += proposed_bytes
+        ledger.save(
+            update_fields=(
+                "request_count",
+                "budgeted_response_bytes",
+                "updated_at",
+            )
+        )
+    return RaceDataSyncCapacityDecision(True, "")
 
 
 class _RacecardNeedsReview(Exception):
@@ -114,6 +391,14 @@ class RaceDataSyncFlags:
     providers: frozenset[str]
     regions: frozenset[str]
     fields: frozenset[str]
+    data_kinds: frozenset[str]
+    scheduler_enabled: bool
+    allow_network: bool
+    schedule_apply_enabled: bool
+    racecard_apply_enabled: bool
+    result_apply_enabled: bool
+    result_public_enabled: bool
+    correction_apply_enabled: bool
 
     @classmethod
     def from_settings(cls) -> "RaceDataSyncFlags":
@@ -140,6 +425,34 @@ class RaceDataSyncFlags:
                 )
                 if str(value).strip()
             ),
+            data_kinds=frozenset(
+                str(value).strip()
+                for value in getattr(
+                    settings, "RACE_DATA_SYNC_ENABLED_DATA_KINDS", ()
+                )
+                if str(value).strip()
+            ),
+            scheduler_enabled=bool(
+                getattr(settings, "RACE_DATA_SYNC_SCHEDULER_ENABLED", False)
+            ),
+            allow_network=bool(
+                getattr(settings, "RACE_DATA_SYNC_ALLOW_NETWORK", False)
+            ),
+            schedule_apply_enabled=bool(
+                getattr(settings, "RACE_DATA_SYNC_SCHEDULE_APPLY_ENABLED", False)
+            ),
+            racecard_apply_enabled=bool(
+                getattr(settings, "RACE_DATA_SYNC_RACECARD_APPLY_ENABLED", False)
+            ),
+            result_apply_enabled=bool(
+                getattr(settings, "RACE_DATA_SYNC_RESULT_APPLY_ENABLED", False)
+            ),
+            result_public_enabled=bool(
+                getattr(settings, "RACE_DATA_SYNC_RESULT_PUBLIC_ENABLED", False)
+            ),
+            correction_apply_enabled=bool(
+                getattr(settings, "RACE_DATA_SYNC_CORRECTION_APPLY_ENABLED", False)
+            ),
         )
 
     def allows(self, *, provider: str, region: str, field_name: str) -> bool:
@@ -150,11 +463,24 @@ class RaceDataSyncFlags:
             and field_name in self.fields
         )
 
+    def allows_data_kind(self, data_kind: str) -> bool:
+        return bool(self.enabled and data_kind in self.data_kinds)
+
+    def apply_enabled_for(self, data_kind: str) -> bool:
+        if not self.allows_data_kind(data_kind):
+            return False
+        return {
+            "race_time": self.schedule_apply_enabled,
+            "racecard": self.racecard_apply_enabled,
+            "result": self.result_apply_enabled,
+        }.get(data_kind, False)
+
 
 @dataclass(frozen=True)
 class RaceDataProviderRosterEntry:
     provider: str
     regions: tuple[str, ...]
+    enabled_regions: tuple[str, ...]
     source_class: str
     adapter_status: str
     transport_enabled: bool
@@ -162,6 +488,16 @@ class RaceDataProviderRosterEntry:
     contract_version: str
     contract_digest: str
     allowed_fields: tuple[str, ...]
+    identity_namespaces: tuple[str, ...]
+    data_kinds: tuple[str, ...]
+    enabled_data_kinds: tuple[str, ...]
+    terminal_markers: tuple[str, ...]
+    allowed_hosts: tuple[str, ...]
+    allowed_path_prefixes: tuple[str, ...]
+    request_budget: int
+    minimum_interval_seconds: int
+    automation_allowed: bool
+    proof_digest: str
 
 
 @dataclass(frozen=True)
@@ -187,6 +523,7 @@ class RaceDataProviderRoster:
                 for entry in self.entries
                 if entry.provider == provider
                 and region in entry.regions
+                and region in entry.enabled_regions
                 and field_name in entry.allowed_fields
                 and entry.adapter_status == "implemented"
                 and entry.transport_enabled
@@ -194,6 +531,50 @@ class RaceDataProviderRoster:
             ),
             None,
         )
+
+    def resolve_route(
+        self,
+        *,
+        provider: str,
+        region: str,
+        identity_namespace: str,
+        data_kind: str,
+    ) -> RaceDataProviderRosterEntry | None:
+        if not self.verify_digest():
+            return None
+        return next(
+            (
+                entry
+                for entry in self.entries
+                if entry.provider == provider
+                and region in entry.regions
+                and region in entry.enabled_regions
+                and identity_namespace in entry.identity_namespaces
+                and data_kind in entry.enabled_data_kinds
+                and entry.adapter_status == "implemented"
+                and entry.automation_allowed
+                and bool(entry.proof_digest)
+                and bool(entry.allowed_hosts)
+                and bool(entry.allowed_path_prefixes)
+                and entry.request_budget > 0
+                and entry.minimum_interval_seconds > 0
+            ),
+            None,
+        )
+
+
+@dataclass(frozen=True)
+class RaceDataResolvedRoute:
+    registry_digest: str
+    route_digest: str
+    contract_digest: str
+    proof_digest: str
+    allowed_hosts: tuple[str, ...]
+    allowed_path_prefixes: tuple[str, ...]
+    request_budget: int
+    minimum_interval_seconds: int
+    identity_namespace: str
+    entry: RaceDataProviderRosterEntry
 
 
 _ROSTER_ALLOWED_FIELDS = tuple(
@@ -219,18 +600,26 @@ _ROSTER_DEFINITIONS = (
     ("equibase", ("united_states",), "official_operator", "proof_required"),
     ("france_galop", ("france",), "official_operator", "proof_required"),
     ("hkjc", ("hong_kong",), "official_operator", "proof_required"),
-    ("horse_racing_nation", ("united_states",), "trusted_publisher", "proof_required"),
+    ("horse_racing_nation", ("united_states",), "trusted_publisher", "implemented"),
     ("hri", ("ireland",), "official_operator", "proof_required"),
     ("jra", ("japan_jra",), "official_operator", "proof_required"),
     ("nar", ("japan_nar",), "official_operator", "proof_required"),
-    ("sporting_life", ("ireland", "united_kingdom"), "trusted_publisher", "proof_required"),
+    ("sporting_life", ("united_kingdom",), "trusted_publisher", "implemented"),
     (
         "the_racing_api",
-        ("france", "hong_kong", "ireland", "united_kingdom", "united_states"),
+        (
+            "france",
+            "hong_kong",
+            "ireland",
+            "japan_jra",
+            "japan_nar",
+            "united_kingdom",
+            "united_states",
+        ),
         "licensed_api",
         "implemented",
     ),
-    ("zeturf", ("france",), "trusted_publisher", "proof_required"),
+    ("zeturf", ("france",), "trusted_publisher", "implemented"),
 )
 _EVENT_REGION_BY_CONTRACT_REGION = {
     "hong_kong": models.RacingRegion.HONG_KONG,
@@ -264,10 +653,19 @@ def _provider_roster_digest(
                 {
                     "provider": entry.provider,
                     "regions": list(entry.regions),
+                    "enabled_regions": list(entry.enabled_regions),
                     "source_class": entry.source_class,
                     "adapter_status": entry.adapter_status,
                     "contract_version": entry.contract_version,
                     "contract_digest": entry.contract_digest,
+                    "identity_namespaces": list(entry.identity_namespaces),
+                    "data_kinds": list(entry.data_kinds),
+                    "terminal_markers": list(entry.terminal_markers),
+                    "allowed_hosts": list(entry.allowed_hosts),
+                    "allowed_path_prefixes": list(entry.allowed_path_prefixes),
+                    "request_budget": entry.request_budget,
+                    "minimum_interval_seconds": entry.minimum_interval_seconds,
+                    "proof_digest": entry.proof_digest,
                 }
                 for entry in entries
             ],
@@ -275,13 +673,146 @@ def _provider_roster_digest(
     )
 
 
+def race_data_route_digest(
+    *, roster: RaceDataProviderRoster, entry: RaceDataProviderRosterEntry
+) -> str:
+    """Bind one runnable route to the exact current roster and audit proof."""
+
+    return _canonical_sha256(
+        {
+            "registry_digest": roster.registry_digest,
+            "provider": entry.provider,
+            "regions": list(entry.regions),
+            "identity_namespaces": list(entry.identity_namespaces),
+            "enabled_data_kinds": list(entry.enabled_data_kinds),
+            "contract_version": entry.contract_version,
+            "contract_digest": entry.contract_digest,
+            "proof_digest": entry.proof_digest,
+            "allowed_hosts": list(entry.allowed_hosts),
+            "allowed_path_prefixes": list(entry.allowed_path_prefixes),
+            "request_budget": entry.request_budget,
+            "minimum_interval_seconds": entry.minimum_interval_seconds,
+        }
+    )
+
+
+def resolve_race_data_provider_route(
+    *,
+    provider: str,
+    region: str,
+    identity_namespace: str,
+    data_kinds: Iterable[str],
+    configuration_only: bool = False,
+) -> RaceDataResolvedRoute | None:
+    """Resolve every requested kind through the one current Slice A roster."""
+
+    kinds = tuple(sorted(set(data_kinds)))
+    if not kinds:
+        return None
+    roster = build_race_data_provider_roster(configuration_only=configuration_only)
+    matches = {
+        roster.resolve_route(
+            provider=provider,
+            region=region,
+            identity_namespace=identity_namespace,
+            data_kind=kind,
+        )
+        for kind in kinds
+    }
+    if None in matches or len(matches) != 1:
+        return None
+    entry = next(iter(matches))
+    assert entry is not None
+    return RaceDataResolvedRoute(
+        registry_digest=roster.registry_digest,
+        route_digest=race_data_route_digest(roster=roster, entry=entry),
+        contract_digest=entry.contract_digest,
+        proof_digest=entry.proof_digest,
+        allowed_hosts=entry.allowed_hosts,
+        allowed_path_prefixes=entry.allowed_path_prefixes,
+        request_budget=entry.request_budget,
+        minimum_interval_seconds=entry.minimum_interval_seconds,
+        identity_namespace=identity_namespace,
+        entry=entry,
+    )
+
+
 def build_race_data_provider_roster(
-    *, expected_registry_digest: str | None = None
+    *,
+    expected_registry_digest: str | None = None,
+    configuration_only: bool = False,
 ) -> RaceDataProviderRoster:
     flags = RaceDataSyncFlags.from_settings()
     entries = []
     for provider, regions, source_class, adapter_status in _ROSTER_DEFINITIONS:
-        contract_version = "racecard-v1"
+        contract_version = "race-data-v2"
+        identity_namespaces = (f"{provider}-race-v1",)
+        data_kinds = tuple(models.RaceDataSyncDataKind.values)
+        terminal_markers: tuple[str, ...] = ()
+        allowed_hosts: tuple[str, ...] = ()
+        allowed_path_prefixes: tuple[str, ...] = ()
+        request_budget = 0
+        minimum_interval_seconds = 1
+        proof_digest = ""
+        if provider == "the_racing_api":
+            terminal_markers = ("complete", "official", "result")
+            allowed_hosts = ("api.theracingapi.com",)
+            allowed_path_prefixes = (
+                "/v1/racecards/free",
+                "/v1/results/today/free",
+                "/v1/results/",
+            )
+            request_budget = 3
+            minimum_interval_seconds = 2
+            configured_proof_digest = str(
+                getattr(settings, "RACE_LIVE_TRA_REGISTRY_SHA256", "") or ""
+            )
+            if (
+                len(configured_proof_digest) == _SHA256_LENGTH
+                and all(
+                    char in "0123456789abcdef"
+                    for char in configured_proof_digest
+                )
+            ):
+                proof_digest = configured_proof_digest
+        elif provider in {
+            "sporting_life",
+            "zeturf",
+            "horse_racing_nation",
+        }:
+            identity_namespaces = (f"{provider}-race-v1", provider)
+            data_kinds = (models.RaceDataSyncDataKind.RESULT,)
+            terminal_markers = ("complete",)
+            reference_route = {
+                "sporting_life": ("sportinglife.com", "/racing/results/"),
+                "zeturf": ("zeturf.fr", "/fr/course-du-jour/"),
+                "horse_racing_nation": (
+                    "horseracingnation.com",
+                    "/entries-results/",
+                ),
+            }[provider]
+            allowed_hosts = (reference_route[0],)
+            allowed_path_prefixes = (reference_route[1],)
+            request_budget = 1
+            minimum_interval_seconds = 2
+            configured_proof_digest = str(
+                getattr(
+                    settings,
+                    "RACE_DATA_SYNC_REFERENCE_REGISTRY_SHA256",
+                    "",
+                )
+                or ""
+            )
+            if (
+                len(configured_proof_digest) == _SHA256_LENGTH
+                and all(
+                    char in "0123456789abcdef"
+                    for char in configured_proof_digest
+                )
+            ):
+                proof_digest = configured_proof_digest
+        elif source_class == "official_operator":
+            terminal_markers = ("complete",)
         contract_digest = _canonical_sha256(
             {
                 "provider": provider,
@@ -290,13 +821,23 @@ def build_race_data_provider_roster(
                 "adapter_status": adapter_status,
                 "contract_version": contract_version,
                 "allowed_fields": list(_ROSTER_ALLOWED_FIELDS),
+                "identity_namespaces": list(identity_namespaces),
+                "data_kinds": list(data_kinds),
+                "terminal_markers": list(terminal_markers),
+                "allowed_hosts": list(allowed_hosts),
+                "allowed_path_prefixes": list(allowed_path_prefixes),
+                "request_budget": request_budget,
+                "minimum_interval_seconds": minimum_interval_seconds,
             }
         )
         runtime_provider_enabled = bool(
-            flags.enabled
+            (flags.enabled or configuration_only)
             and provider in flags.providers
             and set(regions).intersection(flags.regions)
             and adapter_status == "implemented"
+        )
+        enabled_regions = tuple(
+            region for region in regions if region in flags.regions
         )
         runtime_fields = tuple(
             field
@@ -306,26 +847,37 @@ def build_race_data_provider_roster(
         runtime_apply_enabled = bool(
             runtime_provider_enabled and runtime_fields
         )
+        enabled_data_kinds = tuple(
+            kind for kind in data_kinds if kind in flags.data_kinds
+        )
+        automation_allowed = bool(runtime_provider_enabled and enabled_data_kinds)
         entries.append(
             RaceDataProviderRosterEntry(
                 provider=provider,
                 regions=regions,
+                enabled_regions=enabled_regions,
                 source_class=source_class,
                 adapter_status=adapter_status,
                 transport_enabled=runtime_provider_enabled,
                 apply_enabled=runtime_apply_enabled,
                 contract_version=contract_version,
                 contract_digest=contract_digest,
-                allowed_fields=(
-                    runtime_fields
-                    if runtime_apply_enabled
-                    else _ROSTER_ALLOWED_FIELDS
-                ),
+                allowed_fields=_ROSTER_ALLOWED_FIELDS,
+                identity_namespaces=identity_namespaces,
+                data_kinds=data_kinds,
+                enabled_data_kinds=enabled_data_kinds,
+                terminal_markers=terminal_markers,
+                allowed_hosts=allowed_hosts,
+                allowed_path_prefixes=allowed_path_prefixes,
+                request_budget=request_budget,
+                minimum_interval_seconds=minimum_interval_seconds,
+                automation_allowed=automation_allowed,
+                proof_digest=proof_digest,
             )
         )
     roster_entries = tuple(entries)
     registry_digest = _provider_roster_digest(
-        schema_version=1, entries=roster_entries
+        schema_version=2, entries=roster_entries
     )
     if (
         expected_registry_digest is not None
@@ -333,7 +885,7 @@ def build_race_data_provider_roster(
     ):
         raise ValueError("race data provider roster digest mismatch")
     return RaceDataProviderRoster(
-        schema_version=1,
+        schema_version=2,
         registry_digest=registry_digest,
         entries=roster_entries,
     )
@@ -720,14 +1272,48 @@ def _reconcile_racecard_observation_atomic(
     observation_id: int,
     expected_event_id: int,
     allow_schedule_apply: bool,
+    allow_racecard_apply: bool,
     task_id: str,
     run_id: str,
+    claim_guard: RaceDataSyncClaim | None = None,
 ) -> RacecardReconciliationDecision:
-    """Apply non-schedule racecard fields under source and identity checks."""
-
-    if allow_schedule_apply:
-        return RacecardReconciliationDecision("rejected", "slice_c_required")
+    """Apply admitted racecard and schedule fields under source arbitration."""
     with transaction.atomic():
+        lifecycle = (
+            models.RaceEventLifecycleControl.objects.select_for_update()
+            .filter(event_id=expected_event_id)
+            .first()
+        )
+        locked_claim = None
+        if claim_guard is not None:
+            claim_decision, locked_claim = (
+                lock_and_validate_race_data_sync_claim_for_apply(
+                    claim=claim_guard,
+                    now=timezone.now(),
+                    required_data_kinds=tuple(
+                        kind
+                        for kind, enabled in (
+                            (
+                                models.RaceDataSyncDataKind.RACE_TIME,
+                                allow_schedule_apply,
+                            ),
+                            (
+                                models.RaceDataSyncDataKind.RACECARD,
+                                allow_racecard_apply,
+                            ),
+                        )
+                        if enabled
+                    ),
+                )
+            )
+            if locked_claim is None:
+                return RacecardReconciliationDecision(
+                    "rejected", claim_decision.reason_code, expected_event_id
+                )
+            if locked_claim.event.pk != expected_event_id:
+                return RacecardReconciliationDecision(
+                    "rejected", "event_identity_mismatch", expected_event_id
+                )
         observation = (
             models.RaceResultObservation.objects.select_for_update()
             .select_related("source_identity")
@@ -802,7 +1388,17 @@ def _reconcile_racecard_observation_atomic(
             )
         roster = build_race_data_provider_roster()
         roster_entry = next(
-            (entry for entry in roster.entries if entry.provider == source.source_key),
+            (
+                entry
+                for entry in roster.entries
+                if entry.provider == source.source_key
+                and contract_region in entry.regions
+                and (
+                    not source.identity_namespace
+                    or source.identity_namespace in entry.identity_namespaces
+                )
+                and models.RaceDataSyncDataKind.RACECARD in entry.data_kinds
+            ),
             None,
         )
         if roster_entry is None or contract_region not in roster_entry.regions:
@@ -867,12 +1463,43 @@ def _reconcile_racecard_observation_atomic(
                 "rejected", "runtime_admission_closed", expected_event_id, observation.pk
             )
         existing_changes = models.RaceEventFieldChange.objects.filter(
-            observation=observation, operation_mode="slice_a"
+            observation=observation
         )
-        processed_fields = set(
-            existing_changes.values_list(
-                "subject_type", "subject_key", "field_name"
+        reprocessable = Q(pk__in=())
+        if allow_schedule_apply:
+            reprocessable |= Q(rejection_reason="schedule_apply_disabled")
+        if flags.racecard_apply_enabled:
+            reprocessable |= Q(rejection_reason="racecard_apply_disabled")
+        runtime_contract_by_field = {
+            "horse_name": "participants.horse_name",
+            "horse_number": "participants.number",
+            "barrier": "participants.draw",
+            "jockey_name": "participants.jockey_name",
+            "trainer_name": "participants.trainer_name",
+            "carried_weight": "participants.carried_weight",
+            "odds_value": "participants.odds",
+            "popularity": "participants.popularity",
+            "running_status": "participants.status",
+            "race_datetime": "off_time",
+            "local_date": "off_time",
+            "local_start_time": "local_start_time",
+            "timezone_name": "timezone_name",
+            "status": "status",
+        }
+        newly_admitted_model_fields = {
+            model_field
+            for model_field, contract_field in runtime_contract_by_field.items()
+            if contract_field in admitted_fields
+        }
+        if newly_admitted_model_fields:
+            reprocessable |= Q(
+                rejection_reason="runtime_admission_closed",
+                field_name__in=newly_admitted_model_fields,
             )
+        processed_fields = set(
+            existing_changes.exclude(
+                Q(decision="rejected") & reprocessable
+            ).values_list("subject_type", "subject_key", "field_name")
         )
         had_existing_review = existing_changes.filter(
             decision="needs_review"
@@ -885,16 +1512,61 @@ def _reconcile_racecard_observation_atomic(
                 observation.pk,
             )
 
-        event = models.RaceEvent.objects.select_for_update().filter(
-            pk=expected_event_id
-        ).first()
+        event = (
+            locked_claim.event
+            if locked_claim is not None
+            else models.RaceEvent.objects.select_for_update()
+            .filter(pk=expected_event_id)
+            .first()
+        )
         if event is None:
             return RacecardReconciliationDecision(
                 "rejected", "event_missing", expected_event_id, observation.pk
             )
+        control = (
+            locked_claim.control
+            if locked_claim is not None
+            else None
+        )
+        if control is None:
+            control, _created = models.RaceEventProjectionControl.objects.get_or_create(
+                event=event
+            )
+            control = models.RaceEventProjectionControl.objects.select_for_update().get(
+                pk=control.pk
+            )
+        if control.write_owner not in {
+            models.RaceEventProjectionWriteOwner.UNMANAGED,
+            models.RaceEventProjectionWriteOwner.LIVE,
+            models.RaceEventProjectionWriteOwner.DATA_SYNC,
+        }:
+            return RacecardReconciliationDecision(
+                "rejected",
+                "writer_owner_conflict",
+                expected_event_id,
+                observation.pk,
+            )
+        if control.write_owner == models.RaceEventProjectionWriteOwner.DATA_SYNC and (
+            source.terms_status != models.RaceSourceTermsStatus.APPROVED
+            or source.valid_until is None
+            or source.valid_until <= timezone.now()
+            or source.registry_digest != roster.registry_digest
+            or source.region_code != contract_region
+            or source.identity_namespace not in roster_entry.identity_namespaces
+        ):
+            return RacecardReconciliationDecision(
+                "rejected",
+                "source_contract_mismatch",
+                expected_event_id,
+                observation.pk,
+            )
         audit = _audit_defaults(observation=observation, task_id=task_id, run_id=run_id)
+        candidate_watermark = observation.source_updated_at or observation.observed_at
+        candidate_source_class = normalize_source_class(
+            provenance.get("source_class")
+        )
         aggregate = "replayed"
-        participants = list(payload["participants"])
+        participants = list(payload["participants"]) if allow_racecard_apply else []
         seen: set[str] = set()
         validated_participants: list[tuple[str, str, dict[str, Any]]] = []
         for row in participants:
@@ -993,9 +1665,6 @@ def _reconcile_racecard_observation_atomic(
                 )
             locks = runner.manual_lock_flags if isinstance(runner.manual_lock_flags, dict) else {}
             subject_key = runner.external_runner_id or external_runner_id
-            candidate_watermark = (
-                observation.source_updated_at or observation.observed_at
-            )
             runner_field_applied = False
             for field_name, proposed in candidate_fields.items():
                 old_value = None if created else getattr(runner, field_name)
@@ -1010,51 +1679,26 @@ def _reconcile_racecard_observation_atomic(
                         "value_sha256": "",
                     },
                 )
-                decision = (
-                    "applied"
-                    if created or old_value != proposed
-                    else "replayed"
+                arbitration = arbitrate_source_value(
+                    current_source_key=authority.source_key,
+                    current_source_class=authority.source_class,
+                    current_observed_at=authority.observed_at,
+                    candidate_source_key=source.source_key,
+                    candidate_source_class=candidate_source_class,
+                    candidate_observed_at=candidate_watermark,
+                    has_current_value=not created and old_value not in (None, ""),
+                    values_equal=not created and old_value == proposed,
+                    manual_locked=(
+                        locks.get(field_name) is True or authority.manual_lock
+                    ),
                 )
-                reason = ""
-                if not created and old_value != proposed:
-                    if locks.get(field_name) is True or authority.manual_lock:
-                        decision = "needs_review"
-                        reason = "manual_lock"
-                    elif (
-                        not created
-                        and authority.source_key
-                        and authority.source_key != source.source_key
-                    ):
-                        decision = "needs_review"
-                        reason = "cross_source_conflict"
-                    elif (
-                        authority.source_key == source.source_key
-                        and authority.observed_at is not None
-                        and candidate_watermark <= authority.observed_at
-                    ):
-                        decision = "needs_review"
-                        reason = "stale_source_version"
-                applied = decision == "applied"
-                if decision == "needs_review":
-                    raise _RacecardNeedsReview(
-                        reason=reason,
-                        event_id=event.pk,
-                        observation_id=observation.pk,
-                        changes=(
-                            {
-                                "event": event,
-                                "subject_type": models.RaceEventFieldSubjectType.PARTICIPANT,
-                                "subject_key": external_runner_id,
-                                "field_name": field_name,
-                                "old_value": old_value,
-                                "new_value": proposed,
-                                "applied": False,
-                                "decision": "needs_review",
-                                "rejection_reason": reason,
-                                **audit,
-                            },
-                        ),
-                    )
+                applied = arbitration.apply
+                decision = "applied" if applied else (
+                    "replayed"
+                    if arbitration.reason_code == "idempotent_replay"
+                    else "rejected"
+                )
+                reason = arbitration.reason_code
                 models.RaceEventFieldChange.objects.create(
                     event=event,
                     subject_type=models.RaceEventFieldSubjectType.PARTICIPANT,
@@ -1064,7 +1708,9 @@ def _reconcile_racecard_observation_atomic(
                     new_value=proposed,
                     applied=applied,
                     decision=decision,
-                    rejection_reason=reason,
+                    rejection_reason=(
+                        "" if applied or decision == "replayed" else reason
+                    ),
                     **audit,
                 )
                 if applied:
@@ -1072,7 +1718,6 @@ def _reconcile_racecard_observation_atomic(
                     runner_field_applied = True
                     if aggregate != "needs_review":
                         aggregate = "applied"
-                # Legacy authority_level is deliberately never read or changed.
                 if (
                     applied
                     or not authority.source_key
@@ -1084,6 +1729,10 @@ def _reconcile_racecard_observation_atomic(
                         )
                     )
                 ):
+                    authority.authority_level = source_priority(
+                        candidate_source_class
+                    )
+                    authority.source_class = candidate_source_class
                     authority.source_key = source.source_key
                     authority.source_url = source.canonical_url
                     authority.external_id = external_runner_id
@@ -1095,6 +1744,8 @@ def _reconcile_racecard_observation_atomic(
                     ).hexdigest()
                     authority.save(
                         update_fields=(
+                            "authority_level",
+                            "source_class",
                             "source_key",
                             "source_url",
                             "external_id",
@@ -1114,44 +1765,209 @@ def _reconcile_racecard_observation_atomic(
             }
             runner.save()
 
-        schedule_candidates: dict[str, Any] = {}
-        if "off_time" in payload:
-            schedule_candidates["race_datetime"] = payload["off_time"]
-        if "local_start_time" in payload:
-            schedule_candidates["local_start_time"] = payload["local_start_time"]
-        elif (
-            payload.get("off_time")
-            and event.timezone_name
-            and "local_start_time" in set(allowed_fields)
+        if (
+            allow_racecard_apply
+            and validated_participants
+            and control.write_owner != models.RaceEventProjectionWriteOwner.LIVE
         ):
+            revision_rows: list[tuple[models.RaceEventRunner, models.RaceEventParticipant]] = []
+            canonical_participants: list[dict[str, Any]] = []
+            for runner in models.RaceEventRunner.objects.select_for_update().filter(
+                event=event
+            ).order_by("sort_order", "id"):
+                refs = runner.source_refs if isinstance(runner.source_refs, dict) else {}
+                external_runner_id = str(refs.get(source.source_key) or "").strip()
+                if not external_runner_id and refs.get("source_key") == source.source_key:
+                    external_runner_id = str(
+                        refs.get("external_runner_id") or ""
+                    ).strip()
+                if not external_runner_id:
+                    continue
+                stable_key = (
+                    f"{source.source_key}:"
+                    f"{hashlib.sha256(external_runner_id.encode()).hexdigest()[:48]}"
+                )
+                existing_identity = (
+                    models.RaceEventParticipantSourceIdentity.objects.select_for_update()
+                    .select_related("participant")
+                    .filter(
+                        source_identity=source,
+                        external_runner_id=external_runner_id,
+                        participant__event=event,
+                    )
+                    .first()
+                )
+                participant = (
+                    existing_identity.participant
+                    if existing_identity is not None
+                    else models.RaceEventParticipant.objects.get_or_create(
+                        event=event,
+                        stable_key=stable_key,
+                        defaults={
+                            "canonical_name": runner.horse_name,
+                            "country_region": event.country_region,
+                            "review_status": models.RaceLiveReviewStatus.APPROVED,
+                        },
+                    )[0]
+                )
+                models.RaceEventParticipantSourceIdentity.objects.get_or_create(
+                    participant=participant,
+                    source_identity=source,
+                    defaults={"external_runner_id": external_runner_id},
+                )
+                canonical_participants.append(
+                    {
+                        "external_runner_id": external_runner_id,
+                        "horse_name": runner.horse_name,
+                        "number": runner.horse_number,
+                        "draw": runner.barrier,
+                        "jockey_name": runner.jockey_name,
+                        "trainer_name": runner.trainer_name,
+                        "carried_weight": runner.carried_weight,
+                        "status": runner.running_status,
+                    }
+                )
+                revision_rows.append((runner, participant))
+            canonical_payload = {
+                "external_race_id": source.external_race_id,
+                "participants": canonical_participants,
+            }
+            content_sha256 = _canonical_sha256(canonical_payload)
+            current_racecard = control.current_racecard_revision
+            existing_revision = models.RaceEventRevision.objects.filter(
+                event=event,
+                kind=models.RaceEventRevisionKind.RACECARD,
+                phase=models.RaceResultPhase.RACECARD,
+                content_sha256=content_sha256,
+            ).first()
+            if existing_revision is None:
+                revision = models.RaceEventRevision.objects.create(
+                    event=event,
+                    kind=models.RaceEventRevisionKind.RACECARD,
+                    revision_no=control.next_racecard_revision_no,
+                    phase=models.RaceResultPhase.RACECARD,
+                    content_sha256=content_sha256,
+                    source_authority=candidate_source_class,
+                    decision_reason="data_sync_racecard_reconciled",
+                    primary_observation=observation,
+                    supersedes=current_racecard,
+                )
+                models.RaceEventRevisionItem.objects.bulk_create(
+                    [
+                        models.RaceEventRevisionItem(
+                            revision=revision,
+                            participant=participant,
+                            source_order=index,
+                            internal_order=index,
+                            status=runner.running_status,
+                            raw_status=runner.running_status,
+                            horse_number=runner.horse_number,
+                            barrier=runner.barrier,
+                            jockey_name=runner.jockey_name,
+                            trainer_name=runner.trainer_name,
+                            carried_weight=runner.carried_weight,
+                            field_provenance={
+                                "source_key": source.source_key,
+                                "external_runner_id": canonical_participants[index - 1][
+                                    "external_runner_id"
+                                ],
+                                "observation_id": observation.pk,
+                            },
+                        )
+                        for index, (runner, participant) in enumerate(
+                            revision_rows, start=1
+                        )
+                    ]
+                )
+                models.RaceEventRevisionEvidence.objects.create(
+                    revision=revision,
+                    observation=observation,
+                    role="primary",
+                )
+                control.last_known_good_racecard_revision = current_racecard
+                control.current_racecard_revision = revision
+                control.next_racecard_revision_no += 1
+                control.save(
+                    update_fields=(
+                        "last_known_good_racecard_revision",
+                        "current_racecard_revision",
+                        "next_racecard_revision_no",
+                        "updated_at",
+                    )
+                )
+                aggregate = "applied"
+            elif control.current_racecard_revision_id != existing_revision.pk:
+                control.last_known_good_racecard_revision = current_racecard
+                control.current_racecard_revision = existing_revision
+                control.save(
+                    update_fields=(
+                        "last_known_good_racecard_revision",
+                        "current_racecard_revision",
+                        "updated_at",
+                    )
+                )
+                aggregate = "applied"
+
+        candidate_timezone = str(
+            payload.get("timezone_name") or event.timezone_name or ""
+        ).strip()
+        try:
+            candidate_zone = ZoneInfo(candidate_timezone)
+        except (KeyError, ValueError):
+            candidate_zone = None
+        parsed_off: datetime | None = None
+        if payload.get("off_time"):
             try:
                 parsed_off = datetime.fromisoformat(
                     str(payload["off_time"]).replace("Z", "+00:00")
                 )
-                schedule_candidates["local_start_time"] = (
-                    parsed_off.astimezone(ZoneInfo(event.timezone_name))
-                    .time()
-                    .replace(tzinfo=None)
-                    .isoformat()
-                )
-            except (ValueError, KeyError):
-                pass
-        if "timezone_name" in payload:
-            schedule_candidates["timezone_name"] = payload["timezone_name"]
+                if parsed_off.tzinfo is None or parsed_off.utcoffset() is None:
+                    parsed_off = None
+            except ValueError:
+                parsed_off = None
+        schedule_candidates: dict[str, Any] = {}
+        if parsed_off is not None:
+            schedule_candidates["race_datetime"] = parsed_off
+        if candidate_zone is not None and "timezone_name" in payload:
+            schedule_candidates["timezone_name"] = candidate_timezone
+        if "local_start_time" in payload:
+            try:
+                schedule_candidates["local_start_time"] = datetime.strptime(
+                    str(payload["local_start_time"]), "%H:%M:%S"
+                ).time()
+            except ValueError:
+                try:
+                    schedule_candidates["local_start_time"] = datetime.strptime(
+                        str(payload["local_start_time"]), "%H:%M"
+                    ).time()
+                except ValueError:
+                    pass
+        elif parsed_off is not None and candidate_zone is not None:
+            schedule_candidates["local_start_time"] = (
+                parsed_off.astimezone(candidate_zone).time().replace(tzinfo=None)
+            )
+        if parsed_off is not None and candidate_zone is not None:
+            schedule_candidates["local_date"] = parsed_off.astimezone(
+                candidate_zone
+            ).date()
         if payload.get("race_status") in models.RaceEventStatus.values:
             schedule_candidates["status"] = payload["race_status"]
         old_schedule_values = {
-            "race_datetime": (
-                event.race_datetime.isoformat() if event.race_datetime else None
-            ),
-            "local_start_time": (
-                event.local_start_time.isoformat()
-                if event.local_start_time
-                else None
-            ),
-            "timezone_name": event.timezone_name,
-            "status": event.status,
+            field_name: getattr(event, field_name)
+            for field_name in (
+                "race_datetime",
+                "local_date",
+                "local_start_time",
+                "timezone_name",
+                "status",
+            )
         }
+        schedule_changed = False
+        locks = (
+            event.manual_lock_flags
+            if isinstance(event.manual_lock_flags, dict)
+            else {}
+        )
         for field_name, candidate_value in schedule_candidates.items():
             if (
                 models.RaceEventFieldSubjectType.EVENT,
@@ -1159,23 +1975,257 @@ def _reconcile_racecard_observation_atomic(
                 field_name,
             ) in processed_fields:
                 continue
+            authority, _ = models.RaceEventFieldAuthority.objects.select_for_update().get_or_create(
+                event=event,
+                subject_type=models.RaceEventFieldSubjectType.EVENT,
+                subject_key=str(event.pk),
+                field_name=field_name,
+                defaults={
+                    "authority_level": 0,
+                    "source_class": "",
+                    "source_key": "",
+                    "value_sha256": "",
+                },
+            )
+            old_value = old_schedule_values[field_name]
+            field_value_changed = old_value != candidate_value
+            arbitration = arbitrate_source_value(
+                current_source_key=authority.source_key,
+                current_source_class=authority.source_class,
+                current_observed_at=authority.observed_at,
+                candidate_source_key=source.source_key,
+                candidate_source_class=candidate_source_class,
+                candidate_observed_at=candidate_watermark,
+                has_current_value=old_value is not None and old_value != "",
+                values_equal=old_value == candidate_value,
+                manual_locked=(
+                    locks.get(field_name) is True or authority.manual_lock
+                ),
+            )
+            contract_field_name = {
+                "race_datetime": "off_time",
+                "local_date": "off_time",
+                "local_start_time": "local_start_time",
+                "timezone_name": "timezone_name",
+                "status": "status",
+            }[field_name]
+            field_admitted = contract_field_name in admitted_fields
+            terminal_status_regression = bool(
+                field_name == "status"
+                and old_value
+                in {
+                    models.RaceEventStatus.CANCELLED,
+                    models.RaceEventStatus.FINISHED,
+                }
+                and candidate_value != old_value
+            )
+            applied = bool(
+                allow_schedule_apply
+                and field_admitted
+                and arbitration.apply
+                and not terminal_status_regression
+            )
+            decision = (
+                "applied"
+                if applied
+                else (
+                    "replayed"
+                    if arbitration.reason_code == "idempotent_replay"
+                    else "rejected"
+                )
+            )
+            rejection_reason = ""
+            if not applied and decision != "replayed":
+                rejection_reason = (
+                    "terminal_status_regression"
+                    if terminal_status_regression
+                    else "schedule_apply_disabled"
+                    if not allow_schedule_apply
+                    else (
+                        "runtime_admission_closed"
+                        if not field_admitted
+                        else arbitration.reason_code
+                    )
+                )
+            rendered_old = (
+                old_value.isoformat()
+                if hasattr(old_value, "isoformat")
+                else old_value
+            )
+            rendered_candidate = (
+                candidate_value.isoformat()
+                if hasattr(candidate_value, "isoformat")
+                else candidate_value
+            )
+            schedule_audit = {**audit, "operation_mode": "slice_c"}
             models.RaceEventFieldChange.objects.create(
                 event=event,
                 subject_type=models.RaceEventFieldSubjectType.EVENT,
                 subject_key=str(event.pk),
                 field_name=field_name,
-                old_value=old_schedule_values[field_name],
-                new_value=candidate_value,
-                applied=False,
-                decision="rejected",
-                rejection_reason="slice_c_required",
-                **audit,
+                old_value=rendered_old,
+                new_value=rendered_candidate,
+                applied=applied,
+                decision=decision,
+                rejection_reason=rejection_reason,
+                **schedule_audit,
             )
+            if not applied:
+                continue
+            setattr(event, field_name, candidate_value)
+            schedule_changed = schedule_changed or field_value_changed
+            authority.authority_level = source_priority(candidate_source_class)
+            authority.source_class = candidate_source_class
+            authority.source_key = source.source_key
+            authority.source_url = source.canonical_url
+            authority.external_id = source.external_race_id
+            authority.observed_at = candidate_watermark
+            authority.value_sha256 = hashlib.sha256(
+                json.dumps(
+                    rendered_candidate,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                ).encode("utf-8")
+            ).hexdigest()
+            authority.save(
+                update_fields=(
+                    "authority_level",
+                    "source_class",
+                    "source_key",
+                    "source_url",
+                    "external_id",
+                    "observed_at",
+                    "value_sha256",
+                    "updated_at",
+                )
+            )
+        if schedule_changed:
+            event.save(
+                update_fields=tuple(schedule_candidates) + ("updated_at",)
+            )
+            tracking = (
+                locked_claim.tracking
+                if locked_claim is not None
+                else models.RaceEventLiveTracking.objects.select_for_update()
+                .filter(event=event)
+                .first()
+            )
+            if tracking is not None:
+                checkpoints = tuple(
+                    models.RaceEventLiveProviderCheckpoint.objects.select_for_update()
+                    .filter(tracking=tracking)
+                    .order_by("source_key", "data_kind")
+                )
+                checkpoint_now = candidate_watermark
+                for checkpoint in checkpoints:
+                    checkpoint.next_poll_at = calculate_next_poll_at(
+                        data_kind=checkpoint.data_kind,
+                        now=checkpoint_now,
+                        race_datetime=(
+                            None
+                            if event.status == models.RaceEventStatus.POSTPONED
+                            else event.race_datetime
+                        ),
+                        result_confirmed=event.result_confirmed_at is not None,
+                        event_terminal=(
+                            event.status == models.RaceEventStatus.CANCELLED
+                            or (
+                                event.status == models.RaceEventStatus.FINISHED
+                                and checkpoint.data_kind
+                                != models.RaceDataSyncDataKind.RESULT
+                            )
+                        ),
+                    )
+                    checkpoint.lock_version += 1
+                    checkpoint.save(
+                        update_fields=("next_poll_at", "lock_version", "updated_at")
+                    )
+                tracking.active_attempt_token = ""
+                tracking.claim_expires_at = None
+                tracking.claim_generation += 1
+                tracking.next_poll_at = min(
+                    (
+                        checkpoint.next_poll_at
+                        for checkpoint in checkpoints
+                        if checkpoint.next_poll_at is not None
+                    ),
+                    default=None,
+                )
+                tracking.lock_version += 1
+                tracking.save(
+                    update_fields=(
+                        "active_attempt_token",
+                        "claim_expires_at",
+                        "claim_generation",
+                        "next_poll_at",
+                        "lock_version",
+                        "updated_at",
+                    )
+                )
+            if lifecycle is not None:
+                lifecycle.schedule_generation += 1
+                lifecycle.claim_token = ""
+                lifecycle.claim_expires_at = None
+                lifecycle.next_refresh_at = event.race_datetime or timezone.now()
+                lifecycle.last_source_key = source.source_key
+                lifecycle.save(
+                    update_fields=(
+                        "schedule_generation",
+                        "claim_token",
+                        "claim_expires_at",
+                        "next_refresh_at",
+                        "last_source_key",
+                        "updated_at",
+                    )
+                )
+            if event.status != old_schedule_values["status"]:
+                schedule_generation = (
+                    lifecycle.schedule_generation if lifecycle is not None else 0
+                )
+                models.RaceEventLifecycleTransition.objects.get_or_create(
+                    dedupe_key=(
+                        f"data-sync-source:{event.pk}:{observation.pk}:"
+                        f"{event.status}"
+                    ),
+                    defaults={
+                        "event": event,
+                        "from_status": old_schedule_values["status"],
+                        "to_status": event.status,
+                        "reason_code": "provider_status_update",
+                        "effective_at": candidate_watermark,
+                        "source_authority": candidate_source_class,
+                        "source_key": source.source_key,
+                        "source_url": source.canonical_url,
+                        "trigger_task": task_id,
+                        "run_id": run_id,
+                        "schedule_generation": schedule_generation,
+                        "record_kind": (
+                            models.RaceEventLifecycleTransitionKind.APPLIED
+                        ),
+                        "metadata": {
+                            "observation_id": observation.pk,
+                            "normalized_sha256": observation.normalized_sha256,
+                        },
+                    },
+                )
+                tracking_state = {
+                    models.RaceEventStatus.SCHEDULED: models.RaceEventLiveState.SCHEDULED,
+                    models.RaceEventStatus.POSTPONED: models.RaceEventLiveState.SCHEDULED,
+                    models.RaceEventStatus.FINISHED: models.RaceEventLiveState.AWAITING_RESULT,
+                }.get(event.status)
+                if tracking_state:
+                    models.RaceEventLiveTracking.objects.filter(event=event).update(
+                        state=tracking_state,
+                        updated_at=timezone.now(),
+                    )
+            transaction.on_commit(invalidate_public_race_cache)
+            aggregate = "applied"
         return RacecardReconciliationDecision(
             aggregate,
             f"racecard_{aggregate}",
             event.pk,
             observation.pk,
+            claim_invalidated=bool(schedule_changed and claim_guard is not None),
         )
 
 
@@ -1184,16 +2234,20 @@ def reconcile_racecard_observation(
     observation_id: int,
     expected_event_id: int,
     allow_schedule_apply: bool,
+    allow_racecard_apply: bool = True,
     task_id: str,
     run_id: str,
+    claim_guard: RaceDataSyncClaim | None = None,
 ) -> RacecardReconciliationDecision:
     try:
         return _reconcile_racecard_observation_atomic(
             observation_id=observation_id,
             expected_event_id=expected_event_id,
             allow_schedule_apply=allow_schedule_apply,
+            allow_racecard_apply=allow_racecard_apply,
             task_id=task_id,
             run_id=run_id,
+            claim_guard=claim_guard,
         )
     except _RacecardNeedsReview as review:
         with transaction.atomic():
@@ -1208,12 +2262,18 @@ def reconcile_racecard_observation(
 
 
 def cleanup_expired_race_data_raw_payloads(
-    *, now: datetime, batch_size: int = 100
+    *, now: datetime, batch_size: int = 100, max_bytes: int | None = None
 ) -> RawCleanupResult:
     if not isinstance(now, datetime) or timezone.is_naive(now):
         raise ValueError("now must be aware")
     if isinstance(batch_size, bool) or not isinstance(batch_size, int) or not 1 <= batch_size <= 1000:
         raise ValueError("batch_size must be between 1 and 1000")
+    if max_bytes is None:
+        max_bytes = int(
+            getattr(settings, "RACE_DATA_RAW_CLEANUP_MAX_BYTES", 0) or (2**63 - 1)
+        )
+    if isinstance(max_bytes, bool) or not isinstance(max_bytes, int) or max_bytes <= 0:
+        raise ValueError("max_bytes must be positive")
     configured_roots = getattr(settings, "RACE_DATA_RAW_ARTIFACT_ROOTS", ())
     allowed_roots = [Path(value).resolve() for value in configured_roots if value]
     if not allowed_roots:
@@ -1251,6 +2311,7 @@ def cleanup_expired_race_data_raw_payloads(
             if len(candidates) >= batch_size:
                 break
     cleaned = 0
+    cleaned_bytes = 0
     skipped = 0
     for candidate in candidates:
         provenance = candidate.field_provenance
@@ -1282,6 +2343,8 @@ def cleanup_expired_race_data_raw_payloads(
         if not stat.S_ISREG(path_stat.st_mode) or path.is_symlink():
             skipped += 1
             continue
+        if path_stat.st_size > max_bytes - cleaned_bytes:
+            break
 
         with transaction.atomic():
             current = (
@@ -1363,6 +2426,12 @@ def cleanup_expired_race_data_raw_payloads(
             ).update(raw_artifact_path="", raw_size_bytes=None)
             if updated:
                 cleaned += 1
+                cleaned_bytes += path_stat.st_size
             else:
                 skipped += 1
-    return RawCleanupResult(cleaned=cleaned, held=held, skipped=skipped)
+    return RawCleanupResult(
+        cleaned=cleaned,
+        cleaned_bytes=cleaned_bytes,
+        held=held,
+        skipped=skipped,
+    )

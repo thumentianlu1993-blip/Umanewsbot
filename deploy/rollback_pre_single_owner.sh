@@ -95,6 +95,17 @@ if [ -f "$RACE_LIVE_STATE_FILE" ] || [ -L "$RACE_LIVE_STATE_FILE" ]; then
   echo "pre-contract rollback: reusing frozen race_live_worker restore intent ($race_live_intent) from a previous attempt"
 fi
 
+RACE_DATA_SYNC_STATE_FILE="${DEPLOYMENT_LOCK_DIR:-/tmp/umanews-deployment.lock}.race-data-sync-state"
+race_data_sync_intent=""
+if [ -f "$RACE_DATA_SYNC_STATE_FILE" ] || [ -L "$RACE_DATA_SYNC_STATE_FILE" ]; then
+  if ! validate_race_live_state_file "$RACE_DATA_SYNC_STATE_FILE" "$COMPOSE_FILE" "pre-contract-rollback"; then
+    echo "frozen race_sync_v2_worker intent file failed trust validation; review it and delete it manually before retrying" >&2
+    exit 1
+  fi
+  race_data_sync_intent="$(race_live_state_field "$RACE_DATA_SYNC_STATE_FILE" state)"
+  echo "pre-contract rollback: reusing frozen race_sync_v2_worker stop intent ($race_data_sync_intent) from a previous attempt"
+fi
+
 # Freeze current container hostname and running state (same contract as the
 # shared orchestration).
 probe_service() {
@@ -136,11 +147,25 @@ race_live_probe="$(probe_service race_live_worker)" || {
 race_live_current="$(printf '%s' "$race_live_probe" | awk '{print $1}')"
 race_live_node="$(printf '%s' "$race_live_probe" | awk '{print $2}')"
 
+race_data_sync_probe="$(probe_service race_sync_v2_worker)" || {
+  echo "failed to read race_sync_v2_worker container state; failing closed before any stop" >&2
+  exit 1
+}
+race_data_sync_current="$(printf '%s' "$race_data_sync_probe" | awk '{print $1}')"
+race_data_sync_node="$(printf '%s' "$race_data_sync_probe" | awk '{print $2}')"
+
 if [ -z "$race_live_intent" ]; then
   race_live_intent="$race_live_current"
   write_race_live_state_file \
     "$RACE_LIVE_STATE_FILE" "$race_live_intent" "$race_live_node" \
-    "$COMPOSE_FILE" "pre-contract-rollback"
+    "$COMPOSE_FILE" "pre-contract-rollback" "pre-switch"
+fi
+
+if [ -z "$race_data_sync_intent" ]; then
+  race_data_sync_intent="$race_data_sync_current"
+  write_race_live_state_file \
+    "$RACE_DATA_SYNC_STATE_FILE" "$race_data_sync_intent" "$race_data_sync_node" \
+    "$COMPOSE_FILE" "pre-contract-rollback" "pre-switch"
 fi
 
 expected_workers=""
@@ -149,6 +174,9 @@ if [ "$worker_state" = "running" ]; then
 fi
 if [ "$race_live_current" = "running" ]; then
   expected_workers="${expected_workers:+$expected_workers }$race_live_node"
+fi
+if [ "$race_data_sync_current" = "running" ]; then
+  expected_workers="${expected_workers:+$expected_workers }$race_data_sync_node"
 fi
 
 echo "pre-contract rollback: stopping beat"
@@ -165,6 +193,11 @@ if [ "$race_live_current" = "running" ]; then
   "$COMPOSE" -f "$COMPOSE_FILE" stop race_live_worker
 fi
 
+if [ "$race_data_sync_current" = "running" ]; then
+  echo "pre-contract rollback: stopping race_sync_v2_worker (not present in the old image catalog)"
+  "$COMPOSE" -f "$COMPOSE_FILE" stop race_sync_v2_worker
+fi
+
 echo "pre-contract rollback: stopping web"
 "$COMPOSE" -f "$COMPOSE_FILE" stop web
 
@@ -176,7 +209,11 @@ if [ "$SCHEMA_COMPATIBLE_WITH_TARGET" = "false" ]; then
 fi
 
 echo "pre-contract rollback: restoring frozen image tag"
+update_race_live_state_phase "$RACE_LIVE_STATE_FILE" "switching"
+update_race_live_state_phase "$RACE_DATA_SYNC_STATE_FILE" "switching"
 docker tag "$FROZEN_IMAGE_TAG" umanewsbot:prod
+update_race_live_state_phase "$RACE_LIVE_STATE_FILE" "image-switched"
+update_race_live_state_phase "$RACE_DATA_SYNC_STATE_FILE" "image-switched"
 
 echo "pre-contract rollback: starting the single old web (its entrypoint owns migration for the old image)"
 "$COMPOSE" -f "$COMPOSE_FILE" up -d --no-deps web
@@ -194,4 +231,5 @@ fi
 
 "$COMPOSE" -f "$COMPOSE_FILE" ps
 rm -f "$RACE_LIVE_STATE_FILE"
+rm -f "$RACE_DATA_SYNC_STATE_FILE"
 echo "pre-contract rollback: completed"

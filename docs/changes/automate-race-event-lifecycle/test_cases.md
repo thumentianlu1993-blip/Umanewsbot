@@ -562,3 +562,23 @@ GREEN: command / timestamp / exit / counts
 - 扩展现有 `test_realtime_race_results.py`
 - 扩展现有 `test_race_live_racecard_sync.py`
 - 扩展现有 publishing/validation/QQ 测试
+
+## 8. 2026-08-28 实际新增与回归覆盖
+
+| 编号 | 用例 | 结果 |
+|---|---|---|
+| E01 | 来源等级、同级时间/provider 稳定决胜、manual lock | 通过 |
+| E02 | race time/racecard 最慢 12 小时与临赛加密 cadence | 通过 |
+| E03 | future discovery 唯一匹配、standing policy、route drift | 通过 |
+| E04 | claim generation/token/plan SHA 过期完成拒绝与动态 successor | 通过 |
+| E05 | T/T+30 lifecycle、postponed、无时间、幂等 transition | 通过 |
+| E06 | The Racing API host/path/budget、分页、racecard/result 解析 | 通过 |
+| E07 | API not-found 后官方导入优先、再尝试地区第三方 receipt | 通过 |
+| E08 | partial/multi-match 不投影、complete receipt 自动投影 | 通过 |
+| E09 | immutable revisions、dead heat reported position、更正观察 | 通过 |
+| E10 | 公开页统一“赛果”、无来源阶段标签、陈旧警告保留 | 通过 |
+| E11 | 审计 missing policy 为 blocked、有效 policy 为 ready、route drift 阻断 | 通过 |
+| E12 | 全新数据库全配置 dry-run 前后 hash 不变 | 通过 |
+
+最终聚焦命令共执行 171 个测试，全部通过；隔离 PostgreSQL 16 的并发/事务专项 23/23 通过；另有
+`manage.py check`、`makemigrations --check --dry-run` 和 Python compileall 通过。

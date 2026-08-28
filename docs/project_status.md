@@ -1,5 +1,79 @@
 # 项目状态文档
 
+## 2026-08-29 PR #108 阻塞修复和生产历史 claim 已收口，待最终发布确认
+
+- 生产真实状态未变：PR 仍 OPEN，revision `2833558a…56c`、leaf `0073`，新赛事写入全关，
+  `race_sync_v2=0`、旧 `race_live=7543`。未 migration/合并/部署/启用；既有 lifecycle 的
+  `enabled/enforce + 6 controls` 保持不动，不属于本次新 data-sync 开关。
+- 历史 claim 修复已绑定 exact manifest SHA、eligibility、PostgreSQL advisory transaction lock 和全集合
+  CAS；同时修复 prepare exception 终态化与严格过期 sweeper，畸形/活跃/已有证据行仍整批拒绝。
+- 全 PR 的 13 项有效 review findings 已关闭：`0075` final leaf/catalog/rollback、未知名次不猜测、
+  data-sync 独立公开读取、shadow promotion、开关开启后的 observation 重处理、exact enrollment source、
+  8 天 snapshot retention/专用队列清理、cancelled/postponed/terminal polling 和告警公平/解除。
+- 最终增量把 future discovery/cleanup 绑定总开关、保证 snapshot waiter 跨过 lease TTL，并消除
+  data-sync 公开批量读取的 source N+1；完整 diff 独立 code review 最终结论为 `No findings`。
+- 当前组合证据为 SQLite/发布实际断言 `536` 通过、`3` 环境跳过（基础 image 缺 Git 的唯一错误已在
+  Git-capable 同版本容器精确重跑 `1/1`）；部署/回滚合同 `42/42`。PostgreSQL
+  migration/history/catalog/fault injection `27/27`，R0 + Pipeline A 并发/CAS `24/24`，历史 claim 锁
+  另 `4/4`。Django check、migration generation、compileall、Shell、三份 Compose、secret pattern 与
+  diff whitespace 门禁全绿。
+- 生产关闭态使用 `dd67c789…8aa0` / candidate image `8114325b…d8620` 复核迁移计划只有
+  `0074/0075`；manifest `5897db0d…76d1a5` 精确收口 14 行为 `failed/stale_claim_reconciled`，claimed
+  归零。写前 custom backup 为 `484192137` bytes、SHA `64d72011…44bdc`、0600/TOC 有效。
+- 独立复核证明 cursor 保持，bundle/selector 为空，pending/delivery/approval/赛果/相关日志计数、
+  `celery=0`、`race_sync_v2=0`、旧 `race_live=7543` 均未变；旧 Beat 恢复，公网三入口 200。
+  最终 merge/deploy/enable 仍需绑定最终 PR head 和该关闭态证据的一次用户确认；任一门禁失败都停止且
+  保持新写入关闭。
+
+## 2026-08-28 PR #108 发布因 14 条 claimed 赛果审核记录停止
+
+- 用户已给出最终合并/部署授权，但 PR `#108` 尚未合并，生产仍为 revision `2833558a…56c`、migration
+  leaf `0073`；未创建本次发布备份、未执行 `0074/0075`、未切换镜像，也未启用新自动化。
+- 上线前主机 I/O/内存故障已通过只重启空闲普通 worker 恢复；服务与公网入口重新健康。随后 writer
+  静默门禁发现 `RaceResultReviewRun(status="claimed")=14`，因此按约定立即停止。
+- 失败清理后旧 Beat 已恢复，五个赛事写入开关仍为 `false`，`race_sync_v2=0`，旧
+  `race_live=7543` 未触碰。当前阻塞项是对 14 条历史 claim 的独立核验与受审精确收口；不得绕过门禁继续
+  PR 合并、迁移或分阶段启用。
+- 根因已收敛：旧 scheduler 在取得 20 分钟 claim 后，`prepare_review_bundle` 抛出异常时没有 exception
+  terminalization；后续 catch-up 也不会清理由历史 slot 留下的行。发布门禁正确地按所有 `claimed` 计数，
+  所以 14 条租约虽已过期仍必须阻断，而不能被当作 inactive 忽略。
+- 本地已实现原 token 异常终态、5 分钟严格 sweeper 和 SHA-bound 历史修复命令；畸形/活跃/已有证据行会
+  整批阻断。首轮独立 review 的 retry 旧终态残留和 manifest phantom claim 已以字段复位及 PostgreSQL
+  advisory transaction lock 修复，manifest SHA 也绑定 eligibility；聚焦 SQLite 232/232、PostgreSQL 28/28、
+  Django/migration/Compose/compile/diff 静态门禁通过；
+  扩展套件中的既有红灯已在原 PR head 精确复现，当前差异未新增失败。尚待文档闭合、全 PR 独立复审、
+  生产备份与 14 行精确收口。
+
+## 2026-08-20 赛事数据自动同步 R0 已通过独立代码评审，保持默认关闭
+
+- 独立 clean worktree/branch 已完成 `0074` additive migration、`data_sync` writer owner、来源稳定 identity、
+  enrollment/checkpoint/snapshot lease、每分钟 selector 和 `race_sync_v2` 隔离 worker；Slice A 仍是唯一
+  provider roster 与业务 flag namespace。
+- 99 场 census、standing-policy route 歧义、限时 manifest、owner acquire/replay/rotate/disenroll、legacy
+  reviewed transfer、claim/generation/checkpoint CAS 和 provider 局部失败重排已有测试。新 route 缺 host/path/
+  request-budget proof 时保持不可用；provider executor 尚未实现，所有开关默认关闭。
+- 首轮独立代码 review 的 6 high + 3 medium 及第二轮限定复核发现的 legacy 信任根/审批时序、exact catalog、
+  optional-row/checkpoint 锁序、snapshot expiry CAS、rollback sibling marker 已逐项修复：所有 admission/
+  enrollment/claim 绑定当前唯一 provider roster；统一 event-first 锁序并补真实并发/abort；snapshot 使用
+  规范五元组 key、150 秒 COMPLETE
+  TTL 与 FAILED retry；legacy transfer 改为受审 artifact trust root；catalog guard 核精确列语义和 CHECK；
+  rollback intent 增加 image-switch phase；exact enrollment manifest 可重放；非法容量值和 worker media
+  挂载均 fail closed。
+- reverse disenrollment manifest 已按当前 event/source/route/owner/enrollment snapshot 精确释放 tracking、
+  checkpoint 与 `data_sync` owner，保留来源、observation/revision/audit。每小时 future discovery 只加载 raw
+  SHA 绑定的 standing policy，生成全量 census 与最多 20 场限时 proposal；当前不持久化 artifact、不自动 apply。
+- 容量配置已统一为 `RACE_DATA_RAW_*`，默认全部为 `0`，因此在完成生产磁盘 sizing proof 前误开 network 也会
+  在 provider 执行前 fail closed。纯 admission 已覆盖 payload、provider/region 日预算、high/low water、
+  min-free、hold 和 cleanup failure；生产文件系统采样、清理执行与故障注入仍未接线。
+- 发布控制面已纳入新 worker 的 probe/drain/frozen intent/stop/restore 和旧镜像 catalog 边界；migration/
+  rollback 合同顺接 `0074`，migration SHA 为 `21670e77…d54eb`。本轮本地验证合计 R0/邻接/migration/
+  release/PostgreSQL 并发 `566` 项通过、2 项按环境跳过，三份 Compose 结构与静态检查通过。
+- 同一独立 reviewer 最终复核未发现 blocker/high/medium/low，结论为 `VERDICT: APPROVED`。该结论仅批准
+  默认关闭 R0 代码候选，不构成联网、migration、部署或生产启用授权。
+- 当前不是可启用版本：future proposal artifact persistence/运行中自动 apply、真实 provider transport、
+  R1–R4 跨写路径锁图、Celery 真实集成、生产容量/低磁盘故障注入仍待完成。没有生产
+  网络、migration、写入、配置启用、服务重启、push、PR 或部署。
+
 ## 2026-08-17 未来赛事时间已有首批真实样本，备份链路暴露 P1 运维缺口
 
 - event `946–953` 已按 York 官方赛程补齐时间并完成生产审计/页面验收；7 天 lifecycle census 已从
@@ -2876,3 +2950,39 @@ P0 马信息补全专项的模型交接文档见
   claim，赛事仍为 `scheduled`、applied transition 为 0。
 - 下一验收是 event 186/187 各自的 T 与 T+30 状态/审计/缓存观察；完整恢复点和运行证据见 change 的
   `release_report.md`。
+
+# 2026-08-28 赛事数据全生命周期自动化等待 PR 与生产确认
+
+- 代码侧已经完成未来赛事自动发现、赛时/出马表动态同步、赛事状态推进、赛后结果与更正链；无需逐场
+  人工确认，公开页不展示来源或 provisional/official 标签。
+- 来源优先级为 licensed API > 官方导入 > 可信第三方；The Racing API 为联网主链，官网网络抓取未在
+  没有独立 proof 的情况下扩张。
+- migration 0075、Compose/Beat/worker 配置、冻结 standing policy、只读审计命令和回滚边界已齐备；
+  所有开关默认 false、容量默认 0。
+- provider 网络请求后，schedule/racecard/result 投影事务会重新锁定并核验 exact claim、expiry、generation、
+  plan/checkpoint 和 data-kind；失效 worker 零 canonical 写入，也不能完成或释放新 claim。
+- 本地验证为 202/202、PostgreSQL 16 专项 24/24，zero-write dry-run 前后数据库 SHA 不变。赛事相邻
+  扩展套件当前分支 `684` 项相对 `origin/main` 共同模块基线新增 `77` 项，规范化失败/错误集合
+  `current-only=0`；当前为 `9 failures / 39 errors / 4 skipped`，基线为
+  `12 failures / 39 errors / 4 skipped`，因此没有本次新增红灯且少 3 个既有失败。主干缺少本 PR 的 6 个
+  测试模块所产生的 import error 已从共同集合剔除。实现已提交并创建
+  PR #108，当前未合并、发布或改动生产；PR 完成后只再请求一次绑定精确 revision 的生产部署确认。
+- 生产只读 preflight 确认运行 revision `2833558a…`、healthz 200、external started/active lock 为 0（2 条
+  lock 占位行均未持有）、新队列为 0；runtime 只有旧版总开关 false 与 provider/region/field 空集合四键，
+  本 change 新键尚未配置。磁盘可用 `12,211,531,776` bytes 且主 checkout 有 1,710 项历史 dirty，必须使用
+  隔离 release 和 8 GiB min-free 容量门禁。
+  旧 `race_live` 7,543 条遗留消息明确不在本次范围。
+
+# 2026-08-28 PR #108 进入第二轮独立复审前状态
+
+- 历史 claim 防复发、精确 preview/apply 修复包和首轮全量审查的 11 项问题均已有代码与测试；新增
+  exact result route、完整分页共享快照、provisional 非公开、终态 roster 守恒、immutable racecard、
+  lifecycle 保留语义、T+30 普通队列 incident 和事务内来源合同重验。
+- 额外人工复核修正了 fallback 首次来源身份无法使用的问题：只有 canonical runner 与结果行形成完整、
+  无歧义双射时才原子绑定，不降低缺行/多解门禁。
+- 当前仍是 PR OPEN、生产未改动、schema 0073、新写入关闭、历史 14 条 claimed 未处理、旧
+  `race_live=7543` 保持原样。完成组合回归、第二轮独立 review 和 push 后，先执行已授权的备份与历史
+  claim 收口，再请求最终合并/部署/启用确认。
+- 返修组合回归已达到 SQLite `190/190`、PostgreSQL `214/214`；静态、migration、Compose、digest、
+  secret pattern 与关闭态 `ready/would_write=false` 审计全部通过。当前下一步收敛为提交/push 与第二轮
+  独立 review，仍不代表已部署。

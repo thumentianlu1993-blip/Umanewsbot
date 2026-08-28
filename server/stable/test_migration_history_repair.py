@@ -34,6 +34,8 @@ M0070 = ("stable", "0070_horse_identity_evidence_commit_receipt")
 M0071 = ("stable", "0071_historical_calendar_release_b")
 M0072 = ("stable", "0072_add_extended_racing_regions")
 M0073 = ("stable", "0073_lifecycle_enforce_registry")
+M0074 = ("stable", "0074_race_data_sync_r0_control_plane")
+M0075 = ("stable", "0075_race_data_source_priority_and_reported_position")
 
 
 def _stable_plan(loader: MigrationLoader, applied: set[tuple[str, str]]) -> list[str]:
@@ -44,8 +46,8 @@ def _stable_plan(loader: MigrationLoader, applied: set[tuple[str, str]]) -> list
     ]
 
 
-class MigrationHistoryRepair0073ReleaseContractTests(TestCase):
-    """0073 must be a reviewed ordinary-release leaf, not post-migrate drift."""
+class MigrationHistoryRepair0075ReleaseContractTests(TestCase):
+    """0075 must extend the reviewed ordinary-release leaf contract."""
 
     def test_0072_has_exact_forward_plan_to_0073_and_0073_is_final(self):
         from stable.services.historical_calendar_release_b_schema import (
@@ -53,13 +55,21 @@ class MigrationHistoryRepair0073ReleaseContractTests(TestCase):
             TARGET,
         )
 
-        self.assertEqual(TARGET, M0073)
+        self.assertEqual(TARGET, M0075)
         self.assertEqual(
             ALLOWED_FORWARD_STATES[(f"{M0072[0]}.{M0072[1]}",)],
-            [M0073[1]],
+            [M0073[1], M0074[1], M0075[1]],
         )
         self.assertEqual(
             ALLOWED_FORWARD_STATES[(f"{M0073[0]}.{M0073[1]}",)],
+            [M0074[1], M0075[1]],
+        )
+        self.assertEqual(
+            ALLOWED_FORWARD_STATES[(f"{M0074[0]}.{M0074[1]}",)],
+            [M0075[1]],
+        )
+        self.assertEqual(
+            ALLOWED_FORWARD_STATES[(f"{M0075[0]}.{M0075[1]}",)],
             [],
         )
 
@@ -69,8 +79,8 @@ class MigrationHistoryRepair0073ReleaseContractTests(TestCase):
             PREVIOUS_FINAL_LEAF_SET,
         )
 
-        self.assertEqual(PREVIOUS_FINAL_LEAF_SET, (f"{M0072[0]}.{M0072[1]}",))
-        self.assertEqual(FINAL_LEAF_SET, (f"{M0073[0]}.{M0073[1]}",))
+        self.assertEqual(PREVIOUS_FINAL_LEAF_SET, (f"{M0074[0]}.{M0074[1]}",))
+        self.assertEqual(FINAL_LEAF_SET, (f"{M0075[0]}.{M0075[1]}",))
 
     def test_preflight_accepts_both_pre_migration_and_current_leaf(self):
         preflight = (
@@ -78,6 +88,11 @@ class MigrationHistoryRepair0073ReleaseContractTests(TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("stable.0072_add_extended_racing_regions)", preflight)
         self.assertIn("stable.0073_lifecycle_enforce_registry)", preflight)
+        self.assertIn("stable.0074_race_data_sync_r0_control_plane)", preflight)
+        self.assertIn(
+            "stable.0075_race_data_source_priority_and_reported_position)",
+            preflight,
+        )
 
     def test_every_initial_install_prefix_includes_0073(self):
         from stable.services.historical_calendar_release_b_schema import (
@@ -86,18 +101,18 @@ class MigrationHistoryRepair0073ReleaseContractTests(TestCase):
 
         for leaf_set, plan in INITIAL_INSTALL_FORWARD_STATES.items():
             with self.subTest(leaf_set=leaf_set):
-                if leaf_set != (f"{M0073[0]}.{M0073[1]}",):
-                    self.assertEqual(plan[-1], M0073[1])
+                if leaf_set != (f"{M0075[0]}.{M0075[1]}",):
+                    self.assertEqual(plan[-1], M0075[1])
 
     def test_generic_rollback_contract_carries_0073(self):
         for relative in ("deploy/rollback.sh", "deploy/rollback_lowcost.sh"):
             self.assertIn(
                 "RELEASE_B_EXPECTED_MIGRATION_LEAF_SET="
-                "stable.0073_lifecycle_enforce_registry",
+                "stable.0075_race_data_source_priority_and_reported_position",
                 (ROOT / relative).read_text(encoding="utf-8"),
             )
         self.assertIn(
-            "EXPECTED_LEAF=stable.0073_lifecycle_enforce_registry",
+            "EXPECTED_LEAF=stable.0075_race_data_source_priority_and_reported_position",
             (ROOT / "deploy/resume_rollback_control_state.sh").read_text(
                 encoding="utf-8"
             ),
@@ -109,6 +124,14 @@ class MigrationHistoryRepair0073ReleaseContractTests(TestCase):
             '"server/stable/migrations/0073_lifecycle_enforce_registry.py"',
             verifier,
         )
+        self.assertIn(
+            '"server/stable/migrations/0074_race_data_sync_r0_control_plane.py"',
+            verifier,
+        )
+        self.assertIn(
+            '"server/stable/migrations/0075_race_data_source_priority_and_reported_position.py"',
+            verifier,
+        )
         allowlist = json.loads(
             (ROOT / "deploy/reviewed_release_b_rollback_migrations.json").read_text(
                 encoding="utf-8"
@@ -116,7 +139,7 @@ class MigrationHistoryRepair0073ReleaseContractTests(TestCase):
         )
         self.assertEqual(
             allowlist["required_migrations"][-1]["migration_path"],
-            "server/stable/migrations/0073_lifecycle_enforce_registry.py",
+            "server/stable/migrations/0075_race_data_source_priority_and_reported_position.py",
         )
 
     def test_0073_catalog_contract_validates_tables_fks_constraints_and_indexes(self):
@@ -357,7 +380,7 @@ class MigrationHistoryRepairLeafSetRedTests(TestCase):
         )
         self.assertEqual(
             payload["migration_plan"],
-            [M0069[1], M0071[1], M0072[1], M0073[1]],
+            [M0069[1], M0071[1], M0072[1], M0073[1], M0074[1], M0075[1]],
         )
         self.assertTrue(payload["migration_state_allowed"])
 
@@ -725,7 +748,7 @@ class MigrationHistoryRepairBaselineRedTests(SimpleTestCase):
             "applied_nodes": ["stable.0067_historical_calendar_release_a"],
             "migration_leaf_set": ["stable.0067_historical_calendar_release_a"],
             "migration_plan": [
-                M0070[1], M0068[1], M0069[1], M0071[1], M0072[1], M0073[1]
+                M0070[1], M0068[1], M0069[1], M0071[1], M0072[1], M0073[1], M0074[1], M0075[1]
             ],
             "unknown_applied_migrations": [],
             "migration_graph_known": True,
@@ -1360,6 +1383,269 @@ class MigrationHistoryRepairRestrictedRecoveryRedTests(SimpleTestCase):
             },
         }
 
+
+    @staticmethod
+    def _valid_contract():
+        snapshot = "stable_racedatasnapshotlease"
+        checkpoint = "stable_raceeventliveprovidercheckpoint"
+        enrollment = "stable_racedatasyncenrollment"
+        source = "stable_raceresultsourceidentity"
+        projection = "stable_raceeventprojectioncontrol"
+        column_names = {
+            snapshot: {
+                "id", "created_at", "updated_at", "cache_key", "state",
+                "owner_token", "lease_generation", "lease_expires_at",
+                "artifact_sha256", "manifest_data", "retry_after", "error_code",
+            },
+            checkpoint: {
+                "id", "created_at", "updated_at", "source_key", "data_kind",
+                "next_poll_at", "last_attempt_at", "last_success_at",
+                "last_observation_hash", "last_source_updated_at",
+                "consecutive_failures", "circuit_reason", "stale_at",
+                "contract_digest", "registry_digest", "lock_version", "tracking_id",
+            },
+            enrollment: {
+                "id", "created_at", "updated_at", "state",
+                "standing_policy_digest", "route_digest", "event_snapshot_sha256",
+                "projection_owner_generation", "enrollment_generation",
+                "manifest_sha256", "entry_sha256", "reason_code", "effective_at",
+                "retired_at", "event_id", "source_identity_id",
+            },
+            source: {"region_code", "identity_namespace"},
+            projection: {"write_owner"},
+        }
+        column_semantics = {
+            snapshot: {
+                "id": ("bigint", True),
+                "created_at": ("timestamp with time zone", True),
+                "updated_at": ("timestamp with time zone", True),
+                "cache_key": ("character varying(255)", True),
+                "state": ("character varying(16)", True),
+                "owner_token": ("character varying(64)", True),
+                "lease_generation": ("bigint", True),
+                "lease_expires_at": ("timestamp with time zone", False),
+                "artifact_sha256": ("character varying(64)", True),
+                "manifest_data": ("jsonb", True),
+                "retry_after": ("timestamp with time zone", False),
+                "error_code": ("character varying(64)", True),
+            },
+            checkpoint: {
+                "id": ("bigint", True),
+                "created_at": ("timestamp with time zone", True),
+                "updated_at": ("timestamp with time zone", True),
+                "source_key": ("character varying(64)", True),
+                "data_kind": ("character varying(16)", True),
+                "next_poll_at": ("timestamp with time zone", False),
+                "last_attempt_at": ("timestamp with time zone", False),
+                "last_success_at": ("timestamp with time zone", False),
+                "last_observation_hash": ("character varying(64)", True),
+                "last_source_updated_at": ("timestamp with time zone", False),
+                "consecutive_failures": ("integer", True),
+                "circuit_reason": ("character varying(64)", True),
+                "stale_at": ("timestamp with time zone", False),
+                "contract_digest": ("character varying(64)", True),
+                "registry_digest": ("character varying(64)", True),
+                "lock_version": ("bigint", True),
+                "tracking_id": ("bigint", True),
+            },
+            enrollment: {
+                "id": ("bigint", True),
+                "created_at": ("timestamp with time zone", True),
+                "updated_at": ("timestamp with time zone", True),
+                "state": ("character varying(16)", True),
+                "standing_policy_digest": ("character varying(64)", True),
+                "route_digest": ("character varying(64)", True),
+                "event_snapshot_sha256": ("character varying(64)", True),
+                "projection_owner_generation": ("bigint", True),
+                "enrollment_generation": ("bigint", True),
+                "manifest_sha256": ("character varying(64)", True),
+                "entry_sha256": ("character varying(64)", True),
+                "reason_code": ("character varying(64)", True),
+                "effective_at": ("timestamp with time zone", False),
+                "retired_at": ("timestamp with time zone", False),
+                "event_id": ("bigint", True),
+                "source_identity_id": ("bigint", True),
+            },
+            source: {
+                "region_code": ("character varying(32)", True),
+                "identity_namespace": ("character varying(64)", True),
+            },
+            projection: {"write_owner": ("character varying(16)", True)},
+        }
+        columns = []
+        for table, names in column_names.items():
+            for name in sorted(names):
+                column_type, not_null = column_semantics[table][name]
+                columns.append({
+                    "table_name": table,
+                    "column_name": name,
+                    "type": column_type,
+                    "not_null": not_null,
+                    "identity": "d" if name == "id" else "",
+                    "default_expr": "",
+                })
+
+        def constraint(table, name, kind, columns, target="", definition=""):
+            return {
+                "table_name": table,
+                "name": name,
+                "type": kind,
+                "validated": True,
+                "deferrable": bool(target),
+                "initially_deferred": bool(target),
+                "definition": definition,
+                "target_table": target,
+                "columns": columns,
+                "target_columns": ["id"] if target else [],
+                "delete_action": "a" if target else " ",
+            }
+
+        constraints = [
+            constraint(snapshot, "snapshot_pk", "p", ["id"]),
+            constraint(snapshot, "snapshot_cache_unique", "u", ["cache_key"]),
+            constraint(checkpoint, "checkpoint_pk", "p", ["id"]),
+            constraint(checkpoint, "uq_race_data_ckpt_route_kind", "u", ["tracking_id", "source_key", "data_kind"]),
+            constraint(checkpoint, "checkpoint_tracking_fk", "f", ["tracking_id"], "stable_raceeventlivetracking"),
+            constraint(enrollment, "enrollment_pk", "p", ["id"]),
+            constraint(enrollment, "enrollment_event_unique", "u", ["event_id"]),
+            constraint(enrollment, "enrollment_event_fk", "f", ["event_id"], "stable_raceevent"),
+            constraint(enrollment, "enrollment_source_fk", "f", ["source_identity_id"], source),
+            constraint(source, "uq_race_srcid_route_external", "u", ["source_key", "region_code", "identity_namespace", "external_race_id"]),
+            constraint(source, "uq_race_srcid_event_route", "u", ["event_id", "source_key", "region_code", "identity_namespace"]),
+            constraint(
+                snapshot,
+                "race_data_snapshot_state_valid",
+                "c",
+                ["state"],
+                definition=(
+                    "CHECK (state = ANY (ARRAY['claimed', 'complete', 'failed']))"
+                ),
+            ),
+            constraint(
+                snapshot,
+                "race_data_snapshot_generation_gte1",
+                "c",
+                ["lease_generation"],
+                definition="CHECK (lease_generation >= 1)",
+            ),
+            constraint(
+                snapshot,
+                "race_data_snapshot_state_shape",
+                "c",
+                ["state", "owner_token", "lease_expires_at"],
+                definition=(
+                    "CHECK ((state = 'claimed' AND owner_token > '' AND "
+                    "lease_expires_at IS NOT NULL AND artifact_sha256 = '' AND "
+                    "retry_after IS NULL AND error_code = '') OR "
+                    "(state = 'complete' AND owner_token = '' AND "
+                    "lease_expires_at IS NOT NULL AND artifact_sha256 > '' AND "
+                    "retry_after IS NULL AND error_code = '') OR "
+                    "(state = 'failed' AND owner_token = '' AND "
+                    "lease_expires_at IS NULL AND artifact_sha256 = '' AND "
+                    "retry_after IS NOT NULL AND error_code > ''))"
+                ),
+            ),
+            constraint(
+                checkpoint,
+                "race_data_ckpt_kind_valid",
+                "c",
+                ["data_kind"],
+                definition=(
+                    "CHECK (data_kind = ANY "
+                    "(ARRAY['race_time', 'racecard', 'result']))"
+                ),
+            ),
+            constraint(
+                enrollment,
+                "race_data_enroll_state_valid",
+                "c",
+                ["state"],
+                definition=(
+                    "CHECK (state = ANY "
+                    "(ARRAY['proposed', 'enrolled', 'paused', 'retired']))"
+                ),
+            ),
+            constraint(
+                enrollment,
+                "race_data_enroll_gen_gte1",
+                "c",
+                ["enrollment_generation"],
+                definition="CHECK (enrollment_generation >= 1)",
+            ),
+            constraint(
+                projection,
+                "race_projection_owner_valid",
+                "c",
+                ["write_owner"],
+                definition=(
+                    "CHECK (write_owner = ANY "
+                    "(ARRAY['unmanaged', 'historical', 'live', 'data_sync', "
+                    "'manual_paused']))"
+                ),
+            ),
+        ]
+
+        def index(name, table, columns):
+            return {
+                "name": name,
+                "table_name": table,
+                "method": "btree",
+                "unique": False,
+                "valid": True,
+                "ready": True,
+                "live": True,
+                "columns": columns,
+                "predicate": "",
+            }
+
+        return {
+            "columns": columns,
+            "constraints": constraints,
+            "indexes": [
+                index("race_data_snapshot_lease_idx", snapshot, ["state", "lease_expires_at"]),
+                index("race_data_ckpt_due_idx", checkpoint, ["next_poll_at", "tracking_id"]),
+                index("race_data_enroll_state_evt_idx", enrollment, ["state", "event_id"]),
+            ],
+        }
+
+    def test_valid_0074_catalog_is_accepted(self):
+        from stable.services.historical_calendar_release_b_schema import (
+            validate_race_data_sync_r0_catalog_contract,
+        )
+
+        self.assertEqual(
+            validate_race_data_sync_r0_catalog_contract(
+                contract=self._valid_contract(), migration_applied=True
+            ),
+            [],
+        )
+
+    def test_identity_or_owner_contract_drift_is_rejected(self):
+        from stable.services.historical_calendar_release_b_schema import (
+            validate_race_data_sync_r0_catalog_contract,
+        )
+
+        contract = self._valid_contract()
+        contract["columns"] = [
+            row
+            for row in contract["columns"]
+            if not (
+                row["table_name"] == "stable_raceresultsourceidentity"
+                and row["column_name"] == "identity_namespace"
+            )
+        ]
+        owner = next(
+            row
+            for row in contract["constraints"]
+            if row["name"] == "race_projection_owner_valid"
+        )
+        owner["definition"] = "CHECK write_owner IN (unmanaged, live)"
+        drift = validate_race_data_sync_r0_catalog_contract(
+            contract=contract, migration_applied=True
+        )
+        self.assertIn("0074.identity_scope_columns", drift)
+        self.assertIn("0074.projection_owner_check", drift)
+
     def test_initial_completion_uses_origin_bound_audit_not_reviewed_static(self):
         command = (
             "stable.management.commands."
@@ -1372,7 +1658,7 @@ class MigrationHistoryRepairRestrictedRecoveryRedTests(SimpleTestCase):
         }
         live = {
             "ok": True,
-            "migration_leaf_set": [f"{M0073[0]}.{M0073[1]}"],
+            "migration_leaf_set": [f"{M0075[0]}.{M0075[1]}"],
             "database_identity_sha256": "d" * 64,
         }
         with TemporaryDirectory() as tmp:
@@ -1531,7 +1817,7 @@ class MigrationHistoryRepairRestrictedRecoveryRedTests(SimpleTestCase):
     def test_required_completion_cannot_noop_after_marker_deletion(self):
         live = {
             "ok": True,
-            "migration_leaf_set": [f"{M0073[0]}.{M0073[1]}"],
+            "migration_leaf_set": [f"{M0075[0]}.{M0075[1]}"],
             "database_identity_sha256": "d" * 64,
         }
         with TemporaryDirectory() as tmp, patch(

@@ -217,10 +217,10 @@ class RaceDataSyncPipelineAPostgresConcurrencyTests(TransactionTestCase):
             observation=observation,
             operation_mode="slice_a",
         )
-        self.assertEqual(changes.count(), 7)
+        self.assertEqual(changes.count(), 5)
         self.assertEqual(
             changes.values("subject_type", "subject_key", "field_name").distinct().count(),
-            7,
+            5,
         )
         self.assertEqual(
             set(changes.values_list("field_name", flat=True)),
@@ -230,12 +230,16 @@ class RaceDataSyncPipelineAPostgresConcurrencyTests(TransactionTestCase):
                 "barrier",
                 "jockey_name",
                 "running_status",
-                "race_datetime",
-                "local_start_time",
             },
         )
+        schedule_changes = models.RaceEventFieldChange.objects.filter(
+            observation=observation,
+            operation_mode="slice_c",
+        )
+        self.assertEqual(schedule_changes.count(), 3)
+        self.assertFalse(schedule_changes.filter(applied=True).exists())
 
-    def test_same_source_equal_watermark_conflict_has_one_winner_and_one_review(self):
+    def test_same_source_equal_watermark_conflict_has_one_stable_winner(self):
         first_observation = self._observation(
             self.tra,
             jockey="TRA First Jockey",
@@ -255,7 +259,7 @@ class RaceDataSyncPipelineAPostgresConcurrencyTests(TransactionTestCase):
 
         self.assertEqual(
             sorted(result.status for result in results),
-            ["applied", "needs_review"],
+            ["applied", "replayed"],
         )
         runners = models.RaceEventRunner.objects.filter(event=self.event)
         self.assertEqual(runners.count(), 1)
@@ -271,7 +275,7 @@ class RaceDataSyncPipelineAPostgresConcurrencyTests(TransactionTestCase):
         self.assertEqual(jockey_changes.count(), 2)
         self.assertEqual(
             sorted(jockey_changes.values_list("decision", flat=True)),
-            ["applied", "needs_review"],
+            ["applied", "rejected"],
         )
 
     def test_schedule_candidates_concurrent_are_idempotent_and_never_apply(self):
@@ -315,13 +319,14 @@ class RaceDataSyncPipelineAPostgresConcurrencyTests(TransactionTestCase):
                 schedule_changes = models.RaceEventFieldChange.objects.filter(
                     observation=observation,
                     subject_type=models.RaceEventFieldSubjectType.EVENT,
-                    operation_mode="slice_a",
+                    operation_mode="slice_c",
                 )
-                self.assertEqual(schedule_changes.count(), 4)
+                self.assertEqual(schedule_changes.count(), 5)
                 self.assertEqual(
                     set(schedule_changes.values_list("field_name", flat=True)),
                     {
                         "race_datetime",
+                        "local_date",
                         "local_start_time",
                         "timezone_name",
                         "status",

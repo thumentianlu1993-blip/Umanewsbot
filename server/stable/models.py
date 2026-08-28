@@ -513,6 +513,7 @@ class RaceEventProjectionWriteOwner(models.TextChoices):
     UNMANAGED = "unmanaged", "未启用"
     HISTORICAL = "historical", "历史导入"
     LIVE = "live", "准实时"
+    DATA_SYNC = "data_sync", "赛事数据同步"
     MANUAL_PAUSED = "manual_paused", "人工暂停"
 
 
@@ -523,6 +524,25 @@ class RaceEventLiveState(models.TextChoices):
     PROVISIONAL_RESULT = "provisional_result", "暂定赛果"
     OFFICIAL_RESULT = "official_result", "正式赛果"
     CORRECTED_RESULT = "corrected_result", "改判赛果"
+
+
+class RaceDataSyncDataKind(models.TextChoices):
+    RACE_TIME = "race_time", "开跑时间"
+    RACECARD = "racecard", "出马表"
+    RESULT = "result", "赛果"
+
+
+class RaceDataSyncEnrollmentState(models.TextChoices):
+    PROPOSED = "proposed", "待纳管"
+    ENROLLED = "enrolled", "已纳管"
+    PAUSED = "paused", "已暂停"
+    RETIRED = "retired", "已退出"
+
+
+class RaceDataSnapshotLeaseState(models.TextChoices):
+    CLAIMED = "claimed", "采集中"
+    COMPLETE = "complete", "已完成"
+    FAILED = "failed", "失败"
 
 
 class RaceLiveReviewStatus(models.TextChoices):
@@ -1727,6 +1747,166 @@ class RaceEventLiveTracking(TimestampedModel):
         return f"{self.event} {self.state}"
 
 
+class RaceDataSyncEnrollment(TimestampedModel):
+    event = models.OneToOneField(
+        RaceEvent,
+        on_delete=models.PROTECT,
+        related_name="race_data_sync_enrollment",
+    )
+    source_identity = models.ForeignKey(
+        "RaceResultSourceIdentity",
+        on_delete=models.PROTECT,
+        related_name="race_data_sync_enrollments",
+    )
+    state = models.CharField(
+        max_length=16,
+        choices=RaceDataSyncEnrollmentState.choices,
+        default=RaceDataSyncEnrollmentState.PROPOSED,
+    )
+    standing_policy_digest = models.CharField(max_length=64)
+    route_digest = models.CharField(max_length=64)
+    event_snapshot_sha256 = models.CharField(max_length=64)
+    projection_owner_generation = models.PositiveBigIntegerField(default=0)
+    enrollment_generation = models.PositiveBigIntegerField(default=1)
+    manifest_sha256 = models.CharField(max_length=64)
+    entry_sha256 = models.CharField(max_length=64)
+    reason_code = models.CharField(max_length=64, blank=True)
+    effective_at = models.DateTimeField(null=True, blank=True)
+    retired_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(state__in=RaceDataSyncEnrollmentState.values),
+                name="race_data_enroll_state_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(enrollment_generation__gte=1),
+                name="race_data_enroll_gen_gte1",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("state", "event"),
+                name="race_data_enroll_state_evt_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"event={self.event_id} {self.state} generation={self.enrollment_generation}"
+
+
+class RaceEventLiveProviderCheckpoint(TimestampedModel):
+    tracking = models.ForeignKey(
+        RaceEventLiveTracking,
+        on_delete=models.CASCADE,
+        related_name="provider_checkpoints",
+    )
+    source_key = models.CharField(max_length=64)
+    data_kind = models.CharField(
+        max_length=16,
+        choices=RaceDataSyncDataKind.choices,
+    )
+    next_poll_at = models.DateTimeField(null=True, blank=True)
+    last_attempt_at = models.DateTimeField(null=True, blank=True)
+    last_success_at = models.DateTimeField(null=True, blank=True)
+    last_observation_hash = models.CharField(max_length=64, blank=True)
+    last_source_updated_at = models.DateTimeField(null=True, blank=True)
+    consecutive_failures = models.PositiveIntegerField(default=0)
+    circuit_reason = models.CharField(max_length=64, blank=True)
+    stale_at = models.DateTimeField(null=True, blank=True)
+    contract_digest = models.CharField(max_length=64, blank=True)
+    registry_digest = models.CharField(max_length=64, blank=True)
+    lock_version = models.PositiveBigIntegerField(default=0)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("tracking", "source_key", "data_kind"),
+                name="uq_race_data_ckpt_route_kind",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(data_kind__in=RaceDataSyncDataKind.values),
+                name="race_data_ckpt_kind_valid",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("next_poll_at", "tracking"),
+                name="race_data_ckpt_due_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"tracking={self.tracking_id} {self.source_key}:{self.data_kind}"
+
+
+class RaceDataSnapshotLease(TimestampedModel):
+    cache_key = models.CharField(max_length=255, unique=True)
+    state = models.CharField(
+        max_length=16,
+        choices=RaceDataSnapshotLeaseState.choices,
+        default=RaceDataSnapshotLeaseState.CLAIMED,
+    )
+    owner_token = models.CharField(max_length=64, blank=True)
+    lease_generation = models.PositiveBigIntegerField(default=1)
+    lease_expires_at = models.DateTimeField(null=True, blank=True)
+    artifact_sha256 = models.CharField(max_length=64, blank=True)
+    manifest_data = models.JSONField(default=dict, blank=True)
+    retry_after = models.DateTimeField(null=True, blank=True)
+    error_code = models.CharField(max_length=64, blank=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(state__in=RaceDataSnapshotLeaseState.values),
+                name="race_data_snapshot_state_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(lease_generation__gte=1),
+                name="race_data_snapshot_generation_gte1",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        state=RaceDataSnapshotLeaseState.CLAIMED,
+                        owner_token__gt="",
+                        lease_expires_at__isnull=False,
+                        artifact_sha256="",
+                        retry_after__isnull=True,
+                        error_code="",
+                    )
+                    | models.Q(
+                        state=RaceDataSnapshotLeaseState.COMPLETE,
+                        owner_token="",
+                        lease_expires_at__isnull=False,
+                        artifact_sha256__gt="",
+                        retry_after__isnull=True,
+                        error_code="",
+                    )
+                    | models.Q(
+                        state=RaceDataSnapshotLeaseState.FAILED,
+                        owner_token="",
+                        lease_expires_at__isnull=True,
+                        artifact_sha256="",
+                        retry_after__isnull=False,
+                        error_code__gt="",
+                    )
+                ),
+                name="race_data_snapshot_state_shape",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("state", "lease_expires_at"),
+                name="race_data_snapshot_lease_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.cache_key} {self.state} generation={self.lease_generation}"
+
+
 class RaceLiveHostBudget(TimestampedModel):
     host = models.CharField(max_length=255, unique=True)
     min_interval_ms = models.PositiveIntegerField(default=1000)
@@ -1758,6 +1938,39 @@ class RaceLiveHostBudget(TimestampedModel):
         return self.host
 
 
+class RaceDataTransportCapacityLedger(TimestampedModel):
+    provider = models.CharField(max_length=64)
+    region_code = models.CharField(max_length=32)
+    usage_date = models.DateField()
+    request_count = models.PositiveIntegerField(default=0)
+    budgeted_response_bytes = models.PositiveBigIntegerField(default=0)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("provider", "region_code", "usage_date"),
+                name="race_data_capacity_day_uq",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(provider=""),
+                name="race_data_capacity_provider_nonempty",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(region_code=""),
+                name="race_data_capacity_region_nonempty",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("usage_date", "provider", "region_code"),
+                name="race_data_capacity_day_idx",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.usage_date} {self.provider}:{self.region_code}"
+
+
 class RaceResultSourceIdentity(TimestampedModel):
     event = models.ForeignKey(
         RaceEvent,
@@ -1765,6 +1978,8 @@ class RaceResultSourceIdentity(TimestampedModel):
         related_name="source_identities",
     )
     source_key = models.CharField(max_length=64)
+    region_code = models.CharField(max_length=32, blank=True)
+    identity_namespace = models.CharField(max_length=64, blank=True)
     external_race_id = models.CharField(max_length=128)
     canonical_url = models.URLField(blank=True)
     host = models.CharField(max_length=255, blank=True)
@@ -1802,12 +2017,17 @@ class RaceResultSourceIdentity(TimestampedModel):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=("source_key", "external_race_id"),
-                name="uq_race_srcid_source_external",
+                fields=(
+                    "source_key",
+                    "region_code",
+                    "identity_namespace",
+                    "external_race_id",
+                ),
+                name="uq_race_srcid_route_external",
             ),
             models.UniqueConstraint(
-                fields=("event", "source_key"),
-                name="uq_race_srcid_event_source",
+                fields=("event", "source_key", "region_code", "identity_namespace"),
+                name="uq_race_srcid_event_route",
             ),
             models.CheckConstraint(
                 condition=models.Q(review_status__in=RaceLiveReviewStatus.values),
@@ -2180,6 +2400,7 @@ class RaceEventRevisionItem(TimestampedModel):
     )
     source_order = models.PositiveIntegerField(null=True, blank=True)
     internal_order = models.PositiveIntegerField()
+    reported_finish_position = models.PositiveSmallIntegerField(null=True, blank=True)
     official_finish_position = models.PositiveSmallIntegerField(null=True, blank=True)
     status = models.CharField(
         max_length=24,
@@ -3180,6 +3401,7 @@ class RaceEventRunner(TimestampedModel):
 class RaceEventResult(TimestampedModel):
     event = models.ForeignKey(RaceEvent, on_delete=models.CASCADE, related_name="results")
     finish_position = models.PositiveSmallIntegerField()
+    reported_finish_position = models.PositiveSmallIntegerField(null=True, blank=True)
     official_finish_position = models.PositiveSmallIntegerField(null=True, blank=True)
     horse_number = models.CharField(max_length=32, blank=True)
     horse_name = models.CharField(max_length=255)
@@ -5752,6 +5974,7 @@ class RaceEventFieldAuthority(TimestampedModel):
     subject_key = models.CharField(max_length=255)
     field_name = models.CharField(max_length=64)
     authority_level = models.PositiveSmallIntegerField(default=0)
+    source_class = models.CharField(max_length=32, blank=True)
     source_key = models.CharField(max_length=128, blank=True)
     source_url = models.CharField(max_length=1000, blank=True)
     external_id = models.CharField(max_length=255, blank=True)

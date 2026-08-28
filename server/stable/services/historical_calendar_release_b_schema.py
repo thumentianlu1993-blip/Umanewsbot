@@ -29,7 +29,10 @@ PRODUCTION_AUDIT_EXPECTED_APPLIED_NODES = [
     "stable.0067_historical_calendar_release_a",
     "stable.0070_horse_identity_evidence_commit_receipt",
 ]
-TARGET = ("stable", "0073_lifecycle_enforce_registry")
+TARGET = (
+    "stable",
+    "0075_race_data_source_priority_and_reported_position",
+)
 AUDIT_PATH = (
     Path(__file__).resolve().parents[3]
     / "docs"
@@ -45,6 +48,8 @@ ALLOWED_FORWARD_STATES = {
         "0071_historical_calendar_release_b",
         "0072_add_extended_racing_regions",
         "0073_lifecycle_enforce_registry",
+        "0074_race_data_sync_r0_control_plane",
+        "0075_race_data_source_priority_and_reported_position",
     ],
     (
         "stable.0068_race_data_sync_pipeline_a_field_audit",
@@ -54,6 +59,8 @@ ALLOWED_FORWARD_STATES = {
         "0071_historical_calendar_release_b",
         "0072_add_extended_racing_regions",
         "0073_lifecycle_enforce_registry",
+        "0074_race_data_sync_r0_control_plane",
+        "0075_race_data_source_priority_and_reported_position",
     ],
     (
         "stable.0069_race_data_sync_pipeline_a_ledger_guards",
@@ -62,18 +69,31 @@ ALLOWED_FORWARD_STATES = {
         "0071_historical_calendar_release_b",
         "0072_add_extended_racing_regions",
         "0073_lifecycle_enforce_registry",
+        "0074_race_data_sync_r0_control_plane",
+        "0075_race_data_source_priority_and_reported_position",
     ],
     ("stable.0071_historical_calendar_release_b",): [
         "0072_add_extended_racing_regions",
         "0073_lifecycle_enforce_registry",
+        "0074_race_data_sync_r0_control_plane",
+        "0075_race_data_source_priority_and_reported_position",
     ],
     ("stable.0072_add_extended_racing_regions",): [
-        "0073_lifecycle_enforce_registry"
+        "0073_lifecycle_enforce_registry",
+        "0074_race_data_sync_r0_control_plane",
+        "0075_race_data_source_priority_and_reported_position",
     ],
-    ("stable.0073_lifecycle_enforce_registry",): [],
+    ("stable.0073_lifecycle_enforce_registry",): [
+        "0074_race_data_sync_r0_control_plane",
+        "0075_race_data_source_priority_and_reported_position",
+    ],
+    ("stable.0074_race_data_sync_r0_control_plane",): [
+        "0075_race_data_source_priority_and_reported_position"
+    ],
+    ("stable.0075_race_data_source_priority_and_reported_position",): [],
 }
 
-# Exact recorder states reachable when Django executes the reviewed 0073 plan
+# Exact recorder states reachable when Django executes the reviewed 0075 plan
 # from the sole approved pre-0070 origin.  This is deliberately not merged
 # into ALLOWED_FORWARD_STATES: ordinary Release B deploys must never acquire an
 # initial-install bypass merely because they happen to see an old database.
@@ -85,6 +105,8 @@ INITIAL_INSTALL_FORWARD_STATES = {
         "0071_historical_calendar_release_b",
         "0072_add_extended_racing_regions",
         "0073_lifecycle_enforce_registry",
+        "0074_race_data_sync_r0_control_plane",
+        "0075_race_data_source_priority_and_reported_position",
     ],
     ("stable.0070_horse_identity_evidence_commit_receipt",): [
         "0068_race_data_sync_pipeline_a_field_audit",
@@ -92,6 +114,8 @@ INITIAL_INSTALL_FORWARD_STATES = {
         "0071_historical_calendar_release_b",
         "0072_add_extended_racing_regions",
         "0073_lifecycle_enforce_registry",
+        "0074_race_data_sync_r0_control_plane",
+        "0075_race_data_source_priority_and_reported_position",
     ],
     (
         "stable.0068_race_data_sync_pipeline_a_field_audit",
@@ -101,6 +125,8 @@ INITIAL_INSTALL_FORWARD_STATES = {
         "0071_historical_calendar_release_b",
         "0072_add_extended_racing_regions",
         "0073_lifecycle_enforce_registry",
+        "0074_race_data_sync_r0_control_plane",
+        "0075_race_data_source_priority_and_reported_position",
     ],
     (
         "stable.0069_race_data_sync_pipeline_a_ledger_guards",
@@ -109,15 +135,28 @@ INITIAL_INSTALL_FORWARD_STATES = {
         "0071_historical_calendar_release_b",
         "0072_add_extended_racing_regions",
         "0073_lifecycle_enforce_registry",
+        "0074_race_data_sync_r0_control_plane",
+        "0075_race_data_source_priority_and_reported_position",
     ],
     ("stable.0071_historical_calendar_release_b",): [
         "0072_add_extended_racing_regions",
         "0073_lifecycle_enforce_registry",
+        "0074_race_data_sync_r0_control_plane",
+        "0075_race_data_source_priority_and_reported_position",
     ],
     ("stable.0072_add_extended_racing_regions",): [
-        "0073_lifecycle_enforce_registry"
+        "0073_lifecycle_enforce_registry",
+        "0074_race_data_sync_r0_control_plane",
+        "0075_race_data_source_priority_and_reported_position",
     ],
-    ("stable.0073_lifecycle_enforce_registry",): [],
+    ("stable.0073_lifecycle_enforce_registry",): [
+        "0074_race_data_sync_r0_control_plane",
+        "0075_race_data_source_priority_and_reported_position",
+    ],
+    ("stable.0074_race_data_sync_r0_control_plane",): [
+        "0075_race_data_source_priority_and_reported_position"
+    ],
+    ("stable.0075_race_data_source_priority_and_reported_position",): [],
 }
 
 AUDIT_FIELDS = (
@@ -517,6 +556,15 @@ def collect_postgresql_catalog_contract() -> dict:
         "stable_historicalraceeventtarget",
         "stable_raceeventlifecycleenforceregistry",
         "stable_raceeventlifecycleenforcemembership",
+        "stable_racedatasnapshotlease",
+        "stable_raceeventliveprovidercheckpoint",
+        "stable_racedatasyncenrollment",
+        "stable_raceresultsourceidentity",
+        "stable_raceeventprojectioncontrol",
+        "stable_racedatatransportcapacityledger",
+        "stable_raceeventfieldauthority",
+        "stable_raceeventrevisionitem",
+        "stable_raceeventresult",
     )
     release_b_index_names = (
         "uq_race_event_series_edition",
@@ -1163,6 +1211,520 @@ def validate_lifecycle_registry_catalog_contract(
     return sorted(set(drift))
 
 
+def validate_race_data_sync_r0_catalog_contract(
+    *, contract: dict, migration_applied: bool
+) -> list[str]:
+    """Validate the additive 0074 control tables and upgraded identity scope."""
+
+    snapshot = "stable_racedatasnapshotlease"
+    checkpoint = "stable_raceeventliveprovidercheckpoint"
+    enrollment = "stable_racedatasyncenrollment"
+    source_identity = "stable_raceresultsourceidentity"
+    projection = "stable_raceeventprojectioncontrol"
+    by_table: dict[str, list[dict]] = {}
+    for row in contract.get("columns", []):
+        by_table.setdefault(row.get("table_name", ""), []).append(row)
+    present = any(by_table.get(table) for table in (snapshot, checkpoint, enrollment))
+    if migration_applied != present:
+        return ["0074.table_presence"]
+    if not migration_applied:
+        if any(
+            row.get("column_name") in {"region_code", "identity_namespace"}
+            for row in by_table.get(source_identity, [])
+        ):
+            return ["0074.identity_scope_presence"]
+        return []
+
+    drift: list[str] = []
+    expected_columns = {
+        snapshot: {
+            "id", "created_at", "updated_at", "cache_key", "state",
+            "owner_token", "lease_generation", "lease_expires_at",
+            "artifact_sha256", "manifest_data", "retry_after", "error_code",
+        },
+        checkpoint: {
+            "id", "created_at", "updated_at", "source_key", "data_kind",
+            "next_poll_at", "last_attempt_at", "last_success_at",
+            "last_observation_hash", "last_source_updated_at",
+            "consecutive_failures", "circuit_reason", "stale_at",
+            "contract_digest", "registry_digest", "lock_version", "tracking_id",
+        },
+        enrollment: {
+            "id", "created_at", "updated_at", "state",
+            "standing_policy_digest", "route_digest", "event_snapshot_sha256",
+            "projection_owner_generation", "enrollment_generation",
+            "manifest_sha256", "entry_sha256", "reason_code", "effective_at",
+            "retired_at", "event_id", "source_identity_id",
+        },
+    }
+    for table, names in expected_columns.items():
+        actual = {row.get("column_name") for row in by_table.get(table, [])}
+        if actual != names:
+            drift.append(f"0074.{table.removeprefix('stable_')}_columns")
+        id_row = next(
+            (
+                row
+                for row in by_table.get(table, [])
+                if row.get("column_name") == "id"
+            ),
+            None,
+        )
+        if not id_row or id_row.get("type") != "bigint" or id_row.get("identity") != "d":
+            drift.append(f"0074.{table.removeprefix('stable_')}_id")
+        if any(
+            row.get("identity")
+            for row in by_table.get(table, [])
+            if row.get("column_name") != "id"
+        ):
+            drift.append(f"0074.{table.removeprefix('stable_')}_unexpected_identity")
+
+    expected_semantics = {
+        snapshot: {
+            "id": ("bigint", True),
+            "created_at": ("timestamp with time zone", True),
+            "updated_at": ("timestamp with time zone", True),
+            "cache_key": ("character varying(255)", True),
+            "state": ("character varying(16)", True),
+            "owner_token": ("character varying(64)", True),
+            "lease_generation": ("bigint", True),
+            "lease_expires_at": ("timestamp with time zone", False),
+            "artifact_sha256": ("character varying(64)", True),
+            "manifest_data": ("jsonb", True),
+            "retry_after": ("timestamp with time zone", False),
+            "error_code": ("character varying(64)", True),
+        },
+        checkpoint: {
+            "id": ("bigint", True),
+            "created_at": ("timestamp with time zone", True),
+            "updated_at": ("timestamp with time zone", True),
+            "source_key": ("character varying(64)", True),
+            "data_kind": ("character varying(16)", True),
+            "next_poll_at": ("timestamp with time zone", False),
+            "last_attempt_at": ("timestamp with time zone", False),
+            "last_success_at": ("timestamp with time zone", False),
+            "last_observation_hash": ("character varying(64)", True),
+            "last_source_updated_at": ("timestamp with time zone", False),
+            "consecutive_failures": ("integer", True),
+            "circuit_reason": ("character varying(64)", True),
+            "stale_at": ("timestamp with time zone", False),
+            "contract_digest": ("character varying(64)", True),
+            "registry_digest": ("character varying(64)", True),
+            "lock_version": ("bigint", True),
+            "tracking_id": ("bigint", True),
+        },
+        enrollment: {
+            "id": ("bigint", True),
+            "created_at": ("timestamp with time zone", True),
+            "updated_at": ("timestamp with time zone", True),
+            "state": ("character varying(16)", True),
+            "standing_policy_digest": ("character varying(64)", True),
+            "route_digest": ("character varying(64)", True),
+            "event_snapshot_sha256": ("character varying(64)", True),
+            "projection_owner_generation": ("bigint", True),
+            "enrollment_generation": ("bigint", True),
+            "manifest_sha256": ("character varying(64)", True),
+            "entry_sha256": ("character varying(64)", True),
+            "reason_code": ("character varying(64)", True),
+            "effective_at": ("timestamp with time zone", False),
+            "retired_at": ("timestamp with time zone", False),
+            "event_id": ("bigint", True),
+            "source_identity_id": ("bigint", True),
+        },
+    }
+    for table, expected in expected_semantics.items():
+        rows = by_table.get(table, [])
+        actual = {
+            row.get("column_name"): (row.get("type"), row.get("not_null"))
+            for row in rows
+        }
+        if actual != expected:
+            drift.append(f"0074.{table.removeprefix('stable_')}_column_semantics")
+        if any(row.get("default_expr") for row in rows):
+            drift.append(f"0074.{table.removeprefix('stable_')}_column_defaults")
+
+    identity_names = {
+        row.get("column_name") for row in by_table.get(source_identity, [])
+    }
+    if not {"region_code", "identity_namespace"}.issubset(identity_names):
+        drift.append("0074.identity_scope_columns")
+    identity_semantics = {
+        row.get("column_name"): (row.get("type"), row.get("not_null"))
+        for row in by_table.get(source_identity, [])
+        if row.get("column_name") in {"region_code", "identity_namespace"}
+    }
+    if identity_semantics != {
+        "region_code": ("character varying(32)", True),
+        "identity_namespace": ("character varying(64)", True),
+    }:
+        drift.append("0074.identity_scope_semantics")
+    if any(
+        row.get("default_expr")
+        for row in by_table.get(source_identity, [])
+        if row.get("column_name") in {"region_code", "identity_namespace"}
+    ):
+        drift.append("0074.identity_scope_defaults")
+    projection_owner_row = next(
+        (
+            row
+            for row in by_table.get(projection, [])
+            if row.get("column_name") == "write_owner"
+        ),
+        None,
+    )
+    if not projection_owner_row or (
+        projection_owner_row.get("type"),
+        projection_owner_row.get("not_null"),
+    ) != ("character varying(16)", True):
+        drift.append("0074.projection_owner_column_semantics")
+    if projection_owner_row and projection_owner_row.get("default_expr"):
+        drift.append("0074.projection_owner_column_default")
+
+    constraints = contract.get("constraints", [])
+
+    def constraint_matches(
+        *, table: str, kind: str, columns: list[str], name: str | None = None,
+        target: str = "",
+    ) -> bool:
+        rows = [
+            row
+            for row in constraints
+            if row.get("table_name") == table
+            and row.get("type") == kind
+            and row.get("columns") == columns
+            and (name is None or row.get("name") == name)
+        ]
+        if len(rows) != 1 or rows[0].get("validated") is not True:
+            return False
+        if target:
+            return (
+                rows[0].get("target_table") == target
+                and rows[0].get("target_columns") == ["id"]
+                and rows[0].get("delete_action") == "a"
+                and rows[0].get("deferrable") is True
+                and rows[0].get("initially_deferred") is True
+            )
+        return not rows[0].get("target_table") and not rows[0].get("target_columns")
+
+    required_constraints = (
+        ("snapshot_pk", constraint_matches(table=snapshot, kind="p", columns=["id"])),
+        ("snapshot_cache_unique", constraint_matches(table=snapshot, kind="u", columns=["cache_key"])),
+        ("checkpoint_pk", constraint_matches(table=checkpoint, kind="p", columns=["id"])),
+        ("checkpoint_route_unique", constraint_matches(table=checkpoint, kind="u", columns=["tracking_id", "source_key", "data_kind"], name="uq_race_data_ckpt_route_kind")),
+        ("checkpoint_tracking_fk", constraint_matches(table=checkpoint, kind="f", columns=["tracking_id"], target="stable_raceeventlivetracking")),
+        ("enrollment_pk", constraint_matches(table=enrollment, kind="p", columns=["id"])),
+        ("enrollment_event_unique", constraint_matches(table=enrollment, kind="u", columns=["event_id"])),
+        ("enrollment_event_fk", constraint_matches(table=enrollment, kind="f", columns=["event_id"], target="stable_raceevent")),
+        ("enrollment_source_fk", constraint_matches(table=enrollment, kind="f", columns=["source_identity_id"], target=source_identity)),
+        ("identity_external_unique", constraint_matches(table=source_identity, kind="u", columns=["source_key", "region_code", "identity_namespace", "external_race_id"], name="uq_race_srcid_route_external")),
+        ("identity_event_unique", constraint_matches(table=source_identity, kind="u", columns=["event_id", "source_key", "region_code", "identity_namespace"], name="uq_race_srcid_event_route")),
+    )
+    drift.extend(f"0074.{name}" for name, valid in required_constraints if not valid)
+
+    named_checks = {row.get("name"): row for row in constraints if row.get("type") == "c"}
+
+    def normalized_check(name: str) -> str:
+        row = named_checks.get(name)
+        if not row or row.get("validated") is not True:
+            return ""
+        value = re.sub(r"\s+", "", str(row.get("definition", "")).lower())
+        for cast in ("::charactervarying", "::text[]", "::text"):
+            value = value.replace(cast, "")
+        return value.translate(str.maketrans("", "", "()"))
+
+    exact_checks = {
+        "race_data_snapshot_state_valid": (
+            "checkstate=anyarray['claimed','complete','failed']"
+        ),
+        "race_data_ckpt_kind_valid": (
+            "checkdata_kind=anyarray['race_time','racecard','result']"
+        ),
+        "race_data_enroll_state_valid": (
+            "checkstate=anyarray['proposed','enrolled','paused','retired']"
+        ),
+    }
+    for name, exact in exact_checks.items():
+        if normalized_check(name) != exact:
+            drift.append(f"0074.{name}")
+    for name, exact in (
+        ("race_data_snapshot_generation_gte1", "checklease_generation>=1"),
+        ("race_data_enroll_gen_gte1", "checkenrollment_generation>=1"),
+    ):
+        if normalized_check(name) != exact:
+            drift.append(f"0074.{name}")
+    snapshot_shape = normalized_check("race_data_snapshot_state_shape")
+    expected_shape = {
+        frozenset(
+            {
+                "state='claimed'",
+                "owner_token>''",
+                "lease_expires_atisnotnull",
+                "artifact_sha256=''",
+                "retry_afterisnull",
+                "error_code=''",
+            }
+        ),
+        frozenset(
+            {
+                "state='complete'",
+                "owner_token=''",
+                "lease_expires_atisnotnull",
+                "artifact_sha256>''",
+                "retry_afterisnull",
+                "error_code=''",
+            }
+        ),
+        frozenset(
+            {
+                "state='failed'",
+                "owner_token=''",
+                "lease_expires_atisnull",
+                "artifact_sha256=''",
+                "retry_afterisnotnull",
+                "error_code>''",
+            }
+        ),
+    }
+    actual_shape = set()
+    if snapshot_shape.startswith("check"):
+        atoms = sorted(
+            {atom for clause in expected_shape for atom in clause},
+            key=len,
+            reverse=True,
+        )
+        atom_tokens = {atom: f"p{index}" for index, atom in enumerate(atoms)}
+        tokenized = snapshot_shape.removeprefix("check")
+        for atom, token in atom_tokens.items():
+            tokenized = tokenized.replace(atom, token)
+        actual_shape = {
+            frozenset(clause.split("and")) for clause in tokenized.split("or")
+        }
+        expected_shape_tokens = {
+            frozenset(atom_tokens[atom] for atom in clause)
+            for clause in expected_shape
+        }
+    else:
+        expected_shape_tokens = set()
+    if actual_shape != expected_shape_tokens:
+        drift.append("0074.race_data_snapshot_state_shape")
+    owner_definition = normalized_check("race_projection_owner_valid")
+    if owner_definition != (
+        "checkwrite_owner=anyarray['unmanaged','historical','live',"
+        "'data_sync','manual_paused']"
+    ):
+        drift.append("0074.projection_owner_check")
+
+    indexes = {row.get("name"): row for row in contract.get("indexes", [])}
+
+    def index_matches(name: str, table: str, columns: list[str]) -> bool:
+        row = indexes.get(name)
+        return bool(
+            row
+            and row.get("table_name") == table
+            and row.get("method") == "btree"
+            and row.get("unique") is False
+            and row.get("valid") is True
+            and row.get("ready") is True
+            and row.get("live") is True
+            and row.get("columns") == columns
+            and not row.get("predicate")
+        )
+
+    for label, name, table, columns in (
+        ("snapshot_lease_index", "race_data_snapshot_lease_idx", snapshot, ["state", "lease_expires_at"]),
+        ("checkpoint_due_index", "race_data_ckpt_due_idx", checkpoint, ["next_poll_at", "tracking_id"]),
+        ("enrollment_state_index", "race_data_enroll_state_evt_idx", enrollment, ["state", "event_id"]),
+    ):
+        if not index_matches(name, table, columns):
+            drift.append(f"0074.{label}")
+    return sorted(set(drift))
+
+
+def validate_race_data_source_priority_catalog_contract(
+    *, contract: dict, migration_applied: bool
+) -> list[str]:
+    """Validate the additive 0075 capacity ledger and result projection fields."""
+
+    capacity = "stable_racedatatransportcapacityledger"
+    authority = "stable_raceeventfieldauthority"
+    revision_item = "stable_raceeventrevisionitem"
+    result = "stable_raceeventresult"
+    by_table: dict[str, list[dict]] = {}
+    for row in contract.get("columns", []):
+        by_table.setdefault(row.get("table_name", ""), []).append(row)
+
+    added_columns = {
+        (authority, "source_class"),
+        (revision_item, "reported_finish_position"),
+        (result, "reported_finish_position"),
+    }
+    present_added_columns = {
+        (table, row.get("column_name"))
+        for table in (authority, revision_item, result)
+        for row in by_table.get(table, [])
+        if (table, row.get("column_name")) in added_columns
+    }
+    capacity_present = bool(by_table.get(capacity))
+    if migration_applied != capacity_present:
+        return ["0075.capacity_table_presence"]
+    if migration_applied != (present_added_columns == added_columns):
+        return ["0075.added_column_presence"]
+    if not migration_applied:
+        return []
+
+    drift: list[str] = []
+    expected_columns = {
+        "id",
+        "created_at",
+        "updated_at",
+        "provider",
+        "region_code",
+        "usage_date",
+        "request_count",
+        "budgeted_response_bytes",
+    }
+    capacity_rows = by_table.get(capacity, [])
+    if {row.get("column_name") for row in capacity_rows} != expected_columns:
+        drift.append("0075.capacity_columns")
+    id_row = next(
+        (row for row in capacity_rows if row.get("column_name") == "id"),
+        None,
+    )
+    if (
+        not id_row
+        or id_row.get("type") != "bigint"
+        or id_row.get("identity") != "d"
+    ):
+        drift.append("0075.capacity_id")
+    if any(
+        row.get("identity")
+        for row in capacity_rows
+        if row.get("column_name") != "id"
+    ):
+        drift.append("0075.capacity_unexpected_identity")
+
+    expected_semantics = {
+        "id": ("bigint", True),
+        "created_at": ("timestamp with time zone", True),
+        "updated_at": ("timestamp with time zone", True),
+        "provider": ("character varying(64)", True),
+        "region_code": ("character varying(32)", True),
+        "usage_date": ("date", True),
+        "request_count": ("integer", True),
+        "budgeted_response_bytes": ("bigint", True),
+    }
+    actual_semantics = {
+        row.get("column_name"): (row.get("type"), row.get("not_null"))
+        for row in capacity_rows
+    }
+    if actual_semantics != expected_semantics:
+        drift.append("0075.capacity_column_semantics")
+    if any(row.get("default_expr") for row in capacity_rows):
+        drift.append("0075.capacity_column_defaults")
+
+    added_semantics = {
+        (authority, "source_class"): ("character varying(32)", True),
+        (revision_item, "reported_finish_position"): ("smallint", False),
+        (result, "reported_finish_position"): ("smallint", False),
+    }
+    for (table, column), expected in added_semantics.items():
+        row = next(
+            (
+                candidate
+                for candidate in by_table.get(table, [])
+                if candidate.get("column_name") == column
+            ),
+            None,
+        )
+        if not row or (row.get("type"), row.get("not_null")) != expected:
+            drift.append(f"0075.{table.removeprefix('stable_')}_{column}_semantics")
+        if row and row.get("default_expr"):
+            drift.append(f"0075.{table.removeprefix('stable_')}_{column}_default")
+
+    constraints = contract.get("constraints", [])
+
+    def constraint_matches(
+        *, name: str, kind: str, columns: list[str]
+    ) -> bool:
+        rows = [
+            row
+            for row in constraints
+            if row.get("table_name") == capacity
+            and row.get("name") == name
+            and row.get("type") == kind
+            and row.get("columns") == columns
+        ]
+        return bool(
+            len(rows) == 1
+            and rows[0].get("validated") is True
+            and not rows[0].get("target_table")
+            and not rows[0].get("target_columns")
+        )
+
+    for label, ok in (
+        (
+            "capacity_pk",
+            constraint_matches(name=f"{capacity}_pkey", kind="p", columns=["id"]),
+        ),
+        (
+            "capacity_day_unique",
+            constraint_matches(
+                name="race_data_capacity_day_uq",
+                kind="u",
+                columns=["provider", "region_code", "usage_date"],
+            ),
+        ),
+    ):
+        if not ok:
+            drift.append(f"0075.{label}")
+
+    named_checks = {
+        row.get("name"): row
+        for row in constraints
+        if row.get("table_name") == capacity and row.get("type") == "c"
+    }
+
+    def normalized_check(name: str) -> str:
+        row = named_checks.get(name)
+        if not row or row.get("validated") is not True:
+            return ""
+        value = re.sub(r"\s+", "", str(row.get("definition", "")).lower())
+        for cast in ("::charactervarying", "::text"):
+            value = value.replace(cast, "")
+        return value.translate(str.maketrans("", "", "()"))
+
+    for name, column in (
+        ("race_data_capacity_provider_nonempty", "provider"),
+        ("race_data_capacity_region_nonempty", "region_code"),
+    ):
+        if normalized_check(name) not in {
+            f"check{column}<>''",
+            f"checknot{column}=''",
+        }:
+            drift.append(f"0075.{name}")
+
+    index = next(
+        (
+            row
+            for row in contract.get("indexes", [])
+            if row.get("name") == "race_data_capacity_day_idx"
+        ),
+        None,
+    )
+    if not (
+        index
+        and index.get("table_name") == capacity
+        and index.get("method") == "btree"
+        and index.get("unique") is False
+        and index.get("valid") is True
+        and index.get("ready") is True
+        and index.get("live") is True
+        and index.get("columns") == ["usage_date", "provider", "region_code"]
+        and not index.get("predicate")
+    ):
+        drift.append("0075.capacity_day_index")
+    return sorted(set(drift))
+
+
 def _postgres_catalog_state(
     contract: dict,
     applied_nodes: set[str],
@@ -1434,6 +1996,23 @@ def _postgres_catalog_state(
             contract=contract,
             migration_applied=(
                 "stable.0073_lifecycle_enforce_registry" in applied_nodes
+            ),
+        )
+    )
+    drift.extend(
+        validate_race_data_sync_r0_catalog_contract(
+            contract=contract,
+            migration_applied=(
+                "stable.0074_race_data_sync_r0_control_plane" in applied_nodes
+            ),
+        )
+    )
+    drift.extend(
+        validate_race_data_source_priority_catalog_contract(
+            contract=contract,
+            migration_applied=(
+                "stable.0075_race_data_source_priority_and_reported_position"
+                in applied_nodes
             ),
         )
     )

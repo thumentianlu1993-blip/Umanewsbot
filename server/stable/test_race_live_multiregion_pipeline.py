@@ -29,7 +29,7 @@ class TheRacingApiRegistryV2ContractTests(SimpleTestCase):
     def _payload(self):
         return json.loads(TRA_REGISTRY.read_text(encoding="utf-8"))
 
-    def test_registry_v2_has_exact_five_region_codes_and_route_contracts(self):
+    def test_registry_v2_has_reviewed_region_codes_and_route_contracts(self):
         payload = self._payload()
 
         self.assertEqual(payload.get("schema_version"), 2)
@@ -39,6 +39,7 @@ class TheRacingApiRegistryV2ContractTests(SimpleTestCase):
                 "united_kingdom": "gb",
                 "france": "fr",
                 "hong_kong": "hk",
+                "ireland": "ire",
                 "japan": "jpn",
                 "united_states": "usa",
             },
@@ -56,6 +57,9 @@ class TheRacingApiRegistryV2ContractTests(SimpleTestCase):
                     "path": "/v1/results/today/free",
                     "limit": [50],
                     "skip": list(range(0, 500, 50)),
+                },
+                "result_by_id": {
+                    "path": "/v1/results/{race_id}",
                 },
             },
         )
@@ -85,6 +89,17 @@ class TheRacingApiRegistryV2ContractTests(SimpleTestCase):
                 "https://api.theracingapi.com/v1/racecards/free"
                 "?day=today&region_codes=fr&limit=500&skip=0"
             ),
+        )
+        self.assertEqual(
+            builder(
+                registry=payload,
+                route_name="result_by_id",
+                region=models.RacingRegion.JAPAN,
+                race_id="jp-race:2026-11",
+                limit=0,
+                skip=0,
+            ),
+            "https://api.theracingapi.com/v1/results/jp-race:2026-11",
         )
         self.assertEqual(
             builder(
@@ -303,7 +318,7 @@ class RaceLiveTimezoneAndRacecardRefreshContractTests(SimpleTestCase):
                 "skip": 0,
             }
         )
-        self.assertEqual(racecard.races[0]["participants"][0]["status"], "declared")
+        self.assertNotIn("status", racecard.races[0]["participants"][0])
 
 
 class RaceLiveRegionResultsSnapshotContractTests(SimpleTestCase):
@@ -739,7 +754,7 @@ class RaceLiveRegistryImageContractTests(SimpleTestCase):
         ).hexdigest()
         self.assertEqual(
             registry_sha,
-            "7aca49ff1df7573ebfe6a9e403eefca5c9e64d8ee18d8d3be383d67803db550a",
+            "3bac3b644c631ed165b8430343822b2c70c5a88c5036b63dcb557c83c0e0a6da",
         )
         for relative_path in (
             ".env.example",

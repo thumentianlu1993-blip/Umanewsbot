@@ -2979,11 +2979,24 @@ def _confirmed_race_results(event: RaceEvent) -> list[RaceEventResult]:
 
 
 def _confirmed_race_winner(results: list[RaceEventResult]):
-    return next((result for result in results if result.official_finish_position == 1), None) or next(
+    return next(
+        (result for result in results if result.reported_finish_position == 1),
+        None,
+    ) or next(
         (
             result
             for result in results
-            if result.official_finish_position is None and result.finish_position == 1
+            if result.reported_finish_position is None
+            and result.official_finish_position == 1
+        ),
+        None,
+    ) or next(
+        (
+            result
+            for result in results
+            if result.reported_finish_position is None
+            and result.official_finish_position is None
+            and result.finish_position == 1
         ),
         None,
     )
@@ -3033,11 +3046,27 @@ def _public_today_races() -> tuple[list[dict], bool]:
     winners: dict[int, str] = {}
     finished_ids = [event.pk for event in events if event.status == RaceEventStatus.FINISHED]
     if finished_ids:
+        candidates_by_event: dict[int, list[RaceEventResult]] = {}
         for result in RaceEventResult.objects.filter(
             event_id__in=finished_ids,
             is_confirmed=True,
-        ).filter(Q(official_finish_position=1) | Q(official_finish_position__isnull=True, finish_position=1)):
-            winners[result.event_id] = result.horse_name
+        ).filter(
+            Q(reported_finish_position=1)
+            | Q(
+                reported_finish_position__isnull=True,
+                official_finish_position=1,
+            )
+            | Q(
+                reported_finish_position__isnull=True,
+                official_finish_position__isnull=True,
+                finish_position=1,
+            )
+        ).order_by("event_id", "finish_position", "id"):
+            candidates_by_event.setdefault(result.event_id, []).append(result)
+        for event_id, candidates in candidates_by_event.items():
+            winner = _confirmed_race_winner(candidates)
+            if winner is not None:
+                winners[event_id] = winner.horse_name
     entries = [
         {
             "event": event,
@@ -3331,14 +3360,23 @@ def _attach_result_display_positions(results):
     status_labels = dict(RaceRunnerStatus.choices)
     for result in results:
         source_refs = result.source_refs or {}
+        reported_position = result.reported_finish_position
         official_position = (
             result.official_finish_position
             or source_refs.get("official_finish_position")
         )
-        if official_position is None and result.running_status in non_finish_statuses:
+        if (
+            reported_position is None
+            and official_position is None
+            and result.running_status in non_finish_statuses
+        ):
             result.display_finish_position = status_labels[result.running_status]
         else:
-            result.display_finish_position = official_position or result.finish_position
+            result.display_finish_position = (
+                reported_position
+                or official_position
+                or result.finish_position
+            )
     return results
 
 
@@ -3588,8 +3626,16 @@ def _series_history_winners(
             is_confirmed=True,
         )
         .filter(
-            Q(official_finish_position=1)
-            | Q(official_finish_position__isnull=True, finish_position=1)
+            Q(reported_finish_position=1)
+            | Q(
+                reported_finish_position__isnull=True,
+                official_finish_position=1,
+            )
+            | Q(
+                reported_finish_position__isnull=True,
+                official_finish_position__isnull=True,
+                finish_position=1,
+            )
         )
     )
     if exclude_result_event_id is not None:
@@ -3709,27 +3755,8 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
     )
     if current_result_revision and live_public_read.visible:
         tracking = getattr(event, "live_tracking", None)
-        if current_result_revision.conflict_status == "pending":
-            status_label = "赛果待复核"
-            status_detail = "不同来源的赛果存在差异，正在复核"
-        else:
-            status_label, status_detail = {
-                "provisional": ("暂定赛果", "尚待官方来源复核"),
-                "official": ("正式赛果", ""),
-                "corrected": ("赛果已更正", ""),
-            }.get(
-                current_result_revision.phase,
-                ("赛果更新", ""),
-            )
         live_result_status = {
-            "label": status_label,
-            "detail": status_detail,
             "phase": current_result_revision.phase,
-            "source_label": (
-                "官方来源"
-                if current_result_revision.source_authority == "official"
-                else "补充来源"
-            ),
             "published_at": current_result_revision.published_at,
             "is_stale": bool(
                 tracking
@@ -3766,29 +3793,7 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
         if hide_live_results
         else _attach_result_display_positions(list(event.results.all()))
     )
-    result_section_label = "正式赛果"
-    if results and all(result.official_finish_position is None for result in results):
-        from stable.services.scheduled_race_result_review import (
-            compute_reviewed_row_digest,
-        )
-
-        current_digest = compute_reviewed_row_digest(
-            [
-                {
-                    "finish_position": result.finish_position,
-                    "horse_number": result.horse_number,
-                    "horse_name": result.horse_name,
-                    "running_status": result.running_status,
-                }
-                for result in results
-            ]
-        )
-        if any(
-            approval.authority == "human_reviewed_reference"
-            and approval.reviewed_row_digest == current_digest
-            for approval in event.result_review_approvals.all()
-        ):
-            result_section_label = "已人工审核赛果"
+    result_section_label = "赛果"
     history_winners = _series_history_winners(
         event,
         exclude_result_event_id=event.pk if hide_live_results else None,

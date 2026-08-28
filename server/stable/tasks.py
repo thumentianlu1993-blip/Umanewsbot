@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import asdict
 from datetime import datetime, timedelta
 
 from celery import shared_task
@@ -124,6 +125,21 @@ def scheduled_race_result_review_task() -> dict:
     from stable.services.scheduled_race_result_review import run_scheduled_prepare
 
     return run_scheduled_prepare()
+
+
+@shared_task
+def reconcile_stale_race_result_review_claims_task() -> dict:
+    if not getattr(settings, "RACE_RESULT_REVIEW_ENABLED", False):
+        return {"enabled": False, "status": "disabled"}
+    from stable.services.scheduled_race_result_review import (
+        reconcile_expired_review_claims,
+    )
+
+    receipt = reconcile_expired_review_claims(
+        now=timezone.now(),
+        reason_code="lease_expired_without_terminal",
+    )
+    return {"enabled": True, "status": "completed", **receipt}
 
 
 @shared_task
@@ -336,6 +352,477 @@ def select_due_race_live_events_task() -> dict:
 
 
 @shared_task
+def select_due_race_data_sync_task() -> dict:
+    """Claim enrolled data-sync events; never touches the legacy queue."""
+
+    if getattr(settings, "RACE_DATA_SYNC_SCHEDULER_ENABLED", False) is not True:
+        return {"enabled": False, "claimed": 0, "dispatched": 0}
+    if getattr(settings, "RACE_DATA_SYNC_ENABLED", False) is not True:
+        return {"enabled": False, "claimed": 0, "dispatched": 0}
+
+    enabled_providers = tuple(
+        getattr(settings, "RACE_DATA_SYNC_ENABLED_PROVIDERS", ())
+    )
+    enabled_regions = tuple(
+        getattr(settings, "RACE_DATA_SYNC_ENABLED_REGIONS", ())
+    )
+    enabled_data_kinds = tuple(
+        getattr(settings, "RACE_DATA_SYNC_ENABLED_DATA_KINDS", ())
+    )
+    if not enabled_providers or not enabled_regions or not enabled_data_kinds:
+        return {
+            "enabled": False,
+            "claimed": 0,
+            "dispatched": 0,
+            "reason": "admission_scope_empty",
+        }
+
+    from stable.services.race_data_sync_control import claim_due_enrollments
+
+    claims = claim_due_enrollments(
+        now=timezone.now(),
+        batch_size=getattr(settings, "RACE_DATA_SYNC_SELECTOR_BATCH_SIZE", 100),
+        ttl_seconds=getattr(settings, "RACE_DATA_SYNC_CLAIM_TTL_SECONDS", 240),
+        enabled_providers=enabled_providers,
+        enabled_regions=enabled_regions,
+        enabled_data_kinds=enabled_data_kinds,
+    )
+    for claim in claims:
+        dispatch_kwargs = {
+            "event_id": claim.event_id,
+            "expected_enrollment_generation": claim.enrollment_generation,
+            "expected_owner_generation": claim.owner_generation,
+            "expected_claim_generation": claim.claim_generation,
+            "attempt_token": claim.attempt_token,
+            "data_kinds": claim.data_kinds,
+            "checkpoint_plan": claim.checkpoint_plan,
+            "expected_enrollment_entry_sha256": claim.enrollment_entry_sha256,
+            "expected_plan_sha256": claim.plan_sha256,
+        }
+        transaction.on_commit(
+            lambda kwargs=dispatch_kwargs: sync_race_event_provider_task.apply_async(
+                kwargs=kwargs,
+                queue="race_sync_v2",
+            )
+        )
+    count = len(claims)
+    return {"enabled": True, "claimed": count, "dispatched": count}
+
+
+@shared_task
+def discover_future_race_data_sync_task() -> dict:
+    """Hourly census and bounded automatic enrollment under standing policy."""
+
+    if (
+        getattr(settings, "RACE_DATA_SYNC_ENABLED", False) is not True
+        or getattr(settings, "RACE_DATA_SYNC_FUTURE_DISCOVERY_ENABLED", False)
+        is not True
+    ):
+        return {"enabled": False, "status": "disabled"}
+
+    import re
+
+    from stable.services.race_data_sync_enrollment import (
+        apply_race_data_enrollment_manifest,
+        build_future_race_data_enrollment_proposal,
+        load_standing_policy_file,
+    )
+    from stable.services.race_data_sync_providers import (
+        discover_the_racing_api_source_identities,
+    )
+
+    candidate_commit = str(getattr(settings, "UMANEWS_RELEASE_COMMIT", ""))
+    if re.fullmatch(r"[0-9a-f]{40}", candidate_commit) is None:
+        return {"enabled": True, "status": "blocked", "reason": "release_commit_invalid"}
+    try:
+        horizon_days = int(settings.RACE_DATA_SYNC_FUTURE_HORIZON_DAYS)
+        max_events = int(settings.RACE_DATA_SYNC_FUTURE_BATCH_SIZE)
+        ttl_seconds = int(settings.RACE_DATA_SYNC_FUTURE_MANIFEST_TTL_SECONDS)
+        if not 1 <= horizon_days <= 366:
+            raise ValueError("horizon_days")
+        if not 1 <= max_events <= 100:
+            raise ValueError("max_events")
+        if not 60 <= ttl_seconds <= 86_400:
+            raise ValueError("ttl_seconds")
+        policy = load_standing_policy_file(
+            path=settings.RACE_DATA_SYNC_FUTURE_STANDING_POLICY_FILE,
+            expected_sha256=settings.RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256,
+        )
+        now = timezone.now()
+        identity_discovery = discover_the_racing_api_source_identities(now=now)
+        proposal = build_future_race_data_enrollment_proposal(
+            standing_policy=policy,
+            cutoff=now,
+            horizon_days=horizon_days,
+            max_events=max_events,
+            candidate_commit=candidate_commit,
+            apply_expires_at=now + timedelta(seconds=ttl_seconds),
+        )
+        decisions = (
+            apply_race_data_enrollment_manifest(
+                manifest=proposal.manifest.as_dict(),
+                expected_manifest_sha256=proposal.manifest.manifest_sha256,
+                current_commit=candidate_commit,
+                now=now,
+                allow_runtime_open=True,
+            )
+            if proposal.manifest is not None
+            else ()
+        )
+    except (OSError, TypeError, ValueError) as exc:
+        logger.error("race_data_future_discovery_blocked error=%s", exc)
+        return {
+            "enabled": True,
+            "status": "blocked",
+            "reason": "future_discovery_contract_invalid",
+        }
+    return {
+        "enabled": True,
+        "status": "enrollment_applied" if proposal.manifest else "no_candidates",
+        "census_sha256": proposal.census.census_sha256,
+        "total": proposal.census.total,
+        "classification_counts": proposal.census.classification_counts,
+        "selected_event_ids": proposal.selected_event_ids,
+        "decision_counts": {
+            action: sum(1 for decision in decisions if decision.action == action)
+            for action in sorted({decision.action for decision in decisions})
+        },
+        "identity_discovery": asdict(identity_discovery),
+        "manifest": proposal.manifest.as_dict() if proposal.manifest else None,
+    }
+
+
+@shared_task
+def advance_race_data_sync_lifecycle_task() -> dict:
+    """Advance lifecycle only for events owned by race_sync_v2."""
+
+    if (
+        getattr(settings, "RACE_DATA_SYNC_ENABLED", False) is not True
+        or getattr(settings, "RACE_DATA_SYNC_SCHEDULER_ENABLED", False) is not True
+        or getattr(settings, "RACE_DATA_SYNC_LIFECYCLE_APPLY_ENABLED", False)
+        is not True
+    ):
+        return {"enabled": False, "status": "disabled"}
+    from stable.services.race_data_sync_lifecycle import (
+        advance_due_data_sync_lifecycle,
+    )
+
+    result = advance_due_data_sync_lifecycle(
+        now=timezone.now(),
+        batch_size=int(
+            getattr(settings, "RACE_DATA_SYNC_SELECTOR_BATCH_SIZE", 100)
+        ),
+    )
+    return {"enabled": True, "status": "complete", **result}
+
+
+@shared_task
+def monitor_race_data_sync_result_slo_task() -> dict:
+    """Stage data-sync T+30 incidents on the ordinary queue only."""
+
+    if (
+        getattr(settings, "RACE_DATA_SYNC_ENABLED", False) is not True
+        or getattr(settings, "RACE_DATA_SYNC_SCHEDULER_ENABLED", False) is not True
+    ):
+        return {"enabled": False, "status": "disabled", "staged": 0}
+    from stable.services.race_data_sync_alerts import monitor_data_sync_result_slo
+
+    incident_ids = monitor_data_sync_result_slo(
+        now=timezone.now(),
+        batch_size=int(
+            getattr(settings, "RACE_DATA_SYNC_SELECTOR_BATCH_SIZE", 100)
+        ),
+    )
+    return {
+        "enabled": True,
+        "status": "complete",
+        "staged": len(incident_ids),
+        "incident_ids": incident_ids,
+    }
+
+
+@shared_task
+def cleanup_race_data_sync_artifacts_task() -> dict:
+    """Bound cleanup of raw observations and unreferenced shared snapshots."""
+
+    if (
+        getattr(settings, "RACE_DATA_SYNC_ENABLED", False) is not True
+        or getattr(settings, "RACE_DATA_SYNC_SCHEDULER_ENABLED", False) is not True
+    ):
+        return {"enabled": False, "status": "disabled"}
+    from stable.services.race_data_sync_pipeline import (
+        cleanup_expired_race_data_raw_payloads,
+    )
+    from stable.services.race_data_sync_providers import (
+        cleanup_expired_shared_snapshots,
+    )
+
+    batch_size = int(getattr(settings, "RACE_DATA_RAW_CLEANUP_MAX_ROWS", 0))
+    max_bytes = int(getattr(settings, "RACE_DATA_RAW_CLEANUP_MAX_BYTES", 0))
+    if not 1 <= batch_size <= 1000 or max_bytes <= 0:
+        return {
+            "enabled": True,
+            "status": "blocked",
+            "reason": "cleanup_capacity_invalid",
+        }
+    now = timezone.now()
+    raw = cleanup_expired_race_data_raw_payloads(
+        now=now,
+        batch_size=batch_size,
+        max_bytes=max_bytes,
+    )
+    snapshots = cleanup_expired_shared_snapshots(
+        now=now,
+        batch_size=batch_size,
+        max_bytes=max_bytes - raw.cleaned_bytes,
+    ) if raw.cleaned_bytes < max_bytes else None
+    return {
+        "enabled": True,
+        "status": "complete",
+        "raw_cleaned": raw.cleaned,
+        "raw_cleaned_bytes": raw.cleaned_bytes,
+        "raw_held": raw.held,
+        "raw_skipped": raw.skipped,
+        "snapshot_cleaned": snapshots.cleaned if snapshots is not None else 0,
+        "snapshot_cleaned_bytes": (
+            snapshots.cleaned_bytes if snapshots is not None else 0
+        ),
+        "snapshot_skipped": snapshots.skipped if snapshots is not None else 0,
+    }
+
+
+@shared_task
+def sync_race_event_provider_task(
+    event_id: int,
+    expected_enrollment_generation: int,
+    expected_owner_generation: int,
+    expected_claim_generation: int,
+    attempt_token: str,
+    data_kinds: tuple[str, ...] | list[str],
+    checkpoint_plan: tuple[dict, ...] | list[dict] | None = None,
+    expected_enrollment_entry_sha256: str = "",
+    expected_plan_sha256: str = "",
+) -> dict:
+    """Execute one exact race_sync_v2 provider claim."""
+
+    from datetime import timedelta
+
+    from stable.services.race_data_sync_control import (
+        RaceDataSyncClaim,
+        complete_race_data_sync_claim,
+        fail_race_data_sync_claim,
+        lock_and_validate_race_data_sync_claim_for_apply,
+    )
+
+    def fail_closed(reason: str) -> dict:
+        now = timezone.now()
+        decision = fail_race_data_sync_claim(
+            event_id=event_id,
+            expected_enrollment_generation=expected_enrollment_generation,
+            expected_owner_generation=expected_owner_generation,
+            expected_claim_generation=expected_claim_generation,
+            attempt_token=attempt_token,
+            data_kinds=data_kinds,
+            checkpoint_plan=checkpoint_plan,
+            expected_enrollment_entry_sha256=expected_enrollment_entry_sha256,
+            expected_plan_sha256=expected_plan_sha256,
+            reason_code=reason,
+            retry_at=now + timedelta(minutes=5),
+            now=now,
+        )
+        return {
+            "processed": False,
+            "event_id": event_id,
+            "reason": reason,
+            "claim_action": decision.action,
+            "claim_reason": decision.reason_code,
+        }
+
+    if getattr(settings, "RACE_DATA_SYNC_ENABLED", False) is not True:
+        return fail_closed("disabled")
+    if getattr(settings, "RACE_DATA_SYNC_ALLOW_NETWORK", False) is not True:
+        return fail_closed("network_disabled")
+    from stable.services.race_data_sync_pipeline import RaceDataSyncCapacityLimits
+
+    try:
+        RaceDataSyncCapacityLimits.from_settings()
+    except (TypeError, ValueError):
+        return fail_closed("artifact_capacity_config_invalid")
+    from stable import models
+    from stable.services.race_data_sync_pipeline import (
+        reserve_race_data_transport_capacity,
+        resolve_race_data_provider_route,
+    )
+    from stable.services.race_data_sync_providers import (
+        run_reference_result_data_sync,
+        run_result_fallback_chain,
+        run_the_racing_api_data_sync,
+    )
+
+    enrollment = (
+        models.RaceDataSyncEnrollment.objects.select_related("source_identity")
+        .filter(
+            event_id=event_id,
+            state=models.RaceDataSyncEnrollmentState.ENROLLED,
+        )
+        .first()
+    )
+    if enrollment is None:
+        return fail_closed("enrollment_missing")
+    source = enrollment.source_identity
+    route = resolve_race_data_provider_route(
+        provider=source.source_key,
+        region=source.region_code,
+        identity_namespace=source.identity_namespace,
+        data_kinds=data_kinds,
+    )
+    if route is None or route.route_digest != enrollment.route_digest:
+        return fail_closed("provider_route_unavailable")
+    claim_guard = RaceDataSyncClaim(
+        event_id=event_id,
+        enrollment_generation=expected_enrollment_generation,
+        owner_generation=expected_owner_generation,
+        claim_generation=expected_claim_generation,
+        attempt_token=attempt_token,
+        enrollment_entry_sha256=expected_enrollment_entry_sha256,
+        route_digest=enrollment.route_digest,
+        checkpoint_plan=tuple(checkpoint_plan or ()),
+        plan_sha256=expected_plan_sha256,
+    )
+    with transaction.atomic():
+        claim_decision, locked_claim = lock_and_validate_race_data_sync_claim_for_apply(
+            claim=claim_guard,
+            now=timezone.now(),
+        )
+    if locked_claim is None:
+        return fail_closed(claim_decision.reason_code)
+    now = timezone.now()
+    if source.source_key != "the_racing_api":
+        try:
+            capacity = reserve_race_data_transport_capacity(
+                provider=source.source_key,
+                region_code=source.region_code,
+                now=now,
+                proposed_requests=route.request_budget,
+                max_response_bytes_per_request=2 * 1024 * 1024,
+            )
+        except (OSError, TypeError, ValueError):
+            return fail_closed("artifact_capacity_config_invalid")
+        if not capacity.allowed:
+            return fail_closed(capacity.reason_code)
+    provider_kwargs = {
+        "event_id": event_id,
+        "data_kinds": tuple(data_kinds),
+        "route": route,
+        "now": now,
+        "task_id": str(
+            getattr(sync_race_event_provider_task.request, "id", "")
+            or f"sync-{event_id}"
+        ),
+        "run_id": attempt_token,
+        "claim_guard": claim_guard,
+    }
+    if source.source_key == "the_racing_api":
+        outcome = run_the_racing_api_data_sync(**provider_kwargs)
+    elif source.source_key in {
+        "sporting_life",
+        "zeturf",
+        "horse_racing_nation",
+    }:
+        outcome = run_reference_result_data_sync(
+            **provider_kwargs,
+            capacity_reserved=True,
+        )
+    else:
+        return fail_closed("provider_not_implemented")
+    fallback_reason = ""
+    if (
+        outcome.success
+        and source.source_key == "the_racing_api"
+        and models.RaceDataSyncDataKind.RESULT in outcome.not_found_kinds
+    ):
+        fallback = run_result_fallback_chain(
+            event_id=event_id,
+            excluded_providers=(source.source_key,),
+            now=now,
+            task_id=provider_kwargs["task_id"],
+            run_id=attempt_token,
+            claim_guard=claim_guard,
+        )
+        fallback_reason = fallback.reason_code
+        if fallback.success and fallback.applied_kinds:
+            outcome = type(outcome)(
+                success=True,
+                reason_code="complete",
+                observation_hashes={
+                    **outcome.observation_hashes,
+                    **fallback.observation_hashes,
+                },
+                source_updated_at_by_kind={
+                    **outcome.source_updated_at_by_kind,
+                    **fallback.source_updated_at_by_kind,
+                },
+                applied_kinds=tuple(
+                    dict.fromkeys(
+                        (*outcome.applied_kinds, *fallback.applied_kinds)
+                    )
+                ),
+                not_found_kinds=tuple(
+                    kind
+                    for kind in outcome.not_found_kinds
+                    if kind != models.RaceDataSyncDataKind.RESULT
+                ),
+            )
+    if not outcome.success:
+        result = fail_closed(outcome.reason_code)
+        result["applied_kinds"] = outcome.applied_kinds
+        result["not_found_kinds"] = outcome.not_found_kinds
+        result["fallback_reason"] = fallback_reason
+        return result
+    if models.RaceDataSyncDataKind.RESULT in data_kinds:
+        from stable.services.race_data_sync_alerts import (
+            stage_data_sync_result_overdue_alert,
+        )
+
+        stage_data_sync_result_overdue_alert(
+            event_id=event_id,
+            now=timezone.now(),
+            reason_code=(
+                fallback_reason
+                or (
+                    "result_not_found"
+                    if models.RaceDataSyncDataKind.RESULT in outcome.not_found_kinds
+                    else outcome.reason_code
+                )
+            ),
+        )
+    decision = complete_race_data_sync_claim(
+        event_id=event_id,
+        expected_enrollment_generation=expected_enrollment_generation,
+        expected_owner_generation=expected_owner_generation,
+        expected_claim_generation=expected_claim_generation,
+        attempt_token=attempt_token,
+        checkpoint_plan=checkpoint_plan or (),
+        expected_enrollment_entry_sha256=expected_enrollment_entry_sha256,
+        expected_plan_sha256=expected_plan_sha256,
+        observation_hashes=outcome.observation_hashes,
+        source_updated_at_by_kind=outcome.source_updated_at_by_kind,
+        now=timezone.now(),
+    )
+    return {
+        "processed": decision.action == "complete",
+        "event_id": event_id,
+        "reason": outcome.reason_code,
+        "claim_action": decision.action,
+        "claim_reason": decision.reason_code,
+        "data_kinds": tuple(data_kinds),
+        "applied_kinds": outcome.applied_kinds,
+        "not_found_kinds": outcome.not_found_kinds,
+        "fallback_reason": fallback_reason,
+    }
+
+
+@shared_task
 def poll_race_live_event_task(
     event_id: int,
     expected_owner_generation: int,
@@ -465,6 +952,13 @@ def monitor_race_live_sla_task() -> dict:
 
 @shared_task
 def deliver_race_live_alert_task(incident_id: int) -> dict:
+    incident = RaceLiveAlertIncident.objects.filter(pk=incident_id).first()
+    if incident is not None and incident.scope_type == "data_sync_event":
+        return {
+            "delivered": False,
+            "reason": "data_sync_incident_non_dispatching",
+            "incident_id": incident_id,
+        }
     now = timezone.now()
     claim = claim_race_live_alert_delivery(
         incident_id=incident_id,

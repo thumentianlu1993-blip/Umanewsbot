@@ -61,6 +61,12 @@ case "$EXPECTED_MIGRATION_LEAF_SET" in
   stable.0073_lifecycle_enforce_registry)
     leaf_args="--expected-migration-leaf-set=stable.0073_lifecycle_enforce_registry"
     ;;
+  stable.0074_race_data_sync_r0_control_plane)
+    leaf_args="--expected-migration-leaf-set=stable.0074_race_data_sync_r0_control_plane"
+    ;;
+  stable.0075_race_data_source_priority_and_reported_position)
+    leaf_args="--expected-migration-leaf-set=stable.0075_race_data_source_priority_and_reported_position"
+    ;;
   *) echo "RELEASE_B_EXPECTED_MIGRATION_LEAF_SET must be one complete reviewed leaf set" >&2; exit 1 ;;
 esac
 RELEASE_B_PREFLIGHT_ACTION="${RELEASE_B_PREFLIGHT_ACTION:-}"

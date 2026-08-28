@@ -2,16 +2,17 @@
   "allowed_region_codes": {
     "france": "fr",
     "hong_kong": "hk",
+    "ireland": "ire",
     "japan": "jpn",
     "united_kingdom": "gb",
     "united_states": "usa"
   },
   "automation_allowed": true,
   "evidence": {
-    "authorization_basis": "user_confirmed_automation_permission",
+    "authorization_basis": "provider_terms_for_application_use_and_user_requested_automation",
     "documentation_url": "https://api.theracingapi.com/documentation",
     "terms_url": "https://www.theracingapi.com/terms-of-service",
-    "verified_at": "2026-07-16T17:00:00+00:00"
+    "verified_at": "2026-08-28T00:00:00+00:00"
   },
   "host": "api.theracingapi.com",
   "max_requests": 3,
@@ -29,6 +30,9 @@
       "skip": [
         0
       ]
+    },
+    "result_by_id": {
+      "path": "/v1/results/{race_id}"
     },
     "results_today_free": {
       "limit": [
@@ -52,5 +56,5 @@
   "schema_version": 2,
   "source_key": "the_racing_api",
   "terms_status": "approved",
-  "valid_until": "2026-08-16T16:00:00+00:00"
+  "valid_until": "2026-09-27T00:00:00+00:00"
 }

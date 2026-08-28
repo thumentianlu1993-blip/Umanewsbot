@@ -8,6 +8,7 @@ durable delivery state and an exact reviewed-bundle apply boundary.
 from __future__ import annotations
 
 import csv
+import json
 import importlib
 import io
 import tempfile
@@ -576,6 +577,7 @@ class ScheduledRaceResultReviewDatabaseContractTests(TestCase):
         run = models.RaceResultReviewRun.objects.create(
             schedule_slot=NOW,
             status="claimed",
+            cursor={"claim_token": "expired-owner"},
             lease_expires_at=NOW - timedelta(seconds=1),
         )
         with mock.patch.object(service.timezone, "now", return_value=NOW), mock.patch.object(
@@ -592,6 +594,312 @@ class ScheduledRaceResultReviewDatabaseContractTests(TestCase):
         self.assertEqual(result["status"], "noop")
         self.assertEqual(run.status, "noop")
         prepare.assert_called_once()
+
+    @override_settings(RACE_RESULT_REVIEW_ENABLED=True)
+    def test_prepare_exception_terminalizes_claim_without_exposing_error_text(self):
+        service = _scheduled_service(self)
+        with mock.patch.object(service.timezone, "now", return_value=NOW), mock.patch.object(
+            service,
+            "prepare_review_bundle",
+            side_effect=RuntimeError("secret-bearing upstream failure"),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "secret-bearing"):
+                service.run_scheduled_prepare(schedule_slot=NOW)
+
+        run = models.RaceResultReviewRun.objects.get(schedule_slot=NOW)
+        self.assertEqual(run.status, "failed")
+        self.assertIsNone(run.lease_expires_at)
+        self.assertEqual(run.finished_at, NOW)
+        self.assertEqual(run.terminal_summary["status"], "failed")
+        self.assertEqual(run.terminal_summary["reason_code"], "prepare_exception")
+        self.assertEqual(run.terminal_summary["error_type"], "RuntimeError")
+        self.assertNotIn("secret-bearing", json.dumps(run.terminal_summary))
+
+    @override_settings(RACE_RESULT_REVIEW_ENABLED=True)
+    def test_prepare_exception_cannot_overwrite_new_claim_owner(self):
+        service = _scheduled_service(self)
+
+        def lose_claim(**kwargs):
+            models.RaceResultReviewRun.objects.filter(schedule_slot=NOW).update(
+                cursor={"claim_token": "new-owner"}
+            )
+            raise RuntimeError("old owner failed")
+
+        with mock.patch.object(service.timezone, "now", return_value=NOW), mock.patch.object(
+            service,
+            "prepare_review_bundle",
+            side_effect=lose_claim,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "old owner failed"):
+                service.run_scheduled_prepare(schedule_slot=NOW)
+
+        run = models.RaceResultReviewRun.objects.get(schedule_slot=NOW)
+        self.assertEqual(run.status, "claimed")
+        self.assertEqual(run.cursor, {"claim_token": "new-owner"})
+        self.assertEqual(run.terminal_summary, {})
+        self.assertIsNotNone(run.lease_expires_at)
+
+    @override_settings(RACE_RESULT_REVIEW_ENABLED=True)
+    def test_retry_clears_prior_failed_attempt_evidence_before_prepare(self):
+        service = _scheduled_service(self)
+        models.RaceResultReviewRun.objects.create(
+            schedule_slot=NOW,
+            status="failed",
+            selector_sha256="a" * 64,
+            bundle_sha256="b" * 64,
+            terminal_summary={"status": "failed", "reason_code": "prepare_exception"},
+            finished_at=NOW - timedelta(minutes=1),
+        )
+
+        def inspect_reclaimed_run(**kwargs):
+            reclaimed = models.RaceResultReviewRun.objects.get(schedule_slot=NOW)
+            self.assertEqual(reclaimed.status, "claimed")
+            self.assertEqual(reclaimed.selector_sha256, "")
+            self.assertEqual(reclaimed.bundle_sha256, "")
+            self.assertEqual(reclaimed.terminal_summary, {})
+            self.assertIsNone(reclaimed.finished_at)
+            return {
+                "status": "noop",
+                "selector_sha256": "d" * 64,
+                "target_count": 0,
+            }
+
+        with mock.patch.object(service.timezone, "now", return_value=NOW), mock.patch.object(
+            service,
+            "prepare_review_bundle",
+            side_effect=inspect_reclaimed_run,
+        ):
+            result = service.run_scheduled_prepare(schedule_slot=NOW)
+
+        self.assertEqual(result["status"], "noop")
+
+    @override_settings(RACE_RESULT_REVIEW_ENABLED=True)
+    def test_next_slot_terminalizes_well_formed_expired_claim_before_prepare(self):
+        service = _scheduled_service(self)
+        stale_slot = NOW - timedelta(hours=12)
+        stale = models.RaceResultReviewRun.objects.create(
+            schedule_slot=stale_slot,
+            status="claimed",
+            cursor={"claim_token": "old-owner"},
+            lease_expires_at=NOW - timedelta(seconds=1),
+        )
+        with mock.patch.object(service.timezone, "now", return_value=NOW), mock.patch.object(
+            service,
+            "prepare_review_bundle",
+            return_value={
+                "status": "noop",
+                "selector_sha256": "d" * 64,
+                "target_count": 0,
+            },
+        ):
+            result = service.run_scheduled_prepare(schedule_slot=NOW)
+
+        stale.refresh_from_db()
+        self.assertEqual(result["status"], "noop")
+        self.assertEqual(result["stale_claims_reconciled"], 1)
+        self.assertEqual(stale.status, "failed")
+        self.assertIsNone(stale.lease_expires_at)
+        self.assertEqual(stale.finished_at, NOW)
+        self.assertEqual(
+            stale.terminal_summary["reason_code"],
+            "lease_expired_without_terminal",
+        )
+        self.assertEqual(stale.cursor, {"claim_token": "old-owner"})
+
+    @override_settings(RACE_RESULT_REVIEW_ENABLED=True)
+    def test_malformed_expired_claim_blocks_new_prepare_without_mutation(self):
+        service = _scheduled_service(self)
+        stale_slot = NOW - timedelta(hours=12)
+        stale = models.RaceResultReviewRun.objects.create(
+            schedule_slot=stale_slot,
+            status="claimed",
+            cursor={"claim_token": "old-owner"},
+            lease_expires_at=NOW - timedelta(seconds=1),
+            bundle_sha256="a" * 64,
+        )
+        with mock.patch.object(service.timezone, "now", return_value=NOW), mock.patch.object(
+            service,
+            "prepare_review_bundle",
+        ) as prepare:
+            with self.assertRaises(service.StaleClaimReconciliationBlocked):
+                service.run_scheduled_prepare(schedule_slot=NOW)
+
+        stale.refresh_from_db()
+        self.assertEqual(stale.status, "claimed")
+        self.assertEqual(stale.bundle_sha256, "a" * 64)
+        self.assertFalse(
+            models.RaceResultReviewRun.objects.filter(schedule_slot=NOW).exists()
+        )
+        prepare.assert_not_called()
+
+    @override_settings(RACE_RESULT_REVIEW_ENABLED=True)
+    def test_periodic_sweeper_terminalizes_expired_claim_without_bundle_or_delivery(self):
+        from stable import tasks
+
+        stale = models.RaceResultReviewRun.objects.create(
+            schedule_slot=NOW - timedelta(hours=12),
+            status="claimed",
+            cursor={"claim_token": "old-owner"},
+            lease_expires_at=NOW - timedelta(seconds=1),
+        )
+        with mock.patch.object(tasks.timezone, "now", return_value=NOW):
+            result = tasks.reconcile_stale_race_result_review_claims_task()
+
+        stale.refresh_from_db()
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["reconciled_count"], 1)
+        self.assertEqual(stale.status, "failed")
+        self.assertFalse(models.RaceResultReviewDelivery.objects.exists())
+
+    @override_settings(RACE_RESULT_REVIEW_ENABLED=False)
+    def test_periodic_sweeper_is_fail_closed_when_review_is_disabled(self):
+        from stable import tasks
+
+        stale = models.RaceResultReviewRun.objects.create(
+            schedule_slot=NOW - timedelta(hours=12),
+            status="claimed",
+            cursor={"claim_token": "old-owner"},
+            lease_expires_at=NOW - timedelta(seconds=1),
+        )
+        result = tasks.reconcile_stale_race_result_review_claims_task()
+
+        stale.refresh_from_db()
+        self.assertEqual(result, {"enabled": False, "status": "disabled"})
+        self.assertEqual(stale.status, "claimed")
+
+    def test_reconcile_command_requires_exact_preview_digest_and_is_idempotent(self):
+        stale = models.RaceResultReviewRun.objects.create(
+            schedule_slot=NOW,
+            status="claimed",
+            cursor={"claim_token": "old-owner"},
+            lease_expires_at=NOW - timedelta(seconds=1),
+        )
+        preview_out = io.StringIO()
+        with mock.patch(
+            "stable.management.commands.reconcile_stale_race_result_review_claims.timezone.now",
+            return_value=NOW,
+        ):
+            call_command(
+                "reconcile_stale_race_result_review_claims",
+                stdout=preview_out,
+            )
+        preview = json.loads(preview_out.getvalue())
+        self.assertEqual(preview["mode"], "preview")
+        self.assertEqual(preview["claimed_count"], 1)
+        self.assertEqual(preview["eligible_count"], 1)
+
+        with self.assertRaises(CommandError):
+            call_command(
+                "reconcile_stale_race_result_review_claims",
+                "--apply",
+                "--expected-manifest-sha256",
+                "f" * 64,
+            )
+        stale.refresh_from_db()
+        self.assertEqual(stale.status, "claimed")
+
+        applied_out = io.StringIO()
+        with mock.patch(
+            "stable.management.commands.reconcile_stale_race_result_review_claims.timezone.now",
+            return_value=NOW,
+        ):
+            call_command(
+                "reconcile_stale_race_result_review_claims",
+                "--apply",
+                "--expected-manifest-sha256",
+                preview["manifest_sha256"],
+                stdout=applied_out,
+            )
+        applied = json.loads(applied_out.getvalue())
+        stale.refresh_from_db()
+        self.assertEqual(applied["mode"], "apply")
+        self.assertEqual(applied["reconciled_count"], 1)
+        self.assertEqual(stale.status, "failed")
+        self.assertEqual(
+            stale.terminal_summary["reason_code"], "stale_claim_reconciled"
+        )
+
+        replay_out = io.StringIO()
+        call_command(
+            "reconcile_stale_race_result_review_claims",
+            stdout=replay_out,
+        )
+        replay = json.loads(replay_out.getvalue())
+        self.assertEqual(replay["claimed_count"], 0)
+        self.assertEqual(replay["eligible_count"], 0)
+
+    def test_reconcile_command_rolls_back_entire_mixed_manifest(self):
+        eligible = models.RaceResultReviewRun.objects.create(
+            schedule_slot=NOW - timedelta(hours=12),
+            status="claimed",
+            cursor={"claim_token": "eligible-owner"},
+            lease_expires_at=NOW - timedelta(seconds=1),
+        )
+        malformed = models.RaceResultReviewRun.objects.create(
+            schedule_slot=NOW,
+            status="claimed",
+            cursor={"claim_token": "malformed-owner"},
+            lease_expires_at=NOW - timedelta(seconds=1),
+            bundle_sha256="b" * 64,
+        )
+        preview_out = io.StringIO()
+        with mock.patch(
+            "stable.management.commands.reconcile_stale_race_result_review_claims.timezone.now",
+            return_value=NOW,
+        ):
+            call_command(
+                "reconcile_stale_race_result_review_claims",
+                stdout=preview_out,
+            )
+        preview = json.loads(preview_out.getvalue())
+        self.assertEqual(preview["eligible_count"], 1)
+        self.assertEqual(preview["blocked_count"], 1)
+        self.assertEqual(
+            preview["blocked"],
+            [{"reason_codes": ["bundle_present"], "run_id": malformed.pk}],
+        )
+
+        with mock.patch(
+            "stable.management.commands.reconcile_stale_race_result_review_claims.timezone.now",
+            return_value=NOW,
+        ), self.assertRaises(CommandError):
+            call_command(
+                "reconcile_stale_race_result_review_claims",
+                "--apply",
+                "--expected-manifest-sha256",
+                preview["manifest_sha256"],
+            )
+
+        eligible.refresh_from_db()
+        malformed.refresh_from_db()
+        self.assertEqual(eligible.status, "claimed")
+        self.assertEqual(malformed.status, "claimed")
+        self.assertEqual(eligible.terminal_summary, {})
+        self.assertEqual(malformed.bundle_sha256, "b" * 64)
+
+    def test_manifest_digest_changes_when_live_claim_becomes_expired(self):
+        service = _scheduled_service(self)
+        run = models.RaceResultReviewRun.objects.create(
+            schedule_slot=NOW,
+            status="claimed",
+            cursor={"claim_token": "owner"},
+            lease_expires_at=NOW + timedelta(seconds=1),
+        )
+        preview = service.build_stale_claim_reconciliation_preview(now=NOW)
+        self.assertEqual(preview["eligible_count"], 0)
+        self.assertEqual(preview["blocked_count"], 1)
+
+        with self.assertRaises(service.StaleClaimManifestDrift):
+            service.reconcile_expired_review_claims(
+                now=NOW + timedelta(seconds=2),
+                reason_code="stale_claim_reconciled",
+                expected_manifest_sha256=preview["manifest_sha256"],
+                include_all_claimed=True,
+            )
+
+        run.refresh_from_db()
+        self.assertEqual(run.status, "claimed")
+        self.assertEqual(run.terminal_summary, {})
 
     @override_settings(RACE_RESULT_REVIEW_ENABLED=True)
     def test_automatic_catchup_persists_json_serializable_terminal_summary(self):
@@ -821,7 +1129,7 @@ class ScheduledRaceResultReviewDatabaseContractTests(TestCase):
                         output.getvalue(),
                     )
 
-    def test_public_detail_distinguishes_human_reviewed_from_official_results(self):
+    def test_public_detail_does_not_label_result_source_class(self):
         service = _scheduled_service(self)
         human = self._event(
             "human-reviewed-public-label",
@@ -871,10 +1179,10 @@ class ScheduledRaceResultReviewDatabaseContractTests(TestCase):
         human_response = self.client.get(human.public_path)
         official_response = self.client.get(official.public_path)
 
-        self.assertContains(human_response, "已人工审核赛果")
-        self.assertNotContains(human_response, "正式赛果")
-        self.assertContains(official_response, "正式赛果")
-        self.assertNotContains(official_response, "已人工审核赛果")
+        for response in (human_response, official_response):
+            self.assertContains(response, "<h2>赛果</h2>", html=True)
+            self.assertNotContains(response, "正式赛果")
+            self.assertNotContains(response, "已人工审核赛果")
 
 
 class ScheduledRaceResultReviewGreenIntegrationTests(TestCase):
@@ -964,6 +1272,19 @@ class ScheduledRaceResultReviewGreenIntegrationTests(TestCase):
         self.assertEqual(
             settings.CELERY_TASK_ROUTES[
                 "stable.tasks.scheduled_race_result_review_task"
+            ]["queue"],
+            "celery",
+        )
+        sweep = settings.CELERY_BEAT_SCHEDULE[
+            "reconcile-stale-race-result-review-claims"
+        ]
+        self.assertEqual(
+            str(sweep["schedule"]), "<crontab: */5 * * * * (m/h/dM/MY/d)>"
+        )
+        self.assertEqual(sweep["options"], {"queue": "celery", "expires": 240})
+        self.assertEqual(
+            settings.CELERY_TASK_ROUTES[
+                "stable.tasks.reconcile_stale_race_result_review_claims_task"
             ]["queue"],
             "celery",
         )

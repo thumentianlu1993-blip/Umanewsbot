@@ -1,5 +1,89 @@
 # 部署运行手册
 
+## 2026-08-29 PR #108 历史 claim 修复后的发布门禁（候选未上线）
+
+本轮关闭态修复已完成：候选 `dd67c789…8aa0` / image `8114325b…d8620` 的 preview manifest
+`5897db0d…76d1a5` 精确命中 14 行；写前 custom dump 为 `484192137` bytes、SHA-256
+`64d72011245c60d359cada8998bb04decaab58ca8a15071a5a4b64eb09a44bdc`，0600 且 `pg_restore --list`
+通过。apply 后 claimed=0，队列仍为 `celery=0 / race_sync_v2=0 / race_live=7543`，原 Beat 已恢复。
+证据目录为 `/opt/umanewsbot-builds/pr108-dd67c789-claim-reconcile-evidence`；这不构成 migration、合并、
+部署或启用授权。
+
+1. 重试必须从生产只读盘点开始：exact resident revision/image/schema、host health、五个新写
+   开关、Beat/worker active/reserved/scheduled、external/historical/P0 writer、`celery`、`race_sync_v2`
+   与旧 `race_live` 队列都要重新读取。旧 `race_live` 只记录长度，不得清理、迁移或消费。
+2. 历史 claim 收口前，冻结 Beat 并 drain 普通/新队列；运行 exact preview，必须只命中已审核
+   的 14 条过期、空证据 claim。随后创建 PostgreSQL custom-format `0600` 备份，记录 SHA-256
+   并通过 `pg_restore --list`。apply 必须绑定 preview canonical manifest SHA，在同一 advisory
+   transaction lock 内锁住全部目标并重算；任一漂移整批零写。
+3. claim apply 后独立验证 `claimed=0`、目标只转为 `failed/expired_claim_reconciled`、且
+   bundle/delivery/pending/business result/两条队列长度都未变。任一不符立即停止，恢复冻结前应
+   运行的旧 Beat，保持新写入关闭，不进入 PR merge/migration。
+4. 普通 Release-B 目标 leaf 为 `stable.0075_race_data_source_priority_and_reported_position`，
+   reviewed migration SHA 为 `d8b220b241e560911bc5a02acada986926d93eb13a8aae0ace590a7f1e8bb0bd`。
+   preflight 必须同时核对 `0074` 和 `0075` 的精确 catalog/allowlist；pre-0075 为另行审核的跨
+   schema 恢复，不得用通用 rollback。迁移后未知 `reported_finish_position` 必须仍为 `NULL`。
+5. 关闭态镜像验收后才注入已冻结容量。`RACE_DATA_SNAPSHOT_RETENTION_SECONDS=691200`
+   为独立 8 天 retention；artifact cleanup 任务的 task route 和 Beat option 都必须是
+   `race_sync_v2`，且专用 worker 必须看到 `/run/race-data-sync`。若 retention 非 7–90 天、
+   mount/root/SHA/inode 校验失败，清理拒绝而不删 lease/file。
+6. future discovery 与 artifact cleanup 都必须先通过 `RACE_DATA_SYNC_ENABLED` 总开关；仅打开子开关或
+   保留 Beat schedule 时不得产生数据库、网络或删除副作用。shared snapshot waiter 的轮询窗必须覆盖
+   完整 lease TTL，批量公开读取必须预载 enrollment source，避免容量随赛事数线性放大。
+7. 启用顺序不变：future discovery -> time/racecard -> lifecycle -> result apply/public -> correction。
+   每步都分别核对 run terminal、claim/checkpoint、provider 预算、revision/projection、alert 与公开页；
+   任一失败立即停止后续步骤并关闭新写入。最终 merge/deploy/enable 前必须绑定精确
+   PR head/merge SHA/image 取得用户确认。
+8. 当前旧 lifecycle 已是 `RACE_EVENT_LIFECYCLE_ENABLED=true / mode=enforce`，数据库有 6 个 enforce
+   controls；它们属于既有生产授权，不得在本发布中顺手关闭、迁移或重新纳管。第三阶段启用的是
+   `RACE_DATA_SYNC_LIFECYCLE_APPLY_ENABLED`，必须证明 enrollment/event 边界不与旧 controls 冲突。
+
+## 2026-08-20 race-data-sync R0 发布边界（仅本地实现，未授权部署）
+
+1. 当前生产真实 migration leaf 仍以线上只读核验为准；本候选代码把目标 leaf 扩展为
+   `stable.0074_race_data_sync_r0_control_plane`。部署前必须重新核对 exact merge SHA/image、migration plan、
+   PostgreSQL catalog、数据库备份可恢复性及全部 `RACE_DATA_SYNC_*` 开关为 false/空集合；不得把本地测试
+   结果当作生产已应用证据。
+2. 新服务 `race_sync_v2_worker` 只消费 `race_sync_v2`。标准 application/manual release 必须在停止任何服务前
+   probe 它；若原本运行，则与普通 worker 分别 drain、停止、写入独立 frozen intent，并只在目标 compose
+   catalog 仍存在该服务且恢复合同通过时恢复。probe 或 drain 失败即停止发布并保持后续零执行。
+3. `resume_stopped_release.sh` 必须同时读取并交叉验证 race-live 与 race-data-sync 两份 intent 的 action/phase；
+   任一可信 pre-contract marker 为 `switching`，即使 sibling 缺失/损坏也必须全局拒绝；两个可信 marker 不一致
+   同样保留文件并拒绝。`rollback_pre_single_owner.sh` 在 checkout/build 前也必须 probe/drain/stop 新 worker，
+   但目标旧镜像不含该服务时不得恢复到旧 catalog。
+4. 普通 Release-B schema rollback 目标必须能通过 `0074` catalog/allowlist 合同。任何 pre-0074 目标都是独立
+   跨 schema 恢复：需要新的 reviewed reverse/restore 方案、停服边界与备份证明，不能通过放宽 allowlist 或
+   手工 fake migration 绕过。
+5. 关闭态部署即使成功也只安装控制面：provider task 仍为 fail-closed placeholder。联网、schedule/racecard/
+   result apply、public/correction、enrollment apply 分别需要新的精确授权；不得一次性开启，也不得复用遗留
+   `race_live` 队列的历史积压。
+6. `RACE_DATA_SYNC_FUTURE_DISCOVERY_ENABLED` 默认必须为 `false`。未来启用只读 proposal 前，standing policy
+   必须是绝对路径、普通非 symlink 文件、UTF-8 duplicate-key-free JSON，且
+   `RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256` 与原始字节完全一致；image commit 必须是精确 40 位 Git SHA。
+   当前 task 只在 `race_sync_v2` 返回 census/manifest proposal，不持久化 artifact、不执行 enrollment apply。
+7. `RACE_DATA_RAW_MAX_COMPRESSED_BYTES`、`RACE_DATA_RAW_MAX_UNCOMPRESSED_BYTES`、provider/region 日 bytes/request、
+   root high/low water、min-free、cleanup rows/bytes 与 hold alert 的默认值均为 `0`。关闭态部署必须保留这些值；
+   在 G2 通过 live disk 与约 45GB 备份的 sizing proof 前，严禁只打开 network 或填任意占位正数绕过门禁。
+8. reverse disenrollment 必须使用同一受审 commit 生成的限时 exact manifest，apply 前重算 event/source/route/
+   owner/enrollment baseline；成功只释放 tracking、checkpoint 与 `data_sync` owner。不得删除来源证据或任何
+   observation/revision/audit，也不得把 reverse 当作公开数据回滚。
+9. `0074` 的 reviewed migration SHA 必须是
+   `21670e7731456a33e473fd97cb43ca72545477aa600ea594c6c071c4dd2d54eb`；preflight 必须同时核对精确列
+   type/nullability/default、状态集合、generation/state-shape CHECK 和 `data_sync` owner 集合。任一
+   `CHECK(TRUE)`、任意额外放宽的 `OR`、错误 default 或 nullable/type 漂移都必须停止发布。
+10. pre-contract rollback state 的 `phase` 只允许 `pre-switch`、`switching`、`image-switched`（兼容旧的
+    `frozen` 读取）。`pre-switch` 退出可恢复旧 worker；`switching` 必须保留 intent 并人工判定镜像状态；
+    `image-switched` 不得把新 sync service 启动到不含该 service 的旧 catalog。
+11. 首次 enrollment 或 claim 前必须以当前 Slice A roster 重新解析 provider/region/identity namespace/全部
+    data kind，并匹配 registry/contract/proof/host/path/budget。legacy transfer 还必须验证 15 分钟内 runtime
+    receipt、两个队列 `message_count=0/active_claim_count=0`、精确 commit/expiry 和 projection baseline。
+    apply 只接受 `RACE_DATA_SYNC_LEGACY_TRANSFER_APPROVAL_SHA256` 绑定的 canonical approval 文件；approval
+    必须在 manifest 生成后、expiry 前产生，并逐字绑定 manifest/receipt raw SHA。任何调用者提供的裸布尔值
+    或同一调用方自签 SHA 都不是发布证据。
+12. 当前本地候选验证为 `566` 项通过、2 项按环境跳过；这只证明关闭态代码候选，不是 production migration、
+    联网、自动 enrollment、赛事字段写入或 worker 启动授权。同一独立 reviewer 的 `VERDICT: APPROVED` 也只
+    覆盖该默认关闭 R0 边界。
+
 ## 2026-08-17 York race_datetime 与备份/OSS/Nginx 运维收口
 
 1. event `946–953` 的生产时间写入以 manifest
@@ -8625,3 +8709,117 @@ activation 必须产生新的 ID。范围外 enforce control 在 scanner claim �
   active verifier、runtime coherence、scanner smoke、Celery/HTTP/日志验收均通过。
 - 当前信任根精确为 event `186,187`，activation ID=`fb222bb1…010e`；race-live 保持关闭。逐时间点
   观察与完整路径见 `docs/changes/lifecycle-enforce-canary/release_report.md`。
+
+## 2026-08-28 赛事数据全生命周期发布步骤（等待最终生产确认）
+
+本节只描述发布顺序，不构成部署授权。必须先取得 PR 合并后的精确 revision/image 和用户最终确认。
+
+1. 只读确认 production revision、三服务镜像、数据库版本、现有 lifecycle/race-live 控制面、queue、
+   policy/registry 文件和全部 `RACE_DATA_SYNC_*` 环境变量；任何 unknown 均停止。
+2. 完成 custom-format PostgreSQL 备份，记录 SHA-256，并以 `pg_restore --list` 验证可读。
+3. 先以所有新增开关 `false`、全部容量 `0` 发布 web/worker/Beat，运行 migration
+   `0075_race_data_source_priority_and_reported_position`；验证三服务 revision/settings 完全一致。
+4. 运行 `manage.py audit_race_data_sync`，必须为 `would_write=false`，并核对 standing policy SHA
+   `07013655d4e0ae4bd5688b9a5dc447d759c0effa4b5393ec198f48bf961a1888`、TRA registry SHA
+   `3bac3b644c631ed165b8430343822b2c70c5a88c5036b63dcb557c83c0e0a6da`、`route_drift=[]`。
+5. 先配置精确 provider/region/data-kind allowlist、host/request/event/enrollment/checkpoint/revision 容量，
+   保持 network/apply/public/lifecycle/future discovery 关闭，再次审计。
+6. 灰度顺序：scheduler + future discovery census -> network + time/racecard apply -> lifecycle apply ->
+   result apply -> result public/correction apply。每一步分别检查 run terminal state、claim completion、
+   provider 请求数、not-found/fallback reason、revision/projection 数、公开页和错误率。
+7. 一级止损关闭总开关、future discovery、lifecycle 和全部 apply/public 开关；保留 revision/transition，
+   不批量反向状态、不降级已确认结果。数据库 reverse migration 仅在单独授权、备份和审计保留确认后执行。
+
+部署验收命令、dry-run 证据和已知官网 transport 边界见
+`docs/changes/automate-race-event-lifecycle/race_data_lifecycle_implementation_20260828.md`。
+
+本次基于 2026-08-28 线上只读磁盘/备份基线，容量值固定为：
+
+```dotenv
+RACE_DATA_RAW_MAX_COMPRESSED_BYTES=2097152
+RACE_DATA_RAW_MAX_UNCOMPRESSED_BYTES=8388608
+RACE_DATA_RAW_DAILY_PROVIDER_REGION_BYTES=1073741824
+RACE_DATA_RAW_DAILY_PROVIDER_REGION_REQUESTS=192
+RACE_DATA_RAW_ROOT_HIGH_WATER_BYTES=536870912
+RACE_DATA_RAW_ROOT_LOW_WATER_BYTES=268435456
+RACE_DATA_RAW_MIN_FREE_DISK_BYTES=8589934592
+RACE_DATA_RAW_CLEANUP_MAX_ROWS=100
+RACE_DATA_RAW_CLEANUP_MAX_BYTES=67108864
+RACE_DATA_RAW_HOLD_ALERT_BYTES=268435456
+RACE_DATA_SNAPSHOT_RETENTION_SECONDS=691200
+RACE_DATA_RAW_ARTIFACT_ROOTS=/run/race-data-sync
+```
+
+当前线上可用磁盘约 12.2 GB，最近备份约 445.5 MB；构建、备份和关闭态发布后若 free disk 不再满足
+8 GiB，或 audit/capacity ledger/root 任一异常，则不得打开 network/apply。旧 `race_live=7543` 消息不得
+删除、迁移或交给 `race_sync_v2_worker`；新队列必须继续从 0 开始。
+
+### 2026-08-28 PR #108 首次发布尝试的硬停止证据
+
+- 合并前生产机出现低内存与 I/O 饱和：`MemAvailable` 约 `100 MiB`、无 swap，I/O PSI `full avg10`
+  一度约 80%，Docker/SSH/公网请求均受阻。确认普通 `celery=0`、Redis `unacked=0`，且两个 pool 子进程
+  都在读取空闲工作管道后，仅对普通 worker 主进程发送 TERM；既有 `unless-stopped` 自动拉起成功，内存
+  回升到约 `1.2–1.5 GiB`，I/O PSI 回落，公网四入口恢复 200。
+- 为发布冻结旧 Beat 后，普通队列和 worker active/reserved/scheduled 均排空，external import lock/started、
+  historical batch、horse P0 run 均为 0；但应用硬门禁返回
+  `RaceResultReviewRun(status="claimed")=14`。因此不得运行 release owner、备份、migration、构建或配置
+  启用，更不得把 claimed 记录自行改成完成/失败。
+- 停止清理只恢复冻结前运行的旧 Beat。复核 `RACE_LIVE_SCHEDULER_ENABLED=false`、
+  `RACE_LIVE_MONITOR_ENABLED=false`、`RACE_DATA_SYNC_ENABLED=false`、
+  `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`，
+  `race_sync_v2=0`、`race_live=7543`。PR `#108` 保持 OPEN；重试必须从全套合并前检查开始，且 claimed
+  count 必须先经独立授权的精确收口回到 0。
+
+### 2026-08-28 最终确认前只读复核快照
+
+- resident web/worker/Beat 仍统一运行 image
+  `sha256:4bc392d012080a482523451016074f55ebcee84177ccab08b7563b233411a611`，OCI revision
+  `2833558a6a2d67b7dc9816b53ea8ad5d580eb56c`；内外 healthz 均为 200。宿主 checkout HEAD 为
+  `bef0cdc5034bd2516df9876b2a7dde2357f03495`，且有 1,710 项 dirty，与 resident revision 不同，仍必须
+  从 PR merge SHA 创建隔离 release，不得在该 checkout 原地 pull/checkout/clean。
+- 生产 migration leaf 为 `0073`；runtime 已有 `RACE_DATA_SYNC_ENABLED=false` 以及 provider/region/field
+  三个空集合旧键，本 change 的 scheduler/network/apply/capacity 等新键尚不存在。发布顺序必须显式先安装
+  `0074/0075` 且保持所有新开关 false，再注入冻结容量和 allowlist。现有 lifecycle 为 `true/enforce`，
+  race-live scheduler/monitor 为 false、regions 为空、runner 未启用；新链不得隐式关闭或扩张旧控制面。
+- external import started=0；两条 lock 占位行的 owner/acquired time 均为空，因此 active lock=0。
+  `celery=0`、`race_sync_v2=0`、遗留 `race_live=7543`。发布前还要在
+  同一锁窗口重验；`race_live` 数量只允许观测，不允许 purge、migrate 或 consume。
+- 文件系统实测 total/used/available 为 `105286258688 / 88562573312 / 12214140928` bytes，备份目录为
+  `47380298866` bytes。最新复核 used/available 为 `88565182464 / 12211531776` bytes；创建备份、构建镜像
+  和关闭态切换后必须逐次重验 8 GiB min-free，任何一次低于门槛
+  就停止，不打开 network/apply。
+- 运行 task 在 provider 网络请求后写 schedule/racecard/result 前必须重新验证 exact claim、expiry、
+  generations、entry/route/plan SHA、checkpoint version 和 data-kind。验收至少注入一次 superseded/expired
+  claim，确认 canonical/revision/projection 与新 claim 均不变；只看到 HTTP 200 或 raw receipt 不算通过。
+
+### 2026-08-28 历史赛果审核 claim 的精确收口步骤
+
+1. 保持 PR 未合并、全部新赛事写入开关关闭；停止 Beat，并确认普通 worker active/reserved/scheduled、
+   `celery`、`race_sync_v2`、external/historical/P0 writer 全部为 0。只读取并记录 `race_live`，不得消费。
+2. 从待复审的精确 PR head 构建隔离候选镜像；只运行
+   `reconcile_stale_race_result_review_claims` preview，保存 JSON、文件 SHA 和其中的 manifest SHA。
+3. preview 必须恰为已核验的 14 个 run，`eligible_count=14`、`blocked_count=0`；出现活租约、异常 cursor、
+   selector/bundle/terminal/finished 证据或行集合漂移时立即停止并恢复 Beat。
+4. 创建 PostgreSQL custom-format 备份，验证 regular file、0600、非空、SHA-256 和 `pg_restore --list`；
+   备份后 free disk 仍须不低于 8 GiB。
+5. 使用同一候选镜像执行 `--apply --expected-manifest-sha256=<preview digest>`。命令在单事务锁定全部
+   claimed 行；错误 SHA 或任何行漂移必须整批零写。
+6. 写后核对 14 行均为 `failed/stale_claim_reconciled`、lease 清空且原 cursor 保留，claimed=0；bundle、
+   delivery、pending-event、赛果/赛事业务表和三队列前后指纹必须一致，尤其 `race_live=7543` 不变。
+7. 恢复旧 Beat，重新跑完整 writer 静默、服务、HTTP、日志与磁盘门禁。该动作只解除历史状态泄漏，
+   不构成 PR 合并、migration 或新自动化启用授权。
+
+## PR #108 全量复审后的追加发布门禁
+
+1. 历史 claim 收口只能使用已 push、独立复审通过的 PR head 候选镜像；全部新写入开关保持关闭，
+   `race_sync_v2_worker` 不启动。候选 commit、preview manifest 或生产 claimed 集合任一漂移都重新开始。
+2. 关闭态部署后，配置审计应在所有运行开关仍为 false 时返回 `configuration_status=ready`；这只证明
+   allowlist、route、policy、registry 与容量可用，不代表 network/apply/public 已经启用。
+3. 启用 network/time/racecard 时，抽检同地区/日期的多个 event 必须共用一个 150 秒内 complete snapshot；
+   pagination 未完成、TTL 过期仍复用旧 artifact、或按 event 重复预留容量均视为失败。
+4. result/public 门禁要求：当日无 terminal marker 不公开；赛后只命中受审 race-id 路由；每个 terminal
+   result 覆盖 canonical runner 全集。fallback 只有马号和规范化马名形成唯一全双射才能补绑定来源 ID。
+5. enrollment 后 lifecycle 原 mode、manual pause、next refresh 不得被覆盖；新 control 必须保持 off，直到
+   lifecycle 步骤单独启用。锁等待或 deadlock、T+30 incident 进入 `race_live`/delivery 都立即止损。
+6. 任一步失败关闭最窄开关并停止后续序列；不得以 HTTP 200、task exit 0、queue 下降或 observation 已写入
+   替代 canonical/public/副作用核验。

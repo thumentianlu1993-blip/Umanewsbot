@@ -80,16 +80,15 @@ def _aware_iso_datetime(container: dict[str, Any], key: str) -> str:
 def _normalize_racecard_runner(runner: Any) -> dict[str, Any]:
     if not isinstance(runner, dict):
         raise ValueError("racecard runner must be an object")
-    return {
+    number = _required_nonempty_string(runner, "number", max_length=32)
+    normalized = {
         "external_runner_id": _required_nonempty_string(
             runner, "horse_id", max_length=128
         ),
         "horse_name": _required_nonempty_string(
             runner, "horse", max_length=255
         ),
-        "number": _required_nonempty_string(
-            runner, "number", max_length=32
-        ),
+        "number": number,
         "draw": _optional_string(runner, "draw", max_length=32),
         "jockey_name": _optional_string(
             runner, "jockey", max_length=255
@@ -97,8 +96,14 @@ def _normalize_racecard_runner(runner: Any) -> dict[str, Any]:
         "jockey_id": _optional_string(
             runner, "jockey_id", max_length=128
         ),
-        "status": "declared",
     }
+    # The Basic/Free racecard contract exposes no general runner status.  Its
+    # one explicit withdrawal signal is saddlecloth number ``NR``.  Absence of
+    # that signal must not reset a canonical scratched/withdrawn runner back to
+    # declared on a later refresh.
+    if number.upper() == "NR":
+        normalized["status"] = "non_runner"
+    return normalized
 
 
 def _positive_finish_position(value: Any) -> int | None:

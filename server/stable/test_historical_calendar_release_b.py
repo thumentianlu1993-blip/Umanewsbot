@@ -126,7 +126,7 @@ class ReleaseBSchemaPreflightTests(TestCase):
         self.assertRegex(payload["rows_sha256"], r"^[0-9a-f]{64}$")
         self.assertEqual(
             payload["migration_leaf"],
-            "stable.0071_historical_calendar_release_b",
+            "stable.0075_race_data_source_priority_and_reported_position",
         )
 
     def test_unknown_applied_stable_migration_fails_closed(self):

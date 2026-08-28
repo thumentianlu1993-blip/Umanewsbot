@@ -159,7 +159,7 @@ override_owner="$(stat -c '%u' "$CONTROL_OVERRIDE" 2>/dev/null || stat -f '%u' "
 override_mode="$(stat -c '%a' "$CONTROL_OVERRIDE" 2>/dev/null || stat -f '%Lp' "$CONTROL_OVERRIDE")"
 if [ "$override_owner" != "$(id -u)" ] || [ "$override_mode" != "400" ]; then echo "rollback control override trust failed" >&2; exit 1; fi
 
-# This generic path is B-to-B only: it keeps 0073 applied. Validate the target
+# This generic path is B-to-B only: it keeps 0075 applied. Validate the target
 # image against the current Release B schema; reverse compatibility belongs
 # exclusively to the separately reviewed cross-schema recovery procedure.
 PREFLIGHT_ROOT="$REPAIR_RUNTIME_ROOT/preflight"
@@ -174,7 +174,7 @@ COMPOSE_FILE="$COMPOSE_FILE" EXPECTED_CANDIDATE_COMMIT="$TARGET_OID" \
   UMANEWS_ROOT_DIR="$ROOT_DIR" RELEASE_B_BINDING_IMAGE_NAME="$TARGET_IMAGE_TAG" \
   RELEASE_CONTROL_COMPOSE_OVERRIDE="$CONTROL_OVERRIDE" \
   RELEASE_B_PREFLIGHT_ACTION=rollback \
-  RELEASE_B_EXPECTED_MIGRATION_LEAF_SET=stable.0073_lifecycle_enforce_registry \
+  RELEASE_B_EXPECTED_MIGRATION_LEAF_SET=stable.0075_race_data_source_priority_and_reported_position \
   "$CONTROL_DIR/preflight.sh"
 RELEASE_B_PREFLIGHT_ARTIFACT_SHA256="$(sed -n 's/.*"artifact_sha256":"\([0-9a-f]*\)".*/\1/p' "$RELEASE_B_PREFLIGHT_ARTIFACT_PATH")"
 EXPECTED_PRODUCTION_DB_IDENTITY_SHA256="$(sed -n 's/.*"database_identity_sha256":"\([0-9a-f]*\)".*/\1/p' "$RELEASE_B_PREFLIGHT_ARTIFACT_PATH" | head -n 1)"

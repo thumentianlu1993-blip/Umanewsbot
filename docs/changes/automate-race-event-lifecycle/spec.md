@@ -319,3 +319,71 @@ Sporting Life、ZEturf、Horse Racing Nation 统一作为 `internal_reference`�
 10. 现有 race-live、字段归一化、日历移动端样式不回归。
 11. Sporting Life、ZEturf、HRN 的观察只能进入内部参考模型，公开赛事/赛果/新闻/QQ 零变化。
 12. 内部参考来源相同内容重放不重复，变化内容保留版本，歧义/partial/来源失败可解释。
+
+## ADDED Requirements
+
+### Requirement: 未来赛事自动发现与纳管
+
+系统 SHALL 使用冻结 standing policy 自动发现未来公开赛事，并在唯一来源身份匹配后建立 enrollment、
+projection owner、provider checkpoints 和 lifecycle control，不要求逐场人工确认。
+
+#### Scenario: 唯一匹配自动纳管
+
+- **WHEN** 未来公开赛事的地区、规范化赛名、场地和当地日期唯一匹配已批准 provider route
+- **THEN** 系统原子建立或采用 source identity，并生成带 route digest 和 generation 的同步控制面
+
+#### Scenario: 多解或路由漂移拒绝纳管
+
+- **WHEN** 来源身份存在多解、proof 失效或 standing policy route digest 与运行 roster 不一致
+- **THEN** 系统 SHALL 保持未纳管并输出稳定 blocker，不得任选来源或写赛事字段
+
+### Requirement: 赛时、出马表与赛事状态自动更新
+
+系统 SHALL 让赛时和出马表在赛前最慢每 12 小时检查一次，并在临近比赛时动态加密；赛事状态按已确认
+`race_datetime` 在 T 推进为 running、T+30 推进为 finished，延期和无时间赛事不得误推。
+
+#### Scenario: 每日不少于两次出马表更新
+
+- **WHEN** 已纳管赛事距离开赛超过 7 天且尚未终态
+- **THEN** 下一次 racecard checkpoint SHALL 不晚于当前时间后 12 小时
+
+#### Scenario: 旧 claim 不能完成新计划
+
+- **WHEN** worker 携带过期 enrollment/owner/claim generation、attempt token 或 plan SHA 回报完成
+- **THEN** 系统 SHALL 拒绝完成并且不得覆盖当前后继 checkpoint
+
+### Requirement: 赛果自动抓取、优先级仲裁与更正
+
+系统 SHALL 自 T+3 起自动抓取赛果，按 `licensed_api > official_operator > trusted_publisher` 仲裁，保留原始
+observation 和 immutable revisions，并在首次确认后继续观察更正至少 7 天。
+
+#### Scenario: 主 API 缺失时按等级备用
+
+- **WHEN** The Racing API 成功响应但没有目标赛事赛果
+- **THEN** 系统 SHALL 先尝试已导入的完整官方结果，再尝试该地区已批准可信第三方 receipt
+
+#### Scenario: 并列名次与更正
+
+- **WHEN** 来源报告并列名次或随后发布更正
+- **THEN** 系统 SHALL 保留 `reported_finish_position`，使用内部唯一排序投影，并为更正追加 revision
+
+### Requirement: 公开展示不暴露内部来源阶段
+
+系统 SHALL 在公开赛事详情统一显示“赛果”，不得显示来源等级、人工复核、provisional/official/corrected
+等内部标签；数据陈旧警告不属于来源标签并 SHALL 保留。
+
+#### Scenario: 任意内部结果阶段的公开标题
+
+- **WHEN** 已发布赛事存在可公开赛果
+- **THEN** 详情页 SHALL 只显示统一“赛果”标题，并继续按既有规则显示陈旧警告
+
+### Requirement: 默认关闭与只读审计
+
+系统 SHALL 默认关闭 network、future discovery、lifecycle 和全部 apply/public 开关，容量默认 0，并提供
+不写数据库、不发网络请求的审计命令报告配置、inventory、policy census、route drift、artifact root/free
+disk 和当日 provider/region 容量账本。任何 transport SHALL 在发请求前原子预留请求数与最大响应字节。
+
+#### Scenario: 全开配置 dry-run
+
+- **WHEN** 操作者在隔离数据库以完整配置运行 `audit_race_data_sync`
+- **THEN** 输出 SHALL 包含 `would_write=false` 和明确 `ready/blocked`，且数据库内容 hash 不变

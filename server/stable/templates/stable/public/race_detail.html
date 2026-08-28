@@ -37,7 +37,7 @@
       <p class="race-hero-original">{% if event.original_name and event.original_name != event.chinese_name %}{{ event.original_name }} · {% endif %}{% if event.local_date %}{{ event.local_date|date:"Y-m-d" }}{% endif %}{% if event.local_start_time %} {{ event.local_start_time|time:"H:i" }}{% endif %}</p>
 
       {% if winner %}
-        <span class="winner-ribbon">WINNER · 冠军{% if live_result_status.phase == "provisional" %} · 暂定{% endif %}</span>
+        <span class="winner-ribbon">WINNER · 冠军</span>
         <div class="winner-name">{{ winner.display_horse_name }}</div>
         <div class="winner-crew">
           {% if winner.display_jockey_name %}<div><span>骑师</span><b>{{ winner.display_jockey_name }}</b></div>{% endif %}
@@ -55,13 +55,8 @@
       {% else %}
         <div class="countdown-hero-digits">{{ status_label }}{% if event.status == 'scheduled' and event.local_start_time %}<small>{{ event.local_start_time|time:"H:i" }} 发走</small>{% endif %}</div>
       {% endif %}
-      {% if live_result_status %}
-        <aside class="race-result-status race-result-status-{{ live_result_status.phase }}" role="status" aria-label="赛果发布状态">
-          <strong>{{ live_result_status.label }}</strong>
-          {% if live_result_status.detail %}<span>{{ live_result_status.detail }}</span>{% endif %}
-          <span>{{ live_result_status.source_label }} · {{ live_result_status.published_at|date:"m-d H:i" }}</span>
-          {% if live_result_status.is_stale %}<em>数据可能已过期</em>{% endif %}
-        </aside>
+      {% if live_result_status.is_stale %}
+        <aside class="race-result-status" role="status">数据可能已过期</aside>
       {% endif %}
     </section>
 
@@ -116,13 +111,6 @@
     {% if results %}
       <section class="panel" id="results">
         <h2>{{ result_section_label }}</h2>
-        {% if live_result_status %}
-          <div class="race-result-status-summary" aria-label="本表赛果状态">
-            <strong>{{ live_result_status.label }}</strong>
-            {% if live_result_status.detail %}<span>{{ live_result_status.detail }}</span>{% endif %}
-            {% if live_result_status.is_stale %}<em>数据可能已过期</em>{% endif %}
-          </div>
-        {% endif %}
         <div class="race-table-wrap">
           <table class="data-table">
             <thead><tr><th>名次</th><th>马号</th><th>马名</th><th>骑师</th><th>练马师</th><th>时间</th><th>差距</th><th>赔率 / 人气</th></tr></thead>

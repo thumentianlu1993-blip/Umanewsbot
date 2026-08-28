@@ -6,6 +6,7 @@ import csv
 import hashlib
 import io
 import json
+import logging
 import os
 import tempfile
 import uuid
@@ -19,7 +20,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from django.conf import settings
 from django.core.mail import EmailMessage
 from django.core.management import call_command
-from django.db import transaction
+from django.db import connection, transaction
 from django.db.models import Q
 from django.utils import timezone
 
@@ -41,12 +42,27 @@ REVIEW_CSV_FIELDS = (
     "horse_name",
     "running_status",
 )
+STALE_CLAIM_MANIFEST_VERSION = "race-result-review-stale-claims/v1"
+STALE_CLAIM_REASON_CODES = {
+    "lease_expired_without_terminal",
+    "stale_claim_reconciled",
+}
+REVIEW_CLAIM_ADVISORY_LOCK_ID = 7_046_029_254_386_353_131
+logger = logging.getLogger(__name__)
 
 
 class ReviewBundleDrift(ValueError):
     def __init__(self, reason_code: str):
         self.reason_code = reason_code
         super().__init__(reason_code)
+
+
+class StaleClaimReconciliationBlocked(ValueError):
+    pass
+
+
+class StaleClaimManifestDrift(ValueError):
+    pass
 
 
 def _canonical_json(value: Any) -> bytes:
@@ -58,6 +74,170 @@ def _canonical_json(value: Any) -> bytes:
 def _sha256(value: Any) -> str:
     data = value if isinstance(value, bytes) else _canonical_json(value)
     return hashlib.sha256(data).hexdigest()
+
+
+def _lock_review_claim_namespace() -> None:
+    if connection.vendor != "postgresql":
+        return
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT pg_advisory_xact_lock(%s)",
+            [REVIEW_CLAIM_ADVISORY_LOCK_ID],
+        )
+
+
+def _stale_claim_snapshot(run: models.RaceResultReviewRun) -> dict[str, Any]:
+    return {
+        "run_id": run.pk,
+        "schedule_slot": run.schedule_slot.isoformat(),
+        "lease_expires_at": (
+            run.lease_expires_at.isoformat() if run.lease_expires_at else None
+        ),
+        "selector_sha256": run.selector_sha256,
+        "bundle_sha256": run.bundle_sha256,
+        "cursor_sha256": _sha256(run.cursor),
+        "terminal_summary_sha256": _sha256(run.terminal_summary),
+        "finished_at": run.finished_at.isoformat() if run.finished_at else None,
+        "updated_at": run.updated_at.isoformat(),
+    }
+
+
+def _stale_claim_blockers(
+    run: models.RaceResultReviewRun, *, now: datetime
+) -> list[str]:
+    blockers: list[str] = []
+    if run.lease_expires_at is None:
+        blockers.append("lease_missing")
+    elif run.lease_expires_at > now:
+        blockers.append("lease_not_expired")
+    if not isinstance(run.cursor, dict) or set(run.cursor) != {"claim_token"}:
+        blockers.append("cursor_contract_invalid")
+    elif (
+        not isinstance(run.cursor.get("claim_token"), str)
+        or not run.cursor["claim_token"]
+    ):
+        blockers.append("claim_token_invalid")
+    if run.selector_sha256:
+        blockers.append("selector_present")
+    if run.bundle_sha256:
+        blockers.append("bundle_present")
+    if run.terminal_summary:
+        blockers.append("terminal_summary_present")
+    if run.finished_at is not None:
+        blockers.append("finished_at_present")
+    return blockers
+
+
+def _stale_claim_preview_for_runs(
+    runs: Iterable[models.RaceResultReviewRun], *, now: datetime
+) -> dict[str, Any]:
+    ordered = sorted(runs, key=lambda run: (run.schedule_slot, run.pk))
+    rows = [_stale_claim_snapshot(run) for run in ordered]
+    blocked = []
+    eligible_ids = []
+    for run in ordered:
+        reasons = _stale_claim_blockers(run, now=now)
+        if reasons:
+            blocked.append({"run_id": run.pk, "reason_codes": reasons})
+        else:
+            eligible_ids.append(run.pk)
+    manifest = {
+        "schema_version": STALE_CLAIM_MANIFEST_VERSION,
+        "runs": rows,
+        "eligible_run_ids": eligible_ids,
+        "blocked": blocked,
+    }
+    return {
+        **manifest,
+        "manifest_sha256": _sha256(manifest),
+        "claimed_count": len(rows),
+        "eligible_count": len(eligible_ids),
+        "blocked_count": len(blocked),
+    }
+
+
+def build_stale_claim_reconciliation_preview(
+    *, now: datetime, run_ids: Iterable[int] | None = None
+) -> dict[str, Any]:
+    queryset = models.RaceResultReviewRun.objects.filter(status="claimed")
+    if run_ids is not None:
+        queryset = queryset.filter(pk__in=tuple(run_ids))
+    return _stale_claim_preview_for_runs(
+        queryset.order_by("schedule_slot", "id"),
+        now=now,
+    )
+
+
+def reconcile_expired_review_claims(
+    *,
+    now: datetime,
+    reason_code: str,
+    expected_manifest_sha256: str | None = None,
+    include_all_claimed: bool = False,
+) -> dict[str, Any]:
+    if reason_code not in STALE_CLAIM_REASON_CODES:
+        raise ValueError("stale claim reason_code is not allowed")
+    with transaction.atomic():
+        _lock_review_claim_namespace()
+        queryset = models.RaceResultReviewRun.objects.select_for_update().filter(
+            status="claimed"
+        )
+        if not include_all_claimed:
+            queryset = queryset.filter(
+                Q(lease_expires_at__lte=now) | Q(lease_expires_at__isnull=True)
+            )
+        runs = list(queryset.order_by("schedule_slot", "id"))
+        preview = _stale_claim_preview_for_runs(runs, now=now)
+        if (
+            expected_manifest_sha256 is not None
+            and preview["manifest_sha256"] != expected_manifest_sha256
+        ):
+            raise StaleClaimManifestDrift(
+                "stale claim manifest drift: expected exact preview digest"
+            )
+        if preview["blocked_count"]:
+            raise StaleClaimReconciliationBlocked(
+                "stale claim reconciliation blocked by non-empty or live claim state"
+            )
+        reconciled_ids: list[int] = []
+        for run in runs:
+            summary = {
+                "status": "failed",
+                "reason_code": reason_code,
+                "schedule_slot": run.schedule_slot.isoformat(),
+                "previous_lease_expires_at": run.lease_expires_at.isoformat(),
+                "reconciled_at": now.isoformat(),
+            }
+            updated = models.RaceResultReviewRun.objects.filter(
+                pk=run.pk,
+                status="claimed",
+                cursor=run.cursor,
+                lease_expires_at=run.lease_expires_at,
+                selector_sha256="",
+                bundle_sha256="",
+                terminal_summary={},
+                finished_at__isnull=True,
+            ).update(
+                status="failed",
+                terminal_summary=summary,
+                lease_expires_at=None,
+                finished_at=now,
+                updated_at=now,
+            )
+            if updated != 1:
+                raise StaleClaimManifestDrift(
+                    f"stale claim changed while reconciling run_id={run.pk}"
+                )
+            reconciled_ids.append(run.pk)
+        return {
+            "manifest_sha256": preview["manifest_sha256"],
+            "reason_code": reason_code,
+            "reconciled_count": len(reconciled_ids),
+            "reconciled_run_ids": reconciled_ids,
+            "remaining_claimed_count": models.RaceResultReviewRun.objects.filter(
+                status="claimed"
+            ).count(),
+        }
 
 
 def coalesce_due_schedule_slots(
@@ -1082,6 +1262,11 @@ def run_scheduled_prepare(*, schedule_slot: datetime | None = None) -> dict[str,
     if not getattr(settings, "RACE_RESULT_REVIEW_ENABLED", False):
         return {"enabled": False, "status": "disabled"}
     now = timezone.now()
+    stale_receipt = reconcile_expired_review_claims(
+        now=now,
+        reason_code="lease_expired_without_terminal",
+    )
+    stale_count = stale_receipt["reconciled_count"]
     if schedule_slot is None:
         local_now = now.astimezone(ZoneInfo("Asia/Shanghai"))
         due_slots = []
@@ -1098,7 +1283,11 @@ def run_scheduled_prepare(*, schedule_slot: datetime | None = None) -> dict[str,
         )
         slot = decision["execute_slot"]
         if slot is None:
-            return {"enabled": True, "status": "not_due"}
+            return {
+                "enabled": True,
+                "status": "not_due",
+                "stale_claims_reconciled": stale_count,
+            }
         for item in decision["coalesced_slots"]:
             models.RaceResultReviewRun.objects.get_or_create(
                 schedule_slot=item["schedule_slot"],
@@ -1114,6 +1303,7 @@ def run_scheduled_prepare(*, schedule_slot: datetime | None = None) -> dict[str,
     else:
         slot = schedule_slot
     with transaction.atomic():
+        _lock_review_claim_namespace()
         claim_token = uuid.uuid4().hex
         run, created = models.RaceResultReviewRun.objects.get_or_create(
             schedule_slot=slot,
@@ -1130,32 +1320,67 @@ def run_scheduled_prepare(*, schedule_slot: datetime | None = None) -> dict[str,
                     "enabled": True,
                     "status": "already_claimed",
                     "run_id": run.pk,
+                    "stale_claims_reconciled": stale_count,
                 }
             if run.lease_expires_at and run.lease_expires_at > now:
                 return {
                     "enabled": True,
                     "status": "already_claimed",
                     "run_id": run.pk,
+                    "stale_claims_reconciled": stale_count,
                 }
             run.status = "claimed"
             run.cursor = {"claim_token": claim_token}
             run.lease_expires_at = now + timedelta(minutes=20)
+            run.selector_sha256 = ""
+            run.bundle_sha256 = ""
+            run.terminal_summary = {}
             run.finished_at = None
             run.save(
                 update_fields=(
                     "status",
                     "cursor",
                     "lease_expires_at",
+                    "selector_sha256",
+                    "bundle_sha256",
+                    "terminal_summary",
                     "finished_at",
                     "updated_at",
                 )
             )
-    result = prepare_review_bundle(
-        now=now,
-        bundle_root=Path(settings.RACE_RESULT_REVIEW_BUNDLE_ROOT),
-        lookback_hours=settings.RACE_RESULT_REVIEW_LOOKBACK_HOURS,
-        pending_max_age_days=settings.RACE_RESULT_REVIEW_PENDING_MAX_AGE_DAYS,
-    )
+    try:
+        result = prepare_review_bundle(
+            now=now,
+            bundle_root=Path(settings.RACE_RESULT_REVIEW_BUNDLE_ROOT),
+            lookback_hours=settings.RACE_RESULT_REVIEW_LOOKBACK_HOURS,
+            pending_max_age_days=settings.RACE_RESULT_REVIEW_PENDING_MAX_AGE_DAYS,
+        )
+    except Exception as exc:
+        failed_at = timezone.now()
+        try:
+            models.RaceResultReviewRun.objects.filter(
+                pk=run.pk,
+                status="claimed",
+                cursor={"claim_token": claim_token},
+            ).update(
+                status="failed",
+                terminal_summary={
+                    "status": "failed",
+                    "reason_code": "prepare_exception",
+                    "error_type": type(exc).__name__,
+                    "schedule_slot": run.schedule_slot.isoformat(),
+                    "failed_at": failed_at.isoformat(),
+                },
+                finished_at=failed_at,
+                lease_expires_at=None,
+                updated_at=failed_at,
+            )
+        except Exception:
+            logger.exception(
+                "race_result_review_claim_failure_terminalization_failed run_id=%s",
+                run.pk,
+            )
+        raise
     terminal_updated = models.RaceResultReviewRun.objects.filter(
         pk=run.pk,
         status="claimed",
@@ -1170,7 +1395,12 @@ def run_scheduled_prepare(*, schedule_slot: datetime | None = None) -> dict[str,
         updated_at=now,
     )
     if terminal_updated != 1:
-        return {"enabled": True, "status": "lease_lost", "run_id": run.pk}
+        return {
+            "enabled": True,
+            "status": "lease_lost",
+            "run_id": run.pk,
+            "stale_claims_reconciled": stale_count,
+        }
     if result["status"] == "prepared":
         recipient = settings.RACE_RESULT_REVIEW_RECIPIENT
         delivery = deliver_bundle_email(
@@ -1190,4 +1420,9 @@ def run_scheduled_prepare(*, schedule_slot: datetime | None = None) -> dict[str,
                 terminal_summary=result,
                 updated_at=now,
             )
-    return {"enabled": True, "run_id": run.pk, **result}
+    return {
+        "enabled": True,
+        "run_id": run.pk,
+        "stale_claims_reconciled": stale_count,
+        **result,
+    }

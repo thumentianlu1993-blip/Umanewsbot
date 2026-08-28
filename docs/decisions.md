@@ -1,5 +1,82 @@
 # 关键决策
 
+## 2026-08-29 0075 为本发布最终 leaf，门禁重放与公开读取必须保持证据语义
+
+- 普通 Release-B deploy/rollback 的最终 leaf 固定为
+  `stable.0075_race_data_source_priority_and_reported_position`；pre-0075 目标不得使用通用
+  rollback。`0075` 的 `reported_finish_position` 只可回填已存在的 official value，
+  `finish_position` 只是内部稳定排序，未知名次必须保持 `NULL`。
+- `data_sync` owner 的赛果不借用 legacy race-live policy/authority 决策。读取时独立重验
+  result apply/public/correction 开关、exact enrollment/source/route、owner/enrollment generation、standing
+  policy、registry/contract/provenance 与 publication audit；任一漂移即 fail closed。
+- 因开关关闭而保存的 shadow/rejected 证据不是永久处理完成。同一 observation 只在相应
+  apply/public 门禁真正打开后才可 promotion/重处理；门禁仍关闭时重放必须零新 audit
+  写入。manual lock、身份冲突、证据不完整和真实 contract rejection 不得自动重试覆盖。
+- provider 执行器的赛事身份唯一来自当前 `RaceDataSyncEnrollment.source_identity`；即使同事件
+  存在多 provider/region/namespace identity，也不得通过 `.first()` 选择另一条“看似可用”的来源。
+- `RACE_DATA_SYNC_ENABLED` 是 future discovery 和 artifact cleanup 的共同总开关；子开关、Beat route
+  或 cleanup schedule 不能绕过它产生数据库、网络或删除副作用。snapshot waiter 的有界轮询必须在
+  最小 jitter 下仍覆盖完整 lease TTL，不能在合法 owner 即将发布前提前宣告 timeout。
+- shared snapshot 保留 8 天，以覆盖确认赛果的 T+7 更正窗口；清理有批量上限、校验
+  manifest/cache key/SHA 和文件 inode，且只投递到拥有 `/run/race-data-sync` mount 的
+  `race_sync_v2`。不消费旧 `race_live`，也不让普通 worker 处理 artifact 清理。
+- cancelled/finished 为 lifecycle 终态；cancelled 停止所有 checkpoint，postponed 丢弃旧
+  result datetime 并等待新 schedule。T+30 告警只针对未确认且非 cancelled/postponed 的 enrolled
+  event；已有 open incident 不得占用后续 batch，赛果确认后 incident 自动 resolved。
+- 历史 claim 关闭态收口只处理 exact preview 中的过期空证据行，不把既有 lifecycle 或 race-live 当作
+  本发布附带清理项。生产原有 `enabled/enforce` lifecycle controls 保持原授权状态；新 data-sync
+  lifecycle 继续由独立 false 开关隔离，旧 `race_live` 队列只读计数、不得消费或迁移。
+
+## 2026-08-28 自动赛事数据以一次最终生产确认为授权边界，canonical 写入必须重验 exact claim
+
+- 本 change 的产品目标明确覆盖早期文档中的固定 7 天 shadow、多 PR、逐地区或逐赛事人工批准：未来赛事
+  时间、出马表、状态、赛果和更正均按 standing policy 自动运行，三类获准来源均作为正式数据使用，公开页
+  不显示来源等级或内部阶段。PR 完成后只申请一次绑定精确 revision/image 的最终生产合并与部署确认。
+- 启用时按 future discovery、time/racecard、lifecycle、result public/correction 依次开关并逐步自动验收；这是
+  同一发布内的可观测性和 kill-switch，不产生新的人工批准门槛。任何门禁失败立即停止后续步骤并保持相应
+  写开关关闭，不得以“已有最终确认”为由绕过备份、容量、身份、来源合同或回滚边界。
+- provider transport 在数据库事务外执行。网络返回后，任何 schedule、racecard 或 result canonical 写入必须
+  在该写事务最先按统一锁序锁定 event、projection control、tracking、enrollment 与 checkpoints，并重新核对
+  owner/enrollment/claim generation、attempt token、claim expiry、entry/route/plan SHA、checkpoint lock
+  version 及 required data kind。任一不符即整个投影零写回滚。
+- claim 过期或被接管的旧 worker 可以保留已经取得的 immutable transport 证据，但不能写 canonical、完成
+  checkpoint，或通过 fail/release 改动新 owner 的 claim。complete/fail 同样要求 `lease_expires_at > now`；
+  不能把外层 task 成功返回、HTTP 200 或 receipt 存在误报成业务投影成功。
+
+## 2026-08-20 赛事数据自动同步 R0 使用独立持久 owner、限时 manifest 与隔离 worker
+
+- 新 writer 只能使用 `RaceEventProjectionWriteOwner.DATA_SYNC`；旧 `LIVE` 不由 migration 或普通 enrollment
+  自动转移。唯一允许的 legacy transfer 必须证明 legacy runtime 关闭、legacy/new 两条队列完整 drain、无
+  active claim，并绑定 current/LKG/revision/tracking 的精确 baseline 后单事务执行 owner generation CAS。
+- enrollment 是赛事数据同步选择边界，不替代 lifecycle membership。普通纳管必须绑定 exact commit、standing
+  policy、census/event/source/route/owner snapshot、entry SHA、限时不超过 24 小时的 manifest；过期、歧义、
+  identity/route/owner 漂移均逐场零写拒绝。
+- provider roster 仍以既有 Slice A 为唯一 facade。adapter 为 implemented 仍不等于可联网；缺任一 audited
+  proof、host allowlist、path prefix、正 request budget 或最小间隔时，route resolution 必须返回不可用。
+- `race_sync_v2_worker` 只消费 `race_sync_v2`，使用独立 concurrency/prefetch/time limits、max-tasks-per-child、
+  max-memory-per-child 和 Compose CPU/memory 上限；不得消费或清理遗留 `race_live` backlog。
+- reverse disenrollment 必须绑定当前 event/source/route/owner/enrollment snapshot，逐场释放 tracking、checkpoint
+  与 `data_sync` owner；来源、observation、revision 和 audit 永久保留。任一 baseline 漂移即该场零写拒绝。
+- future discovery 当前只允许读取 raw SHA 绑定的 standing policy 并生成限时小批 proposal，不得由 Beat 直接
+  apply。proposal artifact persistence、route admission 复核和独立 live-apply 开关完成前，自动纳管保持关闭。
+- `RACE_DATA_RAW_*` 容量值默认全部为 `0`，含义是配置无效而不是无限制。只有基于生产磁盘、备份占用、
+  provider/region 成本与 cleanup/hold 故障的 sizing proof 冻结正值后，network admission 才可能通过。
+- release freeze/resume/rollback 必须把新 worker 当作独立状态机成员。目标旧镜像 service catalog 不含新 worker
+  时不得恢复它；普通 rollback 只接受包含 `0074` 合同的目标，pre-0074 为另行审核的跨 schema 恢复。
+- 所有 R0 事件写路径遵循 `RaceEvent -> projection control -> live tracking -> enrollment -> checkpoint -> source`
+  的统一锁序；optional control/tracking 不存在时也必须在 source 前创建并锁定，后续拒绝通过 savepoint 零残留；
+  会停用旧 checkpoint 的 rotate/transfer/manifest 外层必须先按稳定顺序锁全量目标行。snapshot `COMPLETE` 只
+  允许复用 150 秒，publish/fail 也必须 CAS `lease_expires_at > now`，失败态必须有显式 retry boundary。
+- legacy owner transfer 的信任根是配置 raw SHA 绑定的独立 approval 文件，不是 API 调用者传入的布尔状态或
+  自签 manifest。approval 必须在 canonical manifest 生成后产生，并绑定 manifest/receipt 原始字节 SHA、commit、
+  时间窗和 event；apply 还须复核当前 runtime、两条队列 drain、entry digest 与 projection baseline。
+- `0074` 发布 guard 必须拒绝列 type/nullability/default 或 CHECK 语义漂移；只比较列名、约束名或出现
+  `data_sync` 字符串不构成 schema compatibility。rollback 在 image switch 前后必须持久 phase，`switching`
+  歧义态禁止自动恢复猜测；race-live/data-sync 任一可信 sibling marker 为 `switching` 或两者 action/phase
+  不一致时都必须全局拒绝恢复。
+- 本决定只固定 R0 关闭态控制面，不批准联网、赛事字段写入、公开赛果、生产 migration 或部署。首次生产启用
+  仍需 PostgreSQL/Celery/Compose、容量故障与独立代码 review 门禁，以及单独 G2/G3 授权。
+
 ## 2026-08-17 未来赛事时间只写官方明确值，备份可恢复性先于磁盘清理
 
 - 首批未来时间只使用 York Racecourse 官方 Order of Runnings；其他地区没有明确、当前、可核对的开赛
@@ -3034,3 +3111,52 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
   active verify、Beat-last 顺序执行。
 - apply freshness 固定 24 小时；runtime validity 固定为最晚 race datetime +30 分钟 +24 小时。一级止损
   永远是无需 manifest 的 false/off；已合法推进的公开状态不自动反向修改。
+
+# 2026-08-28 赛事数据自动化采用 standing policy、确定性来源仲裁和动态 cadence
+
+- 用户本轮明确要求完整自动闭环并覆盖此前逐阶段/逐场确认约束；因此未来公开赛事由一年期冻结 standing
+  policy 自动纳管，不再逐场确认。生产部署仍是独立的最终确认点，代码合并不自动扩大生产权限。
+- 来源等级固定为 `licensed_api=300 > official_operator=200 > trusted_publisher=100`。更高等级覆盖低等级；
+  同等级使用 observation 时间和 provider key 稳定决胜；manual lock 永不被自动化覆盖。
+- The Racing API 是新增联网主链，单 task 最多 3 请求；官网层本轮只消费既有 HKJC/France Galop 导入，
+  未经独立 proof 不新增官网网络抓取。API 未找到赛果时才依次尝试官方导入和地区可信第三方 receipt。
+- 赛时和出马表远期最多间隔 12 小时，临赛加密；状态按 T/T+30 推进；赛果自 T+3 起抓取并在确认后继续
+  7 天更正观察。所有 checkpoint 由 claim completion 原子生成后继，避免固定 Beat 与 worker 重复派发。
+- 来源报告名次与内部唯一排序分离：`reported_finish_position` 保留 dead heat，`finish_position` 保持既有
+  唯一约束。更正追加 immutable revision，不就地覆盖证据。
+- 公开页面不显示来源等级、provisional/official 或人工复核标签；这些字段保留为内部仲裁、审计和回滚依据。
+- The Racing API 身份发现每轮最多 3 请求，但 provider/日期桶按 UTC 小时轮转，不能固定从字典序头部开始；
+  这样所有存在候选的地区在有限轮次内都有机会执行，不会因全局 budget 长期饥饿。
+- network 前容量不是“正数配置即通过”：必须在 `RaceDataTransportCapacityLedger` 原子预留 provider/region/day
+  请求和最大响应字节，并同时验证 artifact root、high-water、hold 与 free disk。失败只消耗零网络请求。
+
+# 2026-08-28 过期赛果审核 claim 必须显式失败终态，发布门禁不忽略
+
+- 用户已在发现 14 条阻塞后明确授权按本方案处理历史 claim 并修复防复发逻辑；该授权只覆盖备份、精确
+  manifest 收口和验证，不覆盖修复后 PR 的最终合并、部署、migration 或自动化启用。
+- `claimed` 表示仍有写入所有权，租约过期不等于业务终态；发布门禁继续统计全部 claimed，不增加
+  “expired 即安全”的旁路。
+- prepare 异常由仍持有原 token 的 worker 写 `failed/prepare_exception`；独立 sweeper 只处理租约过期且
+  从未形成 selector、bundle、terminal 或 finished 证据的标准空 claim。其他形态保持 claimed 并告警。
+- 历史修复采用 preview canonical manifest SHA + apply 事务锁/CAS，两阶段绑定全部 claimed 行；任一漂移
+  整批零写。收口状态使用 `failed/stale_claim_reconciled`，不使用会误示“没有目标”的 `noop`。
+- 自动收口只解决运行记录泄漏，不触发重跑。具体 slot 的 retry 是独立运维动作，沿用现有显式入口与门禁。
+
+# 2026-08-28 PR #108 赛果、出马表与生命周期发布门禁收紧
+
+- The Racing API 当日列表只有返回 registry 登记的 terminal marker 才能形成正式赛果；无 marker 的完整
+  行只保存 provisional revision，不移动 current 或公开投影。赛后第 1 至 7 天只使用受审精确路由
+  `/v1/results/{race_id}`，404 作为明确 not-found，禁止猜测其他历史 endpoint。
+- 地区/日期批量 racecard 与 results 使用数据库 single-flight 和 150 秒 complete TTL 共享完整快照；必须
+  完成全部分页后才发布 manifest，缺页或预算不足整份拒绝。容量由快照 owner 预留一次，event waiter
+  只消费已完成 artifact，不能逐赛事重复扣减整批请求预算。
+- 正式/更正赛果必须覆盖 canonical runner 全集且每行都是终态。优先要求已有来源 runner ID 精确相等；
+  对仅提供赛果的 fallback，只有 runner 数量、马号与 NFKC 规范化马名构成无歧义全双射时，才在同一
+  投影事务原子补充该来源 runner ID。缺行、多解、重复或非终态全部 fail closed。
+- data-sync 纳管不再隐式把 lifecycle 切为 `enforce`，也不清除人工暂停；新 control 从 `off` 建立，已有
+  mode、pause 和 refresh 原样保留。所有相关写路径统一使用 lifecycle control -> event 的锁顺序。
+- T+30 未确认只创建 `data_sync_event` incident，监控任务走普通 `celery`，不派发邮件或旧
+  `race_live` 消息。配置审计的 `ready` 只证明 allowlist、route、policy、registry 与容量完整，不要求
+  运行开关已打开。
+- schedule/racecard/result canonical apply 都必须在网络之后、事务内重新验证来源 review/terms、有效期、
+  registry、contract、region/namespace 和 exact claim；观察创建成功不能替代写入时准入。

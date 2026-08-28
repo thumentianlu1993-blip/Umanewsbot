@@ -120,6 +120,7 @@ class TheRacingApiFreeSourceProofTests(SimpleTestCase):
                 "united_kingdom": "gb",
                 "france": "fr",
                 "hong_kong": "hk",
+                "ireland": "ire",
                 "japan": "jpn",
                 "united_states": "usa",
             },
@@ -134,6 +135,9 @@ class TheRacingApiFreeSourceProofTests(SimpleTestCase):
                     "path": "/v1/results/today/free",
                     "limit": [50],
                     "skip": list(range(0, 500, 50)),
+                },
+                "result_by_id": {
+                    "path": "/v1/results/{race_id}",
                 },
             },
         }
@@ -262,7 +266,7 @@ class TheRacingApiFreeSourceProofTests(SimpleTestCase):
 
             cases = (
                 ("missing", registry, digest, None, 3),
-                ("invalid", registry, digest, "ireland", 3),
+                ("invalid", registry, digest, "australia", 3),
                 (
                     "registry-budget",
                     limited_registry,
