@@ -104,11 +104,12 @@ enrollment、due checkpoints、policy census/blocker 和 route drift，并固定
 2026-08-28 只读预检确认生产 web/worker/Beat 统一运行 revision
 `2833558a6a2d67b7dc9816b53ea8ad5d580eb56c`、image
 `sha256:4bc392d012080a482523451016074f55ebcee84177ccab08b7563b233411a611`，内外 healthz 200，
-external started/lock 均为 0。`race_sync_v2` 队列为 0；旧 `race_live` 队列有 7,543 条遗留消息且 worker
-不存在，本发布不得清理或复用该队列。
+external started/active lock 均为 0；现存 2 条 lock 占位行均没有 owner/acquired time。`race_sync_v2`
+队列为 0；旧 `race_live` 队列有 7,543 条遗留消息且 worker 不存在，本发布不得清理或复用该队列。
 
-主机磁盘总量约 105.3 GB、已用约 88.6 GB、可用约 12.2 GB；备份目录约 47.4 GB，最近单份备份约
-445.5 MB。生产 checkout 有大量历史 runtime dirty 文件，因此发布必须从合并 revision 建立隔离 release，
+主机磁盘总量 `105,286,258,688` bytes、最新已用/可用 `88,565,182,464 / 12,211,531,776` bytes；备份目录
+`47,380,298,866` bytes，最近单份备份约 445.5 MB。生产 checkout 有 1,710 项历史 runtime dirty 文件，
+因此发布必须从合并 revision 建立隔离 release，
 不得在 `/opt/umanewsbot` 直接 pull/checkout 或清理文件。
 
 本次拟冻结容量：单响应压缩/解压 `2 MiB / 8 MiB`，provider+region 每日 `1 GiB / 192 requests`，

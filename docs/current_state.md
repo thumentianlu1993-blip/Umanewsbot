@@ -6191,9 +6191,11 @@ v3 首次 prepare 在请求预算 `60/60` 时由 HRN 空候选连带阻断 Equib
   实现和发布边界详见
   `docs/changes/automate-race-event-lifecycle/race_data_lifecycle_implementation_20260828.md`。
 - 生产只读预检：运行 revision/image 为 `2833558a…` / `sha256:4bc392…`，内外 healthz 200，external
-  started/lock 为 0，新 `race_sync_v2` 队列为 0。旧 `race_live` 队列有 7,543 条遗留消息且无 worker，
-  必须保持不动。磁盘可用约 12.2 GB、备份约 47.4 GB，主 checkout 有 1,709 项历史 dirty；部署必须用
-  隔离 release，不得直接清理或覆盖主 checkout。
+  started/active lock 为 0；2 条 `ExternalDataImportLock` 占位行均无 owner/acquired time。新
+  `race_sync_v2` 队列为 0，旧 `race_live` 队列有 7,543 条遗留消息且无 worker，必须保持不动。磁盘可用
+  `12,211,531,776` bytes、备份 `47,380,298,866` bytes，主 checkout 有 1,710 项历史 dirty；部署必须用
+  隔离 release，不得直接清理或覆盖主 checkout。runtime 已有旧版总开关 false 与 provider/region/field
+  三个空集合键，其余本 change 新键尚不存在。
 - 已据此冻结候选容量：响应 `2/8 MiB`、provider-region 日 `1 GiB/192 requests`、root high/low
   `512/256 MiB`、min-free `8 GiB`、cleanup `100 rows/64 MiB`、hold `256 MiB`。0075 新增日账本，
   identity/provider transport 写前必须原子预留预算并检查 root/free disk；关闭态发布后还要重新核对。

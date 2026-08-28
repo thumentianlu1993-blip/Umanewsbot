@@ -28,10 +28,11 @@
 - 普通 `celery` 队列为 `0`，遗留 `race_live` 队列为 `7543`；该积压不属于本方案的可恢复任务。
 
 `2026-08-28` 最新只读 preflight：web/worker/Beat 统一运行 `2833558a` / `sha256:4bc392…`，双 healthz
-为 200，migration leaf 为 `0073`，external started/lock 为 0，`celery=0`、`race_sync_v2=0`、
-`race_live=7543`；磁盘可用 `12,214,140,928` bytes。生产 checkout 有 1,709 项历史 dirty，发布必须使用
-隔离 release。`RACE_DATA_SYNC_*` 生产键尚不存在；现有 lifecycle 为 `true/enforce`，race-live network/
-scheduler 仍关闭。
+为 200，migration leaf 为 `0073`，external started/active lock 为 0（另有 2 条未持有的 lock 占位行），
+`celery=0`、`race_sync_v2=0`、`race_live=7543`；磁盘可用 `12,211,531,776` bytes。生产 checkout 有
+1,710 项历史 dirty，发布必须使用隔离 release。runtime 仅有 4 个旧键：`RACE_DATA_SYNC_ENABLED=false`
+及 provider/region/field 三个空集合；本 change 的 scheduler/network/apply/capacity 等新增键尚不存在。
+现有 lifecycle 为 `true/enforce`，race-live network/scheduler 仍关闭。
 
 因此本功能不能简化为“增加两个 cron”。第一道门槛是建立可审计的赛事身份、准确时间和来源路由，
 之后才允许动态调度出马表与赛果。

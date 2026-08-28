@@ -2923,6 +2923,8 @@ P0 马信息补全专项的模型交接文档见
   `12 failures / 39 errors / 4 skipped`，因此没有本次新增红灯且少 3 个既有失败。主干缺少本 PR 的 6 个
   测试模块所产生的 import error 已从共同集合剔除。实现已提交并创建
   PR #108，当前未合并、发布或改动生产；PR 完成后只再请求一次绑定精确 revision 的生产部署确认。
-- 生产只读 preflight 确认运行 revision `2833558a…`、healthz 200、external import/lock 为 0、新队列为 0；
-  磁盘仅余约 12.2 GB且主 checkout 有大量历史 dirty，必须使用隔离 release 和 8 GiB min-free 容量门禁。
+- 生产只读 preflight 确认运行 revision `2833558a…`、healthz 200、external started/active lock 为 0（2 条
+  lock 占位行均未持有）、新队列为 0；runtime 只有旧版总开关 false 与 provider/region/field 空集合四键，
+  本 change 新键尚未配置。磁盘可用 `12,211,531,776` bytes 且主 checkout 有 1,710 项历史 dirty，必须使用
+  隔离 release 和 8 GiB min-free 容量门禁。
   旧 `race_live` 7,543 条遗留消息明确不在本次范围。

@@ -77,7 +77,7 @@
 ## 最终生产发布
 
 - [ ] (operations) 取得用户对 PR #108 合并及生产部署的最终确认。
-- [ ] (operations) 合并后绑定精确 revision/tree/archive/image，建立隔离 release；不得在 1,709 项 dirty 的
+- [ ] (operations) 合并后绑定精确 revision/tree/archive/image，建立隔离 release；不得在 1,710 项 dirty 的
   `/opt/umanewsbot` checkout 直接 pull、checkout 或清理。
 - [ ] (operations) 创建 PostgreSQL custom-format 备份，记录权限/大小/SHA 并通过 `pg_restore --list`。
 - [ ] (operations) 所有新开关关闭应用 0074/0075，验证 web/worker/Beat 同 image/revision、healthz、迁移和

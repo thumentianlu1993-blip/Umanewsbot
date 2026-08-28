@@ -4,10 +4,13 @@
 
 - PR #108 已包含未来赛事自动纳管、时间与出马表、lifecycle、赛果、更正、容量账本和发布控制面。
 - 最新生产只读快照：web/worker/Beat 为 `2833558a` / `sha256:4bc392…`，双 healthz 200，migration
-  leaf `0073`，external started/lock 为 0，`celery=0`、`race_sync_v2=0`、`race_live=7543`。
-- 生产磁盘可用 `12,214,140,928` bytes，backup 目录 `47,380,298,866` bytes；主 checkout 有 1,709 项
+  leaf `0073`，external started/active lock 为 0（2 条 lock 占位行均未持有），`celery=0`、
+  `race_sync_v2=0`、`race_live=7543`。
+- 生产磁盘可用 `12,211,531,776` bytes，backup 目录 `47,380,298,866` bytes；主 checkout 有 1,710 项
   历史 dirty，禁止直接 pull/checkout/清理，必须用隔离 release。
-- `RACE_DATA_SYNC_*` 生产键尚不存在；现有 lifecycle 为 `true/enforce`，race-live network/scheduler 关闭。
+- runtime 仅有旧版 `RACE_DATA_SYNC_ENABLED=false` 与 provider/region/field 三个空集合键；本 change 新增的
+  scheduler/network/apply/capacity 等键尚不存在。现有 lifecycle 为 `true/enforce`，race-live network/scheduler
+  关闭。
 - 尚未合并、备份、迁移、部署或开启任何新开关；等待用户唯一一次最终生产确认。
 
 ## 2. 用户覆盖的旧门禁
