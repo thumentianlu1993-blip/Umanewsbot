@@ -87,6 +87,11 @@ enrollment、due checkpoints、policy census/blocker 和 route drift，并固定
   官网/第三方 fallback、不可变赛果 revision、dead heat、更正、审计、route drift、公开页去来源标签；
 - 隔离 PostgreSQL 16 专项：23/23 通过，覆盖行锁、并发幂等、唯一约束、raw cleanup 和 migration；
 - zero-write dry-run：通过，数据库 hash 不变。
+- 相邻扩展回归：当前分支筛除 PostgreSQL-only 后运行 679 项，结果为
+  `9 failures / 39 errors / 3 skipped`；同日、同配置的 `origin/main@2833558a` 共享基线运行 607 项，结果为
+  `12 failures / 39 errors / 3 skipped`。规范化用例名后 `current-only=0`，即新增 72 项没有新增失败或
+  错误；本分支还消除了基线中的 source-proof schema-v2 和两个旧公开阶段标签断言共 3 项失败。剩余
+  红灯均为基线已有的日期/授权绑定旧 `race_live` 契约，未计入本次绿色测试，也不影响差异归因。
 
 ## 7. 生产只读预检与容量冻结
 
