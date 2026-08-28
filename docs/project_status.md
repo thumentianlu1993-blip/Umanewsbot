@@ -1,5 +1,15 @@
 # 项目状态文档
 
+## 2026-08-28 PR #108 发布因 14 条 claimed 赛果审核记录停止
+
+- 用户已给出最终合并/部署授权，但 PR `#108` 尚未合并，生产仍为 revision `2833558a…56c`、migration
+  leaf `0073`；未创建本次发布备份、未执行 `0074/0075`、未切换镜像，也未启用新自动化。
+- 上线前主机 I/O/内存故障已通过只重启空闲普通 worker 恢复；服务与公网入口重新健康。随后 writer
+  静默门禁发现 `RaceResultReviewRun(status="claimed")=14`，因此按约定立即停止。
+- 失败清理后旧 Beat 已恢复，五个赛事写入开关仍为 `false`，`race_sync_v2=0`，旧
+  `race_live=7543` 未触碰。当前阻塞项是对 14 条历史 claim 的独立核验与受审精确收口；不得绕过门禁继续
+  PR 合并、备份、迁移或分阶段启用。
+
 ## 2026-08-20 赛事数据自动同步 R0 已通过独立代码评审，保持默认关闭
 
 - 独立 clean worktree/branch 已完成 `0074` additive migration、`data_sync` writer owner、来源稳定 identity、

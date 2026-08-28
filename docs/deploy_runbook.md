@@ -8715,6 +8715,22 @@ RACE_DATA_RAW_ARTIFACT_ROOTS=/run/race-data-sync
 8 GiB，或 audit/capacity ledger/root 任一异常，则不得打开 network/apply。旧 `race_live=7543` 消息不得
 删除、迁移或交给 `race_sync_v2_worker`；新队列必须继续从 0 开始。
 
+### 2026-08-28 PR #108 首次发布尝试的硬停止证据
+
+- 合并前生产机出现低内存与 I/O 饱和：`MemAvailable` 约 `100 MiB`、无 swap，I/O PSI `full avg10`
+  一度约 80%，Docker/SSH/公网请求均受阻。确认普通 `celery=0`、Redis `unacked=0`，且两个 pool 子进程
+  都在读取空闲工作管道后，仅对普通 worker 主进程发送 TERM；既有 `unless-stopped` 自动拉起成功，内存
+  回升到约 `1.2–1.5 GiB`，I/O PSI 回落，公网四入口恢复 200。
+- 为发布冻结旧 Beat 后，普通队列和 worker active/reserved/scheduled 均排空，external import lock/started、
+  historical batch、horse P0 run 均为 0；但应用硬门禁返回
+  `RaceResultReviewRun(status="claimed")=14`。因此不得运行 release owner、备份、migration、构建或配置
+  启用，更不得把 claimed 记录自行改成完成/失败。
+- 停止清理只恢复冻结前运行的旧 Beat。复核 `RACE_LIVE_SCHEDULER_ENABLED=false`、
+  `RACE_LIVE_MONITOR_ENABLED=false`、`RACE_DATA_SYNC_ENABLED=false`、
+  `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`，
+  `race_sync_v2=0`、`race_live=7543`。PR `#108` 保持 OPEN；重试必须从全套合并前检查开始，且 claimed
+  count 必须先经独立授权的精确收口回到 0。
+
 ### 2026-08-28 最终确认前只读复核快照
 
 - resident web/worker/Beat 仍统一运行 image

@@ -1,5 +1,23 @@
 # 当前状态
 
+## 2026-08-28 PR #108 生产发布在 writer 静默门禁安全停止
+
+- 用户已确认合并并部署 PR `#108`，但合并前生产检查发现宿主机一度处于约 `100 MiB`
+  `MemAvailable`、无 swap、I/O PSI `full` 约 80% 的故障态；公网首页曾超时。PR 仍保持 OPEN，未执行
+  备份、`0074/0075`、镜像切换或任何新赛事写入。
+- 故障检查确认普通 `celery` 与 Redis `unacked` 已排空，两个 pool 子进程均为空闲管道读取；仅对旧普通
+  worker 做受控 TERM，由 `restart: unless-stopped` 拉起。可用内存恢复至约 `1.2–1.5 GiB`，I/O PSI
+  `avg10` 回落接近 0，公网 health/home/races/admin 均恢复 200。该恢复未触碰 Beat 以外的发布控制面、
+  `race_sync_v2` 或旧 `race_live` 消息。
+- 发布冻结后，Celery active/reserved/scheduled、普通队列和 external import/historical/horse P0 writer 均为
+  0，但 `RaceResultReviewRun(status="claimed")=14`，触发硬门禁。记录 ID 范围为 `69–89`，UTC 创建/
+  更新时间分布在 `2026-08-17T22:30` 至 `2026-08-27T22:30`，且更新时间与创建时间一致；未擅自清理、
+  完成或改写这些 claim。
+- 已立即停止发布并恢复冻结前运行的旧 Beat。最终复核五个旧/新赛事写入开关均为 `false`，
+  `race_sync_v2=0`、旧 `race_live=7543`，web/worker/Beat/db/redis/nginx/onebot 均在线。下一步必须先对
+  14 条 claimed review 做单独、受审的生产状态核验与精确收口；门禁回到 0 后才能重新取得发布窗口并从
+  PR 合并前检查重新开始。
+
 ## 2026-08-20 赛事数据自动同步 R0 已通过独立代码评审，保持默认关闭
 
 - 已在干净 worktree `/Users/mentianlu/.codex/worktrees/implement-race-data-lifecycle-sync/umanews` 和独立分支
