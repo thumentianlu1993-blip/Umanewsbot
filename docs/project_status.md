@@ -2915,5 +2915,8 @@ P0 马信息补全专项的模型交接文档见
   没有独立 proof 的情况下扩张。
 - migration 0075、Compose/Beat/worker 配置、冻结 standing policy、只读审计命令和回滚边界已齐备；
   所有开关默认 false、容量默认 0。
-- 本地验证为 169/169，zero-write dry-run 前后数据库 SHA 不变。实现已提交为 `e6ec0e6e` 并创建
+- 本地验证为 171/171、PostgreSQL 16 专项 23/23，zero-write dry-run 前后数据库 SHA 不变。实现已提交为 `e6ec0e6e` 并创建
   PR #108，当前未合并、发布或改动生产；PR 完成后只再请求一次绑定精确 revision 的生产部署确认。
+- 生产只读 preflight 确认运行 revision `2833558a…`、healthz 200、external import/lock 为 0、新队列为 0；
+  磁盘仅余约 12.2 GB且主 checkout 有大量历史 dirty，必须使用隔离 release 和 8 GiB min-free 容量门禁。
+  旧 `race_live` 7,543 条遗留消息明确不在本次范围。

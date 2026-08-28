@@ -287,6 +287,13 @@ RACE_DATA_RAW_CLEANUP_MAX_BYTES = race_data_capacity_int(
 RACE_DATA_RAW_HOLD_ALERT_BYTES = race_data_capacity_int(
     "RACE_DATA_RAW_HOLD_ALERT_BYTES"
 )
+RACE_DATA_RAW_ARTIFACT_ROOTS = tuple(
+    item.strip()
+    for item in env(
+        "RACE_DATA_RAW_ARTIFACT_ROOTS", ""
+    ).split(",")
+    if item.strip()
+)
 
 HISTORICAL_RACE_BACKFILL_ENABLED = env_bool("HISTORICAL_RACE_BACKFILL_ENABLED", False)
 HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK = env_bool("HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK", False)

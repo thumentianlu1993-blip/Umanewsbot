@@ -10,9 +10,11 @@ from django.test import TestCase, override_settings
 from stable import models
 from stable.services.race_data_sync_pipeline import (
     _ROSTER_ALLOWED_FIELDS,
+    reserve_race_data_transport_capacity,
     resolve_race_data_provider_route,
 )
 from stable.services.race_data_sync_providers import (
+    _fair_discovery_bucket_order,
     discover_the_racing_api_source_identities,
     run_persisted_official_result_data_sync,
     run_reference_result_data_sync,
@@ -26,6 +28,63 @@ NOW = datetime(2026, 8, 28, 8, 0, tzinfo=dt_timezone.utc)
 SHA = "a" * 64
 ROOT = Path(__file__).resolve().parents[2]
 REFERENCE_SHA = "740a93774927765f9c848cc97e4b87b78ab36d473c4c3e2e644d56a6f856cff2"
+
+
+class ProviderIdentityDiscoveryFairnessTests(TestCase):
+    def test_hourly_budget_rotates_across_all_region_day_buckets(self):
+        buckets = {
+            ("france", "today"): [],
+            ("hong_kong", "today"): [],
+            ("japan", "today"): [],
+            ("united_kingdom", "tomorrow"): [],
+        }
+
+        first = _fair_discovery_bucket_order(buckets=buckets, now=NOW)
+        second = _fair_discovery_bucket_order(
+            buckets=buckets,
+            now=NOW + timedelta(hours=1),
+        )
+
+        self.assertEqual({key for key, _items in first}, set(buckets))
+        self.assertEqual(second, (*first[1:], first[0]))
+
+
+@override_settings(
+    RACE_DATA_RAW_MAX_COMPRESSED_BYTES=2 * 1024 * 1024,
+    RACE_DATA_RAW_MAX_UNCOMPRESSED_BYTES=8 * 1024 * 1024,
+    RACE_DATA_RAW_DAILY_PROVIDER_REGION_BYTES=16 * 1024 * 1024,
+    RACE_DATA_RAW_DAILY_PROVIDER_REGION_REQUESTS=3,
+    RACE_DATA_RAW_ROOT_HIGH_WATER_BYTES=1024 * 1024 * 1024,
+    RACE_DATA_RAW_ROOT_LOW_WATER_BYTES=512 * 1024 * 1024,
+    RACE_DATA_RAW_MIN_FREE_DISK_BYTES=1,
+    RACE_DATA_RAW_CLEANUP_MAX_ROWS=100,
+    RACE_DATA_RAW_CLEANUP_MAX_BYTES=64 * 1024 * 1024,
+    RACE_DATA_RAW_HOLD_ALERT_BYTES=256 * 1024 * 1024,
+    RACE_DATA_RAW_ARTIFACT_ROOTS=(str(ROOT / "runtime"),),
+)
+class RaceDataTransportCapacityTests(TestCase):
+    def test_daily_provider_region_reservation_is_atomic_and_bounded(self):
+        admitted = reserve_race_data_transport_capacity(
+            provider="the_racing_api",
+            region_code="japan_jra",
+            now=NOW,
+            proposed_requests=2,
+            max_response_bytes_per_request=1024,
+        )
+        blocked = reserve_race_data_transport_capacity(
+            provider="the_racing_api",
+            region_code="japan_jra",
+            now=NOW,
+            proposed_requests=2,
+            max_response_bytes_per_request=1024,
+        )
+
+        self.assertTrue(admitted.allowed)
+        self.assertFalse(blocked.allowed)
+        self.assertEqual(blocked.reason_code, "artifact_daily_requests_exceeded")
+        ledger = models.RaceDataTransportCapacityLedger.objects.get()
+        self.assertEqual(ledger.request_count, 2)
+        self.assertEqual(ledger.budgeted_response_bytes, 2048)
 
 
 @override_settings(
@@ -42,6 +101,17 @@ REFERENCE_SHA = "740a93774927765f9c848cc97e4b87b78ab36d473c4c3e2e644d56a6f856cff
     RACE_LIVE_TRA_REGISTRY_SHA256=SHA,
     RACE_LIVE_TRA_REGISTRY_FILE="/not/read/in/test.json",
     RACE_LIVE_TRA_SECRET_ENV_FILE="/not/read/in/test.env",
+    RACE_DATA_RAW_MAX_COMPRESSED_BYTES=2 * 1024 * 1024,
+    RACE_DATA_RAW_MAX_UNCOMPRESSED_BYTES=8 * 1024 * 1024,
+    RACE_DATA_RAW_DAILY_PROVIDER_REGION_BYTES=1024 * 1024 * 1024,
+    RACE_DATA_RAW_DAILY_PROVIDER_REGION_REQUESTS=1000,
+    RACE_DATA_RAW_ROOT_HIGH_WATER_BYTES=1024 * 1024 * 1024,
+    RACE_DATA_RAW_ROOT_LOW_WATER_BYTES=512 * 1024 * 1024,
+    RACE_DATA_RAW_MIN_FREE_DISK_BYTES=1,
+    RACE_DATA_RAW_CLEANUP_MAX_ROWS=100,
+    RACE_DATA_RAW_CLEANUP_MAX_BYTES=64 * 1024 * 1024,
+    RACE_DATA_RAW_HOLD_ALERT_BYTES=256 * 1024 * 1024,
+    RACE_DATA_RAW_ARTIFACT_ROOTS=(str(ROOT / "runtime"),),
 )
 class TheRacingApiDataSyncAdapterTests(TestCase):
     def setUp(self):

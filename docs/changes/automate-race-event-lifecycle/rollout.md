@@ -217,7 +217,7 @@ NOT REVIEWED FOR CODE / NOT DEPLOYED`
 用户本轮已明确授权完整代码实现、dry-run 和 PR，并明确只在最后一次生产部署前确认。因此早期按 A/B/C/D
 逐阶段等待实现确认的状态由本节更新；生产权限边界仍保持不变。
 
-当前状态：`PR #108 OPEN / IMPLEMENTED / TESTED 169/169 / ZERO-WRITE DRY-RUN PASSED /
+当前状态：`PR #108 OPEN / IMPLEMENTED / TESTED 171/171 + POSTGRESQL 23/23 / ZERO-WRITE DRY-RUN PASSED /
 NOT DEPLOYED`。
 
 建议生产启用顺序：

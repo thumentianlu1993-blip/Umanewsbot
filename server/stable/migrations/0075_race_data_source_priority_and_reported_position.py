@@ -20,6 +20,52 @@ class Migration(migrations.Migration):
     dependencies = [("stable", "0074_race_data_sync_r0_control_plane")]
 
     operations = [
+        migrations.CreateModel(
+            name="RaceDataTransportCapacityLedger",
+            fields=[
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                ("provider", models.CharField(max_length=64)),
+                ("region_code", models.CharField(max_length=32)),
+                ("usage_date", models.DateField()),
+                ("request_count", models.PositiveIntegerField(default=0)),
+                (
+                    "budgeted_response_bytes",
+                    models.PositiveBigIntegerField(default=0),
+                ),
+            ],
+            options={
+                "indexes": [
+                    models.Index(
+                        fields=["usage_date", "provider", "region_code"],
+                        name="race_data_capacity_day_idx",
+                    )
+                ],
+                "constraints": [
+                    models.UniqueConstraint(
+                        fields=("provider", "region_code", "usage_date"),
+                        name="race_data_capacity_day_uq",
+                    ),
+                    models.CheckConstraint(
+                        condition=~models.Q(provider=""),
+                        name="race_data_capacity_provider_nonempty",
+                    ),
+                    models.CheckConstraint(
+                        condition=~models.Q(region_code=""),
+                        name="race_data_capacity_region_nonempty",
+                    ),
+                ],
+            },
+        ),
         migrations.AddField(
             model_name="raceeventfieldauthority",
             name="source_class",

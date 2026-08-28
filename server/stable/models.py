@@ -1938,6 +1938,39 @@ class RaceLiveHostBudget(TimestampedModel):
         return self.host
 
 
+class RaceDataTransportCapacityLedger(TimestampedModel):
+    provider = models.CharField(max_length=64)
+    region_code = models.CharField(max_length=32)
+    usage_date = models.DateField()
+    request_count = models.PositiveIntegerField(default=0)
+    budgeted_response_bytes = models.PositiveBigIntegerField(default=0)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("provider", "region_code", "usage_date"),
+                name="race_data_capacity_day_uq",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(provider=""),
+                name="race_data_capacity_provider_nonempty",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(region_code=""),
+                name="race_data_capacity_region_nonempty",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("usage_date", "provider", "region_code"),
+                name="race_data_capacity_day_idx",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.usage_date} {self.provider}:{self.region_code}"
+
+
 class RaceResultSourceIdentity(TimestampedModel):
     event = models.ForeignKey(
         RaceEvent,

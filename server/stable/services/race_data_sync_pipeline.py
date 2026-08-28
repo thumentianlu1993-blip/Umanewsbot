@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, Sum
 from django.utils import timezone
 
 from stable import models
@@ -230,6 +230,142 @@ def evaluate_race_data_capacity(
         return RaceDataSyncCapacityDecision(False, "artifact_root_high_water")
     if free_disk_bytes - proposed_compressed_bytes < limits.min_free_disk_bytes:
         return RaceDataSyncCapacityDecision(False, "artifact_min_free_disk")
+    return RaceDataSyncCapacityDecision(True, "")
+
+
+def inspect_race_data_artifact_capacity(
+    *, artifact_roots: tuple[str, ...]
+) -> tuple[int, int]:
+    if not artifact_roots:
+        raise ValueError("race data artifact roots are not configured")
+    total_bytes = 0
+    free_bytes: list[int] = []
+    for raw_root in artifact_roots:
+        root = Path(raw_root)
+        try:
+            root_stat = root.lstat()
+        except OSError as exc:
+            raise ValueError("race data artifact root is unavailable") from exc
+        if root.is_symlink() or not stat.S_ISDIR(root_stat.st_mode):
+            raise ValueError("race data artifact root is unsafe")
+        try:
+            filesystem = os.statvfs(root)
+        except OSError as exc:
+            raise ValueError("race data artifact filesystem is unavailable") from exc
+        free_bytes.append(filesystem.f_bavail * filesystem.f_frsize)
+        for directory, directory_names, filenames in os.walk(
+            root, followlinks=False
+        ):
+            directory_path = Path(directory)
+            directory_names[:] = [
+                name
+                for name in directory_names
+                if not (directory_path / name).is_symlink()
+            ]
+            for filename in filenames:
+                candidate = directory_path / filename
+                try:
+                    candidate_stat = candidate.lstat()
+                except OSError:
+                    continue
+                if stat.S_ISREG(candidate_stat.st_mode) and not candidate.is_symlink():
+                    total_bytes += candidate_stat.st_size
+    return total_bytes, min(free_bytes)
+
+
+def reserve_race_data_transport_capacity(
+    *,
+    provider: str,
+    region_code: str,
+    now: datetime,
+    proposed_requests: int,
+    max_response_bytes_per_request: int,
+) -> RaceDataSyncCapacityDecision:
+    """Atomically reserve a provider/region daily budget before transport."""
+
+    if not isinstance(now, datetime) or timezone.is_naive(now):
+        raise ValueError("now must be aware")
+    if (
+        not isinstance(provider, str)
+        or not provider
+        or provider != provider.strip()
+        or len(provider) > 64
+        or not isinstance(region_code, str)
+        or not region_code
+        or region_code != region_code.strip()
+        or len(region_code) > 32
+    ):
+        raise ValueError("capacity scope is invalid")
+    if (
+        isinstance(proposed_requests, bool)
+        or not isinstance(proposed_requests, int)
+        or not 1 <= proposed_requests <= 100
+        or isinstance(max_response_bytes_per_request, bool)
+        or not isinstance(max_response_bytes_per_request, int)
+        or max_response_bytes_per_request <= 0
+    ):
+        raise ValueError("capacity reservation is invalid")
+    limits = RaceDataSyncCapacityLimits.from_settings()
+    if max_response_bytes_per_request > limits.raw_max_compressed_bytes:
+        return RaceDataSyncCapacityDecision(
+            False, "artifact_payload_compressed_too_large"
+        )
+    proposed_bytes = proposed_requests * max_response_bytes_per_request
+    artifact_bytes, free_disk_bytes = inspect_race_data_artifact_capacity(
+        artifact_roots=tuple(
+            str(value)
+            for value in getattr(settings, "RACE_DATA_RAW_ARTIFACT_ROOTS", ())
+            if str(value)
+        )
+    )
+    hold_bytes = int(
+        models.RaceResultObservation.objects.filter(
+            field_provenance__raw_hold=True,
+            raw_size_bytes__isnull=False,
+        ).aggregate(total=Sum("raw_size_bytes"))["total"]
+        or 0
+    )
+    if hold_bytes >= limits.hold_alert_bytes:
+        return RaceDataSyncCapacityDecision(
+            False, "artifact_capacity_hold_exceeded"
+        )
+    if artifact_bytes + proposed_bytes > limits.artifact_high_water_bytes:
+        return RaceDataSyncCapacityDecision(False, "artifact_root_high_water")
+    if free_disk_bytes - proposed_bytes < limits.min_free_disk_bytes:
+        return RaceDataSyncCapacityDecision(False, "artifact_min_free_disk")
+
+    with transaction.atomic():
+        ledger, _created = (
+            models.RaceDataTransportCapacityLedger.objects.select_for_update()
+            .get_or_create(
+                provider=provider,
+                region_code=region_code,
+                usage_date=now.date(),
+            )
+        )
+        if (
+            ledger.request_count + proposed_requests
+            > limits.provider_region_daily_requests
+        ):
+            return RaceDataSyncCapacityDecision(
+                False, "artifact_daily_requests_exceeded"
+            )
+        if (
+            ledger.budgeted_response_bytes + proposed_bytes
+            > limits.provider_region_daily_bytes
+        ):
+            return RaceDataSyncCapacityDecision(
+                False, "artifact_daily_bytes_exceeded"
+            )
+        ledger.request_count += proposed_requests
+        ledger.budgeted_response_bytes += proposed_bytes
+        ledger.save(
+            update_fields=(
+                "request_count",
+                "budgeted_response_bytes",
+                "updated_at",
+            )
+        )
     return RaceDataSyncCapacityDecision(True, "")
 
 

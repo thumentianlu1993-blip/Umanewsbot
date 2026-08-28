@@ -6175,9 +6175,17 @@ v3 首次 prepare 在请求预算 `60/60` 时由 HRN 空候选连带阻断 Equib
 - 新 migration 为 `0075_race_data_source_priority_and_reported_position`；standing policy SHA 为
   `60fe9230ca0e97d69a8406118b5d346649239f3f0699efe9a1d0c63972e44ba4`，TRA registry SHA 为
   `24981f62e30e83e58fc82d4247560af35e4041b05857c287bd64430d0f2e2ecc`。全部新开关默认关闭、容量默认 0。
-- 聚焦回归 `169/169`、Django check、migration drift 和 compileall 均通过。全新临时 SQLite dry-run
+- 聚焦回归 `171/171`、隔离 PostgreSQL 16 专项 `23/23`、Django check、migration drift 和 compileall
+  均通过。全新临时 SQLite dry-run
   返回 `configuration_status=ready / route_drift=[] / would_write=false`，审计前后数据库 SHA 同为
-  `3339d40728f8b0eb4310e97efb6f169f3f4c52625fa8a3b6c94bd2e3492caea0`；容量合同为 `valid`。
+  `7be22b4ae103330a5443671031b82230841ff4688817722cc1573fa9fba548ef`；容量合同为 `valid`。
 - 实现 commit `e6ec0e6e` 已推送并创建 PR #108；尚未合并、部署、迁移生产或开启任何新 flag。
   实现和发布边界详见
   `docs/changes/automate-race-event-lifecycle/race_data_lifecycle_implementation_20260828.md`。
+- 生产只读预检：运行 revision/image 为 `2833558a…` / `sha256:4bc392…`，内外 healthz 200，external
+  started/lock 为 0，新 `race_sync_v2` 队列为 0。旧 `race_live` 队列有 7,543 条遗留消息且无 worker，
+  必须保持不动。磁盘可用约 12.2 GB、备份约 47.4 GB，主 checkout 有 1,709 项历史 dirty；部署必须用
+  隔离 release，不得直接清理或覆盖主 checkout。
+- 已据此冻结候选容量：响应 `2/8 MiB`、provider-region 日 `1 GiB/192 requests`、root high/low
+  `512/256 MiB`、min-free `8 GiB`、cleanup `100 rows/64 MiB`、hold `256 MiB`。0075 新增日账本，
+  identity/provider transport 写前必须原子预留预算并检查 root/free disk；关闭态发布后还要重新核对。

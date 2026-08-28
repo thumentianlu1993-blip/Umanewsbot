@@ -25,6 +25,7 @@
    结果仍保留 7 天更正观察。原始 observation、不可变 revision、projection 和公开缓存失效分离。
 6. 并列名次保留来源报告名次 `reported_finish_position`，内部 `finish_position` 继续唯一，避免 dead heat
    被误判成冲突；更正新增 revision，不覆盖历史证据。
+7. 身份发现的 provider/日期桶使用稳定顺序并按 UTC 小时轮转；单轮 3 请求上限不会长期饿死后排地区。
 
 ## 3. 来源优先级与边界
 
@@ -48,7 +49,7 @@ The Racing API 是本轮唯一新增的联网主适配器，单 task 最多 3 �
 
 ## 4. 配置与迁移
 
-- migration：`0075_race_data_source_priority_and_reported_position`；
+- migration：`0075_race_data_source_priority_and_reported_position`，同时增加 provider/region/day 容量账本；
 - standing policy：`runtime/policies/race_data_sync/standing_policy.json`；
 - policy SHA-256：`60fe9230ca0e97d69a8406118b5d346649239f3f0699efe9a1d0c63972e44ba4`；
 - 新任务路由到 `race_sync` queue；Beat 增加未来发现和 lifecycle tick；
@@ -56,8 +57,9 @@ The Racing API 是本轮唯一新增的联网主适配器，单 task 最多 3 �
 - 所有 runtime/apply/network/future-discovery/lifecycle 开关默认 `false`，容量默认 `0`，防止代码发布即写入。
 
 生产启用至少需要同时设置总开关、scheduler、network、对应 apply/public/lifecycle/future-discovery 开关，
-并为 provider/region/data kind、host/request、event/enrollment/checkpoint/revision 配置正容量。任何缺项均
-`blocked` 或 fail closed。
+并为 provider/region/data kind、host/request、event/enrollment/checkpoint/revision 配置正容量。身份发现和
+provider worker 会在 transport 前原子预留日请求/最大响应字节预算，并检查固定 artifact root、high-water、
+hold 和剩余磁盘；任何缺项均 `blocked` 或 fail closed。
 
 ## 5. 可观测性与 dry-run
 
@@ -73,18 +75,37 @@ enrollment、due checkpoints、policy census/blocker 和 route drift，并固定
 
 2026-08-28 在全新临时 SQLite 数据库完成 migration 与全开配置审计：`configuration_status=ready`、
 `capacity.status=valid`、`route_drift=[]`；审计前后数据库 SHA-256 均为
-`3339d40728f8b0eb4310e97efb6f169f3f4c52625fa8a3b6c94bd2e3492caea0`，证明该命令零写入、零联网。
+`7be22b4ae103330a5443671031b82230841ff4688817722cc1573fa9fba548ef`，证明该命令零写入、零联网。
 
 ## 6. 验证结果
 
 - `manage.py makemigrations --check --dry-run`：No changes detected；
 - `manage.py check`：0 issues；
 - Python `compileall`：通过；
-- 聚焦回归：169/169 通过；覆盖来源仲裁、动态 cadence、future discovery、CAS、lifecycle、TRA transport、
+- 聚焦回归：171/171 通过；覆盖来源仲裁、动态 cadence、future discovery 公平轮转、容量账本、CAS、
+  lifecycle、TRA transport、
   官网/第三方 fallback、不可变赛果 revision、dead heat、更正、审计、route drift、公开页去来源标签；
+- 隔离 PostgreSQL 16 专项：23/23 通过，覆盖行锁、并发幂等、唯一约束、raw cleanup 和 migration；
 - zero-write dry-run：通过，数据库 hash 不变。
 
-## 7. 发布门禁与回滚
+## 7. 生产只读预检与容量冻结
+
+2026-08-28 只读预检确认生产 web/worker/Beat 统一运行 revision
+`2833558a6a2d67b7dc9816b53ea8ad5d580eb56c`、image
+`sha256:4bc392d012080a482523451016074f55ebcee84177ccab08b7563b233411a611`，内外 healthz 200，
+external started/lock 均为 0。`race_sync_v2` 队列为 0；旧 `race_live` 队列有 7,543 条遗留消息且 worker
+不存在，本发布不得清理或复用该队列。
+
+主机磁盘总量约 105.3 GB、已用约 88.6 GB、可用约 12.2 GB；备份目录约 47.4 GB，最近单份备份约
+445.5 MB。生产 checkout 有大量历史 runtime dirty 文件，因此发布必须从合并 revision 建立隔离 release，
+不得在 `/opt/umanewsbot` 直接 pull/checkout 或清理文件。
+
+本次拟冻结容量：单响应压缩/解压 `2 MiB / 8 MiB`，provider+region 每日 `1 GiB / 192 requests`，
+artifact root high/low `512 MiB / 256 MiB`，最小剩余磁盘 `8 GiB`，每次 cleanup `100 rows / 64 MiB`，
+hold alert `256 MiB`，root `/run/race-data-sync`。写前备份、镜像构建和关闭态发布后必须再次核对磁盘；
+若低于任一门槛，network/apply 保持关闭。
+
+## 8. 发布门禁与回滚
 
 代码 PR 不等于生产启用。最终发布必须绑定合并后的精确 revision/image、migration 0075、registry SHA、
 policy SHA 和开关/容量清单；先备份并验证 `pg_restore --list`，再迁移，保持全部新开关关闭完成 web/worker/

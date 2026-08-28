@@ -554,6 +554,7 @@ def sync_race_event_provider_task(
         return fail_closed("artifact_capacity_config_invalid")
     from stable import models
     from stable.services.race_data_sync_pipeline import (
+        reserve_race_data_transport_capacity,
         resolve_race_data_provider_route,
     )
     from stable.services.race_data_sync_providers import (
@@ -582,6 +583,18 @@ def sync_race_event_provider_task(
     if route is None or route.route_digest != enrollment.route_digest:
         return fail_closed("provider_route_unavailable")
     now = timezone.now()
+    try:
+        capacity = reserve_race_data_transport_capacity(
+            provider=source.source_key,
+            region_code=source.region_code,
+            now=now,
+            proposed_requests=route.request_budget,
+            max_response_bytes_per_request=2 * 1024 * 1024,
+        )
+    except (OSError, TypeError, ValueError):
+        return fail_closed("artifact_capacity_config_invalid")
+    if not capacity.allowed:
+        return fail_closed(capacity.reason_code)
     provider_kwargs = {
         "event_id": event_id,
         "data_kinds": tuple(data_kinds),
@@ -600,7 +613,10 @@ def sync_race_event_provider_task(
         "zeturf",
         "horse_racing_nation",
     }:
-        outcome = run_reference_result_data_sync(**provider_kwargs)
+        outcome = run_reference_result_data_sync(
+            **provider_kwargs,
+            capacity_reserved=True,
+        )
     else:
         return fail_closed("provider_not_implemented")
     fallback_reason = ""

@@ -8694,3 +8694,23 @@ activation 必须产生新的 ID。范围外 enforce control 在 scanner claim �
 
 部署验收命令、dry-run 证据和已知官网 transport 边界见
 `docs/changes/automate-race-event-lifecycle/race_data_lifecycle_implementation_20260828.md`。
+
+本次基于 2026-08-28 线上只读磁盘/备份基线，容量值固定为：
+
+```dotenv
+RACE_DATA_RAW_MAX_COMPRESSED_BYTES=2097152
+RACE_DATA_RAW_MAX_UNCOMPRESSED_BYTES=8388608
+RACE_DATA_RAW_DAILY_PROVIDER_REGION_BYTES=1073741824
+RACE_DATA_RAW_DAILY_PROVIDER_REGION_REQUESTS=192
+RACE_DATA_RAW_ROOT_HIGH_WATER_BYTES=536870912
+RACE_DATA_RAW_ROOT_LOW_WATER_BYTES=268435456
+RACE_DATA_RAW_MIN_FREE_DISK_BYTES=8589934592
+RACE_DATA_RAW_CLEANUP_MAX_ROWS=100
+RACE_DATA_RAW_CLEANUP_MAX_BYTES=67108864
+RACE_DATA_RAW_HOLD_ALERT_BYTES=268435456
+RACE_DATA_RAW_ARTIFACT_ROOTS=/run/race-data-sync
+```
+
+当前线上可用磁盘约 12.2 GB，最近备份约 445.5 MB；构建、备份和关闭态发布后若 free disk 不再满足
+8 GiB，或 audit/capacity ledger/root 任一异常，则不得打开 network/apply。旧 `race_live=7543` 消息不得
+删除、迁移或交给 `race_sync_v2_worker`；新队列必须继续从 0 开始。

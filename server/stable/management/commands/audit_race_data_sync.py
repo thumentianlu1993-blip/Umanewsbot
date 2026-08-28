@@ -17,6 +17,7 @@ from stable.services.race_data_sync_pipeline import (
     RaceDataSyncCapacityLimits,
     RaceDataSyncFlags,
     build_race_data_provider_roster,
+    inspect_race_data_artifact_capacity,
     resolve_race_data_provider_route,
 )
 
@@ -52,13 +53,46 @@ class Command(BaseCommand):
         end_date = (cutoff + timedelta(days=horizon_days)).date()
         flags = RaceDataSyncFlags.from_settings()
         try:
-            RaceDataSyncCapacityLimits.from_settings()
-            capacity_status = {"status": "valid"}
-        except (TypeError, ValueError) as exc:
+            capacity_limits = RaceDataSyncCapacityLimits.from_settings()
+            artifact_bytes, free_disk_bytes = inspect_race_data_artifact_capacity(
+                artifact_roots=tuple(
+                    str(value)
+                    for value in getattr(
+                        settings, "RACE_DATA_RAW_ARTIFACT_ROOTS", ()
+                    )
+                    if str(value)
+                )
+            )
+            capacity_status = {
+                "status": (
+                    "valid"
+                    if artifact_bytes < capacity_limits.artifact_high_water_bytes
+                    and free_disk_bytes >= capacity_limits.min_free_disk_bytes
+                    else "invalid"
+                ),
+                "artifact_root_bytes": artifact_bytes,
+                "free_disk_bytes": free_disk_bytes,
+            }
+            if capacity_status["status"] == "invalid":
+                capacity_status["reason"] = "artifact_capacity_threshold"
+        except (OSError, TypeError, ValueError) as exc:
             capacity_status = {
                 "status": "invalid",
                 "reason": str(exc),
             }
+        capacity_status["usage_date"] = cutoff.date().isoformat()
+        capacity_status["daily_ledgers"] = list(
+            models.RaceDataTransportCapacityLedger.objects.filter(
+                usage_date=cutoff.date()
+            )
+            .order_by("provider", "region_code")
+            .values(
+                "provider",
+                "region_code",
+                "request_count",
+                "budgeted_response_bytes",
+            )
+        )
         roster = build_race_data_provider_roster()
         configured_entries = [
             {

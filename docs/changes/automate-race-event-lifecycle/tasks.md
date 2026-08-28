@@ -320,7 +320,9 @@
 - [x] (application) 移除公开页来源、人工复核和 provisional/official/corrected 标签，保留陈旧警告。
 - [x] (operations) 增加 migration 0075、Beat/queue/Compose 配置、冻结 policy/registry 与默认关闭开关。
 - [x] (operations) 增加只读 `audit_race_data_sync` 和 standing policy renderer。
-- [x] (integration) 完成 169/169 聚焦回归、Django check、migration drift、compileall。
+- [x] (integration) 完成 171/171 聚焦回归、PostgreSQL 16 专项 23/23、Django check、migration drift、compileall。
+- [x] (integration) 修复 3-request identity discovery 固定排序饥饿，并实现 transport 前 provider/region/day
+  容量原子预留与 root/free-disk 门禁。
 - [x] (operations) 完成隔离数据库全配置 zero-write dry-run，审计前后 SHA-256 一致。
 - [x] (operations) 已以实现 commit `e6ec0e6e` 提交并推送，创建 PR #108；随后仅追加本状态回写。
 - [ ] (operations) 在 PR 合并后取得绑定精确 revision/image、migration、policy/registry SHA 和开关清单的

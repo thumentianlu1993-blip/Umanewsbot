@@ -580,5 +580,5 @@ GREEN: command / timestamp / exit / counts
 | E11 | 审计 missing policy 为 blocked、有效 policy 为 ready、route drift 阻断 | 通过 |
 | E12 | 全新数据库全配置 dry-run 前后 hash 不变 | 通过 |
 
-最终聚焦命令共执行 169 个测试，全部通过；另有 `manage.py check`、
-`makemigrations --check --dry-run` 和 Python compileall 通过。
+最终聚焦命令共执行 171 个测试，全部通过；隔离 PostgreSQL 16 的并发/事务专项 23/23 通过；另有
+`manage.py check`、`makemigrations --check --dry-run` 和 Python compileall 通过。

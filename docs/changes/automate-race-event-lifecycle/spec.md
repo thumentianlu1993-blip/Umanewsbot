@@ -380,7 +380,8 @@ observation 和 immutable revisions，并在首次确认后继续观察更正至
 ### Requirement: 默认关闭与只读审计
 
 系统 SHALL 默认关闭 network、future discovery、lifecycle 和全部 apply/public 开关，容量默认 0，并提供
-不写数据库、不发网络请求的审计命令报告配置、inventory、policy census 和 route drift。
+不写数据库、不发网络请求的审计命令报告配置、inventory、policy census、route drift、artifact root/free
+disk 和当日 provider/region 容量账本。任何 transport SHALL 在发请求前原子预留请求数与最大响应字节。
 
 #### Scenario: 全开配置 dry-run
 

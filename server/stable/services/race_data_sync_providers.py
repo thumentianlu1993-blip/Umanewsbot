@@ -19,6 +19,7 @@ from stable.services.race_data_sync_pipeline import (
     RaceDataSyncFlags,
     normalize_racecard_observation,
     reconcile_racecard_observation,
+    reserve_race_data_transport_capacity,
     resolve_race_data_provider_route,
 )
 from stable.services.race_data_sync_results import (
@@ -151,6 +152,18 @@ def _match_discovery_race(
     if matches:
         return None, "racecard_ambiguous"
     return None, "racecard_not_found"
+
+
+def _fair_discovery_bucket_order(
+    *, buckets: dict[tuple[str, str], list[tuple[Any, ...]]], now: datetime
+) -> tuple[tuple[tuple[str, str], list[tuple[Any, ...]]], ...]:
+    """Rotate a stable bucket order so a bounded hourly run cannot starve regions."""
+
+    ordered = sorted(buckets.items())
+    if not ordered:
+        return ()
+    offset = int(now.timestamp() // 3600) % len(ordered)
+    return tuple((*ordered[offset:], *ordered[:offset]))
 
 
 def discover_the_racing_api_source_identities(
@@ -295,10 +308,22 @@ def discover_the_racing_api_source_identities(
     unmatched = 0
     request_count = 0
     try:
-        for (event_region, day), bucket in sorted(buckets.items()):
+        for (event_region, day), bucket in _fair_discovery_bucket_order(
+            buckets=buckets,
+            now=now,
+        ):
             if request_count >= first_route.request_budget:
                 break
             route = bucket[0][2]
+            capacity = reserve_race_data_transport_capacity(
+                provider="the_racing_api",
+                region_code=event_region,
+                now=now,
+                proposed_requests=1,
+                max_response_bytes_per_request=_MAX_RESPONSE_BYTES,
+            )
+            if not capacity.allowed:
+                raise _ProviderSyncError(capacity.reason_code)
             url = build_the_racing_api_route_url(
                 registry=registry,
                 route_name="racecards_free",
@@ -581,6 +606,7 @@ def run_reference_result_data_sync(
     task_id: str,
     run_id: str,
     collect_if_missing: bool = True,
+    capacity_reserved: bool = False,
 ) -> ProviderSyncOutcome:
     """Collect and consume a complete immutable third-party result receipt."""
 
@@ -635,6 +661,16 @@ def run_reference_result_data_sync(
             .first()
         )
         if receipt is None and collect_if_missing:
+            if not capacity_reserved:
+                capacity = reserve_race_data_transport_capacity(
+                    provider=provider,
+                    region_code=route.entry.regions[0],
+                    now=now,
+                    proposed_requests=route.request_budget,
+                    max_response_bytes_per_request=_MAX_RESPONSE_BYTES,
+                )
+                if not capacity.allowed:
+                    raise _ProviderSyncError(capacity.reason_code)
             blockers = _collect_missing_reference_receipts(
                 targets=[{"event_id": event.pk}],
                 now=now,
@@ -890,6 +926,7 @@ def run_result_fallback_chain(
             now=now,
             task_id=task_id,
             run_id=run_id,
+            capacity_reserved=False,
         )
         if outcome.success and outcome.applied_kinds:
             return outcome

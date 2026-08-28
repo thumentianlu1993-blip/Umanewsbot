@@ -3082,3 +3082,7 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
 - 来源报告名次与内部唯一排序分离：`reported_finish_position` 保留 dead heat，`finish_position` 保持既有
   唯一约束。更正追加 immutable revision，不就地覆盖证据。
 - 公开页面不显示来源等级、provisional/official 或人工复核标签；这些字段保留为内部仲裁、审计和回滚依据。
+- The Racing API 身份发现每轮最多 3 请求，但 provider/日期桶按 UTC 小时轮转，不能固定从字典序头部开始；
+  这样所有存在候选的地区在有限轮次内都有机会执行，不会因全局 budget 长期饥饿。
+- network 前容量不是“正数配置即通过”：必须在 `RaceDataTransportCapacityLedger` 原子预留 provider/region/day
+  请求和最大响应字节，并同时验证 artifact root、high-water、hold 与 free disk。失败只消耗零网络请求。
