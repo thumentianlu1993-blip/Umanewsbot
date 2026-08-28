@@ -69,6 +69,15 @@ class RaceDataSyncClaim:
         return tuple(str(item["data_kind"]) for item in self.checkpoint_plan)
 
 
+@dataclass(frozen=True)
+class LockedRaceDataSyncClaim:
+    event: models.RaceEvent
+    control: models.RaceEventProjectionControl
+    tracking: models.RaceEventLiveTracking
+    enrollment: models.RaceDataSyncEnrollment
+    checkpoints: tuple[models.RaceEventLiveProviderCheckpoint, ...]
+
+
 def _claim_plan_sha256(
     *,
     event_id: int,
@@ -115,6 +124,153 @@ def _normalize_data_kinds(values: Iterable[str]) -> tuple[str, ...]:
     if not kinds or any(value not in models.RaceDataSyncDataKind.values for value in kinds):
         raise ValueError("data_kinds are invalid")
     return kinds
+
+
+def lock_and_validate_race_data_sync_claim_for_apply(
+    *,
+    claim: RaceDataSyncClaim,
+    now: datetime,
+    required_data_kinds: Iterable[str] = (),
+) -> tuple[ControlDecision, LockedRaceDataSyncClaim | None]:
+    """Lock and revalidate an exact provider claim inside a projection transaction.
+
+    Provider transport happens outside the database transaction.  Every canonical
+    schedule/racecard/result apply must call this after transport and before any
+    business mutation so an expired or superseded worker can retain an immutable
+    observation but cannot project it.
+    """
+
+    _require_aware(now, "now")
+    if not transaction.get_connection().in_atomic_block:
+        raise RuntimeError("claim apply validation requires an atomic transaction")
+    if not isinstance(claim, RaceDataSyncClaim):
+        raise ValueError("claim must be a RaceDataSyncClaim")
+    if not isinstance(claim.attempt_token, str) or _TOKEN_RE.fullmatch(
+        claim.attempt_token
+    ) is None:
+        raise ValueError("attempt_token is invalid")
+    _require_sha(claim.enrollment_entry_sha256, "enrollment_entry_sha256")
+    _require_sha(claim.plan_sha256, "plan_sha256")
+    frozen_plan = tuple(claim.checkpoint_plan)
+    if not frozen_plan:
+        raise ValueError("checkpoint_plan is empty")
+
+    event = (
+        models.RaceEvent.objects.select_for_update(of=("self",))
+        .filter(pk=claim.event_id)
+        .first()
+    )
+    if event is None:
+        return ControlDecision("rejected", "claim_subject_missing", claim.event_id), None
+    control = (
+        models.RaceEventProjectionControl.objects.select_for_update()
+        .filter(event=event)
+        .first()
+    )
+    tracking = (
+        models.RaceEventLiveTracking.objects.select_for_update()
+        .filter(event=event)
+        .first()
+    )
+    enrollment = (
+        models.RaceDataSyncEnrollment.objects.select_for_update()
+        .filter(event=event)
+        .first()
+    )
+    if control is None or tracking is None or enrollment is None:
+        return ControlDecision("rejected", "claim_subject_missing", claim.event_id), None
+    if (
+        control.write_owner != models.RaceEventProjectionWriteOwner.DATA_SYNC
+        or control.owner_generation != claim.owner_generation
+        or enrollment.state != models.RaceDataSyncEnrollmentState.ENROLLED
+        or enrollment.enrollment_generation != claim.enrollment_generation
+        or tracking.claim_generation != claim.claim_generation
+        or tracking.active_attempt_token != claim.attempt_token
+    ):
+        return (
+            ControlDecision(
+                "rejected", "claim_cas_stale", claim.event_id, tracking.claim_generation
+            ),
+            None,
+        )
+    if tracking.claim_expires_at is None or tracking.claim_expires_at <= now:
+        return (
+            ControlDecision(
+                "rejected", "claim_expired", claim.event_id, tracking.claim_generation
+            ),
+            None,
+        )
+    computed_plan_sha256 = _claim_plan_sha256(
+        event_id=claim.event_id,
+        enrollment_generation=claim.enrollment_generation,
+        owner_generation=claim.owner_generation,
+        claim_generation=claim.claim_generation,
+        attempt_token=claim.attempt_token,
+        enrollment_entry_sha256=claim.enrollment_entry_sha256,
+        route_digest=enrollment.route_digest,
+        checkpoint_plan=frozen_plan,
+    )
+    if (
+        enrollment.entry_sha256 != claim.enrollment_entry_sha256
+        or computed_plan_sha256 != claim.plan_sha256
+        or enrollment.route_digest != claim.route_digest
+    ):
+        return (
+            ControlDecision(
+                "rejected", "claim_plan_drift", claim.event_id, tracking.claim_generation
+            ),
+            None,
+        )
+    planned_source_keys = {
+        row.get("source_key") for row in frozen_plan if isinstance(row, dict)
+    }
+    planned_kinds = {
+        row.get("data_kind") for row in frozen_plan if isinstance(row, dict)
+    }
+    required_kinds = set(required_data_kinds)
+    if (
+        len(planned_source_keys) != 1
+        or any(kind not in models.RaceDataSyncDataKind.values for kind in planned_kinds)
+        or any(kind not in models.RaceDataSyncDataKind.values for kind in required_kinds)
+        or not required_kinds.issubset(planned_kinds)
+    ):
+        return (
+            ControlDecision(
+                "rejected", "claim_plan_drift", claim.event_id, tracking.claim_generation
+            ),
+            None,
+        )
+    checkpoints = tuple(
+        models.RaceEventLiveProviderCheckpoint.objects.select_for_update()
+        .filter(
+            tracking=tracking,
+            source_key__in=planned_source_keys,
+            data_kind__in=planned_kinds,
+        )
+        .order_by("source_key", "data_kind")
+    )
+    current_plan = tuple(
+        {
+            "source_key": checkpoint.source_key,
+            "data_kind": checkpoint.data_kind,
+            "lock_version": checkpoint.lock_version,
+        }
+        for checkpoint in checkpoints
+    )
+    if current_plan != frozen_plan:
+        return (
+            ControlDecision(
+                "rejected",
+                "checkpoint_cas_stale",
+                claim.event_id,
+                tracking.claim_generation,
+            ),
+            None,
+        )
+    return (
+        ControlDecision("valid", "", claim.event_id, tracking.claim_generation),
+        LockedRaceDataSyncClaim(event, control, tracking, enrollment, checkpoints),
+    )
 
 
 def _normalize_scope(values: Iterable[str], label: str) -> tuple[str, ...]:
@@ -1738,6 +1894,13 @@ def fail_race_data_sync_claim(
                 event_id,
                 tracking.claim_generation,
             )
+        if tracking.claim_expires_at is None or tracking.claim_expires_at <= now:
+            return ControlDecision(
+                "rejected",
+                "claim_expired",
+                event_id,
+                tracking.claim_generation,
+            )
         if frozen_plan:
             computed_plan_sha256 = _claim_plan_sha256(
                 event_id=event_id,
@@ -1919,6 +2082,10 @@ def complete_race_data_sync_claim(
         ):
             return ControlDecision(
                 "rejected", "claim_cas_stale", event_id, tracking.claim_generation
+            )
+        if tracking.claim_expires_at is None or tracking.claim_expires_at <= now:
+            return ControlDecision(
+                "rejected", "claim_expired", event_id, tracking.claim_generation
             )
         computed_plan_sha256 = _claim_plan_sha256(
             event_id=event_id,

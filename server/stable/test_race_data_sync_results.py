@@ -3,10 +3,12 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta, timezone as dt_timezone
 import hashlib
 import json
+from unittest.mock import patch
 
 from django.test import TestCase
 
 from stable import models
+from stable.services import race_data_sync_control
 from stable.services.race_data_sync_results import (
     apply_data_sync_result_observation,
 )
@@ -90,6 +92,74 @@ class RaceDataSyncResultApplicationTests(TestCase):
             },
         )
 
+    def _claim_guard(
+        self,
+        *,
+        expires_at=NOW + timedelta(minutes=4),
+        data_kind=models.RaceDataSyncDataKind.RESULT,
+    ):
+        entry_sha256 = "a" * 64
+        route_digest = "b" * 64
+        tracking = self.event.live_tracking
+        tracking.claim_generation = 1
+        tracking.active_attempt_token = "result-claim-1"
+        tracking.claim_expires_at = expires_at
+        tracking.save(
+            update_fields=(
+                "claim_generation",
+                "active_attempt_token",
+                "claim_expires_at",
+            )
+        )
+        models.RaceDataSyncEnrollment.objects.create(
+            event=self.event,
+            source_identity=self.source,
+            state=models.RaceDataSyncEnrollmentState.ENROLLED,
+            standing_policy_digest="c" * 64,
+            route_digest=route_digest,
+            event_snapshot_sha256="d" * 64,
+            projection_owner_generation=1,
+            enrollment_generation=1,
+            manifest_sha256="e" * 64,
+            entry_sha256=entry_sha256,
+            effective_at=NOW,
+        )
+        models.RaceEventLiveProviderCheckpoint.objects.create(
+            tracking=tracking,
+            source_key=self.source.source_key,
+            data_kind=data_kind,
+            next_poll_at=NOW,
+            lock_version=0,
+        )
+        checkpoint_plan = (
+            {
+                "source_key": self.source.source_key,
+                "data_kind": data_kind,
+                "lock_version": 0,
+            },
+        )
+        plan_sha256 = race_data_sync_control._claim_plan_sha256(
+            event_id=self.event.pk,
+            enrollment_generation=1,
+            owner_generation=1,
+            claim_generation=1,
+            attempt_token="result-claim-1",
+            enrollment_entry_sha256=entry_sha256,
+            route_digest=route_digest,
+            checkpoint_plan=checkpoint_plan,
+        )
+        return race_data_sync_control.RaceDataSyncClaim(
+            event_id=self.event.pk,
+            enrollment_generation=1,
+            owner_generation=1,
+            claim_generation=1,
+            attempt_token="result-claim-1",
+            enrollment_entry_sha256=entry_sha256,
+            route_digest=route_digest,
+            checkpoint_plan=checkpoint_plan,
+            plan_sha256=plan_sha256,
+        )
+
     @staticmethod
     def _rows(first_name="Alpha", first_position=1):
         return [
@@ -138,6 +208,77 @@ class RaceDataSyncResultApplicationTests(TestCase):
             models.RaceEventLifecycleTransition.objects.get().reason_code,
             "data_sync_complete_result",
         )
+
+    def test_superseded_claim_cannot_project_result_before_completion_cas(self):
+        observation = self._observation(
+            self.source, "licensed_api", self._rows()
+        )
+        guard = self._claim_guard()
+        tracking = self.event.live_tracking
+        tracking.claim_generation = 2
+        tracking.active_attempt_token = "result-claim-2"
+        tracking.save(
+            update_fields=("claim_generation", "active_attempt_token")
+        )
+
+        with patch("stable.services.race_data_sync_results.timezone.now", return_value=NOW):
+            decision = apply_data_sync_result_observation(
+                observation_id=observation.pk,
+                expected_event_id=self.event.pk,
+                now=NOW,
+                project_current=True,
+                correction_apply_enabled=True,
+                claim_guard=guard,
+            )
+
+        self.assertEqual(decision.action, "rejected")
+        self.assertEqual(decision.reason_code, "claim_cas_stale")
+        self.event.refresh_from_db()
+        self.assertEqual(self.event.status, models.RaceEventStatus.RUNNING)
+        self.assertFalse(models.RaceEventRevision.objects.exists())
+        self.assertFalse(models.RaceEventResult.objects.exists())
+
+    def test_expired_claim_cannot_project_result(self):
+        observation = self._observation(
+            self.source, "licensed_api", self._rows()
+        )
+        guard = self._claim_guard(expires_at=NOW)
+
+        with patch("stable.services.race_data_sync_results.timezone.now", return_value=NOW):
+            decision = apply_data_sync_result_observation(
+                observation_id=observation.pk,
+                expected_event_id=self.event.pk,
+                now=NOW,
+                project_current=True,
+                correction_apply_enabled=True,
+                claim_guard=guard,
+            )
+
+        self.assertEqual(decision.action, "rejected")
+        self.assertEqual(decision.reason_code, "claim_expired")
+        self.assertFalse(models.RaceEventRevision.objects.exists())
+        self.assertFalse(models.RaceEventResult.objects.exists())
+
+    def test_claim_for_another_data_kind_cannot_project_result(self):
+        observation = self._observation(
+            self.source, "licensed_api", self._rows()
+        )
+        guard = self._claim_guard(data_kind=models.RaceDataSyncDataKind.RACECARD)
+
+        with patch("stable.services.race_data_sync_results.timezone.now", return_value=NOW):
+            decision = apply_data_sync_result_observation(
+                observation_id=observation.pk,
+                expected_event_id=self.event.pk,
+                now=NOW,
+                project_current=True,
+                correction_apply_enabled=True,
+                claim_guard=guard,
+            )
+
+        self.assertEqual(decision.action, "rejected")
+        self.assertEqual(decision.reason_code, "claim_plan_drift")
+        self.assertFalse(models.RaceEventRevision.objects.exists())
+        self.assertFalse(models.RaceEventResult.objects.exists())
 
     def test_dead_heat_keeps_duplicate_reported_positions_with_unique_internal_order(self):
         rows = self._rows(first_position=1)

@@ -18,6 +18,10 @@ from django.db.models import Q, Sum
 from django.utils import timezone
 
 from stable import models
+from stable.services.race_data_sync_control import (
+    RaceDataSyncClaim,
+    lock_and_validate_race_data_sync_claim_for_apply,
+)
 from stable.services.race_data_sync_policy import (
     arbitrate_source_value,
     normalize_source_class,
@@ -1260,9 +1264,40 @@ def _reconcile_racecard_observation_atomic(
     allow_racecard_apply: bool,
     task_id: str,
     run_id: str,
+    claim_guard: RaceDataSyncClaim | None = None,
 ) -> RacecardReconciliationDecision:
     """Apply admitted racecard and schedule fields under source arbitration."""
     with transaction.atomic():
+        locked_claim = None
+        if claim_guard is not None:
+            claim_decision, locked_claim = (
+                lock_and_validate_race_data_sync_claim_for_apply(
+                    claim=claim_guard,
+                    now=timezone.now(),
+                    required_data_kinds=tuple(
+                        kind
+                        for kind, enabled in (
+                            (
+                                models.RaceDataSyncDataKind.RACE_TIME,
+                                allow_schedule_apply,
+                            ),
+                            (
+                                models.RaceDataSyncDataKind.RACECARD,
+                                allow_racecard_apply,
+                            ),
+                        )
+                        if enabled
+                    ),
+                )
+            )
+            if locked_claim is None:
+                return RacecardReconciliationDecision(
+                    "rejected", claim_decision.reason_code, expected_event_id
+                )
+            if locked_claim.event.pk != expected_event_id:
+                return RacecardReconciliationDecision(
+                    "rejected", "event_identity_mismatch", expected_event_id
+                )
         observation = (
             models.RaceResultObservation.objects.select_for_update()
             .select_related("source_identity")
@@ -1420,9 +1455,13 @@ def _reconcile_racecard_observation_atomic(
                 observation.pk,
             )
 
-        event = models.RaceEvent.objects.select_for_update().filter(
-            pk=expected_event_id
-        ).first()
+        event = (
+            locked_claim.event
+            if locked_claim is not None
+            else models.RaceEvent.objects.select_for_update()
+            .filter(pk=expected_event_id)
+            .first()
+        )
         if event is None:
             return RacecardReconciliationDecision(
                 "rejected", "event_missing", expected_event_id, observation.pk
@@ -1889,6 +1928,7 @@ def reconcile_racecard_observation(
     allow_racecard_apply: bool = True,
     task_id: str,
     run_id: str,
+    claim_guard: RaceDataSyncClaim | None = None,
 ) -> RacecardReconciliationDecision:
     try:
         return _reconcile_racecard_observation_atomic(
@@ -1898,6 +1938,7 @@ def reconcile_racecard_observation(
             allow_racecard_apply=allow_racecard_apply,
             task_id=task_id,
             run_id=run_id,
+            claim_guard=claim_guard,
         )
     except _RacecardNeedsReview as review:
         with transaction.atomic():

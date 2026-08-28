@@ -514,8 +514,10 @@ def sync_race_event_provider_task(
     from datetime import timedelta
 
     from stable.services.race_data_sync_control import (
+        RaceDataSyncClaim,
         complete_race_data_sync_claim,
         fail_race_data_sync_claim,
+        lock_and_validate_race_data_sync_claim_for_apply,
     )
 
     def fail_closed(reason: str) -> dict:
@@ -582,6 +584,24 @@ def sync_race_event_provider_task(
     )
     if route is None or route.route_digest != enrollment.route_digest:
         return fail_closed("provider_route_unavailable")
+    claim_guard = RaceDataSyncClaim(
+        event_id=event_id,
+        enrollment_generation=expected_enrollment_generation,
+        owner_generation=expected_owner_generation,
+        claim_generation=expected_claim_generation,
+        attempt_token=attempt_token,
+        enrollment_entry_sha256=expected_enrollment_entry_sha256,
+        route_digest=enrollment.route_digest,
+        checkpoint_plan=tuple(checkpoint_plan or ()),
+        plan_sha256=expected_plan_sha256,
+    )
+    with transaction.atomic():
+        claim_decision, locked_claim = lock_and_validate_race_data_sync_claim_for_apply(
+            claim=claim_guard,
+            now=timezone.now(),
+        )
+    if locked_claim is None:
+        return fail_closed(claim_decision.reason_code)
     now = timezone.now()
     try:
         capacity = reserve_race_data_transport_capacity(
@@ -605,6 +625,7 @@ def sync_race_event_provider_task(
             or f"sync-{event_id}"
         ),
         "run_id": attempt_token,
+        "claim_guard": claim_guard,
     }
     if source.source_key == "the_racing_api":
         outcome = run_the_racing_api_data_sync(**provider_kwargs)
@@ -631,6 +652,7 @@ def sync_race_event_provider_task(
             now=now,
             task_id=provider_kwargs["task_id"],
             run_id=attempt_token,
+            claim_guard=claim_guard,
         )
         fallback_reason = fallback.reason_code
         if fallback.success and fallback.applied_kinds:

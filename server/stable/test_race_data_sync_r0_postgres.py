@@ -16,7 +16,11 @@ from django.db import close_old_connections, connection, connections, transactio
 from django.test import TransactionTestCase, override_settings
 
 from stable import models
-from stable.services import race_data_sync_control, race_data_sync_enrollment
+from stable.services import (
+    race_data_sync_control,
+    race_data_sync_enrollment,
+    race_data_sync_results,
+)
 from stable.test_race_data_sync_r0 import audited_test_roster
 
 
@@ -267,6 +271,80 @@ class RaceDataSyncR0PostgresConcurrencyTests(TransactionTestCase):
         tracking = models.RaceEventLiveTracking.objects.get(event=self.event)
         self.assertTrue(tracking.active_attempt_token)
         self.assertEqual(tracking.claim_generation, 2)
+
+    def test_superseded_claim_cannot_project_result_on_postgres(self):
+        self.event.race_datetime = NOW - timedelta(minutes=10)
+        self.event.local_date = date(2026, 8, 20)
+        self.event.status = models.RaceEventStatus.RUNNING
+        self.event.save(
+            update_fields=("race_datetime", "local_date", "status", "updated_at")
+        )
+        first = self._claim()
+        second = race_data_sync_control.claim_due_enrollments(
+            now=NOW + timedelta(seconds=61),
+            batch_size=10,
+            ttl_seconds=60,
+            enabled_providers=("jra",),
+            enabled_regions=("japan",),
+            enabled_data_kinds=("racecard", "result"),
+        )[0]
+        self.assertNotEqual(first.attempt_token, second.attempt_token)
+        self.assertIn(models.RaceDataSyncDataKind.RESULT, first.data_kinds)
+        payload = {
+            "external_race_id": self.source.external_race_id,
+            "off_time": self.event.race_datetime.isoformat(),
+            "region": "japan",
+            "course": "Tokyo",
+            "race_name": self.event.original_name,
+            "race_status": "complete",
+            "participants": [
+                {
+                    "external_runner_id": "runner-pg-1",
+                    "horse_name": "PostgreSQL Winner",
+                    "reported_finish_position": 1,
+                    "status": models.RaceEventRevisionItemStatus.FINISHED,
+                    "number": "1",
+                }
+            ],
+        }
+        observation = models.RaceResultObservation.objects.create(
+            source_identity=self.source,
+            observed_at=NOW + timedelta(seconds=62),
+            source_updated_at=NOW + timedelta(seconds=62),
+            parser_version="pg-claim-guard-v1",
+            raw_sha256=hashlib.sha256(
+                json.dumps(payload, sort_keys=True).encode()
+            ).hexdigest(),
+            normalized_sha256=hashlib.sha256(
+                json.dumps(payload, sort_keys=True).encode()
+            ).hexdigest(),
+            result_phase=models.RaceResultPhase.OFFICIAL,
+            normalized_payload=payload,
+            field_provenance={
+                "provider": self.source.source_key,
+                "source_class": "official_operator",
+                "automation_allowed": True,
+            },
+        )
+
+        with patch(
+            "stable.services.race_data_sync_results.timezone.now",
+            return_value=NOW + timedelta(seconds=62),
+        ):
+            decision = race_data_sync_results.apply_data_sync_result_observation(
+                observation_id=observation.pk,
+                expected_event_id=self.event.pk,
+                now=NOW + timedelta(seconds=62),
+                project_current=True,
+                correction_apply_enabled=True,
+                claim_guard=first,
+            )
+
+        self.assertEqual(decision.reason_code, "claim_cas_stale")
+        self.event.refresh_from_db()
+        self.assertEqual(self.event.status, models.RaceEventStatus.RUNNING)
+        self.assertFalse(models.RaceEventRevision.objects.exists())
+        self.assertFalse(models.RaceEventResult.objects.exists())
 
     def test_failure_and_rotation_follow_one_lock_order_without_deadlock(self):
         claim = self._claim()

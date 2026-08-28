@@ -1,199 +1,121 @@
-# 赛事时间、出马表与赛果自动同步发布与回滚方案
+# 赛事时间、出马表与赛果自动同步发布方案
 
 ## 1. 当前停点
 
-- 方案 worktree：`/Users/mentianlu/.codex/worktrees/race-data-automation-plan/umanews`。
-- 分支：`codex/race-data-automation-plan`。
-- 基线：`origin/main@2833558a6a2d67b7dc9816b53ea8ad5d580eb56c`。
-- 当前只创建方案文档；没有代码、migration、联网、生产写入、commit、push、PR 或部署。
-- 所有生产自动化开关仍按只读快照保持关闭；现有人工结果审核调度不变。
+- PR #108 已包含未来赛事自动纳管、时间与出马表、lifecycle、赛果、更正、容量账本和发布控制面。
+- 最新生产只读快照：web/worker/Beat 为 `2833558a` / `sha256:4bc392…`，双 healthz 200，migration
+  leaf `0073`，external started/lock 为 0，`celery=0`、`race_sync_v2=0`、`race_live=7543`。
+- 生产磁盘可用 `12,214,140,928` bytes，backup 目录 `47,380,298,866` bytes；主 checkout 有 1,709 项
+  历史 dirty，禁止直接 pull/checkout/清理，必须用隔离 release。
+- `RACE_DATA_SYNC_*` 生产键尚不存在；现有 lifecycle 为 `true/enforce`，race-live network/scheduler 关闭。
+- 尚未合并、备份、迁移、部署或开启任何新开关；等待用户唯一一次最终生产确认。
 
-## 2. 发布单元
+## 2. 用户覆盖的旧门禁
 
-发布顺序固定：
+本发布以用户 2026-08-28 目标为最高产品口径：dry-run 通过后允许直接上线，不要求五个独立 PR、固定
+7 天 shadow、逐地区 canary 或逐赛事人工确认。Racing API、官网/官方导入、可信第三方都属于正式来源，
+按 `licensed_api > official_operator > trusted_publisher` 自动仲裁，前台统一显示“赛果”。
 
-```text
-R0 queue/registry/checkpoint
--> R1 race time
--> R2 racecard
--> R3 result revision shadow
--> R4 lifecycle/public/SLO
+为控制故障半径，启用仍拆成可独立关闭的能力步骤；这是同一已确认发布中的自动验收/止损顺序，不是
+新增人工批准点。任一步 fail closed 时停止后续步骤并保持当前或更窄开关关闭。
+
+## 3. 发布身份
+
+最终确认后才执行：
+
+1. 合并 PR #108，重新 fetch `origin/main` 并记录 merge revision、tree、source archive SHA-256；
+2. 从 merge revision 建立只读/隔离 build context，构建固定 `linux/amd64` 镜像；
+3. 核对 OCI `org.opencontainers.image.revision`、镜像 ID、镜像内 policy/registry SHA 与 Git revision；
+4. 保存旧生产 image ID 和 rollback tag，不以浮动 `prod` tag 作为恢复证据。
+
+当前冻结输入：
+
+- standing policy SHA：`60fe9230ca0e97d69a8406118b5d346649239f3f0699efe9a1d0c63972e44ba4`；
+- TRA registry SHA：`24981f62e30e83e58fc82d4247560af35e4041b05857c287bd64430d0f2e2ecc`；
+- reference registry SHA：`740a93774927765f9c848cc97e4b87b78ab36d473c4c3e2e644d56a6f856cff2`。
+
+## 4. 写前恢复点
+
+1. 重新确认所有 external import/run/lock、Celery active/reserved/scheduled、migration 和三个队列；
+2. 创建 PostgreSQL custom-format 备份，要求 regular file、0600、非空；
+3. 记录 byte size、mtime 和 SHA-256，并执行 `pg_restore --list`；
+4. 备份 `.env`、Compose/release manifest 和旧 image ID；
+5. 备份或构建后若磁盘低于 8 GiB，停止发布，不清理旧备份或 runtime 来绕过门禁。
+
+## 5. 关闭态部署
+
+1. 写入全部 `RACE_DATA_SYNC_* = false/空集合` 和容量 0，确认 `race_sync_v2_worker` 不运行；
+2. 通过 deployment lock 和受审 release orchestration 停 Beat、完整 drain worker、迁移并重建服务；
+3. 应用 migration 0074/0075，运行 Django check、migration drift、collectstatic；
+4. 验证 web/worker/Beat 同 image/revision、双 healthz 200、普通新闻链路正常；
+5. 运行 `audit_race_data_sync`：必须 `would_write=false`、network/request/business write/public change 全 0；
+6. 核对 `race_live=7543` 未变化、`race_sync_v2=0`，旧 `race_live_worker` 不被启动。
+
+## 6. 冻结容量与 admission
+
+关闭态部署通过后写入：
+
+```dotenv
+RACE_DATA_RAW_MAX_COMPRESSED_BYTES=2097152
+RACE_DATA_RAW_MAX_UNCOMPRESSED_BYTES=8388608
+RACE_DATA_RAW_DAILY_PROVIDER_REGION_BYTES=1073741824
+RACE_DATA_RAW_DAILY_PROVIDER_REGION_REQUESTS=192
+RACE_DATA_RAW_ROOT_HIGH_WATER_BYTES=536870912
+RACE_DATA_RAW_ROOT_LOW_WATER_BYTES=268435456
+RACE_DATA_RAW_MIN_FREE_DISK_BYTES=8589934592
+RACE_DATA_RAW_CLEANUP_MAX_ROWS=100
+RACE_DATA_RAW_CLEANUP_MAX_BYTES=67108864
+RACE_DATA_RAW_HOLD_ALERT_BYTES=268435456
+RACE_DATA_RAW_ARTIFACT_ROOTS=/run/race-data-sync
 ```
 
-每个单元独立 PR、独立 review、独立关闭态部署和回滚；不能把五个单元合并成一次高风险启用。
+同时写入精确 provider、region、field/data-kind allowlist、policy/registry 路径和 SHA。保持 network/apply/
+public/lifecycle/future discovery 关闭，再次运行审计；必须 `configuration_status=ready`、`capacity=valid`、
+`route_drift=[]`、daily ledger 未超限、free disk >=8 GiB。
 
-## 3. 阶段 0：方案评审
+## 7. 同一确认内的直接启用顺序
 
-进入实现前必须：
+1. 启用总开关、scheduler、future discovery，network/apply/public 仍关闭；运行一次 census，确认范围只含
+   standing policy 内 published/scheduled/postponed 赛事，无 legacy owner 接管。
+2. 启用 `race_sync_v2_worker` 与受限 network，再启用 schedule/racecard apply；检查时间补齐、出马表完整性、
+   每日 <=12 小时 cadence、request/byte ledger 和 claim terminal state。
+3. 启用 data-sync lifecycle apply；验证 T/T+30 规则、postponed/cancelled 分支和唯一 transition。
+4. 启用 result apply/public；验证 T+3 起 checkpoint、完整 roster、不可变 revision、并列名次和公开页统一
+   “赛果”，不出现来源/阶段标签。
+5. 启用 correction apply；验证同源更新或高优先级来源更正创建 superseding revision，保留旧证据。
 
-- 独立 reviewer 核对架构、模型、迁移、Celery、来源、并发、测试、发布与回滚；
-- actionable findings 清零；
-- 冻结 plan fingerprint、review 结论与最新 `origin/main`；
-- 若 review 改变产品范围、来源权威、30 分钟口径或队列方案，回到 G1。
+每一步至少检查：任务 terminal state、claim/token 清空或明确 due、provider 请求数、not-found/fallback reason、
+observation/revision/projection 数、公开 DB/页面一致性、worker/queue、磁盘、error/traceback 和新闻/QQ side
+effect=0。HTTP 200、queue 下降或 task exit 0 不能单独证明成功。
 
-## 4. 阶段 1：关闭态部署
+## 8. 自动止损
 
-每个发布单元均执行：
+下列任一情况立即停止后续启用并关闭最窄相关开关：
 
-1. 只读盘点生产 revision、migration、服务、队列、active/reserved/scheduled、claims、磁盘和锁；
-2. 冻结 exact commit/image/config/migration/release manifest；
-3. 创建 PostgreSQL custom-format 备份，验证非空、0600、SHA 和 `pg_restore --list`；
-4. 记录旧镜像和精确 rollback target；
-5. 部署代码/migration，但保持所有 `RACE_DATA_SYNC_*` 新旧开关关闭；
-6. 验证 Django、migration、Compose、web/worker/Beat、healthz 和运行 revision；
-7. flag-off smoke 必须为 selector 0、network 0、business write 0、public change 0；
-8. `race_live=7543` 保持不变；新 `race_sync_v2` 队列从 0 开始；
-9. 发布前 `run_application_release.sh` 必须已把 `race_sync_v2_worker` 纳入 frozen intent、完整 Celery
-   node drain、stop/restore；`manual_release.sh`、`resume_stopped_release.sh`、rollback 与 immutable-control
-   resume 的 service catalog 同步更新并通过 running/stopped/probe-failure/interrupted/old-image tests。
-10. 基于 live free disk、现有约 45GB backups、抓取增长率和 hold 上界冻结 artifact daily quota、root
-    high/low water 与 min-free；未取得 sizing proof 时 network admission 保持关闭。
-11. migration 后只读证明历史 projection owner 原值不变、`live` 未自动转为 `data_sync`；旧候选 image 对
-    `data_sync` owner 的兼容 smoke 必须 fail closed，不能把未知值当 unmanaged/live。
+- identity 多解/跨 event、manual lock 覆盖、stale/expired claim 发生 canonical 写入；
+- route/registry/contract drift，响应 schema/大小越界，redirect/host/path 越权；
+- 错误或部分赛果公开、重复 current revision、投影与页面不一致；
+- provider/day 预算、artifact high-water/hold、free disk 8 GiB 门槛失败；
+- `race_live` 队列被消费/改变，或普通 worker/新闻/QQ 发生越界副作用。
 
-该阶段属于 G2 精确发布包；不得顺带启用真实网络或自动公开。
+止损顺序：单 provider -> 单 region/data kind -> result public/correction -> result/racecard/schedule apply ->
+lifecycle -> network -> future discovery/scheduler -> 停 `race_sync_v2_worker`。不清空 Redis，不删除 observation/
+revision/transition，不批量反向赛事状态。
 
-## 5. 阶段 2：离线与只观察
+## 9. 回滚
 
-1. 使用固定 fixture 验证五地区 time/racecard/result adapters；
-2. 只启用 selector 与 observation，network 仍关闭；
-3. 使用受审 synthetic due events 验证 cadence、claim、generation、checkpoint 和 verifier；
-4. observation artifact、DB ledger 和公开业务表必须证明零越权写入；
-5. 关闭后一个 selector 周期内无新 dispatch。
-6. 对生产当前 99 场运行只读 enrollment census，逐场给出唯一分类且总数严格等于 99；本阶段不 apply。
-7. 对 owner acquire/replay/rotate/disenroll 与单独 reviewed `live -> data_sync` transfer manifest 做离线/影子
-   dry-run；未获单独 transfer 授权时所有既有 live owner 保持冲突、零写。
+- 行为回滚优先使用开关收窄；错误结果以新 correction/reverse manifest 修复，不静默删除历史证据。
+- 代码回滚前先关闭全部新开关，完整 drain 新 worker，再恢复精确旧 image；additive schema 默认保留。
+- 只有新 schema 与旧代码不兼容且尚无新审计数据时，才在单独授权和已验证备份下考虑 reverse migration。
+- 数据库损坏才使用 custom-format 恢复，属于独立高影响操作，不包含在普通应用回滚中。
 
-## 6. 阶段 3：真实网络 shadow
+## 10. 发布完成证据
 
-这是首次 G3：发布包必须精确列出 provider、region、data kind、cohort、request budget、registry SHA、
-proof digest、有效期和 artifact root。
+只有以下全部有生产实证才结束本目标：
 
-shadow 至少连续 7 天且覆盖至少 10 场终态赛事：
-
-- 允许受限来源网络和 observation/artifact/metric 写入；
-- schedule/racecard/result canonical apply 与 public 全部关闭；
-- 与公开官网/API/可信第三方和现有人工 review bundle 对照；
-- 每日输出 identity coverage、datetime coverage、roster completeness、terminal detection、冲突、
-  请求预算、artifact 容量、错误率和预计 T+30 四分指标；
-- 任一跨 event identity、secret 泄露、请求越界或 parser schema drift 立即关闭该 provider。
-
-shadow 晋级门槛：
-
-- identity 误绑 0；
-- source route 明确或 route_missing 100% 可解释；
-- T-24h datetime coverage >=95%；
-- T-6h racecard freshness P95 <=15 分钟；
-- terminal detection cadence 足以满足公开 P95/P99；
-- 无 manual lock override、重复 revision 或未审计 payload。
-- 独立 reference snapshot 能区分“上游 T+30 已终态但系统漏检”和“上游确实未终态”，alert 不计结果成功。
-
-## 7. 阶段 4：日本重点赛事 canary
-
-首发范围：JRA 已发布 P0/P1/重赏 2–4 场。先从 99 场 census 生成 exact enrollment manifest；只有同时
-命中已批准 standing policy、data-sync enrollment 与独立 active lifecycle membership 的 event 才可进入。
-
-按能力分三次启用，不能合并：
-
-1. time apply：允许时间/时区字段写入与 reschedule，racecard/result public 仍关闭；
-2. racecard apply/public：允许 runner revision 投影，result 仍只 shadow；
-3. result confirmed/public：允许完整终态赛果自动更新与 lifecycle 协调。
-
-每次启用前重新冻结 event/source identity、baseline、registry、generation、开关和 rollback manifest。
-每场完成后验证：
-
-- DB event/runner/result/revision/field ledger；
-- 完整“名次 + 马号”序列、source label 和页面状态；
-- independent upstream terminal availability、terminal detection、confirmed publication、blocked alert
-  coverage 与 terminal-to-public 延迟；
-- task/queue/checkpoint/claim 归零或进入 correction watch；
-- 新闻和 QQ side effect 为 0。
-
-晋级要求：reference 证明 T+30 前终态完整的 canary，confirmed/publication rate >=95%，错误结果 0；
-确实 unavailable/blocked 的 alert coverage >=99%。地区扩大后前一指标升至 >=99%。
-
-## 8. 阶段 5：地区扩展
-
-顺序建议：
-
-```text
-日本 JRA 全部已发布重点赛事
--> 英国
--> 法国
--> 美国
--> 中国香港
--> 日本 NAR
--> 所有已发布且身份/route/time 合格赛事
-```
-
-顺序是 rollout 建议，不是来源置信度排名。每个地区先 2–4 场 canary，达到相同指标后独立扩大；
-某地区失败不阻塞已通过地区，也不能借其他地区证据自动放行。
-
-没有确定性 identity、有效 IANA zone、有效 route 或时间的 event 只进入 discovery/observation，不能
-自动 apply。每小时 future census 只能把命中未过期 standing policy 的新赛事纳入小批 manifest；策略外
-赛事只 proposal。新增 provider、付费套餐或扩大真实网络预算需要新的 G3 精确范围。
-
-## 9. 生产监控
-
-发布后持续观察：
-
-- web/ordinary worker/Beat/race_sync_v2_worker 状态与 image revision；
-- `celery`、`race_sync_v2`、遗留 `race_live` queue depth；
-- due/claimed/dispatched/replayed/stale/circuit；
-- provider request、错误、预算、schema/contract 到期；
-- future datetime/racecard/result coverage；
-- upstream terminal availability、terminal detection、confirmed publication、blocked alert coverage、
-  terminal-to-public、correction latency；
-- DB/public verifier、manual lock 和 identity incident。
-
-不能用 HTTP 200、task exit 0 或 queue 下降单独证明端到端成功。
-
-## 10. Kill switch
-
-止血顺序按影响最小原则：
-
-1. 关闭单 provider；
-2. 关闭单 region/cohort；
-3. 关闭 result public；
-4. 关闭 result/racecard/schedule apply；
-5. 关闭 network；
-6. 关闭 selector；
-7. 停止 `race_sync_v2_worker`。
-
-关闭后等待 active task 自然退出，并验证一个 selector 周期内新 dispatch/write 为 0。不得使用
-`docker compose down`，不得清空 Redis 队列；旧 task 由 generation/CAS 失效。
-
-若 release 中断，恢复必须使用该 attempt 的 mode-600、compose/action/HEAD 绑定 frozen intent；不得手工
-`up` 新 worker。intent 不可信时保持新 worker stopped 并告警。回滚到不含新 service 的旧 target 时，
-immutable control catalog 明确记录 `service_absent`，不得把 probe failure 当 absent。
-
-## 11. 行为回滚
-
-- 关闭相关 provider/cohort/data kind/public flag；
-- 冻结当前 observation/revision/field decision/checkpoint/incident，禁止删除审计事实；
-- 核对公开 current/LKG pointer 和 event status；
-- 对错误字段或结果生成 exact reverse manifest，绑定 event、before/current baseline、revision 和 SHA；
-- dry-run 后在单 event 事务回退 canonical projection，append correction audit；
-- 独立 verifier 与公开页面核对后关闭 incident。
-
-赛果 correction 优先于删除；已公开错误结果不能由 cron 自动覆盖或静默回滚。
-
-## 12. 代码与 migration 回滚
-
-- 回到旧代码前先关闭 selector/network/apply/public/lifecycle integration；
-- 恢复精确旧镜像和 Compose 配置，不重用浮动 tag 作为证据；
-- additive nullable schema 默认保留，旧代码关闭态必须可读；
-- 只有旧版本无法与新 schema 共存且审计数据已被保全时，才使用受审 reverse migration；
-- 数据库级损坏才考虑已验证备份恢复，并作为独立高影响发布包授权。
-
-## 13. 完成定义
-
-只有以下全部成立才可宣称功能完成：
-
-- 所有五个发布单元已合并并通过独立 review；
-- 至少日本、英国、法国、美国、香港/NAR 的目标 cohort 分别验收；
-- future datetime/racecard coverage 和结果 SLO 达标；
-- 当前 99 场均有稳定 enrollment 分类，之后新 published event 的 standing-policy 纳管链已验收；
-- 30 天内没有 P0 数据错误、跨 event 写入或无证据公开；
-- kill switch 和 reverse manifest 至少完成一次受控演练；
-- current_state、decisions、deploy runbook、release evidence 与生产运行态一致。
+- merge revision/image/migration/flags/capacity 与 release manifest 一致；
+- future discovery 能纳管新赛事，时间和出马表路径有真实成功与明确 blocked 分类；
+- lifecycle 自动任务正常，赛果任务在自然到期或受控 fixture smoke 中完成 immutable revision 与公开投影；
+- kill switch 实测在一个 selector 周期内停止新 dispatch/write；
+- `race_live=7543` 保持不变，race_sync 新队列/worker 可观测；
+- current_state、decisions、deploy runbook、project status 和 release evidence 与生产运行态一致。

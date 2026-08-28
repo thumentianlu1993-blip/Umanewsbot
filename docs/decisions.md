@@ -1,5 +1,21 @@
 # 关键决策
 
+## 2026-08-28 自动赛事数据以一次最终生产确认为授权边界，canonical 写入必须重验 exact claim
+
+- 本 change 的产品目标明确覆盖早期文档中的固定 7 天 shadow、多 PR、逐地区或逐赛事人工批准：未来赛事
+  时间、出马表、状态、赛果和更正均按 standing policy 自动运行，三类获准来源均作为正式数据使用，公开页
+  不显示来源等级或内部阶段。PR 完成后只申请一次绑定精确 revision/image 的最终生产合并与部署确认。
+- 启用时按 future discovery、time/racecard、lifecycle、result public/correction 依次开关并逐步自动验收；这是
+  同一发布内的可观测性和 kill-switch，不产生新的人工批准门槛。任何门禁失败立即停止后续步骤并保持相应
+  写开关关闭，不得以“已有最终确认”为由绕过备份、容量、身份、来源合同或回滚边界。
+- provider transport 在数据库事务外执行。网络返回后，任何 schedule、racecard 或 result canonical 写入必须
+  在该写事务最先按统一锁序锁定 event、projection control、tracking、enrollment 与 checkpoints，并重新核对
+  owner/enrollment/claim generation、attempt token、claim expiry、entry/route/plan SHA、checkpoint lock
+  version 及 required data kind。任一不符即整个投影零写回滚。
+- claim 过期或被接管的旧 worker 可以保留已经取得的 immutable transport 证据，但不能写 canonical、完成
+  checkpoint，或通过 fail/release 改动新 owner 的 claim。complete/fail 同样要求 `lease_expires_at > now`；
+  不能把外层 task 成功返回、HTTP 200 或 receipt 存在误报成业务投影成功。
+
 ## 2026-08-20 赛事数据自动同步 R0 使用独立持久 owner、限时 manifest 与隔离 worker
 
 - 新 writer 只能使用 `RaceEventProjectionWriteOwner.DATA_SYNC`；旧 `LIVE` 不由 migration 或普通 enrollment

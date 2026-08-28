@@ -10,10 +10,13 @@
 1. 一个 Beat selector + 每场 `next_poll_at`，取代逐赛事固定 cron；
 2. 现有 race-data Slice A 是唯一 provider roster、合同校验、observation 与字段 reconciliation 内核；
    `race_sync_v2` 只命名新队列/worker，不建立第二套业务 flag 或 writer；
-3. 官网、Racing API、可信第三方按版本化合同获得同等写入资格，冲突时 fail closed；
+3. 来源优先级固定为 Racing API（`licensed_api`）> 官网/官方导入（`official_operator`）> 可信第三方
+   （`trusted_publisher`）；三类都可无人审核自动采用，冲突按等级、时间和稳定 provider key 确定性仲裁；
 4. 来源类别、结果 finality、人工审核方式分字段表达，不再共用一个含糊 authority；
 5. 时间变更、出马表、赛果与 lifecycle 通过 generation/CAS 汇合，任何旧任务零写退出；
-6. 先 shadow、再日本重点赛事、再按地区扩大；自动公开与自动采集是不同开关。
+6. dry-run 和最终生产确认后可在同一隔离 release 中直接上线；future discovery、network/time/racecard、
+   lifecycle、result/public/correction 仍用独立开关顺序启用，以便每一步自动验收和止损，但不要求逐场确认、
+   固定 7 天 shadow 或逐地区人工批准。
 
 ## 2. 现有能力复用审计
 
@@ -170,7 +173,7 @@ operation mode 与 rejection reason，本方案直接复用，不再迁移重复
 - 增不可变 `region_code`、`identity_namespace`；稳定唯一约束为
   `(source_key, region_code, identity_namespace, external_race_id)`，event 侧 current 唯一约束为
   `(event, source_key, region_code, identity_namespace)`；contract version/digest 不参与稳定唯一键；
-- `source_label`：official/racing_api_auto/trusted_provider_auto；
+- `source_class`：licensed_api/official_operator/trusted_publisher，并绑定数值优先级 300/200/100；
 - `finality_capability`：provisional_only/terminal_complete；
 - `automation_allowed`、contract/registry/proof digest、valid until；
 - 历史 identity 只在现有 `identity_fields` 能确定性给出 region/namespace 时 adoption；无法证明或产生唯一
@@ -184,14 +187,14 @@ operation mode 与 rejection reason，本方案直接复用，不再迁移重复
 - observation/content/roster digest；
 - parent revision 与 correction reason。
 
-来源类别与结果阶段必须正交，避免把可信第三方错误显示为官方。
+来源类别与结果阶段必须正交并仅用于内部审计/仲裁；公开页统一显示“赛果”，不暴露来源类别或内部阶段。
 
 `RaceEventRevisionItem` 与 legacy `RaceEventResult` 各增 nullable
 `reported_finish_position`（可重复、正整数）；唯一 `internal_order/finish_position` 继续承担排序和行身份。
-官方来源写 reported + official，API/可信第三方只写 reported。adoption 仅把已有
-`official_finish_position` 复制到 reported；历史 human/reference 只有冻结 source refs/review bundle 能证明时
-才回填，否则保持 null 并沿用旧页面 fallback，不从内部唯一顺序猜死热。公开展示优先 reported，再回退
-legacy official/source proof，最后才是内部 order。
+所有正式来源以 `reported_finish_position` 保存来源报告名次；legacy `official_finish_position` 可在兼容投影
+中镜像同值，但不参与来源类别判断。adoption 仅把已有 `official_finish_position` 复制到 reported；历史
+human/reference 只有冻结 source refs/review bundle 能证明时才回填，否则保持 null 并沿用旧页面 fallback，
+不从内部唯一顺序猜死热。公开展示优先 reported，再回退 legacy 字段，最后才是内部 order。
 
 ### 5.4 Incident 与运行记录
 
@@ -207,8 +210,9 @@ standing policy digest、source identity/route digest、event snapshot SHA、pro
 enrollment generation、manifest/entry SHA、reason code 与生效/失效时间。
 
 `build_race_data_enrollment_census()` 只读扫描 published 的现有/未来赛事，严格按 canonical duplicate link、
-status、manual lock、稳定 source identity、route、owner 与时间质量分类。首次实施必须把快照中的 99 场逐场
-归入 `eligible/enrolled` 或明确阻断原因，分类总数严格等于 99；不能只扫已有 enabled tracking。
+status、manual lock、稳定 source identity、route、owner 与时间质量分类。R0 的 99 场历史快照保留为 census
+完整性回归证据；当前发布必须对 standing policy 命中的实时全量 inventory 自动归入 `eligible/enrolled` 或
+明确阻断原因，分类总数严格守恒，不能只扫已有 enabled tracking，也不把分类变成逐赛事人工批准。
 
 `apply_race_data_enrollment_manifest()` 只能在全部 runtime/apply/network/public 开关关闭时运行，绑定 exact
 commit、standing policy、census cutoff、event/identity/route/owner before snapshot 与 manifest SHA；按 event ID
@@ -234,10 +238,10 @@ manifest：legacy scheduler/monitor/network/apply 全关、legacy/new queues 均
 tracking claim、current/LKG/revision baseline 精确绑定，再在单事务执行 `live -> data_sync` 与 generation+1；
 失败整场零写。旧代码遇到 `data_sync` owner 时不能写，只能拒绝未知/非 `live` owner。
 
-新发布赛事由每小时 census 发现。只有命中已人工批准、未过期的 standing policy（region/provider/data
-kind/visibility/status/identity rules 精确绑定）才自动生成并 apply 小批 enrollment manifest；策略外赛事只
-生成 proposal。enrollment 永不隐式创建 lifecycle membership：R4 公开 confirmed result 还必须命中当前
-active lifecycle registry 的 event membership 和完整 trust root。
+新发布赛事由每小时 census 发现。只有命中用户授权且未过期的 standing policy（region/provider/data
+kind/visibility/status/identity rules 精确绑定）才自动生成并 apply 小批 enrollment；无需逐场批准，策略外
+赛事只生成 proposal。纳管事务同时建立 data-sync owner、provider checkpoint 与 lifecycle control；公开
+confirmed result 仍必须通过当前 enrollment/generation/contract/manual-lock 等完整 admission。
 
 ## 7. Selector 与 claim
 
@@ -356,81 +360,48 @@ normalized result 至少包含：
 - 与 current confirmed 不同且有 correction marker -> correction candidate；
 - 与 current confirmed 不同但无 correction marker -> conflict incident。
 
-### 11.3 Shadow revision 的唯一生命周期
+### 11.3 Immutable revision 与原子公开
 
-R3 对完整 terminal/correction 只创建一个 immutable shadow `RaceEventRevision`：`kind=result`、
-`phase=official/corrected`、`published_at=null`、primary observation/evidence/content SHA 已冻结；不移动 current
-pointer、不写 legacy results、不改 event status。相同 event/kind/phase/content SHA 由现有唯一约束 replay。
-correction shadow 必须精确 `supersedes` 当前 published revision。
+`apply_data_sync_result_observation()` 是唯一结果投影入口。它在一个 transaction 内按以下顺序执行：
 
-R4 不再创建 observation、revision 或 evidence，只锁定并 promote 调用者指定的 shadow revision。它要求
-revision 仍 unpublished、conflict none、primary observation/SHA/identity/contract 均匹配，且
-`expected_current_result_revision_id` 与 current pointer 相同；任一漂移零写。public off -> on 只允许以后显式
-重试 promote 同一 shadow revision，不能重新生成相同 revision。
+1. 锁定并重验 exact provider claim：event、projection owner/generation、enrollment/generation/entry SHA、
+   active attempt token、claim expiry、plan SHA 与 checkpoint lock version；
+2. 锁定 observation/source，重验身份、合同、完整性、manual lock 与 source-class 仲裁；
+3. 以 event/kind/content SHA 幂等创建 immutable `RaceEventRevision` 和 items/evidence；
+4. `result apply/public` 关闭或候选未赢得仲裁时，revision 保持未发布且不移动 current；
+5. 开关开启且候选胜出时，在同一事务替换 legacy `RaceEventResult`、移动 current/LKG pointer、写
+   `result_confirmed_at`、tracking 状态和唯一 lifecycle transition，并推进 event 为 `finished`；
+6. commit 后失效公开缓存；checkpoint/父 due 由随后仍需通过同一 exact claim CAS 的 completion 更新。
 
-### 11.4 原子 promote 与 lifecycle
-
-唯一公开入口定义为：
-
-```python
-apply_confirmed_result_with_lifecycle(
-    *, event_id, observation_id, expected_observation_sha256,
-    expected_result_revision_id, expected_result_revision_sha256,
-    expected_current_result_revision_id, expected_projection_owner_generation,
-    expected_tracking_generation, expected_attempt_token,
-    expected_lifecycle_schedule_generation,
-    expected_registry_root_sha256, expected_registry_activation_id,
-    expected_registry_membership_sha256, expected_registry_member_count,
-    expected_enrollment_generation, expected_enrollment_entry_sha256,
-    expected_runtime_mode, expected_manifest_sha256, now,
-)
-```
-
-该服务自身打开唯一 transaction，先取得 lifecycle shared advisory barrier，并按全局锁图锁 membership、
-control、event、projection、tracking 与结果对象；不得从 task 先提交结果再另调 lifecycle API。它复用
-`validate_active_registry_membership()` 的 root/activation/membership/count、control schedule generation、
-frozen schedule 检查，同时重验 data-sync enrollment 与 result baseline。调用者不传 lifecycle claim：服务在
-锁住 lifecycle control 后执行 evidence-driven atomic claim。`next_refresh_at` 尚未 due 不阻断；无 claim 或
-claim 已过期时递增 `claim_generation`、生成本事务 token 并接管，存在他人未过期 claim 时返回
-`lifecycle_claim_busy`。本服务持 claim 期间完成 promote/transition，并在所有正常返回分支清空自身
-token/expiry；进程在 commit 前崩溃时数据库自动回滚，不能遗留半 claim。scanner 并发由同一 control row
-lock 串行化，不能借用或覆盖对方有效 token。
+网络请求发生在事务外，因此步骤 1 必须在每一次 schedule/racecard/result canonical apply 内重新执行。
+claim 在网络期间过期、被新 worker 接管，或 enrollment/owner/plan/checkpoint 漂移时，只允许保留已经形成的
+immutable observation；canonical、revision、runner/result、status 和 checkpoint 全部零写。claim completion
+和 failure release 也显式拒绝 `claim_expired`，不能由迟到 worker 清理或重排新任务。
 
 分支固定如下：
 
-| lifecycle/runtime | result 行为 | status 行为 |
+| runtime/仲裁 | revision/result 行为 | status 行为 |
 |---|---|---|
-| off、无 active membership 或 trust root 漂移 | 已有 observation/shadow revision 保留不动；public/legacy confirmed 零写 | 零写并 reason-code 拒绝 |
-| shadow | 已有 shadow revision 保留，不 promote | 不改公开 status |
-| enforce + exact active membership/trust root | 同一事务 promote 指定 shadow revision、写 legacy projection 与 publication | 同事务 `scheduled/running -> finished` |
-| 已 `finished` 且结果 compatible | 可幂等写/重放 compatible result | 不重复 transition |
-| `cancelled/postponed` | canonical/public 零写并 incident | 零写 |
+| apply/public 关闭 | 可保留合格 immutable revision，legacy/current 零写 | 零写 |
+| stale/expired claim、identity/contract/manual lock 失败 | canonical 与 revision 零写，返回 reason code | 零写 |
+| 高优先级或同源更新胜出 | 同事务写 revision、legacy projection 与 current/LKG | 同事务写唯一 `finished` transition |
+| 低优先级候选 | 保留未发布 revision，不覆盖 current | 零写 |
+| 已存在相同 content SHA | replay 既有 revision，不重复投影 | 不重复 transition |
+| correction 胜出且 correction flag 开启 | 新 revision 精确 supersedes current，历史保留 | 保持 `finished` |
 
-投影协调器在该事务内：
-
-1. 重验 baseline/generation/manual lock；
-2. 锁定并重验指定 immutable shadow revision/observation/evidence，绝不新增 revision；
-3. 写或替换 current legacy result projection；
-4. 写 `result_confirmed_at`、source label 和 OperationLog；
-5. 在同一服务中调用无独立事务的 lifecycle internal transition primitive，绝不裸写 status；
-6. 更新 provider checkpoint 和父 due；
-7. commit 后失效缓存并触发只读 verifier。
-
-单 event 事务失败不影响其他 event；同 event 内不允许结果行和状态部分提交。
-
-自动 public confirmed 始终要求 lifecycle `enforce` 和 exact membership；没有该授权时即使结果完整也只能
-shadow。R3 不得调用此入口，R4 才接线。task wrapper 只传冻结参数并消费返回值，不拥有第二个事务边界。
+单 event 事务失败不影响其他 event；同 event 内不允许结果行、current pointer 和状态部分提交。正常赛事只需
+全局/分项开关与 standing-policy 自动 enrollment，不需要逐场人工确认。
 
 ## 12. 人工审核任务的定位
 
-现有 `scheduled-race-result-review` 保留为：
+现有 `scheduled-race-result-review` 保留为异常兜底：
 
 - 不具备 `race_datetime` 的历史/残缺赛事补偿；
 - 自动 route 缺失、身份冲突、部分赛果或 T+24h stale 的人工 fallback；
-- 自动赛果发布前的 shadow 对照来源。
+- 自动链长期阻断时的离线对照来源。
 
-它仍要求 bundle/event digest 的人工批准。自动链不能伪造 approval，也不能复用
-`human_reviewed_reference` authority。
+该旧链自身仍要求 bundle/event digest 的人工批准，但不会阻断或批准新的正常自动链。自动链不能伪造
+approval，也不能复用 `human_reviewed_reference` authority。
 
 ## 13. 开关与配置
 
@@ -532,9 +503,10 @@ audit hold bytes 单独计量且不可被 cleanup 删除；hold 超预算、clea
 - P1：T+30 无结果且无告警、terminal 后 10 分钟未公开、queue 无消费者；
 - P2：单 provider circuit、route 即将过期、时间/出马表覆盖下降。
 
-## 17. 代码切片
+## 17. 代码切片与发布单元
 
-为降低风险，实施拆为五个独立 PR/发布单元：
+实现内部仍按五个切片组织，但按用户授权合并在同一 PR #108 和同一隔离 release；切片边界用于测试、
+开关启用与止损，不再要求五个独立 PR 或五次人工批准：
 
 1. R0：扩展现有 Slice A roster/flags，加入 enrollment census/manifest、provider checkpoint、single-flight、
    selector、`race_sync_v2` queue/worker 与完整 release control-plane，全部关闭；

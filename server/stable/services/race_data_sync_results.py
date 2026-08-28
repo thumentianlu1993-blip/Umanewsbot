@@ -10,6 +10,10 @@ from django.db import transaction
 from django.utils import timezone
 
 from stable import models
+from stable.services.race_data_sync_control import (
+    RaceDataSyncClaim,
+    lock_and_validate_race_data_sync_claim_for_apply,
+)
 from stable.services.race_data_sync_policy import (
     arbitrate_source_value,
     normalize_source_class,
@@ -114,10 +118,28 @@ def apply_data_sync_result_observation(
     now: datetime,
     project_current: bool,
     correction_apply_enabled: bool,
+    claim_guard: RaceDataSyncClaim | None = None,
 ) -> DataSyncResultApplyDecision:
     if timezone.is_naive(now):
         raise ValueError("now must be timezone-aware")
     with transaction.atomic():
+        locked_claim = None
+        if claim_guard is not None:
+            claim_decision, locked_claim = (
+                lock_and_validate_race_data_sync_claim_for_apply(
+                    claim=claim_guard,
+                    now=timezone.now(),
+                    required_data_kinds=(models.RaceDataSyncDataKind.RESULT,),
+                )
+            )
+            if locked_claim is None:
+                return DataSyncResultApplyDecision(
+                    "rejected", claim_decision.reason_code
+                )
+            if locked_claim.event.pk != expected_event_id:
+                return DataSyncResultApplyDecision(
+                    "rejected", "event_identity_mismatch"
+                )
         observation = (
             models.RaceResultObservation.objects.select_for_update()
             .select_related("source_identity")
@@ -159,12 +181,20 @@ def apply_data_sync_result_observation(
         except (TypeError, ValueError):
             return DataSyncResultApplyDecision("rejected", "result_payload_incomplete")
 
-        event = models.RaceEvent.objects.select_for_update().filter(
-            pk=expected_event_id
-        ).first()
-        control = models.RaceEventProjectionControl.objects.select_for_update().filter(
-            event_id=expected_event_id
-        ).first()
+        event = (
+            locked_claim.event
+            if locked_claim is not None
+            else models.RaceEvent.objects.select_for_update()
+            .filter(pk=expected_event_id)
+            .first()
+        )
+        control = (
+            locked_claim.control
+            if locked_claim is not None
+            else models.RaceEventProjectionControl.objects.select_for_update()
+            .filter(event_id=expected_event_id)
+            .first()
+        )
         if event is None or control is None:
             return DataSyncResultApplyDecision("rejected", "projection_subject_missing")
         if control.write_owner != models.RaceEventProjectionWriteOwner.DATA_SYNC:

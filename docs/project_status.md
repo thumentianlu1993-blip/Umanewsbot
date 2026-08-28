@@ -2915,10 +2915,13 @@ P0 马信息补全专项的模型交接文档见
   没有独立 proof 的情况下扩张。
 - migration 0075、Compose/Beat/worker 配置、冻结 standing policy、只读审计命令和回滚边界已齐备；
   所有开关默认 false、容量默认 0。
-- 本地验证为 171/171、PostgreSQL 16 专项 23/23，zero-write dry-run 前后数据库 SHA 不变。赛事相邻
-  扩展套件当前分支 `679` 项相对 `origin/main` 共享基线新增 `72` 项，规范化失败/错误集合
-  `current-only=0`；当前为 `9 failures / 39 errors / 3 skipped`，基线为
-  `12 failures / 39 errors / 3 skipped`，因此没有本次新增红灯且少 3 个既有失败。实现已提交并创建
+- provider 网络请求后，schedule/racecard/result 投影事务会重新锁定并核验 exact claim、expiry、generation、
+  plan/checkpoint 和 data-kind；失效 worker 零 canonical 写入，也不能完成或释放新 claim。
+- 本地验证为 202/202、PostgreSQL 16 专项 24/24，zero-write dry-run 前后数据库 SHA 不变。赛事相邻
+  扩展套件当前分支 `684` 项相对 `origin/main` 共同模块基线新增 `77` 项，规范化失败/错误集合
+  `current-only=0`；当前为 `9 failures / 39 errors / 4 skipped`，基线为
+  `12 failures / 39 errors / 4 skipped`，因此没有本次新增红灯且少 3 个既有失败。主干缺少本 PR 的 6 个
+  测试模块所产生的 import error 已从共同集合剔除。实现已提交并创建
   PR #108，当前未合并、发布或改动生产；PR 完成后只再请求一次绑定精确 revision 的生产部署确认。
 - 生产只读 preflight 确认运行 revision `2833558a…`、healthz 200、external import/lock 为 0、新队列为 0；
   磁盘仅余约 12.2 GB且主 checkout 有大量历史 dirty，必须使用隔离 release 和 8 GiB min-free 容量门禁。

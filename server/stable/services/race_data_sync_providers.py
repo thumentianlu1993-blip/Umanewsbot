@@ -14,6 +14,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from stable import models
+from stable.services.race_data_sync_control import RaceDataSyncClaim
 from stable.services.race_data_sync_pipeline import (
     RaceDataResolvedRoute,
     RaceDataSyncFlags,
@@ -607,6 +608,7 @@ def run_reference_result_data_sync(
     run_id: str,
     collect_if_missing: bool = True,
     capacity_reserved: bool = False,
+    claim_guard: RaceDataSyncClaim | None = None,
 ) -> ProviderSyncOutcome:
     """Collect and consume a complete immutable third-party result receipt."""
 
@@ -796,6 +798,7 @@ def run_reference_result_data_sync(
                 flags.result_apply_enabled and flags.result_public_enabled
             ),
             correction_apply_enabled=flags.correction_apply_enabled,
+            claim_guard=claim_guard,
         )
         if applied.action not in {"applied", "recorded", "replayed"}:
             raise _ProviderSyncError(f"result_{applied.reason_code}")
@@ -823,6 +826,7 @@ def run_result_fallback_chain(
     now: datetime,
     task_id: str,
     run_id: str,
+    claim_guard: RaceDataSyncClaim | None = None,
 ) -> ProviderSyncOutcome:
     """Try admitted lower-priority result routes after a higher source has no row."""
 
@@ -857,6 +861,7 @@ def run_result_fallback_chain(
             now=now,
             task_id=task_id,
             run_id=run_id,
+            claim_guard=claim_guard,
         )
         if outcome.success and outcome.applied_kinds:
             return outcome
@@ -927,6 +932,7 @@ def run_result_fallback_chain(
             task_id=task_id,
             run_id=run_id,
             capacity_reserved=False,
+            claim_guard=claim_guard,
         )
         if outcome.success and outcome.applied_kinds:
             return outcome
@@ -950,6 +956,7 @@ def run_persisted_official_result_data_sync(
     now: datetime,
     task_id: str,
     run_id: str,
+    claim_guard: RaceDataSyncClaim | None = None,
 ) -> ProviderSyncOutcome:
     """Project a complete result already collected by an official importer.
 
@@ -1100,6 +1107,7 @@ def run_persisted_official_result_data_sync(
             and apply_flags.result_public_enabled
         ),
         correction_apply_enabled=apply_flags.correction_apply_enabled,
+        claim_guard=claim_guard,
     )
     if applied.action not in {"applied", "recorded", "replayed"}:
         return ProviderSyncOutcome(
@@ -1181,6 +1189,7 @@ def run_the_racing_api_data_sync(
     now: datetime,
     task_id: str,
     run_id: str,
+    claim_guard: RaceDataSyncClaim | None = None,
     transport: Callable[..., Any] = the_racing_api_transport,
     clock: Callable[[], datetime] = timezone.now,
     sleeper: Callable[[float], Any] = time.sleep,
@@ -1379,6 +1388,7 @@ def run_the_racing_api_data_sync(
                             ),
                             task_id=task_id,
                             run_id=run_id,
+                            claim_guard=claim_guard,
                         )
                         if reconcile.status not in {"applied", "replayed"}:
                             raise _ProviderSyncError(
@@ -1520,6 +1530,7 @@ def run_the_racing_api_data_sync(
                             and flags.result_public_enabled
                         ),
                         correction_apply_enabled=flags.correction_apply_enabled,
+                        claim_guard=claim_guard,
                     )
                     if apply_result.action not in {
                         "applied",

@@ -657,6 +657,56 @@ class RaceDataSyncEnrollmentControlTests(TestCase):
         tracking = models.RaceEventLiveTracking.objects.get(event=self.event)
         self.assertEqual(tracking.active_attempt_token, second.attempt_token)
 
+    def test_expired_provider_task_cannot_complete_or_release_claim(self):
+        self._acquire()
+        claim = race_data_sync_control.claim_due_enrollments(
+            now=NOW,
+            batch_size=10,
+            ttl_seconds=60,
+            enabled_providers=("jra",),
+            enabled_regions=("japan",),
+            enabled_data_kinds=("race_time", "racecard", "result"),
+        )[0]
+
+        completed = race_data_sync_control.complete_race_data_sync_claim(
+            event_id=claim.event_id,
+            expected_enrollment_generation=claim.enrollment_generation,
+            expected_owner_generation=claim.owner_generation,
+            expected_claim_generation=claim.claim_generation,
+            attempt_token=claim.attempt_token,
+            checkpoint_plan=claim.checkpoint_plan,
+            expected_enrollment_entry_sha256=claim.enrollment_entry_sha256,
+            expected_plan_sha256=claim.plan_sha256,
+            now=NOW + timedelta(seconds=60),
+        )
+        failed = race_data_sync_control.fail_race_data_sync_claim(
+            event_id=claim.event_id,
+            expected_enrollment_generation=claim.enrollment_generation,
+            expected_owner_generation=claim.owner_generation,
+            expected_claim_generation=claim.claim_generation,
+            attempt_token=claim.attempt_token,
+            data_kinds=claim.data_kinds,
+            checkpoint_plan=claim.checkpoint_plan,
+            expected_enrollment_entry_sha256=claim.enrollment_entry_sha256,
+            expected_plan_sha256=claim.plan_sha256,
+            reason_code="late-worker",
+            retry_at=NOW + timedelta(minutes=5),
+            now=NOW + timedelta(seconds=60),
+        )
+
+        self.assertEqual(completed.reason_code, "claim_expired")
+        self.assertEqual(failed.reason_code, "claim_expired")
+        tracking = models.RaceEventLiveTracking.objects.get(event=self.event)
+        self.assertEqual(tracking.active_attempt_token, claim.attempt_token)
+        self.assertEqual(
+            set(
+                tracking.provider_checkpoints.values_list(
+                    "consecutive_failures", flat=True
+                )
+            ),
+            {0},
+        )
+
     def test_direct_admission_rejects_expired_or_route_drifted_source(self):
         self.source.proof_network_allowed = False
         self.source.save(update_fields=("proof_network_allowed",))

@@ -14,7 +14,12 @@ from django.db import IntegrityError, migrations, transaction
 from django.test import SimpleTestCase, TestCase, override_settings
 
 from stable import models
-from stable.services import race_events, race_live_fixtures, race_live_racecard_sync
+from stable.services import (
+    race_data_sync_control,
+    race_events,
+    race_live_fixtures,
+    race_live_racecard_sync,
+)
 from stable import test_race_live_multiregion_pipeline as _multiregion_tests
 
 
@@ -439,13 +444,85 @@ class RacecardFieldReconciliationContractTests(TestCase):
         self.assertTrue(decision.recorded, decision.reason)
         return decision.observation
 
-    def _reconcile(self, observation, *, event=None, allow_schedule_apply=False):
+    def _reconcile(
+        self,
+        observation,
+        *,
+        event=None,
+        allow_schedule_apply=False,
+        claim_guard=None,
+    ):
         return _pipeline().reconcile_racecard_observation(
             observation_id=observation.pk,
             expected_event_id=(event or self.event).pk,
             allow_schedule_apply=allow_schedule_apply,
             task_id="celery-task-1",
             run_id="run-1",
+            claim_guard=claim_guard,
+        )
+
+    def _claim_guard(self):
+        entry_sha256 = "a" * 64
+        route_digest = "b" * 64
+        control = models.RaceEventProjectionControl.objects.create(
+            event=self.event,
+            write_owner=models.RaceEventProjectionWriteOwner.DATA_SYNC,
+            owner_generation=1,
+        )
+        tracking = models.RaceEventLiveTracking.objects.create(
+            event=self.event,
+            tracking_enabled=True,
+            claim_generation=1,
+            active_attempt_token="racecard-claim-1",
+            claim_expires_at=NOW + timedelta(minutes=4),
+        )
+        models.RaceDataSyncEnrollment.objects.create(
+            event=self.event,
+            source_identity=self.tra,
+            state=models.RaceDataSyncEnrollmentState.ENROLLED,
+            standing_policy_digest="c" * 64,
+            route_digest=route_digest,
+            event_snapshot_sha256="d" * 64,
+            projection_owner_generation=control.owner_generation,
+            enrollment_generation=1,
+            manifest_sha256="e" * 64,
+            entry_sha256=entry_sha256,
+            effective_at=NOW,
+        )
+        checkpoint = models.RaceEventLiveProviderCheckpoint.objects.create(
+            tracking=tracking,
+            source_key=self.tra.source_key,
+            data_kind=models.RaceDataSyncDataKind.RACECARD,
+            next_poll_at=NOW,
+            lock_version=0,
+        )
+        checkpoint_plan = (
+            {
+                "source_key": checkpoint.source_key,
+                "data_kind": checkpoint.data_kind,
+                "lock_version": checkpoint.lock_version,
+            },
+        )
+        plan_sha256 = race_data_sync_control._claim_plan_sha256(
+            event_id=self.event.pk,
+            enrollment_generation=1,
+            owner_generation=control.owner_generation,
+            claim_generation=1,
+            attempt_token="racecard-claim-1",
+            enrollment_entry_sha256=entry_sha256,
+            route_digest=route_digest,
+            checkpoint_plan=checkpoint_plan,
+        )
+        return race_data_sync_control.RaceDataSyncClaim(
+            event_id=self.event.pk,
+            enrollment_generation=1,
+            owner_generation=control.owner_generation,
+            claim_generation=1,
+            attempt_token="racecard-claim-1",
+            enrollment_entry_sha256=entry_sha256,
+            route_digest=route_digest,
+            checkpoint_plan=checkpoint_plan,
+            plan_sha256=plan_sha256,
         )
 
     def test_event_identity_mismatch_is_zero_write(self):
@@ -455,6 +532,28 @@ class RacecardFieldReconciliationContractTests(TestCase):
 
         self.assertEqual(decision.status, "rejected")
         self.assertEqual(decision.reason, "event_identity_mismatch")
+        self.assertFalse(models.RaceEventRunner.objects.exists())
+        self.assertFalse(models.RaceEventFieldChange.objects.exists())
+
+    def test_superseded_claim_cannot_apply_racecard_or_schedule(self):
+        observation = self._observation(self.tra)
+        guard = self._claim_guard()
+        tracking = self.event.live_tracking
+        tracking.claim_generation = 2
+        tracking.active_attempt_token = "racecard-claim-2"
+        tracking.save(
+            update_fields=("claim_generation", "active_attempt_token")
+        )
+
+        with patch("stable.services.race_data_sync_pipeline.timezone.now", return_value=NOW):
+            decision = self._reconcile(
+                observation,
+                allow_schedule_apply=True,
+                claim_guard=guard,
+            )
+
+        self.assertEqual(decision.status, "rejected")
+        self.assertEqual(decision.reason, "claim_cas_stale")
         self.assertFalse(models.RaceEventRunner.objects.exists())
         self.assertFalse(models.RaceEventFieldChange.objects.exists())
 

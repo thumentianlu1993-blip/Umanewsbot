@@ -16,7 +16,10 @@
    地区、来源和身份；The Racing API 通过“规范化赛名 + 场地 + 当地日期”唯一匹配建立 source identity。
 2. 纳管事务同时建立 `race_sync_v2` projection owner、enrollment、provider checkpoints 和 lifecycle
    enforce control；claim/complete 使用 enrollment、owner、claim generation、attempt token 和计划 SHA
-   做 CAS，过期 worker 不能完成新 claim。
+   做 CAS。provider 网络请求在事务外执行，但任何 schedule/racecard/result canonical 写入前都必须在同一
+   写事务按统一锁序重新锁定 event、projection control、tracking、enrollment 与 checkpoints，并核对
+   exact claim、有效期、entry/route/plan SHA、checkpoint version 及该 claim 获准的数据类型；过期或被
+   替换的 worker 不能投影、完成或释放新 claim。
 3. 赛时与出马表在远期至少每 12 小时一次，临近比赛逐步缩短到 6 小时、1 小时、15/10 分钟；满足
    “每天至少两次”且不会用固定高频轮询消耗所有配额。
 4. 到开跑时间自动 `scheduled -> running`，T+30 自动 `running/scheduled -> finished`；延期赛事不误推，
@@ -82,14 +85,17 @@ enrollment、due checkpoints、policy census/blocker 和 route drift，并固定
 - `manage.py makemigrations --check --dry-run`：No changes detected；
 - `manage.py check`：0 issues；
 - Python `compileall`：通过；
-- 聚焦回归：171/171 通过；覆盖来源仲裁、动态 cadence、future discovery 公平轮转、容量账本、CAS、
+- 聚焦回归：202/202 通过；覆盖来源仲裁、动态 cadence、future discovery 公平轮转、容量账本、CAS、
   lifecycle、TRA transport、
-  官网/第三方 fallback、不可变赛果 revision、dead heat、更正、审计、route drift、公开页去来源标签；
-- 隔离 PostgreSQL 16 专项：23/23 通过，覆盖行锁、并发幂等、唯一约束、raw cleanup 和 migration；
+  官网/第三方 fallback、不可变赛果 revision、dead heat、更正、审计、route drift、公开页去来源标签，
+  以及 claim 被替换/过期/data-kind 越权时的 canonical 零写入；
+- 隔离 PostgreSQL 16 专项：24/24 通过，覆盖行锁、并发幂等、唯一约束、raw cleanup、migration 和
+  superseded claim 的真实 PostgreSQL 零投影；
 - zero-write dry-run：通过，数据库 hash 不变。
-- 相邻扩展回归：当前分支筛除 PostgreSQL-only 后运行 679 项，结果为
-  `9 failures / 39 errors / 3 skipped`；同日、同配置的 `origin/main@2833558a` 共享基线运行 607 项，结果为
-  `12 failures / 39 errors / 3 skipped`。规范化用例名后 `current-only=0`，即新增 72 项没有新增失败或
+- 相邻扩展回归：claim 硬化后当前分支筛除 PostgreSQL-only 运行 684 项，结果为
+  `9 failures / 39 errors / 4 skipped`；同日、同镜像、同配置的 `origin/main@2833558a` 共同模块基线为
+  607 项，结果为 `12 failures / 39 errors / 4 skipped`。主干尚无本 PR 的 6 个测试模块，直接调用产生的
+  6 个 `_FailedTest` import error 已从共同集合剔除；规范化用例名后 `current-only=0`，即新增 77 项没有新增失败或
   错误；本分支还消除了基线中的 source-proof schema-v2 和两个旧公开阶段标签断言共 3 项失败。剩余
   红灯均为基线已有的日期/授权绑定旧 `race_live` 契约，未计入本次绿色测试，也不影响差异归因。
 

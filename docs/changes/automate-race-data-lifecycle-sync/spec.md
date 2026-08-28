@@ -5,13 +5,14 @@
 - 变更 slug：`automate-race-data-lifecycle-sync`。
 - 工作流：仓库原生 `docs/changes/` 方案，不使用 OpenSpec，也不生成 OpenSpec 产物。
 - 基线：`origin/main@2833558a6a2d67b7dc9816b53ea8ad5d580eb56c`。
-- 当前阶段：同一独立 reviewer 经 3 轮评审后给出 `VERDICT: APPROVED`，actionable findings 已清零；
-  方案待用户决定是否进入实现，尚未开始测试或实现。
-- 本阶段不包含应用代码、migration、真实来源请求、生产配置、队列消费、自动写入、部署或服务重启。
+- 当前阶段：实现、migration、Compose/Beat/worker、聚焦与 PostgreSQL 测试、零写 dry-run、扩展基线归因
+  和生产只读 preflight 均已完成，代码位于 PR #108；生产尚未合并、迁移、部署或启用。
+- 用户已明确覆盖早期“多 PR、7 天 shadow、逐地区/逐赛事人工批准”门禁：dry-run 通过后，只需一次最终
+  生产确认，即可在同一隔离 release 中按开关顺序直接上线；任一步验收失败自动停止，不回退已留存审计。
 
-## 2. 当前事实
+## 2. 基线与最新只读事实
 
-`2026-08-19 23:24 +08:00` 的生产只读快照：
+`2026-08-19 23:24 +08:00` 的方案基线快照（不再作为当前运行态）：
 
 - web、普通 worker、Beat、db、Redis、Nginx 正常运行，运行 revision 与方案基线同为 `2833558a`；
 - `race_live_worker=created`，没有运行；
@@ -26,6 +27,12 @@
   `RACE_DATA_SYNC_*` 字段写入 admission；schedule apply 目前明确返回 `slice_c_required`；
 - 普通 `celery` 队列为 `0`，遗留 `race_live` 队列为 `7543`；该积压不属于本方案的可恢复任务。
 
+`2026-08-28` 最新只读 preflight：web/worker/Beat 统一运行 `2833558a` / `sha256:4bc392…`，双 healthz
+为 200，migration leaf 为 `0073`，external started/lock 为 0，`celery=0`、`race_sync_v2=0`、
+`race_live=7543`；磁盘可用 `12,214,140,928` bytes。生产 checkout 有 1,709 项历史 dirty，发布必须使用
+隔离 release。`RACE_DATA_SYNC_*` 生产键尚不存在；现有 lifecycle 为 `true/enforce`，race-live network/
+scheduler 仍关闭。
+
 因此本功能不能简化为“增加两个 cron”。第一道门槛是建立可审计的赛事身份、准确时间和来源路由，
 之后才允许动态调度出马表与赛果。
 
@@ -37,7 +44,8 @@
 4. 在计划开跑后 30 分钟仍不能得到可写赛果时生成明确告警并继续补偿，不猜测、不制造赛果。
 5. 所有自动变化可解释、可重放、可审计、可关闭，并能由精确 revision 或 reverse manifest 回退。
 
-最终覆盖所有已发布赛事；上线按重点赛事、地区和来源分批推进，不一次性全开。
+最终覆盖 standing policy 内所有已发布且身份唯一的未来赛事。生产启用按能力开关顺序推进以便止损，
+但不要求逐赛事人工确认，也不以固定 7 天 shadow 或地区 canary 作为初次上线前置条件。
 
 ## 4. 非目标
 
@@ -47,7 +55,8 @@
 - 不采集高频赔率，不建设投注、预测、新闻或 QQ 自动发送能力。
 - 不把生命周期时间状态与赛果权威混为一体；`finished` 不等于已有赛果。
 - 不清空、重放、消费或迁移现有 `race_live` 7543 条积压。
-- 不把当前人工审核赛果任务直接改成无人审核 apply。
+- 不修改当前人工审核赛果任务的既有语义；新的自动链独立完成无人审核 apply，人工任务只保留为异常兜底，
+  不能成为正常赛事的逐场确认门槛。
 
 ## 5. 核心状态语义
 
@@ -89,27 +98,19 @@ provider
 `provider + region + identity_namespace` 下只能有一个 current identity。
 身份缺失、重复、过期或冲突时允许保存脱敏 observation，但业务字段、runner 和赛果均不得写入。
 
-## 7. 来源与置信度
+## 7. 来源优先级与前台语义
 
-沿用用户已经确认的产品口径：官网、Racing API 和已登记可信第三方在满足相同完整性门槛时，具有
-同等自动采用资格，不建立全局来源高低排序。系统必须保留真实 provenance：
+自动仲裁固定为 `licensed_api > official_operator > trusted_publisher`，当前分别对应 Racing API、已经由
+官网/官方数据链导入的事实、已登记可信第三方。三类都属于可自动采用的正式来源，不需要逐赛事人工确认。
+内部必须保留 provider、URL、抓取时间、source class、contract/proof digest 和 observation/revision；前台
+统一显示“赛果”，不显示来源类别，也不显示 provisional/official/corrected 等内部阶段标签。
 
-| `source_label` | 含义 | 公开标签 |
-|---|---|---|
-| `official` | 赛事主办方或官方机构终态赛果 | 官方赛果 |
-| `racing_api_auto` | 已批准 Racing API 的终态完整赛果 | 可信来源赛果（自动） |
-| `trusted_provider_auto` | 已批准可信第三方的终态完整赛果 | 可信来源赛果（自动） |
-| `human_reviewed_reference` | 人工核验并批准的参考来源 | 已人工审核赛果 |
-
-`corrected_result` 是 revision 阶段，不是来源类别；页面应显示“已更正”并同时展示真实来源标签。
-
-- 相同 semantic value 可自动合并。
-- 同一来源更晚的 `source_updated_at` 可修正自身旧版本。
-- 不同来源给出不同值时，因为它们具有同等资格，系统不得静默选边；保持当前 canonical，创建
-  `needs_review` incident，并继续采集后续修正。
-- `human_reviewed_reference` 不能用于无人审核流程。
-- 第三方或 API 赛果的 `official_finish_position` 保持 `null`；平台可将 `is_confirmed` 解释为
-  “通过平台完整性门禁”，不能解释为“官方来源”。
+- 相同 semantic value 自动合并；同来源以更晚 `source_updated_at` 更新。
+- 不同来源值冲突时，高优先级覆盖低优先级；同优先级按 observation 时间和稳定 provider key 决胜，保证
+  重放确定性。manual lock 仍优先，身份不唯一、结果不完整或合同失效继续 fail closed。
+- `human_reviewed_reference` 只属于旧人工兜底，不进入无人审核自动来源链。
+- `reported_finish_position` 是公开名次真相并支持并列；legacy `official_finish_position` 可为兼容旧投影镜像
+  同值，但不得被解释为前台来源声明或改变上述来源优先级。
 
 每个 provider route 必须版本化登记 region、data kind、字段、host/path、identity namespace、
 parser version、终态 marker、自动化许可、有效期、请求预算、限速和 proof digest。合同过期或不完整时
@@ -160,16 +161,16 @@ parser version、终态 marker、自动化许可、有效期、请求预算、�
 5. 名次序列可确定性投影，无重复身份、未知缺口或部分 `Also Ran`；
 6. raw/normalized 内容 SHA、抓取时间、来源更新时间和 external race ID 已冻结；
 7. 当前结果 baseline、manual lock 和 projection generation 未漂移；
-8. 不存在未解决的同资格来源冲突。
+8. 来源仲裁已经按固定等级、观测时间和 provider key 得到确定结果，且没有 manual lock 或身份冲突。
 
 自动 writer 的持久 owner 必须是新增的 `data_sync`，不得复用 legacy `live`。只有 exact enrollment manifest
 可把 `unmanaged` CAS 为 `data_sync`；`live/historical/manual_paused` 一律冲突，disenroll 只有在无 active
 claim 且 baseline 匹配时才能 `data_sync -> unmanaged`。历史 `live` 不自动迁移。
 
 死热/并列继续使用唯一 `finish_position` 作为内部稳定排序键；另增 authority-neutral、可重复的
-`reported_finish_position` 保存来源报告名次。官方来源同时写与其一致的
-`official_finish_position`，API/可信第三方只写 `reported_finish_position`，不得伪造官方名次字段。
-页面展示 `reported_finish_position`，仅历史无证据行才回退旧字段，所以可信第三方 `1,1,3` 必须显示为
+`reported_finish_position` 保存来源报告名次。页面展示 `reported_finish_position`，仅历史无证据行才回退
+旧字段；legacy `official_finish_position` 即使为兼容投影镜像同值，也不用于判断来源类别。所以可信第三方
+`1,1,3` 必须显示为
 `1,1,3`，而不是内部排序 `1,2,3`。
 
 完整 confirmed/corrected candidate 在 R3 只创建 immutable、未公开 shadow revision，不移动 current、
@@ -223,9 +224,10 @@ identity/route digest、预期 owner/generation 和精确 before state，可反�
    告警；该指标只证明运营覆盖，不计入赛果成功率；
 5. 上游终态首次被系统观察后，P95 5 分钟、P99 10 分钟内完成公开更新。
 
-首发 canary 中，独立 reference 证明 T+30 前已完整终态的赛事，confirmed/publication rate 至少 95%；
-地区扩大后至少 99%，错误赛果始终为 0。上游未发布终态时继续补偿，reference snapshot 必须能独立证明
-告警原因，不能由本系统自己的 alert 反向证明成功。
+生产上线观察期中，独立 reference 证明 T+30 前已完整终态的赛事，confirmed/publication rate 目标至少
+95%，稳定运行后至少 99%，错误赛果始终为 0。该指标是上线后的持续验收和自动止损信号，不是强制等待
+7 天或逐地区人工批准的前置门禁。上游未发布终态时继续补偿，reference snapshot 必须能独立证明告警
+原因，不能由本系统自己的 alert 反向证明成功。
 
 ## 13. 队列、并发与资源隔离
 
@@ -255,13 +257,15 @@ identity/route digest、预期 owner/generation 和精确 before state，可反�
 
 ## 15. 验收标准
 
-代码进入生产灰度前必须达到：
+生产启用前必须有代码/迁移/Compose、聚焦与 PostgreSQL 测试、zero-write dry-run、来源/容量配置、备份与
+回滚证据；以下覆盖率与延迟指标从启用后首个自然赛事窗口开始持续计算，未达标时自动停在当前阶段或
+关闭对应 provider/region/apply，不需要逐赛事人工确认：
 
 - 支持地区的 future published events 100% 有唯一 source route，或明确 `route_missing`；
 - 首发 cohort 在 T-24h 的 `race_datetime` 覆盖率至少 95%；
 - T-6h 内出马表更新新鲜度 P95 不超过 15 分钟；
 - 首发 cohort 终态赛果检测后公开延迟 P95 不超过 5 分钟、P99 不超过 10 分钟；
-- 独立 reference 证明 T+30 前终态完整的赛事，canary confirmed/publication rate >=95%，地区扩大后
+- 独立 reference 证明 T+30 前终态完整的赛事，confirmed/publication rate 初始目标 >=95%、稳定目标
   >=99%；真正 blocked 赛事 alert coverage >=99%，两者分别报告；
 - 错绑赛事、跨 event 写入、manual lock 覆盖、重复 current revision、无证据公开均为 0；
 - 关闭任一 provider/cohort/field/public flag 后，新写入在一个 selector 周期内停止；

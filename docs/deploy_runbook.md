@@ -8714,3 +8714,22 @@ RACE_DATA_RAW_ARTIFACT_ROOTS=/run/race-data-sync
 当前线上可用磁盘约 12.2 GB，最近备份约 445.5 MB；构建、备份和关闭态发布后若 free disk 不再满足
 8 GiB，或 audit/capacity ledger/root 任一异常，则不得打开 network/apply。旧 `race_live=7543` 消息不得
 删除、迁移或交给 `race_sync_v2_worker`；新队列必须继续从 0 开始。
+
+### 2026-08-28 最终确认前只读复核快照
+
+- resident web/worker/Beat 仍统一运行 image
+  `sha256:4bc392d012080a482523451016074f55ebcee84177ccab08b7563b233411a611`，OCI revision
+  `2833558a6a2d67b7dc9816b53ea8ad5d580eb56c`；内外 healthz 均为 200。宿主 checkout HEAD 为
+  `bef0cdc5034bd2516df9876b2a7dde2357f03495`，且有 1,709 项 dirty，与 resident revision 不同，仍必须
+  从 PR merge SHA 创建隔离 release，不得在该 checkout 原地 pull/checkout/clean。
+- 生产 migration leaf 为 `0073`，尚无任何 `RACE_DATA_SYNC_*` `.env` 键；发布顺序必须显式先安装
+  `0074/0075` 且保持所有新开关 false，再注入冻结容量和 allowlist。现有 lifecycle 为 `true/enforce`，
+  race-live scheduler/monitor 为 false、regions 为空、runner 未启用；新链不得隐式关闭或扩张旧控制面。
+- external import started/lock 均为 0，`celery=0`、`race_sync_v2=0`、遗留 `race_live=7543`。发布前还要在
+  同一锁窗口重验；`race_live` 数量只允许观测，不允许 purge、migrate 或 consume。
+- 文件系统实测 total/used/available 为 `105286258688 / 88562573312 / 12214140928` bytes，备份目录为
+  `47380298866` bytes。创建备份、构建镜像和关闭态切换后必须逐次重验 8 GiB min-free；任何一次低于门槛
+  就停止，不打开 network/apply。
+- 运行 task 在 provider 网络请求后写 schedule/racecard/result 前必须重新验证 exact claim、expiry、
+  generations、entry/route/plan SHA、checkpoint version 和 data-kind。验收至少注入一次 superseded/expired
+  claim，确认 canonical/revision/projection 与新 claim 均不变；只看到 HTTP 200 或 raw receipt 不算通过。

@@ -6175,10 +6175,14 @@ v3 首次 prepare 在请求预算 `60/60` 时由 HRN 空候选连带阻断 Equib
 - 新 migration 为 `0075_race_data_source_priority_and_reported_position`；standing policy SHA 为
   `60fe9230ca0e97d69a8406118b5d346649239f3f0699efe9a1d0c63972e44ba4`，TRA registry SHA 为
   `24981f62e30e83e58fc82d4247560af35e4041b05857c287bd64430d0f2e2ecc`。全部新开关默认关闭、容量默认 0。
-- 聚焦回归 `171/171`、隔离 PostgreSQL 16 专项 `23/23`、Django check、migration drift 和 compileall
-  均通过。另以同一 SQLite/Celery eager 口径复跑赛事相邻扩展套件：当前分支 `679` 项为
-  `9 failures / 39 errors / 3 skipped`，`origin/main@2833558a` 的共享基线 `607` 项为
-  `12 failures / 39 errors / 3 skipped`；规范化失败/错误用例集合中 `current-only=0`，新增 `72` 项均未
+- provider 网络请求后、任何 schedule/racecard/result canonical 写入前，现会在同一事务重新锁定并核验
+  exact claim、有效期、owner/enrollment generation、entry/route/plan SHA、checkpoint version 和获准
+  data-kind；claim 被替换、过期或越权时零投影，旧 worker 也不能完成或释放新 claim。
+- 聚焦回归 `202/202`、隔离 PostgreSQL 16 专项 `24/24`、Django check、migration drift 和 compileall
+  均通过。另以同一 SQLite/Celery eager 口径复跑赛事相邻扩展套件：当前分支 `684` 项为
+  `9 failures / 39 errors / 4 skipped`，`origin/main@2833558a` 的共同模块基线 `607` 项为
+  `12 failures / 39 errors / 4 skipped`；主干缺少本 PR 的 6 个测试模块所产生的 import error 已剔除，
+  规范化失败/错误用例集合中 `current-only=0`，新增 `77` 项均未
   引入红灯，并修复基线 3 项既有失败。剩余红灯完整继承自日期/授权绑定的旧 `race_live` 契约，不作为
   本次通过项伪报。全新临时 SQLite dry-run
   返回 `configuration_status=ready / route_drift=[] / would_write=false`，审计前后数据库 SHA 同为
