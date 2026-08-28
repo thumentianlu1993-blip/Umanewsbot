@@ -6,15 +6,16 @@
 - 最新生产只读快照：web/worker/Beat 为 `2833558a` / `sha256:4bc392…`，双 healthz 200，migration
   leaf `0073`，external started/active lock 为 0（2 条 lock 占位行均未持有），`celery=0`、
   `race_sync_v2=0`、`race_live=7543`。
-- 生产磁盘可用 `12,211,531,776` bytes，backup 目录 `47,380,298,866` bytes；主 checkout 有 1,710 项
+- 关闭态修复及候选构建后生产磁盘可用约 `11.3 GB`；主 checkout 有 1,722 项
   历史 dirty，禁止直接 pull/checkout/清理，必须用隔离 release。
 - runtime 仅有旧版 `RACE_DATA_SYNC_ENABLED=false` 与 provider/region/field 三个空集合键；本 change 新增的
   scheduler/network/apply/capacity 等键尚不存在。现有 lifecycle 为 `true/enforce`，race-live network/scheduler
   关闭。
-- 尚未合并、备份、迁移、部署或开启任何新开关。发布硬门禁另发现 14 条租约过期但仍为 `claimed` 的
-  历史赛果审核 run。用户随后已明确授权“按方案处理历史 claim 并修复代码”，因此历史收口属于本次独立
-  获准的数据修复包；先按精确 manifest、已验证备份和单事务命令执行。PR 全量代码复审完成后，仅在真正
-  合并/部署/启用前再请求一次最终生产确认。
+- PR 仍未合并，migration/部署/新开关均未执行。原先阻断发布的 14 条过期 `claimed` 已在停 Beat 的
+  关闭态窗口按 manifest `5897db0d…76d1a5` 精确收口为 `failed/stale_claim_reconciled`；写前 custom
+  backup 为 `484192137` bytes、SHA `64d72011…44bdc`、0600/TOC 有效。独立 verifier 证明队列、pending、
+  delivery、approval、赛果和旧 lifecycle 均未越界，原 Beat 已恢复。下一步只在真正合并/部署/启用前
+  请求一次最终生产确认。
 
 历史收口不得通过修改 writer 门禁或忽略过期 lease 完成。只有 selector/bundle/terminal/finished 全空且
 cursor 形态精确的已过期 claim 可转为 `failed/stale_claim_reconciled`；任何活租约、异常字段或 SHA 漂移
@@ -82,6 +83,18 @@ RACE_DATA_RAW_ARTIFACT_ROOTS=/run/race-data-sync
 同时写入精确 provider、region、field/data-kind allowlist、policy/registry 路径和 SHA。保持 network/apply/
 public/lifecycle/future discovery 关闭，再次运行审计；必须 `configuration_status=ready`、`capacity=valid`、
 `route_drift=[]`、daily ledger 未超限、free disk >=8 GiB。
+
+本发布冻结的 allowlist 来自 standing policy 与当前唯一 roster，不包含尚未实现的 official-provider route：
+
+```dotenv
+RACE_DATA_SYNC_ENABLED_PROVIDERS=horse_racing_nation,sporting_life,the_racing_api,zeturf
+RACE_DATA_SYNC_ENABLED_REGIONS=france,hong_kong,ireland,japan_jra,japan_nar,united_kingdom,united_states
+RACE_DATA_SYNC_ENABLED_FIELDS=local_start_time,off_time,participants.carried_weight,participants.draw,participants.horse_name,participants.jockey_name,participants.number,participants.odds,participants.popularity,participants.status,participants.trainer_name,status,timezone_name
+RACE_DATA_SYNC_ENABLED_DATA_KINDS=race_time,racecard,result
+```
+
+任一 policy route 在 `configuration_only` 解析下不唯一、未 admitted 或 digest 漂移时，必须缩窄到实际通过的
+provider/region/data-kind，不能临场加入 JRA/HKJC 等 `proof_required` route 或放宽字段集合。
 
 ## 7. 同一确认内的直接启用顺序
 
