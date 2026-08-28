@@ -1,5 +1,22 @@
 # 项目状态文档
 
+## 2026-08-29 PR #108 已合并，生产发布在 migration 前安全停止并恢复旧版本
+
+- PR `#108` merge SHA 为 `e5287acf…af5d`，候选 image `7403b21f…afdd1`。新写前 backup
+  `pre-pr108-merge-e5287acf-20260828T200920Z.dump` 已通过 size/SHA/0600/1325 行 TOC 门禁。
+- Release-B handoff 正确识别生产起点 `0073` 和计划 `0074/0075`，但
+  `ensure_historical_calendar_recovery_intent` 在 `migrate` 前把 no-intent 普通发布错误要求成已位于最终
+  leaf，报 `no-intent attempt requires exact final 0071` 后停止。错误文本陈旧，实际最终常量为 0075。
+- 生产确认没有 0074/0075 记录、没有 restricted marker。候选未常驻，所有 data-sync 开关、容量注入和
+  五阶段启用均未执行；旧 `race_live` 没有被消费。
+- 旧 image `4bc392d0…611a611` 和 revision `2833558a…56c` 已恢复。隔离 release 的 Git-only
+  `deploy/certs` 缺真实 Let’s Encrypt runtime，且历史任务 runtime bind 也指向新目录；等待两条普通新闻
+  任务自然 drain 后，已从原 PR107 release 重建 web/worker/Beat/Nginx，使 working directory、mount 和
+  证书全部回到旧基线，HTTP/HTTPS 四入口均为 200。
+- 当前最终态：leaf `0073`，web healthy、worker/Beat/Nginx running、restart count=0、近两分钟 error
+  marker=0，writer preflight `ok=true`，`celery=0 / race_sync_v2=0 / race_live=7543`。下一步是独立修复 no-intent pre/post leaf 状态机、真实
+  PostgreSQL 0073->0075 wrapper 回归和 release 外 TLS runtime mount；复审后重新备份并取得新的发布窗口。
+
 ## 2026-08-29 PR #108 阻塞修复和生产历史 claim 已收口，待最终发布确认
 
 - 生产真实状态未变：PR 仍 OPEN，revision `2833558a…56c`、leaf `0073`，新赛事写入全关，

@@ -1,5 +1,19 @@
 # 关键决策
 
+## 2026-08-29 普通 migration 的 no-intent 校验必须区分 pre-migrate 与 post-migrate leaf
+
+- `recovery_intent_mode=not-required` 只表示当前 schema 不属于受限 migration-history repair，不表示
+  数据库在运行 `migrate` 前已经位于候选最终 leaf。普通 forward deploy 的 intent 阶段必须接受 handoff
+  artifact 绑定且 catalog 校验通过的受审起始 leaf；完成阶段仍必须精确要求候选最终 leaf。
+- 本次 `0073 -> 0075` 在 migration 前被“必须已是最终 leaf”的条件阻断，禁止通过手工伪造 marker、修改
+  preflight artifact、直接调用 `migrate` 或跳过 wrapper 继续发布。必须用独立修复 PR 补齐状态机和真实
+  PostgreSQL 端到端回归后，重新走完整发布门禁。
+- release 隔离不能把 TLS 私钥/证书当作 Git checkout 内容。Nginx 的证书 mount 必须指向 release 外稳定
+  runtime，或在新 release 中以不暴露内容的受审复制/绑定步骤建立；切换前必须验证
+  `fullchain.pem`/`privkey.pem` 可读和 `nginx -t`。仅恢复应用 health 不等于公网恢复。
+- 任一发布门禁失败后，先证明 migration 边界和镜像身份，再恢复精确旧服务。旧 `race_live` 队列和新
+  data-sync 开关继续保持原值；故障恢复不构成绕过失败门禁继续启用的授权。
+
 ## 2026-08-29 0075 为本发布最终 leaf，门禁重放与公开读取必须保持证据语义
 
 - 普通 Release-B deploy/rollback 的最终 leaf 固定为
