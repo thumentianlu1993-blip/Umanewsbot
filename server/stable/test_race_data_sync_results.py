@@ -5,10 +5,14 @@ import hashlib
 import json
 from unittest.mock import patch
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from stable import models
 from stable.services import race_data_sync_control
+from stable.services.race_data_sync_pipeline import (
+    _ROSTER_ALLOWED_FIELDS,
+    build_race_data_provider_roster,
+)
 from stable.services.race_data_sync_results import (
     apply_data_sync_result_observation,
 )
@@ -23,6 +27,13 @@ def _sha(value) -> str:
     ).hexdigest()
 
 
+@override_settings(
+    RACE_DATA_SYNC_ENABLED_PROVIDERS=("the_racing_api", "jra"),
+    RACE_DATA_SYNC_ENABLED_REGIONS=("japan_jra",),
+    RACE_DATA_SYNC_ENABLED_FIELDS=_ROSTER_ALLOWED_FIELDS,
+    RACE_DATA_SYNC_ENABLED_DATA_KINDS=("result",),
+    RACE_LIVE_TRA_REGISTRY_SHA256="a" * 64,
+)
 class RaceDataSyncResultApplicationTests(TestCase):
     def setUp(self):
         self.event = models.RaceEvent.objects.create(
@@ -49,12 +60,24 @@ class RaceDataSyncResultApplicationTests(TestCase):
             event=self.event,
             tracking_enabled=True,
         )
+        self.roster = build_race_data_provider_roster(configuration_only=True)
         self.source = self._source(
             "the_racing_api", "licensed_api", "api-result"
         )
+        for runner_id, name, number in (
+            ("horse-1", "Alpha", "1"),
+            ("horse-2", "Beta", "2"),
+        ):
+            models.RaceEventRunner.objects.create(
+                event=self.event,
+                external_runner_id=runner_id,
+                horse_name=name,
+                horse_number=number,
+                source_refs={self.source.source_key: runner_id},
+            )
 
     def _source(self, source_key, source_class, external_id):
-        return models.RaceResultSourceIdentity.objects.create(
+        source = models.RaceResultSourceIdentity.objects.create(
             event=self.event,
             source_key=source_key,
             region_code="japan_jra",
@@ -63,19 +86,55 @@ class RaceDataSyncResultApplicationTests(TestCase):
             review_status=models.RaceLiveReviewStatus.APPROVED,
             terms_status=models.RaceSourceTermsStatus.APPROVED,
             automation_allowed=True,
+            valid_until=NOW + timedelta(days=30),
+            registry_digest=self.roster.registry_digest,
             identity_fields={"source_class": source_class},
         )
+        for runner in models.RaceEventRunner.objects.filter(event=self.event):
+            refs = runner.source_refs if isinstance(runner.source_refs, dict) else {}
+            refs[source_key] = runner.external_runner_id
+            runner.source_refs = refs
+            runner.save(update_fields=("source_refs", "updated_at"))
+        return source
 
-    def _observation(self, source, source_class, rows, *, observed_at=NOW):
+    def _observation(
+        self,
+        source,
+        source_class,
+        rows,
+        *,
+        observed_at=NOW,
+        race_status="complete",
+        result_phase=models.RaceResultPhase.OFFICIAL,
+        provenance_overrides=None,
+    ):
         payload = {
             "external_race_id": source.external_race_id,
             "off_time": self.event.race_datetime.isoformat(),
             "region": "japan_jra",
             "course": "Tokyo",
             "race_name": "Data Sync Result",
-            "race_status": "complete",
+            "race_status": race_status,
             "participants": rows,
         }
+        field_provenance = {
+            "provider": source.source_key,
+            "region": source.region_code,
+            "source_class": source_class,
+            "registry_digest": self.roster.registry_digest,
+            "contract_version": next(
+                entry.contract_version
+                for entry in self.roster.entries
+                if entry.provider == source.source_key
+            ),
+            "contract_digest": next(
+                entry.contract_digest
+                for entry in self.roster.entries
+                if entry.provider == source.source_key
+            ),
+            "automation_allowed": True,
+        }
+        field_provenance.update(provenance_overrides or {})
         return models.RaceResultObservation.objects.create(
             source_identity=source,
             observed_at=observed_at,
@@ -83,13 +142,9 @@ class RaceDataSyncResultApplicationTests(TestCase):
             parser_version="test-v1",
             raw_sha256=_sha(payload),
             normalized_sha256=_sha(payload),
-            result_phase=models.RaceResultPhase.OFFICIAL,
+            result_phase=result_phase,
             normalized_payload=payload,
-            field_provenance={
-                "provider": source.source_key,
-                "source_class": source_class,
-                "automation_allowed": True,
-            },
+            field_provenance=field_provenance,
         )
 
     def _claim_guard(
@@ -364,3 +419,124 @@ class RaceDataSyncResultApplicationTests(TestCase):
             self.event.results.get(finish_position=1).horse_name,
             "Corrected Alpha",
         )
+
+    def test_provisional_complete_roster_is_recorded_without_public_projection(self):
+        observation = self._observation(
+            self.source,
+            "licensed_api",
+            self._rows(),
+            race_status="running",
+            result_phase=models.RaceResultPhase.PROVISIONAL,
+        )
+
+        decision = apply_data_sync_result_observation(
+            observation_id=observation.pk,
+            expected_event_id=self.event.pk,
+            now=NOW,
+            project_current=True,
+            correction_apply_enabled=True,
+        )
+
+        self.assertEqual(decision.action, "recorded")
+        self.assertFalse(decision.projected)
+        self.assertFalse(models.RaceEventResult.objects.exists())
+        self.control.refresh_from_db()
+        self.assertEqual(
+            self.control.last_provisional_result_revision_id,
+            decision.revision_id,
+        )
+        self.assertIsNone(self.control.current_result_revision_id)
+
+    def test_official_phase_without_registered_terminal_marker_is_rejected(self):
+        observation = self._observation(
+            self.source,
+            "licensed_api",
+            self._rows(),
+            race_status="running",
+        )
+
+        decision = apply_data_sync_result_observation(
+            observation_id=observation.pk,
+            expected_event_id=self.event.pk,
+            now=NOW,
+            project_current=True,
+            correction_apply_enabled=True,
+        )
+
+        self.assertEqual(decision.reason_code, "terminal_marker_missing")
+        self.assertFalse(models.RaceEventRevision.objects.exists())
+
+    def test_partial_terminal_result_cannot_replace_existing_public_result(self):
+        baseline = self._observation(
+            self.source, "licensed_api", self._rows()
+        )
+        applied = apply_data_sync_result_observation(
+            observation_id=baseline.pk,
+            expected_event_id=self.event.pk,
+            now=NOW,
+            project_current=True,
+            correction_apply_enabled=True,
+        )
+        partial = self._observation(
+            self.source,
+            "licensed_api",
+            self._rows(first_name="Partial Alpha")[:1],
+            observed_at=NOW + timedelta(minutes=1),
+        )
+
+        decision = apply_data_sync_result_observation(
+            observation_id=partial.pk,
+            expected_event_id=self.event.pk,
+            now=NOW + timedelta(minutes=1),
+            project_current=True,
+            correction_apply_enabled=True,
+        )
+
+        self.assertEqual(decision.reason_code, "result_roster_incomplete")
+        self.control.refresh_from_db()
+        self.assertEqual(self.control.current_result_revision_id, applied.revision_id)
+        self.assertEqual(
+            self.event.results.get(finish_position=1).horse_name,
+            "Alpha",
+        )
+
+    def test_expired_source_contract_is_rejected_at_apply_time(self):
+        observation = self._observation(
+            self.source, "licensed_api", self._rows()
+        )
+        self.source.valid_until = NOW
+        self.source.save(update_fields=("valid_until", "updated_at"))
+
+        decision = apply_data_sync_result_observation(
+            observation_id=observation.pk,
+            expected_event_id=self.event.pk,
+            now=NOW,
+            project_current=True,
+            correction_apply_enabled=True,
+        )
+
+        self.assertEqual(decision.reason_code, "source_contract_mismatch")
+        self.assertFalse(models.RaceEventRevision.objects.exists())
+
+    def test_registry_and_contract_drift_are_rejected_at_apply_time(self):
+        for key in ("registry_digest", "contract_digest"):
+            with self.subTest(key=key):
+                observation = self._observation(
+                    self.source,
+                    "licensed_api",
+                    self._rows(),
+                    provenance_overrides={key: "f" * 64},
+                )
+                decision = apply_data_sync_result_observation(
+                    observation_id=observation.pk,
+                    expected_event_id=self.event.pk,
+                    now=NOW,
+                    project_current=True,
+                    correction_apply_enabled=True,
+                )
+                self.assertEqual(
+                    decision.reason_code,
+                    "source_contract_mismatch",
+                )
+                observation.delete()
+                self.assertFalse(models.RaceEventRevision.objects.exists())

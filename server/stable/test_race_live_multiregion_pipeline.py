@@ -58,6 +58,9 @@ class TheRacingApiRegistryV2ContractTests(SimpleTestCase):
                     "limit": [50],
                     "skip": list(range(0, 500, 50)),
                 },
+                "result_by_id": {
+                    "path": "/v1/results/{race_id}",
+                },
             },
         )
 
@@ -86,6 +89,17 @@ class TheRacingApiRegistryV2ContractTests(SimpleTestCase):
                 "https://api.theracingapi.com/v1/racecards/free"
                 "?day=today&region_codes=fr&limit=500&skip=0"
             ),
+        )
+        self.assertEqual(
+            builder(
+                registry=payload,
+                route_name="result_by_id",
+                region=models.RacingRegion.JAPAN,
+                race_id="jp-race:2026-11",
+                limit=0,
+                skip=0,
+            ),
+            "https://api.theracingapi.com/v1/results/jp-race:2026-11",
         )
         self.assertEqual(
             builder(
@@ -304,7 +318,7 @@ class RaceLiveTimezoneAndRacecardRefreshContractTests(SimpleTestCase):
                 "skip": 0,
             }
         )
-        self.assertEqual(racecard.races[0]["participants"][0]["status"], "declared")
+        self.assertNotIn("status", racecard.races[0]["participants"][0])
 
 
 class RaceLiveRegionResultsSnapshotContractTests(SimpleTestCase):
@@ -740,7 +754,7 @@ class RaceLiveRegistryImageContractTests(SimpleTestCase):
         ).hexdigest()
         self.assertEqual(
             registry_sha,
-            "24981f62e30e83e58fc82d4247560af35e4041b05857c287bd64430d0f2e2ecc",
+            "3bac3b644c631ed165b8430343822b2c70c5a88c5036b63dcb557c83c0e0a6da",
         )
         for relative_path in (
             ".env.example",

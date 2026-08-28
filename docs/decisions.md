@@ -3114,3 +3114,22 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
 - 历史修复采用 preview canonical manifest SHA + apply 事务锁/CAS，两阶段绑定全部 claimed 行；任一漂移
   整批零写。收口状态使用 `failed/stale_claim_reconciled`，不使用会误示“没有目标”的 `noop`。
 - 自动收口只解决运行记录泄漏，不触发重跑。具体 slot 的 retry 是独立运维动作，沿用现有显式入口与门禁。
+
+# 2026-08-28 PR #108 赛果、出马表与生命周期发布门禁收紧
+
+- The Racing API 当日列表只有返回 registry 登记的 terminal marker 才能形成正式赛果；无 marker 的完整
+  行只保存 provisional revision，不移动 current 或公开投影。赛后第 1 至 7 天只使用受审精确路由
+  `/v1/results/{race_id}`，404 作为明确 not-found，禁止猜测其他历史 endpoint。
+- 地区/日期批量 racecard 与 results 使用数据库 single-flight 和 150 秒 complete TTL 共享完整快照；必须
+  完成全部分页后才发布 manifest，缺页或预算不足整份拒绝。容量由快照 owner 预留一次，event waiter
+  只消费已完成 artifact，不能逐赛事重复扣减整批请求预算。
+- 正式/更正赛果必须覆盖 canonical runner 全集且每行都是终态。优先要求已有来源 runner ID 精确相等；
+  对仅提供赛果的 fallback，只有 runner 数量、马号与 NFKC 规范化马名构成无歧义全双射时，才在同一
+  投影事务原子补充该来源 runner ID。缺行、多解、重复或非终态全部 fail closed。
+- data-sync 纳管不再隐式把 lifecycle 切为 `enforce`，也不清除人工暂停；新 control 从 `off` 建立，已有
+  mode、pause 和 refresh 原样保留。所有相关写路径统一使用 lifecycle control -> event 的锁顺序。
+- T+30 未确认只创建 `data_sync_event` incident，监控任务走普通 `celery`，不派发邮件或旧
+  `race_live` 消息。配置审计的 `ready` 只证明 allowlist、route、policy、registry 与容量完整，不要求
+  运行开关已打开。
+- schedule/racecard/result canonical apply 都必须在网络之后、事务内重新验证来源 review/terms、有效期、
+  registry、contract、region/namespace 和 exact claim；观察创建成功不能替代写入时准入。

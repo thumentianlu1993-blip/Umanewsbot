@@ -136,6 +136,9 @@ class TheRacingApiFreeSourceProofTests(SimpleTestCase):
                     "limit": [50],
                     "skip": list(range(0, 500, 50)),
                 },
+                "result_by_id": {
+                    "path": "/v1/results/{race_id}",
+                },
             },
         }
         payload.update(overrides)

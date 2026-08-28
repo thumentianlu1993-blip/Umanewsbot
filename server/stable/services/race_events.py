@@ -28,6 +28,7 @@ from stable.models import (
     RaceEventDataQuality,
     RaceEventHistoryWinner,
     RaceEventLiveState,
+    RaceEventLifecycleControl,
     RaceLiveHostBudget,
     RaceEventLiveTracking,
     RaceEventModule,
@@ -4523,6 +4524,9 @@ def apply_race_live_racecard_refresh(
 
     with transaction.atomic():
         try:
+            RaceEventLifecycleControl.objects.select_for_update().filter(
+                event_id=event_id
+            ).first()
             event = RaceEvent.objects.select_for_update().get(pk=event_id)
             control = RaceEventProjectionControl.objects.select_for_update().get(
                 event_id=event_id

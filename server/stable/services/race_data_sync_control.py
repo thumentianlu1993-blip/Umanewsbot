@@ -30,6 +30,9 @@ _COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 _TOKEN_RE = re.compile(r"^[A-Za-z0-9._:-]{1,64}$")
 _SNAPSHOT_COMPLETE_TTL_SECONDS = 150
 _REVIEWED_ARTIFACT_MAX_BYTES = 1024 * 1024
+_DATA_KIND_ORDER = {
+    value: index for index, value in enumerate(models.RaceDataSyncDataKind.values)
+}
 _LEGACY_TRANSFER_RUNTIME_SWITCHES = (
     "RACE_LIVE_SCHEDULER_ENABLED",
     "RACE_LIVE_MONITOR_ENABLED",
@@ -76,6 +79,27 @@ class LockedRaceDataSyncClaim:
     tracking: models.RaceEventLiveTracking
     enrollment: models.RaceDataSyncEnrollment
     checkpoints: tuple[models.RaceEventLiveProviderCheckpoint, ...]
+
+
+def _checkpoint_plan_payload(
+    checkpoints: Iterable[models.RaceEventLiveProviderCheckpoint],
+) -> tuple[dict[str, str | int], ...]:
+    ordered = sorted(
+        checkpoints,
+        key=lambda row: (
+            row.source_key,
+            _DATA_KIND_ORDER.get(row.data_kind, len(_DATA_KIND_ORDER)),
+            row.data_kind,
+        ),
+    )
+    return tuple(
+        {
+            "source_key": row.source_key,
+            "data_kind": row.data_kind,
+            "lock_version": row.lock_version,
+        }
+        for row in ordered
+    )
 
 
 def _claim_plan_sha256(
@@ -249,14 +273,7 @@ def lock_and_validate_race_data_sync_claim_for_apply(
         )
         .order_by("source_key", "data_kind")
     )
-    current_plan = tuple(
-        {
-            "source_key": checkpoint.source_key,
-            "data_kind": checkpoint.data_kind,
-            "lock_version": checkpoint.lock_version,
-        }
-        for checkpoint in checkpoints
-    )
+    current_plan = _checkpoint_plan_payload(checkpoints)
     if current_plan != frozen_plan:
         return (
             ControlDecision(
@@ -269,7 +286,24 @@ def lock_and_validate_race_data_sync_claim_for_apply(
         )
     return (
         ControlDecision("valid", "", claim.event_id, tracking.claim_generation),
-        LockedRaceDataSyncClaim(event, control, tracking, enrollment, checkpoints),
+        LockedRaceDataSyncClaim(
+            event,
+            control,
+            tracking,
+            enrollment,
+            tuple(
+                sorted(
+                    checkpoints,
+                    key=lambda row: (
+                        row.source_key,
+                        _DATA_KIND_ORDER.get(
+                            row.data_kind, len(_DATA_KIND_ORDER)
+                        ),
+                        row.data_kind,
+                    ),
+                )
+            ),
+        ),
     )
 
 
@@ -399,6 +433,13 @@ def acquire_enrollment(
     normalized_kinds = _normalize_data_kinds(data_kinds)
 
     with transaction.atomic():
+        # Global lock graph: lifecycle control precedes the event row.  The row
+        # may legitimately be absent for a newly enrolled event.
+        locked_lifecycle = (
+            models.RaceEventLifecycleControl.objects.select_for_update()
+            .filter(event_id=event_id)
+            .first()
+        )
         event = (
             models.RaceEvent.objects.select_for_update(of=("self",))
             .filter(pk=event_id)
@@ -576,21 +617,17 @@ def acquire_enrollment(
                         "registry_digest",
                         "updated_at",
                     )
-                    )
-        lifecycle, _ = models.RaceEventLifecycleControl.objects.select_for_update().get_or_create(
-            event=event,
-            defaults={
-                "mode": models.RaceEventLifecycleMode.ENFORCE,
-                "schedule_generation": 1,
-                "next_refresh_at": event.race_datetime or now,
-                "enrollment_manifest_sha256": manifest_sha256,
-                "manifest_data": {},
-            },
-        )
-        lifecycle.mode = models.RaceEventLifecycleMode.ENFORCE
-        if lifecycle.schedule_generation < 1:
-            lifecycle.schedule_generation = 1
-        lifecycle.next_refresh_at = event.race_datetime or now
+                )
+        lifecycle = locked_lifecycle
+        if lifecycle is None:
+            lifecycle = models.RaceEventLifecycleControl.objects.create(
+                event=event,
+                mode=models.RaceEventLifecycleMode.OFF,
+                schedule_generation=1,
+                next_refresh_at=None,
+                enrollment_manifest_sha256=manifest_sha256,
+                manifest_data={},
+            )
         lifecycle.enrollment_manifest_sha256 = manifest_sha256
         lifecycle.manifest_data = {
             **(
@@ -603,8 +640,13 @@ def acquire_enrollment(
                 "owner_generation": next_generation,
             },
         }
-        lifecycle.manual_pause_reason = ""
-        lifecycle.save()
+        lifecycle.save(
+            update_fields=(
+                "enrollment_manifest_sha256",
+                "manifest_data",
+                "updated_at",
+            )
+        )
         return ControlDecision("acquired", "", event_id, next_generation)
 
 
@@ -834,6 +876,11 @@ def disenroll(
     _require_aware(now, "now")
     _require_sha(expected_manifest_sha256, "expected_manifest_sha256")
     with transaction.atomic():
+        lifecycle = (
+            models.RaceEventLifecycleControl.objects.select_for_update()
+            .filter(event_id=event_id)
+            .first()
+        )
         event = (
             models.RaceEvent.objects.select_for_update(of=("self",))
             .filter(pk=event_id)
@@ -919,13 +966,20 @@ def disenroll(
         enrollment.save(
             update_fields=("state", "reason_code", "retired_at", "updated_at")
         )
-        models.RaceEventLifecycleControl.objects.filter(event=event).update(
-            mode=models.RaceEventLifecycleMode.OFF,
-            next_refresh_at=None,
-            claim_token="",
-            claim_expires_at=None,
-            updated_at=now,
-        )
+        if lifecycle is not None:
+            lifecycle.mode = models.RaceEventLifecycleMode.OFF
+            lifecycle.next_refresh_at = None
+            lifecycle.claim_token = ""
+            lifecycle.claim_expires_at = None
+            lifecycle.save(
+                update_fields=(
+                    "mode",
+                    "next_refresh_at",
+                    "claim_token",
+                    "claim_expires_at",
+                    "updated_at",
+                )
+            )
         return ControlDecision(
             "released", "", event_id, control.owner_generation
         )
@@ -1786,14 +1840,7 @@ def claim_due_enrollments(
                     "updated_at",
                 )
             )
-            checkpoint_plan = tuple(
-                {
-                    "source_key": row.source_key,
-                    "data_kind": row.data_kind,
-                    "lock_version": row.lock_version,
-                }
-                for row in checkpoint_rows
-            )
+            checkpoint_plan = _checkpoint_plan_payload(checkpoint_rows)
             plan_sha256 = _claim_plan_sha256(
                 event_id=tracking.event_id,
                 enrollment_generation=enrollment.enrollment_generation,
@@ -1957,14 +2004,7 @@ def fail_race_data_sync_claim(
                 tracking.claim_generation,
             )
         if frozen_plan:
-            current_plan = tuple(
-                {
-                    "source_key": checkpoint.source_key,
-                    "data_kind": checkpoint.data_kind,
-                    "lock_version": checkpoint.lock_version,
-                }
-                for checkpoint in checkpoints
-            )
+            current_plan = _checkpoint_plan_payload(checkpoints)
             if current_plan != frozen_plan:
                 return ControlDecision(
                     "rejected",
@@ -2126,14 +2166,7 @@ def complete_race_data_sync_claim(
             )
             .order_by("source_key", "data_kind")
         )
-        current_plan = tuple(
-            {
-                "source_key": checkpoint.source_key,
-                "data_kind": checkpoint.data_kind,
-                "lock_version": checkpoint.lock_version,
-            }
-            for checkpoint in checkpoints
-        )
+        current_plan = _checkpoint_plan_payload(checkpoints)
         if current_plan != frozen_plan:
             return ControlDecision(
                 "rejected", "checkpoint_cas_stale", event_id, tracking.claim_generation
@@ -2258,6 +2291,18 @@ def build_snapshot_cache_key(
     return f"race-data-snapshot-v1:{hashlib.sha256(encoded).hexdigest()}"
 
 
+def _aware_iso_datetime_or_none(value: object) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
+    return parsed
+
+
 def _snapshot_manifest_valid(
     *,
     manifest: object,
@@ -2274,6 +2319,7 @@ def _snapshot_manifest_valid(
             "cache_key",
             "artifact_sha256",
             "registry_digest",
+            "fetched_at",
             "page_count",
             "item_count",
         }
@@ -2282,6 +2328,8 @@ def _snapshot_manifest_valid(
         and manifest.get("cache_key") == cache_key
         and manifest.get("artifact_sha256") == artifact_sha256
         and manifest.get("registry_digest") == registry_digest
+        and isinstance(manifest.get("fetched_at"), str)
+        and _aware_iso_datetime_or_none(manifest.get("fetched_at")) is not None
         and type(manifest.get("page_count")) is int
         and manifest["page_count"] >= 1
         and type(manifest.get("item_count")) is int

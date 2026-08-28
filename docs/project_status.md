@@ -2947,3 +2947,17 @@ P0 马信息补全专项的模型交接文档见
   本 change 新键尚未配置。磁盘可用 `12,211,531,776` bytes 且主 checkout 有 1,710 项历史 dirty，必须使用
   隔离 release 和 8 GiB min-free 容量门禁。
   旧 `race_live` 7,543 条遗留消息明确不在本次范围。
+
+# 2026-08-28 PR #108 进入第二轮独立复审前状态
+
+- 历史 claim 防复发、精确 preview/apply 修复包和首轮全量审查的 11 项问题均已有代码与测试；新增
+  exact result route、完整分页共享快照、provisional 非公开、终态 roster 守恒、immutable racecard、
+  lifecycle 保留语义、T+30 普通队列 incident 和事务内来源合同重验。
+- 额外人工复核修正了 fallback 首次来源身份无法使用的问题：只有 canonical runner 与结果行形成完整、
+  无歧义双射时才原子绑定，不降低缺行/多解门禁。
+- 当前仍是 PR OPEN、生产未改动、schema 0073、新写入关闭、历史 14 条 claimed 未处理、旧
+  `race_live=7543` 保持原样。完成组合回归、第二轮独立 review 和 push 后，先执行已授权的备份与历史
+  claim 收口，再请求最终合并/部署/启用确认。
+- 返修组合回归已达到 SQLite `190/190`、PostgreSQL `214/214`；静态、migration、Compose、digest、
+  secret pattern 与关闭态 `ready/would_write=false` 审计全部通过。当前下一步收敛为提交/push 与第二轮
+  独立 review，仍不代表已部署。

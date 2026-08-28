@@ -79,6 +79,12 @@
   terminal/finished 或 manifest 漂移时整批零写。
 - [x] (integration) 新增 SQLite 契约与 PostgreSQL sweeper×迟到 worker/manifest×新 claim 并发测试；本变更
   聚焦套件 SQLite 232/232、PostgreSQL 28/28 通过。
+- [x] (application) 首轮全量复审 11 项阻断和后续人工复核边界全部修复；最终赛事数据组合套件 SQLite
+  190/190、同范围 PostgreSQL（含并发）214/214 通过。
+- [x] (operations) 返修后 Django check、migration drift、compileall、Compose 三配置、JSON/digest、
+  diff 和 literal secret pattern 门禁通过；全开配置/运行开关全关审计为 `ready/would_write=false`。
+- [ ] (operations) 提交并 push 返修候选，运行第二轮独立 `codex review --base origin/main`，有效发现归零后
+  再进入生产备份与历史 claim 收口。
 
 ## 最终生产发布
 

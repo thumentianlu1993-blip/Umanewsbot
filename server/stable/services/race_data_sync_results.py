@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 import hashlib
 import json
+import unicodedata
 from typing import Any
 
 from django.db import transaction
@@ -19,6 +20,23 @@ from stable.services.race_data_sync_policy import (
     normalize_source_class,
 )
 from stable.services.race_event_public_cache import invalidate_public_race_cache
+
+
+_TERMINAL_RESULT_STATUSES = frozenset(
+    {
+        models.RaceEventRevisionItemStatus.FINISHED,
+        models.RaceEventRevisionItemStatus.DEAD_HEAT,
+        models.RaceEventRevisionItemStatus.SCRATCHED,
+        models.RaceEventRevisionItemStatus.WITHDRAWN,
+        models.RaceEventRevisionItemStatus.NON_RUNNER,
+        models.RaceEventRevisionItemStatus.DISQUALIFIED,
+        models.RaceEventRevisionItemStatus.DID_NOT_FINISH,
+        models.RaceEventRevisionItemStatus.PULLED_UP,
+        models.RaceEventRevisionItemStatus.UNSEATED_RIDER,
+        models.RaceEventRevisionItemStatus.FELL,
+        models.RaceEventRevisionItemStatus.REFUSED,
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -111,6 +129,76 @@ def _normalize_result_rows(payload: object) -> tuple[dict[str, Any], ...]:
     return tuple(normalized)
 
 
+def _source_runner_id(
+    *, runner: models.RaceEventRunner, source: models.RaceResultSourceIdentity
+) -> str:
+    refs = runner.source_refs if isinstance(runner.source_refs, dict) else {}
+    direct = str(refs.get(source.source_key) or "").strip()
+    if direct:
+        return direct
+    if refs.get("source_key") == source.source_key:
+        return str(refs.get("external_runner_id") or "").strip()
+    return ""
+
+
+def _identity_text(value: object) -> str:
+    return " ".join(
+        unicodedata.normalize("NFKC", str(value or "")).split()
+    ).casefold()
+
+
+def _result_roster_mapping(
+    *,
+    event: models.RaceEvent,
+    source: models.RaceResultSourceIdentity,
+    rows: tuple[dict[str, Any], ...],
+) -> tuple[tuple[dict[str, Any], models.RaceEventRunner], ...] | None:
+    runners = list(
+        models.RaceEventRunner.objects.select_for_update()
+        .filter(event=event)
+        .order_by("id")
+    )
+    if not runners or len(runners) != len(rows) or any(
+        row["status"] not in _TERMINAL_RESULT_STATUSES for row in rows
+    ):
+        return None
+    direct: dict[str, models.RaceEventRunner] = {}
+    for runner in runners:
+        external_runner_id = _source_runner_id(runner=runner, source=source)
+        if not external_runner_id:
+            continue
+        if external_runner_id in direct:
+            return None
+        direct[external_runner_id] = runner
+    assigned: set[int] = set()
+    mapping: list[tuple[dict[str, Any], models.RaceEventRunner]] = []
+    for row in rows:
+        runner = direct.get(row["external_runner_id"])
+        if runner is None:
+            number = str(row.get("number") or "").strip()
+            name = _identity_text(row.get("horse_name"))
+            if not number or not name:
+                return None
+            candidates = [
+                candidate
+                for candidate in runners
+                if candidate.pk not in assigned
+                and not _source_runner_id(runner=candidate, source=source)
+                and str(candidate.horse_number or "").strip() == number
+                and _identity_text(candidate.horse_name) == name
+            ]
+            if len(candidates) != 1:
+                return None
+            runner = candidates[0]
+        if runner.pk in assigned:
+            return None
+        assigned.add(runner.pk)
+        mapping.append((row, runner))
+    if len(assigned) != len(runners):
+        return None
+    return tuple(mapping)
+
+
 def apply_data_sync_result_observation(
     *,
     observation_id: int,
@@ -123,6 +211,13 @@ def apply_data_sync_result_observation(
     if timezone.is_naive(now):
         raise ValueError("now must be timezone-aware")
     with transaction.atomic():
+        # Lifecycle-control-before-event is the shared lock graph used by the
+        # lifecycle worker and all data-sync canonical projections.
+        lifecycle = (
+            models.RaceEventLifecycleControl.objects.select_for_update()
+            .filter(event_id=expected_event_id)
+            .first()
+        )
         locked_claim = None
         if claim_guard is not None:
             claim_decision, locked_claim = (
@@ -170,10 +265,36 @@ def apply_data_sync_result_observation(
         candidate_source_class = normalize_source_class(
             provenance.get("source_class")
         )
+        from stable.services.race_data_sync_pipeline import (
+            build_race_data_provider_roster,
+        )
+
+        roster = build_race_data_provider_roster(configuration_only=True)
+        roster_entry = next(
+            (
+                entry
+                for entry in roster.entries
+                if entry.provider == source.source_key
+                and source.region_code in entry.regions
+                and source.identity_namespace in entry.identity_namespaces
+                and models.RaceDataSyncDataKind.RESULT in entry.data_kinds
+            ),
+            None,
+        )
         if (
             provenance.get("provider") != source.source_key
             or not candidate_source_class
             or provenance.get("automation_allowed") is not True
+            or roster_entry is None
+            or candidate_source_class != roster_entry.source_class
+            or source.terms_status != models.RaceSourceTermsStatus.APPROVED
+            or source.valid_until is None
+            or source.valid_until <= now
+            or source.registry_digest != roster.registry_digest
+            or provenance.get("region") != source.region_code
+            or provenance.get("registry_digest") != roster.registry_digest
+            or provenance.get("contract_version") != roster_entry.contract_version
+            or provenance.get("contract_digest") != roster_entry.contract_digest
         ):
             return DataSyncResultApplyDecision("rejected", "source_contract_mismatch")
         try:
@@ -199,6 +320,29 @@ def apply_data_sync_result_observation(
             return DataSyncResultApplyDecision("rejected", "projection_subject_missing")
         if control.write_owner != models.RaceEventProjectionWriteOwner.DATA_SYNC:
             return DataSyncResultApplyDecision("rejected", "writer_owner_conflict")
+        race_status = str(
+            observation.normalized_payload.get("race_status") or ""
+        ).strip().casefold()
+        terminal_marker = race_status in {
+            value.casefold() for value in roster_entry.terminal_markers
+        }
+        terminal_phase = observation.result_phase in {
+            models.RaceResultPhase.OFFICIAL,
+            models.RaceResultPhase.CORRECTED,
+        }
+        if terminal_phase and not terminal_marker:
+            return DataSyncResultApplyDecision("rejected", "terminal_marker_missing")
+        roster_mapping = None
+        if terminal_phase:
+            roster_mapping = _result_roster_mapping(
+                event=event,
+                source=source,
+                rows=rows,
+            )
+            if roster_mapping is None:
+                return DataSyncResultApplyDecision(
+                    "rejected", "result_roster_incomplete"
+                )
         manual_locks = (
             event.manual_lock_flags
             if isinstance(event.manual_lock_flags, dict)
@@ -263,10 +407,25 @@ def apply_data_sync_result_observation(
             )
         revision_no = control.next_result_revision_no
         phase = (
-            models.RaceResultPhase.CORRECTED
+            models.RaceResultPhase.PROVISIONAL
+            if observation.result_phase == models.RaceResultPhase.PROVISIONAL
+            else models.RaceResultPhase.CORRECTED
             if current is not None
             else models.RaceResultPhase.OFFICIAL
         )
+        may_project = bool(terminal_phase and project_current and arbitration.apply)
+        if may_project:
+            assert roster_mapping is not None
+            for row, runner in roster_mapping:
+                runner.source_refs = {
+                    **(
+                        runner.source_refs
+                        if isinstance(runner.source_refs, dict)
+                        else {}
+                    ),
+                    source.source_key: row["external_runner_id"],
+                }
+                runner.save(update_fields=("source_refs", "updated_at"))
         revision = models.RaceEventRevision.objects.create(
             event=event,
             kind=models.RaceEventRevisionKind.RESULT,
@@ -277,9 +436,29 @@ def apply_data_sync_result_observation(
             decision_reason=arbitration.reason_code,
             primary_observation=observation,
             supersedes=current if arbitration.apply else None,
-            published_at=now if project_current and arbitration.apply else None,
-            official_confirmed_at=now if project_current and arbitration.apply else None,
+            published_at=now if may_project else None,
+            official_confirmed_at=now if may_project else None,
         )
+        if may_project:
+            models.RaceEventRevisionPublication.objects.create(
+                revision=revision,
+                published_at=now,
+                reason="data_sync_result",
+                policy_versions=[
+                    [
+                        "race_data_sync_contract",
+                        roster_entry.contract_version,
+                        1,
+                    ]
+                ],
+                allowlist_version=1,
+                registry_digest=roster.registry_digest,
+                coverage_proof_digest=observation.normalized_sha256,
+                authorization_kind=(
+                    models.RaceLivePublicationAuthorizationKind.OFFICIAL_ROUTE
+                ),
+                official_authorization_version=0,
+            )
         control.next_result_revision_no += 1
         for internal_order, row in enumerate(rows, start=1):
             stable_key = (
@@ -325,7 +504,7 @@ def apply_data_sync_result_observation(
             role="primary",
         )
 
-        projected = bool(project_current and arbitration.apply)
+        projected = may_project
         if projected:
             models.RaceEventResult.objects.filter(event=event).delete()
             legacy_results = []
@@ -382,9 +561,6 @@ def apply_data_sync_result_observation(
                 updated_at=now,
             )
             if event_before_status != models.RaceEventStatus.FINISHED:
-                lifecycle = models.RaceEventLifecycleControl.objects.filter(
-                    event=event
-                ).first()
                 models.RaceEventLifecycleTransition.objects.get_or_create(
                     dedupe_key=f"data-sync-result:{event.pk}:{revision.pk}:finished",
                     defaults={
@@ -410,6 +586,8 @@ def apply_data_sync_result_observation(
                     },
                 )
             transaction.on_commit(invalidate_public_race_cache)
+        if phase == models.RaceResultPhase.PROVISIONAL:
+            control.last_provisional_result_revision = revision
         control.save(
             update_fields=(
                 "next_result_revision_no",

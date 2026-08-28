@@ -4,7 +4,9 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 import hashlib
 import json
+import os
 from pathlib import Path
+import stat
 import time
 from typing import Any, Callable
 from zoneinfo import ZoneInfo
@@ -14,7 +16,13 @@ from django.db import transaction
 from django.utils import timezone
 
 from stable import models
-from stable.services.race_data_sync_control import RaceDataSyncClaim
+from stable.services.race_data_sync_control import (
+    RaceDataSyncClaim,
+    build_snapshot_cache_key,
+    claim_snapshot_lease,
+    fail_snapshot_lease,
+    publish_snapshot,
+)
 from stable.services.race_data_sync_pipeline import (
     RaceDataResolvedRoute,
     RaceDataSyncFlags,
@@ -49,6 +57,7 @@ from stable.services.race_live_source_proof import (
 
 _HOST = "api.theracingapi.com"
 _MAX_RESPONSE_BYTES = 2 * 1024 * 1024
+_SNAPSHOT_LEASE_TTL_SECONDS = 120
 _REFERENCE_SOURCE_KEYS = {
     "sporting_life": "reference_sporting_life",
     "zeturf": "reference_zeturf",
@@ -86,6 +95,231 @@ class _ProviderSyncError(Exception):
     def __init__(self, reason_code: str):
         super().__init__(reason_code)
         self.reason_code = reason_code
+
+
+def _snapshot_artifact_root() -> Path:
+    configured = tuple(
+        Path(str(value))
+        for value in getattr(settings, "RACE_DATA_RAW_ARTIFACT_ROOTS", ())
+        if str(value)
+    )
+    if not configured:
+        raise _ProviderSyncError("artifact_root_not_configured")
+    root = configured[0]
+    try:
+        root_stat = root.lstat()
+    except OSError as exc:
+        raise _ProviderSyncError("artifact_root_unavailable") from exc
+    if root.is_symlink() or not stat.S_ISDIR(root_stat.st_mode):
+        raise _ProviderSyncError("artifact_root_unsafe")
+    snapshots = root / "snapshots"
+    try:
+        snapshots.mkdir(mode=0o700, exist_ok=True)
+        snapshot_stat = snapshots.lstat()
+    except OSError as exc:
+        raise _ProviderSyncError("artifact_snapshot_root_unavailable") from exc
+    if snapshots.is_symlink() or not stat.S_ISDIR(snapshot_stat.st_mode):
+        raise _ProviderSyncError("artifact_snapshot_root_unsafe")
+    return snapshots
+
+
+def _write_snapshot_artifact(
+    *, cache_key: str, owner_token: str, payload: dict[str, Any]
+) -> tuple[Path, str]:
+    try:
+        encoded = json.dumps(
+            payload,
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise _ProviderSyncError("snapshot_payload_invalid") from exc
+    max_bytes = int(getattr(settings, "RACE_DATA_RAW_MAX_UNCOMPRESSED_BYTES", 0))
+    if max_bytes <= 0 or len(encoded) > max_bytes:
+        raise _ProviderSyncError("snapshot_payload_too_large")
+    artifact_sha256 = hashlib.sha256(encoded).hexdigest()
+    root = _snapshot_artifact_root()
+    basename = hashlib.sha256(cache_key.encode()).hexdigest()
+    final_path = root / f"{basename}.json"
+    temporary_path = root / f".{basename}.{owner_token}.tmp"
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(temporary_path, flags, 0o600)
+        try:
+            with os.fdopen(descriptor, "wb", closefd=False) as handle:
+                handle.write(encoded)
+                handle.flush()
+                os.fsync(handle.fileno())
+        finally:
+            os.close(descriptor)
+        os.replace(temporary_path, final_path)
+        os.chmod(final_path, 0o600)
+    except OSError as exc:
+        try:
+            temporary_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise _ProviderSyncError("snapshot_artifact_publish_failed") from exc
+    return final_path, artifact_sha256
+
+
+def _read_snapshot_artifact(*, manifest: dict[str, Any]) -> tuple[dict[str, Any], str]:
+    cache_key = manifest.get("cache_key")
+    artifact_sha256 = manifest.get("artifact_sha256")
+    if not isinstance(cache_key, str) or not isinstance(artifact_sha256, str):
+        raise _ProviderSyncError("snapshot_manifest_invalid")
+    root = _snapshot_artifact_root().resolve()
+    path = root / f"{hashlib.sha256(cache_key.encode()).hexdigest()}.json"
+    try:
+        resolved = path.resolve(strict=True)
+        path_stat = path.lstat()
+    except OSError as exc:
+        raise _ProviderSyncError("snapshot_artifact_missing") from exc
+    if (
+        resolved.parent != root
+        or path.is_symlink()
+        or not stat.S_ISREG(path_stat.st_mode)
+        or stat.S_IMODE(path_stat.st_mode) & 0o077
+    ):
+        raise _ProviderSyncError("snapshot_artifact_unsafe")
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(path, flags)
+        try:
+            with os.fdopen(descriptor, "rb", closefd=False) as handle:
+                encoded = handle.read(
+                    int(getattr(settings, "RACE_DATA_RAW_MAX_UNCOMPRESSED_BYTES", 0))
+                    + 1
+                )
+        finally:
+            os.close(descriptor)
+    except OSError as exc:
+        raise _ProviderSyncError("snapshot_artifact_read_failed") from exc
+    if hashlib.sha256(encoded).hexdigest() != artifact_sha256:
+        raise _ProviderSyncError("snapshot_artifact_digest_mismatch")
+    try:
+        payload = json.loads(encoded)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise _ProviderSyncError("snapshot_artifact_invalid") from exc
+    if not isinstance(payload, dict):
+        raise _ProviderSyncError("snapshot_artifact_invalid")
+    return payload, artifact_sha256
+
+
+def _get_or_fetch_shared_snapshot(
+    *,
+    provider: str,
+    region: str,
+    scope_key: str,
+    data_kind: str,
+    registry_digest: str,
+    run_id: str,
+    now: datetime,
+    proposed_requests: int,
+    clock: Callable[[], datetime],
+    fetcher: Callable[[], tuple[dict[str, Any], int, int]],
+) -> tuple[dict[str, Any], str]:
+    cache_key = build_snapshot_cache_key(
+        provider=provider,
+        region=region,
+        scope_key=scope_key,
+        data_kind=data_kind,
+        registry_digest=registry_digest,
+    )
+    owner_token = "snapshot-" + hashlib.sha256(
+        f"{run_id}:{cache_key}".encode()
+    ).hexdigest()[:48]
+    decision = claim_snapshot_lease(
+        provider=provider,
+        region=region,
+        scope_key=scope_key,
+        data_kind=data_kind,
+        registry_digest=registry_digest,
+        owner_token=owner_token,
+        now=now,
+        ttl_seconds=_SNAPSHOT_LEASE_TTL_SECONDS,
+    )
+    if decision.action == "complete":
+        lease = models.RaceDataSnapshotLease.objects.filter(
+            cache_key=cache_key,
+            state=models.RaceDataSnapshotLeaseState.COMPLETE,
+        ).first()
+        if lease is None:
+            raise _ProviderSyncError("snapshot_manifest_missing")
+        return _read_snapshot_artifact(manifest=lease.manifest_data)
+    if decision.action not in {"acquired", "replay", "taken_over"}:
+        raise _ProviderSyncError(
+            "snapshot_lease_busy"
+            if decision.action == "busy"
+            else "snapshot_lease_rejected"
+        )
+    try:
+        capacity = reserve_race_data_transport_capacity(
+            provider=provider,
+            region_code=region,
+            now=now,
+            proposed_requests=proposed_requests,
+            max_response_bytes_per_request=_MAX_RESPONSE_BYTES,
+        )
+        if not capacity.allowed:
+            raise _ProviderSyncError(capacity.reason_code)
+        payload, page_count, item_count = fetcher()
+        completed_at = _safe_clock_value(clock=clock, fallback=now)
+        _artifact_path, artifact_sha256 = _write_snapshot_artifact(
+            cache_key=cache_key,
+            owner_token=owner_token,
+            payload=payload,
+        )
+        manifest = {
+            "schema_version": 1,
+            "complete": True,
+            "cache_key": cache_key,
+            "artifact_sha256": artifact_sha256,
+            "registry_digest": registry_digest,
+            "fetched_at": completed_at.isoformat(),
+            "page_count": page_count,
+            "item_count": item_count,
+        }
+        published = publish_snapshot(
+            provider=provider,
+            region=region,
+            scope_key=scope_key,
+            data_kind=data_kind,
+            registry_digest=registry_digest,
+            owner_token=owner_token,
+            expected_generation=decision.generation,
+            artifact_sha256=artifact_sha256,
+            manifest=manifest,
+            now=completed_at,
+        )
+        if published.action != "published":
+            raise _ProviderSyncError("snapshot_publish_cas_stale")
+        return payload, artifact_sha256
+    except Exception as exc:
+        failed_at = _safe_clock_value(clock=clock, fallback=now)
+        fail_snapshot_lease(
+            provider=provider,
+            region=region,
+            scope_key=scope_key,
+            data_kind=data_kind,
+            registry_digest=registry_digest,
+            owner_token=owner_token,
+            expected_generation=decision.generation,
+            error_code=(
+                exc.reason_code
+                if isinstance(exc, _ProviderSyncError)
+                else "snapshot_fetch_failed"
+            ),
+            retry_after=failed_at + timedelta(minutes=5),
+            now=failed_at,
+        )
+        if isinstance(exc, _ProviderSyncError):
+            raise
+        raise _ProviderSyncError("snapshot_fetch_failed") from exc
 
 
 def _event_contract_region(event: models.RaceEvent) -> str:
@@ -467,6 +701,7 @@ def _fetch_json(
     now: datetime,
     clock: Callable[[], datetime],
     sleeper: Callable[[float], Any],
+    allow_not_found: bool = False,
 ) -> tuple[dict[str, Any], str]:
     request_now = _safe_clock_value(clock=clock, fallback=now)
     reservation = reserve_race_live_host_request(host=_HOST, now=request_now)
@@ -500,6 +735,17 @@ def _fetch_json(
             max_response_bytes=_MAX_RESPONSE_BYTES,
             allow_redirects=False,
         )
+        if (
+            allow_not_found
+            and response.redirect_url is None
+            and response.status_code == 404
+            and isinstance(response.body, bytes)
+            and len(response.body) <= _MAX_RESPONSE_BYTES
+        ):
+            raw_sha256 = hashlib.sha256(response.body).hexdigest()
+            success = True
+            error_code = ""
+            return {"_not_found": True}, raw_sha256
         if (
             response.redirect_url is not None
             or response.status_code != 200
@@ -975,6 +1221,32 @@ def run_persisted_official_result_data_sync(
     )
     if event is None or source is None or external_source is None:
         return ProviderSyncOutcome(False, "source_identity_missing", {}, {})
+    from stable.services.race_data_sync_pipeline import (
+        build_race_data_provider_roster,
+    )
+
+    roster = build_race_data_provider_roster(configuration_only=True)
+    roster_entry = next(
+        (
+            entry
+            for entry in roster.entries
+            if entry.provider == source.source_key
+            and source.region_code in entry.regions
+            and source.identity_namespace in entry.identity_namespaces
+            and models.RaceDataSyncDataKind.RESULT in entry.data_kinds
+        ),
+        None,
+    )
+    if (
+        roster_entry is None
+        or source.review_status != models.RaceLiveReviewStatus.APPROVED
+        or source.terms_status != models.RaceSourceTermsStatus.APPROVED
+        or source.automation_allowed is not True
+        or source.valid_until is None
+        or source.valid_until <= now
+        or source.registry_digest != roster.registry_digest
+    ):
+        return ProviderSyncOutcome(False, "source_runtime_contract_rejected", {}, {})
     race = (
         models.ExternalRace.objects.filter(
             source=external_source,
@@ -1085,9 +1357,12 @@ def run_persisted_official_result_data_sync(
         field_provenance={
             "provider": source.source_key,
             "region": source.region_code,
-            "source_class": "official_operator",
+            "source_class": roster_entry.source_class,
             "source_url": source.canonical_url,
             "external_race_pk": race.pk,
+            "registry_digest": roster.registry_digest,
+            "contract_version": roster_entry.contract_version,
+            "contract_digest": roster_entry.contract_digest,
             "automation_allowed": True,
         },
         parse_warnings=[],
@@ -1206,6 +1481,15 @@ def run_the_racing_api_data_sync(
     ).first()
     if event is None or source is None:
         return ProviderSyncOutcome(False, "source_identity_missing", {}, {})
+    if (
+        source.review_status != models.RaceLiveReviewStatus.APPROVED
+        or source.terms_status != models.RaceSourceTermsStatus.APPROVED
+        or source.automation_allowed is not True
+        or source.valid_until is None
+        or source.valid_until <= now
+        or source.registry_digest != route.registry_digest
+    ):
+        return ProviderSyncOutcome(False, "source_runtime_contract_rejected", {}, {})
     try:
         registry, registry_digest = read_the_racing_api_automation_registry(
             registry_file=settings.RACE_LIVE_TRA_REGISTRY_FILE,
@@ -1238,7 +1522,6 @@ def run_the_racing_api_data_sync(
     updated_by_kind: dict[str, datetime | None] = {}
     applied: list[str] = []
     not_found: list[str] = []
-    request_count = 0
     try:
         if {
             models.RaceDataSyncDataKind.RACE_TIME,
@@ -1267,31 +1550,50 @@ def run_the_racing_api_data_sync(
                         }
                     )
                 else:
-                    if request_count >= route.request_budget:
-                        raise _ProviderSyncError("provider_request_budget_exhausted")
                     day = "today" if day_offset == 0 else "tomorrow"
+                    provider_region = _registry_region(
+                        event_region=event.country_region,
+                        contract_region=source.region_code,
+                    )
                     url = build_the_racing_api_route_url(
                         registry=registry,
                         route_name="racecards_free",
-                        region=_registry_region(
-                            event_region=event.country_region,
-                            contract_region=source.region_code,
-                        ),
+                        region=provider_region,
                         day=day,
                         limit=500,
                         skip=0,
                     )
-                    response_payload, raw_sha256 = _fetch_json(
-                        transport=transport,
-                        endpoint_name=f"racecards_sync_{day}",
-                        url=url,
-                        username=username,
-                        password=password,
+
+                    def fetch_racecard_snapshot() -> tuple[dict[str, Any], int, int]:
+                        payload, _payload_sha256 = _fetch_json(
+                            transport=transport,
+                            endpoint_name=f"racecards_sync_{day}",
+                            url=url,
+                            username=username,
+                            password=password,
+                            now=now,
+                            clock=clock,
+                            sleeper=sleeper,
+                        )
+                        rows = payload.get("racecards")
+                        if not isinstance(rows, list):
+                            raise _ProviderSyncError("provider_response_invalid")
+                        return payload, 1, len(rows)
+
+                    response_payload, raw_sha256 = _get_or_fetch_shared_snapshot(
+                        provider=source.source_key,
+                        region=source.region_code,
+                        scope_key=(
+                            f"{event.local_date.isoformat()}:{day}:{provider_region}"
+                        ),
+                        data_kind=models.RaceDataSyncDataKind.RACECARD,
+                        registry_digest=route.registry_digest,
+                        run_id=run_id,
                         now=now,
+                        proposed_requests=1,
                         clock=clock,
-                        sleeper=sleeper,
+                        fetcher=fetch_racecard_snapshot,
                     )
-                    request_count += 1
                     snapshot = parse_the_racing_api_live_racecards_payload(
                         response_payload
                     )
@@ -1405,67 +1707,122 @@ def run_the_racing_api_data_sync(
                         )
 
         if models.RaceDataSyncDataKind.RESULT in data_kinds:
-            if event.local_date != provider_date:
+            day_offset = (
+                (event.local_date - provider_date).days
+                if event.local_date is not None
+                else None
+            )
+            result_url = ""
+            response_payload: dict[str, Any] | None = None
+            raw_sha256 = ""
+            provider_region = _registry_region(
+                event_region=event.country_region,
+                contract_region=source.region_code,
+            )
+            if day_offset == 0:
+                result_url = build_the_racing_api_route_url(
+                    registry=registry,
+                    route_name="results_today_free",
+                    region=provider_region,
+                    limit=50,
+                    skip=0,
+                )
+
+                def fetch_result_snapshot() -> tuple[dict[str, Any], int, int]:
+                    collected: list[dict[str, Any]] = []
+                    page_hashes: list[str] = []
+                    pagination_complete = False
+                    for page_index in range(route.request_budget):
+                        page_url = build_the_racing_api_route_url(
+                            registry=registry,
+                            route_name="results_today_free",
+                            region=provider_region,
+                            limit=50,
+                            skip=page_index * 50,
+                        )
+                        page, page_hash = _fetch_json(
+                            transport=transport,
+                            endpoint_name="results_today",
+                            url=page_url,
+                            username=username,
+                            password=password,
+                            now=now,
+                            clock=clock,
+                            sleeper=sleeper,
+                        )
+                        rows = page.get("results")
+                        if not isinstance(rows, list):
+                            raise _ProviderSyncError("provider_response_invalid")
+                        collected.extend(rows)
+                        page_hashes.append(page_hash)
+                        total = page.get("total")
+                        if len(rows) < 50 or (
+                            isinstance(total, int) and len(collected) >= total
+                        ):
+                            pagination_complete = True
+                            break
+                    if not page_hashes:
+                        raise _ProviderSyncError(
+                            "provider_request_budget_exhausted"
+                        )
+                    if not pagination_complete:
+                        raise _ProviderSyncError("provider_pagination_incomplete")
+                    return {
+                        "results": collected,
+                        "page_sha256": page_hashes,
+                    }, len(page_hashes), len(collected)
+
+                response_payload, raw_sha256 = _get_or_fetch_shared_snapshot(
+                    provider=source.source_key,
+                    region=source.region_code,
+                    scope_key=f"{provider_date.isoformat()}:{provider_region}",
+                    data_kind=models.RaceDataSyncDataKind.RESULT,
+                    registry_digest=route.registry_digest,
+                    run_id=run_id,
+                    now=now,
+                    proposed_requests=route.request_budget,
+                    clock=clock,
+                    fetcher=fetch_result_snapshot,
+                )
+            elif day_offset is not None and -7 <= day_offset < 0:
+                capacity = reserve_race_data_transport_capacity(
+                    provider=source.source_key,
+                    region_code=source.region_code,
+                    now=now,
+                    proposed_requests=1,
+                    max_response_bytes_per_request=_MAX_RESPONSE_BYTES,
+                )
+                if not capacity.allowed:
+                    raise _ProviderSyncError(capacity.reason_code)
+                result_url = build_the_racing_api_route_url(
+                    registry=registry,
+                    route_name="result_by_id",
+                    region=provider_region,
+                    race_id=source.external_race_id,
+                    limit=0,
+                    skip=0,
+                )
+                exact_result, raw_sha256 = _fetch_json(
+                    transport=transport,
+                    endpoint_name="result_by_id",
+                    url=result_url,
+                    username=username,
+                    password=password,
+                    now=now,
+                    clock=clock,
+                    sleeper=sleeper,
+                    allow_not_found=True,
+                )
+                if exact_result.get("_not_found") is not True:
+                    response_payload = {
+                        "results": [{**exact_result, "race_status": "official"}]
+                    }
+
+            if response_payload is None:
                 not_found.append(models.RaceDataSyncDataKind.RESULT)
             else:
-                collected: list[dict[str, Any]] = []
-                page_hashes: list[str] = []
-                result_url = ""
-                for page_index in range(route.request_budget - request_count):
-                    skip = page_index * 50
-                    result_url = build_the_racing_api_route_url(
-                        registry=registry,
-                        route_name="results_today_free",
-                        region=_registry_region(
-                            event_region=event.country_region,
-                            contract_region=source.region_code,
-                        ),
-                        limit=50,
-                        skip=skip,
-                    )
-                    page, page_hash = _fetch_json(
-                        transport=transport,
-                        endpoint_name="results_today",
-                        url=result_url,
-                        username=username,
-                        password=password,
-                        now=now,
-                        clock=clock,
-                        sleeper=sleeper,
-                    )
-                    request_count += 1
-                    rows = page.get("results")
-                    if not isinstance(rows, list):
-                        raise _ProviderSyncError("provider_response_invalid")
-                    collected.extend(rows)
-                    page_hashes.append(page_hash)
-                    if any(
-                        isinstance(row, dict)
-                        and str(row.get("race_id") or "")
-                        == source.external_race_id
-                        for row in rows
-                    ):
-                        break
-                    total = page.get("total")
-                    if len(rows) < 50 or (
-                        isinstance(total, int) and len(collected) >= total
-                    ):
-                        break
-                if not page_hashes:
-                    raise _ProviderSyncError("provider_request_budget_exhausted")
-                combined = {
-                    "results": collected,
-                    "page_sha256": page_hashes,
-                }
-                raw_sha256 = hashlib.sha256(
-                    json.dumps(
-                        combined,
-                        sort_keys=True,
-                        separators=(",", ":"),
-                    ).encode()
-                ).hexdigest()
                 snapshot = parse_the_racing_api_live_results_payload(
-                    {"results": collected}
+                    response_payload
                 )
                 normalized_race = next(
                     (
@@ -1480,6 +1837,14 @@ def run_the_racing_api_data_sync(
                 if normalized_race is None:
                     not_found.append(models.RaceDataSyncDataKind.RESULT)
                 else:
+                    phase = (
+                        models.RaceResultPhase.OFFICIAL
+                        if str(normalized_race.get("race_status") or "")
+                        .strip()
+                        .casefold()
+                        in route.entry.terminal_markers
+                        else models.RaceResultPhase.PROVISIONAL
+                    )
                     payload = _result_payload(
                         normalized_race=normalized_race,
                         region=source.region_code,
@@ -1498,7 +1863,7 @@ def run_the_racing_api_data_sync(
                         source_updated_at=None,
                         parser_version="the-racing-api-v1",
                         raw_sha256=raw_sha256,
-                        result_phase=models.RaceResultPhase.OFFICIAL,
+                        result_phase=phase,
                         normalized_payload=payload,
                         field_provenance={
                             "provider": source.source_key,

@@ -6205,8 +6205,8 @@ v3 首次 prepare 在请求预算 `60/60` 时由 HRN 空候选连带阻断 Equib
   是本轮唯一新增联网主适配器；HKJC/France Galop 官网层只消费既有官方导入，未把网站条款误当成
   新 transport 授权。主 API result not-found 后才按官方、Sporting Life/ZEturf/HRN 顺序 fallback。
 - 新 migration 为 `0075_race_data_source_priority_and_reported_position`；standing policy SHA 为
-  `60fe9230ca0e97d69a8406118b5d346649239f3f0699efe9a1d0c63972e44ba4`，TRA registry SHA 为
-  `24981f62e30e83e58fc82d4247560af35e4041b05857c287bd64430d0f2e2ecc`。全部新开关默认关闭、容量默认 0。
+  `07013655d4e0ae4bd5688b9a5dc447d759c0effa4b5393ec198f48bf961a1888`，TRA registry SHA 为
+  `3bac3b644c631ed165b8430343822b2c70c5a88c5036b63dcb557c83c0e0a6da`。全部新开关默认关闭、容量默认 0。
 - provider 网络请求后、任何 schedule/racecard/result canonical 写入前，现会在同一事务重新锁定并核验
   exact claim、有效期、owner/enrollment generation、entry/route/plan SHA、checkpoint version 和获准
   data-kind；claim 被替换、过期或越权时零投影，旧 worker 也不能完成或释放新 claim。
@@ -6231,3 +6231,20 @@ v3 首次 prepare 在请求预算 `60/60` 时由 HRN 空候选连带阻断 Equib
 - 已据此冻结候选容量：响应 `2/8 MiB`、provider-region 日 `1 GiB/192 requests`、root high/low
   `512/256 MiB`、min-free `8 GiB`、cleanup `100 rows/64 MiB`、hold `256 MiB`。0075 新增日账本，
   identity/provider transport 写前必须原子预留预算并检查 root/free disk；关闭态发布后还要重新核对。
+
+# 2026-08-28 PR #108 全量复审返修候选，生产仍未改动
+
+- 首轮全量代码复审发现 11 个发布阻断：当日赛果错误强制 official、终态 roster 不守恒、纳管覆盖
+  lifecycle mode/pause、出马表重置退赛、批量响应未共享、缺 immutable racecard revision、缺 T+30
+  告警、关闭态审计误报、赛果 apply 未重验来源合同、赛后停止主来源抓取，以及 lifecycle/event 锁序相反。
+- 当前候选已逐项修复并补覆盖：当日无 terminal marker 只记录 provisional；赛后 7 天走受审
+  `/v1/results/{race_id}`；终态要求完整 runner 全双射；批量快照 single-flight/150 秒 TTL；racecard
+  revision、来源合同重验、lifecycle 保留语义和普通队列 T+30 incident 均已落地。
+- 人工复核另外补上两项边界：data-sync racecard apply 在事务内重验 source expiry/registry；仅赛果
+  fallback 可用完整马号+规范化马名双射原子建立来源 runner identity，不再要求赛前已有第三方 ID。
+- PR #108 仍未合并，生产仍运行 `2833558a…` / migration `0073`；14 条历史过期 claimed 尚未收口，
+  新写入开关保持关闭，`race_live=7543` 不触碰。候选仍须完成最终组合回归、独立复审、push 和生产
+  备份/精确 claim 修复，之后才进入最终上线确认。
+- 返修后的完整赛事数据组合门禁为 SQLite `190/190`、PostgreSQL `214/214`；后者同时覆盖 R0 与
+  racecard 并发。Django check、migration drift、compileall、三份 Compose、JSON/digest、diff 与 literal
+  secret pattern 均通过；全开配置且运行开关全关的审计返回 `ready/would_write=false`、route drift 为空。

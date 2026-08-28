@@ -45,7 +45,7 @@ SHA-bound 历史收口命令；完成全 PR 复审及历史收口后，生产部
 
 The Racing API 是本轮唯一新增的联网主适配器，单 task 最多 3 个 provider 请求，并由 host/path allowlist、
 令牌桶、地区/数据类型 allowlist 与有效期 proof 限制。当前 source registry SHA-256 为
-`24981f62e30e83e58fc82d4247560af35e4041b05857c287bd64430d0f2e2ecc`，有效至 2026-09-27。
+`3bac3b644c631ed165b8430343822b2c70c5a88c5036b63dcb557c83c0e0a6da`，有效至 2026-09-27。
 
 本轮没有新增 JRA、NAR、HKJC、France Galop 官网的常驻联网抓取。现有官网条款/免责声明不能单独证明
 自动化许可；因此官网层只消费仓库既有官方导入事实。这不阻断 Racing API 主链自动化，但若以后新增
@@ -55,8 +55,8 @@ The Racing API 是本轮唯一新增的联网主适配器，单 task 最多 3 �
 
 - migration：`0075_race_data_source_priority_and_reported_position`，同时增加 provider/region/day 容量账本；
 - standing policy：`runtime/policies/race_data_sync/standing_policy.json`；
-- policy SHA-256：`60fe9230ca0e97d69a8406118b5d346649239f3f0699efe9a1d0c63972e44ba4`；
-- 新任务路由到 `race_sync` queue；Beat 增加未来发现和 lifecycle tick；
+- policy SHA-256：`07013655d4e0ae4bd5688b9a5dc447d759c0effa4b5393ec198f48bf961a1888`；
+- provider/future-discovery 任务路由到 `race_sync_v2`，lifecycle/T+30 monitor 路由到普通 `celery`；
 - `.env.example`、普通 Compose 和 low-cost Compose 已同步 registry/policy、mount、flags 和 task route；
 - 所有 runtime/apply/network/future-discovery/lifecycle 开关默认 `false`，容量默认 `0`，防止代码发布即写入。
 
@@ -143,3 +143,21 @@ Beat 每 5 分钟运行 sweeper，仅将标准空证据且租约过期的 claim 
 claimed 行生成 canonical manifest，apply 要求精确 SHA 并锁定重算，写入
 `failed/stale_claim_reconciled`。三条路径都不创建 bundle、delivery 或赛果业务投影；任何非标准形态继续
 fail closed。
+
+## 10. PR 全量复审返修结果
+
+首轮全量审查的 11 项阻断已全部按代码和测试闭环：当日无 terminal marker 的结果只记录 provisional；
+T+1 至 T+7 使用受审 `/v1/results/{race_id}`；地区/日期批量响应使用 150 秒 TTL single-flight 并验证完整
+分页；正式结果要求 terminal marker、全 runner 终态和 canonical roster 守恒；racecard 创建 immutable
+revision 且不重置未知状态；enrollment 保留 lifecycle mode/pause；T+30 incident 不可投递且不进入旧队列；
+审计区分配置就绪与运行开关；所有 canonical apply 重验当前来源合同并统一 lifecycle -> event 锁序。
+
+人工复核再补两项：data-sync racecard apply 在事务内重验 source expiry/registry；只提供赛果的 fallback
+只有在结果行与 canonical runners 通过数量、马号、NFKC 规范化马名形成完整唯一双射时，才在同一事务
+补充来源 runner ID。PostgreSQL 还暴露出 data-kind 默认排序差异，现 checkpoint plan 按固定业务枚举顺序
+生成，SQLite/PostgreSQL digest 一致。
+
+返修后完整组合为 SQLite `190/190`、PostgreSQL `214/214`；Django check、migration drift、compileall、
+三份 Compose、policy/registry JSON 与 SHA、diff、literal secret pattern 均通过。冻结 allowlist/容量下，
+所有运行开关保持 false 的审计返回 `configuration_status=ready`、`would_write=false`、`route_drift=[]`。
+生产仍未改动，第二轮独立 review 与历史 claim 生产收口仍是后续门禁。

@@ -17,7 +17,7 @@ import stat
 import tempfile
 import time
 from typing import Any, Callable
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 
 _HOST = "api.theracingapi.com"
@@ -57,6 +57,9 @@ _ROUTE_CONTRACTS = {
         "path": "/v1/results/today/free",
         "limit": [50],
         "skip": list(range(0, 500, 50)),
+    },
+    "result_by_id": {
+        "path": "/v1/results/{race_id}",
     },
 }
 
@@ -202,7 +205,10 @@ def _read_registry_contract(
         or evidence["terms_url"]
         != "https://www.theracingapi.com/terms-of-service"
         or evidence["authorization_basis"]
-        != "user_confirmed_automation_permission"
+        not in {
+            "provider_terms_for_application_use_and_user_requested_automation",
+            "user_confirmed_automation_permission",
+        }
     ):
         raise PermissionError("source registry evidence is not approved")
     try:
@@ -251,6 +257,7 @@ def build_the_racing_api_route_url(
     limit: int,
     skip: int,
     day: str | None = None,
+    race_id: str | None = None,
 ) -> str:
     """Build one canonical URL from the reviewed registry v2 contract."""
     if (
@@ -266,6 +273,23 @@ def build_the_racing_api_route_url(
     contract = _ROUTE_CONTRACTS.get(route_name)
     if region_code is None or contract is None:
         raise ValueError("region or route is not allowed")
+    if route_name == "result_by_id":
+        if day is not None or limit != 0 or skip != 0:
+            raise ValueError("result-by-id route does not accept pagination")
+        if (
+            not isinstance(race_id, str)
+            or not race_id
+            or race_id != race_id.strip()
+            or len(race_id) > 128
+            or any(char in race_id for char in ("/", "?", "#", "\\", "\x00"))
+        ):
+            raise ValueError("race_id is outside the contract")
+        return (
+            f"https://{_HOST}"
+            f"{contract['path'].replace('{race_id}', quote(race_id, safe='._:-'))}"
+        )
+    if race_id is not None:
+        raise ValueError("collection routes do not accept race_id")
     if (
         isinstance(limit, bool)
         or limit not in contract["limit"]

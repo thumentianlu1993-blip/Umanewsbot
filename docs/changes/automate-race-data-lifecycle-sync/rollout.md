@@ -40,8 +40,8 @@ cursor 形态精确的已过期 claim 可转为 `failed/stale_claim_reconciled`�
 
 当前冻结输入：
 
-- standing policy SHA：`60fe9230ca0e97d69a8406118b5d346649239f3f0699efe9a1d0c63972e44ba4`；
-- TRA registry SHA：`24981f62e30e83e58fc82d4247560af35e4041b05857c287bd64430d0f2e2ecc`；
+- standing policy SHA：`07013655d4e0ae4bd5688b9a5dc447d759c0effa4b5393ec198f48bf961a1888`；
+- TRA registry SHA：`3bac3b644c631ed165b8430343822b2c70c5a88c5036b63dcb557c83c0e0a6da`；
 - reference registry SHA：`740a93774927765f9c848cc97e4b87b78ab36d473c4c3e2e644d56a6f856cff2`。
 
 ## 4. 写前恢复点
@@ -129,3 +129,15 @@ revision/transition，不批量反向赛事状态。
 - kill switch 实测在一个 selector 周期内停止新 dispatch/write；
 - `race_live=7543` 保持不变，race_sync 新队列/worker 可观测；
 - current_state、decisions、deploy runbook、project status 和 release evidence 与生产运行态一致。
+
+## 11. PR 全量复审增补门禁
+
+- 当日 results 无 terminal marker 只能记录 provisional；赛后 7 天只允许
+  `/v1/results/{race_id}`，404 明确 not-found。
+- shared snapshot complete TTL 为 150 秒，必须完整分页；owner 预留一次容量，event 复用同一 artifact。
+- terminal result 必须覆盖 canonical runner 全集。结果型 fallback 只有马号和 NFKC 规范化马名构成唯一
+  全双射时，才在投影事务原子绑定来源 runner ID。
+- enrollment 保留已有 lifecycle mode/pause；新 control 从 off 建立；所有写路径 lifecycle -> event。
+- data-sync T+30 只在普通队列生成不可发送 incident；旧 `race_live` 队列和 delivery 均为零副作用。
+- audit 的 ready 是配置就绪，不要求运行开关打开；实际 apply 仍重验 source expiry/registry/contract 和
+  exact claim。

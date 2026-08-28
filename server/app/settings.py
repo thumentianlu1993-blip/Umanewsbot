@@ -890,6 +890,7 @@ CELERY_TASK_ROUTES = {
     "stable.tasks.sync_race_event_provider_task": {"queue": "race_sync_v2"},
     "stable.tasks.discover_future_race_data_sync_task": {"queue": "race_sync_v2"},
     "stable.tasks.advance_race_data_sync_lifecycle_task": {"queue": "celery"},
+    "stable.tasks.monitor_race_data_sync_result_slo_task": {"queue": "celery"},
     "stable.tasks.advance_race_event_lifecycle_task": {"queue": "celery"},
     "stable.tasks.scheduled_race_result_review_task": {"queue": "celery"},
     "stable.tasks.reconcile_stale_race_result_review_claims_task": {
@@ -963,6 +964,12 @@ def build_race_data_sync_beat_schedule(
     if scheduler_enabled and lifecycle_apply_enabled:
         schedule["advance-race-data-sync-lifecycle"] = {
             "task": "stable.tasks.advance_race_data_sync_lifecycle_task",
+            "schedule": crontab(minute="*"),
+            "options": {"queue": "celery", "expires": 55},
+        }
+    if scheduler_enabled:
+        schedule["monitor-race-data-sync-result-slo"] = {
+            "task": "stable.tasks.monitor_race_data_sync_result_slo_task",
             "schedule": crontab(minute="*"),
             "options": {"queue": "celery", "expires": 55},
         }

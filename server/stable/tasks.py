@@ -513,6 +513,31 @@ def advance_race_data_sync_lifecycle_task() -> dict:
 
 
 @shared_task
+def monitor_race_data_sync_result_slo_task() -> dict:
+    """Stage data-sync T+30 incidents on the ordinary queue only."""
+
+    if (
+        getattr(settings, "RACE_DATA_SYNC_ENABLED", False) is not True
+        or getattr(settings, "RACE_DATA_SYNC_SCHEDULER_ENABLED", False) is not True
+    ):
+        return {"enabled": False, "status": "disabled", "staged": 0}
+    from stable.services.race_data_sync_alerts import monitor_data_sync_result_slo
+
+    incident_ids = monitor_data_sync_result_slo(
+        now=timezone.now(),
+        batch_size=int(
+            getattr(settings, "RACE_DATA_SYNC_SELECTOR_BATCH_SIZE", 100)
+        ),
+    )
+    return {
+        "enabled": True,
+        "status": "complete",
+        "staged": len(incident_ids),
+        "incident_ids": incident_ids,
+    }
+
+
+@shared_task
 def sync_race_event_provider_task(
     event_id: int,
     expected_enrollment_generation: int,
@@ -618,18 +643,19 @@ def sync_race_event_provider_task(
     if locked_claim is None:
         return fail_closed(claim_decision.reason_code)
     now = timezone.now()
-    try:
-        capacity = reserve_race_data_transport_capacity(
-            provider=source.source_key,
-            region_code=source.region_code,
-            now=now,
-            proposed_requests=route.request_budget,
-            max_response_bytes_per_request=2 * 1024 * 1024,
-        )
-    except (OSError, TypeError, ValueError):
-        return fail_closed("artifact_capacity_config_invalid")
-    if not capacity.allowed:
-        return fail_closed(capacity.reason_code)
+    if source.source_key != "the_racing_api":
+        try:
+            capacity = reserve_race_data_transport_capacity(
+                provider=source.source_key,
+                region_code=source.region_code,
+                now=now,
+                proposed_requests=route.request_budget,
+                max_response_bytes_per_request=2 * 1024 * 1024,
+            )
+        except (OSError, TypeError, ValueError):
+            return fail_closed("artifact_capacity_config_invalid")
+        if not capacity.allowed:
+            return fail_closed(capacity.reason_code)
     provider_kwargs = {
         "event_id": event_id,
         "data_kinds": tuple(data_kinds),
@@ -699,6 +725,23 @@ def sync_race_event_provider_task(
         result["not_found_kinds"] = outcome.not_found_kinds
         result["fallback_reason"] = fallback_reason
         return result
+    if models.RaceDataSyncDataKind.RESULT in data_kinds:
+        from stable.services.race_data_sync_alerts import (
+            stage_data_sync_result_overdue_alert,
+        )
+
+        stage_data_sync_result_overdue_alert(
+            event_id=event_id,
+            now=timezone.now(),
+            reason_code=(
+                fallback_reason
+                or (
+                    "result_not_found"
+                    if models.RaceDataSyncDataKind.RESULT in outcome.not_found_kinds
+                    else outcome.reason_code
+                )
+            ),
+        )
     decision = complete_race_data_sync_claim(
         event_id=event_id,
         expected_enrollment_generation=expected_enrollment_generation,
@@ -855,6 +898,13 @@ def monitor_race_live_sla_task() -> dict:
 
 @shared_task
 def deliver_race_live_alert_task(incident_id: int) -> dict:
+    incident = RaceLiveAlertIncident.objects.filter(pk=incident_id).first()
+    if incident is not None and incident.scope_type == "data_sync_event":
+        return {
+            "delivered": False,
+            "reason": "data_sync_incident_non_dispatching",
+            "incident_id": incident_id,
+        }
     now = timezone.now()
     claim = claim_race_live_alert_delivery(
         incident_id=incident_id,

@@ -289,6 +289,10 @@ class RaceDataSyncR0FlagContractTests(SimpleTestCase):
             schedule["advance-race-data-sync-lifecycle"]["options"]["queue"],
             "celery",
         )
+        self.assertEqual(
+            schedule["monitor-race-data-sync-result-slo"]["options"]["queue"],
+            "celery",
+        )
 
     def test_slice_a_roster_v2_exposes_identity_and_data_kind_contract(self):
         from stable.services.race_data_sync_pipeline import (
@@ -423,6 +427,34 @@ class RaceDataSyncEnrollmentControlTests(TestCase):
         enrollment.refresh_from_db()
         self.assertEqual(enrollment.state, models.RaceDataSyncEnrollmentState.RETIRED)
         self.assertFalse(enrollment.event.live_tracking.tracking_enabled)
+
+    def test_acquire_preserves_existing_shadow_mode_and_manual_pause(self):
+        lifecycle = models.RaceEventLifecycleControl.objects.create(
+            event=self.event,
+            mode=models.RaceEventLifecycleMode.SHADOW,
+            next_refresh_at=NOW + timedelta(hours=1),
+            schedule_generation=7,
+            manual_pause_reason="operator pause",
+            manifest_data={"existing": True},
+        )
+
+        acquired = self._acquire()
+
+        self.assertEqual(acquired.action, "acquired")
+        lifecycle.refresh_from_db()
+        self.assertEqual(lifecycle.mode, models.RaceEventLifecycleMode.SHADOW)
+        self.assertEqual(lifecycle.next_refresh_at, NOW + timedelta(hours=1))
+        self.assertEqual(lifecycle.schedule_generation, 7)
+        self.assertEqual(lifecycle.manual_pause_reason, "operator pause")
+        self.assertTrue(lifecycle.manifest_data["existing"])
+
+    def test_acquire_creates_missing_lifecycle_control_closed(self):
+        acquired = self._acquire()
+
+        self.assertEqual(acquired.action, "acquired")
+        lifecycle = models.RaceEventLifecycleControl.objects.get(event=self.event)
+        self.assertEqual(lifecycle.mode, models.RaceEventLifecycleMode.OFF)
+        self.assertIsNone(lifecycle.next_refresh_at)
 
     def test_legacy_owner_and_stale_generation_fail_closed(self):
         self.control.write_owner = models.RaceEventProjectionWriteOwner.LIVE
@@ -1027,6 +1059,7 @@ class RaceDataSnapshotLeaseControlTests(TestCase):
             "cache_key": race_data_sync_control.build_snapshot_cache_key(**args),
             "artifact_sha256": artifact_sha256,
             "registry_digest": args["registry_digest"],
+            "fetched_at": NOW.isoformat(),
             "page_count": 1,
             "item_count": 12,
         }

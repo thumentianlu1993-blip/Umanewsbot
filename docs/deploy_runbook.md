@@ -8682,8 +8682,8 @@ activation 必须产生新的 ID。范围外 enforce control 在 scanner claim �
 3. 先以所有新增开关 `false`、全部容量 `0` 发布 web/worker/Beat，运行 migration
    `0075_race_data_source_priority_and_reported_position`；验证三服务 revision/settings 完全一致。
 4. 运行 `manage.py audit_race_data_sync`，必须为 `would_write=false`，并核对 standing policy SHA
-   `60fe9230ca0e97d69a8406118b5d346649239f3f0699efe9a1d0c63972e44ba4`、TRA registry SHA
-   `24981f62e30e83e58fc82d4247560af35e4041b05857c287bd64430d0f2e2ecc`、`route_drift=[]`。
+   `07013655d4e0ae4bd5688b9a5dc447d759c0effa4b5393ec198f48bf961a1888`、TRA registry SHA
+   `3bac3b644c631ed165b8430343822b2c70c5a88c5036b63dcb557c83c0e0a6da`、`route_drift=[]`。
 5. 先配置精确 provider/region/data-kind allowlist、host/request/event/enrollment/checkpoint/revision 容量，
    保持 network/apply/public/lifecycle/future discovery 关闭，再次审计。
 6. 灰度顺序：scheduler + future discovery census -> network + time/racecard apply -> lifecycle apply ->
@@ -8769,3 +8769,18 @@ RACE_DATA_RAW_ARTIFACT_ROOTS=/run/race-data-sync
    delivery、pending-event、赛果/赛事业务表和三队列前后指纹必须一致，尤其 `race_live=7543` 不变。
 7. 恢复旧 Beat，重新跑完整 writer 静默、服务、HTTP、日志与磁盘门禁。该动作只解除历史状态泄漏，
    不构成 PR 合并、migration 或新自动化启用授权。
+
+## PR #108 全量复审后的追加发布门禁
+
+1. 历史 claim 收口只能使用已 push、独立复审通过的 PR head 候选镜像；全部新写入开关保持关闭，
+   `race_sync_v2_worker` 不启动。候选 commit、preview manifest 或生产 claimed 集合任一漂移都重新开始。
+2. 关闭态部署后，配置审计应在所有运行开关仍为 false 时返回 `configuration_status=ready`；这只证明
+   allowlist、route、policy、registry 与容量可用，不代表 network/apply/public 已经启用。
+3. 启用 network/time/racecard 时，抽检同地区/日期的多个 event 必须共用一个 150 秒内 complete snapshot；
+   pagination 未完成、TTL 过期仍复用旧 artifact、或按 event 重复预留容量均视为失败。
+4. result/public 门禁要求：当日无 terminal marker 不公开；赛后只命中受审 race-id 路由；每个 terminal
+   result 覆盖 canonical runner 全集。fallback 只有马号和规范化马名形成唯一全双射才能补绑定来源 ID。
+5. enrollment 后 lifecycle 原 mode、manual pause、next refresh 不得被覆盖；新 control 必须保持 off，直到
+   lifecycle 步骤单独启用。锁等待或 deadlock、T+30 incident 进入 `race_live`/delivery 都立即止损。
+6. 任一步失败关闭最窄开关并停止后续序列；不得以 HTTP 200、task exit 0、queue 下降或 observation 已写入
+   替代 canonical/public/副作用核验。

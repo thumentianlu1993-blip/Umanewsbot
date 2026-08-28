@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta, timezone as dt_timezone
 import json
 from pathlib import Path
+import tempfile
 from unittest.mock import patch
 
 from django.test import TestCase, override_settings
@@ -10,6 +11,7 @@ from django.test import TestCase, override_settings
 from stable import models
 from stable.services.race_data_sync_pipeline import (
     _ROSTER_ALLOWED_FIELDS,
+    build_race_data_provider_roster,
     reserve_race_data_transport_capacity,
     resolve_race_data_provider_route,
 )
@@ -115,6 +117,13 @@ class RaceDataTransportCapacityTests(TestCase):
 )
 class TheRacingApiDataSyncAdapterTests(TestCase):
     def setUp(self):
+        self.artifact_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.artifact_dir.cleanup)
+        artifact_override = override_settings(
+            RACE_DATA_RAW_ARTIFACT_ROOTS=(self.artifact_dir.name,)
+        )
+        artifact_override.enable()
+        self.addCleanup(artifact_override.disable)
         self.event = models.RaceEvent.objects.create(
             year=2026,
             slug="tra-data-sync",
@@ -157,6 +166,11 @@ class TheRacingApiDataSyncAdapterTests(TestCase):
             data_kinds=("race_time", "racecard", "result"),
         )
         self.assertIsNotNone(self.route)
+        self.source.valid_until = NOW + timedelta(days=30)
+        self.source.registry_digest = self.route.registry_digest
+        self.source.save(
+            update_fields=("valid_until", "registry_digest", "updated_at")
+        )
         self.registry = json.loads(
             (
                 ROOT
@@ -273,9 +287,63 @@ class TheRacingApiDataSyncAdapterTests(TestCase):
         self.assertEqual(self.event.results.count(), 2)
         self.assertEqual(self.event.results.get(finish_position=1).horse_name, "Alpha")
         self.assertEqual(
+            self.event.revisions.filter(
+                kind=models.RaceEventRevisionKind.RACECARD
+            ).count(),
+            1,
+        )
+        self.assertEqual(
             set(outcome.observation_hashes),
             {"race_time", "racecard", "result"},
         )
+
+    def test_today_result_without_terminal_marker_stays_provisional(self):
+        tick = {"value": NOW}
+
+        def clock():
+            tick["value"] += timedelta(seconds=2)
+            return tick["value"]
+
+        def provisional_transport(**kwargs):
+            response = self._transport(**kwargs)
+            payload = json.loads(response.body)
+            if "results" in payload:
+                payload["results"][0]["race_status"] = "running"
+            return RaceLiveProofHttpResponse(
+                status_code=200,
+                content_type="application/json",
+                body=json.dumps(payload).encode(),
+                elapsed_ms=5,
+            )
+
+        with (
+            patch(
+                "stable.services.race_data_sync_providers.read_the_racing_api_automation_registry",
+                return_value=(self.registry, SHA),
+            ),
+            patch(
+                "stable.services.race_data_sync_providers._read_secret",
+                return_value=("user", "secret"),
+            ),
+        ):
+            outcome = run_the_racing_api_data_sync(
+                event_id=self.event.pk,
+                data_kinds=("racecard", "result"),
+                route=self.route,
+                now=NOW,
+                task_id="provider-provisional",
+                run_id="run-provisional",
+                transport=provisional_transport,
+                clock=clock,
+                sleeper=lambda seconds: None,
+            )
+
+        self.assertTrue(outcome.success, outcome.reason_code)
+        result_observation = models.RaceResultObservation.objects.get(
+            result_phase=models.RaceResultPhase.PROVISIONAL
+        )
+        self.assertIsNotNone(result_observation)
+        self.assertFalse(models.RaceEventResult.objects.exists())
 
     def test_out_of_window_racecard_is_successful_not_found_and_stays_due(self):
         self.event.local_date = date(2026, 9, 15)
@@ -304,6 +372,276 @@ class TheRacingApiDataSyncAdapterTests(TestCase):
         self.assertTrue(outcome.success)
         self.assertEqual(set(outcome.not_found_kinds), {"race_time", "racecard"})
         self.assertFalse(models.RaceResultObservation.objects.exists())
+
+    def test_two_events_reuse_one_region_day_racecard_snapshot(self):
+        second_event = models.RaceEvent.objects.create(
+            year=2026,
+            slug="tra-data-sync-second",
+            original_name="API Cup Two",
+            chinese_name="API杯二",
+            country_region=models.RacingRegion.JAPAN,
+            racecourse="Tokyo",
+            grade_text="G2",
+            normalized_grade=models.RaceGrade.G2,
+            surface=models.RaceEventSurface.TURF,
+            race_datetime=NOW + timedelta(minutes=20),
+            timezone_name="Asia/Tokyo",
+            local_date=date(2026, 8, 28),
+            status=models.RaceEventStatus.SCHEDULED,
+        )
+        models.RaceEventProjectionControl.objects.create(
+            event=second_event,
+            write_owner=models.RaceEventProjectionWriteOwner.DATA_SYNC,
+            owner_generation=1,
+        )
+        models.RaceEventLiveTracking.objects.create(event=second_event)
+        second_source = models.RaceResultSourceIdentity.objects.create(
+            event=second_event,
+            source_key="the_racing_api",
+            region_code="japan_jra",
+            identity_namespace="the_racing_api-race-v1",
+            external_race_id="jp-api-22",
+            review_status=models.RaceLiveReviewStatus.APPROVED,
+            terms_status=models.RaceSourceTermsStatus.APPROVED,
+            automation_allowed=True,
+            valid_until=NOW + timedelta(days=30),
+            registry_digest=self.route.registry_digest,
+        )
+        calls = []
+
+        def transport(**kwargs):
+            calls.append(kwargs["url"])
+            payload = {
+                "racecards": [
+                    {
+                        "race_id": race_id,
+                        "off_dt": off_time.isoformat(),
+                        "region": "jpn",
+                        "course": "Tokyo",
+                        "race_name": race_name,
+                        "race_status": "scheduled",
+                        "runners": [
+                            {
+                                "horse_id": f"{race_id}-horse-1",
+                                "horse": "Alpha",
+                                "number": "1",
+                            }
+                        ],
+                    }
+                    for race_id, off_time, race_name in (
+                        ("jp-api-11", self.event.race_datetime, "API Cup"),
+                        (
+                            second_source.external_race_id,
+                            second_event.race_datetime,
+                            "API Cup Two",
+                        ),
+                    )
+                ]
+            }
+            return RaceLiveProofHttpResponse(
+                status_code=200,
+                content_type="application/json",
+                body=json.dumps(payload).encode(),
+                elapsed_ms=5,
+            )
+
+        tick = {"value": NOW}
+
+        def clock():
+            tick["value"] += timedelta(seconds=2)
+            return tick["value"]
+
+        with (
+            patch(
+                "stable.services.race_data_sync_providers.read_the_racing_api_automation_registry",
+                return_value=(self.registry, SHA),
+            ),
+            patch(
+                "stable.services.race_data_sync_providers._read_secret",
+                return_value=("user", "secret"),
+            ),
+        ):
+            outcomes = [
+                run_the_racing_api_data_sync(
+                    event_id=event_id,
+                    data_kinds=("racecard",),
+                    route=self.route,
+                    now=NOW,
+                    task_id=f"provider-{event_id}",
+                    run_id=f"run-{event_id}",
+                    transport=transport,
+                    clock=clock,
+                    sleeper=lambda seconds: None,
+                )
+                for event_id in (self.event.pk, second_event.pk)
+            ]
+
+        self.assertTrue(all(outcome.success for outcome in outcomes), outcomes)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(self.event.runners.count(), 1)
+        self.assertEqual(second_event.runners.count(), 1)
+
+    def test_racecard_without_status_preserves_withdrawal_and_nr_is_explicit(self):
+        tick = {"value": NOW}
+
+        def clock():
+            tick["value"] += timedelta(seconds=2)
+            return tick["value"]
+
+        with (
+            patch(
+                "stable.services.race_data_sync_providers.read_the_racing_api_automation_registry",
+                return_value=(self.registry, SHA),
+            ),
+            patch(
+                "stable.services.race_data_sync_providers._read_secret",
+                return_value=("user", "secret"),
+            ),
+        ):
+            first = run_the_racing_api_data_sync(
+                event_id=self.event.pk,
+                data_kinds=("racecard",),
+                route=self.route,
+                now=NOW,
+                task_id="provider-first",
+                run_id="run-first",
+                transport=self._transport,
+                clock=clock,
+                sleeper=lambda seconds: None,
+            )
+            self.assertTrue(first.success, first.reason_code)
+            runner = self.event.runners.get(external_runner_id="horse-1")
+            runner.running_status = models.RaceRunnerStatus.WITHDRAWN
+            runner.save(update_fields=("running_status", "updated_at"))
+
+            def changed_transport(**kwargs):
+                response = self._transport(**kwargs)
+                payload = json.loads(response.body)
+                payload["racecards"][0]["runners"][0]["jockey"] = "Changed"
+                return RaceLiveProofHttpResponse(
+                    status_code=200,
+                    content_type="application/json",
+                    body=json.dumps(payload).encode(),
+                    elapsed_ms=5,
+                )
+
+            second = run_the_racing_api_data_sync(
+                event_id=self.event.pk,
+                data_kinds=("racecard",),
+                route=self.route,
+                now=NOW + timedelta(minutes=3),
+                task_id="provider-second",
+                run_id="run-second",
+                transport=changed_transport,
+                clock=lambda: NOW + timedelta(minutes=3),
+                sleeper=lambda seconds: None,
+            )
+
+            def non_runner_transport(**kwargs):
+                response = changed_transport(**kwargs)
+                payload = json.loads(response.body)
+                payload["racecards"][0]["runners"][1]["number"] = "NR"
+                return RaceLiveProofHttpResponse(
+                    status_code=200,
+                    content_type="application/json",
+                    body=json.dumps(payload).encode(),
+                    elapsed_ms=5,
+                )
+
+            third = run_the_racing_api_data_sync(
+                event_id=self.event.pk,
+                data_kinds=("racecard",),
+                route=self.route,
+                now=NOW + timedelta(minutes=6),
+                task_id="provider-third",
+                run_id="run-third",
+                transport=non_runner_transport,
+                clock=lambda: NOW + timedelta(minutes=6),
+                sleeper=lambda seconds: None,
+            )
+
+        self.assertTrue(second.success, second.reason_code)
+        self.assertTrue(third.success, third.reason_code)
+        runner.refresh_from_db()
+        self.assertEqual(runner.running_status, models.RaceRunnerStatus.WITHDRAWN)
+        self.assertEqual(
+            self.event.runners.get(external_runner_id="horse-2").running_status,
+            models.RaceRunnerStatus.NON_RUNNER,
+        )
+
+    def test_previous_day_result_uses_exact_race_id_route(self):
+        self.event.local_date = date(2026, 8, 27)
+        self.event.race_datetime = NOW - timedelta(days=1, minutes=10)
+        self.event.save(update_fields=("local_date", "race_datetime", "updated_at"))
+        for runner_id, name, number in (
+            ("horse-1", "Alpha", "1"),
+            ("horse-2", "Beta", "2"),
+        ):
+            models.RaceEventRunner.objects.create(
+                event=self.event,
+                external_runner_id=runner_id,
+                horse_name=name,
+                horse_number=number,
+                source_refs={self.source.source_key: runner_id},
+            )
+        calls = []
+
+        def transport(**kwargs):
+            calls.append((kwargs["endpoint_name"], kwargs["url"]))
+            payload = {
+                "race_id": self.source.external_race_id,
+                "off_dt": self.event.race_datetime.isoformat(),
+                "region": "jpn",
+                "course": "Tokyo",
+                "race_name": "API Cup",
+                "runners": [
+                    {
+                        "horse_id": "horse-1",
+                        "horse": "Alpha",
+                        "number": "1",
+                        "position": "1",
+                    },
+                    {
+                        "horse_id": "horse-2",
+                        "horse": "Beta",
+                        "number": "2",
+                        "position": "2",
+                    },
+                ],
+            }
+            return RaceLiveProofHttpResponse(
+                status_code=200,
+                content_type="application/json",
+                body=json.dumps(payload).encode(),
+                elapsed_ms=5,
+            )
+
+        with (
+            patch(
+                "stable.services.race_data_sync_providers.read_the_racing_api_automation_registry",
+                return_value=(self.registry, SHA),
+            ),
+            patch(
+                "stable.services.race_data_sync_providers._read_secret",
+                return_value=("user", "secret"),
+            ),
+        ):
+            outcome = run_the_racing_api_data_sync(
+                event_id=self.event.pk,
+                data_kinds=("result",),
+                route=self.route,
+                now=NOW,
+                task_id="provider-exact-result",
+                run_id="run-exact-result",
+                transport=transport,
+                clock=lambda: NOW,
+                sleeper=lambda seconds: None,
+            )
+
+        self.assertTrue(outcome.success, outcome.reason_code)
+        self.assertEqual(calls[0][0], "result_by_id")
+        self.assertIn("/v1/results/jp-api-11", calls[0][1])
+        self.assertEqual(self.event.results.count(), 2)
 
     @override_settings(RACE_DATA_SYNC_ALLOW_NETWORK=True)
     def test_future_event_identity_is_discovered_without_per_race_review(self):
@@ -458,6 +796,17 @@ class ReferenceResultDataSyncAdapterTests(TestCase):
                 "registry_digest",
             )
         )
+        for runner_id, name, number in (
+            ("sl-horse-1", "Alpha", "1"),
+            ("sl-horse-2", "Beta", "2"),
+        ):
+            models.RaceEventRunner.objects.create(
+                event=self.event,
+                external_runner_id=runner_id,
+                horse_name=name,
+                horse_number=number,
+                source_refs={self.source.source_key: runner_id},
+            )
 
     def _receipt(self, *, complete=True):
         semantic = {
@@ -578,6 +927,35 @@ class ReferenceResultDataSyncAdapterTests(TestCase):
             observation.field_provenance["reference_receipt_id"], receipt.pk
         )
 
+    def test_reference_result_binds_exact_canonical_roster_bijection(self):
+        for runner in self.event.runners.all():
+            runner.source_refs = {
+                "the_racing_api": f"tra-{runner.horse_number}"
+            }
+            runner.save(update_fields=("source_refs", "updated_at"))
+        self._receipt()
+
+        outcome = run_reference_result_data_sync(
+            event_id=self.event.pk,
+            data_kinds=("result",),
+            route=self.route,
+            now=NOW,
+            task_id="reference-test",
+            run_id="reference-bijection-run",
+            collect_if_missing=False,
+        )
+
+        self.assertTrue(outcome.success, outcome.reason_code)
+        self.assertEqual(outcome.applied_kinds, ("result",))
+        self.assertEqual(
+            set(
+                self.event.runners.values_list(
+                    "source_refs__sporting_life", flat=True
+                )
+            ),
+            {"sl-horse-1", "sl-horse-2"},
+        )
+
     def test_partial_reference_receipt_is_not_projected(self):
         self._receipt(complete=False)
         outcome = run_reference_result_data_sync(
@@ -680,6 +1058,10 @@ class PersistedOfficialResultBridgeTests(TestCase):
             automation_allowed=True,
             valid_until=NOW + timedelta(days=30),
         )
+        source.registry_digest = build_race_data_provider_roster(
+            configuration_only=True
+        ).registry_digest
+        source.save(update_fields=("registry_digest", "updated_at"))
         external = models.ExternalRace.objects.create(
             source=models.ExternalDataSource.HKJC,
             racing_region=models.RacingRegion.HONG_KONG,
@@ -706,6 +1088,13 @@ class PersistedOfficialResultBridgeTests(TestCase):
                 raw_payload={"finish_position": position},
                 fetched_at=NOW,
                 last_seen_at=NOW,
+            )
+            models.RaceEventRunner.objects.create(
+                event=event,
+                external_runner_id=f"horse-{position}",
+                horse_name=name,
+                horse_number=str(position),
+                source_refs={source.source_key: f"horse-{position}"},
             )
 
         outcome = run_persisted_official_result_data_sync(

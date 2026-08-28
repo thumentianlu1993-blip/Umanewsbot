@@ -93,7 +93,7 @@ class Command(BaseCommand):
                 "budgeted_response_bytes",
             )
         )
-        roster = build_race_data_provider_roster()
+        roster = build_race_data_provider_roster(configuration_only=True)
         configured_entries = [
             {
                 "provider": entry.provider,
@@ -135,6 +135,7 @@ class Command(BaseCommand):
                         region=policy_route.region_code,
                         identity_namespace=policy_route.identity_namespace,
                         data_kinds=policy_route.data_kinds,
+                        configuration_only=True,
                     )
                     if (
                         binding is None
@@ -233,15 +234,11 @@ class Command(BaseCommand):
             "ready"
             if all(
                 (
-                    flags.enabled,
-                    flags.scheduler_enabled,
-                    flags.allow_network,
-                    flags.schedule_apply_enabled,
-                    flags.racecard_apply_enabled,
-                    flags.result_apply_enabled,
-                    flags.result_public_enabled,
-                    bool(settings.RACE_DATA_SYNC_LIFECYCLE_APPLY_ENABLED),
-                    bool(settings.RACE_DATA_SYNC_FUTURE_DISCOVERY_ENABLED),
+                    bool(flags.providers),
+                    bool(flags.regions),
+                    bool(flags.fields),
+                    bool(flags.data_kinds),
+                    any(entry["route_admitted"] for entry in configured_entries),
                     capacity_status["status"] == "valid",
                     policy_report.get("status") == "loaded",
                     not policy_report.get("route_drift"),

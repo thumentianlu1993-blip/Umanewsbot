@@ -433,3 +433,8 @@ checkpoint 动态抓取赛时、出马表和赛果，lifecycle control 在 T/T+3
 来源仲裁统一为 licensed racing API > 已导入官方赛事事实 > 可信第三方；公开页不暴露来源或内部确认
 阶段。自动链由来源 proof、固定路由 digest、standing policy、CAS generation、请求/数据库容量和独立
 kill-switch 约束，仓库默认关闭，生产启用必须绑定精确发布版本并另行确认。
+
+批量 racecard/当日 results 在短 TTL 内按地区和日期共享完整分页快照；赛后历史结果只走 registry 明确
+登记的 race-id 路由。无终态标记的结果只形成内部 provisional revision，正式/更正公开还必须覆盖完整
+canonical runner roster。只有结果型 fallback 与现有 runner 通过马号和规范化马名形成唯一全双射时，
+才可在同一事务补足来源身份；缺行、多解和来源合同漂移均保持零公开写入。

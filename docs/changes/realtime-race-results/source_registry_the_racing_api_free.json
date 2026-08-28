@@ -31,6 +31,9 @@
         0
       ]
     },
+    "result_by_id": {
+      "path": "/v1/results/{race_id}"
+    },
     "results_today_free": {
       "limit": [
         50

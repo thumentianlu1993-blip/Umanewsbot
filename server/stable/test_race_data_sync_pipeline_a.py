@@ -535,6 +535,54 @@ class RacecardFieldReconciliationContractTests(TestCase):
         self.assertFalse(models.RaceEventRunner.objects.exists())
         self.assertFalse(models.RaceEventFieldChange.objects.exists())
 
+    def test_data_sync_racecard_revalidates_source_expiry_and_registry(self):
+        roster = _pipeline().build_race_data_provider_roster()
+        self.tra.region_code = "hong_kong"
+        self.tra.identity_namespace = "the_racing_api-race-v1"
+        self.tra.valid_until = NOW + timedelta(days=1)
+        self.tra.registry_digest = roster.registry_digest
+        self.tra.save(
+            update_fields=(
+                "region_code",
+                "identity_namespace",
+                "valid_until",
+                "registry_digest",
+                "updated_at",
+            )
+        )
+        observation = self._observation(self.tra)
+        models.RaceEventProjectionControl.objects.create(
+            event=self.event,
+            write_owner=models.RaceEventProjectionWriteOwner.DATA_SYNC,
+            owner_generation=1,
+        )
+
+        for field_name, invalid_value in (
+            ("valid_until", NOW),
+            ("registry_digest", "f" * 64),
+        ):
+            with self.subTest(field_name=field_name):
+                self.tra.valid_until = NOW + timedelta(days=1)
+                self.tra.registry_digest = roster.registry_digest
+                setattr(self.tra, field_name, invalid_value)
+                self.tra.save(
+                    update_fields=(
+                        "valid_until",
+                        "registry_digest",
+                        "updated_at",
+                    )
+                )
+                with patch(
+                    "stable.services.race_data_sync_pipeline.timezone.now",
+                    return_value=NOW,
+                ):
+                    decision = self._reconcile(observation)
+
+                self.assertEqual(decision.status, "rejected")
+                self.assertEqual(decision.reason, "source_contract_mismatch")
+                self.assertFalse(models.RaceEventRunner.objects.exists())
+                self.assertFalse(models.RaceEventFieldChange.objects.exists())
+
     def test_superseded_claim_cannot_apply_racecard_or_schedule(self):
         observation = self._observation(self.tra)
         guard = self._claim_guard()

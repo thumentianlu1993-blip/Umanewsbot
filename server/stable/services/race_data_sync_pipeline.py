@@ -698,13 +698,14 @@ def resolve_race_data_provider_route(
     region: str,
     identity_namespace: str,
     data_kinds: Iterable[str],
+    configuration_only: bool = False,
 ) -> RaceDataResolvedRoute | None:
     """Resolve every requested kind through the one current Slice A roster."""
 
     kinds = tuple(sorted(set(data_kinds)))
     if not kinds:
         return None
-    roster = build_race_data_provider_roster()
+    roster = build_race_data_provider_roster(configuration_only=configuration_only)
     matches = {
         roster.resolve_route(
             provider=provider,
@@ -732,7 +733,9 @@ def resolve_race_data_provider_route(
 
 
 def build_race_data_provider_roster(
-    *, expected_registry_digest: str | None = None
+    *,
+    expected_registry_digest: str | None = None,
+    configuration_only: bool = False,
 ) -> RaceDataProviderRoster:
     flags = RaceDataSyncFlags.from_settings()
     entries = []
@@ -752,6 +755,7 @@ def build_race_data_provider_roster(
             allowed_path_prefixes = (
                 "/v1/racecards/free",
                 "/v1/results/today/free",
+                "/v1/results/",
             )
             request_budget = 3
             minimum_interval_seconds = 2
@@ -802,6 +806,8 @@ def build_race_data_provider_roster(
                 )
             ):
                 proof_digest = configured_proof_digest
+        elif source_class == "official_operator":
+            terminal_markers = ("complete",)
         contract_digest = _canonical_sha256(
             {
                 "provider": provider,
@@ -820,7 +826,7 @@ def build_race_data_provider_roster(
             }
         )
         runtime_provider_enabled = bool(
-            flags.enabled
+            (flags.enabled or configuration_only)
             and provider in flags.providers
             and set(regions).intersection(flags.regions)
             and adapter_status == "implemented"
@@ -1268,6 +1274,11 @@ def _reconcile_racecard_observation_atomic(
 ) -> RacecardReconciliationDecision:
     """Apply admitted racecard and schedule fields under source arbitration."""
     with transaction.atomic():
+        lifecycle = (
+            models.RaceEventLifecycleControl.objects.select_for_update()
+            .filter(event_id=expected_event_id)
+            .first()
+        )
         locked_claim = None
         if claim_guard is not None:
             claim_decision, locked_claim = (
@@ -1372,7 +1383,17 @@ def _reconcile_racecard_observation_atomic(
             )
         roster = build_race_data_provider_roster()
         roster_entry = next(
-            (entry for entry in roster.entries if entry.provider == source.source_key),
+            (
+                entry
+                for entry in roster.entries
+                if entry.provider == source.source_key
+                and contract_region in entry.regions
+                and (
+                    not source.identity_namespace
+                    or source.identity_namespace in entry.identity_namespaces
+                )
+                and models.RaceDataSyncDataKind.RACECARD in entry.data_kinds
+            ),
             None,
         )
         if roster_entry is None or contract_region not in roster_entry.regions:
@@ -1465,6 +1486,43 @@ def _reconcile_racecard_observation_atomic(
         if event is None:
             return RacecardReconciliationDecision(
                 "rejected", "event_missing", expected_event_id, observation.pk
+            )
+        control = (
+            locked_claim.control
+            if locked_claim is not None
+            else None
+        )
+        if control is None:
+            control, _created = models.RaceEventProjectionControl.objects.get_or_create(
+                event=event
+            )
+            control = models.RaceEventProjectionControl.objects.select_for_update().get(
+                pk=control.pk
+            )
+        if control.write_owner not in {
+            models.RaceEventProjectionWriteOwner.UNMANAGED,
+            models.RaceEventProjectionWriteOwner.LIVE,
+            models.RaceEventProjectionWriteOwner.DATA_SYNC,
+        }:
+            return RacecardReconciliationDecision(
+                "rejected",
+                "writer_owner_conflict",
+                expected_event_id,
+                observation.pk,
+            )
+        if control.write_owner == models.RaceEventProjectionWriteOwner.DATA_SYNC and (
+            source.terms_status != models.RaceSourceTermsStatus.APPROVED
+            or source.valid_until is None
+            or source.valid_until <= timezone.now()
+            or source.registry_digest != roster.registry_digest
+            or source.region_code != contract_region
+            or source.identity_namespace not in roster_entry.identity_namespaces
+        ):
+            return RacecardReconciliationDecision(
+                "rejected",
+                "source_contract_mismatch",
+                expected_event_id,
+                observation.pk,
             )
         audit = _audit_defaults(observation=observation, task_id=task_id, run_id=run_id)
         candidate_watermark = observation.source_updated_at or observation.observed_at
@@ -1671,6 +1729,149 @@ def _reconcile_racecard_observation_atomic(
             }
             runner.save()
 
+        if (
+            allow_racecard_apply
+            and validated_participants
+            and control.write_owner != models.RaceEventProjectionWriteOwner.LIVE
+        ):
+            revision_rows: list[tuple[models.RaceEventRunner, models.RaceEventParticipant]] = []
+            canonical_participants: list[dict[str, Any]] = []
+            for runner in models.RaceEventRunner.objects.select_for_update().filter(
+                event=event
+            ).order_by("sort_order", "id"):
+                refs = runner.source_refs if isinstance(runner.source_refs, dict) else {}
+                external_runner_id = str(refs.get(source.source_key) or "").strip()
+                if not external_runner_id and refs.get("source_key") == source.source_key:
+                    external_runner_id = str(
+                        refs.get("external_runner_id") or ""
+                    ).strip()
+                if not external_runner_id:
+                    continue
+                stable_key = (
+                    f"{source.source_key}:"
+                    f"{hashlib.sha256(external_runner_id.encode()).hexdigest()[:48]}"
+                )
+                existing_identity = (
+                    models.RaceEventParticipantSourceIdentity.objects.select_for_update()
+                    .select_related("participant")
+                    .filter(
+                        source_identity=source,
+                        external_runner_id=external_runner_id,
+                        participant__event=event,
+                    )
+                    .first()
+                )
+                participant = (
+                    existing_identity.participant
+                    if existing_identity is not None
+                    else models.RaceEventParticipant.objects.get_or_create(
+                        event=event,
+                        stable_key=stable_key,
+                        defaults={
+                            "canonical_name": runner.horse_name,
+                            "country_region": event.country_region,
+                            "review_status": models.RaceLiveReviewStatus.APPROVED,
+                        },
+                    )[0]
+                )
+                models.RaceEventParticipantSourceIdentity.objects.get_or_create(
+                    participant=participant,
+                    source_identity=source,
+                    defaults={"external_runner_id": external_runner_id},
+                )
+                canonical_participants.append(
+                    {
+                        "external_runner_id": external_runner_id,
+                        "horse_name": runner.horse_name,
+                        "number": runner.horse_number,
+                        "draw": runner.barrier,
+                        "jockey_name": runner.jockey_name,
+                        "trainer_name": runner.trainer_name,
+                        "carried_weight": runner.carried_weight,
+                        "status": runner.running_status,
+                    }
+                )
+                revision_rows.append((runner, participant))
+            canonical_payload = {
+                "external_race_id": source.external_race_id,
+                "participants": canonical_participants,
+            }
+            content_sha256 = _canonical_sha256(canonical_payload)
+            current_racecard = control.current_racecard_revision
+            existing_revision = models.RaceEventRevision.objects.filter(
+                event=event,
+                kind=models.RaceEventRevisionKind.RACECARD,
+                phase=models.RaceResultPhase.RACECARD,
+                content_sha256=content_sha256,
+            ).first()
+            if existing_revision is None:
+                revision = models.RaceEventRevision.objects.create(
+                    event=event,
+                    kind=models.RaceEventRevisionKind.RACECARD,
+                    revision_no=control.next_racecard_revision_no,
+                    phase=models.RaceResultPhase.RACECARD,
+                    content_sha256=content_sha256,
+                    source_authority=candidate_source_class,
+                    decision_reason="data_sync_racecard_reconciled",
+                    primary_observation=observation,
+                    supersedes=current_racecard,
+                )
+                models.RaceEventRevisionItem.objects.bulk_create(
+                    [
+                        models.RaceEventRevisionItem(
+                            revision=revision,
+                            participant=participant,
+                            source_order=index,
+                            internal_order=index,
+                            status=runner.running_status,
+                            raw_status=runner.running_status,
+                            horse_number=runner.horse_number,
+                            barrier=runner.barrier,
+                            jockey_name=runner.jockey_name,
+                            trainer_name=runner.trainer_name,
+                            carried_weight=runner.carried_weight,
+                            field_provenance={
+                                "source_key": source.source_key,
+                                "external_runner_id": canonical_participants[index - 1][
+                                    "external_runner_id"
+                                ],
+                                "observation_id": observation.pk,
+                            },
+                        )
+                        for index, (runner, participant) in enumerate(
+                            revision_rows, start=1
+                        )
+                    ]
+                )
+                models.RaceEventRevisionEvidence.objects.create(
+                    revision=revision,
+                    observation=observation,
+                    role="primary",
+                )
+                control.last_known_good_racecard_revision = current_racecard
+                control.current_racecard_revision = revision
+                control.next_racecard_revision_no += 1
+                control.save(
+                    update_fields=(
+                        "last_known_good_racecard_revision",
+                        "current_racecard_revision",
+                        "next_racecard_revision_no",
+                        "updated_at",
+                    )
+                )
+                aggregate = "applied"
+            elif control.current_racecard_revision_id != existing_revision.pk:
+                control.last_known_good_racecard_revision = current_racecard
+                control.current_racecard_revision = existing_revision
+                control.save(
+                    update_fields=(
+                        "last_known_good_racecard_revision",
+                        "current_racecard_revision",
+                        "updated_at",
+                    )
+                )
+                aggregate = "applied"
+
         candidate_timezone = str(
             payload.get("timezone_name") or event.timezone_name or ""
         ).strip()
@@ -1851,9 +2052,6 @@ def _reconcile_racecard_observation_atomic(
             event.save(
                 update_fields=tuple(schedule_candidates) + ("updated_at",)
             )
-            lifecycle = models.RaceEventLifecycleControl.objects.select_for_update().filter(
-                event=event
-            ).first()
             if lifecycle is not None:
                 lifecycle.schedule_generation += 1
                 lifecycle.claim_token = ""
