@@ -5,12 +5,31 @@ import hashlib
 import json
 
 from django.db import transaction
+from django.db.models import CharField, Exists, OuterRef, Q
+from django.db.models.functions import Cast
 from django.utils import timezone
 
 from stable import models
 
 
 _RESULT_SLO = timedelta(minutes=30)
+
+
+def _resolve_data_sync_event_incidents(*, event_id: int, now: datetime) -> int:
+    return models.RaceLiveAlertIncident.objects.filter(
+        scope_type="data_sync_event",
+        scope_key=str(event_id),
+    ).exclude(
+        status=models.RaceLiveAlertIncidentStatus.RESOLVED
+    ).update(
+        status=models.RaceLiveAlertIncidentStatus.RESOLVED,
+        resolved_at=now,
+        last_seen_at=now,
+        next_attempt_at=None,
+        delivery_token="",
+        delivery_lease_expires_at=None,
+        updated_at=now,
+    )
 
 
 def stage_data_sync_result_overdue_alert(
@@ -34,8 +53,18 @@ def stage_data_sync_result_overdue_alert(
     if (
         event.race_datetime is None
         or event.result_confirmed_at is not None
+        or event.status
+        in {
+            models.RaceEventStatus.CANCELLED,
+            models.RaceEventStatus.POSTPONED,
+        }
         or event.race_datetime + _RESULT_SLO > now
     ):
+        if event.result_confirmed_at is not None or event.status in {
+            models.RaceEventStatus.CANCELLED,
+            models.RaceEventStatus.POSTPONED,
+        }:
+            _resolve_data_sync_event_incidents(event_id=event.pk, now=now)
         return None
     deadline_at = event.race_datetime + _RESULT_SLO
     reference_version = f"data-sync-t30:{event.race_datetime.isoformat()}"
@@ -101,6 +130,34 @@ def monitor_data_sync_result_slo(
     ):
         return ()
     deadline = now - _RESULT_SLO
+    active_incidents = models.RaceLiveAlertIncident.objects.filter(
+        scope_type="data_sync_event",
+    ).exclude(status=models.RaceLiveAlertIncidentStatus.RESOLVED)
+    active_incident_for_event = active_incidents.filter(
+        scope_key=OuterRef("event_scope_key")
+    )
+    resolved_event_ids = tuple(
+        models.RaceDataSyncEnrollment.objects.filter(
+            state=models.RaceDataSyncEnrollmentState.ENROLLED,
+        )
+        .filter(
+            Q(event__result_confirmed_at__isnull=False)
+            | Q(
+                event__status__in=(
+                    models.RaceEventStatus.CANCELLED,
+                    models.RaceEventStatus.POSTPONED,
+                )
+            )
+        )
+        .annotate(event_scope_key=Cast("event_id", output_field=CharField()))
+        .annotate(has_active_incident=Exists(active_incident_for_event))
+        .filter(has_active_incident=True)
+        .order_by("event_id")
+        .values_list("event_id", flat=True)
+        [:batch_size]
+    )
+    for event_id in resolved_event_ids:
+        _resolve_data_sync_event_incidents(event_id=event_id, now=now)
     event_ids = tuple(
         models.RaceDataSyncEnrollment.objects.filter(
             state=models.RaceDataSyncEnrollmentState.ENROLLED,
@@ -108,6 +165,15 @@ def monitor_data_sync_result_slo(
             event__race_datetime__lte=deadline,
             event__result_confirmed_at__isnull=True,
         )
+        .exclude(
+            event__status__in=(
+                models.RaceEventStatus.CANCELLED,
+                models.RaceEventStatus.POSTPONED,
+            )
+        )
+        .annotate(event_scope_key=Cast("event_id", output_field=CharField()))
+        .annotate(has_active_incident=Exists(active_incident_for_event))
+        .filter(has_active_incident=False)
         .order_by("event__race_datetime", "event_id")
         .values_list("event_id", flat=True)[:batch_size]
     )

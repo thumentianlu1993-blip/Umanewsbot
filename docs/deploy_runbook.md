@@ -1,5 +1,33 @@
 # 部署运行手册
 
+## 2026-08-29 PR #108 历史 claim 修复后的发布门禁（候选未上线）
+
+1. 重试必须从生产只读盘点开始：exact resident revision/image/schema、host health、五个新写
+   开关、Beat/worker active/reserved/scheduled、external/historical/P0 writer、`celery`、`race_sync_v2`
+   与旧 `race_live` 队列都要重新读取。旧 `race_live` 只记录长度，不得清理、迁移或消费。
+2. 历史 claim 收口前，冻结 Beat 并 drain 普通/新队列；运行 exact preview，必须只命中已审核
+   的 14 条过期、空证据 claim。随后创建 PostgreSQL custom-format `0600` 备份，记录 SHA-256
+   并通过 `pg_restore --list`。apply 必须绑定 preview canonical manifest SHA，在同一 advisory
+   transaction lock 内锁住全部目标并重算；任一漂移整批零写。
+3. claim apply 后独立验证 `claimed=0`、目标只转为 `failed/expired_claim_reconciled`、且
+   bundle/delivery/pending/business result/两条队列长度都未变。任一不符立即停止，恢复冻结前应
+   运行的旧 Beat，保持新写入关闭，不进入 PR merge/migration。
+4. 普通 Release-B 目标 leaf 为 `stable.0075_race_data_source_priority_and_reported_position`，
+   reviewed migration SHA 为 `d8b220b241e560911bc5a02acada986926d93eb13a8aae0ace590a7f1e8bb0bd`。
+   preflight 必须同时核对 `0074` 和 `0075` 的精确 catalog/allowlist；pre-0075 为另行审核的跨
+   schema 恢复，不得用通用 rollback。迁移后未知 `reported_finish_position` 必须仍为 `NULL`。
+5. 关闭态镜像验收后才注入已冻结容量。`RACE_DATA_SNAPSHOT_RETENTION_SECONDS=691200`
+   为独立 8 天 retention；artifact cleanup 任务的 task route 和 Beat option 都必须是
+   `race_sync_v2`，且专用 worker 必须看到 `/run/race-data-sync`。若 retention 非 7–90 天、
+   mount/root/SHA/inode 校验失败，清理拒绝而不删 lease/file。
+6. future discovery 与 artifact cleanup 都必须先通过 `RACE_DATA_SYNC_ENABLED` 总开关；仅打开子开关或
+   保留 Beat schedule 时不得产生数据库、网络或删除副作用。shared snapshot waiter 的轮询窗必须覆盖
+   完整 lease TTL，批量公开读取必须预载 enrollment source，避免容量随赛事数线性放大。
+7. 启用顺序不变：future discovery -> time/racecard -> lifecycle -> result apply/public -> correction。
+   每步都分别核对 run terminal、claim/checkpoint、provider 预算、revision/projection、alert 与公开页；
+   任一失败立即停止后续步骤并关闭新写入。最终 merge/deploy/enable 前必须绑定精确
+   PR head/merge SHA/image 取得用户确认。
+
 ## 2026-08-20 race-data-sync R0 发布边界（仅本地实现，未授权部署）
 
 1. 当前生产真实 migration leaf 仍以线上只读核验为准；本候选代码把目标 leaf 扩展为
@@ -8708,6 +8736,7 @@ RACE_DATA_RAW_MIN_FREE_DISK_BYTES=8589934592
 RACE_DATA_RAW_CLEANUP_MAX_ROWS=100
 RACE_DATA_RAW_CLEANUP_MAX_BYTES=67108864
 RACE_DATA_RAW_HOLD_ALERT_BYTES=268435456
+RACE_DATA_SNAPSHOT_RETENTION_SECONDS=691200
 RACE_DATA_RAW_ARTIFACT_ROOTS=/run/race-data-sync
 ```
 

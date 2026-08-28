@@ -73,6 +73,21 @@
           "sha256": "21670e7731456a33e473fd97cb43ca72545477aa600ea594c6c071c4dd2d54eb"
         }
       ]
+    },
+    {
+      "migration_path": "server/stable/migrations/0075_race_data_source_priority_and_reported_position.py",
+      "reviewed_variants": [
+        {
+          "dependencies": [
+            [
+              "stable",
+              "0074_race_data_sync_r0_control_plane"
+            ]
+          ],
+          "rationale": "The rollback target must carry the additive 0075 capacity ledger and reported-position/source-priority projection contract; pre-0075 targets require separately reviewed cross-schema recovery.",
+          "sha256": "d8b220b241e560911bc5a02acada986926d93eb13a8aae0ace590a7f1e8bb0bd"
+        }
+      ]
     }
   ],
   "schema_version": "release-b-rollback-migration-allowlist/v2"

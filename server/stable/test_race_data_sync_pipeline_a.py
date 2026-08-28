@@ -461,7 +461,10 @@ class RacecardFieldReconciliationContractTests(TestCase):
             claim_guard=claim_guard,
         )
 
-    def _claim_guard(self):
+    def _claim_guard(
+        self,
+        data_kinds=(models.RaceDataSyncDataKind.RACECARD,),
+    ):
         entry_sha256 = "a" * 64
         route_digest = "b" * 64
         control = models.RaceEventProjectionControl.objects.create(
@@ -489,19 +492,23 @@ class RacecardFieldReconciliationContractTests(TestCase):
             entry_sha256=entry_sha256,
             effective_at=NOW,
         )
-        checkpoint = models.RaceEventLiveProviderCheckpoint.objects.create(
-            tracking=tracking,
-            source_key=self.tra.source_key,
-            data_kind=models.RaceDataSyncDataKind.RACECARD,
-            next_poll_at=NOW,
-            lock_version=0,
-        )
-        checkpoint_plan = (
+        checkpoints = [
+            models.RaceEventLiveProviderCheckpoint.objects.create(
+                tracking=tracking,
+                source_key=self.tra.source_key,
+                data_kind=data_kind,
+                next_poll_at=NOW,
+                lock_version=0,
+            )
+            for data_kind in data_kinds
+        ]
+        checkpoint_plan = tuple(
             {
                 "source_key": checkpoint.source_key,
                 "data_kind": checkpoint.data_kind,
                 "lock_version": checkpoint.lock_version,
-            },
+            }
+            for checkpoint in checkpoints
         )
         plan_sha256 = race_data_sync_control._claim_plan_sha256(
             event_id=self.event.pk,
@@ -604,6 +611,50 @@ class RacecardFieldReconciliationContractTests(TestCase):
         self.assertEqual(decision.reason, "claim_cas_stale")
         self.assertFalse(models.RaceEventRunner.objects.exists())
         self.assertFalse(models.RaceEventFieldChange.objects.exists())
+
+    def test_schedule_change_marks_the_active_data_sync_claim_invalid(self):
+        roster = _pipeline().build_race_data_provider_roster()
+        self.tra.region_code = "hong_kong"
+        self.tra.identity_namespace = "the_racing_api-race-v1"
+        self.tra.valid_until = NOW + timedelta(days=1)
+        self.tra.registry_digest = roster.registry_digest
+        self.tra.save(
+            update_fields=(
+                "region_code",
+                "identity_namespace",
+                "valid_until",
+                "registry_digest",
+                "updated_at",
+            )
+        )
+        observation = self._observation(
+            self.tra,
+            payload_overrides={"off_time": "2026-08-02T08:00:00+00:00"},
+        )
+        guard = self._claim_guard(
+            data_kinds=(
+                models.RaceDataSyncDataKind.RACE_TIME,
+                models.RaceDataSyncDataKind.RACECARD,
+            )
+        )
+
+        with patch(
+            "stable.services.race_data_sync_pipeline.timezone.now",
+            return_value=NOW,
+        ):
+            decision = self._reconcile(
+                observation,
+                allow_schedule_apply=True,
+                claim_guard=guard,
+            )
+
+        self.assertEqual(decision.status, "applied")
+        self.assertTrue(decision.claim_invalidated)
+        tracking = self.event.live_tracking
+        tracking.refresh_from_db()
+        self.assertEqual(tracking.active_attempt_token, "")
+        self.assertIsNone(tracking.claim_expires_at)
+        self.assertEqual(tracking.claim_generation, 2)
 
     def test_same_value_replays_and_same_source_newer_version_corrects(self):
         observation = self._observation(self.tra, suffix="1")
@@ -822,6 +873,21 @@ class RacecardFieldReconciliationContractTests(TestCase):
             claim_generation=4,
             claim_expires_at=NOW + timedelta(minutes=5),
         )
+        tracking = models.RaceEventLiveTracking.objects.create(
+            event=self.event,
+            tracking_enabled=True,
+            claim_generation=7,
+            active_attempt_token="stale-data-sync-claim",
+            claim_expires_at=NOW + timedelta(minutes=5),
+            next_poll_at=NOW + timedelta(days=1),
+        )
+        for data_kind in models.RaceDataSyncDataKind.values:
+            models.RaceEventLiveProviderCheckpoint.objects.create(
+                tracking=tracking,
+                source_key=self.tra.source_key,
+                data_kind=data_kind,
+                next_poll_at=NOW + timedelta(days=1),
+            )
         observation = self._observation(
             self.tra,
             payload_overrides={
@@ -860,6 +926,27 @@ class RacecardFieldReconciliationContractTests(TestCase):
         self.assertEqual(lifecycle.claim_token, "")
         self.assertIsNone(lifecycle.claim_expires_at)
         self.assertEqual(lifecycle.last_source_key, "the_racing_api")
+        tracking.refresh_from_db()
+        self.assertEqual(tracking.claim_generation, 8)
+        self.assertEqual(tracking.active_attempt_token, "")
+        self.assertIsNone(tracking.claim_expires_at)
+        checkpoints = {
+            row.data_kind: row
+            for row in tracking.provider_checkpoints.order_by("data_kind")
+        }
+        self.assertEqual(
+            checkpoints[models.RaceDataSyncDataKind.RACE_TIME].next_poll_at,
+            observation.source_updated_at + timedelta(hours=12),
+        )
+        self.assertEqual(
+            checkpoints[models.RaceDataSyncDataKind.RACECARD].next_poll_at,
+            observation.source_updated_at + timedelta(hours=12),
+        )
+        self.assertIsNone(
+            checkpoints[models.RaceDataSyncDataKind.RESULT].next_poll_at
+        )
+        self.assertEqual(tracking.next_poll_at, checkpoints["race_time"].next_poll_at)
+        self.assertTrue(all(row.lock_version == 1 for row in checkpoints.values()))
         schedule_changes = models.RaceEventFieldChange.objects.filter(
             event=self.event,
             subject_type=models.RaceEventFieldSubjectType.EVENT,
@@ -870,11 +957,117 @@ class RacecardFieldReconciliationContractTests(TestCase):
             {"slice_c"},
         )
 
+    @override_settings(
+        RACE_DATA_SYNC_ENABLED_FIELDS=(
+            "off_time",
+            "status",
+            "participants.horse_name",
+            "participants.number",
+            "participants.draw",
+            "participants.jockey_name",
+            "participants.status",
+        )
+    )
+    def test_provider_schedule_cannot_reopen_terminal_event(self):
+        self.event.status = models.RaceEventStatus.FINISHED
+        self.event.save(update_fields=("status", "updated_at"))
+        observation = self._observation(
+            self.tra,
+            payload_overrides={
+                "off_time": "2026-08-02T15:00:00+08:00",
+                "race_status": models.RaceEventStatus.RUNNING,
+            },
+            allowed_fields=[
+                "off_time",
+                "status",
+                "participants.horse_name",
+                "participants.number",
+                "participants.draw",
+                "participants.jockey_name",
+                "participants.status",
+            ],
+        )
+
+        decision = self._reconcile(observation, allow_schedule_apply=True)
+
+        self.assertIn(decision.status, {"applied", "replayed"})
+        self.event.refresh_from_db()
+        self.assertEqual(self.event.status, models.RaceEventStatus.FINISHED)
+        status_change = models.RaceEventFieldChange.objects.get(
+            event=self.event,
+            observation=observation,
+            subject_type=models.RaceEventFieldSubjectType.EVENT,
+            field_name="status",
+        )
+        self.assertFalse(status_change.applied)
+        self.assertEqual(
+            status_change.rejection_reason, "terminal_status_regression"
+        )
+
     def test_postponed_and_full_schedule_tuple_are_candidates_only(self):
         self._assert_schedule_candidates(models.RaceEventStatus.POSTPONED)
 
     def test_cancelled_and_full_schedule_tuple_are_candidates_only(self):
         self._assert_schedule_candidates(models.RaceEventStatus.CANCELLED)
+
+    @override_settings(
+        RACE_DATA_SYNC_ENABLED_FIELDS=(
+            "off_time",
+            "local_start_time",
+            "timezone_name",
+            "status",
+            "participants.horse_name",
+            "participants.number",
+            "participants.draw",
+            "participants.jockey_name",
+            "participants.status",
+        )
+    )
+    def test_same_observation_reprocesses_fields_after_schedule_gate_opens(self):
+        observation = self._observation(
+            self.tra,
+            payload_overrides={
+                "off_time": "2026-08-03T15:10:00+08:00",
+                "local_start_time": "15:10:00",
+                "timezone_name": "Asia/Macau",
+                "race_status": models.RaceEventStatus.POSTPONED,
+            },
+            allowed_fields=[
+                "off_time",
+                "local_start_time",
+                "timezone_name",
+                "status",
+                "participants.horse_name",
+                "participants.number",
+                "participants.draw",
+                "participants.jockey_name",
+                "participants.status",
+            ],
+        )
+
+        shadow = self._reconcile(observation, allow_schedule_apply=False)
+        applied = self._reconcile(observation, allow_schedule_apply=True)
+
+        self.assertEqual(shadow.status, "applied")
+        self.assertEqual(applied.status, "applied")
+        self.event.refresh_from_db()
+        self.assertEqual(
+            self.event.race_datetime,
+            datetime(2026, 8, 3, 7, 10, tzinfo=dt_timezone.utc),
+        )
+        self.assertEqual(self.event.status, models.RaceEventStatus.POSTPONED)
+        schedule_changes = models.RaceEventFieldChange.objects.filter(
+            observation=observation,
+            subject_type=models.RaceEventFieldSubjectType.EVENT,
+        )
+        self.assertEqual(schedule_changes.filter(applied=True).count(), 5)
+        self.assertEqual(
+            schedule_changes.filter(
+                applied=False,
+                rejection_reason="schedule_apply_disabled",
+            ).count(),
+            5,
+        )
 
     @override_settings(
         RACE_DATA_SYNC_ENABLED_FIELDS=tuple(
@@ -1571,6 +1764,29 @@ class RaceDataRawRetentionContractTests(TestCase):
         self.assertTrue((self.root / "b2").exists())
         self.assertTrue((self.root / "c3").exists())
         self.assertTrue(models.RaceResultObservation.objects.filter(pk=expired.pk).exists())
+
+    def test_cleanup_stops_before_exceeding_byte_budget(self):
+        first = self._observation(
+            "g7", retention_until=NOW - timedelta(seconds=2)
+        )
+        second = self._observation(
+            "h8", retention_until=NOW - timedelta(seconds=1)
+        )
+        first_size = Path(first.raw_artifact_path).stat().st_size
+
+        result = _pipeline().cleanup_expired_race_data_raw_payloads(
+            now=NOW,
+            batch_size=100,
+            max_bytes=first_size,
+        )
+
+        self.assertEqual(result.cleaned, 1)
+        self.assertEqual(result.cleaned_bytes, first_size)
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertEqual(first.raw_artifact_path, "")
+        self.assertTrue(second.raw_artifact_path)
+        self.assertTrue(Path(second.raw_artifact_path).exists())
 
     def test_cleanup_never_deletes_symlink_target_or_out_of_root_path(self):
         symlinked = self._observation(

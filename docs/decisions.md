@@ -1,5 +1,29 @@
 # 关键决策
 
+## 2026-08-29 0075 为本发布最终 leaf，门禁重放与公开读取必须保持证据语义
+
+- 普通 Release-B deploy/rollback 的最终 leaf 固定为
+  `stable.0075_race_data_source_priority_and_reported_position`；pre-0075 目标不得使用通用
+  rollback。`0075` 的 `reported_finish_position` 只可回填已存在的 official value，
+  `finish_position` 只是内部稳定排序，未知名次必须保持 `NULL`。
+- `data_sync` owner 的赛果不借用 legacy race-live policy/authority 决策。读取时独立重验
+  result apply/public/correction 开关、exact enrollment/source/route、owner/enrollment generation、standing
+  policy、registry/contract/provenance 与 publication audit；任一漂移即 fail closed。
+- 因开关关闭而保存的 shadow/rejected 证据不是永久处理完成。同一 observation 只在相应
+  apply/public 门禁真正打开后才可 promotion/重处理；门禁仍关闭时重放必须零新 audit
+  写入。manual lock、身份冲突、证据不完整和真实 contract rejection 不得自动重试覆盖。
+- provider 执行器的赛事身份唯一来自当前 `RaceDataSyncEnrollment.source_identity`；即使同事件
+  存在多 provider/region/namespace identity，也不得通过 `.first()` 选择另一条“看似可用”的来源。
+- `RACE_DATA_SYNC_ENABLED` 是 future discovery 和 artifact cleanup 的共同总开关；子开关、Beat route
+  或 cleanup schedule 不能绕过它产生数据库、网络或删除副作用。snapshot waiter 的有界轮询必须在
+  最小 jitter 下仍覆盖完整 lease TTL，不能在合法 owner 即将发布前提前宣告 timeout。
+- shared snapshot 保留 8 天，以覆盖确认赛果的 T+7 更正窗口；清理有批量上限、校验
+  manifest/cache key/SHA 和文件 inode，且只投递到拥有 `/run/race-data-sync` mount 的
+  `race_sync_v2`。不消费旧 `race_live`，也不让普通 worker 处理 artifact 清理。
+- cancelled/finished 为 lifecycle 终态；cancelled 停止所有 checkpoint，postponed 丢弃旧
+  result datetime 并等待新 schedule。T+30 告警只针对未确认且非 cancelled/postponed 的 enrolled
+  event；已有 open incident 不得占用后续 batch，赛果确认后 incident 自动 resolved。
+
 ## 2026-08-28 自动赛事数据以一次最终生产确认为授权边界，canonical 写入必须重验 exact claim
 
 - 本 change 的产品目标明确覆盖早期文档中的固定 7 天 shadow、多 PR、逐地区或逐赛事人工批准：未来赛事

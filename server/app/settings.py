@@ -248,11 +248,11 @@ RACE_DATA_SYNC_LEGACY_TRANSFER_APPROVAL_SHA256 = env(
 UMANEWS_RELEASE_COMMIT = env("UMANEWS_RELEASE_COMMIT", "")
 
 
-def race_data_capacity_int(name: str) -> int | None:
+def race_data_capacity_int(name: str, default: str = "0") -> int | None:
     """Keep bad capacity input local to provider admission, not process import."""
 
     try:
-        return int(env(name, "0"))
+        return int(env(name, default))
     except (TypeError, ValueError):
         return None
 
@@ -286,6 +286,9 @@ RACE_DATA_RAW_CLEANUP_MAX_BYTES = race_data_capacity_int(
 )
 RACE_DATA_RAW_HOLD_ALERT_BYTES = race_data_capacity_int(
     "RACE_DATA_RAW_HOLD_ALERT_BYTES"
+)
+RACE_DATA_SNAPSHOT_RETENTION_SECONDS = race_data_capacity_int(
+    "RACE_DATA_SNAPSHOT_RETENTION_SECONDS", str(8 * 24 * 3600)
 )
 RACE_DATA_RAW_ARTIFACT_ROOTS = tuple(
     item.strip()
@@ -891,6 +894,7 @@ CELERY_TASK_ROUTES = {
     "stable.tasks.discover_future_race_data_sync_task": {"queue": "race_sync_v2"},
     "stable.tasks.advance_race_data_sync_lifecycle_task": {"queue": "celery"},
     "stable.tasks.monitor_race_data_sync_result_slo_task": {"queue": "celery"},
+    "stable.tasks.cleanup_race_data_sync_artifacts_task": {"queue": "race_sync_v2"},
     "stable.tasks.advance_race_event_lifecycle_task": {"queue": "celery"},
     "stable.tasks.scheduled_race_result_review_task": {"queue": "celery"},
     "stable.tasks.reconcile_stale_race_result_review_claims_task": {
@@ -972,6 +976,11 @@ def build_race_data_sync_beat_schedule(
             "task": "stable.tasks.monitor_race_data_sync_result_slo_task",
             "schedule": crontab(minute="*"),
             "options": {"queue": "celery", "expires": 55},
+        }
+        schedule["cleanup-race-data-sync-artifacts"] = {
+            "task": "stable.tasks.cleanup_race_data_sync_artifacts_task",
+            "schedule": crontab(minute=37),
+            "options": {"queue": "race_sync_v2", "expires": 3300},
         }
     return schedule
 

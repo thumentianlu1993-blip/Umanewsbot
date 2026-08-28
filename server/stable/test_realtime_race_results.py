@@ -2872,6 +2872,9 @@ class RaceLiveTheRacingApiFreeRunnerTests(TestCase):
                     "path": "/v1/racecards/free",
                     "skip": [0],
                 },
+                "result_by_id": {
+                    "path": "/v1/results/{race_id}",
+                },
                 "results_today_free": {
                     "limit": [50],
                     "path": "/v1/results/today/free",
@@ -4596,7 +4599,6 @@ class TheRacingApiOfflineFixtureContractTests(SimpleTestCase):
                     "draw": "4",
                     "jockey_name": "Fixture Jockey",
                     "jockey_id": "jky_fixture_1",
-                    "status": "declared",
                 },
             ),
         )
@@ -5562,6 +5564,87 @@ class RaceResultRevisionApplyTests(TestCase):
         stable_views._attach_result_display_positions([non_finisher])
         self.assertEqual(non_finisher.display_finish_position, "中止")
         self.assertNotEqual(non_finisher.display_finish_position, non_finisher.finish_position)
+
+    def test_public_display_and_winner_prefer_reported_position(self):
+        reported_winner = stable_models.RaceEventResult(
+            event=self.event,
+            finish_position=2,
+            reported_finish_position=1,
+            official_finish_position=2,
+            horse_name="Reported Winner",
+            running_status=stable_models.RaceRunnerStatus.FINISHED,
+            source_refs={},
+        )
+        legacy_winner = stable_models.RaceEventResult(
+            event=self.event,
+            finish_position=1,
+            reported_finish_position=2,
+            official_finish_position=1,
+            horse_name="Legacy Winner",
+            running_status=stable_models.RaceRunnerStatus.FINISHED,
+            source_refs={},
+        )
+        from stable import views as stable_views
+
+        stable_views._attach_result_display_positions(
+            [legacy_winner, reported_winner]
+        )
+
+        self.assertEqual(reported_winner.display_finish_position, 1)
+        self.assertEqual(legacy_winner.display_finish_position, 2)
+        self.assertIs(
+            stable_views._confirmed_race_winner(
+                [legacy_winner, reported_winner]
+            ),
+            reported_winner,
+        )
+
+    def test_homepage_today_race_winner_prefers_reported_position(self):
+        self.event.local_date = self.NOW.date()
+        self.event.status = stable_models.RaceEventStatus.FINISHED
+        self.event.visibility_status = stable_models.RaceEventVisibility.PUBLISHED
+        self.event.save(
+            update_fields=(
+                "local_date",
+                "status",
+                "visibility_status",
+                "updated_at",
+            )
+        )
+        stable_models.RaceEventResult.objects.bulk_create(
+            [
+                stable_models.RaceEventResult(
+                    event=self.event,
+                    finish_position=1,
+                    reported_finish_position=2,
+                    official_finish_position=1,
+                    horse_name="Legacy Winner",
+                    running_status=stable_models.RaceRunnerStatus.FINISHED,
+                    is_confirmed=True,
+                ),
+                stable_models.RaceEventResult(
+                    event=self.event,
+                    finish_position=2,
+                    reported_finish_position=1,
+                    official_finish_position=2,
+                    horse_name="Reported Winner",
+                    running_status=stable_models.RaceRunnerStatus.FINISHED,
+                    is_confirmed=True,
+                ),
+            ]
+        )
+        from stable import views as stable_views
+
+        with patch.object(
+            stable_views.timezone,
+            "localdate",
+            return_value=self.event.local_date,
+        ):
+            entries, is_fallback = stable_views._public_today_races()
+
+        self.assertFalse(is_fallback)
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]["winner"], "Reported Winner")
 
     def test_caller_cannot_spoof_official_authority_for_supplemental_source(self):
         official = self._make_observation("official", (2, 1), "e")

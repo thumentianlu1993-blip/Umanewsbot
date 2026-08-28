@@ -1,5 +1,36 @@
 # 当前状态
 
+## 2026-08-29 PR #108 历史 claim 与整体代码阻塞已通过最终复审和发布门禁，生产未变
+
+- PR `#108` 仍为 OPEN，生产仍运行 revision `2833558a6a2d67b7dc9816b53ea8ad5d580eb56c` / image
+  `sha256:4bc392d0…611a611` / migration leaf `0073`；新赛事写入开关均关闭，
+  `race_sync_v2=0`，旧 `race_live=7543` 未清理、迁移或消费。本记录所在候选 commit 尚未合并，
+  未执行生产备份、历史 claim 收口、migration、合并、镜像切换或自动化启用。
+- 14 条过期 `claimed` 的根因修复保持三层边界：prepare exception 按原 token 终态化；
+  每 5 分钟 sweeper 只收口过期且严格空证据 claim；历史命令使用 canonical manifest SHA、
+  PostgreSQL advisory transaction lock 和全集合重算，任一活跃、畸形、证据存在或
+  eligibility 漂移都整批零写。收口不会生成 bundle、delivery、赛果或队列消息。
+- 全 PR 独立审查返回的 6 个 P1 + 7 个 P2 已逐项修复：Release-B 最终 leaf/rollback
+  已顺接 `0075`；migration 不再把内部排序猜成对外名次；data-sync 赛果使用独立公开
+  读取合同；开关打开后可 promotion 既有 shadow revision，并重处理先前只因门禁关闭而
+  rejected 的同一 observation；TRA 执行器必须使用 enrollment 的 exact source/route。
+- shared snapshot 新增 8 天 retention（覆盖 T+7 更正窗口）与有界清理，清理任务只路由到
+  `race_sync_v2`，因此能看到专用 artifact mount，不会交给普通 worker 或旧 `race_live`。取消赛事
+  停止 result polling，延期赛事不再沿用旧时间轮询赛果，终态 lifecycle 不再每分钟重选；
+  T+30 告警已排除取消/延期、不被既有 open incident 饿死，赛果确认后自动解除。
+- 最终增量还补齐三条直接边界：future discovery 与 artifact cleanup 均先核对总开关
+  `RACE_DATA_SYNC_ENABLED`；snapshot waiter 的最小 jitter 也必然跨过 120 秒 lease；赛事公开批量读取
+  预载 exact source，避免逐场 N+1。对应测试已固化，完整 diff 独立复审结论为 `No findings`。
+- 当前发布门禁：SQLite/发布组合一次发现 `539` 项，其中 `535` 通过、`3` 跳过，唯一错误是基础
+  image 缺少 `git`；在同版本、可读取 worktree 元数据的 Git-capable 容器中精确重跑该项为 `1/1`，
+  因而实际断言为 `536` 通过、`3` 环境跳过。部署/回滚合同另为 `42/42`；PostgreSQL
+  migration/history/catalog/fault-injection `27/27`，R0 + Pipeline A 并发/CAS `24/24`，历史 claim
+  并发锁另 `4/4`。Django check、migration drift、compileall、Shell syntax、三份 Compose、secret
+  pattern scan 与 `git diff --check` 全绿。
+- 下一步只允许 push 并核对远端精确候选，再按生产只读复核、备份、精确收口 14 条 claim 和重跑
+  closed-state preflight 的顺序准备发布。只在 exact PR head/merge SHA/image 的 merge/deploy/enable 前
+  再请求一次最终确认；任一门禁失败立即停止并保持新写入关闭。
+
 ## 2026-08-28 PR #108 生产发布在 writer 静默门禁安全停止
 
 - 用户已确认合并并部署 PR `#108`，但合并前生产检查发现宿主机一度处于约 `100 MiB`

@@ -37,6 +37,12 @@ _TERMINAL_RESULT_STATUSES = frozenset(
         models.RaceEventRevisionItemStatus.REFUSED,
     }
 )
+_RANKED_RESULT_STATUSES = frozenset(
+    {
+        models.RaceEventRevisionItemStatus.FINISHED,
+        models.RaceEventRevisionItemStatus.DEAD_HEAT,
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -75,7 +81,7 @@ def _normalize_result_rows(payload: object) -> tuple[dict[str, Any], ...]:
         raise ValueError("result participants are invalid")
     normalized: list[dict[str, Any]] = []
     seen_runner_ids: set[str] = set()
-    has_positive_position = False
+    ranked_positions: list[int] = []
     for source_order, raw in enumerate(participants, start=1):
         if not isinstance(raw, dict):
             raise ValueError("result participant is invalid")
@@ -98,10 +104,13 @@ def _normalize_result_rows(payload: object) -> tuple[dict[str, Any], ...]:
                 or not 1 <= reported_position <= 100
             ):
                 raise ValueError("reported finish position is invalid")
-            has_positive_position = True
         status = str(raw.get("status") or "").strip()
         if status not in models.RaceEventRevisionItemStatus.values:
             raise ValueError("result participant status is invalid")
+        if (status in _RANKED_RESULT_STATUSES) != (reported_position is not None):
+            raise ValueError("result position and status are inconsistent")
+        if reported_position is not None:
+            ranked_positions.append(reported_position)
         normalized.append(
             {
                 "source_order": source_order,
@@ -124,8 +133,27 @@ def _normalize_result_rows(payload: object) -> tuple[dict[str, Any], ...]:
                 ),
             }
         )
-    if not has_positive_position:
+    if not ranked_positions:
         raise ValueError("result has no positive finish position")
+    counts: dict[int, int] = {}
+    for position in ranked_positions:
+        counts[position] = counts.get(position, 0) + 1
+    ranked_count = 0
+    for position, count in sorted(counts.items()):
+        if position != ranked_count + 1:
+            raise ValueError("result finish order is not a legal competition ranking")
+        ranked_count += count
+    for row in normalized:
+        position = row["reported_finish_position"]
+        if position is None:
+            continue
+        expected_status = (
+            models.RaceEventRevisionItemStatus.DEAD_HEAT
+            if counts[position] > 1
+            else models.RaceEventRevisionItemStatus.FINISHED
+        )
+        if row["status"] != expected_status:
+            raise ValueError("result dead-heat status is inconsistent")
     return tuple(normalized)
 
 
@@ -211,8 +239,18 @@ def apply_data_sync_result_observation(
     if timezone.is_naive(now):
         raise ValueError("now must be timezone-aware")
     with transaction.atomic():
-        # Lifecycle-control-before-event is the shared lock graph used by the
-        # lifecycle worker and all data-sync canonical projections.
+        from stable.services.race_event_lifecycle_enforce import (
+            lock_current_runtime_registry_membership,
+            validate_registry_membership_snapshot,
+        )
+
+        membership_validation = None
+        if project_current:
+            # Global lock graph: registry barrier/membership -> lifecycle -> event.
+            membership_validation = lock_current_runtime_registry_membership(
+                event_id=expected_event_id,
+                now=now,
+            )
         lifecycle = (
             models.RaceEventLifecycleControl.objects.select_for_update()
             .filter(event_id=expected_event_id)
@@ -301,6 +339,16 @@ def apply_data_sync_result_observation(
             rows = _normalize_result_rows(observation.normalized_payload)
         except (TypeError, ValueError):
             return DataSyncResultApplyDecision("rejected", "result_payload_incomplete")
+        ordered_rows = tuple(
+            sorted(
+                rows,
+                key=lambda row: (
+                    row["reported_finish_position"] is None,
+                    row["reported_finish_position"] or 101,
+                    row["source_order"],
+                ),
+            )
+        )
 
         event = (
             locked_claim.event
@@ -320,12 +368,28 @@ def apply_data_sync_result_observation(
             return DataSyncResultApplyDecision("rejected", "projection_subject_missing")
         if control.write_owner != models.RaceEventProjectionWriteOwner.DATA_SYNC:
             return DataSyncResultApplyDecision("rejected", "writer_owner_conflict")
+        lifecycle_trusted = False
+        lifecycle_reason = "registry_membership_missing"
+        if membership_validation is not None:
+            lifecycle_reason = membership_validation.reason_code
+            if membership_validation.valid:
+                lifecycle_snapshot = validate_registry_membership_snapshot(
+                    membership=membership_validation.membership,
+                    event=event,
+                    control=lifecycle,
+                    now=now,
+                )
+                lifecycle_trusted = lifecycle_snapshot.valid
+                lifecycle_reason = lifecycle_snapshot.reason_code
         race_status = str(
             observation.normalized_payload.get("race_status") or ""
         ).strip().casefold()
         terminal_marker = race_status in {
             value.casefold() for value in roster_entry.terminal_markers
-        }
+        } or bool(
+            observation.result_phase == models.RaceResultPhase.CORRECTED
+            and provenance.get("correction_marker") is True
+        )
         terminal_phase = observation.result_phase in {
             models.RaceResultPhase.OFFICIAL,
             models.RaceResultPhase.CORRECTED,
@@ -333,6 +397,9 @@ def apply_data_sync_result_observation(
         if terminal_phase and not terminal_marker:
             return DataSyncResultApplyDecision("rejected", "terminal_marker_missing")
         roster_mapping = None
+        participants_by_external_id: dict[
+            str, models.RaceEventParticipant | None
+        ] = {}
         if terminal_phase:
             roster_mapping = _result_roster_mapping(
                 event=event,
@@ -342,6 +409,89 @@ def apply_data_sync_result_observation(
             if roster_mapping is None:
                 return DataSyncResultApplyDecision(
                     "rejected", "result_roster_incomplete"
+                )
+            existing_identities = list(
+                models.RaceEventParticipantSourceIdentity.objects.select_for_update()
+                .select_related("participant", "source_identity")
+                .filter(participant__event=event)
+            )
+            identities_by_source_runner = {
+                (
+                    identity.source_identity.source_key,
+                    identity.external_runner_id,
+                ): identity
+                for identity in existing_identities
+                if identity.external_runner_id
+            }
+            identities_by_result_runner = {
+                identity.external_runner_id: identity
+                for identity in existing_identities
+                if identity.source_identity_id == source.pk
+                and identity.external_runner_id
+            }
+            identities_by_participant_source = {
+                (identity.participant_id, identity.source_identity_id): identity
+                for identity in existing_identities
+            }
+            for row, runner in roster_mapping:
+                refs = (
+                    runner.source_refs
+                    if isinstance(runner.source_refs, dict)
+                    else {}
+                )
+                candidate_participants: dict[
+                    int, models.RaceEventParticipant
+                ] = {}
+                for source_key, external_runner_id in refs.items():
+                    identity = identities_by_source_runner.get(
+                        (str(source_key), str(external_runner_id or "").strip())
+                    )
+                    if identity is not None:
+                        candidate_participants[identity.participant_id] = (
+                            identity.participant
+                        )
+                legacy_source_key = str(refs.get("source_key") or "").strip()
+                legacy_external_id = str(
+                    refs.get("external_runner_id") or ""
+                ).strip()
+                if legacy_source_key and legacy_external_id:
+                    identity = identities_by_source_runner.get(
+                        (legacy_source_key, legacy_external_id)
+                    )
+                    if identity is not None:
+                        candidate_participants[identity.participant_id] = (
+                            identity.participant
+                        )
+                existing_result_identity = identities_by_result_runner.get(
+                    row["external_runner_id"]
+                )
+                if existing_result_identity is not None:
+                    candidate_participants[
+                        existing_result_identity.participant_id
+                    ] = existing_result_identity.participant
+                if len(candidate_participants) > 1:
+                    return DataSyncResultApplyDecision(
+                        "rejected", "participant_identity_conflict"
+                    )
+                participant = next(
+                    iter(candidate_participants.values()), None
+                )
+                if participant is not None:
+                    participant_source_identity = (
+                        identities_by_participant_source.get(
+                            (participant.pk, source.pk)
+                        )
+                    )
+                    if (
+                        participant_source_identity is not None
+                        and participant_source_identity.external_runner_id
+                        != row["external_runner_id"]
+                    ):
+                        return DataSyncResultApplyDecision(
+                            "rejected", "participant_identity_conflict"
+                        )
+                participants_by_external_id[row["external_runner_id"]] = (
+                    participant
                 )
         manual_locks = (
             event.manual_lock_flags
@@ -388,32 +538,62 @@ def apply_data_sync_result_observation(
             return DataSyncResultApplyDecision(
                 "replayed", arbitration.reason_code, current.pk, True
             )
-        if current is not None and not correction_apply_enabled and arbitration.apply:
+        correction_marked = bool(
+            observation.result_phase == models.RaceResultPhase.CORRECTED
+            and provenance.get("correction_marker") is True
+        )
+        priority_replacement = bool(
+            current is not None
+            and arbitration.apply
+            and arbitration.reason_code == "higher_priority_source"
+        )
+        authorized_replacement = correction_marked or priority_replacement
+        if (
+            current is not None
+            and authorized_replacement
+            and not correction_apply_enabled
+            and arbitration.apply
+        ):
             return DataSyncResultApplyDecision(
                 "rejected", "correction_apply_disabled", current.pk, True
             )
 
+        phase = (
+            models.RaceResultPhase.PROVISIONAL
+            if observation.result_phase == models.RaceResultPhase.PROVISIONAL
+            else observation.result_phase
+        )
+        correction_conflict = bool(
+            current is not None and not authorized_replacement
+        )
+        may_project = bool(
+            terminal_phase
+            and project_current
+            and arbitration.apply
+            and lifecycle_trusted
+            and not correction_conflict
+        )
         existing = models.RaceEventRevision.objects.filter(
             event=event,
             kind=models.RaceEventRevisionKind.RESULT,
             content_sha256=content_sha256,
         ).first()
-        if existing is not None:
+        promote_existing = bool(
+            existing is not None
+            and may_project
+            and existing.published_at is None
+            and existing.primary_observation_id == observation.pk
+            and existing.phase == phase
+            and existing.source_authority == candidate_source_class
+            and existing.items.count() == len(rows)
+        )
+        if existing is not None and not promote_existing:
             return DataSyncResultApplyDecision(
                 "replayed",
                 "revision_exists",
                 existing.pk,
                 control.current_result_revision_id == existing.pk,
             )
-        revision_no = control.next_result_revision_no
-        phase = (
-            models.RaceResultPhase.PROVISIONAL
-            if observation.result_phase == models.RaceResultPhase.PROVISIONAL
-            else models.RaceResultPhase.CORRECTED
-            if current is not None
-            else models.RaceResultPhase.OFFICIAL
-        )
-        may_project = bool(terminal_phase and project_current and arbitration.apply)
         if may_project:
             assert roster_mapping is not None
             for row, runner in roster_mapping:
@@ -426,19 +606,47 @@ def apply_data_sync_result_observation(
                     source.source_key: row["external_runner_id"],
                 }
                 runner.save(update_fields=("source_refs", "updated_at"))
-        revision = models.RaceEventRevision.objects.create(
-            event=event,
-            kind=models.RaceEventRevisionKind.RESULT,
-            revision_no=revision_no,
-            phase=phase,
-            content_sha256=content_sha256,
-            source_authority=candidate_source_class,
-            decision_reason=arbitration.reason_code,
-            primary_observation=observation,
-            supersedes=current if arbitration.apply else None,
-            published_at=now if may_project else None,
-            official_confirmed_at=now if may_project else None,
-        )
+        if promote_existing:
+            assert existing is not None
+            revision = existing
+            revision.published_at = now
+            revision.official_confirmed_at = now
+            revision.decision_reason = "shadow_revision_promoted"
+            revision.save(
+                update_fields=(
+                    "published_at",
+                    "official_confirmed_at",
+                    "decision_reason",
+                    "updated_at",
+                )
+            )
+        else:
+            revision = models.RaceEventRevision.objects.create(
+                event=event,
+                kind=models.RaceEventRevisionKind.RESULT,
+                revision_no=control.next_result_revision_no,
+                phase=phase,
+                content_sha256=content_sha256,
+                source_authority=candidate_source_class,
+                decision_reason=(
+                    "correction_marker_missing"
+                    if correction_conflict
+                    else lifecycle_reason
+                    if project_current and arbitration.apply and not lifecycle_trusted
+                    else arbitration.reason_code
+                ),
+                primary_observation=observation,
+                supersedes=(
+                    current if arbitration.apply and authorized_replacement else None
+                ),
+                published_at=now if may_project else None,
+                official_confirmed_at=now if may_project else None,
+                conflict_status=(
+                    models.RaceEventRevisionConflictStatus.PENDING
+                    if correction_conflict
+                    else models.RaceEventRevisionConflictStatus.NONE
+                ),
+            )
         if may_project:
             models.RaceEventRevisionPublication.objects.create(
                 revision=revision,
@@ -459,57 +667,64 @@ def apply_data_sync_result_observation(
                 ),
                 official_authorization_version=0,
             )
-        control.next_result_revision_no += 1
-        for internal_order, row in enumerate(rows, start=1):
-            stable_key = (
-                f"{source.source_key}:"
-                f"{hashlib.sha256(row['external_runner_id'].encode()).hexdigest()[:48]}"
-            )
-            participant, _ = models.RaceEventParticipant.objects.get_or_create(
-                event=event,
-                stable_key=stable_key,
-                defaults={
-                    "canonical_name": row["horse_name"],
-                    "country_region": event.country_region,
-                    "review_status": models.RaceLiveReviewStatus.APPROVED,
-                },
-            )
-            models.RaceEventParticipantSourceIdentity.objects.get_or_create(
-                participant=participant,
-                source_identity=source,
-                defaults={"external_runner_id": row["external_runner_id"]},
-            )
-            reported_position = row["reported_finish_position"]
-            models.RaceEventRevisionItem.objects.create(
+        if not promote_existing:
+            control.next_result_revision_no += 1
+            for internal_order, row in enumerate(ordered_rows, start=1):
+                stable_key = (
+                    f"{source.source_key}:"
+                    f"{hashlib.sha256(row['external_runner_id'].encode()).hexdigest()[:48]}"
+                )
+                participant = participants_by_external_id.get(
+                    row["external_runner_id"]
+                )
+                if participant is None:
+                    participant, _ = (
+                        models.RaceEventParticipant.objects.get_or_create(
+                            event=event,
+                            stable_key=stable_key,
+                            defaults={
+                                "canonical_name": row["horse_name"],
+                                "country_region": event.country_region,
+                                "review_status": models.RaceLiveReviewStatus.APPROVED,
+                            },
+                        )
+                    )
+                models.RaceEventParticipantSourceIdentity.objects.get_or_create(
+                    source_identity=source,
+                    external_runner_id=row["external_runner_id"],
+                    defaults={"participant": participant},
+                )
+                reported_position = row["reported_finish_position"]
+                models.RaceEventRevisionItem.objects.create(
+                    revision=revision,
+                    participant=participant,
+                    source_order=row["source_order"],
+                    internal_order=internal_order,
+                    reported_finish_position=reported_position,
+                    official_finish_position=reported_position,
+                    status=row["status"],
+                    raw_status=row["raw_status"],
+                    finish_time=row["finish_time"],
+                    margin=row["margin"],
+                    horse_number=row["number"],
+                    barrier=row["barrier"],
+                    jockey_name=row["jockey_name"],
+                    trainer_name=row["trainer_name"],
+                    carried_weight=row["carried_weight"],
+                    field_provenance=row["field_provenance"],
+                )
+            models.RaceEventRevisionEvidence.objects.create(
                 revision=revision,
-                participant=participant,
-                source_order=row["source_order"],
-                internal_order=internal_order,
-                reported_finish_position=reported_position,
-                official_finish_position=reported_position,
-                status=row["status"],
-                raw_status=row["raw_status"],
-                finish_time=row["finish_time"],
-                margin=row["margin"],
-                horse_number=row["number"],
-                barrier=row["barrier"],
-                jockey_name=row["jockey_name"],
-                trainer_name=row["trainer_name"],
-                carried_weight=row["carried_weight"],
-                field_provenance=row["field_provenance"],
+                observation=observation,
+                role="primary",
             )
-        models.RaceEventRevisionEvidence.objects.create(
-            revision=revision,
-            observation=observation,
-            role="primary",
-        )
 
         projected = may_project
         if projected:
             models.RaceEventResult.objects.filter(event=event).delete()
             legacy_results = []
             for item, row in zip(
-                revision.items.order_by("internal_order"), rows, strict=True
+                revision.items.order_by("internal_order"), ordered_rows, strict=True
             ):
                 legacy_results.append(
                     models.RaceEventResult(
@@ -599,7 +814,11 @@ def apply_data_sync_result_observation(
         )
         return DataSyncResultApplyDecision(
             "applied" if projected else "recorded",
-            arbitration.reason_code,
+            (
+                "shadow_revision_promoted"
+                if promote_existing
+                else revision.decision_reason
+            ),
             revision.pk,
             projected,
         )

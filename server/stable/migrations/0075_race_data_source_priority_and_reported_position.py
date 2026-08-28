@@ -1,5 +1,4 @@
 from django.db import migrations, models
-from django.db.models.functions import Coalesce
 
 
 def backfill_reported_finish_positions(apps, schema_editor):
@@ -8,11 +7,11 @@ def backfill_reported_finish_positions(apps, schema_editor):
     RevisionItem.objects.filter(reported_finish_position__isnull=True).update(
         reported_finish_position=models.F("official_finish_position")
     )
-    Result.objects.filter(reported_finish_position__isnull=True).update(
-        reported_finish_position=Coalesce(
-            "official_finish_position",
-            "finish_position",
-        )
+    Result.objects.filter(
+        reported_finish_position__isnull=True,
+        official_finish_position__isnull=False,
+    ).update(
+        reported_finish_position=models.F("official_finish_position")
     )
 
 

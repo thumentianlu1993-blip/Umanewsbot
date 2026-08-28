@@ -1,5 +1,25 @@
 # 项目状态文档
 
+## 2026-08-29 PR #108 阻塞修复已通过最终独立复审与发布门禁，精确候选已生成
+
+- 生产真实状态未变：PR 仍 OPEN，revision `2833558a…56c`、leaf `0073`，新赛事写入全关，
+  `race_sync_v2=0`、旧 `race_live=7543`。未备份、未收口 14 条 claim、未 migration/合并/部署/启用。
+- 历史 claim 修复已绑定 exact manifest SHA、eligibility、PostgreSQL advisory transaction lock 和全集合
+  CAS；同时修复 prepare exception 终态化与严格过期 sweeper，畸形/活跃/已有证据行仍整批拒绝。
+- 全 PR 的 13 项有效 review findings 已关闭：`0075` final leaf/catalog/rollback、未知名次不猜测、
+  data-sync 独立公开读取、shadow promotion、开关开启后的 observation 重处理、exact enrollment source、
+  8 天 snapshot retention/专用队列清理、cancelled/postponed/terminal polling 和告警公平/解除。
+- 最终增量把 future discovery/cleanup 绑定总开关、保证 snapshot waiter 跨过 lease TTL，并消除
+  data-sync 公开批量读取的 source N+1；完整 diff 独立 code review 最终结论为 `No findings`。
+- 当前组合证据为 SQLite/发布实际断言 `536` 通过、`3` 环境跳过（基础 image 缺 Git 的唯一错误已在
+  Git-capable 同版本容器精确重跑 `1/1`）；部署/回滚合同 `42/42`。PostgreSQL
+  migration/history/catalog/fault injection `27/27`，R0 + Pipeline A 并发/CAS `24/24`，历史 claim 锁
+  另 `4/4`。Django check、migration generation、compileall、Shell、三份 Compose、secret pattern 与
+  diff whitespace 门禁全绿。
+- 当前下一步是 push 并核对远端精确候选，随后在生产创建可恢复备份并精确收口 14 条 claim。最终
+  merge/deploy/enable 仍需绑定 exact PR head/merge SHA/image 的一次用户确认；任一门禁失败都停止且
+  保持新写入关闭。
+
 ## 2026-08-28 PR #108 发布因 14 条 claimed 赛果审核记录停止
 
 - 用户已给出最终合并/部署授权，但 PR `#108` 尚未合并，生产仍为 revision `2833558a…56c`、migration

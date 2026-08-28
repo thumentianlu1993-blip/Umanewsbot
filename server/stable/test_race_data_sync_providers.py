@@ -4,11 +4,12 @@ from datetime import date, datetime, timedelta, timezone as dt_timezone
 import json
 from pathlib import Path
 import tempfile
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from django.test import TestCase, override_settings
 
 from stable import models
+from stable.services import race_data_sync_control, race_data_sync_providers
 from stable.services.race_data_sync_pipeline import (
     _ROSTER_ALLOWED_FIELDS,
     build_race_data_provider_roster,
@@ -24,12 +25,66 @@ from stable.services.race_data_sync_providers import (
     run_the_racing_api_data_sync,
 )
 from stable.services.race_live_source_proof import RaceLiveProofHttpResponse
+from stable.services.race_event_lifecycle_enrollment import _schedule_hash
 
 
 NOW = datetime(2026, 8, 28, 8, 0, tzinfo=dt_timezone.utc)
 SHA = "a" * 64
 ROOT = Path(__file__).resolve().parents[2]
 REFERENCE_SHA = "740a93774927765f9c848cc97e4b87b78ab36d473c4c3e2e644d56a6f856cff2"
+REGISTRY_ROOT = "b" * 64
+REGISTRY_MEMBERSHIP = "c" * 64
+REGISTRY_ACTIVATION = "d" * 64
+REGISTRY_ENTRY = "e" * 64
+LIFECYCLE_ENROLLMENT = "f" * 64
+
+
+def _authorize_lifecycle(event: models.RaceEvent) -> None:
+    event.visibility_status = models.RaceEventVisibility.PUBLISHED
+    event.save(update_fields=("visibility_status", "updated_at"))
+    models.RaceEventLifecycleControl.objects.create(
+        event=event,
+        mode=models.RaceEventLifecycleMode.ENFORCE,
+        schedule_generation=1,
+        enrollment_manifest_sha256=LIFECYCLE_ENROLLMENT,
+        manifest_data={
+            "enforce_registry": {
+                "root_sha256": REGISTRY_ROOT,
+                "membership_sha256": REGISTRY_MEMBERSHIP,
+                "entry_sha256": REGISTRY_ENTRY,
+                "activation_state": "active",
+                "activation_id": REGISTRY_ACTIVATION,
+            }
+        },
+    )
+    registry = models.RaceEventLifecycleEnforceRegistry.objects.create(
+        root_sha256=REGISTRY_ROOT,
+        generation=1,
+        membership_sha256=REGISTRY_MEMBERSHIP,
+        member_count=1,
+        state="active",
+        is_active=True,
+        activation_id=REGISTRY_ACTIVATION,
+        approved_commit="1" * 40,
+        selector_scope={},
+        scope_sha256="2" * 64,
+        census_cutoff=NOW - timedelta(days=1),
+        apply_expires_at=NOW + timedelta(days=1),
+        runtime_valid_until=NOW + timedelta(days=35),
+        activated_at=NOW,
+    )
+    models.RaceEventLifecycleEnforceMembership.objects.create(
+        registry=registry,
+        event=event,
+        state="active",
+        entry_sha256=REGISTRY_ENTRY,
+        source_enrollment_sha256=LIFECYCLE_ENROLLMENT,
+        schedule_generation=1,
+        schedule_hash=_schedule_hash(event),
+        country_region=event.country_region,
+        timezone_name=event.timezone_name,
+        frozen_snapshot={},
+    )
 
 
 class ProviderIdentityDiscoveryFairnessTests(TestCase):
@@ -114,6 +169,14 @@ class RaceDataTransportCapacityTests(TestCase):
     RACE_DATA_RAW_CLEANUP_MAX_BYTES=64 * 1024 * 1024,
     RACE_DATA_RAW_HOLD_ALERT_BYTES=256 * 1024 * 1024,
     RACE_DATA_RAW_ARTIFACT_ROOTS=(str(ROOT / "runtime"),),
+    RACE_EVENT_LIFECYCLE_ENABLED=True,
+    RACE_EVENT_LIFECYCLE_MODE="enforce",
+    RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_SHA256=REGISTRY_ROOT,
+    RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBERSHIP_SHA256=(
+        REGISTRY_MEMBERSHIP
+    ),
+    RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBER_COUNT=1,
+    RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_ACTIVATION_ID=REGISTRY_ACTIVATION,
 )
 class TheRacingApiDataSyncAdapterTests(TestCase):
     def setUp(self):
@@ -140,14 +203,23 @@ class TheRacingApiDataSyncAdapterTests(TestCase):
             local_start_time=datetime(2026, 8, 28, 16, 50).time(),
             status=models.RaceEventStatus.RUNNING,
         )
-        models.RaceEventProjectionControl.objects.create(
+        self.control = models.RaceEventProjectionControl.objects.create(
             event=self.event,
             write_owner=models.RaceEventProjectionWriteOwner.DATA_SYNC,
             owner_generation=1,
+            owner_manifest_sha256="d" * 64,
         )
         models.RaceEventLiveTracking.objects.create(
             event=self.event,
             tracking_enabled=True,
+        )
+        _authorize_lifecycle(self.event)
+        self.decoy_source = models.RaceResultSourceIdentity.objects.create(
+            event=self.event,
+            source_key="the_racing_api",
+            region_code="hong_kong",
+            identity_namespace="the_racing_api-race-v1",
+            external_race_id="decoy-api-99",
         )
         self.source = models.RaceResultSourceIdentity.objects.create(
             event=self.event,
@@ -171,6 +243,20 @@ class TheRacingApiDataSyncAdapterTests(TestCase):
         self.source.save(
             update_fields=("valid_until", "registry_digest", "updated_at")
         )
+        models.RaceDataSyncEnrollment.objects.create(
+            event=self.event,
+            source_identity=self.source,
+            state=models.RaceDataSyncEnrollmentState.ENROLLED,
+            standing_policy_digest="a" * 64,
+            route_digest=self.route.route_digest,
+            event_snapshot_sha256="b" * 64,
+            projection_owner_generation=1,
+            enrollment_generation=1,
+            manifest_sha256="d" * 64,
+            entry_sha256="e" * 64,
+            effective_at=NOW - timedelta(days=1),
+        )
+        self.assertLess(self.decoy_source.pk, self.source.pk)
         self.registry = json.loads(
             (
                 ROOT
@@ -282,9 +368,25 @@ class TheRacingApiDataSyncAdapterTests(TestCase):
         self.assertTrue(outcome.success, outcome.reason_code)
         self.assertEqual(set(outcome.applied_kinds), {"race_time", "racecard", "result"})
         self.event.refresh_from_db()
-        self.assertEqual(self.event.status, models.RaceEventStatus.FINISHED)
+        self.assertEqual(
+            self.event.status,
+            models.RaceEventStatus.FINISHED,
+            list(
+                self.event.revisions.values_list(
+                    "phase", "decision_reason", "published_at"
+                )
+            ),
+        )
         self.assertEqual(self.event.runners.count(), 2)
-        self.assertEqual(self.event.results.count(), 2)
+        self.assertEqual(
+            self.event.results.count(),
+            2,
+            list(
+                self.event.revisions.values_list(
+                    "phase", "decision_reason", "published_at"
+                )
+            ),
+        )
         self.assertEqual(self.event.results.get(finish_position=1).horse_name, "Alpha")
         self.assertEqual(
             self.event.revisions.filter(
@@ -345,6 +447,68 @@ class TheRacingApiDataSyncAdapterTests(TestCase):
         self.assertIsNotNone(result_observation)
         self.assertFalse(models.RaceEventResult.objects.exists())
 
+    def test_registered_provider_correction_marker_produces_corrected_phase(self):
+        for runner_id, name, number in (
+            ("horse-1", "Alpha", "1"),
+            ("horse-2", "Beta", "2"),
+        ):
+            models.RaceEventRunner.objects.create(
+                event=self.event,
+                external_runner_id=runner_id,
+                horse_name=name,
+                horse_number=number,
+                source_refs={self.source.source_key: runner_id},
+            )
+
+        def corrected_transport(**kwargs):
+            response = self._transport(**kwargs)
+            payload = json.loads(response.body)
+            payload["results"][0]["race_status"] = "corrected"
+            return RaceLiveProofHttpResponse(
+                status_code=response.status_code,
+                content_type=response.content_type,
+                body=json.dumps(payload).encode(),
+                elapsed_ms=response.elapsed_ms,
+            )
+
+        tick = {"value": NOW}
+
+        def clock():
+            tick["value"] += timedelta(seconds=2)
+            return tick["value"]
+
+        with (
+            patch(
+                "stable.services.race_data_sync_providers.read_the_racing_api_automation_registry",
+                return_value=(self.registry, SHA),
+            ),
+            patch(
+                "stable.services.race_data_sync_providers._read_secret",
+                return_value=("user", "secret"),
+            ),
+        ):
+            outcome = run_the_racing_api_data_sync(
+                event_id=self.event.pk,
+                data_kinds=("result",),
+                route=self.route,
+                now=NOW,
+                task_id="provider-corrected-result",
+                run_id="run-corrected-result",
+                transport=corrected_transport,
+                clock=clock,
+                sleeper=lambda seconds: None,
+            )
+
+        self.assertTrue(outcome.success, outcome.reason_code)
+        observation = models.RaceResultObservation.objects.get()
+        self.assertEqual(
+            observation.result_phase, models.RaceResultPhase.CORRECTED
+        )
+        self.assertTrue(observation.field_provenance["correction_marker"])
+        revision = models.RaceEventRevision.objects.get()
+        self.assertEqual(revision.phase, models.RaceResultPhase.CORRECTED)
+        self.assertIsNotNone(revision.published_at)
+
     def test_out_of_window_racecard_is_successful_not_found_and_stays_due(self):
         self.event.local_date = date(2026, 9, 15)
         self.event.save(update_fields=("local_date",))
@@ -393,6 +557,7 @@ class TheRacingApiDataSyncAdapterTests(TestCase):
             event=second_event,
             write_owner=models.RaceEventProjectionWriteOwner.DATA_SYNC,
             owner_generation=1,
+            owner_manifest_sha256="d" * 64,
         )
         models.RaceEventLiveTracking.objects.create(event=second_event)
         second_source = models.RaceResultSourceIdentity.objects.create(
@@ -406,6 +571,19 @@ class TheRacingApiDataSyncAdapterTests(TestCase):
             automation_allowed=True,
             valid_until=NOW + timedelta(days=30),
             registry_digest=self.route.registry_digest,
+        )
+        models.RaceDataSyncEnrollment.objects.create(
+            event=second_event,
+            source_identity=second_source,
+            state=models.RaceDataSyncEnrollmentState.ENROLLED,
+            standing_policy_digest="a" * 64,
+            route_digest=self.route.route_digest,
+            event_snapshot_sha256="b" * 64,
+            projection_owner_generation=1,
+            enrollment_generation=1,
+            manifest_sha256="d" * 64,
+            entry_sha256="e" * 64,
+            effective_at=NOW - timedelta(days=1),
         )
         calls = []
 
@@ -480,6 +658,65 @@ class TheRacingApiDataSyncAdapterTests(TestCase):
         self.assertEqual(len(calls), 1)
         self.assertEqual(self.event.runners.count(), 1)
         self.assertEqual(second_event.runners.count(), 1)
+
+    def test_shared_snapshot_waiter_polls_until_complete_manifest(self):
+        self.assertGreater(
+            race_data_sync_providers._SNAPSHOT_WAITER_MAX_POLLS
+            * (race_data_sync_providers._SNAPSHOT_WAITER_POLL_SECONDS - 0.25),
+            race_data_sync_providers._SNAPSHOT_LEASE_TTL_SECONDS,
+        )
+        lease = MagicMock(manifest_data={"complete": True})
+        fetcher = MagicMock()
+        sleep_intervals = []
+        queryset = MagicMock()
+        queryset.first.return_value = lease
+
+        with (
+            patch.object(
+                race_data_sync_providers,
+                "claim_snapshot_lease",
+                side_effect=(
+                    race_data_sync_control.ControlDecision(
+                        "busy", "lease_active", generation=1
+                    ),
+                    race_data_sync_control.ControlDecision(
+                        "complete", generation=1
+                    ),
+                ),
+            ) as claim,
+            patch.object(
+                models.RaceDataSnapshotLease.objects,
+                "filter",
+                return_value=queryset,
+            ),
+            patch.object(
+                race_data_sync_providers,
+                "_read_snapshot_artifact",
+                return_value=({"racecards": []}, "a" * 64),
+            ),
+        ):
+            payload, artifact_sha256 = (
+                race_data_sync_providers._get_or_fetch_shared_snapshot(
+                    provider="the_racing_api",
+                    region="japan_jra",
+                    scope_key="2026-08-28:jpn",
+                    data_kind=models.RaceDataSyncDataKind.RACECARD,
+                    registry_digest="b" * 64,
+                    run_id="waiter-run",
+                    now=NOW,
+                    proposed_requests=1,
+                    clock=lambda: NOW + timedelta(seconds=2),
+                    sleeper=sleep_intervals.append,
+                    fetcher=fetcher,
+                )
+            )
+
+        self.assertEqual(payload, {"racecards": []})
+        self.assertEqual(artifact_sha256, "a" * 64)
+        self.assertEqual(claim.call_count, 2)
+        self.assertEqual(len(sleep_intervals), 1)
+        self.assertNotEqual(sleep_intervals[0], 2.0)
+        fetcher.assert_not_called()
 
     def test_racecard_without_status_preserves_withdrawal_and_nr_is_explicit(self):
         tick = {"value": NOW}
@@ -573,6 +810,11 @@ class TheRacingApiDataSyncAdapterTests(TestCase):
         self.event.local_date = date(2026, 8, 27)
         self.event.race_datetime = NOW - timedelta(days=1, minutes=10)
         self.event.save(update_fields=("local_date", "race_datetime", "updated_at"))
+        membership = models.RaceEventLifecycleEnforceMembership.objects.get(
+            event=self.event
+        )
+        membership.schedule_hash = _schedule_hash(self.event)
+        membership.save(update_fields=("schedule_hash", "updated_at"))
         for runner_id, name, number in (
             ("horse-1", "Alpha", "1"),
             ("horse-2", "Beta", "2"),
@@ -660,6 +902,43 @@ class TheRacingApiDataSyncAdapterTests(TestCase):
             status=models.RaceEventStatus.SCHEDULED,
             visibility_status=models.RaceEventVisibility.PUBLISHED,
         )
+        legacy_event = models.RaceEvent.objects.create(
+            year=2026,
+            slug="tra-identity-discovery-legacy-namespace",
+            original_name="Legacy Namespace Cup",
+            chinese_name="旧命名空间杯",
+            country_region=models.RacingRegion.JAPAN,
+            racecourse="Tokyo",
+            grade_text="G1",
+            normalized_grade=models.RaceGrade.G1,
+            surface=models.RaceEventSurface.TURF,
+            timezone_name="Asia/Tokyo",
+            local_date=date(2026, 8, 28),
+            status=models.RaceEventStatus.SCHEDULED,
+            visibility_status=models.RaceEventVisibility.DRAFT,
+        )
+        models.RaceResultSourceIdentity.objects.create(
+            event=legacy_event,
+            source_key="the_racing_api",
+            region_code="japan_jra",
+            identity_namespace="the_racing_api-legacy-v0",
+            external_race_id="jp-discovery-1",
+        )
+        stale_source = models.RaceResultSourceIdentity.objects.create(
+            event=event,
+            source_key="the_racing_api",
+            region_code="japan_jra",
+            identity_namespace="the_racing_api-race-v1",
+            external_race_id="jp-discovery-1",
+            review_status=models.RaceLiveReviewStatus.APPROVED,
+            terms_status=models.RaceSourceTermsStatus.APPROVED,
+            automation_allowed=True,
+            proof_network_allowed=True,
+            evidence_url="https://api.theracingapi.com/terms",
+            evidence_sha256="0" * 64,
+            valid_until=NOW,
+            registry_digest="0" * 64,
+        )
 
         def transport(**kwargs):
             payload = {
@@ -714,8 +993,10 @@ class TheRacingApiDataSyncAdapterTests(TestCase):
             )
 
         self.assertTrue(outcome.success, outcome.reason_code)
-        self.assertEqual(outcome.created_source_count, 1, outcome)
+        self.assertEqual(outcome.created_source_count, 0, outcome)
+        self.assertEqual(outcome.adopted_source_count, 1, outcome)
         source = models.RaceResultSourceIdentity.objects.get(event=event)
+        self.assertEqual(source.pk, stale_source.pk)
         self.assertEqual(source.external_race_id, "jp-discovery-1")
         self.assertEqual(source.region_code, "japan_jra")
         self.assertEqual(
@@ -738,6 +1019,14 @@ class TheRacingApiDataSyncAdapterTests(TestCase):
     RACE_RESULT_REVIEW_ROUTE_REGISTRY=str(
         ROOT / "runtime/policies/race_result_review/source_routes_v1.json"
     ),
+    RACE_EVENT_LIFECYCLE_ENABLED=True,
+    RACE_EVENT_LIFECYCLE_MODE="enforce",
+    RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_SHA256=REGISTRY_ROOT,
+    RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBERSHIP_SHA256=(
+        REGISTRY_MEMBERSHIP
+    ),
+    RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBER_COUNT=1,
+    RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_ACTIVATION_ID=REGISTRY_ACTIVATION,
 )
 class ReferenceResultDataSyncAdapterTests(TestCase):
     def setUp(self):
@@ -765,6 +1054,7 @@ class ReferenceResultDataSyncAdapterTests(TestCase):
             event=self.event,
             tracking_enabled=True,
         )
+        _authorize_lifecycle(self.event)
         self.source = models.RaceResultSourceIdentity.objects.create(
             event=self.event,
             source_key="sporting_life",
@@ -993,7 +1283,32 @@ class ReferenceResultDataSyncAdapterTests(TestCase):
         )
         self.assertTrue(outcome.success, outcome.reason_code)
         self.assertEqual(outcome.applied_kinds, ("result",))
+        self.event.refresh_from_db()
+        self.assertEqual(self.event.status, models.RaceEventStatus.FINISHED)
         self.assertEqual(self.event.results.count(), 2)
+        revision = models.RaceEventRevision.objects.get()
+        self.assertIsNotNone(revision.published_at)
+
+    @override_settings(
+        RACE_DATA_SYNC_ENABLED_PROVIDERS=("the_racing_api",),
+        RACE_DATA_SYNC_ENABLED_REGIONS=("united_kingdom",),
+    )
+    def test_fallback_chain_never_executes_provider_outside_allowlist(self):
+        self._receipt()
+        with patch(
+            "stable.services.race_data_sync_providers.run_reference_result_data_sync"
+        ) as execute_reference:
+            outcome = run_result_fallback_chain(
+                event_id=self.event.pk,
+                excluded_providers=("the_racing_api",),
+                now=NOW,
+                task_id="fallback-test",
+                run_id="fallback-run",
+            )
+
+        self.assertTrue(outcome.success, outcome.reason_code)
+        self.assertEqual(outcome.not_found_kinds, ("result",))
+        execute_reference.assert_not_called()
 
     def test_fallback_creates_identity_from_existing_matched_receipt(self):
         self._receipt()
@@ -1022,6 +1337,14 @@ class ReferenceResultDataSyncAdapterTests(TestCase):
     RACE_DATA_SYNC_RESULT_APPLY_ENABLED=True,
     RACE_DATA_SYNC_RESULT_PUBLIC_ENABLED=True,
     RACE_DATA_SYNC_CORRECTION_APPLY_ENABLED=True,
+    RACE_EVENT_LIFECYCLE_ENABLED=True,
+    RACE_EVENT_LIFECYCLE_MODE="enforce",
+    RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_SHA256=REGISTRY_ROOT,
+    RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBERSHIP_SHA256=(
+        REGISTRY_MEMBERSHIP
+    ),
+    RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBER_COUNT=1,
+    RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_ACTIVATION_ID=REGISTRY_ACTIVATION,
 )
 class PersistedOfficialResultBridgeTests(TestCase):
     def test_existing_hkjc_import_projects_before_third_party_fallback(self):
@@ -1046,6 +1369,7 @@ class PersistedOfficialResultBridgeTests(TestCase):
             owner_generation=1,
         )
         models.RaceEventLiveTracking.objects.create(event=event)
+        _authorize_lifecycle(event)
         source = models.RaceResultSourceIdentity.objects.create(
             event=event,
             source_key="hkjc",

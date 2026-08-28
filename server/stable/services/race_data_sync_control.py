@@ -19,7 +19,7 @@ from typing import Iterable
 
 from django.conf import settings
 from django.db import IntegrityError, transaction
-from django.db.models import Min, Q
+from django.db.models import Exists, Min, OuterRef, Q
 
 from stable import models
 from stable.services.race_data_sync_policy import calculate_next_poll_at
@@ -625,10 +625,9 @@ def acquire_enrollment(
                 mode=models.RaceEventLifecycleMode.OFF,
                 schedule_generation=1,
                 next_refresh_at=None,
-                enrollment_manifest_sha256=manifest_sha256,
+                enrollment_manifest_sha256="",
                 manifest_data={},
             )
-        lifecycle.enrollment_manifest_sha256 = manifest_sha256
         lifecycle.manifest_data = {
             **(
                 lifecycle.manifest_data
@@ -636,13 +635,13 @@ def acquire_enrollment(
                 else {}
             ),
             "race_data_sync": {
+                "manifest_sha256": manifest_sha256,
                 "entry_sha256": entry_sha256,
                 "owner_generation": next_generation,
             },
         }
         lifecycle.save(
             update_fields=(
-                "enrollment_manifest_sha256",
                 "manifest_data",
                 "updated_at",
             )
@@ -681,6 +680,11 @@ def rotate_enrollment(
     normalized_kinds = _normalize_data_kinds(data_kinds)
 
     with transaction.atomic():
+        lifecycle = (
+            models.RaceEventLifecycleControl.objects.select_for_update()
+            .filter(event_id=event_id)
+            .first()
+        )
         event = (
             models.RaceEvent.objects.select_for_update(of=("self",))
             .filter(pk=event_id)
@@ -733,6 +737,7 @@ def rotate_enrollment(
         )
         if (
             control is None
+            or lifecycle is None
             or tracking is None
             or enrollment is None
             or source is None
@@ -807,6 +812,19 @@ def rotate_enrollment(
                 "updated_at",
             )
         )
+        lifecycle.manifest_data = {
+            **(
+                lifecycle.manifest_data
+                if isinstance(lifecycle.manifest_data, dict)
+                else {}
+            ),
+            "race_data_sync": {
+                "manifest_sha256": successor_manifest_sha256,
+                "entry_sha256": successor_entry_sha256,
+                "owner_generation": next_generation,
+            },
+        }
+        lifecycle.save(update_fields=("manifest_data", "updated_at"))
         tracking.tracking_enabled = True
         tracking.claim_generation += 1
         tracking.active_attempt_token = ""
@@ -966,20 +984,13 @@ def disenroll(
         enrollment.save(
             update_fields=("state", "reason_code", "retired_at", "updated_at")
         )
-        if lifecycle is not None:
-            lifecycle.mode = models.RaceEventLifecycleMode.OFF
-            lifecycle.next_refresh_at = None
-            lifecycle.claim_token = ""
-            lifecycle.claim_expires_at = None
-            lifecycle.save(
-                update_fields=(
-                    "mode",
-                    "next_refresh_at",
-                    "claim_token",
-                    "claim_expires_at",
-                    "updated_at",
-                )
-            )
+        if lifecycle is not None and isinstance(lifecycle.manifest_data, dict):
+            lifecycle.manifest_data = {
+                key: value
+                for key, value in lifecycle.manifest_data.items()
+                if key != "race_data_sync"
+            }
+            lifecycle.save(update_fields=("manifest_data", "updated_at"))
         return ControlDecision(
             "released", "", event_id, control.owner_generation
         )
@@ -1721,6 +1732,17 @@ def claim_due_enrollments(
     data_kinds = _normalize_data_kinds(enabled_data_kinds)
     claims: list[RaceDataSyncClaim] = []
     with transaction.atomic():
+        enabled_due_checkpoints = (
+            models.RaceEventLiveProviderCheckpoint.objects.filter(
+                tracking__event_id=OuterRef("pk"),
+                tracking__tracking_enabled=True,
+                source_key=OuterRef(
+                    "race_data_sync_enrollment__source_identity__source_key"
+                ),
+                data_kind__in=data_kinds,
+                next_poll_at__lte=now,
+            )
+        )
         events = list(
             models.RaceEvent.objects.select_for_update(
                 skip_locked=True,
@@ -1728,7 +1750,6 @@ def claim_due_enrollments(
             )
             .filter(
                 live_tracking__tracking_enabled=True,
-                live_tracking__next_poll_at__lte=now,
                 projection_control__write_owner=models.RaceEventProjectionWriteOwner.DATA_SYNC,
                 race_data_sync_enrollment__state=models.RaceDataSyncEnrollmentState.ENROLLED,
                 race_data_sync_enrollment__source_identity__source_key__in=providers,
@@ -1738,6 +1759,8 @@ def claim_due_enrollments(
                 Q(live_tracking__active_attempt_token="")
                 | Q(live_tracking__claim_expires_at__lte=now)
             )
+            .annotate(has_enabled_due_checkpoint=Exists(enabled_due_checkpoints))
+            .filter(has_enabled_due_checkpoint=True)
             .order_by("live_tracking__next_poll_at", "id")[:batch_size]
         )
         for event in events:
@@ -1760,8 +1783,6 @@ def claim_due_enrollments(
                 continue
             if (
                 not tracking.tracking_enabled
-                or tracking.next_poll_at is None
-                or tracking.next_poll_at > now
                 or (
                     tracking.active_attempt_token
                     and (
@@ -2184,11 +2205,6 @@ def complete_race_data_sync_claim(
                 race_datetime=(
                     None
                     if event.status == models.RaceEventStatus.POSTPONED
-                    and checkpoint.data_kind
-                    in {
-                        models.RaceDataSyncDataKind.RACE_TIME,
-                        models.RaceDataSyncDataKind.RACECARD,
-                    }
                     else event.race_datetime
                 ),
                 result_confirmed=result_confirmed,
@@ -2404,8 +2420,29 @@ def claim_snapshot_lease(
         lease.owner_token = owner_token
         lease.lease_generation += 1
         lease.lease_expires_at = now + timedelta(seconds=ttl_seconds)
+        previous_manifest = lease.manifest_data
+        previous_artifact_sha256 = lease.artifact_sha256
+        if (
+            not previous_artifact_sha256
+            and isinstance(previous_manifest, dict)
+            and _SHA256_RE.fullmatch(
+                str(previous_manifest.get("previous_artifact_sha256") or "")
+            )
+        ):
+            previous_artifact_sha256 = str(
+                previous_manifest["previous_artifact_sha256"]
+            )
+            previous_manifest = previous_manifest.get("previous_manifest", {})
         lease.artifact_sha256 = ""
-        lease.manifest_data = {}
+        lease.manifest_data = (
+            {
+                "previous_artifact_sha256": previous_artifact_sha256,
+                "previous_manifest": previous_manifest,
+            }
+            if _SHA256_RE.fullmatch(previous_artifact_sha256 or "") is not None
+            and isinstance(previous_manifest, dict)
+            else {}
+        )
         lease.retry_after = None
         lease.error_code = ""
         lease.save(
@@ -2534,7 +2571,6 @@ def fail_snapshot_lease(
         lease.owner_token = ""
         lease.lease_expires_at = None
         lease.artifact_sha256 = ""
-        lease.manifest_data = {}
         lease.retry_after = retry_after
         lease.error_code = error_code
         lease.save()

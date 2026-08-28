@@ -271,7 +271,7 @@ export RELEASE_B_PREFLIGHT_ARTIFACT_PATH
 unset EXPECTED_PRODUCTION_DB_IDENTITY_SHA256
 if [ "$ATTEMPT_MODE" = "not-required" ]; then
   PREFLIGHT_ACTION=rollback
-  EXPECTED_LEAF=stable.0074_race_data_sync_r0_control_plane
+  EXPECTED_LEAF=stable.0075_race_data_source_priority_and_reported_position
 else
   PREFLIGHT_ACTION=forward-resume
   EXPECTED_LEAF=""

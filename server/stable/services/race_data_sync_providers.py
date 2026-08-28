@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 import hashlib
 import json
+import logging
 import os
 from pathlib import Path
 import stat
@@ -22,6 +23,7 @@ from stable.services.race_data_sync_control import (
     claim_snapshot_lease,
     fail_snapshot_lease,
     publish_snapshot,
+    resolve_source_route_admission,
 )
 from stable.services.race_data_sync_pipeline import (
     RaceDataResolvedRoute,
@@ -56,8 +58,14 @@ from stable.services.race_live_source_proof import (
 
 
 _HOST = "api.theracingapi.com"
+logger = logging.getLogger(__name__)
 _MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 _SNAPSHOT_LEASE_TTL_SECONDS = 120
+_SNAPSHOT_WAITER_POLL_SECONDS = 2.0
+# Jitter can shorten each sleep by 0.25s.  Keep the bounded waiter long enough
+# that even the shortest legal sequence crosses the full lease TTL and gets one
+# CAS takeover opportunity instead of failing just before expiry.
+_SNAPSHOT_WAITER_MAX_POLLS = 69
 _REFERENCE_SOURCE_KEYS = {
     "sporting_life": "reference_sporting_life",
     "zeturf": "reference_zeturf",
@@ -67,6 +75,7 @@ _PERSISTED_OFFICIAL_SOURCES = {
     "hkjc": models.ExternalDataSource.HKJC,
     "france_galop": models.ExternalDataSource.FRANCE_GALOP,
 }
+_TRA_CORRECTION_MARKERS = frozenset({"amended", "corrected", "revised"})
 
 
 @dataclass(frozen=True)
@@ -89,6 +98,13 @@ class ProviderIdentityDiscoveryOutcome:
     adopted_source_count: int
     ambiguous_event_count: int
     unmatched_event_count: int
+
+
+@dataclass(frozen=True)
+class SnapshotCleanupOutcome:
+    cleaned: int
+    cleaned_bytes: int
+    skipped: int
 
 
 class _ProviderSyncError(Exception):
@@ -142,8 +158,8 @@ def _write_snapshot_artifact(
     artifact_sha256 = hashlib.sha256(encoded).hexdigest()
     root = _snapshot_artifact_root()
     basename = hashlib.sha256(cache_key.encode()).hexdigest()
-    final_path = root / f"{basename}.json"
-    temporary_path = root / f".{basename}.{owner_token}.tmp"
+    final_path = root / f"{basename}-{artifact_sha256}.json"
+    temporary_path = root / f".{basename}-{artifact_sha256}.{owner_token}.tmp"
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
@@ -156,7 +172,20 @@ def _write_snapshot_artifact(
                 os.fsync(handle.fileno())
         finally:
             os.close(descriptor)
-        os.replace(temporary_path, final_path)
+        try:
+            os.link(temporary_path, final_path, follow_symlinks=False)
+        except FileExistsError:
+            existing_fd = os.open(
+                final_path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+            )
+            try:
+                existing_stat = os.fstat(existing_fd)
+                existing = os.read(existing_fd, len(encoded) + 1)
+            finally:
+                os.close(existing_fd)
+            if not stat.S_ISREG(existing_stat.st_mode) or existing != encoded:
+                raise OSError("snapshot digest path contains different bytes")
+        temporary_path.unlink(missing_ok=True)
         os.chmod(final_path, 0o600)
     except OSError as exc:
         try:
@@ -173,7 +202,9 @@ def _read_snapshot_artifact(*, manifest: dict[str, Any]) -> tuple[dict[str, Any]
     if not isinstance(cache_key, str) or not isinstance(artifact_sha256, str):
         raise _ProviderSyncError("snapshot_manifest_invalid")
     root = _snapshot_artifact_root().resolve()
-    path = root / f"{hashlib.sha256(cache_key.encode()).hexdigest()}.json"
+    path = root / (
+        f"{hashlib.sha256(cache_key.encode()).hexdigest()}-{artifact_sha256}.json"
+    )
     try:
         resolved = path.resolve(strict=True)
         path_stat = path.lstat()
@@ -210,6 +241,157 @@ def _read_snapshot_artifact(*, manifest: dict[str, Any]) -> tuple[dict[str, Any]
     return payload, artifact_sha256
 
 
+def _delete_unreferenced_snapshot_artifact(
+    *, cache_key: str, artifact_sha256: str
+) -> None:
+    """Retire one superseded content-addressed snapshot after a successful CAS."""
+
+    if not artifact_sha256 or models.RaceDataSnapshotLease.objects.filter(
+        cache_key=cache_key,
+        artifact_sha256=artifact_sha256,
+    ).exists():
+        return
+    root = _snapshot_artifact_root().resolve()
+    name = (
+        f"{hashlib.sha256(cache_key.encode()).hexdigest()}-"
+        f"{artifact_sha256}.json"
+    )
+    path = root / name
+    try:
+        path_stat = path.lstat()
+        if path.is_symlink() or not stat.S_ISREG(path_stat.st_mode):
+            return
+        directory_flags = os.O_RDONLY | os.O_DIRECTORY
+        if hasattr(os, "O_NOFOLLOW"):
+            directory_flags |= os.O_NOFOLLOW
+        parent_fd = os.open(root, directory_flags)
+        try:
+            file_flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+            file_fd = os.open(name, file_flags, dir_fd=parent_fd)
+            try:
+                opened = os.fstat(file_fd)
+                if (
+                    not stat.S_ISREG(opened.st_mode)
+                    or opened.st_dev != path_stat.st_dev
+                    or opened.st_ino != path_stat.st_ino
+                ):
+                    return
+            finally:
+                os.close(file_fd)
+            if models.RaceDataSnapshotLease.objects.filter(
+                cache_key=cache_key,
+                artifact_sha256=artifact_sha256,
+            ).exists():
+                return
+            os.unlink(name, dir_fd=parent_fd)
+        finally:
+            os.close(parent_fd)
+    except OSError:
+        logger.warning(
+            "Unable to retire superseded race-data snapshot",
+            extra={"cache_key": cache_key, "artifact_sha256": artifact_sha256},
+        )
+
+
+def cleanup_expired_shared_snapshots(
+    *, now: datetime, batch_size: int = 100, max_bytes: int | None = None
+) -> SnapshotCleanupOutcome:
+    """Remove complete shared snapshots after the correction window expires."""
+
+    if timezone.is_naive(now):
+        raise ValueError("now must be timezone-aware")
+    if isinstance(batch_size, bool) or not 1 <= batch_size <= 1000:
+        raise ValueError("batch_size must be between 1 and 1000")
+    if max_bytes is None:
+        max_bytes = int(
+            getattr(settings, "RACE_DATA_RAW_CLEANUP_MAX_BYTES", 0) or (2**63 - 1)
+        )
+    if isinstance(max_bytes, bool) or not isinstance(max_bytes, int) or max_bytes <= 0:
+        raise ValueError("max_bytes must be positive")
+    retention_seconds = int(
+        getattr(settings, "RACE_DATA_SNAPSHOT_RETENTION_SECONDS", 0)
+    )
+    if not 7 * 24 * 3600 <= retention_seconds <= 90 * 24 * 3600:
+        raise ValueError("snapshot retention must cover 7 to 90 days")
+    cutoff = now - timedelta(seconds=retention_seconds)
+    candidate_ids = tuple(
+        models.RaceDataSnapshotLease.objects.filter(
+            state=models.RaceDataSnapshotLeaseState.COMPLETE,
+            updated_at__lte=cutoff,
+        )
+        .order_by("updated_at", "id")
+        .values_list("id", flat=True)[:batch_size]
+    )
+    cleaned = 0
+    cleaned_bytes = 0
+    skipped = 0
+    for lease_id in candidate_ids:
+        with transaction.atomic():
+            lease = (
+                models.RaceDataSnapshotLease.objects.select_for_update()
+                .filter(
+                    pk=lease_id,
+                    state=models.RaceDataSnapshotLeaseState.COMPLETE,
+                    updated_at__lte=cutoff,
+                )
+                .first()
+            )
+            if lease is None:
+                skipped += 1
+                continue
+            manifest = lease.manifest_data
+            if (
+                not isinstance(manifest, dict)
+                or manifest.get("cache_key") != lease.cache_key
+                or manifest.get("artifact_sha256") != lease.artifact_sha256
+            ):
+                skipped += 1
+                continue
+            root = _snapshot_artifact_root().resolve()
+            name = (
+                f"{hashlib.sha256(lease.cache_key.encode()).hexdigest()}-"
+                f"{lease.artifact_sha256}.json"
+            )
+            path = root / name
+            try:
+                _payload, digest = _read_snapshot_artifact(manifest=manifest)
+                before = path.lstat()
+                if before.st_size > max_bytes - cleaned_bytes:
+                    break
+                directory_flags = os.O_RDONLY | os.O_DIRECTORY
+                if hasattr(os, "O_NOFOLLOW"):
+                    directory_flags |= os.O_NOFOLLOW
+                parent_fd = os.open(root, directory_flags)
+                try:
+                    file_flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+                    file_fd = os.open(name, file_flags, dir_fd=parent_fd)
+                    try:
+                        opened = os.fstat(file_fd)
+                        if (
+                            not stat.S_ISREG(opened.st_mode)
+                            or opened.st_dev != before.st_dev
+                            or opened.st_ino != before.st_ino
+                            or digest != lease.artifact_sha256
+                        ):
+                            raise OSError("snapshot artifact identity changed")
+                    finally:
+                        os.close(file_fd)
+                    os.unlink(name, dir_fd=parent_fd)
+                finally:
+                    os.close(parent_fd)
+            except (OSError, TypeError, ValueError, _ProviderSyncError):
+                skipped += 1
+                continue
+            lease.delete()
+            cleaned += 1
+            cleaned_bytes += before.st_size
+    return SnapshotCleanupOutcome(
+        cleaned=cleaned,
+        cleaned_bytes=cleaned_bytes,
+        skipped=skipped,
+    )
+
+
 def _get_or_fetch_shared_snapshot(
     *,
     provider: str,
@@ -221,6 +403,7 @@ def _get_or_fetch_shared_snapshot(
     now: datetime,
     proposed_requests: int,
     clock: Callable[[], datetime],
+    sleeper: Callable[[float], Any],
     fetcher: Callable[[], tuple[dict[str, Any], int, int]],
 ) -> tuple[dict[str, Any], str]:
     cache_key = build_snapshot_cache_key(
@@ -233,6 +416,7 @@ def _get_or_fetch_shared_snapshot(
     owner_token = "snapshot-" + hashlib.sha256(
         f"{run_id}:{cache_key}".encode()
     ).hexdigest()[:48]
+    decision_now = now
     decision = claim_snapshot_lease(
         provider=provider,
         region=region,
@@ -240,9 +424,31 @@ def _get_or_fetch_shared_snapshot(
         data_kind=data_kind,
         registry_digest=registry_digest,
         owner_token=owner_token,
-        now=now,
+        now=decision_now,
         ttl_seconds=_SNAPSHOT_LEASE_TTL_SECONDS,
     )
+    if decision.action == "busy" and decision.reason_code == "lease_active":
+        for poll_index in range(_SNAPSHOT_WAITER_MAX_POLLS):
+            jitter_seed = hashlib.sha256(
+                f"{owner_token}:{poll_index}".encode()
+            ).digest()[0]
+            jitter = ((jitter_seed / 255.0) - 0.5) * 0.5
+            sleeper(max(0.1, _SNAPSHOT_WAITER_POLL_SECONDS + jitter))
+            decision_now = _safe_clock_value(clock=clock, fallback=decision_now)
+            decision = claim_snapshot_lease(
+                provider=provider,
+                region=region,
+                scope_key=scope_key,
+                data_kind=data_kind,
+                registry_digest=registry_digest,
+                owner_token=owner_token,
+                now=decision_now,
+                ttl_seconds=_SNAPSHOT_LEASE_TTL_SECONDS,
+            )
+            if decision.action != "busy":
+                break
+            if decision.reason_code != "lease_active":
+                break
     if decision.action == "complete":
         lease = models.RaceDataSnapshotLease.objects.filter(
             cache_key=cache_key,
@@ -257,18 +463,28 @@ def _get_or_fetch_shared_snapshot(
             if decision.action == "busy"
             else "snapshot_lease_rejected"
         )
+    lease_state = models.RaceDataSnapshotLease.objects.filter(
+        cache_key=cache_key,
+        owner_token=owner_token,
+        lease_generation=decision.generation,
+    ).values_list("manifest_data", flat=True).first()
+    previous_artifact_sha256 = (
+        str(lease_state.get("previous_artifact_sha256") or "")
+        if isinstance(lease_state, dict)
+        else ""
+    )
     try:
         capacity = reserve_race_data_transport_capacity(
             provider=provider,
             region_code=region,
-            now=now,
+            now=decision_now,
             proposed_requests=proposed_requests,
             max_response_bytes_per_request=_MAX_RESPONSE_BYTES,
         )
         if not capacity.allowed:
             raise _ProviderSyncError(capacity.reason_code)
         payload, page_count, item_count = fetcher()
-        completed_at = _safe_clock_value(clock=clock, fallback=now)
+        completed_at = _safe_clock_value(clock=clock, fallback=decision_now)
         _artifact_path, artifact_sha256 = _write_snapshot_artifact(
             cache_key=cache_key,
             owner_token=owner_token,
@@ -298,9 +514,14 @@ def _get_or_fetch_shared_snapshot(
         )
         if published.action != "published":
             raise _ProviderSyncError("snapshot_publish_cas_stale")
+        if previous_artifact_sha256 != artifact_sha256:
+            _delete_unreferenced_snapshot_artifact(
+                cache_key=cache_key,
+                artifact_sha256=previous_artifact_sha256,
+            )
         return payload, artifact_sha256
     except Exception as exc:
-        failed_at = _safe_clock_value(clock=clock, fallback=now)
+        failed_at = _safe_clock_value(clock=clock, fallback=decision_now)
         fail_snapshot_lease(
             provider=provider,
             region=region,
@@ -458,12 +679,6 @@ def discover_the_racing_api_source_identities(
             for source in event.source_identities.all()
             if source.source_key == "the_racing_api"
         ]
-        if any(
-            source.region_code == contract_region
-            and source.identity_namespace == "the_racing_api-race-v1"
-            for source in existing
-        ):
-            continue
         route = resolve_race_data_provider_route(
             provider="the_racing_api",
             region=contract_region,
@@ -472,6 +687,21 @@ def discover_the_racing_api_source_identities(
         )
         if route is None:
             continue
+        exact_existing = [
+            source
+            for source in existing
+            if source.region_code == contract_region
+            and source.identity_namespace == route.identity_namespace
+        ]
+        if len(exact_existing) == 1:
+            admission_reason, _binding = resolve_source_route_admission(
+                source=exact_existing[0],
+                route_digest=route.route_digest,
+                data_kinds=required_kinds,
+                now=now,
+            )
+            if not admission_reason:
+                continue
         candidates.append((event, contract_region, route, existing))
     if not candidates:
         return ProviderIdentityDiscoveryOutcome(
@@ -508,6 +738,7 @@ def discover_the_racing_api_source_identities(
             ):
                 raise PermissionError("host budget mismatch")
     except Exception:
+        logger.exception("TRA identity discovery runtime contract failed")
         return ProviderIdentityDiscoveryOutcome(
             False,
             "source_runtime_contract_rejected",
@@ -599,13 +830,20 @@ def discover_the_racing_api_source_identities(
                     )
                     if models.RaceResultSourceIdentity.objects.filter(
                         source_key="the_racing_api",
+                        region_code=contract_region,
+                        identity_namespace=route.identity_namespace,
                         external_race_id=external_id,
                     ).exclude(event=locked_event).exists():
                         ambiguous += 1
                         continue
                     locked_sources = list(
                         models.RaceResultSourceIdentity.objects.select_for_update()
-                        .filter(event=locked_event, source_key="the_racing_api")[:2]
+                        .filter(
+                            event=locked_event,
+                            source_key="the_racing_api",
+                            region_code=contract_region,
+                            identity_namespace=route.identity_namespace,
+                        )[:2]
                     )
                     if len(locked_sources) > 1:
                         ambiguous += 1
@@ -614,13 +852,13 @@ def discover_the_racing_api_source_identities(
                     identity_fields = {
                         "event_id": locked_event.pk,
                         "identity_discovery": "exact_name_course_local_date_v1",
-                        "identity_namespace": "the_racing_api-race-v1",
+                        "identity_namespace": route.identity_namespace,
                         "race_data_region": contract_region,
                         "source_response_sha256": raw_sha256,
                     }
                     values = {
                         "region_code": contract_region,
-                        "identity_namespace": "the_racing_api-race-v1",
+                        "identity_namespace": route.identity_namespace,
                         "external_race_id": external_id,
                         "canonical_url": url,
                         "host": _HOST,
@@ -638,7 +876,9 @@ def discover_the_racing_api_source_identities(
                     }
                     if source is None:
                         models.RaceResultSourceIdentity.objects.create(
-                            event=locked_event, **values
+                            event=locked_event,
+                            source_key="the_racing_api",
+                            **values,
                         )
                         created += 1
                     elif source.external_race_id == external_id:
@@ -660,6 +900,7 @@ def discover_the_racing_api_source_identities(
             unmatched,
         )
     except Exception:
+        logger.exception("TRA identity discovery execution failed")
         return ProviderIdentityDiscoveryOutcome(
             False,
             "provider_execution_failed",
@@ -855,6 +1096,7 @@ def run_reference_result_data_sync(
     collect_if_missing: bool = True,
     capacity_reserved: bool = False,
     claim_guard: RaceDataSyncClaim | None = None,
+    project_current: bool | None = None,
 ) -> ProviderSyncOutcome:
     """Collect and consume a complete immutable third-party result receipt."""
 
@@ -945,28 +1187,25 @@ def run_reference_result_data_sync(
                 {},
                 not_found_kinds=(models.RaceDataSyncDataKind.RESULT,),
             )
+        provider_event_key = str(
+            receipt.payload.provider_event_key or ""
+        ).strip()
+        if not provider_event_key:
+            raise _ProviderSyncError("reference_identity_missing")
+        external_race_id = (
+            provider_event_key
+            if len(provider_event_key) <= 128
+            else "reference:"
+            + hashlib.sha256(provider_event_key.encode()).hexdigest()
+        )
+        namespace = route.identity_namespace
         source = models.RaceResultSourceIdentity.objects.filter(
             event_id=event_id,
             source_key=provider,
-            region_code__in=route.entry.regions,
+            region_code=route.entry.regions[0],
+            identity_namespace=namespace,
         ).first()
         if source is None:
-            provider_event_key = str(
-                receipt.payload.provider_event_key or ""
-            ).strip()
-            if not provider_event_key:
-                raise _ProviderSyncError("reference_identity_missing")
-            external_race_id = (
-                provider_event_key
-                if len(provider_event_key) <= 128
-                else "reference:"
-                + hashlib.sha256(provider_event_key.encode()).hexdigest()
-            )
-            namespace = (
-                provider
-                if provider in route.entry.identity_namespaces
-                else route.entry.identity_namespaces[0]
-            )
             source = models.RaceResultSourceIdentity.objects.create(
                 event=event,
                 source_key=provider,
@@ -992,6 +1231,32 @@ def run_reference_result_data_sync(
                 valid_until=valid_until,
                 registry_digest=route.registry_digest,
             )
+        elif (
+            source.external_race_id != external_race_id
+            or (
+                isinstance(source.identity_fields, dict)
+                and source.identity_fields.get("provider_event_key") not in {
+                    None,
+                    "",
+                    provider_event_key,
+                }
+            )
+        ):
+            raise _ProviderSyncError("reference_identity_conflict")
+        elif not isinstance(source.identity_fields, dict) or not source.identity_fields.get(
+            "provider_event_key"
+        ):
+            source.identity_fields = {
+                **(
+                    source.identity_fields
+                    if isinstance(source.identity_fields, dict)
+                    else {}
+                ),
+                "provider_event_key": provider_event_key,
+                "identity_namespace": namespace,
+                "race_data_region": route.entry.regions[0],
+            }
+            source.save(update_fields=("identity_fields", "updated_at"))
         semantic = receipt.payload.structured_payload
         completeness = (
             semantic.get("completeness")
@@ -1036,13 +1301,16 @@ def run_reference_result_data_sync(
         if not decision.recorded or decision.observation is None:
             raise _ProviderSyncError(f"observation_{decision.reason}")
         flags = RaceDataSyncFlags.from_settings()
+        should_project = (
+            bool(flags.result_apply_enabled and flags.result_public_enabled)
+            if project_current is None
+            else project_current
+        )
         applied = apply_data_sync_result_observation(
             observation_id=decision.observation.pk,
             expected_event_id=event.pk,
             now=now,
-            project_current=bool(
-                flags.result_apply_enabled and flags.result_public_enabled
-            ),
+            project_current=should_project,
             correction_apply_enabled=flags.correction_apply_enabled,
             claim_guard=claim_guard,
         )
@@ -1108,6 +1376,7 @@ def run_result_fallback_chain(
             task_id=task_id,
             run_id=run_id,
             claim_guard=claim_guard,
+            project_current=None,
         )
         if outcome.success and outcome.applied_kinds:
             return outcome
@@ -1119,6 +1388,11 @@ def run_result_fallback_chain(
     candidate_providers = set()
     for source in sources:
         if source.source_key not in _REFERENCE_SOURCE_KEYS:
+            continue
+        if (
+            source.source_key not in flags.providers
+            or source.region_code not in flags.regions
+        ):
             continue
         route = resolve_race_data_provider_route(
             provider=source.source_key,
@@ -1156,7 +1430,11 @@ def run_result_fallback_chain(
     )
     if reference_region is not None:
         provider, region = reference_region
-        if provider not in candidate_providers:
+        if (
+            provider in flags.providers
+            and region in flags.regions
+            and provider not in candidate_providers
+        ):
             route = resolve_race_data_provider_route(
                 provider=provider,
                 region=region,
@@ -1179,6 +1457,7 @@ def run_result_fallback_chain(
             run_id=run_id,
             capacity_reserved=False,
             claim_guard=claim_guard,
+            project_current=None,
         )
         if outcome.success and outcome.applied_kinds:
             return outcome
@@ -1203,6 +1482,7 @@ def run_persisted_official_result_data_sync(
     task_id: str,
     run_id: str,
     claim_guard: RaceDataSyncClaim | None = None,
+    project_current: bool | None = None,
 ) -> ProviderSyncOutcome:
     """Project a complete result already collected by an official importer.
 
@@ -1373,14 +1653,19 @@ def run_persisted_official_result_data_sync(
             False, f"observation_{decision.reason}", {}, {}
         )
     apply_flags = RaceDataSyncFlags.from_settings()
+    should_project = (
+        bool(
+            apply_flags.result_apply_enabled
+            and apply_flags.result_public_enabled
+        )
+        if project_current is None
+        else project_current
+    )
     applied = apply_data_sync_result_observation(
         observation_id=decision.observation.pk,
         expected_event_id=event.pk,
         now=now,
-        project_current=bool(
-            apply_flags.result_apply_enabled
-            and apply_flags.result_public_enabled
-        ),
+        project_current=should_project,
         correction_apply_enabled=apply_flags.correction_apply_enabled,
         claim_guard=claim_guard,
     )
@@ -1474,15 +1759,24 @@ def run_the_racing_api_data_sync(
     if route.entry.provider != "the_racing_api":
         return ProviderSyncOutcome(False, "provider_not_implemented", {}, {})
     event = models.RaceEvent.objects.filter(pk=event_id).first()
-    source = models.RaceResultSourceIdentity.objects.filter(
-        event_id=event_id,
-        source_key="the_racing_api",
-        region_code__in=route.entry.regions,
-    ).first()
-    if event is None or source is None:
+    enrollment = (
+        models.RaceDataSyncEnrollment.objects.select_related("source_identity")
+        .filter(
+            event_id=event_id,
+            state=models.RaceDataSyncEnrollmentState.ENROLLED,
+        )
+        .first()
+    )
+    source = enrollment.source_identity if enrollment is not None else None
+    if event is None or enrollment is None or source is None:
         return ProviderSyncOutcome(False, "source_identity_missing", {}, {})
     if (
-        source.review_status != models.RaceLiveReviewStatus.APPROVED
+        source.event_id != event_id
+        or source.source_key != "the_racing_api"
+        or source.region_code not in route.entry.regions
+        or source.identity_namespace not in route.entry.identity_namespaces
+        or enrollment.route_digest != route.route_digest
+        or source.review_status != models.RaceLiveReviewStatus.APPROVED
         or source.terms_status != models.RaceSourceTermsStatus.APPROVED
         or source.automation_allowed is not True
         or source.valid_until is None
@@ -1592,6 +1886,7 @@ def run_the_racing_api_data_sync(
                         now=now,
                         proposed_requests=1,
                         clock=clock,
+                        sleeper=sleeper,
                         fetcher=fetch_racecard_snapshot,
                     )
                     snapshot = parse_the_racing_api_live_racecards_payload(
@@ -1705,6 +2000,10 @@ def run_the_racing_api_data_sync(
                                 models.RaceDataSyncDataKind.RACECARD,
                             }
                         )
+                        if reconcile.claim_invalidated:
+                            raise _ProviderSyncError(
+                                "schedule_changed_claim_invalidated"
+                            )
 
         if models.RaceDataSyncDataKind.RESULT in data_kinds:
             day_offset = (
@@ -1782,6 +2081,7 @@ def run_the_racing_api_data_sync(
                     now=now,
                     proposed_requests=route.request_budget,
                     clock=clock,
+                    sleeper=sleeper,
                     fetcher=fetch_result_snapshot,
                 )
             elif day_offset is not None and -7 <= day_offset < 0:
@@ -1815,7 +2115,14 @@ def run_the_racing_api_data_sync(
                 )
                 if exact_result.get("_not_found") is not True:
                     response_payload = {
-                        "results": [{**exact_result, "race_status": "official"}]
+                        "results": [
+                            {
+                                **exact_result,
+                                "race_status": (
+                                    exact_result.get("race_status") or "official"
+                                ),
+                            }
+                        ]
                     }
 
             if response_payload is None:
@@ -1837,12 +2144,19 @@ def run_the_racing_api_data_sync(
                 if normalized_race is None:
                     not_found.append(models.RaceDataSyncDataKind.RESULT)
                 else:
-                    phase = (
-                        models.RaceResultPhase.OFFICIAL
-                        if str(normalized_race.get("race_status") or "")
+                    normalized_status = (
+                        str(normalized_race.get("race_status") or "")
                         .strip()
                         .casefold()
-                        in route.entry.terminal_markers
+                    )
+                    correction_marked = (
+                        normalized_status in _TRA_CORRECTION_MARKERS
+                    )
+                    phase = (
+                        models.RaceResultPhase.CORRECTED
+                        if correction_marked
+                        else models.RaceResultPhase.OFFICIAL
+                        if normalized_status in route.entry.terminal_markers
                         else models.RaceResultPhase.PROVISIONAL
                     )
                     payload = _result_payload(
@@ -1875,6 +2189,10 @@ def run_the_racing_api_data_sync(
                             "contract_digest": route.entry.contract_digest,
                             "automation_allowed": True,
                             "normalized_sha256": normalized_sha256,
+                            "correction_marker": correction_marked,
+                            "correction_marker_value": (
+                                normalized_status if correction_marked else ""
+                            ),
                         },
                         parse_warnings=[],
                         permission_classification="licensed_api_automation",

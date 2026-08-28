@@ -413,7 +413,11 @@ def select_due_race_data_sync_task() -> dict:
 def discover_future_race_data_sync_task() -> dict:
     """Hourly census and bounded automatic enrollment under standing policy."""
 
-    if getattr(settings, "RACE_DATA_SYNC_FUTURE_DISCOVERY_ENABLED", False) is not True:
+    if (
+        getattr(settings, "RACE_DATA_SYNC_ENABLED", False) is not True
+        or getattr(settings, "RACE_DATA_SYNC_FUTURE_DISCOVERY_ENABLED", False)
+        is not True
+    ):
         return {"enabled": False, "status": "disabled"}
 
     import re
@@ -534,6 +538,56 @@ def monitor_race_data_sync_result_slo_task() -> dict:
         "status": "complete",
         "staged": len(incident_ids),
         "incident_ids": incident_ids,
+    }
+
+
+@shared_task
+def cleanup_race_data_sync_artifacts_task() -> dict:
+    """Bound cleanup of raw observations and unreferenced shared snapshots."""
+
+    if (
+        getattr(settings, "RACE_DATA_SYNC_ENABLED", False) is not True
+        or getattr(settings, "RACE_DATA_SYNC_SCHEDULER_ENABLED", False) is not True
+    ):
+        return {"enabled": False, "status": "disabled"}
+    from stable.services.race_data_sync_pipeline import (
+        cleanup_expired_race_data_raw_payloads,
+    )
+    from stable.services.race_data_sync_providers import (
+        cleanup_expired_shared_snapshots,
+    )
+
+    batch_size = int(getattr(settings, "RACE_DATA_RAW_CLEANUP_MAX_ROWS", 0))
+    max_bytes = int(getattr(settings, "RACE_DATA_RAW_CLEANUP_MAX_BYTES", 0))
+    if not 1 <= batch_size <= 1000 or max_bytes <= 0:
+        return {
+            "enabled": True,
+            "status": "blocked",
+            "reason": "cleanup_capacity_invalid",
+        }
+    now = timezone.now()
+    raw = cleanup_expired_race_data_raw_payloads(
+        now=now,
+        batch_size=batch_size,
+        max_bytes=max_bytes,
+    )
+    snapshots = cleanup_expired_shared_snapshots(
+        now=now,
+        batch_size=batch_size,
+        max_bytes=max_bytes - raw.cleaned_bytes,
+    ) if raw.cleaned_bytes < max_bytes else None
+    return {
+        "enabled": True,
+        "status": "complete",
+        "raw_cleaned": raw.cleaned,
+        "raw_cleaned_bytes": raw.cleaned_bytes,
+        "raw_held": raw.held,
+        "raw_skipped": raw.skipped,
+        "snapshot_cleaned": snapshots.cleaned if snapshots is not None else 0,
+        "snapshot_cleaned_bytes": (
+            snapshots.cleaned_bytes if snapshots is not None else 0
+        ),
+        "snapshot_skipped": snapshots.skipped if snapshots is not None else 0,
     }
 
 

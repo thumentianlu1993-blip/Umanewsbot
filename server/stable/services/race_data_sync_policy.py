@@ -130,10 +130,10 @@ def calculate_next_poll_at(
         raise ValueError("race_datetime must be timezone-aware")
     if data_kind not in models.RaceDataSyncDataKind.values:
         raise ValueError("unsupported race data kind")
+    if event_terminal:
+        return None
 
     if data_kind == models.RaceDataSyncDataKind.RACE_TIME:
-        if event_terminal:
-            return None
         if race_datetime is None:
             return now + timedelta(hours=12)
         until_race = race_datetime - now
@@ -148,8 +148,6 @@ def calculate_next_poll_at(
         return None
 
     if data_kind == models.RaceDataSyncDataKind.RACECARD:
-        if event_terminal:
-            return None
         if race_datetime is None:
             return now + timedelta(hours=12)
         until_race = race_datetime - now

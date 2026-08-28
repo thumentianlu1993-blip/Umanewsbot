@@ -1106,7 +1106,8 @@ def verify_registry_state(
 
 def validate_active_registry_membership(
     *, event_id: int, root_sha256: str, membership_sha256: str,
-    member_count: int, activation_id: str, lock: bool = False
+    member_count: int, activation_id: str, lock: bool = False,
+    now: datetime | None = None,
 ) -> MembershipValidation:
     try:
         # Rotation is excluded by the transaction-level advisory barrier in
@@ -1133,8 +1134,118 @@ def validate_active_registry_membership(
         RaceEventLifecycleEnforceMembership.DoesNotExist,
     ):
         return MembershipValidation(False, "registry_root_stale")
-    if django_timezone.now() >= membership.registry.runtime_valid_until:
+    effective_now = now or django_timezone.now()
+    if django_timezone.is_naive(effective_now):
+        return MembershipValidation(False, "registry_now_invalid")
+    if effective_now >= membership.registry.runtime_valid_until:
         return MembershipValidation(False, "registry_runtime_expired")
+    return MembershipValidation(True, membership=membership)
+
+
+def acquire_registry_shared_advisory_lock() -> None:
+    """Hold the lifecycle-registry rotation barrier in the current transaction."""
+
+    _advisory_shared_lock()
+
+
+def lock_current_runtime_registry_membership(
+    *, event_id: int, now: datetime
+) -> MembershipValidation:
+    """Lock the exact active membership selected by current runtime trust roots.
+
+    Callers must already be inside ``transaction.atomic()`` and must invoke this
+    before locking lifecycle control or event rows.
+    """
+
+    if django_timezone.is_naive(now):
+        return MembershipValidation(False, "registry_now_invalid")
+    root = getattr(settings, "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_SHA256", "")
+    membership_sha = getattr(
+        settings, "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBERSHIP_SHA256", ""
+    )
+    member_count = getattr(
+        settings, "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBER_COUNT", 0
+    )
+    activation_id = getattr(
+        settings, "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_ACTIVATION_ID", ""
+    )
+    if (
+        _SHA_RE.fullmatch(root or "") is None
+        or _SHA_RE.fullmatch(membership_sha or "") is None
+        or type(member_count) is not int
+        or member_count <= 0
+        or _SHA_RE.fullmatch(activation_id or "") is None
+    ):
+        return MembershipValidation(False, "registry_runtime_settings_invalid")
+    acquire_registry_shared_advisory_lock()
+    return validate_active_registry_membership(
+        event_id=event_id,
+        root_sha256=root,
+        membership_sha256=membership_sha,
+        member_count=member_count,
+        activation_id=activation_id,
+        lock=True,
+        now=now,
+    )
+
+
+def validate_registry_membership_snapshot(
+    *,
+    membership: RaceEventLifecycleEnforceMembership | None,
+    event: RaceEvent,
+    control: RaceEventLifecycleControl | None,
+    now: datetime,
+) -> MembershipValidation:
+    """Revalidate loaded lifecycle evidence for projection and public reads."""
+
+    if membership is None or control is None or django_timezone.is_naive(now):
+        return MembershipValidation(False, "registry_membership_missing")
+    registry = membership.registry
+    root = getattr(settings, "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_SHA256", "")
+    membership_sha = getattr(
+        settings, "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBERSHIP_SHA256", ""
+    )
+    member_count = getattr(
+        settings, "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBER_COUNT", 0
+    )
+    activation_id = getattr(
+        settings, "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_ACTIVATION_ID", ""
+    )
+    evidence = (
+        control.manifest_data.get("enforce_registry")
+        if isinstance(control.manifest_data, dict)
+        else None
+    )
+    if (
+        not getattr(settings, "RACE_EVENT_LIFECYCLE_ENABLED", False)
+        or getattr(settings, "RACE_EVENT_LIFECYCLE_MODE", "off") != "enforce"
+        or registry.root_sha256 != root
+        or registry.membership_sha256 != membership_sha
+        or registry.member_count != member_count
+        or registry.activation_id != activation_id
+        or not registry.is_active
+        or registry.state != "active"
+        or now >= registry.runtime_valid_until
+        or membership.state != "active"
+        or membership.event_id != event.pk
+        or control.mode != RaceEventLifecycleMode.ENFORCE
+        or event.visibility_status != "published"
+        or bool(event.manual_lock_flags)
+        or bool(control.manual_pause_reason)
+        or membership.schedule_generation != control.schedule_generation
+        or membership.source_enrollment_sha256
+        != control.enrollment_manifest_sha256
+        or membership.schedule_hash != _schedule_hash(event)
+        or membership.country_region != event.country_region
+        or membership.timezone_name != event.timezone_name
+        or not isinstance(evidence, dict)
+        or evidence.get("root_sha256") != root
+        or evidence.get("membership_sha256") != membership_sha
+        or evidence.get("entry_sha256") != membership.entry_sha256
+        or evidence.get("activation_state") != "active"
+        or evidence.get("activation_id") != activation_id
+    ):
+        return MembershipValidation(False, "registry_membership_drift")
     return MembershipValidation(True, membership=membership)
 
 
@@ -1193,6 +1304,7 @@ def apply_registry_lifecycle_decision(
                 member_count=expected_registry_member_count,
                 activation_id=expected_registry_activation_id,
                 lock=True,
+                now=now,
             )
             if not validation.valid:
                 return ApplyResult(action="noop", reason_code=validation.reason_code)
@@ -1212,6 +1324,11 @@ def apply_registry_lifecycle_decision(
                 return ApplyResult(action="noop", reason_code="registry_event_manual_lock")
             if control.manual_pause_reason:
                 return ApplyResult(action="noop", reason_code="registry_control_manual_pause")
+            evidence = (
+                control.manifest_data.get("enforce_registry")
+                if isinstance(control.manifest_data, dict)
+                else None
+            )
             if (
                 membership.schedule_generation != expected_generation
                 or membership.schedule_generation != control.schedule_generation
@@ -1222,6 +1339,15 @@ def apply_registry_lifecycle_decision(
                 or membership.timezone_name != event.timezone_name
                 or not membership.registry.is_active
                 or membership.registry.state != "active"
+                or not isinstance(evidence, dict)
+                or evidence.get("root_sha256")
+                != expected_registry_root_sha256
+                or evidence.get("membership_sha256")
+                != expected_registry_membership_sha256
+                or evidence.get("entry_sha256") != membership.entry_sha256
+                or evidence.get("activation_state") != "active"
+                or evidence.get("activation_id")
+                != expected_registry_activation_id
             ):
                 return ApplyResult(action="noop", reason_code="registry_membership_drift")
             zones = membership.frozen_snapshot.get("allowed_us_zones") or []

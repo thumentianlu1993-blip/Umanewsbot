@@ -29,6 +29,8 @@ from stable.models import (
     RaceEventHistoryWinner,
     RaceEventLiveState,
     RaceEventLifecycleControl,
+    RaceEventLifecycleEnforceMembership,
+    RaceDataSyncEnrollment,
     RaceLiveHostBudget,
     RaceEventLiveTracking,
     RaceEventModule,
@@ -3228,6 +3230,180 @@ def _race_live_official_publication_audit_matches(
     )
 
 
+def _resolve_data_sync_publication_from_loaded_rows(
+    *,
+    event: RaceEvent,
+    control: RaceEventProjectionControl,
+    revision: RaceEventRevision,
+    publication: RaceEventRevisionPublication,
+    observation: RaceResultObservation,
+    source: RaceResultSourceIdentity,
+    enrollment: RaceDataSyncEnrollment | None,
+    enrollment_source: RaceResultSourceIdentity | None,
+    lifecycle: RaceEventLifecycleControl | None,
+    lifecycle_membership: RaceEventLifecycleEnforceMembership | None,
+    now: datetime,
+) -> RaceLivePublicReadDecision:
+    """Authorize a data-sync result without borrowing legacy race-live policy."""
+
+    def reject(reason: str) -> RaceLivePublicReadDecision:
+        return RaceLivePublicReadDecision(
+            visible=False,
+            reason=f"data_sync_{reason}",
+            revision_id=revision.pk,
+            phase=revision.phase,
+            effective_mode=RaceLivePublicationMode.OFF,
+        )
+
+    if control.write_owner != RaceEventProjectionWriteOwner.DATA_SYNC:
+        return reject("writer_owner_mismatch")
+    if revision.phase not in {RaceResultPhase.OFFICIAL, RaceResultPhase.CORRECTED}:
+        return reject("phase_not_public")
+    if event.status != RaceEventStatus.FINISHED or not isinstance(
+        event.result_confirmed_at, datetime
+    ) or timezone.is_naive(event.result_confirmed_at):
+        return reject("event_not_confirmed")
+
+    from stable.services.race_event_lifecycle_enforce import (
+        validate_registry_membership_snapshot,
+    )
+
+    lifecycle_validation = validate_registry_membership_snapshot(
+        membership=lifecycle_membership,
+        event=event,
+        control=lifecycle,
+        now=now,
+    )
+    if not lifecycle_validation.valid:
+        return reject(lifecycle_validation.reason_code)
+
+    from stable.services.race_data_sync_control import (
+        resolve_source_route_admission,
+    )
+    from stable.services.race_data_sync_pipeline import (
+        RaceDataSyncFlags,
+        resolve_race_data_provider_route,
+    )
+
+    flags = RaceDataSyncFlags.from_settings()
+    if not (
+        flags.enabled
+        and flags.result_apply_enabled
+        and flags.result_public_enabled
+        and source.source_key in flags.providers
+        and source.region_code in flags.regions
+        and RaceEventRevisionKind.RESULT == revision.kind
+        and "result" in flags.data_kinds
+    ):
+        return reject("runtime_gate_closed")
+    if (
+        revision.phase == RaceResultPhase.CORRECTED
+        and not flags.correction_apply_enabled
+    ):
+        return reject("correction_gate_closed")
+
+    if enrollment is None:
+        return reject("enrollment_missing")
+    if (
+        enrollment.state != "enrolled"
+        or enrollment.event_id != event.pk
+        or enrollment.projection_owner_generation != control.owner_generation
+        or enrollment.enrollment_generation != control.owner_generation
+        or enrollment.manifest_sha256 != control.owner_manifest_sha256
+        or not isinstance(enrollment.effective_at, datetime)
+        or timezone.is_naive(enrollment.effective_at)
+        or enrollment.effective_at > publication.published_at
+    ):
+        return reject("enrollment_drift")
+    digest_values = (
+        enrollment.standing_policy_digest,
+        enrollment.route_digest,
+        enrollment.event_snapshot_sha256,
+        enrollment.manifest_sha256,
+        enrollment.entry_sha256,
+    )
+    if any(
+        not isinstance(value, str)
+        or RACE_PROJECTION_MANIFEST_SHA256_RE.fullmatch(value) is None
+        for value in digest_values
+    ):
+        return reject("enrollment_digest_invalid")
+    standing_policy_digest = str(
+        getattr(settings, "RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256", "")
+        or ""
+    )
+    if enrollment.standing_policy_digest != standing_policy_digest:
+        return reject("standing_policy_drift")
+
+    if (
+        enrollment_source is None
+        or enrollment_source.pk != enrollment.source_identity_id
+        or enrollment_source.event_id != event.pk
+    ):
+        return reject("enrollment_source_missing")
+    enrollment_reason, enrollment_route = resolve_source_route_admission(
+        source=enrollment_source,
+        route_digest=enrollment.route_digest,
+        data_kinds=("result",),
+        now=now,
+    )
+    if enrollment_reason or enrollment_route is None:
+        return reject(enrollment_reason or "enrollment_route_unavailable")
+
+    route = resolve_race_data_provider_route(
+        provider=source.source_key,
+        region=source.region_code,
+        identity_namespace=source.identity_namespace,
+        data_kinds=("result",),
+    )
+    if route is None:
+        return reject("route_unavailable")
+    admission_reason, admitted_route = resolve_source_route_admission(
+        source=source,
+        route_digest=route.route_digest,
+        data_kinds=("result",),
+        now=now,
+    )
+    if admission_reason or admitted_route is None:
+        return reject(admission_reason or "route_unavailable")
+    route = admitted_route
+    provenance = (
+        observation.field_provenance
+        if isinstance(observation.field_provenance, dict)
+        else {}
+    )
+    expected_source_class = route.entry.source_class
+    if (
+        revision.source_authority != expected_source_class
+        or provenance.get("provider") != source.source_key
+        or provenance.get("region") != source.region_code
+        or provenance.get("source_class") != expected_source_class
+        or provenance.get("automation_allowed") is not True
+        or provenance.get("registry_digest") != route.registry_digest
+        or provenance.get("contract_version") != route.entry.contract_version
+        or provenance.get("contract_digest") != route.contract_digest
+    ):
+        return reject("source_contract_drift")
+    if (
+        publication.reason != "data_sync_result"
+        or publication.authorization_kind != "official_route"
+        or publication.official_authorization_version != 0
+        or publication.allowlist_version != 1
+        or publication.registry_digest != route.registry_digest
+        or publication.coverage_proof_digest != observation.normalized_sha256
+        or publication.policy_versions
+        != [["race_data_sync_contract", route.entry.contract_version, 1]]
+    ):
+        return reject("publication_audit_mismatch")
+    return RaceLivePublicReadDecision(
+        visible=True,
+        reason="data_sync_public_read_allowed",
+        revision_id=revision.pk,
+        phase=revision.phase,
+        effective_mode=RaceLivePublicationMode.OFFICIAL_PUBLIC,
+    )
+
+
 def resolve_race_live_public_read(
     *,
     event_id: int,
@@ -3351,6 +3527,42 @@ def resolve_race_live_public_read(
             "source_event_mismatch",
             revision_id=revision_id,
             phase=phase,
+        )
+    if control.write_owner == RaceEventProjectionWriteOwner.DATA_SYNC:
+        enrollment = (
+            RaceDataSyncEnrollment.objects.select_related("source_identity")
+            .filter(event_id=event_id)
+            .first()
+        )
+        event = RaceEvent.objects.get(pk=event_id)
+        lifecycle = RaceEventLifecycleControl.objects.filter(
+            event_id=event_id
+        ).first()
+        lifecycle_membership = (
+            RaceEventLifecycleEnforceMembership.objects.select_related("registry")
+            .filter(
+                event_id=event_id,
+                state="active",
+                registry__root_sha256=getattr(
+                    settings,
+                    "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_SHA256",
+                    "",
+                ),
+            )
+            .first()
+        )
+        return _resolve_data_sync_publication_from_loaded_rows(
+            event=event,
+            control=control,
+            revision=revision,
+            publication=publication,
+            observation=observation,
+            source=source,
+            enrollment=enrollment,
+            enrollment_source=(enrollment.source_identity if enrollment else None),
+            lifecycle=lifecycle,
+            lifecycle_membership=lifecycle_membership,
+            now=now,
         )
     if revision.source_authority != source.result_authority:
         return reject(
@@ -3917,6 +4129,36 @@ def resolve_race_live_public_reads(
             )
         )
     }
+    data_sync_event_ids = [
+        event_id
+        for event_id, control in control_by_event_id.items()
+        if control.write_owner == RaceEventProjectionWriteOwner.DATA_SYNC
+    ]
+    enrollment_by_event_id = {
+        enrollment.event_id: enrollment
+        for enrollment in RaceDataSyncEnrollment.objects.filter(
+            event_id__in=data_sync_event_ids
+        ).select_related("source_identity")
+    }
+    lifecycle_by_event_id = {
+        lifecycle.event_id: lifecycle
+        for lifecycle in RaceEventLifecycleControl.objects.filter(
+            event_id__in=data_sync_event_ids
+        )
+    }
+    lifecycle_membership_by_event_id = {
+        membership.event_id: membership
+        for membership in RaceEventLifecycleEnforceMembership.objects.filter(
+            event_id__in=data_sync_event_ids,
+            state="active",
+            registry__root_sha256=getattr(
+                settings,
+                "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_SHA256",
+                "",
+            ),
+        )
+        .select_related("registry")
+    }
 
     required_mode_by_phase = {
         RaceResultPhase.PROVISIONAL: RaceLivePublicationMode.PROVISIONAL_PUBLIC,
@@ -4025,6 +4267,27 @@ def resolve_race_live_public_reads(
                 "source_event_mismatch",
                 revision_id=revision_id,
                 phase=phase,
+            )
+            continue
+        if control.write_owner == RaceEventProjectionWriteOwner.DATA_SYNC:
+            decisions[event_id] = _resolve_data_sync_publication_from_loaded_rows(
+                event=event,
+                control=control,
+                revision=revision,
+                publication=publication,
+                observation=observation,
+                source=source,
+                enrollment=enrollment_by_event_id.get(event_id),
+                enrollment_source=(
+                    enrollment_by_event_id[event_id].source_identity
+                    if event_id in enrollment_by_event_id
+                    else None
+                ),
+                lifecycle=lifecycle_by_event_id.get(event_id),
+                lifecycle_membership=lifecycle_membership_by_event_id.get(
+                    event_id
+                ),
+                now=now,
             )
             continue
         if revision.source_authority != source.result_authority:

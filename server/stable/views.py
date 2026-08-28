@@ -2979,11 +2979,24 @@ def _confirmed_race_results(event: RaceEvent) -> list[RaceEventResult]:
 
 
 def _confirmed_race_winner(results: list[RaceEventResult]):
-    return next((result for result in results if result.official_finish_position == 1), None) or next(
+    return next(
+        (result for result in results if result.reported_finish_position == 1),
+        None,
+    ) or next(
         (
             result
             for result in results
-            if result.official_finish_position is None and result.finish_position == 1
+            if result.reported_finish_position is None
+            and result.official_finish_position == 1
+        ),
+        None,
+    ) or next(
+        (
+            result
+            for result in results
+            if result.reported_finish_position is None
+            and result.official_finish_position is None
+            and result.finish_position == 1
         ),
         None,
     )
@@ -3033,11 +3046,27 @@ def _public_today_races() -> tuple[list[dict], bool]:
     winners: dict[int, str] = {}
     finished_ids = [event.pk for event in events if event.status == RaceEventStatus.FINISHED]
     if finished_ids:
+        candidates_by_event: dict[int, list[RaceEventResult]] = {}
         for result in RaceEventResult.objects.filter(
             event_id__in=finished_ids,
             is_confirmed=True,
-        ).filter(Q(official_finish_position=1) | Q(official_finish_position__isnull=True, finish_position=1)):
-            winners[result.event_id] = result.horse_name
+        ).filter(
+            Q(reported_finish_position=1)
+            | Q(
+                reported_finish_position__isnull=True,
+                official_finish_position=1,
+            )
+            | Q(
+                reported_finish_position__isnull=True,
+                official_finish_position__isnull=True,
+                finish_position=1,
+            )
+        ).order_by("event_id", "finish_position", "id"):
+            candidates_by_event.setdefault(result.event_id, []).append(result)
+        for event_id, candidates in candidates_by_event.items():
+            winner = _confirmed_race_winner(candidates)
+            if winner is not None:
+                winners[event_id] = winner.horse_name
     entries = [
         {
             "event": event,
@@ -3331,14 +3360,23 @@ def _attach_result_display_positions(results):
     status_labels = dict(RaceRunnerStatus.choices)
     for result in results:
         source_refs = result.source_refs or {}
+        reported_position = result.reported_finish_position
         official_position = (
             result.official_finish_position
             or source_refs.get("official_finish_position")
         )
-        if official_position is None and result.running_status in non_finish_statuses:
+        if (
+            reported_position is None
+            and official_position is None
+            and result.running_status in non_finish_statuses
+        ):
             result.display_finish_position = status_labels[result.running_status]
         else:
-            result.display_finish_position = official_position or result.finish_position
+            result.display_finish_position = (
+                reported_position
+                or official_position
+                or result.finish_position
+            )
     return results
 
 
@@ -3588,8 +3626,16 @@ def _series_history_winners(
             is_confirmed=True,
         )
         .filter(
-            Q(official_finish_position=1)
-            | Q(official_finish_position__isnull=True, finish_position=1)
+            Q(reported_finish_position=1)
+            | Q(
+                reported_finish_position__isnull=True,
+                official_finish_position=1,
+            )
+            | Q(
+                reported_finish_position__isnull=True,
+                official_finish_position__isnull=True,
+                finish_position=1,
+            )
         )
     )
     if exclude_result_event_id is not None:

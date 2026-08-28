@@ -1,15 +1,18 @@
 # 项目总览
 
-截至 2026-08-20，赛事数据自动同步已在独立分支完成 R0 关闭态控制面骨架：复用既有 Slice A，新增
-`data_sync` 持久 writer owner、manifest-bound enrollment、provider checkpoint、DB snapshot single-flight、
-每分钟 selector 和 `race_sync_v2` 隔离 worker，并把新服务纳入发布/恢复/回滚状态机。exact reverse manifest
-可安全停止纳管并保留全部来源/修订证据；每小时 future discovery 当前只生成 raw-SHA standing-policy 绑定的
-小批限时 proposal，不持久化或自动 apply。所有新开关默认关闭，`RACE_DATA_RAW_*` 容量默认值为零且 provider
-执行器尚未接通，当前不会联网或自动修改公开赛事；R1 时间、R2 出马表、R3 赛果 revision、R4 生命周期/公开
-仍需按阶段实现和审核。两轮独立代码评审指出的 provider registry 绕过、optional-row/checkpoint 锁序、
-snapshot TTL/过期 owner、legacy 独立信任根与后置审批、exact catalog guard、rollback sibling phase 等缺口
-已修复；本地 `566` 项通过、2 项按环境跳过。同一独立 reviewer 最终复核为 0 blocker/high/medium/low，
-`VERDICT: APPROVED`；该批准只覆盖默认关闭的 R0 代码候选，仍不构成联网、migration、部署或生产启用授权。
+截至 2026-08-29，PR `#108` 候选已覆盖 future discovery、时间/出马表、lifecycle、赛果公开与更正，
+并使用 `data_sync` 持久 owner、exact enrollment/source/route、provider checkpoint、DB snapshot single-flight、
+`race_sync_v2` 隔离 worker 和证据绑定的 publication audit。历史 prepare exception 留下的 14 条过期
+claim 已有 SHA-bound、advisory-lock-bound 的精确收口候选；不生成 bundle/delivery/赛果。全 diff 审查
+发现的 migration `0075`、公开读取、shadow promotion、门禁重放、exact TRA source、snapshot
+retention、终态 polling 和 T+30 alert 问题已修复并通过 SQLite/PostgreSQL 聚焦门禁。最终增量又把
+future discovery/cleanup 绑定总开关、覆盖完整 snapshot lease 并消除公开批量读取 source N+1；完整
+diff 独立复审最终为 `No findings`，本地发布门禁全绿。生产仍为
+revision `2833558a…56c` / leaf `0073`，PR 未合并，新写入全关，`race_sync_v2=0`，旧
+`race_live=7543` 保持不动；本记录所在候选 commit 尚未合并，且尚未备份、收口生产 claim、
+migration、部署或启用。
+
+## 历史背景（以下状态以各段日期为准）
 
 八地区链路与 migration `0072` 已关闭态发布；当前生产代码 revision 为 PR `#98` 的精确 merge SHA
 `127d4833…9528`，统一 image 为 `sha256:37f84597…8852`。2025 范围暂收缩为日本、中国香港、英国、法国和美国，

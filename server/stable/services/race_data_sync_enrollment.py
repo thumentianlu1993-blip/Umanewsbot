@@ -16,9 +16,11 @@ from pathlib import Path
 import re
 import stat
 from typing import Any, Iterable
+from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.db import transaction
+from django.utils import timezone
 
 from stable import models
 from stable.services import race_data_sync_control
@@ -417,17 +419,35 @@ def build_race_data_enrollment_census(
     if not 1 <= horizon_days <= 366:
         raise ValueError("horizon_days is invalid")
     policy = parse_standing_policy(standing_policy)
-    end_date = (cutoff + timedelta(days=horizon_days)).date()
-    events = list(
+    end_at = cutoff + timedelta(days=horizon_days)
+    end_date = end_at.date()
+    candidate_events = list(
         models.RaceEvent.objects.filter(
             visibility_status=models.RaceEventVisibility.PUBLISHED,
-            local_date__gte=cutoff.date(),
-            local_date__lte=end_date,
+            local_date__gte=cutoff.date() - timedelta(days=1),
+            local_date__lte=end_date + timedelta(days=1),
         )
         .select_related("projection_control", "race_data_sync_enrollment")
         .prefetch_related("source_identities")
         .order_by("id")
     )
+    events = []
+    for event in candidate_events:
+        if event.race_datetime is not None:
+            if timezone.is_naive(event.race_datetime):
+                continue
+            if cutoff <= event.race_datetime <= end_at:
+                events.append(event)
+            continue
+        try:
+            event_zone = ZoneInfo(event.timezone_name)
+            local_start = cutoff.astimezone(event_zone).date()
+            local_end = end_at.astimezone(event_zone).date()
+        except (KeyError, ValueError):
+            local_start = cutoff.date()
+            local_end = end_date
+        if event.local_date is not None and local_start <= event.local_date <= local_end:
+            events.append(event)
     duplicate_ids = set(
         models.RaceEventProductCanonicalLink.objects.filter(
             duplicate_event_id__in=[event.pk for event in events],
@@ -841,6 +861,9 @@ def apply_race_data_enrollment_manifest(
         ):
             raise ValueError("manifest entry route budget is invalid")
         with transaction.atomic():
+            models.RaceEventLifecycleControl.objects.select_for_update().filter(
+                event_id=entry["event_id"]
+            ).first()
             event = models.RaceEvent.objects.select_for_update().get(pk=entry["event_id"])
             control, control_created = (
                 models.RaceEventProjectionControl.objects.get_or_create(event=event)
@@ -1092,6 +1115,9 @@ def apply_race_data_disenrollment_manifest(
             raise ValueError("manifest entry data kinds are invalid")
 
         with transaction.atomic():
+            models.RaceEventLifecycleControl.objects.select_for_update().filter(
+                event_id=entry["event_id"]
+            ).first()
             event = models.RaceEvent.objects.select_for_update().get(pk=entry["event_id"])
             control = (
                 models.RaceEventProjectionControl.objects.select_for_update()

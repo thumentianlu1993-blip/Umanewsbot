@@ -38,11 +38,14 @@ PARTIAL_LEAF_SETS = {
 REPAIR_LEAF_SETS = PARTIAL_LEAF_SETS | {
     ("stable.0070_horse_identity_evidence_commit_receipt",),
 }
-PREVIOUS_FINAL_LEAF_SET = ("stable.0073_lifecycle_enforce_registry",)
-FINAL_LEAF_SET = ("stable.0074_race_data_sync_r0_control_plane",)
+PREVIOUS_FINAL_LEAF_SET = ("stable.0074_race_data_sync_r0_control_plane",)
+FINAL_LEAF_SET = (
+    "stable.0075_race_data_source_priority_and_reported_position",
+)
 LEGACY_FINAL_LEAF_SETS = {
     ("stable.0071_historical_calendar_release_b",),
     ("stable.0072_add_extended_racing_regions",),
+    ("stable.0073_lifecycle_enforce_registry",),
     PREVIOUS_FINAL_LEAF_SET,
 }
 INITIAL_INSTALL_LEAF_SET = ("stable.0067_historical_calendar_release_a",)

@@ -141,6 +141,18 @@ class RaceDataDynamicCadenceTests(SimpleTestCase):
             NOW + timedelta(hours=6),
         )
 
+    def test_terminal_event_stops_every_data_kind_including_result(self):
+        for data_kind in models.RaceDataSyncDataKind.values:
+            with self.subTest(data_kind=data_kind):
+                self.assertIsNone(
+                    calculate_next_poll_at(
+                        data_kind=data_kind,
+                        now=NOW,
+                        race_datetime=NOW - timedelta(minutes=10),
+                        event_terminal=True,
+                    )
+                )
+
     def test_naive_datetime_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "timezone-aware"):
             calculate_next_poll_at(

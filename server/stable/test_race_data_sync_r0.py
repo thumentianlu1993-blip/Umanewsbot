@@ -9,6 +9,7 @@ import re
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.db import IntegrityError, connection, transaction
@@ -230,6 +231,61 @@ class RaceDataSyncR0MigrationAdoptionTests(TransactionTestCase):
         )
 
 
+class RaceDataSourcePriorityMigrationTests(TransactionTestCase):
+    migrate_from = [("stable", "0074_race_data_sync_r0_control_plane")]
+    migrate_to = [("stable", "0075_race_data_source_priority_and_reported_position")]
+
+    def setUp(self):
+        super().setUp()
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.migrate_from)
+        old_apps = executor.loader.project_state(self.migrate_from).apps
+        RaceEvent = old_apps.get_model("stable", "RaceEvent")
+        RaceEventResult = old_apps.get_model("stable", "RaceEventResult")
+        event = RaceEvent.objects.create(
+            year=2026,
+            edition_year=2026,
+            slug="migration-reported-position",
+            series_key="migration-reported-position",
+            original_name="Migration Reported Position",
+            chinese_name="迁移对外名次",
+            country_region="japan",
+            racecourse="Tokyo",
+            grade_text="G1",
+            surface="turf",
+            local_date=date(2026, 8, 21),
+            status="finished",
+            visibility_status="published",
+        )
+        self.unknown_id = RaceEventResult.objects.create(
+            event=event,
+            finish_position=7,
+            official_finish_position=None,
+            horse_name="Unknown Finish",
+        ).pk
+        self.official_id = RaceEventResult.objects.create(
+            event=event,
+            finish_position=1,
+            official_finish_position=3,
+            horse_name="Official Third",
+        ).pk
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.migrate_to)
+        self.apps = executor.loader.project_state(self.migrate_to).apps
+
+    def tearDown(self):
+        MigrationExecutor(connection).migrate(self.migrate_to)
+        super().tearDown()
+
+    def test_unknown_reported_position_is_not_fabricated_from_internal_order(self):
+        RaceEventResult = self.apps.get_model("stable", "RaceEventResult")
+        unknown = RaceEventResult.objects.get(pk=self.unknown_id)
+        official = RaceEventResult.objects.get(pk=self.official_id)
+
+        self.assertIsNone(unknown.reported_finish_position)
+        self.assertEqual(official.reported_finish_position, 3)
+
+
 @override_settings(
     RACE_DATA_SYNC_ENABLED=True,
     RACE_DATA_SYNC_ENABLED_PROVIDERS=("jra",),
@@ -293,6 +349,16 @@ class RaceDataSyncR0FlagContractTests(SimpleTestCase):
             schedule["monitor-race-data-sync-result-slo"]["options"]["queue"],
             "celery",
         )
+        self.assertEqual(
+            schedule["cleanup-race-data-sync-artifacts"]["options"]["queue"],
+            "race_sync_v2",
+        )
+        self.assertEqual(
+            app_settings.CELERY_TASK_ROUTES[
+                "stable.tasks.cleanup_race_data_sync_artifacts_task"
+            ],
+            {"queue": "race_sync_v2"},
+        )
 
     def test_slice_a_roster_v2_exposes_identity_and_data_kind_contract(self):
         from stable.services.race_data_sync_pipeline import (
@@ -313,6 +379,7 @@ class RaceDataSyncR0FlagContractTests(SimpleTestCase):
                 self.assertEqual(set(entry.data_kinds), expected_kinds)
                 if entry.adapter_status == "implemented" and entry.proof_digest:
                     self.assertRegex(entry.proof_digest, r"\A[0-9a-f]{64}\Z")
+
                 else:
                     self.assertIn(entry.proof_digest, {"", entry.contract_digest})
         self.assertIsNone(
@@ -332,6 +399,42 @@ class RaceDataSyncR0FlagContractTests(SimpleTestCase):
             ),
             "a route without audited host/path/budget must stay ineligible",
         )
+
+    @override_settings(
+        RACE_DATA_SYNC_SCHEDULER_ENABLED=True,
+        RACE_DATA_RAW_CLEANUP_MAX_ROWS=100,
+        RACE_DATA_RAW_CLEANUP_MAX_BYTES=64,
+    )
+    def test_cleanup_task_shares_one_byte_budget_across_artifact_classes(self):
+        from stable.tasks import cleanup_race_data_sync_artifacts_task
+
+        raw_outcome = SimpleNamespace(
+            cleaned=2,
+            cleaned_bytes=40,
+            held=0,
+            skipped=0,
+        )
+        snapshot_outcome = SimpleNamespace(
+            cleaned=1,
+            cleaned_bytes=24,
+            skipped=0,
+        )
+        with (
+            patch(
+                "stable.services.race_data_sync_pipeline.cleanup_expired_race_data_raw_payloads",
+                return_value=raw_outcome,
+            ) as cleanup_raw,
+            patch(
+                "stable.services.race_data_sync_providers.cleanup_expired_shared_snapshots",
+                return_value=snapshot_outcome,
+            ) as cleanup_snapshots,
+        ):
+            result = cleanup_race_data_sync_artifacts_task()
+
+        self.assertEqual(result["raw_cleaned_bytes"], 40)
+        self.assertEqual(result["snapshot_cleaned_bytes"], 24)
+        self.assertEqual(cleanup_raw.call_args.kwargs["max_bytes"], 64)
+        self.assertEqual(cleanup_snapshots.call_args.kwargs["max_bytes"], 24)
 
 
 class RaceDataSyncEnrollmentControlTests(TestCase):
@@ -435,6 +538,7 @@ class RaceDataSyncEnrollmentControlTests(TestCase):
             next_refresh_at=NOW + timedelta(hours=1),
             schedule_generation=7,
             manual_pause_reason="operator pause",
+            enrollment_manifest_sha256=SHA_C,
             manifest_data={"existing": True},
         )
 
@@ -446,7 +550,25 @@ class RaceDataSyncEnrollmentControlTests(TestCase):
         self.assertEqual(lifecycle.next_refresh_at, NOW + timedelta(hours=1))
         self.assertEqual(lifecycle.schedule_generation, 7)
         self.assertEqual(lifecycle.manual_pause_reason, "operator pause")
+        self.assertEqual(lifecycle.enrollment_manifest_sha256, SHA_C)
         self.assertTrue(lifecycle.manifest_data["existing"])
+        self.assertEqual(
+            lifecycle.manifest_data["race_data_sync"]["manifest_sha256"],
+            SHA_D,
+        )
+
+        released = race_data_sync_control.disenroll(
+            event_id=self.event.pk,
+            expected_manifest_sha256=SHA_D,
+            expected_owner_generation=1,
+            now=NOW + timedelta(minutes=1),
+        )
+        self.assertEqual(released.action, "released")
+        lifecycle.refresh_from_db()
+        self.assertEqual(lifecycle.mode, models.RaceEventLifecycleMode.SHADOW)
+        self.assertEqual(lifecycle.enrollment_manifest_sha256, SHA_C)
+        self.assertTrue(lifecycle.manifest_data["existing"])
+        self.assertNotIn("race_data_sync", lifecycle.manifest_data)
 
     def test_acquire_creates_missing_lifecycle_control_closed(self):
         acquired = self._acquire()
@@ -653,6 +775,48 @@ class RaceDataSyncEnrollmentControlTests(TestCase):
         )
         self.assertEqual(tracking.next_poll_at, NOW + timedelta(hours=1, seconds=1))
 
+    def test_postponed_claim_does_not_keep_polling_obsolete_result_time(self):
+        self._acquire()
+        self.event.status = models.RaceEventStatus.POSTPONED
+        self.event.save(update_fields=("status", "updated_at"))
+        claim = race_data_sync_control.claim_due_enrollments(
+            now=NOW,
+            batch_size=10,
+            ttl_seconds=60,
+            enabled_providers=("jra",),
+            enabled_regions=("japan",),
+            enabled_data_kinds=("race_time", "racecard", "result"),
+        )[0]
+
+        decision = race_data_sync_control.complete_race_data_sync_claim(
+            event_id=claim.event_id,
+            expected_enrollment_generation=claim.enrollment_generation,
+            expected_owner_generation=claim.owner_generation,
+            expected_claim_generation=claim.claim_generation,
+            attempt_token=claim.attempt_token,
+            checkpoint_plan=claim.checkpoint_plan,
+            expected_enrollment_entry_sha256=claim.enrollment_entry_sha256,
+            expected_plan_sha256=claim.plan_sha256,
+            now=NOW + timedelta(seconds=1),
+        )
+
+        self.assertEqual(decision.action, "complete")
+        checkpoints = {
+            checkpoint.data_kind: checkpoint.next_poll_at
+            for checkpoint in models.RaceEventLiveProviderCheckpoint.objects.filter(
+                tracking__event=self.event
+            )
+        }
+        self.assertEqual(
+            checkpoints[models.RaceDataSyncDataKind.RACE_TIME],
+            NOW + timedelta(hours=12, seconds=1),
+        )
+        self.assertEqual(
+            checkpoints[models.RaceDataSyncDataKind.RACECARD],
+            NOW + timedelta(hours=12, seconds=1),
+        )
+        self.assertIsNone(checkpoints[models.RaceDataSyncDataKind.RESULT])
+
     def test_stale_provider_task_cannot_release_newer_claim(self):
         self._acquire()
         first = race_data_sync_control.claim_due_enrollments(
@@ -803,6 +967,61 @@ class RaceDataSyncEnrollmentControlTests(TestCase):
             enabled_data_kinds=("racecard",),
         )[0]
         self.assertEqual(claim.data_kinds, ("racecard",))
+
+    def test_disabled_due_checkpoint_cannot_starve_enabled_due_event(self):
+        self._acquire()
+        first_tracking = self.event.live_tracking
+        first_tracking.provider_checkpoints.filter(
+            data_kind=models.RaceDataSyncDataKind.RACECARD
+        ).update(next_poll_at=NOW + timedelta(hours=1))
+
+        second_event = create_event(slug="r0-enabled-due-second")
+        models.RaceEventProjectionControl.objects.create(
+            event=second_event,
+            write_owner=models.RaceEventProjectionWriteOwner.UNMANAGED,
+        )
+        second_source = models.RaceResultSourceIdentity.objects.create(
+            event=second_event,
+            source_key="jra",
+            region_code="japan",
+            identity_namespace="jra-race-v1",
+            external_race_id="20260821-tokyo-12",
+            review_status=models.RaceLiveReviewStatus.APPROVED,
+            terms_status=models.RaceSourceTermsStatus.APPROVED,
+            automation_allowed=True,
+            proof_network_allowed=True,
+            evidence_url="https://jra.example.test/reviewed-proof",
+            evidence_sha256=SHA_A,
+            valid_until=NOW + timedelta(days=30),
+            registry_digest=self.route.registry_digest,
+        )
+        acquired = race_data_sync_control.acquire_enrollment(
+            event_id=second_event.pk,
+            source_identity_id=second_source.pk,
+            standing_policy_digest=SHA_A,
+            route_digest=self.route.route_digest,
+            event_snapshot_sha256=SHA_C,
+            manifest_sha256=SHA_D,
+            entry_sha256=SHA_B,
+            expected_owner=models.RaceEventProjectionWriteOwner.UNMANAGED,
+            expected_owner_generation=0,
+            data_kinds=("race_time", "racecard", "result"),
+            now=NOW,
+        )
+        self.assertEqual(acquired.action, "acquired")
+
+        claims = race_data_sync_control.claim_due_enrollments(
+            now=NOW,
+            batch_size=1,
+            ttl_seconds=60,
+            enabled_providers=("jra",),
+            enabled_regions=("japan",),
+            enabled_data_kinds=("racecard",),
+        )
+
+        self.assertEqual(len(claims), 1)
+        self.assertEqual(claims[0].event_id, second_event.pk)
+        self.assertEqual(claims[0].data_kinds, ("racecard",))
 
     def test_reviewed_legacy_transfer_requires_closed_drained_baseline(self):
         self.control.write_owner = models.RaceEventProjectionWriteOwner.LIVE
@@ -1118,15 +1337,163 @@ class RaceDataSnapshotLeaseControlTests(TestCase):
             ).action,
             "complete",
         )
-        self.assertEqual(
-            race_data_sync_control.claim_snapshot_lease(
-                **self._args(),
-                owner_token="owner-c",
-                now=NOW + timedelta(seconds=212),
-                ttl_seconds=60,
-            ).action,
-            "taken_over",
+        refreshed = race_data_sync_control.claim_snapshot_lease(
+            **self._args(),
+            owner_token="owner-c",
+            now=NOW + timedelta(seconds=212),
+            ttl_seconds=60,
         )
+        self.assertEqual(refreshed.action, "taken_over")
+        lease.refresh_from_db()
+        self.assertEqual(
+            lease.manifest_data["previous_artifact_sha256"],
+            SHA_A,
+        )
+        self.assertEqual(
+            lease.manifest_data["previous_manifest"]["artifact_sha256"],
+            SHA_A,
+        )
+
+    def test_stale_owner_artifact_cannot_overwrite_published_generation(self):
+        from stable.services.race_data_sync_providers import (
+            _read_snapshot_artifact,
+            _write_snapshot_artifact,
+        )
+
+        with TemporaryDirectory() as temporary_directory, self.settings(
+            RACE_DATA_RAW_ARTIFACT_ROOTS=(temporary_directory,),
+            RACE_DATA_RAW_MAX_UNCOMPRESSED_BYTES=8 * 1024 * 1024,
+        ):
+            cache_key = race_data_sync_control.build_snapshot_cache_key(
+                **self._args(scope_key="immutable-generation")
+            )
+            first = race_data_sync_control.claim_snapshot_lease(
+                **self._args(scope_key="immutable-generation"),
+                owner_token="owner-a",
+                now=NOW,
+                ttl_seconds=60,
+            )
+            takeover = race_data_sync_control.claim_snapshot_lease(
+                **self._args(scope_key="immutable-generation"),
+                owner_token="owner-b",
+                now=NOW + timedelta(seconds=61),
+                ttl_seconds=60,
+            )
+            current_payload = {"racecards": [{"race_id": "current"}]}
+            current_path, current_sha = _write_snapshot_artifact(
+                cache_key=cache_key,
+                owner_token="owner-b",
+                payload=current_payload,
+            )
+            current_manifest = self._manifest(
+                scope_key="immutable-generation",
+                artifact_sha256=current_sha,
+            )
+            published = race_data_sync_control.publish_snapshot(
+                **self._args(scope_key="immutable-generation"),
+                owner_token="owner-b",
+                expected_generation=takeover.generation,
+                artifact_sha256=current_sha,
+                manifest=current_manifest,
+                now=NOW + timedelta(seconds=62),
+            )
+            self.assertEqual(published.action, "published")
+
+            stale_path, stale_sha = _write_snapshot_artifact(
+                cache_key=cache_key,
+                owner_token="owner-a",
+                payload={"racecards": [{"race_id": "stale"}]},
+            )
+            stale_publish = race_data_sync_control.publish_snapshot(
+                **self._args(scope_key="immutable-generation"),
+                owner_token="owner-a",
+                expected_generation=first.generation,
+                artifact_sha256=stale_sha,
+                manifest=self._manifest(
+                    scope_key="immutable-generation",
+                    artifact_sha256=stale_sha,
+                ),
+                now=NOW + timedelta(seconds=63),
+            )
+
+            self.assertEqual(stale_publish.action, "rejected")
+            self.assertNotEqual(current_path, stale_path)
+            payload, artifact_sha = _read_snapshot_artifact(
+                manifest=current_manifest
+            )
+            self.assertEqual(payload, current_payload)
+            self.assertEqual(artifact_sha, current_sha)
+
+    def test_successful_snapshot_refresh_retires_previous_artifact(self):
+        from stable.services.race_data_sync_providers import (
+            _delete_unreferenced_snapshot_artifact,
+            _write_snapshot_artifact,
+        )
+
+        with TemporaryDirectory() as temporary_directory, self.settings(
+            RACE_DATA_RAW_ARTIFACT_ROOTS=(temporary_directory,),
+            RACE_DATA_RAW_MAX_UNCOMPRESSED_BYTES=8 * 1024 * 1024,
+        ):
+            args = self._args(scope_key="refresh-retirement")
+            cache_key = race_data_sync_control.build_snapshot_cache_key(**args)
+            old_path, old_sha = _write_snapshot_artifact(
+                cache_key=cache_key,
+                owner_token="old-owner",
+                payload={"racecards": [{"race_id": "old"}]},
+            )
+            first = race_data_sync_control.claim_snapshot_lease(
+                **args,
+                owner_token="old-owner",
+                now=NOW,
+                ttl_seconds=60,
+            )
+            self.assertEqual(
+                race_data_sync_control.publish_snapshot(
+                    **args,
+                    owner_token="old-owner",
+                    expected_generation=first.generation,
+                    artifact_sha256=old_sha,
+                    manifest=self._manifest(
+                        artifact_sha256=old_sha,
+                        scope_key="refresh-retirement",
+                    ),
+                    now=NOW + timedelta(seconds=1),
+                ).action,
+                "published",
+            )
+            takeover = race_data_sync_control.claim_snapshot_lease(
+                **args,
+                owner_token="new-owner",
+                now=NOW + timedelta(seconds=152),
+                ttl_seconds=60,
+            )
+            self.assertEqual(takeover.action, "taken_over")
+            new_path, new_sha = _write_snapshot_artifact(
+                cache_key=cache_key,
+                owner_token="new-owner",
+                payload={"racecards": [{"race_id": "new"}]},
+            )
+            self.assertEqual(
+                race_data_sync_control.publish_snapshot(
+                    **args,
+                    owner_token="new-owner",
+                    expected_generation=takeover.generation,
+                    artifact_sha256=new_sha,
+                    manifest=self._manifest(
+                        artifact_sha256=new_sha,
+                        scope_key="refresh-retirement",
+                    ),
+                    now=NOW + timedelta(seconds=153),
+                ).action,
+                "published",
+            )
+            _delete_unreferenced_snapshot_artifact(
+                cache_key=cache_key,
+                artifact_sha256=old_sha,
+            )
+
+            self.assertFalse(old_path.exists())
+            self.assertTrue(new_path.exists())
 
     def test_corrupt_complete_and_failed_retry_after_are_fail_closed(self):
         acquired = race_data_sync_control.claim_snapshot_lease(
@@ -1274,6 +1641,106 @@ class RaceDataSnapshotLeaseControlTests(TestCase):
             )
             self.assertEqual(lease.state, models.RaceDataSnapshotLeaseState.CLAIMED)
             self.assertTrue(lease.owner_token)
+
+    def test_cleanup_removes_only_expired_valid_complete_snapshot(self):
+        from stable.services.race_data_sync_providers import (
+            cleanup_expired_shared_snapshots,
+        )
+
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            snapshot_root = root / "snapshots"
+            snapshot_root.mkdir(mode=0o700)
+            payload = {"racecards": [{"race_id": "expired"}]}
+            encoded = json.dumps(
+                payload,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+            artifact_sha256 = hashlib.sha256(encoded).hexdigest()
+            expired_key = "jra:japan:expired:racecard:" + SHA_B
+            expired_path = snapshot_root / (
+                hashlib.sha256(expired_key.encode()).hexdigest()
+                + f"-{artifact_sha256}.json"
+            )
+            expired_path.write_bytes(encoded)
+            expired_path.chmod(0o600)
+            expired = models.RaceDataSnapshotLease.objects.create(
+                cache_key=expired_key,
+                state=models.RaceDataSnapshotLeaseState.COMPLETE,
+                owner_token="",
+                lease_expires_at=NOW - timedelta(days=8),
+                artifact_sha256=artifact_sha256,
+                manifest_data={
+                    "schema_version": 1,
+                    "complete": True,
+                    "cache_key": expired_key,
+                    "artifact_sha256": artifact_sha256,
+                    "registry_digest": SHA_B,
+                    "fetched_at": (NOW - timedelta(days=8)).isoformat(),
+                    "page_count": 1,
+                    "item_count": 1,
+                },
+            )
+            malformed = models.RaceDataSnapshotLease.objects.create(
+                cache_key="jra:japan:malformed:racecard:" + SHA_B,
+                state=models.RaceDataSnapshotLeaseState.COMPLETE,
+                owner_token="",
+                lease_expires_at=NOW - timedelta(days=8),
+                artifact_sha256=SHA_A,
+                manifest_data={"complete": True},
+            )
+            recent = models.RaceDataSnapshotLease.objects.create(
+                cache_key="jra:japan:recent:racecard:" + SHA_B,
+                state=models.RaceDataSnapshotLeaseState.COMPLETE,
+                owner_token="",
+                lease_expires_at=NOW - timedelta(days=6),
+                artifact_sha256=SHA_A,
+                manifest_data={"complete": True},
+            )
+            models.RaceDataSnapshotLease.objects.filter(pk=expired.pk).update(
+                updated_at=NOW - timedelta(days=8)
+            )
+            models.RaceDataSnapshotLease.objects.filter(pk=malformed.pk).update(
+                updated_at=NOW - timedelta(days=8)
+            )
+            models.RaceDataSnapshotLease.objects.filter(pk=recent.pk).update(
+                updated_at=NOW - timedelta(days=6)
+            )
+
+            with self.settings(
+                RACE_DATA_RAW_ARTIFACT_ROOTS=(str(root),),
+                RACE_DATA_RAW_MAX_UNCOMPRESSED_BYTES=8 * 1024 * 1024,
+                RACE_DATA_SNAPSHOT_RETENTION_SECONDS=7 * 24 * 3600,
+            ):
+                bounded = cleanup_expired_shared_snapshots(
+                    now=NOW,
+                    batch_size=100,
+                    max_bytes=len(encoded) - 1,
+                )
+                self.assertEqual(bounded.cleaned, 0)
+                self.assertEqual(bounded.cleaned_bytes, 0)
+                self.assertTrue(expired_path.exists())
+                outcome = cleanup_expired_shared_snapshots(
+                    now=NOW,
+                    batch_size=100,
+                    max_bytes=len(encoded),
+                )
+
+            self.assertEqual(outcome.cleaned, 1)
+            self.assertEqual(outcome.cleaned_bytes, len(encoded))
+            self.assertEqual(outcome.skipped, 1)
+            self.assertFalse(expired_path.exists())
+            self.assertFalse(
+                models.RaceDataSnapshotLease.objects.filter(pk=expired.pk).exists()
+            )
+            self.assertTrue(
+                models.RaceDataSnapshotLease.objects.filter(pk=malformed.pk).exists()
+            )
+            self.assertTrue(
+                models.RaceDataSnapshotLease.objects.filter(pk=recent.pk).exists()
+            )
 
     def test_data_sync_reuses_shared_host_budget_with_route_interval_floor(self):
         budget = models.RaceLiveHostBudget.objects.create(
@@ -1430,6 +1897,44 @@ class RaceDataSyncCensusManifestTests(TestCase):
         self.assertEqual(census.entries[0].provider, "jra")
         self.assertEqual(census.entries[0].source_identity_id, event.source_identities.get().pk)
 
+    def test_census_includes_future_event_on_western_local_cutoff_date(self):
+        event = models.RaceEvent.objects.create(
+            year=2026,
+            slug="census-western-local-date",
+            original_name="Western Local Date Cup",
+            chinese_name="西部时区杯",
+            country_region=models.RacingRegion.UNITED_STATES,
+            racecourse="Del Mar",
+            grade_text="G1",
+            normalized_grade=models.RaceGrade.G1,
+            surface=models.RaceEventSurface.TURF,
+            race_datetime=None,
+            timezone_name="America/Los_Angeles",
+            local_date=date(2026, 8, 19),
+            local_start_time=datetime(2026, 8, 19, 22, 0).time(),
+            status=models.RaceEventStatus.SCHEDULED,
+            visibility_status=models.RaceEventVisibility.PUBLISHED,
+        )
+        policy = self._policy()
+        policy["routes"].append(
+            {
+                "country_region": models.RacingRegion.UNITED_STATES,
+                "provider": "equibase",
+                "region_code": "united_states",
+                "identity_namespace": "equibase-race-v1",
+                "route_digest": SHA_A,
+                "data_kinds": ["race_time", "racecard", "result"],
+            }
+        )
+
+        census = race_data_sync_enrollment.build_race_data_enrollment_census(
+            standing_policy=policy,
+            cutoff=NOW,
+            horizon_days=30,
+        )
+
+        self.assertIn(event.pk, {entry.event_id for entry in census.entries})
+
     def test_future_discovery_builds_bounded_proposal_without_writes(self):
         for number in range(25):
             event = create_event(slug=f"future-proposal-{number:02d}")
@@ -1466,6 +1971,7 @@ class RaceDataSyncCensusManifestTests(TestCase):
             policy_path.write_bytes(raw)
             with (
                 override_settings(
+                    RACE_DATA_SYNC_ENABLED=True,
                     RACE_DATA_SYNC_FUTURE_DISCOVERY_ENABLED=True,
                     RACE_DATA_SYNC_FUTURE_STANDING_POLICY_FILE=str(policy_path),
                     RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256=hashlib.sha256(raw).hexdigest(),
@@ -1819,6 +2325,36 @@ class RaceDataSyncSelectorFailClosedTests(SimpleTestCase):
             result = discover_future_race_data_sync_task()
         self.assertEqual(result, {"enabled": False, "status": "disabled"})
         loader.assert_not_called()
+
+    @override_settings(
+        RACE_DATA_SYNC_ENABLED=False,
+        RACE_DATA_SYNC_FUTURE_DISCOVERY_ENABLED=True,
+    )
+    def test_future_discovery_subswitch_cannot_bypass_disabled_master(self):
+        from stable.tasks import discover_future_race_data_sync_task
+
+        with patch(
+            "stable.services.race_data_sync_enrollment.load_standing_policy_file"
+        ) as loader:
+            result = discover_future_race_data_sync_task()
+
+        self.assertEqual(result, {"enabled": False, "status": "disabled"})
+        loader.assert_not_called()
+
+    @override_settings(
+        RACE_DATA_SYNC_ENABLED=False,
+        RACE_DATA_SYNC_SCHEDULER_ENABLED=True,
+    )
+    def test_cleanup_scheduler_cannot_bypass_disabled_master(self):
+        from stable.tasks import cleanup_race_data_sync_artifacts_task
+
+        with patch(
+            "stable.services.race_data_sync_pipeline.cleanup_expired_race_data_raw_payloads"
+        ) as cleanup:
+            result = cleanup_race_data_sync_artifacts_task()
+
+        self.assertEqual(result, {"enabled": False, "status": "disabled"})
+        cleanup.assert_not_called()
 
     @override_settings(
         RACE_DATA_SYNC_SCHEDULER_ENABLED=True,

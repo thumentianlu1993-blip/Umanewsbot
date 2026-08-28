@@ -8,17 +8,24 @@ from unittest.mock import patch
 from django.test import TestCase, override_settings
 
 from stable import models
-from stable.services import race_data_sync_control
+from stable.services import race_data_sync_control, race_events
 from stable.services.race_data_sync_pipeline import (
     _ROSTER_ALLOWED_FIELDS,
     build_race_data_provider_roster,
+    resolve_race_data_provider_route,
 )
 from stable.services.race_data_sync_results import (
     apply_data_sync_result_observation,
 )
+from stable.services.race_event_lifecycle_enrollment import _schedule_hash
 
 
 NOW = datetime(2026, 8, 28, 8, 0, tzinfo=dt_timezone.utc)
+REGISTRY_ROOT = "1" * 64
+REGISTRY_MEMBERSHIP = "2" * 64
+REGISTRY_ACTIVATION = "3" * 64
+REGISTRY_ENTRY = "4" * 64
+LIFECYCLE_ENROLLMENT = "5" * 64
 
 
 def _sha(value) -> str:
@@ -33,6 +40,14 @@ def _sha(value) -> str:
     RACE_DATA_SYNC_ENABLED_FIELDS=_ROSTER_ALLOWED_FIELDS,
     RACE_DATA_SYNC_ENABLED_DATA_KINDS=("result",),
     RACE_LIVE_TRA_REGISTRY_SHA256="a" * 64,
+    RACE_EVENT_LIFECYCLE_ENABLED=True,
+    RACE_EVENT_LIFECYCLE_MODE="enforce",
+    RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_SHA256=REGISTRY_ROOT,
+    RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBERSHIP_SHA256=(
+        REGISTRY_MEMBERSHIP
+    ),
+    RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBER_COUNT=1,
+    RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_ACTIVATION_ID=REGISTRY_ACTIVATION,
 )
 class RaceDataSyncResultApplicationTests(TestCase):
     def setUp(self):
@@ -50,6 +65,7 @@ class RaceDataSyncResultApplicationTests(TestCase):
             timezone_name="Asia/Tokyo",
             local_date=date(2026, 8, 28),
             status=models.RaceEventStatus.RUNNING,
+            visibility_status=models.RaceEventVisibility.PUBLISHED,
         )
         self.control = models.RaceEventProjectionControl.objects.create(
             event=self.event,
@@ -59,6 +75,49 @@ class RaceDataSyncResultApplicationTests(TestCase):
         models.RaceEventLiveTracking.objects.create(
             event=self.event,
             tracking_enabled=True,
+        )
+        self.lifecycle = models.RaceEventLifecycleControl.objects.create(
+            event=self.event,
+            mode=models.RaceEventLifecycleMode.ENFORCE,
+            schedule_generation=1,
+            enrollment_manifest_sha256=LIFECYCLE_ENROLLMENT,
+            manifest_data={
+                "enforce_registry": {
+                    "root_sha256": REGISTRY_ROOT,
+                    "membership_sha256": REGISTRY_MEMBERSHIP,
+                    "entry_sha256": REGISTRY_ENTRY,
+                    "activation_state": "active",
+                    "activation_id": REGISTRY_ACTIVATION,
+                }
+            },
+        )
+        registry = models.RaceEventLifecycleEnforceRegistry.objects.create(
+            root_sha256=REGISTRY_ROOT,
+            generation=1,
+            membership_sha256=REGISTRY_MEMBERSHIP,
+            member_count=1,
+            state="active",
+            is_active=True,
+            activation_id=REGISTRY_ACTIVATION,
+            approved_commit="6" * 40,
+            selector_scope={},
+            scope_sha256="7" * 64,
+            census_cutoff=NOW - timedelta(days=1),
+            apply_expires_at=NOW + timedelta(days=1),
+            runtime_valid_until=NOW + timedelta(days=35),
+            activated_at=NOW,
+        )
+        models.RaceEventLifecycleEnforceMembership.objects.create(
+            registry=registry,
+            event=self.event,
+            state="active",
+            entry_sha256=REGISTRY_ENTRY,
+            source_enrollment_sha256=LIFECYCLE_ENROLLMENT,
+            schedule_generation=1,
+            schedule_hash=_schedule_hash(self.event),
+            country_region=self.event.country_region,
+            timezone_name=self.event.timezone_name,
+            frozen_snapshot={},
         )
         self.roster = build_race_data_provider_roster(configuration_only=True)
         self.source = self._source(
@@ -215,6 +274,43 @@ class RaceDataSyncResultApplicationTests(TestCase):
             plan_sha256=plan_sha256,
         )
 
+    def _public_enrollment(self):
+        route = resolve_race_data_provider_route(
+            provider=self.source.source_key,
+            region=self.source.region_code,
+            identity_namespace=self.source.identity_namespace,
+            data_kinds=(models.RaceDataSyncDataKind.RESULT,),
+        )
+        self.assertIsNotNone(route)
+        self.control.owner_manifest_sha256 = "e" * 64
+        self.control.save(
+            update_fields=("owner_manifest_sha256", "updated_at")
+        )
+        self.source.proof_network_allowed = True
+        self.source.evidence_url = "https://api.theracingapi.com/v1/results/api-result"
+        self.source.evidence_sha256 = "a" * 64
+        self.source.save(
+            update_fields=(
+                "proof_network_allowed",
+                "evidence_url",
+                "evidence_sha256",
+                "updated_at",
+            )
+        )
+        return models.RaceDataSyncEnrollment.objects.create(
+            event=self.event,
+            source_identity=self.source,
+            state=models.RaceDataSyncEnrollmentState.ENROLLED,
+            standing_policy_digest="f" * 64,
+            route_digest=route.route_digest,
+            event_snapshot_sha256="d" * 64,
+            projection_owner_generation=1,
+            enrollment_generation=1,
+            manifest_sha256="e" * 64,
+            entry_sha256="b" * 64,
+            effective_at=NOW - timedelta(minutes=1),
+        )
+
     @staticmethod
     def _rows(first_name="Alpha", first_position=1):
         return [
@@ -263,6 +359,210 @@ class RaceDataSyncResultApplicationTests(TestCase):
             models.RaceEventLifecycleTransition.objects.get().reason_code,
             "data_sync_complete_result",
         )
+
+    def test_matching_shadow_revision_is_promoted_when_publication_opens(self):
+        observation = self._observation(
+            self.source, "licensed_api", self._rows()
+        )
+        shadow = apply_data_sync_result_observation(
+            observation_id=observation.pk,
+            expected_event_id=self.event.pk,
+            now=NOW,
+            project_current=False,
+            correction_apply_enabled=True,
+        )
+        self.assertEqual(shadow.action, "recorded")
+        self.assertFalse(shadow.projected)
+        revision = models.RaceEventRevision.objects.get(pk=shadow.revision_id)
+        self.assertIsNone(revision.published_at)
+
+        promoted = apply_data_sync_result_observation(
+            observation_id=observation.pk,
+            expected_event_id=self.event.pk,
+            now=NOW + timedelta(minutes=1),
+            project_current=True,
+            correction_apply_enabled=True,
+        )
+
+        self.assertEqual(promoted.action, "applied")
+        self.assertEqual(promoted.reason_code, "shadow_revision_promoted")
+        self.assertEqual(promoted.revision_id, shadow.revision_id)
+        self.assertTrue(promoted.projected)
+        self.control.refresh_from_db()
+        self.assertEqual(self.control.current_result_revision_id, shadow.revision_id)
+        self.assertEqual(self.control.next_result_revision_no, 2)
+        self.assertEqual(models.RaceEventRevision.objects.count(), 1)
+        self.assertEqual(models.RaceEventRevisionPublication.objects.count(), 1)
+        self.assertEqual(models.RaceEventResult.objects.count(), 2)
+
+    @override_settings(
+        RACE_DATA_SYNC_ENABLED=True,
+        RACE_DATA_SYNC_RESULT_APPLY_ENABLED=True,
+        RACE_DATA_SYNC_RESULT_PUBLIC_ENABLED=True,
+        RACE_DATA_SYNC_CORRECTION_APPLY_ENABLED=True,
+        RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256="f" * 64,
+    )
+    def test_data_sync_publication_is_visible_in_detail_and_bulk_resolvers(self):
+        self._public_enrollment()
+        observation = self._observation(
+            self.source, "licensed_api", self._rows()
+        )
+        applied = apply_data_sync_result_observation(
+            observation_id=observation.pk,
+            expected_event_id=self.event.pk,
+            now=NOW,
+            project_current=True,
+            correction_apply_enabled=True,
+        )
+        self.assertTrue(applied.projected, applied)
+
+        detail = race_events.resolve_race_live_public_read(
+            event_id=self.event.pk,
+            now=NOW + timedelta(seconds=1),
+        )
+        source_manager = models.RaceResultSourceIdentity.objects
+        with patch.object(
+            source_manager,
+            "filter",
+            wraps=source_manager.filter,
+        ) as source_filter:
+            bulk = race_events.resolve_race_live_public_reads(
+                event_ids=[self.event.pk],
+                now=NOW + timedelta(seconds=1),
+            )[self.event.pk]
+
+        self.assertTrue(detail.visible, detail.reason)
+        self.assertEqual(detail.reason, "data_sync_public_read_allowed")
+        self.assertEqual(bulk, detail)
+        self.assertEqual(source_filter.call_count, 1)
+
+    @override_settings(
+        RACE_DATA_SYNC_ENABLED=True,
+        RACE_DATA_SYNC_ENABLED_PROVIDERS=("the_racing_api", "sporting_life"),
+        RACE_DATA_SYNC_ENABLED_REGIONS=("japan_jra", "united_kingdom"),
+        RACE_DATA_SYNC_RESULT_APPLY_ENABLED=True,
+        RACE_DATA_SYNC_RESULT_PUBLIC_ENABLED=True,
+        RACE_DATA_SYNC_CORRECTION_APPLY_ENABLED=True,
+        RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256="f" * 64,
+        RACE_DATA_SYNC_REFERENCE_REGISTRY_SHA256="9" * 64,
+    )
+    def test_fallback_publication_retains_original_enrollment_evidence(self):
+        self.roster = build_race_data_provider_roster(configuration_only=True)
+        self.source.registry_digest = self.roster.registry_digest
+        self.source.save(update_fields=("registry_digest", "updated_at"))
+        enrollment = self._public_enrollment()
+        fallback_source = self._source(
+            "sporting_life", "trusted_publisher", "fallback-result"
+        )
+        fallback_source.region_code = "united_kingdom"
+        fallback_source.identity_namespace = "sporting_life-race-v1"
+        fallback_source.save(
+            update_fields=("region_code", "identity_namespace", "updated_at")
+        )
+        fallback_route = resolve_race_data_provider_route(
+            provider=fallback_source.source_key,
+            region=fallback_source.region_code,
+            identity_namespace=fallback_source.identity_namespace,
+            data_kinds=(models.RaceDataSyncDataKind.RESULT,),
+        )
+        self.assertIsNotNone(fallback_route)
+        fallback_source.proof_network_allowed = True
+        fallback_source.evidence_url = "https://www.sportinglife.com/racing/results/"
+        fallback_source.evidence_sha256 = "a" * 64
+        fallback_source.registry_digest = fallback_route.registry_digest
+        fallback_source.save(
+            update_fields=(
+                "proof_network_allowed",
+                "evidence_url",
+                "evidence_sha256",
+                "registry_digest",
+                "updated_at",
+            )
+        )
+        observation = self._observation(
+            fallback_source,
+            "trusted_publisher",
+            self._rows(first_name="Fallback Alpha"),
+        )
+        applied = apply_data_sync_result_observation(
+            observation_id=observation.pk,
+            expected_event_id=self.event.pk,
+            now=NOW,
+            project_current=True,
+            correction_apply_enabled=True,
+        )
+        self.assertTrue(applied.projected, applied)
+
+        decision = race_events.resolve_race_live_public_read(
+            event_id=self.event.pk,
+            now=NOW + timedelta(seconds=1),
+        )
+
+        self.assertTrue(decision.visible, decision.reason)
+        self.assertEqual(enrollment.source_identity_id, self.source.pk)
+        self.assertNotEqual(
+            observation.source_identity_id,
+            enrollment.source_identity_id,
+        )
+
+    @override_settings(
+        RACE_DATA_SYNC_ENABLED=True,
+        RACE_DATA_SYNC_RESULT_APPLY_ENABLED=True,
+        RACE_DATA_SYNC_RESULT_PUBLIC_ENABLED=True,
+        RACE_DATA_SYNC_CORRECTION_APPLY_ENABLED=True,
+        RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256="f" * 64,
+    )
+    def test_data_sync_public_read_fails_closed_on_contract_drift(self):
+        enrollment = self._public_enrollment()
+        observation = self._observation(
+            self.source, "licensed_api", self._rows()
+        )
+        applied = apply_data_sync_result_observation(
+            observation_id=observation.pk,
+            expected_event_id=self.event.pk,
+            now=NOW,
+            project_current=True,
+            correction_apply_enabled=True,
+        )
+        self.assertTrue(applied.projected)
+        lifecycle_membership = (
+            models.RaceEventLifecycleEnforceMembership.objects.get(
+                event=self.event
+            )
+        )
+        cases = (
+            (self.source, "valid_until", NOW),
+            (enrollment, "enrollment_generation", 2),
+            (observation, "field_provenance", {
+                **observation.field_provenance,
+                "contract_digest": "0" * 64,
+            }),
+            (
+                models.RaceEventRevisionPublication.objects.get(
+                    revision_id=applied.revision_id
+                ),
+                "registry_digest",
+                "0" * 64,
+            ),
+            (lifecycle_membership, "state", "inactive"),
+        )
+        for instance, field, drifted in cases:
+            with self.subTest(model=type(instance).__name__, field=field):
+                original = getattr(instance, field)
+                setattr(instance, field, drifted)
+                instance.save(update_fields=(field, "updated_at"))
+                detail = race_events.resolve_race_live_public_read(
+                    event_id=self.event.pk,
+                    now=NOW + timedelta(seconds=1),
+                )
+                bulk = race_events.resolve_race_live_public_reads(
+                    event_ids=[self.event.pk],
+                    now=NOW + timedelta(seconds=1),
+                )[self.event.pk]
+                self.assertFalse(detail.visible)
+                self.assertEqual(bulk, detail)
+                setattr(instance, field, original)
+                instance.save(update_fields=(field, "updated_at"))
 
     def test_superseded_claim_cannot_project_result_before_completion_cas(self):
         observation = self._observation(
@@ -338,6 +638,8 @@ class RaceDataSyncResultApplicationTests(TestCase):
     def test_dead_heat_keeps_duplicate_reported_positions_with_unique_internal_order(self):
         rows = self._rows(first_position=1)
         rows[1]["reported_finish_position"] = 1
+        rows[0]["status"] = models.RaceEventRevisionItemStatus.DEAD_HEAT
+        rows[1]["status"] = models.RaceEventRevisionItemStatus.DEAD_HEAT
         observation = self._observation(self.source, "licensed_api", rows)
         decision = apply_data_sync_result_observation(
             observation_id=observation.pk,
@@ -350,6 +652,81 @@ class RaceDataSyncResultApplicationTests(TestCase):
         results = list(self.event.results.order_by("finish_position"))
         self.assertEqual([row.finish_position for row in results], [1, 2])
         self.assertEqual([row.reported_finish_position for row in results], [1, 1])
+
+    def test_provider_declaration_order_does_not_control_internal_result_order(self):
+        rows = list(reversed(self._rows()))
+        observation = self._observation(
+            self.source, "licensed_api", rows
+        )
+
+        decision = apply_data_sync_result_observation(
+            observation_id=observation.pk,
+            expected_event_id=self.event.pk,
+            now=NOW,
+            project_current=True,
+            correction_apply_enabled=True,
+        )
+
+        self.assertEqual(decision.action, "applied")
+        results = list(self.event.results.order_by("finish_position"))
+        self.assertEqual(
+            [(row.horse_name, row.reported_finish_position) for row in results],
+            [("Alpha", 1), ("Beta", 2)],
+        )
+
+    def test_fallback_result_reuses_canonical_racecard_participants(self):
+        canonical_participants = {}
+        for runner in self.event.runners.order_by("horse_number"):
+            participant = models.RaceEventParticipant.objects.create(
+                event=self.event,
+                stable_key=f"canonical:{runner.external_runner_id}",
+                canonical_name=runner.horse_name,
+                country_region=self.event.country_region,
+                review_status=models.RaceLiveReviewStatus.APPROVED,
+            )
+            models.RaceEventParticipantSourceIdentity.objects.create(
+                participant=participant,
+                source_identity=self.source,
+                external_runner_id=runner.external_runner_id,
+            )
+            canonical_participants[runner.horse_name] = participant
+        fallback_source = self._source(
+            "jra", "official_operator", "fallback-result"
+        )
+        for runner in self.event.runners.all():
+            refs = dict(runner.source_refs)
+            refs.pop(fallback_source.source_key, None)
+            runner.source_refs = refs
+            runner.save(update_fields=("source_refs", "updated_at"))
+        rows = self._rows()
+        for index, row in enumerate(rows, start=1):
+            row["external_runner_id"] = f"fallback-horse-{index}"
+        observation = self._observation(
+            fallback_source, "official_operator", rows
+        )
+
+        decision = apply_data_sync_result_observation(
+            observation_id=observation.pk,
+            expected_event_id=self.event.pk,
+            now=NOW,
+            project_current=True,
+            correction_apply_enabled=True,
+        )
+
+        self.assertEqual(decision.action, "applied")
+        revision = models.RaceEventRevision.objects.get(pk=decision.revision_id)
+        self.assertEqual(
+            set(revision.items.values_list("participant_id", flat=True)),
+            {participant.pk for participant in canonical_participants.values()},
+        )
+        self.assertEqual(models.RaceEventParticipant.objects.count(), 2)
+        for identity in fallback_source.participant_identities.select_related(
+            "participant"
+        ):
+            self.assertEqual(
+                identity.participant_id,
+                canonical_participants[identity.participant.canonical_name].pk,
+            )
 
     def test_lower_priority_result_is_recorded_but_does_not_replace_api(self):
         api = self._observation(self.source, "licensed_api", self._rows())
@@ -382,6 +759,55 @@ class RaceDataSyncResultApplicationTests(TestCase):
         self.assertEqual(self.control.current_result_revision_id, first.revision_id)
         self.assertEqual(self.event.results.get(finish_position=1).horse_name, "Alpha")
 
+    def test_higher_priority_result_replaces_fallback_only_after_correction_gate(self):
+        fallback_source = self._source(
+            "jra", "official_operator", "official-result"
+        )
+        fallback = self._observation(
+            fallback_source,
+            "official_operator",
+            self._rows(first_name="Fallback Alpha"),
+        )
+        first = apply_data_sync_result_observation(
+            observation_id=fallback.pk,
+            expected_event_id=self.event.pk,
+            now=NOW,
+            project_current=True,
+            correction_apply_enabled=True,
+        )
+        self.assertTrue(first.projected)
+        licensed = self._observation(
+            self.source,
+            "licensed_api",
+            self._rows(first_name="Licensed Alpha"),
+            observed_at=NOW + timedelta(minutes=1),
+        )
+
+        blocked = apply_data_sync_result_observation(
+            observation_id=licensed.pk,
+            expected_event_id=self.event.pk,
+            now=NOW + timedelta(minutes=1),
+            project_current=True,
+            correction_apply_enabled=False,
+        )
+        self.assertEqual(blocked.reason_code, "correction_apply_disabled")
+        applied = apply_data_sync_result_observation(
+            observation_id=licensed.pk,
+            expected_event_id=self.event.pk,
+            now=NOW + timedelta(minutes=1),
+            project_current=True,
+            correction_apply_enabled=True,
+        )
+
+        self.assertEqual(applied.action, "applied")
+        self.assertTrue(applied.projected)
+        revision = models.RaceEventRevision.objects.get(pk=applied.revision_id)
+        self.assertEqual(revision.supersedes_id, first.revision_id)
+        self.assertEqual(
+            self.event.results.get(finish_position=1).horse_name,
+            "Licensed Alpha",
+        )
+
     def test_same_source_correction_requires_flag_then_replaces_current(self):
         first_observation = self._observation(
             self.source, "licensed_api", self._rows()
@@ -398,6 +824,9 @@ class RaceDataSyncResultApplicationTests(TestCase):
             "licensed_api",
             self._rows(first_name="Corrected Alpha"),
             observed_at=NOW + timedelta(minutes=2),
+            race_status="corrected",
+            result_phase=models.RaceResultPhase.CORRECTED,
+            provenance_overrides={"correction_marker": True},
         )
         blocked = apply_data_sync_result_observation(
             observation_id=correction.pk,
@@ -419,6 +848,104 @@ class RaceDataSyncResultApplicationTests(TestCase):
             self.event.results.get(finish_position=1).horse_name,
             "Corrected Alpha",
         )
+
+    def test_changed_official_result_without_correction_marker_stays_conflict(self):
+        baseline = self._observation(
+            self.source, "licensed_api", self._rows()
+        )
+        applied = apply_data_sync_result_observation(
+            observation_id=baseline.pk,
+            expected_event_id=self.event.pk,
+            now=NOW,
+            project_current=True,
+            correction_apply_enabled=True,
+        )
+        unmarked = self._observation(
+            self.source,
+            "licensed_api",
+            self._rows(first_name="Unmarked Alpha"),
+            observed_at=NOW + timedelta(minutes=2),
+        )
+
+        conflict = apply_data_sync_result_observation(
+            observation_id=unmarked.pk,
+            expected_event_id=self.event.pk,
+            now=NOW + timedelta(minutes=2),
+            project_current=True,
+            correction_apply_enabled=True,
+        )
+
+        self.assertEqual(conflict.action, "recorded")
+        self.assertEqual(conflict.reason_code, "correction_marker_missing")
+        self.assertFalse(conflict.projected)
+        self.control.refresh_from_db()
+        self.assertEqual(
+            self.control.current_result_revision_id, applied.revision_id
+        )
+        revision = models.RaceEventRevision.objects.get(pk=conflict.revision_id)
+        self.assertEqual(
+            revision.conflict_status,
+            models.RaceEventRevisionConflictStatus.PENDING,
+        )
+        self.assertEqual(
+            self.event.results.get(finish_position=1).horse_name,
+            "Alpha",
+        )
+
+    def test_terminal_result_requires_complete_competition_ranking(self):
+        rows = self._rows()
+        rows[1]["reported_finish_position"] = 3
+        observation = self._observation(
+            self.source, "licensed_api", rows
+        )
+
+        decision = apply_data_sync_result_observation(
+            observation_id=observation.pk,
+            expected_event_id=self.event.pk,
+            now=NOW,
+            project_current=True,
+            correction_apply_enabled=True,
+        )
+
+        self.assertEqual(decision.reason_code, "result_payload_incomplete")
+        self.assertFalse(models.RaceEventRevision.objects.exists())
+
+    def test_non_finisher_cannot_carry_numeric_finish_position(self):
+        rows = self._rows()
+        rows[1]["status"] = models.RaceEventRevisionItemStatus.DID_NOT_FINISH
+        observation = self._observation(
+            self.source, "licensed_api", rows
+        )
+
+        decision = apply_data_sync_result_observation(
+            observation_id=observation.pk,
+            expected_event_id=self.event.pk,
+            now=NOW,
+            project_current=True,
+            correction_apply_enabled=True,
+        )
+
+        self.assertEqual(decision.reason_code, "result_payload_incomplete")
+        self.assertFalse(models.RaceEventRevision.objects.exists())
+
+    def test_result_is_shadow_only_when_lifecycle_registry_membership_is_missing(self):
+        models.RaceEventLifecycleEnforceMembership.objects.all().delete()
+        observation = self._observation(
+            self.source, "licensed_api", self._rows()
+        )
+
+        decision = apply_data_sync_result_observation(
+            observation_id=observation.pk,
+            expected_event_id=self.event.pk,
+            now=NOW,
+            project_current=True,
+            correction_apply_enabled=True,
+        )
+
+        self.assertEqual(decision.action, "recorded")
+        self.assertFalse(decision.projected)
+        self.assertIn("registry", decision.reason_code)
+        self.assertFalse(models.RaceEventResult.objects.exists())
 
     def test_provisional_complete_roster_is_recorded_without_public_projection(self):
         observation = self._observation(

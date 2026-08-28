@@ -3,11 +3,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from stable import models
-from stable.services.race_event_public_cache import invalidate_public_race_cache
+from stable.services.race_event_lifecycle_enforce import (
+    apply_registry_lifecycle_decision,
+    validate_registry_membership_snapshot,
+    validate_runtime_registry_settings,
+)
 
 
 @dataclass(frozen=True)
@@ -65,6 +71,12 @@ def decide_data_sync_lifecycle(
 def advance_due_data_sync_lifecycle(
     *, now: datetime, batch_size: int = 100, dry_run: bool = False
 ) -> dict[str, int]:
+    """Advance only events authorized by the active lifecycle registry.
+
+    Data-sync supplies cohort selection; the lifecycle registry coordinator is
+    the sole writer of lifecycle state and transition evidence.
+    """
+
     if timezone.is_naive(now):
         raise ValueError("now must be timezone-aware")
     if isinstance(batch_size, bool) or not 1 <= batch_size <= 1000:
@@ -76,129 +88,191 @@ def advance_due_data_sync_lifecycle(
         "not_due": 0,
         "error": 0,
     }
-    query = models.RaceEventLifecycleControl.objects.filter(
-        mode=models.RaceEventLifecycleMode.ENFORCE,
-        event__projection_control__write_owner=(
-            models.RaceEventProjectionWriteOwner.DATA_SYNC
-        ),
-        event__race_data_sync_enrollment__state=(
-            models.RaceDataSyncEnrollmentState.ENROLLED
-        ),
-    ).filter(next_refresh_at__isnull=True) | models.RaceEventLifecycleControl.objects.filter(
-        mode=models.RaceEventLifecycleMode.ENFORCE,
-        next_refresh_at__lte=now,
-        event__projection_control__write_owner=(
-            models.RaceEventProjectionWriteOwner.DATA_SYNC
-        ),
-        event__race_data_sync_enrollment__state=(
-            models.RaceDataSyncEnrollmentState.ENROLLED
-        ),
-    )
+    if not getattr(settings, "RACE_EVENT_LIFECYCLE_ENABLED", False) or getattr(
+        settings, "RACE_EVENT_LIFECYCLE_MODE", "off"
+    ) != "enforce":
+        stats["error"] = 1
+        return stats
+    registry_valid, registry_or_reason = validate_runtime_registry_settings()
+    if not registry_valid:
+        stats["error"] = 1
+        return stats
+    registry = registry_or_reason
+    assert isinstance(registry, models.RaceEventLifecycleEnforceRegistry)
+    if now >= registry.runtime_valid_until:
+        stats["error"] = 1
+        return stats
+
     control_ids = tuple(
-        query.order_by("next_refresh_at", "event_id").values_list("id", flat=True)[
-            :batch_size
-        ]
+        models.RaceEventLifecycleControl.objects.filter(
+            Q(next_refresh_at__isnull=True) | Q(next_refresh_at__lte=now),
+            mode=models.RaceEventLifecycleMode.ENFORCE,
+            event__projection_control__write_owner=(
+                models.RaceEventProjectionWriteOwner.DATA_SYNC
+            ),
+            event__race_data_sync_enrollment__state=(
+                models.RaceDataSyncEnrollmentState.ENROLLED
+            ),
+            event__lifecycle_enforce_memberships__registry=registry,
+            event__lifecycle_enforce_memberships__state="active",
+        )
+        .exclude(
+            event__status__in=(
+                models.RaceEventStatus.FINISHED,
+                models.RaceEventStatus.CANCELLED,
+            )
+        )
+        .order_by("next_refresh_at", "event_id")
+        .values_list("id", flat=True)[:batch_size]
     )
     stats["selected"] = len(control_ids)
+
     for control_id in control_ids:
+        control = (
+            models.RaceEventLifecycleControl.objects.select_related("event")
+            .filter(pk=control_id)
+            .first()
+        )
+        if control is None:
+            stats["replayed"] += 1
+            continue
+        membership = (
+            models.RaceEventLifecycleEnforceMembership.objects.select_related(
+                "registry"
+            )
+            .filter(registry=registry, event_id=control.event_id, state="active")
+            .first()
+        )
+        validation = validate_registry_membership_snapshot(
+            membership=membership,
+            event=control.event,
+            control=control,
+            now=now,
+        )
+        if not validation.valid:
+            stats["error"] += 1
+            continue
+        try:
+            decision = decide_data_sync_lifecycle(event=control.event, now=now)
+        except ValueError:
+            stats["error"] += 1
+            continue
         if dry_run:
-            control = models.RaceEventLifecycleControl.objects.select_related(
-                "event"
-            ).get(pk=control_id)
-            try:
-                decision = decide_data_sync_lifecycle(event=control.event, now=now)
-            except ValueError:
-                stats["error"] += 1
-                continue
             stats["transitioned" if decision.to_status else "not_due"] += 1
+            continue
+        # The generic lifecycle engine has a date-only next-midnight rule. The
+        # data-sync contract deliberately does not: a missing exact race time is
+        # refreshed later and must never be inferred as a completed race.
+        if not decision.to_status:
+            with transaction.atomic():
+                locked_control = (
+                    models.RaceEventLifecycleControl.objects.select_for_update()
+                    .select_related("event")
+                    .filter(pk=control_id)
+                    .first()
+                )
+                if locked_control is None:
+                    stats["replayed"] += 1
+                    continue
+                locked_membership = (
+                    models.RaceEventLifecycleEnforceMembership.objects.select_related(
+                        "registry"
+                    )
+                    .filter(
+                        registry=registry,
+                        event_id=locked_control.event_id,
+                        state="active",
+                    )
+                    .first()
+                )
+                locked_validation = validate_registry_membership_snapshot(
+                    membership=locked_membership,
+                    event=locked_control.event,
+                    control=locked_control,
+                    now=now,
+                )
+                if not locked_validation.valid:
+                    stats["error"] += 1
+                    continue
+                try:
+                    locked_decision = decide_data_sync_lifecycle(
+                        event=locked_control.event,
+                        now=now,
+                    )
+                except ValueError:
+                    stats["error"] += 1
+                    continue
+                if locked_decision.to_status:
+                    # The schedule changed between the read and row lock. Leave
+                    # the due time intact so the next selector pass re-enters
+                    # the registry-authorized transition path.
+                    stats["replayed"] += 1
+                    continue
+                locked_control.last_attempt_at = now
+                locked_control.last_success_at = now
+                locked_control.last_result_code = locked_decision.reason_code
+                locked_control.last_error = ""
+                locked_control.consecutive_failures = 0
+                locked_control.next_refresh_at = locked_decision.next_refresh_at
+                locked_control.claim_token = ""
+                locked_control.claim_expires_at = None
+                locked_control.save(
+                    update_fields=(
+                        "last_attempt_at",
+                        "last_success_at",
+                        "last_result_code",
+                        "last_error",
+                        "consecutive_failures",
+                        "next_refresh_at",
+                        "claim_token",
+                        "claim_expires_at",
+                        "updated_at",
+                    )
+                )
+                stats["not_due"] += 1
             continue
 
         with transaction.atomic():
-            control = (
-                models.RaceEventLifecycleControl.objects.select_for_update()
-                .select_related("event")
-                .filter(
-                    pk=control_id,
-                    mode=models.RaceEventLifecycleMode.ENFORCE,
-                    event__projection_control__write_owner=(
-                        models.RaceEventProjectionWriteOwner.DATA_SYNC
-                    ),
-                    event__race_data_sync_enrollment__state=(
-                        models.RaceDataSyncEnrollmentState.ENROLLED
-                    ),
+            result = apply_registry_lifecycle_decision(
+                event_id=control.event_id,
+                expected_generation=control.schedule_generation,
+                now=now,
+                expected_registry_root_sha256=registry.root_sha256,
+                expected_registry_activation_id=registry.activation_id,
+                expected_registry_membership_sha256=registry.membership_sha256,
+                expected_registry_member_count=registry.member_count,
+                expected_runtime_enabled=True,
+                expected_runtime_mode="enforce",
+            )
+            if result.action == "applied":
+                event_status = (
+                    models.RaceEvent.objects.filter(pk=control.event_id)
+                    .values_list("status", flat=True)
+                    .first()
                 )
-                .first()
-            )
-            if control is None:
-                stats["replayed"] += 1
-                continue
-            event = models.RaceEvent.objects.select_for_update().get(
-                pk=control.event_id
-            )
-            try:
-                decision = decide_data_sync_lifecycle(event=event, now=now)
-            except ValueError as exc:
-                control.last_attempt_at = now
-                control.last_result_code = "invalid_schedule"
-                control.last_error = str(exc)
-                control.consecutive_failures += 1
-                control.next_refresh_at = now + timedelta(hours=12)
-                control.save()
+                if event_status == models.RaceEventStatus.FINISHED:
+                    models.RaceEventLiveTracking.objects.filter(
+                        event_id=control.event_id
+                    ).update(
+                        state=models.RaceEventLiveState.AWAITING_RESULT,
+                        updated_at=now,
+                    )
+                stats["transitioned"] += 1
+            elif result.action == "error":
                 stats["error"] += 1
-                continue
-            if decision.to_status:
-                dedupe_key = (
-                    f"data-sync-time:{event.pk}:{control.schedule_generation}:"
-                    f"{decision.reason_code}:{decision.to_status}"
-                )
-                transition, created = models.RaceEventLifecycleTransition.objects.get_or_create(
-                    dedupe_key=dedupe_key,
-                    defaults={
-                        "event": event,
-                        "from_status": event.status,
-                        "to_status": decision.to_status,
-                        "reason_code": decision.reason_code,
-                        "effective_at": now,
-                        "source_authority": "data_sync_time_rule",
-                        "source_key": "race_sync_v2",
-                        "trigger_task": "advance_race_data_sync_lifecycle_task",
-                        "schedule_generation": control.schedule_generation,
-                        "record_kind": models.RaceEventLifecycleTransitionKind.APPLIED,
-                    },
-                )
-                if created:
-                    event.status = decision.to_status
-                    event.save(update_fields=("status", "updated_at"))
-                    if decision.to_status == models.RaceEventStatus.FINISHED:
-                        models.RaceEventLiveTracking.objects.filter(event=event).update(
-                            state=models.RaceEventLiveState.AWAITING_RESULT,
-                            updated_at=now,
-                        )
-                    stats["transitioned"] += 1
-                    transaction.on_commit(invalidate_public_race_cache)
-                else:
-                    stats["replayed"] += 1
-            else:
+            elif result.reason_code in {
+                "already_finished",
+                "applied_duplicate",
+                "generation_stale",
+            }:
+                stats["replayed"] += 1
+            elif result.reason_code in {
+                "before_race_datetime",
+                "before_local_midnight",
+                "postponed_awaiting_new_time",
+                "terminal_cancelled",
+            }:
                 stats["not_due"] += 1
-            control.last_attempt_at = now
-            control.last_success_at = now
-            control.last_result_code = decision.reason_code
-            control.last_error = ""
-            control.consecutive_failures = 0
-            control.next_refresh_at = decision.next_refresh_at
-            control.claim_token = ""
-            control.claim_expires_at = None
-            control.save(
-                update_fields=(
-                    "last_attempt_at",
-                    "last_success_at",
-                    "last_result_code",
-                    "last_error",
-                    "consecutive_failures",
-                    "next_refresh_at",
-                    "claim_token",
-                    "claim_expires_at",
-                    "updated_at",
-                )
-            )
+            else:
+                stats["error"] += 1
     return stats

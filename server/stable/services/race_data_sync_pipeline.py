@@ -24,6 +24,7 @@ from stable.services.race_data_sync_control import (
 )
 from stable.services.race_data_sync_policy import (
     arbitrate_source_value,
+    calculate_next_poll_at,
     normalize_source_class,
     source_priority,
 )
@@ -100,11 +101,13 @@ class RacecardReconciliationDecision:
     reason: str
     event_id: int | None = None
     observation_id: int | None = None
+    claim_invalidated: bool = False
 
 
 @dataclass(frozen=True)
 class RawCleanupResult:
     cleaned: int
+    cleaned_bytes: int
     held: int
     skipped: int
 
@@ -570,6 +573,7 @@ class RaceDataResolvedRoute:
     allowed_path_prefixes: tuple[str, ...]
     request_budget: int
     minimum_interval_seconds: int
+    identity_namespace: str
     entry: RaceDataProviderRosterEntry
 
 
@@ -728,6 +732,7 @@ def resolve_race_data_provider_route(
         allowed_path_prefixes=entry.allowed_path_prefixes,
         request_budget=entry.request_budget,
         minimum_interval_seconds=entry.minimum_interval_seconds,
+        identity_namespace=identity_namespace,
         entry=entry,
     )
 
@@ -1460,10 +1465,41 @@ def _reconcile_racecard_observation_atomic(
         existing_changes = models.RaceEventFieldChange.objects.filter(
             observation=observation
         )
-        processed_fields = set(
-            existing_changes.values_list(
-                "subject_type", "subject_key", "field_name"
+        reprocessable = Q(pk__in=())
+        if allow_schedule_apply:
+            reprocessable |= Q(rejection_reason="schedule_apply_disabled")
+        if flags.racecard_apply_enabled:
+            reprocessable |= Q(rejection_reason="racecard_apply_disabled")
+        runtime_contract_by_field = {
+            "horse_name": "participants.horse_name",
+            "horse_number": "participants.number",
+            "barrier": "participants.draw",
+            "jockey_name": "participants.jockey_name",
+            "trainer_name": "participants.trainer_name",
+            "carried_weight": "participants.carried_weight",
+            "odds_value": "participants.odds",
+            "popularity": "participants.popularity",
+            "running_status": "participants.status",
+            "race_datetime": "off_time",
+            "local_date": "off_time",
+            "local_start_time": "local_start_time",
+            "timezone_name": "timezone_name",
+            "status": "status",
+        }
+        newly_admitted_model_fields = {
+            model_field
+            for model_field, contract_field in runtime_contract_by_field.items()
+            if contract_field in admitted_fields
+        }
+        if newly_admitted_model_fields:
+            reprocessable |= Q(
+                rejection_reason="runtime_admission_closed",
+                field_name__in=newly_admitted_model_fields,
             )
+        processed_fields = set(
+            existing_changes.exclude(
+                Q(decision="rejected") & reprocessable
+            ).values_list("subject_type", "subject_key", "field_name")
         )
         had_existing_review = existing_changes.filter(
             decision="needs_review"
@@ -1952,6 +1988,7 @@ def _reconcile_racecard_observation_atomic(
                 },
             )
             old_value = old_schedule_values[field_name]
+            field_value_changed = old_value != candidate_value
             arbitration = arbitrate_source_value(
                 current_source_key=authority.source_key,
                 current_source_class=authority.source_class,
@@ -1973,8 +2010,20 @@ def _reconcile_racecard_observation_atomic(
                 "status": "status",
             }[field_name]
             field_admitted = contract_field_name in admitted_fields
+            terminal_status_regression = bool(
+                field_name == "status"
+                and old_value
+                in {
+                    models.RaceEventStatus.CANCELLED,
+                    models.RaceEventStatus.FINISHED,
+                }
+                and candidate_value != old_value
+            )
             applied = bool(
-                allow_schedule_apply and field_admitted and arbitration.apply
+                allow_schedule_apply
+                and field_admitted
+                and arbitration.apply
+                and not terminal_status_regression
             )
             decision = (
                 "applied"
@@ -1988,7 +2037,9 @@ def _reconcile_racecard_observation_atomic(
             rejection_reason = ""
             if not applied and decision != "replayed":
                 rejection_reason = (
-                    "schedule_apply_disabled"
+                    "terminal_status_regression"
+                    if terminal_status_regression
+                    else "schedule_apply_disabled"
                     if not allow_schedule_apply
                     else (
                         "runtime_admission_closed"
@@ -2022,7 +2073,7 @@ def _reconcile_racecard_observation_atomic(
             if not applied:
                 continue
             setattr(event, field_name, candidate_value)
-            schedule_changed = True
+            schedule_changed = schedule_changed or field_value_changed
             authority.authority_level = source_priority(candidate_source_class)
             authority.source_class = candidate_source_class
             authority.source_key = source.source_key
@@ -2052,6 +2103,65 @@ def _reconcile_racecard_observation_atomic(
             event.save(
                 update_fields=tuple(schedule_candidates) + ("updated_at",)
             )
+            tracking = (
+                locked_claim.tracking
+                if locked_claim is not None
+                else models.RaceEventLiveTracking.objects.select_for_update()
+                .filter(event=event)
+                .first()
+            )
+            if tracking is not None:
+                checkpoints = tuple(
+                    models.RaceEventLiveProviderCheckpoint.objects.select_for_update()
+                    .filter(tracking=tracking)
+                    .order_by("source_key", "data_kind")
+                )
+                checkpoint_now = candidate_watermark
+                for checkpoint in checkpoints:
+                    checkpoint.next_poll_at = calculate_next_poll_at(
+                        data_kind=checkpoint.data_kind,
+                        now=checkpoint_now,
+                        race_datetime=(
+                            None
+                            if event.status == models.RaceEventStatus.POSTPONED
+                            else event.race_datetime
+                        ),
+                        result_confirmed=event.result_confirmed_at is not None,
+                        event_terminal=(
+                            event.status == models.RaceEventStatus.CANCELLED
+                            or (
+                                event.status == models.RaceEventStatus.FINISHED
+                                and checkpoint.data_kind
+                                != models.RaceDataSyncDataKind.RESULT
+                            )
+                        ),
+                    )
+                    checkpoint.lock_version += 1
+                    checkpoint.save(
+                        update_fields=("next_poll_at", "lock_version", "updated_at")
+                    )
+                tracking.active_attempt_token = ""
+                tracking.claim_expires_at = None
+                tracking.claim_generation += 1
+                tracking.next_poll_at = min(
+                    (
+                        checkpoint.next_poll_at
+                        for checkpoint in checkpoints
+                        if checkpoint.next_poll_at is not None
+                    ),
+                    default=None,
+                )
+                tracking.lock_version += 1
+                tracking.save(
+                    update_fields=(
+                        "active_attempt_token",
+                        "claim_expires_at",
+                        "claim_generation",
+                        "next_poll_at",
+                        "lock_version",
+                        "updated_at",
+                    )
+                )
             if lifecycle is not None:
                 lifecycle.schedule_generation += 1
                 lifecycle.claim_token = ""
@@ -2115,6 +2225,7 @@ def _reconcile_racecard_observation_atomic(
             f"racecard_{aggregate}",
             event.pk,
             observation.pk,
+            claim_invalidated=bool(schedule_changed and claim_guard is not None),
         )
 
 
@@ -2151,12 +2262,18 @@ def reconcile_racecard_observation(
 
 
 def cleanup_expired_race_data_raw_payloads(
-    *, now: datetime, batch_size: int = 100
+    *, now: datetime, batch_size: int = 100, max_bytes: int | None = None
 ) -> RawCleanupResult:
     if not isinstance(now, datetime) or timezone.is_naive(now):
         raise ValueError("now must be aware")
     if isinstance(batch_size, bool) or not isinstance(batch_size, int) or not 1 <= batch_size <= 1000:
         raise ValueError("batch_size must be between 1 and 1000")
+    if max_bytes is None:
+        max_bytes = int(
+            getattr(settings, "RACE_DATA_RAW_CLEANUP_MAX_BYTES", 0) or (2**63 - 1)
+        )
+    if isinstance(max_bytes, bool) or not isinstance(max_bytes, int) or max_bytes <= 0:
+        raise ValueError("max_bytes must be positive")
     configured_roots = getattr(settings, "RACE_DATA_RAW_ARTIFACT_ROOTS", ())
     allowed_roots = [Path(value).resolve() for value in configured_roots if value]
     if not allowed_roots:
@@ -2194,6 +2311,7 @@ def cleanup_expired_race_data_raw_payloads(
             if len(candidates) >= batch_size:
                 break
     cleaned = 0
+    cleaned_bytes = 0
     skipped = 0
     for candidate in candidates:
         provenance = candidate.field_provenance
@@ -2225,6 +2343,8 @@ def cleanup_expired_race_data_raw_payloads(
         if not stat.S_ISREG(path_stat.st_mode) or path.is_symlink():
             skipped += 1
             continue
+        if path_stat.st_size > max_bytes - cleaned_bytes:
+            break
 
         with transaction.atomic():
             current = (
@@ -2306,6 +2426,12 @@ def cleanup_expired_race_data_raw_payloads(
             ).update(raw_artifact_path="", raw_size_bytes=None)
             if updated:
                 cleaned += 1
+                cleaned_bytes += path_stat.st_size
             else:
                 skipped += 1
-    return RawCleanupResult(cleaned=cleaned, held=held, skipped=skipped)
+    return RawCleanupResult(
+        cleaned=cleaned,
+        cleaned_bytes=cleaned_bytes,
+        held=held,
+        skipped=skipped,
+    )

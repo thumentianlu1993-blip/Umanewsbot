@@ -35,6 +35,7 @@ M0071 = ("stable", "0071_historical_calendar_release_b")
 M0072 = ("stable", "0072_add_extended_racing_regions")
 M0073 = ("stable", "0073_lifecycle_enforce_registry")
 M0074 = ("stable", "0074_race_data_sync_r0_control_plane")
+M0075 = ("stable", "0075_race_data_source_priority_and_reported_position")
 
 
 def _stable_plan(loader: MigrationLoader, applied: set[tuple[str, str]]) -> list[str]:
@@ -45,8 +46,8 @@ def _stable_plan(loader: MigrationLoader, applied: set[tuple[str, str]]) -> list
     ]
 
 
-class MigrationHistoryRepair0073ReleaseContractTests(TestCase):
-    """0074 must extend the reviewed ordinary-release leaf contract."""
+class MigrationHistoryRepair0075ReleaseContractTests(TestCase):
+    """0075 must extend the reviewed ordinary-release leaf contract."""
 
     def test_0072_has_exact_forward_plan_to_0073_and_0073_is_final(self):
         from stable.services.historical_calendar_release_b_schema import (
@@ -54,17 +55,21 @@ class MigrationHistoryRepair0073ReleaseContractTests(TestCase):
             TARGET,
         )
 
-        self.assertEqual(TARGET, M0074)
+        self.assertEqual(TARGET, M0075)
         self.assertEqual(
             ALLOWED_FORWARD_STATES[(f"{M0072[0]}.{M0072[1]}",)],
-            [M0073[1], M0074[1]],
+            [M0073[1], M0074[1], M0075[1]],
         )
         self.assertEqual(
             ALLOWED_FORWARD_STATES[(f"{M0073[0]}.{M0073[1]}",)],
-            [M0074[1]],
+            [M0074[1], M0075[1]],
         )
         self.assertEqual(
             ALLOWED_FORWARD_STATES[(f"{M0074[0]}.{M0074[1]}",)],
+            [M0075[1]],
+        )
+        self.assertEqual(
+            ALLOWED_FORWARD_STATES[(f"{M0075[0]}.{M0075[1]}",)],
             [],
         )
 
@@ -74,8 +79,8 @@ class MigrationHistoryRepair0073ReleaseContractTests(TestCase):
             PREVIOUS_FINAL_LEAF_SET,
         )
 
-        self.assertEqual(PREVIOUS_FINAL_LEAF_SET, (f"{M0073[0]}.{M0073[1]}",))
-        self.assertEqual(FINAL_LEAF_SET, (f"{M0074[0]}.{M0074[1]}",))
+        self.assertEqual(PREVIOUS_FINAL_LEAF_SET, (f"{M0074[0]}.{M0074[1]}",))
+        self.assertEqual(FINAL_LEAF_SET, (f"{M0075[0]}.{M0075[1]}",))
 
     def test_preflight_accepts_both_pre_migration_and_current_leaf(self):
         preflight = (
@@ -84,6 +89,10 @@ class MigrationHistoryRepair0073ReleaseContractTests(TestCase):
         self.assertIn("stable.0072_add_extended_racing_regions)", preflight)
         self.assertIn("stable.0073_lifecycle_enforce_registry)", preflight)
         self.assertIn("stable.0074_race_data_sync_r0_control_plane)", preflight)
+        self.assertIn(
+            "stable.0075_race_data_source_priority_and_reported_position)",
+            preflight,
+        )
 
     def test_every_initial_install_prefix_includes_0073(self):
         from stable.services.historical_calendar_release_b_schema import (
@@ -92,18 +101,18 @@ class MigrationHistoryRepair0073ReleaseContractTests(TestCase):
 
         for leaf_set, plan in INITIAL_INSTALL_FORWARD_STATES.items():
             with self.subTest(leaf_set=leaf_set):
-                if leaf_set != (f"{M0074[0]}.{M0074[1]}",):
-                    self.assertEqual(plan[-1], M0074[1])
+                if leaf_set != (f"{M0075[0]}.{M0075[1]}",):
+                    self.assertEqual(plan[-1], M0075[1])
 
     def test_generic_rollback_contract_carries_0073(self):
         for relative in ("deploy/rollback.sh", "deploy/rollback_lowcost.sh"):
             self.assertIn(
                 "RELEASE_B_EXPECTED_MIGRATION_LEAF_SET="
-                "stable.0074_race_data_sync_r0_control_plane",
+                "stable.0075_race_data_source_priority_and_reported_position",
                 (ROOT / relative).read_text(encoding="utf-8"),
             )
         self.assertIn(
-            "EXPECTED_LEAF=stable.0074_race_data_sync_r0_control_plane",
+            "EXPECTED_LEAF=stable.0075_race_data_source_priority_and_reported_position",
             (ROOT / "deploy/resume_rollback_control_state.sh").read_text(
                 encoding="utf-8"
             ),
@@ -119,6 +128,10 @@ class MigrationHistoryRepair0073ReleaseContractTests(TestCase):
             '"server/stable/migrations/0074_race_data_sync_r0_control_plane.py"',
             verifier,
         )
+        self.assertIn(
+            '"server/stable/migrations/0075_race_data_source_priority_and_reported_position.py"',
+            verifier,
+        )
         allowlist = json.loads(
             (ROOT / "deploy/reviewed_release_b_rollback_migrations.json").read_text(
                 encoding="utf-8"
@@ -126,7 +139,7 @@ class MigrationHistoryRepair0073ReleaseContractTests(TestCase):
         )
         self.assertEqual(
             allowlist["required_migrations"][-1]["migration_path"],
-            "server/stable/migrations/0074_race_data_sync_r0_control_plane.py",
+            "server/stable/migrations/0075_race_data_source_priority_and_reported_position.py",
         )
 
     def test_0073_catalog_contract_validates_tables_fks_constraints_and_indexes(self):
@@ -367,7 +380,7 @@ class MigrationHistoryRepairLeafSetRedTests(TestCase):
         )
         self.assertEqual(
             payload["migration_plan"],
-            [M0069[1], M0071[1], M0072[1], M0073[1], M0074[1]],
+            [M0069[1], M0071[1], M0072[1], M0073[1], M0074[1], M0075[1]],
         )
         self.assertTrue(payload["migration_state_allowed"])
 
@@ -735,7 +748,7 @@ class MigrationHistoryRepairBaselineRedTests(SimpleTestCase):
             "applied_nodes": ["stable.0067_historical_calendar_release_a"],
             "migration_leaf_set": ["stable.0067_historical_calendar_release_a"],
             "migration_plan": [
-                M0070[1], M0068[1], M0069[1], M0071[1], M0072[1], M0073[1], M0074[1]
+                M0070[1], M0068[1], M0069[1], M0071[1], M0072[1], M0073[1], M0074[1], M0075[1]
             ],
             "unknown_applied_migrations": [],
             "migration_graph_known": True,
@@ -1645,7 +1658,7 @@ class MigrationHistoryRepairRestrictedRecoveryRedTests(SimpleTestCase):
         }
         live = {
             "ok": True,
-            "migration_leaf_set": [f"{M0074[0]}.{M0074[1]}"],
+            "migration_leaf_set": [f"{M0075[0]}.{M0075[1]}"],
             "database_identity_sha256": "d" * 64,
         }
         with TemporaryDirectory() as tmp:
@@ -1804,7 +1817,7 @@ class MigrationHistoryRepairRestrictedRecoveryRedTests(SimpleTestCase):
     def test_required_completion_cannot_noop_after_marker_deletion(self):
         live = {
             "ok": True,
-            "migration_leaf_set": [f"{M0074[0]}.{M0074[1]}"],
+            "migration_leaf_set": [f"{M0075[0]}.{M0075[1]}"],
             "database_identity_sha256": "d" * 64,
         }
         with TemporaryDirectory() as tmp, patch(
