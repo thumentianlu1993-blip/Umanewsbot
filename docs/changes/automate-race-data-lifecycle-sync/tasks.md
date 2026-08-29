@@ -51,6 +51,8 @@
 
 ## R4：配置、观测、回滚与文档
 
+- [x] (operations) 普通 Celery worker 增加 prefetch=1、20-task/256 MiB child recycling 和三份 Compose
+  512 MiB 默认 cgroup；合同测试及核心组合回归通过，生产保持 10 false 等待关闭态发布。
 - [x] (operations) migration 0074/0075、普通/生产/low-cost Compose、Beat route、worker 启动脚本和
   `.env.example` 已同步；全部新开关默认 false、容量默认 0。
 - [x] (operations) 新增 `audit_race_data_sync` 和 standing-policy renderer；审计固定 `would_write=false`，

@@ -1,5 +1,18 @@
 # 当前状态
 
+## 2026-08-30 普通 Celery 内存保护 hotfix 已完成代码验证
+
+- 生产普通 worker 在 concurrency=1 下从约 129–292 MiB 增长到 1.344 GiB，使
+  `MemAvailable` 降到 751020 kB、后续最低约 528300 kB；DB/Redis、Swap 与磁盘正常。门禁失败后已
+  10 false、移除专用 worker并重建 Web/普通 worker/Beat，内存恢复约 2.05 GB，旧
+  `race_live=7543` 不变。
+- hotfix 给普通 worker 显式增加 `prefetch-multiplier=1`、默认每 20 任务回收、子进程超过 262144 KiB
+  后回收；三份 Compose 的普通 worker 增加可覆盖的默认 512 MiB cgroup 上限。concurrency 不变，不修改
+  数据库、队列路由、业务任务、migration 或赛事同步逻辑。
+- 新合同先 RED 后 GREEN；赛事同步/lifecycle/result SQLite 核心组合 250/250，Django check、migration
+  drift、compileall、shell syntax、三份 Compose 渲染和 diff check 全通过，验证过程禁用真实 provider。
+  生产仍保持 10 false；合并和关闭态发布后须观察至少三个普通 Beat 周期再决定是否重开赛事同步。
+
 ## 2026-08-30 Racing API proof 发布前关闭 legacy queue 合同冲突
 
 - proof-only PR `#125` 已合并到 `main@865a41a0…5201`，尚未部署。生产只读盘点为

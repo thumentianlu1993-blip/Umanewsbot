@@ -1,5 +1,22 @@
 # 部署运行手册
 
+## 2026-08-30 普通 worker 内存保护 hotfix 发布步骤
+
+1. 发布前权威关闭态必须为 10 个 data-sync 开关 false、`race_sync_v2_worker` absent、
+   `celery=0 / race_sync_v2=0 / race_live=7543`、Web healthy；资源仍按 1536 MiB/512 MiB swap/8 GiB
+   磁盘门槛，不因刚重启读数良好而放宽。
+2. hotfix 只允许修改普通 worker 启动参数、三份 Compose mem_limit、示例 env、合同测试和文档；不得夹带
+   migration、业务任务、队列路由、赛事同步开关或 provider 变化。
+3. 以精确 merge revision 构建隔离 image，保留 PR #127 image 作 rollback；所有服务保持 10 false 切换。
+   migration plan 必须为空、leaf 仍为 0075，Web/worker/Beat image/revision 一致。
+4. 容器内普通 worker 命令行必须含 prefetch=1、max-tasks-per-child=20、max-memory-per-child=262144；
+   Docker `HostConfig.Memory` 必须为 536870912，concurrency 仍取生产显式 1。
+5. 至少观察三个 Beat 周期：每轮冻结 queue/active/reserved/scheduled、worker memory.current、
+   restart/OOM、task terminal/error/redelivery、MemAvailable/SwapFree/磁盘和公网。队列须在 5 分钟内归零，
+   host 全样本通过；失败立即保持 10 false 并回滚或继续诊断。
+6. 只有关闭态热身通过，才从 future discovery 全量重走；旧 `race_live` 不清、不迁移、不消费，event 956
+   due time/claim/result 不手工改写。
+
 ## 2026-08-30 Racing API exclusive proof 的 legacy `race_live` 验收口径
 
 1. `race_live=7543` 是冻结历史 backlog，禁止为了 proof 执行 `DEL`、`PURGE`、迁移、消费或启动旧 worker。

@@ -433,6 +433,8 @@ Compose 新增 `race_sync_v2_worker`：
 
 - `-Q race_sync_v2`，不得消费 `race_live` 或普通 `celery`；
 - 独立 concurrency/prefetch/soft-hard limit/max-tasks-per-child/memory；
+- 普通 `celery` worker 也必须使用 `prefetch=1`、任务数/内存 child recycling，并由 Compose 512 MiB
+  默认 cgroup 防止新闻任务异常占用拖垮赛事同步 host 门槛；参数可由环境显式收窄或覆盖；
 - 仅挂载受限 artifact、registry 和 secret 文件；
 - 网络 admission 与普通新闻 worker 分离；
 - health 以 worker ping、queue lag、DB claim 和固定离线 fixture smoke 组合判断。

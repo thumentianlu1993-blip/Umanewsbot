@@ -1,5 +1,14 @@
 # 关键决策
 
+## 2026-08-30 普通 worker 用 child recycling 加 512 MiB cgroup 阻断 host starvation
+
+- concurrency=1 不能阻止长寿命子进程在任务后保留 1 GiB 以上内存；重启后 host 可用内存从低于 1 GiB
+  恢复到约 2.05 GB，先做进程生命周期治理，不扩 RAM、不降低 1536 MiB 门槛。
+- 普通 worker 固定 prefetch=1，默认 `max-tasks-per-child=20`、`max-memory-per-child=262144` KiB；三份
+  Compose 默认 `mem_limit=512M`，均允许显式 env 覆盖。软回收处理任务后滞留，cgroup 处理单任务失控。
+- 发布只能在 10 false 下进行，并验证 OOM/restart、未确认任务 redelivery、重复副作用、队列排空和公网。
+  任何一项失败保持专用 worker absent；不得用提高 swap、drop cache 或直接扩容掩盖普通任务异常。
+
 ## 2026-08-30 exclusive proof 允许不可执行的 legacy backlog，但拒绝任何消费能力
 
 - 决定：旧 `race_live=7543` 已被项目冻结为不得清理、迁移或消费的历史 backlog，不能为了生成 Racing API

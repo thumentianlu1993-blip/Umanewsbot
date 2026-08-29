@@ -1,5 +1,14 @@
 # 项目状态文档
 
+## 2026-08-30 普通 worker 内存保护 hotfix 待关闭态发布
+
+- 生产内存门禁失败已收口：10 false、专用 worker absent、`celery=0 / race_sync_v2=0 /
+  race_live=7543`，普通 worker 重建后约 129 MiB，host 可用内存约 2.05 GB，公网正常。
+- hotfix 增加普通 worker prefetch=1、20-task/256 MiB child recycling 与 512 MiB cgroup；不变更
+  concurrency、业务代码、队列路由、migration 或数据。
+- 新合同 RED/GREEN、SQLite 核心组合 250/250、Django/migration/compile/shell/三 Compose/diff 门禁通过。
+  生产新写入继续关闭；须先合并、关闭态发布和三个 Beat 周期热身，不能直接恢复 result/public。
+
 ## 2026-08-30 proof-only 部署因 legacy queue 合同冲突先修正
 
 - PR `#125` 已合并、未部署；生产健康但当时普通任务仍在执行，`celery=2 / race_sync_v2=0 /

@@ -2454,6 +2454,43 @@ class RaceDataSyncSelectorFailClosedTests(SimpleTestCase):
 
 
 class RaceDataSyncWorkerReleaseContractTests(SimpleTestCase):
+    def test_general_worker_recycles_children_and_has_a_host_memory_limit(self):
+        start_script = (ROOT / "deploy/docker/start-worker.sh").read_text()
+        self.assertIn(
+            '--prefetch-multiplier="${CELERY_WORKER_PREFETCH_MULTIPLIER:-1}"',
+            start_script,
+        )
+        self.assertIn(
+            '--max-tasks-per-child="${CELERY_WORKER_MAX_TASKS_PER_CHILD:-20}"',
+            start_script,
+        )
+        self.assertIn(
+            '--max-memory-per-child="${CELERY_WORKER_MAX_MEMORY_PER_CHILD:-262144}"',
+            start_script,
+        )
+
+        env_example = (ROOT / ".env.example").read_text()
+        self.assertIn("CELERY_WORKER_MAX_TASKS_PER_CHILD=20", env_example)
+        self.assertIn("CELERY_WORKER_MAX_MEMORY_PER_CHILD=262144", env_example)
+        self.assertIn("CELERY_WORKER_MEMORY_LIMIT=512M", env_example)
+
+        for compose_name in (
+            "docker-compose.yml",
+            "docker-compose.prod.yml",
+            "docker-compose.prod.lowcost.yml",
+        ):
+            compose = (ROOT / compose_name).read_text()
+            service = re.search(
+                r"(?ms)^  worker:\n(.*?)(?=^  [a-zA-Z0-9_-]+:\n|\Z)",
+                compose,
+            )
+            self.assertIsNotNone(service, compose_name)
+            self.assertIn(
+                "mem_limit: ${CELERY_WORKER_MEMORY_LIMIT:-512M}",
+                service.group(0),
+                compose_name,
+            )
+
     def test_dedicated_worker_is_queue_isolated_and_resource_bounded(self):
         start_script = (ROOT / "deploy/docker/start-race-data-sync-worker.sh").read_text()
         self.assertIn('--queues="race_sync_v2"', start_script)
