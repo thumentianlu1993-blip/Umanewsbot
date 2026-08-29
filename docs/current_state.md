@@ -21,7 +21,7 @@
 - 热身后 Web/worker 约为 `421 MiB / 292 MiB`；15 分钟观察窗最低 `MemAvailable=1662256 kB`，
   随后的繁忙窗口最低 `1639612 kB`，仍高于 1536 MiB 门槛；`SwapFree=1310716 kB` 全程未下降。
   现有常驻站点暂不需要
-  扩容，但最小余量只有约 87 MiB，不能直接推断启动 384 MiB 上限的 `race_sync_v2_worker` 后也安全。
+  扩容，但最终最小余量只有约 65 MiB，不能直接推断启动 384 MiB 上限的 `race_sync_v2_worker` 后也安全。
 - 当前仍为 revision `a063ecf9…5fc8` / leaf `0075`，Web/worker/Beat 同 image 且 restart count=0，OneBot
   running/restart count=0；全部 10 个 data-sync 开关 false，专用 worker 未运行，
   `celery=0 / race_sync_v2=0 / race_live=7543`。冻结容量、future discovery、time/racecard、data-sync
