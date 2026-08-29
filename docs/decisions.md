@@ -1,5 +1,20 @@
 # 关键决策
 
+## 2026-08-30 排空门禁失败后不因任务稍后成功而自动重试
+
+- Phase 2 的开关变更必须发生在停 Beat、普通 worker `active=0 / reserved=0` 之后。本次普通新闻采集在
+  180 秒排空窗口内始终 active，因此门禁已经失败；它稍后返回 SUCCESS 只说明业务任务完成，不能把失败
+  窗口改写为通过，也不能沿用原发布锁继续开启 network/apply。
+- fail-closed 后保持 10 个 data-sync 开关全 false、专用 worker absent，恢复普通 worker/Beat；旧
+  `race_live=7543` 只读保留。Phase 2、lifecycle、result public 与 correction 都等待新的发布窗口和完整
+  前置门禁，不从失败步骤中间续跑。
+- 中断产生的已过期 data-sync claim 不直接 SQL 清除。旧任务在全关状态消费后返回
+  `disabled/claim_expired`，checkpoint 未计失败；控制面已明确允许 selector 对过期 token 做原子换代，
+  手工清 token 会绕过 generation/plan CAS 证据。
+- 现有 2+1 内存配置仍通过 1536 MiB 门槛，不扩 RAM；当前实际约束是磁盘仅比 8 GiB 冻结底线多约
+  16.0 MiB。不得为继续灰度降低磁盘底线、删备份或盲目 prune；恢复足够余量须走精确可恢复清理授权，
+  无合适对象时再扩磁盘。
+
 ## 2026-08-29 manifest 路由列表保持 roster 声明顺序，只禁止重复
 
 - `allowed_hosts` / `allowed_path_prefixes` 的安全合同是非空字符串、无重复，并与当前 resolved route 的列表

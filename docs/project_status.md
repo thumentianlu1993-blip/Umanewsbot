@@ -1,5 +1,20 @@
 # 项目状态文档
 
+## 2026-08-30 PR #120 已上线，Phase 2 因普通任务 drain 超时停止
+
+- 生产为 revision `409f2ac6…2121` / image `74465006…d8df` / leaf `0075`；既有备份继续通过
+  size/0600/SHA/1366 行 TOC 验证，关闭态 audit 为 ready/valid、route drift 0、would_write=false。
+- Phase 1 已建立 event 956 的 generation 1 enrollment、data-sync owner 与三类 checkpoint。用户确认保留
+  该预期 delta；只读重放为 114 blocked、1 enrolled、0 candidate、0 request、状态 SHA 不变。
+- 中断遗留的一条旧 selector 消息在 10 false 下返回 `disabled/claim_expired`，无网络/apply、checkpoint
+  failure=0；过期 token 留给 selector 按 CAS 原子换代，不手工清库。
+- Phase 2 在写开关前停 Beat/drain；普通 `crawl_news_source_task` 180 秒内仍 active，门禁失败并自动恢复
+  10 false、停止专用 worker、恢复普通 worker/Beat。任务稍后 SUCCESS 不改变停止结论，lifecycle/result
+  public/correction 均未开启。
+- 最终 worker active=0/reserved=0，`celery=0 / race_sync_v2=0 / race_live=7543`，公网 200、Meta 429。
+  `MemAvailable=1700304 kB`、swap 余量完整，无需扩 RAM；free disk `8606695424` bytes，仅高于 8 GiB
+  门槛约 16 MiB。新窗口前先经授权治理磁盘，不能降低门槛或删除备份。
+
 ## 2026-08-29 PR #119 已上线，manifest hotfix 通过本地门禁
 
 - PR #119 的 Meta/Facebook 精确 429 已在生产生效；约 5 分钟六轮公网样本均通过，目标 crawler 不再进入
