@@ -11,7 +11,9 @@
   数据库、队列路由、业务任务、migration 或赛事同步逻辑。
 - 新合同先 RED 后 GREEN；赛事同步/lifecycle/result SQLite 核心组合 250/250，Django check、migration
   drift、compileall、shell syntax、三份 Compose 渲染和 diff check 全通过，验证过程禁用真实 provider。
-  生产仍保持 10 false；合并和关闭态发布后须观察至少三个普通 Beat 周期再决定是否重开赛事同步。
+  一次性 Redis runtime smoke 又证明 worker `pong`、实际命令行含三个新参数且 HostConfig.Memory 精确为
+  536870912；临时容器/network 已回收。生产仍保持 10 false；合并和关闭态发布后须观察至少三个普通 Beat
+  周期再决定是否重开赛事同步。
 
 ## 2026-08-30 Racing API proof 发布前关闭 legacy queue 合同冲突
 
