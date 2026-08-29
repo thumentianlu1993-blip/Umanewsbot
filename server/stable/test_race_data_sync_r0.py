@@ -51,7 +51,14 @@ def audited_test_roster():
         enabled_data_kinds=tuple(models.RaceDataSyncDataKind.values),
         terminal_markers=("OFFICIAL",),
         allowed_hosts=("jra.example.test",),
-        allowed_path_prefixes=("/race/",),
+        # Keep the audited declaration order. Prefix matching semantics do not
+        # require lexical sorting, and the production TRA route intentionally
+        # declares its narrower result path before the broader result prefix.
+        allowed_path_prefixes=(
+            "/v1/racecards/free",
+            "/v1/results/today/free",
+            "/v1/results/",
+        ),
         request_budget=20,
         minimum_interval_seconds=2,
         automation_allowed=True,
@@ -2024,6 +2031,48 @@ class RaceDataSyncCensusManifestTests(TestCase):
             models.RaceEventProjectionControl.objects.get(event=event).write_owner,
             models.RaceEventProjectionWriteOwner.DATA_SYNC,
         )
+
+    def test_manifest_rejects_duplicate_route_values_before_writes(self):
+        event = create_event(slug="manifest-duplicate-route-value")
+        self._identity(event)
+        census = race_data_sync_enrollment.build_race_data_enrollment_census(
+            standing_policy=self._policy(),
+            cutoff=NOW,
+            horizon_days=30,
+        )
+        manifest = race_data_sync_enrollment.build_race_data_enrollment_manifest(
+            census=census,
+            selected_event_ids=(event.pk,),
+            candidate_commit="1" * 40,
+            created_at=NOW,
+            apply_expires_at=NOW + timedelta(hours=1),
+        ).as_dict()
+        entry = manifest["entries"][0]
+        entry["allowed_path_prefixes"].append(entry["allowed_path_prefixes"][-1])
+        entry_payload = {
+            key: value for key, value in entry.items() if key != "entry_sha256"
+        }
+        entry["entry_sha256"] = race_data_sync_enrollment._canonical_sha(entry_payload)
+        manifest_payload = {
+            key: value for key, value in manifest.items() if key != "manifest_sha256"
+        }
+        manifest["manifest_sha256"] = race_data_sync_enrollment._canonical_sha(
+            manifest_payload
+        )
+
+        with self.assertRaisesMessage(
+            ValueError,
+            "manifest entry allowed_path_prefixes is invalid",
+        ):
+            race_data_sync_enrollment.apply_race_data_enrollment_manifest(
+                manifest=manifest,
+                expected_manifest_sha256=manifest["manifest_sha256"],
+                current_commit="1" * 40,
+                now=NOW,
+            )
+
+        self.assertFalse(models.RaceDataSyncEnrollment.objects.exists())
+        self.assertFalse(models.RaceEventProjectionControl.objects.exists())
 
     @override_settings(
         RACE_DATA_SYNC_ENABLED=False,
