@@ -143,6 +143,9 @@ revision/transition，不批量反向赛事状态。
 - `race_live=7543` 保持不变，race_sync 新队列/worker 可观测；
 - current_state、decisions、deploy runbook、project status 和 release evidence 与生产运行态一致。
 
+本次生产证据统一追加到 `release_evidence.md`；不得用聊天记录、HTTP 200 或 Celery `SUCCESS` 替代其中的
+数据库、任务、队列、资源和公开页逐层验收。
+
 ## 11. PR 全量复审增补门禁
 
 - 当日 results 无 terminal marker 只能记录 provisional；赛后 7 天只允许

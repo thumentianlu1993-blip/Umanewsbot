@@ -26,6 +26,10 @@
   config 和 `git diff --check` 全部通过。测试容器显式 `RACE_DATA_SYNC_ALLOW_NETWORK=false`，没有真实
   provider 请求或生产写入；首次只读源码 compile/缺 `.env` 的环境错误已用临时 pycache 与临时示例 env
   修正后重跑，不计作代码失败。
+- 已建立 `docs/changes/automate-race-data-lifecycle-sync/release_evidence.md` 作为本次发布的单一证据索引。
+  赛前 root/www event 956 详情均为 200、9542 bytes、相同 SHA，已有出马表但无赛果区块、无来源/阶段标签；
+  数据库 result observation/revision/publication 仍为 0，checkpoint 未提前执行。赛后必须相对该基线证明
+  lifecycle、结果投影和公开页真实变化。
 
 ## 2026-08-30 Racing API proof 发布前关闭 legacy queue 合同冲突
 
