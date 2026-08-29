@@ -1,5 +1,36 @@
 # 部署运行手册
 
+## 2026-08-30 PR #120 生产基线与 Phase 2 drain 止损
+
+1. 当前精确生产基线是 revision `409f2ac6cd15b7e8781dd9ada2903c91a9fc2121`、image
+   `sha256:744650063e3da92bde4e2d2529e817f66ff50e40df8100afd6a4ccc00ad6d8df`、release
+   `/opt/umanews-release-409f2ac6-PR120-20260829T154300Z/umanewsbot`、leaf
+   `0075_race_data_source_priority_and_reported_position`。恢复点仍为
+   `pre-pr115-activation-20260829T104229Z.dump`，必须核对 `468585439` bytes、0600、完整 SHA 与 1366 行
+   PostgreSQL 16 TOC，不因它不是 PR #120 当分钟生成就跳过恢复性验证。
+2. 关闭态 audit 使用 `audit-closed-pr120-20260829T155300Z.json`（SHA
+   `80821aa7…2401`）。Phase 1 当前包含一个已验证的 event 956 enrollment；只读重放必须得到
+   114 blocked、1 enrolled、0 candidate、0 provider request 与相同状态 SHA。不得再使用“数据库必须零
+   delta”的旧 wrapper 判定首次 enrollment，也不得反向删除已由用户确认保留的 enrollment/owner/checkpoint。
+3. 若 SSH 中断后留下 `/tmp/umanews-deployment.lock`，先读 pid/action/started_at，证明 PID 已死亡且没有
+   deploy/rollback/drain 进程后，才可精确移除该锁目录；不得按年龄自动清理。若 `race_sync_v2` 有旧消息，
+   先读任务名、ID、routing key 与 data kinds，在所有开关 false 的 worker 中消费并读取业务终态；不得把
+   含 result 的旧消息带入只允许 time/racecard 的阶段。
+4. 过期任务返回 `claim_expired` 时不得直接改库清 token。确认 claim expiry 已过、checkpoint failure 未变、
+   队列归零后，由下一次 selector 通过既有 CAS 合同原子换代。terminal SUCCESS 仍要与
+   `processed/reason/claim_action` 分开记录。
+5. Phase 2 的固定顺序为：持有 deployment lock -> 停 Beat -> 用冻结的普通 worker hostname 验证
+   ping/active/reserved 两次完整快照均为 0 -> 才写入 `race_time,racecard` scope 和 network/schedule/racecard
+   apply 开关 -> 重建普通/专用 worker -> 资源热身 -> 单次 selector。排空超时本身就是门禁失败，即使原任务
+   随后成功也执行 10 false、停专用 worker、恢复普通 worker/Beat，并停止本轮，不自动重试。
+6. 本次排空 blocker 是 `stable.tasks.crawl_news_source_task`：180 秒内一直 active，随后业务 SUCCESS；最终
+   active/reserved 与两条新队列均为 0，旧 `race_live=7543`。下一次窗口仍必须从停 Beat 和 drain 重新开始，
+   不复用本次失败门禁。
+7. 资源门禁继续为 `MemAvailable>=1572864 kB`、`SwapFree>=524288 kB`、free disk
+   `>=8589934592` bytes。当前内存通过，但磁盘只有 `8606695424` bytes；只有约 16 MiB 余量，不能安全承受
+   12 个热身样本。先盘点零引用且可恢复的精确对象并单独取得删除授权；没有安全对象时扩磁盘，不降低门槛、
+   不删除已验证备份。
+
 ## 2026-08-29 manifest 路由顺序 hotfix 关闭态发布与重放
 
 1. 当前入口保护已上线，但 data-sync 因 `future_discovery_contract_invalid` 自动收口：发布前必须再次确认

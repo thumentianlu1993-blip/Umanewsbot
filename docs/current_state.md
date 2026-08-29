@@ -1,5 +1,42 @@
 # 当前状态
 
+## 2026-08-30 PR #120 已上线，Phase 1 建立单场纳管，Phase 2 因普通队列排空超时停止
+
+- manifest 顺序 hotfix 已通过 PR `#120` 合并为
+  `409f2ac6cd15b7e8781dd9ada2903c91a9fc2121`，生产隔离 release 为
+  `/opt/umanews-release-409f2ac6-PR120-20260829T154300Z/umanewsbot`，web/worker/Beat 当前统一运行
+  image `sha256:744650063e3da92bde4e2d2529e817f66ff50e40df8100afd6a4ccc00ad6d8df`，revision、image、
+  restart=0、OOM=false 均一致。release task 的 migration plan 为空，最终 leaf 仍精确为
+  `0075_race_data_source_priority_and_reported_position`。
+- 本次无 schema 变化且磁盘接近冻结下限，未创建第二份约 468 MiB 备份；继续使用并重新验证恢复点
+  `pre-pr115-activation-20260829T104229Z.dump`：`468585439` bytes、0600、SHA-256
+  `0bbec2c477afaebf83691e2e2cbaa9ba6e9ae249fa1c894344ea906bff7b7746`、PostgreSQL 16 TOC 1366 行。
+  关闭态 audit artifact 为
+  `/opt/umanewsbot-builds/pr120-409f2ac6/race-data-activation/audit-closed-pr120-20260829T155300Z.json`，
+  SHA-256 `80821aa72198348117e261931a5d10235eca70d77f05a010731974805c422401`，结果为
+  ready/valid、route drift 0、artifact root 0、would_write=false。
+- 第一次 Phase 1 discovery 的真实业务终态是 `enrollment_applied`：115 场中 1 场 eligible/acquired，event
+  `956` 建立 generation 1 enrollment、`data_sync` owner 和三类 checkpoint；旧操作 wrapper 错把任何 DB
+  delta 都当作失败并回到全关。用户明确选择保留该精确纳管。随后只读重放 artifact
+  `phase1-replay-pr120-20260829T174713Z.json` 的 SHA-256 为
+  `1b82a42c68ca96d442e3dc61bd7e26a5d3e80890f89acf9fb4f5e39122e643f6`：114 blocked、1 enrolled、
+  0 candidate、0 provider request，数据库前后状态 SHA 同为
+  `a9e4b6a82b2e2f143b508633e60f74ac222bc4b678a5774079624b05b2832ed0`，Phase 1 通过。
+- 中断恢复时确认 deployment lock 的记录 PID 已死亡且无 deploy/rollback/drain 进程，按锁脚本约定只移除
+  精确陈旧目录。Beat 停止竞态留下的一条 event 956 旧 selector 消息包含
+  `race_time/racecard/result`；在 10 个开关全 false 时由短命专用 worker 消费，业务返回
+  `disabled/claim_expired`，无网络、无 apply、checkpoint failure 仍全为 0。过期 token 按控制面合同保留，
+  下一次 selector 可在事务中原子换代，不直接改库清除。
+- 恢复后的 Phase 2 在任何网络/写入开关变更前先停 Beat，并等待普通 worker active/reserved 双零；当时一条
+  `stable.tasks.crawl_news_source_task` 连续 180 秒仍 active，故 drain gate 超时并执行 fail-closed。该新闻
+  任务稍后返回 SUCCESS（crawl job `65191`，seen 40、new 0），但不能追溯性改写已经失败的门禁，本轮不重试
+  Phase 2，也未进入 lifecycle/result public/correction。
+- 当前生产 10 个 data-sync 开关全 false、专用 worker absent，普通 worker/Beat 已恢复且
+  active=0/reserved=0，`celery=0 / race_sync_v2=0 / race_live=7543`。root/www/races 为 200，Meta 精确
+  `/races/` 为 429。`MemAvailable=1700304 kB`、`SwapFree=1310716 kB`，内存仍通过且无需扩 RAM；磁盘
+  `8606695424` bytes，只比冻结的 8 GiB 下限多 `16760832` bytes。下一次重试前必须先以另行授权的可恢复
+  清理或磁盘扩容恢复余量，不能降低门槛；当前新写入保持关闭。
+
 ## 2026-08-29 PR #119 入口保护已上线，Phase 2 因 manifest 顺序契约止损
 
 - PR `#119` 已合并为 `474aad1430d1451ad4e45713bd3d50a5f889ab9b`。生产 Nginx 当前配置 SHA-256

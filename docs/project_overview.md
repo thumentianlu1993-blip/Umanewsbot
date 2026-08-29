@@ -1,5 +1,14 @@
 # 项目总览
 
+2026-08-30 PR `#120` 已以 revision `409f2ac6…2121`、image `74465006…d8df` 关闭态上线，leaf 保持
+`0075`，既有 468 MiB 恢复点与 PR #120 zero-write audit 已重新验证。Phase 1 已真实纳管 event 956；旧
+wrapper 把预期 enrollment delta 错判为失败后，用户确认保留，后续只读重放证明 114 blocked、1 enrolled、
+0 candidate、0 provider request 且状态 SHA 不变。中断恢复又在全关状态消费了一条 Beat 竞态旧消息，
+没有网络或 apply。恢复后的 Phase 2 在开任何 network/apply 前，因普通新闻任务 180 秒内未 drain 而按
+门禁停止；任务稍后 SUCCESS 不使失败窗口追溯通过。当前 10 个新开关全 false、专用 worker absent，
+`celery=0 / race_sync_v2=0 / race_live=7543`，公网正常。2+1 内存仍通过，无需扩 RAM；实际新约束是磁盘
+`8606695424` bytes，仅比 8 GiB 底线多约 16 MiB，下一次灰度前须先经授权恢复磁盘余量或扩磁盘，不能降门槛。
+
 2026-08-29 PR `#119` 的 Meta/Facebook 精确 `/races/`/字体 `429` 已上线；六轮约 5 分钟公网窗口通过，
 目标请求不再进入 Django，普通页面、Nginx/Web 稳定性和内存门禁正常。Phase 1 重新通过后，Phase 2
 专用 worker 仅约 124.7 MiB，证明现有主机无需扩容；但首次真实 discovery 的 Celery `SUCCESS` 业务上是
