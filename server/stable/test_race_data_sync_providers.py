@@ -949,7 +949,10 @@ class TheRacingApiDataSyncAdapterTests(TestCase):
             registry_digest="0" * 64,
         )
 
+        transport_calls = []
+
         def transport(**kwargs):
+            transport_calls.append(kwargs)
             payload = {
                 "racecards": [
                     {
@@ -1009,6 +1012,16 @@ class TheRacingApiDataSyncAdapterTests(TestCase):
             )
 
         self.assertTrue(outcome.success, outcome.reason_code)
+        self.assertEqual(len(transport_calls), 1)
+        self.assertEqual(
+            transport_calls[0]["endpoint_name"],
+            "racecards_identity_japan_today",
+        )
+        self.assertEqual(
+            transport_calls[0]["url"],
+            "https://api.theracingapi.com/v1/racecards/free"
+            "?day=today&region_codes=jpn&limit=500&skip=0",
+        )
         self.assertEqual(outcome.created_source_count, 0, outcome)
         self.assertEqual(outcome.adopted_source_count, 1, outcome)
         source = models.RaceResultSourceIdentity.objects.get(event=event)

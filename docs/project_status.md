@@ -1,5 +1,19 @@
 # 项目状态文档
 
+## 2026-08-29 PR #115 已上线，Phase 2 因 identity transport allowlist 止损
+
+- 生产为 revision `46911d56…b021` / image `42aae312…0bc5` / leaf `0075`；激活前 custom backup
+  `pre-pr115-activation-20260829T104229Z.dump` 已以 0600、SHA-256 和 1366 行 TOC 验证。
+- 普通 Celery 空闲子进程的 1.34 GiB RSS 已在零任务门禁后通过重启回收；专用 worker 60 秒约 123 MiB，
+  最低 `MemAvailable=1869636 kB`、swap 未动，当前无需扩容。
+- Phase 1 为 115 blocked、0 请求、0 DB delta。Phase 2 任务 terminal `SUCCESS`，但业务
+  `no_candidates/provider_response_invalid`；根因是 identity endpoint 名未进入 fixed transport allowlist。
+- 已全量止损为 10 false、专用 worker停止，`celery=0 / race_sync_v2=0 / race_live=7543`。
+  ledger 仅保守预留 1 request/2 MiB，host budget 已收紧到 2000ms；无 enrollment、identity、owner、
+  claim、observation 或 revision 新增。
+- hotfix 新增精确 region/day identity tuple 与正反向回归；关闭态发布后必须从 Phase 1 重新开始，
+  不把 Celery SUCCESS、业务 request_count=0 或已通过热身当成可跳级证据。
+
 ## 2026-08-29 激活在 Phase 2 host budget 门禁止损，hotfix 待关闭态发布
 
 - frozen capacity/allowlist/digest 已注入并通过 zero-write audit。Phase 1 的 0-network census 完成，

@@ -904,6 +904,84 @@ class TheRacingApiFreeSourceProofTests(SimpleTestCase):
                             )
                 resolver.assert_not_called()
 
+    def test_identity_discovery_routes_are_exactly_bound_to_region_and_day(self):
+        service = self._service()
+        region_codes = {
+            "united_kingdom": "gb",
+            "france": "fr",
+            "hong_kong": "hk",
+            "ireland": "ire",
+            "japan": "jpn",
+            "united_states": "usa",
+        }
+        for region_name, region_code in region_codes.items():
+            for day in ("today", "tomorrow"):
+                with self.subTest(region=region_name, day=day):
+                    with self.assertRaisesRegex(
+                        RuntimeError,
+                        "valid identity route reached transport",
+                    ):
+                        with patch.object(
+                            service,
+                            "_resolve_public_addresses",
+                            side_effect=RuntimeError(
+                                "valid identity route reached transport"
+                            ),
+                        ):
+                            service.the_racing_api_transport(
+                                endpoint_name=(
+                                    f"racecards_identity_{region_name}_{day}"
+                                ),
+                                url=(
+                                    "https://api.theracingapi.com"
+                                    "/v1/racecards/free"
+                                    f"?day={day}&region_codes={region_code}"
+                                    "&limit=500&skip=0"
+                                ),
+                                username="user",
+                                password="password",
+                                timeout_seconds=15,
+                                max_response_bytes=2 * 1024 * 1024,
+                                allow_redirects=False,
+                            )
+
+        with patch.object(
+            service,
+            "_resolve_public_addresses",
+            side_effect=AssertionError(
+                "mismatched identity route must fail before DNS"
+            ),
+        ) as resolver:
+            for endpoint_name, url in (
+                (
+                    "racecards_identity_france_today",
+                    "https://api.theracingapi.com/v1/racecards/free"
+                    "?day=today&region_codes=gb&limit=500&skip=0",
+                ),
+                (
+                    "racecards_identity_united_kingdom_tomorrow",
+                    "https://api.theracingapi.com/v1/racecards/free"
+                    "?day=today&region_codes=gb&limit=500&skip=0",
+                ),
+                (
+                    "racecards_identity_gb_today",
+                    "https://api.theracingapi.com/v1/racecards/free"
+                    "?day=today&region_codes=gb&limit=500&skip=0",
+                ),
+            ):
+                with self.subTest(endpoint_name=endpoint_name, url=url):
+                    with self.assertRaises(PermissionError):
+                        service.the_racing_api_transport(
+                            endpoint_name=endpoint_name,
+                            url=url,
+                            username="user",
+                            password="password",
+                            timeout_seconds=15,
+                            max_response_bytes=2 * 1024 * 1024,
+                            allow_redirects=False,
+                        )
+            resolver.assert_not_called()
+
     def test_results_pagination_uses_one_exact_allowlisted_endpoint_name(self):
         service = self._service()
         for skip in (0, 50, 450):
