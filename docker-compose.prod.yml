@@ -40,6 +40,7 @@ services:
   worker:
     image: umanewsbot:prod
     command: /app/deploy/docker/start-worker.sh
+    mem_limit: ${CELERY_WORKER_MEMORY_LIMIT:-512M}
     env_file:
       - .env
     environment: *safe_news_modes

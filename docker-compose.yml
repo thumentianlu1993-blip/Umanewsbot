@@ -16,6 +16,7 @@ services:
   worker:
     build: .
     command: /app/deploy/docker/start-worker.sh
+    mem_limit: ${CELERY_WORKER_MEMORY_LIMIT:-512M}
     volumes:
       - ./server:/app/server
       - ./server/media:/app/server/media

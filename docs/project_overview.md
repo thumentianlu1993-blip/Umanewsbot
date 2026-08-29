@@ -1,5 +1,11 @@
 # 项目总览
 
+2026-08-30 赛事同步因普通 Celery worker 1.344 GiB 内存异常已 fail-closed，生产恢复为 10 false、专用
+worker absent、`0/0/7543` 和约 2.05 GB 可用内存。代码 hotfix 为普通 worker 增加 prefetch=1、每 20
+任务/262144 KiB 子进程回收，并在三份 Compose 设置默认 512 MiB cgroup；不改业务、migration、路由或
+concurrency。核心回归 250/250 与结构门禁已通过。下一步以关闭态发布并观察三个普通调度周期，稳定后才从
+future discovery 重走，当前不扩容。
+
 2026-08-30 proof-only PR `#125` 合并后、部署前发现与现有生产边界冲突：generator 原本要求所有 Redis 队列
 为 0，但旧 `race_live=7543` 是明确不得消费或清理的冻结 backlog。部署已暂停并改为证明“不可执行”而非
 删除历史：默认/新同步队列必须为 0，live/data-sync 网络开关全关，不得存在专用 worker 容器，Celery 只能
