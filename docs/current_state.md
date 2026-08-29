@@ -18,8 +18,9 @@
 - Celery 调整前先停 Beat，确认普通 queue/active/reserved/scheduled 全 0，再重建为 concurrency=1 并恢复
   Beat。15 分钟热身和三轮调度中普通队列峰值 22；两次大批分别约 4 分 17 秒、3 分 40 秒归零，最后
   5 条约 30 秒归零。最终 queue/active/reserved/scheduled 均为 0、worker pong、OOM=false、错误=0。
-- 热身后 Web/worker 约为 `421 MiB / 292 MiB`；观察窗最低 `MemAvailable=1662256 kB`，最终
-  `1690568 kB`，稳定高于 1536 MiB 门槛；`SwapFree=1310716 kB` 全程未下降。现有常驻站点暂不需要
+- 热身后 Web/worker 约为 `421 MiB / 292 MiB`；15 分钟观察窗最低 `MemAvailable=1662256 kB`，
+  随后的繁忙窗口最低 `1639612 kB`，仍高于 1536 MiB 门槛；`SwapFree=1310716 kB` 全程未下降。
+  现有常驻站点暂不需要
   扩容，但最小余量只有约 87 MiB，不能直接推断启动 384 MiB 上限的 `race_sync_v2_worker` 后也安全。
 - 当前仍为 revision `a063ecf9…5fc8` / leaf `0075`，Web/worker/Beat 同 image 且 restart count=0，OneBot
   running/restart count=0；全部 10 个 data-sync 开关 false，专用 worker 未运行，

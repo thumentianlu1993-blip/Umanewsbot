@@ -17,8 +17,9 @@
    同一顺序，不能在活跃任务中直接重建。
 5. concurrency=1 的观测门禁：至少覆盖一个 15 分钟窗口和 3 个调度周期；普通队列峰值必须在 5 分钟内归零，
    不得与下一批持续叠加。本次峰值 22，最大约 4 分 17 秒归零；最终 queue/active/reserved/scheduled 全 0。
-6. 当前热身后 Web/worker 约 `421/292 MiB`，窗口最低 `MemAvailable=1662256 kB`，最终
-   `1690568 kB`，SwapFree `1310716 kB` 未变化，free disk `9655083008` bytes；现有 resident stack
+6. 当前热身后 Web/worker 约 `421/292 MiB`，15 分钟窗口最低 `MemAvailable=1662256 kB`；随后一次
+   active=1 的繁忙复核最低为 `1639612 kB`，队列约 52 秒归零。SwapFree `1310716 kB` 未变化，
+   free disk 约 `9654026240` bytes；现有 resident stack
    暂不扩容。该结果不覆盖未来专用 worker：启动 `race_sync_v2_worker` 后必须重新观察热身内存、swap、
    普通/新队列、公网和 5xx，失败时保持新写入关闭并扩容至 8 GiB。
 7. 当前 data-sync 仍是 10 个开关全 false、专用 worker not-running，
