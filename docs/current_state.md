@@ -1,8 +1,13 @@
 # 当前状态
 
-## 2026-08-29 PR #109 已补齐普通 migration 与隔离 release 门禁，生产仍保持旧版本
+## 2026-08-29 PR #109 已合并，tracked runtime follow-up 待发布，生产仍保持旧版本
 
-- PR `#109` 候选已把 no-intent 语义改为“迁移前精确绑定 handoff artifact 中的受审起始 leaf”，允许
+- 首次准备 PR `#109` isolated release 时又安全停止：`runtime/horse_profile_completion` 含 Git tracked
+  审核证据，整目录替换为 symlink 会污染 worktree 并可能阻断 rollback checkout。跟进修复保留该 tracked
+  parent，只把 `cache/batches/review/budget` 四个运行态子目录指向稳定根；其他未跟踪 runtime 与 TLS
+  仍使用整目录 compatibility symlink。生产没有创建 release/backup/migration，旧 Beat 已恢复。
+- PR `#109` 已合并为 `69e87c446ad7a5f5494bb381b44cda2679e8ec8e`；它把 no-intent 语义改为
+  “迁移前精确绑定 handoff artifact 中的受审起始 leaf”，允许
   `0071/0072/0073/0074/0075` 这些已审核普通发布终态；live leaf 与 artifact 漂移或出现未审核 leaf
   仍立即拒绝。迁移后的 completion 继续只接受最终 `0075`，没有放宽 restricted recovery marker、
   database identity、catalog 或 migration-history 校验。
@@ -11,10 +16,13 @@
   `11/11`、非 PostgreSQL 修复套件 `78/78`（另 1 项按环境跳过）通过。
 - 隔离 release 的可变 runtime 与 TLS 已改为 `.env` 中唯一、绝对的
   `UMANEWS_PERSISTENT_RUNTIME_ROOT` / `UMANEWS_TLS_CERT_ROOT`。发布在 build/停服前核对稳定目录、
-  rollback compatibility symlink、证书 realpath 不逃逸及 `nginx -t`；缺失、相对、重复、空目录或
-  symlink 逃逸均 fail closed。完整 single-migration-owner/发布编排套件 `177/177`，另 2 项按环境跳过。
-- 当前仅完成本地修复和测试，PR `#109` 仍为 Draft，尚未 merge、构建新生产镜像、创建本次新鲜备份或
-  重试部署。生产仍为 revision `2833558a…56c` / leaf `0073`，新写入关闭，
+  rollback compatibility path、证书 realpath 不逃逸及 `nginx -t`；缺失、相对、重复、空目录或
+  symlink 逃逸均 fail closed。含 tracked runtime follow-up 的完整 single-migration-owner/发布编排套件
+  `178/178`，另 2 项按环境跳过。
+- 当前尚未构建新生产镜像、创建本次新鲜备份或重试 migration。生产仍为 revision `2833558a…56c` /
+  leaf `0073`，新写入关闭。资源门禁发现无 swap 且内存不足后，经用户明确授权创建并启用 1280 MiB、
+  0600、非 fstab swap；旧 Beat drain 后重启 worker/web，门禁恢复为 `MemAvailable≈1.81 GiB / SwapFree≈1.25 GiB`，
+  公网 200，随后因 tracked runtime 门禁停止并恢复旧 Beat。当前
   `celery=0 / race_sync_v2=0 / race_live=7543` 的最后确认基线不变；上线前必须重新实时核验。
 
 ## 2026-08-29 PR #108 已合并，但普通 0073 -> 0075 发布被 recovery-intent 门禁安全阻断

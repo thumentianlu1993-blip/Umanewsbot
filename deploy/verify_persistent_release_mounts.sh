@@ -48,6 +48,25 @@ do
     exit 1
   fi
   fallback="$ROOT_DIR/runtime/$relative"
+  if [ "$relative" = "horse_profile_completion" ]; then
+    if [ ! -d "$fallback" ] || [ -L "$fallback" ]; then
+      echo "tracked horse-profile rollback directory is missing or is a symlink" >&2
+      exit 1
+    fi
+    for state_dir in cache batches review budget; do
+      persistent_state="$candidate/$state_dir"
+      fallback_state="$fallback/$state_dir"
+      if [ ! -d "$persistent_state" ] || [ -L "$persistent_state" ]; then
+        echo "persistent horse-profile state directory is missing or is a symlink: $state_dir" >&2
+        exit 1
+      fi
+      if [ ! -d "$fallback_state" ] || [ "$(realpath "$fallback_state")" != "$(realpath "$persistent_state")" ]; then
+        echo "tracked horse-profile rollback state is not bound to persistent runtime: $state_dir" >&2
+        exit 1
+      fi
+    done
+    continue
+  fi
   if [ ! -d "$fallback" ] || [ "$(realpath "$fallback")" != "$runtime_root_real/$relative" ]; then
     echo "release-local rollback compatibility path is not bound to persistent runtime: $relative" >&2
     exit 1

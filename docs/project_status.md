@@ -1,13 +1,17 @@
 # 项目状态文档
 
-## 2026-08-29 PR #109 修复候选已通过 migration/release 回归，待合并和重新部署
+## 2026-08-29 PR #109 已合并，tracked runtime follow-up 待发布
 
+- isolated release 准备阶段识别出 tracked `horse_profile_completion` parent 不能整目录 symlink；生产按门禁
+  零 release/backup/migration 停止并恢复旧 Beat。跟进候选只稳定链接四个运行态子目录，保持 checkout
+  clean 和 PR `#108` rollback 可执行。
 - no-intent intent gate 已从错误的“迁移前必须到最终 0075”改为验签 artifact 绑定的受审起始 leaf；
   fresh live 漂移和未知 leaf 继续 fail closed，completion 仍只接受最终 `0075`。
 - 真实 PostgreSQL migration-history 套件 `11/11`、非 PostgreSQL 修复套件 `78/78`（另 1 skip）、完整
-  single-migration-owner/部署编排 `177/177`（另 2 skip）通过。隔离 release 现在要求稳定 runtime/TLS
+  single-migration-owner/部署编排 `178/178`（另 2 skip）通过。隔离 release 现在要求稳定 runtime/TLS
   绝对根、旧 Compose 回滚兼容链接、证书 containment 和停服前 `nginx -t`。
-- 尚未 merge PR `#109`、重新备份、migration 或启用。生产最后确认仍为旧 revision `2833558a…56c`、
+- PR `#109` 已合并为 `69e87c44…e8ec8e`，尚未重新备份、migration 或启用。生产最后确认仍为旧
+  revision `2833558a…56c`、
   leaf `0073`、新写入关闭、`race_sync_v2=0`、旧 `race_live=7543`；所有数字上线前重新实时核验。
 
 ## 2026-08-29 PR #108 已合并，生产发布在 migration 前安全停止并恢复旧版本

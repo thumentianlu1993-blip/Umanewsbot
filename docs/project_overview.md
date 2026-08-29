@@ -17,10 +17,11 @@ backup，以 SHA-bound manifest 把 14 条过期空证据 claim 精确收口为 
 审批、赛果、投递和 pending 集合不变，旧 Beat 已恢复。既有 lifecycle `enabled/enforce + 6 controls`
 保持原授权状态；新 data-sync lifecycle 和其余新开关仍关闭。隔离 release 还暴露 Nginx 证书及历史任务
 runtime 位于旧 release 相对目录的问题，已在 drain 普通任务后从原目录恢复全部服务、挂载和公网。
-PR `#109` 候选现已把迁移前 leaf 精确绑定到验签 handoff artifact，迁移后仍严格要求 0075；Compose
+PR `#109` 已合并为 `69e87c44…e8ec8e`，把迁移前 leaf 精确绑定到验签 handoff artifact，迁移后仍严格要求 0075；Compose
 改用 release 外稳定 runtime/TLS 根，并在停服前验证 rollback compatibility link、证书 containment 和
-`nginx -t`。真实 PostgreSQL 与完整部署编排回归已通过，但 PR `#109` 仍未合并，也未创建本次新鲜备份、
-重试 deployment 或启用任何 data-sync 开关。
+`nginx -t`。真实 PostgreSQL 与完整部署编排回归已通过。首次准备 isolated release 又识别出 Git tracked
+`horse_profile_completion` parent 不能整目录链接；跟进候选只链接其四个运行态子目录。当前仍未创建本次
+新鲜备份、重试 deployment 或启用任何 data-sync 开关。
 
 ## 历史背景（以下状态以各段日期为准）
 
