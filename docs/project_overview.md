@@ -1,5 +1,12 @@
 # 项目总览
 
+2026-08-29 PR `#115` 已完成关闭态生产发布与新鲜备份，migration leaf 保持 `0075`。Phase 1 的无网络
+census 通过；Phase 2 专用 worker 资源热身也通过，现有 3.4 GiB 主机暂不扩容。第一次真实 discovery
+暴露固定 transport 的用途名 allowlist 缺口：调用方使用 `racecards_identity_<region>_<day>`，transport
+只允许旧 `racecards_sync_<day>`，因此按合同止损。生产现已恢复 10 个开关全 false、专用 worker 停止、
+旧 `race_live=7543`。当前 follow-up 仅补冻结 region/day 的精确 endpoint-name + URL 二元组，不放宽网络边界；
+关闭态发布后仍须从 Phase 1 重放。
+
 2026-08-29 五阶段激活已完成 frozen admission 与 0-network future census，但 Phase 2 在发出第一个
 provider 请求前因共享 host budget 的 1050ms/2000ms 精确值冲突止损。生产已恢复所有
 data-sync 开关 false、专用 worker 停止，`race_live=7543` 不变。hotfix 不改 schema，将同一

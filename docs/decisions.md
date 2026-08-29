@@ -1,5 +1,17 @@
 # 关键决策
 
+## 2026-08-29 provider transport 授权必须绑定用途名与规范 URL 二元组
+
+- future discovery 的 identity 请求与已纳管 racecard sync 可访问同一固定 path，但二者是不同用途；transport
+  allowlist 必须显式接受 `racecards_identity_<region>_<day>` 与该 region/day 规范 URL 的精确二元组，不能
+  仅按 URL 放行，也不能把 identity 调用伪装成 `racecards_sync_<day>`。
+- identity region 只允许冻结 registry 的 6 个规范名称，day 只允许 today/tomorrow；endpoint 名、region code、
+  query 顺序或 day 任一错配都必须在 DNS 解析前拒绝。该补丁不改变 proof request budget、registry digest、
+  credential、redirect、host 或 path 边界。
+- provider 结果中的 `request_count` 只统计成功解析的响应，不能代表 transport 完全未尝试。生产审计还必须
+  对照 capacity ledger 与 host budget；本次 `provider_response_invalid` 的业务 request_count 为 0，但 ledger
+  已保守预留 1 次且 host outcome 已记录失败，因此按一次失败尝试处理，不立即重试。
+
 ## 2026-08-29 同一 provider host 的共享预算只可单调收紧
 
 - `RaceLiveHostBudget.host` 是跨 legacy race-live 与 data-sync 的共享唯一行，不能同时满足

@@ -1,5 +1,22 @@
 # 部署运行手册
 
+## 2026-08-29 identity transport allowlist hotfix 关闭态发布与重放
+
+1. 当前生产基线是 PR #115 revision `46911d56…b021` / image `42aae312…0bc5` / leaf `0075`；
+   10 个 data-sync 开关全 false、专用 worker 停止，`celery=0 / race_sync_v2=0 / race_live=7543`。
+   不得从失败的 Phase 2 续跑。
+2. 写前恢复点使用 `pre-pr115-activation-20260829T104229Z.dump`（`468585439` bytes、SHA-256
+   `0bbec2c4…7746`、0600、1366 行 TOC）。hotfix 无 migration；发布继续使用隔离 release、精确 amd64
+   image/revision、旧 image rollback tag 和 deployment lock。
+3. 关闭态发布后先重验 10 false、leaf、双域名、队列、磁盘与 zero-write audit；再从 Phase 1 开
+   master/scheduler/future discovery 做 0-network census。Phase 1 必须仍为 115 blocked、0 request、0 DB delta。
+4. Phase 2 热身通过后只派发一条 discovery。terminal 必须读 Celery `SUCCESS`，业务同时必须为
+   `enrollment_applied`；identity outcome 要求 `success=true / reason_code=complete`、成功解析请求 1–3、
+   至少一个 created/adopted source，并核对 ledger delta。`SUCCESS/no_candidates` 仍是失败。
+5. `request_count=0` 不足以证明无 transport 尝试；还要读取 capacity ledger、host budget 和 source delta。
+   任一失败立即恢复 10 false、停专用 worker、重建普通 worker/Beat，不删除 ledger/host outcome，
+   不消费或清理旧 `race_live`。
+
 ## 2026-08-29 host budget hotfix 关闭态发布与重放
 
 1. 当前止损终态必须是 10 个 data-sync 开关全 false、`race_sync_v2_worker` 不运行、

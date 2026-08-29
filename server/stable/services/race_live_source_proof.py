@@ -690,16 +690,23 @@ def the_racing_api_transport(
     parsed = urlsplit(url)
     request_path = parsed.path + (f"?{parsed.query}" if parsed.query else "")
     allowed_requests = set(_ENDPOINTS)
-    for region_code in _REGION_CODES.values():
+    for region_name, region_code in _REGION_CODES.items():
         for day in ("today", "tomorrow"):
+            allowed_path = (
+                "/v1/racecards/free"
+                f"?day={day}&region_codes={region_code}"
+                "&limit=500&skip=0"
+            )
             allowed_requests.add(
                 (
                     f"racecards_sync_{day}",
-                    (
-                        "/v1/racecards/free"
-                        f"?day={day}&region_codes={region_code}"
-                        "&limit=500&skip=0"
-                    ),
+                    allowed_path,
+                )
+            )
+            allowed_requests.add(
+                (
+                    f"racecards_identity_{region_name}_{day}",
+                    allowed_path,
                 )
             )
     for skip in range(0, 500, 50):

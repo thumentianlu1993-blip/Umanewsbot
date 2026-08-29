@@ -1,5 +1,28 @@
 # 当前状态
 
+## 2026-08-29 PR #115 已上线并在 Phase 2 transport allowlist 门禁止损
+
+- PR `#115` merge revision `46911d56524f61ff4a50ad1c62ead46e77b1b021` 已以隔离 release
+  `/opt/umanews-release-46911d56-PR115-20260829T102958Z/umanewsbot` 和 amd64 image
+  `sha256:42aae312faab43fbc051f212a1e2448f7b21f558ef43f1872304582b01df0bc5` 上线；leaf 仍精确为
+  `0075`，web/worker/Beat 同 image/revision，双域名 200，旧 image 有精确 rollback tag。
+- 激活前 custom backup 为
+  `/opt/umanewsbot/backups/db/pre-pr115-activation-20260829T104229Z.dump`，大小 `468585439` bytes、
+  SHA-256 `0bbec2c477afaebf83691e2e2cbaa9ba6e9ae249fa1c894344ea906bff7b7746`、0600，
+  `pg_restore --list` 为 1366 行；备份后磁盘仍高于冻结的 8 GiB 门槛。
+- 空闲普通 Celery 子进程曾保留约 1.34 GiB RSS；确认 active/reserved/queue 全 0 后受控重启，
+  `MemAvailable` 从约 605 MiB 回升到约 1.88 GiB。专用 worker 60 秒热身稳定约 123 MiB，最低
+  `MemAvailable=1869636 kB`、swap 未动，因此本轮仍不扩容。
+- PR #115 关闭态 audit 为 ready/valid/route drift 0，Phase 1 重放为 115 blocked、0 请求、0 业务变化。
+  Phase 2 第一次真实 discovery 为 Celery `SUCCESS`，但业务为 `no_candidates /
+  provider_response_invalid`：已确认代码生成 `racecards_identity_<region>_<day>`，固定 transport 却只
+  allowlist `racecards_sync_<day>`，因此在 DNS/HTTP 前由 endpoint tuple 拒绝。
+- 止损已把 10 个开关全部恢复 false、停止专用 worker并保持
+  `celery=0 / race_sync_v2=0 / race_live=7543`。仅 capacity ledger 保守预留 1 request/2 MiB，
+  共享 host budget 正常从 1050ms 收紧到 2000ms；enrollment/source identity/owner/claim/observation/revision
+  均未新增。当前 hotfix 只补 6 个冻结 region × today/tomorrow 的精确 identity endpoint/URL 绑定，
+  不放宽 host/path/query/redirect。
+
 ## 2026-08-29 五阶段激活在 Phase 2 host budget 门禁止损，hotfix 已通过回归
 
 - 生产重开身份、leaf、writer、队列、资源和公网门禁后，已把冻结 capacity/allowlist 和
