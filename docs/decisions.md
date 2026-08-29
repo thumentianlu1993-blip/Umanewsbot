@@ -1,5 +1,19 @@
 # 关键决策
 
+## 2026-08-29 关闭态代码与 schema 可保留在线，容量失败不得开启任何自动写入
+
+- PR `#110` 的精确候选已证明普通 `0073 -> 0074/0075` migration、持久 runtime/TLS mount、服务身份和公网
+  都通过；因此容量失败的最小止损是保留新代码及 additive schema，同时保持全部 data-sync 开关关闭并不启动
+  `race_sync_v2_worker`，而不是把已经验证成功的 migration 反向回滚。
+- 1536 MiB `MemAvailable` 与 8 GiB free disk 是启动专用 worker、注入冻结容量和开始五阶段启用前的硬门禁。
+  临时停 OneBot、只删除零容器引用旧镜像属于本次获准的有界恢复尝试；即使读数只差少量，只要未稳定通过就
+  不得以清缓存、临场降低阈值、扩大 swap 或直接启动 worker 绕过。
+- 资源尝试失败后必须先恢复原 OneBot，再把同步面收窄到总开关、scheduler、network 及所有 apply/public
+  开关均关闭，确认 `race_sync_v2=0` 和旧 `race_live` 计数不变。下一次资源扩容后从 capacity admission 和
+  future discovery 第一阶段重新开始，不继承本次未执行的阶段状态。
+- 本次 1280 MiB swap 是 0600、非 fstab 的临时生产措施；它与镜像清理均不得被描述为自动化已启用。
+  停用/删除 swap 或清理其他备份、镜像、runtime 仍是独立运维动作。
+
 ## 2026-08-29 普通发布起点绑定 artifact，隔离 release 同时保留旧 Compose 回滚挂载
 
 - no-intent 的迁移前门禁不再比较候选最终 leaf，而是要求 fresh live leaf 与已验签 handoff artifact

@@ -1,18 +1,18 @@
 # 项目总览
 
-截至 2026-08-29，PR `#108` 已合并为 `e5287acf…af5d`，但第一次生产发布在 migration 前安全停止，
-生产尚未切换。候选已覆盖 future discovery、时间/出马表、lifecycle、赛果公开与更正，
+截至 2026-08-29，PR `#108` 的功能与 PR `#109/#110` 的 migration/release 修复已作为精确 revision
+`a063ecf985539fc2d82a27170c7d634e0f7e5fc8`、image `sha256:4a5f34b1…078eb` 关闭态部署到生产。
+数据库已从 leaf `0073` 正常应用 additive migration `0074/0075`，最终 leaf 精确为 `0075`；新鲜 custom
+backup、隔离 release、持久 runtime/TLS、回滚镜像、服务身份和 HTTP/HTTPS 四入口均完成生产验证。
+候选覆盖 future discovery、时间/出马表、lifecycle、赛果公开与更正，
 并使用 `data_sync` 持久 owner、exact enrollment/source/route、provider checkpoint、DB snapshot single-flight、
 `race_sync_v2` 隔离 worker 和证据绑定的 publication audit。历史 prepare exception 留下的 14 条过期
 claim 已有 SHA-bound、advisory-lock-bound 的精确收口候选；不生成 bundle/delivery/赛果。全 diff 审查
 发现的 migration `0075`、公开读取、shadow promotion、门禁重放、exact TRA source、snapshot
 retention、终态 polling 和 T+30 alert 问题已修复并通过 SQLite/PostgreSQL 聚焦门禁。最终增量又把
 future discovery/cleanup 绑定总开关、覆盖完整 snapshot lease 并消除公开批量读取 source N+1；完整
-diff 独立复审最终为 `No findings`。实际生产发布在 migration 前暴露了未被测试覆盖的 Release-B 状态机
-缺口：no-intent 路径把合法 0073 起点错误要求成已到最终 0075，因此按 fail-closed 停止；
-0074/0075 均未应用。精确旧镜像和服务已恢复，生产仍为 revision `2833558a…56c` / leaf `0073`，
-新写入全关，`race_sync_v2=0`，旧
-`race_live=7543` 保持不动。候选 `dd67c789…8aa0` 已在停止 Beat 的关闭态窗口创建并验证 custom
+diff 独立复审最终为 `No findings`。第一次发布暴露的 no-intent 状态机和 isolated runtime/TLS 问题已经
+修复，并由真实 `0073 -> 0075` 生产发布验证。候选 `dd67c789…8aa0` 此前已在停止 Beat 的关闭态窗口创建并验证 custom
 backup，以 SHA-bound manifest 把 14 条过期空证据 claim 精确收口为 failed；claimed 已归零，队列、
 审批、赛果、投递和 pending 集合不变，旧 Beat 已恢复。既有 lifecycle `enabled/enforce + 6 controls`
 保持原授权状态；新 data-sync lifecycle 和其余新开关仍关闭。隔离 release 还暴露 Nginx 证书及历史任务
@@ -20,8 +20,11 @@ runtime 位于旧 release 相对目录的问题，已在 drain 普通任务后�
 PR `#109` 已合并为 `69e87c44…e8ec8e`，把迁移前 leaf 精确绑定到验签 handoff artifact，迁移后仍严格要求 0075；Compose
 改用 release 外稳定 runtime/TLS 根，并在停服前验证 rollback compatibility link、证书 containment 和
 `nginx -t`。真实 PostgreSQL 与完整部署编排回归已通过。首次准备 isolated release 又识别出 Git tracked
-`horse_profile_completion` parent 不能整目录链接；跟进候选只链接其四个运行态子目录。当前仍未创建本次
-新鲜备份、重试 deployment 或启用任何 data-sync 开关。
+`horse_profile_completion` parent 不能整目录链接；PR `#110` 只链接其四个运行态子目录并完成发布。
+激活前资源门禁随后停止了启用：即使创建 1280 MiB 临时 swap、临时停 OneBot 并精确删除 6 个零引用旧镜像，
+`MemAvailable` 仍未稳定达到 1536 MiB。因此 frozen capacity 未注入、`race_sync_v2_worker` 未启动，
+future discovery、时间/出马表、data-sync lifecycle、赛果公开及更正全部保持关闭；OneBot 已恢复，
+`race_sync_v2=0`、旧 `race_live=7543` 不变。下一步先扩容宿主资源，再从 admission 第一阶段重新开始。
 
 ## 历史背景（以下状态以各段日期为准）
 
