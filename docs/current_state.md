@@ -1,5 +1,16 @@
 # 当前状态
 
+## 2026-08-29 Meta/Facebook 赛事入口 429 已获授权，候选待关闭态发布
+
+- 用户已明确授权入口防护。候选只识别 `meta-externalagent` / `facebookexternalhit`，且只在 URI 为精确
+  `/races/` 或 `/static/` 下 `woff/woff2/ttf/otf` 字体时返回 `429`；普通用户、其他 crawler、其他页面、
+  ACME、healthz、媒体与非字体静态资源维持原行为。
+- 规则由 Nginx `map` 在入口层判定，并同时放入 HTTP/HTTPS server；不增加 Web/Celery 进程、不修改
+  schema、provider、容量或业务写路径。配置合同测试 `5/5`、容器化 `nginx -t` 已通过。
+- 当前尚未合并或生产发布。生产仍以 PR #117 关闭态运行，10 个 data-sync 开关全 false、专用 worker
+  不运行；发布后必须先验证 Meta 命中为 429、普通页面为 200、Django 不再收到同类请求及 20 秒公网窗口，
+  全部通过才从 Phase 1 重走。旧 `race_live=7543` 不触碰。
+
 ## 2026-08-29 PR #117 已关闭态上线，激活因 20 秒公网门禁再次停止
 
 - PR `#117` 已合并为 `6e6d79778d206817058585b8c25287c005378e04`，生产隔离 release 为

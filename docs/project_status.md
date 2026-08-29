@@ -1,5 +1,12 @@
 # 项目状态文档
 
+## 2026-08-29 Meta/Facebook 赛事入口 429 候选已通过本地门禁
+
+- 已获用户授权；规则仅匹配两个 Meta/Facebook UA 和精确赛事页/字体 URI，HTTP/HTTPS 都返回 429，
+  不改变普通流量、schema、provider、Web/Celery sizing 或旧队列。
+- Nginx 合同 `5/5` 与容器化语法检查通过；尚未合并、部署或启用自动化。生产继续 10 false、专用 worker
+  absent，发布和公网窗口通过后从 Phase 1 重走，不继承旧阶段证据。
+
 ## 2026-08-29 PR #117 已上线，公网 20 秒门禁仍失败
 
 - 生产为 revision `6e6d7977…e04` / image `cb3852e4…663c` / leaf `0075`；release no-op migration，

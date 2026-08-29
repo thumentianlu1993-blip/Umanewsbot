@@ -1,5 +1,11 @@
 # 项目总览
 
+2026-08-29 已取得 Meta/Facebook 赛事入口防护授权。候选在 Nginx 同时覆盖 HTTP/HTTPS，只对
+`meta-externalagent` / `facebookexternalhit` 请求的精确 `/races/` 与 `/static/` 字体返回 `429`；不全站
+封禁、不按 IP、不扩内存、不改数据链路。配置合同与容器化 `nginx -t` 已通过，尚待关闭态合并/发布和
+20 秒公网重验。通过后五阶段仍从 future discovery 第一阶段重走，任一门禁失败保持新写入全关且旧
+`race_live` 不动。
+
 2026-08-29 PR `#117` 已以 revision `6e6d7977…e04`、image `cb3852e4…663c` 关闭态上线，migration no-op、
 leaf `0075`，PR #116 rollback tag 已固定。正确的 sync-mount zero-write audit 为 ready/valid，畸形赛事
 query 已在数据库前 301，正常赛事页约 0.036 秒；三服务一致、10 个新开关全 false，旧

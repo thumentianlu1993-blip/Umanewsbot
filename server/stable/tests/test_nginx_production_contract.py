@@ -49,6 +49,25 @@ class ProductionNginxContractTests(SimpleTestCase):
         ):
             self.assertIn(fragment, https)
 
+    def test_meta_race_crawler_block_is_narrow_and_applies_to_http_and_https(self):
+        self.assertIn("map $http_user_agent $is_meta_race_crawler", self.source)
+        self.assertIn(
+            "~*(meta-externalagent|facebookexternalhit) 1;",
+            self.source,
+        )
+        self.assertIn(
+            'map "$is_meta_race_crawler:$uri" $block_meta_race_crawler',
+            self.source,
+        )
+        self.assertIn("~*^1:/races/$ 1;", self.source)
+        self.assertIn(r"~*^1:/static/.*\.(woff2?|ttf|otf)$ 1;", self.source)
+        self.assertEqual(
+            self.source.count(
+                "if ($block_meta_race_crawler) {\n        return 429;\n    }"
+            ),
+            2,
+        )
+
     def test_retired_hipilot_host_remains_gone(self):
         self.assertIn("server_name hipilot.umafans.run", self.source)
         block = self.source[self.source.index("server_name hipilot.umafans.run") :]

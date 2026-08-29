@@ -1,5 +1,15 @@
 # 关键决策
 
+## 2026-08-29 Meta/Facebook 入口防护采用赛事路径级 429
+
+- 用户已确认采用 Nginx 入口规则，不使用扩内存制造公网门禁通过。UA 只匹配大小写不敏感的
+  `meta-externalagent` / `facebookexternalhit`；URI 只匹配精确 `/races/` 和 `/static/` 下字体后缀
+  `woff/woff2/ttf/otf`，返回 `429`。
+- 不做全站 UA 封禁，也不按来源 IP 封禁：Meta 来源 IP 分散且会变化；全站封禁会扩大社交预览影响。
+  规则同时覆盖 HTTP/HTTPS，其他 UA/URI 必须走原 location/proxy/alias。
+- 此授权只覆盖入口保护及其关闭态发布。五阶段启用仍逐门禁推进；任一公网、资源、队列、业务终态或
+  zero-write/write-delta 门禁失败，立即恢复 10 false、停止专用 worker且不消费旧 `race_live`。
+
 ## 2026-08-29 应用 canonical redirect 不能替代分布式 crawler 入口防护
 
 - PR #117 已证明畸形 query 可在数据库前快速 301，且正常赛事页本身可约 0.036 秒返回；但 Meta crawler
