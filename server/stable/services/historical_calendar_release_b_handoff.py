@@ -48,6 +48,7 @@ LEGACY_FINAL_LEAF_SETS = {
     ("stable.0073_lifecycle_enforce_registry",),
     PREVIOUS_FINAL_LEAF_SET,
 }
+ORDINARY_RELEASE_LEAF_SETS = LEGACY_FINAL_LEAF_SETS | {FINAL_LEAF_SET}
 INITIAL_INSTALL_LEAF_SET = ("stable.0067_historical_calendar_release_a",)
 
 

@@ -1269,6 +1269,78 @@ class MigrationHistoryRepairDockerImageContractTests(SimpleTestCase):
 
 
 class MigrationHistoryRepairRestrictedRecoveryRedTests(SimpleTestCase):
+    def _run_no_intent_ensure(
+        self,
+        *,
+        artifact_leaf_set: list[str],
+        live_leaf_set: list[str],
+    ) -> str:
+        command = (
+            "stable.management.commands."
+            "ensure_historical_calendar_recovery_intent"
+        )
+        payload = {
+            "recovery_intent_mode": "not-required",
+            "handoff_action": "deploy",
+            "preflight": {"migration_leaf_set": artifact_leaf_set},
+        }
+        live = {
+            "ok": True,
+            "migration_leaf_set": live_leaf_set,
+            "database_identity_sha256": "d" * 64,
+        }
+        with TemporaryDirectory() as tmp, patch(
+            f"{command}.database_vendor_contract",
+            return_value={
+                "ok": True,
+                "expected": "postgresql",
+                "actual": "postgresql",
+            },
+        ), patch(
+            f"{command}.verify_preflight_artifact",
+            return_value={"ok": True, "payload": payload},
+        ), patch(
+            f"{command}.collect_handoff_preflight", return_value=live
+        ):
+            root = Path(tmp)
+            root.chmod(0o700)
+            output = StringIO()
+            call_command(
+                "ensure_historical_calendar_recovery_intent",
+                marker_path=str(root / "restricted-recovery.json"),
+                artifact_path=str(root / "preflight.json"),
+                artifact_sha256="1" * 64,
+                candidate_commit="a" * 40,
+                candidate_image_id="sha256:" + "b" * 64,
+                database_identity_sha256="d" * 64,
+                attempt_mode="not-required",
+                stdout=output,
+            )
+            self.assertFalse((root / "restricted-recovery.json").exists())
+            return output.getvalue()
+
+    def test_no_intent_accepts_artifact_bound_0073_starting_leaf(self):
+        leaf = f"{M0073[0]}.{M0073[1]}"
+        output = self._run_no_intent_ensure(
+            artifact_leaf_set=[leaf], live_leaf_set=[leaf]
+        )
+        self.assertIn('"status": "not-required"', output)
+        self.assertIn(leaf, output)
+
+    def test_no_intent_rejects_live_starting_leaf_drift(self):
+        with self.assertRaisesRegex(CommandError, "starting leaf drift"):
+            self._run_no_intent_ensure(
+                artifact_leaf_set=[f"{M0073[0]}.{M0073[1]}"],
+                live_leaf_set=[f"{M0074[0]}.{M0074[1]}"],
+            )
+
+    def test_no_intent_rejects_unreviewed_artifact_bound_leaf(self):
+        with self.assertRaisesRegex(CommandError, "reviewed ordinary starting leaf"):
+            self._run_no_intent_ensure(
+                artifact_leaf_set=["stable.9999_unreviewed"],
+                live_leaf_set=["stable.9999_unreviewed"],
+            )
+
     def _initial_install_marker(self, path: Path):
         from stable.services.historical_calendar_release_b_handoff import (
             build_restricted_recovery_marker,

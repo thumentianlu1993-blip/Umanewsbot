@@ -1,5 +1,57 @@
 # 当前状态
 
+## 2026-08-29 PR #109 已补齐普通 migration 与隔离 release 门禁，生产仍保持旧版本
+
+- PR `#109` 候选已把 no-intent 语义改为“迁移前精确绑定 handoff artifact 中的受审起始 leaf”，允许
+  `0071/0072/0073/0074/0075` 这些已审核普通发布终态；live leaf 与 artifact 漂移或出现未审核 leaf
+  仍立即拒绝。迁移后的 completion 继续只接受最终 `0075`，没有放宽 restricted recovery marker、
+  database identity、catalog 或 migration-history 校验。
+- 新增真实 PostgreSQL 16 回归已证明 `0073 -> ensure(not-required) -> migrate 0074/0075 ->
+  complete(not-required)` 全链成功且不会创建 recovery marker；migration-history PostgreSQL 套件
+  `11/11`、非 PostgreSQL 修复套件 `78/78`（另 1 项按环境跳过）通过。
+- 隔离 release 的可变 runtime 与 TLS 已改为 `.env` 中唯一、绝对的
+  `UMANEWS_PERSISTENT_RUNTIME_ROOT` / `UMANEWS_TLS_CERT_ROOT`。发布在 build/停服前核对稳定目录、
+  rollback compatibility symlink、证书 realpath 不逃逸及 `nginx -t`；缺失、相对、重复、空目录或
+  symlink 逃逸均 fail closed。完整 single-migration-owner/发布编排套件 `177/177`，另 2 项按环境跳过。
+- 当前仅完成本地修复和测试，PR `#109` 仍为 Draft，尚未 merge、构建新生产镜像、创建本次新鲜备份或
+  重试部署。生产仍为 revision `2833558a…56c` / leaf `0073`，新写入关闭，
+  `celery=0 / race_sync_v2=0 / race_live=7543` 的最后确认基线不变；上线前必须重新实时核验。
+
+## 2026-08-29 PR #108 已合并，但普通 0073 -> 0075 发布被 recovery-intent 门禁安全阻断
+
+- PR `#108` 已合并，merge revision 为 `e5287acfc7dca8b6a1e7d01e3c3f89e0b945af5d`，tree
+  `4313b521091eb1d0241d70d11cfd624fe4cba0e2`，source archive SHA-256
+  `6866b3d6a86b312de4bd219644727ad2f3afdd9db725c88a1fe34bb81bc9a277`。精确候选镜像为
+  `sha256:7403b21f2651304893f0309f94eeda4b0f19f1716c4316b73d90f751962afdd1`，已保留为
+  `umanewsbot:failed-gate-pr108-e5287acf`，没有成为常驻生产镜像。
+- 写前 custom backup 为
+  `/opt/umanewsbot/backups/db/pre-pr108-merge-e5287acf-20260828T200920Z.dump`，大小
+  `484317721` bytes，SHA-256
+  `f88abd1358ed51be0d03e83eb8a87ca091e952f15808d31daa2feac3e27ac1f0`，权限 0600，
+  `pg_restore --list` 产生 1325 行 TOC。备份后可用空间 `10810208256` bytes，高于 8 GiB 门禁。
+- Release-B 候选 preflight 已绑定旧生产 leaf `0073`、零 writer、精确 DB/image/commit，随后在
+  `migrate` 之前由 `ensure_historical_calendar_recovery_intent` 拒绝，错误为
+  `no-intent attempt requires exact final 0071`。实际代码常量已是最终 leaf `0075`；问题是
+  `attempt_mode=not-required` 分支在 migration 前错误要求 live leaf 已等于最终 leaf，因而合法的
+  `0073 -> 0074 -> 0075` 普通发布无法进入 `migrate`。
+- 失败点发生在 migration 前；生产数据库确认 `0074/0075` 应用记录均为 0，也没有 active restricted
+  recovery marker。按 fail-closed 约定停止后续步骤，未注入冻结容量、未启动 `race_sync_v2_worker`，
+  future discovery、schedule/racecard、data-sync lifecycle、result public、correction 均未启用。
+- 已把 `umanewsbot:prod` 恢复为精确旧 image
+  `sha256:4bc392d012080a482523451016074f55ebcee84177ccab08b7563b233411a611`，并通过受审
+  `resume_stopped_release.sh` 恢复 web/worker/Beat。首次从新 release 目录恢复 Nginx 时，因该目录
+  `deploy/certs` 只有仓库 README、没有旧 release 的 Let’s Encrypt runtime，Nginx 报缺
+  `fullchain.pem`；同时发现 web/worker 的历史 runtime bind 仍指向新目录。随后停 Beat，等待两条普通
+  新闻任务自然 drain，再从原 PR107 release 目录重建 web/worker/Beat/Nginx。四服务 working directory、
+  runtime mount 和旧镜像现均回到原基线，HTTP/HTTPS 四入口全部 200。
+- 当前生产最终态仍为 revision `2833558a6a2d67b7dc9816b53ea8ad5d580eb56c` / leaf `0073`；
+  web healthy，worker/Beat/Nginx 运行且 restart count 为 0，近两分钟四服务 error marker 为 0；writer
+  preflight `ok=true`，`celery=0`、`race_sync_v2=0`、旧 `race_live=7543`，新写入总开关和旧
+  race-live scheduler/monitor 均关闭。
+- 下次重试必须先以独立修复 PR：区分 no-intent 的“迁移前受审起始 leaf”和“迁移后最终 leaf”，增加真实
+  PostgreSQL `0073 -> 0075` 全 wrapper 测试，并把 TLS runtime 改为 release 外稳定挂载或在切换前做
+  精确证书 preflight。修复重新审查后仍需新鲜备份和完整生产门禁；不得复用本次最终确认绕过新门禁。
+
 ## 2026-08-29 PR #108 历史 claim 已在关闭态精确收口，待最终 merge/deploy/enable 确认
 
 - PR `#108` 仍为 OPEN，生产仍运行 revision `2833558a6a2d67b7dc9816b53ea8ad5d580eb56c` / image

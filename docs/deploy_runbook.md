@@ -1,5 +1,67 @@
 # 部署运行手册
 
+## 2026-08-29 PR #109 修复后的隔离 release 重试门禁
+
+1. 从最终 merge SHA 创建全新 isolated release。先把当前活跃 release 的 runtime 与证书复制到
+   `/opt/umanewsbot-persistent/runtime`、`/opt/umanewsbot-persistent/certs`，逐项核对目录、owner/mode、
+   文件数量/大小和非敏感 digest；不得输出私钥内容。
+2. 新 release 的 `.env` 必须各且仅各有一条绝对路径：
+   `UMANEWS_PERSISTENT_RUNTIME_ROOT=/opt/umanewsbot-persistent/runtime`、
+   `UMANEWS_TLS_CERT_ROOT=/opt/umanewsbot-persistent/certs`。在 `runtime/` 下为
+   `horse_profile_completion`、`upcoming_racecard_urls`、`secrets`、`race_live_racecards`、
+   `race_live_publications`、`race_data_sync` 建立指向稳定根的 compatibility symlink；
+   `deploy/certs/letsencrypt` 同样指向稳定证书根。保留 release-local `migration_history_repair` 和
+   tracked policy 文件。
+3. 执行 `./deploy/verify_persistent_release_mounts.sh`。它必须在 build/停服务前通过稳定根、回滚兼容路径、
+   TLS containment 和 key/cert 可读性；随后
+   `./deploy/docker/compose-wrapper.sh -f docker-compose.prod.lowcost.yml run --rm --no-deps nginx nginx -t`
+   必须成功。任一步失败立即停止，不得 build、停 Beat 或 migration。
+4. 重新实时确认旧服务 revision/image/leaf `0073`、writer=0、新队列=0、旧 `race_live` 只读计数不变，
+   全部 data-sync network/apply/public/correction 开关关闭。再创建一份新的 PostgreSQL custom backup，
+   验证 regular file、0600、非空、SHA-256、`pg_restore --list` 和备份后至少 8 GiB free；上次备份不能代替。
+5. 普通 deploy 的 handoff artifact 必须绑定 fresh live `0073` 和唯一计划 `0074/0075`。intent 阶段接受的
+   只是该 artifact 精确起点；live/artifact leaf 漂移或未知 leaf 立即停止。`migrate` 后 completion 必须
+   精确看到 `stable.0075_race_data_source_priority_and_reported_position`，且 restricted marker 不存在。
+6. 关闭态部署完成前不注入启用开关、不启动 `race_sync_v2_worker`。服务、镜像、leaf、catalog、writer、
+   三队列、容量、配置 audit 和公网 HTTP/HTTPS 全部通过后，才按既定顺序逐级启用：future discovery ->
+   time/racecard -> lifecycle -> result apply/public -> correction。任一门禁失败停止后续并保持新写入关闭；
+   `race_live` 遗留队列始终不得消费、清理或迁移。
+
+## 2026-08-29 PR #108 merge 后发布失败与安全恢复
+
+本次 PR 已合并为 `e5287acf…af5d`，精确候选 image 为 `7403b21f…afdd1`。写前备份
+`pre-pr108-merge-e5287acf-20260828T200920Z.dump` 为 `484317721` bytes、SHA-256
+`f88abd1358ed51be0d03e83eb8a87ca091e952f15808d31daa2feac3e27ac1f0`、0600、1325 行 TOC。
+发布没有越过 migration 边界，生产已恢复旧 revision `2833558a…56c` / leaf `0073`。
+
+1. 候选 handoff 在旧 leaf `0073` 上正确生成 artifact
+   `6daea716fb6fdfb7fb3bb969c65f59ab951a0de9c1ccca6af29bdd3c248bd1ba`，migration plan 只有
+   `0074/0075`，writer activity 全 0。
+2. `run-release-tasks.sh` 顺序为 handoff verify -> `ensure_historical_calendar_recovery_intent` ->
+   `migrate`。当前 ensure 命令在 `attempt_mode=not-required` 时要求 live leaf 已等于
+   `FINAL_LEAF_SET`，所以在合法 0073 起点报 `no-intent attempt requires exact final 0071`；错误文本
+   仍残留 0071，但实际 `FINAL_LEAF_SET` 已是 0075。
+3. 看到该错误必须立即停止。不得直接运行 `python manage.py migrate`，不得改 artifact/attempt mode，
+   不得用 restricted marker 把普通发布伪装成 recovery。先以 DB 直接查询确认 0074/0075 均未应用、
+   marker 不存在，再保存失败候选 image ID 并恢复旧 `prod` tag。
+4. 若所有应用服务已停且 migration 未开始，可从失败 release checkout 运行受审
+   `COMPOSE_FILE=docker-compose.prod.lowcost.yml ./deploy/resume_stopped_release.sh`；前提是 `prod` 已重新
+   指向精确旧 image。恢复后必须逐服务核 image/revision、health、writer 和三队列。
+5. 不要从一个只含 Git 文件的新 release 目录重建 Nginx：Compose 把 `./deploy/certs` 绑定到
+   `/etc/nginx/certs`，而 Let’s Encrypt runtime 只存在于原 release。本次错误表现为缺
+   `/etc/nginx/certs/letsencrypt/live/umafans.run/fullchain.pem`。应从仍绑定真实证书的原 release 恢复
+   Nginx；长期修复是 release 外稳定证书 mount，并在切换前执行证书存在性和 `nginx -t` 门禁。
+6. 新 release 上恢复旧 image 仍不等于完整恢复：还要逐服务核
+   `com.docker.compose.project.working_dir` 和 bind mount source。本次先等待两条普通新闻任务自然 drain，
+   再从原 PR107 release 重建 web/worker/Beat，使历史 runtime mount 一并回到旧目录。
+7. 本次最终恢复验收：web/worker/Beat 为旧 image `4bc392d0…611a611`，四服务 working directory 都是
+   `/opt/umanews-release-2833558a-PR107-20260817/umanewsbot`，Nginx running，HTTP/HTTPS 四入口 200，
+   restart count 与近两分钟 error marker 均为 0；writer preflight `ok=true`，
+   `celery=0 / race_sync_v2=0 / race_live=7543`，0074/0075 count=0。
+8. 再次发布前必须有独立修复 PR，至少覆盖真实 PostgreSQL 0073 起点、完整
+   `run-release-tasks.sh`、migrate 后 0075 completion 以及隔离 release 的 TLS mount。随后重新创建
+   新鲜 backup；本次备份只能作为本次失败窗口证据，不能替代未来写前恢复点。
+
 ## 2026-08-29 PR #108 历史 claim 修复后的发布门禁（候选未上线）
 
 本轮关闭态修复已完成：候选 `dd67c789…8aa0` / image `8114325b…d8620` 的 preview manifest
