@@ -1,5 +1,11 @@
 # 项目总览
 
+2026-08-29 五阶段激活已完成 frozen admission 与 0-network future census，但 Phase 2 在发出第一个
+provider 请求前因共享 host budget 的 1050ms/2000ms 精确值冲突止损。生产已恢复所有
+data-sync 开关 false、专用 worker 停止，`race_live=7543` 不变。hotfix 不改 schema，将同一
+provider host 的共享请求预算改为只可单调收紧，新 data-sync 可原子提高下限，legacy 可兼容
+更严格但不可兼容更宽松的值。完成关闭态发布后才从 Phase 1 重放，不从失败任务中间续跑。
+
 截至 2026-08-29，PR `#108` 的功能与 PR `#109/#110` 的 migration/release 修复已作为精确 revision
 `a063ecf985539fc2d82a27170c7d634e0f7e5fc8`、image `sha256:4a5f34b1…078eb` 关闭态部署到生产。
 数据库已从 leaf `0073` 正常应用 additive migration `0074/0075`，最终 leaf 精确为 `0075`；新鲜 custom

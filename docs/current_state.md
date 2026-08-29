@@ -1,5 +1,26 @@
 # 当前状态
 
+## 2026-08-29 五阶段激活在 Phase 2 host budget 门禁止损，hotfix 已通过回归
+
+- 生产重开身份、leaf、writer、队列、资源和公网门禁后，已把冻结 capacity/allowlist 和
+  standing/TRA/reference 三个精确摘要注入 `.env`。只读 `audit_race_data_sync` 为
+  `configuration_status=ready / capacity=valid / route_drift=[] / would_write=false`；审计时所有运行开关仍为 false。
+- Phase 1 仅开启 master/scheduler/future discovery、保持 network/apply/public 关闭。一次同步
+  census 将 115 场全部明确分类为 blocked，provider 请求为 0，enrollment/owner/claim/ledger/
+  observation/revision 前后不变，`race_live=7543`。
+- Phase 2 专用 worker 热身约 123 MiB，60 秒最低 `MemAvailable=1823504 kB`、
+  `SwapFree=1310716 kB`，因此当前无需扩容。真实 discovery 在第 0 个网络请求前被
+  `host budget mismatch` 拒绝：生产共享行是 legacy 的 1050ms，新 data-sync 代码错误要求
+  必须精确等于 2000ms。任务终态为 `SUCCESS/no_candidates`，`candidate_event_count=21 /
+  request_count=0 / source_runtime_contract_rejected`。
+- 止损已把 10 个 data-sync 开关全部恢复 false，停止专用 worker 并重建关闭态的
+  普通 worker/Beat。最终 `celery=0 / race_sync_v2=0 / race_live=7543`，无 enrollment、
+  data-sync owner、active claim、capacity ledger 或新 observation/revision。
+- hotfix 将共享 host budget 定义为“只可单调收紧”：新消费者可原子把 1050ms 提高到
+  2000ms，同步延长尚未到期的 `next_allowed_at`；legacy 路径接受不低于自身 1050ms
+  的更严格共享值，仍拒绝更低值。data-sync SQLite `247/247`、PostgreSQL 16 `25/25`
+  与 5 个直接回归已通过；扩大相关组的 2 个失败已在未修改 `origin/main` 上原样复现。
+
 ## 2026-08-29 生产 2+1 内存灰度通过，现有站点暂不扩容；新自动化仍关闭
 
 - 只读拆账证明高占用主要来自常驻 Python 进程数，而不是 PostgreSQL/Redis：原 Web 为 3 个 Gunicorn

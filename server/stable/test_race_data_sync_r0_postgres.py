@@ -20,6 +20,7 @@ from stable.services import (
     race_data_sync_control,
     race_data_sync_enrollment,
     race_data_sync_results,
+    race_events,
 )
 from stable.test_race_data_sync_r0 import audited_test_roster
 
@@ -799,3 +800,31 @@ class RaceDataSyncR0PostgresConcurrencyTests(TransactionTestCase):
             sorted((decision.reserved, decision.reason) for decision in results),
             [(False, "rate_limited"), (True, "reserved")],
         )
+
+    def test_concurrent_host_budget_floors_only_tighten(self):
+        budget = models.RaceLiveHostBudget.objects.create(
+            host="shared-floor-pg.example.test",
+            min_interval_ms=1_050,
+            next_allowed_at=NOW + timedelta(milliseconds=1_050),
+            lock_version=9,
+        )
+
+        results = self._run_pair(
+            lambda: race_events.ensure_race_live_host_budget_floor(
+                host=budget.host,
+                minimum_interval_ms=1_050,
+            ).min_interval_ms,
+            lambda: race_events.ensure_race_live_host_budget_floor(
+                host=budget.host,
+                minimum_interval_ms=2_000,
+            ).min_interval_ms,
+        )
+
+        self.assertTrue(all(value in {1_050, 2_000} for value in results))
+        budget.refresh_from_db()
+        self.assertEqual(budget.min_interval_ms, 2_000)
+        self.assertEqual(
+            budget.next_allowed_at,
+            NOW + timedelta(milliseconds=2_000),
+        )
+        self.assertEqual(budget.lock_version, 9)

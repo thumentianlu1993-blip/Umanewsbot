@@ -17,7 +17,11 @@ from django.db.migrations.executor import MigrationExecutor
 from django.test import SimpleTestCase, TestCase, TransactionTestCase, override_settings
 
 from stable import models
-from stable.services import race_data_sync_control, race_data_sync_enrollment
+from stable.services import (
+    race_data_sync_control,
+    race_data_sync_enrollment,
+    race_events,
+)
 
 
 NOW = datetime(2026, 8, 20, 4, 0, tzinfo=dt_timezone.utc)
@@ -1745,8 +1749,33 @@ class RaceDataSnapshotLeaseControlTests(TestCase):
     def test_data_sync_reuses_shared_host_budget_with_route_interval_floor(self):
         budget = models.RaceLiveHostBudget.objects.create(
             host="race-data.example.test",
-            min_interval_ms=2_000,
+            min_interval_ms=1_050,
+            next_allowed_at=NOW + timedelta(milliseconds=1_050),
+            lock_version=7,
         )
+        tightened = race_events.ensure_race_live_host_budget_floor(
+            host=budget.host,
+            minimum_interval_ms=2_000,
+        )
+        self.assertEqual(tightened.min_interval_ms, 2_000)
+        self.assertEqual(
+            tightened.next_allowed_at,
+            NOW + timedelta(milliseconds=2_000),
+        )
+        self.assertEqual(tightened.lock_version, 7)
+
+        reused = race_events.ensure_race_live_host_budget_floor(
+            host=budget.host,
+            minimum_interval_ms=1_050,
+        )
+        self.assertEqual(reused.min_interval_ms, 2_000)
+        self.assertEqual(
+            reused.next_allowed_at,
+            NOW + timedelta(milliseconds=2_000),
+        )
+
+        budget.next_allowed_at = None
+        budget.save(update_fields=("next_allowed_at",))
         first = race_data_sync_control.reserve_race_data_host_request(
             host=budget.host,
             minimum_interval_seconds=2,

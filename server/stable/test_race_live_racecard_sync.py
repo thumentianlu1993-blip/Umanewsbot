@@ -1268,6 +1268,19 @@ class RaceLiveRacecardPrepareTests(TestCase):
         )
         self.assertEqual(budget.lock_version, 9)
 
+    def test_host_budget_accepts_a_stricter_shared_floor(self):
+        models.RaceLiveHostBudget.objects.create(
+            host="api.theracingapi.com",
+            min_interval_ms=2000,
+        )
+
+        self._service()._bootstrap_host_budget()
+
+        budget = models.RaceLiveHostBudget.objects.get(
+            host="api.theracingapi.com"
+        )
+        self.assertEqual(budget.min_interval_ms, 2000)
+
     def test_confirmation_registry_and_policy_gates_fail_before_transport_or_budget(self):
         cases = (
             {
