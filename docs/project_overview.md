@@ -23,7 +23,8 @@ PR `#109` 已合并为 `69e87c44…e8ec8e`，把迁移前 leaf 精确绑定到�
 `horse_profile_completion` parent 不能整目录链接；PR `#110` 只链接其四个运行态子目录并完成发布。
 激活前资源门禁一度停止了启用；创建 1280 MiB 临时 swap、临时停 OneBot 和精确镜像清理仍未稳定达到
 1536 MiB。后续 PSS/cgroup 拆账证明根因是常驻 Python 进程数，生产已灰度为 Web 2 workers、普通 Celery
-concurrency=1。15 分钟热身与三轮调度后最低 `MemAvailable=1662256 kB`、队列均在 5 分钟内归零，现有
+concurrency=1。15 分钟热身与三轮调度后最低 `MemAvailable=1662256 kB`；后续繁忙窗口最低进一步到
+`1639612 kB`，仍高于门槛，且队列均在 5 分钟内归零。现有
 resident stack 暂不扩容。Web 切换时发生的 14 次短暂 5xx 已如实保留，稳态随后零新增 5xx。frozen
 capacity 仍未注入，`race_sync_v2_worker` 未启动，future discovery、时间/出马表、data-sync lifecycle、
 赛果公开及更正全部保持关闭；OneBot 已恢复，`race_sync_v2=0`、旧 `race_live=7543` 不变。下一步从

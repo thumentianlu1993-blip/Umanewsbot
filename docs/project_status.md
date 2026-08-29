@@ -7,8 +7,8 @@
   `race_live` 不动。
 - Web 切换产生 14 次短暂 5xx，稳定后四入口持续 200、5xx=0；该切换损失已保留。Celery 在停 Beat、零任务
   drain 后重建并恢复 Beat，15 分钟内普通队列峰值 22，三轮均在 5 分钟内归零，最终 control/queue 全 0。
-- 热身后 Web/worker 约 `421/292 MiB`；最低 `MemAvailable=1662256 kB`、最终 `1690568 kB`，SwapFree
-  全程 `1310716 kB`。现有 resident stack 通过 1536 MiB 门禁，暂不需要直接扩容。
+- 热身后 Web/worker 约 `421/292 MiB`；15 分钟窗口最低 `MemAvailable=1662256 kB`，后续繁忙窗口最低
+  `1639612 kB`，SwapFree 全程 `1310716 kB`。现有 resident stack 通过 1536 MiB 门禁，暂不需要直接扩容。
 - data-sync 仍全部 false，`race_sync_v2_worker` 未运行，`race_sync_v2=0 / race_live=7543`。新专用 worker
   启动和热身后必须重新验收；如果内存、swap、队列或公网失败，再扩容至 8 GiB，不继续压缩核心服务。
 
