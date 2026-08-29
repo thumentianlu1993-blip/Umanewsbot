@@ -1,5 +1,22 @@
 # 当前状态
 
+## 2026-08-29 PR #109 已补齐普通 migration 与隔离 release 门禁，生产仍保持旧版本
+
+- PR `#109` 候选已把 no-intent 语义改为“迁移前精确绑定 handoff artifact 中的受审起始 leaf”，允许
+  `0071/0072/0073/0074/0075` 这些已审核普通发布终态；live leaf 与 artifact 漂移或出现未审核 leaf
+  仍立即拒绝。迁移后的 completion 继续只接受最终 `0075`，没有放宽 restricted recovery marker、
+  database identity、catalog 或 migration-history 校验。
+- 新增真实 PostgreSQL 16 回归已证明 `0073 -> ensure(not-required) -> migrate 0074/0075 ->
+  complete(not-required)` 全链成功且不会创建 recovery marker；migration-history PostgreSQL 套件
+  `11/11`、非 PostgreSQL 修复套件 `78/78`（另 1 项按环境跳过）通过。
+- 隔离 release 的可变 runtime 与 TLS 已改为 `.env` 中唯一、绝对的
+  `UMANEWS_PERSISTENT_RUNTIME_ROOT` / `UMANEWS_TLS_CERT_ROOT`。发布在 build/停服前核对稳定目录、
+  rollback compatibility symlink、证书 realpath 不逃逸及 `nginx -t`；缺失、相对、重复、空目录或
+  symlink 逃逸均 fail closed。完整 single-migration-owner/发布编排套件 `177/177`，另 2 项按环境跳过。
+- 当前仅完成本地修复和测试，PR `#109` 仍为 Draft，尚未 merge、构建新生产镜像、创建本次新鲜备份或
+  重试部署。生产仍为 revision `2833558a…56c` / leaf `0073`，新写入关闭，
+  `celery=0 / race_sync_v2=0 / race_live=7543` 的最后确认基线不变；上线前必须重新实时核验。
+
 ## 2026-08-29 PR #108 已合并，但普通 0073 -> 0075 发布被 recovery-intent 门禁安全阻断
 
 - PR `#108` 已合并，merge revision 为 `e5287acfc7dca8b6a1e7d01e3c3f89e0b945af5d`，tree

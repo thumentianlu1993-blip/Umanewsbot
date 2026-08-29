@@ -432,6 +432,70 @@ class MigrationHistoryRepairPostgresMigrationTests(TransactionTestCase):
         final = check_initial_install_schema_compatibility()
         self.assertTrue(final["ok"], final)
 
+    def test_ordinary_0073_ensure_migrate_complete_reaches_0075_without_marker(self):
+        _executor().migrate([M0073])
+        preflight = check_release_b_schema_compatibility(direction="forward")
+        self.assertTrue(preflight["ok"], preflight)
+        self.assertEqual(
+            preflight["migration_leaf_set"], [f"{M0073[0]}.{M0073[1]}"]
+        )
+        self.assertEqual(preflight["migration_plan"], [M0074[1], M0075[1]])
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            root.chmod(0o700)
+            artifact_path = root / "preflight.json"
+            marker_path = root / "restricted-recovery.json"
+            artifact = build_preflight_artifact(
+                preflight=preflight,
+                candidate_commit="a" * 40,
+                candidate_image_id="sha256:" + "b" * 64,
+                compose_file="docker-compose.prod.lowcost.yml",
+                deployment_lock_token_sha256="c" * 64,
+                artifact_path=str(artifact_path),
+                handoff_action="deploy",
+            )
+            self.assertEqual(artifact["recovery_intent_mode"], "not-required")
+            publish_preflight_artifact(path=artifact_path, payload=artifact)
+
+            ensure_output = StringIO()
+            call_command(
+                "ensure_historical_calendar_recovery_intent",
+                marker_path=str(marker_path),
+                artifact_path=str(artifact_path),
+                artifact_sha256=artifact["artifact_sha256"],
+                candidate_commit="a" * 40,
+                candidate_image_id="sha256:" + "b" * 64,
+                database_identity_sha256=preflight["database_identity_sha256"],
+                attempt_mode="not-required",
+                stdout=ensure_output,
+            )
+            self.assertIn('"status": "not-required"', ensure_output.getvalue())
+            self.assertFalse(marker_path.exists())
+
+            _executor().migrate([M0075])
+            complete_output = StringIO()
+            call_command(
+                "complete_historical_calendar_restricted_recovery",
+                marker_path=str(marker_path),
+                artifact_path=str(artifact_path),
+                artifact_sha256=artifact["artifact_sha256"],
+                provenance_artifact_sha256=artifact["artifact_sha256"],
+                candidate_commit="a" * 40,
+                candidate_image_id="sha256:" + "b" * 64,
+                database_identity_sha256=preflight["database_identity_sha256"],
+                attempt_mode="not-required",
+                stdout=complete_output,
+            )
+            self.assertIn('"status": "not-required"', complete_output.getvalue())
+            self.assertFalse(marker_path.exists())
+            self.assertEqual(
+                check_release_b_schema_compatibility(direction="forward")[
+                    "migration_leaf_set"
+                ],
+                [f"{M0075[0]}.{M0075[1]}"],
+            )
+
     def test_missing_early_dependency_record_is_structured_and_command_fails(self):
         _executor().migrate([M0070])
         recorder = MigrationRecorder(connection)

@@ -9,6 +9,7 @@ from django.core.management.base import BaseCommand, CommandError
 from stable.services.historical_calendar_release_b_handoff import (
     FINAL_LEAF_SET,
     INITIAL_INSTALL_LEAF_SET,
+    ORDINARY_RELEASE_LEAF_SETS,
     build_restricted_recovery_marker,
     collect_handoff_preflight,
     collect_initial_install_preflight,
@@ -119,10 +120,34 @@ class Command(BaseCommand):
         if options["attempt_mode"] == "not-required":
             if action == "forward-resume" or marker_present or transition_present:
                 raise CommandError("no-intent attempt has recovery marker state")
-            if tuple(live["migration_leaf_set"]) != FINAL_LEAF_SET:
-                raise CommandError("no-intent attempt requires exact final 0071")
+            artifact_preflight = artifact.get("preflight")
+            artifact_leaf_set = (
+                artifact_preflight.get("migration_leaf_set")
+                if isinstance(artifact_preflight, dict)
+                else None
+            )
+            if not isinstance(artifact_leaf_set, list) or not all(
+                isinstance(item, str) and item for item in artifact_leaf_set
+            ):
+                raise CommandError(
+                    "no-intent artifact is missing an exact starting leaf"
+                )
+            live_leaf_set = tuple(live["migration_leaf_set"])
+            if live_leaf_set != tuple(artifact_leaf_set):
+                raise CommandError("no-intent starting leaf drifted after handoff")
+            if live_leaf_set not in ORDINARY_RELEASE_LEAF_SETS:
+                raise CommandError(
+                    "no-intent attempt requires an exact reviewed ordinary starting leaf"
+                )
             self.stdout.write(
-                json.dumps({"ok": True, "status": "not-required"}, sort_keys=True)
+                json.dumps(
+                    {
+                        "ok": True,
+                        "status": "not-required",
+                        "starting_leaf_set": list(live_leaf_set),
+                    },
+                    sort_keys=True,
+                )
             )
             return
 

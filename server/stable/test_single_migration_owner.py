@@ -224,6 +224,9 @@ case "$cmd" in
       run)
         run_rc_name="compose-run"
         case " $* " in
+          *" nginx nginx -t "*)
+            run_rc_name="compose-nginx-config"
+            ;;
           *" manage.py collectstatic --noinput "*)
             run_rc_name="compose-target-collectstatic"
             ;;
@@ -550,7 +553,40 @@ class Harness:
         shutil.copytree(DEPLOY_DIR, self.work / "deploy")
         for script in (self.work / "deploy").rglob("*.sh"):
             script.chmod(0o755)
-        (self.work / ".env").write_text("", encoding="utf-8")
+        persistent_runtime = base / "persistent-runtime"
+        for relative in (
+            "horse_profile_completion",
+            "upcoming_racecard_urls",
+            "secrets",
+            "race_live_racecards",
+            "race_live_publications",
+            "race_data_sync",
+        ):
+            (persistent_runtime / relative).mkdir(parents=True, exist_ok=True)
+        persistent_certs = base / "persistent-certs"
+        live_certs = persistent_certs / "letsencrypt/live/umafans.run"
+        live_certs.mkdir(parents=True)
+        (live_certs / "fullchain.pem").write_text("test certificate\n", encoding="utf-8")
+        (live_certs / "privkey.pem").write_text("test private key\n", encoding="utf-8")
+        release_runtime = self.work / "runtime"
+        release_runtime.mkdir()
+        for relative in (
+            "horse_profile_completion",
+            "upcoming_racecard_urls",
+            "secrets",
+            "race_live_racecards",
+            "race_live_publications",
+            "race_data_sync",
+        ):
+            (release_runtime / relative).symlink_to(persistent_runtime / relative)
+        (self.work / "deploy/certs/letsencrypt").symlink_to(
+            persistent_certs / "letsencrypt"
+        )
+        (self.work / ".env").write_text(
+            f"UMANEWS_PERSISTENT_RUNTIME_ROOT={persistent_runtime}\n"
+            f"UMANEWS_TLS_CERT_ROOT={persistent_certs}\n",
+            encoding="utf-8",
+        )
         for name in ALLOWED_COMPOSE_FILES:
             (self.work / name).write_text("services: {}\n", encoding="utf-8")
         self.fakes = base / "fakes"
@@ -1471,6 +1507,131 @@ class DeploymentLockTests(SimpleTestCase):
                     self.assertEqual(released.returncode, 0, released.stderr)
 
 
+class PersistentReleaseMountTests(SimpleTestCase):
+    """Isolated releases must use stable runtime and TLS host roots."""
+
+    def _seed_roots(self, root: Path) -> tuple[Path, Path]:
+        runtime = root / "persistent-runtime"
+        for relative in (
+            "horse_profile_completion",
+            "upcoming_racecard_urls",
+            "secrets",
+            "race_live_racecards",
+            "race_live_publications",
+            "race_data_sync",
+        ):
+            (runtime / relative).mkdir(parents=True, exist_ok=True)
+        certs = root / "persistent-certs"
+        live = certs / "letsencrypt/live/umafans.run"
+        live.mkdir(parents=True)
+        (live / "fullchain.pem").write_text("certificate\n", encoding="utf-8")
+        (live / "privkey.pem").write_text("private key\n", encoding="utf-8")
+        release_runtime = root / "runtime"
+        release_runtime.mkdir()
+        for relative in (
+            "horse_profile_completion",
+            "upcoming_racecard_urls",
+            "secrets",
+            "race_live_racecards",
+            "race_live_publications",
+            "race_data_sync",
+        ):
+            (release_runtime / relative).symlink_to(runtime / relative)
+        release_certs = root / "deploy/certs"
+        release_certs.mkdir(parents=True)
+        (release_certs / "letsencrypt").symlink_to(certs / "letsencrypt")
+        return runtime, certs
+
+    def _run(self, root: Path):
+        return subprocess.run(
+            ["sh", str(ROOT / "deploy/verify_persistent_release_mounts.sh")],
+            env={**os.environ, "UMANEWS_ROOT_DIR": str(root)},
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+    def test_valid_absolute_persistent_roots_pass(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            runtime, certs = self._seed_roots(root)
+            (root / ".env").write_text(
+                f"UMANEWS_PERSISTENT_RUNTIME_ROOT={runtime}\n"
+                f"UMANEWS_TLS_CERT_ROOT={certs}\n",
+                encoding="utf-8",
+            )
+            result = self._run(root)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("preflight passed", result.stdout)
+
+    def test_relative_or_duplicate_root_is_rejected(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _runtime, certs = self._seed_roots(root)
+            (root / ".env").write_text(
+                "UMANEWS_PERSISTENT_RUNTIME_ROOT=./runtime\n"
+                "UMANEWS_PERSISTENT_RUNTIME_ROOT=./other\n"
+                f"UMANEWS_TLS_CERT_ROOT={certs}\n",
+                encoding="utf-8",
+            )
+            result = self._run(root)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("exactly once", result.stderr)
+
+    def test_tls_symlink_cannot_escape_certificate_root(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            runtime, certs = self._seed_roots(root)
+            outside = root / "outside-key.pem"
+            outside.write_text("outside\n", encoding="utf-8")
+            private_key = certs / "letsencrypt/live/umafans.run/privkey.pem"
+            private_key.unlink()
+            private_key.symlink_to(outside)
+            (root / ".env").write_text(
+                f"UMANEWS_PERSISTENT_RUNTIME_ROOT={runtime}\n"
+                f"UMANEWS_TLS_CERT_ROOT={certs}\n",
+                encoding="utf-8",
+            )
+            result = self._run(root)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("escapes", result.stderr)
+
+    def test_release_local_rollback_path_must_resolve_to_persistent_root(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            runtime, certs = self._seed_roots(root)
+            fallback = root / "runtime/race_data_sync"
+            fallback.unlink()
+            fallback.mkdir()
+            (root / ".env").write_text(
+                f"UMANEWS_PERSISTENT_RUNTIME_ROOT={runtime}\n"
+                f"UMANEWS_TLS_CERT_ROOT={certs}\n",
+                encoding="utf-8",
+            )
+            result = self._run(root)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("rollback compatibility", result.stderr)
+
+    def test_prod_compose_files_bind_stable_roots(self):
+        for relative in ALLOWED_COMPOSE_FILES:
+            text = (ROOT / relative).read_text(encoding="utf-8")
+            self.assertIn("${UMANEWS_PERSISTENT_RUNTIME_ROOT:-./runtime}", text)
+            self.assertIn("${UMANEWS_TLS_CERT_ROOT:-./deploy/certs}", text)
+            self.assertNotIn("- ./runtime/secrets:/run/secrets", text)
+            self.assertNotIn("- ./deploy/certs:/etc/nginx/certs", text)
+
+    def test_deploy_preflights_mounts_and_nginx_before_build(self):
+        for relative in ("deploy/deploy.sh", "deploy/deploy_lowcost.sh"):
+            text = (ROOT / relative).read_text(encoding="utf-8")
+            marker = text.index("check_restricted_recovery_marker.sh")
+            mounts = text.index("verify_persistent_release_mounts.sh")
+            nginx = text.index('run --rm --no-deps nginx nginx -t')
+            build = text.index('build web')
+            self.assertLess(marker, mounts, relative)
+            self.assertLess(mounts, nginx, relative)
+            self.assertLess(nginx, build, relative)
+
+
 class ManualReleaseTests(SimpleTestCase):
     """T06 (manual part): deploy/manual_release.sh fail-closed manual entry."""
 
@@ -1754,6 +1915,25 @@ class DeployOrchestrationTests(SimpleTestCase):
                 self.assertEqual([e for e in events if is_exec_migrate(e)], [])
                 self.assertEqual([e for e in events if is_release_run(e)], [])
 
+    def test_nginx_mount_or_config_failure_stops_before_build_or_service_stop(self):
+        for script in ("deploy/deploy.sh", "deploy/deploy_lowcost.sh"):
+            with self.subTest(script=script), TemporaryDirectory() as tmp:
+                harness = Harness(Path(tmp))
+                seed_services(harness)
+                harness.set_rc("compose-nginx-config", 1)
+                result = self._run_deploy(harness, script)
+                self.assertNotEqual(result.returncode, 0)
+                events = harness.events()
+                self.assertEqual(
+                    [e for e in events if e[0] == "compose" and e[2][:1] == ["build"]],
+                    [],
+                )
+                self.assertEqual(
+                    [e for e in events if e[0] == "compose" and e[2][:1] == ["stop"]],
+                    [],
+                )
+                self.assertEqual([e for e in events if is_release_run(e)], [])
+
     def _assert_full_orchestration(
         self, harness: Harness, result, compose_file: str
     ) -> None:
@@ -1775,11 +1955,13 @@ class DeployOrchestrationTests(SimpleTestCase):
             "deploy must never exec migrate inside the web container",
         )
 
-        # T09.4: release wrapper invoked exactly once with the exact argv.
+        # T09.4: nginx config/cert preflight precedes the handoff and the
+        # release wrapper is still invoked exactly once with the exact argv.
         runs = [argv for _cf, argv in calls if argv[:1] == ["run"]]
-        self.assertEqual(len(runs), 2)
-        self.assertIn("create_historical_calendar_release_b_handoff", runs[0])
-        self.assertTrue(is_release_run(("compose", compose_file, runs[1])), runs[1])
+        self.assertEqual(len(runs), 3)
+        self.assertEqual(runs[0], ["run", "--rm", "--no-deps", "nginx", "nginx", "-t"])
+        self.assertIn("create_historical_calendar_release_b_handoff", runs[1])
+        self.assertTrue(is_release_run(("compose", compose_file, runs[2])), runs[2])
 
         def index(predicate, label):
             found = first_index(evts, predicate)
@@ -3213,10 +3395,14 @@ class HistoricalInitialInstallSemanticsTests(SimpleTestCase):
                 )
                 self.assertEqual(result.returncode, 0, result.stderr)
                 runs = [a for _cf, a in compose_calls(harness.events()) if a[:1] == ["run"]]
-                self.assertEqual(len(runs), 2)
-                self.assertTrue(any("--action=initial-install" in arg for arg in runs[0]))
-                self.assertTrue(any("--output-path=" in arg for arg in runs[0]))
-                self.assertIn("RELEASE_HANDOFF_MODE=release-b", runs[1])
+                self.assertEqual(len(runs), 3)
+                self.assertEqual(
+                    runs[0],
+                    ["run", "--rm", "--no-deps", "nginx", "nginx", "-t"],
+                )
+                self.assertTrue(any("--action=initial-install" in arg for arg in runs[1]))
+                self.assertTrue(any("--output-path=" in arg for arg in runs[1]))
+                self.assertIn("RELEASE_HANDOFF_MODE=release-b", runs[2])
                 self.assertEqual(
                     {cf for cf, _a in compose_calls(harness.events()) if cf},
                     {compose_file},

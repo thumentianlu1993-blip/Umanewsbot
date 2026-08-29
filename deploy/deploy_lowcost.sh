@@ -30,6 +30,7 @@ trap 'exit 143' TERM
 
 python3 ./deploy/ensure_migration_history_repair_runtime.py
 ./deploy/check_restricted_recovery_marker.sh
+./deploy/verify_persistent_release_mounts.sh
 
 INITIAL_INSTALL_MODE="${HISTORICAL_RUNNER_INITIAL_INSTALL:-false}"
 case "$INITIAL_INSTALL_MODE" in true|false) ;; *) echo "HISTORICAL_RUNNER_INITIAL_INSTALL must be true or false" >&2; exit 1 ;; esac
@@ -50,6 +51,7 @@ else
 fi
 
 "$COMPOSE" -f "$COMPOSE_FILE" pull nginx
+"$COMPOSE" -f "$COMPOSE_FILE" run --rm --no-deps nginx nginx -t
 UMANEWS_RELEASE_COMMIT="$(git rev-parse HEAD)"
 case "$UMANEWS_RELEASE_COMMIT" in
   [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;

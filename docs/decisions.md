@@ -1,5 +1,16 @@
 # 关键决策
 
+## 2026-08-29 普通发布起点绑定 artifact，隔离 release 同时保留旧 Compose 回滚挂载
+
+- no-intent 的迁移前门禁不再比较候选最终 leaf，而是要求 fresh live leaf 与已验签 handoff artifact
+  内的 `preflight.migration_leaf_set` 精确相等，并且该 leaf 属于代码审查过的普通发布集合；这同时阻断
+  handoff 后 TOCTOU 漂移和未知分支。迁移后 completion 仍精确要求 `0075`。
+- release 外持久目录是运行数据与 TLS 的 canonical host root；新 Compose 只从这两个绝对根挂载。
+  同一 isolated checkout 还必须建立指向它们的 release-local compatibility symlink，使回滚到仍使用
+  `./runtime/*` / `./deploy/certs` 的 PR `#108` Compose 时不会静默挂载空目录。
+- compatibility symlink 不是信任根：发布脚本逐项比较 `realpath`，TLS key/cert 目标必须留在稳定证书根
+  内，候选 Nginx 必须在 build 和服务停止前通过 `nginx -t`。任一不一致均零停服、零 migration。
+
 ## 2026-08-29 普通 migration 的 no-intent 校验必须区分 pre-migrate 与 post-migrate leaf
 
 - `recovery_intent_mode=not-required` 只表示当前 schema 不属于受限 migration-history repair，不表示

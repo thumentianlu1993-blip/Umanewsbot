@@ -1,5 +1,32 @@
 # 部署运行手册
 
+## 2026-08-29 PR #109 修复后的隔离 release 重试门禁
+
+1. 从最终 merge SHA 创建全新 isolated release。先把当前活跃 release 的 runtime 与证书复制到
+   `/opt/umanewsbot-persistent/runtime`、`/opt/umanewsbot-persistent/certs`，逐项核对目录、owner/mode、
+   文件数量/大小和非敏感 digest；不得输出私钥内容。
+2. 新 release 的 `.env` 必须各且仅各有一条绝对路径：
+   `UMANEWS_PERSISTENT_RUNTIME_ROOT=/opt/umanewsbot-persistent/runtime`、
+   `UMANEWS_TLS_CERT_ROOT=/opt/umanewsbot-persistent/certs`。在 `runtime/` 下为
+   `horse_profile_completion`、`upcoming_racecard_urls`、`secrets`、`race_live_racecards`、
+   `race_live_publications`、`race_data_sync` 建立指向稳定根的 compatibility symlink；
+   `deploy/certs/letsencrypt` 同样指向稳定证书根。保留 release-local `migration_history_repair` 和
+   tracked policy 文件。
+3. 执行 `./deploy/verify_persistent_release_mounts.sh`。它必须在 build/停服务前通过稳定根、回滚兼容路径、
+   TLS containment 和 key/cert 可读性；随后
+   `./deploy/docker/compose-wrapper.sh -f docker-compose.prod.lowcost.yml run --rm --no-deps nginx nginx -t`
+   必须成功。任一步失败立即停止，不得 build、停 Beat 或 migration。
+4. 重新实时确认旧服务 revision/image/leaf `0073`、writer=0、新队列=0、旧 `race_live` 只读计数不变，
+   全部 data-sync network/apply/public/correction 开关关闭。再创建一份新的 PostgreSQL custom backup，
+   验证 regular file、0600、非空、SHA-256、`pg_restore --list` 和备份后至少 8 GiB free；上次备份不能代替。
+5. 普通 deploy 的 handoff artifact 必须绑定 fresh live `0073` 和唯一计划 `0074/0075`。intent 阶段接受的
+   只是该 artifact 精确起点；live/artifact leaf 漂移或未知 leaf 立即停止。`migrate` 后 completion 必须
+   精确看到 `stable.0075_race_data_source_priority_and_reported_position`，且 restricted marker 不存在。
+6. 关闭态部署完成前不注入启用开关、不启动 `race_sync_v2_worker`。服务、镜像、leaf、catalog、writer、
+   三队列、容量、配置 audit 和公网 HTTP/HTTPS 全部通过后，才按既定顺序逐级启用：future discovery ->
+   time/racecard -> lifecycle -> result apply/public -> correction。任一门禁失败停止后续并保持新写入关闭；
+   `race_live` 遗留队列始终不得消费、清理或迁移。
+
 ## 2026-08-29 PR #108 merge 后发布失败与安全恢复
 
 本次 PR 已合并为 `e5287acf…af5d`，精确候选 image 为 `7403b21f…afdd1`。写前备份

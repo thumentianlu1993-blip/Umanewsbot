@@ -47,6 +47,7 @@ trap 'exit 143' TERM
 
 python3 ./deploy/ensure_migration_history_repair_runtime.py
 ./deploy/check_restricted_recovery_marker.sh
+./deploy/verify_persistent_release_mounts.sh
 
 # Fail closed if any application service is running, restarting, or its
 # state cannot be read. No Compose `run` may happen before this gate. A
