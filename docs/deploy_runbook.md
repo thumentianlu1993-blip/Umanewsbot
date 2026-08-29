@@ -1,5 +1,21 @@
 # 部署运行手册
 
+## 2026-08-30 dangling 清理完成与 Celery readiness 修正
+
+1. 用户已单独授权并完成精确删除 Created/未运行的旧 `race_live_worker` 容器及其旧 image；删除前后必须
+   证明 Redis `race_live=7543` 相同。后续逐层 dangling 清理每轮都冻结完整 ID、RepoTags 与容器引用，
+   共删除 82 个 image manifest/layer，最终 dangling=0；prod 与即时 rollback image 必须继续可 inspect。
+2. 本次 free disk 从门槛边缘恢复到约 10.07 GB；不得把 Docker `reclaimable` 总数当作单 image 可释放量，
+   以每轮 `df -B1` delta 和最终磁盘为准。备份、release、runtime、volume 均未删除。
+3. Phase 2 在 drain 通过后才设置 `race_time,racecard` 和 network/apply。worker readiness 不再 grep 日志
+   `ready.`：读取普通与专用容器 hostname，使用 `app.control.inspect(timeout=5).ping()`，要求两个目标精确
+   出现在响应集合；随后读取 active/reserved，要求返回 worker 集合完整。容器 running/restart/OOM、Redis
+   ping、队列、资源和公网门禁仍单独检查。
+4. 本次日志门禁 240 秒超时后已 fail-closed；专用 worker absent、10 false、普通 worker/Beat 恢复，普通
+   worker 后续 pong 且队列 5 分钟内归零。该结果只证明关闭态恢复，不允许在同一窗口派发 selector。
+5. 下一次须新持 deployment lock，从停 Beat/drain 重走；Celery ping 门禁通过后再执行 12 个热身样本，
+   最后才单次 selector。event 956 的过期 token 由 selector CAS 换代，不直接 SQL 清除。
+
 ## 2026-08-30 dangling image 精确清理停止点
 
 1. 清理候选不能只用 `docker image ls -f dangling=true`；对每个完整 ID 同时验证 RepoTags/RepoDigests、

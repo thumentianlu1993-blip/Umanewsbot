@@ -1,5 +1,13 @@
 # 项目总览
 
+2026-08-30 经用户单独授权，旧 Created `race_live_worker` 容器及其 image 已精确删除，Redis
+`race_live=7543` 不变；随后逐层清理 82 个零 tag、零容器引用 image manifest/layer，最终 dangling=0，
+磁盘回升到约 10.07 GB，当前与 PR117 即时回滚 image 均保留。新 Phase 2 的普通任务 drain 已通过，但
+普通/专用 worker 在 240 秒内没有输出 wrapper 要求的 `ready.` 日志文本，故在热身与 selector 前
+fail-closed。普通 worker 事后实际 pong、Redis/DNS 正常且队列 5 分钟归零，说明 readiness 入口误判；仍不
+追溯改写失败。当前 10 false、专用 worker absent、`celery=0 / race_sync_v2=0 / race_live=7543`，公网与
+资源正常。下一窗口改用目标 hostname 的 Celery ping/inspect 判定，再从停 Beat/drain 全量重走。
+
 2026-08-30 用户授权的 dangling image 清理在容器引用门禁处收窄：4 个零 tag、零容器引用 image 已精确删除，
 但其层由旧 `race_live_worker` 的 Created 容器所引用 image 共享，仅回收 60 KiB。该 legacy 容器未运行，
 队列仍为 `race_live=7543`；未取得删除容器的单独授权，因此未强删。磁盘当前

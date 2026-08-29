@@ -1,5 +1,16 @@
 # 项目状态文档
 
+## 2026-08-30 磁盘清理完成，Phase 2 readiness wrapper 误判后全关
+
+- 已按授权删除旧 Created `race_live_worker` 容器及其 image，并逐层清理共 82 个零引用 image
+  manifest/layer；dangling=0，磁盘约 10.07 GB，当前/即时回滚 image 和 `race_live=7543` 保持。
+- Phase 2 的普通 worker drain 已为 0/0/0；随后才启用 `race_time,racecard` 范围。两个 worker 容器正常，
+  但 240 秒未出现 wrapper 要求的日志 `ready.`，故在 12 样本和 selector 前停止，没有 data-sync task。
+- fail-closed 后 10 false、专用 worker absent。普通 worker 后续 pong、DNS/Redis 正常，普通队列 5 分钟
+  归零；该事后成功不改变门禁失败。最终 `celery=0 / race_sync_v2=0 / race_live=7543`，公网正常。
+- 下一窗口须用目标 worker hostname 的 Celery ping/inspect 完整响应作为 readiness 协议，不能 grep 固定
+  日志文案；仍从停 Beat/drain 重新开始，不能直接派发 selector。
+
 ## 2026-08-30 dangling image 仅清理零引用子集，Phase 2 继续关闭
 
 - 4 个零 tag、零容器引用 image 已按完整 ID 删除；因为层仍被第五个 image 共享，只回收 `61440` bytes。
