@@ -1,5 +1,19 @@
 # 当前状态
 
+## 2026-08-30 悬空镜像清理只完成零引用子集，磁盘仍低于 Phase 2 门槛
+
+- 用户授权清理只读盘点得到的 5 个 dangling image。删除前重新逐一核对完整 image ID、tag、当前/回滚
+  image 排除关系和全部运行/停止容器引用；其中 4 个仍为零 tag、零容器引用，已精确删除，未使用宽泛
+  `prune` 或 `--force`。
+- 第 5 个 image `sha256:e0a2d3d6…e61a3` 虽无 tag，但被
+  `umanewsbot-race_live_worker-1` 引用；该容器状态为 Created/running=false、restart=0、OOM=false，属于
+  明确保留未消费的旧 `race_live` 边界。因此清理在删除该容器前停止，不把“dangling”误当作“零引用”。
+- 前 4 个 image 的层均被第 5 个共享，实际只回收 `61440` bytes；Docker 当前仍报告约 `720.6 MB`
+  reclaimable，但需要先删除上述未运行容器才能释放。最新 free disk 为 `8572174336` bytes，已低于冻结的
+  `8589934592` bytes；Phase 2 未重启，`race_sync_v2=0 / race_live=7543`，新写入继续全关。
+- 下一步只能在用户单独确认后精确删除该 Created 容器及其旧 image，或改走磁盘扩容。不得 `docker image
+  prune -a`、不得强删容器、不得触碰备份/release/runtime/volume，也不得降低 8 GiB 门槛。
+
 ## 2026-08-30 PR #120 已上线，Phase 1 建立单场纳管，Phase 2 因普通队列排空超时停止
 
 - manifest 顺序 hotfix 已通过 PR `#120` 合并为

@@ -1,5 +1,18 @@
 # 部署运行手册
 
+## 2026-08-30 dangling image 精确清理停止点
+
+1. 清理候选不能只用 `docker image ls -f dangling=true`；对每个完整 ID 同时验证 RepoTags/RepoDigests、
+   `docker ps -aq --filter ancestor=<id>`、当前 prod image、即时 rollback image。任一容器引用存在就停止，
+   不加 `--force`。
+2. 本次 4 个零引用 image 已精确删除，但共享层只回收 `61440` bytes。剩余
+   `sha256:e0a2d3d6…e61a3` 被 Created 的 `umanewsbot-race_live_worker-1` 引用；Docker 估算的约
+   `720.6 MB` reclaimable 不能在保留该容器时兑现。
+3. 当前 `race_sync_v2=0 / race_live=7543`，free disk `8572174336 < 8589934592`。保持全部 data-sync
+   开关 false，不启动专用 worker、不运行 warm gate；磁盘恢复后仍需从停 Beat/drain 重新开始 Phase 2。
+4. 若用户批准删除 legacy Created 容器，只允许精确 `docker rm` 该未运行容器，再按完整 ID 删除上述 image；
+   前后核对 `race_live=7543`、当前/回滚 image、容器集合、磁盘和公网。若不批准，则改为云盘扩容或保持关闭。
+
 ## 2026-08-30 PR #120 生产基线与 Phase 2 drain 止损
 
 1. 当前精确生产基线是 revision `409f2ac6cd15b7e8781dd9ada2903c91a9fc2121`、image

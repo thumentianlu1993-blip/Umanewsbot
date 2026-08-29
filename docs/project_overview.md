@@ -1,5 +1,11 @@
 # 项目总览
 
+2026-08-30 用户授权的 dangling image 清理在容器引用门禁处收窄：4 个零 tag、零容器引用 image 已精确删除，
+但其层由旧 `race_live_worker` 的 Created 容器所引用 image 共享，仅回收 60 KiB。该 legacy 容器未运行，
+队列仍为 `race_live=7543`；未取得删除容器的单独授权，因此未强删。磁盘当前
+`8572174336 < 8589934592` bytes，Phase 2 没有重启，10 个新开关继续全 false。下一步需明确选择删除该
+Created 容器及旧 image，或扩磁盘；不能降低门槛或动备份。
+
 2026-08-30 PR `#120` 已以 revision `409f2ac6…2121`、image `74465006…d8df` 关闭态上线，leaf 保持
 `0075`，既有 468 MiB 恢复点与 PR #120 zero-write audit 已重新验证。Phase 1 已真实纳管 event 956；旧
 wrapper 把预期 enrollment delta 错判为失败后，用户确认保留，后续只读重放证明 114 blocked、1 enrolled、
