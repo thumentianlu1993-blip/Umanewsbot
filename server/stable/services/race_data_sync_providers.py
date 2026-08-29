@@ -37,6 +37,7 @@ from stable.services.race_data_sync_results import (
     apply_data_sync_result_observation,
 )
 from stable.services.race_events import (
+    ensure_race_live_host_budget_floor,
     record_race_live_host_outcome,
     record_race_result_observation,
     reserve_race_live_host_request,
@@ -721,22 +722,10 @@ def discover_the_racing_api_source_identities(
         valid_until = datetime.fromisoformat(
             str(registry["valid_until"]).replace("Z", "+00:00")
         )
-        with transaction.atomic():
-            budget, created_budget = (
-                models.RaceLiveHostBudget.objects.select_for_update().get_or_create(
-                    host=_HOST,
-                    defaults={
-                        "min_interval_ms": first_route.minimum_interval_seconds
-                        * 1000
-                    },
-                )
-            )
-            if (
-                not created_budget
-                and budget.min_interval_ms
-                != first_route.minimum_interval_seconds * 1000
-            ):
-                raise PermissionError("host budget mismatch")
+        ensure_race_live_host_budget_floor(
+            host=_HOST,
+            minimum_interval_ms=first_route.minimum_interval_seconds * 1000,
+        )
     except Exception:
         logger.exception("TRA identity discovery runtime contract failed")
         return ProviderIdentityDiscoveryOutcome(
@@ -1799,19 +1788,13 @@ def run_the_racing_api_data_sync(
         return ProviderSyncOutcome(False, "source_runtime_contract_rejected", {}, {})
 
     flags = RaceDataSyncFlags.from_settings()
-    with transaction.atomic():
-        budget, created = models.RaceLiveHostBudget.objects.select_for_update().get_or_create(
+    try:
+        ensure_race_live_host_budget_floor(
             host=_HOST,
-            defaults={
-                "min_interval_ms": route.minimum_interval_seconds * 1000
-            },
+            minimum_interval_ms=route.minimum_interval_seconds * 1000,
         )
-        if (
-            not created
-            and budget.min_interval_ms
-            != route.minimum_interval_seconds * 1000
-        ):
-            return ProviderSyncOutcome(False, "host_budget_mismatch", {}, {})
+    except (TypeError, ValueError):
+        return ProviderSyncOutcome(False, "host_budget_mismatch", {}, {})
     observation_hashes: dict[str, str] = {}
     updated_by_kind: dict[str, datetime | None] = {}
     applied: list[str] = []

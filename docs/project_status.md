@@ -1,5 +1,16 @@
 # 项目状态文档
 
+## 2026-08-29 激活在 Phase 2 host budget 门禁止损，hotfix 待关闭态发布
+
+- frozen capacity/allowlist/digest 已注入并通过 zero-write audit。Phase 1 的 0-network census 完成，
+  115 场全 blocked、0 请求、0 业务变更。
+- 专用 worker 约 123 MiB，最低 `MemAvailable=1823504 kB`，资源门禁通过，不扩容。
+  真实 discovery 因生产共享 budget=1050ms 而新路径错误要求 exact 2000ms，在网络请求 0 时阻断。
+- 自动止损后 10 开关全 false、专用 worker 停止，`celery=0 / race_sync_v2=0 /
+  race_live=7543`，无 enrollment/owner/claim/ledger/observation/revision 新增。
+- hotfix 已实现共享下限单调收紧和 legacy 兼容，直接回归 `5/5`、data-sync SQLite
+  `247/247`、PostgreSQL 16 `25/25` 通过。下一步先关闭态发布 hotfix，再从 Phase 1 重放。
+
 ## 2026-08-29 生产内存已收敛为 2+1，现有站点暂不扩容
 
 - 根因不是 PostgreSQL/Redis，而是 Web 3 个约 190 MiB PSS worker 与普通 Celery 2 个约 210 MiB PSS

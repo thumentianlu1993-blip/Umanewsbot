@@ -388,6 +388,54 @@ def disable_race_event_live_tracking(
         return RaceEventLiveDisableDecision(True, "tracking_disabled")
 
 
+def ensure_race_live_host_budget_floor(
+    *,
+    host: str,
+    minimum_interval_ms: int,
+) -> RaceLiveHostBudget:
+    """Create or monotonically tighten one shared provider host budget.
+
+    Multiple consumers may share the same host while requiring different
+    minimum intervals.  The persisted budget therefore represents the
+    strictest admitted floor and must never be reduced by a later consumer.
+    When a live reservation exists, extend it by the same delta so raising the
+    floor cannot allow the next request under the previous, shorter interval.
+    """
+
+    if (
+        not isinstance(host, str)
+        or not host
+        or len(host) > 255
+        or host.strip() != host
+    ):
+        raise ValueError("invalid host")
+    if (
+        isinstance(minimum_interval_ms, bool)
+        or not isinstance(minimum_interval_ms, int)
+        or not 1 <= minimum_interval_ms <= 3_600_000
+    ):
+        raise ValueError("invalid minimum interval")
+
+    with transaction.atomic():
+        budget, _ = RaceLiveHostBudget.objects.select_for_update().get_or_create(
+            host=host,
+            defaults={"min_interval_ms": minimum_interval_ms},
+        )
+        if budget.min_interval_ms < minimum_interval_ms:
+            interval_delta = minimum_interval_ms - budget.min_interval_ms
+            budget.min_interval_ms = minimum_interval_ms
+            if budget.next_allowed_at is not None:
+                budget.next_allowed_at += timedelta(milliseconds=interval_delta)
+            budget.save(
+                update_fields=(
+                    "min_interval_ms",
+                    "next_allowed_at",
+                    "updated_at",
+                )
+            )
+        return budget
+
+
 def reserve_race_live_host_request(
     *,
     host: str,

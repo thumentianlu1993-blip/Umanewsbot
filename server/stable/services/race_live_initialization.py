@@ -937,7 +937,7 @@ def _validate_shared_rows(
             _fail(f"publication policy 冲突：{scope_type}:{scope_key}")
     budget = models.RaceLiveHostBudget.objects.filter(host=_HOST).first()
     budget_matches = budget is None or (
-        budget.min_interval_ms == 1050
+        budget.min_interval_ms >= 1050
         and (
             manifest.payload["schema_version"] == 2
             or (
@@ -950,7 +950,7 @@ def _validate_shared_rows(
         )
     )
     if not budget_matches:
-        _fail("The Racing API host budget 已存在且不精确匹配")
+        _fail("The Racing API host budget 已存在且低于安全下限")
 
 
 def _event_has_any_initialization_rows(event_id: int) -> bool:
@@ -1427,7 +1427,7 @@ def _create_missing_shared_rows(
             min_interval_ms=1050,
         )
     elif not (
-        budget.min_interval_ms == 1050
+        budget.min_interval_ms >= 1050
         and (
             manifest.payload["schema_version"] == 2
             or (
@@ -1439,7 +1439,7 @@ def _create_missing_shared_rows(
             )
         )
     ):
-        _fail("The Racing API host budget 已存在且不精确匹配")
+        _fail("The Racing API host budget 已存在且低于安全下限")
 
 
 def _create_event_rows(
@@ -1696,7 +1696,7 @@ def verify_race_live_initialization(
             errors.append(f"policy_mismatch:{scope_type}:{scope_key}")
     budgets = list(models.RaceLiveHostBudget.objects.filter(host=_HOST))
     if len(budgets) != 1 or not (
-        budgets[0].min_interval_ms == 1050
+        budgets[0].min_interval_ms >= 1050
         and (
             manifest.payload["schema_version"] == 2
             or (

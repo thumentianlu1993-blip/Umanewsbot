@@ -1,5 +1,16 @@
 # 关键决策
 
+## 2026-08-29 同一 provider host 的共享预算只可单调收紧
+
+- `RaceLiveHostBudget.host` 是跨 legacy race-live 与 data-sync 的共享唯一行，不能同时满足
+  “精确 1050ms”与“精确 2000ms”两个互斥条件。持久值改为该 host 已纳管消费者中的
+  最严格下限，各消费者只要它不低于自身安全下限即可使用。
+- 新消费者要求更严时，必须在 `select_for_update` 事务内单调提高 `min_interval_ms`；
+  若 `next_allowed_at` 已存在，还要增加新旧下限差值，不得让已预留的下一次请求沿用旧短间隔。
+  任何路径不得自动降低共享下限。
+- 该修复不变更 migration，不通过生产 SQL 热改绕过代码门禁。修复发布必须先保持所有
+  data-sync 开关 false，验证 legacy 初始化/racecard 对 2000ms 兼容后，再从 Phase 1 重放。
+
 ## 2026-08-29 低成本生产 sizing 使用显式 2+1，扩容只作为专用 worker 复验后的后备
 
 - 当前 2 vCPU / 3.4 GiB 生产实例的 resident profile 显式设置 `GUNICORN_WORKERS=2`、

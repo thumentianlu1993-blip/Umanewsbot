@@ -359,7 +359,7 @@ def _bootstrap_host_budget() -> None:
             host=_HOST,
             defaults={"min_interval_ms": _MIN_INTERVAL_MS},
         )
-        if budget.min_interval_ms != _MIN_INTERVAL_MS:
+        if budget.min_interval_ms < _MIN_INTERVAL_MS:
             raise PermissionError("host budget configuration mismatch")
 
 

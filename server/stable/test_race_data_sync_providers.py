@@ -343,6 +343,13 @@ class TheRacingApiDataSyncAdapterTests(TestCase):
             tick["value"] += timedelta(seconds=2)
             return tick["value"]
 
+        shared_budget = models.RaceLiveHostBudget.objects.create(
+            host="api.theracingapi.com",
+            min_interval_ms=1050,
+            next_allowed_at=NOW + timedelta(milliseconds=1050),
+            lock_version=36,
+        )
+
         with (
             patch(
                 "stable.services.race_data_sync_providers.read_the_racing_api_automation_registry",
@@ -398,6 +405,8 @@ class TheRacingApiDataSyncAdapterTests(TestCase):
             set(outcome.observation_hashes),
             {"race_time", "racecard", "result"},
         )
+        shared_budget.refresh_from_db()
+        self.assertEqual(shared_budget.min_interval_ms, 2000)
 
     def test_today_result_without_terminal_marker_stays_provisional(self):
         tick = {"value": NOW}
@@ -975,6 +984,13 @@ class TheRacingApiDataSyncAdapterTests(TestCase):
             tick["value"] += timedelta(seconds=2)
             return tick["value"]
 
+        shared_budget = models.RaceLiveHostBudget.objects.create(
+            host="api.theracingapi.com",
+            min_interval_ms=1050,
+            next_allowed_at=NOW + timedelta(milliseconds=1050),
+            lock_version=36,
+        )
+
         with (
             patch(
                 "stable.services.race_data_sync_providers.read_the_racing_api_automation_registry",
@@ -1004,6 +1020,13 @@ class TheRacingApiDataSyncAdapterTests(TestCase):
         )
         self.assertTrue(source.automation_allowed)
         self.assertTrue(source.proof_network_allowed)
+        shared_budget.refresh_from_db()
+        self.assertEqual(shared_budget.min_interval_ms, 2000)
+        self.assertEqual(
+            shared_budget.next_allowed_at,
+            NOW + timedelta(seconds=4),
+        )
+        self.assertEqual(shared_budget.lock_version, 38)
 
 
 @override_settings(

@@ -305,7 +305,7 @@ class RaceLiveInitializationV2Tests(TestCase):
     def test_v2_dry_run_is_read_only_and_apply_atomically_sets_time_and_fields(self):
         models.RaceLiveHostBudget.objects.create(
             host="api.theracingapi.com",
-            min_interval_ms=1050,
+            min_interval_ms=2000,
             next_allowed_at=self.NOW + timedelta(seconds=1),
             consecutive_failures=2,
             last_error_code="timeout",
@@ -357,6 +357,7 @@ class RaceLiveInitializationV2Tests(TestCase):
         budget = models.RaceLiveHostBudget.objects.get(
             host="api.theracingapi.com"
         )
+        self.assertEqual(budget.min_interval_ms, 2000)
         self.assertEqual(budget.lock_version, 7)
         self.assertEqual(budget.consecutive_failures, 2)
 

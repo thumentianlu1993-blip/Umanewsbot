@@ -1,5 +1,22 @@
 # 部署运行手册
 
+## 2026-08-29 host budget hotfix 关闭态发布与重放
+
+1. 当前止损终态必须是 10 个 data-sync 开关全 false、`race_sync_v2_worker` 不运行、
+   `celery=0 / race_sync_v2=0 / race_live=7543`，且 enrollment/data-sync owner/active claim/ledger 全为 0。
+   真实失败任务是 `SUCCESS/no_candidates`，但其 `identity_discovery` 必须单独读为
+   `source_runtime_contract_rejected / request_count=0`，不得把 Celery SUCCESS 当成业务成功。
+2. hotfix 无 migration。从 merge SHA 建新隔离 release/image，先保留当前精确 image 作 rollback；
+   发布时 `.env` 继续保留冻结 capacity/allowlist/digest，但所有运行开关仍为 false。
+   不修改生产 `RaceLiveHostBudget` 来制造通过。
+3. 关闭态切换后验证 web/worker/Beat 同 image/revision、leaf 仍为 `0075`、四入口 200、
+   队列与旧 `race_live` 计数不变，并重跑 zero-write audit。
+4. 重放时先开 master/scheduler/future discovery 做 0-network census；再停 Beat/drain，开专用 worker 与
+   network/schedule/racecard apply。真实 discovery 必须把共享 budget 从 1050ms 原子收紧到
+   2000ms，至少完成 1 个唯一 identity 与 enrollment，才可继续 selector/apply。
+5. 任何一步失败先停 Beat，把 10 个开关全部收窄到 false，停专用 worker，重建关闭态
+   普通 worker/Beat；不清理 Redis、不删 observation/revision/ledger，不触碰旧 `race_live` 队列。
+
 ## 2026-08-29 生产内存 2+1 灰度与回退口径
 
 1. 当前生产 `.env` 的 sizing 为 `GUNICORN_WORKERS=2`、`GUNICORN_THREADS=2`、
