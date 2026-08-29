@@ -684,7 +684,11 @@ def race_data_route_digest(
             "provider": entry.provider,
             "regions": list(entry.regions),
             "identity_namespaces": list(entry.identity_namespaces),
-            "enabled_data_kinds": list(entry.enabled_data_kinds),
+            # Route identity describes the provider contract, not the current
+            # rollout stage.  Keep the existing canonical key so enrollments
+            # created while every supported kind was enabled retain their
+            # digest, but bind its value to the stable supported-kind set.
+            "enabled_data_kinds": list(entry.data_kinds),
             "contract_version": entry.contract_version,
             "contract_digest": entry.contract_digest,
             "proof_digest": entry.proof_digest,
