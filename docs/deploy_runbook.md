@@ -8,8 +8,10 @@
 2. 新 release 的 `.env` 必须各且仅各有一条绝对路径：
    `UMANEWS_PERSISTENT_RUNTIME_ROOT=/opt/umanewsbot-persistent/runtime`、
    `UMANEWS_TLS_CERT_ROOT=/opt/umanewsbot-persistent/certs`。在 `runtime/` 下为
-   `horse_profile_completion`、`upcoming_racecard_urls`、`secrets`、`race_live_racecards`、
-   `race_live_publications`、`race_data_sync` 建立指向稳定根的 compatibility symlink；
+   `upcoming_racecard_urls`、`secrets`、`race_live_racecards`、`race_live_publications`、
+   `race_data_sync` 建立指向稳定根的 compatibility symlink。`horse_profile_completion` 是 Git tracked
+   审核证据 parent，禁止整目录替换；只为其 `cache/batches/review/budget` 四个 ignored 运行态子目录
+   建立稳定链接。
    `deploy/certs/letsencrypt` 同样指向稳定证书根。保留 release-local `migration_history_repair` 和
    tracked policy 文件。
 3. 执行 `./deploy/verify_persistent_release_mounts.sh`。它必须在 build/停服务前通过稳定根、回滚兼容路径、

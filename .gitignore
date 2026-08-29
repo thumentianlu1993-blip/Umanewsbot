@@ -31,6 +31,10 @@ runtime/term_review/
 runtime/historical_race_inventory/
 runtime/race_live_source_proof/
 runtime/upcoming_racecard_urls/
+runtime/horse_profile_completion/cache/
+runtime/horse_profile_completion/batches/
+runtime/horse_profile_completion/review/
+runtime/horse_profile_completion/budget/
 outputs/
 
 sample_news.json

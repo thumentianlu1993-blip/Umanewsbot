@@ -6,8 +6,10 @@
   内的 `preflight.migration_leaf_set` 精确相等，并且该 leaf 属于代码审查过的普通发布集合；这同时阻断
   handoff 后 TOCTOU 漂移和未知分支。迁移后 completion 仍精确要求 `0075`。
 - release 外持久目录是运行数据与 TLS 的 canonical host root；新 Compose 只从这两个绝对根挂载。
-  同一 isolated checkout 还必须建立指向它们的 release-local compatibility symlink，使回滚到仍使用
-  `./runtime/*` / `./deploy/certs` 的 PR `#108` Compose 时不会静默挂载空目录。
+  同一 isolated checkout 还必须建立 release-local rollback compatibility path，使回滚到仍使用
+  `./runtime/*` / `./deploy/certs` 的 PR `#108` Compose 时不会静默挂载空目录。未跟踪 runtime 和 TLS
+  使用整目录 symlink；Git tracked 的 `horse_profile_completion` parent 保持普通目录，只把
+  `cache/batches/review/budget` 四个运行态子目录链接到稳定根，避免污染 worktree 或阻断 checkout。
 - compatibility symlink 不是信任根：发布脚本逐项比较 `realpath`，TLS key/cert 目标必须留在稳定证书根
   内，候选 Nginx 必须在 build 和服务停止前通过 `nginx -t`。任一不一致均零停服、零 migration。
 

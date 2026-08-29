@@ -563,6 +563,8 @@ class Harness:
             "race_data_sync",
         ):
             (persistent_runtime / relative).mkdir(parents=True, exist_ok=True)
+        for state_dir in ("cache", "batches", "review", "budget"):
+            (persistent_runtime / "horse_profile_completion" / state_dir).mkdir()
         persistent_certs = base / "persistent-certs"
         live_certs = persistent_certs / "letsencrypt/live/umafans.run"
         live_certs.mkdir(parents=True)
@@ -570,8 +572,13 @@ class Harness:
         (live_certs / "privkey.pem").write_text("test private key\n", encoding="utf-8")
         release_runtime = self.work / "runtime"
         release_runtime.mkdir()
+        tracked_horse_runtime = release_runtime / "horse_profile_completion"
+        tracked_horse_runtime.mkdir()
+        for state_dir in ("cache", "batches", "review", "budget"):
+            (tracked_horse_runtime / state_dir).symlink_to(
+                persistent_runtime / "horse_profile_completion" / state_dir
+            )
         for relative in (
-            "horse_profile_completion",
             "upcoming_racecard_urls",
             "secrets",
             "race_live_racecards",
@@ -1521,6 +1528,8 @@ class PersistentReleaseMountTests(SimpleTestCase):
             "race_data_sync",
         ):
             (runtime / relative).mkdir(parents=True, exist_ok=True)
+        for state_dir in ("cache", "batches", "review", "budget"):
+            (runtime / "horse_profile_completion" / state_dir).mkdir()
         certs = root / "persistent-certs"
         live = certs / "letsencrypt/live/umafans.run"
         live.mkdir(parents=True)
@@ -1528,8 +1537,13 @@ class PersistentReleaseMountTests(SimpleTestCase):
         (live / "privkey.pem").write_text("private key\n", encoding="utf-8")
         release_runtime = root / "runtime"
         release_runtime.mkdir()
+        tracked_horse_runtime = release_runtime / "horse_profile_completion"
+        tracked_horse_runtime.mkdir()
+        for state_dir in ("cache", "batches", "review", "budget"):
+            (tracked_horse_runtime / state_dir).symlink_to(
+                runtime / "horse_profile_completion" / state_dir
+            )
         for relative in (
-            "horse_profile_completion",
             "upcoming_racecard_urls",
             "secrets",
             "race_live_racecards",
@@ -1611,6 +1625,24 @@ class PersistentReleaseMountTests(SimpleTestCase):
             result = self._run(root)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("rollback compatibility", result.stderr)
+
+    def test_tracked_horse_profile_parent_cannot_be_replaced_by_symlink(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            runtime, certs = self._seed_roots(root)
+            tracked_parent = root / "runtime/horse_profile_completion"
+            for child in tracked_parent.iterdir():
+                child.unlink()
+            tracked_parent.rmdir()
+            tracked_parent.symlink_to(runtime / "horse_profile_completion")
+            (root / ".env").write_text(
+                f"UMANEWS_PERSISTENT_RUNTIME_ROOT={runtime}\n"
+                f"UMANEWS_TLS_CERT_ROOT={certs}\n",
+                encoding="utf-8",
+            )
+            result = self._run(root)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("tracked horse-profile", result.stderr)
 
     def test_prod_compose_files_bind_stable_roots(self):
         for relative in ALLOWED_COMPOSE_FILES:
