@@ -1,5 +1,19 @@
 # 部署运行手册
 
+## 2026-08-29 Meta/Facebook 赛事入口 429 发布与激活前验收
+
+1. 入口修复必须在 10 个 data-sync 开关全 false、专用 worker absent、leaf `0075`、旧
+   `race_live=7543` 的关闭态发布；先用 `docker inspect` 确认 Nginx 实际 bind source，保留精确旧配置/
+   image 回滚点，候选必须通过 `nginx -t` 才可平滑 reload/recreate。
+2. HTTP/HTTPS 都要验证：Meta/Facebook UA 请求 `/races/` 和字体返回 `429`；普通 UA 对 root、www、
+   `/races/`、筛选赛事页、`/healthz/`、`/admin/login/` 返回预期 200；Meta 对非赛事普通路由不被规则误伤。
+3. 从 Nginx 与 Web 两侧核对新窗口：命中 429 的请求不得进入 Django，近期 5xx/OOM/restart 为 0，
+   `MemAvailable>=1536 MiB`、SwapFree 不下降，普通 Celery 能归零，四个公网 root/www 样本均在总
+   `--max-time 20` 内完成。任一失败保持全关，不启 Phase 1。
+4. 入口门禁通过后从 Phase 1 重新做 zero-network census；不得复用 PR #116/#117 的 Phase 1/2 结果。
+   后续严格按 future discovery -> time/racecard -> lifecycle -> result apply/public -> correction 推进，
+   每阶段重新核对任务业务终态、请求/写入 delta、资源、公网页面和旧队列。
+
 ## 2026-08-29 PR #117 关闭态发布与公网二次止损
 
 1. 生产当前 revision/image/release 为 `6e6d7977…e04` / `cb3852e4…663c` /
