@@ -21,6 +21,11 @@
   image 一致且 restart=0、OOM=false。最近热身窗口 `MemAvailable` 约 1.94–1.99 GB、Swap 完整、磁盘约
   16.86 GB，均高于冻结门槛，无需扩容。已建立当前任务内的定时续跑，在真实赛时检查 lifecycle、result
   apply/public 与公网，再仅在全部通过后开启 correction；任一门禁失败立即 10 false 并移除专用 worker。
+- `a040af3c` clean-worktree 完成性审计再次运行当前代码：赛事同步/lifecycle/result SQLite 核心组合
+  249/249；Django check、`makemigrations --check --dry-run`、重定向 bytecode 的 compileall、三份 Compose
+  config 和 `git diff --check` 全部通过。测试容器显式 `RACE_DATA_SYNC_ALLOW_NETWORK=false`，没有真实
+  provider 请求或生产写入；首次只读源码 compile/缺 `.env` 的环境错误已用临时 pycache 与临时示例 env
+  修正后重跑，不计作代码失败。
 
 ## 2026-08-30 Racing API proof 发布前关闭 legacy queue 合同冲突
 

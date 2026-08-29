@@ -11,6 +11,9 @@
   restart=0、OOM=false；内存、Swap 与约 16.86 GB 磁盘均通过冻结容量，无需扩容。
 - 当前任务已安排真实赛时自动续验：先核对 lifecycle、provider、数据库 publication 和公网结果，再在独立
   发布锁内开启 correction 并观察一周期。任一门禁失败立即 10 false、移除专用 worker并保持新写入关闭。
+- 上线后完成性回归为 SQLite 核心组合 249/249；Django check、migration drift、compileall、三份 Compose
+  config 与 diff check 均通过，且整个验证容器禁用真实 provider 网络。最终仍只差 event 956 的自然 T+3
+  result/public 与随后 correction 生产实证，不能以测试代替。
 
 ## 2026-08-30 proof-only 部署因 legacy queue 合同冲突先修正
 
