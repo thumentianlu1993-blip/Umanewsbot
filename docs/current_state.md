@@ -1,5 +1,33 @@
 # 当前状态
 
+## 2026-08-29 PR #117 已关闭态上线，激活因 20 秒公网门禁再次停止
+
+- PR `#117` 已合并为 `6e6d79778d206817058585b8c25287c005378e04`，生产隔离 release 为
+  `/opt/umanews-release-6e6d7977-PR117-20260829T130421Z/umanewsbot`，image 为
+  `sha256:cb3852e4180c8d0902333171541d33910eab0ac10b1533dc37d06afdef7e663c`，PR #116 image 已固定为
+  `umanewsbot:rollback-pre-pr117-20260829T1307Z`。handoff SHA 为
+  `a6893930f729ee31e8d1e4f59e1847128aeb083697e367673d970f4751f9d33d`；release task 明确为
+  migration plan 空、`No migrations to apply`、最终 leaf `0075`。
+- 复用并重新验证激活备份 `pre-pr115-activation-20260829T104229Z.dump`：`468585439` bytes、0600、
+  SHA-256 `0bbec2c4…7746`、PostgreSQL 16 `pg_restore --list` 1366 行。为保持 8 GiB 门槛，只删除了
+  2026-07-15 的单一旧传输暂存 tar `umanewsbot-main-ccfee75f-amd64-20260715-1210.tar.gz`
+  （`123394611` bytes、无运行引用、可由 Git 恢复），未删除备份、release 或 rollback image。
+- 关闭态正确 audit 必须用带 `/run/race-data-sync` mount 的短命 `race_sync_v2_worker` one-off；artifact
+  `/opt/umanewsbot-builds/pr117-6e6d7977/race-calendar-hotfix/audit-closed-sync-mount-20260829T1314Z.json`
+  SHA-256 为 `a013c0e8…979`，结果 `ready/valid/artifact_root_bytes=0/route_drift=[]/would_write=false`，
+  free disk `8747511808` bytes，115 场仍全 blocked，既有 ledger 仍为 1 request/2 MiB。此前误在 Web
+  容器运行的 audit 因设计上无 artifact mount 返回 invalid，不是配置漂移，不作为门禁证据。
+- 部署后 web/worker/Beat 同 image/revision、restart count=0，10 个 data-sync 开关全 false，
+  `celery=0 / race_sync_v2=0 / race_live=7543`。畸形 URL 已快速 301 到 `/races/?tab=all`，正常赛事筛选页
+  约 `0.036s`，HTML 不再带污染片段；源码与 image 内 SHA 一致。
+- 入口压力仍未消失：5 分钟 Web/Nginx 日志有 `464` 个 Meta/Facebook crawler 请求、`468` 个
+  `/races/`、`321` 个快速 301、0 个 5xx。crawler 继续跟随 canonical URL，并并发抓取大字体静态资源。
+  本地回环 root 约 `0.96s`，但公网样本曾到 `16.28s`；按冻结的纯 `--max-time 20` 完整重验，第 1 个
+  `umafans.run` 请求即在 `20.001s` 以 HTTP 000、0 bytes 超时，激活正式停止。
+- 最终主机 load `0.39/0.57/0.61`、`MemAvailable≈1.76 GiB`、swap 未用，说明当前阻塞是公网入口/带宽与
+  分布式 crawler 压力，不是内存不足。未开启 Phase 1、未启动专用 worker、未发出本轮 provider 请求。
+  下一步需独立确认 Nginx UA block/429、CDN/WAF 或其他入口防护；在此之前新写入继续全关，不扩容制造通过。
+
 ## 2026-08-29 PR #116 已关闭态上线，Phase 2 因公网 crawler 饱和门禁停止
 
 - PR `#116` merge revision `5863afaea0d28b520ce9e2448451c707e9ed3870` 已以隔离 release

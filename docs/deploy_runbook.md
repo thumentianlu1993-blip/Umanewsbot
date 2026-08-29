@@ -1,5 +1,25 @@
 # 部署运行手册
 
+## 2026-08-29 PR #117 关闭态发布与公网二次止损
+
+1. 生产当前 revision/image/release 为 `6e6d7977…e04` / `cb3852e4…663c` /
+   `/opt/umanews-release-6e6d7977-PR117-20260829T130421Z/umanewsbot`；rollback tag 是
+   `umanewsbot:rollback-pre-pr117-20260829T1307Z`。bounded release 为 no-op migration，leaf `0075`。
+2. 激活备份继续使用 `pre-pr115-activation-20260829T104229Z.dump`，必须同时核对 size `468585439`、0600、
+   SHA `0bbec2c4…7746` 和 PostgreSQL 16 TOC 1366 行。宿主没有 `pg_restore`，不得把失败管道后的
+   `wc -l=0` 当作复验；使用只读挂载的 `postgres:16-alpine`。
+3. `audit_race_data_sync` 必须从短命 `race_sync_v2_worker` one-off 运行，Web 容器没有
+   `/run/race-data-sync` mount；在 Web 上得到 `artifact root unavailable` 是错误验收入口。正确 artifact
+   SHA 为 `a013c0e8…979`，结果 ready/valid、root bytes 0、route drift 0、free disk `8747511808`。
+4. post-deploy 关闭态为三服务同 image/revision、10 false、专用 worker absent、
+   `celery=0 / race_sync_v2=0 / race_live=7543`。畸形 query 应 301 到清洁 URL，正常赛事页 200 且 HTML
+   无 `®ion=`/`Â®ion=`；这些通过仍不足以开启自动化。
+5. 公网窗口只用总 `--max-time 20` 判定；额外 connect timeout 只能单列诊断。当前最终复测首请求
+   `20.001s / HTTP 000 / 0 bytes`，因此停止在 Phase 0。不要再次运行 Phase 1、专用 worker热身或 discovery。
+6. 5 分钟基线为 crawler 464、`/races/` 468、301 321、5xx 0。下一次重试前必须先批准并发布独立入口
+   防护，再在 10 false 下重验 crawler/公网窗口；不得增加 Gunicorn 进程、降低内存门槛或扩内存来掩盖
+   分布式入口压力。
+
 ## 2026-08-29 PR #116 crawler 饱和止损与规范化 hotfix
 
 1. 当前生产是 revision `5863afae…3870` / image `4096114b…6ee1` / leaf `0075`。Phase 2 资源样本通过，

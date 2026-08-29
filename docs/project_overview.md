@@ -1,5 +1,14 @@
 # 项目总览
 
+2026-08-29 PR `#117` 已以 revision `6e6d7977…e04`、image `cb3852e4…663c` 关闭态上线，migration no-op、
+leaf `0075`，PR #116 rollback tag 已固定。正确的 sync-mount zero-write audit 为 ready/valid，畸形赛事
+query 已在数据库前 301，正常赛事页约 0.036 秒；三服务一致、10 个新开关全 false，旧
+`race_live=7543`。但 Meta/Facebook crawler 5 分钟仍产生 464 个请求、468 个 `/races/`，其中 321 个
+虽已快速 301，crawler 仍跟随 canonical 页面并抓取大字体。冻结的 20 秒公网复测首请求即以 HTTP 000、
+0 bytes 超时，故未开启 Phase 1、专用 worker或 provider 网络。主机负载、约 1.76 GiB 可用内存和完整
+swap 余量正常，当前无需扩内存；后续需先单独决定 Nginx UA block/429 或 CDN/WAF 入口策略，再从全关
+状态重验，不从本次失败中间续跑。
+
 2026-08-29 PR `#116` 已以 revision `5863afae…3870` 关闭态上线，leaf 保持 `0075`。zero-write audit 与
 Phase 1 的 115 场无网络 census 通过；Phase 2 的专用 worker 12 个样本稳定约 123.3 MiB，主机最低仍有
 约 1.81 GiB 可用、swap 未动，现有 3.4 GiB 主机无需扩容。但公网根页在随后 20 秒门禁中超时，自动保护

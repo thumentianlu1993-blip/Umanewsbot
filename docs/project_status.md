@@ -1,5 +1,18 @@
 # 项目状态文档
 
+## 2026-08-29 PR #117 已上线，公网 20 秒门禁仍失败
+
+- 生产为 revision `6e6d7977…e04` / image `cb3852e4…663c` / leaf `0075`；release no-op migration，
+  rollback tag 与 1366 行 TOC 的激活备份已验证。
+- sync-mount 关闭态 audit SHA `a013c0e8…979` 为 ready/valid、route drift 0、root bytes 0；三服务一致、
+  10 false、`celery=0 / race_sync_v2=0 / race_live=7543`。
+- 畸形 URL 已快速 301，正常赛事页约 0.036 秒；但 5 分钟仍有 464 个 Meta/Facebook crawler 请求、
+  468 个 `/races/`、321 个 301。crawler 继续跟随 canonical 页面及静态字体。
+- 冻结 `--max-time 20` 复测的第 1 个公网请求在 20.001 秒以 HTTP 000、0 bytes 超时；因此未开启 Phase 1、
+  未启动专用 worker、未发出 provider 请求，激活序列正式停止。
+- 主机 load/内存/swap 正常，阻塞是公网入口压力而非内存。下一步需要用户确认 UA block/429 或 CDN/WAF
+  方案；确认前不扩容、不重试激活，旧队列保持不动。
+
 ## 2026-08-29 PR #116 已上线，Phase 2 因 crawler 饱和停止
 
 - 生产为 revision `5863afae…3870` / image `4096114b…6ee1` / leaf `0075`；关闭态 audit 和 Phase 1
