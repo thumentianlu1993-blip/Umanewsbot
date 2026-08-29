@@ -1,5 +1,30 @@
 # 部署运行手册
 
+## 2026-08-29 生产内存 2+1 灰度与回退口径
+
+1. 当前生产 `.env` 的 sizing 为 `GUNICORN_WORKERS=2`、`GUNICORN_THREADS=2`、
+   `CELERY_WORKER_CONCURRENCY=1`。变更前 0600 备份为
+   `/opt/umanewsbot-builds/pr110-a063ecf9/memory-tuning/env-before-2plus1-20260829T0845Z`，SHA-256
+   `434c2f98168944ea5aea16d5142a53b1484fc96b875c129685235078cb2c45e2`；不得输出 `.env` 内容。
+2. 诊断时以 cgroup `memory.current/memory.stat anon` 和进程 PSS 为主，不把 PostgreSQL shared pages、
+   OneBot file cache 或 Linux page cache 重复计为不可回收内存。当前原始大头是 Web 3 个约 190 MiB PSS
+   worker 与普通 Celery 2 个约 210 MiB PSS 子进程；DB/Redis 无需为本问题调参。
+3. Web 从 3 调为 2 后，force-recreate 窗口出现 14 次短暂 5xx，随后稳定窗口四入口 200、5xx=0。
+   因此以后不能把 `docker compose up --force-recreate web` 当作零中断操作；应使用滚动容器或明确维护窗口。
+   若稳态健康、延迟、5xx 失败，恢复 `GUNICORN_WORKERS=3` 后重新创建 Web，并再次记录切换损失。
+4. 普通 Celery sizing 变更必须先停 Beat，再要求 `LLEN celery=0` 和 active/reserved/scheduled 全 0；随后
+   才重建 worker，验证精确 image/revision、child count、pong、OOM/error，再恢复原 Beat。恢复到 2 也走
+   同一顺序，不能在活跃任务中直接重建。
+5. concurrency=1 的观测门禁：至少覆盖一个 15 分钟窗口和 3 个调度周期；普通队列峰值必须在 5 分钟内归零，
+   不得与下一批持续叠加。本次峰值 22，最大约 4 分 17 秒归零；最终 queue/active/reserved/scheduled 全 0。
+6. 当前热身后 Web/worker 约 `421/292 MiB`，窗口最低 `MemAvailable=1662256 kB`，最终
+   `1690568 kB`，SwapFree `1310716 kB` 未变化，free disk `9655083008` bytes；现有 resident stack
+   暂不扩容。该结果不覆盖未来专用 worker：启动 `race_sync_v2_worker` 后必须重新观察热身内存、swap、
+   普通/新队列、公网和 5xx，失败时保持新写入关闭并扩容至 8 GiB。
+7. 当前 data-sync 仍是 10 个开关全 false、专用 worker not-running，
+   `celery=0 / race_sync_v2=0 / race_live=7543`。本次 sizing 不构成 capacity 注入或五阶段自动化启用证据。
+   1280 MiB 临时 swap 仍已启用且未写 fstab；本轮未使用 swap，停用/删除仍属独立动作。
+
 ## 2026-08-29 PR #110 关闭态生产发布与容量止损证据
 
 1. 生产运行 revision 为 `a063ecf985539fc2d82a27170c7d634e0f7e5fc8`，image 为

@@ -1,5 +1,17 @@
 # 项目状态文档
 
+## 2026-08-29 生产内存已收敛为 2+1，现有站点暂不扩容
+
+- 根因不是 PostgreSQL/Redis，而是 Web 3 个约 190 MiB PSS worker 与普通 Celery 2 个约 210 MiB PSS
+  子进程。生产显式调整为 `GUNICORN_WORKERS=2 / CELERY_WORKER_CONCURRENCY=1`，OneBot 和旧
+  `race_live` 不动。
+- Web 切换产生 14 次短暂 5xx，稳定后四入口持续 200、5xx=0；该切换损失已保留。Celery 在停 Beat、零任务
+  drain 后重建并恢复 Beat，15 分钟内普通队列峰值 22，三轮均在 5 分钟内归零，最终 control/queue 全 0。
+- 热身后 Web/worker 约 `421/292 MiB`；最低 `MemAvailable=1662256 kB`、最终 `1690568 kB`，SwapFree
+  全程 `1310716 kB`。现有 resident stack 通过 1536 MiB 门禁，暂不需要直接扩容。
+- data-sync 仍全部 false，`race_sync_v2_worker` 未运行，`race_sync_v2=0 / race_live=7543`。新专用 worker
+  启动和热身后必须重新验收；如果内存、swap、队列或公网失败，再扩容至 8 GiB，不继续压缩核心服务。
+
 ## 2026-08-29 PR #110 已关闭态上线，自动化激活因容量门禁停止
 
 - 生产已切换到 revision `a063ecf9…5fc8` / image `4a5f34b1…078eb`；写前 custom backup
