@@ -1,5 +1,14 @@
 # 关键决策
 
+## 2026-08-30 dangling image 清理仍以容器引用为硬边界
+
+- `RepoTags=[]` 只说明 image 无 tag，不等于无引用。删除前必须对每个完整 image ID 检查所有运行和停止
+  容器；只删除 tag 为空且 `docker ps -a --filter ancestor=<id>` 为 0 的精确集合，不用全局 prune。
+- 旧 `race_live_worker` 即使处于 Created/未运行，也属于生产 legacy 边界；之前的“清理零引用镜像”授权
+  不自动包含删除该容器。共享层导致 4 个真正零引用 image 只释放 60 KiB，不能据 Docker 预估值猜测成功。
+- 磁盘低于 8 GiB 时保持 10 false 并停止 Phase 2。删除 Created legacy 容器及其 image、清理 release/备份
+  或扩磁盘都是新的明确选择；未确认前不得执行。
+
 ## 2026-08-30 排空门禁失败后不因任务稍后成功而自动重试
 
 - Phase 2 的开关变更必须发生在停 Beat、普通 worker `active=0 / reserved=0` 之后。本次普通新闻采集在

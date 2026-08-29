@@ -1,5 +1,13 @@
 # 项目状态文档
 
+## 2026-08-30 dangling image 仅清理零引用子集，Phase 2 继续关闭
+
+- 4 个零 tag、零容器引用 image 已按完整 ID 删除；因为层仍被第五个 image 共享，只回收 `61440` bytes。
+- 第五个无 tag image 被 Created/未运行的旧 `race_live_worker` 容器引用，未使用 `--force` 删除。Docker
+  仍估算约 `720.6 MB` reclaimable，但释放它需要新的容器删除授权。
+- free disk `8572174336` bytes，低于 8 GiB 门槛；`race_sync_v2=0 / race_live=7543`，Phase 2 未启动，
+  所有新写入继续全关。下一步等待用户明确选择精确删除该 legacy 容器及 image，或扩磁盘。
+
 ## 2026-08-30 PR #120 已上线，Phase 2 因普通任务 drain 超时停止
 
 - 生产为 revision `409f2ac6…2121` / image `74465006…d8df` / leaf `0075`；既有备份继续通过
