@@ -1,5 +1,25 @@
 # 当前状态
 
+## 2026-08-30 悬空层已清完，Phase 2 因 readiness 信号门禁停止
+
+- 用户单独授权后，已精确删除 Created/running=false 的旧 `umanewsbot-race_live_worker-1` 容器及其
+  `sha256:e0a2d3d6…e61a3` image；删除前后 `race_live` 均为 7543，队列没有被消费或删除，当前 prod
+  `74465006…d8df` 与即时 PR117 rollback `cb3852e4…663c` 均保留。
+- 删除旧 image 后逐层暴露新的 dangling parent。每轮冻结完整 image ID，并确认 RepoTags 为空且全部运行/
+  停止容器引用为 0；共精确删除 82 个 image manifest/layer，未使用 `prune -a` 或 `--force`。最终
+  dangling=0，free disk 回升到约 `10067349504` bytes；尾段实际回收 `1475436544` bytes。
+- 新 Phase 2 窗口在任何开关变更前停 Beat，普通 worker drain 为 active=0/reserved=0/active_confirm=0；随后
+  才把 data kinds 收窄到 `race_time,racecard`，开启 network/schedule/racecard apply 并重建普通/专用 worker。
+  两个容器 running、restart=0、OOM=false，但 240 秒内日志均未出现脚本要求的 `ready.` 字样，因此 readiness
+  gate 超时；12 个热身样本和 selector 均未开始，没有 data-sync task/provider 请求或本阶段业务写入。
+- fail-closed 已恢复 10 false、data kinds 恢复 `race_time,racecard,result`、移除专用 worker并恢复普通
+  worker/Beat。随后普通 worker 返回 `pong`，DNS/Redis ping 正常，普通队列在 5 分钟内自然归零；说明本次
+  是 readiness wrapper 依赖日志文本的误判，不是 broker、内存或磁盘故障，但失败窗口不得追溯改为通过。
+- 最终 active/reserved=0/0，`celery=0 / race_sync_v2=0 / race_live=7543`，event 956 的过期 claim 仍按
+  CAS 合同保留、checkpoint failures 为 0。`MemAvailable=1676232 kB`、`SwapFree=1310716 kB`、磁盘约
+  `10061934592` bytes；root/www/races 200、Meta 精确 `/races/` 429。下一次只能新开 Phase 2 窗口，并用
+  目标 worker hostname 的 Celery ping/inspect 完整快照替代日志字符串门禁；本轮不自动重试。
+
 ## 2026-08-30 悬空镜像清理只完成零引用子集，磁盘仍低于 Phase 2 门槛
 
 - 用户授权清理只读盘点得到的 5 个 dangling image。删除前重新逐一核对完整 image ID、tag、当前/回滚

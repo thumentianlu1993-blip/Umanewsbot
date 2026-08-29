@@ -1,5 +1,17 @@
 # 关键决策
 
+## 2026-08-30 worker readiness 以协议响应判定，不依赖日志固定文案
+
+- 容器 running、restart=0、OOM=false 仍不足以证明 Celery ready，但日志出现固定 `ready.` 字符串也不是稳定
+  协议；本次普通/专用 worker 均未输出该行，脚本 240 秒超时后，普通 worker 实际已能返回 `pong` 并消费
+  队列。后续 readiness 必须冻结目标容器 hostname，以 Celery `ping` 加 active/reserved 完整 worker 集合
+  判定，同时保留容器、Redis/DNS、资源和队列门禁。
+- readiness wrapper 误判仍属于本轮门禁失败：立即 10 false、停专用 worker、恢复普通 worker/Beat；不得
+  因事后 pong 自动重试 selector。修正验收入口后另开新窗口，从停 Beat/drain 重新开始。
+- dangling layer 清理只删除逐轮验证为零 tag、零容器引用的完整 ID；本次在用户授权删除 legacy Created
+  容器后共清理 82 个 image manifest/layer、最终 dangling=0，当前/即时回滚 image 与 `race_live=7543`
+  保持。Docker 首次 reclaimable 估算不能替代逐轮实际 `df`。
+
 ## 2026-08-30 dangling image 清理仍以容器引用为硬边界
 
 - `RepoTags=[]` 只说明 image 无 tag，不等于无引用。删除前必须对每个完整 image ID 检查所有运行和停止
