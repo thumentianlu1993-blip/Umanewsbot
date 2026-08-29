@@ -1,5 +1,22 @@
 # 关键决策
 
+## 2026-08-29 低成本生产 sizing 使用显式 2+1，扩容只作为专用 worker 复验后的后备
+
+- 当前 2 vCPU / 3.4 GiB 生产实例的 resident profile 显式设置 `GUNICORN_WORKERS=2`、
+  `GUNICORN_THREADS=2`、`CELERY_WORKER_CONCURRENCY=1`。仓库通用默认值暂不修改；该值是基于当前生产
+  约 1.9 req/s、8 req/s 峰值和真实任务窗口验证的 host-specific 配置。
+- 内存优化优先减少常驻 Python 进程，不调整 PostgreSQL 已较小的 128 MiB shared buffers，不限制 Redis，
+  不用 drop cache、降低 1536 MiB 门槛或提高 swap 使用来制造通过读数。OneBot 保持原运行态，旧
+  `race_live` 不消费。
+- concurrency=1 的保留条件是每轮普通调度峰值在 5 分钟内自然归零、active/reserved/scheduled 可清空、
+  worker pong、失败数不增加且公网稳定；任一不满足先停 Beat、drain，再把普通 worker 恢复为 2。
+  本次峰值 22 且最大约 4 分 17 秒归零，因此暂时保留 1。
+- 单个 Web 容器的 force-recreate 会产生真实切换损失；本次记录到 14 次短暂 5xx。健康恢复后零新增 5xx
+  只能证明稳态可用，不能把这 14 次抹掉。后续 sizing/release 应增加滚动 Web 切换能力或选择维护窗口。
+- 2+1 只证明现有 resident stack 暂不需扩容。`race_sync_v2_worker` 仍有 384 MiB cgroup 上限，启动并热身后
+  必须重新执行内存、SwapFree、队列、延迟和 5xx 门禁；若失败，优先扩容至 8 GiB，而不是继续削减核心 Web
+  或让普通任务长期积压。
+
 ## 2026-08-29 关闭态代码与 schema 可保留在线，容量失败不得开启任何自动写入
 
 - PR `#110` 的精确候选已证明普通 `0073 -> 0074/0075` migration、持久 runtime/TLS mount、服务身份和公网

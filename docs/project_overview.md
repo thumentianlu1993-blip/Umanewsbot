@@ -21,10 +21,13 @@ PR `#109` 已合并为 `69e87c44…e8ec8e`，把迁移前 leaf 精确绑定到�
 改用 release 外稳定 runtime/TLS 根，并在停服前验证 rollback compatibility link、证书 containment 和
 `nginx -t`。真实 PostgreSQL 与完整部署编排回归已通过。首次准备 isolated release 又识别出 Git tracked
 `horse_profile_completion` parent 不能整目录链接；PR `#110` 只链接其四个运行态子目录并完成发布。
-激活前资源门禁随后停止了启用：即使创建 1280 MiB 临时 swap、临时停 OneBot 并精确删除 6 个零引用旧镜像，
-`MemAvailable` 仍未稳定达到 1536 MiB。因此 frozen capacity 未注入、`race_sync_v2_worker` 未启动，
-future discovery、时间/出马表、data-sync lifecycle、赛果公开及更正全部保持关闭；OneBot 已恢复，
-`race_sync_v2=0`、旧 `race_live=7543` 不变。下一步先扩容宿主资源，再从 admission 第一阶段重新开始。
+激活前资源门禁一度停止了启用；创建 1280 MiB 临时 swap、临时停 OneBot 和精确镜像清理仍未稳定达到
+1536 MiB。后续 PSS/cgroup 拆账证明根因是常驻 Python 进程数，生产已灰度为 Web 2 workers、普通 Celery
+concurrency=1。15 分钟热身与三轮调度后最低 `MemAvailable=1662256 kB`、队列均在 5 分钟内归零，现有
+resident stack 暂不扩容。Web 切换时发生的 14 次短暂 5xx 已如实保留，稳态随后零新增 5xx。frozen
+capacity 仍未注入，`race_sync_v2_worker` 未启动，future discovery、时间/出马表、data-sync lifecycle、
+赛果公开及更正全部保持关闭；OneBot 已恢复，`race_sync_v2=0`、旧 `race_live=7543` 不变。下一步从
+admission 第一阶段重新开始，并在专用 worker 启动/热身后重新验收；只有该门禁失败才扩容至 8 GiB。
 
 ## 历史背景（以下状态以各段日期为准）
 

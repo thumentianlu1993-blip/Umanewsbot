@@ -1,5 +1,32 @@
 # 当前状态
 
+## 2026-08-29 生产 2+1 内存灰度通过，现有站点暂不扩容；新自动化仍关闭
+
+- 只读拆账证明高占用主要来自常驻 Python 进程数，而不是 PostgreSQL/Redis：原 Web 为 3 个 Gunicorn
+  worker，每个 PSS 约 188–190 MiB，cgroup 约 645 MiB；普通 Celery 为 2 个子进程，每个 PSS 约
+  210 MiB，cgroup 约 503 MiB。PostgreSQL 已是 `shared_buffers=128MB / work_mem=4MB`，大部分 cgroup
+  占用是可回收 file cache；Redis 仅约 27–30 MiB。OneBot 匿名内存约 161 MiB，其余也以 file cache
+  为主，不是唯一根因。短时采样确认 Web/Celery 是稳定高基线而非分钟级泄漏。
+- 经用户两次明确确认执行生产灰度：`.env` 从 `GUNICORN_WORKERS=3` 调为 `2`，普通 worker 从默认
+  `CELERY_WORKER_CONCURRENCY=2` 调为显式 `1`。原 `.env` 以 0600 备份到
+  `/opt/umanewsbot-builds/pr110-a063ecf9/memory-tuning/env-before-2plus1-20260829T0845Z`，SHA-256
+  `434c2f98168944ea5aea16d5142a53b1484fc96b875c129685235078cb2c45e2`。
+- Web 单容器 force-recreate 切换时产生 14 次短暂 5xx；新容器 healthy 后的稳定窗口 5xx=0，
+  HTTP/HTTPS root/www 四入口持续 200。窗口内唯一 traceback 被精确分类为非法 Host 请求触发的
+  `DisallowedHost`，不是并发、内存或 5xx 故障。切换损失如实保留，未来 Web sizing 变更应使用滚动容器
+  或明确 maintenance window，不能把当前稳定态倒推成零中断。
+- Celery 调整前先停 Beat，确认普通 queue/active/reserved/scheduled 全 0，再重建为 concurrency=1 并恢复
+  Beat。15 分钟热身和三轮调度中普通队列峰值 22；两次大批分别约 4 分 17 秒、3 分 40 秒归零，最后
+  5 条约 30 秒归零。最终 queue/active/reserved/scheduled 均为 0、worker pong、OOM=false、错误=0。
+- 热身后 Web/worker 约为 `421 MiB / 292 MiB`；观察窗最低 `MemAvailable=1662256 kB`，最终
+  `1690568 kB`，稳定高于 1536 MiB 门槛；`SwapFree=1310716 kB` 全程未下降。现有常驻站点暂不需要
+  扩容，但最小余量只有约 87 MiB，不能直接推断启动 384 MiB 上限的 `race_sync_v2_worker` 后也安全。
+- 当前仍为 revision `a063ecf9…5fc8` / leaf `0075`，Web/worker/Beat 同 image 且 restart count=0，OneBot
+  running/restart count=0；全部 10 个 data-sync 开关 false，专用 worker 未运行，
+  `celery=0 / race_sync_v2=0 / race_live=7543`。冻结容量、future discovery、time/racecard、data-sync
+  lifecycle、result public、correction 均未启用。下一步仍从 capacity admission 第一阶段重走；专用 worker
+  启动后的内存、swap、队列或公网任一失败，才进入 8 GiB 扩容，不降低门槛。
+
 ## 2026-08-29 PR #110 已关闭态部署，0074/0075 成功；自动化因内存门禁保持关闭
 
 - 最终生产 revision 为 `a063ecf985539fc2d82a27170c7d634e0f7e5fc8`，image 为
