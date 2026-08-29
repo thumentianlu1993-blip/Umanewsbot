@@ -1,5 +1,21 @@
 # 项目状态文档
 
+## 2026-08-29 PR #110 已关闭态上线，自动化激活因容量门禁停止
+
+- 生产已切换到 revision `a063ecf9…5fc8` / image `4a5f34b1…078eb`；写前 custom backup
+  `pre-pr110-a063ecf9-20260829T061324Z.dump` 为 `485007018` bytes、SHA
+  `f3c1af55…902b8`、0600/1332 行 TOC。旧 image `4bc392d0…611a611` 有精确 rollback tag。
+- 受审发布从 leaf `0073` 正常应用 `0074/0075`，最终 leaf 精确为 `0075`，无 restricted recovery marker。
+  web/worker/Beat 同 revision/image，web healthy、restart count=0，HTTP/HTTPS root/www 四入口 200。
+- 关闭态通过：专用 worker 未运行，10 个 data-sync 开关均 false，`celery=0 / race_sync_v2=0 /
+  race_live=7543`，既有 6 个 lifecycle enforce controls 未改。
+- 激活资源门禁失败。1280 MiB 临时 swap、临时停 OneBot 及 6 个零引用旧镜像的精确清理仍未让
+  `MemAvailable` 稳定达到 1536 MiB；按 fail closed 未注入 frozen capacity、未执行 census，也未启用
+  future discovery、time/racecard、data-sync lifecycle、result public 或 correction。
+- OneBot 已按原容器恢复并保持 restart count=0。下一步是先扩容生产宿主，再从 capacity admission 和第一
+  阶段重新开始；当前 additive schema 与新代码保留在线，但新写入继续关闭。非 fstab 临时 swap 仍启用，
+  后续停用/删除属于独立运维动作。
+
 ## 2026-08-29 PR #109 已合并，tracked runtime follow-up 待发布
 
 - isolated release 准备阶段识别出 tracked `horse_profile_completion` parent 不能整目录 symlink；生产按门禁

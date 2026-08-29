@@ -1,5 +1,37 @@
 # 部署运行手册
 
+## 2026-08-29 PR #110 关闭态生产发布与容量止损证据
+
+1. 生产运行 revision 为 `a063ecf985539fc2d82a27170c7d634e0f7e5fc8`，image 为
+   `sha256:4a5f34b1e2bcc2b2568ef6749cfa0d7041e913ebcb1b8665ce312a3c787078eb`，isolated release 是
+   `/opt/umanews-release-a063ecf9-PR110-20260829T0608Z/umanewsbot`。rollback image 是
+   `sha256:4bc392d012080a482523451016074f55ebcee84177ccab08b7563b233411a611`，tag 为
+   `umanewsbot:rollback-pre-a063ecf9-20260829T0616Z`。
+2. source archive 为 `/opt/umanewsbot-builds/pr110-a063ecf9/source.tar.gz`，大小 `9989770` bytes，
+   SHA-256 `2a894038f200490316a23dfdc66a9aa0a91c898c43fdb4fc5dd326c159c9f78d`。写前 backup 为
+   `/opt/umanewsbot/backups/db/pre-pr110-a063ecf9-20260829T061324Z.dump`，大小 `485007018` bytes，
+   SHA-256 `f3c1af55887a8f4026feffef078487b35606dcb9d3a2d3d6ab72409e5f0902b8`，0600，1332 行 TOC。
+3. handoff artifact SHA-256 为 `8849b93621ab4e94ff9c1b4e0b6cd712b47a59f72b4a7f34b089a08d53cfd40e`；
+   preflight 绑定 leaf `0073`、计划 `0074/0075`、writers=0。ensure 返回 `starting_leaf_set=[0073] /
+   status=not-required`；migration 与 completion 成功，最终 leaf 精确为
+   `stable.0075_race_data_source_priority_and_reported_position`，没有 recovery marker。
+4. 关闭态验收为 web healthy、web/worker/Beat 同 revision/image 且 restart count=0，持久 runtime/TLS
+   verifier、Nginx config、Django check 和 HTTP/HTTPS root/www 四入口均通过；10 个 data-sync 开关全部
+   false，专用 worker 未启动，`celery=0 / race_sync_v2=0 / race_live=7543`。
+5. 激活前的资源门禁没有通过。经用户授权创建 `/var/lib/umanews-pr109.swap`（1280 MiB、0600、已 swapon、
+   未写 fstab），临时停止原 OneBot，并删除 6 个经 `docker ps -a --filter ancestor` 证明零容器引用的旧候选
+   image；当前和 rollback image 均保留。磁盘可用约 8.8 GiB，但 OneBot 停止时内存仍低于 1536 MiB，
+   因此禁止注入 frozen capacity、运行 census 或启动 `race_sync_v2_worker`。
+6. 资源失败的恢复动作是恢复原 `umanewsbot-onebot-1` 容器并验证 running/restart count=0，保持所有新开关
+   false、两条新队列为 0、旧 `race_live=7543`，再复核公网 200。不得通过降低内存阈值、扩大临时 swap、
+   清 page cache 或让 OneBot 长期离线来继续启用。
+7. 后续先做宿主资源扩容，并在 OneBot 正常运行、web/worker/Beat 稳态下重新满足 `MemAvailable >=1536 MiB`、
+   `SwapFree >=512 MiB` 和 free disk >=8 GiB。随后从冻结容量/admission 审计重新开始，再严格按
+   future discovery -> time/racecard -> lifecycle -> result apply/public -> correction 逐阶段启用；任一失败
+   立即关闭最窄相关开关并停止后续。旧 `race_live` 不消费、不迁移、不清理。
+8. 临时 swap 当前仍启用；停用并删除 `/var/lib/umanews-pr109.swap` 需要在另一维护窗口确认内存余量，执行
+   `swapoff` 后再删除，不能因为它未写入 fstab 就假设当前已失效。
+
 ## 2026-08-29 PR #109 修复后的隔离 release 重试门禁
 
 1. 从最终 merge SHA 创建全新 isolated release。先把当前活跃 release 的 runtime 与证书复制到

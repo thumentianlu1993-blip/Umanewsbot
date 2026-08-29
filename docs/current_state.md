@@ -1,5 +1,33 @@
 # 当前状态
 
+## 2026-08-29 PR #110 已关闭态部署，0074/0075 成功；自动化因内存门禁保持关闭
+
+- 最终生产 revision 为 `a063ecf985539fc2d82a27170c7d634e0f7e5fc8`，image 为
+  `sha256:4a5f34b1e2bcc2b2568ef6749cfa0d7041e913ebcb1b8665ce312a3c787078eb`，隔离 release 为
+  `/opt/umanews-release-a063ecf9-PR110-20260829T0608Z/umanewsbot`。web/worker/Beat 使用同一精确
+  revision/image，web healthy、restart count=0；HTTP/HTTPS 的 root/www 四入口均为 200。
+- 写前 custom backup 为
+  `/opt/umanewsbot/backups/db/pre-pr110-a063ecf9-20260829T061324Z.dump`，大小 `485007018` bytes，
+  SHA-256 `f3c1af55887a8f4026feffef078487b35606dcb9d3a2d3d6ab72409e5f0902b8`，权限 0600，
+  `pg_restore --list` 产生 1332 行 TOC。旧 image 已固定为 rollback tag
+  `umanewsbot:rollback-pre-a063ecf9-20260829T0616Z`。
+- 受审 release orchestration 从 fresh leaf `0073` 运行，no-intent ensure 返回 `not-required`，随后正常应用
+  `stable.0074_race_data_sync_r0_control_plane` 与
+  `stable.0075_race_data_source_priority_and_reported_position`；completion 再次精确核验 leaf `0075`，
+  没有创建 restricted recovery marker。迁移阻塞问题已修复并在生产闭环验证。
+- 关闭态验收通过：新专用 worker 未运行，web/worker/Beat 的 10 个 data-sync 总开关、scheduler、network、
+  future discovery、schedule/racecard/lifecycle/result/public/correction 开关均为 `false`；
+  `celery=0 / race_sync_v2=0 / race_live=7543`。既有 lifecycle 的 6 个 enforce controls 未改动。
+- 准备注入冻结容量时资源门禁失败：启用 1280 MiB 非持久 swap 后，临时停止 OneBot 并精确删除 6 个零容器
+  引用旧候选镜像，磁盘恢复到约 8.8 GiB 可用，但 OneBot 停止期间 `MemAvailable` 仍从约 1535 MiB
+  回落到约 1505 MiB，低于 1536 MiB 硬门槛。按 fail-closed 约定没有注入容量、没有运行 census、没有启动
+  `race_sync_v2_worker`，五阶段自动化均未启用。
+- 止损后原 OneBot 容器已恢复，running/restart count=0；最终快照 `MemAvailable=1355936 kB`、
+  `SwapFree=1310716 kB`、磁盘可用 `9486413824` bytes。当前代码和 additive schema 保留在线，但所有新写入
+  继续关闭。下一步只能先把宿主资源扩到恢复 OneBot 后仍稳定通过内存/磁盘门禁，再从 frozen capacity
+  admission 重走 future discovery -> time/racecard -> lifecycle -> result apply/public -> correction；不得从
+  中间阶段续跑。临时 swap 未写入 fstab，当前仍启用，停用/删除需另行执行。
+
 ## 2026-08-29 PR #109 已合并，tracked runtime follow-up 待发布，生产仍保持旧版本
 
 - 首次准备 PR `#109` isolated release 时又安全停止：`runtime/horse_profile_completion` 含 Git tracked
