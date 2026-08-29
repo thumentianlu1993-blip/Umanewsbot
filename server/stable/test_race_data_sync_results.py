@@ -375,6 +375,7 @@ class RaceDataSyncResultApplicationTests(TestCase):
         self.assertFalse(shadow.projected)
         revision = models.RaceEventRevision.objects.get(pk=shadow.revision_id)
         self.assertIsNone(revision.published_at)
+        self.assertEqual(revision.official_confirmed_at, NOW)
 
         promoted = apply_data_sync_result_observation(
             observation_id=observation.pk,

@@ -271,6 +271,8 @@ def select_registry_candidates(
             return True
         if kind == "no_time_canary":
             return event.race_datetime is None and event.id in explicit
+        if explicit and event.id not in explicit:
+            return False
         if event.race_datetime is None or window_end is None:
             return False
         race_at = event.race_datetime.astimezone(timezone.utc)

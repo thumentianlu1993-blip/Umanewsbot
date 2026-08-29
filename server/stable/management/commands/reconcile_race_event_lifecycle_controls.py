@@ -208,7 +208,9 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS(
                 f"[{label}] schema=v2 total={len(manifest.event_ids)} "
-                f"would_create={result.would_create} replay={result.replayed} error=0"
+                f"would_create={result.would_create} "
+                f"would_adopt={result.would_adopt} "
+                f"replay={result.replayed} error=0"
             )
         )
 

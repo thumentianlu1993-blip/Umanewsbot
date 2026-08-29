@@ -609,17 +609,6 @@ def apply_data_sync_result_observation(
         if promote_existing:
             assert existing is not None
             revision = existing
-            revision.published_at = now
-            revision.official_confirmed_at = now
-            revision.decision_reason = "shadow_revision_promoted"
-            revision.save(
-                update_fields=(
-                    "published_at",
-                    "official_confirmed_at",
-                    "decision_reason",
-                    "updated_at",
-                )
-            )
         else:
             revision = models.RaceEventRevision.objects.create(
                 event=event,
@@ -640,7 +629,9 @@ def apply_data_sync_result_observation(
                     current if arbitration.apply and authorized_replacement else None
                 ),
                 published_at=now if may_project else None,
-                official_confirmed_at=now if may_project else None,
+                # Confirmation belongs to the immutable source revision, not
+                # to the later decision to expose it publicly.
+                official_confirmed_at=now if terminal_phase else None,
                 conflict_status=(
                     models.RaceEventRevisionConflictStatus.PENDING
                     if correction_conflict
@@ -667,6 +658,12 @@ def apply_data_sync_result_observation(
                 ),
                 official_authorization_version=0,
             )
+            if promote_existing:
+                # PostgreSQL permits only the audited NULL -> timestamp
+                # publication transition.  The audit row must exist first;
+                # every other revision identity field remains immutable.
+                revision.published_at = now
+                revision.save(update_fields=("published_at", "updated_at"))
         if not promote_existing:
             control.next_result_revision_no += 1
             for internal_order, row in enumerate(ordered_rows, start=1):

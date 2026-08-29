@@ -395,6 +395,35 @@ class FullCohortArtifactAndSelectorContracts(TestCase):
         census = self.svc().select_registry_candidates(scope=scope)
         self.assertEqual(census.included_event_ids, tuple(sorted((late.id, early.id))))
 
+    def test_datetime_successor_honors_explicit_ids_and_carries_predecessor(self):
+        predecessor = self._eligible(
+            slug="explicit-predecessor",
+            at=self.cutoff + timedelta(days=8),
+        )
+        target = self._eligible(
+            slug="explicit-target", at=self.cutoff + timedelta(days=1)
+        )
+        unrelated = self._eligible(
+            slug="explicit-unrelated", at=self.cutoff + timedelta(days=2)
+        )
+        scope = self.svc().build_registry_selector_scope(
+            kind="datetime_7d_canary",
+            cutoff=self.cutoff,
+            window_end=self.cutoff + timedelta(days=7),
+            explicit_event_ids=[target.id],
+            limit=20,
+            predecessor_carry_forward=True,
+        )
+        census = self.svc().select_registry_candidates(
+            scope=scope,
+            predecessor_event_ids=[predecessor.id],
+        )
+        self.assertEqual(
+            census.included_event_ids,
+            tuple(sorted((predecessor.id, target.id))),
+        )
+        self.assertNotIn(unrelated.id, census.included_event_ids)
+
     def test_carry_forward_false_does_not_inherit_predecessor(self):
         predecessor = self._eligible(
             slug="no-carry-predecessor", at=self.cutoff + timedelta(days=31)
