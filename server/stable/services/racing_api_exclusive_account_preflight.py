@@ -27,6 +27,9 @@ SHA256_RE = re.compile(r"[0-9a-f]{64}$")
 IDENTIFIER_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
 MAX_EVIDENCE_BYTES = 1024 * 1024
 QUEUE_NAMES = ("celery", "race_live", "race_sync_v2")
+NETWORK_WORKER_NAME_RE = re.compile(
+    r"(?:^|[-_.])(?:race[-_]live|race[-_]sync[-_]v2)[-_]worker(?:$|[-_.])"
+)
 
 
 class RacingApiExclusivePreflightError(ValueError):
@@ -113,6 +116,18 @@ def _worker_matches(expected: str, actual: str) -> bool:
     return expected == actual or actual.endswith("@" + expected)
 
 
+def _queue_names(payload: Mapping[str, object]) -> list[str]:
+    names = []
+    for rows in payload.values():
+        if not isinstance(rows, list):
+            raise RacingApiExclusivePreflightError("Celery queue snapshot is invalid")
+        for row in rows:
+            if not isinstance(row, Mapping) or not str(row.get("name") or "").strip():
+                raise RacingApiExclusivePreflightError("Celery queue row is invalid")
+            names.append(str(row["name"]))
+    return sorted(set(names))
+
+
 def collect_celery_idle_snapshot(
     *, expected_worker_nodes: Iterable[str], timeout: float = 5.0
 ) -> dict[str, Any]:
@@ -131,11 +146,12 @@ def collect_celery_idle_snapshot(
         reserved = inspector.reserved()
         scheduled = inspector.scheduled()
         active_confirm = inspector.active()
+        active_queues = inspector.active_queues()
     except Exception as exc:
         raise RacingApiExclusivePreflightError(
             f"Celery inspection failed: {exc.__class__.__name__}"
         ) from exc
-    snapshots = (ping, active, reserved, scheduled, active_confirm)
+    snapshots = (ping, active, reserved, scheduled, active_confirm, active_queues)
     if any(not isinstance(value, dict) or not value for value in snapshots):
         raise RacingApiExclusivePreflightError("Celery inspection returned no worker snapshot")
     workers = set(ping)
@@ -146,14 +162,26 @@ def collect_celery_idle_snapshot(
         for expected_node in expected
         if not any(_worker_matches(expected_node, actual) for actual in workers)
     ]
-    if missing:
-        raise RacingApiExclusivePreflightError("Celery snapshot is missing expected workers")
+    unexpected = [
+        actual
+        for actual in workers
+        if not any(_worker_matches(expected_node, actual) for expected_node in expected)
+    ]
+    if missing or unexpected:
+        raise RacingApiExclusivePreflightError(
+            "Celery snapshot has missing or unexpected workers"
+        )
     active_names = _task_names(active)
     reserved_names = _task_names(reserved)
     scheduled_names = _task_names(scheduled)
     active_confirm_names = _task_names(active_confirm)
+    subscribed_queues = _queue_names(active_queues)
     if active_names or reserved_names or scheduled_names or active_confirm_names:
         raise RacingApiExclusivePreflightError("Celery workers are not fully idle")
+    if subscribed_queues != ["celery"]:
+        raise RacingApiExclusivePreflightError(
+            "Celery workers subscribe to a non-default queue"
+        )
     return {
         "workers": sorted(workers),
         "expected_workers": list(expected),
@@ -161,6 +189,7 @@ def collect_celery_idle_snapshot(
         "reserved_count": 0,
         "scheduled_count": 0,
         "active_confirm_count": 0,
+        "subscribed_queues": subscribed_queues,
     }
 
 
@@ -215,6 +244,22 @@ def _validate_host_evidence(
     ):
         raise RacingApiExclusivePreflightError("host process evidence is not clean and fresh")
     return evidence, actual_sha
+
+
+def _network_worker_containers(evidence: Mapping[str, object]) -> list[str]:
+    containers = evidence.get("containers")
+    if not isinstance(containers, list):
+        raise RacingApiExclusivePreflightError("host container evidence is invalid")
+    matches = []
+    for row in containers:
+        if not isinstance(row, Mapping):
+            raise RacingApiExclusivePreflightError("host container row is invalid")
+        name = str(row.get("name") or "")
+        if not name:
+            raise RacingApiExclusivePreflightError("host container name is invalid")
+        if NETWORK_WORKER_NAME_RE.search(name):
+            matches.append(name)
+    return sorted(matches)
 
 
 def _atomic_private_write(path: Path, payload: bytes) -> None:
@@ -289,6 +334,12 @@ def generate_exclusive_account_proof(
         raise RacingApiExclusivePreflightError(
             "runner and production host evidence must cover distinct hosts"
         )
+    if _network_worker_containers(runner_host_evidence) or _network_worker_containers(
+        production_host_evidence
+    ):
+        raise RacingApiExclusivePreflightError(
+            "a Racing API-capable Celery worker container is present"
+        )
     flags = RaceDataSyncFlags.from_settings()
     race_live_scheduler_enabled = bool(
         getattr(settings, "RACE_LIVE_SCHEDULER_ENABLED", False)
@@ -314,9 +365,11 @@ def generate_exclusive_account_proof(
     celery = celery_collector(expected_worker_nodes=expected_worker_nodes)
     queue_lengths = queue_collector()
     if set(queue_lengths) != set(QUEUE_NAMES) or any(
-        isinstance(value, bool) or not isinstance(value, int) or value != 0
+        isinstance(value, bool) or not isinstance(value, int) or value < 0
         for value in queue_lengths.values()
     ):
+        raise RacingApiExclusivePreflightError("Celery broker queue snapshot is invalid")
+    if queue_lengths["celery"] != 0 or queue_lengths["race_sync_v2"] != 0:
         raise RacingApiExclusivePreflightError("Celery broker queues are not empty")
     checks = {
         "race_live_scheduler_enabled": race_live_scheduler_enabled,

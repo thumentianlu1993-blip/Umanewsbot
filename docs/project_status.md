@@ -1,5 +1,14 @@
 # 项目状态文档
 
+## 2026-08-30 proof-only 部署因 legacy queue 合同冲突先修正
+
+- PR `#125` 已合并、未部署；生产健康但当时普通任务仍在执行，`celery=2 / race_sync_v2=0 /
+  race_live=7543`。没有重启或队列变更。
+- 旧 `race_live` 是禁止清理/消费的冻结 backlog，不能作为 proof 必须为 0 的条件。修正后只允许在专用
+  worker 容器不存在、Celery worker/订阅精确为普通 `celery`、全部网络开关/claim/lock 关闭时保留该计数。
+- 新增 legacy backlog 成功、默认/新队列非零、专用 worker 容器、extra worker/错误订阅失败关闭测试；
+  proof 专项 `9/9`、check/migration drift/pycompile/diff check 通过。尚无 TRA 请求、DB 写或生产部署。
+
 ## 2026-08-30 磁盘清理完成，Phase 2 readiness wrapper 误判后全关
 
 - 已按授权删除旧 Created `race_live_worker` 容器及其 image，并逐层清理共 82 个零引用 image

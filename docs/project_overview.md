@@ -1,5 +1,10 @@
 # 项目总览
 
+2026-08-30 proof-only PR `#125` 合并后、部署前发现与现有生产边界冲突：generator 原本要求所有 Redis 队列
+为 0，但旧 `race_live=7543` 是明确不得消费或清理的冻结 backlog。部署已暂停并改为证明“不可执行”而非
+删除历史：默认/新同步队列必须为 0，live/data-sync 网络开关全关，不得存在专用 worker 容器，Celery 只能
+有普通 worker 且只订阅 `celery`。修正回归 `9/9` 通过，尚未部署、调用 TRA 或写库。
+
 2026-08-30 经用户单独授权，旧 Created `race_live_worker` 容器及其 image 已精确删除，Redis
 `race_live=7543` 不变；随后逐层清理 82 个零 tag、零容器引用 image manifest/layer，最终 dangling=0，
 磁盘回升到约 10.07 GB，当前与 PR117 即时回滚 image 均保留。新 Phase 2 的普通任务 drain 已通过，但

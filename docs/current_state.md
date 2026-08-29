@@ -1,5 +1,17 @@
 # 当前状态
 
+## 2026-08-30 Racing API proof 发布前关闭 legacy queue 合同冲突
+
+- proof-only PR `#125` 已合并到 `main@865a41a0…5201`，尚未部署。生产只读盘点为
+  `celery=2 / race_sync_v2=0 / race_live=7543`，普通 worker 正在执行既有新闻抓取；服务与数据库健康，
+  TRA import lock/active claim 均为 0。
+- 发布前发现 generator 把冻结的旧 `race_live=7543` 也要求归零，与项目“不得清理、迁移或消费该遗留队列”
+  冲突。若不修正，合法 proof 永远不可生成；因此暂停部署，没有重启、清队列、TRA 请求或数据库写入。
+- 修正合同：`celery` 与 `race_sync_v2` 必须为 0；旧 `race_live` 可保留非负计数，但全部 live/data-sync
+  网络开关必须 false、host evidence 中不得存在 `race_live_worker/race_sync_v2_worker` 容器、Celery inspector
+  只能看到预期普通 worker 且其订阅队列必须精确为 `celery`。新增回归后 proof 专项 `9/9`、check、migration
+  drift、pycompile、diff check 均通过。
+
 ## 2026-08-30 悬空层已清完，Phase 2 因 readiness 信号门禁停止
 
 - 用户单独授权后，已精确删除 Created/running=false 的旧 `umanewsbot-race_live_worker-1` 容器及其

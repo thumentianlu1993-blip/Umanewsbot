@@ -1,5 +1,18 @@
 # 部署运行手册
 
+## 2026-08-30 Racing API exclusive proof 的 legacy `race_live` 验收口径
+
+1. `race_live=7543` 是冻结历史 backlog，禁止为了 proof 执行 `DEL`、`PURGE`、迁移、消费或启动旧 worker。
+   proof 允许其为任意非负整数，并把精确长度写入 evidence。
+2. `celery` 与 `race_sync_v2` 必须为 0；Celery ping/active/reserved/scheduled/active-confirm/active-queues
+   六份快照必须覆盖完全相同的 worker 集合。只允许命令指定的普通 worker，订阅队列必须精确为 `celery`。
+3. runner 与 production 两份 host v2 evidence 都不得包含 `race_live_worker` 或 `race_sync_v2_worker` 容器，
+   也不得匹配 TRA export 进程。生产 live/data-sync scheduler/network flags、active claims 和 TRA import lock
+   继续必须全关/为 0。
+4. 普通新闻任务或默认队列非零时只等待自然排空；不停止 Beat、不重启 worker、不清队列。fresh host evidence
+   只有两分钟有效，全部运行态通过后再生成最长 15 分钟 proof 并立即执行绑定 scope。
+5. 上述规则只用于证明没有可执行 TRA caller；不改变旧 `race_live` 的治理决定，也不授权任何网络或写入。
+
 ## 2026-08-30 dangling 清理完成与 Celery readiness 修正
 
 1. 用户已单独授权并完成精确删除 Created/未运行的旧 `race_live_worker` 容器及其旧 image；删除前后必须
