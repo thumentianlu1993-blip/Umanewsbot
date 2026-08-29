@@ -2962,6 +2962,10 @@ PUBLIC_RACE_WHEN_FILTERS = {
     "upcoming": [RaceEventStatus.SCHEDULED, RaceEventStatus.RUNNING, RaceEventStatus.POSTPONED],
     "finished": [RaceEventStatus.FINISHED],
 }
+RACE_CALENDAR_QUERY_KEYS = frozenset(
+    {"tab", "region", "grade", "when", "year", "q", "direction", "cursor"}
+)
+RACE_CALENDAR_MALFORMED_QUERY_MARKERS = ("®ion=", "Â®ion=")
 
 
 def _race_date_label(event: RaceEvent, today) -> str:
@@ -3136,6 +3140,13 @@ def _race_calendar_queryset(request: HttpRequest, *, today):
     if tab not in {"all", "key"}:
         tab = "key"
     region = request.GET.get("region", "").strip()
+    public_regions = {
+        value
+        for value, _label in RacingRegion.choices
+        if value != RacingRegion.OTHER
+    }
+    if region not in public_regions:
+        region = ""
     direction = request.GET.get("direction", "").strip()
     cursor = request.GET.get("cursor", "").strip()
     year = request.GET.get("year", "").strip()
@@ -3265,6 +3276,42 @@ def _race_calendar_queryset(request: HttpRequest, *, today):
         window,
         None,
     )
+
+
+def _race_calendar_canonical_redirect_url(request: HttpRequest) -> str:
+    """Return a cheap canonical redirect for crawler-amplified query strings.
+
+    Some external crawlers have sent the HTML entity ``&amp;region=`` back as
+    ``®ion=``.  Copying those fragments into every filter link multiplies the
+    number of expensive calendar requests.  Drop unknown and contaminated
+    fields before any calendar query is evaluated.
+    """
+
+    if not request.GET:
+        return ""
+    has_unknown_key = any(key not in RACE_CALENDAR_QUERY_KEYS for key in request.GET)
+    has_malformed_fragment = any(
+        marker in value
+        for key in request.GET
+        for value in (key, *request.GET.getlist(key))
+        for marker in RACE_CALENDAR_MALFORMED_QUERY_MARKERS
+    )
+    if not has_unknown_key and not has_malformed_fragment:
+        return ""
+
+    canonical = request.GET.copy()
+    for key in list(canonical):
+        values = canonical.getlist(key)
+        if key not in RACE_CALENDAR_QUERY_KEYS or any(
+            marker in value
+            for value in (key, *values)
+            for marker in RACE_CALENDAR_MALFORMED_QUERY_MARKERS
+        ):
+            canonical.pop(key, None)
+            continue
+        canonical.setlist(key, values[-1:])
+    query_string = canonical.urlencode()
+    return f"{request.path}?{query_string}" if query_string else request.path
 
 
 def _group_race_events_by_date(events, *, today, anchor_date=None):
@@ -3487,6 +3534,9 @@ def _attach_race_term_display_names(event_records):
 
 
 def public_race_calendar(request: HttpRequest):
+    canonical_redirect_url = _race_calendar_canonical_redirect_url(request)
+    if canonical_redirect_url:
+        return redirect(canonical_redirect_url, permanent=True)
     shanghai_today = timezone.localdate(timezone=ZoneInfo("Asia/Shanghai"))
     events, filters, window, pagination = _race_calendar_queryset(
         request,
@@ -3512,8 +3562,10 @@ def public_race_calendar(request: HttpRequest):
     date_axis_spans_years = len({group["date"].year for group in groups if group["date"]}) > 1
     def filter_url(**changes):
         params = request.GET.copy()
-        params.pop("cursor", None)
-        params.pop("direction", None)
+        params.clear()
+        for key in ("tab", "region", "grade", "when", "year", "q"):
+            if key in request.GET and filters[key]:
+                params[key] = filters[key]
         for key, value in changes.items():
             if value:
                 params[key] = value

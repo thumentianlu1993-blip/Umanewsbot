@@ -1,5 +1,22 @@
 # 部署运行手册
 
+## 2026-08-29 PR #116 crawler 饱和止损与规范化 hotfix
+
+1. 当前生产是 revision `5863afae…3870` / image `4096114b…6ee1` / leaf `0075`。Phase 2 资源样本通过，
+   但 root 请求 20 秒超时，故已恢复 10 个 data-sync 开关全 false、停止专用 worker并恢复普通
+   worker/Beat；基线必须保持 `race_sync_v2=0 / race_live=7543`，不得直接派发 discovery。
+2. 诊断必须同时读 Web access log、请求 UA、`MemAvailable/SwapFree`、容器内存和公网延迟。本次 20 分钟
+   `1970` 个 crawler 请求、关键 4 分钟 `340` 个 crawler 请求；专用 worker 约 123.3 MiB、主机约
+   1.86 GiB 可用，因此按请求槽饱和处理，不按内存不足扩容。
+3. hotfix 无 migration。关闭态发布前后都要核对 10 false、专用 worker不存在、leaf `0075`、普通队列和
+   `race_sync_v2=0`、旧 `race_live=7543`、web/worker/Beat 精确 image/revision、公网 root/www。
+4. 发布后用一个包含 `%C2%AEion%3D` 与未知 query key 的 `/races/` URL 验证快速 301 到仅含合法字段的
+   canonical URL；再验证正常筛选 URL 200、HTML 使用 `&amp;`、链接不含污染片段。301 必须发生在
+   `_race_calendar_queryset` 前，不能先执行重查询再重定向。
+5. 至少观察一个新的 crawler 窗口，要求 root/www 在 20 秒门槛内稳定 200、无新增 5xx/OOM/restart，
+   ordinary queue 可归零且内存/swap 门禁不退化。通过后也必须从 Phase 1 重新做 zero-network census，
+   再进入 Phase 2 热身和单次 discovery；任一失败继续全关，不自动重试。
+
 ## 2026-08-29 identity transport allowlist hotfix 关闭态发布与重放
 
 1. 当前生产基线是 PR #115 revision `46911d56…b021` / image `42aae312…0bc5` / leaf `0075`；

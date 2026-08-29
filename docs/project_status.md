@@ -1,5 +1,19 @@
 # 项目状态文档
 
+## 2026-08-29 PR #116 已上线，Phase 2 因 crawler 饱和停止
+
+- 生产为 revision `5863afae…3870` / image `4096114b…6ee1` / leaf `0075`；关闭态 audit 和 Phase 1
+  115 场 census 通过，0 provider 请求、0 DB delta。
+- Phase 2 专用 worker 的 12 个样本约 123.3 MiB，最低 `MemAvailable=1857056 kB`、swap 未使用，资源
+  足够且暂不扩容；但 root 在 20 秒内无首字节，故未派发真实 discovery。
+- fail-closed 已恢复 10 false、停专用 worker并恢复普通 worker/Beat；`race_sync_v2=0 / race_live=7543`，
+  站点随后约 1 秒返回 200。遗留 ledger 保留，无新 enrollment/owner/claim/observation/revision。
+- 20 分钟日志有 1970 次 Meta/Facebook crawler 请求，关键 4 分钟 340 次；畸形 `®ion=` 参数被旧筛选
+  链接继续复制，耗尽 2×2 Gunicorn 请求槽。最小 follow-up 在 DB 前 canonical redirect，并只复制规范化
+  query；不增加进程或扩容。
+- 新增 2 测试通过；赛事相关 82 项为 80 pass + 2 个未修改 main 同样失败的日期 fixture 基线。修复待
+  合并/关闭态部署；生产继续全关，后续从 Phase 1 重走。
+
 ## 2026-08-29 PR #115 已上线，Phase 2 因 identity transport allowlist 止损
 
 - 生产为 revision `46911d56…b021` / image `42aae312…0bc5` / leaf `0075`；激活前 custom backup

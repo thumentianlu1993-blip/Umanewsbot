@@ -1,5 +1,32 @@
 # 当前状态
 
+## 2026-08-29 PR #116 已关闭态上线，Phase 2 因公网 crawler 饱和门禁停止
+
+- PR `#116` merge revision `5863afaea0d28b520ce9e2448451c707e9ed3870` 已以隔离 release
+  `/opt/umanews-release-5863afae-PR116-20260829T122308Z/umanewsbot` 和 image
+  `sha256:4096114bf8d436b328a007234e92e6f582db3bc7db5e084182f92e05bb1d6ee1` 关闭态上线；migration
+  no-op，leaf 仍精确为 `0075`。web/worker/Beat 同 revision/image，持久 runtime/TLS、Django check、
+  双域名和队列门禁通过。
+- 关闭态 zero-write audit 为 ready/valid/route drift 0，artifact 是
+  `/opt/umanewsbot-builds/pr116-5863afae/race-data-activation/audit-closed-pr116-20260829T122740Z.json`，
+  SHA-256 `f6ca01e…1da6`。Phase 1 重放 artifact 为
+  `phase1-final-20260829T124120Z.json`，SHA-256 `c7c255e3…8692`：115 场全 blocked、0 provider 请求、
+  0 DB delta，旧 `race_live=7543`。
+- Phase 2 专用 worker 的 12 个样本均约 `123.3 MiB`；最低 `MemAvailable=1857056 kB`、
+  `SwapFree=1310716 kB`，资源门禁通过，因此不扩容。但随后公网根页在 20 秒内无首字节，curl 以
+  exit 28 失败，尚未派发本轮真实 discovery。
+- 自动 trap 已恢复 10 个 data-sync 开关全 false、停止专用 worker并重建普通 worker/Beat。只读复核为
+  `race_sync_v2=0 / race_live=7543`，站点随后恢复到约 1 秒、HTTP 200；主机
+  `MemAvailable≈1.86 GiB`、swap 未使用。PR #115 失败遗留的保守 capacity ledger 1 request/2 MiB
+  保留，未新增 enrollment/owner/claim/observation/revision。
+- 失败窗口 20 分钟有 `1970` 次 Meta/Facebook crawler 请求；20:44–20:47 有 `340` 次 crawler、`341`
+  次 `/races/`，当前 Gunicorn 只有 `2 workers × 2 threads`。crawler URL 反复含 `®ion=`/`Â®ion=`，而赛事
+  日历旧逻辑会复制当前请求的全部 query 参数，导致畸形参数进入大量筛选链接并放大重查询。
+- 最小修复保持 2+1 内存配置不变：畸形/未知 query 在任何日历 DB 查询前 301 到清洁 URL，筛选链接只复制
+  规范化 allowlist 字段，非法地区归一为空。2 个新增测试通过；相关 82 项为 80 pass + 2 个
+  `public_year` 日期 fixture 基线错误，后两项已在未修改 `origin/main@5863afae` 原样复现。该修复尚未
+  合并或部署；生产继续全关，不从失败的 Phase 2 中间续跑。
+
 ## 2026-08-29 PR #115 已上线并在 Phase 2 transport allowlist 门禁止损
 
 - PR `#115` merge revision `46911d56524f61ff4a50ad1c62ead46e77b1b021` 已以隔离 release
