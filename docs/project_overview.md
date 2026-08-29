@@ -1,10 +1,12 @@
 # 项目总览
 
-2026-08-29 已取得 Meta/Facebook 赛事入口防护授权。候选在 Nginx 同时覆盖 HTTP/HTTPS，只对
-`meta-externalagent` / `facebookexternalhit` 请求的精确 `/races/` 与 `/static/` 字体返回 `429`；不全站
-封禁、不按 IP、不扩内存、不改数据链路。配置合同与容器化 `nginx -t` 已通过，尚待关闭态合并/发布和
-20 秒公网重验。通过后五阶段仍从 future discovery 第一阶段重走，任一门禁失败保持新写入全关且旧
-`race_live` 不动。
+2026-08-29 PR `#119` 的 Meta/Facebook 精确 `/races/`/字体 `429` 已上线；六轮约 5 分钟公网窗口通过，
+目标请求不再进入 Django，普通页面、Nginx/Web 稳定性和内存门禁正常。Phase 1 重新通过后，Phase 2
+专用 worker 仅约 124.7 MiB，证明现有主机无需扩容；但首次真实 discovery 的 Celery `SUCCESS` 业务上是
+`blocked/future_discovery_contract_invalid`，自动保护已恢复 10 false、停止专用 worker并保持旧
+`race_live=7543`。根因是 apply 错误要求 roster 路径列表字典序，而 builder 保留合法声明顺序。最小 hotfix
+只禁止重复并保留与 resolved route 的逐项精确比对，不改 provider、digest、policy 或 transport；聚焦回归
+`77/77` 通过。关闭态合并/发布后必须从 Phase 1 重走，不能继承失败阶段。
 
 2026-08-29 PR `#117` 已以 revision `6e6d7977…e04`、image `cb3852e4…663c` 关闭态上线，migration no-op、
 leaf `0075`，PR #116 rollback tag 已固定。正确的 sync-mount zero-write audit 为 ready/valid，畸形赛事

@@ -1,15 +1,27 @@
 # 当前状态
 
-## 2026-08-29 Meta/Facebook 赛事入口 429 已获授权，候选待关闭态发布
+## 2026-08-29 PR #119 入口保护已上线，Phase 2 因 manifest 顺序契约止损
 
-- 用户已明确授权入口防护。候选只识别 `meta-externalagent` / `facebookexternalhit`，且只在 URI 为精确
-  `/races/` 或 `/static/` 下 `woff/woff2/ttf/otf` 字体时返回 `429`；普通用户、其他 crawler、其他页面、
-  ACME、healthz、媒体与非字体静态资源维持原行为。
-- 规则由 Nginx `map` 在入口层判定，并同时放入 HTTP/HTTPS server；不增加 Web/Celery 进程、不修改
-  schema、provider、容量或业务写路径。配置合同测试 `5/5`、容器化 `nginx -t` 已通过。
-- 当前尚未合并或生产发布。生产仍以 PR #117 关闭态运行，10 个 data-sync 开关全 false、专用 worker
-  不运行；发布后必须先验证 Meta 命中为 429、普通页面为 200、Django 不再收到同类请求及 20 秒公网窗口，
-  全部通过才从 Phase 1 重走。旧 `race_live=7543` 不触碰。
+- PR `#119` 已合并为 `474aad1430d1451ad4e45713bd3d50a5f889ab9b`。生产 Nginx 当前配置 SHA-256
+  为 `7bc8fd14…934`；单文件 bind 因 inode 固定不能靠 reload 换入新内容，已在 `nginx -t` 通过后只重建
+  Nginx 容器。Meta/Facebook 对精确 `/races/` 与字体返回 `429`，普通 root/www/races 返回 `200`，精确目标
+  未再进入 Django；约 5 分钟六轮公网门禁均在 20 秒内通过，Nginx/Web restart、OOM、5xx 为 0。
+- 关闭态 audit artifact 为
+  `/opt/umanewsbot-builds/pr119-474aad14/race-data-activation/audit-closed-pr119-20260829T151756Z.json`，
+  SHA-256 `a11ee227…b87`；`ready/valid/route_drift=[]/would_write=false`。Phase 1 artifact SHA-256
+  `50b8db97…0e`，115 场全 blocked、0 provider 请求、数据库前后 SHA 相同。
+- Phase 2 专用 worker 约 `124.7 MiB`，12 个样本最低 `MemAvailable=1829468 kB`、swap 未使用，现有主机
+  无需扩容。随后只派发一次真实 discovery，Celery terminal 为 `SUCCESS`，但业务终态为
+  `blocked/future_discovery_contract_invalid`；日志精确为
+  `manifest entry allowed_path_prefixes is invalid`，因此不得视为成功。
+- 自动止损已恢复 10 个 data-sync 开关全 false、停止专用 worker并恢复普通 worker/Beat；当前
+  `celery=0 / race_sync_v2=0 / race_live=7543`，旧队列未消费。失败前 3 个受控 provider 请求只新增 1 条
+  source identity 与 3 条 capacity ledger 证据；enrollment、data-sync owner、checkpoint、observation、
+  revision 和 active claim 均为 0，证据不删除。
+- 根因是 manifest 生成器保留已审路由声明顺序，而应用器额外要求 `allowed_hosts/allowed_path_prefixes`
+  必须字典序；生产 TRA 的窄结果路径故意先于宽前缀，因而同一 roster 自己生成的 manifest 被拒。最小修复
+  改为要求列表非空、字符串且无重复，同时保留原顺序与 route binding 精确比对；不修改 route/registry
+  digest、冻结 policy 或 transport。聚焦回归 `77/77` 已通过，待合并并关闭态部署后从 Phase 1 全量重走。
 
 ## 2026-08-29 PR #117 已关闭态上线，激活因 20 秒公网门禁再次停止
 

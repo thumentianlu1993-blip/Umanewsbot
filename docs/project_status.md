@@ -1,11 +1,17 @@
 # 项目状态文档
 
-## 2026-08-29 Meta/Facebook 赛事入口 429 候选已通过本地门禁
+## 2026-08-29 PR #119 已上线，manifest hotfix 通过本地门禁
 
-- 已获用户授权；规则仅匹配两个 Meta/Facebook UA 和精确赛事页/字体 URI，HTTP/HTTPS 都返回 429，
-  不改变普通流量、schema、provider、Web/Celery sizing 或旧队列。
-- Nginx 合同 `5/5` 与容器化语法检查通过；尚未合并、部署或启用自动化。生产继续 10 false、专用 worker
-  absent，发布和公网窗口通过后从 Phase 1 重走，不继承旧阶段证据。
+- PR #119 的 Meta/Facebook 精确 429 已在生产生效；约 5 分钟六轮公网样本均通过，目标 crawler 不再进入
+  Django，普通 root/www/races 200，Nginx/Web 无新增 5xx、OOM 或 restart。
+- Phase 1 为 115 blocked、0 request、0 DB delta。Phase 2 内存热身通过且无需扩容；首次 discovery
+  terminal 为 `SUCCESS`，业务却为 `blocked/future_discovery_contract_invalid`，故已自动回到 10 false、
+  专用 worker stopped、`celery=0 / race_sync_v2=0 / race_live=7543`。
+- 失败窗口产生 3 次 provider 请求、1 条 source identity 与 3 条 ledger 证据；没有 enrollment、data-sync
+  owner、checkpoint、observation、revision 或 active claim，证据保留。
+- 最小修复让 manifest 路由列表保留 roster 顺序、只拒绝重复，并继续逐项校验 resolved route；未改
+  provider/digest/policy/transport。聚焦 R0/provider/audit 回归 `77/77` 通过，待 PR 合并和关闭态上线后
+  从 Phase 1 重新开始。
 
 ## 2026-08-29 PR #117 已上线，公网 20 秒门禁仍失败
 

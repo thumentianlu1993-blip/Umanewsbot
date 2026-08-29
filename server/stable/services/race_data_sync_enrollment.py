@@ -847,7 +847,7 @@ def apply_race_data_enrollment_manifest(
             if (
                 not isinstance(values, list)
                 or not values
-                or values != sorted(set(values))
+                or len(values) != len(set(values))
                 or any(not isinstance(value, str) or not value for value in values)
             ):
                 raise ValueError(f"manifest entry {label} is invalid")

@@ -1,5 +1,16 @@
 # 关键决策
 
+## 2026-08-29 manifest 路由列表保持 roster 声明顺序，只禁止重复
+
+- `allowed_hosts` / `allowed_path_prefixes` 的安全合同是非空字符串、无重复，并与当前 resolved route 的列表
+  逐项相等；前缀匹配不要求字典序。builder 既然从已审 roster 原样生成 manifest，apply 不得再施加 builder
+  没有保证且 transport 不需要的排序条件。
+- 不重排 TRA roster 常量，也不对 manifest 静默排序：两者都会改变 route/registry digest 或破坏与冻结
+  standing policy 的精确绑定。修复只把 `values == sorted(set(values))` 收窄为唯一性校验，后续 route-drift
+  精确比较保持不变，重复值仍在任何事件写入前失败。
+- Phase 2 的 3 次 provider 请求及新增 identity/ledger 是失败证据，保留而不清理；它们不是 enrollment 或
+  发布成功。hotfix 必须在 10 false 下发布，随后 Phase 1/Phase 2 全部重走，不能从已经失败的 task 续跑。
+
 ## 2026-08-29 Meta/Facebook 入口防护采用赛事路径级 429
 
 - 用户已确认采用 Nginx 入口规则，不使用扩内存制造公网门禁通过。UA 只匹配大小写不敏感的
@@ -7,7 +18,7 @@
   `woff/woff2/ttf/otf`，返回 `429`。
 - 不做全站 UA 封禁，也不按来源 IP 封禁：Meta 来源 IP 分散且会变化；全站封禁会扩大社交预览影响。
   规则同时覆盖 HTTP/HTTPS，其他 UA/URI 必须走原 location/proxy/alias。
-- 此授权只覆盖入口保护及其关闭态发布。五阶段启用仍逐门禁推进；任一公网、资源、队列、业务终态或
+- 入口规则已通过 PR #119 上线；五阶段启用仍逐门禁推进。任一公网、资源、队列、业务终态或
   zero-write/write-delta 门禁失败，立即恢复 10 false、停止专用 worker且不消费旧 `race_live`。
 
 ## 2026-08-29 应用 canonical redirect 不能替代分布式 crawler 入口防护

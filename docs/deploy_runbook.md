@@ -1,10 +1,26 @@
 # 部署运行手册
 
+## 2026-08-29 manifest 路由顺序 hotfix 关闭态发布与重放
+
+1. 当前入口保护已上线，但 data-sync 因 `future_discovery_contract_invalid` 自动收口：发布前必须再次确认
+   10 个开关全 false、专用 worker stopped、`race_sync_v2=0`、旧 `race_live=7543`、leaf `0075`，并保留
+   Phase 2 的 identity/ledger 证据。
+2. hotfix 无 migration、无 provider/route/digest/policy 变化；精确 diff 只能把 manifest 路由列表的排序要求
+   改为无重复要求，并补“生产同型非字典序可 apply”和“重复值零写入拒绝”测试。合并后以精确 merge SHA
+   构建隔离 image/release，全 false 切换，migration plan 必须为空且 leaf 仍为 `0075`。
+3. 关闭态发布后重验：三服务同 revision/image、PR #119 Nginx 规则仍在容器内、普通公网 200、Meta 精确
+   目标 429、zero-write audit ready/valid/route drift 0、队列与旧 `race_live` 不变。备份须校验 size、0600、
+   SHA-256 与 PostgreSQL 16 `pg_restore --list`；无足够磁盘时不得用未验证的新备份替换既有有效恢复点。
+4. 必须从 Phase 1 重新生成 0-network census；Phase 2 重新热身后只派发一次 discovery，并同时读取 Celery
+   terminal 与业务终态。只有 `enrollment_applied`、manifest apply 决策、identity/ledger/enrollment/owner
+   delta 全部相符才可继续 time/racecard；`SUCCESS/blocked` 立即走 fail-closed。
+5. 任一门禁失败：停 Beat、drain 普通任务、10 false、停专用 worker、恢复普通 worker/Beat，确认
+   `race_sync_v2=0`、公网可用及 `race_live=7543`；不删除失败证据、不自动重试、不跳到 lifecycle/result。
+
 ## 2026-08-29 Meta/Facebook 赛事入口 429 发布与激活前验收
 
-1. 入口修复必须在 10 个 data-sync 开关全 false、专用 worker absent、leaf `0075`、旧
-   `race_live=7543` 的关闭态发布；先用 `docker inspect` 确认 Nginx 实际 bind source，保留精确旧配置/
-   image 回滚点，候选必须通过 `nginx -t` 才可平滑 reload/recreate。
+1. 入口修复已通过 PR #119 在 10 false 下发布。单文件 bind 替换后必须用 `docker inspect` 与容器内 SHA
+   验证实际内容；宿主文件更新加 reload 不会替换已绑定 inode，必要时在 `nginx -t` 通过后只重建 Nginx。
 2. HTTP/HTTPS 都要验证：Meta/Facebook UA 请求 `/races/` 和字体返回 `429`；普通 UA 对 root、www、
    `/races/`、筛选赛事页、`/healthz/`、`/admin/login/` 返回预期 200；Meta 对非赛事普通路由不被规则误伤。
 3. 从 Nginx 与 Web 两侧核对新窗口：命中 429 的请求不得进入 Django，近期 5xx/OOM/restart 为 0，
