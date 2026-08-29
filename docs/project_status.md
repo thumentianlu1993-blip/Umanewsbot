@@ -1,5 +1,17 @@
 # 项目状态文档
 
+## 2026-08-30 PR #127 已上线，result/public 等待真实赛时
+
+- 生产 revision `a040af3c…257f`、image `7eb5c329…9628d`、leaf `0075`；generation 2 registry 已激活，
+  仅纳管 event 956。新恢复点 487733802 bytes、0600、SHA/TOC 均通过。
+- future discovery、`race_time/racecard`、lifecycle 三阶段已通过；event 956 的实际 provider 结果完成
+  `race_time,racecard` apply，lifecycle smoke 无 error。result apply/public 当前开启，checkpoint 自然等待
+  `2026-08-30 14:13:00Z`；correction 仍关闭。
+- `celery=0 / race_sync_v2=0 / race_live=7543`，旧队列未消费或删除。专用 worker 384 MiB 上限，容器
+  restart=0、OOM=false；内存、Swap 与约 16.86 GB 磁盘均通过冻结容量，无需扩容。
+- 当前任务已安排真实赛时自动续验：先核对 lifecycle、provider、数据库 publication 和公网结果，再在独立
+  发布锁内开启 correction 并观察一周期。任一门禁失败立即 10 false、移除专用 worker并保持新写入关闭。
+
 ## 2026-08-30 proof-only 部署因 legacy queue 合同冲突先修正
 
 - PR `#125` 已合并、未部署；生产健康但当时普通任务仍在执行，`celery=2 / race_sync_v2=0 /

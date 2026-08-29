@@ -1,5 +1,27 @@
 # 当前状态
 
+## 2026-08-30 PR #127 已上线，赛事生命周期进入真实赛时验收
+
+- PR `#127` 已以 revision `a040af3c…257f`、image `7eb5c329…9628d` 上线，Django migration leaf
+  精确为 `0075`。发布前后均未消费、迁移或删除旧 `race_live`，队列保持 `7543`；当前与即时回滚 image
+  均保留，dangling image 为 0。
+- generation 2 已只纳管仍符合条件的 event 956；6 个已结束的 predecessor 不复制到 successor roster。
+  最终 registry raw SHA 为 `28c327c0…b1a9`、membership SHA 为 `b2907002…54cc`，控制面已切换到
+  `enforce / schedule_generation=2`。注册 promotion 自动生成的新备份为
+  `rds_horse_news_20260829T215423Z_3070249.dump`，487733802 bytes、0600、SHA
+  `1606a014…f85`，`pg_restore --list` 为 1359 行。
+- future discovery、`race_time/racecard` 与 lifecycle 已依次通过独立窗口。event 956 的 provider 实际结果
+  为 `processed=true / complete`，应用 `race_time,racecard`；lifecycle Celery smoke 为 `complete`，未产生
+  错误或重复 transition。数据同步专用 worker 在阶段间均按门禁移除或重建。
+- result apply/public 窗口已开启，correction 继续为 false。首次真实 selector/provider 已成功刷新
+  `race_time,racecard`，result checkpoint 仍按赛事时间自然等待 `2026-08-30 14:13:00Z`，未手工修改 due
+  time、claim 或数据库。event 956 的真实赛果、公开页和更正自动化须在 T/T+3 后依次验证，不能用任务
+  `SUCCESS` 代替业务结果或公开可见性。
+- 当前队列为 `celery=0 / race_sync_v2=0 / race_live=7543`；专用 worker 内存上限 384 MiB，服务 revision/
+  image 一致且 restart=0、OOM=false。最近热身窗口 `MemAvailable` 约 1.94–1.99 GB、Swap 完整、磁盘约
+  16.86 GB，均高于冻结门槛，无需扩容。已建立当前任务内的定时续跑，在真实赛时检查 lifecycle、result
+  apply/public 与公网，再仅在全部通过后开启 correction；任一门禁失败立即 10 false 并移除专用 worker。
+
 ## 2026-08-30 Racing API proof 发布前关闭 legacy queue 合同冲突
 
 - proof-only PR `#125` 已合并到 `main@865a41a0…5201`，尚未部署。生产只读盘点为

@@ -1,5 +1,12 @@
 # 项目总览
 
+2026-08-30 PR `#127` 已以 `a040af3c…257f` / `7eb5c329…9628d` 上线，migration leaf 为 `0075`。
+future discovery、赛时/出马表和 lifecycle 已按冻结容量依次通过，generation 2 只纳管仍有效的 event 956；
+已结束的 predecessor 不复制到 successor cohort。result apply/public 已开启并等待 event 956 的真实 T+3，
+correction 仍关闭，只有真实 provider、数据库、publication 与公网结果页全部一致后才会单独放行。旧
+`race_live=7543` 全程未动；当前资源高于冻结门槛，无需扩 RAM。任一后续门禁失败仍执行 10 false、移除
+专用 worker并恢复普通 worker/Beat。
+
 2026-08-30 proof-only PR `#125` 合并后、部署前发现与现有生产边界冲突：generator 原本要求所有 Redis 队列
 为 0，但旧 `race_live=7543` 是明确不得消费或清理的冻结 backlog。部署已暂停并改为证明“不可执行”而非
 删除历史：默认/新同步队列必须为 0，live/data-sync 网络开关全关，不得存在专用 worker 容器，Celery 只能

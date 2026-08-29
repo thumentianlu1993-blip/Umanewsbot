@@ -1,5 +1,26 @@
 # 部署运行手册
 
+## 2026-08-30 PR #127 当前生产基线与 event 956 收尾步骤
+
+1. 当前唯一验收基线为 revision `a040af3c…257f`、image `7eb5c329…9628d`、migration leaf `0075`、
+   generation 2 event 956。registry raw SHA `28c327c0…b1a9`，membership SHA `b2907002…54cc`；恢复点
+   `rds_horse_news_20260829T215423Z_3070249.dump` 必须继续满足 487733802 bytes、0600、SHA
+   `1606a014…f85` 和 1359 行 TOC。
+2. event 956 开赛时间为 `2026-08-30 22:10 Asia/Shanghai`，result checkpoint 为
+   `2026-08-30 14:13:00Z`。不得改 due time/claim、不得直接 SQL 补写。T/T+30 检查 lifecycle；T+3 后分别
+   检查 provider business result、result checkpoint、结果/发布记录及 root/www/races/赛事结果页。
+3. result/public 当前为 true，correction 为 false。只有上述四层证据全部一致，才重新取得 production
+   manual-release lock，保持其他开关不变并单独开启 correction；观察至少一个无 error、无重复写、无 revision
+   反转的完整周期后才记录完成。
+4. 每次窗口先检查 `MemAvailable>=1572864 kB`、`SwapFree>=524288 kB`、free disk
+   `>=8589934592`、`celery=0`、`race_sync_v2=0`、`race_live=7543`，以及锁、active/reserved、容器
+   revision/image/restart/OOM、公网页。旧 `race_live` 禁止消费、删除、迁移；另一个发布任务持锁时只等待，
+   不抢占或删除其 lock。
+5. 任一门禁失败立即停止当前阶段：10 个 data-sync 开关全 false，删除专用 `race_sync_v2_worker`，恢复普通
+   worker/Beat，再验证 `celery=0 / race_sync_v2=0 / race_live=7543` 和公网。失败窗口不得事后改写为通过。
+6. 真实赛时续跑由当前任务的 heartbeat `umanews-event-956` 承接。完成 result/public 与 correction 后，回写
+   五份项目文档、暂停该 heartbeat，并以最终生产证据结束本次发布。
+
 ## 2026-08-30 Racing API exclusive proof 的 legacy `race_live` 验收口径
 
 1. `race_live=7543` 是冻结历史 backlog，禁止为了 proof 执行 `DEL`、`PURGE`、迁移、消费或启动旧 worker。

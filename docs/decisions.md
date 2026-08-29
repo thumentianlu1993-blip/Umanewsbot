@@ -1,5 +1,17 @@
 # 关键决策
 
+## 2026-08-30 generation 2 只继承仍可执行成员，赛果与更正分开放行
+
+- lifecycle successor registry 只包含创建时仍符合 selector 条件的赛事；已结束 predecessor 不为维持成员数而
+  复制。本轮 generation 1 的 6 个已结束成员自然退出，generation 2 只纳管 event 956，属于预期 cohort
+  收敛，不是成员丢失。
+- result apply/public 可以在真实赛时前保持开启，以便 checkpoint 按 T+3 自然到期；禁止直接修改 due time、
+  claim 或手工补写结果来提前验收。必须分别证明 provider 终态、数据库 apply/publication 和真实公网结果页，
+  Celery `SUCCESS` 只证明任务终止状态。
+- correction 是 result/public 通过后的独立门禁。只有 event 956 的真实赛果和公开页全部通过，才在新的发布锁
+  内单独开启并观察一个完整周期；否则保持 false。任一资源、队列、锁、路由、worker 或业务门禁失败均立即
+  关闭 10 个 data-sync 开关、移除专用 worker并恢复普通 worker/Beat；旧 `race_live=7543` 始终不动。
+
 ## 2026-08-30 exclusive proof 允许不可执行的 legacy backlog，但拒绝任何消费能力
 
 - 决定：旧 `race_live=7543` 已被项目冻结为不得清理、迁移或消费的历史 backlog，不能为了生成 Racing API
