@@ -1,5 +1,15 @@
 # 项目状态文档
 
+## 2026-08-30 内存门禁失败后已安全关闭赛事同步
+
+- 普通 worker 增长到约 1.344 GiB，`MemAvailable` 先降到 751020 kB、随后最低约 528300 kB；Swap 与
+  16.85 GB 磁盘正常。该窗口按门禁失败处理，不以任务成功或内存稍后回升改写结论。
+- 已等待并尊重其他 proof 的 `manual-release` 锁，随后在新锁内完成双 env 10 false、移除专用 worker、
+  重建 PR #127 Web/普通 worker/Beat。最终 `celery=0 / race_sync_v2=0 / race_live=7543`，三服务
+  10 false，公网 200，内存恢复约 2.05 GB。
+- result/public 现已关闭，correction 从未开启；event 956 的自然赛果仍未验证。先实现普通 worker
+  prefetch/child recycling/512 MiB cgroup hotfix，并在关闭态通过三个调度周期，之后才从 discovery 重走。
+
 ## 2026-08-30 PR #127 已上线，result/public 等待真实赛时
 
 - 生产 revision `a040af3c…257f`、image `7eb5c329…9628d`、leaf `0075`；generation 2 registry 已激活，

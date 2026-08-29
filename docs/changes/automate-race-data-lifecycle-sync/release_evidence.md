@@ -1,6 +1,16 @@
 # 赛事数据生命周期生产发布证据
 
-更新时间：2026-08-30 06:33 Asia/Shanghai
+更新时间：2026-08-30 06:40 Asia/Shanghai
+
+## 2026-08-30 06:36 内存门禁失败与关闭态
+
+- `2026-08-29T22:36:06Z` `MemAvailable=751020 kB < 1572864 kB`，后续最低约 528300 kB；普通
+  worker cgroup 约 1.344 GiB，是主要异常占用。Swap 完整、磁盘约 16.85 GB。
+- 先等待并尊重其他任务持有的 `manual-release` 锁；其停止联网并安全释放后，本窗口另取锁执行止损。
+- 双 env 10 false，`race_sync_v2_worker` 已移除；Web/普通 worker/Beat 以当前 image 重建。终态
+  `MemAvailable=2050808 kB`、三队列 `0/0/7543`、root/www healthz 200、锁 absent。
+- 本文件下方的 result/public “赛前窗口已开启”现只作为历史阶段证据；当前权威状态是全部新写入关闭。
+  correction 从未开启，result checkpoint 未提前执行。完成普通 worker 内存保护 hotfix 和新热身前不得重开。
 
 ## 发布身份与恢复点
 

@@ -1,5 +1,17 @@
 # 关键决策
 
+## 2026-08-30 普通 Celery 必须有任务后回收与 512 MiB host 保护
+
+- 生产普通 worker 在 concurrency=1 下仍从约 129–292 MiB 增长到 1.344 GiB，并把 host
+  `MemAvailable` 压到 751020 kB；重启后立即恢复到 2.05 GB，证明扩容不是首选，问题是长寿命 Celery
+  子进程的任务后内存滞留/异常峰值。
+- 在赛事写入重新开启前，普通 worker 启动合同增加 `prefetch-multiplier=1`、可配置
+  `max-tasks-per-child` 与 `max-memory-per-child`，并在三份 Compose 给普通 worker 设置默认 512 MiB
+  cgroup 上限。子进程超过软阈值在任务完成后回收；单任务失控则由 cgroup 阻止拖垮整机。
+- 该保护必须先在隔离测试覆盖参数/Compose 合同，再以 10 false 发布，观察普通调度峰值、OOM/restart、
+  redelivery/重复副作用与 1536 MiB host 门槛。只有新窗口稳定才从 future discovery 全量重走；当前不扩 RAM、
+  不降低门槛、不用 swap/drop cache 制造通过读数。
+
 ## 2026-08-30 generation 2 只继承仍可执行成员，赛果与更正分开放行
 
 - lifecycle successor registry 只包含创建时仍符合 selector 条件的赛事；已结束 predecessor 不为维持成员数而

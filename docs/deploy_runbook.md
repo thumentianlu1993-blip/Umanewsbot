@@ -1,5 +1,22 @@
 # 部署运行手册
 
+## 2026-08-30 普通 Celery 内存 fail-closed 与重新启用前置门禁
+
+1. 本轮门禁失败证据为 `MemAvailable=751020 kB`（后续最低约 528300 kB），普通 worker cgroup
+   约 1.344 GiB；Swap 与磁盘正常。先归因普通 worker，不扩 RAM、不修改 PostgreSQL/Redis 或 OneBot。
+2. 锁被其他窗口持有时只通知 holder 安全退出并等待，不删除锁。取得新 `manual-release` 锁后停 Beat/
+   dedicated/ordinary/Web，双 env 10 false、删除 dedicated，再按 Web healthy -> ordinary -> Beat 恢复；
+   `race_live` 始终必须精确 7543。
+3. 当前关闭态为 PR #127 image/revision、leaf 0075、Web healthy、ordinary/Beat running、dedicated absent、
+   三服务 10 false、`celery=0 / race_sync_v2=0 / race_live=7543`，可用内存恢复到约 2.05 GB。
+4. 新代码须为普通 worker 增加 prefetch=1、max-tasks-per-child、max-memory-per-child，并在三份 Compose
+   设置 512 MiB 默认 cgroup；参数必须可由 env 收窄或覆盖，默认不扩大 concurrency。
+5. 关闭态 hotfix 发布后，至少观察三个普通 Beat 周期：队列须在 5 分钟内自然归零，active/reserved/
+   scheduled 清空，worker restart/OOM=0，Celery 业务失败和重复副作用为 0，所有热身样本均满足
+   `MemAvailable>=1572864 kB`。失败则保持 10 false，不重开专用 worker。
+6. 只有上述门禁通过，才从 future discovery -> time/racecard -> lifecycle -> result/public 重新开新窗口；
+   correction 仍是最后独立门禁。event 956 due time/claim 不人工改写，旧失败窗口不复用。
+
 ## 2026-08-30 PR #127 当前生产基线与 event 956 收尾步骤
 
 1. 当前唯一验收基线为 revision `a040af3c…257f`、image `7eb5c329…9628d`、migration leaf `0075`、

@@ -1,5 +1,22 @@
 # 当前状态
 
+## 2026-08-30 普通 Celery 内存越线，赛事同步已 fail-closed
+
+- `2026-08-29T22:36:06Z` 生产 `MemAvailable=751020 kB`，低于冻结门槛 `1572864 kB`；随后最低读到
+  约 528300 kB。Swap 仍完整、磁盘约 16.85 GB，异常主因不是容量账本或磁盘，而是普通
+  `umanewsbot-worker-1` cgroup 已增长到约 1.344 GiB；同次拆账 DB 约 23.6 MiB、Redis 约 29.8 MiB。
+- 发现门禁时另一个只读 proof 窗口正持 `manual-release` 锁。已通知其停止联网并走安全退出；未删除、抢占
+  或伪造对方锁。锁正常释放后才取得新锁执行止损，期间旧 `race_live` 未消费或删除。
+- `22:38:41Z` 起停 Beat、专用 worker、普通 worker 与 Web，把 canonical/release 两份 env 的 10 个
+  data-sync 开关全部设为 false，移除 `race_sync_v2_worker`，再以当前 PR #127 image 重建 Web/普通
+  worker/Beat。未修改 due time、claim、result 行、registry、migration 或 Redis backlog。
+- `22:39:32Z` 终态：锁 absent，Web healthy，普通 worker/Beat running，专用 worker absent；三服务均
+  10 false，`celery=0 / race_sync_v2=0 / race_live=7543`，root/www healthz 200。普通 worker 回到约
+  129 MiB，`MemAvailable=2050808 kB`、Swap 完整、磁盘约 16.85 GB。
+- result/public 的赛前窗口已经关闭，correction 从未开启；event 956 的 result checkpoint 尚未自然执行。
+  在普通 worker 增加子进程回收和 host-safe cgroup 上限、完成回归与新的热身窗口前，不重开任何新写入，
+  也不因当前内存恢复而追溯把失败窗口改为通过。
+
 ## 2026-08-30 PR #127 已上线，赛事生命周期进入真实赛时验收
 
 - PR `#127` 已以 revision `a040af3c…257f`、image `7eb5c329…9628d` 上线，Django migration leaf

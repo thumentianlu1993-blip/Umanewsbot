@@ -100,7 +100,7 @@
 - [x] (operations) 所有新开关关闭应用 0074/0075，验证 web/worker/Beat 同 image/revision、healthz、迁移和
   flag-off 三零；磁盘低于 8 GiB 时停止。
 - [ ] (operations) 写入冻结容量与 allowlist，按 future discovery -> network/time/racecard -> lifecycle ->
-  result apply/public -> correction 顺序启用；当前已通过 result apply/public 的赛前窗口，correction 保持关闭，
-  等待 event 956 真实 T+3 后核对 revision、公开页与错误率。
+  result apply/public -> correction 顺序启用；原 result/public 赛前窗口因普通 worker 内存越线已 10 false，
+  correction 从未开启。先完成 child recycling/cgroup hotfix 和关闭态热身，再从 future discovery 全量重走。
 - [x] (operations) 已验证 `race_sync_v2_worker` 只消费新队列、普通 worker 只消费 `celery`，旧
   `race_live=7543` 不变；当前/回滚镜像和 release evidence 均已记录。
