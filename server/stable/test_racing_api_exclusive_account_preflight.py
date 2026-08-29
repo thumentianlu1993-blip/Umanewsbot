@@ -39,6 +39,7 @@ class RacingApiExclusiveAccountPreflightTests(TestCase):
         host_role: str,
         host_name: str,
         matches: list[dict] | None = None,
+        containers: list[dict] | None = None,
     ) -> tuple[Path, str]:
         payload = {
             "schema_version": "racing-api-host-process-preflight.v2",
@@ -49,7 +50,9 @@ class RacingApiExclusiveAccountPreflightTests(TestCase):
             "scope_manifest_sha256": "a" * 64,
             "host_ps_available": True,
             "docker_ps_available": True,
-            "containers": [{"id": "abcdef123456", "name": "umanews-web"}],
+            "containers": containers
+            if containers is not None
+            else [{"id": "abcdef123456", "name": "umanews-web"}],
             "matching_processes": matches or [],
             "network_requests": 0,
             "database_writes": 0,
@@ -68,6 +71,7 @@ class RacingApiExclusiveAccountPreflightTests(TestCase):
             "reserved_count": 0,
             "scheduled_count": 0,
             "active_confirm_count": 0,
+            "subscribed_queues": ["celery"],
         }
 
     @staticmethod
@@ -129,6 +133,7 @@ class RacingApiExclusiveAccountPreflightTests(TestCase):
                 ["runner", "production"],
             )
             self.assertEqual(proof["database_writes"], 0)
+            self.assertEqual(proof["evidence"]["queue_lengths"]["race_live"], 0)
             self.assertEqual(stat.S_IMODE(output.stat().st_mode), 0o600)
             self.assertEqual(
                 datetime.fromisoformat(proof["valid_until"].replace("Z", "+00:00"))
@@ -136,6 +141,79 @@ class RacingApiExclusiveAccountPreflightTests(TestCase):
                 timedelta(minutes=15),
             )
             self.assertEqual(len(hashlib.sha256(output.read_bytes()).hexdigest()), 64)
+
+    def test_preserves_closed_legacy_race_live_backlog(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            now = datetime(2026, 8, 30, 0, 0, tzinfo=timezone.utc)
+            runner_path, runner_sha = self._host_evidence(
+                root, now=now, host_role="runner", host_name="mac-runner"
+            )
+            production_path, production_sha = self._host_evidence(
+                root, now=now, host_role="production", host_name="production-host"
+            )
+            with patch.object(
+                self,
+                "_queues",
+                return_value={"celery": 0, "race_live": 7543, "race_sync_v2": 0},
+            ):
+                proof = self._generate(
+                    root=root,
+                    now=now,
+                    runner_host_path=runner_path,
+                    runner_host_sha=runner_sha,
+                    production_host_path=production_path,
+                    production_host_sha=production_sha,
+                )
+            self.assertEqual(proof["evidence"]["queue_lengths"]["race_live"], 7543)
+
+    def test_nonzero_executable_queue_or_network_worker_container_fails_closed(self):
+        now = datetime(2026, 8, 30, 0, 0, tzinfo=timezone.utc)
+        for case, queues, containers, message in (
+            (
+                "default_queue",
+                {"celery": 1, "race_live": 7543, "race_sync_v2": 0},
+                None,
+                "queues are not empty",
+            ),
+            (
+                "new_sync_queue",
+                {"celery": 0, "race_live": 7543, "race_sync_v2": 1},
+                None,
+                "queues are not empty",
+            ),
+            (
+                "race_live_worker",
+                {"celery": 0, "race_live": 7543, "race_sync_v2": 0},
+                [{"id": "abcdef123456", "name": "umanewsbot-race_live_worker-1"}],
+                "worker container is present",
+            ),
+        ):
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                runner_path, runner_sha = self._host_evidence(
+                    root, now=now, host_role="runner", host_name="mac-runner"
+                )
+                production_path, production_sha = self._host_evidence(
+                    root,
+                    now=now,
+                    host_role="production",
+                    host_name="production-host",
+                    containers=containers,
+                )
+                with (
+                    patch.object(self, "_queues", return_value=queues),
+                    self.assertRaisesRegex(RacingApiExclusivePreflightError, message),
+                ):
+                    self._generate(
+                        root=root,
+                        now=now,
+                        runner_host_path=runner_path,
+                        runner_host_sha=runner_sha,
+                        production_host_path=production_path,
+                        production_host_sha=production_sha,
+                    )
+                self.assertFalse((root / "exclusive-proof.json").exists())
 
     def test_management_command_writes_only_redacted_summary(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -287,6 +365,9 @@ class RacingApiExclusiveAccountPreflightTests(TestCase):
         ]
         inspector.reserved.return_value = {"celery@worker": []}
         inspector.scheduled.return_value = {"celery@worker": []}
+        inspector.active_queues.return_value = {
+            "celery@worker": [{"name": "celery"}]
+        }
         with patch("app.celery.app.control.inspect", return_value=inspector):
             snapshot = collect_celery_idle_snapshot(expected_worker_nodes=["worker"])
         self.assertEqual(snapshot["workers"], ["celery@worker"])
@@ -300,6 +381,9 @@ class RacingApiExclusiveAccountPreflightTests(TestCase):
         ]
         inspector.reserved.return_value = {"celery@worker": []}
         inspector.scheduled.return_value = {"other@worker": []}
+        inspector.active_queues.return_value = {
+            "celery@worker": [{"name": "celery"}]
+        }
         with (
             patch("app.celery.app.control.inspect", return_value=inspector),
             self.assertRaisesRegex(
@@ -307,6 +391,41 @@ class RacingApiExclusiveAccountPreflightTests(TestCase):
             ),
         ):
             collect_celery_idle_snapshot(expected_worker_nodes=["worker"])
+
+    def test_celery_snapshot_rejects_extra_worker_or_non_default_subscription(self):
+        for case, ping, queues, message in (
+            (
+                "extra_worker",
+                {
+                    "celery@worker": {"ok": "pong"},
+                    "celery@race-live": {"ok": "pong"},
+                },
+                {
+                    "celery@worker": [{"name": "celery"}],
+                    "celery@race-live": [{"name": "race_live"}],
+                },
+                "unexpected workers",
+            ),
+            (
+                "wrong_subscription",
+                {"celery@worker": {"ok": "pong"}},
+                {"celery@worker": [{"name": "celery"}, {"name": "race_live"}]},
+                "non-default queue",
+            ),
+        ):
+            inspector = Mock()
+            inspector.ping.return_value = ping
+            empty = {worker: [] for worker in ping}
+            inspector.active.side_effect = [empty, empty]
+            inspector.reserved.return_value = empty
+            inspector.scheduled.return_value = empty
+            inspector.active_queues.return_value = queues
+            with (
+                self.subTest(case=case),
+                patch("app.celery.app.control.inspect", return_value=inspector),
+                self.assertRaisesRegex(RacingApiExclusivePreflightError, message),
+            ):
+                collect_celery_idle_snapshot(expected_worker_nodes=["worker"])
 
 
 if __name__ == "__main__":

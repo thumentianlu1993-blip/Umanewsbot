@@ -1,5 +1,15 @@
 # 关键决策
 
+## 2026-08-30 exclusive proof 允许不可执行的 legacy backlog，但拒绝任何消费能力
+
+- 决定：旧 `race_live=7543` 已被项目冻结为不得清理、迁移或消费的历史 backlog，不能为了生成 Racing API
+  exclusive proof 将它归零。队列非空本身不等于存在 caller；是否可执行由 scheduler/network flags、worker
+  容器、Celery worker 集合和订阅队列共同证明。
+- 决定：proof 仍要求 `celery=0`、`race_sync_v2=0`；允许 `race_live>=0` 的前提是 host evidence 中不存在
+  `race_live_worker` 或 `race_sync_v2_worker` 容器，Celery inspector 只返回精确预期的普通 worker，且其
+  active queue 精确为 `celery`。任何 extra worker、非默认订阅、活动/保留/调度任务或开关开启均失败关闭。
+- 该修正只使只读 proof 与既有生产边界相容，不批准消费旧队列、清理 Redis、调用 TRA 或写数据库。
+
 ## 2026-08-30 worker readiness 以协议响应判定，不依赖日志固定文案
 
 - 容器 running、restart=0、OOM=false 仍不足以证明 Celery ready，但日志出现固定 `ready.` 字符串也不是稳定
