@@ -313,6 +313,46 @@ class RaceDataProviderRosterContractTests(SimpleTestCase):
             )
         )
 
+    @override_settings(
+        RACE_DATA_SYNC_ENABLED=True,
+        RACE_DATA_SYNC_ENABLED_PROVIDERS=("the_racing_api",),
+        RACE_DATA_SYNC_ENABLED_REGIONS=("united_kingdom",),
+        RACE_DATA_SYNC_ENABLED_FIELDS=("off_time",),
+        RACE_DATA_SYNC_ENABLED_DATA_KINDS=("race_time", "racecard", "result"),
+        RACE_LIVE_TRA_REGISTRY_SHA256="a" * 64,
+    )
+    def test_route_digest_is_stable_across_staged_data_kind_scope(self):
+        full_route = _pipeline().resolve_race_data_provider_route(
+            provider="the_racing_api",
+            region="united_kingdom",
+            identity_namespace="the_racing_api-race-v1",
+            data_kinds=("race_time", "racecard", "result"),
+        )
+        self.assertIsNotNone(full_route)
+
+        with self.settings(
+            RACE_DATA_SYNC_ENABLED_DATA_KINDS=("race_time", "racecard")
+        ):
+            staged_route = _pipeline().resolve_race_data_provider_route(
+                provider="the_racing_api",
+                region="united_kingdom",
+                identity_namespace="the_racing_api-race-v1",
+                data_kinds=("race_time", "racecard"),
+            )
+            result_route = _pipeline().resolve_race_data_provider_route(
+                provider="the_racing_api",
+                region="united_kingdom",
+                identity_namespace="the_racing_api-race-v1",
+                data_kinds=("result",),
+            )
+
+        assert full_route is not None
+        assert staged_route is not None
+        self.assertEqual(staged_route.registry_digest, full_route.registry_digest)
+        self.assertEqual(staged_route.route_digest, full_route.route_digest)
+        self.assertEqual(staged_route.entry.enabled_data_kinds, ("race_time", "racecard"))
+        self.assertIsNone(result_route)
+
 
 class RacecardRunnerMergeContractTests(SimpleTestCase):
     def test_source_gap_preserves_runner_but_explicit_withdrawal_applies(self):
