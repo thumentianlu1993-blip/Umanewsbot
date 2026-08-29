@@ -30,6 +30,9 @@
   赛前 root/www event 956 详情均为 200、9542 bytes、相同 SHA，已有出马表但无赛果区块、无来源/阶段标签；
   数据库 result observation/revision/publication 仍为 0，checkpoint 未提前执行。赛后必须相对该基线证明
   lifecycle、结果投影和公开页真实变化。
+- 隔离 PostgreSQL 16 再跑当前代码的 `race_data_sync_r0_postgres` 与 `pipeline_a_postgres` 专项 25/25，
+  覆盖真实行锁、并发 claim/CAS、幂等、约束与 migration；测试明确 network=false，临时数据库、容器和
+  network 已全部回收，没有接触生产。
 
 ## 2026-08-30 Racing API proof 发布前关闭 legacy queue 合同冲突
 

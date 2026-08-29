@@ -52,6 +52,8 @@
 
 - 当前代码以只读 mount、SQLite 和 `RACE_DATA_SYNC_ALLOW_NETWORK=false` 运行赛事同步/lifecycle/result
   核心组合：249/249。
+- 当前代码另在一次性 PostgreSQL 16 容器运行 R0 与 pipeline A 专项：25/25；覆盖真实数据库行锁、并发
+  claim/CAS、幂等、约束与 migration 路径。测试数据库创建和销毁正常，临时数据库容器与网络已回收。
 - Django check、migration drift、重定向 bytecode 的 compileall、三份 Compose config 和
   `git diff --check` 全部通过。
 - 首次 compileall/Compose 只出现只读目录无法写 pycache、worktree 缺 `.env` 的验证环境错误；改用临时

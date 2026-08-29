@@ -86,7 +86,8 @@
 - [x] (operations) 返修候选已完成独立复审并通过后续 PR 链合并；最终生产候选由 PR #127 修复 lifecycle
   adoption bridge 与 PostgreSQL result publication trigger 顺序，merge revision 为 `a040af3c…257f`。
 - [x] (operations) PR #127 上线后的 clean-worktree 完成性复跑：SQLite 核心组合 249/249，Django check、
-  migration drift、compileall、三份 Compose config 与 diff check 全部通过；测试显式关闭真实网络。
+  migration drift、compileall、三份 Compose config 与 diff check 全部通过；隔离 PostgreSQL 16 专项
+  25/25，测试显式关闭真实网络。
 
 ## 最终生产发布
 
