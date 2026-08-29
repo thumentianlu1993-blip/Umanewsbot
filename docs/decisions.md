@@ -1,5 +1,18 @@
 # 关键决策
 
+## 2026-08-29 公网可用性是激活硬门禁，畸形赛事查询必须在数据库前规范化
+
+- 专用 worker 内存通过不代表 Phase 2 通过；同一窗口的 root/www 任一请求超时仍立即关闭全部新写入、
+  停专用 worker并恢复普通 worker/Beat。事后恢复 200 不能替代失败窗口证据，也不能自动续跑 discovery。
+- Meta/Facebook crawler 把筛选分隔符带成 `®ion=`/`Â®ion=` 后，赛事日历不得复制未知或未规范化 query
+  到所有筛选链接。检测到未知 key 或上述污染片段时必须在执行日历 queryset 前永久跳转到清洁 URL；正常
+  链接只保留 `tab/region/grade/when/year/q` 的规范化值，cursor/direction 仍由当前页面重新生成。
+- 当前瓶颈是 4 个 Gunicorn 请求槽被慢 `/races/` 抓取占满，不是主机内存不足。先消除请求放大并以生产
+  公网延迟/5xx 重验，不为通过门禁临时增加 Web worker、降低 1536 MiB 内存阈值、动用 swap 或直接扩容。
+- 此修复不修改 migration、自动化容量、provider 网络或旧 `race_live`；必须在 10 个 data-sync 开关全 false
+  的关闭态发布。发布后先验证畸形 URL 快速 301、正常 `/races/`/root/www 200 和 0 新写入，再从 Phase 1
+  重新建立一套新鲜门禁证据。
+
 ## 2026-08-29 provider transport 授权必须绑定用途名与规范 URL 二元组
 
 - future discovery 的 identity 请求与已纳管 racecard sync 可访问同一固定 path，但二者是不同用途；transport

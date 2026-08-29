@@ -1,5 +1,14 @@
 # 项目总览
 
+2026-08-29 PR `#116` 已以 revision `5863afae…3870` 关闭态上线，leaf 保持 `0075`。zero-write audit 与
+Phase 1 的 115 场无网络 census 通过；Phase 2 的专用 worker 12 个样本稳定约 123.3 MiB，主机最低仍有
+约 1.81 GiB 可用、swap 未动，现有 3.4 GiB 主机无需扩容。但公网根页在随后 20 秒门禁中超时，自动保护
+已恢复 10 个开关全 false、停止专用 worker并恢复普通 worker/Beat，真实 discovery 未派发，旧
+`race_live=7543` 未触碰。日志显示 20 分钟 1970 次 Meta/Facebook crawler 请求；畸形 `®ion=` query 被旧
+赛事日历复制进筛选链接，放大了慢 `/races/` 请求并耗尽 2×2 Gunicorn 槽。当前 follow-up 只在 DB 查询前
+规范化畸形/未知 query，并让链接只复制规范字段；不增加 Web 进程、不改 schema/provider/容量。修复仍须
+关闭态发布并重新通过公网窗口，随后从 Phase 1 建立新鲜激活证据。
+
 2026-08-29 PR `#115` 已完成关闭态生产发布与新鲜备份，migration leaf 保持 `0075`。Phase 1 的无网络
 census 通过；Phase 2 专用 worker 资源热身也通过，现有 3.4 GiB 主机暂不扩容。第一次真实 discovery
 暴露固定 transport 的用途名 allowlist 缺口：调用方使用 `racecards_identity_<region>_<day>`，transport

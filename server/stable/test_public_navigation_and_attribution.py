@@ -13,10 +13,12 @@ These tests assert the NEW expected behavior:
 Because the implementation has NOT been done, ALL of these tests should FAIL (RED).
 """
 
+from datetime import timedelta
+from unittest.mock import patch
+
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
-from datetime import timedelta
 
 from stable.models import (
     HorseProfile,
@@ -543,6 +545,36 @@ class PublicNavigationAndAttributionTests(TestCase):
 
         # Race calendar should still allow region filtering
         self.assertEqual(response.status_code, 200)
+
+    @patch("stable.views._race_calendar_queryset")
+    def test_race_calendar_redirects_malformed_crawler_query_before_database_work(
+        self,
+        calendar_queryset,
+    ):
+        response = self.client.get(
+            f"{reverse('public-race-calendar')}?tab=all&grade=g1%C2%AEion%3Dfrance&tracking=meta"
+        )
+
+        self.assertEqual(response.status_code, 301)
+        self.assertEqual(response["Location"], f"{reverse('public-race-calendar')}?tab=all")
+        calendar_queryset.assert_not_called()
+
+    def test_race_calendar_filter_links_only_copy_normalized_values(self):
+        response = self.client.get(
+            reverse("public-race-calendar"),
+            {"tab": "all", "grade": "invalid-grade", "region": "invalid-region"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        urls = [
+            response.context["all_tab_url"],
+            response.context["key_tab_url"],
+            *(tab["url"] for tab in response.context["region_tabs"]),
+            *(tab["url"] for tab in response.context["grade_tabs"]),
+            *(tab["url"] for tab in response.context["when_tabs"]),
+        ]
+        self.assertTrue(all("invalid-grade" not in url for url in urls))
+        self.assertTrue(all("invalid-region" not in url for url in urls))
 
     # -----------------------------------------------------------------------
     # T05_horse: Horse index pagination uses unified list
