@@ -26,8 +26,14 @@ from django.db import transaction
 from django.utils import timezone as django_timezone
 
 from stable.models import (
+    RaceDataSyncEnrollment,
+    RaceDataSyncEnrollmentState,
     RaceEvent,
     RaceEventLifecycleControl,
+    RaceEventLifecycleEnforceMembership,
+    RaceEventLiveTracking,
+    RaceEventProjectionControl,
+    RaceEventProjectionWriteOwner,
     RaceEventStatus,
 )
 from stable.services.race_event_lifecycle import (
@@ -177,6 +183,10 @@ class EnrollmentPreflight:
         return sum(value == "would_create" for value in self.outcomes.values())
 
     @property
+    def would_adopt(self) -> int:
+        return sum(value == "would_adopt" for value in self.outcomes.values())
+
+    @property
     def replayed(self) -> int:
         return sum(value == "replay" for value in self.outcomes.values())
 
@@ -308,9 +318,85 @@ def _validate_expected_control(value: Any, *, event_id: int) -> None:
             value, frozenset({"state"}), label=f"event {event_id}.expected_control"
         )
         return
+    if state == "data_sync_off":
+        fields = frozenset(
+            {
+                "state",
+                "manifest_sha256",
+                "mode",
+                "generation",
+                "next_refresh_at",
+                "manifest_data_sha256",
+                "race_data_sync",
+                "projection_owner_generation",
+                "enrollment_generation",
+                "tracking_claim_generation",
+                "tracking_lock_version",
+            }
+        )
+        _ensure_exact_fields(
+            value, fields, label=f"event {event_id}.expected_control"
+        )
+        if value["manifest_sha256"] != "" or value["mode"] != "off":
+            raise EnrollmentError(
+                f"event {event_id}: data-sync control 必须为 off 且无 lifecycle manifest"
+            )
+        for field in (
+            "generation",
+            "projection_owner_generation",
+            "enrollment_generation",
+            "tracking_claim_generation",
+            "tracking_lock_version",
+        ):
+            if (
+                not isinstance(value[field], int)
+                or isinstance(value[field], bool)
+                or value[field] < (1 if field in {
+                    "generation",
+                    "projection_owner_generation",
+                    "enrollment_generation",
+                } else 0)
+            ):
+                raise EnrollmentError(
+                    f"event {event_id}: expected_control.{field} 非法"
+                )
+        if value["next_refresh_at"] is not None:
+            _parse_aware_datetime(
+                value["next_refresh_at"],
+                label=f"event {event_id}.expected_control.next_refresh_at",
+            )
+        if not _is_sha256(value["manifest_data_sha256"]):
+            raise EnrollmentError(
+                f"event {event_id}: control manifest_data SHA 非法"
+            )
+        binding = value["race_data_sync"]
+        if not isinstance(binding, dict):
+            raise EnrollmentError(
+                f"event {event_id}: race_data_sync binding 必须为 object"
+            )
+        _ensure_exact_fields(
+            binding,
+            frozenset({"manifest_sha256", "entry_sha256", "owner_generation"}),
+            label=f"event {event_id}.expected_control.race_data_sync",
+        )
+        if not _is_sha256(binding["manifest_sha256"]) or not _is_sha256(
+            binding["entry_sha256"]
+        ):
+            raise EnrollmentError(
+                f"event {event_id}: race_data_sync binding SHA 非法"
+            )
+        if (
+            not isinstance(binding["owner_generation"], int)
+            or isinstance(binding["owner_generation"], bool)
+            or binding["owner_generation"] < 1
+        ):
+            raise EnrollmentError(
+                f"event {event_id}: race_data_sync owner generation 非法"
+            )
+        return
     if state != "present":
         raise EnrollmentError(
-            f"event {event_id}: expected_control.state 必须为 absent|present"
+            f"event {event_id}: expected_control.state 必须为 absent|present|data_sync_off"
         )
     fields = frozenset(
         {
@@ -569,6 +655,71 @@ def _control_snapshot(control: RaceEventLifecycleControl) -> dict[str, Any]:
     }
 
 
+def _validate_data_sync_control_admission(
+    *,
+    event_id: int,
+    control: RaceEventLifecycleControl,
+    projection: RaceEventProjectionControl | None,
+    enrollment: RaceDataSyncEnrollment | None,
+    tracking: RaceEventLiveTracking | None,
+    has_membership: bool,
+) -> dict[str, Any]:
+    """Return the exact bridge snapshot for one closed data-sync control."""
+
+    binding = (
+        control.manifest_data.get("race_data_sync")
+        if isinstance(control.manifest_data, dict)
+        else None
+    )
+    if (
+        control.mode != "off"
+        or control.enrollment_manifest_sha256
+        or control.schedule_generation < 1
+        or control.claim_token
+        or control.claim_expires_at is not None
+        or control.manual_pause_reason
+        or not isinstance(binding, dict)
+        or set(control.manifest_data) != {"race_data_sync"}
+        or set(binding) != {"manifest_sha256", "entry_sha256", "owner_generation"}
+        or not _is_sha256(binding.get("manifest_sha256"))
+        or not _is_sha256(binding.get("entry_sha256"))
+        or not isinstance(binding.get("owner_generation"), int)
+        or isinstance(binding.get("owner_generation"), bool)
+        or binding["owner_generation"] < 1
+        or projection is None
+        or projection.write_owner != RaceEventProjectionWriteOwner.DATA_SYNC
+        or projection.owner_generation != binding["owner_generation"]
+        or projection.owner_manifest_sha256 != binding["manifest_sha256"]
+        or enrollment is None
+        or enrollment.state != RaceDataSyncEnrollmentState.ENROLLED
+        or enrollment.manifest_sha256 != binding["manifest_sha256"]
+        or enrollment.entry_sha256 != binding["entry_sha256"]
+        or enrollment.projection_owner_generation != binding["owner_generation"]
+        or enrollment.enrollment_generation != binding["owner_generation"]
+        or tracking is None
+        or tracking.tracking_enabled is not True
+        or tracking.active_attempt_token
+        or tracking.claim_expires_at is not None
+        or has_membership
+    ):
+        raise EnrollmentError(
+            f"event {event_id}: data-sync lifecycle adoption admission 不完整或已漂移"
+        )
+    return {
+        "state": "data_sync_off",
+        "manifest_sha256": "",
+        "mode": control.mode,
+        "generation": control.schedule_generation,
+        "next_refresh_at": _iso_datetime(control.next_refresh_at),
+        "manifest_data_sha256": _control_manifest_data_sha(control),
+        "race_data_sync": dict(binding),
+        "projection_owner_generation": projection.owner_generation,
+        "enrollment_generation": enrollment.enrollment_generation,
+        "tracking_claim_generation": tracking.claim_generation,
+        "tracking_lock_version": tracking.lock_version,
+    }
+
+
 def _event_snapshot_values(event: RaceEvent) -> dict[str, Any]:
     return {
         "event_id": event.id,
@@ -659,20 +810,44 @@ def build_enrollment_artifacts(
         raise EnrollmentError("event ID 不得重复")
     sorted_ids = sorted(event_ids)
     zone_map = _normalize_us_zone_map(sorted_ids, allowed_us_zones)
-    events = list(RaceEvent.objects.filter(id__in=sorted_ids).order_by("id"))
+    events = list(
+        RaceEvent.objects.select_related(
+            "lifecycle_control",
+            "projection_control",
+            "race_data_sync_enrollment",
+            "live_tracking",
+        )
+        .filter(id__in=sorted_ids)
+        .order_by("id")
+    )
     if [event.id for event in events] != sorted_ids:
         found = {event.id for event in events}
         raise EnrollmentError(f"赛事不存在: {sorted(set(sorted_ids) - found)}")
-    existing = {
-        control.event_id: control
-        for control in RaceEventLifecycleControl.objects.filter(
-            event_id__in=sorted_ids
-        )
+    projections = {
+        event.id: event.projection_control
+        for event in events
+        if hasattr(event, "projection_control")
     }
-    if existing:
-        raise EnrollmentError(
-            f"prepare 只接受尚未纳管赛事，已有 control: {sorted(existing)}"
-        )
+    enrollments = {
+        event.id: event.race_data_sync_enrollment
+        for event in events
+        if hasattr(event, "race_data_sync_enrollment")
+    }
+    trackings = {
+        event.id: event.live_tracking
+        for event in events
+        if hasattr(event, "live_tracking")
+    }
+    existing = {
+        event.id: event.lifecycle_control
+        for event in events
+        if hasattr(event, "lifecycle_control")
+    }
+    membership_event_ids = set(
+        RaceEventLifecycleEnforceMembership.objects.filter(
+            event_id__in=sorted_ids
+        ).values_list("event_id", flat=True)
+    )
 
     generated_at = now or django_timezone.now()
     if django_timezone.is_naive(generated_at):
@@ -697,10 +872,23 @@ def build_enrollment_artifacts(
         )
         next_refresh = _initial_next_refresh(event)
         snapshot = _event_snapshot_values(event)
+        control = existing.get(event.id)
+        expected_control = (
+            {"state": "absent"}
+            if control is None
+            else _validate_data_sync_control_admission(
+                event_id=event.id,
+                control=control,
+                projection=projections.get(event.id),
+                enrollment=enrollments.get(event.id),
+                tracking=trackings.get(event.id),
+                has_membership=event.id in membership_event_ids,
+            )
+        )
         snapshot.update(
             {
                 "allowed_us_zones": zones,
-                "expected_control": {"state": "absent"},
+                "expected_control": expected_control,
                 "predicted_decision": {
                     "action": decision.action,
                     "to_status": decision.to_status,
@@ -1129,17 +1317,91 @@ def _desired_control_matches(
     manifest: LoadedEnrollmentManifest,
     snapshot: dict[str, Any],
 ) -> bool:
+    expected = snapshot["expected_control"]
+    expected_generation = (
+        expected["generation"]
+        if expected.get("state") == "data_sync_off"
+        else 1
+    )
+    desired_manifest_data = _manifest_data_for(manifest, snapshot)
+    if expected.get("state") == "data_sync_off":
+        desired_manifest_data["race_data_sync"] = dict(
+            expected["race_data_sync"]
+        )
     return bool(
         control.mode == "shadow"
         and control.enrollment_manifest_sha256 == manifest.raw_sha256
-        and control.schedule_generation == 1
+        and control.schedule_generation == expected_generation
         and _iso_datetime(control.next_refresh_at)
         == snapshot["predicted_next_refresh_at"]
-        and control.manifest_data == _manifest_data_for(manifest, snapshot)
+        and control.manifest_data == desired_manifest_data
         and not control.claim_token
         and control.claim_generation == 0
         and control.claim_expires_at is None
         and not control.manual_pause_reason
+    )
+
+
+def _data_sync_expected_control_matches(
+    *,
+    event_id: int,
+    snapshot: dict[str, Any],
+    control: RaceEventLifecycleControl,
+    projection: RaceEventProjectionControl | None,
+    enrollment: RaceDataSyncEnrollment | None,
+    tracking: RaceEventLiveTracking | None,
+    has_membership: bool,
+) -> bool:
+    expected = snapshot["expected_control"]
+    if expected.get("state") != "data_sync_off":
+        return False
+    try:
+        current = _validate_data_sync_control_admission(
+            event_id=event_id,
+            control=control,
+            projection=projection,
+            enrollment=enrollment,
+            tracking=tracking,
+            has_membership=has_membership,
+        )
+    except EnrollmentError:
+        return False
+    return current == expected
+
+
+def _data_sync_external_evidence_matches(
+    *,
+    expected: dict[str, Any],
+    projection: RaceEventProjectionControl | None,
+    enrollment: RaceDataSyncEnrollment | None,
+    tracking: RaceEventLiveTracking | None,
+    has_membership: bool,
+) -> bool:
+    if expected.get("state") != "data_sync_off":
+        return True
+    binding = expected["race_data_sync"]
+    return bool(
+        projection is not None
+        and projection.write_owner == RaceEventProjectionWriteOwner.DATA_SYNC
+        and projection.owner_generation
+        == expected["projection_owner_generation"]
+        == binding["owner_generation"]
+        and projection.owner_manifest_sha256 == binding["manifest_sha256"]
+        and enrollment is not None
+        and enrollment.state == RaceDataSyncEnrollmentState.ENROLLED
+        and enrollment.manifest_sha256 == binding["manifest_sha256"]
+        and enrollment.entry_sha256 == binding["entry_sha256"]
+        and enrollment.projection_owner_generation
+        == binding["owner_generation"]
+        and enrollment.enrollment_generation
+        == expected["enrollment_generation"]
+        and tracking is not None
+        and tracking.tracking_enabled is True
+        and tracking.claim_generation == expected["tracking_claim_generation"]
+        and tracking.lock_version == expected["tracking_lock_version"]
+        and not tracking.active_attempt_token
+        and tracking.claim_expires_at is None
+        and not has_membership
     )
 
 
@@ -1149,6 +1411,12 @@ def preflight_enrollment(
     lock: bool = False,
 ) -> EnrollmentPreflight:
     """Perform complete DB CAS validation; caller owns any transaction."""
+    control_query = RaceEventLifecycleControl.objects.filter(
+        event_id__in=manifest.event_ids
+    ).order_by("event_id")
+    if lock:
+        control_query = control_query.select_for_update()
+    controls = {control.event_id: control for control in control_query}
     event_query = RaceEvent.objects.filter(id__in=manifest.event_ids).order_by("id")
     if lock:
         event_query = event_query.select_for_update()
@@ -1158,13 +1426,29 @@ def preflight_enrollment(
         raise EnrollmentError(
             f"赛事不存在: {sorted(set(manifest.event_ids) - found)}"
         )
-
-    control_query = RaceEventLifecycleControl.objects.filter(
+    projection_query = RaceEventProjectionControl.objects.filter(
+        event_id__in=manifest.event_ids
+    ).order_by("event_id")
+    tracking_query = RaceEventLiveTracking.objects.filter(
+        event_id__in=manifest.event_ids
+    ).order_by("event_id")
+    enrollment_query = RaceDataSyncEnrollment.objects.filter(
+        event_id__in=manifest.event_ids
+    ).order_by("event_id")
+    membership_query = RaceEventLifecycleEnforceMembership.objects.filter(
         event_id__in=manifest.event_ids
     ).order_by("event_id")
     if lock:
-        control_query = control_query.select_for_update()
-    controls = {control.event_id: control for control in control_query}
+        projection_query = projection_query.select_for_update()
+        tracking_query = tracking_query.select_for_update()
+        enrollment_query = enrollment_query.select_for_update()
+        membership_query = membership_query.select_for_update()
+    projections = {row.event_id: row for row in projection_query}
+    trackings = {row.event_id: row for row in tracking_query}
+    enrollments = {row.event_id: row for row in enrollment_query}
+    membership_event_ids = set(
+        membership_query.values_list("event_id", flat=True)
+    )
     outcomes: dict[int, str] = {}
     observed_at = django_timezone.now()
     if django_timezone.is_naive(observed_at):
@@ -1211,8 +1495,26 @@ def preflight_enrollment(
             if snapshot["expected_control"] != {"state": "absent"}:
                 raise EnrollmentError(f"event {event.id}: expected control 已漂移")
             outcomes[event.id] = "would_create"
-        elif _desired_control_matches(control, manifest, snapshot):
+        elif _desired_control_matches(control, manifest, snapshot) and (
+            _data_sync_external_evidence_matches(
+                expected=snapshot["expected_control"],
+                projection=projections.get(event.id),
+                enrollment=enrollments.get(event.id),
+                tracking=trackings.get(event.id),
+                has_membership=event.id in membership_event_ids,
+            )
+        ):
             outcomes[event.id] = "replay"
+        elif _data_sync_expected_control_matches(
+            event_id=event.id,
+            snapshot=snapshot,
+            control=control,
+            projection=projections.get(event.id),
+            enrollment=enrollments.get(event.id),
+            tracking=trackings.get(event.id),
+            has_membership=event.id in membership_event_ids,
+        ):
+            outcomes[event.id] = "would_adopt"
         else:
             raise EnrollmentError(f"event {event.id}: 已存在不同或漂移的 control")
     return EnrollmentPreflight(
@@ -1255,6 +1557,33 @@ def apply_enrollment(
                     manifest_data=_manifest_data_for(manifest, snapshot),
                 )
             )
+        to_adopt: list[RaceEventLifecycleControl] = []
+        for event in result.events:
+            if result.outcomes[event.id] != "would_adopt":
+                continue
+            snapshot = manifest.data["events"][str(event.id)]
+            control = result.existing_controls[event.id]
+            manifest_data = _manifest_data_for(manifest, snapshot)
+            manifest_data["race_data_sync"] = dict(
+                snapshot["expected_control"]["race_data_sync"]
+            )
+            control.mode = "shadow"
+            control.next_refresh_at = _initial_next_refresh(event)
+            control.enrollment_manifest_sha256 = manifest.raw_sha256
+            control.manifest_data = manifest_data
+            control.updated_at = django_timezone.now()
+            to_adopt.append(control)
         if to_create:
             RaceEventLifecycleControl.objects.bulk_create(to_create)
+        if to_adopt:
+            RaceEventLifecycleControl.objects.bulk_update(
+                to_adopt,
+                (
+                    "mode",
+                    "next_refresh_at",
+                    "enrollment_manifest_sha256",
+                    "manifest_data",
+                    "updated_at",
+                ),
+            )
         return result

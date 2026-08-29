@@ -27,6 +27,10 @@ from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 
 from stable.models import (
+    RaceDataSyncEnrollment,
+    RaceEventLiveTracking,
+    RaceEventProjectionControl,
+    RaceResultSourceIdentity,
     RaceEvent,
     RaceEventLifecycleControl,
     RaceEventLifecycleTransition,
@@ -44,6 +48,8 @@ from stable.services.race_event_lifecycle_enrollment import (
 
 
 APPROVED_COMMIT = "a" * 40
+DATA_SYNC_MANIFEST = "b" * 64
+DATA_SYNC_ENTRY = "c" * 64
 
 
 def _make_event(*, slug: str, **overrides) -> RaceEvent:
@@ -65,6 +71,56 @@ def _make_event(*, slug: str, **overrides) -> RaceEvent:
     }
     values.update(overrides)
     return RaceEvent.objects.create(**values)
+
+
+def _make_data_sync_control(
+    event: RaceEvent, *, schedule_generation: int = 2
+) -> RaceEventLifecycleControl:
+    source = RaceResultSourceIdentity.objects.create(
+        event=event,
+        source_key="the_racing_api",
+        region_code="japan_jra",
+        identity_namespace="the-racing-api-v1",
+        external_race_id=f"event-{event.pk}",
+    )
+    RaceEventProjectionControl.objects.create(
+        event=event,
+        write_owner="data_sync",
+        owner_generation=1,
+        owner_manifest_sha256=DATA_SYNC_MANIFEST,
+    )
+    RaceEventLiveTracking.objects.create(
+        event=event,
+        tracking_enabled=True,
+        next_poll_at=event.race_datetime,
+        claim_generation=4,
+        lock_version=1,
+    )
+    RaceDataSyncEnrollment.objects.create(
+        event=event,
+        source_identity=source,
+        state="enrolled",
+        standing_policy_digest="d" * 64,
+        route_digest="e" * 64,
+        event_snapshot_sha256="f" * 64,
+        projection_owner_generation=1,
+        enrollment_generation=1,
+        manifest_sha256=DATA_SYNC_MANIFEST,
+        entry_sha256=DATA_SYNC_ENTRY,
+    )
+    return RaceEventLifecycleControl.objects.create(
+        event=event,
+        mode="off",
+        next_refresh_at=event.race_datetime,
+        schedule_generation=schedule_generation,
+        manifest_data={
+            "race_data_sync": {
+                "manifest_sha256": DATA_SYNC_MANIFEST,
+                "entry_sha256": DATA_SYNC_ENTRY,
+                "owner_generation": 1,
+            }
+        },
+    )
 
 
 class LifecycleEnrollmentCommandTests(TestCase):
@@ -300,7 +356,8 @@ class LifecycleEnrollmentCommandTests(TestCase):
         )
         self.assertIn(f"event={event.pk} result=would_create", stdout.getvalue())
         self.assertIn(
-            "[DRY-RUN] schema=v2 total=1 would_create=1 replay=0 error=0",
+            "[DRY-RUN] schema=v2 total=1 would_create=1 "
+            "would_adopt=0 replay=0 error=0",
             stdout.getvalue(),
         )
         self.assertEqual(RaceEventLifecycleControl.objects.count(), 0)
@@ -1746,6 +1803,146 @@ class LifecycleEnrollmentCommandTests(TestCase):
             manifest["content_sha256"],
         )
         self.assertEqual(RaceEventLifecycleTransition.objects.count(), 0)
+
+    @override_settings(
+        RACE_EVENT_LIFECYCLE_ENABLED=False,
+        RACE_EVENT_LIFECYCLE_MODE="off",
+    )
+    def test_closed_data_sync_control_is_adopted_by_exact_cas_and_replays(self):
+        event = _make_event(
+            slug="adopt-data-sync-control",
+            race_datetime=datetime(
+                2026, 8, 31, 6, 0, tzinfo=dt_timezone.utc
+            ),
+            local_date=date(2026, 8, 31),
+        )
+        control = _make_data_sync_control(event, schedule_generation=2)
+
+        with TemporaryDirectory() as tmp:
+            path, manifest, sha = self._prepare(Path(tmp), [event])
+            before = list(
+                RaceEventLifecycleControl.objects.filter(event=event).values()
+            )
+            dry_run = preflight_enrollment(
+                load_enrollment_manifest(
+                    path,
+                    expected_raw_sha256=sha,
+                    expected_commit=APPROVED_COMMIT,
+                )
+            )
+            self.assertEqual(dry_run.outcomes[event.pk], "would_adopt")
+            self.assertEqual(dry_run.would_adopt, 1)
+            self.assertEqual(
+                list(
+                    RaceEventLifecycleControl.objects.filter(event=event).values()
+                ),
+                before,
+            )
+
+            self._reconcile(path, sha, apply=True)
+            first_updated_at = control.updated_at
+            control.refresh_from_db()
+            first_updated_at = control.updated_at
+            self._reconcile(path, sha, apply=True)
+
+        snapshot = manifest["events"][str(event.pk)]
+        self.assertEqual(
+            snapshot["expected_control"]["state"], "data_sync_off"
+        )
+        control.refresh_from_db()
+        self.assertEqual(control.mode, "shadow")
+        self.assertEqual(control.schedule_generation, 2)
+        self.assertEqual(control.enrollment_manifest_sha256, sha)
+        self.assertEqual(control.updated_at, first_updated_at)
+        self.assertEqual(
+            control.manifest_data["race_data_sync"]["manifest_sha256"],
+            DATA_SYNC_MANIFEST,
+        )
+        self.assertEqual(control.manifest_data["schema_version"], 2)
+        self.assertEqual(
+            RaceEventProjectionControl.objects.get(event=event).write_owner,
+            "data_sync",
+        )
+        tracking = RaceEventLiveTracking.objects.get(event=event)
+        self.assertEqual(tracking.claim_generation, 4)
+        self.assertEqual(tracking.lock_version, 1)
+
+    @override_settings(
+        RACE_EVENT_LIFECYCLE_ENABLED=False,
+        RACE_EVENT_LIFECYCLE_MODE="off",
+    )
+    def test_data_sync_claim_drift_rejects_adoption_without_writes(self):
+        event = _make_event(
+            slug="adopt-data-sync-claim-drift",
+            race_datetime=datetime(
+                2026, 8, 31, 7, 0, tzinfo=dt_timezone.utc
+            ),
+            local_date=date(2026, 8, 31),
+        )
+        control = _make_data_sync_control(event)
+        with TemporaryDirectory() as tmp:
+            path, _, sha = self._prepare(Path(tmp), [event])
+            tracking = RaceEventLiveTracking.objects.get(event=event)
+            tracking.active_attempt_token = "active-token"
+            tracking.claim_expires_at = datetime(
+                2026, 8, 31, 8, 0, tzinfo=dt_timezone.utc
+            )
+            tracking.save(
+                update_fields=(
+                    "active_attempt_token",
+                    "claim_expires_at",
+                    "updated_at",
+                )
+            )
+            with self.assertRaisesRegex(
+                EnrollmentError, "已存在不同或漂移"
+            ):
+                apply_enrollment(
+                    load_enrollment_manifest(
+                        path,
+                        expected_raw_sha256=sha,
+                        expected_commit=APPROVED_COMMIT,
+                    )
+                )
+
+        control.refresh_from_db()
+        self.assertEqual(control.mode, "off")
+        self.assertEqual(control.enrollment_manifest_sha256, "")
+        self.assertNotIn("schema_version", control.manifest_data)
+
+    @override_settings(
+        RACE_EVENT_LIFECYCLE_ENABLED=False,
+        RACE_EVENT_LIFECYCLE_MODE="off",
+    )
+    def test_adopted_control_claim_generation_drift_rejects_replay(self):
+        event = _make_event(
+            slug="adopted-control-claim-drift",
+            race_datetime=datetime(
+                2026, 8, 31, 7, 30, tzinfo=dt_timezone.utc
+            ),
+            local_date=date(2026, 8, 31),
+        )
+        _make_data_sync_control(event)
+        with TemporaryDirectory() as tmp:
+            path, _, sha = self._prepare(Path(tmp), [event])
+            self._reconcile(path, sha, apply=True)
+            control = RaceEventLifecycleControl.objects.get(event=event)
+            control.claim_generation = 1
+            control.save(update_fields=("claim_generation", "updated_at"))
+
+            with self.assertRaisesRegex(
+                EnrollmentError, "已存在不同或漂移"
+            ):
+                apply_enrollment(
+                    load_enrollment_manifest(
+                        path,
+                        expected_raw_sha256=sha,
+                        expected_commit=APPROVED_COMMIT,
+                    )
+                )
+
+        control.refresh_from_db()
+        self.assertEqual(control.claim_generation, 1)
 
     @override_settings(
         RACE_EVENT_LIFECYCLE_ENABLED=False,
