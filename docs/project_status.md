@@ -1,5 +1,27 @@
 # 项目状态文档
 
+## 2026-08-31 07:42 赛事自动化因复核 selector OOM 关闭
+
+- P0 URL 发现于 22:30:20Z 正常完成；赛果复核随后启动，普通 worker child 在 22:30:41Z 以约
+  970 MiB anon RSS 命中 1 GiB cgroup OOM。主机仍有充足内存，因此不再用扩容或提高上限替代查询修复。
+- 生产现为 10 false、race sync worker absent；Web/普通 worker/Beat exact PR #129、restart0/OOMfalse，
+  leaf 0075，队列 `0/0/7543`，公网正常。event 956 保持 finished/published、0 canonical
+  results/publication；23:29Z 自然 poll 被 reservation circuit 关闭，claim 已释放。
+- selector 修复将预取范围从 9,806 events/92,663 results 缩为当前 45 candidate events/0 results，同时
+  保留 local-date/IANA timezone 精确裁决；SQLite 数据库合约 23/23 通过。下一步是完整回归、合并、以新
+  exact image 关闭态发布与热身，再按冻结五阶段恢复，最后独立验收 correction。
+
+## 2026-08-31 04:29 event 956 generation 77 等待切日 exact result
+
+- 20:28Z 自然 selector 成功、claim 释放、failures=0、下一 poll 23:28Z；UK ledger=96。下一轮已经自然
+  排在 Europe/London 切日之后，将走受审 exact result-by-id 路由。唯一 result revision 仍为 8-item
+  provisional，canonical result/publication=0，公网页只显示“赛果待确认”。
+- lock absent，四服务 exact PR #129/restart0/OOMfalse，leaf 0075，9 true + correction false；资源约
+  5.35 GiB 可用、Swap 完整、磁盘约 14.0 GiB，队列 `0/0/7543`。专用 worker 的 zero-write audit 为
+  ready/valid/route drift 0；Web 不挂载 artifact root，不作为该审计入口。
+- 最新主线禁网回归为 SQLite `250/250`、PostgreSQL 16 `25/25`，结构门禁全通过；生产备份 SHA/权限/TOC
+  重新验证一致。继续等待 provider 本地日期切换后的自然 exact route，之后才放行 correction。
+
 ## 2026-08-31 2C/8G active 基线稳定，event 956 仍待正式赛果
 
 - PR #129 四服务 exact、restart=0、OOM=false，leaf `0075`；9 true + correction false，资源余量充足，

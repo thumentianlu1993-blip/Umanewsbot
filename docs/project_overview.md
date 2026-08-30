@@ -1,11 +1,11 @@
 # 项目总览
 
-2026-08-31 02:03，生产主机升级到 2C/8G 后，完整赛事链保持 active：四服务均为 PR #129 exact
-revision/image、restart=0、OOM=false，leaf `0075`，9 个前置开关 true、correction false；可用内存约
-5.37 GiB，Swap 完整，队列 `0/0/7543`，公网 5 个目标均 200。event 956 已自然完成
-scheduled -> running -> finished，但 provider 结果仍缺原始 terminal marker，所以只幂等保留 provisional
-revision，canonical result/publication 仍为 0。继续等待 exact result route 自然运行，正式赛果和公网通过前
-不提前开启 correction。
+2026-08-31 07:42，赛事链因普通 worker 的 child-only cgroup OOM 再次 fail-closed：10 个
+`RACE_DATA_SYNC_*` 全 false、`race_sync_v2_worker` absent，Web 1x4/普通 worker/Beat 已以 exact PR #129
+恢复，队列 `0/0/7543` 与公网均正常。根因是赛果复核 selector 先加载 9,806 场已发布赛事和 92,663 条
+历史赛果再筛近 72 小时；数据库限窗修复把同一快照候选缩到 45 场、0 条历史赛果，新增及既有合约测试
+23/23 通过，待发布并完成关闭态热身。event 956 的 lifecycle 已完成，但仍只有 provisional revision、0
+canonical result/publication；恢复后继续只允许自然 exact-result 轮询，正式公开前 correction 保持关闭。
 
 2026-08-30 20:00，PR `#129` active 赛前窗口因普通 worker `OOMKilled=true` 命中硬门禁，已自动
 fail-closed。生产当前为 10 个赛事开关全 false、专用 worker absent；Web 1×4、普通 worker、Beat 已以

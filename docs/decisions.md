@@ -1,5 +1,29 @@
 # 关键决策
 
+## 2026-08-31 赛果复核 selector 必须先在数据库限窗
+
+- 普通 worker 的 1 GiB cgroup OOM 已由内核日志、P0 TaskExecutionLog 与 RaceResultReviewRun 时间线
+  交叉确认：P0 于 `22:30:20Z` 正常结束，复核任务随后 claim，Celery 子进程于 `22:30:41Z` 被杀。
+  不能用 restart=0 或宿主机剩余内存否认 child-only memcg OOM。
+- `select_due_targets()` 不得再对全部 published RaceEvent 做 `prefetch_related("results")` 后才在 Python
+  筛时间。数据库候选范围固定为 race_datetime 的 72 小时新窗口、14 天 pending 窗口，以及带两天保守
+  cushion 的 local_date fallback；`_event_due_at()` 仍负责精确 IANA 时区边界，避免性能修复改变业务语义。
+- 本次不以单纯提高 worker 内存上限掩盖查询放大。代码修复、关闭态热身、无 OOM/队列/公网门禁全部
+  通过后，才恢复赛事自动化；event 956 仍只允许 Beat/selector 自然继续。
+
+## 2026-08-31 event 956 正式结果等待与审计执行上下文
+
+- event 956 的当日 results 响应缺原始 terminal marker 时，重复自然轮询只能幂等保留同一 provisional
+  revision；请求成功、claim 释放或 `decision_reason=empty_field` 都不授予正式发布资格。Europe/London
+  日期切换后只允许 Beat 自然进入受审的 exact result-by-id 路由，不手工改 due time 或触发 provider。
+- `audit_race_data_sync` 的生产通过口径固定在挂载 `/run/race-data-sync` 与 policy/secrets 的
+  `race_sync_v2_worker`。Web 容器按最小挂载原则不持有该 artifact root，因此 Web 内
+  `artifact root unavailable` 只说明执行上下文错误，不能作为 ready 证据，也不能覆盖专用 worker的
+  `ready/valid/route_drift=[]/would_write=false` 权威结果。
+- correction 继续保持 false；只有正式 revision、canonical projection、publication 与 root/www 页面同时
+  通过后，才在独立共享锁窗口单独开启并观察完整自然周期。相邻 UK/USA proof 和 France/Ireland 未批准
+  proposals 在该窗口结束前不得并发执行或写入 registry。
+
 ## 2026-08-31 扩容后仍以 provider 原始终态作为正式赛果门禁
 
 - 主机升级到 2C/8G 解决了此前狭窄内存余量，但不改变结果 finality 合同，也不降低

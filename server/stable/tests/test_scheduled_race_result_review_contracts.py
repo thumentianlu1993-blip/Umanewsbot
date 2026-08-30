@@ -20,7 +20,9 @@ from django.conf import settings
 from django.core import mail
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.db import connection
 from django.test import SimpleTestCase, TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 
 from stable import models
 from stable.services import race_event_crawl_orchestration as orchestration
@@ -416,6 +418,84 @@ class ScheduledRaceResultReviewDatabaseContractTests(TestCase):
         )
         self.assertFalse(by_id[status_repair.pk]["network_required"])
         self.assertEqual(len(snapshot["selector_sha256"]), 64)
+
+    def test_selector_pushes_due_window_into_database_before_prefetch(self):
+        service = _scheduled_service(self)
+        due = self._event(
+            "due-window-filter",
+            race_datetime=NOW - timedelta(hours=2),
+        )
+        ancient = self._event(
+            "ancient-window-filter",
+            race_datetime=NOW - timedelta(days=90),
+        )
+
+        with CaptureQueriesContext(connection) as captured:
+            snapshot = service.select_due_targets(
+                now=NOW,
+                pending_event_ids=[],
+                lookback_hours=72,
+                pending_max_age_days=14,
+            )
+
+        target_ids = {row["event_id"] for row in snapshot["targets"]}
+        self.assertIn(due.pk, target_ids)
+        self.assertNotIn(ancient.pk, target_ids)
+        event_queries = [
+            query["sql"]
+            for query in captured.captured_queries
+            if 'FROM "stable_raceevent"' in query["sql"]
+            and 'FROM "stable_raceeventresult"' not in query["sql"]
+        ]
+        self.assertEqual(len(event_queries), 1)
+        self.assertIn('"stable_raceevent"."race_datetime" >=', event_queries[0])
+        self.assertIn('"stable_raceevent"."local_date" >=', event_queries[0])
+
+    def test_selector_keeps_local_date_timezone_fallback_semantics(self):
+        service = _scheduled_service(self)
+        due = models.RaceEvent.objects.create(
+            year=2026,
+            slug="local-date-due",
+            original_name="local-date-due",
+            chinese_name="local-date-due",
+            country_region=models.RacingRegion.UNITED_KINGDOM,
+            racecourse="Goodwood",
+            grade_text="G2",
+            surface=models.RaceEventSurface.TURF,
+            timezone_name="Europe/London",
+            local_date=NOW.date() - timedelta(days=1),
+            race_datetime=None,
+            status=models.RaceEventStatus.SCHEDULED,
+            visibility_status=models.RaceEventVisibility.PUBLISHED,
+            source_refs={},
+        )
+        ancient = models.RaceEvent.objects.create(
+            year=2026,
+            slug="local-date-ancient",
+            original_name="local-date-ancient",
+            chinese_name="local-date-ancient",
+            country_region=models.RacingRegion.UNITED_KINGDOM,
+            racecourse="Goodwood",
+            grade_text="G2",
+            surface=models.RaceEventSurface.TURF,
+            timezone_name="Europe/London",
+            local_date=NOW.date() - timedelta(days=90),
+            race_datetime=None,
+            status=models.RaceEventStatus.SCHEDULED,
+            visibility_status=models.RaceEventVisibility.PUBLISHED,
+            source_refs={},
+        )
+
+        snapshot = service.select_due_targets(
+            now=NOW,
+            pending_event_ids=[],
+            lookback_hours=72,
+            pending_max_age_days=14,
+        )
+
+        target_ids = {row["event_id"] for row in snapshot["targets"]}
+        self.assertIn(due.pk, target_ids)
+        self.assertNotIn(ancient.pk, target_ids)
 
     def test_apply_is_atomic_per_event_and_keeps_authority_split(self):
         service = _scheduled_service(self)
