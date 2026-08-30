@@ -3406,3 +3406,16 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
   shared buffer 或扩容来掩盖应用进程常驻占用。继续优先使用 PSS/cgroup 证据和可逆进程配置。
 - Web 优化的关闭态热身只证明新配置可运行；恢复赛事链仍需新的全量 preflight、配置审计、资源余量和
   冻结顺序启用，不复用内存失败窗口的激活结论。
+
+# 2026-08-30 扩容后仍保留应用级资源约束与原始终态标记门禁
+
+- 2C/8G 扩容不取消进程上限：Web 保持 1×4，普通 worker 单并发/单预取并提高至 1 GiB cgroup，专用
+  worker 仍为 384 MiB；1280 MiB Swap 必须持久化，原 1.5 GiB/512 MiB/8 GiB 三项硬门槛继续执行。
+- `race_sync_v2=0` 是阶段切换和关闭态门禁；Beat 开启后的正常运行期允许已批准 enrollment 的合法任务
+  短暂排队。必须逐条解码 task/event/data_kinds、限制有界数量并验证自然排空、claim 释放和业务终态，
+  不能因 LLEN 瞬时非零误判为积压，也不能 purge/重排来制造 0。
+- provider 规范化 payload 中的默认 `race_status=complete` 不能替代原始响应 terminal marker。当天批量
+  results 没有受审 marker 时只记录 provisional immutable revision，不创建 canonical results/publication；
+  后续继续自然轮询，跨 provider local date 后只走受审 exact race-id 路由。
+- Compose 重建 Web 会改变容器 IP；当前 Nginx upstream 在 reload 时解析服务名，因此每次 Web 重建后必须
+  先 `nginx -t` 再平滑 reload，并同时验收 root/www，而不能把内部 health 或旧连接的 200 当公网恢复。

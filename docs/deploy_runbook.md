@@ -9224,3 +9224,18 @@ RACE_DATA_RAW_ARTIFACT_ROOTS=/run/race-data-sync
    `--threads 4`。失败立即恢复 2 × 2 并复验 health。
 5. Web 调整后至少做 10 分钟关闭态热身，覆盖普通 Beat 周期、资源、锁、服务、专用 worker absent、三队列
    与公网。通过只允许进入新的 preflight，不自动恢复任何赛事开关。
+
+## 2C/8G 主机上的赛事链恢复补充
+
+1. 主机重启后先验证 `nproc=2`、`MemTotal≈7.1 GiB`，再检查 Swap；若 `/swapfile` 未启用，仅在部署锁内
+   创建 1280 MiB、0600、`mkswap/swapon`，备份并精确追加 `/etc/fstab`。Swap 恢复后仍必须通过原硬门槛。
+2. 普通 worker 当前合同为 1 GiB cgroup/2 GiB memory+swap，仍保持 concurrency=1、prefetch=1；专用
+   worker 384 MiB。扩容后不得恢复多并发或取消 child 回收参数。
+3. 每次 `--force-recreate web` 后执行 `docker exec <nginx> nginx -t` 与 `nginx -s reload`，再验收 root/www
+   首页、healthz 和 event 页。遇到 Nginx 连接旧 Web IP 的 502 时不改 upstream 地址、不重启整组服务。
+4. 阶段切换前要求 `race_sync_v2=0`；Beat 活动期若 LLEN 非零，逐条只读解码 Kombu message，限定为
+   `stable.tasks.sync_race_event_provider_task`、approved event 和受审 data kinds，并验证有界排空。禁止
+   purge、消费、迁移或手工重发；claim TTL 过期由 selector 自然重新 claim，禁止手工清 token。
+5. result provider 的 Celery SUCCESS、checkpoint success 或规范化 payload `race_status=complete` 都不是
+   publication 证明。必须同时看到原始 terminal marker 对应 official/corrected observation、完整 roster、
+   current immutable revision、canonical result rows、publication audit row，以及 root/www 的一致赛果区块。

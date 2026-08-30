@@ -3221,3 +3221,13 @@ P0 马信息补全专项的模型交接文档见
   `1915052 kB`，Web cgroup 峰值 `217976832 bytes`，没有扩容、清队列或修改数据库业务状态。
 - 当前权威状态仍为全部赛事新写入关闭。下一步重新执行配置审计与完整 preflight；只有新启用窗口通过后，
   才恢复赛事阶段并继续真实 T/T+30/T+3 与 correction 验收。
+
+# 2026-08-30 2C/8G 后已重开，等待 event 956 official/public
+
+- 主机已升级为 2C/8G，并恢复持久化 1280 MiB Swap；普通 worker 提高为 1 GiB cgroup，Web 1×4 与专用
+  worker 384 MiB 保持。四服务当前 exact PR #129、restart=0/OOM=false，资源余量约 5.6 GiB。
+- 全量五阶段已重新通过，9 个前置开关 true、correction=false；三队列 `0/0/7543`、锁 absent，公网 5 个
+  URL 均 200。event 956 已自然完成 T 与 T+30 两条 lifecycle transition并处于 finished。
+- 14:34Z provider 返回 8 名完赛马，但原始 terminal marker 缺失，系统仅记录 provisional observation 和
+  immutable shadow revision，canonical results/publication 仍为 0；14:40Z 幂等重试后下一 poll 为
+  14:55:09Z。真实 official projection/public 与 correction 周期仍未完成，自动监控继续。

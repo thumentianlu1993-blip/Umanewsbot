@@ -194,3 +194,20 @@
 - root/www 公开详情页出现统一“赛果”，不泄露 provider/source phase，且与数据库一致。
 - result/public 全部通过后，单独开启 correction，观察一个无重复写、无 revision 反转、无错误的完整周期。
 - 将最终证据补入本文件和五份项目文档，完成 PR #128 后暂停 heartbeat。
+
+## 2026-08-30 22:35 CST 2C/8G 重开与 event 956 provisional 证据
+
+- 主机升级后 `MemTotal=7441560 kB`；10 个只读样本的 MemAvailable 最低/平均/最高为
+  `5965652/6024863/6069928 kB`，memory PSI 全 0、无 kernel/container OOM。恢复 1280 MiB 持久化
+  `/swapfile`，普通 worker cgroup 从 512 MiB 调为 1 GiB；四服务最终 restart=0/OOM=false。
+- 重开过程的 discovery、race time/racecard、lifecycle、result apply/public 依次通过；active audit 为
+  `ready/valid/route_drift=0`，9 true + correction false。早期 census/赛前状态/瞬时队列冻结假设不再成立时
+  均真实 fail-closed；旧 `race_live=7543` 从未删除、消费或迁移。
+- event 956 在 `14:15:01Z` 生成 `scheduled→running / time_reached_race_datetime`，在 `14:40:05Z`
+  生成 `running→finished / time_t_plus_30`，两条均为 generation 2 registry 下的 immutable applied record。
+- `14:34:17Z` TRA 当日结果 observation #15 记录 8 名完赛马，raw SHA
+  `c9cab51b…7b13`、normalized SHA `68c3e5c4…f85dc5`；原始响应没有 terminal marker，因此 phase 为
+  provisional。result revision #1 已记录，reason `empty_field`，但 `published_at/official_confirmed_at` 为空，
+  canonical result/publication 均为 0。14:40Z 同 artifact 重试未重复建 revision，下一 poll 为 14:55:09Z。
+- root/www event 页均 200、9541 bytes，只在 footer 出现产品描述中的“赛果”；没有 results 区块、provider
+  或 provisional/source phase 泄露。correction 继续 false，等待 official/corrected 完整投影和公开后再单开。

@@ -6733,3 +6733,22 @@ v3 首次 prepare 在请求预算 `60/60` 时由 HRN 空候选连带阻断 Equib
   磁盘、服务、锁、队列和公网全程通过。当前仍为 10 false、专用 worker absent，不将优化通过误报为重开。
 - 下一步是以当前关闭态重新完成配置审计和全量 preflight；只有新的独立启用窗口完整通过，才恢复
   future discovery → race time/racecard → lifecycle → result/public 顺序。
+
+# 2026-08-30 主机升级后赛事链重开，event 956 进入 provisional 赛果观察
+
+- 主机已升级为 2C/8G；冷启动实测 `MemTotal=7441560 kB`。已恢复 1280 MiB 持久化 `/swapfile` 并写入
+  `/etc/fstab`，普通 worker cgroup 由 512 MiB 调整为 1 GiB；Web 继续 1×4，专用 worker 保持 384 MiB。
+  `2026-08-30T14:35:58Z` 可用内存 `5866888 kB`、SwapFree `1310716 kB`、磁盘
+  `14970400768 bytes`，四服务 exact PR #129、restart=0、OOM=false。
+- 已重新走完 future discovery → race time/racecard → lifecycle → result apply/public 五阶段；配置审计为
+  `ready/valid`、route drift 为空。当前 9 个前置开关 true、correction=false，队列 `0/0/7543`、锁 absent，
+  root/www 首页、healthz 和 event 页均 200。Web 重建后 Nginx 需 `nginx -t` 后平滑 reload，避免缓存旧
+  Compose Web IP 导致 502。
+- event 956 已生成两条 time-rule lifecycle transition：`scheduled→running`（T）与
+  `running→finished`（T+30），当前 finished/published、10 runners、0 canonical results。14:34Z 的自然
+  provider 轮询记录 8 名完赛马和 immutable provisional result revision #1；原始响应没有受审 terminal
+  marker，因此 revision 未投影、未 publication，公网页不显示赛果且不泄露 provider/source phase。
+- result checkpoint 在 14:40Z 自然重试并成功释放 claim；相同 artifact 未生成重复 observation/revision，
+  下一次为 `2026-08-30T14:55:09Z`。`empty_field` 是“当前赛果字段为空、候选可记录”的仲裁理由，不代表
+  terminal/public 已通过；只有 observation phase 为 official/corrected、完整 roster 投影并公开后才开启
+  correction。
