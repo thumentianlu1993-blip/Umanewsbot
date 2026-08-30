@@ -3371,3 +3371,15 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
   保持不变，任何采样越线仍关闭全部新写入。
 - canonical/release env 的冻结容量、持久目录、TLS 根、exact revision 与 registry digest 属于同一发布合同；
   发现配置漂移必须修复并重新审计，不能只依赖容器 image 一致。
+
+# 2026-08-30 小站 Web 采用单进程四线程，运行期越线必须重新开窗
+
+- 激活态任一实时采样低于硬内存门槛，即使服务、Swap、磁盘和队列仍正常，也必须立即 10 false并移除
+  专用 worker；关闭完成后资源恢复不能追溯性地把失败窗口改为通过，也不能由 heartbeat 自行重开。
+- Web 两个 Gunicorn worker 的实测 PSS 各约 173 MiB；小站生产改为 1 worker × 4 threads，保持原 4 个
+  请求线程并减少约 160 MiB 常驻匿名内存。该选择以资源稳定性换取进程级冗余，Gunicorn master 仍负责
+  worker 重启；任何健康或吞吐回归都回退 2 × 2。
+- PostgreSQL cgroup 的主要占用来自 file cache，`shared_buffers=128MB`；不通过 drop cache、压低正确的
+  shared buffer 或扩容来掩盖应用进程常驻占用。继续优先使用 PSS/cgroup 证据和可逆进程配置。
+- Web 优化的关闭态热身只证明新配置可运行；恢复赛事链仍需新的全量 preflight、配置审计、资源余量和
+  冻结顺序启用，不复用内存失败窗口的激活结论。

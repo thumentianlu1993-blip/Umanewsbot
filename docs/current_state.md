@@ -6681,3 +6681,15 @@ v3 首次 prepare 在请求预算 `60/60` 时由 HRN 空候选连带阻断 Equib
 - 下一门禁仍是 event 956 的真实 T/T+30 transition、T+3 终态完整 roster、immutable revision、数据库投影
   和公开页赛果；全部通过后才单独开启 correction 并观察一个干净周期。完整生产证据见
   `docs/changes/automate-race-data-lifecycle-sync/release_evidence.md`。
+
+# 2026-08-30 运行期内存越线后已关闭，Web 1×4 优化通过
+
+- `2026-08-30T01:41:35Z` 激活态连续监视发现 `MemAvailable=1496692 kB`，低于 1.5 GiB 硬门槛；
+  已立即执行 10 false、移除专用 worker、以 PR #129 重建 Web/普通 worker/Beat并释放自己的锁。终态
+  队列 `0/0/7543`，公网 5 个 URL 均 200，event 956 仍 scheduled 且无结果、transition 或 active claim。
+- 关闭态 PSS/cgroup 归因显示 PostgreSQL 大头为可回收 file cache，Web 两个 Gunicorn worker 各约
+  173 MiB PSS。Web 已在共享锁内从 2×2 调整为 1 worker × 4 threads，保持 4 个并发线程且失败可回退。
+- 调整后 10 分钟/88 次热身最低 `MemAvailable=1915052 kB`，Web cgroup 峰值 `217976832 bytes`；Swap、
+  磁盘、服务、锁、队列和公网全程通过。当前仍为 10 false、专用 worker absent，不将优化通过误报为重开。
+- 下一步是以当前关闭态重新完成配置审计和全量 preflight；只有新的独立启用窗口完整通过，才恢复
+  future discovery → race time/racecard → lifecycle → result/public 顺序。

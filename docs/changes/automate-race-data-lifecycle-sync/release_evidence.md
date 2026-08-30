@@ -1,6 +1,30 @@
 # 赛事数据生命周期生产发布证据
 
-更新时间：2026-08-30 09:00 Asia/Shanghai
+更新时间：2026-08-30 10:00 Asia/Shanghai
+
+## 2026-08-30 09:41 运行期内存门禁失败、关闭态与 Web 第二轮优化
+
+- 连续监视在 `2026-08-30T01:41:35Z` 第 77 次采样发现
+  `MemAvailable=1496692 kB < 1572864 kB`；当时 Swap、磁盘、四服务和三队列其他不变量仍正常，
+  `celery=5 / race_sync_v2=0 / race_live=7543`，deployment lock absent。该窗口立即以失败终止，未等待
+  下一轮采样、未继续 provider 或数据库写入。
+- 同一 owner 随即取得 `manual-release` 锁并完成 fail-closed：canonical 与 active release 双 env 10 false，
+  专用 worker 停止并移除，Web/普通 worker/Beat 以 exact PR #129 image 重建；普通 backlog 自然排空，
+  终态 `MemAvailable=1931332 kB / SwapFree=1310716 kB / disk=16398266368 bytes`，队列 `0/0/7543`，
+  5 个公网 URL 均 200，自己的锁正常释放。
+- 独立关闭态复核确认三服务 restart=0、OOM=false、10 false，专用 worker absent；event 956 仍为 scheduled，
+  result/transition/active claim 均为 0，result checkpoint 未提前执行。关闭态常驻 cgroup 约为 DB 579–777
+  MiB、Web 360 MiB、普通 worker 199 MiB、Beat 109 MiB；PostgreSQL 的主要部分是可回收 file cache，
+  `shared_buffers=128MB`，而 Web 两个 worker 各约 173 MiB PSS，是下一项可逆优化目标。
+- 在全部新写入关闭且共享锁独占时，Web 从 2 workers × 2 threads 调整为 1 worker × 4 threads，保持 4 个
+  请求线程；失败路径已绑定自动回退 2 × 2。重建成功后 Web cgroup 为 `197246976 bytes`，公网和三队列
+  均通过，自己的锁正常释放。
+- 之后完成 10 分钟关闭态热身：88 次完整采样最低 `MemAvailable=1915052 kB`，Web cgroup 峰值
+  `217976832 bytes`，普通 Beat backlog 自然入队并排空，Swap、磁盘、锁、三服务、专用 worker absent、
+  `race_sync_v2=0 / race_live=7543` 与分段公网验收全程通过。独立终态为 `MemAvailable=2014948 kB`、
+  Web cgroup `211234816 bytes`、5 个 URL 均 200。
+- 当前权威生产状态仍是 10 false、专用 worker absent；Web 1 × 4 优化通过不等于自动化已重开。必须重新
+  完成全量 preflight、关闭态配置审计和按冻结顺序的独立启用窗口，才可考虑恢复赛事链。
 
 ## 2026-08-30 08:14–08:24 PR #129 资源修复后赛前链路已重新启用
 

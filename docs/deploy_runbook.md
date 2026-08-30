@@ -9175,3 +9175,17 @@ RACE_DATA_RAW_ARTIFACT_ROOTS=/run/race-data-sync
    全部验证后单独开启。
 6. 任一资源、锁、路由、拓扑、任务、数据库或公网门禁失败：同一 owner 锁内设 10 false、移除专用 worker、
    恢复普通 worker/Beat并复验公网；不清理任何 Redis 队列，不删除其他 owner 的锁。
+
+## 运行期内存越线后的 Web 低成本恢复步骤
+
+1. 任一采样 `MemAvailable<1572864 kB` 时立即结束观察并执行 fail-closed；不要因为下一采样可能回升而
+   延迟，也不要只停止专用 worker而保留部分新写入开关。
+2. 关闭态独立验证 10 false、专用 worker absent、普通 backlog 自然排空、`race_sync_v2=0`、
+   `race_live=7543`、三服务 exact image/revision、restart/OOM 与 5 个公网 URL。
+3. 内存归因同时读取 container cgroup `memory.current/memory.stat` 与进程 `smaps_rollup` PSS；PostgreSQL
+   file cache 与应用匿名内存分开判断，禁止用 RSS 简单相加或 drop cache 形成虚假余量。
+4. 当前低成本 Web 合同为 `GUNICORN_WORKERS=1 / GUNICORN_THREADS=4`，必须同时写 canonical 与 active
+   release env，在共享锁内只重建 Web；进程表必须恰为 master + 1 worker且两行都含 `--workers 1` 与
+   `--threads 4`。失败立即恢复 2 × 2 并复验 health。
+5. Web 调整后至少做 10 分钟关闭态热身，覆盖普通 Beat 周期、资源、锁、服务、专用 worker absent、三队列
+   与公网。通过只允许进入新的 preflight，不自动恢复任何赛事开关。

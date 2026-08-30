@@ -546,3 +546,7 @@ canonical runner roster。只有结果型 fallback 与现有 runner 通过马号
 不消费。普通 worker 和 Web 已按小站负载压低并发并设置子进程回收/cgroup 上限，以资源门禁和 fail-closed
 优先替代主机扩容。赛前 future discovery、赛时/出马表、lifecycle 与 result/public 已按序启用；更正自动化
 仍需真实赛果公开验证后单独开启。
+
+运行期内存门禁实际越线后，赛事链会回到 10 false并移除专用 worker，不能把服务仍健康当作继续写入的
+理由。当前小站 Web 使用 1 Gunicorn worker × 4 threads，保持 4 个请求线程并减少进程常驻内存；生产目前
+处于该优化后的关闭态，必须通过新的发布窗口才能恢复上述自动链。

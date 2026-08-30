@@ -3191,3 +3191,12 @@ P0 马信息补全专项的模型交接文档见
   fail-closed 后重试，没有删除队列或提前打开 correction。
 - 未完成项只有真实 T/T+30 lifecycle、T+3 终态赛果/完整 roster/revision/公开页，以及其后 correction
   单周期验证；最终证据完成前不宣告整条链上线完成。
+
+# 2026-08-30 赛事链因内存门禁回到关闭态，Web 优化待重新开窗
+
+- 激活态在 `2026-08-30T01:41:35Z` 触发内存硬门禁，已成功 10 false、移除专用 worker并恢复普通服务；
+  三队列 `0/0/7543`，公网正常，event 956 未提前产生结果或 lifecycle transition。
+- 关闭态归因后 Web 从 2 workers × 2 threads 调整为 1 worker × 4 threads；10 分钟热身最低内存
+  `1915052 kB`，Web cgroup 峰值 `217976832 bytes`，没有扩容、清队列或修改数据库业务状态。
+- 当前权威状态仍为全部赛事新写入关闭。下一步重新执行配置审计与完整 preflight；只有新启用窗口通过后，
+  才恢复赛事阶段并继续真实 T/T+30/T+3 与 correction 验收。
