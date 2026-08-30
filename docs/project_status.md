@@ -1,5 +1,14 @@
 # 项目状态文档
 
+## 2026-08-31 2C/8G active 基线稳定，event 956 仍待正式赛果
+
+- PR #129 四服务 exact、restart=0、OOM=false，leaf `0075`；9 true + correction false，资源余量充足，
+  `celery=0 / race_sync_v2=0 / race_live=7543`，公网 root/www/health/event 均通过。
+- event 956 已自然进入 finished，并保留两条 lifecycle transition；最后一次自然结果轮询成功释放 claim。
+  当前唯一结果 revision 仍为 provisional，canonical result/publication 为 0，公网页无内部状态泄露。
+- 下一步只等待 Beat 自然运行 exact result route；正式 apply/public 全证据通过后再单独开启 correction 并
+  观察完整周期。扩容只解决资源余量，不改变 finality、锁、队列和 fail-closed 合同。
+
 ## 2026-08-30 20:00 赛事链因普通 worker OOM 安全关闭
 
 - 赛前检查发现普通 worker `OOMKilled=true`；容器 running/restart=0 不使该硬门禁通过。event 956 当时仍
@@ -45,6 +54,15 @@
 - 上线后完成性回归为 SQLite 核心组合 249/249、隔离 PostgreSQL 16 专项 25/25；Django check、migration
   drift、compileall、三份 Compose config 与 diff check 均通过，且整个验证容器禁用真实 provider 网络。
   最终仍只差 event 956 的自然 T+3 result/public 与随后 correction 生产实证，不能以测试代替。
+## 2026-08-30 普通 worker 内存保护 hotfix 待关闭态发布
+
+- 生产内存门禁失败已收口：10 false、专用 worker absent、`celery=0 / race_sync_v2=0 /
+  race_live=7543`，普通 worker 重建后约 129 MiB，host 可用内存约 2.05 GB，公网正常。
+- hotfix 增加普通 worker prefetch=1、20-task/256 MiB child recycling 与 512 MiB cgroup；不变更
+  concurrency、业务代码、队列路由、migration 或数据。
+- 新合同 RED/GREEN、SQLite 核心组合 250/250、Django/migration/compile/shell/三 Compose/diff 门禁通过。
+  隔离 runtime smoke 的 worker `pong`，命令行和 536870912-byte cgroup 精确生效。生产新写入继续关闭；
+  须先合并、关闭态发布和三个 Beat 周期热身，不能直接恢复 result/public。
 
 ## 2026-08-30 proof-only 部署因 legacy queue 合同冲突先修正
 

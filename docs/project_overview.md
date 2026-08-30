@@ -1,5 +1,12 @@
 # 项目总览
 
+2026-08-31 02:03，生产主机升级到 2C/8G 后，完整赛事链保持 active：四服务均为 PR #129 exact
+revision/image、restart=0、OOM=false，leaf `0075`，9 个前置开关 true、correction false；可用内存约
+5.37 GiB，Swap 完整，队列 `0/0/7543`，公网 5 个目标均 200。event 956 已自然完成
+scheduled -> running -> finished，但 provider 结果仍缺原始 terminal marker，所以只幂等保留 provisional
+revision，canonical result/publication 仍为 0。继续等待 exact result route 自然运行，正式赛果和公网通过前
+不提前开启 correction。
+
 2026-08-30 20:00，PR `#129` active 赛前窗口因普通 worker `OOMKilled=true` 命中硬门禁，已自动
 fail-closed。生产当前为 10 个赛事开关全 false、专用 worker absent；Web 1×4、普通 worker、Beat 已以
 exact image 重建且 restart=0/OOM=false，队列 `0/0/7543`，公网 6 个 URL 200，event 956 未产生赛果、
@@ -26,6 +33,11 @@ future discovery、赛时/出马表和 lifecycle 已按冻结容量依次通过�
 correction 仍关闭，只有真实 provider、数据库、publication 与公网结果页全部一致后才会单独放行。旧
 `race_live=7543` 全程未动；当前资源高于冻结门槛，无需扩 RAM。任一后续门禁失败仍执行 10 false、移除
 专用 worker并恢复普通 worker/Beat。
+2026-08-30 赛事同步因普通 Celery worker 1.344 GiB 内存异常已 fail-closed，生产恢复为 10 false、专用
+worker absent、`0/0/7543` 和约 2.05 GB 可用内存。代码 hotfix 为普通 worker 增加 prefetch=1、每 20
+任务/262144 KiB 子进程回收，并在三份 Compose 设置默认 512 MiB cgroup；不改业务、migration、路由或
+concurrency。核心回归 250/250 与结构门禁已通过。下一步以关闭态发布并观察三个普通调度周期，稳定后才从
+future discovery 重走，当前不扩容。
 
 2026-08-30 proof-only PR `#125` 合并后、部署前发现与现有生产边界冲突：generator 原本要求所有 Redis 队列
 为 0，但旧 `race_live=7543` 是明确不得消费或清理的冻结 backlog。部署已暂停并改为证明“不可执行”而非

@@ -1,5 +1,21 @@
 # 部署运行手册
 
+## 2026-08-31 event 956 正式赛果等待窗口
+
+1. 当前 active 基线固定为 PR #129 revision `cbf3f043…1ccf`、image `8e70cc43…fc76`、leaf `0075`；
+   Web 为 1×4，普通 worker 为 concurrency/prefetch `1/1` 且 1 GiB cgroup，专用 worker为 `1/1` 且
+   384 MiB，Beat 正常。
+2. 每轮先只读核对 deployment lock、四服务 image/revision/restart/OOM、资源门槛、9 true + correction
+   false、`celery`/`race_sync_v2`/`race_live`、event checkpoint/claim/observation/revision/result/publication/
+   lifecycle 与 root/www 公网页。`race_live` 必须精确保持 7543。
+3. event 956 当前只有 provisional revision id 13；selector 只能在 `next_poll_at` 由 Beat 自然派发。不得
+   手工调用 provider、改 due time/claim/status/result，不能用 HTTP 200、Celery SUCCESS 或
+   `decision_reason=empty_field` 代替正式赛果证据。
+4. 只有 provider 原始终态、正式 revision、canonical projection、publication 与 root/www 页面均通过，
+   才获取新的 `manual-release` 锁，将 `CORRECTION_APPLY` 单独改为 true并重建四服务；至少观察一个完整
+   correction 周期。任一门禁失败立即把 canonical 与 active env 的 10 个开关全设 false、移除专用 worker、
+   以 exact PR #129 重建 Web/普通 worker/Beat并平滑 reload Nginx；全部 Redis 队列原样保留。
+
 ## 2026-08-30 20:00 普通 worker OOM 后的关闭态基线
 
 1. 当前唯一权威状态为 `CLOSED_AFTER_ORDINARY_WORKER_OOM`：canonical/active env 的 10 个
@@ -72,6 +88,22 @@
    worker/Beat，再验证 `celery=0 / race_sync_v2=0 / race_live=7543` 和公网。失败窗口不得事后改写为通过。
 6. 真实赛时续跑由当前任务的 heartbeat `umanews-event-956` 承接。完成 result/public 与 correction 后，回写
    五份项目文档、暂停该 heartbeat，并以最终生产证据结束本次发布。
+## 2026-08-30 普通 worker 内存保护 hotfix 发布步骤
+
+1. 发布前权威关闭态必须为 10 个 data-sync 开关 false、`race_sync_v2_worker` absent、
+   `celery=0 / race_sync_v2=0 / race_live=7543`、Web healthy；资源仍按 1536 MiB/512 MiB swap/8 GiB
+   磁盘门槛，不因刚重启读数良好而放宽。
+2. hotfix 只允许修改普通 worker 启动参数、三份 Compose mem_limit、示例 env、合同测试和文档；不得夹带
+   migration、业务任务、队列路由、赛事同步开关或 provider 变化。
+3. 以精确 merge revision 构建隔离 image，保留 PR #127 image 作 rollback；所有服务保持 10 false 切换。
+   migration plan 必须为空、leaf 仍为 0075，Web/worker/Beat image/revision 一致。
+4. 容器内普通 worker 命令行必须含 prefetch=1、max-tasks-per-child=20、max-memory-per-child=262144；
+   Docker `HostConfig.Memory` 必须为 536870912，concurrency 仍取生产显式 1。
+5. 至少观察三个 Beat 周期：每轮冻结 queue/active/reserved/scheduled、worker memory.current、
+   restart/OOM、task terminal/error/redelivery、MemAvailable/SwapFree/磁盘和公网。队列须在 5 分钟内归零，
+   host 全样本通过；失败立即保持 10 false 并回滚或继续诊断。
+6. 只有关闭态热身通过，才从 future discovery 全量重走；旧 `race_live` 不清、不迁移、不消费，event 956
+   due time/claim/result 不手工改写。
 
 ## 2026-08-30 Racing API exclusive proof 的 legacy `race_live` 验收口径
 

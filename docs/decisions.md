@@ -1,5 +1,16 @@
 # 关键决策
 
+## 2026-08-31 扩容后仍以 provider 原始终态作为正式赛果门禁
+
+- 主机升级到 2C/8G 解决了此前狭窄内存余量，但不改变结果 finality 合同，也不降低
+  `MemAvailable>=1536 MiB`、Swap、磁盘、容器 OOM/restart、共享锁和队列完整性门禁。
+- `race_status=complete` 的规范化字段不能替代 provider 响应中的原始 terminal marker。缺少 marker 时，
+  同一 artifact 只允许幂等保留为 provisional observation/revision，不创建 canonical result 或 publication，
+  不在公网泄露 provider/source phase，也不能据此开启 correction。
+- event 956 继续只允许 Beat/selector 在 `next_poll_at` 到期后自然调用受审路由；禁止手工触发 provider、
+  修改 due time/claim/event status/result。只有正式 result apply、不可变 revision/publication、canonical
+  projection 与 root/www 公网页全部一致后，才在独立锁窗口开启 correction 并观察完整周期。
+
 ## 2026-08-30 普通 worker 的 OOMKilled 标记即使未重启也必须 fail-closed
 
 - `OOMKilled=true` 是冻结的容器完整性硬门禁；不能因容器仍 running、restart=0、主机
@@ -46,6 +57,14 @@
 - correction 是 result/public 通过后的独立门禁。只有 event 956 的真实赛果和公开页全部通过，才在新的发布锁
   内单独开启并观察一个完整周期；否则保持 false。任一资源、队列、锁、路由、worker 或业务门禁失败均立即
   关闭 10 个 data-sync 开关、移除专用 worker并恢复普通 worker/Beat；旧 `race_live=7543` 始终不动。
+## 2026-08-30 普通 worker 用 child recycling 加 512 MiB cgroup 阻断 host starvation
+
+- concurrency=1 不能阻止长寿命子进程在任务后保留 1 GiB 以上内存；重启后 host 可用内存从低于 1 GiB
+  恢复到约 2.05 GB，先做进程生命周期治理，不扩 RAM、不降低 1536 MiB 门槛。
+- 普通 worker 固定 prefetch=1，默认 `max-tasks-per-child=20`、`max-memory-per-child=262144` KiB；三份
+  Compose 默认 `mem_limit=512M`，均允许显式 env 覆盖。软回收处理任务后滞留，cgroup 处理单任务失控。
+- 发布只能在 10 false 下进行，并验证 OOM/restart、未确认任务 redelivery、重复副作用、队列排空和公网。
+  任何一项失败保持专用 worker absent；不得用提高 swap、drop cache 或直接扩容掩盖普通任务异常。
 
 ## 2026-08-30 exclusive proof 允许不可执行的 legacy backlog，但拒绝任何消费能力
 

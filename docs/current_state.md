@@ -1,5 +1,23 @@
 # 当前状态
 
+## 2026-08-31 02:03 主机升级后赛事链保持全量开启，event 956 等待正式赛果
+
+- 生产主机现为 2C/8G，持久化 Swap 为 1280 MiB。`2026-08-30T18:03:32Z` 只读复核得到
+  `MemAvailable=5626284 kB`、`SwapFree=1310716 kB`、磁盘可用 `14915956736 bytes`；deployment lock
+  absent。Web、普通 worker、Beat、`race_sync_v2_worker` 均为 PR #129 revision
+  `cbf3f043…1ccf` / image `8e70cc43…fc76`，running、restart=0、OOM=false；migration leaf 精确为
+  `stable.0075`。
+- 9 个前置 `RACE_DATA_SYNC_*` 开关保持 true，`CORRECTION_APPLY=false`。三队列为
+  `celery=0 / race_sync_v2=0 / race_live=7543`，旧队列仍未消费、清理、迁移或重排。root/www、healthz
+  与 root/www event 956 canonical 页面共 5 个 URL 均为 200，页面没有 provider/provisional 内部状态泄露。
+- event 956 已按真实时间形成两条不可变 lifecycle transition：`scheduled -> running`
+  (`time_reached_race_datetime`) 与 `running -> finished` (`time_t_plus_30`)；当前 10 runners，active claim
+  为空。结果 selector 最后一次于 `17:53:45Z` 自然成功，下一次为 `18:23:45Z`。
+- provider 仍只提供缺少原始 terminal marker 的同一份候选，因此数据库只有 observation id 15 与
+  result revision id 13，phase 为 `provisional`、content SHA 为 `68c3e5c4…f85dc5`；canonical result、
+  result publication、`published_at` 与 `official_confirmed_at` 均为 0/null。该状态不得伪装为正式赛果，
+  correction 也不得提前开启；继续等待代码内受审的 exact result route 通过 Beat 自然派发。
+
 ## 2026-08-30 20:00 普通 worker OOM 硬门禁失败，赛事链已自动关闭
 
 - `2026-08-30T12:00:57Z` 赛前只读门禁发现普通 `worker` 容器 `OOMKilled=true`；即使容器仍 running、
@@ -90,6 +108,20 @@
 - 隔离 PostgreSQL 16 再跑当前代码的 `race_data_sync_r0_postgres` 与 `pipeline_a_postgres` 专项 25/25，
   覆盖真实行锁、并发 claim/CAS、幂等、约束与 migration；测试明确 network=false，临时数据库、容器和
   network 已全部回收，没有接触生产。
+## 2026-08-30 普通 Celery 内存保护 hotfix 已完成代码验证
+
+- 生产普通 worker 在 concurrency=1 下从约 129–292 MiB 增长到 1.344 GiB，使
+  `MemAvailable` 降到 751020 kB、后续最低约 528300 kB；DB/Redis、Swap 与磁盘正常。门禁失败后已
+  10 false、移除专用 worker并重建 Web/普通 worker/Beat，内存恢复约 2.05 GB，旧
+  `race_live=7543` 不变。
+- hotfix 给普通 worker 显式增加 `prefetch-multiplier=1`、默认每 20 任务回收、子进程超过 262144 KiB
+  后回收；三份 Compose 的普通 worker 增加可覆盖的默认 512 MiB cgroup 上限。concurrency 不变，不修改
+  数据库、队列路由、业务任务、migration 或赛事同步逻辑。
+- 新合同先 RED 后 GREEN；赛事同步/lifecycle/result SQLite 核心组合 250/250，Django check、migration
+  drift、compileall、shell syntax、三份 Compose 渲染和 diff check 全通过，验证过程禁用真实 provider。
+  一次性 Redis runtime smoke 又证明 worker `pong`、实际命令行含三个新参数且 HostConfig.Memory 精确为
+  536870912；临时容器/network 已回收。生产仍保持 10 false；合并和关闭态发布后须观察至少三个普通 Beat
+  周期再决定是否重开赛事同步。
 
 ## 2026-08-30 Racing API proof 发布前关闭 legacy queue 合同冲突
 
