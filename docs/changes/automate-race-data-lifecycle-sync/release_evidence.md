@@ -27,6 +27,10 @@
   符合冻结容量，0073/0074/0075 均 applied，无 one-off 残留；复核资源为 `1853372/1310716 kB`、
   `16389922816 bytes`，三队列 `0/0/7543`，5 个公网 URL 200、Meta 赛事入口 429。event 956 result
   checkpoint 仍是 `14:13Z` 且 last attempt null，公开页尚无 results 区块。
+- 中断续跑终检于 `04:27–04:30Z` 完成：本轮自己创建的本地脚本及服务器 `/tmp` 脚本、日志、PID 文件已
+  精确删除，deployment lock 始终 absent。Beat 周期使普通 `celery` 短时升至 29 后自然归零，期间最低
+  `MemAvailable=1663796 kB`；`race_sync_v2=0 / race_live=7543` 不变。event 956 的 root/www canonical
+  页面均为 200、9542 bytes 且 SHA-256 同为 `ebf7740c…df978`；没有人为消费、清队列或改写赛事记录。
 - 当前权威状态为 9 true + correction false；heartbeat 已切换为 active 只读门禁与授权 fail-closed。只有真实
   result apply/public 通过后才单独开启 correction。UK/USA proof 与法国/爱尔兰未批准 proposals 继续暂停；
   当前最小资源余量约 190 MiB，因此不扩容、不并发新增 proof。
