@@ -16,11 +16,12 @@
   `16389922816 bytes`，deployment lock absent，无 one-off 容器残留。
 - event 956 仍为 `scheduled/published`，10 runners、0 results、0 transition、无 active claim；result
   checkpoint 仍自然等待 `2026-08-30T14:13:00Z`，公开页尚无赛果区块。只有真实 result apply/public 四层
-  证据通过后才单独开启 correction。UK/USA proof 与法国/爱尔兰未批准 proposals 继续暂停，不占用当前约
-  190 MiB 的最小资源余量；现阶段仍不扩 RAM、不降低门槛。
+  证据通过后才单独开启 correction。UK/USA proof 与法国/爱尔兰未批准 proposals 继续暂停；现阶段仍不扩
+  RAM、不降低门槛。
 - `04:27–04:30Z` 中断续跑终检中，普通队列随 Beat 周期短时升至 29 后自然归零，最低内存
-  `1663796 kB`，专用/旧队列保持 `0/7543`；event 956 root/www canonical 页面均为 200 且摘要一致。自己的
-  本地与服务器临时脚本、日志、PID 已精确清理，lock absent；未删除发布物、队列或他人文件。
+  `1663796 kB`，比硬门槛仅高约 89 MiB，专用/旧队列保持 `0/7543`；event 956 root/www canonical 页面均
+  为 200 且摘要一致。自己的本地与服务器临时脚本、日志、PID 已精确清理，lock absent；未删除发布物、
+  队列或他人文件。
 
 ## 2026-08-30 普通 Celery 内存越线，赛事同步已 fail-closed
 

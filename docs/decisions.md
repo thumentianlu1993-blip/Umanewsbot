@@ -5,9 +5,10 @@
 - 生产 Web 从 2×2 调整为 1×4 后仍保留 4 个请求线程，关闭态 10 分钟热身最低内存约 1.83 GiB；完整
   激活后的 120 样本最低 `1767740 kB`，比 1536 MiB 硬门槛高约 190 MiB，公网、队列、restart/OOM
   同时通过。该配置作为 event 956 真实赛果窗口的当前基线，不恢复第二个 Gunicorn worker，也不扩 RAM。
-- 约 190 MiB 是有效但不宽裕的最小余量；在 result/public/correction 实证完成前，UK/USA TRA proof
-  继续暂停，法国/爱尔兰 `PROPOSED_NOT_APPROVED` proposals 不进入 canonical registry。若后续活跃窗口
-  再次低于硬门槛，仍立即 10 false、移除专用 worker并恢复普通服务，不能用扩容追溯改写失败窗口。
+- 后续 Beat 周期最低 `1663796 kB`，把已观测最小余量进一步收窄到约 89 MiB；在
+  result/public/correction 实证完成前，UK/USA TRA proof 继续暂停，法国/爱尔兰
+  `PROPOSED_NOT_APPROVED` proposals 不进入 canonical registry。若后续活跃窗口低于硬门槛，仍立即
+  10 false、移除专用 worker并恢复普通服务，不能用扩容追溯改写失败窗口。
 - 摘要语义必须分开：TRA source registry SHA 是 `3bac3b64…a6da`，standing policy SHA 是
   `07013655…1888`，reference registry SHA 是 `740a9377…cff2`，配置生成的 provider roster SHA 是
   `26e0625d…32d4`。审计的 `roster.registry_digest` 只能与最后一项比较，不能误与 TRA SHA 比较。

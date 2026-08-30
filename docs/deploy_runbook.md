@@ -10,8 +10,9 @@
 3. 本轮 future discovery 必须保持 `113/112/1` 的业务不变量、0 request、0 write；相关数据库摘要为
    `827ff114…9e88`。随后按 time/racecard -> lifecycle -> result apply -> result public 推进；Beat 最后启动。
 4. active 热身已完成 120 样本，最低 `MemAvailable=1767740 kB`、Web 峰值 230057574 bytes、普通 backlog
-   最高 26 后自然归零。后续仍逐次要求内存/Swap/磁盘硬门槛、`race_sync_v2=0`、`race_live=7543`、
-   exact services、公网页；不得因本轮通过降低门槛。
+   最高 26 后自然归零；后续 Beat 周期最低降到 `1663796 kB`、普通 backlog 峰值 29 后仍自然归零，已观测
+   最小余量约 89 MiB。后续仍逐次要求内存/Swap/磁盘硬门槛、`race_sync_v2=0`、`race_live=7543`、exact
+   services、公网页；不得因本轮通过降低门槛。
 5. event 956 result checkpoint 为 `2026-08-30T14:13:00Z`。此前不手工触发 selector/provider，不改 due
    time、claim、event status 或结果。到期后区分 Celery terminal、provider business result、capacity/
    claim、immutable revision/canonical publication 与 root/www 页面；任何一层失败立即 fail-closed。

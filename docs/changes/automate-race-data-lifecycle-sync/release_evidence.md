@@ -33,7 +33,7 @@
   页面均为 200、9542 bytes 且 SHA-256 同为 `ebf7740c…df978`；没有人为消费、清队列或改写赛事记录。
 - 当前权威状态为 9 true + correction false；heartbeat 已切换为 active 只读门禁与授权 fail-closed。只有真实
   result apply/public 通过后才单独开启 correction。UK/USA proof 与法国/爱尔兰未批准 proposals 继续暂停；
-  当前最小资源余量约 190 MiB，因此不扩容、不并发新增 proof。
+  后续 Beat 周期把已观测最小资源余量收窄到约 89 MiB，因此不扩容、不并发新增 proof，并保持硬门槛。
 
 ## 2026-08-30 09:41 运行期内存门禁失败、关闭态与 Web 第二轮优化
 

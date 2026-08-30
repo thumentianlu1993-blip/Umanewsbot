@@ -7,7 +7,8 @@
 - 完整重开按 discovery -> time/racecard -> lifecycle -> result apply -> result public 执行；discovery 为
   113/112/1、0 request/0 write，lifecycle 为 0 error/0 transition，active audit ready/valid/route drift 0。
 - 120 个 active 样本最低 `MemAvailable=1767740 kB`，Web 峰值约 219 MiB，普通队列最高 26 后自然归零；
-  `race_sync_v2=0 / race_live=7543`，Swap 与磁盘通过。独立公网、容器、migration 与 event DB 复核通过。
+  后续 Beat 周期最低降到 `1663796 kB`、普通队列峰值 29 后仍自然归零，已观测最小余量约 89 MiB。
+  `race_sync_v2=0 / race_live=7543`，Swap 与磁盘通过；独立公网、容器、migration 与 event DB 复核通过。
 - event 956 仍 scheduled、10 runners、0 results、0 transition，result checkpoint 在 14:13Z；当前只差自然
   result/public 与 correction 实证。相邻 proof/proposals 继续暂停，当前无需扩容；任一门禁失败仍立即全关。
 
