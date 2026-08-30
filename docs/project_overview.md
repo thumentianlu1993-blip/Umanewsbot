@@ -1,5 +1,12 @@
 # 项目总览
 
+2026-08-30 12:19，PR `#129` 的赛事全生命周期链在 Web 1 worker × 4 threads 优化后完成全量重开。
+future discovery、赛时/出马表、lifecycle、result apply 与 result public 已依次通过，active audit 为
+ready/valid/route drift 0；120 样本最低 `MemAvailable=1767740 kB`，普通 backlog 自然归零，新旧赛事队列
+保持 `0/7543`，因此当前不扩 RAM。四服务均为 `cbf3f043…1ccf` / `8e70cc43…fc76`，9 个前置 flags
+true，correction false。event 956 仍在赛前，结果 checkpoint 自然等待 14:13Z；真实赛果、公开页与随后
+correction 仍是最终未完成项。UK/USA proof 和未批准 proposals 继续暂停，避免占用约 190 MiB 最小余量。
+
 2026-08-30 result/public 赛前窗口因真实内存门禁失败已自动关闭。普通 Celery worker 在 concurrency=1 下
 增长到约 1.344 GiB，使 `MemAvailable` 降到 751020 kB；数据库、Redis、Swap 和磁盘不是主因。已在共享锁
 内完成 10 false、移除专用 worker并重建 Web/普通 worker/Beat，终态内存恢复约 2.05 GB，队列为

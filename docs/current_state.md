@@ -1,5 +1,24 @@
 # 当前状态
 
+## 2026-08-30 PR #129 在 Web 1×4 优化后完成全量重开，等待真实赛果与更正
+
+- 权威生产基线为 revision `cbf3f043…1ccf`、image `8e70cc43…fc76`、migration exact leaf `0075`；
+  Web/普通 worker/Beat/`race_sync_v2_worker` 均为该 image/revision，restart=0、OOM=false。Web 实际为
+  1 worker × 4 threads；普通与专用 Celery 均为 concurrency=1、prefetch=1，分别受 512 MiB/384 MiB
+  cgroup 保护。当前 9 个前置 data-sync flags 为 true，correction 仍为 false。
+- 新窗口重新完成关闭态审计和冻结顺序：future discovery 为 `113 total / 112 blocked / 1 enrolled`、
+  provider request 0、相关数据库前后 SHA 同为 `827ff114…9e88`；time/racecard 当前 checkpoint 验证通过；
+  lifecycle smoke 为 `selected=0 / transitioned=0 / error=0`；result apply 与 result public 依次放行。active
+  audit 为 `ready / valid / route_drift=[] / would_write=false`，provider roster SHA 为 `26e0625d…32d4`。
+- Beat 最后恢复后完成 120 个连续样本：最低 `MemAvailable=1767740 kB`，Web 峰值
+  `230057574 bytes`，普通 `celery` 最高 26 后自然归零；`race_sync_v2=0 / race_live=7543` 全程不变，
+  Swap 未下降，公网门禁全程通过。独立终态为 `MemAvailable=1853372 kB`、磁盘
+  `16389922816 bytes`，deployment lock absent，无 one-off 容器残留。
+- event 956 仍为 `scheduled/published`，10 runners、0 results、0 transition、无 active claim；result
+  checkpoint 仍自然等待 `2026-08-30T14:13:00Z`，公开页尚无赛果区块。只有真实 result apply/public 四层
+  证据通过后才单独开启 correction。UK/USA proof 与法国/爱尔兰未批准 proposals 继续暂停，不占用当前约
+  190 MiB 的最小资源余量；现阶段仍不扩 RAM、不降低门槛。
+
 ## 2026-08-30 普通 Celery 内存越线，赛事同步已 fail-closed
 
 - `2026-08-29T22:36:06Z` 生产 `MemAvailable=751020 kB`，低于冻结门槛 `1572864 kB`；随后最低读到

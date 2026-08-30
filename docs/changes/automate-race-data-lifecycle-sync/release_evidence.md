@@ -1,6 +1,35 @@
 # 赛事数据生命周期生产发布证据
 
-更新时间：2026-08-30 10:00 Asia/Shanghai
+更新时间：2026-08-30 12:20 Asia/Shanghai
+
+## 2026-08-30 11:47–12:19 Web 1×4 后全量重开与 active 热身
+
+- 关闭态全量 preflight 为 `MemAvailable=1932892 kB / SwapFree=1310716 kB / disk=16397012992 bytes`、
+  lock absent、`celery/race_sync_v2/race_live=0/0/7543`、10 false、专用 worker absent。one-off audit 为
+  `ready / valid / policy loaded / route_drift=[] / would_write=false`。摘要口径重新核清：TRA registry
+  `3bac3b64…a6da`，provider roster `26e0625d…32d4`；后者与服务器 7 份历史独立 audit 一致。
+- 在 shared `manual-release` lock 内停 Beat 并自然 drain 普通 worker；Phase 1 重跑为
+  `total=113 / blocked=112 / enrolled=1 / requests=0 / writes=0`，相关数据库前后 SHA 同为
+  `827ff114c2d0be78e9f1548ef291e412e4d183abec6aca4bca3b6d9295dd9e88`。没有调用 provider。
+- 随后按冻结顺序启用 time/racecard、lifecycle、result apply、result public。每次重建后两个 Celery 节点
+  均 exact/idle；event 956 一直为 scheduled、10 runners、0 results、0 transition。lifecycle smoke 为
+  `selected=0 / not_due=0 / transitioned=0 / error=0`；active audit 为 ready/valid、route drift 0、
+  9 true + correction false、would_write false。Beat 最后恢复。
+- 期间身份探针误依赖 release 内 `.git`、普通 backlog 零值检查位置错误、Compose wrapper 参数顺序错误、
+  控制会话中断以及 `numfmt` 不接受 Docker 小数 MiB 均被当作真实脚本失败；每次都自动 10 false、移除专用
+  worker、恢复 Web/普通 worker/Beat并释放自己的锁，队列始终保留。最终脚本以 image label 识别身份、在
+  停 Beat 后 drain、遵守 `run --rm --no-deps` grammar，并用自校验单位转换采样；没有把失败窗口改写成功。
+- 最终 active 热身完成 120 个样本：最低 `MemAvailable=1767740 kB`，Web 峰值 `230057574 bytes`，普通
+  `celery` 最高 26 并自然归零，`race_sync_v2=0 / race_live=7543` 全程不变，Swap 未下降，四服务
+  restart=0/OOM=false，分段公网验收全部通过。终态
+  `MemAvailable=1825508 kB / SwapFree=1310716 kB / disk=16389996544 bytes`，锁正常释放。
+- 独立终态复核确认四服务均为 PR #129 exact image/revision，Web 进程确为 1×4，普通/专用 Celery 命令行
+  符合冻结容量，0073/0074/0075 均 applied，无 one-off 残留；复核资源为 `1853372/1310716 kB`、
+  `16389922816 bytes`，三队列 `0/0/7543`，5 个公网 URL 200、Meta 赛事入口 429。event 956 result
+  checkpoint 仍是 `14:13Z` 且 last attempt null，公开页尚无 results 区块。
+- 当前权威状态为 9 true + correction false；heartbeat 已切换为 active 只读门禁与授权 fail-closed。只有真实
+  result apply/public 通过后才单独开启 correction。UK/USA proof 与法国/爱尔兰未批准 proposals 继续暂停；
+  当前最小资源余量约 190 MiB，因此不扩容、不并发新增 proof。
 
 ## 2026-08-30 09:41 运行期内存门禁失败、关闭态与 Web 第二轮优化
 

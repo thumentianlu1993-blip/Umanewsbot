@@ -1,5 +1,25 @@
 # 部署运行手册
 
+## 2026-08-30 12:19 PR #129 Web 1×4 重开后的当前生产基线
+
+1. 当前唯一 active 基线为 revision `cbf3f043…1ccf`、image `8e70cc43…fc76`、leaf `0075`、Web 1×4、
+   普通 worker 1×prefetch1/512 MiB、专用 worker 1×prefetch1/384 MiB；9 个前置 flags true，correction
+   false。四服务必须 restart=0/OOM=false，旧 `race_live` 必须精确 7543。
+2. digest 口径：standing `07013655…1888`、TRA `3bac3b64…a6da`、reference `740a9377…cff2`、provider
+   roster `26e0625d…32d4`。`audit_race_data_sync.roster.registry_digest` 比对 provider roster，不比对 TRA。
+3. 本轮 future discovery 必须保持 `113/112/1` 的业务不变量、0 request、0 write；相关数据库摘要为
+   `827ff114…9e88`。随后按 time/racecard -> lifecycle -> result apply -> result public 推进；Beat 最后启动。
+4. active 热身已完成 120 样本，最低 `MemAvailable=1767740 kB`、Web 峰值 230057574 bytes、普通 backlog
+   最高 26 后自然归零。后续仍逐次要求内存/Swap/磁盘硬门槛、`race_sync_v2=0`、`race_live=7543`、
+   exact services、公网页；不得因本轮通过降低门槛。
+5. event 956 result checkpoint 为 `2026-08-30T14:13:00Z`。此前不手工触发 selector/provider，不改 due
+   time、claim、event status 或结果。到期后区分 Celery terminal、provider business result、capacity/
+   claim、immutable revision/canonical publication 与 root/www 页面；任何一层失败立即 fail-closed。
+6. 只有 result/public 全部通过才在新锁内将 correction 单独设为 true并重建四服务，观察一个完整周期。
+   UK/USA proof 与未批准 identity/module proposals 在此之前继续暂停。若控制终端可能断线，允许将同一
+   带 trap 的脚本放入独立 session，但它必须自己持官方 deployment lock、只释放自己的 token，并把任何
+   脚本/采样错误也按真实门禁失败执行 10 false；严禁删除未知锁。
+
 ## 2026-08-30 普通 Celery 内存 fail-closed 与重新启用前置门禁
 
 1. 本轮门禁失败证据为 `MemAvailable=751020 kB`（后续最低约 528300 kB），普通 worker cgroup

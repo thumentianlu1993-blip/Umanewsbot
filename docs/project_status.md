@@ -1,5 +1,16 @@
 # 项目状态文档
 
+## 2026-08-30 Web 1×4 后已重新开启赛果公开窗口
+
+- 生产当前为 revision `cbf3f043…1ccf`、image `8e70cc43…fc76`、leaf `0075`；Web/普通 worker/Beat/
+  专用 worker 同 image/revision、restart=0/OOM=false。9 个前置 flags true，correction false。
+- 完整重开按 discovery -> time/racecard -> lifecycle -> result apply -> result public 执行；discovery 为
+  113/112/1、0 request/0 write，lifecycle 为 0 error/0 transition，active audit ready/valid/route drift 0。
+- 120 个 active 样本最低 `MemAvailable=1767740 kB`，Web 峰值约 219 MiB，普通队列最高 26 后自然归零；
+  `race_sync_v2=0 / race_live=7543`，Swap 与磁盘通过。独立公网、容器、migration 与 event DB 复核通过。
+- event 956 仍 scheduled、10 runners、0 results、0 transition，result checkpoint 在 14:13Z；当前只差自然
+  result/public 与 correction 实证。相邻 proof/proposals 继续暂停，当前无需扩容；任一门禁失败仍立即全关。
+
 ## 2026-08-30 内存门禁失败后已安全关闭赛事同步
 
 - 普通 worker 增长到约 1.344 GiB，`MemAvailable` 先降到 751020 kB、随后最低约 528300 kB；Swap 与
