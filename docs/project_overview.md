@@ -1,5 +1,38 @@
 # 项目总览
 
+2026-08-31 02:03，生产主机升级到 2C/8G 后，完整赛事链保持 active：四服务均为 PR #129 exact
+revision/image、restart=0、OOM=false，leaf `0075`，9 个前置开关 true、correction false；可用内存约
+5.37 GiB，Swap 完整，队列 `0/0/7543`，公网 5 个目标均 200。event 956 已自然完成
+scheduled -> running -> finished，但 provider 结果仍缺原始 terminal marker，所以只幂等保留 provisional
+revision，canonical result/publication 仍为 0。继续等待 exact result route 自然运行，正式赛果和公网通过前
+不提前开启 correction。
+
+2026-08-30 20:00，PR `#129` active 赛前窗口因普通 worker `OOMKilled=true` 命中硬门禁，已自动
+fail-closed。生产当前为 10 个赛事开关全 false、专用 worker absent；Web 1×4、普通 worker、Beat 已以
+exact image 重建且 restart=0/OOM=false，队列 `0/0/7543`，公网 6 个 URL 200，event 956 未产生赛果、
+transition、claim 或 revision。下一步先在关闭态完成 OOM 根因与更低风险修复，再从 future discovery
+全量重走；今晚不能直接从 result/public 阶段续跑，correction 继续关闭。
+
+2026-08-30 12:19，PR `#129` 的赛事全生命周期链在 Web 1 worker × 4 threads 优化后完成全量重开。
+future discovery、赛时/出马表、lifecycle、result apply 与 result public 已依次通过，active audit 为
+ready/valid/route drift 0；120 样本最低 `MemAvailable=1767740 kB`，普通 backlog 自然归零，新旧赛事队列
+保持 `0/7543`，因此当前不扩 RAM。四服务均为 `cbf3f043…1ccf` / `8e70cc43…fc76`，9 个前置 flags
+true，correction false。event 956 仍在赛前，结果 checkpoint 自然等待 14:13Z；真实赛果、公开页与随后
+correction 仍是最终未完成项。后续 Beat 周期最低内存降到 `1663796 kB`，已观测最小余量约 89 MiB；
+UK/USA proof 和未批准 proposals 继续暂停。
+
+2026-08-30 result/public 赛前窗口因真实内存门禁失败已自动关闭。普通 Celery worker 在 concurrency=1 下
+增长到约 1.344 GiB，使 `MemAvailable` 降到 751020 kB；数据库、Redis、Swap 和磁盘不是主因。已在共享锁
+内完成 10 false、移除专用 worker并重建 Web/普通 worker/Beat，终态内存恢复约 2.05 GB，队列为
+`0/0/7543`、公网正常。correction 从未开启，result checkpoint 未提前执行。下一步先给普通 worker 增加
+任务后回收与 512 MiB cgroup 上限，以关闭态发布并通过新热身，再从 future discovery 全量重走；暂不扩容。
+
+2026-08-30 PR `#127` 已以 `a040af3c…257f` / `7eb5c329…9628d` 上线，migration leaf 为 `0075`。
+future discovery、赛时/出马表和 lifecycle 已按冻结容量依次通过，generation 2 只纳管仍有效的 event 956；
+已结束的 predecessor 不复制到 successor cohort。result apply/public 已开启并等待 event 956 的真实 T+3，
+correction 仍关闭，只有真实 provider、数据库、publication 与公网结果页全部一致后才会单独放行。旧
+`race_live=7543` 全程未动；当前资源高于冻结门槛，无需扩 RAM。任一后续门禁失败仍执行 10 false、移除
+专用 worker并恢复普通 worker/Beat。
 2026-08-30 赛事同步因普通 Celery worker 1.344 GiB 内存异常已 fail-closed，生产恢复为 10 false、专用
 worker absent、`0/0/7543` 和约 2.05 GB 可用内存。代码 hotfix 为普通 worker 增加 prefetch=1、每 20
 任务/262144 KiB 子进程回收，并在三份 Compose 设置默认 512 MiB cgroup；不改业务、migration、路由或
@@ -532,3 +565,14 @@ kill-switch 约束，仓库默认关闭，生产启用必须绑定精确发布�
 登记的 race-id 路由。无终态标记的结果只形成内部 provisional revision，正式/更正公开还必须覆盖完整
 canonical runner roster。只有结果型 fallback 与现有 runner 通过马号和规范化马名形成唯一全双射时，
 才可在同一事务补足来源身份；缺行、多解和来源合同漂移均保持零公开写入。
+
+## 赛事数据自动化的生产运行形态
+
+生产链现以普通 `celery` worker 与专用 `race_sync_v2` worker 隔离运行；旧 `race_live` 遗留队列不接入、
+不消费。普通 worker 和 Web 已按小站负载压低并发并设置子进程回收/cgroup 上限，以资源门禁和 fail-closed
+优先替代主机扩容。赛前 future discovery、赛时/出马表、lifecycle 与 result/public 已按序启用；更正自动化
+仍需真实赛果公开验证后单独开启。
+
+运行期内存门禁实际越线后，赛事链会回到 10 false并移除专用 worker，不能把服务仍健康当作继续写入的
+理由。当前小站 Web 使用 1 Gunicorn worker × 4 threads，保持 4 个请求线程并减少进程常驻内存；生产目前
+处于该优化后的关闭态，必须通过新的发布窗口才能恢复上述自动链。

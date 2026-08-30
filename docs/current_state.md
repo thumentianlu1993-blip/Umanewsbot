@@ -1,5 +1,113 @@
 # 当前状态
 
+## 2026-08-31 02:03 主机升级后赛事链保持全量开启，event 956 等待正式赛果
+
+- 生产主机现为 2C/8G，持久化 Swap 为 1280 MiB。`2026-08-30T18:03:32Z` 只读复核得到
+  `MemAvailable=5626284 kB`、`SwapFree=1310716 kB`、磁盘可用 `14915956736 bytes`；deployment lock
+  absent。Web、普通 worker、Beat、`race_sync_v2_worker` 均为 PR #129 revision
+  `cbf3f043…1ccf` / image `8e70cc43…fc76`，running、restart=0、OOM=false；migration leaf 精确为
+  `stable.0075`。
+- 9 个前置 `RACE_DATA_SYNC_*` 开关保持 true，`CORRECTION_APPLY=false`。三队列为
+  `celery=0 / race_sync_v2=0 / race_live=7543`，旧队列仍未消费、清理、迁移或重排。root/www、healthz
+  与 root/www event 956 canonical 页面共 5 个 URL 均为 200，页面没有 provider/provisional 内部状态泄露。
+- event 956 已按真实时间形成两条不可变 lifecycle transition：`scheduled -> running`
+  (`time_reached_race_datetime`) 与 `running -> finished` (`time_t_plus_30`)；当前 10 runners，active claim
+  为空。结果 selector 最后一次于 `17:53:45Z` 自然成功，下一次为 `18:23:45Z`。
+- provider 仍只提供缺少原始 terminal marker 的同一份候选，因此数据库只有 observation id 15 与
+  result revision id 13，phase 为 `provisional`、content SHA 为 `68c3e5c4…f85dc5`；canonical result、
+  result publication、`published_at` 与 `official_confirmed_at` 均为 0/null。该状态不得伪装为正式赛果，
+  correction 也不得提前开启；继续等待代码内受审的 exact result route 通过 Beat 自然派发。
+
+## 2026-08-30 20:00 普通 worker OOM 硬门禁失败，赛事链已自动关闭
+
+- `2026-08-30T12:00:57Z` 赛前只读门禁发现普通 `worker` 容器 `OOMKilled=true`；即使容器仍 running、
+  restart=0，仍按冻结合同判定失败。当时 `MemAvailable=1736044 kB`、Swap 完整、磁盘
+  `16365473792 bytes`，event 956 仍 scheduled、10 runners、0 results/transition、无 claim/revision，
+  result checkpoint 未执行；队列为 `celery=8 / race_sync_v2=0 / race_live=7543`。
+- 在 lock absent 前提下，自动保护以自己的 `manual-release` token 获取共享锁，将 canonical 与 active env
+  的 10 个 `RACE_DATA_SYNC_*` 开关全部设为 false，停止并移除专用 worker，以 exact PR #129 image 重建
+  Web 1×4、普通 worker 与 Beat；未清理、消费、迁移或重排任何 Redis 队列。
+- `12:03:54Z` 独立终态为 lock absent、三服务 exact revision/image、restart=0/OOM=false、Web healthy、
+  专用 worker absent、队列 `0/0/7543`，`MemAvailable=2127476 kB`、Swap `1310716 kB`、磁盘
+  `16366440448 bytes`，root/www/home/health/event 6 个 URL 全部 200。event 956 仍 0 result/transition，
+  checkpoint `14:13Z`、last attempt null。
+- 当前权威状态为 `CLOSED_AFTER_ORDINARY_WORKER_OOM`。今晚 result/correction 不会按原 active 窗口继续；
+  必须先查明普通 worker OOM 根因、在 10 false 关闭态完成更低风险修复与热身，再从 future discovery 起
+  重走全量门禁，不能直接从 result 阶段续跑。
+
+## 2026-08-30 PR #129 在 Web 1×4 优化后完成全量重开，等待真实赛果与更正
+
+- 权威生产基线为 revision `cbf3f043…1ccf`、image `8e70cc43…fc76`、migration exact leaf `0075`；
+  Web/普通 worker/Beat/`race_sync_v2_worker` 均为该 image/revision，restart=0、OOM=false。Web 实际为
+  1 worker × 4 threads；普通与专用 Celery 均为 concurrency=1、prefetch=1，分别受 512 MiB/384 MiB
+  cgroup 保护。当前 9 个前置 data-sync flags 为 true，correction 仍为 false。
+- 新窗口重新完成关闭态审计和冻结顺序：future discovery 为 `113 total / 112 blocked / 1 enrolled`、
+  provider request 0、相关数据库前后 SHA 同为 `827ff114…9e88`；time/racecard 当前 checkpoint 验证通过；
+  lifecycle smoke 为 `selected=0 / transitioned=0 / error=0`；result apply 与 result public 依次放行。active
+  audit 为 `ready / valid / route_drift=[] / would_write=false`，provider roster SHA 为 `26e0625d…32d4`。
+- Beat 最后恢复后完成 120 个连续样本：最低 `MemAvailable=1767740 kB`，Web 峰值
+  `230057574 bytes`，普通 `celery` 最高 26 后自然归零；`race_sync_v2=0 / race_live=7543` 全程不变，
+  Swap 未下降，公网门禁全程通过。独立终态为 `MemAvailable=1853372 kB`、磁盘
+  `16389922816 bytes`，deployment lock absent，无 one-off 容器残留。
+- event 956 仍为 `scheduled/published`，10 runners、0 results、0 transition、无 active claim；result
+  checkpoint 仍自然等待 `2026-08-30T14:13:00Z`，公开页尚无赛果区块。只有真实 result apply/public 四层
+  证据通过后才单独开启 correction。UK/USA proof 与法国/爱尔兰未批准 proposals 继续暂停；现阶段仍不扩
+  RAM、不降低门槛。
+- `04:27–04:30Z` 中断续跑终检中，普通队列随 Beat 周期短时升至 29 后自然归零，最低内存
+  `1663796 kB`，比硬门槛仅高约 89 MiB，专用/旧队列保持 `0/7543`；event 956 root/www canonical 页面均
+  为 200 且摘要一致。自己的本地与服务器临时脚本、日志、PID 已精确清理，lock absent；未删除发布物、
+  队列或他人文件。
+
+## 2026-08-30 普通 Celery 内存越线，赛事同步已 fail-closed
+
+- `2026-08-29T22:36:06Z` 生产 `MemAvailable=751020 kB`，低于冻结门槛 `1572864 kB`；随后最低读到
+  约 528300 kB。Swap 仍完整、磁盘约 16.85 GB，异常主因不是容量账本或磁盘，而是普通
+  `umanewsbot-worker-1` cgroup 已增长到约 1.344 GiB；同次拆账 DB 约 23.6 MiB、Redis 约 29.8 MiB。
+- 发现门禁时另一个只读 proof 窗口正持 `manual-release` 锁。已通知其停止联网并走安全退出；未删除、抢占
+  或伪造对方锁。锁正常释放后才取得新锁执行止损，期间旧 `race_live` 未消费或删除。
+- `22:38:41Z` 起停 Beat、专用 worker、普通 worker 与 Web，把 canonical/release 两份 env 的 10 个
+  data-sync 开关全部设为 false，移除 `race_sync_v2_worker`，再以当前 PR #127 image 重建 Web/普通
+  worker/Beat。未修改 due time、claim、result 行、registry、migration 或 Redis backlog。
+- `22:39:32Z` 终态：锁 absent，Web healthy，普通 worker/Beat running，专用 worker absent；三服务均
+  10 false，`celery=0 / race_sync_v2=0 / race_live=7543`，root/www healthz 200。普通 worker 回到约
+  129 MiB，`MemAvailable=2050808 kB`、Swap 完整、磁盘约 16.85 GB。
+- result/public 的赛前窗口已经关闭，correction 从未开启；event 956 的 result checkpoint 尚未自然执行。
+  在普通 worker 增加子进程回收和 host-safe cgroup 上限、完成回归与新的热身窗口前，不重开任何新写入，
+  也不因当前内存恢复而追溯把失败窗口改为通过。
+
+## 2026-08-30 PR #127 已上线，赛事生命周期进入真实赛时验收
+
+- PR `#127` 已以 revision `a040af3c…257f`、image `7eb5c329…9628d` 上线，Django migration leaf
+  精确为 `0075`。发布前后均未消费、迁移或删除旧 `race_live`，队列保持 `7543`；当前与即时回滚 image
+  均保留，dangling image 为 0。
+- generation 2 已只纳管仍符合条件的 event 956；6 个已结束的 predecessor 不复制到 successor roster。
+  最终 registry raw SHA 为 `28c327c0…b1a9`、membership SHA 为 `b2907002…54cc`，控制面已切换到
+  `enforce / schedule_generation=2`。注册 promotion 自动生成的新备份为
+  `rds_horse_news_20260829T215423Z_3070249.dump`，487733802 bytes、0600、SHA
+  `1606a014…f85`，`pg_restore --list` 为 1359 行。
+- future discovery、`race_time/racecard` 与 lifecycle 已依次通过独立窗口。event 956 的 provider 实际结果
+  为 `processed=true / complete`，应用 `race_time,racecard`；lifecycle Celery smoke 为 `complete`，未产生
+  错误或重复 transition。数据同步专用 worker 在阶段间均按门禁移除或重建。
+- result apply/public 窗口已开启，correction 继续为 false。首次真实 selector/provider 已成功刷新
+  `race_time,racecard`，result checkpoint 仍按赛事时间自然等待 `2026-08-30 14:13:00Z`，未手工修改 due
+  time、claim 或数据库。event 956 的真实赛果、公开页和更正自动化须在 T/T+3 后依次验证，不能用任务
+  `SUCCESS` 代替业务结果或公开可见性。
+- 当前队列为 `celery=0 / race_sync_v2=0 / race_live=7543`；专用 worker 内存上限 384 MiB，服务 revision/
+  image 一致且 restart=0、OOM=false。最近热身窗口 `MemAvailable` 约 1.94–1.99 GB、Swap 完整、磁盘约
+  16.86 GB，均高于冻结门槛，无需扩容。已建立当前任务内的定时续跑，在真实赛时检查 lifecycle、result
+  apply/public 与公网，再仅在全部通过后开启 correction；任一门禁失败立即 10 false 并移除专用 worker。
+- `a040af3c` clean-worktree 完成性审计再次运行当前代码：赛事同步/lifecycle/result SQLite 核心组合
+  249/249；Django check、`makemigrations --check --dry-run`、重定向 bytecode 的 compileall、三份 Compose
+  config 和 `git diff --check` 全部通过。测试容器显式 `RACE_DATA_SYNC_ALLOW_NETWORK=false`，没有真实
+  provider 请求或生产写入；首次只读源码 compile/缺 `.env` 的环境错误已用临时 pycache 与临时示例 env
+  修正后重跑，不计作代码失败。
+- 已建立 `docs/changes/automate-race-data-lifecycle-sync/release_evidence.md` 作为本次发布的单一证据索引。
+  赛前 root/www event 956 详情均为 200、9542 bytes、相同 SHA，已有出马表但无赛果区块、无来源/阶段标签；
+  数据库 result observation/revision/publication 仍为 0，checkpoint 未提前执行。赛后必须相对该基线证明
+  lifecycle、结果投影和公开页真实变化。
+- 隔离 PostgreSQL 16 再跑当前代码的 `race_data_sync_r0_postgres` 与 `pipeline_a_postgres` 专项 25/25，
+  覆盖真实行锁、并发 claim/CAS、幂等、约束与 migration；测试明确 network=false，临时数据库、容器和
+  network 已全部回收，没有接触生产。
 ## 2026-08-30 普通 Celery 内存保护 hotfix 已完成代码验证
 
 - 生产普通 worker 在 concurrency=1 下从约 129–292 MiB 增长到 1.344 GiB，使
@@ -6626,3 +6734,54 @@ v3 首次 prepare 在请求预算 `60/60` 时由 HRN 空候选连带阻断 Equib
 - 返修后的完整赛事数据组合门禁为 SQLite `190/190`、PostgreSQL `214/214`；后者同时覆盖 R0 与
   racecard 并发。Django check、migration drift、compileall、三份 Compose、JSON/digest、diff 与 literal
   secret pattern 均通过；全开配置且运行开关全关的审计返回 `ready/would_write=false`、route drift 为空。
+
+# 2026-08-30 PR #129 资源修复及赛事链赛前启用完成
+
+- PR #108 后续发布已推进至 PR #129，生产当前运行 revision `cbf3f043…`、image
+  `sha256:8e70cc…fc76`，migration exact leaf 为 `0075`，`0074/0075` 已应用；可恢复的 PR #127 image 与
+  pre-PR129 rollback tag 均保留。
+- 普通 worker 已降为单并发、单预取、每子进程最多 20 task/256 MiB，cgroup 为 512 MiB；专用
+  `race_sync_v2_worker` 为单并发、单预取、384 MiB cgroup。Web 使用 2 workers/2 threads。该配置替代扩容，
+  并已在实际 Beat 周期与专用 worker 冷启动后通过资源门禁。
+- `2026-08-30T00:14Z` 起按 future discovery → race time/racecard → lifecycle → result/public 顺序完成
+  赛前激活。当前 9 个前置开关为 true，correction=false；event 956 仍为 scheduled/published，赛果行和
+  公开赛果均为 0，result checkpoint 等待 `2026-08-30T14:13:00Z`。
+- 最终激活检查为 `MemAvailable=1788692 kB / SwapFree=1310716 kB / disk=16410525696 bytes`，
+  `celery=0 / race_sync_v2=0 / race_live=7543`，拓扑恰好为普通与专用两个 worker，公网 5 个 URL 均 200，
+  deployment lock absent。其后 10 分钟/120 次热身最低 `MemAvailable=1598324 kB`，全程未越线；旧
+  `race_live` 从未被消费、删除或迁移。
+- 下一门禁仍是 event 956 的真实 T/T+30 transition、T+3 终态完整 roster、immutable revision、数据库投影
+  和公开页赛果；全部通过后才单独开启 correction 并观察一个干净周期。完整生产证据见
+  `docs/changes/automate-race-data-lifecycle-sync/release_evidence.md`。
+
+# 2026-08-30 运行期内存越线后已关闭，Web 1×4 优化通过
+
+- `2026-08-30T01:41:35Z` 激活态连续监视发现 `MemAvailable=1496692 kB`，低于 1.5 GiB 硬门槛；
+  已立即执行 10 false、移除专用 worker、以 PR #129 重建 Web/普通 worker/Beat并释放自己的锁。终态
+  队列 `0/0/7543`，公网 5 个 URL 均 200，event 956 仍 scheduled 且无结果、transition 或 active claim。
+- 关闭态 PSS/cgroup 归因显示 PostgreSQL 大头为可回收 file cache，Web 两个 Gunicorn worker 各约
+  173 MiB PSS。Web 已在共享锁内从 2×2 调整为 1 worker × 4 threads，保持 4 个并发线程且失败可回退。
+- 调整后 10 分钟/88 次热身最低 `MemAvailable=1915052 kB`，Web cgroup 峰值 `217976832 bytes`；Swap、
+  磁盘、服务、锁、队列和公网全程通过。当前仍为 10 false、专用 worker absent，不将优化通过误报为重开。
+- 下一步是以当前关闭态重新完成配置审计和全量 preflight；只有新的独立启用窗口完整通过，才恢复
+  future discovery → race time/racecard → lifecycle → result/public 顺序。
+
+# 2026-08-30 主机升级后赛事链重开，event 956 进入 provisional 赛果观察
+
+- 主机已升级为 2C/8G；冷启动实测 `MemTotal=7441560 kB`。已恢复 1280 MiB 持久化 `/swapfile` 并写入
+  `/etc/fstab`，普通 worker cgroup 由 512 MiB 调整为 1 GiB；Web 继续 1×4，专用 worker 保持 384 MiB。
+  `2026-08-30T14:35:58Z` 可用内存 `5866888 kB`、SwapFree `1310716 kB`、磁盘
+  `14970400768 bytes`，四服务 exact PR #129、restart=0、OOM=false。
+- 已重新走完 future discovery → race time/racecard → lifecycle → result apply/public 五阶段；配置审计为
+  `ready/valid`、route drift 为空。当前 9 个前置开关 true、correction=false，队列 `0/0/7543`、锁 absent，
+  root/www 首页、healthz 和 event 页均 200。Web 重建后 Nginx 需 `nginx -t` 后平滑 reload，避免缓存旧
+  Compose Web IP 导致 502。
+- event 956 已生成两条 time-rule lifecycle transition：`scheduled→running`（T）与
+  `running→finished`（T+30），当前 finished/published、10 runners、0 canonical results。14:34Z 的自然
+  provider 轮询记录 8 名完赛马和 immutable provisional result revision #1；原始响应没有受审 terminal
+  marker，因此 revision 未投影、未 publication，公网页不显示赛果且不泄露 provider/source phase。
+- result checkpoint 在 14:40Z 与 14:56Z 自然重试并成功释放 claim；相同 artifact 未生成重复
+  observation/revision，英国当日 capacity ledger request_count 从 54 增至 57，下一次为
+  `2026-08-30T15:11:01.537509Z`。`empty_field` 是“当前赛果字段为空、候选可记录”的仲裁理由，不代表
+  terminal/public 已通过；只有 observation phase 为 official/corrected、完整 roster 投影并公开后才开启
+  correction。

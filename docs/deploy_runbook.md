@@ -1,5 +1,93 @@
 # 部署运行手册
 
+## 2026-08-31 event 956 正式赛果等待窗口
+
+1. 当前 active 基线固定为 PR #129 revision `cbf3f043…1ccf`、image `8e70cc43…fc76`、leaf `0075`；
+   Web 为 1×4，普通 worker 为 concurrency/prefetch `1/1` 且 1 GiB cgroup，专用 worker为 `1/1` 且
+   384 MiB，Beat 正常。
+2. 每轮先只读核对 deployment lock、四服务 image/revision/restart/OOM、资源门槛、9 true + correction
+   false、`celery`/`race_sync_v2`/`race_live`、event checkpoint/claim/observation/revision/result/publication/
+   lifecycle 与 root/www 公网页。`race_live` 必须精确保持 7543。
+3. event 956 当前只有 provisional revision id 13；selector 只能在 `next_poll_at` 由 Beat 自然派发。不得
+   手工调用 provider、改 due time/claim/status/result，不能用 HTTP 200、Celery SUCCESS 或
+   `decision_reason=empty_field` 代替正式赛果证据。
+4. 只有 provider 原始终态、正式 revision、canonical projection、publication 与 root/www 页面均通过，
+   才获取新的 `manual-release` 锁，将 `CORRECTION_APPLY` 单独改为 true并重建四服务；至少观察一个完整
+   correction 周期。任一门禁失败立即把 canonical 与 active env 的 10 个开关全设 false、移除专用 worker、
+   以 exact PR #129 重建 Web/普通 worker/Beat并平滑 reload Nginx；全部 Redis 队列原样保留。
+
+## 2026-08-30 20:00 普通 worker OOM 后的关闭态基线
+
+1. 当前唯一权威状态为 `CLOSED_AFTER_ORDINARY_WORKER_OOM`：canonical/active env 的 10 个
+   `RACE_DATA_SYNC_*` 开关全 false，`race_sync_v2_worker` 必须 absent；Web 1×4、普通 worker、Beat 必须
+   为 PR #129 exact image/revision 且 restart=0/OOM=false。
+2. 触发证据是原普通 worker `OOMKilled=true`，不是主机内存数值越线；当时 host 内存、Swap、磁盘与公网
+   仍通过，仍必须 fail-closed。禁止通过重启后 OOM 标记消失追溯改写失败窗口。
+3. 关闭终态为 lock absent、队列 `celery/race_sync_v2/race_live=0/0/7543`、
+   `MemAvailable=2127476 kB`、Swap `1310716 kB`、磁盘 `16366440448 bytes`，6 个公网 URL 200；event 956
+   仍 scheduled、0 result/transition、无 claim/revision，result checkpoint 未执行。
+4. 后续先在关闭态归因普通 worker OOM，并验证任务后回收、cgroup、DeepSeek 402/OSS 404 相关路径是否造成
+   峰值或滞留；不得仅凭相邻日志猜定根因。修复后需重新完成关闭态热身，再从 discovery → time/racecard →
+   lifecycle → result/public 全量重开；不能直接打开 result 或 correction。
+
+## 2026-08-30 12:19 PR #129 Web 1×4 重开后的当前生产基线
+
+1. 当前唯一 active 基线为 revision `cbf3f043…1ccf`、image `8e70cc43…fc76`、leaf `0075`、Web 1×4、
+   普通 worker 1×prefetch1/512 MiB、专用 worker 1×prefetch1/384 MiB；9 个前置 flags true，correction
+   false。四服务必须 restart=0/OOM=false，旧 `race_live` 必须精确 7543。
+2. digest 口径：standing `07013655…1888`、TRA `3bac3b64…a6da`、reference `740a9377…cff2`、provider
+   roster `26e0625d…32d4`。`audit_race_data_sync.roster.registry_digest` 比对 provider roster，不比对 TRA。
+3. 本轮 future discovery 必须保持 `113/112/1` 的业务不变量、0 request、0 write；相关数据库摘要为
+   `827ff114…9e88`。随后按 time/racecard -> lifecycle -> result apply -> result public 推进；Beat 最后启动。
+4. active 热身已完成 120 样本，最低 `MemAvailable=1767740 kB`、Web 峰值 230057574 bytes、普通 backlog
+   最高 26 后自然归零；后续 Beat 周期最低降到 `1663796 kB`、普通 backlog 峰值 29 后仍自然归零，已观测
+   最小余量约 89 MiB。后续仍逐次要求内存/Swap/磁盘硬门槛、`race_sync_v2=0`、`race_live=7543`、exact
+   services、公网页；不得因本轮通过降低门槛。
+5. event 956 result checkpoint 为 `2026-08-30T14:13:00Z`。此前不手工触发 selector/provider，不改 due
+   time、claim、event status 或结果。到期后区分 Celery terminal、provider business result、capacity/
+   claim、immutable revision/canonical publication 与 root/www 页面；任何一层失败立即 fail-closed。
+6. 只有 result/public 全部通过才在新锁内将 correction 单独设为 true并重建四服务，观察一个完整周期。
+   UK/USA proof 与未批准 identity/module proposals 在此之前继续暂停。若控制终端可能断线，允许将同一
+   带 trap 的脚本放入独立 session，但它必须自己持官方 deployment lock、只释放自己的 token，并把任何
+   脚本/采样错误也按真实门禁失败执行 10 false；严禁删除未知锁。
+
+## 2026-08-30 普通 Celery 内存 fail-closed 与重新启用前置门禁
+
+1. 本轮门禁失败证据为 `MemAvailable=751020 kB`（后续最低约 528300 kB），普通 worker cgroup
+   约 1.344 GiB；Swap 与磁盘正常。先归因普通 worker，不扩 RAM、不修改 PostgreSQL/Redis 或 OneBot。
+2. 锁被其他窗口持有时只通知 holder 安全退出并等待，不删除锁。取得新 `manual-release` 锁后停 Beat/
+   dedicated/ordinary/Web，双 env 10 false、删除 dedicated，再按 Web healthy -> ordinary -> Beat 恢复；
+   `race_live` 始终必须精确 7543。
+3. 当前关闭态为 PR #127 image/revision、leaf 0075、Web healthy、ordinary/Beat running、dedicated absent、
+   三服务 10 false、`celery=0 / race_sync_v2=0 / race_live=7543`，可用内存恢复到约 2.05 GB。
+4. 新代码须为普通 worker 增加 prefetch=1、max-tasks-per-child、max-memory-per-child，并在三份 Compose
+   设置 512 MiB 默认 cgroup；参数必须可由 env 收窄或覆盖，默认不扩大 concurrency。
+5. 关闭态 hotfix 发布后，至少观察三个普通 Beat 周期：队列须在 5 分钟内自然归零，active/reserved/
+   scheduled 清空，worker restart/OOM=0，Celery 业务失败和重复副作用为 0，所有热身样本均满足
+   `MemAvailable>=1572864 kB`。失败则保持 10 false，不重开专用 worker。
+6. 只有上述门禁通过，才从 future discovery -> time/racecard -> lifecycle -> result/public 重新开新窗口；
+   correction 仍是最后独立门禁。event 956 due time/claim 不人工改写，旧失败窗口不复用。
+
+## 2026-08-30 PR #127 当前生产基线与 event 956 收尾步骤
+
+1. 当前唯一验收基线为 revision `a040af3c…257f`、image `7eb5c329…9628d`、migration leaf `0075`、
+   generation 2 event 956。registry raw SHA `28c327c0…b1a9`，membership SHA `b2907002…54cc`；恢复点
+   `rds_horse_news_20260829T215423Z_3070249.dump` 必须继续满足 487733802 bytes、0600、SHA
+   `1606a014…f85` 和 1359 行 TOC。
+2. event 956 开赛时间为 `2026-08-30 22:10 Asia/Shanghai`，result checkpoint 为
+   `2026-08-30 14:13:00Z`。不得改 due time/claim、不得直接 SQL 补写。T/T+30 检查 lifecycle；T+3 后分别
+   检查 provider business result、result checkpoint、结果/发布记录及 root/www/races/赛事结果页。
+3. result/public 当前为 true，correction 为 false。只有上述四层证据全部一致，才重新取得 production
+   manual-release lock，保持其他开关不变并单独开启 correction；观察至少一个无 error、无重复写、无 revision
+   反转的完整周期后才记录完成。
+4. 每次窗口先检查 `MemAvailable>=1572864 kB`、`SwapFree>=524288 kB`、free disk
+   `>=8589934592`、`celery=0`、`race_sync_v2=0`、`race_live=7543`，以及锁、active/reserved、容器
+   revision/image/restart/OOM、公网页。旧 `race_live` 禁止消费、删除、迁移；另一个发布任务持锁时只等待，
+   不抢占或删除其 lock。
+5. 任一门禁失败立即停止当前阶段：10 个 data-sync 开关全 false，删除专用 `race_sync_v2_worker`，恢复普通
+   worker/Beat，再验证 `celery=0 / race_sync_v2=0 / race_live=7543` 和公网。失败窗口不得事后改写为通过。
+6. 真实赛时续跑由当前任务的 heartbeat `umanews-event-956` 承接。完成 result/public 与 correction 后，回写
+   五份项目文档、暂停该 heartbeat，并以最终生产证据结束本次发布。
 ## 2026-08-30 普通 worker 内存保护 hotfix 发布步骤
 
 1. 发布前权威关闭态必须为 10 个 data-sync 开关 false、`race_sync_v2_worker` absent、
@@ -9136,3 +9224,50 @@ RACE_DATA_RAW_ARTIFACT_ROOTS=/run/race-data-sync
    lifecycle 步骤单独启用。锁等待或 deadlock、T+30 incident 进入 `race_live`/delivery 都立即止损。
 6. 任一步失败关闭最窄开关并停止后续序列；不得以 HTTP 200、task exit 0、queue 下降或 observation 已写入
    替代 canonical/public/副作用核验。
+
+## PR #129 后赛事链资源与 worker 就绪门禁
+
+1. 普通 worker 固定订阅 `celery`，使用 `concurrency=1`、`prefetch-multiplier=1`、
+   `max-tasks-per-child=20`、`max-memory-per-child=262144`、512 MiB cgroup；专用 worker 只订阅
+   `race_sync_v2`，使用单并发/单预取、256 MiB child 上限、384 MiB cgroup。不得启动旧 `race_live` worker。
+2. 任何启用窗口写前、每阶段后和热身期都验证 `MemAvailable>=1572864 kB`、
+   `SwapFree>=524288 kB`、free disk `>=8589934592` bytes；同时确认 `race_sync_v2=0`、
+   `race_live=7543`。普通 `celery` backlog 只能自然排空，不 purge、重排或冒充空闲。
+3. 专用容器启动后以有界重试检查 Celery topology；验收必须恰好为普通与专用两个节点、队列隔离且 idle。
+   `docker running`、单次 inspect 或固定短 sleep 均不能替代节点级 ready 证据。
+4. future discovery 使用业务不变量：唯一目标已纳管，其余目标均阻断，candidate/decision/provider request
+   为预期值且数据库 before/after SHA 匹配；不得冻结随时间变化的 census 绝对计数。
+5. 启用顺序保持 future discovery → race time/racecard → lifecycle → result apply/public → correction。
+   correction 只在真实 T+3 赛果、完整 roster、immutable revision、canonical projection 与 root/www 公开页
+   全部验证后单独开启。
+6. 任一资源、锁、路由、拓扑、任务、数据库或公网门禁失败：同一 owner 锁内设 10 false、移除专用 worker、
+   恢复普通 worker/Beat并复验公网；不清理任何 Redis 队列，不删除其他 owner 的锁。
+
+## 运行期内存越线后的 Web 低成本恢复步骤
+
+1. 任一采样 `MemAvailable<1572864 kB` 时立即结束观察并执行 fail-closed；不要因为下一采样可能回升而
+   延迟，也不要只停止专用 worker而保留部分新写入开关。
+2. 关闭态独立验证 10 false、专用 worker absent、普通 backlog 自然排空、`race_sync_v2=0`、
+   `race_live=7543`、三服务 exact image/revision、restart/OOM 与 5 个公网 URL。
+3. 内存归因同时读取 container cgroup `memory.current/memory.stat` 与进程 `smaps_rollup` PSS；PostgreSQL
+   file cache 与应用匿名内存分开判断，禁止用 RSS 简单相加或 drop cache 形成虚假余量。
+4. 当前低成本 Web 合同为 `GUNICORN_WORKERS=1 / GUNICORN_THREADS=4`，必须同时写 canonical 与 active
+   release env，在共享锁内只重建 Web；进程表必须恰为 master + 1 worker且两行都含 `--workers 1` 与
+   `--threads 4`。失败立即恢复 2 × 2 并复验 health。
+5. Web 调整后至少做 10 分钟关闭态热身，覆盖普通 Beat 周期、资源、锁、服务、专用 worker absent、三队列
+   与公网。通过只允许进入新的 preflight，不自动恢复任何赛事开关。
+
+## 2C/8G 主机上的赛事链恢复补充
+
+1. 主机重启后先验证 `nproc=2`、`MemTotal≈7.1 GiB`，再检查 Swap；若 `/swapfile` 未启用，仅在部署锁内
+   创建 1280 MiB、0600、`mkswap/swapon`，备份并精确追加 `/etc/fstab`。Swap 恢复后仍必须通过原硬门槛。
+2. 普通 worker 当前合同为 1 GiB cgroup/2 GiB memory+swap，仍保持 concurrency=1、prefetch=1；专用
+   worker 384 MiB。扩容后不得恢复多并发或取消 child 回收参数。
+3. 每次 `--force-recreate web` 后执行 `docker exec <nginx> nginx -t` 与 `nginx -s reload`，再验收 root/www
+   首页、healthz 和 event 页。遇到 Nginx 连接旧 Web IP 的 502 时不改 upstream 地址、不重启整组服务。
+4. 阶段切换前要求 `race_sync_v2=0`；Beat 活动期若 LLEN 非零，逐条只读解码 Kombu message，限定为
+   `stable.tasks.sync_race_event_provider_task`、approved event 和受审 data kinds，并验证有界排空。禁止
+   purge、消费、迁移或手工重发；claim TTL 过期由 selector 自然重新 claim，禁止手工清 token。
+5. result provider 的 Celery SUCCESS、checkpoint success 或规范化 payload `race_status=complete` 都不是
+   publication 证明。必须同时看到原始 terminal marker 对应 official/corrected observation、完整 roster、
+   current immutable revision、canonical result rows、publication audit row，以及 root/www 的一致赛果区块。

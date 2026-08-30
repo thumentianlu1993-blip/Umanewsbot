@@ -1,5 +1,62 @@
 # 关键决策
 
+## 2026-08-31 扩容后仍以 provider 原始终态作为正式赛果门禁
+
+- 主机升级到 2C/8G 解决了此前狭窄内存余量，但不改变结果 finality 合同，也不降低
+  `MemAvailable>=1536 MiB`、Swap、磁盘、容器 OOM/restart、共享锁和队列完整性门禁。
+- `race_status=complete` 的规范化字段不能替代 provider 响应中的原始 terminal marker。缺少 marker 时，
+  同一 artifact 只允许幂等保留为 provisional observation/revision，不创建 canonical result 或 publication，
+  不在公网泄露 provider/source phase，也不能据此开启 correction。
+- event 956 继续只允许 Beat/selector 在 `next_poll_at` 到期后自然调用受审路由；禁止手工触发 provider、
+  修改 due time/claim/event status/result。只有正式 result apply、不可变 revision/publication、canonical
+  projection 与 root/www 公网页全部一致后，才在独立锁窗口开启 correction 并观察完整周期。
+
+## 2026-08-30 普通 worker 的 OOMKilled 标记即使未重启也必须 fail-closed
+
+- `OOMKilled=true` 是冻结的容器完整性硬门禁；不能因容器仍 running、restart=0、主机
+  `MemAvailable` 尚高于 1536 MiB 或公网仍为 200 而忽略。20:00 赛前检查命中该条件后，已立即关闭全部
+  10 个赛事开关并移除专用 worker。
+- 本次关闭不等于扩大赛事链容量或修改业务语义。普通新闻任务在此前窗口出现 DeepSeek 402、OSS 404 与
+  持续 backlog，但这些只能作为后续归因线索，不能在缺少旧 cgroup/task 证据时直接宣告单一根因。
+- 在关闭态根因修复和新热身通过前，不因真实赛果时点临近而恢复 result/public；下一次启用必须从 future
+  discovery 全量重走。扩容仍是优化证据证明现有资源不可满足硬门槛之后的独立决策。
+
+## 2026-08-30 Web 保持 1 worker × 4 threads，当前不扩容并暂停相邻 proof
+
+- 生产 Web 从 2×2 调整为 1×4 后仍保留 4 个请求线程，关闭态 10 分钟热身最低内存约 1.83 GiB；完整
+  激活后的 120 样本最低 `1767740 kB`，比 1536 MiB 硬门槛高约 190 MiB，公网、队列、restart/OOM
+  同时通过。该配置作为 event 956 真实赛果窗口的当前基线，不恢复第二个 Gunicorn worker，也不扩 RAM。
+- 后续 Beat 周期最低 `1663796 kB`，把已观测最小余量进一步收窄到约 89 MiB；在
+  result/public/correction 实证完成前，UK/USA TRA proof 继续暂停，法国/爱尔兰
+  `PROPOSED_NOT_APPROVED` proposals 不进入 canonical registry。若后续活跃窗口低于硬门槛，仍立即
+  10 false、移除专用 worker并恢复普通服务，不能用扩容追溯改写失败窗口。
+- 摘要语义必须分开：TRA source registry SHA 是 `3bac3b64…a6da`，standing policy SHA 是
+  `07013655…1888`，reference registry SHA 是 `740a9377…cff2`，配置生成的 provider roster SHA 是
+  `26e0625d…32d4`。审计的 `roster.registry_digest` 只能与最后一项比较，不能误与 TRA SHA 比较。
+
+## 2026-08-30 普通 Celery 必须有任务后回收与 512 MiB host 保护
+
+- 生产普通 worker 在 concurrency=1 下仍从约 129–292 MiB 增长到 1.344 GiB，并把 host
+  `MemAvailable` 压到 751020 kB；重启后立即恢复到 2.05 GB，证明扩容不是首选，问题是长寿命 Celery
+  子进程的任务后内存滞留/异常峰值。
+- 在赛事写入重新开启前，普通 worker 启动合同增加 `prefetch-multiplier=1`、可配置
+  `max-tasks-per-child` 与 `max-memory-per-child`，并在三份 Compose 给普通 worker 设置默认 512 MiB
+  cgroup 上限。子进程超过软阈值在任务完成后回收；单任务失控则由 cgroup 阻止拖垮整机。
+- 该保护必须先在隔离测试覆盖参数/Compose 合同，再以 10 false 发布，观察普通调度峰值、OOM/restart、
+  redelivery/重复副作用与 1536 MiB host 门槛。只有新窗口稳定才从 future discovery 全量重走；当前不扩 RAM、
+  不降低门槛、不用 swap/drop cache 制造通过读数。
+
+## 2026-08-30 generation 2 只继承仍可执行成员，赛果与更正分开放行
+
+- lifecycle successor registry 只包含创建时仍符合 selector 条件的赛事；已结束 predecessor 不为维持成员数而
+  复制。本轮 generation 1 的 6 个已结束成员自然退出，generation 2 只纳管 event 956，属于预期 cohort
+  收敛，不是成员丢失。
+- result apply/public 可以在真实赛时前保持开启，以便 checkpoint 按 T+3 自然到期；禁止直接修改 due time、
+  claim 或手工补写结果来提前验收。必须分别证明 provider 终态、数据库 apply/publication 和真实公网结果页，
+  Celery `SUCCESS` 只证明任务终止状态。
+- correction 是 result/public 通过后的独立门禁。只有 event 956 的真实赛果和公开页全部通过，才在新的发布锁
+  内单独开启并观察一个完整周期；否则保持 false。任一资源、队列、锁、路由、worker 或业务门禁失败均立即
+  关闭 10 个 data-sync 开关、移除专用 worker并恢复普通 worker/Beat；旧 `race_live=7543` 始终不动。
 ## 2026-08-30 普通 worker 用 child recycling 加 512 MiB cgroup 阻断 host starvation
 
 - concurrency=1 不能阻止长寿命子进程在任务后保留 1 GiB 以上内存；重启后 host 可用内存从低于 1 GiB
@@ -3343,3 +3400,41 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
   运行开关已打开。
 - schedule/racecard/result canonical apply 都必须在网络之后、事务内重新验证来源 review/terms、有效期、
   registry、contract、region/namespace 和 exact claim；观察创建成功不能替代写入时准入。
+
+# 2026-08-30 赛事链生产启用采用业务不变量、冷启动有界等待与进程级内存保护
+
+- future discovery census 的绝对 total/blocked 会随时间自然变化，发布门禁不再固定某个瞬时数字；必须
+  验证唯一目标 event 已纳管、其余目标全部以可解释原因阻断、无越权 candidate/decision/provider request，
+  并以数据库前后 SHA 证明零意外写入。
+- 专用 worker 容器 running 不等于 Celery 节点 ready。启用门禁使用有界重试等待拓扑恰好包含普通
+  `celery` 与专用 `race_sync_v2` 两个隔离节点；超时仍 fail-closed，不通过延长锁无限等待或跳过检查。
+- 小站资源治理先约束进程而非扩容：普通 worker 单并发/单预取、20 task 回收、256 MiB child 上限、
+  512 MiB cgroup；专用 worker 单并发/单预取、384 MiB cgroup；Web 为 2 workers/2 threads。硬资源门槛
+  保持不变，任何采样越线仍关闭全部新写入。
+- canonical/release env 的冻结容量、持久目录、TLS 根、exact revision 与 registry digest 属于同一发布合同；
+  发现配置漂移必须修复并重新审计，不能只依赖容器 image 一致。
+
+# 2026-08-30 小站 Web 采用单进程四线程，运行期越线必须重新开窗
+
+- 激活态任一实时采样低于硬内存门槛，即使服务、Swap、磁盘和队列仍正常，也必须立即 10 false并移除
+  专用 worker；关闭完成后资源恢复不能追溯性地把失败窗口改为通过，也不能由 heartbeat 自行重开。
+- Web 两个 Gunicorn worker 的实测 PSS 各约 173 MiB；小站生产改为 1 worker × 4 threads，保持原 4 个
+  请求线程并减少约 160 MiB 常驻匿名内存。该选择以资源稳定性换取进程级冗余，Gunicorn master 仍负责
+  worker 重启；任何健康或吞吐回归都回退 2 × 2。
+- PostgreSQL cgroup 的主要占用来自 file cache，`shared_buffers=128MB`；不通过 drop cache、压低正确的
+  shared buffer 或扩容来掩盖应用进程常驻占用。继续优先使用 PSS/cgroup 证据和可逆进程配置。
+- Web 优化的关闭态热身只证明新配置可运行；恢复赛事链仍需新的全量 preflight、配置审计、资源余量和
+  冻结顺序启用，不复用内存失败窗口的激活结论。
+
+# 2026-08-30 扩容后仍保留应用级资源约束与原始终态标记门禁
+
+- 2C/8G 扩容不取消进程上限：Web 保持 1×4，普通 worker 单并发/单预取并提高至 1 GiB cgroup，专用
+  worker 仍为 384 MiB；1280 MiB Swap 必须持久化，原 1.5 GiB/512 MiB/8 GiB 三项硬门槛继续执行。
+- `race_sync_v2=0` 是阶段切换和关闭态门禁；Beat 开启后的正常运行期允许已批准 enrollment 的合法任务
+  短暂排队。必须逐条解码 task/event/data_kinds、限制有界数量并验证自然排空、claim 释放和业务终态，
+  不能因 LLEN 瞬时非零误判为积压，也不能 purge/重排来制造 0。
+- provider 规范化 payload 中的默认 `race_status=complete` 不能替代原始响应 terminal marker。当天批量
+  results 没有受审 marker 时只记录 provisional immutable revision，不创建 canonical results/publication；
+  后续继续自然轮询，跨 provider local date 后只走受审 exact race-id 路由。
+- Compose 重建 Web 会改变容器 IP；当前 Nginx upstream 在 reload 时解析服务名，因此每次 Web 重建后必须
+  先 `nginx -t` 再平滑 reload，并同时验收 root/www，而不能把内部 health 或旧连接的 200 当公网恢复。

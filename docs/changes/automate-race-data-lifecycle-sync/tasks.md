@@ -85,19 +85,24 @@
   190/190、同范围 PostgreSQL（含并发）214/214 通过。
 - [x] (operations) 返修后 Django check、migration drift、compileall、Compose 三配置、JSON/digest、
   diff 和 literal secret pattern 门禁通过；全开配置/运行开关全关审计为 `ready/would_write=false`。
-- [ ] (operations) 提交并 push 返修候选，运行第二轮独立 `codex review --base origin/main`，有效发现归零后
-  再进入生产备份与历史 claim 收口。
+- [x] (operations) 返修候选已完成独立复审并通过后续 PR 链合并；最终生产候选由 PR #127 修复 lifecycle
+  adoption bridge 与 PostgreSQL result publication trigger 顺序，merge revision 为 `a040af3c…257f`。
+- [x] (operations) PR #127 上线后的 clean-worktree 完成性复跑：SQLite 核心组合 249/249，Django check、
+  migration drift、compileall、三份 Compose config 与 diff check 全部通过；隔离 PostgreSQL 16 专项
+  25/25，测试显式关闭真实网络。
 
 ## 最终生产发布
 
-- [ ] (operations) 先创建并验证独立生产备份，再用候选镜像 preview 及精确 manifest SHA 将 14 条历史
+- [x] (operations) 先创建并验证独立生产备份，再用候选镜像 preview 及精确 manifest SHA 将 14 条历史
   `claimed` 收口为 `failed/stale_claim_reconciled`；验证 claimed=0、delivery/业务数据零写和旧队列不变。
-- [ ] (operations) 取得用户对修复后精确 PR #108 合并及生产部署的最终确认。
-- [ ] (operations) 合并后绑定精确 revision/tree/archive/image，建立隔离 release；不得在 1,710 项 dirty 的
+- [x] (operations) 用户已确认继续完成修复、合并、生产部署与分阶段上线；重要功能分歧外无需重复确认。
+- [x] (operations) 合并后绑定精确 revision/tree/archive/image，建立隔离 release；不得在 1,710 项 dirty 的
   `/opt/umanewsbot` checkout 直接 pull、checkout 或清理。
-- [ ] (operations) 创建 PostgreSQL custom-format 备份，记录权限/大小/SHA 并通过 `pg_restore --list`。
-- [ ] (operations) 所有新开关关闭应用 0074/0075，验证 web/worker/Beat 同 image/revision、healthz、迁移和
+- [x] (operations) 创建 PostgreSQL custom-format 备份，记录权限/大小/SHA 并通过 `pg_restore --list`。
+- [x] (operations) 所有新开关关闭应用 0074/0075，验证 web/worker/Beat 同 image/revision、healthz、迁移和
   flag-off 三零；磁盘低于 8 GiB 时停止。
 - [ ] (operations) 写入冻结容量与 allowlist，按 future discovery -> network/time/racecard -> lifecycle ->
-  result apply/public -> correction 顺序启用，每一步核对 run、claim、请求、revision、公开页和错误率。
-- [ ] (operations) 验证 `race_sync_v2_worker` 正常消费新队列、旧 `race_live=7543` 不变，并记录 release evidence。
+  result apply/public -> correction 顺序启用；原 result/public 赛前窗口因普通 worker 内存越线已 10 false，
+  correction 从未开启。先完成 child recycling/cgroup hotfix 和关闭态热身，再从 future discovery 全量重走。
+- [x] (operations) 已验证 `race_sync_v2_worker` 只消费新队列、普通 worker 只消费 `celery`，旧
+  `race_live=7543` 不变；当前/回滚镜像和 release evidence 均已记录。

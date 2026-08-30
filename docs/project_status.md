@@ -1,5 +1,59 @@
 # 项目状态文档
 
+## 2026-08-31 2C/8G active 基线稳定，event 956 仍待正式赛果
+
+- PR #129 四服务 exact、restart=0、OOM=false，leaf `0075`；9 true + correction false，资源余量充足，
+  `celery=0 / race_sync_v2=0 / race_live=7543`，公网 root/www/health/event 均通过。
+- event 956 已自然进入 finished，并保留两条 lifecycle transition；最后一次自然结果轮询成功释放 claim。
+  当前唯一结果 revision 仍为 provisional，canonical result/publication 为 0，公网页无内部状态泄露。
+- 下一步只等待 Beat 自然运行 exact result route；正式 apply/public 全证据通过后再单独开启 correction 并
+  观察完整周期。扩容只解决资源余量，不改变 finality、锁、队列和 fail-closed 合同。
+
+## 2026-08-30 20:00 赛事链因普通 worker OOM 安全关闭
+
+- 赛前检查发现普通 worker `OOMKilled=true`；容器 running/restart=0 不使该硬门禁通过。event 956 当时仍
+  scheduled、0 results/transition，result checkpoint 尚未执行。
+- 自动保护已在自己的共享锁内完成 10 false、移除专用 worker并重建 PR #129 Web 1×4/普通 worker/Beat。
+  独立终态三服务 OOM=false、队列 `0/0/7543`、公网 6 URL 200、资源通过、lock absent。
+- 当前不再等待今晚 active result/correction；先在关闭态归因并修复普通 worker OOM，完成热身后从 future
+  discovery 全量重走。旧 `race_live` 与未批准 proof/proposals 继续保持不动。
+
+## 2026-08-30 Web 1×4 后已重新开启赛果公开窗口
+
+- 生产当前为 revision `cbf3f043…1ccf`、image `8e70cc43…fc76`、leaf `0075`；Web/普通 worker/Beat/
+  专用 worker 同 image/revision、restart=0/OOM=false。9 个前置 flags true，correction false。
+- 完整重开按 discovery -> time/racecard -> lifecycle -> result apply -> result public 执行；discovery 为
+  113/112/1、0 request/0 write，lifecycle 为 0 error/0 transition，active audit ready/valid/route drift 0。
+- 120 个 active 样本最低 `MemAvailable=1767740 kB`，Web 峰值约 219 MiB，普通队列最高 26 后自然归零；
+  后续 Beat 周期最低降到 `1663796 kB`、普通队列峰值 29 后仍自然归零，已观测最小余量约 89 MiB。
+  `race_sync_v2=0 / race_live=7543`，Swap 与磁盘通过；独立公网、容器、migration 与 event DB 复核通过。
+- event 956 仍 scheduled、10 runners、0 results、0 transition，result checkpoint 在 14:13Z；当前只差自然
+  result/public 与 correction 实证。相邻 proof/proposals 继续暂停，当前无需扩容；任一门禁失败仍立即全关。
+
+## 2026-08-30 内存门禁失败后已安全关闭赛事同步
+
+- 普通 worker 增长到约 1.344 GiB，`MemAvailable` 先降到 751020 kB、随后最低约 528300 kB；Swap 与
+  16.85 GB 磁盘正常。该窗口按门禁失败处理，不以任务成功或内存稍后回升改写结论。
+- 已等待并尊重其他 proof 的 `manual-release` 锁，随后在新锁内完成双 env 10 false、移除专用 worker、
+  重建 PR #127 Web/普通 worker/Beat。最终 `celery=0 / race_sync_v2=0 / race_live=7543`，三服务
+  10 false，公网 200，内存恢复约 2.05 GB。
+- result/public 现已关闭，correction 从未开启；event 956 的自然赛果仍未验证。先实现普通 worker
+  prefetch/child recycling/512 MiB cgroup hotfix，并在关闭态通过三个调度周期，之后才从 discovery 重走。
+
+## 2026-08-30 PR #127 已上线，result/public 等待真实赛时
+
+- 生产 revision `a040af3c…257f`、image `7eb5c329…9628d`、leaf `0075`；generation 2 registry 已激活，
+  仅纳管 event 956。新恢复点 487733802 bytes、0600、SHA/TOC 均通过。
+- future discovery、`race_time/racecard`、lifecycle 三阶段已通过；event 956 的实际 provider 结果完成
+  `race_time,racecard` apply，lifecycle smoke 无 error。result apply/public 当前开启，checkpoint 自然等待
+  `2026-08-30 14:13:00Z`；correction 仍关闭。
+- `celery=0 / race_sync_v2=0 / race_live=7543`，旧队列未消费或删除。专用 worker 384 MiB 上限，容器
+  restart=0、OOM=false；内存、Swap 与约 16.86 GB 磁盘均通过冻结容量，无需扩容。
+- 当前任务已安排真实赛时自动续验：先核对 lifecycle、provider、数据库 publication 和公网结果，再在独立
+  发布锁内开启 correction 并观察一周期。任一门禁失败立即 10 false、移除专用 worker并保持新写入关闭。
+- 上线后完成性回归为 SQLite 核心组合 249/249、隔离 PostgreSQL 16 专项 25/25；Django check、migration
+  drift、compileall、三份 Compose config 与 diff check 均通过，且整个验证容器禁用真实 provider 网络。
+  最终仍只差 event 956 的自然 T+3 result/public 与随后 correction 生产实证，不能以测试代替。
 ## 2026-08-30 普通 worker 内存保护 hotfix 待关闭态发布
 
 - 生产内存门禁失败已收口：10 false、专用 worker absent、`celery=0 / race_sync_v2=0 /
@@ -3163,3 +3217,35 @@ P0 马信息补全专项的模型交接文档见
 - 返修组合回归已达到 SQLite `190/190`、PostgreSQL `214/214`；静态、migration、Compose、digest、
   secret pattern 与关闭态 `ready/would_write=false` 审计全部通过。当前下一步收敛为提交/push 与第二轮
   独立 review，仍不代表已部署。
+
+# 2026-08-30 赛事数据自动化已进入真实赛事观察
+
+- 生产已运行 PR #129 `cbf3f043…` / image `sha256:8e70cc…fc76`，migration exact leaf `0075`；普通
+  worker、专用 worker 与 Web 的内存/并发约束已部署，未执行主机扩容。
+- future discovery、race time/racecard、lifecycle、result apply/public 已按冻结顺序启用并通过赛前门禁；
+  9 个前置开关为 true，correction=false。event 956 仍在赛前 scheduled 状态，result checkpoint 等待
+  `2026-08-30T14:13:00Z`。
+- 激活终态资源、拓扑、审计、数据库和公网均通过；10 分钟/120 次热身最低内存为 `1598324 kB`，新队列
+  为空，旧 `race_live=7543` 始终未动。早期 census、脚本、冷启动和普通 backlog 门禁失败均真实
+  fail-closed 后重试，没有删除队列或提前打开 correction。
+- 未完成项只有真实 T/T+30 lifecycle、T+3 终态赛果/完整 roster/revision/公开页，以及其后 correction
+  单周期验证；最终证据完成前不宣告整条链上线完成。
+
+# 2026-08-30 赛事链因内存门禁回到关闭态，Web 优化待重新开窗
+
+- 激活态在 `2026-08-30T01:41:35Z` 触发内存硬门禁，已成功 10 false、移除专用 worker并恢复普通服务；
+  三队列 `0/0/7543`，公网正常，event 956 未提前产生结果或 lifecycle transition。
+- 关闭态归因后 Web 从 2 workers × 2 threads 调整为 1 worker × 4 threads；10 分钟热身最低内存
+  `1915052 kB`，Web cgroup 峰值 `217976832 bytes`，没有扩容、清队列或修改数据库业务状态。
+- 当前权威状态仍为全部赛事新写入关闭。下一步重新执行配置审计与完整 preflight；只有新启用窗口通过后，
+  才恢复赛事阶段并继续真实 T/T+30/T+3 与 correction 验收。
+
+# 2026-08-30 2C/8G 后已重开，等待 event 956 official/public
+
+- 主机已升级为 2C/8G，并恢复持久化 1280 MiB Swap；普通 worker 提高为 1 GiB cgroup，Web 1×4 与专用
+  worker 384 MiB 保持。四服务当前 exact PR #129、restart=0/OOM=false，资源余量约 5.6 GiB。
+- 全量五阶段已重新通过，9 个前置开关 true、correction=false；三队列 `0/0/7543`、锁 absent，公网 5 个
+  URL 均 200。event 956 已自然完成 T 与 T+30 两条 lifecycle transition并处于 finished。
+- 14:34Z provider 返回 8 名完赛马，但原始 terminal marker 缺失，系统仅记录 provisional observation 和
+  immutable shadow revision，canonical results/publication 仍为 0；14:40Z、14:56Z 幂等重试后下一 poll
+  为 15:11:01Z。真实 official projection/public 与 correction 周期仍未完成，自动监控继续。
