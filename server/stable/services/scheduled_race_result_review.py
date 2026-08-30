@@ -539,13 +539,40 @@ def select_due_targets(
 ) -> dict[str, Any]:
     lower = now - timedelta(hours=lookback_hours)
     pending_lower = now - timedelta(days=pending_max_age_days)
+    pending_ids = set(pending_event_ids)
     duplicates = models.RaceEventProductCanonicalLink.objects.filter(
         is_active=True
     ).values_list("duplicate_event_id", flat=True)
+    # Keep the Python-side timezone calculation as the final authority, but do
+    # not prefetch every published event and all of its result rows first.  A
+    # conservative two-day cushion covers the full IANA UTC offset range for
+    # local-date-only events; _event_due_at applies the exact cutoff below.
+    fallback_window_lower = (lower - timedelta(days=2)).date()
+    fallback_pending_lower = (pending_lower - timedelta(days=2)).date()
+    candidate_scope = (
+        Q(race_datetime__gte=lower, race_datetime__lte=now)
+        | Q(
+            pk__in=pending_ids,
+            race_datetime__gte=pending_lower,
+            race_datetime__lte=now,
+        )
+        | Q(
+            race_datetime__isnull=True,
+            local_date__gte=fallback_window_lower,
+            local_date__lte=now.date(),
+        )
+        | Q(
+            pk__in=pending_ids,
+            race_datetime__isnull=True,
+            local_date__gte=fallback_pending_lower,
+            local_date__lte=now.date(),
+        )
+    )
     queryset = (
         models.RaceEvent.objects.filter(
-            visibility_status=models.RaceEventVisibility.PUBLISHED
+            visibility_status=models.RaceEventVisibility.PUBLISHED,
         )
+        .filter(candidate_scope)
         .exclude(pk__in=duplicates)
         .exclude(status__in=("cancelled", "postponed"))
         .prefetch_related("results")
@@ -556,7 +583,7 @@ def select_due_targets(
         if due_at is None or due_at > now:
             continue
         in_window = due_at >= lower
-        pending = event.pk in pending_event_ids and due_at >= pending_lower
+        pending = event.pk in pending_ids and due_at >= pending_lower
         if not in_window and not pending:
             continue
         state, network = _result_state(event)

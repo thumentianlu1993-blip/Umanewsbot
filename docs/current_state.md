@@ -1,5 +1,43 @@
 # 当前状态
 
+## 2026-08-31 07:42 赛果复核全量 prefetch 触发 cgroup OOM，生产已关闭
+
+- `22:30:00Z` P0 URL 发现先运行并于 `22:30:20Z` 成功；随后赛果复核 run id 95 启动，内核在
+  `22:30:41Z` 从普通 worker 的 1 GiB cgroup 杀死 `anon-rss=970604 kB` 的 Celery 子进程。宿主机当时
+  仍有数 GiB 余量，restart=0 但 Docker `OOMKilled=true` 与 child-only kill 语义一致；run id 95 最终由
+  stale-claim sweeper 终结为 `lease_expired_without_terminal`。
+- 已按硬门禁自动 fail-closed：canonical/active env 的 10 个 `RACE_DATA_SYNC_*` 全 false，
+  `race_sync_v2_worker` absent；Web 1x4、普通 worker、Beat 已用 exact PR #129 重建并恢复公网。最新终态
+  lock absent、三服务 running/restart=0/OOM=false、leaf 0075、资源约 5.7 GiB 可用、Swap 全空闲、队列
+  `celery=0/race_sync_v2=0/race_live=7543`，root/www/health/event 均 200。
+- 根因不是 event 956 provider：旧 `select_due_targets()` 会先 prefetch 全部 9,806 场已发布赛事与 92,663
+  条历史赛果，再筛近 72 小时。当前修复在数据库先做保守时间窗，同一生产快照只取 45 场、0 条历史
+  赛果，并保留 Python 的精确时区/本地日期裁决；新增回归测试与既有数据库合约共 23/23 通过。
+- event 956 保持 finished/published、10 runners、0 canonical results、0 publication；唯一 provisional
+  observation/revision 和两条 lifecycle transition 不变。`23:29Z` 自然轮询以
+  `host_reservation_circuit_open` 失败并释放 claim，未写正式赛果。修复发布、关闭态热身及门禁复核前不
+  重开，不手工改 due time/claim/status/result。
+
+## 2026-08-31 04:29 event 956 已排定切日后的 exact result 自然轮询
+
+- `2026-08-30T20:28:00Z` 的 Beat/selector 自然轮询已完成并释放 claim；tracking generation 从 76
+  增至 77，`last_success_at=20:28:02Z`、`next_poll_at=23:28:02Z`、failures=0，英国 TRA capacity
+  ledger 从 93 增至 96。下一 poll 已自然排到 Europe/London `23:00Z` 日期切换之后，将由代码进入受审
+  exact result-by-id 路由；没有手工触发 provider、修改 due time/claim/status/result。
+- 数据库仍只有 observation id 15 与 result revision id 13：8 个 items、phase `provisional`、content SHA
+  `68c3e5c4…f85dc5`，`published_at/official_confirmed_at=NULL`；canonical result 与 publication 均为 0。
+  两条 lifecycle transition 仍唯一且不变，root/www canonical 赛事页均为 200，只显示“赛果待确认”，没有
+  provider/provisional/source phase 泄露。
+- 同次硬门禁为 lock absent、`MemAvailable=5602632 kB`、`SwapFree=1310716 kB`、磁盘
+  `15055392768 bytes`；四服务均为 exact PR #129、running、restart=0、OOM=false，三队列为
+  `0/0/7543`。`race_sync_v2_worker` 内 zero-write audit 为 `ready/valid/route_drift=[]/would_write=false`；
+  Web 容器按设计不挂载赛事 artifact root，因此不能用 Web 内的 capacity unavailable 结果替代专用 worker
+  审计。
+- 最新 `origin/main` 已在禁网隔离环境复跑：SQLite 核心组合 `250/250`，PostgreSQL 16 专项 `25/25`；
+  Django check、migration drift、compileall、三份 Compose config、diff 与 literal secret scan 全部通过。
+  生产恢复点仍为 487733802 bytes、0600、SHA `1606a014…3f85`，PostgreSQL 16
+  `pg_restore --list` 为 1359 行。
+
 ## 2026-08-31 02:03 主机升级后赛事链保持全量开启，event 956 等待正式赛果
 
 - 生产主机现为 2C/8G，持久化 Swap 为 1280 MiB。`2026-08-30T18:03:32Z` 只读复核得到

@@ -1,6 +1,39 @@
 # 赛事数据生命周期生产发布证据
 
-更新时间：2026-08-30 20:05 Asia/Shanghai
+更新时间：2026-08-31 07:42 Asia/Shanghai
+
+## 2026-08-31 07:42 普通 worker 复核任务 OOM，生产已 fail-closed
+
+- `2026-08-30T22:30:00Z` P0 URL 发现任务自然启动并于 `22:30:20Z` 成功结束；赛果复核 run id 95
+  随后取得 `22:30Z` slot，`22:30:41Z` 内核在普通 worker 的 1 GiB memory cgroup 内杀死 Celery
+  子进程。被杀进程 `anon-rss=970604 kB`；宿主机仍有约 5.3 GiB 可用，故这是单容器上限而不是主机
+  内存耗尽。run id 95 后续按租约规则终结为 `lease_expired_without_terminal`。
+- 门禁发现 worker `OOMKilled=true` 后已用独占 deployment lock 自动关闭：canonical/active env 的 10 个
+  `RACE_DATA_SYNC_*` 全 false，`race_sync_v2_worker` 已停并移除；Web 1x4、普通 worker、Beat 以 exact
+  PR #129 重建，Nginx 配置通过并平滑 reload。终态 lock absent、三服务 restart=0/OOM=false、leaf
+  `0075`、队列 `0/0/7543`、公网 root/www/health/event 均 200。
+- 根因位于 `select_due_targets()`：旧实现先 prefetch 全部 9,806 场已发布赛事和 92,663 条历史赛果，再在
+  Python 中筛选近 72 小时。修复改为数据库先做保守时间窗，再由原 Python 时区逻辑精确裁决；同一生产
+  快照候选降为 45 场、0 条历史赛果。SQLite 合约回归含新增限窗/本地日期语义测试共 23/23 通过。
+- event 956 仍为 finished/published、10 runners、0 canonical results；observation 15 / revision 13
+  仍是同一 provisional artifact，无 publication。`23:29Z` 自然轮询只记录
+  `host_reservation_circuit_open` 并释放 claim，未生成正式赛果；关闭后不手工触发或改 checkpoint。
+
+## 2026-08-31 04:29 generation 77 已排定切日后的 exact result
+
+- `20:28:00Z` Beat/selector 自然轮询后 claim generation=77，`last_success_at=20:28:02Z`、next poll
+  `23:28:02Z`、failures=0；英国 TRA ledger=96。下一轮已自然落在 Europe/London 日期切换之后，代码将
+  使用受审 exact result-by-id 路由；没有手工 provider 调用或数据库改写。
+- observation id 15 / revision id 13 仍是同一 content SHA `68c3e5c4…f85dc5`，8 items、phase
+  provisional；published/official 时间为空，canonical result 与 publication 为 0。两条 lifecycle
+  transition 未重复，root/www canonical 页均 200、显示“赛果待确认”，无内部来源/阶段泄露。
+- 同轮资源为 `MemAvailable=5602632 kB / SwapFree=1310716 kB / disk=15055392768 bytes`；lock absent，
+  四服务 exact PR #129/restart0/OOMfalse，队列 `0/0/7543`。专用 worker 的线上 zero-write audit 为
+  ready、capacity valid、route drift 0、would_write false。
+- 最新 `origin/main` 禁网复跑 SQLite 核心 `250/250`、隔离 PostgreSQL 16 `25/25`；Django check、
+  migration drift、compileall、三份 Compose config、diff/secret scan 全通过。恢复点
+  `rds_horse_news_20260829T215423Z_3070249.dump` 为 487733802 bytes、0600、SHA
+  `1606a014…3f85`，PostgreSQL 16 `pg_restore --list` 为 1359 行。
 
 ## 2026-08-30 20:00 普通 worker OOM 门禁失败与自动关闭
 

@@ -1,5 +1,34 @@
 # 部署运行手册
 
+## 2026-08-31 普通 worker 赛果复核 OOM 修复与恢复顺序
+
+1. 诊断口径以 kernel memcg 日志为准：`22:30:20Z` P0 URL 发现成功后，赛果复核 run claim；
+   `22:30:41Z` Celery child 以约 970 MiB anon RSS 被 1 GiB cgroup 杀死。restart=0 不代表 child 未 OOM。
+2. 生产保持 10 个 `RACE_DATA_SYNC_*` false、`race_sync_v2_worker` absent，旧 `race_live=7543` 原样保留。
+   先发布 `select_due_targets()` 数据库限窗修复；生产只读计数应从全量 9,806 events/92,663 results
+   缩到约 45 candidate events/0 prefetched results，具体数值允许随时间自然变化。
+3. 在 shared lock absent 时取得自己的 random-token lock，以新 exact image 重建 Web 1x4、普通 worker、
+   Beat；Nginx `-t` 后平滑 reload。关闭态至少覆盖普通队列自然排空、worker pong、restart/OOM/memory.events
+   与稳定资源采样，任何异常继续全关并仅释放自己的锁。
+4. 关闭态通过后再按 future discovery -> time/racecard -> lifecycle -> result apply/public 顺序重开 9 个
+   前置开关；correction 保持 false。event 956 只等自然 poll，严禁手工 provider、改 due/claim/status/result。
+   正式 revision/canonical/public/root+www 全通过后，另取锁单独开启 correction 并观察完整自然周期。
+
+## 2026-08-31 04:29 event 956 切日 exact result 窗口
+
+1. 最新自然轮询为 `20:28:00Z`，generation 77、claim 已释放、下一 poll `23:28:02Z`；仍是 revision id 13
+   的同一 provisional artifact，0 canonical result、0 publication。该 poll 已自然落在 Europe/London
+   `23:00Z` 切日之后，只允许 Beat 进入受审 exact result-by-id 路由，不手工触发或修改 checkpoint。
+2. zero-write 配置审计必须在 `race_sync_v2_worker` 内运行；该容器挂载 policy、secrets、artifact root，
+   当前结果为 ready、capacity valid、route drift 0、would_write false。Web 容器不挂载 artifact root，
+   在 Web 内运行得到 capacity unavailable 属于错误执行上下文，不作为门禁结论。
+3. 当前硬门禁为 lock absent、四服务 exact PR #129/restart0/OOMfalse、leaf 0075、9 true + correction
+   false、资源 `5602632/1310716 kB`、磁盘 `15055392768 bytes`、队列 `0/0/7543`；root/www canonical
+   页面均为 200 且仅显示“赛果待确认”。
+4. 正式结果出现后仍需逐层核对 observation/revision/items、canonical result、publication、tracking、
+   lifecycle 与 root/www 展示；全部一致后才取新锁开启 correction，并在下一自然 correction 周期完成后
+   复核无重复 revision、无结果反转、claim 释放和 `race_live=7543`。
+
 ## 2026-08-31 event 956 正式赛果等待窗口
 
 1. 当前 active 基线固定为 PR #129 revision `cbf3f043…1ccf`、image `8e70cc43…fc76`、leaf `0075`；
