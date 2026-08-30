@@ -9157,3 +9157,21 @@ RACE_DATA_RAW_ARTIFACT_ROOTS=/run/race-data-sync
    lifecycle 步骤单独启用。锁等待或 deadlock、T+30 incident 进入 `race_live`/delivery 都立即止损。
 6. 任一步失败关闭最窄开关并停止后续序列；不得以 HTTP 200、task exit 0、queue 下降或 observation 已写入
    替代 canonical/public/副作用核验。
+
+## PR #129 后赛事链资源与 worker 就绪门禁
+
+1. 普通 worker 固定订阅 `celery`，使用 `concurrency=1`、`prefetch-multiplier=1`、
+   `max-tasks-per-child=20`、`max-memory-per-child=262144`、512 MiB cgroup；专用 worker 只订阅
+   `race_sync_v2`，使用单并发/单预取、256 MiB child 上限、384 MiB cgroup。不得启动旧 `race_live` worker。
+2. 任何启用窗口写前、每阶段后和热身期都验证 `MemAvailable>=1572864 kB`、
+   `SwapFree>=524288 kB`、free disk `>=8589934592` bytes；同时确认 `race_sync_v2=0`、
+   `race_live=7543`。普通 `celery` backlog 只能自然排空，不 purge、重排或冒充空闲。
+3. 专用容器启动后以有界重试检查 Celery topology；验收必须恰好为普通与专用两个节点、队列隔离且 idle。
+   `docker running`、单次 inspect 或固定短 sleep 均不能替代节点级 ready 证据。
+4. future discovery 使用业务不变量：唯一目标已纳管，其余目标均阻断，candidate/decision/provider request
+   为预期值且数据库 before/after SHA 匹配；不得冻结随时间变化的 census 绝对计数。
+5. 启用顺序保持 future discovery → race time/racecard → lifecycle → result apply/public → correction。
+   correction 只在真实 T+3 赛果、完整 roster、immutable revision、canonical projection 与 root/www 公开页
+   全部验证后单独开启。
+6. 任一资源、锁、路由、拓扑、任务、数据库或公网门禁失败：同一 owner 锁内设 10 false、移除专用 worker、
+   恢复普通 worker/Beat并复验公网；不清理任何 Redis 队列，不删除其他 owner 的锁。

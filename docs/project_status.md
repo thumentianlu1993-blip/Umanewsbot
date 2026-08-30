@@ -3178,3 +3178,16 @@ P0 马信息补全专项的模型交接文档见
 - 返修组合回归已达到 SQLite `190/190`、PostgreSQL `214/214`；静态、migration、Compose、digest、
   secret pattern 与关闭态 `ready/would_write=false` 审计全部通过。当前下一步收敛为提交/push 与第二轮
   独立 review，仍不代表已部署。
+
+# 2026-08-30 赛事数据自动化已进入真实赛事观察
+
+- 生产已运行 PR #129 `cbf3f043…` / image `sha256:8e70cc…fc76`，migration exact leaf `0075`；普通
+  worker、专用 worker 与 Web 的内存/并发约束已部署，未执行主机扩容。
+- future discovery、race time/racecard、lifecycle、result apply/public 已按冻结顺序启用并通过赛前门禁；
+  9 个前置开关为 true，correction=false。event 956 仍在赛前 scheduled 状态，result checkpoint 等待
+  `2026-08-30T14:13:00Z`。
+- 激活终态资源、拓扑、审计、数据库和公网均通过；10 分钟/120 次热身最低内存为 `1598324 kB`，新队列
+  为空，旧 `race_live=7543` 始终未动。早期 census、脚本、冷启动和普通 backlog 门禁失败均真实
+  fail-closed 后重试，没有删除队列或提前打开 correction。
+- 未完成项只有真实 T/T+30 lifecycle、T+3 终态赛果/完整 roster/revision/公开页，以及其后 correction
+  单周期验证；最终证据完成前不宣告整条链上线完成。

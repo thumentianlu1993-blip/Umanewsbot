@@ -1,6 +1,48 @@
 # 赛事数据生命周期生产发布证据
 
-更新时间：2026-08-30 06:40 Asia/Shanghai
+更新时间：2026-08-30 08:24 Asia/Shanghai
+
+## 2026-08-30 08:14–08:24 PR #129 资源修复后赛前链路已重新启用
+
+- PR #129 已合并为 `cbf3f0436aae99890ca2498bff7761adf4a71ccf`，生产隔离 release 为
+  `/opt/umanews-release-cbf3f043-PR129-20260829T2250Z/umanewsbot`，image 为
+  `sha256:8e70cc43667f946ac4329cf4a70c1be6ddc3cc63b9bfd3eccff8f28e8c36fc76`；回滚 tag 为
+  `umanewsbot:rollback-pre-pr129-a040af3c-20260829T2306Z`。migration leaf 复核为 exact `0075`，
+  `0073/0074/0075` 均已应用。
+- 普通 worker 降为 `concurrency=1 / prefetch=1 / max-tasks-per-child=20 / max-memory-per-child=262144`
+  并设置 512 MiB cgroup；专用 worker 为单并发、单预取、384 MiB cgroup。Web 修正为 2 workers/2 threads；
+  canonical 与 release env 已恢复冻结容量、持久目录、TLS 根和 registry SHA
+  `3bac3b644c631ed165b8430343822b2c70c5a88c5036b63dcb557c83c0e0a6da`。
+- `2026-08-30T00:14:14Z` 写前门禁为 `MemAvailable=1949796 kB`、`SwapFree=1310716 kB`、
+  `disk=16410984448 bytes`，三队列为 `0/0/7543`，随后按冻结顺序启用 future discovery、
+  race time/racecard、lifecycle、result apply/public；9 个前置开关为 true，correction 仍为 false。
+- future discovery 的当前业务 census 为 `total=113 / blocked=112 / enrolled=1`；本轮无候选、无 provider
+  请求、无数据库写，前后数据库 SHA 均为
+  `2ba2016cfaf229361b93d8d518ed03ff0e6f654806157967c46dae9042f4f274`。这里冻结的是“唯一已纳管赛事且
+  其他候选保持阻断”的业务不变量，不再把会随时间自然变化的绝对 115/114 当作发布常量。
+- race time/racecard task `6a82f8de-3a60-468c-9c68-f753fda5defe` 返回 `SUCCESS`、
+  `processed=true / complete`，只应用 `race_time,racecard`；lifecycle smoke 为 complete、0 error、0 transition，赛前状态
+  仍为 scheduled。独立审计返回 `configuration_status=ready / capacity=valid / route_drift=[] /
+  would_write=false`，audit SHA 为
+  `6c4bfb7ae9fa4072337da191428a1be9893319a1a80b02e84623ea4ec52829ae`。
+- 专用 worker 冷启动约 2 分钟，最终拓扑为恰好两个隔离节点且均 idle；Beat 最后恢复。激活终态为
+  `MemAvailable=1788692 kB / SwapFree=1310716 kB / disk=16410525696 bytes`，队列 `0/0/7543`，
+  5 个公网验收 URL 均 200，赛前页面仍无赛果，锁已释放。
+- 激活前发生的 discovery census 漂移、checkpoint 脚本引号错误、过早检查专用 worker 拓扑和普通 Beat
+  backlog 均按规则真实 fail-closed；每次都恢复 10 false、普通 worker/Beat，移除专用 worker并保留队列，
+  未伪装为成功窗口。最终成功窗口改用业务不变量与有界冷启动重试，没有放宽资源、路由或写入门禁。
+- 随后完成 120 次、每 5 秒一次的 10 分钟热身观察：最低 `MemAvailable=1598324 kB`，全程
+  `SwapFree=1310716 kB`、`race_sync_v2=0`、`race_live=7543`，普通 Beat backlog 自然入队并排空；最低值
+  只比硬门槛高约 25 MiB，因此继续保留硬门禁，不追加联网 proof，也不以本次通过作为扩容理由。
+- 独立复核时资源为 `1709212 kB / 1310716 kB / 16409595904 bytes`，锁 absent、三队列 `0/0/7543`；
+  Web、普通 worker、Beat、专用 worker 均运行 exact PR #129 image/revision，restart=0、OOM=false，cgroup
+  分别符合未设/512 MiB/未设/384 MiB。三类消费者的 9 true + correction false 完全一致。
+- event 956 独立数据库复核为 `scheduled / is_public=true / runners=10 / results=0`，tracking 无 active token、
+  lifecycle generation 2、transition 0、result revision null，result checkpoint 仍等待 `14:13Z`；root/www
+  首页、带尾斜杠 healthz 和赛事页共 5 个 URL 均为 200，页面 9542 bytes 且 `results` 区块 absent。首次
+  只读查询误用了不存在的 `is_published` 属性而中止，未发生写入；改用真实 `is_public` 字段后完整重跑通过。
+- 激活与观察临时脚本已在确认无进程占用后从本地 worktree 和生产 `/tmp` 精确删除；未执行广义 prune、
+  队列清理或其他文件删除。
 
 ## 2026-08-30 06:36 内存门禁失败与关闭态
 

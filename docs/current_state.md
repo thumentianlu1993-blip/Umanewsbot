@@ -6662,3 +6662,22 @@ v3 首次 prepare 在请求预算 `60/60` 时由 HRN 空候选连带阻断 Equib
 - 返修后的完整赛事数据组合门禁为 SQLite `190/190`、PostgreSQL `214/214`；后者同时覆盖 R0 与
   racecard 并发。Django check、migration drift、compileall、三份 Compose、JSON/digest、diff 与 literal
   secret pattern 均通过；全开配置且运行开关全关的审计返回 `ready/would_write=false`、route drift 为空。
+
+# 2026-08-30 PR #129 资源修复及赛事链赛前启用完成
+
+- PR #108 后续发布已推进至 PR #129，生产当前运行 revision `cbf3f043…`、image
+  `sha256:8e70cc…fc76`，migration exact leaf 为 `0075`，`0074/0075` 已应用；可恢复的 PR #127 image 与
+  pre-PR129 rollback tag 均保留。
+- 普通 worker 已降为单并发、单预取、每子进程最多 20 task/256 MiB，cgroup 为 512 MiB；专用
+  `race_sync_v2_worker` 为单并发、单预取、384 MiB cgroup。Web 使用 2 workers/2 threads。该配置替代扩容，
+  并已在实际 Beat 周期与专用 worker 冷启动后通过资源门禁。
+- `2026-08-30T00:14Z` 起按 future discovery → race time/racecard → lifecycle → result/public 顺序完成
+  赛前激活。当前 9 个前置开关为 true，correction=false；event 956 仍为 scheduled/published，赛果行和
+  公开赛果均为 0，result checkpoint 等待 `2026-08-30T14:13:00Z`。
+- 最终激活检查为 `MemAvailable=1788692 kB / SwapFree=1310716 kB / disk=16410525696 bytes`，
+  `celery=0 / race_sync_v2=0 / race_live=7543`，拓扑恰好为普通与专用两个 worker，公网 5 个 URL 均 200，
+  deployment lock absent。其后 10 分钟/120 次热身最低 `MemAvailable=1598324 kB`，全程未越线；旧
+  `race_live` 从未被消费、删除或迁移。
+- 下一门禁仍是 event 956 的真实 T/T+30 transition、T+3 终态完整 roster、immutable revision、数据库投影
+  和公开页赛果；全部通过后才单独开启 correction 并观察一个干净周期。完整生产证据见
+  `docs/changes/automate-race-data-lifecycle-sync/release_evidence.md`。

@@ -539,3 +539,10 @@ kill-switch 约束，仓库默认关闭，生产启用必须绑定精确发布�
 登记的 race-id 路由。无终态标记的结果只形成内部 provisional revision，正式/更正公开还必须覆盖完整
 canonical runner roster。只有结果型 fallback 与现有 runner 通过马号和规范化马名形成唯一全双射时，
 才可在同一事务补足来源身份；缺行、多解和来源合同漂移均保持零公开写入。
+
+## 赛事数据自动化的生产运行形态
+
+生产链现以普通 `celery` worker 与专用 `race_sync_v2` worker 隔离运行；旧 `race_live` 遗留队列不接入、
+不消费。普通 worker 和 Web 已按小站负载压低并发并设置子进程回收/cgroup 上限，以资源门禁和 fail-closed
+优先替代主机扩容。赛前 future discovery、赛时/出马表、lifecycle 与 result/public 已按序启用；更正自动化
+仍需真实赛果公开验证后单独开启。

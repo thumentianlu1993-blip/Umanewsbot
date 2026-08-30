@@ -3358,3 +3358,16 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
   运行开关已打开。
 - schedule/racecard/result canonical apply 都必须在网络之后、事务内重新验证来源 review/terms、有效期、
   registry、contract、region/namespace 和 exact claim；观察创建成功不能替代写入时准入。
+
+# 2026-08-30 赛事链生产启用采用业务不变量、冷启动有界等待与进程级内存保护
+
+- future discovery census 的绝对 total/blocked 会随时间自然变化，发布门禁不再固定某个瞬时数字；必须
+  验证唯一目标 event 已纳管、其余目标全部以可解释原因阻断、无越权 candidate/decision/provider request，
+  并以数据库前后 SHA 证明零意外写入。
+- 专用 worker 容器 running 不等于 Celery 节点 ready。启用门禁使用有界重试等待拓扑恰好包含普通
+  `celery` 与专用 `race_sync_v2` 两个隔离节点；超时仍 fail-closed，不通过延长锁无限等待或跳过检查。
+- 小站资源治理先约束进程而非扩容：普通 worker 单并发/单预取、20 task 回收、256 MiB child 上限、
+  512 MiB cgroup；专用 worker 单并发/单预取、384 MiB cgroup；Web 为 2 workers/2 threads。硬资源门槛
+  保持不变，任何采样越线仍关闭全部新写入。
+- canonical/release env 的冻结容量、持久目录、TLS 根、exact revision 与 registry digest 属于同一发布合同；
+  发现配置漂移必须修复并重新审计，不能只依赖容器 image 一致。
