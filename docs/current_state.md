@@ -6748,7 +6748,8 @@ v3 首次 prepare 在请求预算 `60/60` 时由 HRN 空候选连带阻断 Equib
   `running→finished`（T+30），当前 finished/published、10 runners、0 canonical results。14:34Z 的自然
   provider 轮询记录 8 名完赛马和 immutable provisional result revision #1；原始响应没有受审 terminal
   marker，因此 revision 未投影、未 publication，公网页不显示赛果且不泄露 provider/source phase。
-- result checkpoint 在 14:40Z 自然重试并成功释放 claim；相同 artifact 未生成重复 observation/revision，
-  下一次为 `2026-08-30T14:55:09Z`。`empty_field` 是“当前赛果字段为空、候选可记录”的仲裁理由，不代表
+- result checkpoint 在 14:40Z 与 14:56Z 自然重试并成功释放 claim；相同 artifact 未生成重复
+  observation/revision，英国当日 capacity ledger request_count 从 54 增至 57，下一次为
+  `2026-08-30T15:11:01.537509Z`。`empty_field` 是“当前赛果字段为空、候选可记录”的仲裁理由，不代表
   terminal/public 已通过；只有 observation phase 为 official/corrected、完整 roster 投影并公开后才开启
   correction。

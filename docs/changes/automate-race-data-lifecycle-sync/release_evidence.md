@@ -208,6 +208,7 @@
 - `14:34:17Z` TRA 当日结果 observation #15 记录 8 名完赛马，raw SHA
   `c9cab51b…7b13`、normalized SHA `68c3e5c4…f85dc5`；原始响应没有 terminal marker，因此 phase 为
   provisional。result revision #1 已记录，reason `empty_field`，但 `published_at/official_confirmed_at` 为空，
-  canonical result/publication 均为 0。14:40Z 同 artifact 重试未重复建 revision，下一 poll 为 14:55:09Z。
+  canonical result/publication 均为 0。14:40Z 与 14:56Z 同 artifact 重试均未重复建 revision，claim
+  generation 增至 64、英国 capacity ledger request_count 增至 57，下一 poll 为 15:11:01Z。
 - root/www event 页均 200、9541 bytes，只在 footer 出现产品描述中的“赛果”；没有 results 区块、provider
   或 provisional/source phase 泄露。correction 继续 false，等待 official/corrected 完整投影和公开后再单开。
