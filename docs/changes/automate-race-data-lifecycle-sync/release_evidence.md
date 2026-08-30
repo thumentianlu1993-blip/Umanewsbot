@@ -1,6 +1,6 @@
 # 赛事数据生命周期生产发布证据
 
-更新时间：2026-08-30 08:24 Asia/Shanghai
+更新时间：2026-08-30 09:00 Asia/Shanghai
 
 ## 2026-08-30 08:14–08:24 PR #129 资源修复后赛前链路已重新启用
 
@@ -22,8 +22,8 @@
   其他候选保持阻断”的业务不变量，不再把会随时间自然变化的绝对 115/114 当作发布常量。
 - race time/racecard task `6a82f8de-3a60-468c-9c68-f753fda5defe` 返回 `SUCCESS`、
   `processed=true / complete`，只应用 `race_time,racecard`；lifecycle smoke 为 complete、0 error、0 transition，赛前状态
-  仍为 scheduled。独立审计返回 `configuration_status=ready / capacity=valid / route_drift=[] /
-  would_write=false`，audit SHA 为
+  仍为 scheduled。独立审计返回 `configuration_status=ready / capacity=valid / route_drift=[]`、
+  `would_write=false`，audit SHA 为
   `6c4bfb7ae9fa4072337da191428a1be9893319a1a80b02e84623ea4ec52829ae`。
 - 专用 worker 冷启动约 2 分钟，最终拓扑为恰好两个隔离节点且均 idle；Beat 最后恢复。激活终态为
   `MemAvailable=1788692 kB / SwapFree=1310716 kB / disk=16410525696 bytes`，队列 `0/0/7543`，
@@ -34,6 +34,9 @@
 - 随后完成 120 次、每 5 秒一次的 10 分钟热身观察：最低 `MemAvailable=1598324 kB`，全程
   `SwapFree=1310716 kB`、`race_sync_v2=0`、`race_live=7543`，普通 Beat backlog 自然入队并排空；最低值
   只比硬门槛高约 25 MiB，因此继续保留硬门禁，不追加联网 proof，也不以本次通过作为扩容理由。
+- `2026-08-30T00:44:00Z–01:00:01Z` 又完成 149 次、每 5 秒一次的连续赛前观察：最低
+  `MemAvailable=1604772 kB`，Swap、磁盘、deployment lock、四服务 running/restart/OOM、新队列为空与旧
+  `race_live=7543` 均逐次通过。期间普通 `celery` backlog 最高 21 并自然排空，未 purge、重排或干预。
 - 独立复核时资源为 `1709212 kB / 1310716 kB / 16409595904 bytes`，锁 absent、三队列 `0/0/7543`；
   Web、普通 worker、Beat、专用 worker 均运行 exact PR #129 image/revision，restart=0、OOM=false，cgroup
   分别符合未设/512 MiB/未设/384 MiB。三类消费者的 9 true + correction false 完全一致。
