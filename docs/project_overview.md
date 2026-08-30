@@ -1,5 +1,11 @@
 # 项目总览
 
+2026-08-30 20:00，PR `#129` active 赛前窗口因普通 worker `OOMKilled=true` 命中硬门禁，已自动
+fail-closed。生产当前为 10 个赛事开关全 false、专用 worker absent；Web 1×4、普通 worker、Beat 已以
+exact image 重建且 restart=0/OOM=false，队列 `0/0/7543`，公网 6 个 URL 200，event 956 未产生赛果、
+transition、claim 或 revision。下一步先在关闭态完成 OOM 根因与更低风险修复，再从 future discovery
+全量重走；今晚不能直接从 result/public 阶段续跑，correction 继续关闭。
+
 2026-08-30 12:19，PR `#129` 的赛事全生命周期链在 Web 1 worker × 4 threads 优化后完成全量重开。
 future discovery、赛时/出马表、lifecycle、result apply 与 result public 已依次通过，active audit 为
 ready/valid/route drift 0；120 样本最低 `MemAvailable=1767740 kB`，普通 backlog 自然归零，新旧赛事队列

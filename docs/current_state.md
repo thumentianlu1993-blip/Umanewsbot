@@ -1,5 +1,22 @@
 # 当前状态
 
+## 2026-08-30 20:00 普通 worker OOM 硬门禁失败，赛事链已自动关闭
+
+- `2026-08-30T12:00:57Z` 赛前只读门禁发现普通 `worker` 容器 `OOMKilled=true`；即使容器仍 running、
+  restart=0，仍按冻结合同判定失败。当时 `MemAvailable=1736044 kB`、Swap 完整、磁盘
+  `16365473792 bytes`，event 956 仍 scheduled、10 runners、0 results/transition、无 claim/revision，
+  result checkpoint 未执行；队列为 `celery=8 / race_sync_v2=0 / race_live=7543`。
+- 在 lock absent 前提下，自动保护以自己的 `manual-release` token 获取共享锁，将 canonical 与 active env
+  的 10 个 `RACE_DATA_SYNC_*` 开关全部设为 false，停止并移除专用 worker，以 exact PR #129 image 重建
+  Web 1×4、普通 worker 与 Beat；未清理、消费、迁移或重排任何 Redis 队列。
+- `12:03:54Z` 独立终态为 lock absent、三服务 exact revision/image、restart=0/OOM=false、Web healthy、
+  专用 worker absent、队列 `0/0/7543`，`MemAvailable=2127476 kB`、Swap `1310716 kB`、磁盘
+  `16366440448 bytes`，root/www/home/health/event 6 个 URL 全部 200。event 956 仍 0 result/transition，
+  checkpoint `14:13Z`、last attempt null。
+- 当前权威状态为 `CLOSED_AFTER_ORDINARY_WORKER_OOM`。今晚 result/correction 不会按原 active 窗口继续；
+  必须先查明普通 worker OOM 根因、在 10 false 关闭态完成更低风险修复与热身，再从 future discovery 起
+  重走全量门禁，不能直接从 result 阶段续跑。
+
 ## 2026-08-30 PR #129 在 Web 1×4 优化后完成全量重开，等待真实赛果与更正
 
 - 权威生产基线为 revision `cbf3f043…1ccf`、image `8e70cc43…fc76`、migration exact leaf `0075`；

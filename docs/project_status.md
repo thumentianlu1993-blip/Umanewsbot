@@ -1,5 +1,14 @@
 # 项目状态文档
 
+## 2026-08-30 20:00 赛事链因普通 worker OOM 安全关闭
+
+- 赛前检查发现普通 worker `OOMKilled=true`；容器 running/restart=0 不使该硬门禁通过。event 956 当时仍
+  scheduled、0 results/transition，result checkpoint 尚未执行。
+- 自动保护已在自己的共享锁内完成 10 false、移除专用 worker并重建 PR #129 Web 1×4/普通 worker/Beat。
+  独立终态三服务 OOM=false、队列 `0/0/7543`、公网 6 URL 200、资源通过、lock absent。
+- 当前不再等待今晚 active result/correction；先在关闭态归因并修复普通 worker OOM，完成热身后从 future
+  discovery 全量重走。旧 `race_live` 与未批准 proof/proposals 继续保持不动。
+
 ## 2026-08-30 Web 1×4 后已重新开启赛果公开窗口
 
 - 生产当前为 revision `cbf3f043…1ccf`、image `8e70cc43…fc76`、leaf `0075`；Web/普通 worker/Beat/

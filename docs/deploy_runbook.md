@@ -1,5 +1,19 @@
 # 部署运行手册
 
+## 2026-08-30 20:00 普通 worker OOM 后的关闭态基线
+
+1. 当前唯一权威状态为 `CLOSED_AFTER_ORDINARY_WORKER_OOM`：canonical/active env 的 10 个
+   `RACE_DATA_SYNC_*` 开关全 false，`race_sync_v2_worker` 必须 absent；Web 1×4、普通 worker、Beat 必须
+   为 PR #129 exact image/revision 且 restart=0/OOM=false。
+2. 触发证据是原普通 worker `OOMKilled=true`，不是主机内存数值越线；当时 host 内存、Swap、磁盘与公网
+   仍通过，仍必须 fail-closed。禁止通过重启后 OOM 标记消失追溯改写失败窗口。
+3. 关闭终态为 lock absent、队列 `celery/race_sync_v2/race_live=0/0/7543`、
+   `MemAvailable=2127476 kB`、Swap `1310716 kB`、磁盘 `16366440448 bytes`，6 个公网 URL 200；event 956
+   仍 scheduled、0 result/transition、无 claim/revision，result checkpoint 未执行。
+4. 后续先在关闭态归因普通 worker OOM，并验证任务后回收、cgroup、DeepSeek 402/OSS 404 相关路径是否造成
+   峰值或滞留；不得仅凭相邻日志猜定根因。修复后需重新完成关闭态热身，再从 discovery → time/racecard →
+   lifecycle → result/public 全量重开；不能直接打开 result 或 correction。
+
 ## 2026-08-30 12:19 PR #129 Web 1×4 重开后的当前生产基线
 
 1. 当前唯一 active 基线为 revision `cbf3f043…1ccf`、image `8e70cc43…fc76`、leaf `0075`、Web 1×4、

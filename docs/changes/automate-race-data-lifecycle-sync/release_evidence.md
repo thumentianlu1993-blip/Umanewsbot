@@ -1,6 +1,22 @@
 # 赛事数据生命周期生产发布证据
 
-更新时间：2026-08-30 12:20 Asia/Shanghai
+更新时间：2026-08-30 20:05 Asia/Shanghai
+
+## 2026-08-30 20:00 普通 worker OOM 门禁失败与自动关闭
+
+- `12:00:57Z` 只读检查发现普通 worker `OOMKilled=true`；它仍 running、restart=0，但该标记是独立硬门禁。
+  同时资源为 `MemAvailable=1736044 kB / SwapFree=1310716 kB / disk=16365473792 bytes`，四服务仍为
+  exact PR #129，9 true + correction false，队列 `8/0/7543`。event 956 仍 scheduled、10 runners、
+  0 results/transition、无 claim/revision，result checkpoint `14:13Z`、last attempt null。
+- lock absent 后，自动保护用自己的 `manual-release` token 获取锁，将 canonical/active env 10 flags 全设
+  false，依次停止 Beat、专用 worker、普通 worker和 Web，移除专用 worker，再以 exact image 重建 Web
+  1×4、普通 worker与 Beat。没有 purge、消费、迁移或人工重排队列，也没有改 event/due/claim/result。
+- `12:03:54Z` 独立复核为 lock absent、三服务 exact revision/image、restart=0/OOM=false、Web healthy、
+  专用 worker absent、队列 `0/0/7543`，`MemAvailable=2127476 kB / SwapFree=1310716 kB /`
+  `disk=16366440448 bytes`，6 个公网 URL 200；event 956 数据库状态与 checkpoint 未变化。
+- 本窗口结论为 `CLOSED_AFTER_ORDINARY_WORKER_OOM`。相邻普通 worker 日志曾出现 DeepSeek 402、OSS 404
+  和 backlog，但旧容器销毁后没有足够 cgroup/task 证据把它们直接定为 OOM 单一根因。必须先在关闭态完成
+  归因、修复和热身，再从 future discovery 全量重走；不直接续开 result/public/correction。
 
 ## 2026-08-30 11:47–12:19 Web 1×4 后全量重开与 active 热身
 
