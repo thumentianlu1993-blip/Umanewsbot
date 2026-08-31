@@ -93,6 +93,12 @@ case "$artifact_handoff_action" in
     ;;
   *) echo "invalid handoff_action in exact handoff artifact" >&2; exit 1 ;;
 esac
+artifact_0077_binding_mode="$(sed -n 's/.*"release_0077_recovery_binding_mode":"\([a-z-]*\)".*/\1/p' "$RELEASE_B_PREFLIGHT_ARTIFACT_PATH" | head -n 1)"
+case "$artifact_0077_binding_mode" in
+  admission-only|bound|not-required) ;;
+  "") artifact_0077_binding_mode="not-required" ;;
+  *) echo "invalid 0077 recovery binding mode in exact handoff artifact" >&2; exit 1 ;;
+esac
 
 # The intent file records which entry froze it; deploy.sh passes
 # RELEASE_ACTION=deploy, rollback.sh passes RELEASE_ACTION=rollback.
@@ -109,6 +115,60 @@ esac
 
 # Verify the deployment lock before any Compose call.
 ./deploy/deployment_lock.sh verify
+
+# A 0075 -> 0077 deploy is forward-only. Before stopping any service, bind the
+# original admission handoff to one exact mode-0600 custom-format backup and a
+# successful pg_restore --list result. The closed-state handoff itself is
+# created later, only after every application service has stopped.
+if [ "$artifact_0077_binding_mode" = "admission-only" ]; then
+  if [ "$RELEASE_ACTION" != "deploy" ] || [ "$artifact_handoff_action" != "deploy" ]; then
+    echo "0077 admission-only handoff is valid only for deploy" >&2
+    exit 1
+  fi
+  verified_backup_path="${RELEASE_0077_VERIFIED_BACKUP_PATH:-}"
+  verified_backup_sha256="${RELEASE_0077_VERIFIED_BACKUP_SHA256:-}"
+  if [ -z "$verified_backup_path" ] || [ -z "$verified_backup_sha256" ]; then
+    echo "0077 deploy requires RELEASE_0077_VERIFIED_BACKUP_PATH and RELEASE_0077_VERIFIED_BACKUP_SHA256 before any stop" >&2
+    exit 1
+  fi
+  recovery_manifest_dir="$ROOT_DIR/runtime/migration_history_repair/release-0077-recovery"
+  if [ -L "$recovery_manifest_dir" ]; then
+    echo "0077 recovery manifest directory must not be a symlink" >&2
+    exit 1
+  fi
+  umask 077
+  mkdir -p "$recovery_manifest_dir"
+  chmod 700 "$recovery_manifest_dir"
+  RELEASE_0077_RECOVERY_MANIFEST_PATH="$recovery_manifest_dir/$EXPECTED_CANDIDATE_COMMIT.json"
+  origin_handoff_sha256="$RELEASE_B_PREFLIGHT_ARTIFACT_SHA256"
+  db_container_ids="$("$COMPOSE" -f "$COMPOSE_FILE" ps -q db 2>/dev/null)"
+  db_container_id="$(printf '%s\n' "$db_container_ids" | head -n 1 | tr -d '[:space:]')"
+  if [ -z "$db_container_id" ] || [ "$(printf '%s\n' "$db_container_ids" | sed '/^[[:space:]]*$/d' | wc -l | tr -d ' ')" -ne 1 ]; then
+    echo "0077 recovery manifest requires exactly one database container" >&2
+    exit 1
+  fi
+  if [ "$(docker inspect --format '{{.State.Running}}' "$db_container_id" 2>/dev/null)" != "true" ]; then
+    echo "0077 recovery manifest requires a running database container" >&2
+    exit 1
+  fi
+  manifest_result="$(python3 "$ROOT_DIR/deploy/create_release_0077_recovery_manifest.py" \
+    --output-path "$RELEASE_0077_RECOVERY_MANIFEST_PATH" \
+    --candidate-commit "$EXPECTED_CANDIDATE_COMMIT" \
+    --candidate-image-id "$EXPECTED_CANDIDATE_IMAGE_ID" \
+    --database-identity-sha256 "$EXPECTED_PRODUCTION_DB_IDENTITY_SHA256" \
+    --origin-handoff-sha256 "$origin_handoff_sha256" \
+    --backup-path "$verified_backup_path" \
+    --backup-sha256 "$verified_backup_sha256" \
+    --pg-restore-container-id "$db_container_id" \
+    --source-leaf stable.0075_race_data_source_priority_and_reported_position)"
+  RELEASE_0077_RECOVERY_MANIFEST_SHA256="$(printf '%s' "$manifest_result" | sed -n 's/.*"manifest_sha256":"\([0-9a-f]*\)".*/\1/p')"
+  RELEASE_0077_RECOVERY_ORIGIN_HANDOFF_SHA256="$origin_handoff_sha256"
+  if [ "${#RELEASE_0077_RECOVERY_MANIFEST_SHA256}" -ne 64 ]; then
+    echo "0077 recovery manifest generator returned an invalid SHA" >&2
+    exit 1
+  fi
+  export RELEASE_0077_RECOVERY_MANIFEST_PATH RELEASE_0077_RECOVERY_MANIFEST_SHA256 RELEASE_0077_RECOVERY_ORIGIN_HANDOFF_SHA256
+fi
 
 # The frozen race_live_worker state file persists the RESTORE INTENT across
 # retries of the same release: a failed attempt keeps the file, a retry reads
@@ -237,6 +297,36 @@ fi
 
 echo "release: stopping web"
 "$COMPOSE" -f "$COMPOSE_FILE" stop web
+
+if [ "$artifact_0077_binding_mode" = "admission-only" ]; then
+  echo "release: binding closed-state 0077 recovery handoff"
+  closed_preflight_root="$ROOT_DIR/runtime/migration_history_repair/preflight"
+  closed_preflight_dir="$(mktemp -d "$closed_preflight_root/closed.XXXXXXXX")"
+  chmod 700 "$closed_preflight_dir"
+  closed_preflight_path="$closed_preflight_dir/preflight.json"
+  original_database_identity_sha256="$EXPECTED_PRODUCTION_DB_IDENTITY_SHA256"
+  RELEASE_B_PREFLIGHT_ARTIFACT_PATH="$closed_preflight_path" \
+    RELEASE_B_EXPECTED_MIGRATION_LEAF_SET=stable.0075_race_data_source_priority_and_reported_position \
+    RELEASE_B_PREFLIGHT_ACTION=deploy \
+    COMPOSE_FILE="$COMPOSE_FILE" \
+    EXPECTED_CANDIDATE_COMMIT="$EXPECTED_CANDIDATE_COMMIT" \
+    RELEASE_0077_RECOVERY_MANIFEST_PATH="$RELEASE_0077_RECOVERY_MANIFEST_PATH" \
+    RELEASE_0077_RECOVERY_MANIFEST_SHA256="$RELEASE_0077_RECOVERY_MANIFEST_SHA256" \
+    RELEASE_0077_RECOVERY_ORIGIN_HANDOFF_SHA256="$RELEASE_0077_RECOVERY_ORIGIN_HANDOFF_SHA256" \
+    "$ROOT_DIR/deploy/run_historical_calendar_release_b_preflight.sh"
+  RELEASE_B_PREFLIGHT_ARTIFACT_PATH="$closed_preflight_path"
+  RELEASE_B_PREFLIGHT_ARTIFACT_SHA256="$(sed -n 's/.*"artifact_sha256":"\([0-9a-f]*\)".*/\1/p' "$closed_preflight_path")"
+  rebound_database_identity_sha256="$(sed -n 's/.*"database_identity_sha256":"\([0-9a-f]*\)".*/\1/p' "$closed_preflight_path" | head -n 1)"
+  rebound_binding_mode="$(sed -n 's/.*"release_0077_recovery_binding_mode":"\([a-z-]*\)".*/\1/p' "$closed_preflight_path" | head -n 1)"
+  if [ "${#RELEASE_B_PREFLIGHT_ARTIFACT_SHA256}" -ne 64 ] || \
+     [ "$rebound_database_identity_sha256" != "$original_database_identity_sha256" ] || \
+     [ "$rebound_binding_mode" != "bound" ]; then
+    echo "closed-state 0077 recovery handoff binding failed" >&2
+    exit 1
+  fi
+  EXPECTED_PRODUCTION_DB_IDENTITY_SHA256="$rebound_database_identity_sha256"
+  export RELEASE_B_PREFLIGHT_ARTIFACT_PATH RELEASE_B_PREFLIGHT_ARTIFACT_SHA256 EXPECTED_PRODUCTION_DB_IDENTITY_SHA256
+fi
 
 echo "release: running the bounded release task phases"
 COMPOSE_FILE="$COMPOSE_FILE" DEPLOYMENT_LOCK_TOKEN="$DEPLOYMENT_LOCK_TOKEN" \

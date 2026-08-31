@@ -1,5 +1,21 @@
 # 关键决策
 
+## 2026-09-01 0077 forward-only 发布必须使用 admission 与 closed-state 两份 handoff
+
+- 从 0075 跨越不可反向的 0077 时，停服务前的 handoff 只负责 admission，不能直接授权 migration。它必须
+  先绑定一份 exact custom-format backup：绝对路径、owner/mode、调用者提供的 SHA 与现场重算 SHA、
+  `pg_restore --list` 都通过后，才发布 candidate-bound、0600、no-clobber recovery manifest。生产宿主机
+  不要求安装 PostgreSQL client；标准入口只允许使用 Compose 精确解析且 running 的唯一 `db` 容器，
+  将备份通过 stdin 交给容器内 PostgreSQL 16 `pg_restore --list`，不复制或解包备份。
+- recovery manifest 固定在 `runtime/migration_history_repair/release-0077-recovery/<candidate-commit>.json`，
+  并绑定 candidate commit/image、database identity、origin admission handoff SHA、source leaf 0075、
+  backup path/size/SHA 与 TOC SHA/行数。缺字段、路径/SHA/权限漂移或重复候选 manifest 均在任何 stop 前拒绝。
+- Web 和全部 worker 停止后，标准 release 必须重新执行只读 preflight，生成第二份 bound closed-state
+  handoff；database identity 必须与 admission 完全一致。release task 永远拒绝 admission-only artifact，
+  verifier 同时重读 recovery manifest 的可信文件、原始字节 SHA 和字段绑定后才允许 migrate。
+- 首次 PR #136 发布被 `release_0077_recovery_manifest_unbound` 拒绝是正确 fail-closed，但暴露的是编排缺口。
+  该次未迁移；恢复旧 PR #133 时只复用原 restore intent、旧 image 与 0075，不把失败 verifier 改写成成功。
+
 ## 2026-08-31 0077 只建立 External staging，发布与数据 apply 分开授权
 
 - France 2023 的 5 马 materialization 不能在 PR #133 / leaf 0075 上用 bind mount、one-off Python
