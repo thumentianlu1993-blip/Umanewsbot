@@ -43,6 +43,13 @@ SHA256_RE = re.compile(r"[0-9a-f]{64}$")
 # not an expected request count.
 MAX_BULK_PAGES_PER_RANGE = 10
 BULK_EARLIEST_DATE = date(2005, 1, 1)
+# Live provider evidence on 2026-09-01 showed that /v1/results rejects the
+# documented inclusive boundary 2005-01-01 with a 422.  Keep 2005 targets in
+# the bulk reconciliation denominator, but start the provider scan on the
+# first accepted day.  Any target not reconciled from the remaining year must
+# stay a gap and move to the reviewed stable-ID route; it must never be guessed
+# complete.
+BULK_QUERY_EARLIEST_DATE = date(2005, 1, 2)
 
 
 def _write_jsonl(path: Path, rows: list[dict]) -> dict:
@@ -184,7 +191,7 @@ def load_coverage_artifact(
 def _ranges_for_year(year: int, as_of_date: date) -> list[dict]:
     if year > as_of_date.year:
         raise ValueError("due target year is after as_of_date")
-    start = date(year, 1, 1)
+    start = max(date(year, 1, 1), BULK_QUERY_EARLIEST_DATE)
     end = as_of_date if year == as_of_date.year else date(year, 12, 31)
     if end < start:
         raise ValueError("as_of_date is before the target year")
@@ -327,6 +334,8 @@ def build_readiness(
         "assumptions": {
             "target_catalog_as_of_date": target_catalog_as_of_date.isoformat(),
             "bulk_earliest_date": BULK_EARLIEST_DATE.isoformat(),
+            "bulk_query_earliest_date": BULK_QUERY_EARLIEST_DATE.isoformat(),
+            "provider_2005_01_01_boundary": "http_422_route_gaps_to_stable_id",
             "bulk_range_max_inclusive_days": 1,
             "bulk_partition_strategy": "one_region_per_calendar_date",
             "bulk_limit": 100,
@@ -353,6 +362,7 @@ def build_readiness(
             "fresh proof must confirm historical bulk and North America entitlements",
             "protocol page ceiling is a fail-closed maximum, not an approved or expected request budget",
             "bulk daily outputs require exact target reconciliation and gap review before stable-ID extraction",
+            "the provider rejects 2005-01-01; any affected target remains a gap for stable-ID recovery",
             "pre-2005 targets require reviewed external anchors and targeted horse results",
             "each network batch still requires exclusive-account proof, exact G3, and execution ledger",
         ],

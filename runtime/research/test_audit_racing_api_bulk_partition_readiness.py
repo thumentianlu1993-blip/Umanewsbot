@@ -93,15 +93,19 @@ class RacingApiBulkPartitionReadinessTests(unittest.TestCase):
                 "pre_2005_targeted_anchor_targets": 1,
                 "not_due_targets": 1,
                 "bulk_region_year_units": 3,
-                "bulk_date_ranges": 974,
-                "protocol_request_ceiling": 9740,
-                "protocol_minimum_seconds_at_4_requests_per_second": 2435.0,
+                "bulk_date_ranges": 973,
+                "protocol_request_ceiling": 9730,
+                "protocol_minimum_seconds_at_4_requests_per_second": 2432.5,
             },
         )
         partitions = {
             (row["country_region"], row["year"]): row for row in report["partitions"]
         }
-        self.assertEqual(partitions[("france", 2005)]["range_count"], 365)
+        self.assertEqual(partitions[("france", 2005)]["range_count"], 364)
+        self.assertEqual(
+            partitions[("france", 2005)]["ranges"][0]["start_date"],
+            "2005-01-02",
+        )
         self.assertEqual(partitions[("ireland", 2008)]["range_count"], 366)
         self.assertEqual(
             partitions[("united_states", 2026)]["ranges"][0],
