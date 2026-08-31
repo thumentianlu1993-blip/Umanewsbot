@@ -24,7 +24,7 @@ from prepare_held_winner_seed_extension import (
 )
 
 
-SCHEMA_VERSION = "racing-api-bulk-partition-readiness-audit.v1"
+SCHEMA_VERSION = "racing-api-bulk-partition-readiness-audit.v2"
 PARTITION_SCHEMA_VERSION = "racing-api-bulk-region-year-partition.v1"
 TARGET_CLASS_SCHEMA_VERSION = "racing-api-bulk-target-classification.v1"
 TARGET_MANIFEST_SCHEMA = "graded-horse-target-ledger.v1"
@@ -42,14 +42,25 @@ SHA256_RE = re.compile(r"[0-9a-f]{64}$")
 # is a deliberately conservative fail-closed ceiling for one region/day; it is
 # not an expected request count.
 MAX_BULK_PAGES_PER_RANGE = 10
-BULK_EARLIEST_DATE = date(2005, 1, 1)
-# Live provider evidence on 2026-09-01 showed that /v1/results rejects the
-# documented inclusive boundary 2005-01-01 with a 422.  Keep 2005 targets in
-# the bulk reconciliation denominator, but start the provider scan on the
-# first accepted day.  Any target not reconciled from the remaining year must
-# stay a gap and move to the reviewed stable-ID route; it must never be guessed
-# complete.
-BULK_QUERY_EARLIEST_DATE = date(2005, 1, 2)
+PROVIDER_RESULTS_WINDOW_MONTHS = 12
+
+
+def _bulk_query_earliest_date(as_of_date: date) -> date:
+    """Return a conservative date strictly inside TRA's rolling 12-month window.
+
+    Live provider evidence on 2026-09-01 showed that ``/v1/results`` rejects
+    older dates with ``start date must be 12 months or less in the past``.
+    We deliberately add one day after the calendar-year anniversary so the
+    boundary cannot drift because of provider time-zone or inclusive/exclusive
+    interpretation.  Races on that single boundary day remain gaps and route
+    through reviewed external anchors plus stable-ID endpoints.
+    """
+
+    try:
+        anniversary = as_of_date.replace(year=as_of_date.year - 1)
+    except ValueError:  # February 29 -> February 28 in the prior year.
+        anniversary = as_of_date.replace(year=as_of_date.year - 1, day=28)
+    return anniversary + timedelta(days=1)
 
 
 def _write_jsonl(path: Path, rows: list[dict]) -> dict:
@@ -188,10 +199,12 @@ def load_coverage_artifact(
     }
 
 
-def _ranges_for_year(year: int, as_of_date: date) -> list[dict]:
+def _ranges_for_year(
+    year: int, as_of_date: date, bulk_query_earliest_date: date
+) -> list[dict]:
     if year > as_of_date.year:
         raise ValueError("due target year is after as_of_date")
-    start = max(date(year, 1, 1), BULK_QUERY_EARLIEST_DATE)
+    start = max(date(year, 1, 1), bulk_query_earliest_date)
     end = as_of_date if year == as_of_date.year else date(year, 12, 31)
     if end < start:
         raise ValueError("as_of_date is before the target year")
@@ -242,7 +255,8 @@ def build_readiness(
             or coverage_calendar_date.year != as_of_date.year
         ):
             raise ValueError("coverage calendar is stale for execution as_of_date")
-    classified = {"bulk": [], "pre_2005": [], "not_due": []}
+    bulk_query_earliest_date = _bulk_query_earliest_date(as_of_date)
+    classified = {"bulk": [], "historical": [], "not_due": []}
     grouped: dict[tuple[str, int], list[dict]] = defaultdict(list)
     for target_key in sorted(targets):
         target = targets[target_key]
@@ -273,16 +287,16 @@ def build_readiness(
         if source.get("evidence_state") == "not_due_official_calendar":
             row["route_class"] = "not_due_excluded_from_results"
             classified["not_due"].append(row)
-        elif year < BULK_EARLIEST_DATE.year:
+        elif year < bulk_query_earliest_date.year:
             row["route_class"] = "external_anchor_then_targeted_horse_results"
-            classified["pre_2005"].append(row)
+            classified["historical"].append(row)
         else:
             row["route_class"] = "bulk_results_region_year_then_stable_id"
             classified["bulk"].append(row)
             grouped[(region, year)].append(row)
     partitions = []
     for (region, year), rows in sorted(grouped.items()):
-        ranges = _ranges_for_year(year, as_of_date)
+        ranges = _ranges_for_year(year, as_of_date, bulk_query_earliest_date)
         target_keys = sorted(row["target_key"] for row in rows)
         evidence_counts = Counter(row["evidence_state"] for row in rows)
         partitions.append(
@@ -305,14 +319,18 @@ def build_readiness(
     by_region = []
     for region in sorted(VALID_REGIONS):
         bulk = [row for row in classified["bulk"] if row["country_region"] == region]
-        pre = [row for row in classified["pre_2005"] if row["country_region"] == region]
+        historical = [
+            row
+            for row in classified["historical"]
+            if row["country_region"] == region
+        ]
         future = [row for row in classified["not_due"] if row["country_region"] == region]
         region_partitions = [row for row in partitions if row["country_region"] == region]
         by_region.append(
             {
                 "country_region": region,
                 "bulk_eligible_targets": len(bulk),
-                "pre_2005_targeted_anchor_targets": len(pre),
+                "historical_targeted_anchor_targets": len(historical),
                 "not_due_targets": len(future),
                 "bulk_region_year_units": len(region_partitions),
                 "bulk_date_ranges": sum(row["range_count"] for row in region_partitions),
@@ -333,9 +351,10 @@ def build_readiness(
         "coverage_artifact": coverage_identity,
         "assumptions": {
             "target_catalog_as_of_date": target_catalog_as_of_date.isoformat(),
-            "bulk_earliest_date": BULK_EARLIEST_DATE.isoformat(),
-            "bulk_query_earliest_date": BULK_QUERY_EARLIEST_DATE.isoformat(),
-            "provider_2005_01_01_boundary": "http_422_route_gaps_to_stable_id",
+            "provider_results_window_months": PROVIDER_RESULTS_WINDOW_MONTHS,
+            "bulk_query_earliest_date": bulk_query_earliest_date.isoformat(),
+            "bulk_query_boundary_policy": "strictly_inside_window_route_boundary_gap_to_stable_id",
+            "provider_window_evidence": "http_422_start_date_must_be_12_months_or_less_in_the_past",
             "bulk_range_max_inclusive_days": 1,
             "bulk_partition_strategy": "one_region_per_calendar_date",
             "bulk_limit": 100,
@@ -346,9 +365,9 @@ def build_readiness(
         },
         "counts": {
             "targets": len(targets),
-            "due_targets": len(classified["bulk"]) + len(classified["pre_2005"]),
-            "bulk_eligible_2005_plus_targets": len(classified["bulk"]),
-            "pre_2005_targeted_anchor_targets": len(classified["pre_2005"]),
+            "due_targets": len(classified["bulk"]) + len(classified["historical"]),
+            "bulk_eligible_rolling_window_targets": len(classified["bulk"]),
+            "historical_targeted_anchor_targets": len(classified["historical"]),
             "not_due_targets": len(classified["not_due"]),
             "bulk_region_year_units": len(partitions),
             "bulk_date_ranges": sum(row["range_count"] for row in partitions),
@@ -359,11 +378,11 @@ def build_readiness(
         "partitions": partitions,
         "classified_targets": classified,
         "blockers": [
-            "fresh proof must confirm historical bulk and North America entitlements",
+            "bulk results are limited to the provider rolling 12-month window",
             "protocol page ceiling is a fail-closed maximum, not an approved or expected request budget",
             "bulk daily outputs require exact target reconciliation and gap review before stable-ID extraction",
-            "the provider rejects 2005-01-01; any affected target remains a gap for stable-ID recovery",
-            "pre-2005 targets require reviewed external anchors and targeted horse results",
+            "the conservative boundary day and all unreconciled targets remain gaps for stable-ID recovery",
+            "historical targets require reviewed external anchors and targeted horse results",
             "each network batch still requires exclusive-account proof, exact G3, and execution ledger",
         ],
     }
@@ -381,8 +400,9 @@ def write_audit(report: Mapping[str, object], output_dir: Path) -> dict:
         "bulk-eligible-targets.jsonl": _write_jsonl(
             output_dir / "bulk-eligible-targets.jsonl", list(classified["bulk"])
         ),
-        "pre-2005-targeted-anchor-targets.jsonl": _write_jsonl(
-            output_dir / "pre-2005-targeted-anchor-targets.jsonl", list(classified["pre_2005"])
+        "historical-targeted-anchor-targets.jsonl": _write_jsonl(
+            output_dir / "historical-targeted-anchor-targets.jsonl",
+            list(classified["historical"]),
         ),
         "not-due-targets.jsonl": _write_jsonl(
             output_dir / "not-due-targets.jsonl", list(classified["not_due"])

@@ -29,7 +29,7 @@ from prepare_held_winner_seed_extension import (
 )
 
 
-SCHEMA_VERSION = "racing-api-bulk-range-batch-plan.v1"
+SCHEMA_VERSION = "racing-api-bulk-range-batch-plan.v2"
 BATCH_SCHEMA_VERSION = "racing-api-bulk-range-batch.v1"
 SHA256_RE = re.compile(r"[0-9a-f]{64}$")
 
@@ -95,7 +95,7 @@ def load_readiness_artifact(
     )
     if (
         counts.get("bulk_region_year_units") != len(partitions)
-        or counts.get("bulk_eligible_2005_plus_targets") != len(bulk_targets)
+        or counts.get("bulk_eligible_rolling_window_targets") != len(bulk_targets)
         or any(row.get("schema_version") != PARTITION_SCHEMA_VERSION for row in partitions)
         or any(row.get("schema_version") != TARGET_CLASS_SCHEMA_VERSION for row in bulk_targets)
     ):
