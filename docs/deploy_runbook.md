@@ -1,5 +1,23 @@
 # 部署运行手册
 
+## 2026-08-31 PR #132 active shadow 到正式公开/更正的剩余步骤
+
+1. active 身份固定为 release `/opt/umanews-release-edf0322d-PR132-20260831T0105Z/umanewsbot`、revision
+   `edf0322d8395f1e202b681cd2d215ed832e95649`、image `e9b8ca02…1396c`、leaf 0075；四服务必须
+   restart=0/OOM=false，9 true + correction false，旧 `race_live` 精确为 7543。
+2. event 956 已有 official revision id 17/no2、10 items、content SHA `aa76ecba…e533`，但 publication 与
+   canonical result 均为 0。不得手工 apply 该 revision，也不得修改 `next_poll_at=04:26:30.052004Z`；只
+   允许 Beat/selector 自然 claim 并重放同一 exact result-by-id artifact。
+3. 自然周期后逐项验证：task 业务 `processed/reason/applied_kinds`、UK capacity ledger 增量、claim 释放、
+   revision id 17 原地 published、唯一 publication、10 条 canonical projection、8 个 1–8 名次与 2 个
+   non-runner 空 reported position、两条 lifecycle transition 不重复，以及 root/www 同时显示“赛果”且无
+   provider/provisional/source phase 泄露。任一不一致执行全关恢复脚本，不清 Redis。
+4. result/public 全通过后，使用 `/tmp/umanews-pr132-set-stage.sh correction` 在新的随机 token lock 中单独
+   开启 correction；Nginx `-t` 后 reload，重新核对四服务 exact identity 与资源。根据已确认结果 cadence，
+   下一 correction checkpoint 为约 6 小时后；禁止提前派发或改 due。
+5. correction 自然重放必须保持 revision/publication/result 数量和内容不变、claim 释放、checkpoint 推进、
+   `race_live=7543`。通过后更新发布证据与任务清单、提交/推送/合并最终文档 PR，再明确释放相邻 proof 窗口。
+
 ## 2026-08-31 exact official 缺失已知 non-runner 的恢复顺序
 
 1. 当前生产是 PR #131 关闭态：10 false、专用 worker absent、`0/0/7543`、leaf 0075；observation id 18

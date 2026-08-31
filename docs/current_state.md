@@ -1,5 +1,28 @@
 # 当前状态
 
+## 2026-08-31 09:41 PR #132 已全阶段重开，等待 official shadow 自然公开
+
+- PR #132 已合并为 `edf0322d8395f1e202b681cd2d215ed832e95649`，生产隔离 release 为
+  `/opt/umanews-release-edf0322d-PR132-20260831T0105Z/umanewsbot`，image 为
+  `e9b8ca02…1396c`，回滚 tag 为 `rollback-pre-pr132-11fce12c-20260831T0106Z`。关闭态发布证明
+  migration leaf 精确为 `0075`、10 个 data-sync flags 全 false、专用 worker absent、旧
+  `race_live=7543` 不变。
+- 已按 future discovery -> network/time/racecard -> lifecycle -> result apply -> result public 的冻结
+  顺序逐层重建；每层使用独立随机 token 的 deployment lock、先停 Beat 并自然 drain，不 purge 或手工重排
+  队列。当前四服务均为 exact PR #132、running、restart=0、OOM=false；9 个前置 flags true，correction
+  false。专用 worker 内审计为 `ready / capacity valid / route_drift=[] / would_write=false`。
+- PR #132 修复已被 `01:26Z` 的 Beat 自然 exact-result 周期实证：observation id 21 / result revision id 17
+  为 official，raw SHA `54be7156…5e8a` 保留 provider 8 行，normalized/content SHA
+  `aa76ecba…e533` 包含完整 10 行。8 名完赛马保留 reported position 1–8；Martinet 与 Nuit d'Eclair 以
+  同源 stable ID、`status=non_runner`、空 reported position 和
+  `field_provenance.result=racecard_terminal_nonstarter` 追加。缺失 declared runner 的拒绝合同未放宽。
+- 该自然周期发生在 result public 单独门禁完成前，因此 official revision 已确认但尚未 publication；
+  canonical result 仍为 0，root/www 仍只显示“赛果待确认”。checkpoint 成功清零 failures 并按既定 late
+  cadence 排到 `2026-08-31T04:26:30.052004Z`（北京时间 12:26:30）。当前资源为
+  `MemAvailable=5705296 kB / SwapFree=1310716 kB / disk=13243576320 bytes`，lock absent，队列
+  `celery=4 / race_sync_v2=0 / race_live=7543`；禁止改 due/claim 或手工派发。下一自然周期完成正式公开后
+  才单独开启 correction 并观察完整 6 小时更正周期。
+
 ## 2026-08-31 09:01 exact result 已取得 official，但 8 完赛 + 2 non-runner 被误拒绝
 
 - PR #131 已合并为 `11fce12c…f5e`，生产 image `a4f898d1…a7fd` 与 491800366-byte/0600/TOC 1359

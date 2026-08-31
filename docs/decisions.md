@@ -1,5 +1,17 @@
 # 关键决策
 
+## 2026-08-31 official shadow 不补做手工 publication，等待既定 checkpoint 自然晋级
+
+- PR #132 的 10-row official revision 已证明 non-runner 补全合同正确，但它在 result public 配置门禁完成前
+  由 Beat 自然产生，所以 `official_confirmed_at` 已记录而 `published_at`、canonical projection 与
+  publication 仍为空。这是受控 shadow，不是数据缺失或 provider 失败。
+- 不以“数据已在库中”为理由直接调用 apply、修改 checkpoint、缩短 cadence 或手工派发 selector；保持
+  result apply/public 全开，等待 `next_poll_at=2026-08-31T04:26:30.052004Z` 由正常 claim/CAS/transport/
+  publication 全链自然重放。同一 official artifact 应复用 revision id 17 并原子公开，不新增重复 revision。
+- correction 仍是独立最后门禁。只有 10 条 canonical result、唯一 publication、root/www “赛果”、claim
+  释放、资源与队列全部通过，才在新 deployment lock 中单独开启；下一次 6 小时 correction 周期必须证明
+  幂等、无 revision 反转或重复写后，才能释放相邻 TRA proof 窗口。
+
 ## 2026-08-31 official roster 可合并同源已确认 non-starter，但不能补 declared runner
 
 - The Racing API exact official 响应只返回实际出赛结果；event 956 的 8 行与数据库 8 名 declared runner

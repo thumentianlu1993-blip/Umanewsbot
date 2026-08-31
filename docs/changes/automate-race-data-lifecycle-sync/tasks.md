@@ -102,13 +102,11 @@
 - [x] (operations) 所有新开关关闭应用 0074/0075，验证 web/worker/Beat 同 image/revision、healthz、迁移和
   flag-off 三零；磁盘低于 8 GiB 时停止。
 - [ ] (operations) 写入冻结容量与 allowlist，按 future discovery -> network/time/racecard -> lifecycle ->
-  result apply/public -> correction 顺序启用；前五阶段曾在 2C/8G 主机按 exact PR #129 全量重走，
-  event 956 lifecycle 已完成，但 06:30 赛果复核 selector 的全量 prefetch 触发普通 worker cgroup OOM，
-  PR #130 数据库限窗已关闭态发布并完成热身；重走到 lifecycle 后，自然 exact-result poll 又暴露 transport
-  未允许动态 `result_by_id` 的缺口。PR #131 修复后真实 official 8-row 已自然取得，但两名已知 non-runner
-  未出现在 provider result response，旧 len=roster 合同误判为 incomplete，当前再次 10 false fail-closed。
-  先发布同源 stable-ID terminal non-starter 补全修复，再从 future discovery 全量重走；
-  只有正式 revision、canonical projection、publication 与 root/www 页面同时通过后，才单独开启并验收
-  correction 自然周期。
+  result apply/public -> correction 顺序启用；PR #130 数据库限窗、PR #131 exact transport 与 PR #132
+  同源 terminal non-starter 补全均已合并并上线。PR #132 五个前置阶段已全量重走，01:26Z 自然 poll 已
+  生成 10-row official revision，证明 8 名完赛马 + 2 名 non-runner 合同正确；因该轮发生在 public 门禁
+  完成前，目前仍是 0 canonical result/0 publication 的 official shadow。等待 04:26:30Z 自然重放完成
+  revision publication、10 条 projection 与 root/www “赛果”验收后，再单独开启 correction；只有下一
+  自然更正周期幂等通过并完成最终文档 PR，才勾选本项。
 - [x] (operations) 已验证 `race_sync_v2_worker` 只消费新队列、普通 worker 只消费 `celery`，旧
   `race_live=7543` 不变；当前/回滚镜像和 release evidence 均已记录。

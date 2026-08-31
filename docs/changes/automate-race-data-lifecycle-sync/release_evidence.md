@@ -1,6 +1,24 @@
 # 赛事数据生命周期生产发布证据
 
-更新时间：2026-08-31 09:01 Asia/Shanghai
+更新时间：2026-08-31 09:41 Asia/Shanghai
+
+## 2026-08-31 09:41 PR #132 active，10-row official shadow 已线上实证
+
+- PR #132 merge revision `edf0322d8395f1e202b681cd2d215ed832e95649` 已构建为 image
+  `sha256:e9b8ca022bcdf03061135b28bb0e30bbae035bd2a6837b992c785e84adc1396c`，隔离 release 为
+  `/opt/umanews-release-edf0322d-PR132-20260831T0105Z/umanewsbot`。关闭态 release task 证明 leaf exact
+  0075、migration no-op；三服务 exact、10 false、专用 worker absent、旧队列 7543。
+- future、racecard、lifecycle、result apply、result public 已依序在独立锁窗口恢复；每次先停 Beat 并自然
+  drain、重建 exact Web/worker/Beat/race worker、nginx test/reload。active audit 为 ready、capacity valid、
+  route drift 0、would_write false；四服务 restart0/OOMfalse，9 true + correction false。
+- `01:26:26Z` 自然 provider 周期创建 observation 21 / official revision 17：raw SHA
+  `54be7156…5e8a`、normalized/content SHA `aa76ecba…e533`、10 items。8 个 provider finisher 为 1–8；
+  Martinet/Nuit d'Eclair 以同源 stable ID、non_runner、空 reported position、
+  `racecard_terminal_nonstarter` provenance 补齐。claim 释放、failures 清零，证明 PR #132 业务修复有效。
+- 该轮发生在 result public 门禁完成前，故 revision 仍未 published，canonical result/publication 为 0；
+  checkpoint 自然排到 `04:26:30.052004Z`，root/www 仍“赛果待确认”且无内部标签泄露。资源为
+  `5705296/1310716 kB`、磁盘 `13243576320 bytes`，lock absent，队列 `4/0/7543`。继续等待自然公开，
+  之后才单开 correction 并完成最终证据。
 
 ## 2026-08-31 09:01 exact official 8-row 已取得，known non-runner 门禁误判
 

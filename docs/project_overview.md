@@ -1,5 +1,12 @@
 # 项目总览
 
+2026-08-31 09:41，PR #132 已以 `edf0322d…5649` / `e9b8ca02…1396c` 上线并完成 future discovery、
+race time/racecard、lifecycle、result apply、result public 的冻结顺序重开。自然 exact-result 轮询已生成
+完整 10-row official revision：8 名完赛马和 2 名同源 non-runner 的身份、状态、名次与 provenance 均通过；
+此前 roster 误拒问题已解决。该轮在 public 门禁完成前形成 shadow，故 canonical/public 仍等待北京时间
+12:26:30 的既定自然 checkpoint；correction 继续关闭，公开验收通过后才独立开启并观察完整自然周期。
+四服务 exact、资源充足、审计 ready/valid、旧 `race_live=7543` 未动。
+
 2026-08-31 09:01，PR #131 已让 event 956 的自然 exact route 取得真实 official 响应；8 名完赛马与全部
 stable ID 均有效，但旧完整性门禁错误要求两名此前已确定 `non_runner` 的马也必须出现在 official result
 response，因而安全拒绝并再次全关。新修复只用同源 stable ID 补入已确认 scratched/withdrawn/non_runner，

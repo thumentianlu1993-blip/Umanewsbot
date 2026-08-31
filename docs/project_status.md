@@ -1,5 +1,15 @@
 # 项目状态文档
 
+## 2026-08-31 09:41 PR #132 已 active，10-row official shadow 等待自然公开
+
+- PR #132 revision `edf0322d…5649` / image `e9b8ca02…1396c` 已关闭态部署，并按冻结顺序恢复五阶段；
+  四服务 exact、restart0/OOMfalse，9 true + correction false，audit ready/valid/route drift 0。
+- 01:26Z 自然 exact poll 已创建 observation id 21 与 official revision id 17/no2：8 名完赛马 1–8，
+  Martinet/Nuit d'Eclair 为同源 non-runner 且无名次，normalized SHA `aa76ecba…e533`。修复已线上实证。
+- 该 revision 目前是未公开 shadow：0 canonical result、0 publication，root/www 为“赛果待确认”；下一
+  checkpoint 为北京时间 12:26:30。公开通过后单独开启 correction，并在下一自然 6 小时周期验证幂等。
+  锁不存在、资源充足、`race_sync_v2=0 / race_live=7543`，未手工改写 due/claim/result。
+
 ## 2026-08-31 09:01 official 已到达，non-runner 完整性修复待发布
 
 - PR #131 exact image/恢复点/关闭态热身通过，四个前置阶段恢复后，event 956 在 00:50Z 自然取得
