@@ -1,5 +1,22 @@
 # 项目状态文档
 
+## 2026-09-01 PR #137 / leaf 0077 已上线，France 2023 五马 staging 验收完成
+
+- PR #137 merge `1312c8de…4a03` / image `85b94626…f253` 已通过 exact backup 与两阶段 handoff 发布；
+  migration leaf 为 `0077_racing_api_horse_identity_staging`。备份为 494113960 bytes、0600、SHA
+  `c72b5945…f6a9`、TOC 1359 行。
+- 固定输入 SHA 为 ledger `aa3d51d4…3095`、batch `ed0295d9…7973`、materialization
+  `f7a1fa5e…51b99`、plan `90d5613f…e2f61`。生产 zero-write dry-run 为
+  `create=210/update=0/skip=7/conflict=0`，5 个 scope ID 之外与 canonical 写均为 0。
+- one-shot 双门禁单事务 apply 创建 run 1961–1965。独立 verifier 确认 5 horses / 60 races / 67 results /
+  67 histories / 5 variants / 5 SUCCESS receipts，七张计划表全局增量精确，active run/lock=0，
+  HorseExternalIdentity=0，event 956 和双 registry SHA 不变。
+- 最终 canonical/active/runtime 的 10 个 data-sync flags 全 true，staging 写开关 false；Web 1×4、普通
+  worker 1/1 + 1 GiB、专用 worker 1/1 + 384 MiB、Beat 同一 revision/image且 restart0/OOMfalse。
+  shared lock absent，队列 `0/0/7543`，内存/Swap/磁盘与 root/www/health/event 956 均通过。
+- 当前阶段结束于 External staging。identity/module review、verified identity、HorseProfile/canonical、
+  registry 和公网发布未执行；扩大目标批次仍需新的 manifest-bound dry-run/apply/verifier。
+
 ## 2026-09-01 PR #136 发布安全拒绝，PR #133 已恢复，0077 binding 修复待合并
 
 - PR #136 merge `f1af10a5…19f` / candidate image `2b75ef9b…cf97` 的首次关闭态发布，在 migrate 前由

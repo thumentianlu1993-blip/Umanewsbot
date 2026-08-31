@@ -1,5 +1,23 @@
 # 关键决策
 
+## 2026-09-01 France 2023 五马以 provider stable ID 完成 staging，不自动晋级 canonical identity
+
+- 本批唯一身份主键是目标赛事中已确认的 The Racing API `hrs_*` stable ID；名称、国家后缀、出生日期、
+  性别和父母字段用于资料与后续审查，不用于在本次 staging apply 中猜测或合并 canonical HorseProfile。
+  这样可保留日文、香港中文名及海外英文名未来做跨语言 crosswalk 的空间，避免仅按名称产生重复或误合并。
+- `f7a1fa5e…51b99` 的 5/5 materialization 是本次写入的唯一业务输入。父母 profile、同场其他 runner 和
+  重复赛事只属于目标马 provenance；本批只创建 5 个目标 ExternalHorse、60 个去重 ExternalRace、67 个
+  目标马结果/履历和 5 个 source-display name variant，不扩张到证据中出现的其他马。
+- staging 写开关不得长期打开。正式写入只能由 one-shot 容器临时覆盖
+  `RACING_API_STAGING_WRITE_ENABLED=true`，并同时显式传 `--apply --allow-write`；常驻 Web/worker/Beat
+  继续读取 false。这样 staging apply 不需要改赛事 flags、Beat 或 worker 配置，也不会把一次授权变成长期开口。
+- 成功标准不是 exit 0、HTTP 200 或 receipt 存在，而是写前备份、零写 dry-run、单事务 apply、逐表全局增量、
+  5 个 manifest/stable ID 守恒、import lock 释放、event/registry/canonical 零变化和最终运行态全部通过。
+  本次 verifier 已满足这些条件。
+- 5 个 SUCCESS receipt 只批准 External staging 终态。`HorseExternalIdentity` 仍为 0；identity/module review、
+  verified identity、HorseProfile/canonical apply、registry 写和公网发布仍是不同阶段。后续阶段必须重新绑定
+  reviewer、冲突策略、跨语言名称证据和 rollback/verifier，不能自动延续本次权限。
+
 ## 2026-09-01 0077 forward-only 发布必须使用 admission 与 closed-state 两份 handoff
 
 - 从 0075 跨越不可反向的 0077 时，停服务前的 handoff 只负责 admission，不能直接授权 migration。它必须

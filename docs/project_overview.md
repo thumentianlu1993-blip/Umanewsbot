@@ -1,19 +1,17 @@
 # 项目总览
 
-PR #136 的 leaf 0077 External staging foundation 已合并，但首次生产发布在 migration 前被
-`release_0077_recovery_manifest_unbound` 正确拒绝；数据库未离开 0075，PR #133 四服务、flags、registry、
-队列与公网均已完整恢复，`race_live=7543` 未动。当前热修复把 forward-only 发布补成两阶段 handoff：任何
-stop 前验证 exact custom-format backup 并生成 candidate-bound recovery manifest，全部应用停止后再生成
-bound closed-state handoff，release task 拒绝 admission-only artifact。该修复尚未部署，France 2023 尚未
-写 staging。
+PR #137 已把 leaf 0077 External staging foundation 与 forward-only 恢复绑定修复完整部署到生产：当前
+revision 为 `1312c8de…4a03`、image 为 `85b94626…f253`、leaf 精确为 0077。标准入口已用 exact PostgreSQL
+custom-format backup、admission handoff、candidate-bound recovery manifest 与 closed-state handoff 完成
+0075 -> 0077；四服务随后恢复同一 image/revision，10 个赛事开关全 true、staging 写开关 false，队列
+`0/0/7543`、资源与公网均通过。
 
-leaf 0077 foundation 只增加 The Racing API / Ireland schema、
-5 个 ExternalHorse 资料字段、provider identity/name-variant staging 模型和
-stage_racing_api_targeted_batch；仓库写开关默认 false。批量入口只创建 materialization 中获准的目标
-stable ID，父母 profile 和其他 runner 仅作 provenance，重复赛事校验后批内去重。0077 的 PostgreSQL DDL 在 atomic 事务首项
-设置 5 秒锁等待和 5 分钟执行超时，并禁止反向 DDL。staging loader 将 normalized profile/career/race/runner
-逐项绑定 exact TRA response wrapper，且仅写 External 层。它不包含 0078–0080、canonical identity、
-HorseProfile 发布或公网变化；生产当前仍为 PR #133 / leaf 0075。
+France 2023 首批 5 个 provider stable ID 已完成生产 External staging：5 horses、60 去重 races、67 target
+results、67 histories、5 source-display name variants 和 5 SUCCESS receipts。生产 dry-run 精确为
+`create=210/update=0/skip=7/conflict=0`，单事务 apply 后独立 verifier 证明逐表增量、manifest/stable ID、
+event 956、registry 与锁全部守恒；`HorseExternalIdentity` 仍为 0。该链只保存经 content-addressed TRA
+profile/career/race/runner 证据重验的 External 数据，不创建其他 runner/父母实体，也不做 canonical identity、
+HorseProfile、registry 或公网发布。后续跨语言身份桥接和更大批次继续作为独立阶段。
 
 2026-08-31 18:40，完整赛事状态更迭生产目标已通过。PR #133 以 `220bc621…402b` /
 `946f2177…9803a` 完成关闭态发布和五阶段重开；event 956 已自然经历 scheduled -> running -> finished、

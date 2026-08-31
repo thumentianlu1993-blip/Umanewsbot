@@ -1,5 +1,43 @@
 # 当前状态
 
+## 2026-09-01 PR #137 已上线，France 2023 五马 External staging 已完成并独立验收
+
+完整批次、逐表计数和终态证据见
+[Racing API France 2023 五马 External staging 生产报告](racing_api_france_2023_staging_report_20260901.md)。
+
+- PR #137 已合并为 `1312c8de131bba6e5a6a3ee1b52a6a2d2fc14a03`，生产 release 为
+  `/opt/umanews-release-1312c8de-PR137-20260831T1710Z/umanewsbot`，image 为
+  `sha256:85b94626e302036598cf67194d4c3bf7cb8f9f2ddda2e8de288df42fce4af253`。标准发布先绑定
+  494113960-byte、0600、SHA `c72b5945…f6a9`、TOC 1359 行的 PostgreSQL custom-format 备份，生成
+  admission/closed-state 两份 handoff 后正常应用 `0076/0077`；最终 leaf 精确为
+  `0077_racing_api_horse_identity_staging`。
+- 本次唯一获准输入继续精确绑定 execution ledger `aa3d51d4…3095`、batch COMPLETE
+  `ed0295d9…7973`、5/5 materialization `f7a1fa5e…51b99` 和 postprocess plan
+  `90d5613f…e2f61`。上传目录含 37 个普通文件、无 symlink，manifest/COMPLETE 与服务器完整树 SHA
+  `757319b1…79e` 均一致，随后固定为 root:root、目录 0500/文件 0400。
+- 生产零写 dry-run 输出 SHA 为 `1344fe69…f7a1`，精确得到 5 个目标 stable ID、5 horses、60 unique
+  races、67 results、67 histories、5 name variants、7 个重复 race operation；逐表合计
+  `create=210 / update=0 / skip=7 / conflict=0`，`database_writes=0`，canonical 与 out-of-scope 写均为 0。
+- 正式 apply 只在 one-shot 容器临时注入 `RACING_API_STAGING_WRITE_ENABLED=true`，长期 active env 始终为
+  false；命令同时要求 `--apply --allow-write`，整批由一个外层事务包裹。apply 输出 SHA 为
+  `3e8b1679…ab2e`，run `1961–1965` 全部 `applied`。独立只读 verifier 输出 SHA
+  `ead2dc16…ef1b`：七张计划表全局增量精确为 `+1 lock / +5 runs / +5 horses / +60 races /
+  +67 results / +67 histories / +5 variants`，5 个 manifest 与 stable ID 一一守恒，active import
+  run/lock 均为 0，`HorseExternalIdentity=0`。
+- 写前/写后 event 956（event、10 runners、10 results）快照 SHA 均为
+  `e832c573727760bd1785604a74520f4f5c969166139894633abbe4b9be4bfb9a`；reference registry
+  `740a9377…cff2` 与 TRA canonical `3bac3b64…a6da` 未变，没有 RaceEvent、canonical identity、公开页或
+  registry 写入。
+- staging verifier 通过后，已用自己的 random-token `manual-release` 锁自然排空 Celery，恢复 canonical、
+  active 与 runtime 的 10 个 data-sync flags 全 true；`RACING_API_STAGING_WRITE_ENABLED=false`。终态 lock
+  absent，Web 1×4、普通 worker concurrency/prefetch 1/1（1 GiB）、专用 worker 1/1（384 MiB）和 Beat
+  均为 exact image、restart=0/OOM=false；队列 `celery=0 / race_sync_v2=0 / race_live=7543`，
+  `MemAvailable=5785308 kB / SwapFree=1310716 kB / disk=9867190272 bytes`，root/www/health/event 956
+  全部 HTTP 200。
+- 当前终态严格是 External staging-only：尚未发布 HorseExternalIdentity、HorseProfile/canonical identity、
+  identity/module review、canonical/reference registry 或公网马匹资料。后续任何身份桥接、模块发布或扩大到
+  其他马匹/年份/地区，仍须以新的不可变输入和独立门禁执行，不能从本次 5 个 SUCCESS receipt 自动推导。
+
 ## 2026-09-01 PR #136 首次发布因 0077 恢复清单未绑定而关闭，PR #133 已完整恢复
 
 - PR #136 已合并为 `f1af10a5516516a7c9258ba67af8728f9417f61b`，候选 image 为
