@@ -406,7 +406,7 @@ class RacingApiBulkRangeBatchExportTests(unittest.TestCase):
                 )
             self.assertFalse((root / "stable-ledger").exists())
 
-    def test_unmatched_target_stays_prepared(self):
+    def test_unmatched_target_completes_scan_with_manifest_bound_gap(self):
         class FakeClient:
             request_ceiling = 10
             request_count = 0
@@ -436,9 +436,21 @@ class RacingApiBulkRangeBatchExportTests(unittest.TestCase):
                 client=FakeClient(),
                 openapi_fingerprint_identity=fingerprint_identity(root),
             )
-            self.assertEqual(manifest["status"], "needs_review")
+            self.assertEqual(manifest["status"], "complete_with_gaps")
+            self.assertEqual(manifest["reconciliation_status"], "needs_review")
             self.assertEqual(manifest["gap_count"], 1)
-            self.assertTrue((output / "PREPARED").is_file())
+            self.assertTrue((output / "COMPLETE").is_file())
+            self.assertFalse((output / "PREPARED").exists())
+            manifest_sha = hashlib.sha256(
+                (output / "batch-manifest.json").read_bytes()
+            ).hexdigest()
+            stable = self.builder.build_bulk_stable_id_seed_ledger(
+                bulk_run_dir=output,
+                approved_bulk_run_manifest_sha256=manifest_sha,
+                output_dir=root / "stable-ledger",
+            )
+            self.assertEqual(stable["source_target_occurrence_count"], 0)
+            self.assertEqual(stable["unique_actual_starter_count"], 0)
 
     def test_target_ledger_tamper_and_client_ceiling_drift_fail_closed(self):
         with tempfile.TemporaryDirectory() as temporary:

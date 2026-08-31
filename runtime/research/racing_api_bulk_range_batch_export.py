@@ -37,7 +37,7 @@ from racing_api_horse_export import (
 )
 
 
-RUN_SCHEMA_VERSION = "racing-api-bulk-range-batch-run.v1"
+RUN_SCHEMA_VERSION = "racing-api-bulk-range-batch-run.v2"
 DEFINITION_SCHEMA_VERSION = "racing-api-bulk-range-batch-definition.v1"
 CHECKPOINT_SCHEMA_VERSION = "racing-api-bulk-range-batch-checkpoint.v1"
 
@@ -689,11 +689,17 @@ def run_bulk_range_batch_artifact(
     }
     normalized_path = output_dir / "normalized" / "bulk-range-reconciliation.json"
     _atomic_write(normalized_path, (canonical_json(normalized) + "\n").encode("utf-8"))
-    status = reconciliation["status"]
-    marker = "COMPLETE" if status == "complete" else "PREPARED"
+    reconciliation_status = reconciliation["status"]
+    status = (
+        "complete"
+        if reconciliation_status == "complete"
+        else "complete_with_gaps"
+    )
+    marker = "COMPLETE"
     manifest = {
         "schema_version": RUN_SCHEMA_VERSION,
         "status": status,
+        "reconciliation_status": reconciliation_status,
         "completion_marker": marker,
         "database_writes": 0,
         "batch": {key: value for key, value in batch.items() if key != "region_year_units"},

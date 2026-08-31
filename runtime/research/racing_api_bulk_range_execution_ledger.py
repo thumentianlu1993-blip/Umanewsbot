@@ -180,8 +180,10 @@ def _validate_complete_artifact(entry: Mapping[str, object], batch: Mapping[str,
         manifest_sha != entry.get("batch_manifest_sha256")
         or marker.read_text(encoding="ascii").strip() != manifest_sha
         or manifest.get("schema_version") != RUN_SCHEMA_VERSION
-        or manifest.get("status") != "complete"
+        or manifest.get("status") not in {"complete", "complete_with_gaps"}
         or manifest.get("completion_marker") != "COMPLETE"
+        or manifest.get("reconciliation_status")
+        != ("complete" if manifest.get("gap_count") == 0 else "needs_review")
         or manifest.get("database_writes") != 0
         or not isinstance(plan, dict)
         or not isinstance(manifest_batch, dict)

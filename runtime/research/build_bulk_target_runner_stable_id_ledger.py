@@ -148,7 +148,7 @@ def _load_complete_bulk_run(
     range_units = manifest.get("range_units")
     if (
         manifest.get("schema_version") != RUN_SCHEMA_VERSION
-        or manifest.get("status") != "complete"
+        or manifest.get("status") not in {"complete", "complete_with_gaps"}
         or manifest.get("completion_marker") != "COMPLETE"
         or manifest.get("database_writes") != 0
         or marker.read_text(encoding="ascii").strip() != manifest_sha
@@ -162,7 +162,11 @@ def _load_complete_bulk_run(
         or not isinstance(summary, Mapping)
         or not isinstance(range_units, list)
         or not range_units
-        or manifest.get("gap_count") != 0
+        or isinstance(manifest.get("gap_count"), bool)
+        or not isinstance(manifest.get("gap_count"), int)
+        or manifest.get("gap_count") < 0
+        or manifest.get("reconciliation_status")
+        != ("complete" if manifest.get("gap_count") == 0 else "needs_review")
         or manifest.get("request_count") != len(manifest.get("request_ledger") or [])
         or not isinstance(manifest.get("openapi_contract"), Mapping)
     ):
@@ -282,11 +286,10 @@ def _load_complete_bulk_run(
     races = normalized.get("races")
     if (
         normalized.get("schema_version") != RECONCILIATION_SCHEMA_VERSION
-        or normalized.get("status") != "complete"
+        or normalized.get("status") not in {"complete", "needs_review"}
         or normalized.get("database_writes") != 0
         or normalized.get("batch_id") != batch_id
         or not isinstance(races, list)
-        or not races
     ):
         raise BulkStableIdLedgerError("bulk normalized result contract drift")
     repeated = reconcile_partition(targets=targets, races=races)
@@ -430,10 +433,7 @@ def build_bulk_stable_id_seed_ledger(
                 "target_occurrences": occurrences,
             }
         )
-    if (
-        len(seen_target_horses) != normalized["participant_count"]
-        or not seeds
-    ):
+    if len(seen_target_horses) != normalized["participant_count"]:
         raise BulkStableIdLedgerError("bulk participant conservation drift")
 
     output_dir.mkdir(parents=True, mode=0o700, exist_ok=True)
