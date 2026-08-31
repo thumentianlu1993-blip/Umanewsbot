@@ -551,6 +551,18 @@ class RacingApiBulkRangeExecutionLedgerTests(unittest.TestCase):
         self.assertEqual(payload["race_name_aliases"], [])
         self.assertEqual(payload["racecourse_aliases"], [])
 
+    def test_stable_occurrence_identity_includes_catalogue_target(self):
+        identity = self.stable_builder_module._occurrence_identity
+
+        self.assertNotEqual(
+            identity("united_states:2026:delaware-oaks:flat", "rac_1"),
+            identity("united_states:2026:delaware:flat", "rac_1"),
+        )
+        self.assertEqual(
+            identity("united_states:2026:delaware-oaks:flat", "rac_1"),
+            identity("united_states:2026:delaware-oaks:flat", "rac_1"),
+        )
+
     def test_safe_stop_is_recorded_and_blocks_implicit_retry(self):
         now = datetime(2026, 8, 31, 0, 0, tzinfo=timezone.utc)
         with tempfile.TemporaryDirectory() as temporary:
