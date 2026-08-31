@@ -127,6 +127,12 @@ def _target_payload(target: Mapping[str, object], race: Mapping[str, object]) ->
     }
 
 
+def _occurrence_identity(target_key: str, race_id: str) -> tuple[str, str]:
+    """Keep catalogue-target identity even when two targets map one physical race."""
+
+    return target_key, race_id
+
+
 def _load_complete_bulk_run(
     root: Path,
     *,
@@ -406,7 +412,8 @@ def build_bulk_stable_id_seed_ledger(
             {"source_names": set(), "target_occurrences": {}},
         )
         entry["source_names"].add(occurrence["source_runner_name"])
-        existing = entry["target_occurrences"].get(race_id)
+        occurrence_identity = _occurrence_identity(target_key, race_id)
+        existing = entry["target_occurrences"].get(occurrence_identity)
         if existing is not None:
             if canonical_json(existing) == canonical_json(occurrence):
                 raise BulkStableIdLedgerError(
@@ -415,14 +422,14 @@ def build_bulk_stable_id_seed_ledger(
             raise BulkStableIdLedgerError(
                 f"conflicting bulk horse occurrence: {horse_id}/{race_id}"
             )
-        entry["target_occurrences"][race_id] = occurrence
+        entry["target_occurrences"][occurrence_identity] = occurrence
 
     seeds = []
     for horse_id in sorted(horses):
         entry = horses[horse_id]
         occurrences = [
-            entry["target_occurrences"][race_id]
-            for race_id in sorted(entry["target_occurrences"])
+            entry["target_occurrences"][identity]
+            for identity in sorted(entry["target_occurrences"])
         ]
         seed_id = (
             f"target-runner-{horse_id}-"
