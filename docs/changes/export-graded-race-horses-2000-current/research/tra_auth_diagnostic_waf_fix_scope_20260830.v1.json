@@ -1,0 +1,11 @@
+{
+  "database_writes": 0,
+  "host": "api.theracingapi.com:443",
+  "max_requests": 1,
+  "method": "GET",
+  "path": "/v1/courses/regions",
+  "purpose": "Verify credential acceptance after replacing the Cloudflare-blocked Python-urllib browser signature with the fixed Umanews API client User-Agent.",
+  "rate_limit_requests_per_second": 1,
+  "schema_version": "racing-api-auth-diagnostic-scope.v1",
+  "scope_id": "tra-auth-diagnostic-free-regions-waf-fix"
+}

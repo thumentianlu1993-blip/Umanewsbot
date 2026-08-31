@@ -1,0 +1,51 @@
+{
+  "schema_version": "g2-proof-only-release-proposal.v1",
+  "status": "PROPOSED_NOT_APPROVED",
+  "generated_at": "2026-08-30T02:04:59+08:00",
+  "last_updated": "2026-08-30T02:12:28+08:00",
+  "base_commit": "409f2ac6cd15b7e8781dd9ada2903c91a9fc2121",
+  "production_observed_head": "bef0cdc5034bd2516df9876b2a7dde2357f03495",
+  "candidate_worktree": "/Users/mentianlu/.codex/worktrees/tra-proof-only-g2-20260830",
+  "purpose": "deploy only the read-only exclusive-account proof generator required before Montjeu N1",
+  "files": [
+    {
+      "path": "runtime/research/capture_racing_api_host_process_preflight.py",
+      "sha256": "c7d79b55978a07df8e1d3f5c70e4d15b734d5f12e95069c4261e14b2482307bc"
+    },
+    {
+      "path": "runtime/research/test_capture_racing_api_host_process_preflight.py",
+      "sha256": "dba5d1cb44c49a11f54f21d2901e07438da05d82d63619db2910f78755842302"
+    },
+    {
+      "path": "server/stable/services/racing_api_exclusive_account_preflight.py",
+      "sha256": "d0c339be922798b1afe2fb73416594829c623c3a8a1d3fc8a399fd7502c9b923"
+    },
+    {
+      "path": "server/stable/management/commands/generate_racing_api_exclusive_account_proof.py",
+      "sha256": "76ecdbf1157f0aa9774db4d756329856446c8340118d94538f4850df3a98a238"
+    },
+    {
+      "path": "server/stable/test_racing_api_exclusive_account_preflight.py",
+      "sha256": "f0abd9dc9ab91a1f595319f8580eba875403b7b6c1c44dcf023c1dcc776c0fe3"
+    }
+  ],
+  "migrations": [],
+  "host_evidence_schema": "racing-api-host-process-preflight.v2",
+  "required_host_roles": [
+    "runner",
+    "production"
+  ],
+  "settings_changes": [],
+  "database_writes": 0,
+  "the_racing_api_network_requests": 0,
+  "persistent_feature_flags_changed": false,
+  "production_actions_authorized": false,
+  "excluded": [
+    "Montjeu N1 network execution",
+    "four-region sample or batch execution",
+    "schema migrations 0076-0079",
+    "External staging or canonical database writes",
+    "race-live or race-data-sync activation",
+    "publication and notifications"
+  ]
+}

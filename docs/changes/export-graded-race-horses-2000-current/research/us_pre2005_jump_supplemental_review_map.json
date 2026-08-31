@@ -1,0 +1,36 @@
+{
+  "schema_version": "us-pre2005-jump-supplemental-review-map.v1",
+  "status": "PROPOSED_NOT_APPROVED",
+  "approval": false,
+  "database_writes": 0,
+  "resolutions": [
+    {
+      "target_key": "united_states:2002:united-states-atlanta-cup:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "Pinkie Swear",
+      "source_id": "wayback-pinkie-swear-obituary",
+      "source_page": 32,
+      "evidence_mode": "text_extract",
+      "reviewed_evidence": "The archived obituary states that Pinkie Swear won the 2002 Atlanta Cup."
+    },
+    {
+      "target_key": "united_states:2004:united-states-hard-scuffle:jumps",
+      "resolution_kind": "calendar_correction",
+      "correction_state": "not_held",
+      "correction_reason": "churchill_downs_discontinued_for_purse_considerations",
+      "source_id": "wayback-bloodhorse-index-2004",
+      "source_page": 28,
+      "evidence_mode": "text_extract",
+      "reviewed_evidence": "The archived Blood-Horse 2004 index states that purse considerations led Churchill Downs to discontinue the Hard Scuffle."
+    },
+    {
+      "target_key": "united_states:2004:united-states-u-s-championship-supreme-novice:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "Cherokeeinthehills",
+      "source_id": "wayback-steeplechase-times-2010-10-22",
+      "source_page": 30,
+      "evidence_mode": "text_extract",
+      "reviewed_evidence": "The archived Steeplechase Times identifies the rider's 2004 novice-stakes win at Callaway Gardens as being aboard Cherokeeinthehills."
+    }
+  ]
+}

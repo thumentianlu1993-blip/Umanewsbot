@@ -1,0 +1,11 @@
+{
+  "database_writes": 0,
+  "host": "api.theracingapi.com:443",
+  "max_requests": 1,
+  "method": "GET",
+  "path": "/v1/courses/regions",
+  "purpose": "Differentiate invalid credentials from missing Horse Search entitlement after the Montjeu search returned HTTP 403.",
+  "rate_limit_requests_per_second": 1,
+  "schema_version": "racing-api-auth-diagnostic-scope.v1",
+  "scope_id": "tra-auth-diagnostic-free-regions"
+}

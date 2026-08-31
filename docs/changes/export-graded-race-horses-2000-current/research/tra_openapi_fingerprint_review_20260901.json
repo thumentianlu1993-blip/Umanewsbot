@@ -1,0 +1,86 @@
+{
+  "database_writes": 0,
+  "fingerprint": {
+    "fingerprint_generated_at": "2026-08-31T18:11:05+00:00",
+    "full_openapi_sha256": "0033643fcca4301889098fe6dcda021beb840207880f848a25b6153208a87df7",
+    "openapi_version": "1.4.4",
+    "selected_contract": {
+      "paths": [
+        "/v1/horses/search",
+        "/v1/horses/{horse_id}/pro",
+        "/v1/horses/{horse_id}/results",
+        "/v1/horses/{horse_id}/standard",
+        "/v1/results"
+      ],
+      "sha256": "910e5ccc1592bc3f50c5219bac6a195f9d1f7063bd5b7e7ef3b31b716d1514ba"
+    },
+    "selected_schema": {
+      "names": [
+        "Horse",
+        "HorsePro",
+        "ResultsStandardPage",
+        "RunnerStandard"
+      ],
+      "sha256": "cc7fc55ebd1bd3a0c6120c698a7bd4e03a99ba83bfe839f7fa69d8badfef9173"
+    },
+    "source_url": "https://api.theracingapi.com/openapi.json"
+  },
+  "fingerprint_file": {
+    "path": "/Users/mentianlu/.codex/worktrees/staging-france-2023-foundation/umanews/docs/changes/export-graded-race-horses-2000-current/research/tra_openapi_fingerprint_20260901.json",
+    "sha256": "e42434c2a0a3f0736ab1820927b9d7241285031f51a79263b2aca7bfccbb6620",
+    "size": 756
+  },
+  "historical_bulk_add_on_declared": true,
+  "network_requests": 0,
+  "raw_openapi": {
+    "path": "/private/tmp/umanews-openapi-20260901.json",
+    "sha256": "0033643fcca4301889098fe6dcda021beb840207880f848a25b6153208a87df7",
+    "size": 493226
+  },
+  "schema_version": "racing-api-openapi-fingerprint-capture.v1",
+  "selected_operations": [
+    {
+      "operation_id": "horse_search_v1_horses_search_get",
+      "path": "/v1/horses/search",
+      "plans": [
+        "Pro Plan",
+        "Standard Plan"
+      ],
+      "rate_limit_requests_per_second": 5
+    },
+    {
+      "operation_id": "horse_pro_v1_horses__horse_id__pro_get",
+      "path": "/v1/horses/{horse_id}/pro",
+      "plans": [
+        "Pro Plan"
+      ],
+      "rate_limit_requests_per_second": 5
+    },
+    {
+      "operation_id": "horse_results_v1_horses__horse_id__results_get",
+      "path": "/v1/horses/{horse_id}/results",
+      "plans": [
+        "Pro Plan"
+      ],
+      "rate_limit_requests_per_second": 5
+    },
+    {
+      "operation_id": "horse_standard_v1_horses__horse_id__standard_get",
+      "path": "/v1/horses/{horse_id}/standard",
+      "plans": [
+        "Pro Plan",
+        "Standard Plan"
+      ],
+      "rate_limit_requests_per_second": 5
+    },
+    {
+      "operation_id": "results_v1_results_get",
+      "path": "/v1/results",
+      "plans": [
+        "Pro Plan",
+        "Standard Plan"
+      ],
+      "rate_limit_requests_per_second": 5
+    }
+  ]
+}
