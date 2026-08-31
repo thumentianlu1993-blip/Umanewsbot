@@ -904,6 +904,116 @@ class TheRacingApiFreeSourceProofTests(SimpleTestCase):
                             )
                 resolver.assert_not_called()
 
+    def test_result_by_id_transport_is_exactly_allowlisted(self):
+        service = self._service()
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "valid exact-result route reached transport",
+        ):
+            with patch.object(
+                service,
+                "_resolve_public_addresses",
+                side_effect=RuntimeError(
+                    "valid exact-result route reached transport"
+                ),
+            ):
+                service.the_racing_api_transport(
+                    endpoint_name="result_by_id",
+                    url=(
+                        "https://api.theracingapi.com"
+                        "/v1/results/uk-api-99"
+                    ),
+                    username="user",
+                    password="password",
+                    timeout_seconds=15,
+                    max_response_bytes=2 * 1024 * 1024,
+                    allow_redirects=False,
+                )
+
+        unsafe_requests = (
+            (
+                "results_today",
+                "https://api.theracingapi.com/v1/results/uk-api-99",
+            ),
+            (
+                "result_by_id",
+                "https://api.theracingapi.com/v1/results/uk-api-99?x=1",
+            ),
+            (
+                "result_by_id",
+                "https://api.theracingapi.com/v1/results/",
+            ),
+            (
+                "result_by_id",
+                "https://api.theracingapi.com/v1/results/a/b",
+            ),
+            (
+                "result_by_id",
+                "https://api.theracingapi.com/v1/results/a%2Fb",
+            ),
+            (
+                "result_by_id",
+                "https://api.theracingapi.com/v1/results/a%5Cb",
+            ),
+            (
+                "result_by_id",
+                "https://api.theracingapi.com/v1/results/a%00b",
+            ),
+            (
+                "result_by_id",
+                "https://api.theracingapi.com/v1/results/..",
+            ),
+            (
+                "result_by_id",
+                "https://api.theracingapi.com/v1/results/%252F",
+            ),
+            (
+                "result_by_id",
+                "https://api.theracingapi.com/v1/results/uk-api-99#fragment",
+            ),
+        )
+        with patch.object(
+            service,
+            "_resolve_public_addresses",
+            side_effect=AssertionError(
+                "unsafe exact-result URL must be rejected before DNS resolution"
+            ),
+        ) as resolver:
+            for endpoint_name, unsafe_url in unsafe_requests:
+                with self.subTest(endpoint=endpoint_name, url=unsafe_url):
+                    with self.assertRaises(PermissionError):
+                        service.the_racing_api_transport(
+                            endpoint_name=endpoint_name,
+                            url=unsafe_url,
+                            username="user",
+                            password="password",
+                            timeout_seconds=15,
+                            max_response_bytes=2 * 1024 * 1024,
+                            allow_redirects=False,
+                        )
+            resolver.assert_not_called()
+
+    def test_result_by_id_builder_rejects_path_metacharacters(self):
+        service = self._service()
+        with TemporaryDirectory() as directory:
+            registry_path, digest = self._registry_v2(Path(directory))
+            registry, _ = service.read_the_racing_api_automation_registry(
+                registry_file=registry_path,
+                expected_registry_sha256=digest,
+                now=self.NOW,
+            )
+        for race_id in (".", "..", "a/b", "a\\b", "a%b", "a?b", "a#b"):
+            with self.subTest(race_id=race_id):
+                with self.assertRaisesRegex(ValueError, "race_id"):
+                    service.build_the_racing_api_route_url(
+                        registry=registry,
+                        route_name="result_by_id",
+                        region="united_kingdom",
+                        limit=0,
+                        skip=0,
+                        race_id=race_id,
+                    )
+
     def test_identity_discovery_routes_are_exactly_bound_to_region_and_day(self):
         service = self._service()
         region_codes = {

@@ -1,5 +1,16 @@
 # 关键决策
 
+## 2026-08-31 动态 exact-result 只按规范化单段 race id 放行
+
+- `result_by_id` 已是受审 source registry 与 provider 的正式路由，缺口只在 transport allowlist；因此修复
+  不新增来源、host、endpoint family、重定向、分页或 query，只使既有 `/v1/results/{race_id}` 合同可执行。
+- transport 必须同时验证 endpoint name=`result_by_id`、HTTPS exact host、标准端口、无凭据/重定向/query/
+  fragment，以及单一 canonical-encoded path segment。解码后含 `/`、`\\`、`%`、NUL、控制路径 `.`/`..`
+  或超过 128 字符一律在 DNS 前拒绝；builder 使用同一边界，避免调用层与传输层语义漂移。
+- `provider_response_invalid` 本轮不得被当作 provider 暂无正式赛果。新 image 关闭态验证后必须从 future
+  discovery 重走；自然 exact poll 若仍失败，继续全关并按真实 transport/HTTP/schema 证据归因，不手工
+  调 provider、不伪造 official、不降低 finality 门禁。
+
 ## 2026-08-31 赛果复核 selector 必须先在数据库限窗
 
 - 普通 worker 的 1 GiB cgroup OOM 已由内核日志、P0 TaskExecutionLog 与 RaceResultReviewRun 时间线

@@ -1,5 +1,20 @@
 # 部署运行手册
 
+## 2026-08-31 exact result-by-id transport 修复恢复顺序
+
+1. 当前生产基线是 PR #130 exact revision/image、10 false、专用 worker absent、队列 `0/0/7543`；先确认
+   lock absent、leaf 0075、资源硬门槛、公网页和三服务 restart/OOM，再部署 transport 修复的 exact image。
+2. 关闭态验证必须覆盖：合法 `result_by_id` 能越过本地 allowlist 到 DNS 边界，query/fragment/多段路径/
+   编码分隔符/endpoint mismatch 均在 DNS 前拒绝；不得用一次真实 provider 手工请求替代合同测试。
+3. 新 image 仍从 future -> network/time/racecard -> lifecycle -> result apply -> result public 逐阶段开启，
+   每次重建后执行 exact identity、flags、queues、资源与 zero-write audit。event 956 仅由 Beat 在自然
+   `next_poll_at` 派发。
+4. exact poll 必须分别核对 Celery 终态、业务 reason/applied kinds、provider/capacity ledger、claim 释放、
+   official immutable revision、canonical projection、publication 和 root/www “赛果”。任一失败立即 10 false、
+   移除专用 worker、重建 exact Web/普通 worker/Beat，`race_live=7543` 不动。
+5. 只有正式 apply/public 全部成立后，才另取新锁单独开启 correction 并观察完整自然周期；本修复本身不
+   授予 provisional 数据正式性，也不改变 France/Ireland/UK/USA 相邻 proof 的暂停边界。
+
 ## 2026-08-31 普通 worker 赛果复核 OOM 修复与恢复顺序
 
 1. 诊断口径以 kernel memcg 日志为准：`22:30:20Z` P0 URL 发现成功后，赛果复核 run claim；
