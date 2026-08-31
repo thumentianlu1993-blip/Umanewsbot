@@ -101,7 +101,16 @@ def _target_payload(target: Mapping[str, object], race: Mapping[str, object]) ->
         raise BulkStableIdLedgerError("bulk target region is unsupported")
     names = target.get("race_name_aliases")
     courses = target.get("racecourse_aliases")
-    if not isinstance(names, list) or not isinstance(courses, list):
+    if names is None:
+        names = []
+    if courses is None:
+        courses = []
+    if (
+        not isinstance(names, list)
+        or any(not isinstance(value, str) for value in names)
+        or not isinstance(courses, list)
+        or any(not isinstance(value, str) for value in courses)
+    ):
         raise BulkStableIdLedgerError("bulk target aliases are invalid")
     return {
         "year": year,

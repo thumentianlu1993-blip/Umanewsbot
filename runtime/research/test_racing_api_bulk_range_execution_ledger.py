@@ -541,6 +541,16 @@ class RacingApiBulkRangeExecutionLedgerTests(unittest.TestCase):
                     stable_ledger_parent=stable_parent,
                 )
 
+    def test_stable_builder_accepts_null_optional_target_aliases(self):
+        target = self.target()
+        target["race_name_aliases"] = None
+        target["racecourse_aliases"] = None
+
+        payload = self.stable_builder_module._target_payload(target, self.race())
+
+        self.assertEqual(payload["race_name_aliases"], [])
+        self.assertEqual(payload["racecourse_aliases"], [])
+
     def test_safe_stop_is_recorded_and_blocks_implicit_retry(self):
         now = datetime(2026, 8, 31, 0, 0, tzinfo=timezone.utc)
         with tempfile.TemporaryDirectory() as temporary:
