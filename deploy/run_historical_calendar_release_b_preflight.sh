@@ -118,6 +118,41 @@ if [ "$(stat -c '%a' "$artifact_dir" 2>/dev/null || stat -f '%Lp' "$artifact_dir
   exit 1
 fi
 
+recovery_manifest_path="${RELEASE_0077_RECOVERY_MANIFEST_PATH:-}"
+recovery_manifest_sha256="${RELEASE_0077_RECOVERY_MANIFEST_SHA256:-}"
+recovery_origin_handoff_sha256="${RELEASE_0077_RECOVERY_ORIGIN_HANDOFF_SHA256:-}"
+recovery_args=""
+if [ -n "$recovery_manifest_path$recovery_manifest_sha256$recovery_origin_handoff_sha256" ]; then
+  if [ -z "$recovery_manifest_path" ] || [ -z "$recovery_manifest_sha256" ] || [ -z "$recovery_origin_handoff_sha256" ]; then
+    echo "0077 recovery manifest binding must be complete" >&2; exit 1
+  fi
+  canonical_recovery_manifest="$artifact_mount_root/release-0077-recovery/$EXPECTED_CANDIDATE_COMMIT.json"
+  if [ "$recovery_manifest_path" != "$canonical_recovery_manifest" ]; then
+    echo "0077 recovery manifest path must be canonical" >&2; exit 1
+  fi
+  if [ ! -f "$recovery_manifest_path" ] || [ -L "$recovery_manifest_path" ]; then
+    echo "0077 recovery manifest must be a regular non-symlink file" >&2; exit 1
+  fi
+  if [ "$(stat -c '%a' "$recovery_manifest_path" 2>/dev/null || stat -f '%Lp' "$recovery_manifest_path")" != "600" ]; then
+    echo "0077 recovery manifest mode must be 0600" >&2; exit 1
+  fi
+  case "$recovery_manifest_sha256$recovery_origin_handoff_sha256" in
+    *[!0-9a-f]*) echo "0077 recovery manifest SHA binding is invalid" >&2; exit 1 ;;
+  esac
+  if [ "${#recovery_manifest_sha256}" -ne 64 ] || [ "${#recovery_origin_handoff_sha256}" -ne 64 ]; then
+    echo "0077 recovery manifest SHA binding is invalid" >&2; exit 1
+  fi
+  if command -v sha256sum >/dev/null 2>&1; then
+    actual_recovery_manifest_sha256="$(sha256sum "$recovery_manifest_path" | cut -d' ' -f1)"
+  else
+    actual_recovery_manifest_sha256="$(shasum -a 256 "$recovery_manifest_path" | cut -d' ' -f1)"
+  fi
+  if [ "$actual_recovery_manifest_sha256" != "$recovery_manifest_sha256" ]; then
+    echo "0077 recovery manifest SHA mismatch" >&2; exit 1
+  fi
+  recovery_args="--release-0077-recovery-manifest-path=$recovery_manifest_path --release-0077-recovery-manifest-sha256=$recovery_manifest_sha256 --release-0077-recovery-origin-handoff-sha256=$recovery_origin_handoff_sha256"
+fi
+
 IMAGE_NAME="${RELEASE_B_BINDING_IMAGE_NAME:-umanewsbot:prod}"
 EXPECTED_CANDIDATE_IMAGE_ID="$(docker image inspect --format '{{.Id}}' "$IMAGE_NAME")"
 IMAGE_COMMIT="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$IMAGE_NAME")"
@@ -145,6 +180,7 @@ fi
   $leaf_args \
   $db_args \
   $restricted_args \
+  $recovery_args \
   --candidate-commit="$EXPECTED_CANDIDATE_COMMIT" \
   --candidate-image-id="$EXPECTED_CANDIDATE_IMAGE_ID"
 

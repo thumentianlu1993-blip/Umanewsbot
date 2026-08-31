@@ -60,6 +60,9 @@ ORDINARY_RELEASE_LEAF_SETS = LEGACY_FINAL_LEAF_SETS | {
 }
 INITIAL_INSTALL_LEAF_SET = ("stable.0067_historical_calendar_release_a",)
 RELEASE_0077_MIGRATION_NAME = "0077_racing_api_horse_identity_staging"
+RELEASE_0077_RECOVERY_MANIFEST_SCHEMA = (
+    "release-0077-verified-backup-recovery/v1"
+)
 
 
 def _lower_hex(value: str, *, length: int) -> bool:
@@ -74,6 +77,7 @@ def release_0077_recovery_binding(
     *,
     preflight: dict[str, Any],
     candidate_commit: str,
+    candidate_image_id: str,
     artifact_path: str,
     handoff_action: str,
     manifest_path: str = "",
@@ -135,6 +139,21 @@ def release_0077_recovery_binding(
         or manifest.parent.parent not in artifact.parents
     ):
         raise ValueError("0077 recovery manifest path is not canonical")
+    manifest_errors = _verify_release_0077_recovery_manifest(
+        path=manifest,
+        expected_sha256=manifest_sha256,
+        expected_candidate_commit=candidate_commit,
+        expected_candidate_image_id=candidate_image_id,
+        expected_database_identity_sha256=(
+            preflight.get("database_identity_sha256") or ""
+        ),
+        expected_origin_handoff_sha256=origin_handoff_sha256,
+    )
+    if manifest_errors:
+        raise ValueError(
+            "0077 recovery manifest verification failed: "
+            + ",".join(manifest_errors)
+        )
     return {
         "release_0077_recovery_binding_mode": "bound",
         "release_0077_recovery_manifest_path": str(manifest),
@@ -296,6 +315,7 @@ def build_preflight_artifact(
     recovery_binding = release_0077_recovery_binding(
         preflight=preflight,
         candidate_commit=candidate_commit,
+        candidate_image_id=candidate_image_id,
         artifact_path=artifact_path,
         handoff_action=handoff_action,
         manifest_path=release_0077_recovery_manifest_path,
@@ -468,6 +488,75 @@ def _read_trusted_json(path: Path) -> tuple[dict[str, Any] | None, list[str]]:
         os.close(parent_fd)
 
 
+def _read_trusted_json_and_sha256(
+    path: Path,
+) -> tuple[dict[str, Any] | None, str | None, list[str]]:
+    payload, parent_fd, fd, errors = _open_trusted_json(path)
+    if payload is None:
+        return None, None, errors
+    assert parent_fd is not None and fd is not None
+    try:
+        os.lseek(fd, 0, os.SEEK_SET)
+        digest = hashlib.sha256()
+        while True:
+            chunk = os.read(fd, 1024 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+        return payload, digest.hexdigest(), []
+    finally:
+        os.close(fd)
+        os.close(parent_fd)
+
+
+def _verify_release_0077_recovery_manifest(
+    *,
+    path: Path,
+    expected_sha256: str,
+    expected_candidate_commit: str,
+    expected_candidate_image_id: str,
+    expected_database_identity_sha256: str,
+    expected_origin_handoff_sha256: str,
+) -> list[str]:
+    payload, actual_sha256, errors = _read_trusted_json_and_sha256(path)
+    if payload is None:
+        return [f"trust:{error}" for error in errors]
+    checks = {
+        "schema_version": RELEASE_0077_RECOVERY_MANIFEST_SCHEMA,
+        "candidate_commit": expected_candidate_commit,
+        "candidate_image_id": expected_candidate_image_id,
+        "database_identity_sha256": expected_database_identity_sha256,
+        "origin_handoff_sha256": expected_origin_handoff_sha256,
+        "source_leaf": PREVIOUS_FINAL_LEAF_SET[0],
+    }
+    if actual_sha256 != expected_sha256:
+        errors.append("sha256")
+    for key, expected in checks.items():
+        if payload.get(key) != expected:
+            errors.append(f"binding:{key}")
+    image_id = payload.get("candidate_image_id")
+    if not (
+        isinstance(image_id, str)
+        and image_id.startswith("sha256:")
+        and _lower_hex(image_id.removeprefix("sha256:"), length=64)
+    ):
+        errors.append("candidate_image_id")
+    backup_path = payload.get("backup_path")
+    if not isinstance(backup_path, str) or not Path(backup_path).is_absolute():
+        errors.append("backup_path")
+    for key in ("backup_sha256", "pg_restore_list_sha256"):
+        if not _lower_hex(payload.get(key), length=64):
+            errors.append(key)
+    for key in ("backup_size_bytes", "pg_restore_list_line_count"):
+        value = payload.get(key)
+        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+            errors.append(key)
+    created_at = payload.get("created_at_utc")
+    if not isinstance(created_at, str) or not created_at.endswith("Z"):
+        errors.append("created_at_utc")
+    return sorted(set(errors))
+
+
 def publish_preflight_artifact(*, path: Path, payload: dict[str, Any]) -> None:
     _publish_trusted_json(path=path, payload=payload)
 
@@ -489,6 +578,7 @@ def verify_preflight_artifact(
             recovery_binding = release_0077_recovery_binding(
                 preflight=payload.get("preflight") or {},
                 candidate_commit=payload.get("candidate_commit") or "",
+                candidate_image_id=payload.get("candidate_image_id") or "",
                 artifact_path=payload.get("artifact_path") or "",
                 handoff_action=payload.get("handoff_action") or "",
                 manifest_path=(

@@ -1,5 +1,29 @@
 # 当前状态
 
+## 2026-09-01 PR #136 首次发布因 0077 恢复清单未绑定而关闭，PR #133 已完整恢复
+
+- PR #136 已合并为 `f1af10a5516516a7c9258ba67af8728f9417f61b`，候选 image 为
+  `sha256:2b75ef9b8ffcfbd7a05460abe8e1d92ccd797718cec58ed1a69c1f198caccf97`。发布前新备份
+  `rds_horse_news_20260831T160200Z_394261.dump` 为 494113960 bytes、0600、SHA-256
+  `c72b594551e81a8f7f8a4f941594c07d2ffada2e20a0dba68c5feb3a4991f6a9`，`pg_restore --list`
+  为 1359 行。
+- 首次发布在 Beat/worker/web 已安全停止后，由关闭态 verifier 以
+  `release_0077_recovery_manifest_unbound` 拒绝；migration 未开始，数据库 leaf 始终为 exact 0075。
+  失败部署产生的两个 restore-intent 文件经候选 HEAD、action、compose、owner/mode 校验后，已在本会话
+  自己的随机 token 锁内按原意恢复：旧 `umanewsbot:prod` 重新指向 PR #133 image，Web、普通 worker、Beat、
+  `race_sync_v2_worker` 全部 running/restart=0/OOM=false，普通队列自然从 26 排空到 0，未 purge 或手工消费；
+  `race_sync_v2=0 / race_live=7543`，root/www/healthz/event 956 均 200。两个 intent 由原 owner 删除，锁正常
+  release，leaf 仍为 0075，10 个 data-sync flags 与双 registry SHA 均恢复原值。
+- 根因是 PR #136 只加入了 0077 recovery manifest 的 Python 校验字段，标准 release 没有生成 exact
+  backup manifest、也没有在服务全停后创建第二份 bound handoff。当前修复分两段：任何 stop 前先验证
+  备份绝对路径、0600、SHA，并通过 Compose 锁定的运行中 PostgreSQL 16 `db` 容器以 stdin 执行
+  `pg_restore --list`，随后发布 candidate-bound no-clobber manifest；全停后再生成
+  第二份 closed-state handoff，release task 明确拒绝 admission-only artifact。manifest 还绑定 candidate
+  commit/image、production DB identity、origin handoff SHA、source leaf、backup size/SHA 和 TOC digest。
+- 新聚焦测试 6/6，相关 staging/migration/release 套件 152/152（跳过 1），应用发布编排 24/24；完整
+  single-owner 套件除容器无法解析宿主 worktree `.git` 的唯一环境项外 185 项均通过（含 2 skip）。该修复
+  尚未合并或部署；生产继续稳定运行 PR #133 / leaf 0075，France 2023 staging 仍未写入。
+
 ## 2026-08-31 leaf 0077 External staging 最小发布候选（仅本地）
 
 - 已从 origin/main@256311a81bf129cf2f9292d3a30d5907d42427ea 建立独立 clean worktree

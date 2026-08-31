@@ -98,6 +98,16 @@ pop_line() {
 cmd="${1:-}"
 if [ $# -gt 0 ]; then shift; fi
 case "$cmd" in
+  exec)
+    case " $* " in
+      *" pg_restore --list "*)
+        cat >/dev/null
+        printf '%s\n' '; fake custom archive' '1; 0 0 TABLE public example owner'
+        exit 0
+        ;;
+    esac
+    exit "$(rc_file exec)"
+    ;;
   image)
     case " $* " in
       *org.opencontainers.image.revision*)
@@ -244,16 +254,26 @@ case "$cmd" in
         esac
         output_path=""
         handoff_action="deploy"
+        recovery_manifest_path=""
+        recovery_manifest_sha256=""
+        recovery_origin_handoff_sha256=""
         for arg in "$@"; do
           case "$arg" in
             --output-path=*) output_path="${arg#--output-path=}" ;;
             --action=*) handoff_action="${arg#--action=}" ;;
+            --release-0077-recovery-manifest-path=*) recovery_manifest_path="${arg#*=}" ;;
+            --release-0077-recovery-manifest-sha256=*) recovery_manifest_sha256="${arg#*=}" ;;
+            --release-0077-recovery-origin-handoff-sha256=*) recovery_origin_handoff_sha256="${arg#*=}" ;;
           esac
         done
         if [ -n "$output_path" ] && [ "$(rc_file "$run_rc_name")" -eq 0 ]; then
           attempt_mode="not-required"
           if [ -f "$state/preflight-attempt-mode" ]; then attempt_mode="$(cat "$state/preflight-attempt-mode")"; fi
-          printf '%s' "{\"artifact_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"database_identity_sha256\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"handoff_action\":\"$handoff_action\",\"recovery_intent_mode\":\"$attempt_mode\"}" > "$output_path"
+          recovery_fields=""
+          if [ -n "$recovery_manifest_path" ]; then
+            recovery_fields=",\"release_0077_recovery_binding_mode\":\"bound\",\"release_0077_recovery_manifest_path\":\"$recovery_manifest_path\",\"release_0077_recovery_manifest_sha256\":\"$recovery_manifest_sha256\",\"release_0077_recovery_origin_handoff_sha256\":\"$recovery_origin_handoff_sha256\""
+          fi
+          printf '%s' "{\"artifact_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"database_identity_sha256\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"handoff_action\":\"$handoff_action\",\"recovery_intent_mode\":\"$attempt_mode\"$recovery_fields}" > "$output_path"
           chmod 600 "$output_path"
         fi
         case " $* " in
@@ -2848,6 +2868,101 @@ class ApplicationReleaseOrchestrationTests(SimpleTestCase):
             for _cf, a in compose_calls(evts)
             if a[:1] == [verb] and "race_live_worker" in a
         ]
+
+    def test_0077_admission_handoff_requires_backup_and_rebinds_after_all_stops(self):
+        with TemporaryDirectory() as tmp:
+            harness = Harness(Path(tmp))
+            self._prepared(harness, race_live="absent")
+            harness.set_state("git-rev-parse-head", f"{'b' * 40}\n")
+            harness.set_state(f"inspect-{SERVICE_IDS['db']}", "true\n")
+            repair = harness.work.resolve() / "runtime" / "migration_history_repair"
+            artifact_dir = repair / "preflight" / "before.orchestration"
+            artifact_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+            artifact_dir.chmod(0o700)
+            artifact_path = artifact_dir / "preflight.json"
+            artifact_path.write_text(
+                json.dumps(
+                    {
+                        "handoff_action": "deploy",
+                        "recovery_intent_mode": "not-required",
+                        "release_0077_recovery_binding_mode": "admission-only",
+                    },
+                    separators=(",", ":"),
+                ),
+                encoding="utf-8",
+            )
+            artifact_path.chmod(0o600)
+            backup = harness.work.resolve() / "backups" / "exact.dump"
+            backup.parent.mkdir(mode=0o700)
+            backup.write_bytes(b"PGDMP fake verified backup")
+            backup.chmod(0o600)
+            backup_sha256 = hashlib.sha256(backup.read_bytes()).hexdigest()
+
+            result = self._run_orchestration(
+                harness,
+                RELEASE_0077_VERIFIED_BACKUP_PATH=str(backup),
+                RELEASE_0077_VERIFIED_BACKUP_SHA256=backup_sha256,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            events = harness.events()
+            web_stop = first_index(
+                events,
+                lambda event: event[0] == "compose"
+                and event[2][:1] == ["stop"]
+                and "web" in event[2],
+            )
+            bound_handoff = first_index(
+                events,
+                lambda event: event[0] == "compose"
+                and "create_historical_calendar_release_b_handoff" in event[2]
+                and any(
+                    argument.startswith("--release-0077-recovery-manifest-path=")
+                    for argument in event[2]
+                ),
+            )
+            release_task = first_index(events, is_release_run)
+            self.assertIsNotNone(web_stop)
+            self.assertIsNotNone(bound_handoff)
+            self.assertIsNotNone(release_task)
+            self.assertLess(web_stop, bound_handoff)
+            self.assertLess(bound_handoff, release_task)
+            manifest = (
+                repair
+                / "release-0077-recovery"
+                / f"{'b' * 40}.json"
+            )
+            self.assertTrue(manifest.is_file())
+            self.assertEqual(stat.S_IMODE(manifest.stat().st_mode), 0o600)
+            payload = json.loads(manifest.read_text(encoding="utf-8"))
+            self.assertEqual(payload["backup_sha256"], backup_sha256)
+            self.assertEqual(payload["origin_handoff_sha256"], "a" * 64)
+
+    def test_0077_admission_handoff_without_backup_fails_before_any_stop(self):
+        with TemporaryDirectory() as tmp:
+            harness = Harness(Path(tmp))
+            self._prepared(harness, race_live="absent")
+            repair = harness.work.resolve() / "runtime" / "migration_history_repair"
+            artifact_dir = repair / "preflight" / "before.orchestration"
+            artifact_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+            artifact_dir.chmod(0o700)
+            artifact = artifact_dir / "preflight.json"
+            artifact.write_text(
+                '{"handoff_action":"deploy","recovery_intent_mode":"not-required",'
+                '"release_0077_recovery_binding_mode":"admission-only"}',
+                encoding="utf-8",
+            )
+            artifact.chmod(0o600)
+            result = self._run_orchestration(harness)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("requires RELEASE_0077_VERIFIED_BACKUP_PATH", result.stderr)
+            self.assertEqual(
+                [
+                    argv
+                    for _compose_file, argv in compose_calls(harness.events())
+                    if argv[:1] == ["stop"]
+                ],
+                [],
+            )
 
     def test_attempt_mode_only_activates_from_exact_artifact_and_stale_env_is_cleared(self):
         with TemporaryDirectory() as tmp:

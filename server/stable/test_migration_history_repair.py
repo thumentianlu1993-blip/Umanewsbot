@@ -1030,6 +1030,7 @@ class MigrationHistoryRepairArtifactRedTests(SimpleTestCase):
             release_0077_recovery_binding(
                 preflight=payload["preflight"],
                 candidate_commit=payload["candidate_commit"],
+                candidate_image_id=payload["candidate_image_id"],
                 artifact_path=payload["artifact_path"],
                 handoff_action=payload["handoff_action"],
             )

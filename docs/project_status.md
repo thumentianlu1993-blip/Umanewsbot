@@ -1,5 +1,19 @@
 # 项目状态文档
 
+## 2026-09-01 PR #136 发布安全拒绝，PR #133 已恢复，0077 binding 修复待合并
+
+- PR #136 merge `f1af10a5…19f` / candidate image `2b75ef9b…cf97` 的首次关闭态发布，在 migrate 前由
+  `release_0077_recovery_manifest_unbound` 拒绝；leaf 全程 0075。exact 新备份为 494113960 bytes、
+  SHA `c72b5945…f6a9`、0600，`pg_restore --list` 1359 行。
+- 旧 PR #133 image/revision 已在本会话自己的 shared lock 内恢复；四服务 running/restart0/OOMfalse，
+  10 flags 与双 registry SHA 正确，普通队列自然归零、sync=0/live=7543，公网 root/www/healthz/event 956
+  全部 200。可信 restore intent 由原 owner 清理，锁 absent，未迁移、purge 或写 France staging。
+- 热修复要求 stop 前 exact backup manifest，停服务后第二份 bound handoff，并让 release task 拒绝
+  admission-only artifact；manifest 绑定 candidate、DB identity、origin handoff、0075、backup 与 TOC。
+  TOC 复核通过 Compose 唯一 running `db` 容器的 PostgreSQL 16 `pg_restore --list` 读取 stdin，已现场确认
+  容器版本为 16.14，避免依赖生产宿主机未安装的 client。
+  新聚焦 6/6、相关套件 152/152、应用编排 24/24 通过；待合并、重建 exact image并重新发布。
+
 ## 2026-08-31 leaf 0077 External staging foundation 本地候选
 
 - 独立 clean worktree 基于 origin/main@256311a8…27ea；仅包含 0076/0077 schema、External

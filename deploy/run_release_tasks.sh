@@ -63,6 +63,34 @@ case "$artifact_handoff_action" in
     ;;
   *) echo "invalid handoff_action in exact handoff artifact" >&2; exit 1 ;;
 esac
+release_0077_binding_mode="$(sed -n 's/.*"release_0077_recovery_binding_mode":"\([a-z-]*\)".*/\1/p' "$RELEASE_B_PREFLIGHT_ARTIFACT_PATH" | head -n 1)"
+release_0077_manifest_path="$(sed -n 's/.*"release_0077_recovery_manifest_path":"\([^"]*\)".*/\1/p' "$RELEASE_B_PREFLIGHT_ARTIFACT_PATH" | head -n 1)"
+release_0077_manifest_sha256="$(sed -n 's/.*"release_0077_recovery_manifest_sha256":"\([0-9a-f]*\)".*/\1/p' "$RELEASE_B_PREFLIGHT_ARTIFACT_PATH" | head -n 1)"
+release_0077_origin_handoff_sha256="$(sed -n 's/.*"release_0077_recovery_origin_handoff_sha256":"\([0-9a-f]*\)".*/\1/p' "$RELEASE_B_PREFLIGHT_ARTIFACT_PATH" | head -n 1)"
+case "$release_0077_binding_mode" in
+  bound)
+    if [ -z "$release_0077_manifest_path" ] || \
+       [ "${#release_0077_manifest_sha256}" -ne 64 ] || \
+       [ "${#release_0077_origin_handoff_sha256}" -ne 64 ]; then
+      echo "bound 0077 recovery handoff is incomplete" >&2; exit 1
+    fi
+    ;;
+  not-required)
+    if [ -n "$release_0077_manifest_path$release_0077_manifest_sha256$release_0077_origin_handoff_sha256" ]; then
+      echo "non-0077 handoff unexpectedly carries recovery fields" >&2; exit 1
+    fi
+    ;;
+  admission-only)
+    echo "release task refuses an admission-only 0077 handoff" >&2; exit 1
+    ;;
+  "")
+    if [ -n "$release_0077_manifest_path$release_0077_manifest_sha256$release_0077_origin_handoff_sha256" ]; then
+      echo "legacy handoff unexpectedly carries partial 0077 recovery fields" >&2; exit 1
+    fi
+    release_0077_binding_mode="not-required"
+    ;;
+  *) echo "invalid 0077 recovery binding mode in exact handoff artifact" >&2; exit 1 ;;
+esac
 CANONICAL_RESTRICTED_RECOVERY_MARKER_PATH="$ROOT_DIR/runtime/migration_history_repair/restricted-recovery.json"
 if [ -n "${RESTRICTED_RECOVERY_MARKER_PATH:-}" ] && [ "$RESTRICTED_RECOVERY_MARKER_PATH" != "$CANONICAL_RESTRICTED_RECOVERY_MARKER_PATH" ]; then
   echo "restricted recovery marker path must be canonical" >&2; exit 1
@@ -101,6 +129,9 @@ run_control_phase() {
     -e "RESTRICTED_RECOVERY_PROVENANCE_ARTIFACT_SHA256=$provenance_sha256" \
     -e "RELEASE_EXPECTED_MARKER_DEVICE=${RELEASE_EXPECTED_MARKER_DEVICE:-}" \
     -e "RELEASE_EXPECTED_MARKER_INODE=${RELEASE_EXPECTED_MARKER_INODE:-}" \
+    -e "RELEASE_0077_RECOVERY_MANIFEST_PATH=$release_0077_manifest_path" \
+    -e "RELEASE_0077_RECOVERY_MANIFEST_SHA256=$release_0077_manifest_sha256" \
+    -e "RELEASE_0077_RECOVERY_ORIGIN_HANDOFF_SHA256=$release_0077_origin_handoff_sha256" \
     web /app/deploy/docker/run-release-tasks.sh
 }
 

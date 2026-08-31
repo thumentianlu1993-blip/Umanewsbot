@@ -42,7 +42,10 @@ else
     --candidate-image-id="${EXPECTED_CANDIDATE_IMAGE_ID:-}" \
     --database-identity-sha256="${EXPECTED_PRODUCTION_DB_IDENTITY_SHA256:-}" \
     --compose-file="${EXPECTED_COMPOSE_FILE:-}" \
-    --deployment-lock-token-sha256="${EXPECTED_DEPLOYMENT_LOCK_TOKEN_SHA256:-}"
+    --deployment-lock-token-sha256="${EXPECTED_DEPLOYMENT_LOCK_TOKEN_SHA256:-}" \
+    --release-0077-recovery-manifest-path="${RELEASE_0077_RECOVERY_MANIFEST_PATH:-}" \
+    --release-0077-recovery-manifest-sha256="${RELEASE_0077_RECOVERY_MANIFEST_SHA256:-}" \
+    --release-0077-recovery-origin-handoff-sha256="${RELEASE_0077_RECOVERY_ORIGIN_HANDOFF_SHA256:-}"
   intent_result="$(python manage.py ensure_historical_calendar_recovery_intent \
     --marker-path="$RESTRICTED_RECOVERY_MARKER_PATH" \
     --artifact-path="$RELEASE_B_PREFLIGHT_ARTIFACT_PATH" \

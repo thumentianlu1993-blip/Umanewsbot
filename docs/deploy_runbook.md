@@ -9,21 +9,30 @@
    ExternalDataImportRun(status=started)=0、TRA ExternalDataImportLock 无 active run，
    migration leaf 精确 0075，资源/磁盘与三队列满足当前生产门禁；race_live 必须保持精确 7543。
 2. 使用受审备份脚本创建新的 custom-format PostgreSQL 备份；必须同时记录文件大小、SHA-256、
-   0600 权限和 pg_restore --list 成功证据。备份未完成时不得进入 release task。
-3. 只允许用标准受锁 release 入口部署由本候选构建的 exact image。0077 是 atomic migration，其首操作
+   0600 权限和 pg_restore --list 成功证据。调用标准入口时显式传
+   `RELEASE_0077_VERIFIED_BACKUP_PATH=<absolute-path>` 与
+   `RELEASE_0077_VERIFIED_BACKUP_SHA256=<64-lower-hex>`；不得自动选择“最新”备份。缺少或漂移时标准入口
+   必须在停止 Beat/Web/worker 前失败。宿主机无需 `pg_restore`；入口要求 Compose 的唯一 `db` 容器
+   running，并把备份经 stdin 送入容器内 `pg_restore --list`，不把 archive 复制进容器。
+3. 标准入口先生成 admission handoff，再用 exact 备份创建
+   `runtime/migration_history_repair/release-0077-recovery/<candidate-commit>.json`。该文件必须是当前 owner、
+   0600、非 symlink、no-clobber，并绑定 candidate image/commit、DB identity、origin handoff、0075 leaf、
+   backup SHA/size 与 `pg_restore --list` digest。全应用停止后必须生成第二份 bound closed-state handoff；
+   release task 收到 admission-only artifact 必须拒绝，不能现场补参数绕过。
+4. 只允许用标准受锁 release 入口部署由本候选构建的 exact image。0077 是 atomic migration，其首操作
    对 PostgreSQL 设置 transaction-local lock_timeout=5s、statement_timeout=5min；任一超时都视为
    release 失败并保持应用服务停止，不在现场删除 operation 或手工补列。
-4. release 后必须确认 migration leaf 精确为
+5. release 后必须确认 migration leaf 精确为
    0077_racing_api_horse_identity_staging，manage.py check 通过，且
    manage.py help stage_racing_api_targeted_batch 可用；同时核对四服务 image/revision、
    restart/OOM、Nginx、公网页、赛事 flags/registry 和全部队列没有漂移。
-5. release 终态必须保持 RACING_API_STAGING_WRITE_ENABLED=false。随后可在零写环境运行整批
+6. release 终态必须保持 RACING_API_STAGING_WRITE_ENABLED=false。随后可在零写环境运行整批
    dry-run；只有 dry-run 的 status=batch_dry_run / database_writes=0、run/horse 数量和 exact
    manifest SHA 全部匹配，`scope_stable_ids` 精确为获准的 5 个 ID，逐表
    create/update/skip/conflict 与唯一行数守恒、out-of-scope/canonical 写均为 0，且 provenance 校验确认
    exact TRA host/route/wrapper/profile/career 全部守恒，
    才另行申请 staging apply 窗口。命令输出、manifest SHA、`--allow-write` 或环境开关本身都不是授权证明。
-6. staging apply 窗口内才临时设置 write flag 为 true，并同时传
+7. staging apply 窗口内才临时设置 write flag 为 true，并同时传
    --apply --allow-write。结束后无论 applied、replayed 或失败，都恢复 flag=false，核对 import
    run/lock、External 计数、registry/canonical 零写边界、队列和公网，再释放自己的锁。
 
