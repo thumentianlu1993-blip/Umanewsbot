@@ -1243,6 +1243,44 @@ class RacingApiHorseExportTests(unittest.TestCase):
         self.assertEqual(parents[1]["profile_kind"], "standard")
         self.assertEqual(len(calls), 3)
 
+    def test_parent_pool_preserves_missing_pro_dob_as_explicit_gap(self):
+        profile = self.module.normalize_profile(montjeu_profile(), profile_kind="pro")
+        profile["dam_id"] = ""
+        parent_payload = montjeu_profile(
+            id="hrs_100",
+            name="Sadler's Wells (USA)",
+            dob="",
+            sire="Northern Dancer (CAN)",
+            sire_id="sir_101",
+            dam="Fairy Bridge (USA)",
+            dam_id="dam_102",
+        )
+
+        class FakeClient:
+            def request_json(self, url, *, allow_not_found=False):
+                if not url.endswith("/horses/hrs_100/pro") or not allow_not_found:
+                    raise AssertionError(url)
+                return parent_payload
+
+        parents = self.module.fetch_parent_profiles(
+            FakeClient(),
+            profile=profile,
+            max_parent_profiles=2,
+        )
+
+        self.assertEqual(len(parents), 1)
+        self.assertEqual(parents[0]["horse_id"], "hrs_100")
+        self.assertEqual(parents[0]["profile_kind"], "pro")
+        self.assertEqual(parents[0]["dob"], "")
+
+        malformed = {**parent_payload, "dob": "unknown"}
+        with self.assertRaisesRegex(ValueError, "invalid pro profile dob"):
+            self.module.normalize_profile(
+                malformed,
+                profile_kind="pro",
+                allow_missing_pro_dob=True,
+            )
+
     def test_page_field_matrix_maps_two_generation_pedigree_and_career(self):
         profile = self.module.normalize_profile(montjeu_profile(), profile_kind="pro")
         sire = self.module.normalize_profile(

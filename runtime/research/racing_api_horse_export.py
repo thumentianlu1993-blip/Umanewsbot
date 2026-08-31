@@ -515,7 +515,12 @@ def parent_profile_id(value: object) -> str:
     return f"hrs_{raw.split('_', 1)[1]}"
 
 
-def normalize_profile(payload: Mapping[str, object], *, profile_kind: str) -> dict:
+def normalize_profile(
+    payload: Mapping[str, object],
+    *,
+    profile_kind: str,
+    allow_missing_pro_dob: bool = False,
+) -> dict:
     if profile_kind not in {"pro", "standard"}:
         raise ValueError("profile_kind must be pro or standard")
     horse_id = normalize_space(payload.get("id"))
@@ -532,10 +537,13 @@ def normalize_profile(payload: Mapping[str, object], *, profile_kind: str) -> di
             parents.append(parent_profile_id(value))
     if profile_kind == "pro":
         dob = normalize_space(payload.get("dob"))
-        try:
-            date.fromisoformat(dob)
-        except ValueError as exc:
-            raise ValueError("invalid pro profile dob") from exc
+        if dob:
+            try:
+                date.fromisoformat(dob)
+            except ValueError as exc:
+                raise ValueError("invalid pro profile dob") from exc
+        elif not allow_missing_pro_dob:
+            raise ValueError("invalid pro profile dob")
     else:
         dob = ""
     return {
@@ -871,7 +879,12 @@ def exact_search_candidates(
     return candidates
 
 
-def fetch_profile_with_fallback(client: object, *, horse_id: str) -> dict:
+def fetch_profile_with_fallback(
+    client: object,
+    *,
+    horse_id: str,
+    allow_missing_pro_dob: bool = False,
+) -> dict:
     if not HORSE_ID_RE.fullmatch(horse_id):
         raise ValueError("invalid horse id")
     payload = client.request_json(
@@ -884,7 +897,11 @@ def fetch_profile_with_fallback(client: object, *, horse_id: str) -> dict:
         profile_kind = "standard"
     if not isinstance(payload, Mapping):
         raise RacingApiSchemaError("horse profile response must be an object")
-    normalized = normalize_profile(payload, profile_kind=profile_kind)
+    normalized = normalize_profile(
+        payload,
+        profile_kind=profile_kind,
+        allow_missing_pro_dob=allow_missing_pro_dob,
+    )
     if normalized["horse_id"] != horse_id:
         raise RacingApiSchemaError("horse profile identity drift")
     return normalized
@@ -911,7 +928,11 @@ def fetch_parent_profiles(
             f"parent profile ceiling exceeded: {len(unique_parent_ids)}>{max_parent_profiles}"
         )
     return [
-        fetch_profile_with_fallback(client, horse_id=horse_id)
+        fetch_profile_with_fallback(
+            client,
+            horse_id=horse_id,
+            allow_missing_pro_dob=True,
+        )
         for horse_id in unique_parent_ids
     ]
 
