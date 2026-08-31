@@ -1,6 +1,27 @@
 # 赛事数据生命周期生产发布证据
 
-更新时间：2026-08-31 09:41 Asia/Shanghai
+更新时间：2026-08-31 13:02 Asia/Shanghai
+
+## 2026-08-31 13:02 PR #133 正式公开已通过，correction 已开启
+
+- `04:27Z` 自然周期已将 official revision id 17/no2 原地 published，创建唯一 publication 与 10 条
+  canonical result；8 名 finisher 的 reported/official position 为 1–8，Martinet/Nuit d'Eclair 为
+  `non_runner` 且两类 position 为空。claim 释放、failures=0、两条 lifecycle transition 未重复。
+- 旧 public-read 错把 enrollment canonical standing-policy digest `b679…e87d` 与策略文件 raw SHA
+  `0701…1888` 直接比较，故数据库成功后仍 `data_sync_standing_policy_drift`。PR #133 改为先校验 raw SHA，
+  再比较 canonical digest；文件/配置漂移仍 fail closed。聚焦 `24/24`、全部非 PostgreSQL race-data-sync
+  `198/198`、公网状态 `13/13` 通过，merge revision 为 `220bc621…402b`。
+- 新 custom-format 备份为 `rds_horse_news_20260831T044152Z_258573.dump`，492273277 bytes、0600、SHA
+  `cbf2d324…52062`、TOC 1359。新 release/image 为
+  `/opt/umanews-release-220bc621-PR133-20260831T0444Z/umanewsbot` /
+  `sha256:946f2177…9803a`；migration no-op、leaf exact 0075，关闭态 10 false 与旧队列 7543 先通过。
+- future、racecard、lifecycle、result apply、result public 已按冻结顺序恢复。线上 public-read detail/bulk
+  均为 `visible=true / data_sync_public_read_allowed`；root/www 页面均包含 10 匹“赛果”，无“赛果待确认”
+  或 provider/provisional/source phase。active audit 为 would_write=false、capacity valid、standing policy
+  loaded、route drift 0。
+- correction 已在独立随机 token lock 中开启；即时计数保持 10 results、2 result revisions、1 publication、
+  7 observations，四服务 exact/restart0/OOMfalse，lock absent，`race_sync_v2=0 / race_live=7543`。最终
+  checkpoint 为 `2026-08-31T10:27:01.874961Z`；等待自然幂等 replay 后补充终态证据。
 
 ## 2026-08-31 09:41 PR #132 active，10-row official shadow 已线上实证
 

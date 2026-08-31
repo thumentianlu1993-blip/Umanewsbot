@@ -1,5 +1,25 @@
 # 部署运行手册
 
+## 2026-08-31 PR #133 正式公开后的 correction 最终收口
+
+1. active 身份固定为 release
+   `/opt/umanews-release-220bc621-PR133-20260831T0444Z/umanewsbot`、revision
+   `220bc6210fa16cce3d3c19c8cb1d8ad096db402b`、image `946f2177…9803a`、leaf `0075`；四服务应为
+   running/restart0/OOMfalse，10 个 data-sync flags true，旧 `race_live` 精确 7543。
+2. 恢复点固定为 `/opt/umanewsbot/backups/db/rds_horse_news_20260831T044152Z_258573.dump`：
+   492273277 bytes、0600、SHA `cbf2d324…52062`、TOC 1359。即时 image 回滚 tag 为
+   `umanewsbot:rollback-pre-pr133-edf0322d-20260831T0444Z`。
+3. event 956 当前 official revision id 17/no2、content SHA `aa76ecba…e533`、10 results、唯一
+   publication、两条 lifecycle transition；root/www 已显示完整“赛果”，public-read detail/bulk 均为
+   `data_sync_public_read_allowed`。不得重做 publication 或手工改 due/claim/result。
+4. correction 已开启，result checkpoint 为 `2026-08-31T10:27:01.874961Z`。到期前只读监视；到期后
+   只允许 Beat/selector 自然派发，分别核对 Celery terminal 与业务 processed/reason/applied kinds、capacity
+   ledger、claim 释放和 checkpoint 推进。
+5. 自然 replay 必须保持 10 results、2 result revisions、1 publication、2 lifecycle transitions 和
+   content SHA 不变，root/www 无回退，资源/锁/队列继续过门禁。任一失败执行
+   `/tmp/umanews-pr133-set-stage.sh close` 的同等 fail-closed 路径，不 purge Redis；全部通过后合并最终文档
+   PR、释放相邻 TRA proof 窗口并删除 event 956 automation。
+
 ## 2026-08-31 PR #132 active shadow 到正式公开/更正的剩余步骤
 
 1. active 身份固定为 release `/opt/umanews-release-edf0322d-PR132-20260831T0105Z/umanewsbot`、revision

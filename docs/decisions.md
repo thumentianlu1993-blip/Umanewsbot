@@ -1,5 +1,17 @@
 # 关键决策
 
+## 2026-08-31 standing policy 必须分别校验 raw SHA 与 canonical digest
+
+- `RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256` 是策略文件原始字节的供应链完整性 SHA；
+  `RaceDataSyncEnrollment.standing_policy_digest` 是解析后 canonical JSON 的业务身份摘要。格式化合法 JSON
+  时两者可以不同，不能直接比较，也不能通过把 enrollment 改写成 raw SHA 来掩盖语义错误。
+- 公共读取先以配置 path/raw SHA 通过 no-follow、size-bounded loader 校验文件，再解析并把 canonical
+  digest 与 enrollment 比较；文件缺失、raw SHA 不符、重复键/非法 JSON 或 canonical digest 漂移均保持
+  fail closed。detail 每次解析一次，bulk 每批解析一次，不按 event 重复文件读取。
+- event 956 已有的 official revision/publication/results 不手工重写；PR #133 只修复读取授权判定，并在
+  关闭态发布后从 future 到 result public 全量重走。公开证据全部通过后才另取锁开启 correction，仍只允许
+  Beat 在 `10:27:01Z` 自然 replay；最终完成以幂等业务证据为准，不以 HTTP 200 或 Celery SUCCESS 代替。
+
 ## 2026-08-31 official shadow 不补做手工 publication，等待既定 checkpoint 自然晋级
 
 - PR #132 的 10-row official revision 已证明 non-runner 补全合同正确，但它在 result public 配置门禁完成前

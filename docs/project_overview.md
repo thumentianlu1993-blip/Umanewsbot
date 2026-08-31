@@ -1,5 +1,12 @@
 # 项目总览
 
+2026-08-31 13:02，PR #133 已修复 data-sync 公共读取中 raw file SHA 与 canonical policy digest 的错误
+比较，并以 `220bc621…402b` / `946f2177…9803a` 完成备份、关闭态发布和五阶段重开。event 956 的
+official revision id 17 已自然公开为唯一 publication 与 10 条 canonical result；root/www 均展示 8 名
+1–8 完赛马及 2 名无名次 non-runner，public-read detail/bulk 允许且无内部来源/阶段泄露。correction 已在
+独立锁窗口开启，当前计数保持 `10 results / 2 result revisions / 1 publication`、四服务 exact、
+`race_live=7543`。只剩北京时间 18:27:01 的自然 correction 幂等 replay 和最终证据 PR，禁止提前派发。
+
 2026-08-31 09:41，PR #132 已以 `edf0322d…5649` / `e9b8ca02…1396c` 上线并完成 future discovery、
 race time/racecard、lifecycle、result apply、result public 的冻结顺序重开。自然 exact-result 轮询已生成
 完整 10-row official revision：8 名完赛马和 2 名同源 non-runner 的身份、状态、名次与 provenance 均通过；

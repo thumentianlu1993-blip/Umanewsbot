@@ -1,5 +1,17 @@
 # 项目状态文档
 
+## 2026-08-31 13:02 PR #133 已正式公开，correction 已开启待自然验收
+
+- PR #133 merge revision `220bc621…402b`、image `946f2177…9803a` 已经备份保护并以 10 false 关闭态
+  发布；migration no-op、leaf `0075`，随后五个前置阶段按冻结顺序全部恢复。
+- event 956 已自然完成 10 条 canonical result 和唯一 publication；public-read detail/bulk 均为
+  `data_sync_public_read_allowed`，root/www 展示完整“赛果”，8 名完赛马和 2 名 non-runner 的身份、状态、
+  名次一致，无内部 provider/provisional/source phase 标签。
+- correction 已单独开启；四服务 exact/restart0/OOMfalse，lock absent，当前计数仍为
+  `10 results / 2 result revisions / 1 publication / 2 lifecycle transitions`，队列
+  `race_sync_v2=0 / race_live=7543`。最终只等待北京时间 18:27:01 的自然 replay 证明幂等并推进 checkpoint，
+  随后补齐文档 PR 和生产终态。
+
 ## 2026-08-31 09:41 PR #132 已 active，10-row official shadow 等待自然公开
 
 - PR #132 revision `edf0322d…5649` / image `e9b8ca02…1396c` 已关闭态部署，并按冻结顺序恢复五阶段；
