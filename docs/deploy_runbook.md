@@ -1,5 +1,59 @@
 # 部署运行手册
 
+## 2026-09-01 France 2023 五马 External staging 生产执行与复核
+
+本节记录已完成的 exact 批次，不能替其他 materialization、年份或地区提供通用授权。
+
+1. 权威输入固定为 ledger `aa3d51d4…3095`、batch `ed0295d9…7973`、materialization
+   `f7a1fa5e…51b99` 和 plan `90d5613f…e2f61`。服务器材料目录必须为 37 个 root:root 普通文件、目录
+   0500/文件 0400、零 symlink；`materialization-manifest.json` 与 `COMPLETE` 均为
+   `f7a1fa5e…51b99`，相对路径树 SHA 为 `757319b1…79e`。
+2. 写前要求 PR #137 exact revision `1312c8de…4a03` / image `85b94626…f253`、leaf 0077、shared lock
+   absent、无 STARTED External import run/active import lock、`race_live=7543`、双 registry SHA 正确、资源与
+   公网通过。恢复点固定为 494113960-byte、0600、root:root、SHA `c72b5945…f6a9` 的 custom-format
+   backup，并须由运行中 PostgreSQL 16 `db` 容器重新通过 `pg_restore --list` 1359 行。
+3. dry-run 使用生产 image 的 no-deps one-shot 容器和只读 bind mount，不设置写开关：
+
+   ```bash
+   docker compose -f docker-compose.prod.lowcost.yml run --rm --no-deps \
+     -v /opt/umanews-external-staging/france-2023-5horses-f7a1fa5e:/app/external-staging:ro \
+     web python manage.py stage_racing_api_targeted_batch \
+     --materialization-dir /app/external-staging \
+     --approved-manifest-sha256 f7a1fa5e091f8a642b8ae348a2736493bf452b34ba3f1cc5b23f170f3ce51b99
+   ```
+
+   只有 `batch_dry_run/database_writes=0`、scope 5/5、唯一行 `5/60/67/67/5`、
+   `create/update/skip/conflict=210/0/7/0`、canonical/out-of-scope 0 时可继续。本次输出 SHA 为
+   `1344fe69…f7a1`。
+4. apply 前重新执行同一 preflight。常驻 `.env` 的 `RACING_API_STAGING_WRITE_ENABLED` 必须继续为 false；
+   只给一次性容器临时传 true，并同时传两个命令门禁：
+
+   ```bash
+   docker compose -f docker-compose.prod.lowcost.yml run --rm --no-deps \
+     -e RACING_API_STAGING_WRITE_ENABLED=true \
+     -v /opt/umanews-external-staging/france-2023-5horses-f7a1fa5e:/app/external-staging:ro \
+     web python manage.py stage_racing_api_targeted_batch \
+     --materialization-dir /app/external-staging \
+     --approved-manifest-sha256 f7a1fa5e091f8a642b8ae348a2736493bf452b34ba3f1cc5b23f170f3ce51b99 \
+     --apply --allow-write
+   ```
+
+   本次外层事务得到 run 1961–1965 全部 applied，输出 SHA `3e8b1679…ab2e`。任一成员失败时必须以整批
+   rollback 为准，不能手工补写后续成员或 SQL。
+5. 独立 verifier 必须从新进程只读检查：七张计划表相对写前全局计数只增加
+   `1/5/5/60/67/67/5`；5 个 run 的 manifest、horse ID、SUCCESS、finished_at 与 coverage 一致；60 个 race
+   ID 来自 67 条目标马 history，67 result、67 history、5 variant 均只绑定目标 ID；STARTED run、active
+   lock 与 HorseExternalIdentity 都是 0。写前/写后 event 956 hash 必须一致，双 registry、服务与公网不得
+   漂移。本次 verifier 输出 SHA 为 `ead2dc16…ef1b`，event SHA 为 `e832c573…fb9a`。
+6. verifier 通过后才在新的 random-token shared lock 内恢复赛事运行态。先停 Beat并让 Celery 自然排空，
+   不 purge/迁移/重排队列；把 canonical/active 的 10 个 data-sync flags 全部恢复 true，staging 写开关保持
+   false，再按 Web healthy -> ordinary worker -> race_sync_v2_worker -> Beat 重建，最后 `nginx -t` 与
+   reload。终态必须为 exact PR #137、restart0/OOMfalse、Web 1×4、普通 1/1 + 1 GiB、专用 1/1 +
+   384 MiB、lock absent、`0/0/7543` 和五个公网入口 200。
+
+该阶段完成后必须保持 staging-only。禁止顺手创建 verified identity、运行 identity/module publish、写
+HorseProfile/canonical/reference registry、改 event 956 或发布公网页；这些步骤需要新的阶段计划与授权。
+
 ## 2026-08-31 leaf 0077 External staging foundation 发布门禁
 
 本节只适用于从 exact PR #133 / migration leaf 0075 发布最小 0077 foundation。它不授权 France
