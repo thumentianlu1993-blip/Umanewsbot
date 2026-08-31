@@ -1,5 +1,20 @@
 # 当前状态
 
+## 2026-08-31 09:01 exact result 已取得 official，但 8 完赛 + 2 non-runner 被误拒绝
+
+- PR #131 已合并为 `11fce12c…f5e`，生产 image `a4f898d1…a7fd` 与 491800366-byte/0600/TOC 1359
+  新恢复点均验证通过。关闭态 12 个样本最低 `MemAvailable=5859656 kB`，普通队列 10 后自然归零；
+  future、racecard、lifecycle、result apply 随后按冻结顺序恢复。
+- `00:50Z` Beat 自然 exact-result 周期已越过 transport 并取得真实 official observation id 18：raw SHA
+  `54be7156…5e8a`、normalized SHA `e6a96df1…71ab`、8 名实际完赛马，phase/race_status 均 official。
+  claim 正常释放；但旧 roster 完整性要求 provider 行数等于全部 10 条赛前 runner，把同源 racecard 已明确
+  标为 non-runner 的 Martinet 与 Nuit d'Eclair 也机械要求出现在赛果响应中，最终以
+  `result_result_roster_incomplete` 拒绝。未创建 official revision/canonical result/publication。
+- 失败后已立即恢复 10 false、专用 worker absent；lock absent、队列 `0/0/7543`、约 5.64 GiB 可用内存，
+  PR #131 Web/普通 worker/Beat running。修复只允许用同一 source stable ID 且当前状态为
+  scratched/withdrawn/non_runner 的已知缺行补齐终态；缺失 declared runner、无同源 ID、重复或冲突身份
+  仍由原 len/mapping 合同拒绝。聚焦 provider/result/transport/selector 回归 92/92 通过。
+
 ## 2026-08-31 08:24 PR #130 关闭态稳定，exact result transport 白名单缺口已定位
 
 - PR #130 已合并为 `8e7a2ba8…b19b`，生产隔离 release 为

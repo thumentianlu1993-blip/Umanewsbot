@@ -1,5 +1,20 @@
 # 部署运行手册
 
+## 2026-08-31 exact official 缺失已知 non-runner 的恢复顺序
+
+1. 当前生产是 PR #131 关闭态：10 false、专用 worker absent、`0/0/7543`、leaf 0075；observation id 18
+   是未投影的 official 8-row 证据，revision/publication/result 仍为 0。不得手工 apply 该旧 observation。
+2. 新 image 关闭态验证须同时证明：同源 stable-ID 的已知 non-runner 可形成 8+2 normalized roster；缺失
+   declared runner 仍返回 `result_roster_incomplete`；raw/normalized SHA 与每行 provenance 分离。
+3. 仍从 future -> racecard -> lifecycle -> result apply -> result public 重走。为避免 shadow official 在
+   late-result cadence 下等待 3 小时，result apply 配置门禁通过后、下一自然 selector 之前立即单独完成
+   result public 配置阶段；不修改 checkpoint，也不手工派发任务。
+4. 下一自然 poll 必须生成新的 10-row official observation/revision、10 条 canonical projection 与 1 条
+   publication；root/www 应统一显示“赛果”，其中两名未出赛保持无名次。任一数量、身份、状态、SHA、claim、
+   资源或页面不一致立即全关。
+5. result/public 全证据通过后才单独开启 correction，至少观察一个自然成功周期；同一 official artifact
+   应幂等 replay，不新增重复 revision/publication，之后再决定是否释放相邻 TRA proof 窗口。
+
 ## 2026-08-31 exact result-by-id transport 修复恢复顺序
 
 1. 当前生产基线是 PR #130 exact revision/image、10 false、专用 worker absent、队列 `0/0/7543`；先确认

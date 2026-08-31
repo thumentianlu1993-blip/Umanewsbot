@@ -1,5 +1,15 @@
 # 项目状态文档
 
+## 2026-08-31 09:01 official 已到达，non-runner 完整性修复待发布
+
+- PR #131 exact image/恢复点/关闭态热身通过，四个前置阶段恢复后，event 956 在 00:50Z 自然取得
+  official observation id 18。transport 已正常，8 名实际完赛马 stable ID 和名次完整。
+- 两名赛前已由同源 racecard 标记 non_runner 的 runner 不在 official 响应内；旧算法以 8 != 10 拒绝，
+  因此 0 official revision/result/publication。自动保护已恢复 10 false、专用 worker absent、队列
+  `0/0/7543`，资源与公网正常。
+- 最小修复只派生同源 stable-ID 的 terminal non-starter，保留 raw/derived provenance；declared 缺行仍拒绝。
+  92/92 聚焦回归通过。下一步合并与关闭态发布后全阶段重走，并在下一自然 poll 完成公开与 correction。
+
 ## 2026-08-31 08:24 exact-result transport 缺口待关闭态发布
 
 - PR #130 已以 `8e7a2ba8…b19b` / `9174654b…f426` 关闭态上线并完成 5 分钟热身，selector 候选限窗与

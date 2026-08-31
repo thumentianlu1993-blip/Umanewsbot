@@ -1697,9 +1697,87 @@ def _racecard_payload(
     }
 
 
+_KNOWN_NONSTARTER_STATUSES = frozenset(
+    {
+        models.RaceRunnerStatus.SCRATCHED,
+        models.RaceRunnerStatus.WITHDRAWN,
+        models.RaceRunnerStatus.NON_RUNNER,
+    }
+)
+
+
+def _runner_source_id(
+    *, runner: models.RaceEventRunner, source_key: str
+) -> str:
+    refs = runner.source_refs if isinstance(runner.source_refs, dict) else {}
+    direct = str(refs.get(source_key) or "").strip()
+    if direct:
+        return direct
+    if refs.get("source_key") == source_key:
+        return str(refs.get("external_runner_id") or "").strip()
+    return ""
+
+
 def _result_payload(
-    *, normalized_race: dict[str, Any], region: str
+    *,
+    normalized_race: dict[str, Any],
+    region: str,
+    event: models.RaceEvent,
+    source_key: str,
 ) -> dict[str, Any]:
+    participants = [
+        {
+            "external_runner_id": participant["external_runner_id"],
+            "horse_name": participant["horse_name"],
+            "reported_finish_position": participant[
+                "official_finish_position"
+            ],
+            "status": participant["status"],
+            "raw_status": str(participant["position_raw"]),
+            "number": participant["number"],
+            "barrier": "",
+            "jockey_name": "",
+            "trainer_name": "",
+            "carried_weight": "",
+            "finish_time": "",
+            "margin": "",
+            "field_provenance": {"result": "the_racing_api"},
+        }
+        for participant in normalized_race["participants"]
+    ]
+    seen_runner_ids = {
+        participant["external_runner_id"] for participant in participants
+    }
+    for runner in event.runners.filter(
+        running_status__in=_KNOWN_NONSTARTER_STATUSES
+    ).order_by("sort_order", "id"):
+        external_runner_id = _runner_source_id(
+            runner=runner,
+            source_key=source_key,
+        )
+        if not external_runner_id or external_runner_id in seen_runner_ids:
+            continue
+        seen_runner_ids.add(external_runner_id)
+        participants.append(
+            {
+                "external_runner_id": external_runner_id,
+                "horse_name": runner.horse_name,
+                "reported_finish_position": None,
+                "status": runner.running_status,
+                "raw_status": runner.running_status,
+                "number": runner.horse_number,
+                "barrier": runner.barrier,
+                "jockey_name": runner.jockey_name,
+                "trainer_name": runner.trainer_name,
+                "carried_weight": runner.carried_weight,
+                "finish_time": "",
+                "margin": "",
+                "field_provenance": {
+                    "result": "racecard_terminal_nonstarter",
+                    "source_key": source_key,
+                },
+            }
+        )
     return {
         "external_race_id": normalized_race["external_race_id"],
         "off_time": normalized_race["off_time"],
@@ -1707,26 +1785,7 @@ def _result_payload(
         "course": normalized_race["course"],
         "race_name": normalized_race["race_name"],
         "race_status": str(normalized_race.get("race_status") or "complete"),
-        "participants": [
-            {
-                "external_runner_id": participant["external_runner_id"],
-                "horse_name": participant["horse_name"],
-                "reported_finish_position": participant[
-                    "official_finish_position"
-                ],
-                "status": participant["status"],
-                "raw_status": str(participant["position_raw"]),
-                "number": participant["number"],
-                "barrier": "",
-                "jockey_name": "",
-                "trainer_name": "",
-                "carried_weight": "",
-                "finish_time": "",
-                "margin": "",
-                "field_provenance": {"result": "the_racing_api"},
-            }
-            for participant in normalized_race["participants"]
-        ],
+        "participants": participants,
     }
 
 
@@ -2145,6 +2204,8 @@ def run_the_racing_api_data_sync(
                     payload = _result_payload(
                         normalized_race=normalized_race,
                         region=source.region_code,
+                        event=event,
+                        source_key=source.source_key,
                     )
                     normalized_sha256 = hashlib.sha256(
                         json.dumps(

@@ -1,5 +1,11 @@
 # 项目总览
 
+2026-08-31 09:01，PR #131 已让 event 956 的自然 exact route 取得真实 official 响应；8 名完赛马与全部
+stable ID 均有效，但旧完整性门禁错误要求两名此前已确定 `non_runner` 的马也必须出现在 official result
+response，因而安全拒绝并再次全关。新修复只用同源 stable ID 补入已确认 scratched/withdrawn/non_runner，
+raw 8-row 与 derived 2-row provenance 分开，declared 缺行仍 fail closed；92/92 聚焦回归通过。正式
+revision/canonical/public 尚未发生，需关闭态发布后全阶段重走，correction 继续关闭。
+
 2026-08-31 08:24，PR #130 的赛果复核数据库限窗修复已在 10 false 关闭态部署并通过热身；分阶段恢复至
 lifecycle 后，event 956 首次自然 exact-result 轮询暴露 transport 动态白名单缺口。请求尚未到 DNS，未写
 正式赛果，生产已再次自动全关且 `race_live=7543` 不变。最小修复只放行受审
