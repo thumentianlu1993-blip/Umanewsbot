@@ -1,5 +1,32 @@
 # 当前状态
 
+## 2026-08-31 18:40 event 956 正式赛果、公开与自然更正周期全部完成
+
+- 生产继续运行 PR #133 exact release
+  `/opt/umanews-release-220bc621-PR133-20260831T0444Z/umanewsbot`，revision
+  `220bc6210fa16cce3d3c19c8cb1d8ad096db402b`、image
+  `sha256:946f21770061a7d6fe259f148474e40360a9dfc67a6478c2b04219b3d7c9803a`。Web、普通 worker、Beat、
+  `race_sync_v2_worker` 均 running/restart=0/OOM=false；migration leaf exact
+  `0075_race_data_source_priority_and_reported_position`，10 个 data-sync flags 全 true。
+- `2026-08-31T10:27:12Z`（北京时间 18:27:12）Beat/selector 在既定 checkpoint 后自然派发，任务
+  `2a69c1ef-d3c2-48be-9f23-9504f580f89d` 不仅为 Celery `SUCCESS`，业务结果同时为
+  `processed=true / reason=complete / claim_action=complete / applied_kinds=[result] / not_found_kinds=[]`。
+  tracking claim generation 从 86 增至 87，active token 与 claim expiry 均为空、failures=0；result
+  checkpoint 成功时间为 `10:27:13.662628Z`，下一次自然检查推进到 `16:27:13.662628Z`。英国当日
+  capacity ledger 从 4 增至 5 次请求，证明本轮确实经过真实 transport，而非只读假通过。
+- 本轮上游 official artifact 未变化，因此 correction 按设计幂等：event 956 仍为
+  `finished/published`、10 runners/10 confirmed results；observations 7、result revision 2、publication
+  1、lifecycle transition 2 均未新增或反转。official revision id 17/no2 的 content SHA 继续为
+  `aa76ecbaba9fea4d6a3975ce1ff831da45ab2a72f8c4baa1d6098eebe961e533`，没有伪造
+  `corrected_result` 或重复 publication。
+- root/www 赛事页均为 HTTP 200、14386 bytes、相同 SHA-256
+  `0074214e60ae505505b68879951a6fe58ed851e1698dc1debd6a3ce2966f2a84`；完整 10 匹均出现，页面显示
+  “赛果”、不显示“赛果待确认”，也没有 provider/provisional/The Racing API 内部阶段泄露。
+- 终验资源为 deployment lock absent、`MemAvailable=5647744 kB`、`SwapFree=1310716 kB`、根盘可用
+  `12291444736` bytes，三队列为 `celery=0 / race_sync_v2=0 / race_live=7543`。赛事链上线目标已经通过；
+  PR #134 仅收口本组不可变证据，不修改生产代码或运行态，合并后再做一次只读终审并按 exact registry
+  边界释放相邻 TRA proof 窗口。
+
 ## 2026-08-31 09:41 PR #132 已全阶段重开，等待 official shadow 自然公开
 
 - PR #132 已合并为 `edf0322d8395f1e202b681cd2d215ed832e95649`，生产隔离 release 为

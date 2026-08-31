@@ -1,5 +1,20 @@
 # 项目状态文档
 
+## 2026-08-31 18:40 event 956 自然 correction 与完整生产验收通过
+
+- PR #133 exact revision `220bc621…402b` / image `946f2177…9803a` 继续运行；四服务
+  running/restart0/OOMfalse，leaf 0075，10 个 data-sync flags true，shared lock absent。
+- 18:27:12 的自然 task `2a69c1ef…f89d` 同时满足 Celery terminal 与业务
+  `processed=true / reason=complete / claim_action=complete / applied_kinds=[result]`。claim generation
+  86 -> 87，claim 已释放、failures=0，checkpoint 推进到次日北京时间 00:27:13；英国 capacity ledger
+  4 -> 5。
+- official artifact 未改变，故 correction 正确地保持 10 results、2 result revisions、1 publication、
+  7 observations、2 lifecycle transitions 与 content SHA `aa76ecba…e533` 不变；未制造重复 revision 或
+  `corrected_result`。root/www 均为 200、相同 SHA，显示完整“赛果”且无内部来源/阶段泄露。
+- 资源为 `MemAvailable=5647744 kB / SwapFree=1310716 kB / disk=12291444736 bytes`，队列
+  `celery=0 / race_sync_v2=0 / race_live=7543`。完整赛事状态更迭目标已经验收；剩余工作只有合并
+  docs-only PR #134、合并后只读终审、释放隔离 TRA 窗口并删除 event 956 heartbeat。
+
 ## 2026-08-31 09:41 PR #132 已 active，10-row official shadow 等待自然公开
 
 - PR #132 revision `edf0322d…5649` / image `e9b8ca02…1396c` 已关闭态部署，并按冻结顺序恢复五阶段；

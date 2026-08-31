@@ -101,12 +101,12 @@
 - [x] (operations) 创建 PostgreSQL custom-format 备份，记录权限/大小/SHA 并通过 `pg_restore --list`。
 - [x] (operations) 所有新开关关闭应用 0074/0075，验证 web/worker/Beat 同 image/revision、healthz、迁移和
   flag-off 三零；磁盘低于 8 GiB 时停止。
-- [ ] (operations) 写入冻结容量与 allowlist，按 future discovery -> network/time/racecard -> lifecycle ->
-  result apply/public -> correction 顺序启用；PR #130 数据库限窗、PR #131 exact transport 与 PR #132
-  同源 terminal non-starter 补全均已合并并上线。PR #132 五个前置阶段已全量重走，01:26Z 自然 poll 已
-  生成 10-row official revision，证明 8 名完赛马 + 2 名 non-runner 合同正确；因该轮发生在 public 门禁
-  完成前，目前仍是 0 canonical result/0 publication 的 official shadow。等待 04:26:30Z 自然重放完成
-  revision publication、10 条 projection 与 root/www “赛果”验收后，再单独开启 correction；只有下一
-  自然更正周期幂等通过并完成最终文档 PR，才勾选本项。
+- [x] (operations) 写入冻结容量与 allowlist，按 future discovery -> network/time/racecard -> lifecycle ->
+  result apply/public -> correction 顺序启用；PR #130 数据库限窗、PR #131 exact transport、PR #132 同源
+  terminal non-starter 与 PR #133 standing-policy public-read 修复均已合并并上线。event 956 已自然完成
+  revision 17 publication、10 条 canonical projection 与 root/www “赛果”验收，correction 也已在独立锁
+  窗口开启。`2026-08-31T10:27:12Z` 自然更正任务已以业务 `processed=true / complete /
+  applied_kinds=[result]` 完成，claim/checkpoint/capacity 推进，10 results、2 revisions、1 publication、
+  2 lifecycle transitions 幂等不变；资源、四服务、公开页与 `0/0/7543` 队列终验全部通过。
 - [x] (operations) 已验证 `race_sync_v2_worker` 只消费新队列、普通 worker 只消费 `celery`，旧
   `race_live=7543` 不变；当前/回滚镜像和 release evidence 均已记录。
