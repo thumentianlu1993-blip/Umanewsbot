@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta, timezone as dt_timezone
 import hashlib
 import json
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from django.test import TestCase, override_settings
@@ -17,6 +19,7 @@ from stable.services.race_data_sync_pipeline import (
 from stable.services.race_data_sync_results import (
     apply_data_sync_result_observation,
 )
+from stable.services.race_data_sync_enrollment import parse_standing_policy
 from stable.services.race_event_lifecycle_enrollment import _schedule_hash
 
 
@@ -51,6 +54,41 @@ def _sha(value) -> str:
 )
 class RaceDataSyncResultApplicationTests(TestCase):
     def setUp(self):
+        self._policy_directory = TemporaryDirectory()
+        self.addCleanup(self._policy_directory.cleanup)
+        policy = {
+            "schema_version": 1,
+            "policy_id": "test-data-sync-standing-policy-v1",
+            "approved_by": "test-reviewer",
+            "approved_at": NOW.isoformat(),
+            "valid_from": (NOW - timedelta(days=1)).isoformat(),
+            "valid_until": (NOW + timedelta(days=30)).isoformat(),
+            "routes": [
+                {
+                    "country_region": models.RacingRegion.JAPAN,
+                    "provider": "the_racing_api",
+                    "region_code": "japan_jra",
+                    "identity_namespace": "the_racing_api-race-v1",
+                    "route_digest": "8" * 64,
+                    "data_kinds": [models.RaceDataSyncDataKind.RESULT],
+                }
+            ],
+            "visibility_statuses": [models.RaceEventVisibility.PUBLISHED],
+            "event_statuses": [models.RaceEventStatus.FINISHED],
+        }
+        raw = json.dumps(policy, indent=2).encode()
+        policy_path = Path(self._policy_directory.name) / "standing_policy.json"
+        policy_path.write_bytes(raw)
+        self.standing_policy_raw_sha256 = hashlib.sha256(raw).hexdigest()
+        self.standing_policy_digest = parse_standing_policy(policy).digest
+        policy_settings = override_settings(
+            RACE_DATA_SYNC_FUTURE_STANDING_POLICY_FILE=str(policy_path),
+            RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256=(
+                self.standing_policy_raw_sha256
+            ),
+        )
+        policy_settings.enable()
+        self.addCleanup(policy_settings.disable)
         self.event = models.RaceEvent.objects.create(
             year=2026,
             slug="data-sync-result",
@@ -301,7 +339,7 @@ class RaceDataSyncResultApplicationTests(TestCase):
             event=self.event,
             source_identity=self.source,
             state=models.RaceDataSyncEnrollmentState.ENROLLED,
-            standing_policy_digest="f" * 64,
+            standing_policy_digest=self.standing_policy_digest,
             route_digest=route.route_digest,
             event_snapshot_sha256="d" * 64,
             projection_owner_generation=1,
@@ -401,7 +439,6 @@ class RaceDataSyncResultApplicationTests(TestCase):
         RACE_DATA_SYNC_RESULT_APPLY_ENABLED=True,
         RACE_DATA_SYNC_RESULT_PUBLIC_ENABLED=True,
         RACE_DATA_SYNC_CORRECTION_APPLY_ENABLED=True,
-        RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256="f" * 64,
     )
     def test_data_sync_publication_is_visible_in_detail_and_bulk_resolvers(self):
         self._public_enrollment()
@@ -433,6 +470,10 @@ class RaceDataSyncResultApplicationTests(TestCase):
             )[self.event.pk]
 
         self.assertTrue(detail.visible, detail.reason)
+        self.assertNotEqual(
+            self.standing_policy_raw_sha256,
+            self.standing_policy_digest,
+        )
         self.assertEqual(detail.reason, "data_sync_public_read_allowed")
         self.assertEqual(bulk, detail)
         self.assertEqual(source_filter.call_count, 1)
@@ -444,7 +485,6 @@ class RaceDataSyncResultApplicationTests(TestCase):
         RACE_DATA_SYNC_RESULT_APPLY_ENABLED=True,
         RACE_DATA_SYNC_RESULT_PUBLIC_ENABLED=True,
         RACE_DATA_SYNC_CORRECTION_APPLY_ENABLED=True,
-        RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256="f" * 64,
         RACE_DATA_SYNC_REFERENCE_REGISTRY_SHA256="9" * 64,
     )
     def test_fallback_publication_retains_original_enrollment_evidence(self):
@@ -511,7 +551,6 @@ class RaceDataSyncResultApplicationTests(TestCase):
         RACE_DATA_SYNC_RESULT_APPLY_ENABLED=True,
         RACE_DATA_SYNC_RESULT_PUBLIC_ENABLED=True,
         RACE_DATA_SYNC_CORRECTION_APPLY_ENABLED=True,
-        RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256="f" * 64,
     )
     def test_data_sync_public_read_fails_closed_on_contract_drift(self):
         enrollment = self._public_enrollment()
@@ -564,6 +603,42 @@ class RaceDataSyncResultApplicationTests(TestCase):
                 self.assertEqual(bulk, detail)
                 setattr(instance, field, original)
                 instance.save(update_fields=(field, "updated_at"))
+
+    @override_settings(
+        RACE_DATA_SYNC_ENABLED=True,
+        RACE_DATA_SYNC_RESULT_APPLY_ENABLED=True,
+        RACE_DATA_SYNC_RESULT_PUBLIC_ENABLED=True,
+        RACE_DATA_SYNC_CORRECTION_APPLY_ENABLED=True,
+    )
+    def test_data_sync_public_read_fails_closed_on_policy_file_sha_drift(self):
+        self._public_enrollment()
+        observation = self._observation(
+            self.source, "licensed_api", self._rows()
+        )
+        applied = apply_data_sync_result_observation(
+            observation_id=observation.pk,
+            expected_event_id=self.event.pk,
+            now=NOW,
+            project_current=True,
+            correction_apply_enabled=True,
+        )
+        self.assertTrue(applied.projected)
+
+        with self.settings(
+            RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256="0" * 64,
+        ):
+            detail = race_events.resolve_race_live_public_read(
+                event_id=self.event.pk,
+                now=NOW + timedelta(seconds=1),
+            )
+            bulk = race_events.resolve_race_live_public_reads(
+                event_ids=[self.event.pk],
+                now=NOW + timedelta(seconds=1),
+            )[self.event.pk]
+
+        self.assertFalse(detail.visible)
+        self.assertEqual(detail.reason, "data_sync_standing_policy_unavailable")
+        self.assertEqual(bulk, detail)
 
     def test_superseded_claim_cannot_project_result_before_completion_cas(self):
         observation = self._observation(
