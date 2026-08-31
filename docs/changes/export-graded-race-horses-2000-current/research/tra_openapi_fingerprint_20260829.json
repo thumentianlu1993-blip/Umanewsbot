@@ -1,0 +1,25 @@
+{
+  "fingerprint_generated_at": "2026-08-29T15:33:04+08:00",
+  "full_openapi_sha256": "e1ec8bd34df75808fae65cbaffb0c634adf204fa7d06627d92421dd86193a06b",
+  "openapi_version": "1.4.4",
+  "selected_contract": {
+    "paths": [
+      "/v1/horses/search",
+      "/v1/horses/{horse_id}/pro",
+      "/v1/horses/{horse_id}/results",
+      "/v1/horses/{horse_id}/standard",
+      "/v1/results"
+    ],
+    "sha256": "d291af21a5a646ec803e9bafcdeb8786b87593dff6dfc10220da8ce00a66a0c9"
+  },
+  "selected_schema": {
+    "names": [
+      "HorsePro",
+      "HorseStandard",
+      "ResultsStandardPage",
+      "RunnerStandard"
+    ],
+    "sha256": "e7298d8a29751d8e985400e626a9b28abf3c39ef80fb0a9dce8b51591f61df0c"
+  },
+  "source_url": "https://api.theracingapi.com/openapi.json"
+}

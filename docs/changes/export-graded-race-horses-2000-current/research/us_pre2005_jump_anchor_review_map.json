@@ -1,0 +1,324 @@
+{
+  "schema_version": "us-pre2005-jump-anchor-review-map.v1",
+  "status": "PROPOSED_NOT_APPROVED",
+  "approval": false,
+  "database_writes": 0,
+  "review_basis": "人工复核已缓存公开历史资料；本文件只生成未批准候选，不构成来源批准或数据库写入授权。",
+  "resolutions": [
+    {
+      "target_key": "united_states:2000:united-states-atlanta-cup:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "All Gong",
+      "source_id": "tdn-all-gong-obituary",
+      "source_page": 13,
+      "evidence_mode": "text_extract",
+      "reviewed_evidence": "The obituary identifies All Gong as winner of the Atlanta Cup Hurdle during his 2000 championship season."
+    },
+    {
+      "target_key": "united_states:2001:united-states-atlanta-cup:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "Electron",
+      "source_id": "american-classic-pedigrees-shy-spirit",
+      "evidence_mode": "html_text_review",
+      "reviewed_evidence": "Electron is identified as winner of the 2001 Coca-Cola/UPS Atlanta Cup Hurdle Stakes."
+    },
+    {
+      "target_key": "united_states:2000:united-states-carolina-cup:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "Invest West",
+      "source_id": "ccra-history",
+      "evidence_mode": "html_winner_history_review",
+      "reviewed_evidence": "Carolina Cup history lists 2000 Invest West."
+    },
+    {
+      "target_key": "united_states:2001:united-states-carolina-cup:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "Al Skywalker",
+      "source_id": "ccra-history",
+      "evidence_mode": "html_winner_history_review",
+      "reviewed_evidence": "Carolina Cup history lists 2001 Al Skywalker."
+    },
+    {
+      "target_key": "united_states:2002:united-states-carolina-cup:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "Canta Ke Brave",
+      "source_id": "ccra-history",
+      "evidence_mode": "html_winner_history_review",
+      "reviewed_evidence": "Carolina Cup history lists 2002 Canta Ke Brave."
+    },
+    {
+      "target_key": "united_states:2003:united-states-carolina-cup:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "Al Skywalker",
+      "source_id": "ccra-history",
+      "evidence_mode": "html_winner_history_review",
+      "reviewed_evidence": "Carolina Cup history lists 2003 Al Skywalker."
+    },
+    {
+      "target_key": "united_states:2004:united-states-carolina-cup:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "Preemptive Strike",
+      "source_id": "ccra-history",
+      "evidence_mode": "html_winner_history_review",
+      "reviewed_evidence": "Carolina Cup history lists 2004 Preemptive Strike."
+    },
+    {
+      "target_key": "united_states:2000:united-states-colonial-cup:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "Romantic",
+      "source_id": "ccra-history",
+      "evidence_mode": "html_winner_history_review",
+      "reviewed_evidence": "Colonial Cup history lists 2000 Romantic."
+    },
+    {
+      "target_key": "united_states:2001:united-states-colonial-cup:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "Lord Zada",
+      "source_id": "ccra-history",
+      "evidence_mode": "html_winner_history_review",
+      "reviewed_evidence": "Colonial Cup history lists 2001 Lord Zada."
+    },
+    {
+      "target_key": "united_states:2002:united-states-colonial-cup:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "Flat Top",
+      "source_id": "ccra-history",
+      "evidence_mode": "html_winner_history_review",
+      "reviewed_evidence": "Colonial Cup history lists 2002 Flat Top."
+    },
+    {
+      "target_key": "united_states:2003:united-states-colonial-cup:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "McDynamo",
+      "source_id": "ccra-history",
+      "evidence_mode": "html_winner_history_review",
+      "reviewed_evidence": "Colonial Cup history lists 2003 McDynamo."
+    },
+    {
+      "target_key": "united_states:2004:united-states-colonial-cup:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "Hirapour (IRE)",
+      "source_id": "ccra-history",
+      "evidence_mode": "html_winner_history_review",
+      "reviewed_evidence": "Colonial Cup history lists 2004 Hirapour (IRE)."
+    },
+    {
+      "target_key": "united_states:2000:united-states-hard-scuffle-steeplechase:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "Pompeyo (CHI)",
+      "source_id": "tdn-2000-hard-scuffle",
+      "source_page": 8,
+      "evidence_mode": "visual_ocr_review",
+      "reviewed_evidence": "Rendered result page identifies Pompeyo (CHI) as first in the 2000 Hard Scuffle Stakes."
+    },
+    {
+      "target_key": "united_states:2001:united-states-hard-scuffle-steeplechase:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "Praise The Prince",
+      "source_id": "nyra-media-guide-2026",
+      "source_page": 21,
+      "evidence_mode": "text_extract",
+      "reviewed_evidence": "Trainer profile lists Praise The Prince: Hard Scuffle Hurdle (2001)."
+    },
+    {
+      "target_key": "united_states:2002:united-states-hard-scuffle-steeplechase:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "McDynamo",
+      "source_id": "tdn-2002-hard-scuffle",
+      "source_page": 10,
+      "evidence_mode": "text_extract",
+      "reviewed_evidence": "Race result identifies McDynamo as first in the 2002 Hard Scuffle Stakes."
+    },
+    {
+      "target_key": "united_states:2003:united-states-hard-scuffle:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "Trebizond (IRE)",
+      "source_id": "tdn-2003-hard-scuffle",
+      "source_page": 13,
+      "evidence_mode": "text_extract",
+      "reviewed_evidence": "Race result identifies Trebizond (IRE) as first in the 2003 Hard Scuffle Stakes."
+    },
+    {
+      "target_key": "united_states:2000:united-states-j-l-aitcheson-jr-novice-hurdle:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "Pompeyo (CHI)",
+      "source_id": "nyra-media-guide-2026",
+      "source_page": 21,
+      "evidence_mode": "text_extract",
+      "reviewed_evidence": "Trainer profile lists Pompeyo: Joe Aitcheson Hurdle (2000)."
+    },
+    {
+      "target_key": "united_states:2001:united-states-j-l-aitcheson-jr-novice-hurdle:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "Flasher",
+      "source_id": "kentucky-downs-media-guide-2021",
+      "source_page": 28,
+      "evidence_mode": "text_extract",
+      "reviewed_evidence": "Trainer profile lists Flasher's Grade 1 win in the 2001 Joe Aitcheson."
+    },
+    {
+      "target_key": "united_states:2002:united-states-j-l-aitcheson-jr-novice-hurdle:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "Anofferucantrefuse",
+      "source_id": "tdn-2002-joe-aitcheson",
+      "source_page": 9,
+      "evidence_mode": "text_extract",
+      "reviewed_evidence": "Race result identifies Anofferucantrefuse as first in the 2002 Joe Aitcheson Jr. Novice Hurdle."
+    },
+    {
+      "target_key": "united_states:2003:united-states-joe-aitcheson-jr-novice-hurdle:jumps",
+      "resolution_kind": "calendar_correction",
+      "correction_state": "not_held",
+      "correction_reason": "canceled_due_to_weather",
+      "source_id": "tjcis-postpublication-2004",
+      "source_page": 29,
+      "evidence_mode": "text_extract",
+      "reviewed_evidence": "The 2003 post-publication appendix says the Joe Aitcheson Jr. Novice Hurdle was canceled due to weather."
+    },
+    {
+      "target_key": "united_states:2004:united-states-joe-aitcheson-jr-novice-hurdle:jumps",
+      "resolution_kind": "calendar_correction",
+      "correction_state": "not_held",
+      "correction_reason": "did_not_run_no_jump_races_at_pimlico",
+      "source_id": "tjcis-postpublication-2005",
+      "source_page": 31,
+      "evidence_mode": "text_extract",
+      "reviewed_evidence": "The 2004 post-publication appendix says the race did not run because there were no jump races at Pimlico in 2004."
+    },
+    {
+      "target_key": "united_states:2000:united-states-meadowbrook-novice:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "Yellowroad",
+      "source_id": "kentucky-downs-media-guide-2021",
+      "source_page": 28,
+      "evidence_mode": "text_extract",
+      "reviewed_evidence": "Trainer profile lists Yellowroad's Grade 1 win in the 2000 Meadow Brook."
+    },
+    {
+      "target_key": "united_states:2001:united-states-meadowbrook-novice:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "Praise The Prince",
+      "source_id": "nyra-media-guide-2026",
+      "source_page": 21,
+      "evidence_mode": "text_extract",
+      "reviewed_evidence": "Trainer profile lists Praise The Prince: Meadow Brook Hurdle (2001)."
+    },
+    {
+      "target_key": "united_states:2002:united-states-meadowbrook-novice:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "Sharp Face",
+      "source_id": "tdn-2002-meadow-brook",
+      "source_page": 9,
+      "evidence_mode": "text_extract",
+      "reviewed_evidence": "Race result identifies Sharp Face as first in the 2002 Meadow Brook Novice Hurdle."
+    },
+    {
+      "target_key": "united_states:2003:united-states-meadowbrook-novice:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "Trebizond (IRE)",
+      "source_id": "tdn-2003-meadow-brook",
+      "source_page": 12,
+      "evidence_mode": "text_extract",
+      "reviewed_evidence": "Race result identifies Trebizond (IRE) as first in the 2003 Meadow Brook Novice Hurdle."
+    },
+    {
+      "target_key": "united_states:2004:united-states-meadowbrook-novice:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "Sur La Tete",
+      "source_id": "tdn-2004-meadow-brook",
+      "source_page": 13,
+      "evidence_mode": "text_extract",
+      "reviewed_evidence": "Race result identifies Sur La Tete as first in the 2004 Meadow Brook Novice Hurdle."
+    },
+    {
+      "target_key": "united_states:2000:united-states-royal-chase:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "Flat Top",
+      "source_id": "keeneland-stakes-winning-horses",
+      "source_page": 3,
+      "evidence_mode": "text_extract",
+      "reviewed_evidence": "Keeneland stakes history lists Flat Top for the 2000 Royal Chase for the Sport of Kings."
+    },
+    {
+      "target_key": "united_states:2001:united-states-royal-chase:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "Pompeyo (CHI)",
+      "source_id": "keeneland-stakes-winning-horses",
+      "source_page": 5,
+      "evidence_mode": "text_extract",
+      "reviewed_evidence": "Keeneland stakes history lists Pompeyo (CHI) for the 2001 Royal Chase for the Sport of Kings."
+    },
+    {
+      "target_key": "united_states:2002:united-states-royal-chase:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "It's a Giggle",
+      "source_id": "keeneland-stakes-winning-horses",
+      "source_page": 3,
+      "evidence_mode": "text_extract",
+      "reviewed_evidence": "Keeneland stakes history lists It's a Giggle for the 2002 Royal Chase for the Sport of Kings."
+    },
+    {
+      "target_key": "united_states:2003:united-states-royal-chase-for-the-sport-of-kings:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "McDynamo",
+      "source_id": "keeneland-stakes-winning-horses",
+      "source_page": 4,
+      "evidence_mode": "text_extract",
+      "reviewed_evidence": "Keeneland stakes history lists McDynamo for the 2003 Royal Chase for the Sport of Kings."
+    },
+    {
+      "target_key": "united_states:2004:united-states-royal-chase-for-the-sport-of-kings:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "Hirapour (IRE)",
+      "source_id": "keeneland-stakes-winning-horses",
+      "source_page": 3,
+      "evidence_mode": "text_extract",
+      "reviewed_evidence": "Keeneland stakes history lists Hirapour (IRE) for the 2004 Royal Chase for the Sport of Kings."
+    },
+    {
+      "target_key": "united_states:2003:united-states-foxbrook-supreme-novice:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "Sur La Tete",
+      "source_id": "tdn-2003-foxbrook",
+      "source_page": 14,
+      "evidence_mode": "text_extract",
+      "reviewed_evidence": "Race result identifies Sur La Tete as first in the 2003 Foxbrook Supreme Novice Stakes."
+    },
+    {
+      "target_key": "united_states:2004:united-states-foxbrook-supreme-novice:jumps",
+      "resolution_kind": "winner_anchor",
+      "anchor_horse_name": "Paradise's Boss",
+      "source_id": "irish-field-tom-foley-interview",
+      "evidence_mode": "html_text_review",
+      "reviewed_evidence": "The 2024 interview says the rider's last American Grade 1 win twenty years earlier was the Foxbrook Supreme Hurdle on Paradise's Boss."
+    },
+    {
+      "target_key": "united_states:2002:united-states-atlanta-cup:jumps",
+      "resolution_kind": "manual_source_not_sha_bound",
+      "proposed_anchor_horse_name": "Pinkie Swear",
+      "source_urls": [
+        "https://cs.bloodhorse.com/files/folders/28337/download.aspx"
+      ],
+      "blocker": "The BloodHorse index identifies Pinkie Swear for the Atlanta Cup, but the historical file is not retrievable through the fail-closed local TLS capture path."
+    },
+    {
+      "target_key": "united_states:2004:united-states-hard-scuffle:jumps",
+      "resolution_kind": "manual_source_not_sha_bound",
+      "proposed_correction_state": "not_held",
+      "source_urls": [
+        "https://cs.bloodhorse.com/files/folders/28339/download.aspx"
+      ],
+      "blocker": "The BloodHorse index says purse considerations led Churchill Downs to discontinue the Hard Scuffle, but the historical file is not retrievable through the fail-closed local TLS capture path."
+    },
+    {
+      "target_key": "united_states:2004:united-states-u-s-championship-supreme-novice:jumps",
+      "resolution_kind": "manual_source_not_sha_bound",
+      "proposed_anchor_horse_name": "Cherokeeinthehills",
+      "source_urls": [
+        "https://www.nyra.com/uploads/belmont/assets/uploads/2020MediaGuideHistory_WEB.pdf",
+        "https://thisishorseracing.com/wp-content/uploads/2023/02/10-22-10.pdf"
+      ],
+      "blocker": "Two independent indexed sources identify Cherokeeinthehills as the 2004 Callaway novice winner, but the NYRA file is no longer available and the archive PDF returns 403 to the fail-closed capture client."
+    }
+  ]
+}

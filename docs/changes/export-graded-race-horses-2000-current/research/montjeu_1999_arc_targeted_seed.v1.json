@@ -1,0 +1,44 @@
+{
+  "schema_version": "targeted-horse-seed.v1",
+  "seed_id": "proof-1999-arc-winner-montjeu",
+  "review_status": "prepared_for_review",
+  "scope_exception": "user_requested_pre_2000_acceptance_proof",
+  "name": "Montjeu",
+  "country_suffix": "IRE",
+  "sire": "Sadler's Wells",
+  "dam": "Floripedes",
+  "damsire": "Top Ville",
+  "expected_finish_position": "1",
+  "source_authority": "official_operator_archived_result",
+  "source_provider": "france_galop",
+  "source_url": "https://web.archive.org/web/20231002015541id_/https://www9.france-galop.com/fgweb/domaines/courses/course_detail.aspx?aaCrse=1999&spCrse=P&numCrsePgm=00780",
+  "source_upstream_url": "https://www9.france-galop.com/fgweb/domaines/courses/course_detail.aspx?aaCrse=1999&spCrse=P&numCrsePgm=00780",
+  "source_payload_sha256": "50cd02479fdca9155be2c9ccfc0b6d1bc0a0e89c16305807462315beffd6f1a1",
+  "source_observation": {
+    "race_label": "PRIX DE L'ARC DE TRIOMPHE LUCIEN BARRIERE",
+    "race_date": "1999-10-03",
+    "racecourse": "PARISLONGCHAMP",
+    "winner_raw": "montjeu (ire)",
+    "winner_provider_local_id": "46939448",
+    "winner_age_at_race": 3,
+    "winner_sire_raw": "SADLER'S WELLS",
+    "winner_dam_raw": "FLORIPEDES",
+    "winner_damsire_raw": "TOP VILLE",
+    "winner_breeder_raw": "SUC. J. GOLDSMITH"
+  },
+  "target": {
+    "year": 1999,
+    "country_region": "france",
+    "local_date": "1999-10-03",
+    "canonical_name_original": "Prix de l'Arc de Triomphe",
+    "race_name_aliases": [
+      "Prix de l'Arc de Triomphe Lucien Barriere"
+    ],
+    "racecourse": "ParisLongchamp",
+    "racecourse_aliases": [
+      "Longchamp"
+    ],
+    "grade_text": "G1",
+    "discipline": "flat"
+  }
+}

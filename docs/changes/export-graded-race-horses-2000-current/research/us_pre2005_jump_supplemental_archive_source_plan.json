@@ -1,0 +1,29 @@
+{
+  "schema_version": "exact-review-source-plan.v1",
+  "status": "PROPOSED_NOT_APPROVED",
+  "approval": false,
+  "database_writes": 0,
+  "sources": [
+    {
+      "source_id": "wayback-pinkie-swear-obituary",
+      "url": "https://web.archive.org/web/20230321173945id_/https://thisishorseracing.com/wp-content/uploads/2013/02/03-14-08.pdf",
+      "content_types": ["application/pdf"],
+      "max_bytes": 10485760,
+      "extension": "pdf"
+    },
+    {
+      "source_id": "wayback-bloodhorse-index-2004",
+      "url": "https://web.archive.org/web/20090221044515id_/http://cs.bloodhorse.com:80/files/folders/28339/download.aspx",
+      "content_types": ["application/pdf"],
+      "max_bytes": 2097152,
+      "extension": "pdf"
+    },
+    {
+      "source_id": "wayback-steeplechase-times-2010-10-22",
+      "url": "https://web.archive.org/web/20231031062857id_/https://thisishorseracing.com/wp-content/uploads/2023/02/10-22-10.pdf",
+      "content_types": ["application/pdf"],
+      "max_bytes": 10485760,
+      "extension": "pdf"
+    }
+  ]
+}
