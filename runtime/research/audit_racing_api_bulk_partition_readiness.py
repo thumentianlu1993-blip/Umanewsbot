@@ -266,6 +266,8 @@ def build_readiness(
             year = int(target.get("year"))
         except (TypeError, ValueError) as exc:
             raise ValueError("target year is invalid") from exc
+        if year > as_of_date.year:
+            raise ValueError("due target year is after as_of_date")
         if (
             region not in VALID_REGIONS
             or source.get("country_region") != region
@@ -284,10 +286,25 @@ def build_readiness(
             "evidence_state": source.get("evidence_state"),
             "local_date_known": bool(str(target.get("local_date") or "")),
         }
+        local_date_text = str(target.get("local_date") or "")
+        local_date_value = None
+        if local_date_text:
+            try:
+                local_date_value = date.fromisoformat(local_date_text)
+            except ValueError as exc:
+                raise ValueError("target local_date is invalid") from exc
+            if local_date_value.year != year:
+                raise ValueError("target local_date year disagrees with target year")
         if source.get("evidence_state") == "not_due_official_calendar":
             row["route_class"] = "not_due_excluded_from_results"
             classified["not_due"].append(row)
-        elif year < bulk_query_earliest_date.year:
+        elif not (
+            year == as_of_date.year
+            or (
+                local_date_value is not None
+                and bulk_query_earliest_date <= local_date_value <= as_of_date
+            )
+        ):
             row["route_class"] = "external_anchor_then_targeted_horse_results"
             classified["historical"].append(row)
         else:
@@ -354,6 +371,7 @@ def build_readiness(
             "provider_results_window_months": PROVIDER_RESULTS_WINDOW_MONTHS,
             "bulk_query_earliest_date": bulk_query_earliest_date.isoformat(),
             "bulk_query_boundary_policy": "strictly_inside_window_route_boundary_gap_to_stable_id",
+            "previous_year_unknown_date_policy": "route_to_external_anchor_then_targeted_horse",
             "provider_window_evidence": "http_422_start_date_must_be_12_months_or_less_in_the_past",
             "bulk_range_max_inclusive_days": 1,
             "bulk_partition_strategy": "one_region_per_calendar_date",
