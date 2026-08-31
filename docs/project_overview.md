@@ -390,9 +390,12 @@ artifact 行，不能因为同属一个地区 batch 就把未完成对象带入�
 
 准实时赛果与新闻、历史回填分离。来源事实先保存为 append-only observation 和 immutable
 revision，再经四层 policy、逐赛事 allowlist、来源条款/authority、participant 完整性和
-owner/claim CAS 决定是否形成公开 projection。The Racing API 只提供快速
-`provisional_result`；官方来源的独立 evidence 才能支持后续 `official_result` 或
-`corrected_result`。
+owner/claim CAS 决定是否形成公开 projection。旧 `race_live` 快速链曾把 The Racing API 固定作为
+`provisional_result` 来源；当前 `race_sync_v2` 不再仅按 provider 名称判断 finality，而是要求受审 exact
+route、原始 terminal marker、已批准来源身份/authority、完整 canonical roster 与 claim/CAS 同时通过。
+满足该合同时可形成 `official_result`；缺少任一条件仍只能保留 provisional，后续不同的合法终态 artifact
+才可形成带 superseding 关系的 `corrected_result`。已导入官方事实和可信第三方 fallback 继续遵守统一来源
+优先级与独立证据边界。
 
 定时赛果审核运行记录也采用显式终态：prepare 异常由原 token CAS 写 `failed`，租约过期且没有形成
 selector、bundle 或 terminal 证据的空 claim 由严格 sweeper 收口。发布门禁仍统计所有 claimed；畸形、
@@ -596,10 +599,11 @@ canonical runner roster。只有结果型 fallback 与现有 runner 通过马号
 ## 赛事数据自动化的生产运行形态
 
 生产链现以普通 `celery` worker 与专用 `race_sync_v2` worker 隔离运行；旧 `race_live` 遗留队列不接入、
-不消费。普通 worker 和 Web 已按小站负载压低并发并设置子进程回收/cgroup 上限，以资源门禁和 fail-closed
-优先替代主机扩容。赛前 future discovery、赛时/出马表、lifecycle 与 result/public 已按序启用；更正自动化
-仍需真实赛果公开验证后单独开启。
+不消费。普通 worker 和 Web 已按小站负载压低并发并设置子进程回收/cgroup 上限，继续以资源门禁和
+fail-closed 控制风险。future discovery、赛时/出马表、lifecycle、result apply/public 与 correction 已按冻结
+顺序全部启用；event 956 的正式公开和一个完整自然 correction 周期均已通过。
 
 运行期内存门禁实际越线后，赛事链会回到 10 false并移除专用 worker，不能把服务仍健康当作继续写入的
 理由。当前小站 Web 使用 1 Gunicorn worker × 4 threads，保持 4 个请求线程并减少进程常驻内存；生产目前
-处于该优化后的关闭态，必须通过新的发布窗口才能恢复上述自动链。
+处于 10 flags true 的 active 状态，四服务运行 exact PR #133 image。后续任一硬门禁失败仍立即恢复关闭态，
+再次启用必须重新经过共享锁、资源、队列、exact identity 与冻结顺序验收。
