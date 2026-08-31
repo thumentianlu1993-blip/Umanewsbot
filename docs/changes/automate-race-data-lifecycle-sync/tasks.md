@@ -101,11 +101,12 @@
 - [x] (operations) 创建 PostgreSQL custom-format 备份，记录权限/大小/SHA 并通过 `pg_restore --list`。
 - [x] (operations) 所有新开关关闭应用 0074/0075，验证 web/worker/Beat 同 image/revision、healthz、迁移和
   flag-off 三零；磁盘低于 8 GiB 时停止。
-- [ ] (operations) 写入冻结容量与 allowlist，按 future discovery -> network/time/racecard -> lifecycle ->
+- [x] (operations) 写入冻结容量与 allowlist，按 future discovery -> network/time/racecard -> lifecycle ->
   result apply/public -> correction 顺序启用；PR #130 数据库限窗、PR #131 exact transport、PR #132 同源
   terminal non-starter 与 PR #133 standing-policy public-read 修复均已合并并上线。event 956 已自然完成
   revision 17 publication、10 条 canonical projection 与 root/www “赛果”验收，correction 也已在独立锁
-  窗口开启。只剩 `2026-08-31T10:27:01.874961Z` 自然更正周期的幂等、claim/checkpoint、资源/队列
-  终验和最终文档 PR；全部通过后才勾选本项。
+  窗口开启。`2026-08-31T10:27:12Z` 自然更正任务已以业务 `processed=true / complete /
+  applied_kinds=[result]` 完成，claim/checkpoint/capacity 推进，10 results、2 revisions、1 publication、
+  2 lifecycle transitions 幂等不变；资源、四服务、公开页与 `0/0/7543` 队列终验全部通过。
 - [x] (operations) 已验证 `race_sync_v2_worker` 只消费新队列、普通 worker 只消费 `celery`，旧
   `race_live=7543` 不变；当前/回滚镜像和 release evidence 均已记录。

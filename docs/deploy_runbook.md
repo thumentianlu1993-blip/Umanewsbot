@@ -1,5 +1,27 @@
 # 部署运行手册
 
+## 2026-08-31 event 956 自然 correction 通过后的终态与交接
+
+1. `2026-08-31T10:27:12Z` 的自然 correction task
+   `2a69c1ef-d3c2-48be-9f23-9504f580f89d` 已返回业务
+   `processed=true / complete / claim_action=complete / applied_kinds=[result] / not_found_kinds=[]`。不能只引用
+   Celery `SUCCESS`；还要保留该业务 payload、claim generation 87、空 token/lease、failures=0 与下一 result
+   checkpoint `2026-08-31T16:27:13.662628Z`。
+2. 幂等不变量为：10 confirmed results、2 result revisions、1 publication、7 observations、2 lifecycle
+   transitions，official content SHA `aa76ecba…e533`。同一 official artifact 不创建 correction revision，
+   `corrected_at=NULL` 属于正确结果；任何重复行、revision 反转或 publication 增量均视为失败。
+3. 公网终验固定使用 `/races/2026/uk-bha-flat-2026-0830-099/` 的 root/www 两个入口。两者应为 200、
+   14386 bytes、SHA `0074214e…2a84`，显示完整 10 匹“赛果”，不出现“赛果待确认”或
+   provider/provisional/The Racing API 内部阶段。
+4. 资源与运行态终验为：lock absent，四服务 exact revision `220bc621…402b` / image
+   `946f2177…9803a`、restart0/OOMfalse，leaf 0075，10 flags true，`MemAvailable=5647744 kB`、
+   `SwapFree=1310716 kB`、disk `12291444736` bytes，队列 `0/0/7543`。PR #134 为 docs-only 终态证据，
+   合并不需要重建生产容器；合并后仍应重新执行一次本条只读门禁。
+5. TRA 窗口只有在合并后只读终验仍通过时才能释放：可以让后续 owner 自己取得新随机 deployment lock 并
+   暂停 Beat，但本任务不代替其 claim 或联网。必须明确绑定 reference registry SHA
+   `740a9377…cff2` 与 TRA canonical SHA `3bac3b64…a6da`，保持二者分离；`race_live=7543` 继续禁止删除、
+   消费、迁移或手工重排。未来任一赛事硬门禁失败仍按原 10 false 路径 fail closed。
+
 ## 2026-08-31 PR #133 正式公开后的 correction 最终收口
 
 1. active 身份固定为 release

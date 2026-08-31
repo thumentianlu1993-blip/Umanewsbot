@@ -1,11 +1,12 @@
 # 项目总览
 
-2026-08-31 13:02，PR #133 已修复 data-sync 公共读取中 raw file SHA 与 canonical policy digest 的错误
-比较，并以 `220bc621…402b` / `946f2177…9803a` 完成备份、关闭态发布和五阶段重开。event 956 的
-official revision id 17 已自然公开为唯一 publication 与 10 条 canonical result；root/www 均展示 8 名
-1–8 完赛马及 2 名无名次 non-runner，public-read detail/bulk 允许且无内部来源/阶段泄露。correction 已在
-独立锁窗口开启，当前计数保持 `10 results / 2 result revisions / 1 publication`、四服务 exact、
-`race_live=7543`。只剩北京时间 18:27:01 的自然 correction 幂等 replay 和最终证据 PR，禁止提前派发。
+2026-08-31 18:40，完整赛事状态更迭生产目标已通过。PR #133 以 `220bc621…402b` /
+`946f2177…9803a` 完成关闭态发布和五阶段重开；event 956 已自然经历 scheduled -> running -> finished、
+official revision、10 条 canonical result、唯一 publication 与 root/www 公开。北京时间 18:27 的自然
+correction task 业务结果为 `processed=true / complete / applied_kinds=[result]`，claim/checkpoint/capacity
+均推进；因 official artifact 未变化，10 results / 2 revisions / 1 publication / 2 transitions 全部幂等不变。
+四服务 exact、migration 0075、10 flags、资源和队列终验通过，`race_live=7543` 始终未动。PR #134 仅收口
+最终证据；合并后执行一次只读终审即可释放严格隔离的 TRA proof 窗口。
 
 2026-08-31 09:41，PR #132 已以 `edf0322d…5649` / `e9b8ca02…1396c` 上线并完成 future discovery、
 race time/racecard、lifecycle、result apply、result public 的冻结顺序重开。自然 exact-result 轮询已生成

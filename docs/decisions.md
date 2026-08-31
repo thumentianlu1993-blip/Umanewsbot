@@ -1,5 +1,20 @@
 # 关键决策
 
+## 2026-08-31 同一 official artifact 的 correction 以幂等 checkpoint 推进为成功
+
+- correction 开启后若 provider 返回与已公开 official revision 完全相同的终态，不应新增
+  `corrected_result`、superseding revision、publication 或 canonical row，也不应为了“看起来发生过更正”
+  写入 `corrected_at`。正确结果是业务任务成功完成 claim、capacity ledger 真实增量、checkpoint 按 correction
+  cadence 推进，而所有内容计数和 SHA 保持不变。
+- event 956 的 `10:27Z` 自然任务已经同时满足 Celery terminal 与业务
+  `processed=true / reason=complete / claim_action=complete / applied_kinds=[result]`；claim generation 87、
+  token/lease 释放、failures=0、下一 checkpoint `16:27:13Z`。10 results、2 revisions、1 publication、
+  2 lifecycle transitions 和 official content SHA 均未变化，因此这是通过的幂等 correction 周期，不是
+  “更正功能未运行”。
+- 释放相邻 TRA proof 窗口仍要求最终只读门禁同时满足：shared lock absent、四服务 exact/restart0/OOMfalse、
+  leaf 0075、10 flags true、资源阈值通过、`celery/race_sync_v2` 空且 `race_live=7543`。reference registry
+  `740a…cff2` 与独立 TRA canonical `3bac…a6da` 必须继续分离，不能借窗口自动迁移或改写。
+
 ## 2026-08-31 standing policy 必须分别校验 raw SHA 与 canonical digest
 
 - `RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256` 是策略文件原始字节的供应链完整性 SHA；
