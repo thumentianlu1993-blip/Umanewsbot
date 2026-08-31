@@ -1,6 +1,18 @@
 # 赛事数据生命周期生产发布证据
 
-更新时间：2026-08-31 07:42 Asia/Shanghai
+更新时间：2026-08-31 08:24 Asia/Shanghai
+
+## 2026-08-31 08:24 PR #130 热身通过，exact-result transport 自身拒绝后再次关闭
+
+- PR #130 merge revision `8e7a2ba8…b19b` 已构建为 image `9174654b…f426` 并在隔离 release 关闭态部署；
+  leaf 0075、10 false、专用 worker absent、队列 `0/0/7543`。5 分钟 10 样本热身中普通 worker
+  126.5–195.2 MiB、最低 MemAvailable 约 5.55 GiB、无 OOM/restart，ordinary queue 自然归零。
+- future/racecard/lifecycle 依次恢复后，event 956 的 `00:16:18Z` 自然 poll 进入受审 result-by-id 分支，
+  但 transport 未把动态 `/v1/results/{race_id}` 加入固定 allowlist，调用在 DNS 前抛 PermissionError 并
+  归一为 `provider_response_invalid`。claim 正常释放，0 新 observation/revision/result/publication。
+- 自动保护已恢复 10 false、移除专用 worker并保持全部 Redis 队列。修复仅允许 exact endpoint name、
+  HTTPS host、无 query/fragment和 canonical 单段 race id；unsafe variants 在 DNS 前拒绝，聚焦测试 37/37。
+  新 exact image 关闭态验证后仍须从 future 全量重走。
 
 ## 2026-08-31 07:42 普通 worker 复核任务 OOM，生产已 fail-closed
 

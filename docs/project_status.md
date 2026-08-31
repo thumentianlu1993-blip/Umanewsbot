@@ -1,5 +1,16 @@
 # 项目状态文档
 
+## 2026-08-31 08:24 exact-result transport 缺口待关闭态发布
+
+- PR #130 已以 `8e7a2ba8…b19b` / `9174654b…f426` 关闭态上线并完成 5 分钟热身，selector 候选限窗与
+  普通 worker 内存均稳定。future、racecard、lifecycle 分阶段恢复成功。
+- event 956 于 00:16:18Z 自然调用 exact result 路由时被 transport 自身固定 allowlist 拒绝，业务记为
+  `provider_response_invalid`；claim 已释放、正式赛果/publication 仍为 0。生产已恢复 10 false、专用
+  worker absent，旧队列仍为 7543。
+- 修复把动态路由收敛为 exact host/endpoint/单段规范 race id，危险编码和所有 query/fragment 继续拒绝；
+  聚焦回归 37/37。下一步合并、关闭态发布，然后从 future 全量重走并等待自然 official result，最后独立
+  开启 correction。
+
 ## 2026-08-31 07:42 赛事自动化因复核 selector OOM 关闭
 
 - P0 URL 发现于 22:30:20Z 正常完成；赛果复核随后启动，普通 worker child 在 22:30:41Z 以约

@@ -1,5 +1,11 @@
 # 项目总览
 
+2026-08-31 08:24，PR #130 的赛果复核数据库限窗修复已在 10 false 关闭态部署并通过热身；分阶段恢复至
+lifecycle 后，event 956 首次自然 exact-result 轮询暴露 transport 动态白名单缺口。请求尚未到 DNS，未写
+正式赛果，生产已再次自动全关且 `race_live=7543` 不变。最小修复只放行受审
+`result_by_id + /v1/results/{canonical race_id}` 组合并拒绝全部路径/query/fragment 变体，聚焦回归 37/37；
+合并与关闭态部署后须从 future discovery 重走，正式公开通过前 correction 仍关闭。
+
 2026-08-31 07:42，赛事链因普通 worker 的 child-only cgroup OOM 再次 fail-closed：10 个
 `RACE_DATA_SYNC_*` 全 false、`race_sync_v2_worker` absent，Web 1x4/普通 worker/Beat 已以 exact PR #129
 恢复，队列 `0/0/7543` 与公网均正常。根因是赛果复核 selector 先加载 9,806 场已发布赛事和 92,663 条

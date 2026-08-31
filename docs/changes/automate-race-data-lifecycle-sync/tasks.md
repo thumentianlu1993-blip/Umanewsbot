@@ -104,7 +104,9 @@
 - [ ] (operations) 写入冻结容量与 allowlist，按 future discovery -> network/time/racecard -> lifecycle ->
   result apply/public -> correction 顺序启用；前五阶段曾在 2C/8G 主机按 exact PR #129 全量重走，
   event 956 lifecycle 已完成，但 06:30 赛果复核 selector 的全量 prefetch 触发普通 worker cgroup OOM，
-  当前已 10 false fail-closed。先发布数据库限窗修复并完成关闭态热身，再从 future discovery 全量重走；
+  PR #130 数据库限窗已关闭态发布并完成热身；重走到 lifecycle 后，自然 exact-result poll 又暴露 transport
+  未允许动态 `result_by_id` 的缺口，当前再次 10 false fail-closed。先发布 exact 单段 route allowlist 修复，
+  再从 future discovery 全量重走；
   只有正式 revision、canonical projection、publication 与 root/www 页面同时通过后，才单独开启并验收
   correction 自然周期。
 - [x] (operations) 已验证 `race_sync_v2_worker` 只消费新队列、普通 worker 只消费 `celery`，旧

@@ -1,5 +1,22 @@
 # 当前状态
 
+## 2026-08-31 08:24 PR #130 关闭态稳定，exact result transport 白名单缺口已定位
+
+- PR #130 已合并为 `8e7a2ba8…b19b`，生产隔离 release 为
+  `/opt/umanews-release-8e7a2ba8-PR130-20260830T2347Z/umanewsbot`，image 为
+  `9174654b…f426`。migration leaf 精确为 `0075`；10 个赛事开关全 false、专用 worker absent，Web 1x4、
+  普通 worker、Beat running/restart=0/OOM=false，队列 `0/0/7543`。5 分钟关闭态热身中普通 worker
+  约 126.5–195.2 MiB、宿主最低约 5.55 GiB 可用，普通队列自然排空。
+- 按冻结顺序恢复 future、racecard、lifecycle 后，event 956 于 `00:16:18Z` 自然进入 exact result-by-id
+  分支，但以 `provider_response_invalid` 失败并释放 claim；未新增 observation/revision/canonical result/
+  publication。硬门禁随即恢复 10 false、移除专用 worker并保留全部 Redis 队列。
+- 静态根因已确认：受审 registry 和 URL builder 都包含 `/v1/results/{race_id}`，但底层 transport 的精确
+  allowlist 只有固定 collection routes，没有纳入动态 `result_by_id` 二元组，故请求在 DNS 前被自身
+  `PermissionError` 拒绝。当前修复只接受 exact endpoint name、HTTPS 固定 host、无 query/fragment、单段
+  canonical-encoded race id；路径穿越、编码分隔符、空字节和 endpoint mismatch 继续 fail closed。
+- 新 transport/builder 合约与 provider exact-route 聚焦回归 37/37 通过。完成全量结构门禁、合并和新
+  exact image 关闭态发布前，event 956 不再轮询；不得手工触发 provider 或修改 checkpoint。
+
 ## 2026-08-31 07:42 赛果复核全量 prefetch 触发 cgroup OOM，生产已关闭
 
 - `22:30:00Z` P0 URL 发现先运行并于 `22:30:20Z` 成功；随后赛果复核 run id 95 启动，内核在

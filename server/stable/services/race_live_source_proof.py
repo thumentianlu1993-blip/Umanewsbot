@@ -17,7 +17,7 @@ import stat
 import tempfile
 import time
 from typing import Any, Callable
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, unquote, urlsplit
 
 
 _HOST = "api.theracingapi.com"
@@ -281,7 +281,11 @@ def build_the_racing_api_route_url(
             or not race_id
             or race_id != race_id.strip()
             or len(race_id) > 128
-            or any(char in race_id for char in ("/", "?", "#", "\\", "\x00"))
+            or race_id in {".", ".."}
+            or any(
+                char in race_id
+                for char in ("/", "?", "#", "\\", "%", "\x00")
+            )
         ):
             raise ValueError("race_id is outside the contract")
         return (
@@ -677,6 +681,34 @@ def _resolve_public_addresses(host: str) -> list[str]:
     return addresses
 
 
+def _is_allowlisted_result_by_id_request(
+    *,
+    endpoint_name: str,
+    path: str,
+    query: str,
+) -> bool:
+    """Validate the one dynamic exact-result route without widening its host."""
+    prefix = "/v1/results/"
+    if endpoint_name != "result_by_id" or query or not path.startswith(prefix):
+        return False
+    encoded_race_id = path[len(prefix) :]
+    if not encoded_race_id or "/" in encoded_race_id:
+        return False
+    race_id = unquote(encoded_race_id)
+    if (
+        not race_id
+        or race_id != race_id.strip()
+        or len(race_id) > 128
+        or race_id in {".", ".."}
+        or any(
+            char in race_id
+            for char in ("/", "?", "#", "\\", "%", "\x00")
+        )
+    ):
+        return False
+    return quote(race_id, safe="._:-") == encoded_race_id
+
+
 def the_racing_api_transport(
     *,
     endpoint_name: str,
@@ -716,13 +748,22 @@ def the_racing_api_transport(
                 f"/v1/results/today/free?limit=50&skip={skip}",
             )
         )
+    result_by_id_allowed = _is_allowlisted_result_by_id_request(
+        endpoint_name=endpoint_name,
+        path=parsed.path,
+        query=parsed.query,
+    )
     if (
-        (endpoint_name, request_path) not in allowed_requests
+        (
+            (endpoint_name, request_path) not in allowed_requests
+            and not result_by_id_allowed
+        )
         or parsed.scheme != "https"
         or parsed.hostname != _HOST
         or parsed.port not in (None, 443)
         or parsed.username is not None
         or parsed.password is not None
+        or parsed.fragment
         or allow_redirects is not False
     ):
         raise PermissionError("transport target is outside the fixed allowlist")
