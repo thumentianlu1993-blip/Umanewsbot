@@ -1,6 +1,19 @@
 # 赛事数据生命周期生产发布证据
 
-更新时间：2026-08-31 08:24 Asia/Shanghai
+更新时间：2026-08-31 09:01 Asia/Shanghai
+
+## 2026-08-31 09:01 exact official 8-row 已取得，known non-runner 门禁误判
+
+- PR #131 revision `11fce12c…f5e` / image `a4f898d1…a7fd` 已关闭态发布；新备份
+  `rds_horse_news_20260831T002918Z_187475.dump` 为 491800366 bytes、0600、SHA
+  `1e0876d3…362a`、TOC 1359。12 样本最低 MemAvailable 5859656 kB，队列自然归零。
+- future/racecard/lifecycle/result apply 按序恢复后，`00:50Z` 自然 poll 产生 official observation id 18；
+  raw/normalized SHA 为 `54be7156…5e8a` / `e6a96df1…71ab`，8 名完赛马及 1-8 名次完整，claim 释放。
+  旧算法因 roster 另含两名明确 non-runner 而返回 `result_result_roster_incomplete`；0 official revision、
+  0 canonical result、0 publication。随后已 10 false、移除专用 worker，`race_live=7543` 不变。
+- 修复只追加持有同源 stable ID 的 scratched/withdrawn/non_runner 派生行并保留 provenance；任何 declared
+  缺行继续触发原完整性拒绝。provider/result/transport/selector 聚焦回归 92/92，结构门禁通过；仍需新
+  exact image 关闭态发布后全阶段重走。
 
 ## 2026-08-31 08:24 PR #130 热身通过，exact-result transport 自身拒绝后再次关闭
 

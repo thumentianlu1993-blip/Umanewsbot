@@ -824,15 +824,22 @@ class TheRacingApiDataSyncAdapterTests(TestCase):
         )
         membership.schedule_hash = _schedule_hash(self.event)
         membership.save(update_fields=("schedule_hash", "updated_at"))
-        for runner_id, name, number in (
-            ("horse-1", "Alpha", "1"),
-            ("horse-2", "Beta", "2"),
+        for runner_id, name, number, status in (
+            ("horse-1", "Alpha", "1", models.RaceRunnerStatus.DECLARED),
+            ("horse-2", "Beta", "2", models.RaceRunnerStatus.DECLARED),
+            (
+                "horse-nr",
+                "Gamma",
+                "NR",
+                models.RaceRunnerStatus.NON_RUNNER,
+            ),
         ):
             models.RaceEventRunner.objects.create(
                 event=self.event,
                 external_runner_id=runner_id,
                 horse_name=name,
                 horse_number=number,
+                running_status=status,
                 source_refs={self.source.source_key: runner_id},
             )
         calls = []
@@ -892,7 +899,21 @@ class TheRacingApiDataSyncAdapterTests(TestCase):
         self.assertTrue(outcome.success, outcome.reason_code)
         self.assertEqual(calls[0][0], "result_by_id")
         self.assertIn("/v1/results/jp-api-11", calls[0][1])
-        self.assertEqual(self.event.results.count(), 2)
+        self.assertEqual(self.event.results.count(), 3)
+        non_runner = self.event.results.get(
+            running_status=models.RaceRunnerStatus.NON_RUNNER
+        )
+        self.assertEqual(non_runner.horse_name, "Gamma")
+        self.assertIsNone(non_runner.reported_finish_position)
+        observation = models.RaceResultObservation.objects.get(
+            result_phase=models.RaceResultPhase.OFFICIAL
+        )
+        derived = observation.normalized_payload["participants"][-1]
+        self.assertEqual(derived["external_runner_id"], "horse-nr")
+        self.assertEqual(
+            derived["field_provenance"]["result"],
+            "racecard_terminal_nonstarter",
+        )
 
     @override_settings(RACE_DATA_SYNC_ALLOW_NETWORK=True)
     def test_future_event_identity_is_discovered_without_per_race_review(self):

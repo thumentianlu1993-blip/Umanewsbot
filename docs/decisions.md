@@ -1,5 +1,18 @@
 # 关键决策
 
+## 2026-08-31 official roster 可合并同源已确认 non-starter，但不能补 declared runner
+
+- The Racing API exact official 响应只返回实际出赛结果；event 956 的 8 行与数据库 8 名 declared runner
+  逐一 stable-ID 对应，另两名在此前同源 racecard 已明确为 `non_runner`。将“结果响应行数必须等于赛前
+  roster 总行数”用于该合同会把合法官方结果永久误判为不完整。
+- 允许在 normalized observation 生成时追加缺失的 scratched/withdrawn/non_runner，前提是 runner 已持有
+  当前 source key 的非空 stable ID；派生行保留空 finish position，并写入
+  `field_provenance.result=racecard_terminal_nonstarter`。raw SHA 仍精确绑定 provider 原始 8 行，normalized
+  SHA 绑定 8+2 完整终态，不能宣称两条派生行来自 official response。
+- declared/running/reinstated/unknown 或任何无同源 ID 的缺行不补；下游 `_result_roster_mapping` 仍要求完整
+  一一映射、全终态、无重复/多解。该放宽不允许马名猜测、手工赛果、绕过 official marker 或提前开启
+  correction。
+
 ## 2026-08-31 动态 exact-result 只按规范化单段 race id 放行
 
 - `result_by_id` 已是受审 source registry 与 provider 的正式路由，缺口只在 transport allowlist；因此修复
