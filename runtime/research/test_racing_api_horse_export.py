@@ -527,6 +527,24 @@ class RacingApiHorseExportTests(unittest.TestCase):
             self.module.build_endpoint("horse_results", horse_id="hrs_1024", limit=100, skip=0),
             "https://api.theracingapi.com/v1/horses/hrs_1024/results?limit=100&skip=0",
         )
+        self.assertEqual(
+            self.module.build_endpoint(
+                "bulk_results",
+                start_date="2005-01-01",
+                end_date="2005-01-01",
+                region="FR",
+                limit=100,
+                skip=0,
+            ),
+            "https://api.theracingapi.com/v1/results?start_date=2005-01-01&end_date=2005-01-01&region=fr&limit=100&skip=0",
+        )
+        self.module.validate_endpoint_url(
+            "https://api.theracingapi.com/v1/results?start_date=2005-01-01&end_date=2005-01-01&region=fr&limit=100&skip=0"
+        )
+        with self.assertRaisesRegex(ValueError, "bulk results query"):
+            self.module.validate_endpoint_url(
+                "https://api.theracingapi.com/v1/results?start_date=2005-01-01&end_date=2005-01-01&region=FR&limit=100&skip=0"
+            )
         with self.assertRaisesRegex(ValueError, "invalid horse id"):
             self.module.build_endpoint("horse_pro", horse_id="https://evil.example/x")
         with self.assertRaisesRegex(ValueError, "unknown endpoint kind"):
