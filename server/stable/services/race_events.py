@@ -81,6 +81,10 @@ from stable.services.race_field_normalization import (
     normalize_eligibility,
     normalize_surface_race_type_layout_going,
 )
+from stable.services.race_data_sync_enrollment import (
+    load_standing_policy_file,
+    parse_standing_policy,
+)
 
 # 赛事总账关联保持为独立领域服务；这里重导出兼容既有调用方和测试 API。
 from stable.services.race_event_reconciliation import (
@@ -3290,6 +3294,7 @@ def _resolve_data_sync_publication_from_loaded_rows(
     enrollment_source: RaceResultSourceIdentity | None,
     lifecycle: RaceEventLifecycleControl | None,
     lifecycle_membership: RaceEventLifecycleEnforceMembership | None,
+    standing_policy_digest: str | None,
     now: datetime,
 ) -> RaceLivePublicReadDecision:
     """Authorize a data-sync result without borrowing legacy race-live policy."""
@@ -3376,10 +3381,8 @@ def _resolve_data_sync_publication_from_loaded_rows(
         for value in digest_values
     ):
         return reject("enrollment_digest_invalid")
-    standing_policy_digest = str(
-        getattr(settings, "RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256", "")
-        or ""
-    )
+    if standing_policy_digest is None:
+        return reject("standing_policy_unavailable")
     if enrollment.standing_policy_digest != standing_policy_digest:
         return reject("standing_policy_drift")
 
@@ -3450,6 +3453,30 @@ def _resolve_data_sync_publication_from_loaded_rows(
         phase=revision.phase,
         effective_mode=RaceLivePublicationMode.OFFICIAL_PUBLIC,
     )
+
+
+def _load_race_data_sync_standing_policy_digest() -> str | None:
+    """Return the reviewed policy's canonical digest after byte-SHA validation."""
+
+    try:
+        value = load_standing_policy_file(
+            path=getattr(
+                settings,
+                "RACE_DATA_SYNC_FUTURE_STANDING_POLICY_FILE",
+                "",
+            ),
+            expected_sha256=str(
+                getattr(
+                    settings,
+                    "RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256",
+                    "",
+                )
+                or ""
+            ),
+        )
+        return parse_standing_policy(value).digest
+    except (OSError, TypeError, ValueError):
+        return None
 
 
 def resolve_race_live_public_read(
@@ -3610,6 +3637,9 @@ def resolve_race_live_public_read(
             enrollment_source=(enrollment.source_identity if enrollment else None),
             lifecycle=lifecycle,
             lifecycle_membership=lifecycle_membership,
+            standing_policy_digest=(
+                _load_race_data_sync_standing_policy_digest()
+            ),
             now=now,
         )
     if revision.source_authority != source.result_authority:
@@ -4207,6 +4237,11 @@ def resolve_race_live_public_reads(
         )
         .select_related("registry")
     }
+    standing_policy_digest = (
+        _load_race_data_sync_standing_policy_digest()
+        if data_sync_event_ids
+        else None
+    )
 
     required_mode_by_phase = {
         RaceResultPhase.PROVISIONAL: RaceLivePublicationMode.PROVISIONAL_PUBLIC,
@@ -4335,6 +4370,7 @@ def resolve_race_live_public_reads(
                 lifecycle_membership=lifecycle_membership_by_event_id.get(
                     event_id
                 ),
+                standing_policy_digest=standing_policy_digest,
                 now=now,
             )
             continue
