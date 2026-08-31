@@ -69,9 +69,9 @@ class RacingApiBulkPartitionReadinessTests(unittest.TestCase):
 
     def test_classifies_cutoff_leap_current_and_not_due_without_execution(self):
         targets = [
-            self.target("france:2004:pre", "france", 2004),
-            self.target("france:2005:first", "france", 2005),
-            self.target("ireland:2008:leap", "ireland", 2008),
+            self.target("france:2004:historical", "france", 2004),
+            self.target("france:2024:historical", "france", 2024),
+            self.target("ireland:2025:window", "ireland", 2025),
             self.target("united_states:2026:due", "united_states", 2026),
             self.target("united_kingdom:2026:not-due", "united_kingdom", 2026),
         ]
@@ -89,24 +89,23 @@ class RacingApiBulkPartitionReadinessTests(unittest.TestCase):
             {
                 "targets": 5,
                 "due_targets": 4,
-                "bulk_eligible_2005_plus_targets": 3,
-                "pre_2005_targeted_anchor_targets": 1,
+                "bulk_eligible_rolling_window_targets": 2,
+                "historical_targeted_anchor_targets": 2,
                 "not_due_targets": 1,
-                "bulk_region_year_units": 3,
-                "bulk_date_ranges": 973,
-                "protocol_request_ceiling": 9730,
-                "protocol_minimum_seconds_at_4_requests_per_second": 2432.5,
+                "bulk_region_year_units": 2,
+                "bulk_date_ranges": 365,
+                "protocol_request_ceiling": 3650,
+                "protocol_minimum_seconds_at_4_requests_per_second": 912.5,
             },
         )
         partitions = {
             (row["country_region"], row["year"]): row for row in report["partitions"]
         }
-        self.assertEqual(partitions[("france", 2005)]["range_count"], 364)
+        self.assertEqual(partitions[("ireland", 2025)]["range_count"], 122)
         self.assertEqual(
-            partitions[("france", 2005)]["ranges"][0]["start_date"],
-            "2005-01-02",
+            partitions[("ireland", 2025)]["ranges"][0]["start_date"],
+            "2025-09-01",
         )
-        self.assertEqual(partitions[("ireland", 2008)]["range_count"], 366)
         self.assertEqual(
             partitions[("united_states", 2026)]["ranges"][0],
             {
@@ -121,10 +120,20 @@ class RacingApiBulkPartitionReadinessTests(unittest.TestCase):
         )
 
     def test_target_and_coverage_keys_must_conserve(self):
-        target = self.target("france:2005:a", "france", 2005)
+        target = self.target("france:2026:a", "france", 2026)
         other = self.target("france:2005:b", "france", 2005)
         with self.assertRaisesRegex(ValueError, "key sets do not conserve"):
             self.build([target], [self.coverage(other)])
+
+    def test_rolling_window_boundary_and_leap_day_are_conservative(self):
+        self.assertEqual(
+            self.module._bulk_query_earliest_date(date(2026, 9, 1)),
+            date(2025, 9, 2),
+        )
+        self.assertEqual(
+            self.module._bulk_query_earliest_date(date(2024, 2, 29)),
+            date(2023, 3, 1),
+        )
 
     def test_execution_date_may_advance_with_fresh_calendar_in_same_year(self):
         target = self.target("france:2026:a", "france", 2026)
@@ -180,7 +189,7 @@ class RacingApiBulkPartitionReadinessTests(unittest.TestCase):
             self.build([future], [self.coverage(future)])
 
     def test_output_is_prepared_zero_write_artifact_and_existing_path_is_rejected(self):
-        target = self.target("france:2005:a", "france", 2005)
+        target = self.target("france:2026:a", "france", 2026)
         report = self.build([target], [self.coverage(target)])
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary) / "artifact"
