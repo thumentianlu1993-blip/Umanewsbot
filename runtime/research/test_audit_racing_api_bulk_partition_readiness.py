@@ -77,6 +77,7 @@ class RacingApiBulkPartitionReadinessTests(unittest.TestCase):
         ]
         coverage = [self.coverage(target) for target in targets]
         coverage[-1]["evidence_state"] = "not_due_official_calendar"
+        targets[2]["local_date"] = "2025-09-01"
 
         report = self.build(targets, coverage)
 
@@ -133,6 +134,16 @@ class RacingApiBulkPartitionReadinessTests(unittest.TestCase):
         self.assertEqual(
             self.module._bulk_query_earliest_date(date(2024, 2, 29)),
             date(2023, 3, 1),
+        )
+
+    def test_previous_year_without_exact_date_routes_to_targeted_horse(self):
+        target = self.target("france:2025:unknown-date", "france", 2025)
+        report = self.build([target], [self.coverage(target)])
+        self.assertEqual(report["counts"]["bulk_eligible_rolling_window_targets"], 0)
+        self.assertEqual(report["counts"]["historical_targeted_anchor_targets"], 1)
+        self.assertEqual(
+            report["classified_targets"]["historical"][0]["route_class"],
+            "external_anchor_then_targeted_horse_results",
         )
 
     def test_execution_date_may_advance_with_fresh_calendar_in_same_year(self):
