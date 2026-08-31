@@ -237,8 +237,11 @@ def build_endpoint(kind: str, **values: object) -> str:
             raise ValueError("invalid results date") from exc
         if start > end or (end - start).days > 364:
             raise ValueError("invalid results date range")
-        region = normalize_space(values.get("region")).upper()
-        if region not in set(REGION_CODES.values()):
+        # Race payloads use IFHA-style upper-case region codes, while the
+        # /v1/results filter contract expects The Racing API's lower-case
+        # course region codes (for example ``fr`` rather than ``FR``).
+        region = normalize_space(values.get("region")).lower()
+        if region not in {value.lower() for value in REGION_CODES.values()}:
             raise ValueError("invalid results region")
         limit = _positive_page_value("limit", values.get("limit", 100), minimum=1, maximum=100)
         skip = _positive_page_value("skip", values.get("skip", 0), minimum=0, maximum=20000)
@@ -287,7 +290,12 @@ def validate_endpoint_url(url: str) -> None:
             _positive_page_value("skip", int(query["skip"][0]), minimum=0, maximum=20000)
         except (TypeError, ValueError) as exc:
             raise ValueError("bulk results query is invalid") from exc
-        if start > end or (end - start).days > 364 or query["region"][0] not in set(REGION_CODES.values()):
+        if (
+            start > end
+            or (end - start).days > 364
+            or query["region"][0]
+            not in {value.lower() for value in REGION_CODES.values()}
+        ):
             raise ValueError("bulk results query is invalid")
         return
     raise ValueError("endpoint query validation is missing")
