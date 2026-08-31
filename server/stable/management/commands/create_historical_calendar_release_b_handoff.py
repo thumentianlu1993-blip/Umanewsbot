@@ -38,6 +38,11 @@ class Command(BaseCommand):
         )
         parser.add_argument("--restricted-marker-path", required=True)
         parser.add_argument("--provenance-artifact-sha256", default="")
+        parser.add_argument("--release-0077-recovery-manifest-path", default="")
+        parser.add_argument("--release-0077-recovery-manifest-sha256", default="")
+        parser.add_argument(
+            "--release-0077-recovery-origin-handoff-sha256", default=""
+        )
 
     def handle(self, *args, **options):
         marker_path = (
@@ -76,7 +81,7 @@ class Command(BaseCommand):
             result["recovery_origin_action"] = "initial-install"
         if not result["ok"]:
             self.stdout.write(json.dumps(result, ensure_ascii=False, sort_keys=True))
-            raise CommandError("Release B v2 preflight failed")
+            raise CommandError("Release B preflight failed")
         marker_ok = False
         verified_marker = None
         if options["action"] == "forward-resume":
@@ -139,7 +144,7 @@ class Command(BaseCommand):
                 != sorted(options["expected_migration_leaf_set"])
             )
         ):
-            raise CommandError("Release B v2 preflight failed")
+            raise CommandError("Release B preflight failed")
         path = Path(options["output_path"])
         try:
             artifact = build_preflight_artifact(
@@ -150,6 +155,15 @@ class Command(BaseCommand):
                 deployment_lock_token_sha256=options["deployment_lock_token_sha256"],
                 artifact_path=str(path),
                 handoff_action=options["action"],
+                release_0077_recovery_manifest_path=options[
+                    "release_0077_recovery_manifest_path"
+                ],
+                release_0077_recovery_manifest_sha256=options[
+                    "release_0077_recovery_manifest_sha256"
+                ],
+                release_0077_recovery_origin_handoff_sha256=options[
+                    "release_0077_recovery_origin_handoff_sha256"
+                ],
             )
             publish_preflight_artifact(path=path, payload=artifact)
         except (OSError, ValueError) as exc:

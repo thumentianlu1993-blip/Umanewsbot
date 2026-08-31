@@ -36,6 +36,8 @@ M0072 = ("stable", "0072_add_extended_racing_regions")
 M0073 = ("stable", "0073_lifecycle_enforce_registry")
 M0074 = ("stable", "0074_race_data_sync_r0_control_plane")
 M0075 = ("stable", "0075_race_data_source_priority_and_reported_position")
+M0076 = ("stable", "0076_alter_externaldataimporterror_racing_region_and_more")
+M0077 = ("stable", "0077_racing_api_horse_identity_staging")
 
 
 def _stable_plan(loader: MigrationLoader, applied: set[tuple[str, str]]) -> list[str]:
@@ -55,21 +57,29 @@ class MigrationHistoryRepair0075ReleaseContractTests(TestCase):
             TARGET,
         )
 
-        self.assertEqual(TARGET, M0075)
+        self.assertEqual(TARGET, M0077)
         self.assertEqual(
             ALLOWED_FORWARD_STATES[(f"{M0072[0]}.{M0072[1]}",)],
-            [M0073[1], M0074[1], M0075[1]],
+            [M0073[1], M0074[1], M0075[1], M0076[1], M0077[1]],
         )
         self.assertEqual(
             ALLOWED_FORWARD_STATES[(f"{M0073[0]}.{M0073[1]}",)],
-            [M0074[1], M0075[1]],
+            [M0074[1], M0075[1], M0076[1], M0077[1]],
         )
         self.assertEqual(
             ALLOWED_FORWARD_STATES[(f"{M0074[0]}.{M0074[1]}",)],
-            [M0075[1]],
+            [M0075[1], M0076[1], M0077[1]],
         )
         self.assertEqual(
             ALLOWED_FORWARD_STATES[(f"{M0075[0]}.{M0075[1]}",)],
+            [M0076[1], M0077[1]],
+        )
+        self.assertEqual(
+            ALLOWED_FORWARD_STATES[(f"{M0076[0]}.{M0076[1]}",)],
+            [M0077[1]],
+        )
+        self.assertEqual(
+            ALLOWED_FORWARD_STATES[(f"{M0077[0]}.{M0077[1]}",)],
             [],
         )
 
@@ -79,8 +89,8 @@ class MigrationHistoryRepair0075ReleaseContractTests(TestCase):
             PREVIOUS_FINAL_LEAF_SET,
         )
 
-        self.assertEqual(PREVIOUS_FINAL_LEAF_SET, (f"{M0074[0]}.{M0074[1]}",))
-        self.assertEqual(FINAL_LEAF_SET, (f"{M0075[0]}.{M0075[1]}",))
+        self.assertEqual(PREVIOUS_FINAL_LEAF_SET, (f"{M0075[0]}.{M0075[1]}",))
+        self.assertEqual(FINAL_LEAF_SET, (f"{M0077[0]}.{M0077[1]}",))
 
     def test_preflight_accepts_both_pre_migration_and_current_leaf(self):
         preflight = (
@@ -93,6 +103,11 @@ class MigrationHistoryRepair0075ReleaseContractTests(TestCase):
             "stable.0075_race_data_source_priority_and_reported_position)",
             preflight,
         )
+        self.assertIn(
+            "stable.0076_alter_externaldataimporterror_racing_region_and_more)",
+            preflight,
+        )
+        self.assertIn("stable.0077_racing_api_horse_identity_staging)", preflight)
 
     def test_every_initial_install_prefix_includes_0073(self):
         from stable.services.historical_calendar_release_b_schema import (
@@ -101,18 +116,18 @@ class MigrationHistoryRepair0075ReleaseContractTests(TestCase):
 
         for leaf_set, plan in INITIAL_INSTALL_FORWARD_STATES.items():
             with self.subTest(leaf_set=leaf_set):
-                if leaf_set != (f"{M0075[0]}.{M0075[1]}",):
-                    self.assertEqual(plan[-1], M0075[1])
+                if leaf_set != (f"{M0077[0]}.{M0077[1]}",):
+                    self.assertEqual(plan[-1], M0077[1])
 
     def test_generic_rollback_contract_carries_0073(self):
         for relative in ("deploy/rollback.sh", "deploy/rollback_lowcost.sh"):
             self.assertIn(
                 "RELEASE_B_EXPECTED_MIGRATION_LEAF_SET="
-                "stable.0075_race_data_source_priority_and_reported_position",
+                "stable.0077_racing_api_horse_identity_staging",
                 (ROOT / relative).read_text(encoding="utf-8"),
             )
         self.assertIn(
-            "EXPECTED_LEAF=stable.0075_race_data_source_priority_and_reported_position",
+            "EXPECTED_LEAF=stable.0077_racing_api_horse_identity_staging",
             (ROOT / "deploy/resume_rollback_control_state.sh").read_text(
                 encoding="utf-8"
             ),
@@ -132,6 +147,14 @@ class MigrationHistoryRepair0075ReleaseContractTests(TestCase):
             '"server/stable/migrations/0075_race_data_source_priority_and_reported_position.py"',
             verifier,
         )
+        self.assertIn(
+            '"server/stable/migrations/0076_alter_externaldataimporterror_racing_region_and_more.py"',
+            verifier,
+        )
+        self.assertIn(
+            '"server/stable/migrations/0077_racing_api_horse_identity_staging.py"',
+            verifier,
+        )
         allowlist = json.loads(
             (ROOT / "deploy/reviewed_release_b_rollback_migrations.json").read_text(
                 encoding="utf-8"
@@ -139,7 +162,7 @@ class MigrationHistoryRepair0075ReleaseContractTests(TestCase):
         )
         self.assertEqual(
             allowlist["required_migrations"][-1]["migration_path"],
-            "server/stable/migrations/0075_race_data_source_priority_and_reported_position.py",
+            "server/stable/migrations/0077_racing_api_horse_identity_staging.py",
         )
 
     def test_0073_catalog_contract_validates_tables_fks_constraints_and_indexes(self):
@@ -372,7 +395,7 @@ class MigrationHistoryRepairLeafSetRedTests(TestCase):
             )
         payload = json.loads(output.getvalue())
         self.assertEqual(
-            payload["schema_version"], "migration-history-repair-preflight/v2"
+            payload["schema_version"], "migration-history-repair-preflight/v3"
         )
         self.assertEqual(
             payload["migration_leaf_set"],
@@ -380,7 +403,10 @@ class MigrationHistoryRepairLeafSetRedTests(TestCase):
         )
         self.assertEqual(
             payload["migration_plan"],
-            [M0069[1], M0071[1], M0072[1], M0073[1], M0074[1], M0075[1]],
+            [
+                M0069[1], M0071[1], M0072[1], M0073[1], M0074[1],
+                M0075[1], M0076[1], M0077[1],
+            ],
         )
         self.assertTrue(payload["migration_state_allowed"])
 
@@ -748,7 +774,8 @@ class MigrationHistoryRepairBaselineRedTests(SimpleTestCase):
             "applied_nodes": ["stable.0067_historical_calendar_release_a"],
             "migration_leaf_set": ["stable.0067_historical_calendar_release_a"],
             "migration_plan": [
-                M0070[1], M0068[1], M0069[1], M0071[1], M0072[1], M0073[1], M0074[1], M0075[1]
+                M0070[1], M0068[1], M0069[1], M0071[1], M0072[1],
+                M0073[1], M0074[1], M0075[1], M0076[1], M0077[1],
             ],
             "unknown_applied_migrations": [],
             "migration_graph_known": True,
@@ -976,22 +1003,38 @@ class MigrationHistoryRepairCatalogRedTests(SimpleTestCase):
 class MigrationHistoryRepairArtifactRedTests(SimpleTestCase):
     def _write_artifact(self, root: Path) -> tuple[Path, str, dict]:
         from stable.services.historical_calendar_release_b_handoff import (
+            HANDOFF_SCHEMA_VERSION,
             canonical_artifact_sha256,
+            release_0077_recovery_binding,
         )
 
+        path = root / "before.json"
         payload = {
-            "schema_version": "migration-history-repair-preflight/v2",
+            "schema_version": HANDOFF_SCHEMA_VERSION,
             "candidate_commit": "a" * 40,
             "candidate_image_id": "sha256:" + "b" * 64,
             "database_identity_sha256": "c" * 64,
             "compose_file": "docker-compose.prod.lowcost.yml",
             "deployment_lock_token_sha256": "d" * 64,
+            "artifact_path": str(path),
+            "handoff_action": "deploy",
+            "preflight": {
+                "migration_leaf_set": [],
+                "migration_plan": [],
+            },
             "receipt_rows_sha256": "e" * 64,
             "operation_log_rows_sha256": "f" * 64,
             "operation_log_fk_sha256": "1" * 64,
         }
+        payload.update(
+            release_0077_recovery_binding(
+                preflight=payload["preflight"],
+                candidate_commit=payload["candidate_commit"],
+                artifact_path=payload["artifact_path"],
+                handoff_action=payload["handoff_action"],
+            )
+        )
         payload["artifact_sha256"] = canonical_artifact_sha256(payload)
-        path = root / "before.json"
         path.write_text(
             json.dumps(payload, ensure_ascii=False, sort_keys=True), encoding="utf-8"
         )
@@ -1730,7 +1773,7 @@ class MigrationHistoryRepairRestrictedRecoveryRedTests(SimpleTestCase):
         }
         live = {
             "ok": True,
-            "migration_leaf_set": [f"{M0075[0]}.{M0075[1]}"],
+            "migration_leaf_set": [f"{M0077[0]}.{M0077[1]}"],
             "database_identity_sha256": "d" * 64,
         }
         with TemporaryDirectory() as tmp:
@@ -1889,7 +1932,7 @@ class MigrationHistoryRepairRestrictedRecoveryRedTests(SimpleTestCase):
     def test_required_completion_cannot_noop_after_marker_deletion(self):
         live = {
             "ok": True,
-            "migration_leaf_set": [f"{M0075[0]}.{M0075[1]}"],
+            "migration_leaf_set": [f"{M0077[0]}.{M0077[1]}"],
             "database_identity_sha256": "d" * 64,
         }
         with TemporaryDirectory() as tmp, patch(
@@ -2693,15 +2736,30 @@ class MigrationHistoryRepairOperationsContractRedTests(TestCase):
             collect_writer_activity,
         )
 
+        race_data_flags = (
+            "RACE_DATA_SYNC_ENABLED",
+            "RACE_DATA_SYNC_SCHEDULER_ENABLED",
+            "RACE_DATA_SYNC_ALLOW_NETWORK",
+            "RACE_DATA_SYNC_FUTURE_DISCOVERY_ENABLED",
+            "RACE_DATA_SYNC_SCHEDULE_APPLY_ENABLED",
+            "RACE_DATA_SYNC_RACECARD_APPLY_ENABLED",
+            "RACE_DATA_SYNC_LIFECYCLE_APPLY_ENABLED",
+            "RACE_DATA_SYNC_RESULT_APPLY_ENABLED",
+            "RACE_DATA_SYNC_RESULT_PUBLIC_ENABLED",
+            "RACE_DATA_SYNC_CORRECTION_APPLY_ENABLED",
+        )
         with patch.dict(
             os.environ,
             {
+                **{name: "false" for name in race_data_flags},
                 "HISTORICAL_RACE_BACKFILL_ENABLED": "false",
                 "HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK": "false",
             },
             clear=False,
         ):
             result = collect_writer_activity()
+        for name in race_data_flags:
+            self.assertIn(name, result["flags"])
         self.assertIn("HISTORICAL_RACE_BACKFILL_ENABLED", result["flags"])
         self.assertIn("HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK", result["flags"])
         self.assertNotIn("HISTORICAL_NETWORK_ENABLED", result["flags"])

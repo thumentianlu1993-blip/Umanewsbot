@@ -1,5 +1,43 @@
 # 关键决策
 
+## 2026-08-31 0077 只建立 External staging，发布与数据 apply 分开授权
+
+- France 2023 的 5 马 materialization 不能在 PR #133 / leaf 0075 上用 bind mount、one-off Python
+  或手工 SQL 补能力。先发布一个从当前主线构建、schema 精确到 leaf 0077 的最小 release；发布完成
+  也只代表命令和表结构可用，不代表获准写 staging。
+- stage_racing_api_targeted_batch 是本批正常入口：先以 exact materialization manifest SHA
+  做整批 dry-run；正式 apply 必须同时提供 --apply --allow-write 和仅在独立写窗口临时开启的
+  RACING_API_STAGING_WRITE_ENABLED=true。任何成员/SHA/JSON/字段漂移或后段异常都使整批事务回滚。
+- manifest SHA 或命令参数只是输入绑定，不是审批、备份或 shared-lock 证明。生产执行仍必须由标准
+  release/runbook 在自己的 deployment lock 内绑定已验证可恢复备份；不得给命令增加自报字段来伪造授权。
+- normalized 数据必须从 exact manifest-listed TRA wrapper 确定性重验：profile payload 使用 exporter
+  相同的 compact canonical JSON SHA，career 由 `/results` 全页逐 race/runner 重建。空 responses、
+  非受审 host/route/query、ID/hash/career 漂移均不得进入 dry-run 结果，更不得写 External 表。本 release
+  只接受 France 2023 stable-ID 批次的 `provider_stable_id_from_target_race`，不接受 profile-only 或
+  旧 `target_occurrence` 工件。
+- materialization 中父母 profile 和同场 runner 是目标马资料的 provenance，不等于获准导入的其他马匹。
+  0077 staging 只创建 5 个目标 provider stable ID；父母 stable ID 仅存目标马的谱系字段，同场其他马
+  不创建 ExternalHorse/ExternalRaceResult。跨目标重复赛事必须 raw payload 完全一致，批次内只写一次；
+  dry-run 必须输出 scope stable IDs、逐表 create/update/skip/conflict 与 out-of-scope=0。
+- 本 release 不携带 0078–0080，也不提供 identity/module approval、canonical HorseProfile apply
+  或公开页发布。External staging 成功后仍须分别取得这些后续门禁，不能由 staging receipt 推导。
+
+## 2026-08-31 0077 的 PostgreSQL DDL 必须有事务内超时
+
+- 0077 会向既有 stable_externalhorse 连续增加 5 个字段；每个 PostgreSQL ADD COLUMN 都可能等待
+  ACCESS EXCLUSIVE。migration 第一项固定为 PostgreSQL-only 的
+  SET LOCAL lock_timeout='5s' 与 statement_timeout='5min'，并依赖 Django atomic migration
+  让设置只作用于本事务。
+- SQLite 和其他非 PostgreSQL backend 对该 operation 为 no-op。生产若在 5 秒内拿不到锁或在 5 分钟内
+  未完成，0077 自身事务回滚并保持服务关闭等待排查；不得去掉超时、在线重试 DDL 或以手工 SQL 绕过。
+  0076 与 0077 是两个独立 migration transaction：若 0077 失败，实际 leaf 为已提交的 0076，不能切回
+  不认识该 leaf 的 PR #133。恢复路径固定为候选镜像 fail closed，清除锁竞争后从 exact 0076 继续 0077；
+  只有先用已验证备份恢复数据库到 0075，才可恢复 PR #133。
+- 0077 的 reverse 第一项（按反向执行顺序）固定抛出 IrreversibleError，防止误删证据表/字段。
+  本 release 是 forward-only：0077 成功后 generic code rollback 全部拒绝。需要回到 PR #133 / 0075
+  数据形态时，唯一恢复路径是本次 release 绑定且已验证可恢复的 PostgreSQL custom-format 备份，不能执行
+  `migrate stable 0075`。
+
 ## 2026-08-31 同一 official artifact 的 correction 以幂等 checkpoint 推进为成功
 
 - correction 开启后若 provider 返回与已公开 official revision 完全相同的终态，不应新增

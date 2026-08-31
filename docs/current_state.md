@@ -1,5 +1,43 @@
 # 当前状态
 
+## 2026-08-31 leaf 0077 External staging 最小发布候选（仅本地）
+
+- 已从 origin/main@256311a81bf129cf2f9292d3a30d5907d42427ea 建立独立 clean worktree
+  codex/staging-france-2023-foundation。候选只补齐 0076/0077 所需的 Ireland/TRA 枚举、
+  ExternalHorse 的 breeder/父系 provider ID 字段、HorseExternalIdentity /
+  HorseNameVariant，以及整批 stage_racing_api_targeted_batch External staging 入口。
+- 0077_racing_api_horse_identity_staging 保持 atomic，并把 PostgreSQL-only
+  SET LOCAL lock_timeout='5s'、statement_timeout='5min' 作为第一项 operation；SQLite 明确
+  no-op。锁等待超过 5 秒或整个 migration 超过 5 分钟时，事务失败关闭，不能无限阻塞生产表。
+  独立 PostgreSQL 16 锁竞争实测确认 0077 超时后其 5 列/2 表均为 0；但 0076 已按 Django 的
+  per-migration transaction 先行提交，所以失败叶子是 0076，不是 0075。
+- staging 写入需要 --apply --allow-write 与
+  RACING_API_STAGING_WRITE_ENABLED=true 双门禁；仓库默认值为 false。批量入口先对所有
+  materialized run 做零写 dry-run，再在一个外层事务中写 External horse/race/result/history、
+  name variant 与 import receipt。写入范围严格只有 materialization 的目标 stable ID；父母 profile 和
+  同场其他 runner 只保留在 content-addressed provenance，不创建额外 ExternalHorse/Result。它不会创建
+  canonical identity、HorseProfile 发布或公网内容。
+- loader 只接受 manifest 内非空、content-addressed 的 TRA `/pro` 与 `/results` response wrapper；
+  HTTPS host/path/query、allow-not-found policy、wrapper SHA/size/timestamp、profile canonical payload SHA、
+  parent profile 及完整 career/race/runner 必须逐项守恒。单文件、单 run 聚合和整批 run 数均有上限，
+  identity_mode 只接受本批 `provider_stable_id_from_target_race`；symlink、重复 JSON key、额外文件或
+  任一 provenance 漂移都会在查询/写入前 fail closed。
+- HorseExternalIdentity 的 VERIFIED 状态由数据库约束强制 evidence URL、payload SHA、验证时间和
+  reviewer 齐全；HorseNameVariant 只能绑定 canonical 或 External 实体之一。本 staging service
+  不创建 HorseExternalIdentity，也不建立 canonical/External 双向桥。
+- 严格排除 migration 0078–0080、identity/module publish、canonical/public apply。当前 External staging
+  授权只绑定 execution ledger `aa3d51d4…3095`、batch `ed0295d9…7973`、materialization
+  `f7a1fa5e…51b99` 和 postprocess plan `90d5613f…e2f61`；当前仍未 commit、push、开 PR 或修改生产，
+  生产仍是 PR #133 / leaf 0075。
+- staging/model/migration/command 聚焦套件 30/30、发布/回滚/迁移合同 306/306（按设计跳过 1）、
+  Django check、makemigrations --check --dry-run 与 diff check 均通过。临时 PostgreSQL 16 从 exact 0075
+  迁到 0076/0077 成功，PostgreSQL 聚焦套件 15/15 通过。
+- 同一 exact France 2023 工件在临时 PostgreSQL 16（不是生产）完成 dry-run、apply、replay。dry-run
+  精确报告 create=210 / update=0 / skip=7 / conflict=0；5 个目标 stable ID 之外的 horse 写为 0。
+  apply 终态为 5 horses / 60 deduplicated races / 67 target-horse results / 67 histories / 5 variants、
+  5 SUCCESS receipts 与 1 import lock；canonical HorseProfile/HorseExternalIdentity/RaceEvent 均为 0。
+  第二次整批为 5/5 replay、writes=0，External 业务状态 SHA 保持不变。
+
 ## 2026-08-31 18:40 event 956 正式赛果、公开与自然更正周期全部完成
 
 - 生产继续运行 PR #133 exact release

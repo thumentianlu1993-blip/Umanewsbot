@@ -40,8 +40,8 @@ case "$COMPOSE_FILE" in
     ;;
 esac
 
-# Schema gate: fail closed unless the caller made an explicit compatibility
-# decision. Rejected before the image inspect and before any probe or stop.
+# Operator acknowledgement is secondary to the live catalog gate below; it
+# can never declare a 0076/0077 database compatible with a pre-contract image.
 case "${SCHEMA_COMPATIBLE_WITH_TARGET:-}" in
   true|false) ;;
   *)
@@ -68,6 +68,15 @@ trap 'exit 143' TERM
 
 # Verify the lock token before any Compose call.
 ./deploy/deployment_lock.sh verify
+
+# This bridge is only valid at the exact ordinary legacy 0075 state.  The
+# current control image, not the frozen target, reads the live recorder and
+# PostgreSQL catalog.  In particular, irreversible 0077 and recoverable 0076
+# are rejected before image inspection, service probes, stops, or retagging.
+"$COMPOSE" -f "$COMPOSE_FILE" run --rm --no-deps \
+  web python manage.py check_historical_calendar_release_b_schema \
+  --direction=forward \
+  --expected-migration-leaf-set=stable.0075_race_data_source_priority_and_reported_position
 
 # The frozen image must exist locally before any service is stopped.
 if ! docker image inspect "$FROZEN_IMAGE_TAG" >/dev/null 2>&1; then

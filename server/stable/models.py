@@ -57,6 +57,7 @@ class RacingRegion(models.TextChoices):
     JAPAN = "japan", "日本"
     HONG_KONG = "hong_kong", "中国香港"
     UNITED_KINGDOM = "united_kingdom", "英国"
+    IRELAND = "ireland", "爱尔兰"
     FRANCE = "france", "法国"
     UNITED_STATES = "united_states", "美国"
     AUSTRALIA = "australia", "澳大利亚"
@@ -265,6 +266,7 @@ class QuotaLedgerScope(models.TextChoices):
 class ExternalDataSource(models.TextChoices):
     NETKEIBA = "netkeiba", "netkeiba"
     HKJC = "hkjc", "HKJC"
+    THE_RACING_API = "the_racing_api", "The Racing API"
     SPORTING_LIFE = "sporting_life", "Sporting Life"
     FRANCE_GALOP = "france_galop", "France Galop"
     GENY_FRANCE = "geny_france", "Geny France"
@@ -785,6 +787,22 @@ class HorseIdentityConflictStatus(models.TextChoices):
     PENDING = "pending", "待处理"
     RESOLVED = "resolved", "已解决"
     IGNORED = "ignored", "已忽略"
+
+
+class HorseExternalIdentityStatus(models.TextChoices):
+    OBSERVED = "observed", "已观测"
+    VERIFIED = "verified", "已验证"
+    REJECTED = "rejected", "已拒绝"
+    RETIRED = "retired", "已停用"
+
+
+class HorseNameKind(models.TextChoices):
+    REGISTERED = "registered", "注册名"
+    OFFICIAL_LATIN = "official_latin", "官方欧字名"
+    HK_ASSIGNED = "hk_assigned", "香港赛马名"
+    PRE_IMPORT = "pre_import", "来港前名称"
+    TRANSLATION = "translation", "译名"
+    SOURCE_DISPLAY = "source_display", "来源展示名"
 
 
 class HorseCompletionRunStatus(models.TextChoices):
@@ -4800,8 +4818,13 @@ class ExternalHorse(TimestampedModel):
     birth_date = models.DateField(null=True, blank=True)
     country = models.CharField(max_length=128, blank=True)
     color = models.CharField(max_length=128, blank=True)
+    breeder_name = models.CharField(max_length=255, blank=True)
     father_name = models.CharField(max_length=255, blank=True)
     mother_name = models.CharField(max_length=255, blank=True)
+    damsire_name = models.CharField(max_length=255, blank=True)
+    sire_external_id = models.CharField(max_length=32, blank=True)
+    dam_external_id = models.CharField(max_length=32, blank=True)
+    damsire_external_id = models.CharField(max_length=32, blank=True)
     owner_name = models.CharField(max_length=255, blank=True)
     trainer_name = models.CharField(max_length=255, blank=True)
     record_summary = models.CharField(max_length=255, blank=True)
@@ -4874,6 +4897,193 @@ class ExternalHorseAlias(TimestampedModel):
 
     def __str__(self) -> str:
         return f"{self.name_ja} ({self.external_horse_id})"
+
+
+class HorseExternalIdentity(TimestampedModel):
+    horse_profile = models.ForeignKey(
+        HorseProfile,
+        on_delete=models.CASCADE,
+        related_name="external_identities",
+    )
+    source = models.CharField(max_length=32, choices=ExternalDataSource.choices)
+    namespace = models.CharField(max_length=64)
+    external_id = models.CharField(max_length=128)
+    status = models.CharField(
+        max_length=16,
+        choices=HorseExternalIdentityStatus.choices,
+        default=HorseExternalIdentityStatus.OBSERVED,
+    )
+    evidence_url = models.URLField(max_length=500, blank=True)
+    payload_sha256 = models.CharField(max_length=64, blank=True)
+    observed_at = models.DateTimeField(default=timezone.now)
+    verified_at = models.DateTimeField(null=True, blank=True)
+    rejected_at = models.DateTimeField(null=True, blank=True)
+    verified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="verified_horse_external_identities",
+    )
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ("source", "namespace", "external_id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("source", "namespace", "external_id"),
+                name="uq_horse_ext_identity_source_ns_id",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    ~models.Q(status=HorseExternalIdentityStatus.VERIFIED)
+                    | (
+                        ~models.Q(evidence_url="")
+                        & ~models.Q(payload_sha256="")
+                        & models.Q(verified_at__isnull=False)
+                        & models.Q(verified_by__isnull=False)
+                    )
+                ),
+                name="horse_ext_verified_evidence",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(payload_sha256="")
+                    | models.Q(payload_sha256__regex=r"^[0-9a-f]{64}$")
+                ),
+                name="horse_ext_payload_sha_valid",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("horse_profile", "status"),
+                name="horse_ext_identity_profile_idx",
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        if not self.namespace.strip() or not self.external_id.strip():
+            raise ValidationError("外部身份 namespace 和 external_id 不能为空。")
+        if self.payload_sha256 and not re.fullmatch(r"[0-9a-f]{64}", self.payload_sha256):
+            raise ValidationError({"payload_sha256": "必须是小写 SHA-256。"})
+        if self.status == HorseExternalIdentityStatus.VERIFIED:
+            missing = []
+            if not self.evidence_url:
+                missing.append("evidence_url")
+            if not self.payload_sha256:
+                missing.append("payload_sha256")
+            if self.verified_at is None:
+                missing.append("verified_at")
+            if self.verified_by_id is None:
+                missing.append("verified_by")
+            if missing:
+                raise ValidationError(
+                    {
+                        field: "已验证身份必须保留证据 URL、payload SHA、验证时间和审核人。"
+                        for field in missing
+                    }
+                )
+
+    def __str__(self) -> str:
+        return f"{self.source}:{self.namespace}:{self.external_id}"
+
+
+class HorseNameVariant(TimestampedModel):
+    horse_profile = models.ForeignKey(
+        HorseProfile,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="name_variants",
+    )
+    external_horse = models.ForeignKey(
+        ExternalHorse,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="name_variants",
+    )
+    name_text = models.CharField(max_length=255)
+    language = models.CharField(max_length=16, choices=SourceLanguage.choices)
+    script = models.CharField(max_length=32)
+    name_kind = models.CharField(max_length=32, choices=HorseNameKind.choices)
+    country_suffix = models.CharField(max_length=8, blank=True)
+    normalized_strict = models.CharField(max_length=255)
+    normalized_loose = models.CharField(max_length=255)
+    source = models.CharField(max_length=32, choices=ExternalDataSource.choices)
+    is_official = models.BooleanField(default=False)
+    valid_from = models.DateField(null=True, blank=True)
+    valid_to = models.DateField(null=True, blank=True)
+    evidence_url = models.URLField(max_length=500, blank=True)
+    payload_sha256 = models.CharField(max_length=64, blank=True)
+
+    class Meta:
+        ordering = ("normalized_strict", "source", "name_kind", "id")
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    (
+                        models.Q(horse_profile__isnull=False)
+                        & models.Q(external_horse__isnull=True)
+                    )
+                    | (
+                        models.Q(horse_profile__isnull=True)
+                        & models.Q(external_horse__isnull=False)
+                    )
+                ),
+                name="horse_name_variant_exactly_one_entity",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(valid_from__isnull=True)
+                    | models.Q(valid_to__isnull=True)
+                    | models.Q(valid_from__lte=models.F("valid_to"))
+                ),
+                name="horse_name_variant_valid_range",
+            ),
+            models.UniqueConstraint(
+                fields=("horse_profile", "source", "name_kind", "normalized_strict"),
+                condition=models.Q(horse_profile__isnull=False),
+                name="uq_horse_name_variant_profile",
+            ),
+            models.UniqueConstraint(
+                fields=("external_horse", "source", "name_kind", "normalized_strict"),
+                condition=models.Q(external_horse__isnull=False),
+                name="uq_horse_name_variant_external",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(payload_sha256="")
+                    | models.Q(payload_sha256__regex=r"^[0-9a-f]{64}$")
+                ),
+                name="horse_name_payload_sha_valid",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("normalized_strict", "country_suffix"),
+                name="horse_name_variant_strict_idx",
+            ),
+            models.Index(
+                fields=("normalized_loose", "language"),
+                name="horse_name_variant_loose_idx",
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        if (self.horse_profile_id is None) == (self.external_horse_id is None):
+            raise ValidationError("马名变体必须且只能绑定 HorseProfile 或 ExternalHorse 之一。")
+        if not self.name_text.strip() or not self.normalized_strict.strip():
+            raise ValidationError("马名原文和 strict normalized key 不能为空。")
+        if self.valid_from and self.valid_to and self.valid_from > self.valid_to:
+            raise ValidationError({"valid_to": "名称有效期结束日期不能早于开始日期。"})
+        if self.payload_sha256 and not re.fullmatch(r"[0-9a-f]{64}", self.payload_sha256):
+            raise ValidationError({"payload_sha256": "必须是小写 SHA-256。"})
+
+    def __str__(self) -> str:
+        return f"{self.name_text} ({self.source}/{self.name_kind})"
 
 
 class ExternalDataImportRun(TimestampedModel):

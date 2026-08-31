@@ -1,4 +1,7 @@
 {
+  "generic_code_rollback_allowed": false,
+  "recoverable_forward_partial_leaf": "stable.0076_alter_externaldataimporterror_racing_region_and_more",
+  "recovery_mode": "forward-only-verified-backup-restore",
   "required_migrations": [
     {
       "migration_path": "server/stable/migrations/0071_historical_calendar_release_b.py",
@@ -84,11 +87,49 @@
               "0074_race_data_sync_r0_control_plane"
             ]
           ],
-          "rationale": "The rollback target must carry the additive 0075 capacity ledger and reported-position/source-priority projection contract; pre-0075 targets require separately reviewed cross-schema recovery.",
+          "rationale": "The rollback target must carry the exact additive 0075 dependency beneath the required 0076/0077 application state. The pinned current control image retains live 0077; this migration is never used to reverse recorder or DDL state.",
           "sha256": "d8b220b241e560911bc5a02acada986926d93eb13a8aae0ace590a7f1e8bb0bd"
+        }
+      ]
+    },
+    {
+      "migration_path": "server/stable/migrations/0076_alter_externaldataimporterror_racing_region_and_more.py",
+      "reviewed_variants": [
+        {
+          "dependencies": [
+            [
+              "stable",
+              "0075_race_data_source_priority_and_reported_position"
+            ]
+          ],
+          "rationale": "The dormant independently-reviewed compatibility validator requires the exact 0076 application state. This release has no reviewed target and disables generic code rollback; exact PR133 ends at 0075 and is incompatible with the additive 0077 ExternalHorse columns.",
+          "sha256": "9fb6f0e4199bddaf99608bc63406a1a811fa180da75c615433c50919c6f6e072"
+        }
+      ]
+    },
+    {
+      "migration_path": "server/stable/migrations/0077_racing_api_horse_identity_staging.py",
+      "reviewed_variants": [
+        {
+          "dependencies": [
+            [
+              "stable",
+              "0076_alter_externaldataimporterror_racing_region_and_more"
+            ],
+            [
+              "settings.AUTH_USER_MODEL",
+              "__first__"
+            ]
+          ],
+          "rationale": "The dormant independently-reviewed compatibility validator requires knowledge of the exact irreversible 0077 state. This release has no reviewed target and disables generic code rollback; the symbolic auth dependency records the exact reviewed swappable_dependency(settings.AUTH_USER_MODEL) expression.",
+          "sha256": "fa36c9758d0975976f5de42791af5e5ec2c2530a11be44e41ca448e7d374550d"
         }
       ]
     }
   ],
-  "schema_version": "release-b-rollback-migration-allowlist/v2"
+  "final_schema_leaf": "stable.0077_racing_api_horse_identity_staging",
+  "reviewed_targets": [],
+  "reverse_migration_allowed": false,
+  "schema_version": "release-b-rollback-migration-allowlist/v6",
+  "verified_backup_restore_required": true
 }

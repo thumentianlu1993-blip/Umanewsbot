@@ -24,7 +24,7 @@ from stable.models import (
 )
 
 
-HANDOFF_SCHEMA_VERSION = "migration-history-repair-preflight/v2"
+HANDOFF_SCHEMA_VERSION = "migration-history-repair-preflight/v4"
 PARTIAL_LEAF_SETS = {
     (
         "stable.0068_race_data_sync_pipeline_a_field_audit",
@@ -38,18 +38,109 @@ PARTIAL_LEAF_SETS = {
 REPAIR_LEAF_SETS = PARTIAL_LEAF_SETS | {
     ("stable.0070_horse_identity_evidence_commit_receipt",),
 }
-PREVIOUS_FINAL_LEAF_SET = ("stable.0074_race_data_sync_r0_control_plane",)
-FINAL_LEAF_SET = (
+PREVIOUS_FINAL_LEAF_SET = (
     "stable.0075_race_data_source_priority_and_reported_position",
+)
+RECOVERABLE_FORWARD_PARTIAL_LEAF_SET = (
+    "stable.0076_alter_externaldataimporterror_racing_region_and_more",
+)
+FINAL_LEAF_SET = (
+    "stable.0077_racing_api_horse_identity_staging",
 )
 LEGACY_FINAL_LEAF_SETS = {
     ("stable.0071_historical_calendar_release_b",),
     ("stable.0072_add_extended_racing_regions",),
     ("stable.0073_lifecycle_enforce_registry",),
+    ("stable.0074_race_data_sync_r0_control_plane",),
     PREVIOUS_FINAL_LEAF_SET,
 }
-ORDINARY_RELEASE_LEAF_SETS = LEGACY_FINAL_LEAF_SETS | {FINAL_LEAF_SET}
+ORDINARY_RELEASE_LEAF_SETS = LEGACY_FINAL_LEAF_SETS | {
+    RECOVERABLE_FORWARD_PARTIAL_LEAF_SET,
+    FINAL_LEAF_SET,
+}
 INITIAL_INSTALL_LEAF_SET = ("stable.0067_historical_calendar_release_a",)
+RELEASE_0077_MIGRATION_NAME = "0077_racing_api_horse_identity_staging"
+
+
+def _lower_hex(value: str, *, length: int) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == length
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
+def release_0077_recovery_binding(
+    *,
+    preflight: dict[str, Any],
+    candidate_commit: str,
+    artifact_path: str,
+    handoff_action: str,
+    manifest_path: str = "",
+    manifest_sha256: str = "",
+    origin_handoff_sha256: str = "",
+) -> dict[str, Any]:
+    """Return the SHA-bound 0077 recovery admission carried by a handoff.
+
+    A deploy artifact created before writers stop is admission-only.  It may
+    stop/drain services, but the release task must consume a second no-clobber
+    artifact whose manifest fields are bound.  A 0076 manual-release is a
+    recovery entry and therefore never gets the admission-only exception.
+    """
+
+    values = (manifest_path, manifest_sha256, origin_handoff_sha256)
+    if any(values) and not all(values):
+        raise ValueError("0077 recovery manifest binding is incomplete")
+    plan = preflight.get("migration_plan") or []
+    crosses_0077 = RELEASE_0077_MIGRATION_NAME in plan
+    leaf_set = tuple(sorted(preflight.get("migration_leaf_set") or []))
+    if not all(values):
+        if crosses_0077 and handoff_action == "manual-release":
+            raise ValueError(
+                "0077 manual release requires the original release-bound recovery manifest"
+            )
+        return {
+            "release_0077_recovery_binding_mode": (
+                "admission-only"
+                if crosses_0077 and handoff_action == "deploy"
+                else "not-required"
+            ),
+            "release_0077_recovery_manifest_path": None,
+            "release_0077_recovery_manifest_sha256": None,
+            "release_0077_recovery_origin_handoff_sha256": None,
+        }
+
+    if not crosses_0077 or handoff_action not in {"deploy", "manual-release"}:
+        raise ValueError("0077 recovery manifest is not valid for this handoff")
+    if handoff_action == "deploy" and leaf_set != PREVIOUS_FINAL_LEAF_SET:
+        raise ValueError("bound 0077 deploy requires exact starting leaf 0075")
+    if (
+        handoff_action == "manual-release"
+        and leaf_set != RECOVERABLE_FORWARD_PARTIAL_LEAF_SET
+    ):
+        raise ValueError("bound 0077 manual release requires exact partial leaf 0076")
+    if not _lower_hex(candidate_commit, length=40):
+        raise ValueError("0077 recovery candidate commit is invalid")
+    if not _lower_hex(manifest_sha256, length=64) or not _lower_hex(
+        origin_handoff_sha256, length=64
+    ):
+        raise ValueError("0077 recovery manifest SHA binding is invalid")
+    manifest = Path(manifest_path)
+    artifact = Path(artifact_path)
+    if (
+        not manifest.is_absolute()
+        or manifest.name != f"{candidate_commit}.json"
+        or manifest.parent.name != "release-0077-recovery"
+        or not artifact.is_absolute()
+        or manifest.parent.parent not in artifact.parents
+    ):
+        raise ValueError("0077 recovery manifest path is not canonical")
+    return {
+        "release_0077_recovery_binding_mode": "bound",
+        "release_0077_recovery_manifest_path": str(manifest),
+        "release_0077_recovery_manifest_sha256": manifest_sha256,
+        "release_0077_recovery_origin_handoff_sha256": origin_handoff_sha256,
+    }
 
 
 def authorize_handoff_action(
@@ -64,12 +155,29 @@ def authorize_handoff_action(
             "ok": leaves == INITIAL_INSTALL_LEAF_SET and not active_marker_present,
             "requires_restricted_marker": True,
         }
+    if leaves == RECOVERABLE_FORWARD_PARTIAL_LEAF_SET:
+        return {
+            # 0076 can only be completed by the stopped-service manual-release
+            # entry, which verifies HEAD == candidate image revision.  A fresh
+            # deploy could rebuild/switch candidates after the partial commit,
+            # while the older restricted-marker protocol does not bind 0076.
+            "ok": action == "manual-release",
+            "requires_restricted_marker": False,
+        }
     if action == "forward-resume":
         return {"ok": restricted_marker_ok, "requires_restricted_marker": True}
+    # This release is forward-only.  Returning to PR #133 / leaf 0075 requires
+    # the separately authorized, release-bound verified backup restore; no
+    # migration handoff may turn a generic code rollback into that recovery.
+    if action == "rollback":
+        return {
+            "ok": False,
+            "requires_restricted_marker": False,
+        }
     if leaves in PARTIAL_LEAF_SETS:
         return {"ok": False, "requires_restricted_marker": True}
     return {
-        "ok": action in {"deploy", "manual-release", "rollback"},
+        "ok": action in {"deploy", "manual-release"},
         "requires_restricted_marker": False,
     }
 
@@ -98,6 +206,15 @@ def collect_writer_activity() -> dict[str, Any]:
             "RACE_LIVE_SCHEDULER_ENABLED",
             "RACE_LIVE_MONITOR_ENABLED",
             "RACE_DATA_SYNC_ENABLED",
+            "RACE_DATA_SYNC_SCHEDULER_ENABLED",
+            "RACE_DATA_SYNC_ALLOW_NETWORK",
+            "RACE_DATA_SYNC_FUTURE_DISCOVERY_ENABLED",
+            "RACE_DATA_SYNC_SCHEDULE_APPLY_ENABLED",
+            "RACE_DATA_SYNC_RACECARD_APPLY_ENABLED",
+            "RACE_DATA_SYNC_LIFECYCLE_APPLY_ENABLED",
+            "RACE_DATA_SYNC_RESULT_APPLY_ENABLED",
+            "RACE_DATA_SYNC_RESULT_PUBLIC_ENABLED",
+            "RACE_DATA_SYNC_CORRECTION_APPLY_ENABLED",
             "HISTORICAL_RACE_BACKFILL_ENABLED",
             "HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK",
         )
@@ -162,6 +279,9 @@ def build_preflight_artifact(
     deployment_lock_token_sha256: str,
     artifact_path: str,
     handoff_action: str,
+    release_0077_recovery_manifest_path: str = "",
+    release_0077_recovery_manifest_sha256: str = "",
+    release_0077_recovery_origin_handoff_sha256: str = "",
 ) -> dict[str, Any]:
     live = preflight.get("production_audit_live") or {}
     writer_activity = collect_writer_activity()
@@ -172,6 +292,15 @@ def build_preflight_artifact(
         if handoff_action == "initial-install"
         or preflight.get("recovery_origin_action") == "initial-install"
         else "migration-history-repair"
+    )
+    recovery_binding = release_0077_recovery_binding(
+        preflight=preflight,
+        candidate_commit=candidate_commit,
+        artifact_path=artifact_path,
+        handoff_action=handoff_action,
+        manifest_path=release_0077_recovery_manifest_path,
+        manifest_sha256=release_0077_recovery_manifest_sha256,
+        origin_handoff_sha256=release_0077_recovery_origin_handoff_sha256,
     )
     payload: dict[str, Any] = {
         "schema_version": HANDOFF_SCHEMA_VERSION,
@@ -211,6 +340,7 @@ def build_preflight_artifact(
         "operation_log_fk_sha256": live.get("operation_log_fk_sha256"),
         "preflight": preflight,
         "writer_activity": writer_activity,
+        **recovery_binding,
     }
     payload["artifact_sha256"] = canonical_artifact_sha256(payload)
     return payload
@@ -355,6 +485,29 @@ def verify_preflight_artifact(
         for key, expected in expected_bindings.items():
             if payload.get(key) != expected:
                 errors.append(f"binding:{key}")
+        try:
+            recovery_binding = release_0077_recovery_binding(
+                preflight=payload.get("preflight") or {},
+                candidate_commit=payload.get("candidate_commit") or "",
+                artifact_path=payload.get("artifact_path") or "",
+                handoff_action=payload.get("handoff_action") or "",
+                manifest_path=(
+                    payload.get("release_0077_recovery_manifest_path") or ""
+                ),
+                manifest_sha256=(
+                    payload.get("release_0077_recovery_manifest_sha256") or ""
+                ),
+                origin_handoff_sha256=(
+                    payload.get("release_0077_recovery_origin_handoff_sha256")
+                    or ""
+                ),
+            )
+        except ValueError:
+            errors.append("release_0077_recovery_binding")
+        else:
+            for key, expected in recovery_binding.items():
+                if payload.get(key) != expected:
+                    errors.append(f"binding:{key}")
     return {"ok": not errors, "errors": sorted(set(errors)), "payload": payload}
 
 
@@ -392,6 +545,8 @@ def verify_closed_state(
             "applied_nodes",
             "migration_leaf_set",
             "migration_plan",
+            "candidate_post_target_migrations",
+            "migration_graph_target_exclusive",
             "unknown_applied_migrations",
             "database_identity_sha256",
             "rows_sha256",
@@ -597,11 +752,13 @@ def verify_restricted_marker_for_live_state(
                 "stable.0070_horse_identity_evidence_commit_receipt",
             ),
             *LEGACY_FINAL_LEAF_SETS,
+            RECOVERABLE_FORWARD_PARTIAL_LEAF_SET,
             FINAL_LEAF_SET,
         }
     else:
         allowed_live_states = REPAIR_LEAF_SETS | {
             *LEGACY_FINAL_LEAF_SETS,
+            RECOVERABLE_FORWARD_PARTIAL_LEAF_SET,
             FINAL_LEAF_SET,
         }
         if marker_state != ("stable.0070_horse_identity_evidence_commit_receipt",):

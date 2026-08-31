@@ -1,5 +1,48 @@
 # 部署运行手册
 
+## 2026-08-31 leaf 0077 External staging foundation 发布门禁
+
+本节只适用于从 exact PR #133 / migration leaf 0075 发布最小 0077 foundation。它不授权 France
+2023 数据写入，也不授权 0078–0080、identity/module/canonical/public 链。
+
+1. 发布前只读确认 shared deployment lock absent、现有四服务 exact/restart0/OOMfalse、
+   ExternalDataImportRun(status=started)=0、TRA ExternalDataImportLock 无 active run，
+   migration leaf 精确 0075，资源/磁盘与三队列满足当前生产门禁；race_live 必须保持精确 7543。
+2. 使用受审备份脚本创建新的 custom-format PostgreSQL 备份；必须同时记录文件大小、SHA-256、
+   0600 权限和 pg_restore --list 成功证据。备份未完成时不得进入 release task。
+3. 只允许用标准受锁 release 入口部署由本候选构建的 exact image。0077 是 atomic migration，其首操作
+   对 PostgreSQL 设置 transaction-local lock_timeout=5s、statement_timeout=5min；任一超时都视为
+   release 失败并保持应用服务停止，不在现场删除 operation 或手工补列。
+4. release 后必须确认 migration leaf 精确为
+   0077_racing_api_horse_identity_staging，manage.py check 通过，且
+   manage.py help stage_racing_api_targeted_batch 可用；同时核对四服务 image/revision、
+   restart/OOM、Nginx、公网页、赛事 flags/registry 和全部队列没有漂移。
+5. release 终态必须保持 RACING_API_STAGING_WRITE_ENABLED=false。随后可在零写环境运行整批
+   dry-run；只有 dry-run 的 status=batch_dry_run / database_writes=0、run/horse 数量和 exact
+   manifest SHA 全部匹配，`scope_stable_ids` 精确为获准的 5 个 ID，逐表
+   create/update/skip/conflict 与唯一行数守恒、out-of-scope/canonical 写均为 0，且 provenance 校验确认
+   exact TRA host/route/wrapper/profile/career 全部守恒，
+   才另行申请 staging apply 窗口。命令输出、manifest SHA、`--allow-write` 或环境开关本身都不是授权证明。
+6. staging apply 窗口内才临时设置 write flag 为 true，并同时传
+   --apply --allow-write。结束后无论 applied、replayed 或失败，都恢复 flag=false，核对 import
+   run/lock、External 计数、registry/canonical 零写边界、队列和公网，再释放自己的锁。
+
+失败/回滚边界：0076/0077 都是 additive schema，但 Django 为两个 migration 分别提交事务。0077 的
+reverse guard 会在任何反向 DDL 前抛出 IrreversibleError。若 0077 因锁/statement timeout 失败，0077
+的 5 列/2 表会回滚，但 0076 已提交，数据库 leaf 精确为 0076；此时必须保持候选镜像与全部新写入关闭，
+排除锁竞争后从 exact 0076 重跑 0077。绝不能切回不认识 0076 的 PR #133，也不能 reverse 0076。
+若 0077 已成功，本 release 不提供保留 schema 的通用代码回滚，generic code rollback 全部拒绝。只有先
+使用本次 release 绑定且已验证可恢复的 PostgreSQL custom-format 备份把数据库恢复到 exact 0075，才允许
+恢复 PR #133；所有备份恢复仍需按 docs/backup_recovery.md 另行授权。
+
+真实 PostgreSQL 门禁：候选合并/部署前还必须在 PostgreSQL 16 临时库从 production-compatible 0075
+快照执行 exact migration plan `[0076, 0077]`，验证 timeout SQL、0077 catalog contract、post-plan 为空，
+并运行同一 manifest 两并发 apply 的测试（期望一个 SUCCESS receipt、另一个 replay、无重复 External 写）。
+SQLite 的通过结果不能替代这项门禁。当前临时 PostgreSQL 16 已通过真实 France 5-run 的
+dry-run/apply/replay、canonical 零写检查及 15 项 PostgreSQL 聚焦套件；本地 apply 终态精确为
+5 horses / 60 races / 67 target results / 67 histories / 5 variants，第二次 5/5 replay 零写。生产发布仍须重新绑定 exact
+候选 revision/image、备份、shared lock 与现场 schema/catalog 证据，不能直接复用临时库结论。
+
 ## 2026-08-31 event 956 自然 correction 通过后的终态与交接
 
 1. `2026-08-31T10:27:12Z` 的自然 correction task
