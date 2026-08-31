@@ -69,6 +69,7 @@ SERVICE_IDS = {
 
 LOCK_TOKEN_A = "tok-alpha-0123456789abcdef0123456789abcdef"
 LOCK_TOKEN_B = "tok-bravo-fedcba9876543210fedcba9876543210"
+ROLLBACK_TEST_TARGET_OID = "0123456789abcdef0123456789abcdef01234567"
 
 
 FAKE_DOCKER = r"""#!/bin/sh
@@ -417,6 +418,11 @@ case "$cmd" in
     fi
     exit 0
     ;;
+  ls-tree)
+    [ -f "$state/git-ls-tree-migrations" ] || exit 1
+    cat "$state/git-ls-tree-migrations"
+    exit 0
+    ;;
   show)
     case "${1:-}" in
       *0071_historical_calendar_release_b.py)
@@ -442,6 +448,16 @@ case "$cmd" in
       *0075_race_data_source_priority_and_reported_position.py)
         [ -f "$state/git-show-0075" ] || exit 1
         cat "$state/git-show-0075"
+        exit 0
+        ;;
+      *0076_alter_externaldataimporterror_racing_region_and_more.py)
+        [ -f "$state/git-show-0076" ] || exit 1
+        cat "$state/git-show-0076"
+        exit 0
+        ;;
+      *0077_racing_api_horse_identity_staging.py)
+        [ -f "$state/git-show-0077" ] || exit 1
+        cat "$state/git-show-0077"
         exit 0
         ;;
     esac
@@ -622,6 +638,50 @@ class Harness:
             ROOT
             / "server/stable/migrations/0075_race_data_source_priority_and_reported_position.py",
             self.state / "git-show-0075",
+        )
+        shutil.copyfile(
+            ROOT
+            / "server/stable/migrations/0076_alter_externaldataimporterror_racing_region_and_more.py",
+            self.state / "git-show-0076",
+        )
+        shutil.copyfile(
+            ROOT / "server/stable/migrations/0077_racing_api_horse_identity_staging.py",
+            self.state / "git-show-0077",
+        )
+        migration_paths = sorted(
+            str(path.relative_to(ROOT))
+            for path in (ROOT / "server/stable/migrations").glob("*.py")
+        )
+        (self.state / "git-ls-tree-migrations").write_text(
+            "\n".join(migration_paths) + "\n",
+            encoding="utf-8",
+        )
+        migration_manifest_sha256 = hashlib.sha256(
+            "".join(f"{path}\n" for path in migration_paths).encode("utf-8")
+        ).hexdigest()
+        rollback_allowlist_path = (
+            self.work / "deploy/reviewed_release_b_rollback_migrations.json"
+        )
+        rollback_allowlist = json.loads(
+            rollback_allowlist_path.read_text(encoding="utf-8")
+        )
+        rollback_allowlist["recovery_mode"] = (
+            "independently-reviewed-retained-schema"
+        )
+        rollback_allowlist["generic_code_rollback_allowed"] = True
+        rollback_allowlist["reviewed_targets"] = [
+            {
+                "commit": ROLLBACK_TEST_TARGET_OID,
+                "application_schema_leaf": (
+                    "stable.0077_racing_api_horse_identity_staging"
+                ),
+                "migration_paths_sha256": migration_manifest_sha256,
+                "rationale": "isolated fake target for rollback contract tests",
+            }
+        ]
+        rollback_allowlist_path.write_text(
+            json.dumps(rollback_allowlist, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
         )
         self.log = base / "calls.log"
         self.log.touch()
@@ -2353,6 +2413,57 @@ class PreContractRollbackBridgeTests(SimpleTestCase):
             result = self._run_bridge(harness)
             self.assertNotEqual(result.returncode, 0)
 
+    def test_t12_live_0076_or_0077_schema_gate_rejects_before_stop_or_retag(self):
+        for compose_file in (COMPOSE_STANDARD, COMPOSE_LOWCOST):
+            with self.subTest(compose_file=compose_file), TemporaryDirectory() as tmp:
+                harness = Harness(Path(tmp))
+                self._assert_script_exists(harness)
+                seed_services(harness, race_live="running", race_sync="running")
+                harness.set_rc("compose-run", 76)
+                result = self._run_bridge(
+                    harness,
+                    self.FROZEN_TAG,
+                    COMPOSE_FILE=compose_file,
+                    SCHEMA_COMPATIBLE_WITH_TARGET="true",
+                )
+                self.assertEqual(result.returncode, 76, result.stderr)
+                evts = harness.events()
+                schema_runs = [
+                    argv
+                    for _compose, argv in compose_calls(evts)
+                    if argv[:1] == ["run"]
+                ]
+                self.assertEqual(
+                    schema_runs,
+                    [[
+                        "run",
+                        "--rm",
+                        "--no-deps",
+                        "web",
+                        "python",
+                        "manage.py",
+                        "check_historical_calendar_release_b_schema",
+                        "--direction=forward",
+                        "--expected-migration-leaf-set=stable.0075_race_data_source_priority_and_reported_position",
+                    ]],
+                )
+                self.assertEqual(
+                    [
+                        argv
+                        for _compose, argv in compose_calls(evts)
+                        if argv[:1] in (["stop"], ["up"])
+                    ],
+                    [],
+                )
+                self.assertEqual(
+                    [
+                        event[2]
+                        for event in evts
+                        if event[0] == "docker" and event[2][:1] == ["tag"]
+                    ],
+                    [],
+                )
+
     def test_t12_bridge_restores_frozen_image_without_checkout_or_one_shot(self):
         with TemporaryDirectory() as tmp:
             harness = Harness(Path(tmp))
@@ -3529,6 +3640,8 @@ class MigrationDriftGuardTests(SimpleTestCase):
                 "server/stable/migrations/0071_historical_calendar_release_b.py",
                 "server/stable/migrations/0074_race_data_sync_r0_control_plane.py",
                 "server/stable/migrations/0075_race_data_source_priority_and_reported_position.py",
+                "server/stable/migrations/0076_alter_externaldataimporterror_racing_region_and_more.py",
+                "server/stable/migrations/0077_racing_api_horse_identity_staging.py",
             ))
         ]
         self.assertEqual(unexpected, [], f"unexpected migration drift:\n{result.stdout}")
@@ -4107,11 +4220,27 @@ class ResumeStoppedReleaseTests(SimpleTestCase):
             result = self._run_resume(harness)
             self.assertEqual(result.returncode, 0, result.stderr)
             evts = harness.events()
+            schema_gate = [
+                "run",
+                "--rm",
+                "--no-deps",
+                "web",
+                "python",
+                "manage.py",
+                "check_historical_calendar_release_b_schema",
+                "--direction=forward",
+                "--expected-migration-leaf-set=stable.0077_racing_api_horse_identity_staging",
+            ]
             self.assertEqual(
                 [a for _cf, a in compose_calls(evts) if a[:1] == ["run"]],
-                [],
-                "resume must never invoke the one-shot release task",
+                [schema_gate],
+                "resume may run only the audited read-only exact-0077 schema gate",
             )
+            schema_gate_index = first_index(
+                evts,
+                lambda e: e[0] == "compose" and e[2] == schema_gate,
+            )
+            self.assertIsNotNone(schema_gate_index)
             up_web = first_index(
                 evts,
                 lambda e: e[0] == "compose" and e[2] == ["up", "-d", "--no-deps", "web"],
@@ -4133,6 +4262,7 @@ class ResumeStoppedReleaseTests(SimpleTestCase):
                 evts, lambda e: e[0] == "compose" and e[2] == ["ps"]
             )
             self.assertIsNotNone(final_ps)
+            self.assertLess(schema_gate_index, up_web)
             self.assertLess(up_web, healthy)
             self.assertLess(healthy, up_downstream)
             self.assertLess(up_downstream, final_ps)
@@ -4468,7 +4598,7 @@ class RollbackContractValidationTests(SimpleTestCase):
         "deploy/docker/start-web.sh",
         "deploy/docker/compose-wrapper.sh",
     )
-    FIXED_OID = "0123456789abcdef0123456789abcdef01234567"
+    FIXED_OID = ROLLBACK_TEST_TARGET_OID
 
     def _seed_stateful_original(self, harness: Harness, *, branch: bool) -> tuple[str, str]:
         original_oid = "fedcba9876543210fedcba9876543210fedcba98"
@@ -4556,7 +4686,7 @@ class RollbackContractValidationTests(SimpleTestCase):
                 harness, original_oid, original_image, branch=True
             )
 
-    def test_rollback_allowlist_requires_reviewed_migrations_through_0075(self):
+    def test_rollback_allowlist_requires_reviewed_migrations_through_0077(self):
         allowlist = json.loads(
             (
                 ROOT / "deploy/reviewed_release_b_rollback_migrations.json"
@@ -4567,6 +4697,17 @@ class RollbackContractValidationTests(SimpleTestCase):
             for item in allowlist["required_migrations"]
         }
         self.assertEqual(
+            allowlist["reviewed_targets"],
+            [],
+            "repository policy must not invent an unreviewed compatible rollback OID",
+        )
+        self.assertEqual(
+            allowlist["recovery_mode"],
+            "forward-only-verified-backup-restore",
+        )
+        self.assertFalse(allowlist["generic_code_rollback_allowed"])
+        self.assertTrue(allowlist["verified_backup_restore_required"])
+        self.assertEqual(
             set(contracts),
             {
                 "server/stable/migrations/0071_historical_calendar_release_b.py",
@@ -4574,6 +4715,8 @@ class RollbackContractValidationTests(SimpleTestCase):
                 "server/stable/migrations/0073_lifecycle_enforce_registry.py",
                 "server/stable/migrations/0074_race_data_sync_r0_control_plane.py",
                 "server/stable/migrations/0075_race_data_source_priority_and_reported_position.py",
+                "server/stable/migrations/0076_alter_externaldataimporterror_racing_region_and_more.py",
+                "server/stable/migrations/0077_racing_api_horse_identity_staging.py",
             },
         )
         self.assertEqual(
@@ -4617,6 +4760,22 @@ class RollbackContractValidationTests(SimpleTestCase):
                 "d8b220b241e560911bc5a02acada986926d93eb13a8aae0ace590a7f1e8bb0bd",
             },
         )
+        self.assertEqual(
+            {item["sha256"] for item in contracts[
+                "server/stable/migrations/0076_alter_externaldataimporterror_racing_region_and_more.py"
+            ]},
+            {
+                "9fb6f0e4199bddaf99608bc63406a1a811fa180da75c615433c50919c6f6e072",
+            },
+        )
+        self.assertEqual(
+            {item["sha256"] for item in contracts[
+                "server/stable/migrations/0077_racing_api_horse_identity_staging.py"
+            ]},
+            {
+                "fa36c9758d0975976f5de42791af5e5ec2c2530a11be44e41ca448e7d374550d",
+            },
+        )
         self.assertTrue(
             all(
                 item["rationale"].strip()
@@ -4624,6 +4783,101 @@ class RollbackContractValidationTests(SimpleTestCase):
                 for item in variants
             )
         )
+
+    def test_exact_pr133_floor_is_rejected_before_checkout_and_build(self):
+        for script in ("deploy/rollback.sh", "deploy/rollback_lowcost.sh"):
+            with self.subTest(script=script), TemporaryDirectory() as tmp:
+                harness = Harness(Path(tmp))
+                seed_services(harness, race_live="running")
+                harness.set_state("git-rev-parse-output", f"{self.FIXED_OID}\n")
+                (harness.state / "git-show-0076").unlink()
+                result = harness.run_script(script, "exact-pr133-floor")
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("required reviewed migration", result.stderr)
+                self.assertFalse(
+                    any(
+                        event[0] == "git" and event[2][:1] == ["checkout"]
+                        for event in harness.events()
+                    )
+                )
+
+    def test_unreviewed_whole_target_oid_is_rejected_before_checkout_and_build(self):
+        for script in ("deploy/rollback.sh", "deploy/rollback_lowcost.sh"):
+            with self.subTest(script=script), TemporaryDirectory() as tmp:
+                harness = Harness(Path(tmp))
+                seed_services(harness, race_live="running")
+                harness.set_state("git-rev-parse-output", f"{self.FIXED_OID}\n")
+                allowlist_path = (
+                    harness.work
+                    / "deploy/reviewed_release_b_rollback_migrations.json"
+                )
+                allowlist = json.loads(allowlist_path.read_text(encoding="utf-8"))
+                allowlist["reviewed_targets"] = []
+                allowlist_path.write_text(
+                    json.dumps(allowlist, indent=2, sort_keys=True) + "\n",
+                    encoding="utf-8",
+                )
+                result = harness.run_script(script, "unreviewed-whole-target")
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("not an exact reviewed 0077-compatible", result.stderr)
+                self.assertFalse(
+                    any(
+                        event[0] == "git" and event[2][:1] == ["checkout"]
+                        for event in harness.events()
+                    )
+                )
+
+    def test_target_0078_or_later_is_rejected_before_checkout_and_build(self):
+        for script in ("deploy/rollback.sh", "deploy/rollback_lowcost.sh"):
+            with self.subTest(script=script), TemporaryDirectory() as tmp:
+                harness = Harness(Path(tmp))
+                seed_services(harness, race_live="running")
+                harness.set_state("git-rev-parse-output", f"{self.FIXED_OID}\n")
+                with (harness.state / "git-ls-tree-migrations").open(
+                    "a", encoding="utf-8"
+                ) as handle:
+                    handle.write("server/stable/migrations/0078_unreviewed.py\n")
+                result = harness.run_script(script, "unreviewed-0078")
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("exact reviewed 0077 ceiling", result.stderr)
+                self.assertFalse(
+                    any(
+                        event[0] == "git" and event[2][:1] == ["checkout"]
+                        for event in harness.events()
+                    )
+                )
+
+    def test_target_full_migration_manifest_rejects_low_name_and_nested_bypasses(self):
+        cases = (
+            (
+                "low-name",
+                "server/stable/migrations/0001_shadow.py",
+                "migration path manifest is not the exact reviewed set",
+            ),
+            (
+                "nested",
+                "server/stable/migrations/0078_evil/__init__.py",
+                "exact reviewed 0077 ceiling",
+            ),
+        )
+        for label, extra_path, expected in cases:
+            with self.subTest(case=label), TemporaryDirectory() as tmp:
+                harness = Harness(Path(tmp))
+                seed_services(harness, race_live="running")
+                harness.set_state("git-rev-parse-output", f"{self.FIXED_OID}\n")
+                with (harness.state / "git-ls-tree-migrations").open(
+                    "a", encoding="utf-8"
+                ) as handle:
+                    handle.write(f"{extra_path}\n")
+                result = harness.run_script("deploy/rollback.sh", label)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(expected, result.stderr)
+                self.assertFalse(
+                    any(
+                        event[0] == "git" and event[2][:1] == ["checkout"]
+                        for event in harness.events()
+                    )
+                )
 
     def test_legacy_reviewed_0071_with_exact_0072_remains_b_to_b_eligible(self):
         repaired = (
@@ -4727,7 +4981,7 @@ class RollbackContractValidationTests(SimpleTestCase):
                         )
                     )
 
-    def test_0075_rollback_target_does_not_need_later_v2_marker_file(self):
+    def test_0077_compatible_rollback_target_does_not_need_later_v2_marker_file(self):
         verifier_call = (
             "python3 ./deploy/verify_rollback_target_migration.py "
             '--target-oid "$TARGET_OID"'
@@ -4748,7 +5002,7 @@ class RollbackContractValidationTests(SimpleTestCase):
             )
             self.assertIn(
                 "RELEASE_B_EXPECTED_MIGRATION_LEAF_SET="
-                "stable.0075_race_data_source_priority_and_reported_position",
+                "stable.0077_racing_api_horse_identity_staging",
                 text,
             )
 
@@ -4756,7 +5010,7 @@ class RollbackContractValidationTests(SimpleTestCase):
             ROOT / "deploy/resume_rollback_control_state.sh"
         ).read_text(encoding="utf-8")
         self.assertIn(
-            "EXPECTED_LEAF=stable.0075_race_data_source_priority_and_reported_position",
+            "EXPECTED_LEAF=stable.0077_racing_api_horse_identity_staging",
             resume,
         )
 
@@ -4782,6 +5036,8 @@ class RollbackContractValidationTests(SimpleTestCase):
                 "server/stable/migrations/0073_lifecycle_enforce_registry.py",
                 "server/stable/migrations/0074_race_data_sync_r0_control_plane.py",
                 "server/stable/migrations/0075_race_data_source_priority_and_reported_position.py",
+                "server/stable/migrations/0076_alter_externaldataimporterror_racing_region_and_more.py",
+                "server/stable/migrations/0077_racing_api_horse_identity_staging.py",
             },
         )
 
@@ -5217,6 +5473,43 @@ class RollbackContractValidationTests(SimpleTestCase):
                 [],
             )
 
+    def test_rollback_preflight_rejects_empty_expected_leaf_before_compose(self):
+        with TemporaryDirectory() as tmp:
+            harness = Harness(Path(tmp))
+            seed_services(harness, race_live="running")
+            locked = acquire_lock(harness, LOCK_TOKEN_A, action="rollback")
+            self.assertEqual(locked.returncode, 0, locked.stderr)
+            artifact_dir = (
+                harness.work
+                / "runtime"
+                / "migration_history_repair"
+                / "preflight"
+                / "empty-leaf.test"
+            )
+            artifact_dir.mkdir(parents=True, mode=0o700)
+            artifact_dir.chmod(0o700)
+            harness.clear_log()
+            result = harness.run_script(
+                "deploy/run_historical_calendar_release_b_preflight.sh",
+                COMPOSE_FILE=COMPOSE_STANDARD,
+                DEPLOYMENT_LOCK_TOKEN=LOCK_TOKEN_A,
+                EXPECTED_CANDIDATE_COMMIT=self.FIXED_OID,
+                RELEASE_B_PREFLIGHT_ARTIFACT_PATH=str(
+                    artifact_dir / "preflight.json"
+                ),
+                RELEASE_B_PREFLIGHT_ACTION="rollback",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("generic rollback is disabled", result.stderr)
+            self.assertEqual(
+                [
+                    argv
+                    for _compose_file, argv in compose_calls(harness.events())
+                    if argv[:1] == ["run"]
+                ],
+                [],
+            )
+
     def test_every_pinned_control_file_rejects_same_mode_tamper_for_both_rollbacks(self):
         cases = (
             ("deploy/rollback.sh", COMPOSE_STANDARD),
@@ -5622,6 +5915,16 @@ class RollbackContractValidationTests(SimpleTestCase):
                                 "show",
                                 f"{self.FIXED_OID}:server/stable/migrations/"
                                 "0075_race_data_source_priority_and_reported_position.py",
+                            ],
+                            [
+                                "show",
+                                f"{self.FIXED_OID}:server/stable/migrations/"
+                                "0076_alter_externaldataimporterror_racing_region_and_more.py",
+                            ],
+                            [
+                                "show",
+                                f"{self.FIXED_OID}:server/stable/migrations/"
+                                "0077_racing_api_horse_identity_staging.py",
                             ],
                         ],
                     )

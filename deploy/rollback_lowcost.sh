@@ -159,9 +159,11 @@ override_owner="$(stat -c '%u' "$CONTROL_OVERRIDE" 2>/dev/null || stat -f '%u' "
 override_mode="$(stat -c '%a' "$CONTROL_OVERRIDE" 2>/dev/null || stat -f '%Lp' "$CONTROL_OVERRIDE")"
 if [ "$override_owner" != "$(id -u)" ] || [ "$override_mode" != "400" ]; then echo "rollback control override trust failed" >&2; exit 1; fi
 
-# This generic path is B-to-B only: it keeps 0075 applied. Validate the target
-# image against the current Release B schema; reverse compatibility belongs
-# exclusively to the separately reviewed cross-schema recovery procedure.
+# Release 0077 is forward-only.  The verifier above rejects every generic code
+# rollback before checkout/build; exact PR133 is not compatible with the five
+# new NOT NULL ExternalHorse columns.  A 0076 partial state must be completed
+# with the candidate image, while recovery after completed 0077 uses the
+# release-bound verified database backup.  No reverse migration is permitted.
 PREFLIGHT_ROOT="$REPAIR_RUNTIME_ROOT/preflight"
 if [ -L "$PREFLIGHT_ROOT" ]; then echo "preflight root must not be a symlink" >&2; exit 1; fi
 umask 077
@@ -174,7 +176,7 @@ COMPOSE_FILE="$COMPOSE_FILE" EXPECTED_CANDIDATE_COMMIT="$TARGET_OID" \
   UMANEWS_ROOT_DIR="$ROOT_DIR" RELEASE_B_BINDING_IMAGE_NAME="$TARGET_IMAGE_TAG" \
   RELEASE_CONTROL_COMPOSE_OVERRIDE="$CONTROL_OVERRIDE" \
   RELEASE_B_PREFLIGHT_ACTION=rollback \
-  RELEASE_B_EXPECTED_MIGRATION_LEAF_SET=stable.0075_race_data_source_priority_and_reported_position \
+  RELEASE_B_EXPECTED_MIGRATION_LEAF_SET=stable.0077_racing_api_horse_identity_staging \
   "$CONTROL_DIR/preflight.sh"
 RELEASE_B_PREFLIGHT_ARTIFACT_SHA256="$(sed -n 's/.*"artifact_sha256":"\([0-9a-f]*\)".*/\1/p' "$RELEASE_B_PREFLIGHT_ARTIFACT_PATH")"
 EXPECTED_PRODUCTION_DB_IDENTITY_SHA256="$(sed -n 's/.*"database_identity_sha256":"\([0-9a-f]*\)".*/\1/p' "$RELEASE_B_PREFLIGHT_ARTIFACT_PATH" | head -n 1)"

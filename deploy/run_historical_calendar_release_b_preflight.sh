@@ -67,10 +67,21 @@ case "$EXPECTED_MIGRATION_LEAF_SET" in
   stable.0075_race_data_source_priority_and_reported_position)
     leaf_args="--expected-migration-leaf-set=stable.0075_race_data_source_priority_and_reported_position"
     ;;
+  stable.0076_alter_externaldataimporterror_racing_region_and_more)
+    leaf_args="--expected-migration-leaf-set=stable.0076_alter_externaldataimporterror_racing_region_and_more"
+    ;;
+  stable.0077_racing_api_horse_identity_staging)
+    leaf_args="--expected-migration-leaf-set=stable.0077_racing_api_horse_identity_staging"
+    ;;
   *) echo "RELEASE_B_EXPECTED_MIGRATION_LEAF_SET must be one complete reviewed leaf set" >&2; exit 1 ;;
 esac
 RELEASE_B_PREFLIGHT_ACTION="${RELEASE_B_PREFLIGHT_ACTION:-}"
 case "$RELEASE_B_PREFLIGHT_ACTION" in deploy|manual-release|rollback|forward-resume|initial-install) ;; *) echo "RELEASE_B_PREFLIGHT_ACTION is required" >&2; exit 1 ;; esac
+if [ "$RELEASE_B_PREFLIGHT_ACTION" = rollback ] && \
+   [ "$EXPECTED_MIGRATION_LEAF_SET" != stable.0077_racing_api_horse_identity_staging ]; then
+  echo "generic rollback is disabled; even a diagnostic rollback preflight requires exact leaf stable.0077_racing_api_horse_identity_staging" >&2
+  exit 1
+fi
 if [ "$RELEASE_B_PREFLIGHT_ACTION" != forward-resume ]; then
   unset RESTRICTED_RECOVERY_PROVENANCE_ARTIFACT_SHA256
 fi

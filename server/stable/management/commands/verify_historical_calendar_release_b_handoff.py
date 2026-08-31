@@ -26,6 +26,11 @@ class Command(BaseCommand):
         parser.add_argument("--compose-file", required=True)
         parser.add_argument("--deployment-lock-token-sha256", required=True)
         parser.add_argument("--artifact-only", action="store_true")
+        parser.add_argument("--release-0077-recovery-manifest-path", default="")
+        parser.add_argument("--release-0077-recovery-manifest-sha256", default="")
+        parser.add_argument(
+            "--release-0077-recovery-origin-handoff-sha256", default=""
+        )
 
     def handle(self, *args, **options):
         vendor = database_vendor_contract()
@@ -45,16 +50,55 @@ class Command(BaseCommand):
             "deployment_lock_token_sha256": options["deployment_lock_token_sha256"],
             "artifact_path": options["artifact_path"],
         }
+        recovery_values = (
+            options["release_0077_recovery_manifest_path"],
+            options["release_0077_recovery_manifest_sha256"],
+            options["release_0077_recovery_origin_handoff_sha256"],
+        )
+        if any(recovery_values) and not all(recovery_values):
+            raise CommandError("0077 recovery manifest expectation is incomplete")
+        if all(recovery_values):
+            bindings.update(
+                {
+                    "release_0077_recovery_manifest_path": recovery_values[0],
+                    "release_0077_recovery_manifest_sha256": recovery_values[1],
+                    "release_0077_recovery_origin_handoff_sha256": recovery_values[2],
+                    "release_0077_recovery_binding_mode": "bound",
+                }
+            )
         verifier = (
             verify_preflight_artifact
             if options["artifact_only"]
             else verify_closed_state
+        )
+        artifact_contract = verify_preflight_artifact(
+            path=Path(options["artifact_path"]),
+            expected_artifact_sha256=options["artifact_sha256"],
+            expected_bindings=bindings,
         )
         result = verifier(
             path=Path(options["artifact_path"]),
             expected_artifact_sha256=options["artifact_sha256"],
             expected_bindings=bindings,
         )
+        payload = artifact_contract.get("payload") or {}
+        preflight = payload.get("preflight") or {}
+        crosses_0077 = (
+            "0077_racing_api_horse_identity_staging"
+            in (preflight.get("migration_plan") or [])
+        )
+        if (
+            not options["artifact_only"]
+            and crosses_0077
+            and (
+                payload.get("release_0077_recovery_binding_mode") != "bound"
+                or not all(recovery_values)
+            )
+        ):
+            result["ok"] = False
+            result.setdefault("artifact_errors", []).append(
+                "release_0077_recovery_manifest_unbound"
+            )
         self.stdout.write(json.dumps(result, ensure_ascii=False, sort_keys=True))
         if not result["ok"]:
             mode = "artifact" if options["artifact_only"] else "closed-state"

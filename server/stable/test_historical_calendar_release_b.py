@@ -119,14 +119,14 @@ class ReleaseBSchemaPreflightTests(TestCase):
                 stdout=output,
             )
         payload = json.loads(output.getvalue())
-        self.assertEqual(payload["schema_version"], "migration-history-repair-preflight/v2")
+        self.assertEqual(payload["schema_version"], "migration-history-repair-preflight/v3")
         self.assertEqual(payload["direction"], "forward")
         self.assertIn("migration_leaf", payload)
         self.assertIn("database_identity_sha256", payload)
         self.assertRegex(payload["rows_sha256"], r"^[0-9a-f]{64}$")
         self.assertEqual(
             payload["migration_leaf"],
-            "stable.0075_race_data_source_priority_and_reported_position",
+            "stable.0077_racing_api_horse_identity_staging",
         )
 
     def test_unknown_applied_stable_migration_fails_closed(self):
@@ -334,6 +334,528 @@ class ReleaseBDeployContractTests(SimpleTestCase):
         self.assertIn("EXPECTED_PRODUCTION_DB_IDENTITY_SHA256", wrapper)
         self.assertIn("RELEASE_B_PREFLIGHT_ARTIFACT_PATH", wrapper)
         self.assertIn("deployment-lock-token-sha256", wrapper)
+
+
+class ReleaseB0077ReleaseContractTests(SimpleTestCase):
+    M0075 = "stable.0075_race_data_source_priority_and_reported_position"
+    M0076 = "stable.0076_alter_externaldataimporterror_racing_region_and_more"
+    M0077 = "stable.0077_racing_api_horse_identity_staging"
+
+    def test_forward_plan_has_exact_0075_0076_0077_boundaries(self):
+        from stable.services.historical_calendar_release_b_schema import (
+            ALLOWED_FORWARD_STATES,
+            TARGET,
+        )
+
+        self.assertEqual(TARGET, ("stable", self.M0077.removeprefix("stable.")))
+        self.assertEqual(
+            ALLOWED_FORWARD_STATES[(self.M0075,)],
+            [
+                self.M0076.removeprefix("stable."),
+                self.M0077.removeprefix("stable."),
+            ],
+        )
+        self.assertEqual(
+            ALLOWED_FORWARD_STATES[(self.M0076,)],
+            [self.M0077.removeprefix("stable.")],
+        )
+        self.assertEqual(ALLOWED_FORWARD_STATES[(self.M0077,)], [])
+
+    def test_0076_only_allows_stopped_candidate_manual_release(self):
+        from stable.services.historical_calendar_release_b_handoff import (
+            authorize_handoff_action,
+        )
+
+        self.assertTrue(
+            authorize_handoff_action(
+                leaf_set=[self.M0076],
+                action="manual-release",
+                restricted_marker_ok=False,
+            )["ok"]
+        )
+        self.assertFalse(
+            authorize_handoff_action(
+                leaf_set=[self.M0076],
+                action="deploy",
+                restricted_marker_ok=False,
+            )["ok"]
+        )
+        self.assertFalse(
+            authorize_handoff_action(
+                leaf_set=[self.M0076],
+                action="forward-resume",
+                restricted_marker_ok=True,
+            )["ok"]
+        )
+        self.assertFalse(
+            authorize_handoff_action(
+                leaf_set=[self.M0076],
+                action="rollback",
+                restricted_marker_ok=False,
+            )["ok"]
+        )
+        self.assertFalse(
+            authorize_handoff_action(
+                leaf_set=[self.M0075],
+                action="rollback",
+                restricted_marker_ok=False,
+            )["ok"]
+        )
+        self.assertFalse(
+            authorize_handoff_action(
+                leaf_set=[self.M0077],
+                action="rollback",
+                restricted_marker_ok=False,
+            )["ok"]
+        )
+
+    def test_candidate_graph_with_0078_or_later_fails_closed(self):
+        from types import SimpleNamespace
+
+        from stable.services.historical_calendar_release_b_schema import (
+            _migration_state,
+        )
+
+        target = ("stable", self.M0077.removeprefix("stable."))
+        later = ("stable", "0078_unreviewed_follow_on")
+        graph = SimpleNamespace(
+            node_map={
+                target: SimpleNamespace(children={later}),
+                later: SimpleNamespace(children=set()),
+            },
+            forwards_plan=lambda node: [node],
+        )
+        loader = SimpleNamespace(
+            graph=graph,
+            check_consistent_history=lambda connection: None,
+        )
+        with patch(
+            "stable.services.historical_calendar_release_b_schema.MigrationLoader",
+            return_value=loader,
+        ), patch(
+            "stable.services.historical_calendar_release_b_schema."
+            "MigrationRecorder.applied_migrations",
+            return_value={target},
+        ):
+            state = _migration_state()
+        self.assertEqual(
+            state["candidate_post_target_migrations"],
+            ["stable.0078_unreviewed_follow_on"],
+        )
+        self.assertFalse(state["migration_graph_target_exclusive"])
+        self.assertFalse(state["migration_state_allowed"])
+
+    @staticmethod
+    def _catalog_fixture() -> dict:
+        from stable.services.historical_calendar_release_b_schema import (
+            RACING_API_STAGING_EXTERNAL_HORSE_COLUMNS,
+            RACING_API_STAGING_INDEX_CONTRACT,
+            RACING_API_STAGING_TABLE_COLUMNS,
+        )
+
+        columns = []
+        for name, (field_type, not_null) in (
+            RACING_API_STAGING_EXTERNAL_HORSE_COLUMNS.items()
+        ):
+            columns.append(
+                {
+                    "table_name": "stable_externalhorse",
+                    "column_name": name,
+                    "type": field_type,
+                    "not_null": not_null,
+                    "identity": "",
+                    "default_expr": "",
+                }
+            )
+        for table, fields in RACING_API_STAGING_TABLE_COLUMNS.items():
+            for name, (field_type, not_null, identity) in fields.items():
+                columns.append(
+                    {
+                        "table_name": table,
+                        "column_name": name,
+                        "type": field_type,
+                        "not_null": not_null,
+                        "identity": identity,
+                        "default_expr": "",
+                    }
+                )
+
+        def constraint(
+            table: str,
+            name: str,
+            kind: str,
+            columns: list[str],
+            *,
+            definition: str = "",
+            target: str = "",
+        ) -> dict:
+            foreign = kind == "f"
+            return {
+                "table_name": table,
+                "name": name,
+                "type": kind,
+                "validated": True,
+                "deferrable": foreign,
+                "initially_deferred": foreign,
+                "definition": definition,
+                "target_schema": "public" if foreign else "",
+                "target_table": target,
+                "columns": columns,
+                "target_columns": ["id"] if foreign else [],
+                "update_action": "a" if foreign else " ",
+                "delete_action": "a" if foreign else " ",
+                "match_type": "s" if foreign else " ",
+            }
+
+        identity = "stable_horseexternalidentity"
+        variant = "stable_horsenamevariant"
+        constraints = [
+            constraint(
+                identity,
+                "horse_ext_payload_sha_valid",
+                "c",
+                ["payload_sha256"],
+                definition=(
+                    "CHECK ((((payload_sha256)::text = ''::text) OR "
+                    "((payload_sha256)::text ~ '^[0-9a-f]{64}$'::text)))"
+                ),
+            ),
+            constraint(
+                identity,
+                "horse_ext_verified_evidence",
+                "c",
+                [
+                    "status",
+                    "evidence_url",
+                    "payload_sha256",
+                    "verified_at",
+                    "verified_by_id",
+                ],
+                definition=(
+                    "CHECK (((NOT ((status)::text = 'verified'::text)) OR "
+                    "((NOT ((evidence_url)::text = ''::text)) AND "
+                    "(NOT ((payload_sha256)::text = ''::text)) AND "
+                    "(verified_at IS NOT NULL) AND (verified_by_id IS NOT NULL))))"
+                ),
+            ),
+            constraint(
+                identity,
+                "stable_horseexternal_horse_profile_id_843b6204_fk_stable_ho",
+                "f",
+                ["horse_profile_id"],
+                target="stable_horseprofile",
+            ),
+            constraint(
+                identity,
+                "stable_horseexternal_verified_by_id_479b81b3_fk_auth_user",
+                "f",
+                ["verified_by_id"],
+                target="auth_user",
+            ),
+            constraint(identity, "stable_horseexternalidentity_pkey", "p", ["id"]),
+            constraint(
+                identity,
+                "uq_horse_ext_identity_source_ns_id",
+                "u",
+                ["source", "namespace", "external_id"],
+            ),
+            constraint(
+                variant,
+                "horse_name_payload_sha_valid",
+                "c",
+                ["payload_sha256"],
+                definition=(
+                    "CHECK ((((payload_sha256)::text = ''::text) OR "
+                    "((payload_sha256)::text ~ '^[0-9a-f]{64}$'::text)))"
+                ),
+            ),
+            constraint(
+                variant,
+                "horse_name_variant_exactly_one_entity",
+                "c",
+                ["horse_profile_id", "external_horse_id"],
+                definition=(
+                    "CHECK ((((horse_profile_id IS NOT NULL) AND "
+                    "(external_horse_id IS NULL)) OR ((horse_profile_id IS NULL) "
+                    "AND (external_horse_id IS NOT NULL))))"
+                ),
+            ),
+            constraint(
+                variant,
+                "horse_name_variant_valid_range",
+                "c",
+                ["valid_from", "valid_to"],
+                definition=(
+                    "CHECK (((valid_from IS NULL) OR (valid_to IS NULL) OR "
+                    "(valid_from <= valid_to)))"
+                ),
+            ),
+            constraint(
+                variant,
+                "stable_horsenamevari_external_horse_id_9b027f60_fk_stable_ex",
+                "f",
+                ["external_horse_id"],
+                target="stable_externalhorse",
+            ),
+            constraint(
+                variant,
+                "stable_horsenamevari_horse_profile_id_cc509a6e_fk_stable_ho",
+                "f",
+                ["horse_profile_id"],
+                target="stable_horseprofile",
+            ),
+            constraint(variant, "stable_horsenamevariant_pkey", "p", ["id"]),
+        ]
+        indexes = []
+        for name, (
+            table,
+            unique,
+            index_columns,
+            operator_classes,
+            predicate,
+        ) in RACING_API_STAGING_INDEX_CONTRACT.items():
+            indexes.append(
+                {
+                    "table_name": table,
+                    "name": name,
+                    "method": "btree",
+                    "unique": unique,
+                    "valid": True,
+                    "ready": True,
+                    "live": True,
+                    "columns": index_columns,
+                    "operator_classes": operator_classes,
+                    "predicate": predicate,
+                }
+            )
+        sequences = [
+            {
+                "name": f"{table}_id_seq",
+                "owned_table": table,
+                "owned_column": "id",
+                "dependency_type": "i",
+                "type": "bigint",
+                "start": 1,
+                "increment": 1,
+                "min": 1,
+                "max": 9223372036854775807,
+                "cache": 1,
+                "cycle": False,
+            }
+            for table in RACING_API_STAGING_TABLE_COLUMNS
+        ]
+        relations = [
+            {"name": "stable_horseexternalidentity", "kind": "r"},
+            {"name": "stable_horsenamevariant", "kind": "r"},
+            {"name": "stable_horseexternalidentity_id_seq", "kind": "S"},
+            {"name": "stable_horsenamevariant_id_seq", "kind": "S"},
+            *[
+                {"name": name, "kind": "i"}
+                for name in RACING_API_STAGING_INDEX_CONTRACT
+            ],
+        ]
+        return {
+            "schema_name": "public",
+            "columns": columns,
+            "constraints": constraints,
+            "indexes": indexes,
+            "sequences": sequences,
+            "relations": relations,
+        }
+
+    def test_pure_0077_catalog_validator_covers_columns_fks_checks_and_indexes(self):
+        import copy
+
+        from stable.services.historical_calendar_release_b_schema import (
+            validate_racing_api_horse_staging_catalog_contract,
+        )
+
+        valid = self._catalog_fixture()
+        self.assertEqual(
+            validate_racing_api_horse_staging_catalog_contract(
+                contract=valid, migration_applied=True
+            ),
+            [],
+        )
+        mutations = (
+            (
+                "column",
+                lambda payload: payload["columns"].pop(0),
+                "0077.externalhorse_columns",
+            ),
+            (
+                "fk",
+                lambda payload: payload["constraints"][2].update(
+                    target_table="wrong_table"
+                ),
+                "0077.foreign_key:horse_profile_id:stable_horseprofile",
+            ),
+            (
+                "fk-schema",
+                lambda payload: payload["constraints"][2].update(
+                    target_schema="shadow"
+                ),
+                "0077.foreign_key:horse_profile_id:stable_horseprofile",
+            ),
+            (
+                "check",
+                lambda payload: payload["constraints"][0].update(
+                    definition="CHECK (TRUE)"
+                ),
+                "0077.check:horse_ext_payload_sha_valid",
+            ),
+            (
+                "check-regrouped",
+                lambda payload: payload["constraints"][1].update(
+                    definition=(
+                        "CHECK ((((NOT ((status)::text = 'verified'::text)) OR "
+                        "(NOT ((evidence_url)::text = ''::text))) AND "
+                        "(NOT ((payload_sha256)::text = ''::text)) AND "
+                        "(verified_at IS NOT NULL) AND (verified_by_id IS NOT NULL)))"
+                    )
+                ),
+                "0077.check:horse_ext_verified_evidence",
+            ),
+            (
+                "check-deferrable",
+                lambda payload: payload["constraints"][0].update(
+                    deferrable=True
+                ),
+                "0077.check:horse_ext_payload_sha_valid",
+            ),
+            (
+                "pk-deferrable",
+                lambda payload: payload["constraints"][4].update(
+                    deferrable=True
+                ),
+                "0077.primary_keys",
+            ),
+            (
+                "index",
+                lambda payload: payload["indexes"][0].update(valid=False),
+                "0077.index:horse_ext_identity_profile_idx",
+            ),
+            (
+                "sequence",
+                lambda payload: payload["sequences"].pop(),
+                "0077.sequences",
+            ),
+            (
+                "sequence-dependency",
+                lambda payload: payload["sequences"][0].update(
+                    dependency_type="a"
+                ),
+                "0077.sequences",
+            ),
+            (
+                "sequence-surplus",
+                lambda payload: payload["sequences"].append(
+                    {**payload["sequences"][0], "name": "surplus_id_seq"}
+                ),
+                "0077.sequences",
+            ),
+            (
+                "relation-kind",
+                lambda payload: payload["relations"][0].update(kind="v"),
+                "0077.relations",
+            ),
+        )
+        for label, mutate, expected in mutations:
+            with self.subTest(label=label):
+                drifted = copy.deepcopy(valid)
+                mutate(drifted)
+                self.assertIn(
+                    expected,
+                    validate_racing_api_horse_staging_catalog_contract(
+                        contract=drifted, migration_applied=True
+                    ),
+                )
+
+        pre_migration_drift = copy.deepcopy(valid)
+        pre_migration_drift["columns"] = []
+        pre_migration_drift["constraints"] = []
+        pre_migration_drift["indexes"] = []
+        pre_migration_drift["sequences"] = []
+        pre_migration_drift["relations"] = [
+            {"name": "stable_horseexternalidentity_id_seq", "kind": "S"}
+        ]
+        self.assertEqual(
+            validate_racing_api_horse_staging_catalog_contract(
+                contract=pre_migration_drift,
+                migration_applied=False,
+            ),
+            ["0077.object_presence"],
+        )
+
+    def test_shell_and_rollback_allowlists_bind_exact_0077_forward_only_policy(self):
+        import json
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[2]
+        preflight = (
+            root / "deploy/run_historical_calendar_release_b_preflight.sh"
+        ).read_text(encoding="utf-8")
+        self.assertIn(f"{self.M0076})", preflight)
+        self.assertIn(f"{self.M0077})", preflight)
+        for relative in ("deploy/rollback.sh", "deploy/rollback_lowcost.sh"):
+            rollback = (root / relative).read_text(encoding="utf-8")
+            self.assertIn(
+                f"RELEASE_B_EXPECTED_MIGRATION_LEAF_SET={self.M0077}", rollback
+            )
+            self.assertNotIn(
+                f"RELEASE_B_EXPECTED_MIGRATION_LEAF_SET={self.M0076}", rollback
+            )
+        resume = (root / "deploy/resume_stopped_release.sh").read_text(
+            encoding="utf-8"
+        )
+        exact_gate = f"--expected-migration-leaf-set={self.M0077}"
+        self.assertIn(exact_gate, resume)
+        self.assertLess(resume.index(exact_gate), resume.index('echo "resume: starting web"'))
+        allowlist = json.loads(
+            (root / "deploy/reviewed_release_b_rollback_migrations.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(allowlist["final_schema_leaf"], self.M0077)
+        self.assertEqual(
+            allowlist["schema_version"],
+            "release-b-rollback-migration-allowlist/v6",
+        )
+        self.assertEqual(allowlist["recoverable_forward_partial_leaf"], self.M0076)
+        self.assertFalse(allowlist["reverse_migration_allowed"])
+        self.assertEqual(
+            allowlist["reviewed_targets"],
+            [],
+            "generic rollback stays disabled until a whole compatible target OID is reviewed",
+        )
+        self.assertEqual(
+            allowlist["recovery_mode"],
+            "forward-only-verified-backup-restore",
+        )
+        self.assertFalse(allowlist["generic_code_rollback_allowed"])
+        self.assertTrue(allowlist["verified_backup_restore_required"])
+
+    def test_repository_policy_rejects_every_generic_0077_code_rollback(self):
+        import subprocess
+        import sys
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[2]
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(root / "deploy/verify_rollback_target_migration.py"),
+                "--target-oid",
+                "0" * 40,
+            ],
+            cwd=root,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("0077 is forward-only", result.stderr)
+        self.assertIn("verified backup", result.stderr)
 
 
 class ReleaseBSeriesPlannerTests(TransactionTestCase):

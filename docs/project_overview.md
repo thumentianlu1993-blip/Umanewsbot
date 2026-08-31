@@ -1,5 +1,14 @@
 # 项目总览
 
+当前正在准备一个严格限定到 migration leaf 0077 的 External staging foundation 候选。它从
+origin/main@256311a8…27ea 的 clean worktree 构建，只增加 The Racing API / Ireland schema、
+5 个 ExternalHorse 资料字段、provider identity/name-variant staging 模型和
+stage_racing_api_targeted_batch；仓库写开关默认 false。批量入口只创建 materialization 中获准的目标
+stable ID，父母 profile 和其他 runner 仅作 provenance，重复赛事校验后批内去重。0077 的 PostgreSQL DDL 在 atomic 事务首项
+设置 5 秒锁等待和 5 分钟执行超时，并禁止反向 DDL。staging loader 将 normalized profile/career/race/runner
+逐项绑定 exact TRA response wrapper，且仅写 External 层。该候选尚未提交、PR 或部署，也不包含
+0078–0080、canonical identity、HorseProfile 发布或公网变化；生产仍为 PR #133 / leaf 0075。
+
 2026-08-31 18:40，完整赛事状态更迭生产目标已通过。PR #133 以 `220bc621…402b` /
 `946f2177…9803a` 完成关闭态发布和五阶段重开；event 956 已自然经历 scheduled -> running -> finished、
 official revision、10 条 canonical result、唯一 publication 与 root/www 公开。北京时间 18:27 的自然

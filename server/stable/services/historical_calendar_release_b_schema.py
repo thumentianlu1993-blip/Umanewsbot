@@ -21,7 +21,7 @@ from stable.models import (
 )
 
 
-SCHEMA_VERSION = "migration-history-repair-preflight/v2"
+SCHEMA_VERSION = "migration-history-repair-preflight/v3"
 LEGACY_SCHEMA_VERSION = "historical-calendar-release-b-preflight/v1"
 PRODUCTION_AUDIT_SCHEMA_VERSION = "migration-history-repair-production-audit/v2"
 PRODUCTION_AUDIT_CANONICALIZATION_VERSION = "named-object-scalar-fk/v1"
@@ -31,7 +31,7 @@ PRODUCTION_AUDIT_EXPECTED_APPLIED_NODES = [
 ]
 TARGET = (
     "stable",
-    "0075_race_data_source_priority_and_reported_position",
+    "0077_racing_api_horse_identity_staging",
 )
 AUDIT_PATH = (
     Path(__file__).resolve().parents[3]
@@ -50,6 +50,8 @@ ALLOWED_FORWARD_STATES = {
         "0073_lifecycle_enforce_registry",
         "0074_race_data_sync_r0_control_plane",
         "0075_race_data_source_priority_and_reported_position",
+        "0076_alter_externaldataimporterror_racing_region_and_more",
+        "0077_racing_api_horse_identity_staging",
     ],
     (
         "stable.0068_race_data_sync_pipeline_a_field_audit",
@@ -61,6 +63,8 @@ ALLOWED_FORWARD_STATES = {
         "0073_lifecycle_enforce_registry",
         "0074_race_data_sync_r0_control_plane",
         "0075_race_data_source_priority_and_reported_position",
+        "0076_alter_externaldataimporterror_racing_region_and_more",
+        "0077_racing_api_horse_identity_staging",
     ],
     (
         "stable.0069_race_data_sync_pipeline_a_ledger_guards",
@@ -71,92 +75,57 @@ ALLOWED_FORWARD_STATES = {
         "0073_lifecycle_enforce_registry",
         "0074_race_data_sync_r0_control_plane",
         "0075_race_data_source_priority_and_reported_position",
+        "0076_alter_externaldataimporterror_racing_region_and_more",
+        "0077_racing_api_horse_identity_staging",
     ],
     ("stable.0071_historical_calendar_release_b",): [
         "0072_add_extended_racing_regions",
         "0073_lifecycle_enforce_registry",
         "0074_race_data_sync_r0_control_plane",
         "0075_race_data_source_priority_and_reported_position",
+        "0076_alter_externaldataimporterror_racing_region_and_more",
+        "0077_racing_api_horse_identity_staging",
     ],
     ("stable.0072_add_extended_racing_regions",): [
         "0073_lifecycle_enforce_registry",
         "0074_race_data_sync_r0_control_plane",
         "0075_race_data_source_priority_and_reported_position",
+        "0076_alter_externaldataimporterror_racing_region_and_more",
+        "0077_racing_api_horse_identity_staging",
     ],
     ("stable.0073_lifecycle_enforce_registry",): [
         "0074_race_data_sync_r0_control_plane",
         "0075_race_data_source_priority_and_reported_position",
+        "0076_alter_externaldataimporterror_racing_region_and_more",
+        "0077_racing_api_horse_identity_staging",
     ],
     ("stable.0074_race_data_sync_r0_control_plane",): [
-        "0075_race_data_source_priority_and_reported_position"
+        "0075_race_data_source_priority_and_reported_position",
+        "0076_alter_externaldataimporterror_racing_region_and_more",
+        "0077_racing_api_horse_identity_staging",
     ],
-    ("stable.0075_race_data_source_priority_and_reported_position",): [],
+    ("stable.0075_race_data_source_priority_and_reported_position",): [
+        "0076_alter_externaldataimporterror_racing_region_and_more",
+        "0077_racing_api_horse_identity_staging",
+    ],
+    ("stable.0076_alter_externaldataimporterror_racing_region_and_more",): [
+        "0077_racing_api_horse_identity_staging",
+    ],
+    ("stable.0077_racing_api_horse_identity_staging",): [],
 }
 
-# Exact recorder states reachable when Django executes the reviewed 0075 plan
+# Exact recorder states reachable when Django executes the reviewed 0077 plan
 # from the sole approved pre-0070 origin.  This is deliberately not merged
 # into ALLOWED_FORWARD_STATES: ordinary Release B deploys must never acquire an
 # initial-install bypass merely because they happen to see an old database.
 INITIAL_INSTALL_FORWARD_STATES = {
     ("stable.0067_historical_calendar_release_a",): [
         "0070_horse_identity_evidence_commit_receipt",
-        "0068_race_data_sync_pipeline_a_field_audit",
-        "0069_race_data_sync_pipeline_a_ledger_guards",
-        "0071_historical_calendar_release_b",
-        "0072_add_extended_racing_regions",
-        "0073_lifecycle_enforce_registry",
-        "0074_race_data_sync_r0_control_plane",
-        "0075_race_data_source_priority_and_reported_position",
+        *ALLOWED_FORWARD_STATES[
+            ("stable.0070_horse_identity_evidence_commit_receipt",)
+        ],
     ],
-    ("stable.0070_horse_identity_evidence_commit_receipt",): [
-        "0068_race_data_sync_pipeline_a_field_audit",
-        "0069_race_data_sync_pipeline_a_ledger_guards",
-        "0071_historical_calendar_release_b",
-        "0072_add_extended_racing_regions",
-        "0073_lifecycle_enforce_registry",
-        "0074_race_data_sync_r0_control_plane",
-        "0075_race_data_source_priority_and_reported_position",
-    ],
-    (
-        "stable.0068_race_data_sync_pipeline_a_field_audit",
-        "stable.0070_horse_identity_evidence_commit_receipt",
-    ): [
-        "0069_race_data_sync_pipeline_a_ledger_guards",
-        "0071_historical_calendar_release_b",
-        "0072_add_extended_racing_regions",
-        "0073_lifecycle_enforce_registry",
-        "0074_race_data_sync_r0_control_plane",
-        "0075_race_data_source_priority_and_reported_position",
-    ],
-    (
-        "stable.0069_race_data_sync_pipeline_a_ledger_guards",
-        "stable.0070_horse_identity_evidence_commit_receipt",
-    ): [
-        "0071_historical_calendar_release_b",
-        "0072_add_extended_racing_regions",
-        "0073_lifecycle_enforce_registry",
-        "0074_race_data_sync_r0_control_plane",
-        "0075_race_data_source_priority_and_reported_position",
-    ],
-    ("stable.0071_historical_calendar_release_b",): [
-        "0072_add_extended_racing_regions",
-        "0073_lifecycle_enforce_registry",
-        "0074_race_data_sync_r0_control_plane",
-        "0075_race_data_source_priority_and_reported_position",
-    ],
-    ("stable.0072_add_extended_racing_regions",): [
-        "0073_lifecycle_enforce_registry",
-        "0074_race_data_sync_r0_control_plane",
-        "0075_race_data_source_priority_and_reported_position",
-    ],
-    ("stable.0073_lifecycle_enforce_registry",): [
-        "0074_race_data_sync_r0_control_plane",
-        "0075_race_data_source_priority_and_reported_position",
-    ],
-    ("stable.0074_race_data_sync_r0_control_plane",): [
-        "0075_race_data_source_priority_and_reported_position"
-    ],
-    ("stable.0075_race_data_source_priority_and_reported_position",): [],
+    **ALLOWED_FORWARD_STATES,
 }
 
 AUDIT_FIELDS = (
@@ -482,6 +451,8 @@ def _migration_state() -> dict:
             "applied_nodes": [],
             "migration_leaf_set": [],
             "migration_plan": [],
+            "candidate_post_target_migrations": [],
+            "migration_graph_target_exclusive": False,
             "unknown_applied_migrations": [],
             "migration_graph_known": True,
             "migration_history_consistent": False,
@@ -511,17 +482,26 @@ def _migration_state() -> dict:
         for app, name in loader.graph.forwards_plan(TARGET)
         if app == "stable" and (app, name) not in applied and name >= "0068"
     ]
+    post_target = sorted(
+        _format_node(node)
+        for node in known_nodes
+        if node[0] == "stable" and node[1] > TARGET[1]
+    )
     leaf_set = tuple(_format_node(node) for node in leaves)
     expected_plan = ALLOWED_FORWARD_STATES.get(leaf_set)
     return {
         "applied_nodes": sorted(_format_node(node) for node in applied),
         "migration_leaf_set": list(leaf_set),
         "migration_plan": plan,
+        "candidate_post_target_migrations": post_target,
+        "migration_graph_target_exclusive": not post_target,
         "unknown_applied_migrations": [_format_node(node) for node in unknown],
         "migration_graph_known": not unknown,
         "migration_history_consistent": True,
         "migration_history_consistency_detail": None,
-        "migration_state_allowed": expected_plan is not None and plan == expected_plan,
+        "migration_state_allowed": (
+            expected_plan is not None and plan == expected_plan and not post_target
+        ),
         "expected_plan_for_leaf_set": expected_plan,
     }
 
@@ -565,6 +545,9 @@ def collect_postgresql_catalog_contract() -> dict:
         "stable_raceeventfieldauthority",
         "stable_raceeventrevisionitem",
         "stable_raceeventresult",
+        "stable_externalhorse",
+        "stable_horseexternalidentity",
+        "stable_horsenamevariant",
     )
     release_b_index_names = (
         "uq_race_event_series_edition",
@@ -598,6 +581,7 @@ def collect_postgresql_catalog_contract() -> dict:
                    con.convalidated AS validated, con.condeferrable AS deferrable,
                    con.condeferred AS initially_deferred,
                    pg_get_constraintdef(con.oid, false) AS definition,
+                   COALESCE(rn.nspname, '') AS target_schema,
                    COALESCE(rt.relname, '') AS target_table,
                    ARRAY(
                        SELECT a.attname
@@ -619,6 +603,7 @@ def collect_postgresql_catalog_contract() -> dict:
               JOIN pg_class c ON c.oid = con.conrelid
               JOIN pg_namespace n ON n.oid = c.relnamespace
          LEFT JOIN pg_class rt ON rt.oid = con.confrelid
+         LEFT JOIN pg_namespace rn ON rn.oid = rt.relnamespace
              WHERE n.nspname = current_schema() AND c.relname = ANY(%s)
           ORDER BY c.relname, con.conname
             """,
@@ -659,6 +644,7 @@ def collect_postgresql_catalog_contract() -> dict:
             cursor,
             """
             SELECT s.relname AS name, t.relname AS owned_table, a.attname AS owned_column,
+                   dep.deptype AS dependency_type,
                    format_type(seq.seqtypid, NULL) AS type,
                    seq.seqstart AS start, seq.seqincrement AS increment,
                    seq.seqmin AS min, seq.seqmax AS max, seq.seqcache AS cache,
@@ -670,9 +656,33 @@ def collect_postgresql_catalog_contract() -> dict:
          LEFT JOIN pg_class t ON t.oid = dep.refobjid
          LEFT JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = dep.refobjsubid
              WHERE n.nspname = current_schema()
-               AND t.relname = 'stable_horseidentityevidencecommitreceipt'
+               AND t.relname = ANY(%s)
           ORDER BY s.relname
             """,
+            ([
+                "stable_horseidentityevidencecommitreceipt",
+                "stable_horseexternalidentity",
+                "stable_horsenamevariant",
+            ],),
+        )
+        staging_relation_names = [
+            "stable_horseexternalidentity",
+            "stable_horsenamevariant",
+            "stable_horseexternalidentity_id_seq",
+            "stable_horsenamevariant_id_seq",
+            *RACING_API_STAGING_INDEX_CONTRACT,
+        ]
+        relations = _fetch_dicts(
+            cursor,
+            """
+            SELECT c.relname AS name, c.relkind AS kind
+              FROM pg_class c
+              JOIN pg_namespace n ON n.oid = c.relnamespace
+             WHERE n.nspname = current_schema()
+               AND c.relname = ANY(%s)
+          ORDER BY c.relname
+            """,
+            (staging_relation_names,),
         )
         triggers = _fetch_dicts(
             cursor,
@@ -733,6 +743,7 @@ def collect_postgresql_catalog_contract() -> dict:
         "constraints": constraints,
         "indexes": indexes,
         "sequences": sequences,
+        "relations": relations,
         "triggers": triggers,
         "functions": functions,
     }
@@ -1725,6 +1736,431 @@ def validate_race_data_source_priority_catalog_contract(
     return sorted(set(drift))
 
 
+RACING_API_STAGING_EXTERNAL_HORSE_COLUMNS = {
+    "breeder_name": ("character varying(255)", True),
+    "dam_external_id": ("character varying(32)", True),
+    "damsire_external_id": ("character varying(32)", True),
+    "damsire_name": ("character varying(255)", True),
+    "sire_external_id": ("character varying(32)", True),
+}
+
+RACING_API_STAGING_TABLE_COLUMNS = {
+    "stable_horseexternalidentity": {
+        "id": ("bigint", True, "d"),
+        "created_at": ("timestamp with time zone", True, ""),
+        "updated_at": ("timestamp with time zone", True, ""),
+        "source": ("character varying(32)", True, ""),
+        "namespace": ("character varying(64)", True, ""),
+        "external_id": ("character varying(128)", True, ""),
+        "status": ("character varying(16)", True, ""),
+        "evidence_url": ("character varying(500)", True, ""),
+        "payload_sha256": ("character varying(64)", True, ""),
+        "observed_at": ("timestamp with time zone", True, ""),
+        "verified_at": ("timestamp with time zone", False, ""),
+        "rejected_at": ("timestamp with time zone", False, ""),
+        "notes": ("text", True, ""),
+        "horse_profile_id": ("bigint", True, ""),
+        "verified_by_id": ("integer", False, ""),
+    },
+    "stable_horsenamevariant": {
+        "id": ("bigint", True, "d"),
+        "created_at": ("timestamp with time zone", True, ""),
+        "updated_at": ("timestamp with time zone", True, ""),
+        "name_text": ("character varying(255)", True, ""),
+        "language": ("character varying(16)", True, ""),
+        "script": ("character varying(32)", True, ""),
+        "name_kind": ("character varying(32)", True, ""),
+        "country_suffix": ("character varying(8)", True, ""),
+        "normalized_strict": ("character varying(255)", True, ""),
+        "normalized_loose": ("character varying(255)", True, ""),
+        "source": ("character varying(32)", True, ""),
+        "is_official": ("boolean", True, ""),
+        "valid_from": ("date", False, ""),
+        "valid_to": ("date", False, ""),
+        "evidence_url": ("character varying(500)", True, ""),
+        "payload_sha256": ("character varying(64)", True, ""),
+        "external_horse_id": ("bigint", False, ""),
+        "horse_profile_id": ("bigint", False, ""),
+    },
+}
+
+RACING_API_STAGING_CONSTRAINT_NAMES = {
+    "stable_horseexternalidentity": {
+        "horse_ext_payload_sha_valid",
+        "horse_ext_verified_evidence",
+        "stable_horseexternal_horse_profile_id_843b6204_fk_stable_ho",
+        "stable_horseexternal_verified_by_id_479b81b3_fk_auth_user",
+        "stable_horseexternalidentity_pkey",
+        "uq_horse_ext_identity_source_ns_id",
+    },
+    "stable_horsenamevariant": {
+        "horse_name_payload_sha_valid",
+        "horse_name_variant_exactly_one_entity",
+        "horse_name_variant_valid_range",
+        "stable_horsenamevari_external_horse_id_9b027f60_fk_stable_ex",
+        "stable_horsenamevari_horse_profile_id_cc509a6e_fk_stable_ho",
+        "stable_horsenamevariant_pkey",
+    },
+}
+
+RACING_API_STAGING_INDEX_CONTRACT = {
+    "horse_ext_identity_profile_idx": (
+        "stable_horseexternalidentity",
+        False,
+        ["horse_profile_id", "status"],
+        ["int8_ops", "text_ops"],
+        "",
+    ),
+    "stable_horseexternalidentity_horse_profile_id_843b6204": (
+        "stable_horseexternalidentity",
+        False,
+        ["horse_profile_id"],
+        ["int8_ops"],
+        "",
+    ),
+    "stable_horseexternalidentity_pkey": (
+        "stable_horseexternalidentity",
+        True,
+        ["id"],
+        ["int8_ops"],
+        "",
+    ),
+    "stable_horseexternalidentity_verified_by_id_479b81b3": (
+        "stable_horseexternalidentity",
+        False,
+        ["verified_by_id"],
+        ["int4_ops"],
+        "",
+    ),
+    "uq_horse_ext_identity_source_ns_id": (
+        "stable_horseexternalidentity",
+        True,
+        ["source", "namespace", "external_id"],
+        ["text_ops", "text_ops", "text_ops"],
+        "",
+    ),
+    "horse_name_variant_loose_idx": (
+        "stable_horsenamevariant",
+        False,
+        ["normalized_loose", "language"],
+        ["text_ops", "text_ops"],
+        "",
+    ),
+    "horse_name_variant_strict_idx": (
+        "stable_horsenamevariant",
+        False,
+        ["normalized_strict", "country_suffix"],
+        ["text_ops", "text_ops"],
+        "",
+    ),
+    "stable_horsenamevariant_external_horse_id_9b027f60": (
+        "stable_horsenamevariant",
+        False,
+        ["external_horse_id"],
+        ["int8_ops"],
+        "",
+    ),
+    "stable_horsenamevariant_horse_profile_id_cc509a6e": (
+        "stable_horsenamevariant",
+        False,
+        ["horse_profile_id"],
+        ["int8_ops"],
+        "",
+    ),
+    "stable_horsenamevariant_pkey": (
+        "stable_horsenamevariant",
+        True,
+        ["id"],
+        ["int8_ops"],
+        "",
+    ),
+    "uq_horse_name_variant_external": (
+        "stable_horsenamevariant",
+        True,
+        ["external_horse_id", "source", "name_kind", "normalized_strict"],
+        ["int8_ops", "text_ops", "text_ops", "text_ops"],
+        "external_horse_idisnotnull",
+    ),
+    "uq_horse_name_variant_profile": (
+        "stable_horsenamevariant",
+        True,
+        ["horse_profile_id", "source", "name_kind", "normalized_strict"],
+        ["int8_ops", "text_ops", "text_ops", "text_ops"],
+        "horse_profile_idisnotnull",
+    ),
+}
+
+
+def _compact_postgresql_predicate(value: str) -> str:
+    compact = re.sub(r"\s+", "", (value or "").lower())
+    for cast in ("::charactervarying", "::text[]", "::text"):
+        compact = compact.replace(cast, "")
+    return compact.translate(str.maketrans("", "", "()"))
+
+
+def _compact_postgresql_check_definition(value: str) -> str:
+    compact = re.sub(r"\s+", "", (value or "").lower())
+    for cast in ("::charactervarying", "::text[]", "::text"):
+        compact = compact.replace(cast, "")
+    # Parentheses are semantic evidence.  Removing them lets a differently
+    # grouped boolean expression retain the same token order and bypass this
+    # catalog gate (for example ``A OR (B AND C)`` versus ``(A OR B) AND C``).
+    return compact
+
+
+def _valid_fk_constraint(
+    row: dict | None,
+    *,
+    column: str,
+    target_schema: str,
+    target_table: str,
+    nullable: bool = False,
+) -> bool:
+    del nullable  # Nullability is validated against the column catalog above.
+    return bool(
+        row
+        and row.get("type") == "f"
+        and row.get("validated") is True
+        and row.get("deferrable") is True
+        and row.get("initially_deferred") is True
+        and row.get("columns") == [column]
+        and row.get("target_schema") == target_schema
+        and row.get("target_table") == target_table
+        and row.get("target_columns") == ["id"]
+        and row.get("update_action") == "a"
+        and row.get("delete_action") == "a"
+        and row.get("match_type") == "s"
+    )
+
+
+def validate_racing_api_horse_staging_catalog_contract(
+    *, contract: dict, migration_applied: bool
+) -> list[str]:
+    """Validate the exact additive 0077 PostgreSQL catalog contract."""
+
+    tables = set(RACING_API_STAGING_TABLE_COLUMNS)
+    by_table: dict[str, list[dict]] = {}
+    for row in contract.get("columns", []):
+        by_table.setdefault(row.get("table_name", ""), []).append(row)
+    external_rows = {
+        row.get("column_name"): row
+        for row in by_table.get("stable_externalhorse", [])
+        if row.get("column_name") in RACING_API_STAGING_EXTERNAL_HORSE_COLUMNS
+    }
+    table_present = any(by_table.get(table) for table in tables)
+    expected_relations = {
+        "stable_horseexternalidentity": "r",
+        "stable_horsenamevariant": "r",
+        "stable_horseexternalidentity_id_seq": "S",
+        "stable_horsenamevariant_id_seq": "S",
+        **{name: "i" for name in RACING_API_STAGING_INDEX_CONTRACT},
+    }
+    relation_rows = [
+        row
+        for row in contract.get("relations", [])
+        if row.get("name") in expected_relations
+    ]
+    object_present = bool(external_rows) or table_present or bool(relation_rows)
+    if not migration_applied:
+        return ["0077.object_presence"] if object_present else []
+
+    drift: list[str] = []
+    actual_relations = {row.get("name"): row.get("kind") for row in relation_rows}
+    if actual_relations != expected_relations or len(relation_rows) != len(
+        expected_relations
+    ):
+        drift.append("0077.relations")
+    if set(external_rows) != set(RACING_API_STAGING_EXTERNAL_HORSE_COLUMNS):
+        drift.append("0077.externalhorse_columns")
+    else:
+        for name, (expected_type, expected_not_null) in (
+            RACING_API_STAGING_EXTERNAL_HORSE_COLUMNS.items()
+        ):
+            row = external_rows[name]
+            if (
+                row.get("type") != expected_type
+                or row.get("not_null") is not expected_not_null
+                or row.get("identity") != ""
+                or row.get("default_expr") != ""
+            ):
+                drift.append(f"0077.externalhorse_column:{name}")
+
+    for table, expected_columns in RACING_API_STAGING_TABLE_COLUMNS.items():
+        rows = by_table.get(table, [])
+        actual = {
+            row.get("column_name"): (
+                row.get("type"),
+                row.get("not_null"),
+                row.get("identity"),
+            )
+            for row in rows
+        }
+        if actual != expected_columns:
+            drift.append(f"0077.columns:{table}")
+        if any(row.get("default_expr") for row in rows):
+            drift.append(f"0077.column_defaults:{table}")
+
+    constraints = [
+        row
+        for row in contract.get("constraints", [])
+        if row.get("table_name") in tables
+    ]
+    constraints_by_name = {row.get("name"): row for row in constraints}
+    expected_schema = contract.get("schema_name", "")
+    for table, expected_names in RACING_API_STAGING_CONSTRAINT_NAMES.items():
+        actual_names = {
+            row.get("name") for row in constraints if row.get("table_name") == table
+        }
+        if actual_names != expected_names:
+            drift.append(f"0077.constraint_set:{table}")
+
+    identity_pk = constraints_by_name.get("stable_horseexternalidentity_pkey")
+    name_pk = constraints_by_name.get("stable_horsenamevariant_pkey")
+    if not (
+        identity_pk
+        and identity_pk.get("type") == "p"
+        and identity_pk.get("validated") is True
+        and identity_pk.get("deferrable") is False
+        and identity_pk.get("initially_deferred") is False
+        and identity_pk.get("columns") == ["id"]
+        and name_pk
+        and name_pk.get("type") == "p"
+        and name_pk.get("validated") is True
+        and name_pk.get("deferrable") is False
+        and name_pk.get("initially_deferred") is False
+        and name_pk.get("columns") == ["id"]
+    ):
+        drift.append("0077.primary_keys")
+    identity_unique = constraints_by_name.get("uq_horse_ext_identity_source_ns_id")
+    if not (
+        identity_unique
+        and identity_unique.get("type") == "u"
+        and identity_unique.get("validated") is True
+        and identity_unique.get("deferrable") is False
+        and identity_unique.get("initially_deferred") is False
+        and identity_unique.get("columns") == ["source", "namespace", "external_id"]
+    ):
+        drift.append("0077.identity_unique")
+
+    for name, column, target in (
+        (
+            "stable_horseexternal_horse_profile_id_843b6204_fk_stable_ho",
+            "horse_profile_id",
+            "stable_horseprofile",
+        ),
+        (
+            "stable_horseexternal_verified_by_id_479b81b3_fk_auth_user",
+            "verified_by_id",
+            "auth_user",
+        ),
+        (
+            "stable_horsenamevari_external_horse_id_9b027f60_fk_stable_ex",
+            "external_horse_id",
+            "stable_externalhorse",
+        ),
+        (
+            "stable_horsenamevari_horse_profile_id_cc509a6e_fk_stable_ho",
+            "horse_profile_id",
+            "stable_horseprofile",
+        ),
+    ):
+        if not _valid_fk_constraint(
+            constraints_by_name.get(name),
+            column=column,
+            target_schema=expected_schema,
+            target_table=target,
+        ):
+            drift.append(f"0077.foreign_key:{column}:{target}")
+
+    expected_checks = {
+        "horse_ext_payload_sha_valid": (
+            "check((((payload_sha256)='')or((payload_sha256)~'^[0-9a-f]{64}$')))"
+        ),
+        "horse_ext_verified_evidence": (
+            "check(((not((status)='verified'))or((not((evidence_url)=''))and"
+            "(not((payload_sha256)=''))and(verified_atisnotnull)and"
+            "(verified_by_idisnotnull))))"
+        ),
+        "horse_name_payload_sha_valid": (
+            "check((((payload_sha256)='')or((payload_sha256)~'^[0-9a-f]{64}$')))"
+        ),
+        "horse_name_variant_exactly_one_entity": (
+            "check((((horse_profile_idisnotnull)and(external_horse_idisnull))or"
+            "((horse_profile_idisnull)and(external_horse_idisnotnull))))"
+        ),
+        "horse_name_variant_valid_range": (
+            "check(((valid_fromisnull)or(valid_toisnull)or(valid_from<=valid_to)))"
+        ),
+    }
+    for name, expected in expected_checks.items():
+        row = constraints_by_name.get(name)
+        if not (
+            row
+            and row.get("type") == "c"
+            and row.get("validated") is True
+            and row.get("deferrable") is False
+            and row.get("initially_deferred") is False
+            and _compact_postgresql_check_definition(row.get("definition", ""))
+            == expected
+        ):
+            drift.append(f"0077.check:{name}")
+
+    indexes = [
+        row
+        for row in contract.get("indexes", [])
+        if row.get("table_name") in tables
+    ]
+    indexes_by_name = {row.get("name"): row for row in indexes}
+    if set(indexes_by_name) != set(RACING_API_STAGING_INDEX_CONTRACT):
+        drift.append("0077.index_set")
+    for name, (
+        table,
+        unique,
+        columns,
+        operator_classes,
+        predicate,
+    ) in RACING_API_STAGING_INDEX_CONTRACT.items():
+        row = indexes_by_name.get(name)
+        if not (
+            row
+            and row.get("table_name") == table
+            and row.get("method") == "btree"
+            and row.get("unique") is unique
+            and row.get("valid") is True
+            and row.get("ready") is True
+            and row.get("live") is True
+            and row.get("columns") == columns
+            and row.get("operator_classes") == operator_classes
+            and _compact_postgresql_predicate(row.get("predicate", "")) == predicate
+        ):
+            drift.append(f"0077.index:{name}")
+
+    sequences = [
+        row
+        for row in contract.get("sequences", [])
+        if row.get("owned_table") in tables
+    ]
+    expected_sequences = {
+        "stable_horseexternalidentity": "stable_horseexternalidentity_id_seq",
+        "stable_horsenamevariant": "stable_horsenamevariant_id_seq",
+    }
+    if len(sequences) != len(expected_sequences) or any(
+        expected_sequences.get(row.get("owned_table")) != row.get("name")
+        or row.get("owned_column") != "id"
+        or row.get("dependency_type") != "i"
+        or row.get("type") != "bigint"
+        or row.get("start") != 1
+        or row.get("increment") != 1
+        or row.get("min") != 1
+        or row.get("max") != 9223372036854775807
+        or row.get("cache") != 1
+        or row.get("cycle") is not False
+        for row in sequences
+    ):
+        drift.append("0077.sequences")
+    return sorted(set(drift))
+
+
 def _postgres_catalog_state(
     contract: dict,
     applied_nodes: set[str],
@@ -1837,17 +2273,22 @@ def _postgres_catalog_state(
             for r in receipt_indexes
         ):
             drift.append("0070.pattern_index")
+        receipt_sequences = [
+            row
+            for row in sequences
+            if row.get("owned_table")
+            == "stable_horseidentityevidencecommitreceipt"
+        ]
         if (
-            len(sequences) != 1
-            or sequences[0]["owned_table"] != "stable_horseidentityevidencecommitreceipt"
-            or sequences[0]["owned_column"] != "id"
-            or sequences[0]["type"] != "bigint"
-            or sequences[0]["start"] != 1
-            or sequences[0]["increment"] != 1
-            or sequences[0]["min"] != 1
-            or sequences[0]["max"] != 9223372036854775807
-            or sequences[0]["cache"] != 1
-            or sequences[0]["cycle"]
+            len(receipt_sequences) != 1
+            or receipt_sequences[0]["owned_column"] != "id"
+            or receipt_sequences[0]["type"] != "bigint"
+            or receipt_sequences[0]["start"] != 1
+            or receipt_sequences[0]["increment"] != 1
+            or receipt_sequences[0]["min"] != 1
+            or receipt_sequences[0]["max"] != 9223372036854775807
+            or receipt_sequences[0]["cache"] != 1
+            or receipt_sequences[0]["cycle"]
         ):
             drift.append("0070.sequence")
 
@@ -2016,6 +2457,14 @@ def _postgres_catalog_state(
             ),
         )
     )
+    drift.extend(
+        validate_racing_api_horse_staging_catalog_contract(
+            contract=contract,
+            migration_applied=(
+                "stable.0077_racing_api_horse_identity_staging" in applied_nodes
+            ),
+        )
+    )
     return {
         "ok": not drift,
         "drift_paths": sorted(set(drift)),
@@ -2088,6 +2537,8 @@ def check_release_b_schema_compatibility(
             "migration_leaf_set": [],
             "migration_leaf": "",
             "migration_plan": [],
+            "candidate_post_target_migrations": [],
+            "migration_graph_target_exclusive": False,
             "unknown_applied_migrations": [],
             "migration_graph_known": False,
             "migration_state_allowed": False,
@@ -2124,6 +2575,8 @@ def check_release_b_schema_compatibility(
         schema_drift_paths.append("migration.history_consistency")
     if not state["migration_graph_known"]:
         schema_drift_paths.append("migration.unknown_applied_migrations")
+    if state.get("candidate_post_target_migrations"):
+        schema_drift_paths.append("migration.candidate_post_target_migrations")
     if not state["migration_state_allowed"]:
         schema_drift_paths.append("migration.state")
     schema_safe = not schema_drift_paths
@@ -2209,6 +2662,8 @@ def check_initial_install_schema_compatibility() -> dict:
         drift.append("migration.history_consistency")
     if not state["migration_graph_known"]:
         drift.append("migration.unknown_applied_migrations")
+    if state.get("candidate_post_target_migrations"):
+        drift.append("migration.candidate_post_target_migrations")
     if not progress_allowed:
         drift.append("migration.initial_install_progress")
     schema_safe = not drift

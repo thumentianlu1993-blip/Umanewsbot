@@ -1,5 +1,23 @@
 # 项目状态文档
 
+## 2026-08-31 leaf 0077 External staging foundation 本地候选
+
+- 独立 clean worktree 基于 origin/main@256311a8…27ea；仅包含 0076/0077 schema、External
+  staging service/批量命令、默认关闭的写开关、聚焦测试和运行手册。
+- 0077 atomic migration 第一项设置 PostgreSQL transaction-local 5 秒 lock timeout / 5 分钟
+  statement timeout，SQLite no-op；reverse 在任何反向 DDL 前禁止。
+- strict loader 只接受 exact TRA `/pro` + `/results` content-addressed evidence，并回绑 normalized
+  profile canonical hash 与完整 career/race/runner；空证据、scope/route/hash/ID 漂移全部 fail closed。
+- importer 只写获准的 5 个目标 stable ID；父母 profile 与其他 runner 只作 provenance。重复赛事 payload
+  必须一致并批内去重，dry-run 明示逐表 action count 和 out-of-scope=0。
+- 聚焦套件 30/30、发布/回滚/迁移合同 306/306（跳过 1）、PostgreSQL 聚焦套件 15/15，Django、
+  migration drift 与 diff check 均通过。真实 France 5-run materialization `f7a1fa5e…51b99` 在临时
+  PostgreSQL 16 的 dry-run 为 create=210/update=0/skip=7/conflict=0；apply 终态为
+  5 horses / 60 races / 67 results / 67 histories / 5 variants、5 receipts / 1 lock，canonical 零写；
+  第二次 5/5 replay、writes=0、状态 SHA 不变。
+- 该状态不等于已上线或已授权写入。生产继续运行 PR #133 / leaf 0075；0078–0080、
+  identity/module/canonical/public 链全部不在本候选。
+
 ## 2026-08-31 18:40 event 956 自然 correction 与完整生产验收通过
 
 - PR #133 exact revision `220bc621…402b` / image `946f2177…9803a` 继续运行；四服务
