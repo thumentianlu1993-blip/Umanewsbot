@@ -129,7 +129,9 @@ def _title_matches(title: str, aliases: list[str]) -> bool:
     return False
 
 
-def _search_result_matches(title: str, snippet: str, aliases: list[str]) -> bool:
+def _search_result_matches(
+    title: str, snippet: str, aliases: list[str], *, region: str = ""
+) -> bool:
     """Match registered or historical race names to renamed Wikipedia pages.
 
     Wikipedia often stores a race under its current sponsored title while the
@@ -168,6 +170,85 @@ def _search_result_matches(title: str, snippet: str, aliases: list[str]) -> bool
         "trophy",
     }
     if not title_tokens.intersection(race_title_signals):
+        return False
+    region_signals = {
+        "france": {"france", "french"},
+        "ireland": {"ireland", "irish"},
+        "united_kingdom": {
+            "britain",
+            "british",
+            "england",
+            "english",
+            "scotland",
+            "scottish",
+            "united kingdom",
+            "wales",
+            "welsh",
+        },
+        "united_states": {"america", "american", "u s", "united states"},
+    }
+    geography_signals = {
+        "america",
+        "american",
+        "argentina",
+        "argentine",
+        "australia",
+        "australian",
+        "britain",
+        "british",
+        "canada",
+        "canadian",
+        "france",
+        "french",
+        "germany",
+        "german",
+        "hong kong",
+        "india",
+        "indian",
+        "england",
+        "english",
+        "ireland",
+        "irish",
+        "italian",
+        "italy",
+        "japan",
+        "japanese",
+        "new zealand",
+        "scotland",
+        "scottish",
+        "south africa",
+        "united kingdom",
+        "united states",
+        "united arab emirates",
+        "wales",
+        "welsh",
+    }
+    searchable_norm = _collapse(
+        unicodedata.normalize("NFKD", f"{title} {plain_snippet}")
+        .encode("ascii", "ignore")
+        .decode("ascii")
+        .casefold()
+    )
+    def has_signal(signal: str) -> bool:
+        return bool(re.search(rf"\b{re.escape(signal)}\b", searchable_norm))
+
+    desired_signals = region_signals.get(region, set())
+    has_desired_region = any(has_signal(signal) for signal in desired_signals)
+    conflicting_regions = geography_signals - desired_signals
+    if any(has_signal(signal) for signal in conflicting_regions) and not has_desired_region:
+        return False
+    horse_race_context = any(
+        has_signal(signal)
+        for signal in {
+            "horse race",
+            "horse racing",
+            "national hunt",
+            "racehorse",
+            "steeplechase",
+            "thoroughbred",
+        }
+    )
+    if not horse_race_context and not has_desired_region:
         return False
     if _title_matches(title, aliases):
         return True
@@ -224,6 +305,7 @@ def _search_title(
     source_dir: Path,
     *,
     aliases: list[str],
+    region: str,
     allow_network: bool,
     timeout: int,
     sleep_seconds: float,
@@ -234,7 +316,9 @@ def _search_title(
     best_title = ""
     for item in data.get("query", {}).get("search", []):
         title = item.get("title") or ""
-        if _search_result_matches(title, item.get("snippet") or "", aliases):
+        if _search_result_matches(
+            title, item.get("snippet") or "", aliases, region=region
+        ):
             best_title = title
             break
     if not best_title:
@@ -389,6 +473,7 @@ def prepare(args: argparse.Namespace) -> dict:
                         candidate_query,
                         source_dir,
                         aliases=queries,
+                        region=str(event.get("country_region") or ""),
                         allow_network=args.allow_network,
                         timeout=args.timeout_seconds,
                         sleep_seconds=args.sleep_seconds,
