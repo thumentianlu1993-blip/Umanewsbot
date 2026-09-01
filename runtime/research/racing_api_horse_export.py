@@ -913,8 +913,16 @@ def fetch_profile_with_fallback(
     )
     profile_kind = "pro"
     if payload is None:
-        payload = client.request_json(build_endpoint("horse_standard", horse_id=horse_id))
+        payload = client.request_json(
+            build_endpoint("horse_standard", horse_id=horse_id),
+            allow_not_found=True,
+        )
         profile_kind = "standard"
+    if payload is None:
+        raise RacingApiSemanticGap(
+            "provider_profile_missing",
+            f"provider profile is unavailable for {horse_id}",
+        )
     if not isinstance(payload, Mapping):
         raise RacingApiSchemaError("horse profile response must be an object")
     normalized = normalize_profile(
@@ -947,14 +955,25 @@ def fetch_parent_profiles(
         raise ValueError(
             f"parent profile ceiling exceeded: {len(unique_parent_ids)}>{max_parent_profiles}"
         )
-    return [
-        fetch_profile_with_fallback(
-            client,
-            horse_id=horse_id,
-            allow_missing_pro_dob=True,
-        )
-        for horse_id in unique_parent_ids
-    ]
+    profiles = []
+    for horse_id in unique_parent_ids:
+        try:
+            profiles.append(
+                fetch_profile_with_fallback(
+                    client,
+                    horse_id=horse_id,
+                    allow_missing_pro_dob=True,
+                )
+            )
+        except RacingApiSemanticGap as exc:
+            if exc.code != "provider_profile_missing":
+                raise
+            # A target horse remains materializable when the provider exposes
+            # the parent name/ID on its profile but has no parent profile row.
+            # The page field matrix already preserves this as unavailable
+            # second-generation data; do not turn it into a guessed identity.
+            continue
+    return profiles
 
 
 def _page_field(value: object, *, source: str, status: str | None = None, **extra: object) -> dict:

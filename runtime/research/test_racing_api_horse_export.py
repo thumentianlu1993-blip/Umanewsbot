@@ -1281,6 +1281,35 @@ class RacingApiHorseExportTests(unittest.TestCase):
                 allow_missing_pro_dob=True,
             )
 
+    def test_parent_pool_preserves_missing_provider_parent_profile_as_gap(self):
+        profile = self.module.normalize_profile(montjeu_profile(), profile_kind="pro")
+        calls = []
+
+        class FakeClient:
+            def request_json(self, url, *, allow_not_found=False):
+                calls.append((url, allow_not_found))
+                if "/hrs_100/" in url:
+                    return montjeu_profile(id="hrs_100", name="Sadler's Wells (USA)")
+                if "/hrs_200/" in url:
+                    return None
+                raise AssertionError(url)
+
+        parents = self.module.fetch_parent_profiles(
+            FakeClient(),
+            profile=profile,
+            max_parent_profiles=2,
+        )
+
+        self.assertEqual([row["horse_id"] for row in parents], ["hrs_100"])
+        self.assertEqual(
+            calls,
+            [
+                (self.module.build_endpoint("horse_pro", horse_id="hrs_100"), True),
+                (self.module.build_endpoint("horse_pro", horse_id="hrs_200"), True),
+                (self.module.build_endpoint("horse_standard", horse_id="hrs_200"), True),
+            ],
+        )
+
     def test_page_field_matrix_maps_two_generation_pedigree_and_career(self):
         profile = self.module.normalize_profile(montjeu_profile(), profile_kind="pro")
         sire = self.module.normalize_profile(
