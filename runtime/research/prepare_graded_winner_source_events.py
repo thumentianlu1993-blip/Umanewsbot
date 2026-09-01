@@ -217,6 +217,12 @@ def prepare(
     history_covered, history_identities = _history_keys(
         _parse_history_specs(history_inputs), target_occurrences
     )
+    toba_occurrences = {
+        (str(row["country_region"]), str(row["series_key"]), int(row["year"]))
+        for row in targets
+        if str(row["target_key"]) in toba_covered
+    }
+    history_only_covered = history_covered - toba_occurrences
 
     uncovered = [
         row
@@ -282,7 +288,7 @@ def prepare(
     counts = {
         "target_occurrences_2005_2025": len(targets),
         "covered_by_toba": len(toba_covered),
-        "covered_by_frozen_history": len(history_covered),
+        "covered_by_frozen_history": len(history_only_covered),
         "uncovered_target_occurrences": len(uncovered),
         "source_events": len(events),
         "by_region": dict(sorted(Counter(row["country_region"] for row in uncovered).items())),

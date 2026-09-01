@@ -72,12 +72,28 @@ class PrepareGradedWinnerSourceEventsTests(unittest.TestCase):
                     }
                 ],
             )
+            us_history_sha = write_jsonl(
+                root / "us.jsonl",
+                [
+                    {
+                        "slug": "us-a",
+                        "modules": {
+                            "history_winners": {
+                                "items": [{"winner_year": 2005, "horse_name": "US Winner"}]
+                            }
+                        },
+                    }
+                ],
+            )
             manifest = MODULE.prepare(
                 target_ledger=root / "targets.jsonl",
                 expected_target_sha256=target_sha,
                 toba_bindings=root / "toba.jsonl",
                 expected_toba_sha256=toba_sha,
-                history_inputs=[f"france={root / 'france.jsonl'}={history_sha}"],
+                history_inputs=[
+                    f"france={root / 'france.jsonl'}={history_sha}",
+                    f"united_states={root / 'us.jsonl'}={us_history_sha}",
+                ],
                 output_dir=root / "output",
             )
             self.assertEqual(
