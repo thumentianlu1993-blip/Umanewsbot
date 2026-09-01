@@ -40,6 +40,7 @@ MAX_ARTIFACT_JSON_BYTES = 16 * 1024 * 1024
 MAX_RUN_JSON_BYTES = 64 * 1024 * 1024
 MAX_RESPONSE_FILES_PER_RUN = 256
 MAX_MATERIALIZED_RUNS = 5
+MAX_COLLECTION_MATERIALIZATIONS = 25
 MAX_MARKER_BYTES = 256
 REGION_BY_CODE = {
     "GB": RacingRegion.UNITED_KINGDOM,
@@ -2016,4 +2017,177 @@ def verify_targeted_materialization(
         "canonical_identity_count": canonical_identity_count,
         "active_import_lock_count": active_lock_count,
         "active_import_run_count": active_run_count,
+    }
+
+
+def _collection_preflight(
+    bindings: list[tuple[Path, str]],
+) -> dict[str, Any]:
+    if not bindings or len(bindings) > MAX_COLLECTION_MATERIALIZATIONS:
+        raise RacingApiStagingError(
+            "materialization collection must contain between 1 and "
+            f"{MAX_COLLECTION_MATERIALIZATIONS} parts"
+        )
+    seen_paths: set[Path] = set()
+    seen_horse_ids: set[str] = set()
+    race_payload_sha_by_id: dict[str, str] = {}
+    rows = []
+    for ordinal, (path, manifest_sha) in enumerate(bindings, 1):
+        if not SHA256_RE.fullmatch(str(manifest_sha or "")):
+            raise RacingApiStagingError("collection manifest SHA-256 is invalid")
+        try:
+            resolved = path.resolve(strict=True)
+        except OSError as exc:
+            raise RacingApiStagingError("collection materialization is missing") from exc
+        if path.is_symlink() or not resolved.is_dir() or resolved in seen_paths:
+            raise RacingApiStagingError("collection materialization path is invalid")
+        loaded = load_targeted_materialization(
+            resolved,
+            approved_manifest_sha256=manifest_sha,
+        )
+        plans = _materialization_plans(loaded)
+        horse_ids = [plan["horse_id"] for plan in plans]
+        duplicates = seen_horse_ids & set(horse_ids)
+        if duplicates:
+            raise RacingApiStagingError(
+                "materialization collection contains a duplicate target horse"
+            )
+        for plan in plans:
+            for race in plan["races"]:
+                race_id = race["race_id"]
+                payload_sha = _canonical_json_sha256(race["raw"])
+                previous_sha = race_payload_sha_by_id.setdefault(race_id, payload_sha)
+                if previous_sha != payload_sha:
+                    raise RacingApiStagingError(
+                        "materialization collection contains conflicting race payloads"
+                    )
+        dry_run = dry_run_targeted_materialization(
+            resolved,
+            approved_manifest_sha256=manifest_sha,
+        )
+        if dry_run.get("scope_stable_ids") != horse_ids:
+            raise RacingApiStagingError("collection dry-run scope drift")
+        rows.append(
+            {
+                "ordinal": ordinal,
+                "path": resolved,
+                "manifest_sha256": manifest_sha,
+                "horse_ids": horse_ids,
+                "dry_run": dry_run,
+            }
+        )
+        seen_paths.add(resolved)
+        seen_horse_ids.update(horse_ids)
+    binding_payload = [
+        {
+            "ordinal": row["ordinal"],
+            "manifest_sha256": row["manifest_sha256"],
+            "horse_ids": row["horse_ids"],
+        }
+        for row in rows
+    ]
+    return {
+        "rows": rows,
+        "binding_sha256": _canonical_json_sha256(binding_payload),
+        "scope_stable_ids": sorted(seen_horse_ids),
+        "unique_race_count": len(race_payload_sha_by_id),
+    }
+
+
+def dry_run_targeted_materialization_collection(
+    bindings: list[tuple[Path, str]],
+) -> dict[str, Any]:
+    preflight = _collection_preflight(bindings)
+    reports = [row["dry_run"] for row in preflight["rows"]]
+    return {
+        "status": "collection_dry_run",
+        "database_writes": 0,
+        "commit_unit": "materialization_part",
+        "collection_binding_sha256": preflight["binding_sha256"],
+        "materialization_count": len(reports),
+        "horse_count": len(preflight["scope_stable_ids"]),
+        "unique_race_count": preflight["unique_race_count"],
+        "scope_stable_ids": preflight["scope_stable_ids"],
+        "parts": [
+            {
+                "ordinal": row["ordinal"],
+                "manifest_sha256": row["manifest_sha256"],
+                "run_count": row["dry_run"]["run_count"],
+                "scope_stable_ids": row["horse_ids"],
+                "action_totals": row["dry_run"]["action_totals"],
+            }
+            for row in preflight["rows"]
+        ],
+    }
+
+
+def apply_targeted_materialization_collection(
+    bindings: list[tuple[Path, str]],
+    *,
+    allow_write: bool = False,
+) -> dict[str, Any]:
+    if not allow_write or not _write_enabled(
+        os.environ.get("RACING_API_STAGING_WRITE_ENABLED")
+    ):
+        raise RacingApiStagingError(
+            "collection staging write gate requires allow_write and "
+            "RACING_API_STAGING_WRITE_ENABLED=true"
+        )
+    preflight = _collection_preflight(bindings)
+    results = []
+    for row in preflight["rows"]:
+        result = apply_targeted_materialization(
+            row["path"],
+            approved_manifest_sha256=row["manifest_sha256"],
+            allow_write=True,
+        )
+        results.append(
+            {
+                "ordinal": row["ordinal"],
+                "manifest_sha256": row["manifest_sha256"],
+                **result,
+            }
+        )
+    return {
+        "status": (
+            "applied"
+            if any(row["status"] == "applied" for row in results)
+            else "replayed"
+        ),
+        "database_writes": sum(row["database_writes"] for row in results),
+        "commit_unit": "materialization_part",
+        "collection_binding_sha256": preflight["binding_sha256"],
+        "materialization_count": len(results),
+        "horse_count": len(preflight["scope_stable_ids"]),
+        "scope_stable_ids": preflight["scope_stable_ids"],
+        "results": results,
+    }
+
+
+def verify_targeted_materialization_collection(
+    bindings: list[tuple[Path, str]],
+) -> dict[str, Any]:
+    preflight = _collection_preflight(bindings)
+    results = []
+    for row in preflight["rows"]:
+        result = verify_targeted_materialization(
+            row["path"],
+            approved_manifest_sha256=row["manifest_sha256"],
+        )
+        results.append(
+            {
+                "ordinal": row["ordinal"],
+                "manifest_sha256": row["manifest_sha256"],
+                **result,
+            }
+        )
+    return {
+        "status": "verified",
+        "database_writes": 0,
+        "commit_unit": "materialization_part",
+        "collection_binding_sha256": preflight["binding_sha256"],
+        "materialization_count": len(results),
+        "horse_count": len(preflight["scope_stable_ids"]),
+        "scope_stable_ids": preflight["scope_stable_ids"],
+        "results": results,
     }
