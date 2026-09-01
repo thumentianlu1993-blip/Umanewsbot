@@ -68,15 +68,17 @@ class WikipediaWinnerQueryTests(unittest.TestCase):
         self.assertTrue(
             MODULE._search_result_matches(
                 "Betfair Chase",
-                "Its registered title is the <span>Lancashire Chase</span>.",
+                "A British horse race whose registered title is the <span>Lancashire Chase</span>.",
                 ["Lancashire Chase", "Lancashire Chase horse race"],
+                region="united_kingdom",
             )
         )
         self.assertTrue(
             MODULE._search_result_matches(
                 "Dooley Insurance Group Champion Novice Chase",
-                "Formerly the Ellier Developments Novice Chase.",
+                "An Irish horse race formerly called the Ellier Developments Novice Chase.",
                 ["The Ellier Novice Chase", "The Ellier Novice Chase horse race"],
+                region="ireland",
             )
         )
         self.assertTrue(
@@ -84,6 +86,33 @@ class WikipediaWinnerQueryTests(unittest.TestCase):
                 "Tingle Creek Chase",
                 "A Grade 1 National Hunt steeplechase horse race.",
                 ["Tingle Creek Trophy Chase", "Tingle Creek Trophy Chase horse race"],
+                region="united_kingdom",
+            )
+        )
+
+    def test_search_result_match_rejects_same_name_in_wrong_country(self):
+        self.assertFalse(
+            MODULE._search_result_matches(
+                "Concorde Stakes",
+                "An Australian Thoroughbred horse race.",
+                ["Concorde Stakes", "Concorde Stakes horse race"],
+                region="ireland",
+            )
+        )
+        self.assertFalse(
+            MODULE._search_result_matches(
+                "Diamond Stakes (Japan)",
+                "A Japanese Thoroughbred horse race.",
+                ["Diamond Stakes", "Diamond Stakes horse race"],
+                region="ireland",
+            )
+        )
+        self.assertTrue(
+            MODULE._search_result_matches(
+                "Concorde Stakes",
+                "An Irish flat horse race at Tipperary Racecourse.",
+                ["Concorde Stakes", "Concorde Stakes horse race"],
+                region="ireland",
             )
         )
 
@@ -93,6 +122,7 @@ class WikipediaWinnerQueryTests(unittest.TestCase):
                 "Silviniaco Conti",
                 "The horse won the Lancashire Chase in 2012 and 2014.",
                 ["Lancashire Chase", "Lancashire Chase horse race"],
+                region="united_kingdom",
             )
         )
         self.assertFalse(
@@ -100,6 +130,7 @@ class WikipediaWinnerQueryTests(unittest.TestCase):
                 "Sword Dancer",
                 "A racehorse who finished second in the Preakness Stakes.",
                 ["Sword Dancer Stakes", "Sword Dancer Stakes horse race"],
+                region="united_states",
             )
         )
 
