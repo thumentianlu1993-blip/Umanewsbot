@@ -111,6 +111,7 @@ class PrepareHriUnmatchedOfficialTargetedSeedsTests(unittest.TestCase):
             self.assertEqual(seed["target"]["discipline"], "jumps")
             self.assertEqual(seed["target"]["local_date"], "2024-04-01")
             self.assertEqual(seed["target"]["grade_text"], "G2")
+            self.assertTrue(seed["target"]["allow_unique_structured_name_mismatch"])
             self.assertEqual(
                 (output / "COMPLETE").read_text().strip(),
                 sha256_path(output / "seed-ledger-manifest.json"),

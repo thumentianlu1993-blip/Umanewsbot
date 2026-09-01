@@ -974,6 +974,107 @@ class RacingApiHorseExportTests(unittest.TestCase):
             "target_occurrence_missing_from_provider_results",
         )
 
+    def test_official_exact_structured_occurrence_tolerates_sponsor_name_drift(self):
+        result_race = {
+            **arc_result(race_id="rac_naas_2021_lawlor"),
+            "date": "2021-01-13",
+            "region": "IRE",
+            "course": "Naas",
+            "course_id": "crs_naas",
+            "race_name": "Lawlor's of Naas Novice Hurdle",
+            "pattern": "Grade 1",
+            "type": "Hurdle",
+        }
+        result_race["runners"][0].update(
+            {"horse_id": "hrs_20210113", "horse": "Bob Olinger (IRE)"}
+        )
+        seed = {
+            "schema_version": "targeted-horse-seed.v2",
+            "seed_id": "hri-held-example",
+            "name": "Bob Olinger",
+            "expected_finish_position": "1",
+            "allow_profile_only_if_target_missing": True,
+            "source_authority": "organizer_official",
+            "source_url": (
+                "https://www.hri.ie/results/race-result/"
+                "?date=2021-01-13&race=1420&venue=NS"
+            ),
+            "source_payload_sha256": "a" * 64,
+            "target": {
+                "year": 2021,
+                "edition_year": 2021,
+                "country_region": "ireland",
+                "local_date": "2021-01-13",
+                "canonical_name_original": (
+                    "The Lawlor`s Of Naas Novice Hurdle"
+                ),
+                "racecourse": "Naas",
+                "grade_text": "G1",
+                "discipline": "jumps",
+                "organizer_result_url": (
+                    "https://www.hri.ie/results/race-result/"
+                    "?date=2021-01-13&race=1420&venue=NS"
+                ),
+                "allow_unique_structured_name_mismatch": True,
+            },
+        }
+        responses = {
+            self.module.build_endpoint("horse_search", name="Bob Olinger"): {
+                "search_results": [
+                    {"id": "hrs_20210113", "name": "Bob Olinger (IRE)"}
+                ]
+            },
+            self.module.build_endpoint(
+                "horse_results", horse_id="hrs_20210113", limit=100, skip=0
+            ): {
+                "results": [result_race],
+                "total": 1,
+                "limit": 100,
+                "skip": 0,
+                "query": [],
+            },
+            self.module.build_endpoint("horse_pro", horse_id="hrs_20210113"): montjeu_profile(
+                id="hrs_20210113", name="Bob Olinger (IRE)", dob="2015-05-11"
+            ),
+        }
+
+        class FakeClient:
+            def request_json(self, url, *, allow_not_found=False):
+                return responses[url]
+
+        result = self.module.run_targeted_seed(seed, client=FakeClient())
+
+        self.assertEqual(result["horse_id"], "hrs_20210113")
+        self.assertEqual(result["target_race"]["race_id"], "rac_naas_2021_lawlor")
+        self.assertEqual(len(result["target_race"]["actual_starters"]), 2)
+
+    def test_structured_name_mismatch_rejects_non_organizer_authority(self):
+        seed = {
+            "name": "Bob Olinger",
+            "expected_finish_position": "1",
+            "source_authority": "human_reviewed_reference",
+            "source_url": "https://example.test/result",
+            "source_payload_sha256": "a" * 64,
+            "target": {
+                "year": 2021,
+                "country_region": "ireland",
+                "local_date": "2021-01-13",
+                "canonical_name_original": "Official name",
+                "racecourse": "Naas",
+                "grade_text": "G1",
+                "discipline": "jumps",
+                "organizer_result_url": "https://example.test/result",
+                "allow_unique_structured_name_mismatch": True,
+            },
+        }
+
+        with self.assertRaisesRegex(ValueError, "exact organizer result"):
+            self.module.target_occurrence_candidate_ids(
+                seed,
+                {"search_results": []},
+                {},
+            )
+
     def test_profile_only_fallback_never_resolves_multiple_exact_name_candidates(self):
         seed = {
             "schema_version": "targeted-horse-seed.v1",

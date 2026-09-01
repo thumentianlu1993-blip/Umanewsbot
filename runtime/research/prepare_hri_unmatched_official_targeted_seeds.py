@@ -203,6 +203,7 @@ def _seed(row: Mapping[str, object]) -> dict:
             "discipline": discipline,
             "organizer_result_url": result_url,
             "organizer_date_page_url": source_url,
+            "allow_unique_structured_name_mismatch": True,
         },
     }
 
