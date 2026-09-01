@@ -195,6 +195,15 @@ class FranceGalopBulletinTests(unittest.TestCase):
         self.assertEqual(unresolved[0]["target_key"], "france:2026:france-bango:flat")
         self.assertIn("not_selected_as_a_seed", unresolved[0]["interpretation"])
 
+    def test_canonical_json_makes_equivalent_republication_conservation_stable(self):
+        first = {"winner": {"horse_name": "Example"}, "starters": [1, 2]}
+        second = {"starters": [1, 2], "winner": {"horse_name": "Example"}}
+
+        self.assertEqual(
+            self.module.canonical_json(first),
+            self.module.canonical_json(second),
+        )
+
     def test_exact_race_name_wins_over_a_longer_subset_target(self):
         parsed = self.module.parse_targeted_results(
             [{"page_number": 77, "column": "right", "text": BANGO_TEXT}],

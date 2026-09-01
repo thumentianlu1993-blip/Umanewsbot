@@ -803,9 +803,46 @@ def prepare_proposal(
     by_target: dict[str, list[dict]] = defaultdict(list)
     for result in results:
         by_target[result["target_key"]].append(result)
+    repeated_publications = []
+    deduplicated_results = []
+    for target_key, rows in sorted(by_target.items()):
+        if len(rows) == 1:
+            deduplicated_results.extend(rows)
+            continue
+        conservation_fields = (
+            "local_date",
+            "race_name",
+            "racecourse",
+            "normalized_grade",
+            "distance_metres",
+            "actual_starter_count",
+            "winner",
+            "starters",
+        )
+        identities = {
+            canonical_json({field: row[field] for field in conservation_fields})
+            for row in rows
+        }
+        if len(identities) != 1:
+            continue
+        ordered = sorted(rows, key=lambda row: row["source_evidence"]["source_url"])
+        selected = ordered[0]
+        deduplicated_results.append(selected)
+        repeated_publications.append(
+            {
+                "target_key": target_key,
+                "selected_source_url": selected["source_evidence"]["source_url"],
+                "equivalent_source_urls": [
+                    row["source_evidence"]["source_url"] for row in ordered
+                ],
+                "conservation": "exact_result_and_starter_rows_equal",
+            }
+        )
+        by_target[target_key] = [selected]
     duplicates = {key: rows for key, rows in by_target.items() if len(rows) != 1}
     if duplicates:
         raise ValueError(f"targets appear in multiple bulletin results: {sorted(duplicates)}")
+    results = deduplicated_results
 
     occurrences = []
     seeds_by_name: dict[str, dict] = {}
@@ -920,6 +957,7 @@ def prepare_proposal(
             "sources": source_identities[1:],
         },
         "unresolved_official_results": unresolved_official_results,
+        "repeated_official_publications": repeated_publications,
         "targets": {
             "in_scope": len(targets),
             "held_results": len(occurrences),
