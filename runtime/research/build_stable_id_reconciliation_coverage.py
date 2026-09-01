@@ -542,6 +542,10 @@ def _targeted_materialization_component(
     expected_manifest_sha256: str,
     allowed_stable_identities: set[tuple[str, str]],
     merged_occurrences: Mapping[str, tuple[str, dict]],
+    targeted_source_index: Mapping[
+        str, tuple[list[dict], dict]
+    ]
+    | None = None,
 ) -> tuple[list[dict], dict]:
     try:
         resolved = root.resolve(strict=True)
@@ -566,22 +570,26 @@ def _targeted_materialization_component(
             "source_batch_manifest_sha256"
         ],
     }
-    matching_sources = []
-    for source_root, source_sha in sorted(allowed_stable_identities):
-        source_rows, source_stable_identity = load_stable_runner_ledger(
-            Path(source_root),
-            approved_manifest_sha256=source_sha,
-        )
-        source_manifest = _read_json(
-            Path(source_stable_identity["root"]) / "manifest.json",
-            label="targeted source stable manifest",
-        )
-        if (
-            source_stable_identity.get("source_route") is None
-            and source_manifest.get("source_materialization")
-            == source_materialization
-        ):
-            matching_sources.append((source_rows, source_stable_identity))
+    if targeted_source_index is None:
+        matching_sources = []
+        for source_root, source_sha in sorted(allowed_stable_identities):
+            source_rows, source_stable_identity = load_stable_runner_ledger(
+                Path(source_root),
+                approved_manifest_sha256=source_sha,
+            )
+            source_manifest = _read_json(
+                Path(source_stable_identity["root"]) / "manifest.json",
+                label="targeted source stable manifest",
+            )
+            if (
+                source_stable_identity.get("source_route") is None
+                and source_manifest.get("source_materialization")
+                == source_materialization
+            ):
+                matching_sources.append((source_rows, source_stable_identity))
+    else:
+        indexed = targeted_source_index.get(canonical_json(source_materialization))
+        matching_sources = [indexed] if indexed is not None else []
     if len(matching_sources) != 1:
         raise ReconciliationCoverageError(
             "targeted materialization must bind exactly one stable source ledger"
@@ -736,6 +744,41 @@ def _targeted_materialization_component(
     }
 
 
+def _targeted_stable_source_index(
+    allowed_stable_identities: set[tuple[str, str]],
+) -> dict[str, tuple[list[dict], dict]]:
+    """Load each targeted stable source once for large materialization sets.
+
+    Historical winner recovery can create thousands of five-seed immutable
+    materializations.  Re-scanning every stable lineage member for every
+    materialization is quadratic; this exact source-materialization index keeps
+    the same SHA-bound matching contract while making the audit linear.
+    """
+
+    index: dict[str, tuple[list[dict], dict]] = {}
+    for source_root, source_sha in sorted(allowed_stable_identities):
+        source_rows, source_stable_identity = load_stable_runner_ledger(
+            Path(source_root),
+            approved_manifest_sha256=source_sha,
+        )
+        if source_stable_identity.get("source_route") is not None:
+            continue
+        source_manifest = _read_json(
+            Path(source_stable_identity["root"]) / "manifest.json",
+            label="targeted source stable manifest",
+        )
+        source_materialization = source_manifest.get("source_materialization")
+        if not isinstance(source_materialization, Mapping):
+            continue
+        key = canonical_json(source_materialization)
+        if key in index:
+            raise ReconciliationCoverageError(
+                "targeted materialization stable source is duplicated"
+            )
+        index[key] = (source_rows, source_stable_identity)
+    return index
+
+
 def build_coverage(
     *,
     stable_runner_ledger_root: Path,
@@ -789,6 +832,11 @@ def build_coverage(
         stable_runner_ledger_root,
         approved_stable_runner_manifest_sha256,
     )
+    targeted_source_index = (
+        _targeted_stable_source_index(allowed_stable_identities)
+        if provider_native_targeted_materialization_roots
+        else {}
+    )
     rows = []
     components = []
     for root, manifest_sha in zip(
@@ -825,6 +873,7 @@ def build_coverage(
             expected_manifest_sha256=manifest_sha,
             allowed_stable_identities=allowed_stable_identities,
             merged_occurrences=merged_occurrences,
+            targeted_source_index=targeted_source_index,
         )
         rows.extend(component_rows)
         components.append(identity)

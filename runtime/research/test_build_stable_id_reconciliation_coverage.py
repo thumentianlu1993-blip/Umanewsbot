@@ -338,6 +338,82 @@ class StableReconciliationCoverageTests(unittest.TestCase):
         self.assertEqual(supporting_identity["binding_rows"], 0)
         self.assertEqual(supporting_identity["supporting_occurrence_rows"], 1)
 
+    def test_targeted_source_index_loads_each_lineage_member_once(self):
+        identities = {
+            ("/merged", "a" * 64): (
+                [],
+                {
+                    "root": "/merged",
+                    "manifest_sha256": "a" * 64,
+                    "source_route": None,
+                },
+                {},
+            ),
+            ("/stable-a", "b" * 64): (
+                [{"horse_id": "hrs_a"}],
+                {
+                    "root": "/stable-a",
+                    "manifest_sha256": "b" * 64,
+                    "source_route": None,
+                },
+                {
+                    "source_materialization": {
+                        "path": "/material-a",
+                        "manifest_sha256": "1" * 64,
+                        "source_targeted_batch_manifest_sha256": "2" * 64,
+                    }
+                },
+            ),
+            ("/stable-b", "c" * 64): (
+                [{"horse_id": "hrs_b"}],
+                {
+                    "root": "/stable-b",
+                    "manifest_sha256": "c" * 64,
+                    "source_route": None,
+                },
+                {
+                    "source_materialization": {
+                        "path": "/material-b",
+                        "manifest_sha256": "3" * 64,
+                        "source_targeted_batch_manifest_sha256": "4" * 64,
+                    }
+                },
+            ),
+        }
+
+        def load_stable(path, *, approved_manifest_sha256):
+            rows, identity, _manifest = identities[
+                (str(path), approved_manifest_sha256)
+            ]
+            return rows, identity
+
+        def read_manifest(path, *, label):
+            del label
+            root = str(path.parent)
+            return next(
+                manifest
+                for (_source_root, _sha), (_rows, _identity, manifest) in identities.items()
+                if _source_root == root
+            )
+
+        with patch.object(
+            self.module,
+            "load_stable_runner_ledger",
+            side_effect=load_stable,
+        ) as loader, patch.object(
+            self.module,
+            "_read_json",
+            side_effect=read_manifest,
+        ):
+            index = self.module._targeted_stable_source_index(set(identities))
+
+        self.assertEqual(loader.call_count, 3)
+        self.assertEqual(len(index), 2)
+        self.assertEqual(
+            sorted(identity["root"] for _rows, identity in index.values()),
+            ["/stable-a", "/stable-b"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
