@@ -420,8 +420,29 @@ def _write_persistent_fetch_error(
     return payload
 
 
+def _column_bboxes(width: float, height: float) -> list[tuple[str, tuple[float, ...]]]:
+    """Return bulletin columns in publication reading order.
+
+    Older bulletins store one portrait publication page per PDF page and need
+    two columns.  Some 2024+ files store two portrait pages side by side on one
+    landscape PDF page and therefore need four columns.  Treating the latter
+    as two columns interleaves adjacent races and violates starter
+    conservation.
+    """
+
+    column_count = 4 if width > height else 2
+    column_width = width / column_count
+    return [
+        (
+            f"column-{index + 1}-of-{column_count}",
+            (index * column_width, 0, (index + 1) * column_width, height),
+        )
+        for index in range(column_count)
+    ]
+
+
 def extract_pdf_segments(pdf_path: Path) -> list[dict]:
-    """Extract pages in left-column then right-column reading order."""
+    """Extract portrait or double-page bulletin columns in reading order."""
 
     try:
         import pdfplumber
@@ -430,11 +451,7 @@ def extract_pdf_segments(pdf_path: Path) -> list[dict]:
     segments = []
     with pdfplumber.open(pdf_path) as pdf:
         for page_number, page in enumerate(pdf.pages, start=1):
-            midpoint = page.width / 2
-            for column, bbox in (
-                ("left", (0, 0, midpoint, page.height)),
-                ("right", (midpoint, 0, page.width, page.height)),
-            ):
+            for column, bbox in _column_bboxes(page.width, page.height):
                 text = page.crop(bbox).extract_text(x_tolerance=2, y_tolerance=3) or ""
                 segments.append(
                     {"page_number": page_number, "column": column, "text": text}
