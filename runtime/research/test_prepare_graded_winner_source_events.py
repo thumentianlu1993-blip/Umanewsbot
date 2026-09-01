@@ -51,6 +51,7 @@ class PrepareGradedWinnerSourceEventsTests(unittest.TestCase):
                 [
                     {
                         "adapter_key": "toba",
+                        "calendar_source_provider": "toba",
                         "country_region": "united_states",
                         "target_key": targets[0]["target_key"],
                         "occurrence_key": "us-a-2005-a",

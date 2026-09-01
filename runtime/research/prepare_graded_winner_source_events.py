@@ -121,7 +121,8 @@ def _toba_keys(path: Path, expected_sha256: str, target_keys: set[str]) -> set[s
         target_key = str(row.get("target_key") or "")
         occurrence_key = str(row.get("occurrence_key") or "")
         if (
-            row.get("adapter_key") != "toba"
+            row.get("adapter_key") not in {"toba", "equibase"}
+            or row.get("calendar_source_provider") != "toba"
             or row.get("country_region") != "united_states"
             or not target_key
             or not occurrence_key
