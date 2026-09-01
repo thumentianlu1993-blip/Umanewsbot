@@ -38,7 +38,7 @@ def race(race_id: str, raced_at: str, starters: list[tuple[str, str]]) -> dict:
         "course_id": "crs_saint_cloud",
         "race_name": f"Prix {race_id.removeprefix('rac_')}",
         "type": "Flat",
-        "pattern": "G3",
+        "pattern": "Grade 3",
         "runners": [
             {"horse_id": horse_id, "horse": name, "position": str(position), "number": str(position)}
             for position, (horse_id, name) in enumerate(starters, 1)
@@ -191,6 +191,10 @@ class StableIdLedgerTests(unittest.TestCase):
             seeds = [json.loads(line) for line in (output / "target-runner-stable-id-seeds.v1.jsonl").read_text().splitlines()]
             alpha = next(seed for seed in seeds if seed["horse_id"] == "hrs_a")
             self.assertEqual(len(alpha["target_occurrences"]), 2)
+            self.assertEqual(
+                {row["target"]["grade_text"] for row in alpha["target_occurrences"]},
+                {"G3"},
+            )
             self.assertEqual(alpha["source_names"], ["Alpha (FR)"])
             self.assertTrue((output / "COMPLETE").is_file())
 
