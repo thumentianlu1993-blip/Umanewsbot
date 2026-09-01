@@ -1,9 +1,14 @@
 from __future__ import annotations
 
 import importlib.util
+import csv
+import json
 import sys
+import tempfile
 import unittest
+from argparse import Namespace
 from pathlib import Path
+from unittest import mock
 
 
 SCRIPT = Path(__file__).with_name("prepare_france_wikipedia_history_winner_candidates.py")
@@ -58,6 +63,62 @@ class WikipediaWinnerQueryTests(unittest.TestCase):
         self.assertFalse(
             MODULE._title_matches("Prix Marcel Boussac", ["Prix Rothschild horse race"])
         )
+
+    def test_reuses_frozen_current_record_without_network(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            events = root / "events.csv"
+            with events.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.DictWriter(
+                    handle,
+                    fieldnames=["year", "slug", "series_key", "original_name", "country_region"],
+                )
+                writer.writeheader()
+                writer.writerow(
+                    {
+                        "year": 2020,
+                        "slug": "france-known",
+                        "series_key": "france-known",
+                        "original_name": "Known",
+                        "country_region": "france",
+                    }
+                )
+            current = root / "current.jsonl"
+            current.write_text(
+                json.dumps(
+                    {
+                        "year": 2020,
+                        "slug": "france-known",
+                        "source_name": "wikipedia_winners_table",
+                        "source_url": "https://en.wikipedia.org/wiki/Prix_Known",
+                        "modules": {
+                            "history_winners": {
+                                "items": [{"winner_year": 2020, "horse_name": "Known Winner"}]
+                            }
+                        },
+                        "metadata": {"wiki_title": "Prix Known"},
+                    },
+                    separators=(",", ":"),
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            args = Namespace(
+                output_dir=str(root / "output"),
+                events_csv=str(events),
+                current_history_jsonl=str(current),
+                limit=0,
+                allow_network=False,
+                timeout_seconds=20,
+                sleep_seconds=0.0,
+                min_year=2005,
+                allow_partial_history=False,
+            )
+            with mock.patch.object(MODULE, "_request_text") as request:
+                result = MODULE.prepare(args)
+            request.assert_not_called()
+            self.assertEqual(result["events"], 1)
+            self.assertEqual(result["history_items"], 1)
 
 
 if __name__ == "__main__":

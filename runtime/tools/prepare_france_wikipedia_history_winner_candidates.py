@@ -224,8 +224,8 @@ def _read_events(path: Path) -> list[dict]:
         return list(csv.DictReader(handle))
 
 
-def _read_current_history(path: Path) -> dict[str, list[dict]]:
-    current: dict[str, list[dict]] = {}
+def _read_current_history(path: Path) -> dict[str, dict]:
+    current: dict[str, dict] = {}
     if not path:
         return current
     with path.open("r", encoding="utf-8") as handle:
@@ -236,7 +236,7 @@ def _read_current_history(path: Path) -> dict[str, list[dict]]:
             slug = record.get("slug") or ""
             items = ((record.get("modules") or {}).get("history_winners") or {}).get("items") or []
             if slug and items:
-                current[slug] = items
+                current[slug] = record
     return current
 
 
@@ -276,6 +276,36 @@ def prepare(args: argparse.Namespace) -> dict:
     unmatched_rows = []
     with jsonl_path.open("w", encoding="utf-8") as jsonl:
         for event in events:
+            current_record = current_history.get(event["slug"])
+            if current_record is not None:
+                items = (
+                    ((current_record.get("modules") or {}).get("history_winners") or {}).get(
+                        "items"
+                    )
+                    or []
+                )
+                metadata = current_record.get("metadata") or {}
+                title = str(metadata.get("wiki_title") or "")
+                page_url = str(current_record.get("source_url") or "")
+                jsonl.write(
+                    json.dumps(current_record, ensure_ascii=False, separators=(",", ":"))
+                    + "\n"
+                )
+                summary["events"] += 1
+                summary["history_items"] += len(items)
+                review_rows.append(
+                    {
+                        "slug": event["slug"],
+                        "original_name": event.get("original_name", ""),
+                        "history_count": len(items),
+                        "first_year": min(item["winner_year"] for item in items),
+                        "latest_year": max(item["winner_year"] for item in items),
+                        "latest_winner": items[0]["horse_name"],
+                        "wiki_title": title,
+                        "source_url": page_url,
+                    }
+                )
+                continue
             queries = _query_candidates(event)
             query = queries[0]
             diagnostics = []
@@ -327,7 +357,7 @@ def prepare(args: argparse.Namespace) -> dict:
                 # Earlier discovery misses are expected bounded fallbacks, not
                 # partial source failures once a complete winner table wins.
                 diagnostics = []
-            items = _merge_items(wiki_items, current_history.get(event["slug"], []))
+            items = _merge_items(wiki_items, [])
             if not items:
                 summary["events_without_history"] += 1
                 unmatched_rows.append({"slug": event["slug"], "original_name": event.get("original_name", ""), "query": query, "wiki_title": title, "source_url": page_url})
