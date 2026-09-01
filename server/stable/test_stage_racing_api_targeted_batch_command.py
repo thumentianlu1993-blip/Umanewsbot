@@ -35,6 +35,18 @@ class StageRacingApiTargetedBatchCommandTests(TestCase):
         self.assertIn("--materialization-dir", output)
         self.assertIn("--approved-manifest-sha256", output)
 
+    def test_help_discovers_collection_staging_command(self):
+        stdout = StringIO()
+
+        with redirect_stdout(stdout):
+            ManagementUtility(
+                ["manage.py", "help", "stage_racing_api_targeted_collection"]
+            ).execute()
+
+        output = stdout.getvalue()
+        self.assertIn("stage_racing_api_targeted_collection", output)
+        self.assertIn("--materialization", output)
+
     def test_allow_write_without_apply_is_rejected_before_service_call(self):
         with mock.patch(
             "stable.management.commands.stage_racing_api_targeted_batch."
@@ -155,6 +167,31 @@ class StageRacingApiTargetedBatchCommandTests(TestCase):
                 verify=True,
                 no_color=True,
             )
+
+    def test_collection_command_requires_absolute_sha_bound_paths(self):
+        for value in ("relative-path=" + "a" * 64, "/absolute/no-sha"):
+            with self.subTest(value=value), self.assertRaises(CommandError):
+                call_command(
+                    "stage_racing_api_targeted_collection",
+                    materialization=[value],
+                    no_color=True,
+                )
+
+    def test_collection_command_runs_exact_zero_write_preflight(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root, manifest_sha = self._materialization(Path(temporary))
+            stdout = StringIO()
+            call_command(
+                "stage_racing_api_targeted_collection",
+                materialization=[f"{root}={manifest_sha}"],
+                stdout=stdout,
+                no_color=True,
+            )
+            report = json.loads(stdout.getvalue())
+            self.assertEqual(report["status"], "collection_dry_run")
+            self.assertEqual(report["database_writes"], 0)
+            self.assertEqual(report["materialization_count"], 1)
+            self.assertEqual(report["horse_count"], 2)
 
     def test_env_example_keeps_staging_writes_disabled(self):
         env_example = Path(__file__).resolve().parents[2] / ".env.example"

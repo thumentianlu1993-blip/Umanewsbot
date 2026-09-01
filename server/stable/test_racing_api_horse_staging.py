@@ -28,11 +28,14 @@ from stable.services.racing_api_horse_staging import (
     RacingApiStagingError,
     apply_targeted_artifact,
     apply_targeted_materialization,
+    apply_targeted_materialization_collection,
     dry_run_targeted_artifact,
     dry_run_targeted_materialization,
+    dry_run_targeted_materialization_collection,
     load_targeted_artifact,
     load_targeted_materialization,
     verify_targeted_materialization,
+    verify_targeted_materialization_collection,
 )
 
 
@@ -799,6 +802,48 @@ class RacingApiHorseStagingTests(TestCase):
             self.assertEqual(ExternalRace.objects.count(), 0)
             self.assertEqual(ExternalRaceResult.objects.count(), 0)
             self.assertEqual(ExternalHorseHistory.objects.count(), 0)
+
+    def test_collection_preflights_then_applies_and_verifies_exact_parts(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root, manifest_sha = self._materialization(Path(temporary))
+            bindings = [(root, manifest_sha)]
+            dry_run = dry_run_targeted_materialization_collection(bindings)
+            self.assertEqual(dry_run["status"], "collection_dry_run")
+            self.assertEqual(dry_run["database_writes"], 0)
+            self.assertEqual(dry_run["materialization_count"], 1)
+            self.assertEqual(dry_run["horse_count"], 2)
+
+            with self.assertRaisesRegex(RacingApiStagingError, "write gate"):
+                apply_targeted_materialization_collection(bindings)
+            with mock.patch.dict(
+                "os.environ", {"RACING_API_STAGING_WRITE_ENABLED": "true"}
+            ):
+                applied = apply_targeted_materialization_collection(
+                    bindings,
+                    allow_write=True,
+                )
+            verified = verify_targeted_materialization_collection(bindings)
+
+            self.assertEqual(applied["status"], "applied")
+            self.assertGreater(applied["database_writes"], 0)
+            self.assertEqual(verified["status"], "verified")
+            self.assertEqual(verified["database_writes"], 0)
+            self.assertEqual(
+                applied["collection_binding_sha256"],
+                verified["collection_binding_sha256"],
+            )
+
+    def test_collection_rejects_duplicate_part_before_any_write(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root, manifest_sha = self._materialization(Path(temporary))
+            with self.assertRaisesRegex(
+                RacingApiStagingError,
+                "path is invalid",
+            ):
+                dry_run_targeted_materialization_collection(
+                    [(root, manifest_sha), (root, manifest_sha)]
+                )
+        self.assertEqual(ExternalDataImportRun.objects.count(), 0)
 
     def test_materialization_member_drift_is_rejected_before_batch_dry_run(self):
         with tempfile.TemporaryDirectory() as temporary:
