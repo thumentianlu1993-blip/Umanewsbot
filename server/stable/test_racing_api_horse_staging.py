@@ -740,6 +740,26 @@ class RacingApiHorseStagingTests(TestCase):
                 source=ExternalDataSource.THE_RACING_API,
                 horse_id="hrs_1024",
             )
+            self.assertEqual(horse.trainer_name, "J Hammond")
+            self.assertEqual(
+                horse.record_summary,
+                "starts=1;wins=1;seconds=0;thirds=0",
+            )
+            self.assertEqual(
+                horse.profile_snapshot["career"],
+                {
+                    "provider_row_count": 1,
+                    "unique_race_count": 1,
+                    "page_count": 1,
+                    "started_count": 1,
+                    "win_count": 1,
+                    "second_count": 0,
+                    "third_count": 0,
+                    "provider_pagination_complete": True,
+                    "authority_status": "provider_available",
+                    "authority_basis": "",
+                },
+            )
             horse.breeder_name = "Drifted Breeder"
             horse.save(update_fields=["breeder_name", "updated_at"])
             with self.assertRaisesRegex(RacingApiStagingError, "ExternalHorse field drift"):
@@ -850,6 +870,61 @@ class RacingApiHorseStagingTests(TestCase):
             self.assertEqual(CanonicalRaceEventResult.objects.count(), 0)
             self.assertEqual(HorseRaceRecord.objects.count(), 0)
 
+    def test_existing_v1_receipt_is_upgraded_once_with_page_snapshot(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root, manifest_sha = self._artifact(Path(temporary), with_parents=True)
+            with mock.patch.dict(
+                "os.environ", {"RACING_API_STAGING_WRITE_ENABLED": "true"}
+            ):
+                first = apply_targeted_artifact(
+                    root,
+                    approved_manifest_sha256=manifest_sha,
+                    allow_write=True,
+                )
+                horse = ExternalHorse.objects.get(
+                    source=ExternalDataSource.THE_RACING_API,
+                    horse_id="hrs_1024",
+                )
+                horse.profile_snapshot = {}
+                horse.owner_name = ""
+                horse.trainer_name = ""
+                horse.record_summary = ""
+                horse.save(
+                    update_fields=[
+                        "profile_snapshot",
+                        "owner_name",
+                        "trainer_name",
+                        "record_summary",
+                        "updated_at",
+                    ]
+                )
+                upgraded = apply_targeted_artifact(
+                    root,
+                    approved_manifest_sha256=manifest_sha,
+                    allow_write=True,
+                )
+                replayed = apply_targeted_artifact(
+                    root,
+                    approved_manifest_sha256=manifest_sha,
+                    allow_write=True,
+                )
+
+        horse.refresh_from_db()
+        self.assertEqual(first["status"], "applied")
+        self.assertEqual(upgraded["status"], "applied")
+        self.assertEqual(replayed["status"], "replayed")
+        self.assertEqual(horse.trainer_name, "J Hammond")
+        self.assertEqual(
+            horse.profile_snapshot["pedigree_two_generation"]["dam_dam"],
+            "Toute Cy (FR)",
+        )
+        self.assertEqual(
+            ExternalDataImportRun.objects.filter(
+                target_type="targeted_horse_profile_snapshot_v1"
+            ).count(),
+            1,
+        )
+
     def test_runner_only_observation_does_not_erase_existing_profile_fields(self):
         existing = ExternalHorse.objects.create(
             source=ExternalDataSource.THE_RACING_API,
@@ -904,6 +979,24 @@ class RacingApiHorseStagingTests(TestCase):
         )
         self.assertEqual(target.sire_external_id, "hrs_100")
         self.assertEqual(target.dam_external_id, "hrs_200")
+        pedigree = target.profile_snapshot["pedigree_two_generation"]
+        self.assertEqual(pedigree["sire_sire"], "Northern Dancer (CAN)")
+        self.assertEqual(pedigree["sire_dam"], "Fairy Bridge (USA)")
+        self.assertEqual(pedigree["dam_sire"], "Top Ville (IRE)")
+        self.assertEqual(pedigree["dam_dam"], "Toute Cy (FR)")
+        self.assertEqual(
+            target.profile_snapshot["major_wins"],
+            [
+                {
+                    "race_id": "rac_arc_1999",
+                    "race_date": "1999-10-03",
+                    "race_name": "Prix de l'Arc de Triomphe",
+                    "grade": "G1",
+                    "course": "Longchamp (FR)",
+                    "region": "FR",
+                }
+            ],
+        )
         self.assertEqual(HorseExternalIdentity.objects.count(), 0)
 
     def test_target_non_runner_history_is_not_counted_as_an_actual_start(self):

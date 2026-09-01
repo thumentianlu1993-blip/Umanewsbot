@@ -850,7 +850,163 @@ def _validated_payload_sha256(value: object) -> str:
     return raw
 
 
-def _validate_and_plan(normalized: Mapping[str, object]) -> dict[str, Any]:
+def _numeric_finish_position(value: object) -> int | None:
+    match = re.match(r"^([1-9][0-9]*)(?:DH)?$", str(value or "").strip().upper())
+    return int(match.group(1)) if match else None
+
+
+def _normalized_grade(race: Mapping[str, object]) -> str:
+    for field in ("pattern", "class"):
+        value = str(race.get(field) or "").strip().upper()
+        match = re.search(r"(?:GROUP|GRADE|G)\s*([123])\b", value)
+        if match:
+            return f"G{match.group(1)}"
+    return ""
+
+
+def _latest_observation(
+    rows: list[dict[str, object]],
+    *,
+    field: str,
+) -> dict[str, object]:
+    observations = [
+        {
+            "value": str(row["runner"].get(field) or "").strip(),
+            "as_of": row["raced_at"].isoformat(),
+            "race_id": row["race_id"],
+        }
+        for row in rows
+        if str(row["runner"].get(field) or "").strip()
+    ]
+    if not observations:
+        return {"value": "", "as_of": "", "race_ids": [], "conflict": False}
+    latest_date = max(row["as_of"] for row in observations)
+    latest = [row for row in observations if row["as_of"] == latest_date]
+    values = sorted({row["value"] for row in latest})
+    return {
+        "value": values[0] if len(values) == 1 else "",
+        "as_of": latest_date,
+        "race_ids": sorted(row["race_id"] for row in latest),
+        "conflict": len(values) > 1,
+        "candidates": values if len(values) > 1 else [],
+    }
+
+
+def _page_profile_snapshot(
+    normalized: Mapping[str, object],
+    *,
+    profile: Mapping[str, object],
+    parent_profiles: list[Mapping[str, object]],
+    started_rows: list[dict[str, object]],
+    response_urls: list[str],
+) -> dict[str, object]:
+    parent_by_id = {
+        str(row.get("horse_id") or "").strip(): row
+        for row in parent_profiles
+    }
+    sire_id = _parent_horse_id(profile.get("sire_id"))
+    dam_id = _parent_horse_id(profile.get("dam_id"))
+    sire = parent_by_id.get(sire_id, {})
+    dam = parent_by_id.get(dam_id, {})
+    finishes = [
+        _numeric_finish_position(row["position"])
+        for row in started_rows
+    ]
+    major_wins = []
+    for row, finish in zip(started_rows, finishes, strict=True):
+        grade = _normalized_grade(row["race"])
+        if finish == 1 and grade:
+            major_wins.append(
+                {
+                    "race_id": row["race_id"],
+                    "race_date": row["raced_at"].isoformat(),
+                    "race_name": str(row["race"].get("race_name") or ""),
+                    "grade": grade,
+                    "course": str(row["race"].get("course") or ""),
+                    "region": str(row["race"].get("region") or ""),
+                }
+            )
+    career = normalized.get("career") or {}
+    authority = normalized.get("career_authority") or {}
+    return {
+        "schema_version": "racing-api-external-horse-page-snapshot.v1",
+        "provider": "the_racing_api",
+        "horse_id": str(profile.get("horse_id") or ""),
+        "profile_payload_sha256": str(profile.get("payload_sha256") or ""),
+        "pedigree_two_generation": {
+            "sire": str(profile.get("sire") or ""),
+            "sire_id": sire_id,
+            "dam": str(profile.get("dam") or ""),
+            "dam_id": dam_id,
+            "sire_sire": str(sire.get("sire") or ""),
+            "sire_sire_id": _parent_horse_id(sire.get("sire_id")),
+            "sire_dam": str(sire.get("dam") or ""),
+            "sire_dam_id": _parent_horse_id(sire.get("dam_id")),
+            "dam_sire": str(dam.get("sire") or profile.get("damsire") or ""),
+            "dam_sire_id": _parent_horse_id(
+                dam.get("sire_id") or profile.get("damsire_id")
+            ),
+            "dam_dam": str(dam.get("dam") or ""),
+            "dam_dam_id": _parent_horse_id(dam.get("dam_id")),
+            "parent_profile_payload_sha256": {
+                horse_id: str(parent.get("payload_sha256") or "")
+                for horse_id, parent in sorted(parent_by_id.items())
+            },
+        },
+        "owner_observation": _latest_observation(started_rows, field="owner"),
+        "trainer_observation": _latest_observation(started_rows, field="trainer"),
+        "career": {
+            "provider_row_count": career.get("provider_row_count"),
+            "unique_race_count": career.get("unique_race_count"),
+            "page_count": career.get("page_count"),
+            "started_count": len(started_rows),
+            "win_count": sum(position == 1 for position in finishes),
+            "second_count": sum(position == 2 for position in finishes),
+            "third_count": sum(position == 3 for position in finishes),
+            "provider_pagination_complete": True,
+            "authority_status": str(authority.get("status") or "provider_available"),
+            "authority_basis": str(authority.get("basis") or ""),
+        },
+        "major_wins": sorted(
+            major_wins,
+            key=lambda row: (row["race_date"], row["race_id"]),
+        ),
+        "evidence_urls": sorted(set(response_urls)),
+    }
+
+
+def _profile_summary_fields(snapshot: Mapping[str, object]) -> dict[str, object]:
+    career = snapshot.get("career") or {}
+    if not isinstance(career, Mapping):
+        raise RacingApiStagingError("page profile career snapshot is invalid")
+    required_counts = ("started_count", "win_count", "second_count", "third_count")
+    if any(
+        isinstance(career.get(field), bool)
+        or not isinstance(career.get(field), int)
+        or career[field] < 0
+        for field in required_counts
+    ):
+        raise RacingApiStagingError("page profile career counts are invalid")
+    owner = snapshot.get("owner_observation") or {}
+    trainer = snapshot.get("trainer_observation") or {}
+    if not isinstance(owner, Mapping) or not isinstance(trainer, Mapping):
+        raise RacingApiStagingError("page profile observations are invalid")
+    return {
+        "owner_name": str(owner.get("value") or ""),
+        "trainer_name": str(trainer.get("value") or ""),
+        "record_summary": (
+            "starts={started_count};wins={win_count};seconds={second_count};"
+            "thirds={third_count}"
+        ).format(**career),
+        "profile_snapshot": dict(snapshot),
+    }
+
+
+def _validate_and_plan(
+    normalized: Mapping[str, object],
+    *,
+    responses: list[dict[str, object]] | None = None,
+) -> dict[str, Any]:
     profile = normalized.get("profile")
     career = normalized.get("career")
     if not isinstance(profile, Mapping) or not isinstance(career, Mapping):
@@ -872,6 +1028,7 @@ def _validate_and_plan(normalized: Mapping[str, object]) -> dict[str, Any]:
     parent_profiles = normalized.get("parent_profiles", [])
     if not isinstance(parent_profiles, list):
         raise RacingApiStagingError("parent_profiles must be a list")
+    typed_parent_profiles: list[Mapping[str, object]] = []
     for parent_profile in parent_profiles:
         if not isinstance(parent_profile, Mapping):
             raise RacingApiStagingError("parent profile must be an object")
@@ -882,9 +1039,11 @@ def _validate_and_plan(normalized: Mapping[str, object]) -> dict[str, Any]:
             raise RacingApiStagingError("parent profile identity is invalid")
         if parent_horse_id == horse_id:
             raise RacingApiStagingError("parent profile conflicts with target identity")
+        typed_parent_profiles.append(parent_profile)
     planned_races = []
     results = []
     histories = []
+    started_rows = []
     for race in races:
         if not isinstance(race, Mapping):
             raise RacingApiStagingError("career race must be an object")
@@ -919,6 +1078,15 @@ def _validate_and_plan(normalized: Mapping[str, object]) -> dict[str, Any]:
             # evidence, but do not create a result or career-start row.
             continue
         target_runner = target_rows[0]
+        started_rows.append(
+            {
+                "race_id": race_id,
+                "raced_at": raced_at,
+                "position": str(target_runner.get("position") or "").strip(),
+                "runner": dict(target_runner),
+                "race": dict(race),
+            }
+        )
         results.append(
             {
                 "race_id": race_id,
@@ -951,6 +1119,17 @@ def _validate_and_plan(normalized: Mapping[str, object]) -> dict[str, Any]:
         "raw_name": target_raw_name,
         "region": target_region,
         "profile": dict(profile),
+        "page_profile_snapshot": _page_profile_snapshot(
+            normalized,
+            profile=profile,
+            parent_profiles=typed_parent_profiles,
+            started_rows=started_rows,
+            response_urls=[
+                str(row.get("identity", {}).get("url") or "")
+                for row in (responses or [])
+                if isinstance(row.get("identity"), Mapping)
+            ],
+        ),
     }
     return {
         "horse_id": horse_id,
@@ -963,7 +1142,10 @@ def _validate_and_plan(normalized: Mapping[str, object]) -> dict[str, Any]:
 
 def dry_run_targeted_artifact(run_dir: Path, *, approved_manifest_sha256: str) -> dict[str, Any]:
     loaded = load_targeted_artifact(run_dir, approved_manifest_sha256=approved_manifest_sha256)
-    plan = _validate_and_plan(loaded["normalized"])
+    plan = _validate_and_plan(
+        loaded["normalized"],
+        responses=loaded["responses"],
+    )
     return {
         "status": "dry_run",
         "database_writes": 0,
@@ -1031,7 +1213,10 @@ def apply_targeted_artifact(
             "staging write gate requires allow_write and RACING_API_STAGING_WRITE_ENABLED=true"
         )
     loaded = load_targeted_artifact(run_dir, approved_manifest_sha256=approved_manifest_sha256)
-    plan = _validate_and_plan(loaded["normalized"])
+    plan = _validate_and_plan(
+        loaded["normalized"],
+        responses=loaded["responses"],
+    )
     with transaction.atomic():
         lock, _created = ExternalDataImportLock.objects.select_for_update().get_or_create(
             source=ExternalDataSource.THE_RACING_API,
@@ -1046,18 +1231,34 @@ def apply_targeted_artifact(
             status=ExternalImportStatus.SUCCESS,
         ).first()
         if existing_receipt is not None:
-            return {
-                "status": "replayed",
-                "database_writes": 0,
-                "manifest_sha256": loaded["manifest_sha256"],
-                "run_id": existing_receipt.pk,
-            }
+            target_plan = plan["horses"][0]
+            snapshot_fields = _profile_summary_fields(
+                target_plan.get("page_profile_snapshot") or {}
+            )
+            existing_horse = ExternalHorse.objects.filter(
+                source=ExternalDataSource.THE_RACING_API,
+                horse_id=target_plan["horse_id"],
+            ).first()
+            if existing_horse is not None and all(
+                getattr(existing_horse, field) == value
+                for field, value in snapshot_fields.items()
+            ):
+                return {
+                    "status": "replayed",
+                    "database_writes": 0,
+                    "manifest_sha256": loaded["manifest_sha256"],
+                    "run_id": existing_receipt.pk,
+                }
         now = timezone.now()
         run = ExternalDataImportRun.objects.create(
             source=ExternalDataSource.THE_RACING_API,
             racing_region=RacingRegion.OTHER,
             source_language=SourceLanguage.ENGLISH,
-            target_type="targeted_horse_artifact",
+            target_type=(
+                "targeted_horse_profile_snapshot_v1"
+                if existing_receipt is not None
+                else "targeted_horse_artifact"
+            ),
             horse_id=plan["horse_id"],
             parameters={
                 "manifest_sha256": loaded["manifest_sha256"],
@@ -1102,6 +1303,7 @@ def apply_targeted_artifact(
                 "sire_external_id": _parent_horse_id(profile.get("sire_id")),
                 "dam_external_id": _parent_horse_id(profile.get("dam_id")),
                 "damsire_external_id": _parent_horse_id(profile.get("damsire_id")),
+                **_profile_summary_fields(row.get("page_profile_snapshot") or {}),
                 "raw_payload": dict(profile),
                 "fetched_at": now,
             }
@@ -1254,7 +1456,10 @@ def _materialization_plans(loaded: Mapping[str, object]) -> list[dict[str, Any]]
             row["run_dir"],
             approved_manifest_sha256=row["manifest_sha256"],
         )
-        plan = _validate_and_plan(artifact["normalized"])
+        plan = _validate_and_plan(
+            artifact["normalized"],
+            responses=artifact["responses"],
+        )
         if plan["horse_id"] != row["horse_id"]:
             raise RacingApiStagingError("materialization plan horse identity drift")
         for race in plan["races"]:
@@ -1664,6 +1869,9 @@ def verify_targeted_materialization(
                     "sire_external_id": _parent_horse_id(profile.get("sire_id")),
                     "dam_external_id": _parent_horse_id(profile.get("dam_id")),
                     "damsire_external_id": _parent_horse_id(profile.get("damsire_id")),
+                    **_profile_summary_fields(
+                        horse_plan.get("page_profile_snapshot") or {}
+                    ),
                     "raw_payload": dict(profile),
                 },
                 label="ExternalHorse",
