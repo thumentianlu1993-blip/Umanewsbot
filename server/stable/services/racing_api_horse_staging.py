@@ -23,6 +23,7 @@ from stable.models import (
     ExternalImportStatus,
     ExternalRace,
     ExternalRaceResult,
+    HorseExternalIdentity,
     HorseNameKind,
     HorseNameVariant,
     RacingRegion,
@@ -1549,4 +1550,262 @@ def apply_targeted_materialization(
         "dry_run_action_counts": dry_run_report["action_counts"],
         "dry_run_action_totals": dry_run_report["action_totals"],
         "results": results,
+    }
+
+
+def _verified_exact_row(queryset, expected: Mapping[str, object], *, label: str):
+    rows = list(queryset[:2])
+    if len(rows) != 1:
+        raise RacingApiStagingError(f"{label} row count drift")
+    row = rows[0]
+    actual = {field: getattr(row, field) for field in expected}
+    if actual != dict(expected):
+        raise RacingApiStagingError(f"{label} field drift")
+    return row
+
+
+def verify_targeted_materialization(
+    materialization_dir: Path,
+    *,
+    approved_manifest_sha256: str,
+) -> dict[str, Any]:
+    """Read-only exact verifier for one already-applied materialization.
+
+    The verifier reloads all content-addressed provider evidence, reconstructs
+    the write plan, and compares every field controlled by the staging writer.
+    It does not treat row existence or a successful import receipt alone as
+    proof of a valid apply.
+    """
+
+    loaded = load_targeted_materialization(
+        materialization_dir,
+        approved_manifest_sha256=approved_manifest_sha256,
+    )
+    plans = _materialization_plans(loaded)
+    seen_race_ids: set[str] = set()
+    verified_counts = {
+        "external_horses": 0,
+        "external_races": 0,
+        "external_results": 0,
+        "external_histories": 0,
+        "name_variants": 0,
+        "import_runs": 0,
+    }
+
+    for materialized, plan in zip(loaded["runs"], plans, strict=True):
+        manifest_sha = materialized["manifest_sha256"]
+        duplicate_races = {
+            race["race_id"] for race in plan["races"]
+        } & seen_race_ids
+        expected_coverage = {
+            "external_horses": len(plan["horses"]),
+            "external_races": len(plan["races"]),
+            "external_results": len(plan["results"]),
+            "external_histories": len(plan["histories"]),
+            "canonical_identity_writes": 0,
+            "out_of_scope_horse_writes": 0,
+            "deduplicated_external_races": len(duplicate_races),
+        }
+        import_run = _verified_exact_row(
+            ExternalDataImportRun.objects.filter(
+                source=ExternalDataSource.THE_RACING_API,
+                target_type="targeted_horse_artifact",
+                parameters__manifest_sha256=manifest_sha,
+                status=ExternalImportStatus.SUCCESS,
+            ),
+            {
+                "horse_id": plan["horse_id"],
+                "status": ExternalImportStatus.SUCCESS,
+                "dry_run": False,
+                "success_count": len(plan["races"]) + len(plan["horses"]),
+                "failure_count": 0,
+                "coverage_stats": expected_coverage,
+            },
+            label="ExternalDataImportRun",
+        )
+        if (
+            import_run.finished_at is None
+            or import_run.parameters.get("canonical_identity_writes") != 0
+            or not str(import_run.parameters.get("artifact_root") or "").strip()
+        ):
+            raise RacingApiStagingError("ExternalDataImportRun evidence drift")
+        verified_counts["import_runs"] += 1
+
+        horse_objects: dict[str, ExternalHorse] = {}
+        for horse_plan in plan["horses"]:
+            profile = horse_plan.get("profile") or {}
+            raw_name = horse_plan["raw_name"]
+            plain_name, suffix = _split_name(raw_name)
+            birth_date = None
+            if profile.get("dob"):
+                try:
+                    birth_date = date.fromisoformat(str(profile["dob"]))
+                except ValueError as exc:
+                    raise RacingApiStagingError("invalid target horse DOB") from exc
+            horse = _verified_exact_row(
+                ExternalHorse.objects.filter(
+                    source=ExternalDataSource.THE_RACING_API,
+                    horse_id=horse_plan["horse_id"],
+                ),
+                {
+                    "racing_region": horse_plan["region"],
+                    "source_language": SourceLanguage.ENGLISH,
+                    "horse_name": raw_name,
+                    "horse_name_en": plain_name,
+                    "normalized_horse_name": _normalized_name(raw_name),
+                    "country": suffix,
+                    "sex": str(profile.get("sex_code") or profile.get("sex") or ""),
+                    "birth_date": birth_date,
+                    "color": str(profile.get("colour") or ""),
+                    "breeder_name": str(profile.get("breeder") or ""),
+                    "father_name": str(profile.get("sire") or ""),
+                    "mother_name": str(profile.get("dam") or ""),
+                    "damsire_name": str(profile.get("damsire") or ""),
+                    "sire_external_id": _parent_horse_id(profile.get("sire_id")),
+                    "dam_external_id": _parent_horse_id(profile.get("dam_id")),
+                    "damsire_external_id": _parent_horse_id(profile.get("damsire_id")),
+                    "raw_payload": dict(profile),
+                },
+                label="ExternalHorse",
+            )
+            horse_objects[horse_plan["horse_id"]] = horse
+            verified_counts["external_horses"] += 1
+
+            strict_name = _normalized_name(raw_name)
+            _verified_exact_row(
+                HorseNameVariant.objects.filter(
+                    external_horse=horse,
+                    source=ExternalDataSource.THE_RACING_API,
+                    name_kind=HorseNameKind.SOURCE_DISPLAY,
+                    normalized_strict=strict_name,
+                ),
+                {
+                    "horse_profile_id": None,
+                    "name_text": raw_name,
+                    "language": SourceLanguage.ENGLISH,
+                    "script": "latin",
+                    "country_suffix": suffix,
+                    "normalized_loose": strict_name,
+                    "is_official": False,
+                    "payload_sha256": str(profile.get("payload_sha256") or ""),
+                },
+                label="HorseNameVariant",
+            )
+            verified_counts["name_variants"] += 1
+
+        race_objects: dict[str, ExternalRace] = {}
+        for race_plan in plan["races"]:
+            raw = race_plan["raw"]
+            race = _verified_exact_row(
+                ExternalRace.objects.filter(
+                    source=ExternalDataSource.THE_RACING_API,
+                    race_id=race_plan["race_id"],
+                ),
+                {
+                    "racing_region": race_plan["region"],
+                    "source_language": SourceLanguage.ENGLISH,
+                    "race_name": str(raw.get("race_name") or ""),
+                    "race_date": race_plan["raced_at"],
+                    "course": str(raw.get("course") or ""),
+                    "venue": str(raw.get("course_id") or ""),
+                    "race_grade": str(raw.get("pattern") or ""),
+                    "race_class": str(raw.get("class") or ""),
+                    "surface": str(raw.get("surface") or ""),
+                    "distance": str(raw.get("dist") or raw.get("dist_m") or ""),
+                    "going": str(raw.get("going") or ""),
+                    "raw_payload": raw,
+                },
+                label="ExternalRace",
+            )
+            race_objects[race_plan["race_id"]] = race
+            if race_plan["race_id"] not in seen_race_ids:
+                verified_counts["external_races"] += 1
+
+        for result_plan in plan["results"]:
+            runner = result_plan["runner"]
+            _verified_exact_row(
+                ExternalRaceResult.objects.filter(
+                    source=ExternalDataSource.THE_RACING_API,
+                    external_race_id=result_plan["race_id"],
+                    result_key=result_plan["horse_id"],
+                ),
+                {
+                    "racing_region": result_plan["race_region"],
+                    "source_language": SourceLanguage.ENGLISH,
+                    "race_id": race_objects[result_plan["race_id"]].pk,
+                    "horse_id": result_plan["horse_id"],
+                    "horse_name": result_plan["horse_name"],
+                    "normalized_horse_name": _normalized_name(result_plan["horse_name"]),
+                    "horse_number": str(runner.get("number") or ""),
+                    "finish_position": result_plan["position"],
+                    "finish_time": str(runner.get("time") or ""),
+                    "margin": str(runner.get("btn") or runner.get("ovr_btn") or ""),
+                    "odds_value": str(runner.get("sp") or runner.get("bsp") or ""),
+                    "barrier": str(runner.get("draw") or ""),
+                    "jockey_name": str(runner.get("jockey") or ""),
+                    "trainer_name": str(runner.get("trainer") or ""),
+                    "raw_payload": runner,
+                },
+                label="ExternalRaceResult",
+            )
+            verified_counts["external_results"] += 1
+
+        target_horse = horse_objects[plan["horse_id"]]
+        for history_plan in plan["histories"]:
+            _verified_exact_row(
+                ExternalHorseHistory.objects.filter(
+                    source=ExternalDataSource.THE_RACING_API,
+                    external_horse_id=plan["horse_id"],
+                    history_key=history_plan["race_id"],
+                ),
+                {
+                    "racing_region": race_objects[
+                        history_plan["race_id"]
+                    ].racing_region,
+                    "source_language": SourceLanguage.ENGLISH,
+                    "horse_id": target_horse.pk,
+                    "external_race_id": history_plan["race_id"],
+                    "race_name": history_plan["race_name"],
+                    "raced_at": history_plan["raced_at"],
+                    "horse_number": history_plan["horse_number"],
+                    "finish_position": history_plan["position"],
+                    "raw_payload": history_plan["raw"],
+                },
+                label="ExternalHorseHistory",
+            )
+            verified_counts["external_histories"] += 1
+        seen_race_ids.update(race_objects)
+
+    target_ids = [plan["horse_id"] for plan in plans]
+    canonical_identity_count = HorseExternalIdentity.objects.filter(
+        source=ExternalDataSource.THE_RACING_API,
+        external_id__in=target_ids,
+    ).count()
+    if canonical_identity_count:
+        raise RacingApiStagingError("canonical identity scope is not empty")
+    active_lock_count = ExternalDataImportLock.objects.filter(
+        source=ExternalDataSource.THE_RACING_API,
+        locked_by_run__status=ExternalImportStatus.STARTED,
+    ).count()
+    active_run_count = ExternalDataImportRun.objects.filter(
+        source=ExternalDataSource.THE_RACING_API,
+        status=ExternalImportStatus.STARTED,
+    ).count()
+    if active_lock_count or active_run_count:
+        raise RacingApiStagingError("The Racing API staging import is still active")
+
+    return {
+        "status": "verified",
+        "database_writes": 0,
+        "materialization_manifest_sha256": loaded["manifest_sha256"],
+        "source_batch_manifest_sha256": loaded["source_batch_manifest_sha256"],
+        "source_content_pool_manifest_sha256": loaded[
+            "source_content_pool_manifest_sha256"
+        ],
+        "run_count": len(plans),
+        "scope_stable_ids": target_ids,
+        "verified_rows": verified_counts,
+        "canonical_identity_count": canonical_identity_count,
+        "active_import_lock_count": active_lock_count,
+        "active_import_run_count": active_run_count,
     }

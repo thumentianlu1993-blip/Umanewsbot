@@ -107,6 +107,14 @@ class RacingApiSchemaError(RacingApiError):
     pass
 
 
+class RacingApiSemanticGap(ValueError):
+    """A reviewed seed could not be resolved without guessing identity."""
+
+    def __init__(self, code: str, message: str):
+        super().__init__(message)
+        self.code = code
+
+
 @dataclass(frozen=True)
 class HttpResponse:
     status: int
@@ -515,7 +523,12 @@ def parent_profile_id(value: object) -> str:
     return f"hrs_{raw.split('_', 1)[1]}"
 
 
-def normalize_profile(payload: Mapping[str, object], *, profile_kind: str) -> dict:
+def normalize_profile(
+    payload: Mapping[str, object],
+    *,
+    profile_kind: str,
+    allow_missing_pro_dob: bool = False,
+) -> dict:
     if profile_kind not in {"pro", "standard"}:
         raise ValueError("profile_kind must be pro or standard")
     horse_id = normalize_space(payload.get("id"))
@@ -532,10 +545,13 @@ def normalize_profile(payload: Mapping[str, object], *, profile_kind: str) -> di
             parents.append(parent_profile_id(value))
     if profile_kind == "pro":
         dob = normalize_space(payload.get("dob"))
-        try:
-            date.fromisoformat(dob)
-        except ValueError as exc:
-            raise ValueError("invalid pro profile dob") from exc
+        if dob:
+            try:
+                date.fromisoformat(dob)
+            except ValueError as exc:
+                raise ValueError("invalid pro profile dob") from exc
+        elif not allow_missing_pro_dob:
+            raise ValueError("invalid pro profile dob")
     else:
         dob = ""
     return {
@@ -713,7 +729,6 @@ def _profile_only_external_anchor_allowed(seed: Mapping[str, object]) -> bool:
     required_target_fields = (
         "year",
         "country_region",
-        "local_date",
         "canonical_name_original",
         "racecourse",
         "grade_text",
@@ -722,15 +737,28 @@ def _profile_only_external_anchor_allowed(seed: Mapping[str, object]) -> bool:
     if any(not normalize_space(target.get(field)) for field in required_target_fields):
         raise ValueError("profile-only external anchor target is incomplete")
     try:
-        target_date = date.fromisoformat(normalize_space(target.get("local_date")))
-    except ValueError as exc:
-        raise ValueError("profile-only external anchor target date is invalid") from exc
-    try:
         target_year = int(str(target.get("year")))
     except (TypeError, ValueError) as exc:
         raise ValueError("profile-only external anchor target year is invalid") from exc
-    if target_date.year != target_year:
-        raise ValueError("profile-only external anchor target year/date mismatch")
+    target_date_text = normalize_space(target.get("local_date"))
+    if target_date_text:
+        try:
+            target_date = date.fromisoformat(target_date_text)
+        except ValueError as exc:
+            raise ValueError("profile-only external anchor target date is invalid") from exc
+        if target_date.year != target_year:
+            raise ValueError("profile-only external anchor target year/date mismatch")
+    elif seed.get("schema_version") == "targeted-horse-seed.v2":
+        try:
+            edition_year = int(str(target.get("edition_year")))
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "profile-only external anchor edition year is invalid"
+            ) from exc
+        if edition_year != target_year:
+            raise ValueError("profile-only external anchor edition year drift")
+    else:
+        raise ValueError("profile-only external anchor target date is required")
     if normalize_space(target.get("country_region")) not in REGION_CODES:
         raise ValueError("profile-only external anchor target region is unsupported")
     if normalize_space(target.get("grade_text")).upper() not in {"G1", "G2", "G3"}:
@@ -871,7 +899,12 @@ def exact_search_candidates(
     return candidates
 
 
-def fetch_profile_with_fallback(client: object, *, horse_id: str) -> dict:
+def fetch_profile_with_fallback(
+    client: object,
+    *,
+    horse_id: str,
+    allow_missing_pro_dob: bool = False,
+) -> dict:
     if not HORSE_ID_RE.fullmatch(horse_id):
         raise ValueError("invalid horse id")
     payload = client.request_json(
@@ -880,11 +913,23 @@ def fetch_profile_with_fallback(client: object, *, horse_id: str) -> dict:
     )
     profile_kind = "pro"
     if payload is None:
-        payload = client.request_json(build_endpoint("horse_standard", horse_id=horse_id))
+        payload = client.request_json(
+            build_endpoint("horse_standard", horse_id=horse_id),
+            allow_not_found=True,
+        )
         profile_kind = "standard"
+    if payload is None:
+        raise RacingApiSemanticGap(
+            "provider_profile_missing",
+            f"provider profile is unavailable for {horse_id}",
+        )
     if not isinstance(payload, Mapping):
         raise RacingApiSchemaError("horse profile response must be an object")
-    normalized = normalize_profile(payload, profile_kind=profile_kind)
+    normalized = normalize_profile(
+        payload,
+        profile_kind=profile_kind,
+        allow_missing_pro_dob=allow_missing_pro_dob,
+    )
     if normalized["horse_id"] != horse_id:
         raise RacingApiSchemaError("horse profile identity drift")
     return normalized
@@ -910,10 +955,25 @@ def fetch_parent_profiles(
         raise ValueError(
             f"parent profile ceiling exceeded: {len(unique_parent_ids)}>{max_parent_profiles}"
         )
-    return [
-        fetch_profile_with_fallback(client, horse_id=horse_id)
-        for horse_id in unique_parent_ids
-    ]
+    profiles = []
+    for horse_id in unique_parent_ids:
+        try:
+            profiles.append(
+                fetch_profile_with_fallback(
+                    client,
+                    horse_id=horse_id,
+                    allow_missing_pro_dob=True,
+                )
+            )
+        except RacingApiSemanticGap as exc:
+            if exc.code != "provider_profile_missing":
+                raise
+            # A target horse remains materializable when the provider exposes
+            # the parent name/ID on its profile but has no parent profile row.
+            # The page field matrix already preserves this as unavailable
+            # second-generation data; do not turn it into a guessed identity.
+            continue
+    return profiles
 
 
 def _page_field(value: object, *, source: str, status: str | None = None, **extra: object) -> dict:
@@ -1331,8 +1391,9 @@ def run_targeted_seed(
             selected_id = candidates[0]
             identity_mode = "external_anchor_profile_only"
         else:
-            raise ValueError(
-                f"target occurrence candidate count must be 1, got {len(occurrence_candidate_ids)}"
+            raise RacingApiSemanticGap(
+                "target_occurrence_identity_unresolved",
+                f"target occurrence candidate count must be 1, got {len(occurrence_candidate_ids)}",
             )
 
     if selected_profile_payload is None:
@@ -1831,7 +1892,9 @@ def run_targeted_seed_artifact(
             getattr(client, "request_count", len(recording.responses))
         )
         failure_category = "validation_error"
-        if isinstance(exc, RacingApiAuthError):
+        if isinstance(exc, RacingApiSemanticGap):
+            failure_category = "semantic_gap"
+        elif isinstance(exc, RacingApiAuthError):
             failure_category = "auth_failure"
             if request_ledger:
                 failure_category = str(
@@ -1867,6 +1930,8 @@ def run_targeted_seed_artifact(
                 "message": normalize_space(str(exc))[:500],
             },
         }
+        if isinstance(exc, RacingApiSemanticGap):
+            failure_manifest["failure"]["gap_code"] = exc.code
         failure_path = output_dir / "run-failure.json"
         _atomic_write(
             failure_path,

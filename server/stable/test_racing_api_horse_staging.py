@@ -32,6 +32,7 @@ from stable.services.racing_api_horse_staging import (
     dry_run_targeted_materialization,
     load_targeted_artifact,
     load_targeted_materialization,
+    verify_targeted_materialization,
 )
 
 
@@ -723,6 +724,29 @@ class RacingApiHorseStagingTests(TestCase):
             )
             self.assertEqual(ExternalDataImportRun.objects.count(), 2)
             self.assertEqual(ExternalHorseHistory.objects.count(), 2)
+
+            verified = verify_targeted_materialization(
+                root,
+                approved_manifest_sha256=manifest_sha,
+            )
+            self.assertEqual(verified["status"], "verified")
+            self.assertEqual(verified["database_writes"], 0)
+            self.assertEqual(verified["run_count"], 2)
+            self.assertEqual(verified["canonical_identity_count"], 0)
+            self.assertEqual(verified["verified_rows"]["external_horses"], 2)
+            self.assertEqual(verified["verified_rows"]["external_races"], 1)
+
+            horse = ExternalHorse.objects.get(
+                source=ExternalDataSource.THE_RACING_API,
+                horse_id="hrs_1024",
+            )
+            horse.breeder_name = "Drifted Breeder"
+            horse.save(update_fields=["breeder_name", "updated_at"])
+            with self.assertRaisesRegex(RacingApiStagingError, "ExternalHorse field drift"):
+                verify_targeted_materialization(
+                    root,
+                    approved_manifest_sha256=manifest_sha,
+                )
 
     def test_materialization_batch_apply_rolls_back_all_runs_on_late_failure(self):
         with tempfile.TemporaryDirectory() as temporary:

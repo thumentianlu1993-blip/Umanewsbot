@@ -112,6 +112,50 @@ class StageRacingApiTargetedBatchCommandTests(TestCase):
                 no_color=True,
             )
 
+    def test_verify_replays_artifact_and_checks_applied_rows(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root, manifest_sha = self._materialization(Path(temporary))
+            with mock.patch.dict(
+                os.environ,
+                {"RACING_API_STAGING_WRITE_ENABLED": "true"},
+                clear=False,
+            ):
+                call_command(
+                    "stage_racing_api_targeted_batch",
+                    materialization_dir=root,
+                    approved_manifest_sha256=manifest_sha,
+                    apply=True,
+                    allow_write=True,
+                    stdout=StringIO(),
+                    no_color=True,
+                )
+
+            stdout = StringIO()
+            call_command(
+                "stage_racing_api_targeted_batch",
+                materialization_dir=root,
+                approved_manifest_sha256=manifest_sha,
+                verify=True,
+                stdout=stdout,
+                no_color=True,
+            )
+            report = json.loads(stdout.getvalue())
+            self.assertEqual(report["status"], "verified")
+            self.assertEqual(report["database_writes"], 0)
+            self.assertEqual(report["verified_rows"]["external_horses"], 2)
+            self.assertEqual(report["canonical_identity_count"], 0)
+
+    def test_apply_and_verify_are_mutually_exclusive(self):
+        with self.assertRaisesRegex(CommandError, "不能同时使用"):
+            call_command(
+                "stage_racing_api_targeted_batch",
+                materialization_dir=Path("/private/not-read"),
+                approved_manifest_sha256="a" * 64,
+                apply=True,
+                verify=True,
+                no_color=True,
+            )
+
     def test_env_example_keeps_staging_writes_disabled(self):
         env_example = Path(__file__).resolve().parents[2] / ".env.example"
 

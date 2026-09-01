@@ -906,7 +906,7 @@ class RacingApiHorseExportTests(unittest.TestCase):
 
     def test_reviewed_external_anchor_exports_unique_profile_when_target_is_missing(self):
         seed = {
-            "schema_version": "targeted-horse-seed.v1",
+            "schema_version": "targeted-horse-seed.v2",
             "seed_id": "sample-westover-saint-cloud",
             "name": "Westover",
             "expected_finish_position": "1",
@@ -917,7 +917,7 @@ class RacingApiHorseExportTests(unittest.TestCase):
             "target": {
                 "year": 2023,
                 "country_region": "france",
-                "local_date": "2023-07-08",
+                "edition_year": 2023,
                 "canonical_name_original": "Grand Prix de Saint-Cloud",
                 "racecourse": "Saint-Cloud",
                 "grade_text": "G1",
@@ -1242,6 +1242,73 @@ class RacingApiHorseExportTests(unittest.TestCase):
         self.assertEqual(parents[0]["profile_kind"], "pro")
         self.assertEqual(parents[1]["profile_kind"], "standard")
         self.assertEqual(len(calls), 3)
+
+    def test_parent_pool_preserves_missing_pro_dob_as_explicit_gap(self):
+        profile = self.module.normalize_profile(montjeu_profile(), profile_kind="pro")
+        profile["dam_id"] = ""
+        parent_payload = montjeu_profile(
+            id="hrs_100",
+            name="Sadler's Wells (USA)",
+            dob="",
+            sire="Northern Dancer (CAN)",
+            sire_id="sir_101",
+            dam="Fairy Bridge (USA)",
+            dam_id="dam_102",
+        )
+
+        class FakeClient:
+            def request_json(self, url, *, allow_not_found=False):
+                if not url.endswith("/horses/hrs_100/pro") or not allow_not_found:
+                    raise AssertionError(url)
+                return parent_payload
+
+        parents = self.module.fetch_parent_profiles(
+            FakeClient(),
+            profile=profile,
+            max_parent_profiles=2,
+        )
+
+        self.assertEqual(len(parents), 1)
+        self.assertEqual(parents[0]["horse_id"], "hrs_100")
+        self.assertEqual(parents[0]["profile_kind"], "pro")
+        self.assertEqual(parents[0]["dob"], "")
+
+        malformed = {**parent_payload, "dob": "unknown"}
+        with self.assertRaisesRegex(ValueError, "invalid pro profile dob"):
+            self.module.normalize_profile(
+                malformed,
+                profile_kind="pro",
+                allow_missing_pro_dob=True,
+            )
+
+    def test_parent_pool_preserves_missing_provider_parent_profile_as_gap(self):
+        profile = self.module.normalize_profile(montjeu_profile(), profile_kind="pro")
+        calls = []
+
+        class FakeClient:
+            def request_json(self, url, *, allow_not_found=False):
+                calls.append((url, allow_not_found))
+                if "/hrs_100/" in url:
+                    return montjeu_profile(id="hrs_100", name="Sadler's Wells (USA)")
+                if "/hrs_200/" in url:
+                    return None
+                raise AssertionError(url)
+
+        parents = self.module.fetch_parent_profiles(
+            FakeClient(),
+            profile=profile,
+            max_parent_profiles=2,
+        )
+
+        self.assertEqual([row["horse_id"] for row in parents], ["hrs_100"])
+        self.assertEqual(
+            calls,
+            [
+                (self.module.build_endpoint("horse_pro", horse_id="hrs_100"), True),
+                (self.module.build_endpoint("horse_pro", horse_id="hrs_200"), True),
+                (self.module.build_endpoint("horse_standard", horse_id="hrs_200"), True),
+            ],
+        )
 
     def test_page_field_matrix_maps_two_generation_pedigree_and_career(self):
         profile = self.module.normalize_profile(montjeu_profile(), profile_kind="pro")
@@ -1677,7 +1744,11 @@ class RacingApiHorseExportTests(unittest.TestCase):
                 )
 
             failure = json.loads((output / "run-failure.json").read_text())
-            self.assertEqual(failure["failure"]["category"], "validation_error")
+            self.assertEqual(failure["failure"]["category"], "semantic_gap")
+            self.assertEqual(
+                failure["failure"]["gap_code"],
+                "target_occurrence_identity_unresolved",
+            )
             self.assertEqual(
                 failure["failure"]["message"],
                 "target occurrence candidate count must be 1, got 0",
