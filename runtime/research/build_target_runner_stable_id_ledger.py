@@ -159,7 +159,12 @@ def _target_occurrence(
     region_code = normalize_space(target_race.get("region")).upper()
     if region_code not in REGION_TO_SCOPE:
         raise StableIdLedgerError(f"target race region is unsupported: {region_code!r}")
-    grade = normalize_space(target_race.get("pattern")).upper().replace("GROUP ", "G")
+    grade = (
+        normalize_space(target_race.get("pattern"))
+        .upper()
+        .replace("GROUP ", "G")
+        .replace("GRADE ", "G")
+    )
     if grade not in {"G1", "G2", "G3"}:
         raise StableIdLedgerError(f"target race grade is unsupported: {grade!r}")
     raw_race = _raw_target_race(target_race)
