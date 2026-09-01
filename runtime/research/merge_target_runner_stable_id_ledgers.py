@@ -58,7 +58,79 @@ def _source_batch_shas(seed: Mapping[str, object]) -> list[str]:
     return values
 
 
-def _validate_occurrence(occurrence: Mapping[str, object]) -> tuple[str, str]:
+def _validate_source_observations(occurrence: Mapping[str, object]) -> list[dict] | None:
+    raw = occurrence.get("source_observations")
+    if raw is None:
+        return None
+    if not isinstance(raw, list) or not raw:
+        raise StableRunnerMergeError("stable source observation list is invalid")
+    observations = []
+    for observation in raw:
+        if (
+            not isinstance(observation, Mapping)
+            or not str(observation.get("source_targeted_seed_id") or "")
+            or not SHA256_RE.fullmatch(
+                str(observation.get("source_materialized_run_manifest_sha256") or "")
+            )
+            or not SHA256_RE.fullmatch(
+                str(observation.get("source_runner_payload_sha256") or "")
+            )
+        ):
+            raise StableRunnerMergeError("stable source observation contract drift")
+        observations.append(dict(observation))
+    ordered = sorted(observations, key=canonical_json)
+    if len({canonical_json(value) for value in ordered}) != len(ordered):
+        raise StableRunnerMergeError("stable source observation is duplicated")
+    primary = ordered[0]
+    if any(occurrence.get(key) != value for key, value in primary.items()):
+        raise StableRunnerMergeError("stable primary source observation drift")
+    return ordered
+
+
+def _semantic_occurrence(occurrence: Mapping[str, object]) -> dict:
+    return {
+        key: value
+        for key, value in occurrence.items()
+        if key
+        not in {
+            "source_targeted_seed_id",
+            "source_materialized_run_manifest_sha256",
+            "source_runner_payload_sha256",
+            "source_observations",
+        }
+    }
+
+
+def _merge_observed_occurrences(existing: dict, incoming: Mapping[str, object]) -> dict:
+    if canonical_json(_semantic_occurrence(existing)) != canonical_json(
+        _semantic_occurrence(incoming)
+    ):
+        raise StableRunnerMergeError("horse occurrence semantic conflict")
+    observations = {
+        canonical_json(observation): dict(observation)
+        for occurrence in (existing, incoming)
+        for observation in occurrence.get("source_observations", [])
+        if isinstance(observation, Mapping)
+    }
+    ordered = [observations[key] for key in sorted(observations)]
+    if not ordered:
+        raise StableRunnerMergeError("horse occurrence observations are missing")
+    if len(
+        {
+            str(observation.get("source_runner_payload_sha256") or "")
+            for observation in ordered
+        }
+    ) != 1:
+        raise StableRunnerMergeError(
+            "horse runner payload differs across observations"
+        )
+    merged = dict(existing)
+    merged["source_observations"] = ordered
+    merged.update(ordered[0])
+    return merged
+
+
+def _validate_occurrence(occurrence: Mapping[str, object]) -> tuple[str, str, bool]:
     race_id = str(occurrence.get("race_id") or "")
     seed_id = str(occurrence.get("source_targeted_seed_id") or "")
     payload_sha = str(occurrence.get("target_race_payload_sha256") or "")
@@ -78,18 +150,28 @@ def _validate_occurrence(occurrence: Mapping[str, object]) -> tuple[str, str]:
         or not str(occurrence.get("source_runner_position") or "").strip()
     ):
         raise StableRunnerMergeError("stable target occurrence contract drift")
+    observations = _validate_source_observations(occurrence)
+    observation_aware = observations is not None
     occurrence_key = canonical_json(
-        {"race_id": race_id, "source_targeted_seed_id": seed_id}
+        {"race_id": race_id}
+        if observation_aware
+        else {"race_id": race_id, "source_targeted_seed_id": seed_id}
     )
     race_identity = canonical_json(
         {
             "race_id": race_id,
             "target_race_payload_sha256": payload_sha,
             "target": dict(target),
+        }
+        if observation_aware
+        else {
+            "race_id": race_id,
+            "target_race_payload_sha256": payload_sha,
+            "target": dict(target),
             "source_targeted_seed_id": seed_id,
         }
     )
-    return occurrence_key, race_identity
+    return occurrence_key, race_identity, observation_aware
 
 
 def merge_stable_runner_ledgers(
@@ -161,7 +243,9 @@ def merge_stable_runner_ledgers(
                         "stable target occurrence must be an object"
                     )
                 source_occurrence_rows += 1
-                occurrence_key, race_identity = _validate_occurrence(occurrence)
+                occurrence_key, race_identity, observation_aware = _validate_occurrence(
+                    occurrence
+                )
                 physical_race_ids.add(str(occurrence["race_id"]))
                 previous_race = occurrence_identities.setdefault(
                     occurrence_key, race_identity
@@ -172,9 +256,14 @@ def merge_stable_runner_ledgers(
                     )
                 previous_occurrence = entry["occurrences"].get(occurrence_key)
                 if previous_occurrence is not None:
-                    if canonical_json(previous_occurrence) == canonical_json(
-                        occurrence
-                    ):
+                    if observation_aware:
+                        entry["occurrences"][occurrence_key] = (
+                            _merge_observed_occurrences(
+                                previous_occurrence, occurrence
+                            )
+                        )
+                        continue
+                    if canonical_json(previous_occurrence) == canonical_json(occurrence):
                         raise StableRunnerMergeError(
                             "duplicate horse occurrence across source ledgers: "
                             f"{horse_id}/{occurrence_key}"
@@ -235,6 +324,11 @@ def merge_stable_runner_ledgers(
         "unique_physical_race_count": len(physical_race_ids),
         "unique_actual_starter_count": len(seeds),
         "cross_batch_duplicate_horse_count": source_horse_rows - len(seeds),
+        "source_observation_count": sum(
+            len(occurrence.get("source_observations", []))
+            for seed in seeds
+            for occurrence in seed["target_occurrences"]
+        ),
         "seed_ledger": {
             "path": ledger_path.name,
             "sha256": sha256_path(ledger_path),
