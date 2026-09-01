@@ -183,6 +183,18 @@ class FranceGalopBulletinTests(unittest.TestCase):
                 targets=[target()],
             )
 
+    def test_missing_partants_can_be_retained_as_an_explicit_unresolved_target(self):
+        unresolved = []
+        rows = self.module.parse_targeted_results(
+            [{"page_number": 77, "column": "right", "text": BANGO_TEXT.replace("3 partants ;", "") }],
+            targets=[target()],
+            unresolved=unresolved,
+        )
+
+        self.assertEqual(rows, [])
+        self.assertEqual(unresolved[0]["target_key"], "france:2026:france-bango:flat")
+        self.assertIn("not_selected_as_a_seed", unresolved[0]["interpretation"])
+
     def test_exact_race_name_wins_over_a_longer_subset_target(self):
         parsed = self.module.parse_targeted_results(
             [{"page_number": 77, "column": "right", "text": BANGO_TEXT}],

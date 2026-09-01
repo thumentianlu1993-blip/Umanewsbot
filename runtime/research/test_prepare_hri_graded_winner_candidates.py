@@ -4,6 +4,9 @@ import importlib.util
 import sys
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from urllib.error import HTTPError
+from unittest.mock import patch
 
 
 SCRIPT = Path(__file__).with_name("prepare_hri_graded_winner_candidates.py")
@@ -93,6 +96,42 @@ class HriOfficialWinnerTests(unittest.TestCase):
 
         self.assertIsNone(matched)
         self.assertEqual(diagnostics, [])
+
+    def test_records_retryable_unavailable_date_without_treating_it_as_no_race(self):
+        target_identity = {
+            "root": "/frozen/targets",
+            "manifest_sha256": "a" * 64,
+        }
+        args = type(
+            "Args",
+            (),
+            {
+                "output_dir": None,
+                "start_date": "2021-01-04",
+                "end_date": "2021-01-04",
+                "max_requests": 1,
+                "target_root": Path("/frozen/targets"),
+                "allow_network": True,
+                "timeout_seconds": 30,
+                "request_interval_seconds": 1.25,
+            },
+        )()
+        with TemporaryDirectory() as temporary:
+            args.output_dir = temporary
+            with (
+                patch.object(MODULE, "load_target_artifact", return_value=([], target_identity)),
+                patch.object(
+                    MODULE,
+                    "_download",
+                    side_effect=HTTPError("https://www.hri.ie/results", 500, "error", {}, None),
+                ),
+                patch.object(MODULE, "sha256_path", return_value="b" * 64),
+            ):
+                manifest = MODULE.prepare(args)
+
+            self.assertEqual(manifest["counts"]["date_pages_unavailable"], 1)
+            row = (Path(temporary) / "hri-result-date-fetch-errors.jsonl").read_text()
+            self.assertIn("source_unavailable_not_evidence_of_no_race", row)
 
 
 if __name__ == "__main__":
