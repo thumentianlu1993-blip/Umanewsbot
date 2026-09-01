@@ -173,10 +173,17 @@ class WikipediaWinnerQueryTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
+            current_sources = root / "current-sources"
+            MODULE.write_source_cache_text(
+                current_sources / "source_wiki_page_prix_known.html",
+                "<html>frozen official reference</html>",
+                source_url="https://en.wikipedia.org/wiki/Prix_Known",
+            )
             args = Namespace(
                 output_dir=str(root / "output"),
                 events_csv=str(events),
                 current_history_jsonl=str(current),
+                current_source_dir=str(current_sources),
                 limit=0,
                 allow_network=False,
                 timeout_seconds=20,

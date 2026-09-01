@@ -18,6 +18,7 @@ BASE_SCHEMA = "targeted-horse-seed-ledger.v1"
 AUDIT_SCHEMAS = {
     "france-galop-bulletin-occurrence-audit.v1",
     "hri-graded-winner-candidate-audit.v1",
+    "bha-pattern-book-winner-candidate-audit.v1",
 }
 SEED_SCHEMAS = {"targeted-horse-seed.v1", "targeted-horse-seed.v2"}
 GAP_SCHEMA = "graded-winner-anchor-gap.v1"
@@ -195,6 +196,7 @@ def load_audit(root: Path, *, approved_manifest_sha256: str) -> tuple[list[dict]
         "manifest_sha256": manifest_sha,
         "proposal_sha256": sha256_path(path),
         "proposal_rows": len(rows),
+        "schema_version": manifest["schema_version"],
         "source_proposal": manifest.get("source_proposal"),
     }
 
@@ -214,6 +216,7 @@ def merge(
     gaps_by_key = {str(row["target_key"]): row for row in gaps}
     supplements = []
     audit_identities = []
+    supplemental_source_counts = Counter()
     selected_keys = set()
     for root, approved_sha in audits:
         rows, identity = load_audit(root, approved_manifest_sha256=approved_sha)
@@ -233,6 +236,12 @@ def merge(
                 raise ValueError("official seed target does not conserve the semantic gap")
             selected_keys.add(target_key)
             supplements.append(row)
+            source_label = {
+                "france-galop-bulletin-occurrence-audit.v1": "france_galop_organizer_official",
+                "hri-graded-winner-candidate-audit.v1": "hri_organizer_official",
+                "bha-pattern-book-winner-candidate-audit.v1": "bha_organizer_official",
+            }[identity["schema_version"]]
+            supplemental_source_counts[source_label] += 1
     if not supplements:
         raise ValueError("official audits do not resolve any base semantic gap")
     combined = seeds + sorted(supplements, key=lambda row: str(row["target"]["target_key"]))
@@ -265,7 +274,7 @@ def merge(
     source_counts = Counter(
         {str(key): int(value) for key, value in dict(base_counts.get("by_source") or {}).items()}
     )
-    source_counts["france_galop_organizer_official"] += len(supplements)
+    source_counts.update(supplemental_source_counts)
     base_counts.update(
         {
             "by_region": dict(sorted(by_region.items())),

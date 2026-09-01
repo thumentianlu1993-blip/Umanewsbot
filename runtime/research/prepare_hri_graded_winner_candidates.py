@@ -15,6 +15,7 @@ from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 from difflib import SequenceMatcher
 from pathlib import Path
+from urllib.error import HTTPError
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
@@ -35,6 +36,7 @@ from race_event_source_cache import write_source_cache
 SCHEMA_VERSION = "hri-graded-winner-candidate-proposal.v1"
 CANDIDATE_SCHEMA = "hri-graded-winner-candidate.v1"
 UNMATCHED_SCHEMA = "hri-graded-result-unmatched.v1"
+FETCH_ERROR_SCHEMA = "hri-result-date-fetch-error.v1"
 BASE_URL = "https://www.hri.ie"
 ALLOWED_HOSTS = ("hri.ie", "www.hri.ie")
 GRADE_RE = re.compile(r"\((?:Grade|Group)\s*([123])\)", re.IGNORECASE)
@@ -313,20 +315,40 @@ def prepare(args: argparse.Namespace) -> dict:
     matched = []
     unmatched = []
     all_results = []
+    fetch_errors = []
     cursor = start
     while cursor <= end:
         source_url = f"{BASE_URL}/results?date={cursor.isoformat()}"
         source_path = source_dir / _source_filename(cursor)
-        body = _download(
-            source_url,
-            source_path,
-            allow_network=args.allow_network,
-            timeout_seconds=args.timeout_seconds,
-            request_budget_path=request_budget,
-            host_interval_path=host_interval,
-            max_requests=args.max_requests,
-            request_interval_seconds=args.request_interval_seconds,
-        )
+        try:
+            body = _download(
+                source_url,
+                source_path,
+                allow_network=args.allow_network,
+                timeout_seconds=args.timeout_seconds,
+                request_budget_path=request_budget,
+                host_interval_path=host_interval,
+                max_requests=args.max_requests,
+                request_interval_seconds=args.request_interval_seconds,
+            )
+        except HTTPError as exc:
+            if exc.code not in {404, 410, 500, 502, 503, 504}:
+                raise
+            fetch_errors.append(
+                {
+                    "schema_version": FETCH_ERROR_SCHEMA,
+                    "local_date": cursor.isoformat(),
+                    "source_url": source_url,
+                    "http_status": exc.code,
+                    "reason": str(exc.reason or "HRI date page unavailable"),
+                    "interpretation": (
+                        "source_unavailable_not_evidence_of_no_race; "
+                        "target remains unresolved unless another audited source supplies it"
+                    ),
+                }
+            )
+            cursor += timedelta(days=1)
+            continue
         source = _cache_identity(source_dir, source_path, source_url=source_url)
         for result in parse_date_page(body, local_date=cursor.isoformat(), source_evidence=source):
             all_results.append(result)
@@ -360,18 +382,31 @@ def prepare(args: argparse.Namespace) -> dict:
     unmatched.sort(key=lambda row: (row["local_date"], row["result_url"]))
     candidates_path = output_dir / "hri-graded-winner-candidates.jsonl"
     unmatched_path = output_dir / "hri-graded-result-unmatched.jsonl"
+    fetch_errors_path = output_dir / "hri-result-date-fetch-errors.jsonl"
     _atomic(candidates_path, "".join(canonical_json(row) + "\n" for row in matched).encode())
     _atomic(unmatched_path, "".join(canonical_json(row) + "\n" for row in unmatched).encode())
+    _atomic(
+        fetch_errors_path,
+        "".join(canonical_json(row) + "\n" for row in fetch_errors).encode(),
+    )
     identities = {}
     for key, path, rows in (
         ("candidates", candidates_path, matched),
         ("unmatched", unmatched_path, unmatched),
+        ("fetch_errors", fetch_errors_path, fetch_errors),
     ):
         identities[key] = {
             "path": path.name,
             "rows": len(rows),
             "sha256": sha256_path(path),
             "size": path.stat().st_size,
+        }
+    request_identity = None
+    if request_budget.is_file():
+        request_identity = {
+            "path": request_budget.name,
+            "sha256": sha256_path(request_budget),
+            "size": request_budget.stat().st_size,
         }
     manifest = {
         "schema_version": SCHEMA_VERSION,
@@ -387,13 +422,11 @@ def prepare(args: argparse.Namespace) -> dict:
             "matched_targets": len(matched),
             "unmatched_official_results": len(unmatched),
             "target_rows_in_scope": len(targets),
+            "date_pages_unavailable": len(fetch_errors),
+            "date_pages_verified": day_count - len(fetch_errors),
         },
         "outputs": identities,
-        "request_budget": {
-            "path": request_budget.name,
-            "sha256": sha256_path(request_budget),
-            "size": request_budget.stat().st_size,
-        },
+        "request_budget": request_identity,
         "generator": {"path": Path(__file__).name, "sha256": sha256_path(Path(__file__))},
     }
     manifest_path = output_dir / "proposal-manifest.json"

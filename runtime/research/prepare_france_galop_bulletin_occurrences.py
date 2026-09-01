@@ -532,7 +532,12 @@ def _target_matches_header(target: dict, *, race_name: str, grade: str, distance
     return target_tokens.issubset(source_tokens) or source_tokens.issubset(target_tokens)
 
 
-def parse_targeted_results(segments: list[dict], *, targets: list[dict]) -> list[dict]:
+def parse_targeted_results(
+    segments: list[dict],
+    *,
+    targets: list[dict],
+    unresolved: list[dict] | None = None,
+) -> list[dict]:
     """Parse target-bound Groupe results and enforce exact starter counts."""
 
     records = _line_records(
@@ -605,7 +610,23 @@ def parse_targeted_results(segments: list[dict], *, targets: list[dict]) -> list
                 partants_count = int(count_match.group("count"))
                 break
         if partants_index is None or partants_count is None or partants_index >= next_header_index:
-            raise ValueError(f"official result has no partants boundary: {race_name}")
+            if unresolved is None:
+                raise ValueError(f"official result has no partants boundary: {race_name}")
+            unresolved.append(
+                {
+                    "target_key": target_key,
+                    "local_date": local_date,
+                    "race_name": race_name,
+                    "page_number": record["page_number"],
+                    "column": record["column"],
+                    "reason": "official_result_has_no_partants_boundary",
+                    "interpretation": (
+                        "not_selected_as_a_seed; target remains unresolved unless another "
+                        "audited source supplies it"
+                    ),
+                }
+            )
+            continue
 
         starters = []
         for offset in range(grade_index + 1, partants_index):
@@ -731,6 +752,7 @@ def prepare_proposal(
     results = []
     source_identities = [index_identity]
     source_fetch_errors = []
+    unresolved_official_results = []
     for bulletin in bulletins:
         bulletin_path = source_dir / bulletin["filename"]
         fetch_error_path = source_dir / f"{bulletin['filename']}.fetch-error.json"
@@ -766,7 +788,11 @@ def prepare_proposal(
             source_dir, bulletin_path, source_url=bulletin["url"]
         )
         source_identities.append(identity)
-        for parsed in parse_targeted_results(extract_pdf_segments(bulletin_path), targets=targets):
+        for parsed in parse_targeted_results(
+            extract_pdf_segments(bulletin_path),
+            targets=targets,
+            unresolved=unresolved_official_results,
+        ):
             parsed["source_evidence"] = {
                 **identity,
                 "source_provider": "france_galop",
@@ -777,9 +803,46 @@ def prepare_proposal(
     by_target: dict[str, list[dict]] = defaultdict(list)
     for result in results:
         by_target[result["target_key"]].append(result)
+    repeated_publications = []
+    deduplicated_results = []
+    for target_key, rows in sorted(by_target.items()):
+        if len(rows) == 1:
+            deduplicated_results.extend(rows)
+            continue
+        conservation_fields = (
+            "local_date",
+            "race_name",
+            "racecourse",
+            "normalized_grade",
+            "distance_metres",
+            "actual_starter_count",
+            "winner",
+            "starters",
+        )
+        identities = {
+            canonical_json({field: row[field] for field in conservation_fields})
+            for row in rows
+        }
+        if len(identities) != 1:
+            continue
+        ordered = sorted(rows, key=lambda row: row["source_evidence"]["source_url"])
+        selected = ordered[0]
+        deduplicated_results.append(selected)
+        repeated_publications.append(
+            {
+                "target_key": target_key,
+                "selected_source_url": selected["source_evidence"]["source_url"],
+                "equivalent_source_urls": [
+                    row["source_evidence"]["source_url"] for row in ordered
+                ],
+                "conservation": "exact_result_and_starter_rows_equal",
+            }
+        )
+        by_target[target_key] = [selected]
     duplicates = {key: rows for key, rows in by_target.items() if len(rows) != 1}
     if duplicates:
         raise ValueError(f"targets appear in multiple bulletin results: {sorted(duplicates)}")
+    results = deduplicated_results
 
     occurrences = []
     seeds_by_name: dict[str, dict] = {}
@@ -893,6 +956,8 @@ def prepare_proposal(
             "fetch_errors": source_fetch_errors,
             "sources": source_identities[1:],
         },
+        "unresolved_official_results": unresolved_official_results,
+        "repeated_official_publications": repeated_publications,
         "targets": {
             "in_scope": len(targets),
             "held_results": len(occurrences),

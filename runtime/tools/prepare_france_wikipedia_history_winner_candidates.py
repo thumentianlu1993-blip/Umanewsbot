@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import re
 import time
@@ -394,6 +395,42 @@ def _read_current_history(path: Path) -> dict[str, dict]:
     return current
 
 
+def _materialize_current_source_page(
+    record: dict, *, current_source_dir: Path, destination_source_dir: Path
+) -> None:
+    metadata = record.get("metadata") or {}
+    title = str(metadata.get("wiki_title") or "")
+    source_url = str(record.get("source_url") or "")
+    filename = _cache_name("source_wiki_page", title, "html")
+    manifest_path = current_source_dir / "source_cache_manifest.json"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError("current Wikipedia source manifest is unreadable") from exc
+    source_path = current_source_dir / filename
+    identity = (manifest.get("files") or {}).get(filename)
+    if (
+        not title
+        or not source_url.startswith("https://en.wikipedia.org/wiki/")
+        or current_source_dir.is_symlink()
+        or source_path.is_symlink()
+        or not source_path.is_file()
+        or manifest.get("schema_version") != "1.0"
+        or Path(str(manifest.get("root") or "")).resolve() != current_source_dir.resolve()
+        or not isinstance(identity, dict)
+        or identity.get("source_url") != source_url
+        or identity.get("size") != source_path.stat().st_size
+        or identity.get("sha256")
+        != hashlib.sha256(source_path.read_bytes()).hexdigest()
+    ):
+        raise ValueError("current Wikipedia source page identity drift")
+    write_source_cache_text(
+        destination_source_dir / filename,
+        source_path.read_text(encoding="utf-8"),
+        source_url=source_url,
+    )
+
+
 def _merge_items(wiki_items: list[dict], current_items: list[dict]) -> list[dict]:
     merged = {item["winner_year"]: item for item in wiki_items if item.get("winner_year")}
     for item in current_items:
@@ -411,6 +448,10 @@ def prepare(args: argparse.Namespace) -> dict:
     if args.limit:
         events = events[: args.limit]
     current_history = _read_current_history(Path(args.current_history_jsonl)) if args.current_history_jsonl else {}
+    current_source_value = str(getattr(args, "current_source_dir", "") or "").strip()
+    current_source_dir = Path(current_source_value)
+    if current_history and (not current_source_value or not current_source_dir.is_dir()):
+        raise ValueError("current history reuse requires its frozen source directory")
 
     jsonl_path = output_dir / "france_wikipedia_history_winner_candidates_2026.jsonl"
     review_path = output_dir / "france_wikipedia_history_winner_review_2026.csv"
@@ -432,6 +473,11 @@ def prepare(args: argparse.Namespace) -> dict:
         for event in events:
             current_record = current_history.get(event["slug"])
             if current_record is not None:
+                _materialize_current_source_page(
+                    current_record,
+                    current_source_dir=current_source_dir,
+                    destination_source_dir=source_dir,
+                )
                 items = (
                     ((current_record.get("modules") or {}).get("history_winners") or {}).get(
                         "items"
@@ -577,6 +623,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Generate France 2026 historical winner candidates from Wikipedia winners tables plus confirmed current winners.")
     parser.add_argument("--events-csv", required=True)
     parser.add_argument("--current-history-jsonl", default="")
+    parser.add_argument("--current-source-dir", default="")
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--min-year", type=int, default=2020)
     parser.add_argument("--allow-network", action="store_true")
