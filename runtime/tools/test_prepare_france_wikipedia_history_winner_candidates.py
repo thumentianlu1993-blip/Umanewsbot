@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import csv
 import json
@@ -20,6 +21,43 @@ SPEC.loader.exec_module(MODULE)
 
 
 class WikipediaWinnerQueryTests(unittest.TestCase):
+    def test_racecourse_aliases_require_and_report_exact_ledger_sha(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            ledger = Path(temporary) / "targets.jsonl"
+            ledger.write_text(
+                json.dumps(
+                    {
+                        "series_key": "united-kingdom-bowl-stp",
+                        "racecourse": "Aintree",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            expected_sha = hashlib.sha256(ledger.read_bytes()).hexdigest()
+            aliases, identity = MODULE._racecourse_aliases(
+                ledger, approved_sha256=expected_sha
+            )
+
+            self.assertEqual(aliases, {"united-kingdom-bowl-stp": ["Aintree"]})
+            self.assertEqual(identity["sha256"], expected_sha)
+            self.assertEqual(identity["rows"], 1)
+            with self.assertRaisesRegex(ValueError, "SHA-256 mismatch"):
+                MODULE._racecourse_aliases(ledger, approved_sha256="0" * 64)
+
+    def test_query_candidates_include_racecourse_qualified_alias(self):
+        queries = MODULE._query_candidates(
+            {
+                "series_key": "united-kingdom-bowl-stp",
+                "original_name": "Bowl Stp.",
+                "country_region": "united_kingdom",
+                "racecourse_aliases": ["Aintree"],
+            }
+        )
+
+        self.assertIn("Aintree Bowl Chase", queries)
+        self.assertIn("Aintree Bowl Chase horse race", queries)
+
     def test_adds_region_specific_race_queries(self):
         france = MODULE._query_candidates(
             {
