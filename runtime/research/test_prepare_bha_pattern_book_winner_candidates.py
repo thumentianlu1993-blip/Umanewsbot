@@ -46,6 +46,21 @@ HORSE NAME AGE/WEIGHT JOCKEY TRAINER SP RNRS
 *2021/2022 Epatante (FR) 7-11-0 Aidan Coleman Nicky Henderson 11/8 6
 """
 
+OLD_JUMP = """
+[[BHA_PAGE_0023]]
+CLOSED ON MAY4 th 2020
+HAYDOCK PARK
+Saturday,M ay 9th
+THE PERTEMPS NETWORK SWINTON HANDICAP HURDLE RACE (CLASS 1)
+(Grade 3)
+HORSE NAME AGE/WEIGHT JOCKEY TRAINER SP RNRS
+2020/2021 Abandoned
+2019/2020 Le Patriote (FR) 7-11-12 Sam Twiston-Davies Richard Newland 20/1 17
+2018/2019 Silver Streak (IRE) 5-10-2 Adam Wedge Evan Williams 13/2 16
+2017/2018 John Constable (IRE) 6-11-2 Davy Russell Evan Williams 5/1 17
+2016/2017 Drop Out Joe 8-10-3 Graham Watters Charlie Longsdon 20/1 19
+"""
+
 
 class BhaPatternBookTests(unittest.TestCase):
     def test_flat_book_emits_four_years_and_registered_alias(self):
@@ -132,6 +147,18 @@ class BhaPatternBookTests(unittest.TestCase):
         self.assertEqual(
             rejected[0]["match_rejection"], "duplicate_target_lower_confidence"
         )
+
+    def test_old_jump_book_handles_ocr_spaced_month_and_closed_on_heading(self):
+        rows = MODULE.parse_pattern_book(
+            OLD_JUMP,
+            discipline="jumps",
+            source_evidence={"sha256": "c" * 64},
+        )
+
+        self.assertEqual(
+            [row["edition_year"] for row in rows], [2017, 2018, 2019, 2020]
+        )
+        self.assertEqual(rows[0]["winner"]["horse_name"], "Drop Out Joe")
 
 
 if __name__ == "__main__":

@@ -39,6 +39,23 @@ SOURCE_SPECS = (
     {
         "discipline": "flat",
         "source_url": (
+            "https://media.britishhorseracing.com/bha/Publications/2021_Flat_Pattern.pdf"
+        ),
+        "filename": "bha-flat-pattern-listed-2021.pdf",
+        "book_edition": "2021",
+    },
+    {
+        "discipline": "jumps",
+        "source_url": (
+            "https://media.britishhorseracing.com/bha/Publications/"
+            "Pattern_Listed_Books/British_Jump_Pattern_Listed_20_21.pdf"
+        ),
+        "filename": "bha-jump-pattern-listed-2020-2021.pdf",
+        "book_edition": "2020/2021",
+    },
+    {
+        "discipline": "flat",
+        "source_url": (
             "https://media.britishhorseracing.com/bha/Publications/"
             "Pattern_Listed_Books/2025_British_Flat_Pattern_Listed_Races.pdf"
         ),
@@ -73,7 +90,7 @@ JUMP_WINNER_RE = re.compile(
     r"^\*?(?P<start>20\d{2})/(?P<end>20\d{2})\s+"
     r"(?P<name>.+?)\s+\d{1,2}-\d{1,2}-\d{1,2}\s+"
 )
-COUNTRY_RE = re.compile(r"\s*\(([A-Z]{2,3})\)\s*$")
+COUNTRY_RE = re.compile(r"\s*\(\s*([A-Z]{2,3})\s*\)\s*$")
 MONTHS = {
     "january": 1,
     "february": 2,
@@ -238,22 +255,33 @@ def _scheduled_context(block: str) -> tuple[str, str, int]:
     lines = [" ".join(line.split()) for line in block.splitlines() if line.strip()]
     for index, line in enumerate(lines):
         match = DATE_RE.fullmatch(line)
-        if match is None or index == 0:
+        if match is not None and index > 0:
+            course = lines[index - 1]
+            month = MONTHS[match.group("month").casefold()]
+            return course, line, month
+        if index == 0 or not re.match(
+            r"^\*?(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)",
+            line,
+            re.IGNORECASE,
+        ):
+            continue
+        compact = re.sub(r"[^A-Za-z]", "", line).casefold()
+        month_matches = [value for name, value in MONTHS.items() if name in compact]
+        if len(month_matches) != 1:
             continue
         course = lines[index - 1]
-        month = MONTHS[match.group("month").casefold()]
-        return course, line, month
+        return course, line, month_matches[0]
     raise ValueError("BHA race block has no scheduled course/date context")
 
 
 def _aliases(block: str) -> tuple[list[str], list[str], str]:
     lines = [" ".join(line.split()) for line in block.splitlines() if line.strip()]
-    title = next((line for line in lines if line.startswith("THE ")), "")
+    title = next((line for line in lines if re.match(r"^THE", line, re.IGNORECASE)), "")
     if not title:
         raise ValueError("BHA race block has no title")
     title = re.split(r"\s+\(CLASS\s+\d+\)", title, maxsplit=1, flags=re.IGNORECASE)[0]
     title = GRADE_RE.sub("", title).strip()
-    title_alias = re.sub(r"^THE\s+", "", title, flags=re.IGNORECASE)
+    title_alias = re.sub(r"^THE\s*", "", title, flags=re.IGNORECASE)
     registered_aliases = []
     for line in lines:
         match = REGISTERED_RE.match(line)
@@ -266,7 +294,10 @@ def _aliases(block: str) -> tuple[list[str], list[str], str]:
 def parse_pattern_book(
     text: str, *, discipline: str, source_evidence: dict
 ) -> list[dict]:
-    starts = [match.start() for match in re.finditer(r"(?m)^TO CLOSE BY NOON", text)]
+    starts = [
+        match.start()
+        for match in re.finditer(r"(?m)^(?:TO CLOSE BY NOON|CLOSED ON)", text)
+    ]
     rows = []
     for block_number, start in enumerate(starts, 1):
         end = starts[block_number] if block_number < len(starts) else len(text)
@@ -296,7 +327,7 @@ def parse_pattern_book(
                 edition_year = start_year if scheduled_month >= 7 else end_year
                 raw_name = match.group("name") if match else ""
                 season = f"{start_year}/{end_year}" if match else ""
-            if match is None or not 2021 <= edition_year <= 2024:
+            if match is None or not 2016 <= edition_year <= 2024:
                 continue
             horse_name, country_suffix = _name(raw_name)
             winner = {
@@ -492,7 +523,7 @@ def prepare(args: argparse.Namespace) -> dict:
         row
         for row in targets
         if row.get("country_region") == "united_kingdom"
-        and 2021 <= int(row.get("year") or 0) <= 2024
+        and 2016 <= int(row.get("year") or 0) <= 2024
     ]
     output_dir.mkdir(parents=True, exist_ok=True)
     source_dir = output_dir / "sources"
@@ -621,7 +652,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--allow-network", action="store_true")
     parser.add_argument("--timeout-seconds", type=int, default=120)
-    parser.add_argument("--max-requests", type=int, default=2)
+    parser.add_argument("--max-requests", type=int, default=4)
     parser.add_argument("--request-interval-seconds", type=float, default=1.25)
     return parser.parse_args()
 

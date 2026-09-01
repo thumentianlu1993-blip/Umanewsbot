@@ -809,25 +809,33 @@ def prepare_proposal(
         if len(rows) == 1:
             deduplicated_results.extend(rows)
             continue
-        conservation_fields = (
+        header_fields = (
             "local_date",
             "race_name",
             "racecourse",
             "normalized_grade",
             "distance_metres",
             "actual_starter_count",
-            "winner",
-            "starters",
         )
-        identities = {
-            canonical_json({field: row[field] for field in conservation_fields})
+        header_identities = {
+            canonical_json({field: row[field] for field in header_fields})
             for row in rows
         }
-        if len(identities) != 1:
+        winner_names = {row["winner"]["horse_name"] for row in rows}
+        starter_name_sets = {
+            tuple(sorted(starter["horse_name"] for starter in row["starters"]))
+            for row in rows
+        }
+        if (
+            len(header_identities) != 1
+            or len(winner_names) != 1
+            or len(starter_name_sets) != 1
+        ):
             continue
         ordered = sorted(rows, key=lambda row: row["source_evidence"]["source_url"])
-        selected = ordered[0]
+        selected = ordered[-1]
         deduplicated_results.append(selected)
+        exact_rows_equal = len({canonical_json(row["starters"]) for row in rows}) == 1
         repeated_publications.append(
             {
                 "target_key": target_key,
@@ -835,7 +843,11 @@ def prepare_proposal(
                 "equivalent_source_urls": [
                     row["source_evidence"]["source_url"] for row in ordered
                 ],
-                "conservation": "exact_result_and_starter_rows_equal",
+                "conservation": (
+                    "exact_result_and_starter_rows_equal"
+                    if exact_rows_equal
+                    else "later_bulletin_correction_same_race_winner_and_starter_set"
+                ),
             }
         )
         by_target[target_key] = [selected]
