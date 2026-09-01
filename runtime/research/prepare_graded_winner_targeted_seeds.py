@@ -192,7 +192,7 @@ def _load_capture(
     unmatched_sha: str,
     budget_sha: str,
     source_manifest_sha: str,
-    expected_events: int,
+    expected_event_slugs: set[str],
 ) -> tuple[dict[tuple[str, str, int], dict], dict]:
     resolved = root.resolve(strict=True)
     output = resolved / "output"
@@ -226,14 +226,24 @@ def _load_capture(
     records = _jsonl(paths["candidates"], label="capture candidates")
     review = _csv(paths["review"], label="capture review")
     unmatched = _csv(paths["unmatched"], label="capture unmatched")
+    record_slugs = [str(row.get("slug") or "") for row in records]
+    review_slugs = [str(row.get("slug") or "") for row in review]
+    unmatched_slugs = [str(row.get("slug") or "") for row in unmatched]
     requests = budget.get("requests")
     source_files = source_manifest.get("files")
     if (
         summary.get("source") != "wikipedia_winners_table"
-        or summary.get("events_requested") != expected_events
+        or summary.get("events_requested") != len(expected_event_slugs)
         or summary.get("events") != len(records)
         or summary.get("events_without_history") != len(unmatched)
+        or int(summary.get("events_skipped_partial") or 0) != 0
+        or len(records) + len(unmatched) != len(expected_event_slugs)
         or len(review) != len(records)
+        or not all(record_slugs)
+        or len(record_slugs) != len(set(record_slugs))
+        or set(review_slugs) != set(record_slugs)
+        or set(record_slugs) & set(unmatched_slugs)
+        or set(record_slugs) | set(unmatched_slugs) != expected_event_slugs
         or budget.get("status") != "active"
         or budget.get("request_count") != len(requests or [])
         or int(budget.get("request_count") or 0) > int(budget.get("max_requests") or 0)
@@ -453,6 +463,9 @@ def build(
         label="source events",
     )
     events = _csv(events_path, label="source events")
+    event_slugs = [str(row.get("slug") or "") for row in events]
+    if not events or not all(event_slugs) or len(event_slugs) != len(set(event_slugs)):
+        raise ValueError("source event identity drift")
     capture, capture_identity = _load_capture(
         capture_root,
         candidates_sha=capture_hashes["candidates"],
@@ -461,7 +474,7 @@ def build(
         unmatched_sha=capture_hashes["unmatched"],
         budget_sha=capture_hashes["budget"],
         source_manifest_sha=capture_hashes["sources"],
-        expected_events=len(events),
+        expected_event_slugs=set(event_slugs),
     )
 
     seeds: list[dict] = []
