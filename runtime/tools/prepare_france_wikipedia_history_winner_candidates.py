@@ -100,6 +100,15 @@ def _query_candidates(event: dict) -> list[str]:
         specific.append(f"{expanded} Stakes")
     if region == "united_kingdom" and "gold-cup-ascot" in series_key:
         specific.append("Ascot Gold Cup")
+    for racecourse in event.get("racecourse_aliases") or []:
+        racecourse = _collapse(str(racecourse))
+        if racecourse:
+            specific.extend(
+                [
+                    f"{racecourse} {expanded}",
+                    f"{expanded} {racecourse}",
+                ]
+            )
     values = specific + [base]
     values = [item for value in values for item in (value, f"{value} horse race")]
     return list(dict.fromkeys(_collapse(value) for value in values if _collapse(value)))
@@ -379,6 +388,37 @@ def _read_events(path: Path) -> list[dict]:
         return list(csv.DictReader(handle))
 
 
+def _racecourse_aliases(
+    path: Path, *, approved_sha256: str
+) -> tuple[dict[str, list[str]], dict]:
+    resolved = path.resolve(strict=True)
+    if path.is_symlink() or not resolved.is_file():
+        raise ValueError("target ledger must be a regular non-symlink file")
+    actual_sha = hashlib.sha256(resolved.read_bytes()).hexdigest()
+    if not re.fullmatch(r"[0-9a-f]{64}", approved_sha256) or actual_sha != approved_sha256:
+        raise ValueError("target ledger SHA-256 mismatch")
+    aliases: dict[str, set[str]] = {}
+    row_count = 0
+    with resolved.open("r", encoding="utf-8") as handle:
+        for line_number, line in enumerate(handle, 1):
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            series_key = str(row.get("series_key") or "")
+            racecourse = _collapse(str(row.get("racecourse") or ""))
+            if not series_key:
+                raise ValueError(f"target ledger series key is missing at line {line_number}")
+            if racecourse:
+                aliases.setdefault(series_key, set()).add(racecourse)
+            row_count += 1
+    return {key: sorted(values) for key, values in aliases.items()}, {
+        "path": str(resolved),
+        "sha256": actual_sha,
+        "size": resolved.stat().st_size,
+        "rows": row_count,
+    }
+
+
 def _read_current_history(path: Path) -> dict[str, dict]:
     current: dict[str, dict] = {}
     if not path:
@@ -445,6 +485,21 @@ def prepare(args: argparse.Namespace) -> dict:
     output_dir.mkdir(parents=True, exist_ok=True)
     source_dir.mkdir(exist_ok=True)
     events = _read_events(Path(args.events_csv))
+    target_ledger_value = str(getattr(args, "target_ledger", "") or "").strip()
+    target_ledger_sha = str(
+        getattr(args, "target_ledger_sha256", "") or ""
+    ).strip()
+    if bool(target_ledger_value) != bool(target_ledger_sha):
+        raise ValueError("target ledger path and SHA-256 must be supplied together")
+    target_ledger_identity = None
+    if target_ledger_value:
+        racecourses, target_ledger_identity = _racecourse_aliases(
+            Path(target_ledger_value), approved_sha256=target_ledger_sha
+        )
+        for event in events:
+            event["racecourse_aliases"] = racecourses.get(
+                str(event.get("series_key") or ""), []
+            )
     if args.limit:
         events = events[: args.limit]
     current_history = _read_current_history(Path(args.current_history_jsonl)) if args.current_history_jsonl else {}
@@ -466,6 +521,7 @@ def prepare(args: argparse.Namespace) -> dict:
         "events_skipped_partial": 0,
         "skipped": [],
         "errors": [],
+        "target_ledger": target_ledger_identity,
     }
     review_rows = []
     unmatched_rows = []
@@ -624,6 +680,8 @@ def main() -> None:
     parser.add_argument("--events-csv", required=True)
     parser.add_argument("--current-history-jsonl", default="")
     parser.add_argument("--current-source-dir", default="")
+    parser.add_argument("--target-ledger", default="")
+    parser.add_argument("--target-ledger-sha256", default="")
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--min-year", type=int, default=2020)
     parser.add_argument("--allow-network", action="store_true")
