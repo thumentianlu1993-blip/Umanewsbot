@@ -53,6 +53,7 @@ class PrepareGradedWinnerSourceEventsTests(unittest.TestCase):
                         "adapter_key": "toba",
                         "country_region": "united_states",
                         "target_key": targets[0]["target_key"],
+                        "occurrence_key": "us-a-2005-a",
                         "anchor_horse_name": "US Winner",
                     }
                 ],

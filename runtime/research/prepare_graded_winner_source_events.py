@@ -116,16 +116,20 @@ def _toba_keys(path: Path, expected_sha256: str, target_keys: set[str]) -> set[s
     source = _require_sha(path, expected_sha256, label="TOBA automatic bindings")
     rows = _jsonl(source, label="TOBA automatic bindings")
     keys: set[str] = set()
+    occurrence_keys: set[str] = set()
     for ordinal, row in enumerate(rows, 1):
         target_key = str(row.get("target_key") or "")
+        occurrence_key = str(row.get("occurrence_key") or "")
         if (
             row.get("adapter_key") != "toba"
             or row.get("country_region") != "united_states"
             or not target_key
-            or target_key in keys
+            or not occurrence_key
+            or occurrence_key in occurrence_keys
             or not str(row.get("anchor_horse_name") or "").strip()
         ):
             raise ValueError(f"TOBA binding row {ordinal} contract drift")
+        occurrence_keys.add(occurrence_key)
         keys.add(target_key)
     return keys & target_keys
 
