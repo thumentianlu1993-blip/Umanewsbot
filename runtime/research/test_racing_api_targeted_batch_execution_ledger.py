@@ -294,11 +294,12 @@ class TargetedBatchExecutionLedgerTests(unittest.TestCase):
         request_ceiling: int,
         request_count: int,
         openapi_contract: dict,
+        gap_seed_count: int = 0,
     ):
         output.mkdir(mode=0o700, exist_ok=True)
         manifest = {
             "schema_version": "targeted-horse-batch-run.v1",
-            "status": "complete",
+            "status": "complete" if not gap_seed_count else "complete_with_gaps",
             "database_writes": 0,
             "seed_ledger": {
                 "path": str(seed_path),
@@ -314,7 +315,14 @@ class TargetedBatchExecutionLedgerTests(unittest.TestCase):
                 "openapi_contract": openapi_contract,
             },
             "planned_seed_count": 2,
-            "completed_seed_count": 2,
+            "completed_seed_count": 2 - gap_seed_count,
+            "gap_seed_count": gap_seed_count,
+            "gaps": {
+                f"gap-seed-{index}": {
+                    "gap_code": "target_occurrence_identity_unresolved"
+                }
+                for index in range(gap_seed_count)
+            },
             "request_ceiling": request_ceiling,
             "request_count": request_count,
         }
@@ -529,6 +537,72 @@ class TargetedBatchExecutionLedgerTests(unittest.TestCase):
                     resume=False,
                     now=now + timedelta(minutes=1),
                 )
+
+    def test_complete_with_semantic_gaps_advances_exact_ledger(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            paths = self._plan(root, batches=1)
+            now = datetime(2026, 8, 30, 0, 0, tzinfo=timezone.utc)
+            output = root / "batch-output"
+            budget = root / "budget"
+            approved = self._prepare_and_approve(
+                paths=paths,
+                root=root,
+                suffix="gap",
+                batch_output=output,
+                budget_root=budget,
+                now=now,
+            )
+            proof, proof_sha = self._proof(
+                root,
+                scope_id="batch-gap",
+                proposal_sha=approved["proposal"]["proposal_manifest_sha256"],
+                now=now,
+            )
+            claim = self._claim(
+                paths=paths,
+                approved=approved,
+                batch_output=output,
+                budget_root=budget,
+                proof_path=proof,
+                proof_sha=proof_sha,
+                request_ceiling=8,
+                resume=False,
+                now=now + timedelta(seconds=2),
+            )
+            manifest_path = self._complete_artifact(
+                output,
+                seed_path=Path(
+                    approved["approval"]["scope"]["batch"]["seed_ledger_path"]
+                ),
+                request_ceiling=8,
+                request_count=5,
+                openapi_contract=approved["approval"]["scope"]["run"][
+                    "openapi_contract"
+                ],
+                gap_seed_count=1,
+            )
+
+            completed = complete_batch_execution(
+                **{
+                    key: paths[key]
+                    for key in (
+                        "plan_root",
+                        "expected_plan_manifest_sha256",
+                        "expected_batch_plan_sha256",
+                        "execution_ledger_path",
+                    )
+                },
+                claim_token=claim["claim_token"],
+                batch_manifest_path=manifest_path,
+                now=now + timedelta(seconds=4),
+            )
+
+            self.assertEqual(completed["completed_seed_count"], 1)
+            self.assertEqual(completed["gap_seed_count"], 1)
+            ledger = json.loads(paths["execution_ledger_path"].read_text())
+            self.assertIsNone(ledger["active"])
+            self.assertEqual(len(ledger["completed"]), 1)
 
     def test_safe_stop_requires_new_retry_g3_and_counts_consumed_requests(self):
         with tempfile.TemporaryDirectory() as temporary:

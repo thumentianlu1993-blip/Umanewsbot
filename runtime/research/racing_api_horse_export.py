@@ -107,6 +107,14 @@ class RacingApiSchemaError(RacingApiError):
     pass
 
 
+class RacingApiSemanticGap(ValueError):
+    """A reviewed seed could not be resolved without guessing identity."""
+
+    def __init__(self, code: str, message: str):
+        super().__init__(message)
+        self.code = code
+
+
 @dataclass(frozen=True)
 class HttpResponse:
     status: int
@@ -721,7 +729,6 @@ def _profile_only_external_anchor_allowed(seed: Mapping[str, object]) -> bool:
     required_target_fields = (
         "year",
         "country_region",
-        "local_date",
         "canonical_name_original",
         "racecourse",
         "grade_text",
@@ -730,15 +737,28 @@ def _profile_only_external_anchor_allowed(seed: Mapping[str, object]) -> bool:
     if any(not normalize_space(target.get(field)) for field in required_target_fields):
         raise ValueError("profile-only external anchor target is incomplete")
     try:
-        target_date = date.fromisoformat(normalize_space(target.get("local_date")))
-    except ValueError as exc:
-        raise ValueError("profile-only external anchor target date is invalid") from exc
-    try:
         target_year = int(str(target.get("year")))
     except (TypeError, ValueError) as exc:
         raise ValueError("profile-only external anchor target year is invalid") from exc
-    if target_date.year != target_year:
-        raise ValueError("profile-only external anchor target year/date mismatch")
+    target_date_text = normalize_space(target.get("local_date"))
+    if target_date_text:
+        try:
+            target_date = date.fromisoformat(target_date_text)
+        except ValueError as exc:
+            raise ValueError("profile-only external anchor target date is invalid") from exc
+        if target_date.year != target_year:
+            raise ValueError("profile-only external anchor target year/date mismatch")
+    elif seed.get("schema_version") == "targeted-horse-seed.v2":
+        try:
+            edition_year = int(str(target.get("edition_year")))
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "profile-only external anchor edition year is invalid"
+            ) from exc
+        if edition_year != target_year:
+            raise ValueError("profile-only external anchor edition year drift")
+    else:
+        raise ValueError("profile-only external anchor target date is required")
     if normalize_space(target.get("country_region")) not in REGION_CODES:
         raise ValueError("profile-only external anchor target region is unsupported")
     if normalize_space(target.get("grade_text")).upper() not in {"G1", "G2", "G3"}:
@@ -1352,8 +1372,9 @@ def run_targeted_seed(
             selected_id = candidates[0]
             identity_mode = "external_anchor_profile_only"
         else:
-            raise ValueError(
-                f"target occurrence candidate count must be 1, got {len(occurrence_candidate_ids)}"
+            raise RacingApiSemanticGap(
+                "target_occurrence_identity_unresolved",
+                f"target occurrence candidate count must be 1, got {len(occurrence_candidate_ids)}",
             )
 
     if selected_profile_payload is None:
@@ -1852,7 +1873,9 @@ def run_targeted_seed_artifact(
             getattr(client, "request_count", len(recording.responses))
         )
         failure_category = "validation_error"
-        if isinstance(exc, RacingApiAuthError):
+        if isinstance(exc, RacingApiSemanticGap):
+            failure_category = "semantic_gap"
+        elif isinstance(exc, RacingApiAuthError):
             failure_category = "auth_failure"
             if request_ledger:
                 failure_category = str(
@@ -1888,6 +1911,8 @@ def run_targeted_seed_artifact(
                 "message": normalize_space(str(exc))[:500],
             },
         }
+        if isinstance(exc, RacingApiSemanticGap):
+            failure_manifest["failure"]["gap_code"] = exc.code
         failure_path = output_dir / "run-failure.json"
         _atomic_write(
             failure_path,

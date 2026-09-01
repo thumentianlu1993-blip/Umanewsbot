@@ -906,7 +906,7 @@ class RacingApiHorseExportTests(unittest.TestCase):
 
     def test_reviewed_external_anchor_exports_unique_profile_when_target_is_missing(self):
         seed = {
-            "schema_version": "targeted-horse-seed.v1",
+            "schema_version": "targeted-horse-seed.v2",
             "seed_id": "sample-westover-saint-cloud",
             "name": "Westover",
             "expected_finish_position": "1",
@@ -917,7 +917,7 @@ class RacingApiHorseExportTests(unittest.TestCase):
             "target": {
                 "year": 2023,
                 "country_region": "france",
-                "local_date": "2023-07-08",
+                "edition_year": 2023,
                 "canonical_name_original": "Grand Prix de Saint-Cloud",
                 "racecourse": "Saint-Cloud",
                 "grade_text": "G1",
@@ -1715,7 +1715,11 @@ class RacingApiHorseExportTests(unittest.TestCase):
                 )
 
             failure = json.loads((output / "run-failure.json").read_text())
-            self.assertEqual(failure["failure"]["category"], "validation_error")
+            self.assertEqual(failure["failure"]["category"], "semantic_gap")
+            self.assertEqual(
+                failure["failure"]["gap_code"],
+                "target_occurrence_identity_unresolved",
+            )
             self.assertEqual(
                 failure["failure"]["message"],
                 "target occurrence candidate count must be 1, got 0",

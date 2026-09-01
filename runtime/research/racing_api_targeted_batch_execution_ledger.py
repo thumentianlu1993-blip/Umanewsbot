@@ -397,10 +397,17 @@ def _validate_completed_artifact(entry: Mapping[str, object]) -> None:
         manifest_sha != entry.get("batch_manifest_sha256")
         or complete.read_text(encoding="ascii").strip() != manifest_sha
         or manifest.get("schema_version") != "targeted-horse-batch-run.v1"
-        or manifest.get("status") != "complete"
+        or manifest.get("status") not in {"complete", "complete_with_gaps"}
         or manifest.get("database_writes") != 0
         or not isinstance(manifest.get("seed_ledger"), dict)
         or manifest["seed_ledger"].get("sha256") != entry.get("seed_ledger_sha256")
+        or manifest.get("planned_seed_count")
+        != manifest.get("completed_seed_count", 0) + manifest.get("gap_seed_count", 0)
+        or manifest.get("gap_seed_count", 0) != len(manifest.get("gaps", {}))
+        or entry.get("completed_seed_count", manifest.get("completed_seed_count"))
+        != manifest.get("completed_seed_count")
+        or entry.get("gap_seed_count", manifest.get("gap_seed_count", 0))
+        != manifest.get("gap_seed_count", 0)
     ):
         raise TargetedBatchExecutionError("completed batch artifact identity drift")
 
@@ -567,6 +574,7 @@ def _resume_ceiling(
     parameters = _plan_parameters(plan)
     definition_parameters = definition.get("parameters")
     completed = checkpoint.get("completed")
+    gaps = checkpoint.get("gaps", {})
     seeds = definition.get("seeds")
     if (
         definition.get("schema_version") != "targeted-horse-batch-definition.v1"
@@ -585,13 +593,15 @@ def _resume_ceiling(
         or checkpoint.get("schema_version") != "targeted-horse-batch-checkpoint.v1"
         or checkpoint.get("status") != "safe_stopped"
         or not isinstance(completed, dict)
-        or len(completed) >= len(seeds)
+        or not isinstance(gaps, dict)
+        or set(completed) & set(gaps)
+        or len(completed) + len(gaps) >= len(seeds)
     ):
         raise TargetedBatchExecutionError("resume checkpoint does not bind the planned batch")
     per_seed = plan["manifest"]["parameters"].get("per_seed_request_ceiling")
     if isinstance(per_seed, bool) or not isinstance(per_seed, int) or per_seed < 1:
         raise TargetedBatchExecutionError("plan per-seed request ceiling is invalid")
-    remaining = (len(seeds) - len(completed)) * per_seed
+    remaining = (len(seeds) - len(completed) - len(gaps)) * per_seed
     if remaining < 1:
         raise TargetedBatchExecutionError("resume request ceiling is empty")
     return remaining
@@ -1309,13 +1319,17 @@ def complete_batch_execution(
         if (
             complete.read_text(encoding="ascii").strip() != manifest_sha
             or manifest.get("schema_version") != "targeted-horse-batch-run.v1"
-            or manifest.get("status") != "complete"
+            or manifest.get("status") not in {"complete", "complete_with_gaps"}
             or manifest.get("database_writes") != 0
             or not isinstance(manifest.get("seed_ledger"), dict)
             or manifest["seed_ledger"].get("sha256") != active["seed_ledger_sha256"]
             or manifest.get("parameters") != expected_parameters
             or manifest.get("planned_seed_count") != batch["seed_count"]
-            or manifest.get("completed_seed_count") != batch["seed_count"]
+            or manifest.get("completed_seed_count", 0)
+            + manifest.get("gap_seed_count", 0)
+            != batch["seed_count"]
+            or manifest.get("gap_seed_count", 0)
+            != len(manifest.get("gaps", {}))
             or manifest.get("request_ceiling") != active["run_request_ceiling"]
             or isinstance(request_count, bool)
             or not isinstance(request_count, int)
@@ -1342,6 +1356,8 @@ def complete_batch_execution(
             "attempts": attempts,
             "total_request_count": total_request_count,
             "batch_manifest_sha256": manifest_sha,
+            "completed_seed_count": manifest.get("completed_seed_count", 0),
+            "gap_seed_count": manifest.get("gap_seed_count", 0),
             "completed_at": _timestamp(clock),
         }
         window.ledger["completed"].append(completed_entry)

@@ -17,6 +17,7 @@ from racing_api_content_pool import ContentAddressedPool, POOL_SCHEMA_VERSION
 from racing_api_horse_export import (
     RacingApiClient,
     RacingApiError,
+    RacingApiSemanticGap,
     SAFE_STOP_EXIT_CODE,
     _atomic_write,
     _enabled,
@@ -276,6 +277,7 @@ def _initialize_batch(
         "schema_version": "targeted-horse-batch-checkpoint.v1",
         "status": "running",
         "completed": {},
+        "gaps": {},
         "last_error": None,
     }
     _write_json(output_dir / "checkpoint.json", checkpoint)
@@ -318,8 +320,15 @@ def _load_existing_batch(
         ):
             raise ValueError("batch seed identity mismatch")
     completed = checkpoint.get("completed")
-    if checkpoint.get("schema_version") != "targeted-horse-batch-checkpoint.v1" or not isinstance(completed, dict):
+    gaps = checkpoint.get("gaps", {})
+    if (
+        checkpoint.get("schema_version") != "targeted-horse-batch-checkpoint.v1"
+        or not isinstance(completed, dict)
+        or not isinstance(gaps, dict)
+        or set(completed) & set(gaps)
+    ):
         raise ValueError("batch checkpoint drift")
+    checkpoint["gaps"] = gaps
     for seed_id, receipt in completed.items():
         if not isinstance(receipt, Mapping):
             raise ValueError("batch completion receipt must be an object")
@@ -338,6 +347,26 @@ def _load_existing_batch(
             or complete_path.read_text(encoding="ascii").strip() != receipt.get("manifest_sha256")
         ):
             raise ValueError(f"completed seed artifact identity mismatch: {seed_id}")
+    for seed_id, receipt in gaps.items():
+        if not isinstance(receipt, Mapping):
+            raise ValueError("batch gap receipt must be an object")
+        artifact_dir = root / str(receipt.get("artifact_dir") or "")
+        try:
+            artifact_dir.resolve(strict=True).relative_to(root)
+        except (OSError, ValueError) as exc:
+            raise ValueError("batch gap path escapes output root") from exc
+        failure_path = artifact_dir / "run-failure.json"
+        failed_path = artifact_dir / "FAILED"
+        if (
+            artifact_dir.is_symlink()
+            or not failure_path.is_file()
+            or not failed_path.is_file()
+            or _sha256_path(failure_path) != receipt.get("failure_sha256")
+            or failed_path.read_text(encoding="ascii").strip()
+            != receipt.get("failure_sha256")
+            or receipt.get("gap_code") != "target_occurrence_identity_unresolved"
+        ):
+            raise ValueError(f"gap seed artifact identity mismatch: {seed_id}")
     return definition, checkpoint
 
 
@@ -377,7 +406,11 @@ def run_targeted_batch_artifact(
             parameters=parameters,
         )
     completed = checkpoint["completed"]
-    if len(completed) == len(seeds) and (output_dir / "COMPLETE").is_file():
+    gaps = checkpoint["gaps"]
+    if (
+        len(completed) + len(gaps) == len(seeds)
+        and (output_dir / "COMPLETE").is_file()
+    ):
         manifest_path = output_dir / "batch-manifest.json"
         complete_path = output_dir / "COMPLETE"
         final_manifest = _read_json(manifest_path)
@@ -394,7 +427,11 @@ def run_targeted_batch_artifact(
             raise ValueError("batch COMPLETE marker does not bind final manifest")
         return {**final_manifest, "status": "replayed", "database_writes": 0}
     content_pool = ContentAddressedPool(output_dir / "objects")
-    remaining = [entry for entry in definition["seeds"] if entry["seed_id"] not in completed]
+    remaining = [
+        entry
+        for entry in definition["seeds"]
+        if entry["seed_id"] not in completed and entry["seed_id"] not in gaps
+    ]
     seeds_by_id = {seed["seed_id"]: seed for seed in seeds}
     expected_ceiling = batch_request_ceiling(
         [seeds_by_id[entry["seed_id"]] for entry in remaining],
@@ -414,17 +451,42 @@ def run_targeted_batch_artifact(
             attempt_root = output_dir / "attempts" / f"{entry['ordinal']:05d}-{entry['sha256'][:12]}"
             attempt_number = len(list(attempt_root.glob("attempt-*"))) + 1 if attempt_root.exists() else 1
             artifact_dir = attempt_root / f"attempt-{attempt_number:03d}"
-            manifest = run_targeted_seed_artifact(
-                seed_path=output_dir / entry["path"],
-                approved_seed_sha256=entry["sha256"],
-                output_dir=artifact_dir,
-                client=cached_client,
-                max_search_candidates=max_search_candidates,
-                max_results_pages_per_horse=max_results_pages_per_horse,
-                max_parent_profiles=max_parent_profiles,
-                openapi_fingerprint_identity=openapi_fingerprint_identity,
-                content_pool=content_pool,
-            )
+            try:
+                manifest = run_targeted_seed_artifact(
+                    seed_path=output_dir / entry["path"],
+                    approved_seed_sha256=entry["sha256"],
+                    output_dir=artifact_dir,
+                    client=cached_client,
+                    max_search_candidates=max_search_candidates,
+                    max_results_pages_per_horse=max_results_pages_per_horse,
+                    max_parent_profiles=max_parent_profiles,
+                    openapi_fingerprint_identity=openapi_fingerprint_identity,
+                    content_pool=content_pool,
+                )
+            except RacingApiSemanticGap as exc:
+                failure_path = artifact_dir / "run-failure.json"
+                failed_path = artifact_dir / "FAILED"
+                failure_sha = _sha256_path(failure_path)
+                if (
+                    not failed_path.is_file()
+                    or failed_path.read_text(encoding="ascii").strip()
+                    != failure_sha
+                ):
+                    raise ValueError("semantic gap failure artifact drift") from exc
+                gaps[seed_id] = {
+                    "artifact_dir": str(artifact_dir.relative_to(output_dir)),
+                    "failure_sha256": failure_sha,
+                    "seed_sha256": entry["sha256"],
+                    "gap_code": exc.code,
+                }
+                checkpoint.update(
+                    status="running",
+                    completed=completed,
+                    gaps=gaps,
+                    last_error=None,
+                )
+                _write_json(output_dir / "checkpoint.json", checkpoint)
+                continue
             manifest_path = artifact_dir / "run-manifest.json"
             completed[seed_id] = {
                 "artifact_dir": str(artifact_dir.relative_to(output_dir)),
@@ -432,12 +494,18 @@ def run_targeted_batch_artifact(
                 "seed_sha256": entry["sha256"],
                 "horse_id": manifest["result_summary"]["horse_id"],
             }
-            checkpoint.update(status="running", completed=completed, last_error=None)
+            checkpoint.update(
+                status="running",
+                completed=completed,
+                gaps=gaps,
+                last_error=None,
+            )
             _write_json(output_dir / "checkpoint.json", checkpoint)
     except Exception as exc:
         checkpoint.update(
             status="safe_stopped",
             completed=completed,
+            gaps=gaps,
             last_error={"type": type(exc).__name__, "message": str(exc)},
         )
         _write_json(output_dir / "checkpoint.json", checkpoint)
@@ -448,12 +516,14 @@ def run_targeted_batch_artifact(
     _write_json(pool_manifest_path, pool_manifest)
     final_manifest = {
         "schema_version": "targeted-horse-batch-run.v1",
-        "status": "complete",
+        "status": "complete" if not gaps else "complete_with_gaps",
         "database_writes": 0,
         "seed_ledger": ledger_identity,
         "parameters": parameters,
         "planned_seed_count": len(seeds),
         "completed_seed_count": len(completed),
+        "gap_seed_count": len(gaps),
+        "gaps": gaps,
         "request_ceiling": expected_ceiling,
         "request_count": request_count_after - request_count_before,
         "request_cache": {
@@ -472,7 +542,12 @@ def run_targeted_batch_artifact(
         },
     }
     _write_json(output_dir / "batch-manifest.json", final_manifest)
-    checkpoint.update(status="complete", completed=completed, last_error=None)
+    checkpoint.update(
+        status=final_manifest["status"],
+        completed=completed,
+        gaps=gaps,
+        last_error=None,
+    )
     _write_json(output_dir / "checkpoint.json", checkpoint)
     _atomic_write(
         output_dir / "COMPLETE",

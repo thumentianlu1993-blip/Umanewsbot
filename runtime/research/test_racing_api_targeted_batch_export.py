@@ -318,6 +318,83 @@ class RacingApiTargetedBatchExportTests(unittest.TestCase):
             self.assertEqual(replay["status"], "replayed")
             self.assertEqual(replay["database_writes"], 0)
 
+    def test_semantic_identity_gap_is_bound_and_does_not_block_later_seed(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            ledger, ledger_sha = self._ledger(root)
+            output = root / "output"
+            client = FakeClient(request_ceiling=8)
+            _fingerprint_path, _fingerprint_sha, fingerprint_identity = (
+                self._openapi_fingerprint(root)
+            )
+            original = self.module.run_targeted_seed_artifact
+            call_count = 0
+
+            def first_seed_is_a_gap(**kwargs):
+                nonlocal call_count
+                call_count += 1
+                if call_count != 1:
+                    return original(**kwargs)
+                artifact_dir = kwargs["output_dir"]
+                artifact_dir.mkdir(parents=True)
+                failure = artifact_dir / "run-failure.json"
+                failure.write_text(
+                    json.dumps(
+                        {
+                            "schema_version": "targeted-horse-run-failure.v1",
+                            "status": "failed",
+                            "database_writes": 0,
+                            "failure": {
+                                "category": "semantic_gap",
+                                "gap_code": "target_occurrence_identity_unresolved",
+                            },
+                        },
+                        sort_keys=True,
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+                failure_sha = hashlib.sha256(failure.read_bytes()).hexdigest()
+                (artifact_dir / "FAILED").write_text(
+                    failure_sha + "\n",
+                    encoding="ascii",
+                )
+                raise self.module.RacingApiSemanticGap(
+                    "target_occurrence_identity_unresolved",
+                    "target occurrence candidate count must be 1, got 0",
+                )
+
+            with mock.patch.object(
+                self.module,
+                "run_targeted_seed_artifact",
+                side_effect=first_seed_is_a_gap,
+            ):
+                manifest = self.module.run_targeted_batch_artifact(
+                    seed_ledger_path=ledger,
+                    approved_seed_ledger_sha256=ledger_sha,
+                    output_dir=output,
+                    client=client,
+                    max_search_candidates=1,
+                    max_results_pages_per_horse=1,
+                    max_parent_profiles=0,
+                    openapi_fingerprint_identity=fingerprint_identity,
+                )
+
+            self.assertEqual(manifest["status"], "complete_with_gaps")
+            self.assertEqual(manifest["completed_seed_count"], 1)
+            self.assertEqual(manifest["gap_seed_count"], 1)
+            self.assertEqual(set(manifest["completed"]), {"seed-b"})
+            self.assertEqual(set(manifest["gaps"]), {"seed-a"})
+            self.assertTrue((output / "COMPLETE").is_file())
+            checkpoint = json.loads(
+                (output / "checkpoint.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(checkpoint["status"], "complete_with_gaps")
+            self.assertEqual(
+                checkpoint["gaps"]["seed-a"]["gap_code"],
+                "target_occurrence_identity_unresolved",
+            )
+
     def test_shared_parent_profiles_are_requested_once_per_batch(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
