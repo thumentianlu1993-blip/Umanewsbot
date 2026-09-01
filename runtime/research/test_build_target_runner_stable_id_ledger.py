@@ -198,6 +198,104 @@ class StableIdLedgerTests(unittest.TestCase):
             self.assertEqual(alpha["source_names"], ["Alpha (FR)"])
             self.assertTrue((output / "COMPLETE").is_file())
 
+    def test_merges_identical_race_observed_from_multiple_anchor_seeds(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            target = race(
+                "rac_shared",
+                "2026-05-01",
+                [("hrs_a", "Alpha (FR)"), ("hrs_b", "Beta (FR)")],
+            )
+            materialized = root / "materialized"
+            materialized.mkdir()
+            rows = [
+                materialized_run(materialized, 1, "target-runner-b", target),
+                materialized_run(materialized, 2, "target-runner-a", target),
+            ]
+            manifest = {
+                "schema_version": "targeted-horse-batch-materialization.v1",
+                "status": "complete",
+                "database_writes": 0,
+                "source_batch_manifest_sha256": "a" * 64,
+                "source_content_pool_manifest_sha256": "b" * 64,
+                "selected_seed_count": 2,
+                "materialized": rows,
+            }
+            manifest_path = materialized / "materialization-manifest.json"
+            manifest_path.write_text(
+                json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            manifest_sha = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+            (materialized / "COMPLETE").write_text(manifest_sha + "\n", encoding="ascii")
+
+            output = root / "ledger"
+            report = self.module.build_stable_id_seed_ledger(
+                materialized_dir=materialized,
+                approved_materialization_manifest_sha256=manifest_sha,
+                output_dir=output,
+            )
+            seeds = [
+                json.loads(line)
+                for line in (
+                    output / "target-runner-stable-id-seeds.v1.jsonl"
+                ).read_text().splitlines()
+            ]
+
+        self.assertEqual(report["source_target_occurrence_count"], 2)
+        self.assertEqual(report["unique_target_race_count"], 1)
+        self.assertEqual(report["unique_actual_starter_count"], 2)
+        self.assertEqual(report["source_observation_count"], 4)
+        for seed in seeds:
+            occurrence = seed["target_occurrences"][0]
+            self.assertEqual(len(occurrence["source_observations"]), 2)
+            self.assertEqual(
+                occurrence["source_targeted_seed_id"],
+                occurrence["source_observations"][0]["source_targeted_seed_id"],
+            )
+
+    def test_rejects_semantic_runner_difference_across_anchor_seeds(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            first = race(
+                "rac_shared",
+                "2026-05-01",
+                [("hrs_a", "Alpha (FR)"), ("hrs_b", "Beta (FR)")],
+            )
+            second = json.loads(json.dumps(first))
+            second["runners"][0]["position"] = "2"
+            materialized = root / "materialized"
+            materialized.mkdir()
+            rows = [
+                materialized_run(materialized, 1, "target-runner-a", first),
+                materialized_run(materialized, 2, "target-runner-b", second),
+            ]
+            manifest = {
+                "schema_version": "targeted-horse-batch-materialization.v1",
+                "status": "complete",
+                "database_writes": 0,
+                "source_batch_manifest_sha256": "a" * 64,
+                "source_content_pool_manifest_sha256": "b" * 64,
+                "selected_seed_count": 2,
+                "materialized": rows,
+            }
+            manifest_path = materialized / "materialization-manifest.json"
+            manifest_path.write_text(
+                json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            manifest_sha = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+            (materialized / "COMPLETE").write_text(manifest_sha + "\n", encoding="ascii")
+
+            with self.assertRaisesRegex(
+                self.module.StableIdLedgerError, "target race payload conflict"
+            ):
+                self.module.build_stable_id_seed_ledger(
+                    materialized_dir=materialized,
+                    approved_materialization_manifest_sha256=manifest_sha,
+                    output_dir=root / "ledger",
+                )
+
     def test_rejects_materialization_extra_member_before_stable_projection(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

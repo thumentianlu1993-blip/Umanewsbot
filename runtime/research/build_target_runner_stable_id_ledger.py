@@ -143,6 +143,61 @@ def _raw_target_race(target_race: Mapping[str, object]) -> dict:
     }
 
 
+def _source_observation(
+    *,
+    seed_id: str,
+    run_manifest_sha256: str,
+    runner_payload_sha256: str,
+) -> dict:
+    return {
+        "source_targeted_seed_id": seed_id,
+        "source_materialized_run_manifest_sha256": run_manifest_sha256,
+        "source_runner_payload_sha256": runner_payload_sha256,
+    }
+
+
+def _occurrence_semantic_identity(occurrence: Mapping[str, object]) -> str:
+    return canonical_json(
+        {
+            key: value
+            for key, value in occurrence.items()
+            if key
+            not in {
+                "source_targeted_seed_id",
+                "source_materialized_run_manifest_sha256",
+                "source_runner_payload_sha256",
+                "source_observations",
+            }
+        }
+    )
+
+
+def _merge_occurrence_observations(existing: dict, incoming: Mapping[str, object]) -> dict:
+    if _occurrence_semantic_identity(existing) != _occurrence_semantic_identity(incoming):
+        raise StableIdLedgerError("runner occurrence semantic conflict")
+    observations = {
+        canonical_json(observation): dict(observation)
+        for occurrence in (existing, incoming)
+        for observation in occurrence.get("source_observations", [])
+        if isinstance(observation, Mapping)
+    }
+    if not observations:
+        raise StableIdLedgerError("runner occurrence observations are missing")
+    ordered = [observations[key] for key in sorted(observations)]
+    if len(
+        {
+            str(observation.get("source_runner_payload_sha256") or "")
+            for observation in ordered
+        }
+    ) != 1:
+        raise StableIdLedgerError("runner payload differs across observations")
+    primary = ordered[0]
+    merged = dict(existing)
+    merged["source_observations"] = ordered
+    merged.update(primary)
+    return merged
+
+
 def _target_occurrence(
     *,
     seed_id: str,
@@ -168,12 +223,17 @@ def _target_occurrence(
     if grade not in {"G1", "G2", "G3"}:
         raise StableIdLedgerError(f"target race grade is unsupported: {grade!r}")
     raw_race = _raw_target_race(target_race)
+    runner_payload_sha256 = payload_sha256(runner)
+    observation = _source_observation(
+        seed_id=seed_id,
+        run_manifest_sha256=run_manifest_sha256,
+        runner_payload_sha256=runner_payload_sha256,
+    )
     return {
         "race_id": race_id,
         "target_race_payload_sha256": payload_sha256(raw_race),
-        "source_targeted_seed_id": seed_id,
-        "source_materialized_run_manifest_sha256": run_manifest_sha256,
-        "source_runner_payload_sha256": payload_sha256(runner),
+        **observation,
+        "source_observations": [observation],
         "source_runner_name": normalize_space(runner.get("horse")),
         "source_runner_position": normalize_space(runner.get("position")),
         "target": {
@@ -347,8 +407,13 @@ def build_stable_id_seed_ledger(
             )
             entry["source_names"].add(normalize_space(runner.get("horse")))
             existing = entry["target_occurrences"].get(race_id)
-            if existing is not None and canonical_json(existing) != canonical_json(occurrence):
-                raise StableIdLedgerError(f"runner occurrence conflict: {horse_id}/{race_id}")
+            if existing is not None:
+                try:
+                    occurrence = _merge_occurrence_observations(existing, occurrence)
+                except StableIdLedgerError as exc:
+                    raise StableIdLedgerError(
+                        f"runner occurrence conflict: {horse_id}/{race_id}"
+                    ) from exc
             entry["target_occurrences"][race_id] = occurrence
 
     seeds = []
@@ -394,6 +459,11 @@ def build_stable_id_seed_ledger(
         "profile_only_gap_count": len(profile_only_gaps),
         "unique_target_race_count": len(observed_race_hashes),
         "unique_actual_starter_count": len(seeds),
+        "source_observation_count": sum(
+            len(occurrence.get("source_observations", []))
+            for seed in seeds
+            for occurrence in seed["target_occurrences"]
+        ),
         "seed_ledger": {
             "path": ledger_path.name,
             "sha256": _sha256(ledger_path),

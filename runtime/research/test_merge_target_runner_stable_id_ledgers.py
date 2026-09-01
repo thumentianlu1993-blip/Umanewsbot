@@ -61,6 +61,25 @@ class MergeStableRunnerLedgersTests(unittest.TestCase):
             },
         }
 
+    def _observed_occurrence(
+        self, race_id: str, seed_id: str, name: str, run_marker: str
+    ) -> dict:
+        occurrence = self._occurrence(race_id, seed_id, name)
+        occurrence["target"]["canonical_name_original"] = "Shared Fixture"
+        occurrence["source_materialized_run_manifest_sha256"] = hashlib.sha256(
+            run_marker.encode()
+        ).hexdigest()
+        observation = {
+            key: occurrence[key]
+            for key in (
+                "source_targeted_seed_id",
+                "source_materialized_run_manifest_sha256",
+                "source_runner_payload_sha256",
+            )
+        }
+        occurrence["source_observations"] = [observation]
+        return occurrence
+
     def _ledger(
         self, root: Path, name: str, batch_sha: str, rows: list[dict]
     ) -> tuple[Path, str]:
@@ -186,6 +205,109 @@ class MergeStableRunnerLedgersTests(unittest.TestCase):
             )
         self.assertEqual(manifest["unique_target_race_count"], 3)
         self.assertEqual(manifest["unique_physical_race_count"], 2)
+
+    def test_merges_observation_aware_duplicate_across_batches(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            first, first_sha = self._ledger(
+                root,
+                "first",
+                "1" * 64,
+                [{
+                    "seed_id": "horse-one",
+                    "horse_id": "hrs_alpha",
+                    "source_names": ["Alpha"],
+                    "target_occurrences": [
+                        self._observed_occurrence(
+                            "rac_same", "target-runner-b", "Alpha", "run-b"
+                        )
+                    ],
+                }],
+            )
+            second, second_sha = self._ledger(
+                root,
+                "second",
+                "2" * 64,
+                [{
+                    "seed_id": "horse-two",
+                    "horse_id": "hrs_alpha",
+                    "source_names": ["Alpha (FR)"],
+                    "target_occurrences": [
+                        self._observed_occurrence(
+                            "rac_same", "target-runner-a", "Alpha", "run-a"
+                        )
+                    ],
+                }],
+            )
+            output = root / "merged"
+            manifest = self.module.merge_stable_runner_ledgers(
+                source_roots=[first, second],
+                approved_manifest_sha256s=[first_sha, second_sha],
+                output_dir=output,
+            )
+            rows, _identity = sys.modules[
+                "prepare_held_census_tra_reconciliation"
+            ].load_stable_runner_ledger(
+                output,
+                approved_manifest_sha256=sha(output / "manifest.json"),
+            )
+
+        occurrence = rows[0]["target_occurrences"][0]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(len(rows[0]["target_occurrences"]), 1)
+        self.assertEqual(len(occurrence["source_observations"]), 2)
+        self.assertEqual(manifest["source_observation_count"], 2)
+        self.assertEqual(manifest["merged_target_occurrence_count"], 1)
+
+    def test_observation_aware_race_identity_allows_distinct_runners(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            first, first_sha = self._ledger(
+                root,
+                "first",
+                "1" * 64,
+                [{
+                    "seed_id": "horse-one",
+                    "horse_id": "hrs_alpha",
+                    "source_names": ["Alpha"],
+                    "target_occurrences": [
+                        self._observed_occurrence(
+                            "rac_same", "target-runner-a", "Alpha", "run-a"
+                        )
+                    ],
+                }],
+            )
+            beta = self._observed_occurrence(
+                "rac_same", "target-runner-b", "Beta", "run-b"
+            )
+            beta["source_runner_position"] = "2"
+            beta["source_runner_payload_sha256"] = hashlib.sha256(
+                b"runner:rac_same:Beta"
+            ).hexdigest()
+            beta["source_observations"][0]["source_runner_payload_sha256"] = (
+                beta["source_runner_payload_sha256"]
+            )
+            second, second_sha = self._ledger(
+                root,
+                "second",
+                "2" * 64,
+                [{
+                    "seed_id": "horse-two",
+                    "horse_id": "hrs_beta",
+                    "source_names": ["Beta"],
+                    "target_occurrences": [beta],
+                }],
+            )
+            output = root / "merged"
+            manifest = self.module.merge_stable_runner_ledgers(
+                source_roots=[first, second],
+                approved_manifest_sha256s=[first_sha, second_sha],
+                output_dir=output,
+            )
+
+        self.assertEqual(manifest["unique_actual_starter_count"], 2)
+        self.assertEqual(manifest["unique_target_race_count"], 1)
+        self.assertEqual(manifest["unique_physical_race_count"], 1)
 
 
 if __name__ == "__main__":
