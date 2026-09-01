@@ -15,8 +15,9 @@ from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 from difflib import SequenceMatcher
 from pathlib import Path
+from typing import Mapping
 from urllib.error import HTTPError
-from urllib.parse import urljoin
+from urllib.parse import parse_qs, urljoin, urlparse
 
 from bs4 import BeautifulSoup
 
@@ -37,6 +38,11 @@ SCHEMA_VERSION = "hri-graded-winner-candidate-proposal.v1"
 CANDIDATE_SCHEMA = "hri-graded-winner-candidate.v1"
 UNMATCHED_SCHEMA = "hri-graded-result-unmatched.v1"
 FETCH_ERROR_SCHEMA = "hri-result-date-fetch-error.v1"
+FETCH_ERROR_INTERPRETATION = (
+    "source_unavailable_not_evidence_of_no_race; "
+    "target remains unresolved unless another audited source supplies it"
+)
+RETRYABLE_HTTP_STATUSES = {404, 410, 500, 502, 503, 504}
 BASE_URL = "https://www.hri.ie"
 ALLOWED_HOSTS = ("hri.ie", "www.hri.ie")
 GRADE_RE = re.compile(r"\((?:Grade|Group)\s*([123])\)", re.IGNORECASE)
@@ -92,6 +98,69 @@ def _horse_name(value: object) -> tuple[str, str]:
 
 def _source_filename(day: date) -> str:
     return f"hri-results-{day.isoformat()}.html"
+
+
+def _fetch_error_path(source_dir: Path, day: date) -> Path:
+    return source_dir / f"hri-results-{day.isoformat()}.fetch-error.json"
+
+
+def _load_fetch_error(path: Path, *, local_date: str, source_url: str) -> dict:
+    if path.is_symlink() or not path.is_file():
+        raise ValueError("HRI fetch-error evidence must be a regular non-symlink file")
+    try:
+        row = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError("HRI fetch-error evidence is unreadable") from exc
+    if not isinstance(row, dict):
+        raise ValueError("HRI fetch-error evidence must be a JSON object")
+    required_keys = {
+        "schema_version",
+        "local_date",
+        "source_url",
+        "http_status",
+        "reason",
+        "observed_at",
+        "interpretation",
+    }
+    try:
+        observed_at = datetime.fromisoformat(str(row.get("observed_at") or ""))
+    except ValueError as exc:
+        raise ValueError("HRI fetch-error observed_at is invalid") from exc
+    if (
+        set(row) != required_keys
+        or row.get("schema_version") != FETCH_ERROR_SCHEMA
+        or row.get("local_date") != local_date
+        or row.get("source_url") != source_url
+        or isinstance(row.get("http_status"), bool)
+        or row.get("http_status") not in RETRYABLE_HTTP_STATUSES
+        or not isinstance(row.get("reason"), str)
+        or not row["reason"].strip()
+        or observed_at.tzinfo is None
+        or row.get("interpretation") != FETCH_ERROR_INTERPRETATION
+    ):
+        raise ValueError("HRI fetch-error evidence identity or schema drift")
+    return row
+
+
+def _write_fetch_error(
+    path: Path,
+    *,
+    local_date: str,
+    source_url: str,
+    http_status: int,
+    reason: str,
+) -> dict:
+    row = {
+        "schema_version": FETCH_ERROR_SCHEMA,
+        "local_date": local_date,
+        "source_url": source_url,
+        "http_status": http_status,
+        "reason": reason,
+        "observed_at": datetime.now(timezone.utc).isoformat(),
+        "interpretation": FETCH_ERROR_INTERPRETATION,
+    }
+    _atomic(path, (canonical_json(row) + "\n").encode())
+    return _load_fetch_error(path, local_date=local_date, source_url=source_url)
 
 
 def _download(
@@ -160,7 +229,56 @@ def _cache_identity(source_dir: Path, source_path: Path, *, source_url: str) -> 
     }
 
 
-def parse_date_page(html: bytes, *, local_date: str, source_evidence: dict) -> list[dict]:
+def _venue_codes(html: bytes) -> tuple[set[str], set[str]]:
+    soup = BeautifulSoup(html, "lxml")
+    course_names = {
+        " ".join(node.get_text(" ", strip=True).split())
+        for node in soup.select("p.h3")
+        if node.get_text(" ", strip=True)
+    }
+    venue_codes = set()
+    for link in soup.select(".race-result-item h2 a"):
+        query = parse_qs(urlparse(str(link.get("href") or "")).query)
+        venue_code = str((query.get("venue") or [""])[0]).upper()
+        if venue_code:
+            venue_codes.add(venue_code)
+    return course_names, venue_codes
+
+
+def infer_venue_course_map(source_paths: list[Path]) -> dict[str, str]:
+    """Infer HRI venue codes only from single-meeting official date pages."""
+
+    candidates: dict[str, set[str]] = {}
+    observed_codes = set()
+    for source_path in source_paths:
+        course_names, venue_codes = _venue_codes(source_path.read_bytes())
+        observed_codes.update(venue_codes)
+        if len(course_names) == 1 and len(venue_codes) == 1:
+            venue_code = next(iter(venue_codes))
+            candidates.setdefault(venue_code, set()).update(course_names)
+    conflicts = {
+        venue_code: sorted(course_names)
+        for venue_code, course_names in candidates.items()
+        if len(course_names) != 1
+    }
+    missing = sorted(observed_codes - set(candidates))
+    if conflicts or missing:
+        raise ValueError(
+            f"HRI venue/course inference is incomplete: conflicts={conflicts} missing={missing}"
+        )
+    return {
+        venue_code: next(iter(candidates[venue_code]))
+        for venue_code in sorted(candidates)
+    }
+
+
+def parse_date_page(
+    html: bytes,
+    *,
+    local_date: str,
+    source_evidence: dict,
+    venue_course_map: Mapping[str, str] | None = None,
+) -> list[dict]:
     soup = BeautifulSoup(html, "lxml")
     results = []
     seen = set()
@@ -175,12 +293,17 @@ def parse_date_page(html: bytes, *, local_date: str, source_evidence: dict) -> l
         result_href = str(title_link.get("href") or "")
         result_url = urljoin(BASE_URL, result_href)
         validate_https_url(result_url, allowed_hosts=ALLOWED_HOSTS)
-        course_node = item.find_previous("p", class_="h3")
-        racecourse = (
-            " ".join(course_node.get_text(" ", strip=True).split())
-            if course_node is not None
-            else ""
-        )
+        if venue_course_map is None:
+            course_node = item.find_previous("p", class_="h3")
+            racecourse = (
+                " ".join(course_node.get_text(" ", strip=True).split())
+                if course_node is not None
+                else ""
+            )
+        else:
+            result_query = parse_qs(urlparse(result_url).query)
+            venue_code = str((result_query.get("venue") or [""])[0]).upper()
+            racecourse = str(venue_course_map.get(venue_code) or "")
         if not racecourse:
             raise ValueError(f"HRI graded result has no racecourse: {local_date} {race_name}")
         placings = []
@@ -233,7 +356,7 @@ def _alias_score(race_name: str, alias: str) -> tuple[float, int]:
     return max(coverage, sequence), overlap
 
 
-def match_target(result: dict, targets: list[dict]) -> tuple[dict | None, list[dict]]:
+def _target_candidates(result: dict, targets: list[dict]) -> list[dict]:
     candidates = []
     for target in targets:
         if (
@@ -259,7 +382,11 @@ def match_target(result: dict, targets: list[dict]) -> tuple[dict | None, list[d
     candidates.sort(
         key=lambda row: (-row["score"], -row["overlap"], str(row["target"]["target_key"]))
     )
-    diagnostics = [
+    return candidates
+
+
+def _candidate_diagnostics(candidates: list[dict]) -> list[dict]:
+    return [
         {
             "target_key": row["target"]["target_key"],
             "score": row["score"],
@@ -267,6 +394,11 @@ def match_target(result: dict, targets: list[dict]) -> tuple[dict | None, list[d
         }
         for row in candidates
     ]
+
+
+def match_target(result: dict, targets: list[dict]) -> tuple[dict | None, list[dict]]:
+    candidates = _target_candidates(result, targets)
+    diagnostics = _candidate_diagnostics(candidates)
     if not candidates:
         return None, diagnostics
     if len(candidates) > 1 and (
@@ -275,6 +407,156 @@ def match_target(result: dict, targets: list[dict]) -> tuple[dict | None, list[d
     ):
         return None, diagnostics
     return candidates[0]["target"], diagnostics
+
+
+def _hungarian_max(weights: list[list[int]]) -> tuple[list[int], int]:
+    """Return the maximum-weight column assignment for a rectangular matrix."""
+
+    if not weights:
+        return [], 0
+    row_count = len(weights)
+    column_count = len(weights[0])
+    if column_count < row_count or any(len(row) != column_count for row in weights):
+        raise ValueError("HRI assignment matrix is invalid")
+    maximum = max(max(row) for row in weights)
+    costs = [[maximum - value for value in row] for row in weights]
+    u = [0] * (row_count + 1)
+    v = [0] * (column_count + 1)
+    matching = [0] * (column_count + 1)
+    way = [0] * (column_count + 1)
+    for row_index in range(1, row_count + 1):
+        matching[0] = row_index
+        minimum = [10**30] * (column_count + 1)
+        used = [False] * (column_count + 1)
+        column = 0
+        while True:
+            used[column] = True
+            active_row = matching[column]
+            delta = 10**30
+            next_column = 0
+            for candidate_column in range(1, column_count + 1):
+                if used[candidate_column]:
+                    continue
+                current = (
+                    costs[active_row - 1][candidate_column - 1]
+                    - u[active_row]
+                    - v[candidate_column]
+                )
+                if current < minimum[candidate_column]:
+                    minimum[candidate_column] = current
+                    way[candidate_column] = column
+                if minimum[candidate_column] < delta:
+                    delta = minimum[candidate_column]
+                    next_column = candidate_column
+            for candidate_column in range(column_count + 1):
+                if used[candidate_column]:
+                    u[matching[candidate_column]] += delta
+                    v[candidate_column] -= delta
+                else:
+                    minimum[candidate_column] -= delta
+            column = next_column
+            if matching[column] == 0:
+                break
+        while True:
+            previous = way[column]
+            matching[column] = matching[previous]
+            column = previous
+            if column == 0:
+                break
+    assignment = [-1] * row_count
+    for column in range(1, column_count + 1):
+        if matching[column]:
+            assignment[matching[column] - 1] = column - 1
+    return assignment, sum(weights[row][column] for row, column in enumerate(assignment))
+
+
+def assign_targets_globally(
+    results: list[dict], targets: list[dict]
+) -> tuple[list[tuple[dict, dict, list[dict]]], list[tuple[dict, list[dict]]]]:
+    """Resolve same-meeting sponsored-name collisions by unique global assignment."""
+
+    grouped: dict[tuple[int, str, str], list[tuple[dict, list[dict]]]] = {}
+    unmatched = []
+    for result in results:
+        candidates = _target_candidates(result, targets)
+        diagnostics = _candidate_diagnostics(candidates)
+        if not candidates:
+            unmatched.append((result, diagnostics))
+            continue
+        key = (
+            int(result["edition_year"]),
+            str(result["normalized_grade"]),
+            _course_key(result["racecourse"]),
+        )
+        grouped.setdefault(key, []).append((result, candidates))
+
+    matched = []
+    match_bonus = 10**12
+    forbidden = -(10**15)
+    # Require more than a five-point aggregate alias-score advantage.  The
+    # small overlap suffix is only a deterministic tie-break and must not turn
+    # an exact 0.05 boundary into an approved identity.
+    minimum_margin = 5_000_100
+    for key in sorted(grouped):
+        rows = grouped[key]
+        target_by_key = {
+            str(candidate["target"]["target_key"]): candidate["target"]
+            for _result, candidates in rows
+            for candidate in candidates
+        }
+        target_keys = sorted(target_by_key)
+        target_index = {target_key: index for index, target_key in enumerate(target_keys)}
+        weights = []
+        candidate_maps = []
+        for _result, candidates in rows:
+            candidate_map = {
+                str(candidate["target"]["target_key"]): candidate
+                for candidate in candidates
+            }
+            candidate_maps.append(candidate_map)
+            row_weights = [forbidden] * len(target_keys)
+            for target_key, candidate in candidate_map.items():
+                row_weights[target_index[target_key]] = (
+                    match_bonus
+                    + int(round(float(candidate["score"]) * 1_000_000)) * 100
+                    + int(candidate["overlap"])
+                )
+            row_weights.extend([0] * len(rows))
+            weights.append(row_weights)
+        assignment, best_score = _hungarian_max(weights)
+        assigned_edges = [
+            (row_index, column)
+            for row_index, column in enumerate(assignment)
+            if column < len(target_keys) and weights[row_index][column] > 0
+        ]
+        edge_margins = {}
+        for row_index, column in assigned_edges:
+            alternative = [list(values) for values in weights]
+            alternative[row_index][column] = forbidden
+            _alternative_assignment, alternative_score = _hungarian_max(alternative)
+            edge_margins[(row_index, column)] = best_score - alternative_score
+        accepted_edges = [
+            edge
+            for edge in assigned_edges
+            if edge_margins[edge] >= minimum_margin
+        ]
+        assigned_rows = {row_index for row_index, _column in accepted_edges}
+        for row_index, column in accepted_edges:
+            target_key = target_keys[column]
+            candidate = candidate_maps[row_index][target_key]
+            matched.append(
+                (
+                    rows[row_index][0],
+                    candidate["target"],
+                    _candidate_diagnostics(rows[row_index][1]),
+                )
+            )
+        unmatched.extend(
+            (rows[row_index][0], _candidate_diagnostics(rows[row_index][1]))
+            for row_index in range(len(rows))
+            if row_index not in assigned_rows
+        )
+    return matched, unmatched
 
 
 def _require_resumable(output_dir: Path) -> None:
@@ -310,16 +592,64 @@ def prepare(args: argparse.Namespace) -> dict:
     output_dir.mkdir(parents=True, exist_ok=True)
     source_dir = output_dir / "sources"
     source_dir.mkdir(exist_ok=True)
+    reuse_source_dir = None
+    if getattr(args, "reuse_source_dir", None):
+        configured = Path(args.reuse_source_dir)
+        reuse_source_dir = configured.resolve(strict=True)
+        if configured.is_symlink() or not reuse_source_dir.is_dir():
+            raise ValueError("reuse source directory must be a regular non-symlink directory")
     request_budget = output_dir / "request-budget.json"
     host_interval = output_dir / "host-interval.json"
     matched = []
     unmatched = []
     all_results = []
     fetch_errors = []
+    verified_pages = []
     cursor = start
     while cursor <= end:
         source_url = f"{BASE_URL}/results?date={cursor.isoformat()}"
         source_path = source_dir / _source_filename(cursor)
+        fetch_error_path = _fetch_error_path(source_dir, cursor)
+        if not source_path.is_file() and (
+            fetch_error_path.exists() or fetch_error_path.is_symlink()
+        ):
+            fetch_errors.append(
+                _load_fetch_error(
+                    fetch_error_path,
+                    local_date=cursor.isoformat(),
+                    source_url=source_url,
+                )
+            )
+            cursor += timedelta(days=1)
+            continue
+        if not source_path.is_file() and reuse_source_dir is not None:
+            reused_source_path = reuse_source_dir / _source_filename(cursor)
+            reused_error_path = _fetch_error_path(reuse_source_dir, cursor)
+            if reused_source_path.is_file() or reused_source_path.is_symlink():
+                source = _cache_identity(
+                    reuse_source_dir,
+                    reused_source_path,
+                    source_url=source_url,
+                )
+                verified_pages.append(
+                    {
+                        "local_date": cursor.isoformat(),
+                        "source_path": reused_source_path,
+                        "source_evidence": source,
+                    }
+                )
+                cursor += timedelta(days=1)
+                continue
+            if reused_error_path.exists() or reused_error_path.is_symlink():
+                row = _load_fetch_error(
+                    reused_error_path,
+                    local_date=cursor.isoformat(),
+                    source_url=source_url,
+                )
+                _atomic(fetch_error_path, (canonical_json(row) + "\n").encode())
+                fetch_errors.append(row)
+                cursor += timedelta(days=1)
+                continue
         try:
             body = _download(
                 source_url,
@@ -332,48 +662,60 @@ def prepare(args: argparse.Namespace) -> dict:
                 request_interval_seconds=args.request_interval_seconds,
             )
         except HTTPError as exc:
-            if exc.code not in {404, 410, 500, 502, 503, 504}:
+            if exc.code not in RETRYABLE_HTTP_STATUSES:
                 raise
             fetch_errors.append(
-                {
-                    "schema_version": FETCH_ERROR_SCHEMA,
-                    "local_date": cursor.isoformat(),
-                    "source_url": source_url,
-                    "http_status": exc.code,
-                    "reason": str(exc.reason or "HRI date page unavailable"),
-                    "interpretation": (
-                        "source_unavailable_not_evidence_of_no_race; "
-                        "target remains unresolved unless another audited source supplies it"
-                    ),
-                }
+                _write_fetch_error(
+                    fetch_error_path,
+                    local_date=cursor.isoformat(),
+                    source_url=source_url,
+                    http_status=exc.code,
+                    reason=str(exc.reason or "HRI date page unavailable"),
+                )
             )
             cursor += timedelta(days=1)
             continue
         source = _cache_identity(source_dir, source_path, source_url=source_url)
-        for result in parse_date_page(body, local_date=cursor.isoformat(), source_evidence=source):
-            all_results.append(result)
-            target, diagnostics = match_target(result, targets)
-            if target is None:
-                unmatched.append(
-                    {
-                        "schema_version": UNMATCHED_SCHEMA,
-                        **result,
-                        "match_diagnostics": diagnostics,
-                    }
-                )
-                continue
-            matched.append(
-                {
-                    "schema_version": CANDIDATE_SCHEMA,
-                    "target_key": target["target_key"],
-                    "series_key": target["series_key"],
-                    "country_region": "ireland",
-                    "discipline": target["discipline"],
-                    **result,
-                    "match_diagnostics": diagnostics,
-                }
-            )
+        verified_pages.append(
+            {
+                "local_date": cursor.isoformat(),
+                "source_path": source_path,
+                "source_evidence": source,
+            }
+        )
         cursor += timedelta(days=1)
+    venue_course_map = infer_venue_course_map(
+        [row["source_path"] for row in verified_pages]
+    )
+    for page in verified_pages:
+        for result in parse_date_page(
+            page["source_path"].read_bytes(),
+            local_date=page["local_date"],
+            source_evidence=page["source_evidence"],
+            venue_course_map=venue_course_map,
+        ):
+            all_results.append(result)
+    assignments, unmatched_results = assign_targets_globally(all_results, targets)
+    for result, target, diagnostics in assignments:
+        matched.append(
+            {
+                "schema_version": CANDIDATE_SCHEMA,
+                "target_key": target["target_key"],
+                "series_key": target["series_key"],
+                "country_region": "ireland",
+                "discipline": target["discipline"],
+                **result,
+                "match_diagnostics": diagnostics,
+            }
+        )
+    for result, diagnostics in unmatched_results:
+        unmatched.append(
+            {
+                "schema_version": UNMATCHED_SCHEMA,
+                **result,
+                "match_diagnostics": diagnostics,
+            }
+        )
     target_keys = [row["target_key"] for row in matched]
     if len(target_keys) != len(set(target_keys)):
         duplicates = sorted(key for key, count in Counter(target_keys).items() if count > 1)
@@ -427,6 +769,8 @@ def prepare(args: argparse.Namespace) -> dict:
         },
         "outputs": identities,
         "request_budget": request_identity,
+        "venue_course_map": venue_course_map,
+        "reuse_source_root": str(reuse_source_dir) if reuse_source_dir else None,
         "generator": {"path": Path(__file__).name, "sha256": sha256_path(Path(__file__))},
     }
     manifest_path = output_dir / "proposal-manifest.json"
@@ -448,6 +792,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--timeout-seconds", type=int, default=30)
     parser.add_argument("--max-requests", type=int, default=2000)
     parser.add_argument("--request-interval-seconds", type=float, default=1.25)
+    parser.add_argument("--reuse-source-dir", type=Path)
     return parser.parse_args()
 
 

@@ -9,6 +9,7 @@ import json
 import os
 import re
 import tempfile
+from datetime import date, datetime
 from pathlib import Path
 from typing import Mapping
 from urllib.parse import urljoin, urlsplit
@@ -21,6 +22,12 @@ from audit_legacy_historical_detail_bundle import canonical_json, load_target_ar
 SOURCE_SCHEMA = "hri-graded-winner-candidate-proposal.v1"
 AUDIT_SCHEMA = "hri-graded-winner-candidate-audit.v1"
 CANDIDATE_SCHEMA = "hri-graded-winner-candidate.v1"
+FETCH_ERROR_SCHEMA = "hri-result-date-fetch-error.v1"
+FETCH_ERROR_INTERPRETATION = (
+    "source_unavailable_not_evidence_of_no_race; "
+    "target remains unresolved unless another audited source supplies it"
+)
+RETRYABLE_HTTP_STATUSES = {404, 410, 500, 502, 503, 504}
 SHA_RE = re.compile(r"[0-9a-f]{64}")
 GRADE_RE = re.compile(r"\((?:Grade|Group)\s*([123])\)", re.IGNORECASE)
 COUNTRY_RE = re.compile(r"\s*\(([A-Z]{2,3})\)\s*$")
@@ -214,6 +221,41 @@ def audit(*, proposal_root: Path, output_dir: Path) -> dict:
         raise ValueError("HRI proposal outputs are missing")
     _candidate_path, candidates = _bound(root, outputs.get("candidates"), label="candidates")
     _unmatched_path, _unmatched = _bound(root, outputs.get("unmatched"), label="unmatched")
+    _fetch_error_path, fetch_errors = _bound(
+        root, outputs.get("fetch_errors"), label="fetch errors"
+    )
+    unavailable_dates = set()
+    for row in fetch_errors:
+        local_date = str(row.get("local_date") or "")
+        expected_url = f"https://www.hri.ie/results?date={local_date}"
+        evidence_path = root / "sources" / f"hri-results-{local_date}.fetch-error.json"
+        try:
+            parsed_date = date.fromisoformat(local_date)
+            observed_at = datetime.fromisoformat(str(row.get("observed_at") or ""))
+        except ValueError as exc:
+            raise ValueError("HRI fetch-error date evidence is invalid") from exc
+        if (
+            row.get("schema_version") != FETCH_ERROR_SCHEMA
+            or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", local_date)
+            or parsed_date.isoformat() != local_date
+            or observed_at.tzinfo is None
+            or local_date in unavailable_dates
+            or row.get("source_url") != expected_url
+            or isinstance(row.get("http_status"), bool)
+            or row.get("http_status") not in RETRYABLE_HTTP_STATUSES
+            or not isinstance(row.get("reason"), str)
+            or not row["reason"].strip()
+            or row.get("interpretation") != FETCH_ERROR_INTERPRETATION
+            or evidence_path.is_symlink()
+            or not evidence_path.is_file()
+            or _json(evidence_path, label="persistent fetch error") != row
+        ):
+            raise ValueError("HRI fetch-error evidence contract drift")
+        unavailable_dates.add(local_date)
+    if len(fetch_errors) != int(
+        (manifest.get("counts") or {}).get("date_pages_unavailable") or 0
+    ):
+        raise ValueError("HRI unavailable-date count drift")
     seeds = []
     seen = set()
     for candidate in candidates:
@@ -282,7 +324,9 @@ def audit(*, proposal_root: Path, output_dir: Path) -> dict:
             "unmatched_official_results": int(
                 (manifest.get("counts") or {}).get("unmatched_official_results") or 0
             ),
+            "unavailable_date_pages": len(fetch_errors),
         },
+        "unavailable_date_evidence": dict(outputs["fetch_errors"]),
         "targeted_seed_proposals": proposal_identity,
         "auditor": {"path": Path(__file__).name, "sha256": sha256_path(Path(__file__))},
     }
