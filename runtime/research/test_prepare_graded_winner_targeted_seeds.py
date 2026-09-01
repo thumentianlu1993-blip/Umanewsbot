@@ -13,6 +13,11 @@ SPEC = importlib.util.spec_from_file_location("graded_winner_targeted_seeds", SC
 MODULE = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader is not None
 SPEC.loader.exec_module(MODULE)
+PLAN_SCRIPT = Path(__file__).with_name("prepare_racing_api_targeted_batch_plan.py")
+PLAN_SPEC = importlib.util.spec_from_file_location("targeted_batch_plan_for_winners", PLAN_SCRIPT)
+PLAN_MODULE = importlib.util.module_from_spec(PLAN_SPEC)
+assert PLAN_SPEC.loader is not None
+PLAN_SPEC.loader.exec_module(PLAN_MODULE)
 
 
 class GradedWinnerTargetedSeedsTests(unittest.TestCase):
@@ -232,6 +237,21 @@ class GradedWinnerTargetedSeedsTests(unittest.TestCase):
                 (output / "COMPLETE").read_text().strip(),
                 MODULE.sha256_path(output / "seed-ledger-manifest.json"),
             )
+            batch_plan = PLAN_MODULE.prepare_batch_plan(
+                seed_root=output,
+                approved_seed_manifest_sha256=MODULE.sha256_path(
+                    output / "seed-ledger-manifest.json"
+                ),
+                approved_seed_ledger_sha256=MODULE.sha256_path(
+                    output / "targeted-horse-seeds.jsonl"
+                ),
+                output_dir=root / "batch-plan",
+                batch_size_cap=2,
+                max_search_candidates=1,
+                max_results_pages_per_horse=5,
+                spacing_minutes=5,
+            )
+            self.assertEqual(batch_plan["counts"]["seeds"], 3)
 
     def test_rejects_capture_hash_drift(self):
         with tempfile.TemporaryDirectory() as temporary:
