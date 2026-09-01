@@ -95,6 +95,55 @@ def materialized_run(root: Path, ordinal: int, seed_id: str, target_race: dict) 
     }
 
 
+def profile_only_run(root: Path, ordinal: int, seed_id: str) -> dict:
+    run_root = root / f"{ordinal:05d}-profile-only"
+    normalized = {
+        "schema_version": "targeted-horse-export.v1",
+        "database_writes": 0,
+        "seed_id": seed_id,
+        "horse_id": "hrs_profileonly",
+        "identity_mode": "external_anchor_profile_only",
+        "profile": {"horse_id": "hrs_profileonly", "name": "Fallback"},
+        "parent_profiles": [],
+        "career": {"provider_row_count": 1, "unique_race_count": 1, "page_count": 1, "races": []},
+        "scope_target_races": [],
+        "target_race": None,
+        "target_occurrence": {
+            "status": "missing_from_provider_results",
+            "authority": "external_anchor",
+            "expected_finish_position": "1",
+            "target": {"year": 2005, "edition_year": 2005},
+            "source": {"authority": "human_reviewed_reference", "url": "https://example.com"},
+        },
+    }
+    normalized_path = run_root / "normalized" / "targeted-horse-export.json"
+    normalized_path.parent.mkdir(parents=True)
+    normalized_path.write_bytes(canonical(normalized))
+    normalized_sha = hashlib.sha256(normalized_path.read_bytes()).hexdigest()
+    manifest = {
+        "schema_version": "targeted-horse-run.v1",
+        "status": "complete",
+        "database_writes": 0,
+        "responses": [],
+        "normalized": {
+            "path": "normalized/targeted-horse-export.json",
+            "sha256": normalized_sha,
+            "size": normalized_path.stat().st_size,
+        },
+    }
+    manifest_path = run_root / "run-manifest.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    manifest_sha = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+    (run_root / "COMPLETE").write_text(manifest_sha + "\n", encoding="ascii")
+    return {
+        "ordinal": ordinal,
+        "seed_id": seed_id,
+        "horse_id": normalized["horse_id"],
+        "path": run_root.relative_to(root).as_posix(),
+        "manifest_sha256": manifest_sha,
+    }
+
+
 class StableIdLedgerTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -159,6 +208,41 @@ class StableIdLedgerTests(unittest.TestCase):
                     output_dir=root / "ledger",
                 )
             self.assertFalse((root / "ledger").exists())
+
+    def test_profile_only_member_becomes_gap_without_blocking_other_starters(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            materialized, _manifest_sha, _races = self._materialization(root)
+            manifest_path = materialized / "materialization-manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["materialized"].append(
+                profile_only_run(materialized, 3, "winner-profile-only")
+            )
+            manifest["selected_seed_count"] = 3
+            manifest_path.write_text(
+                json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
+            manifest_sha = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+            (materialized / "COMPLETE").write_text(manifest_sha + "\n", encoding="ascii")
+
+            output = root / "ledger"
+            report = self.module.build_stable_id_seed_ledger(
+                materialized_dir=materialized,
+                approved_materialization_manifest_sha256=manifest_sha,
+                output_dir=output,
+            )
+
+            self.assertEqual(report["coverage_status"], "complete_with_gaps")
+            self.assertEqual(report["source_materialized_seed_count"], 3)
+            self.assertEqual(report["source_target_occurrence_count"], 2)
+            self.assertEqual(report["profile_only_gap_count"], 1)
+            self.assertEqual(report["unique_actual_starter_count"], 3)
+            gaps = [
+                json.loads(line)
+                for line in (output / "target-occurrence-gaps.v1.jsonl").read_text().splitlines()
+            ]
+            self.assertEqual(gaps[0]["gap_code"], "target_occurrence_identity_unresolved")
+            self.assertEqual(gaps[0]["horse_id"], "hrs_profileonly")
 
     def test_stable_id_seed_fetches_directly_and_validates_every_target_race(self):
         with tempfile.TemporaryDirectory() as temporary:
