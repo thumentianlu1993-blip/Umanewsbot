@@ -601,8 +601,20 @@ def _targeted_materialization_component(
         merged_physical[physical_key] = (merged_key, occurrence)
     expected_by_physical: dict[tuple[str, str], dict] = {}
     binding_payloads: dict[tuple[str, str], list[dict]] = {}
+    profile_only_gap_count = 0
     output = []
-    for seed_id, run_manifest_sha, target_race in materialized:
+    for seed_id, run_manifest_sha, target_race, gap in materialized:
+        if gap is not None:
+            if target_race is not None:
+                raise ReconciliationCoverageError(
+                    "targeted materialization gap has an unexpected target race"
+                )
+            profile_only_gap_count += 1
+            continue
+        if target_race is None:
+            raise ReconciliationCoverageError(
+                "targeted materialization target race/gap conservation drift"
+            )
         starters = target_race.get("actual_starters")
         if not isinstance(starters, list) or not starters:
             raise ReconciliationCoverageError(
@@ -720,6 +732,7 @@ def _targeted_materialization_component(
         "binding_rows": len(output),
         "supporting_occurrence_rows": len(supported),
         "source_occurrence_rows": len(source_occurrences),
+        "profile_only_gap_count": profile_only_gap_count,
     }
 
 
