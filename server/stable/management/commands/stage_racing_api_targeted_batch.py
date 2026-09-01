@@ -9,6 +9,7 @@ from stable.services.racing_api_horse_staging import (
     RacingApiStagingError,
     apply_targeted_materialization,
     dry_run_targeted_materialization,
+    verify_targeted_materialization,
 )
 
 
@@ -23,10 +24,13 @@ class Command(BaseCommand):
         parser.add_argument("--approved-manifest-sha256", required=True)
         parser.add_argument("--apply", action="store_true")
         parser.add_argument("--allow-write", action="store_true")
+        parser.add_argument("--verify", action="store_true")
 
     def handle(self, *args, **options):
         if options["allow_write"] and not options["apply"]:
             raise CommandError("--allow-write 只能与 --apply 同时使用。")
+        if options["apply"] and options["verify"]:
+            raise CommandError("--apply 与 --verify 不能同时使用。")
         try:
             if options["apply"]:
                 report = apply_targeted_materialization(
@@ -35,6 +39,13 @@ class Command(BaseCommand):
                         "approved_manifest_sha256"
                     ],
                     allow_write=options["allow_write"],
+                )
+            elif options["verify"]:
+                report = verify_targeted_materialization(
+                    options["materialization_dir"],
+                    approved_manifest_sha256=options[
+                        "approved_manifest_sha256"
+                    ],
                 )
             else:
                 report = dry_run_targeted_materialization(
