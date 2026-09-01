@@ -15,7 +15,10 @@ from typing import Mapping
 
 
 BASE_SCHEMA = "targeted-horse-seed-ledger.v1"
-AUDIT_SCHEMA = "france-galop-bulletin-occurrence-audit.v1"
+AUDIT_SCHEMAS = {
+    "france-galop-bulletin-occurrence-audit.v1",
+    "hri-graded-winner-candidate-audit.v1",
+}
 SEED_SCHEMAS = {"targeted-horse-seed.v1", "targeted-horse-seed.v2"}
 GAP_SCHEMA = "graded-winner-anchor-gap.v1"
 SHA_RE = re.compile(r"[0-9a-f]{64}")
@@ -161,7 +164,7 @@ def load_audit(root: Path, *, approved_manifest_sha256: str) -> tuple[list[dict]
         not SHA_RE.fullmatch(approved_manifest_sha256)
         or manifest_sha != approved_manifest_sha256
         or marker.read_text(encoding="ascii").strip() != manifest_sha
-        or manifest.get("schema_version") != AUDIT_SCHEMA
+        or manifest.get("schema_version") not in AUDIT_SCHEMAS
         or manifest.get("status") != "reference_only_target_review_required"
         or manifest.get("completion_marker") != "AUDITED_REFERENCE_ONLY"
         or manifest.get("approval") is not False
