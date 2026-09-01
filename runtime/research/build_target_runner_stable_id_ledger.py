@@ -189,7 +189,7 @@ def _load_materialized_target_races(
     materialized_dir: Path,
     *,
     approved_manifest_sha256: str,
-) -> tuple[dict, list[tuple[str, str, dict]]]:
+) -> tuple[dict, list[tuple[str, str, dict | None, dict | None]]]:
     if not SHA256_RE.fullmatch(str(approved_manifest_sha256 or "")):
         raise StableIdLedgerError("approved materialization SHA-256 is invalid")
     if materialized_dir.is_symlink():
@@ -249,10 +249,39 @@ def _load_materialized_target_races(
         normalized = _read_json(normalized_path, "normalized export")
         if normalized.get("schema_version") != "targeted-horse-export.v1" or normalized.get("database_writes") != 0:
             raise StableIdLedgerError("normalized targeted export contract drift")
+        seed_id = normalize_space(row.get("seed_id"))
         target_race = normalized.get("target_race")
-        if not isinstance(target_race, Mapping):
-            raise StableIdLedgerError("normalized target race is missing")
-        result.append((normalize_space(row.get("seed_id")), run_manifest_sha, dict(target_race)))
+        if target_race is None:
+            target_occurrence = normalized.get("target_occurrence")
+            if (
+                normalized.get("identity_mode") != "external_anchor_profile_only"
+                or normalized.get("scope_target_races") != []
+                or not isinstance(target_occurrence, Mapping)
+                or target_occurrence.get("status") != "missing_from_provider_results"
+                or not HORSE_ID_RE.fullmatch(normalize_space(normalized.get("horse_id")))
+            ):
+                raise StableIdLedgerError("profile-only target occurrence gap contract drift")
+            result.append(
+                (
+                    seed_id,
+                    run_manifest_sha,
+                    None,
+                    {
+                        "schema_version": "target-runner-stable-id-gap.v1",
+                        "gap_code": "target_occurrence_identity_unresolved",
+                        "seed_id": seed_id,
+                        "horse_id": normalize_space(normalized.get("horse_id")),
+                        "source_materialized_run_manifest_sha256": run_manifest_sha,
+                        "target_occurrence": dict(target_occurrence),
+                    },
+                )
+            )
+        elif isinstance(target_race, Mapping):
+            if normalized.get("identity_mode") == "external_anchor_profile_only":
+                raise StableIdLedgerError("profile-only materialization unexpectedly has a target race")
+            result.append((seed_id, run_manifest_sha, dict(target_race), None))
+        else:
+            raise StableIdLedgerError("normalized target race is invalid")
     return manifest, result
 
 
@@ -272,7 +301,13 @@ def build_stable_id_seed_ledger(
     horses: dict[str, dict] = {}
     observed_race_hashes: dict[str, str] = {}
     source_occurrence_count = 0
-    for seed_id, run_manifest_sha, target_race in target_races:
+    profile_only_gaps = []
+    for seed_id, run_manifest_sha, target_race, gap in target_races:
+        if gap is not None:
+            profile_only_gaps.append(gap)
+            continue
+        if target_race is None:
+            raise StableIdLedgerError("target race/gap conservation drift")
         race_id = normalize_space(target_race.get("race_id"))
         raw_race_hash = payload_sha256(_raw_target_race(target_race))
         previous_hash = observed_race_hashes.setdefault(race_id, raw_race_hash)
@@ -329,13 +364,19 @@ def build_stable_id_seed_ledger(
 
     output_dir.mkdir(parents=True, exist_ok=True)
     ledger_path = output_dir / "target-runner-stable-id-seeds.v1.jsonl"
+    gap_path = output_dir / "target-occurrence-gaps.v1.jsonl"
     _atomic_write(
         ledger_path,
         "".join(f"{canonical_json(seed)}\n" for seed in seeds).encode("utf-8"),
     )
+    _atomic_write(
+        gap_path,
+        "".join(f"{canonical_json(gap)}\n" for gap in profile_only_gaps).encode("utf-8"),
+    )
     manifest = {
         "schema_version": "target-runner-stable-id-ledger.v1",
         "status": "complete",
+        "coverage_status": "complete" if not profile_only_gaps else "complete_with_gaps",
         "database_writes": 0,
         "network_requests": 0,
         "source_materialization": {
@@ -344,6 +385,8 @@ def build_stable_id_seed_ledger(
             "source_targeted_batch_manifest_sha256": source_batch_sha,
         },
         "source_target_occurrence_count": source_occurrence_count,
+        "source_materialized_seed_count": len(target_races),
+        "profile_only_gap_count": len(profile_only_gaps),
         "unique_target_race_count": len(observed_race_hashes),
         "unique_actual_starter_count": len(seeds),
         "seed_ledger": {
@@ -351,6 +394,12 @@ def build_stable_id_seed_ledger(
             "sha256": _sha256(ledger_path),
             "size": ledger_path.stat().st_size,
             "rows": len(seeds),
+        },
+        "semantic_gaps": {
+            "path": gap_path.name,
+            "sha256": _sha256(gap_path),
+            "size": gap_path.stat().st_size,
+            "rows": len(profile_only_gaps),
         },
     }
     manifest_path = output_dir / "manifest.json"
