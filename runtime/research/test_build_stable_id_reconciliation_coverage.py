@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 import sys
 import tempfile
@@ -198,6 +199,144 @@ class StableReconciliationCoverageTests(unittest.TestCase):
                             output_dir=root / "coverage",
                         )
                 self.assertFalse((root / "coverage").exists())
+
+    def test_targeted_duplicate_observation_has_one_owner_and_supporter(self):
+        runner = {
+            "horse_id": "hrs_shared",
+            "horse": "Shared (FR)",
+            "position": "1",
+            "participant_status": "finished",
+        }
+        target_race = {
+            "race_id": "rac_shared",
+            "date": "2026-05-01",
+            "region": "FR",
+            "pattern": "Grade 3",
+            "type": "Flat",
+            "race_name": "Prix Shared",
+            "course": "Fixture",
+            "runners": [dict(runner)],
+            "actual_starters": [dict(runner)],
+            "excluded_non_runner_count": 0,
+            "source_mode": "targeted_horse_content_pool",
+        }
+        occurrence_a = self.module._target_occurrence(
+            seed_id="target-runner-a",
+            run_manifest_sha256="1" * 64,
+            target_race=target_race,
+            runner=runner,
+        )
+        occurrence_b = self.module._target_occurrence(
+            seed_id="target-runner-b",
+            run_manifest_sha256="2" * 64,
+            target_race=target_race,
+            runner=runner,
+        )
+        merged_occurrence = self.module._merge_occurrence_observations(
+            occurrence_a, occurrence_b
+        )
+        merged_key = self.module.occurrence_key(
+            "hrs_shared", merged_occurrence
+        )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            materializations = []
+            stable_by_root = {}
+            for suffix, seed_id, run_sha, occurrence in (
+                ("a", "target-runner-a", "1" * 64, occurrence_a),
+                ("b", "target-runner-b", "2" * 64, occurrence_b),
+            ):
+                material = root / f"material-{suffix}"
+                material.mkdir()
+                manifest_path = material / "materialization-manifest.json"
+                manifest_path.write_text(
+                    json.dumps({"component": suffix}) + "\n", encoding="utf-8"
+                )
+                manifest_sha = hashlib.sha256(
+                    manifest_path.read_bytes()
+                ).hexdigest()
+                stable = root / f"stable-{suffix}"
+                stable.mkdir()
+                source_materialization = {
+                    "path": str(material.resolve()),
+                    "manifest_sha256": manifest_sha,
+                    "source_targeted_batch_manifest_sha256": "f" * 64,
+                }
+                (stable / "manifest.json").write_text(
+                    json.dumps(
+                        {"source_materialization": source_materialization}
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+                stable_sha = suffix.encode().hex().ljust(64, "0")[:64]
+                stable_by_root[str(stable)] = (
+                    [{
+                        "horse_id": "hrs_shared",
+                        "target_occurrences": [occurrence],
+                    }],
+                    {
+                        "root": str(stable),
+                        "manifest_sha256": stable_sha,
+                        "source_route": None,
+                    },
+                )
+                materializations.append(
+                    (material, manifest_sha, seed_id, run_sha, stable, stable_sha)
+                )
+
+            def load_stable(path, *, approved_manifest_sha256):
+                rows, identity = stable_by_root[str(path)]
+                self.assertEqual(
+                    approved_manifest_sha256, identity["manifest_sha256"]
+                )
+                return rows, identity
+
+            results = []
+            for material, manifest_sha, seed_id, run_sha, stable, stable_sha in materializations:
+                with patch.object(
+                    self.module,
+                    "_load_materialized_target_races",
+                    return_value=(
+                        {"source_batch_manifest_sha256": "f" * 64},
+                        [(seed_id, run_sha, target_race)],
+                    ),
+                ), patch.object(
+                    self.module,
+                    "load_stable_runner_ledger",
+                    side_effect=load_stable,
+                ), patch.object(
+                    self.module,
+                    "_read_json",
+                    return_value={
+                        "source_materialization": {
+                            "path": str(material.resolve()),
+                            "manifest_sha256": manifest_sha,
+                            "source_targeted_batch_manifest_sha256": "f" * 64,
+                        }
+                    },
+                ):
+                    results.append(
+                        self.module._targeted_materialization_component(
+                            material,
+                            expected_manifest_sha256=manifest_sha,
+                            allowed_stable_identities={(str(stable), stable_sha)},
+                            merged_occurrences={
+                                merged_key: ("hrs_shared", merged_occurrence)
+                            },
+                        )
+                    )
+
+        owner_rows, owner_identity = results[0]
+        supporting_rows, supporting_identity = results[1]
+        self.assertEqual(len(owner_rows), 1)
+        self.assertEqual(owner_rows[0]["occurrence_key"], merged_key)
+        self.assertEqual(owner_identity["binding_rows"], 1)
+        self.assertEqual(owner_identity["supporting_occurrence_rows"], 0)
+        self.assertEqual(supporting_rows, [])
+        self.assertEqual(supporting_identity["binding_rows"], 0)
+        self.assertEqual(supporting_identity["supporting_occurrence_rows"], 1)
 
 
 if __name__ == "__main__":
