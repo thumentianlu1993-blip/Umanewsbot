@@ -78,6 +78,57 @@ def _query_from_series(series_key: str, original_name: str) -> str:
     return " ".join(words)
 
 
+def _query_candidates(event: dict) -> list[str]:
+    """Return bounded, deterministic discovery queries for one race series."""
+
+    base = _query_from_series(
+        str(event.get("series_key") or ""), str(event.get("original_name") or "")
+    )
+    region = str(event.get("country_region") or "")
+    series_key = str(event.get("series_key") or "")
+    expanded = re.sub(r"\bStp\b\.?", "Chase", base, flags=re.IGNORECASE)
+    expanded = re.sub(r"\bS\.?\s*(?=\(|$)", "Stakes ", expanded, flags=re.IGNORECASE)
+    specific = []
+    if expanded != base:
+        specific.append(expanded)
+    if region == "france" and not re.match(r"^(Prix|Grand Prix)\b", base, re.IGNORECASE):
+        specific.append(f"Prix {base}")
+    if region == "united_states" and not re.search(
+        r"\b(Stakes|Derby|Oaks|Cup|Handicap|Hurdle|Chase)\b", expanded, re.IGNORECASE
+    ):
+        specific.append(f"{expanded} Stakes")
+    if region == "united_kingdom" and "gold-cup-ascot" in series_key:
+        specific.append("Ascot Gold Cup")
+    values = specific + [base]
+    values = [item for value in values for item in (value, f"{value} horse race")]
+    return list(dict.fromkeys(_collapse(value) for value in values if _collapse(value)))
+
+
+def _title_matches(title: str, aliases: list[str]) -> bool:
+    title_norm = _norm(title)
+    if not title_norm:
+        return False
+    for alias in aliases:
+        alias = re.sub(r"\bhorse\s+race\b", "", alias, flags=re.IGNORECASE).strip()
+        expected = _norm(alias)
+        if expected and (title_norm == expected or expected in title_norm or title_norm in expected):
+            return True
+        ignored = {"and", "de", "des", "du", "et", "horse", "la", "le", "prix", "race", "s", "stakes", "the"}
+        expected_tokens = {
+            token.casefold()
+            for token in re.findall(r"[A-Za-z0-9]+", unicodedata.normalize("NFKD", alias).encode("ascii", "ignore").decode("ascii"))
+            if token.casefold() not in ignored
+        }
+        title_tokens = {
+            token.casefold()
+            for token in re.findall(r"[A-Za-z0-9]+", unicodedata.normalize("NFKD", title).encode("ascii", "ignore").decode("ascii"))
+            if token.casefold() not in ignored
+        }
+        if expected_tokens and expected_tokens <= title_tokens:
+            return True
+    return False
+
+
 def _request_text(url: str, cache_path: Path, *, allow_network: bool, timeout: int, sleep_seconds: float) -> str:
     if cache_path.exists():
         return cache_path.read_text(encoding="utf-8", errors="replace")
@@ -98,16 +149,22 @@ def _cache_name(prefix: str, value: str, suffix: str) -> str:
     return f"{prefix}_{key[-120:]}.{suffix}"
 
 
-def _search_title(query: str, source_dir: Path, *, allow_network: bool, timeout: int, sleep_seconds: float) -> tuple[str, str]:
+def _search_title(
+    query: str,
+    source_dir: Path,
+    *,
+    aliases: list[str],
+    allow_network: bool,
+    timeout: int,
+    sleep_seconds: float,
+) -> tuple[str, str]:
     url = f"{WIKI_API}?{urlencode({'action': 'query', 'list': 'search', 'srsearch': query, 'format': 'json', 'srlimit': 5})}"
     text = _request_text(url, source_dir / _cache_name("source_wiki_search", query, "json"), allow_network=allow_network, timeout=timeout, sleep_seconds=sleep_seconds)
     data = json.loads(text)
-    expected = _norm(query)
     best_title = ""
     for item in data.get("query", {}).get("search", []):
         title = item.get("title") or ""
-        title_norm = _norm(title)
-        if title_norm == expected or expected in title_norm or title_norm in expected:
+        if _title_matches(title, aliases):
             best_title = title
             break
     if not best_title:
@@ -219,26 +276,57 @@ def prepare(args: argparse.Namespace) -> dict:
     unmatched_rows = []
     with jsonl_path.open("w", encoding="utf-8") as jsonl:
         for event in events:
-            query = _query_from_series(event.get("series_key") or "", event.get("original_name") or "")
+            queries = _query_candidates(event)
+            query = queries[0]
             diagnostics = []
-            try:
-                title, page_url = _search_title(query, source_dir, allow_network=args.allow_network, timeout=args.timeout_seconds, sleep_seconds=args.sleep_seconds)
-                if not title:
-                    raise RuntimeError("wikipedia_search_no_match")
-                html = _request_text(
-                    page_url,
-                    source_dir / _cache_name("source_wiki_page", title, "html"),
-                    allow_network=args.allow_network,
-                    timeout=args.timeout_seconds,
-                    sleep_seconds=args.sleep_seconds,
-                )
-                wiki_items = _parse_winner_tables(html, page_url=page_url, min_year=args.min_year, max_year=2026)
-            except Exception as exc:
-                diagnostics.append({"slug": event.get("slug"), "query": query, "error": str(exc)})
+            wiki_items = []
+            title = ""
+            page_url = ""
+            selected_query = ""
+            for candidate_query in queries:
+                try:
+                    candidate_title, candidate_url = _search_title(
+                        candidate_query,
+                        source_dir,
+                        aliases=queries,
+                        allow_network=args.allow_network,
+                        timeout=args.timeout_seconds,
+                        sleep_seconds=args.sleep_seconds,
+                    )
+                    if not candidate_title:
+                        raise RuntimeError("wikipedia_search_no_match")
+                    html = _request_text(
+                        candidate_url,
+                        source_dir / _cache_name("source_wiki_page", candidate_title, "html"),
+                        allow_network=args.allow_network,
+                        timeout=args.timeout_seconds,
+                        sleep_seconds=args.sleep_seconds,
+                    )
+                    candidate_items = _parse_winner_tables(
+                        html, page_url=candidate_url, min_year=args.min_year, max_year=2026
+                    )
+                    if not candidate_items:
+                        raise RuntimeError("wikipedia_winner_table_not_found")
+                    title = candidate_title
+                    page_url = candidate_url
+                    selected_query = candidate_query
+                    wiki_items = candidate_items
+                    break
+                except Exception as exc:
+                    diagnostics.append(
+                        {
+                            "slug": event.get("slug"),
+                            "query": candidate_query,
+                            "error": str(exc),
+                        }
+                    )
+            discovery_diagnostics = list(diagnostics)
+            if not wiki_items:
                 summary["errors"].extend(diagnostics)
-                wiki_items = []
-                title = ""
-                page_url = ""
+            else:
+                # Earlier discovery misses are expected bounded fallbacks, not
+                # partial source failures once a complete winner table wins.
+                diagnostics = []
             items = _merge_items(wiki_items, current_history.get(event["slug"], []))
             if not items:
                 summary["events_without_history"] += 1
@@ -264,9 +352,11 @@ def prepare(args: argparse.Namespace) -> dict:
                 "metadata": {
                     "source_kind": "wikipedia_winners_table",
                     "wiki_title": title,
-                    "query": query,
+                    "query": selected_query or query,
+                    "attempted_queries": queries,
                     "partial_history": bool(diagnostics),
                     "diagnostics": diagnostics,
+                    "discovery_diagnostics": discovery_diagnostics,
                 },
             }
             jsonl.write(json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n")
