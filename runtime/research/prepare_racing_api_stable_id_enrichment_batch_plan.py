@@ -314,10 +314,20 @@ def _load_reconciliation_coverage(
         if binding_rows == 0 and (
             component.get("type")
             != "provider_native_targeted_materialization"
-            or not isinstance(component.get("supporting_occurrence_rows"), int)
-            or component.get("supporting_occurrence_rows", 0) < 1
-            or component.get("source_occurrence_rows")
-            != component.get("supporting_occurrence_rows")
+            or not (
+                (
+                    isinstance(component.get("supporting_occurrence_rows"), int)
+                    and component.get("supporting_occurrence_rows", 0) >= 1
+                    and component.get("source_occurrence_rows")
+                    == component.get("supporting_occurrence_rows")
+                )
+                or (
+                    component.get("supporting_occurrence_rows") == 0
+                    and component.get("source_occurrence_rows") == 0
+                    and isinstance(component.get("profile_only_gap_count"), int)
+                    and component.get("profile_only_gap_count", 0) >= 1
+                )
+            )
         ):
             raise ValueError(
                 "zero-binding reconciliation component is not valid supporting evidence"

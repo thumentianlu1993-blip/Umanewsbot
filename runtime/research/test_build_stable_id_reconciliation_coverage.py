@@ -300,7 +300,7 @@ class StableReconciliationCoverageTests(unittest.TestCase):
                     "_load_materialized_target_races",
                     return_value=(
                         {"source_batch_manifest_sha256": "f" * 64},
-                        [(seed_id, run_sha, target_race)],
+                        [(seed_id, run_sha, target_race, None)],
                     ),
                 ), patch.object(
                     self.module,
