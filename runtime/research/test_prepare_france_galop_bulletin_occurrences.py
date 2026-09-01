@@ -95,6 +95,15 @@ class FranceGalopBulletinTests(unittest.TestCase):
         self.assertEqual(rows[1]["filename"], "26plat07_0.pdf")
         self.assertEqual(rows[2]["url"].split(":", 1)[0], "https")
 
+    def test_pdf_columns_adapt_to_portrait_and_double_page_landscape(self):
+        portrait = self.module._column_bboxes(595.0, 842.0)
+        landscape = self.module._column_bboxes(1190.0, 842.0)
+
+        self.assertEqual(len(portrait), 2)
+        self.assertEqual(len(landscape), 4)
+        self.assertEqual(portrait[0][1], (0.0, 0, 297.5, 842.0))
+        self.assertEqual(landscape[-1][1], (892.5, 0, 1190.0, 842.0))
+
     def test_index_accepts_linked_four_digit_year_and_numeric_revision_suffix(self):
         html = """
         <a href="/sites/default/files/2024-02/2024plat01.pdf">N°1</a>
