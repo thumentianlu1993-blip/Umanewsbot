@@ -464,8 +464,41 @@ def _materialize_current_source_page(
         != hashlib.sha256(source_path.read_bytes()).hexdigest()
     ):
         raise ValueError("current Wikipedia source page identity drift")
+    destination = destination_source_dir / filename
+    destination_manifest_path = destination_source_dir / "source_cache_manifest.json"
+    destination_manifest = None
+    if destination_manifest_path.is_file() and not destination_manifest_path.is_symlink():
+        try:
+            destination_manifest = json.loads(
+                destination_manifest_path.read_text(encoding="utf-8")
+            )
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValueError("destination Wikipedia source manifest is unreadable") from exc
+    destination_identity = (
+        (destination_manifest.get("files") or {}).get(filename)
+        if isinstance(destination_manifest, dict)
+        else None
+    )
+    if destination.exists() or destination.is_symlink() or destination_identity is not None:
+        if (
+            destination_source_dir.is_symlink()
+            or destination.is_symlink()
+            or not destination.is_file()
+            or not isinstance(destination_manifest, dict)
+            or destination_manifest.get("schema_version") != "1.0"
+            or Path(str(destination_manifest.get("root") or "")).resolve()
+            != destination_source_dir.resolve()
+            or not isinstance(destination_identity, dict)
+            or destination_identity.get("source_url") != source_url
+            or destination_identity.get("size") != source_path.stat().st_size
+            or destination_identity.get("sha256") != identity.get("sha256")
+            or hashlib.sha256(destination.read_bytes()).hexdigest()
+            != identity.get("sha256")
+        ):
+            raise ValueError("destination Wikipedia source page identity drift")
+        return
     write_source_cache_text(
-        destination_source_dir / filename,
+        destination,
         source_path.read_text(encoding="utf-8"),
         source_url=source_url,
     )

@@ -234,6 +234,13 @@ class WikipediaWinnerQueryTests(unittest.TestCase):
             request.assert_not_called()
             self.assertEqual(result["events"], 1)
             self.assertEqual(result["history_items"], 1)
+            with mock.patch.object(
+                MODULE, "write_source_cache_text"
+            ) as rewrite, mock.patch.object(MODULE, "_request_text") as request:
+                replay = MODULE.prepare(args)
+            rewrite.assert_not_called()
+            request.assert_not_called()
+            self.assertEqual(replay["events"], 1)
 
 
 if __name__ == "__main__":
