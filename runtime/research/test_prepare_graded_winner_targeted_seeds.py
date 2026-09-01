@@ -196,7 +196,7 @@ class GradedWinnerTargetedSeedsTests(unittest.TestCase):
                 "request_count": 1,
                 "max_requests": 2,
                 "request_interval_seconds": 1.0,
-                "requests": [{"method": "GET"}],
+                "requests": [{"sequence": 1, "method": "GET"}],
             },
         )
         source_manifest = sources / "source_cache_manifest.json"
@@ -259,6 +259,62 @@ class GradedWinnerTargetedSeedsTests(unittest.TestCase):
             plan, plan_sha, capture, hashes = self.fixture(root)
             hashes["summary"] = "0" * 64
             with self.assertRaisesRegex(ValueError, "capture summary SHA-256 mismatch"):
+                MODULE.build(
+                    event_plan_root=plan,
+                    expected_event_manifest_sha256=plan_sha,
+                    capture_root=capture,
+                    capture_hashes=hashes,
+                    output_dir=root / "artifact",
+                )
+
+    def test_accepts_bounded_tail_for_more_than_200_requests(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            plan, plan_sha, capture, hashes = self.fixture(root)
+            budget = capture / "request-budget.json"
+            self.write_json(
+                budget,
+                {
+                    "status": "active",
+                    "request_count": 2093,
+                    "max_requests": 2608,
+                    "request_interval_seconds": 1.0,
+                    "requests": [
+                        {"sequence": sequence, "method": "GET"}
+                        for sequence in range(1894, 2094)
+                    ],
+                },
+            )
+            hashes["budget"] = MODULE.sha256_path(budget)
+            result = MODULE.build(
+                event_plan_root=plan,
+                expected_event_manifest_sha256=plan_sha,
+                capture_root=capture,
+                capture_hashes=hashes,
+                output_dir=root / "artifact",
+            )
+            self.assertEqual(result["bounded_capture"]["network_requests"], 2093)
+
+    def test_rejects_non_contiguous_bounded_request_tail(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            plan, plan_sha, capture, hashes = self.fixture(root)
+            budget = capture / "request-budget.json"
+            self.write_json(
+                budget,
+                {
+                    "status": "active",
+                    "request_count": 201,
+                    "max_requests": 2608,
+                    "request_interval_seconds": 1.0,
+                    "requests": [
+                        {"sequence": sequence, "method": "GET"}
+                        for sequence in range(1, 201)
+                    ],
+                },
+            )
+            hashes["budget"] = MODULE.sha256_path(budget)
+            with self.assertRaisesRegex(ValueError, "bounded capture contract drift"):
                 MODULE.build(
                     event_plan_root=plan,
                     expected_event_manifest_sha256=plan_sha,

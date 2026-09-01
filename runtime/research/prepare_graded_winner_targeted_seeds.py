@@ -231,6 +231,14 @@ def _load_capture(
     unmatched_slugs = [str(row.get("slug") or "") for row in unmatched]
     requests = budget.get("requests")
     source_files = source_manifest.get("files")
+    request_count = int(budget.get("request_count") or 0)
+    request_sequences = [
+        row.get("sequence") if isinstance(row, Mapping) else None
+        for row in (requests or [])
+    ]
+    expected_request_sequences = list(
+        range(max(1, request_count - 199), request_count + 1)
+    )
     if (
         summary.get("source") != "wikipedia_winners_table"
         or summary.get("events_requested") != len(expected_event_slugs)
@@ -245,8 +253,11 @@ def _load_capture(
         or set(record_slugs) & set(unmatched_slugs)
         or set(record_slugs) | set(unmatched_slugs) != expected_event_slugs
         or budget.get("status") != "active"
-        or budget.get("request_count") != len(requests or [])
-        or int(budget.get("request_count") or 0) > int(budget.get("max_requests") or 0)
+        # race_event_request_budget intentionally retains only the latest 200
+        # request rows while request_count remains cumulative.  Verify that
+        # bounded tail exactly instead of requiring the two counts to match.
+        or request_sequences != expected_request_sequences
+        or request_count > int(budget.get("max_requests") or 0)
         or float(budget.get("request_interval_seconds") or 0) < 1
         or not isinstance(requests, list)
         or not isinstance(source_files, Mapping)
@@ -314,7 +325,7 @@ def _load_capture(
         "unmatched": _identity(paths["unmatched"], rows=len(unmatched)),
         "request_budget": _identity(paths["budget"]),
         "source_manifest": _identity(paths["sources"]),
-        "network_requests": int(budget["request_count"]),
+        "network_requests": request_count,
         "errors": len(summary.get("errors") or []),
     }
 
