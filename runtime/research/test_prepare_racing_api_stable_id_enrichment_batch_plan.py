@@ -426,6 +426,111 @@ class StableIdEnrichmentBatchPlanTests(unittest.TestCase):
                     expected_horse_ids={"hrs_a", "hrs_b"},
                     expected_occurrence_keys={next(iter(occurrence_keys))},
                 )
+
+    def test_targeted_supporting_component_may_have_zero_owned_bindings(self):
+        stable_identity = {
+            "root": "/stable/root",
+            "manifest_sha256": "4" * 64,
+        }
+        occurrences = [
+            ("hrs_a", "rac_a", "target-runner-a"),
+            ("hrs_b", "rac_b", "target-runner-b"),
+        ]
+        occurrence_keys = {
+            canonical(
+                {
+                    "horse_id": horse_id,
+                    "race_id": race_id,
+                    "source_targeted_seed_id": seed_id,
+                }
+            )
+            for horse_id, race_id, seed_id in occurrences
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            coverage, _manifest_sha = self.coverage_artifact(
+                root, stable_identity, occurrences
+            )
+            supporting_root = root / "supporting-materialization"
+            supporting_root.mkdir()
+            supporting_manifest = supporting_root / "materialization-manifest.json"
+            supporting_manifest.write_text("{}\n", encoding="utf-8")
+            supporting_sha = hashlib.sha256(
+                supporting_manifest.read_bytes()
+            ).hexdigest()
+            supporting_stable_root = root / "supporting-stable"
+            supporting_stable_root.mkdir()
+            supporting_stable_identity = {
+                "root": str(supporting_stable_root.resolve()),
+                "manifest_sha256": "e" * 64,
+                "source_route": None,
+            }
+            (supporting_stable_root / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "source_materialization": {
+                            "path": str(supporting_root.resolve()),
+                            "manifest_sha256": supporting_sha,
+                            "source_targeted_batch_manifest_sha256": "d" * 64,
+                        }
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            manifest_path = coverage / "coverage-manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["components"].append(
+                {
+                    "type": "provider_native_targeted_materialization",
+                    "root": str(supporting_root.resolve()),
+                    "manifest_sha256": supporting_sha,
+                    "binding_rows": 0,
+                    "supporting_occurrence_rows": 1,
+                    "source_occurrence_rows": 1,
+                    "source_targeted_batch_manifest_sha256": "d" * 64,
+                    "source_stable_runner_ledger": supporting_stable_identity,
+                }
+            )
+            manifest_path.write_text(
+                json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            manifest_sha = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+            (coverage / "COMPLETE").write_text(manifest_sha + "\n")
+
+            with patch.object(
+                self.module,
+                "_stable_lineage_identities",
+                return_value={
+                    (
+                        supporting_stable_identity["root"],
+                        supporting_stable_identity["manifest_sha256"],
+                    )
+                },
+            ), patch.object(
+                self.module,
+                "_load_materialized_target_races",
+                return_value=(
+                    {"source_batch_manifest_sha256": "d" * 64},
+                    [],
+                ),
+            ), patch.object(
+                self.module,
+                "load_stable_runner_ledger",
+                return_value=([], supporting_stable_identity),
+            ):
+                identity = self.module._load_approved_reconciliation(
+                    coverage,
+                    approved_manifest_sha256=manifest_sha,
+                    stable_identity=stable_identity,
+                    expected_horse_ids={"hrs_a", "hrs_b"},
+                    expected_occurrence_keys=occurrence_keys,
+                )
+
+        self.assertEqual(identity["approved_binding_rows"], 2)
+        self.assertEqual(identity["component_count"], 3)
+
     def test_duplicate_or_invalid_stable_horse_ids_are_rejected_before_planning(self):
         seeds = [self.seed("hrs_a"), self.seed("hrs_a")]
         with tempfile.TemporaryDirectory() as temporary:

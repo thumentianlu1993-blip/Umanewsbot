@@ -46,6 +46,7 @@ from build_bulk_target_runner_stable_id_ledger import (  # noqa: E402
 )
 from build_target_runner_stable_id_ledger import (  # noqa: E402
     _load_materialized_target_races,
+    _merge_occurrence_observations,
     _target_occurrence,
 )
 from racing_api_horse_export import runner_disposition  # noqa: E402
@@ -92,6 +93,83 @@ def _stable_occurrences(rows: list[dict]) -> dict[str, tuple[str, dict]]:
             if key in output:
                 raise ReconciliationCoverageError("stable occurrence identity is duplicated")
             output[key] = (horse_id, dict(occurrence))
+    return output
+
+
+def _source_observations(occurrence: Mapping[str, object]) -> list[dict]:
+    raw = occurrence.get("source_observations")
+    if not isinstance(raw, list) or not raw:
+        raise ReconciliationCoverageError(
+            "provider-native targeted occurrence observations are missing"
+        )
+    observations = []
+    for value in raw:
+        if not isinstance(value, Mapping):
+            raise ReconciliationCoverageError(
+                "provider-native targeted observation must be an object"
+            )
+        observation = {
+            key: str(value.get(key) or "")
+            for key in (
+                "source_targeted_seed_id",
+                "source_materialized_run_manifest_sha256",
+                "source_runner_payload_sha256",
+            )
+        }
+        if any(not item for item in observation.values()):
+            raise ReconciliationCoverageError(
+                "provider-native targeted observation identity is incomplete"
+            )
+        observations.append(observation)
+    ordered = sorted(observations, key=canonical_json)
+    if (
+        len({canonical_json(value) for value in ordered}) != len(ordered)
+        or any(occurrence.get(key) != value for key, value in ordered[0].items())
+    ):
+        raise ReconciliationCoverageError(
+            "provider-native targeted observation ordering drift"
+        )
+    return ordered
+
+
+def _targeted_semantic_occurrence(occurrence: Mapping[str, object]) -> dict:
+    return {
+        key: value
+        for key, value in occurrence.items()
+        if key
+        not in {
+            "source_targeted_seed_id",
+            "source_materialized_run_manifest_sha256",
+            "source_runner_payload_sha256",
+            "source_observations",
+        }
+    }
+
+
+def _targeted_physical_occurrences(
+    rows: list[dict],
+) -> dict[tuple[str, str], dict]:
+    output = {}
+    for seed in rows:
+        horse_id = str(seed.get("horse_id") or "")
+        occurrences = seed.get("target_occurrences")
+        if not horse_id or not isinstance(occurrences, list):
+            raise ReconciliationCoverageError(
+                "provider-native targeted stable seed contract drift"
+            )
+        for occurrence in occurrences:
+            if not isinstance(occurrence, Mapping):
+                raise ReconciliationCoverageError(
+                    "provider-native targeted occurrence must be an object"
+                )
+            _source_observations(occurrence)
+            race_id = str(occurrence.get("race_id") or "")
+            key = (horse_id, race_id)
+            if not race_id or key in output:
+                raise ReconciliationCoverageError(
+                    "provider-native targeted physical occurrence is duplicated"
+                )
+            output[key] = dict(occurrence)
     return output
 
 
@@ -509,9 +587,21 @@ def _targeted_materialization_component(
             "targeted materialization must bind exactly one stable source ledger"
         )
     source_rows, source_stable_identity = matching_sources[0]
-    source_occurrences = _stable_occurrences(source_rows)
+    source_occurrences = _targeted_physical_occurrences(source_rows)
+    merged_physical = {}
+    for merged_key, (horse_id, occurrence) in merged_occurrences.items():
+        if occurrence.get("source_observations") is None:
+            continue
+        _source_observations(occurrence)
+        physical_key = (horse_id, str(occurrence.get("race_id") or ""))
+        if not physical_key[1] or physical_key in merged_physical:
+            raise ReconciliationCoverageError(
+                "merged provider-native targeted occurrence is duplicated"
+            )
+        merged_physical[physical_key] = (merged_key, occurrence)
+    expected_by_physical: dict[tuple[str, str], dict] = {}
+    binding_payloads: dict[tuple[str, str], list[dict]] = {}
     output = []
-    seen = set()
     for seed_id, run_manifest_sha, target_race in materialized:
         starters = target_race.get("actual_starters")
         if not isinstance(starters, list) or not starters:
@@ -535,56 +625,87 @@ def _targeted_materialization_component(
                 runner=runner,
             )
             race_id = expected_occurrence["race_id"]
-            key = canonical_json(
-                {
-                    "horse_id": horse_id,
-                    "race_id": race_id,
-                    "source_targeted_seed_id": seed_id,
-                }
-            )
-            source = source_occurrences.get(key)
-            merged = merged_occurrences.get(key)
-            if (
-                source is None
-                or merged is None
-                or canonical_json(source[1]) != canonical_json(expected_occurrence)
-                or canonical_json(merged[1]) != canonical_json(expected_occurrence)
-                or key in seen
-            ):
-                raise ReconciliationCoverageError(
-                    "targeted provider-native occurrence is absent or duplicated"
-                )
-            seen.add(key)
-            binding_payload = {
+            physical_key = (horse_id, race_id)
+            existing = expected_by_physical.get(physical_key)
+            if existing is not None:
+                try:
+                    expected_occurrence = _merge_occurrence_observations(
+                        existing, expected_occurrence
+                    )
+                except ValueError as exc:
+                    raise ReconciliationCoverageError(str(exc)) from exc
+            expected_by_physical[physical_key] = expected_occurrence
+            binding_payloads.setdefault(physical_key, []).append({
                 "seed_id": seed_id,
                 "run_manifest_sha256": run_manifest_sha,
                 "horse_id": horse_id,
                 "race_id": race_id,
                 "runner": dict(runner),
-            }
-            output.append(
-                {
-                    "schema_version": BINDING_SCHEMA_VERSION,
-                    "occurrence_key": key,
-                    "horse_id": horse_id,
-                    "race_id": race_id,
-                    "source_targeted_seed_id": seed_id,
-                    "target_key": seed_id,
-                    "starter_occurrence_key": (
-                        "provider-native-targeted:"
-                        f"{expected_manifest_sha256}:{seed_id}:{race_id}:{horse_id}"
-                    ),
-                    "component_type": "provider_native_targeted_materialization",
-                    "component_manifest_sha256": expected_manifest_sha256,
-                    "component_binding_sha256": hashlib.sha256(
-                        canonical_json(binding_payload).encode("utf-8")
-                    ).hexdigest(),
-                    "stable_occurrence_sha256": hashlib.sha256(
-                        canonical_json(expected_occurrence).encode("utf-8")
-                    ).hexdigest(),
-                }
+            })
+
+    owned = set()
+    supported = set()
+    for physical_key in sorted(expected_by_physical):
+        horse_id, race_id = physical_key
+        expected_occurrence = expected_by_physical[physical_key]
+        source_occurrence = source_occurrences.get(physical_key)
+        merged_row = merged_physical.get(physical_key)
+        if source_occurrence is None or merged_row is None:
+            raise ReconciliationCoverageError(
+                "targeted provider-native occurrence is absent from stable lineage"
             )
-    if set(source_occurrences) != seen:
+        merged_key, merged_occurrence = merged_row
+        expected_observations = {
+            canonical_json(value) for value in _source_observations(expected_occurrence)
+        }
+        merged_observations = {
+            canonical_json(value) for value in _source_observations(merged_occurrence)
+        }
+        if (
+            canonical_json(source_occurrence) != canonical_json(expected_occurrence)
+            or canonical_json(_targeted_semantic_occurrence(merged_occurrence))
+            != canonical_json(_targeted_semantic_occurrence(expected_occurrence))
+            or not expected_observations <= merged_observations
+        ):
+            raise ReconciliationCoverageError(
+                "targeted provider-native occurrence evidence drift"
+            )
+        primary = canonical_json(_source_observations(merged_occurrence)[0])
+        if primary not in expected_observations:
+            supported.add(physical_key)
+            continue
+        owned.add(physical_key)
+        primary_seed_id = str(merged_occurrence["source_targeted_seed_id"])
+        binding_payload = {
+            "materialization_manifest_sha256": expected_manifest_sha256,
+            "observations": sorted(
+                binding_payloads[physical_key], key=canonical_json
+            ),
+            "source_occurrence": source_occurrence,
+        }
+        output.append(
+            {
+                "schema_version": BINDING_SCHEMA_VERSION,
+                "occurrence_key": merged_key,
+                "horse_id": horse_id,
+                "race_id": race_id,
+                "source_targeted_seed_id": primary_seed_id,
+                "target_key": primary_seed_id,
+                "starter_occurrence_key": (
+                    "provider-native-targeted:"
+                    f"{expected_manifest_sha256}:{primary_seed_id}:{race_id}:{horse_id}"
+                ),
+                "component_type": "provider_native_targeted_materialization",
+                "component_manifest_sha256": expected_manifest_sha256,
+                "component_binding_sha256": hashlib.sha256(
+                    canonical_json(binding_payload).encode("utf-8")
+                ).hexdigest(),
+                "stable_occurrence_sha256": hashlib.sha256(
+                    canonical_json(merged_occurrence).encode("utf-8")
+                ).hexdigest(),
+            }
+        )
+    if set(source_occurrences) != set(expected_by_physical) or owned & supported:
         raise ReconciliationCoverageError(
             "targeted materialization does not cover its exact stable source ledger"
         )
@@ -597,6 +718,8 @@ def _targeted_materialization_component(
         ],
         "source_stable_runner_ledger": source_stable_identity,
         "binding_rows": len(output),
+        "supporting_occurrence_rows": len(supported),
+        "source_occurrence_rows": len(source_occurrences),
     }
 
 

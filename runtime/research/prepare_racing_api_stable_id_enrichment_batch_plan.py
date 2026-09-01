@@ -305,10 +305,23 @@ def _load_reconciliation_coverage(
         for component in components
     }
     if any(
-        isinstance(value, bool) or not isinstance(value, int) or value < 1
+        isinstance(value, bool) or not isinstance(value, int) or value < 0
         for value in component_binding_counts.values()
     ):
         raise ValueError("reconciliation coverage component binding count drift")
+    for component in components:
+        binding_rows = component.get("binding_rows")
+        if binding_rows == 0 and (
+            component.get("type")
+            != "provider_native_targeted_materialization"
+            or not isinstance(component.get("supporting_occurrence_rows"), int)
+            or component.get("supporting_occurrence_rows", 0) < 1
+            or component.get("source_occurrence_rows")
+            != component.get("supporting_occurrence_rows")
+        ):
+            raise ValueError(
+                "zero-binding reconciliation component is not valid supporting evidence"
+            )
     binding_path = _regular(
         resolved / "coverage-bindings.jsonl",
         label="reconciliation coverage bindings",
@@ -334,7 +347,12 @@ def _load_reconciliation_coverage(
         or len(occurrence_keys) != len(set(occurrence_keys))
         or set(occurrence_keys) != expected_occurrence_keys
         or binding_horse_ids != expected_horse_ids
-        or dict(observed_component_counts) != component_binding_counts
+        or dict(observed_component_counts)
+        != {
+            key: value
+            for key, value in component_binding_counts.items()
+            if value > 0
+        }
         or any(
             row.get("schema_version")
             != RECONCILIATION_COVERAGE_BINDING_SCHEMA_VERSION
