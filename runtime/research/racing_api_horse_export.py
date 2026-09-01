@@ -647,6 +647,19 @@ def target_occurrence_candidate_ids(
     target = seed.get("target")
     if not isinstance(target, Mapping):
         raise ValueError("target occurrence seed requires target object")
+    mismatch_flag = target.get("allow_unique_structured_name_mismatch", False)
+    if not isinstance(mismatch_flag, bool):
+        raise ValueError("structured target name mismatch flag must be boolean")
+    if mismatch_flag:
+        organizer_result_url = normalize_space(target.get("organizer_result_url"))
+        if (
+            normalize_space(seed.get("source_authority")) != "organizer_official"
+            or not normalize_space(target.get("local_date"))
+            or organizer_result_url != source_url
+        ):
+            raise ValueError(
+                "structured target name mismatch requires an exact organizer result"
+            )
     expected_position = normalize_space(seed.get("expected_finish_position")).upper()
     if not FINISHED_POSITION_RE.fullmatch(expected_position):
         raise ValueError("target occurrence seed requires numeric expected finish position")
@@ -2147,7 +2160,10 @@ def _race_matches_target(target: Mapping[str, object], race: Mapping[str, object
     if target_date and raw_date != target_date:
         return False
     accepted_names = _target_aliases(target, "canonical_name_original", "race_name_aliases")
-    if not _race_name_matches(accepted_names, race.get("race_name")):
+    allow_name_mismatch = target.get("allow_unique_structured_name_mismatch") is True
+    if allow_name_mismatch and not target_date:
+        return False
+    if not allow_name_mismatch and not _race_name_matches(accepted_names, race.get("race_name")):
         return False
     accepted_courses = _target_aliases(target, "racecourse", "racecourse_aliases")
     observed_course = _without_parenthetical_qualifiers(race.get("course"))
