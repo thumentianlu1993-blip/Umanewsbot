@@ -4828,6 +4828,7 @@ class ExternalHorse(TimestampedModel):
     owner_name = models.CharField(max_length=255, blank=True)
     trainer_name = models.CharField(max_length=255, blank=True)
     record_summary = models.CharField(max_length=255, blank=True)
+    profile_snapshot = models.JSONField(default=dict, blank=True)
     raw_payload = models.JSONField(default=dict, blank=True)
     fetched_at = models.DateTimeField(default=timezone.now)
     last_seen_at = models.DateTimeField(default=timezone.now)
