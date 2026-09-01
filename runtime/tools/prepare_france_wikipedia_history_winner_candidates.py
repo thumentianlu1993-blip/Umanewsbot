@@ -129,6 +129,76 @@ def _title_matches(title: str, aliases: list[str]) -> bool:
     return False
 
 
+def _search_result_matches(title: str, snippet: str, aliases: list[str]) -> bool:
+    """Match registered or historical race names to renamed Wikipedia pages.
+
+    Wikipedia often stores a race under its current sponsored title while the
+    calendar carries its registered or former title.  The fallback uses both
+    the result title and snippet, but still requires a race-like page title so
+    that a horse biography merely mentioning the race cannot be selected.
+    """
+
+    plain_snippet = BeautifulSoup(snippet or "", "lxml").get_text(" ", strip=True)
+
+    def tokens(value: str) -> set[str]:
+        return {
+            token.casefold()
+            for token in re.findall(
+                r"[A-Za-z0-9]+",
+                unicodedata.normalize("NFKD", value)
+                .encode("ascii", "ignore")
+                .decode("ascii"),
+            )
+        }
+
+    title_tokens = tokens(title)
+    searchable_tokens = tokens(f"{title} {plain_snippet}")
+    race_title_signals = {
+        "chase",
+        "championship",
+        "cup",
+        "derby",
+        "handicap",
+        "hurdle",
+        "memorial",
+        "oaks",
+        "prix",
+        "stakes",
+        "steeplechase",
+        "trophy",
+    }
+    if not title_tokens.intersection(race_title_signals):
+        return False
+    if _title_matches(title, aliases):
+        return True
+    ignored = {
+        "and",
+        "de",
+        "des",
+        "du",
+        "et",
+        "horse",
+        "la",
+        "le",
+        "prix",
+        "race",
+        "s",
+        "stakes",
+        "the",
+    }
+    for alias in aliases:
+        alias = re.sub(r"\bhorse\s+race\b", "", alias, flags=re.IGNORECASE).strip()
+        expected_tokens = tokens(alias) - ignored
+        if len(expected_tokens) < 2:
+            continue
+        if expected_tokens <= searchable_tokens:
+            return True
+        overlap = len(expected_tokens.intersection(title_tokens))
+        if overlap >= 2 and overlap / len(expected_tokens) >= 0.75:
+            return True
+    return False
+
+
 def _request_text(url: str, cache_path: Path, *, allow_network: bool, timeout: int, sleep_seconds: float) -> str:
     if cache_path.exists():
         return cache_path.read_text(encoding="utf-8", errors="replace")
@@ -164,7 +234,7 @@ def _search_title(
     best_title = ""
     for item in data.get("query", {}).get("search", []):
         title = item.get("title") or ""
-        if _title_matches(title, aliases):
+        if _search_result_matches(title, item.get("snippet") or "", aliases):
             best_title = title
             break
     if not best_title:

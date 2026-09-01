@@ -64,6 +64,45 @@ class WikipediaWinnerQueryTests(unittest.TestCase):
             MODULE._title_matches("Prix Marcel Boussac", ["Prix Rothschild horse race"])
         )
 
+    def test_search_result_match_accepts_registered_and_sponsored_renames(self):
+        self.assertTrue(
+            MODULE._search_result_matches(
+                "Betfair Chase",
+                "Its registered title is the <span>Lancashire Chase</span>.",
+                ["Lancashire Chase", "Lancashire Chase horse race"],
+            )
+        )
+        self.assertTrue(
+            MODULE._search_result_matches(
+                "Dooley Insurance Group Champion Novice Chase",
+                "Formerly the Ellier Developments Novice Chase.",
+                ["The Ellier Novice Chase", "The Ellier Novice Chase horse race"],
+            )
+        )
+        self.assertTrue(
+            MODULE._search_result_matches(
+                "Tingle Creek Chase",
+                "A Grade 1 National Hunt steeplechase horse race.",
+                ["Tingle Creek Trophy Chase", "Tingle Creek Trophy Chase horse race"],
+            )
+        )
+
+    def test_search_result_match_rejects_unrelated_horse_page(self):
+        self.assertFalse(
+            MODULE._search_result_matches(
+                "Silviniaco Conti",
+                "The horse won the Lancashire Chase in 2012 and 2014.",
+                ["Lancashire Chase", "Lancashire Chase horse race"],
+            )
+        )
+        self.assertFalse(
+            MODULE._search_result_matches(
+                "Sword Dancer",
+                "A racehorse who finished second in the Preakness Stakes.",
+                ["Sword Dancer Stakes", "Sword Dancer Stakes horse race"],
+            )
+        )
+
     def test_reuses_frozen_current_record_without_network(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
