@@ -117,7 +117,7 @@ class RaceDataSyncAuditCommandTests(TestCase):
                 ROOT / "runtime/policies/race_data_sync/standing_policy.json"
             ),
             RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256=(
-                "07013655d4e0ae4bd5688b9a5dc447d759c0effa4b5393ec198f48bf961a1888"
+                "4e000fd7510c076eb798345ff1d9dd5cded8043477dd2d55613cecebead31a07"
             ),
             RACE_DATA_RAW_MAX_COMPRESSED_BYTES=2 * 1024 * 1024,
             RACE_DATA_RAW_MAX_UNCOMPRESSED_BYTES=8 * 1024 * 1024,

@@ -57,8 +57,8 @@ class RaceDataSyncResultApplicationTests(TestCase):
         self._policy_directory = TemporaryDirectory()
         self.addCleanup(self._policy_directory.cleanup)
         policy = {
-            "schema_version": 1,
-            "policy_id": "test-data-sync-standing-policy-v1",
+            "schema_version": 2,
+            "policy_id": "test-data-sync-standing-policy-v2",
             "approved_by": "test-reviewer",
             "approved_at": NOW.isoformat(),
             "valid_from": (NOW - timedelta(days=1)).isoformat(),
@@ -71,10 +71,13 @@ class RaceDataSyncResultApplicationTests(TestCase):
                     "identity_namespace": "the_racing_api-race-v1",
                     "route_digest": "8" * 64,
                     "data_kinds": [models.RaceDataSyncDataKind.RESULT],
+                    "enrollment_eligible": False,
+                    "tiebreak_order": 1,
                 }
             ],
             "visibility_statuses": [models.RaceEventVisibility.PUBLISHED],
-            "event_statuses": [models.RaceEventStatus.FINISHED],
+            "new_enrollment_statuses": [models.RaceEventStatus.FINISHED],
+            "continuation_statuses": [models.RaceEventStatus.FINISHED],
         }
         raw = json.dumps(policy, indent=2).encode()
         policy_path = Path(self._policy_directory.name) / "standing_policy.json"

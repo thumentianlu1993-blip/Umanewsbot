@@ -70,29 +70,47 @@ class Command(BaseCommand):
                             "identity_namespace": identity_namespace,
                             "route_digest": route.route_digest,
                             "data_kinds": list(entry.enabled_data_kinds),
+                            "enrollment_eligible": (
+                                tuple(sorted(set(entry.enabled_data_kinds)))
+                                == tuple(sorted(models.RaceDataSyncDataKind.values))
+                            ),
                         }
                     )
         if not routes:
             raise CommandError("当前配置没有可运行的 provider route")
+        routes.sort(
+            key=lambda row: (
+                row["country_region"],
+                row["provider"],
+                row["region_code"],
+                row["identity_namespace"],
+            )
+        )
+        tiebreak_counters: dict[str, int] = {}
+        for wanted in (True, False):
+            for route_row in routes:
+                if route_row["enrollment_eligible"] is not wanted:
+                    continue
+                region = route_row["country_region"]
+                tiebreak_counters[region] = tiebreak_counters.get(region, 0) + 1
+                route_row["tiebreak_order"] = tiebreak_counters[region]
         payload = {
-            "schema_version": 1,
+            "schema_version": 2,
             "policy_id": options["policy_id"],
             "approved_by": options["approved_by"],
             "approved_at": approved_at.isoformat(),
             "valid_from": valid_from.isoformat(),
             "valid_until": valid_until.isoformat(),
-            "routes": sorted(
-                routes,
-                key=lambda row: (
-                    row["country_region"],
-                    row["provider"],
-                    row["region_code"],
-                    row["identity_namespace"],
-                ),
-            ),
+            "routes": routes,
             "visibility_statuses": [models.RaceEventVisibility.PUBLISHED],
-            "event_statuses": [
+            "new_enrollment_statuses": [
                 models.RaceEventStatus.POSTPONED,
+                models.RaceEventStatus.SCHEDULED,
+            ],
+            "continuation_statuses": [
+                models.RaceEventStatus.FINISHED,
+                models.RaceEventStatus.POSTPONED,
+                models.RaceEventStatus.RUNNING,
                 models.RaceEventStatus.SCHEDULED,
             ],
         }

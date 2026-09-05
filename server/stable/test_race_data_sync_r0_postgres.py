@@ -151,7 +151,7 @@ class RaceDataSyncR0PostgresConcurrencyTests(TransactionTestCase):
 
     def _standing_policy(self):
         return {
-            "schema_version": 1,
+            "schema_version": 2,
             "policy_id": "japan-r0-pg-reviewed",
             "approved_by": "postgres-concurrency-reviewer",
             "approved_at": NOW.isoformat(),
@@ -164,11 +164,14 @@ class RaceDataSyncR0PostgresConcurrencyTests(TransactionTestCase):
                     "region_code": "japan",
                     "identity_namespace": "jra-race-v1",
                     "route_digest": self.route.route_digest,
-                    "data_kinds": ["racecard", "result"],
+                    "data_kinds": ["race_time", "racecard", "result"],
+                    "enrollment_eligible": True,
+                    "tiebreak_order": 1,
                 }
             ],
             "visibility_statuses": [models.RaceEventVisibility.PUBLISHED],
-            "event_statuses": [models.RaceEventStatus.SCHEDULED],
+            "new_enrollment_statuses": [models.RaceEventStatus.SCHEDULED],
+            "continuation_statuses": [models.RaceEventStatus.SCHEDULED],
         }
 
     def _reviewed_manifest(self, *, reverse: bool = False):

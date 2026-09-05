@@ -1821,7 +1821,7 @@ class RaceDataSyncCensusManifestTests(TestCase):
 
     def _policy(self, *, valid_until: datetime | None = None) -> dict:
         return {
-            "schema_version": 1,
+            "schema_version": 2,
             "policy_id": "japan-r0-reviewed",
             "approved_by": "local-test-reviewer",
             "approved_at": NOW.isoformat(),
@@ -1835,10 +1835,13 @@ class RaceDataSyncCensusManifestTests(TestCase):
                     "identity_namespace": "jra-race-v1",
                     "route_digest": self.route.route_digest,
                     "data_kinds": ["race_time", "racecard", "result"],
+                    "enrollment_eligible": True,
+                    "tiebreak_order": 1,
                 }
             ],
             "visibility_statuses": [models.RaceEventVisibility.PUBLISHED],
-            "event_statuses": [models.RaceEventStatus.SCHEDULED],
+            "new_enrollment_statuses": [models.RaceEventStatus.SCHEDULED],
+            "continuation_statuses": [models.RaceEventStatus.SCHEDULED],
         }
 
     def _identity(self, event, *, automation_allowed: bool = True):
@@ -1922,6 +1925,8 @@ class RaceDataSyncCensusManifestTests(TestCase):
                 "identity_namespace": "nar-race-v1",
                 "route_digest": SHA_C,
                 "data_kinds": ["racecard"],
+                "enrollment_eligible": False,
+                "tiebreak_order": 2,
             }
         )
         census = race_data_sync_enrollment.build_race_data_enrollment_census(
@@ -1960,6 +1965,8 @@ class RaceDataSyncCensusManifestTests(TestCase):
                 "identity_namespace": "equibase-race-v1",
                 "route_digest": SHA_A,
                 "data_kinds": ["race_time", "racecard", "result"],
+                "enrollment_eligible": True,
+                "tiebreak_order": 1,
             }
         )
 
