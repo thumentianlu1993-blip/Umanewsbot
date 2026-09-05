@@ -10,7 +10,9 @@
 - 决定全文已写入 `docs/decisions.md`；`docs/future_work_roadmap.md` 与
   `docs/changes/complete-race-status-automation-coverage/` 六份文档已同步修订，
   `review.md` 第 12 节记录了第三轮用户审核结论。
-- 下一步：对第 1、4 项修订做一轮设计复审，复审通过后从 tasks.md 的 RED 测试开始实现。
+- 修订设计复审已于 2026-09-05 通过：4 项发现（并发授予原子性、获胜来源持续失败时的初始赛果
+  通道、修复命令独立发布切割、残留口径）已修正并记录在 `review.md` §12.1；下一步从
+  tasks.md 的 RED 测试开始 M1 实现。
 - 本轮只修改文档（分支 `codex/record-race-automation-decisions`）；没有实现、部署、联网、
   数据库写入或生产变更。
 

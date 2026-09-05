@@ -262,5 +262,23 @@ Next: Waiting for user product review. Implementation has not started.
 rollout.md（§4、§6、§8）以及 `docs/future_work_roadmap.md`（§4、§5、§6、§7.1、§8、§9、§13）
 和 `docs/decisions.md`（决定全文）。
 
-原两轮 `APPROVED FOR USER REVIEW` 结论覆盖的方案已被本轮修订改变；实现前需要对第 1、4 项相关
-改动做一轮设计复审，复审通过前不开始 RED 实现。
+原两轮 `APPROVED FOR USER REVIEW` 结论覆盖的方案已被本轮修订改变；第 1、4 项相关改动的设计
+复审已于 2026-09-05 完成并通过，见 §12.1。
+
+### 12.1 修订设计复审（2026-09-05）
+
+对第 1、4 项修订后的六份文档做设计复审，发现并修正 4 项：
+
+- F-R1（High）：先到先得授予的并发原子性未明确；两个并行任务可能同时观察到未授予状态而
+  重复授予。修正：design.md §4.1 明确授予在单事务内按 event 加锁完成、以事务提交先后定论；
+  design.md §11 与 test_cases.md §9 增加并发授予竞争验证；test_cases.md §0 增加原子性通过
+  标准；tasks.md §1 并发 RED 同步覆盖。
+- F-R2（Medium）：获胜来源有效但持续 not-found 或超出失败预算时，初始赛果缺少合法来源通道。
+  修正：design.md §4.1 增加该情形进入 incident + 人工审核、有审计回池重授的规则；仅赛果来源
+  数据只经 observation -> revision 证据链采用，不允许无审核直接作为初始赛果写库。
+- F-R3（Low）：审计修复命令的独立发布切割未在任务层明确。修正：design.md §8 说明命令自包含、
+  可先于自动化链独立交付；tasks.md §4 增加独立 G2 发布包候选项。
+- F-R4（Low）：design.md §15 残留“在 755/756/757 上验证”的旧口径，已改为审计修复包验证。
+
+复审结论：修订后设计一致、可追溯、无未处理的 Critical/High 缺口；第 1、4 项修订复审通过，
+可以按 tasks.md 从 RED 测试开始实现。实现、合并与发布授权仍按根 AGENTS.md 走 G1/G2/G3。

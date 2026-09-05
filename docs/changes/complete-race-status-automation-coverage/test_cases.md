@@ -6,6 +6,7 @@
 
 - 未来 30 天盘点分类数量 100% 守恒；
 - 多个可信来源竞争不能制造 enrollment route ambiguity（先到先得 + 固定平局顺序）；
+- 同一赛事的并发授予竞争只产生一条有效 enrollment（先到先得授予原子性）；
 - 来源窗口内唯一匹配赛事 60 分钟内纳管；
 - lifecycle 状态推进 P95 不超过 5 分钟；
 - 正式终态识别到公开 P95 不超过 5 分钟、P99 不超过 10 分钟；
@@ -103,6 +104,7 @@
 ## 9. PostgreSQL 16 并发必跑
 
 - discovery × lifecycle reconciliation；
+- 两个来源对同一赛事的并发 FCFS 授予（必须只有一条有效 enrollment）；
 - schedule × lifecycle；
 - lifecycle × result publication；
 - result publication × public-read snapshot；

@@ -92,10 +92,15 @@
 每场赛事的纳管权只授予一次：
 
 - 首个在合法请求窗口内返回完整合法响应且身份唯一匹配的 `enrollment_eligible` route 获得；
+- 授予必须在单个事务内完成：按 event 加锁并使用唯一证据约束，并发授予竞争中只有一份
+  enrollment 生效，其余重放为 noop；“先到先得”以事务提交先后定论，不依赖任务墙钟到达顺序；
 - 授予后粘滞：后续 time/racecard/result 只接受获胜来源；其他来源的响应只保存 observation，
   经 correction 流程 supersede；
 - 获胜来源失效（许可、route、身份或有效期）时 fail closed，赛事回到纳管池按同一规则重新授予，
-  审计记录换手原因，禁止无记录接管。
+  审计记录换手原因，禁止无记录接管；
+- 获胜来源有效但在终态窗口内持续 not-found 或超出失败预算时，赛事进入 incident 与人工审核；
+  经审核执行有审计的回池重授；仅赛果来源的数据只能经 observation -> revision 证据链采用，
+  不允许无审核直接作为初始赛果写库。
 
 policy 顶层同时把状态分为：
 
@@ -264,6 +269,9 @@ validate_data_sync_lifecycle_admission(
 这条路径优先用于当前 755/756/757，但代码不能硬编码 event ID；同形态停滞赛事复用同一流程。
 修复窗口内必须确认没有自动化任务触碰目标赛事。
 
+修复命令只依赖现有表与证据链，不依赖 policy v2 或 admission 改动；可以切割为独立的小型
+发布包，在本变更其余部分之前单独交付（独立 G2/G3）。
+
 ## 9. 更正链路
 
 更正沿用 immutable revision：
@@ -316,6 +324,7 @@ data-sync admission 不新增另一把全局锁。reconciliation 与 discovery �
 必须在 PostgreSQL 16 验证：
 
 - discovery 与 lifecycle reconciliation 并发；
+- 两个来源对同一赛事的并发授予竞争（必须只有一条 enrollment 生效）；
 - schedule 更新与 lifecycle 推进并发；
 - lifecycle 推进与 result publication 并发；
 - correction 与重复 provider task 并发；
@@ -370,4 +379,4 @@ data-sync admission 不新增另一把全局锁。reconciliation 与 discovery �
 - 不新增公开页面；
 - 预计不新增 migration；
 - 只修正两个真实断点，并让三条授权路径共用一个判断；
-- 可以先在 755/756/757 和一场新未来赛事上验证，再扩大到全部自动合格赛事。
+- 可以先在 755/756/757 审计修复包和一场新未来赛事自然闭环上验证，再扩大到全部自动合格赛事。

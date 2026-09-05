@@ -17,7 +17,7 @@
 - [ ] (application) 增加 late-admission RED：允许有证据的 `scheduled -> finished`，不得伪造 running。
 - [ ] (application) 增加 755/756/757 同形态审计修复 RED：未经来源证据复核的旧 official revision 不能直接公开；证据复核、不可变候选、dry-run、批准、apply、verifier 链路完整；同内容重放幂等。
 - [ ] (application) 增加 correction RED：相同内容幂等、合法变化 supersede、无 marker 冲突、低优先级不得覆盖。
-- [ ] (integration) 增加 PostgreSQL 并发 RED：discovery/reconciliation/schedule/lifecycle/result/correction/双 authority。
+- [ ] (integration) 增加 PostgreSQL 并发 RED：discovery/reconciliation/schedule/lifecycle/result/correction/双 authority/并发授予竞争。
 - [ ] (operations) 增加发布和 kill-switch RED：policy SHA 漂移、服务恢复、一个 selector 周期停止写入、`race_live` 不变。
 
 ## 2. 最小实现
@@ -50,6 +50,7 @@
 - [ ] (operations) 固定 PR、commit、image、policy/registry SHA、是否有 migration、配置变化、服务重建范围和回滚 image。
 - [ ] (operations) 计算新备份、新镜像、runtime 增长和 8 GiB 保底所需磁盘；不足时不请求发布执行。
 - [ ] (operations) 给用户提供一次 G2/G3 发布包选择：只合并不发布，或合并并执行精确发布包。
+- [ ] (operations) 如选择提前单独交付审计修复：确认修复命令可切割为独立 G2 发布包（只含修复命令与既有表，不含自动化开关）。
 
 ## 5. 获得发布确认后
 
