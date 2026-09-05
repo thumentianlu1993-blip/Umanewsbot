@@ -8,6 +8,9 @@ Review mode: Full (profile: feature)
 含义：方案可以交给用户审核；尚未授权实现、合并或部署。
 ```
 
+> 2026-09-05 更新：用户审核已完成，第 1、4 项产品决定被否决并改写，修订记录见第 12 节；
+> 上述结论已被本轮修订取代，实现前须对第 1、4 项相关改动做一轮设计复审。
+
 本仓库当前使用原生 `docs/changes/` 工作流，不使用 OpenSpec phase、journal 或 sidecar。审核按照
 `plan-eng-review` 的范围、架构、代码质量、测试、性能、上线与一致性门禁执行，但不生成已被仓库规则禁用的 OpenSpec 文件。
 
@@ -237,3 +240,27 @@ Failure modes: 0 unhandled critical gaps
 
 Next: Waiting for user product review. Implementation has not started.
 ```
+
+## 12. 第三轮：用户审核结论与设计修订（2026-09-05）
+
+用户审核了 spec.md 第 8 节五项产品决定，结论：
+
+- 决定 1（来源角色）：**否决**“每地区恰好一个 primary”。改为所有可信来源“先到先得”竞争首次
+  纳管：纳管权一次性授予、同轮按 `tiebreak_order` 确定性裁决、授予后粘滞；仅赛果能力来源不参与
+  竞争，只进更正渠道；获胜来源失效后回池重新授予并留换手审计。F-002 的原修正
+  （primary/result_fallback 角色）被本决定取代，design.md §4 已重写。
+- 决定 2（SLA 起算）：同意，方案不变。
+- 决定 3（双 authority 分离）：接受，方案不变。
+- 决定 4（停滞赛事恢复）：**否决**“只通过新自然 provider 响应恢复”。改为一次性审计修复包单独
+  修复上线：来源证据复核、SHA 锁定候选、dry-run、备份、人工批准、apply、verifier；F-004 的
+  防绕过目标改由“修复前强制重新核对来源证据，失败整场零写”保证。spec.md §6.3 与 design.md §8
+  已重写。
+- 决定 5（correction 验收方式）：同意，方案不变。
+
+同步修订的文档：spec.md（§1、§4.2、§5.1、§5.2、§6.1、§6.3、§7.1、§8）、design.md
+（§1、§4、§5.2、§6.1、§8）、test_cases.md（§0、§1、§6）、tasks.md（§1、§2、§5）、
+rollout.md（§4、§6、§8）以及 `docs/future_work_roadmap.md`（§4、§5、§6、§7.1、§8、§9、§13）
+和 `docs/decisions.md`（决定全文）。
+
+原两轮 `APPROVED FOR USER REVIEW` 结论覆盖的方案已被本轮修订改变；实现前需要对第 1、4 项相关
+改动做一轮设计复审，复审通过前不开始 RED 实现。

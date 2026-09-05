@@ -5,7 +5,7 @@
 实现前先冻结以下判断，测试后不能为了得到绿色结果再降低要求：
 
 - 未来 30 天盘点分类数量 100% 守恒；
-- 备用结果源不能制造 enrollment route ambiguity；
+- 多个可信来源竞争不能制造 enrollment route ambiguity（先到先得 + 固定平局顺序）；
 - 来源窗口内唯一匹配赛事 60 分钟内纳管；
 - lifecycle 状态推进 P95 不超过 5 分钟；
 - 正式终态识别到公开 P95 不超过 5 分钟、P99 不超过 10 分钟；
@@ -15,12 +15,12 @@
 
 ## 1. Standing policy v2
 
-1. 每个地区恰好一个 primary，正常通过。
-2. 一个地区没有 primary，整地区返回 `primary_route_missing`。
-3. 一个地区有两个 primary，整地区返回 `primary_route_ambiguous`。
-4. 一个 primary 加多个 result fallback，不产生 enrollment ambiguity。
-5. fallback 包含 racecard/time，policy 解析失败。
-6. fallback 未精确绑定 primary，policy 解析失败。
+1. 地区至少有一条 `enrollment_eligible` route，policy 正常通过；result-only route 被标记为不参与竞争。
+2. 一个地区没有任何 `enrollment_eligible` route，整地区返回 `trusted_route_missing`。
+3. 先到来源获得纳管后，后到来源不能再创建竞争 enrollment（重放为 noop）。
+4. 同一轮多个来源命中同一赛事时按 `tiebreak_order` 确定性授予，审计记录全部候选与胜者。
+5. 授予后粘滞：非获胜来源的 time/racecard/result 响应只保存 observation，不改写 canonical。
+6. 获胜来源失效后赛事回池重新授予并留换手审计；无审计记录的接管必须失败。
 7. policy 原始文件 SHA、canonical digest、有效期任一漂移，网络和业务写入均为 0。
 8. v1 policy 不被 v2 代码静默解释为 v2；升级必须使用明确的新 SHA。
 
@@ -75,8 +75,8 @@
 43. official + terminal + 完整 roster + 唯一身份在同一事务写 status/result/current/publication。
 44. partial、无 terminal marker、缺 runner、多解或未知状态只保存 observation。
 45. result apply/public 任一关闭时 canonical 和 public 均零写。
-46. 755/756/757 形态：已有旧 official revision、无 lifecycle admission，不直接公开旧 revision。
-47. 上述形态在 policy 轮换、admission 补齐和下一次自然 provider 响应后完成公开。
+46. 755/756/757 形态：已有旧 official revision、无 lifecycle admission，未经来源证据复核不直接公开旧 revision。
+47. 上述形态经来源证据复核、不可变候选、人工批准和 apply 后完成公开；verifier 与公网一致，同内容重放幂等。
 48. 同内容重放不重复 revision/result/publication/transition。
 49. 页面 root/www 同时显示已结束和赛果，不出现 provider/provisional/source phase。
 50. 数据库写成功但 public validator 拒绝的路径必须为测试失败。

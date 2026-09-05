@@ -1,5 +1,19 @@
 # 当前状态
 
+## 2026-09-05 完整赛事自动化五项产品决定已定稿
+
+- 用户已审核 `complete-race-status-automation-coverage` 的五项产品决定：同意第 2、3、5 项；
+  否决第 1 项，改为所有可信来源“先到先得”竞争首次纳管（一次性授予、`tiebreak_order` 固定平局、
+  授予后粘滞、仅完整能力来源可竞争、失效回池重新授予）；否决第 4 项，event 755/756/757 一类
+  停滞赛事改为一次性审计修复包单独修复上线（来源证据复核、SHA 锁定候选、dry-run、备份、批准、
+  apply、verifier）。
+- 决定全文已写入 `docs/decisions.md`；`docs/future_work_roadmap.md` 与
+  `docs/changes/complete-race-status-automation-coverage/` 六份文档已同步修订，
+  `review.md` 第 12 节记录了第三轮用户审核结论。
+- 下一步：对第 1、4 项修订做一轮设计复审，复审通过后从 tasks.md 的 RED 测试开始实现。
+- 本轮只修改文档（分支 `codex/record-race-automation-decisions`）；没有实现、部署、联网、
+  数据库写入或生产变更。
+
 ## 2026-09-05 后续路线与完整赛事自动化方案已写入仓库
 
 - 新增 [后续工作路线图与 Agent 交接](future_work_roadmap.md)，统一记录近期未收口工作、

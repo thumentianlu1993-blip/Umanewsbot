@@ -4,12 +4,12 @@
 
 本变更不重建赛事系统。它修正现有 `race_sync_v2` 的两个断点：
 
-1. standing policy 把主来源和备用来源放在同一组选项中，导致没有来源身份的新赛事被批量判为路由歧义；
+1. standing policy 把多个可信来源放在同一组选项中且没有授予规则，导致没有来源身份的新赛事被批量判为路由歧义；
 2. data-sync enrollment 与 lifecycle 固定 registry 是两套名单，新增赛事进入前者后仍进不了后者。
 
 最小方案是：
 
-- 将 standing policy 升级为 v2，明确 `primary` 和 `result_fallback`；
+- 将 standing policy 升级为 v2：可信来源按“先到先得”竞争首次纳管（一次性授予、`tiebreak_order` 固定平局、授予后粘滞），仅赛果能力来源只进更正渠道；
 - 继续复用 `RaceDataSyncEnrollment`，把它作为新 data-sync 赛事的动态 lifecycle 准入证据；
 - 新增一个共享的 lifecycle admission validator，供状态推进、赛果投影和公开读取共同使用；
 - 保留旧 lifecycle registry 处理既有固定名单，不自动迁移历史；
@@ -48,8 +48,8 @@
 ```text
 每小时 future discovery
   -> 未来 30 天全量盘点
-  -> 判断是否进入主来源开放窗口
-  -> 主来源身份唯一匹配
+  -> 判断是否进入可信来源开放窗口
+  -> 先到先得授予：身份唯一匹配、一次性授予、同轮 tiebreak_order 裁决
   -> 创建或轮换 RaceDataSyncEnrollment
   -> 建立 data-sync lifecycle admission
 
@@ -73,23 +73,29 @@
 
 ## 4. Standing policy v2
 
-### 4.1 路由角色
+### 4.1 先到先得纳管
 
 每条 route 新增：
 
 ```json
 {
-  "enrollment_role": "primary",
-  "fallback_for": []
+  "enrollment_eligible": true,
+  "tiebreak_order": 1
 }
 ```
 
-合法角色：
+- `enrollment_eligible`：来源具备完整能力（`race_time/racecard/result`）且已获许可，可以竞争首次
+  纳管；只有 result 能力的来源必须为 `false`，只能进入更正渠道；
+- `tiebreak_order`：地区内确定性平局顺序；同一轮盘点中多个来源同时命中同一赛事时按该顺序
+  授予，结果写入审计，不随机。
 
-- `primary`：可建立赛事身份和 enrollment；
-- `result_fallback`：只能在主来源 result 明确 not-found 后参与赛果仲裁。
+每场赛事的纳管权只授予一次：
 
-`result_fallback` 必须声明 `fallback_for`，精确绑定一个主 route 的 provider、region 和 identity namespace。
+- 首个在合法请求窗口内返回完整合法响应且身份唯一匹配的 `enrollment_eligible` route 获得；
+- 授予后粘滞：后续 time/racecard/result 只接受获胜来源；其他来源的响应只保存 observation，
+  经 correction 流程 supersede；
+- 获胜来源失效（许可、route、身份或有效期）时 fail closed，赛事回到纳管池按同一规则重新授予，
+  审计记录换手原因，禁止无记录接管。
 
 policy 顶层同时把状态分为：
 
@@ -104,14 +110,14 @@ policy 顶层同时把状态分为：
 
 ### 4.2 静态规则
 
-- 每个支持地区必须恰好有一个 `primary`；
-- 主 route 必须包含 `race_time/racecard/result`；
-- fallback 只能包含 `result`；
-- fallback 不参与 `build_race_data_enrollment_census()` 的主 route 选择；
-- 同地区零个或多个 primary 均是配置错误，整地区阻断；
-- 来源级别仍用于赛果仲裁，不再用于决定谁负责纳管。
+- 每个支持地区必须至少有一条 `enrollment_eligible` route，否则整地区阻断（`trusted_route_missing`）；
+- `enrollment_eligible` route 必须包含 `race_time/racecard/result`；
+- result-only route 不参与 `build_race_data_enrollment_census()` 的纳管授予；
+- 同一轮同一赛事多个来源命中时按 `tiebreak_order` 授予，审计记录全部候选与胜者；
+- 来源优先级仍用于赛果更正仲裁，不再用于指定谁负责纳管。
 
-这样可以从根本上消除“备用来源越多，纳管越容易歧义”的问题。
+这样可以从根本上消除“可信来源越多，纳管越容易歧义”的问题：竞争在时间上先后定论，同轮平局有
+确定性顺序。
 
 ## 5. Future discovery 的分类与守恒
 
@@ -123,7 +129,7 @@ policy 顶层同时把状态分为：
 
 盘点窗口内、请求窗口外的赛事记为 `awaiting_source_window`，不是 blocked。
 
-恢复清单不把过去 7 天的全部赛事重新纳管，也不直接投影旧 revision；它只让仍有合法 tracking 责任的赛事进入 policy/enrollment/lifecycle 重新验证，并等待下一次自然 provider 响应。
+恢复清单不把过去 7 天的全部赛事重新纳管，也不直接投影旧 revision；它只让仍有合法 tracking 责任的赛事进入 policy/enrollment/lifecycle 重新验证，并进入第 8 节的一次性审计修复流程。
 
 ### 5.2 明确分类
 
@@ -132,8 +138,8 @@ policy 顶层同时把状态分为：
 - `eligible`
 - `enrolled`
 - `manual_lock_present`
-- `primary_route_missing`
-- `primary_route_invalid`
+- `trusted_route_missing`
+- `trusted_route_invalid`
 - `source_identity_not_found`
 - `source_identity_ambiguous`
 - `writer_owner_conflict`
@@ -191,6 +197,7 @@ validate_data_sync_lifecycle_admission(
 - projection owner 为 `data_sync`；
 - enrollment 为 `enrolled`，policy/route/entry/manifest/generation 与 control 一致；
 - enrollment source identity 唯一且当前仍通过 route、条款、有效期和 registry 校验；
+- enrollment 的授予来源与当前负责来源一致（纳管权粘滞），无未审计换手；
 - lifecycle control 没有人工暂停；
 - 没有同时存在一份适用于未结束赛事的 active legacy lifecycle membership；
 - 需要写入时使用既有全局锁顺序，并在事务内重新验证。
@@ -237,21 +244,25 @@ validate_data_sync_lifecycle_admission(
 
 初次 enrollment 的 `event_snapshot_sha256` 是采用当时的审计证据，不把它误当成赛事以后永远不变。当前值安全性由事务内 event、source、route、generation 和 manual lock 重验保证。
 
-## 8. 停滞赛事自然恢复
+## 8. 停滞赛事审计修复
 
-发布后不直接调用 result writer，也不修改 due time。
+755/756/757 一类停滞赛事不等待新链的自然 provider 响应，改为一次性审计修复；该修复是独立
+运维操作，可先于本变更发布窗口执行，不直接调用 result writer，也不修改 due time。
 
 流程：
 
-1. 新 policy v2 的最近 7 天恢复清单找到现有未闭环 data-sync enrollment；
-2. 具有唯一主来源身份的旧 enrollment 自动轮换到 v2 manifest；
-3. lifecycle reconciliation 为没有 legacy membership 的赛事补齐 data-sync admission；
-4. Beat/selector 按既有 `next_poll_at` 自然派发；
-5. provider 新响应仍为正式、完整且当前有效时，事务内完成 status/result/publication；
-6. 旧 provisional/official revision 保留，重复内容走幂等；
-7. 对应 `provisional_overdue` incident 在业务闭环后自动解决。
+1. 最近 7 天未闭环清单找到现有未闭环 data-sync enrollment（已纳管、tracking 开启、存在未公开
+   official revision、开放 incident 或 correction watch）；
+2. 逐场重新核对来源证据：现有 official observation/revision 对照来源原文或新鲜 provider 响应，
+   复核身份、终态和完整参赛名单；复核失败整场零写；
+3. 生成 SHA 锁定的不可变候选包，dry-run 确认零写入；
+4. 备份并取得人工批准后，事务内完成 status/result/publication；
+5. 独立 verifier 逐场核对数据库与公网页面；
+6. OperationLog 记录为人工修复；新链上线后由 standing policy 接管后续更正观察；
+7. 对应 `provisional_overdue` incident 在业务闭环后解决。
 
-这条路径优先用于当前 755/756/757，但代码不能硬编码 event ID。
+这条路径优先用于当前 755/756/757，但代码不能硬编码 event ID；同形态停滞赛事复用同一流程。
+修复窗口内必须确认没有自动化任务触碰目标赛事。
 
 ## 9. 更正链路
 

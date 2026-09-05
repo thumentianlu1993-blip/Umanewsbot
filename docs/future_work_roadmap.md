@@ -87,9 +87,11 @@
    `AGENTS.md` 的门禁执行。
 2. **候选数据 fail closed。** 未审核的来源、模糊身份、partial result、未知状态和缺证据字段只进入
    candidate/review/observation，不得进入 canonical writer。
-3. **来源优先级和运行角色分开。** 来源选型优先考虑 The Racing API，其次赛事权威官方站点，再次是
-   Racing Post、ATR 等可信综合来源；运行策略仍必须显式标记 `primary` 或 `result_fallback`。
-   每个地区只允许一个 primary，fallback 不得参与 enrollment。
+3. **来源可信与纳管授予分开。** 所有已批准来源都视为可信；赛事纳管按“先到先得”授予：一次性
+   授予、同轮平局按 policy 固定顺序裁决、授予后粘滞。只有具备完整能力（赛时/出马表/赛果）的
+   来源可竞争纳管；仅赛果能力来源只作为更正证据渠道，不得直接改写 canonical。来源选型参考
+   顺序仍为 The Racing API、赛事权威官方站点、Racing Post、ATR 等可信综合来源，但该顺序不再
+   指定固定主来源。
 4. **稳定身份优先。** 使用 source-scoped stable ID、alias 和 provenance；不得仅凭名称、翻译或模糊相似度合并马匹或赛事。
 5. **赛果完整性按实际参赛者守恒。** `finished` 不等于“只有有名次的马”；退赛、未出赛、竞走中止、
    失格、未完赛等必须保留明确状态。
@@ -106,10 +108,10 @@
 
 | 工作 | 当前状态 | 已有成果 | 剩余动作 | 主要阻塞 |
 | --- | --- | --- | --- | --- |
-| 完整赛事状态自动更新 | 待用户产品审核；未实现 | 六份计划文档已完成，两轮工程审核收敛为 `APPROVED FOR USER REVIEW` | 审核第 6 节五项决定；批准后按 tasks 从 RED 测试开始实现 | 产品决定与后续 G2/G3 |
+| 完整赛事状态自动更新 | 产品决定于 2026-09-05 定稿（第 1、4 项按用户口径改写）；方案已修订，未实现 | 六份计划文档已按用户决定修订 | 对第 1、4 项修订做设计复审；复审通过后按 tasks 从 RED 测试开始实现 | 设计复审与后续 G2/G3 |
 | 赛事数据链路稳定化候选 | 本地 candidate-only，未提交/未推送/未部署 | 多语言赛事/场地身份、JRA/NAR fail-closed route、D-1..D+3 审计、field-scoped evidence、五事件 offline shadow；聚焦测试 136/136 | 从最新主线做逐文件 diff，只提取完整赛事自动化需要的基础，不得整分支直接合并 | 与主计划存在重叠，含 migration 0079 候选 |
-| 定时赛果复核 | 任务已停止，问题未解决 | 调度、审核包、通知和 dry-run 可运行 | 先修 primary/fallback 与 route admission，再恢复只读复核；不得把通知成功当结果补齐 | 40/40 `route_missing` |
-| event 755/756/757 恢复 | 未完成 | 已有 official observation/revision | 新版本建立合法 enrollment/admission 后，等待 Beat 的新自然 provider 响应，再完成投影 | 禁止复用旧 revision 直接写公开 |
+| 定时赛果复核 | 任务已停止，问题未解决 | 调度、审核包、通知和 dry-run 可运行 | 先修先到先得 route admission，再恢复只读复核；不得把通知成功当结果补齐 | 40/40 `route_missing` |
+| event 755/756/757 恢复 | 未完成 | 已有 official observation/revision | 走一次性审计修复包：来源证据复核、SHA 锁定候选、dry-run、备份、批准、apply、verifier，可先于新链独立上线 | 禁止未经复核直接复用旧 revision 写公开 |
 | Racing API 四地区重赏马导出 | `BLOCKED / INCOMPLETE` | 559/559 本地研究测试；21/200 stable IDs 有可复用 profile+career | 等待可审计的 provider 权限/回复或用户精确 G3；重新绑定 ledger、scope、预算后才可联网 | 两份 proposal 均未批准；179 个 stable ID 缺口 |
 | P0 马匹资料生产补全 | 候选已冻结，未获新写入授权 | 最近记录候选：32 profile updates、180 race creates、230 cross-source updates、32 source upserts、128 audits；422 条目标守恒，16 个 blocker 冻结 | 重新生成并核验不可变 candidate，提交精确 G3 包；写后独立 verifier | 旧 candidate/旧授权不可复用 |
 | 历史 PR 与 worktree 收口 | 未完成 | 2026-09-05 仍有 7 个 open PR 和大量 worktree | 逐项判断继续、拆分、替代或归档；先只读，不批量关闭或删除 | 分支陈旧、依赖关系不清 |
@@ -122,21 +124,27 @@
 
 本文分支已把完整赛事自动化的六份计划文档纳入仓库；其他两个 worktree 仍需后续 Agent 做差异提取和持久化。
 
-## 6. 完整赛事自动化：待用户审核的五项决定
+## 6. 完整赛事自动化：用户已定稿的五项决定（2026-09-05）
 
-以下五项已通过工程审核，但尚未因写入本文而自动获得实现或发布授权。建议全部接受：
+以下五项已于 2026-09-05 由用户审核定稿；第 1、4 项否决了工程建议并按用户口径改写，方案文档已同步修订。
+完整决定文本与后果见 [关键决策](decisions.md)。
 
-1. 每个地区恰好一个 `primary`；其他来源只能是 `result_fallback`，不能竞争首次纳管。
+1. **不设指定主来源**：所有可信来源按“先到先得”竞争首次纳管；纳管权只授予一次、同轮平局按
+   policy 固定顺序（`tiebreak_order`）裁决、授予后粘滞；只有具备完整能力（赛时/出马表/赛果）的
+   来源可竞争，仅赛果能力来源只进更正渠道；获胜来源失效时回池重新授予并留换手审计。
 2. SLA 从 provider 实际开放窗口开始计算；保留未来 30 天盘点，但窗口外标记
-   `awaiting_source_window`，不承诺当前 provider 无法提供的 D-30 出马表。
+   `awaiting_source_window`，不承诺当前 provider 无法提供的 D-30 出马表。（同意原建议）
 3. 新链以 data-sync enrollment + standing policy 授权 lifecycle；legacy registry 只服务旧固定名单，
-   双 authority 必须拒绝。
-4. event 755/756/757 一类停滞赛事只能通过新的自然 provider 响应恢复，不直接采用旧 revision。
+   双 authority 必须拒绝。（接受原建议）
+4. event 755/756/757 一类停滞赛事**不等待新链自然恢复**，改用一次性审计修复包单独修复上线：
+   来源证据复核 -> SHA 锁定候选 -> dry-run -> 备份 -> 人工批准 -> apply -> 独立 verifier ->
+   公网验收；不硬编码 event ID。（否决原建议）
 5. correction 变化分支在隔离 PostgreSQL 用 fixture 验证；生产发布完成只要求自然无变化周期幂等，
-   不制造虚假更正。
+   不制造虚假更正。（同意原建议）
 
 详细依据与反例见
-[工程审核记录](changes/complete-race-status-automation-coverage/review.md)。
+[工程审核记录](changes/complete-race-status-automation-coverage/review.md)；
+第 1、4 项修订记录见同文件第 12 节。实现须在设计复审通过后从 tasks 的 RED 测试开始。
 
 ## 7. “记录待修复事项与方案”未完成清单
 
@@ -150,7 +158,7 @@
 | provisional 与 official 复核不完整 | 保存 observation/revision，只有完整 terminal + 来源优先级 + admission 通过才确认；更正 supersede 旧 revision | `is_confirmed`、`result_confirmed_at`、rows、publication 一致 | M1/M2，P0 |
 | 全站赛事字段不统一 | 分字段保存来源证据，分批补齐 distance、age restriction、surface、course、grade；冲突进 review | 每字段有来源/时间/hash；无证据不覆盖已有可信值 | M3，P1 |
 | 时区和 DST 口径不统一 | 存举办地 wall-clock + IANA + aware UTC；公开统一北京时间标签 | 跨 DST fixture、数据库值、页面文案一致 | M3，P1 |
-| 赛果复核长期 `route_missing` | policy v2 拆分 primary/fallback；audit 输出零/双 primary、窗口等待、not-found、多解等守恒分类 | 候选不再静默消失；`route_missing` 有可行动原因 | M1，P0 |
+| 赛果复核长期 `route_missing` | policy v2 改为先到先得纳管（一次性授予、固定平局顺序、授予后粘滞）；audit 输出无可信 route、窗口等待、not-found、多解等守恒分类 | 候选不再静默消失；`route_missing` 有可行动原因 | M1，P0 |
 
 ### 7.2 赛事页面、首页与新闻联动
 
@@ -180,7 +188,7 @@
 | Australia | 第二优先；先解决赛季制目录、访问稳定性和官方证据覆盖，再做映射 | 不把跨年赛季文件冒充自然年完整目录 |
 | Middle East | 第三优先；region 下按 UAE、Saudi、Qatar、Bahrain 等国家分别校验身份和来源 | country 不能缺失或冲突；不得把一个国家的证据外推到整个地区 |
 
-新增地区不得直接复制旧地区路由，也不得因可信第三方可访问就自动取得 `primary` 角色。
+新增地区不得直接复制旧地区路由，也不得因可信第三方可访问就自动获得纳管竞争资格（`enrollment_eligible`）。
 
 ### 7.5 内容生产、后台与模型
 
@@ -197,7 +205,7 @@
 
 目标：在继续写代码前，消除重复方案、陈旧分支和不明确的生产基线。
 
-- 用户审核第 6 节五项产品决定。
+- 用户审核第 6 节五项产品决定（已完成：2026-09-05 定稿，第 1、4 项按用户口径改写）。
 - 以 `complete-race-status-automation-coverage` 作为赛事自动化唯一产品主线。
 - 对 `stabilize-race-data-pipeline` 做逐文件差异审计，只迁入被主方案需要且有测试的基础；不得整体 cherry-pick。
 - 刷新 open PR、worktree、远端分支和生产运行态清单。
@@ -207,7 +215,7 @@
 
 完成标准：
 
-- 只有一个赛事自动化实现分支和一份批准的计划；
+- 只有一个赛事自动化实现分支和一份按第 6 节决定修订并复审通过的计划；
 - 所有候选 worktree 都有 owner、用途、保存位置和处置状态；
 - 生产四层版本关系及分母可重放；
 - 没有执行生产写入、联网扩量、服务变更或队列操作。
@@ -218,8 +226,8 @@
 
 顺序：
 
-1. 先写 policy v2、discovery 守恒、双 authority、755/756/757、correction 和 PostgreSQL 并发 RED；
-2. 实现 `primary/result_fallback`、未来 30 天盘点与最近 7 天恢复清单；
+1. 先写 policy v2、discovery 守恒、双 authority、755/756/757 审计修复、correction 和 PostgreSQL 并发 RED；
+2. 实现先到先得纳管（一次性授予、固定平局顺序、授予后粘滞、仅完整能力来源可竞争）、未来 30 天盘点与最近 7 天恢复清单；
 3. 实现唯一 `validate_data_sync_lifecycle_admission()`；
 4. 让 lifecycle、result projection 和 public read 共用校验器；
 5. 增加审计分类、incident reason code、kill switch 和资源门禁；
@@ -229,7 +237,7 @@
 
 - [任务清单](changes/complete-race-status-automation-coverage/tasks.md) 第 0–4 节全部完成；
 - 预计无 migration；如产生 migration，立即返回产品/发布风险审核；
-- event 956 成功 fixture 不变，755/756/757 型停滞 fixture 可通过新自然响应恢复；
+- event 956 成功 fixture 不变，755/756/757 型停滞 fixture 可通过审计修复包完成闭环；
 - legacy `race_live` 和 France staging 范围零变化。
 
 ### M2：关闭态发布与自然灰度
@@ -251,7 +259,7 @@
 完成标准：
 
 - 至少一场新的 today/tomorrow 赛事自然完成发现、身份、纳管、时间、出马表、状态和正式赛果公开；
-- 755/756/757 型赛事通过新自然响应恢复，不手工改 status/checkpoint/result；
+- 755/756/757 型赛事通过一次性审计修复包恢复并公开（证据复核、dry-run、备份、批准、apply、verifier 全流程），不绕过审计直接改库；
 - 完成一轮自然“内容未变化” correction 幂等验证；
 - 首个真实 correction 留作持续验收，不在生产造数；
 - 最终事实写回所有受影响状态和运行手册。
@@ -337,7 +345,7 @@
 必须串行：
 
 - M0 产品决定 -> M1 实现 -> M2 生产灰度；
-- primary/fallback 修复 -> 恢复定时赛果复核；
+- 先到先得 route admission 修复 -> 恢复定时赛果复核；
 - 身份规则稳定 -> canonical 马匹写入；
 - 完整赛事主链稳定 -> 新地区 production enrollment；
 - 数据真相稳定 -> AI 自动改写/聚合自动发布。
@@ -369,7 +377,7 @@
 | 维度 | 必须回答的问题 |
 | --- | --- |
 | 页面症状 | 用户看到的内容是否正确，而不只是 HTTP 200？ |
-| 身份与路由 | event/horse stable ID 是否唯一？本次是谁是 primary，谁是 fallback？ |
+| 身份与路由 | event/horse stable ID 是否唯一？本场纳管权由哪个来源持有、何时授予、平局裁决与换手是否有审计？ |
 | 调度准入 | Beat/selector 是否真的纳管，还是只生成了审核包？ |
 | 来源调用 | 是否命中获准 route/window/budget？响应是否完整和可重放？ |
 | 数据库写入 | 哪些表、多少行、哪个事务、是否越界？dry-run 必须明确为 0 写入。 |
@@ -404,9 +412,9 @@
 3. 只读刷新 7 个 open PR、关键 worktree 和生产四层版本关系；
 4. 对稳定化 candidate 与主计划做 path-level diff，输出“迁入 / 重写 / 丢弃 / 需决策”表；
 5. 生成新的脱敏全站 census，逐项区分页面、身份、route、admission、任务、数据库写入和 publication；
-6. 在获得产品决定后，从
+6. 产品决定已于 2026-09-05 定稿；先完成第 1、4 项修订的设计复审，再从
    [任务清单](changes/complete-race-status-automation-coverage/tasks.md) 的 RED 测试开始；
-7. 未获得决定或外部权限时，继续只读和本地验证，不启动 provider、生产写入、服务变更或队列操作。
+7. 未完成设计复审或未获得外部权限时，继续只读和本地验证，不启动 provider、生产写入、服务变更或队列操作。
 
 ## 14. 文档维护规则
 

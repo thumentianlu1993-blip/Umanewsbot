@@ -9,26 +9,27 @@
 
 ## 1. 先写会失败的测试
 
-- [ ] (integration) 增加 standing policy v2 RED：primary/fallback 角色、零/双 primary、fallback 越权和 v1 不可静默升级。
+- [ ] (integration) 增加 standing policy v2 RED：先到先得授予（一次性授予、同轮 `tiebreak_order` 平局、授予后粘滞、result-only 来源无竞争资格、失效回池重新授予）和 v1 不可静默升级。
 - [ ] (integration) 增加 discovery RED：30 天分类、today/tomorrow 请求窗口、守恒统计、等待/未找到/多解分离。
 - [ ] (integration) 增加最近 7 天恢复清单 RED，以及 new-enrollment/continuation 状态分离 RED。
 - [ ] (application) 增加 lifecycle admission RED：data-sync enrollment 可以授权 lifecycle，legacy registry 保持不变，双 authority 拒绝。
 - [ ] (application) 增加共享 validator RED：lifecycle writer、result writer 和 public reader 的通过/拒绝必须一致。
 - [ ] (application) 增加 late-admission RED：允许有证据的 `scheduled -> finished`，不得伪造 running。
-- [ ] (application) 增加 755/756/757 同形态 RED：旧 official revision 不能直接公开，新自然响应可完成闭环。
+- [ ] (application) 增加 755/756/757 同形态审计修复 RED：未经来源证据复核的旧 official revision 不能直接公开；证据复核、不可变候选、dry-run、批准、apply、verifier 链路完整；同内容重放幂等。
 - [ ] (application) 增加 correction RED：相同内容幂等、合法变化 supersede、无 marker 冲突、低优先级不得覆盖。
 - [ ] (integration) 增加 PostgreSQL 并发 RED：discovery/reconciliation/schedule/lifecycle/result/correction/双 authority。
 - [ ] (operations) 增加发布和 kill-switch RED：policy SHA 漂移、服务恢复、一个 selector 周期停止写入、`race_live` 不变。
 
 ## 2. 最小实现
 
-- [ ] (integration) 将 standing policy parser 和 runtime policy 升级为 v2，加入 `primary` / `result_fallback`，重新生成精确 SHA。
-- [ ] (integration) 修改 enrollment census：只用 primary 纳管，fallback 只在结果 not-found 后使用。
+- [ ] (integration) 将 standing policy parser 和 runtime policy 升级为 v2，加入 `enrollment_eligible` / `tiebreak_order` 先到先得语义，重新生成精确 SHA。
+- [ ] (integration) 修改 enrollment census：按先到先得授予纳管（同轮 `tiebreak_order` 裁决、授予后粘滞、失效回池重新授予），result-only 来源只进更正渠道。
 - [ ] (integration) 修改 TRA identity discovery：区分盘点窗口和来源窗口，补齐全部 outcome 计数。
 - [ ] (integration) 增加有界恢复清单：只选择最近 7 天仍有 tracking 责任的未闭环 data-sync 赛事。
 - [ ] (application) 实现唯一 `validate_data_sync_lifecycle_admission()`，不接受调用者布尔值绕过。
 - [ ] (application) 修改 enrollment/control 协调：lifecycle 开启时建立 data-sync admission，关闭时保持 off。
 - [ ] (application) 实现每批最多 20 场的 lifecycle admission reconciliation，保留 manual pause 和 legacy membership。
+- [ ] (application) 实现停滞赛事审计修复命令：未闭环清单选择、来源证据复核、SHA 锁定候选、dry-run/apply/verifier 和 OperationLog；不硬编码 event ID。
 - [ ] (application) 让 lifecycle task、result projection 和 public read 共用同一 validator。
 - [ ] (application) 为 late admission、authority conflict 和恢复成功补齐稳定 reason code 与 incident 收口。
 - [ ] (operations) 扩展 `audit_race_data_sync`，输出完整分类、守恒、两类 authority、stuck official 和 correction watch。
@@ -56,7 +57,7 @@
 - [ ] (operations) 以 10 flags false、专用 worker stopped 的关闭态部署候选，确认 migration leaf 精确且 `race_live` 不变。
 - [ ] (operations) 先运行 policy v2 的未来/恢复双 census 只读验收：分类守恒、route ambiguity=0、无意外 enrollment。
 - [ ] (operations) 按 future discovery -> network/time/racecard -> lifecycle -> result apply/public -> correction 顺序启用。
-- [ ] (operations) 等待 755/756/757 通过新的自然 provider 周期恢复；不手工改 checkpoint/status/result。
+- [ ] (operations) 执行 755/756/757 一次性审计修复（可先于本变更发布窗口独立执行）：来源证据复核、候选 SHA、dry-run、备份、批准、apply、verifier、公网验收；修复窗口内确认无自动化任务触碰目标赛事。
 - [ ] (operations) 等待至少一场新的 today/tomorrow 赛事自然完成 identity、enrollment、time/racecard 和 lifecycle。
 - [ ] (operations) 等待正式赛果自然公开，核对任务、数据库、claim、revision、publication、页面和 SLO。
 - [ ] (operations) 完成一轮自然无变化 correction 验收；真实 correction 作为持续监控，不生产造数。

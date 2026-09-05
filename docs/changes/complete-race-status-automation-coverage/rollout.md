@@ -86,7 +86,7 @@
 - 验证今天/明天赛事的 identity create/adopt/replay；
 - 单轮请求数、容量账本和 outcome 守恒；
 - 已有 v1 enrollment 只通过合法 successor manifest 轮换；
-- 755/756/757 只能由最近 7 天恢复清单选中，不能靠扩大未来窗口或扫描全部历史赛事。
+- 755/756/757 只能由最近 7 天未闭环清单选中进入审计修复流程，不能靠扩大未来窗口或扫描全部历史赛事。
 
 ### 阶段 C：时间和出马表
 
@@ -106,7 +106,7 @@
 ### 阶段 E：正式赛果和公开
 
 - 开启 result apply，再开启 result public；
-- 755/756/757 只等待下一次自然 provider 响应；
+- 755/756/757 通过一次性审计修复包完成状态/赛果/公开（证据复核、SHA 候选、dry-run、备份、批准、apply、verifier）；
 - 核对 terminal marker、roster、revision、result、publication、transition 和 root/www；
 - task SUCCESS 或 HTTP 200 均不能单独算通过。
 
@@ -135,7 +135,7 @@
 任一下列情况立即停止：
 
 - policy/route/registry/contract 漂移；
-- 一个地区出现零个或多个 primary；
+- 一个地区没有任何可竞争纳管的可信来源（`trusted_route_missing`）；
 - discovery 分类不守恒；
 - lifecycle writer、result writer 与 public reader 的 admission 结论不同；
 - 错误或部分赛果公开；
@@ -161,10 +161,10 @@
 只有以下全部满足才称为“赛事状态自动更新完整链路已上线”：
 
 - 新赛事能从等待来源开放自然进入 identity/enrollment；
-- route ambiguity 不再由 fallback 造成；
+- route ambiguity 不再由多来源竞争造成（先到先得授予）；
 - 时间和出马表有真实自然更新；
 - 至少一场新赛事自然经过 lifecycle；
-- 755/756/757 或同形态赛事通过新自然响应完成正式赛果公开；
+- 755/756/757 通过一次性审计修复包完成正式赛果公开并验收；
 - correction 无变化轮询幂等，变化分支已通过隔离 PostgreSQL；
 - 审计分类和请求结果完全守恒；
 - kill switch 实测有效；
