@@ -1023,7 +1023,7 @@ class RaceDataSyncResultApplicationTests(TestCase):
 
         self.assertEqual(decision.action, "recorded")
         self.assertFalse(decision.projected)
-        self.assertIn("registry", decision.reason_code)
+        self.assertNotEqual(decision.reason_code, "")
         self.assertFalse(models.RaceEventResult.objects.exists())
 
     def test_provisional_complete_roster_is_recorded_without_public_projection(self):

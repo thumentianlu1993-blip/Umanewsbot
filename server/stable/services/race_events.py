@@ -3321,14 +3321,37 @@ def _resolve_data_sync_publication_from_loaded_rows(
         validate_registry_membership_snapshot,
     )
 
-    lifecycle_validation = validate_registry_membership_snapshot(
-        membership=lifecycle_membership,
-        event=event,
-        control=lifecycle,
-        now=now,
-    )
-    if not lifecycle_validation.valid:
-        return reject(lifecycle_validation.reason_code)
+    if (
+        lifecycle_membership is not None
+        and lifecycle_membership.state == "active"
+    ):
+        lifecycle_validation = validate_registry_membership_snapshot(
+            membership=lifecycle_membership,
+            event=event,
+            control=lifecycle,
+            now=now,
+        )
+        if not lifecycle_validation.valid:
+            return reject(lifecycle_validation.reason_code)
+        if (
+            lifecycle is not None
+            and isinstance(lifecycle.manifest_data, dict)
+            and "race_data_sync" in lifecycle.manifest_data
+            and event.status
+            not in {RaceEventStatus.FINISHED, RaceEventStatus.CANCELLED}
+        ):
+            return reject("lifecycle_authority_conflict")
+    else:
+        from stable.services.race_data_sync_admission import (
+            validate_data_sync_lifecycle_admission,
+        )
+
+        admission = validate_data_sync_lifecycle_admission(
+            event_id=event.pk,
+            now=now,
+        )
+        if not admission.admitted:
+            return reject(admission.reason_code)
 
     from stable.services.race_data_sync_control import (
         resolve_source_route_admission,

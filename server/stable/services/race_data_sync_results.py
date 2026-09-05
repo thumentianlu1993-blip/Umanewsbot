@@ -245,12 +245,50 @@ def apply_data_sync_result_observation(
         )
 
         membership_validation = None
+        data_sync_admission = None
         if project_current:
             # Global lock graph: registry barrier/membership -> lifecycle -> event.
-            membership_validation = lock_current_runtime_registry_membership(
-                event_id=expected_event_id,
-                now=now,
+            has_legacy_membership = (
+                models.RaceEventLifecycleEnforceMembership.objects.filter(
+                    event_id=expected_event_id,
+                    state="active",
+                    registry__state="active",
+                    registry__is_active=True,
+                    registry__runtime_valid_until__gt=now,
+                ).exists()
             )
+            has_data_sync_authority = models.RaceEventLifecycleControl.objects.filter(
+                event_id=expected_event_id,
+                manifest_data__has_key="race_data_sync",
+            ).exists()
+            if has_legacy_membership and has_data_sync_authority:
+                current_status = (
+                    models.RaceEvent.objects.filter(pk=expected_event_id)
+                    .values_list("status", flat=True)
+                    .first()
+                )
+                if current_status not in {
+                    models.RaceEventStatus.FINISHED,
+                    models.RaceEventStatus.CANCELLED,
+                }:
+                    return DataSyncResultApplyDecision(
+                        "rejected", "lifecycle_authority_conflict"
+                    )
+            if has_legacy_membership:
+                membership_validation = lock_current_runtime_registry_membership(
+                    event_id=expected_event_id,
+                    now=now,
+                )
+            else:
+                from stable.services.race_data_sync_admission import (
+                    validate_data_sync_lifecycle_admission,
+                )
+
+                data_sync_admission = validate_data_sync_lifecycle_admission(
+                    event_id=expected_event_id,
+                    now=now,
+                    lock=True,
+                )
         lifecycle = (
             models.RaceEventLifecycleControl.objects.select_for_update()
             .filter(event_id=expected_event_id)
@@ -381,6 +419,9 @@ def apply_data_sync_result_observation(
                 )
                 lifecycle_trusted = lifecycle_snapshot.valid
                 lifecycle_reason = lifecycle_snapshot.reason_code
+        elif data_sync_admission is not None:
+            lifecycle_trusted = data_sync_admission.admitted
+            lifecycle_reason = data_sync_admission.reason_code
         race_status = str(
             observation.normalized_payload.get("race_status") or ""
         ).strip().casefold()
