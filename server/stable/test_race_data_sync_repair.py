@@ -278,6 +278,13 @@ class StalledEventRepairTests(TestCase):
         )
 
     def test_apply_repairs_stalled_event(self):
+        models.RaceLiveAlertIncident.objects.create(
+            alert_type=models.RaceLiveAlertType.PROVISIONAL_OVERDUE,
+            scope_type="data_sync_event",
+            scope_key=str(self.event.pk),
+            dedupe_key="repair-stalled-1",
+            status=models.RaceLiveAlertIncidentStatus.OPEN,
+        )
         report = self._dry_run()
 
         output = StringIO()
@@ -312,6 +319,12 @@ class StalledEventRepairTests(TestCase):
                 action_type="race_data_sync_stalled_repair",
                 target_id=str(self.event.pk),
             ).exists()
+        )
+        incident = models.RaceLiveAlertIncident.objects.get(
+            scope_key=str(self.event.pk)
+        )
+        self.assertEqual(
+            incident.status, models.RaceLiveAlertIncidentStatus.RESOLVED
         )
         public = race_events.resolve_race_live_public_read(
             event_id=self.event.pk,

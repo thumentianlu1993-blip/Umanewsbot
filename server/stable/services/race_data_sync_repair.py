@@ -206,4 +206,17 @@ def apply_stalled_event_repair(
         if verify_reason:
             transaction.set_rollback(True)
             return verify_reason
+        models.RaceLiveAlertIncident.objects.filter(
+            scope_type="data_sync_event",
+            scope_key=str(assessment.event_id),
+            status__in=(
+                models.RaceLiveAlertIncidentStatus.OPEN,
+                models.RaceLiveAlertIncidentStatus.SENDING,
+                models.RaceLiveAlertIncidentStatus.FAILED,
+            ),
+        ).update(
+            status=models.RaceLiveAlertIncidentStatus.RESOLVED,
+            resolved_at=now,
+            updated_at=now,
+        )
     return ""

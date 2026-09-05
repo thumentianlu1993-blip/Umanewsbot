@@ -183,6 +183,27 @@ class DataSyncLifecycleAdvanceTests(TestCase):
         event.refresh_from_db()
         self.assertEqual(event.status, models.RaceEventStatus.FINISHED)
 
+    def test_advance_late_admission_finishes_scheduled_event_without_fake_running(self):
+        event = self._make_event(
+            slug="advance-late",
+            race_datetime=NOW - timedelta(minutes=45),
+        )
+        self._control(event)
+
+        stats = race_data_sync_lifecycle.advance_due_data_sync_lifecycle(now=NOW)
+
+        self.assertEqual(stats["error"], 0, stats)
+        self.assertEqual(stats["transitioned"], 1, stats)
+        event.refresh_from_db()
+        self.assertEqual(event.status, models.RaceEventStatus.FINISHED)
+        transitions = models.RaceEventLifecycleTransition.objects.filter(
+            event=event
+        )
+        self.assertEqual(transitions.count(), 1)
+        self.assertNotEqual(
+            transitions.first().to_status, models.RaceEventStatus.RUNNING
+        )
+
     def test_advance_respects_manual_pause(self):
         event = self._make_event(slug="advance-paused", race_datetime=NOW - timedelta(minutes=1))
         self._control(event, pause="operator hold")
