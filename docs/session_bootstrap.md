@@ -11,8 +11,9 @@
 
 1. `AGENTS.md`
 2. 本文件
-3. 按本次任务关键词查询 `docs/current_state.md` 和 `docs/decisions.md`
-4. 按任务影响补读 `docs/project_overview.md`、`docs/project_status.md` 或相关 `docs/changes/<slug>/`
+3. `docs/future_work_roadmap.md`
+4. 按本次任务关键词查询 `docs/current_state.md` 和 `docs/decisions.md`
+5. 按任务影响补读 `docs/project_overview.md`、`docs/project_status.md` 或相关 `docs/changes/<slug>/`
 
 部署、回滚、生产数据或运维任务再读相关章节：
 

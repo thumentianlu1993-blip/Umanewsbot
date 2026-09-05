@@ -1,5 +1,17 @@
 # 当前状态
 
+## 2026-09-05 后续路线与完整赛事自动化方案已写入仓库
+
+- 新增 [后续工作路线图与 Agent 交接](future_work_roadmap.md)，统一记录近期未收口工作、
+  “记录待修复事项与方案”遗留项、阶段依赖、验收矩阵、open PR 盘点和多 Agent 文件责任边界。
+- `complete-race-status-automation-coverage` 的 spec/design/test/tasks/rollout/review 六份方案已从
+  独立计划 worktree 持久化到 `docs/changes/`。工程审核结论仍是
+  `APPROVED FOR USER REVIEW`：实现、合并、发布和生产写入均未因文档入库而获得授权。
+- 赛事自动化后续建议只保留这一条产品主线；本地 `stabilize-race-data-pipeline` candidate 只作为
+  基础实现来源，必须从最新主线逐文件审计后迁入，不得整分支直接合并。Racing API 四地区导出和
+  P0 马匹资料 apply 继续维持各自的外部权限/精确 G3 阻断。
+- 本轮只修改文档；没有运行 provider、修改数据库、迁移、服务、开关、队列或生产环境。
+
 ## 2026-09-01 PR #137 已上线，France 2023 五马 External staging 已完成并独立验收
 
 完整批次、逐表计数和终态证据见

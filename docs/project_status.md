@@ -1,5 +1,13 @@
 # 项目状态文档
 
+## 2026-09-05 后续工作与多 Agent 交接基线
+
+- 新增 [后续工作路线图与 Agent 交接](future_work_roadmap.md)，覆盖近期未收口工作和长期待修清单。
+- 完整赛事状态自动化六份方案已入库，工程审核为 `APPROVED FOR USER REVIEW`，实现任务仍全部未开始。
+- 下一执行门是：用户审核五项产品决定 -> M0 收敛候选/PR/生产基线 -> M1 RED 测试与实现 ->
+  M2 关闭态分阶段自然灰度。任何 HTTP 200、任务 SUCCESS 或通知 SENT 都不能单独代表业务闭环。
+- 本次为 docs-only 变更，没有修改生产运行态。
+
 ## 2026-09-01 PR #137 / leaf 0077 已上线，France 2023 五马 staging 验收完成
 
 - PR #137 merge `1312c8de…4a03` / image `85b94626…f253` 已通过 exact backup 与两阶段 handoff 发布；

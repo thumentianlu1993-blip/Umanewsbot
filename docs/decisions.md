@@ -1,5 +1,17 @@
 # 关键决策
 
+## 2026-09-05 后续工作使用单一路线图和单一赛事自动化主线交接
+
+- [后续工作路线图与 Agent 交接](future_work_roadmap.md) 作为跨 Agent 的后续工作入口，负责维护
+  未收口事项、执行顺序、依赖和 owner；生产真相仍以 `docs/current_state.md` 和当次只读核验为准。
+- 赛事自动化不再让 `complete-race-status-automation-coverage` 与
+  `stabilize-race-data-pipeline` 形成两条竞争实现。前者是待用户审核的完整产品主线；后者只提供
+  可逐文件复用的 identity、evidence、audit 和测试基础，不能整体 cherry-pick。
+- 完整赛事方案中的五项产品决定仍处于“建议接受、等待用户审核”状态。文档提交只保存上下文，
+  不代表用户已经批准实现、发布、联网扩量、生产数据写入或旧 `race_live` 处置。
+- 多 Agent 必须按根 `AGENTS.md` 使用独立 worktree 和明确文件 ownership；人工确认门禁不在 roadmap
+  或 change 文档中另行定义。
+
 ## 2026-09-01 France 2023 五马以 provider stable ID 完成 staging，不自动晋级 canonical identity
 
 - 本批唯一身份主键是目标赛事中已确认的 The Racing API `hrs_*` stable ID；名称、国家后缀、出生日期、
