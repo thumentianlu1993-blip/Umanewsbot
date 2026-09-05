@@ -397,6 +397,57 @@ def _lock_checkpoints_before_source(
     return source_hint, checkpoints
 
 
+def _establish_data_sync_lifecycle_evidence(
+    *,
+    lifecycle: models.RaceEventLifecycleControl,
+    event: models.RaceEvent,
+    standing_policy_digest: str,
+    manifest_sha256: str,
+    entry_sha256: str,
+    owner_generation: int,
+    now: datetime,
+) -> None:
+    manifest_data = (
+        dict(lifecycle.manifest_data)
+        if isinstance(lifecycle.manifest_data, dict)
+        else {}
+    )
+    manifest_data["race_data_sync"] = {
+        "standing_policy_digest": standing_policy_digest,
+        "manifest_sha256": manifest_sha256,
+        "entry_sha256": entry_sha256,
+        "owner_generation": owner_generation,
+    }
+    lifecycle.manifest_data = manifest_data
+    update_fields = ["manifest_data", "updated_at"]
+    legacy_active = models.RaceEventLifecycleEnforceMembership.objects.filter(
+        event_id=event.pk,
+        state="active",
+        registry__state="active",
+        registry__is_active=True,
+        registry__runtime_valid_until__gt=now,
+    ).exists()
+    if legacy_active or lifecycle.manual_pause_reason:
+        lifecycle.save(update_fields=tuple(update_fields))
+        return
+    lifecycle.enrollment_manifest_sha256 = manifest_sha256
+    update_fields.append("enrollment_manifest_sha256")
+    if (
+        getattr(settings, "RACE_DATA_SYNC_LIFECYCLE_APPLY_ENABLED", False) is True
+        and not lifecycle.manual_pause_reason
+        and not legacy_active
+    ):
+        from stable.services.race_data_sync_lifecycle import (
+            decide_data_sync_lifecycle,
+        )
+
+        lifecycle.mode = models.RaceEventLifecycleMode.ENFORCE
+        decision = decide_data_sync_lifecycle(event=event, now=now)
+        lifecycle.next_refresh_at = decision.next_refresh_at or now
+        update_fields += ["mode", "next_refresh_at"]
+    lifecycle.save(update_fields=tuple(update_fields))
+
+
 def acquire_enrollment(
     *,
     event_id: int,
@@ -628,23 +679,14 @@ def acquire_enrollment(
                 enrollment_manifest_sha256="",
                 manifest_data={},
             )
-        lifecycle.manifest_data = {
-            **(
-                lifecycle.manifest_data
-                if isinstance(lifecycle.manifest_data, dict)
-                else {}
-            ),
-            "race_data_sync": {
-                "manifest_sha256": manifest_sha256,
-                "entry_sha256": entry_sha256,
-                "owner_generation": next_generation,
-            },
-        }
-        lifecycle.save(
-            update_fields=(
-                "manifest_data",
-                "updated_at",
-            )
+        _establish_data_sync_lifecycle_evidence(
+            lifecycle=lifecycle,
+            event=event,
+            standing_policy_digest=standing_policy_digest,
+            manifest_sha256=manifest_sha256,
+            entry_sha256=entry_sha256,
+            owner_generation=next_generation,
+            now=now,
         )
         return ControlDecision("acquired", "", event_id, next_generation)
 
@@ -812,19 +854,15 @@ def rotate_enrollment(
                 "updated_at",
             )
         )
-        lifecycle.manifest_data = {
-            **(
-                lifecycle.manifest_data
-                if isinstance(lifecycle.manifest_data, dict)
-                else {}
-            ),
-            "race_data_sync": {
-                "manifest_sha256": successor_manifest_sha256,
-                "entry_sha256": successor_entry_sha256,
-                "owner_generation": next_generation,
-            },
-        }
-        lifecycle.save(update_fields=("manifest_data", "updated_at"))
+        _establish_data_sync_lifecycle_evidence(
+            lifecycle=lifecycle,
+            event=event,
+            standing_policy_digest=standing_policy_digest,
+            manifest_sha256=successor_manifest_sha256,
+            entry_sha256=successor_entry_sha256,
+            owner_generation=next_generation,
+            now=now,
+        )
         tracking.tracking_enabled = True
         tracking.claim_generation += 1
         tracking.active_attempt_token = ""
