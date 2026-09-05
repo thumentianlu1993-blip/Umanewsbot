@@ -99,6 +99,10 @@ class ProviderIdentityDiscoveryOutcome:
     adopted_source_count: int
     ambiguous_event_count: int
     unmatched_event_count: int
+    already_valid_count: int = 0
+    awaiting_source_window_count: int = 0
+    deferred_event_count: int = 0
+    rejected_event_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -626,6 +630,7 @@ def _fair_discovery_bucket_order(
 def discover_the_racing_api_source_identities(
     *,
     now: datetime,
+    horizon_days: int = 30,
     transport: Callable[..., Any] = the_racing_api_transport,
     clock: Callable[[], datetime] = timezone.now,
     sleeper: Callable[[float], Any] = time.sleep,
@@ -634,6 +639,9 @@ def discover_the_racing_api_source_identities(
 
     Only deterministic name + course + local-date matches are admitted.  One
     hourly invocation is bounded by the reviewed TRA registry request budget.
+    Every scanned event is accounted exactly once: already valid, waiting for
+    the source window, rejected before candidacy, deferred by budget, or
+    processed to created/adopted/ambiguous/unmatched.
     """
 
     flags = RaceDataSyncFlags.from_settings()
@@ -655,25 +663,37 @@ def discover_the_racing_api_source_identities(
         return ProviderIdentityDiscoveryOutcome(
             False, "provider_discovery_disabled", 0, 0, 0, 0, 0, 0
         )
+    if (
+        isinstance(horizon_days, bool)
+        or not isinstance(horizon_days, int)
+        or not 1 <= horizon_days <= 366
+    ):
+        raise ValueError("horizon_days is invalid")
     candidate_events = list(
         models.RaceEvent.objects.filter(
             visibility_status=models.RaceEventVisibility.PUBLISHED,
             status=models.RaceEventStatus.SCHEDULED,
             local_date__gte=now.date() - timedelta(days=1),
-            local_date__lte=now.date() + timedelta(days=2),
+            local_date__lte=now.date() + timedelta(days=horizon_days + 1),
         )
         .select_related("race_series", "major_race_event")
         .prefetch_related("aliases", "race_series__names", "source_identities")
         .order_by("local_date", "id")
     )
+    total = len(candidate_events)
+    already_valid = 0
+    awaiting = 0
+    rejected = 0
     candidates = []
     for event in candidate_events:
         if isinstance(event.manual_lock_flags, dict) and any(
             event.manual_lock_flags.values()
         ):
+            rejected += 1
             continue
         contract_region = _event_contract_region(event)
         if contract_region not in flags.regions:
+            rejected += 1
             continue
         existing = [
             source
@@ -687,6 +707,7 @@ def discover_the_racing_api_source_identities(
             data_kinds=required_kinds,
         )
         if route is None:
+            rejected += 1
             continue
         exact_existing = [
             source
@@ -702,11 +723,31 @@ def discover_the_racing_api_source_identities(
                 now=now,
             )
             if not admission_reason:
+                already_valid += 1
                 continue
-        candidates.append((event, contract_region, route, existing))
+        try:
+            provider_date = now.astimezone(ZoneInfo(event.timezone_name)).date()
+        except (KeyError, ValueError):
+            rejected += 1
+            continue
+        offset = (event.local_date - provider_date).days
+        if offset not in {0, 1}:
+            awaiting += 1
+            continue
+        candidates.append((event, contract_region, route, existing, offset))
     if not candidates:
         return ProviderIdentityDiscoveryOutcome(
-            True, "no_candidates", 0, 0, 0, 0, 0, 0
+            True,
+            "no_candidates",
+            0,
+            total,
+            0,
+            0,
+            0,
+            0,
+            already_valid_count=already_valid,
+            awaiting_source_window_count=awaiting,
+            rejected_event_count=rejected,
         )
 
     first_route = candidates[0][2]
@@ -732,29 +773,25 @@ def discover_the_racing_api_source_identities(
             False,
             "source_runtime_contract_rejected",
             0,
-            len(candidates),
+            total,
             0,
             0,
             0,
             len(candidates),
+            already_valid_count=already_valid,
+            awaiting_source_window_count=awaiting,
+            rejected_event_count=rejected,
         )
 
     buckets: dict[tuple[str, str], list[tuple[Any, ...]]] = {}
     for candidate in candidates:
         event = candidate[0]
-        try:
-            provider_date = now.astimezone(ZoneInfo(event.timezone_name)).date()
-        except (KeyError, ValueError):
-            continue
-        offset = (event.local_date - provider_date).days
-        if offset not in {0, 1}:
-            continue
         provider_region = _registry_region(
             event_region=event.country_region,
             contract_region=candidate[1],
         )
         buckets.setdefault(
-            (provider_region, "today" if offset == 0 else "tomorrow"), []
+            (provider_region, "today" if candidate[4] == 0 else "tomorrow"), []
         ).append(candidate)
 
     created = 0
@@ -800,7 +837,7 @@ def discover_the_racing_api_source_identities(
             request_count += 1
             snapshot = parse_the_racing_api_live_racecards_payload(payload)
             expected_region_code = registry["allowed_region_codes"][event_region]
-            for event, contract_region, route, existing in bucket:
+            for event, contract_region, route, existing, _offset in bucket:
                 race, reason = _match_discovery_race(
                     event=event,
                     races=snapshot.races,
@@ -882,11 +919,17 @@ def discover_the_racing_api_source_identities(
             False,
             exc.reason_code,
             request_count,
-            len(candidates),
+            total,
             created,
             adopted,
             ambiguous,
             unmatched,
+            already_valid_count=already_valid,
+            awaiting_source_window_count=awaiting,
+            deferred_event_count=(
+                len(candidates) - created - adopted - ambiguous - unmatched
+            ),
+            rejected_event_count=rejected,
         )
     except Exception:
         logger.exception("TRA identity discovery execution failed")
@@ -894,21 +937,33 @@ def discover_the_racing_api_source_identities(
             False,
             "provider_execution_failed",
             request_count,
-            len(candidates),
+            total,
             created,
             adopted,
             ambiguous,
             unmatched,
+            already_valid_count=already_valid,
+            awaiting_source_window_count=awaiting,
+            deferred_event_count=(
+                len(candidates) - created - adopted - ambiguous - unmatched
+            ),
+            rejected_event_count=rejected,
         )
     return ProviderIdentityDiscoveryOutcome(
         True,
         "complete",
         request_count,
-        len(candidates),
+        total,
         created,
         adopted,
         ambiguous,
         unmatched,
+        already_valid_count=already_valid,
+        awaiting_source_window_count=awaiting,
+        deferred_event_count=(
+            len(candidates) - created - adopted - ambiguous - unmatched
+        ),
+        rejected_event_count=rejected,
     )
 
 
