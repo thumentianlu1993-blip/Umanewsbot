@@ -16,6 +16,7 @@ backups/
 tmp/
 *.log
 .claude/
+/.worktrees/
 runtime/termbase_seed/
 runtime/race_event_detail_imports/
 runtime/race_event_exports/
@@ -26,6 +27,10 @@ runtime/race_event_crawl_runs/
 runtime/race_event_review_samples/
 runtime/multiregion_candidate_audit/
 runtime/term_review/
+runtime/historical_crawl_runs/
+runtime/historical_detail_crawl_runs/
+runtime/historical_plan_exports/
+runtime/historical_race_batches/
 
 sample_news.json
 netkeiba_page1.html
@@ -36,3 +41,6 @@ news_detail.html
 news_detail_mobile.html
 netkeiba_news_test.json
 netkeiba_news_detail_test.json
+
+# Kimi Code 项目本地配置（机器相关，不提交；.kimi-code/AGENTS.md 与 skills 需提交）
+.kimi-code/local.toml

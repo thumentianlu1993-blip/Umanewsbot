@@ -37,16 +37,17 @@
 - 所有关键状态、决策、排查过程都要写回仓库文档
 - 做生产相关改动时，优先核对运行态，而不是只看本地代码预期
 
-## OpenSpec / Codex 工作流
+## 需求管理流程：按工具分派
 
-- 较大功能、跨模块改动、架构调整和生产高风险变更，先通过 OpenSpec 对齐需求，再进入实现
-- OpenSpec 项目上下文与任务路由位于 `openspec/config.yaml`
-- 工作流顺序：探索 -> 提案/规格/设计/任务 -> 实现 -> 验证 -> 归档
-- 使用 Codex 时，可从 `/skills` 调用 `openspec-propose` 创建变更，调用 `openspec-apply-change` 实现，完成验证后调用 `openspec-archive-change`
-- `tasks.md` 中的任务必须使用 `(application)`、`(integration)` 或 `(operations)` 域前缀，并按实现先于验证的顺序排列
-- `.codex/agents/` 中提供对应领域代理；子代理仅在明确要求时启用
-- 不手工修改 `.codex/skills/openspec-*` 生成文件；需要刷新时运行 `openspec update`
+本仓库存在两套需求管理 harness，按当前使用的 AI 工具分派，互不混用：
+
+- **Codex**：使用 Codex 原生需求管理流程（内建 plan / 任务分解能力），不使用 OpenSpec，不创建、不修改 `openspec/` 目录与 `.kimi-code/` 目录下的任何内容
+- **Kimi Code**：使用 OpenSpec 流程；除本文件外还必须额外遵守 `.kimi-code/AGENTS.md` 中的全部约定（Kimi Code 会同时加载这两份指令文件）。`openspec/` 目录与 `.kimi-code/` 目录是 Kimi Code 专属 harness
+
+共用约定（两个工具都必须遵守）：
+
 - 小型修复可以直接处理，但仍须遵守本文件的阅读、验证与文档回写要求
+- `.codex/agents/` 中提供领域代理；子代理仅在明确要求时启用
 
 ## 开始任何任务前必须先阅读
 
@@ -69,7 +70,7 @@
 
 ## 输出风格
 
-- Codex 新增或维护的仓库文档、OpenSpec 产物、代理说明和面向协作者的文字默认使用中文
+- AI 助手新增或维护的仓库文档、OpenSpec 产物、代理说明和面向协作者的文字默认使用中文
 - 命令、代码标识符、协议字段、第三方工具要求的机器语法，以及无法合理翻译的专有名词可以保留英文
 - OpenSpec 规格中的 `ADDED Requirements / Requirement / Scenario / WHEN / THEN` 等校验关键字必须保留，但其标题和正文内容使用中文
 - 先确认当前真实状态，再给建议

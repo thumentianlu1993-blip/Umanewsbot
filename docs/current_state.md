@@ -2,6 +2,90 @@
 
 ## 当前结论
 
+`2026-09-05` 已完成需求管理 harness 按工具分派：Codex 使用其原生流程，Kimi Code 使用 OpenSpec 流程。根 `AGENTS.md` 的“OpenSpec / Codex 工作流”段已改写为“需求管理流程：按工具分派”路由段；新增 `.kimi-code/AGENTS.md` 承载 Kimi Code 专属 OpenSpec 约定（工作流顺序、`/skill:openspec-*` 调用方式、tasks.md 域前缀、校验与归档要求）；`openspec/` 目录已从 git HEAD 恢复；`.kimi-code/skills/` 已复制 5 个 openspec skill 并改写 `/opsx:*` 引用；`.gitignore` 新增 `.kimi-code/local.toml`。已用 `kimi -p` 实测两份指令文件合并注入且路由规则被正确理解。决策详情见 `docs/decisions.md` 顶部。注意：工作树仍有该分派之外的大量未提交改动（48 个修改、44 个未跟踪文件、`.codex/skills/openspec-*` 删除保持未提交），提交时需分开处理。
+
+`2026-08-29` 已完成 The Racing API 赛马数据库接入调研，完整报告见 `docs/the_racing_api_horse_database_research_20260829.md`。本轮仅研究官方 OpenAPI `1.4.4`、套餐/覆盖/条款、JRA/JBIS/HKJC 身份资料和仓库现有模型，没有调用账号付费 endpoint、没有读取或写入凭据、没有修改数据库或生产运行态。结论为：TRA 适合作为全球赛事/赛果、英文马名、基础 profile 和血统外部事实层；核心数据对香港覆盖较完整，日本只覆盖全球 Group/graded 级及部分让赛，不能替代 JRA/NAR 全量库；`Pro` 也不自动包含解除 `/results` 12 个月限制的 historical add-on。日港马不得按英文名去重，应以 TRA `hrs_*`、JRA/JRA-VAN/JBIS 身份、HKJC full HorseId/烙号和 DOB/sex/父母指纹建立可审计 crosswalk。正式实现前需要 OpenSpec，新增跨来源身份、多语言马名和身份候选/审计结构，并先做零业务写入的五地区真实字段非空率与 ID 稳定性 proof。
+
+`2026-08-29` 同日追加“外部名单驱动的逐马历史导出”调研。官方 OpenAPI 将 `/v1/horses/{horse_id}/results` 定义为 Pro 套餐的单马 full historical results，没有 `/v1/results` 的 12 个月回溯限制；因此可先从合规外部来源取得重点参赛马/冠军名单，再执行 horse search、身份校验、Pro profile 和逐马 results 分页。1999 年凯旋门冠军 Montjeu 已用 France Galop 与 Coolmore 公开资料构造示例 seed，但本轮未使用付费账号，实际 `hrs_*`、返回场次和最早日期仍为待 proof 的 unknown。该路径只能证明 TRA available record，不自动证明官方完整生涯；搜索结果必须用国别、DOB/sex/父母校验，不能取第一条或只按名字合并。
+
+`2026-08-28 08:39 +08:00` 已完成生产站点间歇性无响应的现场排查与恢复。主机 `47.239.167.86` 的 `22/80/443`、SSH、PostgreSQL、Redis、Django `check` 和容器基础健康均可用，故障不是 ECS、Nginx 或数据库整体退出。故障窗口中，生产 web 最近 20 分钟日志抽样共 `2592` 条，其中 `2486` 条为 `meta-externalagent`，该爬虫持续以每秒多次访问带递归畸形组合参数的 `/races/`；当时 15 分钟负载为 `3.69`，小规格主机只有约 `398 MiB` 可用内存且无 swap，web CPU 一度约 `87%`，形成应用层拥塞。根因处置没有使用整机重启，因为流量在重启后会立即回来。
+
+实际 Nginx bind mount 来自 `/opt/umanews-release-93cfd240-PR105-20260817/umanewsbot/deploy/nginx/nginx.conf`，不是 checkout `/opt/umanewsbot/deploy/nginx/nginx.conf`。已在实际挂载配置中增加 `meta-externalagent` 的显式 403 门禁，原文件备份为同目录 `nginx.conf.backup.emergency-20260828T0834+0800`；原 SHA-256 为 `a506e857d959529deb6cfbbe8712864031defddfb8583c628d64e50197748b9c`，热修后为 `f22f11875c085c16bcc9d1357ff0b042d27916ebef4e250506a9c62373f7ca79`。`nginx -t` 通过后只执行平滑 reload。HTTP/HTTPS 的 Meta UA 均返回 `403`，随后两分钟进入 Django 的同 UA 请求为 `0`；普通 `/healthz/`、首页、`/races/`、`/admin/login/` 连续返回 `200`，web CPU 回落到约 `0.04%`。
+
+普通 Celery active/reserved 与队列均确认空后，只重启 `umanewsbot-worker-1` 释放长期子进程内存；worker 从约 `1.21 GiB` 降为 `186.5 MiB`，容器 `OOMKilled=false`，Celery 重新 `pong`，普通队列仍为 `0`，宿主机 available memory 从约 `351 MiB` 回升至 `1.4 GiB`。未重启 web、beat、db、redis、nginx 容器或 ECS。根盘为 `83G/99G`、`88%`，其中 `/opt/umanewsbot/backups/db` 约 `42G`；本轮没有无授权删除备份。独立遗留问题仍有：`race_live=7543` 且专用 worker 未启动；历史 HRN 同一来源键存在 `13` 条重复新闻，`Article#9879` 的 stale translation recovery 每 5 分钟触发唯一约束错误。两者不是本次公网卡顿根因，也未在恢复窗口中清队列、删记录或改业务数据。Nginx 门禁目前固化在实际 release 目录，下一次发布前必须把同等防护纳入新 release 配置，否则部署会覆盖本次热修。
+
+`2026-08-17 01:05 +08:00` 已按用户授权完成“赛事当地日期为 `2026-08-16`、截至当前已完赛”的公开唯一赛事赛果补齐。生产该日期共 `7` 场：日本中京纪念、札幌纪念此前已为完整确认赛果；本轮新增法国多维尔 `3` 场，分别为 `RaceEvent#748` 弗朗索瓦·布坦锦标、`#749` 奥赖利夫人锦标（Prix Minerve）、`#750` 杰克莫华大赛；美国 `#451` Rancho Bernardo Stakes 与 `#452` Mahony Stakes 在最终来源复查时仍为 Sporting Life API `DORMANT`，计划时间尚未到，继续保持 `scheduled/0 results`，没有提前制造赛果。因此截至该时点，8月16日已完赛范围为 `5/5` 场全部有确认赛果，未完赛 `2` 场明确留在阻断清单。
+
+法国3场以 Sporting Life racecards API 的稳定 race ID、`2026-08-16 / Deauville / WEIGHEDIN` 终态与结果详情页共同锁定；race ID 分别为 `933990/933989/933992`。来源审阅 artifact SHA-256 为 `b79cd2aca847eca9e76f2d7f8b4e28b80542f916690fe4156efaa580adb9732d`，新不可变 bundle SHA-256 为 `9337e4a501bae4c1f007a9360b167be5364a65c6c5102e7416375a9b6aad5a7f`。写前3场均为 `scheduled/published`、0结果、0 approval，无持有中的导入锁或活跃 review run；正式 dry-run 为 `3 events / 22 rows`，apply 为 `3/3 applied`，exact verifier 为 `3/3 verified`。写后3场均 `finished` 且有确认时间，`22/22` 行 confirmed、`22/22 official_finish_position=null`，并有3个 `human_reviewed_reference` approval 与3个 OperationLog。头马依次为 `5` 号 Avec Toi、`5` 号 Romantic Symphony、`8` 号 Rayif（前台术语显示“横逸”）。
+
+写前恢复点为 `backups/db/pre-aug16-france-results-20260816T165748Z.dump`，`445,536,037` 字节、mode `600`、SHA-256 `9cd6fba5f80c22da474d76b5953f02e0ce34c9b93858426867e310d693fe76c1`，`pg_restore --list` 得到 `1,325` 项。3个公网详情页均为 `200`、显示“已人工审核赛果”，完整“名次 + 马号”序列与来源 `22/22` 一致；内外 `/healthz/` 与公网 `/races/` 均为 `200`。来源、API 原文和 bundle 归档于 `backups/race-result-review/20260816T165748Z/`。本轮未部署或重启；实际 web/worker/beat 镜像同为 revision `0f3391a9308ec07a0cf685c39680b0fdd5311ea6`，最终 web/worker/beat、db/redis/nginx 均运行，`race_live_worker` 仍为 `created`。
+
+`2026-08-16 20:35 +08:00` 已按用户追加授权补齐当天两场日本重赏赛果：`RaceEvent#90` 中京纪念与 `RaceEvent#91` 札幌纪念。来源分别为 JRA 官方 replay `073`、`074`；两页均解析为 `16` 匹完整数字名次，头马为中京纪念 `3` 号 `ラヴァンダ`、札幌纪念 `15` 号 `シェイクユアハート`。来源审阅 artifact SHA-256 为 `662665c9cd0a8e3b6473f979a75d5373922eee5ca85ef6e7cef9f4ec0551c971`，本次新建的不可变 bundle SHA-256 为 `4020f5e375eff5ee3bd26696b820f8232dea044a09fc673344d37d1121f58a9c`；写前两个目标均为 `scheduled/published`、结果和 approval 均为 `0`，外部导入锁和活跃 review run 均为 `0`，正式 dry-run 精确为 `2 events / 32 rows`。
+
+写前恢复点 `backups/db/pre-jra-results-20260816T122548Z.dump` 为 `444,419,031` 字节、mode `600`、SHA-256 `b2c132343e20591b49ff9a3b7563b62274f25becb5a1435f59b5c25b95c19d08`，`pg_restore --list` 可读并得到 `1,301` 项。正式 apply 后 exact bundle verifier 返回 `2/2 verified`；数据库为 `2/2 finished`、`32/32 is_confirmed`、`32/32 official_finish_position`、`32/32 bundle SHA`，并有 `2` 个 official approval 和 `2` 个 OperationLog，当天日本公开赛事中 `scheduled + zero results=0`。两个公网详情页均为 `200`、显示“正式赛果”，各 `16` 行完整“名次 + 马号”序列与 JRA 来源一致；内外 `/healthz/` 及公网 `/races/` 均为 `200`。来源证据与 bundle 保存于 `backups/race-result-review/20260816T122548Z/`。
+
+本次没有部署、重启或修改服务配置。生产 checkout 仍为 `HEAD=bef0cdc5034bd2516df9876b2a7dde2357f03495`，实际 web 容器为镜像 `sha256:afa0379f04d1ca8d0115f4ef724fdc9d08a4e34157682c2f657a6fd59f0f441f`（镜像标签 revision `a7e3783f...`）；写前运行服务只有 web/db/redis/nginx，最终 `ps --all` 显示 `worker/beat=exited`、`race_live_worker=created`。该 Celery 运行态是独立遗留风险，本轮为避免扩大授权范围未启动或修复，不能用网页赛果更新成功替代后台任务健康结论。
+
+`2026-08-16 19:55 +08:00` 已完成用户授权的全量缺失赛果恢复。生产以“公开、非 active duplicate、非 cancelled/postponed，且 `race_datetime` 已到或本地日期次日零点已到”为同一验收口径，只读扫描 `9,459` 场已到期赛事，写前发现 `57` 场零赛果，写后同口径为 `0`。精确范围为：日本 `8` 场（`84–89、186–187`），美国 `24` 场（`5、428–450`），法国 `11` 场（`737–747`），英国 `14` 场（`932–945`）。其中包括アイビスサマーダッシュ、クイーンS、エルムS、レパードS、CBC賞、新潟ジャンプS、クラスターカップ、北海道スプリントカップ；Kentucky Derby、Glens Falls、Amsterdam、Clement L. Hirsch、Saratoga Special、Lake George、Jim Dandy、Beverly D.、Arlington Million、Secretariat、Adirondack、Saratoga Oaks、National Museum of Racing Hall of Fame、Best Pal、Yellow Ribbon、Whitney、Fourstardave、Test、Saratoga Derby、Sorrento、Troy、West Virginia Derby、Philip H. Iselin、Christophe Clement Turf；Prix de Cabourg、Six Perfections、Psyche、Rothschild、Reux、Daphnis、Maurice de Gheest、Alec Head、Lieurey、Guillaume d’Ornano、Gontaut-Biron；Sussex、Oak Tree、Molecomb、Nassau、Gordon、Richmond、King George Qatar、Thoroughbred、Lillie Langtry、Glorious、Rose of Lancaster、Sweet Solera、Hungerford、Geoffrey Freer。
+
+来源按用户确认的同等置信度口径处理，但保留真实 provenance：JRA/NAR 官网 `8` 场写为 `official`，Sporting Life API + 结果页 `49` 场写为 `human_reviewed_reference`；共写入 `493` 条完整数字名次，其中官方 `101` 条、人工审核可信第三方 `392` 条。来源审阅 artifact SHA-256 为 `ab5eac9bd57b4ce922b38a9653b8a80281f92b41281e761fd85878864b206b2f`，不可变 bundle SHA-256 为 `9ffc83d63b90fb7fd1d2f9d756a3f20ba0b327a80240175a19d26d96772adb83`。正式 dry-run 为 `57 events / 493 rows`，apply 为 `57/57 applied`，exact bundle verifier 为 `57/57 verified`；数据库写后为 `57/57 finished`、`57/57 result_confirmed_at`、`493/493 is_confirmed`、`57` 个 approval、`57` 个 OperationLog，零赛果目标和错误状态均为 `0`。
+
+写前恢复点为 `backups/db/pre-manual-race-results-20260816T114700Z.dump`，`444,359,738` 字节、mode `600`、SHA-256 `6b083d535d6cbea9f1d6faa2fccbb9d04be8c0eb35a8c13d8edf1ce9382bf406`，`pg_restore -l` 可读并得到 `1,301` 行。来源网页、API 响应、inventory、CSV/JSON review 和公网验收证据保存在 `backups/race-result-review/20260816T114200Z/`；来源压缩包 SHA-256 为 `ce74ab491f2a83307e6fe446ea2e3f3dbcd334414141f8694bf6338aca7c3c53`。公网 57 个赛事页全部 `200`，57/57 的完整“名次 + 马号”序列与来源包一致，57/57 显示正确的“正式赛果/已人工审核赛果”标签；公网验收 artifact SHA-256 为 `65be575ceb04e45dfab80b8d2bfa63d850f72fca2463485d9f4832e9a9a7ad11`。最终生产 `HEAD=bef0cdc5034bd2516df9876b2a7dde2357f03495`，内外 `/healthz/` 与 `/races/` 均为 `200`。
+
+本轮只更新赛果、确认时间和赛事完成状态，没有顺带改赛事身份字段。已知两个上游日期残差继续保留待单独修复：`RaceEvent#5` Kentucky Derby 的库内日期/时区口径与美国当地 `2026-05-02` 不一致；`RaceEvent#428` Glens Falls 保留原废止场次日期 `2026-07-31`，本次赛果对应 Sporting Life `race_id=931769` 的 `2026-08-02` 改期举行赛事。两者结果身份均已通过来源 race ID 锁定，不能把本次赛果更新误报为日期身份也已修复。
+
+`2026-08-03` 已完成 DeepSeek 占位符兼容修复方案，创建 OpenSpec change `fix-deepseek-placeholder-compatibility`；proposal/design/spec/tasks 共 4/4 artifact 完成并通过 strict validation。本次只形成方案，没有修改运行时代码、数据库、生产 `.env`、Celery 或文章状态。方案不放宽术语与发布门禁：DeepSeek profile 显式使用 non-thinking；保护机制升级为唯一结构化槽引用，由服务端 manifest 注入马名和确定性术语最终值；缺失、重复、未知、跨字段和重组后计数异常全部 fail-closed。默认连续 3 次确定性协议失败按能力指纹熔断，所有必需槽计数为 0 时不再追加相同付费重试。上线顺序锁定为 RED/GREEN 与工程评审、部署但自动翻译关闭、无副作用在线探针、单篇、固定 5 篇、至少 24 小时小流量观察。当前兼容问题尚未修复，现有失败稿不得继续批量重放；实现需要后续代码变更和 PR，部署/探针/回放仍分别需要授权，聊天中曾暴露的 DeepSeek API key 必须在正式部署前轮换。
+
+`2026-08-02 23:14 +08:00` 完成用户授权的“最新五篇进入翻译和发布流程”有界生产验证。先等待自然抓取队列从 `12` 清空到 `0`、worker active/reserved 为空，再按 `first_seen_at/id` 冻结 `11194/11193/11192/11191/11190`，逐篇串行调用现有 `translate_article_task`，不直接写 published、不绕过术语或质量门禁。五篇的 DeepSeek `deepseek-v4-flash` 请求均持续返回 HTTP `200`，但最终 `5/5` 翻译失败：`11194/11193/11191/11190` 为 `Translation response changed required deterministic term placeholder`，`11192` 为 `Translation response changed required seed term placeholder`。只读审计最新 `TranslationRun.raw_response` 的结构化校验结果显示，模型输出正文中要求保留的 `__UMA_KEEP_*`、`__UMA_TERM_*`、`__UMA_SEED_*` 占位符计数均为 `0`，属于系统性占位符丢失，不是偶发 429 或余额问题。五篇全部保持 `workflow_status=translation_failed`、`automation_status=failed`、`published_to_web_at=null`，因此没有进入自动化评分或实际发布；`23:00` 五地区发布窗口正常 `succeeded`，对相关稿件给出 `translation_retry_waiting/hard_gate_blocked`，没有误发布。结束时普通 Celery 队列 `0`、worker active 为空，公网 `/healthz/`、首页、后台登录均为 `200`。当前结论为“DeepSeek API 连通正常，但 `deepseek-v4-flash` 与现有占位符契约不兼容，新闻生产尚未恢复”；不得继续批量重放或放宽门禁。修复模型行为需要代码变更、测试和 PR，或另选先通过离线占位符 fixture 的模型。
+
+`2026-08-02 22:55 +08:00` 已按用户明确授权把生产翻译运行时从 SiliconFlow 切换到 DeepSeek 官方 API，不涉及仓库代码或 PR。生产 `HEAD=bef0cdc5`；切换前 worker 无 active/reserved，普通 Celery 队列为 `0`。先创建 mode `600` 的 `.env` 回滚备份 `.env.backup.deepseek-switch-20260802_225014`，大小 `9378` 字节，SHA-256 `c0588d4498afd817e3d0d385ecad36516b31c13bdf9721bc21a9935f3a19a130`；随后原子写入 `TRANSLATION_PROVIDER=openai-compatible`、`TRANSLATION_MODEL=deepseek-v4-flash`、`OPENAI_BASE_URL=https://api.deepseek.com` 及用户提供的 Key（Key 未回显、未写仓库），Compose 配置校验通过，仅 force-recreate `worker`。运行态确认 provider/model/base URL 生效、Key 已配置、自动改写仍关闭。固定文章 `11193` 做唯一一次串行验证，DeepSeek Chat Completions 三次均返回 HTTP `200`，证明 Key、余额、端点和模型有效；最终因 `Translation response changed required deterministic term placeholder` 触发既有质量门禁，文章保持 `translation_failed/failed`、未公开，未扩大到其他历史失败稿。公网 `/healthz/`、首页、后台登录页和 `/races/` 均为 `200`，普通队列仍为 `0`；`race_live=7543` 为独立遗留风险。本次环境切换本身无需 PR；若要显式关闭 V4 默认 thinking 或调整占位符提示/重试代码，则必须另立代码变更和 PR。后续以自然新稿是否成功完成“翻译 -> 自动化门禁 -> 发布窗口”为恢复判据，不把 API `200` 单独报告为新闻生产恢复。
+
+`2026-08-02 22:44 +08:00` 完成新一轮新闻停更只读诊断及供应商切换评估。生产 HTTP 与 SSH 已从前一晚异常中恢复：固定生产 IP 后 `/healthz/`、首页、后台登录页和 `/races/` 均为 `200`，生产容器正常运行，`db/redis/web` healthy，普通 Celery 队列为 `0`；磁盘使用 `61%`，可用内存约 `1.3 GiB`。停更不是采集或发布窗口中断：最近 24 小时仍入库 `169` 篇，其中 `163` 篇翻译失败、`5` 篇进入人工审核、`1` 篇公开；诊断时最近 3 小时新入库 `33` 篇且 `33/33` 翻译失败。当前主因是 SiliconFlow `deepseek-ai/DeepSeek-V3` 持续返回 HTTP `429`、错误码 `50609`、`System is too busy now`；`22:41` 的最新自然翻译仍为同一失败，最近 48 小时没有新的 HTTP `402` 余额错误，故不能再沿用“余额不足”结论。429 从 `2026-07-31 17:00 +08:00` 起间歇出现，最后一次成功翻译为 `2026-08-01 20:48 +08:00`，最后一次公开为 `2026-08-01 21:03 +08:00`；此后自然稿没有成功穿过翻译层。最近 6 小时 `120` 个发布窗口全部 `succeeded`，但候选决策为 `translation_retry_waiting`，没有可发布稿。现有证据只能确认供应商接口正在限流/报告系统繁忙，不能仅凭返回码区分共享容量拥塞与账号级速率限制。代码现有 `openai-compatible` 路径可接 DeepSeek 官方 API，但生产未配置 `OPENAI_API_KEY/OPENAI_BASE_URL`；按 `2026-08-02` 官方文档应使用 `https://api.deepseek.com` 与 `deepseek-v4-flash` 或 `deepseek-v4-pro`，旧 `deepseek-chat` 已退役。翻译优先建议 `deepseek-v4-flash`，先以单篇验证 JSON、确定性术语占位符和正文完整性；官方 V4 默认 thinking，现有代码尚未显式关闭，需把响应时延/费用纳入验证。独立风险仍包括 `race_live` 队列约 `7543` 条、`11` 条历史 stale `CrawlJob`，以及生产 compose wrapper 缺少执行位；它们不是本次新闻停更主因。本轮未重试文章、未改配置、未重启服务、未清队列、未执行部署或生产写入。
+
+`2026-08-01 20:16 +08:00` 生产站点再次处于不健康状态。本轮只读探测绕过本机代理 fake-IP，固定到生产 IP `47.239.167.86`：`/healthz/` 返回 `200`，但首字节约 `3.7–6.5s`；静态 CSS 返回 `200`，首字节约 `2.8s`；后台登录页返回 `200`，首字节约 `16.4s`。所有需要业务数据库查询的公开入口均失败：首页、`/races/`、`/horses/` 分别在约 `14.7s`、`13.9s`、`16.2s` 后返回 Django 通用 `500`。生产 IP 的 `22/80/443` 均能完成 TCP 握手，但两次 SSH 都在 banner exchange 阶段超时，无法读取容器、数据库健康、内存、磁盘、队列或应用日志。该分层证据高置信度支持“实例整体严重调度/资源卡顿，同时数据库容器或数据库查询不可用/超时”，排除单纯 DNS、Nginx 完全停机和首页单一模板错误；在取得当前云监控、VNC、内核或容器日志前，不能进一步写成已确认 OOM、已确认磁盘故障或归责到具体任务。阿里云控制台旧诊断页仍只显示 `2026-07-28` 历史报告，导航到当前监控页时登录已过期，因此没有取得本次实时控制面证据。本轮未重启、未操作容器、未修改配置、未执行生产写入，站点未恢复。
+
+`2026-07-30 23:24 +08:00` 完成新闻停更诊断与用户充值后的最小生产验证。公网 healthz、首页及 web/worker/beat/db/redis 均正常，普通 Celery 队列为 `0`；停更不是采集或调度中断。过去 24 小时生产新入库 `153` 篇，其中 `147` 篇处于 `translation_failed`，SiliconFlow 从 `2026-07-29 22:12 +08:00` 起持续返回余额不足，最后一次此前的成功翻译为 `22:08`，存量译稿继续发布至 `23:45` 后耗尽，因此首页随后停止更新。用户充值后仅对当时最新的 3 篇失败稿 `10779/10778/10777` 做了有界重试：`10779` 已不再返回 402，但因确定性术语占位符被改写而再次失败；`10778` 翻译成功、评分 `67`，按价值/确定性规则进入人工审核；`10777` 翻译成功、评分 `93`，但因核心术语 `Irad Ortiz Jr.` 未稳定保留而降级人工审核。三篇均未自动发布，证明余额恢复且质量门禁仍 fail closed；本轮未批量重放其余失败稿、未绕过审核、未手工发布、未改配置或部署。`23:06` 前自然入库的最新稿仍属于充值前余额失败样本；截至本次结束尚无充值后新自然入库稿可用于确认常态自动发布恢复。
+
+`2026-07-29 21:42 +08:00` 用户从云控制台重启生产实例；约 1 分钟后 SSH banner 恢复，公网 `/healthz/` 首次短暂返回 `502`，随后稳定为 `200`。只读验收确认本机与公网 `/healthz/`、首页、`/races/` 均为 `200`，web/db/redis healthy，worker/beat/nginx/OneBot 已运行，磁盘约 `48%`，系统无 failed unit；`ArticleRaceLink=537`，证明图中所述既有赛事关联写入已持久化。`race_live_worker` 仍为 `Created`，本轮未启动。
+
+故障触发链已取得高置信度证据：图中说明故障前在资源受限主机执行了未限定列的 Django ORM 全行读取，后续轻量 `values()` 版本尚未执行；服务器日志显示 `06:31:11` 管理员公钥 SSH 登录，约 43 秒后出现容器 exec 事件，`06:32:52` 起容器健康检查无法启动，随后 Docker resolver 超过 `1024` 个并发查询、snapd watchdog 超时，containerd 事件延迟数小时才被转发，整机 SSH/HTTP 长期失去应用层响应。生产 `NewsArticle` 为 `10552` 行，表本体约 `21 MB`、含索引/TOAST 总计约 `273 MB`；完整 Django 对象及大文本/JSON 字段进入 Python 后会进一步放大。实例可用内存仅约 `3.4 GiB`、无 swap，重启后常驻容器已经占用可观内存。现有证据支持该无界全行读取触发内存压力、回收和调度风暴，但本次内核日志没有留下 OOM kill，不能误报为已确认 OOM。
+
+恢复后仍有独立风险：普通 Celery 队列约 `369` 条，主要是停机期间积压的发布、QQ、抓取、翻译恢复和生命周期窗口任务；`race_live` 队列约 `5782` 条，全部为 `monitor_race_live_sla_task`，而对应 worker 未运行。PostgreSQL 还在对单篇文章的 stale translation 收敛重复触发唯一约束错误。以上是恢复后待处理项，不是本次最初故障触发器；本轮未清队列、未启动 worker、未改配置、未写生产数据。
+
+`2026-07-29 21:38 +08:00` 再次执行只读复测，生产站点仍未恢复。本机 DNS 将 `umafans.run` 解析到代理 fake-IP；绕过 DNS、固定到生产 IP 后，HTTP `/healthz/` 仍在 12 秒内收到 `0` 字节，直接 IP + `Host: umafans.run` 结果相同。生产 IP 的 `22/80/443` 仍可完成 TCP 握手，但 SSH 在发送本地版本串后等待服务端 banner 超时。现有证据继续支持“实例或实例内服务调度阻塞”，排除单纯 DNS/代理与安全组完全拒绝连接作为单一根因；尚未取得新的云监控、VNC、进程、容器或内核证据，不能确认是否再次 OOM，也不能确认先前已提交任务与数据写入的最终状态。本轮未重启实例、未操作容器、未修改配置、未执行生产写入。
+
+`2026-07-28 12:38 +08:00` 生产站点再次出现公网不可用。只读探测确认生产 IP `47.239.167.86` 的 `22/80/443` 均可完成 TCP 握手，但 HTTP 域名、绕过 DNS 后固定到生产 IP 的 `/healthz/`、直接 IP + `Host: umafans.run` 均在 12 秒内没有收到任何响应字节；SSH 同样在 TCP 建连后卡在 banner exchange，无法进入实例读取容器、内存、磁盘或日志。该组合排除“安全组完全拒绝连接”和“仅本机 DNS/fake-IP 异常”作为单一根因，当前最可能是 ECS 实例内部资源饱和、内存回收阻塞或同等级的操作系统卡顿；症状与 `2026-07-15` 已确认的 OOM/kcompactd 阻塞事故相似，但在取得云监控/VNC/实例内进程证据前，不得断言为同一根因或归责到具体任务。阿里云控制台当前未登录，未取得新的实例状态与监控证据。本轮未重启实例、未修改安全组/配置、未操作容器，也未执行任何生产写入；站点仍未确认恢复。
+
+`2026-07-27` 用户完成 40 场缺失赛果人工审阅并授权生产写入。生产 `HEAD=0bf3fd975155795c6df885b1055bd97c342db880`，写入候选 SHA-256 为 `ddb0c8121c3fcc213b44d0d4a298b0b1125df2e42f8169e87325f1751f43c5b2`；写前确认 40 个赛事精确解析、目标 `RaceEventResult=0`、目标结果候选 `0`、活动外部导入及锁均为 `0`。恢复点为 `backups/db/pre-race-result-gap-v2-apply-20260727T140020Z.sql.gz`，`260769094` 字节、mode `600`，`gzip -t` 通过，SHA-256 为 `521f16160768fa33f1646dd85d566a5366594ca4ba771e90e69b40f3f32c5458`。生产内最终 dry-run 为 `events=40 / modules=40 / results=319`，正式 apply 为 `candidates=40 / applied=40`；写后逐赛事对比候选的名次、马号、马名，差异 `0`，目标结果 `319`，全库 `RaceEventResult 91904→92223`、`RaceEventDataCandidate 20661→20701`。这些行按已审阅候选保留 `is_confirmed=false`，表示尚未全部形成官方结构化凭证，不得误报为官方确认；HTTP healthz 与 `/races/` 均为 `200`，项目仍未启用 HTTPS。
+
+用户随后确认：已有正式赛果的赛事可将赛事状态改为 `finished`，该状态变更不等于把赛果升级为官方确认。生产只读统计显示“有赛果但非 finished”的范围恰好为上述 40 场，且全部原状态为 `scheduled`；原状态回滚清单为 `status-finish-rollback-20260727T142500Z.json`，SHA-256 `abc0fe60cb55ac39b657c305a16e1f5e928cdb26c097d3ff2c98ccaa617300be`。单条原子更新完成 `40/40`，写后 40 场均为 `finished`、319 条结果和 40 个 applied candidate 保持不变、全库有赛果但非 finished 的赛事为 `0`，赛果 `is_confirmed=true` 仍为 `0`；HTTP healthz 与赛事入口均为 `200`。
+
+同日已按用户明确授权完成 9 组重复赛事的产品层 canonical 合并。空赛果旧记录 `79/405/408/409/410/729/730/731/732` 分别指向已有完整赛果的 canonical 记录 `15441/15640/15587/15487/15484/16193/16176/16199/16198`；使用线上既有 `RaceEventProductCanonicalLink` 和 `apply_race_result_recovery`，未删除或搬移底层赛事、赛果、历届冠军或审计候选。manifest/approval/receipt SHA-256 分别为 `8a27e47d5a1d9ec00c223bd100d9e1f6a269e4a08ddac21cfddfdb034ad93a79`、`88d90855732f693ec01f3874496a68fb91881b8abc67980d856ff452c13b1c26`、`19950c2267f4c65e777ca58fcf1f5c4d0939b80d8af5a9986a3ba6e61ef33c44`；写前恢复点 `backups/db/pre-nine-race-canonical-merge-20260727T141638Z.sql.gz` 为 `261070455` 字节，SHA-256 `f93abc11a03813fe83334c51c7318725f796d8455c76998843cb18c5dba66144`。写后 active canonical link 为 `9`，精确配对 `9/9`，canonical 赛事均为 `finished`、合计 `70` 条赛果，全库赛果仍为 `92223`；9 个名称的线上搜索均为 duplicate slug `0`、canonical slug `1`，旧 URL 保留正式入口提示，canonical URL 展示正式赛果，HTTP healthz 为 `200`。
+
+`2026-07-22` 运行态覆盖说明：生产站点当前 `HEAD=7ff968c0557300c1240f13a3d6feae3a8df3085d`，web/worker/beat/race_live_worker 均已核对为同一镜像 `sha256:712a5da8b408…`，HTTP `/healthz/`、首页和五地区页均返回 `200`；项目尚未完成 HTTPS 接入，本次验收以已上线的 HTTP 入口为准。下面 `2026-07-15` 的不可用/OOM 记录仅保留为历史故障证据，不代表当前状态。
+
+新闻 P0 索引已在备份、暂停 worker/beat 和无活动写入的窗口内执行受控 `REINDEX INDEX public.stable_newsarticle_public_slug_46694cb6`；目录状态、事务回滚写入探针、临时 `amcheck bt_index_check`和一轮真实抓取均通过。数据库备份为 `backups/db/pre-news-index-repair-20260722_135849.dump`，大小 `229947588` 字节，SHA-256 `07d2ebd67f1a3c5ec1fb9ddaf93f554639980425dde87c4b19d0cc54a9ae2fb1`，`pg_restore -l` 得到 `1017` 行；`.env` 备份为 `.env.backup.news-index-repair-20260722_135849`。
+
+`REINDEX` 后原始观察窗口被并行部署中断：对方重建 db/web 后 Nginx 仍指向旧 web IP，曾造成约 `14:19-14:22` 的 `502`。本轮未回退对方提交，而是恢复必需容器并 reload Nginx；线上镜像一致后从约 `14:23` 重新计时。`15:23` 满 60 分钟最终快照为：重建后 CrawlJob `77 success / 0 failed / 0 started`，CrawlJob、TaskExecutionLog、db 与 worker 日志同类索引错误均为 `0`；真实新增 `2` 篇，其中日本稿 `9572` 已由正常窗口公开，英国稿 `9573` 进入人工复核；索引仍为 valid/ready/live，公网 HTTP 七个验收入口均为 `200`，容器资源平稳。历史 stale started 仍为 `32` 且未被索引操作改写。P0 索引修复门禁正式 PASS。
+
+`2026-07-22` 已按用户确认的"门户视觉重设计 P1→P2→P3"路线创建 OpenSpec change `redesign-public-portal-p1`（`openspec validate --strict` 通过），包含 proposal/design/tasks 与 `public-site-design-system`、`public-home-info-feed` 两个 delta spec；P1 高保真静态原型已产出在 `openspec/changes/redesign-public-portal-p1/prototype/`（`index.html`、`article.html`、`prototype.css`），并经 Chrome 桌面 `1440px` 与移动 `390px` 视口自检：无页面级横向溢出，头版 Hero、今日赛事面板、地区色 Tab、三栏信息流、右栏三模块、页脚与移动底部四 Tab 导航均按设计呈现。当前停在原型确认门禁：用户确认前不得开始模板与样式实现（tasks 1.2）。
+
+`2026-07-23` P1 已完成本地实现与验收（用户已确认原型，唯一修改为标题字体从系统宋体改为 Noto Serif SC 并自托管）。实现内容：重写 `public.css` 为设计令牌层 + 新组件 + 保留赛事/马匹旧样式；`base.html` 重构为深绿头栏、页脚、移动底部四 Tab 导航（按 resolver 激活态）；首页新增头版 Hero（头条 + 今日赛事面板，空窗回退近期重点赛）、实体 chip、赛事快讯卡、右栏热门榜/我的关注/即将开赛；详情页杂志化（实体 chip 带、预告卡、上下篇、相关新闻）。视图新增 `_public_today_races` / `_public_next_key_race` 与详情上下文（prev/next、related、teaser_event），信息流用 Prefetch 避免 N+1；`NewsArticle.region_color` 与 `RaceEvent.grade_badge_class/label` 为纯属性、无迁移。字体自托管 `static/stable/fonts/noto-serif-sc-{700,900}.woff2`（fonttools 子集化 GB2312 6788 字 + 假名 + 高频日语汉字，约 1.4MB/字重，font-display: swap），覆盖抽样字形验证无缺字。验证：`PublicPortalVisualP1Tests` 15 项 TDD 全绿、既有公开页相关 76 项通过、完整 `stable` 套件 `775` 项通过、Django check、`openspec validate --strict`、`git diff --check` 全部通过；Chrome 桌面/移动验收截图在 `tmp/p1-accept-*.png`。本次未部署生产；P2（赛事日历/详情）开始前需按同一门禁先出原型。
+
+`2026-07-23` P2/P3 高保真原型已产出并完成自检，需求整体交接文档已落地。原型位于 `docs/prototypes/`：P2 三页（`p2/calendar.html` 赛事日历：本周焦点条/日期轴/按日分组时间线；`p2/race-detail.html` 已完赛详情：冠军 Hero/吸顶子导航/金银铜赛果行/历年冠军时间轴；`p2/race-detail-upcoming.html` 未开赛倒计时版），P3 三页（`p3/index.html` 马匹列表搜索与战绩卡片、`p3/detail.html` 马匹 Hero + 战绩条 + 履历时间线、`p3/follows.html` 我的关注混排流），共享样式 `docs/prototypes/prototype.css`（P1 设计系统 + P2/P3 组件雏形）；Chrome 桌面/移动自检无页面级横向溢出，截图在 `tmp/p2-*.png`、`tmp/p3-*.png`。交接文档为 `docs/portal_visual_redesign_handover.md`，包含项目背景、需求目标、P1 完成清单（含改动文件列表与验证结果）、P2/P3 原型说明、下一步实施步骤（含 P1 部署决策、P2/P3 OpenSpec 与 TDD 流程、提交时甄别在途改动的提醒）。P2/P3 原型尚未经用户确认，P1 仍未部署。
+
+`2026-07-23` 用户已确认 P2/P3 原型方向，并锁定 P2 桌面端采用按日时间线卡片、未来赛事倒计时最多精确到日。P2 已按 OpenSpec change `redesign-public-portal-p2` 完成本地实现：赛事日历新增自然周 G1 焦点、地区/等级/时间筛选、日期轴与单列时间线；赛事详情新增五状态 Hero、仅限审核系列的届次切换、吸顶模块导航、确认赛果、最近十届历史折叠和公开相关新闻卡片。公开冠军严格要求 `finished + is_confirmed`，未确认赛果不进入冠军态；没有新增模型或迁移。自动化验证为 `PublicPortalVisualP2Tests` 9 项、完整 `stable` 784 项、Django check、迁移漂移检查、OpenSpec strict 与 scoped diff check 全部通过。浏览器验收覆盖 1440px/390px、scheduled/running/finished/postponed/cancelled 五状态、稀疏数据和局部表格横滑，页面无整体横向溢出，截图在 `tmp/p2-accept/`。本次仍未部署生产，P1/P2 的生产上线需另行授权；下一阶段为 P3 正式 OpenSpec 与 TDD 实现。
+
+`2026-07-23` P3 已按 OpenSpec change `redesign-public-portal-p3` 完成本地实现：马匹索引升级为搜索 Hero、地区 Tab、战绩卡片与原生关注 POST；详情升级为深绿 Hero、出赛/冠/亚/季/胜率、稀疏安全的血统与履历时间线、直接/子代相关新闻；关注页提供可取消 chip 和来源明确的混排文章卡。统计通过条件聚合、关注状态通过 `Exists`，页面不输出匿名 token；关注 `next` 只允许同站 `/horses/` 路径。`PublicPortalVisualP3Tests` 6 项、P1/P2/马匹兼容集合 45 项、完整 `stable` 790 项、Django check、迁移漂移、OpenSpec strict 和 scoped diff check 全部通过。浏览器真实验收覆盖 1440px/390px、关注/取消、空状态、直接来源标签、金银铜履历与移动底栏，无页面级横向溢出，截图位于 `tmp/p3-accept/`；临时演示履历已删除。本次未部署生产，P1/P2/P3 生产上线及 OpenSpec 归档仍需另行授权。
+
+`repair-news-production-integrity` 已部署。部署前恢复点为 `backups/db/pre-news-integrity-deploy-20260722_152904.dump`（`230252800` 字节、mode `600`、SHA-256 `810b07829c36c551722168b0a76ab1efc65b7bbd367ddcab6f0741c6b7b5807a`、`pg_restore -l` `1017` 项）及 `.env.backup.news-integrity-deploy-20260722_152904`（SHA-256 `7af509d60ca60f2cf232959d2e779388917a688c3a3210bbb5d70445bda668de`）。停 beat 并排空两节点后生成 manifest `/app/runtime/news_integrity/stale-crawl-20260722_153609.json`，SHA-256 `c4cc4f4975a6246131cd91bf2772aaaeb36d85344fbb02fc6223467567230ea0`：执行时仍为 `32` 条，活动证据完整、活动来源 `0`、未映射任务 `0`，全部建议收敛。apply 为 `32/32`，stale started `32→0`；文章总数、公开数、QQ delivery 和 `NewsSource.last_crawl_*` 哈希前后不变，同一 manifest 重放更新 `0`，新 dry-run 为 `0` 条。
+
+`16:37` 完成代码上线后 60 分钟观察：新 CrawlJob `61 success / 0 failed / 0 started`，新稿 `1` 篇（日本 article `9575`，正常进入人工复核），stale started `0`、迟到终态标记 `0`、新索引错误 `0`、部署后异常日志 `0`。修复前索引错误已退出 2h 窗口但继续在 24h 历史可见；P0 信号只生成一次 `4` 个渠道账本行，冷却未重复。四应用容器镜像一致、Celery 两节点正常、HTTP 七入口全部 `200`，本 change 的生产验收门禁全部 PASS。下一步进入 publish_ready 积压修复。
+
+`2026-07-15` 生产站点当前处于不可用状态，下面早期记录中的“域名已可访问”不再代表当前运行态。阿里云控制面显示实例 `i-j6cbb18fb1mtzhow5s7e`（公网 `47.239.167.86`，`ecs.e-c1m2.large`，`2 vCPU / 4 GiB`）仍为运行中，系统与实例可达性检查通过，但公网 HTTP/HTTPS、SSH 和实例内应用均无法正常响应。VNC 内核控制台已直接看到 Python 进程触发 `Memory cgroup out of memory`，同时出现 `kcompactd0` 阻塞超过 120 秒；云监控另显示 CPU 长时间处于约 `60%–90%`，并有“CPU 性能达到规格上限”告警。当前根因层级已确认是实例内部内存耗尽、内存回收阻塞与 CPU 饱和，而不是 ECS 停机、宿主机维护事件、突发性能积分限制或安全组完全拒绝连接。
+
+本轮仍不能确认被 OOM 杀死的 Python 进程对应哪一个命令或容器：SSH 在 banner 阶段超时，云助手 Agent 状态异常且只读诊断命令发送失败，实例未安装云监控插件，因此没有进程级、内存和磁盘曲线。结合现有工作负载，历史赛事回填/校验或英文门禁重处理等重型 Python 任务属于高概率来源；法国常规新闻轮询频率和既往产量较低，单独造成此次持续 OOM 的可能性较低，但在取得进程和日志证据前不得把责任归到任何具体任务。排查期间没有重启/停止实例、终止进程、修改安全组或配置，也没有执行生产业务写入；生产恢复仍需单独授权。
+
 项目当前已经完成正式域名 HTTP 接入修复，`umafans.run` 与 `www.umafans.run` 已可访问。  
 “自动化内容运营 + AI 编辑改写 MVP”已完成代码侧与生产侧上线，当前处于上线后观察与质量抽检阶段。
 
@@ -949,3 +1033,128 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 已部署生产提交 `d071952`，无新增迁移。生产 `web / worker / beat` 重建正常，内外 healthz、赛事日历和日本德比详情均返回 `200`，近 5 分钟服务日志无 traceback/error。
 - 线上首批术语覆盖抽检：香港赛果已是中文原文；英国马名 `13/13`、骑师 `9/13` 命中；美国马名 `2/18`、骑师 `11/18` 命中；法国马名 `1/7`、骑师 `0/7` 命中；日本德比马名 `1/18`、骑师 `0/18` 命中。日本德比当前冠军 `ロブチェン` 和骑师 `松山 弘平` 尚无 active 正式术语，页面按规则保留原文，后续需补词库而不是改展示逻辑。
 - 部署前 `.env` 备份为 `.env.backup.race-display-20260712_002533`；数据库备份为 `backups/db/pre-race-display-20260712_002533.sql.gz`，约 `105M`，gzip 校验通过，SHA-256 为 `99994e84d3154dd9d4c1503b96688cd24bf7e00d9ad13aca02a965a69d64a8c0`。
+## 2026-07-12 五地区赛事追溯至 1984 年目标启动
+
+- 新长期目标已锁定：日本、中国香港、英国、法国、美国赛事采用相同历史深度，统一追溯至 1984 年，并沿用应到清单、跨来源关联、去重补漏、五地区抽样、覆盖审计、dry-run、备份、分批写入和写后核验门禁。
+- 生产只读基线：`RaceEvent=995`，全部为 2026 年；日本 `186`、香港 `20`、英国 `203`、法国 `174`、美国 `412`。按现有系列机械乘以 1984–2026 的 43 年，理论上限约 `42,785` 个年度对象，但该数字尚未扣除创办年、停办/取消和历史等级范围变化。
+- 当前前置缺口：编排器支持年份范围，但要求每个年份先存在正式 `RaceEvent`；日本、香港部分 `series_key` 带 2026 日期，美国另有两个同年重复系列键，不能直接复制当前赛历生成历史年度对象。
+- 已创建 OpenSpec change `backfill-race-events-to-1984`，完成 proposal、design、4 份 delta spec 和 tasks；`/grill-me` 共锁定 22 个产品决策。两轮 `/plan-eng-review` 已收敛，最终 verdict 为 APPROVED，审查记录见 `engineering_review.md`。当前只获准进入“编写完整测试用例”阶段，尚未实现代码、触网、创建历史赛事或写生产数据。
+- `/grill-me` Q1 已确认选择 A：历史范围为当前五地区全部 graded/pattern 系列，包括日本 JRA/NAR 分级赛、香港分级赛、英国/法国 Pattern Race 和美国 Graded Stakes；明确排除普通赛、让赛和未胜利赛。
+- `/grill-me` Q2 已确认选择 A：入选赛事系列按完整系列史收录，从 `max(1984, 实际创办年)` 开始；赛事升级为分级赛之前的届次也纳入，并保存当年真实等级。
+- `/grill-me` Q3 已确认选择 A：纳入 1984–当前年度任一年曾属于 graded/pattern 体系、但后来停办、降级退出或不在 2026 当前目录中的历史独有系列。完整目录必须逐年发现，不能只从现役 2026 系列向前复制。
+- `/grill-me` Q4 已确认选择 A：已排期后取消的年度赛事创建 `RaceEvent(status=cancelled)`；当年根本未举办的系列只在应到清单记录 `not_held`、原因和证据，不创建虚假赛事，且不作为漏抓。
+- `/grill-me` Q5 已确认选择 A：历史年份只有可信完整赛果而无独立 racecard 时，可从完整赛果派生出马表并标记 `derived_from_results`；仅复制有证据字段，赔率、闸位等未知值保持为空。
+- `/grill-me` Q6 已确认选择 A：年度冠军以该年正式赛果为唯一主事实，历届冠军按稳定系列动态汇总；只有缺完整赛果而有可信冠军证据的年份才用 `RaceEventHistoryWinner` 补位，禁止向每届复制整张冠军表。
+- `/grill-me` Q7 已确认选择 A：稳定赛事系列身份按权威沿革认定；冠名、名称、场地、距离和等级变化不自动切断系列，合并/拆分/替代必须人工确认并记录前身后继，名称相似只生成待审候选。
+- `/grill-me` Q8 已确认选择 A：字段级来源权威顺序为当年主办方/监管机构官方结果、官方历史档案/年鉴、高可信专业数据库、参考来源；低级来源只补空，同级或更高级冲突阻断相应写入范围并人工审核。
+- `/grill-me` Q9 已确认选择 A；工程审查将不可执行的停办系列近年锚点澄清为：每地区 3 个代表系列、约 9 个真实 held/cancelled 年度目标，地区整体覆盖 1980 年代、2000 年前后和近年，约 45 场，并覆盖长寿、改名/迁场、历史独有或停办系列。
+- `/grill-me` Q10 已确认选择 A：覆盖完整目标可按批准 scope 先写入；`source_unavailable / identity_review_required` 持续挂在总缺口账本且不计完成，不冻结其他完整目标，也不得用空记录占位。
+- `/grill-me` Q11 已确认选择 A：永久不可得必须完成官方/监管档案与至少一个独立可信来源的双来源核查，保留完整证据并人工批准；超时、403、限流和页面改版只算暂时不可用。
+- `/grill-me` Q12 已确认选择 A：当前年度未来赛事或官方确认宽限期内赛事标记 `not_due`，进入总清单但不计缺失；到期后再转为应到，历史完成率与滚动当前赛季分开统计。
+- `/grill-me` Q13 已确认选择 A：批准批次中身份完整且出马表/赛果达到年度可得标准的历史赛事可自动公开；身份待审、来源冲突或资料不足保持 draft，已确认取消赛事可带说明公开。
+- `/grill-me` Q14 已确认选择 A：后续更权威/更完整来源通过新候选 diff 和批准批次修正机器字段，人工锁字段不覆盖；旧值、来源快照、批次、原因和回滚证据必须保留。
+- `/grill-me` Q15 已确认选择 A：马名/骑师名缺中文术语不阻止结构化历史赛事写入和公开，页面保留原文并生成术语缺口；术语补齐后动态显示中文，禁止自动音译直接写正式词库。
+- `/grill-me` Q16 已确认选择 A：首批后全量按 `2016–2025 → 2006–2015 → 1996–2005 → 1984–1995` 从新到旧推进；标准批次每地区最多 50 个目标，任何地区不得比最慢地区领先超过 100 个同年代带标准目标。
+- `/grill-me` Q17 已确认选择 A：最终以 `accounted_rate=100%` 收口，同时独立报告 `data_complete_rate`；全部目标必须写入、确认 not_held/not_due，或经双来源批准 permanently_unavailable，永久缺档不得伪装成数据完整。
+- `/grill-me` Q18 已确认选择 A：历史参赛记录不自动批量创建 HorseProfile，只关联现有正式术语/马匹资料；未识别人马进入候选和术语缺口，避免同名误合并与空壳资料。
+- `/grill-me` Q19 已确认选择 B：不新增公开赛事系列页；历史数据继续落在年度 RaceEvent 详情页，稳定系列仅用于后台身份、历届冠军汇总和年度关联。
+- `/grill-me` Q20 已确认选择 A：赛事日历增加年份筛选和赛事名称搜索，结果进入现有年度详情页；不新增系列页，也不要求按短窗口连续翻到 1984 年。
+- `/grill-me` Q21 已确认选择 A：哈希锁定 artifact 是审批与 apply 唯一凭证；后台增加按地区/年代/系列/状态/冲突查看的汇总入口，但不得绕过 artifact 直接批量写入。
+- `/grill-me` Q22 已确认选择 A：质量达标且 published 的历史年度赛事允许搜索引擎收录并进入分片 sitemap；draft、身份冲突、资料不足和 not_held 不收录。
+- 本轮 `/grill-me` 已完成关键产品分支确认，下一步进入 OpenSpec design、delta specs 和 tasks 编写。
+- `backfill-race-events-to-1984` 已完成两轮 Full `/plan-eng-review`，最终 APPROVED；随后已创建 `test_cases.md`，共 160 个唯一测试用例，覆盖范围、系列/迁移、年度状态机、来源权威、artifact、五地区 adapter、批次、导入、公开页面、运维和非目标回归。OpenSpec change strict、全量 22 项和 `git diff --check` 均通过。当前按用户流程进入 `/opsx:apply`，尚未上线、触网或写生产历史赛事。
+
+## 2026-07-12 历史赛事回填 apply 第一阶段
+
+- `backfill-race-events-to-1984` 已进入 `/opsx:apply`，当前仅完成本地模型、迁移和只读 inventory 基础能力；尚未部署、触网、提交历史总账或创建历史年度赛事。
+- 新增稳定系列、历史名称、系列关系和年度应到总账模型；`RaceEvent.race_series` 为 nullable，旧 `series_key` 和公开 slug 保持兼容。赛果新增独立 `official_finish_position`，迁移会优先读取旧 `source_refs` 官方名次并回退存储顺序，历史冠军唯一约束已支持并列冠军。
+- 新增离线 `build_historical_race_inventory`：默认只生成 series/target/conflict/gap/summary/manifest/approval artifact；commit 必须开启功能开关并验证批准人、时间、manifest SHA 和全部文件 SHA，且 commit 阶段不重新生成输入、不触网。
+- 已实现字段级来源权威合并、同级冲突阻断、人工锁保护、系列关系防环、名称模糊匹配只进待审、双状态转换、永久缺档独立双来源校验和 accounted/data-complete 分开统计。
+- 历史总账 Django admin 为只读入口，支持地区、年份、系列、expectation/resolution 状态和名称筛选；无新增、编辑、删除或直接 apply 动作。
+- 新增默认关闭配置：`HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`，并设置请求、source cache 和最小剩余磁盘预算。历史 prepare 必须同时通过功能开关、网络开关、plan 显式授权和预算校验。
+- 当前相关模型、service、command、后台、旧赛事页面和旧编排回归共 `122` 项通过；空 SQLite 正向迁移、反向回滚、再迁移、Django check 和迁移漂移检查通过。完整实现、全量回归、代码 review 和生产验收仍未完成。
+- 后续 apply 已推进到 `62/82` 项，代码与自动化测试任务已全部完成：除 2026 mapping、总账切批、历史 importer、公开搜索和分片 sitemap 外，已新增五地区统一离线目录 adapter、`parse_historical_race_catalog` 标准候选命令、共享 source cache/请求预算锁、历史网络运行日志，以及 sitemap/年份缓存和查询索引。五地区三年代测试摘录只验证解析契约，不代表生产目录已收齐。
+- 本轮专项测试覆盖目录、模型、artifact、批次、日志、缓存和编排，完整 `stable` 回归最终为 `743/743`；Django check、迁移无漂移、OpenSpec strict/all `23/23`、三套 Compose 配置、实际 Docker 镜像构建及容器内 `/app/runtime` 路径检查均通过。
+- 已完成多轮 `/review -> 修复 -> 重新 review`：修复目录年份/香港赛季与 provenance、稳定 key 冲突、批准人和人工锁、artifact/cache 路径边界、apply-check cache 保护、已导入/永久缺档状态漂移、共享 Redis cache 降级，以及受保护 cache 不可覆盖和大文件分块校验。最终一轮 review 无 actionable finding，代码门禁 clean；尚未部署本变更、触网或写入生产历史赛事。
+- 剩余 `20` 项全部是生产操作：2026 mapping 审核、逐年官方 source cache/总账、首批五地区验收、分年代带抓取落库和最终审计。1984 起官方年鉴 cache 尚未收齐，不能把测试 fixture 当作生产总账分母。
+- 用户已授权：准备任务、完整测试和 clean review 全部完成后，可自主执行生产部署、抓取与分批落库，无需逐批再次确认；最终必须恢复关闭历史功能/网络开关，历史年度赛事保持 draft，不提前公开。
+
+## 2026-07-12 英文术语命中级上下文门禁提案
+
+- 已创建 OpenSpec change `fix-english-term-context-gates-and-reprocess-performance`，完成 proposal、design、两组 delta specs、tasks 和完整 `test_cases.md`；严格校验和 OpenSpec 全量 `23` 项通过，尚未进入 apply。
+- 锁定产品原则：合法的单词型马名继续保留在术语库；系统必须对文章中的每一次实际命中分别判断马名、普通词或不确定，不得仅凭 `term_type=horse` 阻断，也不得通过删除同名马解决误挡。
+- 生产 7 天基线：英文稿 `320` 篇，`101` 篇命中已知高歧义词，`36` 篇的已存 blocker 全部来自这些词；36 篇均已翻译、评分不低于 `75`、无重复标记。预计稳态每天新增公开 `2-5` 篇，中位 `3-4` 篇；历史 36 篇只进入受控重校验，不直接批量公开。
+- 设计同时修复重处理性能：命中实例级分类、批次复用术语索引、候选 ID 两阶段加载、稳定游标、最大执行时间、互斥锁和 dry-run artifact；生产等价 100 篇/60 秒是上线门槛。
+# 2026-07-12 英文术语上下文门禁 change 实现状态
+
+- `fix-english-term-context-gates-and-reprocess-performance` 已进入实现阶段。
+- 已落地逐命中英文上下文分类、可见正文清洗、`off/shadow/enforce` 模式、批次术语索引和结构化赛事实体证据。
+- 已新增数据库 `TermGateReprocessRun` / `TermGateReprocessLock`、复合游标、快照/文章漂移校验、事务化 commit 和只读 Admin。
+- 本地新增 32 个测试已通过；生产 PostgreSQL 100 篇/60 秒基准、24 小时 shadow 和分地区历史 commit 尚未执行，不能视为已上线。
+- 近 7 天样本的稳态产量预估仍为新增公开约 2-5 篇/天，中位 3-4 篇；该数字是观察目标，不是放松真实专名保护的门槛。
+- `2026-07-12` 代码审查返修已完成：同一上下文片段内的多个同词命中改为只围绕当前命中判断；高优先级只可增强明确专名，不再把正文背景 uncertain 升为 blocker；结构化实体只接受 `auto/manual` 且未移除的赛事关联；批次重校验恢复与正常链路一致的外部马名识别。
+- 重校验候选改为分批 keyset 扫描并增加硬扫描上限，窗口外旧 `core_term_missing` 积压仅返回计数，不再加载全部 ID；`max_seconds` 通过上下文、马名、术语和重复检测进度回调覆盖耗时循环，停止后返回稳定游标；dry-run/commit 均按时间续租，租约冲突的新运行记录会以 `rejected` 结束，不会残留 `running`。
+- 第二轮审查返修完成：英文术语索引改为首 token/首字符分桶，每篇只检查文章实际出现的候选桶；设置快照补齐发布内容源、rewrite 和重复回看配置；漏斗增加 uncertain 命中/文章及 core/background 统计；SQL 数、实体/重复预取和 RSS 增量改为真实采集。历史赛事与术语门禁迁移从共同 `0023` 分叉，并由空操作 `0027` merge 汇合，可独立部署各自分支。
+- 第三轮审查返修已固定重处理绝对时间窗口：首次运行把 `window_start/window_end` 写入 Run、结果和 cursor，后续页面不再按当前时间重算 lookback，也不混入窗口结束后到达的新稿。commit 在 PostgreSQL 事务中以 `SHARE` 模式锁定术语/alias 表，上下文 SHA 直接来自实际加载的数据，并在文章写入前和事务提交前双重校验；任何晚到漂移都会整批回滚并标记 `rejected`。
+- 实体性能指标已拆为真实执行计数：`race_entity_prefetch_count`、`horse_alias_prefetch_count`、`horse_term_prefetch_count`，英文外部马名识别复用批次正式术语数据，不再额外查询正式马名术语；聚合 `entity_prefetch_count` 为上述真实计数之和。
+- 当前目标测试 `49/49`、完整 `stable` 回归 `760/760` 通过；`makemigrations --check --dry-run` 无漂移，临时空库已验证独立迁移分支与 `0027` 前进、回退、再次前进成功。生产等价 PostgreSQL 100 篇基准及灰度仍未执行，不能视为已上线。
+
+## 2026-07-18 生产磁盘安全清理
+
+- 本节是晚于 `2026-07-15` 超时事故记录的当前运行态：生产主机仍为 `root@47.239.167.86`，清理完成后系统盘由约 `1.6-1.7G` 可用、`96%` 使用率恢复到约 `7.0G` 可用、`82%` 使用率。
+- 删除范围严格使用用户确认的逐路径清单：数据库旧快照 `49` 个，释放 `4,099,402,547` bytes；已归档 runtime 重复副本 `12` 个路径，实际释放 `986,144,768` bytes；两代旧应用镜像实际释放 `715,595,776` bytes。合计实际释放 `5,801,143,091` bytes，未整目录删除 `backups` 或 `runtime`。
+- 删除前阿里云 HBR 增量整机快照 `9da2893af6e1246d6e513b59a1b7c6db6441a7dbb76cbbb855209fb154cbdd4e` 已成功完成，日志为 `ErrorCount=0`、`FilesDone=416657/416657`。
+- 另生成当前数据库备份 `backups/db/pre-disk-cleanup-4af5e20a-20260718_052011.dump`，大小 `195,837,027` bytes，`pg_restore -l` 通过；服务器与本机安全副本 `/Users/mentianlu/Backups/umanews/2026-07-18/` 的 SHA-256 均为 `c7824b753502054933e73095755f85a6a6b29127762bafbd9ccda586ddcd389c`。
+- OSS 自动上传未作为本次安全门：宿主机缺少 `oss2`，应用镜像内上传又暴露 `.env` 中旧端点 `oss-hk.aliyuncs.com` 无法解析；本次没有修改生产配置，改用已校验的服务器外本机副本。后续应单独修正为实际可用地域端点并验证对象级备份。
+- 当前应用容器继续统一运行镜像 `sha256:111dbe46ba7a7024632ba2ca7c57c387b19ab39861f0147421a0245d08c38d7a`；保留回滚镜像 `sha256:a8d7138edf264beb1b8d4a5cbe2f61256516993646528299c292d4623cbc16fe`。
+- 清理后 PostgreSQL `pg_isready`、SQL `select 1`、Redis `PING`、Celery `active/reserved/scheduled`、Redis `celery/race_live` 队列、Compose 容器、受保护 runtime、当前/回滚镜像均通过验收；本机及公网 `/healthz/` 返回 `ok`，首页与 `/races/` 返回 `200`，四个应用容器近 15 分钟无 traceback/error/critical。
+
+## 2026-07-31 日本新闻来源产量只读快照
+
+- 统计时间为 `2026-07-31 03:43 CST`，本次只读查询生产数据库，没有触发抓取、翻译、重试或发布。
+- 日本共有 `3` 个发布方、`6` 个生产批准并启用的抓取入口：netkeiba 新着顺/访问量榜/注目数榜，JRA 官方新闻，以及 Sponichi 赛马新闻/新闻ランキング。
+- 最近 24 小时：netkeiba 新增/公开 `72/0`，JRA 官方新闻 `6/0`，Sponichi `21/1`；合计新增 `99` 篇、公开 `1` 篇。当前状态为 `translation_failed=96`、`pending_review=2`、`published=1`。
+- 最近 7 天：netkeiba 新增/公开 `531/218`，JRA 官方新闻 `19/8`，Sponichi `140/24`；合计新增 `690` 篇、公开 `250` 篇，公开转化约 `36.2%`。
+- netkeiba 最近 7 天按文章当前主来源模式为：新着顺 `395/138`（新增/公开）、访问量榜 `134/79`、注目数榜 `2/1`。榜单命中可能将同一文章从 `latest` 提升为 `access` 或 `attention`，因此该拆分表示最终主来源归属，不等同于首次抓取入口。
+- Sponichi 最近 7 天按当前主来源模式为：普通赛马新闻 `59/9`，新闻排行榜 `81/15`；排行榜同样可能提升文章主来源。
+- 查询时六个日本抓取入口的最近状态均为 `success`，`failure_streak=0`。当前主要问题不是上游抓取无产出，而是最近 24 小时绝大多数新稿未完成翻译到公开的转化。
+
+## 2026-07-31 Sponichi 生产来源临时停用
+
+- 用户基于与 netkeiba 内容重复较多的判断，要求暂时关闭 Sponichi。生产 `NewsSource#5 Sponichi 赛马新闻` 与 `NewsSource#6 Sponichi 新闻ランキング` 已在同一事务中设置为 `enabled=false`、`production_approved=false`，并写入 `manual_pause_reason` 与两条 `OperationLog(source_paused)`。
+- 停用前两条来源均为启用、生产批准、无人工暂停；停用时 Celery `active/reserved/scheduled` 为空，没有终止任务、清理队列、删除历史文章或修改既有稿件。
+- netkeiba 三个入口和 JRA 官方新闻保持 `enabled=true / production_approved=true`，其余日本来源未改动。本机及公网 `/healthz/` 均返回 `{"status":"ok"}`。
+- 数据库中仍有一条 `CrawlJob#26119`（Sponichi 排行榜，`2026-07-23 00:05 CST`）遗留为 `started`，但 Celery 已无对应在途任务；本次没有扩大范围去收敛该历史记录。
+- 恢复时只针对来源 `#5/#6` 把 `enabled`、`production_approved` 恢复为 `true` 并清空本次 `manual_pause_reason`，恢复前仍须重新确认用户意图、重复率和实时运行态。
+
+## 2026-08-04 生产中文比赛名与马名只读导出
+
+- 本次只读查询生产数据库，没有修改术语、赛事、马匹资料或公开页面。查询时生产代码为 `bef0cdc5`，web 与 db 容器正常运行。
+- 导出口径合并 active `TermEntry(horse/race)`、`HorseProfile.display_name_zh`、`RaceSeries.chinese_name` 与 `RaceEvent.chinese_name`；排除空值及原名与中文名完全相同的回退值，按“类型 + 原名 + 中文名”去重并保留记录来源、地区、语言和赛事年份。
+- 产物为 `outputs/name_translation_export_20260804/translated_race_and_horse_names_20260804.csv`，UTF-8 BOM 编码，共 `28,931` 条唯一映射：马名 `21,628`、比赛名 `7,303`；必填字段空值 `0`，原名/中文名相同记录 `0`。SHA-256 为 `489804dbc55c2c0c77bef64f2d463efff857e406e9f6b18df642a230321b4602`。
+
+## 2026-08-05 日语马名与比赛名分文档导出
+
+- 基于同一生产只读口径，单独导出 active `TermEntry(source_language=ja)` 日语马名 `3,154` 条；按“日语原名 + 中文名”去重，保留地区和正式术语记录数。
+- 日语比赛名优先按 `RaceSeries` 身份合并，同一系列只保留一条；未关联系列的 active 日语赛事术语再按“日语原名 + 中文名”去重，最终 `148` 条，其中有系列标识 `146` 条且重复系列标识 `0`。`Arima Kinen` 校验只有一条：`有馬記念 -> 有马纪念`，系列标识 `jp-jra-arima-kinen-the-grand-prix`。
+- 产物为 `outputs/name_translation_export_20260805/日语马名_中文翻译_20260805.xlsx` 与 `outputs/name_translation_export_20260805/日语比赛名_中文翻译_按系列去重_20260805.xlsx`；两份工作簿均已通过关键区域检查、公式错误扫描和视觉渲染验收，本次没有写入生产数据库。
+
+## 2026-08-10 生产磁盘低风险清理
+
+- `14:50 +08:00` 只读盘点确认生产系统盘并未写满：`99G` 总量、约 `73G` 已用、`22G` 可用、使用率 `78%`；inode 使用率 `10%`。主要占用为 `/opt/umanewsbot/backups` 约 `41G`、`runtime` 约 `5.1G`，systemd journal 约 `1.1G`。
+- 本轮只执行低风险可再生项：`docker image prune -f` 清理无标签且未被容器引用的悬空镜像，Docker 报告释放 `279.1MB`；`journalctl --vacuum-size=512M` 删除归档 journal，报告释放 `600.0M`，清理后 journal 约 `536.0M`。未删除数据库备份、runtime 产物、Docker volume、容器、带标签回滚镜像或业务文件。
+- 系统盘最终约 `72G` 已用、`23G` 可用、使用率 `76%`；按字节口径可用空间从 `23,045,763,072` 增至 `24,545,619,968`，净增加 `1,499,856,896` bytes（约 `1.40 GiB`）。
+- 清理后当前应用镜像仍为 `sha256:4a8667b91122...`（`umanewsbot:prod`），最近回滚镜像仍为 `sha256:71d56e74be55...`（`rollback-pre-pr93-20260810`）。PostgreSQL `pg_isready/select 1`、Redis `PING`、Celery active/reserved/scheduled、本机与公网 `/healthz/`、首页和 `/races/` 全部通过，web/worker/beat 近 10 分钟错误关键字命中为 `0`。
+- 普通 Celery 队列为 `0`；`race_live` 队列仍为已知遗留 `7543`，本轮未把业务队列当作磁盘缓存清理。若要继续清理约 `41G` 的数据库备份或约 `5.1G` 的 runtime，必须先生成逐路径候选清单、确认当前外部恢复面并另行批准。
+- 验收过程中只读 `docker compose config` 输出曾包含生产邮件凭据字段；未修改配置，后续应单独轮换该邮件授权码，并避免再次输出未脱敏的完整 Compose 环境。
+
+## 2026-08-14 HiPilot 保密静态站部署
+
+- 独立子域名 `hipilot.umafans.run` 已新增 `A` 记录指向 `47.239.167.86`，TTL 为 `10` 分钟；权威 DNS、`1.1.1.1` 和 `8.8.8.8` 均返回目标 IP。
+- 页面使用 Docker 静态卷中的独立版本目录：`/var/lib/docker/volumes/umanewsbot_static_data/_data/hipilot.umafans.run/releases/20260814125905/index.html`，`current` 为相对链接 `releases/20260814125905`。线上文件 SHA-256 为 `79121011d6ab70e884a105c87124520c2eecd5dae3217ca88ac76e6e29bfddb7`，标题为 `AI品类经营官｜药师帮 × HiPilot`；上一版 `20260814125413` 保留用于回滚。
+- 宿主机没有 Nginx；80/443 由既有 `umanewsbot-nginx-1` 提供。HiPilot 使用独立 server block、独立静态目录和独立证书，只执行过 `nginx -t` 与平滑 reload，没有执行 Compose down、容器 restart 或业务迁移。
+- HTTP 已固定 `301` 到 HTTPS；Let's Encrypt 证书域名为 `hipilot.umafans.run`，有效期至 `2026-11-12`。证书状态持久化在现有证书挂载目录，`/etc/cron.d/hipilot-cert-renew` 每日两次检查续期，只有证书实际变化且 `nginx -t` 通过时才平滑 reload；续期 dry-run 已通过。
+- 页面启用 Nginx Basic Auth，用户名为 `hipilot`，随机密码没有写入仓库或聊天；同时返回 `X-Robots-Tag: noindex, nofollow, noarchive`、HSTS、`nosniff` 和严格 Referrer Policy。`/healthz` 不需要认证，公网返回 `ok`。
+- 公网命令行验收：HTTP `301`、HTTPS 未认证 `401`、认证后 `200`、`/healthz=ok`、证书链 `Verify return code: 0 (ok)`，认证后页面 SHA 与当前 release 完全一致。部署前已用同一 SHA 页面完成 `1440×900`、`1280×720`、`390×844`、`360×800` 响应式与交互检查；Basic Auth 首次可能显示通用不可访问页，重新输入凭据后用户已确认浏览器成功进入公网页面。
+- 主站回归：`http://umafans.run/` 与 `/healthz/` 均为 `200`；nginx/web/worker/beat 容器启动时间未变化、重启计数均为 `0`，其余容器保持运行且 web/db/redis healthy。
+- `2026-08-14 13:22 +08:00` 按用户要求轮换 Basic Auth 密码。新凭据公网返回 `200`、旧凭据返回 `401`；认证文件仍为容器内 nginx UID/GID 可读的 `0640`，备份保留为 `.htpasswd.backup.20260814132248`。本次没有 reload 或重启容器，主站 `/healthz/` 仍为 `200`。

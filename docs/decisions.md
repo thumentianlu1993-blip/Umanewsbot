@@ -1,5 +1,87 @@
 # 关键决策
 
+## 为什么需求管理 harness 按工具分派：Codex 原生流程、Kimi Code 走 OpenSpec
+
+`2026-09-05` 用户明确要求：仓库内两套需求管理 harness 不再强制统一，Codex 使用其原生需求管理流程（内建 plan / 任务分解），Kimi Code 使用 OpenSpec 流程，两者互不混用。
+
+实现机制利用两个工具加载指令文件的差异：Codex 只读取根目录 `AGENTS.md`；Kimi Code 会同时加载根目录 `AGENTS.md` 与 `.kimi-code/AGENTS.md`（已实测两份文件合并注入 system prompt）。因此根 `AGENTS.md` 作为共享入口，只放双方共用约定和“按工具分派”的路由段；Kimi Code 专属的 OpenSpec 工作流约定放在 `.kimi-code/AGENTS.md`。配套变更：`openspec/` 目录从 git HEAD 恢复（此前在未提交的迁移中间态中被整体删除）；`.kimi-code/skills/` 从 `.claude/disabled-skills/2026-07-15/` 复制 5 个 openspec skill 并把其中 `/opsx:*` 引用改写为 Kimi Code 的 `/skill:openspec-*` 形式；`.codex/skills/openspec-*` 保持删除状态，Codex 侧不再使用 OpenSpec；`.kimi-code/local.toml` 加入 `.gitignore`（机器相关配置不提交，`.kimi-code/AGENTS.md` 与 skills 需提交）。
+
+该分派不改变双方共用的底线约定：任务前必读文档、任务后文档回写、中文输出风格、生产变更核对运行态等仍在根 `AGENTS.md`，对两个工具同时生效。
+
+## 为什么本次爬虫拥塞采用 Nginx 定向阻断与空队列 worker 重启，而不重启整机
+
+`2026-08-28` 故障窗口的分层证据显示 ECS、SSH、Nginx、Django health、PostgreSQL 和 Redis 都未整体退出；真正占用 web 的是 `meta-externalagent` 对动态 `/races/` 的高频递归畸形查询。重启 ECS 只能短暂清空进程，不能阻止同一流量重新进入 Django。因此恢复顺序锁定为：先在实际 bind-mounted Nginx release 配置按已确认 UA 返回 `403`，`nginx -t` 后平滑 reload；观察该 UA 不再进入 web、正常 UA 仍为 `200`；再在 Celery active/reserved/普通队列均为零时只重启高内存 worker。数据库、Redis、beat、Nginx 容器和 ECS 不随意重启。
+
+该门禁是可回滚的生产热修，不等于通用反爬架构。原配置必须保留哈希与备份，下一 release 需要显式移植等效防护并补充通用请求限速/缓存方案，不能依赖某个旧 release 目录长期充当配置源。若未来故障中 SSH、内核调度或容器控制面已不可操作，用户已明确授权直接重启 ECS；但只要根因可在入口层隔离，就优先执行影响更小、可验证且不会掩盖现场的恢复动作。
+
+## 为什么官网、Racing API 与可信第三方赛果按同等置信度验收，但仍保留来源标签
+
+`2026-08-16` 用户明确确认：官网、Racing API 和可信第三方网站的赛果可按同等置信度用于补齐已完赛赛事。本次执行因此不按“官网优先、第三方只能 provisional”降低已人工逐场核验的 Sporting Life 结果；只要赛事身份由稳定 race ID、日期/马场/赛事名共同锁定，来源页面已进入终态，完整数字名次连续且与 runner 语义一致，就可以进入同一个不可变 review bundle，并在人工批准后写为正式可展示赛果。
+
+“同等置信度”不等于伪造来源。JRA/NAR 官网仍使用 `approval_authority=official`、保留 `official_finish_position`，前台显示“正式赛果”；Sporting Life API + 结果页使用 `approval_authority=human_reviewed_reference`、`official_finish_position=null`，前台显示“已人工审核赛果”。两类结果在本次确认后都写入 `is_confirmed=true`，使已完赛页面可以展示冠军和完整名次；官方性由 approval authority、official finish position、bundle/source hash 和公开标签表达，不再把 `is_confirmed` 单字段解释为“只允许官方来源”。该口径覆盖 `2026-07-27` 文档中较窄的旧解释，但不允许静态 `200`、模糊名称命中、未终态页面或不完整名次直接升级为确认赛果。
+
+生产写入继续要求：先固定应到赛事与来源证据 SHA，执行零写 dry-run，生成并验证数据库恢复点，以 exact bundle SHA + 逐 event reviewed-row digest 批准，写后同时核对数据库 digest、authority 语义和公网完整“名次 + 马号”序列。赛事日期、时区或 canonical 身份修复是独立 mutation；本次两个已知日期残差只记录、不随赛果补齐顺手改写。
+
+## 为什么 DeepSeek 兼容修复采用结构化保护槽而不是继续加强提示词
+
+`2026-08-02` 生产样本已经排除网络与余额：最近 5 篇的 15 次请求全部 HTTP `200`，但 KEEP/TERM/SEED 占位符仍 5/5 丢失。继续用同一提示词重试只会增加费用；接受缺失 token 则会把马名和确定性术语错误带入公开内容。因此 `fix-deepseek-placeholder-compatibility` 决定让每个受保护 occurrence 使用唯一结构化槽，模型只返回槽 ID，最终值由服务端不可变 manifest 注入；任何缺失、重复、未知、跨字段或替代值都 fail-closed，槽协议通过后仍运行现有完整性与 source-aware 术语计数门禁。
+
+DeepSeek V4 显式使用 non-thinking profile，但 non-thinking 只是一项请求能力，不是内容安全证明。provider/model/request-mode/protocol 必须先通过离线合同测试和无业务副作用在线探针；能力指纹变化后重新认证。默认连续 3 次协议失败即熔断，不自动切换供应商，也不把确定性兼容错误当作 429/5xx 瞬态错误重试。首版优先复用 `TranslationRun.raw_response` 的固定脱敏 metadata 与 Redis breaker，是否新增字段须和 `harden-news-translation-recovery` 一并评审，避免 migration 重叠。本次只批准形成方案，不等于批准实现、PR、部署、在线调用或生产文章写入。
+
+## 为什么翻译供应商紧急切换不要求 PR，但模型行为修改必须走 PR
+
+`2026-08-02` SiliconFlow 在余额正常时仍持续返回 HTTP `429 / 50609 System is too busy now`，导致自然新稿无法穿过翻译层。项目已有 `openai-compatible` provider、可配置 Base URL、模型和 Key，因此把生产运行时从 SiliconFlow 切到 DeepSeek 官方 API 只修改服务器 `.env`，不改变仓库代码、数据库结构或发布门禁；这类可回滚的运行时配置切换不要求 PR，但仍必须单独授权、备份 `.env`、只重建实际消费配置的 worker，并先做单篇验证。
+
+DeepSeek V4 默认 thinking，而当前翻译调用没有显式发送 `thinking.type=disabled`。是否关闭 thinking、增加 DeepSeek 专用配置名、调整占位符提示或重试策略都会改变代码和模型行为，必须另立代码变更、测试并通过 PR 后部署。供应商切换不得绕开确定性术语占位符、JSON、正文完整性、人工审核和自动发布门禁；API 返回 `200` 只证明连通，不等于文章可以发布。
+
+同日对切换时最新五篇 `11194/11193/11192/11191/11190` 做串行生产验证，五篇的 DeepSeek 请求均返回 HTTP `200`，但 `5/5` 最终都把正文中要求原样保留的 `__UMA_KEEP_*`、`__UMA_TERM_*` 或 `__UMA_SEED_*` 占位符计数降为 `0`，因此全部被现有门禁阻断。该样本已足以停止批量重放；不得为追求产出降低占位符门禁。继续使用 DeepSeek V4 前，应先通过代码变更显式非 thinking、强化占位符传输/恢复契约或选择经离线 fixture 验证的模型，再走 PR、部署和小批生产复验。
+
+## 为什么生产诊断禁止无界 Django 全行对象加载
+
+`2026-07-29` 一次生产只读诊断在 `3.4 GiB`、无 swap 的单机上读取未限定列的 Django ORM 全行对象。服务器时间线显示该管理员 SSH 会话和容器 exec 后约一分钟即出现容器健康检查无法启动、Docker resolver 并发溢出、snapd watchdog 超时与 containerd 事件长时间延迟，最终 SSH/HTTP 应用层持续不可用，重启后恢复。虽然本次没有新的 kernel OOM kill 记录，但图中操作说明、事件时序和主机容量共同支持内存压力/回收与调度风暴。
+
+因此生产诊断与审计固定采用有界投影：先以 SQL 聚合或 `.count()` 确认分母，仅读取所需字段，优先 `values()` / `values_list()`，大结果必须分页或 `iterator(chunk_size=...)`，并设置行数、执行时间与输出上限。禁止为了“只读”便利一次实例化全量含正文、翻译、JSON 等大字段的模型；只读不等于低风险。需要全量分析时，应在生产等价副本或导出 artifact 上执行。
+
+## 为什么公开站点视觉系统采用"赛马场"设计语言并自托管思源宋体子集
+
+`2026-07-23` 用户确认 P1 门户视觉重设计原型后实施。公开站点定位为"赛马体育新闻门户"，原有纯白卡片工具型视觉无法承载门户的权威感与信息密度，也无法把赛事数据、马匹档案等差异化资产显性化。设计语言因此锁定为：深草绿（Turf Green `#0E5A38`）× 冠军金（`#C9A227`）× 暖白纸面（`#FAF8F3`），G1/G2/G3 等级金银铜徽章，五地区各自地区色；设计令牌以 CSS 自定义属性集中在 `public.css` 顶部，公开页面不得绕开令牌引入新品牌色。
+
+标题字体锁定 Noto Serif SC（思源宋体）：用户评审原型时明确指出系统宋体（Songti SC）"太丑"。但站点面向中文用户、服务器在阿里云香港，Google Fonts 不可作为生产依赖，因此字体自托管：从 google/fonts 官方仓库取得可变字重 TTF，用 fonttools instancer 固定 700/900 两个标题字重，再按 GB2312 汉字集（6788 字）+ 拉丁/假名/CJK 标点/全角 + 高频日语汉字子集化为 woff2（约 1.4MB/字重），`font-display: swap`，降级栈为系统宋体。罕见汉字标题会降级为系统宋体渲染，属于可接受的兜底，不为此携带 4MB+ 全量字体。
+
+交互口径同步锁定：移动端导航从横滑 Tab 改为底部固定四 Tab（首页/赛事/马匹/关注），直接回应此前线上验收"马匹/美国入口不显眼"的问题；每阶段实现前必须先出高保真静态原型经用户确认（写入 OpenSpec 规格 req-prototype-approval），P2（赛事日历/详情）、P3（马匹模块）沿用同一门禁。
+
+## 为什么赛事日历采用按日时间线，未来提示只承诺日级精度
+
+`2026-07-23` 用户确认 P2 原型后锁定：桌面与移动端使用同一份按日分组时间线数据，桌面不恢复旧的高密度宽表。赛事阅读的第一任务是快速判断“哪一天、哪个地区、哪场重点赛”，因此页面先展示自然周 G1 焦点，再按地区、等级和时间筛选，通过日期轴跳转到单列赛事卡；年份和名称搜索继续保留，既有 URL 参数与前后方向加载语义不得改变。
+
+未来赛事的数据完整度并不一致，很多场次只能确认日期，无法可靠确认分钟级开赛时间。因此倒计时和状态文案最多承诺到日（如“今天”“明天”“还有 N 天”），有可信开始时间时可以作为附加资料展示，但不得据此生成小时/分钟/秒级倒计时。冠军态同时锁定为 `finished + is_confirmed`，scheduled、running、postponed、cancelled 或未确认赛果都不得提前显示冠军。
+
+`2026-07-27` 用户进一步确认赛事状态与赛果官方确认应分层表达：已经人工审阅并正式写入完整名次的赛事可以设为 `finished`，即使部分来源尚未形成系统认可的官方结构化凭证；`RaceEventResult.is_confirmed` 继续表达官方确认闭环，不能因赛事改为 `finished` 而自动置真。公开冠军态仍必须同时满足 `finished + is_confirmed`。
+
+同日用户授权直接合并 9 组重复赛事并替代线上重复展示。产品层以已有完整出马表和赛果的记录为 canonical，空赛果旧记录保留为可审计入口并通过 `RaceEventProductCanonicalLink` 指向 canonical；日历、首页、焦点与 sitemap 排除 active duplicate，旧详情 URL 显示正式入口提示。该合并不得复制或删除底层赛果、历届冠军和候选审计数据，回滚使用停用 canonical link，而不是恢复整库或重建赛事记录。
+
+## 为什么马匹战绩实时聚合，关注操作继续使用原生 POST
+
+`2026-07-23` P3 实施锁定：马匹出赛/冠/亚/季和胜率直接从 `HorseRaceRecord` 条件聚合，不新增冗余统计字段。出赛排除退赛，冠军接受已标记胜出或可标准化的一名，亚季军只识别可确认的二、三名；历史自由文本无法可靠解析时宁可不计，不制造精确数字。索引在同一 queryset 聚合统计，并用 `Exists` 批量判断当前匿名 token 的关注状态，避免卡片 N+1。
+
+关注与取消继续使用 CSRF 保护的原生 POST，不引入 JavaScript 或账号体系；匿名 cookie 保持 `HttpOnly/SameSite`，数据库只保存 hash。为了让索引和关注管理页操作后留在原页面，端点允许 `next`，但只接受同站且以 `/horses/` 开头的地址，任何外部或不符合范围的目标都回退到马匹详情。直接相关新闻标记“来自”，两代内公开后代新闻标记“子代相关”，两者仍只消费已发布文章和 `auto/manual` 关联。
+
+## 为什么遗留 CrawlJob 不能直接批量改为 failed
+
+`2026-07-22` 审计发现 `32` 条超过 60 分钟仍为 started 的 CrawlJob。这些记录看起来像“卡住了”，但数据库里的 started 本身不能证明 Celery 任务已经死亡：任务可能还在 worker 中运行、已被 reserved，或者仍持有有效生产窗口租约。
+
+因此锁定为两步：先生成不写业务表的 manifest，记录任务 ID、来源、开始时间、关联文章数、Celery active/reserved 证据、生产窗口租约和 SHA-256；再使用同一份 SHA 锁定文件 apply。apply 时重新取活动证据，Celery 无回应、有未映射抓取任务或租约未过期都必须 fail closed；每行再加锁并确认仍是 started、开始时间和来源未漂移后才能改为 failed。
+
+抓取任务自身的完成写也同时改为 started→success/failed 的条件抢占。这样运维先收敛的遗留记录不会被迟到任务覆盖，迟到结果只记录 `terminal_state_already_claimed`，也不能改写 `NewsSource.last_crawl_*`。历史审计的 `32` 只是基线，不是正式 apply 清单。
+
+## 为什么低产地区来源改为有界并行生产直开
+
+`2026-07-22` 用户确认新闻生产恢复方案第 1–5 项按推荐实施，并要求第 6 项提高测试速度：取消来源 shadow，允许每个地区并行测试多个来源，直接观察生产环境表现。
+
+实现口径锁定为：候选仍须先通过只读准入、最小脱敏 fixture 和自动化回归；代码同步默认关闭，执行阶段每地区初始最多同时启用 2 个 accepted 来源，并设置 `enabled=true/production_approved=true` 直接进入现有生产窗口。文章继续经过翻译、门禁、去重、配额和发布策略；首 4 个窗口及随后 24 小时观察 CPU、内存、队列、容器、healthz、日期、正文、重复和公开漏斗，任一异常只停用问题来源并停止提高并发。
+
+“不会影响产品性能”不能作为免检前提：法国 TDN 来源曾因日期解析错误直接误发布 5 篇旧文，说明生产直开同时存在内容质量风险。当前以每地区上限 2、完整质量门禁和逐源熔断换取更快验证；后续只有生产容量证据支持时才能提高并发上限。没有 accepted 来源时仍允许 no-go，不接入 blocked/deferred 来源。
+
 ## 为什么技术审查问题默认直接修复，产品能力与交互仍需用户审核
 
 后续 code review 发现的纯技术问题，例如正确性、安全门禁、并发、性能、测试缺口、状态一致性和可维护性问题，默认由 Codex 直接修复、补测试并完成验证，不再逐项等待用户确认。这样可以减少已经明确方向后的重复审批，让技术返修持续推进到全绿。
@@ -980,3 +1062,62 @@ HKJC 官方来源适合作为国际和香港赛马术语主译名，但生产库
 赛事抓取数据需要保留来源原文，便于去重、追溯、重新匹配和处理术语库后续修订；若把中文译名直接覆盖进赛事明细，术语更新后会产生历史脏数据，也会丢失原始证据。因此赛事页采用展示时批量解析：马名和骑师名精确命中 active 正式术语主原文或别名时显示 `target_zh`，冲突时优先赛事同地区，其次全局，再次其他地区；未命中时原样展示，不自动编造译名。
 
 出马表与赛果是两个不同视图。赛果继续按完赛名次排列；出马表当前五地区按马号自然升序排列，马号缺失时回退闸位，最后才使用来源行序。地区排序映射显式保留，后续若某地区以闸位为主，只调整该地区规则，不改写已抓取数据。
+## 五地区分级赛事追溯至 1984 年的范围与完成口径
+
+历史赛事目标采用以下锁定口径：
+
+- 覆盖日本 JRA/NAR、中国香港、英国、法国和美国在 1984 年以来全部 graded/pattern 系列，包含历史停办和降级退出系列，不包含普通赛、让赛和未胜利赛。
+- 入选系列从 `max(1984, 创办年)` 保存完整系列史，包含升格前和降级后连续届次，各年使用真实等级。
+- 已排期后取消创建 cancelled 年度赛事；当年未举办只记 not-held 证据，不创建虚假 `RaceEvent`。
+- 可信完整赛果可派生 runners 并标记来源；年度正式赛果是冠军主事实，缺完整赛果时才使用冠军补位，历届冠军按稳定系列动态汇总。
+- 字段冲突按官方当年结果、官方档案/年鉴、高可信专业库、参考来源排序；低级来源只补空，同级或高级冲突人工审核。
+- 完整目标可先按批准 scope 写入，暂时不可用和身份待审持续挂账；永久不可得必须双来源证据和人工批准。
+- 最终同时报告 accounted rate 和 data complete rate；闭环要求全部年度目标有明确结论，不把永久缺档伪装成数据完整。
+- 历史数据不自动创建 HorseProfile、不自动音译正式术语；前台不新增系列页，赛事日历增加年份和名称搜索。
+- 达标 historical publication scope 可公开年度赛事并进入分片 sitemap；资料不足、冲突和 not-held 不进入索引。
+
+工程实现使用稳定 `RaceSeries`、年度总账 `HistoricalRaceEventTarget` 和真实年度 `RaceEvent` 三层身份。年度总账拆分客观 expectation 与处理 resolution 状态；逐年分级目录发现入选系列，再通过 lineage/timeline 补足前分级、后降级、取消和缺届。生产网络和 commit 默认关闭，所有批量行为继续绑定 artifact、请求/磁盘预算、备份、原子写入和写后核验。
+
+## 英文单词型马名按每次命中上下文判定
+
+- `Brilliant`、`Something`、`Tuesday` 等普通英文词形可以是合法马名，正式术语和安全 alias 必须保留，不通过删除或永久普通词标记减少误挡。
+- 分类单位是文章中的单次命中，不是整条 `TermEntry`；同一句中的同词可以分别判为马名和普通词。
+- 结构化参赛/赛果和马匹语法关系优先，普通语法搭配可高置信降级；标题大写不是充分证据。
+- 标题、摘要和首段中的 uncertain 核心命中保持阻断或人工处理，正文背景 uncertain 只 warning；译文已保留译名、原文或 alias 时不阻断。
+- 首版使用本地可解释规则和结构化证据，不逐词调用外部 AI。重处理必须有界、互斥、可续跑，并达到生产等价 100 篇/60 秒后才允许生产 commit。
+# 2026-07-12 历史赛事生产执行授权
+
+- `backfill-race-events-to-1984` 准备任务全部完成、测试通过且最终 code review 无 actionable finding 后，Codex 可自主执行生产备份、部署、历史目录抓取、详情抓取、dry-run、分批落库和写后核验，无需逐批再次取得用户确认。
+- 自主执行不取消既有安全门禁：总账和批次 artifact 必须锁定 SHA，网络和写入必须受请求/cache/磁盘预算、coverage、备份、原子 scope 和写后计数约束；失败批次停止扩大并保留 gap ledger。
+- 生产抓取/写入期间可临时开启 `HISTORICAL_RACE_BACKFILL_ENABLED` 与 `HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK`，但本轮结束时必须恢复关闭。历史年度赛事默认保持 draft，最终线上展示开关暂不开放。
+# 2026-07-12：英文单词型马名按命中上下文判定
+
+- 正式术语库继续保留与普通英文单词同形的合法马名，不通过删除术语降低误挡。
+- 英文门禁以每次实际命中为单位，输出 `proper_noun / common_word / uncertain`；标题大写和 `term_type=horse` 都不是单独的充分证据。
+- 灰度使用单一 `ENGLISH_TERM_CONTEXT_MODE=off|shadow|enforce`，默认 `off`。shadow 只记录差异，enforce 才改变门禁。
+- 历史重处理以数据库 `TermGateReprocessRun` 为审核事实来源，commit 必须引用 run ID 和 manifest SHA；JSON 只作可选导出。
+- 所有重处理批次共用一个数据库租约，避免不同地区同时占用生产 CPU。
+- 每次英文术语分类只能使用当前命中左右的有界 token，不能在整段 snippet 中搜索另一处同词的语法证据；术语优先级不能把正文背景 uncertain 单独升级为 blocker。
+- 赛事参赛/赛果实体证据只信任 `ArticleRaceLink.status in {auto, manual}` 且 `removed_at is null` 的有效关联；候选或已移除关联不得影响发布门禁。
+- 重处理的 `--limit` 限制有效候选数，同时另设有界扫描上限；达到扫描上限或时间预算时必须输出稳定游标续跑。窗口外积压只输出计数，禁止为诊断加载全部文章 ID。
+- 重处理租约按经过时间续租，而不是按文章数量续租；租约竞争失败也必须把本次审计 Run 记为 `rejected`，避免后台长期显示虚假的运行中任务。
+- 英文批次术语索引按首 token/首字符分桶，文章只检查实际出现的候选桶；性能验收必须记录真实 SQL、模式检查数、实体/重复预取次数和进程 RSS 增量，不接受固定占位值。
+- `outside_lookback_count` 只统计时间窗外仍含 blocker 级 `core_term_missing` 的英文稿；全部人工审核积压若以后需要展示，必须使用不同字段名，不能混入术语重处理口径。
+- 影响完整门禁结果的发布内容源、rewrite、重复阈值和重复回看设置全部进入设置快照；任一变化都整批拒绝 commit，而不是伪装成单篇文章漂移。
+- 并行 OpenSpec change 的迁移从共同主干迁移分叉，各自分支可独立部署；工作区同时包含两条分支时使用无 schema 操作的 merge migration 汇合，不让一个 change 的业务迁移依赖另一个 change。
+- continuation cursor 必须固定首次运行的 `window_start/window_end`；后续页只推进 `(first_seen_at,id)`，不得重新计算相对 lookback，也不得把窗口结束后新到文章混入原批次。
+- dry-run 上下文快照必须由实际参与匹配的同一批 TermEntry/TermAlias 生成。commit 在 PostgreSQL 事务中短暂锁定两张术语表，并在写入前、事务提交前分别比较规则/设置/术语快照；晚到漂移整批回滚为 `rejected`。
+- 实体查询指标按真实 SQL 执行拆分为赛事实体、外部马名 alias 和额外正式马名术语三类；英文批次必须复用已加载术语，使额外正式马名术语查询为 0，聚合指标不得使用固定常量。
+
+## 2026-07-31 日本新闻来源去重阶段策略
+
+- Sponichi 普通新闻与新闻排行榜暂时退出生产抓取，原因是与 netkeiba 的内容重复较多；这是一项可逆运营决策，不删除来源定义、历史文章、快照或来源归属。
+- 日本生产新闻暂时继续保留 netkeiba 新着顺/访问量榜/注目数榜与 JRA 官方新闻。后续是否恢复 Sponichi，应以独立重复率审计和增量价值为依据，不因内置来源同步而自动恢复。
+
+## 2026-08-14 HiPilot 同机静态站隔离策略
+
+- `hipilot.umafans.run` 是与 Umanews 主站无业务依赖的保密静态交付物；同机部署只能新增独立 DNS、静态目录、证书和 Nginx server block，不修改 `umafans.run` / `www.umafans.run` 的代理路由。
+- 80/443 实际由 `umanewsbot-nginx-1` 占用，因此不安装或启动第二个宿主机 Nginx，也不重启现有 Compose。证书签发和续期使用一次性 Certbot 容器的 webroot 模式，不能绑定 80/443。
+- 页面同时启用 Basic Auth 与 `X-Robots-Tag: noindex, nofollow, noarchive`。健康检查 `/healthz` 保持免认证，便于无密钥监控；页面正文必须认证后访问。
+- 运行中容器的 `default.conf` 是单文件只读 bind mount，历史更新已造成宿主机路径与运行中 inode 分离。因此本次将最终配置同时写入宿主机持久化源文件和运行中容器的独立 `hipilot.conf`：当前 reload 读取后者，未来容器自然重建后读取前者；禁止为同步配置而主动重建容器。
+- 静态 `current` 必须使用 volume 内相对链接，不能指向宿主机绝对路径，否则 Nginx 容器会看到断链。发布保留旧 release，只原子切换相对链接。
