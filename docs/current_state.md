@@ -1,5 +1,31 @@
 # 当前状态
 
+## 2026-09-06 M1 完整赛事自动化代码闭环已实现（未部署）
+
+- 分支 `codex/complete-race-status-automation-m1` 完成 `complete-race-status-automation-coverage`
+  的 tasks §1（全部 RED 转 GREEN）与 §2（除 migration drift 验证在收尾）：standing policy v2
+  先到先得纳管（一次性授予、`tiebreak_order` 固定平局、授予后粘滞、仅完整能力来源竞争、
+  result-only 只进更正渠道、v1 大声拒绝）、census 分类消除多来源歧义（`trusted_route_missing`
+  取代 `standing_policy_route_ambiguous`）、new/continuation 状态分组、discovery 守恒
+  （already_valid/awaiting_source_window/deferred/rejected 等全部分类计数）、共享
+  `validate_data_sync_lifecycle_admission()` 并被 lifecycle 推进、赛果写入和公开读取三处共用、
+  enrollment 建立 lifecycle control（含 `standing_policy_digest` evidence）、每批 20 的
+  reconciliation、停滞赛事审计修复命令 `repair_data_sync_stalled_events`（dry-run SHA 锁定候选、
+  apply 走标准写入链 + verifier + OperationLog + incident 收口）、audit 命令增加 lifecycle 双
+  authority/停滞/correction watch 段落。
+- 双 authority 口径：未结束赛事同时存在 active legacy membership 和 race_data_sync lifecycle
+  evidence 才判 `lifecycle_authority_conflict`；只有 enrollment 行而无 lifecycle evidence 的旧名单
+  赛事继续走 registry 路径，行为不变。
+- 生产 policy 文件迁移 v2，新 SHA
+  `4e000fd7510c076eb798345ff1d9dd5cded8043477dd2d55613cecebead31a07`，`.env.example` 已同步；
+  生产环境变量切换属发布窗口动作。
+- 测试：新增 policy v2 13 项、discovery 守恒 5 项、admission 15 项、wiring 3 项、advance 与
+  reconciliation 8 项、结果/公开准入 5 项、修复命令 5 项、audit 1 项、PostgreSQL 双源并发授予 1 项
+  （PG 环境执行）；`test_race_data_sync_*` 相关套件本地全绿。基线已知 2 个迁移回滚测试与
+  race_live 链 12 项在 origin/main 上预先失败，与本变更无关。
+- 本轮未部署、未迁移、未联网扩量、未写生产。755/756/757 修复命令可作为独立小型 G2 先行交付。
+- 下一步：全量 stable 回归、Compose/diff/secret 检查、独立 review，然后向用户提供 G2 候选包。
+
 ## 2026-09-05 完整赛事自动化五项产品决定已定稿
 
 - 用户已审核 `complete-race-status-automation-coverage` 的五项产品决定：同意第 2、3、5 项；

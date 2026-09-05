@@ -139,13 +139,13 @@ policy 顶层同时把状态分为：
 ### 5.2 明确分类
 
 - `awaiting_source_window`
-- `identity_ready`
+- `identity_ready`（保留词汇；首版由 `eligible` 覆盖，不单独产出）
 - `eligible`
 - `enrolled`
 - `manual_lock_present`
 - `trusted_route_missing`
-- `trusted_route_invalid`
-- `source_identity_not_found`
+- `trusted_route_invalid`（保留词汇；首版不产出，区域无可信 route 统一报 `trusted_route_missing`）
+- `source_identity_not_found`（首版沿用既有 `source_identity_missing`）
 - `source_identity_ambiguous`
 - `writer_owner_conflict`
 - `standing_policy_expired`

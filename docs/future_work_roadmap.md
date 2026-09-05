@@ -108,7 +108,7 @@
 
 | 工作 | 当前状态 | 已有成果 | 剩余动作 | 主要阻塞 |
 | --- | --- | --- | --- | --- |
-| 完整赛事状态自动更新 | 产品决定于 2026-09-05 定稿（第 1、4 项按用户口径改写）；修订设计复审已通过 | 六份计划文档已按用户决定修订 | 按 tasks 从 RED 测试开始实现 | 后续 G2/G3 |
+| 完整赛事状态自动更新 | M1 代码闭环已实现（分支 `codex/complete-race-status-automation-m1`），未部署 | 六份计划文档 + tasks §1/§2 全部完成；新增约 51 项测试 | §3 隔离验证与独立 review，然后 G2 候选包；755/756/757 修复命令可独立先行 | 后续 G2/G3 |
 | 赛事数据链路稳定化候选 | 本地 candidate-only，未提交/未推送/未部署 | 多语言赛事/场地身份、JRA/NAR fail-closed route、D-1..D+3 审计、field-scoped evidence、五事件 offline shadow；聚焦测试 136/136 | 从最新主线做逐文件 diff，只提取完整赛事自动化需要的基础，不得整分支直接合并 | 与主计划存在重叠，含 migration 0079 候选 |
 | 定时赛果复核 | 任务已停止，问题未解决 | 调度、审核包、通知和 dry-run 可运行 | 先修先到先得 route admission，再恢复只读复核；不得把通知成功当结果补齐 | 40/40 `route_missing` |
 | event 755/756/757 恢复 | 未完成 | 已有 official observation/revision | 走一次性审计修复包：来源证据复核、SHA 锁定候选、dry-run、备份、批准、apply、verifier，可先于新链独立上线 | 禁止未经复核直接复用旧 revision 写公开 |
