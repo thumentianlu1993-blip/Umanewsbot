@@ -54,13 +54,13 @@
 
 ## 5. 获得发布确认后
 
-- [ ] (operations) 在 shared deployment lock 下创建并验证 PostgreSQL custom-format 备份和配置/镜像恢复点。
-- [ ] (operations) 以 10 flags false、专用 worker stopped 的关闭态部署候选，确认 migration leaf 精确且 `race_live` 不变。
-- [ ] (operations) 先运行 policy v2 的未来/恢复双 census 只读验收：分类守恒、route ambiguity=0、无意外 enrollment。
-- [ ] (operations) 按 future discovery -> network/time/racecard -> lifecycle -> result apply/public -> correction 顺序启用。
-- [ ] (operations) 执行 755/756/757 一次性审计修复（可先于本变更发布窗口独立执行）：来源证据复核、候选 SHA、dry-run、备份、批准、apply、verifier、公网验收；修复窗口内确认无自动化任务触碰目标赛事。
+- [x] (operations) 在 shared deployment lock 下创建并验证 PostgreSQL custom-format 备份和配置/镜像恢复点。
+- [x] (operations) 以 10 flags false、专用 worker stopped 的关闭态部署候选，确认 migration leaf 精确且 `race_live` 不变。
+- [x] (operations) 先运行 policy v2 的未来/恢复双 census 只读验收：分类守恒、route ambiguity=0、无意外 enrollment。
+- [x] (operations) 按 future discovery -> network/time/racecard -> lifecycle -> result apply/public -> correction 顺序启用。
+- [x] (operations) 执行 755/756/757 一次性审计修复（可先于本变更发布窗口独立执行）：来源证据复核、候选 SHA、dry-run、备份、批准、apply、verifier、公网验收；修复窗口内确认无自动化任务触碰目标赛事。
 - [ ] (operations) 等待至少一场新的 today/tomorrow 赛事自然完成 identity、enrollment、time/racecard 和 lifecycle。
 - [ ] (operations) 等待正式赛果自然公开，核对任务、数据库、claim、revision、publication、页面和 SLO。
 - [ ] (operations) 完成一轮自然无变化 correction 验收；真实 correction 作为持续监控，不生产造数。
-- [ ] (operations) 复核 lock absent、四服务 exact、restart/OOM=0、资源、三队列、root/www/healthz。
-- [ ] (operations) 将最终生产事实写回 current_state、decisions、deploy_runbook、project_overview、project_status 和本 change rollout。
+- [x] (operations) 复核 lock absent、四服务 exact、restart/OOM=0、资源、三队列、root/www/healthz。
+- [x] (operations) 将最终生产事实写回 current_state、decisions、deploy_runbook、project_overview、project_status 和本 change rollout。

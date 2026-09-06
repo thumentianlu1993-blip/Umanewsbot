@@ -1,5 +1,27 @@
 # 部署运行手册
 
+## 2026-09-07 M1 生产上线与 755/756/757 修复记录
+
+- 发布包：main `ca6e9d06`（PR #176/#177/#178），镜像 `umanewsbot:pr177-ca6e9d06`（prod 同 tag；
+  旧 prod 镜像 `85b94626e302` 为回滚点）。恢复点
+  `backups/db/pre-pr177-m1-20260906T154238Z.dump`（514,444,727 字节、SHA-256 `e6138e9f…`）。
+  `.env` 回滚点：`.env.backup-pre-policy-v2-20260906`（v1 policy SHA 绑定）及各阶段备份。
+- 关键顺序：部署锁 -> 排空 beat/队列 -> 停专用 worker -> 关闭态重建（10 开关 false）->
+  迁移 0078 -> nginx 重启（容器重建后 upstream 需重新解析）-> 阶段 A 只读审计 ->
+  B（ENABLED/SCHEDULER/FUTURE_DISCOVERY/ALLOW_NETWORK）-> C（SCHEDULE/RACECARD apply）->
+  D（LIFECYCLE apply）-> E（RESULT apply/public）+ 修复 -> F（CORRECTION apply）。
+- 踩坑记录：①另一会话曾把 v1 链全部开关打开（v1 policy SHA 绑定），部署前必须以容器实际
+  环境为准而不是某个 release 目录的 .env；②容器重建后 nginx 会 502，需要 restart/reload；
+  ③policy 文件在容器内为 `./runtime/policies/race_data_sync` 只读挂载（随 release 目录），
+  TRA registry 文件现已版本化进 `runtime/policies/race_live/`（PR #178），缺失会让 discovery
+  在 contract 阶段 fail-closed；④compose `up -d` 对配置有差异的服务会顺带重建（本次 db 被
+  重建，数据卷无损），执行前应有预期；⑤修复候选文件写在容器内 `/app/runtime/` 为临时路径，
+  dry-run 后应立即 apply，长期留存需挂持久卷（后续改进点）。
+- 修复执行：`repair_data_sync_stalled_events` dry-run（候选 `fd50ce54…`、零写入）-> apply
+  3/3 -> verifier/公网/OperationLog/incident 全部通过。前置核对（observation 来源==获胜来源）
+  已在写前逐场确认。
+- 当前基线：全开关开启、`race_live=7543` 未动、停滞 0、双授权 0、审计 would_write=false。
+
 ## 2026-09-06 M1 完整赛事自动化代码闭环（未部署）
 
 - 分支 `codex/complete-race-status-automation-m1` 已实现方案全部代码：standing policy v2
