@@ -289,7 +289,7 @@ validate_data_sync_lifecycle_admission(
 扩展 `audit_race_data_sync`，输出：
 
 - 盘点分类与 reason-code 明细；
-- identity discovery 守恒统计；
+- identity discovery 守恒统计由 discovery 任务自身返回 payload 承载（审计不重复触网重放）；
 - lifecycle admission 类型与冲突；
 - 已到 T/T+30 但未推进的事件；
 - 已有 official revision 但未 publication 的事件；

@@ -511,7 +511,6 @@ def build_race_data_enrollment_census(
         )
         route = None
         source = None
-        route_conflict = False
         sticky_routes = []
         for candidate_route in eligible_routes:
             candidate_binding = resolve_race_data_provider_route(
@@ -542,10 +541,16 @@ def build_race_data_enrollment_census(
             ):
                 continue
             sticky_routes.append((candidate_route, candidate_sources[0]))
-        if len(sticky_routes) == 1:
-            route, source = sticky_routes[0]
-        elif len(sticky_routes) > 1:
-            route_conflict = True
+        if sticky_routes:
+            route, source = sorted(
+                sticky_routes,
+                key=lambda item: (
+                    item[0].tiebreak_order,
+                    item[0].provider,
+                    item[0].region_code,
+                    item[0].identity_namespace,
+                ),
+            )[0]
         elif eligible_routes:
             route = eligible_routes[0]
         route_binding = (
@@ -585,8 +590,6 @@ def build_race_data_enrollment_census(
             reason = "manual_lock_present"
         elif not eligible_routes:
             reason = "trusted_route_missing"
-        elif route_conflict:
-            reason = "source_identity_ambiguous"
         elif route_binding is None:
             reason = "provider_route_unavailable"
         elif route.route_digest != route_binding.route_digest:
@@ -634,6 +637,14 @@ def build_race_data_enrollment_census(
                         classification = "enrolled"
                     else:
                         classification = "eligible"
+        if reason == "source_identity_missing" and event.local_date is not None:
+            try:
+                provider_date = cutoff.astimezone(ZoneInfo(event.timezone_name)).date()
+            except (KeyError, ValueError):
+                provider_date = cutoff.date()
+            if (event.local_date - provider_date).days > 1:
+                reason = ""
+                classification = "awaiting_source_window"
         if reason:
             classification = "blocked"
         snapshot = _event_snapshot(

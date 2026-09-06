@@ -332,6 +332,42 @@ class StalledEventRepairTests(TestCase):
         )
         self.assertTrue(public.visible, public.reason)
 
+    def test_apply_adopts_stale_policy_digest_and_repairs(self):
+        self.enrollment.standing_policy_digest = "1" * 64
+        self.enrollment.save(update_fields=("standing_policy_digest",))
+
+        report = self._dry_run()
+        entry = report["entries"][0]
+        self.assertTrue(entry["repairable"], entry)
+
+        output = StringIO()
+        call_command(
+            "repair_data_sync_stalled_events",
+            "--apply",
+            "--as-of",
+            NOW.isoformat(),
+            "--candidate-file",
+            report["candidate_file"],
+            "--expected-sha256",
+            report["candidate_sha256"],
+            stdout=output,
+        )
+        applied_report = json.loads(output.getvalue())
+
+        self.assertEqual(applied_report["applied_count"], 1, applied_report)
+        self.enrollment.refresh_from_db()
+        self.assertEqual(
+            self.enrollment.standing_policy_digest, self.admission_policy_digest
+        )
+        self.assertTrue(
+            models.OperationLog.objects.filter(
+                action_type="race_data_sync_policy_adoption",
+                target_id=str(self.event.pk),
+            ).exists()
+        )
+        self.event.refresh_from_db()
+        self.assertEqual(self.event.status, models.RaceEventStatus.FINISHED)
+
     def test_apply_rejects_sha_mismatch(self):
         report = self._dry_run()
 

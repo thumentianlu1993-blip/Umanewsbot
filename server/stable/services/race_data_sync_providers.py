@@ -731,8 +731,11 @@ def discover_the_racing_api_source_identities(
             rejected += 1
             continue
         offset = (event.local_date - provider_date).days
-        if offset not in {0, 1}:
+        if offset > 1:
             awaiting += 1
+            continue
+        if offset < 0:
+            rejected += 1
             continue
         candidates.append((event, contract_region, route, existing, offset))
     if not candidates:

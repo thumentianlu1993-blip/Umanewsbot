@@ -335,3 +335,38 @@ class RaceDataSyncCensusFcfsTests(TestCase):
 
         self.assertEqual(census.entries[0].classification, "blocked")
         self.assertEqual(census.entries[0].reason_code, "continuation_status_not_allowed")
+
+    def test_two_sticky_identities_grant_by_tiebreak_order(self):
+        event = create_event(slug="fcfs-two-sticky")
+        jra_identity = self._identity(event, provider="jra", namespace="jra-race-v1")
+        self._identity(event, provider="nar", namespace="nar-race-v1")
+
+        census = self._census(self._policy())
+        entry = census.entries[0]
+
+        self.assertEqual(entry.classification, "eligible")
+        self.assertEqual(entry.provider, "jra")
+        self.assertEqual(entry.source_identity_id, jra_identity.pk)
+
+    def test_far_future_event_is_awaiting_source_window(self):
+        from datetime import date
+
+        event = create_event(slug="fcfs-far-future")
+        event.race_datetime = NOW + timedelta(days=10)
+        event.local_date = date(2026, 8, 30)
+        event.save(update_fields=("race_datetime", "local_date"))
+
+        census = self._census(self._policy())
+        entry = census.entries[0]
+
+        self.assertEqual(entry.classification, "awaiting_source_window")
+        self.assertEqual(entry.reason_code, "")
+
+    def test_in_window_missing_identity_is_blocked_not_awaiting(self):
+        create_event(slug="fcfs-in-window-missing")
+
+        census = self._census(self._policy())
+        entry = census.entries[0]
+
+        self.assertEqual(entry.classification, "blocked")
+        self.assertEqual(entry.reason_code, "source_identity_missing")

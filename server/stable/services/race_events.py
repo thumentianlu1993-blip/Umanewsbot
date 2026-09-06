@@ -3296,6 +3296,7 @@ def _resolve_data_sync_publication_from_loaded_rows(
     lifecycle_membership: RaceEventLifecycleEnforceMembership | None,
     standing_policy_digest: str | None,
     now: datetime,
+    standing_policy: dict | None = None,
 ) -> RaceLivePublicReadDecision:
     """Authorize a data-sync result without borrowing legacy race-live policy."""
 
@@ -3333,14 +3334,6 @@ def _resolve_data_sync_publication_from_loaded_rows(
         )
         if not lifecycle_validation.valid:
             return reject(lifecycle_validation.reason_code)
-        if (
-            lifecycle is not None
-            and isinstance(lifecycle.manifest_data, dict)
-            and "race_data_sync" in lifecycle.manifest_data
-            and event.status
-            not in {RaceEventStatus.FINISHED, RaceEventStatus.CANCELLED}
-        ):
-            return reject("lifecycle_authority_conflict")
     else:
         from stable.services.race_data_sync_admission import (
             validate_data_sync_lifecycle_admission,
@@ -3349,6 +3342,7 @@ def _resolve_data_sync_publication_from_loaded_rows(
         admission = validate_data_sync_lifecycle_admission(
             event_id=event.pk,
             now=now,
+            standing_policy=standing_policy,
         )
         if not admission.admitted:
             return reject(admission.reason_code)
@@ -3476,6 +3470,29 @@ def _resolve_data_sync_publication_from_loaded_rows(
         phase=revision.phase,
         effective_mode=RaceLivePublicationMode.OFFICIAL_PUBLIC,
     )
+
+
+def _load_race_data_sync_standing_policy() -> dict | None:
+    """Return the reviewed policy payload after byte-SHA validation."""
+
+    try:
+        return load_standing_policy_file(
+            path=getattr(
+                settings,
+                "RACE_DATA_SYNC_FUTURE_STANDING_POLICY_FILE",
+                "",
+            ),
+            expected_sha256=str(
+                getattr(
+                    settings,
+                    "RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256",
+                    "",
+                )
+                or ""
+            ),
+        )
+    except (OSError, TypeError, ValueError):
+        return None
 
 
 def _load_race_data_sync_standing_policy_digest() -> str | None:
@@ -3663,6 +3680,7 @@ def resolve_race_live_public_read(
             standing_policy_digest=(
                 _load_race_data_sync_standing_policy_digest()
             ),
+            standing_policy=_load_race_data_sync_standing_policy(),
             now=now,
         )
     if revision.source_authority != source.result_authority:
@@ -4265,6 +4283,9 @@ def resolve_race_live_public_reads(
         if data_sync_event_ids
         else None
     )
+    standing_policy = (
+        _load_race_data_sync_standing_policy() if data_sync_event_ids else None
+    )
 
     required_mode_by_phase = {
         RaceResultPhase.PROVISIONAL: RaceLivePublicationMode.PROVISIONAL_PUBLIC,
@@ -4394,6 +4415,7 @@ def resolve_race_live_public_reads(
                     event_id
                 ),
                 standing_policy_digest=standing_policy_digest,
+                standing_policy=standing_policy,
                 now=now,
             )
             continue

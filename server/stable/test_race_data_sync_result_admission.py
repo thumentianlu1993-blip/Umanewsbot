@@ -281,6 +281,44 @@ class DataSyncResultAdmissionTests(TestCase):
         self.assertEqual(self.event.status, models.RaceEventStatus.FINISHED)
         self.assertEqual(self.event.results.count(), 2)
 
+    @override_settings(RACE_DATA_SYNC_ENABLED_REGIONS=("japan_jra", "japan_nar"))
+    def test_initial_result_from_ungranted_source_is_not_projected(self):
+        self.roster = build_race_data_provider_roster(configuration_only=True)
+        self.source.registry_digest = self.roster.registry_digest
+        self.source.save(update_fields=("registry_digest", "updated_at"))
+        other = models.RaceResultSourceIdentity.objects.create(
+            event=self.event,
+            source_key="the_racing_api",
+            region_code="japan_nar",
+            identity_namespace="the_racing_api-race-v1",
+            external_race_id="api-result-other",
+            review_status=models.RaceLiveReviewStatus.APPROVED,
+            terms_status=models.RaceSourceTermsStatus.APPROVED,
+            automation_allowed=True,
+            proof_network_allowed=True,
+            evidence_url="https://api.theracingapi.com/v1/results/api-result-other",
+            evidence_sha256="b" * 64,
+            valid_until=NOW + timedelta(days=30),
+            registry_digest=self.roster.registry_digest,
+            identity_fields={"source_class": "licensed_api"},
+        )
+        observation = self._observation(other, "licensed_api", self._rows())
+
+        decision = apply_data_sync_result_observation(
+            observation_id=observation.pk,
+            expected_event_id=self.event.pk,
+            now=NOW,
+            project_current=True,
+            correction_apply_enabled=True,
+        )
+
+        self.assertFalse(decision.projected)
+        revision = models.RaceEventRevision.objects.get(pk=decision.revision_id)
+        self.assertIsNone(revision.published_at)
+        self.assertEqual(revision.decision_reason, "not_granted_source")
+        self.event.refresh_from_db()
+        self.assertEqual(self.event.status, models.RaceEventStatus.RUNNING)
+
     def test_result_shadow_only_when_admission_evidence_drifts(self):
         self.lifecycle.manifest_data = {
             "race_data_sync": {"standing_policy_digest": "9" * 64}

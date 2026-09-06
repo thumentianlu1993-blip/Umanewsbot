@@ -535,14 +535,19 @@ class RaceDataSyncResultApplicationTests(TestCase):
             project_current=True,
             correction_apply_enabled=True,
         )
-        self.assertTrue(applied.projected, applied)
+        # 仅赛果来源不能在初始投影中绕过获胜来源（决定①/F-R2）；
+        # 其证据以 observation/revision 保留，enrollment 证据不被改写。
+        self.assertFalse(applied.projected)
+        revision = models.RaceEventRevision.objects.get(pk=applied.revision_id)
+        self.assertIsNone(revision.published_at)
+        self.assertEqual(revision.decision_reason, "not_granted_source")
 
         decision = race_events.resolve_race_live_public_read(
             event_id=self.event.pk,
             now=NOW + timedelta(seconds=1),
         )
 
-        self.assertTrue(decision.visible, decision.reason)
+        self.assertFalse(decision.visible)
         self.assertEqual(enrollment.source_identity_id, self.source.pk)
         self.assertNotEqual(
             observation.source_identity_id,

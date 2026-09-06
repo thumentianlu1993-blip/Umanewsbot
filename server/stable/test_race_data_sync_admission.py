@@ -234,7 +234,7 @@ class DataSyncLifecycleAdmissionTests(TestCase):
         self.assertNotEqual(decision.reason_code, "")
 
     @override_settings(RACE_DATA_SYNC_ENABLED_REGIONS=("japan_jra", "japan_nar"))
-    def test_second_admitted_eligible_route_is_grant_conflict(self):
+    def test_second_admitted_eligible_route_does_not_block(self):
         jra_route = resolve_race_data_provider_route(
             provider="the_racing_api",
             region="japan_jra",
@@ -307,8 +307,9 @@ class DataSyncLifecycleAdmissionTests(TestCase):
             standing_policy=policy,
         )
 
-        self.assertFalse(decision.admitted)
-        self.assertEqual(decision.reason_code, "enrollment_grant_conflict")
+        # 粘滞由 enrollment 的来源绑定保证；第二来源只进更正渠道，不阻断赛事。
+        self.assertTrue(decision.admitted, decision.reason_code)
+        self.assertEqual(decision.source.pk, self.source.pk)
         second.delete()
 
     def test_manual_pause_is_rejected(self):

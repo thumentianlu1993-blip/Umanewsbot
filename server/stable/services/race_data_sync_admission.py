@@ -72,8 +72,17 @@ def validate_data_sync_lifecycle_admission(
         return _deny("standing_policy_expired")
 
     event_qs = models.RaceEvent.objects.all()
+    control_qs = models.RaceEventLifecycleControl.objects.all()
+    enrollment_qs = models.RaceDataSyncEnrollment.objects.select_related(
+        "source_identity"
+    )
     if lock:
+        # Global lock graph: lifecycle control -> event -> projection ->
+        # tracking/checkpoint -> source identity -> observation/revision.
+        control_qs = control_qs.select_for_update()
         event_qs = event_qs.select_for_update()
+        enrollment_qs = enrollment_qs.select_for_update()
+    control = control_qs.filter(event_id=event_id).first()
     event = event_qs.filter(pk=event_id).first()
     if event is None:
         return _deny("event_missing")
@@ -106,11 +115,6 @@ def validate_data_sync_lifecycle_admission(
     ):
         return _deny("writer_owner_conflict")
 
-    enrollment_qs = models.RaceDataSyncEnrollment.objects.select_related(
-        "source_identity"
-    )
-    if lock:
-        enrollment_qs = enrollment_qs.select_for_update()
     enrollment = enrollment_qs.filter(event_id=event_id).first()
     if (
         enrollment is None
@@ -151,37 +155,6 @@ def validate_data_sync_lifecycle_admission(
     if source_reason:
         return _deny(source_reason)
 
-    for other in policy.routes:
-        if other.country_region != event.country_region or not other.enrollment_eligible:
-            continue
-        if (
-            other.provider,
-            other.region_code,
-            other.identity_namespace,
-        ) == (route.provider, route.region_code, route.identity_namespace):
-            continue
-        others = [
-            candidate
-            for candidate in event.source_identities.all()
-            if candidate.source_key == other.provider
-            and candidate.region_code == other.region_code
-            and candidate.identity_namespace == other.identity_namespace
-        ]
-        if len(others) != 1:
-            continue
-        other_reason = race_data_sync_control.source_admission_reason(
-            source=others[0],
-            route_digest=other.route_digest,
-            data_kinds=other.data_kinds,
-            now=now,
-        )
-        if not other_reason:
-            return _deny("enrollment_grant_conflict")
-
-    control_qs = models.RaceEventLifecycleControl.objects.all()
-    if lock:
-        control_qs = control_qs.select_for_update()
-    control = control_qs.filter(event_id=event_id).first()
     if control is None:
         return _deny("lifecycle_control_missing")
     if control.manual_pause_reason:

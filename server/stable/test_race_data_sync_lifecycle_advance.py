@@ -203,6 +203,9 @@ class DataSyncLifecycleAdvanceTests(TestCase):
         self.assertNotEqual(
             transitions.first().to_status, models.RaceEventStatus.RUNNING
         )
+        self.assertEqual(
+            transitions.first().reason_code, "data_sync_late_admission_finish"
+        )
 
     def test_advance_respects_manual_pause(self):
         event = self._make_event(slug="advance-paused", race_datetime=NOW - timedelta(minutes=1))
@@ -219,6 +222,45 @@ class DataSyncLifecycleAdvanceTests(TestCase):
         control = self._control(event)
         control.manifest_data = {"race_data_sync": {"standing_policy_digest": "9" * 64}}
         control.save(update_fields=("manifest_data",))
+
+        stats = race_data_sync_lifecycle.advance_due_data_sync_lifecycle(now=NOW)
+
+        event.refresh_from_db()
+        self.assertEqual(event.status, models.RaceEventStatus.SCHEDULED)
+        self.assertEqual(stats["transitioned"], 0, stats)
+        self.assertEqual(stats["error"], 1, stats)
+
+    def test_advance_rejects_dual_authority_on_legacy_branch(self):
+        event = self._make_event(slug="advance-dual", race_datetime=NOW - timedelta(minutes=1))
+        self._control(event)
+        registry = models.RaceEventLifecycleEnforceRegistry.objects.create(
+            root_sha256=REGISTRY_ROOT,
+            generation=1,
+            membership_sha256=REGISTRY_MEMBERSHIP,
+            member_count=1,
+            state="active",
+            is_active=True,
+            activation_id=REGISTRY_ACTIVATION,
+            approved_commit="1" * 40,
+            selector_scope={},
+            scope_sha256="2" * 64,
+            census_cutoff=NOW - timedelta(days=1),
+            apply_expires_at=NOW + timedelta(days=1),
+            runtime_valid_until=NOW + timedelta(days=35),
+            activated_at=NOW,
+        )
+        models.RaceEventLifecycleEnforceMembership.objects.create(
+            registry=registry,
+            event=event,
+            state="active",
+            entry_sha256="0" * 64,
+            source_enrollment_sha256="f" * 64,
+            schedule_generation=1,
+            schedule_hash="0" * 64,
+            country_region=event.country_region,
+            timezone_name=event.timezone_name,
+            frozen_snapshot={},
+        )
 
         stats = race_data_sync_lifecycle.advance_due_data_sync_lifecycle(now=NOW)
 

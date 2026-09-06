@@ -607,12 +607,23 @@ def apply_data_sync_result_observation(
         correction_conflict = bool(
             current is not None and not authorized_replacement
         )
+        granted_identity_id = models.RaceDataSyncEnrollment.objects.filter(
+            event_id=expected_event_id,
+            state=models.RaceDataSyncEnrollmentState.ENROLLED,
+        ).values_list("source_identity_id", flat=True).first()
+        initial_from_ungranted_source = bool(
+            project_current
+            and current is None
+            and granted_identity_id is not None
+            and observation.source_identity_id != granted_identity_id
+        )
         may_project = bool(
             terminal_phase
             and project_current
             and arbitration.apply
             and lifecycle_trusted
             and not correction_conflict
+            and not initial_from_ungranted_source
         )
         existing = models.RaceEventRevision.objects.filter(
             event=event,
@@ -661,6 +672,8 @@ def apply_data_sync_result_observation(
                 decision_reason=(
                     "correction_marker_missing"
                     if correction_conflict
+                    else "not_granted_source"
+                    if initial_from_ungranted_source
                     else lifecycle_reason
                     if project_current and arbitration.apply and not lifecycle_trusted
                     else arbitration.reason_code

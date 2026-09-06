@@ -52,7 +52,11 @@ def decide_data_sync_lifecycle(
     if now >= finish_at:
         return DataSyncLifecycleDecision(
             to_status=models.RaceEventStatus.FINISHED,
-            reason_code="data_sync_time_t_plus_30",
+            reason_code=(
+                "data_sync_late_admission_finish"
+                if event.status == models.RaceEventStatus.SCHEDULED
+                else "data_sync_time_t_plus_30"
+            ),
         )
     if now >= event.race_datetime and event.status == models.RaceEventStatus.SCHEDULED:
         return DataSyncLifecycleDecision(
@@ -113,7 +117,8 @@ def apply_data_sync_lifecycle_decision(
         )
         if not isinstance(evidence, dict):
             return ApplyResult(action="noop", reason_code="lifecycle_evidence_drift")
-        return apply_race_lifecycle_decision(
+        pre_status = admission.event.status if admission.event is not None else ""
+        result = apply_race_lifecycle_decision(
             event_id=event_id,
             expected_generation=expected_generation,
             now=now,
@@ -121,6 +126,22 @@ def apply_data_sync_lifecycle_decision(
             registry_authorized=True,
             registry_transition_metadata={"race_data_sync": dict(evidence)},
         )
+        if (
+            result.action == "applied"
+            and pre_status == models.RaceEventStatus.SCHEDULED
+            and models.RaceEvent.objects.filter(
+                pk=event_id, status=models.RaceEventStatus.FINISHED
+            ).exists()
+        ):
+            transition = (
+                models.RaceEventLifecycleTransition.objects.filter(event_id=event_id)
+                .order_by("-id")
+                .first()
+            )
+            if transition is not None and transition.reason_code == "time_t_plus_30":
+                transition.reason_code = "data_sync_late_admission_finish"
+                transition.save(update_fields=("reason_code", "updated_at"))
+        return result
 
 
 def advance_due_data_sync_lifecycle(
@@ -155,6 +176,18 @@ def advance_due_data_sync_lifecycle(
         or now >= registry.runtime_valid_until
     ):
         registry = None
+
+    from stable.services.race_data_sync_enrollment import (
+        load_standing_policy_file,
+    )
+
+    try:
+        standing_policy = load_standing_policy_file(
+            path=settings.RACE_DATA_SYNC_FUTURE_STANDING_POLICY_FILE,
+            expected_sha256=settings.RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256,
+        )
+    except (OSError, TypeError, ValueError):
+        standing_policy = None
 
     control_ids = tuple(
         models.RaceEventLifecycleControl.objects.filter(
@@ -205,6 +238,11 @@ def advance_due_data_sync_lifecycle(
             stats["error"] += 1
             continue
         if membership is not None:
+            if isinstance(control.manifest_data, dict) and (
+                "race_data_sync" in control.manifest_data
+            ):
+                stats["error"] += 1
+                continue
             validation = validate_registry_membership_snapshot(
                 membership=membership,
                 event=control.event,
@@ -342,6 +380,7 @@ def advance_due_data_sync_lifecycle(
         admission = validate_data_sync_lifecycle_admission(
             event_id=control.event_id,
             now=now,
+            standing_policy=standing_policy,
         )
         if not admission.admitted:
             stats["error"] += 1
@@ -369,6 +408,7 @@ def advance_due_data_sync_lifecycle(
                     event_id=locked_control.event_id,
                     now=now,
                     lock=True,
+                    standing_policy=standing_policy,
                 )
                 if not locked_admission.admitted:
                     stats["error"] += 1
@@ -541,6 +581,19 @@ def reconcile_data_sync_lifecycle_admission(
         reason = ""
         if control is not None and control.manual_pause_reason:
             reason = "manual_pause_present"
+        elif isinstance(event.manual_lock_flags, dict) and any(
+            event.manual_lock_flags.values()
+        ):
+            reason = "manual_lock_present"
+        elif (
+            event.visibility_status != models.RaceEventVisibility.PUBLISHED
+            or event.status
+            in {
+                models.RaceEventStatus.FINISHED,
+                models.RaceEventStatus.CANCELLED,
+            }
+        ):
+            reason = "event_state_not_allowed"
         elif legacy_active:
             reason = "legacy_membership_active"
         elif route is None or not route.enrollment_eligible:
@@ -563,23 +616,28 @@ def reconcile_data_sync_lifecycle_admission(
             stats["skipped"] += 1
             stats[f"skipped_{reason}"] = stats.get(f"skipped_{reason}", 0) + 1
             continue
-        if control is None:
-            control = models.RaceEventLifecycleControl.objects.create(
+        with transaction.atomic():
+            control, _ = models.RaceEventLifecycleControl.objects.get_or_create(
                 event=event,
-                mode=models.RaceEventLifecycleMode.OFF,
-                schedule_generation=1,
-                next_refresh_at=None,
-                enrollment_manifest_sha256="",
-                manifest_data={},
+                defaults={
+                    "mode": models.RaceEventLifecycleMode.OFF,
+                    "schedule_generation": 1,
+                    "next_refresh_at": None,
+                    "enrollment_manifest_sha256": "",
+                    "manifest_data": {},
+                },
             )
-        _establish_data_sync_lifecycle_evidence(
-            lifecycle=control,
-            event=event,
-            standing_policy_digest=policy.digest,
-            manifest_sha256=enrollment.manifest_sha256,
-            entry_sha256=enrollment.entry_sha256,
-            owner_generation=enrollment.projection_owner_generation,
-            now=now,
-        )
+            control = models.RaceEventLifecycleControl.objects.select_for_update().get(
+                pk=control.pk
+            )
+            _establish_data_sync_lifecycle_evidence(
+                lifecycle=control,
+                event=event,
+                standing_policy_digest=policy.digest,
+                manifest_sha256=enrollment.manifest_sha256,
+                entry_sha256=enrollment.entry_sha256,
+                owner_generation=enrollment.projection_owner_generation,
+                now=now,
+            )
         stats["enforced"] += 1
     return stats
