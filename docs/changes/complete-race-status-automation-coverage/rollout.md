@@ -107,6 +107,7 @@
 
 - 开启 result apply，再开启 result public；
 - 755/756/757 通过一次性审计修复包完成状态/赛果/公开（证据复核、SHA 候选、dry-run、备份、批准、apply、verifier）；
+- 执行修复前必须只读核对每场 `observation.source_identity_id == enrollment.source_identity_id`；不成立时停止并回到产品处置，不得强写；
 - 核对 terminal marker、roster、revision、result、publication、transition 和 root/www；
 - task SUCCESS 或 HTTP 200 均不能单独算通过。
 

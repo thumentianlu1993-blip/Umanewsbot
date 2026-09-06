@@ -139,13 +139,13 @@ policy 顶层同时把状态分为：
 ### 5.2 明确分类
 
 - `awaiting_source_window`
-- `identity_ready`
+- `identity_ready`（保留词汇；首版由 `eligible` 覆盖，不单独产出）
 - `eligible`
 - `enrolled`
 - `manual_lock_present`
 - `trusted_route_missing`
-- `trusted_route_invalid`
-- `source_identity_not_found`
+- `trusted_route_invalid`（保留词汇；首版不产出，区域无可信 route 统一报 `trusted_route_missing`）
+- `source_identity_not_found`（首版沿用既有 `source_identity_missing`）
 - `source_identity_ambiguous`
 - `writer_owner_conflict`
 - `standing_policy_expired`
@@ -269,8 +269,12 @@ validate_data_sync_lifecycle_admission(
 这条路径优先用于当前 755/756/757，但代码不能硬编码 event ID；同形态停滞赛事复用同一流程。
 修复窗口内必须确认没有自动化任务触碰目标赛事。
 
-修复命令只依赖现有表与证据链，不依赖 policy v2 或 admission 改动；可以切割为独立的小型
-发布包，在本变更其余部分之前单独交付（独立 G2/G3）。
+修复命令复用标准链路（当前 policy、共享 admission、reconcile、标准 result writer），
+不再假设旧 revision 可直接公开；stale-digest enrollment 会先按当前 policy 轮换
+（route 身份不变、source 重新过 admission、rotate 走既有 manifest 机制并留审计）。
+其独立性体现在：独立命令、独立 SHA 锁定候选包、独立小型 G2 发布包，可在自动化链
+全量灰度之前单独交付（独立 G2/G3）；执行窗口要求相关运行时开关开启，并先只读核对
+每场 `observation.source_identity_id == enrollment.source_identity_id`，不成立时停止。
 
 ## 9. 更正链路
 
@@ -289,7 +293,7 @@ validate_data_sync_lifecycle_admission(
 扩展 `audit_race_data_sync`，输出：
 
 - 盘点分类与 reason-code 明细；
-- identity discovery 守恒统计；
+- identity discovery 守恒统计由 discovery 任务自身返回 payload 承载（审计不重复触网重放）；
 - lifecycle admission 类型与冲突；
 - 已到 T/T+30 但未推进的事件；
 - 已有 official revision 但未 publication 的事件；

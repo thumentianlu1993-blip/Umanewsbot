@@ -156,16 +156,21 @@ class Command(BaseCommand):
                     horizon_days=horizon_days,
                 )
                 blockers: dict[str, int] = {}
+                blocker_event_ids: dict[str, list[int]] = {}
                 for entry in census.entries:
                     if entry.reason_code:
                         blockers[entry.reason_code] = (
                             blockers.get(entry.reason_code, 0) + 1
+                        )
+                        blocker_event_ids.setdefault(entry.reason_code, []).append(
+                            entry.event_id
                         )
                 policy_report = {
                     "status": "loaded",
                     "census_sha256": census.census_sha256,
                     "classification_counts": census.classification_counts,
                     "blocker_counts": blockers,
+                    "blocker_event_ids": blocker_event_ids,
                     "route_drift": route_drift,
                 }
             except (OSError, TypeError, ValueError) as exc:
@@ -186,6 +191,69 @@ class Command(BaseCommand):
                 models.RaceDataSyncEnrollmentState.ENROLLED
             ),
         )
+        membership_event_ids = set(
+            models.RaceEventLifecycleEnforceMembership.objects.filter(
+                state="active",
+                registry__state="active",
+                registry__is_active=True,
+                registry__runtime_valid_until__gt=cutoff,
+            ).values_list("event_id", flat=True)
+        )
+        data_sync_control_event_ids = set(
+            models.RaceEventLifecycleControl.objects.filter(
+                manifest_data__has_key="race_data_sync"
+            ).values_list("event_id", flat=True)
+        )
+        dual_ids = membership_event_ids & data_sync_control_event_ids
+        unfinished_dual = (
+            sorted(
+                models.RaceEvent.objects.filter(pk__in=dual_ids)
+                .exclude(
+                    status__in=(
+                        models.RaceEventStatus.FINISHED,
+                        models.RaceEventStatus.CANCELLED,
+                    )
+                )
+                .values_list("id", flat=True)
+            )
+            if dual_ids
+            else []
+        )
+        due_not_transitioned = list(
+            models.RaceEvent.objects.filter(
+                race_data_sync_enrollment__state=(
+                    models.RaceDataSyncEnrollmentState.ENROLLED
+                ),
+                race_datetime__lte=cutoff - timedelta(minutes=30),
+            )
+            .exclude(
+                status__in=(
+                    models.RaceEventStatus.FINISHED,
+                    models.RaceEventStatus.CANCELLED,
+                )
+            )
+            .order_by("id")
+            .values_list("id", flat=True)[:100]
+        )
+        from stable.services.race_data_sync_repair import (
+            find_unclosed_data_sync_events,
+        )
+
+        stalled_events = find_unclosed_data_sync_events(
+            now=cutoff,
+            horizon_days=7,
+            batch_size=100,
+        )
+        open_incidents = models.RaceLiveAlertIncident.objects.filter(
+            scope_type="data_sync_event",
+            status=models.RaceLiveAlertIncidentStatus.OPEN,
+        )
+        correction_watch = models.RaceEventLiveProviderCheckpoint.objects.filter(
+            data_kind=models.RaceDataSyncDataKind.RESULT,
+            next_poll_at__isnull=False,
+            tracking__tracking_enabled=True,
+            tracking__event__status=models.RaceEventStatus.FINISHED,
+        ).count()
         report = {
             "schema_version": 1,
             "cutoff": cutoff.isoformat(),
@@ -229,6 +297,22 @@ class Command(BaseCommand):
                 "due_checkpoints": due_checkpoints.count(),
             },
             "standing_policy": policy_report,
+            "lifecycle": {
+                "legacy_membership_active": len(membership_event_ids),
+                "data_sync_evidence_controls": len(data_sync_control_event_ids),
+                "dual_authority_conflicts": unfinished_dual,
+                "due_not_transitioned": due_not_transitioned,
+            },
+            "stalled": {
+                "unpublished_terminal_revision_event_ids": [
+                    event.pk for event in stalled_events
+                ],
+                "open_incident_count": open_incidents.count(),
+                "open_incident_event_ids": sorted(
+                    {int(key) for key in open_incidents.values_list("scope_key", flat=True) if str(key).isdigit()}
+                ),
+                "correction_watch_checkpoints": correction_watch,
+            },
         }
         report["configuration_status"] = (
             "ready"

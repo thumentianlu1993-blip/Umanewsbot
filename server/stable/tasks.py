@@ -449,7 +449,10 @@ def discover_future_race_data_sync_task() -> dict:
             expected_sha256=settings.RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256,
         )
         now = timezone.now()
-        identity_discovery = discover_the_racing_api_source_identities(now=now)
+        identity_discovery = discover_the_racing_api_source_identities(
+            now=now,
+            horizon_days=horizon_days,
+        )
         proposal = build_future_race_data_enrollment_proposal(
             standing_policy=policy,
             cutoff=now,

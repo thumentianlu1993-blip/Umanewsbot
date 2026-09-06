@@ -25,7 +25,6 @@ from django.utils import timezone
 from stable import models
 from stable.services import race_data_sync_control
 from stable.services.race_data_sync_pipeline import resolve_race_data_provider_route
-from stable.services.race_data_sync_policy import source_priority
 
 
 _SHA_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -71,6 +70,8 @@ _MANIFEST_ENTRY_FIELDS = {
     "request_budget",
     "minimum_interval_seconds",
     "data_kinds",
+    "enrollment_eligible",
+    "tiebreak_order",
     "owner",
     "owner_generation",
     "owner_manifest_sha256",
@@ -116,6 +117,8 @@ class StandingPolicyRoute:
     identity_namespace: str
     route_digest: str
     data_kinds: tuple[str, ...]
+    enrollment_eligible: bool
+    tiebreak_order: int
 
 
 @dataclass(frozen=True)
@@ -125,7 +128,8 @@ class StandingPolicy:
     valid_from: datetime
     valid_until: datetime
     visibility_statuses: tuple[str, ...]
-    event_statuses: tuple[str, ...]
+    new_enrollment_statuses: tuple[str, ...]
+    continuation_statuses: tuple[str, ...]
     routes: tuple[StandingPolicyRoute, ...]
 
 
@@ -149,6 +153,8 @@ class CensusEntry:
     request_budget: int
     minimum_interval_seconds: int
     data_kinds: tuple[str, ...]
+    enrollment_eligible: bool
+    tiebreak_order: int
     owner: str
     owner_generation: int
     owner_manifest_sha256: str
@@ -227,11 +233,12 @@ def parse_standing_policy(value: dict[str, Any]) -> StandingPolicy:
         "valid_until",
         "routes",
         "visibility_statuses",
-        "event_statuses",
+        "new_enrollment_statuses",
+        "continuation_statuses",
     }
     if not isinstance(value, dict) or set(value) != required:
         raise ValueError("standing policy schema is invalid")
-    if value["schema_version"] != 1:
+    if value["schema_version"] != 2:
         raise ValueError("standing policy version is invalid")
     for label in ("policy_id", "approved_by"):
         if not isinstance(value[label], str) or not value[label].strip():
@@ -243,17 +250,21 @@ def parse_standing_policy(value: dict[str, Any]) -> StandingPolicy:
         raise ValueError("standing policy validity window is invalid")
 
     visibility = tuple(sorted(set(value["visibility_statuses"])))
-    statuses = tuple(sorted(set(value["event_statuses"])))
+    new_enrollment = tuple(sorted(set(value["new_enrollment_statuses"])))
+    continuation = tuple(sorted(set(value["continuation_statuses"])))
     if (
         not visibility
         or any(item not in models.RaceEventVisibility.values for item in visibility)
-        or not statuses
-        or any(item not in models.RaceEventStatus.values for item in statuses)
+        or not new_enrollment
+        or any(item not in models.RaceEventStatus.values for item in new_enrollment)
+        or not continuation
+        or any(item not in models.RaceEventStatus.values for item in continuation)
     ):
         raise ValueError("standing policy event filters are invalid")
 
     routes = []
     route_keys = set()
+    tiebreak_keys = set()
     if not isinstance(value["routes"], list) or not value["routes"]:
         raise ValueError("standing policy routes are invalid")
     route_fields = {
@@ -263,7 +274,10 @@ def parse_standing_policy(value: dict[str, Any]) -> StandingPolicy:
         "identity_namespace",
         "route_digest",
         "data_kinds",
+        "enrollment_eligible",
+        "tiebreak_order",
     }
+    full_data_kinds = tuple(sorted(models.RaceDataSyncDataKind.values))
     for raw in value["routes"]:
         if not isinstance(raw, dict) or set(raw) != route_fields:
             raise ValueError("standing policy route schema is invalid")
@@ -277,6 +291,18 @@ def parse_standing_policy(value: dict[str, Any]) -> StandingPolicy:
         data_kinds = tuple(sorted(set(raw["data_kinds"])))
         if not data_kinds or any(kind not in models.RaceDataSyncDataKind.values for kind in data_kinds):
             raise ValueError("standing policy data kinds are invalid")
+        enrollment_eligible = raw["enrollment_eligible"]
+        if not isinstance(enrollment_eligible, bool):
+            raise ValueError("standing policy enrollment eligible is invalid")
+        tiebreak_order = raw["tiebreak_order"]
+        if (
+            not isinstance(tiebreak_order, int)
+            or isinstance(tiebreak_order, bool)
+            or tiebreak_order < 1
+        ):
+            raise ValueError("standing policy tiebreak order is invalid")
+        if enrollment_eligible and data_kinds != full_data_kinds:
+            raise ValueError("standing policy enrollment route requires full data kinds")
         key = (
             raw["country_region"],
             raw["provider"],
@@ -286,6 +312,10 @@ def parse_standing_policy(value: dict[str, Any]) -> StandingPolicy:
         if key in route_keys:
             raise ValueError("standing policy route is duplicated")
         route_keys.add(key)
+        tiebreak_key = (raw["country_region"], tiebreak_order)
+        if tiebreak_key in tiebreak_keys:
+            raise ValueError("standing policy tiebreak order is duplicated")
+        tiebreak_keys.add(tiebreak_key)
         routes.append(
             StandingPolicyRoute(
                 country_region=raw["country_region"],
@@ -294,6 +324,8 @@ def parse_standing_policy(value: dict[str, Any]) -> StandingPolicy:
                 identity_namespace=raw["identity_namespace"],
                 route_digest=raw["route_digest"],
                 data_kinds=data_kinds,
+                enrollment_eligible=enrollment_eligible,
+                tiebreak_order=tiebreak_order,
             )
         )
     return StandingPolicy(
@@ -302,7 +334,8 @@ def parse_standing_policy(value: dict[str, Any]) -> StandingPolicy:
         valid_from=valid_from,
         valid_until=valid_until,
         visibility_statuses=visibility,
-        event_statuses=statuses,
+        new_enrollment_statuses=new_enrollment,
+        continuation_statuses=continuation,
         routes=tuple(sorted(routes, key=lambda item: (item.country_region, item.provider))),
     )
 
@@ -462,54 +495,64 @@ def build_race_data_enrollment_census(
         owner = control.write_owner if control else models.RaceEventProjectionWriteOwner.UNMANAGED
         generation = control.owner_generation if control else 0
         owner_manifest = control.owner_manifest_sha256 if control else ""
-        matching_routes = tuple(
+        region_routes = tuple(
             item for item in policy.routes if item.country_region == event.country_region
         )
-        route = matching_routes[0] if len(matching_routes) == 1 else None
+        eligible_routes = tuple(
+            sorted(
+                (item for item in region_routes if item.enrollment_eligible),
+                key=lambda item: (
+                    item.tiebreak_order,
+                    item.provider,
+                    item.region_code,
+                    item.identity_namespace,
+                ),
+            )
+        )
+        route = None
         source = None
-        if len(matching_routes) > 1:
-            ranked_routes = []
-            for candidate_route in matching_routes:
-                candidate_binding = resolve_race_data_provider_route(
-                    provider=candidate_route.provider,
-                    region=candidate_route.region_code,
-                    identity_namespace=candidate_route.identity_namespace,
+        sticky_routes = []
+        for candidate_route in eligible_routes:
+            candidate_binding = resolve_race_data_provider_route(
+                provider=candidate_route.provider,
+                region=candidate_route.region_code,
+                identity_namespace=candidate_route.identity_namespace,
+                data_kinds=candidate_route.data_kinds,
+            )
+            candidate_sources = [
+                candidate
+                for candidate in event.source_identities.all()
+                if candidate.source_key == candidate_route.provider
+                and candidate.region_code == candidate_route.region_code
+                and candidate.identity_namespace
+                == candidate_route.identity_namespace
+            ]
+            if (
+                candidate_binding is None
+                or candidate_route.route_digest
+                != candidate_binding.route_digest
+                or len(candidate_sources) != 1
+                or race_data_sync_control.source_admission_reason(
+                    source=candidate_sources[0],
+                    route_digest=candidate_route.route_digest,
                     data_kinds=candidate_route.data_kinds,
+                    now=cutoff,
                 )
-                candidate_sources = [
-                    candidate
-                    for candidate in event.source_identities.all()
-                    if candidate.source_key == candidate_route.provider
-                    and candidate.region_code == candidate_route.region_code
-                    and candidate.identity_namespace
-                    == candidate_route.identity_namespace
-                ]
-                if (
-                    candidate_binding is None
-                    or candidate_route.route_digest
-                    != candidate_binding.route_digest
-                    or len(candidate_sources) != 1
-                    or race_data_sync_control.source_admission_reason(
-                        source=candidate_sources[0],
-                        route_digest=candidate_route.route_digest,
-                        data_kinds=candidate_route.data_kinds,
-                        now=cutoff,
-                    )
-                ):
-                    continue
-                ranked_routes.append(
-                    (
-                        -source_priority(candidate_binding.entry.source_class),
-                        candidate_route.provider,
-                        candidate_route.region_code,
-                        candidate_route,
-                        candidate_sources[0],
-                    )
-                )
-            if ranked_routes:
-                _priority, _provider, _region, route, source = sorted(
-                    ranked_routes, key=lambda item: item[:3]
-                )[0]
+            ):
+                continue
+            sticky_routes.append((candidate_route, candidate_sources[0]))
+        if sticky_routes:
+            route, source = sorted(
+                sticky_routes,
+                key=lambda item: (
+                    item[0].tiebreak_order,
+                    item[0].provider,
+                    item[0].region_code,
+                    item[0].identity_namespace,
+                ),
+            )[0]
+        elif eligible_routes:
+            route = eligible_routes[0]
         route_binding = (
             resolve_race_data_provider_route(
                 provider=route.provider,
@@ -520,6 +563,15 @@ def build_race_data_enrollment_census(
             if route is not None
             else None
         )
+        enrolled_active = (
+            enrollment is not None
+            and enrollment.state == models.RaceDataSyncEnrollmentState.ENROLLED
+        )
+        allowed_statuses = (
+            policy.continuation_statuses
+            if enrolled_active
+            else policy.new_enrollment_statuses
+        )
         reason = ""
         classification = "eligible"
         if not (policy.valid_from <= cutoff < policy.valid_until):
@@ -528,14 +580,16 @@ def build_race_data_enrollment_census(
             reason = "canonical_duplicate"
         elif event.visibility_status not in policy.visibility_statuses:
             reason = "visibility_not_allowed"
-        elif event.status not in policy.event_statuses:
-            reason = "event_status_not_allowed"
+        elif event.status not in allowed_statuses:
+            reason = (
+                "continuation_status_not_allowed"
+                if enrolled_active
+                else "event_status_not_allowed"
+            )
         elif isinstance(event.manual_lock_flags, dict) and any(event.manual_lock_flags.values()):
             reason = "manual_lock_present"
-        elif not matching_routes:
-            reason = "standing_policy_route_missing"
-        elif len(matching_routes) > 1 and route is None:
-            reason = "standing_policy_route_ambiguous"
+        elif not eligible_routes:
+            reason = "trusted_route_missing"
         elif route_binding is None:
             reason = "provider_route_unavailable"
         elif route.route_digest != route_binding.route_digest:
@@ -583,6 +637,14 @@ def build_race_data_enrollment_census(
                         classification = "enrolled"
                     else:
                         classification = "eligible"
+        if reason == "source_identity_missing" and event.local_date is not None:
+            try:
+                provider_date = cutoff.astimezone(ZoneInfo(event.timezone_name)).date()
+            except (KeyError, ValueError):
+                provider_date = cutoff.date()
+            if (event.local_date - provider_date).days > 1:
+                reason = ""
+                classification = "awaiting_source_window"
         if reason:
             classification = "blocked"
         snapshot = _event_snapshot(
@@ -622,6 +684,8 @@ def build_race_data_enrollment_census(
                     route_binding.minimum_interval_seconds if route_binding else 0
                 ),
                 data_kinds=route.data_kinds if route else (),
+                enrollment_eligible=route.enrollment_eligible if route else False,
+                tiebreak_order=route.tiebreak_order if route else 0,
                 owner=owner,
                 owner_generation=generation,
                 owner_manifest_sha256=owner_manifest,
@@ -914,6 +978,8 @@ def apply_race_data_enrollment_manifest(
                 identity_namespace=entry["identity_namespace"],
                 route_digest=entry["route_digest"],
                 data_kinds=tuple(entry["data_kinds"]),
+                enrollment_eligible=entry.get("enrollment_eligible", False),
+                tiebreak_order=entry.get("tiebreak_order", 0),
             )
             route_binding = resolve_race_data_provider_route(
                 provider=route.provider,
@@ -1152,6 +1218,8 @@ def apply_race_data_disenrollment_manifest(
                 identity_namespace=entry["identity_namespace"],
                 route_digest=entry["route_digest"],
                 data_kinds=tuple(entry["data_kinds"]),
+                enrollment_eligible=entry.get("enrollment_eligible", False),
+                tiebreak_order=entry.get("tiebreak_order", 0),
             )
             snapshot = _event_snapshot(
                 event=event,

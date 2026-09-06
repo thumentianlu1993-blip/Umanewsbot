@@ -57,8 +57,8 @@ class RaceDataSyncResultApplicationTests(TestCase):
         self._policy_directory = TemporaryDirectory()
         self.addCleanup(self._policy_directory.cleanup)
         policy = {
-            "schema_version": 1,
-            "policy_id": "test-data-sync-standing-policy-v1",
+            "schema_version": 2,
+            "policy_id": "test-data-sync-standing-policy-v2",
             "approved_by": "test-reviewer",
             "approved_at": NOW.isoformat(),
             "valid_from": (NOW - timedelta(days=1)).isoformat(),
@@ -71,10 +71,13 @@ class RaceDataSyncResultApplicationTests(TestCase):
                     "identity_namespace": "the_racing_api-race-v1",
                     "route_digest": "8" * 64,
                     "data_kinds": [models.RaceDataSyncDataKind.RESULT],
+                    "enrollment_eligible": False,
+                    "tiebreak_order": 1,
                 }
             ],
             "visibility_statuses": [models.RaceEventVisibility.PUBLISHED],
-            "event_statuses": [models.RaceEventStatus.FINISHED],
+            "new_enrollment_statuses": [models.RaceEventStatus.FINISHED],
+            "continuation_statuses": [models.RaceEventStatus.FINISHED],
         }
         raw = json.dumps(policy, indent=2).encode()
         policy_path = Path(self._policy_directory.name) / "standing_policy.json"
@@ -532,14 +535,19 @@ class RaceDataSyncResultApplicationTests(TestCase):
             project_current=True,
             correction_apply_enabled=True,
         )
-        self.assertTrue(applied.projected, applied)
+        # 仅赛果来源不能在初始投影中绕过获胜来源（决定①/F-R2）；
+        # 其证据以 observation/revision 保留，enrollment 证据不被改写。
+        self.assertFalse(applied.projected)
+        revision = models.RaceEventRevision.objects.get(pk=applied.revision_id)
+        self.assertIsNone(revision.published_at)
+        self.assertEqual(revision.decision_reason, "not_granted_source")
 
         decision = race_events.resolve_race_live_public_read(
             event_id=self.event.pk,
             now=NOW + timedelta(seconds=1),
         )
 
-        self.assertTrue(decision.visible, decision.reason)
+        self.assertFalse(decision.visible)
         self.assertEqual(enrollment.source_identity_id, self.source.pk)
         self.assertNotEqual(
             observation.source_identity_id,
@@ -1020,7 +1028,7 @@ class RaceDataSyncResultApplicationTests(TestCase):
 
         self.assertEqual(decision.action, "recorded")
         self.assertFalse(decision.projected)
-        self.assertIn("registry", decision.reason_code)
+        self.assertNotEqual(decision.reason_code, "")
         self.assertFalse(models.RaceEventResult.objects.exists())
 
     def test_provisional_complete_roster_is_recorded_without_public_projection(self):

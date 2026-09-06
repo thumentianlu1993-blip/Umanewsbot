@@ -151,7 +151,7 @@ class RaceDataSyncR0PostgresConcurrencyTests(TransactionTestCase):
 
     def _standing_policy(self):
         return {
-            "schema_version": 1,
+            "schema_version": 2,
             "policy_id": "japan-r0-pg-reviewed",
             "approved_by": "postgres-concurrency-reviewer",
             "approved_at": NOW.isoformat(),
@@ -164,11 +164,14 @@ class RaceDataSyncR0PostgresConcurrencyTests(TransactionTestCase):
                     "region_code": "japan",
                     "identity_namespace": "jra-race-v1",
                     "route_digest": self.route.route_digest,
-                    "data_kinds": ["racecard", "result"],
+                    "data_kinds": ["race_time", "racecard", "result"],
+                    "enrollment_eligible": True,
+                    "tiebreak_order": 1,
                 }
             ],
             "visibility_statuses": [models.RaceEventVisibility.PUBLISHED],
-            "event_statuses": [models.RaceEventStatus.SCHEDULED],
+            "new_enrollment_statuses": [models.RaceEventStatus.SCHEDULED],
+            "continuation_statuses": [models.RaceEventStatus.SCHEDULED],
         }
 
     def _reviewed_manifest(self, *, reverse: bool = False):
@@ -828,3 +831,73 @@ class RaceDataSyncR0PostgresConcurrencyTests(TransactionTestCase):
             NOW + timedelta(milliseconds=2_000),
         )
         self.assertEqual(budget.lock_version, 9)
+
+
+    def test_concurrent_fcfs_grant_from_two_sources_has_one_winner(self):
+        from stable.test_race_data_sync_policy_v2 import two_provider_roster
+
+        self.roster_patcher.stop()
+        roster, bindings = two_provider_roster()
+        self.roster_patcher = patch(
+            "stable.services.race_data_sync_pipeline.build_race_data_provider_roster",
+            return_value=roster,
+        )
+        self.roster_patcher.start()
+        self.source.registry_digest = roster.registry_digest
+        self.source.save(update_fields=("registry_digest",))
+        nar_source = models.RaceResultSourceIdentity.objects.create(
+            event=self.event,
+            source_key="nar",
+            region_code="japan",
+            identity_namespace="nar-race-v1",
+            external_race_id="20260821-tokyo-11-pg-nar",
+            review_status=models.RaceLiveReviewStatus.APPROVED,
+            terms_status=models.RaceSourceTermsStatus.APPROVED,
+            automation_allowed=True,
+            proof_network_allowed=True,
+            evidence_url="https://nar.example.test/reviewed-proof",
+            evidence_sha256=SHA_A,
+            valid_until=NOW + timedelta(days=30),
+            registry_digest=roster.registry_digest,
+        )
+
+        def acquire_jra():
+            return race_data_sync_control.acquire_enrollment(
+                event_id=self.event.pk,
+                source_identity_id=self.source.pk,
+                standing_policy_digest=SHA_A,
+                route_digest=bindings["jra"].route_digest,
+                event_snapshot_sha256=SHA_C,
+                manifest_sha256=SHA_D,
+                entry_sha256=SHA_A,
+                expected_owner=models.RaceEventProjectionWriteOwner.UNMANAGED,
+                expected_owner_generation=0,
+                data_kinds=("race_time", "racecard", "result"),
+                now=NOW,
+            )
+
+        def acquire_nar():
+            return race_data_sync_control.acquire_enrollment(
+                event_id=self.event.pk,
+                source_identity_id=nar_source.pk,
+                standing_policy_digest=SHA_A,
+                route_digest=bindings["nar"].route_digest,
+                event_snapshot_sha256=SHA_C,
+                manifest_sha256=SHA_D,
+                entry_sha256=SHA_A,
+                expected_owner=models.RaceEventProjectionWriteOwner.UNMANAGED,
+                expected_owner_generation=0,
+                data_kinds=("race_time", "racecard", "result"),
+                now=NOW,
+            )
+
+        results = self._run_pair(acquire_jra, acquire_nar)
+
+        self.assertEqual(
+            sorted(result.action for result in results),
+            ["acquired", "rejected"],
+        )
+        self.assertEqual(
+            models.RaceDataSyncEnrollment.objects.filter(event=self.event).count(),
+            1,
+        )

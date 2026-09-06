@@ -27,7 +27,9 @@
    official observation/revision 对照来源原文或新鲜响应，复核身份、终态和完整参赛名单）->
    SHA 锁定不可变候选 -> dry-run 零写 -> 备份 -> 人工批准 -> 事务写入 -> 独立 verifier ->
    公网验收；全程记录为人工修复（OperationLog）；前提是修复窗口内没有自动化任务触碰目标
-   赛事；代码不硬编码 event ID。该修复是独立运维操作，不依赖新链上线；新链上线后由
+   赛事；代码不硬编码 event ID。修复复用标准准入与写入链（含按当前 policy 轮换 stale
+   enrollment），但可切割为独立小型 G2 先行交付，不要求自动化链全量上线；执行前必须只读
+   核对每场 observation 是否来自各自获胜来源，不成立时停止而非强写。新链上线后由
    standing policy 接管后续更正观察。
 5. **更正验证方式**：同意。correction 变化分支只在隔离 PostgreSQL 用确定性 fixture 验证；
    生产只要求自然无变化周期幂等，不制造虚假更正。

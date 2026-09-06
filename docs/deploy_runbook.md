@@ -1,5 +1,24 @@
 # 部署运行手册
 
+## 2026-09-06 M1 完整赛事自动化代码闭环（未部署）
+
+- 分支 `codex/complete-race-status-automation-m1` 已实现方案全部代码：standing policy v2
+  （先到先得纳管：`enrollment_eligible`/`tiebreak_order`）、共享 lifecycle admission validator、
+  lifecycle/赛果/公开三处接线、停滞赛事审计修复命令和 audit 扩展。
+- 生产 policy 文件已迁移 v2：新 SHA-256
+  `4e000fd7510c076eb798345ff1d9dd5cded8043477dd2d55613cecebead31a07`
+  （`runtime/policies/race_data_sync/standing_policy.json`）。发布时
+  `RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256` 必须同步切换到该值，否则 fail closed。
+- 新增运维命令 `repair_data_sync_stalled_events`：默认 dry-run 输出 SHA 锁定候选、零写入；
+  `--apply` 需 `--candidate-file` + `--expected-sha256`，并要求 5 个运行时开关已开启
+  （RACE_DATA_SYNC_ENABLED/SCHEDULER/LIFECYCLE_APPLY/RESULT_APPLY/RESULT_PUBLIC）。
+  该命令复用标准准入与写入链（含按当前 policy 轮换 stale-digest enrollment），可作为独立
+  小型 G2 发布包先于自动化链灰度交付，用于 755/756/757 修复。
+- 执行修复前的前置只读核对：每场 `observation.source_identity_id == enrollment.source_identity_id`
+  （停滞 observation 必须来自获胜来源），不成立时停止并回到产品处置，不得强写。
+- 本变更无 migration；发布窗口仍需按 rollout.md 重新核对生产基线。
+- 本次没有部署、迁移、服务重建、开关修改、生产写入或 `race_live` 操作。
+
 ## 2026-09-05 后续赛事自动化发布入口
 
 - 后续赛事自动化发布顺序、动态磁盘预算、自然验收和回退边界统一见
