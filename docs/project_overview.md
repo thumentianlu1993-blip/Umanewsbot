@@ -1,5 +1,13 @@
 # 项目总览
 
+## 2026-09-05 后续协作入口
+
+项目下一阶段的统一工作入口是
+[后续工作路线图与 Agent 交接](future_work_roadmap.md)。它把赛事自动化、赛事/马匹数据质量、
+地区扩展、内容模型和移动后台分成 M0–M6，并明确已完成边界、近期未收口候选、验收口径和多 Agent
+责任边界。完整赛事自动化的待审核方案已保存于
+`docs/changes/complete-race-status-automation-coverage/`；当前尚未开始实现或发布。
+
 PR #137 已把 leaf 0077 External staging foundation 与 forward-only 恢复绑定修复完整部署到生产：当前
 revision 为 `1312c8de…4a03`、image 为 `85b94626…f253`、leaf 精确为 0077。标准入口已用 exact PostgreSQL
 custom-format backup、admission handoff、candidate-bound recovery manifest 与 closed-state handoff 完成

@@ -1,5 +1,33 @@
 # 当前状态
 
+## 2026-09-05 完整赛事自动化五项产品决定已定稿
+
+- 用户已审核 `complete-race-status-automation-coverage` 的五项产品决定：同意第 2、3、5 项；
+  否决第 1 项，改为所有可信来源“先到先得”竞争首次纳管（一次性授予、`tiebreak_order` 固定平局、
+  授予后粘滞、仅完整能力来源可竞争、失效回池重新授予）；否决第 4 项，event 755/756/757 一类
+  停滞赛事改为一次性审计修复包单独修复上线（来源证据复核、SHA 锁定候选、dry-run、备份、批准、
+  apply、verifier）。
+- 决定全文已写入 `docs/decisions.md`；`docs/future_work_roadmap.md` 与
+  `docs/changes/complete-race-status-automation-coverage/` 六份文档已同步修订，
+  `review.md` 第 12 节记录了第三轮用户审核结论。
+- 修订设计复审已于 2026-09-05 通过：4 项发现（并发授予原子性、获胜来源持续失败时的初始赛果
+  通道、修复命令独立发布切割、残留口径）已修正并记录在 `review.md` §12.1；下一步从
+  tasks.md 的 RED 测试开始 M1 实现。
+- 本轮只修改文档（分支 `codex/record-race-automation-decisions`）；没有实现、部署、联网、
+  数据库写入或生产变更。
+
+## 2026-09-05 后续路线与完整赛事自动化方案已写入仓库
+
+- 新增 [后续工作路线图与 Agent 交接](future_work_roadmap.md)，统一记录近期未收口工作、
+  “记录待修复事项与方案”遗留项、阶段依赖、验收矩阵、open PR 盘点和多 Agent 文件责任边界。
+- `complete-race-status-automation-coverage` 的 spec/design/test/tasks/rollout/review 六份方案已从
+  独立计划 worktree 持久化到 `docs/changes/`。工程审核结论仍是
+  `APPROVED FOR USER REVIEW`：实现、合并、发布和生产写入均未因文档入库而获得授权。
+- 赛事自动化后续建议只保留这一条产品主线；本地 `stabilize-race-data-pipeline` candidate 只作为
+  基础实现来源，必须从最新主线逐文件审计后迁入，不得整分支直接合并。Racing API 四地区导出和
+  P0 马匹资料 apply 继续维持各自的外部权限/精确 G3 阻断。
+- 本轮只修改文档；没有运行 provider、修改数据库、迁移、服务、开关、队列或生产环境。
+
 ## 2026-09-01 PR #137 已上线，France 2023 五马 External staging 已完成并独立验收
 
 完整批次、逐表计数和终态证据见

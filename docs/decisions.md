@@ -1,5 +1,57 @@
 # 关键决策
 
+## 2026-09-05 完整赛事自动化五项产品决定定稿：先到先得纳管、停滞赛事单独审计修复
+
+用户已审核 `complete-race-status-automation-coverage` 方案的五项产品决定（原建议见
+`docs/changes/complete-race-status-automation-coverage/spec.md` 第 8 节与
+`docs/future_work_roadmap.md` 第 6 节），最终决定如下：
+
+1. **来源角色：不设指定主来源，采纳“先到先得”**（否决工程建议的“每地区恰好一个 primary”）。
+   - 所有已批准的可信来源均可竞争首次纳管；每场比赛的纳管权只授予一次，由首个在合法请求
+     窗口内给出完整合法响应且身份唯一匹配的来源获得；
+   - 同一轮盘点中多个来源同时命中时，按 standing policy 为该地区配置的固定来源顺序
+     （`tiebreak_order`）裁决，结果写入审计，不随机；
+   - 纳管权粘滞：获得纳管的来源负责该场后续的时间、出马表、状态和正式赛果；其他来源的
+     响应只保存 observation，经 correction 流程 supersede，不得中途接管或直接改写；
+   - 参与竞争必须具备完整能力（赛时 / 出马表 / 赛果）；只有赛果能力的来源不参与纳管竞争，
+     只能作为更正证据渠道；
+   - 获得纳管的来源失效（合同、route、身份或有效期）时 fail closed，赛事回到纳管池按同一
+     规则重新授予，全程留换手审计，禁止无记录接管。
+2. **SLA 从来源实际开放窗口起算**：同意。保留未来 30 天盘点，窗口外标记
+   `awaiting_source_window`，不承诺当前 provider 无法提供的远期出马表。
+3. **lifecycle 授权双轨分离**：接受。新链以 data-sync enrollment + standing policy 授权；
+   legacy registry 只服务旧固定名单；同一场未结束赛事被两类 authority 同时主张时必须拒绝
+   （`lifecycle_authority_conflict`）。
+4. **停滞赛事不等自然恢复，单独审计修复上线**（否决工程建议的“只通过新自然 provider 响应
+   恢复”）。event 755/756/757 及同形态赛事改用一次性审计修复包：重新核对来源证据（现有
+   official observation/revision 对照来源原文或新鲜响应，复核身份、终态和完整参赛名单）->
+   SHA 锁定不可变候选 -> dry-run 零写 -> 备份 -> 人工批准 -> 事务写入 -> 独立 verifier ->
+   公网验收；全程记录为人工修复（OperationLog）；前提是修复窗口内没有自动化任务触碰目标
+   赛事；代码不硬编码 event ID。该修复是独立运维操作，不依赖新链上线；新链上线后由
+   standing policy 接管后续更正观察。
+5. **更正验证方式**：同意。correction 变化分支只在隔离 PostgreSQL 用确定性 fixture 验证；
+   生产只要求自然无变化周期幂等，不制造虚假更正。
+
+后果与边界：
+
+- 原工程审核中 F-002（primary/result_fallback 角色）与 F-004（等待自然响应恢复）的修正被
+  第 1、4 项决定取代；方案六份文档已按本决定修订，实现前须对修订部分做一轮设计复审。
+- “先到先得”不等于降低身份要求：唯一身份匹配、完整终态、人工锁、来源许可和有效期门禁全部
+  保留；多来源竞争只决定“谁先获得纳管权”，不决定“数据是否可信”。
+- 审计修复包不是绕过门禁的直接投影：来源证据复核失败时整场零写，保持 fail closed。
+
+## 2026-09-05 后续工作使用单一路线图和单一赛事自动化主线交接
+
+- [后续工作路线图与 Agent 交接](future_work_roadmap.md) 作为跨 Agent 的后续工作入口，负责维护
+  未收口事项、执行顺序、依赖和 owner；生产真相仍以 `docs/current_state.md` 和当次只读核验为准。
+- 赛事自动化不再让 `complete-race-status-automation-coverage` 与
+  `stabilize-race-data-pipeline` 形成两条竞争实现。前者是待用户审核的完整产品主线；后者只提供
+  可逐文件复用的 identity、evidence、audit 和测试基础，不能整体 cherry-pick。
+- 完整赛事方案中的五项产品决定仍处于“建议接受、等待用户审核”状态。文档提交只保存上下文，
+  不代表用户已经批准实现、发布、联网扩量、生产数据写入或旧 `race_live` 处置。
+- 多 Agent 必须按根 `AGENTS.md` 使用独立 worktree 和明确文件 ownership；人工确认门禁不在 roadmap
+  或 change 文档中另行定义。
+
 ## 2026-09-01 France 2023 五马以 provider stable ID 完成 staging，不自动晋级 canonical identity
 
 - 本批唯一身份主键是目标赛事中已确认的 The Racing API `hrs_*` stable ID；名称、国家后缀、出生日期、

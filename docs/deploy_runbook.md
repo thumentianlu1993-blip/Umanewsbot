@@ -1,5 +1,14 @@
 # 部署运行手册
 
+## 2026-09-05 后续赛事自动化发布入口
+
+- 后续赛事自动化发布顺序、动态磁盘预算、自然验收和回退边界统一见
+  [完整赛事自动化上线与回退方案](changes/complete-race-status-automation-coverage/rollout.md)；
+  全局依赖与里程碑见 [后续工作路线图与 Agent 交接](future_work_roadmap.md)。
+- 上述文件当前只是 `APPROVED FOR USER REVIEW` 的方案，不是发布授权。进入 G2/G3 前必须重新核对
+  origin/main、服务器 checkout、实际容器 image、migration leaf、开关、锁、资源和三队列。
+- 本次文档变更没有部署、迁移、服务重建、开关修改、生产写入或 `race_live` 操作。
+
 ## 2026-09-01 France 2023 五马 External staging 生产执行与复核
 
 本节记录已完成的 exact 批次，不能替其他 materialization、年份或地区提供通用授权。
