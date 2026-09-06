@@ -2,6 +2,13 @@
 
 ## 2026-09-06 M1 完整赛事自动化代码闭环已实现（未部署）
 
+- 独立 review 结论：**APPROVED WITH COMMENTS**。首轮 16 条 finding（C-1/H-1~H-3/M-1~M-4/L-1~L-8）
+  已全部修复并复审通过；残留 4 条注释级意见（轮换锁序说明、文档契约、assess 前置核对、
+  advance 文件加载）已随本轮一并处理。
+- 关键修复：修复命令新增 stale-digest enrollment 按当前 policy 轮换（755/756/757 可达）；
+  初始赛果投影绑定获胜来源（result-only 只进更正渠道）；共享 validator 按全局锁序取锁；
+  advance legacy 分支同样拒绝双 authority；census 支持 `awaiting_source_window` 与同轮
+  tiebreak 授予；公开读取/推进复用单次 policy 加载；修复 OperationLog 入事务、incident 收口。
 - 分支 `codex/complete-race-status-automation-m1` 完成 `complete-race-status-automation-coverage`
   的 tasks §1（全部 RED 转 GREEN）与 §2（除 migration drift 验证在收尾）：standing policy v2
   先到先得纳管（一次性授予、`tiebreak_order` 固定平局、授予后粘滞、仅完整能力来源竞争、

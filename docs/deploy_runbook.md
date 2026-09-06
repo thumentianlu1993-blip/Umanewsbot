@@ -12,7 +12,10 @@
 - 新增运维命令 `repair_data_sync_stalled_events`：默认 dry-run 输出 SHA 锁定候选、零写入；
   `--apply` 需 `--candidate-file` + `--expected-sha256`，并要求 5 个运行时开关已开启
   （RACE_DATA_SYNC_ENABLED/SCHEDULER/LIFECYCLE_APPLY/RESULT_APPLY/RESULT_PUBLIC）。
-  该命令只依赖既有表，可作为独立小型 G2 发布包先于自动化链交付，用于 755/756/757 修复。
+  该命令复用标准准入与写入链（含按当前 policy 轮换 stale-digest enrollment），可作为独立
+  小型 G2 发布包先于自动化链灰度交付，用于 755/756/757 修复。
+- 执行修复前的前置只读核对：每场 `observation.source_identity_id == enrollment.source_identity_id`
+  （停滞 observation 必须来自获胜来源），不成立时停止并回到产品处置，不得强写。
 - 本变更无 migration；发布窗口仍需按 rollout.md 重新核对生产基线。
 - 本次没有部署、迁移、服务重建、开关修改、生产写入或 `race_live` 操作。
 

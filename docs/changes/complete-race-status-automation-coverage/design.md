@@ -269,8 +269,12 @@ validate_data_sync_lifecycle_admission(
 这条路径优先用于当前 755/756/757，但代码不能硬编码 event ID；同形态停滞赛事复用同一流程。
 修复窗口内必须确认没有自动化任务触碰目标赛事。
 
-修复命令只依赖现有表与证据链，不依赖 policy v2 或 admission 改动；可以切割为独立的小型
-发布包，在本变更其余部分之前单独交付（独立 G2/G3）。
+修复命令复用标准链路（当前 policy、共享 admission、reconcile、标准 result writer），
+不再假设旧 revision 可直接公开；stale-digest enrollment 会先按当前 policy 轮换
+（route 身份不变、source 重新过 admission、rotate 走既有 manifest 机制并留审计）。
+其独立性体现在：独立命令、独立 SHA 锁定候选包、独立小型 G2 发布包，可在自动化链
+全量灰度之前单独交付（独立 G2/G3）；执行窗口要求相关运行时开关开启，并先只读核对
+每场 `observation.source_identity_id == enrollment.source_identity_id`，不成立时停止。
 
 ## 9. 更正链路
 

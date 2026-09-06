@@ -453,6 +453,7 @@ def advance_due_data_sync_lifecycle(
                 event_id=control.event_id,
                 expected_generation=control.schedule_generation,
                 now=now,
+                standing_policy=standing_policy,
             )
             if result.action == "applied":
                 event_status = (

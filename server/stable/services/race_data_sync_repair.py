@@ -109,9 +109,11 @@ def adopt_stalled_event_policy(
     if not (policy.valid_from <= now < policy.valid_until):
         return "standing_policy_expired"
     with transaction.atomic():
+        # Lock order is owned by rotate_enrollment's CAS below; reading the
+        # enrollment unlocked here is safe because the rotation re-verifies
+        # the expected owner manifest and generation before writing.
         enrollment = (
-            models.RaceDataSyncEnrollment.objects.select_for_update()
-            .select_related("source_identity")
+            models.RaceDataSyncEnrollment.objects.select_related("source_identity")
             .filter(event=event)
             .first()
         )
@@ -261,6 +263,13 @@ def assess_stalled_event(
     if not admission.admitted:
         return StalledEventAssessment(
             event.pk, revision.pk, observation.pk, False, admission.reason_code
+        )
+    if (
+        admission.enrollment is not None
+        and observation.source_identity_id != admission.enrollment.source_identity_id
+    ):
+        return StalledEventAssessment(
+            event.pk, revision.pk, observation.pk, False, "not_granted_source"
         )
     return StalledEventAssessment(event.pk, revision.pk, observation.pk, True, "")
 
