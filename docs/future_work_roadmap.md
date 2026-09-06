@@ -108,10 +108,10 @@
 
 | 工作 | 当前状态 | 已有成果 | 剩余动作 | 主要阻塞 |
 | --- | --- | --- | --- | --- |
-| 完整赛事状态自动更新 | M1 代码闭环已实现（分支 `codex/complete-race-status-automation-m1`），未部署 | 六份计划文档 + tasks §1/§2 全部完成；新增约 51 项测试 | §3 隔离验证与独立 review，然后 G2 候选包；755/756/757 修复命令可独立先行 | 后续 G2/G3 |
+| 完整赛事状态自动更新 | 2026-09-07 已生产上线并分阶段启用完成（PR #176/#177/#178，运行 `ca6e9d06`） | 独立 review APPROVED；全量回归与基线一致；关闭态部署→A-F 阶段验收通过 | 自然闭环持续验收（等 today/tomorrow 赛事自然走完）；观察期后进入 M3 | 无 |
 | 赛事数据链路稳定化候选 | 本地 candidate-only，未提交/未推送/未部署 | 多语言赛事/场地身份、JRA/NAR fail-closed route、D-1..D+3 审计、field-scoped evidence、五事件 offline shadow；聚焦测试 136/136 | 从最新主线做逐文件 diff，只提取完整赛事自动化需要的基础，不得整分支直接合并 | 与主计划存在重叠，含 migration 0079 候选 |
 | 定时赛果复核 | 任务已停止，问题未解决 | 调度、审核包、通知和 dry-run 可运行 | 先修先到先得 route admission，再恢复只读复核；不得把通知成功当结果补齐 | 40/40 `route_missing` |
-| event 755/756/757 恢复 | 未完成 | 已有 official observation/revision | 走一次性审计修复包：按当前 policy 轮换 stale enrollment、来源证据复核、SHA 锁定候选、dry-run、备份、批准、apply、verifier；可作独立 G2 先行 | 禁止未经复核直接复用旧 revision 写公开；执行前须只读核对 observation 是否来自获胜来源 |
+| event 755/756/757 恢复 | 2026-09-07 已完成 | 三场经审计修复包修复：轮换+复核+dry-run+apply+verifier+公网验收全过，incident 收口 | 无剩余动作；更正观察由 standing policy 接管 | 无 |
 | Racing API 四地区重赏马导出 | `BLOCKED / INCOMPLETE` | 559/559 本地研究测试；21/200 stable IDs 有可复用 profile+career | 等待可审计的 provider 权限/回复或用户精确 G3；重新绑定 ledger、scope、预算后才可联网 | 两份 proposal 均未批准；179 个 stable ID 缺口 |
 | P0 马匹资料生产补全 | 候选已冻结，未获新写入授权 | 最近记录候选：32 profile updates、180 race creates、230 cross-source updates、32 source upserts、128 audits；422 条目标守恒，16 个 blocker 冻结 | 重新生成并核验不可变 candidate，提交精确 G3 包；写后独立 verifier | 旧 candidate/旧授权不可复用 |
 | 历史 PR 与 worktree 收口 | 未完成 | 2026-09-05 仍有 7 个 open PR 和大量 worktree | 逐项判断继续、拆分、替代或归档；先只读，不批量关闭或删除 | 分支陈旧、依赖关系不清 |

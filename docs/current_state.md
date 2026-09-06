@@ -1,5 +1,29 @@
 # 当前状态
 
+## 2026-09-07 M1 完整赛事自动化已生产上线，755/756/757 已修复
+
+- 发布：PR #176/#177/#178 已合并，生产运行 `ca6e9d06`（镜像 `umanewsbot:pr177-ca6e9d06`），
+  release 目录 `/opt/umanews-release-95fc8726-PR177-20260906T1400Z`。部署前清理磁盘
+  92%→38%（252 个旧 dump 留最新 2 个并已回传本机校验 SHA、旧 release 目录 40→4、镜像 14→3）；
+  写前备份 `pre-pr177-m1-20260906T154238Z.dump`（514MB，`pg_restore --list` 可读）。
+- 分阶段启用按 rollout 完成：A 只读审计（route ambiguity=0、无意外写入）→ B 发现/纳管
+  （TRA 发现任务真实跑通：3 请求预算内、138 候选全守恒、无身份匹配则零写入）→ C 时间/出马表
+  → D 状态（无 legacy/新链双授权冲突）→ E 赛果（755/756/757 修复）→ F 更正（自然幂等观察）。
+- 修复：三场法国停滞赛事经 `repair_data_sync_stalled_events` 一次性修复：stale-digest
+  enrollment 按当前 policy v2 轮换（3 条 adoption OperationLog）、dry-run 候选
+  `fd50ce54…`、apply 3/3、逐场 verifier 通过；三场均 finished+确认时间+revision 公开+
+  publication+完整赛果行（11/6/7 条），3 个 open incident 自动收口；公网三个详情页 200
+  且赛果表完整。`race_live=7543` 全程未动。
+- 部署中发现并处理：TRA registry 文件此前未随代码版本化，新镜像缺失导致 discovery
+  fail-closed，已通过 PR #178 把 `source_registry_the_racing_api_free.json` 纳入
+  `runtime/policies/race_live/` 并重建镜像；compose `up` 曾因配置差异顺带重建 db 容器
+  （数据卷无损，事后全量核验通过）。
+- 当前链路全部开关开启；审计显示 `awaiting_source_window=106`、in-window 待身份 15 场、
+  人工锁 1 场、停滞 0、双授权 0。下一场自然闭环（today/tomorrow 赛事从发现到公开）待
+  自然发生，作为持续验收指标。
+- 注：main 全量回归存在 235 项预先失败（race_live 旧链、rollback 脚本契约、historical 工具等），
+  与本变更无关，正在单独排查。
+
 ## 2026-09-06 M1 完整赛事自动化代码闭环已实现（未部署）
 
 - 独立 review 结论：**APPROVED WITH COMMENTS**。首轮 16 条 finding（C-1/H-1~H-3/M-1~M-4/L-1~L-8）
