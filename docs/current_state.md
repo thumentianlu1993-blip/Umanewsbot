@@ -1,5 +1,51 @@
 # 当前状态
 
+## 2026-09-07 会话总结：从路线图到 M1 生产上线的完整交接
+
+> 本条是 2026-09-05 至 2026-09-07 整段工作的交接总入口；分项事实见各自日期条目。
+
+### 本次会话完成的工作
+
+1. **项目调研**：完整阅读代码库与线上提交（main 约 746 提交、174 PR），输出项目现状总结；
+   拉取最新分支并解读 `docs/future_work_roadmap.md`（M0-M6 路线）。
+2. **五项产品决定定稿**（2026-09-05，用户拍板）：①不设指定主来源，可信来源先到先得
+   （一次性授予、`tiebreak_order` 平局、授予后粘滞、仅完整能力来源竞争、失效回池重授）；
+   ②SLA 从来源开放窗口起算；③新旧授权分离、双 authority 拒绝；④755/756/757 单独审计
+   修复上线（否决等待自然恢复）；⑤更正只在隔离环境验证。全文在 `docs/decisions.md`。
+3. **修订设计复审**：4 项发现（并发授予原子性、获胜来源失败通道、修复独立切割、残留口径）
+   已修正并记录于 `review.md` §12.1。
+4. **M1 实现**（`codex/complete-race-status-automation-m1`，13 提交，PR #177）：policy v2
+   先到先得、discovery 守恒、共享 admission validator、三处接线、enrollment→control、
+   advance+reconciliation、审计修复命令、audit 扩展、PG 并发测试、E2E 链路证明。
+   新增约 69 项测试全绿；全量回归 4886 项失败集合与基线逐项一致。
+5. **独立 review 两轮**：首轮 CHANGES REQUESTED 16 条全部修复（`b1bd3e90`），复审
+   APPROVED WITH COMMENTS，残留 4 条已处理（`22a71a54`）。
+6. **生产上线**（PR #176/#177/#178，运行 `ca6e9d06`）：处置了一个并行旧链发布会话
+   （lifecycle shadow→enforce、v1 开关全开），确认其停止后接管；磁盘清理 92%→38%
+   （备份回传本机校验 SHA）；关闭态部署 + 迁移 0078；分阶段 A-F 启用全部验收；
+   TRA registry 文件版本化（PR #178）补齐 discovery 前置。
+7. **755/756/757 修复**：审计修复包 3/3（轮换+dry-run+apply+verifier），公网详情页赛果
+   完整，incident 收口，`race_live=7543` 未动。
+8. **235 项预存失败排查**：根因分类与处理建议见
+   [测试基线失败排查报告](test_baseline_failures_20260907.md)；发现真实运维缺口——
+   回滚脚本评审上限停在 0077，0078 已上生产后回滚当前会被拒，建议优先工单修复。
+
+### 当前生产真实状态（2026-09-07 核验）
+
+- 运行 `ca6e9d06`，web/worker/beat/race_sync_v2_worker 健康，nginx/db/redis/onebot 正常；
+  celery/race_sync_v2 队列空，`race_live=7543` 原值。
+- RACE_DATA_SYNC 全部开关已开启；审计 `would_write=false`、`awaiting_source_window=106`、
+  停滞 0、双授权 0、`due_not_transitioned=[]`；legacy 名单 1 场（956）。
+- 磁盘 59G 可用（38%）；最新恢复点 `pre-pr177-m1-20260906T154238Z.dump` + 本机两个副本。
+
+### 交接给下一位的事项
+
+- 自然闭环持续验收：下一场 today/tomorrow 赛事应从发现到公开自动走完（指标：identity
+  created/enrolled、状态自然推进、赛果公开、更正幂等）。
+- 优先工单：回滚工具 0078 化（恢复生产回滚能力），见排查报告。
+- M3+ 按 roadmap 继续；多地区新闻与翻译链路的 DeepSeek 占位符兼容方案仍未实现
+  （翻译生产自 2026-08-02 受阻的状态未变，本链不受影响）。
+
 ## 2026-09-07 M1 完整赛事自动化已生产上线，755/756/757 已修复
 
 - 发布：PR #176/#177/#178 已合并，生产运行 `ca6e9d06`（镜像 `umanewsbot:pr177-ca6e9d06`），
