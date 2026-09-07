@@ -126,7 +126,7 @@ class ReleaseBSchemaPreflightTests(TestCase):
         self.assertRegex(payload["rows_sha256"], r"^[0-9a-f]{64}$")
         self.assertEqual(
             payload["migration_leaf"],
-            "stable.0077_racing_api_horse_identity_staging",
+            "stable.0078_externalhorse_profile_snapshot",
         )
 
     def test_unknown_applied_stable_migration_fails_closed(self):

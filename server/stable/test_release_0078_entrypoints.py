@@ -100,7 +100,7 @@ elif command == 'compose':
         elif 'historical-initial-install-0070-or-later' in args[-1]: print(state['initial_install_schema'])
         else: assert args[-2:] == ['-s','reload']
     elif args[0] == 'run' and 'check_historical_calendar_release_b_schema' in args:
-        print(json.dumps({'ok': True, 'migration_leaf_set':[state['leaf']], 'database_identity_sha256':os.environ['EXPECTED_PRODUCTION_DB_IDENTITY_SHA256']}))
+        print(json.dumps({'ok': True, 'migration_leaf_set':[state['leaf']], 'database_identity_sha256':state['database_identity']}))
     elif args[0] == 'run' and args[-2:] == ['web','/app/deploy/docker/run-release-tasks.sh']:
         raise SystemExit(state.get('compose_release_rc',0))
     elif args[0] in ('pull','build') or (args[0]=='run' and args[-3:]==['nginx','nginx','-t']):
@@ -124,14 +124,14 @@ elif command == 'preflight':
         'migration_contract_sha256':c.migration_contract(),
         'candidate_commit':os.environ['EXPECTED_CANDIDATE_COMMIT'],
         'candidate_image_id':os.environ['EXPECTED_CANDIDATE_IMAGE_ID'],
-        'database_identity_sha256':os.environ['EXPECTED_PRODUCTION_DB_IDENTITY_SHA256'],
+        'database_identity_sha256':state['database_identity'],
         'compose_file':os.environ['COMPOSE_FILE'], 'artifact_path':str(path),
         'deployment_lock_token_sha256':hashlib.sha256(os.environ['DEPLOYMENT_LOCK_TOKEN'].encode()).hexdigest(),
         'handoff_action':'forward-resume' if bound else os.environ.get('RELEASE_B_PREFLIGHT_ACTION','deploy'),
         'release_0078_recovery_binding_mode':'bound' if bound else 'admission-only',
         'recovery_intent_mode':'required', 'recovery_origin_action':'release-0078',
         'writer_activity':{'ok':True,'counts':{},'flags':state['flags']},
-        'preflight':{'ok':True,'database_identity_sha256':os.environ['EXPECTED_PRODUCTION_DB_IDENTITY_SHA256'],'migration_leaf_set':[state['leaf']], 'migration_plan':[] if state['leaf'].startswith('stable.0078') else ['0078_externalhorse_profile_snapshot']},
+        'preflight':{'ok':True,'database_identity_sha256':state['database_identity'],'migration_leaf_set':[state['leaf']], 'migration_plan':[] if state['leaf'].startswith('stable.0078') else ['0078_externalhorse_profile_snapshot']},
         **({key:os.environ[key.upper()] for key in c.BINDING_FIELDS} if bound else {})}
     if bound and state.get('closed_database_identity'):
         # The live closed preflight reports a different database only after
@@ -218,7 +218,7 @@ class HostHarness:
         self.repair = root / "runtime/migration_history_repair"
         self.repair.mkdir(mode=0o700, parents=True)
         self.restore = {name: name in {"nginx"} if manual else name in {"web", "worker", "beat", "race_sync_v2_worker", "nginx"} for name in SERVICES}
-        (root / "test-state.json").write_text(json.dumps({"leaf": leaf, "services": self.restore, "compose_services": list(SERVICES), "migration_count": 0, "static_complete": False,
+        (root / "test-state.json").write_text(json.dumps({"leaf": leaf, "database_identity": DB, "services": self.restore, "compose_services": list(SERVICES), "migration_count": 0, "static_complete": False,
                                                        "flags": {name: "false" for name in WRITER_FLAGS}}))
         (root / ".env").write_text("# synthetic closed writer flags\n")
         self.env = {**os.environ, **{name: "false" for name in WRITER_FLAGS},

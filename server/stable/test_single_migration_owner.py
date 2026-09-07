@@ -2945,11 +2945,21 @@ class ApplicationReleaseOrchestrationTests(SimpleTestCase):
         self.assertEqual(h.state()['services'], h.restore)
 
 
-    def test_attempt_mode_only_activates_from_exact_artifact_and_stale_env_is_cleared(self):
+    def test_attempt_mode_must_match_exact_artifact_before_preparation(self):
         for caller_mode in ('required', 'not-required'):
             with self.subTest(caller_mode=caller_mode):
                 h = current_release_harness(self)
                 h.env['RESTRICTED_RECOVERY_ATTEMPT_MODE'] = caller_mode
+                if caller_mode == 'not-required':
+                    result = h.initial(entrypoint=['sh', ORCHESTRATION_REL])
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn('RESTRICTED_RECOVERY_ATTEMPT_MODE does not match the exact handoff artifact', result.stderr)
+                    self.assertNotIn('backup-created', h.events())
+                    self.assertFalse(any(event.startswith('stop-with-') for event in h.events()))
+                    self.assertEqual(h.state()['migration_count'], 0)
+                    self.assertEqual(h.state()['services'], h.restore)
+                    self.assertFalse((h.directory/'intent.json').exists())
+                    continue
                 result = h.initial('marker-before-write', entrypoint=['sh', ORCHESTRATION_REL])
                 self.assertNotEqual(result.returncode, 0)
                 artifact = json.loads(next(h.repair.glob('preflight/closed-0078-*/preflight.json')).read_text())
@@ -5721,6 +5731,11 @@ class RollbackContractValidationTests(SimpleTestCase):
                                 "show",
                                 f"{self.FIXED_OID}:server/stable/migrations/"
                                 "0077_racing_api_horse_identity_staging.py",
+                            ],
+                            [
+                                "show",
+                                f"{self.FIXED_OID}:server/stable/migrations/"
+                                "0078_externalhorse_profile_snapshot.py",
                             ],
                         ],
                     )
