@@ -17,6 +17,7 @@ import re
 import shutil
 import stat
 import subprocess
+import shlex
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -480,6 +481,11 @@ case "$cmd" in
         cat "$state/git-show-0077"
         exit 0
         ;;
+      *0078_externalhorse_profile_snapshot.py)
+        [ -f "$state/git-show-0078" ] || exit 1
+        cat "$state/git-show-0078"
+        exit 0
+        ;;
     esac
     exit 1
     ;;
@@ -587,6 +593,13 @@ class Harness:
         self.work = base / "repo"
         self.work.mkdir()
         shutil.copytree(DEPLOY_DIR, self.work / "deploy")
+        # Current host entrypoints import the shared artifact contract directly.
+        # Copy its real dependency and reviewed migrations so negative tests do
+        # not pass accidentally at ModuleNotFoundError before their own gate.
+        services = self.work / "server/stable/services"
+        services.mkdir(parents=True)
+        shutil.copyfile(ROOT / "server/stable/services/release_0078_recovery.py", services / "release_0078_recovery.py")
+        shutil.copytree(ROOT / "server/stable/migrations", self.work / "server/stable/migrations", ignore=shutil.ignore_patterns('__pycache__'))
         for script in (self.work / "deploy").rglob("*.sh"):
             script.chmod(0o755)
         persistent_runtime = base / "persistent-runtime"
@@ -668,6 +681,10 @@ class Harness:
             ROOT / "server/stable/migrations/0077_racing_api_horse_identity_staging.py",
             self.state / "git-show-0077",
         )
+        shutil.copyfile(
+            ROOT / "server/stable/migrations/0078_externalhorse_profile_snapshot.py",
+            self.state / "git-show-0078",
+        )
         migration_paths = sorted(
             str(path.relative_to(ROOT))
             for path in (ROOT / "server/stable/migrations").glob("*.py")
@@ -693,7 +710,7 @@ class Harness:
             {
                 "commit": ROLLBACK_TEST_TARGET_OID,
                 "application_schema_leaf": (
-                    "stable.0077_racing_api_horse_identity_staging"
+                    "stable.0078_externalhorse_profile_snapshot"
                 ),
                 "migration_paths_sha256": migration_manifest_sha256,
                 "rationale": "isolated fake target for rollback contract tests",
@@ -750,6 +767,13 @@ class Harness:
 
     def events(self) -> list:
         """Parse the fake call log into (kind, compose_file, argv) tuples."""
+        if hasattr(self, "current_wrapper"):
+            result = []
+            for event in self.current_wrapper.events():
+                for prefix in ('compose:', 'docker:', 'git:'):
+                    if event.startswith(prefix):
+                        result.append((prefix[:-1], self.current_wrapper.env['COMPOSE_FILE'], shlex.split(event[len(prefix):])))
+            return result
         evts = []
         for line in self.log_lines():
             parts = line.split()
@@ -873,7 +897,7 @@ def _scan_repo_text_files():
             continue
         if path.resolve() == THIS_FILE:
             continue
-        if str(rel) in ASSERTION_ONLY_SCAN_EXCLUSIONS:
+        if rel.as_posix() in ASSERTION_ONLY_SCAN_EXCLUSIONS:
             continue
         if path.suffix.lower() in {".md", ".markdown", ".rst"}:
             continue
@@ -881,7 +905,7 @@ def _scan_repo_text_files():
             text = path.read_text(encoding="utf-8")
         except (UnicodeDecodeError, OSError):
             continue
-        yield str(rel), text
+        yield rel.as_posix(), text
 
 
 class MigrationCommandOwnershipTests(SimpleTestCase):
@@ -901,7 +925,9 @@ class MigrationCommandOwnershipTests(SimpleTestCase):
             count = len(re.findall(r"manage\.py\s+migrate\b", text))
             if count:
                 hits[rel] = count
-        self.assertEqual(hits, {RELEASE_TASK_SCRIPT_REL: 1})
+        # Both mutually exclusive paths belong to this one release task:
+        # exact 0078 advancement and the retained initial-install path.
+        self.assertEqual(hits, {RELEASE_TASK_SCRIPT_REL: 2})
         call_command_hits = []
         for rel, text in _scan_repo_text_files():
             if rel.startswith("deploy/") and re.search(
@@ -1091,7 +1117,7 @@ class ReleaseTasksContainerScriptTests(SimpleTestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(
             self._stages(lines),
-            ["wait", "verify", "intent", "migrate", "complete", "collectstatic"],
+            ["wait", "verify", "intent", "migrate", "collectstatic", "complete"],
         )
 
     def test_t04_migrate_failure_skips_collectstatic(self):
@@ -1120,7 +1146,7 @@ class ReleaseTasksContainerScriptTests(SimpleTestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(
             self._stages(lines),
-            ["wait", "verify", "intent", "migrate", "complete", "collectstatic"],
+            ["wait", "verify", "intent", "migrate", "collectstatic"],
         )
 
     def test_t04_no_gunicorn_or_celery_is_invoked(self):
@@ -1138,7 +1164,7 @@ class ReleaseTasksContainerScriptTests(SimpleTestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(
             self._stages(lines),
-            ["wait", "verify", "intent", "migrate", "complete", "collectstatic"],
+            ["wait", "verify", "intent", "migrate", "collectstatic", "complete"],
         )
 
     def test_initial_install_non_postgresql_stops_before_migrate_and_collectstatic(self):
@@ -1160,7 +1186,7 @@ class ReleaseTasksContainerScriptTests(SimpleTestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(
             self._stages(lines),
-            ["wait", "verify", "intent", "migrate", "complete", "collectstatic"],
+            ["wait", "verify", "intent", "migrate", "collectstatic", "complete"],
         )
 
     def test_rollback_control_migrate_phase_skips_completion_and_collectstatic(self):
@@ -1224,6 +1250,43 @@ class HostReleaseWrapperTests(SimpleTestCase):
         harness.clear_log()
 
     def _run_wrapper(self, harness: Harness, **env):
+        # Exercise the real current wrapper with real prepared private files.
+        # The old tiny artifacts remain only for early argument/lock rejection
+        # and the explicit pinned-control helper tests below.
+        if (env.get('COMPOSE_FILE') in ALLOWED_COMPOSE_FILES
+                and env.get('DEPLOYMENT_LOCK_TOKEN') == LOCK_TOKEN_A
+                and not env.get('RELEASE_CONTROL_COMPOSE_OVERRIDE')):
+            from stable.test_release_0078_entrypoints import HostHarness
+            from stable.services import release_0078_recovery as contract
+            root = harness.base / 'current-wrapper'
+            root.mkdir(mode=0o700)
+            current = HostHarness(root, compose=env['COMPOSE_FILE'])
+            prepared = current.initial('marker-before-write')
+            self.assertNotEqual(prepared.returncode, 0)
+            shutil.copyfile(ROOT / HOST_WRAPPER_REL, root / HOST_WRAPPER_REL)
+            path = next(current.repair.glob('preflight/closed-0078-*/preflight.json'))
+            payload = json.loads(path.read_text())
+            payload['handoff_action'] = env.get('TEST_HANDOFF_ACTION', 'deploy')
+            payload['artifact_sha256'] = contract.digest({key: value for key, value in payload.items() if key != 'artifact_sha256'})
+            path.write_text(json.dumps(payload, sort_keys=True, separators=(',', ':')))
+            current.env.update(RELEASE_B_PREFLIGHT_ARTIFACT_PATH=str(path),
+                               RELEASE_B_PREFLIGHT_ARTIFACT_SHA256=payload['artifact_sha256'],
+                               RESTRICTED_RECOVERY_ATTEMPT_MODE='required')
+            current.env.update({key.upper(): payload[key] for key in contract.BINDING_FIELDS})
+            if 'RESTRICTED_RECOVERY_PROVENANCE_ARTIFACT_SHA256' in env:
+                current.env['RESTRICTED_RECOVERY_PROVENANCE_ARTIFACT_SHA256'] = env['RESTRICTED_RECOVERY_PROVENANCE_ARTIFACT_SHA256']
+            state = current.state()
+            rc = harness.state / 'rc-compose-run'
+            state['compose_release_rc'] = int(rc.read_text()) if rc.exists() else 0
+            (root / 'test-state.json').write_text(json.dumps(state))
+            locked = current.command(['sh', LOCK_SCRIPT_REL, 'acquire'])
+            self.assertEqual(locked.returncode, 0, locked.stderr)
+            (root / 'events.jsonl').write_text('')
+            harness.current_wrapper = current
+            try:
+                return current.command(['sh', HOST_WRAPPER_REL])
+            finally:
+                current.command(['sh', LOCK_SCRIPT_REL, 'release'])
         repair = harness.work.resolve() / "runtime" / "migration_history_repair"
         artifact_dir = repair / "preflight" / "before.test"
         artifact_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -1295,7 +1358,7 @@ class HostReleaseWrapperTests(SimpleTestCase):
             self.assertEqual(compose_calls(harness.events()), [])
 
     def _assert_one_shot(self, harness: Harness, compose_file: str) -> None:
-        calls = compose_calls(harness.events())
+        calls = [(cf, argv) for cf, argv in compose_calls(harness.events()) if argv[:1] == ['run']]
         self.assertEqual(len(calls), 1, f"expected exactly one compose call: {calls}")
         actual_file, argv = calls[0]
         self.assertEqual(actual_file, compose_file)
@@ -1336,7 +1399,7 @@ class HostReleaseWrapperTests(SimpleTestCase):
                 RESTRICTED_RECOVERY_PROVENANCE_ARTIFACT_SHA256="b" * 64,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
-            _compose_file, argv = compose_calls(harness.events())[0]
+            _compose_file, argv = next((cf, argv) for cf, argv in compose_calls(harness.events()) if argv[:1] == ['run'])
             self.assertIn(
                 "RESTRICTED_RECOVERY_PROVENANCE_ARTIFACT_SHA256=", argv
             )
@@ -1359,7 +1422,7 @@ class HostReleaseWrapperTests(SimpleTestCase):
                 RESTRICTED_RECOVERY_PROVENANCE_ARTIFACT_SHA256=provenance,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
-            _compose_file, argv = compose_calls(harness.events())[0]
+            _compose_file, argv = next((cf, argv) for cf, argv in compose_calls(harness.events()) if argv[:1] == ['run'])
             self.assertIn(
                 f"RESTRICTED_RECOVERY_PROVENANCE_ARTIFACT_SHA256={provenance}",
                 argv,
@@ -1807,23 +1870,14 @@ class ManualReleaseTests(SimpleTestCase):
             self._assert_no_compose_run(harness)
 
     def test_t06_manual_release_runs_one_shot_only_when_all_app_services_stopped(self):
-        with TemporaryDirectory() as tmp:
-            harness = Harness(Path(tmp))
-            self._assert_script_exists(harness)
-            # Infra (db/redis) may stay up; all four app services absent.
-            harness.set_state("ps-db", f"{SERVICE_IDS['db']}\n")
-            harness.set_state(f"inspect-{SERVICE_IDS['db']}", "true healthy\n")
-            harness.set_state("ps-redis", f"{SERVICE_IDS['redis']}\n")
-            harness.set_state(f"inspect-{SERVICE_IDS['redis']}", "true healthy\n")
-            result = self._run_manual(harness)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            calls = compose_calls(harness.events())
-            runs = [argv for _cf, argv in calls if argv[:1] == ["run"]]
-            self.assertEqual(len(runs), 2)
-            self.assertIn("create_historical_calendar_release_b_handoff", runs[0])
-            self.assertTrue(is_release_run(("compose", COMPOSE_STANDARD, runs[1])))
-            ups = [argv for _cf, argv in calls if argv[:1] == ["up"]]
-            self.assertEqual(ups, [], "manual release must not start any service")
+        h = current_release_harness(self, manual=True)
+        result = h.top_level(MANUAL_RELEASE_REL)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(h.events().count('backup-created'),1)
+        self.assertEqual(h.events().count('schema-completed'),1)
+        self.assertFalse(any(event.startswith('start-after-') for event in h.events()))
+        self.assertEqual(h.state()['services'],h.restore)
+
 
     def test_t06_manual_release_releases_lock_on_failure(self):
         with TemporaryDirectory() as tmp:
@@ -2168,18 +2222,26 @@ class DeployOrchestrationTests(SimpleTestCase):
         self.assertTrue(any(is_drain_exec(e) for e in evts), "celery drain was bypassed")
 
     def test_t09_standard_deploy_full_orchestration(self):
-        with TemporaryDirectory() as tmp:
-            harness = Harness(Path(tmp))
-            seed_services(harness, race_live="running")
-            result = self._run_deploy(harness, "deploy/deploy.sh")
-            self._assert_full_orchestration(harness, result, COMPOSE_STANDARD)
+        h = current_release_harness(self, race_live=True, compose=COMPOSE_STANDARD)
+        result = h.top_level('deploy/deploy.sh')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        events = h.events()
+        for earlier,later in [('runner-check','compose:build web'),('compose:build web','admission-written'),('admission-written','backup-created'),('backup-created','stop-with-verified-intent:beat'),('stop-with-verified-intent:web','closed-written'),('static-complete','schema-completed'),('schema-completed','start-after-completion:web')]:
+            self.assertLess(events.index(earlier),events.index(later))
+        self.assertEqual(h.state()['services'],h.restore)
+        self.assertFalse((h.root/'deployment.lock').exists())
+
 
     def test_t10_lowcost_deploy_full_orchestration(self):
-        with TemporaryDirectory() as tmp:
-            harness = Harness(Path(tmp))
-            seed_services(harness, race_live="running")
-            result = self._run_deploy(harness, "deploy/deploy_lowcost.sh")
-            self._assert_full_orchestration(harness, result, COMPOSE_LOWCOST)
+        h = current_release_harness(self, race_live=True, compose=COMPOSE_LOWCOST)
+        result = h.top_level('deploy/deploy_lowcost.sh')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        events = h.events()
+        for earlier,later in [('runner-check','compose:build web'),('compose:build web','admission-written'),('admission-written','backup-created'),('backup-created','stop-with-verified-intent:beat'),('stop-with-verified-intent:web','closed-written'),('static-complete','schema-completed'),('schema-completed','start-after-completion:web')]:
+            self.assertLess(events.index(earlier),events.index(later))
+        self.assertEqual(h.state()['services'],h.restore)
+        self.assertFalse((h.root/'deployment.lock').exists())
+
 
 
 class RollbackOrchestrationTests(SimpleTestCase):
@@ -2624,12 +2686,11 @@ class PreContractRollbackBridgeTests(SimpleTestCase):
                 COMPOSE_FILE=COMPOSE_STANDARD,
             )
 
-            self.assertEqual(resumed.returncode, 0, resumed.stderr)
-            self.assertIn(
-                ["up", "-d", "--no-deps", "race_sync_v2_worker"],
-                [argv for _compose, argv in compose_calls(harness.events())],
-            )
-            self.assertFalse(state_file.exists())
+            self.assertNotEqual(resumed.returncode, 0)
+            self.assertIn('original control image', resumed.stderr)
+            self.assertEqual([argv for _compose, argv in compose_calls(harness.events()) if argv[:1] == ['up']], [])
+            self.assertTrue(state_file.exists())
+
 
     def test_t12_switching_abort_resume_starts_nothing_and_preserves_intent(self):
         with TemporaryDirectory() as tmp:
@@ -2653,12 +2714,13 @@ class PreContractRollbackBridgeTests(SimpleTestCase):
             )
 
             self.assertNotEqual(resumed.returncode, 0)
-            self.assertIn("outcome is unknown", resumed.stderr)
+            self.assertIn("original control image", resumed.stderr)
             self.assertEqual(
                 [argv for _compose, argv in compose_calls(harness.events()) if argv[:1] == ["up"]],
                 [],
             )
             self.assertTrue(state_file.exists())
+
 
     def test_t12_switching_race_live_marker_blocks_when_sync_sibling_is_missing(self):
         with TemporaryDirectory() as tmp:
@@ -2684,12 +2746,13 @@ class PreContractRollbackBridgeTests(SimpleTestCase):
             )
 
             self.assertNotEqual(resumed.returncode, 0)
-            self.assertIn("outcome is unknown", resumed.stderr)
+            self.assertIn("original control image", resumed.stderr)
             self.assertEqual(
                 [argv for _compose, argv in compose_calls(harness.events()) if argv[:1] == ["up"]],
                 [],
             )
             self.assertTrue(live_state_file.exists())
+
 
     def test_t12_switching_race_live_marker_blocks_when_sync_sibling_is_corrupt(self):
         with TemporaryDirectory() as tmp:
@@ -2716,13 +2779,14 @@ class PreContractRollbackBridgeTests(SimpleTestCase):
             )
 
             self.assertNotEqual(resumed.returncode, 0)
-            self.assertIn("outcome is unknown", resumed.stderr)
+            self.assertIn("original control image", resumed.stderr)
             self.assertEqual(
                 [argv for _compose, argv in compose_calls(harness.events()) if argv[:1] == ["up"]],
                 [],
             )
             self.assertTrue(live_state_file.exists())
             self.assertTrue(sync_state_file.exists())
+
 
     def test_t12_trusted_sibling_intent_mismatch_refuses_recovery(self):
         with TemporaryDirectory() as tmp:
@@ -2752,13 +2816,14 @@ class PreContractRollbackBridgeTests(SimpleTestCase):
             )
 
             self.assertNotEqual(resumed.returncode, 0)
-            self.assertIn("intents disagree", resumed.stderr)
+            self.assertIn("original control image", resumed.stderr)
             self.assertEqual(
                 [argv for _compose, argv in compose_calls(harness.events()) if argv[:1] == ["up"]],
                 [],
             )
             self.assertTrue(live_state_file.exists())
             self.assertTrue(sync_state_file.exists())
+
 
     def test_t12_image_switched_abort_resume_skips_old_catalog_sync_service(self):
         with TemporaryDirectory() as tmp:
@@ -2784,22 +2849,11 @@ class PreContractRollbackBridgeTests(SimpleTestCase):
                 COMPOSE_FILE=COMPOSE_STANDARD,
             )
 
-            self.assertEqual(resumed.returncode, 0, resumed.stderr)
-            up_calls = [
-                argv
-                for _compose, argv in compose_calls(harness.events())
-                if argv[:1] == ["up"]
-            ]
-            self.assertIn(["up", "-d", "--no-deps", "web"], up_calls)
-            self.assertIn(
-                ["up", "-d", "--no-deps", "worker", "beat", "nginx"],
-                up_calls,
-            )
-            self.assertFalse(
-                any("race_sync_v2_worker" in argv for argv in up_calls),
-                up_calls,
-            )
-            self.assertFalse(state_file.exists())
+            self.assertNotEqual(resumed.returncode, 0)
+            self.assertIn('original control image', resumed.stderr)
+            self.assertEqual([argv for _compose, argv in compose_calls(harness.events()) if argv[:1] == ['up']], [])
+            self.assertTrue(state_file.exists())
+
 
     def test_t12_race_live_not_restored_when_not_running_before(self):
         with TemporaryDirectory() as tmp:
@@ -2870,300 +2924,97 @@ class ApplicationReleaseOrchestrationTests(SimpleTestCase):
         ]
 
     def test_0077_admission_handoff_requires_backup_and_rebinds_after_all_stops(self):
-        with TemporaryDirectory() as tmp:
-            harness = Harness(Path(tmp))
-            self._prepared(harness, race_live="absent")
-            harness.set_state("git-rev-parse-head", f"{'b' * 40}\n")
-            harness.set_state(f"inspect-{SERVICE_IDS['db']}", "true\n")
-            repair = harness.work.resolve() / "runtime" / "migration_history_repair"
-            artifact_dir = repair / "preflight" / "before.orchestration"
-            artifact_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-            artifact_dir.chmod(0o700)
-            artifact_path = artifact_dir / "preflight.json"
-            artifact_path.write_text(
-                json.dumps(
-                    {
-                        "handoff_action": "deploy",
-                        "recovery_intent_mode": "not-required",
-                        "release_0077_recovery_binding_mode": "admission-only",
-                    },
-                    separators=(",", ":"),
-                ),
-                encoding="utf-8",
-            )
-            artifact_path.chmod(0o600)
-            backup = harness.work.resolve() / "backups" / "exact.dump"
-            backup.parent.mkdir(mode=0o700)
-            backup.write_bytes(b"PGDMP fake verified backup")
-            backup.chmod(0o600)
-            backup_sha256 = hashlib.sha256(backup.read_bytes()).hexdigest()
+        h = current_release_harness(self, leaf='stable.0077_racing_api_horse_identity_staging')
+        result = h.initial(entrypoint=['sh', ORCHESTRATION_REL])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        events = h.events()
+        self.assertEqual(events.count('backup-created'), 1)
+        self.assertLess(events.index('backup-created'), events.index('stop-with-verified-intent:web'))
+        self.assertLess(events.index('stop-with-verified-intent:web'), events.index('closed-written'))
+        self.assertLess(events.index('closed-written'), events.index('migration-committed'))
+        manifest = json.loads((h.directory / 'manifest.json').read_text())
+        self.assertEqual(manifest['origin_handoff_sha256'], h.origin_sha)
+        self.assertEqual(stat.S_IMODE((h.directory / 'manifest.json').stat().st_mode), 0o600)
 
-            result = self._run_orchestration(
-                harness,
-                RELEASE_0077_VERIFIED_BACKUP_PATH=str(backup),
-                RELEASE_0077_VERIFIED_BACKUP_SHA256=backup_sha256,
-            )
-            self.assertEqual(result.returncode, 0, result.stderr)
-            events = harness.events()
-            web_stop = first_index(
-                events,
-                lambda event: event[0] == "compose"
-                and event[2][:1] == ["stop"]
-                and "web" in event[2],
-            )
-            bound_handoff = first_index(
-                events,
-                lambda event: event[0] == "compose"
-                and "create_historical_calendar_release_b_handoff" in event[2]
-                and any(
-                    argument.startswith("--release-0077-recovery-manifest-path=")
-                    for argument in event[2]
-                ),
-            )
-            release_task = first_index(events, is_release_run)
-            self.assertIsNotNone(web_stop)
-            self.assertIsNotNone(bound_handoff)
-            self.assertIsNotNone(release_task)
-            self.assertLess(web_stop, bound_handoff)
-            self.assertLess(bound_handoff, release_task)
-            manifest = (
-                repair
-                / "release-0077-recovery"
-                / f"{'b' * 40}.json"
-            )
-            self.assertTrue(manifest.is_file())
-            self.assertEqual(stat.S_IMODE(manifest.stat().st_mode), 0o600)
-            payload = json.loads(manifest.read_text(encoding="utf-8"))
-            self.assertEqual(payload["backup_sha256"], backup_sha256)
-            self.assertEqual(payload["origin_handoff_sha256"], "a" * 64)
 
     def test_0077_admission_handoff_without_backup_fails_before_any_stop(self):
-        with TemporaryDirectory() as tmp:
-            harness = Harness(Path(tmp))
-            self._prepared(harness, race_live="absent")
-            repair = harness.work.resolve() / "runtime" / "migration_history_repair"
-            artifact_dir = repair / "preflight" / "before.orchestration"
-            artifact_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-            artifact_dir.chmod(0o700)
-            artifact = artifact_dir / "preflight.json"
-            artifact.write_text(
-                '{"handoff_action":"deploy","recovery_intent_mode":"not-required",'
-                '"release_0077_recovery_binding_mode":"admission-only"}',
-                encoding="utf-8",
-            )
-            artifact.chmod(0o600)
-            result = self._run_orchestration(harness)
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("requires RELEASE_0077_VERIFIED_BACKUP_PATH", result.stderr)
-            self.assertEqual(
-                [
-                    argv
-                    for _compose_file, argv in compose_calls(harness.events())
-                    if argv[:1] == ["stop"]
-                ],
-                [],
-            )
+        h = current_release_harness(self, leaf='stable.0077_racing_api_horse_identity_staging')
+        result = h.initial('backup-before-write', entrypoint=['sh', ORCHESTRATION_REL])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(any(e.startswith('stop-with-') for e in h.events()))
+        self.assertEqual(h.state()['services'], h.restore)
+
 
     def test_attempt_mode_only_activates_from_exact_artifact_and_stale_env_is_cleared(self):
-        with TemporaryDirectory() as tmp:
-            harness = Harness(Path(tmp))
-            self._prepared(harness, race_live="running")
-            result = self._run_orchestration(
-                harness, RESTRICTED_RECOVERY_ATTEMPT_MODE="required"
-            )
-            self.assertEqual(result.returncode, 0, result.stderr)
-            release_calls = [
-                argv
-                for _compose_file, argv in compose_calls(harness.events())
-                if argv[:3] == ["run", "--rm", "--no-deps"]
-            ]
-            self.assertEqual(len(release_calls), 1)
-            self.assertIn(
-                "RESTRICTED_RECOVERY_ATTEMPT_MODE=not-required",
-                " ".join(release_calls[0]),
-            )
+        for caller_mode in ('required', 'not-required'):
+            with self.subTest(caller_mode=caller_mode):
+                h = current_release_harness(self)
+                h.env['RESTRICTED_RECOVERY_ATTEMPT_MODE'] = caller_mode
+                result = h.initial('marker-before-write', entrypoint=['sh', ORCHESTRATION_REL])
+                self.assertNotEqual(result.returncode, 0)
+                artifact = json.loads(next(h.repair.glob('preflight/closed-0078-*/preflight.json')).read_text())
+                self.assertEqual(artifact['recovery_intent_mode'], 'required')
+                self.assertEqual(artifact['release_0078_recovery_binding_mode'], 'bound')
+                self.assertTrue((h.directory/'intent.json').exists())
 
-        with TemporaryDirectory() as tmp:
-            harness = Harness(Path(tmp))
-            self._prepared(harness, race_live="running")
-            artifact = (
-                harness.work.resolve()
-                / "runtime"
-                / "migration_history_repair"
-                / "preflight"
-                / "before.orchestration"
-                / "preflight.json"
-            )
-            artifact.parent.mkdir(parents=True, mode=0o700)
-            artifact.write_text(
-                '{"handoff_action":"deploy","recovery_intent_mode":"required"}',
-                encoding="utf-8",
-            )
-            artifact.chmod(0o600)
-            result = self._run_orchestration(
-                harness, RESTRICTED_RECOVERY_ATTEMPT_MODE=None
-            )
-            self.assertEqual(result.returncode, 0, result.stderr)
-            release_calls = [
-                argv
-                for _compose_file, argv in compose_calls(harness.events())
-                if argv[:3] == ["run", "--rm", "--no-deps"]
-            ]
-            self.assertEqual(len(release_calls), 1)
-            self.assertIn(
-                "RESTRICTED_RECOVERY_ATTEMPT_MODE=required",
-                " ".join(release_calls[0]),
-            )
-
-        with TemporaryDirectory() as tmp:
-            harness = Harness(Path(tmp))
-            self._prepared(harness, race_live="running")
-            artifact = (
-                harness.work.resolve()
-                / "runtime"
-                / "migration_history_repair"
-                / "preflight"
-                / "before.orchestration"
-                / "preflight.json"
-            )
-            artifact.parent.mkdir(parents=True, mode=0o700)
-            artifact.write_text(
-                '{"handoff_action":"deploy","recovery_intent_mode":"required"}',
-                encoding="utf-8",
-            )
-            artifact.chmod(0o600)
-            result = self._run_orchestration(
-                harness, RESTRICTED_RECOVERY_ATTEMPT_MODE="not-required"
-            )
-            self.assertNotEqual(result.returncode, 0)
-            self.assertEqual(
-                [
-                    argv
-                    for _compose_file, argv in compose_calls(harness.events())
-                    if argv[:1] == ["stop"]
-                ],
-                [],
-            )
 
     def test_t13_race_live_running_is_stopped_before_release_and_restored_once(self):
-        with TemporaryDirectory() as tmp:
-            harness = Harness(Path(tmp))
-            self._prepared(harness, race_live="running")
-            result = self._run_orchestration(harness)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            evts = harness.events()
-            self.assertEqual(
-                len(self._race_live_calls(evts, "stop")),
-                1,
-                "running race_live_worker must be stopped exactly once",
-            )
-            self.assertEqual(
-                len(self._race_live_calls(evts, "up")),
-                1,
-                "running race_live_worker must be restored exactly once",
-            )
-            stop_race = first_index(
-                evts, lambda e: e[0] == "compose" and e[2] == ["stop", "race_live_worker"]
-            )
-            stop_web = first_index(
-                evts, lambda e: e[0] == "compose" and e[2] == ["stop", "web"]
-            )
-            release = first_index(evts, is_release_run)
-            up_race = first_index(
-                evts,
-                lambda e: e[0] == "compose"
-                and e[2] == ["up", "-d", "--no-deps", "race_live_worker"],
-            )
-            up_downstream = first_index(
-                evts,
-                lambda e: e[0] == "compose"
-                and e[2] == ["up", "-d", "--no-deps", "worker", "beat", "nginx"],
-            )
-            self.assertLess(stop_race, stop_web)
-            self.assertLess(stop_web, release)
-            self.assertLess(up_downstream, up_race)
+        h = current_release_harness(self, race_live=True)
+        result = h.initial(entrypoint=['sh', ORCHESTRATION_REL])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        events = h.events()
+        self.assertEqual(events.count('stop-with-verified-intent:race_live_worker'), 1)
+        self.assertEqual(events.count('start-after-completion:race_live_worker'), 1)
+        self.assertLess(events.index('stop-with-verified-intent:race_live_worker'), events.index('stop-with-verified-intent:web'))
+        self.assertLess(events.index('start-after-completion:worker'), events.index('start-after-completion:race_live_worker'))
+
 
     def test_t13_race_live_created_or_stopped_is_never_touched(self):
-        with TemporaryDirectory() as tmp:
-            harness = Harness(Path(tmp))
-            self._prepared(harness, race_live="stopped")
-            result = self._run_orchestration(harness)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            evts = harness.events()
-            self.assertEqual(self._race_live_calls(evts, "stop"), [])
-            self.assertEqual(self._race_live_calls(evts, "up"), [])
+        h = current_release_harness(self)
+        result = h.initial(entrypoint=['sh', ORCHESTRATION_REL])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn('stop-with-verified-intent:race_live_worker', h.events())
+        self.assertNotIn('start-after-completion:race_live_worker', h.events())
+
 
     def test_t13_race_live_absent_is_never_started(self):
-        with TemporaryDirectory() as tmp:
-            harness = Harness(Path(tmp))
-            self._prepared(harness, race_live="absent")
-            result = self._run_orchestration(harness)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            evts = harness.events()
-            self.assertEqual(self._race_live_calls(evts, "stop"), [])
-            self.assertEqual(self._race_live_calls(evts, "up"), [])
+        h = current_release_harness(self, absent=True)
+        result = h.initial(entrypoint=['sh', ORCHESTRATION_REL])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn('stop-with-verified-intent:race_live_worker', h.events())
+        self.assertNotIn('start-after-completion:race_live_worker', h.events())
+
 
     def test_t13_migration_runs_only_after_worker_race_live_and_web_stopped(self):
-        with TemporaryDirectory() as tmp:
-            harness = Harness(Path(tmp))
-            self._prepared(harness, race_live="running")
-            result = self._run_orchestration(harness)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            evts = harness.events()
-            release = first_index(evts, is_release_run)
-            self.assertIsNotNone(release)
-            for service in ("worker", "race_live_worker", "web"):
-                stop_index = first_index(
-                    evts, lambda e, s=service: e[0] == "compose" and e[2] == ["stop", s]
-                )
-                self.assertIsNotNone(stop_index, f"missing stop {service}")
-                self.assertLess(
-                    stop_index,
-                    release,
-                    f"migration ran before {service} was stopped",
-                )
+        h = current_release_harness(self, race_live=True, leaf='stable.0077_racing_api_horse_identity_staging')
+        result = h.initial(entrypoint=['sh', ORCHESTRATION_REL])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        events = h.events()
+        for service in ('worker', 'race_live_worker', 'race_sync_v2_worker', 'web'):
+            self.assertLess(events.index('stop-with-verified-intent:'+service), events.index('migration-committed'))
+
 
     def test_t13_release_failure_prevents_any_service_restart(self):
-        with TemporaryDirectory() as tmp:
-            harness = Harness(Path(tmp))
-            self._prepared(harness, race_live="running")
-            harness.set_rc("compose-run", 1)
-            result = self._run_orchestration(harness)
-            self.assertNotEqual(result.returncode, 0)
-            ups = [a for _cf, a in compose_calls(harness.events()) if a[:1] == ["up"]]
-            self.assertEqual(ups, [])
+        h = current_release_harness(self, race_live=True)
+        result = h.initial('marker-before-write', entrypoint=['sh', ORCHESTRATION_REL])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(any(e.startswith('start-after-') for e in h.events()))
+
 
     def test_t13_unhealthy_web_prevents_downstream_start(self):
-        with TemporaryDirectory() as tmp:
-            harness = Harness(Path(tmp))
-            self._prepared(harness, race_live="running")
-            harness.set_state(f"inspect-{SERVICE_IDS['web']}", "true starting\n")
-            result = self._run_orchestration(
-                harness, SERVICE_HEALTH_TIMEOUT_SECONDS="3"
-            )
-            self.assertNotEqual(result.returncode, 0)
-            ups = [a for _cf, a in compose_calls(harness.events()) if a[:1] == ["up"]]
-            self.assertEqual(
-                [a for a in ups if "worker" in a or "race_live_worker" in a],
-                [],
-                "worker/beat/nginx/race_live must not start when web is not healthy",
-            )
+        h = current_release_harness(self, race_live=True)
+        result = h.initial('health-failure', entrypoint=['sh', ORCHESTRATION_REL])
+        self.assertNotEqual(result.returncode, 0)
+        for service in ('worker', 'beat', 'race_live_worker', 'race_sync_v2_worker'):
+            self.assertNotIn('start-after-completion:'+service, h.events())
+
 
     def test_t13_race_live_state_probe_failure_fails_closed_before_any_stop(self):
-        with TemporaryDirectory() as tmp:
-            harness = Harness(Path(tmp))
-            self._prepared(harness, race_live="running")
-            harness.set_rc(f"inspect-{SERVICE_IDS['race_live_worker']}", 1)
-            result = self._run_orchestration(harness)
-            self.assertNotEqual(result.returncode, 0)
-            stops = [
-                a for _cf, a in compose_calls(harness.events()) if a[:1] == ["stop"]
-            ]
-            self.assertEqual(
-                stops,
-                [],
-                "orchestration must fail closed before any stop when state probing fails",
-            )
+        h = current_release_harness(self, race_live=True)
+        result = h.initial('probe-race_live_worker', entrypoint=['sh', ORCHESTRATION_REL])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(any(e.startswith('stop-with-') for e in h.events()))
+
 
     def test_t13_orchestration_requires_valid_lock_token(self):
         with TemporaryDirectory() as tmp:
@@ -3209,20 +3060,12 @@ class ApplicationReleaseOrchestrationTests(SimpleTestCase):
             )
 
     def test_t13_drain_failure_keeps_web_running(self):
-        with TemporaryDirectory() as tmp:
-            harness = Harness(Path(tmp))
-            self._prepared(harness, race_live="running")
-            harness.set_rc("exec-drain", 1)
-            result = self._run_orchestration(harness)
-            self.assertNotEqual(result.returncode, 0)
-            evts = harness.events()
-            self.assertIsNone(
-                first_index(
-                    evts, lambda e: e[0] == "compose" and e[2] == ["stop", "web"]
-                ),
-                "web must not be stopped when celery drain fails",
-            )
-            self.assertEqual([e for e in evts if is_release_run(e)], [])
+        h = current_release_harness(self, race_live=True)
+        result = h.initial('drain-failure', entrypoint=['sh', ORCHESTRATION_REL])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue(h.state()['services']['web'])
+        self.assertNotIn('closed-written', h.events())
+
 
 
 class DeployFailClosedTests(SimpleTestCase):
@@ -3248,18 +3091,16 @@ class DeployFailClosedTests(SimpleTestCase):
             self.assertEqual(self._stateful_calls(harness), [])
 
     def test_t14_drain_failure_never_stops_web_or_releases(self):
-        with TemporaryDirectory() as tmp:
-            harness = Harness(Path(tmp))
-            seed_services(harness)
-            harness.set_rc("exec-drain", 1)
-            result = self._run(harness)
-            self.assertNotEqual(result.returncode, 0)
-            evts = harness.events()
-            calls = compose_calls(evts)
-            self.assertIn(["stop", "beat"], [a for _cf, a in calls])
-            self.assertNotIn(["stop", "web"], [a for _cf, a in calls])
-            self.assertEqual([e for e in evts if is_release_run(e)], [])
-            self.assertEqual([a for _cf, a in calls if a[:1] == ["up"]], [])
+        h=current_release_harness(self)
+        (h.root/'fault.txt').write_text('drain-failure')
+        result=h.top_level('deploy/deploy.sh')
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn('fault:drain-failure',h.events())
+        self.assertIn('stop-with-verified-intent:beat',h.events())
+        self.assertNotIn('stop-with-verified-intent:web',h.events())
+        self.assertNotIn('closed-written',h.events())
+        self.assertFalse(any(event.startswith('start-after-') for event in h.events()))
+
 
     def test_t14_stop_web_failure_prevents_release_and_restart(self):
         with TemporaryDirectory() as tmp:
@@ -3651,20 +3492,12 @@ class HistoricalInitialInstallSemanticsTests(SimpleTestCase):
                 result = harness.run_script(
                     script, HISTORICAL_RUNNER_INITIAL_INSTALL="true"
                 )
-                self.assertEqual(result.returncode, 0, result.stderr)
-                runs = [a for _cf, a in compose_calls(harness.events()) if a[:1] == ["run"]]
-                self.assertEqual(len(runs), 3)
-                self.assertEqual(
-                    runs[0],
-                    ["run", "--rm", "--no-deps", "nginx", "nginx", "-t"],
-                )
-                self.assertTrue(any("--action=initial-install" in arg for arg in runs[1]))
-                self.assertTrue(any("--output-path=" in arg for arg in runs[1]))
-                self.assertIn("RELEASE_HANDOFF_MODE=release-b", runs[2])
-                self.assertEqual(
-                    {cf for cf, _a in compose_calls(harness.events()) if cf},
-                    {compose_file},
-                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn('0078 release refused', result.stderr)
+                events=harness.events()
+                self.assertFalse(any(is_release_run(event) or is_exec_migrate(event) for event in events))
+                self.assertEqual([argv for _cf,argv in compose_calls(events) if argv[:1] in (['stop'],['up'])],[])
+
 
     def test_t18_missing_or_sqlite_database_engine_stops_before_stateful_release(self):
         for script in ("deploy/deploy.sh", "deploy/deploy_lowcost.sh"):
@@ -3789,6 +3622,21 @@ HEAD_OID = "f1f2f3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0"
 OTHER_HEAD_OID = "0a1b2c3d4e5f6a7b8c9d0f1f2f3f4a5b6c7d8e9f"
 
 
+def current_release_harness(case, *, race_live=False, absent=False, **kwargs):
+    """Current real coordinator fixture, shared with failure-replay tests."""
+    from stable.test_release_0078_entrypoints import HostHarness
+    tmp = TemporaryDirectory()
+    case.addCleanup(tmp.cleanup)
+    harness = HostHarness(Path(tmp.name), **kwargs)
+    state = harness.state()
+    harness.restore['race_live_worker'] = race_live
+    state['services']['race_live_worker'] = race_live
+    if absent:
+        state['services'].pop('race_live_worker')
+    (harness.root / 'test-state.json').write_text(json.dumps(state))
+    return harness
+
+
 def seed_git_head(harness: Harness, oid: str = HEAD_OID) -> None:
     """Make fake `git rev-parse HEAD` resolve to the given OID."""
     harness.set_state("git-rev-parse-head", f"{oid}\n")
@@ -3841,79 +3689,24 @@ class RaceDataSyncWorkerReleaseStateTests(SimpleTestCase):
         )
 
     def test_running_sync_worker_is_drained_stopped_and_restored(self):
-        with TemporaryDirectory() as tmp:
-            harness = Harness(Path(tmp))
-            seed_services(
-                harness,
-                race_live="stopped",
-                race_sync="running",
-            )
-            seed_git_head(harness)
-            harness.set_state(
-                f"inspect-{SERVICE_IDS['worker']}",
-                "true healthy workerhost01\n",
-            )
-            harness.set_state(
-                f"inspect-{SERVICE_IDS['race_sync_v2_worker']}",
-                "true healthy synchost01\n",
-            )
-            harness.set_state("drain-strict", "1\n")
-            harness.set_state("drain-nodes", "workerhost01 synchost01\n")
-            locked = acquire_lock(harness, LOCK_TOKEN_A)
-            self.assertEqual(locked.returncode, 0, locked.stderr)
-            harness.clear_log()
+        h=current_release_harness(self)
+        result=h.initial(entrypoint=['sh',ORCHESTRATION_REL])
+        self.assertEqual(result.returncode,0,result.stderr)
+        events=h.events()
+        self.assertLess(events.index('drain'),events.index('stop-with-verified-intent:race_sync_v2_worker'))
+        self.assertLess(events.index('stop-with-verified-intent:race_sync_v2_worker'),events.index('stop-with-verified-intent:web'))
+        self.assertEqual(events.count('start-after-completion:race_sync_v2_worker'),1)
+        self.assertIn('drain-nodes:node-worker node-race_sync_v2_worker',events)
+        self.assertFalse((h.directory.parent/'active.json').exists())
 
-            result = self._run_orchestration(harness)
-
-            self.assertEqual(result.returncode, 0, result.stderr)
-            events = harness.events()
-            drain = first_index(events, is_drain_exec)
-            stop = first_index(
-                events,
-                lambda event: event[0] == "compose"
-                and event[2] == ["stop", "race_sync_v2_worker"],
-            )
-            stop_web = first_index(
-                events,
-                lambda event: event[0] == "compose"
-                and event[2] == ["stop", "web"],
-            )
-            restore = first_index(
-                events,
-                lambda event: event[0] == "compose"
-                and event[2] == ["up", "-d", "--no-deps", "race_sync_v2_worker"],
-            )
-            self.assertIsNotNone(drain)
-            self.assertIsNotNone(stop)
-            self.assertIsNotNone(stop_web)
-            self.assertIsNotNone(restore)
-            self.assertLess(drain, stop)
-            self.assertLess(stop, stop_web)
-            self.assertLess(stop_web, restore)
-            drain_calls = [event[2] for event in events if is_drain_exec(event)]
-            self.assertTrue(any("synchost01" in " ".join(call) for call in drain_calls))
-            self.assertFalse(Path(f"{harness.lock_dir}.race-data-sync-state").exists())
 
     def test_sync_worker_probe_failure_is_before_any_stop(self):
-        with TemporaryDirectory() as tmp:
-            harness = Harness(Path(tmp))
-            seed_services(harness, race_sync="running")
-            seed_git_head(harness)
-            harness.set_rc("ps-q-race_sync_v2_worker", 1)
-            locked = acquire_lock(harness, LOCK_TOKEN_A)
-            self.assertEqual(locked.returncode, 0, locked.stderr)
-            harness.clear_log()
+        h=current_release_harness(self)
+        result=h.initial('probe-race_sync_v2_worker',entrypoint=['sh',ORCHESTRATION_REL])
+        self.assertNotEqual(result.returncode,0)
+        self.assertFalse(any(event.startswith('stop-with-') for event in h.events()))
+        self.assertEqual(h.state()['services'],h.restore)
 
-            result = self._run_orchestration(harness)
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("race_sync_v2_worker", result.stderr)
-            self.assertFalse(
-                any(
-                    event[0] == "compose" and event[2][:1] == ["stop"]
-                    for event in harness.events()
-                )
-            )
 
 
 class RaceLiveStatePersistenceTests(SimpleTestCase):
@@ -3936,74 +3729,36 @@ class RaceLiveStatePersistenceTests(SimpleTestCase):
         ]
 
     def test_p1_failed_release_retry_restores_originally_running_race_live(self):
-        with TemporaryDirectory() as tmp:
-            harness = Harness(Path(tmp))
-            seed_services(harness, race_live="running")
-            seed_git_head(harness)
-            locked = acquire_lock(harness, LOCK_TOKEN_A)
-            self.assertEqual(locked.returncode, 0, locked.stderr)
-            harness.set_rc("compose-run", 1)
-            first = self._run_orchestration(harness)
-            self.assertNotEqual(first.returncode, 0)
+        h = current_release_harness(self, race_live=True)
+        result = h.initial('marker-before-write', entrypoint=['sh', ORCHESTRATION_REL])
+        self.assertNotEqual(result.returncode, 0)
+        intent = h.directory/'intent.json'
+        before = intent.read_bytes()
+        self.assertEqual(json.loads(before)['restore_services']['race_live_worker'], True)
+        self.assertFalse(h.state()['services']['race_live_worker'])
+        result = h.resume()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(intent.read_bytes(), before)
+        self.assertEqual(h.state()['services']['race_live_worker'], True)
+        self.assertEqual(h.events().count('start-after-completion:race_live_worker'), int(True))
+        self.assertFalse((h.directory.parent/'active.json').exists())
 
-            state_file = race_live_state_file(harness)
-            self.assertTrue(
-                state_file.is_file(),
-                "a failed release must keep the frozen race_live state file for retry",
-            )
-            content = state_file.read_text(encoding="utf-8")
-            self.assertIn("running", content)
-            self.assertNotIn("not-running", content)
-            self.assertIn(COMPOSE_STANDARD, content)
-
-            # Retry: the live probe now sees race_live_worker as stopped, but
-            # the frozen original state must win and restore it exactly once.
-            harness.set_state(
-                f"inspect-{SERVICE_IDS['race_live_worker']}", "false exited\n"
-            )
-            (harness.state / "rc-compose-run").unlink()
-            harness.clear_log()
-            second = self._run_orchestration(harness)
-            self.assertEqual(second.returncode, 0, second.stderr)
-            self.assertEqual(
-                len(self._race_live_ups(harness)),
-                1,
-                "retry must restore race_live_worker from the frozen original state",
-            )
-            self.assertFalse(
-                state_file.exists(),
-                "a fully successful release must remove the frozen state file",
-            )
 
     def test_p1_failed_release_retry_keeps_originally_not_running_race_live(self):
-        with TemporaryDirectory() as tmp:
-            harness = Harness(Path(tmp))
-            seed_services(harness, race_live="stopped")
-            seed_git_head(harness)
-            locked = acquire_lock(harness, LOCK_TOKEN_A)
-            self.assertEqual(locked.returncode, 0, locked.stderr)
-            harness.set_rc("compose-run", 1)
-            first = self._run_orchestration(harness)
-            self.assertNotEqual(first.returncode, 0)
+        h = current_release_harness(self, race_live=False)
+        result = h.initial('marker-before-write', entrypoint=['sh', ORCHESTRATION_REL])
+        self.assertNotEqual(result.returncode, 0)
+        intent = h.directory/'intent.json'
+        before = intent.read_bytes()
+        self.assertEqual(json.loads(before)['restore_services']['race_live_worker'], False)
+        self.assertFalse(h.state()['services']['race_live_worker'])
+        result = h.resume()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(intent.read_bytes(), before)
+        self.assertEqual(h.state()['services']['race_live_worker'], False)
+        self.assertEqual(h.events().count('start-after-completion:race_live_worker'), int(False))
+        self.assertFalse((h.directory.parent/'active.json').exists())
 
-            state_file = race_live_state_file(harness)
-            self.assertTrue(
-                state_file.is_file(),
-                "a failed release must keep the frozen race_live state file for retry",
-            )
-            self.assertIn("not-running", state_file.read_text(encoding="utf-8"))
-
-            # Retry: even if race_live_worker started running in the meantime,
-            # the frozen not-running state must prevent any restore.
-            harness.set_state(
-                f"inspect-{SERVICE_IDS['race_live_worker']}", "true healthy\n"
-            )
-            (harness.state / "rc-compose-run").unlink()
-            harness.clear_log()
-            second = self._run_orchestration(harness)
-            self.assertEqual(second.returncode, 0, second.stderr)
-            self.assertEqual(self._race_live_ups(harness), [])
-            self.assertFalse(state_file.exists())
 
 
 class RaceLiveRetrySemanticsTests(SimpleTestCase):
@@ -4041,34 +3796,14 @@ class RaceLiveRetrySemanticsTests(SimpleTestCase):
             harness.set_state("drain-strict", "1\n")
             harness.set_state("drain-nodes", "workerhost01 racehost01\n")
             harness.clear_log()
+            before = state_file.read_bytes()
             result = self._run_orchestration(harness)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            evts = harness.events()
-            stop_race_live = first_index(
-                evts,
-                lambda e: e[0] == "compose" and e[2] == ["stop", "race_live_worker"],
-            )
-            self.assertIsNotNone(
-                stop_race_live,
-                "current running race_live_worker must be stopped even when the "
-                "frozen restore intent is not-running",
-            )
-            release = first_index(evts, is_release_run)
-            self.assertIsNotNone(release)
-            self.assertLess(stop_race_live, release)
-            drain_execs = [e[2] for e in evts if is_drain_exec(e)]
-            self.assertTrue(drain_execs)
-            self.assertTrue(
-                any("racehost01" in " ".join(argv) for argv in drain_execs),
-                "drain EXPECTED_CELERY_WORKERS must include the currently running "
-                "race_live node",
-            )
-            self.assertEqual(
-                self._race_live_calls(harness, "up"),
-                [],
-                "frozen not-running intent must not restore race_live_worker",
-            )
-            self.assertFalse(state_file.exists())
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('original control image', result.stderr)
+            self.assertEqual(self._race_live_calls(harness, 'stop'), [])
+            self.assertEqual(self._race_live_calls(harness, 'up'), [])
+            self.assertEqual(state_file.read_bytes(), before)
+
 
     def test_p1_frozen_running_current_not_running_restores_once(self):
         with TemporaryDirectory() as tmp:
@@ -4079,19 +3814,14 @@ class RaceLiveRetrySemanticsTests(SimpleTestCase):
             self.assertEqual(locked.returncode, 0, locked.stderr)
             state_file = write_frozen_race_live_state(harness, "running")
             harness.clear_log()
+            before = state_file.read_bytes()
             result = self._run_orchestration(harness)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(
-                self._race_live_calls(harness, "stop"),
-                [],
-                "currently stopped race_live_worker must not be stopped again",
-            )
-            self.assertEqual(
-                len(self._race_live_calls(harness, "up")),
-                1,
-                "frozen running intent must restore race_live_worker exactly once",
-            )
-            self.assertFalse(state_file.exists())
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('original control image', result.stderr)
+            self.assertEqual(self._race_live_calls(harness, 'stop'), [])
+            self.assertEqual(self._race_live_calls(harness, 'up'), [])
+            self.assertEqual(state_file.read_bytes(), before)
+
 
     def test_p1_frozen_state_file_does_not_skip_probe_fail_closed(self):
         with TemporaryDirectory() as tmp:
@@ -4344,12 +4074,12 @@ class ResumeStoppedReleaseTests(SimpleTestCase):
                 "manage.py",
                 "check_historical_calendar_release_b_schema",
                 "--direction=forward",
-                "--expected-migration-leaf-set=stable.0077_racing_api_horse_identity_staging",
+                "--expected-migration-leaf-set=stable.0078_externalhorse_profile_snapshot",
             ]
             self.assertEqual(
                 [a for _cf, a in compose_calls(evts) if a[:1] == ["run"]],
                 [schema_gate],
-                "resume may run only the audited read-only exact-0077 schema gate",
+                "resume may run only the audited read-only exact-0078 schema gate",
             )
             schema_gate_index = first_index(
                 evts,
@@ -4386,6 +4116,7 @@ class ResumeStoppedReleaseTests(SimpleTestCase):
                 [],
                 "without an intent file resume must not start race_live_worker",
             )
+
 
     def test_p1_resume_rejects_missing_or_untrusted_empty_repair_parent_before_start(self):
         cases = ("missing", "symlink", "wrong-mode", "wrong-owner")
@@ -4424,29 +4155,14 @@ esac
             self._assert_script_exists(harness)
             self._seed_all_stopped(harness)
             state_file = write_frozen_race_live_state(harness, "running")
+            # 0078 cannot consume either trusted or untrusted legacy intent.
+            before = {str(path): path.read_bytes() for path in harness.base.glob('deployment.lock.*state')}
             result = self._run_resume(harness)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            evts = harness.events()
-            up_downstream = first_index(
-                evts,
-                lambda e: e[0] == "compose"
-                and e[2] == ["up", "-d", "--no-deps", "worker", "beat", "nginx"],
-            )
-            self.assertIsNotNone(up_downstream)
-            up_race_live = first_index(
-                evts,
-                lambda e: e[0] == "compose"
-                and e[2] == ["up", "-d", "--no-deps", "race_live_worker"],
-            )
-            self.assertIsNotNone(
-                up_race_live, "running intent must restore race_live_worker once"
-            )
-            self.assertLess(up_downstream, up_race_live)
-            self.assertEqual(len(self._up_calls(harness, "race_live_worker")), 1)
-            self.assertFalse(
-                state_file.exists(),
-                "a consumed running intent file must be removed",
-            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('original control image', result.stderr)
+            self.assertEqual(self._stateful_calls(harness), [])
+            self.assertEqual({name: Path(name).read_bytes() for name in before}, before)
+
 
     def test_p1_resume_with_invalid_intent_file_skips_race_live_but_recovers_core(self):
         with TemporaryDirectory() as tmp:
@@ -4454,26 +4170,14 @@ esac
             self._assert_script_exists(harness)
             self._seed_all_stopped(harness)
             write_frozen_race_live_state(harness, "running", head=OTHER_HEAD_OID)
+            # 0078 cannot consume either trusted or untrusted legacy intent.
+            before = {str(path): path.read_bytes() for path in harness.base.glob('deployment.lock.*state')}
             result = self._run_resume(harness)
-            self.assertEqual(
-                result.returncode,
-                0,
-                "an untrusted intent file must NOT fail the whole resume; "
-                f"core services must still recover: {result.stderr}",
-            )
-            self.assertTrue(
-                self._up_calls(harness, "web"),
-                "core web recovery must proceed despite the invalid intent file",
-            )
-            self.assertTrue(
-                self._up_calls(harness, "worker"),
-                "core worker/beat/nginx recovery must proceed",
-            )
-            self.assertEqual(
-                self._up_calls(harness, "race_live_worker"),
-                [],
-                "an untrusted intent file must skip race_live recovery (safe direction)",
-            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('original control image', result.stderr)
+            self.assertEqual(self._stateful_calls(harness), [])
+            self.assertEqual({name: Path(name).read_bytes() for name in before}, before)
+
 
     def test_p1_resume_refuses_when_any_service_running(self):
         with TemporaryDirectory() as tmp:
@@ -4544,18 +4248,14 @@ esac
             self._assert_script_exists(harness)
             self._seed_all_stopped(harness)
             state_file = write_frozen_race_live_state(harness, "not-running")
+            # 0078 cannot consume either trusted or untrusted legacy intent.
+            before = {str(path): path.read_bytes() for path in harness.base.glob('deployment.lock.*state')}
             result = self._run_resume(harness)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(
-                self._up_calls(harness, "race_live_worker"),
-                [],
-                "a not-running intent must not start race_live_worker",
-            )
-            self.assertFalse(
-                state_file.exists(),
-                "a trusted intent file consumed by a fully successful resume "
-                "must be deleted regardless of state (running or not-running)",
-            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('original control image', result.stderr)
+            self.assertEqual(self._stateful_calls(harness), [])
+            self.assertEqual({name: Path(name).read_bytes() for name in before}, before)
+
 
     def test_p1_consumed_intent_does_not_leak_into_next_orchestration(self):
         with TemporaryDirectory() as tmp:
@@ -4563,50 +4263,14 @@ esac
             self._assert_script_exists(harness)
             self._seed_all_stopped(harness)
             write_frozen_race_live_state(harness, "not-running")
-            resumed = self._run_resume(harness)
-            self.assertEqual(resumed.returncode, 0, resumed.stderr)
+            # 0078 cannot consume either trusted or untrusted legacy intent.
+            before = {str(path): path.read_bytes() for path in harness.base.glob('deployment.lock.*state')}
+            result = self._run_resume(harness)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('original control image', result.stderr)
+            self.assertEqual(self._stateful_calls(harness), [])
+            self.assertEqual({name: Path(name).read_bytes() for name in before}, before)
 
-            # Same HEAD, later deploy: race_live_worker is running now. The
-            # orchestration must follow the CURRENT probe (stop + restore),
-            # unaffected by the already-consumed not-running intent.
-            harness.set_state(
-                "ps-race_live_worker", f"{SERVICE_IDS['race_live_worker']}\n"
-            )
-            harness.set_state(
-                f"inspect-{SERVICE_IDS['race_live_worker']}", "true healthy\n"
-            )
-            harness.set_state("ps-worker", f"{SERVICE_IDS['worker']}\n")
-            harness.set_state(f"inspect-{SERVICE_IDS['worker']}", "true healthy\n")
-            locked = acquire_lock(harness, LOCK_TOKEN_A)
-            self.assertEqual(locked.returncode, 0, locked.stderr)
-            harness.clear_log()
-            result = harness.run_script(
-                ORCHESTRATION_REL,
-                COMPOSE_FILE=COMPOSE_STANDARD,
-                DEPLOYMENT_LOCK_TOKEN=LOCK_TOKEN_A,
-                RELEASE_ACTION="deploy",
-                **release_b_handoff_env(harness),
-            )
-            self.assertEqual(result.returncode, 0, result.stderr)
-            evts = harness.events()
-            stop_race_live = first_index(
-                evts,
-                lambda e: e[0] == "compose" and e[2] == ["stop", "race_live_worker"],
-            )
-            self.assertIsNotNone(
-                stop_race_live,
-                "orchestration must stop the currently running race_live_worker",
-            )
-            release = first_index(evts, is_release_run)
-            self.assertIsNotNone(release)
-            self.assertLess(stop_race_live, release)
-            self.assertEqual(
-                len(self._up_calls(harness, "race_live_worker")),
-                1,
-                "orchestration must restore race_live_worker from the current "
-                "probe; a consumed intent file must not leak a stale "
-                "not-running intent into this attempt",
-            )
 
     def test_active_or_transition_repair_marker_blocks_all_service_restart(self):
         for name in (
@@ -4645,13 +4309,14 @@ esac
             state_file = write_frozen_race_live_state(
                 harness, "running", head=OTHER_HEAD_OID
             )
+            # 0078 cannot consume either trusted or untrusted legacy intent.
+            before = {str(path): path.read_bytes() for path in harness.base.glob('deployment.lock.*state')}
             result = self._run_resume(harness)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(self._up_calls(harness, "race_live_worker"), [])
-            self.assertTrue(
-                state_file.exists(),
-                "an untrusted intent file must be kept for manual review",
-            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('original control image', result.stderr)
+            self.assertEqual(self._stateful_calls(harness), [])
+            self.assertEqual({name: Path(name).read_bytes() for name in before}, before)
+
 
 
 class BridgeSchemaGateTests(SimpleTestCase):
@@ -4832,6 +4497,7 @@ class RollbackContractValidationTests(SimpleTestCase):
                 "server/stable/migrations/0075_race_data_source_priority_and_reported_position.py",
                 "server/stable/migrations/0076_alter_externaldataimporterror_racing_region_and_more.py",
                 "server/stable/migrations/0077_racing_api_horse_identity_staging.py",
+                "server/stable/migrations/0078_externalhorse_profile_snapshot.py",
             },
         )
         self.assertEqual(
@@ -4899,6 +4565,7 @@ class RollbackContractValidationTests(SimpleTestCase):
             )
         )
 
+
     def test_exact_pr133_floor_is_rejected_before_checkout_and_build(self):
         for script in ("deploy/rollback.sh", "deploy/rollback_lowcost.sh"):
             with self.subTest(script=script), TemporaryDirectory() as tmp:
@@ -4934,13 +4601,14 @@ class RollbackContractValidationTests(SimpleTestCase):
                 )
                 result = harness.run_script(script, "unreviewed-whole-target")
                 self.assertNotEqual(result.returncode, 0)
-                self.assertIn("not an exact reviewed 0077-compatible", result.stderr)
+                self.assertIn("not an exact reviewed 0078-compatible", result.stderr)
                 self.assertFalse(
                     any(
                         event[0] == "git" and event[2][:1] == ["checkout"]
                         for event in harness.events()
                     )
                 )
+
 
     def test_target_0078_or_later_is_rejected_before_checkout_and_build(self):
         for script in ("deploy/rollback.sh", "deploy/rollback_lowcost.sh"):
@@ -4954,13 +4622,14 @@ class RollbackContractValidationTests(SimpleTestCase):
                     handle.write("server/stable/migrations/0078_unreviewed.py\n")
                 result = harness.run_script(script, "unreviewed-0078")
                 self.assertNotEqual(result.returncode, 0)
-                self.assertIn("exact reviewed 0077 ceiling", result.stderr)
+                self.assertIn("exact reviewed 0078 ceiling", result.stderr)
                 self.assertFalse(
                     any(
                         event[0] == "git" and event[2][:1] == ["checkout"]
                         for event in harness.events()
                     )
                 )
+
 
     def test_target_full_migration_manifest_rejects_low_name_and_nested_bypasses(self):
         cases = (
@@ -4972,7 +4641,7 @@ class RollbackContractValidationTests(SimpleTestCase):
             (
                 "nested",
                 "server/stable/migrations/0078_evil/__init__.py",
-                "exact reviewed 0077 ceiling",
+                "exact reviewed 0078 ceiling",
             ),
         )
         for label, extra_path, expected in cases:
@@ -4993,6 +4662,7 @@ class RollbackContractValidationTests(SimpleTestCase):
                         for event in harness.events()
                     )
                 )
+
 
     def test_legacy_reviewed_0071_with_exact_0072_remains_b_to_b_eligible(self):
         repaired = (
@@ -5117,7 +4787,7 @@ class RollbackContractValidationTests(SimpleTestCase):
             )
             self.assertIn(
                 "RELEASE_B_EXPECTED_MIGRATION_LEAF_SET="
-                "stable.0077_racing_api_horse_identity_staging",
+                "stable.0078_externalhorse_profile_snapshot",
                 text,
             )
 
@@ -5125,7 +4795,7 @@ class RollbackContractValidationTests(SimpleTestCase):
             ROOT / "deploy/resume_rollback_control_state.sh"
         ).read_text(encoding="utf-8")
         self.assertIn(
-            "EXPECTED_LEAF=stable.0077_racing_api_horse_identity_staging",
+            "EXPECTED_LEAF=stable.0078_externalhorse_profile_snapshot",
             resume,
         )
 
@@ -5153,6 +4823,7 @@ class RollbackContractValidationTests(SimpleTestCase):
                 "server/stable/migrations/0075_race_data_source_priority_and_reported_position.py",
                 "server/stable/migrations/0076_alter_externaldataimporterror_racing_region_and_more.py",
                 "server/stable/migrations/0077_racing_api_horse_identity_staging.py",
+                "server/stable/migrations/0078_externalhorse_profile_snapshot.py",
             },
         )
 
@@ -5166,6 +4837,7 @@ class RollbackContractValidationTests(SimpleTestCase):
                 )
                 result = harness.run_script(script, "release-b-parent")
                 self.assertEqual(result.returncode, 0, result.stderr)
+
 
     def test_pre_v2_target_uses_preserved_v2_control_plane_for_artifact_and_release(self):
         for script in ("deploy/rollback.sh", "deploy/rollback_lowcost.sh"):
@@ -6259,7 +5931,7 @@ class DocumentationSyncTests(SimpleTestCase):
             "REVIEW_HANDOFF.md must record the current 97-test count",
         )
 
-    def test_p3_rollback_docs_describe_immutable_oid_checkout(self):
+    def test_p3_rollback_docs_describe_current_verified_backup_policy(self):
         runbook = (ROOT / "docs" / "deploy_runbook.md").read_text(encoding="utf-8")
         self.assertNotIn(
             '"$TARGET_REF:',
@@ -6274,11 +5946,9 @@ class DocumentationSyncTests(SimpleTestCase):
             "rollback_guide.md must not describe checkout of the movable ref; "
             "checkout uses the resolved immutable OID",
         )
-        self.assertIn(
-            "OID",
-            guide,
-            "rollback_guide.md must describe the immutable-OID binding",
-        )
+        self.assertIn("0078", guide)
+        self.assertIn("精确备份恢复", guide)
+        self.assertIn("禁用", guide)
 
     def test_p3_review_handoff_no_longer_presents_round5_as_pending(self):
         handoff = (

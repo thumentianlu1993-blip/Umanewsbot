@@ -77,6 +77,7 @@ elif command == 'compose':
     event('compose:'+' '.join(args))
     if args[0] == 'ps':
         service = args[-1]
+        fail('probe-'+service)
         if service in state['services']: print('cid-'+service)
     elif args[0] == 'config':
         print(json.dumps({'name':os.environ.get('COMPOSE_PROJECT_NAME','isolated0078'), 'services':{service:{'environment':{name:os.environ.get(name,'false') for name in state['flags']}} for service in state['services']}}))
@@ -98,6 +99,10 @@ elif command == 'compose':
         else: assert args[-2:] == ['-s','reload']
     elif args[0] == 'run' and 'check_historical_calendar_release_b_schema' in args:
         print(json.dumps({'ok': True, 'migration_leaf_set':[state['leaf']], 'database_identity_sha256':os.environ['EXPECTED_PRODUCTION_DB_IDENTITY_SHA256']}))
+    elif args[0] == 'run' and args[-2:] == ['web','/app/deploy/docker/run-release-tasks.sh']:
+        raise SystemExit(state.get('compose_release_rc',0))
+    elif args[0] in ('pull','build') or (args[0]=='run' and args[-3:]==['nginx','nginx','-t']):
+        pass
     else: raise SystemExit(93)
 elif command == 'backup':
     fail('backup-before-write')
@@ -106,8 +111,11 @@ elif command == 'backup':
     path.write_bytes(b'new synthetic backup for this release'); path.chmod(0o600)
     event('backup-created'); print('Backup created: '+str(path))
 elif command == 'preflight':
-    assert not any(value for name,value in state['services'].items() if name!='nginx')
-    fail('closed-before-write')
+    bound=bool(os.environ.get('RELEASE_0078_INTENT_PATH'))
+    if bound:
+        assert not any(value for name,value in state['services'].items() if name!='nginx')
+        fail('closed-before-write')
+    else: fail('admission-failure')
     path=Path(os.environ['RELEASE_B_PREFLIGHT_ARTIFACT_PATH'])
     payload={'schema_version':'migration-history-repair-preflight/v5',
         'target_leaf_set':['stable.0078_externalhorse_profile_snapshot'],
@@ -117,12 +125,14 @@ elif command == 'preflight':
         'database_identity_sha256':os.environ['EXPECTED_PRODUCTION_DB_IDENTITY_SHA256'],
         'compose_file':os.environ['COMPOSE_FILE'], 'artifact_path':str(path),
         'deployment_lock_token_sha256':hashlib.sha256(os.environ['DEPLOYMENT_LOCK_TOKEN'].encode()).hexdigest(),
-        'handoff_action':'forward-resume', 'release_0078_recovery_binding_mode':'bound',
+        'handoff_action':'forward-resume' if bound else os.environ.get('RELEASE_B_PREFLIGHT_ACTION','deploy'),
+        'release_0078_recovery_binding_mode':'bound' if bound else 'admission-only',
+        'recovery_intent_mode':'required', 'recovery_origin_action':'release-0078',
         'writer_activity':{'ok':True,'counts':{},'flags':state['flags']},
         'preflight':{'ok':True,'database_identity_sha256':os.environ['EXPECTED_PRODUCTION_DB_IDENTITY_SHA256'],'migration_leaf_set':[state['leaf']], 'migration_plan':[] if state['leaf'].startswith('stable.0078') else ['0078_externalhorse_profile_snapshot']},
-        **{key:os.environ[key.upper()] for key in c.BINDING_FIELDS}}
+        **({key:os.environ[key.upper()] for key in c.BINDING_FIELDS} if bound else {})}
     payload['artifact_sha256']=c.digest(payload)
-    c.publish_once(path,payload); event('closed-written')
+    c.publish_once(path,payload); event('closed-written' if bound else 'admission-written')
 elif command == 'tasks':
     assert not any(value for name,value in state['services'].items() if name!='nginx')
     artifact,_=c.read_json(Path(os.environ['RELEASE_B_PREFLIGHT_ARTIFACT_PATH']))
@@ -145,8 +155,10 @@ elif command == 'tasks':
     state['static_complete']=True; save(); event('static-complete')
     marker.rename(directory/('restricted-recovery.completed.'+payload['marker_sha256']+'.json'))
     event('schema-completed'); fail('after-schema-completion')
-elif command in ('drain','health'):
+elif command in ('drain','health','mount-check','runner-check'):
     event(command)
+    if command == 'drain': event('drain-nodes:'+os.environ.get('EXPECTED_CELERY_WORKERS',''))
+    fail(command+'-failure')
 else: raise SystemExit(94)
 '''
 
@@ -233,14 +245,14 @@ class HostHarness:
     def command(self, argv, env=None):
         return subprocess.run(argv, cwd=self.root, env=env or self.env, text=True, capture_output=True, timeout=60)
 
-    def initial(self, fault=""):
+    def initial(self, fault="", *, entrypoint=None):
         if fault:
             (self.root / "fault.txt").write_text(fault)
         acquire = self.command(["sh", "deploy/deployment_lock.sh", "acquire"], {**self.env, "DEPLOYMENT_LOCK_ACTION": "deploy"})
         if acquire.returncode:
             raise AssertionError(acquire.stderr)
         try:
-            result = self.command([sys.executable, "deploy/release_0078.py", "release"])
+            result = self.command(entrypoint or [sys.executable, "deploy/release_0078.py", "release"])
             if fault and (self.root / "fault.txt").exists():
                 raise AssertionError("injected stage was not reached: " + fault + "\n" + result.stdout + result.stderr)
             return result
@@ -262,6 +274,14 @@ class HostHarness:
 
     def state(self):
         return json.loads((self.root / "test-state.json").read_text())
+
+    def top_level(self, entrypoint):
+        # These two existing components have independent real-shell tests.
+        # Here their successful boundary lets the current top-level script,
+        # lock, admission, coordinator and recovery artifacts run together.
+        self.wrapper(self.root/'deploy/verify_persistent_release_mounts.sh','mount-check')
+        self.wrapper(self.root/'deploy/historical_runner_preflight.sh','runner-check')
+        return self.command(['sh',entrypoint])
 
 
 @skipUnless(os.name == "posix", "requires real Linux shell, POSIX permissions and locks")

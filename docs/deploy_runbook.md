@@ -12,6 +12,9 @@
   `intent.json` 和同级根下的 `active.json` 在第一条 stop 之前持久化。
 - `.env` 的业务开关必须满足既有只读 admission 检查；协调脚本不自动改业务开关。
   `.env` 在同一发布重试期间保持原摘要，发布包另行记录业务开关的最终恢复步骤。
+  同时核验实际 Compose project 与 writer flags，调用方环境变量覆盖同样受检查。
+  0078 入口使用支持 [`config --format json`](https://docs.docker.com/reference/cli/docker/compose/config/)
+  的 Compose 来解析实际配置；不支持该命令时会在首次 stop 前拒绝。
 - 当前有未完成意图时，新 deploy/manual 和普通 stopped-service resume 均拒绝。
   使用 `resume_migration_history_repair.sh`，明确传入原 `RELEASE_0078_INTENT_PATH`、
   `RELEASE_0078_INTENT_SHA256`、`COMPOSE_FILE`、候选 commit/image。恢复取得新部署锁，

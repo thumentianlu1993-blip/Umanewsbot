@@ -1,8 +1,31 @@
-# 0078 修复方案审核记录
+# 0078 方案与实现审核记录
 
 本文件记录实施前r2方案的审核。用户随后授权实现，五份文档已进入实施记录阶段；
 下述输入指纹和“字节一致”说明仅描述审核结束当时的r2快照，不覆盖后续实现修改。
-代码与独立测试结果另记，不由本方案结论替代。
+实现审核如下，独立测试结果见 `validation.md`，不由方案结论替代。
+
+## 实现审核
+
+原生只读 `codex review` 审核首轮实现 `e79fe4ba1c1a8e1bb424bcb4e3f37ed0094e11f0`，
+在同一 session `01a07b1d-7de0-7d10-a1a2-505f62a51bc2` 复审返修提交
+`3c051364c692ff1cd1a68e4b51d8797a7ddae0f7`。审核基线为下文固定 main，
+返修 tree 为 `4f9aef28982c8bc278c6d1beab5a93a0f586b93a`，审核前后工作树 clean。
+
+| Finding | 修复与复审结果 |
+| --- | --- |
+| P1：已有 schema receipt 的恢复路径只检查 `.env`，调用环境可改变实际业务开关 | `prepare`、`finish` 与 host one-shot verify 比较实际 Compose project/flags；复审确认解决 |
+| P2：旧测试仍要求 complete 早于 collectstatic，与新完成边界冲突 | 正常路径改为 migrate→collectstatic→complete，两个失败路径均要求不 complete；复审确认解决 |
+
+第二轮结论：原 P1/P2 均解决，直接回归路径无新的 actionable findings。
+reviewer 独立执行了 80 个配置检查场景、6 个 shell 成败场景及原排序断言，均通过。
+shell 使用命令替身；该结论不等于真实 PG16 接缝或完整 stable 已通过。
+原生报告保存在本地 `runtime/review_evidence/fix-0078-recovery-contract/code-review-r2.txt`。
+之后的测试/CI 返修仍需最终差量审核；完整验证状态以 `validation.md` 为准。
+
+Windows 原 fingerprint 脚本因缺少 `O_NOFOLLOW` 拒绝执行，未修改该检查。
+本地以不可变 Git OID/tree 与审核前后 clean 状态绑定输入，Linux CI 另执行原脚本并保存前后指纹。
+
+以下各节保留实施前方案审核的历史记录，其输入指纹不代表上述实现。
 
 ## 1. 审核对象与证据边界
 

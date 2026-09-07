@@ -2,7 +2,7 @@
 
 ## 1. 验证边界
 
-本文件定义验收矩阵。实现阶段已取得纯逻辑 RED→GREEN，独立测试正在补齐 Linux 入口与 PostgreSQL 16 验证；实际执行结果另记验证报告。本次未操作生产。
+本文件定义验收矩阵。实现阶段已取得纯逻辑 RED→GREEN；独立 Linux/PostgreSQL 16 专项 36 项已通过，旧合同全量对照仍在收尾。逐项覆盖与实际执行结果以 `validation.md` 为准，不能把下列计划要求直接当作全部完成。本次未操作生产。
 权威环境为隔离 Linux + PostgreSQL 16；Windows 原生不等同生产 shell/权限语义，SQLite不替代PG catalog、锁与事务。
 所有网络、Git远端、Docker生产项目、Celery/Redis和外部消息均使用 mock 或本次专用隔离资源；测试环境不得继承生产 .env。
 
@@ -70,9 +70,9 @@ Harness改为显式代际输入，不默认把仓库glob结果塞进0077模拟�
 2. 新写T02/T06/T20/T23/T28等有效RED，失败必须命中目标缺口；对已有可通过保护测试保留GREEN。
 3. 最小实现，单元及shell模拟套件GREEN。
 4. PG16从真实0077迁到0078，做锁竞争、失败重试和恢复演练。
-5. 全相关套件全绿；一次全量stable与同环境基线比较，无新增失败。其他235项债务不在本修复内偷改。
+5. 全相关套件全绿；一次全量stable与同环境基线比较，无新增失败。历史债务以本轮同环境基线为准，不在本修复内扩大清理。
 6. 独立代码review及同上下文复审；发布后另做T34。
 
 T35–T42必须分别经真实resume_migration_history_repair.sh新分支重放，不能仅直接调用Python helper。对upgrade和same-schema都覆盖相应断点，两个Compose模式与manual首次进入都验证T28。每例断言不需要新的deploy、手改marker或解除原backup绑定，且首次stop前已验证prepared意图、closed验证前0 DDL、schema/static证明前0提前启动writer。
 
-未来保留环境/依赖版本、基线与候选SHA、命令、退出码、测试总数、失败名称及原因、artifact SHA。没有执行的项目明确标“未执行”，不勾完成。
+验证记录保留环境/依赖版本、基线与候选SHA、命令、退出码、测试总数、失败名称及原因、artifact SHA。没有执行的项目明确标“未执行”，不勾完成。

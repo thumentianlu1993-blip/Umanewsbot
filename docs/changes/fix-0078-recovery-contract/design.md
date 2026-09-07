@@ -53,6 +53,7 @@ manifest 绑定：
 - release_id、operation、数据库 identity；source leaf 精确 0077（upgrade）或 0078（same-schema），target leaf 均精确 0078；
 - 迁移清单及 hash、backup 绝对路径/大小/SHA；
 - pg_restore --list 的成功结果、TOC digest 与条目数量；
+- 原 Compose project、各应用服务原始运行状态、`.env` 字节 hash 与原 writer flags；停服与恢复前通过 `compose config --format json` 核对实际解析的 project/flags，覆盖调用方环境覆盖值；
 - 文件 owner、0600 模式、目录可信链、无 symlink。
 
 同版本 0078→0078 也必须经过实际 producer/consumer。deploy.sh、deploy_lowcost.sh 和 manual_release.sh 的新0078分支统一调用release_0078.py。新发布准备在固定release_id下由既有backup_db.sh生成新路径的备份；producer复验来源DB、source leaf、文件身份、实际字节SHA和TOC后生成manifest。重试只能复用同一release_id/原始admission/candidate的已验证备份，不能补造新的origin SHA。
