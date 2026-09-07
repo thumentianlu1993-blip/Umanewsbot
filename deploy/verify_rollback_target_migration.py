@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Enforce the Release 0077 forward-only recovery policy before checkout."""
+"""Enforce the Release 0078 forward-only recovery policy before checkout."""
 
 from __future__ import annotations
 
@@ -23,8 +23,13 @@ EXPECTED_MIGRATION_PATHS = (
     "server/stable/migrations/0075_race_data_source_priority_and_reported_position.py",
     "server/stable/migrations/0076_alter_externaldataimporterror_racing_region_and_more.py",
     "server/stable/migrations/0077_racing_api_horse_identity_staging.py",
+    "server/stable/migrations/0078_externalhorse_profile_snapshot.py",
 )
-REVIEWED_TAIL_PATHS = frozenset(EXPECTED_MIGRATION_PATHS[-2:])
+REVIEWED_TAIL_PATHS = frozenset({
+    "server/stable/migrations/0076_alter_externaldataimporterror_racing_region_and_more.py",
+    "server/stable/migrations/0077_racing_api_horse_identity_staging.py",
+    "server/stable/migrations/0078_externalhorse_profile_snapshot.py",
+})
 
 
 def _dependency_contract(node: ast.AST) -> list[str]:
@@ -114,7 +119,7 @@ def _verify_target_migration_ceiling(target_oid: str) -> list[str]:
             unexpected_tail.append(path)
     if unexpected_tail:
         raise ValueError(
-            "target migration graph exceeds the exact reviewed 0077 ceiling: "
+            "target migration graph exceeds the exact reviewed 0078 ceiling: "
             + ", ".join(sorted(unexpected_tail))
         )
     return paths
@@ -140,7 +145,7 @@ def _reviewed_target_contract(allowlist: dict, target_oid: str) -> dict:
             or len(commit) != 40
             or any(char not in "0123456789abcdef" for char in commit)
             or item["application_schema_leaf"]
-            != "stable.0077_racing_api_horse_identity_staging"
+            != "stable.0078_externalhorse_profile_snapshot"
             or not isinstance(manifest_sha, str)
             or len(manifest_sha) != 64
             or any(char not in "0123456789abcdef" for char in manifest_sha)
@@ -152,7 +157,7 @@ def _reviewed_target_contract(allowlist: dict, target_oid: str) -> dict:
     matches = [item for item in valid_contracts if item["commit"] == target_oid]
     if len(matches) != 1:
         raise ValueError(
-            "target commit is not an exact reviewed 0077-compatible rollback release"
+            "target commit is not an exact reviewed 0078-compatible rollback release"
         )
     return matches[0]
 
@@ -204,10 +209,10 @@ def verify(target_oid: str) -> dict:
         raise ValueError("target OID must be one lowercase 40-character commit id")
     allowlist = json.loads(ALLOWLIST_PATH.read_text(encoding="utf-8"))
     expected_policy = {
-        "schema_version": "release-b-rollback-migration-allowlist/v6",
-        "final_schema_leaf": "stable.0077_racing_api_horse_identity_staging",
+        "schema_version": "release-b-rollback-migration-allowlist/v7",
+        "final_schema_leaf": "stable.0078_externalhorse_profile_snapshot",
         "recoverable_forward_partial_leaf": (
-            "stable.0076_alter_externaldataimporterror_racing_region_and_more"
+            "stable.0077_racing_api_horse_identity_staging"
         ),
         "reverse_migration_allowed": False,
     }
@@ -224,7 +229,7 @@ def verify(target_oid: str) -> dict:
         ):
             raise ValueError("forward-only rollback policy is invalid")
         raise ValueError(
-            "0077 is forward-only: generic application rollback is disabled; "
+            "0078 is forward-only: generic application rollback is disabled; "
             "restore the release-bound verified backup"
         )
     if (

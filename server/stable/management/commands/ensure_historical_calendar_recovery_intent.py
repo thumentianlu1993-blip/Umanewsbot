@@ -17,9 +17,11 @@ from stable.services.historical_calendar_release_b_handoff import (
     publish_restricted_recovery_marker,
     trusted_restricted_marker_identity,
     verify_preflight_artifact,
+    verify_closed_state,
     verify_restricted_marker_for_live_state,
 )
 from stable.services.historical_calendar_release_b_schema import database_vendor_contract
+from stable.services import release_0078_recovery as release_0078
 
 
 INITIAL_LEAF_SET = ["stable.0070_horse_identity_evidence_commit_receipt"]
@@ -87,6 +89,48 @@ class Command(BaseCommand):
             raise CommandError("recovery intent live preflight failed")
 
         marker_path = Path(options["marker_path"])
+        if artifact.get("recovery_origin_action") == "release-0078":
+            if options["attempt_mode"] != "required":
+                raise CommandError("0078 requires a durable DDL intent")
+            closed = verify_closed_state(
+                path=artifact_path, expected_artifact_sha256=options["artifact_sha256"],
+                expected_bindings={"candidate_commit": options["candidate_commit"]},
+            )
+            if not closed["ok"]:
+                raise CommandError("0078 DDL intent requires verified closed state")
+            try:
+                binding_0078 = release_0078.marker_binding(artifact)
+                intent, manifest = release_0078.verify_intent(
+                    Path(artifact["release_0078_intent_path"]), artifact["release_0078_intent_sha256"],
+                    {"candidate_commit": options["candidate_commit"]},
+                )
+                transition_path = marker_path.parent / "restricted-recovery.transition.json"
+                if os.path.lexists(marker_path) and os.path.lexists(transition_path):
+                    raise ValueError("active and transition marker conflict")
+                source = marker_path if os.path.lexists(marker_path) else transition_path if os.path.lexists(transition_path) else None
+                status = "verified"
+                if source is None:
+                    source = find_completed_restricted_recovery_marker(path=marker_path, expected_binding=binding_0078)
+                    if source is not None:
+                        status = "completed"
+                        if live["migration_leaf_set"] != list(FINAL_LEAF_SET):
+                            raise ValueError("completed 0078 marker has non-final live state")
+                    else:
+                        if live["migration_leaf_set"] != [manifest["source_leaf"]]:
+                            raise ValueError("0078 missing marker after source leaf changed")
+                        marker = build_restricted_recovery_marker(binding=binding_0078, leaf_set=live["migration_leaf_set"])
+                        release_0078.publish_once(marker_path, marker)
+                        source, status = marker_path, "created"
+                verified = verify_restricted_marker_for_live_state(
+                    path=source, expected_binding=binding_0078, live_leaf_set=live["migration_leaf_set"],
+                )
+                if not verified["ok"]:
+                    raise ValueError("0078 recovery marker binding mismatch")
+                device, inode = trusted_restricted_marker_identity(path=source, expected_binding=binding_0078)
+            except (OSError, ValueError) as exc:
+                raise CommandError(str(exc)) from exc
+            self.stdout.write(json.dumps({"ok": True, "status": status, "marker_device": device, "marker_inode": inode}, sort_keys=True))
+            return
         marker_present = os.path.lexists(marker_path)
         transition_present = os.path.lexists(
             marker_path.parent / "restricted-recovery.transition.json"

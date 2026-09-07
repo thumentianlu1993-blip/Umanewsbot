@@ -1,6 +1,6 @@
 {
   "generic_code_rollback_allowed": false,
-  "recoverable_forward_partial_leaf": "stable.0076_alter_externaldataimporterror_racing_region_and_more",
+  "recoverable_forward_partial_leaf": "stable.0077_racing_api_horse_identity_staging",
   "recovery_mode": "forward-only-verified-backup-restore",
   "required_migrations": [
     {
@@ -125,11 +125,21 @@
           "sha256": "fa36c9758d0975976f5de42791af5e5ec2c2530a11be44e41ca448e7d374550d"
         }
       ]
+    },
+    {
+      "migration_path": "server/stable/migrations/0078_externalhorse_profile_snapshot.py",
+      "reviewed_variants": [
+        {
+          "dependencies": [["stable", "0077_racing_api_horse_identity_staging"]],
+          "rationale": "0078 的 profile_snapshot 已进入当前数据库合同；记录精确内容与依赖用于兼容性验证，普通代码回滚继续禁用。",
+          "sha256": "3340d6bd8891ffc82470ff249cbfe7d2965b68cc6b9edcb5dd5c9f2ab65ac00b"
+        }
+      ]
     }
   ],
-  "final_schema_leaf": "stable.0077_racing_api_horse_identity_staging",
+  "final_schema_leaf": "stable.0078_externalhorse_profile_snapshot",
   "reviewed_targets": [],
   "reverse_migration_allowed": false,
-  "schema_version": "release-b-rollback-migration-allowlist/v6",
+  "schema_version": "release-b-rollback-migration-allowlist/v7",
   "verified_backup_restore_required": true
 }

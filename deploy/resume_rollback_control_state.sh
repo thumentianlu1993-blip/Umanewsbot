@@ -271,7 +271,7 @@ export RELEASE_B_PREFLIGHT_ARTIFACT_PATH
 unset EXPECTED_PRODUCTION_DB_IDENTITY_SHA256
 if [ "$ATTEMPT_MODE" = "not-required" ]; then
   PREFLIGHT_ACTION=rollback
-  EXPECTED_LEAF=stable.0077_racing_api_horse_identity_staging
+  EXPECTED_LEAF=stable.0078_externalhorse_profile_snapshot
 else
   PREFLIGHT_ACTION=forward-resume
   EXPECTED_LEAF=""

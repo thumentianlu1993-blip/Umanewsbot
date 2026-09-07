@@ -1,0 +1,67 @@
+{
+  "baseline": "a88bcbf669bd609e30f97c8a07f009881d2da705",
+  "reviewer": "review_0078_plan",
+  "verdict": "APPROVED",
+  "reviewed_round": "r2",
+  "reviewed_inputs": [
+    {
+      "path": "C:\\coding\\umanews\\docs\\changes\\fix-0078-recovery-contract\\spec.md",
+      "sha256": "e09bbda568ed5fcf77195af8d766019c9067126fc24967df2dc1459809c58f30",
+      "bytes": 6078
+    },
+    {
+      "path": "C:\\coding\\umanews\\docs\\changes\\fix-0078-recovery-contract\\design.md",
+      "sha256": "a2894aaf0a7bdd9cfc9c588a08589b24c3f6e4f6e5c144b49f547b8b1a033dc3",
+      "bytes": 16143
+    },
+    {
+      "path": "C:\\coding\\umanews\\docs\\changes\\fix-0078-recovery-contract\\test_cases.md",
+      "sha256": "91c636164d3005a8cb08d619033d4dafa64702b951183ac344c50b893de4ee2f",
+      "bytes": 7871
+    },
+    {
+      "path": "C:\\coding\\umanews\\docs\\changes\\fix-0078-recovery-contract\\tasks.md",
+      "sha256": "4fab4bf47c66f434970208d1536dc867e1aa571ed2e09a2f27f4f6fe095b09bf",
+      "bytes": 2875
+    },
+    {
+      "path": "C:\\coding\\umanews\\docs\\changes\\fix-0078-recovery-contract\\rollout.md",
+      "sha256": "e8d78740e2f099f866856f87fd4acfa56b2f8fd0c1f1a1567bdc70db196b5800",
+      "bytes": 7251
+    }
+  ],
+  "final_inputs": [
+    {
+      "path": "C:\\coding\\umanews\\docs\\changes\\fix-0078-recovery-contract\\spec.md",
+      "sha256": "e09bbda568ed5fcf77195af8d766019c9067126fc24967df2dc1459809c58f30",
+      "bytes": 6078
+    },
+    {
+      "path": "C:\\coding\\umanews\\docs\\changes\\fix-0078-recovery-contract\\design.md",
+      "sha256": "a2894aaf0a7bdd9cfc9c588a08589b24c3f6e4f6e5c144b49f547b8b1a033dc3",
+      "bytes": 16143
+    },
+    {
+      "path": "C:\\coding\\umanews\\docs\\changes\\fix-0078-recovery-contract\\test_cases.md",
+      "sha256": "91c636164d3005a8cb08d619033d4dafa64702b951183ac344c50b893de4ee2f",
+      "bytes": 7871
+    },
+    {
+      "path": "C:\\coding\\umanews\\docs\\changes\\fix-0078-recovery-contract\\tasks.md",
+      "sha256": "81c86675acd34bed81de2b5d8b5c1e30c69779dc23a8dc485a7f0b71e9045401",
+      "bytes": 2875
+    },
+    {
+      "path": "C:\\coding\\umanews\\docs\\changes\\fix-0078-recovery-contract\\rollout.md",
+      "sha256": "e8d78740e2f099f866856f87fd4acfa56b2f8fd0c1f1a1567bdc70db196b5800",
+      "bytes": 7251
+    }
+  ],
+  "post_review_changes": "Only the two planning-review completion checkboxes in tasks.md were marked complete. The other four reviewed inputs are byte-identical.",
+  "review_report": {
+    "path": "C:\\coding\\umanews\\docs\\changes\\fix-0078-recovery-contract\\review.md",
+    "sha256": "5a51f533b52131977a0a45e9c85b8597377cae43eebd8074aa9acc06369e273f",
+    "bytes": 5191
+  },
+  "verification": "Document structure and fingerprint checks only; no application, migration, restore or production tests executed."
+}

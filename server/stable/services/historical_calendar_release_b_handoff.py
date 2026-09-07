@@ -9,6 +9,7 @@ import stat
 import sys
 from pathlib import Path
 from typing import Any
+from stable.services import release_0078_recovery as release_0078
 
 from stable.services.historical_calendar_release_b_schema import (
     check_release_b_schema_compatibility,
@@ -24,7 +25,7 @@ from stable.models import (
 )
 
 
-HANDOFF_SCHEMA_VERSION = "migration-history-repair-preflight/v4"
+HANDOFF_SCHEMA_VERSION = release_0078.HANDOFF_SCHEMA
 PARTIAL_LEAF_SETS = {
     (
         "stable.0068_race_data_sync_pipeline_a_field_audit",
@@ -44,9 +45,10 @@ PREVIOUS_FINAL_LEAF_SET = (
 RECOVERABLE_FORWARD_PARTIAL_LEAF_SET = (
     "stable.0076_alter_externaldataimporterror_racing_region_and_more",
 )
-FINAL_LEAF_SET = (
+LEGACY_0077_FINAL_LEAF_SET = (
     "stable.0077_racing_api_horse_identity_staging",
 )
+FINAL_LEAF_SET = (release_0078.TARGET_LEAF,)
 LEGACY_FINAL_LEAF_SETS = {
     ("stable.0071_historical_calendar_release_b",),
     ("stable.0072_add_extended_racing_regions",),
@@ -54,8 +56,8 @@ LEGACY_FINAL_LEAF_SETS = {
     ("stable.0074_race_data_sync_r0_control_plane",),
     PREVIOUS_FINAL_LEAF_SET,
 }
-ORDINARY_RELEASE_LEAF_SETS = LEGACY_FINAL_LEAF_SETS | {
-    RECOVERABLE_FORWARD_PARTIAL_LEAF_SET,
+ORDINARY_RELEASE_LEAF_SETS = {
+    LEGACY_0077_FINAL_LEAF_SET,
     FINAL_LEAF_SET,
 }
 INITIAL_INSTALL_LEAF_SET = ("stable.0067_historical_calendar_release_a",)
@@ -167,6 +169,10 @@ def authorize_handoff_action(
     active_marker_present: bool = False,
 ) -> dict[str, Any]:
     leaves = tuple(sorted(leaf_set))
+    if leaves not in ORDINARY_RELEASE_LEAF_SETS:
+        return {"ok": False, "requires_restricted_marker": active_marker_present}
+    if action == "manual-release" and leaves != FINAL_LEAF_SET:
+        return {"ok": False, "requires_restricted_marker": False}
     if active_marker_present and action != "forward-resume":
         return {"ok": False, "requires_restricted_marker": True}
     if action == "initial-install":
@@ -256,6 +262,8 @@ def canonical_artifact_sha256(payload: dict[str, Any]) -> str:
 def production_audit_policy_for_leaf_set(
     leaf_set: list[str], *, repair_intent: bool = False
 ) -> str:
+    if tuple(sorted(leaf_set)) in ORDINARY_RELEASE_LEAF_SETS:
+        return "live-handoff"
     return (
         "reviewed-static"
         if repair_intent or tuple(sorted(leaf_set)) in REPAIR_LEAF_SETS
@@ -301,12 +309,20 @@ def build_preflight_artifact(
     release_0077_recovery_manifest_path: str = "",
     release_0077_recovery_manifest_sha256: str = "",
     release_0077_recovery_origin_handoff_sha256: str = "",
+    release_0078_recovery_manifest_path: str = "",
+    release_0078_recovery_manifest_sha256: str = "",
+    release_0078_recovery_origin_handoff_sha256: str = "",
+    release_0078_intent_path: str = "",
+    release_0078_intent_sha256: str = "",
 ) -> dict[str, Any]:
     live = preflight.get("production_audit_live") or {}
     writer_activity = collect_writer_activity()
     if not writer_activity["ok"]:
         raise ValueError("application writer activity is not quiescent")
     recovery_origin_action = (
+        "release-0078"
+        if tuple(preflight.get("migration_leaf_set") or []) in ORDINARY_RELEASE_LEAF_SETS
+        else
         "initial-install"
         if handoff_action == "initial-install"
         or preflight.get("recovery_origin_action") == "initial-install"
@@ -324,6 +340,8 @@ def build_preflight_artifact(
     )
     payload: dict[str, Any] = {
         "schema_version": HANDOFF_SCHEMA_VERSION,
+        "target_leaf_set": list(FINAL_LEAF_SET),
+        "migration_contract_sha256": release_0078.migration_contract(),
         "candidate_commit": candidate_commit,
         "candidate_image_id": candidate_image_id,
         "database_identity_sha256": preflight["database_identity_sha256"],
@@ -333,7 +351,8 @@ def build_preflight_artifact(
         "handoff_action": handoff_action,
         "recovery_intent_mode": (
             "required"
-            if handoff_action in {"forward-resume", "initial-install"}
+            if recovery_origin_action == "release-0078"
+            or handoff_action in {"forward-resume", "initial-install"}
             or tuple(sorted(preflight.get("migration_leaf_set", [])))
             in REPAIR_LEAF_SETS
             else "not-required"
@@ -361,6 +380,14 @@ def build_preflight_artifact(
         "preflight": preflight,
         "writer_activity": writer_activity,
         **recovery_binding,
+        **release_0078.recovery_binding(
+            preflight=preflight, candidate_commit=candidate_commit,
+            candidate_image_id=candidate_image_id,
+            manifest_path=release_0078_recovery_manifest_path,
+            manifest_sha256=release_0078_recovery_manifest_sha256,
+            origin_handoff_sha256=release_0078_recovery_origin_handoff_sha256,
+            intent_path=release_0078_intent_path, intent_sha256=release_0078_intent_sha256,
+        ),
     }
     payload["artifact_sha256"] = canonical_artifact_sha256(payload)
     return payload
@@ -571,6 +598,25 @@ def verify_preflight_artifact(
             errors.append("sha256")
         if payload.get("schema_version") != HANDOFF_SCHEMA_VERSION:
             errors.append("schema_version")
+        if payload.get("target_leaf_set") != list(FINAL_LEAF_SET):
+            errors.append("target_leaf_set")
+        try:
+            release_0078.validate_admission_state(payload)
+            if payload.get("migration_contract_sha256") != release_0078.migration_contract():
+                errors.append("migration_contract_sha256")
+            current_binding = release_0078.recovery_binding(
+                preflight=payload.get("preflight") or {},
+                candidate_commit=payload.get("candidate_commit") or "",
+                candidate_image_id=payload.get("candidate_image_id") or "",
+                manifest_path=payload.get("release_0078_recovery_manifest_path") or "",
+                manifest_sha256=payload.get("release_0078_recovery_manifest_sha256") or "",
+                origin_handoff_sha256=payload.get("release_0078_recovery_origin_handoff_sha256") or "",
+                intent_path=payload.get("release_0078_intent_path") or "",
+                intent_sha256=payload.get("release_0078_intent_sha256") or "",
+            )
+            errors.extend(f"binding:{key}" for key, value in current_binding.items() if payload.get(key) != value)
+        except (OSError, ValueError):
+            errors.append("release_0078_recovery_binding")
         for key, expected in expected_bindings.items():
             if payload.get(key) != expected:
                 errors.append(f"binding:{key}")
@@ -687,9 +733,11 @@ def build_restricted_recovery_marker(
 ) -> dict[str, Any]:
     initial_leaf_set = sorted(leaf_set)
     initial = tuple(initial_leaf_set)
+    current_origin = binding.get("origin_action") == "release-0078"
     if initial not in {
         ("stable.0070_horse_identity_evidence_commit_receipt",),
         INITIAL_INSTALL_LEAF_SET,
+        *(ORDINARY_RELEASE_LEAF_SETS if current_origin else set()),
     }:
         raise ValueError("restricted recovery intent has an unreviewed origin")
     required = {
@@ -708,6 +756,9 @@ def build_restricted_recovery_marker(
         raise ValueError("initial-install origin requires exact 0067")
     marker = {
         "schema_version": (
+            release_0078.MARKER_SCHEMA
+            if current_origin
+            else
             "migration-history-repair-restricted-recovery/v2"
             if origin_action == "initial-install"
             else "migration-history-repair-restricted-recovery/v1"
@@ -767,6 +818,22 @@ def _restricted_marker_validation_errors(
 ) -> list[str]:
     errors: list[str] = []
     schema_version = marker.get("schema_version")
+    if schema_version == release_0078.MARKER_SCHEMA:
+        if marker.get("marker_sha256") != _marker_sha256(marker):
+            errors.append("marker_sha256")
+        errors.extend(f"binding:{key}" for key, value in expected_binding.items() if marker.get(key) != value)
+        if marker.get("initial_leaf_set") != sorted(expected_leaf_set) or tuple(expected_leaf_set) not in ORDINARY_RELEASE_LEAF_SETS:
+            errors.append("initial_leaf_set")
+        if marker.get("migration_leaf_set") != marker.get("initial_leaf_set"):
+            errors.append("migration_leaf_set")
+        if marker.get("origin_action") != "release-0078" or marker.get("action") != "forward-resume":
+            errors.append("origin_action")
+        if marker.get("target_leaf_set") != list(FINAL_LEAF_SET) or marker.get("migration_contract_sha256") != release_0078.MIGRATION_CONTRACT_SHA256:
+            errors.append("target_contract")
+        for key in ("release_0078_manifest_sha256", "release_0078_intent_sha256"):
+            if not release_0078.hex_value(marker.get(key)):
+                errors.append(key)
+        return sorted(set(errors))
     if schema_version not in {
         "migration-history-repair-restricted-recovery/v1",
         "migration-history-repair-restricted-recovery/v2",
@@ -829,6 +896,10 @@ def verify_restricted_marker_for_live_state(
     )
     live = tuple(sorted(live_leaf_set))
     marker_state = tuple(sorted(marker_leaf))
+    if marker.get("schema_version") == release_0078.MARKER_SCHEMA:
+        if live not in {marker_state, FINAL_LEAF_SET}:
+            errors.append("unsafe_live_state")
+        return {"ok": not errors, "errors": sorted(set(errors)), "marker": marker}
     if marker_state == INITIAL_INSTALL_LEAF_SET:
         allowed_live_states = {
             INITIAL_INSTALL_LEAF_SET,
@@ -843,13 +914,13 @@ def verify_restricted_marker_for_live_state(
             ),
             *LEGACY_FINAL_LEAF_SETS,
             RECOVERABLE_FORWARD_PARTIAL_LEAF_SET,
-            FINAL_LEAF_SET,
+            LEGACY_0077_FINAL_LEAF_SET,
         }
     else:
         allowed_live_states = REPAIR_LEAF_SETS | {
             *LEGACY_FINAL_LEAF_SETS,
             RECOVERABLE_FORWARD_PARTIAL_LEAF_SET,
-            FINAL_LEAF_SET,
+            LEGACY_0077_FINAL_LEAF_SET,
         }
         if marker_state != ("stable.0070_horse_identity_evidence_commit_receipt",):
             errors.append("marker_not_initial")

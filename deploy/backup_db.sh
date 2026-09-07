@@ -12,6 +12,7 @@ fi
 # A caller such as a release wrapper must be able to force a local-only
 # rollback snapshot even when the persistent production .env defaults to OSS.
 CALLER_BACKUP_TARGET="${BACKUP_TARGET:-}"
+CALLER_BACKUP_DIR="${BACKUP_DIR:-}"
 CALLER_COMPOSE_FILE="${COMPOSE_FILE:-}"
 CALLER_EXPECTED_COMPOSE_PROJECT="${EXPECTED_COMPOSE_PROJECT:-}"
 
@@ -20,6 +21,9 @@ set -a
 set +a
 
 BACKUP_DIR="${BACKUP_DIR:-./backups/db}"
+if [ -n "$CALLER_BACKUP_DIR" ]; then
+  BACKUP_DIR="$CALLER_BACKUP_DIR"
+fi
 BACKUP_TARGET="${BACKUP_TARGET:-local}"
 if [ -n "$CALLER_BACKUP_TARGET" ]; then
   BACKUP_TARGET="$CALLER_BACKUP_TARGET"

@@ -16,6 +16,7 @@ from stable.services.historical_calendar_release_b_handoff import (
     restricted_marker_origin_action,
     verify_restricted_marker_for_live_state,
 )
+from stable.services import release_0078_recovery as release_0078
 
 
 class Command(BaseCommand):
@@ -43,6 +44,8 @@ class Command(BaseCommand):
         parser.add_argument(
             "--release-0077-recovery-origin-handoff-sha256", default=""
         )
+        for field in release_0078.BINDING_FIELDS:
+            parser.add_argument("--" + field.replace("_", "-"), default="")
 
     def handle(self, *args, **options):
         marker_path = (
@@ -84,6 +87,22 @@ class Command(BaseCommand):
             raise CommandError("Release B preflight failed")
         marker_ok = False
         verified_marker = None
+        prepared_0078 = bool(options["release_0078_intent_path"])
+        if prepared_0078:
+            try:
+                release_0078.recovery_binding(
+                    preflight=result, candidate_commit=options["candidate_commit"],
+                    candidate_image_id=options["candidate_image_id"],
+                    manifest_path=options["release_0078_recovery_manifest_path"],
+                    manifest_sha256=options["release_0078_recovery_manifest_sha256"],
+                    origin_handoff_sha256=options["release_0078_recovery_origin_handoff_sha256"],
+                    intent_path=options["release_0078_intent_path"],
+                    intent_sha256=options["release_0078_intent_sha256"],
+                )
+            except (OSError, ValueError) as exc:
+                raise CommandError(str(exc)) from exc
+            if options["action"] == "forward-resume" and options["provenance_artifact_sha256"] != options["release_0078_recovery_origin_handoff_sha256"]:
+                raise CommandError("0078 resume origin differs from prepared intent")
         if options["action"] == "forward-resume":
             if not options["restricted_marker_path"] or not options["provenance_artifact_sha256"]:
                 raise CommandError("forward-resume requires marker and provenance")
@@ -118,6 +137,11 @@ class Command(BaseCommand):
                     )
                     marker_ok = marker_result["ok"]
                     verified_marker = marker_result.get("marker")
+            if prepared_0078 and not active_marker_present:
+                # The host intent was persisted before the first stop. A
+                # failed closed-handoff/marker publication is recoverable;
+                # ensure_intent still verifies closed state before any DDL.
+                marker_ok = True
         if initial_origin and verified_marker:
             result.update({
                 "recovery_origin_catalog_sha256": verified_marker.get("initial_catalog_sha256"),
@@ -164,6 +188,7 @@ class Command(BaseCommand):
                 release_0077_recovery_origin_handoff_sha256=options[
                     "release_0077_recovery_origin_handoff_sha256"
                 ],
+                **{field: options[field] for field in release_0078.BINDING_FIELDS},
             )
             publish_preflight_artifact(path=path, payload=artifact)
         except (OSError, ValueError) as exc:
