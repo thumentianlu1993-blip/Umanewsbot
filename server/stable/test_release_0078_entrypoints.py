@@ -80,7 +80,7 @@ elif command == 'compose':
         fail('probe-'+service)
         if service in state['services']: print('cid-'+service)
     elif args[0] == 'config':
-        print(json.dumps({'name':os.environ.get('COMPOSE_PROJECT_NAME','isolated0078'), 'services':{service:{'environment':{name:os.environ.get(name,'false') for name in state['flags']}} for service in state['services']}}))
+        print(json.dumps({'name':os.environ.get('COMPOSE_PROJECT_NAME','isolated0078'), 'services':{service:{'environment':{name:os.environ.get(name,'false') for name in state['flags']}} for service in state['compose_services']}}))
     elif args[0] == 'stop':
         # This is the externally visible side effect: durable intent and
         # active pointer must already exist and validate before it happens.
@@ -96,6 +96,8 @@ elif command == 'compose':
         save(); event('start-after-completion:'+args[-1]); fail('after-service-start')
     elif args[0] == 'exec':
         if 'pg_restore' in args: print('synthetic custom dump TOC')
+        elif 'print(connection.vendor)' in args[-1]: print('postgresql')
+        elif 'historical-initial-install-0070-or-later' in args[-1]: print(state['initial_install_schema'])
         else: assert args[-2:] == ['-s','reload']
     elif args[0] == 'run' and 'check_historical_calendar_release_b_schema' in args:
         print(json.dumps({'ok': True, 'migration_leaf_set':[state['leaf']], 'database_identity_sha256':os.environ['EXPECTED_PRODUCTION_DB_IDENTITY_SHA256']}))
@@ -216,7 +218,7 @@ class HostHarness:
         self.repair = root / "runtime/migration_history_repair"
         self.repair.mkdir(mode=0o700, parents=True)
         self.restore = {name: name in {"nginx"} if manual else name in {"web", "worker", "beat", "race_sync_v2_worker", "nginx"} for name in SERVICES}
-        (root / "test-state.json").write_text(json.dumps({"leaf": leaf, "services": self.restore, "migration_count": 0, "static_complete": False,
+        (root / "test-state.json").write_text(json.dumps({"leaf": leaf, "services": self.restore, "compose_services": list(SERVICES), "migration_count": 0, "static_complete": False,
                                                        "flags": {name: "false" for name in WRITER_FLAGS}}))
         (root / ".env").write_text("# synthetic closed writer flags\n")
         self.env = {**os.environ, **{name: "false" for name in WRITER_FLAGS},

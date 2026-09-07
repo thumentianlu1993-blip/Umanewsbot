@@ -2979,8 +2979,11 @@ class ApplicationReleaseOrchestrationTests(SimpleTestCase):
 
     def test_t13_race_live_absent_is_never_started(self):
         h = current_release_harness(self, absent=True)
+        self.assertIn('race_live_worker', h.state()['compose_services'])
+        self.assertNotIn('race_live_worker', h.state()['services'])
         result = h.initial(entrypoint=['sh', ORCHESTRATION_REL])
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('compose:config --format json', h.events())
         self.assertNotIn('stop-with-verified-intent:race_live_worker', h.events())
         self.assertNotIn('start-after-completion:race_live_worker', h.events())
 
@@ -3476,27 +3479,33 @@ class HistoricalInitialInstallSemanticsTests(SimpleTestCase):
                 relative,
             )
 
-    def test_t18_pre_0070_initial_install_reaches_release_for_standard_and_lowcost(self):
+    def test_t18_pre_0070_initial_install_is_rejected_before_stop_for_standard_and_lowcost(self):
+        from stable.services import release_0078_recovery as contract
         for script, compose_file in (
             ("deploy/deploy.sh", COMPOSE_STANDARD),
             ("deploy/deploy_lowcost.sh", COMPOSE_LOWCOST),
         ):
-            with self.subTest(script=script), TemporaryDirectory() as tmp:
-                harness = Harness(Path(tmp))
-                seed_services(harness, race_live="running")
-                seed_git_head(harness)
-                harness.set_state(
-                    "initial-install-schema", "historical-initial-install-pre-0070\n"
-                )
-                harness.set_state("preflight-attempt-mode", "required\n")
-                result = harness.run_script(
-                    script, HISTORICAL_RUNNER_INITIAL_INSTALL="true"
-                )
+            with self.subTest(script=script):
+                harness = current_release_harness(self, compose=compose_file,
+                    leaf='stable.0067_historical_calendar_release_a')
+                state = harness.state()
+                state['initial_install_schema'] = 'historical-initial-install-pre-0070'
+                (harness.root / 'test-state.json').write_text(json.dumps(state))
+                harness.env['HISTORICAL_RUNNER_INITIAL_INSTALL'] = 'true'
+                result = harness.top_level(script)
                 self.assertNotEqual(result.returncode, 0)
-                self.assertIn('0078 release refused', result.stderr)
-                events=harness.events()
-                self.assertFalse(any(is_release_run(event) or is_exec_migrate(event) for event in events))
-                self.assertEqual([argv for _cf,argv in compose_calls(events) if argv[:1] in (['stop'],['up'])],[])
+                self.assertIn('0078 handoff has an unsupported source leaf', result.stderr)
+                artifact = next(harness.repair.glob('preflight/initial.*/preflight.json'))
+                payload = json.loads(artifact.read_text())
+                self.assertEqual(payload['artifact_sha256'], contract.digest(
+                    {key: value for key, value in payload.items() if key != 'artifact_sha256'}))
+                self.assertEqual(payload['preflight']['migration_leaf_set'],
+                                 ['stable.0067_historical_calendar_release_a'])
+                self.assertIn('admission-written', harness.events())
+                self.assertFalse(any(event.startswith(('stop-with-', 'start-after-'))
+                                     for event in harness.events()))
+                self.assertNotIn('backup-created', harness.events())
+                self.assertEqual(harness.state()['migration_count'], 0)
 
 
     def test_t18_missing_or_sqlite_database_engine_stops_before_stateful_release(self):
