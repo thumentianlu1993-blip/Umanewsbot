@@ -1279,7 +1279,7 @@ class HostReleaseWrapperTests(SimpleTestCase):
             rc = harness.state / 'rc-compose-run'
             state['compose_release_rc'] = int(rc.read_text()) if rc.exists() else 0
             (root / 'test-state.json').write_text(json.dumps(state))
-            locked = current.command(['sh', LOCK_SCRIPT_REL, 'acquire'])
+            locked = current.command(['sh', LOCK_SCRIPT_REL, 'acquire'], {**current.env, 'DEPLOYMENT_LOCK_ACTION': 'deploy'})
             self.assertEqual(locked.returncode, 0, locked.stderr)
             (root / 'events.jsonl').write_text('')
             harness.current_wrapper = current

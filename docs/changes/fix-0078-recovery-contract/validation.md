@@ -21,8 +21,8 @@
 | 真实 PostgreSQL 16 | 0077→0078、锁超时原子性与重试、不可逆边界、custom dump 在新空库恢复 JSON/FK/recorder 均通过 |
 | 实际恢复 shell、私有文件和故障断点 | 修正夹具后通过，覆盖两种 source leaf 的中断与续跑、身份/备份/配置篡改拒绝 |
 | 真实 v5 管理命令与迁移衔接 | 真实 create→verify→ensure(v3)→0078 migration→complete receipt 通过；`manage.py check` 正常，`makemigrations --check --dry-run` 无漂移 |
-| 完整 stable 固定基线对照 | 首轮 baseline 4886 tests / 71 failures / 259 errors / 15 skipped；candidate 4915 tests / 163 failures / 264 errors / 18 skipped；新增 101 个失败记录（含子例），尚未通过 |
-| 仓库工作流合同检查 | 本地 checker 报 5 处既有历史文档引用；4 项合同测试中 1 error、3 pass。待同环境固定基线对照，不在本任务中扩大治理清理 |
+| 完整 stable 固定基线对照 | 正常测试模式 baseline 4886 tests / 69 failures / 258 errors / 15 skipped；第二轮 candidate 4922 / 131 failures / 262 errors / 19 skipped；新增 70 个旧合同失败已修夹具，待最终 CI |
+| 仓库工作流合同检查 | 正常模式两侧 checker/test 均退出 1/1：5 处既有历史文档引用，4 项合同测试中 1 error、3 pass；没有新增，不在本任务中扩大治理清理 |
 | 独立原生代码审核 | 首轮 P1/P2 已在同一 reviewer 的第二轮复审中解决，无新增 finding；最终测试/CI 差量仍待审核 |
 
 首轮 [CI run 34103904943](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/34103904943)
@@ -31,7 +31,11 @@
 
 首轮完整套件通过 `python -` 启动，触发了仓库既有 `RUNNING_TESTS` 判断差异，使用了
 RedisCache 而非正常测试的 LocMemCache。因此这些数量只是首轮原始证据，不能作为最终
-正常测试基线；已把两侧启动参数统一为 `manage.py test stable` 的测试模式，正在重跑。
+正常测试基线；已把两侧启动参数统一为 `manage.py test stable` 的测试模式。
+第二轮 [CI run 34105926335](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/34105926335)
+取得上表的正常基线，新增失败为 `test_single_migration_owner` 55 个、
+`test_migration_history_repair` 11 个、`test_historical_calendar_release_b` 4 个。
+新 0078 模块没有新增失败，不能因此忽略旧入口的合同回归。
 第二轮专项在测试前因证据目录造成脏 worktree 而退出，没有执行用例；证据现移至
 `RUNNER_TEMP`，未放松 clean 检查或 fingerprint 脚本。
 
@@ -65,3 +69,27 @@ P2 保留并修正了断言，没有删除测试或将新增失败归入历史�
 恢复入口测试运行真实 coordinator、resume shell、deployment lock 和 POSIX 私有产物，
 Docker/Compose、备份命令与部分下游命令使用替身。PG16 测试补充真实迁移、数据库语义、
 备份恢复和管理命令衔接。二者不等于已经在生产容器编排中演练。
+
+## 验收矩阵的实际覆盖
+
+下表按独立测试 agent 的用例核对记录；计划中的完整系统验收与开发验证分开标记。
+36 项通过来自 `dfb20ca8`；三个补充用例以及旧夹具修正来自 `2e11e7ef`，仍待最终 Linux 结果。
+
+| 计划项 | 已有证据与边界 |
+| --- | --- |
+| T01 | 固定 Git SHA、迁移合同和 Linux 前后指纹 |
+| T02–T03、T09–T11 | 真实 PG16 的 preflight、0077→0078 与空计划、JSON/NOT NULL/default、锁超时原子重试、不可逆 |
+| T04–T05 | 全文件 hash、未知 0079、异名 0078、低序号插入和嵌套路径负例；重复路径枚举没有单独用例 |
+| T06–T08 | catalog 变异的纯校验器测试；真实 PG 验证正确结构，旧 0077 catalog 测试待最终全量 |
+| T12–T15、T28 | coordinator 两 Compose 的备份失败/绑定拒绝；共享校验和真实 PG 管理命令闭环；私有文件权限/父目录/symlink；admission-only 拒绝。新三类顶层入口和 wrapper 正例、合法含空格路径待最终 CI。未对每个坏证明在每个入口穷举组合 |
+| T16 | 静态 DB/source/plan 漂移负例通过；新增 stop web 后 closed preflight 改变 DB identity 的真实 coordinator 拒绝测试待 CI。未逐项动态改变所有 catalog 属性 |
+| T17–T20、T35–T42 | 两种 source 的 20 个故障重放子例经真实 resume shell 通过；Docker/Git/DDL 边界用替身，真实 DDL 由独立 PG 用例验证 |
+| T21 | 备份 inode、intent/pointer 绑定通过；新增替换 v3 receipt 内容及 inode 后真实 resume 拒绝待 CI，不承诺相同内容跨重试换 inode 必须拒绝 |
+| T22–T27 | 默认两种 rollback 零变更拒绝已通过；旧 stopped resume、控制镜像、模拟允许与显式代际夹具待最终全量 |
+| T29–T30 | 真实 0077/0078 custom dump 均恢复到新空库，核对 snapshot、关联、计数、recorder 和列状态；未构建目标应用镜像读取恢复库 |
+| T31 | 截断 dump 恢复失败且已恢复数据不变；未做进程中断、连接切换与服务组切换的系统演练 |
+| T32 | 实际 host shell 与替身 Docker/drain，覆盖有效开关和原服务意图；没有真实 Celery/Redis 消费或 purge 验证 |
+| T33 | check、migration drift、shell 语法、diff 和 Linux 指纹通过；工作流检查与固定基线相同，最终全量结果待收尾 |
+| T34 | 未来生产实时只读验收，未执行 |
+
+这些未执行项不通过增建一套部署平台补齐。候选真实镜像/Compose、队列和连接切换验收仍属于精确发布包的验证范围。
