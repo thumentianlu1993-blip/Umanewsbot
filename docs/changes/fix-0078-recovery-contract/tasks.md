@@ -18,10 +18,10 @@
 
 ## 2. 目标测试（RED 与故障注入）
 
-- [x] (application) T02–T11：migration graph、catalog、不可逆、锁与原子性测试。
-- [ ] (integration) T12–T22/T28/T35–T42：核对三类入口备份检查与stop/closed/marker/completion断点的真实resume覆盖；专项已通过，矩阵逐项映射待收尾。
-- [ ] (operations) T23–T27：真实拒绝策略和显式代际fixture；防回归负例。
-- [ ] (operations) T29–T32：隔离备份恢复已通过；核对完整恢复矩阵与队列边界证据。
+- [x] (application) T02–T11：完成本次直接路径的graph、纯catalog校验、正向PG模板、不可逆与锁原子性开发验证；旧历史PG场景仍被既有setup错误阻断，见validation。
+- [x] (integration) T12–T22/T28/T35–T42：完成开发测试与逐项覆盖核对；专项及三类入口/真实wrapper的最终回归通过，系统验收边界见validation。
+- [x] (operations) T23–T27：真实禁用策略、模拟允许与显式代际fixture完成验证；防回归负例保留。
+- [x] (operations) T29–T32：隔离备份恢复通过，已核对并记录恢复矩阵与队列测试边界；真实镜像/队列/连接切换验收留在发布阶段。
 
 首批 7 项测试取得 RED 后转为 GREEN；其余用例补充故障注入与隔离集成证据，未声称每项都有独立 RED 记录。实际结果与测试替身边界见 `validation.md`。
 
@@ -31,16 +31,16 @@
 - [x] (integration) v5 handoff及upgrade/same-schema backup manifest贯穿标准/低成本/manual和全部producer/consumer。
 - [x] (integration) 停服前prepared发布意图、active pointer与既有DDL marker/completion分层绑定；扩展resume_migration_history_repair.sh覆盖无DDL marker和schema完成但服务未恢复的断点。
 - [x] (operations) 0078 allowlist和显式tail；保持真实生产普通rollback禁用。
-- [ ] (operations) 重建测试Harness代际输入，保留旧协议fixture与拒绝回归。
+- [x] (operations) 重建测试Harness代际输入，保留旧协议fixture与拒绝回归。
 - [x] (operations) 更新部署/恢复文档，明确旧世代恢复边界和备份数据损失窗口。
 
 ## 4. 验证与交付准备
 
-- [ ] (application) 相关单元和shell套件全绿。
-- [x] (integration) PG16迁移、锁竞争、失败重放、备份恢复全部通过。
-- [ ] (operations) T33检查、全量stable同环境基线对比，无新增失败。
-- [ ] (operations) 独立代码review及复审。
-- [ ] (operations) 整理实现、测试与恢复路径的交付记录；更新必要状态文档。
+- [x] (application) 0078专项与修订的shell/夹具回归通过；未通过的历史基线场景单独记录，不声称完整stable或旧历史PG套件全绿。
+- [x] (integration) 真实PG16迁移、锁竞争、备份恢复与管理命令链通过；真实host入口的故障重放也通过，Docker/DDL边界使用明示替身。
+- [x] (operations) T33完成检查与全量stable同环境基线对比：4925对4886，无新增失败；工作流合同的既有失败与基线相同。
+- [x] (operations) 独立代码review及同上下文五轮审核/复审；所有 actionable findings 解决。
+- [x] (operations) 整理实现、测试与恢复路径的交付记录，更新必要状态文档；交付为Draft PR #181。
 
 ## 5. 后续发布
 

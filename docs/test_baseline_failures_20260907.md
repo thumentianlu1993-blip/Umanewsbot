@@ -4,6 +4,15 @@
 > 失败集合与 M1 分支逐项一致，与 M1 变更无关）。当时没有完整 stable 回归 CI；已有的两条专项 workflow 不覆盖该基线。
 > 本报告记录 2026-09-07 的逐簇取样结论与处理建议，供后续工单使用。
 
+## 0078 跟进结果
+
+`fix-0078-recovery-contract` 已完成代码实现与独立测试/复审，交付为 Draft PR #181，未合并或部署。
+同环境 Linux/PG16 固定基线 `a88bcbf6` 为 4886 tests、69 failures、258 errors；
+最终代码 `966e3455` 为 4925 tests、31 failures、257 errors，0 新增失败、39 个既有失败 ID 消失。
+0078 专项 39/39 通过；普通生产代码 rollback 仍按既定策略关闭。
+完整结果、仍被不可逆 setup 阻断的旧 PG 场景与测试替身边界见
+[验证记录](changes/fix-0078-recovery-contract/validation.md)。下文是原始基线的历史分类与建议。
+
 ## 分类与根因
 
 | 类别 | 规模 | 根因 | 典型模块 |

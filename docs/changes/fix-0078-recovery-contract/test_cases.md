@@ -2,7 +2,7 @@
 
 ## 1. 验证边界
 
-本文件定义验收矩阵。实现阶段已取得纯逻辑 RED→GREEN；独立 Linux/PostgreSQL 16 专项 36 项已通过，旧合同全量对照仍在收尾。逐项覆盖与实际执行结果以 `validation.md` 为准，不能把下列计划要求直接当作全部完成。本次未操作生产。
+本文件定义验收矩阵。实现阶段已取得纯逻辑 RED→GREEN；最终独立 Linux/PostgreSQL 16 专项 39 项通过，全量 4925 项相对固定基线无新增失败。逐项覆盖、历史失败与实际执行结果以 `validation.md` 为准，不能把下列系统验收计划直接当作全部完成。本次未操作生产。
 权威环境为隔离 Linux + PostgreSQL 16；Windows 原生不等同生产 shell/权限语义，SQLite不替代PG catalog、锁与事务。
 所有网络、Git远端、Docker生产项目、Celery/Redis和外部消息均使用 mock 或本次专用隔离资源；测试环境不得继承生产 .env。
 

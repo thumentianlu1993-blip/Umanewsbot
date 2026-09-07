@@ -20,7 +20,29 @@
 reviewer 独立执行了 80 个配置检查场景、6 个 shell 成败场景及原排序断言，均通过。
 shell 使用命令替身；该结论不等于真实 PG16 接缝或完整 stable 已通过。
 原生报告保存在本地 `runtime/review_evidence/fix-0078-recovery-contract/code-review-r2.txt`。
-之后的测试/CI 返修仍需最终差量审核；完整验证状态以 `validation.md` 为准。
+后续测试/CI 差量经第三、四轮审核，记录如下；完整验证状态以 `validation.md` 为准。
+
+第三轮固定 `2e11e7efe35efd86abcfe7db5d0b58e41139dfcb`，仅审 3c051364 之后的
+测试、CI 与文档差量，发现两项 P2：
+
+- “容器不存在”的夹具同时删除 Compose 服务定义，导致配置核验先遇到 KeyError。
+- pre-0070 拒绝用例的 artifact 签名不正确，尚未到达 source leaf 门禁就被拒绝。
+
+这两处分别修成配置服务与容器状态分离、正确签名的真实顶层入口测试并断言精确拒绝原因。
+另修正 wrapper 夹具 acquire 时显式传 `DEPLOYMENT_LOCK_ACTION=deploy`。
+第四轮在同一 session 固定 `17089d36d19ca293590b22293c94339471225c1d`、tree
+`de8d1de21c2fce0ccbfa8a55757babeb70662b81`，确认两项 P2 均解决，三处改动的直接
+回归无新增 actionable findings；5 个不落盘的定向场景通过，审核前后 HEAD/tree/clean 不变。
+本地报告为同目录 `code-review-r3.txt`、`code-review-r4.txt`。
+
+完整 CI 随后暴露的三个测试差量再由第五轮审核：conflicting attempt mode 精确验证
+prepare 前拒绝；manual 的 fake preflight 使用独立 DB 事实；leaf/OID 精确列表补入 0078。
+第五轮固定 `966e3455afc66a1476a8dc8e020ee81592237bbb`、tree
+`6928c2a6fa2cb0c54348c75a1a9b9a5cdafe9ece`，6 个不落盘定向场景通过，无新增 finding，
+审核前后 HEAD/tree/clean 不变，报告为 `code-review-r5.txt`。
+
+因此生产实现与最终测试代码均已完成独立审核闭环。该结论不预判完整 stable CI，
+也不代替生产镜像、队列或连接切换验收；最终结果只在 `validation.md` 中按实际证据回写。
 
 Windows 原 fingerprint 脚本因缺少 `O_NOFOLLOW` 拒绝执行，未修改该检查。
 本地以不可变 Git OID/tree 与审核前后 clean 状态绑定输入，Linux CI 另执行原脚本并保存前后指纹。
