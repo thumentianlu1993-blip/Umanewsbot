@@ -131,6 +131,12 @@ elif command == 'preflight':
         'writer_activity':{'ok':True,'counts':{},'flags':state['flags']},
         'preflight':{'ok':True,'database_identity_sha256':os.environ['EXPECTED_PRODUCTION_DB_IDENTITY_SHA256'],'migration_leaf_set':[state['leaf']], 'migration_plan':[] if state['leaf'].startswith('stable.0078') else ['0078_externalhorse_profile_snapshot']},
         **({key:os.environ[key.upper()] for key in c.BINDING_FIELDS} if bound else {})}
+    if bound and state.get('closed_database_identity'):
+        # The live closed preflight reports a different database only after
+        # all stops. The real coordinator must reject even a re-signed file.
+        payload['database_identity_sha256']=state['closed_database_identity']
+        payload['preflight']['database_identity_sha256']=state['closed_database_identity']
+        event('closed-database-drift')
     payload['artifact_sha256']=c.digest(payload)
     c.publish_once(path,payload); event('closed-written' if bound else 'admission-written')
 elif command == 'tasks':
@@ -312,6 +318,53 @@ class Release0078EntrypointTests(TestCase):
                 self.assertNotEqual(harness.initial("backup-before-write").returncode, 0)
                 self.assertFalse(any(event.startswith("stop-") for event in harness.events()))
                 self.assertEqual(harness.state()["services"], harness.restore)
+
+    def test_backup_path_with_spaces_survives_real_coordinator_arguments(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name) / 'release with spaces'
+        root.mkdir(mode=0o700)
+        harness = HostHarness(root)
+        self.assert_success(harness.initial())
+        manifest = json.loads((harness.directory / 'manifest.json').read_text())
+        self.assertIn('release with spaces', manifest['backup_path'])
+        self.assertTrue(Path(manifest['backup_path']).is_file())
+        self.assertEqual(harness.events().count('backup-created'), 1)
+
+    def test_database_drift_after_stop_blocks_migration_and_all_writer_restart(self):
+        harness = self.harness(leaf=SOURCE)
+        state = harness.state()
+        state['closed_database_identity'] = 'f' * 64
+        (harness.root / 'test-state.json').write_text(json.dumps(state))
+        result = harness.initial()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('handoff binding mismatch', result.stderr)
+        events = harness.events()
+        self.assertLess(events.index('stop-with-verified-intent:web'), events.index('closed-database-drift'))
+        self.assertEqual(harness.state()['migration_count'], 0)
+        self.assertFalse((harness.repair / 'restricted-recovery.json').exists())
+        self.assertFalse(any(event.startswith('start-after-') for event in events))
+        self.assertTrue((harness.directory.parent / 'active.json').exists())
+
+    def test_replaced_v3_completion_receipt_is_rejected_by_real_resume(self):
+        harness = self.harness()
+        self.assertNotEqual(harness.initial('after-schema-completion').returncode, 0)
+        receipt = next(harness.repair.glob('restricted-recovery.completed.*.json'))
+        original_inode = receipt.stat().st_ino
+        payload = json.loads(receipt.read_text())
+        self.assertEqual(payload['schema_version'], 'migration-history-repair-restricted-recovery/v3')
+        receipt.rename(receipt.with_suffix('.preserved'))
+        payload['marker_sha256'] = '0' * 64
+        receipt.write_bytes(contract.encoded(payload))
+        receipt.chmod(0o600)
+        self.assertNotEqual(receipt.stat().st_ino, original_inode)
+        before = [event for event in harness.events() if event.startswith('start-after-')]
+        result = harness.resume()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('completion receipt is invalid', result.stderr)
+        self.assertEqual([event for event in harness.events() if event.startswith('start-after-')], before)
+        self.assertFalse((harness.directory / 'complete.json').exists())
+        self.assertTrue((harness.directory.parent / 'active.json').exists())
 
     def test_manual_stopped_service_intent_is_preserved(self):
         for compose in ("docker-compose.prod.yml", "docker-compose.prod.lowcost.yml"):
