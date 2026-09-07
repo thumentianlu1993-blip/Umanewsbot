@@ -6,10 +6,14 @@ test "${POSTGRES_HOST:-}" = 127.0.0.1
 test "${POSTGRES_DB:-}" = release_0078_ci
 test ! -e .env
 test ! -e server/.env
-evidence="$PWD/runtime/review_evidence/fix-0078-recovery-contract/ci"
+evidence="${RUNNER_TEMP:?RUNNER_TEMP must be outside the clean checkout}/release-0078-test-evidence"
 mkdir -p "$evidence"
 git rev-parse HEAD > "$evidence/commit.txt"
-test -z "$(git status --porcelain)"
+if [ -n "$(git status --porcelain)" ]; then
+  git status --short >&2
+  echo 'The fingerprint requires a clean checkout before testing.' >&2
+  exit 1
+fi
 python .codex/scripts/review_fingerprint.py --base a88bcbf669bd609e30f97c8a07f009881d2da705 > "$evidence/review-fingerprint-before.txt"
 finish_fingerprint() {
   status=$?

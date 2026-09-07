@@ -62,7 +62,7 @@ jobs:
         if: always()
         with:
           name: release-0078-test-evidence
-          path: runtime/review_evidence/fix-0078-recovery-contract/ci
+          path: ${{ runner.temp }}/release-0078-test-evidence
           if-no-files-found: error
 
   stable-baseline-comparison:
