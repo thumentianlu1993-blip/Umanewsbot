@@ -1,7 +1,7 @@
 #!/bin/sh
-# Resume only the exact reviewed candidate after a 0068/0069 partial migration.
-# All application services must remain stopped. This entry never builds, pulls,
-# checks out, selects a latest artifact, or accepts a different candidate.
+# Resume the exact prepared 0078 release, including interruptions before DDL.
+# The older marker-based protocol remains below for its pinned control image.
+# Neither path builds, pulls, checks out, or selects a latest artifact.
 set -eu
 
 ROOT_DIR="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"

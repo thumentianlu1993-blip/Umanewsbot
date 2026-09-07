@@ -2532,8 +2532,8 @@ class MigrationHistoryRepairOperationsContractRedTests(TestCase):
         migrate = text.index("manage.py migrate --noinput")
         transition = text.index("complete_historical_calendar_restricted_recovery")
         collectstatic = text.index("manage.py collectstatic --noinput")
-        self.assertLess(migrate, transition)
-        self.assertLess(transition, collectstatic)
+        self.assertLess(migrate, collectstatic)
+        self.assertLess(collectstatic, transition)
         self.assertNotIn("--if-present", text)
         self.assertIn('--attempt-mode="$RESTRICTED_RECOVERY_ATTEMPT_MODE"', text)
         self.assertIn('--artifact-path="$RELEASE_B_PREFLIGHT_ARTIFACT_PATH"', text)
@@ -2601,6 +2601,8 @@ class MigrationHistoryRepairOperationsContractRedTests(TestCase):
         migrate = next(i for i, call in enumerate(calls) if "migrate --noinput" in call)
         self.assertLess(intent, migrate)
         self.assertFalse(any("record_historical_calendar" in call for call in calls))
+        self.assertFalse(any("collectstatic" in call for call in calls))
+        self.assertFalse(any("complete_historical_calendar_restricted_recovery" in call for call in calls))
 
     def test_normal_release_ignores_stale_provenance_and_uses_fresh_artifact(self):
         script = (ROOT / "deploy/docker/run-release-tasks.sh").read_text(
@@ -2680,7 +2682,7 @@ class MigrationHistoryRepairOperationsContractRedTests(TestCase):
         )
         self.assertLess(migrate_index, complete_index)
 
-    def test_collectstatic_failure_occurs_after_restricted_marker_transition(self):
+    def test_collectstatic_failure_keeps_restricted_marker_active(self):
         script = (ROOT / "deploy/docker/run-release-tasks.sh").read_text(
             encoding="utf-8"
         )
@@ -2728,9 +2730,12 @@ class MigrationHistoryRepairOperationsContractRedTests(TestCase):
             )
             calls = log.read_text(encoding="utf-8").splitlines()
         self.assertEqual(result.returncode, 31)
-        transition = next(i for i, call in enumerate(calls) if "complete_historical_calendar_restricted_recovery" in call)
+        intent = next(i for i, call in enumerate(calls) if "ensure_historical_calendar_recovery_intent" in call)
+        migrate = next(i for i, call in enumerate(calls) if "migrate --noinput" in call)
         collectstatic = next(i for i, call in enumerate(calls) if "collectstatic" in call)
-        self.assertLess(transition, collectstatic)
+        self.assertLess(intent, migrate)
+        self.assertLess(migrate, collectstatic)
+        self.assertFalse(any("complete_historical_calendar_restricted_recovery" in call for call in calls))
 
     def test_writer_gate_uses_real_historical_backfill_flags(self):
         from stable.services.historical_calendar_release_b_handoff import (

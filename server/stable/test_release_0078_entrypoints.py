@@ -25,6 +25,14 @@ COMMIT = "b" * 40
 IMAGE = "sha256:" + "c" * 64
 DB = "d" * 64
 SERVICES = ("web", "worker", "beat", "race_live_worker", "race_sync_v2_worker", "nginx")
+WRITER_FLAGS = (
+    "RACE_LIVE_SCHEDULER_ENABLED", "RACE_LIVE_MONITOR_ENABLED", "RACE_DATA_SYNC_ENABLED",
+    "RACE_DATA_SYNC_SCHEDULER_ENABLED", "RACE_DATA_SYNC_ALLOW_NETWORK", "RACE_DATA_SYNC_FUTURE_DISCOVERY_ENABLED",
+    "RACE_DATA_SYNC_SCHEDULE_APPLY_ENABLED", "RACE_DATA_SYNC_RACECARD_APPLY_ENABLED",
+    "RACE_DATA_SYNC_LIFECYCLE_APPLY_ENABLED", "RACE_DATA_SYNC_RESULT_APPLY_ENABLED",
+    "RACE_DATA_SYNC_RESULT_PUBLIC_ENABLED", "RACE_DATA_SYNC_CORRECTION_APPLY_ENABLED",
+    "HISTORICAL_RACE_BACKFILL_ENABLED", "HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK",
+)
 
 
 FAKE_BOUNDARIES = r'''#!/usr/bin/env python3
@@ -70,6 +78,8 @@ elif command == 'compose':
     if args[0] == 'ps':
         service = args[-1]
         if service in state['services']: print('cid-'+service)
+    elif args[0] == 'config':
+        print(json.dumps({'name':os.environ.get('COMPOSE_PROJECT_NAME','isolated0078'), 'services':{service:{'environment':{name:os.environ.get(name,'false') for name in state['flags']}} for service in state['services']}}))
     elif args[0] == 'stop':
         # This is the externally visible side effect: durable intent and
         # active pointer must already exist and validate before it happens.
@@ -108,7 +118,7 @@ elif command == 'preflight':
         'compose_file':os.environ['COMPOSE_FILE'], 'artifact_path':str(path),
         'deployment_lock_token_sha256':hashlib.sha256(os.environ['DEPLOYMENT_LOCK_TOKEN'].encode()).hexdigest(),
         'handoff_action':'forward-resume', 'release_0078_recovery_binding_mode':'bound',
-        'writer_activity':{'ok':True,'counts':{},'flags':{}},
+        'writer_activity':{'ok':True,'counts':{},'flags':state['flags']},
         'preflight':{'ok':True,'database_identity_sha256':os.environ['EXPECTED_PRODUCTION_DB_IDENTITY_SHA256'],'migration_leaf_set':[state['leaf']], 'migration_plan':[] if state['leaf'].startswith('stable.0078') else ['0078_externalhorse_profile_snapshot']},
         **{key:os.environ[key.upper()] for key in c.BINDING_FIELDS}}
     payload['artifact_sha256']=c.digest(payload)
@@ -188,16 +198,19 @@ class HostHarness:
         self.repair = root / "runtime/migration_history_repair"
         self.repair.mkdir(mode=0o700, parents=True)
         self.restore = {name: name in {"nginx"} if manual else name in {"web", "worker", "beat", "race_sync_v2_worker", "nginx"} for name in SERVICES}
-        (root / "test-state.json").write_text(json.dumps({"leaf": leaf, "services": self.restore, "migration_count": 0, "static_complete": False}))
+        (root / "test-state.json").write_text(json.dumps({"leaf": leaf, "services": self.restore, "migration_count": 0, "static_complete": False,
+                                                       "flags": {name: "false" for name in WRITER_FLAGS}}))
         (root / ".env").write_text("# synthetic closed writer flags\n")
-        self.env = {**os.environ, "UMANEWS_ROOT_DIR": str(root), "COMPOSE_FILE": compose,
+        self.env = {**os.environ, **{name: "false" for name in WRITER_FLAGS},
+                    "UMANEWS_ROOT_DIR": str(root), "COMPOSE_FILE": compose, "COMPOSE_PROJECT_NAME": "isolated0078",
                     "EXPECTED_CANDIDATE_COMMIT": COMMIT, "EXPECTED_CANDIDATE_IMAGE_ID": IMAGE,
                     "EXPECTED_PRODUCTION_DB_IDENTITY_SHA256": DB, "EXPECTED_COMPOSE_PROJECT": "isolated0078",
                     "DEPLOYMENT_LOCK_DIR": str(root / "deployment.lock"), "DEPLOYMENT_LOCK_TOKEN": "original-test-lease",
                     "PATH": str(root / "fake-bin") + os.pathsep + os.environ["PATH"],
                     "PYTHONPATH": str(root / "fault-hooks"), "UMANEWS_0078_TEST_FAULTS": "1"}
         origin_dir = self.repair / "preflight/original"
-        origin_dir.mkdir(mode=0o700, parents=True)
+        origin_dir.parent.mkdir(mode=0o700)
+        origin_dir.mkdir(mode=0o700)
         self.origin_path = origin_dir / "preflight.json"
         payload = {"schema_version": "migration-history-repair-preflight/v5", "target_leaf_set": [TARGET],
                    "migration_contract_sha256": "50c421f3167a8c2c8f1613a0597ad7ee196c249fc18bf7eed0de7b9cd2f80906",
@@ -205,7 +218,7 @@ class HostHarness:
                    "compose_file": compose, "artifact_path": str(self.origin_path),
                    "deployment_lock_token_sha256": hashlib.sha256(b"original-test-lease").hexdigest(),
                    "handoff_action": "manual-release" if manual else "deploy", "release_0078_recovery_binding_mode": "admission-only",
-                   "recovery_intent_mode": "required", "writer_activity": {"ok": True, "counts": {}, "flags": {}},
+                   "recovery_intent_mode": "required", "writer_activity": {"ok": True, "counts": {}, "flags": {name: "false" for name in WRITER_FLAGS}},
                    "preflight": {"ok": True, "database_identity_sha256": DB, "migration_leaf_set": [leaf], "migration_plan": [] if leaf == TARGET else ["0078_externalhorse_profile_snapshot"]}}
         self.origin_sha = contract.digest(payload)
         payload["artifact_sha256"] = self.origin_sha
@@ -227,7 +240,10 @@ class HostHarness:
         if acquire.returncode:
             raise AssertionError(acquire.stderr)
         try:
-            return self.command([sys.executable, "deploy/release_0078.py", "release"])
+            result = self.command([sys.executable, "deploy/release_0078.py", "release"])
+            if fault and (self.root / "fault.txt").exists():
+                raise AssertionError("injected stage was not reached: " + fault + "\n" + result.stdout + result.stderr)
+            return result
         finally:
             self.command(["sh", "deploy/deployment_lock.sh", "release"])
 
@@ -378,6 +394,33 @@ class Release0078EntrypointTests(TestCase):
         self.assertEqual([event for event in harness.events() if event.startswith("start-")], ["start-after-completion:web"])
         self.assertFalse((harness.directory / "complete.json").exists())
 
+    def test_resolved_writer_flag_override_blocks_resume_despite_unchanged_env_file(self):
+        for flag in ("RACE_LIVE_SCHEDULER_ENABLED", "RACE_DATA_SYNC_RESULT_APPLY_ENABLED"):
+            with self.subTest(flag=flag):
+                harness = self.harness()
+                self.assertNotEqual(harness.initial("after-schema-completion").returncode, 0)
+                env_bytes = (harness.root / ".env").read_bytes()
+                before = [event for event in harness.events() if event.startswith("start-")]
+                self.assertNotEqual(harness.resume(**{flag: "true"}).returncode, 0)
+                self.assertEqual((harness.root / ".env").read_bytes(), env_bytes)
+                self.assertEqual([event for event in harness.events() if event.startswith("start-")], before)
+                self.assertFalse((harness.directory / "complete.json").exists())
+
+    def test_resolved_writer_flag_override_blocks_initial_stop(self):
+        harness = self.harness()
+        harness.env["RACE_LIVE_SCHEDULER_ENABLED"] = "true"
+        self.assertNotEqual(harness.initial().returncode, 0)
+        self.assertFalse(any(event.startswith("stop-") for event in harness.events()))
+        self.assertEqual(harness.state()["services"], harness.restore)
+
+    def test_compose_project_override_cannot_resume_another_service_group(self):
+        harness = self.harness()
+        self.assertNotEqual(harness.initial("after-schema-completion").returncode, 0)
+        before = [event for event in harness.events() if event.startswith("start-")]
+        self.assertNotEqual(harness.resume(COMPOSE_PROJECT_NAME="otherproject").returncode, 0)
+        self.assertEqual([event for event in harness.events() if event.startswith("start-")], before)
+        self.assertFalse((harness.directory / "complete.json").exists())
+
     def test_replaced_backup_and_wrong_candidate_block_resume_before_more_stops(self):
         for mutation in ("backup", "candidate"):
             with self.subTest(mutation=mutation):
@@ -392,6 +435,19 @@ class Release0078EntrypointTests(TestCase):
                     result = harness.resume(EXPECTED_CANDIDATE_COMMIT="e" * 40)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertEqual([event for event in harness.events() if event.startswith("stop-")], before)
+
+    def test_valid_manifest_source_must_match_original_admission_source(self):
+        harness = self.harness(leaf=TARGET)
+        self.assertNotEqual(harness.initial("intent-before-write").returncode, 0)
+        manifest_path = harness.directory / "manifest.json"
+        manifest, _ = contract.read_json(manifest_path)
+        # Each field is independently valid, but this pair belongs to an
+        # upgrade while the immutable origin admitted same-schema 0078.
+        manifest.update(source_leaf=SOURCE, operation="upgrade")
+        manifest_path.write_bytes(contract.encoded(manifest))
+        self.assertNotEqual(harness.resume().returncode, 0)
+        self.assertFalse(any(event.startswith("stop-") for event in harness.events()))
+        self.assertEqual(harness.state()["services"], harness.restore)
 
     def test_real_default_rollback_scripts_refuse_before_mutations(self):
         for script in ("rollback.sh", "rollback_lowcost.sh"):

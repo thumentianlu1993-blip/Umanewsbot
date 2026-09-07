@@ -102,6 +102,23 @@ def config_sha():
     return hashlib.sha256((ROOT / ".env").read_bytes()).hexdigest()
 
 
+def verify_release_config(env, manifest):
+    # Compose may override .env through the caller's environment. Validate the
+    # effective project and existing writer flags without logging configuration.
+    config = json.loads(compose(["config", "--format", "json"], env))
+    if not manifest.get("compose_project") or config.get("name") != manifest["compose_project"]:
+        raise ValueError("0078 effective Compose project differs from preparation")
+    flags = manifest.get("writer_flags")
+    if not isinstance(flags, dict) or not flags:
+        raise ValueError("0078 original writer flags are missing")
+    for service in contract.SERVICES:
+        if service == "nginx":
+            continue
+        actual = config["services"][service].get("environment") or {}
+        if any(str(actual.get(key, "false")).strip().lower() != value for key, value in flags.items()):
+            raise ValueError(f"0078 effective {service} writer flags differ from preparation")
+
+
 def binding_env(intent_path, identity, intent):
     return {
         "RELEASE_0078_INTENT_PATH": str(intent_path), "RELEASE_0078_INTENT_SHA256": identity["sha256"],
@@ -147,7 +164,10 @@ def prepare(env, *, resume):
     manifest_path = release_dir / "manifest.json"
     intent_path = release_dir / "intent.json"
     expected = {key: origin[key] for key in ("candidate_commit", "candidate_image_id", "database_identity_sha256", "compose_file")}
-    expected.update(release_id=origin_sha, origin_handoff_sha256=origin_sha)
+    expected.update(
+        release_id=origin_sha, origin_handoff_sha256=origin_sha,
+        source_leaf=origin["preflight"]["migration_leaf_set"][0],
+    )
     if os.path.lexists(intent_path):
         if not resume:
             raise ValueError("0078 intent exists; use the resume entry")
@@ -192,6 +212,7 @@ def prepare(env, *, resume):
                     project = observed
             if not re.fullmatch(r"[a-z0-9_-]+", project):
                 raise ValueError("0078 backup requires an exact EXPECTED_COMPOSE_PROJECT")
+            print("0078: creating and verifying this release's backup", flush=True)
             output = run([ROOT / "deploy/backup_db.sh"], env={**env, "BACKUP_TARGET": "local", "BACKUP_DIR": str(backup_dir), "EXPECTED_COMPOSE_PROJECT": project})
             paths = [line.removeprefix("Backup created: ") for line in output.splitlines() if line.startswith("Backup created: ")]
             if len(paths) != 1:
@@ -212,6 +233,7 @@ def prepare(env, *, resume):
             schema_state(env, source_leaf)
             manifest = {
                 "schema_version": contract.MANIFEST_SCHEMA, **expected,
+                "compose_project": project,
                 "source_leaf": source_leaf, "target_leaf": contract.TARGET_LEAF,
                 "operation": "upgrade" if source_leaf == contract.SOURCE_LEAF else "same-schema",
                 "migration_contract_sha256": contract.migration_contract(),
@@ -232,9 +254,11 @@ def prepare(env, *, resume):
             **{key: manifest[key] for key in ("restore_services", "config_sha256", "initial_lock_sha256")},
         }
         identity = contract.publish_once(intent_path, intent)
+    verify_release_config(env, manifest)
     if not os.path.lexists(release_dir / "complete.json"):
         contract.publish_once(RELEASES / "active.json", {"release_id": origin_sha, "intent_path": str(intent_path), "intent_file": identity})
     env.update(binding_env(intent_path, identity, intent))
+    print(f"0078 prepared intent: {intent_path} (sha256={identity['sha256']})", flush=True)
     return intent_path, intent
 
 
@@ -247,6 +271,8 @@ def verify_service_image(service, current, env):
 
 def finish(env, intent_path, intent, receipt):
     schema_state(env, contract.TARGET_LEAF)
+    manifest = contract.verify_manifest(intent_path.parent / "manifest.json", intent["manifest_sha256"], {})
+    verify_release_config(env, manifest)
     restore = intent["restore_services"]
     current_services = {service: probe(service, env) for service in contract.SERVICES}
     for service, current in current_services.items():
@@ -313,6 +339,7 @@ def release(env, *, resume=False):
             raise ValueError("0078 active DDL marker belongs to another release")
     receipt = contract.completed_marker(REPAIR, marker_binding)
     if receipt is None:
+        print("0078: stopping beat and draining application workers", flush=True)
         current = {service: probe(service, env) for service in contract.SERVICES}
         if current["beat"]["running"]:
             compose(["stop", "beat"], env)
@@ -332,6 +359,7 @@ def release(env, *, resume=False):
             "RELEASE_B_PREFLIGHT_ACTION": "forward-resume",
             "RELEASE_B_EXPECTED_MIGRATION_LEAF_SET": "",
         }
+        print("0078: verifying closed state and running release tasks", flush=True)
         run([ROOT / "deploy/run_historical_calendar_release_b_preflight.sh"], env=closed_env)
         closed, _ = contract.read_json(closed_path)
         closed_env["RELEASE_B_PREFLIGHT_ARTIFACT_SHA256"] = closed.get("artifact_sha256", "")
@@ -345,6 +373,7 @@ def release(env, *, resume=False):
         receipt = contract.completed_marker(REPAIR, marker_binding)
         if receipt is None:
             raise ValueError("0078 release task did not publish its exact schema completion")
+    print("0078: schema and static files complete; restoring original services", flush=True)
     finish(env, intent_path, intent, receipt)
 
 
@@ -363,7 +392,8 @@ def main():
             compose_file=env["COMPOSE_FILE"], release_0078_recovery_binding_mode="bound",
         )
         artifact = contract.verify_admission(Path(env["RELEASE_B_PREFLIGHT_ARTIFACT_PATH"]), env["RELEASE_B_PREFLIGHT_ARTIFACT_SHA256"], expected)
-        contract.verify_intent(Path(artifact["release_0078_intent_path"]), artifact["release_0078_intent_sha256"], {key: artifact[key] for key in ("candidate_commit", "candidate_image_id", "database_identity_sha256", "compose_file")})
+        _, manifest = contract.verify_intent(Path(artifact["release_0078_intent_path"]), artifact["release_0078_intent_sha256"], {key: artifact[key] for key in ("candidate_commit", "candidate_image_id", "database_identity_sha256", "compose_file")})
+        verify_release_config(env, manifest)
     else:
         raise ValueError("usage: release_0078.py guard|release|resume|verify")
 

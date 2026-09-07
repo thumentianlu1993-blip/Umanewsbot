@@ -9,11 +9,13 @@ import json
 import os
 import shutil
 import tempfile
+from io import StringIO
 from pathlib import Path
 from unittest import TestCase, skipUnless
 from unittest.mock import patch
 
 from django.test import SimpleTestCase
+from django.core.management import CommandError, call_command
 
 from stable.services import historical_calendar_release_b_schema as schema
 from stable.services import release_0078_recovery as recovery
@@ -169,6 +171,7 @@ class Release0078ArtifactTests(TestCase):
             "backup_path": str(self.backup), "backup_file": recovery.file_evidence(self.backup)[1],
             "pg_restore_list_sha256": "e" * 64, "pg_restore_list_line_count": 10,
             "restore_services": self.services, "config_sha256": "f" * 64, "initial_lock_sha256": "1" * 64,
+            "compose_project": "isolated0078",
         }
         self.manifest_path = self.directory / "manifest.json"
 
@@ -176,11 +179,85 @@ class Release0078ArtifactTests(TestCase):
         self.manifest_path.unlink(missing_ok=True)
         return recovery.publish_once(self.manifest_path, {**self.manifest, **changes})["sha256"]
 
+    def prepared_fields(self):
+        sha = self.write_manifest()
+        path = self.directory / "intent.json"
+        payload = {"schema_version": "release-0078-prepared-intent/v1", **self.bindings,
+                   "manifest_sha256": sha, "source_leaf": self.manifest["source_leaf"],
+                   "restore_services": self.services, "config_sha256": "f" * 64, "initial_lock_sha256": "1" * 64}
+        identity = recovery.publish_once(path, payload)
+        recovery.publish_once(self.root / "active.json", {"release_id": self.release_id, "intent_path": str(path), "intent_file": identity})
+        return {"release_0078_recovery_manifest_path": str(self.manifest_path), "release_0078_recovery_manifest_sha256": sha,
+                "release_0078_recovery_origin_handoff_sha256": self.release_id,
+                "release_0078_intent_path": str(path), "release_0078_intent_sha256": identity["sha256"]}
+
+    def artifact(self, live, fields):
+        path = self.directory / "closed.json"
+        with patch.object(handoff, "collect_writer_activity", return_value={"ok": True, "counts": {}, "flags": {}}):
+            payload = handoff.build_preflight_artifact(
+                preflight=live, candidate_commit="b" * 40, candidate_image_id="sha256:" + "c" * 64,
+                compose_file="docker-compose.prod.yml", deployment_lock_token_sha256="e" * 64,
+                artifact_path=str(path), handoff_action="forward-resume" if fields else "deploy", **fields)
+        handoff.publish_preflight_artifact(path=path, payload=payload)
+        return path, payload
+
+    def test_actual_v5_management_commands_create_and_complete_exact_ddl_marker(self):
+        live = {"ok": True, "migration_leaf_set": [LEAF_0078], "migration_plan": [], "database_identity_sha256": "d" * 64}
+        fields = self.prepared_fields()
+        path, payload = self.artifact(live, fields)
+        marker = Path(self.tmp.name) / "restricted-recovery.json"
+        ensure_module = "stable.management.commands.ensure_historical_calendar_recovery_intent"
+        complete_module = "stable.management.commands.complete_historical_calendar_restricted_recovery"
+        common = {"marker_path": str(marker), "artifact_path": str(path), "artifact_sha256": payload["artifact_sha256"],
+                  "candidate_commit": "b" * 40, "candidate_image_id": "sha256:" + "c" * 64,
+                  "database_identity_sha256": "d" * 64, "attempt_mode": "required",
+                  "provenance_artifact_sha256": self.release_id}
+        out = StringIO()
+        with patch(ensure_module + ".database_vendor_contract", return_value={"ok": True}), \
+             patch(ensure_module + ".collect_handoff_preflight", return_value=live), \
+             patch.object(handoff, "collect_handoff_preflight", return_value=live), \
+             patch.object(handoff, "collect_writer_activity", return_value={"ok": True}):
+            call_command("ensure_historical_calendar_recovery_intent", stdout=out, **common)
+        result = json.loads(out.getvalue())
+        stored, identity = recovery.read_json(marker)
+        self.assertEqual(stored["schema_version"], "migration-history-repair-restricted-recovery/v3")
+        self.assertEqual(stored["target_leaf_set"], [LEAF_0078])
+        self.assertEqual(stored["release_0078_manifest_sha256"], fields["release_0078_recovery_manifest_sha256"])
+        self.assertEqual((result["marker_device"], result["marker_inode"]), (identity["device"], identity["inode"]))
+        with patch(complete_module + ".database_vendor_contract", return_value={"ok": True}), \
+             patch(complete_module + ".collect_handoff_preflight", return_value=live):
+            call_command("complete_historical_calendar_restricted_recovery", stdout=StringIO(), **common,
+                         expected_marker_device=result["marker_device"], expected_marker_inode=result["marker_inode"])
+        self.assertFalse(marker.exists())
+        receipt = recovery.completed_marker(marker.parent, recovery.marker_binding(payload))
+        self.assertIsNotNone(receipt)
+        self.assertTrue((self.root / "active.json").exists(), "schema completion must not erase host service recovery intent")
+
+    def test_admission_only_or_fresh_active_writers_cannot_create_ddl_marker(self):
+        live = {"ok": True, "migration_leaf_set": [LEAF_0078], "migration_plan": [], "database_identity_sha256": "d" * 64}
+        path, payload = self.artifact(live, {})
+        marker = Path(self.tmp.name) / "restricted-recovery.json"
+        module = "stable.management.commands.ensure_historical_calendar_recovery_intent"
+        for active in (False, True):
+            with self.subTest(active=active), \
+                 patch(module + ".database_vendor_contract", return_value={"ok": True}), \
+                 patch(module + ".collect_handoff_preflight", return_value=live), \
+                 patch.object(handoff, "collect_handoff_preflight", return_value=live), \
+                 patch.object(handoff, "collect_writer_activity", return_value={"ok": not active}):
+                with self.assertRaises(CommandError):
+                    call_command("ensure_historical_calendar_recovery_intent", marker_path=str(marker),
+                                 artifact_path=str(path), artifact_sha256=payload["artifact_sha256"],
+                                 candidate_commit="b" * 40, candidate_image_id="sha256:" + "c" * 64,
+                                 database_identity_sha256="d" * 64, attempt_mode="required", stdout=StringIO())
+                self.assertFalse(marker.exists())
+
     def test_same_schema_requires_present_unchanged_backup(self):
         sha = self.write_manifest()
         self.assertEqual(recovery.verify_manifest(self.manifest_path, sha, self.bindings)["operation"], "same-schema")
         original = self.backup.read_bytes()
-        self.backup.unlink()
+        # Keep the old inode allocated; immediate unlink/recreate may reuse
+        # it on Linux and would not actually exercise identity replacement.
+        self.backup.rename(self.backup.with_suffix(".preserved"))
         with self.assertRaises(OSError):
             recovery.verify_manifest(self.manifest_path, sha, self.bindings)
         self.backup.write_bytes(original)

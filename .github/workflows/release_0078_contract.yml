@@ -43,6 +43,9 @@ jobs:
       DOTENV_DISABLED: '1'
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -95,6 +98,9 @@ jobs:
       DOTENV_DISABLED: '1'
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
       - name: 固定历史基线
         if: matrix.revision == 'baseline'
         run: |
@@ -105,6 +111,15 @@ jobs:
           python-version: '3.12'
           cache: pip
       - run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: 记录同环境工作流合同基线
+        run: |
+          mkdir -p evidence
+          set +e
+          python .codex/scripts/check_workflow_contract.py > evidence/workflow-contract-check.log 2>&1
+          echo "$?" > evidence/workflow-contract-check.exit
+          python .codex/scripts/test_workflow_contract.py > evidence/workflow-contract-tests.log 2>&1
+          echo "$?" > evidence/workflow-contract-tests.exit
+          set -e
       - name: 全量 stable 运行并保存实际失败集合
         run: |
           test ! -e .env
@@ -113,7 +128,8 @@ jobs:
           git rev-parse HEAD > evidence/commit.txt
           cd server
           python - <<'PY' > ../evidence/stable.log 2>&1
-          import json, pathlib, socket
+          import json, pathlib, socket, sys
+          sys.argv = ['manage.py', 'test', 'stable']
           import django
           # Application tests may talk only to local synthetic services.
           original_connect = socket.socket.connect

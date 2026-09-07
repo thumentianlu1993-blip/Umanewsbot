@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import os
+import hashlib
+import json
 import subprocess
 import tempfile
 import time
 import uuid
 from pathlib import Path
+from io import StringIO
 from unittest import TestCase, skipUnless
 
 import psycopg
@@ -16,8 +19,10 @@ from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 from django.db.migrations.exceptions import IrreversibleError
 from django.db.migrations.recorder import MigrationRecorder
+from django.core.management import call_command
 
 from stable.services import historical_calendar_release_b_schema as schema
+from stable.services import release_0078_recovery as recovery
 
 
 M77 = ("stable", "0077_racing_api_horse_identity_staging")
@@ -123,6 +128,90 @@ class Release0078PostgresTests(TestCase):
             blocker.close()
         MigrationExecutor(connection).migrate([M78])
         self.assertEqual(self.column(), [("jsonb", True, "", "", None)])
+
+    def test_real_v5_handoff_commands_migrate_and_archive_exact_0078_receipt(self):
+        """No mocked management commands, schema collector, or DDL owner."""
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            marker = directory / "restricted-recovery.json"
+            origin_path = directory / "admission.json"
+            candidate, image = "b" * 40, "sha256:" + "c" * 64
+            db_identity = schema._database_identity_sha256()
+            common = {"candidate_commit": candidate, "candidate_image_id": image,
+                      "compose_file": "docker-compose.prod.yml", "deployment_lock_token_sha256": "e" * 64,
+                      "restricted_marker_path": str(marker), "expected_database_identity_sha256": db_identity}
+            before = schema.check_release_b_schema_compatibility(direction="forward")
+            self.assertTrue(before["ok"], before)
+            self.assertEqual(before["migration_leaf_set"], ["stable.0077_racing_api_horse_identity_staging"])
+            call_command("create_historical_calendar_release_b_handoff", action="deploy",
+                         output_path=str(origin_path), stdout=StringIO(), **common)
+            origin, _ = recovery.read_json(origin_path)
+            release_id = origin["artifact_sha256"]
+            release_root = directory / "release-0078-recovery"
+            release_root.mkdir(mode=0o700)
+            release = release_root / release_id
+            release.mkdir(mode=0o700)
+            backup_dir = release / "backup"
+            backup_dir.mkdir(mode=0o700)
+            backup = backup_dir / "synthetic-0077.dump"
+            self.pg("pg_dump", "--format=custom", "--file", backup, self.name)
+            backup.chmod(0o600)
+            toc = self.pg("pg_restore", "--list", backup).stdout
+            bindings = {"release_id": release_id, "origin_handoff_sha256": release_id,
+                        "candidate_commit": candidate, "candidate_image_id": image,
+                        "database_identity_sha256": db_identity, "compose_file": "docker-compose.prod.yml"}
+            restore = {name: False for name in ("web", "worker", "beat", "race_live_worker", "race_sync_v2_worker", "nginx")}
+            manifest = {"schema_version": "release-0078-verified-backup-recovery/v1", **bindings,
+                        "source_leaf": "stable.0077_racing_api_horse_identity_staging",
+                        "target_leaf": "stable.0078_externalhorse_profile_snapshot", "operation": "upgrade",
+                        "migration_contract_sha256": "50c421f3167a8c2c8f1613a0597ad7ee196c249fc18bf7eed0de7b9cd2f80906",
+                        "backup_path": str(backup), "backup_file": recovery.file_evidence(backup)[1],
+                        "pg_restore_list_sha256": hashlib.sha256(toc).hexdigest(), "pg_restore_list_line_count": len(toc.splitlines()),
+                        "restore_services": restore, "config_sha256": "f" * 64, "initial_lock_sha256": "e" * 64,
+                        "compose_project": "isolated0078",
+                        "writer_flags": origin["writer_activity"]["flags"]}
+            manifest_path = release / "manifest.json"
+            manifest_sha = recovery.publish_once(manifest_path, manifest)["sha256"]
+            intent_path = release / "intent.json"
+            intent = {"schema_version": "release-0078-prepared-intent/v1", **bindings,
+                      "manifest_sha256": manifest_sha, "origin_handoff_path": str(origin_path),
+                      "source_leaf": manifest["source_leaf"], "restore_services": restore,
+                      "config_sha256": "f" * 64, "initial_lock_sha256": "e" * 64}
+            intent_file = recovery.publish_once(intent_path, intent)
+            recovery.publish_once(release_root / "active.json", {"release_id": release_id, "intent_path": str(intent_path), "intent_file": intent_file})
+            fields = {"release_0078_recovery_manifest_path": str(manifest_path),
+                      "release_0078_recovery_manifest_sha256": manifest_sha,
+                      "release_0078_recovery_origin_handoff_sha256": release_id,
+                      "release_0078_intent_path": str(intent_path), "release_0078_intent_sha256": intent_file["sha256"]}
+            closed_path = directory / "closed.json"
+            self.assertFalse(marker.exists())
+            call_command("create_historical_calendar_release_b_handoff", action="forward-resume",
+                         output_path=str(closed_path), provenance_artifact_sha256=release_id,
+                         stdout=StringIO(), **common, **fields)
+            closed, _ = recovery.read_json(closed_path)
+            command_common = {"artifact_path": str(closed_path), "artifact_sha256": closed["artifact_sha256"],
+                              "candidate_commit": candidate, "candidate_image_id": image,
+                              "database_identity_sha256": db_identity}
+            call_command("verify_historical_calendar_release_b_handoff", stdout=StringIO(), **command_common,
+                         compose_file="docker-compose.prod.yml", deployment_lock_token_sha256="e" * 64, **fields)
+            output = StringIO()
+            call_command("ensure_historical_calendar_recovery_intent", stdout=output, **command_common,
+                         marker_path=str(marker), provenance_artifact_sha256=release_id, attempt_mode="required")
+            result = json.loads(output.getvalue())
+            ddl_marker, _ = recovery.read_json(marker)
+            self.assertEqual(ddl_marker["schema_version"], "migration-history-repair-restricted-recovery/v3")
+            self.assertEqual(ddl_marker["initial_leaf_set"], ["stable.0077_racing_api_horse_identity_staging"])
+            MigrationExecutor(connection).migrate([M78])
+            after = schema.check_release_b_schema_compatibility(direction="forward")
+            self.assertTrue(after["ok"], after)
+            self.assertEqual(after["migration_plan"], [])
+            call_command("complete_historical_calendar_restricted_recovery", stdout=StringIO(), **command_common,
+                         marker_path=str(marker), provenance_artifact_sha256=release_id, attempt_mode="required",
+                         expected_marker_device=result["marker_device"], expected_marker_inode=result["marker_inode"])
+            self.assertFalse(marker.exists())
+            receipt = recovery.completed_marker(directory, recovery.marker_binding(closed))
+            self.assertIsNotNone(receipt)
+            self.assertTrue((release_root / "active.json").exists(), "schema completion precedes host service restoration")
 
     def pg(self, command, *args, check=True):
         env = {**os.environ, "PGHOST": "127.0.0.1", "PGPORT": str(self.params["port"]),
