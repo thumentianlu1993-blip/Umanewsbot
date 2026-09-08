@@ -3322,6 +3322,7 @@ def _resolve_data_sync_publication_from_loaded_rows(
         validate_registry_membership_snapshot,
     )
 
+    legacy_authorized = False
     if (
         lifecycle_membership is not None
         and lifecycle_membership.state == "active"
@@ -3334,6 +3335,7 @@ def _resolve_data_sync_publication_from_loaded_rows(
         )
         if not lifecycle_validation.valid:
             return reject(lifecycle_validation.reason_code)
+        legacy_authorized = True
     else:
         from stable.services.race_data_sync_admission import (
             validate_data_sync_lifecycle_admission,
@@ -3400,7 +3402,13 @@ def _resolve_data_sync_publication_from_loaded_rows(
         return reject("enrollment_digest_invalid")
     if standing_policy_digest is None:
         return reject("standing_policy_unavailable")
-    if enrollment.standing_policy_digest != standing_policy_digest:
+    # The validated legacy registry remains the authority for its fixed list.
+    # A successor enrollment policy must not revoke an already published result;
+    # new data-sync admissions still require the current policy digest.
+    if (
+        not legacy_authorized
+        and enrollment.standing_policy_digest != standing_policy_digest
+    ):
         return reject("standing_policy_drift")
 
     if (
