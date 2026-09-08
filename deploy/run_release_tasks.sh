@@ -115,7 +115,15 @@ fi
 run_control_phase() {
   phase="$1"
   shift
-  ./deploy/docker/compose-wrapper.sh "$@" run --rm --no-deps \
+  set -- "$@" run --rm --no-deps
+  if [ -z "${RELEASE_CONTROL_COMPOSE_OVERRIDE:-}" ]; then
+    # Apply to the entire one-shot verify/ensure/migrate/static/complete chain.
+    writer_flags="$(python3 -c 'import sys; sys.path.insert(0, "server"); from stable.services.release_0078_recovery import WRITER_FLAGS; print(" ".join(WRITER_FLAGS))')"
+    for flag in $writer_flags; do
+      set -- "$@" -e "$flag=false"
+    done
+  fi
+  ./deploy/docker/compose-wrapper.sh "$@" \
     -v "$artifact_mount_root:$artifact_mount_root:rw" \
     -e "RELEASE_TASK_PHASE=$phase" \
     -e "RELEASE_B_PREFLIGHT_ARTIFACT_PATH=$RELEASE_B_PREFLIGHT_ARTIFACT_PATH" \

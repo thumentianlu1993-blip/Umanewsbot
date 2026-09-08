@@ -30,6 +30,33 @@ COHERENCE = ROOT / "deploy/verify_lifecycle_runtime_coherence.sh"
 MODE_SWITCH = ROOT / "deploy/switch_lifecycle_mode.sh"
 
 
+def _deploy_wrapper_run_calls(source: str) -> list[tuple[int, str]]:
+    normalized = source.replace("\\\n", " ")
+    variables = set(re.findall(r"^([A-Za-z_][A-Za-z0-9_]*)=.*compose-wrapper\.sh", normalized, flags=re.MULTILINE))
+    calls = []
+    run_argv = ""
+    for number, line in enumerate(normalized.splitlines(), start=1):
+        if line.lstrip().startswith("#"):
+            continue
+        if re.match(r'^\s*set -- "\$@" run --rm --no-deps(?:\s|$)', line):
+            run_argv = line
+        elif re.match(r"^\s*set --(?:\s|$)", line) and not re.match(r'^\s*set -- "\$@"(?:\s|$)', line):
+            run_argv = ""
+        wrapper = "compose-wrapper.sh" in line or any(re.search(rf'\$\{{?{re.escape(name)}\}}?', line) for name in variables)
+        if wrapper and " run " in f" {line} ":
+            calls.append((number, line))
+        elif wrapper and run_argv and '"$@"' in line:
+            try:
+                command = shlex.split(line, comments=True)[0]
+            except (ValueError, IndexError):
+                continue
+            literal = command.rsplit("/", 1)[-1] == "compose-wrapper.sh" and not re.match(r"[A-Za-z_]\w*=", command)
+            variable = any(command in ("$" + name, "${" + name + "}") for name in variables)
+            if literal or variable:
+                calls.append((number, run_argv + "\n" + line))
+    return calls
+
+
 def _write_executable(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
     path.chmod(0o755)
@@ -1579,27 +1606,33 @@ class DeploymentLockLifecycleActionTests(SimpleTestCase):
 class SupportedDeployOneOffInventoryTests(SimpleTestCase):
     """Characterize every supported wrapper one-off, not a hand-picked list."""
 
+    def test_scanner_recognizes_direct_and_constructed_run_argv(self):
+        direct = './deploy/docker/compose-wrapper.sh -f "$COMPOSE_FILE" run --rm --no-deps web python manage.py check'
+        prefix = 'set -- -f "$COMPOSE_FILE"\nset -- "$@" run --rm --no-deps\nset -- "$@" -e WRITER=false\n'
+        invoke = './deploy/docker/compose-wrapper.sh "$@" web python manage.py check'
+        assigned = 'COMPOSE="$ROOT/deploy/docker/compose-wrapper.sh"\n'
+        variable_call = '"$COMPOSE" "$@" web python manage.py check'
+        for source in (direct, prefix + invoke, assigned + prefix + variable_call,
+                       assigned + prefix + variable_call.replace('$COMPOSE', '${COMPOSE}')):
+            with self.subTest(source=source):
+                calls = _deploy_wrapper_run_calls(source)
+                self.assertEqual(len(calls), 1)
+                self.assertRegex(calls[0][1], r"\brun\s+--rm\s+--no-deps\b")
+        for source in (prefix, prefix + 'echo "$@"', prefix + 'echo ' + invoke,
+                       assigned + prefix + 'echo ' + variable_call,
+                       prefix + '# ' + invoke, prefix + invoke.replace('"$@"', ''),
+                       prefix + 'set -- -f another.yml\n' + invoke):
+            with self.subTest(rejected=source):
+                self.assertEqual(_deploy_wrapper_run_calls(source), [])
+
     def test_all_deploy_wrapper_run_calls_are_canonical_and_lock_contracts_remain(self):
         deploy = ROOT / "deploy"
         calls = []
         for script in sorted(deploy.rglob("*.sh")):
             if script == WRAPPER:
                 continue
-            normalized = script.read_text(encoding="utf-8").replace("\\\n", " ")
-            wrapper_variables = set(
-                re.findall(
-                    r"^([A-Za-z_][A-Za-z0-9_]*)=.*compose-wrapper\.sh",
-                    normalized,
-                    flags=re.MULTILINE,
-                )
-            )
-            for line_number, line in enumerate(normalized.splitlines(), start=1):
-                invokes_wrapper = "compose-wrapper.sh" in line or any(
-                    re.search(rf'\$\{{?{re.escape(variable)}\}}?', line)
-                    for variable in wrapper_variables
-                )
-                if invokes_wrapper and " run " in f" {line} ":
-                    calls.append((script.relative_to(ROOT).as_posix(), line_number, line))
+            for line_number, line in _deploy_wrapper_run_calls(script.read_text(encoding="utf-8")):
+                calls.append((script.relative_to(ROOT).as_posix(), line_number, line))
 
         paths = {path for path, _line, _text in calls}
         self.assertEqual(

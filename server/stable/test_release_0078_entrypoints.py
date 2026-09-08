@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import os
 import shutil
@@ -14,6 +15,7 @@ import sys
 import tempfile
 from pathlib import Path
 from unittest import TestCase, skipUnless
+from unittest.mock import patch
 
 from stable.services import release_0078_recovery as contract
 
@@ -36,7 +38,7 @@ WRITER_FLAGS = (
 
 
 FAKE_BOUNDARIES = r'''#!/usr/bin/env python3
-import hashlib, json, os, sys
+import hashlib, json, os, subprocess, sys
 from pathlib import Path
 root = Path(os.environ['UMANEWS_ROOT_DIR'])
 sys.path.insert(0, str(root/'server'))
@@ -54,6 +56,24 @@ def fail(name):
         flag.unlink(); event('fault:'+name); raise SystemExit(42)
 def option(prefix):
     return next((arg[len(prefix):] for arg in args if arg.startswith(prefix)), '')
+def resolved_flags():
+    return {name:os.environ.get(name,value) for name,value in state['flags'].items()}
+def control_flags():
+    effective={name:os.environ.get(name,'false') for name in state['flags']}
+    event('control-env:'+json.dumps({'command':args, 'flags':effective},sort_keys=True))
+    if any(value not in ('','0','false','off','no') for value in effective.values()):
+        raise SystemExit('application writer activity is not quiescent')
+def ensure_marker():
+    assert not any(value for name,value in state['services'].items() if name!='nginx')
+    artifact,_=c.read_json(Path(os.environ['RELEASE_B_PREFLIGHT_ARTIFACT_PATH']))
+    c.verify_admission(Path(os.environ['RELEASE_B_PREFLIGHT_ARTIFACT_PATH']), os.environ['RELEASE_B_PREFLIGHT_ARTIFACT_SHA256'], {'release_0078_recovery_binding_mode':'bound'})
+    marker=root/'runtime/migration_history_repair/restricted-recovery.json'
+    fail('marker-before-write')
+    if not marker.exists():
+        payload={'schema_version':'migration-history-repair-restricted-recovery/v3', **c.marker_binding(artifact), 'initial_leaf_set':[state['leaf']]}
+        payload['marker_sha256']=c.digest(payload)
+        c.publish_once(marker,payload)
+    return marker
 if command == 'git':
     event('git:'+' '.join(args))
     if args[:1] in (['rev-parse'], ['symbolic-ref']): print(os.environ['EXPECTED_CANDIDATE_COMMIT'])
@@ -67,6 +87,9 @@ elif command == 'docker':
         service = args[-1].removeprefix('cid-')
         if 'com.docker.compose.project' in ' '.join(args): print('isolated0078')
         elif '{{.Image}}' in args: print(state.get('images',{}).get(service,os.environ['EXPECTED_CANDIDATE_IMAGE_ID']))
+        elif '.Config.Env' in ' '.join(args):
+            flags=state.get('container_flags',{}).get(service,state['flags'])
+            print(json.dumps([name+'='+value for name,value in flags.items()]))
         else:
             running = state['services'][service]
             print(('true running ' if running else 'false exited ') + 'node-'+service)
@@ -75,12 +98,19 @@ elif command == 'docker':
 elif command == 'compose':
     while args and args[0] in ('-f', '--project-name'): args=args[2:]
     event('compose:'+' '.join(args))
+    child_env={**os.environ, **resolved_flags()}
+    if args[0]=='run':
+        for index,value in enumerate(args[:-1]):
+            if value=='-e':
+                key,value=args[index+1].split('=',1)
+                child_env[key]=value
+        event('one-shot-env:'+json.dumps({'command':args, 'flags':{name:child_env[name] for name in state['flags']}},sort_keys=True))
     if args[0] == 'ps':
         service = args[-1]
         fail('probe-'+service)
         if service in state['services']: print('cid-'+service)
     elif args[0] == 'config':
-        print(json.dumps({'name':os.environ.get('COMPOSE_PROJECT_NAME','isolated0078'), 'services':{service:{'environment':{name:os.environ.get(name,'false') for name in state['flags']}} for service in state['compose_services']}}))
+        print(json.dumps({'name':os.environ.get('COMPOSE_PROJECT_NAME','isolated0078'), 'services':{service:{'environment':resolved_flags()} for service in state['compose_services']}}))
     elif args[0] == 'stop':
         # This is the externally visible side effect: durable intent and
         # active pointer must already exist and validate before it happens.
@@ -93,6 +123,7 @@ elif command == 'compose':
         assert receipts and state.get('static_complete'), 'writer started before schema/static completion'
         state['services'][args[-1]]=True
         state.setdefault('images',{})[args[-1]]=state.get('start_image_overrides',{}).get(args[-1],os.environ['EXPECTED_CANDIDATE_IMAGE_ID'])
+        state.setdefault('container_flags',{})[args[-1]]=state.get('start_flag_overrides',{}).get(args[-1],resolved_flags())
         save(); event('start-after-completion:'+args[-1]); fail('after-service-start')
     elif args[0] == 'exec':
         if 'pg_restore' in args: print('synthetic custom dump TOC')
@@ -101,7 +132,12 @@ elif command == 'compose':
         else: assert args[-2:] == ['-s','reload']
     elif args[0] == 'run' and 'check_historical_calendar_release_b_schema' in args:
         print(json.dumps({'ok': True, 'migration_leaf_set':[state['leaf']], 'database_identity_sha256':state['database_identity']}))
+    elif args[0] == 'run' and 'create_historical_calendar_release_b_handoff' in args:
+        child_env.update(RELEASE_B_PREFLIGHT_ARTIFACT_PATH=option('--output-path='),RELEASE_B_PREFLIGHT_ACTION=option('--action='))
+        raise SystemExit(subprocess.run([sys.executable,__file__,'preflight',*args],env=child_env).returncode)
     elif args[0] == 'run' and args[-2:] == ['web','/app/deploy/docker/run-release-tasks.sh']:
+        if state.get('real_control'):
+            raise SystemExit(subprocess.run(['sh',str(root/'fake-control-release.sh')],env=child_env).returncode)
         raise SystemExit(state.get('compose_release_rc',0))
     elif args[0] in ('pull','build') or (args[0]=='run' and args[-3:]==['nginx','nginx','-t']):
         pass
@@ -113,6 +149,7 @@ elif command == 'backup':
     path.write_bytes(b'new synthetic backup for this release'); path.chmod(0o600)
     event('backup-created'); print('Backup created: '+str(path))
 elif command == 'preflight':
+    if state.get('real_control'): control_flags()
     bound=bool(os.environ.get('RELEASE_0078_INTENT_PATH'))
     if bound:
         assert not any(value for name,value in state['services'].items() if name!='nginx')
@@ -130,7 +167,7 @@ elif command == 'preflight':
         'handoff_action':'forward-resume' if bound else os.environ.get('RELEASE_B_PREFLIGHT_ACTION','deploy'),
         'release_0078_recovery_binding_mode':'bound' if bound else 'admission-only',
         'recovery_intent_mode':'required', 'recovery_origin_action':'release-0078',
-        'writer_activity':{'ok':True,'counts':{},'flags':state['flags']},
+        'writer_activity':{'ok':True,'counts':{},'flags':{name:os.environ.get(name,'false') for name in state['flags']} if state.get('real_control') else state['flags']},
         'preflight':{'ok':True,'database_identity_sha256':state['database_identity'],'migration_leaf_set':[state['leaf']], 'migration_plan':[] if state['leaf'].startswith('stable.0078') else ['0078_externalhorse_profile_snapshot']},
         **({key:os.environ[key.upper()] for key in c.BINDING_FIELDS} if bound else {})}
     if bound and state.get('closed_database_identity'):
@@ -141,6 +178,33 @@ elif command == 'preflight':
         event('closed-database-drift')
     payload['artifact_sha256']=c.digest(payload)
     c.publish_once(path,payload); event('closed-written' if bound else 'admission-written')
+elif command == 'manage':
+    # The real release shell executes every phase. Django/database behavior is
+    # the explicit synthetic boundary; the separate PG16 suite owns real DDL.
+    control_flags()
+    if args[0].endswith('wait_for_services.py'): pass
+    elif args[:2]==['manage.py','check_production_database_vendor']: print('postgresql')
+    elif args[:2]==['manage.py','verify_historical_calendar_release_b_handoff']:
+        c.verify_admission(Path(os.environ['RELEASE_B_PREFLIGHT_ARTIFACT_PATH']),os.environ['RELEASE_B_PREFLIGHT_ARTIFACT_SHA256'],{'release_0078_recovery_binding_mode':'bound'})
+    elif args[:2]==['manage.py','ensure_historical_calendar_recovery_intent']:
+        marker=ensure_marker(); info=marker.stat()
+        print(json.dumps({'marker_device':info.st_dev,'marker_inode':info.st_ino}))
+    elif args[:2]==['manage.py','migrate']:
+        assert args[2:]==['stable','0078_externalhorse_profile_snapshot','--noinput']
+        ensure_marker()
+        if not state['leaf'].startswith('stable.0078'):
+            state['leaf']='stable.0078_externalhorse_profile_snapshot'; state['migration_count']+=1
+            save(); event('migration-committed')
+        fail('after-migration')
+    elif args[:2]==['manage.py','collectstatic']:
+        fail('static-before-complete')
+        state['static_complete']=True; save(); event('static-complete')
+    elif args[:2]==['manage.py','complete_historical_calendar_restricted_recovery']:
+        assert state['static_complete']
+        marker=ensure_marker(); payload,_=c.read_json(marker)
+        marker.rename(marker.parent/('restricted-recovery.completed.'+payload['marker_sha256']+'.json'))
+        event('schema-completed'); fail('after-schema-completion')
+    else: raise SystemExit(95)
 elif command == 'tasks':
     assert not any(value for name,value in state['services'].items() if name!='nginx')
     artifact,_=c.read_json(Path(os.environ['RELEASE_B_PREFLIGHT_ARTIFACT_PATH']))
@@ -193,7 +257,7 @@ if os.environ.get('UMANEWS_0078_TEST_FAULTS') == '1':
 
 
 class HostHarness:
-    def __init__(self, root, leaf=TARGET, compose="docker-compose.prod.yml", manual=False):
+    def __init__(self, root, leaf=TARGET, compose="docker-compose.prod.yml", manual=False, live_flags=False, real_control=False):
         self.root = root
         shutil.copytree(ROOT / "deploy", root / "deploy")
         (root / "server/stable/services").mkdir(parents=True)
@@ -214,17 +278,28 @@ class HostHarness:
             "deploy/run_release_tasks.sh": "tasks", "deploy/wait_for_celery_drain.sh": "drain",
             "deploy/wait_for_compose_service_healthy.sh": "health",
         }.items():
+            if real_control and command in {"preflight", "tasks"}:
+                continue
             self.wrapper(root / path, command)
+        self.real_control = real_control
+        if real_control:
+            self.wrapper(root / "fake-bin/python", "manage")
+            # Only map the container's fixed /app path to this isolated root.
+            # Phase order and management command argv remain the production shell.
+            shell = (root / "deploy/docker/run-release-tasks.sh").read_text()
+            (root / "fake-control-release.sh").write_text(shell.replace("/app/server", str(root / "server")).replace("/app/deploy/", str(root / "deploy") + "/"))
         self.repair = root / "runtime/migration_history_repair"
         self.repair.mkdir(mode=0o700, parents=True)
         self.restore = {name: name in {"nginx"} if manual else name in {"web", "worker", "beat", "race_sync_v2_worker", "nginx"} for name in SERVICES}
+        flags = {name: "true" if live_flags and name.startswith("RACE_DATA_SYNC_") else "false" for name in WRITER_FLAGS}
         (root / "test-state.json").write_text(json.dumps({"leaf": leaf, "database_identity": DB, "services": self.restore, "compose_services": list(SERVICES), "migration_count": 0, "static_complete": False,
-                                                       "flags": {name: "false" for name in WRITER_FLAGS}}))
+                                                       "flags": flags, "real_control": real_control}))
         (root / ".env").write_text("# synthetic closed writer flags\n")
-        self.env = {**os.environ, **{name: "false" for name in WRITER_FLAGS},
+        self.env = {**os.environ, **flags,
                     "UMANEWS_ROOT_DIR": str(root), "COMPOSE_FILE": compose, "COMPOSE_PROJECT_NAME": "isolated0078",
                     "EXPECTED_CANDIDATE_COMMIT": COMMIT, "EXPECTED_CANDIDATE_IMAGE_ID": IMAGE,
                     "EXPECTED_PRODUCTION_DB_IDENTITY_SHA256": DB, "EXPECTED_COMPOSE_PROJECT": "isolated0078",
+                    "RELEASE_B_PREFLIGHT_ACTION": "manual-release" if manual else "deploy", "RESTRICTED_RECOVERY_ATTEMPT_MODE": "required",
                     "DEPLOYMENT_LOCK_DIR": str(root / "deployment.lock"), "DEPLOYMENT_LOCK_TOKEN": "original-test-lease",
                     "PATH": str(root / "fake-bin") + os.pathsep + os.environ["PATH"],
                     "PYTHONPATH": str(root / "fault-hooks"), "UMANEWS_0078_TEST_FAULTS": "1"}
@@ -260,6 +335,14 @@ class HostHarness:
         if acquire.returncode:
             raise AssertionError(acquire.stderr)
         try:
+            if self.real_control:
+                self.origin_path.unlink()
+                admission = self.command(["sh", "deploy/run_historical_calendar_release_b_preflight.sh"])
+                if admission.returncode:
+                    return admission
+                self.origin_sha = contract.read_json(self.origin_path)[0]["artifact_sha256"]
+                self.env["RELEASE_B_PREFLIGHT_ARTIFACT_SHA256"] = self.origin_sha
+                self.directory = self.repair / "release-0078-recovery" / self.origin_sha
             result = self.command(entrypoint or [sys.executable, "deploy/release_0078.py", "release"])
             if fault and (self.root / "fault.txt").exists():
                 raise AssertionError("injected stage was not reached: " + fault + "\n" + result.stdout + result.stderr)
@@ -292,6 +375,33 @@ class HostHarness:
         return self.command(['sh',entrypoint])
 
 
+class Release0078ControlEnvironmentTests(TestCase):
+    def test_schema_one_shot_disarms_enabled_flags_without_changing_host(self):
+        spec = importlib.util.spec_from_file_location("release_0078_environment_test", ROOT / "deploy/release_0078.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        original = {name: "true" if name.startswith("RACE_DATA_SYNC_") else "false" for name in WRITER_FLAGS}
+        env = {**original, "EXPECTED_PRODUCTION_DB_IDENTITY_SHA256": DB}
+        observed = []
+
+        def compose(args, host_env):
+            # Model Docker's run -e precedence over the service environment;
+            # inspecting host_env alone would miss the intended process boundary.
+            effective = dict(original)
+            for index, value in enumerate(args[:-1]):
+                if value == "-e":
+                    name, value = args[index + 1].split("=", 1)
+                    effective[name] = value
+            observed.append({name: effective[name] for name in WRITER_FLAGS})
+            self.assertEqual({name: host_env[name] for name in WRITER_FLAGS}, original)
+            return json.dumps({"ok": True, "database_identity_sha256": DB, "migration_leaf_set": [TARGET]})
+
+        with patch.object(module, "candidate"), patch.object(module, "compose", side_effect=compose):
+            module.schema_state(env, TARGET)
+        self.assertEqual(observed, [{name: "false" for name in WRITER_FLAGS}])
+        self.assertEqual({name: env[name] for name in WRITER_FLAGS}, original)
+
+
 @skipUnless(os.name == "posix", "requires real Linux shell, POSIX permissions and locks")
 class Release0078EntrypointTests(TestCase):
     def harness(self, **kwargs):
@@ -301,6 +411,93 @@ class Release0078EntrypointTests(TestCase):
 
     def assert_success(self, result):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def assert_closed_control_chain(self, harness):
+        calls = [json.loads(event.removeprefix("one-shot-env:")) for event in harness.events() if event.startswith("one-shot-env:")]
+        self.assertTrue(calls)
+        for call in calls:
+            self.assertEqual(call["flags"], {name: "false" for name in WRITER_FLAGS}, call["command"])
+        commands = [json.loads(event.removeprefix("control-env:"))["command"] for event in harness.events() if event.startswith("control-env:")]
+        phases = [command[1] for command in commands if command[0] == "manage.py"]
+        expected = ["check_production_database_vendor", "verify_historical_calendar_release_b_handoff",
+                    "ensure_historical_calendar_recovery_intent", "migrate", "collectstatic",
+                    "complete_historical_calendar_restricted_recovery"]
+        self.assertEqual(phases[-len(expected):], expected)
+        for event in harness.events():
+            if event.startswith("control-env:"):
+                call = json.loads(event.removeprefix("control-env:"))
+                self.assertEqual(call["flags"], {name: "false" for name in WRITER_FLAGS}, call["command"])
+
+    def test_live_flags_release_preserves_enabled_services_and_disarms_full_control_chain(self):
+        for leaf, compose in ((TARGET, "docker-compose.prod.yml"), (SOURCE, "docker-compose.prod.lowcost.yml")):
+            with self.subTest(leaf=leaf, compose=compose):
+                harness = self.harness(leaf=leaf, compose=compose, live_flags=True, real_control=True)
+                original = harness.state()["flags"]
+                env_bytes = (harness.root / ".env").read_bytes()
+                self.assertEqual(sum(value == "true" for value in original.values()), 10)
+                self.assert_success(harness.initial())
+                manifest = contract.read_json(harness.directory / "manifest.json")[0]
+                origin = contract.read_json(harness.origin_path)[0]
+                self.assertEqual(manifest["writer_flags"], original)
+                self.assertEqual(origin["writer_activity"]["flags"], {name: "false" for name in WRITER_FLAGS})
+                self.assertEqual((harness.root / ".env").read_bytes(), env_bytes)
+                self.assertEqual({name: harness.env[name] for name in WRITER_FLAGS}, original)
+                self.assertEqual(harness.state()["services"], harness.restore)
+                for service, flags in harness.state()["container_flags"].items():
+                    if service != "nginx":
+                        self.assertEqual(flags, original)
+                self.assertEqual(harness.state()["migration_count"], int(leaf == SOURCE))
+                self.assert_closed_control_chain(harness)
+
+    def test_live_flags_resume_reuses_enabled_intent_after_stop_static_and_receipt_failures(self):
+        for fault in ("after-first-stop", "static-before-complete", "after-schema-completion"):
+            with self.subTest(fault=fault):
+                harness = self.harness(leaf=SOURCE, live_flags=True, real_control=True)
+                self.assertNotEqual(harness.initial(fault).returncode, 0)
+                original = harness.state()["flags"]
+                frozen = {name: (harness.directory / name).read_bytes() for name in ("intent.json", "manifest.json")}
+                self.assert_success(harness.resume())
+                self.assertEqual({name: (harness.directory / name).read_bytes() for name in frozen}, frozen)
+                self.assertEqual(harness.state()["services"], harness.restore)
+                self.assertEqual(harness.state()["migration_count"], 1)
+                self.assertEqual(harness.events().count("backup-created"), 1)
+                self.assertEqual(contract.read_json(harness.directory / "manifest.json")[0]["writer_flags"], original)
+                self.assert_closed_control_chain(harness)
+
+    def test_live_flags_container_environment_drift_blocks_preparation_and_later_writers(self):
+        for phase in ("prepare", "already-running", "new-web"):
+            with self.subTest(phase=phase):
+                harness = self.harness(live_flags=True, real_control=True)
+                if phase != "prepare":
+                    self.assertNotEqual(harness.initial("after-schema-completion").returncode, 0)
+                state = harness.state()
+                drift = {**state["flags"], "RACE_DATA_SYNC_ALLOW_NETWORK": "false"}
+                if phase == "new-web":
+                    state["start_flag_overrides"] = {"web": drift}
+                else:
+                    state["container_flags"] = {"web": drift}
+                    state["services"]["web"] = True
+                (harness.root / "test-state.json").write_text(json.dumps(state))
+                result = harness.initial() if phase == "prepare" else harness.resume()
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("writer flags differ", result.stderr)
+                starts = [event for event in harness.events() if event.startswith("start-after-")]
+                self.assertEqual(starts, ["start-after-completion:web"] if phase == "new-web" else [])
+                self.assertFalse((harness.directory / "complete.json").exists())
+                if phase == "prepare":
+                    self.assertNotIn("backup-created", harness.events())
+                    self.assertFalse(any(event.startswith("stop-") for event in harness.events()))
+
+    def test_live_flags_compose_override_cannot_change_frozen_enabled_resume_state(self):
+        harness = self.harness(live_flags=True, real_control=True)
+        self.assertNotEqual(harness.initial("after-schema-completion").returncode, 0)
+        env_bytes = (harness.root / ".env").read_bytes()
+        result = harness.resume(RACE_DATA_SYNC_ALLOW_NETWORK="false")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("writer flags differ", result.stderr)
+        self.assertEqual((harness.root / ".env").read_bytes(), env_bytes)
+        self.assertFalse(any(event.startswith("start-after-") for event in harness.events()))
+        self.assertFalse((harness.directory / "complete.json").exists())
 
     def test_same_schema_and_upgrade_both_compose_modes_require_new_backup(self):
         for leaf in (SOURCE, TARGET):

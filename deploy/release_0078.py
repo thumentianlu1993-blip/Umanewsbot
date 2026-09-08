@@ -89,7 +89,10 @@ def candidate(env):
 
 def schema_state(env, expected_leaf=None):
     candidate(env)
-    args = ["run", "--rm", "--no-deps", "web", "python", "manage.py", "check_historical_calendar_release_b_schema", "--direction=forward", "--json"]
+    args = ["run", "--rm", "--no-deps"]
+    for flag in contract.WRITER_FLAGS:
+        args.extend(["-e", f"{flag}=false"])
+    args.extend(["web", "python", "manage.py", "check_historical_calendar_release_b_schema", "--direction=forward", "--json"])
     if expected_leaf:
         args.append("--expected-migration-leaf-set=" + expected_leaf)
     result = json.loads(compose(args, env))
@@ -102,21 +105,44 @@ def config_sha():
     return hashlib.sha256((ROOT / ".env").read_bytes()).hexdigest()
 
 
-def verify_release_config(env, manifest):
-    # Compose may override .env through the caller's environment. Validate the
-    # effective project and existing writer flags without logging configuration.
+def writer_flags(values):
+    flags = {key: str(values.get(key, "false")).strip().lower() for key in contract.WRITER_FLAGS}
+    if any(value not in {"", "0", "false", "off", "no", "1", "true", "on", "yes"} for value in flags.values()):
+        raise ValueError("0078 writer flags contain an invalid boolean")
+    return flags
+
+
+def release_config(env):
+    # Only control containers disarm writers; capture resident service values
+    # from the effective Compose configuration, including caller overrides.
     config = json.loads(compose(["config", "--format", "json"], env))
-    if not manifest.get("compose_project") or config.get("name") != manifest["compose_project"]:
-        raise ValueError("0078 effective Compose project differs from preparation")
-    flags = manifest.get("writer_flags")
-    if not isinstance(flags, dict) or not flags:
-        raise ValueError("0078 original writer flags are missing")
+    project = config.get("name", "")
+    if not re.fullmatch(r"[a-z0-9_-]+", project):
+        raise ValueError("0078 effective Compose project is invalid")
+    flags = writer_flags(config["services"]["web"].get("environment") or {})
     for service in contract.SERVICES:
         if service == "nginx":
             continue
         actual = config["services"][service].get("environment") or {}
-        if any(str(actual.get(key, "false")).strip().lower() != value for key, value in flags.items()):
-            raise ValueError(f"0078 effective {service} writer flags differ from preparation")
+        if writer_flags(actual) != flags:
+            raise ValueError(f"0078 effective {service} writer flags differ between services")
+    return project, flags
+
+
+def verify_release_config(env, manifest):
+    project, flags = release_config(env)
+    if project != manifest.get("compose_project"):
+        raise ValueError("0078 effective Compose project differs from preparation")
+    if flags != manifest.get("writer_flags"):
+        raise ValueError("0078 effective writer flags differ from preparation")
+
+
+def verify_service_flags(service, current, env, expected):
+    if service != "nginx" and current["running"]:
+        entries = json.loads(run(["docker", "inspect", "--format", "{{json .Config.Env}}", current["container"]], env=env))
+        values = dict(value.split("=", 1) for value in entries)
+        if writer_flags(values) != expected:
+            raise ValueError(f"0078 running {service} writer flags differ from preparation")
 
 
 def binding_env(intent_path, identity, intent):
@@ -188,6 +214,9 @@ def prepare(env, *, resume):
         source_leaf = origin["preflight"]["migration_leaf_set"][0]
         schema_state(env, source_leaf)
         services = {service: probe(service, env) for service in contract.SERVICES}
+        compose_project, original_flags = release_config(env)
+        for service, current in services.items():
+            verify_service_flags(service, current, env, original_flags)
         if origin["handoff_action"] == "manual-release" and any(services[service]["running"] for service in contract.SERVICES if service != "nginx"):
             raise ValueError("manual 0078 release requires stopped application services")
         restore = {service: values["running"] for service, values in services.items()}
@@ -202,7 +231,9 @@ def prepare(env, *, resume):
             private_directory(backup_dir)
             if any(backup_dir.iterdir()):
                 raise ValueError("0078 unpublished backup exists; preserve it and reconcile preparation before retry")
-            project = env.get("EXPECTED_COMPOSE_PROJECT", "")
+            project = env.get("EXPECTED_COMPOSE_PROJECT", compose_project)
+            if project != compose_project:
+                raise ValueError("0078 expected Compose project differs from configuration")
             for service in contract.SERVICES:
                 cid = services[service]["container"]
                 if cid:
@@ -241,7 +272,7 @@ def prepare(env, *, resume):
                 "pg_restore_list_sha256": hashlib.sha256(toc.encode("utf-8")).hexdigest(),
                 "pg_restore_list_line_count": len(toc.splitlines()),
                 "restore_services": restore, "config_sha256": config_sha(),
-                "writer_flags": origin["writer_activity"]["flags"],
+                "writer_flags": original_flags,
                 "initial_lock_sha256": origin["deployment_lock_token_sha256"],
             }
             contract.publish_once(manifest_path, manifest)
@@ -255,6 +286,8 @@ def prepare(env, *, resume):
         }
         identity = contract.publish_once(intent_path, intent)
     verify_release_config(env, manifest)
+    for service in contract.SERVICES:
+        verify_service_flags(service, probe(service, env), env, manifest["writer_flags"])
     if not os.path.lexists(release_dir / "complete.json"):
         contract.publish_once(RELEASES / "active.json", {"release_id": origin_sha, "intent_path": str(intent_path), "intent_file": identity})
     env.update(binding_env(intent_path, identity, intent))
@@ -277,6 +310,7 @@ def finish(env, intent_path, intent, receipt):
     current_services = {service: probe(service, env) for service in contract.SERVICES}
     for service, current in current_services.items():
         verify_service_image(service, current, env)
+        verify_service_flags(service, current, env, manifest["writer_flags"])
     for service in ("web", "worker", "race_sync_v2_worker", "race_live_worker", "beat", "nginx"):
         current = current_services[service]
         if not restore[service]:
@@ -290,6 +324,7 @@ def finish(env, intent_path, intent, receipt):
             if not current["running"]:
                 raise ValueError(f"0078 {service} did not start")
             verify_service_image(service, current, env)
+            verify_service_flags(service, current, env, manifest["writer_flags"])
         if service == "web":
             run([ROOT / "deploy/wait_for_compose_service_healthy.sh"], env={**env, "SERVICE_NAME": "web"})
         if service == "nginx" and restore["web"]:
