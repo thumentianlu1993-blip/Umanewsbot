@@ -167,7 +167,16 @@ if [ -n "${RELEASE_CONTROL_COMPOSE_OVERRIDE:-}" ]; then
   if [ ! -f "$RELEASE_CONTROL_COMPOSE_OVERRIDE" ] || [ -L "$RELEASE_CONTROL_COMPOSE_OVERRIDE" ]; then echo "control compose override is untrusted" >&2; exit 1; fi
   set -- "$@" -f "$RELEASE_CONTROL_COMPOSE_OVERRIDE"
 fi
-./deploy/docker/compose-wrapper.sh "$@" run --rm --no-deps \
+set -- "$@" run --rm --no-deps
+if [ -z "${RELEASE_CONTROL_COMPOSE_OVERRIDE:-}" ]; then
+  # Keep the resident service configuration intact. Only this control process
+  # must satisfy the existing all-writers-disabled handoff contract.
+  writer_flags="$(python3 -c 'import sys; sys.path.insert(0, "server"); from stable.services.release_0078_recovery import WRITER_FLAGS; print(" ".join(WRITER_FLAGS))')"
+  for flag in $writer_flags; do
+    set -- "$@" -e "$flag=false"
+  done
+fi
+./deploy/docker/compose-wrapper.sh "$@" \
   -v "$artifact_mount_root:$artifact_mount_root:rw" \
   -e "UMANEWS_RELEASE_COMMIT=$EXPECTED_CANDIDATE_COMMIT" \
   -e "UMANEWS_RELEASE_IMAGE_ID=$EXPECTED_CANDIDATE_IMAGE_ID" \

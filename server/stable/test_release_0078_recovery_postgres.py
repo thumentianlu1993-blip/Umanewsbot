@@ -12,6 +12,7 @@ import uuid
 from pathlib import Path
 from io import StringIO
 from unittest import TestCase, skipUnless
+from unittest.mock import patch
 
 import psycopg
 from psycopg import sql
@@ -20,9 +21,11 @@ from django.db.migrations.executor import MigrationExecutor
 from django.db.migrations.exceptions import IrreversibleError
 from django.db.migrations.recorder import MigrationRecorder
 from django.core.management import call_command
+from django.core.management.base import CommandError
 
 from stable.services import historical_calendar_release_b_schema as schema
 from stable.services import release_0078_recovery as recovery
+from stable.test_release_0078_entrypoints import WRITER_FLAGS
 
 
 M77 = ("stable", "0077_racing_api_horse_identity_staging")
@@ -130,7 +133,18 @@ class Release0078PostgresTests(TestCase):
         self.assertEqual(self.column(), [("jsonb", True, "", "", None)])
 
     def test_real_v5_handoff_commands_migrate_and_archive_exact_0078_receipt(self):
+        self.assert_v5_handoff_commands(live_enabled=False)
+
+    def test_real_closed_commands_accept_enabled_restore_manifest_but_reject_enabled_control_process(self):
+        self.assert_v5_handoff_commands(live_enabled=True)
+
+    def assert_v5_handoff_commands(self, *, live_enabled):
         """No mocked management commands, schema collector, or DDL owner."""
+        restore_flags = {name: "true" if live_enabled and name.startswith("RACE_DATA_SYNC_") else "false" for name in WRITER_FLAGS}
+        closed_flags = {name: "false" for name in WRITER_FLAGS}
+        disarmed = patch.dict(os.environ, closed_flags)
+        disarmed.start()
+        self.addCleanup(disarmed.stop)
         with tempfile.TemporaryDirectory() as tmp:
             directory = Path(tmp)
             marker = directory / "restricted-recovery.json"
@@ -143,9 +157,19 @@ class Release0078PostgresTests(TestCase):
             before = schema.check_release_b_schema_compatibility(direction="forward")
             self.assertTrue(before["ok"], before)
             self.assertEqual(before["migration_leaf_set"], ["stable.0077_racing_api_horse_identity_staging"])
+            if live_enabled:
+                self.assertEqual(sum(value == "true" for value in restore_flags.values()), 10)
+                with patch.dict(os.environ, restore_flags):
+                    # The global all-false gate remains real and strict. A
+                    # restore manifest does not grant the control process writes.
+                    with self.assertRaisesRegex(CommandError, "writer activity is not quiescent"):
+                        call_command("create_historical_calendar_release_b_handoff", action="deploy",
+                                     output_path=str(origin_path), stdout=StringIO(), **common)
+                self.assertFalse(origin_path.exists())
             call_command("create_historical_calendar_release_b_handoff", action="deploy",
                          output_path=str(origin_path), stdout=StringIO(), **common)
             origin, _ = recovery.read_json(origin_path)
+            self.assertEqual(origin["writer_activity"]["flags"], closed_flags)
             release_id = origin["artifact_sha256"]
             release_root = directory / "release-0078-recovery"
             release_root.mkdir(mode=0o700)
@@ -169,7 +193,7 @@ class Release0078PostgresTests(TestCase):
                         "pg_restore_list_sha256": hashlib.sha256(toc).hexdigest(), "pg_restore_list_line_count": len(toc.splitlines()),
                         "restore_services": restore, "config_sha256": "f" * 64, "initial_lock_sha256": "e" * 64,
                         "compose_project": "isolated0078",
-                        "writer_flags": origin["writer_activity"]["flags"]}
+                        "writer_flags": restore_flags}
             manifest_path = release / "manifest.json"
             manifest_sha = recovery.publish_once(manifest_path, manifest)["sha256"]
             intent_path = release / "intent.json"
@@ -189,6 +213,7 @@ class Release0078PostgresTests(TestCase):
                          output_path=str(closed_path), provenance_artifact_sha256=release_id,
                          stdout=StringIO(), **common, **fields)
             closed, _ = recovery.read_json(closed_path)
+            self.assertEqual(closed["writer_activity"]["flags"], closed_flags)
             command_common = {"artifact_path": str(closed_path), "artifact_sha256": closed["artifact_sha256"],
                               "candidate_commit": candidate, "candidate_image_id": image,
                               "database_identity_sha256": db_identity}
@@ -212,6 +237,7 @@ class Release0078PostgresTests(TestCase):
             receipt = recovery.completed_marker(directory, recovery.marker_binding(closed))
             self.assertIsNotNone(receipt)
             self.assertTrue((release_root / "active.json").exists(), "schema completion precedes host service restoration")
+            self.assertEqual(recovery.read_json(manifest_path)[0]["writer_flags"], restore_flags)
 
     def pg(self, command, *args, check=True):
         env = {**os.environ, "PGHOST": "127.0.0.1", "PGPORT": str(self.params["port"]),

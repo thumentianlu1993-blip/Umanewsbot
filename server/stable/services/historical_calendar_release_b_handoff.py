@@ -227,22 +227,7 @@ def collect_writer_activity() -> dict[str, Any]:
     }
     flags = {
         name: os.environ.get(name, "false").strip().lower()
-        for name in (
-            "RACE_LIVE_SCHEDULER_ENABLED",
-            "RACE_LIVE_MONITOR_ENABLED",
-            "RACE_DATA_SYNC_ENABLED",
-            "RACE_DATA_SYNC_SCHEDULER_ENABLED",
-            "RACE_DATA_SYNC_ALLOW_NETWORK",
-            "RACE_DATA_SYNC_FUTURE_DISCOVERY_ENABLED",
-            "RACE_DATA_SYNC_SCHEDULE_APPLY_ENABLED",
-            "RACE_DATA_SYNC_RACECARD_APPLY_ENABLED",
-            "RACE_DATA_SYNC_LIFECYCLE_APPLY_ENABLED",
-            "RACE_DATA_SYNC_RESULT_APPLY_ENABLED",
-            "RACE_DATA_SYNC_RESULT_PUBLIC_ENABLED",
-            "RACE_DATA_SYNC_CORRECTION_APPLY_ENABLED",
-            "HISTORICAL_RACE_BACKFILL_ENABLED",
-            "HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK",
-        )
+        for name in release_0078.WRITER_FLAGS
     }
     flags_ok = all(value in {"", "0", "false", "off", "no"} for value in flags.values())
     return {"ok": not any(counts.values()) and flags_ok, "counts": counts, "flags": flags}
