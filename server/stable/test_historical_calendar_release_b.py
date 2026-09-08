@@ -126,7 +126,7 @@ class ReleaseBSchemaPreflightTests(TestCase):
         self.assertRegex(payload["rows_sha256"], r"^[0-9a-f]{64}$")
         self.assertEqual(
             payload["migration_leaf"],
-            "stable.0077_racing_api_horse_identity_staging",
+            "stable.0078_externalhorse_profile_snapshot",
         )
 
     def test_unknown_applied_stable_migration_fails_closed(self):
@@ -340,11 +340,12 @@ class ReleaseB0077ReleaseContractTests(SimpleTestCase):
     M0075 = "stable.0075_race_data_source_priority_and_reported_position"
     M0076 = "stable.0076_alter_externaldataimporterror_racing_region_and_more"
     M0077 = "stable.0077_racing_api_horse_identity_staging"
+    M0078 = "stable.0078_externalhorse_profile_snapshot"
 
     def test_forward_plan_has_exact_0075_0076_0077_boundaries(self):
         from stable.services.historical_calendar_release_b_schema import (
-            ALLOWED_FORWARD_STATES,
-            TARGET,
+            LEGACY_0077_FORWARD_STATES as ALLOWED_FORWARD_STATES,
+            LEGACY_0077_TARGET as TARGET,
         )
 
         self.assertEqual(TARGET, ("stable", self.M0077.removeprefix("stable.")))
@@ -361,12 +362,12 @@ class ReleaseB0077ReleaseContractTests(SimpleTestCase):
         )
         self.assertEqual(ALLOWED_FORWARD_STATES[(self.M0077,)], [])
 
-    def test_0076_only_allows_stopped_candidate_manual_release(self):
+    def test_0076_legacy_state_cannot_enter_current_manual_release(self):
         from stable.services.historical_calendar_release_b_handoff import (
             authorize_handoff_action,
         )
 
-        self.assertTrue(
+        self.assertFalse(
             authorize_handoff_action(
                 leaf_set=[self.M0076],
                 action="manual-release",
@@ -787,7 +788,7 @@ class ReleaseB0077ReleaseContractTests(SimpleTestCase):
             ["0077.object_presence"],
         )
 
-    def test_shell_and_rollback_allowlists_bind_exact_0077_forward_only_policy(self):
+    def test_shell_and_rollback_allowlists_bind_exact_0078_forward_only_policy(self):
         import json
         from pathlib import Path
 
@@ -800,7 +801,7 @@ class ReleaseB0077ReleaseContractTests(SimpleTestCase):
         for relative in ("deploy/rollback.sh", "deploy/rollback_lowcost.sh"):
             rollback = (root / relative).read_text(encoding="utf-8")
             self.assertIn(
-                f"RELEASE_B_EXPECTED_MIGRATION_LEAF_SET={self.M0077}", rollback
+                f"RELEASE_B_EXPECTED_MIGRATION_LEAF_SET={self.M0078}", rollback
             )
             self.assertNotIn(
                 f"RELEASE_B_EXPECTED_MIGRATION_LEAF_SET={self.M0076}", rollback
@@ -808,7 +809,7 @@ class ReleaseB0077ReleaseContractTests(SimpleTestCase):
         resume = (root / "deploy/resume_stopped_release.sh").read_text(
             encoding="utf-8"
         )
-        exact_gate = f"--expected-migration-leaf-set={self.M0077}"
+        exact_gate = f"--expected-migration-leaf-set={self.M0078}"
         self.assertIn(exact_gate, resume)
         self.assertLess(resume.index(exact_gate), resume.index('echo "resume: starting web"'))
         allowlist = json.loads(
@@ -816,12 +817,12 @@ class ReleaseB0077ReleaseContractTests(SimpleTestCase):
                 encoding="utf-8"
             )
         )
-        self.assertEqual(allowlist["final_schema_leaf"], self.M0077)
+        self.assertEqual(allowlist["final_schema_leaf"], self.M0078)
         self.assertEqual(
             allowlist["schema_version"],
-            "release-b-rollback-migration-allowlist/v6",
+            "release-b-rollback-migration-allowlist/v7",
         )
-        self.assertEqual(allowlist["recoverable_forward_partial_leaf"], self.M0076)
+        self.assertEqual(allowlist["recoverable_forward_partial_leaf"], self.M0077)
         self.assertFalse(allowlist["reverse_migration_allowed"])
         self.assertEqual(
             allowlist["reviewed_targets"],
@@ -835,7 +836,7 @@ class ReleaseB0077ReleaseContractTests(SimpleTestCase):
         self.assertFalse(allowlist["generic_code_rollback_allowed"])
         self.assertTrue(allowlist["verified_backup_restore_required"])
 
-    def test_repository_policy_rejects_every_generic_0077_code_rollback(self):
+    def test_repository_policy_rejects_every_generic_0078_code_rollback(self):
         import subprocess
         import sys
         from pathlib import Path
@@ -854,7 +855,7 @@ class ReleaseB0077ReleaseContractTests(SimpleTestCase):
             check=False,
         )
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("0077 is forward-only", result.stderr)
+        self.assertIn("0078 is forward-only", result.stderr)
         self.assertIn("verified backup", result.stderr)
 
 

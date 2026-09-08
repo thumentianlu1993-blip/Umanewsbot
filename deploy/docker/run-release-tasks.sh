@@ -45,7 +45,12 @@ else
     --deployment-lock-token-sha256="${EXPECTED_DEPLOYMENT_LOCK_TOKEN_SHA256:-}" \
     --release-0077-recovery-manifest-path="${RELEASE_0077_RECOVERY_MANIFEST_PATH:-}" \
     --release-0077-recovery-manifest-sha256="${RELEASE_0077_RECOVERY_MANIFEST_SHA256:-}" \
-    --release-0077-recovery-origin-handoff-sha256="${RELEASE_0077_RECOVERY_ORIGIN_HANDOFF_SHA256:-}"
+    --release-0077-recovery-origin-handoff-sha256="${RELEASE_0077_RECOVERY_ORIGIN_HANDOFF_SHA256:-}" \
+    --release-0078-recovery-manifest-path="${RELEASE_0078_RECOVERY_MANIFEST_PATH:-}" \
+    --release-0078-recovery-manifest-sha256="${RELEASE_0078_RECOVERY_MANIFEST_SHA256:-}" \
+    --release-0078-recovery-origin-handoff-sha256="${RELEASE_0078_RECOVERY_ORIGIN_HANDOFF_SHA256:-}" \
+    --release-0078-intent-path="${RELEASE_0078_INTENT_PATH:-}" \
+    --release-0078-intent-sha256="${RELEASE_0078_INTENT_SHA256:-}"
   intent_result="$(python manage.py ensure_historical_calendar_recovery_intent \
     --marker-path="$RESTRICTED_RECOVERY_MARKER_PATH" \
     --artifact-path="$RELEASE_B_PREFLIGHT_ARTIFACT_PATH" \
@@ -68,7 +73,11 @@ else
   fi
 fi
 if [ "$RELEASE_TASK_PHASE" != "complete-intent" ]; then
-  python manage.py migrate --noinput
+  if [ -n "${RELEASE_0078_INTENT_PATH:-}" ]; then
+    python manage.py migrate stable 0078_externalhorse_profile_snapshot --noinput
+  else
+    python manage.py migrate --noinput
+  fi
 fi
 if [ "$RELEASE_TASK_PHASE" = "migrate-verify" ]; then
   if [ "$RESTRICTED_RECOVERY_ATTEMPT_MODE" = "required" ]; then
@@ -77,6 +86,9 @@ if [ "$RELEASE_TASK_PHASE" = "migrate-verify" ]; then
     printf '%s\n' 'release-marker-identity=none'
   fi
   exit 0
+fi
+if [ "$RELEASE_TASK_PHASE" = "all" ]; then
+  python manage.py collectstatic --noinput
 fi
 if [ "$RELEASE_TASK_PHASE" != "migrate-verify" ]; then
   if [ "$handoff_action" = "forward-resume" ]; then
@@ -94,7 +106,4 @@ if [ "$RELEASE_TASK_PHASE" != "migrate-verify" ]; then
     --candidate-commit="$EXPECTED_CANDIDATE_COMMIT" \
     --candidate-image-id="$EXPECTED_CANDIDATE_IMAGE_ID" \
     --database-identity-sha256="${EXPECTED_PRODUCTION_DB_IDENTITY_SHA256:-}"
-fi
-if [ "$RELEASE_TASK_PHASE" = "all" ]; then
-  python manage.py collectstatic --noinput
 fi

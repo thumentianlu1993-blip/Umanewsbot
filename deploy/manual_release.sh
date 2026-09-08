@@ -46,6 +46,7 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 python3 ./deploy/ensure_migration_history_repair_runtime.py
+python3 ./deploy/release_0078.py guard
 ./deploy/check_restricted_recovery_marker.sh
 ./deploy/verify_persistent_release_mounts.sh
 
@@ -103,5 +104,5 @@ if [ "${#RELEASE_B_PREFLIGHT_ARTIFACT_SHA256}" -ne 64 ] || [ "${#EXPECTED_PRODUC
   echo "manual release handoff output is invalid" >&2; exit 1
 fi
 
-COMPOSE_FILE="$COMPOSE_FILE" ./deploy/run_release_tasks.sh
+COMPOSE_FILE="$COMPOSE_FILE" python3 ./deploy/release_0078.py release
 echo "manual release: release task completed; all application services remain stopped"

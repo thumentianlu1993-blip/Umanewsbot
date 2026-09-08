@@ -73,13 +73,16 @@ case "$EXPECTED_MIGRATION_LEAF_SET" in
   stable.0077_racing_api_horse_identity_staging)
     leaf_args="--expected-migration-leaf-set=stable.0077_racing_api_horse_identity_staging"
     ;;
+  stable.0078_externalhorse_profile_snapshot)
+    leaf_args="--expected-migration-leaf-set=stable.0078_externalhorse_profile_snapshot"
+    ;;
   *) echo "RELEASE_B_EXPECTED_MIGRATION_LEAF_SET must be one complete reviewed leaf set" >&2; exit 1 ;;
 esac
 RELEASE_B_PREFLIGHT_ACTION="${RELEASE_B_PREFLIGHT_ACTION:-}"
 case "$RELEASE_B_PREFLIGHT_ACTION" in deploy|manual-release|rollback|forward-resume|initial-install) ;; *) echo "RELEASE_B_PREFLIGHT_ACTION is required" >&2; exit 1 ;; esac
 if [ "$RELEASE_B_PREFLIGHT_ACTION" = rollback ] && \
-   [ "$EXPECTED_MIGRATION_LEAF_SET" != stable.0077_racing_api_horse_identity_staging ]; then
-  echo "generic rollback is disabled; even a diagnostic rollback preflight requires exact leaf stable.0077_racing_api_horse_identity_staging" >&2
+   [ "$EXPECTED_MIGRATION_LEAF_SET" != stable.0078_externalhorse_profile_snapshot ]; then
+  echo "generic rollback is disabled; even a diagnostic rollback preflight requires exact leaf stable.0078_externalhorse_profile_snapshot" >&2
   exit 1
 fi
 if [ "$RELEASE_B_PREFLIGHT_ACTION" != forward-resume ]; then
@@ -90,12 +93,10 @@ if [ -n "${RESTRICTED_RECOVERY_MARKER_PATH:-}" ] && [ "$RESTRICTED_RECOVERY_MARK
   echo "restricted recovery marker path must be canonical" >&2; exit 1
 fi
 RESTRICTED_RECOVERY_MARKER_PATH="$CANONICAL_RESTRICTED_RECOVERY_MARKER_PATH"
-restricted_args="--restricted-marker-path=$RESTRICTED_RECOVERY_MARKER_PATH"
 if [ "$RELEASE_B_PREFLIGHT_ACTION" = forward-resume ]; then
   if [ -z "${RESTRICTED_RECOVERY_MARKER_PATH:-}" ] || [ -z "${RESTRICTED_RECOVERY_PROVENANCE_ARTIFACT_SHA256:-}" ]; then
     echo "forward-resume preflight requires marker provenance" >&2; exit 1
   fi
-  restricted_args="$restricted_args --provenance-artifact-sha256=$RESTRICTED_RECOVERY_PROVENANCE_ARTIFACT_SHA256"
 fi
 
 RELEASE_B_PREFLIGHT_ARTIFACT_PATH="${RELEASE_B_PREFLIGHT_ARTIFACT_PATH:-}"
@@ -121,7 +122,6 @@ fi
 recovery_manifest_path="${RELEASE_0077_RECOVERY_MANIFEST_PATH:-}"
 recovery_manifest_sha256="${RELEASE_0077_RECOVERY_MANIFEST_SHA256:-}"
 recovery_origin_handoff_sha256="${RELEASE_0077_RECOVERY_ORIGIN_HANDOFF_SHA256:-}"
-recovery_args=""
 if [ -n "$recovery_manifest_path$recovery_manifest_sha256$recovery_origin_handoff_sha256" ]; then
   if [ -z "$recovery_manifest_path" ] || [ -z "$recovery_manifest_sha256" ] || [ -z "$recovery_origin_handoff_sha256" ]; then
     echo "0077 recovery manifest binding must be complete" >&2; exit 1
@@ -150,7 +150,6 @@ if [ -n "$recovery_manifest_path$recovery_manifest_sha256$recovery_origin_handof
   if [ "$actual_recovery_manifest_sha256" != "$recovery_manifest_sha256" ]; then
     echo "0077 recovery manifest SHA mismatch" >&2; exit 1
   fi
-  recovery_args="--release-0077-recovery-manifest-path=$recovery_manifest_path --release-0077-recovery-manifest-sha256=$recovery_manifest_sha256 --release-0077-recovery-origin-handoff-sha256=$recovery_origin_handoff_sha256"
 fi
 
 IMAGE_NAME="${RELEASE_B_BINDING_IMAGE_NAME:-umanewsbot:prod}"
@@ -179,8 +178,16 @@ fi
   --action="$RELEASE_B_PREFLIGHT_ACTION" \
   $leaf_args \
   $db_args \
-  $restricted_args \
-  $recovery_args \
+  --restricted-marker-path="$RESTRICTED_RECOVERY_MARKER_PATH" \
+  --provenance-artifact-sha256="${RESTRICTED_RECOVERY_PROVENANCE_ARTIFACT_SHA256:-}" \
+  --release-0077-recovery-manifest-path="$recovery_manifest_path" \
+  --release-0077-recovery-manifest-sha256="$recovery_manifest_sha256" \
+  --release-0077-recovery-origin-handoff-sha256="$recovery_origin_handoff_sha256" \
+  --release-0078-recovery-manifest-path="${RELEASE_0078_RECOVERY_MANIFEST_PATH:-}" \
+  --release-0078-recovery-manifest-sha256="${RELEASE_0078_RECOVERY_MANIFEST_SHA256:-}" \
+  --release-0078-recovery-origin-handoff-sha256="${RELEASE_0078_RECOVERY_ORIGIN_HANDOFF_SHA256:-}" \
+  --release-0078-intent-path="${RELEASE_0078_INTENT_PATH:-}" \
+  --release-0078-intent-sha256="${RELEASE_0078_INTENT_SHA256:-}" \
   --candidate-commit="$EXPECTED_CANDIDATE_COMMIT" \
   --candidate-image-id="$EXPECTED_CANDIDATE_IMAGE_ID"
 

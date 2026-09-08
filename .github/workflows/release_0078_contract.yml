@@ -1,0 +1,198 @@
+name: 0078 发布与恢复合同
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'deploy/**'
+      - 'server/stable/**'
+      - 'scripts/test_release_0078_contract.sh'
+      - '.github/workflows/release_0078_contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: release_0078_ci
+          POSTGRES_USER: release_0078_ci
+          POSTGRES_PASSWORD: synthetic-ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U release_0078_ci -d release_0078_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      DB_ENGINE: postgres
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: '5432'
+      POSTGRES_DB: release_0078_ci
+      POSTGRES_USER: release_0078_ci
+      POSTGRES_PASSWORD: synthetic-ci-only
+      RELEASE_0078_TEST_POSTGRES: '1'
+      DJANGO_SETTINGS_MODULE: app.settings
+      PYTHONDONTWRITEBYTECODE: '1'
+      PYTHONUNBUFFERED: '1'
+      DOTENV_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: 安装固定应用依赖与 PostgreSQL 16 客户端
+        run: |
+          python -m pip install --disable-pip-version-check -r requirements.txt
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client-16
+          echo /usr/lib/postgresql/16/bin >> "$GITHUB_PATH"
+      - name: 隔离测试（无生产配置、无外部业务请求）
+        run: bash scripts/test_release_0078_contract.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-0078-test-evidence
+          path: ${{ runner.temp }}/release-0078-test-evidence
+          if-no-files-found: error
+
+  stable-baseline-comparison:
+    name: stable 全量对照 (${{ matrix.revision }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        revision: [baseline, candidate]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: release_0078_ci
+          POSTGRES_USER: release_0078_ci
+          POSTGRES_PASSWORD: synthetic-ci-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U release_0078_ci -d release_0078_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      DB_ENGINE: postgres
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: '5432'
+      POSTGRES_DB: release_0078_ci
+      POSTGRES_USER: release_0078_ci
+      POSTGRES_PASSWORD: synthetic-ci-only
+      RELEASE_0078_TEST_POSTGRES: '0'
+      DJANGO_SETTINGS_MODULE: app.settings
+      PYTHONDONTWRITEBYTECODE: '1'
+      PYTHONUNBUFFERED: '1'
+      DOTENV_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: 固定历史基线
+        if: matrix.revision == 'baseline'
+        run: |
+          git fetch --depth=1 origin a88bcbf669bd609e30f97c8a07f009881d2da705
+          git checkout --detach a88bcbf669bd609e30f97c8a07f009881d2da705
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: 记录同环境工作流合同基线
+        run: |
+          mkdir -p evidence
+          set +e
+          python .codex/scripts/check_workflow_contract.py > evidence/workflow-contract-check.log 2>&1
+          echo "$?" > evidence/workflow-contract-check.exit
+          python .codex/scripts/test_workflow_contract.py > evidence/workflow-contract-tests.log 2>&1
+          echo "$?" > evidence/workflow-contract-tests.exit
+          set -e
+      - name: 全量 stable 运行并保存实际失败集合
+        run: |
+          test ! -e .env
+          test ! -e server/.env
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/commit.txt
+          cd server
+          python - <<'PY' > ../evidence/stable.log 2>&1
+          import json, pathlib, socket, sys
+          sys.argv = ['manage.py', 'test', 'stable']
+          import django
+          # Application tests may talk only to local synthetic services.
+          original_connect = socket.socket.connect
+          def connect(self, address):
+              if isinstance(address, tuple) and address[0] not in ('127.0.0.1', 'localhost', '::1'):
+                  raise RuntimeError('External network disabled in isolated stable tests')
+              return original_connect(self, address)
+          socket.socket.connect = connect
+          django.setup()
+          from django.test.runner import DiscoverRunner
+          class EvidenceRunner(DiscoverRunner):
+              def run_suite(self, suite, **kwargs):
+                  result = super().run_suite(suite, **kwargs)
+                  payload = {
+                      'tests_run': result.testsRun,
+                      'failures': [{'test': case.id(), 'traceback': error} for case, error in result.failures],
+                      'errors': [{'test': case.id(), 'traceback': error} for case, error in result.errors],
+                      'skipped': [{'test': case.id(), 'reason': reason} for case, reason in result.skipped],
+                  }
+                  pathlib.Path('../evidence/result.json').write_text(json.dumps(payload, ensure_ascii=False, indent=2))
+                  return result
+          # Existing failures are evidence for comparison, not an accepted green baseline.
+          result = EvidenceRunner(verbosity=1, interactive=False).run_tests(['stable'])
+          pathlib.Path('../evidence/exit-code.txt').write_text(str(int(bool(result))))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: stable-${{ matrix.revision }}
+          path: evidence
+          if-no-files-found: error
+
+  compare-stable-failures:
+    name: stable 新增失败检查
+    needs: stable-baseline-comparison
+    if: always()
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: stable-*
+          path: evidence
+      - name: 比较固定基线与候选的失败名称
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          root = pathlib.Path('evidence')
+          baseline = json.loads((root/'stable-baseline/result.json').read_text())
+          candidate = json.loads((root/'stable-candidate/result.json').read_text())
+          def failed(value):
+              return {row['test'] for row in value['failures'] + value['errors']}
+          new = sorted(failed(candidate) - failed(baseline))
+          fixed = sorted(failed(baseline) - failed(candidate))
+          output = {'baseline_tests': baseline['tests_run'], 'candidate_tests': candidate['tests_run'], 'new_failures': new, 'fixed_failures': fixed}
+          (root/'comparison.json').write_text(json.dumps(output, indent=2))
+          print(json.dumps(output, indent=2))
+          raise SystemExit(1 if new else 0)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: stable-comparison
+          path: evidence/comparison.json

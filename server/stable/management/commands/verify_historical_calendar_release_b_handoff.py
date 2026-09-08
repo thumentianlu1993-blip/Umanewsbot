@@ -12,6 +12,7 @@ from stable.services.historical_calendar_release_b_handoff import (
 from stable.services.historical_calendar_release_b_schema import (
     database_vendor_contract,
 )
+from stable.services import release_0078_recovery as release_0078
 
 
 class Command(BaseCommand):
@@ -31,6 +32,8 @@ class Command(BaseCommand):
         parser.add_argument(
             "--release-0077-recovery-origin-handoff-sha256", default=""
         )
+        for field in release_0078.BINDING_FIELDS:
+            parser.add_argument("--" + field.replace("_", "-"), default="")
 
     def handle(self, *args, **options):
         vendor = database_vendor_contract()
@@ -55,6 +58,12 @@ class Command(BaseCommand):
             options["release_0077_recovery_manifest_sha256"],
             options["release_0077_recovery_origin_handoff_sha256"],
         )
+        current_values = {field: options[field] for field in release_0078.BINDING_FIELDS}
+        if any(current_values.values()) and not all(current_values.values()):
+            raise CommandError("0078 recovery expectation is incomplete")
+        if all(current_values.values()):
+            bindings.update(current_values)
+            bindings["release_0078_recovery_binding_mode"] = "bound"
         if any(recovery_values) and not all(recovery_values):
             raise CommandError("0077 recovery manifest expectation is incomplete")
         if all(recovery_values):
@@ -83,6 +92,12 @@ class Command(BaseCommand):
         )
         payload = artifact_contract.get("payload") or {}
         preflight = payload.get("preflight") or {}
+        if not options["artifact_only"] and (
+            payload.get("release_0078_recovery_binding_mode") != "bound"
+            or not all(current_values.values())
+        ):
+            result["ok"] = False
+            result.setdefault("artifact_errors", []).append("release_0078_recovery_unbound")
         crosses_0077 = (
             "0077_racing_api_horse_identity_staging"
             in (preflight.get("migration_plan") or [])

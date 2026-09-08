@@ -29,6 +29,7 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 python3 ./deploy/ensure_migration_history_repair_runtime.py
+python3 ./deploy/release_0078.py guard
 ./deploy/check_restricted_recovery_marker.sh
 ./deploy/verify_persistent_release_mounts.sh
 

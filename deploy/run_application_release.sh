@@ -116,6 +116,13 @@ esac
 # Verify the deployment lock before any Compose call.
 ./deploy/deployment_lock.sh verify
 
+# Current releases share the prepared 0078 intent with manual/resume entrypoints.
+# The retained-schema control-image path below remains only for independently
+# reviewed compatibility fixtures; the real policy has no rollback targets.
+if [ -z "${RELEASE_CONTROL_COMPOSE_OVERRIDE:-}" ]; then
+  exec python3 "$ROOT_DIR/deploy/release_0078.py" release
+fi
+
 # A 0075 -> 0077 deploy is forward-only. Before stopping any service, bind the
 # original admission handoff to one exact mode-0600 custom-format backup and a
 # successful pg_restore --list result. The closed-state handoff itself is

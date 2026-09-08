@@ -19,6 +19,7 @@ from stable.models import (
     OperationLog,
     RaceEvent,
 )
+from stable.services.release_0078_recovery import migration_contract
 
 
 SCHEMA_VERSION = "migration-history-repair-preflight/v3"
@@ -31,8 +32,9 @@ PRODUCTION_AUDIT_EXPECTED_APPLIED_NODES = [
 ]
 TARGET = (
     "stable",
-    "0077_racing_api_horse_identity_staging",
+    "0078_externalhorse_profile_snapshot",
 )
+LEGACY_0077_TARGET = ("stable", "0077_racing_api_horse_identity_staging")
 AUDIT_PATH = (
     Path(__file__).resolve().parents[3]
     / "docs"
@@ -41,7 +43,7 @@ AUDIT_PATH = (
     / "production_audit.json"
 )
 
-ALLOWED_FORWARD_STATES = {
+LEGACY_0077_FORWARD_STATES = {
     ("stable.0070_horse_identity_evidence_commit_receipt",): [
         "0068_race_data_sync_pipeline_a_field_audit",
         "0069_race_data_sync_pipeline_a_ledger_guards",
@@ -114,6 +116,16 @@ ALLOWED_FORWARD_STATES = {
     ("stable.0077_racing_api_horse_identity_staging",): [],
 }
 
+# Only stable 0077 and 0078 are admission states for this release. Historical
+# recovery plans retain their original meaning; the current candidate never
+# takes over a 0077-generation recovery artifact.
+ALLOWED_FORWARD_STATES = {
+    ("stable.0077_racing_api_horse_identity_staging",): [
+        "0078_externalhorse_profile_snapshot",
+    ],
+    ("stable.0078_externalhorse_profile_snapshot",): [],
+}
+
 # Exact recorder states reachable when Django executes the reviewed 0077 plan
 # from the sole approved pre-0070 origin.  This is deliberately not merged
 # into ALLOWED_FORWARD_STATES: ordinary Release B deploys must never acquire an
@@ -121,11 +133,11 @@ ALLOWED_FORWARD_STATES = {
 INITIAL_INSTALL_FORWARD_STATES = {
     ("stable.0067_historical_calendar_release_a",): [
         "0070_horse_identity_evidence_commit_receipt",
-        *ALLOWED_FORWARD_STATES[
+        *LEGACY_0077_FORWARD_STATES[
             ("stable.0070_horse_identity_evidence_commit_receipt",)
         ],
     ],
-    **ALLOWED_FORWARD_STATES,
+    **LEGACY_0077_FORWARD_STATES,
 }
 
 AUDIT_FIELDS = (
@@ -563,6 +575,7 @@ def collect_postgresql_catalog_contract() -> dict:
                    a.attnum AS ordinal, pg_catalog.format_type(a.atttypid, a.atttypmod) AS type,
                    a.attnotnull AS not_null,
                    a.attidentity AS identity,
+                   a.attgenerated AS generated,
                    COALESCE(pg_get_expr(d.adbin, d.adrelid), '') AS default_expr
               FROM pg_attribute a
               JOIN pg_class c ON c.oid = a.attrelid
@@ -2161,6 +2174,28 @@ def validate_racing_api_horse_staging_catalog_contract(
     return sorted(set(drift))
 
 
+def validate_externalhorse_profile_snapshot_catalog_contract(
+    *, contract: dict, migration_applied: bool,
+) -> list[str]:
+    """The additive 0078 column must agree with the migration recorder."""
+    columns = [
+        row for row in contract.get("columns", [])
+        if row.get("table_name") == "stable_externalhorse"
+        and row.get("column_name") == "profile_snapshot"
+    ]
+    if not migration_applied:
+        return ["0078.object_presence"] if columns else []
+    expected = {
+        "type": "jsonb", "not_null": True, "identity": "",
+        "generated": "", "default_expr": "",
+    }
+    if len(columns) != 1 or any(
+        columns[0].get(key) != value for key, value in expected.items()
+    ):
+        return ["0078.externalhorse.profile_snapshot"]
+    return []
+
+
 def _postgres_catalog_state(
     contract: dict,
     applied_nodes: set[str],
@@ -2465,6 +2500,14 @@ def _postgres_catalog_state(
             ),
         )
     )
+    drift.extend(
+        validate_externalhorse_profile_snapshot_catalog_contract(
+            contract=contract,
+            migration_applied=(
+                "stable.0078_externalhorse_profile_snapshot" in applied_nodes
+            ),
+        )
+    )
     return {
         "ok": not drift,
         "drift_paths": sorted(set(drift)),
@@ -2571,6 +2614,10 @@ def check_release_b_schema_compatibility(
         allow_unchecked_nonproduction=allow_nonproduction_database,
     )
     schema_drift_paths = list(catalog_state["drift_paths"])
+    try:
+        migration_contract()
+    except (OSError, ValueError):
+        schema_drift_paths.append("migration.file_contract")
     if not state.get("migration_history_consistent", True):
         schema_drift_paths.append("migration.history_consistency")
     if not state["migration_graph_known"]:
@@ -2621,6 +2668,8 @@ def check_release_b_schema_compatibility(
         "receipt_audit_safe": schema_safe,
     }
     result["ok"] = (
+        not schema_drift_paths
+        and
         state.get("migration_history_consistent", True)
         and state["migration_graph_known"]
         and state["migration_state_allowed"]

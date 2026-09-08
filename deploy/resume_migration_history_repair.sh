@@ -1,13 +1,28 @@
 #!/bin/sh
-# Resume only the exact reviewed candidate after a 0068/0069 partial migration.
-# All application services must remain stopped. This entry never builds, pulls,
-# checks out, selects a latest artifact, or accepts a different candidate.
+# Resume the exact prepared 0078 release, including interruptions before DDL.
+# The older marker-based protocol remains below for its pinned control image.
+# Neither path builds, pulls, checks out, or selects a latest artifact.
 set -eu
 
 ROOT_DIR="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 COMPOSE_FILE="${COMPOSE_FILE:-}"
 case "$COMPOSE_FILE" in docker-compose.prod.yml|docker-compose.prod.lowcost.yml) ;; *) echo "COMPOSE_FILE is not allowlisted" >&2; exit 1 ;; esac
+
+# A prepared 0078 intent exists before the first stop and therefore may precede
+# the DDL marker. Route it before the old protocol's marker requirement.
+if [ -n "${RELEASE_0078_INTENT_PATH:-}${RELEASE_0078_RECOVERY_MANIFEST_SHA256:-}" ]; then
+  DEPLOYMENT_LOCK_TOKEN="$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+  export DEPLOYMENT_LOCK_TOKEN
+  COMPOSE_FILE="$COMPOSE_FILE" DEPLOYMENT_LOCK_ACTION=resume-release ./deploy/deployment_lock.sh acquire
+  release_0078_lock() { ./deploy/deployment_lock.sh release >/dev/null 2>&1 || true; }
+  trap release_0078_lock EXIT
+  trap 'exit 129' HUP
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  COMPOSE_FILE="$COMPOSE_FILE" python3 ./deploy/release_0078.py resume
+  exit 0
+fi
 
 if [ -z "${RELEASE_B_PREFLIGHT_ARTIFACT_SHA256:-}" ]; then echo "RELEASE_B_PREFLIGHT_ARTIFACT_SHA256 provenance is required" >&2; exit 1; fi
 if [ -z "${EXPECTED_CANDIDATE_COMMIT:-}" ]; then echo "EXPECTED_CANDIDATE_COMMIT is required" >&2; exit 1; fi

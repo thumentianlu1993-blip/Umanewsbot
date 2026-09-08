@@ -38,6 +38,7 @@ M0074 = ("stable", "0074_race_data_sync_r0_control_plane")
 M0075 = ("stable", "0075_race_data_source_priority_and_reported_position")
 M0076 = ("stable", "0076_alter_externaldataimporterror_racing_region_and_more")
 M0077 = ("stable", "0077_racing_api_horse_identity_staging")
+M0078 = ("stable", "0078_externalhorse_profile_snapshot")
 
 
 def _stable_plan(loader: MigrationLoader, applied: set[tuple[str, str]]) -> list[str]:
@@ -53,8 +54,8 @@ class MigrationHistoryRepair0075ReleaseContractTests(TestCase):
 
     def test_0072_has_exact_forward_plan_to_0073_and_0073_is_final(self):
         from stable.services.historical_calendar_release_b_schema import (
-            ALLOWED_FORWARD_STATES,
-            TARGET,
+            LEGACY_0077_FORWARD_STATES as ALLOWED_FORWARD_STATES,
+            LEGACY_0077_TARGET as TARGET,
         )
 
         self.assertEqual(TARGET, M0077)
@@ -90,7 +91,7 @@ class MigrationHistoryRepair0075ReleaseContractTests(TestCase):
         )
 
         self.assertEqual(PREVIOUS_FINAL_LEAF_SET, (f"{M0075[0]}.{M0075[1]}",))
-        self.assertEqual(FINAL_LEAF_SET, (f"{M0077[0]}.{M0077[1]}",))
+        self.assertEqual(FINAL_LEAF_SET, (f"{M0078[0]}.{M0078[1]}",))
 
     def test_preflight_accepts_both_pre_migration_and_current_leaf(self):
         preflight = (
@@ -123,11 +124,11 @@ class MigrationHistoryRepair0075ReleaseContractTests(TestCase):
         for relative in ("deploy/rollback.sh", "deploy/rollback_lowcost.sh"):
             self.assertIn(
                 "RELEASE_B_EXPECTED_MIGRATION_LEAF_SET="
-                "stable.0077_racing_api_horse_identity_staging",
+                "stable.0078_externalhorse_profile_snapshot",
                 (ROOT / relative).read_text(encoding="utf-8"),
             )
         self.assertIn(
-            "EXPECTED_LEAF=stable.0077_racing_api_horse_identity_staging",
+            "EXPECTED_LEAF=stable.0078_externalhorse_profile_snapshot",
             (ROOT / "deploy/resume_rollback_control_state.sh").read_text(
                 encoding="utf-8"
             ),
@@ -162,7 +163,7 @@ class MigrationHistoryRepair0075ReleaseContractTests(TestCase):
         )
         self.assertEqual(
             allowlist["required_migrations"][-1]["migration_path"],
-            "server/stable/migrations/0077_racing_api_horse_identity_staging.py",
+            "server/stable/migrations/0078_externalhorse_profile_snapshot.py",
         )
 
     def test_0073_catalog_contract_validates_tables_fks_constraints_and_indexes(self):
@@ -1007,6 +1008,7 @@ class MigrationHistoryRepairArtifactRedTests(SimpleTestCase):
             canonical_artifact_sha256,
             release_0077_recovery_binding,
         )
+        from stable.services.release_0078_recovery import recovery_binding
 
         path = root / "before.json"
         payload = {
@@ -1018,14 +1020,26 @@ class MigrationHistoryRepairArtifactRedTests(SimpleTestCase):
             "deployment_lock_token_sha256": "d" * 64,
             "artifact_path": str(path),
             "handoff_action": "deploy",
+            "target_leaf_set": ["stable.0078_externalhorse_profile_snapshot"],
+            "migration_contract_sha256": "50c421f3167a8c2c8f1613a0597ad7ee196c249fc18bf7eed0de7b9cd2f80906",
+            "writer_activity": {"ok": True, "flags": {}},
             "preflight": {
-                "migration_leaf_set": [],
-                "migration_plan": [],
+                "ok": True,
+                "database_identity_sha256": "c" * 64,
+                "migration_leaf_set": ["stable.0077_racing_api_horse_identity_staging"],
+                "migration_plan": ["0078_externalhorse_profile_snapshot"],
             },
             "receipt_rows_sha256": "e" * 64,
             "operation_log_rows_sha256": "f" * 64,
             "operation_log_fk_sha256": "1" * 64,
         }
+        payload.update(
+            recovery_binding(
+                preflight=payload["preflight"],
+                candidate_commit=payload["candidate_commit"],
+                candidate_image_id=payload["candidate_image_id"],
+            )
+        )
         payload.update(
             release_0077_recovery_binding(
                 preflight=payload["preflight"],
@@ -1363,13 +1377,10 @@ class MigrationHistoryRepairRestrictedRecoveryRedTests(SimpleTestCase):
             self.assertFalse((root / "restricted-recovery.json").exists())
             return output.getvalue()
 
-    def test_no_intent_accepts_artifact_bound_0073_starting_leaf(self):
+    def test_no_intent_rejects_legacy_0073_starting_leaf(self):
         leaf = f"{M0073[0]}.{M0073[1]}"
-        output = self._run_no_intent_ensure(
-            artifact_leaf_set=[leaf], live_leaf_set=[leaf]
-        )
-        self.assertIn('"status": "not-required"', output)
-        self.assertIn(leaf, output)
+        with self.assertRaisesRegex(CommandError, "reviewed ordinary starting leaf"):
+            self._run_no_intent_ensure(artifact_leaf_set=[leaf], live_leaf_set=[leaf])
 
     def test_no_intent_rejects_live_starting_leaf_drift(self):
         with self.assertRaisesRegex(CommandError, "starting leaf drift"):
@@ -1763,6 +1774,8 @@ class MigrationHistoryRepairRestrictedRecoveryRedTests(SimpleTestCase):
         self.assertIn("0074.projection_owner_check", drift)
 
     def test_initial_completion_uses_origin_bound_audit_not_reviewed_static(self):
+        # Retained initial-install audit algorithm at its explicit 0077 boundary;
+        # current v5 admission rejects these legacy artifacts before this branch.
         command = (
             "stable.management.commands."
             "complete_historical_calendar_restricted_recovery"
@@ -1782,6 +1795,8 @@ class MigrationHistoryRepairRestrictedRecoveryRedTests(SimpleTestCase):
             marker_path.write_text("{}", encoding="utf-8")
             marker_path.chmod(0o600)
             with patch(
+                f"{command}.FINAL_LEAF_SET", (f"{M0077[0]}.{M0077[1]}",),
+            ), patch(
                 f"{command}.database_vendor_contract",
                 return_value={"ok": True, "expected": "postgresql", "actual": "postgresql"},
             ), patch(
@@ -1937,6 +1952,9 @@ class MigrationHistoryRepairRestrictedRecoveryRedTests(SimpleTestCase):
             "database_identity_sha256": "d" * 64,
         }
         with TemporaryDirectory() as tmp, patch(
+            "stable.management.commands.complete_historical_calendar_restricted_recovery.FINAL_LEAF_SET",
+            (f"{M0077[0]}.{M0077[1]}",),
+        ), patch(
             "stable.management.commands."
             "complete_historical_calendar_restricted_recovery."
             "collect_handoff_preflight",
@@ -2363,7 +2381,7 @@ class MigrationHistoryRepairOperationsContractRedTests(TestCase):
                 text,
             )
 
-    def test_partial_leaf_requires_marker_bound_forward_resume_action(self):
+    def test_legacy_partial_leaf_cannot_enter_0078_forward_resume(self):
         from stable.services.historical_calendar_release_b_handoff import (
             authorize_handoff_action,
         )
@@ -2382,7 +2400,7 @@ class MigrationHistoryRepairOperationsContractRedTests(TestCase):
                 restricted_marker_ok=False,
             )["ok"]
         )
-        self.assertTrue(
+        self.assertFalse(
             authorize_handoff_action(
                 leaf_set=partial,
                 action="forward-resume",
@@ -2395,7 +2413,7 @@ class MigrationHistoryRepairOperationsContractRedTests(TestCase):
             authorize_handoff_action,
         )
 
-        final = [f"{M0072[0]}.{M0072[1]}"]
+        final = [f"{M0078[0]}.{M0078[1]}"]
         for action in ("deploy", "manual-release", "rollback"):
             with self.subTest(action=action):
                 self.assertFalse(
@@ -2407,7 +2425,7 @@ class MigrationHistoryRepairOperationsContractRedTests(TestCase):
                     )["ok"]
                 )
 
-        initial = [f"{M0070[0]}.{M0070[1]}"]
+        initial = [f"{M0077[0]}.{M0077[1]}"]
         self.assertTrue(
             authorize_handoff_action(
                 leaf_set=initial,
@@ -2508,7 +2526,7 @@ class MigrationHistoryRepairOperationsContractRedTests(TestCase):
         text = (ROOT / "deploy/manual_release.sh").read_text(encoding="utf-8")
         lock = text.index("deployment_lock.sh acquire")
         handoff = text.index("run_historical_calendar_release_b_preflight.sh")
-        release = text.index("run_release_tasks.sh")
+        release = text.index("python3 ./deploy/release_0078.py release")
         self.assertLess(lock, handoff)
         self.assertLess(handoff, release)
         self.assertIn("mktemp -d", text)
@@ -2532,8 +2550,8 @@ class MigrationHistoryRepairOperationsContractRedTests(TestCase):
         migrate = text.index("manage.py migrate --noinput")
         transition = text.index("complete_historical_calendar_restricted_recovery")
         collectstatic = text.index("manage.py collectstatic --noinput")
-        self.assertLess(migrate, transition)
-        self.assertLess(transition, collectstatic)
+        self.assertLess(migrate, collectstatic)
+        self.assertLess(collectstatic, transition)
         self.assertNotIn("--if-present", text)
         self.assertIn('--attempt-mode="$RESTRICTED_RECOVERY_ATTEMPT_MODE"', text)
         self.assertIn('--artifact-path="$RELEASE_B_PREFLIGHT_ARTIFACT_PATH"', text)
@@ -2601,6 +2619,8 @@ class MigrationHistoryRepairOperationsContractRedTests(TestCase):
         migrate = next(i for i, call in enumerate(calls) if "migrate --noinput" in call)
         self.assertLess(intent, migrate)
         self.assertFalse(any("record_historical_calendar" in call for call in calls))
+        self.assertFalse(any("collectstatic" in call for call in calls))
+        self.assertFalse(any("complete_historical_calendar_restricted_recovery" in call for call in calls))
 
     def test_normal_release_ignores_stale_provenance_and_uses_fresh_artifact(self):
         script = (ROOT / "deploy/docker/run-release-tasks.sh").read_text(
@@ -2680,7 +2700,7 @@ class MigrationHistoryRepairOperationsContractRedTests(TestCase):
         )
         self.assertLess(migrate_index, complete_index)
 
-    def test_collectstatic_failure_occurs_after_restricted_marker_transition(self):
+    def test_collectstatic_failure_keeps_restricted_marker_active(self):
         script = (ROOT / "deploy/docker/run-release-tasks.sh").read_text(
             encoding="utf-8"
         )
@@ -2728,9 +2748,12 @@ class MigrationHistoryRepairOperationsContractRedTests(TestCase):
             )
             calls = log.read_text(encoding="utf-8").splitlines()
         self.assertEqual(result.returncode, 31)
-        transition = next(i for i, call in enumerate(calls) if "complete_historical_calendar_restricted_recovery" in call)
+        intent = next(i for i, call in enumerate(calls) if "ensure_historical_calendar_recovery_intent" in call)
+        migrate = next(i for i, call in enumerate(calls) if "migrate --noinput" in call)
         collectstatic = next(i for i, call in enumerate(calls) if "collectstatic" in call)
-        self.assertLess(transition, collectstatic)
+        self.assertLess(intent, migrate)
+        self.assertLess(migrate, collectstatic)
+        self.assertFalse(any("complete_historical_calendar_restricted_recovery" in call for call in calls))
 
     def test_writer_gate_uses_real_historical_backfill_flags(self):
         from stable.services.historical_calendar_release_b_handoff import (

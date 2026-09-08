@@ -1,5 +1,32 @@
 # 部署运行手册
 
+## 0078 发布与恢复合同
+
+当前候选只接受稳定0077升级到0078，或稳定0078的同版本发布。0078迁移文件不变；
+每次发布的原始 admission SHA 同时作为 release_id，备份、意图和完成凭据都属于该 ID。
+
+- 标准/低成本发布与 manual 共用 `deploy/release_0078.py`，调用原 `backup_db.sh`
+  生成本次本地恢复点。备份位于
+  `runtime/migration_history_repair/release-0078-recovery/<release_id>/backup/`。
+- `manifest.json` 绑定实际 dump 字节、inode、TOC、数据库、源/目标叶子、候选与配置摘要；
+  `intent.json` 和同级根下的 `active.json` 在第一条 stop 之前持久化。
+- `.env` 的业务开关必须满足既有只读 admission 检查；协调脚本不自动改业务开关。
+  `.env` 在同一发布重试期间保持原摘要，发布包另行记录业务开关的最终恢复步骤。
+  同时核验实际 Compose project 与 writer flags，调用方环境变量覆盖同样受检查。
+  0078 入口使用支持 [`config --format json`](https://docs.docker.com/reference/cli/docker/compose/config/)
+  的 Compose 来解析实际配置；不支持该命令时会在首次 stop 前拒绝。
+- 当前有未完成意图时，新 deploy/manual 和普通 stopped-service resume 均拒绝。
+  使用 `resume_migration_history_repair.sh`，明确传入原 `RELEASE_0078_INTENT_PATH`、
+  `RELEASE_0078_INTENT_SHA256`、`COMPOSE_FILE`、候选 commit/image。恢复取得新部署锁，
+  原 token 摘要只保留发起时的证据。
+- 若备份证明已写、intent 尚未成功落盘，使用同一恢复入口提供原 admission 路径/SHA、
+  数据库/候选绑定及 `RELEASE_0078_RECOVERY_MANIFEST_SHA256`；必须证明尚未发生 stop。
+- static 成功后才归档 DDL marker；原服务状态恢复并核对后才写 `complete.json`、清理
+  本发布 active pointer。服务已部分恢复的重试不会再迁移或重建新的发布。
+- 旧0077世代的在途恢复由原固定控制镜像完成，新候选不改写旧 artifact。
+
+实施、独立测试和生产交付分开记录；本节对应候选行为，生产执行边界仍以根 `AGENTS.md` 为准。
+
 ## 2026-09-07 M1 生产上线与 755/756/757 修复记录
 
 - 发布包：main `ca6e9d06`（PR #176/#177/#178），镜像 `umanewsbot:pr177-ca6e9d06`（prod 同 tag；

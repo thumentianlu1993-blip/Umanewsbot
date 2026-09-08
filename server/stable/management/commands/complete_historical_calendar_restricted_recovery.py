@@ -19,6 +19,7 @@ from stable.services.historical_calendar_release_b_schema import (
     collect_initial_install_completion_audit,
     database_vendor_contract,
 )
+from stable.services import release_0078_recovery as release_0078
 
 
 class Command(BaseCommand):
@@ -62,7 +63,7 @@ class Command(BaseCommand):
             raise CommandError("completion attempt mode is not artifact-bound")
         artifact_payload = artifact["payload"]
         origin_action = artifact_payload.get("recovery_origin_action")
-        if origin_action not in {"initial-install", "migration-history-repair"}:
+        if origin_action not in {"initial-install", "migration-history-repair", "release-0078"}:
             raise CommandError("completion recovery origin is not artifact-bound")
         transition_path = marker_path.parent / "restricted-recovery.transition.json"
         marker_binding = {
@@ -72,6 +73,15 @@ class Command(BaseCommand):
             "database_identity_sha256": options["database_identity_sha256"],
             "action": "forward-resume",
         }
+        if origin_action == "release-0078":
+            if options["attempt_mode"] != "required":
+                raise CommandError("0078 completion requires durable intent")
+            try:
+                marker_binding = release_0078.marker_binding(artifact_payload)
+            except ValueError as exc:
+                raise CommandError(str(exc)) from exc
+            if options["provenance_artifact_sha256"] != marker_binding["artifact_sha256"]:
+                raise CommandError("0078 completion origin mismatch")
         if origin_action == "initial-install":
             marker_binding.update({
                 "origin_action": "initial-install",

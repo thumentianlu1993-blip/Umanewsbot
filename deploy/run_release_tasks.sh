@@ -100,6 +100,9 @@ export RESTRICTED_RECOVERY_MARKER_PATH
 
 # Verify the deployment lock before any Compose call.
 ./deploy/deployment_lock.sh verify
+if [ -z "${RELEASE_CONTROL_COMPOSE_OVERRIDE:-}" ]; then
+  python3 "$ROOT_DIR/deploy/release_0078.py" verify
+fi
 
 echo "release task: starting one-shot container (compose=$COMPOSE_FILE)"
 artifact_mount_root="$ROOT_DIR/runtime/migration_history_repair"
@@ -132,6 +135,11 @@ run_control_phase() {
     -e "RELEASE_0077_RECOVERY_MANIFEST_PATH=$release_0077_manifest_path" \
     -e "RELEASE_0077_RECOVERY_MANIFEST_SHA256=$release_0077_manifest_sha256" \
     -e "RELEASE_0077_RECOVERY_ORIGIN_HANDOFF_SHA256=$release_0077_origin_handoff_sha256" \
+    -e "RELEASE_0078_RECOVERY_MANIFEST_PATH=${RELEASE_0078_RECOVERY_MANIFEST_PATH:-}" \
+    -e "RELEASE_0078_RECOVERY_MANIFEST_SHA256=${RELEASE_0078_RECOVERY_MANIFEST_SHA256:-}" \
+    -e "RELEASE_0078_RECOVERY_ORIGIN_HANDOFF_SHA256=${RELEASE_0078_RECOVERY_ORIGIN_HANDOFF_SHA256:-}" \
+    -e "RELEASE_0078_INTENT_PATH=${RELEASE_0078_INTENT_PATH:-}" \
+    -e "RELEASE_0078_INTENT_SHA256=${RELEASE_0078_INTENT_SHA256:-}" \
     web /app/deploy/docker/run-release-tasks.sh
 }
 

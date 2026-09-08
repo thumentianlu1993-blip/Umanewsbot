@@ -47,6 +47,7 @@ trap release_lock EXIT
 trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
+python3 "$ROOT_DIR/deploy/release_0078.py" guard
 
 # A stopped-service recovery must never bypass an unfinished migration-history
 # transition. Completed receipts do not use either canonical active path.
@@ -143,13 +144,12 @@ if [ "$intent_file_trusted" = "true" ] && \
   exit 1
 fi
 
-# Never turn a 0076 partial migration failure into a running application.  The
-# current candidate image must first finish 0077 through manual_release.sh;
-# this read-only catalog/recorder gate also excludes any accidental 0078+ leaf.
+# An in-progress 0078 release uses its bound resume entry. This separate manual
+# service start is allowed only after exact 0078 completion, with no active intent.
 "$COMPOSE" -f "$COMPOSE_FILE" run --rm --no-deps \
   web python manage.py check_historical_calendar_release_b_schema \
   --direction=forward \
-  --expected-migration-leaf-set=stable.0077_racing_api_horse_identity_staging
+  --expected-migration-leaf-set=stable.0078_externalhorse_profile_snapshot
 
 echo "resume: starting web"
 "$COMPOSE" -f "$COMPOSE_FILE" up -d --no-deps web
