@@ -46,7 +46,14 @@ def _deploy_wrapper_run_calls(source: str) -> list[tuple[int, str]]:
         if wrapper and " run " in f" {line} ":
             calls.append((number, line))
         elif wrapper and run_argv and '"$@"' in line:
-            calls.append((number, run_argv + "\n" + line))
+            try:
+                command = shlex.split(line, comments=True)[0]
+            except (ValueError, IndexError):
+                continue
+            literal = command.rsplit("/", 1)[-1] == "compose-wrapper.sh" and not re.match(r"[A-Za-z_]\w*=", command)
+            variable = any(command in ("$" + name, "${" + name + "}") for name in variables)
+            if literal or variable:
+                calls.append((number, run_argv + "\n" + line))
     return calls
 
 
@@ -1603,12 +1610,17 @@ class SupportedDeployOneOffInventoryTests(SimpleTestCase):
         direct = './deploy/docker/compose-wrapper.sh -f "$COMPOSE_FILE" run --rm --no-deps web python manage.py check'
         prefix = 'set -- -f "$COMPOSE_FILE"\nset -- "$@" run --rm --no-deps\nset -- "$@" -e WRITER=false\n'
         invoke = './deploy/docker/compose-wrapper.sh "$@" web python manage.py check'
-        for source in (direct, prefix + invoke):
+        assigned = 'COMPOSE="$ROOT/deploy/docker/compose-wrapper.sh"\n'
+        variable_call = '"$COMPOSE" "$@" web python manage.py check'
+        for source in (direct, prefix + invoke, assigned + prefix + variable_call,
+                       assigned + prefix + variable_call.replace('$COMPOSE', '${COMPOSE}')):
             with self.subTest(source=source):
                 calls = _deploy_wrapper_run_calls(source)
                 self.assertEqual(len(calls), 1)
                 self.assertRegex(calls[0][1], r"\brun\s+--rm\s+--no-deps\b")
-        for source in (prefix, prefix + 'echo "$@"', prefix + '# ' + invoke, prefix + invoke.replace('"$@"', ''),
+        for source in (prefix, prefix + 'echo "$@"', prefix + 'echo ' + invoke,
+                       assigned + prefix + 'echo ' + variable_call,
+                       prefix + '# ' + invoke, prefix + invoke.replace('"$@"', ''),
                        prefix + 'set -- -f another.yml\n' + invoke):
             with self.subTest(rejected=source):
                 self.assertEqual(_deploy_wrapper_run_calls(source), [])
