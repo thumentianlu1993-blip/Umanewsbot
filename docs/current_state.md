@@ -4,9 +4,12 @@
 
 - 用户将当前持续目标限定为 M2 验收、测试基线及运维遗留，M3–M6 暂不实施。执行清单和完成标准集中维护于 [后续工作路线图](future_work_roadmap.md) 的最新收口节，不新增并行 backlog；人工门禁仍以根 `AGENTS.md` 为准。
 - M2 观察保持在独立任务，主任务推进测试和运维修复。正式验收需要至少一场新赛事自然走完发现至正式赛果公开，并证明一轮成功取回相同赛果的 correction 幂等。真实变化 correction 依既定隔离 PostgreSQL fixture 验证，生产首个真实变化留作持续观察，不必无限等待它才结束 M2，也不在生产造数。
-- 当前全量测试证据仍为 PR #184 的 4,943 项、31 failures、257 errors、20 skipped，274 个唯一失败 ID；需要按共享根因修复或作有证据的处置，不能把它们解释为 274 个已证实生产故障。5 个文档中的旧流程残留引用已在本轮工作分支修复，原检查器及 4 项合同测试通过，尚待独立审核和交付；检查器及其拒绝规则保持不变。
+- 当前生产候选的全量基线为 PR #184 的 4,943 项、31 failures、257 errors、20 skipped，274 个唯一失败 ID；下述分支结果尚未成为主线或生产状态。5 个文档中的旧流程残留引用已修复，原检查器及 4 项合同测试、独立只读复审通过，形成 Draft PR #186；收口进度和历史 PR 分类也已完成复审，最终交付版本及证据随 PR 记录。检查器及其拒绝规则保持不变。
+- 解析器测试修复为 [Draft PR #187](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/187)，候选 `a1021dcf`：两文件仅对齐当前 `stable` 模块引用，HTTP 旧入口兼容性断言保留。[Linux/PG16 全量 CI](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/34325933049) 为 4,943 项、31 failures、226 errors、20 skipped，唯一失败 ID 从 274 降到 243；31 条旧路径错误全部消失，相对 `69955960` 无新增失败。相关模块无剩余失败，45 项发布合同、Django check、migration drift 和 Linux 前后指纹通过；独立复审通过。历史对照 job 仍因既有 10 秒性能用例波动而标红，不能称全套测试已通过。Windows 本地解析/HTTP 合同 24 项通过，两模块 104 项仍有 7 条文件身份或符号链接错误。
+- 事务测试修复集中于 [Draft PR #188](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/188)。首轮 `17807a80` 的 [CI](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/34326831655) 为 4,943 项、31 failures、238 errors、20 skipped，255 个唯一失败 ID，相对 `69955960` 减少 19 个且无新增；原 24 条隔离级别错误均越过该阻塞，但其中 5 条继续暴露 `race_event_reconciliation` 的 nullable outer join / `FOR UPDATE` 错误，仍待修复。首轮 45 项发布合同及 Linux 前后指纹通过。
+- PR #188 当前候选已更新为 `61afbf59`，六个测试模块合计针对原 105 条事务隔离错误；缓存断言改为观察真实提交和失败恢复，生产 SQL 不变。完整候选独立复审通过，[新 CI](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/34329843286) 已启动，尚待实际结果。Windows 三项缓存试跑在 manifest 安全打开处失败，未到达主要断言；失败 apply 用例仍在回调注册前注入异常，未新增“已注册回调被丢弃”的覆盖声明。本机证据分别在 `runtime/fix-reference-parser-tests/ci-comparison.json`、`runtime/fix-test-transaction-boundaries/ci-comparison-r1.json`、`runtime/fix-remaining-transaction-tests/delivery.json`；新旧候选分开保存。
 - 补齐新闻恢复事实：`2026-09-08 09:30 UTC` 新稿 16078/16079 已自然完成抓取、翻译、审核、发布，09:31 的详情页及首页验证通过；充值后主链路已恢复。少量稿件仍有术语占位符校验失败，不等于整条服务停摆。历史失败稿件不补跑；模型/翻译兼容改造不纳入本轮缩小后的范围。恢复证据为本机 `runtime/release_0078_20260908/news-chain-recovery.md` 及同目录 `news-recovery-verification.json`。
-- 0078 发布恢复、956 公开读取、镜像版本标记和发现诊断已交付，不再作为待实现工单；490/766 具体未匹配原因仍待现有自然任务诊断归因。7 个历史 open PR 仍需只读分类，未经具体处置不批量关闭 PR 或删除工作树。
+- 0078 发布恢复、956 公开读取、镜像版本标记和发现诊断已交付，不再作为待实现工单；490/766 具体未匹配原因仍待现有自然任务诊断归因。7 个历史 open PR 已完成第一轮只读分类，详见路线图 §0.1；#45 的多文章曝光回填缺陷仍存在，处置需单独判断，不能视为已修复。没有关闭 PR、执行历史回填或删除工作树。
 
 ## 2026-09-09 PR #184 发布完成与 M2 待验收状态
 

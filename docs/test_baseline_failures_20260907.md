@@ -11,6 +11,13 @@
 - 初步按异常末行归组，105 条记录涉及事务隔离级别设置时机、31 条涉及 `runtime` 导入、28 条涉及不可逆 0078 的测试准备，另有旧发布合同摘要、nullable outer join 锁和缺失旧工具路径等；这些是失败记录数，可能含同一测试的子测试，不等同于独立根因数量或生产缺陷数量。完整输入保留在本机 `runtime/fix-release-discovery/pr184-stable-candidate.zip`。
 - 当前处理顺序：按共同根因复现 → 判断应用缺陷/测试准备/过期合同 → 最小修复与有效回归 → 同环境全量核对 → 独立 review。先处理可跨模块消除失败的导入和测试基础，不通过放宽断言、批量 expectedFailure 或跳过整套测试制造绿色。实际任务状态只维护在 [roadmap 当前收口节](future_work_roadmap.md)，本报告保留诊断依据。
 
+### 已验证的分支结果（尚未合并）
+
+- [PR #187，`a1021dcf`](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/187) 的 [Linux/PG16 CI](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/34325933049)：4,943 tests、31 failures、226 errors、20 skipped，243 个唯一失败 ID。对照生产候选 `69955960`，31 条旧模块路径失败消失、无新增；相关两个模块无剩余失败。45 项发布合同及正式前后指纹通过。历史对照 job 因既有 10 秒性能用例波动仍标红，不表示全套测试通过。
+- [PR #188 首轮，`17807a80`](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/188) 的 [Linux/PG16 CI](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/34326831655)：4,943 tests、31 failures、238 errors、20 skipped，255 个唯一失败 ID。对照同一生产候选，19 条失败消失、无新增；原 24 条事务隔离级别错误全部越过该阻塞，但其中 5 条继续报 PostgreSQL nullable outer join / `FOR UPDATE` 错误，仍未修复。45 项发布合同及正式前后指纹通过。
+- PR #188 已扩为六个测试模块、候选 `61afbf59`，合计针对原 105 条隔离级别错误，完整候选独立复审通过；[新 CI](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/34329843286) 的全量结果待完成。上述两个候选各自对照生产基线，不能直接相加作为主线已修复数量。
+- 核验输入分别保存在本机 `runtime/fix-reference-parser-tests/ci-comparison.json`、`runtime/fix-test-transaction-boundaries/ci-comparison-r1.json` 和 `runtime/fix-remaining-transaction-tests/delivery.json`；下载的构件均按 GitHub SHA-256 校验，并核对固定候选提交。
+
 ## 0078 跟进结果（历史记录）
 
 `fix-0078-recovery-contract` 已完成代码实现与独立测试/复审，交付为 Draft PR #181，未合并或部署。
