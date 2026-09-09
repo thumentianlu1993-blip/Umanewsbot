@@ -11,7 +11,7 @@ from unittest import mock, skipUnless
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from django.db import connection
+from django.db import connection, transaction
 from django.test import TransactionTestCase
 
 from stable.models import (
@@ -241,6 +241,7 @@ class RaceSeriesIdentityReviewTests(TransactionTestCase):
         )
         return destination, source, target, event
 
+    @transaction.atomic
     def test_identity_lock_queries_lock_only_base_rows_while_prefetching_series(self):
         _, _, target, event = self._positive_fixture()
         service = self._service()
@@ -257,6 +258,7 @@ class RaceSeriesIdentityReviewTests(TransactionTestCase):
                 self.assertEqual(queryset.query.select_for_update_of, ("self",))
 
     @skipUnless(connection.vendor == "postgresql", "requires PostgreSQL")
+    @transaction.atomic
     def test_lock_action_rows_executes_with_nullable_series_join_on_postgresql(self):
         destination, source, target, event = self._positive_fixture()
 
