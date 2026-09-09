@@ -14,6 +14,7 @@ from django.test import TestCase, TransactionTestCase
 from django.test.utils import CaptureQueriesContext
 
 from stable.models import HorseIdentityEvidenceCommitReceipt, OperationLog
+from stable.test_migration_database_helpers import isolated_migration_database
 
 from stable.services.historical_calendar_release_b_schema import (
     check_initial_install_schema_compatibility,
@@ -388,8 +389,12 @@ class ProductionAuditBaselinePostgresTests(TransactionTestCase):
 class MigrationHistoryRepairPostgresMigrationTests(TransactionTestCase):
     reset_sequences = False
 
+    def setUp(self):
+        super().setUp()
+        self.enterContext(isolated_migration_database())
+
     def tearDown(self):
-        # Never leave the shared Django test database at a partial migration leaf.
+        # Restore the fixture's expected leaf before discarding its private schema.
         _executor().migrate([M0075])
         super().tearDown()
 
