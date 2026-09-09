@@ -573,12 +573,17 @@ class RaceLivePublicationTransitionTests(TestCase):
 
     def test_exact_pre_state_binds_event_manual_locks_participant_and_racecard_fallback(self):
         manifest = self._loaded(self._bundle()["promotion"])
+        self.assertTrue(dry_run_race_live_publication_transition(manifest)["ok"])
+
+        def mutate_event_identity():
+            event = models.RaceEvent.objects.get(pk=self.event.pk)
+            event.slug = "event-924-drifted"
+            event.save(update_fields=("slug", "updated_at"))
+
         mutations = (
             (
                 "event_identity",
-                lambda: models.RaceEvent.objects.filter(pk=self.event.pk).update(
-                    slug="event-924-drifted"
-                ),
+                mutate_event_identity,
             ),
             (
                 "manual_result_lock",
