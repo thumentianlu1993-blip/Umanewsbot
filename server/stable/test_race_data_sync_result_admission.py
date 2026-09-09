@@ -403,6 +403,28 @@ class DataSyncResultAdmissionTests(TestCase):
         self.assertTrue(detail.visible, detail.reason)
         self.assertEqual(detail.reason, "data_sync_public_read_allowed")
 
+    def test_new_enrollment_policy_drift_remains_hidden_in_detail_and_bulk(self):
+        observation = self._observation(self.source, "licensed_api", self._rows())
+        applied = apply_data_sync_result_observation(
+            observation_id=observation.pk,
+            expected_event_id=self.event.pk,
+            now=NOW,
+            project_current=True,
+            correction_apply_enabled=True,
+        )
+        self.assertTrue(applied.projected, applied)
+        self.enrollment.standing_policy_digest = "9" * 64
+        self.enrollment.save(update_fields=("standing_policy_digest",))
+        detail = race_events.resolve_race_live_public_read(
+            event_id=self.event.pk, now=NOW + timedelta(seconds=1),
+        )
+        bulk = race_events.resolve_race_live_public_reads(
+            event_ids=[self.event.pk], now=NOW + timedelta(seconds=1),
+        )[self.event.pk]
+        self.assertFalse(detail.visible)
+        self.assertEqual(detail.reason, "data_sync_enrollment_policy_drift")
+        self.assertEqual(bulk, detail)
+
     def test_public_read_rejected_when_admission_evidence_drifts(self):
         observation = self._observation(self.source, "licensed_api", self._rows())
         applied = apply_data_sync_result_observation(

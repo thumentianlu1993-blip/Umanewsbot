@@ -483,6 +483,82 @@ class RaceDataSyncResultApplicationTests(TestCase):
 
     @override_settings(
         RACE_DATA_SYNC_ENABLED=True,
+        RACE_DATA_SYNC_RESULT_APPLY_ENABLED=True,
+        RACE_DATA_SYNC_RESULT_PUBLIC_ENABLED=True,
+        RACE_DATA_SYNC_CORRECTION_APPLY_ENABLED=True,
+    )
+    def test_legacy_publication_survives_standing_policy_successor(self):
+        enrollment = self._public_enrollment()
+        observation = self._observation(self.source, "licensed_api", self._rows())
+        applied = apply_data_sync_result_observation(
+            observation_id=observation.pk,
+            expected_event_id=self.event.pk,
+            now=NOW,
+            project_current=True,
+            correction_apply_enabled=True,
+        )
+        self.assertTrue(applied.projected, applied)
+        policy_path = Path(self._policy_directory.name) / "standing_policy.json"
+        policy = json.loads(policy_path.read_bytes())
+        policy["policy_id"] += "-successor"
+        raw = json.dumps(policy, indent=2).encode()
+        policy_path.write_bytes(raw)
+        self.assertNotEqual(parse_standing_policy(policy).digest, enrollment.standing_policy_digest)
+        tables = (
+            models.RaceDataSyncEnrollment, models.RaceEventRevision,
+            models.RaceEventRevisionPublication, models.RaceEventResult,
+        )
+        before = [list(model.objects.values()) for model in tables]
+
+        with self.settings(RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256=hashlib.sha256(raw).hexdigest()):
+            detail = race_events.resolve_race_live_public_read(event_id=self.event.pk, now=NOW + timedelta(seconds=1))
+            bulk = race_events.resolve_race_live_public_reads(event_ids=[self.event.pk], now=NOW + timedelta(seconds=1))[self.event.pk]
+
+        self.assertTrue(detail.visible, detail.reason)
+        self.assertEqual(bulk, detail)
+        self.assertEqual(before, [list(model.objects.values()) for model in tables])
+
+    @override_settings(
+        RACE_DATA_SYNC_ENABLED=True,
+        RACE_DATA_SYNC_RESULT_APPLY_ENABLED=True,
+        RACE_DATA_SYNC_RESULT_PUBLIC_ENABLED=True,
+        RACE_DATA_SYNC_CORRECTION_APPLY_ENABLED=True,
+    )
+    def test_legacy_policy_successor_does_not_bypass_remaining_guards(self):
+        enrollment = self._public_enrollment()
+        observation = self._observation(self.source, "licensed_api", self._rows())
+        applied = apply_data_sync_result_observation(
+            observation_id=observation.pk, expected_event_id=self.event.pk,
+            now=NOW, project_current=True, correction_apply_enabled=True,
+        )
+        self.assertTrue(applied.projected, applied)
+        enrollment.standing_policy_digest = "9" * 64
+        enrollment.save(update_fields=("standing_policy_digest",))
+        membership = models.RaceEventLifecycleEnforceMembership.objects.get(event=self.event)
+        publication = models.RaceEventRevisionPublication.objects.get(revision_id=applied.revision_id)
+        cases = (
+            (membership, "state", "inactive"),
+            (membership.registry, "runtime_valid_until", NOW),
+            (self.lifecycle, "manual_pause_reason", "operator pause"),
+            (self.source, "valid_until", NOW),
+            (enrollment, "enrollment_generation", 2),
+            (enrollment, "route_digest", "0" * 64),
+            (publication, "registry_digest", "0" * 64),
+        )
+        for instance, field, changed in cases:
+            with self.subTest(model=type(instance).__name__, field=field):
+                original = getattr(instance, field)
+                setattr(instance, field, changed)
+                instance.save(update_fields=(field,))
+                detail = race_events.resolve_race_live_public_read(event_id=self.event.pk, now=NOW + timedelta(seconds=1))
+                bulk = race_events.resolve_race_live_public_reads(event_ids=[self.event.pk], now=NOW + timedelta(seconds=1))[self.event.pk]
+                self.assertFalse(detail.visible)
+                self.assertEqual(bulk, detail)
+                setattr(instance, field, original)
+                instance.save(update_fields=(field,))
+
+    @override_settings(
+        RACE_DATA_SYNC_ENABLED=True,
         RACE_DATA_SYNC_ENABLED_PROVIDERS=("the_racing_api", "sporting_life"),
         RACE_DATA_SYNC_ENABLED_REGIONS=("japan_jra", "united_kingdom"),
         RACE_DATA_SYNC_RESULT_APPLY_ENABLED=True,
