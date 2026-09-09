@@ -12,7 +12,7 @@ from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.db import connection
-from django.test import TestCase
+from django.test import TransactionTestCase
 
 from stable.models import (
     HistoricalRaceEventTarget,
@@ -34,7 +34,7 @@ from stable.services.race_event_reconciliation import event_identity, target_ide
 from stable.services.race_series_identity_review import race_series_identity
 
 
-class RaceSeriesIdentityReviewTests(TestCase):
+class RaceSeriesIdentityReviewTests(TransactionTestCase):
     maxDiff = None
 
     def setUp(self):
@@ -613,7 +613,7 @@ class RaceSeriesIdentityReviewTests(TestCase):
     def test_apply_rejects_source_dependency_or_destination_year_conflict_atomically(self):
         mutations = ("extra_event", "extra_target", "name", "relation", "destination_conflict")
         for mutation in mutations:
-            with self.subTest(mutation=mutation), self.captureOnCommitCallbacks(execute=True):
+            with self.subTest(mutation=mutation):
                 destination, source, target, event = self._positive_fixture()
                 decision = self._decision(
                     sequence=1,
