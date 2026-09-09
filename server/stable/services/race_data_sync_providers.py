@@ -61,6 +61,7 @@ from stable.services.race_live_source_proof import (
 _HOST = "api.theracingapi.com"
 logger = logging.getLogger(__name__)
 _MAX_RESPONSE_BYTES = 2 * 1024 * 1024
+_DISCOVERY_DIAGNOSTIC_EVENT_LIMIT = 50
 _SNAPSHOT_LEASE_TTL_SECONDS = 120
 _SNAPSHOT_WAITER_POLL_SECONDS = 2.0
 # Jitter can shorten each sleep by 0.25s.  Keep the bounded waiter long enough
@@ -103,6 +104,7 @@ class ProviderIdentityDiscoveryOutcome:
     awaiting_source_window_count: int = 0
     deferred_event_count: int = 0
     rejected_event_count: int = 0
+    diagnostic_buckets: tuple[dict[str, Any], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -581,7 +583,10 @@ def _match_discovery_race(
     event: models.RaceEvent,
     races: tuple[dict[str, Any], ...],
     expected_region_code: str,
+    match_counts: dict[str, int] | None = None,
 ) -> tuple[dict[str, Any] | None, str]:
+    counts = match_counts if match_counts is not None else {}
+    counts.update(response=len(races), valid_time=0, region=0, local_date=0, course=0, name=0)
     try:
         event_timezone = ZoneInfo(event.timezone_name)
     except (KeyError, ValueError):
@@ -599,19 +604,32 @@ def _match_discovery_race(
             continue
         if timezone.is_naive(off_time):
             continue
-        if (
-            str(race.get("region") or "").casefold()
-            != expected_region_code.casefold()
-            or off_time.astimezone(event_timezone).date() != event.local_date
-            or normalize_identity_text(race.get("course")) != normalized_course
-            or normalize_identity_text(race.get("race_name")) not in approved_names
-        ):
+        counts["valid_time"] += 1
+        if str(race.get("region") or "").casefold() != expected_region_code.casefold():
             continue
+        counts["region"] += 1
+        if off_time.astimezone(event_timezone).date() != event.local_date:
+            continue
+        counts["local_date"] += 1
+        if normalize_identity_text(race.get("course")) != normalized_course:
+            continue
+        counts["course"] += 1
+        if normalize_identity_text(race.get("race_name")) not in approved_names:
+            continue
+        counts["name"] += 1
         matches.append(race)
     if len(matches) == 1:
         return matches[0], "matched"
     if matches:
         return None, "racecard_ambiguous"
+    # Report the first empty stage of the same exact-match predicate.
+    for stage, reason in (
+        ("response", "response_empty"), ("valid_time", "race_time_invalid"),
+        ("region", "region_not_found"), ("local_date", "local_date_not_found"),
+        ("course", "course_not_found"), ("name", "race_name_not_found"),
+    ):
+        if counts[stage] == 0:
+            return None, reason
     return None, "racecard_not_found"
 
 
@@ -802,6 +820,8 @@ def discover_the_racing_api_source_identities(
     ambiguous = 0
     unmatched = 0
     request_count = 0
+    diagnostic_buckets = []
+    diagnostic_event_count = 0
     try:
         for (event_region, day), bucket in _fair_discovery_bucket_order(
             buckets=buckets,
@@ -839,14 +859,31 @@ def discover_the_racing_api_source_identities(
             )
             request_count += 1
             snapshot = parse_the_racing_api_live_racecards_payload(payload)
+            diagnostic = {
+                "provider": "the_racing_api", "region": event_region, "day": day,
+                "response_sha256": raw_sha256, "response_race_count": len(snapshot.races),
+                "match_reason_counts": {}, "unmatched_events": [], "omitted_event_count": 0,
+            }
+            diagnostic_buckets.append(diagnostic)
             expected_region_code = registry["allowed_region_codes"][event_region]
             for event, contract_region, route, existing, _offset in bucket:
+                match_counts = {}
                 race, reason = _match_discovery_race(
                     event=event,
                     races=snapshot.races,
                     expected_region_code=expected_region_code,
+                    match_counts=match_counts,
                 )
+                reasons = diagnostic["match_reason_counts"]
+                reasons[reason] = reasons.get(reason, 0) + 1
                 if race is None:
+                    if diagnostic_event_count < _DISCOVERY_DIAGNOSTIC_EVENT_LIMIT:
+                        diagnostic["unmatched_events"].append({
+                            "event_id": event.pk, "reason": reason, "match_counts": match_counts,
+                        })
+                        diagnostic_event_count += 1
+                    else:
+                        diagnostic["omitted_event_count"] += 1
                     if reason == "racecard_ambiguous":
                         ambiguous += 1
                     else:
@@ -933,6 +970,7 @@ def discover_the_racing_api_source_identities(
                 len(candidates) - created - adopted - ambiguous - unmatched
             ),
             rejected_event_count=rejected,
+            diagnostic_buckets=tuple(diagnostic_buckets),
         )
     except Exception:
         logger.exception("TRA identity discovery execution failed")
@@ -951,6 +989,7 @@ def discover_the_racing_api_source_identities(
                 len(candidates) - created - adopted - ambiguous - unmatched
             ),
             rejected_event_count=rejected,
+            diagnostic_buckets=tuple(diagnostic_buckets),
         )
     return ProviderIdentityDiscoveryOutcome(
         True,
@@ -967,6 +1006,7 @@ def discover_the_racing_api_source_identities(
             len(candidates) - created - adopted - ambiguous - unmatched
         ),
         rejected_event_count=rejected,
+        diagnostic_buckets=tuple(diagnostic_buckets),
     )
 
 
