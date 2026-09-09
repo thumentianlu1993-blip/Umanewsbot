@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import json
 from datetime import date, datetime, timedelta
 from unittest.mock import patch
@@ -54,6 +55,10 @@ from stable.test_race_data_sync_providers import (
 )
 class TheRacingApiIdentityDiscoveryConservationTests(TestCase):
     def setUp(self):
+        capacity = patch("stable.services.race_data_sync_pipeline.inspect_race_data_artifact_capacity",
+                         return_value=(0, 1024 * 1024 * 1024))
+        capacity.start()
+        self.addCleanup(capacity.stop)
         self.registry = json.loads(
             (
                 ROOT
@@ -220,4 +225,98 @@ class TheRacingApiIdentityDiscoveryConservationTests(TestCase):
         self.assertEqual(outcome.request_count, 1, outcome)
         self.assertEqual(outcome.deferred_event_count, 1, outcome)
         self.assertEqual(outcome.candidate_event_count, 2, outcome)
+        self._assert_conserved(outcome)
+
+    def _racecard_transport(self, rows):
+        body = json.dumps({"racecards": rows, "ignored_secret": "never-log-this"}).encode()
+        calls = []
+
+        def transport(**kwargs):
+            calls.append(kwargs)
+            return RaceLiveProofHttpResponse(status_code=200, content_type="application/json", body=body, elapsed_ms=5)
+
+        return transport, calls, hashlib.sha256(body).hexdigest()
+
+    def _race(self, name, **overrides):
+        return {"race_id": "race-one", "off_dt": "2026-08-28T09:30:00Z", "region": "jpn",
+                "course": "Tokyo", "race_name": name, "race_status": "scheduled",
+                "runners": [{"horse_id": "horse-one", "horse": "Alpha", "number": "1"}], **overrides}
+
+    def test_diagnostics_distinguish_empty_region_date_course_and_name_mismatch(self):
+        event = self._event(slug="match-cup", local_date=date(2026, 8, 28))
+        scenarios = [([], "response_empty"),
+            ([self._race(event.original_name, region="usa")], "region_not_found"),
+            ([self._race(event.original_name, off_dt="2026-08-29T09:30:00Z")], "local_date_not_found"),
+            ([self._race(event.original_name, course="Kyoto")], "course_not_found"),
+            ([self._race("Other Cup")], "race_name_not_found")]
+        for rows, reason in scenarios:
+            with self.subTest(reason=reason):
+                models.RaceLiveHostBudget.objects.all().delete()
+                transport, calls, sha = self._racecard_transport(rows)
+                outcome, _ = self._discover(transport)
+                self.assertTrue(outcome.success, outcome)
+                self.assertEqual(len(calls), 1)
+                self.assertEqual(outcome.unmatched_event_count, 1)
+                self._assert_conserved(outcome)
+                bucket = outcome.diagnostic_buckets[0]
+                self.assertEqual((bucket["region"], bucket["day"]), ("japan", "today"))
+                self.assertEqual(bucket["response_sha256"], sha)
+                self.assertEqual(bucket["response_race_count"], len(rows))
+                self.assertEqual(bucket["match_reason_counts"], {reason: 1})
+                self.assertEqual(bucket["unmatched_events"][0]["event_id"], event.pk)
+                self.assertEqual(bucket["unmatched_events"][0]["reason"], reason)
+                self.assertNotIn("never-log-this", json.dumps(dataclasses.asdict(outcome)))
+                self.assertFalse(event.source_identities.exists())
+
+    def test_diagnostics_keep_unique_match_and_ambiguous_rejection(self):
+        event = self._event(slug="unique-cup", local_date=date(2026, 8, 28))
+        transport, calls, _ = self._racecard_transport([self._race(event.original_name)])
+        outcome, _ = self._discover(transport)
+        self.assertEqual(outcome.created_source_count, 1, outcome)
+        self.assertEqual(outcome.diagnostic_buckets[0]["match_reason_counts"], {"matched": 1})
+        self.assertEqual(outcome.diagnostic_buckets[0]["unmatched_events"], [])
+        self.assertEqual(len(calls), 1)
+        self._assert_conserved(outcome)
+        event.source_identities.all().delete()
+        models.RaceLiveHostBudget.objects.all().delete()
+        transport, calls, _ = self._racecard_transport([
+            self._race(event.original_name), self._race(event.original_name, race_id="race-two")])
+        outcome, _ = self._discover(transport)
+        self.assertEqual(outcome.ambiguous_event_count, 1, outcome)
+        self.assertEqual(outcome.diagnostic_buckets[0]["unmatched_events"][0]["reason"], "racecard_ambiguous")
+        self.assertEqual(outcome.diagnostic_buckets[0]["unmatched_events"][0]["match_counts"]["name"], 2)
+        self.assertFalse(event.source_identities.exists())
+        self.assertEqual(len(calls), 1)
+        self._assert_conserved(outcome)
+
+    def test_diagnostic_samples_are_bounded_without_losing_counts(self):
+        for i in range(53):
+            self._event(slug=f"unmatched-{i}", local_date=date(2026, 8, 28))
+        outcome, calls = self._discover()
+        bucket = outcome.diagnostic_buckets[0]
+        self.assertEqual(len(bucket["unmatched_events"]), 50)
+        self.assertEqual(bucket["omitted_event_count"], 3)
+        self.assertEqual(bucket["match_reason_counts"], {"response_empty": 53})
+        self.assertEqual(outcome.unmatched_event_count, 53)
+        self.assertEqual(len(calls), 1)
+        self._assert_conserved(outcome)
+
+    def test_completed_bucket_diagnostics_survive_later_provider_failure(self):
+        self._event(slug="first-day", local_date=date(2026, 8, 28))
+        self._event(slug="second-day", local_date=date(2026, 8, 29))
+        requests = []
+
+        def transport(**kwargs):
+            requests.append(kwargs)
+            return RaceLiveProofHttpResponse(status_code=200 if len(requests) == 1 else 503,
+                content_type="application/json", body=b'{"racecards": []}', elapsed_ms=5)
+
+        outcome, _ = self._discover(transport)
+        self.assertFalse(outcome.success)
+        self.assertEqual(outcome.reason_code, "provider_response_invalid")
+        self.assertEqual(len(requests), 2)
+        self.assertEqual(outcome.unmatched_event_count, 1)
+        self.assertEqual(outcome.deferred_event_count, 1)
+        self.assertEqual(len(outcome.diagnostic_buckets), 1)
+        self.assertEqual(outcome.diagnostic_buckets[0]["match_reason_counts"], {"response_empty": 1})
         self._assert_conserved(outcome)

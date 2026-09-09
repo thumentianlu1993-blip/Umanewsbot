@@ -26,6 +26,8 @@ COPY deploy /app/deploy
 COPY scripts /app/scripts
 COPY .env.example /app/.env.example
 
+RUN printf '%s\n' "$UMANEWS_RELEASE_COMMIT" > /app/.umanews-release-commit
+
 RUN chmod +x /app/deploy/docker/*.sh /app/scripts/*.py \
     && mkdir -p /app/logs /app/server/staticfiles \
     && ln -s /app/runtime /app/server/runtime

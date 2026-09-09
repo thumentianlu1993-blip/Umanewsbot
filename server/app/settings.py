@@ -245,7 +245,15 @@ RACE_DATA_SYNC_FUTURE_MANIFEST_TTL_SECONDS = int(
 RACE_DATA_SYNC_LEGACY_TRANSFER_APPROVAL_SHA256 = env(
     "RACE_DATA_SYNC_LEGACY_TRANSFER_APPROVAL_SHA256", ""
 )
-UMANEWS_RELEASE_COMMIT = env("UMANEWS_RELEASE_COMMIT", "")
+def image_release_commit() -> str:
+    """Image metadata is authoritative; source checkouts retain env fallback."""
+    try:
+        return (BASE_DIR.parent / ".umanews-release-commit").read_text(encoding="ascii").strip()
+    except FileNotFoundError:
+        return env("UMANEWS_RELEASE_COMMIT", "") or ""
+
+
+UMANEWS_RELEASE_COMMIT = image_release_commit()
 
 
 def race_data_capacity_int(name: str, default: str = "0") -> int | None:
