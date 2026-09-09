@@ -38,6 +38,8 @@ class RaceLivePublicationTransitionTests(TestCase):
     COVERAGE_DIGEST = "c" * 64
 
     def setUp(self):
+        # The service deliberately rechecks expiry against the wall clock.
+        self.enterContext(patch("django.utils.timezone.now", return_value=self.NOW))
         self.event = models.RaceEvent.objects.create(
             id=924,
             year=2026,
@@ -51,6 +53,7 @@ class RaceLivePublicationTransitionTests(TestCase):
             status=models.RaceEventStatus.SCHEDULED,
             visibility_status=models.RaceEventVisibility.PUBLISHED,
             race_datetime=self.NOW - timedelta(hours=3),
+            local_date=self.NOW.date(),
         )
         self.control = models.RaceEventProjectionControl.objects.create(
             event=self.event,
@@ -474,6 +477,65 @@ class RaceLivePublicationTransitionTests(TestCase):
             )
             self.assertTrue(replay["replayed"])
         self.assertEqual(models.OperationLog.objects.count(), 1)
+
+    def test_promotion_rechecks_wall_clock_expiry_even_with_backdated_apply_time(self):
+        expiring_permissions = (
+            (
+                "source",
+                models.RaceResultSourceIdentity.objects.filter(pk=self.source.pk),
+                "valid_until",
+            ),
+            (
+                "allowlist",
+                models.RaceLiveEventPublicationAllowlist.objects.filter(
+                    pk=self.allowlist.pk
+                ),
+                "official_verification_valid_until",
+            ),
+            (
+                "policy",
+                models.RaceLivePublicationPolicy.objects.filter(
+                    scope_type=models.RaceLivePublicationScopeType.GLOBAL,
+                    scope_key="global",
+                ),
+                "valid_until",
+            ),
+        )
+        for name, permission, expiry_field in expiring_permissions:
+            with self.subTest(permission=name), transaction.atomic():
+                self.assertEqual(
+                    permission.update(
+                        **{expiry_field: self.NOW + timedelta(hours=12)}
+                    ),
+                    1,
+                )
+                manifest = self._loaded(self._bundle()["promotion"])
+                provider_before = self._provider_snapshot()
+                self.assertTrue(dry_run_race_live_publication_transition(manifest)["ok"])
+
+                with patch(
+                    "django.utils.timezone.now",
+                    return_value=self.NOW + timedelta(days=1),
+                ):
+                    with self.assertRaisesRegex(
+                        RaceLivePublicationTransitionError, "shadow contract"
+                    ):
+                        dry_run_race_live_publication_transition(manifest)
+                    with self.assertRaisesRegex(
+                        RaceLivePublicationTransitionError, "shadow contract"
+                    ):
+                        apply_race_live_publication_transition(manifest, now=self.NOW)
+
+                self.assertFalse(models.RaceEventRevisionPublication.objects.exists())
+                self.assertFalse(models.RaceEventResult.objects.exists())
+                self.assertFalse(
+                    models.RaceLiveOfficialVerificationIncident.objects.exists()
+                )
+                self.assertFalse(models.OperationLog.objects.exists())
+                self.assertEqual(self._provider_snapshot(), provider_before)
+                # Still the exact pre-state: refusal must not mutate the fixture.
+                self.assertTrue(dry_run_race_live_publication_transition(manifest)["ok"])
+                transaction.set_rollback(True)
 
     def test_failure_rolls_back_policy_allowlist_publication_incident_and_tracking(self):
         manifest = self._loaded(self._bundle()["promotion"])
