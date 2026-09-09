@@ -6,7 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from django.test import TestCase, override_settings
+from django.test import TestCase, TransactionTestCase, override_settings
 
 from stable.models import (
     HorseP0Source,
@@ -30,7 +30,7 @@ from stable.services.p0_horse_completion_batch import (
 )
 
 
-class P0HorseBatchTestBase(TestCase):
+class P0HorseBatchTestBase(TransactionTestCase):
     def _term(self, name: str, region: str = RacingRegion.JAPAN, **overrides):
         defaults = {
             "term_type": TermType.HORSE,
