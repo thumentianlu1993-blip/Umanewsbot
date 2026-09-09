@@ -4,7 +4,26 @@
 > 失败集合与 M1 分支逐项一致，与 M1 变更无关）。当时没有完整 stable 回归 CI；已有的两条专项 workflow 不覆盖该基线。
 > 本报告记录 2026-09-07 的逐簇取样结论与处理建议，供后续工单使用。
 
-## 0078 跟进结果
+## 2026-09-09 当前基线与收口边界
+
+- 0078 发布恢复合同已合并并上线；PR #184 的最新生产候选 `69955960` 通过 45 项 Linux/PostgreSQL 16 发布专项，当前是完整 0078、全图空迁移计划。下节“Draft PR #181，未部署”只描述当时进度，不能再列为现行阻塞；普通代码 rollback 仍按既定策略关闭。
+- 最新证据：[CI run 34319906713](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/34319906713)，4,943 tests、31 failures、257 errors、20 skipped，274 个唯一失败 ID；与前生产候选 `31bf6095` 集合相同，且无相对同环境历史基线新增失败。原“235 项”和下表 Mac 分类是旧基线，不能代替此次 Linux 结果。
+- 初步按异常末行归组，105 条记录涉及事务隔离级别设置时机、31 条涉及 `runtime` 导入、28 条涉及不可逆 0078 的测试准备，另有旧发布合同摘要、nullable outer join 锁和缺失旧工具路径等；这些是失败记录数，可能含同一测试的子测试，不等同于独立根因数量或生产缺陷数量。完整输入保留在本机 `runtime/fix-release-discovery/pr184-stable-candidate.zip`。
+- 当前处理顺序：按共同根因复现 → 判断应用缺陷/测试准备/过期合同 → 最小修复与有效回归 → 同环境全量核对 → 独立 review。先处理可跨模块消除失败的导入和测试基础，不通过放宽断言、批量 expectedFailure 或跳过整套测试制造绿色。实际任务状态只维护在 [roadmap 当前收口节](future_work_roadmap.md)，本报告保留诊断依据。
+
+### 已验证的分支结果（尚未合并）
+
+- [PR #187，`a1021dcf`](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/187) 的 [Linux/PG16 CI](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/34325933049)：4,943 tests、31 failures、226 errors、20 skipped，243 个唯一失败 ID。对照生产候选 `69955960`，31 条旧模块路径失败消失、无新增；相关两个模块无剩余失败。45 项发布合同及正式前后指纹通过。历史对照 job 因既有 10 秒性能用例波动仍标红，不表示全套测试通过。
+- [PR #188 首轮，`17807a80`](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/188) 的 [Linux/PG16 CI](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/34326831655)：4,943 tests、31 failures、238 errors、20 skipped，255 个唯一失败 ID。对照同一生产候选，19 条失败消失、无新增；原 24 条事务隔离级别错误全部越过该阻塞，但其中 5 条继续报 PostgreSQL nullable outer join / `FOR UPDATE` 错误，仍未修复。45 项发布合同及正式前后指纹通过。
+- PR #188 当前 `cb829735` 的 [CI](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/34333661750) 为 4,943 tests、31 failures、153 errors、20 skipped，170 个唯一失败 ID；相对生产消除 104 个、无新增。上一轮 `61afbf59` 的 3 条直接 helper 事务错误已清除；原 105 条隔离级别错误全部消失，其中 100 项通过、5 项外连接加锁错误由 #189 处理。45 项发布合同及正式前后指纹通过，证据为 `runtime/fix-remaining-transaction-tests/ci-comparison-r3.json`。
+- PR #189 当前组合 `22ab56b8` 的 [CI](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/34340519048) 为 4,945 tests、31 failures、143 errors、20 skipped，160 个唯一失败 ID；相对生产消除 114 个、无新增，关联模块 24 项无失败或跳过，45 项发布合同及正式前后指纹通过。此候选以双父合并包含 #188 的事务测试修复，不能与其独立结果相加。原 `936a7be4` 独立候选为 258 个唯一失败、消除 16 个，保留为历史证据；当前输入在 `runtime/fix-reconciliation-row-locks-integrated/ci-comparison.json`。
+- PR #190 `93c7029a` 的 [CI](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/34333456998) 为 4,943/30 failures/257 errors/20 skipped，273 个唯一失败 ID；原 10 秒性能失败消失、无新增，术语模块 41 项无失败或跳过。45 项发布合同和正式前后指纹通过，独立审核通过；本段从前版 #189/#190 合并段落保留该验证事实。
+- PR #191 首轮 `721428a2` 的 [CI](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/34337262093) 为 4,945/37 failures/229 errors/20 skipped，264 个唯一失败 ID。28 条不可逆迁移准备错误全部消失，16 个原测试中 10 个通过、6 个暴露后续旧合同/迁移叶断言，未新增失败 ID；新增两项隔离测试无失败或跳过。45 项发布合同和正式指纹通过，独立审核通过；当时后续六条断言仍需根因修复。证据为 `runtime/fix-historical-migration-test-isolation/ci-comparison.json`。 当前 `151e2e92` 的 [CI 34343151742](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/34343151742) 已核验：4,945/31 failures/228 errors/20 skipped，257 个唯一失败，相对生产消除 17 个、无新增；7 项映射后的真实用例及相关迁移/隔离模块均无失败或跳过，45 项发布合同、Django check、migration drift 与正式前后指纹通过。原 reviewer 增量审核通过。历史对照检查只新增既有 10 秒术语性能失败，由 #190 单独修复，不能称全量全绿；证据在 `runtime/fix-migration-test-contracts/ci-comparison-r2.json`。
+- PR #192 `9fef94fd` 固定发布转换测试时钟并补齐日历日期，保留实时到期拒绝并新增三类权限到期回归；独立复审通过。本地 54 项为 23 pass、27 errors（23 个测试）、8 skipped，Linux/PG16 CI 待核验，不能预先记为消除全部 38 条相关基线错误。证据在 `runtime/fix-publication-test-clock/`。
+- 各候选分别对照同一生产基线，修复数有重叠且尚未合并，不能相加为主线已修复数量；组合候选需要自身 CI。
+- 核验输入分别保存在本机 `runtime/fix-reference-parser-tests/ci-comparison.json`、`runtime/fix-test-transaction-boundaries/ci-comparison-r1.json` 和 `runtime/fix-remaining-transaction-tests/delivery.json`；下载的构件均按 GitHub SHA-256 校验，并核对固定候选提交。
+
+## 0078 跟进结果（历史记录）
 
 `fix-0078-recovery-contract` 已完成代码实现与独立测试/复审，交付为 Draft PR #181，未合并或部署。
 同环境 Linux/PG16 固定基线 `a88bcbf6` 为 4886 tests、69 failures、258 errors；

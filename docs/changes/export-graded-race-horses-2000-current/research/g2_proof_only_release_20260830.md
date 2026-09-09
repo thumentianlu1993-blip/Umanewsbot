@@ -133,4 +133,4 @@ Next: exact G2 approval is required before commit/push/merge/deploy.
 ```
 
 Round 2 只重读上述修改与直接依赖，未发现新的 P0/P1/P2；本 legacy change 无 `.sidecar` 或
-`.openspec.yaml`，按技能约定不创建或伪造 OpenSpec ledger/state。
+`旧规格元数据文件`，按技能约定不创建或伪造 旧规格流程 ledger/state。
