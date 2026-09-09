@@ -1,5 +1,17 @@
 # 部署运行手册
 
+## 2026-09-09 PR #184 实际发布与交接
+
+- [PR #184](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/184) 合并 commit `6db64d379b597c76b94d381ac4464c5530daaae5`；固定部署候选 `69955960b91ed5ec33ce1a57a7834468bec0ca14`，tree `84867ba5745044d6a0ac14e88daf968143eab34e`，于 `2026-09-09 07:10:43 UTC` 完成。当前 checkout：`/opt/umanews-release-69955960-PR184-20260909/umanewsbot`；Compose project `umanewsbot`，配置文件 `docker-compose.prod.lowcost.yml`。
+- 正式应用镜像 `sha256:af9ef499acaf7e1c804e84673bf62dfcd693d9ca75bdefe2ed98ee12fd346a48`。Web、worker、Beat、race_sync_v2_worker 已重建且四应用镜像文件、revision 标签与 Django 有效设置一致。`.env` SHA256 仍为 `e123451855e47bacde4b81adfc49b94c0f10c06073bed8aaf34cf4ec06ff6bfb`，原业务开关保持不变；无配置修改、迁移文件变动或历史稿件处理。
+- 本发布 `release_id=7e7d40df4b96c5033d2826bae756bf7fec4cef44420a63c7e7d74a0fc1b9b3e4`。证据目录为当前 checkout 下 `runtime/migration_history_repair/release-0078-recovery/<release_id>/`：`intent.json` SHA256 `1eb53a58ad8a04fca9b3e46b186822b791ed15a009a337b2c324f72531dd2803`，manifest SHA256 `64af44dc2f7de5ec0d6a4d678a5cda72e645a953da5806620dcb80c9810377c5`，完成凭据 SHA256 `48df39734f9ba26047d5b50a1fe94a411cc187adeeaa6f767eb48df4e9238bcf`。备份文件相对该目录为 `backup/rds_horse_news_20260909T070715Z_3309390.dump`，大小 524,607,735 字节，SHA256 `989972195ff99f5ec2a791a466da0278c8fae36a73fdc8a3935fa3df93fc5326`，TOC 1383 行。备份与候选、配置、意图的绑定已由既有恢复合同验证。
+- `2026-09-09 07:12 UTC` 只读复核完整 0078、全图空迁移计划、Web healthy、两个 worker pong、四应用无 OOM/restart；普通/v2 队列为 0，隔离 `race_live=7543` 不变。DB、Redis、OneBot、Nginx 保持原容器；Nginx `-t` 和 reload 已成功。完成凭据有效，active pointer、恢复限制标记和部署锁均已清理。
+- 双域名健康及 755/756/757/956 公开赛果通过，行数 11/6/7/10；956 原七组业务记录摘要不变。完整只读验证保存在 checkout 上级的 `verification.json`，协调器结果为同级 `deploy-result.json`；本机镜像测试、CI 对照及发布包位于 `runtime/fix-release-discovery/`。
+- 核验版本时使用镜像 `/app/.umanews-release-commit`、revision 标签及 `settings.UMANEWS_RELEASE_COMMIT`。独立 `python -c` 探针应明确设置 `DJANGO_SETTINGS_MODULE=app.settings`；第一次只读探针漏设该模块，修正后四应用复核通过，未修改服务配置。原始 Docker 环境变量可能保留旧 SHA，不能代替应用有效设置。
+- 发布专项 45 项及实际隔离镜像 13 项通过；全量 4,943 项的 274 个失败 ID 与前生产 `31bf6095` 一致，无新增回归。详见 [最终 CI](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/34319906713) 和 [当前状态](current_state.md)。普通代码 rollback 仍禁用；若未来遇到未完成发布，按下方既有合同使用该次原候选、intent/manifest/backup 续跑，不复用本次已完成意图。
+- 前次 PR #183 的生产候选为 `31bf6095`，已于 `2026-09-09 01:54 UTC` 部署并恢复 956 公开赛果；其历史发布/验证证据保留在 `/opt/umanews-release-31bf6095-PR183-20260909/` 与本机 `runtime/fix956/`。这些目录是历史证据，当前运行目录以上方 PR #184 为准。
+- M2 每 15 分钟只读观察现由独立任务 `Umanews M2 只读验收观察`（`01a084d7-ad01-7130-b3a4-8197b3b9bee3`，automation `umanews-m2`）承接，证据在 `runtime/m2_watch_20260909/`。962/963 的正式赛果及自然纠错仍待验收；本次交付不额外抓取、不改开关、不处理历史失败稿件。
+
 ## 0078 发布与恢复合同
 
 候选镜像在 `/app/.umanews-release-commit` 保存构建时的版本号，应用设置优先读取它，
