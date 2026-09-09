@@ -1,4 +1,4 @@
-# 发布转换测试时钟与日历夹具修复
+# 发布转换夹具与正式赛果发布修复
 
 ## 问题与范围
 
@@ -8,10 +8,10 @@ allowlist，有效期为其后 20 天。构建 manifest 和 apply 时间虽显�
 正常发布用例因此停在 `shadow contract` 校验，尚未运行原有发布、幂等及公开展示断言。
 这项实时到期拒绝是正确的生产合同，不能改成信任回填的 apply 时间。
 
-修改仅在共享测试夹具中以 `enterContext` 固定测试时钟，并自动恢复；其继承类和复用
+首轮修改仅在共享测试夹具中以 `enterContext` 固定测试时钟，并自动恢复；其继承类和复用
 setup 的 PostgreSQL 测试使用同一时点。补齐夹具的 `local_date`，使原有默认日历展示
 断言使用实际有日期的赛事；当前 `public_default_race_date_window` 明确排除无日期记录。
-不改应用、迁移、权限期限、公开规则、网络行为或现有测试断言。
+首轮不改应用；下述后续修复只调整发布加锁查询，迁移、权限期限、公开规则、网络行为及原断言保持不变。
 
 新增回归独立验证来源、全局策略及官方核验路由有效期：每种权限在准备时有效，真实
 时钟前进后，dry-run 和回填旧时间的 apply 都必须拒绝，且发布、旧赛果、事件、操作
@@ -26,7 +26,7 @@ setup 的 PostgreSQL 测试使用同一时点。补齐夹具的 `local_date`，�
   错误记录，8 项 PostgreSQL 测试跳过。原发布/日历展示用例与新增到期回归在基类及
   继承类均通过。错误记录中 25 条受 Windows 目录 0700 权限限制；另 2 条是既有
   `QuerySet.update(slug=...)` 夹具违反模型写入合同，在生产候选的 Linux 基线也存在。
-  本次不宣称三个模块全绿；固定候选的 Linux/PG16 CI 待提交后核验。
+  该本机试跑不能代表三个模块全绿；首轮 Linux/PG16 实测结果见下一项。
 - 首轮 `9fef94fd` 的 [Linux/PG16 CI](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/34345529390)
   已按提交与构件 SHA256 核验：4,945 项、31 failures、223 errors、20 skipped，240 个
   唯一失败 ID；相对生产消除 34 个、无新增。新增到期回归无失败或跳过，45 项发布合同、
@@ -52,3 +52,27 @@ setup 的 PostgreSQL 测试使用同一时点。补齐夹具的 `local_date`，�
 `runtime/fix-publication-test-clock/slug-regression-evidence.json`。基类和继承类的
 身份漂移、正常发布/日历及到期回归共 6 项在离线 SQLite 下全部通过（4.186 秒）。
 本次只重跑直接受影响回归；Linux/PG16 的固定候选结果仍需独立核验，不推算整套结果。
+
+## 后续发布审计夹具与可空关联加锁修复
+
+首轮 Linux 构件中的两条剩余错误分别来自：其他赛事的夹具直接创建已发布 revision，
+却没有配套 publication audit，触发数据库延迟约束；正式授权后的 staged 发布用
+`select_related("primary_observation__source_identity")` 对可空外连接整体加锁，
+PostgreSQL 拒绝执行。
+
+夹具现在按真实策略决策补齐匹配时间、策略版本和摘要的发布审计，不关闭数据库约束。
+发布查询先锁定最新 revision，再通过不可空 source 关联锁定 observation 与 source；
+保留三类记录的锁、原选择顺序和权限决策。最新 revision 缺少 observation 时仍直接
+拒绝，不通过过滤空值退回旧版本，也不更改生产开关或启动旧 race-live 链路。
+
+新增回归检查发布审计时间及真实数据库约束；检查最新版本缺少证据时没有发布或指针
+变化；PostgreSQL 独立连接以 NOWAIT 验证三类记录在授权检查时均被锁定，并在拒绝
+退出事务后均可获取。原有完整正式授权、publication audit 和公开读取成功用例保留。
+锁回归仅模拟最终授权拒绝以观察锁边界，不能替代原有端到端发布成功用例。
+
+本地 RED 共 3 项：缺少 audit 导致 1 error，空 observation 拒绝用例通过，1 项
+PostgreSQL 专用回归按环境跳过；完整 PostgreSQL 原失败已由首轮 CI 保存。
+最小修复后本机 GREEN：3 项、0.215 秒，2 项通过、1 项 PostgreSQL 专用跳过；
+Django check 通过。原 reviewer 的独立只读增量审核通过，未发现新增可操作缺陷。
+新增修复的 Linux 完整发布路径、真实锁与约束回归仍待固定候选 CI 验证，不能把
+SQLite 通过或专用跳过记为 PostgreSQL 通过。
