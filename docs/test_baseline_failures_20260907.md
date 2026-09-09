@@ -15,7 +15,8 @@
 
 - [PR #187，`a1021dcf`](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/187) 的 [Linux/PG16 CI](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/34325933049)：4,943 tests、31 failures、226 errors、20 skipped，243 个唯一失败 ID。对照生产候选 `69955960`，31 条旧模块路径失败消失、无新增；相关两个模块无剩余失败。45 项发布合同及正式前后指纹通过。历史对照 job 因既有 10 秒性能用例波动仍标红，不表示全套测试通过。
 - [PR #188 首轮，`17807a80`](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/188) 的 [Linux/PG16 CI](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/34326831655)：4,943 tests、31 failures、238 errors、20 skipped，255 个唯一失败 ID。对照同一生产候选，19 条失败消失、无新增；原 24 条事务隔离级别错误全部越过该阻塞，但其中 5 条继续报 PostgreSQL nullable outer join / `FOR UPDATE` 错误，仍未修复。45 项发布合同及正式前后指纹通过。
-- PR #188 已扩为六个测试模块、候选 `61afbf59`，合计针对原 105 条隔离级别错误，完整候选独立复审通过；[新 CI](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/34329843286) 的全量结果待完成。上述两个候选各自对照生产基线，不能直接相加作为主线已修复数量。
+- PR #188 六模块候选 `61afbf59` 的 [CI](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/34329843286) 已完成：4,943 tests、31 failures、156 errors、20 skipped，173 个唯一失败 ID；消除 104 个原失败 ID、同时新增 3 条直接 helper 测试缺少事务的错误。原 105 条隔离级别错误已清除，其中 100 项测试通过、5 项仍为外连接加锁错误。45 项发布合同及正式前后指纹通过，完整证据为 `runtime/fix-remaining-transaction-tests/ci-comparison-r2.json`。两个直接 helper 测试已补显式事务，原函数体和断言保留；当前 `cb829735` 经原 reviewer 增量复审通过，新 CI 待验证。
+- 外连接应用修复在 PR #189；既有性能用例已定位并在 PR #190 作最小修复，原术语模块本地 41 项通过；两者均有独立只读审核，仍待固定候选 Linux 全量结果。详细状态见路线图和各 PR；各候选分别对照生产基线，不能直接相加作为主线已修复数量。
 - 核验输入分别保存在本机 `runtime/fix-reference-parser-tests/ci-comparison.json`、`runtime/fix-test-transaction-boundaries/ci-comparison-r1.json` 和 `runtime/fix-remaining-transaction-tests/delivery.json`；下载的构件均按 GitHub SHA-256 校验，并核对固定候选提交。
 
 ## 0078 跟进结果（历史记录）
