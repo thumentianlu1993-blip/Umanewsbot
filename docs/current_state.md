@@ -1,5 +1,13 @@
 # 当前状态
 
+## 2026-09-09 持续收口范围已确认（进行中）
+
+- 用户将当前持续目标限定为 M2 验收、测试基线及运维遗留，M3–M6 暂不实施。执行清单和完成标准集中维护于 [后续工作路线图](future_work_roadmap.md) 的最新收口节，不新增并行 backlog；人工门禁仍以根 `AGENTS.md` 为准。
+- M2 观察保持在独立任务，主任务推进测试和运维修复。正式验收需要至少一场新赛事自然走完发现至正式赛果公开，并证明一轮成功取回相同赛果的 correction 幂等。真实变化 correction 依既定隔离 PostgreSQL fixture 验证，生产首个真实变化留作持续观察，不必无限等待它才结束 M2，也不在生产造数。
+- 当前全量测试证据仍为 PR #184 的 4,943 项、31 failures、257 errors、20 skipped，274 个唯一失败 ID；需要按共享根因修复或作有证据的处置，不能把它们解释为 274 个已证实生产故障。5 个文档中的旧流程残留引用已在本轮工作分支修复，原检查器及 4 项合同测试通过，尚待独立审核和交付；检查器及其拒绝规则保持不变。
+- 补齐新闻恢复事实：`2026-09-08 09:30 UTC` 新稿 16078/16079 已自然完成抓取、翻译、审核、发布，09:31 的详情页及首页验证通过；充值后主链路已恢复。少量稿件仍有术语占位符校验失败，不等于整条服务停摆。历史失败稿件不补跑；模型/翻译兼容改造不纳入本轮缩小后的范围。恢复证据为本机 `runtime/release_0078_20260908/news-chain-recovery.md` 及同目录 `news-recovery-verification.json`。
+- 0078 发布恢复、956 公开读取、镜像版本标记和发现诊断已交付，不再作为待实现工单；490/766 具体未匹配原因仍待现有自然任务诊断归因。7 个历史 open PR 仍需只读分类，未经具体处置不批量关闭 PR 或删除工作树。
+
 ## 2026-09-09 PR #184 发布完成与 M2 待验收状态
 
 - [PR #184](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/184) 已合并为 `6db64d379b597c76b94d381ac4464c5530daaae5`；生产于 `2026-09-09 07:10:43 UTC` 完成发布。实际部署候选为 `69955960b91ed5ec33ce1a57a7834468bec0ca14`，tree 为 `84867ba5745044d6a0ac14e88daf968143eab34e`；后续纯交接文档提交不代表再次部署应用。
@@ -987,7 +995,7 @@
 
 - 已按用户要求在独立 worktree/branch `codex/race-data-automation-plan` 创建
   `docs/changes/automate-race-data-lifecycle-sync/`，使用仓库原生 `spec/design/test_cases/tasks/rollout`
-  文档，不使用 OpenSpec，也未生成 OpenSpec 产物。
+  文档，不使用 旧规格流程，也未生成 旧规格流程 产物。
 - 方案基线为当前 `origin/main@2833558a6a2d67b7dc9816b53ea8ad5d580eb56c`，复用现有
   `RaceEventLiveTracking`、observation/revision、字段审计、lifecycle 和定时人工赛果审核；新增建议为
   provider checkpoint、每分钟动态 selector、独立 `race_sync_v2` 队列/worker，以及时间、出马表、

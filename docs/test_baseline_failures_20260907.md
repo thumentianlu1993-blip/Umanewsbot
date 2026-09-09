@@ -4,7 +4,14 @@
 > 失败集合与 M1 分支逐项一致，与 M1 变更无关）。当时没有完整 stable 回归 CI；已有的两条专项 workflow 不覆盖该基线。
 > 本报告记录 2026-09-07 的逐簇取样结论与处理建议，供后续工单使用。
 
-## 0078 跟进结果
+## 2026-09-09 当前基线与收口边界
+
+- 0078 发布恢复合同已合并并上线；PR #184 的最新生产候选 `69955960` 通过 45 项 Linux/PostgreSQL 16 发布专项，当前是完整 0078、全图空迁移计划。下节“Draft PR #181，未部署”只描述当时进度，不能再列为现行阻塞；普通代码 rollback 仍按既定策略关闭。
+- 最新证据：[CI run 34319906713](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/34319906713)，4,943 tests、31 failures、257 errors、20 skipped，274 个唯一失败 ID；与前生产候选 `31bf6095` 集合相同，且无相对同环境历史基线新增失败。原“235 项”和下表 Mac 分类是旧基线，不能代替此次 Linux 结果。
+- 初步按异常末行归组，105 条记录涉及事务隔离级别设置时机、31 条涉及 `runtime` 导入、28 条涉及不可逆 0078 的测试准备，另有旧发布合同摘要、nullable outer join 锁和缺失旧工具路径等；这些是失败记录数，可能含同一测试的子测试，不等同于独立根因数量或生产缺陷数量。完整输入保留在本机 `runtime/fix-release-discovery/pr184-stable-candidate.zip`。
+- 当前处理顺序：按共同根因复现 → 判断应用缺陷/测试准备/过期合同 → 最小修复与有效回归 → 同环境全量核对 → 独立 review。先处理可跨模块消除失败的导入和测试基础，不通过放宽断言、批量 expectedFailure 或跳过整套测试制造绿色。实际任务状态只维护在 [roadmap 当前收口节](future_work_roadmap.md)，本报告保留诊断依据。
+
+## 0078 跟进结果（历史记录）
 
 `fix-0078-recovery-contract` 已完成代码实现与独立测试/复审，交付为 Draft PR #181，未合并或部署。
 同环境 Linux/PG16 固定基线 `a88bcbf6` 为 4886 tests、69 failures、258 errors；

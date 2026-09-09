@@ -4,7 +4,7 @@
 
 审查模式：Full。依据 plan-eng-review 的架构、数据流、迁移、任务行为、测试、性能、部署与文档
 一致性维度，对本仓库当前 docs/changes 原生变更包做两轮自审。根 AGENTS.md 已明确禁止旧
-OpenSpec 工作流，因此本审查不创建或更新旧状态文件。
+旧规格流程 工作流，因此本审查不创建或更新旧状态文件。
 
 ## 审查范围
 
@@ -424,7 +424,7 @@ candidate。Bright Picture 两次获胜保留两条 occurrence seed，不按名�
 
 本轮按 legacy feature / Full 模式对 production apply 的规格、设计、测试、任务、rollout、settings、host wrapper、
 maintenance preflight、rolling ledger/receipt/reverse 与相关项目状态文档做两轮复审。仓库没有该 legacy change 的
-OpenSpec YAML/sidecar，因此不伪造状态文件；本节是当前实现者的工程自审，不替代任务清单中仍待完成的独立全
+旧规格流程 YAML/sidecar，因此不伪造状态文件；本节是当前实现者的工程自审，不替代任务清单中仍待完成的独立全
 diff 代码审查。
 
 ### Round 1 findings
