@@ -18,6 +18,8 @@ from django.db.migrations.executor import MigrationExecutor
 from django.test import TransactionTestCase
 from django.utils import timezone
 
+from stable.test_migration_database_helpers import isolated_migration_database
+
 from stable.models import (
     HistoricalRaceCalendarMaintenanceGate,
     HistoricalRaceCalendarRepairReceipt,
@@ -64,6 +66,10 @@ class HistoricalCalendarReleaseAMigrationPostgresTests(TransactionTestCase):
     """真实执行 0066→0067→0066，并在 tearDown 恢复 Release A。"""
 
     reset_sequences = True
+
+    def setUp(self):
+        super().setUp()
+        self.enterContext(isolated_migration_database())
 
     def _migrate(self, targets):
         started = time.monotonic()
