@@ -1548,6 +1548,73 @@ class HistoricalBackfillTests(TestCase):
         # 重放不应产生新记录
         self.assertEqual(count_after_second, count_after_first)
 
+    def test_multi_article_event_slot_allocation(self) -> None:
+        """同赛事多篇文章：1 个 slot1 + 至多 1 个 slot2，其余 suppressed，apply 不触发约束冲突。"""
+        try:
+            backfill_command = _try_import_service(
+                "stable.management.commands.backfill_race_exposure.Command"
+            )
+            RaceNewsExposure = _try_import_model(
+                "stable.models.RaceNewsExposure"
+            )
+        except ImportError:
+            self.fail("backfill_race_exposure 命令或 RaceNewsExposure 未实现")
+            return
+        from io import StringIO
+        event = _make_event()
+        base = timezone.now() - timedelta(days=2)
+        articles = []
+        titles = [
+            "赛果：冠军诞生",      # comprehensive_result
+            "练马师专访",          # connections
+            "赛事回放与复盘分析",   # analysis
+            "赔率市场观察",        # market
+            "赛果补充报道",        # comprehensive_result (same angle as slot1)
+        ]
+        for i, title in enumerate(titles):
+            articles.append(_make_article(
+                title=title,
+                source_article_id=f"multi-{i}",
+                published_at=base + timedelta(hours=i),
+            ))
+            _make_article_race_link(
+                article=articles[-1], event=event,
+                status=ArticleRaceLinkStatus.MANUAL,
+            )
+        out = StringIO()
+        cmd = backfill_command()
+        cmd.handle(dry_run=True, stdout=out)
+        import json as _json
+        output = _json.loads(out.getvalue().rsplit("\n", 1)[0])
+        manifest = output["manifest"]
+        entries = [e for e in manifest if e["event_id"] == event.id]
+        self.assertEqual(len(entries), len(articles))
+        slot1 = [e for e in entries if e["slot"] == 1]
+        active2 = [e for e in entries if e["slot"] == 2 and e["status"] == "active"]
+        suppressed = [e for e in entries if e["status"] == "suppressed"]
+        self.assertEqual(len(slot1), 1)
+        self.assertEqual(slot1[0]["article_id"], articles[0].id)
+        self.assertLessEqual(len(active2), 1)
+        # slot2 角度必须与 slot1 不同
+        if active2:
+            self.assertNotEqual(active2[0]["angle"], slot1[0]["angle"])
+        self.assertEqual(len(suppressed), len(articles) - len(slot1) - len(active2))
+
+        # apply 整批成功（此前全部 slot1 的 manifest 会因唯一约束整批回滚）
+        import hashlib
+        sha = hashlib.sha256(
+            _json.dumps(manifest, sort_keys=True, ensure_ascii=False).encode("utf-8")
+        ).hexdigest()
+        out2 = StringIO()
+        cmd.handle(
+            dry_run=False, apply=True, manifest=manifest,
+            expected_sha256=sha, stdout=out2, stderr=StringIO(),
+        )
+        exposures = RaceNewsExposure.objects.filter(event=event)
+        self.assertEqual(exposures.count(), len(articles))
+        self.assertEqual(exposures.filter(slot=1, status="active").count(), 1)
+        self.assertLessEqual(exposures.filter(slot=2, status="active").count(), 1)
+
 
 # ============================================================================
 # 测试用例 29: 性能
