@@ -6,8 +6,11 @@ import inspect
 from io import StringIO
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 from django.core.management import call_command
+from django.core.management.base import CommandError
+from django.db import connection
 from django.test import SimpleTestCase, TestCase, override_settings
 
 from stable import models
@@ -415,6 +418,16 @@ class RaceLiveProvisionalRollbackBehaviorTests(TestCase):
             authorization_kind="provisional_policy",
             official_authorization_version=0,
         )
+        models.RaceEventRevisionPublication.objects.create(
+            revision=self.current,
+            published_at=self.current.published_at,
+            reason="test_fixture",
+            allowlist_version=self.allowlist.version,
+            registry_digest=self.REGISTRY_DIGEST,
+            coverage_proof_digest=self.COVERAGE_DIGEST,
+            authorization_kind="official_route",
+            official_authorization_version=1,
+        )
         self.policies = {}
         for scope_type, scope_key in (
             (models.RaceLivePublicationScopeType.GLOBAL, "global"),
@@ -493,6 +506,15 @@ class RaceLiveProvisionalRollbackBehaviorTests(TestCase):
             "expected_manifest_sha256": self.MANIFEST_DIGEST,
             "now": self.NOW,
         }
+
+    def test_published_fixture_revisions_have_matching_audits(self):
+        for revision in (self.provisional, self.current):
+            with self.subTest(phase=revision.phase):
+                publication = models.RaceEventRevisionPublication.objects.get(
+                    revision=revision,
+                )
+                self.assertEqual(publication.published_at, revision.published_at)
+        connection.check_constraints()
 
     def test_validator_accepts_hidden_maintenance_and_coarse_restore_states(self):
         decision = race_events.validate_race_live_provisional_rollback_target(
@@ -667,6 +689,10 @@ class RaceLiveProvisionalRollbackBehaviorTests(TestCase):
 
 class RaceLiveOfficialAuthorizationCommandTests(TestCase):
     def setUp(self):
+        self.enterContext(patch(
+            "django.utils.timezone.now",
+            return_value=datetime(2026, 7, 20, 8, 0, tzinfo=dt_timezone.utc),
+        ))
         self.event = models.RaceEvent.objects.create(
             year=2026,
             slug="france-official-authorization-command",
@@ -723,6 +749,26 @@ class RaceLiveOfficialAuthorizationCommandTests(TestCase):
             stdout=stdout,
         )
         return json.loads(stdout.getvalue())
+
+    def test_expired_authorization_rejects_dry_run_and_apply_without_write(self):
+        with patch(
+            "django.utils.timezone.now",
+            return_value=datetime(2026, 8, 1, tzinfo=dt_timezone.utc),
+        ):
+            for apply in (False, True):
+                with self.subTest(apply=apply):
+                    extra = (
+                        ("--apply", "--confirm", f"AUTHORIZE_OFFICIAL_EVENT_{self.event.pk}")
+                        if apply else ()
+                    )
+                    with self.assertRaisesRegex(
+                        CommandError, "valid-until 必须晚于当前时间",
+                    ):
+                        self._call(*extra)
+                    self.assertFalse(
+                        models.RaceLiveOfficialPublicationAuthorization.objects.exists()
+                    )
+                    self.assertFalse(models.OperationLog.objects.exists())
 
     def test_authorization_command_is_dry_run_by_default_then_cas_applies(self):
         dry_run = self._call()
@@ -829,6 +875,10 @@ class RaceLiveOfficialAuthorizationCommandTests(TestCase):
 
 class RaceLiveBroadScopeTransitionCommandTests(TestCase):
     def setUp(self):
+        self.enterContext(patch(
+            "django.utils.timezone.now",
+            return_value=datetime(2026, 7, 20, 8, 0, tzinfo=dt_timezone.utc),
+        ))
         self.policy = models.RaceLivePublicationPolicy.objects.create(
             scope_type=models.RaceLivePublicationScopeType.REGION,
             scope_key=models.RacingRegion.FRANCE,
@@ -861,6 +911,29 @@ class RaceLiveBroadScopeTransitionCommandTests(TestCase):
             stdout=stdout,
         )
         return json.loads(stdout.getvalue())
+
+    def test_expired_scope_policy_rejects_dry_run_and_apply_without_write(self):
+        before = models.RaceLivePublicationPolicy.objects.values().get(
+            pk=self.policy.pk,
+        )
+        with patch("django.utils.timezone.now", return_value=self.policy.valid_until):
+            for apply in (False, True):
+                with self.subTest(apply=apply):
+                    extra = (
+                        ("--apply", "--confirm", "TRANSITION_RACE_LIVE_SCOPE_region_france")
+                        if apply else ()
+                    )
+                    with self.assertRaisesRegex(
+                        CommandError, "publication scope policy CAS 基线不匹配",
+                    ):
+                        self._call(*extra)
+                    self.assertEqual(
+                        models.RaceLivePublicationPolicy.objects.values().get(
+                            pk=self.policy.pk,
+                        ),
+                        before,
+                    )
+                    self.assertFalse(models.OperationLog.objects.exists())
 
     def test_scope_transition_is_dry_run_by_default_then_exact_cas_applies(self):
         self.assertEqual(self._call()["mode"], "dry_run")
