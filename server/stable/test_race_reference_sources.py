@@ -344,7 +344,7 @@ class RaceReferenceSourceIdentityTests(SimpleTestCase):
         for module_name in module_names:
             with self.subTest(module_name=module_name):
                 parser = importlib.import_module(
-                    f"runtime.tools.race_reference_parsers.{module_name}"
+                    f"stable.race_reference_parsers.{module_name}"
                 )
                 entrypoint = parser.parse_reference_page
                 parameters = list(inspect.signature(entrypoint).parameters)
@@ -511,7 +511,7 @@ class RaceReferenceSourceIdentityTests(SimpleTestCase):
 
     def test_hrn_parser_context_selects_exact_race_number(self):
         parser = importlib.import_module(
-            "runtime.tools.race_reference_parsers.horse_racing_nation"
+            "stable.race_reference_parsers.horse_racing_nation"
         )
         html = b"""
         <h2>Race 8</h2><table class="table-entries"></table>
@@ -536,7 +536,7 @@ class RaceReferenceSourceIdentityTests(SimpleTestCase):
 
     def test_hrn_zero_or_duplicate_race_number_never_falls_back_to_first(self):
         parser = importlib.import_module(
-            "runtime.tools.race_reference_parsers.horse_racing_nation"
+            "stable.race_reference_parsers.horse_racing_nation"
         )
         for candidates in (
             [{"race_no": "8", "runners": [], "results": []}],
@@ -556,7 +556,7 @@ class RaceReferenceSourceIdentityTests(SimpleTestCase):
 
     def test_hrn_missing_race_block_never_borrows_next_race_tables(self):
         parser = importlib.import_module(
-            "runtime.tools.race_reference_parsers.horse_racing_nation"
+            "stable.race_reference_parsers.horse_racing_nation"
         )
         html = b"""
         <html><body>
@@ -603,7 +603,7 @@ class RaceReferenceSourceIdentityTests(SimpleTestCase):
         self.assertNotEqual(parsed["completeness"]["runners"], "complete")
 
     def test_zeturf_page_must_prove_the_exact_meeting_and_race_from_context(self):
-        parser = importlib.import_module("runtime.tools.race_reference_parsers.zeturf")
+        parser = importlib.import_module("stable.race_reference_parsers.zeturf")
         source_url = SOURCE_CASES[1][3]
         context = SOURCE_CASES[1][4]
 
@@ -621,7 +621,7 @@ class RaceReferenceSourceIdentityTests(SimpleTestCase):
             parser.parse_reference_page(wrong_race_html, source_url, context)
 
     def test_zeturf_np_suffix_is_removed_and_marks_runner_withdrawn(self):
-        parser = importlib.import_module("runtime.tools.race_reference_parsers.zeturf")
+        parser = importlib.import_module("stable.race_reference_parsers.zeturf")
         source_url = SOURCE_CASES[1][3]
         context = SOURCE_CASES[1][4]
         html = f"""
@@ -666,7 +666,7 @@ class RaceReferenceSourceIdentityTests(SimpleTestCase):
         self.assertEqual(parsed["runners"][0]["running_status"], "withdrawn")
 
     def test_zeturf_country_then_np_suffixes_are_removed_sequentially(self):
-        parser = importlib.import_module("runtime.tools.race_reference_parsers.zeturf")
+        parser = importlib.import_module("stable.race_reference_parsers.zeturf")
         source_url = SOURCE_CASES[1][3]
         context = SOURCE_CASES[1][4]
         html = f"""
@@ -725,7 +725,7 @@ class RaceReferenceSourceIdentityTests(SimpleTestCase):
 
     def test_hrn_result_country_suffix_matches_entry_and_keeps_finish_position(self):
         parser = importlib.import_module(
-            "runtime.tools.race_reference_parsers.horse_racing_nation"
+            "stable.race_reference_parsers.horse_racing_nation"
         )
         html = b"""
         <html><body>
@@ -762,7 +762,7 @@ class RaceReferenceSourceIdentityTests(SimpleTestCase):
 
     def test_sporting_life_underscore_ride_statuses_map_to_known_statuses(self):
         parser = importlib.import_module(
-            "runtime.tools.race_reference_parsers.sporting_life"
+            "stable.race_reference_parsers.sporting_life"
         )
 
         expected = {
@@ -784,7 +784,7 @@ class RaceReferenceSourceIdentityTests(SimpleTestCase):
 
     def test_sporting_life_underscore_ride_descriptions_map_to_known_statuses(self):
         parser = importlib.import_module(
-            "runtime.tools.race_reference_parsers.sporting_life"
+            "stable.race_reference_parsers.sporting_life"
         )
 
         expected = {
@@ -853,9 +853,7 @@ class RaceReferenceHttpContractTests(SimpleTestCase):
         )
 
         stable_http = importlib.import_module("stable.race_event_safe_http")
-        runtime_http = importlib.import_module(
-            "runtime.tools.race_event_safe_http"
-        )
+        runtime_http = _safe_http()
         self.assertIs(runtime_http.SafeHttpError, stable_http.SafeHttpError)
         self.assertIs(runtime_http.fetch_https, stable_http.fetch_https)
         self.assertIs(
