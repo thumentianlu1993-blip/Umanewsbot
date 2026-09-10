@@ -501,6 +501,108 @@ class RacecardFieldReconciliationContractTests(TestCase):
             claim_guard=claim_guard,
         )
 
+    def _derived_schedule_observation(self, **kwargs):
+        models.RaceEvent.objects.filter(pk=self.event.pk).update(
+            local_start_time=None, timezone_name="Europe/London"
+        )
+        self.event.refresh_from_db()
+        return self._observation(
+            self.tra,
+            payload_overrides={"off_time": "2026-09-10T14:00:00Z"},
+            allowed_fields=[*_contract()["allowed_fields"], "local_start_time"],
+            **kwargs,
+        )
+
+    @override_settings(
+        RACE_DATA_SYNC_ENABLED_FIELDS=(*_contract()["allowed_fields"], "local_start_time")
+    )
+    def test_derived_local_start_time_is_saved_and_visible(self):
+        observation = self._derived_schedule_observation()
+        models.RaceEvent.objects.filter(pk=self.event.pk).update(
+            visibility_status=models.RaceEventVisibility.PUBLISHED
+        )
+
+        decision = self._reconcile(observation, allow_schedule_apply=True)
+
+        self.assertEqual(decision.status, "applied")
+        self.event.refresh_from_db()
+        self.assertEqual(self.event.race_datetime.isoformat(), "2026-09-10T14:00:00+00:00")
+        self.assertEqual(self.event.local_start_time.isoformat(), "15:00:00")
+        response = self.client.get(self.event.public_path)
+        self.assertContains(response, '<div><span>时间</span><b>15:00</b></div>', html=True)
+        self.assertContains(response, "15:00 发走")
+        self.assertNotContains(response, '<div><span>时间</span><b>待定</b></div>', html=True)
+
+    def test_same_observation_repairs_derived_time_once_after_runtime_rejection(self):
+        observation = self._derived_schedule_observation()
+        self._reconcile(observation, allow_schedule_apply=True)
+        rejected = models.RaceEventFieldChange.objects.get(
+            observation=observation, field_name="local_start_time"
+        )
+        self.assertEqual(rejected.rejection_reason, "runtime_admission_closed")
+        self.event.refresh_from_db()
+        self.assertIsNone(self.event.local_start_time)
+        revision_count = models.RaceEventRevision.objects.count()
+
+        with self.settings(
+            RACE_DATA_SYNC_ENABLED_FIELDS=(*_contract()["allowed_fields"], "local_start_time")
+        ):
+            self._reconcile(observation, allow_schedule_apply=True)
+            self.event.refresh_from_db()
+            self.assertEqual(self.event.local_start_time.isoformat(), "15:00:00")
+            changes = models.RaceEventFieldChange.objects.filter(
+                observation=observation, field_name="local_start_time"
+            ).order_by("id")
+            self.assertEqual(list(changes.values_list("decision", flat=True)), ["rejected", "applied"])
+            audit_count = models.RaceEventFieldChange.objects.count()
+            self._reconcile(observation, allow_schedule_apply=True)
+            self.assertEqual(models.RaceEventFieldChange.objects.count(), audit_count)
+            self.assertEqual(models.RaceEventRevision.objects.count(), revision_count)
+        rejected.refresh_from_db()
+        self.assertEqual(rejected.decision, "rejected")
+
+    @override_settings(
+        RACE_DATA_SYNC_ENABLED_FIELDS=("local_start_time", "participants.horse_name")
+    )
+    def test_derived_time_requires_off_time_runtime_permission(self):
+        observation = self._derived_schedule_observation()
+        self._reconcile(observation, allow_schedule_apply=True)
+        self.event.refresh_from_db()
+        self.assertIsNone(self.event.local_start_time)
+        self.assertTrue(models.RaceEventFieldChange.objects.filter(
+            observation=observation, field_name="local_start_time",
+            rejection_reason="runtime_admission_closed", applied=False,
+        ).exists())
+
+    @override_settings(
+        RACE_DATA_SYNC_ENABLED_FIELDS=(*_contract()["allowed_fields"], "local_start_time")
+    )
+    def test_derived_time_requires_source_contract_permission(self):
+        models.RaceEvent.objects.filter(pk=self.event.pk).update(local_start_time=None)
+        observation = self._observation(self.tra)
+        self._reconcile(observation, allow_schedule_apply=True)
+        self.event.refresh_from_db()
+        self.assertIsNone(self.event.local_start_time)
+
+    @override_settings(
+        RACE_DATA_SYNC_ENABLED_FIELDS=(*_contract()["allowed_fields"], "local_start_time")
+    )
+    def test_derived_time_preserves_manual_lock_and_schedule_gate(self):
+        observation = self._derived_schedule_observation()
+        self._reconcile(observation, allow_schedule_apply=False)
+        self.event.refresh_from_db()
+        self.assertIsNone(self.event.local_start_time)
+        models.RaceEvent.objects.filter(pk=self.event.pk).update(
+            manual_lock_flags={"local_start_time": True}
+        )
+        self._reconcile(observation, allow_schedule_apply=True)
+        self.event.refresh_from_db()
+        self.assertIsNone(self.event.local_start_time)
+        self.assertEqual(list(models.RaceEventFieldChange.objects.filter(
+            observation=observation, field_name="local_start_time"
+        ).order_by("id").values_list("rejection_reason", flat=True)),
+            ["schedule_apply_disabled", "manual_lock"])
+
     def _claim_guard(
         self,
         data_kinds=(models.RaceDataSyncDataKind.RACECARD,),
