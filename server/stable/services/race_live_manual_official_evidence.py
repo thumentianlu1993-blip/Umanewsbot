@@ -707,13 +707,18 @@ def publish_authorized_staged_official_revision(
                 ),
                 published_at__isnull=True,
             )
-            .select_related("primary_observation__source_identity")
             .order_by("-revision_no", "-pk")
             .first()
         )
-        if revision is None or revision.primary_observation is None:
+        if revision is None or revision.primary_observation_id is None:
             _fail("不存在待发布的 official/corrected revision")
-        observation = revision.primary_observation
+        # The revision FK is nullable; lock its observation and non-null source
+        # separately so PostgreSQL retains all three row locks without an outer join.
+        observation = (
+            models.RaceResultObservation.objects.select_for_update()
+            .select_related("source_identity")
+            .get(pk=revision.primary_observation_id)
+        )
         identity_rows = list(
             models.RaceEventParticipantSourceIdentity.objects.select_for_update()
             .filter(
