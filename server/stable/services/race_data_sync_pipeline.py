@@ -1462,6 +1462,18 @@ def _reconcile_racecard_observation_atomic(
                 field_name=field_name,
             )
         }
+        # off_time also supplies local wall time when the source omits that field.
+        if (
+            "local_start_time" not in payload
+            and "off_time" in admitted_fields
+            and "local_start_time" in allowed_fields
+            and flags.allows(
+                provider=source.source_key,
+                region=contract_region,
+                field_name="local_start_time",
+            )
+        ):
+            admitted_fields.add("local_start_time")
         if not admitted_fields:
             return RacecardReconciliationDecision(
                 "rejected", "runtime_admission_closed", expected_event_id, observation.pk
