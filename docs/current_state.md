@@ -2,7 +2,7 @@
 
 ## 2026-09-10 持续收口进度（进行中）
 
-- 9 月 10 日会话接续：P0 PostgreSQL 夹具修复已保存为本地 `be42ba4`，独立复审通过；上传被自动审批阻断，等待具体外传授权。第二批本地整合 `f676adcf` 基于 main `ced88882` 合入 #186–192、#195–199 及该 P0 修复；47 个来源文件的组合证明、原检查器和 4 项合同测试通过。尚未上传或进行本组合 Linux/PG 验证，未合并部署；详见 [第二批整合记录](changes/closeout-batch2-integration/validation.md)。
+- 9 月 10 日会话接续：P0 PostgreSQL 夹具修复 `be42ba4` 已获用户授权上传为 [Draft PR #200](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/200)，独立复审通过；[Linux/PG CI](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/34462634738) 正在运行。第二批本地整合 `f676adcf` 基于 main `ced88882` 合入 #186–192、#195–199 及该 P0 修复；47 个来源文件的组合证明、原检查器、4 项合同测试及独立组合审核通过。组合 P0 离线 36 项为 25 pass、3 条与原分支相同的平台错误、8 条 PG skip；不冒充 PG 通过。本组合尚未上传或进行 Linux/PG 验证，未合并部署；详见 [第二批整合记录](changes/closeout-batch2-integration/validation.md)。
 
 - 用户将当前持续目标限定为 M2 验收、测试基线及运维遗留，M3–M6 暂不实施。执行清单和完成标准集中维护于 [后续工作路线图](future_work_roadmap.md) 的最新收口节，不新增并行 backlog；人工门禁仍以根 `AGENTS.md` 为准。
 - M2 观察保持在独立任务，主任务推进测试和运维修复。正式验收需要至少一场新赛事自然走完发现至正式赛果公开，并证明一轮成功取回相同赛果的 correction 幂等。真实变化 correction 依既定隔离 PostgreSQL fixture 验证，生产首个真实变化留作持续观察，不必无限等待它才结束 M2，也不在生产造数。
