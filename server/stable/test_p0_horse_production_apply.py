@@ -6,13 +6,14 @@ import json
 import runpy
 import shutil
 import tempfile
+from contextlib import contextmanager
 from datetime import date, timedelta
 from pathlib import Path
 from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
-from django.test import TestCase
+from django.test import TransactionTestCase
 from django.utils import timezone
 
 from stable.models import (
@@ -41,7 +42,7 @@ from stable.services.p0_horse_production_apply import (
 from stable.services.horse_race_records import upsert_race_record
 
 
-class P0HorseProductionApplyTests(TestCase):
+class P0HorseProductionApplyTests(TransactionTestCase):
     maxDiff = None
 
     def setUp(self):
@@ -376,8 +377,11 @@ class P0HorseProductionApplyTests(TestCase):
                 release_manifest_sha256=release_sha,
             )
 
-    def _commit(self, artifact_path: Path) -> dict:
-        release_path, release_sha = self._release(artifact_path)
+    @contextmanager
+    def _validated_release_for_business_tests(self, release_path: Path, release_sha: str):
+        # Release authorization has separate real-gate tests. Business/transaction
+        # tests enter after that boundary, without mocking database work.
+        # Concurrent callers must share one parent-thread patch lifetime.
         validated_release = FrozenJsonInput(
             path=str(release_path),
             sha256=release_sha,
@@ -398,6 +402,11 @@ class P0HorseProductionApplyTests(TestCase):
             return_value=validated_release,
         ):
             execution_window.return_value.__enter__.return_value = validated_release
+            yield
+
+    def _commit(self, artifact_path: Path) -> dict:
+        release_path, release_sha = self._release(artifact_path)
+        with self._validated_release_for_business_tests(release_path, release_sha):
             return commit_reviewed_p0_completion_artifact(
                 artifact_path=artifact_path,
                 artifact_sha256=sha256_file(artifact_path),

@@ -100,7 +100,6 @@ class TheRacingApiLiveRacecardPayloadTests(SimpleTestCase):
                     "draw": "7",
                     "jockey_name": "Objective Jockey",
                     "jockey_id": "jockey-1",
-                    "status": "declared",
                 },
             ),
         )
@@ -438,12 +437,10 @@ class RaceLiveRacecardPrepareTests(TestCase):
         )
 
     def test_exact_exception_is_embedded_and_reverified_by_initializer(self):
-        self.event.year = 2024
         self.event.grade_text = models.RaceGrade.LISTED
         self.event.normalized_grade = models.RaceGrade.LISTED
         self.event.save(
             update_fields=(
-                "year",
                 "grade_text",
                 "normalized_grade",
                 "updated_at",

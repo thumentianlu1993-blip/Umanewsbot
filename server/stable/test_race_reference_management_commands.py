@@ -218,7 +218,7 @@ class RaceReferenceManagementCommandTests(TestCase):
             "stable.race_event_safe_http.fetch_https",
             side_effect=fetch_side_effect,
         ), patch(
-            "runtime.tools.race_reference_parsers.sporting_life.parse_reference_page",
+            "stable.race_reference_parsers.sporting_life.parse_reference_page",
             side_effect=parser_side_effect,
         ):
             call_command(
@@ -815,7 +815,7 @@ class RaceReferenceManagementCommandTests(TestCase):
                 "stable.race_event_safe_http.fetch_https",
                 side_effect=fetch_side_effect,
             ) as fetch_mock, patch(
-                "runtime.tools.race_reference_parsers.sporting_life.parse_reference_page",
+                "stable.race_reference_parsers.sporting_life.parse_reference_page",
                 side_effect=parser_side_effect,
             ):
                 call_command(
@@ -866,7 +866,7 @@ class RaceReferenceManagementCommandTests(TestCase):
                 "stable.race_event_safe_http.fetch_https",
                 return_value=(raw, response),
             ), patch(
-                "runtime.tools.race_reference_parsers.sporting_life.parse_reference_page",
+                "stable.race_reference_parsers.sporting_life.parse_reference_page",
                 side_effect=RuntimeError("controlled parse failure"),
             ):
                 call_command(
@@ -997,7 +997,7 @@ class RaceReferenceManagementCommandTests(TestCase):
                 "stable.race_event_safe_http.fetch_https",
                 side_effect=fetch_side_effect,
             ) as fetch_mock, patch(
-                "runtime.tools.race_reference_parsers.sporting_life.parse_reference_page",
+                "stable.race_reference_parsers.sporting_life.parse_reference_page",
                 side_effect=parser_side_effect,
             ):
                 call_command(
@@ -1210,7 +1210,7 @@ class RaceReferenceManagementCommandTests(TestCase):
                 "stable.race_event_safe_http.fetch_https",
                 return_value=(raw, response),
             ) as fetch_mock, patch(
-                "runtime.tools.race_reference_parsers.sporting_life.parse_reference_page",
+                "stable.race_reference_parsers.sporting_life.parse_reference_page",
                 return_value=parsed,
             ):
                 call_command(
@@ -1305,7 +1305,7 @@ class RaceReferenceManagementCommandTests(TestCase):
                 "stable.race_event_safe_http.fetch_https",
                 return_value=(b"<html>wrong page identity</html>", response),
             ), patch(
-                "runtime.tools.race_reference_parsers.sporting_life.parse_reference_page",
+                "stable.race_reference_parsers.sporting_life.parse_reference_page",
                 return_value=parsed,
             ):
                 call_command(
@@ -1370,7 +1370,7 @@ class RaceReferenceManagementCommandTests(TestCase):
                 "stable.race_event_safe_http.fetch_https",
                 return_value=(b"<html>different race</html>", response),
             ), patch(
-                "runtime.tools.race_reference_parsers.sporting_life.parse_reference_page",
+                "stable.race_reference_parsers.sporting_life.parse_reference_page",
                 return_value=parsed,
             ):
                 call_command(
@@ -1445,7 +1445,7 @@ class RaceReferenceManagementCommandTests(TestCase):
                 "stable.race_event_safe_http.fetch_https",
                 return_value=(b"<html>accepted alias</html>", response),
             ), patch(
-                "runtime.tools.race_reference_parsers.sporting_life.parse_reference_page",
+                "stable.race_reference_parsers.sporting_life.parse_reference_page",
                 return_value=parsed,
             ):
                 call_command(
