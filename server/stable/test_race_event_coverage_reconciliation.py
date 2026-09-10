@@ -9,7 +9,7 @@ from pathlib import Path
 
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from django.test import TestCase
+from django.test import TransactionTestCase
 
 from stable.models import (
     HistoricalRaceEventTarget,
@@ -30,7 +30,7 @@ from stable.services import race_event_reconciliation
 from stable.services.race_event_reconciliation import RaceEventReconciliationError
 
 
-class RaceEventCoverageReconciliationTests(TestCase):
+class RaceEventCoverageReconciliationTests(TransactionTestCase):
     @staticmethod
     def _sha256(path: Path) -> str:
         return hashlib.sha256(path.read_bytes()).hexdigest()
