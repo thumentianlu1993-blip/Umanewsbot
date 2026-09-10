@@ -1,5 +1,14 @@
 # 测试基线失败排查报告（2026-09-07）
 
+## 2026-09-10 PR194 发布与 PR197–199 独立 CI 补充
+
+- 生产已发布 #194 固定 `51a46c37`；其全量 4,948 项、32 failures、257 errors、20 skipped，275 个唯一失败。其相关 77 项及发布 45 项通过；额外旧夹具到期失败的独立诊断不变。
+- #197 `98a4b55e`：4,943 项、31 failures、257 errors、20 skipped，274 个唯一失败；两项查询数合同通过。修复的是当天新到期失败，因此与到期前旧生产 69955960 比较为 0 消失/0 新增。
+- #198 `5a9e9914`：4,943 项、21 failures、256 errors、20 skipped，263 个唯一失败；26 项相关测试通过，12 个原始失败 ID 消失，新增仅未修改到期夹具。candidate/baseline/release 已完成，最后 comparison job 尚待结束。
+- #199 `784198a2`：4,943 项、31 failures、256 errors、20 skipped，273 个唯一失败；原两项赛卡错误消失，新增仅未修改到期夹具。两模块 30 项及原有退赛/显式 NR 两条保护测试通过；真实 POSIX/PG 路径通过，Windows 原始失败未删除。
+- #197–199 各自 45 项发布专项、Django check、migration drift 和正式前后指纹通过，构件 SHA/commit 已核验；仍为独立 Draft，不计入 #193 旧组合，不提前称全绿。证据在本机各修复 runtime 的 ci-comparison.json、release-evidence.json 与原 ZIP。
+
+
 > 背景：M1 全量回归时发现 `origin/main` 基线本身有 235 项失败/错误（全量 4878 项，
 > 失败集合与 M1 分支逐项一致，与 M1 变更无关）。当时没有完整 stable 回归 CI；已有的两条专项 workflow 不覆盖该基线。
 > 本报告记录 2026-09-07 的逐簇取样结论与处理建议，供后续工单使用。
@@ -22,7 +31,7 @@
 - PR #192 首轮 `9fef94fd` 的 [CI](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/34345529390) 为 4,945/31 failures/223 errors/20 skipped，240 个唯一失败，相对生产消除 34 个、无新增。slug 后续候选 `d68b4258` 的 [CI](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/34348998560) 为 4,945/31 failures/221 errors/20 skipped，238 个唯一失败，消除 36 个、无新增；相关模块只剩审计和加锁两条错误，两轮 45 项发布合同及正式指纹均通过。当前 `de5fb540` 已补齐审计夹具并修复官方发布可空外连接加锁，保留三类行锁及权限判断；SQLite 2 pass/1 PG skip、独立增量复审通过；[当前 Linux/PG16 CI](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/34351623147) 已核验：4,948/30 failures/219 errors/20 skipped，235 个唯一失败，相对生产少 39 个、无新增，其中 38 个为发布相关修复，另 1 个未改动性能用例本轮通过（根因由 #190 修复）。三个发布模块及新增三项 PG 回归无失败或跳过，45 项发布合同、check、migration drift、正式前后指纹通过；当前证据为 `ci-comparison-r3.json`。证据分别在 `runtime/fix-publication-test-clock/ci-comparison-r1.json`、`ci-comparison-r2.json` 和 `manual-publication-regression-evidence.json`。
 - 整合验证 PR #193 `9ebdf657` 含 #186–191 的 27 个已审文件，不含 #192/#194；逐 blob 来源核验与独立组合审核通过。[CI](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/34349427487) 及构件已核验：4,947/30 failures/83 errors/20 skipped，111 个唯一失败，对照生产实际消除 163 个、无新增；相关模块及七个映射用例无失败或跳过，45 项发布合同、check、migration drift、正式前后指纹通过。来源 PR 保持打开，未合并或部署；证据为 `runtime/closeout-batch1-integration/ci-comparison.json`。
 - M2 自然验收新发现的当地赛时缺失为 PR #194 `51a46c37`，此前生产全量测试未覆盖该形状。新增 5 项真实 RED 后修复；[Linux/PG16 CI](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/34427582283) 受影响模块 77 项无失败/跳过，45/45 发布合同、check、migration drift、正式指纹及独立代码审核通过。全量 4,948/32 failures/257 errors/20 skipped，275 个唯一失败：生产旧 274 个全在，新增 FullCohortRuntimeContracts.test_single_event_membership_validation_is_constant_query_count 的旧到期夹具失败。其测试和服务 blob 与生产完全相同；原测试用实际时钟检查固定 2026-09-10 00:00 UTC 到期时间，隔离原样复现在到期前通过、到期点因 registry_runtime_expired 失败。不是查询数超限，不归为 #194 应用回归；CI 红灯保留，不能说相对生产零新增或全量全绿。证据为 `runtime/fix-m2-local-start-time/ci-comparison.json` 和 `expired-fixture-diagnosis.json`；不计入 #193 组合修复数。
-- #195 `be54a04a` 与 #196 `6d19771f` 的 CI `34428158172`/`34429414869` 已逐构件核验：前者相关 31 项、后者相关 43 pass/2 条 macOS 条件 skip（原/新实际 PG 并发均通过），两者发布专项 45 项及正式 Linux 指纹通过。均独立只读审核通过，全量仍有失败，未合并/发布，不计入 #193 的组合结果。旧 full-cohort 到期夹具另由 #197 `98a4b55e` 传固定 now 修正，本地两项通过；实时赛果旧夹具由 #198 `5a9e9914` 校正，本地 26 项辅助测试通过但不覆盖 POSIX 密钥权限/PG。两候选正式 CI 尚待核验，不提前减少全量失败数。
+- #195 `be54a04a` 与 #196 `6d19771f` 的 CI `34428158172`/`34429414869` 已逐构件核验：前者相关 31 项、后者相关 43 pass/2 条 macOS 条件 skip（原/新实际 PG 并发均通过），两者发布专项 45 项及正式 Linux 指纹通过。均独立只读审核通过，全量仍有失败，未合并/发布，不计入 #193 的组合结果。旧 full-cohort 到期夹具另由 #197 `98a4b55e` 传固定 now 修正，本地两项通过；实时赛果旧夹具由 #198 `5a9e9914` 校正，本地 26 项辅助测试通过但不覆盖 POSIX 密钥权限/PG。两候选固定 Linux/PG 构件现已核验，相关 2/26 项及各自发布 45 项通过；实际全量和尚未结束的 #198 comparison job 见本文最新补充，不计入 #193 组合。
 - 两个 `tmp/` 历史 helper 的 9 条缺失源码失败仍保留；本机、全部本地 refs 路径历史与默认分支 API 路径历史未找到文件，不等于穷尽所有远端/原 PC。恢复线索与限制在 `runtime/closeout-m2-test-ops/missing-helper-recovery-check.json`，未重建假 helper 或删除测试。
 - 各候选分别对照同一生产基线，修复数有重叠且尚未合并，不能相加为主线已修复数量；组合候选需要自身 CI。
 - 核验输入分别保存在本机 `runtime/fix-reference-parser-tests/ci-comparison.json`、`runtime/fix-test-transaction-boundaries/ci-comparison-r1.json` 和 `runtime/fix-remaining-transaction-tests/delivery.json`；下载的构件均按 GitHub SHA-256 校验，并核对固定候选提交。
