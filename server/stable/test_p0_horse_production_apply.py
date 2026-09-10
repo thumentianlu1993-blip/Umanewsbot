@@ -12,7 +12,7 @@ from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
-from django.test import TestCase
+from django.test import TransactionTestCase
 from django.utils import timezone
 
 from stable.models import (
@@ -41,7 +41,7 @@ from stable.services.p0_horse_production_apply import (
 from stable.services.horse_race_records import upsert_race_record
 
 
-class P0HorseProductionApplyTests(TestCase):
+class P0HorseProductionApplyTests(TransactionTestCase):
     maxDiff = None
 
     def setUp(self):
