@@ -11,8 +11,8 @@ Review mode: Full (profile: feature)
 > 2026-09-05 更新：用户审核已完成，第 1、4 项产品决定被否决并改写，修订记录见第 12 节；
 > 上述结论已被本轮修订取代，实现前须对第 1、4 项相关改动做一轮设计复审。
 
-本仓库当前使用原生 `docs/changes/` 工作流，不使用 OpenSpec phase、journal 或 sidecar。审核按照
-`plan-eng-review` 的范围、架构、代码质量、测试、性能、上线与一致性门禁执行，但不生成已被仓库规则禁用的 OpenSpec 文件。
+本仓库当前使用原生 `docs/changes/` 工作流，不使用 旧规格流程 phase、journal 或 sidecar。审核按照
+`plan-eng-review` 的范围、架构、代码质量、测试、性能、上线与一致性门禁执行，但不生成已被仓库规则禁用的 旧规格流程 文件。
 
 ## 2. 审核基线
 
