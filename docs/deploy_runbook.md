@@ -1,5 +1,14 @@
 # 部署运行手册
 
+## 2026-09-15 PR #201 生产发布与交接
+
+- 应用合并commit `7981439555bec747d462910506c56b08449ae621`；固定生产候选 `9a88243ffcf4d628a2ceaa528a66871d566fca82`，镜像 `sha256:e022147a9ddd4063e7ac35b5591fd0a118335b211b2c88da90d3fec0cdc1f986`，验证时间 `2026-09-15T02:54:10.391232+00:00`。实际目录 `/opt/umanews-release-9a88243f-PR201-20260915/umanewsbot`，Compose project `umanewsbot`，低成本Compose配置不变。
+- 0078→0078同schema发布；专属备份 `/opt/umanews-release-9a88243f-PR201-20260915/umanewsbot/runtime/migration_history_repair/release-0078-recovery/9f2e0baa24e18cdfa195e7042bd3719cd12f38de095c26cacba5cbbbb4320a97/backup/rds_horse_news_20260915T024939Z_616139.dump`，备份SHA256 `6fd0e4453db473f40e2e493f3ce66bcd3b78ade4caca3e69ceca5fd0a18e5b3f`，TOC 1383行。意图路径 `/opt/umanews-release-9a88243f-PR201-20260915/umanewsbot/runtime/migration_history_repair/release-0078-recovery/9f2e0baa24e18cdfa195e7042bd3719cd12f38de095c26cacba5cbbbb4320a97/intent.json`，SHA256 `814835b51ebab8bf5a1a96c8e03b885d878e7fc6424232bea0eac2a58e79b57b`；manifest `46e797f77ebedbeda52b8f8fd7654d66c32a109c97d4ef0f77be80a86964b66e`，完成凭据 `97bed0b3ddffcf0890e49202fb3992f3b1b64834d75c60f4d00f5e164c1954d9`。
+- 四应用同版本、Web healthy、两个worker响应、0078空计划；配置摘要不变。DB/Redis/OneBot/Nginx原容器保留，Nginx已验证并reload；旧race_live_worker关闭且race_live7543不消费。956七组数据摘要保持，双域名六场赛果通过，发布完成凭据、active pointer和锁收尾通过。
+- 剩余45条旧测试失败未发现本轮需补修的线上问题，按用户要求跳过；具体证据和局限见[影响核查](changes/release-pr201-production/impact-assessment.md)。不得将此判定解释为永久忽略真实生产缺陷。
+- 本机完整证据位于 `C:/coding/umanews/runtime/release_pr201_20260915/`；服务器发布目录保存prepare/build/deploy/verification及原intent/manifest/backup。恢复仍按下方0078合同绑定这一次意图；已完成发布不可当成新发布意图复用，普通代码rollback不开放。
+- 近期工作及下一位接手人的执行边界见[交接记录](changes/release-pr201-production/handoff.md)。M2观察中版本漂移须与本次已授权发布对照后建立新基线，不能沿用PR194镜像假定。
+
 ## 2026-09-10 PR #194 发布完成与自然赛时验收
 
 - 用户已批准固定发布包，#194 合并为 `ced88882152729c8e31a9cddb5fd83094e30d196`，生产部署固定候选 `51a46c379d39efcea75b7e96cff8cdb3b1dece77`，于 `2026-09-10T05:23:06.346895+00:00` 通过部署复验。四应用版本一致，Web healthy，两个 worker 响应，0078 空迁移计划；配置、开关和持久挂载保持，旧 `race_live=7543` 未消费。DB、Redis、OneBot、Nginx 容器保持，Nginx 已重载；956 七组业务摘要一致，双域名 755/756/757/956 分别 11/6/7/10 行。截至 `2026-09-10 05:35 UTC`，962/963 均已由自然同步补齐为英国当地 15:00/15:35（北京时间 22:00/22:35），双域名四页一致。原拒绝审计保留，同 observation 分别只新增一次 applied；两场后续相同来源内容的 race_time 同步均成功且未重复写入。本次赛时显示及重放验收通过；未强制抓取或手工回填，M2 正式赛果/公开/correction 整体验收仍未完成。
