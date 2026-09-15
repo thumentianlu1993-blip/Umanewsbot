@@ -2309,12 +2309,16 @@ class RaceLiveWorkerDeploymentContractTests(SimpleTestCase):
                         break
                     live_worker_lines.append(line)
                 live_worker = "\n".join(live_worker_lines)
+                runtime_root = (
+                    "./runtime" if filename == "docker-compose.yml"
+                    else "${UMANEWS_PERSISTENT_RUNTIME_ROOT:-./runtime}"
+                )
                 self.assertIn(
-                    "./runtime/secrets:/run/secrets:ro",
+                    f"{runtime_root}/secrets:/run/secrets:ro",
                     live_worker,
                 )
                 self.assertIn(
-                    "./runtime/race_live_racecards:/run/race-live/racecards:rw",
+                    f"{runtime_root}/race_live_racecards:/run/race-live/racecards:rw",
                     live_worker,
                 )
 
@@ -2989,8 +2993,7 @@ class RaceLiveTheRacingApiFreeRunnerTests(TestCase):
             "now": self.NOW,
             "transport": transport,
         }
-        if clock is not None:
-            kwargs["clock"] = clock
+        kwargs["clock"] = clock if clock is not None else (lambda: self.NOW)
         if sleeper is not None:
             kwargs["sleeper"] = sleeper
         return service(
@@ -3461,6 +3464,17 @@ class RaceLiveTheRacingApiFreeRunnerTests(TestCase):
             "deadline_exceeded",
         )
 
+    @override_settings(
+        RACE_DATA_SYNC_ENABLED=True,
+        RACE_DATA_SYNC_ENABLED_PROVIDERS=("the_racing_api",),
+        RACE_DATA_SYNC_ENABLED_REGIONS=("united_kingdom",),
+        RACE_DATA_SYNC_ENABLED_FIELDS=(
+            "participants.horse_name",
+            "participants.number",
+            "participants.draw",
+            "participants.jockey_name",
+        ),
+    )
     def test_v2_pre_off_runner_refreshes_racecard_through_region_snapshot(self):
         self.registry_digest = self._write_registry_v2()
         stable_models.RaceResultSourceIdentity.objects.filter(
@@ -3469,10 +3483,11 @@ class RaceLiveTheRacingApiFreeRunnerTests(TestCase):
         stable_models.RaceLivePublicationPolicy.objects.update(
             registry_digest=self.registry_digest
         )
-        stable_models.RaceEvent.objects.filter(pk=self.event.pk).update(
-            race_datetime=self.NOW + timedelta(hours=1),
-            timezone_name="Europe/London",
-            local_date=self.NOW.date(),
+        self.event.race_datetime = self.NOW + timedelta(hours=1)
+        self.event.timezone_name = "Europe/London"
+        self.event.local_date = self.NOW.date()
+        self.event.save(
+            update_fields=("race_datetime", "timezone_name", "local_date", "updated_at"),
         )
         stable_models.RaceEventLiveTracking.objects.filter(
             pk=self.tracking.pk
@@ -3537,7 +3552,7 @@ class RaceLiveTheRacingApiFreeRunnerTests(TestCase):
             clock=lambda: next(clock_values),
         )
 
-        self.assertTrue(result["processed"])
+        self.assertTrue(result["processed"], result)
         self.assertEqual(result["reason"], "racecard_refreshed")
         self.assertEqual(len(calls), 1)
         self.assertEqual(

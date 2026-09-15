@@ -1426,6 +1426,15 @@ def preflight_enrollment(
         raise EnrollmentError(
             f"赛事不存在: {sorted(set(manifest.event_ids) - found)}"
         )
+    if lock:
+        # Do not lock newly appeared controls after events: preserve control -> event.
+        missing_control_ids = [
+            event_id for event_id in manifest.event_ids if event_id not in controls
+        ]
+        if missing_control_ids and RaceEventLifecycleControl.objects.filter(
+            event_id__in=missing_control_ids
+        ).exists():
+            raise EnrollmentError("control 集合在加锁期间变化；请重新预检")
     projection_query = RaceEventProjectionControl.objects.filter(
         event_id__in=manifest.event_ids
     ).order_by("event_id")

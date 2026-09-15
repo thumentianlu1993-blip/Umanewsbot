@@ -12,7 +12,7 @@ from datetime import timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from django.db import connection, connections
+from django.db import connection, connections, transaction
 from django.test import TransactionTestCase
 from django.utils import timezone as django_timezone
 
@@ -61,6 +61,80 @@ def _make_event(*, slug: str) -> RaceEvent:
 
 
 class RaceEventLifecycleEnrollmentPostgresTests(TransactionTestCase):
+    @_pg_only
+    def test_control_created_while_waiting_rejects_cleanly_then_replays(self):
+        first = _make_event(slug="pg-stale-control-first")
+        second = _make_event(slug="pg-stale-control-second")
+        generated_at = django_timezone.now()
+        manifest_bytes, _ = build_enrollment_artifacts(
+            event_ids=[second.pk, first.pk],
+            approved_commit=APPROVED_COMMIT,
+            now=generated_at,
+        )
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "manifest.json"
+            path.write_bytes(manifest_bytes)
+            manifest = load_enrollment_manifest(
+                path,
+                expected_raw_sha256=hashlib.sha256(manifest_bytes).hexdigest(),
+                expected_commit=APPROVED_COMMIT,
+                now=generated_at,
+            )
+            control_read = threading.Event()
+            outcomes = []
+            errors = []
+
+            def notify_control_read(execute, sql, params, many, context):
+                result = execute(sql, params, many, context)
+                if (
+                    sql.lstrip().upper().startswith("SELECT")
+                    and RaceEventLifecycleControl._meta.db_table in sql
+                ):
+                    control_read.set()
+                return result
+
+            def waiting_apply():
+                _close_thread_connections()
+                try:
+                    with connection.cursor() as cursor:
+                        cursor.execute("SET lock_timeout = '5s'")
+                        cursor.execute("SET statement_timeout = '8s'")
+                    with connection.execute_wrapper(notify_control_read):
+                        outcomes.append(apply_enrollment(manifest))
+                except Exception as exc:
+                    errors.append(exc)
+                finally:
+                    _close_thread_connections()
+
+            waiter = threading.Thread(target=waiting_apply)
+            started = False
+            try:
+                with transaction.atomic():
+                    list(RaceEvent.objects.filter(
+                        pk__in=manifest.event_ids
+                    ).order_by("pk").select_for_update())
+                    waiter.start()
+                    started = True
+                    self.assertTrue(control_read.wait(timeout=5), "control read timed out")
+                    created = apply_enrollment(manifest)
+                    self.assertEqual(set(created.outcomes.values()), {"would_create"})
+            finally:
+                if started:
+                    waiter.join(timeout=15)
+            self.assertFalse(waiter.is_alive(), "waiting apply did not finish")
+            self.assertEqual(outcomes, [])
+            self.assertEqual(len(errors), 1, errors)
+            self.assertIsInstance(errors[0], EnrollmentError)
+            self.assertIn("control", str(errors[0]))
+            controls = RaceEventLifecycleControl.objects.order_by("event_id")
+            before_retry = list(controls.values())
+            self.assertEqual([row["event_id"] for row in before_retry], [first.pk, second.pk])
+
+            replay = apply_enrollment(manifest)
+
+            self.assertEqual(set(replay.outcomes.values()), {"replay"})
+            self.assertEqual(list(controls.values()), before_retry)
+
     @_pg_only
     def test_two_concurrent_applies_create_one_complete_control_set(self):
         first = _make_event(slug="pg-enrollment-first")

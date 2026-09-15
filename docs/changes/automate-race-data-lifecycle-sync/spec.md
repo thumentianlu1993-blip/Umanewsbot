@@ -3,7 +3,7 @@
 ## 1. 文档状态
 
 - 变更 slug：`automate-race-data-lifecycle-sync`。
-- 工作流：仓库原生 `docs/changes/` 方案，不使用 OpenSpec，也不生成 OpenSpec 产物。
+- 工作流：仓库原生 `docs/changes/` 方案，不使用 旧规格流程，也不生成 旧规格流程 产物。
 - 基线：`origin/main@2833558a6a2d67b7dc9816b53ea8ad5d580eb56c`。
 - 当前阶段：实现、migration、Compose/Beat/worker、聚焦与 PostgreSQL 测试、零写 dry-run、扩展基线归因
   和生产只读 preflight 均已完成，代码位于 PR #108；生产尚未合并、迁移、部署或启用。

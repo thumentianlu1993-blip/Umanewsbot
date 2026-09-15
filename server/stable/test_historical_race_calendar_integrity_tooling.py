@@ -11,7 +11,8 @@ from unittest import mock
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.management import CommandError, call_command
-from django.test import TestCase, override_settings
+from django.db import connection, transaction
+from django.test import TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 
 from stable.models import (
@@ -33,7 +34,7 @@ def _sha256(path: Path) -> str:
 
 
 @override_settings(HISTORICAL_RACE_BACKFILL_ENABLED=True)
-class HistoricalRaceCalendarIntegrityToolingTests(TestCase):
+class HistoricalRaceCalendarIntegrityToolingTests(TransactionTestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
@@ -341,26 +342,44 @@ class HistoricalRaceCalendarIntegrityToolingTests(TestCase):
         self.assertEqual(public_race_calendar_years(), [2025])
         arguments = self.apply_arguments(self.prepare())
 
+        real_on_commit = transaction.on_commit
         with mock.patch(
             "stable.services.historical_race_calendar_integrity.invalidate_public_race_cache",
             wraps=invalidate_public_race_cache,
         ) as invalidate:
-            with self.captureOnCommitCallbacks(execute=False) as callbacks:
+            def register_deferred(callback, *args, **kwargs):
+                self.assertTrue(connection.in_atomic_block)
+                self.assertEqual(public_race_calendar_years(), [2025])
+                invalidate.assert_not_called()
+
+                def after_commit():
+                    self.assertFalse(connection.in_atomic_block)
+                    callback()
+
+                return real_on_commit(after_commit, *args, **kwargs)
+
+            # apply also verifies in a fresh read-only snapshot after commit.
+            # Observe real callback timing without wrapping that snapshot in
+            # another transaction that has already written the fixtures.
+            with mock.patch(
+                "stable.services.historical_race_calendar_integrity.transaction.on_commit",
+                side_effect=register_deferred,
+            ) as registered:
                 applied = apply_historical_race_calendar_integrity(**arguments)
 
             self.assertEqual(applied["status"], "verified")
-            self.assertEqual(public_race_calendar_years(), [2025])
-            invalidate.assert_not_called()
-            self.assertEqual(len(callbacks), 1)
-            callbacks[0]()
+            self.assertEqual(registered.call_count, 1)
             invalidate.assert_called_once_with()
             self.assertEqual(public_race_calendar_years(), [2024])
 
             invalidate.reset_mock()
-            with self.captureOnCommitCallbacks(execute=False) as reentry_callbacks:
+            with mock.patch(
+                "stable.services.historical_race_calendar_integrity.transaction.on_commit",
+                wraps=real_on_commit,
+            ) as reentry_callbacks:
                 reentered = apply_historical_race_calendar_integrity(**arguments)
             self.assertEqual(reentered["status"], "already_applied")
-            self.assertEqual(reentry_callbacks, [])
+            reentry_callbacks.assert_not_called()
             invalidate.assert_not_called()
 
     def test_rollback_invalidates_public_year_cache_only_after_commit(self):
@@ -381,26 +400,25 @@ class HistoricalRaceCalendarIntegrityToolingTests(TestCase):
         )
         self.assertEqual(public_race_calendar_years(), [2025])
         arguments = self.apply_arguments(self.prepare())
-        with self.captureOnCommitCallbacks(execute=True):
-            applied = apply_historical_race_calendar_integrity(**arguments)
+        applied = apply_historical_race_calendar_integrity(**arguments)
         self.assertEqual(public_race_calendar_years(), [2024])
 
         with mock.patch(
             "stable.services.historical_race_calendar_integrity.invalidate_public_race_cache",
             wraps=invalidate_public_race_cache,
         ) as invalidate:
-            with self.captureOnCommitCallbacks(execute=False) as callbacks:
-                rolled_back = rollback_historical_race_calendar_integrity(
-                    **arguments,
-                    rollback_path=applied["rollback_path"],
-                    expected_rollback_sha256=applied["rollback_sha256"],
-                )
+            with transaction.atomic():
+                with TestCase.captureOnCommitCallbacks(execute=False) as callbacks:
+                    rolled_back = rollback_historical_race_calendar_integrity(
+                        **arguments,
+                        rollback_path=applied["rollback_path"],
+                        expected_rollback_sha256=applied["rollback_sha256"],
+                    )
 
-            self.assertEqual(rolled_back["status"], "rolled_back")
-            self.assertEqual(public_race_calendar_years(), [2024])
-            invalidate.assert_not_called()
-            self.assertEqual(len(callbacks), 1)
-            callbacks[0]()
+                self.assertEqual(rolled_back["status"], "rolled_back")
+                self.assertEqual(public_race_calendar_years(), [2024])
+                invalidate.assert_not_called()
+                self.assertEqual(len(callbacks), 1)
             invalidate.assert_called_once_with()
             self.assertEqual(public_race_calendar_years(), [2025])
 
@@ -426,9 +444,10 @@ class HistoricalRaceCalendarIntegrityToolingTests(TestCase):
             "create",
             side_effect=RuntimeError("simulated receipt failure"),
         ):
-            with self.captureOnCommitCallbacks(execute=False) as callbacks:
-                with self.assertRaisesMessage(RuntimeError, "simulated receipt failure"):
-                    apply_historical_race_calendar_integrity(**arguments)
+            with transaction.atomic():
+                with TestCase.captureOnCommitCallbacks(execute=False) as callbacks:
+                    with self.assertRaisesMessage(RuntimeError, "simulated receipt failure"):
+                        apply_historical_race_calendar_integrity(**arguments)
 
         self.assertEqual(callbacks, [])
         invalidate.assert_not_called()

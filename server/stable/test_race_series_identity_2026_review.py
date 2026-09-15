@@ -12,7 +12,7 @@ from pathlib import Path
 
 from django.core.management import call_command
 from django.db import connection
-from django.test import TestCase
+from django.test import TransactionTestCase
 from django.test.utils import CaptureQueriesContext
 from django.test import SimpleTestCase
 from openpyxl import load_workbook
@@ -538,7 +538,7 @@ class RaceSeriesIdentity2026RedGateTests(SimpleTestCase):
 
 
 @unittest.skipUnless(MODULE_SPEC is not None, "target review adapter is not implemented yet")
-class RaceSeriesIdentity2026OrmAndCommandTests(TestCase):
+class RaceSeriesIdentity2026OrmAndCommandTests(TransactionTestCase):
     def setUp(self):
         self.destination = RaceSeries.objects.create(
             key="shared-race-history",

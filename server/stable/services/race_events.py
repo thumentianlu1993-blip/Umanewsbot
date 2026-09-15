@@ -3071,7 +3071,6 @@ def restore_last_provisional_result(
         )
         revision = (
             RaceEventRevision.objects.select_for_update()
-            .select_related("primary_observation__source_identity")
             .filter(pk=expected_provisional_revision_id, event_id=event_id)
             .first()
         )

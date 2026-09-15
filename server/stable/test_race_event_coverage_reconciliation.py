@@ -3,13 +3,15 @@ from __future__ import annotations
 import hashlib
 import json
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch
 from datetime import date, datetime, time, timedelta, timezone as dt_timezone
 from pathlib import Path
 
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from django.test import TestCase
+from django.db import OperationalError, connections, transaction
+from django.test import TransactionTestCase, skipUnlessDBFeature
 
 from stable.models import (
     HistoricalRaceEventTarget,
@@ -30,7 +32,7 @@ from stable.services import race_event_reconciliation
 from stable.services.race_event_reconciliation import RaceEventReconciliationError
 
 
-class RaceEventCoverageReconciliationTests(TestCase):
+class RaceEventCoverageReconciliationTests(TransactionTestCase):
     @staticmethod
     def _sha256(path: Path) -> str:
         return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -156,6 +158,61 @@ class RaceEventCoverageReconciliationTests(TestCase):
             "historical/current/result 三分母覆盖报告尚未实现",
         )
         return builder(as_of=as_of, result_grace=result_grace)
+
+    @skipUnlessDBFeature("has_select_for_update_nowait")
+    def test_new_and_existing_links_hold_identity_row_locks_until_commit(self):
+        def probe_locks(rows):
+            outcomes = []
+            try:
+                for model, row_id in rows:
+                    try:
+                        with transaction.atomic():
+                            model.objects.select_for_update(nowait=True).get(pk=row_id)
+                    except OperationalError as exc:
+                        cause = exc.__cause__
+                        outcomes.append(getattr(cause, "sqlstate", None) or getattr(cause, "pgcode", None))
+                    else:
+                        outcomes.append("acquired")
+            finally:
+                connections.close_all()
+            return outcomes
+
+        for already_linked in (False, True):
+            with self.subTest(already_linked=already_linked):
+                series = self._series(f"japan-row-locks-{already_linked}")
+                event = self._event(
+                    series=series, year=2026, slug=f"row-locks-{already_linked}",
+                    name="Row Locks Cup", local_date=date(2026, 9, 5),
+                )
+                target = self._target(
+                    series=series, year=2026, name="Row Locks Cup",
+                    local_date=date(2026, 9, 5), event=event if already_linked else None,
+                )
+                rows = [(HistoricalRaceEventTarget, target.pk), (RaceEvent, event.pk), (RaceSeries, series.pk)]
+                with ThreadPoolExecutor(max_workers=1) as executor:
+                    with transaction.atomic():
+                        result = race_event_reconciliation.adopt_existing_race_event_for_target(target_id=target.pk)
+                        self.assertEqual(result["status"], "already_linked" if already_linked else "linked")
+                        self.assertEqual(executor.submit(probe_locks, rows).result(timeout=10), ["55P03"] * 3)
+                    self.assertEqual(executor.submit(probe_locks, rows).result(timeout=10), ["acquired"] * 3)
+                target.refresh_from_db()
+                self.assertEqual(target.event_id, event.pk)
+
+    def test_linked_event_without_series_remains_an_identity_conflict(self):
+        series = self._series("japan-linked-no-series")
+        event = self._event(
+            series=None, year=2026, slug="linked-no-series",
+            name="No Series Cup", local_date=date(2026, 9, 5),
+        )
+        target = self._target(
+            series=series, year=2026, name="No Series Cup",
+            local_date=date(2026, 9, 5), event=event,
+        )
+        with self.assertRaisesRegex(RaceEventReconciliationError, "linked_identity_mismatch"):
+            race_event_reconciliation.adopt_existing_race_event_for_target(target_id=target.pk)
+        target.refresh_from_db()
+        self.assertEqual(target.event_id, event.pk)
+        self.assertFalse(OperationLog.objects.filter(action_type="race_event_target_reconciled").exists())
 
     def test_not_due_target_can_link_scheduled_event_without_becoming_imported(self):
         series = self._series("japan-future-cup")

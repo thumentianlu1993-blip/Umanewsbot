@@ -223,22 +223,27 @@ class RaceLiveTargetEligibilityTests(SimpleTestCase):
         service = self._service()
         artifact = self._exception()
 
-        accepted = service(
-            event_id=1001,
-            year=2026,
-            region=models.RacingRegion.FRANCE,
-            normalized_grade=models.RaceGrade.LISTED,
-            exception_artifact=artifact,
-            expected_approved_commit="a" * 40,
-            now=self.NOW,
-        )
+        for year, grade in (
+            (2024, models.RaceGrade.G1),
+            (2026, models.RaceGrade.LISTED),
+        ):
+            with self.subTest(year=year, grade=grade):
+                accepted = service(
+                    event_id=1001,
+                    year=year,
+                    region=models.RacingRegion.FRANCE,
+                    normalized_grade=grade,
+                    exception_artifact=artifact,
+                    expected_approved_commit="a" * 40,
+                    now=self.NOW,
+                )
 
-        self.assertIs(self._field(accepted, "eligible"), True)
-        self.assertEqual(
-            self._field(accepted, "reason"),
-            "exception_approved",
-        )
-        self.assertTrue(self._field(accepted, "exception_digest"))
+                self.assertIs(self._field(accepted, "eligible"), True)
+                self.assertEqual(
+                    self._field(accepted, "reason"),
+                    "exception_approved",
+                )
+                self.assertTrue(self._field(accepted, "exception_digest"))
 
         rejected_inputs = (
             {

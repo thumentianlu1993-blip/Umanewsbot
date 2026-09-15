@@ -825,6 +825,7 @@ class FullCohortRuntimeContracts(TestCase):
                     membership_sha256=registry.membership_sha256,
                     member_count=registry.member_count,
                     activation_id=registry.activation_id,
+                    now=datetime(2026, 8, 12, tzinfo=timezone.utc),
                 )
             self.assertTrue(result.valid)
             query_counts.append(len(queries))

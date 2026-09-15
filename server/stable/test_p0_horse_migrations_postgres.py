@@ -6,6 +6,8 @@ from django.db import IntegrityError, connection, transaction
 from django.db.migrations.executor import MigrationExecutor
 from django.test import TransactionTestCase, skipUnlessDBFeature
 
+from stable.test_migration_database_helpers import isolated_migration_database
+
 
 @skipUnlessDBFeature("supports_transactions")
 class P0HorseMigrationPostgresTests(TransactionTestCase):
@@ -19,6 +21,7 @@ class P0HorseMigrationPostgresTests(TransactionTestCase):
         super().setUp()
         if connection.vendor != "postgresql":
             self.skipTest("requires PostgreSQL migration DDL semantics")
+        self.enterContext(isolated_migration_database())
         self._migrate(self.migrate_from)
         old_apps = self._apps(self.migrate_from)
         TermEntry = old_apps.get_model("stable", "TermEntry")
@@ -137,10 +140,17 @@ class P0HorseMigrationPostgresTests(TransactionTestCase):
         )
 
         executor = MigrationExecutor(connection)
+        # The graph contains all repository migrations; only the database has
+        # stopped at this historical test target.
+        expected_applied = {
+            node for node in executor.loader.graph.forwards_plan(self.migrate_to[0])
+            if node[0] == "stable"
+        }
         self.assertEqual(
-            executor.loader.graph.leaf_nodes("stable"),
-            self.migrate_to,
+            {node for node in executor.loader.applied_migrations if node[0] == "stable"},
+            expected_applied,
         )
+        self.assertEqual(executor.migration_plan(self.migrate_to), [])
 
         self._migrate(self.migrate_from)
         self._migrate(self.migrate_to)

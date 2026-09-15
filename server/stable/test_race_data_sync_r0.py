@@ -14,9 +14,11 @@ from unittest.mock import patch
 
 from django.db import IntegrityError, connection, transaction
 from django.db.migrations.executor import MigrationExecutor
+
 from django.test import SimpleTestCase, TestCase, TransactionTestCase, override_settings
 
 from stable import models
+from stable.test_migration_database_helpers import isolated_migration_database
 from stable.services import (
     race_data_sync_control,
     race_data_sync_enrollment,
@@ -180,6 +182,7 @@ class RaceDataSyncR0MigrationAdoptionTests(TransactionTestCase):
 
     def setUp(self):
         super().setUp()
+        self.enterContext(isolated_migration_database())
         executor = MigrationExecutor(connection)
         executor.migrate(self.migrate_from)
         apps = executor.loader.project_state(self.migrate_from).apps
@@ -248,6 +251,7 @@ class RaceDataSourcePriorityMigrationTests(TransactionTestCase):
 
     def setUp(self):
         super().setUp()
+        self.enterContext(isolated_migration_database())
         executor = MigrationExecutor(connection)
         executor.migrate(self.migrate_from)
         old_apps = executor.loader.project_state(self.migrate_from).apps

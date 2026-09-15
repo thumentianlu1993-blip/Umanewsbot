@@ -14,6 +14,7 @@ from django.test import TestCase, TransactionTestCase
 from django.test.utils import CaptureQueriesContext
 
 from stable.models import HorseIdentityEvidenceCommitReceipt, OperationLog
+from stable.test_migration_database_helpers import isolated_migration_database
 
 from stable.services.historical_calendar_release_b_schema import (
     check_initial_install_schema_compatibility,
@@ -29,6 +30,7 @@ from stable.services.historical_calendar_release_b_handoff import (
     build_restricted_recovery_marker,
     publish_preflight_artifact,
     publish_restricted_recovery_marker,
+    verify_preflight_artifact,
 )
 
 
@@ -41,6 +43,9 @@ M0072 = ("stable", "0072_add_extended_racing_regions")
 M0073 = ("stable", "0073_lifecycle_enforce_registry")
 M0074 = ("stable", "0074_race_data_sync_r0_control_plane")
 M0075 = ("stable", "0075_race_data_source_priority_and_reported_position")
+M0076 = ("stable", "0076_alter_externaldataimporterror_racing_region_and_more")
+M0077 = ("stable", "0077_racing_api_horse_identity_staging")
+M0078 = ("stable", "0078_externalhorse_profile_snapshot")
 POSTGRES = connection.vendor == "postgresql"
 
 
@@ -314,6 +319,11 @@ def _stable_plan(executor: MigrationExecutor) -> list[str]:
 
 @skipUnless(POSTGRES, "requires PostgreSQL read-only transaction semantics")
 class ProductionAuditBaselinePostgresTests(TransactionTestCase):
+    def setUp(self):
+        super().setUp()
+        self.enterContext(isolated_migration_database())
+        _executor().migrate([M0070])
+
     def test_generator_uses_repeatable_read_read_only_and_runtime_collector(self):
         operation = OperationLog.objects.create(
             action_type="production_audit_fixture",
@@ -332,169 +342,121 @@ class ProductionAuditBaselinePostgresTests(TransactionTestCase):
             operation_log=operation,
         )
         output = StringIO()
-        final_nodes = (M0068, M0069, M0071, M0072, M0073, M0074, M0075)
-        placeholders = ", ".join(["(%s, %s)"] * len(final_nodes))
-        params = [part for node in final_nodes for part in node]
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "SELECT id, app, name, applied FROM django_migrations "
-                f"WHERE (app, name) IN ({placeholders}) ORDER BY id",
-                params,
+        recorded_before = MigrationRecorder(connection).applied_migrations()
+        with CaptureQueriesContext(connection) as queries:
+            call_command(
+                "generate_migration_history_production_audit", stdout=output
             )
-            final_records = cursor.fetchall()
+        payload = json.loads(output.getvalue())
+        live = collect_live_production_audit()
         self.assertEqual(
-            {(row[1], row[2]) for row in final_records}, set(final_nodes)
+            {key: payload[key] for key in live},
+            live,
         )
-        recorder = MigrationRecorder(connection)
-        for node in final_nodes:
-            recorder.record_unapplied(*node)
-        try:
-            with CaptureQueriesContext(connection) as queries:
-                call_command(
-                    "generate_migration_history_production_audit", stdout=output
-                )
-            payload = json.loads(output.getvalue())
-            live = collect_live_production_audit()
-            self.assertEqual(
-                {key: payload[key] for key in live},
-                live,
-            )
-            self.assertEqual(payload["receipt_ids"], [receipt.pk])
-            self.assertEqual(payload["operation_log_ids"], [operation.pk])
-            self.assertEqual(payload["operation_log_fk_ids"], [operation.pk])
-            sql = [query["sql"] for query in queries.captured_queries]
-            self.assertTrue(
-                any(
-                    "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY"
-                    in statement.upper()
-                    for statement in sql
-                ),
-                sql,
-            )
-            data_sql = "\n".join(sql).upper()
-            self.assertNotIn("INSERT INTO", data_sql)
-            self.assertNotIn("UPDATE ", data_sql)
-            self.assertNotIn("DELETE FROM", data_sql)
-        finally:
-            with connection.cursor() as cursor:
-                cursor.executemany(
-                    "INSERT INTO django_migrations (id, app, name, applied) "
-                    "VALUES (%s, %s, %s, %s)",
-                    final_records,
-                )
+        self.assertEqual(payload["receipt_ids"], [receipt.pk])
+        self.assertEqual(payload["operation_log_ids"], [operation.pk])
+        self.assertEqual(payload["operation_log_fk_ids"], [operation.pk])
+        sql = [query["sql"] for query in queries.captured_queries]
+        self.assertTrue(
+            any(
+                "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY"
+                in statement.upper()
+                for statement in sql
+            ),
+            sql,
+        )
+        data_sql = "\n".join(sql).upper()
+        self.assertNotIn("INSERT INTO", data_sql)
+        self.assertNotIn("UPDATE ", data_sql)
+        self.assertNotIn("DELETE FROM", data_sql)
+        self.assertEqual(MigrationRecorder(connection).applied_migrations(), recorded_before)
+
 
 
 @skipUnless(POSTGRES, "requires PostgreSQL pg_catalog and transactional DDL")
 class MigrationHistoryRepairPostgresMigrationTests(TransactionTestCase):
     reset_sequences = False
 
+    def setUp(self):
+        super().setUp()
+        self.enterContext(isolated_migration_database())
+
     def tearDown(self):
-        # Never leave the shared Django test database at a partial migration leaf.
+        # Restore the fixture's expected leaf before discarding its private schema.
         _executor().migrate([M0075])
         super().tearDown()
 
-    def test_initial_install_exact_origin_and_monotonic_prefixes_have_exact_catalogs(self):
-        _executor().migrate([M0067])
-        origin = check_initial_install_schema_compatibility()
-        self.assertTrue(origin["ok"], origin)
-        self.assertTrue(origin["initial_install_origin"])
-        self.assertEqual(
-            origin["migration_plan"],
-            [
-                M0070[1],
-                M0068[1],
-                M0069[1],
-                M0071[1],
-                M0072[1],
-                M0073[1],
-                M0074[1],
-                M0075[1],
-            ],
-        )
-
-        _executor().migrate([M0068, M0070])
-        after_0068 = check_initial_install_schema_compatibility()
-        self.assertTrue(after_0068["ok"], after_0068)
-        self.assertEqual(
-            after_0068["migration_leaf_set"],
-            [f"{M0068[0]}.{M0068[1]}", f"{M0070[0]}.{M0070[1]}"],
-        )
-
-        _executor().migrate([M0069, M0070])
-        partial = check_initial_install_schema_compatibility()
-        self.assertTrue(partial["ok"], partial)
-        self.assertEqual(
-            partial["migration_leaf_set"],
-            [f"{M0069[0]}.{M0069[1]}", f"{M0070[0]}.{M0070[1]}"],
-        )
-
-        _executor().migrate([M0075])
-        final = check_initial_install_schema_compatibility()
-        self.assertTrue(final["ok"], final)
-
-    def test_ordinary_0073_ensure_migrate_complete_reaches_0075_without_marker(self):
-        _executor().migrate([M0073])
-        preflight = check_release_b_schema_compatibility(direction="forward")
-        self.assertTrue(preflight["ok"], preflight)
-        self.assertEqual(
-            preflight["migration_leaf_set"], [f"{M0073[0]}.{M0073[1]}"]
-        )
-        self.assertEqual(preflight["migration_plan"], [M0074[1], M0075[1]])
-
+    def _assert_legacy_handoff_rejected(self, *, action, expected_drift, marker=None):
+        recorded_before = MigrationRecorder(connection).applied_migrations()
+        catalog_before = collect_postgresql_catalog_contract()
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             root.chmod(0o700)
-            artifact_path = root / "preflight.json"
             marker_path = root / "restricted-recovery.json"
-            artifact = build_preflight_artifact(
-                preflight=preflight,
-                candidate_commit="a" * 40,
-                candidate_image_id="sha256:" + "b" * 64,
-                compose_file="docker-compose.prod.lowcost.yml",
-                deployment_lock_token_sha256="c" * 64,
-                artifact_path=str(artifact_path),
-                handoff_action="deploy",
-            )
-            self.assertEqual(artifact["recovery_intent_mode"], "not-required")
-            publish_preflight_artifact(path=artifact_path, payload=artifact)
+            if marker is not None:
+                publish_restricted_recovery_marker(path=marker_path, marker=marker)
+            files_before = {path.name: path.read_bytes() for path in root.iterdir()}
+            output = StringIO()
+            with CaptureQueriesContext(connection) as queries:
+                with self.assertRaisesRegex(CommandError, "Release B preflight failed"):
+                    call_command(
+                        "create_historical_calendar_release_b_handoff",
+                        output_path=str(root / "preflight.json"),
+                        candidate_commit="a" * 40,
+                        candidate_image_id="sha256:" + "b" * 64,
+                        compose_file="docker-compose.prod.lowcost.yml",
+                        deployment_lock_token_sha256="c" * 64,
+                        action=action,
+                        restricted_marker_path=str(marker_path),
+                        provenance_artifact_sha256="f" * 64 if marker is not None else "",
+                        stdout=output,
+                    )
+            result = json.loads(output.getvalue())
+            self.assertFalse(result["ok"], result)
+            self.assertTrue(result["catalog_ok"], result)
+            self.assertIn(expected_drift, result["drift_paths"])
+            self.assertEqual({path.name: path.read_bytes() for path in root.iterdir()}, files_before)
+            data_sql = "\n".join(query["sql"] for query in queries.captured_queries).upper()
+            for verb in ("INSERT INTO", "UPDATE ", "DELETE FROM", "ALTER TABLE", "CREATE TABLE", "DROP TABLE"):
+                self.assertNotIn(verb, data_sql)
+        self.assertEqual(MigrationRecorder(connection).applied_migrations(), recorded_before)
+        self.assertEqual(collect_postgresql_catalog_contract(), catalog_before)
 
-            ensure_output = StringIO()
-            call_command(
-                "ensure_historical_calendar_recovery_intent",
-                marker_path=str(marker_path),
-                artifact_path=str(artifact_path),
-                artifact_sha256=artifact["artifact_sha256"],
-                candidate_commit="a" * 40,
-                candidate_image_id="sha256:" + "b" * 64,
-                database_identity_sha256=preflight["database_identity_sha256"],
-                attempt_mode="not-required",
-                stdout=ensure_output,
-            )
-            self.assertIn('"status": "not-required"', ensure_output.getvalue())
-            self.assertFalse(marker_path.exists())
+    def test_current_release_rejects_legacy_initial_install_origins_and_prefixes(self):
+        _executor().migrate([M0067])
+        origin = check_initial_install_schema_compatibility()
+        self.assertFalse(origin["ok"], origin)
+        self.assertTrue(origin["catalog_ok"], origin)
+        self.assertTrue(origin["initial_install_origin"])
+        self.assertFalse(origin["initial_install_progress_allowed"])
+        self.assertIn("migration.initial_install_progress", origin["drift_paths"])
+        self.assertEqual(
+            origin["migration_plan"],
+            [M0070[1], M0068[1], M0069[1], M0071[1], M0072[1],
+             M0073[1], M0074[1], M0075[1], M0076[1], M0077[1], M0078[1]],
+        )
+        self.assertEqual(origin["expected_plan_for_leaf_set"], origin["migration_plan"][:-1])
 
-            _executor().migrate([M0075])
-            complete_output = StringIO()
-            call_command(
-                "complete_historical_calendar_restricted_recovery",
-                marker_path=str(marker_path),
-                artifact_path=str(artifact_path),
-                artifact_sha256=artifact["artifact_sha256"],
-                provenance_artifact_sha256=artifact["artifact_sha256"],
-                candidate_commit="a" * 40,
-                candidate_image_id="sha256:" + "b" * 64,
-                database_identity_sha256=preflight["database_identity_sha256"],
-                attempt_mode="not-required",
-                stdout=complete_output,
-            )
-            self.assertIn('"status": "not-required"', complete_output.getvalue())
-            self.assertFalse(marker_path.exists())
-            self.assertEqual(
-                check_release_b_schema_compatibility(direction="forward")[
-                    "migration_leaf_set"
-                ],
-                [f"{M0075[0]}.{M0075[1]}"],
-            )
+        for targets in ([M0068, M0070], [M0069, M0070], [M0075]):
+            with self.subTest(targets=targets):
+                _executor().migrate(targets)
+                result = check_initial_install_schema_compatibility()
+                self.assertTrue(result["catalog_ok"], result)
+                self.assertEqual(result["migration_leaf_set"], sorted(f"{app}.{name}" for app, name in targets))
+                self.assertFalse(result["ok"], result)
+                self.assertFalse(result["initial_install_progress_allowed"])
+                self.assertIn("migration.initial_install_progress", result["drift_paths"])
+                self.assertEqual(result["migration_plan"][-1], M0078[1])
+                self.assertEqual(result["expected_plan_for_leaf_set"], result["migration_plan"][:-1])
+
+    def test_current_release_rejects_0073_deploy_without_writing_handoff(self):
+        _executor().migrate([M0073])
+        preflight = check_release_b_schema_compatibility(direction="forward")
+        self.assertFalse(preflight["ok"], preflight)
+        self.assertTrue(preflight["catalog_ok"], preflight)
+        self.assertEqual(preflight["migration_leaf_set"], [f"{M0073[0]}.{M0073[1]}"])
+        self.assertEqual(preflight["migration_plan"], [M0074[1], M0075[1], M0076[1], M0077[1], M0078[1]])
+        self._assert_legacy_handoff_rejected(action="deploy", expected_drift="migration.state")
 
     def test_missing_early_dependency_record_is_structured_and_command_fails(self):
         _executor().migrate([M0070])
@@ -617,116 +579,37 @@ class MigrationHistoryRepairPostgresMigrationTests(TransactionTestCase):
                 cursor.execute(drop_index)
                 cursor.execute(restore)
 
-    def test_initial_install_empty_receipt_artifact_marker_migrate_and_atomic_completion(self):
+    def test_current_release_rejects_empty_pre0070_initial_install_before_handoff(self):
         _executor().migrate([M0067])
-        preflight = check_initial_install_schema_compatibility()
-        self.assertTrue(preflight["ok"], preflight)
-        with TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            root.chmod(0o700)
-            artifact_path = root / "preflight.json"
-            marker_path = root / "restricted-recovery.json"
-            artifact = build_preflight_artifact(
-                preflight=preflight,
-                candidate_commit="a" * 40,
-                candidate_image_id="sha256:" + "b" * 64,
-                compose_file="docker-compose.prod.lowcost.yml",
-                deployment_lock_token_sha256="c" * 64,
-                artifact_path=str(artifact_path),
-                handoff_action="initial-install",
-            )
-            publish_preflight_artifact(path=artifact_path, payload=artifact)
-            ensure_out = StringIO()
-            call_command(
-                "ensure_historical_calendar_recovery_intent",
-                marker_path=str(marker_path),
-                artifact_path=str(artifact_path),
-                artifact_sha256=artifact["artifact_sha256"],
-                candidate_commit="a" * 40,
-                candidate_image_id="sha256:" + "b" * 64,
-                database_identity_sha256=preflight["database_identity_sha256"],
-                attempt_mode="required",
-                stdout=ensure_out,
-            )
-            identity = json.loads(ensure_out.getvalue())
-            self.assertTrue(marker_path.exists())
+        self.assertNotIn("stable_horseidentityevidencecommitreceipt", connection.introspection.table_names())
+        self._assert_legacy_handoff_rejected(
+            action="initial-install", expected_drift="migration.initial_install_progress",
+        )
+        self.assertNotIn("stable_horseidentityevidencecommitreceipt", connection.introspection.table_names())
 
-            _executor().migrate([M0075])
-            self.assertEqual(collect_live_production_audit()["receipt_count"], 0)
-            complete_out = StringIO()
-            call_command(
-                "complete_historical_calendar_restricted_recovery",
-                marker_path=str(marker_path),
-                artifact_path=str(artifact_path),
-                artifact_sha256=artifact["artifact_sha256"],
-                provenance_artifact_sha256=artifact["artifact_sha256"],
-                candidate_commit="a" * 40,
-                candidate_image_id="sha256:" + "b" * 64,
-                database_identity_sha256=preflight["database_identity_sha256"],
-                attempt_mode="required",
-                expected_marker_device=identity["marker_device"],
-                expected_marker_inode=identity["marker_inode"],
-                stdout=complete_out,
-            )
-            completed = Path(json.loads(complete_out.getvalue())["completed_marker"])
-            self.assertFalse(marker_path.exists())
-            self.assertTrue(completed.exists())
-
-    def test_repair_origin_with_empty_receipts_fails_reviewed_static_completion(self):
-        _executor().migrate([M0067])
+    def test_current_release_preserves_legacy_repair_marker_when_rejecting_resume(self):
         _executor().migrate([M0070])
         preflight = check_release_b_schema_compatibility(direction="forward")
-        self.assertTrue(preflight["ok"], preflight)
-        with TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            root.chmod(0o700)
-            artifact_path = root / "preflight.json"
-            marker_path = root / "restricted-recovery.json"
-            artifact = build_preflight_artifact(
-                preflight=preflight,
-                candidate_commit="a" * 40,
-                candidate_image_id="sha256:" + "b" * 64,
-                compose_file="docker-compose.prod.lowcost.yml",
-                deployment_lock_token_sha256="c" * 64,
-                artifact_path=str(artifact_path),
-                handoff_action="forward-resume",
-            )
-            publish_preflight_artifact(path=artifact_path, payload=artifact)
-            marker = build_restricted_recovery_marker(
-                binding={
-                    "candidate_commit": "a" * 40,
-                    "candidate_image_id": "sha256:" + "b" * 64,
-                    "artifact_sha256": artifact["artifact_sha256"],
-                    "database_identity_sha256": preflight["database_identity_sha256"],
-                },
-                leaf_set=[f"{M0070[0]}.{M0070[1]}"],
-            )
-            publish_restricted_recovery_marker(path=marker_path, marker=marker)
-            info = marker_path.stat()
-            _executor().migrate([M0075])
-            output = StringIO()
-            with self.assertRaises(CommandError):
-                call_command(
-                    "complete_historical_calendar_restricted_recovery",
-                    marker_path=str(marker_path), artifact_path=str(artifact_path),
-                    artifact_sha256=artifact["artifact_sha256"],
-                    provenance_artifact_sha256=artifact["artifact_sha256"],
-                    candidate_commit="a" * 40,
-                    candidate_image_id="sha256:" + "b" * 64,
-                    database_identity_sha256=preflight["database_identity_sha256"],
-                    attempt_mode="required",
-                    expected_marker_device=info.st_dev,
-                    expected_marker_inode=info.st_ino,
-                    stdout=output,
-                )
-            payload = json.loads(output.getvalue())
-            self.assertFalse(payload["ok"])
-            self.assertIn("receipt_count", payload["production_audit_drift_fields"])
-            self.assertTrue(marker_path.exists())
+        self.assertFalse(preflight["ok"], preflight)
+        self.assertEqual(collect_live_production_audit()["receipt_count"], 0)
+        marker = build_restricted_recovery_marker(
+            binding={
+                "candidate_commit": "a" * 40,
+                "candidate_image_id": "sha256:" + "b" * 64,
+                "artifact_sha256": "f" * 64,
+                "database_identity_sha256": preflight["database_identity_sha256"],
+            },
+            leaf_set=[f"{M0070[0]}.{M0070[1]}"],
+        )
+        self._assert_legacy_handoff_rejected(
+            action="forward-resume", expected_drift="migration.state", marker=marker,
+        )
+        self.assertEqual(collect_live_production_audit()["receipt_count"], 0)
 
     def test_initial_artifact_with_repair_origin_marker_is_rejected(self):
         _executor().migrate([M0067])
         preflight = check_initial_install_schema_compatibility()
+        self.assertFalse(preflight["ok"], preflight)
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             root.chmod(0o700)
@@ -754,8 +637,16 @@ class MigrationHistoryRepairPostgresMigrationTests(TransactionTestCase):
             )
             publish_restricted_recovery_marker(path=marker_path, marker=repair_marker)
             info = marker_path.stat()
+            files_before = {path.name: path.read_bytes() for path in root.iterdir()}
             _executor().migrate([M0075])
-            with self.assertRaisesRegex(CommandError, "artifact/marker binding mismatch"):
+            trust = verify_preflight_artifact(
+                path=artifact_path, expected_artifact_sha256=artifact["artifact_sha256"],
+                expected_bindings={"recovery_intent_mode": "required"},
+            )
+            self.assertFalse(trust["ok"])
+            self.assertIn("release_0078_recovery_binding", trust["errors"])
+            recorded_before = MigrationRecorder(connection).applied_migrations()
+            with self.assertRaisesRegex(CommandError, "completion attempt mode is not artifact-bound"):
                 call_command(
                     "complete_historical_calendar_restricted_recovery",
                     marker_path=str(marker_path), artifact_path=str(artifact_path),
@@ -769,6 +660,8 @@ class MigrationHistoryRepairPostgresMigrationTests(TransactionTestCase):
                     expected_marker_inode=info.st_ino,
                 )
             self.assertTrue(marker_path.exists())
+            self.assertEqual({path.name: path.read_bytes() for path in root.iterdir()}, files_before)
+            self.assertEqual(MigrationRecorder(connection).applied_migrations(), recorded_before)
 
     def test_legacy_receipt_branch_runs_only_0068_0069_0071_and_preserves_rows(self):
         _executor().migrate([M0067])

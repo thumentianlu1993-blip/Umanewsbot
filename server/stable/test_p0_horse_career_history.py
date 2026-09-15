@@ -4,11 +4,13 @@ from datetime import date, datetime, timedelta
 
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
+
 from django.test import TestCase, TransactionTestCase
 from django.urls import reverse
 from django.utils import timezone
 
 from stable.forms import HorseProfileForm
+from stable.test_migration_database_helpers import isolated_migration_database
 from stable.models import (
     HorseCareerRecordAuthorityStatus,
     HorseCareerHistoryStatus,
@@ -669,6 +671,7 @@ class HorseCareerAuthorityMigrationTests(TransactionTestCase):
 
     def setUp(self):
         super().setUp()
+        self.enterContext(isolated_migration_database())
         executor = MigrationExecutor(connection)
         executor.migrate(self.migrate_from)
         old_apps = executor.loader.project_state(self.migrate_from).apps

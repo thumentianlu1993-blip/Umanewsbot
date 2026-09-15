@@ -156,10 +156,8 @@ class P0HorseProductionApplyPostgresTests(TransactionTestCase):
             statements.append(" ".join(sql.split()))
             return execute(sql, params, many, context)
 
-        with mock.patch(
-            "stable.services.p0_horse_production_apply."
-            "TRUSTED_P0_HORSE_PRODUCTION_RELEASE_MANIFEST_SHA256",
-            (release_sha,),
+        with self.helper._validated_release_for_business_tests(
+            release_path, release_sha,
         ), connection.execute_wrapper(capture_sql):
             commit_reviewed_p0_completion_artifact(
                 artifact_path=artifact_path,
@@ -307,10 +305,8 @@ class P0HorseProductionApplyPostgresTests(TransactionTestCase):
         holder_thread.start()
         self.assertTrue(lock_ready.wait(timeout=10))
         try:
-            with mock.patch(
-                "stable.services.p0_horse_production_apply."
-                "TRUSTED_P0_HORSE_PRODUCTION_RELEASE_MANIFEST_SHA256",
-                (release_sha,),
+            with self.helper._validated_release_for_business_tests(
+                release_path, release_sha,
             ), self.assertRaises(OperationalError):
                 commit_reviewed_p0_completion_artifact(
                     artifact_path=artifact_path,
@@ -368,10 +364,8 @@ class P0HorseProductionApplyPostgresTests(TransactionTestCase):
             finally:
                 close_old_connections()
 
-        with mock.patch(
-            "stable.services.p0_horse_production_apply."
-            "TRUSTED_P0_HORSE_PRODUCTION_RELEASE_MANIFEST_SHA256",
-            (release_sha,),
+        with self.helper._validated_release_for_business_tests(
+            release_path, release_sha,
         ):
             threads = [threading.Thread(target=worker) for _ in range(2)]
             for thread in threads:
@@ -404,10 +398,8 @@ class P0HorseProductionApplyPostgresTests(TransactionTestCase):
             first_row_state_before_failure.update(self._apply_business_counts())
             raise RuntimeError("postgres rollback probe")
 
-        with mock.patch(
-            "stable.services.p0_horse_production_apply."
-            "TRUSTED_P0_HORSE_PRODUCTION_RELEASE_MANIFEST_SHA256",
-            (release_sha,),
+        with self.helper._validated_release_for_business_tests(
+            release_path, release_sha,
         ), mock.patch(
             "stable.services.p0_horse_production_apply._apply_artifact_row",
             side_effect=apply_first_row_then_fail_second,
@@ -449,10 +441,8 @@ class P0HorseProductionApplyPostgresTests(TransactionTestCase):
             state_after_log_create.update(self._apply_business_counts())
             raise RuntimeError("post-log rollback probe")
 
-        with mock.patch(
-            "stable.services.p0_horse_production_apply."
-            "TRUSTED_P0_HORSE_PRODUCTION_RELEASE_MANIFEST_SHA256",
-            (release_sha,),
+        with self.helper._validated_release_for_business_tests(
+            release_path, release_sha,
         ), mock.patch(
             "stable.services.p0_horse_production_apply."
             "_after_task_execution_log_created_for_test",

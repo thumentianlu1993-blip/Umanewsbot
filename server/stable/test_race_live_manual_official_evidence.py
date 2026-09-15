@@ -19,6 +19,7 @@ from django.core.management.base import CommandError
 from django.db import (
     DatabaseError,
     IntegrityError,
+    OperationalError,
     close_old_connections,
     connection,
     connections,
@@ -32,6 +33,7 @@ from stable.services.race_live_manual_official_evidence import (
     apply_race_live_manual_official_evidence,
     load_race_live_manual_official_evidence,
     prepare_race_live_manual_official_evidence,
+    publish_authorized_staged_official_revision,
 )
 from stable.services.race_live_publication_transition import (
     RaceLivePublicationTransitionError,
@@ -300,6 +302,21 @@ class RaceLiveManualOfficialEvidenceTests(
             enabled=True,
             version=2,
         )
+        policy = race_events.resolve_race_live_publication_policy(
+            event_id=other_event.pk,
+            source_identity_id=source.pk,
+            now=self.NOW,
+        )
+        self.assertTrue(policy.allowed)
+        models.RaceEventRevisionPublication.objects.create(
+            revision=result,
+            published_at=result.published_at,
+            reason="shadow_promotion",
+            policy_versions=[list(row) for row in policy.policy_versions],
+            allowlist_version=policy.allowlist_version,
+            registry_digest=policy.registry_digest,
+            coverage_proof_digest=policy.coverage_proof_digest,
+        )
         incident = models.RaceLiveOfficialVerificationIncident.objects.create(
             event=other_event,
             provisional_revision=result,
@@ -320,6 +337,44 @@ class RaceLiveManualOfficialEvidenceTests(
             result.pk,
         )
         return other_event, result, incident
+
+    def test_other_event_published_fixture_satisfies_publication_constraints(self):
+        self._promote()
+        _, revision, _ = self._create_other_event_open_incident()
+        publication = models.RaceEventRevisionPublication.objects.get(
+            revision=revision,
+        )
+        self.assertEqual(publication.published_at, revision.published_at)
+        self.assertEqual(publication.authorization_kind, "provisional_policy")
+        connection.check_constraints()
+
+    def test_latest_staged_revision_without_observation_does_not_fall_back(self):
+        for revision_no, observation in ((2, self.observation), (3, None)):
+            models.RaceEventRevision.objects.create(
+                event=self.event,
+                kind=models.RaceEventRevisionKind.RESULT,
+                revision_no=revision_no,
+                phase=models.RaceResultPhase.OFFICIAL,
+                content_sha256=str(revision_no) * 64,
+                primary_observation=observation,
+            )
+        with patch(
+            "stable.services.race_live_manual_official_evidence."
+            "_publish_official_revision_if_authorized"
+        ) as publisher:
+            with self.assertRaisesRegex(
+                RaceLiveManualOfficialEvidenceError,
+                "不存在待发布的 official/corrected revision",
+            ):
+                publish_authorized_staged_official_revision(
+                    event_id=self.event.pk, now=self.NOW,
+                )
+        publisher.assert_not_called()
+        self.assertFalse(models.RaceEventRevisionPublication.objects.exists())
+        self.control.refresh_from_db()
+        self.assertEqual(
+            self.control.current_result_revision_id, self.result_revision.pk,
+        )
 
     def test_apply_accepts_another_event_with_a_complete_matching_open_incident(self):
         self._promote()
@@ -1256,6 +1311,80 @@ class RaceLiveManualOfficialEvidencePostgresTests(TransactionTestCase):
     _promote = RaceLiveManualOfficialEvidenceTests._promote
     _submission = RaceLiveManualOfficialEvidenceTests._submission
     _receipt = RaceLiveManualOfficialEvidenceTests._receipt
+
+    def test_staged_publication_locks_revision_observation_and_source_until_exit(self):
+        observation = models.RaceResultObservation.objects.create(
+            source_identity=self.source,
+            observed_at=self.NOW,
+            parser_version="lock-regression",
+            raw_sha256="7" * 64,
+            normalized_sha256="8" * 64,
+            result_phase=models.RaceResultPhase.OFFICIAL,
+        )
+        revision = models.RaceEventRevision.objects.create(
+            event=self.event,
+            kind=models.RaceEventRevisionKind.RESULT,
+            revision_no=2,
+            phase=models.RaceResultPhase.OFFICIAL,
+            content_sha256="8" * 64,
+            primary_observation=observation,
+        )
+        rows = (
+            (models.RaceEventRevision, revision.pk),
+            (models.RaceResultObservation, observation.pk),
+            (models.RaceResultSourceIdentity, self.source.pk),
+        )
+
+        def probe_locks():
+            outcomes = []
+            close_old_connections()
+            try:
+                for model, row_id in rows:
+                    try:
+                        with transaction.atomic():
+                            model.objects.select_for_update(nowait=True).get(
+                                pk=row_id,
+                            )
+                    except OperationalError as exc:
+                        cause = exc.__cause__
+                        outcomes.append(
+                            getattr(cause, "sqlstate", None)
+                            or getattr(cause, "pgcode", None)
+                        )
+                    else:
+                        outcomes.append("acquired")
+            finally:
+                connections.close_all()
+            return outcomes
+
+        with ThreadPoolExecutor(max_workers=1) as inspector:
+            def deny_after_lock_check(**kwargs):
+                self.assertEqual(kwargs["revision"].pk, revision.pk)
+                self.assertEqual(kwargs["observation"].pk, observation.pk)
+                self.assertEqual(
+                    inspector.submit(probe_locks).result(timeout=10),
+                    ["55P03"] * 3,
+                )
+                return False
+
+            with patch(
+                "stable.services.race_live_manual_official_evidence."
+                "_publish_official_revision_if_authorized",
+                side_effect=deny_after_lock_check,
+            ) as publisher:
+                with self.assertRaisesRegex(
+                    RaceLiveManualOfficialEvidenceError,
+                    "official authorization 或 coarse policy 不可用",
+                ):
+                    publish_authorized_staged_official_revision(
+                        event_id=self.event.pk, now=self.NOW,
+                    )
+            publisher.assert_called_once()
+            self.assertEqual(
+                inspector.submit(probe_locks).result(timeout=10),
+                ["acquired"] * 3,
+            )
+        self.assertFalse(models.RaceEventRevisionPublication.objects.exists())
 
     def test_concurrent_distinct_unavailable_receipts_share_one_durable_intent(self):
         _, incident = self._promote()

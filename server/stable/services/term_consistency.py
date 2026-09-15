@@ -391,9 +391,13 @@ def resolve_term_occurrences(
         runner_names = _article_runner_names(article) if article else set()
 
     normalized_text = _nfkc(text)
-    # Collect all aliases for the given source language, sorted by length desc
+    normalized_lower = normalized_text.casefold()
+    # Discard absent surfaces before filtering entries and sorting matches.
+    # Batch scans reuse a large index, but each field contains few aliases.
     lang_entries: dict[str, list[dict]] = {}
     for key, entries in surface_index.items():
+        if key not in normalized_lower:
+            continue
         matching = [e for e in entries if e["source_language"] == source_language and e.get("is_active")]
         if matching:
             lang_entries[key] = matching
@@ -401,14 +405,8 @@ def resolve_term_occurrences(
     seen_spans: set[tuple[int, int]] = set()
     suggested_tags: set[str] = set()
 
-    # Pre-compute text for fast substring check (avoids regex when surface not present)
-    normalized_lower = normalized_text.casefold()
-
     # Sort by length desc so longer matches take priority
     for surface_cf, entries in sorted(lang_entries.items(), key=lambda x: -len(x[0])):
-        # Fast path: skip surfaces not present in text
-        if surface_cf not in normalized_lower:
-            continue
         # Find all occurrences in text
         for match in re.finditer(re.escape(surface_cf), normalized_text, re.IGNORECASE):
             start, end = match.start(), match.end()

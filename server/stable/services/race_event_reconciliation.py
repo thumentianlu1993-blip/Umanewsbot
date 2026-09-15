@@ -30,6 +30,7 @@ from stable.models import (
     RaceEventResult,
     RaceEventRunner,
     RaceEventStatus,
+    RaceSeries,
 )
 from stable.services.race_event_years import event_edition_year
 
@@ -428,6 +429,26 @@ def adopt_existing_race_event_for_target(
         )
 
 
+def _lock_race_events(event_ids: Iterable[int]) -> dict[int, RaceEvent]:
+    # Nullable joins cannot be locked by PostgreSQL. Lock the event and series
+    # rows separately, keeping both identities stable until the caller commits.
+    events = {
+        event.pk: event
+        for event in RaceEvent.objects.select_for_update()
+        .filter(pk__in=event_ids)
+        .order_by("pk")
+    }
+    series = {
+        row.pk: row
+        for row in RaceSeries.objects.select_for_update()
+        .filter(pk__in={event.race_series_id for event in events.values() if event.race_series_id})
+        .order_by("pk")
+    }
+    for event in events.values():
+        event.race_series = series[event.race_series_id] if event.race_series_id else None
+    return events
+
+
 def _adopt_existing_race_event_for_target(
     *,
     target_id: int,
@@ -439,9 +460,11 @@ def _adopt_existing_race_event_for_target(
 ) -> dict[str, Any]:
         target = (
             HistoricalRaceEventTarget.objects.select_for_update()
-            .select_related("race_series", "event", "event__race_series")
+            .select_related("race_series")
             .get(pk=target_id)
         )
+        if target.event_id:
+            target.event = _lock_race_events([target.event_id])[target.event_id]
         current_target_identity = target_identity(target)
         if expected_target_sha256 and current_target_identity["sha256"] != expected_target_sha256:
             raise RaceEventReconciliationError(f"target identity drift: {target_id}")
@@ -457,7 +480,7 @@ def _adopt_existing_race_event_for_target(
         event_id = int(classification["event_id"])
         if expected_event_id and event_id != expected_event_id:
             raise RaceEventReconciliationError(f"candidate event drift: {target_id}")
-        event = RaceEvent.objects.select_for_update().select_related("race_series").get(pk=event_id)
+        event = _lock_race_events([event_id])[event_id]
         current_event_identity = event_identity(event)
         if expected_event_sha256 and current_event_identity["sha256"] != expected_event_sha256:
             raise RaceEventReconciliationError(f"event identity drift: {event_id}")
@@ -1076,13 +1099,7 @@ def rollback_race_event_coverage_reconciliation(
             .filter(pk__in=target_ids)
             .order_by("pk")
         }
-        events = {
-            event.pk: event
-            for event in RaceEvent.objects.select_for_update()
-            .select_related("race_series")
-            .filter(pk__in=event_ids)
-            .order_by("pk")
-        }
+        events = _lock_race_events(event_ids)
         if len(targets) != len(set(target_ids)) or len(events) != len(set(event_ids)):
             raise RaceEventReconciliationError("rollback ledger row no longer exists")
         for row in rows:

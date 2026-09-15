@@ -1,5 +1,14 @@
 # 部署运行手册
 
+## 2026-09-10 PR #194 发布完成与自然赛时验收
+
+- 用户已批准固定发布包，#194 合并为 `ced88882152729c8e31a9cddb5fd83094e30d196`，生产部署固定候选 `51a46c379d39efcea75b7e96cff8cdb3b1dece77`，于 `2026-09-10T05:23:06.346895+00:00` 通过部署复验。四应用版本一致，Web healthy，两个 worker 响应，0078 空迁移计划；配置、开关和持久挂载保持，旧 `race_live=7543` 未消费。DB、Redis、OneBot、Nginx 容器保持，Nginx 已重载；956 七组业务摘要一致，双域名 755/756/757/956 分别 11/6/7/10 行。截至 `2026-09-10 05:35 UTC`，962/963 均已由自然同步补齐为英国当地 15:00/15:35（北京时间 22:00/22:35），双域名四页一致。原拒绝审计保留，同 observation 分别只新增一次 applied；两场后续相同来源内容的 race_time 同步均成功且未重复写入。本次赛时显示及重放验收通过；未强制抓取或手工回填，M2 正式赛果/公开/correction 整体验收仍未完成。
+- 镜像：`sha256:fc2913eb4c70845d05c163512621b11b81453f8aa38f0c83ae74d9422069d607`；实际工作目录 `/opt/umanews-release-51a46c37-PR194-20260910/umanewsbot`。隔离镜像版本验证与既有测试通过；生产 release 仍使用原 0078 协调入口。
+- 首次停服前生成并核验本发布专属 custom-format 备份、manifest 和 intent；same-schema 完成凭据已核验，active pointer、部署锁和 restricted recovery 标记均清理。未恢复数据库或清理历史资源。
+- 本地及服务器发布目录中的 `verification.json`、`deploy-result.json` 保存候选、镜像、备份路径及摘要、intent/manifest/receipt/complete 摘要；本地 `pr194-release-package.md` 是用户批准的固定包，包文件保留批准前文本，实际审批和执行结果另存 `delivery.json`。
+- `probe-local-start-times-pr194.py` 只读收集 962/963、519/567 原拒绝审计、race_time checkpoint 和双域名时间；自然重放须用前后 checkpoint/同 observation 审计判断。初次部署快照的自然验收 pending 按当时事实保留；05:35 后续通过证据为本地 `natural-time-20260910T053520Z.json` 和 `natural-time-acceptance.json`。若后续生产问题需要恢复，使用本发布实际 SHA 绑定的意图续跑，不选择“最新文件”或普通代码 rollback。
+
+
 ## 2026-09-09 PR #184 实际发布与交接
 
 - [PR #184](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/184) 合并 commit `6db64d379b597c76b94d381ac4464c5530daaae5`；固定部署候选 `69955960b91ed5ec33ce1a57a7834468bec0ca14`，tree `84867ba5745044d6a0ac14e88daf968143eab34e`，于 `2026-09-09 07:10:43 UTC` 完成。当前 checkout：`/opt/umanews-release-69955960-PR184-20260909/umanewsbot`；Compose project `umanewsbot`，配置文件 `docker-compose.prod.lowcost.yml`。
