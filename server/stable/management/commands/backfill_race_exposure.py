@@ -107,7 +107,14 @@ class Command(BaseCommand):
         Low-confidence auto links are included in the scan but dropped by
         ``_resolve_identity`` (confidence threshold), so the manifest only
         contains entries whose identity actually resolves.
+
+        Slot allocation per event mirrors the live two-slot policy: the
+        chronologically first article gets slot 1 (active); the second gets
+        slot 2 (active) only when its classified angle differs from slot 1's
+        (neither may be ``other``); everything else is ``suppressed``.
         """
+        from stable.services.race_news_exposure import classify_angle
+
         stdout = stdout or self.stdout
         articles = NewsArticle.objects.filter(
             workflow_status="published",
@@ -121,9 +128,9 @@ class Command(BaseCommand):
         if limit > 0:
             articles = articles[:limit]
 
-        manifest: list[dict[str, Any]] = []
+        # Resolve identity per article and group by event
+        by_event: dict[int, list[tuple[NewsArticle, RaceEvent]]] = {}
         seen: set[tuple[int, int]] = set()  # (article_id, event_id) uniqueness
-
         for article in articles:
             try:
                 identity = self._resolve_identity(article)
@@ -137,21 +144,42 @@ class Command(BaseCommand):
             if key in seen:
                 continue
             seen.add(key)
+            event = RaceEvent.objects.filter(pk=event_id).first()
+            if event is None:
+                continue
+            by_event.setdefault(event_id, []).append((article, event))
 
-            # Suggest slot 1 for comprehensive_result angle
-            suggested_angle = "comprehensive_result"
-            suggested_slot = 1
-            suggested_reason = "historical_backfill"
-
-            manifest.append({
-                "article_id": article.id,
-                "event_id": event_id,
-                "slot": suggested_slot,
-                "angle": suggested_angle,
-                "reason": suggested_reason,
-                "channel": "homepage",
-                "scope_key": "site",
-            })
+        manifest: list[dict[str, Any]] = []
+        for event_id in sorted(by_event):
+            pairs = by_event[event_id]
+            # Chronological order mirrors live arrival: earliest article is
+            # the natural slot 1.
+            pairs.sort(key=lambda p: (p[0].published_at or timezone.now(), p[0].id))
+            event = pairs[0][1]
+            slot1_angle: str | None = None
+            slot2_taken = False
+            for article, _event in pairs:
+                angle = classify_angle(article=article, event=event)["angle"]
+                activated = (article.published_at or timezone.now()).isoformat()
+                if slot1_angle is None:
+                    slot, status, reason = 1, "active", "historical_backfill"
+                    slot1_angle = angle
+                elif not slot2_taken and angle != "other" and slot1_angle != "other" and angle != slot1_angle:
+                    slot, status, reason = 2, "active", "historical_backfill"
+                    slot2_taken = True
+                else:
+                    slot, status, reason = 2, "suppressed", "historical_backfill_overflow"
+                manifest.append({
+                    "article_id": article.id,
+                    "event_id": event_id,
+                    "slot": slot,
+                    "status": status,
+                    "angle": angle,
+                    "reason": reason,
+                    "channel": "homepage",
+                    "scope_key": "site",
+                    "activated_at": activated,
+                })
 
         # Compute manifest digest
         manifest_bytes = json.dumps(manifest, sort_keys=True, ensure_ascii=False).encode("utf-8")
@@ -260,6 +288,15 @@ class Command(BaseCommand):
                     channel = entry.get("channel", "homepage")
                     scope_key = entry.get("scope_key", "site")
                     reason = entry.get("reason", "historical_backfill")
+                    status = entry.get("status", RaceNewsExposureStatus.ACTIVE)
+                    activated_at = None
+                    raw_activated = entry.get("activated_at")
+                    if raw_activated:
+                        try:
+                            from datetime import datetime as _dt
+                            activated_at = _dt.fromisoformat(raw_activated)
+                        except (TypeError, ValueError):
+                            activated_at = None
 
                     article = NewsArticle.objects.get(pk=article_id)
                     event = RaceEvent.objects.get(pk=event_id)
@@ -276,11 +313,11 @@ class Command(BaseCommand):
                         scope_key=scope_key,
                         slot=slot,
                         defaults={
-                            "status": RaceNewsExposureStatus.ACTIVE,
+                            "status": status,
                             "angle": angle,
                             "policy_version": "backfill-v1",
                             "reason": reason,
-                            "activated_at": timezone.now(),
+                            "activated_at": activated_at if status == RaceNewsExposureStatus.ACTIVE else None,
                         },
                     )
                     if created:
