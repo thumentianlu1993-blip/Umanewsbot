@@ -1,8 +1,12 @@
 # 当前状态
 
-## 2026-09-17 赛事区代码与定向验收完成，最终测试提交按 PR 检查交付
+## 2026-09-18 赛事区修复达到交付标准，未合并或部署
 
-用户已要求测试先行并实现至发版水平。主线程完成赛果证据回退、D−4 三档发现、JRA 候选展示、权限与租约、状态/筛选/时区修复。固定只读代码 reviewer 核心两轮、精确身份修复两轮、详情状态增量一轮及全量相关测试合同两轮均 APPROVED；257 项核心定向测试及 7 项身份修复测试在隔离 PostgreSQL 通过（核心 SQLite 跳 1 个 PG 专属测试）。829/104 修复入口仅准备为 SHA 绑定发布包，默认 dry-run，保留既有有效别名元数据且整批事务回滚。随后浏览器发现详情基础资料仍显示原始状态，新增两场景先 RED 后修复，状态模块 12 项 PG 通过（合计 265 个不同定向用例）。全量对照暴露的旧正式结果断言已复现并按批准口径修正，保留暂定明细及关闭权限保护，扩展 68 项 PG 全过。Linux 完整候选 5,012 项仍保留原 45 个失败，另 1 个 canonical 详情旧文案断言已真实 RED 后仅改测试文字，相关完整模块 19 项 PG 全过。应用版本保持不变，最终测试提交以 PR 同 HEAD 完整 CI 为准；不将定向修正改写为旧构件全绿。生产只读重查仍为 9a88243f，79 场历史缺口已冻结，正式赛果补齐数量为 0。未合并、未部署、未写生产数据；新 JRA 开关默认关闭。完整计数、构件及修正边界见 [验证记录](changes/fix-race-section-gaps/validation.md)。详情见 [代码审核](changes/fix-race-section-gaps/CODE_REVIEW.md) 与 [发布/数据边界](changes/fix-race-section-gaps/rollout.md)。
+主线程按测试先行完成正式赛果证据回退、D−4 起 3h / 1h / 10min 发现、JRA 候选及 TRA 接管、状态/筛选/双时区和 104/829 身份修复入口；固定只读子代理七轮审核返修后 APPROVED。核心与身份 264 项 PostgreSQL 全过，详情增量 12 项、相关旧合同 68 项、最终文案与 canonical 页面 19 项均通过，测试集合有重叠不相加。
+
+最终候选 `d0bb40fb` 的 [Linux/PG16 CI](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/35242927242) 完整运行 5,012 项，16 failures / 29 errors / 20 skipped；45 个失败 ID 与当前主线同应用的 Linux 参考完全一致，相对固定历史基线也无新增。45 项发布合同、Django check、空迁移计划及前后指纹通过。既有失败未清零，不称全套全绿；证据见 [验证记录](changes/fix-race-section-gaps/validation.md) 和 [代码审核](changes/fix-race-section-gaps/CODE_REVIEW.md)。后续仅文档提交，发布仍固定已测代码 SHA。
+
+[PR #203](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/203) 与 [精确发布包](changes/fix-race-section-gaps/rollout.md) 已准备：无迁移，新 JRA 开关保持 false，仅包含 SHA 绑定的 104/829 名称及别名修复，不含历史赛果批量回补或 JRA 启用。79 场历史缺口只冻结清单，正式结果补齐 0；截至 9 月 17 日只读现场仍为 9a88243f。本次未合并、未部署、未写生产数据，实际交付遵守根 AGENTS.md。
 
 ## 2026-09-17 赛事区修复计划经固定子代理两轮审核通过（未实施）
 

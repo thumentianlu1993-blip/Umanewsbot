@@ -18,7 +18,7 @@ JRA 的目录共享、成功 URL 持久复用和接管停止查询是必需条�
 
 ## 精确交付选择
 
-候选为 [PR #203](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/203)，代码与测试绑定 `3a47a22d45b19cfc4061b2450b25f6167f56b4eb`。后续仅更正一条测试的旧状态文案及补充验证文档，不替换已测试应用 SHA；交付前核对应用与配置 blob 无差异，并核验 PR 最新测试提交的 CI。遵守根 AGENTS.md 的 G2：必要测试、独立审核与 CI 完成后，用户选择只合并，或合并并发布该固定代码 SHA。
+候选为 [PR #203](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/203)，代码与测试绑定 `d0bb40fb8defe3e9de1029aa255edd2e06e1e0c6`，完整 Linux 5,012 项无新增失败，45 项发布合同通过，原有 45 项失败明确保留。后续交接提交仅包含 docs，不替换该已验证 SHA；交付前核对所有应用、测试与配置 blob 无差异。遵守根 AGENTS.md 的 G2：必要测试、独立审核与 CI 完成后，用户选择只合并，或合并并发布该固定代码 SHA。
 
 代码发布包：
 

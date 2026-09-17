@@ -55,3 +55,7 @@
 ## 第七轮 APPROVED
 
 `3a47a22d` 的完整 Linux 5,012 项仅比当前主线同代码参考多出一条旧文案断言：canonical 详情基础资料统一为“已完赛”，旧测试仍要求“已结束”。本地先复现 1 项 RED，仅改该断言文字，相关 canonical 页面和状态模块 19 项 PostgreSQL 全过。原 reviewer 确认冠军、finished 筛选、去重等保护全部保留，应用与配置未变，增量审核 APPROVED。旧完整构件仍记为 17 failures / 29 errors / 20 skipped，不倒改计数；最后测试提交重新走完整 CI。
+
+## 最终完整构件复核
+
+同一 reviewer 独立读取 `d0bb40fb8defe3e9de1029aa255edd2e06e1e0c6` 的原始 Linux 构件并逐 ID 比较：5,012 项，16 failures / 29 errors / 20 skipped，45 个失败与当前主线 Linux 参考完全相同，相对本轮历史基线也无新增。45 项发布合同、Django check、迁移检查及前后指纹通过；相对 `3a47a22d` 只有已审一行测试文案和文档差异。最终 VERDICT APPROVED，可将 G2 发布包绑定该完整 SHA；不声称全量全绿，不替代生产验收。

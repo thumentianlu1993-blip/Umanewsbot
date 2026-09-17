@@ -2,7 +2,7 @@
 
 ## 2026-09-17 赛事区代码发布与 JRA 独立停用
 
-本次新增唯一默认关闭配置 `RACE_DATA_SYNC_JRA_PRE_RACE_ENABLED`，settings、env示例及两份生产Compose均显式传递。无迁移，发布前后按既有0078合同验证，且先检查活跃马匹采集/生产锁。JRA停用必须让worker/Web实际重载false并退出旧在途任务；只改.env不算完成。精确发布包可包含已冻结的829/104两条身份修复，不包含历史赛果批量写入或JRA启用。应用代码绑定 `3a47a22d`，后续测试/文档提交不改变应用；完整测试与构件口径见 [验证记录](changes/fix-race-section-gaps/validation.md)，实际交付仍核验 PR 最新 CI。精确操作范围、容量和数据缺口见 [rollout](changes/fix-race-section-gaps/rollout.md)，通用授权只引用根AGENTS.md。
+本次新增唯一默认关闭配置 `RACE_DATA_SYNC_JRA_PRE_RACE_ENABLED`，settings、env示例及两份生产Compose均显式传递。无迁移，发布前后按既有0078合同验证，且先检查活跃马匹采集/生产锁。JRA停用必须让worker/Web实际重载false并退出旧在途任务；只改.env不算完成。精确发布包可包含已冻结的829/104两条身份修复，不包含历史赛果批量写入或JRA启用。应用与测试绑定 `d0bb40fb`，后续交接仅改文档；完整 Linux 5,012 项无新增失败、45 项发布合同通过，原有 45 项失败仍保留；完整测试与构件口径见 [验证记录](changes/fix-race-section-gaps/validation.md)，实际交付仍核验固定 SHA 的 CI 与后续纯文档差异。精确操作范围、容量和数据缺口见 [rollout](changes/fix-race-section-gaps/rollout.md)，通用授权只引用根AGENTS.md。
 
 ## 2026-09-17 赛事修复的后续操作计划
 

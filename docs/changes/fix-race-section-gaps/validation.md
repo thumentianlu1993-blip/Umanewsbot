@@ -1,6 +1,14 @@
 # 实施验证记录
 
-最终代码与测试候选：`3a47a22d45b19cfc4061b2450b25f6167f56b4eb`（应用与 `939d07edccce6702bcb6c96243e073bac0e60295` 一致，后续仅修正测试合同），PR [#203](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/203)。隔离 worktree 与分支不改动用户原工作区。
+前一完整候选：`3a47a22d45b19cfc4061b2450b25f6167f56b4eb`（应用与 `939d07edccce6702bcb6c96243e073bac0e60295` 一致，后续仅修正测试合同），PR [#203](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/203)。隔离 worktree 与分支不改动用户原工作区。
+
+## 2026-09-18 最终候选验收
+
+最终代码与测试提交为 `d0bb40fb8defe3e9de1029aa255edd2e06e1e0c6`，[完整 CI](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/35242927242) 的三个测试作业已完成并上传构件。候选 5,012 tests / 16 failures / 29 errors / 20 skipped，耗时 2002.034s，45 个不同失败 ID 与当前主线同应用 Linux 参考完全相同；相对本轮固定历史基线也无新增失败。此前旧文案断言已消失。不是全套全绿，未删除或忽略原有 45 项失败。
+
+同一提交的 45 项发布合同全过（484.649s），Django check 正常、迁移无变化，前后指纹均为 `ef832c7ac3fad1d2c6708deed7b0d77eb9d9c8b5e41643468f6514474ed74234`。完整计数、失败 ID 与原始 result.json SHA 见 [最终 CI 摘要](evidence/ci_final_summary.json)。本机逐 ID 比较已通过，GitHub 工作流整体状态以该 run 页面为准，不拿作业状态代替业务或生产验收。
+
+此后交接提交只更新 docs，不替换已验证应用/测试 SHA。发布绑定上述 `d0bb40fb`；应用与上一候选 `3a47a22d` 完全一致，变化仅为一条已审核测试文案和文档。生产仍未合并、部署或写入。
 
 ## 测试与独立审核
 

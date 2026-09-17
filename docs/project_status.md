@@ -1,8 +1,8 @@
 # 项目状态文档
 
-## 2026-09-17 赛事区修复进入交付验证
+## 2026-09-18 赛事区修复完成验证，待交付
 
-赛事区修复及两条身份修复包已实现，经固定子代理七轮代码审核通过；257 项核心与 7 项身份修复 PG 测试通过，另修复浏览器发现的详情状态不一致，增量模块 12 项 PG 通过，全量涉及的旧测试合同已复现并修正，扩展 68 项 PG 全过，Linux 完整候选 5,012 项保留原 45 个失败，另 1 条详情旧文案断言已修正，相关完整模块 19 项 PG 全过；最终测试提交按 PR 同 HEAD CI 验收。历史79场只有冻结清单，尚未恢复赛果；JRA新功能默认关闭，尚未上线。以 [当前状态](current_state.md) 和 [发布包](changes/fix-race-section-gaps/rollout.md) 为准。
+[PR #203](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/203) 经测试先行、主线程修复及固定子代理七轮审核收口。候选 `d0bb40fb` 的 Linux 全量 5,012 项无新增失败，保留与主线参考相同的 45 个旧失败；45 项发布合同及相关定向回归通过。无迁移，JRA 默认关闭；两条身份修复按精确 manifest 交付，历史 79 场尚未恢复赛果。未合并或上线，以 [当前状态](current_state.md)、[验证记录](changes/fix-race-section-gaps/validation.md) 和 [发布包](changes/fix-race-section-gaps/rollout.md) 为准。
 
 ## 2026-09-17 赛事区修复计划形成
 
