@@ -162,7 +162,7 @@ class RaceResultRecoveryPublicPageTests(TestCase):
         self.assertContains(calendar, "已恢复赛事")
         self.assertContains(calendar, "冠军 Official Recovery Winner")
         self.assertNotContains(calendar, "不应展示的重复赛事")
-        self.assertContains(detail, "已结束")
+        self.assertContains(detail, "已完赛")
         self.assertContains(detail, "WINNER · 冠军")
         self.assertContains(detail, "Official Recovery Winner")
 

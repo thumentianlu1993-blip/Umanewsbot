@@ -1,6 +1,6 @@
 # 代码审核与修复记录
 
-本需求由主线程编写测试、实现与修复；固定只读 reviewer `race_code_reviewer` 六轮审核：核心代码两轮，补充的两条身份修复入口两轮，浏览器发现的详情状态遗漏一轮，全量结果相关测试合同一轮。
+本需求由主线程编写测试、实现与修复；固定只读 reviewer `race_code_reviewer` 七轮审核：核心代码两轮，补充的两条身份修复入口两轮，浏览器发现的详情状态遗漏一轮，全量结果相关测试合同一轮、最终完整构件的旧状态文字一轮。
 方案仍绑定 PLAN.md 的批准 SHA，不改写历史计划的“未实施”时间点叙述。
 
 ## 第一轮 REVISE
@@ -47,3 +47,11 @@
 仅调整测试合同，不更改应用：分页补 45 条 confirmed 赛果，保留所有 filter/第二页 5 条断言；暂定明细继续验证公开，hero/日历不显示正式冠军；授权关闭明确断言 top_results 清空；official/corrected 增加冠军正向断言。先在 PostgreSQL 得到 5 tests / 5 failures，再运行相关完整模块 68 项全过。
 
 同一 reviewer 独立确认未弱化保护且符合已批准口径，VERDICT APPROVED。前后指纹一致：`fb9f4ec67adc1ba1f0813b055a176bdd8324a8c4ead419582cb3cda6b67c2479`。最终全量 CI 仍须完成，不能把旧候选全量失败解释为最终候选结果。
+
+## 交付包一致性复核
+
+同一只读 reviewer 复核最终代码与 rollout、validation、审核记录：JRA 默认关闭、已授权暂定明细与正式冠军分离、仅 104/829 身份动作、历史 79 场恢复数为 0、固定代码 SHA 与后续文档提交关系均一致，无影响发布决策的实质遗漏。此轮仅核对文件，不重跑测试；最终 CI 结果以 validation.md 为准。
+
+## 第七轮 APPROVED
+
+`3a47a22d` 的完整 Linux 5,012 项仅比当前主线同代码参考多出一条旧文案断言：canonical 详情基础资料统一为“已完赛”，旧测试仍要求“已结束”。本地先复现 1 项 RED，仅改该断言文字，相关 canonical 页面和状态模块 19 项 PostgreSQL 全过。原 reviewer 确认冠军、finished 筛选、去重等保护全部保留，应用与配置未变，增量审核 APPROVED。旧完整构件仍记为 17 failures / 29 errors / 20 skipped，不倒改计数；最后测试提交重新走完整 CI。

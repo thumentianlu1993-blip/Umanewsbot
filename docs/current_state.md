@@ -1,8 +1,8 @@
 # 当前状态
 
-## 2026-09-17 赛事区代码完成六轮独立审核，等待最终 CI 与交付
+## 2026-09-17 赛事区代码与定向验收完成，最终测试提交按 PR 检查交付
 
-用户已要求测试先行并实现至发版水平。主线程完成赛果证据回退、D−4 三档发现、JRA 候选展示、权限与租约、状态/筛选/时区修复。固定只读代码 reviewer 核心两轮、精确身份修复两轮、详情状态增量一轮及全量相关测试合同一轮均 APPROVED；257 项核心定向测试及 7 项身份修复测试在隔离 PostgreSQL 通过（核心 SQLite 跳 1 个 PG 专属测试）。829/104 修复入口仅准备为 SHA 绑定发布包，默认 dry-run，保留既有有效别名元数据且整批事务回滚。随后浏览器发现详情基础资料仍显示原始状态，新增两场景先 RED 后修复，状态模块 12 项 PG 通过（合计 265 个不同定向用例）。全量对照暴露的旧正式结果断言已复现并按批准口径修正，保留暂定明细及关闭权限保护，扩展 68 项 PG 全过。最终 Linux CI 继续验证，不把原失败视为绿色基线。生产只读重查仍为 9a88243f，79 场历史缺口已冻结，正式赛果补齐数量为 0。未合并、未部署、未写生产数据；新 JRA 开关默认关闭。详情见 [代码审核](changes/fix-race-section-gaps/CODE_REVIEW.md) 与 [发布/数据边界](changes/fix-race-section-gaps/rollout.md)。
+用户已要求测试先行并实现至发版水平。主线程完成赛果证据回退、D−4 三档发现、JRA 候选展示、权限与租约、状态/筛选/时区修复。固定只读代码 reviewer 核心两轮、精确身份修复两轮、详情状态增量一轮及全量相关测试合同两轮均 APPROVED；257 项核心定向测试及 7 项身份修复测试在隔离 PostgreSQL 通过（核心 SQLite 跳 1 个 PG 专属测试）。829/104 修复入口仅准备为 SHA 绑定发布包，默认 dry-run，保留既有有效别名元数据且整批事务回滚。随后浏览器发现详情基础资料仍显示原始状态，新增两场景先 RED 后修复，状态模块 12 项 PG 通过（合计 265 个不同定向用例）。全量对照暴露的旧正式结果断言已复现并按批准口径修正，保留暂定明细及关闭权限保护，扩展 68 项 PG 全过。Linux 完整候选 5,012 项仍保留原 45 个失败，另 1 个 canonical 详情旧文案断言已真实 RED 后仅改测试文字，相关完整模块 19 项 PG 全过。应用版本保持不变，最终测试提交以 PR 同 HEAD 完整 CI 为准；不将定向修正改写为旧构件全绿。生产只读重查仍为 9a88243f，79 场历史缺口已冻结，正式赛果补齐数量为 0。未合并、未部署、未写生产数据；新 JRA 开关默认关闭。完整计数、构件及修正边界见 [验证记录](changes/fix-race-section-gaps/validation.md)。详情见 [代码审核](changes/fix-race-section-gaps/CODE_REVIEW.md) 与 [发布/数据边界](changes/fix-race-section-gaps/rollout.md)。
 
 ## 2026-09-17 赛事区修复计划经固定子代理两轮审核通过（未实施）
 
@@ -645,7 +645,7 @@
 - PR `#119` 已合并为 `474aad1430d1451ad4e45713bd3d50a5f889ab9b`。生产 Nginx 当前配置 SHA-256
   为 `7bc8fd14…934`；单文件 bind 因 inode 固定不能靠 reload 换入新内容，已在 `nginx -t` 通过后只重建
   Nginx 容器。Meta/Facebook 对精确 `/races/` 与字体返回 `429`，普通 root/www/races 返回 `200`，精确目标
-  未再进入 Django；约 5 分钟六轮公网门禁均在 20 秒内通过，Nginx/Web restart、OOM、5xx 为 0。
+  未再进入 Django；约 5 分钟七轮公网门禁均在 20 秒内通过，Nginx/Web restart、OOM、5xx 为 0。
 - 关闭态 audit artifact 为
   `/opt/umanewsbot-builds/pr119-474aad14/race-data-activation/audit-closed-pr119-20260829T151756Z.json`，
   SHA-256 `a11ee227…b87`；`ready/valid/route_drift=[]/would_write=false`。Phase 1 artifact SHA-256
