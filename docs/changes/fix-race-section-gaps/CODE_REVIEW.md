@@ -1,6 +1,6 @@
 # 代码审核与修复记录
 
-本需求由主线程编写测试、实现与修复；固定只读 reviewer `race_code_reviewer` 五轮审核：核心代码两轮，补充的两条身份修复入口两轮，浏览器发现的详情状态遗漏一轮。
+本需求由主线程编写测试、实现与修复；固定只读 reviewer `race_code_reviewer` 六轮审核：核心代码两轮，补充的两条身份修复入口两轮，浏览器发现的详情状态遗漏一轮，全量结果相关测试合同一轮。
 方案仍绑定 PLAN.md 的批准 SHA，不改写历史计划的“未实施”时间点叙述。
 
 ## 第一轮 REVISE
@@ -39,3 +39,11 @@
 浏览器渲染发现详情顶部状态与基础资料原始状态矛盾：过期 scheduled、无正式结果的 finished 仍分别显示赛前/完赛。新增一个测试覆盖两场景，先得到 1 test / 2 failures 的真实 RED；模板仅将原始 get_status_display 替换为顶部既有 status_label。修复后整个状态模块 PostgreSQL 12 例通过，浏览器复验历史详情上下两处一致，日历状态与双时区文本正常。
 
 同一 reviewer 增量复审 APPROVED，前后冻结指纹一致：`4cd8b9f6154a0eba90f602b33495858ddf68e897c0f5d21f9e754f266a3feec2`。无新判定分支、无数据变更。
+
+## 第六轮 APPROVED
+
+本机全量旧候选与当前 main 对照出现 8 个新增失败 ID：3 项已由此前时间文案、正式赛果夹具及 winner 单测修复，5 项在当时 HEAD 逐项复现。剩余 5 项均来自批准 PLAN 103–114 的正式完赛语义变化：历史分页的 finished 空赛果夹具，2 个继承的暂定发布测试、暂定冠军 hero 与 policy-off 日历测试。
+
+仅调整测试合同，不更改应用：分页补 45 条 confirmed 赛果，保留所有 filter/第二页 5 条断言；暂定明细继续验证公开，hero/日历不显示正式冠军；授权关闭明确断言 top_results 清空；official/corrected 增加冠军正向断言。先在 PostgreSQL 得到 5 tests / 5 failures，再运行相关完整模块 68 项全过。
+
+同一 reviewer 独立确认未弱化保护且符合已批准口径，VERDICT APPROVED。前后指纹一致：`fb9f4ec67adc1ba1f0813b055a176bdd8324a8c4ead419582cb3cda6b67c2479`。最终全量 CI 仍须完成，不能把旧候选全量失败解释为最终候选结果。

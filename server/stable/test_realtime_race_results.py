@@ -4247,7 +4247,9 @@ class RaceLivePublicStatusTests(TestCase):
         self.assertNotContains(response, "暂定赛果")
         self.assertNotContains(response, "补充来源")
         self.assertNotContains(response, "官方来源")
-        self.assertContains(response, "WINNER · 冠军")
+        self.assertNotContains(response, "WINNER · 冠军")
+        self.assertContains(response, "赛果待确认")
+        self.assertContains(response, "Fixture Winner")
 
     def test_result_phases_share_one_public_label_and_stale_warning_remains(self):
         official = self._event_with_revision("o" * 8, "official")
@@ -4259,6 +4261,7 @@ class RaceLivePublicStatusTests(TestCase):
             for event in (official, corrected, conflict):
                 response = self.client.get(event.public_path)
                 self.assertContains(response, "<h2>赛果</h2>", html=True)
+                self.assertContains(response, "WINNER · 冠军")
                 self.assertNotContains(response, "正式赛果")
                 self.assertNotContains(response, "赛果已更正")
                 self.assertNotContains(response, "赛果待复核")
@@ -4439,7 +4442,13 @@ class RaceLivePublicStatusTests(TestCase):
 
         with patch("stable.views.timezone.now", return_value=self.NOW):
             baseline = self.client.get(calendar_url, {"tab": "all"})
-        self.assertContains(baseline, "Fixture Winner")
+        self.assertContains(baseline, "赛果待确认")
+        self.assertNotContains(baseline, "Fixture Winner")
+        self.assertEqual(
+            [row.horse_name for group in baseline.context["groups"]
+             for item in group["events"] for row in item.top_results],
+            ["Fixture Winner"],
+        )
 
         global_policy = stable_models.RaceLivePublicationPolicy.objects.get(
             scope_type=stable_models.RaceLivePublicationScopeType.GLOBAL,
@@ -4453,6 +4462,10 @@ class RaceLivePublicStatusTests(TestCase):
             hidden = self.client.get(calendar_url, {"tab": "all"})
         self.assertContains(hidden, event.chinese_name)
         self.assertNotContains(hidden, "Fixture Winner")
+        self.assertEqual(
+            [row for group in hidden.context["groups"]
+             for item in group["events"] for row in item.top_results], [],
+        )
 
     def test_missing_event_policy_hides_from_detail_and_bulk_calendar_reads(self):
         event = self._event_with_revision("m" * 8, "provisional")
