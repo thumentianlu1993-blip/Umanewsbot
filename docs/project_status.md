@@ -1,5 +1,11 @@
 # 项目状态文档
 
+## 2026-09-18 PR #203 已合并并生产上线
+
+用户批准精确发布包后，PR #203 合并为 `6c8bfdde`，生产固定代码 `d0bb40fb`、镜像 `677fe69f68b8…`，0078 空迁移计划。四应用实际版本一致，Web healthy、两个 worker 正常；双域名 20 个赛事页及 8 个首页/健康/筛选请求通过。104 官方别名、829 名称及别名已按原 SHA manifest 修复，审计 552430，其他字段及路径不变。备份、intent、complete 与锁收尾通过，旧 race_live=7543 未消费。
+
+JRA 配置在四应用明确为 false；104/105 资料仍缺，828/830 仍待正式赛果，历史清单正式赛果补齐 0。本次是代码与两条身份修复上线，不是所有赛事资料补齐。全量 CI 无新增失败，45 个旧失败保留。详见[生产发布验收](changes/fix-race-section-gaps/release.md)；以下较早“未交付”记录保留为当时状态。
+
 ## 2026-09-18 赛事区修复完成验证，待交付
 
 [PR #203](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/203) 经测试先行、主线程修复及固定子代理七轮审核收口。候选 `d0bb40fb` 的 Linux 全量 5,012 项无新增失败，保留与主线参考相同的 45 个旧失败；45 项发布合同及相关定向回归通过。无迁移，JRA 默认关闭；两条身份修复按精确 manifest 交付，历史 79 场尚未恢复赛果。未合并或上线，以 [当前状态](current_state.md)、[验证记录](changes/fix-race-section-gaps/validation.md) 和 [发布包](changes/fix-race-section-gaps/rollout.md) 为准。

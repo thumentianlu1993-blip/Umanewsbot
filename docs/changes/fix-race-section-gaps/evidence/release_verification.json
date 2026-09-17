@@ -1,0 +1,621 @@
+{
+  "merge_commit": "6c8bfdde2eac6ad4d25ab8301652197dcc37ac0d",
+  "release_commit": "d0bb40fb8defe3e9de1029aa255edd2e06e1e0c6",
+  "image": "sha256:677fe69f68b8421e306a02bb0c522e4425ee862ee9a7c48a47b8805ba7bc4bee",
+  "verified_at": "2026-09-17T18:32:17.990786+00:00",
+  "services": [
+    {
+      "name": "/umanewsbot-web-1",
+      "running": true,
+      "health": "healthy",
+      "restart_count": 0,
+      "oom": false,
+      "image_revision": "d0bb40fb8defe3e9de1029aa255edd2e06e1e0c6",
+      "file_revision": "d0bb40fb8defe3e9de1029aa255edd2e06e1e0c6",
+      "settings_revision": "d0bb40fb8defe3e9de1029aa255edd2e06e1e0c6",
+      "jra_env": "false",
+      "settings_jra": "False",
+      "env_revision": "ca6e9d0673717e16440824c859051362c28448e6"
+    },
+    {
+      "name": "/umanewsbot-worker-1",
+      "running": true,
+      "health": null,
+      "restart_count": 0,
+      "oom": false,
+      "image_revision": "d0bb40fb8defe3e9de1029aa255edd2e06e1e0c6",
+      "file_revision": "d0bb40fb8defe3e9de1029aa255edd2e06e1e0c6",
+      "settings_revision": "d0bb40fb8defe3e9de1029aa255edd2e06e1e0c6",
+      "jra_env": "false",
+      "settings_jra": "False",
+      "env_revision": "ca6e9d0673717e16440824c859051362c28448e6"
+    },
+    {
+      "name": "/umanewsbot-beat-1",
+      "running": true,
+      "health": null,
+      "restart_count": 0,
+      "oom": false,
+      "image_revision": "d0bb40fb8defe3e9de1029aa255edd2e06e1e0c6",
+      "file_revision": "d0bb40fb8defe3e9de1029aa255edd2e06e1e0c6",
+      "settings_revision": "d0bb40fb8defe3e9de1029aa255edd2e06e1e0c6",
+      "jra_env": "false",
+      "settings_jra": "False",
+      "env_revision": "ca6e9d0673717e16440824c859051362c28448e6"
+    },
+    {
+      "name": "/umanewsbot-race_sync_v2_worker-1",
+      "running": true,
+      "health": null,
+      "restart_count": 0,
+      "oom": false,
+      "image_revision": "d0bb40fb8defe3e9de1029aa255edd2e06e1e0c6",
+      "file_revision": "d0bb40fb8defe3e9de1029aa255edd2e06e1e0c6",
+      "settings_revision": "d0bb40fb8defe3e9de1029aa255edd2e06e1e0c6",
+      "jra_env": "false",
+      "settings_jra": "False",
+      "env_revision": "ca6e9d0673717e16440824c859051362c28448e6"
+    },
+    {
+      "name": "/umanewsbot-db-1",
+      "running": true,
+      "health": "healthy",
+      "restart_count": 0,
+      "oom": false
+    },
+    {
+      "name": "/umanewsbot-redis-1",
+      "running": true,
+      "health": "healthy",
+      "restart_count": 0,
+      "oom": false
+    },
+    {
+      "name": "/umanewsbot-nginx-1",
+      "running": true,
+      "health": null,
+      "restart_count": 0,
+      "oom": false
+    },
+    {
+      "name": "/umanewsbot-onebot-1",
+      "running": true,
+      "health": null,
+      "restart_count": 0,
+      "oom": false
+    }
+  ],
+  "release": {
+    "intent.json": {
+      "path": "/opt/umanews-release-d0bb40fb-PR203-20260918/umanewsbot/runtime/migration_history_repair/release-0078-recovery/f1a1218054f22f6a5ec64cb8efc6f2ddb15b4dba98520e15136e8baad947f368/intent.json",
+      "sha256": "1fe1fcddf6bad5c08c5c224c7e8b2270ce1b3b25949113444b34d8414b5f3895"
+    },
+    "manifest.json": {
+      "path": "/opt/umanews-release-d0bb40fb-PR203-20260918/umanewsbot/runtime/migration_history_repair/release-0078-recovery/f1a1218054f22f6a5ec64cb8efc6f2ddb15b4dba98520e15136e8baad947f368/manifest.json",
+      "sha256": "a07f1d39cc6d2fade96b896c36f4b4c76ecfbf623501147370ec3605b5279206"
+    },
+    "complete.json": {
+      "path": "/opt/umanews-release-d0bb40fb-PR203-20260918/umanewsbot/runtime/migration_history_repair/release-0078-recovery/f1a1218054f22f6a5ec64cb8efc6f2ddb15b4dba98520e15136e8baad947f368/complete.json",
+      "sha256": "5bb31441d0a969fb399c1fd4dc0a79b5e3e2333ae4d49fa8281122a22d8c1392"
+    },
+    "backup": {
+      "path": "/opt/umanews-release-d0bb40fb-PR203-20260918/umanewsbot/runtime/migration_history_repair/release-0078-recovery/f1a1218054f22f6a5ec64cb8efc6f2ddb15b4dba98520e15136e8baad947f368/backup/rds_horse_news_20260917T182359Z_1617986.dump",
+      "sha256": "4947fea28bfd10db88351e165cc23667978fcc7262be26e70ee73802567be650",
+      "size": 558542733
+    },
+    "backup_manifest": {
+      "device": 64515,
+      "inode": 682925,
+      "sha256": "4947fea28bfd10db88351e165cc23667978fcc7262be26e70ee73802567be650",
+      "size": 558542733
+    },
+    "operation": "same-schema",
+    "restore_services": {
+      "beat": true,
+      "nginx": true,
+      "race_live_worker": false,
+      "race_sync_v2_worker": true,
+      "web": true,
+      "worker": true
+    },
+    "toc_lines": 1383
+  },
+  "queues": {
+    "celery": 0,
+    "race_sync_v2": 0,
+    "race_live": 7543
+  },
+  "migration_plan": "Planned operations:\n  No planned migration operations.",
+  "identity": {
+    "manifest_sha256": "31dbf9f1d8400f0ef33a7f7b8dd18931488bfb562fa0437c26e29febf2f5827b",
+    "target_ids": [
+      104,
+      829
+    ],
+    "protected_fields_unchanged": true,
+    "paths_unchanged": true,
+    "audit_id": 552430,
+    "replay_dry_run_passed": true
+  },
+  "public_pages": [
+    {
+      "host": "umafans.run",
+      "event_id": 99,
+      "path": "/races/2026/jra-2026-0906-02/",
+      "status": 200,
+      "canonical_unchanged": true,
+      "winner_ribbon": false,
+      "result_rows": 0,
+      "runner_rows": 0,
+      "status_text": "赛期已过，资料待补",
+      "sha256": "d020cc6ba54fa477e901bbffe0a8d25a6c58fe0dbdcc43de18c360a534755355",
+      "dual_timezone": false,
+      "chambly_corrected": false
+    },
+    {
+      "host": "umafans.run",
+      "event_id": 104,
+      "path": "/races/2026/jra-2026-0920-01/",
+      "status": 200,
+      "canonical_unchanged": true,
+      "winner_ribbon": false,
+      "result_rows": 0,
+      "runner_rows": 0,
+      "status_text": "2天后",
+      "sha256": "834020534ec67153f9f234a663018993df5c19a2b014a282d9d157977286cea2",
+      "dual_timezone": false,
+      "chambly_corrected": false
+    },
+    {
+      "host": "umafans.run",
+      "event_id": 105,
+      "path": "/races/2026/jra-2026-0921-01/",
+      "status": 200,
+      "canonical_unchanged": true,
+      "winner_ribbon": false,
+      "result_rows": 0,
+      "runner_rows": 0,
+      "status_text": "3天后",
+      "sha256": "69da9599af66a6acabe1ec2fcb95a99b96ed0ac4b9fff3eb3ac66298d1552608",
+      "dual_timezone": false,
+      "chambly_corrected": false
+    },
+    {
+      "host": "umafans.run",
+      "event_id": 755,
+      "path": "/races/2026/fr-france-galop-2026-0830-071/",
+      "status": 200,
+      "canonical_unchanged": true,
+      "winner_ribbon": true,
+      "result_rows": 11,
+      "runner_rows": 11,
+      "status_text": "winner",
+      "sha256": "6043b244e26cf650b9cb28b72a6363f492719ae6650f59d2d3ea2d1946c37524",
+      "dual_timezone": true,
+      "chambly_corrected": false
+    },
+    {
+      "host": "umafans.run",
+      "event_id": 828,
+      "path": "/races/2026/fr-france-galop-2026-0917-144/",
+      "status": 200,
+      "canonical_unchanged": true,
+      "winner_ribbon": false,
+      "result_rows": 0,
+      "runner_rows": 7,
+      "status_text": "赛果待确认",
+      "sha256": "6a5955f03226c40518d3599900f645b81d62bc42af55415d270b40ab0431f16a",
+      "dual_timezone": true,
+      "chambly_corrected": false
+    },
+    {
+      "host": "umafans.run",
+      "event_id": 829,
+      "path": "/races/2026/fr-france-galop-2026-0917-145/",
+      "status": 200,
+      "canonical_unchanged": true,
+      "winner_ribbon": false,
+      "result_rows": 0,
+      "runner_rows": 0,
+      "status_text": "今天",
+      "sha256": "3863bacb553f6a66150ae4a8c1d47fe59704255ee892c8f7deeb43752d5d6f40",
+      "dual_timezone": false,
+      "chambly_corrected": true
+    },
+    {
+      "host": "umafans.run",
+      "event_id": 830,
+      "path": "/races/2026/fr-france-galop-2026-0917-146/",
+      "status": 200,
+      "canonical_unchanged": true,
+      "winner_ribbon": false,
+      "result_rows": 0,
+      "runner_rows": 5,
+      "status_text": "赛果待确认",
+      "sha256": "19d0a43ceacaafa9f213e89c179cfc569756208dd0779ce9f8706898426484a5",
+      "dual_timezone": true,
+      "chambly_corrected": false
+    },
+    {
+      "host": "umafans.run",
+      "event_id": 956,
+      "path": "/races/2026/uk-bha-flat-2026-0830-099/",
+      "status": 200,
+      "canonical_unchanged": true,
+      "winner_ribbon": true,
+      "result_rows": 10,
+      "runner_rows": 10,
+      "status_text": "winner",
+      "sha256": "b014343d60642bbadc6a09966402c57076d6671d63e9de2553fd962d686a92d6",
+      "dual_timezone": true,
+      "chambly_corrected": false
+    },
+    {
+      "host": "umafans.run",
+      "event_id": 962,
+      "path": "/races/2026/uk-bha-flat-2026-0910-105/",
+      "status": 200,
+      "canonical_unchanged": true,
+      "winner_ribbon": true,
+      "result_rows": 9,
+      "runner_rows": 9,
+      "status_text": "winner",
+      "sha256": "f5b4c0a9ea70138f1d3b3c7fc3e950a88f7e02184cdae168cbdaf34cedb25665",
+      "dual_timezone": true,
+      "chambly_corrected": false
+    },
+    {
+      "host": "umafans.run",
+      "event_id": 963,
+      "path": "/races/2026/uk-bha-flat-2026-0910-106/",
+      "status": 200,
+      "canonical_unchanged": true,
+      "winner_ribbon": true,
+      "result_rows": 11,
+      "runner_rows": 11,
+      "status_text": "winner",
+      "sha256": "73ef31e5af750b4150557ceeb5ef5c17d56b5fed3f8028645210e6677f22ef7e",
+      "dual_timezone": true,
+      "chambly_corrected": false
+    },
+    {
+      "host": "www.umafans.run",
+      "event_id": 99,
+      "path": "/races/2026/jra-2026-0906-02/",
+      "status": 200,
+      "canonical_unchanged": true,
+      "winner_ribbon": false,
+      "result_rows": 0,
+      "runner_rows": 0,
+      "status_text": "赛期已过，资料待补",
+      "sha256": "d020cc6ba54fa477e901bbffe0a8d25a6c58fe0dbdcc43de18c360a534755355",
+      "dual_timezone": false,
+      "chambly_corrected": false
+    },
+    {
+      "host": "www.umafans.run",
+      "event_id": 104,
+      "path": "/races/2026/jra-2026-0920-01/",
+      "status": 200,
+      "canonical_unchanged": true,
+      "winner_ribbon": false,
+      "result_rows": 0,
+      "runner_rows": 0,
+      "status_text": "2天后",
+      "sha256": "834020534ec67153f9f234a663018993df5c19a2b014a282d9d157977286cea2",
+      "dual_timezone": false,
+      "chambly_corrected": false
+    },
+    {
+      "host": "www.umafans.run",
+      "event_id": 105,
+      "path": "/races/2026/jra-2026-0921-01/",
+      "status": 200,
+      "canonical_unchanged": true,
+      "winner_ribbon": false,
+      "result_rows": 0,
+      "runner_rows": 0,
+      "status_text": "3天后",
+      "sha256": "69da9599af66a6acabe1ec2fcb95a99b96ed0ac4b9fff3eb3ac66298d1552608",
+      "dual_timezone": false,
+      "chambly_corrected": false
+    },
+    {
+      "host": "www.umafans.run",
+      "event_id": 755,
+      "path": "/races/2026/fr-france-galop-2026-0830-071/",
+      "status": 200,
+      "canonical_unchanged": true,
+      "winner_ribbon": true,
+      "result_rows": 11,
+      "runner_rows": 11,
+      "status_text": "winner",
+      "sha256": "6043b244e26cf650b9cb28b72a6363f492719ae6650f59d2d3ea2d1946c37524",
+      "dual_timezone": true,
+      "chambly_corrected": false
+    },
+    {
+      "host": "www.umafans.run",
+      "event_id": 828,
+      "path": "/races/2026/fr-france-galop-2026-0917-144/",
+      "status": 200,
+      "canonical_unchanged": true,
+      "winner_ribbon": false,
+      "result_rows": 0,
+      "runner_rows": 7,
+      "status_text": "赛果待确认",
+      "sha256": "6a5955f03226c40518d3599900f645b81d62bc42af55415d270b40ab0431f16a",
+      "dual_timezone": true,
+      "chambly_corrected": false
+    },
+    {
+      "host": "www.umafans.run",
+      "event_id": 829,
+      "path": "/races/2026/fr-france-galop-2026-0917-145/",
+      "status": 200,
+      "canonical_unchanged": true,
+      "winner_ribbon": false,
+      "result_rows": 0,
+      "runner_rows": 0,
+      "status_text": "今天",
+      "sha256": "3863bacb553f6a66150ae4a8c1d47fe59704255ee892c8f7deeb43752d5d6f40",
+      "dual_timezone": false,
+      "chambly_corrected": true
+    },
+    {
+      "host": "www.umafans.run",
+      "event_id": 830,
+      "path": "/races/2026/fr-france-galop-2026-0917-146/",
+      "status": 200,
+      "canonical_unchanged": true,
+      "winner_ribbon": false,
+      "result_rows": 0,
+      "runner_rows": 5,
+      "status_text": "赛果待确认",
+      "sha256": "19d0a43ceacaafa9f213e89c179cfc569756208dd0779ce9f8706898426484a5",
+      "dual_timezone": true,
+      "chambly_corrected": false
+    },
+    {
+      "host": "www.umafans.run",
+      "event_id": 956,
+      "path": "/races/2026/uk-bha-flat-2026-0830-099/",
+      "status": 200,
+      "canonical_unchanged": true,
+      "winner_ribbon": true,
+      "result_rows": 10,
+      "runner_rows": 10,
+      "status_text": "winner",
+      "sha256": "b014343d60642bbadc6a09966402c57076d6671d63e9de2553fd962d686a92d6",
+      "dual_timezone": true,
+      "chambly_corrected": false
+    },
+    {
+      "host": "www.umafans.run",
+      "event_id": 962,
+      "path": "/races/2026/uk-bha-flat-2026-0910-105/",
+      "status": 200,
+      "canonical_unchanged": true,
+      "winner_ribbon": true,
+      "result_rows": 9,
+      "runner_rows": 9,
+      "status_text": "winner",
+      "sha256": "f5b4c0a9ea70138f1d3b3c7fc3e950a88f7e02184cdae168cbdaf34cedb25665",
+      "dual_timezone": true,
+      "chambly_corrected": false
+    },
+    {
+      "host": "www.umafans.run",
+      "event_id": 963,
+      "path": "/races/2026/uk-bha-flat-2026-0910-106/",
+      "status": 200,
+      "canonical_unchanged": true,
+      "winner_ribbon": true,
+      "result_rows": 11,
+      "runner_rows": 11,
+      "status_text": "winner",
+      "sha256": "73ef31e5af750b4150557ceeb5ef5c17d56b5fed3f8028645210e6677f22ef7e",
+      "dual_timezone": true,
+      "chambly_corrected": false
+    }
+  ],
+  "acceptance": {
+    "verified_at": "2026-09-17T18:32:17.990786+00:00",
+    "env_only_addition": "RACE_DATA_SYNC_JRA_PRE_RACE_ENABLED=false",
+    "persistent_mounts_preserved": true,
+    "standing_policy_unchanged": {
+      "blocker_counts": {
+        "manual_lock_present": 1,
+        "source_identity_missing": 4
+      },
+      "blocker_event_ids": {
+        "manual_lock_present": [
+          507
+        ],
+        "source_identity_missing": [
+          103,
+          491,
+          492,
+          829
+        ]
+      },
+      "census_sha256": "9b1958fccc358a01aef30d3eaabc130131ba2fe2b7e028bbaf8f5536099b7a79",
+      "classification_counts": {
+        "awaiting_source_window": 120,
+        "blocked": 5
+      },
+      "route_drift": [],
+      "status": "loaded"
+    },
+    "configuration_status": "ready",
+    "capacity_status": "valid",
+    "france_tra_requests_at_cutoff": 192,
+    "section_gaps": {
+      "checks_truncated": false,
+      "expired_unmanaged": {
+        "count": 88,
+        "event_ids": [
+          79,
+          92,
+          93,
+          94,
+          95,
+          96,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          188,
+          189,
+          190,
+          405,
+          408,
+          409,
+          410,
+          451,
+          452,
+          453,
+          454,
+          455,
+          456,
+          457,
+          458,
+          459,
+          460,
+          461,
+          462,
+          463,
+          464,
+          465,
+          466,
+          467,
+          468,
+          469,
+          470,
+          471,
+          472,
+          473,
+          474,
+          475,
+          476,
+          477,
+          478,
+          479,
+          480,
+          481
+        ]
+      },
+      "formal_evidence_missing": {
+        "count": 2,
+        "event_ids": [
+          828,
+          830
+        ]
+      },
+      "overdue_sample_count": 0,
+      "pre_race_checks": [],
+      "seven_day_missing_canonical_card": {
+        "count": 20,
+        "event_ids": [
+          103,
+          104,
+          105,
+          191,
+          192,
+          491,
+          492,
+          493,
+          494,
+          495,
+          496,
+          770,
+          771,
+          772,
+          829,
+          831,
+          832,
+          969,
+          970,
+          971
+        ]
+      },
+      "seven_day_missing_time": {
+        "count": 20,
+        "event_ids": [
+          103,
+          104,
+          105,
+          191,
+          192,
+          491,
+          492,
+          493,
+          494,
+          495,
+          496,
+          770,
+          771,
+          772,
+          829,
+          831,
+          832,
+          969,
+          970,
+          971
+        ]
+      },
+      "source_failure_sample_count": 0
+    },
+    "public_extra_checks": [
+      {
+        "host": "umafans.run",
+        "path": "/healthz/",
+        "status": 200
+      },
+      {
+        "host": "umafans.run",
+        "path": "/",
+        "status": 200
+      },
+      {
+        "host": "umafans.run",
+        "path": "/races/?tab=all&region=japan&when=upcoming",
+        "status": 200
+      },
+      {
+        "host": "umafans.run",
+        "path": "/races/?tab=all&region=france&when=finished",
+        "status": 200
+      },
+      {
+        "host": "www.umafans.run",
+        "path": "/healthz/",
+        "status": 200
+      },
+      {
+        "host": "www.umafans.run",
+        "path": "/",
+        "status": 200
+      },
+      {
+        "host": "www.umafans.run",
+        "path": "/races/?tab=all&region=japan&when=upcoming",
+        "status": 200
+      },
+      {
+        "host": "www.umafans.run",
+        "path": "/races/?tab=all&region=france&when=finished",
+        "status": 200
+      }
+    ],
+    "lock_absent": true
+  },
+  "artifacts": {
+    "acceptance-summary.json": "694288587c099f88c2c656a05bbd6678e35f56312a97603d13b969110f92dd09",
+    "identity-verification.json": "eb9c348a1932677a3f219878eca14c43908b148cf08d4a9b70579b8224b55719",
+    "public-verification.json": "2e42e07f9cc4cf32c339cdb34c8912e1f587be18bdcea036a51a5f652f9338cb",
+    "verification.json": "23e7ba25a3c8ca85257c9b51452b60051df35a483977b012f228fd1f9677fb73"
+  }
+}
