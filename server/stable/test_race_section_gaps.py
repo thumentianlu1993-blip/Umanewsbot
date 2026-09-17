@@ -98,3 +98,15 @@ class CalendarFilterTests(TestCase):
         self.assertEqual(report['expired_unmanaged']['event_ids'],[old.pk])
         old.refresh_from_db()
         self.assertEqual(old.status,'scheduled')
+
+    def test_detail_overview_uses_public_status(self):
+        cases = (
+            ('expired-detail', 'scheduled', '赛期已过，资料待补'),
+            ('pending-detail', 'finished', '赛果待确认'),
+        )
+        for slug, status, label in cases:
+            with self.subTest(status=status):
+                event = self.make(slug, status=status, local_date=date(2026, 9, 16))
+                with patch('django.utils.timezone.now', return_value=NOW):
+                    response = self.client.get(event.public_path)
+                self.assertContains(response, f'<span>状态</span><b>{label}</b>', html=True)

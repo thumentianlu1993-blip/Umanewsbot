@@ -1,6 +1,6 @@
 # 代码审核与修复记录
 
-本需求由主线程编写测试、实现与修复；固定只读 reviewer `race_code_reviewer` 四轮审核：核心代码两轮，补充的两条身份修复入口两轮。
+本需求由主线程编写测试、实现与修复；固定只读 reviewer `race_code_reviewer` 五轮审核：核心代码两轮，补充的两条身份修复入口两轮，浏览器发现的详情状态遗漏一轮。
 方案仍绑定 PLAN.md 的批准 SHA，不改写历史计划的“未实施”时间点叙述。
 
 ## 第一轮 REVISE
@@ -33,3 +33,9 @@
 整批回滚用例明确先完成 104 写入，再因 829 基线漂移失败，断言两条事件、别名与审计全部回滚。7 项 PostgreSQL 回归通过。同一 reviewer 第四轮 APPROVED，无新增问题；审核前后指纹一致：`0c2275a927bf1f29b78597b6839c74a6e01b531c20545a6e8ceed64a2ecadbbb`。指纹沿用第二轮两处测试生成物排除规则。
 
 该结论覆盖 SHA 绑定的两条身份修复工具，不表示生产已执行。最终 Linux CI、提交和发布边界以验证记录及 rollout.md 为准。
+
+## 第五轮 APPROVED
+
+浏览器渲染发现详情顶部状态与基础资料原始状态矛盾：过期 scheduled、无正式结果的 finished 仍分别显示赛前/完赛。新增一个测试覆盖两场景，先得到 1 test / 2 failures 的真实 RED；模板仅将原始 get_status_display 替换为顶部既有 status_label。修复后整个状态模块 PostgreSQL 12 例通过，浏览器复验历史详情上下两处一致，日历状态与双时区文本正常。
+
+同一 reviewer 增量复审 APPROVED，前后冻结指纹一致：`4cd8b9f6154a0eba90f602b33495858ddf68e897c0f5d21f9e754f266a3feec2`。无新判定分支、无数据变更。

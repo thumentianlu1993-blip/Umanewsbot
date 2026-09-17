@@ -77,7 +77,7 @@
         <div><span>马场</span><b>{{ event.racecourse }}</b></div>
         {% if event.distance_text %}<div><span>距离</span><b>{{ event.distance_text }}</b></div>{% elif event.surface %}<div><span>场地</span><b>{{ event.get_surface_display }}</b></div>{% endif %}
         {% if event.eligibility_text %}<div><span>参赛条件</span><b>{{ event.eligibility_text }}</b></div>{% endif %}
-        <div><span>状态</span><b>{{ event.get_status_display }}</b></div>
+        <div><span>状态</span><b>{{ status_label }}</b></div>
       </div>
     </section>
 
