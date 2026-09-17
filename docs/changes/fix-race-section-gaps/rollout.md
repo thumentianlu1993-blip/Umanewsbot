@@ -26,7 +26,20 @@ JRA 的目录共享、成功 URL 持久复用和接管停止查询是必需条�
 2. 现有 0078 发布合同备份及 intent；迁移计划必须为空。重建 Web、普通 worker、Beat、race_sync_v2_worker，Nginx 沿既有发布流程处理；DB/Redis/OneBot 不升级，旧 race_live 队列不消费。
 3. 增加并显式传递唯一新配置 `RACE_DATA_SYNC_JRA_PRE_RACE_ENABLED=false`。现有来源、字段、配额不扩大。十分钟发现与同日精确结果补查随代码生效。
 4. 核验 Django check、版本一致、服务/队列健康、audit 无新冲突；原始 828/830/829、104/105 及历史样本公开页与 DB 分别验收。正式证据仍缺失则明确保留待确认。
-5. 此首次代码包不包含生产资料批量写入、JRA 开关开启或付费历史补抓。下述数据包是冻结的审计输入，不是已可应用的正式结果。
+5. 数据动作仅包含 829/104 两条精确身份修复，使用下文 SHA 绑定 manifest；先 dry-run，通过才显式 --apply。不存在正式赛果批量写入、JRA 开关开启或付费历史补抓。其他历史清单只是审计输入。
+
+## 两条身份修复包
+
+`repair_race_section_identities` 是本次专用入口，只接受 829 与 104 的已核定名称/别名。默认 dry-run；在事务内核对 year/slug/名称/地区/马场/日期/时区，拒绝人工锁、lifecycle owner、已纳管或其他 projection owner。只更正名字/添加别名，不改路径、时间、状态、runner 或赛果；TaskExecutionLog 保存完整前后值及 manifest SHA，重复执行验证现状后幂等返回。任一对象漂移整批回滚。已有有效别名保留其全部元数据，仅新增缺少的 fr/ja 别名；已有停用同名别名则整批拒绝，不隐式恢复。
+
+Manifest：`docs/changes/fix-race-section-gaps/evidence/identity_repairs.json`，SHA256 `31dbf9f1d8400f0ef33a7f7b8dd18931488bfb562fa0437c26e29febf2f5827b`。该包已在隔离数据库按真实基线 dry-run 验证，未在生产应用。获准精确发布包后，使用同一个文件和 SHA 运行：
+
+```sh
+python server/manage.py repair_race_section_identities --manifest docs/changes/fix-race-section-gaps/evidence/identity_repairs.json --sha256 31dbf9f1d8400f0ef33a7f7b8dd18931488bfb562fa0437c26e29febf2f5827b
+# 前置 dry-run 无 drift/owner/lock 冲突后，在已批准的发布包内添加 --apply。
+```
+
+如实际运行路径是 `/app/server/manage.py`，相应调整文件挂载路径，不修改文件内容或 SHA。生产 apply 前先保存目标基线/备份；apply 后核对 slug/public_path、原始名与别名及 TaskExecutionLog。仅 alias/name 可被此包更正，不将其当作结果恢复。
 
 ## 数据修复输入与仍缺证据
 
