@@ -1,0 +1,44 @@
+[
+  {
+    "url": "https://umafans.run/races/",
+    "http": 200,
+    "seconds": 2.09,
+    "text": " 赛事日历 Uma Fans 赛马新闻门户 首页 赛事日历 马匹 我的关注 Race Calendar 赛事日历 本周焦点 · G1 赛马会金杯 09月18日 · Belmont Park 科蒂利昂锦标 09月19日 · Parx Racing 宾夕法尼亚打吡 09月19日 · Parx Racing 全部 重点 全部 日本 中国香港 英国 爱尔兰 法国 美国 澳大利亚 德国 中东 全部等级 G1 G2 G3 即将开赛 全部时间 已完赛 9月7日 星期一 9月10日 星期四 9月11日 星期五 9月12日 星期六 9月13日 星期日 9月18日 星期五 9月19日 星期六 9月20日 星期日 9月21日 星期一 9月25日 星期五 9月26日 星期六 document.addEventListener(\"DOMContentLoaded\", function () { var axis = document.querySelector(\".date-axis\"); if (!axis) { return; } var anchor = axis.querySelector(\"[data-calendar-anchor]\"); if (!anchor) { return; } axis.scrollLeft = anchor.offsetLeft - (axis.clientWidth - anchor.offsetWidth) / 2; }); 年份 全部年份 2026 2025 2024 2023 2022 2021 2020 2019 2018 2017 2016 2015 2014 2013 2012 2011 2010 2009 2008 2007 2006 2005 2001 2000 赛事名称 筛选 加载更早赛事 加载未来赛事 9月 7日 星期一 G2 约翰·C·马比锦标 JOHN C. MABEE S. 美国 · Del Mar 9f turf 3U f 3UP F/M R T M 赛前 G2 富兰克林－辛普森锦标 FRANKLIN-SIMPSON S. 美国 · Kentucky Downs 6.5f turf 3 3YO SPR 赛前 9月 10日 星期四 G2 帕克山锦标 BETFRED PARK HILL FILLIES&#x27; STAKES 英国 · DONCASTER 14f abt 115yds 已完赛 冠军 Waardah (IRE) G2 梅希尔锦标 BETFRED MAY HILL STAKES 英国 · DONCASTER 草地 已完赛 冠军 Musical Times (IRE) 9月 11日 星期五 G2 飞彻特斯锦标 CARLSBERG DANISH PILSNER FLYING CHILDERS STAKES 英国 · DONCASTER 5f abt 3yds 已完赛 冠军 Final Objective (IRE) G2 唐加士达杯 BETFRED HOWARD WRIGHT DONCASTER CUP STAKES 英国 · DONCASTER 17f abt 197yds 已完赛 冠军 Caballo De Mar (IRE) 9月 12日 星期六 G2 香槟锦标 BETFRED CHAMPAGNE STAKES 英国 · DONCASTER 7f abt 6yds 已完赛 冠军 Desert Castle (GB) G2 公园锦标 BETFRED PARK STAKES 英国 · DONCASTER 草地 已完赛 冠军 More Thunder (IRE) G1 英国圣烈治锦标 BETFRED ST LEGER STAKES 英国 · DONCASTER 14f abt 115yds 已完赛 冠军 Highwayman (FR) 9月 13日 星期日 G2 圣烈特纪念 セントライト記念 日本 · 中山 芝2,200メートル 3歳 赛前 G2 玫瑰锦标 ローズS 日本 · 阪神 芝1,800メートル 3歳牝 赛前 9月 18日 星期五 G1 赛马会金杯 JOCKEY CLUB GOLD CUP S. 美国 · Belmont Park 10f dirt 3U 3UP R D L 明天 G2 普雷斯克岛草原大师锦标 PRESQUE ISLE DOWNS MASTERS S. 美国 · Presque Isle Downs 6.5f synthetic 3U f 3UP F/M T SPR 明天 9月 19日 星期六 G1 科蒂利昂锦标 COTILLION S. 美国 · Parx Racing 8.5f dirt 3 f 3YO F R D 2天后 G1 宾夕法尼亚打吡 PENNSYLVANIA DERBY 美国 · Parx Racing 9f dirt 3 3YO R D 2天后 G2 勇波比锦标 GALLANT BOB S. 美国 · Parx Racing 6f dirt 3 3YO SPR 2天后 9月 20日 星期日 G2 产经赏All Comers オールカマー 日本 · 中山 芝2,200メートル 3歳以上 3天后 9月 21日 星期一 G2 神户新闻杯 神戸新聞杯 日本 · 阪神 芝2,400メートル 3歳牡・牝 4天后 9月 25日 星期五 G2 贵妇锦标 BELDAME S. 美国 · Belmont Park 9f dirt 3U f 3UP F/M R D 8天后 G2 洛克菲尔锦标 BOYLE SPORTS HOME OF EARLY PAYOUT ROCKFEL STAKES 英国 · NEWMARKET 草地 8天后 G2 乔尔锦标 BOYLE SPORTS DAILY RACING REWARDS JOEL STAKES 英国 · NEWMARKET 草地 8天后 9月 26日 星期六 G2 勇丽锦标 GALLANT BLOOM S. 美国 · Belmont Park 6.5f dirt 3U f 3UP F/M SPR 9天后 G1 乔·赫希草地经典锦标 JOE HIRSCH TURF CLASSIC S. 美国 · Belmont Park 12f turf 3U 3UP R T L 9天后 G2 花钵锦标 FLOWER BOWL S. 美国 · Belmont Park 10f turf 3U f 3UP F/M R T L 9天后 G1 古德伍德锦标 GOODWOOD S. 美国 · Santa Anita Park 9f dirt 3U 3UP R D M 9天后 G2 约翰·亨利草地冠军锦标 JOHN HENRY TURF CHAMPIONSHIP S. 美国 · Santa Anita Park 10f turf 3U 3UP R T L 9天后 G2 希望之城一哩锦标 CITY OF HOPE MILE S. 美国 · Santa Anita Park 8f turf 3U 3UP R T M 9天后 G2 埃迪D锦标 EDDIE D S. 美国 · Santa Anita Park 6.5f turf 3U 3UP T SPR 9天后 G1 中央公园锦标 TATTERSALLS MIDDLE PARK STAKES 英国 · NEWMARKET 6f 9天后 G1 卓维利园锦标 TATTERSALLS SCEPTRE SESSIONS CHEVELEY PARK STAKES 英国 · NEWMARKET 草地 9天后 UmaFans 面向中文读者的全球赛马新闻门户，提供赛事日历、赛果数据与马匹档案。 频道 全部新闻 赛事日历 马匹档案 数据 赛事日历 马匹档案 我的关注 网站地图 © 2026 UmaFans 首页 赛事 马匹 关注 "
+  },
+  {
+    "url": "https://umafans.run/races/2026/fr-france-galop-2026-0917-144/",
+    "http": 200,
+    "seconds": 1.88,
+    "text": " 罗伯特·勒热讷跨栏锦标 2026 Uma Fans 赛马新闻门户 首页 赛事日历 马匹 我的关注 返回赛事日历 返回首页 G3 法国 · Auteuil · 3600m 2026 2026 2025 2024 2023 罗伯特·勒热讷跨栏锦标 PRIX ROBERT LEJEUNE · 2026-09-17 11:42 赛果待确认 概览 出马表 历年冠军 基础资料 等级 Groupe III 日期 2026-09-17 时间 11:42 马场 Auteuil 距离 3600m 状态 已结束 出马表 闸位 马号 马名 骑师 练马师 负磅 赔率 / 热门 状态 0 1 Huron Bleu Gabin Meunier - - - / - 09-17 00:17 更新 已出走登记 0 2 Navy Du Seuil Ludovic Philipperon - - - / - 09-17 00:17 更新 已出走登记 0 3 Sommerkonig Felix De Giles - - - / - 09-17 00:17 更新 已出走登记 0 4 Supreme Light Baptiste Le Clerc - - - / - 09-17 00:17 更新 已出走登记 0 5 Nom D&#x27;Un Chien Angelo Zuliani - - - / - 09-17 00:17 更新 已出走登记 0 6 Naruto Banbou Maxime Behocaray - - - / - 09-17 00:17 更新 已出走登记 0 7 Roi Danaos Kevin Nabet - - - / - 09-17 00:17 更新 已出走登记 历年冠军 2025 MATIN MIDI ET SOIR Nabet K. · H De Bromhead 2024 DJIN&#x27;S Nabet K. · Seror M. 2023 MASTER D&#x27;OC Reveley J. · George &amp; A. Zetterholm N. UmaFans 面向中文读者的全球赛马新闻门户，提供赛事日历、赛果数据与马匹档案。 频道 全部新闻 赛事日历 马匹档案 数据 赛事日历 马匹档案 我的关注 网站地图 © 2026 UmaFans 首页 赛事 马匹 关注 "
+  },
+  {
+    "url": "https://umafans.run/races/2026/fr-france-galop-2026-0917-145/",
+    "http": 200,
+    "seconds": 2.22,
+    "text": " 尚布利跨栏锦标 2026 Uma Fans 赛马新闻门户 首页 赛事日历 马匹 我的关注 返回赛事日历 返回首页 G3 法国 · Auteuil · 3600m 2026 尚布利跨栏锦标 PRIX DE CHAMBL Y · 2026-09-17 今天 概览 基础资料 等级 Groupe III 日期 2026-09-17 时间 待定 马场 Auteuil 距离 3600m 状态 赛前 出马表 出马表尚未公布。 UmaFans 面向中文读者的全球赛马新闻门户，提供赛事日历、赛果数据与马匹档案。 频道 全部新闻 赛事日历 马匹档案 数据 赛事日历 马匹档案 我的关注 网站地图 © 2026 UmaFans 首页 赛事 马匹 关注 "
+  },
+  {
+    "url": "https://umafans.run/races/2026/fr-france-galop-2026-0917-146/",
+    "http": 200,
+    "seconds": 1.65,
+    "text": " 贡比涅跨栏锦标 2026 Uma Fans 赛马新闻门户 首页 赛事日历 马匹 我的关注 返回赛事日历 返回首页 G3 法国 · Auteuil · 3900m 2026 贡比涅跨栏锦标 PRIX DE COMPIEGNE · 2026-09-17 13:27 赛果待确认 概览 出马表 基础资料 等级 Groupe III 日期 2026-09-17 时间 13:27 马场 Auteuil 距离 3900m 状态 已结束 出马表 闸位 马号 马名 骑师 练马师 负磅 赔率 / 热门 状态 0 1 Losange Bleu Johnny Charron - - - / - 09-17 00:17 更新 已出走登记 0 2 Bon Garcon Gaetan Masure - - - / - 09-17 00:17 更新 已出走登记 0 3 Kirikou Des Mers Baptiste Le Clerc - - - / - 09-17 00:17 更新 已出走登记 0 4 Kyrov Kevin Nabet - - - / - 09-17 00:17 更新 已出走登记 0 5 Diamond Dice Felix De Giles - - - / - 09-17 00:17 更新 已出走登记 UmaFans 面向中文读者的全球赛马新闻门户，提供赛事日历、赛果数据与马匹档案。 频道 全部新闻 赛事日历 马匹档案 数据 赛事日历 马匹档案 我的关注 网站地图 © 2026 UmaFans 首页 赛事 马匹 关注 "
+  },
+  {
+    "url": "https://umafans.run/races/2026/jra-2026-0920-01/",
+    "http": 200,
+    "seconds": 3.16,
+    "text": " 产经赏All Comers 2026 Uma Fans 赛马新闻门户 首页 赛事日历 马匹 我的关注 返回赛事日历 返回首页 G2 日本 · 中山 · 芝2,200メートル 2026 产经赏All Comers オールカマー · 2026-09-20 3天后 概览 历年冠军 基础资料 等级 GⅡ オールカマー 日期 2026-09-20 时间 待定 马场 中山 距离 芝2,200メートル 参赛条件 3歳以上 状态 赛前 出马表 出马表尚未公布。 历年冠军 2025 レガレイラ 戸崎 圭太 · - 2024 レーベンスティール C.ルメール · - 2023 利森名园 C.ルメール · - 2022 吉典娜 横山 武史 · - 2021 玛莲必胜 横山 武史 · - 2020 花火 戸崎 圭太 · - 2019 三幕剧 丸山 元気 · - 2018 金之霸 C.ルメール · - 2017 姜味烈酒 北村 宏司 · - 2016 黄金伶人 吉田 隼人 · - 展开更多年份（14） 2015 湘南魔瓶 池添 謙一 · - 2014 マイネルラクリマ 戸崎 圭太 · - 2013 ヴェルデグリーン 田辺 裕信 · - 2012 中山骑士 柴田 善臣 · - 2011 热诚真挚 佐藤 哲三 · - 2010 信玄 藤田 伸二 · - 2009 梵高艺展 横山 典弘 · - 2008 梵高艺展 蛯名 正義 · - 2007 梵高艺展 蛯名 正義 · - 2006 各有千秋 田中 勝春 · - 2005 冲浪圣地 後藤 浩輝 · - 2004 トーセンダンディ 勝浦 正樹 · - 2003 空中阿姆 蛯名 正義 · - 2002 ロサード 後藤 浩輝 · - UmaFans 面向中文读者的全球赛马新闻门户，提供赛事日历、赛果数据与马匹档案。 频道 全部新闻 赛事日历 马匹档案 数据 赛事日历 马匹档案 我的关注 网站地图 © 2026 UmaFans 首页 赛事 马匹 关注 "
+  },
+  {
+    "url": "https://umafans.run/races/2026/jra-2026-0921-01/",
+    "http": 200,
+    "seconds": 1.8,
+    "text": " 神户新闻杯 2026 Uma Fans 赛马新闻门户 首页 赛事日历 马匹 我的关注 返回赛事日历 返回首页 G2 日本 · 阪神 · 芝2,400メートル 2026 神户新闻杯 神戸新聞杯 · 2026-09-21 4天后 概览 历年冠军 基础资料 等级 GⅡ 神戸新聞杯 日期 2026-09-21 时间 待定 马场 阪神 距离 芝2,400メートル 参赛条件 3歳牡・牝 状态 赛前 出马表 出马表尚未公布。 历年冠军 2025 艾里王 川田 将雅 · - 2024 メイショウタバル 浜中 俊 · - 2023 里见腾辉 川田 将雅 · - 2022 ジャスティンパレス 鮫島 克駿 · - 2021 星光速 吉田 隼人 · - 2020 铁鸟翱天 福永 祐一 · - 2019 农神节庆 C.ルメール · - 2018 华格纳 藤岡 康太 · - 2017 金之霸 C.ルメール · - 2016 里见光钻 C.ルメール · - 展开更多年份（14） 2015 加冕石 Ｃ．ルメール · - 2014 天下唯一 横山 典弘 · - 2013 神威启示 福永 祐一 · - 2012 黄金船 内田 博幸 · - 2011 黄金巨匠 池添 謙一 · - 2010 玫瑰帝国 武 豊 · - 2009 至高无上 四位 洋文 · - 2008 天空深处 四位 洋文 · - 2007 梦之旅 武 豊 · - 2006 网路亨通 高田 潤 · - 2005 大震撼 武 豊 · - 2004 夏威夷王 安藤 勝己 · - 2003 荒漠英雄 Ｋ．デザーモ · - 2002 吉兆 岡部 幸雄 · - UmaFans 面向中文读者的全球赛马新闻门户，提供赛事日历、赛果数据与马匹档案。 频道 全部新闻 赛事日历 马匹档案 数据 赛事日历 马匹档案 我的关注 网站地图 © 2026 UmaFans 首页 赛事 马匹 关注 "
+  },
+  {
+    "url": "https://umafans.run/races/2026/jra-2026-0913-02/",
+    "http": 200,
+    "seconds": 2.22,
+    "text": " 玫瑰锦标 2026 Uma Fans 赛马新闻门户 首页 赛事日历 马匹 我的关注 返回赛事日历 返回首页 G2 日本 · 阪神 · 芝1,800メートル 2026 玫瑰锦标 ローズS · 2026-09-13 赛前 概览 历年冠军 基础资料 等级 GⅡ ローズS 日期 2026-09-13 时间 待定 马场 阪神 距离 芝1,800メートル 参赛条件 3歳牝 状态 赛前 出马表 出马表尚未公布。 历年冠军 2025 承天赐福 川田 将雅 · - 2024 クイーンズウォーク 川田 将雅 · - 2023 假面歌姬 岩田 望来 · - 2022 文艺影院 川田 将雅 · - 2021 指环魔力 福永 祐一 · - 2020 丽雅美 川田 将雅 · - 2019 野田幻想 川田 将雅 · - 2018 カンタービレ C.ルメール · - 2017 ラビットラン 和田 竜二 · - 2016 锡兰宝石 池添 謙一 · - 展开更多年份（14） 2015 タッチングスピーチ Ｃ．ルメール · - 2014 新纪录 岩田 康誠 · - 2013 有型露比 内田 博幸 · - 2012 贵妇人 岩田 康誠 · - 2011 捕鲸之旅 池添 謙一 · - 2010 アニメイトバイオ 後藤 浩輝 · - 2009 ブロードストリート 藤田 伸二 · - 2008 マイネレーツェル 川田 将雅 · - 2007 大和赤骥 安藤 勝己 · - 2006 アドマイヤキッス 武 豊 · - 2005 空中救主 武 豊 · - 2004 レクレドール 安藤 勝己 · - 2003 爱慕律动 武 豊 · - 2002 美妙姿势 松永 幹夫 · - UmaFans 面向中文读者的全球赛马新闻门户，提供赛事日历、赛果数据与马匹档案。 频道 全部新闻 赛事日历 马匹档案 数据 赛事日历 马匹档案 我的关注 网站地图 © 2026 UmaFans 首页 赛事 马匹 关注 "
+  }
+]

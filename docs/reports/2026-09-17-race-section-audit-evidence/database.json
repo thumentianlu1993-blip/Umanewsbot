@@ -1,0 +1,774 @@
+{
+  "now": "2026-09-17 12:28:28.402524+00:00",
+  "settings": {
+    "RACE_DATA_SYNC_ALLOW_NETWORK": true,
+    "RACE_DATA_SYNC_CLAIM_TTL_SECONDS": 240,
+    "RACE_DATA_SYNC_CORRECTION_APPLY_ENABLED": true,
+    "RACE_DATA_SYNC_ENABLED": true,
+    "RACE_DATA_SYNC_FUTURE_BATCH_SIZE": 20,
+    "RACE_DATA_SYNC_FUTURE_DISCOVERY_ENABLED": true,
+    "RACE_DATA_SYNC_FUTURE_HORIZON_DAYS": 30,
+    "RACE_DATA_SYNC_FUTURE_MANIFEST_TTL_SECONDS": 900,
+    "RACE_DATA_SYNC_LIFECYCLE_APPLY_ENABLED": true,
+    "RACE_DATA_SYNC_RACECARD_APPLY_ENABLED": true,
+    "RACE_DATA_SYNC_RESULT_APPLY_ENABLED": true,
+    "RACE_DATA_SYNC_RESULT_PUBLIC_ENABLED": true,
+    "RACE_DATA_SYNC_SCHEDULER_ENABLED": true,
+    "RACE_DATA_SYNC_SCHEDULE_APPLY_ENABLED": true,
+    "RACE_DATA_SYNC_SELECTOR_BATCH_SIZE": 100,
+    "RACE_EVENT_LIFECYCLE_ENABLED": true,
+    "RACE_EVENT_LIFECYCLE_MODE": "enforce"
+  },
+  "near_events": [
+    {
+      "id": 828,
+      "year": 2026,
+      "slug": "fr-france-galop-2026-0917-144",
+      "chinese_name": "罗伯特·勒热讷跨栏锦标",
+      "original_name": "PRIX ROBERT LEJEUNE",
+      "country_region": "france",
+      "normalized_grade": "G3",
+      "local_date": "2026-09-17",
+      "local_start_time": "11:42:00",
+      "race_datetime": "2026-09-17 09:42:00+00:00",
+      "timezone_name": "Europe/Paris",
+      "status": "finished",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    },
+    {
+      "id": 829,
+      "year": 2026,
+      "slug": "fr-france-galop-2026-0917-145",
+      "chinese_name": "尚布利跨栏锦标",
+      "original_name": "PRIX DE CHAMBL Y",
+      "country_region": "france",
+      "normalized_grade": "G3",
+      "local_date": "2026-09-17",
+      "local_start_time": null,
+      "race_datetime": null,
+      "timezone_name": "Europe/Paris",
+      "status": "scheduled",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    },
+    {
+      "id": 830,
+      "year": 2026,
+      "slug": "fr-france-galop-2026-0917-146",
+      "chinese_name": "贡比涅跨栏锦标",
+      "original_name": "PRIX DE COMPIEGNE",
+      "country_region": "france",
+      "normalized_grade": "G3",
+      "local_date": "2026-09-17",
+      "local_start_time": "13:27:00",
+      "race_datetime": "2026-09-17 11:27:00+00:00",
+      "timezone_name": "Europe/Paris",
+      "status": "finished",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    },
+    {
+      "id": 491,
+      "year": 2026,
+      "slug": "us-toba-2026-0918-282",
+      "chinese_name": "赛马会金杯",
+      "original_name": "JOCKEY CLUB GOLD CUP S.",
+      "country_region": "united_states",
+      "normalized_grade": "G1",
+      "local_date": "2026-09-18",
+      "local_start_time": null,
+      "race_datetime": null,
+      "timezone_name": "America/New_York",
+      "status": "scheduled",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    },
+    {
+      "id": 492,
+      "year": 2026,
+      "slug": "us-toba-2026-0918-283",
+      "chinese_name": "普雷斯克岛草原大师锦标",
+      "original_name": "PRESQUE ISLE DOWNS MASTERS S.",
+      "country_region": "united_states",
+      "normalized_grade": "G2",
+      "local_date": "2026-09-18",
+      "local_start_time": null,
+      "race_datetime": null,
+      "timezone_name": "America/New_York",
+      "status": "scheduled",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    },
+    {
+      "id": 103,
+      "year": 2026,
+      "slug": "jra-2026-0919-01",
+      "chinese_name": "阪神跳跃锦标",
+      "original_name": "阪神ジャンプS",
+      "country_region": "japan",
+      "normalized_grade": "JG3",
+      "local_date": "2026-09-19",
+      "local_start_time": null,
+      "race_datetime": null,
+      "timezone_name": "Asia/Tokyo",
+      "status": "scheduled",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    },
+    {
+      "id": 493,
+      "year": 2026,
+      "slug": "us-toba-2026-0919-284",
+      "chinese_name": "草地怪兽锦标",
+      "original_name": "TURF MONSTER S.",
+      "country_region": "united_states",
+      "normalized_grade": "G3",
+      "local_date": "2026-09-19",
+      "local_start_time": null,
+      "race_datetime": null,
+      "timezone_name": "America/New_York",
+      "status": "scheduled",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    },
+    {
+      "id": 494,
+      "year": 2026,
+      "slug": "us-toba-2026-0919-285",
+      "chinese_name": "科蒂利昂锦标",
+      "original_name": "COTILLION S.",
+      "country_region": "united_states",
+      "normalized_grade": "G1",
+      "local_date": "2026-09-19",
+      "local_start_time": null,
+      "race_datetime": null,
+      "timezone_name": "America/New_York",
+      "status": "scheduled",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    },
+    {
+      "id": 495,
+      "year": 2026,
+      "slug": "us-toba-2026-0919-286",
+      "chinese_name": "宾夕法尼亚打吡",
+      "original_name": "PENNSYLVANIA DERBY",
+      "country_region": "united_states",
+      "normalized_grade": "G1",
+      "local_date": "2026-09-19",
+      "local_start_time": null,
+      "race_datetime": null,
+      "timezone_name": "America/New_York",
+      "status": "scheduled",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    },
+    {
+      "id": 496,
+      "year": 2026,
+      "slug": "us-toba-2026-0919-287",
+      "chinese_name": "勇波比锦标",
+      "original_name": "GALLANT BOB S.",
+      "country_region": "united_states",
+      "normalized_grade": "G2",
+      "local_date": "2026-09-19",
+      "local_start_time": null,
+      "race_datetime": null,
+      "timezone_name": "America/New_York",
+      "status": "scheduled",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    },
+    {
+      "id": 770,
+      "year": 2026,
+      "slug": "fr-france-galop-2026-0919-086",
+      "chinese_name": "日蚀锦标",
+      "original_name": "PRIX ECLIPSE - FONDS EUROPEEN DE L ’ELEVAGE",
+      "country_region": "france",
+      "normalized_grade": "G3",
+      "local_date": "2026-09-19",
+      "local_start_time": null,
+      "race_datetime": null,
+      "timezone_name": "Europe/Paris",
+      "status": "scheduled",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    },
+    {
+      "id": 771,
+      "year": 2026,
+      "slug": "fr-france-galop-2026-0919-087",
+      "chinese_name": "橡树锦标",
+      "original_name": "PRIX DES CHENES - FONDS EUROPEEN DE L ’ELEVAGE",
+      "country_region": "france",
+      "normalized_grade": "G3",
+      "local_date": "2026-09-19",
+      "local_start_time": null,
+      "race_datetime": null,
+      "timezone_name": "Europe/Paris",
+      "status": "scheduled",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    },
+    {
+      "id": 772,
+      "year": 2026,
+      "slug": "fr-france-galop-2026-0919-088",
+      "chinese_name": "贝特朗·德塔拉贡锦标",
+      "original_name": "PRIX BERTRAND DE TARRAGON - FONDS EUROPEEN DE L ’ELEVAGE",
+      "country_region": "france",
+      "normalized_grade": "G3",
+      "local_date": "2026-09-19",
+      "local_start_time": null,
+      "race_datetime": null,
+      "timezone_name": "Europe/Paris",
+      "status": "scheduled",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    },
+    {
+      "id": 969,
+      "year": 2026,
+      "slug": "uk-bha-flat-2026-0919-112",
+      "chinese_name": "克莱德河湾锦标",
+      "original_name": "LADBROKES 'GET REWARDED WITH LADBUCKS' FIRTH OF CLYDE",
+      "country_region": "united_kingdom",
+      "normalized_grade": "G3",
+      "local_date": "2026-09-19",
+      "local_start_time": null,
+      "race_datetime": null,
+      "timezone_name": "Europe/London",
+      "status": "scheduled",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    },
+    {
+      "id": 970,
+      "year": 2026,
+      "slug": "uk-bha-flat-2026-0919-113",
+      "chinese_name": "世界锦标赛",
+      "original_name": "DUBAI INTERNATIONAL AIRPORT WORLD TROPHY STAKES",
+      "country_region": "united_kingdom",
+      "normalized_grade": "G3",
+      "local_date": "2026-09-19",
+      "local_start_time": null,
+      "race_datetime": null,
+      "timezone_name": "Europe/London",
+      "status": "scheduled",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    },
+    {
+      "id": 104,
+      "year": 2026,
+      "slug": "jra-2026-0920-01",
+      "chinese_name": "产经赏All Comers",
+      "original_name": "オールカマー",
+      "country_region": "japan",
+      "normalized_grade": "G2",
+      "local_date": "2026-09-20",
+      "local_start_time": null,
+      "race_datetime": null,
+      "timezone_name": "Asia/Tokyo",
+      "status": "scheduled",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    },
+    {
+      "id": 105,
+      "year": 2026,
+      "slug": "jra-2026-0921-01",
+      "chinese_name": "神户新闻杯",
+      "original_name": "神戸新聞杯",
+      "country_region": "japan",
+      "normalized_grade": "G2",
+      "local_date": "2026-09-21",
+      "local_start_time": null,
+      "race_datetime": null,
+      "timezone_name": "Asia/Tokyo",
+      "status": "scheduled",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    },
+    {
+      "id": 191,
+      "year": 2026,
+      "slug": "nar-dirt-2026-0922-28",
+      "chinese_name": "白山大賞典",
+      "original_name": "白山大賞典",
+      "country_region": "japan",
+      "normalized_grade": "JPN3",
+      "local_date": "2026-09-22",
+      "local_start_time": null,
+      "race_datetime": null,
+      "timezone_name": "Asia/Tokyo",
+      "status": "scheduled",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    },
+    {
+      "id": 831,
+      "year": 2026,
+      "slug": "fr-france-galop-2026-0922-147",
+      "chinese_name": "费洛－莫拉塔亚侯爵夫人障碍锦标",
+      "original_name": "PRIX THE FELLOW - MARQUISE DE MORATALLA",
+      "country_region": "france",
+      "normalized_grade": "G3",
+      "local_date": "2026-09-22",
+      "local_start_time": null,
+      "race_datetime": null,
+      "timezone_name": "Europe/Paris",
+      "status": "scheduled",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    },
+    {
+      "id": 832,
+      "year": 2026,
+      "slug": "fr-france-galop-2026-0922-148",
+      "chinese_name": "理查德与罗伯特·轩尼诗障碍锦标",
+      "original_name": "PRIX RICHARD ET ROBERT HENNESSY",
+      "country_region": "france",
+      "normalized_grade": "G3",
+      "local_date": "2026-09-22",
+      "local_start_time": null,
+      "race_datetime": null,
+      "timezone_name": "Europe/Paris",
+      "status": "scheduled",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    },
+    {
+      "id": 192,
+      "year": 2026,
+      "slug": "nar-dirt-2026-0923-29",
+      "chinese_name": "椭圆短途锦标",
+      "original_name": "オーバルスプリント",
+      "country_region": "japan",
+      "normalized_grade": "JPN3",
+      "local_date": "2026-09-23",
+      "local_start_time": null,
+      "race_datetime": null,
+      "timezone_name": "Asia/Tokyo",
+      "status": "scheduled",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    }
+  ],
+  "enrollments": [
+    {
+      "event_id": 828,
+      "state": "enrolled",
+      "reason_code": "",
+      "source_identity_id": 14,
+      "created_at": "2026-09-16 16:17:06.436975+00:00",
+      "updated_at": "2026-09-16 16:17:06.436996+00:00"
+    },
+    {
+      "event_id": 830,
+      "state": "enrolled",
+      "reason_code": "",
+      "source_identity_id": 15,
+      "created_at": "2026-09-16 16:17:07.339418+00:00",
+      "updated_at": "2026-09-16 16:17:07.339432+00:00"
+    }
+  ],
+  "controls": [
+    {
+      "event_id": 828,
+      "mode": "enforce",
+      "next_refresh_at": null,
+      "last_attempt_at": "2026-09-17 10:13:19.396684+00:00",
+      "last_success_at": "2026-09-17 10:13:19.396684+00:00",
+      "last_result_code": "enforce_applied",
+      "consecutive_failures": 0,
+      "manual_pause_reason": ""
+    },
+    {
+      "event_id": 830,
+      "mode": "enforce",
+      "next_refresh_at": null,
+      "last_attempt_at": "2026-09-17 11:57:03.064804+00:00",
+      "last_success_at": "2026-09-17 11:57:03.064804+00:00",
+      "last_result_code": "enforce_applied",
+      "consecutive_failures": 0,
+      "manual_pause_reason": ""
+    }
+  ],
+  "identities": [
+    {
+      "event_id": 828,
+      "source_key": "the_racing_api",
+      "region_code": "france",
+      "external_race_id": "rac_32298277362",
+      "review_status": "approved",
+      "automation_allowed": true
+    },
+    {
+      "event_id": 830,
+      "source_key": "the_racing_api",
+      "region_code": "france",
+      "external_race_id": "rac_32298283173",
+      "review_status": "approved",
+      "automation_allowed": true
+    }
+  ],
+  "result_counts": [],
+  "runner_counts": [
+    {
+      "event_id": 828,
+      "n": 7
+    },
+    {
+      "event_id": 830,
+      "n": 5
+    }
+  ],
+  "past_status": [
+    {
+      "status": "cancelled",
+      "n": 2
+    },
+    {
+      "status": "finished",
+      "n": 9481
+    },
+    {
+      "status": "scheduled",
+      "n": 79
+    }
+  ],
+  "stale_years": [
+    {
+      "year": 2026,
+      "n": 79
+    }
+  ],
+  "stale_regions": [
+    {
+      "country_region": "france",
+      "n": 16
+    },
+    {
+      "country_region": "japan",
+      "n": 14
+    },
+    {
+      "country_region": "united_kingdom",
+      "n": 9
+    },
+    {
+      "country_region": "united_states",
+      "n": 40
+    }
+  ],
+  "stale_counts": {
+    "total": 79,
+    "no_datetime": 77,
+    "no_control": 79,
+    "no_enrollment": 79
+  },
+  "stale_with_confirmed_results": 0,
+  "stale_samples": [
+    {
+      "id": 102,
+      "year": 2026,
+      "slug": "jra-2026-0913-02",
+      "chinese_name": "玫瑰锦标",
+      "original_name": "ローズS",
+      "country_region": "japan",
+      "normalized_grade": "G2",
+      "local_date": "2026-09-13",
+      "local_start_time": null,
+      "race_datetime": null,
+      "timezone_name": "Asia/Tokyo",
+      "status": "scheduled",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    },
+    {
+      "id": 769,
+      "year": 2026,
+      "slug": "fr-france-galop-2026-0913-085",
+      "chinese_name": "小盖锦标",
+      "original_name": "PRIX DU PETIT COUVERT",
+      "country_region": "france",
+      "normalized_grade": "G3",
+      "local_date": "2026-09-13",
+      "local_start_time": null,
+      "race_datetime": null,
+      "timezone_name": "Europe/Paris",
+      "status": "scheduled",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    },
+    {
+      "id": 768,
+      "year": 2026,
+      "slug": "fr-france-galop-2026-0913-084",
+      "chinese_name": "松树大赛",
+      "original_name": "PRIX DU PIN",
+      "country_region": "france",
+      "normalized_grade": "G3",
+      "local_date": "2026-09-13",
+      "local_start_time": null,
+      "race_datetime": null,
+      "timezone_name": "Europe/Paris",
+      "status": "scheduled",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    },
+    {
+      "id": 767,
+      "year": 2026,
+      "slug": "fr-france-galop-2026-0913-083",
+      "chinese_name": "奥兰治太子锦标",
+      "original_name": "PRIX DU PRINCE D’ORANGE",
+      "country_region": "france",
+      "normalized_grade": "G3",
+      "local_date": "2026-09-13",
+      "local_start_time": null,
+      "race_datetime": null,
+      "timezone_name": "Europe/Paris",
+      "status": "scheduled",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    },
+    {
+      "id": 101,
+      "year": 2026,
+      "slug": "jra-2026-0913-01",
+      "chinese_name": "圣烈特纪念",
+      "original_name": "セントライト記念",
+      "country_region": "japan",
+      "normalized_grade": "G2",
+      "local_date": "2026-09-13",
+      "local_start_time": null,
+      "race_datetime": null,
+      "timezone_name": "Asia/Tokyo",
+      "status": "scheduled",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    },
+    {
+      "id": 100,
+      "year": 2026,
+      "slug": "jra-2026-0912-01",
+      "chinese_name": "挑战杯",
+      "original_name": "チャレンジC",
+      "country_region": "japan",
+      "normalized_grade": "G3",
+      "local_date": "2026-09-12",
+      "local_start_time": null,
+      "race_datetime": null,
+      "timezone_name": "Asia/Tokyo",
+      "status": "scheduled",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    },
+    {
+      "id": 766,
+      "year": 2026,
+      "slug": "fr-france-galop-2026-0910-082",
+      "chinese_name": "战士锦标",
+      "original_name": "PRIX GLADIATEUR",
+      "country_region": "france",
+      "normalized_grade": "G3",
+      "local_date": "2026-09-10",
+      "local_start_time": null,
+      "race_datetime": null,
+      "timezone_name": "Europe/Paris",
+      "status": "scheduled",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    },
+    {
+      "id": 490,
+      "year": 2026,
+      "slug": "us-toba-2026-0909-281",
+      "chinese_name": "决斗场橡树大赛",
+      "original_name": "DUELING GROUNDS OAKS INVITATIONAL S.",
+      "country_region": "united_states",
+      "normalized_grade": "G3",
+      "local_date": "2026-09-09",
+      "local_start_time": null,
+      "race_datetime": null,
+      "timezone_name": "America/Chicago",
+      "status": "scheduled",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    },
+    {
+      "id": 487,
+      "year": 2026,
+      "slug": "us-toba-2026-0907-278",
+      "chinese_name": "薄荷百万锦标",
+      "original_name": "MINT MILLIONS INVITATIONAL S.",
+      "country_region": "united_states",
+      "normalized_grade": "G3",
+      "local_date": "2026-09-07",
+      "local_start_time": null,
+      "race_datetime": null,
+      "timezone_name": "America/Chicago",
+      "status": "scheduled",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    },
+    {
+      "id": 961,
+      "year": 2026,
+      "slug": "uk-bha-flat-2026-0907-104",
+      "chinese_name": "冬山锦标",
+      "original_name": "WEATHERBYS GLOBAL STALLIONS APP WINTER HILL STAKES",
+      "country_region": "united_kingdom",
+      "normalized_grade": "G3",
+      "local_date": "2026-09-07",
+      "local_start_time": null,
+      "race_datetime": null,
+      "timezone_name": "Europe/London",
+      "status": "scheduled",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    },
+    {
+      "id": 488,
+      "year": 2026,
+      "slug": "us-toba-2026-0907-279",
+      "chinese_name": "富兰克林－辛普森锦标",
+      "original_name": "FRANKLIN-SIMPSON S.",
+      "country_region": "united_states",
+      "normalized_grade": "G2",
+      "local_date": "2026-09-07",
+      "local_start_time": null,
+      "race_datetime": null,
+      "timezone_name": "America/Chicago",
+      "status": "scheduled",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    },
+    {
+      "id": 486,
+      "year": 2026,
+      "slug": "us-toba-2026-0907-277",
+      "chinese_name": "约翰·C·马比锦标",
+      "original_name": "JOHN C. MABEE S.",
+      "country_region": "united_states",
+      "normalized_grade": "G2",
+      "local_date": "2026-09-07",
+      "local_start_time": null,
+      "race_datetime": null,
+      "timezone_name": "America/Los_Angeles",
+      "status": "scheduled",
+      "visibility_status": "published",
+      "result_confirmed_at": null,
+      "data_quality_status": "partial"
+    }
+  ],
+  "sync_enrollment_summary": [
+    {
+      "state": "enrolled",
+      "n": 13
+    }
+  ],
+  "control_summary": [
+    {
+      "mode": "shadow",
+      "last_result_code": "shadow_proposed",
+      "n": 16
+    },
+    {
+      "mode": "enforce",
+      "last_result_code": "",
+      "n": 3
+    },
+    {
+      "mode": "shadow",
+      "last_result_code": "enforce_applied",
+      "n": 8
+    },
+    {
+      "mode": "enforce",
+      "last_result_code": "enforce_applied",
+      "n": 10
+    }
+  ],
+  "recent_task_summary": [
+    {
+      "task_name": "discover_p0_racecard_urls_task",
+      "status": "success",
+      "n": 1
+    }
+  ],
+  "task_samples": [
+    {
+      "id": 547887,
+      "task_name": "discover_term_candidates",
+      "status": "success",
+      "started_at": "2026-09-17 12:22:57.633939+00:00",
+      "payload": {
+        "article_id": 17293
+      }
+    },
+    {
+      "id": 547886,
+      "task_name": "discover_term_candidates",
+      "status": "success",
+      "started_at": "2026-09-17 12:22:44.613531+00:00",
+      "payload": {
+        "article_id": 17292
+      }
+    },
+    {
+      "id": 547669,
+      "task_name": "discover_term_candidates",
+      "status": "success",
+      "started_at": "2026-09-17 12:03:54.293972+00:00",
+      "payload": {
+        "article_id": 17291
+      }
+    },
+    {
+      "id": 547668,
+      "task_name": "discover_term_candidates",
+      "status": "success",
+      "started_at": "2026-09-17 12:02:53.289551+00:00",
+      "payload": {
+        "article_id": 17290
+      }
+    }
+  ]
+}

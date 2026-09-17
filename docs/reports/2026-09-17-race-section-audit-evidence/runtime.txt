@@ -1,0 +1,7 @@
+ffc0a416ef114994fc4c95df397921898ffebc964e5ad9bc94bea0be9db640ff  /app/server/stable/services/race_data_sync_providers.py
+93f249ebe40111df4c2739bd17883e5dd3c5e93ed699879e23247129faaa5f1e  /app/server/stable/services/race_data_sync_results.py
+c36f337e81790168b46e386d5191b527343a47c251509c5e9a17de6ec0c51e07  /app/server/stable/views.py
+/umanewsbot-web-1 sha256:e022147a9ddd4063e7ac35b5591fd0a118335b211b2c88da90d3fec0cdc1f986 running restart=0 OOM=false
+/umanewsbot-worker-1 sha256:e022147a9ddd4063e7ac35b5591fd0a118335b211b2c88da90d3fec0cdc1f986 running restart=0 OOM=false
+/umanewsbot-beat-1 sha256:e022147a9ddd4063e7ac35b5591fd0a118335b211b2c88da90d3fec0cdc1f986 running restart=0 OOM=false
+/umanewsbot-race_sync_v2_worker-1 sha256:e022147a9ddd4063e7ac35b5591fd0a118335b211b2c88da90d3fec0cdc1f986 running restart=0 OOM=false

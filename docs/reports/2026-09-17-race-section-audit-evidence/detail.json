@@ -1,0 +1,427 @@
+{
+  "now": "2026-09-17 12:29:20.724549+00:00",
+  "release": "9a88243ffcf4d628a2ceaa528a66871d566fca82",
+  "tracking": [
+    {
+      "event_id": 828,
+      "state": "awaiting_result",
+      "tracking_enabled": true,
+      "next_poll_at": "2026-09-17 12:47:26.355513+00:00",
+      "last_attempt_at": "2026-09-17 12:17:24.293575+00:00",
+      "last_success_at": "2026-09-17 12:17:26.355513+00:00",
+      "consecutive_failures": 0,
+      "circuit_reason": "",
+      "checkpoint_payload": {}
+    },
+    {
+      "event_id": 830,
+      "state": "awaiting_result",
+      "tracking_enabled": true,
+      "next_poll_at": "2026-09-17 12:44:01.751994+00:00",
+      "last_attempt_at": "2026-09-17 12:29:00.136880+00:00",
+      "last_success_at": "2026-09-17 12:29:01.751994+00:00",
+      "consecutive_failures": 0,
+      "circuit_reason": "",
+      "checkpoint_payload": {}
+    }
+  ],
+  "checkpoints": [
+    {
+      "tracking__event_id": 828,
+      "data_kind": "result",
+      "next_poll_at": "2026-09-17 12:47:26.355513+00:00",
+      "last_attempt_at": "2026-09-17 12:17:26.355513+00:00",
+      "last_success_at": "2026-09-17 12:17:26.355513+00:00",
+      "circuit_reason": "",
+      "consecutive_failures": 0
+    },
+    {
+      "tracking__event_id": 830,
+      "data_kind": "result",
+      "next_poll_at": "2026-09-17 12:44:01.751994+00:00",
+      "last_attempt_at": "2026-09-17 12:29:01.751994+00:00",
+      "last_success_at": "2026-09-17 12:29:01.751994+00:00",
+      "circuit_reason": "",
+      "consecutive_failures": 0
+    },
+    {
+      "tracking__event_id": 828,
+      "data_kind": "race_time",
+      "next_poll_at": null,
+      "last_attempt_at": "2026-09-17 09:47:02.549095+00:00",
+      "last_success_at": "2026-09-17 09:47:02.549095+00:00",
+      "circuit_reason": "",
+      "consecutive_failures": 0
+    },
+    {
+      "tracking__event_id": 828,
+      "data_kind": "racecard",
+      "next_poll_at": null,
+      "last_attempt_at": "2026-09-17 09:47:02.549095+00:00",
+      "last_success_at": "2026-09-17 09:47:02.549095+00:00",
+      "circuit_reason": "",
+      "consecutive_failures": 0
+    },
+    {
+      "tracking__event_id": 830,
+      "data_kind": "race_time",
+      "next_poll_at": null,
+      "last_attempt_at": "2026-09-17 11:32:04.642276+00:00",
+      "last_success_at": "2026-09-17 11:32:04.642276+00:00",
+      "circuit_reason": "",
+      "consecutive_failures": 0
+    },
+    {
+      "tracking__event_id": 830,
+      "data_kind": "racecard",
+      "next_poll_at": null,
+      "last_attempt_at": "2026-09-17 11:32:04.642276+00:00",
+      "last_success_at": "2026-09-17 11:32:04.642276+00:00",
+      "circuit_reason": "",
+      "consecutive_failures": 0
+    }
+  ],
+  "observations": [
+    {
+      "id": 52,
+      "source_identity__event_id": 830,
+      "observed_at": "2026-09-17 11:52:00.346506+00:00",
+      "http_status": null,
+      "result_phase": "provisional",
+      "error_code": "",
+      "parse_warnings": []
+    },
+    {
+      "id": 51,
+      "source_identity__event_id": 828,
+      "observed_at": "2026-09-17 10:07:04.248383+00:00",
+      "http_status": null,
+      "result_phase": "provisional",
+      "error_code": "",
+      "parse_warnings": []
+    },
+    {
+      "id": 50,
+      "source_identity__event_id": 830,
+      "observed_at": "2026-09-16 16:17:50.451885+00:00",
+      "http_status": null,
+      "result_phase": "racecard",
+      "error_code": "",
+      "parse_warnings": []
+    },
+    {
+      "id": 49,
+      "source_identity__event_id": 828,
+      "observed_at": "2026-09-16 16:17:46.639069+00:00",
+      "http_status": null,
+      "result_phase": "racecard",
+      "error_code": "",
+      "parse_warnings": []
+    }
+  ],
+  "incidents": [
+    {
+      "scope_key": "830",
+      "scope_type": "data_sync_event",
+      "status": "open",
+      "alert_type": "provisional_overdue",
+      "details": {
+        "region": "france",
+        "event_id": 830,
+        "source_key": "the_racing_api",
+        "deadline_at": "2026-09-17T11:57:00+00:00",
+        "reason_code": "complete"
+      },
+      "last_error_code": "",
+      "delivery_attempts": 0,
+      "alert_sent_at": null,
+      "opened_at": "2026-09-17 11:57:02.965005+00:00"
+    },
+    {
+      "scope_key": "828",
+      "scope_type": "data_sync_event",
+      "status": "open",
+      "alert_type": "provisional_overdue",
+      "details": {
+        "region": "france",
+        "event_id": 828,
+        "source_key": "the_racing_api",
+        "deadline_at": "2026-09-17T10:12:00+00:00",
+        "reason_code": "complete"
+      },
+      "last_error_code": "",
+      "delivery_attempts": 0,
+      "alert_sent_at": null,
+      "opened_at": "2026-09-17 10:13:19.312974+00:00"
+    }
+  ],
+  "transitions": [
+    {
+      "event_id": 828,
+      "from_status": "scheduled",
+      "to_status": "running",
+      "reason_code": "time_reached_race_datetime",
+      "created_at": "2026-09-17 09:42:00.159308+00:00"
+    },
+    {
+      "event_id": 828,
+      "from_status": "running",
+      "to_status": "finished",
+      "reason_code": "time_t_plus_30",
+      "created_at": "2026-09-17 10:13:19.452678+00:00"
+    },
+    {
+      "event_id": 830,
+      "from_status": "scheduled",
+      "to_status": "running",
+      "reason_code": "time_reached_race_datetime",
+      "created_at": "2026-09-17 11:27:00.053754+00:00"
+    },
+    {
+      "event_id": 830,
+      "from_status": "running",
+      "to_status": "finished",
+      "reason_code": "time_t_plus_30",
+      "created_at": "2026-09-17 11:57:03.129541+00:00"
+    }
+  ],
+  "source_events": [
+    {
+      "id": 828,
+      "racecourse": "Auteuil",
+      "source_refs": {
+        "pdf": "groupes_listed_obstacles_2026_v4.pdf",
+        "page": 44,
+        "primary": "https://www.france-galop.com/sites/default/files/2026-01/groupes_listed_obstacles_2026_v4.pdf",
+        "race_number": "148",
+        "source_kind": "france_galop_groupes_listed_2026",
+        "discipline_line": "Haies - Groupe III - Mâles et Hongres",
+        "source_language": "fr"
+      },
+      "manual_lock_flags": {}
+    },
+    {
+      "id": 830,
+      "racecourse": "Auteuil",
+      "source_refs": {
+        "pdf": "groupes_listed_obstacles_2026_v4.pdf",
+        "page": 44,
+        "primary": "https://www.france-galop.com/sites/default/files/2026-01/groupes_listed_obstacles_2026_v4.pdf",
+        "race_number": "150",
+        "source_kind": "france_galop_groupes_listed_2026",
+        "discipline_line": "Haies - Groupe III",
+        "source_language": "fr"
+      },
+      "manual_lock_flags": {}
+    },
+    {
+      "id": 829,
+      "racecourse": "Auteuil",
+      "source_refs": {
+        "pdf": "groupes_listed_obstacles_2026_v4.pdf",
+        "page": 44,
+        "primary": "https://www.france-galop.com/sites/default/files/2026-01/groupes_listed_obstacles_2026_v4.pdf",
+        "race_number": "149",
+        "source_kind": "france_galop_groupes_listed_2026",
+        "discipline_line": "Haies - Groupe III - Femelles",
+        "source_language": "fr"
+      },
+      "manual_lock_flags": {}
+    },
+    {
+      "id": 104,
+      "racecourse": "中山",
+      "source_refs": {
+        "primary": "https://www.jra.go.jp/datafile/seiseki/replay/2026/jyusyo.html",
+        "source_kind": "jra_official_graded_race_list",
+        "source_language": "ja",
+        "jra_result_label": "",
+        "post_time_policy": "not_recorded_in_jra_graded_race_list",
+        "jockey_source_text": "",
+        "winner_source_text": ""
+      },
+      "manual_lock_flags": {}
+    },
+    {
+      "id": 105,
+      "racecourse": "阪神",
+      "source_refs": {
+        "primary": "https://www.jra.go.jp/datafile/seiseki/replay/2026/jyusyo.html",
+        "source_kind": "jra_official_graded_race_list",
+        "source_language": "ja",
+        "jra_result_label": "",
+        "post_time_policy": "not_recorded_in_jra_graded_race_list",
+        "jockey_source_text": "",
+        "winner_source_text": ""
+      },
+      "manual_lock_flags": {}
+    }
+  ],
+  "aliases": [
+    {
+      "id": 2776,
+      "created_at": "2026-07-06 14:00:46.724149+00:00",
+      "updated_at": "2026-07-06 14:00:46.724166+00:00",
+      "event_id": 828,
+      "text": "G3 PRIX ROBERT LEJEUNE",
+      "source_language": "fr",
+      "alias_type": "alias",
+      "source": "csv",
+      "is_active": true
+    },
+    {
+      "id": 2775,
+      "created_at": "2026-07-06 14:00:46.713400+00:00",
+      "updated_at": "2026-07-06 14:00:46.713428+00:00",
+      "event_id": 828,
+      "text": "Groupe III PRIX ROBERT LEJEUNE",
+      "source_language": "fr",
+      "alias_type": "alias",
+      "source": "csv",
+      "is_active": true
+    },
+    {
+      "id": 2774,
+      "created_at": "2026-07-06 14:00:46.704252+00:00",
+      "updated_at": "2026-07-06 14:00:46.704276+00:00",
+      "event_id": 828,
+      "text": "PRIX ROBERT LEJEUNE",
+      "source_language": "fr",
+      "alias_type": "alias",
+      "source": "csv",
+      "is_active": true
+    },
+    {
+      "id": 2782,
+      "created_at": "2026-07-06 14:00:46.786682+00:00",
+      "updated_at": "2026-07-06 14:00:46.786697+00:00",
+      "event_id": 830,
+      "text": "G3 PRIX DE COMPIEGNE",
+      "source_language": "fr",
+      "alias_type": "alias",
+      "source": "csv",
+      "is_active": true
+    },
+    {
+      "id": 2781,
+      "created_at": "2026-07-06 14:00:46.781746+00:00",
+      "updated_at": "2026-07-06 14:00:46.781763+00:00",
+      "event_id": 830,
+      "text": "Groupe III PRIX DE COMPIEGNE",
+      "source_language": "fr",
+      "alias_type": "alias",
+      "source": "csv",
+      "is_active": true
+    },
+    {
+      "id": 2780,
+      "created_at": "2026-07-06 14:00:46.776320+00:00",
+      "updated_at": "2026-07-06 14:00:46.776337+00:00",
+      "event_id": 830,
+      "text": "PRIX DE COMPIEGNE",
+      "source_language": "fr",
+      "alias_type": "alias",
+      "source": "csv",
+      "is_active": true
+    },
+    {
+      "id": 2779,
+      "created_at": "2026-07-06 14:00:46.762208+00:00",
+      "updated_at": "2026-07-06 14:00:46.762231+00:00",
+      "event_id": 829,
+      "text": "G3 PRIX DE CHAMBL Y",
+      "source_language": "fr",
+      "alias_type": "alias",
+      "source": "csv",
+      "is_active": true
+    },
+    {
+      "id": 2778,
+      "created_at": "2026-07-06 14:00:46.754841+00:00",
+      "updated_at": "2026-07-06 14:00:46.754863+00:00",
+      "event_id": 829,
+      "text": "Groupe III PRIX DE CHAMBL Y",
+      "source_language": "fr",
+      "alias_type": "alias",
+      "source": "csv",
+      "is_active": true
+    },
+    {
+      "id": 2777,
+      "created_at": "2026-07-06 14:00:46.744902+00:00",
+      "updated_at": "2026-07-06 14:00:46.744949+00:00",
+      "event_id": 829,
+      "text": "PRIX DE CHAMBL Y",
+      "source_language": "fr",
+      "alias_type": "alias",
+      "source": "csv",
+      "is_active": true
+    },
+    {
+      "id": 303,
+      "created_at": "2026-07-06 03:40:21.865073+00:00",
+      "updated_at": "2026-07-06 03:40:21.865089+00:00",
+      "event_id": 104,
+      "text": "GⅡ オールカマー",
+      "source_language": "ja",
+      "alias_type": "alias",
+      "source": "csv",
+      "is_active": true
+    },
+    {
+      "id": 302,
+      "created_at": "2026-07-06 03:40:21.860349+00:00",
+      "updated_at": "2026-07-06 03:40:21.860365+00:00",
+      "event_id": 104,
+      "text": "オールカマー",
+      "source_language": "ja",
+      "alias_type": "alias",
+      "source": "csv",
+      "is_active": true
+    },
+    {
+      "id": 304,
+      "created_at": "2026-07-06 03:40:21.869871+00:00",
+      "updated_at": "2026-07-06 03:40:21.869887+00:00",
+      "event_id": 104,
+      "text": "产经赏All Comers",
+      "source_language": "ja",
+      "alias_type": "alias",
+      "source": "csv",
+      "is_active": true
+    },
+    {
+      "id": 306,
+      "created_at": "2026-07-06 03:40:21.885058+00:00",
+      "updated_at": "2026-07-06 03:40:21.885090+00:00",
+      "event_id": 105,
+      "text": "GⅡ 神戸新聞杯",
+      "source_language": "ja",
+      "alias_type": "alias",
+      "source": "csv",
+      "is_active": true
+    },
+    {
+      "id": 307,
+      "created_at": "2026-07-06 03:40:21.889871+00:00",
+      "updated_at": "2026-07-06 03:40:21.889886+00:00",
+      "event_id": 105,
+      "text": "神户新闻杯",
+      "source_language": "ja",
+      "alias_type": "alias",
+      "source": "csv",
+      "is_active": true
+    },
+    {
+      "id": 305,
+      "created_at": "2026-07-06 03:40:21.879723+00:00",
+      "updated_at": "2026-07-06 03:40:21.879739+00:00",
+      "event_id": 105,
+      "text": "神戸新聞杯",
+      "source_language": "ja",
+      "alias_type": "alias",
+      "source": "csv",
+      "is_active": true
+    }
+  ]
+}
