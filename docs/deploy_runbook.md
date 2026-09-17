@@ -1,5 +1,11 @@
 # 部署运行手册
 
+## 2026-09-18 PR #203 已合并并生产上线
+
+用户批准精确发布包后，PR #203 合并为 `6c8bfdde`，生产固定代码 `d0bb40fb`、镜像 `677fe69f68b8…`，0078 空迁移计划。四应用实际版本一致，Web healthy、两个 worker 正常；双域名 20 个赛事页及 8 个首页/健康/筛选请求通过。104 官方别名、829 名称及别名已按原 SHA manifest 修复，审计 552430，其他字段及路径不变。备份、intent、complete 与锁收尾通过，旧 race_live=7543 未消费。
+
+JRA 配置在四应用明确为 false；104/105 资料仍缺，828/830 仍待正式赛果，历史清单正式赛果补齐 0。本次是代码与两条身份修复上线，不是所有赛事资料补齐。全量 CI 无新增失败，45 个旧失败保留。详见[生产发布验收](changes/fix-race-section-gaps/release.md)；以下较早“未交付”记录保留为当时状态。
+
 ## 2026-09-17 赛事区代码发布与 JRA 独立停用
 
 本次新增唯一默认关闭配置 `RACE_DATA_SYNC_JRA_PRE_RACE_ENABLED`，settings、env示例及两份生产Compose均显式传递。无迁移，发布前后按既有0078合同验证，且先检查活跃马匹采集/生产锁。JRA停用必须让worker/Web实际重载false并退出旧在途任务；只改.env不算完成。精确发布包可包含已冻结的829/104两条身份修复，不包含历史赛果批量写入或JRA启用。应用与测试绑定 `d0bb40fb`，后续交接仅改文档；完整 Linux 5,012 项无新增失败、45 项发布合同通过，原有 45 项失败仍保留；完整测试与构件口径见 [验证记录](changes/fix-race-section-gaps/validation.md)，实际交付仍核验固定 SHA 的 CI 与后续纯文档差异。精确操作范围、容量和数据缺口见 [rollout](changes/fix-race-section-gaps/rollout.md)，通用授权只引用根AGENTS.md。
