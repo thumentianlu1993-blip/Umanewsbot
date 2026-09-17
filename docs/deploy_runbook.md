@@ -1,5 +1,9 @@
 # 部署运行手册
 
+## 2026-09-17 赛事区代码发布与 JRA 独立停用
+
+本次新增唯一默认关闭配置 `RACE_DATA_SYNC_JRA_PRE_RACE_ENABLED`，settings、env示例及两份生产Compose均显式传递。无迁移，发布前后按既有0078合同验证，且先检查活跃马匹采集/生产锁。JRA停用必须让worker/Web实际重载false并退出旧在途任务；只改.env不算完成。首次代码包不包含历史数据写入或JRA启用。精确操作范围、容量和数据缺口见 [rollout](changes/fix-race-section-gaps/rollout.md)，通用授权只引用根AGENTS.md。
+
 ## 2026-09-17 赛事修复的后续操作计划
 
 - 具体目标、只读复核、数据包准备、生产验收与恢复约束集中于[赛事区修复计划](changes/fix-race-section-gaps/PLAN.md)。本轮未执行生产操作。

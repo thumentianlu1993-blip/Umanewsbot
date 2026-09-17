@@ -1,5 +1,9 @@
 # 项目状态文档
 
+## 2026-09-17 赛事区修复进入交付验证
+
+赛事区修复已实现并经固定子代理两轮代码审核通过；257 项定向 PG 测试通过，正在完成全量 CI 对照。历史79场只有冻结清单，尚未恢复赛果；JRA新功能默认关闭，尚未上线。以 [当前状态](current_state.md) 和 [发布包](changes/fix-race-section-gaps/rollout.md) 为准。
+
 ## 2026-09-17 赛事区修复计划形成
 
 - [最小修复计划](changes/fix-race-section-gaps/PLAN.md)沿用现有同步、候选与 recovery 链路，先处理具体发布／身份问题及误导展示，再按固定名单补数据；不扩展为新来源平台或运营系统。主线程修订后，同一只读子代理两轮审核已 APPROVED；未实现／发布，详见[审核记录](changes/fix-race-section-gaps/REVIEW.md)。

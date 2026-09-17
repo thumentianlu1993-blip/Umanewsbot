@@ -34,6 +34,38 @@ def _aware(value: str | None) -> datetime:
     return parsed
 
 
+def section_gaps(cutoff):
+    """Bounded diagnostics; dates and metadata are evidence, never state repairs."""
+    from django.db.models import Exists, OuterRef
+    from stable.services.race_pre_race import in_window, _refs, _state, _dt, JRA, TRA
+    events = models.RaceEvent.objects.filter(visibility_status='published')
+    def summarize(qs):
+        return {'count': qs.count(), 'event_ids': list(qs.order_by('pk').values_list('pk', flat=True)[:50])}
+    future = events.filter(status='scheduled', local_date__gte=cutoff.date(),
+                           local_date__lte=cutoff.date()+timedelta(days=7))
+    missing_card = future.annotate(has_card=Exists(models.RaceEventRunner.objects.filter(event_id=OuterRef('pk')))).filter(has_card=False)
+    past = events.filter(status__in=('scheduled','running'), local_date__lt=cutoff.date()).exclude(race_data_sync_enrollment__state='enrolled')
+    provisional = events.filter(status='finished', result_confirmed_at__isnull=True,
+                                local_date__gte=cutoff.date()-timedelta(days=7))
+    window = events.filter(status='scheduled', local_date__gte=cutoff.date()-timedelta(days=1),
+                           local_date__lte=cutoff.date()+timedelta(days=5)).order_by('pk')
+    rows = []
+    for event in window[:500]:
+        if not in_window(event, cutoff): continue
+        for source in (JRA, TRA):
+            state = _state(event, source)
+            if not state: continue
+            due = _dt(state.get('next_poll_at'))
+            rows.append({'event_id':event.pk,'source':source,'last_attempt_at':state.get('last_attempt_at'),
+                'last_success_at':state.get('last_success_at'),'next_poll_at':state.get('next_poll_at'),
+                'reason':state.get('reason',''),'overdue':bool(due and cutoff > due+timedelta(minutes=10))})
+    return {'expired_unmanaged':summarize(past),'seven_day_missing_time':summarize(future.filter(race_datetime__isnull=True)),
+            'seven_day_missing_canonical_card':summarize(missing_card),'formal_evidence_missing':summarize(provisional),
+            'pre_race_checks':rows[:100], 'checks_truncated':len(rows)>100 or window.count()>500,
+            'overdue_sample_count':sum(row['overdue'] for row in rows),
+            'source_failure_sample_count':sum(bool(row['reason']) for row in rows)}
+
+
 class Command(BaseCommand):
     help = "只读审计赛事时间、出马表、赛果和生命周期自动同步"
 
@@ -256,11 +288,13 @@ class Command(BaseCommand):
         ).count()
         report = {
             "schema_version": 1,
+            "section_gaps": section_gaps(cutoff),
             "cutoff": cutoff.isoformat(),
             "horizon_days": horizon_days,
             "would_write": False,
             "runtime": {
                 "enabled": flags.enabled,
+                "jra_pre_race_enabled": settings.RACE_DATA_SYNC_JRA_PRE_RACE_ENABLED,
                 "scheduler_enabled": flags.scheduler_enabled,
                 "allow_network": flags.allow_network,
                 "schedule_apply_enabled": flags.schedule_apply_enabled,

@@ -640,7 +640,11 @@ def race_event_apply_candidate(request: HttpRequest, candidate_id: int):
     if denied:
         return denied
     candidate = get_object_or_404(RaceEventDataCandidate.objects.select_related("event"), pk=candidate_id)
-    apply_data_candidate(candidate, user=request.user)
+    try:
+        apply_data_candidate(candidate, user=request.user)
+    except ValueError as exc:
+        messages.error(request, str(exc))
+        return redirect("console-race-event-edit", event_id=candidate.event_id)
     messages.success(request, "候选资料已应用。")
     return redirect("console-race-event-edit", event_id=candidate.event_id)
 
@@ -2983,6 +2987,7 @@ def _confirmed_race_results(event: RaceEvent) -> list[RaceEventResult]:
 
 
 def _confirmed_race_winner(results: list[RaceEventResult]):
+    results = [row for row in results if row.is_confirmed]
     return next(
         (result for result in results if result.reported_finish_position == 1),
         None,
@@ -3006,9 +3011,64 @@ def _confirmed_race_winner(results: list[RaceEventResult]):
     )
 
 
+def _race_time_label(event):
+    from zoneinfo import ZoneInfo
+    if event.race_datetime:
+        try:
+            local = event.race_datetime.astimezone(ZoneInfo(event.timezone_name))
+            beijing = event.race_datetime.astimezone(ZoneInfo("Asia/Shanghai"))
+            return f"北京时间 {beijing:%m-%d %H:%M}（当地 {local:%m-%d %H:%M}，{event.timezone_name}）"
+        except (ValueError, KeyError):
+            pass
+    return "当地日期，开赛时间待补"
+
+
+def _upcoming_race_queryset(queryset, now):
+    from zoneinfo import ZoneInfo
+    dated = Q(race_datetime__gt=now)
+    for name in queryset.filter(race_datetime__isnull=True).order_by().values_list("timezone_name", flat=True).distinct():
+        try:
+            local_today = now.astimezone(ZoneInfo(name)).date()
+        except (ValueError, KeyError):
+            continue
+        dated |= Q(race_datetime__isnull=True, timezone_name=name, local_date__gte=local_today)
+    return queryset.filter(status=RaceEventStatus.SCHEDULED).filter(dated)
+
+
+def _finished_race_queryset(queryset, now):
+    # Narrow by stored facts first; use the same batched runtime gate as rendering.
+    results = RaceEventResult.objects.filter(event_id=OuterRef("pk"))
+    queryset = queryset.filter(status=RaceEventStatus.FINISHED).annotate(
+        _has_confirmed=Exists(results.filter(is_confirmed=True)),
+        _has_unconfirmed=Exists(results.filter(is_confirmed=False)),
+    ).filter(_has_confirmed=True, _has_unconfirmed=False)
+    ids = list(queryset.filter(
+        Q(projection_control__current_result_revision__isnull=False) |
+        Q(projection_control__write_owner__in=("data_sync", "live"))
+    ).exclude(projection_control__write_owner="historical").values_list("pk", flat=True))
+    hidden = []
+    for offset in range(0,len(ids),100):
+        decisions = resolve_race_live_public_reads(event_ids=ids[offset:offset+100], now=now)
+        hidden.extend(pk for pk, value in decisions.items()
+                      if not value.visible or value.phase not in {"official", "corrected"})
+    return queryset.exclude(pk__in=hidden)
+
+
 def _public_race_status_label(event: RaceEvent, today, winner=None) -> str:
+    event.public_time_label = _race_time_label(event)
     if event.status == RaceEventStatus.FINISHED:
         return "已完赛" if winner else "赛果待确认"
+    now = timezone.now()
+    if event.status in {RaceEventStatus.SCHEDULED, RaceEventStatus.RUNNING}:
+        from zoneinfo import ZoneInfo
+        try:
+            local_today = now.astimezone(ZoneInfo(event.timezone_name)).date()
+        except (ValueError, KeyError):
+            local_today = today
+        if (event.race_datetime and now > event.race_datetime + timedelta(minutes=30)) or (
+            not event.race_datetime and event.local_date and event.local_date < local_today
+        ):
+            return "赛期已过，资料待补"
     if event.status == RaceEventStatus.RUNNING:
         return "进行中"
     if event.status == RaceEventStatus.POSTPONED:
@@ -3017,6 +3077,10 @@ def _public_race_status_label(event: RaceEvent, today, winner=None) -> str:
         return "取消"
     if event.local_date is None:
         return "日期待定"
+    try:
+        today = now.astimezone(ZoneInfo(event.timezone_name)).date()
+    except (ValueError, KeyError):
+        pass
     days = (event.local_date - today).days
     if days == 0:
         return "今天"
@@ -3024,7 +3088,7 @@ def _public_race_status_label(event: RaceEvent, today, winner=None) -> str:
         return "明天"
     if days > 1:
         return f"{days}天后"
-    return event.get_status_display()
+    return "赛期已过，资料待补"
 
 
 def _public_today_races() -> tuple[list[dict], bool]:
@@ -3050,6 +3114,7 @@ def _public_today_races() -> tuple[list[dict], bool]:
     winners: dict[int, str] = {}
     finished_ids = [event.pk for event in events if event.status == RaceEventStatus.FINISHED]
     if finished_ids:
+        finished_ids = list(_finished_race_queryset(base.filter(pk__in=finished_ids), timezone.now()).values_list("pk", flat=True))
         candidates_by_event: dict[int, list[RaceEventResult]] = {}
         for result in RaceEventResult.objects.filter(
             event_id__in=finished_ids,
@@ -3075,6 +3140,7 @@ def _public_today_races() -> tuple[list[dict], bool]:
         {
             "event": event,
             "winner": winners.get(event.pk, ""),
+            "status_label": _public_race_status_label(event, today, winners.get(event.pk)),
             "date_label": _race_date_label(event, today),
         }
         for event in events
@@ -3093,7 +3159,10 @@ def _public_next_key_race():
         Q(priority__in=[RaceEventPriority.P0, RaceEventPriority.P1])
         | Q(is_featured=True)
     )
-    return queryset.order_by("local_date", "local_start_time", "id").first()
+    event = _upcoming_race_queryset(queryset, timezone.now()).order_by("local_date", "local_start_time", "id").first()
+    if event:
+        event.public_time_label = _race_time_label(event)
+    return event
 
 
 def _public_race_calendar_base_queryset(filters: dict, *, today):
@@ -3130,8 +3199,10 @@ def _public_race_calendar_base_queryset(filters: dict, *, today):
         queryset = queryset.filter(country_region=filters["region"])
     if filters["grade"]:
         queryset = queryset.filter(normalized_grade__in=PUBLIC_RACE_GRADE_FILTERS[filters["grade"]])
-    if filters["when"]:
-        queryset = queryset.filter(status__in=PUBLIC_RACE_WHEN_FILTERS[filters["when"]])
+    if filters["when"] == "upcoming":
+        queryset = _upcoming_race_queryset(queryset, timezone.now())
+    elif filters["when"] == "finished":
+        queryset = _finished_race_queryset(queryset, timezone.now())
     return queryset
 
 
@@ -3322,9 +3393,9 @@ def _group_race_events_by_date(events, *, today, anchor_date=None):
     live_revision_event_ids = [
         event.pk
         for event in events
-        if getattr(event, "public_current_result_revision_id", None) is not None
-        and getattr(event, "public_projection_write_owner", None)
-        != "historical"
+        if (getattr(event, "public_current_result_revision_id", None) is not None
+            or getattr(event, "public_projection_write_owner", None) in {"data_sync", "live"})
+        and getattr(event, "public_projection_write_owner", None) != "historical"
     ]
     live_public_reads = (
         resolve_race_live_public_reads(
@@ -3338,7 +3409,6 @@ def _group_race_events_by_date(events, *, today, anchor_date=None):
         live_public_read = live_public_reads.get(event.pk)
         if (
             live_public_read is not None
-            and live_public_read.revision_id is not None
             and not live_public_read.visible
         ):
             event.top_results = []
@@ -3837,8 +3907,11 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
             ArticleRaceLinkType.RELATED,
         )
     }
-    runners = _sort_runners_for_display(list(event.runners.all()), event.country_region)
-    has_current_live_revision = current_result_revision is not None
+    from .services.race_pre_race import public_jra_preview
+    preview = public_jra_preview(event, now=read_now)
+    runners = _sort_runners_for_display(preview["rows"] if preview else list(event.runners.all()), event.country_region)
+    has_current_live_revision = bool(projection_control and projection_control.write_owner != "historical" and (
+        current_result_revision is not None or projection_control.write_owner in {"data_sync", "live"}))
     hide_live_results = has_current_live_revision and not live_public_read.visible
     results = (
         []
@@ -3876,6 +3949,7 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
         {
             "event": event,
             "runners": runners,
+            "runner_section_label": preview["label"] if preview else "出马表",
             "results": results,
             "history_winners": history_winners,
             "history_primary": history_winners[:10],

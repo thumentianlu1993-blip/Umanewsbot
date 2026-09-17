@@ -34,7 +34,7 @@
       <p class="countdown-race">{{ next_key_race.chinese_name }}{% if next_key_race.grade_badge_label %} · {{ next_key_race.grade_badge_label }}{% endif %}</p>
       <p class="countdown-meta">{{ next_key_race.get_country_region_display }} · {{ next_key_race.racecourse }}{% if next_key_race.distance_text %} · {{ next_key_race.distance_text }}{% endif %}</p>
       <div class="countdown-digits tabular">
-        {{ next_key_race.local_date|date:"n月j日" }}{% if next_key_race.local_start_time %} {{ next_key_race.local_start_time|time:"H:i" }}{% endif %}
+        {{ next_key_race.local_date|date:"n月j日" }} · {{ next_key_race.public_time_label }}
         <small>{% if next_key_race.status == "finished" %}已完赛{% else %}开跑{% endif %}</small>
       </div>
     </section>

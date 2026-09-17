@@ -26,11 +26,11 @@
                 </span>
                 <span class="race-row-status">
                   {% if entry.event.status == "finished" %}
-                    <span class="status-chip done">已完赛</span>
+                    <span class="status-chip done">{{ entry.status_label }}</span>
                     {% if entry.winner %}<div class="race-row-winner">冠军 <b>{{ entry.winner }}</b></div>{% endif %}
                   {% else %}
-                    <span class="status-chip soon">{{ entry.date_label }}</span>
-                    <div class="race-row-winner tabular">{% if entry.event.local_start_time %}{{ entry.event.local_start_time|time:"H:i" }} 发走{% else %}时刻待定{% endif %}</div>
+                    <span class="status-chip soon">{{ entry.status_label }}</span>
+                    <div class="race-row-winner tabular">{{ entry.event.public_time_label }}</div>
                   {% endif %}
                 </span>
               </a>

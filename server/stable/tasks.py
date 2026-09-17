@@ -444,6 +444,10 @@ def discover_future_race_data_sync_task() -> dict:
             raise ValueError("max_events")
         if not 60 <= ttl_seconds <= 86_400:
             raise ValueError("ttl_seconds")
+        from stable.services.race_pre_race import discover_jra_pre_race
+        now = timezone.now()
+        census_due = now.minute // 10 == 1
+        jra = discover_jra_pre_race(now=now)
         policy = load_standing_policy_file(
             path=settings.RACE_DATA_SYNC_FUTURE_STANDING_POLICY_FILE,
             expected_sha256=settings.RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256,
@@ -453,6 +457,9 @@ def discover_future_race_data_sync_task() -> dict:
             now=now,
             horizon_days=horizon_days,
         )
+        if not census_due:
+            return {"enabled": True, "status": "pre_race_checked", "jra": jra,
+                    "identity_discovery": asdict(identity_discovery)}
         proposal = build_future_race_data_enrollment_proposal(
             standing_policy=policy,
             cutoff=now,
@@ -491,6 +498,7 @@ def discover_future_race_data_sync_task() -> dict:
             for action in sorted({decision.action for decision in decisions})
         },
         "identity_discovery": asdict(identity_discovery),
+        "jra": jra,
         "manifest": proposal.manifest.as_dict() if proposal.manifest else None,
     }
 

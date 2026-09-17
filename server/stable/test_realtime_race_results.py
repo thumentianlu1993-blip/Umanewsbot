@@ -5648,6 +5648,8 @@ class RaceResultRevisionApplyTests(TestCase):
                 ),
             ]
         )
+        # 此用例验证人工确认行的冠军顺位；自动 owner 缺 revision 的隐藏另有覆盖。
+        stable_models.RaceEventProjectionControl.objects.filter(event=self.event).update(write_owner="unmanaged")
         from stable import views as stable_views
 
         with patch.object(

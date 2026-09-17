@@ -175,6 +175,7 @@ SITE_URL = env("SITE_URL", "http://localhost:8000")
 
 # Race-data slice A remains fail-closed until each provider, region and field is
 # explicitly admitted.  No setting here initiates network traffic.
+RACE_DATA_SYNC_JRA_PRE_RACE_ENABLED = env_bool("RACE_DATA_SYNC_JRA_PRE_RACE_ENABLED", False)
 RACE_DATA_SYNC_ENABLED = env_bool("RACE_DATA_SYNC_ENABLED", False)
 RACE_DATA_SYNC_ENABLED_PROVIDERS = tuple(
     item.strip()
@@ -970,8 +971,8 @@ def build_race_data_sync_beat_schedule(
     if future_discovery_enabled:
         schedule["discover-future-race-data-sync"] = {
             "task": "stable.tasks.discover_future_race_data_sync_task",
-            "schedule": crontab(minute=17),
-            "options": {"queue": "race_sync_v2", "expires": 3300},
+            "schedule": crontab(minute="7,17,27,37,47,57"),
+            "options": {"queue": "race_sync_v2", "expires": 550},
         }
     if scheduler_enabled and lifecycle_apply_enabled:
         schedule["advance-race-data-sync-lifecycle"] = {

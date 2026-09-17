@@ -1,0 +1,7 @@
+{
+  "source_url": "https://www.jra.go.jp/JRADB/accessD.html?CNAME=pw01dde0106202604061120260920/D6",
+  "source_raw_sha256": "f8b2ff9e7d487caad96c414b378db87acd651626028308ff8cf6a432e7456460",
+  "fixture_sha256": "8ff045c290e63a9cc98ef05ea818e5a87920c0ae14045b7c865ebf8612430cd6",
+  "transformation": "只保留赛头和13行名单字段，移除网页导航、样式、过去成绩列；保持官方Shift_JIS字节编码。",
+  "expected_rows": 13
+}

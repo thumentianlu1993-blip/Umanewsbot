@@ -103,7 +103,9 @@
                 <td>{{ candidate.fetched_at|date:"Y-m-d H:i" }}</td>
                 <td><code>{{ candidate.diff_payload|truncatechars:120 }}</code></td>
                 <td>
-                  {% if candidate.status == 'pending' %}
+                  {% if candidate.source_name == 'jra_pre_race_v1' or candidate.raw_payload.jra_pre_race_v1 %}
+                    <span class="muted">赛前专用候选，不支持通用应用</span>
+                  {% elif candidate.status == 'pending' %}
                     <form method="post" action="{% url 'console-race-event-apply-candidate' candidate.id %}">
                       {% csrf_token %}
                       <button class="btn secondary" type="submit">应用</button>
