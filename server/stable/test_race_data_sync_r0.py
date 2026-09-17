@@ -2005,6 +2005,10 @@ class RaceDataSyncCensusManifestTests(TestCase):
         self.assertFalse(models.RaceDataSyncEnrollment.objects.exists())
 
     def test_hourly_future_discovery_loads_exact_policy_and_auto_enrolls(self):
+        tick = {"now": NOW.replace(minute=17)}
+        def slow_jra(**kwargs):
+            tick["now"] = NOW.replace(minute=20)
+            return {"checked": 0}
         event = create_event(slug="future-hourly-task")
         self._identity(event)
         raw = json.dumps(
@@ -2027,7 +2031,8 @@ class RaceDataSyncCensusManifestTests(TestCase):
                     RACE_DATA_SYNC_FUTURE_MANIFEST_TTL_SECONDS=900,
                     UMANEWS_RELEASE_COMMIT="1" * 40,
                 ),
-                patch("stable.tasks.timezone.now", return_value=NOW),
+                patch("stable.tasks.timezone.now", side_effect=lambda: tick["now"]),
+                patch("stable.services.race_pre_race.discover_jra_pre_race", side_effect=slow_jra),
             ):
                 from stable.tasks import discover_future_race_data_sync_task
 

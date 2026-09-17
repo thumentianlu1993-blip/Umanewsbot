@@ -27,6 +27,7 @@ from stable.models import (
     RaceEvent,
     RaceEventDataQuality,
     RaceEventPriority,
+    RaceEventResult,
     RaceEventStatus,
     RaceEventVisibility,
     RaceGrade,
@@ -722,7 +723,12 @@ class HistoricalRaceCalendarPaginationTests(
         self.assertEqual(_event_ids(previous), seen_ids[40:80])
 
     def test_search_pagination_preserves_every_filter(self):
-        self.make_paged_events(count=45, prefix="Filter Keeper")
+        events = self.make_paged_events(count=45, prefix="Filter Keeper")
+        # 已完赛筛选现在要求正式结果；分页夹具必须满足同一公开合同。
+        RaceEventResult.objects.bulk_create([
+            RaceEventResult(event=event, horse_name="Confirmed Winner", finish_position=1, is_confirmed=True)
+            for event in events
+        ])
         response = self.client.get(
             reverse("public-race-calendar"),
             {

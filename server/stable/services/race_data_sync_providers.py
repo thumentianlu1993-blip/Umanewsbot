@@ -412,6 +412,7 @@ def _get_or_fetch_shared_snapshot(
     clock: Callable[[], datetime],
     sleeper: Callable[[float], Any],
     fetcher: Callable[[], tuple[dict[str, Any], int, int]],
+    waiter_max_polls: int = _SNAPSHOT_WAITER_MAX_POLLS,
 ) -> tuple[dict[str, Any], str]:
     cache_key = build_snapshot_cache_key(
         provider=provider,
@@ -435,7 +436,7 @@ def _get_or_fetch_shared_snapshot(
         ttl_seconds=_SNAPSHOT_LEASE_TTL_SECONDS,
     )
     if decision.action == "busy" and decision.reason_code == "lease_active":
-        for poll_index in range(_SNAPSHOT_WAITER_MAX_POLLS):
+        for poll_index in range(waiter_max_polls):
             jitter_seed = hashlib.sha256(
                 f"{owner_token}:{poll_index}".encode()
             ).digest()[0]
@@ -662,6 +663,8 @@ def discover_the_racing_api_source_identities(
     processed to created/adopted/ambiguous/unmatched.
     """
 
+    from .race_pre_race import TRA, claim_pre_race, finish_pre_race, _valid_claim, _state
+    claims = {}
     flags = RaceDataSyncFlags.from_settings()
     required_kinds = tuple(
         kind
@@ -789,6 +792,8 @@ def discover_the_racing_api_source_identities(
             minimum_interval_ms=first_route.minimum_interval_seconds * 1000,
         )
     except Exception:
+        for claim in claims.values():
+            finish_pre_race(claim, now=_safe_clock_value(clock=clock, fallback=now), reason="provider_execution_failed")
         logger.exception("TRA identity discovery runtime contract failed")
         return ProviderIdentityDiscoveryOutcome(
             False,
@@ -829,16 +834,18 @@ def discover_the_racing_api_source_identities(
         ):
             if request_count >= first_route.request_budget:
                 break
+            due_bucket = []
+            for candidate in sorted(bucket, key=lambda item: (_state(item[0], TRA).get("next_poll_at") or "", item[0].pk)):
+                if len(claims) >= settings.RACE_DATA_SYNC_FUTURE_BATCH_SIZE:
+                    break
+                claim = claim_pre_race(event_id=candidate[0].pk, source=TRA, now=_safe_clock_value(clock=clock, fallback=now))
+                if claim:
+                    claims[candidate[0].pk] = claim
+                    due_bucket.append(candidate)
+            bucket = due_bucket
+            if not bucket:
+                continue
             route = bucket[0][2]
-            capacity = reserve_race_data_transport_capacity(
-                provider="the_racing_api",
-                region_code=event_region,
-                now=now,
-                proposed_requests=1,
-                max_response_bytes_per_request=_MAX_RESPONSE_BYTES,
-            )
-            if not capacity.allowed:
-                raise _ProviderSyncError(capacity.reason_code)
             url = build_the_racing_api_route_url(
                 registry=registry,
                 route_name="racecards_free",
@@ -847,17 +854,23 @@ def discover_the_racing_api_source_identities(
                 limit=500,
                 skip=0,
             )
-            payload, raw_sha256 = _fetch_json(
-                transport=transport,
-                endpoint_name=f"racecards_identity_{event_region}_{day}",
-                url=url,
-                username=username,
-                password=password,
-                now=now,
-                clock=clock,
-                sleeper=sleeper,
+            def fetch_bucket():
+                nonlocal request_count
+                request_count += 1
+                payload, raw_sha = _fetch_json(
+                    transport=transport, endpoint_name=f"racecards_identity_{event_region}_{day}",
+                    url=url, username=username, password=password, now=now, clock=clock, sleeper=sleeper,
+                )
+                return {"response": payload, "raw_sha256": raw_sha}, 1, len(payload.get("racecards", []))
+
+            shared, _ = _get_or_fetch_shared_snapshot(
+                provider="the_racing_api", region=event_region,
+                scope_key=f"identity:{now.date().isoformat()}:{day}", data_kind="racecard",
+                registry_digest=route.registry_digest, run_id=next(iter(claims.values()))["token"],
+                now=_safe_clock_value(clock=clock, fallback=now), proposed_requests=1,
+                clock=clock, sleeper=sleeper, fetcher=fetch_bucket, waiter_max_polls=0,
             )
-            request_count += 1
+            payload, raw_sha256 = shared["response"], shared["raw_sha256"]
             snapshot = parse_the_racing_api_live_racecards_payload(payload)
             diagnostic = {
                 "provider": "the_racing_api", "region": event_region, "day": day,
@@ -894,6 +907,12 @@ def discover_the_racing_api_source_identities(
                     locked_event = models.RaceEvent.objects.select_for_update().get(
                         pk=event.pk
                     )
+                    if not _valid_claim(locked_event, claims[event.pk], _safe_clock_value(clock=clock, fallback=now)):
+                        continue
+                    current_flags = RaceDataSyncFlags.from_settings()
+                    if (not current_flags.enabled or not current_flags.allow_network
+                        or "the_racing_api" not in current_flags.providers or contract_region not in current_flags.regions):
+                        continue
                     if models.RaceResultSourceIdentity.objects.filter(
                         source_key="the_racing_api",
                         region_code=contract_region,
@@ -954,7 +973,11 @@ def discover_the_racing_api_source_identities(
                         adopted += 1
                     else:
                         ambiguous += 1
+            for candidate in bucket:
+                finish_pre_race(claims[candidate[0].pk], now=_safe_clock_value(clock=clock, fallback=now))
     except _ProviderSyncError as exc:
+        for claim in claims.values():
+            finish_pre_race(claim, now=_safe_clock_value(clock=clock, fallback=now), reason=exc.reason_code)
         return ProviderIdentityDiscoveryOutcome(
             False,
             exc.reason_code,
@@ -973,6 +996,8 @@ def discover_the_racing_api_source_identities(
             diagnostic_buckets=tuple(diagnostic_buckets),
         )
     except Exception:
+        for claim in claims.values():
+            finish_pre_race(claim, now=_safe_clock_value(clock=clock, fallback=now), reason="provider_execution_failed")
         logger.exception("TRA identity discovery execution failed")
         return ProviderIdentityDiscoveryOutcome(
             False,
@@ -1882,7 +1907,7 @@ def _result_payload(
         "region": region,
         "course": normalized_race["course"],
         "race_name": normalized_race["race_name"],
-        "race_status": str(normalized_race.get("race_status") or "complete"),
+        "race_status": str(normalized_race.get("race_status") or ""),
         "participants": participants,
     }
 
@@ -2259,7 +2284,7 @@ def run_the_racing_api_data_sync(
                             {
                                 **exact_result,
                                 "race_status": (
-                                    exact_result.get("race_status") or "official"
+                                    exact_result.get("race_status") or ""
                                 ),
                             }
                         ]
@@ -2289,6 +2314,42 @@ def run_the_racing_api_data_sync(
                         .strip()
                         .casefold()
                     )
+                    detail_reason = ""
+                    if (day_offset == 0 and not event.result_confirmed_at
+                        and normalized_status not in route.entry.terminal_markers
+                        and normalized_status not in _TRA_CORRECTION_MARKERS):
+                        detail_reason = "formal_evidence_missing"
+                        # Keep the list snapshot if optional detail fails. No fabricated terminal marker.
+                        if len(response_payload.get("page_sha256", [])) < route.request_budget:
+                            try:
+                                capacity = reserve_race_data_transport_capacity(
+                                    provider=source.source_key, region_code=source.region_code, now=now,
+                                    proposed_requests=1, max_response_bytes_per_request=_MAX_RESPONSE_BYTES,
+                                )
+                                if not capacity.allowed:
+                                    raise _ProviderSyncError(capacity.reason_code)
+                                detail_url = build_the_racing_api_route_url(
+                                    registry=registry, route_name="result_by_id", region=provider_region,
+                                    race_id=source.external_race_id, limit=0, skip=0,
+                                )
+                                detail, detail_sha = _fetch_json(
+                                    transport=transport, endpoint_name="result_by_id", url=detail_url,
+                                    username=username, password=password, now=now, clock=clock,
+                                    sleeper=sleeper, allow_not_found=True,
+                                )
+                                detail_snapshot = parse_the_racing_api_live_results_payload({"results": [detail]})
+                                exact = next((row for row in detail_snapshot.races
+                                              if row["external_race_id"] == source.external_race_id), None)
+                                marker = str((exact or {}).get("race_status") or "").strip().casefold()
+                                if exact and marker in {*route.entry.terminal_markers, *_TRA_CORRECTION_MARKERS}:
+                                    normalized_race, normalized_status = exact, marker
+                                    raw_sha256, result_url = detail_sha, detail_url
+                                    observation_hashes[models.RaceDataSyncDataKind.RESULT] = raw_sha256
+                                    detail_reason = "exact_result_terminal_evidence"
+                            except (_ProviderSyncError, ValueError, KeyError, TypeError) as exc:
+                                detail_reason = getattr(exc, "reason_code", "detail_response_invalid")
+                        else:
+                            detail_reason = "provider_request_budget_exhausted"
                     correction_marked = (
                         normalized_status in _TRA_CORRECTION_MARKERS
                     )
@@ -2332,6 +2393,7 @@ def run_the_racing_api_data_sync(
                             "automation_allowed": True,
                             "normalized_sha256": normalized_sha256,
                             "correction_marker": correction_marked,
+                            "confirmation_lookup_reason": detail_reason,
                             "correction_marker_value": (
                                 normalized_status if correction_marked else ""
                             ),

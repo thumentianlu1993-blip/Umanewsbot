@@ -408,6 +408,64 @@ class TheRacingApiDataSyncAdapterTests(TestCase):
         shared_budget.refresh_from_db()
         self.assertEqual(shared_budget.min_interval_ms, 2000)
 
+    def test_same_day_exact_detail_supplies_real_terminal_evidence(self):
+        calls = []
+        tick = {"value": NOW}
+        def clock():
+            tick["value"] += timedelta(seconds=2)
+            return tick["value"]
+        def transport(**kwargs):
+            calls.append(kwargs["endpoint_name"])
+            response = self._transport(**kwargs)
+            payload = json.loads(response.body)
+            if kwargs["endpoint_name"] == "result_by_id":
+                payload = json.loads(self._transport(endpoint_name="results_today").body)["results"][0]
+                payload["race_status"] = "official"
+            elif "results" in payload:
+                payload["results"][0].pop("race_status", None)
+            return RaceLiveProofHttpResponse(status_code=200,content_type="application/json",
+                body=json.dumps(payload).encode(),elapsed_ms=5)
+        with patch("stable.services.race_data_sync_providers.read_the_racing_api_automation_registry", return_value=(self.registry,SHA)), patch("stable.services.race_data_sync_providers._read_secret",return_value=("user","secret")):
+            outcome = run_the_racing_api_data_sync(event_id=self.event.pk,data_kinds=("racecard","result"),
+                route=self.route,now=NOW,task_id="same-day-detail",run_id="same-day-detail",
+                transport=transport,clock=clock,sleeper=lambda seconds:None)
+        self.assertTrue(outcome.success,outcome.reason_code)
+        self.assertEqual(calls.count("result_by_id"),1)
+        self.assertEqual(self.event.results.count(),2)
+        observation=models.RaceResultObservation.objects.get(result_phase="official")
+        self.assertEqual(observation.normalized_payload["race_status"],"official")
+        self.assertIn("/v1/results/",observation.field_provenance["source_url"])
+
+    def test_same_day_optional_detail_failures_keep_provisional_evidence(self):
+        for failure in ('404', 'timeout', 'missing_marker'):
+            with self.subTest(failure=failure):
+                models.RaceDataSnapshotLease.objects.all().delete()
+                models.RaceLiveHostBudget.objects.all().delete()
+                tick = {'value': NOW}
+                calls = []
+                def clock():
+                    tick['value'] += timedelta(seconds=2)
+                    return tick['value']
+                def transport(**kwargs):
+                    calls.append(kwargs['endpoint_name'])
+                    if kwargs['endpoint_name'] == 'result_by_id' and failure == 'timeout':
+                        raise TimeoutError('synthetic timeout')
+                    payload=json.loads(self._transport(endpoint_name='results_today').body)
+                    payload['results'][0].pop('race_status',None)
+                    if kwargs['endpoint_name'] == 'result_by_id':
+                        payload = {} if failure == '404' else payload['results'][0]
+                    return RaceLiveProofHttpResponse(status_code=404 if kwargs['endpoint_name']=='result_by_id' and failure=='404' else 200,
+                        content_type='application/json',body=json.dumps(payload).encode(),elapsed_ms=5)
+                with patch('stable.services.race_data_sync_providers.read_the_racing_api_automation_registry',return_value=(self.registry,SHA)), patch('stable.services.race_data_sync_providers._read_secret',return_value=('user','secret')):
+                    outcome=run_the_racing_api_data_sync(event_id=self.event.pk,data_kinds=('result',),route=self.route,
+                        now=NOW,task_id='detail-failure-'+failure,run_id='detail-failure-'+failure,
+                        transport=transport,clock=clock,sleeper=lambda seconds:None)
+                self.assertTrue(outcome.success,outcome.reason_code)
+                self.assertEqual(calls.count('result_by_id'),1)
+                self.assertFalse(self.event.results.filter(is_confirmed=True).exists())
+                self.assertFalse(models.RaceResultObservation.objects.filter(result_phase='official').exists())
+                self.assertTrue(models.RaceResultObservation.objects.filter(result_phase='provisional').exists())
+
     def test_today_result_without_terminal_marker_stays_provisional(self):
         tick = {"value": NOW}
 
@@ -848,6 +906,7 @@ class TheRacingApiDataSyncAdapterTests(TestCase):
             calls.append((kwargs["endpoint_name"], kwargs["url"]))
             payload = {
                 "race_id": self.source.external_race_id,
+                "race_status": "official",
                 "off_dt": self.event.race_datetime.isoformat(),
                 "region": "jpn",
                 "course": "Tokyo",
@@ -1058,7 +1117,7 @@ class TheRacingApiDataSyncAdapterTests(TestCase):
         self.assertEqual(shared_budget.min_interval_ms, 2000)
         self.assertEqual(
             shared_budget.next_allowed_at,
-            NOW + timedelta(seconds=4),
+            NOW + timedelta(seconds=8),
         )
         self.assertEqual(shared_budget.lock_version, 38)
 

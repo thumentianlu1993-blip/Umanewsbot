@@ -3,6 +3,7 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import json
+import tempfile
 from datetime import date, datetime, timedelta
 from unittest.mock import patch
 
@@ -55,6 +56,11 @@ from stable.test_race_data_sync_providers import (
 )
 class TheRacingApiIdentityDiscoveryConservationTests(TestCase):
     def setUp(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        config = override_settings(RACE_DATA_RAW_ARTIFACT_ROOTS=(temp.name,))
+        config.enable()
+        self.addCleanup(config.disable)
         capacity = patch("stable.services.race_data_sync_pipeline.inspect_race_data_artifact_capacity",
                          return_value=(0, 1024 * 1024 * 1024))
         capacity.start()
@@ -251,6 +257,9 @@ class TheRacingApiIdentityDiscoveryConservationTests(TestCase):
             ([self._race("Other Cup")], "race_name_not_found")]
         for rows, reason in scenarios:
             with self.subTest(reason=reason):
+                event.source_refs = {}
+                event.save(update_fields=["source_refs"])
+                models.RaceDataSnapshotLease.objects.all().delete()
                 models.RaceLiveHostBudget.objects.all().delete()
                 transport, calls, sha = self._racecard_transport(rows)
                 outcome, _ = self._discover(transport)
@@ -278,6 +287,9 @@ class TheRacingApiIdentityDiscoveryConservationTests(TestCase):
         self.assertEqual(len(calls), 1)
         self._assert_conserved(outcome)
         event.source_identities.all().delete()
+        event.source_refs = {}
+        event.save(update_fields=["source_refs"])
+        models.RaceDataSnapshotLease.objects.all().delete()
         models.RaceLiveHostBudget.objects.all().delete()
         transport, calls, _ = self._racecard_transport([
             self._race(event.original_name), self._race(event.original_name, race_id="race-two")])
@@ -289,6 +301,7 @@ class TheRacingApiIdentityDiscoveryConservationTests(TestCase):
         self.assertEqual(len(calls), 1)
         self._assert_conserved(outcome)
 
+    @override_settings(RACE_DATA_SYNC_FUTURE_BATCH_SIZE=100)
     def test_diagnostic_samples_are_bounded_without_losing_counts(self):
         for i in range(53):
             self._event(slug=f"unmatched-{i}", local_date=date(2026, 8, 28))
@@ -320,3 +333,19 @@ class TheRacingApiIdentityDiscoveryConservationTests(TestCase):
         self.assertEqual(len(outcome.diagnostic_buckets), 1)
         self.assertEqual(outcome.diagnostic_buckets[0]["match_reason_counts"], {"response_empty": 1})
         self._assert_conserved(outcome)
+
+    @override_settings(RACE_DATA_SYNC_FUTURE_BATCH_SIZE=1)
+    def test_due_cadence_defers_without_starving_other_events_and_reuses_snapshot(self):
+        first = self._event(slug="first", local_date=date(2026, 8, 28))
+        second = self._event(slug="second", local_date=date(2026, 8, 28))
+        initial, calls = self._discover()
+        self.assertEqual((initial.unmatched_event_count, len(calls)), (1, 1))
+        following, calls = self._discover()
+        self.assertEqual((following.unmatched_event_count, len(calls)), (1, 0))
+        again, calls = self._discover()
+        self.assertEqual((again.deferred_event_count, len(calls)), (2, 0))
+        self._assert_conserved(again)
+        for event in (first, second):
+            event.refresh_from_db()
+            self.assertEqual(event.source_refs['pre_race_checks']['tra_identity']['next_poll_at'],
+                             (NOW + timedelta(minutes=10)).isoformat())

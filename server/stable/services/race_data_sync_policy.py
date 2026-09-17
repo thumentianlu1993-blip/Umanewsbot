@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 from stable import models
 
@@ -112,13 +113,14 @@ def calculate_next_poll_at(
     data_kind: str,
     now: datetime,
     race_datetime: datetime | None,
+    local_date: date | None = None,
+    timezone_name: str = "UTC",
     result_confirmed: bool = False,
     event_terminal: bool = False,
 ) -> datetime | None:
     """Return the next dynamic checkpoint for one race-data kind.
 
-    Racecards are never scheduled less frequently than every 12 hours before
-    the race.  Results use explicit T+ checkpoints and retain a correction
+    Pre-race checks follow local calendar days (D-4: 3h, D-1: 1h, D: 10m).  Results use explicit T+ checkpoints and retain a correction
     watch after the first confirmed result.
     """
 
@@ -133,33 +135,26 @@ def calculate_next_poll_at(
     if event_terminal:
         return None
 
-    if data_kind == models.RaceDataSyncDataKind.RACE_TIME:
-        if race_datetime is None:
+    if data_kind in {models.RaceDataSyncDataKind.RACE_TIME, models.RaceDataSyncDataKind.RACECARD}:
+        zone = ZoneInfo(timezone_name)
+        today = now.astimezone(zone).date()
+        race_date = local_date or (race_datetime.astimezone(zone).date() if race_datetime else None)
+        if race_date is None:
             return now + timedelta(hours=12)
-        until_race = race_datetime - now
-        if until_race > timedelta(days=14):
-            return now + timedelta(hours=12)
-        if until_race > timedelta(days=3):
-            return now + timedelta(hours=6)
-        if until_race > timedelta(hours=12):
-            return now + timedelta(hours=1)
-        if until_race > timedelta(minutes=-5):
-            return min(now + timedelta(minutes=15), race_datetime + timedelta(minutes=5))
-        return None
-
-    if data_kind == models.RaceDataSyncDataKind.RACECARD:
-        if race_datetime is None:
-            return now + timedelta(hours=12)
-        until_race = race_datetime - now
-        if until_race > timedelta(days=7):
-            return now + timedelta(hours=12)
-        if until_race > timedelta(days=2):
-            return now + timedelta(hours=6)
-        if until_race > timedelta(hours=6):
-            return now + timedelta(hours=1)
-        if until_race > timedelta(minutes=-5):
-            return min(now + timedelta(minutes=10), race_datetime + timedelta(minutes=5))
-        return None
+        offset = (race_date - today).days
+        if offset < 0 or (race_datetime and now >= race_datetime + timedelta(minutes=5)):
+            return None
+        interval = timedelta(hours=12 if offset > 4 else 3 if offset >= 2 else 1) if offset else timedelta(minutes=10)
+        due = now + interval
+        # Enter the faster tier on its local midnight, including date-only events.
+        next_boundary = datetime.combine(today + timedelta(days=1), time(), tzinfo=zone)
+        if offset in {1, 2, 5}:
+            due = min(due, next_boundary)
+        if race_datetime is not None:
+            due = min(due, race_datetime + timedelta(minutes=5))
+        elif offset == 0:
+            due = min(due, next_boundary)
+        return due
 
     if race_datetime is None:
         return None

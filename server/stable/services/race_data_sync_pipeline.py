@@ -1924,6 +1924,14 @@ def _reconcile_racecard_observation_atomic(
                 )
                 aggregate = "applied"
 
+        if (allow_racecard_apply and validated_participants
+            and source.source_key == "the_racing_api" and control.current_racecard_revision_id):
+            refs = dict(event.source_refs or {})
+            refs["pre_race_handoff"] = {"source": source.source_key,
+                                       "revision_id": control.current_racecard_revision_id}
+            event.source_refs = refs
+            event.save(update_fields=("source_refs", "updated_at"))
+
         candidate_timezone = str(
             payload.get("timezone_name") or event.timezone_name or ""
         ).strip()
@@ -2135,6 +2143,8 @@ def _reconcile_racecard_observation_atomic(
                 checkpoint_now = candidate_watermark
                 for checkpoint in checkpoints:
                     checkpoint.next_poll_at = calculate_next_poll_at(
+                        local_date=None if event.status == models.RaceEventStatus.POSTPONED else event.local_date,
+                        timezone_name=event.timezone_name,
                         data_kind=checkpoint.data_kind,
                         now=checkpoint_now,
                         race_datetime=(

@@ -34,7 +34,7 @@
         {% endif %}
       </div>
       <h1 class="race-hero-name">{{ event.chinese_name }}</h1>
-      <p class="race-hero-original">{% if event.original_name and event.original_name != event.chinese_name %}{{ event.original_name }} · {% endif %}{% if event.local_date %}{{ event.local_date|date:"Y-m-d" }}{% endif %}{% if event.local_start_time %} {{ event.local_start_time|time:"H:i" }}{% endif %}</p>
+      <p class="race-hero-original">{% if event.original_name and event.original_name != event.chinese_name %}{{ event.original_name }} · {% endif %}{% if event.local_date %}{{ event.local_date|date:"Y-m-d" }}{% endif %} · {{ event.public_time_label }}</p>
 
       {% if winner %}
         <span class="winner-ribbon">WINNER · 冠军</span>
@@ -53,7 +53,7 @@
           </div>
         {% endif %}
       {% else %}
-        <div class="countdown-hero-digits">{{ status_label }}{% if event.status == 'scheduled' and event.local_start_time %}<small>{{ event.local_start_time|time:"H:i" }} 发走</small>{% endif %}</div>
+        <div class="countdown-hero-digits">{{ status_label }}{% if event.status == 'scheduled' and event.local_start_time %}<small>{{ event.public_time_label }}</small>{% endif %}</div>
       {% endif %}
       {% if live_result_status.is_stale %}
         <aside class="race-result-status" role="status">数据可能已过期</aside>
@@ -62,7 +62,7 @@
 
     <nav class="race-subnav" aria-label="赛事详情模块">
       <a href="#overview" class="active">概览</a>
-      {% if runners %}<a href="#runners">出马表</a>{% endif %}
+      {% if runners %}<a href="#runners">{{ runner_section_label }}</a>{% endif %}
       {% if results %}<a href="#results">赛果</a>{% endif %}
       {% if history_winners %}<a href="#history">历年冠军</a>{% endif %}
       {% if has_news %}<a href="#news">相关新闻</a>{% endif %}
@@ -73,16 +73,16 @@
       <div class="race-meta-grid">
         <div><span>等级</span><b>{{ event.grade_text }}</b></div>
         <div><span>日期</span><b>{{ event.local_date|date:"Y-m-d"|default:"待定" }}</b></div>
-        <div><span>时间</span><b>{{ event.local_start_time|time:"H:i"|default:"待定" }}</b></div>
+        <div><span>时间</span><b>{{ event.public_time_label }}</b></div>
         <div><span>马场</span><b>{{ event.racecourse }}</b></div>
         {% if event.distance_text %}<div><span>距离</span><b>{{ event.distance_text }}</b></div>{% elif event.surface %}<div><span>场地</span><b>{{ event.get_surface_display }}</b></div>{% endif %}
         {% if event.eligibility_text %}<div><span>参赛条件</span><b>{{ event.eligibility_text }}</b></div>{% endif %}
-        <div><span>状态</span><b>{{ event.get_status_display }}</b></div>
+        <div><span>状态</span><b>{{ status_label }}</b></div>
       </div>
     </section>
 
     <section class="panel" id="runners">
-      <h2>出马表</h2>
+      <h2>{{ runner_section_label }}</h2>
       {% if runners %}
         <div class="race-table-wrap">
           <table class="data-table">
@@ -90,7 +90,7 @@
             <tbody>
               {% for runner in runners %}
                 <tr>
-                  <td><span class="barrier-chip">{{ runner.barrier|default:"-" }}</span></td>
+                  <td><span class="barrier-chip">{% if runner.barrier and runner.barrier != "0" %}{{ runner.barrier }}{% else %}—{% endif %}</span></td>
                   <td class="num">{{ runner.horse_number|default:"-" }}</td>
                   <td><strong>{{ runner.display_horse_name }}</strong></td>
                   <td>{{ runner.display_jockey_name|default:"-" }}</td>
@@ -104,7 +104,7 @@
           </table>
         </div>
       {% else %}
-        <p class="empty-state">{% if event.status == 'scheduled' or event.status == 'postponed' %}出马表尚未公布。{% else %}暂无出马表资料。{% endif %}</p>
+        <p class="empty-state">本站暂未收录出马表。</p>
       {% endif %}
     </section>
 

@@ -1,5 +1,24 @@
 # 部署运行手册
 
+## 2026-09-17 赛事区代码发布与 JRA 独立停用
+
+本次新增唯一默认关闭配置 `RACE_DATA_SYNC_JRA_PRE_RACE_ENABLED`，settings、env示例及两份生产Compose均显式传递。无迁移，发布前后按既有0078合同验证，且先检查活跃马匹采集/生产锁。JRA停用必须让worker/Web实际重载false并退出旧在途任务；只改.env不算完成。精确发布包可包含已冻结的829/104两条身份修复，不包含历史赛果批量写入或JRA启用。应用与测试绑定 `d0bb40fb`，后续交接仅改文档；完整 Linux 5,012 项无新增失败、45 项发布合同通过，原有 45 项失败仍保留；完整测试与构件口径见 [验证记录](changes/fix-race-section-gaps/validation.md)，实际交付仍核验固定 SHA 的 CI 与后续纯文档差异。精确操作范围、容量和数据缺口见 [rollout](changes/fix-race-section-gaps/rollout.md)，通用授权只引用根AGENTS.md。
+
+## 2026-09-17 赛事修复的后续操作计划
+
+- 具体目标、只读复核、数据包准备、生产验收与恢复约束集中于[赛事区修复计划](changes/fix-race-section-gaps/PLAN.md)。本轮未执行生产操作。
+- 计划新增 D−4 起的赛前更新及用户确认的 3 小时／1 小时／10 分钟频率。发布前核对来源实际窗口、请求合并／缓存后的日预算、赛果额度、JRA 名单候选展示与 TRA 首张完整赛卡的切换；验收要看自然检查时间和实际资料变化，不能以调度配置或手工补齐代替。
+- JRA 专属开关默认关闭，精确发布包列明有限启用和独立停用。配置是进程级：停派发、等待／终止旧在途任务后，以关闭配置重启相关进程并验收；仅改环境文件不算停用完成。既有赛时和 TRA 结果不因停用被清除。
+- 未来准备发布包时须重查活跃马匹采集与共享服务／预算，不将本次静态计划视为可立即重启的运行窗口；旧 race_live 不消费，恢复继续使用现有 exact release 合同。
+
+## 2026-09-17 赛事只读排障记录
+
+- [本轮报告](reports/2026-09-17-race-section-audit.md)及证据固定了 828／829／830、104／105 与 79 场过期赛前记录。生产运行 `9a88243f`，源码 SHA 核对后才将本地定位用于解释运行行为；普通／v2 队列采样为 0，不能据此声称业务完整。
+- 数据库使用 `SET TRANSACTION READ ONLY`、12 秒 statement timeout、字段白名单／有界详情及聚合；缓存重放只调用解析／精确匹配函数，不执行发现或同步入口。v2 worker 挂载 `/run/race-data-sync`；Web 没有该挂载，不能在 Web 内因缓存不存在就判断数据丢失。
+- 当天 results/today/free 缺正式状态造成 provisional；规范化补出的 complete 不是官方确认。尚布利缓存重放为 race_name_not_found，来源 16 场经地区／日期筛选后同场 8 场、名称命中 0。
+- 超时 incident 为 open、投递 0，现有 data_sync_event 刻意不走旧 delivery。日志未取得当前明细时保留 unknown，用检查点和现存缓存交叉核对；不要把 TaskExecutionLog 无 v2 行解释为 worker 停止。
+- 本轮无业务写入、迁移、配置／开关修改、队列消费、服务重启或部署，也未触碰活跃马匹采集。后续修复需按精确范围准备与验收。
+
 ## 2026-09-15 PR #201 生产发布与交接
 
 - 应用合并commit `7981439555bec747d462910506c56b08449ae621`；固定生产候选 `9a88243ffcf4d628a2ceaa528a66871d566fca82`，镜像 `sha256:e022147a9ddd4063e7ac35b5591fd0a118335b211b2c88da90d3fec0cdc1f986`，验证时间 `2026-09-15T02:54:10.391232+00:00`。实际目录 `/opt/umanews-release-9a88243f-PR201-20260915/umanewsbot`，Compose project `umanewsbot`，低成本Compose配置不变。

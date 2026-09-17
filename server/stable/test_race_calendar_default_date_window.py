@@ -488,8 +488,10 @@ class DefaultRaceDateWindowTests(TestCase):
     def test_when_filter_scopes_window(self):
         _make_event(local_date=FIXED_TODAY, chinese_name="今天预定",
                     status=RaceEventStatus.SCHEDULED)
-        _make_event(local_date=date(2026, 7, 20), chinese_name="历史完赛",
+        finished = _make_event(local_date=date(2026, 7, 20), chinese_name="历史完赛",
                     status=RaceEventStatus.FINISHED)
+        from stable.models import RaceEventResult
+        RaceEventResult.objects.create(event=finished,horse_name="已确认冠军",finish_position=1,is_confirmed=True)
         html = self._html(tab="all", when="finished")
         self.assertEqual(_axis_ids(html), [_anchor_id(date(2026, 7, 20))])
         self.assertNotIn("今天预定", html)

@@ -1,5 +1,29 @@
 # 当前状态
 
+## 2026-09-18 赛事区修复达到交付标准，未合并或部署
+
+主线程按测试先行完成正式赛果证据回退、D−4 起 3h / 1h / 10min 发现、JRA 候选及 TRA 接管、状态/筛选/双时区和 104/829 身份修复入口；固定只读子代理七轮审核返修后 APPROVED。核心与身份 264 项 PostgreSQL 全过，详情增量 12 项、相关旧合同 68 项、最终文案与 canonical 页面 19 项均通过，测试集合有重叠不相加。
+
+最终候选 `d0bb40fb` 的 [Linux/PG16 CI](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/35242927242) 完整运行 5,012 项，16 failures / 29 errors / 20 skipped；45 个失败 ID 与当前主线同应用的 Linux 参考完全一致，相对固定历史基线也无新增。45 项发布合同、Django check、空迁移计划及前后指纹通过。既有失败未清零，不称全套全绿；证据见 [验证记录](changes/fix-race-section-gaps/validation.md) 和 [代码审核](changes/fix-race-section-gaps/CODE_REVIEW.md)。后续仅文档提交，发布仍固定已测代码 SHA。
+
+[PR #203](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/203) 与 [精确发布包](changes/fix-race-section-gaps/rollout.md) 已准备：无迁移，新 JRA 开关保持 false，仅包含 SHA 绑定的 104/829 名称及别名修复，不含历史赛果批量回补或 JRA 启用。79 场历史缺口只冻结清单，正式结果补齐 0；截至 9 月 17 日只读现场仍为 9a88243f。本次未合并、未部署、未写生产数据，实际交付遵守根 AGENTS.md。
+
+## 2026-09-17 赛事区修复计划经固定子代理两轮审核通过（未实施）
+
+- 用户要求写 plan 并避免过度设计。已在同一分支整理[修复计划](changes/fix-race-section-gaps/PLAN.md)：同日正式赛果核验回退、829 精确身份修复、赛前资料提前更新、过期状态／筛选与时间文案修正，以及现有流程内的历史回补。
+- 用户补充明确赛前第 4 天（含）开始、提高每日检查频率。计划按举办地日期从 D−4 当地 00:00 纳入主动更新，用户已将 D−4～D−2／D−1／比赛日的频率确定为每 3 小时／1 小时／10 分钟检查，缺赛时／来源身份也进入发现；实施前仍需核对现有预算容量。
+- 本次按用户要求由主线程修订、固定只读子代理审核／复审。修订将 JRA 名单改为已校验候选的赛前展示，不写 canonical runner／participant；TRA 首张完整赛卡成功后切换，单独 enrollment 不造成名单空窗。赛时只对 UNMANAGED 且无锁／无冲突来源的字段受控补齐。
+- 固定子代理第 1 轮 REVISE，要求封住 JRA 候选经后台通用 apply 写入 canonical 的旁路；主线程补服务层拒绝、后台文案与直接入口回归要求后，同一 reviewer 第 2 轮 APPROVED，三项 finding 全部在方案层面解决。批准 PLAN SHA256 `3bfc69404b1228ad1a3b2c42338c87fbc7bb2c7479204a54635eff46e528b323`，见[审核记录](changes/fix-race-section-gaps/REVIEW.md)。
+- 未纳管调度复用 event.source_refs 的限定子树，明确持久 due、短事务 lease、事务外网络和过期响应拒绝；新增一个默认关闭的 JRA 开关，停用以进程载入关闭配置及旧在途任务退出为准。交付仍为一份代码 PR＋数据修复包，不新增表／队列，接口正式性与容量仍需实施前验证。
+- 本次仅更新计划与交接文档，未修改应用、调用生产或启动抓取／导入／部署；此前审计数量和运行版本仍是原时间点证据。用户明确的提前窗口及三档频率记入 decisions，方案已通过审核，未开始应用实现或生产操作。
+
+## 2026-09-17 赛事区只读排查完成（未修复／部署）
+
+- 独立分支 `codex/audit-race-section-20260917` 从 `origin/main@45da57b6` 新建；生产现场仍为 `9a88243f`／`e022147…`，四应用 running、restart=0、OOM=false；关键同步／视图源码 SHA 与 main 一致。
+- 当天 828／830 已取回 7／5 行暂定结果，但当天接口没有 `race_status`，正式发布条件未满足；公开结果为 0。规范化 `complete` 是代码缺值补入，不能当作来源确认。829 的 `CHAMBL Y` 断词导致精确赛名匹配失败，既有缓存重放已证明来源有赛时／出马表／结果。
+- 日本 104／105 的官方赛时及未编马号名单已公布；站内仍为年度日历空字段，自动发现仅覆盖来源 today/tomorrow。过去日期仍 scheduled 的公开赛事为 79 场，均是 2026-08-16～09-13、均未纳管／无生命周期控制；2025 年及以前公开记录未发现赛前状态。
+- 另确认过期赛事混入即将开赛、当地时间无时区标签、缺资料误写尚未公布及 v2 超时告警只登记。详见[报告与优先级](reports/2026-09-17-race-section-audit.md)。本轮只读生产与公开 GET，未部署、改生产数据或调用付费来源；建议尚未实施。
+
 ## 2026-09-15 PR #201 已合并并部署，近期工作准备交接
 
 - 用户本轮明确要求只处理已影响生产的旧失败；未证实线上影响的测试、旧文案和历史工具项跳过，不再以测试清零为本轮目标。生产窗口/样本核查未发现需要补修的旧失败，候选保持原审核SHA；已知TRA旧回执升级字段超长路径保留为未触发风险，不声称所有历史均无影响。
@@ -625,7 +649,7 @@
 - PR `#119` 已合并为 `474aad1430d1451ad4e45713bd3d50a5f889ab9b`。生产 Nginx 当前配置 SHA-256
   为 `7bc8fd14…934`；单文件 bind 因 inode 固定不能靠 reload 换入新内容，已在 `nginx -t` 通过后只重建
   Nginx 容器。Meta/Facebook 对精确 `/races/` 与字体返回 `429`，普通 root/www/races 返回 `200`，精确目标
-  未再进入 Django；约 5 分钟六轮公网门禁均在 20 秒内通过，Nginx/Web restart、OOM、5xx 为 0。
+  未再进入 Django；约 5 分钟七轮公网门禁均在 20 秒内通过，Nginx/Web restart、OOM、5xx 为 0。
 - 关闭态 audit artifact 为
   `/opt/umanewsbot-builds/pr119-474aad14/race-data-activation/audit-closed-pr119-20260829T151756Z.json`，
   SHA-256 `a11ee227…b87`；`ready/valid/route_drift=[]/would_write=false`。Phase 1 artifact SHA-256

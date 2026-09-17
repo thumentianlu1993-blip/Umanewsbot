@@ -1,0 +1,131 @@
+[
+  {
+    "id": 17,
+    "fetched_at": "2026-09-17T12:29:01.246614+00:00",
+    "sha_valid": true,
+    "races": [
+      {
+        "race_id": "rac_32298283173",
+        "race_name": "Prix De Compiegne",
+        "course": "Auteuil (FR)",
+        "region": "FR",
+        "off_dt": "2026-09-17T12:27:00+01:00",
+        "race_status": null,
+        "status": null,
+        "is_official": null,
+        "race_status_present": false,
+        "runners_count": 5
+      },
+      {
+        "race_id": "rac_32298277362",
+        "race_name": "Prix Robert Lejeune",
+        "course": "Auteuil (FR)",
+        "region": "FR",
+        "off_dt": "2026-09-17T10:42:00+01:00",
+        "race_status": null,
+        "status": null,
+        "is_official": null,
+        "race_status_present": false,
+        "runners_count": 7
+      },
+      {
+        "race_id": "rac_32298273488",
+        "race_name": "Prix De Chambly",
+        "course": "Auteuil (FR)",
+        "region": "FR",
+        "off_dt": "2026-09-17T09:32:00+01:00",
+        "race_status": null,
+        "status": null,
+        "is_official": null,
+        "race_status_present": false,
+        "runners_count": 7
+      }
+    ]
+  },
+  {
+    "id": 16,
+    "fetched_at": "2026-09-17T11:32:03.246584+00:00",
+    "sha_valid": true,
+    "races": [
+      {
+        "race_id": "rac_32298273488",
+        "race_name": "Prix De Chambly",
+        "course": "Auteuil",
+        "region": "FR",
+        "off_dt": "2026-09-17T09:32:00+01:00",
+        "race_status": "result",
+        "status": null,
+        "is_official": null,
+        "race_status_present": true,
+        "runners_count": 7
+      },
+      {
+        "race_id": "rac_32298277362",
+        "race_name": "Prix Robert Lejeune",
+        "course": "Auteuil",
+        "region": "FR",
+        "off_dt": "2026-09-17T10:42:00+01:00",
+        "race_status": "result",
+        "status": null,
+        "is_official": null,
+        "race_status_present": true,
+        "runners_count": 7
+      },
+      {
+        "race_id": "rac_32298283173",
+        "race_name": "Prix De Compiegne",
+        "course": "Auteuil",
+        "region": "FR",
+        "off_dt": "2026-09-17T12:27:00+01:00",
+        "race_status": "declared",
+        "status": null,
+        "is_official": null,
+        "race_status_present": true,
+        "runners_count": 5
+      }
+    ]
+  },
+  {
+    "id": 15,
+    "fetched_at": "2026-09-16T21:39:19.144441+00:00",
+    "sha_valid": true,
+    "races": [
+      {
+        "race_id": "rac_32298273488",
+        "race_name": "Prix De Chambly",
+        "course": "Auteuil",
+        "region": "FR",
+        "off_dt": "2026-09-17T09:32:00+01:00",
+        "race_status": "declared",
+        "status": null,
+        "is_official": null,
+        "race_status_present": true,
+        "runners_count": 7
+      },
+      {
+        "race_id": "rac_32298277362",
+        "race_name": "Prix Robert Lejeune",
+        "course": "Auteuil",
+        "region": "FR",
+        "off_dt": "2026-09-17T10:42:00+01:00",
+        "race_status": "declared",
+        "status": null,
+        "is_official": null,
+        "race_status_present": true,
+        "runners_count": 7
+      },
+      {
+        "race_id": "rac_32298283173",
+        "race_name": "Prix De Compiegne",
+        "course": "Auteuil",
+        "region": "FR",
+        "off_dt": "2026-09-17T12:27:00+01:00",
+        "race_status": "declared",
+        "status": null,
+        "is_official": null,
+        "race_status_present": true,
+        "runners_count": 5
+      }
+    ]
+  }
+]

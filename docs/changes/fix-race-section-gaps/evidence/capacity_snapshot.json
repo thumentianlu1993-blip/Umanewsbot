@@ -1,0 +1,347 @@
+{
+  "events": [
+    {
+      "country_region": "france",
+      "id": 829,
+      "local_date": "2026-09-17",
+      "original_name": "PRIX DE CHAMBL Y",
+      "race_datetime": null,
+      "timezone_name": "Europe/Paris"
+    },
+    {
+      "country_region": "united_states",
+      "id": 492,
+      "local_date": "2026-09-18",
+      "original_name": "PRESQUE ISLE DOWNS MASTERS S.",
+      "race_datetime": null,
+      "timezone_name": "America/New_York"
+    },
+    {
+      "country_region": "united_states",
+      "id": 491,
+      "local_date": "2026-09-18",
+      "original_name": "JOCKEY CLUB GOLD CUP S.",
+      "race_datetime": null,
+      "timezone_name": "America/New_York"
+    },
+    {
+      "country_region": "france",
+      "id": 770,
+      "local_date": "2026-09-19",
+      "original_name": "PRIX ECLIPSE - FONDS EUROPEEN DE L ’ELEVAGE",
+      "race_datetime": null,
+      "timezone_name": "Europe/Paris"
+    },
+    {
+      "country_region": "france",
+      "id": 771,
+      "local_date": "2026-09-19",
+      "original_name": "PRIX DES CHENES - FONDS EUROPEEN DE L ’ELEVAGE",
+      "race_datetime": null,
+      "timezone_name": "Europe/Paris"
+    },
+    {
+      "country_region": "france",
+      "id": 772,
+      "local_date": "2026-09-19",
+      "original_name": "PRIX BERTRAND DE TARRAGON - FONDS EUROPEEN DE L ’ELEVAGE",
+      "race_datetime": null,
+      "timezone_name": "Europe/Paris"
+    },
+    {
+      "country_region": "japan",
+      "id": 103,
+      "local_date": "2026-09-19",
+      "original_name": "阪神ジャンプS",
+      "race_datetime": null,
+      "timezone_name": "Asia/Tokyo"
+    },
+    {
+      "country_region": "united_kingdom",
+      "id": 970,
+      "local_date": "2026-09-19",
+      "original_name": "DUBAI INTERNATIONAL AIRPORT WORLD TROPHY STAKES",
+      "race_datetime": null,
+      "timezone_name": "Europe/London"
+    },
+    {
+      "country_region": "united_kingdom",
+      "id": 969,
+      "local_date": "2026-09-19",
+      "original_name": "LADBROKES 'GET REWARDED WITH LADBUCKS' FIRTH OF CLYDE",
+      "race_datetime": null,
+      "timezone_name": "Europe/London"
+    },
+    {
+      "country_region": "united_states",
+      "id": 496,
+      "local_date": "2026-09-19",
+      "original_name": "GALLANT BOB S.",
+      "race_datetime": null,
+      "timezone_name": "America/New_York"
+    },
+    {
+      "country_region": "united_states",
+      "id": 495,
+      "local_date": "2026-09-19",
+      "original_name": "PENNSYLVANIA DERBY",
+      "race_datetime": null,
+      "timezone_name": "America/New_York"
+    },
+    {
+      "country_region": "united_states",
+      "id": 494,
+      "local_date": "2026-09-19",
+      "original_name": "COTILLION S.",
+      "race_datetime": null,
+      "timezone_name": "America/New_York"
+    },
+    {
+      "country_region": "united_states",
+      "id": 493,
+      "local_date": "2026-09-19",
+      "original_name": "TURF MONSTER S.",
+      "race_datetime": null,
+      "timezone_name": "America/New_York"
+    },
+    {
+      "country_region": "japan",
+      "id": 104,
+      "local_date": "2026-09-20",
+      "original_name": "オールカマー",
+      "race_datetime": null,
+      "timezone_name": "Asia/Tokyo"
+    },
+    {
+      "country_region": "japan",
+      "id": 105,
+      "local_date": "2026-09-21",
+      "original_name": "神戸新聞杯",
+      "race_datetime": null,
+      "timezone_name": "Asia/Tokyo"
+    },
+    {
+      "country_region": "france",
+      "id": 832,
+      "local_date": "2026-09-22",
+      "original_name": "PRIX RICHARD ET ROBERT HENNESSY",
+      "race_datetime": null,
+      "timezone_name": "Europe/Paris"
+    },
+    {
+      "country_region": "france",
+      "id": 831,
+      "local_date": "2026-09-22",
+      "original_name": "PRIX THE FELLOW - MARQUISE DE MORATALLA",
+      "race_datetime": null,
+      "timezone_name": "Europe/Paris"
+    },
+    {
+      "country_region": "japan",
+      "id": 191,
+      "local_date": "2026-09-22",
+      "original_name": "白山大賞典",
+      "race_datetime": null,
+      "timezone_name": "Asia/Tokyo"
+    },
+    {
+      "country_region": "japan",
+      "id": 192,
+      "local_date": "2026-09-23",
+      "original_name": "オーバルスプリント",
+      "race_datetime": null,
+      "timezone_name": "Asia/Tokyo"
+    },
+    {
+      "country_region": "united_kingdom",
+      "id": 971,
+      "local_date": "2026-09-24",
+      "original_name": "TATTERSALLS STAKES",
+      "race_datetime": null,
+      "timezone_name": "Europe/London"
+    }
+  ],
+  "ledger": [
+    {
+      "budgeted_response_bytes": 16777216,
+      "provider": "sporting_life",
+      "region_code": "united_kingdom",
+      "request_count": 8,
+      "usage_date": "2026-09-10"
+    },
+    {
+      "budgeted_response_bytes": 44040192,
+      "provider": "the_racing_api",
+      "region_code": "france",
+      "request_count": 21,
+      "usage_date": "2026-09-10"
+    },
+    {
+      "budgeted_response_bytes": 16777216,
+      "provider": "the_racing_api",
+      "region_code": "japan",
+      "request_count": 8,
+      "usage_date": "2026-09-10"
+    },
+    {
+      "budgeted_response_bytes": 402653184,
+      "provider": "the_racing_api",
+      "region_code": "united_kingdom",
+      "request_count": 192,
+      "usage_date": "2026-09-10"
+    },
+    {
+      "budgeted_response_bytes": 10485760,
+      "provider": "the_racing_api",
+      "region_code": "united_states",
+      "request_count": 5,
+      "usage_date": "2026-09-10"
+    },
+    {
+      "budgeted_response_bytes": 18874368,
+      "provider": "sporting_life",
+      "region_code": "united_kingdom",
+      "request_count": 9,
+      "usage_date": "2026-09-11"
+    },
+    {
+      "budgeted_response_bytes": 4194304,
+      "provider": "the_racing_api",
+      "region_code": "france",
+      "request_count": 2,
+      "usage_date": "2026-09-11"
+    },
+    {
+      "budgeted_response_bytes": 69206016,
+      "provider": "the_racing_api",
+      "region_code": "japan",
+      "request_count": 33,
+      "usage_date": "2026-09-11"
+    },
+    {
+      "budgeted_response_bytes": 402653184,
+      "provider": "the_racing_api",
+      "region_code": "united_kingdom",
+      "request_count": 192,
+      "usage_date": "2026-09-11"
+    },
+    {
+      "budgeted_response_bytes": 25165824,
+      "provider": "sporting_life",
+      "region_code": "united_kingdom",
+      "request_count": 12,
+      "usage_date": "2026-09-12"
+    },
+    {
+      "budgeted_response_bytes": 50331648,
+      "provider": "the_racing_api",
+      "region_code": "france",
+      "request_count": 24,
+      "usage_date": "2026-09-12"
+    },
+    {
+      "budgeted_response_bytes": 81788928,
+      "provider": "the_racing_api",
+      "region_code": "japan",
+      "request_count": 39,
+      "usage_date": "2026-09-12"
+    },
+    {
+      "budgeted_response_bytes": 402653184,
+      "provider": "the_racing_api",
+      "region_code": "united_kingdom",
+      "request_count": 192,
+      "usage_date": "2026-09-12"
+    },
+    {
+      "budgeted_response_bytes": 46137344,
+      "provider": "the_racing_api",
+      "region_code": "france",
+      "request_count": 22,
+      "usage_date": "2026-09-13"
+    },
+    {
+      "budgeted_response_bytes": 31457280,
+      "provider": "the_racing_api",
+      "region_code": "japan",
+      "request_count": 15,
+      "usage_date": "2026-09-13"
+    },
+    {
+      "budgeted_response_bytes": 46137344,
+      "provider": "the_racing_api",
+      "region_code": "united_kingdom",
+      "request_count": 22,
+      "usage_date": "2026-09-13"
+    },
+    {
+      "budgeted_response_bytes": 33554432,
+      "provider": "the_racing_api",
+      "region_code": "united_kingdom",
+      "request_count": 16,
+      "usage_date": "2026-09-14"
+    },
+    {
+      "budgeted_response_bytes": 4194304,
+      "provider": "the_racing_api",
+      "region_code": "france",
+      "request_count": 2,
+      "usage_date": "2026-09-15"
+    },
+    {
+      "budgeted_response_bytes": 14680064,
+      "provider": "the_racing_api",
+      "region_code": "united_kingdom",
+      "request_count": 7,
+      "usage_date": "2026-09-15"
+    },
+    {
+      "budgeted_response_bytes": 77594624,
+      "provider": "the_racing_api",
+      "region_code": "france",
+      "request_count": 37,
+      "usage_date": "2026-09-16"
+    },
+    {
+      "budgeted_response_bytes": 14680064,
+      "provider": "the_racing_api",
+      "region_code": "united_kingdom",
+      "request_count": 7,
+      "usage_date": "2026-09-16"
+    },
+    {
+      "budgeted_response_bytes": 335544320,
+      "provider": "the_racing_api",
+      "region_code": "france",
+      "request_count": 160,
+      "usage_date": "2026-09-17"
+    },
+    {
+      "budgeted_response_bytes": 4194304,
+      "provider": "the_racing_api",
+      "region_code": "united_kingdom",
+      "request_count": 2,
+      "usage_date": "2026-09-17"
+    },
+    {
+      "budgeted_response_bytes": 20971520,
+      "provider": "the_racing_api",
+      "region_code": "united_states",
+      "request_count": 10,
+      "usage_date": "2026-09-17"
+    },
+    {
+      "budgeted_response_bytes": 20971520,
+      "provider": "zeturf",
+      "region_code": "france",
+      "request_count": 10,
+      "usage_date": "2026-09-17"
+    }
+  ],
+  "limits": {
+    "RACE_DATA_RAW_DAILY_PROVIDER_REGION_BYTES": 1073741824,
+    "RACE_DATA_RAW_DAILY_PROVIDER_REGION_REQUESTS": 192,
+    "RACE_DATA_RAW_MAX_UNCOMPRESSED_BYTES": 8388608
+  },
+  "observed_at": "2026-09-17T13:20:17.255677+00:00"
+}

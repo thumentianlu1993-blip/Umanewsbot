@@ -2238,6 +2238,8 @@ def complete_race_data_sync_claim(
             checkpoint.consecutive_failures = 0
             checkpoint.circuit_reason = ""
             checkpoint.next_poll_at = calculate_next_poll_at(
+                        local_date=None if event.status == models.RaceEventStatus.POSTPONED else event.local_date,
+                        timezone_name=event.timezone_name,
                 data_kind=checkpoint.data_kind,
                 now=now,
                 race_datetime=(

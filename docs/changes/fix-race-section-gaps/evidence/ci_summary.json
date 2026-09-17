@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "candidate_ci_run": 35230550096,
+  "candidate_ci_attempt": 2,
+  "main_reference_ci_run": 34463096933,
+  "main_reference_observed_date": "2026-09-10",
+  "note": "主线参考为相同应用代码的历史 Linux 构件，不是本日同环境重跑。本次全量仍有一条后续修正的旧文案断言，不表示全量通过。",
+  "revisions": {
+    "candidate": {
+      "commit": "3a47a22d45b19cfc4061b2450b25f6167f56b4eb",
+      "tests_run": 5012,
+      "failures": 17,
+      "errors": 29,
+      "skipped": 20,
+      "unique_failed_count": 46,
+      "result_sha256": "a08f5133acb16851399eacdad03b8d4367b2152f259f8ff8e418594ce7fbf71f"
+    },
+    "historical_baseline": {
+      "commit": "a88bcbf669bd609e30f97c8a07f009881d2da705",
+      "tests_run": 4886,
+      "failures": 70,
+      "errors": 258,
+      "skipped": 15,
+      "unique_failed_count": 314,
+      "result_sha256": "84898e12f7f96800f8d6e11e3f5f6c5a4c545e5abcd6a729a8167f5bb03c53ef"
+    },
+    "main_code_reference": {
+      "commit": "9a88243ffcf4d628a2ceaa528a66871d566fca82",
+      "tests_run": 4961,
+      "failures": 16,
+      "errors": 29,
+      "skipped": 20,
+      "unique_failed_count": 45,
+      "result_sha256": "69a974aa073d413ba513016851fb5db1869ecc68df09273dd052e484399874f4"
+    }
+  },
+  "comparisons": {
+    "historical_baseline": {
+      "new_failed_ids": [
+        "stable.tests.test_race_result_recovery_application_pages.RaceResultRecoveryPublicPageTests.test_finished_filter_shows_recovered_canonical_and_confirmed_winner"
+      ],
+      "removed_failed_count": 269
+    },
+    "main_code_reference": {
+      "new_failed_ids": [
+        "stable.tests.test_race_result_recovery_application_pages.RaceResultRecoveryPublicPageTests.test_finished_filter_shows_recovered_canonical_and_confirmed_winner"
+      ],
+      "removed_failed_count": 0
+    }
+  },
+  "candidate_failed_ids": [
+    "stable.test_contextual_news_entities.ContextualTranslationConsistencyTests.test_person_term_placeholder_loss_rejects_transliterated_name",
+    "stable.test_external_english_horse_context_gate.ExternalEnglishHorseContextGateTests.test_rewrite_provider_alias_only_placeholders_only_confirmed_source_occurrence",
+    "stable.test_historical_batch_pipeline.HistoricalBatchStageVerifierTests.test_verifier_reports_date_source_count_status_and_visibility_drift",
+    "stable.test_historical_calendar_runner_helpers.CurrentYearSourceOverrideRunnerTests.test_classified_reuse_rejects_old_cutoff_identity",
+    "stable.test_historical_calendar_runner_helpers.CurrentYearSourceOverrideRunnerTests.test_hong_kong_runner_archives_and_rebuilds_pre_cutoff_bootstrap",
+    "stable.test_historical_calendar_runner_helpers.CurrentYearSourceOverrideRunnerTests.test_hong_kong_runner_binds_same_cutoff_and_request_manifest_to_both_stages",
+    "stable.test_historical_calendar_runner_helpers.CurrentYearSourceOverrideRunnerTests.test_partial_cache_retries_failed_url_and_preserves_attempt_audit",
+    "stable.test_historical_calendar_runner_helpers.KnownCalendarShardRunnerTests.test_parse_artifact_reuse_requires_exact_selection_catalog_and_tool_identity",
+    "stable.test_historical_calendar_runner_helpers.KnownCalendarShardRunnerTests.test_parse_rebuilds_successful_artifact_without_current_execution_identity",
+    "stable.test_historical_calendar_runner_helpers.KnownCalendarShardRunnerTests.test_standard_cache_retries_only_failed_urls_and_preserves_attempt_audit",
+    "stable.test_historical_calendar_runner_helpers.KnownCalendarShardRunnerTests.test_toba_cache_retries_failed_url_and_preserves_attempt_audit",
+    "stable.test_historical_calendar_runner_helpers.KnownCalendarShardRunnerTests.test_toba_fetch_uses_guarded_docker_network_stage",
+    "stable.test_historical_race_batches.HistoricalRaceBatchTests.test_first_acceptance_selects_five_regions_three_series_and_three_eras",
+    "stable.test_historical_race_batches.HistoricalRaceImporterTests.test_first_acceptance_selects_five_regions_three_series_and_three_eras",
+    "stable.test_historical_race_date_discovery.HistoricalRaceDateDiscoveryTests.test_acceptance_batch_command_exports_pending_snapshot",
+    "stable.test_historical_race_date_discovery.HistoricalRaceDateDiscoveryTests.test_post_discovery_selection_requires_same_target_ids",
+    "stable.test_historical_race_date_discovery.HistoricalRaceDateDiscoveryTests.test_pre_discovery_selection_uses_pending_targets_in_1998_stage",
+    "stable.test_historical_race_detail_runner_v2_contract.HistoricalDetailRunnerV2HostLockAndCheckpointTests.test_shared_host_lock_limits_two_processes_and_appends_both_shards",
+    "stable.test_historical_race_detail_runner_v2_review_findings.HistoricalDetailRunnerV2ReviewFindingTests.test_package_consumes_and_binds_only_validated_candidate_jsonl",
+    "stable.test_lifecycle_shadow_hardening.SupportedDeployOneOffInventoryTests.test_all_deploy_wrapper_run_calls_are_canonical_and_lock_contracts_remain",
+    "stable.test_migration_history_repair.MigrationHistoryRepairLeafSetRedTests.test_management_command_accepts_repeated_complete_leaf_set",
+    "stable.test_multiregion_rollout_change.SingleArticleVisibilityTests.test_related_queries_are_ineffective_outside_enforce",
+    "stable.test_multiregion_rollout_change.SingleArticleVisibilityTests.test_related_region_page_returns_one_article_with_stable_pagination",
+    "stable.test_news_production_integrity.StaleCrawlManifestTests.test_integrity_audit_command_is_read_only",
+    "stable.test_p0_racecard_url_discovery.P0RacecardUrlDiscoveryConfigurationTests.test_production_worker_mounts_the_persistent_document_directory",
+    "stable.test_race_data_sync_repair.StalledEventRepairTests.test_apply_rejects_entry_closed_since_dry_run",
+    "stable.test_race_event_crawl_orchestration.RaceEventCrawlFirstAcceptanceFixtureTests.test_first_acceptance_rejects_missing_region_adapter_coverage",
+    "stable.test_race_live_gate_remediation_postgres.CoupledRunnerRefreshPostgresRemediationTests.test_refresh_persists_both_shared_number_legacy_rows_by_external_id",
+    "stable.test_racing_api_horse_staging.RacingApiHorseStagingTests.test_existing_v1_receipt_is_upgraded_once_with_page_snapshot",
+    "stable.test_racing_api_horse_staging_postgresql.RacingApiHorseStagingPostgresqlConcurrencyTests.test_same_manifest_concurrency_creates_one_receipt_and_one_replay",
+    "stable.tests.test_page_regression.CalendarPageTermDisplayTests.test_calendar_race_name_shows_chinese",
+    "stable.tests.test_page_regression.CalendarQueryCountTests.test_calendar_40_events_query_count_gate",
+    "stable.tests.test_race_result_recovery_application_pages.RaceResultRecoveryPublicPageTests.test_finished_filter_shows_recovered_canonical_and_confirmed_winner",
+    "stable.tests.test_race_result_recovery_application_projection.CanonicalProductLinkContractTests.test_service_rejects_cross_region_year_chain_and_cycle",
+    "stable.tests.test_race_result_recovery_application_projection.RecoveryProjectionContractTests.test_apply_rejects_manifest_bound_current_revision_drift",
+    "stable.tests_legacy.MultiRegionAttributionAndGateTests.test_public_feed_region_filter_includes_related_region_articles",
+    "stable.tests_legacy.MultiRegionAttributionAndGateTests.test_public_region_display_fallback_hides_related_regions_without_deleting_them",
+    "stable.tests_legacy.MultiRegionAttributionAndGateTests.test_region_display_and_qq_message_show_primary_before_related_regions",
+    "stable.tests_legacy.P0HorseProfileDataCompletionTests.test_public_detail_basic_tier_renders_with_in_progress_badge",
+    "stable.tests_legacy.P0HorseProfileDataCompletionTests.test_public_horse_detail_uses_original_name_when_translation_is_pending",
+    "stable.tests_legacy.P0HorseProfileDataCompletionTests.test_public_index_keeps_positive_label_for_complete_profiles",
+    "stable.tests_legacy.P0HorseProfileDataCompletionTests.test_public_index_shows_in_progress_badge_for_incomplete_profiles",
+    "stable.tests_legacy.RaceEventPageMVPTests.test_csv_import_dry_run_rejects_invalid_choice_values",
+    "stable.tests_legacy.RaceEventPageMVPTests.test_csv_import_supports_synthetic_surface",
+    "stable.tests_legacy.RaceEventPageMVPTests.test_seed_sample_import_covers_five_regions_and_calendar_visibility",
+    "stable.tests_legacy.TermbaseSeedDataPreparationTests.test_prepare_seed_command_generates_review_files_without_db_writes"
+  ],
+  "release_contract": {
+    "tests_run": 45,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "django_check": "passed",
+    "migration_drift": "none",
+    "before_after_fingerprint": "f7a5b08dd15c724bde02df95bf65ea2a609e2f873fc310fe80db7965c494db7b"
+  },
+  "follow_up": {
+    "change": "仅将此测试的旧状态文案 已结束 改为统一口径 已完赛，应用未变",
+    "red": {
+      "tests_run": 1,
+      "failures": 1,
+      "errors": 0
+    },
+    "postgresql_green": {
+      "tests_run": 19,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "note": "后续定向验证不能改写本次全量实际计数。最终测试提交仍以 PR 同 HEAD 的完整 CI 为准。"
+  }
+}

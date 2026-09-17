@@ -455,14 +455,20 @@ class RaceLivePublicationTransitionTests(TestCase):
         self.assertContains(detail, "<h2>赛果</h2>", html=True)
         self.assertNotContains(detail, "暂定赛果")
         self.assertNotContains(detail, "补充来源")
-        self.assertContains(detail, "WINNER · 冠军")
+        # 获准的暂定明细仍公开，但不能冒充已确认冠军。
+        self.assertNotContains(detail, "WINNER · 冠军")
+        self.assertContains(detail, "赛果待确认")
         for index, participant in enumerate(self.participants, start=1):
             self.assertContains(detail, participant.canonical_name)
             self.assertContains(detail, f"Jockey {index}")
             self.assertNotContains(detail, f"Forbidden Trainer {index}")
         self.assertNotContains(detail, "官方来源")
         self.assertNotContains(detail, "更正赛果")
-        self.assertContains(calendar, "Winner")
+        self.assertNotContains(calendar, "Winner")
+        self.assertContains(calendar, "赛果待确认")
+        visible = [row.horse_name for group in calendar.context["groups"]
+                   for event in group["events"] for row in event.top_results]
+        self.assertIn("Winner", visible)
         verification = verify_race_live_publication_transition(
             manifest,
             now=self.NOW,

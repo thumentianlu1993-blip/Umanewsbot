@@ -1,0 +1,26 @@
+{
+  "verified_on": "2026-09-17",
+  "jra": [
+    {
+      "event_id": 104,
+      "date": "2026-09-20",
+      "time_jst": "15:45",
+      "time_beijing": "14:45",
+      "racecard_stage": "参赛马已列出，枠与馬番尚为空",
+      "url": "https://www.jra.go.jp/JRADB/accessD.html?CNAME=pw01dde0106202604061120260920/D6"
+    },
+    {
+      "event_id": 105,
+      "date": "2026-09-21",
+      "time_jst": "15:45",
+      "time_beijing": "14:45",
+      "racecard_stage": "参赛马已列出，枠与馬番尚为空",
+      "url": "https://www.jra.go.jp/JRADB/accessD.html?CNAME=pw01dde0109202604071120260921/E4"
+    }
+  ],
+  "numbered_card_announcement": {
+    "event_id": 105,
+    "publish_after_jst": "2026-09-19 10:00",
+    "url": "https://jra.jp/news/202609/091302.html"
+  }
+}

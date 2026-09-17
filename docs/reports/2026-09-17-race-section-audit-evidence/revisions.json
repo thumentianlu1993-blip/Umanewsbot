@@ -1,0 +1,121 @@
+{
+  "logging_paths": {
+    "app_file": "/app/logs/app.log",
+    "celery_file": "/app/logs/celery.log"
+  },
+  "revisions": [
+    {
+      "id": 45,
+      "event_id": 828,
+      "kind": "racecard",
+      "phase": "racecard",
+      "decision_reason": "data_sync_racecard_reconciled",
+      "published_at": null,
+      "official_confirmed_at": null,
+      "primary_observation_id": 49
+    },
+    {
+      "id": 46,
+      "event_id": 830,
+      "kind": "racecard",
+      "phase": "racecard",
+      "decision_reason": "data_sync_racecard_reconciled",
+      "published_at": null,
+      "official_confirmed_at": null,
+      "primary_observation_id": 50
+    },
+    {
+      "id": 47,
+      "event_id": 828,
+      "kind": "result",
+      "phase": "provisional",
+      "decision_reason": "empty_field",
+      "published_at": null,
+      "official_confirmed_at": null,
+      "primary_observation_id": 51
+    },
+    {
+      "id": 48,
+      "event_id": 830,
+      "kind": "result",
+      "phase": "provisional",
+      "decision_reason": "empty_field",
+      "published_at": null,
+      "official_confirmed_at": null,
+      "primary_observation_id": 52
+    }
+  ],
+  "observations": [
+    {
+      "id": 51,
+      "keys": [
+        "course",
+        "region",
+        "off_time",
+        "race_name",
+        "race_status",
+        "participants",
+        "external_race_id"
+      ],
+      "summary": {
+        "course": "Auteuil (FR)",
+        "region": "france",
+        "off_time": "2026-09-17T10:42:00+01:00",
+        "race_name": "Prix Robert Lejeune",
+        "race_status": "complete",
+        "external_race_id": "rac_32298277362"
+      },
+      "rows": 7,
+      "provenance": {
+        "region": "france",
+        "provider": "the_racing_api",
+        "source_url": "https://api.theracingapi.com/v1/results/today/free?limit=50&skip=0",
+        "source_class": "licensed_api",
+        "contract_digest": "74b7a69070b5efb6c6d62583bde697ca11f4964694ff00579a01e919b7867cbd",
+        "registry_digest": "26e0625d73f5e4233d116e04c5b10c19bf8bbd88618bd6928ec43e74ef9832d4",
+        "contract_version": "race-data-v2",
+        "correction_marker": false,
+        "normalized_sha256": "ca11cc1c45f306ab94740dd6b2007551dd72badeb0b70c3b4f6a62b5c1954309",
+        "automation_allowed": true,
+        "correction_marker_value": ""
+      },
+      "note": "rows 为规范化 participants 数；summary.race_status=complete 为适配器缺值补入，不是上游正式标记。"
+    },
+    {
+      "id": 52,
+      "keys": [
+        "course",
+        "region",
+        "off_time",
+        "race_name",
+        "race_status",
+        "participants",
+        "external_race_id"
+      ],
+      "summary": {
+        "course": "Auteuil (FR)",
+        "region": "france",
+        "off_time": "2026-09-17T12:27:00+01:00",
+        "race_name": "Prix De Compiegne",
+        "race_status": "complete",
+        "external_race_id": "rac_32298283173"
+      },
+      "rows": 5,
+      "provenance": {
+        "region": "france",
+        "provider": "the_racing_api",
+        "source_url": "https://api.theracingapi.com/v1/results/today/free?limit=50&skip=0",
+        "source_class": "licensed_api",
+        "contract_digest": "74b7a69070b5efb6c6d62583bde697ca11f4964694ff00579a01e919b7867cbd",
+        "registry_digest": "26e0625d73f5e4233d116e04c5b10c19bf8bbd88618bd6928ec43e74ef9832d4",
+        "contract_version": "race-data-v2",
+        "correction_marker": false,
+        "normalized_sha256": "ba29d405549f1a216ac55c1645f9cb4d49908dfcb9899c0a89c719cbc447f657",
+        "automation_allowed": true,
+        "correction_marker_value": ""
+      },
+      "note": "rows 为规范化 participants 数；summary.race_status=complete 为适配器缺值补入，不是上游正式标记。"
+    }
+  ],
+  "snapshots": []
+}

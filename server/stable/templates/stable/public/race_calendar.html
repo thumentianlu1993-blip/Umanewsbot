@@ -125,7 +125,7 @@
                 </span>
                 <span class="cal-card-status">
                   <strong>{{ event.public_status_label }}</strong>
-                  {% if event.public_winner_name %}<small>冠军 {{ event.public_winner_name }}</small>{% elif event.local_start_time and event.status == 'scheduled' %}<small>{{ event.local_start_time|time:"H:i" }} 发走</small>{% endif %}
+                  {% if event.public_winner_name %}<small>冠军 {{ event.public_winner_name }}</small>{% elif event.status == 'scheduled' %}<small>{{ event.public_time_label }}</small>{% endif %}
                 </span>
               </a>
             {% endfor %}

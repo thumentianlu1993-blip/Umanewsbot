@@ -10,6 +10,7 @@ services:
     env_file:
       - .env
     environment:
+      RACE_DATA_SYNC_JRA_PRE_RACE_ENABLED: ${RACE_DATA_SYNC_JRA_PRE_RACE_ENABLED:-false}
       DB_ENGINE: postgres
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
@@ -50,6 +51,7 @@ services:
     env_file:
       - .env
     environment:
+      RACE_DATA_SYNC_JRA_PRE_RACE_ENABLED: ${RACE_DATA_SYNC_JRA_PRE_RACE_ENABLED:-false}
       DB_ENGINE: postgres
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
@@ -88,6 +90,7 @@ services:
     env_file:
       - .env
     environment:
+      RACE_DATA_SYNC_JRA_PRE_RACE_ENABLED: ${RACE_DATA_SYNC_JRA_PRE_RACE_ENABLED:-false}
       DB_ENGINE: postgres
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
@@ -126,6 +129,7 @@ services:
     env_file:
       - .env
     environment:
+      RACE_DATA_SYNC_JRA_PRE_RACE_ENABLED: ${RACE_DATA_SYNC_JRA_PRE_RACE_ENABLED:-false}
       DB_ENGINE: postgres
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
@@ -160,6 +164,7 @@ services:
     env_file:
       - .env
     environment:
+      RACE_DATA_SYNC_JRA_PRE_RACE_ENABLED: ${RACE_DATA_SYNC_JRA_PRE_RACE_ENABLED:-false}
       DB_ENGINE: postgres
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
