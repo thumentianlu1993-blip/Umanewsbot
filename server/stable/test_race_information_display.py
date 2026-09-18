@@ -160,10 +160,10 @@ class StrictParserTests(SimpleTestCase):
     def test_time_zone_and_dst(self):
         from stable.services.race_information_display import event_fields
         from datetime import date,time,datetime,timezone
-        field=event_fields({'local_date':date(2026,9,18),'local_start_time':time(15,40),'timezone_name':'Asia/Tokyo'})
-        self.assertIn('北京时间2026-09-18 14:40',field['time'].text)
+        field=event_fields({'local_date':date(2026,9,18),'local_start_time':time(15,40),'timezone_name':'Asia/Tokyo', 'race_datetime':'2026-09-18T06:40:00+00:00'})
+        self.assertEqual(field['time'].text,'14:40（北京时间）')
         field=event_fields({'local_date':date(2026,10,25),'local_start_time':time(1,30),'timezone_name':'Europe/London'})
-        self.assertEqual(field['time'].reason_code,'dst_ambiguous_or_missing')
+        self.assertEqual(field['time'].text,'北京时间待定')
         field=event_fields({'local_date':date(2026,9,18),'local_start_time':time(15,40),'timezone_name':'Asia/Tokyo',
                             'race_datetime':datetime(2026,9,18,0,tzinfo=timezone.utc)})
         self.assertEqual(field['time'].state,'conflict')
@@ -182,7 +182,7 @@ class StrictParserTests(SimpleTestCase):
     def test_offline_iso_time_inputs_and_bad_types(self):
         from stable.services.race_information_display import event_fields
         from stable.services.race_field_normalization import parse_display_distance
-        fields=event_fields({'local_date':'2026-09-18','local_start_time':'15:40:00','timezone_name':'Asia/Tokyo'})
+        fields=event_fields({'local_date':'2026-09-18','local_start_time':'15:40:00','timezone_name':'Asia/Tokyo', 'race_datetime':'2026-09-18T06:40:00+00:00'})
         self.assertIn('14:40',fields['time'].text)
         self.assertEqual(event_fields({'local_date':'not-a-date'})['date'].state,'unknown')
         self.assertEqual(parse_display_distance('1600m',unit_hint=None).state,'unknown')

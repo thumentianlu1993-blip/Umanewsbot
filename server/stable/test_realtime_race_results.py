@@ -5632,11 +5632,13 @@ class RaceResultRevisionApplyTests(TestCase):
 
     def test_homepage_today_race_winner_prefers_reported_position(self):
         self.event.local_date = self.NOW.date()
+        self.event.timezone_name = "Asia/Shanghai"
         self.event.status = stable_models.RaceEventStatus.FINISHED
         self.event.visibility_status = stable_models.RaceEventVisibility.PUBLISHED
         self.event.save(
             update_fields=(
                 "local_date",
+                "timezone_name",
                 "status",
                 "visibility_status",
                 "updated_at",

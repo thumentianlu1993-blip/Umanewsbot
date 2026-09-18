@@ -54,7 +54,7 @@ class CandidateBypassTests(TestCase):
 class CalendarFilterTests(TestCase):
     def make(self, slug, **kw):
         return models.RaceEvent.objects.create(year=2026,slug=slug,chinese_name=slug,
-            visibility_status='published',timezone_name='Asia/Tokyo',**kw)
+            visibility_status='published',timezone_name='Asia/Shanghai',**kw)
 
     def test_upcoming_excludes_past_and_running(self):
         from stable.views import _public_race_calendar_base_queryset
@@ -86,8 +86,9 @@ class CalendarFilterTests(TestCase):
         models.RaceEventResult.objects.create(event=event,horse_name='Old',finish_position=1,is_confirmed=True)
         self.assertFalse(_finished_race_queryset(models.RaceEvent.objects.all(), NOW).exists())
 
-    def test_relative_day_uses_race_timezone(self):
-        event=models.RaceEvent(status='scheduled',local_date=date(2026,9,17),timezone_name='America/New_York')
+    def test_relative_day_uses_beijing_timezone(self):
+        event=models.RaceEvent(status='scheduled',local_date=date(2026,9,17),timezone_name='America/New_York',
+            race_datetime=datetime(2026,9,17,20,tzinfo=tz.utc))
         with patch('django.utils.timezone.now',return_value=NOW):
             self.assertEqual(_public_race_status_label(event,NOW.date()),'明天')
 

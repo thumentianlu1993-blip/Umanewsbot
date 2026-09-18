@@ -1,4 +1,4 @@
-from datetime import date, time
+from datetime import date, time, datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -16,7 +16,7 @@ class DisplayPageTests(TestCase):
         self.event=RaceEvent.objects.create(year=2026,slug='normalized',original_name='Test Race',chinese_name='测试赛',
             country_region='japan',racecourse='Tokyo',grade_text='Grade 2',normalized_grade='G2',
             surface='turf',distance_text='1 mile',local_date=date(2026,9,18),local_start_time=time(15,40),
-            timezone_name='Asia/Tokyo',visibility_status='published')
+            timezone_name='Asia/Tokyo',race_datetime=datetime(2026,9,18,6,40,tzinfo=timezone.utc),visibility_status='published')
 
     def test_detail_has_standard_units_and_no_raw_grade(self):
         response=self.client.get(self.event.public_path)
@@ -167,7 +167,7 @@ class DisplayPageTests(TestCase):
         from stable.models import HorseProfile, HorseRaceRecord
         term=TermEntry.objects.create(term_type='horse',source_ja='Winner',target_zh='获胜马')
         horse=HorseProfile.objects.create(primary_term=term,display_name_zh='获胜马',review_status='published')
-        self.event.local_date=None;self.event.chinese_name='统一正式名称';self.event.save()
+        self.event.local_date=None;self.event.race_datetime=None;self.event.local_start_time=None;self.event.chinese_name='统一正式名称';self.event.save()
         record=HorseRaceRecord.objects.create(horse_profile=horse,race_name='Old record name',race_date=date(2025,1,2),race_year=2025,
             finish_position='1',event=self.event,is_major_win=True)
         response=self.client.get(horse.public_path)

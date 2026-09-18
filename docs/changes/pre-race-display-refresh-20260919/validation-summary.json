@@ -1,0 +1,37 @@
+{
+  "baseline": "5731ae6e7f4338a54d983857ca02510c92114ae0",
+  "local_partial_only": {
+    "baseline_tests": 3830,
+    "candidate_tests": 3859,
+    "completed_full_suite": false,
+    "reason": "Stopped slow local diagnostic; complete comparison belongs to Linux PR CI"
+  },
+  "focused": {
+    "final_joint": {
+      "tests_run": 168,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "evidence_sha256": "8b9cef874725f418d8b50f37a8607ff923a6730f971e59126499b724f48b199b"
+    },
+    "historical_pages": {
+      "tests_run": 76,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "evidence_sha256": "8cbecbfdbddca57b5383c4bac50f077d6e64772771b73bb41aadba6777058dd4"
+    },
+    "fresh_database_translation_check": {
+      "tests_run": 48,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "evidence_sha256": "4f685973364a5503d63865d19cd332142b88290b25f6757cb67cea1a8365be47"
+    }
+  },
+  "review": "APPROVED",
+  "review_fingerprint_before": "7719d3470cd61f7d0895e4cacb201c235230194d4b3b24147f44bfe92c4889cb",
+  "review_fingerprint_after": "7719d3470cd61f7d0895e4cacb201c235230194d4b3b24147f44bfe92c4889cb",
+  "github_ci": "blocked_invalid_github_cli_auth_401",
+  "production_changes": false
+}

@@ -1,11 +1,12 @@
 from __future__ import annotations
+from .services.race_public_time import annotate_public_time, public_time, BEIJING
 
 import json
 import math
 import re
 import unicodedata
 import uuid
-from datetime import datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -2973,12 +2974,12 @@ RACE_CALENDAR_MALFORMED_QUERY_MARKERS = ("®ion=", "Â®ion=")
 
 
 def _race_date_label(event: RaceEvent, today) -> str:
-    if event.local_date == today:
+    if public_time(event).day == today:
         return "今天"
-    if event.local_date == today + timedelta(days=1):
+    if public_time(event).day == today + timedelta(days=1):
         return "明天"
-    if event.local_date:
-        return f"{event.local_date.month}月{event.local_date.day}日"
+    if public_time(event).day:
+        return f"{public_time(event).day.month}月{public_time(event).day.day}日"
     return "日期待定"
 
 
@@ -3012,27 +3013,14 @@ def _confirmed_race_winner(results: list[RaceEventResult]):
 
 
 def _race_time_label(event):
-    from zoneinfo import ZoneInfo
-    if event.race_datetime:
-        try:
-            local = event.race_datetime.astimezone(ZoneInfo(event.timezone_name))
-            beijing = event.race_datetime.astimezone(ZoneInfo("Asia/Shanghai"))
-            return f"北京时间 {beijing:%m-%d %H:%M}（当地 {local:%m-%d %H:%M}，{event.timezone_name}）"
-        except (ValueError, KeyError):
-            pass
-    return "当地日期，开赛时间待补"
+    stamp = public_time(event)
+    return f"{stamp.day:%Y-%m-%d} {stamp.clock:%H:%M}（北京时间）" if stamp.clock else "北京时间待定"
 
 
 def _upcoming_race_queryset(queryset, now):
-    from zoneinfo import ZoneInfo
-    dated = Q(race_datetime__gt=now)
-    for name in queryset.filter(race_datetime__isnull=True).order_by().values_list("timezone_name", flat=True).distinct():
-        try:
-            local_today = now.astimezone(ZoneInfo(name)).date()
-        except (ValueError, KeyError):
-            continue
-        dated |= Q(race_datetime__isnull=True, timezone_name=name, local_date__gte=local_today)
-    return queryset.filter(status=RaceEventStatus.SCHEDULED).filter(dated)
+    queryset = annotate_public_time(queryset)
+    return queryset.filter(status=RaceEventStatus.SCHEDULED).filter(
+        Q(public_instant__gt=now) | Q(public_instant__isnull=True, public_date__gte=now.astimezone(BEIJING).date()))
 
 
 def _finished_race_queryset(queryset, now):
@@ -3059,15 +3047,16 @@ def _public_race_status_label(event: RaceEvent, today, winner=None) -> str:
     if event.status == RaceEventStatus.FINISHED:
         return "已完赛" if winner else "赛果待确认"
     now = timezone.now()
+    stamp = public_time(event)
+    today = now.astimezone(BEIJING).date()
     if event.status in {RaceEventStatus.SCHEDULED, RaceEventStatus.RUNNING}:
-        from zoneinfo import ZoneInfo
-        try:
-            local_today = now.astimezone(ZoneInfo(event.timezone_name)).date()
-        except (ValueError, KeyError):
-            local_today = today
-        if (event.race_datetime and now > event.race_datetime + timedelta(minutes=30)) or (
-            not event.race_datetime and event.local_date and event.local_date < local_today
-        ):
+        source_day_passed = False
+        if not stamp.day and event.local_date and event.timezone_name:
+            try:
+                source_day_passed = event.local_date < now.astimezone(ZoneInfo(event.timezone_name)).date()
+            except (ValueError, KeyError):
+                pass
+        if source_day_passed or (stamp.instant and now > stamp.instant + timedelta(minutes=30)) or (not stamp.instant and stamp.day and stamp.day < today):
             return "赛期已过，资料待补"
     if event.status == RaceEventStatus.RUNNING:
         return "进行中"
@@ -3075,13 +3064,9 @@ def _public_race_status_label(event: RaceEvent, today, winner=None) -> str:
         return "延期"
     if event.status == RaceEventStatus.CANCELLED:
         return "取消"
-    if event.local_date is None:
+    if public_time(event).day is None:
         return "日期待定"
-    try:
-        today = now.astimezone(ZoneInfo(event.timezone_name)).date()
-    except (ValueError, KeyError):
-        pass
-    days = (event.local_date - today).days
+    days = (public_time(event).day - today).days
     if days == 0:
         return "今天"
     if days == 1:
@@ -3093,23 +3078,23 @@ def _public_race_status_label(event: RaceEvent, today, winner=None) -> str:
 
 def _public_today_races() -> tuple[list[dict], bool]:
     """首页"今日赛事"面板：当日与次日公开赛事，空窗时回退到最近的重点赛事。"""
-    today = timezone.localdate()
-    base = RaceEvent.objects.filter(
+    today = timezone.localdate(timezone=BEIJING)
+    base = annotate_public_time(RaceEvent.objects.all()).filter(
         visibility_status=RaceEventVisibility.PUBLISHED,
-        local_date__isnull=False,
+        public_date__isnull=False,
     ).exclude(canonical_product_links__is_active=True)
     events = list(
-        base.filter(local_date__gte=today, local_date__lte=today + timedelta(days=1)).order_by(
-            "local_date", "local_start_time", "id"
+        base.filter(public_date__gte=today, public_date__lte=today + timedelta(days=1)).order_by(
+            "public_date", "public_start_time", "id"
         )[:PUBLIC_TODAY_RACE_LIMIT]
     )
     is_fallback = False
     if not events:
         is_fallback = True
         events = list(
-            base.filter(local_date__gt=today + timedelta(days=1))
+            base.filter(public_date__gt=today + timedelta(days=1))
             .filter(Q(priority__in=[RaceEventPriority.P0, RaceEventPriority.P1]) | Q(is_featured=True))
-            .order_by("local_date", "local_start_time", "id")[:PUBLIC_TODAY_RACE_LIMIT]
+            .order_by("public_date", "public_start_time", "id")[:PUBLIC_TODAY_RACE_LIMIT]
         )
     winners: dict[int, str] = {}
     finished_ids = [event.pk for event in events if event.status == RaceEventStatus.FINISHED]
@@ -3150,16 +3135,16 @@ def _public_today_races() -> tuple[list[dict], bool]:
 
 def _public_next_key_race():
     """右栏"即将开赛"模块：最近一场公开重点赛事。"""
-    today = timezone.localdate()
-    queryset = RaceEvent.objects.filter(
+    today = timezone.localdate(timezone=BEIJING)
+    queryset = annotate_public_time(RaceEvent.objects.all()).filter(
         visibility_status=RaceEventVisibility.PUBLISHED,
-        local_date__isnull=False,
-        local_date__gte=today,
+        public_date__isnull=False,
+        public_date__gte=today,
     ).exclude(canonical_product_links__is_active=True).filter(
         Q(priority__in=[RaceEventPriority.P0, RaceEventPriority.P1])
         | Q(is_featured=True)
     )
-    event = _upcoming_race_queryset(queryset, timezone.now()).order_by("local_date", "local_start_time", "id").first()
+    event = _upcoming_race_queryset(queryset, timezone.now()).order_by("public_date", "public_start_time", "id").first()
     if event:
         event.public_time_label = _race_time_label(event)
     return event
@@ -3169,7 +3154,7 @@ def _public_race_calendar_base_queryset(filters: dict, *, today):
     """赛事日历公开基础 queryset：published、排除 active canonical duplicate、
     tab/region/grade/when。默认日期窗口与赛事列表复用同一基础 queryset；
     read-gate 展示 annotation 只在最终赛事对象查询上加。"""
-    queryset = RaceEvent.objects.filter(
+    queryset = annotate_public_time(RaceEvent.objects.all()).filter(
         visibility_status=RaceEventVisibility.PUBLISHED
     ).exclude(canonical_product_links__is_active=True)
     selected_year = (
@@ -3245,9 +3230,16 @@ def _race_calendar_queryset(request: HttpRequest, *, today):
         ),
         public_projection_write_owner=F("projection_control__write_owner"),
     )
-    cross_period = bool(year or query)
+    valid_cursor = decode_race_calendar_cursor(cursor, filters=filters) if cursor and direction in {'past','future'} else None
+    if cursor and valid_cursor is None:
+        cursor = direction = ''
+        filters['cursor'] = filters['direction'] = ''
+    cross_period = bool(year or query or valid_cursor)
+    window = None if cross_period else public_default_race_date_window(base_queryset, today=today)
+    cross_period = cross_period or not window.dates
     if year.isdigit():
-        queryset = queryset.filter(year=int(year))
+        queryset = queryset.filter(Q(public_date__year=int(year)) |
+            Q(public_date__isnull=True, year=int(year)))
     if query:
         series_name_match = (
             Q(race_series__names__text__icontains=query)
@@ -3262,24 +3254,6 @@ def _race_calendar_queryset(request: HttpRequest, *, today):
             | Q(race_series__chinese_name__icontains=query)
             | series_name_match
         ).distinct()
-    cursor_date = None
-    if cursor and not cross_period:
-        try:
-            cursor_date = datetime.fromisoformat(cursor).date()
-        except ValueError:
-            cursor_date = None
-    if cursor_date is not None and direction in {"past", "future"}:
-        # 显式独占边界分页（行为保留）
-        if direction == "past":
-            queryset = queryset.filter(local_date__lt=cursor_date).order_by("-local_date", "-local_start_time", "id")
-        else:
-            queryset = queryset.filter(local_date__gt=cursor_date).order_by("local_date", "local_start_time", "id")
-        return (
-            queryset.prefetch_related("results")[:RACE_CALENDAR_PAGE_SIZE],
-            filters,
-            None,
-            None,
-        )
     if cross_period:
         # 显式 year/q 跨期模式：签名复合游标绑定规范化筛选，并以 NULLS LAST
         # 的日期、时间、主键顺序稳定遍历。每次只读取 page_size + 1。
@@ -3302,14 +3276,14 @@ def _race_calendar_queryset(request: HttpRequest, *, today):
             )
         if direction == "past":
             ordering = (
-                F("local_date").desc(nulls_first=True),
-                F("local_start_time").desc(nulls_first=True),
+                F("public_date").desc(nulls_first=True),
+                F("public_start_time").desc(nulls_first=True),
                 "-id",
             )
         else:
             ordering = (
-                F("local_date").asc(nulls_last=True),
-                F("local_start_time").asc(nulls_last=True),
+                F("public_date").asc(nulls_last=True),
+                F("public_start_time").asc(nulls_last=True),
                 "id",
             )
         page_rows = list(
@@ -3332,15 +3306,20 @@ def _race_calendar_queryset(request: HttpRequest, *, today):
         }
         return page_rows, filters, None, pagination
     # 默认日期窗口模式（含非法/不完整 cursor 的安全回退）
-    window = public_default_race_date_window(base_queryset, today=today)
     if not window.dates:
         return queryset.none(), filters, window, None
-    queryset = queryset.filter(local_date__in=window.dates).order_by(
-        Case(When(pk__in=window.representative_ids, then=0), default=1),
-        "local_date",
-        "local_start_time",
-        "id",
-    )
+    queryset = queryset.filter(public_date__in=window.dates)
+    # A continuous interval containing the anchor: nearest history followed by
+    # anchor/future. Never drop the anchor because previous days filled the cap.
+    forward = queryset.filter(public_date__gte=window.anchor).order_by(
+        F('public_date').asc(nulls_last=True), F('public_start_time').asc(nulls_last=True), 'id')
+    forward_count = forward[:RACE_CALENDAR_PAGE_SIZE].count()
+    before_limit = RACE_CALENDAR_PAGE_SIZE-forward_count
+    previous_ids = queryset.filter(public_date__lt=window.anchor).order_by(
+        F('public_date').desc(nulls_first=True), F('public_start_time').desc(nulls_first=True), '-id'
+    ).values('pk')[:before_limit]
+    queryset = queryset.filter(Q(pk__in=forward.values('pk')[:RACE_CALENDAR_PAGE_SIZE]) | Q(pk__in=previous_ids)).order_by(
+        F('public_date').asc(nulls_last=True), F('public_start_time').asc(nulls_last=True), 'id')
     return (
         queryset.prefetch_related("results")[:RACE_CALENDAR_PAGE_SIZE],
         filters,
@@ -3419,14 +3398,14 @@ def _group_race_events_by_date(events, *, today, anchor_date=None):
         event.public_winner_result = winner
         event.public_winner_name = winner.horse_name if winner else ""
         event.public_status_label = _public_race_status_label(event, today, winner)
-        if event.local_date != current_date:
-            current_date = event.local_date
+        if current_group is None or public_time(event).day != current_date:
+            current_date = public_time(event).day
             current_group = {
-                "date": event.local_date,
+                "date": public_time(event).day,
                 "events": [],
-                "anchor_id": f"race-date-{event.local_date.isoformat()}" if event.local_date else "race-date-undated",
-                "is_today": event.local_date == today,
-                "is_anchor": anchor_date is not None and event.local_date == anchor_date,
+                "anchor_id": f"race-date-{public_time(event).day.isoformat()}" if public_time(event).day else "race-date-undated",
+                "is_today": public_time(event).day == today,
+                "is_anchor": anchor_date is not None and public_time(event).day == anchor_date,
             }
             groups.append(current_group)
         current_group["events"].append(event)
@@ -3439,27 +3418,27 @@ def _group_race_events_by_date(events, *, today, anchor_date=None):
 
 def _public_weekly_focus_events(region: str = "", *, events: list[RaceEvent] | None = None, today=None) -> list[RaceEvent]:
     if today is None:
-        today = timezone.localdate()
+        today = timezone.localdate(timezone=BEIJING)
     week_start = today - timedelta(days=today.weekday())
     week_end = week_start + timedelta(days=6)
     if events is not None:
         return [
             event
             for event in events
-            if event.local_date
-            and week_start <= event.local_date <= week_end
+            if public_time(event).day
+            and week_start <= public_time(event).day <= week_end
             and event.normalized_grade in PUBLIC_RACE_GRADE_FILTERS["g1"]
             and (not region or event.country_region == region)
         ][:3]
-    queryset = RaceEvent.objects.filter(
+    queryset = annotate_public_time(RaceEvent.objects.all()).filter(
         visibility_status=RaceEventVisibility.PUBLISHED,
-        local_date__gte=week_start,
-        local_date__lte=week_end,
+        public_date__gte=week_start,
+        public_date__lte=week_end,
         normalized_grade__in=PUBLIC_RACE_GRADE_FILTERS["g1"],
     ).exclude(canonical_product_links__is_active=True)
     if region:
         queryset = queryset.filter(country_region=region)
-    return list(queryset.order_by("local_date", "local_start_time", "id")[:3])
+    return list(queryset.order_by("public_date", "public_start_time", "id")[:3])
 
 
 def _attach_result_display_positions(results):
@@ -3620,13 +3599,13 @@ def public_race_calendar(request: HttpRequest):
         if pagination is None and filters["direction"] == "past":
             events = list(reversed(events))
     else:
-        # 代表赛事优先截取后在 Python 中恢复现有时间升序；local_start_time 为 None
-        # 的赛事排在当天定时赛事之后，对齐生产 PostgreSQL ASC NULLS LAST 语义。
+        # 与查询及游标保持同一连续公开时间顺序；未知时间在当日最后。
         events.sort(
             key=lambda event: (
-                event.local_date,
-                event.local_start_time is None,
-                event.local_start_time or time.min,
+                event.public_date is None,
+                event.public_date or date.max,
+                event.public_start_time is None,
+                event.public_start_time or time.min,
                 event.pk,
             )
         )
@@ -3673,16 +3652,8 @@ def public_race_calendar(request: HttpRequest):
             filters=filters,
         )
     else:
-        previous_cursor = (
-            events[0].local_date.isoformat()
-            if events and events[0].local_date
-            else ""
-        )
-        next_cursor = (
-            events[-1].local_date.isoformat()
-            if events and events[-1].local_date
-            else ""
-        )
+        previous_cursor = encode_race_calendar_cursor(events[0], filters=filters) if events else ""
+        next_cursor = encode_race_calendar_cursor(events[-1], filters=filters) if events else ""
     grade_tabs = [
         {"value": "", "label": "全部等级", "is_active": filters["grade"] == "", "url": filter_url(grade="")},
         *[
@@ -3911,7 +3882,8 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
         )
     }
     from .services.race_pre_race import public_jra_preview, public_reviewed_preview
-    preview = public_jra_preview(event, now=read_now) or public_reviewed_preview(event, now=read_now)
+    from .services.race_pre_race_refresh import public_refresh_preview
+    preview = public_refresh_preview(event, now=read_now) or public_jra_preview(event, now=read_now) or public_reviewed_preview(event, now=read_now)
     runners = _sort_runners_for_display(preview["rows"] if preview else list(event.runners.all()), event.country_region)
     has_current_live_revision = bool(projection_control and projection_control.write_owner != "historical" and (
         current_result_revision is not None or projection_control.write_owner in {"data_sync", "live"}))
@@ -3953,6 +3925,7 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
             "event": event,
             "runners": runners,
             "runner_section_label": preview["label"] if preview else "出马表",
+            "runner_preview": preview,
             "results": results,
             "history_winners": history_winners,
             "history_primary": history_winners[:10],

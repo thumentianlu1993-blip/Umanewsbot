@@ -879,6 +879,7 @@ def discover_the_racing_api_source_identities(
             }
             diagnostic_buckets.append(diagnostic)
             expected_region_code = registry["allowed_region_codes"][event_region]
+            identity_outcomes = {}
             for event, contract_region, route, existing, _offset in bucket:
                 match_counts = {}
                 race, reason = _match_discovery_race(
@@ -889,6 +890,7 @@ def discover_the_racing_api_source_identities(
                 )
                 reasons = diagnostic["match_reason_counts"]
                 reasons[reason] = reasons.get(reason, 0) + 1
+                identity_outcomes[event.pk] = reason if race is None else "identity_not_applied"
                 if race is None:
                     if diagnostic_event_count < _DISCOVERY_DIAGNOSTIC_EVENT_LIMIT:
                         diagnostic["unmatched_events"].append({
@@ -966,15 +968,18 @@ def discover_the_racing_api_source_identities(
                             **values,
                         )
                         created += 1
+                        identity_outcomes[event.pk] = ""
                     elif source.external_race_id == external_id:
                         for field_name, value in values.items():
                             setattr(source, field_name, value)
                         source.save(update_fields=tuple(values) + ("updated_at",))
                         adopted += 1
+                        identity_outcomes[event.pk] = ""
                     else:
                         ambiguous += 1
             for candidate in bucket:
-                finish_pre_race(claims[candidate[0].pk], now=_safe_clock_value(clock=clock, fallback=now))
+                finish_pre_race(claims[candidate[0].pk], now=_safe_clock_value(clock=clock, fallback=now),
+                    outcome_reason=identity_outcomes.get(candidate[0].pk,"identity_not_applied"))
     except _ProviderSyncError as exc:
         for claim in claims.values():
             finish_pre_race(claim, now=_safe_clock_value(clock=clock, fallback=now), reason=exc.reason_code)

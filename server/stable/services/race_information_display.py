@@ -101,47 +101,14 @@ def source_context(obj):
 
 
 def _time_fields(obj):
-    day, clock, instant = value(obj, 'local_date', None), value(obj, 'local_start_time', None), value(obj, 'race_datetime', None)
-    zone = value(obj, 'timezone_name')
-    try:
-        if isinstance(day, str): day = date.fromisoformat(day)
-        if isinstance(clock, str): clock = time.fromisoformat(clock)
-        if isinstance(instant, str): instant = datetime.fromisoformat(instant.replace('Z', '+00:00'))
-    except ValueError:
-        invalid = display_field({'date':day,'time':clock,'instant':instant}, state='unknown', reason='invalid_datetime')
-        return invalid, invalid
-    raw = {'date': day, 'time': clock, 'instant': instant, 'zone': zone}
-    date_field = display_field(raw, day.isoformat()) if day else display_field(raw, state='missing', reason='missing')
-    if not clock and not instant:
-        return date_field, display_field(raw, state='missing', reason='missing')
-    try:
-        tz = ZoneInfo(zone)
-        if instant:
-            if instant.tzinfo is None:
-                raise ValueError('naive instant')
-            local = instant.astimezone(tz)
-            if (day and local.date() != day) or (clock and local.time().replace(tzinfo=None) != clock):
-                return date_field, display_field(raw, state='conflict', reason='time_conflict')
-        elif day:
-            naive = datetime.combine(day, clock)
-            possible = set()
-            for fold in (0, 1):
-                candidate = naive.replace(tzinfo=tz, fold=fold)
-                utc = candidate.astimezone(timezone.utc)
-                if utc.astimezone(tz).replace(tzinfo=None) == naive:
-                    possible.add(utc)
-            if len(possible) != 1:
-                return date_field, display_field(raw, f'{clock:%H:%M}（当地时间，时区待核实）',
-                                                state='preserved', reason='dst_ambiguous_or_missing')
-            local = next(iter(possible)).astimezone(tz)
-        else:
-            return date_field, display_field(raw, f'{clock:%H:%M}（当地时间，日期待核实）', state='preserved', reason='date_missing')
-        date_field = display_field(raw, local.date().isoformat())
-        beijing = local.astimezone(ZoneInfo('Asia/Shanghai'))
-        return date_field, display_field(raw, f'{local:%H:%M}（当地时间，{zone}；北京时间{beijing:%Y-%m-%d %H:%M}）')
-    except (ValueError, TypeError, ZoneInfoNotFoundError):
-        return date_field, display_field(raw, f'{clock:%H:%M}（当地时间，时区待核实）' if clock else '待核实',
-                                        state='preserved' if clock else 'unknown', reason='timezone_unknown')
+    from dataclasses import replace
+    from .race_public_time import public_time
+    stamp = public_time(obj)
+    raw = {key: value(obj, key, None) for key in ('local_date','local_start_time','race_datetime','timezone_name')}
+    state = 'conflict' if stamp.reason == 'time_conflict' else 'unknown' if stamp.reason == 'invalid_datetime' else 'missing'
+    unknown = replace(display_field(raw, state=state, reason=stamp.reason), text='北京时间待定')
+    return (display_field(raw, stamp.day.isoformat()) if stamp.day else unknown,
+            display_field(raw, f'{stamp.clock:%H:%M}（北京时间）') if stamp.clock else unknown)
 
 
 def event_grade_field(obj, *, context=None):
@@ -240,7 +207,8 @@ def horse_record_fields(record, *, event_source=None):
     fields = event_fields(source)
     if event_source is None or fields['date'].state == 'missing':
         day = value(record, 'race_date', None)
-        fields['date'] = _time_fields({'local_date': day})[0]
+        # Historical date-only horse records remain source dates, not invented Beijing instants.
+        fields['date'] = display_field(day, str(day), state='preserved', reason='historical_date_only') if day else display_field('', state='missing')
         if not day and value(record, 'race_year', None):
             fields['date'] = display_field(value(record, 'race_year'), str(value(record, 'race_year')), state='preserved', reason='year_only')
     fields.update(row_fields(record, horse_record=True))
