@@ -1,0 +1,42 @@
+{
+  "events": 9,
+  "rows": 77,
+  "batches": [
+    {
+      "batch": "future-v2",
+      "manifest_sha256": "043482e9292e6bf1059754f985590f5614e22bf518e383f4f59045b7757816b2",
+      "event_ids": [
+        491,
+        492,
+        969,
+        770,
+        771,
+        772
+      ],
+      "rows": 45,
+      "verified": true
+    },
+    {
+      "batch": "parx-v1",
+      "manifest_sha256": "96ec6df5861ede931fbfe26dca825174f81cc642b44bc94e9bd65596cdc70fa8",
+      "event_ids": [
+        494,
+        495
+      ],
+      "rows": 20,
+      "verified": true
+    },
+    {
+      "batch": "nar-v1",
+      "manifest_sha256": "2444231a66eedcd07354f373ef681643fcbc898cb5e420190c578444b5612087",
+      "event_ids": [
+        191
+      ],
+      "rows": 12,
+      "verified": true
+    }
+  ],
+  "public_times_pages": 18,
+  "public_candidate_rows": 0,
+  "application_deployed": false
+}
