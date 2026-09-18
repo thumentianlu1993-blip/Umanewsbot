@@ -1,0 +1,40 @@
+{
+  "collected_at": "2026-09-18T21:13:24.826885+00:00",
+  "application_commit": "2c8fa8e4ec91d0ba3a32529839cff8f1a4d68615",
+  "merge_commit": "8e0e6c9f13b3a9709cd8b3e550745c14ba179b66",
+  "image": "sha256:214537d25f1e0adf6a740e724be627835ab5287a07fe3a6d56a6c5a8220648f2",
+  "all_services_running": true,
+  "four_application_versions_match": true,
+  "configuration_change": {
+    "RACE_DATA_SYNC_PRE_RACE_REFRESH_ENABLED": "true",
+    "RACE_DATA_RAW_DAILY_PROVIDER_REGION_REQUESTS": "512"
+  },
+  "daily_bytes": 1073741824,
+  "infrastructure_preserved": true,
+  "migration_plan_empty": true,
+  "backup": {
+    "sha256": "da1a4666ad2839b909bbb4dfffb7c71312e356bc6c6ace40fa20faacbde449ac",
+    "size": 564044366
+  },
+  "release_records": {
+    "path": "/opt/umanews-release-2c8fa8e4-prerefresh-20260919/umanewsbot/runtime/migration_history_repair/release-0078-recovery/5217aec9f1361783b73ec3d5904c8909101a60fcdf4b23512d29be0de862acf6/intent.json",
+    "sha256": "964108e92d2cd6a887e942c4864013aaef412fcb1098262ebb8f64bd147f5bb3"
+  },
+  "lock_absent": true,
+  "active_absent": true,
+  "restricted_absent": true,
+  "queues_at_verification": {
+    "celery": 18,
+    "race_sync_v2": 0,
+    "race_live": 7543
+  },
+  "public_requests": 26,
+  "public_all_200": true,
+  "public_no_local_time": true,
+  "public_no_old_card_title": true,
+  "natural_cycles": "first_failed_long_scope",
+  "release_started_at": "2026-09-18T21:05:45.924116+00:00",
+  "release_finished_at": "2026-09-18T21:09:57.684564+00:00",
+  "workers_responded": 2,
+  "worker_reserved": 0
+}

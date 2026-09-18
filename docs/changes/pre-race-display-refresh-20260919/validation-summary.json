@@ -46,8 +46,19 @@
   "review": "APPROVED",
   "review_fingerprint_before": "7719d3470cd61f7d0895e4cacb201c235230194d4b3b24147f44bfe92c4889cb",
   "review_fingerprint_after": "7719d3470cd61f7d0895e4cacb201c235230194d4b3b24147f44bfe92c4889cb",
-  "github_ci": "pending_final_test_contract_commit",
-  "production_changes": false,
+  "github_ci": {
+    "run_id": 35391358462,
+    "head": "2c8fa8e4ec91d0ba3a32529839cff8f1a4d68615",
+    "tests_run": 5128,
+    "failures": 16,
+    "errors": 29,
+    "skipped": 20,
+    "new_failures": [],
+    "release_contract_tests": 45,
+    "review": "APPROVED",
+    "summary_job": "in_progress_not_counted_as_passed"
+  },
+  "production_changes": true,
   "review_live_source_contract": "APPROVED",
   "initial_full_ci": {
     "run_id": 35387873367,
@@ -59,5 +70,23 @@
     "new_vs_production": [
       "stable.test_race_data_sync_discovery.TheRacingApiIdentityDiscoveryConservationTests.test_due_cadence_defers_without_starving_other_events_and_reuses_snapshot"
     ]
+  },
+  "production_release": {
+    "head": "2c8fa8e4ec91d0ba3a32529839cff8f1a4d68615",
+    "image": "sha256:214537d25f1e0adf6a740e724be627835ab5287a07fe3a6d56a6c5a8220648f2",
+    "public_requests": 26,
+    "public_all_200": true,
+    "natural_cycles": "first_failed_long_scope"
+  },
+  "long_url_fix": {
+    "red_tests": 1,
+    "red_failures": 1,
+    "green_tests": 67,
+    "green_failures": 0,
+    "green_errors": 0,
+    "green_sha256": "69c4334bb15cd5dda6d9b576b03904997badeefc72dc11abc38b31a92505104c",
+    "review": "APPROVED",
+    "ci": "pending",
+    "deployed": false
   }
 }

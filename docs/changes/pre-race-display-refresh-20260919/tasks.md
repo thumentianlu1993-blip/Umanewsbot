@@ -5,5 +5,6 @@
 - [x] (application) 第一轮只读审核修正默认窗口遗漏、旧游标回退和SQLite存储时间适配。
 - [x] (integration) 完成扩展来源/并发/失败测试与同一reviewer整包及历史可发现性复审。
 - [x] (application) 完成168项联合、76项历史页面回归、审核指纹和文档回写。
-- [ ] (application) GitHub登录恢复后创建PR并完成Linux全量对照；当前401阻塞，本地部分诊断不能替代。
-- [ ] (operations) 后续发布单独冻结提交/来源绑定/开关/服务/备份包，并验收自然周期；本轮未部署。
+- [x] (application) PR209最终Linux全量5128项，无新增失败；45项发布测试通过，固定reviewer复核APPROVED。
+- [x] (operations) 固定提交/配置/服务/备份包并经0078上线，四应用与26个公开请求通过。
+- [ ] (operations) 完成自然D0两轮验收；纳管长周期未观察充分时明确记录边界。
