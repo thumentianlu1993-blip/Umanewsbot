@@ -72,6 +72,7 @@ def _make_event(*, local_date: date | None, normalized_grade: str = "",
         grade_text=normalized_grade or "G1",
         normalized_grade=normalized_grade or "",
         surface="turf",
+        timezone_name="Asia/Shanghai",
         local_date=local_date,
         priority=priority,
         status=status,
@@ -351,7 +352,10 @@ class DefaultRaceDateWindowTests(TestCase):
     def test_explicit_past_cursor_not_overridden_by_default_anchor(self):
         days = [date(2026, 7, 10), date(2026, 7, 18), FIXED_TODAY, date(2026, 8, 5)]
         self._make_days(days, prefix="XP")
-        html = self._html(tab="all", direction="past", cursor="2026-07-20")
+        from stable.services.race_calendar import encode_race_calendar_cursor
+        filters=dict(tab='all',region='',year='',q='',grade='',when='')
+        cursor=encode_race_calendar_cursor(RaceEvent.objects.get(local_date=FIXED_TODAY),filters=filters)
+        html = self._html(tab="all", direction="past", cursor=cursor)
         ids = _axis_ids(html)
         self.assertIn(_anchor_id(date(2026, 7, 10)), ids)
         self.assertIn(_anchor_id(date(2026, 7, 18)), ids)
@@ -365,7 +369,10 @@ class DefaultRaceDateWindowTests(TestCase):
     def test_explicit_future_cursor_not_overridden_by_default_anchor(self):
         days = [date(2026, 7, 10), FIXED_TODAY, date(2026, 8, 5)]
         self._make_days(days, prefix="XF")
-        html = self._html(tab="all", direction="future", cursor="2026-07-27")
+        from stable.services.race_calendar import encode_race_calendar_cursor
+        filters=dict(tab='all',region='',year='',q='',grade='',when='')
+        cursor=encode_race_calendar_cursor(RaceEvent.objects.get(local_date=FIXED_TODAY),filters=filters)
+        html = self._html(tab="all", direction="future", cursor=cursor)
         ids = _axis_ids(html)
         self.assertEqual(ids, [_anchor_id(date(2026, 8, 5))])
         self.assertFalse(any(link["is_anchor"] for link in _axis_links(html)))
@@ -551,13 +558,13 @@ class DefaultRaceDateWindowTests(TestCase):
     # ------------------------------------------------------------------
     # 日期待定
     # ------------------------------------------------------------------
-    def test_default_mode_with_only_undated_events_renders_empty_state(self):
-        """默认模式不再展示 local_date=None 赛事（当前会展示 → RED）。"""
+    def test_default_mode_with_only_undated_events_renders_pending_group(self):
+        """无可确认北京日期时，待定赛事仍可分页访问。"""
         _make_event(local_date=None, chinese_name="待定独赛")
         html = self._html(tab="all")
         self.assertIn(
-            "暂无符合条件的赛事", html,
-            "RED：默认模式只有日期待定赛事时应为空状态",
+            "待定独赛", html,
+            "待定分组不能遗漏无赛时赛事",
         )
         self.assertEqual(_axis_links(html), [])
 
@@ -601,8 +608,8 @@ class DefaultRaceDateWindowTests(TestCase):
     # ------------------------------------------------------------------
     # 高基数 40 卡
     # ------------------------------------------------------------------
-    def test_high_cardinality_keeps_40_card_cap_and_every_window_date(self):
-        """11 日合计 55 场：渲染 ≤40 卡、11 个日期每个至少 1 张、日期栏含全部 11 日。"""
+    def test_high_cardinality_keeps_40_card_cap_and_contiguous_page(self):
+        """密集窗口按连续顺序取40场，剩余赛事通过签名游标完整可达。"""
         before = [date(2026, 7, 18), date(2026, 7, 20), date(2026, 7, 22),
                   date(2026, 7, 24), date(2026, 7, 26)]
         after = [date(2026, 7, 28), date(2026, 7, 30), date(2026, 8, 1),
@@ -618,11 +625,11 @@ class DefaultRaceDateWindowTests(TestCase):
         html = self._html(tab="all")
         card_count = html.count('class="cal-card"')
         self.assertLessEqual(card_count, 40, "40 卡上限必须保留")
-        expected_days = sorted(before + [FIXED_TODAY] + after)
+        expected_days = sorted(before[1:] + [FIXED_TODAY] + after)
         self.assertEqual(
             _axis_ids(html),
             [_anchor_id(day) for day in expected_days],
-            "RED：当前实现按赛事对象截前 40 场，前段密集日期会吞掉后段日期",
+            "连续页不得抽取后方代表赛事而跳过中间卡片",
         )
         self._assert_each_axis_date_has_card(html)
 
@@ -670,8 +677,7 @@ class DefaultRaceDateWindowTests(TestCase):
         _make_event(local_date=date(2026, 7, 20), chinese_name="脚本历史赛")
         _make_event(local_date=date(2026, 8, 10), chinese_name="脚本未来赛")
         for params in (
-            {"tab": "all", "direction": "past", "cursor": "2026-07-27"},
-            {"tab": "all", "direction": "future", "cursor": "2026-07-27"},
+
             {"tab": "all", "year": "2026"},
             {"tab": "all", "q": "脚本"},
         ):

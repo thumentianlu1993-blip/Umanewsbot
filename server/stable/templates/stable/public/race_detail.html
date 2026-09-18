@@ -1,5 +1,5 @@
 {% extends "stable/public/base.html" %}
-{% load race_information %}
+{% load race_information tz %}
 
 {% block title %}{% race_field event "name" event.chinese_name %} {{ event.year }}{% endblock %}
 
@@ -35,7 +35,7 @@
         {% endif %}
       </div>
       <h1 class="race-hero-name">{% race_field event "name" event.chinese_name %}</h1>
-      <p class="race-hero-original">{% if event.original_name and event.original_name != event.chinese_name %}{{ event.original_name }} · {% endif %}{% if event.local_date %}{% race_field event "date" event.local_date|date:"Y-m-d" %}{% endif %} · {% race_field event "time" event.public_time_label %}</p>
+      <p class="race-hero-original">{% if event.original_name and event.original_name != event.chinese_name %}{{ event.original_name }} · {% endif %}{% race_field event "date" %} · {% race_field event "time" event.public_time_label %}</p>
 
       {% if winner %}
         <span class="winner-ribbon">WINNER · 冠军</span>
@@ -54,7 +54,7 @@
           </div>
         {% endif %}
       {% else %}
-        <div class="countdown-hero-digits">{{ status_label }}{% if event.status == 'scheduled' and event.local_start_time %}<small>{% race_field event "time" event.public_time_label %}</small>{% endif %}</div>
+        <div class="countdown-hero-digits">{{ status_label }}{% if event.status == 'scheduled' %}<small>{% race_field event "time" event.public_time_label %}</small>{% endif %}</div>
       {% endif %}
       {% if live_result_status.is_stale %}
         <aside class="race-result-status" role="status">数据可能已过期</aside>
@@ -82,13 +82,14 @@
         <div><span>时间</span><b>{% race_field event "time" event.public_time_label %}</b></div>
         <div><span>马场</span><b>{% race_field event "racecourse" event.racecourse %}</b></div>
         {% if event.distance_text %}<div><span>距离</span><b>{% race_field event "distance" event.distance_text %}</b></div>{% elif event.surface %}<div><span>场地</span><b>{% race_field event "surface" event.get_surface_display %}</b></div>{% endif %}
-        {% if event.eligibility_text %}<div><span>参赛条件</span><b>{% race_field event "eligibility" event.eligibility_text %}</b></div>{% endif %}
+        {% race_field event "eligibility" as eligibility %}{% if eligibility %}<div><span>参赛条件</span><b>{{ eligibility }}</b></div>{% endif %}
         <div><span>状态</span><b>{{ status_label }}</b></div>
       </div>
     </section>
 
     <section class="panel" id="runners">
       <h2>{{ runner_section_label }}</h2>
+      {% if runner_preview %}{% timezone "Asia/Shanghai" %}<p>更新于{{ runner_preview.checked_at|date:"Y-m-d H:i" }}（北京时间）{% if runner_preview.stale %} · 更新延迟{% endif %}</p>{% endtimezone %}{% endif %}
       {% if runners %}
         <div class="race-table-wrap">
           <table class="data-table">
@@ -102,7 +103,7 @@
                   <td>{% race_field runner "jockey_name" runner.display_jockey_name|default:"-" %}</td>
                   <td>{% race_field runner "trainer_name" runner.trainer_name|default:"-" %}</td>
                   <td>{% race_field runner "weight" runner.carried_weight|default:"-" %}</td>
-                  <td>{% race_field runner "odds" runner.odds_value|default:"-" %} / {% race_field runner "popularity" runner.popularity|default:"-" %}{% if runner.dynamic_updated_at %}<small>{{ runner.dynamic_updated_at|date:"m-d H:i" }} 更新</small>{% endif %}</td>
+                  <td>{% race_field runner "odds" runner.odds_value|default:"-" %}{% if runner.odds_kind_label %}（{{ runner.odds_kind_label }}）{% endif %} / {% race_field runner "popularity" runner.popularity|default:"-" %}{% if runner.dynamic_updated_at %}<small>{{ runner.dynamic_updated_at|date:"m-d H:i" }} 更新</small>{% endif %}</td>
                   <td>{% race_field runner "status" runner.get_running_status_display %}</td>
                 </tr>
               {% endfor %}

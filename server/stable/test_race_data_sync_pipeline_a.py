@@ -529,7 +529,8 @@ class RacecardFieldReconciliationContractTests(TestCase):
         self.assertEqual(self.event.race_datetime.isoformat(), "2026-09-10T14:00:00+00:00")
         self.assertEqual(self.event.local_start_time.isoformat(), "15:00:00")
         response = self.client.get(self.event.public_path)
-        self.assertContains(response, '北京时间 09-10 22:00（当地 09-10 15:00，Europe/London）')
+        self.assertContains(response, '22:00（北京时间）')
+        self.assertNotContains(response, 'Europe/London')
         self.assertNotContains(response, '<div><span>时间</span><b>待定</b></div>', html=True)
 
     def test_same_observation_repairs_derived_time_once_after_runtime_rejection(self):

@@ -20,13 +20,15 @@ from .race_data_sync_policy import calculate_next_poll_at
 
 JRA = 'jra_pre_race_v1'
 TRA = 'tra_identity'
+REFRESH = 'pre_race_refresh_v1'
 INDEX_URL = 'https://www.jra.go.jp/keiba/thisweek/'
 SOURCE_DIGEST = hashlib.sha256(b'jra-pre-race-v1:https://www.jra.go.jp:official-preview-only').hexdigest()
 STAGES = {'registration': 0, 'declared': 1, 'numbered': 2}
 JRA_COURSES = frozenset(('札幌', '函館', '福島', '新潟', '東京', '中山', '中京', '京都', '阪神', '小倉'))
 PUBLIC_FIELDS = {'horse_name':'participants.horse_name', 'horse_number':'participants.number',
     'barrier':'participants.draw', 'trainer_name':'participants.trainer_name',
-    'jockey_name':'participants.jockey_name', 'carried_weight':'participants.carried_weight'}
+    'jockey_name':'participants.jockey_name', 'carried_weight':'participants.carried_weight',
+    'odds_value':'participants.odds', 'popularity':'participants.popularity', 'running_status':'participants.status'}
 LABELS = {'registration': '报名名单', 'declared': '参赛名单，马号待公布', 'numbered': '出马表'}
 
 
@@ -85,10 +87,13 @@ def _save_state(event, source, state):
 
 
 def claim_pre_race(*, event_id, source, now):
-    if source not in {JRA, TRA} or timezone.is_naive(now):
+    if source not in {JRA, TRA, REFRESH} or timezone.is_naive(now):
         raise ValueError('invalid_pre_race_claim')
     if source == JRA and not jra_enabled(network=True):
         return None
+    if source == REFRESH:
+        from .race_pre_race_refresh import refresh_enabled
+        if not refresh_enabled(): return None
     with transaction.atomic():
         event = models.RaceEvent.objects.select_for_update().get(pk=event_id)
         if not in_window(event, now) or (source == JRA and (
@@ -116,26 +121,36 @@ def _valid_claim(event, claim, now):
             and baseline(event) == claim['baseline'] and in_window(event, now))
 
 
-def _finish_locked(event, claim, now, reason='', retry_after=None):
+def _finish_locked(event, claim, now, reason='', retry_after=None, outcome_reason=''):
     state = _state(event, claim['source'])
-    due = calculate_next_poll_at(data_kind='racecard', now=now, race_datetime=event.race_datetime,
+    # Existing Beat slots are 7/17/27/37/47/57. Worker or prior-source delay must
+    # not move the next due beyond the following slot.
+    def slot(value):
+        return value.replace(second=0, microsecond=0)-timedelta(minutes=(value.minute-7)%10)
+    anchor = slot(_dt(state.get('last_attempt_at')) or now)
+    due = calculate_next_poll_at(data_kind='racecard', now=anchor, race_datetime=event.race_datetime,
                                 local_date=event.local_date, timezone_name=event.timezone_name)
+    if due is not None and due <= now:
+        due = calculate_next_poll_at(data_kind='racecard', now=now,
+            race_datetime=event.race_datetime, local_date=event.local_date, timezone_name=event.timezone_name)
+        if due is not None and slot(due)>now:
+            due=slot(due)
     if reason:
         failures = min(int(state.get('failures', 0))+1, 8)
         due = max(now+timedelta(minutes=min(180, 5 * 2**(failures-1))), retry_after or now)
         state['failures'] = failures
     else:
-        state.update(last_success_at=_iso(now), failures=0)
-    state.update(next_poll_at=_iso(due), lease_token='', lease_until=None, reason=reason)
+        state.update(last_success_at=_iso(now), last_checked_at=_iso(now), failures=0)
+    state.update(next_poll_at=_iso(due), lease_token='', lease_until=None, reason=reason or outcome_reason)
     _save_state(event, claim['source'], state)
 
 
-def finish_pre_race(claim, *, now, reason='', retry_after=None):
+def finish_pre_race(claim, *, now, reason='', retry_after=None, outcome_reason=''):
     with transaction.atomic():
         event = models.RaceEvent.objects.select_for_update().get(pk=claim['event_id'])
         if not _valid_claim(event, claim, now):
             return False
-        _finish_locked(event, claim, now, reason, retry_after)
+        _finish_locked(event, claim, now, reason, retry_after, outcome_reason)
         return True
 
 
@@ -200,7 +215,11 @@ def parse_jra_card(html, *, event, url):
         rows.append({'horse_name': name, 'horse_number': number, 'barrier': barrier,
             'trainer_name': _text(row.select_one('td.horse .trainer')),
             'jockey_name': _text(row.select_one('td.jockey .jockey')),
-            'carried_weight': _text(row.select_one('td.jockey .weight')), 'sort_order': len(rows)+1})
+            'carried_weight': _text(row.select_one('td.jockey .weight')), 'sort_order': len(rows)+1,
+            'running_status': 'scratched' if re.search(r'取消|除外', ' '.join(_text(n) for n in row.select('td.status, td.odds, td.horse .name'))) else 'declared',
+            'odds_value': _text(row.select_one('td.odds .odds')),
+            'popularity': _text(row.select_one('td.odds .rank')).strip('()（）人気'),
+            'odds_kind': 'current', 'odds_format': 'decimal'})
     if not rows or len(rows) > 30 or len({r['horse_name'] for r in rows}) != len(rows):
         raise ValueError('jra_pre_race_roster_invalid')
     numbers=[r['horse_number'] for r in rows if r['horse_number']]
@@ -216,8 +235,20 @@ def parse_jra_card(html, *, event, url):
     return {'items': rows, 'stage': stage, 'off_time': off_time.isoformat()}
 
 
+def cancel_pre_race_claim(claim):
+    """Invalidate a stopped in-flight writer; enabling again cannot revive its lease."""
+    with transaction.atomic():
+        event = models.RaceEvent.objects.select_for_update().get(pk=claim['event_id'])
+        state = _state(event, claim['source'])
+        if state.get('lease_token') == claim['token']:
+            state.update(lease_token='', lease_until=None, reason='refresh_disabled')
+            _save_state(event, claim['source'], state)
+
+
 def complete_jra(claim, *, html, url, now):
-    if not jra_enabled(network=True): return False
+    if not jra_enabled(network=True):
+        cancel_pre_race_claim(claim)
+        return False
     with transaction.atomic():
         models.RaceEventLifecycleControl.objects.select_for_update().filter(event_id=claim['event_id']).first()
         event = models.RaceEvent.objects.select_for_update().get(pk=claim['event_id'])
@@ -225,13 +256,17 @@ def complete_jra(claim, *, html, url, now):
         if _refs(event).get('pre_race_handoff'): return False
         payload = parse_jra_card(html, event=event, url=url)
         sha=getattr(html, 'raw_sha256', hashlib.sha256(html.encode()).hexdigest())
-        content_hash=hashlib.sha256(json.dumps(payload,sort_keys=True,ensure_ascii=False).encode()).hexdigest()
         latest=event.data_candidates.filter(source_name=JRA, module='runners').order_by('-fetched_at','-id').first()
         old = (latest.raw_payload or {}).get(JRA,{}) if latest else {}
         if old.get('baseline') == baseline(event) and (STAGES.get(old.get('stage'),-1) > STAGES[payload['stage']] or
                 (latest and latest.fetched_at > now)):
             _finish_locked(event,claim,now,'older_or_incomplete_source')
             return False
+        from .race_pre_race_refresh import stamp_dynamic_items, material_items
+        previous=event.data_candidates.filter(source_name=JRA,module='runners',status='pending',
+            raw_payload__jra_pre_race_v1__baseline=baseline(event)).order_by('-fetched_at','-id').first()
+        payload['items']=stamp_dynamic_items(payload['items'], previous.candidate_payload.get('items',[]) if previous else [], now=now, source_url=url, strict_roster=False, observed_at=getattr(html,'observed_at',None))
+        content_hash=hashlib.sha256(json.dumps(payload,sort_keys=True,ensure_ascii=False).encode()).hexdigest()
         display_admitted = (settings.RACE_DATA_SYNC_RACECARD_APPLY_ENABLED is True and
                             'participants.horse_name' in settings.RACE_DATA_SYNC_ENABLED_FIELDS)
         if (old.get('content_sha256') != content_hash or old.get('baseline') != baseline(event) or
@@ -241,6 +276,8 @@ def complete_jra(claim, *, html, url, now):
                 'stage': payload['stage'], 'fetched_at': _iso(now)}
             models.RaceEventDataCandidate.objects.create(event=event,module='runners',source_name=JRA,source_url=url,
                 candidate_payload=payload,raw_payload={JRA:meta},fetched_at=now)
+            if not previous or material_items(previous.candidate_payload.get('items',[]))!=material_items(payload['items']):
+                state=_state(event,JRA);state['last_changed_at']=_iso(now);_save_state(event,JRA,state)
         control=models.RaceEventProjectionControl.objects.select_for_update().filter(event=event).first()
         locks=event.manual_lock_flags or {}
         refs=_refs(event)
@@ -281,10 +318,13 @@ def complete_jra(claim, *, html, url, now):
 
 
 def public_jra_preview(event, *, now):
-    if (not jra_enabled() or not settings.RACE_DATA_SYNC_RACECARD_APPLY_ENABLED or
+    if (not settings.RACE_DATA_SYNC_ENABLED or not bool({'japan', 'japan_jra'} & set(settings.RACE_DATA_SYNC_ENABLED_REGIONS)) or not settings.RACE_DATA_SYNC_RACECARD_APPLY_ENABLED or
         'participants.horse_name' not in settings.RACE_DATA_SYNC_ENABLED_FIELDS or not in_window(event,now)): return None
     refs=_refs(event)
-    if refs.get('pre_race_handoff') or (event.manual_lock_flags or {}).get('runners') or event.runners.exists(): return None
+    if (refs.get('pre_race_handoff') or any((event.manual_lock_flags or {}).values()) or event.runners.exists()
+        or event.field_authorities.filter(manual_lock=True).exists()): return None
+    control=getattr(event,'projection_control',None)
+    if control and control.write_owner not in {'unmanaged','data_sync'}: return None
     candidate=event.data_candidates.filter(source_name=JRA,module='runners',status='pending',
         raw_payload__jra_pre_race_v1__validated=True).order_by('-fetched_at','-id').first()
     if not candidate: return None
@@ -292,17 +332,14 @@ def public_jra_preview(event, *, now):
     if meta.get('baseline') != baseline(event) or meta.get('stage') not in STAGES: return None
     try: validate_url(candidate.source_url)
     except ValueError: return None
-    fields=('horse_name','horse_number','barrier','trainer_name','jockey_name','carried_weight','sort_order')
-    admitted = set(settings.RACE_DATA_SYNC_ENABLED_FIELDS)
-    rows=[SimpleNamespace(**{k:row.get(k,'') if k == 'sort_order' or PUBLIC_FIELDS[k] in admitted else '' for k in fields}, pk=row.get('sort_order',0), odds_value='',popularity='',running_status='declared')
-          for row in candidate.candidate_payload.get('items',[])]
-    return {'rows':rows,'label':LABELS[meta['stage']]}
+    return preview_payload(event, candidate, meta['stage'], now=now)
 
 
 class JraPage(str):
-    def __new__(cls, html, raw_sha256):
+    def __new__(cls, html, raw_sha256, observed_at=None):
         page = super().__new__(cls, html)
         page.raw_sha256 = raw_sha256
+        page.observed_at = observed_at
         return page
 
 
@@ -313,6 +350,11 @@ class JraFetchError(ValueError):
 
 
 def fetch_jra_html(url, *, now):
+    return _fetch_bounded_html(url, now=now, provider=JRA, region='japan_jra',
+        validator=lambda url: validate_url(url, index=True), enabled=lambda: jra_enabled(network=True))
+
+
+def _fetch_bounded_html(url, *, now, provider, region, validator, enabled):
     """Bounded official HTTP, shared snapshot lease and existing host budget."""
     import requests
     import time as clock
@@ -320,14 +362,14 @@ def fetch_jra_html(url, *, now):
     from .race_data_sync_providers import _get_or_fetch_shared_snapshot, _ProviderSyncError
     from .race_events import (ensure_race_live_host_budget_floor, reserve_race_live_host_request,
                               record_race_live_host_outcome)
-    validate_url(url, index=True)
-    if not jra_enabled(network=True):
+    validator(url)
+    if not enabled():
         raise JraFetchError('jra_pre_race_disabled')
     failure = None
 
     def fetch():
         nonlocal failure
-        host = 'www.jra.go.jp'
+        host = urlsplit(url).hostname
         ensure_race_live_host_budget_floor(host=host, minimum_interval_ms=2000)
         reservation = reserve_race_live_host_request(host=host, now=timezone.now())
         if not reservation.reserved and reservation.reason == 'rate_limited':
@@ -339,7 +381,7 @@ def fetch_jra_html(url, *, now):
             raise JraFetchError('jra_host_'+reservation.reason, reservation.next_allowed_at)
         started, success, retry_after = clock.monotonic(), False, None
         try:
-            if not jra_enabled(network=True):
+            if not enabled():
                 raise JraFetchError('jra_pre_race_disabled')
             with requests.get(url, timeout=(5, 15), allow_redirects=False, stream=True) as response:
                 if response.status_code != 200:
@@ -366,7 +408,7 @@ def fetch_jra_html(url, *, now):
                 if encoding not in encodings: raise JraFetchError('jra_encoding_rejected')
                 html = raw.decode(encodings[encoding])
                 success = True
-                return {'html': html, 'raw_sha256':hashlib.sha256(raw).hexdigest()}, 1, 1
+                return {'html': html, 'raw_sha256':hashlib.sha256(raw).hexdigest(), 'observed_at':timezone.now().isoformat()}, 1, 1
         except (requests.RequestException, UnicodeError) as exc:
             failure = JraFetchError('jra_transport_failed')
             raise failure from exc
@@ -383,13 +425,13 @@ def fetch_jra_html(url, *, now):
                     budget.next_allowed_at = max(budget.next_allowed_at or retry_after, retry_after)
                     budget.save(update_fields=['next_allowed_at'])
     try:
-        payload, _ = _get_or_fetch_shared_snapshot(provider=JRA, region='japan_jra',
-            scope_key=url, data_kind='racecard', registry_digest=SOURCE_DIGEST,
+        payload, _ = _get_or_fetch_shared_snapshot(provider=provider, region=region,
+            scope_key=url, data_kind='racecard', registry_digest=hashlib.sha256((provider+url).encode()).hexdigest(),
             run_id=secrets.token_hex(16), now=now, proposed_requests=1,
             clock=timezone.now, sleeper=clock.sleep, fetcher=fetch, waiter_max_polls=0)
     except _ProviderSyncError as exc:
         raise failure or JraFetchError(exc.reason_code) from exc
-    return JraPage(payload['html'], payload['raw_sha256'])
+    return JraPage(payload['html'], payload['raw_sha256'], _dt(payload.get('observed_at')))
 
 
 def discover_jra_pre_race(*, now, fetcher=None, clock=timezone.now):
@@ -449,6 +491,12 @@ REVIEWED_HOSTS = frozenset({'www.sportinglife.com', 'www.zeturf.fr', 'www.racing
 
 def public_reviewed_preview(event, *, now):
     """仅展示已人工核验的整份参考卡；正式卡接管后永不恢复。"""
+    # Once an automatic full snapshot supersedes this card, a read gate must
+    # never resurrect the older manual roster (including its pre-scratch state).
+    if event.data_candidates.filter(source_name=REFRESH,module='runners',status='pending',
+        raw_payload__pre_race_refresh_v1__validated=True,
+        raw_payload__pre_race_refresh_v1__baseline=baseline(event)).exists():
+        return None
     if (not settings.RACE_DATA_SYNC_ENABLED or not settings.RACE_DATA_SYNC_RACECARD_APPLY_ENABLED
         or 'participants.horse_name' not in settings.RACE_DATA_SYNC_ENABLED_FIELDS
         or not in_window(event, now) or _refs(event).get('pre_race_handoff') or event.runners.exists()
@@ -485,11 +533,13 @@ def public_reviewed_preview(event, *, now):
             return None
     except (ValueError, TypeError):
         return None
-    admitted = set(settings.RACE_DATA_SYNC_ENABLED_FIELDS)
-    fields = (*PUBLIC_FIELDS, 'sort_order')
-    rows = [SimpleNamespace(**{k: row.get(k, '') if k == 'sort_order' or PUBLIC_FIELDS[k] in admitted else ''
-            for k in fields}, pk=row.get('sort_order',0), odds_value='', popularity='',
-            running_status=row['running_status'], get_running_status_display=lambda value=row['running_status']: {
-                'declared':'已宣告', 'withdrawn':'退出', 'non_runner':'未出赛'}[value]) for row in items]
-    authority_label = '官方资料' if meta['authority'] == 'human_reviewed_official' else '参考资料'
-    return {'rows': rows, 'label': LABELS[meta['stage']] + f'（{authority_label}，人工核验）'}
+    return preview_payload(event, candidate, meta['stage'], now=now)
+
+
+def preview_payload(event, candidate, stage, *, now):
+    from .race_pre_race_refresh import dynamic_rows, refresh_interval
+    rows = dynamic_rows(event, candidate.candidate_payload.get('items', []), now=now)
+    checked = _dt(_state(event, candidate.source_name).get('last_checked_at')) or candidate.fetched_at
+    state = _state(event, candidate.source_name)
+    return {'rows': rows, 'label': LABELS[stage], 'checked_at': checked,
+            'stale': bool(state.get('reason')) or now-checked > refresh_interval(event, now)+timedelta(minutes=10)}

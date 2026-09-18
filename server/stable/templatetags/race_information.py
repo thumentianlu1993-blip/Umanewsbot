@@ -6,6 +6,13 @@ register = template.Library()
 
 @register.simple_tag
 def race_field(obj, field, legacy=''):
+    if field in {'date', 'time'} and (hasattr(obj, 'local_date') or isinstance(obj, dict) and 'local_date' in obj):
+        from stable.services.race_information_display import _time_fields
+        return _time_fields(obj)[0 if field == 'date' else 1].text
+    if field == 'eligibility':
+        from stable.services.race_field_normalization import parse_display_eligibility
+        parsed = parse_display_eligibility(value(obj, 'eligibility_text'))
+        return parsed.text if parsed.state == 'normalized' else ''
     if not enabled():
         return legacy
     fields = value(obj, 'public_display', {}) or {}

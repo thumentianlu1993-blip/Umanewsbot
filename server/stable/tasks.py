@@ -448,6 +448,8 @@ def discover_future_race_data_sync_task() -> dict:
         now = timezone.now()
         census_due = now.minute // 10 == 1
         jra = discover_jra_pre_race(now=now)
+        from stable.services.race_pre_race_refresh import discover_bound_pre_race
+        bound_cards = discover_bound_pre_race(now=timezone.now())
         policy = load_standing_policy_file(
             path=settings.RACE_DATA_SYNC_FUTURE_STANDING_POLICY_FILE,
             expected_sha256=settings.RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256,
@@ -458,7 +460,7 @@ def discover_future_race_data_sync_task() -> dict:
             horizon_days=horizon_days,
         )
         if not census_due:
-            return {"enabled": True, "status": "pre_race_checked", "jra": jra,
+            return {"enabled": True, "status": "pre_race_checked", "jra": jra, "bound_cards": bound_cards,
                     "identity_discovery": asdict(identity_discovery)}
         proposal = build_future_race_data_enrollment_proposal(
             standing_policy=policy,
@@ -498,7 +500,7 @@ def discover_future_race_data_sync_task() -> dict:
             for action in sorted({decision.action for decision in decisions})
         },
         "identity_discovery": asdict(identity_discovery),
-        "jra": jra,
+        "jra": jra, "bound_cards": bound_cards,
         "manifest": proposal.manifest.as_dict() if proposal.manifest else None,
     }
 

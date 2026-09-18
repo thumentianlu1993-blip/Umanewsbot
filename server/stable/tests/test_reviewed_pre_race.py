@@ -7,7 +7,7 @@ from stable.services import race_pre_race as pre
 
 NOW=datetime(2026,9,18,4,tzinfo=tz.utc)
 FLAGS=dict(RACE_DATA_SYNC_ENABLED=True,RACE_DATA_SYNC_RACECARD_APPLY_ENABLED=True,
- RACE_DATA_SYNC_ENABLED_FIELDS=('participants.horse_name','participants.number','participants.draw','participants.jockey_name','participants.trainer_name','participants.carried_weight'))
+ RACE_DATA_SYNC_ENABLED_FIELDS=('participants.horse_name','participants.number','participants.draw','participants.jockey_name','participants.trainer_name','participants.carried_weight','participants.status'))
 
 @override_settings(**FLAGS)
 class ReviewedPreviewTests(TestCase):
@@ -19,12 +19,12 @@ class ReviewedPreviewTests(TestCase):
   self.c=m.RaceEventDataCandidate.objects.create(event=self.event,module='runners',source_name='reviewed_pre_race_v1',source_url='https://www.sportinglife.com/racing/racecards/2026-09-19/ayr/racecard/123/test',candidate_payload={'items':self.items},raw_payload={'reviewed_pre_race_v1':{'validated':True,'baseline':pre.baseline(self.event),'authority':'human_reviewed_reference','stage':'numbered','row_count':1,'items_sha256':sha,'source_sha256':'a'*64,'manifest_sha256':'b'*64}},fetched_at=NOW)
  def preview(self,now=NOW):return pre.public_reviewed_preview(self.event,now=now)
  def test_reference_preview_never_creates_canonical_or_results(self):
-  p=self.preview();self.assertEqual(p['rows'][0].horse_number,'1');self.assertIn('人工核验',p['label'])
+  p=self.preview();self.assertEqual(p['rows'][0].horse_number,'1');self.assertEqual(p['label'],'出马表')
   self.assertFalse(self.event.runners.exists());self.assertFalse(self.event.results.exists())
  def test_actual_public_view_and_tra_handoff_no_duplicate(self):
   from unittest.mock import patch
   with patch('stable.views.timezone.now',return_value=NOW):
-   response=self.client.get('/races/2026/reviewed/');self.assertContains(response,'人工核验');self.assertContains(response,'Horse')
+   response=self.client.get('/races/2026/reviewed/');self.assertNotContains(response,'人工核验');self.assertContains(response,'Horse')
   # Canonical TRA IDs are unrelated; a complete TRA card suppresses this whole candidate.
   m.RaceEventRunner.objects.create(event=self.event,horse_name='TRA horse',external_runner_id='hrs_different',horse_number='1')
   self.assertIsNone(self.preview());self.assertEqual(self.event.runners.count(),1)
@@ -47,7 +47,7 @@ class ReviewedPreviewTests(TestCase):
   import hashlib
   self.c.candidate_payload['items'][0]['running_status']='withdrawn'
   self.c.raw_payload['reviewed_pre_race_v1']['items_sha256']=hashlib.sha256(json.dumps(self.c.candidate_payload['items'],sort_keys=True,separators=(',',':'),ensure_ascii=False).encode()).hexdigest();self.c.save()
-  for normalized, label in [(False, '退出'), (True, '取消出走')]:
+  for normalized, label in [(False, '退赛'), (True, '取消出走')]:
    with override_settings(RACE_INFORMATION_NORMALIZED_DISPLAY_ENABLED=normalized), patch('stable.views.timezone.now',return_value=NOW):
     self.assertContains(self.client.get('/races/2026/reviewed/'),label)
  def test_generic_apply_rejects_preview_only_candidate_even_if_source_renamed(self):
@@ -116,7 +116,7 @@ class NarReviewedBackfillTests(UpcomingBackfillTests):
   p=self.nar_package();self.assertEqual(self.run_package(p)['status'],'applied');self.event.refresh_from_db()
   self.assertEqual(str(self.event.local_start_time),'18:00:00');self.assertFalse(self.event.runners.exists())
   candidate=self.event.data_candidates.get();self.assertEqual(candidate.raw_payload['reviewed_pre_race_v1']['authority'],'human_reviewed_official')
-  with override_settings(**FLAGS):self.assertIn('官方资料',pre.public_reviewed_preview(self.event,now=NOW)['label'])
+  with override_settings(**FLAGS):self.assertEqual('出马表',pre.public_reviewed_preview(self.event,now=NOW)['label'])
   self.assertEqual(self.run_package(p)['status'],'already_applied')
  def test_nar_header_mismatch_or_foreign_timezone_reject(self):
   for change in [lambda e:e.update(off_time='2026-09-22T17:00:00+09:00'),lambda e:e['time_evidence'].update(raw='2026年9月22日（火）　金　沢　第11競走　17:00発走'),lambda e:e['source'].update(url=e['source']['url'].replace('k_raceNo=11','k_raceNo=10')),lambda e:e['before']['event'].update(timezone_name='America/New_York')]:

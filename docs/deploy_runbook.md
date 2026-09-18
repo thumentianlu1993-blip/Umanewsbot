@@ -1,3 +1,11 @@
+## 2026-09-19 北京时间/赛前刷新发布准备（尚未执行）
+
+## 2026-09-19 PR209 发布准备（未执行切换）
+
+本次沿用受保护lowcost/0078入口，无模型迁移。预检433de627四应用镜像一致、导入/历史任务/发布锁均空；候选仅准备独立目录与镜像。拟开RACE_DATA_SYNC_PRE_RACE_REFRESH_ENABLED并将全局每provider/region日请求192→512，字节1GiB和原快照水位保持；不新增人工业务回填。最终CI须绑定实际head/run/artifact摘要及commit.txt/exit-code.txt，比较同run历史基线和当前生产失败集合，未完成不得声称发布通过。实际执行后在变更release.md回写备份、版本、锁、公开页面及自然tick证据。
+
+本地实现无迁移，新增`RACE_DATA_SYNC_PRE_RACE_REFRESH_ENABLED=false`。发布与启用须绑定精确提交、来源binding、实际provider/region额度、所需配置和服务操作；Racing Post HTTP406不能记作成功。停止刷新以有效配置重载及旧任务退出为准，保留最后有效卡。自然周期验收尚未进行，历史3场不在范围。详见[本次发布边界与容量表](changes/pre-race-display-refresh-20260919/rollout.md)。
+
 ## 2026-09-18 PR207 归一化已上线并启用
 
 归一化应用固定 `433de627`，实际镜像 `sha256:097820af0b7761b6ff7c5a6c8416c2b7456b3d4f3f6e4aea901b64e7afaa5763`，四应用有效展示开关均为true；JRA及其他配置保持。双域名36次公开请求通过，10场×2域名等级/距离/名称精确匹配，表格行数20页出马表与赛果行数完全一致。五地区25场镜像内只读预览通过（24条距离正常、1条原缺失），无迁移或历史业务回写。备份、四应用版本、服务、锁与恢复意图收尾通过。完整Linux CI候选5090项保留45个既有失败、无新增；45项发布合同通过，不称全量全绿。详见[生产发布记录](changes/normalize-race-information/release.md)。以下“未发布”内容是较早阶段记录，以本条和发布记录为准。
@@ -9663,3 +9671,7 @@ RACE_DATA_RAW_ARTIFACT_ROOTS=/run/race-data-sync
 历史四个固定包合计129场1209行生产apply及verify通过，129条独立审计回执。只写赛果与确认状态；生产版本仍d0bb40fb，JRA=true。完整回填包留在持久artifacts/race-gap-backfill-20260918。赛前完整基线仅留服务器0600文件，本地只保留公开身份/摘要SHA，避免导出控制载荷。
 
 下一窄发布包含人工核验参考候选展示（不建canonical），与六场已公开完整名单和赛时补空。无迁移、无配置/频率/额度修改；正常低成本发布重建四应用并检查Nginx上游，DB/Redis/OneBot不重建。以固定提交、独立目录、现有persistent/TLS绑定执行，先备份和原release coordinator预检。发布/回填后检查两域名及每场名单；任何基线漂移停止该场，不能覆盖新状态。无通知或主动恢复旧LIVE。
+
+## 2026-09-19 赛前刷新只读诊断补充
+
+当前433de627下的人工补卡预览不具备自动刷新入口，TRA身份发现成功与名单/赔率更新成功不是同一结果。排查须同时读取event的预览候选、enrollment、provider checkpoint、pre_race_checks及真实页面，不依据candidate.fetched_at或Celery成功单独归因。实例491无纳管/名单checkpoint且赔率公开硬编码空，772已纳管并持续成功。此次无生产写入/派发/开关/部署；后续验收需覆盖自然周期到页面的完整证据，见[诊断](changes/pre-race-display-refresh-20260919/EVIDENCE.md)。

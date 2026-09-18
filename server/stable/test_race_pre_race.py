@@ -163,7 +163,7 @@ class PreRaceTests(TestCase):
         self.event.refresh_from_db()
         self.assertEqual(self.event.race_datetime.hour, 7)
 
-    def test_public_detail_renders_preview_and_both_times(self):
+    def test_public_detail_renders_preview_and_only_beijing_time(self):
         pre.complete_jra(self.claim(), html=HTML, url=URL, now=NOW)
         with patch('django.utils.timezone.now', return_value=NOW):
             response=self.client.get(self.event.public_path)
@@ -171,7 +171,7 @@ class PreRaceTests(TestCase):
         self.assertContains(response,'参赛名单，马号待公布')
         self.assertContains(response,'テスト馬')
         self.assertContains(response,'14:45')
-        self.assertContains(response,'15:45')
+        self.assertNotContains(response,'15:45')
         self.assertEqual(self.event.runners.count(),0)
 
     def test_backend_post_cannot_apply_marked_candidate(self):

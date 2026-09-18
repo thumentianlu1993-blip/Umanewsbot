@@ -7,7 +7,7 @@ from stable.models import RaceEvent, RaceEventVisibility
 
 
 RACE_SITEMAP_COUNT_CACHE_KEY = "race-events:public:sitemap-count:v1"
-RACE_CALENDAR_YEARS_CACHE_KEY = "race-events:public:calendar-years:v1"
+RACE_CALENDAR_YEARS_CACHE_KEY = "race-events:public:calendar-years:v2"
 
 
 def _timeout() -> int:
@@ -41,12 +41,13 @@ def public_race_calendar_years() -> list[int]:
     cached = _cache_get(RACE_CALENDAR_YEARS_CACHE_KEY)
     if cached is not None:
         return list(cached)
-    years = list(
-        RaceEvent.objects.filter(visibility_status=RaceEventVisibility.PUBLISHED)
-        .order_by("-year")
-        .values_list("year", flat=True)
-        .distinct()
-    )
+    from .race_public_time import annotate_public_time
+    from django.db.models import IntegerField
+    from django.db.models.functions import Coalesce, ExtractYear
+    years = list(annotate_public_time(RaceEvent.objects.filter(visibility_status=RaceEventVisibility.PUBLISHED)
+        .exclude(canonical_product_links__is_active=True))
+        .annotate(beijing_year=Coalesce(ExtractYear('public_date'),'year',output_field=IntegerField()))
+        .order_by('-beijing_year').values_list('beijing_year', flat=True).distinct())
     _cache_set(RACE_CALENDAR_YEARS_CACHE_KEY, years)
     return years
 

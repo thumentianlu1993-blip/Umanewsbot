@@ -175,6 +175,7 @@ SITE_URL = env("SITE_URL", "http://localhost:8000")
 
 # Race-data slice A remains fail-closed until each provider, region and field is
 # explicitly admitted.  No setting here initiates network traffic.
+RACE_DATA_SYNC_PRE_RACE_REFRESH_ENABLED = env_bool("RACE_DATA_SYNC_PRE_RACE_REFRESH_ENABLED", False)
 RACE_DATA_SYNC_JRA_PRE_RACE_ENABLED = env_bool("RACE_DATA_SYNC_JRA_PRE_RACE_ENABLED", False)
 RACE_DATA_SYNC_ENABLED = env_bool("RACE_DATA_SYNC_ENABLED", False)
 RACE_DATA_SYNC_ENABLED_PROVIDERS = tuple(

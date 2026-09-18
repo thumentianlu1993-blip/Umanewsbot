@@ -7058,6 +7058,10 @@ def apply_race_event_normalization(event: RaceEvent) -> None:
 
 
 def apply_data_candidate(candidate: RaceEventDataCandidate, *, user: User | None = None) -> dict:
+    if candidate.source_name == "pre_race_refresh_v1" or (
+        isinstance(candidate.raw_payload, dict) and "pre_race_refresh_v1" in candidate.raw_payload
+    ):
+        raise ValueError("pre_race_refresh_candidate_requires_controlled_path")
     if candidate.source_name == "reviewed_pre_race_v1" or (
         isinstance(candidate.raw_payload, dict) and "reviewed_pre_race_v1" in candidate.raw_payload
     ):
