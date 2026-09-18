@@ -1,0 +1,23 @@
+{
+  "verified_at": "2026-09-18T05:20:44.340935+00:00",
+  "commit": "7e111914d57083299ce452b6222ab9d38476e420",
+  "image": "sha256:8f3110748047e69636f2f1bebbd4eb32ed48018fde1f463c9bb8c297dc7788d3",
+  "all_services_running": true,
+  "application_versions_match": true,
+  "jra_enabled": true,
+  "configuration_unchanged": true,
+  "preserved_infrastructure": true,
+  "check_passed": true,
+  "migration_plan_empty": true,
+  "backup_verified": true,
+  "backup_size": 560559376,
+  "backup_sha256": "abf1c14199ce80c3e7926e335894cdb74f01783a61c754bca8bc3447982074a1",
+  "queues": {
+    "celery": 0,
+    "race_sync_v2": 0,
+    "race_live": 7543
+  },
+  "release_lock_absent": true,
+  "active_absent": true,
+  "restricted_absent": true
+}

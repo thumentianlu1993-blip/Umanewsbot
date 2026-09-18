@@ -1,6 +1,8 @@
-## 2026-09-18 赛事资料回填与PR205交付边界
+## 2026-09-18 PR205 发布完成
 
-历史129场1209行、赛前9场77候选及空赛时均已按独立审核manifest、生产锁、固定脚本和完整before/after重放验收。详情与剩余缺口见[验收记录](changes/complete-race-gaps-20260918/acceptance.md)。候选禁止通过通用apply应用；公开展示需PR205新代码，旧生产仍d0bb40fb。此次无迁移、没有再次启用LIVE或扩大自动来源。回滚使用按字段证据的前向补偿，不整库恢复覆盖其他业务。私有before不外传、不进公开Git。发布按[精确包](changes/complete-race-gaps-20260918/rollout.md)及根AGENTS执行。
+固定应用`7e111914`已通过标准lowcost/0078发布；四应用实际镜像`8f311074…`，DB/Redis/OneBot/Nginx容器保持，Nginx已重载。无迁移、无配置/频率变化、无新增资料写入；备份560559376字节及SHA、intent/manifest/complete、空迁移计划和锁清理全部验证。双域名9场77条新预览、3场JRA预览及主域名129场历史结果通过。精确路径、恢复约束与证据见[发布记录](changes/complete-race-gaps-20260918/release.md)。
+
+GitHub汇总遇历史2MB单行日志延迟；本次以固定同run原始工件的完整同算法差集及双reviewer复核满足原批准门槛，保留远端pending事实，没有伪造check或修改分支规则。仅适用于本次已绑定证据，不把未完成测试作业视作成功。后续可单独修复CI摘要输出体积，本轮不改工作流。
 
 # 部署运行手册
 
