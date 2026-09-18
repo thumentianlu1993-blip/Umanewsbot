@@ -119,7 +119,7 @@ class TheRacingApiIdentityDiscoveryConservationTests(TestCase):
             registry_digest=self.route.registry_digest,
         )
 
-    def _discover(self, transport=None):
+    def _discover(self, transport=None, *, now=NOW):
         calls = []
 
         def _transport(**kwargs):
@@ -142,9 +142,9 @@ class TheRacingApiIdentityDiscoveryConservationTests(TestCase):
             ),
         ):
             outcome = discover_the_racing_api_source_identities(
-                now=NOW,
+                now=now,
                 transport=transport or _transport,
-                clock=lambda: NOW,
+                clock=lambda: now,
                 sleeper=lambda seconds: None,
             )
         return outcome, calls
@@ -347,5 +347,16 @@ class TheRacingApiIdentityDiscoveryConservationTests(TestCase):
         self._assert_conserved(again)
         for event in (first, second):
             event.refresh_from_db()
+            # Beat runs at 07/17/27/...; an off-slot initial check must not
+            # defer the next attempt past the next real scheduler tick.
             self.assertEqual(event.source_refs['pre_race_checks']['tra_identity']['next_poll_at'],
-                             (NOW + timedelta(minutes=10)).isoformat())
+                             NOW.replace(minute=7).isoformat())
+        tick = NOW.replace(minute=7)
+        due, calls = self._discover(now=tick)
+        self.assertEqual((due.unmatched_event_count, len(calls)), (1, 1))
+        due, calls = self._discover(now=tick)
+        self.assertEqual((due.unmatched_event_count, len(calls)), (1, 0))
+        for event in (first, second):
+            event.refresh_from_db()
+            self.assertEqual(event.source_refs['pre_race_checks']['tra_identity']['next_poll_at'],
+                             NOW.replace(minute=17).isoformat())

@@ -20,3 +20,9 @@
 生产真实HTTP预演发现Sporting Life两项源合同差异：跨日美国赛事payload使用UTC日期；金杯退赛后ride_count仅计4匹有效出走，完整rides仍为7匹。先新增3项测试，2项按预期RED；修正UTC日期校验与有效/完整计数兼容，保留URL赛日、race ID、已知状态及完整身份匹配。67项相关回归GREEN，同一reviewer再次APPROVED。此增量必须绑定新提交及最终CI。
 
 发布启用边界另经同一reviewer只读APPROVED。原491→NYRA绑定方案取消：生产NYRA403，现有Sporting Life已明示3/5/6号退赛，无需人工绑定写入。
+
+## 全量CI回归合同修正
+
+首候选801cf77c的完整Linux结果为5125项、17失败/29错误/20跳过；对上一版生产45项失败新增1项：TRA身份发现测试仍期待08:10，但已审Beat对齐合同应为08:07。应用代码未改。测试保留原有公平处理、延后与快照复用断言，并追加真实08:07触发后两事件仅请求一次、均推进到08:17。77项相关回归通过，同一reviewer只读APPROVED。最终新提交仍须完整CI验证，不能把旧候选结果冒充新提交结果。
+
+部署胶水另经两轮只读审核后APPROVED：固定最终run/head，校验官方ZIP摘要、工件内commit.txt/exit-code.txt/result及同run基线/当前生产失败集合；四应用还需核验有效512请求与1GiB配置。

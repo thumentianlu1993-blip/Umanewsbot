@@ -1,5 +1,9 @@
 ## 2026-09-19 北京时间/赛前刷新发布准备（尚未执行）
 
+## 2026-09-19 PR209 发布准备（未执行切换）
+
+本次沿用受保护lowcost/0078入口，无模型迁移。预检433de627四应用镜像一致、导入/历史任务/发布锁均空；候选仅准备独立目录与镜像。拟开RACE_DATA_SYNC_PRE_RACE_REFRESH_ENABLED并将全局每provider/region日请求192→512，字节1GiB和原快照水位保持；不新增人工业务回填。最终CI须绑定实际head/run/artifact摘要及commit.txt/exit-code.txt，比较同run历史基线和当前生产失败集合，未完成不得声称发布通过。实际执行后在变更release.md回写备份、版本、锁、公开页面及自然tick证据。
+
 本地实现无迁移，新增`RACE_DATA_SYNC_PRE_RACE_REFRESH_ENABLED=false`。发布与启用须绑定精确提交、来源binding、实际provider/region额度、所需配置和服务操作；Racing Post HTTP406不能记作成功。停止刷新以有效配置重载及旧任务退出为准，保留最后有效卡。自然周期验收尚未进行，历史3场不在范围。详见[本次发布边界与容量表](changes/pre-race-display-refresh-20260919/rollout.md)。
 
 ## 2026-09-18 PR207 归一化已上线并启用
