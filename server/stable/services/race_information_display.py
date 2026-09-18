@@ -3,6 +3,9 @@ from collections import Counter
 from datetime import datetime, timezone, date, time
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from urllib.parse import urlsplit
+import re
+import unicodedata
 
 from django.conf import settings
 
@@ -29,19 +32,67 @@ def attach(obj, fields):
         obj.public_display = fields
 
 
+def _catalog_meter_profile(obj, refs):
+    """已核验官方目录的 m 字段合同；不对裸数字或仅有地区的记录推断单位。"""
+    raw = unicodedata.normalize('NFKC', str(value(obj, 'distance_text') or '')).strip()
+    if not re.fullmatch(r'\d+(?:\.\d+)?\s*m', raw, re.I):
+        return ''
+    region = value(obj, 'country_region') or value(obj, 'race_region')
+    year = value(obj, 'year', None) or value(obj, 'race_year', None)
+    if year != 2026:
+        return ''
+
+    def official_path(key, host):
+        raw_url = refs.get(key)
+        if not isinstance(raw_url, str):
+            return ''
+        try:
+            url = urlsplit(raw_url)
+            if (url.scheme != 'https' or url.hostname != host or url.username is not None
+                    or url.password is not None or url.port not in (None, 443)):
+                return ''
+            return url.path
+        except ValueError:
+            return ''
+
+    kind = refs.get('source_kind')
+    if region == 'japan' and kind == 'jra_official_graded_race_list':
+        if official_path('primary', 'www.jra.go.jp') == '/datafile/seiseki/replay/2026/jyusyo.html':
+            return 'jra_graded_2026_meter_v1'
+    if region == 'japan' and kind == 'keiba_go_jp_dirt_graded_race_list':
+        if (official_path('primary', 'www.keiba.go.jp').startswith('/pdf/uploads/')
+                and official_path('secondary', 'www.keiba.go.jp') == '/dirtgraderace/2026/racelist/index.html'):
+            return 'nar_graded_2026_meter_v1'
+    if region == 'france' and kind == 'france_galop_groupes_listed_2026':
+        if re.fullmatch(r'/sites/default/files/2026-\d{2}/groupes_listed_(?:plat|obstacles)_2026_v\d+\.pdf',
+                        official_path('primary', 'www.france-galop.com')):
+            return 'france_galop_2026_meter_v1'
+    # HKJC 本地赛事的官方途程字段为米。reviewed_import 是既有导入记录文字，
+    # 不把它的真值当单位证据或发布批准；发布权限仍由现有视图控制。
+    if (region == 'hong_kong' and refs.get('source_provider') == 'HKJC'
+            and official_path('source_url', 'racing.hkjc.com')):
+        return 'hkjc_local_2026_meter_v1'
+    return ''
+
+
 def source_context(obj):
     refs = value(obj, 'source_refs', {})
     refs = refs if isinstance(refs, dict) else {}
     # 单位仅接受明确结构化说明；不由国家、域名或数字大小推断。
     units = refs.get('field_units', {})
     units = units if isinstance(units, dict) else {}
+    profile = _catalog_meter_profile(obj, refs)
+    distance_unit = units.get('distance_text', '') if isinstance(units.get('distance_text'), str) else ''
+    conflict = bool(profile and distance_unit and distance_unit.lower() not in {'m', 'meter', 'metre', 'meters', 'metres', '米'})
     return {
         'provider': value(obj, 'source_name') or refs.get('source_provider', ''),
         'schema': refs.get('parser_version', ''),
         'language': refs.get('source_language', ''),
         'region': value(obj, 'country_region') or value(obj, 'race_region'),
         'year': value(obj, 'year', None) or value(obj, 'race_year', None),
-        'distance_unit': units.get('distance_text', '') if isinstance(units.get('distance_text'), str) else '',
+        'distance_unit': distance_unit or ('meter' if profile else ''),
+        'distance_profile': profile,
+        'distance_unit_conflict': conflict,
         'weight_unit': units.get('carried_weight', '') if isinstance(units.get('carried_weight'), str) else '',
         'odds_format': units.get('odds_value', '') if isinstance(units.get('odds_value'), str) else '',
         'margin_unit': units.get('margin', '') if isinstance(units.get('margin'), str) else '',
@@ -107,7 +158,9 @@ def event_fields(obj):
         'name': display_field(value(obj, 'chinese_name') or value(obj, 'race_name') or value(obj, 'original_name'),
                               value(obj, 'chinese_name') or value(obj, 'race_name') or value(obj, 'original_name'), state='preserved'),
         'grade': parse_display_grade(grade_raw, normalized_grade=value(obj, 'normalized_grade'), context=ctx),
-        'distance': parse_display_distance(value(obj, 'distance_text'), unit_hint=ctx['distance_unit'], context=ctx),
+        'distance': (display_field(value(obj, 'distance_text'), state='conflict', reason='source_unit_conflict', context=ctx)
+                     if ctx['distance_unit_conflict'] else
+                     parse_display_distance(value(obj, 'distance_text'), unit_hint=ctx['distance_unit'], context=ctx)),
         'surface': parse_display_surface(surface_raw),
         'race_type': parse_display_race_type(value(obj,'race_type_text') or ('jumps' if surface_raw == 'jumps' else '')),
         'layout': parse_display_layout(value(obj,'course_layout_text')),
@@ -227,6 +280,9 @@ def prepare_context(context, *, force=False):
         if value(candidate, 'module') == 'basic' and isinstance(payload, dict):
             preview = {key: value(event, key) for key in ('chinese_name', 'original_name', 'grade_text', 'distance_text', 'racecourse', 'country_region', 'year', 'source_refs')}
             preview.update({key: val for key, val in payload.items() if key in preview})
+            if 'distance_text' in payload:
+                # 新候选距离必须使用自身证据，不能继承旧字段的来源单位。
+                preview['source_refs'] = payload.get('source_refs', {})
             events.append(preview)
             candidate_previews.append((candidate, preview))
         elif value(candidate, 'module') in {'runners', 'results', 'history_winners'}:

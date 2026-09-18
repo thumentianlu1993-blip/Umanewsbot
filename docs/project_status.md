@@ -1,3 +1,7 @@
+## 2026-09-18 归一化获明确发布授权（生产未变更）
+
+用户要求正式上线；只读生产预检通过，仍运行7e111914/8f311074，无活动导入/采集或发布意图。用户已补充明确授权向公开仓库 `thumentianlu1993-blip/Umanewsbot` 的 `codex/normalize-race-information` 推送、合并并上线。五地区25条服务器内聚合抽样发现12条距离为m且缺显式单位元数据，已补官方来源合同适配，35项限定测试与同一reviewer复审通过；最终候选实库聚合、PR CI与上线验收待完成。没有推送、合并、配置修改、重启或业务写入；详见[发布预检](changes/normalize-race-information/release-preflight.md)。本机不再重复整仓测试。
+
 ## 2026-09-18 赛事信息归一化本地实现完成
 
 已在独立分支实现严格单位／等级、统一译名及结构化页面展示，默认关闭，无迁移或生产写入。31项新增及93项相关PostgreSQL测试通过，独立审阅通过，全量同环境对照未发现新增失败。远程push被自动审批拒绝，尚未创建PR／合并／发布；准确验证边界以[current_state](current_state.md)及[实施记录](changes/normalize-race-information/implementation.md)为准。

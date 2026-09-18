@@ -1,3 +1,7 @@
+## 2026-09-18 归一化获明确发布授权（生产未变更）
+
+用户要求正式上线；只读生产预检通过，仍运行7e111914/8f311074，无活动导入/采集或发布意图。用户已补充明确授权向公开仓库 `thumentianlu1993-blip/Umanewsbot` 的 `codex/normalize-race-information` 推送、合并并上线。五地区25条服务器内聚合抽样发现12条距离为m且缺显式单位元数据，已补官方来源合同适配，35项限定测试与同一reviewer复审通过；最终候选实库聚合、PR CI与上线验收待完成。没有推送、合并、配置修改、重启或业务写入；详见[发布预检](changes/normalize-race-information/release-preflight.md)。本机不再重复整仓测试。
+
 ## 赛事信息归一化展示开关（2026-09-18，尚未发布）
 
 `RACE_INFORMATION_NORMALIZED_DISPLAY_ENABLED` 默认 false。新展示与旧字段／统计开关独立；无迁移、无数据回填。启用前解释显式单位缺口并检查各入口，恢复时关闭新开关并重载应用配置；不清空Redis。精确影响与验收见[本次发布说明](changes/normalize-race-information/rollout.md)。此处不代表生产已部署或启用。

@@ -37,3 +37,7 @@ python server/manage.py preview_race_information_normalization \
 ## 验证
 
 最初3项入口测试中2项有效RED（Jpn大小写、英制单位），其后严格解析和页面测试GREEN。最终测试、基线差集、独立review见 `validation.md`。本地隔离PostgreSQL与主线基线使用独立数据库；测试禁止真实外网，不使用生产数据库／Redis／队列。
+
+## 发布前单位来源适配（2026-09-18）
+
+补充仅2026年的JRA/NAR/France Galop目录及HKJC官方本地赛事合同，以来源标识、HTTPS官方地址、地区/年份和完整数字+m确定公制；未知来源和裸数字不作推断，显式单位冲突拒绝，候选替换距离须用自身来源证据。只是展示，不回写。来源对照：[NAR目录](https://www.keiba.go.jp/dirtgraderace/2026/racelist/index.html)、[France Galop目录](https://www.france-galop.com/sites/default/files/2026-02/groupes_listed_plat_2026_v7.pdf)、[HKJC官方途程列](https://racing.hkjc.com/racing/english/international-racing/g2-g3-races/index.aspx/1000)。后续年份须重新验证合同，不能自动外推。

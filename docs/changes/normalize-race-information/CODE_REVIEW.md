@@ -19,3 +19,7 @@
 首轮整体指纹因全量测试新增 runtime 工件变化；逐项核对 tracked diff 和所有新增server文件hash相同，审阅中的业务代码未变化。第二、第三轮前后完整指纹相同。测试生成的runtime文件不提交。批准后只补测试结果、状态和交付文档，并移除新文件两处行末空格；清理前后两个文件的Python AST完全相同，业务行为未变。
 
 计划的子agent独立审阅属于上一阶段，见 [REVIEW.md](REVIEW.md)，不冒充代码审阅或发布验收。
+
+## 2026-09-18 上线前单位适配增量
+
+原reviewer上下文继续只读审核两个应用/测试文件。第一轮REVISE发现候选继承旧来源单位、HKJC reviewed_import真值判断两项P2。已修复候选距离证据隔离；生产聚合确认reviewed_import为字符串，它已完全退出单位判断，HKJC合同只依赖明确官方来源、地区、年份、官方HTTPS地址及数字+m，发布权限不变。第二轮APPROVED，reviewer独立13项测试及反例通过；主线程35项限定测试通过。没有整仓复跑。原日志保存在本机/private/tmp/normalization-release[-r2]-review.log。

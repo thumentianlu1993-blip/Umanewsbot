@@ -40,3 +40,7 @@ RACE_INFORMATION_NORMALIZED_DISPLAY_ENABLED=true python server/manage.py test \
 
 - `race-normalization-round2-tests.log`：`b4b283790d8ba915d02605510444c547892b33a71b577d03624785db5484e0b2`。
 - `race-normalization-round2-postgres.log`：`330f5c4914763122de6e4d33262bb01400416fb47203c391cfeec2769107bf89`。
+
+## 2026-09-18 发布前兼容修复
+
+生产服务器内只读聚合发现25条中12条m缺少新单位元数据。新增官方目录合同适配；两项测试先取得6处预期失败，最终归一化三个模块35项通过。原独立reviewer复审APPROVED。此增量不重跑本机5084项；最终PR Linux CI和候选镜像实际聚合另行记录。
