@@ -14,3 +14,9 @@
 此指纹对应最终应用/测试及当时文档；本记录、validation-summary与收尾状态说明在核对之后补写，未再修改应用或测试。工作流合同及4项工具测试、git diff --check通过。
 
 验证：联合168项、历史/页面76项全部通过；翻译测试新隔离库48项通过。一次本地整仓诊断未跑完，不作为全量通过证据。GitHub CLI当前登录失效401，PR及最终Linux CI未创建/执行，待用户完成`gh auth login -h github.com`后继续。禁止据此宣称发版验收完成。详见[实施记录](implementation.md)与[验证摘要](validation-summary.json)。
+
+## 发布预演修复
+
+生产真实HTTP预演发现Sporting Life两项源合同差异：跨日美国赛事payload使用UTC日期；金杯退赛后ride_count仅计4匹有效出走，完整rides仍为7匹。先新增3项测试，2项按预期RED；修正UTC日期校验与有效/完整计数兼容，保留URL赛日、race ID、已知状态及完整身份匹配。67项相关回归GREEN，同一reviewer再次APPROVED。此增量必须绑定新提交及最终CI。
+
+发布启用边界另经同一reviewer只读APPROVED。原491→NYRA绑定方案取消：生产NYRA403，现有Sporting Life已明示3/5/6号退赛，无需人工绑定写入。

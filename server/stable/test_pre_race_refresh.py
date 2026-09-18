@@ -279,3 +279,33 @@ class BeijingEdgeTests(TestCase):
         cursor=encode_race_calendar_cursor(unknown,filters=filters)
         r=self.client.get('/races/',{**filters,'cursor':cursor,'direction':'past'})
         self.assertEqual([e.pk for g in r.context['groups'] for e in g['events']],[late.pk])
+
+class SportingLiveContractTests(TestCase):
+    """上线预演发现的真实来源合同：UTC日期、退赛后的有效出走数。"""
+    def card(self, *, source_day='2026-09-18', ride_count=4):
+        import json
+        from stable.race_reference_parsers.sporting_life import _next_data
+        payload=_next_data((FIXTURES/'sl-491.html').read_text())
+        race=payload['props']['pageProps']['race']
+        race['race_summary'].update(date=source_day,ride_count=ride_count)
+        for ride in race['rides']:
+            ride['ride_status']='NONRUNNER' if ride['cloth_number'] in (3,5,6) else 'RUNNER'
+        return '<html><body><script id="__NEXT_DATA__" type="application/json">'+json.dumps(payload)+'</script></body></html>'
+    def test_active_count_keeps_all_seven_rows_and_three_scratches(self):
+        from stable.services.race_pre_race_sources import parse_bound_card
+        e=SimpleNamespace(local_date=date(2026,9,18),timezone_name='America/New_York')
+        rows=parse_bound_card(self.card(),event=e,url=SL_URL)['items']
+        self.assertEqual(len(rows),7)
+        self.assertEqual([r['horse_number'] for r in rows if r['running_status']=='scratched'],['3','5','6'])
+    def test_source_utc_day_may_be_next_day_with_exact_event_instant(self):
+        from stable.services.race_pre_race_sources import parse_bound_card
+        e=SimpleNamespace(local_date=date(2026,9,18),timezone_name='America/New_York',race_datetime=datetime(2026,9,19,0,36,tzinfo=tz.utc))
+        rows=parse_bound_card(self.card(source_day='2026-09-19',ride_count=7),event=e,url=SL_URL)['items']
+        self.assertEqual(len(rows),7)
+        for instant in (None,datetime(2026,9,18,20,14,tzinfo=tz.utc)):
+            e.race_datetime=instant
+            with self.assertRaises(ValueError):parse_bound_card(self.card(source_day='2026-09-19',ride_count=7),event=e,url=SL_URL)
+    def test_inconsistent_count_remains_rejected(self):
+        from stable.services.race_pre_race_sources import parse_bound_card
+        e=SimpleNamespace(local_date=date(2026,9,18),timezone_name='America/New_York')
+        with self.assertRaises(ValueError):parse_bound_card(self.card(ride_count=5),event=e,url=SL_URL)

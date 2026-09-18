@@ -27,11 +27,20 @@
       "errors": 0,
       "skipped": 0,
       "evidence_sha256": "4f685973364a5503d63865d19cd332142b88290b25f6757cb67cea1a8365be47"
+    },
+    "live_source_contract": {
+      "tests_run": 67,
+      "failures": 0,
+      "errors": 0,
+      "red_tests": 3,
+      "red_expected_errors": 2,
+      "evidence_sha256": "69c4334bb15cd5dda6d9b576b03904997badeefc72dc11abc38b31a92505104c"
     }
   },
   "review": "APPROVED",
   "review_fingerprint_before": "7719d3470cd61f7d0895e4cacb201c235230194d4b3b24147f44bfe92c4889cb",
   "review_fingerprint_after": "7719d3470cd61f7d0895e4cacb201c235230194d4b3b24147f44bfe92c4889cb",
-  "github_ci": "blocked_invalid_github_cli_auth_401",
-  "production_changes": false
+  "github_ci": "PR209_recheck_after_live_source_contract_fix",
+  "production_changes": false,
+  "review_live_source_contract": "APPROVED"
 }

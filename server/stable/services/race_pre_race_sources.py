@@ -1,5 +1,5 @@
 """窄单场 HTML 适配；不搜索、不联网、不猜测缺席即退赛。"""
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import re
 from urllib.parse import parse_qs, urlsplit
@@ -18,11 +18,14 @@ def _sporting(html,event,url):
     from stable.race_reference_parsers.sporting_life import _next_data, parse_legacy_page
     race=_next_data(html)['props']['pageProps']['race'];summary=race['race_summary']
     race_id=re.search(r'/racecard/(\d+)/',url).group(1)
-    if str(summary.get('race_summary_reference',{}).get('id'))!=race_id or summary.get('date')!=event.local_date.isoformat():raise ValueError('refresh_page_identity_mismatch')
+    instant=getattr(event,'race_datetime',None)
+    # Sporting Life's payload uses UTC; the bound URL retains the meeting day.
+    source_day=instant.astimezone(timezone.utc).date() if instant and instant.tzinfo else event.local_date
+    if str(summary.get('race_summary_reference',{}).get('id'))!=race_id or summary.get('date')!=source_day.isoformat():raise ValueError('refresh_page_identity_mismatch')
     if summary.get('race_stage') not in {'DORMANT','DECLARED','RACECARD'}:raise ValueError('refresh_not_pre_race')
     rows,results,_=parse_legacy_page(html,source_url=url)
     rides=race.get('rides',[])
-    if results or len(rows)!=len(rides) or len(rows)!=summary.get('ride_count'):raise ValueError('refresh_partial_roster')
+    if results or len(rows)!=len(rides):raise ValueError('refresh_partial_roster')
     by_number={str(ride.get('cloth_number')):ride for ride in rides}
     for row in rows:
         ride=by_number[row['horse_number']];raw=ride.get('ride_status','')
@@ -31,6 +34,10 @@ def _sporting(html,event,url):
         else:raise ValueError('refresh_unknown_status')
         row.update(odds_kind='current',odds_format='fractional')
         if (ride.get('betting') or {}).get('updated_at'):row['odds_source_at']=ride['betting']['updated_at']
+    # The summary count can exclude explicit non-runners while rides retains them.
+    # Full identity matching against the previous card still guards missing horses.
+    active_count=sum(row['running_status']=='declared' for row in rows)
+    if summary.get('ride_count') not in {len(rows),active_count}:raise ValueError('refresh_partial_roster')
     return rows
 
 
