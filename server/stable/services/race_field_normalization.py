@@ -1282,6 +1282,22 @@ def _display_text(raw):
     return unicodedata.normalize('NFKC', str(raw if raw is not None else '')).strip()
 
 
+def _distance_syntax_text(text):
+    """仅分离明确的场地标签和合法千分位；保留其他未消费内容以供拒绝。"""
+    prefix = re.match(r'^(ダート|芝|ダ)\s*', text)
+    suffix = re.search(r'\s+(turf|dirt)$', text, re.I)
+    if prefix and suffix:
+        surface = 'turf' if prefix[1] == '芝' else 'dirt'
+        if surface != suffix[1].lower():
+            return text
+    if suffix:
+        text = text[:suffix.start()]
+    if prefix:
+        text = text[prefix.end():]
+    return re.sub(r'(?<![\d,.])\d{1,3}(?:,\d{3})+(?:\.\d+)?(?![\d,.])',
+                  lambda match: match[0].replace(',', ''), text).strip()
+
+
 def _missing(raw, context=None):
     return display_field(raw, state='missing', reason='missing', context=context)
 
@@ -1307,13 +1323,13 @@ def _fraction_text(value):
 _NUMBER = r'(?:\d+\s+\d+/\d+|\d+/\d+|\d+(?:\.\d+)?)'
 _DISTANCE_TOKEN = re.compile(
     rf'({_NUMBER})\s*(メートル|kilometers?|kilometres?|meters?|metres?|furlongs?|miles?|feet|foot|yards?|'
-    r'公里|英里|英尺|千米|米|fur|km|ft|yd|mi|m|f|y)', re.I)
+    r'公里|英里|英尺|千米|米|fur|km|ft|yds?|mi|m|f|y)', re.I)
 _UNIT_ALIASES = {
     **{k: 'meter' for k in ('米', 'meter', 'meters', 'metre', 'metres', 'メートル')},
     **{k: 'kilometer' for k in ('km', '公里', '千米', 'kilometer', 'kilometers', 'kilometre', 'kilometres')},
     **{k: 'mile' for k in ('mile', 'miles', 'mi', '英里')},
     **{k: 'foot' for k in ('ft', 'foot', 'feet', '英尺')},
-    **{k: 'yard' for k in ('yd', 'y', 'yard', 'yards')},
+    **{k: 'yard' for k in ('yd', 'yds', 'y', 'yard', 'yards')},
     **{k: 'furlong' for k in ('f', 'fur', 'furlong', 'furlongs')},
 }
 _METERS = {'meter': Fraction(1), 'kilometer': Fraction(1000), 'mile': Fraction('1609.344'),
@@ -1338,9 +1354,9 @@ def parse_display_distance(raw, *, unit_hint='', official_metric_meters=None, co
     fractions = {'½': '1/2', '¼': '1/4', '¾': '3/4', '⅛': '1/8', '⅜': '3/8', '⅝': '5/8', '⅞': '7/8'}
     for symbol, value in fractions.items():
         original = re.sub(rf'(?<=\d){symbol}', ' ' + value, original).replace(symbol, value)
-    text = _display_text(original).replace('⁄', '/')
-    approximate = bool(re.match(r'^(?:约|約|about\s+|approx\.?\s*)', text, re.I))
-    text = re.sub(r'^(?:约|約|about\s+|approx\.?\s*)', '', text, flags=re.I).strip()
+    text = _distance_syntax_text(_display_text(original).replace('⁄', '/'))
+    approximate = bool(re.match(r'^(?:约|約|about\s+|abt\.?\s+|approx\.?\s*)', text, re.I))
+    text = re.sub(r'^(?:约|約|about\s+|abt\.?\s+|approx\.?\s*)', '', text, flags=re.I).strip()
     annotation = re.search(r'\(约(\d+)米\)$', text)
     rounded_annotation = int(annotation.group(1)) if annotation else None
     if annotation:
@@ -1358,7 +1374,10 @@ def parse_display_distance(raw, *, unit_hint='', official_metric_meters=None, co
     end = 0
     try:
         for token in _DISTANCE_TOKEN.finditer(text):
-            if text[end:token.start()].strip():
+            gap = text[end:token.start()].strip()
+            if gap.lower() in {'abt', 'abt.', 'about'}:
+                approximate = True
+            elif gap:
                 return _unresolved(raw, 'unconsumed_token', context=ctx)
             amount = _number_fraction(token.group(1))
             unit = token.group(2).lower()
@@ -1413,8 +1432,8 @@ _DISPLAY_CLASSES = {'NEWCOMER': '新马', 'MAIDEN': '未胜利', '1WIN': '1胜�
                     '新馬': '新马', '新马': '新马', '未勝利': '未胜利', '未胜利': '未胜利'}
 
 
-def parse_display_grade(raw, *, normalized_grade='', context=None):
-    ctx = {**(context or {}), 'normalized_grade': normalized_grade}
+def parse_display_grade(raw, *, normalized_grade='', context=None, verified_race_name=''):
+    ctx = {**(context or {}), 'normalized_grade': normalized_grade, 'verified_race_name': verified_race_name}
     text = _display_text(raw).upper()
     stored = _display_text(normalized_grade).upper()
     if not text:
@@ -1423,6 +1442,9 @@ def parse_display_grade(raw, *, normalized_grade='', context=None):
         return _missing(raw, ctx) if not stored else _unresolved(raw, 'unverified_grade', context=ctx)
     if len(text) > 512:
         return _unresolved(raw, 'input_too_long', context=ctx)
+    name = _display_text(verified_race_name).upper()
+    if name and text.endswith(' ' + name):
+        text = text[:-len(name)].rstrip()
     if text in _DISPLAY_CLASSES or re.fullmatch(r'[123]勝(?:クラス)?', text):
         if stored in _DISPLAY_GRADE_LABELS:
             return _unresolved(raw, 'grade_conflict', context=ctx, conflict=True)

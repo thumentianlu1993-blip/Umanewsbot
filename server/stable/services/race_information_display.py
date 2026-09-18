@@ -34,9 +34,6 @@ def attach(obj, fields):
 
 def _catalog_meter_profile(obj, refs):
     """已核验官方目录的 m 字段合同；不对裸数字或仅有地区的记录推断单位。"""
-    raw = unicodedata.normalize('NFKC', str(value(obj, 'distance_text') or '')).strip()
-    if not re.fullmatch(r'\d+(?:\.\d+)?\s*m', raw, re.I):
-        return ''
     region = value(obj, 'country_region') or value(obj, 'race_region')
     year = value(obj, 'year', None) or value(obj, 'race_year', None)
     if year != 2026:
@@ -81,7 +78,10 @@ def source_context(obj):
     # 单位仅接受明确结构化说明；不由国家、域名或数字大小推断。
     units = refs.get('field_units', {})
     units = units if isinstance(units, dict) else {}
-    profile = _catalog_meter_profile(obj, refs)
+    catalog_profile = _catalog_meter_profile(obj, refs)
+    from .race_field_normalization import _distance_syntax_text
+    raw = _distance_syntax_text(unicodedata.normalize('NFKC', str(value(obj, 'distance_text') or '')).strip())
+    profile = catalog_profile if re.fullmatch(r'\d+(?:\.\d+)?\s*m', raw, re.I) else ''
     distance_unit = units.get('distance_text', '') if isinstance(units.get('distance_text'), str) else ''
     conflict = bool(profile and distance_unit and distance_unit.lower() not in {'m', 'meter', 'metre', 'meters', 'metres', '米'})
     return {
@@ -92,6 +92,7 @@ def source_context(obj):
         'year': value(obj, 'year', None) or value(obj, 'race_year', None),
         'distance_unit': distance_unit or ('meter' if profile else ''),
         'distance_profile': profile,
+        'catalog_profile': catalog_profile,
         'distance_unit_conflict': conflict,
         'weight_unit': units.get('carried_weight', '') if isinstance(units.get('carried_weight'), str) else '',
         'odds_format': units.get('odds_value', '') if isinstance(units.get('odds_value'), str) else '',
@@ -143,6 +144,12 @@ def _time_fields(obj):
                                         state='preserved' if clock else 'unknown', reason='timezone_unknown')
 
 
+def event_grade_field(obj, *, context=None):
+    ctx = context if context is not None else source_context(obj)
+    return parse_display_grade(value(obj, 'grade_text'), normalized_grade=value(obj, 'normalized_grade'), context=ctx,
+                               verified_race_name=value(obj, 'original_name') if ctx['catalog_profile'] == 'jra_graded_2026_meter_v1' else '')
+
+
 def event_fields(obj):
     ctx = source_context(obj)
     date_field, time_field = _time_fields(obj)
@@ -157,7 +164,7 @@ def event_fields(obj):
     return {
         'name': display_field(value(obj, 'chinese_name') or value(obj, 'race_name') or value(obj, 'original_name'),
                               value(obj, 'chinese_name') or value(obj, 'race_name') or value(obj, 'original_name'), state='preserved'),
-        'grade': parse_display_grade(grade_raw, normalized_grade=value(obj, 'normalized_grade'), context=ctx),
+        'grade': event_grade_field(obj, context=ctx),
         'distance': (display_field(value(obj, 'distance_text'), state='conflict', reason='source_unit_conflict', context=ctx)
                      if ctx['distance_unit_conflict'] else
                      parse_display_distance(value(obj, 'distance_text'), unit_hint=ctx['distance_unit'], context=ctx)),
@@ -280,8 +287,8 @@ def prepare_context(context, *, force=False):
         if value(candidate, 'module') == 'basic' and isinstance(payload, dict):
             preview = {key: value(event, key) for key in ('chinese_name', 'original_name', 'grade_text', 'distance_text', 'racecourse', 'country_region', 'year', 'source_refs')}
             preview.update({key: val for key, val in payload.items() if key in preview})
-            if 'distance_text' in payload:
-                # 新候选距离必须使用自身证据，不能继承旧字段的来源单位。
+            if 'distance_text' in payload or 'grade_text' in payload:
+                # 候选距离/等级须用自身证据，不能继承旧字段的来源合同。
                 preview['source_refs'] = payload.get('source_refs', {})
             events.append(preview)
             candidate_previews.append((candidate, preview))

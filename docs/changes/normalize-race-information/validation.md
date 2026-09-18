@@ -44,3 +44,7 @@ RACE_INFORMATION_NORMALIZED_DISPLAY_ENABLED=true python server/manage.py test \
 ## 2026-09-18 发布前兼容修复
 
 生产服务器内只读聚合发现25条中12条m缺少新单位元数据。新增官方目录合同适配；两项测试先取得6处预期失败，最终归一化三个模块35项通过。原独立reviewer复审APPROVED。此增量不重跑本机5084项；最终PR Linux CI和候选镜像实际聚合另行记录。
+
+### 真实格式补充后的最终局部验证
+
+服务器候选只读预览发现场地前后缀、千分位、abt、yds及JRA“等级+原名”尚不兼容，已据公开网页补充完整消费语法，等级去尾须匹配官方目录和原名。37项归一化测试通过；同一独立reviewer再次APPROVED。最终隔离overlay在相同25场得到等级25条normalized，距离24条normalized、1条原缺失、unknown/conflict均0；overlay版本不能冒充最终镜像，后续固定镜像仍需复验。全部明细保留服务器，仅输出聚合，未业务写入。

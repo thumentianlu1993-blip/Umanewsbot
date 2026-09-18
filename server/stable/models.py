@@ -1494,8 +1494,8 @@ class RaceEvent(TimestampedModel):
         grade = (self.normalized_grade or "").upper()
         from django.conf import settings
         if getattr(settings, "RACE_INFORMATION_NORMALIZED_DISPLAY_ENABLED", False):
-            from stable.services.race_field_normalization import parse_display_grade
-            grade = parse_display_grade(self.grade_text, normalized_grade=self.normalized_grade).code
+            from stable.services.race_information_display import event_grade_field
+            grade = event_grade_field(self).code
         if grade in {"G1", "JG1", "JPN1"}:
             return "g1"
         if grade in {"G2", "JG2", "JPN2"}:
@@ -1508,8 +1508,8 @@ class RaceEvent(TimestampedModel):
     def grade_badge_label(self) -> str:
         from django.conf import settings
         if getattr(settings, "RACE_INFORMATION_NORMALIZED_DISPLAY_ENABLED", False):
-            from stable.services.race_field_normalization import parse_display_grade
-            return parse_display_grade(self.grade_text, normalized_grade=self.normalized_grade).text
+            from stable.services.race_information_display import event_grade_field
+            return event_grade_field(self).text
         return (self.normalized_grade or self.grade_text or "").strip()[:4]
 
 

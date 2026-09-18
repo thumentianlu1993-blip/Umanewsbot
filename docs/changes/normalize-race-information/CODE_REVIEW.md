@@ -23,3 +23,5 @@
 ## 2026-09-18 上线前单位适配增量
 
 原reviewer上下文继续只读审核两个应用/测试文件。第一轮REVISE发现候选继承旧来源单位、HKJC reviewed_import真值判断两项P2。已修复候选距离证据隔离；生产聚合确认reviewed_import为字符串，它已完全退出单位判断，HKJC合同只依赖明确官方来源、地区、年份、官方HTTPS地址及数字+m，发布权限不变。第二轮APPROVED，reviewer独立13项测试及反例通过；主线程35项限定测试通过。没有整仓复跑。原日志保存在本机/private/tmp/normalization-release[-r2]-review.log。
+
+公开格式增量首轮发现候选等级继承来源P2及徽章入口不一致P3，均已修复；最终复审APPROVED，独立15项局部测试及合法/非法近似格式反例通过。等级文案/徽章共用无查询适配；候选等级/距离须用自身来源；源单位不明仍拒绝。日志 /private/tmp/normalization-release-r4-review.log。最终overlay实际25场聚合已复核：等级25正常，距离24正常/1原缺失，未知与冲突0。

@@ -18,6 +18,35 @@ class DisplayEntryTests(SimpleTestCase):
 
 
 class StrictParserTests(SimpleTestCase):
+    def test_public_distance_surface_labels_approximation_and_grouped_digits(self):
+        from stable.services.race_field_normalization import parse_display_distance as parse
+        for raw, hint, expected in [
+            ('ダート2000m', 'meter', '2000米'), ('芝1,600メートル', '', '1600米'),
+            ('abt 6f', '', '约0.75英里（约1207米）'),
+            ('8f 37yds', '', '1英里111英尺（约1643米）'),
+            ('11f abt 219yds', '', '约1英里2637英尺（约2413米）'),
+            ('7f dirt', '', '0.875英里（约1408米）'), ('8f turf', '', '1英里（约1609米）'),
+        ]:
+            with self.subTest(raw=raw):
+                self.assertEqual(parse(raw, unit_hint=hint).text, expected)
+        for raw in ['1,60米', '1,600,00米', '芝1600m', '7f dirt unknown', '芝1600米 dirt']:
+            self.assertIn(parse(raw).state, {'unknown', 'conflict'})
+
+    def test_jra_grade_suffix_is_only_removed_with_matching_name_and_source(self):
+        from stable.services.race_information_display import event_fields
+        obj = {'country_region': 'japan', 'year': 2026, 'grade_text': 'GⅢ 京成杯オータムH',
+               'original_name': '京成杯オータムH', 'distance_text': '芝1,600メートル',
+               'source_refs': {'source_kind': 'jra_official_graded_race_list',
+                               'primary': 'https://www.jra.go.jp/datafile/seiseki/replay/2026/jyusyo.html'}}
+        self.assertEqual(event_fields(obj)['grade'].text, 'G3')
+        self.assertEqual(event_fields({**obj, 'original_name': 'Other'})['grade'].text, '待核实')
+        self.assertEqual(event_fields({**obj, 'source_refs': {}})['grade'].text, '待核实')
+        self.assertEqual(event_fields({**obj, 'normalized_grade': 'G2'})['grade'].state, 'conflict')
+        with override_settings(RACE_INFORMATION_NORMALIZED_DISPLAY_ENABLED=True):
+            event = RaceEvent(**obj)
+            self.assertEqual(event.grade_badge_label, 'G3')
+            self.assertEqual(event.grade_badge_class, 'g3')
+
     def test_official_catalog_meter_profiles_preserve_existing_distances(self):
         from stable.services.race_information_display import event_fields
         profiles = [
@@ -77,6 +106,11 @@ class StrictParserTests(SimpleTestCase):
         self.assertIn(('距离', '待核实'), candidate.normalized_preview[0])
         self.assertEqual(event.distance_text, '1600m')
         self.assertNotIn('source_refs', candidate.candidate_payload)
+        event.original_name = '京成杯オータムH'
+        candidate.candidate_payload = {'grade_text': 'GⅢ 京成杯オータムH'}
+        with patch('stable.services.race_information_display.RaceTermResolver'):
+            prepare_context({'event': event, 'candidates': [candidate]}, force=True)
+        self.assertIn(('等级', '待核实'), candidate.normalized_preview[0])
 
     def test_grade_variants_and_conflicts(self):
         from stable.services.race_field_normalization import parse_display_grade as parse
