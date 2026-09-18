@@ -48,6 +48,12 @@ class ReviewedPreviewTests(TestCase):
   self.c.candidate_payload['items'][0]['running_status']='withdrawn'
   self.c.raw_payload['reviewed_pre_race_v1']['items_sha256']=hashlib.sha256(json.dumps(self.c.candidate_payload['items'],sort_keys=True,separators=(',',':'),ensure_ascii=False).encode()).hexdigest();self.c.save()
   with patch('stable.views.timezone.now',return_value=NOW):self.assertContains(self.client.get('/races/2026/reviewed/'),'退出')
+ def test_generic_apply_rejects_preview_only_candidate_even_if_source_renamed(self):
+  from stable.services.race_events import apply_data_candidate
+  for name in ['reviewed_pre_race_v1','renamed']:
+   self.c.source_name=name;self.c.save()
+   with self.assertRaisesRegex(ValueError,'reviewed_pre_race_candidate_requires_controlled_path'):apply_data_candidate(self.c)
+   self.assertFalse(self.event.runners.exists());self.c.refresh_from_db();self.assertEqual(self.c.status,'pending')
  def test_application_disabled_or_manual_owner_reject(self):
   with override_settings(RACE_DATA_SYNC_RACECARD_APPLY_ENABLED=False):self.assertIsNone(self.preview())
   m.RaceEventProjectionControl.objects.create(event=self.event,write_owner='manual_paused');self.assertIsNone(self.preview())
