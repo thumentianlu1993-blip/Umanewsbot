@@ -9634,3 +9634,14 @@ RACE_DATA_RAW_ARTIFACT_ROOTS=/run/race-data-sync
 5. result provider 的 Celery SUCCESS、checkpoint success 或规范化 payload `race_status=complete` 都不是
    publication 证明。必须同时看到原始 terminal marker 对应 official/corrected observation、完整 roster、
    current immutable revision、canonical result rows、publication audit row，以及 root/www 的一致赛果区块。
+
+
+## 2026-09-18 赛事线上验收与资料回填进行中
+
+用户明确授权线上验收、补齐和回填。当前全量清单132场历史缺确认赛果、未来7天22场缺赛时/出马表。生产固定d0bb40fb配置发布完成，四应用JRA=true，版本/备份/锁/迁移验证通过。103官方全名别名已补；原JRA路径3/3成功，双域名103/104/105分别12/13/11匹，105马号尚未公布，三场实际赛时已入库。历史20场256行已通过独立审核及17项PostgreSQL测试，尚待生产dry-run/apply验收；不将候选采集等同已回填。见[本轮记录](changes/complete-race-gaps-20260918/PLAN.md)。
+
+### 本轮回填执行证据与拟补充发布
+
+历史四个固定包合计129场1209行生产apply及verify通过，129条独立审计回执。只写赛果与确认状态；生产版本仍d0bb40fb，JRA=true。完整回填包留在持久artifacts/race-gap-backfill-20260918。赛前完整基线仅留服务器0600文件，本地只保留公开身份/摘要SHA，避免导出控制载荷。
+
+下一窄发布包含人工核验参考候选展示（不建canonical），与六场已公开完整名单和赛时补空。无迁移、无配置/频率/额度修改；正常低成本发布重建四应用并检查Nginx上游，DB/Redis/OneBot不重建。以固定提交、独立目录、现有persistent/TLS绑定执行，先备份和原release coordinator预检。发布/回填后检查两域名及每场名单；任何基线漂移停止该场，不能覆盖新状态。无通知或主动恢复旧LIVE。

@@ -3907,8 +3907,8 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
             ArticleRaceLinkType.RELATED,
         )
     }
-    from .services.race_pre_race import public_jra_preview
-    preview = public_jra_preview(event, now=read_now)
+    from .services.race_pre_race import public_jra_preview, public_reviewed_preview
+    preview = public_jra_preview(event, now=read_now) or public_reviewed_preview(event, now=read_now)
     runners = _sort_runners_for_display(preview["rows"] if preview else list(event.runners.all()), event.country_region)
     has_current_live_revision = bool(projection_control and projection_control.write_owner != "historical" and (
         current_result_revision is not None or projection_control.write_owner in {"data_sync", "live"}))

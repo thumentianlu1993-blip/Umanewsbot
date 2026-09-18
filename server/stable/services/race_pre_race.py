@@ -441,3 +441,52 @@ def discover_jra_pre_race(*, now, fetcher=None, clock=timezone.now):
         except (ValueError, OSError) as exc:
             finish_pre_race(claim,now=clock(),reason=str(exc)[:64], retry_after=getattr(exc,"retry_after",None))
     return {'checked':checked, 'attempted':attempted}
+
+
+REVIEWED_PRE_RACE = 'reviewed_pre_race_v1'
+REVIEWED_HOSTS = frozenset({'www.sportinglife.com', 'www.zeturf.fr', 'www.racingpost.com'})
+
+
+def public_reviewed_preview(event, *, now):
+    """仅展示已人工核验的整份参考卡；正式卡接管后永不恢复。"""
+    if (not settings.RACE_DATA_SYNC_ENABLED or not settings.RACE_DATA_SYNC_RACECARD_APPLY_ENABLED
+        or 'participants.horse_name' not in settings.RACE_DATA_SYNC_ENABLED_FIELDS
+        or not in_window(event, now) or _refs(event).get('pre_race_handoff') or event.runners.exists()
+        or any((event.manual_lock_flags or {}).values())
+        or event.field_authorities.filter(manual_lock=True).exists()):
+        return None
+    control = getattr(event, 'projection_control', None)
+    if control and control.write_owner not in {'unmanaged', 'data_sync'}:
+        return None
+    candidate = event.data_candidates.filter(source_name=REVIEWED_PRE_RACE, module='runners',
+        status='pending', raw_payload__reviewed_pre_race_v1__validated=True).order_by('-fetched_at','-id').first()
+    if not candidate:
+        return None
+    meta = candidate.raw_payload.get(REVIEWED_PRE_RACE, {})
+    items = candidate.candidate_payload.get('items', [])
+    if (meta.get('baseline') != baseline(event) or meta.get('stage') not in STAGES
+        or meta.get('authority') != 'human_reviewed_reference'
+        or not isinstance(items, list) or not 0 < len(items) <= 60 or meta.get('row_count') != len(items)
+        or hashlib.sha256(json.dumps(items, ensure_ascii=False, sort_keys=True,
+                                    separators=(',', ':')).encode()).hexdigest() != meta.get('items_sha256')):
+        return None
+    try:
+        url = urlsplit(candidate.source_url)
+        if (url.scheme != 'https' or url.hostname not in REVIEWED_HOSTS or url.username or url.password
+            or url.port not in {None, 443}):
+            return None
+        if not all(isinstance(row, dict) and row.get('horse_name') and
+                   row.get('running_status') in {'declared','withdrawn','non_runner'} for row in items):
+            return None
+        if meta['stage'] == 'numbered' and (not all(row.get('horse_number') for row in items)
+            or len({row['horse_number'] for row in items}) != len(items)):
+            return None
+    except (ValueError, TypeError):
+        return None
+    admitted = set(settings.RACE_DATA_SYNC_ENABLED_FIELDS)
+    fields = (*PUBLIC_FIELDS, 'sort_order')
+    rows = [SimpleNamespace(**{k: row.get(k, '') if k == 'sort_order' or PUBLIC_FIELDS[k] in admitted else ''
+            for k in fields}, pk=row.get('sort_order',0), odds_value='', popularity='',
+            running_status=row['running_status'], get_running_status_display=lambda value=row['running_status']: {
+                'declared':'已宣告', 'withdrawn':'退出', 'non_runner':'未出赛'}[value]) for row in items]
+    return {'rows': rows, 'label': LABELS[meta['stage']] + '（参考资料，人工核验）'}

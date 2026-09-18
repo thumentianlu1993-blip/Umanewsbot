@@ -1,0 +1,13 @@
+{
+  "observed_date": "2026-09-18",
+  "historical_gap_before": 132,
+  "historical_backfilled": 129,
+  "result_rows_backfilled": 1209,
+  "jra_future_preview_counts": [
+    12,
+    13,
+    11
+  ],
+  "public_historical_pages_verified": 129,
+  "private_runtime_snapshots": "retained on production host; not distributed in public repository"
+}

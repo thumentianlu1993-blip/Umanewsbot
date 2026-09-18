@@ -1,0 +1,30 @@
+[
+  {
+    "batch": "japan-v2",
+    "manifest_sha256": "761155c77db87b599d361fb04a78f28ccf771114bfec2f30290b976228ffaa42",
+    "verified": 20,
+    "all_applied": true,
+    "audit_count": 20
+  },
+  {
+    "batch": "reference-v3",
+    "manifest_sha256": "e46d2df2190fb443e1499f53ac6323abfed978271d4c086b39cecfb7d489e134",
+    "verified": 102,
+    "all_applied": true,
+    "audit_count": 102
+  },
+  {
+    "batch": "france-829",
+    "manifest_sha256": "6e6aed6201a6de012a53b81ef7d749be3269ebb6a6c6c24f03bdc8bad87e5919",
+    "verified": 1,
+    "all_applied": true,
+    "audit_count": 1
+  },
+  {
+    "batch": "retired-v2",
+    "manifest_sha256": "5b941d02139ce8893af1bd66536cee8f94b4e703ef3859a70cf2aaa069960ea6",
+    "verified": 6,
+    "all_applied": true,
+    "audit_count": 6
+  }
+]
