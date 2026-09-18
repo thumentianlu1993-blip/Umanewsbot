@@ -94,3 +94,25 @@ class UpcomingBackfillTests(TestCase):
   self.assertEqual(self.run_package(p,False)['status'],'dry_run')
   e['before_sha256']='0'*64;self.assertEqual(self.run_package(p)['status'],'blocked')
   e['before_path']='../outside.json';self.assertEqual(self.run_package(p)['status'],'blocked')
+
+class NarReviewedBackfillTests(UpcomingBackfillTests):
+ def nar_package(self):
+  self.event.country_region='japan';self.event.racecourse='金泽';self.event.original_name='白山大賞典';self.event.local_date=date(2026,9,22);self.event.timezone_name='Asia/Tokyo';self.event.save()
+  p=self.package();e=p['events'][0]
+  raw='<html><body><p>2026年9月22日（火）　金　沢　第11競走　18:00発走</p></body></html>'.encode()
+  (self.root/'source.html').write_bytes(raw)
+  e['source'].update(provider='nar',url='https://www.keiba.go.jp/KeibaWeb/TodayRaceInfo/DebaTable?k_babaCode=22&k_raceDate=2026%2F09%2F22&k_raceNo=11',sha256=self.s.bytes_sha(raw))
+  e.update(off_time='2026-09-22T18:00:00+09:00',time_evidence={'kind':'nar_race_header','raw':'2026年9月22日（火）　金　沢　第11競走　18:00発走'})
+  return p
+ def test_official_nar_time_candidate_and_replay(self):
+  p=self.nar_package();self.assertEqual(self.run_package(p)['status'],'applied');self.event.refresh_from_db()
+  self.assertEqual(str(self.event.local_start_time),'18:00:00');self.assertFalse(self.event.runners.exists())
+  candidate=self.event.data_candidates.get();self.assertEqual(candidate.raw_payload['reviewed_pre_race_v1']['authority'],'human_reviewed_official')
+  with override_settings(**FLAGS):self.assertIn('官方资料',pre.public_reviewed_preview(self.event,now=NOW)['label'])
+  self.assertEqual(self.run_package(p)['status'],'already_applied')
+ def test_nar_header_mismatch_or_foreign_timezone_reject(self):
+  for change in [lambda e:e.update(off_time='2026-09-22T17:00:00+09:00'),lambda e:e['time_evidence'].update(raw='2026年9月22日（火）　金　沢　第11競走　17:00発走'),lambda e:e['source'].update(url=e['source']['url'].replace('k_raceNo=11','k_raceNo=10')),lambda e:e['before']['event'].update(timezone_name='America/New_York')]:
+   p=self.nar_package();change(p['events'][0]);self.assertEqual(self.run_package(p)['status'],'blocked')
+ def test_official_authority_cannot_be_asserted_by_reference_host(self):
+  p=self.nar_package();self.assertEqual(self.run_package(p)['status'],'applied');c=self.event.data_candidates.get();c.source_url='https://www.racingpost.com/racecards/123/';c.save()
+  with override_settings(**FLAGS):self.assertIsNone(pre.public_reviewed_preview(self.event,now=NOW))

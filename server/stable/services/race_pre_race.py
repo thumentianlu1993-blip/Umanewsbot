@@ -444,7 +444,7 @@ def discover_jra_pre_race(*, now, fetcher=None, clock=timezone.now):
 
 
 REVIEWED_PRE_RACE = 'reviewed_pre_race_v1'
-REVIEWED_HOSTS = frozenset({'www.sportinglife.com', 'www.zeturf.fr', 'www.racingpost.com'})
+REVIEWED_HOSTS = frozenset({'www.sportinglife.com', 'www.zeturf.fr', 'www.racingpost.com', 'www.keiba.go.jp'})
 
 
 def public_reviewed_preview(event, *, now):
@@ -465,7 +465,7 @@ def public_reviewed_preview(event, *, now):
     meta = candidate.raw_payload.get(REVIEWED_PRE_RACE, {})
     items = candidate.candidate_payload.get('items', [])
     if (meta.get('baseline') != baseline(event) or meta.get('stage') not in STAGES
-        or meta.get('authority') != 'human_reviewed_reference'
+        or meta.get('authority') not in {'human_reviewed_reference', 'human_reviewed_official'}
         or not isinstance(items, list) or not 0 < len(items) <= 60 or meta.get('row_count') != len(items)
         or hashlib.sha256(json.dumps(items, ensure_ascii=False, sort_keys=True,
                                     separators=(',', ':')).encode()).hexdigest() != meta.get('items_sha256')):
@@ -474,6 +474,8 @@ def public_reviewed_preview(event, *, now):
         url = urlsplit(candidate.source_url)
         if (url.scheme != 'https' or url.hostname not in REVIEWED_HOSTS or url.username or url.password
             or url.port not in {None, 443}):
+            return None
+        if ((url.hostname == 'www.keiba.go.jp') != (meta['authority'] == 'human_reviewed_official')):
             return None
         if not all(isinstance(row, dict) and row.get('horse_name') and
                    row.get('running_status') in {'declared','withdrawn','non_runner'} for row in items):
@@ -489,4 +491,5 @@ def public_reviewed_preview(event, *, now):
             for k in fields}, pk=row.get('sort_order',0), odds_value='', popularity='',
             running_status=row['running_status'], get_running_status_display=lambda value=row['running_status']: {
                 'declared':'已宣告', 'withdrawn':'退出', 'non_runner':'未出赛'}[value]) for row in items]
-    return {'rows': rows, 'label': LABELS[meta['stage']] + '（参考资料，人工核验）'}
+    authority_label = '官方资料' if meta['authority'] == 'human_reviewed_official' else '参考资料'
+    return {'rows': rows, 'label': LABELS[meta['stage']] + f'（{authority_label}，人工核验）'}

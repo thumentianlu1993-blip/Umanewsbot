@@ -4,9 +4,11 @@ import argparse
 import copy
 import importlib.util
 import json
+import re
 from datetime import datetime, timezone as tz
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, parse_qs
+from bs4 import BeautifulSoup
 from zoneinfo import ZoneInfo
 from django.db import transaction
 from django.utils import timezone
@@ -18,7 +20,7 @@ gap=importlib.util.module_from_spec(_spec);_spec.loader.exec_module(gap)
 require,digest,bytes_sha=gap.require,gap.digest,gap.bytes_sha
 KEY='reviewed_pre_race_v1'
 ACTION='reviewed_pre_race_backfill'
-HOSTS={'sporting_life':'www.sportinglife.com','zeturf':'www.zeturf.fr','racing_post':'www.racingpost.com'}
+HOSTS={'sporting_life':'www.sportinglife.com','zeturf':'www.zeturf.fr','racing_post':'www.racingpost.com','nar':'www.keiba.go.jp'}
 
 
 def snapshot(eid):
@@ -49,8 +51,18 @@ def validate(entry,root):
  require(url.scheme=='https' and url.hostname==HOSTS.get(source['provider']) and not url.username and not url.password and url.port in {None,443},'source_url_invalid')
  path=root/source['path'];require(not path.is_symlink() and path.resolve().is_relative_to(root.resolve()) and bytes_sha(path.read_bytes())==source['sha256'],'source_cache_drift')
  off=datetime.fromisoformat(entry['off_time']);require(timezone.is_aware(off),'timezone_missing')
- evidence=entry['time_evidence'];require(evidence.get('kind') in {'jsonld_startDate','data-depart'},'time_evidence_missing')
- raw=datetime.fromtimestamp(int(evidence['raw']),tz.utc) if evidence['kind']=='data-depart' else datetime.fromisoformat(evidence['raw'])
+ evidence=entry['time_evidence'];require(evidence.get('kind') in {'jsonld_startDate','data-depart','nar_race_header'},'time_evidence_missing')
+ if evidence['kind']=='nar_race_header':
+  require(source['provider']=='nar' and b['event']['country_region']=='japan' and b['event']['timezone_name']=='Asia/Tokyo' and b['event']['racecourse'] in {'金沢','金泽'},'nar_identity_invalid')
+  text=BeautifulSoup(path.read_bytes(),'html.parser').get_text(' ',strip=True)
+  raw_header=evidence['raw'];require(raw_header in text,'nar_header_missing')
+  match=re.fullmatch(r'(\d{4})年(\d{1,2})月(\d{1,2})日（.）\s*金\s*沢\s*第(\d+)競走\s*(\d{1,2}):(\d{2})発走',raw_header)
+  require(match is not None,'nar_header_invalid');year,month,day,race_no,hour,minute=map(int,match.groups())
+  raw=datetime(year,month,day,hour,minute,tzinfo=ZoneInfo('Asia/Tokyo'))
+  require(url.path=='/KeibaWeb/TodayRaceInfo/DebaTable' and parse_qs(url.query)=={'k_babaCode':['22'],'k_raceDate':[raw.strftime('%Y/%m/%d')],'k_raceNo':[str(race_no)]},'nar_url_identity_mismatch')
+ else:
+  require(source['provider']!='nar','nar_header_required')
+  raw=datetime.fromtimestamp(int(evidence['raw']),tz.utc) if evidence['kind']=='data-depart' else datetime.fromisoformat(evidence['raw'])
  require(timezone.is_aware(raw) and raw==off,'time_evidence_mismatch')
  local=off.astimezone(ZoneInfo(b['event']['timezone_name']));require(local.date().isoformat()==str(b['event']['local_date']),'local_date_mismatch')
  rows=entry['items'];require(entry['stage']=='numbered' and 0<len(rows)<=60,'invalid_roster')
@@ -84,7 +96,7 @@ def execute(path,expected_sha,*,apply=False,fault_hook=None):
     require(in_window(event,timezone.now()) and off>timezone.now(),'not_pre_race')
     require(digest(current)==e['before_sha256'],'database_baseline_drift')
     if not apply:reports.append(dict(event_id=eid,status='dry_run',rows=len(e['items'])));continue
-    meta=dict(validated=True,baseline=baseline(event),authority='human_reviewed_reference',stage=e['stage'],row_count=len(e['items']),items_sha256=digest(e['items']),source_sha256=e['source']['sha256'],manifest_sha256=expected_sha,reviewer=manifest['reviewer'],time_evidence=e['time_evidence'])
+    meta=dict(validated=True,baseline=baseline(event),authority=('human_reviewed_official' if e['source']['provider']=='nar' else 'human_reviewed_reference'),stage=e['stage'],row_count=len(e['items']),items_sha256=digest(e['items']),source_sha256=e['source']['sha256'],manifest_sha256=expected_sha,reviewer=manifest['reviewer'],time_evidence=e['time_evidence'])
     m.RaceEventDataCandidate.objects.create(event=event,module='runners',source_name=KEY,source_url=e['source']['url'],candidate_payload={'items':e['items']},raw_payload={KEY:meta},fetched_at=fetched)
     if fault_hook:fault_hook(event_id=eid,stage='after_candidate')
     event.race_datetime=off;event.local_start_time=local.timetz().replace(tzinfo=None);refs=dict(event.source_refs);refs[KEY]=dict(source_url=e['source']['url'],source_sha256=e['source']['sha256'],off_time=off.isoformat(),time_evidence=e['time_evidence'],manifest_sha256=expected_sha);event.source_refs=refs;event.save(update_fields=['race_datetime','local_start_time','source_refs','updated_at'])
