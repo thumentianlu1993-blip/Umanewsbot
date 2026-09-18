@@ -14,3 +14,10 @@
 102场865行 reference-v3、829七行 ZT（含明确落马）、948–953六场81行 retired-v2 均经独立原文审核并生产预检、回填及完整重放通过。合计129场1209行。退役范围只读保留原控制/注册根，写前shared registry barrier，21项历史回填PG测试通过。
 
 未来参考卡直接写 canonical 会导致TRA不同ID重复建马，复用现有候选展示只加入人工核验参考卡入口；完整卡接管或handoff后整份隐藏，不增加表或自动来源。代码review发现退赛状态DTO缺少显示方法、时间测试依赖真实时钟，两项均先复现后修复。61项相关PG测试通过，包含真实页面与事务回滚。
+
+
+## 最终增量审核
+
+Parx两场9/11名单单场原文、原始JSON-LD及所有profile ID独立核对通过；191 NAR原始HTML与12条马号/枠/姓名/原简称/负重/horseID全部一致。NAR新增测试先RED2失败再GREEN，review唯一执行metadata提交号finding修复为a115bb56，writer字节固定一致。
+
+主线程收尾发现通用apply只拦JRA、未拦新reviewed候选；先新增真实失败用例，再按source_name或raw_payload任一标记在所有写入前拒绝。原reviewer终审APPROVED；70项断言首次通过但共享测试库清理冲突，切换独立测试库后70项完整运行并清理成功、退出0。最终应用提交7e111914；新应用仍未发布。

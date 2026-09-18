@@ -1,3 +1,7 @@
+## 2026-09-18 赛事资料回填与PR205交付边界
+
+历史129场1209行、赛前9场77候选及空赛时均已按独立审核manifest、生产锁、固定脚本和完整before/after重放验收。详情与剩余缺口见[验收记录](changes/complete-race-gaps-20260918/acceptance.md)。候选禁止通过通用apply应用；公开展示需PR205新代码，旧生产仍d0bb40fb。此次无迁移、没有再次启用LIVE或扩大自动来源。回滚使用按字段证据的前向补偿，不整库恢复覆盖其他业务。私有before不外传、不进公开Git。发布按[精确包](changes/complete-race-gaps-20260918/rollout.md)及根AGENTS执行。
+
 # 部署运行手册
 
 ## 2026-09-18 PR #203 已合并并生产上线

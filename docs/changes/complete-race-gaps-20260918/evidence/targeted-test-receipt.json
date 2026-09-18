@@ -1,12 +1,9 @@
 {
-  "total": 61,
-  "passed": 61,
-  "database": "PostgreSQL 16",
-  "red_before_implementation": true,
-  "checks": [
-    "historical preservation and concurrency",
-    "retired registry barrier",
-    "reference preview and TRA handoff",
-    "upcoming time and candidate atomic backfill"
-  ]
+  "application_commit": "7e111914d57083299ce452b6222ab9d38476e420",
+  "database": "isolated PostgreSQL 16",
+  "tests": 70,
+  "failures": 0,
+  "errors": 0,
+  "exit_code": 0,
+  "log_scope": "targeted reviewed backfill and pre-race tests; not full CI"
 }
