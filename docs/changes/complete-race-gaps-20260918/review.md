@@ -20,4 +20,11 @@
 
 Parx两场9/11名单单场原文、原始JSON-LD及所有profile ID独立核对通过；191 NAR原始HTML与12条马号/枠/姓名/原简称/负重/horseID全部一致。NAR新增测试先RED2失败再GREEN，review唯一执行metadata提交号finding修复为a115bb56，writer字节固定一致。
 
-主线程收尾发现通用apply只拦JRA、未拦新reviewed候选；先新增真实失败用例，再按source_name或raw_payload任一标记在所有写入前拒绝。原reviewer终审APPROVED；70项断言首次通过但共享测试库清理冲突，切换独立测试库后70项完整运行并清理成功、退出0。最终应用提交7e111914；新应用仍未发布。
+主线程收尾发现通用apply只拦JRA、未拦新reviewed候选；先新增真实失败用例，再按source_name或raw_payload任一标记在所有写入前拒绝。原reviewer终审APPROVED；70项断言首次通过但共享测试库清理冲突，切换独立测试库后70项完整运行并清理成功、退出0。最终应用提交7e111914；该审核时点尚未发布，随后发布结果见下节。
+
+
+## 发布与交接审核
+
+用户确认精确包后，由主线程执行普通expected-head合并与固定7e111914发布。验收脚本经同一race_code_reviewer复核，三处可能误报的健康/时间检查已修正并APPROVED。最终同run失败集合及与生产参考的比较，race_code_reviewer、race_plan_reviewer均独立重算为新增0；两者批准准确保留GitHub日志汇总pending、以原始工件完整比较满足原合同，未改变产品范围或绕过必需检查。
+
+发布后运行态、备份、锁、四应用版本、9场预览及JRA/入口收据经race_code_reviewer审核APPROVED；129历史页完成后，race_plan_reviewer进一步独立核对129页1209行、9场双域名154显示行、公开证据安全和顶层文档一致性，交接APPROVED。保留历史3/未来10缺口和45个旧失败，不声称全部资料补齐或全量测试全绿。

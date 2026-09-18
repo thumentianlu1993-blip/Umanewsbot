@@ -1,0 +1,45 @@
+{
+  "at": "2026-09-18T05:21:14.498697+00:00",
+  "requests": [
+    {
+      "host": "umafans.run",
+      "path": "/",
+      "status": 200
+    },
+    {
+      "host": "umafans.run",
+      "path": "/healthz/",
+      "status": 200
+    },
+    {
+      "host": "umafans.run",
+      "path": "/races/",
+      "status": 200
+    },
+    {
+      "host": "umafans.run",
+      "path": "/races/?status=upcoming",
+      "status": 200
+    },
+    {
+      "host": "www.umafans.run",
+      "path": "/",
+      "status": 200
+    },
+    {
+      "host": "www.umafans.run",
+      "path": "/healthz/",
+      "status": 200
+    },
+    {
+      "host": "www.umafans.run",
+      "path": "/races/",
+      "status": 200
+    },
+    {
+      "host": "www.umafans.run",
+      "path": "/races/?status=upcoming",
+      "status": 200
+    }
+  ]
+}

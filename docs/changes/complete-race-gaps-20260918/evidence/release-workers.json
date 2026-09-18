@@ -1,0 +1,9 @@
+{
+  "at": "2026-09-18T05:21:10.952389+00:00",
+  "responding_workers": 2,
+  "consumed_queues": [
+    "celery",
+    "race_sync_v2"
+  ],
+  "nginx_configuration_ok": true
+}
