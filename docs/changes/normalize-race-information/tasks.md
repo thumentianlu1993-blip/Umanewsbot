@@ -8,4 +8,5 @@
 - [x] (application) 93项PostgreSQL权限回归及同审阅上下文复审。
 - [x] (application) 完整stable基线差集：5084对5053，新增失败0；两边18失败、194错误、18跳过，环境限制已记录。
 - [x] (operations) 文档、工作流检查、本地提交交付；无合并、发布或生产开关启用。
-- [ ] (operations) 远程push及Draft PR：自动审批拒绝远程发布副作用，等待明确授权。
+- [x] (operations) 用户明确授权后推送PR207，最终固定SHA Linux CI与原始失败集合比较、合并、受保护生产发布和开关启用完成。
+- [x] (operations) 最终镜像五地区只读预览、双域名公开页面、版本/备份/迁移/锁收尾通过；正式证据已写入release.md和ci-summary.json。
