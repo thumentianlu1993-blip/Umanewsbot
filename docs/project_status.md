@@ -1,6 +1,6 @@
-## 2026-09-18 赛事信息归一化代码验证中
+## 2026-09-18 赛事信息归一化本地实现完成
 
-已在独立分支实现严格单位／等级、统一译名及结构化页面展示，默认关闭，无迁移或生产写入。尚未合并发布；当前验证进度以[current_state](current_state.md)及[实施记录](changes/normalize-race-information/implementation.md)为准。
+已在独立分支实现严格单位／等级、统一译名及结构化页面展示，默认关闭，无迁移或生产写入。31项新增及93项相关PostgreSQL测试通过，独立审阅通过，全量同环境对照未发现新增失败。远程push被自动审批拒绝，尚未创建PR／合并／发布；准确验证边界以[current_state](current_state.md)及[实施记录](changes/normalize-race-information/implementation.md)为准。
 
 ## 2026-09-18 PR205 已上线并完成线上验收
 

@@ -21,8 +21,22 @@ RACE_INFORMATION_NORMALIZED_DISPLAY_ENABLED=true python server/manage.py test \
   stable.test_realtime_race_results.RaceLivePublicStatusTests --noinput
 ```
 
-## 全量状态（本地交付准备时）
+## 完整stable对照已完成
 
-完整stable发现候选5084项。主线与候选完整测试正在独立数据库执行，尚无最终差集结论，不能称全量通过。驱动复用仓库CI的DiscoverRunner结果收集方式，另外移除继承代理、阻断外部DNS/TCP；只允许本任务隔离PostgreSQL端口。早期未收紧代理隔离的完整运行已主动中止，不作为全量完成证据。当前原始日志和最终JSON写入 `/private/tmp/race-normalization-full-{baseline,final}-isolated.*`；完成后更新本节。
+| 版本 | 测试数 | 失败 | 错误 | 跳过 |
+| --- | ---: | ---: | ---: | ---: |
+| 固定主线91410e7a | 5053 | 18 | 194 | 18 |
+| 本次实现71a820bd | 5084 | 18 | 194 | 18 |
 
-本轮没有读取／写入生产，没有在线覆盖率或发布验收结论。默认关闭开关不代表线上生效。远程push被自动审批拒绝，未创建Draft PR；当前只交付本地分支。
+按 `(failure/error类型, test.id)` 多重集比较，新增0、消除0；异常类比较也相同。新增31项均通过。此结论是同一隔离环境下未发现新增失败，**不是全量全绿，也不是GitHub CI或生产验收通过**。精确失败名称、次数、日志及原始JSON SHA256见 [full_suite_evidence.json](full_suite_evidence.json)。两份原始日志／结果位于 `/private/tmp/race-normalization-full-{baseline,final}-isolated.*`。
+
+本地环境：macOS、Python3.12、Django5.2.1、专用PostgreSQL16容器；候选／主线独立数据库，禁用dotenv、内存broker/cache、移除继承代理、禁止外部DNS/TCP。完整套件使用默认关闭的新开关，相关93项另外显式打开新开关。代码运行内容绑定71a820bd；运行期间仅清理两行行末空白，AST完全一致，未更改业务逻辑。早期未收紧代理继承的完整运行已中止，不作为完成证据。
+
+基线错误包含环境限制：96条NotADirectoryError（macOS `/var` 符号链接），部分artifact安全校验因 `/var` 与 `/private/var` 路径差异拒绝，14条FileNotFoundError中包含子进程找不到 `python`。另有固定主线本身的断言／数据约束失败。本次没有把全部212条失败／错误都归为产品缺陷，也没有修改不相关的采集、发布或数据库合同来让测试通过。后续Linux CI应使用规范临时路径及正确虚拟环境PATH重新核验这些平台相关入口。
+
+本轮没有读取／写入生产，没有在线覆盖率或发布验收结论。默认关闭开关不代表线上生效。自动审批拒绝了远程push，未创建Draft PR、未运行GitHub CI；当前交付本地分支，远程操作仍待用户明确授权。
+
+最终定向日志SHA256：
+
+- `race-normalization-round2-tests.log`：`b4b283790d8ba915d02605510444c547892b33a71b577d03624785db5484e0b2`。
+- `race-normalization-round2-postgres.log`：`330f5c4914763122de6e4d33262bb01400416fb47203c391cfeec2769107bf89`。

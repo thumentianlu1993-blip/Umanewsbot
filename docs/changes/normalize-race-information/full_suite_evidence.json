@@ -1,0 +1,1094 @@
+{
+  "baseline_sha": "91410e7aa077a0b3ea963cccfcd64b935f4369d1",
+  "implementation_commit": "71a820bd80d3ea68437a55416c54accea73b5004",
+  "code_equivalence_note": "完整运行期间仅移除两处行末空白，Python AST完全相同；没有业务代码变更",
+  "completed_at": "2026-09-18T07:21:55.094750+00:00",
+  "environment": "local PostgreSQL16, dotenv disabled, memory broker/cache, no inherited proxies, external DNS/TCP denied",
+  "new_failures": [],
+  "resolved_failures": [],
+  "observed_baseline_failures": [
+    {
+      "kind": "errors",
+      "test": "stable.test_external_english_horse_context_gate.ExternalEnglishHorseContextGateTests.test_rewrite_provider_alias_only_placeholders_only_confirmed_source_occurrence",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_batch_pipeline.HistoricalBatchFormalResourceTests.test_formal_runner_rejects_argv_paths_outside_declared_namespaces",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_batch_pipeline.HistoricalBatchFormalResourceTests.test_formal_runner_rejects_boolean_limits_and_selection_identity_drift",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_batch_pipeline.HistoricalBatchFormalResourceTests.test_formal_runner_rejects_rebound_approval_manifest_relationship",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_batch_pipeline.HistoricalBatchFormalResourceTests.test_matching_resource_identity_is_accepted",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_batch_pipeline.HistoricalBatchFormalResourceTests.test_resource_identity_mismatch_is_rejected_before_run_creation",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_batch_pipeline.HistoricalBatchPlanTests.test_all_initial_typed_recipe_policies_build_and_bind_exact_scope (tool='cache_historical_race_date_sources.py')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_batch_pipeline.HistoricalBatchPlanTests.test_all_initial_typed_recipe_policies_build_and_bind_exact_scope (tool='discover_historical_race_band_sources.py')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_batch_pipeline.HistoricalBatchPlanTests.test_all_initial_typed_recipe_policies_build_and_bind_exact_scope (tool='merge_historical_race_batch_fragments.py')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_batch_pipeline.HistoricalBatchPlanTests.test_all_initial_typed_recipe_policies_build_and_bind_exact_scope (tool='package_historical_race_detail_candidates.py')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_batch_pipeline.HistoricalBatchPlanTests.test_all_initial_typed_recipe_policies_build_and_bind_exact_scope (tool='prepare_cached_historical_race_details.py')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_batch_pipeline.HistoricalBatchPlanTests.test_all_initial_typed_recipe_policies_build_and_bind_exact_scope (tool='prepare_france_zeturf_race_detail_candidates.py')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_batch_pipeline.HistoricalBatchPlanTests.test_all_initial_typed_recipe_policies_build_and_bind_exact_scope (tool='prepare_hkjc_race_detail_candidates.py')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_batch_pipeline.HistoricalBatchPlanTests.test_all_initial_typed_recipe_policies_build_and_bind_exact_scope (tool='prepare_jra_race_detail_candidates.py')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_batch_pipeline.HistoricalBatchPlanTests.test_all_initial_typed_recipe_policies_build_and_bind_exact_scope (tool='prepare_uk_sportinglife_race_detail_candidates.py')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_batch_pipeline.HistoricalBatchPlanTests.test_all_initial_typed_recipe_policies_build_and_bind_exact_scope (tool='prepare_us_equibase_result_candidates.py')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_batch_pipeline.HistoricalBatchPlanTests.test_builds_canonical_plan_bound_to_selection_approval_tools_and_scope",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_batch_pipeline.HistoricalBatchPlanTests.test_calendar_parser_builds_verify_plan_without_network_write_or_resource_budget",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_batch_pipeline.HistoricalBatchPlanTests.test_canonical_output_is_stable_when_descriptor_keys_and_target_order_change",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_batch_pipeline.HistoricalBatchStageVerifierTests.test_verifier_reports_date_source_count_status_and_visibility_drift",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_batch_runner_change.HistoricalBatchRunnerCommandTests.test_run_stage_command_creates_and_completes_registered_run",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_batch_runner_change.HistoricalBatchRunnerExecutionTests.test_crawl_checkpoint_blocks_modified_or_deleted_resource_artifacts (mutation='delete-budget')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_batch_runner_change.HistoricalBatchRunnerExecutionTests.test_crawl_checkpoint_blocks_modified_or_deleted_resource_artifacts (mutation='modify-manifest')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_batch_runner_change.HistoricalBatchRunnerExecutionTests.test_crawl_checkpoint_blocks_resource_artifact_created_after_absent_checkpoint",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_batch_runner_change.HistoricalBatchRunnerExecutionTests.test_crawl_first_step_failure_checkpoints_consumed_resource_artifacts",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_batch_runner_change.HistoricalBatchRunnerExecutionTests.test_crawl_overrides_child_resource_environment_with_shared_artifact_paths",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_batch_runner_change.HistoricalBatchRunnerExecutionTests.test_large_output_executes_without_pipe_deadlock_and_checkpoints",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_batch_runner_change.HistoricalBatchRunnerExecutionTests.test_resume_skips_checkpointed_step_after_later_failure",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_batch_runner_change.HistoricalBatchRunnerExecutionTests.test_verify_checkpoint_tracks_each_output_directory_member",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_calendar_runner_helpers.CurrentYearSourceOverrideRunnerTests.test_classified_reuse_rejects_old_cutoff_identity",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_calendar_runner_helpers.CurrentYearSourceOverrideRunnerTests.test_hong_kong_runner_archives_and_rebuilds_pre_cutoff_bootstrap",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_calendar_runner_helpers.CurrentYearSourceOverrideRunnerTests.test_hong_kong_runner_binds_same_cutoff_and_request_manifest_to_both_stages",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_calendar_runner_helpers.CurrentYearSourceOverrideRunnerTests.test_partial_cache_retries_failed_url_and_preserves_attempt_audit",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_calendar_runner_helpers.KnownCalendarShardRunnerTests.test_parse_artifact_reuse_requires_exact_selection_catalog_and_tool_identity",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_calendar_runner_helpers.KnownCalendarShardRunnerTests.test_parse_rebuilds_successful_artifact_without_current_execution_identity",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_calendar_runner_helpers.KnownCalendarShardRunnerTests.test_standard_cache_retries_only_failed_urls_and_preserves_attempt_audit",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_calendar_runner_helpers.KnownCalendarShardRunnerTests.test_toba_cache_retries_failed_url_and_preserves_attempt_audit",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_calendar_runner_helpers.KnownCalendarShardRunnerTests.test_toba_fetch_uses_guarded_docker_network_stage",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_batches.HistoricalRaceBatchTests.test_first_acceptance_selects_five_regions_three_series_and_three_eras",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_batches.HistoricalRaceImporterTests.test_first_acceptance_selects_five_regions_three_series_and_three_eras",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_date_discovery.HistoricalRaceDateDiscoveryTests.test_acceptance_batch_command_exports_pending_snapshot",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_date_discovery.HistoricalRaceDateDiscoveryTests.test_apply_keeps_declared_actual_non_runner_and_result_sources_separate",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_date_discovery.HistoricalRaceDateDiscoveryTests.test_apply_preserves_sources_marks_ready_materializes_and_audits",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_date_discovery.HistoricalRaceDateDiscoveryTests.test_apply_rejects_hash_drift_without_partial_writes",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_date_discovery.HistoricalRaceDateDiscoveryTests.test_apply_rolls_back_all_targets_when_materialization_fails",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_date_discovery.HistoricalRaceDateDiscoveryTests.test_artifact_binds_manifest_targets_and_source_cache",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_date_discovery.HistoricalRaceDateDiscoveryTests.test_cancelled_target_accepts_cancellation_evidence_without_fake_details",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_date_discovery.HistoricalRaceDateDiscoveryTests.test_cross_year_running_requires_reason_and_keeps_edition_year",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_date_discovery.HistoricalRaceDateDiscoveryTests.test_management_command_build_validate_and_commit",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_date_discovery.HistoricalRaceDateDiscoveryTests.test_post_discovery_selection_requires_same_target_ids",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_date_discovery.HistoricalRaceDateDiscoveryTests.test_pre_discovery_selection_uses_pending_targets_in_1998_stage",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_date_discovery.HistoricalRaceDateDiscoveryTests.test_unapproved_operator_cannot_apply",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_detail_http_budget.HistoricalRaceDetailHTTPBudgetTests.test_host_budget_is_per_descriptor_while_shared_state_still_limits_and_audits",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_detail_runner_v2_contract.HistoricalDetailRunnerV2DescriptorTests.test_valid_v2_descriptor_is_accepted_without_mutating_v1",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_detail_runner_v2_contract.HistoricalDetailRunnerV2HostLockAndCheckpointTests.test_checkpoint_binds_all_immutable_inputs_but_not_live_shared_last_start_sha",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_detail_runner_v2_contract.HistoricalDetailRunnerV2MigrationAndStateTests.test_v1_cache_migration_preserves_each_url_size_and_sha_identity",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_detail_runner_v2_contract.HistoricalDetailRunnerV2MigrationAndStateTests.test_v1_migration_is_read_only_and_maps_all_uk39_gaps_to_fallback_pending",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_detail_runner_v2_review_findings.HistoricalDetailRunnerV2ReviewFindingTests.test_controlled_http_accepts_ledger_hkjc_query_for_initial_and_redirect",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_detail_runner_v2_review_findings.HistoricalDetailRunnerV2ReviewFindingTests.test_controlled_http_reserves_initial_and_redirect_requests_atomically",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_detail_runner_v2_review_findings.HistoricalDetailRunnerV2ReviewFindingTests.test_dispatch_runs_real_internal_pipeline_and_writes_package_checkpoint",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_detail_runner_v2_review_findings.HistoricalDetailRunnerV2ReviewFindingTests.test_package_consumes_and_binds_only_validated_candidate_jsonl",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_detail_runner_v2_review_findings.HistoricalDetailRunnerV2ReviewFindingTests.test_v1_migration_reads_and_binds_real_evidence_under_approved_root",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_detail_runner_v2_validation_gaps.HistoricalRaceDetailRunnerV2ValidationGapTests.test_all_gap_package_writes_zero_records_and_full_gap_manifest",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_detail_runner_v2_validation_gaps.HistoricalRaceDetailRunnerV2ValidationGapTests.test_all_gap_shard_validates_successfully_with_zero_validated_candidates",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_detail_runner_v2_validation_gaps.HistoricalRaceDetailRunnerV2ValidationGapTests.test_distance_conflict_is_a_candidate_gap_and_does_not_abort_mixed_shard",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_detail_runner_v2_validation_gaps.HistoricalRaceDetailRunnerV2ValidationGapTests.test_duplicate_source_url_is_a_candidate_gap_and_does_not_abort_mixed_shard",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_detail_runner_v2_validation_gaps.HistoricalRaceDetailRunnerV2ValidationGapTests.test_mixed_shard_yields_one_validated_candidate_and_one_validation_gap",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_detail_runner_v2_validation_gaps.HistoricalRaceDetailRunnerV2ValidationGapTests.test_package_merges_parse_and_validation_gaps_and_conserves_scope",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_detail_sources.HistoricalRaceDetailSourceArtifactTests.test_apply_locks_events_before_merging_source_refs",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_detail_sources.HistoricalRaceDetailSourceArtifactTests.test_apply_preserves_primary_evidence_and_records_approved_detail_source",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_detail_sources.HistoricalRaceDetailSourceArtifactTests.test_apply_rejects_target_drift_without_partial_write",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_detail_sources.HistoricalRaceDetailSourceArtifactTests.test_approved_artifact_hash_drift_is_rejected",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_detail_sources.HistoricalRaceDetailSourceArtifactTests.test_build_copies_verified_source_and_creates_pending_approval",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_detail_sources.HistoricalRaceDetailSourceArtifactTests.test_check_validates_current_targets_without_writing",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_historical_race_detail_sources.HistoricalRaceDetailSourceArtifactTests.test_management_command_checks_without_writing_then_commits",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_migration_history_repair.MigrationHistoryRepairLeafSetRedTests.test_management_command_accepts_repeated_complete_leaf_set",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_p0_racecard_url_discovery.P0RacecardGenerationTests.test_crash_points_keep_current_on_a_complete_generation (phase='after_current_replace')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_p0_racecard_url_discovery.P0RacecardGenerationTests.test_crash_points_keep_current_on_a_complete_generation (phase='after_generation_fsync')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_p0_racecard_url_discovery.P0RacecardGenerationTests.test_crash_points_keep_current_on_a_complete_generation (phase='after_generation_rename')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_p0_racecard_url_discovery.P0RacecardGenerationTests.test_crash_points_keep_current_on_a_complete_generation (phase='after_json_fsync')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_p0_racecard_url_discovery.P0RacecardGenerationTests.test_crash_points_keep_current_on_a_complete_generation (phase='after_markdown_fsync')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_p0_racecard_url_discovery.P0RacecardGenerationTests.test_crash_points_keep_current_on_a_complete_generation (phase='before_current_replace')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_p0_racecard_url_discovery.P0RacecardGenerationTests.test_generation_is_sha_bound_and_current_is_atomic_relative_symlink",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_p0_racecard_url_discovery.P0RacecardGenerationTests.test_only_current_and_previous_complete_generations_are_retained",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_p0_racecard_url_discovery.P0RacecardGenerationTests.test_raw_fixture_content_is_not_written_to_bundle",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_p0_racecard_url_discovery.P0RacecardGenerationTests.test_stale_run_cannot_replace_newer_generation",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_p0_racecard_url_discovery.P0RacecardServiceIntegrationTests.test_fake_transport_run_replaces_then_preserves_latest_confirmed_url",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_p0_racecard_url_discovery.P0RacecardServiceIntegrationTests.test_newer_failed_run_merges_against_current_inside_publish_lock",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_p0_racecard_url_discovery.P0RacecardServiceIntegrationTests.test_preserved_url_keeps_confirmed_provenance_and_audits_new_check",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_race_data_sync_repair.StalledEventRepairTests.test_apply_rejects_entry_closed_since_dry_run",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_racing_api_horse_staging.RacingApiHorseStagingTests.test_existing_v1_receipt_is_upgraded_once_with_page_snapshot",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_racing_api_horse_staging_postgresql.RacingApiHorseStagingPostgresqlConcurrencyTests.test_same_manifest_concurrency_creates_one_receipt_and_one_replay",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_backup_failure_never_stops_a_service (compose='docker-compose.prod.lowcost.yml')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_backup_failure_never_stops_a_service (compose='docker-compose.prod.yml')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_backup_path_with_spaces_survives_real_coordinator_arguments",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_compose_project_override_cannot_resume_another_service_group",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_database_drift_after_stop_blocks_migration_and_all_writer_restart",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_legacy_intent_appearing_during_0078_attempt_blocks_resume (suffix='.race-data-sync-state')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_legacy_intent_appearing_during_0078_attempt_blocks_resume (suffix='.race-live-state')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_legacy_optional_worker_intent_blocks_guard_and_new_release (suffix='.race-data-sync-state', symlink=False)",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_legacy_optional_worker_intent_blocks_guard_and_new_release (suffix='.race-data-sync-state', symlink=True)",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_legacy_optional_worker_intent_blocks_guard_and_new_release (suffix='.race-live-state', symlink=False)",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_legacy_optional_worker_intent_blocks_guard_and_new_release (suffix='.race-live-state', symlink=True)",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_live_flags_compose_override_cannot_change_frozen_enabled_resume_state",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_live_flags_container_environment_drift_blocks_preparation_and_later_writers (phase='already-running')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_live_flags_container_environment_drift_blocks_preparation_and_later_writers (phase='new-web')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_live_flags_container_environment_drift_blocks_preparation_and_later_writers (phase='prepare')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_live_flags_release_preserves_enabled_services_and_disarms_full_control_chain (leaf='stable.0077_racing_api_horse_identity_staging', compose='docker-compose.prod.lowcost.yml')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_live_flags_release_preserves_enabled_services_and_disarms_full_control_chain (leaf='stable.0078_externalhorse_profile_snapshot', compose='docker-compose.prod.yml')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_live_flags_resume_reuses_enabled_intent_after_stop_static_and_receipt_failures (fault='after-first-stop')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_live_flags_resume_reuses_enabled_intent_after_stop_static_and_receipt_failures (fault='after-schema-completion')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_live_flags_resume_reuses_enabled_intent_after_stop_static_and_receipt_failures (fault='static-before-complete')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_manual_stopped_service_intent_is_preserved (compose='docker-compose.prod.lowcost.yml')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_manual_stopped_service_intent_is_preserved (compose='docker-compose.prod.yml')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_new_web_with_wrong_actual_image_blocks_later_writer_start",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_real_default_rollback_scripts_refuse_before_mutations (script='rollback.sh')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_real_default_rollback_scripts_refuse_before_mutations (script='rollback_lowcost.sh')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_replaced_backup_and_wrong_candidate_block_resume_before_more_stops (mutation='backup')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_replaced_backup_and_wrong_candidate_block_resume_before_more_stops (mutation='candidate')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_replaced_v3_completion_receipt_is_rejected_by_real_resume",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_resolved_writer_flag_override_blocks_initial_stop",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_resolved_writer_flag_override_blocks_resume_despite_unchanged_env_file (flag='RACE_DATA_SYNC_RESULT_APPLY_ENABLED')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_resolved_writer_flag_override_blocks_resume_despite_unchanged_env_file (flag='RACE_LIVE_SCHEDULER_ENABLED')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_resume_rejects_wrong_running_application_image_before_more_writers (service='beat')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_resume_rejects_wrong_running_application_image_before_more_writers (service='race_sync_v2_worker')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_resume_rejects_wrong_running_application_image_before_more_writers (service='web')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_resume_rejects_wrong_running_application_image_before_more_writers (service='worker')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_same_schema_and_upgrade_both_compose_modes_require_new_backup (leaf='stable.0077_racing_api_horse_identity_staging', compose='docker-compose.prod.lowcost.yml')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_same_schema_and_upgrade_both_compose_modes_require_new_backup (leaf='stable.0077_racing_api_horse_identity_staging', compose='docker-compose.prod.yml')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_same_schema_and_upgrade_both_compose_modes_require_new_backup (leaf='stable.0078_externalhorse_profile_snapshot', compose='docker-compose.prod.lowcost.yml')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_same_schema_and_upgrade_both_compose_modes_require_new_backup (leaf='stable.0078_externalhorse_profile_snapshot', compose='docker-compose.prod.yml')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_t35_to_t41_real_resume_entry_replays_each_durable_boundary (leaf='stable.0077_racing_api_horse_identity_staging', fault='active-before-write')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_t35_to_t41_real_resume_entry_replays_each_durable_boundary (leaf='stable.0077_racing_api_horse_identity_staging', fault='after-first-stop')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_t35_to_t41_real_resume_entry_replays_each_durable_boundary (leaf='stable.0077_racing_api_horse_identity_staging', fault='after-migration')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_t35_to_t41_real_resume_entry_replays_each_durable_boundary (leaf='stable.0077_racing_api_horse_identity_staging', fault='after-release-completion')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_t35_to_t41_real_resume_entry_replays_each_durable_boundary (leaf='stable.0077_racing_api_horse_identity_staging', fault='after-schema-completion')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_t35_to_t41_real_resume_entry_replays_each_durable_boundary (leaf='stable.0077_racing_api_horse_identity_staging', fault='after-service-start')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_t35_to_t41_real_resume_entry_replays_each_durable_boundary (leaf='stable.0077_racing_api_horse_identity_staging', fault='closed-before-write')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_t35_to_t41_real_resume_entry_replays_each_durable_boundary (leaf='stable.0077_racing_api_horse_identity_staging', fault='intent-before-write')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_t35_to_t41_real_resume_entry_replays_each_durable_boundary (leaf='stable.0077_racing_api_horse_identity_staging', fault='marker-before-write')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_t35_to_t41_real_resume_entry_replays_each_durable_boundary (leaf='stable.0077_racing_api_horse_identity_staging', fault='static-before-complete')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_t35_to_t41_real_resume_entry_replays_each_durable_boundary (leaf='stable.0078_externalhorse_profile_snapshot', fault='active-before-write')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_t35_to_t41_real_resume_entry_replays_each_durable_boundary (leaf='stable.0078_externalhorse_profile_snapshot', fault='after-first-stop')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_t35_to_t41_real_resume_entry_replays_each_durable_boundary (leaf='stable.0078_externalhorse_profile_snapshot', fault='after-migration')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_t35_to_t41_real_resume_entry_replays_each_durable_boundary (leaf='stable.0078_externalhorse_profile_snapshot', fault='after-release-completion')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_t35_to_t41_real_resume_entry_replays_each_durable_boundary (leaf='stable.0078_externalhorse_profile_snapshot', fault='after-schema-completion')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_t35_to_t41_real_resume_entry_replays_each_durable_boundary (leaf='stable.0078_externalhorse_profile_snapshot', fault='after-service-start')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_t35_to_t41_real_resume_entry_replays_each_durable_boundary (leaf='stable.0078_externalhorse_profile_snapshot', fault='closed-before-write')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_t35_to_t41_real_resume_entry_replays_each_durable_boundary (leaf='stable.0078_externalhorse_profile_snapshot', fault='intent-before-write')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_t35_to_t41_real_resume_entry_replays_each_durable_boundary (leaf='stable.0078_externalhorse_profile_snapshot', fault='marker-before-write')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_t35_to_t41_real_resume_entry_replays_each_durable_boundary (leaf='stable.0078_externalhorse_profile_snapshot', fault='static-before-complete')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_t42_new_release_refused_original_intent_resumes_with_new_lock",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_entrypoints.Release0078EntrypointTests.test_valid_manifest_source_must_match_original_admission_source",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_recovery.Release0078ArtifactTests.test_actual_v5_management_commands_create_and_complete_exact_ddl_marker",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_recovery.Release0078ArtifactTests.test_admission_only_or_fresh_active_writers_cannot_create_ddl_marker",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_recovery.Release0078ArtifactTests.test_admission_v4_and_0077_target_are_rejected",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_recovery.Release0078ArtifactTests.test_intent_and_active_pointer_bind_exact_file_identity",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_recovery.Release0078ArtifactTests.test_manifest_rejects_wrong_database_candidate_source_and_other_release",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_recovery.Release0078ArtifactTests.test_private_files_symlinks_and_no_clobber",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_recovery.Release0078ArtifactTests.test_same_schema_requires_present_unchanged_backup",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_release_0078_recovery.Release0078ArtifactTests.test_writable_or_symlink_ancestor_is_rejected",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_single_migration_owner.ApplicationReleaseOrchestrationTests.test_0077_admission_handoff_requires_backup_and_rebinds_after_all_stops",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_single_migration_owner.ApplicationReleaseOrchestrationTests.test_0077_admission_handoff_without_backup_fails_before_any_stop",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_single_migration_owner.ApplicationReleaseOrchestrationTests.test_attempt_mode_must_match_exact_artifact_before_preparation (caller_mode='not-required')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_single_migration_owner.ApplicationReleaseOrchestrationTests.test_attempt_mode_must_match_exact_artifact_before_preparation (caller_mode='required')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_single_migration_owner.ApplicationReleaseOrchestrationTests.test_t13_drain_failure_keeps_web_running",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_single_migration_owner.ApplicationReleaseOrchestrationTests.test_t13_migration_runs_only_after_worker_race_live_and_web_stopped",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_single_migration_owner.ApplicationReleaseOrchestrationTests.test_t13_race_live_absent_is_never_started",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_single_migration_owner.ApplicationReleaseOrchestrationTests.test_t13_race_live_created_or_stopped_is_never_touched",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_single_migration_owner.ApplicationReleaseOrchestrationTests.test_t13_race_live_running_is_stopped_before_release_and_restored_once",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_single_migration_owner.ApplicationReleaseOrchestrationTests.test_t13_race_live_state_probe_failure_fails_closed_before_any_stop",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_single_migration_owner.ApplicationReleaseOrchestrationTests.test_t13_release_failure_prevents_any_service_restart",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_single_migration_owner.ApplicationReleaseOrchestrationTests.test_t13_unhealthy_web_prevents_downstream_start",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_single_migration_owner.DeployFailClosedTests.test_t14_drain_failure_never_stops_web_or_releases",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_single_migration_owner.DeployOrchestrationTests.test_t09_standard_deploy_full_orchestration",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_single_migration_owner.DeployOrchestrationTests.test_t10_lowcost_deploy_full_orchestration",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_single_migration_owner.HistoricalInitialInstallSemanticsTests.test_t18_pre_0070_initial_install_is_rejected_before_stop_for_standard_and_lowcost (script='deploy/deploy.sh')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_single_migration_owner.HistoricalInitialInstallSemanticsTests.test_t18_pre_0070_initial_install_is_rejected_before_stop_for_standard_and_lowcost (script='deploy/deploy_lowcost.sh')",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_single_migration_owner.HostReleaseWrapperTests.test_t05_compose_failure_is_propagated",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_single_migration_owner.HostReleaseWrapperTests.test_t05_forward_resume_preserves_exact_provenance",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_single_migration_owner.HostReleaseWrapperTests.test_t05_lowcost_compose_file_runs_exactly_one_one_shot",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_single_migration_owner.HostReleaseWrapperTests.test_t05_stale_provenance_is_cleared_for_normal_release",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_single_migration_owner.HostReleaseWrapperTests.test_t05_standard_compose_file_runs_exactly_one_one_shot",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_single_migration_owner.ManualReleaseTests.test_t06_manual_release_runs_one_shot_only_when_all_app_services_stopped",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_single_migration_owner.RaceDataSyncWorkerReleaseStateTests.test_running_sync_worker_is_drained_stopped_and_restored",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_single_migration_owner.RaceDataSyncWorkerReleaseStateTests.test_sync_worker_probe_failure_is_before_any_stop",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_single_migration_owner.RaceLiveStatePersistenceTests.test_p1_failed_release_retry_keeps_originally_not_running_race_live",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.test_single_migration_owner.RaceLiveStatePersistenceTests.test_p1_failed_release_retry_restores_originally_running_race_live",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.tests.test_page_regression.CalendarPageTermDisplayTests.test_calendar_race_name_shows_chinese",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.tests.test_page_regression.CalendarQueryCountTests.test_calendar_40_events_query_count_gate",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.tests.test_race_result_recovery_application_projection.CanonicalProductLinkContractTests.test_service_rejects_cross_region_year_chain_and_cycle",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.tests.test_race_result_recovery_application_projection.RecoveryProjectionContractTests.test_apply_rejects_manifest_bound_current_revision_drift",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.tests_legacy.RaceEventPageMVPTests.test_csv_import_supports_synthetic_surface",
+      "count": 1
+    },
+    {
+      "kind": "errors",
+      "test": "stable.tests_legacy.RaceEventPageMVPTests.test_seed_sample_import_covers_five_regions_and_calendar_visibility",
+      "count": 1
+    },
+    {
+      "kind": "failures",
+      "test": "stable.test_contextual_news_entities.ContextualTranslationConsistencyTests.test_person_term_placeholder_loss_rejects_transliterated_name",
+      "count": 1
+    },
+    {
+      "kind": "failures",
+      "test": "stable.test_historical_race_detail_runner_v2_contract.HistoricalDetailRunnerV2HostLockAndCheckpointTests.test_shared_host_lock_limits_two_processes_and_appends_both_shards",
+      "count": 1
+    },
+    {
+      "kind": "failures",
+      "test": "stable.test_historical_race_detail_runner_v2_review_findings.HistoricalDetailRunnerV2ReviewFindingTests.test_launcher_rejects_descriptor_image_mismatch_before_docker_run",
+      "count": 1
+    },
+    {
+      "kind": "failures",
+      "test": "stable.test_lifecycle_shadow_hardening.SupportedDeployOneOffInventoryTests.test_all_deploy_wrapper_run_calls_are_canonical_and_lock_contracts_remain",
+      "count": 1
+    },
+    {
+      "kind": "failures",
+      "test": "stable.test_multiregion_rollout_change.SingleArticleVisibilityTests.test_related_queries_are_ineffective_outside_enforce",
+      "count": 1
+    },
+    {
+      "kind": "failures",
+      "test": "stable.test_multiregion_rollout_change.SingleArticleVisibilityTests.test_related_region_page_returns_one_article_with_stable_pagination",
+      "count": 1
+    },
+    {
+      "kind": "failures",
+      "test": "stable.test_news_production_integrity.StaleCrawlManifestTests.test_integrity_audit_command_is_read_only",
+      "count": 1
+    },
+    {
+      "kind": "failures",
+      "test": "stable.test_p0_racecard_url_discovery.P0RacecardUrlDiscoveryConfigurationTests.test_production_worker_mounts_the_persistent_document_directory",
+      "count": 1
+    },
+    {
+      "kind": "failures",
+      "test": "stable.test_race_event_crawl_orchestration.RaceEventCrawlAdapterManifestTests.test_adapter_runner_preserves_parent_runner_paths_and_stricter_resource_limits",
+      "count": 1
+    },
+    {
+      "kind": "failures",
+      "test": "stable.test_race_live_gate_remediation_postgres.CoupledRunnerRefreshPostgresRemediationTests.test_refresh_persists_both_shared_number_legacy_rows_by_external_id",
+      "count": 1
+    },
+    {
+      "kind": "failures",
+      "test": "stable.tests_legacy.MultiRegionAttributionAndGateTests.test_public_feed_region_filter_includes_related_region_articles",
+      "count": 1
+    },
+    {
+      "kind": "failures",
+      "test": "stable.tests_legacy.MultiRegionAttributionAndGateTests.test_public_region_display_fallback_hides_related_regions_without_deleting_them",
+      "count": 1
+    },
+    {
+      "kind": "failures",
+      "test": "stable.tests_legacy.MultiRegionAttributionAndGateTests.test_region_display_and_qq_message_show_primary_before_related_regions",
+      "count": 1
+    },
+    {
+      "kind": "failures",
+      "test": "stable.tests_legacy.P0HorseProfileDataCompletionTests.test_public_detail_basic_tier_renders_with_in_progress_badge",
+      "count": 1
+    },
+    {
+      "kind": "failures",
+      "test": "stable.tests_legacy.P0HorseProfileDataCompletionTests.test_public_horse_detail_uses_original_name_when_translation_is_pending",
+      "count": 1
+    },
+    {
+      "kind": "failures",
+      "test": "stable.tests_legacy.P0HorseProfileDataCompletionTests.test_public_index_keeps_positive_label_for_complete_profiles",
+      "count": 1
+    },
+    {
+      "kind": "failures",
+      "test": "stable.tests_legacy.P0HorseProfileDataCompletionTests.test_public_index_shows_in_progress_badge_for_incomplete_profiles",
+      "count": 1
+    },
+    {
+      "kind": "failures",
+      "test": "stable.tests_legacy.RaceEventPageMVPTests.test_csv_import_dry_run_rejects_invalid_choice_values",
+      "count": 1
+    }
+  ],
+  "runs": {
+    "baseline": {
+      "tests_run": 5053,
+      "failures": 18,
+      "errors": 194,
+      "skipped": 18,
+      "artifact_sha256": {
+        "json": "7ce488dafceb0557755f9fdd753f7a906769197f1d7521963feca80258d6819f",
+        "log": "d6b05cb95b63cf3e71b9d90d28907d287115f10a53b0bad9bc343f0bf12a75d0"
+      }
+    },
+    "final": {
+      "tests_run": 5084,
+      "failures": 18,
+      "errors": 194,
+      "skipped": 18,
+      "artifact_sha256": {
+        "json": "7ec719a239ced0efc6ae7b8b696d23d68ed03b290d3e92bf796fc724f5e4da41",
+        "log": "8535d49a27a65702d36237bcee9bf0f85e6cabbd004ecb100459fdfcb30ab70b"
+      }
+    }
+  },
+  "exception_class_comparison_equal": true
+}

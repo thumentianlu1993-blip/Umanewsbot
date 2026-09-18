@@ -1,6 +1,6 @@
-## 2026-09-18 赛事信息归一化实现中（未发布）
+## 2026-09-18 赛事信息归一化本地实现完成（未发布）
 
-用户批准实施后，从 `91410e7a` 创建独立 `codex/normalize-race-information`。严格展示解析、五类词库、结构化公开入口、后台候选预览和只读差异命令已实现；默认关闭新开关，迁移／生产业务写入／新任务均为0。原horse_data工作区保留。31项新增回归、93项PostgreSQL门禁和独立复审通过，正在做完整stable基线对照。范围与限制见[实施记录](changes/normalize-race-information/implementation.md)。此条不更新或推断生产运行态。
+用户批准实施后，从 `91410e7a` 创建独立 `codex/normalize-race-information`。严格展示解析、五类词库、结构化公开入口、后台候选预览和只读差异命令已实现；默认关闭新开关，迁移／生产业务写入／新任务均为0。原horse_data工作区保留。31项新增回归、93项PostgreSQL门禁和独立复审通过；完整stable为5084对5053，失败项／类型／次数完全一致，新增0（两边18失败、194错误、18跳过，含本机环境限制，不是全绿）。代码本地提交71a820bd；自动审批拒绝远程push，尚未创建PR或运行GitHub CI。范围与限制见[实施记录](changes/normalize-race-information/implementation.md)。此条不更新或推断生产运行态。
 
 ## 2026-09-18 PR205 已上线并完成线上验收
 
