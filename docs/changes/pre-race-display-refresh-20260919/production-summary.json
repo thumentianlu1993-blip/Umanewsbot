@@ -1,30 +1,26 @@
 {
-  "collected_at": "2026-09-18T21:13:24.826885+00:00",
-  "application_commit": "2c8fa8e4ec91d0ba3a32529839cff8f1a4d68615",
-  "merge_commit": "8e0e6c9f13b3a9709cd8b3e550745c14ba179b66",
-  "image": "sha256:214537d25f1e0adf6a740e724be627835ab5287a07fe3a6d56a6c5a8220648f2",
+  "collected_at": "2026-09-18T22:09:54.215363+00:00",
+  "application_commit": "3a174b1e93c499f293deeabfff4dfa71b427a684",
+  "merge_commit": "63e5b58a645b39b194c2d5c305e4530bf7d42c58",
+  "image": "sha256:1622560c7f522d5078adbed5049e7bf7ab57e537bff57b97b37df0c83aec57a2",
   "all_services_running": true,
   "four_application_versions_match": true,
-  "configuration_change": {
-    "RACE_DATA_SYNC_PRE_RACE_REFRESH_ENABLED": "true",
-    "RACE_DATA_RAW_DAILY_PROVIDER_REGION_REQUESTS": "512"
-  },
+  "configuration_change": {},
+  "refresh_enabled": true,
+  "provider_region_requests": 512,
   "daily_bytes": 1073741824,
   "infrastructure_preserved": true,
   "migration_plan_empty": true,
   "backup": {
-    "sha256": "da1a4666ad2839b909bbb4dfffb7c71312e356bc6c6ace40fa20faacbde449ac",
-    "size": 564044366
+    "sha256": "73d7bcf1976255f065bac31bfd589201bffa9384823abf878107760d22a1fa29",
+    "size": 564247132
   },
-  "release_records": {
-    "path": "/opt/umanews-release-2c8fa8e4-prerefresh-20260919/umanewsbot/runtime/migration_history_repair/release-0078-recovery/5217aec9f1361783b73ec3d5904c8909101a60fcdf4b23512d29be0de862acf6/intent.json",
-    "sha256": "964108e92d2cd6a887e942c4864013aaef412fcb1098262ebb8f64bd147f5bb3"
-  },
+  "release_intent_sha256": "4e6d9b564881b96c23037935ec2b7352a225683170c8550396b2b8d8bcdced3f",
   "lock_absent": true,
   "active_absent": true,
   "restricted_absent": true,
   "queues_at_verification": {
-    "celery": 18,
+    "celery": 23,
     "race_sync_v2": 0,
     "race_live": 7543
   },
@@ -32,9 +28,537 @@
   "public_all_200": true,
   "public_no_local_time": true,
   "public_no_old_card_title": true,
-  "natural_cycles": "first_failed_long_scope",
-  "release_started_at": "2026-09-18T21:05:45.924116+00:00",
-  "release_finished_at": "2026-09-18T21:09:57.684564+00:00",
-  "workers_responded": 2,
-  "worker_reserved": 0
+  "natural_first": {
+    "at": "2026-09-18T22:17:41.011864+00:00",
+    "events": [
+      {
+        "id": 103,
+        "status": "scheduled",
+        "states": {
+          "jra_pre_race_v1": {
+            "last_attempt_at": "2026-09-18T22:17:00.045027+00:00",
+            "last_checked_at": "2026-09-18T22:17:01.837462+00:00",
+            "last_success_at": "2026-09-18T22:17:01.837462+00:00",
+            "last_changed_at": "2026-09-18T21:27:01.763315+00:00",
+            "next_poll_at": "2026-09-18T22:27:00+00:00",
+            "reason": "",
+            "failures": 0
+          },
+          "tra_identity": {
+            "last_attempt_at": "2026-09-18T22:17:18.939271+00:00",
+            "last_checked_at": "2026-09-18T22:17:20.049517+00:00",
+            "last_success_at": "2026-09-18T22:17:20.049517+00:00",
+            "last_changed_at": null,
+            "next_poll_at": "2026-09-18T22:27:00+00:00",
+            "reason": "response_empty",
+            "failures": 0
+          }
+        },
+        "canonical_count": 0,
+        "eligible": true,
+        "source_binding_override": false,
+        "candidate": {
+          "id": 40408,
+          "source": "jra_pre_race_v1",
+          "url": "https://www.jra.go.jp/JRADB/accessD.html?CNAME=pw01dde0109202604050420260919/59",
+          "fetched_at": "2026-09-18 21:27:01.763315+00:00",
+          "rows": 12,
+          "scratched": [],
+          "prices": 0
+        }
+      },
+      {
+        "id": 491,
+        "status": "scheduled",
+        "states": {
+          "tra_identity": {
+            "last_attempt_at": "2026-09-18T20:17:03.462862+00:00",
+            "last_checked_at": null,
+            "last_success_at": "2026-09-18T20:17:04.773446+00:00",
+            "last_changed_at": null,
+            "next_poll_at": "2026-09-18T20:19:00+00:00",
+            "reason": "",
+            "failures": 0
+          }
+        },
+        "canonical_count": 0,
+        "eligible": false,
+        "source_binding_override": false
+      },
+      {
+        "id": 492,
+        "status": "scheduled",
+        "states": {
+          "pre_race_refresh_v1": {
+            "last_attempt_at": "2026-09-18T22:17:03.340768+00:00",
+            "last_checked_at": "2026-09-18T22:17:04.468985+00:00",
+            "last_success_at": "2026-09-18T22:17:04.468985+00:00",
+            "last_changed_at": "2026-09-18T22:17:04.468985+00:00",
+            "next_poll_at": "2026-09-18T22:27:00+00:00",
+            "reason": "",
+            "failures": 0
+          },
+          "tra_identity": {
+            "last_attempt_at": "2026-09-18T22:17:15.642861+00:00",
+            "last_checked_at": "2026-09-18T22:17:16.850808+00:00",
+            "last_success_at": "2026-09-18T22:17:16.850808+00:00",
+            "last_changed_at": null,
+            "next_poll_at": "2026-09-18T22:27:00+00:00",
+            "reason": "response_empty",
+            "failures": 0
+          }
+        },
+        "canonical_count": 0,
+        "eligible": true,
+        "source_binding_override": false,
+        "candidate": {
+          "id": 40411,
+          "source": "pre_race_refresh_v1",
+          "url": "https://www.sportinglife.com/racing/racecards/2026-09-18/presque-isle-downs/racecard/939732/race-9-presque-isle-downs-masters-stakes-grade-2",
+          "fetched_at": "2026-09-18 22:17:04.468985+00:00",
+          "rows": 9,
+          "scratched": [
+            "3"
+          ],
+          "prices": 9
+        }
+      },
+      {
+        "id": 969,
+        "status": "scheduled",
+        "states": {
+          "pre_race_refresh_v1": {
+            "last_attempt_at": "2026-09-18T22:17:05.360132+00:00",
+            "last_checked_at": "2026-09-18T22:17:06.710581+00:00",
+            "last_success_at": "2026-09-18T22:17:06.710581+00:00",
+            "last_changed_at": "2026-09-18T22:17:06.710581+00:00",
+            "next_poll_at": "2026-09-19T00:00:00+01:00",
+            "reason": "",
+            "failures": 0
+          },
+          "tra_identity": {
+            "last_attempt_at": "2026-09-18T21:07:04.144090+00:00",
+            "last_checked_at": null,
+            "last_success_at": "2026-09-18T21:07:06.044732+00:00",
+            "last_changed_at": null,
+            "next_poll_at": "2026-09-18T22:07:06.044732+00:00",
+            "reason": "",
+            "failures": 0
+          }
+        },
+        "canonical_count": 0,
+        "eligible": true,
+        "source_binding_override": false,
+        "candidate": {
+          "id": 40412,
+          "source": "pre_race_refresh_v1",
+          "url": "https://www.sportinglife.com/racing/racecards/2026-09-19/ayr/racecard/939242/ladbrokes-new-customers-get-501-old-firm-offer-firth-of-clyde-fillies-group-3",
+          "fetched_at": "2026-09-18 22:17:06.710581+00:00",
+          "rows": 9,
+          "scratched": [],
+          "prices": 9
+        }
+      }
+    ],
+    "managed_checkpoints": [
+      {
+        "tracking__event_id": 772,
+        "source_key": "the_racing_api",
+        "last_attempt_at": "2026-09-18 22:15:15.427944+00:00",
+        "last_success_at": "2026-09-18 22:15:15.427944+00:00",
+        "next_poll_at": "2026-09-18 22:25:15.427944+00:00",
+        "circuit_reason": ""
+      },
+      {
+        "tracking__event_id": 970,
+        "source_key": "the_racing_api",
+        "last_attempt_at": "2026-09-18 21:56:03.063772+00:00",
+        "last_success_at": "2026-09-18 21:56:03.063772+00:00",
+        "next_poll_at": "2026-09-18 22:56:03.063772+00:00",
+        "circuit_reason": ""
+      }
+    ],
+    "public": {
+      "at": "2026-09-18T22:17:42.103145+00:00",
+      "pages": [
+        {
+          "domain": "umafans.run",
+          "status": 200,
+          "freshness": "更新于2026-09-19 06:17（北京时间）",
+          "runners": [
+            {
+              "number": "1",
+              "odds": "12/1（分数）（即时） / —",
+              "status": "已出走登记"
+            },
+            {
+              "number": "2",
+              "odds": "4/1（分数）（即时） / —",
+              "status": "已出走登记"
+            },
+            {
+              "number": "3",
+              "odds": "— / —",
+              "status": "退赛"
+            },
+            {
+              "number": "4",
+              "odds": "15/1（分数）（即时） / —",
+              "status": "已出走登记"
+            },
+            {
+              "number": "5",
+              "odds": "8/5（分数）（即时） / —",
+              "status": "已出走登记"
+            },
+            {
+              "number": "6",
+              "odds": "3/1（分数）（即时） / —",
+              "status": "已出走登记"
+            },
+            {
+              "number": "7",
+              "odds": "8/1（分数）（即时） / —",
+              "status": "已出走登记"
+            },
+            {
+              "number": "8",
+              "odds": "6/1（分数）（即时） / —",
+              "status": "已出走登记"
+            },
+            {
+              "number": "9",
+              "odds": "15/1（分数）（即时） / —",
+              "status": "已出走登记"
+            }
+          ]
+        },
+        {
+          "domain": "www.umafans.run",
+          "status": 200,
+          "freshness": "更新于2026-09-19 06:17（北京时间）",
+          "runners": [
+            {
+              "number": "1",
+              "odds": "12/1（分数）（即时） / —",
+              "status": "已出走登记"
+            },
+            {
+              "number": "2",
+              "odds": "4/1（分数）（即时） / —",
+              "status": "已出走登记"
+            },
+            {
+              "number": "3",
+              "odds": "— / —",
+              "status": "退赛"
+            },
+            {
+              "number": "4",
+              "odds": "15/1（分数）（即时） / —",
+              "status": "已出走登记"
+            },
+            {
+              "number": "5",
+              "odds": "8/5（分数）（即时） / —",
+              "status": "已出走登记"
+            },
+            {
+              "number": "6",
+              "odds": "3/1（分数）（即时） / —",
+              "status": "已出走登记"
+            },
+            {
+              "number": "7",
+              "odds": "8/1（分数）（即时） / —",
+              "status": "已出走登记"
+            },
+            {
+              "number": "8",
+              "odds": "6/1（分数）（即时） / —",
+              "status": "已出走登记"
+            },
+            {
+              "number": "9",
+              "odds": "15/1（分数）（即时） / —",
+              "status": "已出走登记"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "natural_second": {
+    "at": "2026-09-18T22:27:41.654652+00:00",
+    "events": [
+      {
+        "id": 103,
+        "status": "scheduled",
+        "states": {
+          "jra_pre_race_v1": {
+            "last_attempt_at": "2026-09-18T22:27:00.016131+00:00",
+            "last_checked_at": "2026-09-18T22:27:01.457574+00:00",
+            "last_success_at": "2026-09-18T22:27:01.457574+00:00",
+            "last_changed_at": "2026-09-18T21:27:01.763315+00:00",
+            "next_poll_at": "2026-09-18T22:37:00+00:00",
+            "reason": "",
+            "failures": 0
+          },
+          "tra_identity": {
+            "last_attempt_at": "2026-09-18T22:27:15.557867+00:00",
+            "last_checked_at": "2026-09-18T22:27:16.712171+00:00",
+            "last_success_at": "2026-09-18T22:27:16.712171+00:00",
+            "last_changed_at": null,
+            "next_poll_at": "2026-09-18T22:37:00+00:00",
+            "reason": "response_empty",
+            "failures": 0
+          }
+        },
+        "canonical_count": 0,
+        "eligible": true,
+        "source_binding_override": false,
+        "candidate": {
+          "id": 40408,
+          "source": "jra_pre_race_v1",
+          "url": "https://www.jra.go.jp/JRADB/accessD.html?CNAME=pw01dde0109202604050420260919/59",
+          "fetched_at": "2026-09-18 21:27:01.763315+00:00",
+          "rows": 12,
+          "scratched": [],
+          "prices": 0
+        }
+      },
+      {
+        "id": 491,
+        "status": "scheduled",
+        "states": {
+          "tra_identity": {
+            "last_attempt_at": "2026-09-18T20:17:03.462862+00:00",
+            "last_checked_at": null,
+            "last_success_at": "2026-09-18T20:17:04.773446+00:00",
+            "last_changed_at": null,
+            "next_poll_at": "2026-09-18T20:19:00+00:00",
+            "reason": "",
+            "failures": 0
+          }
+        },
+        "canonical_count": 0,
+        "eligible": false,
+        "source_binding_override": false
+      },
+      {
+        "id": 492,
+        "status": "scheduled",
+        "states": {
+          "pre_race_refresh_v1": {
+            "last_attempt_at": "2026-09-18T22:27:02.945329+00:00",
+            "last_checked_at": "2026-09-18T22:27:03.954342+00:00",
+            "last_success_at": "2026-09-18T22:27:03.954342+00:00",
+            "last_changed_at": "2026-09-18T22:17:04.468985+00:00",
+            "next_poll_at": "2026-09-18T22:37:00+00:00",
+            "reason": "",
+            "failures": 0
+          },
+          "tra_identity": {
+            "last_attempt_at": "2026-09-18T22:27:12.250902+00:00",
+            "last_checked_at": "2026-09-18T22:27:13.244553+00:00",
+            "last_success_at": "2026-09-18T22:27:13.244553+00:00",
+            "last_changed_at": null,
+            "next_poll_at": "2026-09-18T22:37:00+00:00",
+            "reason": "response_empty",
+            "failures": 0
+          }
+        },
+        "canonical_count": 0,
+        "eligible": true,
+        "source_binding_override": false,
+        "candidate": {
+          "id": 40413,
+          "source": "pre_race_refresh_v1",
+          "url": "https://www.sportinglife.com/racing/racecards/2026-09-18/presque-isle-downs/racecard/939732/race-9-presque-isle-downs-masters-stakes-grade-2",
+          "fetched_at": "2026-09-18 22:27:03.954342+00:00",
+          "rows": 9,
+          "scratched": [
+            "3"
+          ],
+          "prices": 9
+        }
+      },
+      {
+        "id": 969,
+        "status": "scheduled",
+        "states": {
+          "pre_race_refresh_v1": {
+            "last_attempt_at": "2026-09-18T22:17:05.360132+00:00",
+            "last_checked_at": "2026-09-18T22:17:06.710581+00:00",
+            "last_success_at": "2026-09-18T22:17:06.710581+00:00",
+            "last_changed_at": "2026-09-18T22:17:06.710581+00:00",
+            "next_poll_at": "2026-09-19T00:00:00+01:00",
+            "reason": "",
+            "failures": 0
+          },
+          "tra_identity": {
+            "last_attempt_at": "2026-09-18T21:07:04.144090+00:00",
+            "last_checked_at": null,
+            "last_success_at": "2026-09-18T21:07:06.044732+00:00",
+            "last_changed_at": null,
+            "next_poll_at": "2026-09-18T22:07:06.044732+00:00",
+            "reason": "",
+            "failures": 0
+          }
+        },
+        "canonical_count": 0,
+        "eligible": true,
+        "source_binding_override": false,
+        "candidate": {
+          "id": 40412,
+          "source": "pre_race_refresh_v1",
+          "url": "https://www.sportinglife.com/racing/racecards/2026-09-19/ayr/racecard/939242/ladbrokes-new-customers-get-501-old-firm-offer-firth-of-clyde-fillies-group-3",
+          "fetched_at": "2026-09-18 22:17:06.710581+00:00",
+          "rows": 9,
+          "scratched": [],
+          "prices": 9
+        }
+      }
+    ],
+    "managed_checkpoints": [
+      {
+        "tracking__event_id": 772,
+        "source_key": "the_racing_api",
+        "last_attempt_at": "2026-09-18 22:26:18.443620+00:00",
+        "last_success_at": "2026-09-18 22:26:18.443620+00:00",
+        "next_poll_at": "2026-09-18 22:36:18.443620+00:00",
+        "circuit_reason": ""
+      },
+      {
+        "tracking__event_id": 970,
+        "source_key": "the_racing_api",
+        "last_attempt_at": "2026-09-18 21:56:03.063772+00:00",
+        "last_success_at": "2026-09-18 21:56:03.063772+00:00",
+        "next_poll_at": "2026-09-18 22:56:03.063772+00:00",
+        "circuit_reason": ""
+      }
+    ],
+    "public": {
+      "at": "2026-09-18T22:27:42.807281+00:00",
+      "pages": [
+        {
+          "domain": "umafans.run",
+          "status": 200,
+          "freshness": "更新于2026-09-19 06:27（北京时间）",
+          "runners": [
+            {
+              "number": "1",
+              "odds": "12/1（分数）（即时） / —",
+              "status": "已出走登记"
+            },
+            {
+              "number": "2",
+              "odds": "4/1（分数）（即时） / —",
+              "status": "已出走登记"
+            },
+            {
+              "number": "3",
+              "odds": "— / —",
+              "status": "退赛"
+            },
+            {
+              "number": "4",
+              "odds": "15/1（分数）（即时） / —",
+              "status": "已出走登记"
+            },
+            {
+              "number": "5",
+              "odds": "8/5（分数）（即时） / —",
+              "status": "已出走登记"
+            },
+            {
+              "number": "6",
+              "odds": "3/1（分数）（即时） / —",
+              "status": "已出走登记"
+            },
+            {
+              "number": "7",
+              "odds": "8/1（分数）（即时） / —",
+              "status": "已出走登记"
+            },
+            {
+              "number": "8",
+              "odds": "6/1（分数）（即时） / —",
+              "status": "已出走登记"
+            },
+            {
+              "number": "9",
+              "odds": "15/1（分数）（即时） / —",
+              "status": "已出走登记"
+            }
+          ]
+        },
+        {
+          "domain": "www.umafans.run",
+          "status": 200,
+          "freshness": "更新于2026-09-19 06:27（北京时间）",
+          "runners": [
+            {
+              "number": "1",
+              "odds": "12/1（分数）（即时） / —",
+              "status": "已出走登记"
+            },
+            {
+              "number": "2",
+              "odds": "4/1（分数）（即时） / —",
+              "status": "已出走登记"
+            },
+            {
+              "number": "3",
+              "odds": "— / —",
+              "status": "退赛"
+            },
+            {
+              "number": "4",
+              "odds": "15/1（分数）（即时） / —",
+              "status": "已出走登记"
+            },
+            {
+              "number": "5",
+              "odds": "8/5（分数）（即时） / —",
+              "status": "已出走登记"
+            },
+            {
+              "number": "6",
+              "odds": "3/1（分数）（即时） / —",
+              "status": "已出走登记"
+            },
+            {
+              "number": "7",
+              "odds": "8/1（分数）（即时） / —",
+              "status": "已出走登记"
+            },
+            {
+              "number": "8",
+              "odds": "6/1（分数）（即时） / —",
+              "status": "已出走登记"
+            },
+            {
+              "number": "9",
+              "odds": "15/1（分数）（即时） / —",
+              "status": "已出走登记"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "natural_cycles": "two_natural_D0_checks_verified",
+  "release_started_at": "2026-09-18T22:05:10.376827+00:00",
+  "release_finished_at": "2026-09-18T22:09:22.499773+00:00",
+  "natural_capture_sources": {
+    "first": {
+      "source_file": "/opt/umanews-release-3a174b1e-prerefresh-20260919/evidence/natural-first.json",
+      "source_sha256": "c528c9d8531e016f8476c29aec676f489504673b2acb8c5351633add21d3a974"
+    },
+    "second": {
+      "source_file": "/opt/umanews-release-3a174b1e-prerefresh-20260919/evidence/natural-second.json",
+      "source_sha256": "c671519f89b7160bc56bb8a54526848d80f67c241e17f1f632ef094ac5745c02"
+    }
+  }
 }
