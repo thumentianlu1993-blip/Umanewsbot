@@ -1,0 +1,532 @@
+{
+  "detail_checks": 70,
+  "details": [
+    {
+      "url": "https://umafans.run/races/2026/hong-kong-hksar-chief-executives-cup-2026/",
+      "status": 200,
+      "identity": true,
+      "state": "finished",
+      "results": 6
+    },
+    {
+      "url": "https://umafans.run/races/2026/hong-kong-celebration-cup-2026/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2026/hong-kong-national-day-cup-2026/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2026/hong-kong-sha-tin-trophy-2026/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2026/hong-kong-premier-bowl-2026/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2026/hong-kong-ladies-purse-2026/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2026/hong-kong-jockey-club-cup-2026/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2026/hong-kong-jockey-club-mile-2026/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2026/hong-kong-jockey-club-sprint-2026/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2026/hong-kong-cup/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2026/hong-kong-hong-kong-mile-2026/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2026/hong-kong-hong-kong-sprint-2026/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2026/hong-kong-hong-kong-vase-2026/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2027/hong-kong-chinese-club-challenge-cup-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2027/hong-kong-bauhinia-sprint-trophy-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2027/hong-kong-january-cup-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2027/hong-kong-centenary-sprint-cup-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2027/hong-kong-stewards-cup-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2027/hong-kong-hong-kong-classic-mile-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2027/hong-kong-centenary-vase-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2027/hong-kong-queen-s-silver-jubilee-cup-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2027/hong-kong-hong-kong-classic-cup-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2027/hong-kong-hong-kong-gold-cup-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2027/hong-kong-hong-kong-derby-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2027/hong-kong-sprint-cup-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2027/hong-kong-chairman-s-trophy-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2027/hong-kong-queen-elizabeth-ii-cup-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2027/hong-kong-champions-mile-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2027/hong-kong-chairman-s-sprint-prize-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2027/hong-kong-queen-mother-memorial-cup-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2027/hong-kong-hong-kong-champions-chater-cup-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2027/hong-kong-sha-tin-vase-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2027/hong-kong-lion-rock-trophy-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2027/hong-kong-premier-cup-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://umafans.run/races/2027/hong-kong-premier-plate-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2026/hong-kong-hksar-chief-executives-cup-2026/",
+      "status": 200,
+      "identity": true,
+      "state": "finished",
+      "results": 6
+    },
+    {
+      "url": "https://www.umafans.run/races/2026/hong-kong-celebration-cup-2026/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2026/hong-kong-national-day-cup-2026/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2026/hong-kong-sha-tin-trophy-2026/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2026/hong-kong-premier-bowl-2026/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2026/hong-kong-ladies-purse-2026/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2026/hong-kong-jockey-club-cup-2026/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2026/hong-kong-jockey-club-mile-2026/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2026/hong-kong-jockey-club-sprint-2026/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2026/hong-kong-cup/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2026/hong-kong-hong-kong-mile-2026/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2026/hong-kong-hong-kong-sprint-2026/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2026/hong-kong-hong-kong-vase-2026/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2027/hong-kong-chinese-club-challenge-cup-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2027/hong-kong-bauhinia-sprint-trophy-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2027/hong-kong-january-cup-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2027/hong-kong-centenary-sprint-cup-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2027/hong-kong-stewards-cup-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2027/hong-kong-hong-kong-classic-mile-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2027/hong-kong-centenary-vase-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2027/hong-kong-queen-s-silver-jubilee-cup-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2027/hong-kong-hong-kong-classic-cup-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2027/hong-kong-hong-kong-gold-cup-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2027/hong-kong-hong-kong-derby-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2027/hong-kong-sprint-cup-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2027/hong-kong-chairman-s-trophy-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2027/hong-kong-queen-elizabeth-ii-cup-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2027/hong-kong-champions-mile-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2027/hong-kong-chairman-s-sprint-prize-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2027/hong-kong-queen-mother-memorial-cup-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2027/hong-kong-hong-kong-champions-chater-cup-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2027/hong-kong-sha-tin-vase-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2027/hong-kong-lion-rock-trophy-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2027/hong-kong-premier-cup-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    },
+    {
+      "url": "https://www.umafans.run/races/2027/hong-kong-premier-plate-2027/",
+      "status": 200,
+      "identity": true,
+      "state": "scheduled",
+      "results": null
+    }
+  ],
+  "calendars": [
+    {
+      "domain": "https://umafans.run",
+      "year": 2026,
+      "matched": 13,
+      "pages": 2
+    },
+    {
+      "domain": "https://umafans.run",
+      "year": 2027,
+      "matched": 22,
+      "pages": 1
+    },
+    {
+      "domain": "https://www.umafans.run",
+      "year": 2026,
+      "matched": 13,
+      "pages": 2
+    },
+    {
+      "domain": "https://www.umafans.run",
+      "year": 2027,
+      "matched": 22,
+      "pages": 1
+    }
+  ],
+  "health": [
+    {
+      "url": "https://umafans.run/healthz/",
+      "status": 200
+    },
+    {
+      "url": "https://www.umafans.run/healthz/",
+      "status": 200
+    }
+  ],
+  "checked_at": "2026-09-18T05:50:20Z"
+}

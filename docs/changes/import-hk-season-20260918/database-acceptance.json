@@ -1,0 +1,361 @@
+{
+  "commit": "7e111914d57083299ce452b6222ab9d38476e420",
+  "audit_id": 108715,
+  "manifest_sha256": "7ea7d5c387e2ab56450017431fd26588bdc7a5a4d1893c52a55bab89f010eaab",
+  "count": 35,
+  "created": 34,
+  "existing_unchanged": true,
+  "deferred_unchanged": true,
+  "events": [
+    {
+      "id": 19603,
+      "year": 2026,
+      "name": "香港特区行政长官杯",
+      "date": "2026-09-06",
+      "path": "/races/2026/hong-kong-hksar-chief-executives-cup-2026/",
+      "status": "finished",
+      "new": true,
+      "grade": "G3"
+    },
+    {
+      "id": 19604,
+      "year": 2026,
+      "name": "庆典杯",
+      "date": "2026-09-27",
+      "path": "/races/2026/hong-kong-celebration-cup-2026/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "G3"
+    },
+    {
+      "id": 19605,
+      "year": 2026,
+      "name": "国庆杯",
+      "date": "2026-10-01",
+      "path": "/races/2026/hong-kong-national-day-cup-2026/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "G3"
+    },
+    {
+      "id": 19606,
+      "year": 2026,
+      "name": "沙田锦标",
+      "date": "2026-10-19",
+      "path": "/races/2026/hong-kong-sha-tin-trophy-2026/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "G2"
+    },
+    {
+      "id": 19607,
+      "year": 2026,
+      "name": "精英碗",
+      "date": "2026-10-25",
+      "path": "/races/2026/hong-kong-premier-bowl-2026/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "G2"
+    },
+    {
+      "id": 19608,
+      "year": 2026,
+      "name": "妇女银袋赛",
+      "date": "2026-11-08",
+      "path": "/races/2026/hong-kong-ladies-purse-2026/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "G3"
+    },
+    {
+      "id": 19609,
+      "year": 2026,
+      "name": "马会杯",
+      "date": "2026-11-22",
+      "path": "/races/2026/hong-kong-jockey-club-cup-2026/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "G2"
+    },
+    {
+      "id": 19610,
+      "year": 2026,
+      "name": "马会一哩锦标",
+      "date": "2026-11-22",
+      "path": "/races/2026/hong-kong-jockey-club-mile-2026/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "G2"
+    },
+    {
+      "id": 19611,
+      "year": 2026,
+      "name": "马会短途锦标",
+      "date": "2026-11-22",
+      "path": "/races/2026/hong-kong-jockey-club-sprint-2026/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "G2"
+    },
+    {
+      "id": 2,
+      "year": 2026,
+      "name": "香港杯",
+      "date": "2026-12-13",
+      "path": "/races/2026/hong-kong-cup/",
+      "status": "scheduled",
+      "new": false,
+      "grade": "G1"
+    },
+    {
+      "id": 19612,
+      "year": 2026,
+      "name": "香港一哩锦标",
+      "date": "2026-12-13",
+      "path": "/races/2026/hong-kong-hong-kong-mile-2026/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "G1"
+    },
+    {
+      "id": 19613,
+      "year": 2026,
+      "name": "香港短途锦标",
+      "date": "2026-12-13",
+      "path": "/races/2026/hong-kong-hong-kong-sprint-2026/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "G1"
+    },
+    {
+      "id": 19614,
+      "year": 2026,
+      "name": "香港瓶",
+      "date": "2026-12-13",
+      "path": "/races/2026/hong-kong-hong-kong-vase-2026/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "G1"
+    },
+    {
+      "id": 19615,
+      "year": 2027,
+      "name": "华商会挑战杯",
+      "date": "2027-01-01",
+      "path": "/races/2027/hong-kong-chinese-club-challenge-cup-2027/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "G3"
+    },
+    {
+      "id": 19616,
+      "year": 2027,
+      "name": "洋紫荆短途锦标",
+      "date": "2027-01-10",
+      "path": "/races/2027/hong-kong-bauhinia-sprint-trophy-2027/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "G3"
+    },
+    {
+      "id": 19617,
+      "year": 2027,
+      "name": "一月杯",
+      "date": "2027-01-13",
+      "path": "/races/2027/hong-kong-january-cup-2027/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "G3"
+    },
+    {
+      "id": 19618,
+      "year": 2027,
+      "name": "百周年纪念短途杯",
+      "date": "2027-01-24",
+      "path": "/races/2027/hong-kong-centenary-sprint-cup-2027/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "G1"
+    },
+    {
+      "id": 19619,
+      "year": 2027,
+      "name": "董事杯",
+      "date": "2027-01-31",
+      "path": "/races/2027/hong-kong-stewards-cup-2027/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "G1"
+    },
+    {
+      "id": 19620,
+      "year": 2027,
+      "name": "香港经典一哩赛",
+      "date": "2027-01-31",
+      "path": "/races/2027/hong-kong-hong-kong-classic-mile-2027/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "OTHER"
+    },
+    {
+      "id": 19621,
+      "year": 2027,
+      "name": "百周年纪念银瓶",
+      "date": "2027-02-14",
+      "path": "/races/2027/hong-kong-centenary-vase-2027/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "G3"
+    },
+    {
+      "id": 19622,
+      "year": 2027,
+      "name": "女皇银禧纪念杯",
+      "date": "2027-02-21",
+      "path": "/races/2027/hong-kong-queen-s-silver-jubilee-cup-2027/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "G1"
+    },
+    {
+      "id": 19623,
+      "year": 2027,
+      "name": "香港经典杯",
+      "date": "2027-02-28",
+      "path": "/races/2027/hong-kong-hong-kong-classic-cup-2027/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "OTHER"
+    },
+    {
+      "id": 19624,
+      "year": 2027,
+      "name": "香港金杯",
+      "date": "2027-02-28",
+      "path": "/races/2027/hong-kong-hong-kong-gold-cup-2027/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "G1"
+    },
+    {
+      "id": 19625,
+      "year": 2027,
+      "name": "香港打吡大赛",
+      "date": "2027-03-21",
+      "path": "/races/2027/hong-kong-hong-kong-derby-2027/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "OTHER"
+    },
+    {
+      "id": 19626,
+      "year": 2027,
+      "name": "短途锦标",
+      "date": "2027-04-04",
+      "path": "/races/2027/hong-kong-sprint-cup-2027/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "G2"
+    },
+    {
+      "id": 19627,
+      "year": 2027,
+      "name": "主席锦标",
+      "date": "2027-04-04",
+      "path": "/races/2027/hong-kong-chairman-s-trophy-2027/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "G2"
+    },
+    {
+      "id": 19628,
+      "year": 2027,
+      "name": "女皇杯",
+      "date": "2027-04-25",
+      "path": "/races/2027/hong-kong-queen-elizabeth-ii-cup-2027/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "G1"
+    },
+    {
+      "id": 19629,
+      "year": 2027,
+      "name": "冠军一哩赛",
+      "date": "2027-04-25",
+      "path": "/races/2027/hong-kong-champions-mile-2027/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "G1"
+    },
+    {
+      "id": 19630,
+      "year": 2027,
+      "name": "主席短途奖",
+      "date": "2027-04-25",
+      "path": "/races/2027/hong-kong-chairman-s-sprint-prize-2027/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "G1"
+    },
+    {
+      "id": 19631,
+      "year": 2027,
+      "name": "皇太后纪念杯",
+      "date": "2027-05-02",
+      "path": "/races/2027/hong-kong-queen-mother-memorial-cup-2027/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "G3"
+    },
+    {
+      "id": 19632,
+      "year": 2027,
+      "name": "冠军暨遮打杯",
+      "date": "2027-05-23",
+      "path": "/races/2027/hong-kong-hong-kong-champions-chater-cup-2027/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "G1"
+    },
+    {
+      "id": 19633,
+      "year": 2027,
+      "name": "沙田银瓶",
+      "date": "2027-05-30",
+      "path": "/races/2027/hong-kong-sha-tin-vase-2027/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "G3"
+    },
+    {
+      "id": 19634,
+      "year": 2027,
+      "name": "狮子山锦标",
+      "date": "2027-05-30",
+      "path": "/races/2027/hong-kong-lion-rock-trophy-2027/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "G3"
+    },
+    {
+      "id": 19635,
+      "year": 2027,
+      "name": "精英杯",
+      "date": "2027-06-20",
+      "path": "/races/2027/hong-kong-premier-cup-2027/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "G3"
+    },
+    {
+      "id": 19636,
+      "year": 2027,
+      "name": "精英碟",
+      "date": "2027-06-20",
+      "path": "/races/2027/hong-kong-premier-plate-2027/",
+      "status": "scheduled",
+      "new": true,
+      "grade": "G3"
+    }
+  ]
+}
