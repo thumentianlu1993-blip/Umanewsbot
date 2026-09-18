@@ -1,3 +1,5 @@
+> 最终状态：PR209首轮自然验收发现长URL缓存边界，PR210已最小前向修复并完成5129项全量对照及两轮自然刷新；详见[发布记录](release.md)。以下保留方案与执行约束。
+
 # 北京时间展示与赛前资料持续刷新修复方案
 
 状态：以下保留批准时的方案；实施、发布和实际边界以release.md及CODE_REVIEW.md最新记录为准。主线程编写，沿用固定子代理只读审核。独立worktree `/tmp/umanews-pre-race-plan-20260919`，分支`codex/plan-pre-race-refresh-20260919`，基线main `5731ae6e`；保留原horse_data脏工作区。

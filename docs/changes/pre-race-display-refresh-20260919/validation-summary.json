@@ -47,15 +47,16 @@
   "review_fingerprint_before": "7719d3470cd61f7d0895e4cacb201c235230194d4b3b24147f44bfe92c4889cb",
   "review_fingerprint_after": "7719d3470cd61f7d0895e4cacb201c235230194d4b3b24147f44bfe92c4889cb",
   "github_ci": {
-    "run_id": 35391358462,
-    "head": "2c8fa8e4ec91d0ba3a32529839cff8f1a4d68615",
-    "tests_run": 5128,
+    "run_id": 35396515963,
+    "head": "3a174b1e93c499f293deeabfff4dfa71b427a684",
+    "tests_run": 5129,
     "failures": 16,
     "errors": 29,
     "skipped": 20,
-    "new_failures": [],
-    "release_contract_tests": 45,
+    "new_vs_baseline": [],
+    "new_vs_production": [],
     "review": "APPROVED",
+    "release_contract_tests": 45,
     "summary_job": "in_progress_not_counted_as_passed"
   },
   "production_changes": true,
@@ -72,11 +73,11 @@
     ]
   },
   "production_release": {
-    "head": "2c8fa8e4ec91d0ba3a32529839cff8f1a4d68615",
-    "image": "sha256:214537d25f1e0adf6a740e724be627835ab5287a07fe3a6d56a6c5a8220648f2",
+    "application_commit": "3a174b1e93c499f293deeabfff4dfa71b427a684",
+    "image": "sha256:1622560c7f522d5078adbed5049e7bf7ab57e537bff57b97b37df0c83aec57a2",
     "public_requests": 26,
     "public_all_200": true,
-    "natural_cycles": "first_failed_long_scope"
+    "natural_cycles": "two_natural_D0_checks_verified"
   },
   "long_url_fix": {
     "red_tests": 1,
@@ -86,7 +87,37 @@
     "green_errors": 0,
     "green_sha256": "69c4334bb15cd5dda6d9b576b03904997badeefc72dc11abc38b31a92505104c",
     "review": "APPROVED",
-    "ci": "pending",
-    "deployed": false
+    "ci": {
+      "run_id": 35396515963,
+      "head": "3a174b1e93c499f293deeabfff4dfa71b427a684",
+      "tests_run": 5129,
+      "failures": 16,
+      "errors": 29,
+      "skipped": 20,
+      "new_vs_baseline": [],
+      "new_vs_production": [],
+      "review": "APPROVED",
+      "release_contract_tests": 45
+    },
+    "deployed": true
+  },
+  "github_ci_pr209": {
+    "run_id": 35391358462,
+    "head": "2c8fa8e4ec91d0ba3a32529839cff8f1a4d68615",
+    "tests_run": 5128,
+    "failures": 16,
+    "errors": 29,
+    "skipped": 20,
+    "new_failures": [],
+    "release_contract_tests": 45,
+    "review": "APPROVED",
+    "summary_job": "in_progress_not_counted_as_passed"
+  },
+  "production_release_pr209": {
+    "head": "2c8fa8e4ec91d0ba3a32529839cff8f1a4d68615",
+    "image": "sha256:214537d25f1e0adf6a740e724be627835ab5287a07fe3a6d56a6c5a8220648f2",
+    "public_requests": 26,
+    "public_all_200": true,
+    "natural_cycles": "first_failed_long_scope"
   }
 }

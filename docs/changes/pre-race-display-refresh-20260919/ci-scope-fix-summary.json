@@ -1,0 +1,174 @@
+{
+  "run_id": 35396515963,
+  "head": "3a174b1e93c499f293deeabfff4dfa71b427a684",
+  "results": {
+    "candidate": {
+      "tests_run": 5129,
+      "failures": 16,
+      "errors": 29,
+      "skipped": 20
+    },
+    "baseline": {
+      "tests_run": 4886,
+      "failures": 70,
+      "errors": 258,
+      "skipped": 15
+    }
+  },
+  "new_vs_same_run_baseline": [],
+  "new_vs_production_reference": [],
+  "candidate_failed_ids": [
+    "stable.test_contextual_news_entities.ContextualTranslationConsistencyTests.test_person_term_placeholder_loss_rejects_transliterated_name",
+    "stable.test_external_english_horse_context_gate.ExternalEnglishHorseContextGateTests.test_rewrite_provider_alias_only_placeholders_only_confirmed_source_occurrence",
+    "stable.test_historical_batch_pipeline.HistoricalBatchStageVerifierTests.test_verifier_reports_date_source_count_status_and_visibility_drift",
+    "stable.test_historical_calendar_runner_helpers.CurrentYearSourceOverrideRunnerTests.test_classified_reuse_rejects_old_cutoff_identity",
+    "stable.test_historical_calendar_runner_helpers.CurrentYearSourceOverrideRunnerTests.test_hong_kong_runner_archives_and_rebuilds_pre_cutoff_bootstrap",
+    "stable.test_historical_calendar_runner_helpers.CurrentYearSourceOverrideRunnerTests.test_hong_kong_runner_binds_same_cutoff_and_request_manifest_to_both_stages",
+    "stable.test_historical_calendar_runner_helpers.CurrentYearSourceOverrideRunnerTests.test_partial_cache_retries_failed_url_and_preserves_attempt_audit",
+    "stable.test_historical_calendar_runner_helpers.KnownCalendarShardRunnerTests.test_parse_artifact_reuse_requires_exact_selection_catalog_and_tool_identity",
+    "stable.test_historical_calendar_runner_helpers.KnownCalendarShardRunnerTests.test_parse_rebuilds_successful_artifact_without_current_execution_identity",
+    "stable.test_historical_calendar_runner_helpers.KnownCalendarShardRunnerTests.test_standard_cache_retries_only_failed_urls_and_preserves_attempt_audit",
+    "stable.test_historical_calendar_runner_helpers.KnownCalendarShardRunnerTests.test_toba_cache_retries_failed_url_and_preserves_attempt_audit",
+    "stable.test_historical_calendar_runner_helpers.KnownCalendarShardRunnerTests.test_toba_fetch_uses_guarded_docker_network_stage",
+    "stable.test_historical_race_batches.HistoricalRaceBatchTests.test_first_acceptance_selects_five_regions_three_series_and_three_eras",
+    "stable.test_historical_race_batches.HistoricalRaceImporterTests.test_first_acceptance_selects_five_regions_three_series_and_three_eras",
+    "stable.test_historical_race_date_discovery.HistoricalRaceDateDiscoveryTests.test_acceptance_batch_command_exports_pending_snapshot",
+    "stable.test_historical_race_date_discovery.HistoricalRaceDateDiscoveryTests.test_post_discovery_selection_requires_same_target_ids",
+    "stable.test_historical_race_date_discovery.HistoricalRaceDateDiscoveryTests.test_pre_discovery_selection_uses_pending_targets_in_1998_stage",
+    "stable.test_historical_race_detail_runner_v2_contract.HistoricalDetailRunnerV2HostLockAndCheckpointTests.test_shared_host_lock_limits_two_processes_and_appends_both_shards",
+    "stable.test_historical_race_detail_runner_v2_review_findings.HistoricalDetailRunnerV2ReviewFindingTests.test_package_consumes_and_binds_only_validated_candidate_jsonl",
+    "stable.test_lifecycle_shadow_hardening.SupportedDeployOneOffInventoryTests.test_all_deploy_wrapper_run_calls_are_canonical_and_lock_contracts_remain",
+    "stable.test_migration_history_repair.MigrationHistoryRepairLeafSetRedTests.test_management_command_accepts_repeated_complete_leaf_set",
+    "stable.test_multiregion_rollout_change.SingleArticleVisibilityTests.test_related_queries_are_ineffective_outside_enforce",
+    "stable.test_multiregion_rollout_change.SingleArticleVisibilityTests.test_related_region_page_returns_one_article_with_stable_pagination",
+    "stable.test_news_production_integrity.StaleCrawlManifestTests.test_integrity_audit_command_is_read_only",
+    "stable.test_p0_racecard_url_discovery.P0RacecardUrlDiscoveryConfigurationTests.test_production_worker_mounts_the_persistent_document_directory",
+    "stable.test_race_data_sync_repair.StalledEventRepairTests.test_apply_rejects_entry_closed_since_dry_run",
+    "stable.test_race_event_crawl_orchestration.RaceEventCrawlFirstAcceptanceFixtureTests.test_first_acceptance_rejects_missing_region_adapter_coverage",
+    "stable.test_race_live_gate_remediation_postgres.CoupledRunnerRefreshPostgresRemediationTests.test_refresh_persists_both_shared_number_legacy_rows_by_external_id",
+    "stable.test_racing_api_horse_staging.RacingApiHorseStagingTests.test_existing_v1_receipt_is_upgraded_once_with_page_snapshot",
+    "stable.test_racing_api_horse_staging_postgresql.RacingApiHorseStagingPostgresqlConcurrencyTests.test_same_manifest_concurrency_creates_one_receipt_and_one_replay",
+    "stable.tests.test_page_regression.CalendarPageTermDisplayTests.test_calendar_race_name_shows_chinese",
+    "stable.tests.test_page_regression.CalendarQueryCountTests.test_calendar_40_events_query_count_gate",
+    "stable.tests.test_race_result_recovery_application_projection.CanonicalProductLinkContractTests.test_service_rejects_cross_region_year_chain_and_cycle",
+    "stable.tests.test_race_result_recovery_application_projection.RecoveryProjectionContractTests.test_apply_rejects_manifest_bound_current_revision_drift",
+    "stable.tests_legacy.MultiRegionAttributionAndGateTests.test_public_feed_region_filter_includes_related_region_articles",
+    "stable.tests_legacy.MultiRegionAttributionAndGateTests.test_public_region_display_fallback_hides_related_regions_without_deleting_them",
+    "stable.tests_legacy.MultiRegionAttributionAndGateTests.test_region_display_and_qq_message_show_primary_before_related_regions",
+    "stable.tests_legacy.P0HorseProfileDataCompletionTests.test_public_detail_basic_tier_renders_with_in_progress_badge",
+    "stable.tests_legacy.P0HorseProfileDataCompletionTests.test_public_horse_detail_uses_original_name_when_translation_is_pending",
+    "stable.tests_legacy.P0HorseProfileDataCompletionTests.test_public_index_keeps_positive_label_for_complete_profiles",
+    "stable.tests_legacy.P0HorseProfileDataCompletionTests.test_public_index_shows_in_progress_badge_for_incomplete_profiles",
+    "stable.tests_legacy.RaceEventPageMVPTests.test_csv_import_dry_run_rejects_invalid_choice_values",
+    "stable.tests_legacy.RaceEventPageMVPTests.test_csv_import_supports_synthetic_surface",
+    "stable.tests_legacy.RaceEventPageMVPTests.test_seed_sample_import_covers_five_regions_and_calendar_visibility",
+    "stable.tests_legacy.TermbaseSeedDataPreparationTests.test_prepare_seed_command_generates_review_files_without_db_writes"
+  ],
+  "candidate_result_sha256": "eef69afe48bb73627d3dc91f69e22e6830b9d9e36dcfb91004a44985680182af",
+  "release_contract": {
+    "head": "3a174b1e93c499f293deeabfff4dfa71b427a684",
+    "run_id": 35396515963,
+    "tests_run": 45,
+    "passed": true,
+    "fingerprint_before": "da306dd9ffe59add92ae052adacd053abf1d9f52f818f7e32ed2e914a7701302",
+    "fingerprint_after": "da306dd9ffe59add92ae052adacd053abf1d9f52f818f7e32ed2e914a7701302",
+    "migration_drift": false,
+    "artifact_id": 10567718135,
+    "artifact_sha256": "40684a2ef37f57df210d62d2f1dfdb8576b95c8e451048d7a2144c801560e3a7"
+  },
+  "review": "APPROVED",
+  "summary_job": "in_progress_not_counted_as_passed",
+  "source_manifest": {
+    "run_id": 35396515963,
+    "head": "3a174b1e93c499f293deeabfff4dfa71b427a684",
+    "jobs": {
+      "release-contract": {
+        "id": 105766485430,
+        "name": "release-contract",
+        "status": "completed",
+        "conclusion": "success",
+        "run_id": 35396515963
+      },
+      "stable 全量对照 (baseline)": {
+        "id": 105766485602,
+        "name": "stable 全量对照 (baseline)",
+        "status": "completed",
+        "conclusion": "success",
+        "run_id": 35396515963
+      },
+      "stable 全量对照 (candidate)": {
+        "id": 105766485678,
+        "name": "stable 全量对照 (candidate)",
+        "status": "completed",
+        "conclusion": "success",
+        "run_id": 35396515963
+      },
+      "stable 新增失败检查": {
+        "id": 105776709422,
+        "name": "stable 新增失败检查",
+        "status": "in_progress",
+        "conclusion": null,
+        "run_id": 35396515963
+      }
+    },
+    "artifacts": {
+      "stable-baseline": {
+        "id": 10569735451,
+        "name": "stable-baseline",
+        "size_in_bytes": 99154,
+        "url": "https://api.github.com/repos/thumentianlu1993-blip/Umanewsbot/actions/artifacts/10569735451",
+        "archive_download_url": "https://api.github.com/repos/thumentianlu1993-blip/Umanewsbot/actions/artifacts/10569735451/zip",
+        "expired": false,
+        "created_at": "2026-09-18T21:39:57Z",
+        "expires_at": "2026-12-17T21:23:26Z",
+        "updated_at": "2026-09-18T21:39:57Z",
+        "digest": "sha256:35d6868f0f19e071a57f52b714b6d53360b1e35985f7a4569e7253ad95109d70",
+        "workflow_run": {
+          "id": 35396515963,
+          "repository_id": 1202557906,
+          "head_repository_id": 1202557906,
+          "head_branch": "codex/fix-pre-race-snapshot-scope",
+          "head_sha": "3a174b1e93c499f293deeabfff4dfa71b427a684"
+        }
+      },
+      "stable-candidate": {
+        "id": 10569658649,
+        "name": "stable-candidate",
+        "size_in_bytes": 38278,
+        "url": "https://api.github.com/repos/thumentianlu1993-blip/Umanewsbot/actions/artifacts/10569658649",
+        "archive_download_url": "https://api.github.com/repos/thumentianlu1993-blip/Umanewsbot/actions/artifacts/10569658649/zip",
+        "expired": false,
+        "created_at": "2026-09-18T22:03:00Z",
+        "expires_at": "2026-12-17T21:23:26Z",
+        "updated_at": "2026-09-18T22:03:00Z",
+        "digest": "sha256:25d209c99e1fe754c6e60cdf6979cdf95e94b3c8cf3111841d0f9a413e115901",
+        "workflow_run": {
+          "id": 35396515963,
+          "repository_id": 1202557906,
+          "head_repository_id": 1202557906,
+          "head_branch": "codex/fix-pre-race-snapshot-scope",
+          "head_sha": "3a174b1e93c499f293deeabfff4dfa71b427a684"
+        }
+      },
+      "release-0078-test-evidence": {
+        "id": 10567718135,
+        "name": "release-0078-test-evidence",
+        "size_in_bytes": 115099,
+        "url": "https://api.github.com/repos/thumentianlu1993-blip/Umanewsbot/actions/artifacts/10567718135",
+        "archive_download_url": "https://api.github.com/repos/thumentianlu1993-blip/Umanewsbot/actions/artifacts/10567718135/zip",
+        "expired": false,
+        "created_at": "2026-09-18T21:30:37Z",
+        "expires_at": "2026-12-17T21:23:26Z",
+        "updated_at": "2026-09-18T21:30:37Z",
+        "digest": "sha256:40684a2ef37f57df210d62d2f1dfdb8576b95c8e451048d7a2144c801560e3a7",
+        "workflow_run": {
+          "id": 35396515963,
+          "repository_id": 1202557906,
+          "head_repository_id": 1202557906,
+          "head_branch": "codex/fix-pre-race-snapshot-scope",
+          "head_sha": "3a174b1e93c499f293deeabfff4dfa71b427a684"
+        }
+      }
+    }
+  }
+}
