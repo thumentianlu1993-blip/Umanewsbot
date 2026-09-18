@@ -13,7 +13,7 @@
 
 此指纹对应最终应用/测试及当时文档；本记录、validation-summary与收尾状态说明在核对之后补写，未再修改应用或测试。工作流合同及4项工具测试、git diff --check通过。
 
-验证：联合168项、历史/页面76项全部通过；翻译测试新隔离库48项通过。一次本地整仓诊断未跑完，不作为全量通过证据。GitHub CLI当前登录失效401，PR及最终Linux CI未创建/执行，待用户完成`gh auth login -h github.com`后继续。禁止据此宣称发版验收完成。详见[实施记录](implementation.md)与[验证摘要](validation-summary.json)。
+验证：联合168项、历史/页面76项、全新数据库翻译48项通过。本地中断全套不作为验收；最终Linux全量结果和发布证据见本文件末节及ci-summary.json。早期CLI401已通过可用GitHub connector解决。
 
 ## 发布预演修复
 
@@ -26,3 +26,11 @@
 首候选801cf77c的完整Linux结果为5125项、17失败/29错误/20跳过；对上一版生产45项失败新增1项：TRA身份发现测试仍期待08:10，但已审Beat对齐合同应为08:07。应用代码未改。测试保留原有公平处理、延后与快照复用断言，并追加真实08:07触发后两事件仅请求一次、均推进到08:17。77项相关回归通过，同一reviewer只读APPROVED。最终新提交仍须完整CI验证，不能把旧候选结果冒充新提交结果。
 
 部署胶水另经两轮只读审核后APPROVED：固定最终run/head，校验官方ZIP摘要、工件内commit.txt/exit-code.txt/result及同run基线/当前生产失败集合；四应用还需核验有效512请求与1GiB配置。
+
+## 最终CI独立复核
+
+固定head `2c8fa8e4ec91d0ba3a32529839cff8f1a4d68615`、run `35391358462`。同一reviewer独立验证三份ZIP摘要/提交、5128项完整计数与失败集合，45个失败ID与当前生产完全一致，对同run历史基线无新增；45项发布合同通过、前后指纹一致，Django与迁移漂移检查通过，结论APPROVED。三个测试作业completed/success；汇总任务当时仍in_progress，未计为通过。此前缓存中的jobs状态已用直接GitHub返回刷新。此为“无新增失败”门槛，不是全量全绿。
+
+## 长来源URL缓存边界复审
+
+自然tick失败后，同一reviewer独立确认scope上限128与完整URL入参冲突。主线程先RED后修改，保留短key，仅长URL用69字符html:+SHA256；reviewer核对实际集成链及RED/67项GREEN收据，APPROVED。未放宽来源或存储合同，未访问生产或写文件。最终新head仍待CI与自然验收。

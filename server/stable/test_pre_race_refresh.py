@@ -309,3 +309,54 @@ class SportingLiveContractTests(TestCase):
         from stable.services.race_pre_race_sources import parse_bound_card
         e=SimpleNamespace(local_date=date(2026,9,18),timezone_name='America/New_York')
         with self.assertRaises(ValueError):parse_bound_card(self.card(ride_count=5),event=e,url=SL_URL)
+
+
+@override_settings(**REFRESH_FLAGS,
+    RACE_DATA_RAW_MAX_COMPRESSED_BYTES=2*1024*1024,
+    RACE_DATA_RAW_MAX_UNCOMPRESSED_BYTES=8*1024*1024,
+    RACE_DATA_RAW_DAILY_PROVIDER_REGION_BYTES=1024*1024*1024,
+    RACE_DATA_RAW_DAILY_PROVIDER_REGION_REQUESTS=512,
+    RACE_DATA_RAW_ROOT_HIGH_WATER_BYTES=1024*1024*1024,
+    RACE_DATA_RAW_ROOT_LOW_WATER_BYTES=512*1024*1024,
+    RACE_DATA_RAW_MIN_FREE_DISK_BYTES=1,
+    RACE_DATA_RAW_CLEANUP_MAX_ROWS=100,
+    RACE_DATA_RAW_CLEANUP_MAX_BYTES=64*1024*1024,
+    RACE_DATA_RAW_HOLD_ALERT_BYTES=256*1024*1024)
+class LongBoundSourceIntegrationTests(TestCase):
+    def setUp(self):
+        BoundRefreshTests.setUp(self)
+
+    def test_long_source_url_runs_real_snapshot_pipeline_and_keeps_cache_isolation(self):
+        import tempfile
+        from unittest.mock import MagicMock
+        from stable.services.race_pre_race_refresh import discover_bound_pre_race, fetch_bound_html, public_refresh_preview
+        # Production URLs were 140/154 characters; the original fixture was exactly 128.
+        long_url=SL_URL+'-extended-source-title'
+        self.assertGreater(len(long_url),128)
+        self.original.source_url=long_url;self.original.save(update_fields=['source_url'])
+        self.e.source_refs={};self.e.save(update_fields=['source_refs'])
+        body=SportingLiveContractTests().card().encode()
+        response=MagicMock(status_code=200,headers={'Content-Type':'text/html'})
+        response.__enter__.return_value=response;response.iter_content.return_value=[body]
+        with tempfile.TemporaryDirectory() as root, override_settings(RACE_DATA_RAW_ARTIFACT_ROOTS=(root,)), patch('requests.get',return_value=response) as get, patch('django.utils.timezone.now',return_value=self.now):
+            outcome=discover_bound_pre_race(now=self.now,clock=lambda:self.now)
+            self.assertEqual(outcome,{'checked':1,'attempted':1})
+            first=fetch_bound_html(long_url,now=self.now,region='united_states')
+            self.assertEqual(get.call_count,1)
+            self.assertEqual(first.observed_at,self.now)
+            # An alternate long URL must not reuse the first URL's payload.
+            with patch('django.utils.timezone.now',return_value=self.now+timedelta(seconds=3)):
+                fetch_bound_html(long_url+'-another',now=self.now+timedelta(seconds=3),region='united_states')
+            self.assertEqual(get.call_count,2)
+            self.assertEqual(get.call_args.args[0],long_url+'-another')
+            self.assertFalse(get.call_args.kwargs['allow_redirects'])
+            self.assertEqual(models.RaceDataSnapshotLease.objects.filter(state='complete').count(),2)
+            ledger=models.RaceDataTransportCapacityLedger.objects.get(provider='sporting_life',region_code='united_states',usage_date=self.now.date())
+            self.assertEqual(ledger.request_count,2)
+        self.e.refresh_from_db()
+        rows=public_refresh_preview(self.e,now=self.now)['rows']
+        self.assertEqual(len(rows),7)
+        self.assertEqual([r.horse_number for r in rows if r.running_status=='scratched'],['3','5','6'])
+        candidate=self.e.data_candidates.get(source_name=pre.REFRESH)
+        self.assertEqual(candidate.source_url,long_url)
+        self.assertEqual(candidate.raw_payload[pre.REFRESH]['binding']['url'],long_url)

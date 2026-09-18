@@ -425,8 +425,10 @@ def _fetch_bounded_html(url, *, now, provider, region, validator, enabled):
                     budget.next_allowed_at = max(budget.next_allowed_at or retry_after, retry_after)
                     budget.save(update_fields=['next_allowed_at'])
     try:
+        # Snapshot scopes are limited to 128 characters; keep existing short keys stable.
+        scope_key = url if len(url) <= 128 else 'html:' + hashlib.sha256(url.encode()).hexdigest()
         payload, _ = _get_or_fetch_shared_snapshot(provider=provider, region=region,
-            scope_key=url, data_kind='racecard', registry_digest=hashlib.sha256((provider+url).encode()).hexdigest(),
+            scope_key=scope_key, data_kind='racecard', registry_digest=hashlib.sha256((provider+url).encode()).hexdigest(),
             run_id=secrets.token_hex(16), now=now, proposed_requests=1,
             clock=timezone.now, sleeper=clock.sleep, fetcher=fetch, waiter_max_polls=0)
     except _ProviderSyncError as exc:

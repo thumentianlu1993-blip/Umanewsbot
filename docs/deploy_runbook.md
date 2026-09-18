@@ -1,10 +1,12 @@
-## 2026-09-19 北京时间/赛前刷新发布准备（尚未执行）
+## 2026-09-19 自然验收发现长链接缓存边界，最小修复待发布
 
-## 2026-09-19 PR209 发布准备（未执行切换）
+PR209应用`2c8fa8e4`已上线、页面与运行态检查通过，但21:17 UTC首轮自然492刷新失败，不能视为赛前刷新验收通过。生产492/969来源URL分别140/154字符，共享snapshot scope最多128，HTTP前即被拒绝；原测试链接恰好128且mock了共享入口。主线程补真实缓存链路测试，先RED后67项GREEN，固定reviewer APPROVED；修复仅对>128 URL使用html:+SHA256，原URL/身份/来源证据及短key不变。新修复尚未发布；当前页面安全保留旧卡并提示更新延迟，NYRA/RP覆盖限制不变。详见[发布与返修记录](changes/pre-race-display-refresh-20260919/release.md)。
 
-本次沿用受保护lowcost/0078入口，无模型迁移。预检433de627四应用镜像一致、导入/历史任务/发布锁均空；候选仅准备独立目录与镜像。拟开RACE_DATA_SYNC_PRE_RACE_REFRESH_ENABLED并将全局每provider/region日请求192→512，字节1GiB和原快照水位保持；不新增人工业务回填。最终CI须绑定实际head/run/artifact摘要及commit.txt/exit-code.txt，比较同run历史基线和当前生产失败集合，未完成不得声称发布通过。实际执行后在变更release.md回写备份、版本、锁、公开页面及自然tick证据。
+## 2026-09-19 PR209 发布完成，自然周期验收中
 
-本地实现无迁移，新增`RACE_DATA_SYNC_PRE_RACE_REFRESH_ENABLED=false`。发布与启用须绑定精确提交、来源binding、实际provider/region额度、所需配置和服务操作；Racing Post HTTP406不能记作成功。停止刷新以有效配置重载及旧任务退出为准，保留最后有效卡。自然周期验收尚未进行，历史3场不在范围。详见[本次发布边界与容量表](changes/pre-race-display-refresh-20260919/rollout.md)。
+固定应用`2c8fa8e4`、镜像`214537d2…`经lowcost/0078协调器于21:09:57 UTC完成发布；四应用版本一致，DB/Redis/Nginx/OneBot容器保留。新刷新开关true、每来源/地区日请求512，日字节1GiB与其他配置不变。专属备份564044366字节，SHA256 `da1a4666ad2839b909bbb4dfffb7c71312e356bc6c6ace40fa20faacbde449ac`；空迁移计划、恢复完成凭据、active/restricted标记与锁收尾通过。旧race_live=7543未消费。
+
+双域名26请求通过；最终CI5128项保留45个旧失败、无新增，45项发布测试全过，原reviewer独立复核通过。原始CI工件按run/head/摘要/内含commit绑定，GitHub汇总job尚未计作通过。自然刷新仍在观察，Racing Post406不计成功，491已过赛前窗口。停用只能关闭对应开关并经受保护重载验证在途任务退出，不普通切旧镜像或整库恢复。实际证据及明确边界见[发布记录](changes/pre-race-display-refresh-20260919/release.md)。
 
 ## 2026-09-18 PR207 归一化已上线并启用
 
