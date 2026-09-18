@@ -1,0 +1,13 @@
+{
+  "files": {
+    "import_reviewed_hk_season.py": "742149af143452a776d91f1ee2539a7cfa6d90384328154ffe8d9f782a37efa7",
+    "manifest.json": "c88f11d1b3c70a0ebcc06c009ea4b77014d539dd0be6a20ce79bd9344d6fd3f0",
+    "run_reviewed_hk_season.py": "7b4521a6fa7a9477dc12f9b864a0b636daf43a29a98f806b67806adb3b98c26b",
+    "sources/chief-executive-result-en.html": "24aae507ad3011c66a6bde5fe28e4a251962449a060b3e458030cc73eb5120de",
+    "sources/chief-executive-result-zh.html": "504cd78720fbd864d238790a3707178d04fef5a671c59eacbd6d2e7a2c5a605d",
+    "sources/racecard-20260906.pdf": "9ccd1e7bd2bf681fe6fbc7fc7771aac3ffbbf5a64a1e00722da1df0371de7532",
+    "sources/season-2627-en-us.json": "0161807eaff97fe6ed25de0c2f65968d3d7177a91cf02a5851c4e473e8b8c043",
+    "sources/season-2627-zh-hk.json": "b7007ca4dca47b1634b25b1958f0a6e2fae93f9acc50bb3030db68cd84366877"
+  },
+  "manifest_sha256": "7ea7d5c387e2ab56450017431fd26588bdc7a5a4d1893c52a55bab89f010eaab"
+}

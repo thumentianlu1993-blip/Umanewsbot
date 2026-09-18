@@ -1,0 +1,906 @@
+{
+  "schema": "reviewed-hkjc-2627-v1",
+  "season": "2026/27",
+  "as_of": "2026-09-18",
+  "reviewer": "race_code_reviewer",
+  "sources": {
+    "en": {
+      "file": "season-2627-en-us.json",
+      "url": "https://racing.hkjc.com/contentAsset/api/getSeasonRaces",
+      "fetched_at": "2026-09-18T05:29:22.082658+00:00",
+      "sha256": "0161807eaff97fe6ed25de0c2f65968d3d7177a91cf02a5851c4e473e8b8c043"
+    },
+    "zh": {
+      "file": "season-2627-zh-hk.json",
+      "url": "https://racing.hkjc.com/contentAsset/api/getSeasonRaces",
+      "fetched_at": "2026-09-18T05:29:20.964908+00:00",
+      "sha256": "b7007ca4dca47b1634b25b1958f0a6e2fae93f9acc50bb3030db68cd84366877"
+    },
+    "result_en": {
+      "file": "chief-executive-result-en.html",
+      "url": "https://racing.hkjc.com/en-us/local/information/localresults?racedate=2026/09/06&Racecourse=ST&RaceNo=3",
+      "fetched_at": "2026-09-18T05:30:19.574841+00:00",
+      "sha256": "24aae507ad3011c66a6bde5fe28e4a251962449a060b3e458030cc73eb5120de"
+    },
+    "result_zh": {
+      "file": "chief-executive-result-zh.html",
+      "url": "https://racing.hkjc.com/zh-hk/local/information/localresults?racedate=2026/09/06&Racecourse=ST&RaceNo=3",
+      "fetched_at": "2026-09-18T05:30:17.284634+00:00",
+      "sha256": "504cd78720fbd864d238790a3707178d04fef5a671c59eacbd6d2e7a2c5a605d"
+    },
+    "programme": {
+      "file": "racecard-20260906.pdf",
+      "url": "https://racing.hkjc.com/racing/content/PDF/RaceCard/20260906_starter_all.pdf",
+      "fetched_at": "2026-09-18T05:31:11.433371+00:00",
+      "sha256": "9ccd1e7bd2bf681fe6fbc7fc7771aac3ffbbf5a64a1e00722da1df0371de7532"
+    }
+  },
+  "events": [
+    {
+      "index": 0,
+      "date": "2026-09-06",
+      "name_en": "HKSAR Chief Executive's Cup (H)",
+      "name_zh_hant": "香港特區行政長官盃 (讓賽)",
+      "name_zh": "香港特区行政长官杯",
+      "grade": "G3",
+      "distance": "1200",
+      "prize_hkd": "4200000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": null,
+        "key": "hong-kong-hksar-chief-executives-cup",
+        "canonical_name_original": "HKSAR Chief Executive's Cup",
+        "chinese_name": "香港特区行政长官杯"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 1,
+      "date": "2026-09-27",
+      "name_en": "Celebration Cup (H)",
+      "name_zh_hant": "慶典盃（讓賽）",
+      "name_zh": "庆典杯",
+      "grade": "G3",
+      "distance": "1400",
+      "prize_hkd": "4200000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 5964,
+        "key": "hong-kong-celebration-cup",
+        "canonical_name_original": "Celebration Cup",
+        "chinese_name": "庆典杯"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 2,
+      "date": "2026-10-01",
+      "name_en": "National Day Cup (H)",
+      "name_zh_hant": "國慶盃（讓賽）",
+      "name_zh": "国庆杯",
+      "grade": "G3",
+      "distance": "1000",
+      "prize_hkd": "4200000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 6003,
+        "key": "hong-kong-national-day-cup",
+        "canonical_name_original": "National Day Cup",
+        "chinese_name": "国庆杯"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 3,
+      "date": "2026-10-19",
+      "name_en": "Sha Tin Trophy (H)",
+      "name_zh_hant": "沙田錦標 (讓賽)",
+      "name_zh": "沙田锦标",
+      "grade": "G2",
+      "distance": "1600",
+      "prize_hkd": "5350000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 6015,
+        "key": "hong-kong-sha-tin-trophy",
+        "canonical_name_original": "Sha Tin Trophy",
+        "chinese_name": "沙田锦标"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 4,
+      "date": "2026-10-25",
+      "name_en": "Premier Bowl (H)",
+      "name_zh_hant": "精英碗（讓賽）",
+      "name_zh": "精英碗",
+      "grade": "G2",
+      "distance": "1200",
+      "prize_hkd": "5350000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 6004,
+        "key": "hong-kong-premier-bowl",
+        "canonical_name_original": "Premier Bowl",
+        "chinese_name": "精英碗"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 5,
+      "date": "2026-11-08",
+      "name_en": "Sa Sa Ladies' Purse (H)",
+      "name_zh_hant": "莎莎婦女銀袋（讓賽）",
+      "name_zh": "妇女银袋赛",
+      "grade": "G3",
+      "distance": "1800",
+      "prize_hkd": "4200000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 6001,
+        "key": "hong-kong-ladies-purse",
+        "canonical_name_original": "Ladies' Purse",
+        "chinese_name": "妇女银袋赛"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 6,
+      "date": "2026-11-22",
+      "name_en": "BOCHK Jockey Club Cup",
+      "name_zh_hant": "中銀香港馬會盃",
+      "name_zh": "马会杯",
+      "grade": "G2",
+      "distance": "2000",
+      "prize_hkd": "5350000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 5998,
+        "key": "hong-kong-jockey-club-cup",
+        "canonical_name_original": "Jockey Club Cup",
+        "chinese_name": "马会杯"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 7,
+      "date": "2026-11-22",
+      "name_en": "BOCHK Private Wealth Jockey Club Mile",
+      "name_zh_hant": "中銀香港私人財富馬會一哩錦標",
+      "name_zh": "马会一哩锦标",
+      "grade": "G2",
+      "distance": "1600",
+      "prize_hkd": "5350000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 5999,
+        "key": "hong-kong-jockey-club-mile",
+        "canonical_name_original": "Jockey Club Mile",
+        "chinese_name": "马会一哩锦标"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 8,
+      "date": "2026-11-22",
+      "name_en": "BOCHK Private Banking Jockey Club Sprint",
+      "name_zh_hant": "中銀香港私人銀行馬會短途錦標",
+      "name_zh": "马会短途锦标",
+      "grade": "G2",
+      "distance": "1200",
+      "prize_hkd": "5350000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 6000,
+        "key": "hong-kong-jockey-club-sprint",
+        "canonical_name_original": "Jockey Club Sprint",
+        "chinese_name": "马会短途锦标"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 9,
+      "date": "2026-12-13",
+      "name_en": "LONGINES Hong Kong Cup",
+      "name_zh_hant": "浪琴香港盃",
+      "name_zh": "香港杯",
+      "grade": "G1",
+      "distance": "2000",
+      "prize_hkd": "40000000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 5980,
+        "key": "hong-kong-hong-kong-cup",
+        "canonical_name_original": "Hong Kong Cup",
+        "chinese_name": "香港杯"
+      },
+      "existing_event_id": 2
+    },
+    {
+      "index": 10,
+      "date": "2026-12-13",
+      "name_en": "LONGINES Hong Kong Mile",
+      "name_zh_hant": "浪琴香港一哩錦標",
+      "name_zh": "香港一哩锦标",
+      "grade": "G1",
+      "distance": "1600",
+      "prize_hkd": "36000000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 5988,
+        "key": "hong-kong-hong-kong-mile",
+        "canonical_name_original": "Hong Kong Mile",
+        "chinese_name": "香港一哩锦标"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 11,
+      "date": "2026-12-13",
+      "name_en": "LONGINES Hong Kong Sprint",
+      "name_zh_hant": "浪琴香港短途錦標",
+      "name_zh": "香港短途锦标",
+      "grade": "G1",
+      "distance": "1200",
+      "prize_hkd": "28000000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 5989,
+        "key": "hong-kong-hong-kong-sprint",
+        "canonical_name_original": "Hong Kong Sprint",
+        "chinese_name": "香港短途锦标"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 12,
+      "date": "2026-12-13",
+      "name_en": "LONGINES Hong Kong Vase",
+      "name_zh_hant": "浪琴香港瓶",
+      "name_zh": "香港瓶",
+      "grade": "G1",
+      "distance": "2400",
+      "prize_hkd": "26000000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 5990,
+        "key": "hong-kong-hong-kong-vase",
+        "canonical_name_original": "Hong Kong Vase",
+        "chinese_name": "香港瓶"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 13,
+      "date": "2027-01-01",
+      "name_en": "Chinese Club Challenge Cup (H)",
+      "name_zh_hant": "華商會挑戰盃（讓賽）",
+      "name_zh": "华商会挑战杯",
+      "grade": "G3",
+      "distance": "1400",
+      "prize_hkd": "4200000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 5973,
+        "key": "hong-kong-chinese-club-challenge-cup",
+        "canonical_name_original": "Chinese Club Challenge Cup",
+        "chinese_name": "华商会挑战杯"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 14,
+      "date": "2027-01-10",
+      "name_en": "Bauhinia Sprint Trophy (H)",
+      "name_zh_hant": "洋紫荊短途錦標（讓賽）",
+      "name_zh": "洋紫荆短途锦标",
+      "grade": "G3",
+      "distance": "1000",
+      "prize_hkd": "4200000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 5963,
+        "key": "hong-kong-bauhinia-sprint-trophy",
+        "canonical_name_original": "Bauhinia Sprint Trophy",
+        "chinese_name": "洋紫荆短途锦标"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 15,
+      "date": "2027-01-13",
+      "name_en": "January Cup (H)",
+      "name_zh_hant": "一月盃（讓賽）",
+      "name_zh": "一月杯",
+      "grade": "G3",
+      "distance": "1800",
+      "prize_hkd": "4200000",
+      "racecourse": "Happy Valley",
+      "series": {
+        "id": 5997,
+        "key": "hong-kong-january-cup",
+        "canonical_name_original": "January Cup",
+        "chinese_name": "一月杯"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 16,
+      "date": "2027-01-24",
+      "name_en": "Centenary Sprint Cup",
+      "name_zh_hant": "百週年紀念短途盃",
+      "name_zh": "百周年纪念短途杯",
+      "grade": "G1",
+      "distance": "1200",
+      "prize_hkd": "13000000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 5966,
+        "key": "hong-kong-centenary-sprint-cup",
+        "canonical_name_original": "Centenary Sprint Cup",
+        "chinese_name": "百周年纪念短途杯"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 17,
+      "date": "2027-01-31",
+      "name_en": "Stewards’ Cup",
+      "name_zh_hant": "董事盃",
+      "name_zh": "董事杯",
+      "grade": "G1",
+      "distance": "1600",
+      "prize_hkd": "13000000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 6018,
+        "key": "hong-kong-stewards-cup",
+        "canonical_name_original": "Stewards’ Cup",
+        "chinese_name": "董事杯"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 18,
+      "date": "2027-01-31",
+      "name_en": "Hong Kong Classic Mile",
+      "name_zh_hant": "香港經典一哩賽",
+      "name_zh": "香港经典一哩赛",
+      "grade": "4YO",
+      "distance": "1600",
+      "prize_hkd": "14000000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 5978,
+        "key": "hong-kong-hong-kong-classic-mile",
+        "canonical_name_original": "Hong Kong Classic Mile",
+        "chinese_name": "香港经典一哩赛"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 19,
+      "date": "2027-02-14",
+      "name_en": "Centenary Vase (H)",
+      "name_zh_hant": "百週年紀念銀瓶（讓賽）",
+      "name_zh": "百周年纪念银瓶",
+      "grade": "G3",
+      "distance": "1800",
+      "prize_hkd": "4200000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 5967,
+        "key": "hong-kong-centenary-vase",
+        "canonical_name_original": "Centenary Vase",
+        "chinese_name": "百周年纪念银瓶"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 20,
+      "date": "2027-02-21",
+      "name_en": "Queen’s Silver Jubilee Cup",
+      "name_zh_hant": "女皇銀禧紀念盃",
+      "name_zh": "女皇银禧纪念杯",
+      "grade": "G1",
+      "distance": "1400",
+      "prize_hkd": "13000000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 6011,
+        "key": "hong-kong-queen-s-silver-jubilee-cup",
+        "canonical_name_original": "Queen’s Silver Jubilee Cup",
+        "chinese_name": "女皇银禧纪念杯"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 21,
+      "date": "2027-02-28",
+      "name_en": "Hong Kong Classic Cup",
+      "name_zh_hant": "香港經典盃",
+      "name_zh": "香港经典杯",
+      "grade": "4YO",
+      "distance": "1800",
+      "prize_hkd": "14000000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 5977,
+        "key": "hong-kong-hong-kong-classic-cup",
+        "canonical_name_original": "Hong Kong Classic Cup",
+        "chinese_name": "香港经典杯"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 22,
+      "date": "2027-02-28",
+      "name_en": "Citi Hong Kong Gold Cup",
+      "name_zh_hant": "花旗銀行香港金盃",
+      "name_zh": "香港金杯",
+      "grade": "G1",
+      "distance": "2000",
+      "prize_hkd": "13000000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 5983,
+        "key": "hong-kong-hong-kong-gold-cup",
+        "canonical_name_original": "Hong Kong Gold Cup",
+        "chinese_name": "香港金杯"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 23,
+      "date": "2027-03-21",
+      "name_en": "Hong Kong Derby",
+      "name_zh_hant": "香港打吡大賽",
+      "name_zh": "香港打吡大赛",
+      "grade": "4YO",
+      "distance": "2000",
+      "prize_hkd": "28000000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 5981,
+        "key": "hong-kong-hong-kong-derby",
+        "canonical_name_original": "Hong Kong Derby",
+        "chinese_name": "香港打吡大赛"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 24,
+      "date": "2027-04-04",
+      "name_en": "Sprint Cup",
+      "name_zh_hant": "短途錦標",
+      "name_zh": "短途锦标",
+      "grade": "G2",
+      "distance": "1200",
+      "prize_hkd": "5350000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 6017,
+        "key": "hong-kong-sprint-cup",
+        "canonical_name_original": "Sprint Cup",
+        "chinese_name": "短途锦标"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 25,
+      "date": "2027-04-04",
+      "name_en": "Chairman’s Trophy",
+      "name_zh_hant": "主席錦標",
+      "name_zh": "主席锦标",
+      "grade": "G2",
+      "distance": "1600",
+      "prize_hkd": "5350000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 5970,
+        "key": "hong-kong-chairman-s-trophy",
+        "canonical_name_original": "Chairman’s Trophy",
+        "chinese_name": "主席锦标"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 26,
+      "date": "2027-04-25",
+      "name_en": "FWD QEII Cup",
+      "name_zh_hant": "富衛保險女皇盃",
+      "name_zh": "女皇杯",
+      "grade": "G1",
+      "distance": "2000",
+      "prize_hkd": "30000000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 6008,
+        "key": "hong-kong-queen-elizabeth-ii-cup",
+        "canonical_name_original": "Queen Elizabeth II Cup",
+        "chinese_name": "女皇杯"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 27,
+      "date": "2027-04-25",
+      "name_en": "FWD Champions Mile",
+      "name_zh_hant": "富衛保險冠軍一哩賽",
+      "name_zh": "冠军一哩赛",
+      "grade": "G1",
+      "distance": "1600",
+      "prize_hkd": "24000000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 5971,
+        "key": "hong-kong-champions-mile",
+        "canonical_name_original": "Champions Mile",
+        "chinese_name": "冠军一哩赛"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 28,
+      "date": "2027-04-25",
+      "name_en": "Chairman’s Sprint Prize",
+      "name_zh_hant": "主席短途獎",
+      "name_zh": "主席短途奖",
+      "grade": "G1",
+      "distance": "1200",
+      "prize_hkd": "24000000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 5969,
+        "key": "hong-kong-chairman-s-sprint-prize",
+        "canonical_name_original": "Chairman's Sprint Prize",
+        "chinese_name": "主席短途奖"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 29,
+      "date": "2027-05-02",
+      "name_en": "Queen Mother Memorial Cup (H)",
+      "name_zh_hant": "皇太后紀念盃（讓賽）",
+      "name_zh": "皇太后纪念杯",
+      "grade": "G3",
+      "distance": "2400",
+      "prize_hkd": "4200000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 6009,
+        "key": "hong-kong-queen-mother-memorial-cup",
+        "canonical_name_original": "Queen Mother Memorial Cup",
+        "chinese_name": "皇太后纪念杯"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 30,
+      "date": "2027-05-23",
+      "name_en": "Standard Chartered Champions & Chater Cup",
+      "name_zh_hant": "渣打冠軍暨遮打盃",
+      "name_zh": "冠军暨遮打杯",
+      "grade": "G1",
+      "distance": "2400",
+      "prize_hkd": "13000000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 5976,
+        "key": "hong-kong-hong-kong-champions-chater-cup",
+        "canonical_name_original": "Hong Kong Champions & Chater Cup",
+        "chinese_name": "冠军暨遮打杯"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 31,
+      "date": "2027-05-30",
+      "name_en": "Sha Tin Vase (H)",
+      "name_zh_hant": "沙田銀瓶（讓賽）",
+      "name_zh": "沙田银瓶",
+      "grade": "G3",
+      "distance": "1200",
+      "prize_hkd": "4200000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 6016,
+        "key": "hong-kong-sha-tin-vase",
+        "canonical_name_original": "Sha Tin Vase",
+        "chinese_name": "沙田银瓶"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 32,
+      "date": "2027-05-30",
+      "name_en": "Lion Rock Trophy (H)",
+      "name_zh_hant": "獅子山錦標（讓賽）",
+      "name_zh": "狮子山锦标",
+      "grade": "G3",
+      "distance": "1600",
+      "prize_hkd": "4200000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 6002,
+        "key": "hong-kong-lion-rock-trophy",
+        "canonical_name_original": "Lion Rock Trophy",
+        "chinese_name": "狮子山锦标"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 33,
+      "date": "2027-06-20",
+      "name_en": "Premier Cup (H)",
+      "name_zh_hant": "精英盃（讓賽）",
+      "name_zh": "精英杯",
+      "grade": "G3",
+      "distance": "1400",
+      "prize_hkd": "4200000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 6005,
+        "key": "hong-kong-premier-cup",
+        "canonical_name_original": "Premier Cup",
+        "chinese_name": "精英杯"
+      },
+      "existing_event_id": null
+    },
+    {
+      "index": 34,
+      "date": "2027-06-20",
+      "name_en": "Premier Plate (H)",
+      "name_zh_hant": "精英碟（讓賽）",
+      "name_zh": "精英碟",
+      "grade": "G3",
+      "distance": "1800",
+      "prize_hkd": "4200000",
+      "racecourse": "Sha Tin",
+      "series": {
+        "id": 6006,
+        "key": "hong-kong-premier-plate",
+        "canonical_name_original": "Premier Plate",
+        "chinese_name": "精英碟"
+      },
+      "existing_event_id": null
+    }
+  ],
+  "results": [
+    {
+      "rank": 1,
+      "number": "1",
+      "horse_code": "J062",
+      "horse_name": "嘉应高升",
+      "jockey_name": "潘顿",
+      "trainer_name": "大卫希斯",
+      "horse_url": "https://racing.hkjc.com/zh-hk/local/information/horse?horseid=HK_2023_J062",
+      "raw_zh": [
+        "1",
+        "1",
+        "嘉應高昇 (J062)",
+        "潘頓",
+        "大衛希斯",
+        "135",
+        "1172",
+        "1",
+        "---",
+        "1 1 1",
+        "1:06.11",
+        "1"
+      ],
+      "raw_en": [
+        "1",
+        "1",
+        "KA YING RISING (J062)",
+        "Z Purton",
+        "D A Hayes",
+        "135",
+        "1172",
+        "1",
+        "---",
+        "1 1 1",
+        "1:06.11",
+        "1"
+      ]
+    },
+    {
+      "rank": 2,
+      "number": "2",
+      "horse_code": "H408",
+      "horse_name": "合伙奔驰",
+      "jockey_name": "杨明纶",
+      "trainer_name": "吕健威",
+      "horse_url": "https://racing.hkjc.com/zh-hk/local/information/horse?horseid=HK_2022_H408",
+      "raw_zh": [
+        "2",
+        "2",
+        "合夥奔馳 (H408)",
+        "楊明綸",
+        "呂健威",
+        "115",
+        "1114",
+        "5",
+        "7-3/4",
+        "2 2 2",
+        "1:07.35",
+        "107"
+      ],
+      "raw_en": [
+        "2",
+        "2",
+        "COPARTNER PRANCE (H408)",
+        "M L Yeung",
+        "K W Lui",
+        "115",
+        "1114",
+        "5",
+        "7-3/4",
+        "2 2 2",
+        "1:07.35",
+        "107"
+      ]
+    },
+    {
+      "rank": 3,
+      "number": "6",
+      "horse_code": "J333",
+      "horse_name": "魔术控制",
+      "jockey_name": "蔡明绍",
+      "trainer_name": "巫伟杰",
+      "horse_url": "https://racing.hkjc.com/zh-hk/local/information/horse?horseid=HK_2023_J333",
+      "raw_zh": [
+        "3",
+        "6",
+        "魔術控制 (J333)",
+        "蔡明紹",
+        "巫偉傑",
+        "115",
+        "1082",
+        "3",
+        "9-1/4",
+        "4 3 3",
+        "1:07.60",
+        "355"
+      ],
+      "raw_en": [
+        "3",
+        "6",
+        "MAGIC CONTROL (J333)",
+        "M Chadwick",
+        "W K Mo",
+        "115",
+        "1082",
+        "3",
+        "9-1/4",
+        "4 3 3",
+        "1:07.60",
+        "355"
+      ]
+    },
+    {
+      "rank": 4,
+      "number": "4",
+      "horse_code": "H303",
+      "horse_name": "好友心得",
+      "jockey_name": "班德礼",
+      "trainer_name": "大卫希斯",
+      "horse_url": "https://racing.hkjc.com/zh-hk/local/information/horse?horseid=HK_2022_H303",
+      "raw_zh": [
+        "4",
+        "4",
+        "好友心得 (H303)",
+        "班德禮",
+        "大衛希斯",
+        "115",
+        "1207",
+        "6",
+        "10-3/4",
+        "6 5 4",
+        "1:07.84",
+        "220"
+      ],
+      "raw_en": [
+        "4",
+        "4",
+        "TOMODACHI KOKOROE (H303)",
+        "H Bentley",
+        "D A Hayes",
+        "115",
+        "1207",
+        "6",
+        "10-3/4",
+        "6 5 4",
+        "1:07.84",
+        "220"
+      ]
+    },
+    {
+      "rank": 5,
+      "number": "5",
+      "horse_code": "E356",
+      "horse_name": "幸运有您",
+      "jockey_name": "潘明辉",
+      "trainer_name": "罗富全",
+      "horse_url": "https://racing.hkjc.com/zh-hk/local/information/horse?horseid=HK_2020_E356",
+      "raw_zh": [
+        "5",
+        "5",
+        "幸運有您 (E356)",
+        "潘明輝",
+        "羅富全",
+        "116",
+        "1198",
+        "2",
+        "11",
+        "3 4 5",
+        "1:07.88",
+        "235"
+      ],
+      "raw_en": [
+        "5",
+        "5",
+        "LUCKY WITH YOU (E356)",
+        "M F Poon",
+        "F C Lor",
+        "116",
+        "1198",
+        "2",
+        "11",
+        "3 4 5",
+        "1:07.88",
+        "235"
+      ]
+    },
+    {
+      "rank": 6,
+      "number": "3",
+      "horse_code": "J343",
+      "horse_name": "表之星河",
+      "jockey_name": "田泰安",
+      "trainer_name": "文家良",
+      "horse_url": "https://racing.hkjc.com/zh-hk/local/information/horse?horseid=HK_2023_J343",
+      "raw_zh": [
+        "6",
+        "3",
+        "錶之星河 (J343)",
+        "田泰安",
+        "文家良",
+        "115",
+        "1170",
+        "4",
+        "11-1/2",
+        "5 6 6",
+        "1:07.94",
+        "109"
+      ],
+      "raw_en": [
+        "6",
+        "3",
+        "PATCH OF STARS (J343)",
+        "K Teetan",
+        "K L Man",
+        "115",
+        "1170",
+        "4",
+        "11-1/2",
+        "5 6 6",
+        "1:07.94",
+        "109"
+      ]
+    }
+  ],
+  "completed_start": "2026-09-06T13:30:00+08:00",
+  "programme_evidence": {
+    "start_page": 18,
+    "fixture_pages": [
+      52,
+      53
+    ],
+    "surface": "turf",
+    "going": "好地至快地",
+    "course_layout": "A"
+  },
+  "existing_sha256": "14f31cb40e9b07d460b832ff01a4df73627742a492406647ed748061553e5b38"
+}

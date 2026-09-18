@@ -9651,3 +9651,7 @@ RACE_DATA_RAW_ARTIFACT_ROOTS=/run/race-data-sync
 历史四个固定包合计129场1209行生产apply及verify通过，129条独立审计回执。只写赛果与确认状态；生产版本仍d0bb40fb，JRA=true。完整回填包留在持久artifacts/race-gap-backfill-20260918。赛前完整基线仅留服务器0600文件，本地只保留公开身份/摘要SHA，避免导出控制载荷。
 
 下一窄发布包含人工核验参考候选展示（不建canonical），与六场已公开完整名单和赛时补空。无迁移、无配置/频率/额度修改；正常低成本发布重建四应用并检查Nginx上游，DB/Redis/OneBot不重建。以固定提交、独立目录、现有persistent/TLS绑定执行，先备份和原release coordinator预检。发布/回填后检查两域名及每场名单；任何基线漂移停止该场，不能覆盖新状态。无通知或主动恢复旧LIVE。
+
+## 2026-09-18 香港新赛季固定资料包
+
+本轮是数据导入，不重建应用。参见[执行计划](changes/import-hk-season-20260918/PLAN.md)及`scripts/run_reviewed_hk_season.py`：共享部署锁内核验固定7e111914和导入/维护状态，seal绑定脚本、manifest与官源原件；dry-run、0600私有before、既有custom格式备份、重新dry-run、一次事务apply和幂等verify顺序执行。生产包在`/opt/umanewsbot-persistent/runtime/artifacts/hk-season-20260918`；不在仓库提交私有快照或备份。写后逐场验收两域名详情、2026/2027筛选和行政长官杯完整6结果；旧香港杯与暂缓三场摘要须保持一致。

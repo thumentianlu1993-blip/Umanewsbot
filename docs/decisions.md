@@ -3680,3 +3680,7 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
   后续继续自然轮询，跨 provider local date 后只走受审 exact race-id 路由。
 - Compose 重建 Web 会改变容器 IP；当前 Nginx upstream 在 reload 时解析服务名，因此每次 Web 重建后必须
   先 `nginx -t` 再平滑 reload，并同时验收 root/www，而不能把内部 health 或旧连接的 200 当公网恢复。
+
+## 2026-09-18 香港新赛季导入口径
+
+香港2026/27沿用现有分级/重要系列口径，以HKJC当季PatternRace中英文一致的35场为范围，不导入普通赛日全部场次。year与edition_year保留公历年（2026有13场、2027有22场），赛季记入来源；4YO保持OTHER而不升格G1，香港零点日期不当作赛时。仅新增缺少的34场，既有香港杯不覆盖；已结束行政长官杯必须完整官方赛果与finished状态原子落库。一次性受审数据包即可完成，不改通用历史导入门禁或新建采集架构。

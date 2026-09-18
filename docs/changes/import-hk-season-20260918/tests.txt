@@ -1,0 +1,31 @@
+Using existing test database for alias 'default' ('test_hk_season_20260918')...
+test_apply_complete_and_replay_preserves_existing (stable.tests.test_reviewed_hk_season.HKSeasonTests.test_apply_complete_and_replay_preserves_existing) ... /Users/mentianlu/Code/umanews/.venv/lib/python3.12/site-packages/django/core/handlers/base.py:61: UserWarning: No directory at: /private/tmp/umanews-hk-season-20260918/server/staticfiles/
+  mw_instance = middleware(adapted_handler)
+ok
+test_dates_and_dry_run_have_no_writes (stable.tests.test_reviewed_hk_season.HKSeasonTests.test_dates_and_dry_run_have_no_writes) ... ok
+test_duplicate_on_another_series_rejected (stable.tests.test_reviewed_hk_season.HKSeasonTests.test_duplicate_on_another_series_rejected) ... ok
+test_existing_and_series_drift_rejected (stable.tests.test_reviewed_hk_season.HKSeasonTests.test_existing_and_series_drift_rejected) ... ok
+test_full_transaction_rollback (stable.tests.test_reviewed_hk_season.HKSeasonTests.test_full_transaction_rollback) ... ok
+test_invalid_source_scope_result_and_time_rejected (stable.tests.test_reviewed_hk_season.HKSeasonTests.test_invalid_source_scope_result_and_time_rejected) ... ok
+test_maintenance_gate_blocks_without_partial_rows (stable.tests.test_reviewed_hk_season.HKSeasonTests.test_maintenance_gate_blocks_without_partial_rows) ... ok
+test_replay_drift_rejected (stable.tests.test_reviewed_hk_season.HKSeasonTests.test_replay_drift_rejected) ... ok
+test_wrong_manifest_digest_rejected (stable.tests.test_reviewed_hk_season.HKSeasonTests.test_wrong_manifest_digest_rejected) ... ok
+test_healthcheck_unhealthy_and_starting_rejected (stable.tests.test_reviewed_hk_season.HKProductionWindowTests.test_healthcheck_unhealthy_and_starting_rejected) ... ok
+test_pre_apply_failure_and_confirmed_completion_release_lock (stable.tests.test_reviewed_hk_season.HKProductionWindowTests.test_pre_apply_failure_and_confirmed_completion_release_lock) ... ok
+test_uncertain_apply_retains_exclusion_lock (stable.tests.test_reviewed_hk_season.HKProductionWindowTests.test_uncertain_apply_retains_exclusion_lock) ... ok
+
+----------------------------------------------------------------------
+Ran 12 tests in 1.380s
+
+OK
+Preserving test database for alias 'default' ('test_hk_season_20260918')...
+Found 12 test(s).
+Operations to perform:
+  Synchronize unmigrated apps: django_filters, messages, staticfiles
+  Apply all migrations: admin, auth, contenttypes, sessions, stable
+Synchronizing apps without migrations:
+  Creating tables...
+    Running deferred SQL...
+Running migrations:
+  No migrations to apply.
+System check identified no issues (0 silenced).
