@@ -1,3 +1,7 @@
+## 赛事信息归一化展示开关（2026-09-18，尚未发布）
+
+`RACE_INFORMATION_NORMALIZED_DISPLAY_ENABLED` 默认 false。新展示与旧字段／统计开关独立；无迁移、无数据回填。启用前解释显式单位缺口并检查各入口，恢复时关闭新开关并重载应用配置；不清空Redis。精确影响与验收见[本次发布说明](changes/normalize-race-information/rollout.md)。此处不代表生产已部署或启用。
+
 ## 2026-09-18 PR205 发布完成
 
 固定应用`7e111914`已通过标准lowcost/0078发布；四应用实际镜像`8f311074…`，DB/Redis/OneBot/Nginx容器保持，Nginx已重载。无迁移、无配置/频率变化、无新增资料写入；备份560559376字节及SHA、intent/manifest/complete、空迁移计划和锁清理全部验证。双域名9场77条新预览、3场JRA预览及主域名129场历史结果通过。精确路径、恢复约束与证据见[发布记录](changes/complete-race-gaps-20260918/release.md)。

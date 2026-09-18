@@ -1,3 +1,4 @@
+{% load race_information %}
 <aside class="rail">
   {% if hot_articles %}
     <section class="rail-card" aria-label="热门榜">
@@ -31,10 +32,10 @@
   {% if next_key_race %}
     <section class="rail-card" aria-label="即将开赛">
       <h2 class="rail-title">即将开赛</h2>
-      <p class="countdown-race">{{ next_key_race.chinese_name }}{% if next_key_race.grade_badge_label %} · {{ next_key_race.grade_badge_label }}{% endif %}</p>
-      <p class="countdown-meta">{{ next_key_race.get_country_region_display }} · {{ next_key_race.racecourse }}{% if next_key_race.distance_text %} · {{ next_key_race.distance_text }}{% endif %}</p>
+      <p class="countdown-race">{% race_field next_key_race "name" next_key_race.chinese_name %}{% if next_key_race.grade_badge_label %} · {% race_field next_key_race "grade" next_key_race.grade_badge_label %}{% endif %}</p>
+      <p class="countdown-meta">{{ next_key_race.get_country_region_display }} · {% race_field next_key_race "racecourse" next_key_race.racecourse %}{% if next_key_race.distance_text %} · {% race_field next_key_race "distance" next_key_race.distance_text %}{% endif %}</p>
       <div class="countdown-digits tabular">
-        {{ next_key_race.local_date|date:"n月j日" }} · {{ next_key_race.public_time_label }}
+        {% race_field next_key_race "date" next_key_race.local_date|date:"n月j日" %} · {% race_field next_key_race "time" next_key_race.public_time_label %}
         <small>{% if next_key_race.status == "finished" %}已完赛{% else %}开跑{% endif %}</small>
       </div>
     </section>

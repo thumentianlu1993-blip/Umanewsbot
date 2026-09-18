@@ -1242,3 +1242,371 @@ def normalize_context(
         source_language=source_language,
         reason=_make_reason("normalized", reason_code),
     )
+
+# 严格展示合同独立于 v1 写入合同；以下函数不查库，也不读取开关。
+from decimal import Decimal, localcontext
+from fractions import Fraction
+import json
+
+RACE_INFORMATION_DISPLAY_VERSION = 'race-information-display.v1'
+
+
+@dataclass(frozen=True)
+class DisplayField:
+    text: str
+    state: str
+    reason_code: str
+    input_sha256: str
+    rule_version: str = RACE_INFORMATION_DISPLAY_VERSION
+    code: str = ''
+    meters: Decimal | None = None
+    source_unit: str = ''
+    approximate: bool = False
+    min_age: int | None = None
+    max_age: int | None = None
+    age_open_ended: bool = False
+
+
+def display_field(raw, text='', *, state='normalized', reason='normalized', context=None, **values):
+    payload = {'raw': raw, 'context': context or {}, 'version': RACE_INFORMATION_DISPLAY_VERSION}
+    digest = hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str,
+                                       separators=(',', ':')).encode()).hexdigest()
+    if state == 'missing':
+        text = '—'
+    elif state in {'unknown', 'conflict'}:
+        text = '待核实'
+    return DisplayField(text, state, reason, digest, **values)
+
+
+def _display_text(raw):
+    return unicodedata.normalize('NFKC', str(raw if raw is not None else '')).strip()
+
+
+def _missing(raw, context=None):
+    return display_field(raw, state='missing', reason='missing', context=context)
+
+
+def _unresolved(raw, reason='unsupported_format', *, context=None, conflict=False):
+    return display_field(raw, state='conflict' if conflict else 'unknown', reason=reason, context=context)
+
+
+def _fraction_text(value):
+    value = Fraction(value)
+    denominator = value.denominator
+    for divisor in (2, 5):
+        while denominator % divisor == 0:
+            denominator //= divisor
+    if denominator != 1:
+        return f'{value.numerator}/{value.denominator}'
+    with localcontext() as ctx:
+        ctx.prec = max(40, len(str(value.numerator)) + len(str(value.denominator)) + 5)
+        text = format(Decimal(value.numerator) / Decimal(value.denominator), 'f')
+    return text.rstrip('0').rstrip('.') if '.' in text else text
+
+
+_NUMBER = r'(?:\d+\s+\d+/\d+|\d+/\d+|\d+(?:\.\d+)?)'
+_DISTANCE_TOKEN = re.compile(
+    rf'({_NUMBER})\s*(メートル|kilometers?|kilometres?|meters?|metres?|furlongs?|miles?|feet|foot|yards?|'
+    r'公里|英里|英尺|千米|米|fur|km|ft|yd|mi|m|f|y)', re.I)
+_UNIT_ALIASES = {
+    **{k: 'meter' for k in ('米', 'meter', 'meters', 'metre', 'metres', 'メートル')},
+    **{k: 'kilometer' for k in ('km', '公里', '千米', 'kilometer', 'kilometers', 'kilometre', 'kilometres')},
+    **{k: 'mile' for k in ('mile', 'miles', 'mi', '英里')},
+    **{k: 'foot' for k in ('ft', 'foot', 'feet', '英尺')},
+    **{k: 'yard' for k in ('yd', 'y', 'yard', 'yards')},
+    **{k: 'furlong' for k in ('f', 'fur', 'furlong', 'furlongs')},
+}
+_METERS = {'meter': Fraction(1), 'kilometer': Fraction(1000), 'mile': Fraction('1609.344'),
+           'foot': Fraction('0.3048'), 'yard': Fraction('0.9144'), 'furlong': Fraction('201.168')}
+
+
+def _number_fraction(text):
+    bits = text.split()
+    return sum((Fraction(bit) for bit in bits), Fraction(0))
+
+
+def parse_display_distance(raw, *, unit_hint='', official_metric_meters=None, context=None):
+    """m/裸数字只有显式来源单位证据才能解析；不按地区、数字大小猜。"""
+    ctx = {**(context or {}), 'unit_hint': unit_hint, 'official_metric': official_metric_meters}
+    text = _display_text(raw).replace('⁄', '/')
+    if not text:
+        return _missing(raw, ctx)
+    if len(text) > 512:
+        return _unresolved(raw, 'input_too_long', context=ctx)
+    # NFKC 把 1½ 变成 11/2，不能把它当十一分之二或5.5；先在原串中展开。
+    original = str(raw)
+    fractions = {'½': '1/2', '¼': '1/4', '¾': '3/4', '⅛': '1/8', '⅜': '3/8', '⅝': '5/8', '⅞': '7/8'}
+    for symbol, value in fractions.items():
+        original = re.sub(rf'(?<=\d){symbol}', ' ' + value, original).replace(symbol, value)
+    text = _display_text(original).replace('⁄', '/')
+    approximate = bool(re.match(r'^(?:约|約|about\s+|approx\.?\s*)', text, re.I))
+    text = re.sub(r'^(?:约|約|about\s+|approx\.?\s*)', '', text, flags=re.I).strip()
+    annotation = re.search(r'\(约(\d+)米\)$', text)
+    rounded_annotation = int(annotation.group(1)) if annotation else None
+    if annotation:
+        text = text[:annotation.start()].strip()
+    hint_text = unit_hint.lower() if isinstance(unit_hint, str) else ''
+    hint = _UNIT_ALIASES.get(hint_text, hint_text)
+    if hint == 'm':
+        hint = 'meter'
+    if re.fullmatch(_NUMBER, text):
+        if hint not in _METERS:
+            return _unresolved(raw, 'ambiguous_unit', context=ctx)
+        text += {'meter': '米', 'kilometer': '公里', 'mile': '英里', 'foot': '英尺',
+                 'yard': 'yd', 'furlong': 'fur'}[hint]
+    values = []
+    end = 0
+    try:
+        for token in _DISTANCE_TOKEN.finditer(text):
+            if text[end:token.start()].strip():
+                return _unresolved(raw, 'unconsumed_token', context=ctx)
+            amount = _number_fraction(token.group(1))
+            unit = token.group(2).lower()
+            if unit == 'm':
+                if hint not in {'meter', 'mile'}:
+                    return _unresolved(raw, 'ambiguous_unit', context=ctx)
+                unit = hint
+            else:
+                unit = _UNIT_ALIASES[unit]
+            if amount < 0:
+                return _unresolved(raw, 'invalid_distance', context=ctx)
+            values.append((amount, unit))
+            end = token.end()
+        if not values or text[end:].strip() or len({u for _, u in values}) != len(values):
+            return _unresolved(raw, 'unconsumed_token', context=ctx)
+        metric = all(u in {'meter', 'kilometer'} for _, u in values)
+        if not metric and any(u in {'meter', 'kilometer'} for _, u in values):
+            return _unresolved(raw, 'mixed_unit_system', context=ctx, conflict=True)
+        meters = sum((v * _METERS[u] for v, u in values), Fraction(0))
+        if meters <= 0 or meters > 1000000:
+            return _unresolved(raw, 'invalid_distance', context=ctx)
+        rounded = (meters * 2 + 1) // 2  # 正数精确 ROUND_HALF_UP
+        if official_metric_meters is not None and Fraction(str(official_metric_meters)) != meters:
+            return _unresolved(raw, 'metric_conflict', context=ctx, conflict=True)
+        if rounded_annotation is not None and (metric or rounded_annotation != rounded):
+            return _unresolved(raw, 'annotation_conflict', context=ctx, conflict=True)
+        if metric:
+            label = _fraction_text(meters) + '米'
+        else:
+            feet = meters / _METERS['foot']
+            if len(values) == 1 and values[0][1] == 'foot':
+                label = _fraction_text(feet) + '英尺'
+            elif feet % 660 == 0:
+                label = _fraction_text(feet / 5280) + '英里'
+            else:
+                miles, remaining = divmod(feet, 5280)
+                label = (f'{miles}英里' if miles else '') + (_fraction_text(remaining) + '英尺' if remaining else '')
+            label += f'（约{rounded}米）'
+        with localcontext() as decimal_context:
+            decimal_context.prec = 40
+            decimal_meters = Decimal(meters.numerator) / Decimal(meters.denominator)
+        return display_field(raw, ('约' if approximate else '') + label, context=ctx,
+                             meters=decimal_meters, source_unit='+'.join(u for _, u in values), approximate=approximate)
+    except (ValueError, ZeroDivisionError, ArithmeticError):
+        return _unresolved(raw, 'invalid_distance', context=ctx)
+
+
+_DISPLAY_GRADE_LABELS = {**{f'G{i}': f'G{i}' for i in range(1, 4)},
+                         **{f'JPN{i}': f'Jpn{i}' for i in range(1, 4)},
+                         **{f'JG{i}': f'J-G{i}' for i in range(1, 4)}, 'L': 'L', 'OP': 'OP'}
+_DISPLAY_CLASSES = {'NEWCOMER': '新马', 'MAIDEN': '未胜利', '1WIN': '1胜级', '2WIN': '2胜级', '3WIN': '3胜级',
+                    '新馬': '新马', '新马': '新马', '未勝利': '未胜利', '未胜利': '未胜利'}
+
+
+def parse_display_grade(raw, *, normalized_grade='', context=None):
+    ctx = {**(context or {}), 'normalized_grade': normalized_grade}
+    text = _display_text(raw).upper()
+    stored = _display_text(normalized_grade).upper()
+    if not text:
+        if stored in _DISPLAY_GRADE_LABELS:
+            return display_field(raw, _DISPLAY_GRADE_LABELS[stored], code=stored, context=ctx)
+        return _missing(raw, ctx) if not stored else _unresolved(raw, 'unverified_grade', context=ctx)
+    if len(text) > 512:
+        return _unresolved(raw, 'input_too_long', context=ctx)
+    if text in _DISPLAY_CLASSES or re.fullmatch(r'[123]勝(?:クラス)?', text):
+        if stored in _DISPLAY_GRADE_LABELS:
+            return _unresolved(raw, 'grade_conflict', context=ctx, conflict=True)
+        return display_field(raw, '—', state='preserved', reason='race_class_not_grade', context=ctx)
+    if text in {'无分级', 'UN GRADED', 'UNGRADED'}:
+        return display_field(raw, '无分级', context=ctx) if not stored else _unresolved(raw, 'grade_conflict', context=ctx, conflict=True)
+    text = re.sub(r'^(?:重赏|重賞)\s*', '', text)
+    compact = re.sub(r'[\s・.\-]', '', text)
+    code = ''
+    match = re.fullmatch(r'(JPN|JG|GROUP|GROUPE|GRADE|G)(III|II|I|[123])', compact)
+    if match:
+        system = match.group(1)
+        number = {'I': '1', 'II': '2', 'III': '3'}.get(match.group(2), match.group(2))
+        code = (system if system in {'JPN', 'JG'} else 'G') + number
+    elif compact in {'L', 'LISTED', 'リステッド', 'リステッド競走'}:
+        code = 'L'
+    elif compact in {'OP', 'OPEN', 'オープン'}:
+        code = 'OP'
+    # 地方代码仅识别明确体系；不能把“香港一级赛”等转成国际等级。
+    elif re.fullmatch(r'(?:HKG|SI|SII|SIII)[123]?', compact):
+        return _unresolved(raw, 'local_grade_requires_profile', context=ctx)
+    if not code:
+        return _unresolved(raw, 'unverified_grade', context=ctx)
+    if stored and stored != code:
+        return _unresolved(raw, 'grade_conflict', context=ctx, conflict=True)
+    return display_field(raw, _DISPLAY_GRADE_LABELS[code], code=code, context=ctx)
+
+
+def parse_display_eligibility(raw):
+    text = _display_text(raw)
+    if not text:
+        return _missing(raw)
+    # 每个片段都必须可识别，不能丢掉额外资格条件。
+    sex = ''
+    for token, label in [('fillies and mares', '仅限雌马'), ('fillies', '仅限雌马'), ('牝馬', '仅限雌马'),
+                         ('牝', '仅限雌马'), ('雌马', '仅限雌马')]:
+        if token in text.lower():
+            text = re.sub(re.escape(token), '', text, flags=re.I).strip(' ,、・')
+            sex = label
+            break
+    match = re.fullmatch(r'(\d{1,2})\s*(?:yo|歳|岁)(\+|以上|及以上)?', text, re.I)
+    if not match:
+        return display_field(raw, sex) if sex and not text else _unresolved(raw)
+    age, open_ended = int(match[1]), bool(match[2])
+    if not 1 <= age <= 30:
+        return _unresolved(raw, 'invalid_age')
+    label = f'{age}岁' + ('及以上' if open_ended else '') + (f' · {sex}' if sex else '')
+    return display_field(raw, label, min_age=age, max_age=None if open_ended else age, age_open_ended=open_ended)
+
+
+def parse_display_weight(raw, *, unit_hint=''):
+    text = _display_text(raw).lower()
+    if not text:
+        return _missing(raw)
+    if re.fullmatch(r'\d+(?:\.\d+)?', text) and unit_hint in {'kg', 'lb'}:
+        text += unit_hint
+    match = re.fullmatch(r'(\d{1,3}(?:\.\d+)?)\s*(kg|千克|公斤|lb|lbs|磅)', text)
+    if not match or not 0 < Decimal(match[1]) <= 1000:
+        return _unresolved(raw, 'weight_unit_unknown', context={'unit': unit_hint})
+    value = Fraction(match[1])
+    if match[2] in {'kg', '千克', '公斤'}:
+        label = _fraction_text(value) + '千克'
+    else:
+        kilos = value * Fraction('0.45359237')
+        rounded = (kilos * 20 + 1) // 2
+        label = _fraction_text(value) + f'磅（约{Decimal(rounded) / 10:.1f}千克）'
+    return display_field(raw, label, context={'unit': unit_hint})
+
+
+def parse_display_time(raw):
+    text = _display_text(raw)
+    if not text:
+        return _missing(raw)
+    match = re.fullmatch(r'(?:(\d{1,3})[:分])?(\d{1,2}(?:\.\d{1,6})?)(?:秒)?', text)
+    if not match or Decimal(match[2]) >= 60 or Decimal(match[2]) < 0:
+        return _unresolved(raw, 'time_format_unknown')
+    if not match[1] and not text.endswith('秒'):
+        return _unresolved(raw, 'time_format_unknown')
+    seconds = match[2].lstrip('0') or '0'
+    if seconds.startswith('.'):
+        seconds = '0' + seconds
+    return display_field(raw, (f'{int(match[1])}分' if match[1] else '') + seconds + '秒')
+
+
+_DISPLAY_MARGINS = {'nose': '鼻差', 'nse': '鼻差', 'ハナ': '鼻差', '鼻差': '鼻差',
+                    'head': '头差', 'hd': '头差', 'アタマ': '头差', '头差': '头差',
+                    'neck': '颈差', 'nk': '颈差', 'クビ': '颈差', '颈差': '颈差',
+                    'short head': '短头差', 'shd': '短头差', '同着': '同着', 'dead heat': '同着', 'dh': '同着'}
+
+
+def parse_display_margin(raw, *, unit_hint='', basis=''):
+    text = _display_text(raw).lower().replace('⁄', '/')
+    if not text:
+        return _missing(raw)
+    if text in _DISPLAY_MARGINS:
+        return display_field(raw, _DISPLAY_MARGINS[text], context={'basis': basis})
+    original = str(raw)
+    for symbol, val in [('½', '1/2'), ('¼', '1/4'), ('¾', '3/4')]:
+        original = re.sub(rf'(?<=\d){symbol}', ' ' + val, original).replace(symbol, val)
+    text = _display_text(original).lower()
+    match = re.fullmatch(rf'({_NUMBER})\s*(lengths?|l|马身)?', text)
+    try:
+        if match and (match[2] or unit_hint == 'length'):
+            value = _number_fraction(match[1])
+            if value >= 0:
+                return display_field(raw, _fraction_text(value) + '马身', context={'basis': basis})
+    except (ValueError, ZeroDivisionError):
+        pass
+    return _unresolved(raw, 'margin_format_unknown')
+
+
+def parse_display_number(raw, *, popularity=False):
+    text = _display_text(raw)
+    if not text:
+        return _missing(raw)
+    pattern = r'(?:第)?(\d{1,3})(?:番人気|热门|人气)?' if popularity else r'(\d{1,4}[A-Za-z]?)'
+    match = re.fullmatch(pattern, text)
+    if not match:
+        return _unresolved(raw)
+    value = match[1].upper()
+    if popularity:
+        return display_field(raw, f'第{int(value)}热门') if int(value) > 0 else _unresolved(raw)
+    number = re.match(r'\d+', value)[0]
+    return display_field(raw, str(int(number)) + value[len(number):])
+
+
+def parse_display_odds(raw, *, odds_format=''):
+    text = _display_text(raw)
+    if not text:
+        return _missing(raw)
+    labels = {'decimal': '十进制', 'fractional': '分数', 'hong_kong': '香港'}
+    if odds_format not in labels:
+        return _unresolved(raw, 'odds_format_unknown')
+    pattern = r'\d+/[1-9]\d*' if odds_format == 'fractional' else r'\d+(?:\.\d+)?'
+    if not re.fullmatch(pattern, text):
+        return _unresolved(raw, 'invalid_odds')
+    value = Fraction(text)
+    if value < (1 if odds_format == 'decimal' else 0):
+        return _unresolved(raw, 'invalid_odds')
+    return display_field(raw, f'{text}（{labels[odds_format]}）', context={'format': odds_format})
+
+
+def parse_display_surface(raw):
+    text = _display_text(raw).lower()
+    labels = {'turf': '草地', '芝': '草地', '草地': '草地', 'dirt': '泥地', 'ダート': '泥地', '泥地': '泥地',
+              'synthetic': '复合赛道', '复合赛道': '复合赛道'}
+    if not text:
+        return _missing(raw)
+    return display_field(raw, labels[text]) if text in labels else _unresolved(raw, 'surface_context_unknown')
+
+
+def parse_display_layout(raw):
+    text = _display_text(raw)
+    if not text:
+        return _missing(raw)
+    labels = {'left': '左转', '左回り': '左转', '左': '左转', '左转': '左转',
+              'right': '右转', '右回り': '右转', '右': '右转', '右转': '右转',
+              'inner': '内圈', '内回り': '内圈', '内': '内圈', '内圈': '内圈',
+              'outer': '外圈', '外回り': '外圈', '外': '外圈', '外圈': '外圈', 'straight': '直道', '直道': '直道'}
+    tokens = re.split(r'[ /・,、]+', text.lower())
+    if all(t in labels for t in tokens):
+        values = list(dict.fromkeys(labels[t] for t in tokens))
+        if {'左转','右转'} <= set(values) or {'内圈','外圈'} <= set(values):
+            return _unresolved(raw, 'layout_conflict', conflict=True)
+        return display_field(raw, ' · '.join(values))
+    return _unresolved(raw, 'layout_unknown')
+
+
+def parse_display_race_type(raw):
+    text = _display_text(raw).lower()
+    labels = {'jumps':'障碍','障害':'障碍','障碍':'障碍','flat':'平地','平地':'平地',
+              'hurdle':'栏架障碍','steeplechase':'越野障碍','越野障碍':'越野障碍'}
+    if not text:
+        return _missing(raw)
+    return display_field(raw, labels[text]) if text in labels else _unresolved(raw, 'race_type_unknown')
+
+
+def parse_display_money(raw, *, currency='', kind=''):
+    text = _display_text(raw)
+    if not text:
+        return display_field(raw, state='missing', reason='unsupported_missing_source')
+    currencies = {'USD':'美元','GBP':'英镑','EUR':'欧元','JPY':'日元','HKD':'港元','CNY':'人民币元'}
+    if currency not in currencies or kind not in {'total','winner'}:
+        return _unresolved(raw, 'money_context_unknown', context={'currency':currency,'kind':kind})
+    if not re.fullmatch(r'\d+(?:\.\d{1,2})?', text):
+        return _unresolved(raw, 'money_format_unknown')
+    return display_field(raw, _fraction_text(Fraction(text))+currencies[currency], context={'currency':currency,'kind':kind})

@@ -3,6 +3,11 @@
 {% block title %}{{ page_title }} - 赛马新闻后台{% endblock %}
 
 {% block content %}
+  {% if race_information_enabled %}<section class="panel"><h3>标准展示预览（尚未应用到原始数据）</h3><table><thead><tr><th>字段</th><th>原始值</th><th>展示值</th><th>处理状态</th></tr></thead><tbody>
+    <tr><td>等级</td><td>{{ event.grade_text }}</td><td>{{ event.public_display.grade.text }}</td><td>{{ event.public_display.grade.reason_code }}</td></tr>
+    <tr><td>距离</td><td>{{ event.distance_text }}</td><td>{{ event.public_display.distance.text }}</td><td>{{ event.public_display.distance.reason_code }}</td></tr>
+  </tbody></table></section>{% endif %}
+
   <div class="page-header">
     <div>
       <h2 class="page-title">{{ page_title }}</h2>
@@ -101,7 +106,7 @@
                 <td>{{ candidate.confidence }}%</td>
                 <td><span class="badge {% if candidate.status == 'applied' %}success{% endif %}">{{ candidate.get_status_display }}</span></td>
                 <td>{{ candidate.fetched_at|date:"Y-m-d H:i" }}</td>
-                <td><code>{{ candidate.diff_payload|truncatechars:120 }}</code></td>
+                <td><code>{{ candidate.diff_payload|truncatechars:120 }}</code>{% if race_information_enabled and candidate.normalized_preview %}<details><summary>标准展示预览（最多20行）</summary>{% for preview in candidate.normalized_preview %}<p>{% for label, text in preview %}{{ label }}：{{ text }}{% if not forloop.last %} · {% endif %}{% endfor %}</p>{% endfor %}</details>{% endif %}</td>
                 <td>
                   {% if candidate.source_name == 'jra_pre_race_v1' or candidate.raw_payload.jra_pre_race_v1 %}
                     <span class="muted">赛前专用候选，不支持通用应用</span>

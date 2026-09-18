@@ -174,7 +174,11 @@ class RaceTermResolver:
     Request-scoped batch term resolver — type-separated, region + language aware.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, mode="legacy") -> None:
+        if mode not in {"legacy", "strict_display_v1"}:
+            raise ValueError("unknown term display mode")
+        self.mode = mode
+        self.strict = StrictRaceTermResolver() if mode == "strict_display_v1" else None
         self._race_names: Set[Tuple[str, str, str]] = set()
         self._racecourse_names: Set[Tuple[str, str, str]] = set()
         self._resolved: bool = False
@@ -196,6 +200,14 @@ class RaceTermResolver:
             self._racecourse_names.add((normalized, region, source_language))
 
     def resolve(self) -> None:
+        if self.strict is not None:
+            if not self._resolved:
+                for kind, names in ((TermType.RACE, self._race_names), (TermType.RACECOURSE, self._racecourse_names)):
+                    for name, region, language in names:
+                        self.strict.add(name, kind, region, language)
+                self.strict.resolve()
+                self._resolved = True
+            return
         if self._resolved:
             return
         lookups = resolve_batch_race_terms(
@@ -211,6 +223,8 @@ class RaceTermResolver:
     ) -> str:
         if not self._resolved:
             self.resolve()
+        if self.strict is not None:
+            return self.strict.field(name, TermType.RACE, region, source_language).text
         return display_race_name(name, self._race_lookup, region, source_language)
 
     def display_racecourse_name(
@@ -218,4 +232,75 @@ class RaceTermResolver:
     ) -> str:
         if not self._resolved:
             self.resolve()
+        if self.strict is not None:
+            return self.strict.field(name, TermType.RACECOURSE, region, source_language).text
         return display_racecourse_name(name, self._racecourse_lookup, region, source_language)
+
+
+# 新模式先合并主名和别名，再按实体去重；legacy路径保持原样。
+import unicodedata
+from dataclasses import replace
+from django.db.models import Q
+from stable.services.race_field_normalization import display_field
+
+
+def display_identity(value):
+    return ' '.join(unicodedata.normalize('NFKC', value or '').casefold().split())
+
+
+class StrictRaceTermResolver:
+    def __init__(self):
+        self.requests = set()
+        self.results = {}
+
+    def add(self, value, term_type, region='', language='', year=None):
+        self.requests.add((str(value or ''), term_type, region or '', language or '', year))
+
+    def resolve(self):
+        for term_type in {r[1] for r in self.requests}:
+            requests = [r for r in self.requests if r[1] == term_type and r[0].strip()]
+            if not requests:
+                continue
+            primary_query, alias_query = Q(pk__in=[]), Q(pk__in=[])
+            # bounded by rendered page inputs; no full-table Python scan.
+            for name in {r[0] for r in requests}:
+                for variant in {name.strip(), ' '.join(unicodedata.normalize('NFKC', name).split())}:
+                    primary_query |= Q(source_ja__iexact=variant)
+                    alias_query |= Q(text__iexact=variant)
+            regions = {r[2] for r in requests} | {''}
+            candidates = []
+            entries = TermEntry.objects.filter(primary_query, term_type=term_type, is_active=True,
+                                                racing_region__in=regions).values(
+                'id', 'source_ja', 'target_zh', 'racing_region', 'source_language')
+            for entry in entries:
+                candidates.append((entry['id'], display_identity(entry['source_ja']), entry['target_zh'],
+                                   entry['racing_region'], entry['source_language']))
+            aliases = TermAlias.objects.filter(alias_query, term__term_type=term_type, is_active=True,
+                                                term__is_active=True, term__racing_region__in=regions).values(
+                'term_id', 'text', 'term__target_zh', 'term__racing_region', 'source_language')
+            for alias in aliases:
+                candidates.append((alias['term_id'], display_identity(alias['text']), alias['term__target_zh'],
+                                   alias['term__racing_region'], alias['source_language']))
+            for req in requests:
+                name, _, region, language, year = req
+                found = [c for c in candidates if c[1] == display_identity(name) and (not language or c[4] == language)]
+                local = [c for c in found if c[3] == region]
+                tier = local if local else [c for c in found if c[3] == '']
+                by_entity = {c[0]: c for c in tier}
+                context = {'type': term_type, 'region': region, 'language': language, 'year': year}
+                if len(by_entity) == 1:
+                    candidate = next(iter(by_entity.values()))
+                    self.results[req] = display_field(name, candidate[2] or name, context=context,
+                                                      state='normalized' if candidate[2] else 'preserved',
+                                                      reason='formal_term' if candidate[2] else 'untranslated_term')
+                else:
+                    # 专名冲突保留原名，原因仍记录为 conflict，不选任意实体。
+                    self.results[req] = replace(display_field(name, ' '.join(name.split()), state='conflict' if by_entity else 'preserved',
+                                                      reason='term_conflict' if by_entity else 'term_missing', context=context), text=' '.join(name.split()))
+        return self
+
+    def field(self, value, term_type, region='', language='', year=None):
+        key = (str(value or ''), term_type, region or '', language or '', year)
+        if not value:
+            return display_field(value, state='missing', reason='missing')
+        return self.results.get(key, display_field(value, ' '.join(str(value).split()), state='preserved', reason='term_missing'))

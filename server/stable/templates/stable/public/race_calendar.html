@@ -1,4 +1,5 @@
 {% extends "stable/public/base.html" %}
+{% load race_information %}
 
 {% block title %}赛事日历{% endblock %}
 
@@ -15,8 +16,8 @@
         <div class="focus-strip-races">
           {% for event in focus_events %}
             <a class="focus-strip-race" href="{{ event.public_path }}">
-              <b>{{ event.chinese_name }}</b>
-              <span>{{ event.local_date|date:"m月d日" }} · {{ event.racecourse }}</span>
+              <b>{% race_field event "name" event.chinese_name %}</b>
+              <span>{% race_field event "date" event.local_date|date:"m月d日" %} · {% race_field event "racecourse" event.racecourse %}</span>
             </a>
           {% endfor %}
         </div>
@@ -114,18 +115,18 @@
           <div class="agenda-races">
             {% for event in group.events %}
               <a class="cal-card" href="{{ event.public_path }}">
-                <span class="grade-badge {{ event.grade_badge_class }}">{{ event.grade_badge_label }}</span>
+                <span class="grade-badge {{ event.grade_badge_class }}">{% race_field event "grade" event.grade_badge_label %}</span>
                 <span class="cal-card-main">
-                  <span class="cal-card-name">{{ event.chinese_name }}{% if event.original_name and event.original_name != event.chinese_name %}<small>{{ event.original_name }}</small>{% endif %}</span>
+                  <span class="cal-card-name">{% race_field event "name" event.chinese_name %}{% if event.original_name and event.original_name != event.chinese_name %}<small>{{ event.original_name }}</small>{% endif %}</span>
                   <span class="cal-card-meta">
-                    <span>{{ event.get_country_region_display }} · {{ event.racecourse }}</span>
-                    {% if event.distance_text %}<span>{{ event.distance_text }}</span>{% elif event.surface %}<span>{{ event.get_surface_display }}</span>{% endif %}
-                    {% if event.eligibility_text %}<span>{{ event.eligibility_text }}</span>{% endif %}
+                    <span>{{ event.get_country_region_display }} · {% race_field event "racecourse" event.racecourse %}</span>
+                    {% if event.distance_text %}<span>{% race_field event "distance" event.distance_text %}</span>{% elif event.surface %}<span>{% race_field event "surface" event.get_surface_display %}</span>{% endif %}
+                    {% if event.eligibility_text %}<span>{% race_field event "eligibility" event.eligibility_text %}</span>{% endif %}
                   </span>
                 </span>
                 <span class="cal-card-status">
                   <strong>{{ event.public_status_label }}</strong>
-                  {% if event.public_winner_name %}<small>冠军 {{ event.public_winner_name }}</small>{% elif event.status == 'scheduled' %}<small>{{ event.public_time_label }}</small>{% endif %}
+                  {% if event.public_winner_name %}<small>冠军 {% race_field event "winner" event.public_winner_name %}</small>{% elif event.status == 'scheduled' %}<small>{% race_field event "time" event.public_time_label %}</small>{% endif %}
                 </span>
               </a>
             {% endfor %}

@@ -47,7 +47,9 @@ class ReviewedPreviewTests(TestCase):
   import hashlib
   self.c.candidate_payload['items'][0]['running_status']='withdrawn'
   self.c.raw_payload['reviewed_pre_race_v1']['items_sha256']=hashlib.sha256(json.dumps(self.c.candidate_payload['items'],sort_keys=True,separators=(',',':'),ensure_ascii=False).encode()).hexdigest();self.c.save()
-  with patch('stable.views.timezone.now',return_value=NOW):self.assertContains(self.client.get('/races/2026/reviewed/'),'退出')
+  for normalized, label in [(False, '退出'), (True, '取消出走')]:
+   with override_settings(RACE_INFORMATION_NORMALIZED_DISPLAY_ENABLED=normalized), patch('stable.views.timezone.now',return_value=NOW):
+    self.assertContains(self.client.get('/races/2026/reviewed/'),label)
  def test_generic_apply_rejects_preview_only_candidate_even_if_source_renamed(self):
   from stable.services.race_events import apply_data_candidate
   for name in ['reviewed_pre_race_v1','renamed']:
