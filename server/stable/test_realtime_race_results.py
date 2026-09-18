@@ -4512,9 +4512,12 @@ class RaceLivePublicStatusTests(TestCase):
         self.assertContains(response, events[-1].chinese_name)
         # 预算 12 -> 14：默认日期窗口改造获批新增 2 条有界日期聚合查询
         # （docs/changes/fix-race-calendar-default-date-window/design.md）；修改前实测 12 条。
+        from django.conf import settings
+        # 新展示最多五类实体各两次批量查询；旧开关路径仍按14条预算。
+        term_budget = 10 if settings.RACE_INFORMATION_NORMALIZED_DISPLAY_ENABLED else 0
         self.assertLessEqual(
             len(captured),
-            14,
+            14 + term_budget,
             f"赛事日历 live read gate 查询数不应随 40 场赛事线性增长，实际 {len(captured)}",
         )
 

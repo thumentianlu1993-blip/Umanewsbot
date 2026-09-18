@@ -1,8 +1,9 @@
+{% load race_information %}
 {% if flash_race %}
   <a class="flash-card" href="{{ flash_race.event.public_path }}">
-    <div class="flash-kicker">赛事快讯 · {{ flash_race.event.grade_badge_label }} · {{ flash_race.event.get_country_region_display }}</div>
-    <h3 class="flash-title">{{ flash_race.event.chinese_name }}</h3>
-    <p class="flash-result">冠军 <b>{{ flash_race.winner }}</b></p>
+    <div class="flash-kicker">赛事快讯 · {% race_field flash_race.event "grade" flash_race.event.grade_badge_label %} · {{ flash_race.event.get_country_region_display }}</div>
+    <h3 class="flash-title">{% race_field flash_race.event "name" flash_race.event.chinese_name %}</h3>
+    <p class="flash-result">冠军 <b>{% if race_information_enabled %}{{ flash_race.display_winner }}{% else %}{{ flash_race.winner }}{% endif %}</b></p>
     <span class="flash-link">查看完整赛果 →</span>
   </a>
 {% endif %}

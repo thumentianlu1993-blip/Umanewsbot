@@ -1,6 +1,7 @@
 {% extends "stable/public/base.html" %}
+{% load race_information %}
 
-{% block title %}{{ event.chinese_name }} {{ event.year }}{% endblock %}
+{% block title %}{% race_field event "name" event.chinese_name %} {{ event.year }}{% endblock %}
 
 {% block content %}
   <main class="race-page">
@@ -12,14 +13,14 @@
     {% if canonical_product_event %}
       <aside class="panel" role="note" aria-label="赛事正式展示入口">
         此为保留的旧赛事入口。当前正式展示赛事：
-        <a href="{{ canonical_product_event.public_path }}">{{ canonical_product_event.chinese_name }}</a>
+        <a href="{{ canonical_product_event.public_path }}">{% race_field canonical_product_event "name" canonical_product_event.chinese_name %}</a>
       </aside>
     {% endif %}
 
     <section class="race-hero state-{{ event.status }}">
       <div class="race-hero-top">
-        <span class="grade-badge {{ event.grade_badge_class }}">{{ event.grade_badge_label }}</span>
-        <span class="race-hero-meta-text">{{ event.get_country_region_display }} · {{ event.racecourse }} · {% if event.distance_text %}{{ event.distance_text }}{% else %}{{ event.get_surface_display }}{% endif %}</span>
+        <span class="grade-badge {{ event.grade_badge_class }}">{% race_field event "grade" event.grade_badge_label %}</span>
+        <span class="race-hero-meta-text">{{ event.get_country_region_display }} · {% race_field event "racecourse" event.racecourse %} · {% if event.distance_text %}{% race_field event "distance" event.distance_text %}{% else %}{% race_field event "surface" event.get_surface_display %}{% endif %}</span>
         {% if series_events %}
           <details class="race-year-switcher">
             <summary>{{ event.year }}</summary>
@@ -33,27 +34,27 @@
           <span class="race-hero-year">{{ event.year }}</span>
         {% endif %}
       </div>
-      <h1 class="race-hero-name">{{ event.chinese_name }}</h1>
-      <p class="race-hero-original">{% if event.original_name and event.original_name != event.chinese_name %}{{ event.original_name }} · {% endif %}{% if event.local_date %}{{ event.local_date|date:"Y-m-d" }}{% endif %} · {{ event.public_time_label }}</p>
+      <h1 class="race-hero-name">{% race_field event "name" event.chinese_name %}</h1>
+      <p class="race-hero-original">{% if event.original_name and event.original_name != event.chinese_name %}{{ event.original_name }} · {% endif %}{% if event.local_date %}{% race_field event "date" event.local_date|date:"Y-m-d" %}{% endif %} · {% race_field event "time" event.public_time_label %}</p>
 
       {% if winner %}
         <span class="winner-ribbon">WINNER · 冠军</span>
-        <div class="winner-name">{{ winner.display_horse_name }}</div>
+        <div class="winner-name">{% race_field winner "horse_name" winner.display_horse_name %}</div>
         <div class="winner-crew">
-          {% if winner.display_jockey_name %}<div><span>骑师</span><b>{{ winner.display_jockey_name }}</b></div>{% endif %}
-          {% if winner.trainer_name %}<div><span>练马师</span><b>{{ winner.trainer_name }}</b></div>{% endif %}
-          {% if winner.finish_time %}<div><span>完赛时间</span><b>{{ winner.finish_time }}</b></div>{% endif %}
-          {% if winner.popularity %}<div><span>人气</span><b>第 {{ winner.popularity }} 人气</b></div>{% endif %}
+          {% if winner.display_jockey_name or race_information_enabled and winner.jockey_name %}<div><span>骑师</span><b>{% race_field winner "jockey_name" winner.display_jockey_name %}</b></div>{% endif %}
+          {% if winner.trainer_name %}<div><span>练马师</span><b>{% race_field winner "trainer_name" winner.trainer_name %}</b></div>{% endif %}
+          {% if winner.finish_time %}<div><span>完赛时间</span><b>{% race_field winner "finish_time" winner.finish_time %}</b></div>{% endif %}
+          {% if winner.popularity %}<div><span>{% if race_information_enabled %}热门排名{% else %}人气{% endif %}</span><b>{% if race_information_enabled %}{% race_field winner "popularity" %}{% else %}第 {{ winner.popularity }} 人气{% endif %}</b></div>{% endif %}
         </div>
         {% if top_results|length > 1 %}
           <div class="podium-line">
             {% for result in top_results|slice:"1:3" %}
-              <span>{{ result.display_finish_position }}名 <b>{{ result.display_horse_name }}</b>{% if result.margin %}（{{ result.margin }}）{% endif %}</span>
+              <span>{% race_field result "position" result.display_finish_position %}名 <b>{% race_field result "horse_name" result.display_horse_name %}</b>{% if result.margin %}（{% race_field result "margin" result.margin %}）{% endif %}</span>
             {% endfor %}
           </div>
         {% endif %}
       {% else %}
-        <div class="countdown-hero-digits">{{ status_label }}{% if event.status == 'scheduled' and event.local_start_time %}<small>{{ event.public_time_label }}</small>{% endif %}</div>
+        <div class="countdown-hero-digits">{{ status_label }}{% if event.status == 'scheduled' and event.local_start_time %}<small>{% race_field event "time" event.public_time_label %}</small>{% endif %}</div>
       {% endif %}
       {% if live_result_status.is_stale %}
         <aside class="race-result-status" role="status">数据可能已过期</aside>
@@ -71,12 +72,17 @@
     <section class="panel" id="overview">
       <h2>基础资料</h2>
       <div class="race-meta-grid">
-        <div><span>等级</span><b>{{ event.grade_text }}</b></div>
-        <div><span>日期</span><b>{{ event.local_date|date:"Y-m-d"|default:"待定" }}</b></div>
-        <div><span>时间</span><b>{{ event.public_time_label }}</b></div>
-        <div><span>马场</span><b>{{ event.racecourse }}</b></div>
-        {% if event.distance_text %}<div><span>距离</span><b>{{ event.distance_text }}</b></div>{% elif event.surface %}<div><span>场地</span><b>{{ event.get_surface_display }}</b></div>{% endif %}
-        {% if event.eligibility_text %}<div><span>参赛条件</span><b>{{ event.eligibility_text }}</b></div>{% endif %}
+        {% if race_information_enabled %}
+          <div><span>场地</span><b>{% race_field event "surface" %}</b></div>
+          {% if event.public_display.race_type.state != 'missing' %}<div><span>赛种</span><b>{% race_field event "race_type" %}</b></div>{% endif %}
+          {% if event.public_display.race_class.state != 'missing' %}<div><span>类别</span><b>{% race_field event "race_class" %}</b></div>{% endif %}
+        {% endif %}
+        <div><span>等级</span><b>{% race_field event "grade" event.grade_text %}</b></div>
+        <div><span>日期</span><b>{% race_field event "date" event.local_date|date:"Y-m-d"|default:"待定" %}</b></div>
+        <div><span>时间</span><b>{% race_field event "time" event.public_time_label %}</b></div>
+        <div><span>马场</span><b>{% race_field event "racecourse" event.racecourse %}</b></div>
+        {% if event.distance_text %}<div><span>距离</span><b>{% race_field event "distance" event.distance_text %}</b></div>{% elif event.surface %}<div><span>场地</span><b>{% race_field event "surface" event.get_surface_display %}</b></div>{% endif %}
+        {% if event.eligibility_text %}<div><span>参赛条件</span><b>{% race_field event "eligibility" event.eligibility_text %}</b></div>{% endif %}
         <div><span>状态</span><b>{{ status_label }}</b></div>
       </div>
     </section>
@@ -86,18 +92,18 @@
       {% if runners %}
         <div class="race-table-wrap">
           <table class="data-table">
-            <thead><tr><th>闸位</th><th>马号</th><th>马名</th><th>骑师</th><th>练马师</th><th>负磅</th><th>赔率 / 热门</th><th>状态</th></tr></thead>
+            <thead><tr><th>闸位</th><th>马号</th><th>马名</th><th>骑师</th><th>练马师</th><th>{% if race_information_enabled %}负重{% else %}负磅{% endif %}</th><th>{% if race_information_enabled %}赔率 / 热门排名{% else %}赔率 / 热门{% endif %}</th><th>状态</th></tr></thead>
             <tbody>
               {% for runner in runners %}
                 <tr>
-                  <td><span class="barrier-chip">{% if runner.barrier and runner.barrier != "0" %}{{ runner.barrier }}{% else %}—{% endif %}</span></td>
-                  <td class="num">{{ runner.horse_number|default:"-" }}</td>
-                  <td><strong>{{ runner.display_horse_name }}</strong></td>
-                  <td>{{ runner.display_jockey_name|default:"-" }}</td>
-                  <td>{{ runner.trainer_name|default:"-" }}</td>
-                  <td>{{ runner.carried_weight|default:"-" }}</td>
-                  <td>{{ runner.odds_value|default:"-" }} / {{ runner.popularity|default:"-" }}{% if runner.dynamic_updated_at %}<small>{{ runner.dynamic_updated_at|date:"m-d H:i" }} 更新</small>{% endif %}</td>
-                  <td>{{ runner.get_running_status_display }}</td>
+                  <td><span class="barrier-chip">{% if runner.barrier and runner.barrier != "0" %}{% race_field runner "barrier" runner.barrier %}{% else %}—{% endif %}</span></td>
+                  <td class="num">{% race_field runner "horse_number" runner.horse_number|default:"-" %}</td>
+                  <td><strong>{% race_field runner "horse_name" runner.display_horse_name %}</strong></td>
+                  <td>{% race_field runner "jockey_name" runner.display_jockey_name|default:"-" %}</td>
+                  <td>{% race_field runner "trainer_name" runner.trainer_name|default:"-" %}</td>
+                  <td>{% race_field runner "weight" runner.carried_weight|default:"-" %}</td>
+                  <td>{% race_field runner "odds" runner.odds_value|default:"-" %} / {% race_field runner "popularity" runner.popularity|default:"-" %}{% if runner.dynamic_updated_at %}<small>{{ runner.dynamic_updated_at|date:"m-d H:i" }} 更新</small>{% endif %}</td>
+                  <td>{% race_field runner "status" runner.get_running_status_display %}</td>
                 </tr>
               {% endfor %}
             </tbody>
@@ -113,18 +119,18 @@
         <h2>{{ result_section_label }}</h2>
         <div class="race-table-wrap">
           <table class="data-table">
-            <thead><tr><th>名次</th><th>马号</th><th>马名</th><th>骑师</th><th>练马师</th><th>时间</th><th>差距</th><th>赔率 / 人气</th></tr></thead>
+            <thead><tr><th>名次</th><th>马号</th><th>马名</th><th>骑师</th><th>练马师</th><th>时间</th><th>差距</th><th>{% if race_information_enabled %}赔率 / 热门排名{% else %}赔率 / 人气{% endif %}</th></tr></thead>
             <tbody>
               {% for result in results %}
                 <tr class="{% if result.display_finish_position == 1 %}medal-1{% elif result.display_finish_position == 2 %}medal-2{% elif result.display_finish_position == 3 %}medal-3{% endif %}">
-                  <td>{{ result.display_finish_position }}</td>
-                  <td class="num">{{ result.horse_number|default:"-" }}</td>
-                  <td><strong>{{ result.display_horse_name }}</strong></td>
-                  <td>{{ result.display_jockey_name|default:"-" }}</td>
-                  <td>{{ result.trainer_name|default:"-" }}</td>
-                  <td class="num">{{ result.finish_time|default:"-" }}</td>
-                  <td>{{ result.margin|default:"-" }}</td>
-                  <td>{{ result.odds_value|default:"-" }} / {{ result.popularity|default:"-" }}</td>
+                  <td>{% race_field result "position" result.display_finish_position %}</td>
+                  <td class="num">{% race_field result "horse_number" result.horse_number|default:"-" %}</td>
+                  <td><strong>{% race_field result "horse_name" result.display_horse_name %}</strong></td>
+                  <td>{% race_field result "jockey_name" result.display_jockey_name|default:"-" %}</td>
+                  <td>{% race_field result "trainer_name" result.trainer_name|default:"-" %}</td>
+                  <td class="num">{% race_field result "finish_time" result.finish_time|default:"-" %}</td>
+                  <td>{% race_field result "margin" result.margin|default:"-" %}</td>
+                  <td>{% race_field result "odds" result.odds_value|default:"-" %} / {% race_field result "popularity" result.popularity|default:"-" %}</td>
                 </tr>
               {% endfor %}
             </tbody>
@@ -138,12 +144,12 @@
         <h2>历年冠军</h2>
         <div class="history-timeline">
           {% for history in history_primary %}
-            <div class="history-row"><span class="history-year">{{ history.winner_year }}</span><span class="history-horse">{{ history.display_horse_name }}</span><span class="history-crew">{{ history.display_jockey_name|default:"-" }} · {{ history.trainer_name|default:"-" }}{% if history.finish_time %} · {{ history.finish_time }}{% endif %}</span></div>
+            <div class="history-row"><span class="history-year">{{ history.winner_year }}</span><span class="history-horse">{% race_field history "horse_name" history.display_horse_name %}</span><span class="history-crew">{% race_field history "jockey_name" history.display_jockey_name|default:"-" %} · {% race_field history "trainer_name" history.trainer_name|default:"-" %}{% if history.finish_time %} · {% race_field history "finish_time" history.finish_time %}{% endif %}</span></div>
           {% endfor %}
           {% if history_extra %}
             <details class="history-more"><summary>展开更多年份（{{ history_extra|length }}）</summary>
               {% for history in history_extra %}
-                <div class="history-row"><span class="history-year">{{ history.winner_year }}</span><span class="history-horse">{{ history.display_horse_name }}</span><span class="history-crew">{{ history.display_jockey_name|default:"-" }} · {{ history.trainer_name|default:"-" }}{% if history.finish_time %} · {{ history.finish_time }}{% endif %}</span></div>
+                <div class="history-row"><span class="history-year">{{ history.winner_year }}</span><span class="history-horse">{% race_field history "horse_name" history.display_horse_name %}</span><span class="history-crew">{% race_field history "jockey_name" history.display_jockey_name|default:"-" %} · {% race_field history "trainer_name" history.trainer_name|default:"-" %}{% if history.finish_time %} · {% race_field history "finish_time" history.finish_time %}{% endif %}</span></div>
               {% endfor %}
             </details>
           {% endif %}

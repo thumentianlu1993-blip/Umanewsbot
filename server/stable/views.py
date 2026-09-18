@@ -615,7 +615,7 @@ def race_event_edit(request: HttpRequest, event_id: int | None = None):
         logs = OperationLog.objects.filter(target_type__in=["race_event", "article_race_link"]).filter(
             Q(target_id=str(event.pk)) | Q(detail__icontains=f"event={event.pk}")
         )[:20]
-    return render(
+    return _render_race_information(
         request,
         "stable/console/race_event_form.html",
         _console_context(
@@ -2773,7 +2773,7 @@ def _horse_stats(profile: HorseProfile) -> dict[str, int]:
 
 
 def _horse_record_position(record: HorseRaceRecord) -> str:
-    display_enabled = getattr(settings, "RACE_FIELD_NORMALIZED_DISPLAY_ENABLED", False)
+    display_enabled = getattr(settings, "RACE_FIELD_NORMALIZED_DISPLAY_ENABLED", False) and not getattr(settings, "RACE_INFORMATION_NORMALIZED_DISPLAY_ENABLED", False)
 
     if display_enabled:
         if record.normalized_finish_position is not None:
@@ -3433,7 +3433,7 @@ def _group_race_events_by_date(events, *, today, anchor_date=None):
     _attach_race_term_display_names([(event, event.top_results) for event in events])
     for event in events:
         if event.public_winner_result:
-            event.public_winner_name = event.public_winner_result.display_horse_name
+            event.public_winner_name = getattr(event.public_winner_result, "display_horse_name", event.public_winner_result.horse_name)
     return groups
 
 
@@ -3538,6 +3538,9 @@ def _sort_runners_for_display(runners, country_region: str):
 
 
 def _attach_race_term_display_names(event_records):
+    from .services.race_information_display import enabled
+    if enabled():
+        return event_records
     records = [(event, item) for event, items in event_records for item in items]
     source_names = {
         str(value).strip()
@@ -3692,7 +3695,7 @@ def public_race_calendar(request: HttpRequest):
         {"value": "", "label": "全部时间", "is_active": filters["when"] == "", "url": filter_url(when="")},
         {"value": "finished", "label": "已完赛", "is_active": filters["when"] == "finished", "url": filter_url(when="finished")},
     ]
-    return render(
+    return _render_race_information(
         request,
         "stable/public/race_calendar.html",
         {
@@ -3943,7 +3946,7 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
         if len(candidates) > 1:
             series_events = candidates
     has_news = any(news_groups.values())
-    return render(
+    return _render_race_information(
         request,
         "stable/public/race_detail.html",
         {
@@ -4059,7 +4062,7 @@ def public_news_feed(request: HttpRequest):
     today_races, today_races_is_fallback = _public_today_races()
     next_key_race = _public_next_key_race()
     flash_race = next((entry for entry in today_races if entry["winner"]), None)
-    return render(
+    return _render_race_information(
         request,
         "stable/public/feed.html",
         {
@@ -4133,7 +4136,7 @@ def public_article_detail(request: HttpRequest, article_id: int):
         if event.status == RaceEventStatus.SCHEDULED and (event.local_date is None or event.local_date >= today):
             teaser_event = event
             break
-    return render(
+    return _render_race_information(
         request,
         "stable/public/detail.html",
         {
@@ -4224,8 +4227,11 @@ def public_horse_detail(request: HttpRequest, profile_id: int):
     # When the display flag is enabled, resolve formal Chinese names via the
     # term database.  When disabled, fall back to the original names so the
     # template never encounters a missing attribute.
-    display_enabled = getattr(settings, "RACE_FIELD_NORMALIZED_DISPLAY_ENABLED", False)
-    major_wins_list = list(major_win_records(profile))
+    display_enabled = getattr(settings, "RACE_FIELD_NORMALIZED_DISPLAY_ENABLED", False) and not getattr(settings, "RACE_INFORMATION_NORMALIZED_DISPLAY_ENABLED", False)
+    major_wins_query = major_win_records(profile)
+    if getattr(settings, 'RACE_INFORMATION_NORMALIZED_DISPLAY_ENABLED', False):
+        major_wins_query = major_wins_query.select_related('event', 'result')
+    major_wins_list = list(major_wins_query)
 
     if display_enabled:
         from stable.services.race_field_normalization import PROVIDER_LANGUAGE_MAP
@@ -4305,7 +4311,7 @@ def public_horse_detail(request: HttpRequest, profile_id: int):
         HorseProfile.objects.filter(Q(sire_horse_profile=profile) | Q(dam_horse_profile=profile), review_status=HorseProfileStatus.PUBLISHED)
         .order_by("racing_region", "display_name_zh", "id")[:12]
     )
-    return render(
+    return _render_race_information(
         request,
         "stable/public/horse_detail.html",
         {
@@ -4703,3 +4709,8 @@ def term_toggle_active_api(request: HttpRequest, term_id: int) -> JsonResponse:
         admin=request.user,
     )
     return JsonResponse({"ok": True, "term": _term_payload(term)})
+
+
+def _render_race_information(request, template_name, context):
+    from .services.race_information_display import prepare_context
+    return render(request, template_name, prepare_context(context))

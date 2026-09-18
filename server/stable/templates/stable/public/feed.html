@@ -1,4 +1,5 @@
 {% extends "stable/public/base.html" %}
+{% load race_information %}
 
 {% block title %}UmaFans 赛马新闻{% endblock %}
 
@@ -19,18 +20,18 @@
             </div>
             {% for entry in today_races %}
               <a class="race-row" href="{{ entry.event.public_path }}">
-                <span class="grade-badge {{ entry.event.grade_badge_class }}">{{ entry.event.grade_badge_label }}</span>
+                <span class="grade-badge {{ entry.event.grade_badge_class }}">{% race_field entry.event "grade" entry.event.grade_badge_label %}</span>
                 <span class="race-row-main">
-                  <span class="race-row-name">{{ entry.event.chinese_name }}</span>
-                  <span class="race-row-meta">{{ entry.event.get_country_region_display }} · {{ entry.event.racecourse }}{% if entry.event.distance_text %} · {{ entry.event.distance_text }}{% endif %}</span>
+                  <span class="race-row-name">{% race_field entry.event "name" entry.event.chinese_name %}</span>
+                  <span class="race-row-meta">{{ entry.event.get_country_region_display }} · {% race_field entry.event "racecourse" entry.event.racecourse %}{% if entry.event.distance_text %} · {% race_field entry.event "distance" entry.event.distance_text %}{% endif %}</span>
                 </span>
                 <span class="race-row-status">
                   {% if entry.event.status == "finished" %}
                     <span class="status-chip done">{{ entry.status_label }}</span>
-                    {% if entry.winner %}<div class="race-row-winner">冠军 <b>{{ entry.winner }}</b></div>{% endif %}
+                    {% if entry.winner %}<div class="race-row-winner">冠军 <b>{% if race_information_enabled %}{{ entry.display_winner }}{% else %}{{ entry.winner }}{% endif %}</b></div>{% endif %}
                   {% else %}
                     <span class="status-chip soon">{{ entry.status_label }}</span>
-                    <div class="race-row-winner tabular">{{ entry.event.public_time_label }}</div>
+                    <div class="race-row-winner tabular">{% race_field entry.event "time" entry.event.public_time_label %}</div>
                   {% endif %}
                 </span>
               </a>
