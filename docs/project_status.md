@@ -1,3 +1,7 @@
+## 2026-09-20 多来源赛事登记修复进入已审核方案阶段
+
+All Comers 漏登记根因已定位：TRA 空响应、JRA 候选不能独立登记、赛后发现退出，以及未登记赛事不在监控分母。新隔离分支 `codex/multisource-race-enrollment` 的七地区多源登记、强身份去重、赛后补入与覆盖监测方案，经独立 Agent 两轮审核通过。当前未实施、未部署，不能称赛事状态或赛果已恢复；以[当前状态](current_state.md)、[方案](changes/multisource-race-enrollment/PLAN.md)及[审核](changes/multisource-race-enrollment/REVIEW.md)为准。
+
 ## 2026-09-19 PR210 修复已上线，两轮自然刷新通过
 
 固定应用`3a174b1e`经PR210合并`63e5b58a`，22:09:22 UTC（北京时间06:09）完成0078前向发布；实际镜像`sha256:1622560c7f522d5078adbed5049e7bf7ab57e537bff57b97b37df0c83aec57a2`。5129项全量保留16失败/29错误/20跳过，45失败ID与此前生产完全一致、无新增；45项发布合同通过，固定reviewer独立复核APPROVED。不是全套全绿，汇总job未计作通过。

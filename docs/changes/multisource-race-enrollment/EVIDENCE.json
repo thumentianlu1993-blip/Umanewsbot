@@ -1,0 +1,771 @@
+{
+  "scope": "2026-09-20 15:11-15:17 +08:00 read-only production audit; Redis sample bounded and incomplete",
+  "production_commit": "3a174b1e93c499f293deeabfff4dfa71b427a684",
+  "image": "sha256:1622560c7f522d5078adbed5049e7bf7ab57e537bff57b97b37df0c83aec57a2",
+  "event": {
+    "id": 104,
+    "slug": "jra-2026-0920-01",
+    "original_name": "オールカマー",
+    "chinese_name": "产经赏All Comers",
+    "status": "scheduled",
+    "race_datetime": "2026-09-20 06:45:00+00:00",
+    "local_start_time": "15:45:00",
+    "timezone_name": "Asia/Tokyo",
+    "result_confirmed_at": null,
+    "source_refs": {
+      "primary": "https://www.jra.go.jp/datafile/seiseki/replay/2026/jyusyo.html",
+      "source_kind": "jra_official_graded_race_list",
+      "pre_race_checks": {
+        "tra_identity": {
+          "reason": "response_empty",
+          "baseline": {
+            "date": "2026-09-20",
+            "name": "オールカマー",
+            "course": "中山",
+            "event_id": 104,
+            "timezone": "Asia/Tokyo"
+          },
+          "failures": 0,
+          "lease_token": "",
+          "lease_until": null,
+          "next_poll_at": "2026-09-20T06:50:00+00:00",
+          "last_attempt_at": "2026-09-20T06:47:04.456163+00:00",
+          "last_checked_at": "2026-09-20T06:47:05.740159+00:00",
+          "last_success_at": "2026-09-20T06:47:05.740159+00:00"
+        },
+        "jra_pre_race_v1": {
+          "reason": "",
+          "baseline": {
+            "date": "2026-09-20",
+            "name": "オールカマー",
+            "course": "中山",
+            "event_id": 104,
+            "timezone": "Asia/Tokyo"
+          },
+          "failures": 0,
+          "lease_token": "",
+          "lease_until": null,
+          "next_poll_at": "2026-09-20T06:50:00+00:00",
+          "last_attempt_at": "2026-09-20T06:47:00.039490+00:00",
+          "last_changed_at": "2026-09-18T21:47:05.454073+00:00",
+          "last_checked_at": "2026-09-20T06:47:02.137408+00:00",
+          "last_success_at": "2026-09-20T06:47:02.137408+00:00"
+        }
+      },
+      "source_language": "ja",
+      "jra_pre_race_url": "https://www.jra.go.jp/JRADB/accessD.html?CNAME=pw01dde0106202604061120260920/D6",
+      "jra_result_label": "",
+      "post_time_policy": "not_recorded_in_jra_graded_race_list",
+      "jra_pre_race_time": {
+        "value": "2026-09-20T15:45:00+09:00",
+        "baseline": {
+          "date": "2026-09-20",
+          "name": "オールカマー",
+          "course": "中山",
+          "event_id": 104,
+          "timezone": "Asia/Tokyo"
+        },
+        "raw_sha256": "99d7968650a60c381bac4c2277982dd7ef45119d90dbb6b33d7bc5de500cc6b5",
+        "source_url": "https://www.jra.go.jp/JRADB/accessD.html?CNAME=pw01dde0106202604061120260920/D6",
+        "local_start_time": "15:45:00"
+      },
+      "jockey_source_text": "",
+      "winner_source_text": "",
+      "jra_pre_race_binding": {
+        "url": "https://www.jra.go.jp/JRADB/accessD.html?CNAME=pw01dde0106202604061120260920/D6",
+        "baseline": {
+          "date": "2026-09-20",
+          "name": "オールカマー",
+          "course": "中山",
+          "event_id": 104,
+          "timezone": "Asia/Tokyo"
+        }
+      }
+    },
+    "manual_lock_flags": {},
+    "updated_at": "2026-09-20 06:47:05.745633+00:00"
+  },
+  "settings": {
+    "RACE_DATA_SYNC_ALLOW_NETWORK": true,
+    "RACE_DATA_SYNC_CLAIM_TTL_SECONDS": 240,
+    "RACE_DATA_SYNC_CORRECTION_APPLY_ENABLED": true,
+    "RACE_DATA_SYNC_ENABLED": true,
+    "RACE_DATA_SYNC_FUTURE_BATCH_SIZE": 20,
+    "RACE_DATA_SYNC_FUTURE_DISCOVERY_ENABLED": true,
+    "RACE_DATA_SYNC_FUTURE_HORIZON_DAYS": 30,
+    "RACE_DATA_SYNC_FUTURE_MANIFEST_TTL_SECONDS": 900,
+    "RACE_DATA_SYNC_FUTURE_STANDING_POLICY_FILE": "/app/runtime/policies/race_data_sync/standing_policy.json",
+    "RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256": "4e000fd7510c076eb798345ff1d9dd5cded8043477dd2d55613cecebead31a07",
+    "RACE_DATA_SYNC_JRA_PRE_RACE_ENABLED": true,
+    "RACE_DATA_SYNC_LEGACY_TRANSFER_APPROVAL_SHA256": "",
+    "RACE_DATA_SYNC_LIFECYCLE_APPLY_ENABLED": true,
+    "RACE_DATA_SYNC_PRE_RACE_REFRESH_ENABLED": true,
+    "RACE_DATA_SYNC_RACECARD_APPLY_ENABLED": true,
+    "RACE_DATA_SYNC_REFERENCE_REGISTRY_SHA256": "740a93774927765f9c848cc97e4b87b78ab36d473c4c3e2e644d56a6f856cff2",
+    "RACE_DATA_SYNC_RESULT_APPLY_ENABLED": true,
+    "RACE_DATA_SYNC_RESULT_PUBLIC_ENABLED": true,
+    "RACE_DATA_SYNC_SCHEDULER_ENABLED": true,
+    "RACE_DATA_SYNC_SCHEDULE_APPLY_ENABLED": true,
+    "RACE_DATA_SYNC_SELECTOR_BATCH_SIZE": 100,
+    "RACE_EVENT_LIFECYCLE_BATCH_SIZE": 100,
+    "RACE_EVENT_LIFECYCLE_CLAIM_TTL_SECONDS": 240,
+    "RACE_EVENT_LIFECYCLE_ENABLED": true,
+    "RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS": "",
+    "RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256": "",
+    "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_ACTIVATION_ID": "888e4bddf43c86f58b8365c62d2c389cd97a15fc341e5ede6f2b857e4d489aaa",
+    "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBERSHIP_SHA256": "b290700270b4d813134a671e19d25f38e77d6d98d6a11f8f16954c59bae754cc",
+    "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBER_COUNT": 1,
+    "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_SHA256": "28c327c0897f3c1559dfa99fc9fed76532dc1b1bee6f2ed994db4e680e5bb1a9",
+    "RACE_EVENT_LIFECYCLE_MODE": "enforce",
+    "RACE_EVENT_LIFECYCLE_SOFT_TIME_LIMIT": 120,
+    "RACE_EVENT_LIFECYCLE_TIME_LIMIT": 150
+  },
+  "event_empty_tables": [
+    "RaceDataSyncEnrollment",
+    "RaceEventProjectionControl",
+    "RaceEventLiveTracking",
+    "RaceEventLifecycleControl",
+    "RaceEventLifecycleTransition",
+    "RaceResultSourceIdentity",
+    "RaceEventRevision",
+    "RaceEventResult"
+  ],
+  "enrollment_counts": [
+    {
+      "state": "enrolled",
+      "n": 15
+    }
+  ],
+  "census_replay_and_peers": {
+    "at": "2026-09-20 07:14:31.367288+00:00",
+    "regions": [
+      "france",
+      "hong_kong",
+      "ireland",
+      "japan_jra",
+      "japan_nar",
+      "united_kingdom",
+      "united_states"
+    ],
+    "providers": [
+      "horse_racing_nation",
+      "sporting_life",
+      "the_racing_api",
+      "zeturf"
+    ],
+    "beat": {
+      "scheduled-race-result-review": "{'task': 'stable.tasks.scheduled_race_result_review_task', 'schedule': <crontab: 30 6,18 * * * (m/h/dM/MY/d)>}",
+      "reconcile-stale-race-result-review-claims": "{'task': 'stable.tasks.reconcile_stale_race_result_review_claims_task', 'schedule': <crontab: */5 * * * * (m/h/dM/MY/d)>, 'options': {'queue': 'celery', 'expires': 240}}",
+      "discover-p0-racecard-urls": "{'task': 'stable.tasks.discover_p0_racecard_urls_task', 'schedule': <crontab: 30 6,18 * * * (m/h/dM/MY/d)>}",
+      "scan-due-race-lifecycle": "{'task': 'stable.tasks.scan_due_race_event_lifecycle_task', 'schedule': <crontab: */5 * * * * (m/h/dM/MY/d)>}",
+      "select-due-race-data-sync": "{'task': 'stable.tasks.select_due_race_data_sync_task', 'schedule': <crontab: * * * * * (m/h/dM/MY/d)>, 'options': {'queue': 'celery', 'expires': 55}}",
+      "discover-future-race-data-sync": "{'task': 'stable.tasks.discover_future_race_data_sync_task', 'schedule': <crontab: 7,17,27,37,47,57 * * * * (m/h/dM/MY/d)>, 'options': {'queue': 'race_sync_v2', 'expires': 550}}",
+      "advance-race-data-sync-lifecycle": "{'task': 'stable.tasks.advance_race_data_sync_lifecycle_task', 'schedule': <crontab: * * * * * (m/h/dM/MY/d)>, 'options': {'queue': 'celery', 'expires': 55}}",
+      "monitor-race-data-sync-result-slo": "{'task': 'stable.tasks.monitor_race_data_sync_result_slo_task', 'schedule': <crontab: * * * * * (m/h/dM/MY/d)>, 'options': {'queue': 'celery', 'expires': 55}}",
+      "cleanup-race-data-sync-artifacts": "{'task': 'stable.tasks.cleanup_race_data_sync_artifacts_task', 'schedule': <crontab: 37 * * * * (m/h/dM/MY/d)>, 'options': {'queue': 'race_sync_v2', 'expires': 3300}}"
+    },
+    "before_start_replay": {
+      "cutoff": "2026-09-20 06:40:00+00:00",
+      "event104": [
+        {
+          "event_id": 104,
+          "year": 2026,
+          "slug": "jra-2026-0920-01",
+          "classification": "blocked",
+          "reason_code": "source_identity_missing",
+          "source_identity_id": null,
+          "provider": "the_racing_api",
+          "region_code": "japan_jra",
+          "identity_namespace": "the_racing_api-race-v1",
+          "route_digest": "7591a4f2834c1fcf628bfdac6586731a1b45932f90611e89ef306088d73fc35a",
+          "registry_digest": "26e0625d73f5e4233d116e04c5b10c19bf8bbd88618bd6928ec43e74ef9832d4",
+          "contract_digest": "74b7a69070b5efb6c6d62583bde697ca11f4964694ff00579a01e919b7867cbd",
+          "proof_digest": "3bac3b644c631ed165b8430343822b2c70c5a88c5036b63dcb557c83c0e0a6da",
+          "allowed_hosts": [
+            "api.theracingapi.com"
+          ],
+          "allowed_path_prefixes": [
+            "/v1/racecards/free",
+            "/v1/results/today/free",
+            "/v1/results/"
+          ],
+          "request_budget": 3,
+          "minimum_interval_seconds": 2,
+          "data_kinds": [
+            "race_time",
+            "racecard",
+            "result"
+          ],
+          "enrollment_eligible": true,
+          "tiebreak_order": 1,
+          "owner": "unmanaged",
+          "owner_generation": 0,
+          "owner_manifest_sha256": "",
+          "event_snapshot_sha256": "ab98c422db39c5278676a7273edaed0b2b7e3b9657acdb0c7e9b1c6337dd73ed"
+        }
+      ],
+      "classification_counts": {
+        "awaiting_source_window": 114,
+        "blocked": 3
+      },
+      "pre_race_in_window": true,
+      "time_decision_only": {
+        "to_status": "",
+        "reason_code": "not_due",
+        "next_refresh_at": "2026-09-20 06:45:00+00:00"
+      }
+    },
+    "now": {
+      "cutoff": "2026-09-20 07:14:31.389673+00:00",
+      "event104": [],
+      "classification_counts": {
+        "awaiting_source_window": 114,
+        "blocked": 2
+      },
+      "pre_race_in_window": false,
+      "time_decision_only": {
+        "to_status": "running",
+        "reason_code": "data_sync_time_reached_post",
+        "next_refresh_at": "2026-09-20 07:15:00+00:00"
+      }
+    },
+    "nearby_japan": [
+      {
+        "id": 100,
+        "original_name": "チャレンジC",
+        "local_date": "2026-09-12",
+        "race_datetime": null,
+        "status": "finished",
+        "result_confirmed_at": "2026-09-18 03:31:36.859673+00:00",
+        "race_data_sync_enrollment__state": null
+      },
+      {
+        "id": 101,
+        "original_name": "セントライト記念",
+        "local_date": "2026-09-13",
+        "race_datetime": null,
+        "status": "finished",
+        "result_confirmed_at": "2026-09-18 03:31:36.884864+00:00",
+        "race_data_sync_enrollment__state": null
+      },
+      {
+        "id": 102,
+        "original_name": "ローズS",
+        "local_date": "2026-09-13",
+        "race_datetime": null,
+        "status": "finished",
+        "result_confirmed_at": "2026-09-18 03:31:36.908351+00:00",
+        "race_data_sync_enrollment__state": null
+      },
+      {
+        "id": 103,
+        "original_name": "阪神ジャンプS",
+        "local_date": "2026-09-19",
+        "race_datetime": "2026-09-19 02:20:00+00:00",
+        "status": "scheduled",
+        "result_confirmed_at": null,
+        "race_data_sync_enrollment__state": null
+      },
+      {
+        "id": 104,
+        "original_name": "オールカマー",
+        "local_date": "2026-09-20",
+        "race_datetime": "2026-09-20 06:45:00+00:00",
+        "status": "scheduled",
+        "result_confirmed_at": null,
+        "race_data_sync_enrollment__state": null
+      },
+      {
+        "id": 105,
+        "original_name": "神戸新聞杯",
+        "local_date": "2026-09-21",
+        "race_datetime": "2026-09-21 06:45:00+00:00",
+        "status": "scheduled",
+        "result_confirmed_at": null,
+        "race_data_sync_enrollment__state": null
+      }
+    ],
+    "runner_count": 0,
+    "legacy_membership": []
+  },
+  "runtime": {
+    "at": "2026-09-20 07:15:23.709307+00:00",
+    "queues": {
+      "celery": 21,
+      "race_sync_v2": 0,
+      "race_live": 7543
+    },
+    "result_keys_sampled": 6000,
+    "scan_complete": false,
+    "recent_results": [
+      {
+        "task_id": "8d08c0ff-3a41-4f6a-8713-68ac9f17a6af",
+        "status": "SUCCESS",
+        "date_done": "2026-09-20T07:13:00.112669+00:00",
+        "result": {
+          "enabled": true,
+          "status": "complete",
+          "staged": 0,
+          "incident_ids": []
+        }
+      },
+      {
+        "task_id": "40e53abf-b26b-493e-ac46-11734e95c837",
+        "status": "SUCCESS",
+        "date_done": "2026-09-20T06:57:00.741724+00:00",
+        "result": {
+          "status": "pre_race_checked",
+          "identity_discovery": {
+            "success": true,
+            "reason_code": "complete",
+            "request_count": 0,
+            "candidate_event_count": 125,
+            "created_source_count": 0,
+            "adopted_source_count": 0,
+            "ambiguous_event_count": 0,
+            "unmatched_event_count": 0,
+            "already_valid_count": 0,
+            "awaiting_source_window_count": 114,
+            "deferred_event_count": 2,
+            "rejected_event_count": 9,
+            "diagnostic_buckets": []
+          },
+          "jra": {
+            "checked": 0,
+            "attempted": 0
+          },
+          "bound_cards": {
+            "checked": 0,
+            "attempted": 0
+          },
+          "classification_counts": null,
+          "selected_event_ids": null
+        }
+      },
+      {
+        "task_id": "148bceec-589b-49a7-976b-0708bc463764",
+        "status": "SUCCESS",
+        "date_done": "2026-09-20T06:52:00.039127+00:00",
+        "result": {
+          "enabled": true,
+          "status": "complete",
+          "staged": 0,
+          "incident_ids": []
+        }
+      },
+      {
+        "task_id": "b6896016-67d8-4639-9c85-41f78e9f6aac",
+        "status": "SUCCESS",
+        "date_done": "2026-09-20T06:51:44.225086+00:00",
+        "result": {
+          "enabled": true,
+          "status": "complete",
+          "selected": 0,
+          "transitioned": 0,
+          "replayed": 0,
+          "not_due": 0,
+          "error": 0
+        }
+      },
+      {
+        "task_id": "4637b530-a6ed-4805-9c7b-d804fa257264",
+        "status": "SUCCESS",
+        "date_done": "2026-09-20T06:47:05.751404+00:00",
+        "result": {
+          "status": "pre_race_checked",
+          "identity_discovery": {
+            "success": true,
+            "reason_code": "complete",
+            "request_count": 1,
+            "candidate_event_count": 125,
+            "created_source_count": 0,
+            "adopted_source_count": 0,
+            "ambiguous_event_count": 0,
+            "unmatched_event_count": 1,
+            "already_valid_count": 0,
+            "awaiting_source_window_count": 114,
+            "deferred_event_count": 1,
+            "rejected_event_count": 9,
+            "diagnostic_buckets": [
+              {
+                "provider": "the_racing_api",
+                "region": "japan",
+                "day": "today",
+                "response_sha256": "36e53345ee5a2fd68769fa31b24778c3ed931750584d4d77b2114f972468a905",
+                "response_race_count": 0,
+                "match_reason_counts": {
+                  "response_empty": 1
+                },
+                "unmatched_events": [
+                  {
+                    "event_id": 104,
+                    "reason": "response_empty",
+                    "match_counts": {
+                      "response": 0,
+                      "valid_time": 0,
+                      "region": 0,
+                      "local_date": 0,
+                      "course": 0,
+                      "name": 0
+                    }
+                  }
+                ],
+                "omitted_event_count": 0
+              }
+            ]
+          },
+          "jra": {
+            "checked": 1,
+            "attempted": 1
+          },
+          "bound_cards": {
+            "checked": 0,
+            "attempted": 0
+          },
+          "classification_counts": null,
+          "selected_event_ids": null
+        }
+      },
+      {
+        "task_id": "ff17ffc7-7ec9-4d08-81ba-2f640fe77b6a",
+        "status": "SUCCESS",
+        "date_done": "2026-09-20T06:45:00.087678+00:00",
+        "result": {
+          "enabled": true,
+          "status": "complete",
+          "selected": 0,
+          "transitioned": 0,
+          "replayed": 0,
+          "not_due": 0,
+          "error": 0
+        }
+      },
+      {
+        "task_id": "95c03bd7-661a-4672-95ed-1f47d1a9d2f7",
+        "status": "SUCCESS",
+        "date_done": "2026-09-20T06:44:00.116185+00:00",
+        "result": {
+          "enabled": true,
+          "status": "complete",
+          "selected": 0,
+          "transitioned": 0,
+          "replayed": 0,
+          "not_due": 0,
+          "error": 0
+        }
+      },
+      {
+        "task_id": "d91408c2-25e1-4ad7-8d38-a8b4a045dd29",
+        "status": "SUCCESS",
+        "date_done": "2026-09-20T06:44:00.019694+00:00",
+        "result": {
+          "enabled": true,
+          "status": "complete",
+          "staged": 0,
+          "incident_ids": []
+        }
+      },
+      {
+        "task_id": "f351c53b-5ca8-4f64-8a60-65c871da7314",
+        "status": "SUCCESS",
+        "date_done": "2026-09-20T06:41:38.181610+00:00",
+        "result": {
+          "enabled": true,
+          "status": "complete",
+          "selected": 0,
+          "transitioned": 0,
+          "replayed": 0,
+          "not_due": 0,
+          "error": 0
+        }
+      },
+      {
+        "task_id": "cd724285-8b9e-4267-88b4-cd07b076fb45",
+        "status": "SUCCESS",
+        "date_done": "2026-09-20T06:27:04.957266+00:00",
+        "result": {
+          "status": "pre_race_checked",
+          "identity_discovery": {
+            "success": true,
+            "reason_code": "complete",
+            "request_count": 1,
+            "candidate_event_count": 125,
+            "created_source_count": 0,
+            "adopted_source_count": 0,
+            "ambiguous_event_count": 0,
+            "unmatched_event_count": 1,
+            "already_valid_count": 0,
+            "awaiting_source_window_count": 114,
+            "deferred_event_count": 1,
+            "rejected_event_count": 9,
+            "diagnostic_buckets": [
+              {
+                "provider": "the_racing_api",
+                "region": "japan",
+                "day": "today",
+                "response_sha256": "36e53345ee5a2fd68769fa31b24778c3ed931750584d4d77b2114f972468a905",
+                "response_race_count": 0,
+                "match_reason_counts": {
+                  "response_empty": 1
+                },
+                "unmatched_events": [
+                  {
+                    "event_id": 104,
+                    "reason": "response_empty",
+                    "match_counts": {
+                      "response": 0,
+                      "valid_time": 0,
+                      "region": 0,
+                      "local_date": 0,
+                      "course": 0,
+                      "name": 0
+                    }
+                  }
+                ],
+                "omitted_event_count": 0
+              }
+            ]
+          },
+          "jra": {
+            "checked": 1,
+            "attempted": 1
+          },
+          "bound_cards": {
+            "checked": 0,
+            "attempted": 0
+          },
+          "classification_counts": null,
+          "selected_event_ids": null
+        }
+      },
+      {
+        "task_id": "42b4a59d-ee5b-45de-818c-476a274226c0",
+        "status": "SUCCESS",
+        "date_done": "2026-09-20T06:25:00.246153+00:00",
+        "result": {
+          "enabled": true,
+          "status": "complete",
+          "staged": 0,
+          "incident_ids": []
+        }
+      },
+      {
+        "task_id": "c5fba425-305a-4f55-bc31-f9e3243c8d8e",
+        "status": "SUCCESS",
+        "date_done": "2026-09-20T06:24:00.109261+00:00",
+        "result": {
+          "enabled": true,
+          "status": "complete",
+          "selected": 0,
+          "transitioned": 0,
+          "replayed": 0,
+          "not_due": 0,
+          "error": 0
+        }
+      }
+    ],
+    "snapshot_rows": [
+      {
+        "cache_key": "race-data-snapshot-v1:5f230d1481a44716f593e60cff0a7b7908c3fec98df2a8be5bcf9c4045831066",
+        "updated_at": "2026-09-20 07:07:05.973190+00:00",
+        "state": "complete",
+        "manifest_data": {
+          "complete": true,
+          "cache_key": "race-data-snapshot-v1:5f230d1481a44716f593e60cff0a7b7908c3fec98df2a8be5bcf9c4045831066",
+          "fetched_at": "2026-09-20T07:07:05.968021+00:00",
+          "item_count": 0,
+          "page_count": 1,
+          "schema_version": 1,
+          "artifact_sha256": "05c1cd5f6695c417b0a9356bf87b7d9a3019bc278498bcf53e543cdc0046bea2",
+          "registry_digest": "26e0625d73f5e4233d116e04c5b10c19bf8bbd88618bd6928ec43e74ef9832d4"
+        },
+        "artifact_sha256": "05c1cd5f6695c417b0a9356bf87b7d9a3019bc278498bcf53e543cdc0046bea2",
+        "error_code": ""
+      },
+      {
+        "cache_key": "race-data-snapshot-v1:4504d504d58cdf064ec47310823ec3eda48337d5254d4a72a00572ecae8cd1cb",
+        "updated_at": "2026-09-20 07:07:00.638172+00:00",
+        "state": "complete",
+        "manifest_data": {
+          "complete": true,
+          "cache_key": "race-data-snapshot-v1:4504d504d58cdf064ec47310823ec3eda48337d5254d4a72a00572ecae8cd1cb",
+          "fetched_at": "2026-09-20T07:07:00.622945+00:00",
+          "item_count": 1,
+          "page_count": 1,
+          "schema_version": 1,
+          "artifact_sha256": "ce780eff182e401a4f49bb9b0fa11a860a4ddf8d85e5fdaa34362ee96c098833",
+          "registry_digest": "e700c041b1e857b9fa80cd8b95104fba11b88f4073a1cc5a74f2c386cd747b2b"
+        },
+        "artifact_sha256": "ce780eff182e401a4f49bb9b0fa11a860a4ddf8d85e5fdaa34362ee96c098833",
+        "error_code": ""
+      },
+      {
+        "cache_key": "race-data-snapshot-v1:5ab7f65ac19626d2fd717b89b7ef68e8c245fa47e6e3338823c8ad057c509fed",
+        "updated_at": "2026-09-20 06:47:05.730764+00:00",
+        "state": "complete",
+        "manifest_data": {
+          "complete": true,
+          "cache_key": "race-data-snapshot-v1:5ab7f65ac19626d2fd717b89b7ef68e8c245fa47e6e3338823c8ad057c509fed",
+          "fetched_at": "2026-09-20T06:47:05.726190+00:00",
+          "item_count": 0,
+          "page_count": 1,
+          "schema_version": 1,
+          "artifact_sha256": "c5e3cd6280c6dc9e5f083674b3176b7d3be57433358f298e23ea419c793a6568",
+          "registry_digest": "26e0625d73f5e4233d116e04c5b10c19bf8bbd88618bd6928ec43e74ef9832d4"
+        },
+        "artifact_sha256": "c5e3cd6280c6dc9e5f083674b3176b7d3be57433358f298e23ea419c793a6568",
+        "error_code": ""
+      },
+      {
+        "cache_key": "race-data-snapshot-v1:4e31651199f43be788de2ed1a379234001be783e76934a6f64634dad65bba26d",
+        "updated_at": "2026-09-20 06:47:00.196682+00:00",
+        "state": "complete",
+        "manifest_data": {
+          "complete": true,
+          "cache_key": "race-data-snapshot-v1:4e31651199f43be788de2ed1a379234001be783e76934a6f64634dad65bba26d",
+          "fetched_at": "2026-09-20T06:47:00.184602+00:00",
+          "item_count": 1,
+          "page_count": 1,
+          "schema_version": 1,
+          "artifact_sha256": "e423da2be83673249ef9a6aa525cd6c29bffb2079830ab3ad2d104e4734e027d",
+          "registry_digest": "4c39e7abc2aeeb13f09515a750407fe4635dad8bd818c8a83f4deb28daac8473"
+        },
+        "artifact_sha256": "e423da2be83673249ef9a6aa525cd6c29bffb2079830ab3ad2d104e4734e027d",
+        "error_code": ""
+      },
+      {
+        "cache_key": "race-data-snapshot-v1:d51b00aaf51ca22819b0ee9c151df414e176326fa928dbe9620dc020323d4882",
+        "updated_at": "2026-09-20 06:17:03.590845+00:00",
+        "state": "complete",
+        "manifest_data": {
+          "complete": true,
+          "cache_key": "race-data-snapshot-v1:d51b00aaf51ca22819b0ee9c151df414e176326fa928dbe9620dc020323d4882",
+          "fetched_at": "2026-09-20T06:17:03.582173+00:00",
+          "item_count": 1,
+          "page_count": 1,
+          "schema_version": 1,
+          "artifact_sha256": "af386c05d932563b9256cb68ff3fb1b72f80b55f6a67f801b469744c144ca742",
+          "registry_digest": "e17b489033d06117bf081816817e71bead723ddc6301ae16d62c3e95fbbfd23b"
+        },
+        "artifact_sha256": "af386c05d932563b9256cb68ff3fb1b72f80b55f6a67f801b469744c144ca742",
+        "error_code": ""
+      },
+      {
+        "cache_key": "race-data-snapshot-v1:80ae987ecb1cec5094b5488083c199abad3cee02038f48ffa6367e414f84dd13",
+        "updated_at": "2026-09-20 03:57:07.660036+00:00",
+        "state": "complete",
+        "manifest_data": {
+          "complete": true,
+          "cache_key": "race-data-snapshot-v1:80ae987ecb1cec5094b5488083c199abad3cee02038f48ffa6367e414f84dd13",
+          "fetched_at": "2026-09-20T03:57:07.655363+00:00",
+          "item_count": 0,
+          "page_count": 1,
+          "schema_version": 1,
+          "artifact_sha256": "0e4393b042acb702bda230b251f50bc0c209ae60dd4867dab741ac4dc3014ff5",
+          "registry_digest": "26e0625d73f5e4233d116e04c5b10c19bf8bbd88618bd6928ec43e74ef9832d4"
+        },
+        "artifact_sha256": "0e4393b042acb702bda230b251f50bc0c209ae60dd4867dab741ac4dc3014ff5",
+        "error_code": ""
+      }
+    ]
+  },
+  "public_checks": {
+    "official_result_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde0106202604061120260920/92",
+    "official_result_note": "从当场出马表真实结果链接取得；13匹着顺及払戻金存在。冠军8号メイショウゲキリン。搜索索引中的年度列表尚无结果，不能代替实时详情。",
+    "public_url": "https://umafans.run/races/2026/jra-2026-0920-01/",
+    "public_note": "状态 今天；本站暂未收录出马表；无赛果区。",
+    "local_capture_sha256": {
+      "jra-card.html": "9a7711851548a3ece9a6dda9cc1e325db38e9f6ab8a659a7abc2802e8a9329f9",
+      "jra-result-verified.html": "5e78348025e88b8eab8a520eb0d6ca1219536eb92dd060bc751db06329ea6622",
+      "public.html": "04ffe236b9939eb541040e2f81f5d73f7b170d7cc13545d0919cbaa8345d5ce0"
+    }
+  },
+  "raw_response_and_final_recheck": {
+    "at": "2026-09-20 07:16:45.348889+00:00",
+    "raw_snapshot": {
+      "sha256_verified": true,
+      "payload": {
+        "raw_sha256": "36e53345ee5a2fd68769fa31b24778c3ed931750584d4d77b2114f972468a905",
+        "response": {
+          "limit": 500,
+          "query": [
+            [
+              "day",
+              "today"
+            ],
+            [
+              "region_codes",
+              "jpn"
+            ],
+            [
+              "limit",
+              "500"
+            ],
+            [
+              "skip",
+              "0"
+            ]
+          ],
+          "racecards": [],
+          "skip": 0,
+          "total": 0
+        }
+      }
+    },
+    "jra_candidates": [
+      {
+        "id": 40409,
+        "status": "pending",
+        "fetched_at": "2026-09-18 21:47:05.454073+00:00",
+        "source_url": "https://www.jra.go.jp/JRADB/accessD.html?CNAME=pw01dde0106202604061120260920/D6",
+        "item_count": 13,
+        "metadata": {
+          "jra_pre_race_v1": {
+            "stage": "numbered",
+            "baseline": {
+              "date": "2026-09-20",
+              "name": "オールカマー",
+              "course": "中山",
+              "event_id": 104,
+              "timezone": "Asia/Tokyo"
+            },
+            "validated": true,
+            "fetched_at": "2026-09-18T21:47:05.454073+00:00",
+            "raw_sha256": "99d7968650a60c381bac4c2277982dd7ef45119d90dbb6b33d7bc5de500cc6b5",
+            "content_sha256": "6ae54a8d81a28870fb5186dc212ead2fa346e1a4d0da4901266c01ee16f5c467"
+          }
+        }
+      },
+      {
+        "id": 40392,
+        "status": "pending",
+        "fetched_at": "2026-09-18 03:23:04.841013+00:00",
+        "source_url": "https://www.jra.go.jp/JRADB/accessD.html?CNAME=pw01dde0106202604061120260920/D6",
+        "item_count": 13,
+        "metadata": {
+          "jra_pre_race_v1": {
+            "stage": "numbered",
+            "baseline": {
+              "date": "2026-09-20",
+              "name": "オールカマー",
+              "course": "中山",
+              "event_id": 104,
+              "timezone": "Asia/Tokyo"
+            },
+            "validated": true,
+            "fetched_at": "2026-09-18T03:23:04.841013+00:00",
+            "raw_sha256": "99d7968650a60c381bac4c2277982dd7ef45119d90dbb6b33d7bc5de500cc6b5",
+            "content_sha256": "f997f67f6be71b7d265bb1be2fbd679f1b95be7b39578f3da43e168b2f6ea908"
+          }
+        }
+      }
+    ],
+    "final_event": {
+      "id": 104,
+      "status": "scheduled",
+      "result_confirmed_at": null,
+      "race_datetime": "2026-09-20 06:45:00+00:00",
+      "updated_at": "2026-09-20 06:47:05.745633+00:00"
+    }
+  }
+}

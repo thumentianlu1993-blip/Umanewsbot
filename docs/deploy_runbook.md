@@ -1,3 +1,9 @@
+## 2026-09-20 漏登记排障与多来源修复准备（未发布）
+
+All Comers 现场见[根因](changes/multisource-race-enrollment/ROOT_CAUSE.md)和[脱敏证据](changes/multisource-race-enrollment/EVIDENCE.json)。排障顺序为公开页 → event/正式名单与赛果 → source identity/enrollment/projection/tracking/lifecycle → discovery 检查点及原始响应；Celery SUCCESS 或服务 running 不能替代资料写入与状态推进证据。覆盖盘点必须从公开 canonical 赛事出发，不能只查登记表。
+
+[已审核方案的发布与恢复合同](changes/multisource-race-enrollment/rollout.md)拟采用两张新增表、旧 v1 resolver 保留、新 v2 开关默认关闭；精确 seed 清单、来源政策 SHA、逐地区 proof、预算与默认开关属于后续发布包。当前没有迁移或启用动作。新记录出现后不能退回仅理解 v1 的旧应用；继续遵守现行 0078 受保护前向恢复。不得以扩大消费旧 race_live 队列或手工改状态代替本次修复。
+
 ## 2026-09-19 PR210 修复已上线，两轮自然刷新通过
 
 固定应用`3a174b1e`经PR210合并`63e5b58a`，22:09:22 UTC（北京时间06:09）完成0078前向发布；实际镜像`sha256:1622560c7f522d5078adbed5049e7bf7ab57e537bff57b97b37df0c83aec57a2`。5129项全量保留16失败/29错误/20跳过，45失败ID与此前生产完全一致、无新增；45项发布合同通过，固定reviewer独立复核APPROVED。不是全套全绿，汇总job未计作通过。
