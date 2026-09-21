@@ -12,6 +12,18 @@ RELEASE_TASK_PHASE="${RELEASE_TASK_PHASE:-all}"
 case "$RELEASE_TASK_PHASE" in all|migrate-verify|complete-intent) ;; *) echo "invalid RELEASE_TASK_PHASE" >&2; exit 1 ;; esac
 python /app/deploy/docker/wait_for_services.py
 python manage.py check_production_database_vendor
+if [ "${RELEASE_SCHEMA_GENERATION:-}" = "0079" ]; then
+  [ "$RELEASE_TASK_PHASE" = all ] || { echo "0079 requires complete one-shot phase" >&2; exit 1; }
+  marker_result="$(python manage.py release_0079_schema ensure)"
+  printf '%s\n' "$marker_result"
+  marker_device="$(printf '%s' "$marker_result" | python -c 'import json,sys; print(json.load(sys.stdin)["marker_device"])')"
+  marker_inode="$(printf '%s' "$marker_result" | python -c 'import json,sys; print(json.load(sys.stdin)["marker_inode"])')"
+  case "$marker_device:$marker_inode" in *[!0-9:]*|:*|*:) echo "0079 marker identity invalid" >&2; exit 1 ;; esac
+  python manage.py migrate stable 0079_multisource_race_enrollment --noinput
+  python manage.py collectstatic --noinput
+  python manage.py release_0079_schema complete --expected-marker-device="$marker_device" --expected-marker-inode="$marker_inode"
+  exit 0
+fi
 handoff_action="$(sed -n 's/.*"handoff_action":"\([^"]*\)".*/\1/p' "$RELEASE_B_PREFLIGHT_ARTIFACT_PATH" | head -n 1)"
 case "$handoff_action" in
   forward-resume)

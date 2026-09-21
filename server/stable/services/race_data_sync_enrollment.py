@@ -1247,3 +1247,681 @@ def apply_race_data_disenrollment_manifest(
                 )
             )
     return tuple(decisions)
+
+
+class _MultisourceRejected(Exception):
+    pass
+
+
+class _LifecycleLockRetry(Exception):
+    pass
+
+
+def _lock_multisource_event(event_id):
+    """必须在最外层事务起点调用；缺控制行竞争需重启整个事务。"""
+    lifecycle = (
+        models.RaceEventLifecycleControl.objects.select_for_update()
+        .filter(event_id=event_id)
+        .first()
+    )
+    event = models.RaceEvent.objects.select_for_update().get(pk=event_id)
+    if (
+        lifecycle is None
+        and models.RaceEventLifecycleControl.objects.filter(event_id=event_id).exists()
+    ):
+        raise _LifecycleLockRetry()
+    return event, lifecycle
+
+
+def _multisource_manifest(
+    enrollment,
+    projection,
+    policy,
+    now,
+    *,
+    selected=None,
+    alternate=None,
+    check_runtime=True,
+):
+    from stable.services.race_data_source_adapters import canonical_sha
+
+    bindings = list(
+        enrollment.source_bindings.select_related("source_identity")
+        .filter(state="active")
+        .order_by("id")
+    )
+    old = enrollment.source_set_manifest
+    selected = dict(selected if selected is not None else old.get("selected", {}))
+    legal = []
+    for binding in bindings:
+        source = binding.source_identity
+        route = policy.route_for(
+            dict(
+                provider=source.source_key,
+                region=source.region_code,
+                identity_namespace=source.identity_namespace,
+            )
+        )
+        from stable.services.race_data_sync_admission import binding_admission_reason
+
+        if not binding_admission_reason(
+            binding=binding, route=route, now=now, check_runtime=check_runtime
+        ):
+            legal.append((route.tiebreak_order, binding))
+    selected = {
+        kind: pk
+        for kind, pk in selected.items()
+        if any(b.pk == pk and kind in b.capabilities for _, b in legal)
+    }
+    for _, binding in sorted(legal, key=lambda item: (item[0], item[1].pk)):
+        for kind in binding.capabilities:
+            selected.setdefault(kind, binding.pk)
+    from stable.services.race_data_source_adapters import aware
+
+    alternates = alternate if alternate is not None else old.get("alternate", {})
+    alternates = {
+        kind: item
+        for kind, item in alternates.items()
+        if isinstance(item, dict)
+        and aware(item["expires_at"]) > now
+        and any(
+            b.pk == item.get("binding_id") and kind in b.capabilities for _, b in legal
+        )
+    }
+    keys = list(
+        models.RaceEventIdentityKey.objects.filter(event_id=enrollment.event_id)
+        .order_by("namespace", "key_sha256")
+        .values("namespace", "key_sha256", "key_payload")
+    )
+    value = dict(
+        authority_version=2,
+        event_id=enrollment.event_id,
+        policy_digest=policy.digest,
+        owner_generation=projection.owner_generation,
+        enrollment_generation=enrollment.enrollment_generation,
+        source_set_generation=enrollment.source_set_generation + 1,
+        matcher_version="race-identity-v2",
+        parent_sha256=enrollment.source_set_digest,
+        identity_keys_sha256=canonical_sha(keys),
+        selected=selected,
+        bindings=[
+            dict(
+                id=b.pk,
+                source_identity_id=b.source_identity_id,
+                manifest_sha256=b.binding_manifest_sha256,
+            )
+            for b in bindings
+        ],
+        alternate=alternates,
+    )
+    enrollment.source_set_manifest = value
+    enrollment.source_set_generation = value["source_set_generation"]
+    enrollment.source_set_digest = canonical_sha(value)
+    enrollment.save(
+        update_fields=(
+            "source_set_manifest",
+            "source_set_generation",
+            "source_set_digest",
+            "updated_at",
+        )
+    )
+    tracking = models.RaceEventLiveTracking.objects.get(event_id=enrollment.event_id)
+    tracking.claim_generation += 1
+    tracking.active_attempt_token = ""
+    tracking.claim_expires_at = None
+    tracking.lock_version += 1
+    tracking.next_poll_at = race_data_sync_control._multisource_tracking_due(
+        enrollment, tracking, selected, value["alternate"]
+    )
+    tracking.save()
+    lifecycle = models.RaceEventLifecycleControl.objects.get(
+        event_id=enrollment.event_id
+    )
+    manifest = dict(lifecycle.manifest_data or {})
+    manifest["race_data_sync_v2"] = {
+        "source_set_digest": enrollment.source_set_digest,
+        "source_set_generation": enrollment.source_set_generation,
+    }
+    lifecycle.manifest_data = manifest
+    lifecycle.save(update_fields=("manifest_data", "updated_at"))
+
+
+def attach_multisource_observation(observation, *, policy, now, discovery_token=None):
+    """唯一赛事原子登记或挂接；失败全回滚，后到来源不重新授予 owner。"""
+    from django.db import IntegrityError
+    from urllib.parse import urlsplit
+    from stable.services.race_data_source_adapters import canonical_sha, aware
+    from stable.services.race_source_identity import (
+        resolve_observation,
+        identity_key,
+        advisory_identity_locks,
+        event_snapshot,
+        MATCHER_VERSION,
+    )
+
+    Decision = race_data_sync_control.ControlDecision
+    if (
+        not getattr(settings, "RACE_DATA_MULTISOURCE_APPLY_ENABLED", False)
+        or not settings.RACE_DATA_SYNC_ENABLED
+    ):
+        return Decision("rejected", "multisource_apply_disabled")
+    route = policy.route_for(observation)
+    if route is None or not policy.valid(now):
+        return Decision("rejected", "multisource_policy_invalid")
+    if route.provider not in getattr(
+        settings, "RACE_DATA_SYNC_ENABLED_PROVIDERS", ()
+    ) or route.region not in getattr(settings, "RACE_DATA_SYNC_ENABLED_REGIONS", ()):
+        return Decision("rejected", "binding_runtime_disabled")
+    match = resolve_observation(observation, route=route, now=now)
+    if match.status != "exact":
+        return Decision("rejected", match.reason or match.status)
+    for attempt in range(3):
+        try:
+            with transaction.atomic():
+                advisory_identity_locks(observation)
+                event, lifecycle = _lock_multisource_event(match.event_id)
+                now = max(now, timezone.now())
+                if not policy.valid(now) or not route.valid(now):
+                    raise _MultisourceRejected("multisource_policy_expired")
+                if discovery_token:
+                    lease = (event.source_refs or {}).get("source_discovery_v2", {})
+                    if (
+                        lease.get("token") != discovery_token
+                        or not lease.get("lease_until")
+                        or aware(lease["lease_until"]) <= now
+                    ):
+                        raise _MultisourceRejected("discovery_lease_stale")
+                if (
+                    route.provider not in settings.RACE_DATA_SYNC_ENABLED_PROVIDERS
+                    or route.region not in settings.RACE_DATA_SYNC_ENABLED_REGIONS
+                    or not settings.RACE_DATA_MULTISOURCE_APPLY_ENABLED
+                ):
+                    raise _MultisourceRejected("binding_runtime_disabled")
+                if (
+                    event.visibility_status != "published"
+                    or event.status in ("cancelled", "postponed")
+                    or any((event.manual_lock_flags or {}).values())
+                    or (lifecycle and lifecycle.manual_pause_reason)
+                ):
+                    raise _MultisourceRejected("manual_or_visibility_block")
+                if models.RaceEventLifecycleEnforceMembership.objects.filter(
+                    event=event,
+                    state="active",
+                    registry__state="active",
+                    registry__is_active=True,
+                    registry__runtime_valid_until__gt=now,
+                ).exists():
+                    raise _MultisourceRejected("lifecycle_authority_conflict")
+                projection, _ = models.RaceEventProjectionControl.objects.get_or_create(
+                    event=event
+                )
+                projection = (
+                    models.RaceEventProjectionControl.objects.select_for_update().get(
+                        pk=projection.pk
+                    )
+                )
+                if projection.write_owner not in ("unmanaged", "data_sync"):
+                    raise _MultisourceRejected("writer_owner_conflict")
+                tracking, _ = models.RaceEventLiveTracking.objects.get_or_create(
+                    event=event
+                )
+                tracking = models.RaceEventLiveTracking.objects.select_for_update().get(
+                    pk=tracking.pk
+                )
+                enrollment = (
+                    models.RaceDataSyncEnrollment.objects.select_for_update()
+                    .filter(event=event)
+                    .first()
+                )
+                list(
+                    models.RaceEventLiveProviderCheckpoint.objects.select_for_update()
+                    .filter(tracking=tracking)
+                    .order_by("pk")
+                )
+                if enrollment:
+                    if enrollment.authority_version != 2:
+                        raise _MultisourceRejected("legacy_conversion_required")
+                    if enrollment.state != "enrolled":
+                        raise _MultisourceRejected("enrollment_not_active")
+                    if enrollment.standing_policy_digest != policy.digest:
+                        raise _MultisourceRejected("enrollment_policy_drift")
+                    if (
+                        enrollment.projection_owner_generation
+                        != projection.owner_generation
+                        or projection.write_owner != "data_sync"
+                    ):
+                        raise _MultisourceRejected("owner_cas_stale")
+                elif projection.write_owner != "unmanaged":
+                    raise _MultisourceRejected("owner_cas_stale")
+                fresh = resolve_observation(observation, route=route, now=now)
+                if fresh.status != "exact" or fresh.event_id != event.pk:
+                    raise _MultisourceRejected("identity_drift")
+                source_lookup = dict(
+                    source_key=route.provider,
+                    region_code=route.region,
+                    identity_namespace=route.identity_namespace,
+                    external_race_id=observation["external_race_id"],
+                )
+                source = (
+                    models.RaceResultSourceIdentity.objects.select_for_update()
+                    .filter(**source_lookup)
+                    .first()
+                )
+                if source and source.event_id != event.pk:
+                    raise _MultisourceRejected("identity_conflict")
+                if source is None:
+                    source = models.RaceResultSourceIdentity.objects.create(
+                        **source_lookup,
+                        event=event,
+                        canonical_url=observation["canonical_url"],
+                        host=urlsplit(observation["canonical_url"]).hostname,
+                        identity_fields={"multisource_v2": observation},
+                        review_status="approved",
+                        terms_status="approved",
+                        automation_allowed=True,
+                        proof_network_allowed=True,
+                        reviewed_at=now,
+                        evidence_url=observation["canonical_url"],
+                        evidence_sha256=observation["raw_sha256"],
+                        valid_until=aware(route.valid_until),
+                        registry_digest=route.digest,
+                        result_authority=(
+                            "official"
+                            if route.source_class == "official_operator"
+                            else "supplemental"
+                        ),
+                    )
+                elif (
+                    source.review_status != "approved"
+                    or not source.automation_allowed
+                    or source.terms_status != "approved"
+                ):
+                    raise _MultisourceRejected("source_not_admitted")
+                key = identity_key(observation)
+                key_added = False
+                if key:
+                    existing = models.RaceEventIdentityKey.objects.filter(
+                        namespace=key["namespace"], key_sha256=key["key_sha256"]
+                    ).first()
+                    if existing and (
+                        existing.event_id != event.pk
+                        or existing.key_payload != key["key_payload"]
+                    ):
+                        raise _MultisourceRejected("identity_conflict")
+                    if existing is None:
+                        models.RaceEventIdentityKey.objects.create(
+                            event=event,
+                            **key,
+                            evidence=fresh.evidence,
+                            matcher_version=MATCHER_VERSION,
+                        )
+                        key_added = True
+                created = enrollment is None
+                if created:
+                    evidence = canonical_sha(
+                        {
+                            "event": event_snapshot(event),
+                            "match": fresh.evidence,
+                            "policy": policy.digest,
+                        }
+                    )
+                    projection.write_owner = "data_sync"
+                    projection.owner_generation += 1
+                    projection.owner_manifest_sha256 = evidence
+                    projection.owner_changed_at = now
+                    projection.save()
+                    enrollment = models.RaceDataSyncEnrollment.objects.create(
+                        event=event,
+                        source_identity=source,
+                        authority_version=2,
+                        state="enrolled",
+                        standing_policy_digest=policy.digest,
+                        route_digest=route.digest,
+                        event_snapshot_sha256=event_snapshot(event),
+                        projection_owner_generation=projection.owner_generation,
+                        enrollment_generation=projection.owner_generation,
+                        manifest_sha256=evidence,
+                        entry_sha256=evidence,
+                        effective_at=now,
+                    )
+                binding = models.RaceDataSyncSourceBinding.objects.filter(
+                    enrollment=enrollment, source_identity=source
+                ).first()
+                if binding:
+                    if (
+                        binding.state != "active"
+                        or binding.route_digest != route.digest
+                    ):
+                        raise _MultisourceRejected("binding_drift")
+                    if key_added:
+                        _multisource_manifest(enrollment, projection, policy, now)
+                        return Decision(
+                            "attached", "", event.pk, enrollment.source_set_generation
+                        )
+                    return Decision(
+                        "replay", "", event.pk, enrollment.source_set_generation
+                    )
+                # provider checkpoint namespace must remain unambiguous.
+                if enrollment.source_bindings.filter(
+                    source_identity__source_key=source.source_key, state="active"
+                ).exists():
+                    raise _MultisourceRejected("provider_namespace_conflict")
+                manifest = dict(
+                    event_id=event.pk,
+                    source_identity_id=source.pk,
+                    source_registry_digest=source.registry_digest,
+                    route=route.payload,
+                    route_digest=route.digest,
+                    identity_evidence=fresh.evidence,
+                    identity_evidence_sha256=canonical_sha(fresh.evidence),
+                    policy_digest=policy.digest,
+                )
+                models.RaceDataSyncSourceBinding.objects.create(
+                    enrollment=enrollment,
+                    source_identity=source,
+                    capabilities=route.capabilities,
+                    route_digest=route.digest,
+                    contract_digest=route.contract_digest,
+                    proof_digest=route.proof_digest,
+                    identity_evidence_sha256=canonical_sha(fresh.evidence),
+                    binding_manifest=manifest,
+                    binding_manifest_sha256=canonical_sha(manifest),
+                    valid_until=aware(route.valid_until),
+                )
+                tracking.tracking_enabled = True
+                tracking.next_poll_at = now
+                tracking.save()
+                for kind in route.capabilities:
+                    models.RaceEventLiveProviderCheckpoint.objects.get_or_create(
+                        tracking=tracking,
+                        source_key=source.source_key,
+                        data_kind=kind,
+                        defaults={
+                            "next_poll_at": race_data_sync_control.multisource_initial_poll_at(
+                                event=event, kind=kind, now=now
+                            ),
+                            "contract_digest": route.contract_digest,
+                            "registry_digest": route.digest,
+                        },
+                    )
+                if lifecycle is None:
+                    lifecycle = models.RaceEventLifecycleControl.objects.create(
+                        event=event
+                    )
+                race_data_sync_control._establish_data_sync_lifecycle_evidence(
+                    lifecycle=lifecycle,
+                    event=event,
+                    standing_policy_digest=policy.digest,
+                    manifest_sha256=enrollment.manifest_sha256,
+                    entry_sha256=enrollment.entry_sha256,
+                    owner_generation=projection.owner_generation,
+                    now=now,
+                )
+                _multisource_manifest(enrollment, projection, policy, now)
+                return Decision(
+                    "acquired" if created else "attached",
+                    "",
+                    event.pk,
+                    enrollment.source_set_generation,
+                )
+        except _LifecycleLockRetry:
+            continue
+        except IntegrityError:
+            # 整组回滚后重读，绝不留下半份 source/key/enrollment。
+            if attempt == 2:
+                return Decision("rejected", "identity_unique_conflict", match.event_id)
+        except _MultisourceRejected as exc:
+            return Decision("rejected", str(exc), match.event_id)
+    return Decision("rejected", "identity_retry_exhausted", match.event_id)
+
+
+def build_multisource_coverage(*, now, policy):
+    """分母来自公开 canonical calendar；状态分类守恒，未知日期不补猜。"""
+    from django.db.models import Q
+    from stable.services.race_source_identity import normalize_name
+
+    entries = []
+    duplicates = models.RaceEventProductCanonicalLink.objects.filter(
+        is_active=True
+    ).values_list("duplicate_event_id", flat=True)
+    queryset = (
+        models.RaceEvent.objects.filter(visibility_status="published")
+        .exclude(pk__in=duplicates)
+        .filter(
+            Q(local_date__isnull=True)
+            | Q(
+                local_date__range=(
+                    now.date() - timedelta(days=9),
+                    now.date() + timedelta(days=32),
+                )
+            )
+        )
+    )
+    for event in queryset.order_by("pk").iterator(chunk_size=200):
+        routes = [
+            r
+            for r in policy.routes
+            if r.country_region == event.country_region
+            and normalize_name(event.racecourse)
+            in {normalize_name(n) for names in r.venue_aliases.values() for n in names}
+        ]
+        reason = ""
+        if not routes:
+            reason = "unsupported_region"
+        elif not event.local_date:
+            reason = "missing_date"
+        else:
+            try:
+                age = (
+                    now.astimezone(ZoneInfo(event.timezone_name)).date()
+                    - event.local_date
+                ).days
+            except (ValueError, KeyError):
+                reason = "missing_timezone"
+            else:
+                if age < -30 or age > 7:
+                    continue
+        enrollment = models.RaceDataSyncEnrollment.objects.filter(event=event).first()
+        lifecycle = models.RaceEventLifecycleControl.objects.filter(event=event).first()
+        control = models.RaceEventProjectionControl.objects.filter(event=event).first()
+        if not reason:
+            if any((event.manual_lock_flags or {}).values()) or (
+                lifecycle and lifecycle.manual_pause_reason
+            ):
+                reason = "manual_pause"
+            elif control and control.write_owner not in ("unmanaged", "data_sync"):
+                reason = "owner_conflict"
+            elif event.result_confirmed_at:
+                reason = "confirmed"
+            elif event.status in ("cancelled", "postponed"):
+                reason = event.status
+            elif enrollment and enrollment.state == "enrolled":
+                reason = (
+                    "enrolled"
+                    if enrollment.authority_version == 2
+                    else "legacy_enrolled"
+                )
+            else:
+                reason = "enrollment_missing"
+        entries.append(
+            dict(
+                event_id=event.pk,
+                classification=reason,
+                local_date=str(event.local_date or ""),
+                routes=[r.digest for r in routes],
+            )
+        )
+    counts = {}
+    for entry in entries:
+        counts[entry["classification"]] = counts.get(entry["classification"], 0) + 1
+    return dict(total=len(entries), counts=counts, entries=entries)
+
+
+def discover_multisource_events(*, now, policy=None, fetcher=None):
+    from stable.services.race_data_source_adapters import (
+        load_multisource_policy,
+        fetch_bound_observation,
+        canonical_sha,
+        aware,
+    )
+    from stable.services.race_data_sync_alerts import (
+        stage_multisource_coverage_incidents,
+    )
+    import secrets
+
+    if (
+        not getattr(settings, "RACE_DATA_MULTISOURCE_DISCOVERY_ENABLED", False)
+        or not settings.RACE_DATA_SYNC_ENABLED
+    ):
+        return {"enabled": False, "reason": "disabled"}
+    try:
+        policy = policy or load_multisource_policy(now=now)
+    except (ValueError, TypeError, OSError):
+        return {"enabled": True, "reason": "multisource_policy_unavailable"}
+    coverage = build_multisource_coverage(now=now, policy=policy)
+    if getattr(settings, "RACE_DATA_COVERAGE_ALERTS_ENABLED", False):
+        stage_multisource_coverage_incidents(coverage=coverage, policy=policy, now=now)
+    eligible = [
+        e
+        for e in coverage["entries"]
+        if e["classification"] in ("enrollment_missing", "enrolled")
+    ]
+    # 持久的最早 due 排序；identity-only、失败和预算延后仍记结果，不重复占据队首。
+    events = list(
+        models.RaceEvent.objects.filter(pk__in=[e["event_id"] for e in eligible])
+    )
+    events.sort(
+        key=lambda e: (
+            (e.source_refs or {})
+            .get("source_discovery_v2", {})
+            .get("next_poll_at", ""),
+            e.pk,
+        )
+    )
+    # 每桶内部保持持久due顺序，桶之间轮询，避免一个地区占满20场。
+    from collections import defaultdict, deque
+
+    entry_by_id = {row["event_id"]: row for row in eligible}
+    buckets = defaultdict(deque)
+    for event in events:
+        regions = sorted(
+            {
+                r.region
+                for r in policy.routes
+                if r.digest in entry_by_id[event.pk]["routes"]
+            }
+        )
+        buckets[tuple(regions)].append(event)
+    bucket_keys = sorted(buckets)
+    if bucket_keys:
+        offset = now.minute % len(bucket_keys)
+        bucket_keys = bucket_keys[offset:] + bucket_keys[:offset]
+    events = []
+    while any(buckets.values()):
+        for key in bucket_keys:
+            if buckets[key]:
+                events.append(buckets[key].popleft())
+    outcomes = []
+    processed = 0
+    for event in events:
+        if processed >= 20:
+            outcomes.append(dict(event_id=event.pk, reason="budget_deferred"))
+            continue
+        token = secrets.token_hex(16)
+        with transaction.atomic():
+            models.RaceEventLifecycleControl.objects.select_for_update().filter(
+                event=event
+            ).first()
+            event = models.RaceEvent.objects.select_for_update().get(pk=event.pk)
+            state = dict((event.source_refs or {}).get("source_discovery_v2", {}))
+            if state.get("next_poll_at") and aware(state["next_poll_at"]) > now:
+                outcomes.append(dict(event_id=event.pk, reason="not_due"))
+                continue
+            if state.get("lease_until") and aware(state["lease_until"]) > now:
+                outcomes.append(dict(event_id=event.pk, reason="lease_active"))
+                continue
+            state.update(
+                token=token, lease_until=(now + timedelta(seconds=90)).isoformat()
+            )
+            event.source_refs = {
+                **(event.source_refs or {}),
+                "source_discovery_v2": state,
+            }
+            event.save(update_fields=("source_refs", "updated_at"))
+        processed += 1
+        row = next(e for e in eligible if e["event_id"] == event.pk)
+        routes = [
+            r
+            for r in policy.routes
+            if r.digest in row["routes"]
+            and r.valid(now)
+            and r.provider in settings.RACE_DATA_SYNC_ENABLED_PROVIDERS
+            and r.region in settings.RACE_DATA_SYNC_ENABLED_REGIONS
+        ]
+        routes.sort(key=lambda r: (r.tiebreak_order, r.provider, r.region))
+        offset = state.get("route_cursor", 0) % max(1, len(routes))
+        routes = (routes[offset:] + routes[:offset])[:2]
+        results = []
+        for route in routes:
+            try:
+                if not settings.RACE_DATA_SYNC_ALLOW_NETWORK:
+                    raise ValueError("network_disabled")
+                value = fetch_bound_observation(
+                    event=event, route=route, now=now, fetcher=fetcher
+                )
+                decision = attach_multisource_observation(
+                    value, policy=policy, now=timezone.now(), discovery_token=token
+                )
+                results.append(
+                    dict(
+                        provider=route.provider,
+                        reason=decision.reason_code or decision.action,
+                    )
+                )
+            except (ValueError, RuntimeError, OSError) as exc:
+                reason = str(exc)
+                results.append(
+                    dict(
+                        provider=route.provider,
+                        reason=(
+                            reason
+                            if re.fullmatch("[a-z0-9_-]{1,64}", reason)
+                            else "source_parse_failed"
+                        ),
+                    )
+                )
+        with transaction.atomic():
+            models.RaceEventLifecycleControl.objects.select_for_update().filter(
+                event=event
+            ).first()
+            event = models.RaceEvent.objects.select_for_update().get(pk=event.pk)
+            current = dict((event.source_refs or {}).get("source_discovery_v2", {}))
+            if current.get("token") == token:
+                age = (
+                    now.astimezone(ZoneInfo(event.timezone_name)).date()
+                    - event.local_date
+                ).days
+                interval = (
+                    timedelta(hours=6)
+                    if age > 0
+                    else (
+                        timedelta(minutes=10)
+                        if age == 0
+                        else timedelta(hours=1 if age == -1 else 3)
+                    )
+                )
+                current.update(
+                    token="",
+                    lease_until=None,
+                    next_poll_at=(now + interval).isoformat(),
+                    route_cursor=offset + len(routes),
+                    last_outcomes=results,
+                    last_checked_at=now.isoformat(),
+                )
+                event.source_refs = {
+                    **(event.source_refs or {}),
+                    "source_discovery_v2": current,
+                }
+                event.save(update_fields=("source_refs", "updated_at"))
+        outcomes.append(dict(event_id=event.pk, reason="checked", sources=results))
+    return dict(enabled=True, coverage=coverage, attempted=processed, outcomes=outcomes)

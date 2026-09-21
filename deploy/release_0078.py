@@ -52,6 +52,12 @@ def reject_legacy_service_intent(env):
 
 def guard():
     reject_legacy_service_intent(os.environ)
+    newer = REPAIR / "release-0079-recovery"
+    if os.path.lexists(newer / "active.json") or any(
+        not os.path.lexists(path.parent / "complete.json")
+        for path in newer.glob("*/intent.json")
+    ):
+        raise ValueError("0079 release is in progress; use its original control image and intent")
     if os.path.lexists(RELEASES / "active.json"):
         raise ValueError("0078 release is in progress; use resume_migration_history_repair.sh with the original intent")
     for path in RELEASES.glob("*/intent.json"):

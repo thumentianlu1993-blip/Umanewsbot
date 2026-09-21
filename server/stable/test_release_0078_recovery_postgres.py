@@ -16,6 +16,7 @@ from unittest.mock import patch
 
 import psycopg
 from psycopg import sql
+from django.test import override_settings
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 from django.db.migrations.exceptions import IrreversibleError
@@ -23,6 +24,7 @@ from django.db.migrations.recorder import MigrationRecorder
 from django.core.management import call_command
 from django.core.management.base import CommandError
 
+from stable.release_0078_test_fixture import use_historical_migration_contract
 from stable.services import historical_calendar_release_b_schema as schema
 from stable.services import release_0078_recovery as recovery
 from stable.test_release_0078_entrypoints import WRITER_FLAGS
@@ -67,6 +69,7 @@ class Release0078PostgresTests(TestCase):
         super().tearDownClass()
 
     def setUp(self):
+        use_historical_migration_contract(self, isolate_django_migrations=True)
         self.name = "test_0078_case_" + uuid.uuid4().hex
         self.admin.execute(sql.SQL("CREATE DATABASE {} TEMPLATE {}").format(sql.Identifier(self.name), sql.Identifier(self.template)))
         connection.close()
@@ -131,6 +134,13 @@ class Release0078PostgresTests(TestCase):
             blocker.close()
         MigrationExecutor(connection).migrate([M78])
         self.assertEqual(self.column(), [("jsonb", True, "", "", None)])
+
+    def test_current_graph_rejects_0079_for_historical_release(self):
+        with override_settings(MIGRATION_MODULES={}):
+            result = schema.check_release_b_schema_compatibility(direction="forward")
+        self.assertFalse(result["ok"])
+        self.assertIn("stable.0079_multisource_race_enrollment", result["candidate_post_target_migrations"])
+        self.assertIn("migration.candidate_post_target_migrations", result["drift_paths"])
 
     def test_real_v5_handoff_commands_migrate_and_archive_exact_0078_receipt(self):
         self.assert_v5_handoff_commands(live_enabled=False)

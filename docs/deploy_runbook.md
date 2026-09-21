@@ -1,3 +1,23 @@
+## 2026-09-22 0079 独立发布入口准备（未执行）
+
+新增 `deploy/deploy_0079.sh deploy|resume`，绑定当前候选SHA/image、0078→0079或0079同schema、私有dump/manifest/intent、原服务/配置、关闭态预检和同inode完成凭据。旧0078发布合同继续拒绝0079；旧入口也拒绝未完成的0079意图。完整动作、恢复与验收见[发布包](changes/multisource-race-enrollment/release-0079.md)，当前未上线。
+
+## 2026-09-21 PR212 返修及CI完成（未发布）
+
+IR1–IR5及跨语种返修回归已关闭，独立业务终审APPROVED。ec5f7791的Linux全量5205项对准确base953ea626的5129项，均保留45个历史失败ID、新增0；49项发布合同通过，见[验证记录](changes/multisource-race-enrollment/validation.json)。当前0079仍被旧发布/rollback/schema guard拒绝，生产保护未放宽。0079精确发布包、逐地区proof与生产验收另行完成；本轮未执行任何生产动作。
+
+## 2026-09-20 多来源修复代码已准备，0079未发布
+
+新增0079追加两表/四字段；三新开关均false，policy路径/SHA为空。`manage_multisource_enrollment`固定清单工具提供prepare/dry-run/apply/verify；apply要求关闭运行入口，对照镜像固化提交或本地HEAD，不联网、不转换已发布v1历史。详细命令与边界见[实施记录](changes/multisource-race-enrollment/implementation.md)和[发布合同](changes/multisource-race-enrollment/rollout.md)。
+
+当前未执行迁移、生产补入或开关变更。0079必须另行准备经过验证的受保护前向发布包，不能假定既有固定0078目标工具可直接使用；新source proof、实际镜像/配置/队列/备份和自然任务结果均需新鲜证据。
+
+## 2026-09-20 漏登记排障与多来源修复准备（未发布）
+
+All Comers 现场见[根因](changes/multisource-race-enrollment/ROOT_CAUSE.md)和[脱敏证据](changes/multisource-race-enrollment/EVIDENCE.json)。排障顺序为公开页 → event/正式名单与赛果 → source identity/enrollment/projection/tracking/lifecycle → discovery 检查点及原始响应；Celery SUCCESS 或服务 running 不能替代资料写入与状态推进证据。覆盖盘点必须从公开 canonical 赛事出发，不能只查登记表。
+
+[已审核方案的发布与恢复合同](changes/multisource-race-enrollment/rollout.md)拟采用两张新增表、旧 v1 resolver 保留、新 v2 开关默认关闭；精确 seed 清单、来源政策 SHA、逐地区 proof、预算与默认开关属于后续发布包。当前没有迁移或启用动作。新记录出现后不能退回仅理解 v1 的旧应用；继续遵守现行 0078 受保护前向恢复。不得以扩大消费旧 race_live 队列或手工改状态代替本次修复。
+
 ## 2026-09-19 PR210 修复已上线，两轮自然刷新通过
 
 固定应用`3a174b1e`经PR210合并`63e5b58a`，22:09:22 UTC（北京时间06:09）完成0078前向发布；实际镜像`sha256:1622560c7f522d5078adbed5049e7bf7ab57e537bff57b97b37df0c83aec57a2`。5129项全量保留16失败/29错误/20跳过，45失败ID与此前生产完全一致、无新增；45项发布合同通过，固定reviewer独立复核APPROVED。不是全套全绿，汇总job未计作通过。

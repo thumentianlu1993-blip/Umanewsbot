@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "pages": [
+    {
+      "fixture": "all_comers_official_card.html",
+      "fixture_sha256": "924331062d012936720778199887383d0a86333d697e8fb9867985afee47f1fe",
+      "source_url": "https://www.jra.go.jp/JRADB/accessD.html?CNAME=pw01dde0106202604061120260920/D6",
+      "source_raw_sha256": "9a7711851548a3ece9a6dda9cc1e325db38e9f6ab8a659a7abc2802e8a9329f9",
+      "observed_interval_utc": [
+        "2026-09-20T07:11:00Z",
+        "2026-09-20T07:17:00Z"
+      ],
+      "transformation": "保留所有h1和主table，删除脚本样式，转UTF-8；保留13行及原始链接；统一LF并去除行尾空白",
+      "fixture_type": "reduced_real_public_page"
+    },
+    {
+      "fixture": "all_comers_official_result.html",
+      "fixture_sha256": "022951c0f2f89012dab14913a88fc114d8da7366e38d03e70213c7080d1eea31",
+      "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde0106202604061120260920/92",
+      "source_raw_sha256": "5e78348025e88b8eab8a520eb0d6ca1219536eb92dd060bc751db06329ea6622",
+      "observed_interval_utc": [
+        "2026-09-20T07:11:00Z",
+        "2026-09-20T07:17:00Z"
+      ],
+      "transformation": "保留所有h1和主table，删除脚本样式，转UTF-8；保留13行及原始链接；统一LF并去除行尾空白",
+      "fixture_type": "reduced_real_public_page"
+    }
+  ],
+  "notes": "仅离线验证解析与本场身份，不是自动化访问授权，也不证明其他地区覆盖。"
+}

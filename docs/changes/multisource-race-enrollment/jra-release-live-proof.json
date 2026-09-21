@@ -1,0 +1,179 @@
+{
+  "verified_at": "2026-09-21T17:08:54.367586+00:00",
+  "cards": [
+    {
+      "event_id": 103,
+      "url": "https://www.jra.go.jp/JRADB/accessD.html?CNAME=pw01dde0109202604050420260919/59",
+      "status": 200,
+      "sha256": "b74ecaaa48de6ba666d3192b91aeb3f9c074a8bd1a2774f02b36b134390554a2",
+      "bytes": 195204,
+      "encoding": "text/html",
+      "headings": [
+        "",
+        "検索ウィンドウ",
+        "緊急情報",
+        "出馬表 2026年9月19日（土曜）4回阪神5日 4レース",
+        "第28回 阪神ジャンプステークス",
+        "コースレコード",
+        "JRAからのお知らせ"
+      ],
+      "result_links": [
+        "<a href=\"#\" onclick=\"doAction('/JRADB/accessS.html','pw01sli00/AF');return false;\"><span class=\"icon\"><i aria-hidden=\"true\" class=\"fa-solid fa-chevron-right\"></i></span><span class=\"txt\">レース結果</span></a>",
+        "<a class=\"btn-round gray\" data-ga-click=\"search_rwd-race\" href=\"#\" onclick=\"doAction('/JRADB/accessS.html', 'pw01skl00999999/B3');return false\">過去のレース結果<i aria-hidden=\"true\" class=\"fa-solid fa-chevron-right\"></i></a>",
+        "<a class=\"btn-round gray\" data-ga-click=\"search_rwd-overseas\" href=\"#\" onclick=\"doAction('/JRADB/accessSS.html','pk01skl009999/A6');return false;\">海外 過去のレース結果<i aria-hidden=\"true\" class=\"fa-solid fa-chevron-right\"></i></a>",
+        "<a href=\"#\" onclick=\"return doAction('/JRADB/accessS.html','pw01sli00/AF')\"><i aria-hidden=\"true\" class=\"fa fa-chevron-circle-right\"></i>レース結果</a>"
+      ],
+      "footer": [
+        {
+          "text": "UMACAご利用方法",
+          "href": "/kouza/umaca/howto/"
+        },
+        {
+          "text": "スマッピー用QR作成サイト",
+          "href": "//qrcode.jra.go.jp/"
+        },
+        {
+          "text": "サイトマップ",
+          "href": "/sitemap/"
+        },
+        {
+          "text": "ご利用に際して",
+          "href": "/use/"
+        }
+      ],
+      "fetched_at": "2026-09-21T16:59:34.210533+00:00"
+    },
+    {
+      "event_id": 104,
+      "url": "https://www.jra.go.jp/JRADB/accessD.html?CNAME=pw01dde0106202604061120260920/D6",
+      "status": 200,
+      "sha256": "c41379fcd32119c9626c6f3eb34f656bd9e94d99c7a29a0039ea20511b4fe720",
+      "bytes": 207453,
+      "encoding": "text/html",
+      "headings": [
+        "",
+        "検索ウィンドウ",
+        "緊急情報",
+        "出馬表 2026年9月20日（日曜）4回中山6日 11レース",
+        "第72回 産経賞オールカマー",
+        "コースレコード",
+        "JRAからのお知らせ"
+      ],
+      "result_links": [
+        "<a href=\"#\" onclick=\"doAction('/JRADB/accessS.html','pw01sli00/AF');return false;\"><span class=\"icon\"><i aria-hidden=\"true\" class=\"fa-solid fa-chevron-right\"></i></span><span class=\"txt\">レース結果</span></a>",
+        "<a class=\"btn-round gray\" data-ga-click=\"search_rwd-race\" href=\"#\" onclick=\"doAction('/JRADB/accessS.html', 'pw01skl00999999/B3');return false\">過去のレース結果<i aria-hidden=\"true\" class=\"fa-solid fa-chevron-right\"></i></a>",
+        "<a class=\"btn-round gray\" data-ga-click=\"search_rwd-overseas\" href=\"#\" onclick=\"doAction('/JRADB/accessSS.html','pk01skl009999/A6');return false;\">海外 過去のレース結果<i aria-hidden=\"true\" class=\"fa-solid fa-chevron-right\"></i></a>",
+        "<a href=\"#\" onclick=\"return doAction('/JRADB/accessS.html','pw01sli00/AF')\"><i aria-hidden=\"true\" class=\"fa fa-chevron-circle-right\"></i>レース結果</a>"
+      ],
+      "footer": [
+        {
+          "text": "UMACAご利用方法",
+          "href": "/kouza/umaca/howto/"
+        },
+        {
+          "text": "スマッピー用QR作成サイト",
+          "href": "//qrcode.jra.go.jp/"
+        },
+        {
+          "text": "サイトマップ",
+          "href": "/sitemap/"
+        },
+        {
+          "text": "ご利用に際して",
+          "href": "/use/"
+        }
+      ],
+      "fetched_at": "2026-09-21T16:59:36.166512+00:00"
+    },
+    {
+      "event_id": 105,
+      "url": "https://www.jra.go.jp/JRADB/accessD.html?CNAME=pw01dde0109202604071120260921/E4",
+      "status": 200,
+      "sha256": "d1e6bbbc27821056676df2973c62124f57c09f12d871bf471b11dcb314025199",
+      "bytes": 181343,
+      "encoding": "text/html",
+      "headings": [
+        "",
+        "検索ウィンドウ",
+        "緊急情報",
+        "出馬表 2026年9月21日（月曜）4回阪神7日 11レース",
+        "第74回 神戸新聞杯",
+        "コースレコード",
+        "JRAからのお知らせ"
+      ],
+      "result_links": [
+        "<a href=\"#\" onclick=\"doAction('/JRADB/accessS.html','pw01sli00/AF');return false;\"><span class=\"icon\"><i aria-hidden=\"true\" class=\"fa-solid fa-chevron-right\"></i></span><span class=\"txt\">レース結果</span></a>",
+        "<a class=\"btn-round gray\" data-ga-click=\"search_rwd-race\" href=\"#\" onclick=\"doAction('/JRADB/accessS.html', 'pw01skl00999999/B3');return false\">過去のレース結果<i aria-hidden=\"true\" class=\"fa-solid fa-chevron-right\"></i></a>",
+        "<a class=\"btn-round gray\" data-ga-click=\"search_rwd-overseas\" href=\"#\" onclick=\"doAction('/JRADB/accessSS.html','pk01skl009999/A6');return false;\">海外 過去のレース結果<i aria-hidden=\"true\" class=\"fa-solid fa-chevron-right\"></i></a>",
+        "<a href=\"#\" onclick=\"return doAction('/JRADB/accessS.html','pw01sli00/AF')\"><i aria-hidden=\"true\" class=\"fa fa-chevron-circle-right\"></i>レース結果</a>"
+      ],
+      "footer": [
+        {
+          "text": "UMACAご利用方法",
+          "href": "/kouza/umaca/howto/"
+        },
+        {
+          "text": "スマッピー用QR作成サイト",
+          "href": "//qrcode.jra.go.jp/"
+        },
+        {
+          "text": "サイトマップ",
+          "href": "/sitemap/"
+        },
+        {
+          "text": "ご利用に際して",
+          "href": "/use/"
+        }
+      ],
+      "fetched_at": "2026-09-21T16:59:37.889958+00:00"
+    }
+  ],
+  "results": [
+    {
+      "event_id": 103,
+      "url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1009202604050420260919/F4",
+      "status": 200,
+      "sha256": "d1da6a304a93bbac486f9f874cf5800cf7c177b2ac5f4e3ff61dd2766edaa935",
+      "bytes": 94455,
+      "identity": "09202604050420260919",
+      "identity_agrees": true,
+      "roster_count": 12,
+      "card_roster_count": 12,
+      "result_phase": "official",
+      "fetched_at": "2026-09-21T17:06:38.276108+00:00"
+    },
+    {
+      "event_id": 104,
+      "url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1006202604061120260920/71",
+      "status": 200,
+      "sha256": "c515c9c83215838f791468b16a5c65136586d1ea01ed89a15c7cf773a957d985",
+      "bytes": 95459,
+      "identity": "06202604061120260920",
+      "identity_agrees": true,
+      "roster_count": 13,
+      "card_roster_count": 13,
+      "result_phase": "official",
+      "fetched_at": "2026-09-21T17:06:39.921729+00:00"
+    },
+    {
+      "event_id": 105,
+      "url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1009202604071120260921/7F",
+      "status": 200,
+      "sha256": "d6c5e21ab9cac82275266a1c30435b8ed6f4e554c1726a0dadfce106973b3c6c",
+      "bytes": 93178,
+      "identity": "09202604071120260921",
+      "identity_agrees": true,
+      "roster_count": 11,
+      "card_roster_count": 11,
+      "result_phase": "official",
+      "fetched_at": "2026-09-21T17:06:41.431907+00:00"
+    }
+  ],
+  "terms": {
+    "kind": "terms",
+    "url": "https://www.jra.go.jp/use/",
+    "sha256": "7550b029cfca72cc57bc37e9b6adaf4d47da466994b44cee65344e49b254c2b1",
+    "fetched_at": "2026-09-21T17:01:16.525225+00:00"
+  },
+  "scope": "人工有界proof：三赛卡、三真实结果href、官方use页；不含生产写入或持续发现准入。仅事实字段，不转发图片/视频/文章。"
+}

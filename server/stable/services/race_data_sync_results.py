@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 import hashlib
+import re
 import json
 import unicodedata
 from typing import Any
@@ -175,11 +176,29 @@ def _identity_text(value: object) -> str:
     ).casefold()
 
 
+def runner_slot_identity_matches(*, event, source, runner, external_runner_id, horse_name):
+    """马号只表示槽位；换名必须有该场已核验的 runner 映射。"""
+    if not external_runner_id.startswith("number:"):
+        return True
+    if _identity_text(runner.horse_name) == _identity_text(horse_name):
+        return True
+    crosswalk = source.identity_fields.get("reviewed_runner_crosswalk", {})
+    return bool(
+        isinstance(crosswalk, dict)
+        and crosswalk.get("event_id") == event.pk
+        and isinstance(crosswalk.get("evidence_sha256"), str)
+        and re.fullmatch("[0-9a-f]{64}", crosswalk["evidence_sha256"])
+        and isinstance(crosswalk.get("runners"), dict)
+        and crosswalk["runners"].get(external_runner_id) == runner.pk
+    )
+
+
 def _result_roster_mapping(
     *,
     event: models.RaceEvent,
     source: models.RaceResultSourceIdentity,
     rows: tuple[dict[str, Any], ...],
+    allow_event_slots: bool = False,
 ) -> tuple[tuple[dict[str, Any], models.RaceEventRunner], ...] | None:
     runners = list(
         models.RaceEventRunner.objects.select_for_update()
@@ -190,6 +209,15 @@ def _result_roster_mapping(
         row["status"] not in _TERMINAL_RESULT_STATUSES for row in rows
     ):
         return None
+    # 跨语种仅使用该来源已核验的 event-local crosswalk；马号/枠号自身不证明同一匹马。
+    crosswalk = source.identity_fields.get("reviewed_runner_crosswalk", {})
+    crosswalk_valid = (
+        isinstance(crosswalk, dict)
+        and crosswalk.get("event_id") == event.pk
+        and isinstance(crosswalk.get("evidence_sha256"), str)
+        and re.fullmatch("[0-9a-f]{64}", crosswalk["evidence_sha256"])
+        and isinstance(crosswalk.get("runners"), dict)
+    )
     direct: dict[str, models.RaceEventRunner] = {}
     for runner in runners:
         external_runner_id = _source_runner_id(runner=runner, source=source)
@@ -202,6 +230,14 @@ def _result_roster_mapping(
     mapping: list[tuple[dict[str, Any], models.RaceEventRunner]] = []
     for row in rows:
         runner = direct.get(row["external_runner_id"])
+        if (
+            runner is not None
+            and not runner_slot_identity_matches(
+                event=event, source=source, runner=runner,
+                external_runner_id=row["external_runner_id"], horse_name=row["horse_name"],
+            )
+        ):
+            return None
         if runner is None:
             number = str(row.get("number") or "").strip()
             name = _identity_text(row.get("horse_name"))
@@ -213,7 +249,28 @@ def _result_roster_mapping(
                 if candidate.pk not in assigned
                 and not _source_runner_id(runner=candidate, source=source)
                 and str(candidate.horse_number or "").strip() == number
-                and _identity_text(candidate.horse_name) == name
+                and (
+                    _identity_text(candidate.horse_name) == name
+                    or (
+                        allow_event_slots
+                        and crosswalk_valid
+                        and crosswalk["runners"].get(row["external_runner_id"])
+                        == candidate.pk
+                        and not any((candidate.manual_lock_flags or {}).values())
+                        and not candidate.raw_payload.get("substitution")
+                        and not row["field_provenance"].get("substitution")
+                        and (
+                            not candidate.barrier
+                            or not row["barrier"]
+                            or candidate.barrier == row["barrier"]
+                        )
+                        and (
+                            candidate.running_status
+                            not in ("scratched", "withdrawn", "non_runner")
+                            or row["status"] in ("scratched", "withdrawn", "non_runner")
+                        )
+                    )
+                )
             ]
             if len(candidates) != 1:
                 return None
@@ -238,6 +295,11 @@ def apply_data_sync_result_observation(
 ) -> DataSyncResultApplyDecision:
     if timezone.is_naive(now):
         raise ValueError("now must be timezone-aware")
+    is_multisource = models.RaceDataSyncEnrollment.objects.filter(
+        event_id=expected_event_id, authority_version=2
+    ).exists()
+    if is_multisource and claim_guard is None:
+        return DataSyncResultApplyDecision("rejected", "multisource_claim_required")
     with transaction.atomic():
         from stable.services.race_event_lifecycle_enforce import (
             lock_current_runtime_registry_membership,
@@ -357,6 +419,29 @@ def apply_data_sync_result_observation(
             ),
             None,
         )
+        binding = None
+        if is_multisource:
+            from stable.services.race_data_source_adapters import (
+                claim_binding,
+                binding_roster,
+                publication_authority,
+            )
+
+            try:
+                binding, route = claim_binding(claim_guard, now=now)
+                if binding.source_identity_id != source.pk:
+                    return DataSyncResultApplyDecision(
+                        "rejected", "claim_source_mismatch"
+                    )
+                roster, roster_entry = binding_roster(binding=binding, route=route)
+            except (ValueError, TypeError):
+                return DataSyncResultApplyDecision("rejected", "binding_route_missing")
+            if provenance.get("multisource_authority") != publication_authority(
+                binding=binding, enrollment=locked_claim.enrollment
+            ):
+                return DataSyncResultApplyDecision(
+                    "rejected", "publication_authority_drift"
+                )
         if (
             provenance.get("provider") != source.source_key
             or not candidate_source_class
@@ -366,7 +451,7 @@ def apply_data_sync_result_observation(
             or source.terms_status != models.RaceSourceTermsStatus.APPROVED
             or source.valid_until is None
             or source.valid_until <= now
-            or source.registry_digest != roster.registry_digest
+            or (not is_multisource and source.registry_digest != roster.registry_digest)
             or provenance.get("region") != source.region_code
             or provenance.get("registry_digest") != roster.registry_digest
             or provenance.get("contract_version") != roster_entry.contract_version
@@ -446,7 +531,41 @@ def apply_data_sync_result_observation(
                 event=event,
                 source=source,
                 rows=rows,
+                allow_event_slots=is_multisource
+                and provenance.get("roster_complete") is True,
             )
+            if roster_mapping is None and is_multisource and not event.runners.exists():
+                if (
+                    provenance.get("roster_complete") is True
+                    and len({r["number"] for r in rows}) == len(rows)
+                    and all(
+                        r["number"] and r["status"] in _TERMINAL_RESULT_STATUSES
+                        for r in rows
+                    )
+                ):
+                    roster_mapping = tuple(
+                        (
+                            row,
+                            models.RaceEventRunner(
+                                event=event,
+                                sort_order=index,
+                                horse_number=row["number"],
+                                horse_name=row["horse_name"],
+                                barrier=row["barrier"],
+                                jockey_name=row["jockey_name"],
+                                trainer_name=row["trainer_name"],
+                                carried_weight=row["carried_weight"],
+                                source_refs={
+                                    source.source_key: row["external_runner_id"],
+                                    "bootstrap_kind": "result",
+                                },
+                                raw_payload={
+                                    "bootstrap_observation_id": observation.pk
+                                },
+                            ),
+                        )
+                        for index, row in enumerate(rows, 1)
+                    )
             if roster_mapping is None:
                 return DataSyncResultApplyDecision(
                     "rejected", "result_roster_incomplete"
@@ -559,6 +678,46 @@ def apply_data_sync_result_observation(
                     current_observation.source_updated_at
                     or current_observation.observed_at
                 )
+        if is_multisource and current_observation is not None:
+            # 已验证跨来源 runner 映射允许姓名使用不同语种；普通佐证不能
+            # 把翻译差异当更正。同源或明确更正仍比较全部公开姓名字段。
+            compare_names = current_source_key == source.source_key or (
+                observation.result_phase == models.RaceResultPhase.CORRECTED
+                and provenance.get("correction_marker") is True
+            )
+
+            def slot_facts(items):
+                return sorted(
+                    (
+                        r["number"],
+                        r["reported_finish_position"] or 0,
+                        r["status"],
+                        r["finish_time"],
+                        r["margin"],
+                        r["barrier"],
+                        r["carried_weight"],
+                        r["horse_name"] if compare_names else "",
+                        r["jockey_name"] if compare_names else "",
+                        r["trainer_name"] if compare_names else "",
+                    )
+                    for r in items
+                )
+
+            try:
+                same_facts = slot_facts(rows) == slot_facts(
+                    _normalize_result_rows(current_observation.normalized_payload)
+                )
+            except (ValueError, TypeError):
+                same_facts = False
+            if same_facts:
+                models.RaceEventRevisionEvidence.objects.get_or_create(
+                    revision=current,
+                    observation=observation,
+                    defaults={"role": "supporting"},
+                )
+                return DataSyncResultApplyDecision(
+                    "replayed", "same_event_result_evidence", current.pk, True
+                )
         content_sha256 = _canonical_sha256(observation.normalized_payload)
         arbitration = arbitrate_source_value(
             current_source_key=current_source_key,
@@ -587,6 +746,7 @@ def apply_data_sync_result_observation(
             current is not None
             and arbitration.apply
             and arbitration.reason_code == "higher_priority_source"
+            and not is_multisource
         )
         authorized_replacement = correction_marked or priority_replacement
         if (
@@ -616,6 +776,7 @@ def apply_data_sync_result_observation(
             and current is None
             and granted_identity_id is not None
             and observation.source_identity_id != granted_identity_id
+            and not is_multisource
         )
         may_project = bool(
             terminal_phase
@@ -657,7 +818,10 @@ def apply_data_sync_result_observation(
                     ),
                     source.source_key: row["external_runner_id"],
                 }
-                runner.save(update_fields=("source_refs", "updated_at"))
+                if runner.pk is None:
+                    runner.save()
+                else:
+                    runner.save(update_fields=("source_refs", "updated_at"))
         if promote_existing:
             assert existing is not None
             revision = existing
@@ -704,7 +868,7 @@ def apply_data_sync_result_observation(
                         1,
                     ]
                 ],
-                allowlist_version=1,
+                allowlist_version=2 if is_multisource else 1,
                 registry_digest=roster.registry_digest,
                 coverage_proof_digest=observation.normalized_sha256,
                 authorization_kind=(

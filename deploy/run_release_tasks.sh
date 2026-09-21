@@ -14,6 +14,10 @@ set -eu
 ROOT_DIR="${UMANEWS_ROOT_DIR:-$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)}"
 cd "$ROOT_DIR"
 
+if [ "${RELEASE_SCHEMA_GENERATION:-}" = "0079" ]; then
+  exec python3 "$ROOT_DIR/deploy/run_release_0079_tasks.py"
+fi
+
 COMPOSE_FILE="${COMPOSE_FILE:-}"
 case "$COMPOSE_FILE" in
   docker-compose.prod.yml|docker-compose.prod.lowcost.yml) ;;

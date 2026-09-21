@@ -25,6 +25,7 @@ services:
       RACE_LIVE_TRA_REGISTRY_FILE: ${RACE_LIVE_TRA_REGISTRY_FILE:-/app/runtime/policies/race_live/source_registry_the_racing_api_free.json}
       RACE_LIVE_TRA_REGISTRY_SHA256: ${RACE_LIVE_TRA_REGISTRY_SHA256:-3bac3b644c631ed165b8430343822b2c70c5a88c5036b63dcb557c83c0e0a6da}
     volumes:
+      - ${UMANEWS_PERSISTENT_RUNTIME_ROOT:-./runtime}/race_data_sync:/run/race-data-sync:ro
       - static_data:/app/server/staticfiles
       - media_data:/app/server/media
       - app_logs:/app/logs
@@ -47,6 +48,7 @@ services:
       - .env
     environment: *safe_news_modes
     volumes:
+      - ${UMANEWS_PERSISTENT_RUNTIME_ROOT:-./runtime}/race_data_sync:/run/race-data-sync:ro
       - media_data:/app/server/media
       - app_logs:/app/logs
       - race_result_review_data:/app/runtime/race_result_review
@@ -66,6 +68,7 @@ services:
       - .env
     environment: *safe_news_modes
     volumes:
+      - ${UMANEWS_PERSISTENT_RUNTIME_ROOT:-./runtime}/race_data_sync:/run/race-data-sync:ro
       - media_data:/app/server/media
       - app_logs:/app/logs
       - ${UMANEWS_PERSISTENT_RUNTIME_ROOT:-./runtime}/secrets:/run/secrets:ro
@@ -106,6 +109,7 @@ services:
       - .env
     environment: *safe_news_modes
     volumes:
+      - ${UMANEWS_PERSISTENT_RUNTIME_ROOT:-./runtime}/race_data_sync:/run/race-data-sync:ro
       - app_logs:/app/logs
       - race_result_review_data:/app/runtime/race_result_review
     restart: unless-stopped

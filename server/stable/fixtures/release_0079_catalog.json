@@ -1,0 +1,1426 @@
+{
+  "source": {
+    "columns": [
+      {
+        "column_name": "created_at",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "timestamp with time zone"
+      },
+      {
+        "column_name": "effective_at",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": false,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "timestamp with time zone"
+      },
+      {
+        "column_name": "enrollment_generation",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "bigint"
+      },
+      {
+        "column_name": "entry_sha256",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "character varying(64)"
+      },
+      {
+        "column_name": "event_id",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "bigint"
+      },
+      {
+        "column_name": "event_snapshot_sha256",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "character varying(64)"
+      },
+      {
+        "column_name": "id",
+        "default_expr": null,
+        "generated": "",
+        "identity": "d",
+        "not_null": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "bigint"
+      },
+      {
+        "column_name": "manifest_sha256",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "character varying(64)"
+      },
+      {
+        "column_name": "projection_owner_generation",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "bigint"
+      },
+      {
+        "column_name": "reason_code",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "character varying(64)"
+      },
+      {
+        "column_name": "retired_at",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": false,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "timestamp with time zone"
+      },
+      {
+        "column_name": "route_digest",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "character varying(64)"
+      },
+      {
+        "column_name": "source_identity_id",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "bigint"
+      },
+      {
+        "column_name": "standing_policy_digest",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "character varying(64)"
+      },
+      {
+        "column_name": "state",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "character varying(16)"
+      },
+      {
+        "column_name": "updated_at",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "timestamp with time zone"
+      }
+    ],
+    "constraints": [
+      {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (enrollment_generation >= 1)",
+        "name": "race_data_enroll_gen_gte1",
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "c",
+        "validated": true
+      },
+      {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (state::text = ANY (ARRAY['proposed'::character varying, 'enrolled'::character varying, 'paused'::character varying, 'retired'::character varying]::text[]))",
+        "name": "race_data_enroll_state_valid",
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "c",
+        "validated": true
+      },
+      {
+        "deferrable": true,
+        "deferred": true,
+        "definition": "FOREIGN KEY (event_id) REFERENCES stable_raceevent(id) DEFERRABLE INITIALLY DEFERRED",
+        "name": "stable_racedatasynce_event_id_a44fc852_fk_stable_ra",
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "f",
+        "validated": true
+      },
+      {
+        "deferrable": true,
+        "deferred": true,
+        "definition": "FOREIGN KEY (source_identity_id) REFERENCES stable_raceresultsourceidentity(id) DEFERRABLE INITIALLY DEFERRED",
+        "name": "stable_racedatasynce_source_identity_id_e6503df7_fk_stable_ra",
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "f",
+        "validated": true
+      },
+      {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (enrollment_generation >= 0)",
+        "name": "stable_racedatasyncenrollment_enrollment_generation_check",
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "c",
+        "validated": true
+      },
+      {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "UNIQUE (event_id)",
+        "name": "stable_racedatasyncenrollment_event_id_key",
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "u",
+        "validated": true
+      },
+      {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "PRIMARY KEY (id)",
+        "name": "stable_racedatasyncenrollment_pkey",
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "p",
+        "validated": true
+      },
+      {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (projection_owner_generation >= 0)",
+        "name": "stable_racedatasyncenrollment_projection_owner_generation_check",
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "c",
+        "validated": true
+      }
+    ],
+    "indexes": [
+      {
+        "key_count": 2,
+        "keys": [
+          "state",
+          "event_id"
+        ],
+        "method": "btree",
+        "name": "race_data_enroll_state_evt_idx",
+        "predicate": null,
+        "primary": false,
+        "ready": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "unique": false,
+        "valid": true
+      },
+      {
+        "key_count": 1,
+        "keys": [
+          "event_id"
+        ],
+        "method": "btree",
+        "name": "stable_racedatasyncenrollment_event_id_key",
+        "predicate": null,
+        "primary": false,
+        "ready": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "unique": true,
+        "valid": true
+      },
+      {
+        "key_count": 1,
+        "keys": [
+          "id"
+        ],
+        "method": "btree",
+        "name": "stable_racedatasyncenrollment_pkey",
+        "predicate": null,
+        "primary": true,
+        "ready": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "unique": true,
+        "valid": true
+      },
+      {
+        "key_count": 1,
+        "keys": [
+          "source_identity_id"
+        ],
+        "method": "btree",
+        "name": "stable_racedatasyncenrollment_source_identity_id_e6503df7",
+        "predicate": null,
+        "primary": false,
+        "ready": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "unique": false,
+        "valid": true
+      }
+    ],
+    "internal_triggers": [
+      {
+        "constraint_name": "stable_racedatasynce_event_id_a44fc852_fk_stable_ra",
+        "constraint_table": "stable_racedatasyncenrollment",
+        "deferrable": true,
+        "enabled": "O",
+        "function_name": "RI_FKey_check_ins",
+        "function_schema": "pg_catalog",
+        "initially_deferred": true,
+        "trigger_table": "stable_racedatasyncenrollment",
+        "trigger_type": 5
+      },
+      {
+        "constraint_name": "stable_racedatasynce_event_id_a44fc852_fk_stable_ra",
+        "constraint_table": "stable_racedatasyncenrollment",
+        "deferrable": true,
+        "enabled": "O",
+        "function_name": "RI_FKey_check_upd",
+        "function_schema": "pg_catalog",
+        "initially_deferred": true,
+        "trigger_table": "stable_racedatasyncenrollment",
+        "trigger_type": 17
+      },
+      {
+        "constraint_name": "stable_racedatasynce_event_id_a44fc852_fk_stable_ra",
+        "constraint_table": "stable_racedatasyncenrollment",
+        "deferrable": true,
+        "enabled": "O",
+        "function_name": "RI_FKey_noaction_del",
+        "function_schema": "pg_catalog",
+        "initially_deferred": true,
+        "trigger_table": "stable_raceevent",
+        "trigger_type": 9
+      },
+      {
+        "constraint_name": "stable_racedatasynce_event_id_a44fc852_fk_stable_ra",
+        "constraint_table": "stable_racedatasyncenrollment",
+        "deferrable": true,
+        "enabled": "O",
+        "function_name": "RI_FKey_noaction_upd",
+        "function_schema": "pg_catalog",
+        "initially_deferred": true,
+        "trigger_table": "stable_raceevent",
+        "trigger_type": 17
+      },
+      {
+        "constraint_name": "stable_racedatasynce_source_identity_id_e6503df7_fk_stable_ra",
+        "constraint_table": "stable_racedatasyncenrollment",
+        "deferrable": true,
+        "enabled": "O",
+        "function_name": "RI_FKey_check_ins",
+        "function_schema": "pg_catalog",
+        "initially_deferred": true,
+        "trigger_table": "stable_racedatasyncenrollment",
+        "trigger_type": 5
+      },
+      {
+        "constraint_name": "stable_racedatasynce_source_identity_id_e6503df7_fk_stable_ra",
+        "constraint_table": "stable_racedatasyncenrollment",
+        "deferrable": true,
+        "enabled": "O",
+        "function_name": "RI_FKey_check_upd",
+        "function_schema": "pg_catalog",
+        "initially_deferred": true,
+        "trigger_table": "stable_racedatasyncenrollment",
+        "trigger_type": 17
+      },
+      {
+        "constraint_name": "stable_racedatasynce_source_identity_id_e6503df7_fk_stable_ra",
+        "constraint_table": "stable_racedatasyncenrollment",
+        "deferrable": true,
+        "enabled": "O",
+        "function_name": "RI_FKey_noaction_del",
+        "function_schema": "pg_catalog",
+        "initially_deferred": true,
+        "trigger_table": "stable_raceresultsourceidentity",
+        "trigger_type": 9
+      },
+      {
+        "constraint_name": "stable_racedatasynce_source_identity_id_e6503df7_fk_stable_ra",
+        "constraint_table": "stable_racedatasyncenrollment",
+        "deferrable": true,
+        "enabled": "O",
+        "function_name": "RI_FKey_noaction_upd",
+        "function_schema": "pg_catalog",
+        "initially_deferred": true,
+        "trigger_table": "stable_raceresultsourceidentity",
+        "trigger_type": 17
+      }
+    ],
+    "sequences": [
+      {
+        "cache": 1,
+        "column_name": "id",
+        "cycle": false,
+        "dependency": "i",
+        "increment": 1,
+        "max": 9223372036854775807,
+        "min": 1,
+        "name": "stable_racedatasyncenrollment_id_seq",
+        "start": 1,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "bigint"
+      }
+    ],
+    "tables": [
+      {
+        "force_row_security": false,
+        "kind": "r",
+        "persistence": "p",
+        "row_security": false,
+        "table_name": "stable_racedatasyncenrollment"
+      }
+    ],
+    "triggers": []
+  },
+  "target": {
+    "columns": [
+      {
+        "column_name": "authority_version",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "smallint"
+      },
+      {
+        "column_name": "created_at",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "timestamp with time zone"
+      },
+      {
+        "column_name": "effective_at",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": false,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "timestamp with time zone"
+      },
+      {
+        "column_name": "enrollment_generation",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "bigint"
+      },
+      {
+        "column_name": "entry_sha256",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "character varying(64)"
+      },
+      {
+        "column_name": "event_id",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "bigint"
+      },
+      {
+        "column_name": "event_snapshot_sha256",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "character varying(64)"
+      },
+      {
+        "column_name": "id",
+        "default_expr": null,
+        "generated": "",
+        "identity": "d",
+        "not_null": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "bigint"
+      },
+      {
+        "column_name": "manifest_sha256",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "character varying(64)"
+      },
+      {
+        "column_name": "projection_owner_generation",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "bigint"
+      },
+      {
+        "column_name": "reason_code",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "character varying(64)"
+      },
+      {
+        "column_name": "retired_at",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": false,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "timestamp with time zone"
+      },
+      {
+        "column_name": "route_digest",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "character varying(64)"
+      },
+      {
+        "column_name": "source_identity_id",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "bigint"
+      },
+      {
+        "column_name": "source_set_digest",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "character varying(64)"
+      },
+      {
+        "column_name": "source_set_generation",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "bigint"
+      },
+      {
+        "column_name": "source_set_manifest",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "jsonb"
+      },
+      {
+        "column_name": "standing_policy_digest",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "character varying(64)"
+      },
+      {
+        "column_name": "state",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "character varying(16)"
+      },
+      {
+        "column_name": "updated_at",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "timestamp with time zone"
+      },
+      {
+        "column_name": "binding_manifest",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncsourcebinding",
+        "type": "jsonb"
+      },
+      {
+        "column_name": "binding_manifest_sha256",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncsourcebinding",
+        "type": "character varying(64)"
+      },
+      {
+        "column_name": "capabilities",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncsourcebinding",
+        "type": "jsonb"
+      },
+      {
+        "column_name": "contract_digest",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncsourcebinding",
+        "type": "character varying(64)"
+      },
+      {
+        "column_name": "created_at",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncsourcebinding",
+        "type": "timestamp with time zone"
+      },
+      {
+        "column_name": "enrollment_id",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncsourcebinding",
+        "type": "bigint"
+      },
+      {
+        "column_name": "id",
+        "default_expr": null,
+        "generated": "",
+        "identity": "d",
+        "not_null": true,
+        "table_name": "stable_racedatasyncsourcebinding",
+        "type": "bigint"
+      },
+      {
+        "column_name": "identity_evidence_sha256",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncsourcebinding",
+        "type": "character varying(64)"
+      },
+      {
+        "column_name": "proof_digest",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncsourcebinding",
+        "type": "character varying(64)"
+      },
+      {
+        "column_name": "registry_schema_version",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncsourcebinding",
+        "type": "smallint"
+      },
+      {
+        "column_name": "route_digest",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncsourcebinding",
+        "type": "character varying(64)"
+      },
+      {
+        "column_name": "source_identity_id",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncsourcebinding",
+        "type": "bigint"
+      },
+      {
+        "column_name": "state",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncsourcebinding",
+        "type": "character varying(16)"
+      },
+      {
+        "column_name": "updated_at",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncsourcebinding",
+        "type": "timestamp with time zone"
+      },
+      {
+        "column_name": "valid_until",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_racedatasyncsourcebinding",
+        "type": "timestamp with time zone"
+      },
+      {
+        "column_name": "created_at",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_raceeventidentitykey",
+        "type": "timestamp with time zone"
+      },
+      {
+        "column_name": "event_id",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_raceeventidentitykey",
+        "type": "bigint"
+      },
+      {
+        "column_name": "evidence",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_raceeventidentitykey",
+        "type": "jsonb"
+      },
+      {
+        "column_name": "id",
+        "default_expr": null,
+        "generated": "",
+        "identity": "d",
+        "not_null": true,
+        "table_name": "stable_raceeventidentitykey",
+        "type": "bigint"
+      },
+      {
+        "column_name": "key_payload",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_raceeventidentitykey",
+        "type": "jsonb"
+      },
+      {
+        "column_name": "key_sha256",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_raceeventidentitykey",
+        "type": "character varying(64)"
+      },
+      {
+        "column_name": "key_type",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_raceeventidentitykey",
+        "type": "character varying(32)"
+      },
+      {
+        "column_name": "matcher_version",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_raceeventidentitykey",
+        "type": "character varying(64)"
+      },
+      {
+        "column_name": "namespace",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_raceeventidentitykey",
+        "type": "character varying(64)"
+      },
+      {
+        "column_name": "updated_at",
+        "default_expr": null,
+        "generated": "",
+        "identity": "",
+        "not_null": true,
+        "table_name": "stable_raceeventidentitykey",
+        "type": "timestamp with time zone"
+      }
+    ],
+    "constraints": [
+      {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (enrollment_generation >= 1)",
+        "name": "race_data_enroll_gen_gte1",
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "c",
+        "validated": true
+      },
+      {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (state::text = ANY (ARRAY['proposed'::character varying, 'enrolled'::character varying, 'paused'::character varying, 'retired'::character varying]::text[]))",
+        "name": "race_data_enroll_state_valid",
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "c",
+        "validated": true
+      },
+      {
+        "deferrable": true,
+        "deferred": true,
+        "definition": "FOREIGN KEY (event_id) REFERENCES stable_raceevent(id) DEFERRABLE INITIALLY DEFERRED",
+        "name": "stable_racedatasynce_event_id_a44fc852_fk_stable_ra",
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "f",
+        "validated": true
+      },
+      {
+        "deferrable": true,
+        "deferred": true,
+        "definition": "FOREIGN KEY (source_identity_id) REFERENCES stable_raceresultsourceidentity(id) DEFERRABLE INITIALLY DEFERRED",
+        "name": "stable_racedatasynce_source_identity_id_e6503df7_fk_stable_ra",
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "f",
+        "validated": true
+      },
+      {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (authority_version >= 0)",
+        "name": "stable_racedatasyncenrollment_authority_version_check",
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "c",
+        "validated": true
+      },
+      {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (enrollment_generation >= 0)",
+        "name": "stable_racedatasyncenrollment_enrollment_generation_check",
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "c",
+        "validated": true
+      },
+      {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "UNIQUE (event_id)",
+        "name": "stable_racedatasyncenrollment_event_id_key",
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "u",
+        "validated": true
+      },
+      {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "PRIMARY KEY (id)",
+        "name": "stable_racedatasyncenrollment_pkey",
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "p",
+        "validated": true
+      },
+      {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (projection_owner_generation >= 0)",
+        "name": "stable_racedatasyncenrollment_projection_owner_generation_check",
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "c",
+        "validated": true
+      },
+      {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (source_set_generation >= 0)",
+        "name": "stable_racedatasyncenrollment_source_set_generation_check",
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "c",
+        "validated": true
+      },
+      {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (state::text = ANY (ARRAY['active'::character varying, 'quarantined'::character varying, 'retired'::character varying]::text[]))",
+        "name": "race_sync_binding_state",
+        "table_name": "stable_racedatasyncsourcebinding",
+        "type": "c",
+        "validated": true
+      },
+      {
+        "deferrable": true,
+        "deferred": true,
+        "definition": "FOREIGN KEY (enrollment_id) REFERENCES stable_racedatasyncenrollment(id) DEFERRABLE INITIALLY DEFERRED",
+        "name": "stable_racedatasyncs_enrollment_id_a01a44b4_fk_stable_ra",
+        "table_name": "stable_racedatasyncsourcebinding",
+        "type": "f",
+        "validated": true
+      },
+      {
+        "deferrable": true,
+        "deferred": true,
+        "definition": "FOREIGN KEY (source_identity_id) REFERENCES stable_raceresultsourceidentity(id) DEFERRABLE INITIALLY DEFERRED",
+        "name": "stable_racedatasyncs_source_identity_id_f37164fb_fk_stable_ra",
+        "table_name": "stable_racedatasyncsourcebinding",
+        "type": "f",
+        "validated": true
+      },
+      {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "PRIMARY KEY (id)",
+        "name": "stable_racedatasyncsourcebinding_pkey",
+        "table_name": "stable_racedatasyncsourcebinding",
+        "type": "p",
+        "validated": true
+      },
+      {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (registry_schema_version >= 0)",
+        "name": "stable_racedatasyncsourcebinding_registry_schema_version_check",
+        "table_name": "stable_racedatasyncsourcebinding",
+        "type": "c",
+        "validated": true
+      },
+      {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "UNIQUE (enrollment_id, source_identity_id)",
+        "name": "uq_race_sync_binding",
+        "table_name": "stable_racedatasyncsourcebinding",
+        "type": "u",
+        "validated": true
+      },
+      {
+        "deferrable": true,
+        "deferred": true,
+        "definition": "FOREIGN KEY (event_id) REFERENCES stable_raceevent(id) DEFERRABLE INITIALLY DEFERRED",
+        "name": "stable_raceeventiden_event_id_ce9b6ffe_fk_stable_ra",
+        "table_name": "stable_raceeventidentitykey",
+        "type": "f",
+        "validated": true
+      },
+      {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "PRIMARY KEY (id)",
+        "name": "stable_raceeventidentitykey_pkey",
+        "table_name": "stable_raceeventidentitykey",
+        "type": "p",
+        "validated": true
+      },
+      {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "UNIQUE (namespace, key_sha256)",
+        "name": "uq_race_identity_key",
+        "table_name": "stable_raceeventidentitykey",
+        "type": "u",
+        "validated": true
+      }
+    ],
+    "indexes": [
+      {
+        "key_count": 2,
+        "keys": [
+          "state",
+          "event_id"
+        ],
+        "method": "btree",
+        "name": "race_data_enroll_state_evt_idx",
+        "predicate": null,
+        "primary": false,
+        "ready": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "unique": false,
+        "valid": true
+      },
+      {
+        "key_count": 1,
+        "keys": [
+          "event_id"
+        ],
+        "method": "btree",
+        "name": "stable_racedatasyncenrollment_event_id_key",
+        "predicate": null,
+        "primary": false,
+        "ready": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "unique": true,
+        "valid": true
+      },
+      {
+        "key_count": 1,
+        "keys": [
+          "id"
+        ],
+        "method": "btree",
+        "name": "stable_racedatasyncenrollment_pkey",
+        "predicate": null,
+        "primary": true,
+        "ready": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "unique": true,
+        "valid": true
+      },
+      {
+        "key_count": 1,
+        "keys": [
+          "source_identity_id"
+        ],
+        "method": "btree",
+        "name": "stable_racedatasyncenrollment_source_identity_id_e6503df7",
+        "predicate": null,
+        "primary": false,
+        "ready": true,
+        "table_name": "stable_racedatasyncenrollment",
+        "unique": false,
+        "valid": true
+      },
+      {
+        "key_count": 1,
+        "keys": [
+          "enrollment_id"
+        ],
+        "method": "btree",
+        "name": "stable_racedatasyncsourcebinding_enrollment_id_a01a44b4",
+        "predicate": null,
+        "primary": false,
+        "ready": true,
+        "table_name": "stable_racedatasyncsourcebinding",
+        "unique": false,
+        "valid": true
+      },
+      {
+        "key_count": 1,
+        "keys": [
+          "id"
+        ],
+        "method": "btree",
+        "name": "stable_racedatasyncsourcebinding_pkey",
+        "predicate": null,
+        "primary": true,
+        "ready": true,
+        "table_name": "stable_racedatasyncsourcebinding",
+        "unique": true,
+        "valid": true
+      },
+      {
+        "key_count": 1,
+        "keys": [
+          "source_identity_id"
+        ],
+        "method": "btree",
+        "name": "stable_racedatasyncsourcebinding_source_identity_id_f37164fb",
+        "predicate": null,
+        "primary": false,
+        "ready": true,
+        "table_name": "stable_racedatasyncsourcebinding",
+        "unique": false,
+        "valid": true
+      },
+      {
+        "key_count": 2,
+        "keys": [
+          "enrollment_id",
+          "source_identity_id"
+        ],
+        "method": "btree",
+        "name": "uq_race_sync_binding",
+        "predicate": null,
+        "primary": false,
+        "ready": true,
+        "table_name": "stable_racedatasyncsourcebinding",
+        "unique": true,
+        "valid": true
+      },
+      {
+        "key_count": 1,
+        "keys": [
+          "event_id"
+        ],
+        "method": "btree",
+        "name": "stable_raceeventidentitykey_event_id_ce9b6ffe",
+        "predicate": null,
+        "primary": false,
+        "ready": true,
+        "table_name": "stable_raceeventidentitykey",
+        "unique": false,
+        "valid": true
+      },
+      {
+        "key_count": 1,
+        "keys": [
+          "id"
+        ],
+        "method": "btree",
+        "name": "stable_raceeventidentitykey_pkey",
+        "predicate": null,
+        "primary": true,
+        "ready": true,
+        "table_name": "stable_raceeventidentitykey",
+        "unique": true,
+        "valid": true
+      },
+      {
+        "key_count": 2,
+        "keys": [
+          "namespace",
+          "key_sha256"
+        ],
+        "method": "btree",
+        "name": "uq_race_identity_key",
+        "predicate": null,
+        "primary": false,
+        "ready": true,
+        "table_name": "stable_raceeventidentitykey",
+        "unique": true,
+        "valid": true
+      }
+    ],
+    "internal_triggers": [
+      {
+        "constraint_name": "stable_racedatasynce_event_id_a44fc852_fk_stable_ra",
+        "constraint_table": "stable_racedatasyncenrollment",
+        "deferrable": true,
+        "enabled": "O",
+        "function_name": "RI_FKey_check_ins",
+        "function_schema": "pg_catalog",
+        "initially_deferred": true,
+        "trigger_table": "stable_racedatasyncenrollment",
+        "trigger_type": 5
+      },
+      {
+        "constraint_name": "stable_racedatasynce_event_id_a44fc852_fk_stable_ra",
+        "constraint_table": "stable_racedatasyncenrollment",
+        "deferrable": true,
+        "enabled": "O",
+        "function_name": "RI_FKey_check_upd",
+        "function_schema": "pg_catalog",
+        "initially_deferred": true,
+        "trigger_table": "stable_racedatasyncenrollment",
+        "trigger_type": 17
+      },
+      {
+        "constraint_name": "stable_racedatasynce_event_id_a44fc852_fk_stable_ra",
+        "constraint_table": "stable_racedatasyncenrollment",
+        "deferrable": true,
+        "enabled": "O",
+        "function_name": "RI_FKey_noaction_del",
+        "function_schema": "pg_catalog",
+        "initially_deferred": true,
+        "trigger_table": "stable_raceevent",
+        "trigger_type": 9
+      },
+      {
+        "constraint_name": "stable_racedatasynce_event_id_a44fc852_fk_stable_ra",
+        "constraint_table": "stable_racedatasyncenrollment",
+        "deferrable": true,
+        "enabled": "O",
+        "function_name": "RI_FKey_noaction_upd",
+        "function_schema": "pg_catalog",
+        "initially_deferred": true,
+        "trigger_table": "stable_raceevent",
+        "trigger_type": 17
+      },
+      {
+        "constraint_name": "stable_racedatasynce_source_identity_id_e6503df7_fk_stable_ra",
+        "constraint_table": "stable_racedatasyncenrollment",
+        "deferrable": true,
+        "enabled": "O",
+        "function_name": "RI_FKey_check_ins",
+        "function_schema": "pg_catalog",
+        "initially_deferred": true,
+        "trigger_table": "stable_racedatasyncenrollment",
+        "trigger_type": 5
+      },
+      {
+        "constraint_name": "stable_racedatasynce_source_identity_id_e6503df7_fk_stable_ra",
+        "constraint_table": "stable_racedatasyncenrollment",
+        "deferrable": true,
+        "enabled": "O",
+        "function_name": "RI_FKey_check_upd",
+        "function_schema": "pg_catalog",
+        "initially_deferred": true,
+        "trigger_table": "stable_racedatasyncenrollment",
+        "trigger_type": 17
+      },
+      {
+        "constraint_name": "stable_racedatasynce_source_identity_id_e6503df7_fk_stable_ra",
+        "constraint_table": "stable_racedatasyncenrollment",
+        "deferrable": true,
+        "enabled": "O",
+        "function_name": "RI_FKey_noaction_del",
+        "function_schema": "pg_catalog",
+        "initially_deferred": true,
+        "trigger_table": "stable_raceresultsourceidentity",
+        "trigger_type": 9
+      },
+      {
+        "constraint_name": "stable_racedatasynce_source_identity_id_e6503df7_fk_stable_ra",
+        "constraint_table": "stable_racedatasyncenrollment",
+        "deferrable": true,
+        "enabled": "O",
+        "function_name": "RI_FKey_noaction_upd",
+        "function_schema": "pg_catalog",
+        "initially_deferred": true,
+        "trigger_table": "stable_raceresultsourceidentity",
+        "trigger_type": 17
+      },
+      {
+        "constraint_name": "stable_racedatasyncs_enrollment_id_a01a44b4_fk_stable_ra",
+        "constraint_table": "stable_racedatasyncsourcebinding",
+        "deferrable": true,
+        "enabled": "O",
+        "function_name": "RI_FKey_noaction_del",
+        "function_schema": "pg_catalog",
+        "initially_deferred": true,
+        "trigger_table": "stable_racedatasyncenrollment",
+        "trigger_type": 9
+      },
+      {
+        "constraint_name": "stable_racedatasyncs_enrollment_id_a01a44b4_fk_stable_ra",
+        "constraint_table": "stable_racedatasyncsourcebinding",
+        "deferrable": true,
+        "enabled": "O",
+        "function_name": "RI_FKey_noaction_upd",
+        "function_schema": "pg_catalog",
+        "initially_deferred": true,
+        "trigger_table": "stable_racedatasyncenrollment",
+        "trigger_type": 17
+      },
+      {
+        "constraint_name": "stable_racedatasyncs_enrollment_id_a01a44b4_fk_stable_ra",
+        "constraint_table": "stable_racedatasyncsourcebinding",
+        "deferrable": true,
+        "enabled": "O",
+        "function_name": "RI_FKey_check_ins",
+        "function_schema": "pg_catalog",
+        "initially_deferred": true,
+        "trigger_table": "stable_racedatasyncsourcebinding",
+        "trigger_type": 5
+      },
+      {
+        "constraint_name": "stable_racedatasyncs_enrollment_id_a01a44b4_fk_stable_ra",
+        "constraint_table": "stable_racedatasyncsourcebinding",
+        "deferrable": true,
+        "enabled": "O",
+        "function_name": "RI_FKey_check_upd",
+        "function_schema": "pg_catalog",
+        "initially_deferred": true,
+        "trigger_table": "stable_racedatasyncsourcebinding",
+        "trigger_type": 17
+      },
+      {
+        "constraint_name": "stable_racedatasyncs_source_identity_id_f37164fb_fk_stable_ra",
+        "constraint_table": "stable_racedatasyncsourcebinding",
+        "deferrable": true,
+        "enabled": "O",
+        "function_name": "RI_FKey_check_ins",
+        "function_schema": "pg_catalog",
+        "initially_deferred": true,
+        "trigger_table": "stable_racedatasyncsourcebinding",
+        "trigger_type": 5
+      },
+      {
+        "constraint_name": "stable_racedatasyncs_source_identity_id_f37164fb_fk_stable_ra",
+        "constraint_table": "stable_racedatasyncsourcebinding",
+        "deferrable": true,
+        "enabled": "O",
+        "function_name": "RI_FKey_check_upd",
+        "function_schema": "pg_catalog",
+        "initially_deferred": true,
+        "trigger_table": "stable_racedatasyncsourcebinding",
+        "trigger_type": 17
+      },
+      {
+        "constraint_name": "stable_racedatasyncs_source_identity_id_f37164fb_fk_stable_ra",
+        "constraint_table": "stable_racedatasyncsourcebinding",
+        "deferrable": true,
+        "enabled": "O",
+        "function_name": "RI_FKey_noaction_del",
+        "function_schema": "pg_catalog",
+        "initially_deferred": true,
+        "trigger_table": "stable_raceresultsourceidentity",
+        "trigger_type": 9
+      },
+      {
+        "constraint_name": "stable_racedatasyncs_source_identity_id_f37164fb_fk_stable_ra",
+        "constraint_table": "stable_racedatasyncsourcebinding",
+        "deferrable": true,
+        "enabled": "O",
+        "function_name": "RI_FKey_noaction_upd",
+        "function_schema": "pg_catalog",
+        "initially_deferred": true,
+        "trigger_table": "stable_raceresultsourceidentity",
+        "trigger_type": 17
+      },
+      {
+        "constraint_name": "stable_raceeventiden_event_id_ce9b6ffe_fk_stable_ra",
+        "constraint_table": "stable_raceeventidentitykey",
+        "deferrable": true,
+        "enabled": "O",
+        "function_name": "RI_FKey_noaction_del",
+        "function_schema": "pg_catalog",
+        "initially_deferred": true,
+        "trigger_table": "stable_raceevent",
+        "trigger_type": 9
+      },
+      {
+        "constraint_name": "stable_raceeventiden_event_id_ce9b6ffe_fk_stable_ra",
+        "constraint_table": "stable_raceeventidentitykey",
+        "deferrable": true,
+        "enabled": "O",
+        "function_name": "RI_FKey_noaction_upd",
+        "function_schema": "pg_catalog",
+        "initially_deferred": true,
+        "trigger_table": "stable_raceevent",
+        "trigger_type": 17
+      },
+      {
+        "constraint_name": "stable_raceeventiden_event_id_ce9b6ffe_fk_stable_ra",
+        "constraint_table": "stable_raceeventidentitykey",
+        "deferrable": true,
+        "enabled": "O",
+        "function_name": "RI_FKey_check_ins",
+        "function_schema": "pg_catalog",
+        "initially_deferred": true,
+        "trigger_table": "stable_raceeventidentitykey",
+        "trigger_type": 5
+      },
+      {
+        "constraint_name": "stable_raceeventiden_event_id_ce9b6ffe_fk_stable_ra",
+        "constraint_table": "stable_raceeventidentitykey",
+        "deferrable": true,
+        "enabled": "O",
+        "function_name": "RI_FKey_check_upd",
+        "function_schema": "pg_catalog",
+        "initially_deferred": true,
+        "trigger_table": "stable_raceeventidentitykey",
+        "trigger_type": 17
+      }
+    ],
+    "sequences": [
+      {
+        "cache": 1,
+        "column_name": "id",
+        "cycle": false,
+        "dependency": "i",
+        "increment": 1,
+        "max": 9223372036854775807,
+        "min": 1,
+        "name": "stable_racedatasyncenrollment_id_seq",
+        "start": 1,
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "bigint"
+      },
+      {
+        "cache": 1,
+        "column_name": "id",
+        "cycle": false,
+        "dependency": "i",
+        "increment": 1,
+        "max": 9223372036854775807,
+        "min": 1,
+        "name": "stable_racedatasyncsourcebinding_id_seq",
+        "start": 1,
+        "table_name": "stable_racedatasyncsourcebinding",
+        "type": "bigint"
+      },
+      {
+        "cache": 1,
+        "column_name": "id",
+        "cycle": false,
+        "dependency": "i",
+        "increment": 1,
+        "max": 9223372036854775807,
+        "min": 1,
+        "name": "stable_raceeventidentitykey_id_seq",
+        "start": 1,
+        "table_name": "stable_raceeventidentitykey",
+        "type": "bigint"
+      }
+    ],
+    "tables": [
+      {
+        "force_row_security": false,
+        "kind": "r",
+        "persistence": "p",
+        "row_security": false,
+        "table_name": "stable_racedatasyncenrollment"
+      },
+      {
+        "force_row_security": false,
+        "kind": "r",
+        "persistence": "p",
+        "row_security": false,
+        "table_name": "stable_racedatasyncsourcebinding"
+      },
+      {
+        "force_row_security": false,
+        "kind": "r",
+        "persistence": "p",
+        "row_security": false,
+        "table_name": "stable_raceeventidentitykey"
+      }
+    ],
+    "triggers": []
+  }
+}

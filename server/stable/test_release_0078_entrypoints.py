@@ -17,6 +17,7 @@ from pathlib import Path
 from unittest import TestCase, skipUnless
 from unittest.mock import patch
 
+from stable.release_0078_test_fixture import copy_historical_migrations
 from stable.services import release_0078_recovery as contract
 
 
@@ -262,7 +263,7 @@ class HostHarness:
         shutil.copytree(ROOT / "deploy", root / "deploy")
         (root / "server/stable/services").mkdir(parents=True)
         shutil.copy2(ROOT / "server/stable/services/release_0078_recovery.py", root / "server/stable/services/release_0078_recovery.py")
-        shutil.copytree(ROOT / "server/stable/migrations", root / "server/stable/migrations")
+        copy_historical_migrations(root / "server/stable/migrations")
         for path in (root / "deploy").rglob("*.sh"):
             path.chmod(0o755)
         (root / "fake-bin").mkdir()

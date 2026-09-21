@@ -411,6 +411,17 @@ def select_due_race_data_sync_task() -> dict:
 
 @shared_task
 def discover_future_race_data_sync_task() -> dict:
+    if not getattr(settings, "RACE_DATA_MULTISOURCE_DISCOVERY_ENABLED", False):
+        return _discover_future_race_data_sync_legacy_task()
+    from stable.services.race_data_sync_enrollment import discover_multisource_events
+
+    result = discover_multisource_events(now=timezone.now())
+    # Legacy enrollment and candidate refresh remain independent of v2 policy availability.
+    legacy = _discover_future_race_data_sync_legacy_task()
+    return {**legacy, "multisource": result}
+
+
+def _discover_future_race_data_sync_legacy_task() -> dict:
     """Hourly census and bounded automatic enrollment under standing policy."""
 
     if (
@@ -626,6 +637,26 @@ def sync_race_event_provider_task(
         fail_race_data_sync_claim,
         lock_and_validate_race_data_sync_claim_for_apply,
     )
+
+    if (
+        checkpoint_plan
+        and checkpoint_plan[0].get("authority", {}).get("authority_version") == 2
+    ):
+        from stable.services.race_data_source_adapters import run_multisource_claim
+
+        authority = checkpoint_plan[0]["authority"]
+        claim = RaceDataSyncClaim(
+            event_id=event_id,
+            enrollment_generation=expected_enrollment_generation,
+            owner_generation=expected_owner_generation,
+            claim_generation=expected_claim_generation,
+            attempt_token=attempt_token,
+            enrollment_entry_sha256=expected_enrollment_entry_sha256,
+            route_digest=authority.get("route_digest", ""),
+            checkpoint_plan=tuple(checkpoint_plan),
+            plan_sha256=expected_plan_sha256,
+        )
+        return run_multisource_claim(claim=claim, now=timezone.now())
 
     def fail_closed(reason: str) -> dict:
         now = timezone.now()

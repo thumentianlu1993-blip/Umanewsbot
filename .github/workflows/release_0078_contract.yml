@@ -5,10 +5,16 @@ on:
     branches: [main]
     paths:
       - 'deploy/**'
+      - 'docker-compose.prod*.yml'
       - 'server/stable/**'
       - 'scripts/test_release_0078_contract.sh'
       - '.github/workflows/release_0078_contract.yml'
   workflow_dispatch:
+    inputs:
+      baseline_sha:
+        description: '用于同环境对照的完整40位基线提交SHA'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -101,16 +107,25 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
-      - name: 固定历史基线
+      - name: 固定本次比较的基线
         if: matrix.revision == 'baseline'
+        env:
+          BASELINE_SHA: ${{ github.event.pull_request.base.sha || inputs.baseline_sha }}
         run: |
-          git fetch --depth=1 origin a88bcbf669bd609e30f97c8a07f009881d2da705
-          git checkout --detach a88bcbf669bd609e30f97c8a07f009881d2da705
+          [[ "$BASELINE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          git fetch --depth=1 origin "$BASELINE_SHA"
+          git checkout --detach "$BASELINE_SHA"
+          test "$(git rev-parse HEAD)" = "$BASELINE_SHA"
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           cache: pip
       - run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: 安装隔离备份恢复测试客户端
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client-16
+          echo /usr/lib/postgresql/16/bin >> "$GITHUB_PATH"
       - name: 记录同环境工作流合同基线
         run: |
           mkdir -p evidence
@@ -176,17 +191,27 @@ jobs:
           pattern: stable-*
           path: evidence
       - name: 比较固定基线与候选的失败名称
+        env:
+          EXPECTED_BASELINE_SHA: ${{ github.event.pull_request.base.sha || inputs.baseline_sha }}
+          EXPECTED_CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           python - <<'PY'
-          import json, pathlib
+          import json, os, pathlib, re
           root = pathlib.Path('evidence')
+          commits = {}
+          for revision in ('baseline', 'candidate'):
+              expected = os.environ[f'EXPECTED_{revision.upper()}_SHA']
+              actual = (root/f'stable-{revision}/commit.txt').read_text().strip()
+              if not re.fullmatch(r'[0-9a-f]{40}', expected) or actual != expected:
+                  raise SystemExit(f'{revision} artifact commit mismatch: {actual} != {expected}')
+              commits[revision] = actual
           baseline = json.loads((root/'stable-baseline/result.json').read_text())
           candidate = json.loads((root/'stable-candidate/result.json').read_text())
           def failed(value):
               return {row['test'] for row in value['failures'] + value['errors']}
           new = sorted(failed(candidate) - failed(baseline))
           fixed = sorted(failed(baseline) - failed(candidate))
-          output = {'baseline_tests': baseline['tests_run'], 'candidate_tests': candidate['tests_run'], 'new_failures': new, 'fixed_failures': fixed}
+          output = {'commits': commits, 'baseline_tests': baseline['tests_run'], 'candidate_tests': candidate['tests_run'], 'new_failures': new, 'fixed_failures': fixed}
           (root/'comparison.json').write_text(json.dumps(output, indent=2))
           print(json.dumps(output, indent=2))
           raise SystemExit(1 if new else 0)

@@ -1137,3 +1137,10 @@ if LOG_DIR:
     LOGGING["root"]["handlers"].append("app_file")
     LOGGING["loggers"]["celery"]["handlers"].append("celery_file")
     LOGGING["loggers"]["stable"]["handlers"].append("app_file")
+
+# 多来源登记 v2 默认关闭；独立策略文件必须同时固定 SHA。
+RACE_DATA_MULTISOURCE_DISCOVERY_ENABLED = env_bool("RACE_DATA_MULTISOURCE_DISCOVERY_ENABLED", False)
+RACE_DATA_MULTISOURCE_APPLY_ENABLED = env_bool("RACE_DATA_MULTISOURCE_APPLY_ENABLED", False)
+RACE_DATA_COVERAGE_ALERTS_ENABLED = env_bool("RACE_DATA_COVERAGE_ALERTS_ENABLED", False)
+RACE_DATA_MULTISOURCE_POLICY_FILE = env("RACE_DATA_MULTISOURCE_POLICY_FILE", "")
+RACE_DATA_MULTISOURCE_POLICY_SHA256 = env("RACE_DATA_MULTISOURCE_POLICY_SHA256", "")

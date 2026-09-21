@@ -15,8 +15,13 @@ from unittest import TestCase, skipUnless
 from unittest.mock import patch
 
 from django.test import SimpleTestCase
+from django.db.migrations.loader import MigrationLoader
 from django.core.management import CommandError, call_command
 
+from stable import release_0078_test_fixture as historical_fixture
+from stable.release_0078_test_fixture import (
+    RECOVERY_MODULE, copy_historical_migrations, use_historical_migration_contract,
+)
 from stable.services import historical_calendar_release_b_schema as schema
 from stable.services import release_0078_recovery as recovery
 from stable.services import historical_calendar_release_b_handoff as handoff
@@ -91,6 +96,47 @@ class Release0078SchemaContractTests(SimpleTestCase):
 
 
 class Release0078MigrationFileContractTests(TestCase):
+    def setUp(self):
+        use_historical_migration_contract(self)
+
+    def test_current_0079_checkout_is_rejected_by_0078_contract(self):
+        with patch.object(recovery, "__file__", str(RECOVERY_MODULE)):
+            with self.assertRaisesRegex(ValueError, "0078 migration file/content contract drift"):
+                recovery.migration_contract()
+
+    def test_historical_graph_reloads_and_cleanup_restores_current_graph(self):
+        isolated_case = TestCase()
+        try:
+            use_historical_migration_contract(isolated_case, isolate_django_migrations=True)
+            for _ in range(2):
+                graph = MigrationLoader(None).graph
+                self.assertEqual(graph.leaf_nodes("stable"), [("stable", "0078_externalhorse_profile_snapshot")])
+        finally:
+            isolated_case.doCleanups()
+        self.assertIn(
+            ("stable", "0079_multisource_race_enrollment"),
+            MigrationLoader(None).graph.leaf_nodes("stable"),
+        )
+
+    def test_fixture_preserves_unknown_nested_python_files(self):
+        for nested in ("nested", "__pycache__"):
+            with self.subTest(nested=nested), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                source = root / "source/server/stable/migrations"
+                source.parent.mkdir(parents=True)
+                copy_historical_migrations(source)
+                extra = source / nested / "0079_multisource_race_enrollment.py"
+                extra.parent.mkdir(exist_ok=True)
+                extra.write_text("# unreviewed nested migration\n", encoding="utf-8")
+                target = root / "target/stable/migrations"
+                target.parent.mkdir(parents=True)
+                with patch.object(historical_fixture, "ROOT", root / "source"):
+                    copy_historical_migrations(target)
+                self.assertTrue((target / nested / extra.name).exists())
+                with patch.object(recovery, "__file__", str(target.parent / "services/release_0078_recovery.py")):
+                    with self.assertRaisesRegex(ValueError, "contract drift"):
+                        recovery.migration_contract()
+
     def test_v5_django_verifier_requires_same_exact_admission_semantics(self):
         preflight = {"ok": True, "migration_leaf_set": [LEAF_0078], "migration_plan": [],
                      "database_identity_sha256": "d" * 64}
@@ -123,7 +169,7 @@ class Release0078MigrationFileContractTests(TestCase):
             root = Path(tmp)
             services = root / "stable/services"
             services.mkdir(parents=True)
-            shutil.copytree(ROOT / "server/stable/migrations", root / "stable/migrations")
+            copy_historical_migrations(root / "stable/migrations")
             module_path = services / "release_0078_recovery.py"
             module_path.write_bytes(Path(recovery.__file__).read_bytes())
             spec = importlib.util.spec_from_file_location("isolated_0078_contract", module_path)
@@ -146,6 +192,7 @@ class Release0078MigrationFileContractTests(TestCase):
 @skipUnless(os.name == "posix", "requires real POSIX file identity and permissions; run the Linux contract job")
 class Release0078ArtifactTests(TestCase):
     def setUp(self):
+        use_historical_migration_contract(self)
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name) / "release-0078-recovery"

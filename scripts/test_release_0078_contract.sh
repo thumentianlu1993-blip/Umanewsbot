@@ -52,5 +52,6 @@ if result.skipped:
     raise SystemExit('Dedicated Linux/PG16 tests must not be skipped: ' + repr(result.skipped))
 raise SystemExit(0 if result.wasSuccessful() else 1)
 PY
+python manage.py test stable.test_release_0079 --noinput -v 2 2>&1 | tee "$evidence/0079-contract-tests.log"
 python manage.py check 2>&1 | tee "$evidence/django-check.log"
 python manage.py makemigrations --check --dry-run 2>&1 | tee "$evidence/migration-drift.log"

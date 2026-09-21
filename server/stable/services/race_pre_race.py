@@ -67,6 +67,13 @@ def in_window(event, now):
         and (event.race_datetime is None or now < event.race_datetime+timedelta(minutes=5)))
 
 
+def preview_window(event,now):
+    if not getattr(settings,'RACE_DATA_MULTISOURCE_APPLY_ENABLED',False):return in_window(event,now)
+    if event.visibility_status!='published' or event.status in ('cancelled','postponed') or not event.local_date:return False
+    try:return (event.local_date-now.astimezone(ZoneInfo(event.timezone_name)).date()).days<=4
+    except (ValueError,KeyError):return False
+
+
 def _refs(event):
     return dict(event.source_refs) if isinstance(event.source_refs, dict) else {}
 
@@ -319,7 +326,7 @@ def complete_jra(claim, *, html, url, now):
 
 def public_jra_preview(event, *, now):
     if (not settings.RACE_DATA_SYNC_ENABLED or not bool({'japan', 'japan_jra'} & set(settings.RACE_DATA_SYNC_ENABLED_REGIONS)) or not settings.RACE_DATA_SYNC_RACECARD_APPLY_ENABLED or
-        'participants.horse_name' not in settings.RACE_DATA_SYNC_ENABLED_FIELDS or not in_window(event,now)): return None
+        'participants.horse_name' not in settings.RACE_DATA_SYNC_ENABLED_FIELDS or not preview_window(event,now)): return None
     refs=_refs(event)
     if (refs.get('pre_race_handoff') or any((event.manual_lock_flags or {}).values()) or event.runners.exists()
         or event.field_authorities.filter(manual_lock=True).exists()): return None
@@ -501,7 +508,7 @@ def public_reviewed_preview(event, *, now):
         return None
     if (not settings.RACE_DATA_SYNC_ENABLED or not settings.RACE_DATA_SYNC_RACECARD_APPLY_ENABLED
         or 'participants.horse_name' not in settings.RACE_DATA_SYNC_ENABLED_FIELDS
-        or not in_window(event, now) or _refs(event).get('pre_race_handoff') or event.runners.exists()
+        or not preview_window(event, now) or _refs(event).get('pre_race_handoff') or event.runners.exists()
         or any((event.manual_lock_flags or {}).values())
         or event.field_authorities.filter(manual_lock=True).exists()):
         return None

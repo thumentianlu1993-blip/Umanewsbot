@@ -1,3 +1,33 @@
+## 2026-09-22 PR212 接到上线指令，0079发布包准备中
+
+新鲜只读核对生产仍为3a174b1e、schema0078，103/104/105尚未登记。旧发布工具精确拒绝0079，因此正在补齐独立0079前向发布/中断恢复合同及测试，不放宽旧合同。先关闭三新开关发布，再依据真实JRA范围和proof做配置激活；其他地区仍保留覆盖缺口。见[发布包](changes/multisource-race-enrollment/release-0079.md)。当前尚未合并或修改生产。
+
+## 2026-09-21 PR212 返修及独立终审完成：无新增CI失败，未发布
+
+IR1–IR5及返修时发现的跨语种接管回归均已关闭，同一独立reviewer对整个PR已审业务范围APPROVED，无未关闭的可复现P0/P1/P2。最终业务提交为`ec5f7791bc2d54e4841f912449e6acbc470ba7ad`；本地同步模块348项、PG16业务46项、Linux发布合同49项全部通过。
+
+[CI35577038611](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/35577038611)已完成：固定基线953ea626为5129项，候选ec5f7791为5205项；两端均16failures+29errors，失败ID集合完全一致，新增0、修复0。不是全量零失败。原始产物SHA、独立审核与证据见[REVIEW](changes/multisource-race-enrollment/REVIEW.md)和[validation](changes/multisource-race-enrollment/validation.json)。后续收尾仅更新文档，未改变受验业务代码。
+
+[PR212](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/212)保持Draft，未合并、未部署、未写生产或扩大实网来源；逐地区真实proof、0079精确发布包和生产自然周期仍待完成。下方为历史阶段记录。
+
+## 2026-09-21 PR212 追加独立审核：三项业务缺陷已修复，CI重新验收待完成
+
+全新独立子Agent对`8f2bb9c`初审发现1项P1、2项P2：赛卡同号换马覆盖、明确更正标记丢失、赛前结果重复领取。主线程补反例并修复，同一reviewer复审APPROVED，独立54项通过。主线程聚焦453项通过（1跳过）、PG业务31项、PG历史schema25项、历史SQLite31项及rollback合同36项通过。
+
+已核实此前全量CI失败，不能沿用下方“仍在运行”的阶段记录：8f2bb9c实际97个失败/错误，比前一生产候选新增52项。旧固定a88基线自身328项失败，漏报其中40项。历史测试已隔离至精确M78合同，生产保护保持不变；CI改为准确PR base/head SHA，另由原reviewer审核通过。新提交的Linux全量对照待运行，不能称无新增失败。详见[审核与修复](changes/multisource-race-enrollment/REVIEW.md)及[验证记录](changes/multisource-race-enrollment/validation.json)。
+
+[PR #212](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/212)继续Draft；未合并、未部署、未写生产。0079发布包和逐地区真实来源证据仍待完成。
+
+## 2026-09-21 多来源登记实现与离线验证（Draft PR，未发布）
+
+用户批准后，在隔离 `codex/multisource-race-enrollment` 分支完成多来源身份/能力绑定、同场去重、精确来源claim、赛后7天补入、未登记覆盖告警、名单保留和固定v1转换工具；新增0079追加迁移，所有新开关默认关闭。JRA All Comers真实缩减fixture的13匹闭环通过；独立review通过，聚焦447项通过（1项环境跳过），PG16并发/原子性24项通过。已提交 `7ae4935b` 并创建 [Draft PR #212](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/212)，固定代码SHA的Linux发布/恢复合同49项全过；全量基线/候选对照仍在运行，尚未确认无新增失败。最终测试/CI以[验证记录](changes/multisource-race-enrollment/validation.json)为准。
+
+[实施与地区证据矩阵](changes/multisource-race-enrollment/implementation.md)区分真实样本、合成合同与未完成proof。七地区通用去重合同不等于七地区实网全链完成；未合并/发布、未修写生产103/104，未做自然周期验收。下方为历史阶段记录。
+
+## 2026-09-20 多来源赛事登记修复进入已审核方案阶段
+
+All Comers 漏登记根因已定位：TRA 空响应、JRA 候选不能独立登记、赛后发现退出，以及未登记赛事不在监控分母。新隔离分支 `codex/multisource-race-enrollment` 的七地区多源登记、强身份去重、赛后补入与覆盖监测方案，经独立 Agent 两轮审核通过。当前未实施、未部署，不能称赛事状态或赛果已恢复；以[当前状态](current_state.md)、[方案](changes/multisource-race-enrollment/PLAN.md)及[审核](changes/multisource-race-enrollment/REVIEW.md)为准。
+
 ## 2026-09-19 PR210 修复已上线，两轮自然刷新通过
 
 固定应用`3a174b1e`经PR210合并`63e5b58a`，22:09:22 UTC（北京时间06:09）完成0078前向发布；实际镜像`sha256:1622560c7f522d5078adbed5049e7bf7ab57e537bff57b97b37df0c83aec57a2`。5129项全量保留16失败/29错误/20跳过，45失败ID与此前生产完全一致、无新增；45项发布合同通过，固定reviewer独立复核APPROVED。不是全套全绿，汇总job未计作通过。

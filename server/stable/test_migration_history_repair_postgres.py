@@ -15,6 +15,7 @@ from django.test.utils import CaptureQueriesContext
 
 from stable.models import HorseIdentityEvidenceCommitReceipt, OperationLog
 from stable.test_migration_database_helpers import isolated_migration_database
+from stable.release_0078_test_fixture import use_historical_migration_contract
 
 from stable.services.historical_calendar_release_b_schema import (
     check_initial_install_schema_compatibility,
@@ -52,6 +53,11 @@ POSTGRES = connection.vendor == "postgresql"
 @skipUnless(POSTGRES, "requires PostgreSQL catalog mutation semantics")
 class RaceDataSyncR0CatalogFaultInjectionTests(TransactionTestCase):
     reset_sequences = False
+
+    def setUp(self):
+        super().setUp()
+        self.enterContext(isolated_migration_database())
+        _executor().migrate([M0078])
 
     def _drift(self) -> list[str]:
         return validate_race_data_sync_r0_catalog_contract(
@@ -607,6 +613,7 @@ class MigrationHistoryRepairPostgresMigrationTests(TransactionTestCase):
         self.assertEqual(collect_live_production_audit()["receipt_count"], 0)
 
     def test_initial_artifact_with_repair_origin_marker_is_rejected(self):
+        use_historical_migration_contract(self)
         _executor().migrate([M0067])
         preflight = check_initial_install_schema_compatibility()
         self.assertFalse(preflight["ok"], preflight)
@@ -774,9 +781,12 @@ class MigrationHistoryRepairPostgresMigrationTests(TransactionTestCase):
 
 
 @skipUnless(POSTGRES, "requires PostgreSQL pg_catalog and transactional DDL")
-class MigrationHistoryRepairPostgresCatalogDriftTests(TestCase):
+class MigrationHistoryRepairPostgresCatalogDriftTests(TransactionTestCase):
     def setUp(self):
         super().setUp()
+        self.enterContext(isolated_migration_database())
+        _executor().migrate([M0078])
+        self.enterContext(transaction.atomic())
         self._restore_sid = connection.savepoint()
 
     def tearDown(self):

@@ -5,6 +5,7 @@ from datetime import datetime
 import hashlib
 import json
 import math
+import re
 import os
 from pathlib import Path
 import stat
@@ -42,7 +43,11 @@ _REQUIRED_TOP_LEVEL_KEYS = {
     "race_status",
     "participants",
 }
-_OPTIONAL_TOP_LEVEL_KEYS = {"local_start_time", "timezone_name"}
+_OPTIONAL_TOP_LEVEL_KEYS = {
+    "local_start_time",
+    "timezone_name",
+    "multisource_source_set_digest",
+}
 _LEGACY_RECONCILE_REQUIRED_KEYS = _REQUIRED_TOP_LEVEL_KEYS - {"off_time"}
 _CONTRACT_KEYS = {
     "schema_version",
@@ -957,6 +962,10 @@ def normalize_racecard_observation(
         )
     ):
         raise ValueError("racecard payload does not match the strict schema")
+    if "multisource_source_set_digest" in payload and not re.fullmatch(
+        "[0-9a-f]{64}", str(payload["multisource_source_set_digest"])
+    ):
+        raise ValueError("multisource_source_set_digest is invalid")
     if not isinstance(contract, dict) or set(contract) != _CONTRACT_KEYS:
         raise ValueError("contract is invalid")
     if contract.get("schema_version") != 1 or contract.get("data_kind") != "racecard":
@@ -996,16 +1005,17 @@ def normalize_racecard_observation(
         _require_trimmed_string(payload.get(key), key, max_length=limit)
     if payload["region"] != contract["region"]:
         raise ValueError("payload region does not match contract")
-    try:
-        parsed_off_time = datetime.fromisoformat(
-            _require_trimmed_string(
-                payload.get("off_time"), "off_time", max_length=64
-            ).replace("Z", "+00:00")
-        )
-    except ValueError as exc:
-        raise ValueError("off_time is invalid") from exc
-    if timezone.is_naive(parsed_off_time):
-        raise ValueError("off_time must include a timezone")
+    if payload.get("off_time") or not payload.get("multisource_source_set_digest"):
+        try:
+            parsed_off_time = datetime.fromisoformat(
+                _require_trimmed_string(
+                    payload.get("off_time"), "off_time", max_length=64
+                ).replace("Z", "+00:00")
+            )
+        except ValueError as exc:
+            raise ValueError("off_time is invalid") from exc
+        if timezone.is_naive(parsed_off_time):
+            raise ValueError("off_time must include a timezone")
     if "local_start_time" in payload:
         if "local_start_time" not in allowed_field_set:
             raise ValueError("local_start_time is not allowed")
@@ -1288,6 +1298,13 @@ def _reconcile_racecard_observation_atomic(
             .filter(event_id=expected_event_id)
             .first()
         )
+        is_multisource = models.RaceDataSyncEnrollment.objects.filter(
+            event_id=expected_event_id, authority_version=2
+        ).exists()
+        if is_multisource and claim_guard is None:
+            return RacecardReconciliationDecision(
+                "rejected", "multisource_claim_required", expected_event_id
+            )
         locked_claim = None
         if claim_guard is not None:
             claim_decision, locked_claim = (
@@ -1405,6 +1422,30 @@ def _reconcile_racecard_observation_atomic(
             ),
             None,
         )
+        if is_multisource:
+            from stable.services.race_data_source_adapters import (
+                claim_binding,
+                binding_roster,
+            )
+
+            try:
+                binding, route = claim_binding(claim_guard, now=timezone.now())
+                if binding.source_identity_id != source.pk:
+                    return RacecardReconciliationDecision(
+                        "rejected", "claim_source_mismatch", expected_event_id
+                    )
+                roster, roster_entry = binding_roster(binding=binding, route=route)
+                if (
+                    payload.get("multisource_source_set_digest")
+                    != locked_claim.enrollment.source_set_digest
+                ):
+                    return RacecardReconciliationDecision(
+                        "rejected", "observation_authority_stale", expected_event_id
+                    )
+            except (ValueError, TypeError):
+                return RacecardReconciliationDecision(
+                    "rejected", "binding_route_missing", expected_event_id
+                )
         if roster_entry is None or contract_region not in roster_entry.regions:
             return RacecardReconciliationDecision(
                 "rejected", "source_contract_mismatch", expected_event_id, observation.pk
@@ -1566,7 +1607,7 @@ def _reconcile_racecard_observation_atomic(
             source.terms_status != models.RaceSourceTermsStatus.APPROVED
             or source.valid_until is None
             or source.valid_until <= timezone.now()
-            or source.registry_digest != roster.registry_digest
+            or (not is_multisource and source.registry_digest != roster.registry_digest)
             or source.region_code != contract_region
             or source.identity_namespace not in roster_entry.identity_namespaces
         ):
@@ -1635,6 +1676,13 @@ def _reconcile_racecard_observation_atomic(
                 source=source,
                 external_runner_id=external_runner_id,
             )
+            if is_multisource and runner is not None:
+                from stable.services.race_data_sync_results import runner_slot_identity_matches
+
+                identity_conflict = identity_conflict or not runner_slot_identity_matches(
+                    event=event, source=source, runner=runner,
+                    external_runner_id=external_runner_id, horse_name=horse_name,
+                )
             if identity_conflict:
                 raise _RacecardNeedsReview(
                     reason="runner_identity_mapping_required",

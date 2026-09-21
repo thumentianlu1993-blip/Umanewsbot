@@ -10,6 +10,8 @@ a copied deploy tree inside temporary directories.
 
 from __future__ import annotations
 
+from stable.release_0078_test_fixture import copy_historical_migrations
+
 import hashlib
 import json
 import os
@@ -599,7 +601,7 @@ class Harness:
         services = self.work / "server/stable/services"
         services.mkdir(parents=True)
         shutil.copyfile(ROOT / "server/stable/services/release_0078_recovery.py", services / "release_0078_recovery.py")
-        shutil.copytree(ROOT / "server/stable/migrations", self.work / "server/stable/migrations", ignore=shutil.ignore_patterns('__pycache__'))
+        copy_historical_migrations(self.work / "server/stable/migrations")
         for script in (self.work / "deploy").rglob("*.sh"):
             script.chmod(0o755)
         persistent_runtime = base / "persistent-runtime"
@@ -686,8 +688,8 @@ class Harness:
             self.state / "git-show-0078",
         )
         migration_paths = sorted(
-            str(path.relative_to(ROOT))
-            for path in (ROOT / "server/stable/migrations").glob("*.py")
+            str(path.relative_to(self.work))
+            for path in (self.work / "server/stable/migrations").rglob("*.py")
         )
         (self.state / "git-ls-tree-migrations").write_text(
             "\n".join(migration_paths) + "\n",
@@ -925,9 +927,17 @@ class MigrationCommandOwnershipTests(SimpleTestCase):
             count = len(re.findall(r"manage\.py\s+migrate\b", text))
             if count:
                 hits[rel] = count
-        # Both mutually exclusive paths belong to this one release task:
-        # exact 0078 advancement and the retained initial-install path.
-        self.assertEqual(hits, {RELEASE_TASK_SCRIPT_REL: 2})
+        # 0079、0078 和保留的初装分支互斥，仍由同一个 release task 拥有。
+        self.assertEqual(hits, {RELEASE_TASK_SCRIPT_REL: 3})
+        owner = (ROOT / RELEASE_TASK_SCRIPT_REL).read_text(encoding="utf-8")
+        self.assertEqual(
+            sorted(re.findall(r"^\s*(python manage\.py migrate[^\n]*)$", owner, re.M)),
+            sorted([
+                "python manage.py migrate --noinput",
+                "python manage.py migrate stable 0078_externalhorse_profile_snapshot --noinput",
+                "python manage.py migrate stable 0079_multisource_race_enrollment --noinput",
+            ]),
+        )
         call_command_hits = []
         for rel, text in _scan_repo_text_files():
             if rel.startswith("deploy/") and re.search(
@@ -944,7 +954,8 @@ class MigrationCommandOwnershipTests(SimpleTestCase):
         # plan. Every other file must still have zero occurrences.
         p0_exception = "deploy/deploy_race_live_p0_closed.sh"
         allowed = {
-            RELEASE_TASK_SCRIPT_REL: 1,
+            # 0079 与旧世代分别在完成各自迁移之后收集静态文件。
+            RELEASE_TASK_SCRIPT_REL: 2,
             HOST_WRAPPER_REL: 1,
             p0_exception: 1,
         }
@@ -4649,6 +4660,19 @@ class RollbackContractValidationTests(SimpleTestCase):
                     )
                 )
 
+
+    def test_current_0079_target_is_rejected_before_checkout(self):
+        for script in ("deploy/rollback.sh", "deploy/rollback_lowcost.sh"):
+            with self.subTest(script=script), TemporaryDirectory() as tmp:
+                harness = Harness(Path(tmp))
+                seed_services(harness, race_live="running")
+                harness.set_state("git-rev-parse-output", f"{self.FIXED_OID}\n")
+                with (harness.state / "git-ls-tree-migrations").open("a", encoding="utf-8") as handle:
+                    handle.write("server/stable/migrations/0079_multisource_race_enrollment.py\n")
+                result = harness.run_script(script, "current-0079")
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("exact reviewed 0078 ceiling", result.stderr)
+                self.assertFalse(any(event[0] == "git" and event[2][:1] == ["checkout"] for event in harness.events()))
 
     def test_target_full_migration_manifest_rejects_low_name_and_nested_bypasses(self):
         cases = (

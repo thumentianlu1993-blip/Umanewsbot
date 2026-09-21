@@ -1,0 +1,16 @@
+{
+  "release_contract_review": "APPROVED; marker and host interrupted recovery probes passed; catalog internal FK and effective Compose issues closed",
+  "jra_review": "APPROVED; 35 tests and six live raw pages independently replayed",
+  "local_tests": {
+    "release0079_postgresql": 18,
+    "legacy_release0078_regression": 43,
+    "jra_and_identity": 45
+  },
+  "production": "not changed; current 3a174b1e/schema0078",
+  "ci": "pending exact candidate run",
+  "files": {
+    "pr212-jra-independent-review.json": "7d43d53407a42db7839f8ec0130d40720a797029f3ea861858ce9628382ce519",
+    "pr212-jra-independent-review-tests.log": "52860fa8da8f2e60f8445296c346f3d411fc8a3f3edfcd80e4003869cbe95ebf",
+    "pr212-release79-independent-review-evidence.json": "07447c1c1dca548a20b8055e5f57f5b4f261c1da89f74a7d973c58ad8f1b2803"
+  }
+}
