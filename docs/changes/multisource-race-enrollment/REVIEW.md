@@ -93,3 +93,7 @@ CI改为本PR固定base.sha；手动运行要求完整baseline_sha；fetch/check
 `ec5f7791bc2d54e4841f912449e6acbc470ba7ad` 的run35577038611全部完成：基线953ea626为5129项，候选5205项；各16failures+29errors，共同45个历史失败ID，新增0、修复0。候选多1项skip在专用49项发布合同中实际执行通过。主线程核对两端commit.txt、result.json和comparison.json一致，发布合同前后指纹一致、迁移无漂移。本地最终同步模块348项、PG16业务46项通过。收尾仅更新文档，代码验收仍精确绑定上述业务SHA。
 
 原CI reviewer再次独立复核上述最终raw artifacts后 **APPROVED**：准确SHA、失败ID集合、49项零跳过发布合同与工作流结果一致；未重跑测试或访问生产。
+
+## 2026-09-22 发布准备追加审核
+
+0079独立合同首轮找到：原source升级后丢marker却可重建、ensure→complete缺inode连续性、忽略内部FK触发器、仅冻结flags未绑定有效Compose地区/registry/挂载。均补实现及回归；逐项闭合证据见[发布包](release-0079.md)与独立执行摘要。来源实网新增JRA CNAME展示模式01/10导致漏结果的问题，同轮修复并单独复审；不把前轮业务APPROVED冒充当前增量审核或生产验收。

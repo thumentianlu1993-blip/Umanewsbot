@@ -1,0 +1,58 @@
+{
+  "report_created_at": "2026-09-21T17:04:42.932957+00:00",
+  "kind": "independent-reviewer-execution-summary",
+  "limitations": "Original probes ran through tool heredocs and TemporaryDirectory; temporary scripts and artifacts were automatically removed. This is a truthful retained summary of original tool outputs, not a newly executed probe log. Docker and PostgreSQL boundaries were replaced; no production access.",
+  "observations": [
+    {
+      "tool_chunk": "1d9e16",
+      "checks": "12 actual Contract/Marker Django tests",
+      "passed": 12
+    },
+    {
+      "tool_chunk": "a70dc4",
+      "checks": "actual one-shot shell, Python boundary replacement",
+      "cases": [
+        "success:identity7:11",
+        "ensure_failure",
+        "bad_identity",
+        "migration_failure",
+        "collectstatic_failure",
+        "complete_failure"
+      ],
+      "passed": 6
+    },
+    {
+      "tool_chunk": "43b223",
+      "checks": "actual host coordinator and trusted file helpers; Docker/PG replaced",
+      "cases": [
+        "after_ensure",
+        "after_ddl",
+        "after_receipt",
+        "web_health"
+      ],
+      "passed": 4,
+      "every_case": {
+        "backup_count": 1,
+        "ddl_count": 1,
+        "original_services_restored": true
+      }
+    },
+    {
+      "tool_chunk": "244db5",
+      "checks": "actual old0078 guard with temporary file states",
+      "cases": {
+        "active_pointer": "rejected",
+        "orphan_intent": "rejected",
+        "completed_release": "accepted"
+      },
+      "passed": 3
+    }
+  ],
+  "current_file_hashes_not_execution_time_snapshot": {
+    "deploy/release_0079.py": "7c42322cdca1dd737a093754f36ad5c37a0b006133baffc253af03fe7c5b41bb",
+    "deploy/run_release_tasks.sh": "50ac858856a72bdb42eb2330a01c43bf67d0041613973cd1f6dbf23b8b94d45f",
+    "deploy/docker/run-release-tasks.sh": "3577af67bbebcd8c0c1600563c8675d4968ec19f60ed9c9e47ca0b514eca758e",
+    "server/stable/management/commands/release_0079_schema.py": "d7000f586af1a5130cbd1ce4cbb277bb0629ca9b759f5a1de1a08f67b1e9c86e",
+    "server/stable/services/release_0079_recovery.py": "3812e989584870f58ac43f5a4748fe7a5c7d9d0505ea96b4c3b4d012a3dcf07f"
+  }
+}

@@ -254,24 +254,53 @@ def load_multisource_policy(*, now):
     return parse_multisource_policy(value, now=now)
 
 
+_JRA_VENUE_CODES = {
+    "01": "札幌",
+    "02": "函館",
+    "03": "福島",
+    "04": "新潟",
+    "05": "東京",
+    "06": "中山",
+    "07": "中京",
+    "08": "京都",
+    "09": "阪神",
+    "10": "小倉",
+}
+
+
+def jra_cname_identity(url):
+    """CNAME首组01/10是展示模式；强身份保留其余全部定长赛事字段。"""
+    from urllib.parse import parse_qs
+
+    parsed = urlsplit(url)
+    values = parse_qs(parsed.query, keep_blank_values=True).get("CNAME", [])
+    kind = {"/JRADB/accessD.html": "dde", "/JRADB/accessS.html": "sde"}.get(parsed.path)
+    match = (
+        re.fullmatch(
+            rf"pw01{kind}(\d{{2}})(\d{{2}})(\d{{4}})(\d{{2}})(\d{{2}})(\d{{2}})(\d{{8}})/[A-Fa-f0-9]{{2}}",
+            values[0],
+        )
+        if kind and len(values) == 1
+        else None
+    )
+    if not match or match[1] not in {"01", "10"}:
+        raise ValueError("jra_identity_invalid")
+    return match
+
+
+def jra_race_key(url):
+    return "".join(jra_cname_identity(url).groups()[1:])
+
+
 def parse_jra_observation(page, *, url, route, now):
     """从真实 JRADB 页头和 CNAME 一起证明身份，绝不拼造结果 URL 后缀。"""
     from bs4 import BeautifulSoup
     from stable.race_reference_parsers.jra import _parse_barrier
-    from urllib.parse import parse_qs
     from datetime import date
 
     if not route.permits_url(url):
         raise ValueError("source_url_rejected")
-    cname = parse_qs(urlsplit(url).query).get("CNAME", [])
-    if len(cname) != 1:
-        raise ValueError("jra_identity_invalid")
-    match = re.fullmatch(
-        r"pw01(?:dde|sde)(\d{2})(\d{2})(\d{4})(\d{2})(\d{2})(\d{2})(\d{8})/[A-Fa-f0-9]{2}",
-        cname[0],
-    )
-    if not match:
-        raise ValueError("jra_identity_invalid")
+    match = jra_cname_identity(url)
     html = str(page)
     if not html.rstrip().lower().endswith("</html>") or "</body>" not in html.lower():
         raise ValueError("document_truncated")
@@ -290,6 +319,8 @@ def parse_jra_observation(page, *, url, route, now):
     local_date = date(*map(int, day.groups()))
     if (
         local_date.strftime("%Y%m%d") != match[7]
+        or local_date.year != int(match[3])
+        or _JRA_VENUE_CODES.get(match[2]) != meeting[2].strip()
         or int(race_no[1]) != int(match[6])
         or int(meeting[1]) != int(match[4])
         or int(meeting[3]) != int(match[5])
@@ -308,7 +339,7 @@ def parse_jra_observation(page, *, url, route, now):
         provider=route.provider,
         region=route.region,
         identity_namespace=route.identity_namespace,
-        external_race_id="".join(match.groups()[:6]) + match[7],
+        external_race_id=jra_race_key(url),
         canonical_url=url,
         fetched_at=now.isoformat(),
         raw_sha256=raw_sha,
@@ -430,7 +461,10 @@ def fetch_source_page(url, *, route, now):
 
     def enabled():
         return (
-            (getattr(settings, "RACE_DATA_MULTISOURCE_APPLY_ENABLED", False) or getattr(settings, "RACE_DATA_MULTISOURCE_DISCOVERY_ENABLED", False))
+            (
+                getattr(settings, "RACE_DATA_MULTISOURCE_APPLY_ENABLED", False)
+                or getattr(settings, "RACE_DATA_MULTISOURCE_DISCOVERY_ENABLED", False)
+            )
             and settings.RACE_DATA_SYNC_ENABLED
             and settings.RACE_DATA_SYNC_ALLOW_NETWORK
             and route.provider in settings.RACE_DATA_SYNC_ENABLED_PROVIDERS
@@ -536,21 +570,16 @@ def fetch_bound_observation(*, event, route, now, fetcher=None, kind="result"):
             value = parse_jra_observation(page, url=url, route=route, now=now)
             if kind == "result" and not value.get("result_phase"):
                 links = jra_result_links(page, url=url, route=route)
-                if len(links) > 1:
-                    # 仅跟随与卡相同 CNAME 实例的真实链接。
-                    from urllib.parse import parse_qs
-
-                    card_id = parse_qs(urlsplit(url).query)["CNAME"][0][7:].split("/")[
-                        0
-                    ]
-                    links = [
-                        link
-                        for link in links
-                        if parse_qs(urlsplit(link).query)
-                        .get("CNAME", [""])[0][7:]
-                        .split("/")[0]
-                        == card_id
-                    ]
+                # 对每个真实链接解析完整赛事键，忽略展示模式但不忽略任一赛事字段。
+                card_id = jra_race_key(url)
+                matched = []
+                for link in links:
+                    try:
+                        if jra_race_key(link) == card_id:
+                            matched.append(link)
+                    except ValueError:
+                        continue
+                links = matched
                 if len(links) == 1:
                     url = links[0]
                     chain.append(url)
@@ -1486,7 +1515,10 @@ def fetch_tra_observation(*, event, route, now, kind, fetcher=None):
         def fetch():
             current = timezone.now()
             if (
-                not (settings.RACE_DATA_MULTISOURCE_APPLY_ENABLED or settings.RACE_DATA_MULTISOURCE_DISCOVERY_ENABLED)
+                not (
+                    settings.RACE_DATA_MULTISOURCE_APPLY_ENABLED
+                    or settings.RACE_DATA_MULTISOURCE_DISCOVERY_ENABLED
+                )
                 or not settings.RACE_DATA_SYNC_ENABLED
                 or not settings.RACE_DATA_SYNC_ALLOW_NETWORK
                 or not route.valid(current)

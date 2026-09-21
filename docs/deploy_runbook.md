@@ -1,3 +1,7 @@
+## 2026-09-22 0079 独立发布入口准备（未执行）
+
+新增 `deploy/deploy_0079.sh deploy|resume`，绑定当前候选SHA/image、0078→0079或0079同schema、私有dump/manifest/intent、原服务/配置、关闭态预检和同inode完成凭据。旧0078发布合同继续拒绝0079；旧入口也拒绝未完成的0079意图。完整动作、恢复与验收见[发布包](changes/multisource-race-enrollment/release-0079.md)，当前未上线。
+
 ## 2026-09-21 PR212 返修及CI完成（未发布）
 
 IR1–IR5及跨语种返修回归已关闭，独立业务终审APPROVED。ec5f7791的Linux全量5205项对准确base953ea626的5129项，均保留45个历史失败ID、新增0；49项发布合同通过，见[验证记录](changes/multisource-race-enrollment/validation.json)。当前0079仍被旧发布/rollback/schema guard拒绝，生产保护未放宽。0079精确发布包、逐地区proof与生产验收另行完成；本轮未执行任何生产动作。

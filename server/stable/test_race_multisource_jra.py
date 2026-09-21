@@ -111,6 +111,74 @@ class JraColdStartTests(TestCase):
         self.assertIsNotNone(self.event.result_confirmed_at)
         self.assertEqual(models.RaceEventRevisionPublication.objects.count(), 1)
 
+    def test_current_jra_display_mode_links_share_one_strong_identity(self):
+        from stable.services.race_data_source_adapters import jra_race_key
+
+        current = "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1006202604061120260920/71"
+        card = self.card.replace(RESULT, current).replace(
+            "pw01sde0106202604061120260920/92", "pw01sde1006202604061120260920/71"
+        )
+        # 当前实网页同时有往绩及其他比赛的结果链接，只能跟随完整赛事键相同的一条。
+        card = card.replace(
+            "</body>",
+            '<a href="/JRADB/accessS.html?CNAME=pw01sde1006202504071120250921/9A">往绩</a></body>',
+        )
+        calls = []
+
+        def fetch(url, **kwargs):
+            calls.append(url)
+            if url == CARD:
+                return card
+            self.assertEqual(url, current)
+            return self.result
+
+        self.assertEqual(jra_race_key(CARD), jra_race_key(current))
+        value = fetch_bound_observation(
+            event=self.event, route=self.policy.routes[0], now=NOW, fetcher=fetch
+        )
+        self.assertEqual(calls, [CARD, current])
+        self.assertEqual(value["result_phase"], "official")
+        self.assertTrue(value["roster_complete"])
+        first = attach_multisource_observation(value, policy=self.policy, now=NOW)
+        self.assertEqual(first.action, "acquired", first)
+        repeat = fetch_bound_observation(
+            event=self.event, route=self.policy.routes[0], now=NOW, fetcher=fetch
+        )
+        again = attach_multisource_observation(repeat, policy=self.policy, now=NOW)
+        self.assertEqual(models.RaceDataSyncEnrollment.objects.count(), 1, again)
+        self.assertEqual(models.RaceResultSourceIdentity.objects.count(), 1, again)
+
+    def test_jra_identity_rejects_url_header_disagreement_and_duplicate_query(self):
+        from stable.services.race_data_source_adapters import (
+            parse_jra_observation,
+            jra_race_key,
+        )
+
+        for url in (
+            RESULT.replace("01062026", "01092026"),
+            RESULT.replace("01062026", "01062025"),
+            RESULT.replace("2026040611", "2026050611"),
+            RESULT.replace("2026040611", "2026040711"),
+            RESULT.replace("2026040611", "2026040612"),
+            RESULT.replace("20260920", "20260921"),
+        ):
+            with self.subTest(url=url), self.assertRaisesMessage(
+                ValueError, "jra_header_url_disagreement"
+            ):
+                parse_jra_observation(
+                    self.result, url=url, route=self.policy.routes[0], now=NOW
+                )
+        for url in (
+            RESULT + "&CNAME=",
+            RESULT + "&CNAME=bad",
+            RESULT.replace("pw01sde01", "pw01sde99"),
+            RESULT.replace("accessS", "accessD"),
+        ):
+            with self.subTest(url=url), self.assertRaisesMessage(
+                ValueError, "jra_identity_invalid"
+            ):
+                jra_race_key(url)
+
     def test_stale_old_baseline_cannot_seed(self):
         self.event.original_name = "other"
         self.event.save()
