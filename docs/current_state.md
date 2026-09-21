@@ -1,8 +1,10 @@
-## 2026-09-21 PR212 持续返修：完整终审补出问题已修复，等待最终提交CI
+## 2026-09-21 PR212 返修及独立终审完成：无新增CI失败，未发布
 
-完整业务复审补出IR4（公开字段更正被误判重放）、IR5（缺时区中断发现/未知日期误清告警）；修复中另捕获跨语种接管回归并修正。保留多来源跨语言身份合同，明确更正和普通佐证分开验证；见[持续审核记录](changes/multisource-race-enrollment/REVIEW.md)。
+IR1–IR5及返修时发现的跨语种接管回归均已关闭，同一独立reviewer对整个PR已审业务范围APPROVED，无未关闭的可复现P0/P1/P2。最终业务提交为`ec5f7791bc2d54e4841f912449e6acbc470ba7ad`；本地同步模块348项、PG16业务46项、Linux发布合同49项全部通过。
 
-上一固定544bbf0已完成Linux全量：5192项对准确基线5129项，双方相同45个历史失败ID、无新增；不是全套全绿。最新返修已获同一reviewer完整业务范围APPROVED；尚待固定提交CI，PR212保持Draft，未合并、未部署、未扩大真实来源或写生产。
+[CI35577038611](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/35577038611)已完成：固定基线953ea626为5129项，候选ec5f7791为5205项；两端均16failures+29errors，失败ID集合完全一致，新增0、修复0。不是全量零失败。原始产物SHA、独立审核与证据见[REVIEW](changes/multisource-race-enrollment/REVIEW.md)和[validation](changes/multisource-race-enrollment/validation.json)。后续收尾仅更新文档，未改变受验业务代码。
+
+[PR212](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/212)保持Draft，未合并、未部署、未写生产或扩大实网来源；逐地区真实proof、0079精确发布包和生产自然周期仍待完成。下方为历史阶段记录。
 
 ## 2026-09-21 PR212 追加独立审核：三项业务缺陷已修复，CI重新验收待完成
 

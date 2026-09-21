@@ -1,18 +1,19 @@
 {
-  "recorded_at": "2026-09-21T08:15:02.448741+00:00",
+  "recorded_at": "2026-09-21T09:02:43.741764+00:00",
   "branch": "codex/multisource-race-enrollment",
   "base_commit": "953ea62604cd97709310d1e78e16972dd38eba3f",
-  "status": "full_business_review_approved_final_ci_pending",
+  "status": "all_review_findings_closed_no_new_ci_failures",
   "focused": {
-    "tests_run": 453,
-    "skipped": 1,
-    "result": "passed"
-  },
-  "postgres16": {
-    "tests_run": 31,
+    "tests_run": 348,
     "skipped": 0,
     "result": "passed",
-    "scope": "并发/claim/JRA赛卡结果及更正/转换/旧catalog拒绝0079"
+    "scope": "全部race_data_sync/multisource非PG模块"
+  },
+  "postgres16": {
+    "tests_run": 46,
+    "skipped": 0,
+    "result": "passed",
+    "scope": "PG16并发/claim/跨来源更正与重放/coverage/转换/旧catalog拒绝0079"
   },
   "historical_0078_fixture": {
     "targeted_tests_run": 5,
@@ -55,7 +56,8 @@
         "IR4-crosslanguage-regression"
       ],
       "final": "APPROVED"
-    }
+    },
+    "final_ci_raw_evidence": "APPROVED"
   },
   "production": {
     "deployed": false,
@@ -143,7 +145,7 @@
     "run_id": 35553327586,
     "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/35553327586",
     "head_sha": "7ae4935b1254bd777700d39f8e4ddf67062191fb",
-    "status": "in_progress",
+    "status": "completed",
     "release_contract": {
       "result": "passed",
       "tests_run": 49,
@@ -153,9 +155,11 @@
       "migration_drift": "passed",
       "clean_checkout_fingerprint": "passed"
     },
-    "stable_baseline": "in_progress",
-    "stable_candidate": "in_progress",
-    "new_failure_comparison": "pending"
+    "stable_baseline": "completed",
+    "stable_candidate": "completed",
+    "new_failure_comparison": "failed",
+    "conclusion": "failure",
+    "note": "初期候选的历史快照；最终结论以linux_ci为准"
   },
   "failed_ci": {
     "run_id": 35554080816,
@@ -172,9 +176,37 @@
     "fixed_vs_previous_production_ids": 0
   },
   "linux_ci": {
-    "status": "pending_final_business_fixes",
-    "baseline_rule": "PR base SHA / explicit full baseline SHA for manual runs",
-    "artifact_sha_verification": true
+    "run_id": 35577038611,
+    "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/35577038611",
+    "status": "completed",
+    "conclusion": "success",
+    "artifact_sha_verification": true,
+    "baseline": {
+      "commit": "953ea62604cd97709310d1e78e16972dd38eba3f",
+      "tests_run": 5129,
+      "failures": 16,
+      "errors": 29,
+      "skipped": 20,
+      "result_sha256": "a45c806f26894dbd104e6e3be6333fee9687ba01b7954333f516554ffb9023f3"
+    },
+    "candidate": {
+      "commit": "ec5f7791bc2d54e4841f912449e6acbc470ba7ad",
+      "tests_run": 5205,
+      "failures": 16,
+      "errors": 29,
+      "skipped": 21,
+      "result_sha256": "bb9d2a6bcc78164ad7f5755d8c152f0a6f03301edc90a1d68ebfa9534b5d938b"
+    },
+    "new_failure_ids": 0,
+    "fixed_failure_ids": 0,
+    "release_contract": {
+      "tests_run": 49,
+      "skipped": 0,
+      "result": "passed",
+      "commit": "ec5f7791bc2d54e4841f912449e6acbc470ba7ad",
+      "migration_drift": "passed",
+      "before_after_fingerprint": "identical"
+    }
   },
   "initial_changed_non_document_files_sha256": "2d3ef1ac0ab6fbc84cd9b07c017c76695a20fc15611851c73a999b95d75e0daf",
   "initial_changed_non_document_file_count": 34,
@@ -202,5 +234,11 @@
     "postgres_tests": 46,
     "result": "passed",
     "focused_sync_tests": 348
+  },
+  "validated_code_commit": "ec5f7791bc2d54e4841f912449e6acbc470ba7ad",
+  "previous_focused": {
+    "tests_run": 453,
+    "skipped": 1,
+    "result": "passed"
   }
 }

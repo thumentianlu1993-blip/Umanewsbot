@@ -36,7 +36,7 @@
 
 - [ ] (operations) T21/T22/T31先RED；编写固定event manifest的legacy转换命令、dry-run及独立verify；空迁移/0078前向发布合同检查。
 - [x] (application) 在 `.env.example` / `settings.py` 加三开关及v2 policy schema接入，全部默认关闭；维护README/运行文档相关入口。
-- [ ] (integration) 聚焦SQLite/PG测试GREEN，fixture provenance与数据契约review，候选/基线Linux CI无新增失败。
+- [x] (integration) 聚焦SQLite/PG测试GREEN，现有fixture provenance与数据契约review，候选/基线Linux CI无新增失败（ec5f7791；逐地区实网proof另列）。
 - [ ] (operations) 冻结来源/地区/event范围、预算、schema迁移和恢复包，提交独立实现review；给用户具体G2选择后才合并/发布。
 - [ ] (operations) 经批准后关闭态部署、只读预演、分地区灰度、103/104精确修复、105自然周期（若已过期则改新鲜样本并记录）；T32按真实来源开放观察，不用手动任务冒充自然验收。
 
@@ -49,4 +49,4 @@
 - 日历只有裸URL且没有旧候选/导入证据的A0自动收据不实现猜测；需要补足受审输入。
 - 七桶通用去重和离线parser测试已有；各桶完整实网proof、Ireland真实fixture、HKJC赛前卡以及US完整结果合同仍未齐备。
 - 固定未发布v1转换工具已通过独立review和PG测试；已发布v1历史不自动转换。
-- 0079迁移本地通过；Linux同SHA全量对照、0079受保护发布包及T32自然周期分别记录，不提前勾选。
+- 0079迁移本地通过，ec5f7791的Linux固定SHA全量无新增失败；0079受保护发布包及T32自然周期仍未完成。

@@ -87,3 +87,9 @@ CI改为本PR固定base.sha；手动运行要求完整baseline_sha；fetch/check
 固定544bbf0的run35572737991已完成：准确base953ea626为5129项，candidate5192项；各16failures+29errors=45个相同历史失败ID，新增0、修复0。候选测试48m44s，发布合同通过。最终返修提交仍需独立SHA绑定CI，不能把544的全量结果当作新提交验收。
 
 最终同一reviewer **APPROVED（整个PR已审业务范围）**：IR1–IR5及返修回归全部关闭，无未关闭的可复现P0/P1/P2。独立原探针6项与跨来源更正/重放探针通过，JRA+coverage36项分批复验通过。四文件相对544bbf0的diff SHA256为 `867a5c360210359a37ef3268a326de494d1284b6b19b6ba892ad52ef38409ced`，主线程重新计算一致；不代表未知风险为零或真实来源/生产验收。
+
+### 最终固定业务提交CI
+
+`ec5f7791bc2d54e4841f912449e6acbc470ba7ad` 的run35577038611全部完成：基线953ea626为5129项，候选5205项；各16failures+29errors，共同45个历史失败ID，新增0、修复0。候选多1项skip在专用49项发布合同中实际执行通过。主线程核对两端commit.txt、result.json和comparison.json一致，发布合同前后指纹一致、迁移无漂移。本地最终同步模块348项、PG16业务46项通过。收尾仅更新文档，代码验收仍精确绑定上述业务SHA。
+
+原CI reviewer再次独立复核上述最终raw artifacts后 **APPROVED**：准确SHA、失败ID集合、49项零跳过发布合同与工作流结果一致；未重跑测试或访问生产。
