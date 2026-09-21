@@ -32,3 +32,9 @@
 两路独立复审APPROVED：发布marker/host中断、catalog/Compose配置增量与JRA身份修复均闭合。JRA审核实际复核三卡三果raw SHA、同场key及完整马号+规范化马名集合（12/13/11）；35项JRA模块独立通过。聚焦验证和摘要SHA见[本地记录](release-0079-local-validation.json)。接下来固定提交运行Linux发布合同及全量stable同base对照，尚不视作生产已发布。
 
 发布配置补充：两种Compose中web/worker/beat/race-live worker只读挂载既有persistent race_data_sync到`/run/race-data-sync`，sync worker保留原rw；新policy放在其专用子目录，以固定SHA供所有应用读取，不写镜像内临时文件、不借用其他业务目录。初次迁移发布新policy仍为空、三新开关关闭。YAML解析已确认五app路径一致且仅sync worker为rw，Compose变更加入CI触发范围。
+
+## 最终全量CI的静态合同返修
+
+固定2a1c5d0的CI35630788106实际完成：主线5129项有16 failures+29 errors，候选5225项有19 failures+29 errors。逐ID共有45个历史失败，新增恰好3项；分别是同一release task新增0079分支后，旧测试仍预期两条migrate/一条collectstatic，以及用全脚本首个collectstatic错误比较旧分支migrate的顺序。其余新业务与0079真实PG回归没有新增失败。不能将这次CI记为通过。
+
+返修仅调整两份测试：仍限制唯一迁移owner，额外精确枚举0079/0078/初装三个合法命令；分别验证两个世代的迁移、静态收集和完成顺序，0079还核对ensure、marker身份及提前退出。生产代码与发布脚本未变。三个失败用例及两项相邻owner合同共5项本地通过，独立复审与最终CI继续进行；运行服务尚未切换。

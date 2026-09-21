@@ -927,9 +927,17 @@ class MigrationCommandOwnershipTests(SimpleTestCase):
             count = len(re.findall(r"manage\.py\s+migrate\b", text))
             if count:
                 hits[rel] = count
-        # Both mutually exclusive paths belong to this one release task:
-        # exact 0078 advancement and the retained initial-install path.
-        self.assertEqual(hits, {RELEASE_TASK_SCRIPT_REL: 2})
+        # 0079、0078 和保留的初装分支互斥，仍由同一个 release task 拥有。
+        self.assertEqual(hits, {RELEASE_TASK_SCRIPT_REL: 3})
+        owner = (ROOT / RELEASE_TASK_SCRIPT_REL).read_text(encoding="utf-8")
+        self.assertEqual(
+            sorted(re.findall(r"^\s*(python manage\.py migrate[^\n]*)$", owner, re.M)),
+            sorted([
+                "python manage.py migrate --noinput",
+                "python manage.py migrate stable 0078_externalhorse_profile_snapshot --noinput",
+                "python manage.py migrate stable 0079_multisource_race_enrollment --noinput",
+            ]),
+        )
         call_command_hits = []
         for rel, text in _scan_repo_text_files():
             if rel.startswith("deploy/") and re.search(
@@ -946,7 +954,8 @@ class MigrationCommandOwnershipTests(SimpleTestCase):
         # plan. Every other file must still have zero occurrences.
         p0_exception = "deploy/deploy_race_live_p0_closed.sh"
         allowed = {
-            RELEASE_TASK_SCRIPT_REL: 1,
+            # 0079 与旧世代分别在完成各自迁移之后收集静态文件。
+            RELEASE_TASK_SCRIPT_REL: 2,
             HOST_WRAPPER_REL: 1,
             p0_exception: 1,
         }

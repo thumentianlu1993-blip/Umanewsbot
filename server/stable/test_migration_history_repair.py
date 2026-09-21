@@ -2554,9 +2554,22 @@ class MigrationHistoryRepairOperationsContractRedTests(TestCase):
         text = (ROOT / "deploy/docker/run-release-tasks.sh").read_text(
             encoding="utf-8"
         )
-        migrate = text.index("manage.py migrate --noinput")
-        transition = text.index("complete_historical_calendar_restricted_recovery")
-        collectstatic = text.index("manage.py collectstatic --noinput")
+        # 分别核验两个互斥世代，不能把 0079 的 static 与旧世代 migrate 混排。
+        generation_79, legacy = text.split('handoff_action="$(sed', 1)
+        self.assertIn('if [ "${RELEASE_SCHEMA_GENERATION:-}" = "0079" ]; then', generation_79)
+        sequence_79 = [
+            generation_79.index("release_0079_schema ensure"),
+            generation_79.index("manage.py migrate stable 0079_multisource_race_enrollment --noinput"),
+            generation_79.index("manage.py collectstatic --noinput"),
+            generation_79.index("release_0079_schema complete"),
+            generation_79.index("  exit 0"),
+        ]
+        self.assertEqual(sequence_79, sorted(sequence_79))
+        self.assertIn('--expected-marker-device="$marker_device"', generation_79)
+        self.assertIn('--expected-marker-inode="$marker_inode"', generation_79)
+        migrate = legacy.index("manage.py migrate --noinput")
+        transition = legacy.index("complete_historical_calendar_restricted_recovery")
+        collectstatic = legacy.index("manage.py collectstatic --noinput")
         self.assertLess(migrate, collectstatic)
         self.assertLess(collectstatic, transition)
         self.assertNotIn("--if-present", text)
