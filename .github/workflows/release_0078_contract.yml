@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'deploy/**'
+      - 'docker-compose.prod*.yml'
       - 'server/stable/**'
       - 'scripts/test_release_0078_contract.sh'
       - '.github/workflows/release_0078_contract.yml'

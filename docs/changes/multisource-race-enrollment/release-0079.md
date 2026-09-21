@@ -30,3 +30,5 @@
 三场最新结果实际parser通过，103/104/105分别12/13/11匹，与各自赛卡的数量与赛事强ID一致；这只是来源proof，尚非生产A0和公开验收。新增两个回归含01→10同场去重、往绩链接过滤、URL/页头字段不一致与重复query拒绝；JRA+identity 45项通过。URL/抓取时间/字节SHA详见[jra-release-live-proof.json](jra-release-live-proof.json)。
 
 两路独立复审APPROVED：发布marker/host中断、catalog/Compose配置增量与JRA身份修复均闭合。JRA审核实际复核三卡三果raw SHA、同场key及完整马号+规范化马名集合（12/13/11）；35项JRA模块独立通过。聚焦验证和摘要SHA见[本地记录](release-0079-local-validation.json)。接下来固定提交运行Linux发布合同及全量stable同base对照，尚不视作生产已发布。
+
+发布配置补充：两种Compose中web/worker/beat/race-live worker只读挂载既有persistent race_data_sync到`/run/race-data-sync`，sync worker保留原rw；新policy放在其专用子目录，以固定SHA供所有应用读取，不写镜像内临时文件、不借用其他业务目录。初次迁移发布新policy仍为空、三新开关关闭。YAML解析已确认五app路径一致且仅sync worker为rw，Compose变更加入CI触发范围。
