@@ -113,3 +113,18 @@ class MultisourceConcurrencyTests(TransactionTestCase):
             ).active_attempt_token,
             claims[0].attempt_token,
         )
+
+
+@skipUnless(connection.vendor == "postgresql", "requires PostgreSQL catalog")
+class MultisourceHistoricalCatalogGuardTests(TransactionTestCase):
+    def test_current_0079_columns_are_rejected_by_historical_0074_catalog(self):
+        from stable.services.historical_calendar_release_b_schema import (
+            collect_postgresql_catalog_contract,
+            validate_race_data_sync_r0_catalog_contract,
+        )
+
+        drift = validate_race_data_sync_r0_catalog_contract(
+            contract=collect_postgresql_catalog_contract(), migration_applied=True
+        )
+        self.assertIn("0074.racedatasyncenrollment_columns", drift)
+        self.assertIn("0074.racedatasyncenrollment_column_semantics", drift)

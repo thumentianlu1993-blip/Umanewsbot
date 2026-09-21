@@ -2771,13 +2771,11 @@ def _claim_multisource_due(
                 selected = []
                 binding = None
                 for row in checkpoints:
-                    if (
-                        calculate_multisource_next_poll(
-                            event=event, kind=row.data_kind, now=now
-                        )
-                        is None
-                    ):
-                        row.next_poll_at = None
+                    first_allowed = multisource_initial_poll_at(
+                        event=event, kind=row.data_kind, now=now
+                    )
+                    if first_allowed is None or first_allowed > now:
+                        row.next_poll_at = first_allowed
                         row.save(update_fields=("next_poll_at", "updated_at"))
                         continue
                     target = enrollment.source_set_manifest.get("selected", {}).get(
@@ -3045,7 +3043,14 @@ def finish_multisource_claim(
                     retry_at or now,
                     now + timedelta(hours=1) if denied else now + timedelta(minutes=5),
                 )
-                eligible = (
+                first_allowed = multisource_initial_poll_at(
+                    event=event, kind=checkpoint.data_kind, now=now
+                )
+                checkpoint.next_poll_at = (
+                    max(checkpoint.next_poll_at, first_allowed)
+                    if first_allowed is not None else None
+                )
+                eligible = first_allowed is not None and first_allowed <= now and (
                     denied
                     or reason_code in ("not_found", "not_published")
                     or (
@@ -3128,6 +3133,21 @@ def finish_multisource_claim(
             event.pk,
             tracking.claim_generation,
         )
+
+
+def multisource_initial_poll_at(*, event, kind, now):
+    """首次/重试领取的开放下界；不能拿常规轮询间隔当开放时间。"""
+    if calculate_multisource_next_poll(event=event, kind=kind, now=now) is None:
+        return None
+    if kind == "result":
+        if event.race_datetime is not None:
+            return max(now, event.race_datetime + timedelta(minutes=3))
+        if event.local_date is not None:
+            from datetime import time
+            from zoneinfo import ZoneInfo
+
+            return max(now, datetime.combine(event.local_date, time(), tzinfo=ZoneInfo(event.timezone_name)))
+    return now
 
 
 def calculate_multisource_next_poll(*, event, kind, now):

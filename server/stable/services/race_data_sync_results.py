@@ -176,6 +176,23 @@ def _identity_text(value: object) -> str:
     ).casefold()
 
 
+def runner_slot_identity_matches(*, event, source, runner, external_runner_id, horse_name):
+    """马号只表示槽位；换名必须有该场已核验的 runner 映射。"""
+    if not external_runner_id.startswith("number:"):
+        return True
+    if _identity_text(runner.horse_name) == _identity_text(horse_name):
+        return True
+    crosswalk = source.identity_fields.get("reviewed_runner_crosswalk", {})
+    return bool(
+        isinstance(crosswalk, dict)
+        and crosswalk.get("event_id") == event.pk
+        and isinstance(crosswalk.get("evidence_sha256"), str)
+        and re.fullmatch("[0-9a-f]{64}", crosswalk["evidence_sha256"])
+        and isinstance(crosswalk.get("runners"), dict)
+        and crosswalk["runners"].get(external_runner_id) == runner.pk
+    )
+
+
 def _result_roster_mapping(
     *,
     event: models.RaceEvent,
@@ -215,11 +232,9 @@ def _result_roster_mapping(
         runner = direct.get(row["external_runner_id"])
         if (
             runner is not None
-            and row["external_runner_id"].startswith("number:")
-            and _identity_text(runner.horse_name) != _identity_text(row["horse_name"])
-            and not (
-                crosswalk_valid
-                and crosswalk["runners"].get(row["external_runner_id"]) == runner.pk
+            and not runner_slot_identity_matches(
+                event=event, source=source, runner=runner,
+                external_runner_id=row["external_runner_id"], horse_name=row["horse_name"],
             )
         ):
             return None

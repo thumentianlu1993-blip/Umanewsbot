@@ -1676,6 +1676,13 @@ def _reconcile_racecard_observation_atomic(
                 source=source,
                 external_runner_id=external_runner_id,
             )
+            if is_multisource and runner is not None:
+                from stable.services.race_data_sync_results import runner_slot_identity_matches
+
+                identity_conflict = identity_conflict or not runner_slot_identity_matches(
+                    event=event, source=source, runner=runner,
+                    external_runner_id=external_runner_id, horse_name=horse_name,
+                )
             if identity_conflict:
                 raise _RacecardNeedsReview(
                     reason="runner_identity_mapping_required",

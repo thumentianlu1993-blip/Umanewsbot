@@ -825,6 +825,8 @@ def run_multisource_claim(*, claim, now, fetcher=None):
             contract_digest=route.contract_digest,
             automation_allowed=True,
             roster_complete=value.get("roster_complete") is True,
+            # corrected 只由受审 parser 的明确 amended/corrected/revised 标记产生。
+            correction_marker=value.get("result_phase") == "corrected",
             multisource_authority=publication_authority(
                 binding=binding, enrollment=locked.enrollment
             ),

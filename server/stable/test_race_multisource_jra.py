@@ -384,3 +384,217 @@ class JraColdStartTests(TestCase):
                 event=self.event, horse_name="Formal", horse_number="1"
             )
             self.assertIsNone(public_jra_preview(self.event, now=NOW))
+
+    @override_settings(
+        RACE_DATA_SYNC_RACECARD_APPLY_ENABLED=True,
+        RACE_DATA_SYNC_ENABLED_DATA_KINDS=("racecard",),
+        RACE_DATA_SYNC_ENABLED_FIELDS=(
+            "participants.horse_name",
+            "participants.number",
+            "participants.draw",
+            "participants.status",
+            "participants.jockey_name",
+            "participants.trainer_name",
+            "participants.carried_weight",
+        ),
+    )
+    def _check_card_slot_change(self, *, reviewed):
+        policy = parse_multisource_policy(policy_payload(kinds=("racecard",)), now=NOW)
+        self.event.race_datetime = NOW + timedelta(hours=1)
+        self.event.save()
+        self.candidate.raw_payload["jra_pre_race_v1"]["baseline"] = baseline(self.event)
+        self.candidate.save()
+        with patch(
+            "stable.services.race_data_source_adapters.load_multisource_policy",
+            return_value=policy,
+        ):
+            value = fetch_bound_observation(
+                event=self.event,
+                route=policy.routes[0],
+                now=NOW,
+                fetcher=self.fetch,
+                kind="racecard",
+            )
+            attach_multisource_observation(value, policy=policy, now=NOW)
+
+            def claim(at):
+                return claim_due_enrollments(
+                    now=at,
+                    batch_size=20,
+                    ttl_seconds=240,
+                    enabled_providers=("jra",),
+                    enabled_regions=("japan_jra",),
+                    enabled_data_kinds=("racecard",),
+                )[0]
+
+            first = run_multisource_claim(claim=claim(NOW), now=NOW, fetcher=self.fetch)
+            self.assertTrue(first["processed"], first)
+            runners = list(self.event.runners.order_by("pk"))
+            before = [(r.horse_name, r.trainer_name) for r in runners]
+            target = runners[-1]
+            self.card = self.card.replace(target.horse_name, "まったく別の馬")
+            if runners[0].trainer_name:
+                self.card = self.card.replace(runners[0].trainer_name, "別の調教師", 1)
+            if reviewed:
+                source = models.RaceResultSourceIdentity.objects.get(
+                    event=self.event, source_key="jra"
+                )
+                source.identity_fields["reviewed_runner_crosswalk"] = {
+                    "event_id": self.event.pk,
+                    "evidence_sha256": "e" * 64,
+                    "runners": {target.external_runner_id: target.pk},
+                }
+                source.save(update_fields=("identity_fields",))
+            later = NOW + timedelta(minutes=11)
+            with patch("django.utils.timezone.now", return_value=later):
+                result = run_multisource_claim(
+                    claim=claim(later), now=later, fetcher=self.fetch
+                )
+            self.assertEqual(result["processed"], reviewed, result)
+            self.assertEqual(self.event.runners.count(), 13)
+            if reviewed:
+                target.refresh_from_db()
+                self.assertEqual(target.horse_name, "まったく別の馬")
+            else:
+                self.assertEqual(
+                    list(
+                        self.event.runners.order_by("pk").values_list(
+                            "horse_name", "trainer_name"
+                        )
+                    ),
+                    before,
+                )
+                self.assertTrue(
+                    models.RaceEventFieldChange.objects.filter(
+                        event=self.event,
+                        rejection_reason="runner_identity_mapping_required",
+                        applied=False,
+                    ).exists()
+                )
+
+    def test_number_replacement(self):
+        self._check_card_slot_change(reviewed=False)
+
+    def test_reviewed_card_crosswalk_allows_name_change(self):
+        self._check_card_slot_change(reviewed=True)
+
+    def test_result_not_due_before_start(self):
+        self.event.race_datetime = NOW + timedelta(hours=2)
+        self.event.save()
+        self.candidate.raw_payload["jra_pre_race_v1"]["baseline"] = baseline(self.event)
+        self.candidate.save()
+        value = fetch_bound_observation(
+            event=self.event,
+            route=self.policy.routes[0],
+            now=NOW,
+            fetcher=self.fetch,
+            kind="racecard",
+        )
+        attach_multisource_observation(value, policy=self.policy, now=NOW)
+        opening = self.event.race_datetime + timedelta(minutes=3)
+        checkpoint = models.RaceEventLiveProviderCheckpoint.objects.get(
+            tracking__event=self.event, data_kind="result"
+        )
+        self.assertEqual(checkpoint.next_poll_at, opening)
+        # 历史/故障路径即使错误把checkpoint提前，selector也必须重新约束窗口。
+        for at in (NOW, NOW + timedelta(minutes=5), opening - timedelta(seconds=1)):
+            checkpoint.next_poll_at = at
+            checkpoint.save()
+            models.RaceEventLiveTracking.objects.filter(event=self.event).update(
+                next_poll_at=at
+            )
+            with patch("django.utils.timezone.now", return_value=at):
+                claims = claim_due_enrollments(
+                    now=at,
+                    batch_size=20,
+                    ttl_seconds=240,
+                    enabled_providers=("jra",),
+                    enabled_regions=("japan_jra",),
+                    enabled_data_kinds=("result",),
+                )
+            self.assertEqual(claims, ())
+            checkpoint.refresh_from_db()
+            self.assertEqual(checkpoint.next_poll_at, opening)
+            self.assertEqual(checkpoint.consecutive_failures, 0)
+        with patch("django.utils.timezone.now", return_value=opening):
+            claims = claim_due_enrollments(
+                now=opening,
+                batch_size=20,
+                ttl_seconds=240,
+                enabled_providers=("jra",),
+                enabled_regions=("japan_jra",),
+                enabled_data_kinds=("result",),
+            )
+        self.assertEqual(len(claims), 1)
+
+    def test_date_only_result_opens_on_local_race_day(self):
+        from stable.services.race_data_sync_control import multisource_initial_poll_at
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+
+        self.event.race_datetime = None
+        self.event.local_date = (NOW + timedelta(days=1)).date()
+        opening = datetime.combine(
+            self.event.local_date,
+            datetime.min.time(),
+            tzinfo=ZoneInfo(self.event.timezone_name),
+        )
+        self.assertEqual(
+            multisource_initial_poll_at(event=self.event, kind="result", now=NOW),
+            opening,
+        )
+        self.assertEqual(
+            multisource_initial_poll_at(event=self.event, kind="result", now=opening),
+            opening,
+        )
+
+    def _check_result_correction(self, *, explicit):
+        self.enroll()
+        self.event.race_datetime = NOW - timedelta(minutes=15)
+        self.event.save()
+        first = run_multisource_claim(claim=self.claim(), now=NOW, fetcher=self.fetch)
+        self.assertTrue(first["processed"], first)
+        self.event.refresh_from_db()
+        control = models.RaceEventProjectionControl.objects.get(event=self.event)
+        current = control.current_result_revision_id
+        value = fetch_bound_observation(
+            event=self.event, route=self.policy.routes[0], now=NOW, fetcher=self.fetch
+        )
+        value["result_phase"] = "corrected" if explicit else "official"
+        value["roster"][0]["finish_time"] = "2:09.9"
+        later = NOW + timedelta(hours=6, minutes=1)
+        value["fetched_at"] = later.isoformat()
+        with patch("django.utils.timezone.now", return_value=later):
+            claim = claim_due_enrollments(
+                now=later,
+                batch_size=20,
+                ttl_seconds=240,
+                enabled_providers=("jra",),
+                enabled_regions=("japan_jra",),
+                enabled_data_kinds=("result",),
+            )[0]
+            with patch(
+                "stable.services.race_data_source_adapters.fetch_bound_observation",
+                return_value=value,
+            ):
+                result = run_multisource_claim(
+                    claim=claim, now=later, fetcher=self.fetch
+                )
+        control.refresh_from_db()
+        self.assertEqual(result["processed"], explicit, result)
+        self.assertEqual(control.current_result_revision_id != current, explicit)
+        self.assertEqual(
+            models.RaceEventRevisionPublication.objects.count(), 2 if explicit else 1
+        )
+        if explicit:
+            from stable.services.race_events import resolve_race_live_public_read
+
+            public = resolve_race_live_public_read(event_id=self.event.pk, now=later)
+            self.assertTrue(public.visible, public)
+            self.assertTrue(self.event.results.filter(finish_time="2:09.9").exists())
+
+    def test_explicit_correction(self):
+        self._check_result_correction(explicit=True)
+
+    def test_changed_official_result_does_not_invent_correction(self):
+        self._check_result_correction(explicit=False)

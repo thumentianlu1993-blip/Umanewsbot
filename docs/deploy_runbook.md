@@ -1,3 +1,7 @@
+## 2026-09-21 PR212 审核返修状态（不可发布）
+
+三项业务finding已修复并独立复审通过；历史测试改为私有M78 schema及精确文件集合。当前0079仍会被旧发布/rollback/schema guard拒绝，这是预期保护；未改生产准入。旧CI对照基线漏报新增失败，已改为准确PR base/head，等待返修提交的Linux全量结果。发布仍需单独经过验证的0079精确包；本轮未执行任何生产动作。
+
 ## 2026-09-20 多来源修复代码已准备，0079未发布
 
 新增0079追加两表/四字段；三新开关均false，policy路径/SHA为空。`manage_multisource_enrollment`固定清单工具提供prepare/dry-run/apply/verify；apply要求关闭运行入口，对照镜像固化提交或本地HEAD，不联网、不转换已发布v1历史。详细命令与边界见[实施记录](changes/multisource-race-enrollment/implementation.md)和[发布合同](changes/multisource-race-enrollment/rollout.md)。

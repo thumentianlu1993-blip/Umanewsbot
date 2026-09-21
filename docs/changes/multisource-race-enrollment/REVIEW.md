@@ -51,3 +51,23 @@ Reviewer独立SQLite探针及保存回归通过；其结论明确不代表七地
 历史0078测试夹具追加复审：初审发现递归排除同名0079文件会隐藏未知嵌套迁移（P2），已改为仅根目录精确排除。nested和__pycache__中的同名.py经复制后保留并拒绝；reviewer独立4项合同测试通过，最终APPROVED。生产guard/固定SHA未改，当前0079代码仍拒绝旧0078发布准入。
 
 历史迁移图隔离补充复审：动态模块无法被Django reload的问题已修复为真实唯一临时包，清理后恢复0079图；reviewer独立5项合同测试通过，核对6项真实PG日志，最终APPROVED。生产文件与迁移图校验保持拒绝0079。
+
+## 用户追加的独立代码审核（2026-09-21）
+
+全新只读 reviewer `independent_pr212_review` 对固定 `8f2bb9c55d99cec8304a97099d007017e14924fb` 初审，不沿用此前结论。自行运行的六个模块48项通过，但独立3个反例均失败，初审 **REVISE：1项P1、2项P2**。
+
+| ID | 发现 | 修复与回归 |
+| --- | --- | --- |
+| IR1 / P1 | 赛卡的 `number:<马号>` 可将同号不同马名直接覆盖；赛果链已有校验但赛卡末端缺失 | 赛卡与赛果共用槽位身份校验，在锁内要求规范姓名一致或受审 event-local crosswalk；整批回滚并记待审核。末行换马/首行trainer变化整批回滚和受审crosswalk正例通过 |
+| IR2 / P2 | 来源明确 corrected 的结果未生成 writer 要求的 correction_marker，更正无法发布 | 标记只从受审parser明确 corrected 语义产生；首次发布→更正revision→公开读通过，普通official内容变化不补猜更正 |
+| IR3 / P2 | checkpoint首次为now、selector未约束结果开放窗口，T+3前会每5分钟领取并耗预算 | 分离首次开放下界与后续轮询间隔；登记、selector和失败重试共同约束。精确T+3和date-only当地比赛日边界验证通过 |
+
+同一新 reviewer 复审 **APPROVED**：原3探针全部GREEN，六模块54项全部通过，无新增P0/P1/P2。审核的五个业务文件及JRA测试增量（相对8f2bb9c）SHA256为 `086045c75a1b9bcd1f823cbfa4888bc3fd6f39efb58a9f63ee1c15abfe483053`，主线程已重新计算一致。审核未连接真实provider/生产、未代替PG验证。
+
+### CI 与历史合同单独复审
+
+原 `plan_reviewer` 独立核实：run35554080816在8f2bb9c的5184项中为65 failures+32 errors=97；上次生产候选3a174b1e为5129项、45失败ID，当前新增52且修复0。工作流固定的a88bcbf6在本次环境实际有328个失败/错误，比较只报告12新增，掩盖另外40项；不能用它宣称无新增回归。
+
+52项均定位至旧0078文件/迁移图或旧0074列集合保护遇0079：rollback harness36、catalog9、artifact/校验4、preflight3。维护历史测试的精确文件集合、真实M78私有schema和模拟git路径；新增当前0079必须被旧catalog/rollback拒绝的测试，生产guard未放宽。原测试断言未改成接受漂移。
+
+CI改为本PR固定base.sha；手动运行要求完整baseline_sha；fetch/checkout及比较产物两端commit.txt均核对准确SHA。该 reviewer 对此增量 **APPROVED**，独立执行比较脚本6组合成正反例全部通过（包含新增失败、base/head漂移和非法SHA），未重新跑完整PG/rollback套件。主线程补跑结果见validation.json；新提交的Linux全量仍待运行，当前不标无新增失败或发布可用。

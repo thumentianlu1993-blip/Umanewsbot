@@ -9,6 +9,11 @@ from django.db import IntegrityError, models, transaction
 from django.test import SimpleTestCase, TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 
+from stable.release_0078_test_fixture import use_historical_migration_contract
+from stable.test_migration_database_helpers import isolated_migration_database
+from django.db.migrations.executor import MigrationExecutor
+from django.db import connection
+
 from stable.models import (
     HistoricalRaceEventTarget,
     RaceEvent,
@@ -64,8 +69,12 @@ class ReleaseBSchemaStateTests(SimpleTestCase):
         )
 
 
-class ReleaseBSchemaPreflightTests(TestCase):
+class ReleaseBSchemaPreflightTests(TransactionTestCase):
     def setUp(self):
+        super().setUp()
+        use_historical_migration_contract(self, isolate_django_migrations=True)
+        self.enterContext(isolated_migration_database())
+        MigrationExecutor(connection).migrate([("stable", "0078_externalhorse_profile_snapshot")])
         self.series = RaceSeries.objects.create(
             key="release-b-preflight",
             country_region="hong_kong",

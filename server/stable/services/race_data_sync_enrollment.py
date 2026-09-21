@@ -1637,7 +1637,9 @@ def attach_multisource_observation(observation, *, policy, now, discovery_token=
                         source_key=source.source_key,
                         data_kind=kind,
                         defaults={
-                            "next_poll_at": now,
+                            "next_poll_at": race_data_sync_control.multisource_initial_poll_at(
+                                event=event, kind=kind, now=now
+                            ),
                             "contract_digest": route.contract_digest,
                             "registry_digest": route.digest,
                         },

@@ -11,6 +11,8 @@ from tempfile import TemporaryDirectory
 from unittest import skipUnless
 from unittest.mock import patch
 
+from stable.release_0078_test_fixture import use_historical_migration_contract
+
 from django.core.management import CommandError, call_command
 from django.db import OperationalError, connection
 from django.db.migrations.exceptions import InconsistentMigrationHistory
@@ -596,6 +598,7 @@ class MigrationHistoryRepairBaselineRedTests(SimpleTestCase):
         collect_audit.assert_not_called()
 
     def test_schema_check_validates_catalog_before_any_orm_or_live_audit(self):
+        use_historical_migration_contract(self)
         from stable.services.historical_calendar_release_b_schema import (
             check_release_b_schema_compatibility,
         )
@@ -1002,6 +1005,10 @@ class MigrationHistoryRepairCatalogRedTests(SimpleTestCase):
 
 
 class MigrationHistoryRepairArtifactRedTests(SimpleTestCase):
+    def setUp(self):
+        super().setUp()
+        use_historical_migration_contract(self)
+
     def _write_artifact(self, root: Path) -> tuple[Path, str, dict]:
         from stable.services.historical_calendar_release_b_handoff import (
             HANDOFF_SCHEMA_VERSION,

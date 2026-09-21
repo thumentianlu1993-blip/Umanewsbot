@@ -1,18 +1,18 @@
 {
-  "recorded_at": "2026-09-21T02:24:23.351428+00:00",
+  "recorded_at": "2026-09-21T07:22:55.234210+00:00",
   "branch": "codex/multisource-race-enrollment",
   "base_commit": "953ea62604cd97709310d1e78e16972dd38eba3f",
-  "status": "implementation_reviewed_ci_pending",
+  "status": "independent_review_fixes_passed_local_ci_pending",
   "focused": {
-    "tests_run": 447,
+    "tests_run": 453,
     "skipped": 1,
     "result": "passed"
   },
   "postgres16": {
-    "tests_run": 24,
+    "tests_run": 31,
     "skipped": 0,
     "result": "passed",
-    "scope": "独立临时实例；登记/claim并发、JRA完整赛果事务、转换"
+    "scope": "并发/claim/JRA赛卡结果及更正/转换/旧catalog拒绝0079"
   },
   "historical_0078_fixture": {
     "targeted_tests_run": 5,
@@ -39,25 +39,14 @@
   "independent_review": {
     "core": "APPROVED",
     "conversion_and_adapter_permissions": "APPROVED",
-    "historical_release_fixture": "APPROVED"
-  },
-  "linux_ci": {
-    "run_id": 35553327586,
-    "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/35553327586",
-    "head_sha": "7ae4935b1254bd777700d39f8e4ddf67062191fb",
-    "status": "in_progress",
-    "release_contract": {
-      "result": "passed",
-      "tests_run": 49,
-      "skipped": 0,
-      "head_sha": "7ae4935b1254bd777700d39f8e4ddf67062191fb",
-      "django_check": "passed",
-      "migration_drift": "passed",
-      "clean_checkout_fingerprint": "passed"
+    "historical_release_fixture": "APPROVED",
+    "fresh_business_review": {
+      "initial": "REVISE",
+      "initial_p1": 1,
+      "initial_p2": 2,
+      "final": "APPROVED"
     },
-    "stable_baseline": "in_progress",
-    "stable_candidate": "in_progress",
-    "new_failure_comparison": "pending"
+    "historical_fixtures_and_ci_fixes": "APPROVED"
   },
   "production": {
     "deployed": false,
@@ -90,15 +79,86 @@
     "jra_fixture_normalization": {
       "local_path": "/tmp/umanews-multisource-fixture-final.log",
       "sha256": "af49e361c26e8a971ef4c0ef191dcf28654f61d69d5812d903ca089049b523b2"
+    },
+    "review_business_red": {
+      "local_path": "/tmp/umanews-pr212-review-business-red.log",
+      "sha256": "453c6b1628f7536100a72bc0ce798b76813f88b2764b1435662fa8028230ee50"
+    },
+    "review_focused_final": {
+      "local_path": "/tmp/umanews-pr212-review-focused-final.log",
+      "sha256": "3f5299ff44849fca857cb58bacba33cd5b53c92ac3421c3f8463fce6616a72e9"
+    },
+    "review_pg_business": {
+      "local_path": "/tmp/umanews-pr212-review-pg-business-final.log",
+      "sha256": "f33835f3e0207929630979a4e18912dd73820db9a5859ff430a23e0a9838f0d5"
+    },
+    "review_historical_sqlite": {
+      "local_path": "/tmp/umanews-pr212-review-historical-green.log",
+      "sha256": "44d82f713c26798b21f50dc0bec7b63688e9ee68dd20f97f57ace31524bc24be"
+    },
+    "review_pg_historical": {
+      "local_path": "/tmp/umanews-pr212-review-pg-historical.log",
+      "sha256": "d2c5d004994cf3ca63f070ec93006da5792c9f3b3fc49ee877e00a8d3fabe380"
+    },
+    "review_rollback": {
+      "local_path": "/tmp/umanews-pr212-review-rollback.log",
+      "sha256": "4541c43ef5788e76b8142fa8e2b17ee9638c59f0c2b3281c1847fc46109618f1"
     }
   },
-  "code_commit": "7ae4935b1254bd777700d39f8e4ddf67062191fb",
   "pull_request": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/212",
   "jra_fixture_normalization_regression": {
     "tests_run": 34,
     "result": "passed",
     "note": "HTML转LF/去除行尾空白，原始source SHA保持；fixture SHA与变换说明同步"
   },
-  "changed_non_document_files_sha256": "2d3ef1ac0ab6fbc84cd9b07c017c76695a20fc15611851c73a999b95d75e0daf",
-  "changed_non_document_file_count": 34
+  "initial_code_commit": "7ae4935b1254bd777700d39f8e4ddf67062191fb",
+  "reviewed_parent_commit": "8f2bb9c55d99cec8304a97099d007017e14924fb",
+  "business_review_diff_sha256": "086045c75a1b9bcd1f823cbfa4888bc3fd6f39efb58a9f63ee1c15abfe483053",
+  "review_fix_checks": {
+    "independent_business_tests": 54,
+    "historical_sqlite_tests": 31,
+    "historical_pg_tests": 25,
+    "rollback_contract_tests": 36,
+    "ci_comparison_synthetic_cases": 6,
+    "result": "passed"
+  },
+  "previous_ci": {
+    "run_id": 35553327586,
+    "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/35553327586",
+    "head_sha": "7ae4935b1254bd777700d39f8e4ddf67062191fb",
+    "status": "in_progress",
+    "release_contract": {
+      "result": "passed",
+      "tests_run": 49,
+      "skipped": 0,
+      "head_sha": "7ae4935b1254bd777700d39f8e4ddf67062191fb",
+      "django_check": "passed",
+      "migration_drift": "passed",
+      "clean_checkout_fingerprint": "passed"
+    },
+    "stable_baseline": "in_progress",
+    "stable_candidate": "in_progress",
+    "new_failure_comparison": "pending"
+  },
+  "failed_ci": {
+    "run_id": 35554080816,
+    "head_sha": "8f2bb9c55d99cec8304a97099d007017e14924fb",
+    "candidate_tests": 5184,
+    "candidate_failures": 65,
+    "candidate_errors": 32,
+    "old_baseline_tests": 4886,
+    "old_baseline_failures_and_errors": 328,
+    "reported_new_failure_ids": 12,
+    "previous_production_candidate": "3a174b1e93c499f293deeabfff4dfa71b427a684",
+    "previous_production_failure_ids": 45,
+    "added_vs_previous_production_ids": 52,
+    "fixed_vs_previous_production_ids": 0
+  },
+  "linux_ci": {
+    "status": "pending_after_review_fixes",
+    "baseline_rule": "PR base SHA / explicit full baseline SHA for manual runs",
+    "artifact_sha_verification": true
+  },
+  "initial_changed_non_document_files_sha256": "2d3ef1ac0ab6fbc84cd9b07c017c76695a20fc15611851c73a999b95d75e0daf",
+  "initial_changed_non_document_file_count": 34
 }

@@ -1,3 +1,11 @@
+## 2026-09-21 PR212 追加独立审核：三项业务缺陷已修复，CI重新验收待完成
+
+全新独立子Agent对`8f2bb9c`初审发现1项P1、2项P2：赛卡同号换马覆盖、明确更正标记丢失、赛前结果重复领取。主线程补反例并修复，同一reviewer复审APPROVED，独立54项通过。主线程聚焦453项通过（1跳过）、PG业务31项、PG历史schema25项、历史SQLite31项及rollback合同36项通过。
+
+已核实此前全量CI失败，不能沿用下方“仍在运行”的阶段记录：8f2bb9c实际97个失败/错误，比前一生产候选新增52项。旧固定a88基线自身328项失败，漏报其中40项。历史测试已隔离至精确M78合同，生产保护保持不变；CI改为准确PR base/head SHA，另由原reviewer审核通过。新提交的Linux全量对照待运行，不能称无新增失败。详见[审核与修复](changes/multisource-race-enrollment/REVIEW.md)及[验证记录](changes/multisource-race-enrollment/validation.json)。
+
+[PR #212](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/212)继续Draft；未合并、未部署、未写生产。0079发布包和逐地区真实来源证据仍待完成。
+
 ## 2026-09-21 多来源登记实现与离线验证（Draft PR，未发布）
 
 用户批准后，在隔离 `codex/multisource-race-enrollment` 分支完成多来源身份/能力绑定、同场去重、精确来源claim、赛后7天补入、未登记覆盖告警、名单保留和固定v1转换工具；新增0079追加迁移，所有新开关默认关闭。JRA All Comers真实缩减fixture的13匹闭环通过；独立review通过，聚焦447项通过（1项环境跳过），PG16并发/原子性24项通过。已提交 `7ae4935b` 并创建 [Draft PR #212](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/212)，固定代码SHA的Linux发布/恢复合同49项全过；全量基线/候选对照仍在运行，尚未确认无新增失败。最终测试/CI以[验证记录](changes/multisource-race-enrollment/validation.json)为准。
