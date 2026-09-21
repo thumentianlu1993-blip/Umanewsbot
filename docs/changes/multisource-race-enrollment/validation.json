@@ -1,5 +1,5 @@
 {
-  "recorded_at": "2026-09-21T02:06:57.860846+00:00",
+  "recorded_at": "2026-09-21T02:24:23.351428+00:00",
   "branch": "codex/multisource-race-enrollment",
   "base_commit": "953ea62604cd97709310d1e78e16972dd38eba3f",
   "status": "implementation_reviewed_ci_pending",
@@ -17,7 +17,12 @@
   "historical_0078_fixture": {
     "targeted_tests_run": 5,
     "result": "passed",
-    "full_local_suite": "running",
+    "full_local_suite": {
+      "tests_run": 41,
+      "result": "passed",
+      "elapsed_seconds": 425.199,
+      "note": "随后新增的迁移图隔离/清理用例由5项定向及6项PG复验覆盖"
+    },
     "production_guard_unchanged": true,
     "current_0079_checkout_rejected": true,
     "postgres_tests_run": 6,
@@ -36,7 +41,24 @@
     "conversion_and_adapter_permissions": "APPROVED",
     "historical_release_fixture": "APPROVED"
   },
-  "linux_ci": "pending",
+  "linux_ci": {
+    "run_id": 35553327586,
+    "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/35553327586",
+    "head_sha": "7ae4935b1254bd777700d39f8e4ddf67062191fb",
+    "status": "in_progress",
+    "release_contract": {
+      "result": "passed",
+      "tests_run": 49,
+      "skipped": 0,
+      "head_sha": "7ae4935b1254bd777700d39f8e4ddf67062191fb",
+      "django_check": "passed",
+      "migration_drift": "passed",
+      "clean_checkout_fingerprint": "passed"
+    },
+    "stable_baseline": "in_progress",
+    "stable_candidate": "in_progress",
+    "new_failure_comparison": "pending"
+  },
   "production": {
     "deployed": false,
     "data_modified": false,
@@ -56,6 +78,27 @@
     "postgres": {
       "local_path": "/tmp/umanews-multisource-pg-final.log",
       "sha256": "0ebdfe6200bd80a85b4c08a7ab25c04105f5de00fd4f3db68526ae4a45e90797"
+    },
+    "historical_0078_local": {
+      "local_path": "/tmp/umanews-multisource-release-tests-final.log",
+      "sha256": "bde692c8bd6a9caa36811753f7f2f302e32ed5033008f16aa1c817a7e4b74fd0"
+    },
+    "historical_0078_pg": {
+      "local_path": "/tmp/umanews-multisource-release-pg-final.log",
+      "sha256": "d5d3ba70922aec349336dfb60df565f99656cbbed36e528029a4d5abc2e9eeb2"
+    },
+    "jra_fixture_normalization": {
+      "local_path": "/tmp/umanews-multisource-fixture-final.log",
+      "sha256": "af49e361c26e8a971ef4c0ef191dcf28654f61d69d5812d903ca089049b523b2"
     }
-  }
+  },
+  "code_commit": "7ae4935b1254bd777700d39f8e4ddf67062191fb",
+  "pull_request": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/212",
+  "jra_fixture_normalization_regression": {
+    "tests_run": 34,
+    "result": "passed",
+    "note": "HTML转LF/去除行尾空白，原始source SHA保持；fixture SHA与变换说明同步"
+  },
+  "changed_non_document_files_sha256": "2d3ef1ac0ab6fbc84cd9b07c017c76695a20fc15611851c73a999b95d75e0daf",
+  "changed_non_document_file_count": 34
 }
