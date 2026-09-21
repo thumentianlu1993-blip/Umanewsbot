@@ -1,0 +1,61 @@
+{
+  "recorded_at": "2026-09-21T02:06:57.860846+00:00",
+  "branch": "codex/multisource-race-enrollment",
+  "base_commit": "953ea62604cd97709310d1e78e16972dd38eba3f",
+  "status": "implementation_reviewed_ci_pending",
+  "focused": {
+    "tests_run": 447,
+    "skipped": 1,
+    "result": "passed"
+  },
+  "postgres16": {
+    "tests_run": 24,
+    "skipped": 0,
+    "result": "passed",
+    "scope": "独立临时实例；登记/claim并发、JRA完整赛果事务、转换"
+  },
+  "historical_0078_fixture": {
+    "targeted_tests_run": 5,
+    "result": "passed",
+    "full_local_suite": "running",
+    "production_guard_unchanged": true,
+    "current_0079_checkout_rejected": true,
+    "postgres_tests_run": 6,
+    "postgres_result": "passed",
+    "current_0079_graph_rejected": true
+  },
+  "checks": {
+    "migration_drift": "passed",
+    "undefined_names": "passed",
+    "diff_check": "passed",
+    "workflow_contract": "passed",
+    "workflow_contract_tests": 4
+  },
+  "independent_review": {
+    "core": "APPROVED",
+    "conversion_and_adapter_permissions": "APPROVED",
+    "historical_release_fixture": "APPROVED"
+  },
+  "linux_ci": "pending",
+  "production": {
+    "deployed": false,
+    "data_modified": false,
+    "new_flags_enabled": false
+  },
+  "limits": [
+    "七地区去重合同不等于七地区实网proof",
+    "0079精确发布包及生产自然周期待完成",
+    "已有发布历史的v1登记不自动转换",
+    "仅裸日历URL不补造A0身份凭据"
+  ],
+  "logs": {
+    "focused": {
+      "local_path": "/tmp/umanews-multisource-focused-final.log",
+      "sha256": "a3fe1a1db47734a083b5165d6df6dbf1efc601395bf6bcb9b4fc728186be050a"
+    },
+    "postgres": {
+      "local_path": "/tmp/umanews-multisource-pg-final.log",
+      "sha256": "0ebdfe6200bd80a85b4c08a7ab25c04105f5de00fd4f3db68526ae4a45e90797"
+    }
+  }
+}

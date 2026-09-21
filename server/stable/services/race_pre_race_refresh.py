@@ -244,7 +244,7 @@ def public_refresh_preview(event,*,now):
     region = 'japan_nar' if event.country_region == 'japan' else event.country_region
     if (not settings.RACE_DATA_SYNC_ENABLED or not settings.RACE_DATA_SYNC_RACECARD_APPLY_ENABLED
         or 'participants.horse_name' not in settings.RACE_DATA_SYNC_ENABLED_FIELDS
-        or region not in settings.RACE_DATA_SYNC_ENABLED_REGIONS or not pre.in_window(event,now)
+        or region not in settings.RACE_DATA_SYNC_ENABLED_REGIONS or not pre.preview_window(event,now)
         or pre._refs(event).get('pre_race_handoff') or event.runners.exists()
         or any((event.manual_lock_flags or {}).values()) or event.field_authorities.filter(manual_lock=True).exists()
         or (control and control.write_owner not in {'unmanaged','data_sync'})):return None

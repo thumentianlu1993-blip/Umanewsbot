@@ -1778,6 +1778,10 @@ class RaceEventLiveTracking(TimestampedModel):
 
 
 class RaceDataSyncEnrollment(TimestampedModel):
+    authority_version = models.PositiveSmallIntegerField(default=1)
+    source_set_generation = models.PositiveBigIntegerField(default=0)
+    source_set_digest = models.CharField(max_length=64, blank=True)
+    source_set_manifest = models.JSONField(default=dict, blank=True)
     event = models.OneToOneField(
         RaceEvent,
         on_delete=models.PROTECT,
@@ -1824,6 +1828,40 @@ class RaceDataSyncEnrollment(TimestampedModel):
 
     def __str__(self) -> str:
         return f"event={self.event_id} {self.state} generation={self.enrollment_generation}"
+
+
+class RaceEventIdentityKey(TimestampedModel):
+    event = models.ForeignKey(RaceEvent, on_delete=models.PROTECT, related_name="identity_keys")
+    key_type = models.CharField(max_length=32)
+    namespace = models.CharField(max_length=64)
+    key_sha256 = models.CharField(max_length=64)
+    key_payload = models.JSONField()
+    evidence = models.JSONField(default=dict)
+    matcher_version = models.CharField(max_length=64)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=("namespace", "key_sha256"), name="uq_race_identity_key")]
+
+
+class RaceDataSyncSourceBinding(TimestampedModel):
+    enrollment = models.ForeignKey(RaceDataSyncEnrollment, on_delete=models.PROTECT, related_name="source_bindings")
+    source_identity = models.ForeignKey("RaceResultSourceIdentity", on_delete=models.PROTECT, related_name="sync_bindings")
+    state = models.CharField(max_length=16, default="active", choices=(("active", "有效"), ("quarantined", "隔离"), ("retired", "退出")))
+    capabilities = models.JSONField(default=list)
+    route_digest = models.CharField(max_length=64)
+    contract_digest = models.CharField(max_length=64)
+    proof_digest = models.CharField(max_length=64)
+    registry_schema_version = models.PositiveSmallIntegerField(default=3)
+    identity_evidence_sha256 = models.CharField(max_length=64)
+    binding_manifest = models.JSONField(default=dict)
+    binding_manifest_sha256 = models.CharField(max_length=64)
+    valid_until = models.DateTimeField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=("enrollment", "source_identity"), name="uq_race_sync_binding"),
+            models.CheckConstraint(condition=models.Q(state__in=("active", "quarantined", "retired")), name="race_sync_binding_state"),
+        ]
 
 
 class RaceEventLiveProviderCheckpoint(TimestampedModel):

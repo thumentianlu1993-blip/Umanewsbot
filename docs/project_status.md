@@ -1,3 +1,9 @@
+## 2026-09-20 多来源登记实现与离线验证（未发布）
+
+用户批准后，在隔离 `codex/multisource-race-enrollment` 分支完成多来源身份/能力绑定、同场去重、精确来源claim、赛后7天补入、未登记覆盖告警、名单保留和固定v1转换工具；新增0079追加迁移，所有新开关默认关闭。JRA All Comers真实缩减fixture的13匹闭环通过；独立review通过，聚焦447项通过（1项环境跳过），PG16并发/原子性24项通过。最终测试/CI以[验证记录](changes/multisource-race-enrollment/validation.json)为准。
+
+[实施与地区证据矩阵](changes/multisource-race-enrollment/implementation.md)区分真实样本、合成合同与未完成proof。七地区通用去重合同不等于七地区实网全链完成；未合并/发布、未修写生产103/104，未做自然周期验收。下方为历史阶段记录。
+
 ## 2026-09-20 多来源赛事登记修复进入已审核方案阶段
 
 All Comers 漏登记根因已定位：TRA 空响应、JRA 候选不能独立登记、赛后发现退出，以及未登记赛事不在监控分母。新隔离分支 `codex/multisource-race-enrollment` 的七地区多源登记、强身份去重、赛后补入与覆盖监测方案，经独立 Agent 两轮审核通过。当前未实施、未部署，不能称赛事状态或赛果已恢复；以[当前状态](current_state.md)、[方案](changes/multisource-race-enrollment/PLAN.md)及[审核](changes/multisource-race-enrollment/REVIEW.md)为准。

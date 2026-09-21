@@ -187,3 +187,94 @@ def monitor_data_sync_result_slo(
         if incident_id is not None:
             staged.append(incident_id)
     return tuple(staged)
+
+
+def stage_multisource_coverage_incidents(*, coverage, policy, now):
+    """仅持久后台缺口，无发送任务；退出七天窗口也不自动 resolve。"""
+    from zoneinfo import ZoneInfo
+    from stable.services.race_data_source_adapters import canonical_sha
+    from django.conf import settings
+
+    if not getattr(settings, "RACE_DATA_COVERAGE_ALERTS_ENABLED", False):
+        return
+    for row in coverage["entries"]:
+        event = models.RaceEvent.objects.get(pk=row["event_id"])
+        if row["classification"] in (
+            "unsupported_region",
+            "manual_pause",
+            "owner_conflict",
+        ):
+            continue
+        issue = ""
+        if event.result_confirmed_at:
+            models.RaceLiveAlertIncident.objects.filter(
+                scope_type="multisource_coverage", scope_key=str(event.pk)
+            ).exclude(status="resolved").update(
+                status="resolved", resolved_at=now, last_seen_at=now
+            )
+            continue
+        if event.status in ("cancelled", "postponed"):
+            models.RaceLiveAlertIncident.objects.filter(
+                scope_type="multisource_coverage", scope_key=str(event.pk)
+            ).exclude(status="resolved").update(
+                status="resolved", resolved_at=now, last_seen_at=now
+            )
+            continue
+        age = (
+            (
+                now.astimezone(ZoneInfo(event.timezone_name)).date() - event.local_date
+            ).days
+            if event.local_date
+            else None
+        )
+        if event.race_datetime and now >= event.race_datetime + timedelta(minutes=30):
+            issue = "result_overdue"
+        elif age is not None and age >= 1 and event.race_datetime is None:
+            issue = "time_unknown_overdue"
+        elif (
+            age is not None
+            and age >= -1
+            and row["classification"] == "enrollment_missing"
+        ):
+            issue = "enrollment_missing"
+        stale = models.RaceLiveAlertIncident.objects.filter(
+            scope_type="multisource_coverage", scope_key=str(event.pk)
+        ).exclude(status="resolved")
+        for previous in stale:
+            if previous.details.get("issue") != issue:
+                previous.status = "resolved"
+                previous.resolved_at = now
+                previous.last_seen_at = now
+                previous.save(
+                    update_fields=(
+                        "status",
+                        "resolved_at",
+                        "last_seen_at",
+                        "updated_at",
+                    )
+                )
+        if not issue:
+            continue
+        key = canonical_sha(
+            dict(event_id=event.pk, issue=issue, policy=policy.payload["policy_id"])
+        )
+        incident, created = models.RaceLiveAlertIncident.objects.get_or_create(
+            dedupe_key=key,
+            defaults=dict(
+                alert_type="official_overdue",
+                scope_type="multisource_coverage",
+                scope_key=str(event.pk),
+                reference_version=policy.payload["policy_id"],
+                opened_at=now,
+                last_seen_at=now,
+                next_attempt_at=None,
+                details={
+                    "issue": issue,
+                    "classification": row["classification"],
+                    "policy_digest": policy.digest,
+                },
+            ),
+        )
+        if not created:
+            incident.last_seen_at = now
+            incident.save(update_fields=("last_seen_at", "updated_at"))

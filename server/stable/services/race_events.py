@@ -3317,6 +3317,14 @@ def _resolve_data_sync_publication_from_loaded_rows(
     ) or timezone.is_naive(event.result_confirmed_at):
         return reject("event_not_confirmed")
 
+    if enrollment is not None and enrollment.authority_version==2:
+        from stable.services.race_data_sync_admission import validate_multisource_publication
+        reason=validate_multisource_publication(event=event,control=control,revision=revision,
+            publication=publication,observation=observation,source=source,enrollment=enrollment)
+        if reason:return reject(reason)
+        return RaceLivePublicReadDecision(visible=True,reason="data_sync_public_read_allowed",
+            revision_id=revision.pk,phase=revision.phase,effective_mode=RaceLivePublicationMode.OFFICIAL_PUBLIC)
+
     from stable.services.race_event_lifecycle_enforce import (
         validate_registry_membership_snapshot,
     )

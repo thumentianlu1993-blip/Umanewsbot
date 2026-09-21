@@ -1,3 +1,9 @@
+## 2026-09-20 多来源修复代码已准备，0079未发布
+
+新增0079追加两表/四字段；三新开关均false，policy路径/SHA为空。`manage_multisource_enrollment`固定清单工具提供prepare/dry-run/apply/verify；apply要求关闭运行入口，对照镜像固化提交或本地HEAD，不联网、不转换已发布v1历史。详细命令与边界见[实施记录](changes/multisource-race-enrollment/implementation.md)和[发布合同](changes/multisource-race-enrollment/rollout.md)。
+
+当前未执行迁移、生产补入或开关变更。0079必须另行准备经过验证的受保护前向发布包，不能假定既有固定0078目标工具可直接使用；新source proof、实际镜像/配置/队列/备份和自然任务结果均需新鲜证据。
+
 ## 2026-09-20 漏登记排障与多来源修复准备（未发布）
 
 All Comers 现场见[根因](changes/multisource-race-enrollment/ROOT_CAUSE.md)和[脱敏证据](changes/multisource-race-enrollment/EVIDENCE.json)。排障顺序为公开页 → event/正式名单与赛果 → source identity/enrollment/projection/tracking/lifecycle → discovery 检查点及原始响应；Celery SUCCESS 或服务 running 不能替代资料写入与状态推进证据。覆盖盘点必须从公开 canonical 赛事出发，不能只查登记表。

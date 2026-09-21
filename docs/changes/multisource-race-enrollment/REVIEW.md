@@ -41,3 +41,11 @@ Reviewer 全程只读，未改文件、未访问生产或请求 provider。批�
 | test_cases.md | `f96eedc42f9137c5abb407e7d09e337b72afdfeabe3be2b7c1efb1110c3746b0` |
 | tasks.md | `1a9bebd181dd87996d2397a224a043119e00bd06ff73127746b26ffd57b583a8` |
 | rollout.md | `6ad15c5dfea29d57ff7577be82aa9165f247b72dddc02ed33d0f15a83dfc5f8f` |
+
+## 实现阶段独立审查（2026-09-20）
+
+复用同一只读 `plan_reviewer`，不参与源码修改。多轮REVISE已修复：生命周期开关准入、未选来源checkpoint饥饿、20场共享批次上限、基于完整HTML的错误名单完整性、显式来源撤销、取消/延期覆盖、同号换马、锁等待越过授权截止、转换独立verify漏报、运行代码SHA自报及TRA host预算初始化。核心范围最终APPROVED；转换/adapter权限补充范围最终APPROVED。
+
+Reviewer独立SQLite探针及保存回归通过；其结论明确不代表七地区实网proof或生产验收。主线程另外完成独立PG16并发与事务测试，结果见validation.json。上述文档快照SHA保留为方案阶段历史，不宣称与本轮更新文档一致。
+
+历史0078测试夹具追加复审：初审发现递归排除同名0079文件会隐藏未知嵌套迁移（P2），已改为仅根目录精确排除。nested和__pycache__中的同名.py经复制后保留并拒绝；reviewer独立4项合同测试通过，最终APPROVED。生产guard/固定SHA未改，当前0079代码仍拒绝旧0078发布准入。

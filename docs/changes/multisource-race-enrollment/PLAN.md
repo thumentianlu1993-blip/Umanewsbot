@@ -1,10 +1,10 @@
 # 多来源赛事登记与赛后闭环修复方案
 
-- 阶段：方案 v2，独立 Agent 两轮审核 APPROVED（方案阶段）；本轮不实施业务代码、不修改生产。
+- 阶段：用户已批准实现；通用登记、JRA闭环、转换工具与离线验证已落地，独立实现审核通过。生产未修改，七地区实网 proof 尚未齐备；详见 [实施记录](implementation.md)。
 - 分支：`codex/multisource-race-enrollment`；隔离 worktree：`/Users/mentianlu/.codex/worktrees/multisource-race-enrollment/umanews`。
 - 代码基线：`origin/main@953ea62604cd97709310d1e78e16972dd38eba3f`（2026-09-20 fetch）；实际生产诊断版本为 `3a174b1e`，证据时间 15:11～15:17 北京时间。设计不推断此后生产状态。
 - 用户范围：修复 All Comers 暴露的漏登记／状态／赛果问题；所有地区多来源登记，任一可信来源命中可登记，同一赛事后续命中只补来源，不重复登记；处理拼写、别名及跨语种身份。
-- 审核方式：采用 plan-eng-review 的完整架构、质量、测试、性能与一致性检查；以根 AGENTS.md 的 Codex 原生流程为准，不引入 OpenSpec 文件或额外人工门禁。
+- 审核方式：采用 plan-eng-review 的完整架构、质量、测试、性能与一致性检查；以根 AGENTS.md 的 Codex 原生流程为准，不引入其他规格工作流或额外人工门禁。
 
 ## 1. 当前问题与方案结果
 

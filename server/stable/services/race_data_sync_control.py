@@ -18,6 +18,7 @@ from datetime import datetime, timedelta
 from typing import Iterable
 
 from django.conf import settings
+from django.utils import timezone
 from django.db import IntegrityError, transaction
 from django.db.models import Exists, Min, OuterRef, Q
 
@@ -164,6 +165,13 @@ def lock_and_validate_race_data_sync_claim_for_apply(
     observation but cannot project it.
     """
 
+    if (
+        claim.checkpoint_plan
+        and claim.checkpoint_plan[0].get("authority", {}).get("authority_version") == 2
+    ):
+        return _validate_multisource_claim(
+            claim=claim, now=now, required_data_kinds=required_data_kinds
+        )
     _require_aware(now, "now")
     if not transaction.get_connection().in_atomic_block:
         raise RuntimeError("claim apply validation requires an atomic transaction")
@@ -1768,7 +1776,24 @@ def claim_due_enrollments(
     providers = _normalize_scope(enabled_providers, "enabled_providers")
     regions = _normalize_scope(enabled_regions, "enabled_regions")
     data_kinds = _normalize_data_kinds(enabled_data_kinds)
-    claims: list[RaceDataSyncClaim] = []
+    claims: list[RaceDataSyncClaim] = list(
+        _claim_multisource_due(
+            now=now,
+            batch_size=(
+                min(batch_size, 20)
+                if not models.RaceDataSyncEnrollment.objects.filter(
+                    authority_version=1,
+                    state="enrolled",
+                    event__live_tracking__next_poll_at__lte=now,
+                ).exists()
+                else min(20, max(0, (batch_size + (now.minute % 2)) // 2))
+            ),
+            ttl_seconds=ttl_seconds,
+            providers=providers,
+            regions=regions,
+            data_kinds=data_kinds,
+        )
+    )
     with transaction.atomic():
         enabled_due_checkpoints = (
             models.RaceEventLiveProviderCheckpoint.objects.filter(
@@ -1790,6 +1815,7 @@ def claim_due_enrollments(
                 live_tracking__tracking_enabled=True,
                 projection_control__write_owner=models.RaceEventProjectionWriteOwner.DATA_SYNC,
                 race_data_sync_enrollment__state=models.RaceDataSyncEnrollmentState.ENROLLED,
+                race_data_sync_enrollment__authority_version=1,
                 race_data_sync_enrollment__source_identity__source_key__in=providers,
                 race_data_sync_enrollment__source_identity__region_code__in=regions,
             )
@@ -1799,7 +1825,9 @@ def claim_due_enrollments(
             )
             .annotate(has_enabled_due_checkpoint=Exists(enabled_due_checkpoints))
             .filter(has_enabled_due_checkpoint=True)
-            .order_by("live_tracking__next_poll_at", "id")[:batch_size]
+            .order_by("live_tracking__next_poll_at", "id")[
+                : max(0, batch_size - len(claims))
+            ]
         )
         for event in events:
             control = (
@@ -2674,3 +2702,481 @@ def reserve_race_data_host_request(
             next_allowed_at=budget.next_allowed_at,
             reservation_version=budget.lock_version,
         )
+
+
+def _claim_multisource_due(
+    *, now, batch_size, ttl_seconds, providers, regions, data_kinds
+):
+    from stable.services.race_data_source_adapters import load_multisource_policy
+    from stable.services.race_data_sync_admission import validate_multisource_admission
+    from stable.services.race_data_sync_enrollment import (
+        _lock_multisource_event,
+        _LifecycleLockRetry,
+    )
+
+    if not getattr(settings, "RACE_DATA_MULTISOURCE_APPLY_ENABLED", False):
+        return ()
+    try:
+        policy = load_multisource_policy(now=now)
+    except (ValueError, TypeError, OSError):
+        return ()
+    ids = list(
+        models.RaceDataSyncEnrollment.objects.filter(
+            authority_version=2,
+            state="enrolled",
+            event__live_tracking__tracking_enabled=True,
+            event__live_tracking__next_poll_at__lte=now,
+        )
+        .filter(
+            Q(event__live_tracking__active_attempt_token="")
+            | Q(event__live_tracking__claim_expires_at__lte=now)
+        )
+        .order_by("event__live_tracking__next_poll_at", "event_id")
+        .values_list("event_id", flat=True)[:batch_size]
+    )
+    claims = []
+    for event_id in ids:
+        try:
+            with transaction.atomic():
+                event, _ = _lock_multisource_event(event_id)
+                control = (
+                    models.RaceEventProjectionControl.objects.select_for_update().get(
+                        event=event
+                    )
+                )
+                tracking = models.RaceEventLiveTracking.objects.select_for_update().get(
+                    event=event
+                )
+                enrollment = (
+                    models.RaceDataSyncEnrollment.objects.select_for_update().get(
+                        event=event
+                    )
+                )
+                if tracking.active_attempt_token and (
+                    tracking.claim_expires_at is None or tracking.claim_expires_at > now
+                ):
+                    continue
+                checkpoints = list(
+                    models.RaceEventLiveProviderCheckpoint.objects.select_for_update()
+                    .filter(
+                        tracking=tracking,
+                        next_poll_at__lte=now,
+                        source_key__in=providers,
+                        data_kind__in=data_kinds,
+                    )
+                    .order_by(
+                        "next_poll_at", "last_attempt_at", "source_key", "data_kind"
+                    )
+                )
+                selected = []
+                binding = None
+                for row in checkpoints:
+                    if (
+                        calculate_multisource_next_poll(
+                            event=event, kind=row.data_kind, now=now
+                        )
+                        is None
+                    ):
+                        row.next_poll_at = None
+                        row.save(update_fields=("next_poll_at", "updated_at"))
+                        continue
+                    target = enrollment.source_set_manifest.get("selected", {}).get(
+                        row.data_kind
+                    )
+                    alternate = enrollment.source_set_manifest.get("alternate", {}).get(
+                        row.data_kind
+                    )
+                    if isinstance(alternate, dict):
+                        from stable.services.race_data_source_adapters import aware
+
+                        if aware(alternate["expires_at"]) > now:
+                            target = alternate["binding_id"]
+                    b = (
+                        models.RaceDataSyncSourceBinding.objects.select_related(
+                            "source_identity"
+                        )
+                        .filter(pk=target, enrollment=enrollment)
+                        .first()
+                    )
+                    if (
+                        not b
+                        or b.source_identity.source_key != row.source_key
+                        or b.source_identity.region_code not in regions
+                    ):
+                        continue
+                    if binding is not None and binding.pk != b.pk:
+                        continue
+                    admission = validate_multisource_admission(
+                        event_id=event_id,
+                        now=now,
+                        capability=row.data_kind,
+                        binding_id=b.pk,
+                        policy=policy,
+                    )
+                    if not admission.admitted:
+                        continue
+                    if (
+                        row.contract_digest != b.contract_digest
+                        or row.registry_digest != b.route_digest
+                    ):
+                        continue
+                    binding = b
+                    selected.append(row)
+                if not selected:
+                    from stable.services.race_data_sync_enrollment import (
+                        _multisource_manifest,
+                    )
+
+                    _multisource_manifest(enrollment, control, policy, now)
+                    tracking.refresh_from_db()
+                    if tracking.next_poll_at and tracking.next_poll_at <= now:
+                        tracking.next_poll_at = now + timedelta(minutes=1)
+                        tracking.save(update_fields=("next_poll_at", "updated_at"))
+                    continue
+                if any(row.data_kind == "result" for row in selected):
+                    selected = [row for row in selected if row.data_kind == "result"]
+                authority = dict(
+                    authority_version=2,
+                    binding_id=binding.pk,
+                    source_identity_id=binding.source_identity_id,
+                    source_set_generation=enrollment.source_set_generation,
+                    source_set_digest=enrollment.source_set_digest,
+                    binding_manifest_sha256=binding.binding_manifest_sha256,
+                    route_digest=binding.route_digest,
+                    contract_digest=binding.contract_digest,
+                    proof_digest=binding.proof_digest,
+                )
+                token = secrets.token_hex(16)
+                tracking.claim_generation += 1
+                tracking.active_attempt_token = token
+                tracking.claim_expires_at = now + timedelta(seconds=ttl_seconds)
+                tracking.last_attempt_at = now
+                tracking.save()
+                plan = tuple(
+                    {**row, "authority": authority}
+                    for row in _checkpoint_plan_payload(selected)
+                )
+                kwargs = dict(
+                    event_id=event_id,
+                    enrollment_generation=enrollment.enrollment_generation,
+                    owner_generation=control.owner_generation,
+                    claim_generation=tracking.claim_generation,
+                    attempt_token=token,
+                    enrollment_entry_sha256=enrollment.entry_sha256,
+                    route_digest=binding.route_digest,
+                    checkpoint_plan=plan,
+                )
+                claims.append(
+                    RaceDataSyncClaim(
+                        **kwargs, plan_sha256=_claim_plan_sha256(**kwargs)
+                    )
+                )
+        except _LifecycleLockRetry:
+            continue
+    return tuple(claims)
+
+
+def _validate_multisource_claim(*, claim, now, required_data_kinds=()):
+    from stable.services.race_data_sync_admission import validate_multisource_admission
+    from stable.services.race_data_source_adapters import load_multisource_policy
+    from stable.services.race_data_sync_enrollment import _lock_multisource_event
+
+    _require_aware(now, "now")
+    if not transaction.get_connection().in_atomic_block:
+        raise RuntimeError("claim validation requires transaction")
+
+    def deny(reason):
+        return ControlDecision("rejected", reason, claim.event_id), None
+
+    event, _ = _lock_multisource_event(claim.event_id)
+    control = models.RaceEventProjectionControl.objects.select_for_update().get(
+        event=event
+    )
+    tracking = models.RaceEventLiveTracking.objects.select_for_update().get(event=event)
+    enrollment = models.RaceDataSyncEnrollment.objects.select_for_update().get(
+        event=event
+    )
+    if (
+        control.write_owner != "data_sync"
+        or control.owner_generation != claim.owner_generation
+        or enrollment.authority_version != 2
+        or enrollment.state != "enrolled"
+        or enrollment.enrollment_generation != claim.enrollment_generation
+        or tracking.claim_generation != claim.claim_generation
+        or tracking.active_attempt_token != claim.attempt_token
+    ):
+        return deny("claim_cas_stale")
+    if tracking.claim_expires_at is None or tracking.claim_expires_at <= now:
+        return deny("claim_expired")
+    plan = tuple(claim.checkpoint_plan)
+    authority = plan[0].get("authority") if plan else None
+    if not authority or any(row.get("authority") != authority for row in plan):
+        return deny("claim_plan_drift")
+    kinds = {row.get("data_kind") for row in plan}
+    providers = {row.get("source_key") for row in plan}
+    if (
+        len(providers) != 1
+        or not set(required_data_kinds) <= kinds
+        or not kinds <= set(models.RaceDataSyncDataKind.values)
+    ):
+        return deny("claim_plan_drift")
+    checkpoints = tuple(
+        models.RaceEventLiveProviderCheckpoint.objects.select_for_update().filter(
+            tracking=tracking, source_key__in=providers, data_kind__in=kinds
+        )
+    )
+    expected = tuple(
+        {**row, "authority": authority} for row in _checkpoint_plan_payload(checkpoints)
+    )
+    if expected != plan:
+        return deny("checkpoint_cas_stale")
+    binding = (
+        models.RaceDataSyncSourceBinding.objects.select_for_update()
+        .select_related("source_identity")
+        .filter(pk=authority.get("binding_id"), enrollment=enrollment)
+        .first()
+    )
+    if binding is None:
+        return deny("binding_missing")
+    # DB锁等待可跨越lease/proof到期；拿到最后一把写锁后使用新时钟。
+    now = max(now, timezone.now())
+    if tracking.claim_expires_at is None or tracking.claim_expires_at <= now:
+        return deny("claim_expired")
+    expected_authority = dict(
+        authority_version=2,
+        binding_id=binding.pk,
+        source_identity_id=binding.source_identity_id,
+        source_set_generation=enrollment.source_set_generation,
+        source_set_digest=enrollment.source_set_digest,
+        binding_manifest_sha256=binding.binding_manifest_sha256,
+        route_digest=binding.route_digest,
+        contract_digest=binding.contract_digest,
+        proof_digest=binding.proof_digest,
+    )
+    if (
+        authority != expected_authority
+        or binding.source_identity.source_key not in providers
+    ):
+        return deny("claim_plan_drift")
+    kwargs = dict(
+        event_id=claim.event_id,
+        enrollment_generation=claim.enrollment_generation,
+        owner_generation=claim.owner_generation,
+        claim_generation=claim.claim_generation,
+        attempt_token=claim.attempt_token,
+        enrollment_entry_sha256=claim.enrollment_entry_sha256,
+        route_digest=claim.route_digest,
+        checkpoint_plan=plan,
+    )
+    if (
+        _claim_plan_sha256(**kwargs) != claim.plan_sha256
+        or enrollment.entry_sha256 != claim.enrollment_entry_sha256
+        or binding.route_digest != claim.route_digest
+    ):
+        return deny("claim_plan_drift")
+    try:
+        policy = load_multisource_policy(now=now)
+    except (ValueError, TypeError, OSError):
+        return deny("multisource_policy_unavailable")
+    for kind in kinds:
+        admission = validate_multisource_admission(
+            event_id=event.pk,
+            now=now,
+            capability=kind,
+            binding_id=binding.pk,
+            policy=policy,
+        )
+        if not admission.admitted:
+            return deny(admission.reason_code)
+    return ControlDecision(
+        "valid", "", event.pk, tracking.claim_generation
+    ), LockedRaceDataSyncClaim(event, control, tracking, enrollment, checkpoints)
+
+
+def finish_multisource_claim(
+    *, claim, now, success, reason_code="", observation_hashes=None, retry_at=None
+):
+    """领取者只结束自身来源；失败授权备用来源，成功后才粘滞换源。"""
+    from stable.services.race_data_source_adapters import load_multisource_policy
+    from stable.services.race_data_sync_admission import validate_multisource_admission
+    from stable.services.race_data_sync_enrollment import _multisource_manifest
+
+    with transaction.atomic():
+        decision, locked = _validate_multisource_claim(claim=claim, now=now)
+        if locked is None:
+            return decision
+        enrollment = locked.enrollment
+        tracking = locked.tracking
+        event = locked.event
+        policy = load_multisource_policy(now=now)
+        authority = claim.checkpoint_plan[0]["authority"]
+        binding_id = authority["binding_id"]
+        selected = dict(enrollment.source_set_manifest["selected"])
+        alternate = dict(enrollment.source_set_manifest.get("alternate", {}))
+        change = False
+        for checkpoint in locked.checkpoints:
+            checkpoint.last_attempt_at = now
+            checkpoint.lock_version += 1
+            if success:
+                checkpoint.last_success_at = now
+                checkpoint.consecutive_failures = 0
+                checkpoint.circuit_reason = ""
+                checkpoint.last_observation_hash = (observation_hashes or {}).get(
+                    checkpoint.data_kind, ""
+                )
+                checkpoint.next_poll_at = calculate_multisource_next_poll(
+                    event=event, kind=checkpoint.data_kind, now=now
+                )
+                if selected.get(checkpoint.data_kind) != binding_id:
+                    selected[checkpoint.data_kind] = binding_id
+                    alternate.pop(checkpoint.data_kind, None)
+                    change = True
+            else:
+                checkpoint.consecutive_failures += 1
+                checkpoint.circuit_reason = reason_code[:64]
+                denied = reason_code in (
+                    "access_denied",
+                    "http_403",
+                    "http_406",
+                    "jra_http_403",
+                    "jra_http_406",
+                )
+                checkpoint.next_poll_at = max(
+                    retry_at or now,
+                    now + timedelta(hours=1) if denied else now + timedelta(minutes=5),
+                )
+                eligible = (
+                    denied
+                    or reason_code in ("not_found", "not_published")
+                    or (
+                        reason_code
+                        in ("transport_failed", "timeout", "jra_transport_failed")
+                        and checkpoint.consecutive_failures >= 2
+                    )
+                )
+                if eligible:
+                    candidates = (
+                        enrollment.source_bindings.filter(state="active")
+                        .exclude(pk=binding_id)
+                        .select_related("source_identity")
+                        .order_by("pk")
+                    )
+                    for candidate in candidates:
+                        if checkpoint.data_kind not in candidate.capabilities:
+                            continue
+                        other = models.RaceEventLiveProviderCheckpoint.objects.filter(
+                            tracking=tracking,
+                            source_key=candidate.source_identity.source_key,
+                            data_kind=checkpoint.data_kind,
+                        ).first()
+                        if not other or (
+                            other.circuit_reason
+                            and other.next_poll_at
+                            and other.next_poll_at > now
+                        ):
+                            continue
+                        # Check route legality independently, without granting a write before manifest rotation.
+                        admission = validate_multisource_admission(
+                            event_id=event.pk,
+                            now=now,
+                            binding_id=candidate.pk,
+                            policy=policy,
+                        )
+                        if not admission.admitted:
+                            continue
+                        alternate[checkpoint.data_kind] = {
+                            "binding_id": candidate.pk,
+                            "reason": reason_code,
+                            "expires_at": (
+                                now
+                                + timedelta(
+                                    seconds=min(
+                                        300,
+                                        getattr(
+                                            settings,
+                                            "RACE_DATA_SYNC_CLAIM_TTL_SECONDS",
+                                            240,
+                                        ),
+                                    )
+                                )
+                            ).isoformat(),
+                        }
+                        other.next_poll_at = now
+                        other.save(update_fields=("next_poll_at", "updated_at"))
+                        change = True
+                        break
+            checkpoint.save()
+        tracking.active_attempt_token = ""
+        tracking.claim_expires_at = None
+        tracking.lock_version += 1
+        tracking.next_poll_at = _multisource_tracking_due(
+            enrollment, tracking, selected, alternate
+        )
+        tracking.save()
+        if change:
+            _multisource_manifest(
+                enrollment,
+                locked.control,
+                policy,
+                now,
+                selected=selected,
+                alternate=alternate,
+            )
+        return ControlDecision(
+            "complete" if success else "failed",
+            reason_code,
+            event.pk,
+            tracking.claim_generation,
+        )
+
+
+def calculate_multisource_next_poll(*, event, kind, now):
+    from zoneinfo import ZoneInfo
+
+    if event.status in ("cancelled", "postponed"):
+        return None
+    if (
+        kind == "result"
+        and event.local_date
+        and (
+            now.astimezone(ZoneInfo(event.timezone_name)).date() - event.local_date
+        ).days
+        > 7
+    ):
+        return None
+    if kind == "result" and event.race_datetime is None:
+        if event.local_date is None or event.result_confirmed_at:
+            return None
+        age = (
+            now.astimezone(ZoneInfo(event.timezone_name)).date() - event.local_date
+        ).days
+        if age > 7:
+            return None
+        return now + timedelta(minutes=30) if age == 0 else now + timedelta(hours=6)
+    return calculate_next_poll_at(
+        data_kind=kind,
+        now=now,
+        race_datetime=event.race_datetime,
+        local_date=event.local_date,
+        timezone_name=event.timezone_name,
+        result_confirmed=bool(event.result_confirmed_at),
+    )
+
+
+def _multisource_tracking_due(enrollment, tracking, selected, alternate):
+    active = {
+        **selected,
+        **{kind: item["binding_id"] for kind, item in alternate.items()},
+    }
+    q = Q(pk__in=[])
+    for kind, binding_id in active.items():
+        binding = (
+            enrollment.source_bindings.filter(pk=binding_id, state="active")
+            .select_related("source_identity")
+            .first()
+        )
+        if binding:
+            q |= Q(source_key=binding.source_identity.source_key, data_kind=kind)
+    return models.RaceEventLiveProviderCheckpoint.objects.filter(
+        q, tracking=tracking, next_poll_at__isnull=False
+    ).aggregate(v=Min("next_poll_at"))["v"]
