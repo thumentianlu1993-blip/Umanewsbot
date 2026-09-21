@@ -679,6 +679,12 @@ def apply_data_sync_result_observation(
                     or current_observation.observed_at
                 )
         if is_multisource and current_observation is not None:
+            # 已验证跨来源 runner 映射允许姓名使用不同语种；普通佐证不能
+            # 把翻译差异当更正。同源或明确更正仍比较全部公开姓名字段。
+            compare_names = current_source_key == source.source_key or (
+                observation.result_phase == models.RaceResultPhase.CORRECTED
+                and provenance.get("correction_marker") is True
+            )
 
             def slot_facts(items):
                 return sorted(
@@ -688,6 +694,11 @@ def apply_data_sync_result_observation(
                         r["status"],
                         r["finish_time"],
                         r["margin"],
+                        r["barrier"],
+                        r["carried_weight"],
+                        r["horse_name"] if compare_names else "",
+                        r["jockey_name"] if compare_names else "",
+                        r["trainer_name"] if compare_names else "",
                     )
                     for r in items
                 )

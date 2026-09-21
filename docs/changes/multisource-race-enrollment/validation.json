@@ -1,8 +1,8 @@
 {
-  "recorded_at": "2026-09-21T07:22:55.234210+00:00",
+  "recorded_at": "2026-09-21T08:15:02.448741+00:00",
   "branch": "codex/multisource-race-enrollment",
   "base_commit": "953ea62604cd97709310d1e78e16972dd38eba3f",
-  "status": "independent_review_fixes_passed_local_ci_pending",
+  "status": "full_business_review_approved_final_ci_pending",
   "focused": {
     "tests_run": 453,
     "skipped": 1,
@@ -46,7 +46,16 @@
       "initial_p2": 2,
       "final": "APPROVED"
     },
-    "historical_fixtures_and_ci_fixes": "APPROVED"
+    "historical_fixtures_and_ci_fixes": "APPROVED",
+    "full_business_followup": {
+      "initial": "REVISE",
+      "p2_findings": [
+        "IR4",
+        "IR5",
+        "IR4-crosslanguage-regression"
+      ],
+      "final": "APPROVED"
+    }
   },
   "production": {
     "deployed": false,
@@ -103,6 +112,14 @@
     "review_rollback": {
       "local_path": "/tmp/umanews-pr212-review-rollback.log",
       "sha256": "4541c43ef5788e76b8142fa8e2b17ee9638c59f0c2b3281c1847fc46109618f1"
+    },
+    "final_pg": {
+      "local_path": "/tmp/pr212-final-pg.log",
+      "sha256": "cf2c7d3962fa73fcd98473cdcee069380dbbf85409aab117bf9142a859c06798"
+    },
+    "final_focused": {
+      "local_path": "/tmp/pr212-final-focused.log",
+      "sha256": "05369dab30c5264cdb3e24ca813e2eac2218335ff989cccba43af191d69d645b"
     }
   },
   "pull_request": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/212",
@@ -155,10 +172,35 @@
     "fixed_vs_previous_production_ids": 0
   },
   "linux_ci": {
-    "status": "pending_after_review_fixes",
+    "status": "pending_final_business_fixes",
     "baseline_rule": "PR base SHA / explicit full baseline SHA for manual runs",
     "artifact_sha_verification": true
   },
   "initial_changed_non_document_files_sha256": "2d3ef1ac0ab6fbc84cd9b07c017c76695a20fc15611851c73a999b95d75e0daf",
-  "initial_changed_non_document_file_count": 34
+  "initial_changed_non_document_file_count": 34,
+  "previous_review_ci": {
+    "run_id": 35572737991,
+    "status": "completed",
+    "conclusion": "success",
+    "base_commit": "953ea62604cd97709310d1e78e16972dd38eba3f",
+    "head_commit": "544bbf0353a843c98c759e16a598f73c21d88c51",
+    "baseline_tests": 5129,
+    "candidate_tests": 5192,
+    "baseline_failures": 16,
+    "baseline_errors": 29,
+    "candidate_failures": 16,
+    "candidate_errors": 29,
+    "new_failure_ids": 0,
+    "fixed_failure_ids": 0
+  },
+  "final_review_diff_sha256": "867a5c360210359a37ef3268a326de494d1284b6b19b6ba892ad52ef38409ced",
+  "final_review_parent_commit": "544bbf0353a843c98c759e16a598f73c21d88c51",
+  "final_review_checks": {
+    "independent_jra_coverage_tests": 36,
+    "independent_probe_tests": 6,
+    "cross_source_correction_and_replay": "passed",
+    "postgres_tests": 46,
+    "result": "passed",
+    "focused_sync_tests": 348
+  }
 }

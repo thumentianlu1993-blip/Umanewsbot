@@ -548,7 +548,9 @@ class JraColdStartTests(TestCase):
             opening,
         )
 
-    def _check_result_correction(self, *, explicit):
+    def _check_result_correction(
+        self, *, explicit, field="finish_time", value_text="2:09.9", unchanged=False
+    ):
         self.enroll()
         self.event.race_datetime = NOW - timedelta(minutes=15)
         self.event.save()
@@ -561,7 +563,8 @@ class JraColdStartTests(TestCase):
             event=self.event, route=self.policy.routes[0], now=NOW, fetcher=self.fetch
         )
         value["result_phase"] = "corrected" if explicit else "official"
-        value["roster"][0]["finish_time"] = "2:09.9"
+        if not unchanged:
+            value["roster"][0][field] = value_text
         later = NOW + timedelta(hours=6, minutes=1)
         value["fetched_at"] = later.isoformat()
         with patch("django.utils.timezone.now", return_value=later):
@@ -581,20 +584,174 @@ class JraColdStartTests(TestCase):
                     claim=claim, now=later, fetcher=self.fetch
                 )
         control.refresh_from_db()
-        self.assertEqual(result["processed"], explicit, result)
-        self.assertEqual(control.current_result_revision_id != current, explicit)
+        published_correction = explicit and not unchanged
+        self.assertEqual(result["processed"], explicit or unchanged, result)
         self.assertEqual(
-            models.RaceEventRevisionPublication.objects.count(), 2 if explicit else 1
+            control.current_result_revision_id != current, published_correction
         )
-        if explicit:
+        self.assertEqual(
+            models.RaceEventRevisionPublication.objects.count(),
+            2 if published_correction else 1,
+        )
+        if unchanged:
+            self.assertEqual(self.event.revisions.count(), 1)
+            self.assertEqual(
+                models.RaceEventRevisionEvidence.objects.filter(
+                    role="supporting"
+                ).count(),
+                1 if explicit else 0,
+            )
+        if published_correction:
             from stable.services.race_events import resolve_race_live_public_read
 
             public = resolve_race_live_public_read(event_id=self.event.pk, now=later)
             self.assertTrue(public.visible, public)
-            self.assertTrue(self.event.results.filter(finish_time="2:09.9").exists())
+            self.assertTrue(self.event.results.filter(**{field: value_text}).exists())
 
     def test_explicit_correction(self):
         self._check_result_correction(explicit=True)
 
     def test_changed_official_result_does_not_invent_correction(self):
         self._check_result_correction(explicit=False)
+
+    def test_jockey_name_explicit_correction(self):
+        self._check_result_correction(
+            explicit=True, field="jockey_name", value_text="Corrected Jockey"
+        )
+
+    def test_jockey_name_unmarked_conflict(self):
+        self._check_result_correction(
+            explicit=False, field="jockey_name", value_text="Corrected Jockey"
+        )
+
+    def test_trainer_name_explicit_correction(self):
+        self._check_result_correction(
+            explicit=True, field="trainer_name", value_text="Corrected Trainer"
+        )
+
+    def test_trainer_name_unmarked_conflict(self):
+        self._check_result_correction(
+            explicit=False, field="trainer_name", value_text="Corrected Trainer"
+        )
+
+    def test_carried_weight_explicit_correction(self):
+        self._check_result_correction(
+            explicit=True, field="carried_weight", value_text="57.5"
+        )
+
+    def test_carried_weight_unmarked_conflict(self):
+        self._check_result_correction(
+            explicit=False, field="carried_weight", value_text="57.5"
+        )
+
+    def test_barrier_explicit_correction(self):
+        self._check_result_correction(explicit=True, field="barrier", value_text="14")
+
+    def test_barrier_unmarked_conflict(self):
+        self._check_result_correction(explicit=False, field="barrier", value_text="14")
+
+    @override_settings(RACE_DATA_COVERAGE_ALERTS_ENABLED=True)
+    def test_unknown_timezone_does_not_block_valid_event_discovery(self):
+        from stable.services.race_data_sync_enrollment import (
+            discover_multisource_events,
+        )
+
+        invalid = models.RaceEvent.objects.get(pk=self.event.pk)
+        invalid.pk = None
+        invalid.slug = "missing-timezone"
+        invalid.timezone_name = ""
+        invalid.save()
+        result = discover_multisource_events(
+            now=NOW, policy=self.policy, fetcher=self.fetch
+        )
+        self.assertEqual(result["coverage"]["counts"]["missing_timezone"], 1)
+        self.assertTrue(
+            models.RaceDataSyncEnrollment.objects.filter(event=self.event).exists()
+        )
+        self.assertFalse(
+            models.RaceDataSyncEnrollment.objects.filter(event=invalid).exists()
+        )
+
+    @override_settings(RACE_DATA_SYNC_ENABLED_PROVIDERS=("jra", "alternate"))
+    def test_same_result_crosslanguage_alternate(self):
+        from stable.services.race_data_sync_control import finish_multisource_claim
+
+        payload = policy_payload()
+        payload["routes"] += policy_payload("alternate")["routes"]
+        self.policy = parse_multisource_policy(payload, now=NOW)
+        with patch(
+            "stable.services.race_data_source_adapters.load_multisource_policy",
+            return_value=self.policy,
+        ):
+            self.enroll()
+            self.event.race_datetime = NOW - timedelta(minutes=15)
+            self.event.save()
+            self.assertTrue(
+                run_multisource_claim(claim=self.claim(), now=NOW, fetcher=self.fetch)[
+                    "processed"
+                ]
+            )
+            self.event.refresh_from_db()
+            value = fetch_bound_observation(
+                event=self.event,
+                route=self.policy.routes[0],
+                now=NOW,
+                fetcher=self.fetch,
+            )
+            value.update(provider="alternate", identity_namespace="alternate-race-v1")
+            for r in value["roster"]:
+                r["external_runner_id"] = "alt:" + r["number"]
+                r["horse_name"] = "English Horse " + r["number"]
+                r["jockey_name"] = "English Rider " + r["number"]
+                r["trainer_name"] = "English Trainer " + r["number"]
+            result = attach_multisource_observation(value, policy=self.policy, now=NOW)
+            self.assertEqual(result.action, "attached")
+            source = models.RaceResultSourceIdentity.objects.get(
+                event=self.event, source_key="alternate"
+            )
+            source.identity_fields["reviewed_runner_crosswalk"] = {
+                "event_id": self.event.pk,
+                "evidence_sha256": "e" * 64,
+                "runners": {
+                    "alt:" + r.horse_number: r.pk for r in self.event.runners.all()
+                },
+            }
+            source.save()
+            later = NOW + timedelta(hours=6, minutes=1)
+            value["fetched_at"] = later.isoformat()
+
+            def claim():
+                return claim_due_enrollments(
+                    now=later,
+                    batch_size=20,
+                    ttl_seconds=240,
+                    enabled_providers=("jra", "alternate"),
+                    enabled_regions=("japan_jra",),
+                    enabled_data_kinds=("result",),
+                )[0]
+
+            with patch("django.utils.timezone.now", return_value=later):
+                a = claim()
+                self.assertEqual(a.checkpoint_plan[0]["source_key"], "jra")
+                finish_multisource_claim(
+                    claim=a, now=later, success=False, reason_code="http_403"
+                )
+                b = claim()
+                self.assertEqual(b.checkpoint_plan[0]["source_key"], "alternate")
+                with patch(
+                    "stable.services.race_data_source_adapters.fetch_bound_observation",
+                    return_value=value,
+                ):
+                    result = run_multisource_claim(
+                        claim=b, now=later, fetcher=self.fetch
+                    )
+            self.assertTrue(result["processed"], result)
+            self.assertEqual(models.RaceEventRevisionPublication.objects.count(), 1)
+
+            self.assertEqual(self.event.revisions.count(), 1)
+
+    def test_identical_official_result_reuses_observation_without_republication(self):
+        self._check_result_correction(explicit=False, unchanged=True)
+
+    def test_identical_corrected_result_adds_evidence_without_republication(self):
+        self._check_result_correction(explicit=True, unchanged=True)

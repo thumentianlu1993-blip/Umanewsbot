@@ -71,3 +71,19 @@ Reviewer独立SQLite探针及保存回归通过；其结论明确不代表七地
 52项均定位至旧0078文件/迁移图或旧0074列集合保护遇0079：rollback harness36、catalog9、artifact/校验4、preflight3。维护历史测试的精确文件集合、真实M78私有schema和模拟git路径；新增当前0079必须被旧catalog/rollback拒绝的测试，生产guard未放宽。原测试断言未改成接受漂移。
 
 CI改为本PR固定base.sha；手动运行要求完整baseline_sha；fetch/checkout及比较产物两端commit.txt均核对准确SHA。该 reviewer 对此增量 **APPROVED**，独立执行比较脚本6组合成正反例全部通过（包含新增失败、base/head漂移和非法SHA），未重新跑完整PG/rollback套件。主线程补跑结果见validation.json；新提交的Linux全量仍待运行，当前不标无新增失败或发布可用。
+
+## 持续返修与完整业务终审（2026-09-21）
+
+按用户要求，对544bbf0全业务范围再次独立终审，补出IR4/IR5两项P2，而非仅复核前三项增量：
+
+| ID | 发现与修复 | 反例及边界 |
+| --- | --- | --- |
+| IR4 | 同事实指纹漏骑师、练马师、负重、档位，吞掉来源明确更正；补全公开结果字段 | 四字段逐项明确更正可发布，普通official变化保持待审。相同内容重放不重复发布 |
+| IR5 | coverage已分类missing_timezone，告警再次无保护解析时区，使一场坏数据阻断整轮；日期缺失还会误resolve旧incident | 未知日期/时区保留原incident，合法赛事继续；明确赛果确认/取消可resolve。另防census后并发改坏时区 |
+| IR4返修回归 | 初次补raw姓名造成跨语种合法fallback更正冲突；独立review拦下后继续修复 | 已验证runner映射后，普通跨来源忽略姓名语种差异；同源或明确corrected仍比较姓名。13匹英文马名/骑师/练马师来源接管仅保留1revision/1publication |
+
+原两反例先RED（3测试2failures/3errors），修复后GREEN；reviewer另证实跨source明确corrected可产生公开revision2，随后相同内容仅补证据不重复发布。相同source/phase/payload复用原observation及primary evidence，不要求重复supporting行。
+
+固定544bbf0的run35572737991已完成：准确base953ea626为5129项，candidate5192项；各16failures+29errors=45个相同历史失败ID，新增0、修复0。候选测试48m44s，发布合同通过。最终返修提交仍需独立SHA绑定CI，不能把544的全量结果当作新提交验收。
+
+最终同一reviewer **APPROVED（整个PR已审业务范围）**：IR1–IR5及返修回归全部关闭，无未关闭的可复现P0/P1/P2。独立原探针6项与跨来源更正/重放探针通过，JRA+coverage36项分批复验通过。四文件相对544bbf0的diff SHA256为 `867a5c360210359a37ef3268a326de494d1284b6b19b6ba892ad52ef38409ced`，主线程重新计算一致；不代表未知风险为零或真实来源/生产验收。

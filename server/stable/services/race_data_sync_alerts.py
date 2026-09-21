@@ -220,13 +220,22 @@ def stage_multisource_coverage_incidents(*, coverage, policy, now):
                 status="resolved", resolved_at=now, last_seen_at=now
             )
             continue
-        age = (
-            (
-                now.astimezone(ZoneInfo(event.timezone_name)).date() - event.local_date
-            ).days
-            if event.local_date
-            else None
-        )
+        # 缺失日历信息不能证明原告警已解决，也不能阻塞其他赛事。
+        # 确认赛果/取消等明确终态已在上方处理。
+        if row["classification"] in ("missing_date", "missing_timezone"):
+            continue
+        try:
+            age = (
+                (
+                    now.astimezone(ZoneInfo(event.timezone_name)).date()
+                    - event.local_date
+                ).days
+                if event.local_date
+                else None
+            )
+        except (ValueError, KeyError):
+            # census 后字段可能被并发修改；未知状态仍保留原 incident。
+            continue
         if event.race_datetime and now >= event.race_datetime + timedelta(minutes=30):
             issue = "result_overdue"
         elif age is not None and age >= 1 and event.race_datetime is None:
