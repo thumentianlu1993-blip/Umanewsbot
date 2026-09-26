@@ -1,0 +1,100 @@
+{
+  "captured_at": "2026-09-26T10:01:23.712464+00:00",
+  "scope": "batch-0001 through batch-0009; excludes initial pilot and unstarted batches",
+  "batches": [
+    {
+      "batch": "batch-0001",
+      "candidates": 100,
+      "gaps": 0,
+      "state": "first_batch_processed",
+      "completion_present": true,
+      "completion_status": "passed",
+      "lifetime_complete_verified": 0,
+      "state_sha256": "8993a4eafde5c7648ef9a678f8ba7c826ae1046228923170e32dc891d93b3694"
+    },
+    {
+      "batch": "batch-0002",
+      "candidates": 490,
+      "gaps": 10,
+      "state": "batch_processed",
+      "completion_present": true,
+      "completion_status": "passed",
+      "lifetime_complete_verified": 0,
+      "state_sha256": "895bf0547306f4fa34ce613f93be0e3ee25a0f9c673b70461b61840c562b86f8"
+    },
+    {
+      "batch": "batch-0003",
+      "candidates": 495,
+      "gaps": 5,
+      "state": "batch_processed",
+      "completion_present": true,
+      "completion_status": "passed",
+      "lifetime_complete_verified": 0,
+      "state_sha256": "04cc4aa27426e8b0e940f1cb00dcb447a30712b4071f9e7103112bfb87809db7"
+    },
+    {
+      "batch": "batch-0004",
+      "candidates": 491,
+      "gaps": 9,
+      "state": "batch_processed",
+      "completion_present": true,
+      "completion_status": "passed",
+      "lifetime_complete_verified": 0,
+      "state_sha256": "5457f0d4a77905922479f8563f506476d01881c2eeb53c4f2258a031accbadf9"
+    },
+    {
+      "batch": "batch-0005",
+      "candidates": 493,
+      "gaps": 7,
+      "state": "batch_processed",
+      "completion_present": true,
+      "completion_status": "passed",
+      "lifetime_complete_verified": 0,
+      "state_sha256": "7e008c131f7017e8ff40d9c7f2328fd8653eb0bc4d80433277aff1d07c9032a7"
+    },
+    {
+      "batch": "batch-0006",
+      "candidates": 499,
+      "gaps": 1,
+      "state": "batch_processed",
+      "completion_present": true,
+      "completion_status": "passed",
+      "lifetime_complete_verified": 0,
+      "state_sha256": "6d1de75ed168c85ff36cf17eea811b0d5169bb58f7863cb890f5fbdf00a61e53"
+    },
+    {
+      "batch": "batch-0007",
+      "candidates": 497,
+      "gaps": 3,
+      "state": "batch_processed",
+      "completion_present": true,
+      "completion_status": "passed",
+      "lifetime_complete_verified": 0,
+      "state_sha256": "f4aacbcd7a2cf9631dcd4ac2eac22f54bebb3b96935d96e3b4832925d8fcb51f"
+    },
+    {
+      "batch": "batch-0008",
+      "candidates": 498,
+      "gaps": 2,
+      "state": "batch_processed",
+      "completion_present": true,
+      "completion_status": "passed",
+      "lifetime_complete_verified": 0,
+      "state_sha256": "7b666de40e7ab6e7083218b9114f57f82b5784bfc58e397d5893531477745282"
+    },
+    {
+      "batch": "batch-0009",
+      "candidates": 464,
+      "gaps": 0,
+      "state": "checkpoint_ready",
+      "completion_present": false,
+      "completion_status": null,
+      "lifetime_complete_verified": null,
+      "state_sha256": "25784b81b446cd9f234a8d0a06a8735bf0b728fe0799b9264a62bd02b77d7e72"
+    }
+  ],
+  "candidate_count": 4027,
+  "distinct_candidate_count": 4027,
+  "gap_count": 37,
+  "pause_present": true
+}

@@ -1,3 +1,7 @@
+## 2026-09-26 交接与恢复入口校正（无生产变更）
+
+跨任务交接更新见[统一交接](changes/release-pr201-production/handoff.md)。当前应用26706602、0079；旧0078/9月15日包只是历史，不可当当前恢复包执行。PR212恢复仍绑定其原intent与激活脚本，见[发布记录](changes/multisource-race-enrollment/release-20260922/README.md)。马匹批9保持暂停，下次恢复必须检查原14→15差异、当前release/网关合同和实际锁进程；本次文档更新未完成这些恢复门禁，也没有恢复任务。
+
 ## 2026-09-22 PR212：0079与独立JRA配置激活
 
 本次实际运行目录、固定镜像、两个生产备份的SHA/TOC、完成收据、精确恢复命令见[发布记录](changes/multisource-race-enrollment/release-20260922/README.md)。0079已完成；JRA激活同schema同镜像，失败保留共享锁并使用原意图继续或恢复关闭态。生产dump本次验证归档/目录，未进行完整隔离还原；本地PG合同另有还原测试，二者不能混称。

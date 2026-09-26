@@ -1,0 +1,256 @@
+{
+  "captured_at": "2026-09-26T10:03:20.863387+00:00",
+  "remote_main_at_audit": "82556fd17ff6cecadcb248896c95f14702dfb926",
+  "recent_prs": [
+    {
+      "headRefName": "codex/pr212-release-evidence",
+      "mergedAt": "2026-09-26T09:53:32Z",
+      "number": 213,
+      "state": "MERGED",
+      "title": "归档PR212发布、自然运行追验及覆盖缺口",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/213"
+    },
+    {
+      "headRefName": "codex/multisource-race-enrollment",
+      "mergedAt": "2026-09-21T19:06:59Z",
+      "number": 212,
+      "state": "MERGED",
+      "title": "修复多来源赛事登记、同场去重与赛后补入",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/212"
+    },
+    {
+      "headRefName": "codex/pr210-release-acceptance",
+      "mergedAt": "2026-09-18T22:29:58Z",
+      "number": 211,
+      "state": "MERGED",
+      "title": "记录赛前刷新修复的全量测试与生产自然验收",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/211"
+    },
+    {
+      "headRefName": "codex/fix-pre-race-snapshot-scope",
+      "mergedAt": "2026-09-18T22:04:49Z",
+      "number": 210,
+      "state": "MERGED",
+      "title": "修复长赛事来源链接在共享缓存入口被拒绝",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/210"
+    },
+    {
+      "headRefName": "codex/plan-pre-race-refresh-20260919",
+      "mergedAt": "2026-09-18T21:05:27Z",
+      "number": 209,
+      "state": "MERGED",
+      "title": "修复北京时间赛事展示与赛前名单、退赛和赔率持续刷新",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/209"
+    },
+    {
+      "headRefName": "codex/normalize-race-information",
+      "mergedAt": "2026-09-18T09:57:23Z",
+      "number": 208,
+      "state": "MERGED",
+      "title": "回写赛事归一化正式上线与验收证据",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/208"
+    },
+    {
+      "headRefName": "codex/normalize-race-information",
+      "mergedAt": "2026-09-18T09:44:24Z",
+      "number": 207,
+      "state": "MERGED",
+      "title": "统一赛事信息展示：等级、距离、译名及只读预览",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/207"
+    },
+    {
+      "headRefName": "codex/complete-race-gaps-20260918",
+      "mergedAt": "2026-09-18T05:25:40Z",
+      "number": 206,
+      "state": "MERGED",
+      "title": "docs: 回写 PR205 生产发布验收",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/206"
+    },
+    {
+      "headRefName": "codex/complete-race-gaps-20260918",
+      "mergedAt": "2026-09-18T05:14:29Z",
+      "number": 205,
+      "state": "MERGED",
+      "title": "修复赛事缺口回填与已审核赛前参考卡展示",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/205"
+    },
+    {
+      "headRefName": "codex/audit-race-section-20260917",
+      "mergedAt": "2026-09-17T18:34:21Z",
+      "number": 204,
+      "state": "MERGED",
+      "title": "docs: 回写 PR203 生产发布验收",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/204"
+    },
+    {
+      "headRefName": "codex/audit-race-section-20260917",
+      "mergedAt": "2026-09-17T18:21:19Z",
+      "number": 203,
+      "state": "MERGED",
+      "title": "修复赛事正式证据、D−4赛前更新与公开展示",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/203"
+    },
+    {
+      "headRefName": "codex/release-pr201-handoff",
+      "mergedAt": "2026-09-15T03:01:49Z",
+      "number": 202,
+      "state": "MERGED",
+      "title": "docs: 记录 PR201 生产交付与近期工作交接",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/202"
+    },
+    {
+      "headRefName": "codex/closeout-batch2-integration",
+      "mergedAt": "2026-09-15T02:45:10Z",
+      "number": 201,
+      "state": "MERGED",
+      "title": "test: 整合 M2 测试及运维修复并验证完整 PostgreSQL 组合",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/201"
+    },
+    {
+      "headRefName": "codex/fix-p0-postgres-release-fixtures",
+      "mergedAt": "2026-09-15T02:45:11Z",
+      "number": 200,
+      "state": "MERGED",
+      "title": "test: 修复 P0 PostgreSQL 锁与回滚用例的发布夹具",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/200"
+    },
+    {
+      "headRefName": "codex/fix-racecard-test-contracts",
+      "mergedAt": "2026-09-15T02:45:11Z",
+      "number": 199,
+      "state": "MERGED",
+      "title": "test: 校正赛卡状态与资格例外年份夹具",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/199"
+    },
+    {
+      "headRefName": "codex/fix-realtime-result-test-fixtures",
+      "mergedAt": "2026-09-15T02:45:11Z",
+      "number": 198,
+      "state": "MERGED",
+      "title": "test: 校正实时赛果时钟、字段准入和挂载夹具",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/198"
+    },
+    {
+      "headRefName": "codex/fix-full-cohort-test-clock",
+      "mergedAt": "2026-09-15T02:45:11Z",
+      "number": 197,
+      "state": "MERGED",
+      "title": "test: 固定全量纳管查询数测试的夹具时钟",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/197"
+    },
+    {
+      "headRefName": "codex/fix-enrollment-control-race",
+      "mergedAt": "2026-09-15T02:45:11Z",
+      "number": 196,
+      "state": "MERGED",
+      "title": "fix: 受控拒绝纳管加锁期间新增的 lifecycle control",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/196"
+    },
+    {
+      "headRefName": "codex/fix-official-publication-fixtures",
+      "mergedAt": "2026-09-15T02:45:11Z",
+      "number": 195,
+      "state": "MERGED",
+      "title": "fix: 修复官方发布夹具及临时赛果恢复的 PostgreSQL 加锁",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/195"
+    },
+    {
+      "headRefName": "codex/fix-m2-local-start-time",
+      "mergedAt": "2026-09-10T03:59:55Z",
+      "number": 194,
+      "state": "MERGED",
+      "title": "fix: 补齐已获准赛时的当地时间，恢复 M2 页面显示",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/194"
+    },
+    {
+      "headRefName": "codex/closeout-batch1-integration",
+      "mergedAt": null,
+      "number": 193,
+      "state": "OPEN",
+      "title": "test: 整合已审核的 M2 测试及运维修复并验证组合基线",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/193"
+    },
+    {
+      "headRefName": "codex/fix-publication-test-clock",
+      "mergedAt": "2026-09-15T02:45:11Z",
+      "number": 192,
+      "state": "MERGED",
+      "title": "fix: 修复发布测试夹具及正式赛果 PostgreSQL 加锁",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/192"
+    },
+    {
+      "headRefName": "codex/fix-historical-migration-test-isolation",
+      "mergedAt": "2026-09-15T02:45:11Z",
+      "number": 191,
+      "state": "MERGED",
+      "title": "test: 隔离历史迁移测试并对齐当前 0078 合同",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/191"
+    },
+    {
+      "headRefName": "codex/fix-term-scan-performance",
+      "mergedAt": "2026-09-15T02:45:11Z",
+      "number": 190,
+      "state": "MERGED",
+      "title": "perf: 提前排除缺席别名，消除术语 dry-run 性能超时",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/190"
+    },
+    {
+      "headRefName": "codex/fix-reconciliation-row-locks",
+      "mergedAt": "2026-09-15T02:45:11Z",
+      "number": 189,
+      "state": "MERGED",
+      "title": "fix: 修复赛事关联与撤销的 PostgreSQL 外连接加锁错误",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/189"
+    }
+  ],
+  "open_prs": [
+    {
+      "headRefName": "codex/closeout-batch1-integration",
+      "number": 193,
+      "title": "test: 整合已审核的 M2 测试及运维修复并验证组合基线",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/193"
+    },
+    {
+      "headRefName": "codex/document-pr86-g2-release",
+      "number": 87,
+      "title": "Document PR #86 G2 production release",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/87"
+    },
+    {
+      "headRefName": "codex/document-0072-g2-release",
+      "number": 85,
+      "title": "Document migration 0072 production completion",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/85"
+    },
+    {
+      "headRefName": "graded-horse-aliases-and-event-links",
+      "number": 59,
+      "title": "Add base-name aliases and heuristic RaceEvent links for graded horses",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/59"
+    },
+    {
+      "headRefName": "research/graded-participants-multiyear",
+      "number": 49,
+      "title": "[research] 通用年度重赏参赛马与三语马名采集器",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/49"
+    },
+    {
+      "headRefName": "fix/exposure-backfill-slot-allocation",
+      "number": 45,
+      "title": "曝光回填：多文章赛事的席位分配修复",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/45"
+    },
+    {
+      "headRefName": "codex/record-race-lifecycle-dry-run",
+      "number": 26,
+      "title": "docs: record lifecycle production dry-run",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/26"
+    },
+    {
+      "headRefName": "research/2026-graded-top5-wikipedia",
+      "number": 24,
+      "title": "[research] 2026 重赏前五名 Wikipedia 映射",
+      "url": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/24"
+    }
+  ]
+}
