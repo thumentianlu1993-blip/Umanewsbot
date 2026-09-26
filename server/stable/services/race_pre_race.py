@@ -177,6 +177,21 @@ def _text(node):
     return node.get_text(' ', strip=True) if node else ''
 
 
+_JRA_GRADE_PREFIX = re.compile(r'^(?:(?:J・)?G|Jpn)[ⅠⅡⅢ]')
+_JRA_LONG_SUFFIXES = (('ステークス', 'S'), ('カップ', 'C'))
+
+
+def normalize_jra_race_name(name):
+    """JRA 官方名称的确定性归一：去空白与等级前缀，长后缀ステークス/カップ转为 S/C。"""
+    value = re.sub(r'\s+', '', name or '')
+    value = _JRA_GRADE_PREFIX.sub('', value)
+    for long, short in _JRA_LONG_SUFFIXES:
+        if value.endswith(long) and len(value) > len(long):
+            value = value[:-len(long)] + short
+            break
+    return value
+
+
 def parse_jra_card(html, *, event, url):
     validate_url(url)
     lowered = html.lower().strip()
@@ -192,8 +207,9 @@ def parse_jra_card(html, *, event, url):
     day_text = _text(header.select_one('.date'))
     match = re.search(r'(\d{4})年(\d{1,2})月(\d{1,2})日', day_text)
     title = _text(header.select_one('.race_name'))
-    names = {event.original_name, event.chinese_name, *event.aliases.values_list('text', flat=True)} - {''}
-    if not match or datetime(*map(int, match.groups())).date() != event.local_date or title not in names:
+    names = {normalize_jra_race_name(name)
+             for name in {event.original_name, event.chinese_name, *event.aliases.values_list('text', flat=True)}} - {''}
+    if not match or datetime(*map(int, match.groups())).date() != event.local_date or normalize_jra_race_name(title) not in names:
         raise ValueError('jra_pre_race_identity_mismatch')
     # Match the course as its own meeting component, not an arbitrary substring.
     course = re.search(r'\d+回(.+?)\d+日', day_text)
@@ -485,7 +501,8 @@ def discover_jra_pre_race(*, now, fetcher=None, clock=timezone.now):
                 try: parse_jra_card(cache[link],event=event,url=link)
                 except ValueError: continue
                 matches.append(link)
-            if len(matches)!=1: raise ValueError('jra_race_identity_not_unique')
+            if not matches: raise ValueError('jra_race_identity_no_match')
+            if len(matches) > 1: raise ValueError('jra_race_identity_ambiguous')
             completed=clock()
             if (completed-started).total_seconds() > 90: raise ValueError("jra_work_deadline")
             if complete_jra(claim,html=cache[matches[0]],url=matches[0],now=completed): checked+=1
