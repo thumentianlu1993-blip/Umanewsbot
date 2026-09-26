@@ -10,6 +10,19 @@ SHA-256 钉扎），不随账单自动续期。PR #222 合并为 main `9c8891b8`
 7 场（772/828/830/833/970/975/976）在部署前已有 open incident（含 828/830 缺正式结果的既有缺口），
 窗口外已完赛登记的换绑收口列为后续项。下次月度续验截止 2026-10-27（staleness 门禁先于
 valid_until 到期）。完整证据见 [rollout 执行结果](changes/renew-tra-registry-20260927/rollout.md)。
+## 2026-09-27 赛事日历九地区更新：阶段 0（来源注册表 + ICS 全集基准 + 生产对账）完成
+
+用户任务"更新赛事日历：未来赛事几乎都没有更新；调研各地区比赛源（多数据源），按历史方式补足准确比赛全集；保存日本（分 JRA/NAR）、中国香港、英国、爱尔兰、法国、美国、澳洲、德国、中东来源；补足 2025 年起全部 G1/G2/G3+地方一级赛，已结束比赛按当前要求补赛果"。计划经批准后开工，变更文档见 [update-race-calendar-nine-regions](changes/update-race-calendar-nine-regions/spec.md)。
+
+阶段 0 在 `kimi/race-calendar-nine-regions` 分支完成（基于 origin/main c71dcdfc 的独立 worktree）：
+
+- 新增[九地区赛事日历来源注册表](race_calendar_source_registry.md)：每地区的全集基准（IFHA ICS 蓝皮书章节）、官方赛程、赛果主源、交叉验证源、下一年/赛季赛历公布节奏与 TRA 路线状态。
+- ICS 解析器修复并升级 `2026.09.1`：新增爱尔兰支持（`hri_pattern_catalog`，含 Irish Jumps）；修复澳洲年龄栏 `open` 未被识别导致 **25 场/年被静默丢弃**（含 The TAB Everest、C. F. Orr S.、All-Star Mile 等 G1）；修复守卫对 Irish 1,000/2,000 Guineas、Doomben 10,000 等合法含数字赛名的误判。测试 77+8 项通过。
+- ICS 2025/2026 已入 source cache（SHA-256），九地区应办全集 3,393 行（含障碍；另需从 keiba.go.jp 单补 NAR Jpn1，ICS 不收地方级）。5 项"印刷清单 vs 官方计数"上游不一致经证据分析后审批登记（法国 2025/2026、美国 2025/2026、德国 2026），不静默吞掉。
+- 生产只读对账（2,547 场 2025+ 赛事 + 3,280 别名，工具 `runtime/tools/reconcile_race_calendar_vs_ics.py`）：**2025 真实缺口**=香港 12（2025/26 马季前半段 Sep–Dec 2025 整体缺失，生产无任何 local_date 落在 9-12 月的香港赛事）、英国 15、美国 10、日本 2；**新四地区**（爱尔兰/澳洲/德国/中东）2025+2026 约 1,218 场全部缺失；**2026 身份挂账**法 67/英 183/日 65/美 48（命名差异为主，须走系列身份映射，禁止盲目新建）；**145 组同日疑似重复**（美国双轨导入为主）；24 场 stuck_scheduled、9 场 finished 零赛果（与对账口径差异以 ledger 为准）。产物在本地 `runtime/race_calendar_nine_regions/`（ledger、review CSV、审批与证据）。
+- **urgent 运维发现**：生产 TRA registry `valid_until=2026-09-27T00:00:00Z`（已到期），`verified_at=2026-08-28` 的 31 天 staleness 门禁 2026-09-28 到期——race_data_sync 登记/生命周期链路正在 fail-closed，需立即按合同续验，否则既有地区临近同步全部停止。
+
+本轮未写生产、未部署；生产写入与发布按根 AGENTS.md 门禁另行授权。马匹采集暂停状态不受影响（未触碰其预算与锁）。
 
 ## 2026-09-26 跨任务交接已更新
 

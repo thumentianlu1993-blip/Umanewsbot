@@ -93,6 +93,16 @@ ADAPTER_CONFIGS = {
             (r"^(?:(?:Group|Grade)\s*3|G3)$", RaceGrade.G3),
         ),
     ),
+    "hri_pattern_catalog": CatalogAdapterConfig(
+        key="hri_pattern_catalog",
+        region=RacingRegion.IRELAND,
+        providers=frozenset({"hri", "tjcis"}),
+        grade_patterns=_patterns(
+            (r"^(?:(?:Group|Grade)\s*1|G1)$", RaceGrade.G1),
+            (r"^(?:(?:Group|Grade)\s*2|G2)$", RaceGrade.G2),
+            (r"^(?:(?:Group|Grade)\s*3|G3)$", RaceGrade.G3),
+        ),
+    ),
     "france_galop_pattern_catalog": CatalogAdapterConfig(
         key="france_galop_pattern_catalog",
         region=RacingRegion.FRANCE,
