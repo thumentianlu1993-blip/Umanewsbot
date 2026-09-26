@@ -178,11 +178,11 @@ def _text(node):
 
 
 _JRA_GRADE_PREFIX = re.compile(r'^(?:(?:J・)?G|Jpn)[ⅠⅡⅢ]')
-_JRA_LONG_SUFFIXES = (('ステークス', 'S'), ('カップ', 'C'))
+_JRA_LONG_SUFFIXES = (('ステークス', 'S'), ('カップ', 'C'), ('トロフィー', 'T'), ('フィリーズ', 'F'))
 
 
 def normalize_jra_race_name(name):
-    """JRA 官方名称的确定性归一：去空白与等级前缀，长后缀ステークス/カップ转为 S/C。"""
+    """JRA 官方名称的确定性归一：去空白与等级前缀，长后缀ステークス/カップ/トロフィー/フィリーズ转为 S/C/T/F。"""
     value = re.sub(r'\s+', '', name or '')
     value = _JRA_GRADE_PREFIX.sub('', value)
     for long, short in _JRA_LONG_SUFFIXES:
