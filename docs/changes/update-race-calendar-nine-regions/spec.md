@@ -74,3 +74,22 @@ ICS 2025+2026 应办全集 3,393 行（含障碍）：澳洲 337×2、法国 191
   `stable.test_race_calendar_ics_reconciliation`（8 项）通过；ICS 解析全部地区通过官方计数自校验
   或登记在册的审批冲突；对账 ledger 与 review CSV 生成。
 - 后续阶段的生产写入均走既有门禁（descriptor/approval、dry-run、备份、apply、verifier、公网验收）。
+
+## 阶段 1-C 核验结论（2026-09-27）
+
+`verify_calendar_gap_rows.py`（6 项测试）对 ICS 2025 缺口行逐场核验（生产导出+别名）：
+- 香港 12 场：真实缺失（已产出候选，P1-A）。
+- 日本 2 场 J-G1：真实缺失（已产出候选，P1-B）。
+- 英国 15 场：13 场为 ICS 冠名变体的身份挂接问题（生产已有同日赛事），**Dick Poole S. G3 为真实缺场**——
+  原赛日 2025-09-04 Salisbury 会议因暴雨取消，BHA 官宣改期至 2025-09-12（已产出 Sporting Life 候选，
+  冠军 Anthelia 正确）；Classic H. Stp.（Warwick 2025-01-11 冰冻取消、未补办）→ not_held。
+- 美国 10 场：Remsen G2（2025-12-06 Aqueduct，Paladin）与 Matron G3（2025-10-02 Aqueduct，Final Accord）
+  已产出 HRN 候选；4 场障碍（Colonial Cup G1 2025-11-23 Camden-FIL DOR、Commonwealth Cup G1 2025-05-03
+  Great Meadow-Cool Jet、Temple Gwathmey G2 2025-04-19 Middleburg-Snap Decision、Noel Laing G3 2025-11 Montpelier
+  -Cool Jet）已用 NSA 官方结果 PDF 解析验证（parse_nsa_pdf 新增 race_marker 分场，4 项测试）。
+  Brooklyn G2、Cougar II G3、Robert J. Frankel G3、Tokyo City Cup G3 四场 2025 未举办
+  （Wikipedia/TOBA/HRN 多重证据），应标 not_held 而非补场。
+- Matron S. 是 ICS 2025 印刷行被 PDF 文本层损坏（"yo f"）而漏入目录的赛事，由 TOBA 官方表补入；
+  该目标不在生产总账，apply 时需新建 target。
+
+证据目录：runtime/race_calendar_nine_regions/{hk_gap_2025,jra_gap_2025,nar_gap_2025,uk_gap_2025,us_gap_2025,us_jumps_2025}/。

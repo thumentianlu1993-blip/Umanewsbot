@@ -147,3 +147,25 @@ class VerifyCalendarGapRowsTests(SimpleTestCase):
                 ],
             )
             self.assertEqual(result["counts"]["truly_missing"], 1)
+
+    def test_generic_handicap_name_matches_via_sponsor(self):
+        # "[Betfair Exchange] H. Stp" 这类名称主体过泛，身份靠冠名部分区分
+        self.assertEqual(self.module._normalize("[Betfair Exchange] H. Stp"), "hstpbetfairexchange")
+        self.assertEqual(self.module._normalize("Gold Cup H. Stp.[bet365]"), "goldcup")
+        with TemporaryDirectory() as tmp:
+            result = self._run(
+                Path(tmp),
+                missing=[{"region": "united_kingdom", "ics_name": "[Betfair Exchange] H. Stp", "ics_racecourse": "Cheltenham"}],
+                events=[
+                    {
+                        "id": "1246", "year": "2025", "slug": "x", "series_key": "",
+                        "original_name": "[Betfair Exchange] H. Stp", "chinese_name": "",
+                        "country_region": "united_kingdom", "racecourse": "Cheltenham",
+                        "grade_text": "G3", "normalized_grade": "G3",
+                        "local_date": "2025-01-25", "status": "finished", "visibility_status": "published",
+                        "result_count": "10",
+                    }
+                ],
+            )
+            self.assertEqual(result["counts"]["exists_same_year"], 1)
+            self.assertEqual(result["rows"][0]["production_event_id"], "1246")

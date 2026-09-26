@@ -134,16 +134,57 @@ def _comma_person(value: str) -> str:
     return f"{parts[1]} {parts[0]}".strip() if len(parts) == 2 else value.strip()
 
 
-def parse_nsa_words(words: list[dict], *, source_url: str) -> tuple[list[dict], list[dict], dict]:
+RACE_SECTION_RE = re.compile(r"^\d+(?:st|nd|rd|th)\s+Race\b", re.IGNORECASE)
+
+
+def _segment_nsa_lines(ordered_texts: list[str], race_marker: str) -> tuple[int, int]:
+    """按 "Nth Race" 段头把赛日词流切成单场段落，返回 marker 命中段的 [start, end) 下标。"""
+    marker = race_marker.casefold()
+    starts = [index for index, text in enumerate(ordered_texts) if RACE_SECTION_RE.match(text)]
+    hits = []
+    for position, start in enumerate(starts):
+        end = starts[position + 1] if position + 1 < len(starts) else len(ordered_texts)
+        header = " ".join(ordered_texts[start : min(end, start + 3)])
+        if marker in header.casefold():
+            hits.append((start, end))
+    if len(hits) != 1:
+        raise RuntimeError(
+            f"NSA 结果 PDF 的分场标记命中数异常：marker={race_marker!r} hits={len(hits)}"
+        )
+    return hits[0]
+
+
+def parse_nsa_words(words: list[dict], *, source_url: str, race_marker: str | None = None) -> tuple[list[dict], list[dict], dict]:
     lines: dict[float, list[dict]] = {}
     for word in sorted(words, key=lambda item: (float(item["top"]), float(item["x0"]))):
         top = float(word["top"])
         line = next((value for value in lines if abs(value - top) <= 1.0), None)
         lines.setdefault(top if line is None else line, []).append(word)
+    ordered_lines = [lines[key] for key in sorted(lines)]
+    if race_marker:
+        # 分场检测用严格行（同 top 精确分组），避免 ±1.0 模糊合并把段头与描述行融为一行
+        strict: dict[float, list[dict]] = {}
+        for word in words:
+            strict.setdefault(round(float(word["top"])), []).append(word)
+        strict_tops = sorted(strict)
+        strict_texts = [
+            " ".join(item["text"] for item in sorted(strict[key], key=lambda item: float(item["x0"])))
+            for key in strict_tops
+        ]
+        start, end = _segment_nsa_lines(strict_texts, race_marker)
+        top_lo = strict_tops[start]
+        top_hi = strict_tops[end - 1] if end - 1 < len(strict_tops) else None
+        ordered_lines = [
+            line
+            for line in ordered_lines
+            if any(top_lo <= float(word["top"]) <= (top_hi if top_hi is not None else float("inf")) for word in line)
+        ]
+        if not ordered_lines:
+            raise RuntimeError(f"NSA 结果 PDF 分场后为空：marker={race_marker!r}")
     runners = []
     results = []
-    for line in sorted(lines):
-        row = sorted(lines[line], key=lambda item: float(item["x0"]))
+    for line in ordered_lines:
+        row = sorted(line, key=lambda item: float(item["x0"]))
         order_tokens = [item["text"] for item in row if float(item["x0"]) < 40]
         if len(order_tokens) != 1 or not re.fullmatch(r"\d{2}|F|UR|PU|RO|BD", order_tokens[0]):
             continue
@@ -198,10 +239,37 @@ def parse_nsa_words(words: list[dict], *, source_url: str) -> tuple[list[dict], 
     }
 
 
-def parse_nsa_pdf(path: Path, *, source_url: str) -> tuple[list[dict], list[dict], dict]:
+def parse_nsa_pdf(path: Path, *, source_url: str, race_marker: str | None = None) -> tuple[list[dict], list[dict], dict]:
     with pdfplumber.open(path) as pdf:
-        words = [word for page in pdf.pages for word in page.extract_words(x_tolerance=1, y_tolerance=3)]
-    return parse_nsa_words(words, source_url=source_url)
+        if race_marker is None:
+            words = [word for page in pdf.pages for word in page.extract_words(x_tolerance=1, y_tolerance=3)]
+            return parse_nsa_words(words, source_url=source_url)
+        collected: list[dict] = []
+        active = False
+        hits = 0
+        for page in pdf.pages:
+            page_words = page.extract_words(x_tolerance=1, y_tolerance=3)
+            groups: dict[float, list[dict]] = {}
+            for word in page_words:
+                groups.setdefault(round(float(word["top"])), []).append(word)
+            tops = sorted(groups)
+            texts = [
+                " ".join(item["text"] for item in sorted(groups[key], key=lambda item: float(item["x0"])))
+                for key in tops
+            ]
+            for index, text in enumerate(texts):
+                if RACE_SECTION_RE.match(text):
+                    lookahead = " ".join(texts[index : index + 3])
+                    active = race_marker.casefold() in lookahead.casefold()
+                    if active:
+                        hits += 1
+                if active:
+                    collected.extend(groups[tops[index]])
+        if hits != 1:
+            raise RuntimeError(f"NSA 结果 PDF 的分场标记命中数异常：marker={race_marker!r} hits={hits}")
+        if not collected:
+            raise RuntimeError(f"NSA 结果 PDF 分场后为空：marker={race_marker!r}")
+    return parse_nsa_words(collected, source_url=source_url)
 
 
 def _events(paths: list[Path]) -> list[dict]:

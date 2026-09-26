@@ -25,13 +25,27 @@ if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
 
+_SUFFIX_RE = re.compile(
+    r"(?:\s+(?:hurdle|hurdles|steeplechase|steeple chase|chase|stp\.?|s\.?|stakes|h\.?))+\s*$"
+)
+_GENERIC_CORE = {"", "h", "s", "stp", "hstp", "hhurdle", "hurdle", "chase", "steeplechase", "stakes"}
+
+
+def _alnum(text: str) -> str:
+    return re.sub(r"[^0-9a-z\u3040-\u30ff\u3400-\u9fff]+", "", text)
+
+
 def _normalize(value: str) -> str:
     text = unicodedata.normalize("NFKD", unicodedata.normalize("NFKC", value or ""))
     text = "".join(ch for ch in text if not unicodedata.combining(ch)).casefold()
-    text = re.sub(r"\[[^\]]*\]|\([^)]*\)", " ", text)
-    text = re.sub(r"(?:\s+(?:hurdle|hurdles|steeplechase|steeple chase|chase|stp\.?|s\.?|stakes|h\.?))+\s*$", "", text)
-    text = re.sub(r"^prix\s+(?:(?:de|du|des|la|le|l)\s+)?", "", text)
-    return re.sub(r"[^0-9a-z\u3040-\u30ff\u3400-\u9fff]+", "", text)
+    bracket_parts = re.findall(r"\[[^\]]*\]|\([^)]*\)", text)
+    text_no_brackets = re.sub(r"\[[^\]]*\]|\([^)]*\)", " ", text)
+    main = re.sub(r"^prix\s+(?:(?:de|du|des|la|le|l)\s+)?", "", text_no_brackets)
+    core = _alnum(_SUFFIX_RE.sub("", main))
+    if core in _GENERIC_CORE:
+        # 名称主体过泛（如 "H. Stp" 让赛），身份靠冠名部分区分
+        return _alnum(main + " " + " ".join(bracket_parts))
+    return core
 
 
 def _normalize_course(value: str) -> str:
