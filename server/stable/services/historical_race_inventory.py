@@ -47,6 +47,7 @@ SUPPORTED_REGIONS = {
     RacingRegion.JAPAN,
     RacingRegion.HONG_KONG,
     RacingRegion.UNITED_KINGDOM,
+    RacingRegion.IRELAND,
     RacingRegion.FRANCE,
     RacingRegion.UNITED_STATES,
     RacingRegion.AUSTRALIA,

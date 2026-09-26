@@ -221,6 +221,18 @@ class HistoricalRaceDetailDirectUrlTests(SimpleTestCase):
         self.assertEqual(module._approved_result_url(self._event("uk_irishracing", url), provider="uk_irishracing"), url)
         self.assertEqual(module._approved_result_url(self._event("france_irishracing", url), provider="uk_irishracing"), "")
 
+    def test_irishracing_adapter_accepts_ireland_provider(self):
+        module = _load("prepare_irishracing_race_detail_candidates.py")
+        url = "https://www.irishracing.com/raceresults/Sat-13th-Sep-2025/Leopardstown/1625"
+
+        self.assertEqual(module.REGION_PROVIDERS.get("ireland"), "ireland_irishracing")
+        self.assertEqual(module.PROVIDER_SOURCE_NAMES.get("ireland_irishracing"), "ireland_irishracing")
+        self.assertEqual(
+            module._approved_result_url(self._event("ireland_irishracing", url), provider="ireland_irishracing"),
+            url,
+        )
+        self.assertEqual(module._approved_result_url(self._event("ireland_irishracing", url), provider="uk_irishracing"), "")
+
     def test_hrn_adapter_prefers_approved_track_day_url(self):
         module = _load("prepare_us_hrn_race_detail_candidates.py")
         url = "https://entries.horseracingnation.com/entries-results/churchill-downs/2025-09-27"
