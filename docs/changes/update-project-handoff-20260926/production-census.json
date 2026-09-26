@@ -1,0 +1,355 @@
+{
+  "captured_at": "2026-09-26T10:01:53.007Z",
+  "migration_last_by_name": "0079_multisource_race_enrollment",
+  "enrollment_count": 21,
+  "events": [
+    {
+      "event_id": 103,
+      "name": "阪神ジャンプS",
+      "status": "finished",
+      "runners": 12,
+      "results": 12,
+      "result_confirmed_at": "2026-09-21T19:27:22.255Z",
+      "enrollments": [
+        {
+          "state": "enrolled",
+          "authority_version": 2
+        }
+      ],
+      "public": {
+        "visible": true,
+        "reason": "data_sync_public_read_allowed",
+        "revision_id": 60,
+        "phase": "official",
+        "effective_mode": "official_public"
+      }
+    },
+    {
+      "event_id": 104,
+      "name": "オールカマー",
+      "status": "finished",
+      "runners": 13,
+      "results": 13,
+      "result_confirmed_at": "2026-09-21T19:27:23.557Z",
+      "enrollments": [
+        {
+          "state": "enrolled",
+          "authority_version": 2
+        }
+      ],
+      "public": {
+        "visible": true,
+        "reason": "data_sync_public_read_allowed",
+        "revision_id": 61,
+        "phase": "official",
+        "effective_mode": "official_public"
+      }
+    },
+    {
+      "event_id": 105,
+      "name": "神戸新聞杯",
+      "status": "finished",
+      "runners": 11,
+      "results": 11,
+      "result_confirmed_at": "2026-09-21T19:28:00.659Z",
+      "enrollments": [
+        {
+          "state": "enrolled",
+          "authority_version": 2
+        }
+      ],
+      "public": {
+        "visible": true,
+        "reason": "data_sync_public_read_allowed",
+        "revision_id": 62,
+        "phase": "official",
+        "effective_mode": "official_public"
+      }
+    },
+    {
+      "event_id": 106,
+      "name": "シリウスS",
+      "status": "scheduled",
+      "runners": 0,
+      "results": 0,
+      "result_confirmed_at": null,
+      "enrollments": [],
+      "public": {
+        "visible": false,
+        "reason": "control_missing",
+        "revision_id": null,
+        "phase": "",
+        "effective_mode": "off"
+      }
+    },
+    {
+      "event_id": 107,
+      "name": "スプリンターズS",
+      "status": "scheduled",
+      "runners": 0,
+      "results": 0,
+      "result_confirmed_at": null,
+      "enrollments": [],
+      "public": {
+        "visible": false,
+        "reason": "control_missing",
+        "revision_id": null,
+        "phase": "",
+        "effective_mode": "off"
+      }
+    },
+    {
+      "event_id": 491,
+      "name": "JOCKEY CLUB GOLD CUP S.",
+      "status": "scheduled",
+      "runners": 0,
+      "results": 0,
+      "result_confirmed_at": null,
+      "enrollments": [],
+      "public": {
+        "visible": false,
+        "reason": "control_missing",
+        "revision_id": null,
+        "phase": "",
+        "effective_mode": "off"
+      }
+    },
+    {
+      "event_id": 492,
+      "name": "PRESQUE ISLE DOWNS MASTERS S.",
+      "status": "scheduled",
+      "runners": 0,
+      "results": 0,
+      "result_confirmed_at": null,
+      "enrollments": [],
+      "public": {
+        "visible": false,
+        "reason": "control_missing",
+        "revision_id": null,
+        "phase": "",
+        "effective_mode": "off"
+      }
+    },
+    {
+      "event_id": 494,
+      "name": "COTILLION S.",
+      "status": "scheduled",
+      "runners": 0,
+      "results": 0,
+      "result_confirmed_at": null,
+      "enrollments": [],
+      "public": {
+        "visible": false,
+        "reason": "control_missing",
+        "revision_id": null,
+        "phase": "",
+        "effective_mode": "off"
+      }
+    },
+    {
+      "event_id": 495,
+      "name": "PENNSYLVANIA DERBY",
+      "status": "scheduled",
+      "runners": 0,
+      "results": 0,
+      "result_confirmed_at": null,
+      "enrollments": [],
+      "public": {
+        "visible": false,
+        "reason": "control_missing",
+        "revision_id": null,
+        "phase": "",
+        "effective_mode": "off"
+      }
+    },
+    {
+      "event_id": 755,
+      "name": "BARRIERE PRIX DE MEAUTRY",
+      "status": "finished",
+      "runners": 11,
+      "results": 11,
+      "result_confirmed_at": "2026-09-06T16:30:20.710Z",
+      "enrollments": [
+        {
+          "state": "enrolled",
+          "authority_version": 1
+        }
+      ],
+      "public": {
+        "visible": true,
+        "reason": "data_sync_public_read_allowed",
+        "revision_id": 18,
+        "phase": "official",
+        "effective_mode": "official_public"
+      }
+    },
+    {
+      "event_id": 756,
+      "name": "BARRIERE PRIX QUINCEY",
+      "status": "finished",
+      "runners": 6,
+      "results": 6,
+      "result_confirmed_at": "2026-09-06T16:30:20.710Z",
+      "enrollments": [
+        {
+          "state": "enrolled",
+          "authority_version": 1
+        }
+      ],
+      "public": {
+        "visible": true,
+        "reason": "data_sync_public_read_allowed",
+        "revision_id": 15,
+        "phase": "official",
+        "effective_mode": "official_public"
+      }
+    },
+    {
+      "event_id": 757,
+      "name": "LUCIEN BARRIERE GRAND PRIX DE DEAUVILLE",
+      "status": "finished",
+      "runners": 7,
+      "results": 7,
+      "result_confirmed_at": "2026-09-06T16:30:20.710Z",
+      "enrollments": [
+        {
+          "state": "enrolled",
+          "authority_version": 1
+        }
+      ],
+      "public": {
+        "visible": true,
+        "reason": "data_sync_public_read_allowed",
+        "revision_id": 16,
+        "phase": "official",
+        "effective_mode": "official_public"
+      }
+    },
+    {
+      "event_id": 828,
+      "name": "PRIX ROBERT LEJEUNE",
+      "status": "finished",
+      "runners": 7,
+      "results": 0,
+      "result_confirmed_at": null,
+      "enrollments": [
+        {
+          "state": "enrolled",
+          "authority_version": 1
+        }
+      ],
+      "public": {
+        "visible": false,
+        "reason": "current_result_revision_missing",
+        "revision_id": null,
+        "phase": "",
+        "effective_mode": "off"
+      }
+    },
+    {
+      "event_id": 830,
+      "name": "PRIX DE COMPIEGNE",
+      "status": "finished",
+      "runners": 5,
+      "results": 0,
+      "result_confirmed_at": null,
+      "enrollments": [
+        {
+          "state": "enrolled",
+          "authority_version": 1
+        }
+      ],
+      "public": {
+        "visible": false,
+        "reason": "current_result_revision_missing",
+        "revision_id": null,
+        "phase": "",
+        "effective_mode": "off"
+      }
+    },
+    {
+      "event_id": 924,
+      "name": "HALLGARTEN AND NOVUM WINES HACKWOOD STAKES",
+      "status": "finished",
+      "runners": 0,
+      "results": 7,
+      "result_confirmed_at": null,
+      "enrollments": [],
+      "public": {
+        "visible": false,
+        "reason": "policy_automation_not_allowed",
+        "revision_id": 2,
+        "phase": "provisional",
+        "effective_mode": "off"
+      }
+    },
+    {
+      "event_id": 956,
+      "name": "VIRGIN BET PRESTIGE FILLIES' STAKES",
+      "status": "finished",
+      "runners": 10,
+      "results": 10,
+      "result_confirmed_at": "2026-08-31T04:27:00.447Z",
+      "enrollments": [
+        {
+          "state": "enrolled",
+          "authority_version": 1
+        }
+      ],
+      "public": {
+        "visible": true,
+        "reason": "data_sync_public_read_allowed",
+        "revision_id": 17,
+        "phase": "official",
+        "effective_mode": "official_public"
+      }
+    },
+    {
+      "event_id": 962,
+      "name": "BETFRED PARK HILL FILLIES' STAKES",
+      "status": "finished",
+      "runners": 9,
+      "results": 9,
+      "result_confirmed_at": "2026-09-11T00:01:06.557Z",
+      "enrollments": [
+        {
+          "state": "enrolled",
+          "authority_version": 1
+        }
+      ],
+      "public": {
+        "visible": true,
+        "reason": "data_sync_public_read_allowed",
+        "revision_id": 28,
+        "phase": "official",
+        "effective_mode": "official_public"
+      }
+    },
+    {
+      "event_id": 963,
+      "name": "BETFRED MAY HILL STAKES",
+      "status": "finished",
+      "runners": 11,
+      "results": 11,
+      "result_confirmed_at": "2026-09-11T00:01:05.047Z",
+      "enrollments": [
+        {
+          "state": "enrolled",
+          "authority_version": 1
+        }
+      ],
+      "public": {
+        "visible": true,
+        "reason": "data_sync_public_read_allowed",
+        "revision_id": 27,
+        "phase": "official",
+        "effective_mode": "official_public"
+      }
+    }
+  ],
+  "queue_lengths": {
+    "celery": 17,
+    "race_sync_v2": 0,
+    "race_live": 7543
+  }
+}
