@@ -823,3 +823,135 @@ class JraColdStartTests(TestCase):
 
     def test_identical_corrected_result_adds_evidence_without_republication(self):
         self._check_result_correction(explicit=True, unchanged=True)
+
+
+def policy_payload_v2():
+    """同一 route 的 venue/有效期扩版：digest 必然漂移，用于换绑测试。"""
+    payload = policy_payload()
+    payload["policy_id"] = "test-v2"
+    payload["valid_until"] = (NOW + timedelta(days=60)).isoformat()
+    route = dict(payload["routes"][0])
+    route["valid_until"] = payload["valid_until"]
+    route["proof_digest"] = "e" * 64
+    route["venue_aliases"] = dict(route["venue_aliases"], hanshin=["阪神", "Hanshin"])
+    payload["routes"] = [route]
+    return payload
+
+
+class MultisourceRebindTests(JraColdStartTests):
+    """policy 扩版后既有 v2 登记经 rebind 换绑恢复刷新（digest 闭集合同）。"""
+
+    def policy_v2(self):
+        return parse_multisource_policy(policy_payload_v2(), now=NOW)
+
+    def binding(self):
+        return models.RaceDataSyncSourceBinding.objects.get(
+            enrollment__event=self.event, state="active")
+
+    def test_policy_upgrade_breaks_claim_then_rebind_restores(self):
+        from stable.services.race_data_sync_admission import binding_admission_reason
+        from stable.services.race_data_sync_enrollment import rebind_multisource_enrollment
+        self.enroll()
+        old_route_digest = self.binding().route_digest
+        policy_v2 = self.policy_v2()
+        self.assertNotEqual(old_route_digest, policy_v2.routes[0].digest)
+        enrollment = models.RaceDataSyncEnrollment.objects.get(event=self.event)
+        checkpoint = models.RaceEventLiveProviderCheckpoint.objects.get(
+            tracking__event=self.event)
+        with patch("stable.services.race_data_source_adapters.load_multisource_policy",
+                   return_value=policy_v2):
+            self.assertNotEqual(checkpoint.registry_digest, policy_v2.routes[0].digest)
+            dry = rebind_multisource_enrollment(
+                event_id=self.event.pk, policy=policy_v2, now=NOW,
+                expected_route_digest=old_route_digest, apply=False)
+            self.assertEqual(dry["action"], "dry_run")
+            self.assertEqual(self.binding().route_digest, old_route_digest)
+            self.assertFalse(models.OperationLog.objects.filter(
+                action_type="multisource_rebind").exists())
+            applied = rebind_multisource_enrollment(
+                event_id=self.event.pk, policy=policy_v2, now=NOW,
+                expected_route_digest=old_route_digest, apply=True)
+            self.assertEqual(applied["action"], "rebound")
+            binding = self.binding()
+            self.assertEqual(binding.route_digest, policy_v2.routes[0].digest)
+            self.assertEqual(binding.binding_manifest_sha256,
+                             __import__("stable.services.race_data_source_adapters",
+                                        fromlist=["canonical_sha"]).canonical_sha(
+                                            binding.binding_manifest))
+            self.assertEqual(binding_admission_reason(
+                binding=binding, route=policy_v2.routes[0], now=NOW,
+                check_runtime=False), "")
+            enrollment.refresh_from_db()
+            self.assertEqual(enrollment.standing_policy_digest, policy_v2.digest)
+            self.assertEqual(enrollment.route_digest, policy_v2.routes[0].digest)
+            checkpoint.refresh_from_db()
+            self.assertEqual(checkpoint.registry_digest, policy_v2.routes[0].digest)
+            result = run_multisource_claim(claim=self.claim(), now=NOW, fetcher=self.fetch)
+            self.assertTrue(result["processed"], result)
+        self.event.refresh_from_db()
+        self.assertEqual(self.event.results.count(), 13)
+        self.assertEqual(models.RaceEventRevisionPublication.objects.count(), 1)
+        self.assertEqual(models.OperationLog.objects.filter(
+            action_type="multisource_rebind").count(), 1)
+        again = rebind_multisource_enrollment(
+            event_id=self.event.pk, policy=policy_v2, now=NOW,
+            expected_route_digest=old_route_digest, apply=True)
+        self.assertEqual(again["action"], "replay")
+        self.assertEqual(models.OperationLog.objects.filter(
+            action_type="multisource_rebind").count(), 1)
+
+    def test_rebind_rejects_baseline_drift_without_writes(self):
+        from stable.services.race_data_sync_enrollment import rebind_multisource_enrollment
+        self.enroll()
+        old_route_digest = self.binding().route_digest
+        with self.assertRaisesMessage(ValueError, "rebind_baseline_drift"):
+            rebind_multisource_enrollment(
+                event_id=self.event.pk, policy=self.policy_v2(), now=NOW,
+                expected_route_digest="f" * 64, apply=True)
+        self.assertEqual(self.binding().route_digest, old_route_digest)
+        self.assertFalse(models.OperationLog.objects.filter(
+            action_type="multisource_rebind").exists())
+
+    def test_rebind_rejects_missing_enrollment(self):
+        from stable.services.race_data_sync_enrollment import rebind_multisource_enrollment
+        with self.assertRaisesMessage(ValueError, "rebind_enrollment_missing"):
+            rebind_multisource_enrollment(
+                event_id=self.event.pk, policy=self.policy_v2(), now=NOW,
+                expected_route_digest="f" * 64, apply=True)
+
+    def test_rebind_rejects_when_policy_lacks_route(self):
+        from stable.services.race_data_sync_enrollment import rebind_multisource_enrollment
+        self.enroll()
+        payload = policy_payload_v2()
+        payload["routes"][0]["provider"] = "other_provider"
+        policy_v2 = parse_multisource_policy(payload, now=NOW)
+        with self.assertRaisesMessage(ValueError, "rebind_route_unavailable"):
+            rebind_multisource_enrollment(
+                event_id=self.event.pk, policy=policy_v2, now=NOW,
+                expected_route_digest=self.binding().route_digest, apply=True)
+
+    def test_rebind_command_manifest_sha_dry_run_and_apply(self):
+        import hashlib
+        import json
+        import tempfile
+        from django.core.management import call_command
+        from django.core.management.base import CommandError
+        self.enroll()
+        policy_v2 = self.policy_v2()
+        old = self.binding().route_digest
+        manifest = {"schema_version": 1, "policy_digest": policy_v2.digest,
+                    "events": [{"event_id": self.event.pk, "old_route_digest": old,
+                                "new_route_digest": policy_v2.routes[0].digest}]}
+        raw = json.dumps(manifest, ensure_ascii=False).encode()
+        sha = hashlib.sha256(raw).hexdigest()
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as fh:
+            fh.write(raw)
+            path = fh.name
+        with patch("stable.management.commands.rebind_multisource_enrollments.load_multisource_policy",
+                   return_value=policy_v2):
+            with self.assertRaises(CommandError):
+                call_command("rebind_multisource_enrollments", manifest=path, sha256="0" * 64)
+            call_command("rebind_multisource_enrollments", manifest=path, sha256=sha)
+            self.assertEqual(self.binding().route_digest, old)
+            call_command("rebind_multisource_enrollments", manifest=path, sha256=sha, apply=True)
+            self.assertEqual(self.binding().route_digest, policy_v2.routes[0].digest)
