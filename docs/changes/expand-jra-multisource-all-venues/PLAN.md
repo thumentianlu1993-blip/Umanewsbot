@@ -1,6 +1,6 @@
 # 计划：JRA 多来源登记扩展至全部 10 个中央马场
 
-> 状态：计划草案 v3（已按独立审阅第 1、2 轮 REVISE 修订；v2 的轮换对策经代码核实不成立，已重写为新增受审 v2 换绑路径）。待复审与用户批准。未实施、未改生产。
+> 状态：计划草案 v4（已按独立审阅第 1–3 轮 REVISE 修订）。待复审与用户批准。未实施、未改生产。
 > 审阅记录：见同目录 REVIEW.md。
 
 ## 1. 背景与当前真实状态（2026-09-26 核验）
@@ -10,7 +10,7 @@
   - provider `jra` / region `japan_jra` / capabilities `["result"]`；
   - `venue_aliases` 仅 `hanshin`（阪神）与 `nakayama`（中山）；
   - 有效期至 `2026-10-21T17:14:43Z`。
-- 已完成自然闭环证据：103/104/105（9/22，见 `docs/changes/multisource-race-enrollment/release-20260922/README.md`）与 106/107（9/26 晚间生产实测：106 于 13:17 UTC 登记、13:21 官方赛果确认、16/16 confirmed、双域名公开；107 于 13:57 UTC 登记、赛前出马表已公开——记录在 `docs/current_state.md` 2026-09-26 顶部条目，随 PR #217 入库）；107 正式赛果预计 9/27 赛后自然闭环。既有登记共 5 条（103–107），均为 v2 `authority_version=2` 形态。
+- 已完成自然闭环证据：103/104/105（9/22，见 `docs/changes/multisource-race-enrollment/release-20260922/README.md`）。106/107 在 9/26 18:01 交接样本中仍未登记（`docs/current_state.md` 既有条目），此后状态以任务 5 的生产只读预检为准——换绑 manifest 的目标清单（3 条还是 5 条）由预检时的实际 enrolled 集合生成，本计划不预设该数量。
 - 赛前 seed 路径（`discover_jra_pre_race`）本身覆盖全部 10 个 JRA 马场（`JRA_COURSES`），CNAME 解析表 `_JRA_VENUE_CODES` 也已内置 01–10 全部马场代码；瓶颈只在 policy 的 venue 范围。
 - 名称匹配已上线确定性归一（PR216）：等级前缀 + `ステークス→S`／`カップ→C`。JRA 官方缩写字母为 S/C/T/F 四个，剩余系统性差异为 `T=トロフィー`、`F=フィリーズ`（111 アイルランドトロフィー已经 JRA 官方出马表页证实；138 阪神ジュベナイルフィリーズ为 GⅠ 官方赛事名，实施前以真实页面复核）。
 - 当前后果：下周末 108 毎日王冠（10/4 東京）、109 京都大賞典（10/4 京都）等政策外赛事会赛前有出马表预览、但不登记、不闭环正式赛果，且因分类为范围外而不产生覆盖告警。
@@ -53,9 +53,16 @@
 **对策（新增受审的 v2 换绑路径，独立 PR 先行）**：在 `race_data_sync_enrollment.py` 新增 `rebind_multisource_enrollment`（或同级服务函数）+ 管理命令，语义为：
 
 - 输入为 SHA 绑定的 manifest（逐 event 列出 binding 旧 digest → 新 digest），dry-run 默认；
-- 逐场单事务：要求 event 处于 enrolled、binding 当前 digest 精确等于旧 route digest、既有 source identity 的 canonical_url 在新 route 下仍 `permits_url` 且 CNAME/venue 解析不变，然后原子更新 binding 的 `route_digest/proof_digest/binding_manifest` 与 enrollment 的 `standing_policy_digest`，写 OperationLog/审计；任何一项不满足即该场 fail closed；
-- 身份行（source identity）不变、不重建；不重抓网络；
-- 验收：轮换后 103–107 的 result checkpoint 至少一次自然成功、`binding_route_missing`/`enrollment_policy_drift` 为 0、公开赛果行数不变。
+- 逐场单事务，前置条件：event 处于 enrolled、binding 当前 digest 精确等于旧 route digest、既有 source identity 的 canonical_url 在新 route 下仍 `permits_url` 且 CNAME/venue 解析不变；任何一项不满足即该场 fail closed；
+- 更新必须覆盖完整 digest 闭集（第 3 轮审阅逐点核实，遗漏任一都会在运行态被确定性地 fail closed）：
+  1. binding：`route_digest`/`proof_digest`/`binding_manifest`（含内嵌 `policy_digest`）/重算 `binding_manifest_sha256`/`valid_until` 同步新 route 有效期；
+  2. enrollment：`standing_policy_digest` 与 `route_digest`（后者与 claim 签发/校验链一致，`race_data_sync_control.py:242,248,2864`）；
+  3. **直接复用既有 `_multisource_manifest`（`race_data_sync_enrollment.py:1276-1386`）重新生成 source set manifest 与 lifecycle 证据并使旧 claim 失效**，不手写局部更新（否则 `source_set_drift`/`binding_set_drift`，见 `race_data_sync_admission.py:271,283-284,309-317`）；
+  4. checkpoint：`registry_digest` 同步为新 route digest（claim 选取循环的强一致条件，`race_data_sync_control.py:2816-2820`）；
+  5. source identity 的 `valid_until` 同步新 route 有效期（`admission.py:458,477-478`）；
+- 身份行（source identity 本体）不变、不重建；不重抓网络；写 OperationLog/审计；
+- 上述每一点都必须有对应回归测试：换绑后 claim 可签发、`claim_plan_drift`/`binding_contract_drift`/`source_set_drift`/`binding_set_drift`/`binding_route_missing`/`enrollment_policy_drift` 均为 0，103–107 形态的 fixture 走通；
+- 验收：换绑后 103–107 的 result checkpoint 至少一次自然成功、公开赛果行数不变。
 
 该 PR 必须与 3.2 的 T/F 归一 PR 先后合并部署（顺序不限，但激活必须绑定两者之后的生产 commit）。
 
@@ -85,7 +92,7 @@ proof 产物（页面 SHA、解析结果、逐场校验明细）归档进 releas
 
 因此本变更按同款模式新写激活脚本，要求：
 
-- 绑定任务 3.2 合并部署后的新 commit/镜像、新 policy 路径/SHA、当前实际 providers 集合；
+- 绑定任务 1（T/F 归一 PR）与任务 2（换绑 PR）均合并部署之后的新 commit/镜像、新 policy 路径/SHA、当前实际 providers 集合；
 - 意图文件逐字段独立审阅，新意图 SHA 冻结后执行；
 - 服务器侧 `release_0079` 模块与运行态（`.env` 实际值、锁状态）无法从仓库核对，列为实施前只读核对项；
 - 切换只改 `RACE_DATA_MULTISOURCE_POLICY_FILE/SHA256` 两项 + 必要的轮换动作；回滚为恢复 v1 policy 文件+SHA（已轮换的 enrollment 与新产生的登记不回滚，与 9/22 口径一致）。
@@ -93,7 +100,7 @@ proof 产物（页面 SHA、解析结果、逐场校验明细）归档进 releas
 ### 3.5 覆盖告警行为（激活前后核对项）
 
 - 告警仅落库、无发送任务（`race_data_sync_alerts.py:192-289`），无外发风险。
-- `enrollment_missing` 的 incident `dedupe_key` 含 `policy_id`（`alerts.py:267-269`）：切 v2 后 106/107 旧 key 的 open incident 不会自动关闭，且会以新 key 重开。激活步骤必须包含旧 key incident 的显式收口（只读核对 + 受控 resolve），不得遗留重复 open。
+- `enrollment_missing` 的 incident `dedupe_key` 含 `policy_id`（`alerts.py:267-269`）：切 v2 后旧 policy_id 的 incident 不会因新 key 自动关闭。激活步骤必须**先只读核对每个事件当时的实际 open incident**（不预设哪些仍 open——已确认赛果的赛事其 incident 已由 `alerts.py:209-215` 按 scope_key 自动收口），再对仍 open 的旧 key incident 受控 resolve，不得遗留重复 open。
 - 激活时点回看窗口（约 T−9 日）内新马场的已过赛事会同时产生 `enrollment_missing` 与 `result_overdue`。按 9/17–9/26 日历新马场无重赏，预计为 0；激活报告必须实测列出，不能只写预算数字。
 
 ## 4. 风险与缓解

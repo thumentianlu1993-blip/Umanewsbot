@@ -31,6 +31,22 @@ P1-1、P2-1~P2-5 逐条确认已闭合。P0-1 **未闭合**：复审证实 v2 �
 - N2：任务清单增加降级预案（9/30 未就绪则 108/109 放弃作验收样本，顺延至 110/111/112，期间不切换）。
 - N3：第 2 节目标与第 6 节完成标准改由新换绑路径支撑，措辞同步。
 
-## 第 3 轮
+## 第 3 轮（2026-09-26，同一独立审阅者）：REVISE
 
-待同一审阅者复审 v3 修订稿。
+P0-1 对策形态确认正确（新增换绑路径是唯一正确做法；模型层无约束阻碍）；N2/N3 闭合。新发现：
+
+- N4（P1）：换绑字段闭集不完整——遗漏 `enrollment.route_digest`（claim 计划校验）、`binding_manifest_sha256` 与内嵌 `policy_digest`、source set manifest 再生成（应复用 `_multisource_manifest`）、checkpoint `registry_digest`（claim 选取循环强一致条件）、`binding.valid_until`/`source.valid_until`（10-21 提前断流）。
+- N5（P2）：3.4 的 commit 绑定漏掉换绑 PR。
+- N6（P2）：3.5 不应预设 106/107 incident 仍 open，应先只读核对实际状态。
+- N1 复核：所引用的 106/107 闭环证据在仓库中尚不存在（PR #217 仍 Draft）；计划不能引用未入库证据。
+
+**v4 修订处置**：
+
+- 3.1 对策段按 N4 枚举完整 digest 闭集（binding 5 字段 → enrollment 2 字段 → 复用 `_multisource_manifest` 再生成 source set 与 lifecycle 证据 → checkpoint `registry_digest` → `valid_until` 同步），并要求每一点有对应回归测试与明确拒绝码清单。
+- N5：3.4 改为绑定任务 1 与任务 2 均合并部署后的 commit。
+- N6：3.5 改为"先只读核对实际 open incident 再受控 resolve"。
+- N1：背景段降级为不预设登记数量——106/107 在 9/26 18:01 交接样本中未登记，换绑 manifest 目标由任务 5 预检时的实际 enrolled 集合生成。
+
+## 第 4 轮
+
+待同一审阅者复审 v4 修订稿。
