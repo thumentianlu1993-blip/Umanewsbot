@@ -1,6 +1,6 @@
 # 计划：JRA 多来源登记扩展至全部 10 个中央马场
 
-> 状态：v5（任务 1/2 已实施并上线；3.3 proof 改为分层口径）。实施中。
+> 状态：v5。**已于 2026-09-27 激活**（不等 107 闭环，按用户指令提前）：intent `79b9f629…53d5`，换绑 5/5（manifest SHA `a31421f6…610b`），证据见同目录 activation-intent.json / apply.complete.json / rebind-manifest-103-107.json。108/109 自然闭环观察中。
 > 审阅记录：见同目录 REVIEW.md。
 
 ## 1. 背景与当前真实状态（2026-09-26 核验）
@@ -121,9 +121,9 @@ v1 `proof_digest` 生成方式核查结论：无法从仓库归档复原其推�
 1. ~~(integration) 归一规则追加 T/F 后缀 + 回归测试（RED→GREEN），独立 PR 合并并同 schema 发布~~ **已完成（PR #219，生产 15c79f22）**。
 2. ~~(integration) 新增受审的 v2 换绑路径（3.1 对策段）+ 回归测试（含 binding digest 旧→新、identity 不变、非 enrolled/漂移不符即 fail closed），独立 PR 合并并同 schema 发布~~ **已完成（PR #221，生产 15c79f22，含审阅加固）**。
 3. (integration) v1 `proof_digest` 生成方式核查（结论：仓库归档无法复原其推导输入，v2 重新定义并记录，见 3.3）；生成 v2 policy 草案（10 venue_aliases），离线校验 schema 与 venue 代码一致性（已通过 `parse_multisource_policy` 实跑验证）。
-4. (operations) 分层 proof（3.3）：结构级 8 马场已完成；**10/1（周四）10/4 出马表发布后**完成东京/京都/中京的 CNAME 级 proof。
+4. (operations) 分层 proof（3.3）：结构级 8 马场已完成；东京/京都/中京的 CNAME 级 proof 在其出马表发布（约 10/1）后、首场写入前完成（激活已于 9/27 提前执行，这三场在出马表发布前物理上无页面可写，CNAME proof 仍先于任何写入）。
 5. (operations) 生产只读预检：当前登记/告警/预算基线；服务器 `release_0079` 模块与 `.env` 实际状态核对；新 policy 文件落盘与 SHA 绑定。
-6. (operations) **10/1 CNAME proof 完成后尽快激活**（不等 107 赛果闭环——换绑路径已上线，107 与其他既有登记在切换后立即换绑、刷新不断链）：新写激活脚本经独立审阅 → 排空 → 原子切换 policy → 立即执行既有 enrolled 集合换绑（任务 2 的新路径）→ 旧 policy_id incident 收口。
+6. (operations) ~~10/1 CNAME proof 完成后尽快激活~~ **已于 2026-09-27 执行**：激活脚本（SHA `cd9c2f8a…`，经独立审阅 + 重定向 diff 核对）prepare/apply 完成，intent `79b9f629…53d5`；既有 103–107 换绑 5/5 rebound；无 enrollment_missing 重复 incident（旧 22–25 已于 9/26 自闭）。
 7. (operations) 激活后观察：108/109（10/4）自然闭环 身份→登记→正式赛果→双域名公开；既有登记换绑后至少一次自然刷新成功；告警行为按 3.5 实测；福島（11/21）与其余马场的 CNAME 级补证——**补证必须先于（或同日早于）该赛事首次 discovery 尝试完成**（窗口约 T−5 开启）；未完成则该赛事按既有 fail-closed + incident 流程处理，不追赶手工补救。
 8. (application) 文档回写：current_state、deploy_runbook、handoff 第 4 节 P0 项状态更新。
 
