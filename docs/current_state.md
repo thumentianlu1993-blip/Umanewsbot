@@ -1,12 +1,15 @@
-## 2026-09-27 TRA registry 续期至 2026-12-31
+## 2026-09-27 TRA registry 续期至 2026-12-31（已上线）
 
 用户确认 TRA 条款仍允许当前自动化用途（账单按月自动续费正常），批准将项目自建的 TRA 合同 registry
 续期到 2026-12-31。registry 是 fail-closed 门禁（`verified_at` 31 天 staleness + `valid_until` 硬期限 +
-SHA-256 钉扎），不随账单自动续期；本次按门禁设计执行续期：重新抓取条款证据、更新 registry 两份仓库副本、
-重渲 standing policy（roster 摘要闭集导致 13 条 route_digest 全部轮换）、更新全部钉扎。
-生产侧还需：镜像重建（registry 烘焙进镜像）+ `.env` 钉扎 + 部署后用 `repair_data_sync_stalled_events`
-把 18 个 TRA 登记（旧 route_digest `7591a4f2834c…`）轮换到新 digest。变更见
-[changes/renew-tra-registry-20260927](changes/renew-tra-registry-20260927/spec.md)。
+SHA-256 钉扎），不随账单自动续期。PR #222 合并为 main `9c8891b8` 并已发布：
+新 release `/opt/umanews-release-9c8891b8-tra-registry-20260927/umanewsbot`，镜像 `37c044485231`，
+四容器重建后 web healthy、check 通过、双域名 healthz 200、合同检查通过、audit `ready/route_drift=[]`，
+部署后 TRA 与 JRA 赛前请求持续记账，公网今日赛事页（975/976/106 finished）与明日 107（短途锦标）正常。
+18 个续期前 TRA 登记仍持旧 digest：15 场为已完赛有结果的历史赛事（fail-closed 无写入、无数据风险），
+7 场（772/828/830/833/970/975/976）在部署前已有 open incident（含 828/830 缺正式结果的既有缺口），
+窗口外已完赛登记的换绑收口列为后续项。下次月度续验截止 2026-10-27（staleness 门禁先于
+valid_until 到期）。完整证据见 [rollout 执行结果](changes/renew-tra-registry-20260927/rollout.md)。
 
 ## 2026-09-26 跨任务交接已更新
 
