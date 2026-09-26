@@ -1675,6 +1675,186 @@ def attach_multisource_observation(observation, *, policy, now, discovery_token=
     return Decision("rejected", "identity_retry_exhausted", match.event_id)
 
 
+def rebind_multisource_enrollment(*, event_id, policy, now, expected_route_digest, apply=False):
+    """policy 扩版后把 enrolled v2 登记换绑到当前 policy 的新 route digest。
+
+    逐场单事务、fail closed；identity 不变、不重建、不重抓网络。
+    覆盖完整 digest 闭集：binding → enrollment → source set manifest（复用
+    _multisource_manifest）→ checkpoint registry_digest → source/binding valid_until。
+    """
+    from stable.services.race_data_source_adapters import canonical_sha, aware, require_sha
+    from stable.services.race_data_sync_admission import binding_admission_reason
+
+    require_sha(expected_route_digest)
+    with transaction.atomic():
+        event, lifecycle = _lock_multisource_event(event_id)
+        projection = models.RaceEventProjectionControl.objects.select_for_update().filter(event=event).first()
+        tracking = models.RaceEventLiveTracking.objects.select_for_update().filter(event=event).first()
+        enrollment = (
+            models.RaceDataSyncEnrollment.objects.select_for_update()
+            .filter(event=event)
+            .first()
+        )
+        if enrollment is None or projection is None or tracking is None:
+            raise ValueError("rebind_enrollment_missing")
+        if lifecycle is None:
+            raise ValueError("rebind_lifecycle_missing")
+        if enrollment.authority_version != 2 or enrollment.state != "enrolled":
+            raise ValueError("rebind_not_enrolled_v2")
+        if not policy.valid(now):
+            raise ValueError("rebind_policy_invalid")
+        checkpoints = list(
+            models.RaceEventLiveProviderCheckpoint.objects.select_for_update()
+            .filter(tracking=tracking)
+            .order_by("pk")
+        )
+        binding_rows = list(
+            enrollment.source_bindings.filter(state="active").order_by("id")
+        )
+        locked_sources = {
+            s.pk: s
+            for s in models.RaceResultSourceIdentity.objects.select_for_update().filter(
+                pk__in=[b.source_identity_id for b in binding_rows]
+            ).order_by("pk")
+        }
+        bindings = list(
+            enrollment.source_bindings.select_for_update()
+            .select_related("source_identity")
+            .filter(state="active")
+            .order_by("id")
+        )
+        if not bindings:
+            raise ValueError("rebind_no_active_binding")
+        routes = {}
+        for binding in bindings:
+            source = binding.source_identity
+            route = policy.route_for(
+                dict(
+                    provider=source.source_key,
+                    region=source.region_code,
+                    identity_namespace=source.identity_namespace,
+                )
+            )
+            if route is None or not route.valid(now):
+                raise ValueError("rebind_route_unavailable")
+            if not route.permits_url(source.canonical_url):
+                raise ValueError("rebind_identity_url_rejected")
+            routes[binding.pk] = (source, route)
+        changes = []
+        new_route_digests = {routes[b.pk][1].digest for b in bindings}
+        if len(new_route_digests) != 1:
+            raise ValueError("rebind_route_ambiguous")
+        new_route_digest = new_route_digests.pop()
+        if enrollment.standing_policy_digest == policy.digest and all(
+            b.route_digest == new_route_digest for b in bindings
+        ):
+            return {
+                "event_id": event.pk,
+                "action": "replay",
+                "old_route_digest": expected_route_digest,
+                "new_route_digest": new_route_digest,
+                "bindings": [b.pk for b in bindings],
+            }
+        for binding in bindings:
+            source, route = routes[binding.pk]
+            if binding.route_digest != expected_route_digest:
+                raise ValueError("rebind_baseline_drift")
+            manifest = dict(
+                event_id=event.pk,
+                source_identity_id=source.pk,
+                source_registry_digest=source.registry_digest,
+                route=route.payload,
+                route_digest=route.digest,
+                identity_evidence=binding.binding_manifest.get("identity_evidence"),
+                identity_evidence_sha256=binding.identity_evidence_sha256,
+                policy_digest=policy.digest,
+            )
+            if canonical_sha(manifest["identity_evidence"]) != binding.identity_evidence_sha256:
+                raise ValueError("rebind_evidence_drift")
+            changes.append((binding, source, route, manifest))
+        if not apply:
+            transaction.set_rollback(True)
+            return {
+                "event_id": event.pk,
+                "action": "dry_run",
+                "old_route_digest": expected_route_digest,
+                "new_route_digest": new_route_digest,
+                "bindings": [b.pk for b, _, _, _ in changes],
+            }
+        for binding, source, route, manifest in changes:
+            binding.route_digest = route.digest
+            binding.contract_digest = route.contract_digest
+            binding.proof_digest = route.proof_digest
+            binding.binding_manifest = manifest
+            binding.binding_manifest_sha256 = canonical_sha(manifest)
+            binding.valid_until = aware(route.valid_until)
+            binding.save(
+                update_fields=(
+                    "route_digest",
+                    "contract_digest",
+                    "proof_digest",
+                    "binding_manifest",
+                    "binding_manifest_sha256",
+                    "valid_until",
+                    "updated_at",
+                )
+            )
+            reason = binding_admission_reason(
+                binding=binding, route=route, now=now, check_runtime=False
+            )
+            if reason:
+                raise ValueError("rebind_contract_drift:" + reason)
+            if source.valid_until is None or source.valid_until < aware(route.valid_until):
+                source.valid_until = aware(route.valid_until)
+                source.save(update_fields=("valid_until", "updated_at"))
+        enrollment.standing_policy_digest = policy.digest
+        enrollment.route_digest = new_route_digest
+        enrollment.save(
+            update_fields=("standing_policy_digest", "route_digest", "updated_at")
+        )
+        route_by_source = {source.source_key: route for _, source, route, _ in changes}
+        for checkpoint in checkpoints:
+            route = route_by_source.get(checkpoint.source_key)
+            if route is None:
+                raise ValueError("rebind_checkpoint_orphan")
+            checkpoint.registry_digest = route.digest
+            checkpoint.contract_digest = route.contract_digest
+            checkpoint.save(
+                update_fields=("registry_digest", "contract_digest", "updated_at")
+            )
+        _multisource_manifest(enrollment, projection, policy, now)
+        enrollment.refresh_from_db()
+        selected = enrollment.source_set_manifest.get("selected", {})
+        for binding, _, _, _ in changes:
+            for kind in binding.capabilities:
+                if selected.get(kind) != binding.pk:
+                    raise ValueError("rebind_selection_lost")
+        models.OperationLog.objects.create(
+            admin=None,
+            action_type="multisource_rebind",
+            target_type="race_event",
+            target_id=str(event.pk),
+            detail=json.dumps(
+                {
+                    "event_id": event.pk,
+                    "policy_digest": policy.digest,
+                    "old_route_digest": expected_route_digest,
+                    "new_route_digest": new_route_digest,
+                    "bindings": [b.pk for b, _, _, _ in changes],
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            ),
+        )
+        return {
+            "event_id": event.pk,
+            "action": "rebound",
+            "old_route_digest": expected_route_digest,
+            "new_route_digest": new_route_digest,
+            "bindings": [b.pk for b, _, _, _ in changes],
+        }
+
+
 def build_multisource_coverage(*, now, policy):
     """分母来自公开 canonical calendar；状态分类守恒，未知日期不补猜。"""
     from django.db.models import Q
