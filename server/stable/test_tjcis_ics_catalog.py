@@ -252,7 +252,7 @@ Gran Premio de Madrid (L) .... 85,000 .... 3up .... 2500 T .... La Zarzuela
             ["Acorn S", "Indiana General Assembly Distaff S"],
         )
 
-    def test_legacy_country_codes_reset_previous_region_context(self):
+    def test_legacy_country_codes_assign_ireland_and_reset_unsupported(self):
         pages = [
             "British Race G1 .... 80,000 .... 3up .... 8 T .... Ascot\nPt I—GB",
             "Irish Race G1 .... 80,000 .... 3up .... 8 T .... Curragh\nIRELAND\nPt I—IRE",
@@ -264,8 +264,30 @@ Gran Premio de Madrid (L) .... 85,000 .... 3up .... 2500 T .... La Zarzuela
 
         self.assertEqual(
             [(row["country_region"], row["original_name"]) for row in rows],
-            [("united_kingdom", "British Race"), ("japan", "Japan Race")],
+            [("united_kingdom", "British Race"), ("ireland", "Irish Race"), ("japan", "Japan Race")],
         )
+
+    def test_ireland_flat_section_assigns_ireland_context(self):
+        pages = [
+            "2000 Guineas S. G1 .... 80,000 .... 3yo .... 8 T .... Newmarket\nPt I—GB",
+            "Irish 2000 Guineas G1 .... 300,000 .... 3yo .... 8 T .... Curragh\nPt I—IRELAND",
+        ]
+
+        rows = self.module.parse_ics_pages(pages, year=2025)
+
+        self.assertEqual(
+            [(row["country_region"], row["original_name"], row["discipline"]) for row in rows],
+            [("united_kingdom", "2000 Guineas S", "flat"), ("ireland", "Irish 2000 Guineas", "flat")],
+        )
+
+    def test_ireland_declared_group_total_is_enforced(self):
+        page = (
+            "Irish Champion S. G1 .... 1,000,000 .... 3up .... 10 T .... Leopardstown\n"
+            "Total Group races: .... 2\nPt I—IRELAND"
+        )
+
+        with self.assertRaisesRegex(self.module.IcsCatalogError, "graded total mismatch"):
+            self.module.parse_ics_pages([page], year=2025)
 
     def test_race_range_prefix_is_not_mistaken_for_country_code(self):
         pages = [
@@ -334,6 +356,24 @@ Gran Premio de Madrid (L) .... 85,000 .... 3up .... 2500 T .... La Zarzuela
         )
 
         self.assertEqual([row["original_name"] for row in rows], ["Washington Park H"])
+
+    def test_australian_open_age_notation_is_parsed(self):
+        rows = self.module.parse_ics_pages(
+            [
+                "The TAB Everest (ATC) G1..........20,000,000..........open ..........1200 T..........Randwick\n"
+                "Tattersall's Tiara (TATTSRC) G1..........700,000..........open f/m..........1400 T..........Eagle Farm\n"
+                "Pt I—AUSTRALIA"
+            ],
+            year=2026,
+        )
+
+        self.assertEqual(
+            [(row["original_name"], row["grade_text"], row["racecourse"]) for row in rows],
+            [
+                ("The TAB Everest (ATC)", "G1", "Randwick"),
+                ("Tattersall's Tiara (TATTSRC)", "G1", "Eagle Farm"),
+            ],
+        )
 
     def test_legacy_age_range_does_not_drop_wrapped_jump_name(self):
         page = (
@@ -652,15 +692,16 @@ Gran Premio de Madrid (L) .... 85,000 .... 3up .... 2500 T .... La Zarzuela
         rows = self.module.parse_ics_pages(pages, year=2016)
 
         self.assertEqual(
-            [(row["country_region"], row["original_name"]) for row in rows],
+            [(row["country_region"], row["original_name"], row["discipline"]) for row in rows],
             [
-                ("united_kingdom", "British Chase"),
-                ("japan", "Japan Jump"),
-                ("united_states", "US Jump"),
+                ("united_kingdom", "British Chase", "jumps"),
+                ("ireland", "Irish Chase", "jumps"),
+                ("japan", "Japan Jump", "jumps"),
+                ("united_states", "US Jump", "jumps"),
             ],
         )
 
-    def test_legacy_ire_jump_header_resets_uk_context(self):
+    def test_legacy_ire_jump_header_assigns_ireland_context(self):
         pages = [
             "British Chase G1 .... 100,000 .... 5up .... 3 .... Kempton\nPt IV—GB JUMPS",
             "Pt IV—IRE Ark-Hat\nIRELAND JUMPRACES\n"
@@ -669,7 +710,10 @@ Gran Premio de Madrid (L) .... 85,000 .... 3up .... 2500 T .... La Zarzuela
 
         rows = self.module.parse_ics_pages(pages, year=2001)
 
-        self.assertEqual([row["original_name"] for row in rows], ["British Chase"])
+        self.assertEqual(
+            [(row["country_region"], row["original_name"]) for row in rows],
+            [("united_kingdom", "British Chase"), ("ireland", "Arkle Perpetual Challenge Cup Novice Stp")],
+        )
 
     def test_jump_country_title_and_index_reset_context(self):
         pages = [
@@ -680,7 +724,10 @@ Gran Premio de Madrid (L) .... 85,000 .... 3up .... 2500 T .... La Zarzuela
 
         rows = self.module.parse_ics_pages(pages, year=2016)
 
-        self.assertEqual([row["original_name"] for row in rows], ["British Chase"])
+        self.assertEqual(
+            [(row["country_region"], row["original_name"]) for row in rows],
+            [("united_kingdom", "British Chase"), ("ireland", "Irish Chase")],
+        )
 
     def test_incomplete_listed_row_does_not_attach_to_next_graded_race(self):
         page = (
@@ -1016,6 +1063,9 @@ Gran Premio de Madrid (L) .... 85,000 .... 3up .... 2500 T .... La Zarzuela
             {"original_name": "Oka Sho (Japanese 1,000 Guineas)"},
             {"original_name": "Challenger S. [$100,000 Michelob Ultra]"},
             {"original_name": "Normal Stakes"},
+            {"original_name": "Irish 2,000 Guineas [Tattersalls]"},
+            {"original_name": "Doomben 10,000 (BRC)"},
+            {"original_name": "Leopardstown 1,000 Guineas Trial S."},
         ]
 
         suspicious = self.module._suspicious_catalog_names(rows)

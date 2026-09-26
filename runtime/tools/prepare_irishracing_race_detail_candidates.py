@@ -20,10 +20,12 @@ ALLOWED_HOSTS = ("irishracing.com",)
 PROVIDER_SOURCE_NAMES = {
     "uk_irishracing": "irishracing_uk",
     "france_irishracing": "irishracing_france",
+    "ireland_irishracing": "ireland_irishracing",
 }
 REGION_PROVIDERS = {
     "united_kingdom": "uk_irishracing",
     "france": "france_irishracing",
+    "ireland": "ireland_irishracing",
 }
 COUNTRY_SUFFIX_RE = re.compile(r"\s*\([A-Z]{2,3}\)\s*$")
 TITLE_RE = re.compile(

@@ -29,11 +29,12 @@ from race_event_source_cache import write_source_cache  # noqa: E402
 BASE_URL = "https://www.tjcis.com"
 PAST_EDITIONS_URL = f"{BASE_URL}/default.asp?content=PASSYR"
 CURRENT_EDITION_URL = f"{BASE_URL}/default.asp?content=ICS"
-PARSER_VERSION = "2026.08.2"
+PARSER_VERSION = "2026.09.1"
 REGION_ADAPTERS = {
     "japan": "japan_official_catalog",
     "hong_kong": "hkjc_official_catalog",
     "united_kingdom": "bha_pattern_catalog",
+    "ireland": "hri_pattern_catalog",
     "france": "france_galop_pattern_catalog",
     "united_states": "toba_graded_stakes_catalog",
     "australia": "racing_australia_pattern_catalog",
@@ -44,6 +45,7 @@ REGION_PREFIXES = {
     "japan": "japan",
     "hong_kong": "hong-kong",
     "united_kingdom": "united-kingdom",
+    "ireland": "ireland",
     "france": "france",
     "united_states": "united-states",
     "australia": "australia",
@@ -58,6 +60,7 @@ MIN_REGION_ROWS = {
     "japan": 50,
     "hong_kong": 3,
     "united_kingdom": 50,
+    "ireland": 40,
     "france": 50,
     "united_states": 300,
     "australia": 100,
@@ -94,7 +97,8 @@ LISTED_RE = re.compile(r"\((?:L|LR)\)", re.I)
 DOTS_RE = re.compile(r"\s*(?:\.\s*){2,}")
 AGE_PATTERN = (
     r"(?:[2-9]\s*(?:y(?:o)?|u(?:p)?)|[2-9]\s*[-/]\s*[2-9](?:\s*y(?:o)?)?"
-    r"|[2-9]-(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec))"
+    r"|[2-9]-(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)"
+    r"|open(?:\s+[a-z](?:/[a-z])?)?)"
 )
 AGE_RE = re.compile(rf"\b{AGE_PATTERN}\b", re.I)
 DISTANCE_SURFACE_RE = re.compile(r"\b(?:a\s*)?(\d+(?:\.\d+)?)(?:\s*a)?\s*(T|D|AWT)\b", re.I)
@@ -112,7 +116,7 @@ SUPPLEMENT_BOUNDARY_RE = re.compile(
 )
 SOURCE_CONFLICT_POLICY = "explicit_graded_rows_with_regional_official_corrections"
 UNSUPPORTED_SECTION_RE = re.compile(
-    r"(?:PT|PART)(?:I|II|IV)[—-](?:ARGENTINA|BRAZIL|CANADA|CHILE|CZECHREPUBLIC|INDIA|IRE(?:LAND)?(?:JUMPS?)?|IRISHJUMPS|ITALY|ITALIANJUMPS|KOREA|MACAU|MALAYSIA|NEWZEALAND(?:JUMPS)?|PANAMA|PERU|PUERTORICO|SCANDINAVIA|SINGAPORE|SOUTHAFRICA|SPAIN|SWITZERLANDJUMPS|URUGUAY|VENEZUELA|INDEX)"
+    r"(?:PT|PART)(?:I|II|IV)[—-](?:ARGENTINA|BRAZIL|CANADA|CHILE|CZECHREPUBLIC|INDIA|ITALY|ITALIANJUMPS|KOREA|MACAU|MALAYSIA|NEWZEALAND(?:JUMPS)?|PANAMA|PERU|PUERTORICO|SCANDINAVIA|SINGAPORE|SOUTHAFRICA|SPAIN|SWITZERLANDJUMPS|URUGUAY|VENEZUELA|INDEX)"
 )
 UNSUPPORTED_COUNTRY_TITLES = {
     "ARGENTINA",
@@ -121,9 +125,6 @@ UNSUPPORTED_COUNTRY_TITLES = {
     "CHILE",
     "CZECHREPUBLIC",
     "INDIA",
-    "IRELAND",
-    "IRELANDJUMPRACES",
-    "IRISHJUMPRACES",
     "ITALY",
     "ITALIANJUMPRACES",
     "INDEX",
@@ -261,6 +262,8 @@ def _page_context(text: str) -> tuple[str | None, str]:
             return "japan", "jumps"
         if "USAJUMPS" in upper or "UNITEDSTATESJUMPS" in upper:
             return "united_states", "jumps"
+        if "IRISHJUMP" in upper or "IRELANDJUMP" in upper:
+            return "ireland", "jumps"
     if re.search(r"PTI[—-](?:FRANCE|FRA|FR)", upper):
         return "france", "flat"
     if re.search(r"PTI[—-](?:GB|GREATBRITAIN)", upper):
@@ -275,6 +278,8 @@ def _page_context(text: str) -> tuple[str | None, str]:
         return "australia", "flat"
     if re.search(r"PTI[—-]GERMANY", upper):
         return "germany", "flat"
+    if re.search(r"PTI[—-](?:IRELAND|IRE)", upper):
+        return "ireland", "flat"
     if re.search(r"PTI[—-]UNITEDARABEMIRATES", upper):
         return "united_arab_emirates", "flat"
     if re.search(r"PT(?:I|II)[—-](?:OTHERRACES.*)?BAHRAIN", upper, re.S):
@@ -435,6 +440,9 @@ def _metadata_line(line: str) -> bool:
             "GREATBRITAIN",
             "GREATBRITAINJUMPRACES",
             "FRENCHJUMPRACES",
+            "IRELAND",
+            "IRELANDJUMPRACES",
+            "IRISHJUMPRACES",
             "JAPANESEJUMPRACES",
             "UNITEDSTATESJUMPS",
             "UNITEDSTATESJUMPRACES",
@@ -466,8 +474,8 @@ def _clean_name(value: str) -> str:
     value = DOTS_RE.sub(" ", value)
     value = re.sub(r"\s+", " ", value).strip(" .")
     value = re.sub(
-        r"^(?:(?:HONG KONG(?:\s+SAR,?\s*CHINA)?|JAPAN|UNITED STATES OF AMERICA|AUSTRALIA|GERMANY|UNITED ARAB EMIRATES|BAHRAIN|(?:KINGDOM OF )?SAUDI ARABIA)\s+)?"
-        r"(?:(?:JAPANESE|UNITED STATES) JUMP ?RACES\s+)?"
+        r"^(?:(?:HONG KONG(?:\s+SAR,?\s*CHINA)?|JAPAN|IRELAND|UNITED STATES OF AMERICA|AUSTRALIA|GERMANY|UNITED ARAB EMIRATES|BAHRAIN|(?:KINGDOM OF )?SAUDI ARABIA)\s+)?"
+        r"(?:(?:JAPANESE|IRISH|IRELAND|UNITED STATES) JUMP ?RACES\s+)?"
         r"(?:\([^)]*(?:DOLLARS|POUNDS|YEN|METERS|FURLONGS|SURFACE|HK\$)[^)]*\)\s*)+",
         "",
         value,
@@ -902,12 +910,18 @@ def _suspicious_catalog_names(rows: list[dict]) -> list[str]:
         name = str(row.get("original_name") or "")
         upper = name.upper()
         name_without_qualifiers = re.sub(r"\([^)]*\)|\[[^]]*]", " ", name)
+        purse_like_number = re.search(r"\b\d{1,3},\d{3}\b", name_without_qualifiers)
+        # 经典赛名中的数字是赛事身份的一部分（如 Irish 2,000 Guineas、Doomben 10,000），
+        # 只有非这类固定名称的千分位数字才按奖金串入名称的污染处理。
+        legit_name_number = re.search(r"\b\d,000\s+Guineas\b", name_without_qualifiers, re.I) or (
+            name_without_qualifiers.strip().casefold() == "doomben 10,000"
+        )
         if (
             len(name) > 160
             or "RACE PAGE" in upper
             or "(L)" in upper
             or "TOTAL RACES" in upper
-            or re.search(r"\b\d{1,3},\d{3}\b", name_without_qualifiers)
+            or (purse_like_number and not legit_name_number)
         ):
             suspicious.append(name)
     return suspicious

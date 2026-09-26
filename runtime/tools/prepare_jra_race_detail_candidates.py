@@ -5,17 +5,22 @@ import argparse
 import csv
 import json
 import re
+import sys
 import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urljoin
 
-from historical_race_detail_http import controlled_http_get
-from race_event_request_budget import before_network_request
-from race_event_source_cache import write_source_cache
-from jra_legacy_replay_detail_parser import try_parse_jra_legacy_replay_detail
+TOOLS_DIR = Path(__file__).resolve().parent
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
 
-from bs4 import BeautifulSoup
+from historical_race_detail_http import controlled_http_get  # noqa: E402
+from race_event_request_budget import before_network_request  # noqa: E402
+from race_event_source_cache import write_source_cache  # noqa: E402
+from jra_legacy_replay_detail_parser import try_parse_jra_legacy_replay_detail  # noqa: E402
+
+from bs4 import BeautifulSoup  # noqa: E402
 
 
 JRA_BASE_URL = "https://www.jra.go.jp"
@@ -23,6 +28,17 @@ JRA_RESULT_LIST_URL = (
     "https://www.jra.go.jp/datafile/seiseki/replay/2026/jyusyo.html"
 )
 JRA_RESULT_RE = re.compile(r"/datafile/seiseki/(?:replay/2026/\d{3}|g1/[^\"']+/result/[^\"']+2026)\.html")
+
+
+def _result_list_url(year: int) -> str:
+    return f"{JRA_BASE_URL}/datafile/seiseki/replay/{year}/jyusyo.html"
+
+
+def _result_url_re(year: int) -> re.Pattern:
+    return re.compile(
+        rf"/datafile/seiseki/(?:replay/{year}/\d{{3}}|g1/[^\"']+/result/[^\"']+{year})\.html"
+    )
+
 WAKU_RE = re.compile(r"枠(\d+)")
 STRUCTURED_DISTANCE_RE = re.compile(
     r"(?<!\d)(\d{1,2}(?:,\d{3})|\d{3,4})\s*(?:m|メートル)(?![A-Za-z])",
@@ -115,17 +131,18 @@ def _normalize_match_text(value: str) -> str:
     return re.sub(r"[^0-9A-Za-z\u3040-\u30ff\u3400-\u9fff]+", "", value).casefold()
 
 
-def _extract_result_entries(list_html_path: Path) -> list[dict[str, str]]:
+def _extract_result_entries(list_html_path: Path, year: int = 2026) -> list[dict[str, str]]:
     raw = list_html_path.read_bytes()
     try:
         list_html = raw.decode("utf-8")
     except UnicodeDecodeError:
         list_html = _decode_jra_html(raw)
     soup = BeautifulSoup(list_html, "html.parser")
+    result_re = _result_url_re(year)
     entries = []
     for anchor in soup.find_all("a", href=True):
         href = anchor.get("href")
-        if JRA_RESULT_RE.search(href):
+        if result_re.search(href):
             row = anchor.find_parent("tr")
             entries.append(
                 {
@@ -144,8 +161,8 @@ def _extract_result_entries(list_html_path: Path) -> list[dict[str, str]]:
     return unique_entries
 
 
-def _match_result_links(list_html_path: Path, events: list[dict]) -> list[str]:
-    entries = _extract_result_entries(list_html_path)
+def _match_result_links(list_html_path: Path, events: list[dict], year: int = 2026) -> list[str]:
+    entries = _extract_result_entries(list_html_path, year=year)
     matched_links = []
     for event in events:
         names = [event.get("original_name") or ""]
@@ -164,11 +181,13 @@ def _match_result_links(list_html_path: Path, events: list[dict]) -> list[str]:
     return matched_links
 
 
-def _source_filename(source_url: str) -> str:
+def _source_filename(source_url: str, year: int | None = None) -> str:
     path = source_url.split("?", 1)[0].rstrip("/")
-    replay_match = re.search(r"/replay/2026/(\d{3})\.html$", path)
+    replay_match = re.search(r"/replay/(\d{4})/(\d{3})\.html$", path)
     if replay_match:
-        return f"source_jra_2026_{replay_match.group(1)}.html"
+        if year is not None and int(replay_match.group(1)) != year:
+            raise ValueError(f"结果页年份与运行年份不一致：{source_url}")
+        return f"source_jra_{replay_match.group(1)}_{replay_match.group(2)}.html"
     slug = re.sub(r"[^A-Za-z0-9]+", "_", path).strip("_").lower()
     return f"source_jra_{slug[-80:]}.html"
 
@@ -246,17 +265,18 @@ def prepare_candidates(args) -> dict:
         finished_events = finished_events[: args.limit]
     request_context = _request_context_from_args(args)
     source_html = Path(args.source_html)
+    year = int(getattr(args, "year", 2026) or 2026)
     _download(
-        JRA_RESULT_LIST_URL,
+        _result_list_url(year),
         source_html,
         allow_network=args.allow_network,
         timeout=args.timeout_seconds,
         request_context=request_context,
     )
-    result_links = _match_result_links(source_html, finished_events)
+    result_links = _match_result_links(source_html, finished_events, year=year)
 
-    jsonl_path = output_dir / "jra_detail_candidates_2026.jsonl"
-    review_csv_path = output_dir / "jra_detail_review_2026.csv"
+    jsonl_path = output_dir / f"jra_detail_candidates_{year}.jsonl"
+    review_csv_path = output_dir / f"jra_detail_review_{year}.csv"
     source_dir = output_dir / "sources"
     source_dir.mkdir(exist_ok=True)
 
@@ -272,7 +292,7 @@ def prepare_candidates(args) -> dict:
     with jsonl_path.open("w", encoding="utf-8") as jsonl:
         for index, event in enumerate(finished_events):
             source_url = result_links[index]
-            source_path = source_dir / _source_filename(source_url)
+            source_path = source_dir / _source_filename(source_url, year=year)
             try:
                 body = _download(
                     source_url,
@@ -340,6 +360,7 @@ def main() -> None:
     parser.add_argument("--request-shard-id")
     parser.add_argument("--request-state")
     parser.add_argument("--host-state-root")
+    parser.add_argument("--year", type=int, default=2026, help="JRA 年度重赏列表年份（默认 2026）")
     args = parser.parse_args()
     summary = prepare_candidates(args)
     print(json.dumps(summary, ensure_ascii=False, indent=2))

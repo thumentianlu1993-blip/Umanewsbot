@@ -34,6 +34,7 @@ REGION_SOURCES = {
     "japan": ("jra", "netkeiba"),
     "hong_kong": ("hkjc",),
     "united_kingdom": ("racing_post", "sporting_life", "irishracing"),
+    "ireland": ("irishracing",),
     "france": ("france_galop", "zeturf", "irishracing"),
     "united_states": ("equibase_chart", "equibase_archive", "horse_racing_nation"),
 }
@@ -49,6 +50,7 @@ PROVIDER_ALIASES = {
     "irishracing": "irishracing",
     "uk_irishracing": "uk_irishracing",
     "france_irishracing": "france_irishracing",
+    "ireland_irishracing": "ireland_irishracing",
     "zeturf": "zeturf",
     "equibase": "equibase",
     "equibase_chart": "equibase_chart",
@@ -61,6 +63,7 @@ DEFAULT_SOURCE_NAMES = {
     "sporting_life": "sporting_life",
     "uk_irishracing": "irishracing_uk",
     "france_irishracing": "irishracing_france",
+    "ireland_irishracing": "ireland_irishracing",
     "zeturf": "zeturf",
     "equibase": "equibase_yearbook",
     "equibase_chart": "equibase_pdf_chart",
