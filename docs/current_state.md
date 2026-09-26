@@ -1,3 +1,13 @@
+## 2026-09-27 TRA registry 续期至 2026-12-31
+
+用户确认 TRA 条款仍允许当前自动化用途（账单按月自动续费正常），批准将项目自建的 TRA 合同 registry
+续期到 2026-12-31。registry 是 fail-closed 门禁（`verified_at` 31 天 staleness + `valid_until` 硬期限 +
+SHA-256 钉扎），不随账单自动续期；本次按门禁设计执行续期：重新抓取条款证据、更新 registry 两份仓库副本、
+重渲 standing policy（roster 摘要闭集导致 13 条 route_digest 全部轮换）、更新全部钉扎。
+生产侧还需：镜像重建（registry 烘焙进镜像）+ `.env` 钉扎 + 部署后用 `repair_data_sync_stalled_events`
+把 18 个 TRA 登记（旧 route_digest `7591a4f2834c…`）轮换到新 digest。变更见
+[changes/renew-tra-registry-20260927](changes/renew-tra-registry-20260927/spec.md)。
+
 ## 2026-09-26 跨任务交接已更新
 
 已将原9月6–15日交接更新至9月26日，并同步future_work_roadmap：覆盖#201–213发布、历史129场/1209行回填、归一化/北京时间/自然刷新、JRA多来源登记，以及其他任务的马匹采集暂停和长期产品待办。详见[统一交接](changes/release-pr201-production/handoff.md)，旧原文保留为历史。
