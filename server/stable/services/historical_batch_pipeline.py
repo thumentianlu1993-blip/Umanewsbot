@@ -500,6 +500,7 @@ _RECIPE_POLICIES: dict[str, dict[str, Any]] = {
             "limit": "--limit",
             "timeout_seconds": "--timeout-seconds",
             "fail_fast": "--fail-fast",
+            "year": "--year",
         },
     },
     "prepare_hkjc_race_detail_candidates.py": {
