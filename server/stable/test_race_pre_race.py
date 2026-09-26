@@ -335,3 +335,67 @@ class ReviewRegressions(TestCase):
         self.event.refresh_from_db()
         self.assertIsNotNone(pre.public_jra_preview(self.event,now=later))
         self.assertEqual(self.event.data_candidates.filter(module='runners').count(),2)
+
+
+@override_settings(**FLAGS)
+class JraNameNormalizationTests(TestCase):
+    """长短名等价归一与发现 reason 拆分（2026-09-26 シリウスS/スプリンターズS 根因回归）。"""
+
+    def sirius(self):
+        return models.RaceEvent.objects.create(year=2026, slug='sirius-test', chinese_name='天狼星锦标',
+            original_name='シリウスS', country_region='japan', racecourse='阪神',
+            local_date=date(2026,9,20), timezone_name='Asia/Tokyo', visibility_status='published')
+
+    SIRIUS_URL = 'https://www.jra.go.jp/JRADB/accessD.html?CNAME=pw01dde0109202604081120260920/08'
+    SIRIUS_HTML = ('<html><body><h1>出馬表</h1><table><caption><div class="race_header">'
+        '<div class="date">2026年9月20日（日曜）3回阪神6日</div><div class="time">発走時刻：15時35分</div>'
+        '<span class="race_name">シリウスステークス</span></div></caption>'
+        '<tbody><tr><td class="waku"></td><td class="num"></td><td class="horse"><div class="name">'
+        '<a href="/horse/1">テスト馬</a></div><p class="trainer">調教師</p></td>'
+        '<td class="jockey"><p class="weight">57.0kg</p><p class="jockey">騎手</p></td></tr></tbody></table>'
+        '</body></html>')
+
+    def test_normalize_jra_race_name(self):
+        cases = {'シリウスステークス': 'シリウスS', 'シリウスS': 'シリウスS', 'GⅢ シリウスS': 'シリウスS',
+                 'J・GⅢ 阪神ジャンプS': '阪神ジャンプS', 'NHKマイルカップ': 'NHKマイルC', 'NHKマイルC': 'NHKマイルC',
+                 '神戸新聞杯': '神戸新聞杯', '産経賞オールカマー': '産経賞オールカマー', '': '', None: ''}
+        for value, expected in cases.items():
+            with self.subTest(value=value):
+                self.assertEqual(pre.normalize_jra_race_name(value), expected)
+
+    def test_long_form_page_matches_short_event_name(self):
+        target = self.sirius()
+        self.assertEqual(pre.parse_jra_card(self.SIRIUS_HTML, event=target, url=self.SIRIUS_URL)['stage'], 'declared')
+
+    def test_different_race_still_rejected(self):
+        target = self.sirius()
+        for html in [self.SIRIUS_HTML.replace('シリウスステークス', 'スプリンターズステークス'),
+                     self.SIRIUS_HTML.replace('シリウスステークス', 'シリウス記念')]:
+            with self.subTest(html=html[:30]), self.assertRaises(ValueError):
+                pre.parse_jra_card(html, event=target, url=self.SIRIUS_URL)
+
+    def discover(self, target, pages, now=NOW):
+        index = ''.join('<a href="%s">出馬表</a>' % url for url, _ in pages)
+        def fetch(url, **kwargs):
+            return index if url == pre.INDEX_URL else dict(pages)[url]
+        result = pre.discover_jra_pre_race(now=now, clock=lambda: now, fetcher=fetch)
+        target.refresh_from_db()
+        return result, target.source_refs['pre_race_checks']['jra_pre_race_v1']
+
+    def test_discovery_long_form_name_completes_without_manual_alias(self):
+        target = self.sirius()
+        result, state = self.discover(target, [(self.SIRIUS_URL, self.SIRIUS_HTML)])
+        self.assertEqual(result['checked'], 1)
+        self.assertEqual(target.data_candidates.filter(module='runners', source_name=pre.JRA).count(), 1)
+
+    def test_discovery_no_match_and_ambiguous_reasons_split(self):
+        target = self.sirius()
+        other = self.SIRIUS_URL.replace('/08', '/09')
+        result, state = self.discover(target, [(self.SIRIUS_URL, self.SIRIUS_HTML.replace('シリウスステークス', '別の杯'))])
+        self.assertEqual(result['checked'], 0)
+        self.assertEqual(state['reason'], 'jra_race_identity_no_match')
+        later = NOW + timedelta(hours=4)
+        result, state = self.discover(target, [(self.SIRIUS_URL, self.SIRIUS_HTML), (other, self.SIRIUS_HTML)], now=later)
+        self.assertEqual(result['checked'], 0)
+        self.assertEqual(state['reason'], 'jra_race_identity_ambiguous')
+        self.assertEqual(target.data_candidates.count(), 0)
