@@ -1,0 +1,20 @@
+{
+  "reviewer": "independent plan reviewer",
+  "verdict": "APPROVED",
+  "scope": "production-generated activation intent, script binding, six changes and recovery scope",
+  "intent_sha256": "4cbe4fdf33ce5bc9cfa7059b25243ae55b54129858c27be56e4d569de3c14174",
+  "script_sha256": "a5a54a06fdd9a60cc165b52db957a831e50888956564c87e03b4410df5276206",
+  "checks": [
+    "raw and canonical intent SHA exact",
+    "candidate commit and image exact",
+    "same closed-state database identity",
+    "before flags equal closed-state; only three new writer flags enabled",
+    "six allowed active environment changes",
+    "before and target config bindings",
+    "original service mapping, race_live_worker absent",
+    "separate backup file identity and TOC",
+    "JRA result Hanshin/Nakayama T-7 through T+30; no v1 conversion",
+    "legacy 15 authority and public unchanged"
+  ],
+  "production_connection": false
+}

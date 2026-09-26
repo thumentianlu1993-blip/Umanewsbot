@@ -1,0 +1,225 @@
+"""本次PR212专用配置切换；只由release coordinator在0079完成后执行。"""
+import os,sys,json,hashlib,secrets,subprocess,stat,datetime,copy,signal,fcntl,time
+from pathlib import Path
+ROOT=Path('/opt/umanews-release-26706602-multisource-20260922/umanewsbot')
+COMMIT='2670660205fbee04b882dd7d01030c52788b5faf'
+POLICY_SHA='d28a690bfc7ed326f8b675775f48764d874ed4024d8414fbe2b6ec700d47f993'
+POLICY=Path('/opt/umanewsbot-persistent/runtime/race_data_sync/multisource/20260922-jra-policy.json')
+POLICY_CONTAINER='/run/race-data-sync/multisource/20260922-jra-policy.json'
+DIRECTORY=ROOT/'runtime/migration_history_repair/jra-activation-20260922'
+CANONICAL=Path('/opt/umanewsbot/.env')
+os.environ['UMANEWS_ROOT_DIR']=str(ROOT)
+sys.path.insert(0,str(ROOT/'deploy'))
+import release_0079 as release
+c=release.contract
+APP=tuple(s for s in c.SERVICES if s!='nginx')
+CHANGES={'RACE_DATA_MULTISOURCE_APPLY_ENABLED':'true','RACE_DATA_MULTISOURCE_DISCOVERY_ENABLED':'true','RACE_DATA_COVERAGE_ALERTS_ENABLED':'true','RACE_DATA_MULTISOURCE_POLICY_FILE':POLICY_CONTAINER,'RACE_DATA_MULTISOURCE_POLICY_SHA256':POLICY_SHA}
+
+def sha(raw):return hashlib.sha256(raw).hexdigest()
+def blob(path):
+ fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW)
+ try:
+  s=os.fstat(fd)
+  if not stat.S_ISREG(s.st_mode) or s.st_size > 8*1024*1024 or s.st_uid!=os.getuid() or s.st_mode & 0o077:raise ValueError('private regular file required')
+  return os.read(fd,8*1024*1024)
+ finally:os.close(fd)
+def save_blob(path,raw):
+ if path.exists():
+  if blob(path)!=raw:raise ValueError('immutable evidence differs')
+  return
+ fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+ try:
+  with os.fdopen(fd,'wb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
+ except BaseException:raise
+
+def replace_bound(path,raw,allowed):
+ if sha(blob(path)) not in allowed:raise ValueError('configuration CAS drift')
+ tmp=path.with_name(path.name+'.pr212-'+secrets.token_hex(6))
+ save_blob(tmp,raw)
+ os.replace(tmp,path)
+ fd=os.open(path.parent,os.O_RDONLY|os.O_DIRECTORY)
+ try:os.fsync(fd)
+ finally:os.close(fd)
+
+def change_env(raw):
+ lines=raw.decode().splitlines();values={};counts={}
+ for line in lines:
+  if '=' in line and not line.startswith('#'):
+   key,val=line.split('=',1);values[key]=val;counts[key]=counts.get(key,0)+1
+ if any(n!=1 for n in counts.values()):raise ValueError('duplicate env key')
+ providers=values['RACE_DATA_SYNC_ENABLED_PROVIDERS'].split(',')
+ if set(providers)!={'horse_racing_nation','sporting_life','the_racing_api','zeturf'}:raise ValueError('unexpected original providers')
+ changes={**CHANGES,'RACE_DATA_SYNC_ENABLED_PROVIDERS':','.join([*providers,'jra'])}
+ result=[];seen=set()
+ for line in lines:
+  key=line.split('=',1)[0]
+  if key in changes:line=key+'='+changes[key];seen.add(key)
+  result.append(line)
+ result.extend(key+'='+value for key,value in changes.items() if key not in seen)
+ return ('\n'.join(result)+'\n').encode(),changes
+
+def atomic_json(path,value):
+ raw=c.encoded(value)
+ if path.exists():replace_bound(path,raw,{sha(blob(path))})
+ else:
+  save_blob(path,raw)
+  parent=os.open(path.parent,os.O_RDONLY|os.O_DIRECTORY)
+  try:os.fsync(parent)
+  finally:os.close(parent)
+
+def drain(nodes,env):
+ # 同镜像、writer 全关闭的一次性控制容器，恢复不依赖 web 仍在运行。
+ code="""from app.celery import app
+expected=EXPECTED
+inspect=app.control.inspect(timeout=5)
+ping=inspect.ping() or {}; active=inspect.active() or {}; reserved=inspect.reserved() or {}; again=inspect.active() or {}
+workers=set(ping)
+assert workers and set(active)==workers and set(reserved)==workers and set(again)==workers
+assert all(any(n==w or w.endswith('@'+n) for w in workers) for n in expected)
+assert not any(active.values()) and not any(reserved.values()) and not any(again.values())
+print('drained')
+""".replace('EXPECTED',repr(nodes))
+ args=['run','--rm','--no-deps']
+ for flag in c.WRITER_FLAGS:args+=['-e',flag+'=false']
+ args+=['web','python','manage.py','shell','-c',code]
+ deadline=time.monotonic()+900
+ while True:
+  try:release.compose(args,env);return
+  except ValueError:
+   if time.monotonic()>=deadline:raise ValueError('worker drain timeout')
+   time.sleep(5)
+
+def main():
+ mode=sys.argv[1] if len(sys.argv)>1 else 'prepare'
+ if mode not in {'prepare','apply','rollback'}:raise ValueError('invalid mode')
+ env={**os.environ,'COMPOSE_FILE':'docker-compose.prod.lowcost.yml','COMPOSE_PROJECT_NAME':'umanewsbot','UMANEWS_RELEASE_COMMIT':COMMIT,'EXPECTED_CANDIDATE_COMMIT':COMMIT,'DEPLOYMENT_LOCK_ACTION':'deploy','DEPLOYMENT_LOCK_DIR':'/tmp/umanews-deployment.lock'}
+ env['EXPECTED_CANDIDATE_IMAGE_ID']=release.run(['docker','image','inspect','--format','{{.Id}}','umanewsbot:pr212-26706602'],env=env)
+ lock=ROOT/'deploy/deployment_lock.sh'
+ release.private_directory(DIRECTORY)
+ mutex=os.open(DIRECTORY/'operation.lock',os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW,0o600)
+ fcntl.flock(mutex,fcntl.LOCK_EX|fcntl.LOCK_NB)
+ if mode=='prepare' and (DIRECTORY/'phase.json').exists():raise ValueError('prepare cannot resume an activation switch; use apply or rollback')
+ lease_path=DIRECTORY/'lock-lease.json'
+ lease=json.loads(blob(lease_path)) if lease_path.exists() else None
+ if lease is not None and (lease['commit']!=COMMIT or lease['image_id']!=env['EXPECTED_CANDIDATE_IMAGE_ID']):raise ValueError('lock lease binding differs')
+ if lease is not None and Path('/tmp/umanews-deployment.lock').exists():
+  env['DEPLOYMENT_LOCK_TOKEN']=lease['token'];release.run([lock,'verify'],env=env)
+ elif lease is None or lease['state'] in ('acquiring','release_ready'):
+  if lease is None or lease['state']=='release_ready':
+   lease=dict(token=secrets.token_hex(32),commit=COMMIT,image_id=env['EXPECTED_CANDIDATE_IMAGE_ID'],state='acquiring')
+  atomic_json(lease_path,lease)
+  env['DEPLOYMENT_LOCK_TOKEN']=lease['token'];release.run([lock,'acquire'],env=env)
+ else:raise ValueError('unfinished activation lock was removed externally')
+ lease['state']='held';lease['pid']=os.getpid();lease['mode']=mode
+ atomic_json(lease_path,lease)
+ success=False
+ try:
+  c.publish_once(DIRECTORY/('attempt-'+secrets.token_hex(6)+'.json'),dict(owner='Codex',pid=os.getpid(),thread='01a0bda6-cc84-7013-80e1-ce67c8ae3624',operation=mode,sha=COMMIT,started_at=datetime.datetime.now(datetime.timezone.utc).isoformat()))
+  release.candidate(env);release.guard()
+  completed=[]
+  for p in release.RELEASES.glob('*/intent.json'):
+   if (p.parent/'complete.json').exists():
+    value,ident=c.read_json(p)
+    if value['candidate_commit']==COMMIT and value['candidate_image_id']==env['EXPECTED_CANDIDATE_IMAGE_ID']:
+     c.verify_intent(p,ident['sha256'],{},active_required=False);completed.append(value)
+  if len(completed)!=1:raise ValueError('exact completed0079 release required')
+  env['EXPECTED_PRODUCTION_DB_IDENTITY_SHA256']=completed[0]['database_identity_sha256']
+  release.schema_state(env,c.TARGET_LEAF)
+  if mode!='rollback':
+   if sha(blob(POLICY))!=POLICY_SHA:raise ValueError('policy SHA differs')
+   check_args=['run','--rm','--no-deps']
+   for flag in c.WRITER_FLAGS:check_args+=['-e',flag+'=false']
+   check_args+=['-e','RACE_DATA_MULTISOURCE_POLICY_FILE='+POLICY_CONTAINER,'-e','RACE_DATA_MULTISOURCE_POLICY_SHA256='+POLICY_SHA,'web','python','manage.py','shell','-c','from django.utils import timezone; from stable.services.race_data_source_adapters import load_multisource_policy; p=load_multisource_policy(now=timezone.now()); assert all(r.valid(timezone.now()) for r in p.routes); print("policy-valid")']
+   release.compose(check_args,env)
+  intent_path=DIRECTORY/'intent.json'
+  if not intent_path.exists():
+   if mode!='prepare':raise ValueError('prepare intent first')
+   active=blob(ROOT/'.env');canonical=blob(CANONICAL);target,changes=change_env(active)
+   services={s:release.probe(s,env) for s in c.SERVICES}
+   for s,v in services.items():release.verify_service_image(s,v,env)
+   config=json.loads(release.compose(['config','--format','json'],env))
+   before_flags=release.writer_flags(config['services']['web']['environment'])
+   for service,current in services.items():release.verify_service_flags(service,current,env,before_flags)
+   target_config=copy.deepcopy(config)
+   for service in target_config['services'].values():
+    values=service.get('environment',{})
+    for k,v in changes.items():
+     if k in values:values[k]=v
+   for s in APP:
+    if any(target_config['services'][s]['environment'].get(k)!=v for k,v in changes.items()):raise ValueError('target configuration cannot be proved')
+   save_blob(DIRECTORY/'active.before.env',active);save_blob(DIRECTORY/'canonical.before.env',canonical);save_blob(DIRECTORY/'target.env',target)
+   backup_dir=DIRECTORY/'backup';release.private_directory(backup_dir)
+   if any(backup_dir.iterdir()):raise ValueError('unpublished backup exists')
+   output=release.run([ROOT/'deploy/backup_db.sh'],env={**env,'BACKUP_TARGET':'local','BACKUP_DIR':str(backup_dir),'EXPECTED_COMPOSE_PROJECT':'umanewsbot'})
+   paths=[line.removeprefix('Backup created: ') for line in output.splitlines() if line.startswith('Backup created: ')]
+   if len(paths)!=1:raise ValueError('backup proof missing')
+   backup=Path(paths[0]);assert backup.parent==backup_dir
+   with backup.open('rb') as f:
+    toc=release.run([ROOT/'deploy/docker/compose-wrapper.sh','-f',env['COMPOSE_FILE'],'exec','-T','db','pg_restore','--list'],env=env,stdin=f)
+   if not toc:raise ValueError('backup TOC empty')
+   intent=dict(schema_version='pr212-jra-activation/v1',candidate_commit=COMMIT,candidate_image_id=env['EXPECTED_CANDIDATE_IMAGE_ID'],database_identity_sha256=env['EXPECTED_PRODUCTION_DB_IDENTITY_SHA256'],policy_sha256=POLICY_SHA,policy_path=str(POLICY),active_before_sha256=sha(active),canonical_before_sha256=sha(canonical),target_sha256=sha(target),before_compose_sha256=c.digest(config),target_compose_sha256=c.digest(target_config),before_flags=before_flags,target_flags=release.writer_flags(target_config['services']['web']['environment']),restore_services={s:v['running'] for s,v in services.items()},changes=changes,backup_path=str(backup),backup_file=c.file_evidence(backup)[1],backup_toc_sha256=sha(toc.encode()),scope={'provider':'jra','region':'japan_jra','venues':['阪神','中山'],'capabilities':['result'],'calendar_window':'published canonical T-7d to T+30d','initial_targets':[103,104,105],'v1_conversion':False})
+   c.publish_once(intent_path,intent)
+  intent,identity=c.read_json(intent_path)
+  if intent['candidate_commit']!=COMMIT or intent['candidate_image_id']!=env['EXPECTED_CANDIDATE_IMAGE_ID'] or intent['policy_sha256']!=POLICY_SHA:raise ValueError('intent binding differs')
+  if c.file_evidence(Path(intent['backup_path']))[1]!=intent['backup_file']:raise ValueError('backup changed')
+  target=blob(DIRECTORY/'target.env');active_before=blob(DIRECTORY/'active.before.env');canonical_before=blob(DIRECTORY/'canonical.before.env')
+  if any(sha(raw)!=intent[key] for raw,key in [(target,'target_sha256'),(active_before,'active_before_sha256'),(canonical_before,'canonical_before_sha256')]):raise ValueError('env evidence changed')
+  if mode=='prepare':
+   success=True
+   print(json.dumps({'prepared_intent_sha256':identity['sha256'],'scope':intent['scope'],'target_config_sha256':intent['target_compose_sha256']}));return
+  if os.environ.get('EXPECTED_ACTIVATION_INTENT_SHA256')!=identity['sha256']:raise ValueError('exact reviewed activation intent SHA required')
+  rollback=mode=='rollback';wanted=active_before if rollback else target;canonical_wanted=canonical_before if rollback else target
+  if not rollback and (DIRECTORY/'rollback.complete.json').exists():raise ValueError('rolled-back intent cannot reactivate')
+  current_sha=c.digest(json.loads(release.compose(['config','--format','json'],env)))
+  if current_sha not in {intent['before_compose_sha256'],intent['target_compose_sha256']}:raise ValueError('pre-stop effective configuration drift')
+  if sha(blob(ROOT/'.env')) not in {intent['active_before_sha256'],intent['target_sha256']} or sha(blob(CANONICAL)) not in {intent['canonical_before_sha256'],intent['target_sha256']}:raise ValueError('pre-stop env drift')
+  # 恢复也先关闭调度和应用；不改数据库schema或删除v2数据。
+  current={s:release.probe(s,env) for s in c.SERVICES}
+  for s,v in current.items():
+   release.verify_service_image(s,v,env)
+   if s!='nginx' and v['running']:
+    try:release.verify_service_flags(s,v,env,intent['before_flags'])
+    except ValueError:release.verify_service_flags(s,v,env,intent['target_flags'])
+  atomic_json(DIRECTORY/'phase.json',{'intent_sha256':identity['sha256'],'mode':mode,'phase':'switching','started_at':datetime.datetime.now(datetime.timezone.utc).isoformat()})
+  if current['beat']['running']:release.compose(['stop','beat'],env)
+  nodes=[current[s]['node'] for s in ('worker','race_live_worker','race_sync_v2_worker') if current[s]['running']]
+  if nodes:drain(nodes,env)
+  for s in ('worker','race_live_worker','race_sync_v2_worker','web'):
+   if release.probe(s,env)['running']:release.compose(['stop',s],env)
+  if any(release.probe(s,env)['running'] for s in APP):raise ValueError('application still running')
+  replace_bound(ROOT/'.env',wanted,{intent['active_before_sha256'],intent['target_sha256']})
+  replace_bound(CANONICAL,canonical_wanted,{intent['canonical_before_sha256'],intent['target_sha256']})
+  expected_config=intent['before_compose_sha256'] if rollback else intent['target_compose_sha256']
+  def verify_config():
+   if c.digest(json.loads(release.compose(['config','--format','json'],env)))!=expected_config:raise ValueError('effective configuration differs')
+  verify_config();release.schema_state(env,c.TARGET_LEAF)
+  _,flags,_=release.release_config(env)
+  for s in ('web','worker','race_sync_v2_worker','race_live_worker','beat'):
+   if not intent['restore_services'][s]:continue
+   verify_config();release.candidate(env)
+   release.compose(['up','-d','--no-deps','--force-recreate',s],env)
+   observed=release.probe(s,env)
+   if not observed['running']:raise ValueError('service failed to start')
+   release.verify_service_image(s,observed,env);release.verify_service_flags(s,observed,env,flags)
+   if s=='web':release.run([ROOT/'deploy/wait_for_compose_service_healthy.sh'],env={**env,'SERVICE_NAME':'web'})
+  release.compose(['exec','-T','nginx','nginx','-s','reload'],env)
+  if {s:release.probe(s,env)['running'] for s in c.SERVICES}!=intent['restore_services']:raise ValueError('service mapping differs')
+  verify_config()
+  c.publish_once(DIRECTORY/('rollback.complete.json' if rollback else 'apply.complete.json'),{'intent_sha256':identity['sha256'],'config_sha256':expected_config,'image_id':env['EXPECTED_CANDIDATE_IMAGE_ID']})
+  success=True
+  print(json.dumps({'completed':mode,'intent_sha256':identity['sha256'],'image_id':env['EXPECTED_CANDIDATE_IMAGE_ID']}))
+ finally:
+  if success:
+   lease['state']='release_ready';atomic_json(lease_path,lease)
+   release.run([lock,'release'],env=env)
+  else:
+   # 任意未完成尝试保留全局锁；同脚本持私有 token + flock 才能恢复。
+   print('Activation incomplete: shared deployment lock retained; resume this bound intent using this script',file=sys.stderr)
+  os.close(mutex)
+
+if __name__=='__main__':
+ for sig in (signal.SIGINT,signal.SIGTERM,signal.SIGHUP):signal.signal(sig,lambda *_:sys.exit(1))
+ try:main()
+ except Exception as exc:
+  print('JRA activation refused: '+type(exc).__name__+'; retained intent and original files, inspect safe evidence',file=sys.stderr)
+  raise SystemExit(1)

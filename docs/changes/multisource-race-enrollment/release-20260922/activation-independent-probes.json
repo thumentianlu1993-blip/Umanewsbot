@@ -1,0 +1,56 @@
+{
+  "script_sha256": "a5a54a06fdd9a60cc165b52db957a831e50888956564c87e03b4410df5276206",
+  "harness_sha256": "fded9d6b9af9c00a188de69d16df12d6f32d464ce30058589f194d7c213793c0",
+  "probe_root": "/private/tmp/pr212-activation-final-probes-vml8r4rw",
+  "boundary": "real script, real private files and real deployment lock; Docker/schema/previous release proof mocked locally; no network/production",
+  "passed": 10,
+  "results": [
+    {
+      "case": "partial_then_prepare",
+      "prepare_rejected_lock_retained": true,
+      "rollback_rc": 0
+    },
+    {
+      "case": "rollback_missing",
+      "rollback_rc": 0,
+      "exact_env_restored": true,
+      "policy_checks": 0
+    },
+    {
+      "case": "rollback_corrupt",
+      "rollback_rc": 0,
+      "exact_env_restored": true,
+      "policy_checks": 0
+    },
+    {
+      "case": "rollback_expired",
+      "rollback_rc": 0,
+      "exact_env_restored": true,
+      "policy_checks": 0
+    },
+    {
+      "case": "acquire_crash",
+      "retry_rc": 0
+    },
+    {
+      "case": "crash_before_release",
+      "same_intent_retry_rc": 0
+    },
+    {
+      "case": "crash_after_release",
+      "same_intent_retry_rc": 0
+    },
+    {
+      "case": "web_down_worker_running",
+      "rollback_rc": 0
+    },
+    {
+      "case": "flock_concurrent",
+      "second_process_rejected": true
+    },
+    {
+      "case": "foreign_owner",
+      "foreign_lock_untouched": true
+    }
+  ]
+}

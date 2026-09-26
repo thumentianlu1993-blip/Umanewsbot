@@ -1,0 +1,2365 @@
+{
+  "captured_at": "2026-09-26T09:51:30.870Z",
+  "coverage": {
+    "counts": {
+      "confirmed": 3,
+      "enrollment_missing": 2,
+      "unsupported_region": 148
+    },
+    "entries": [
+      {
+        "classification": "unsupported_region",
+        "event_id": 4,
+        "local_date": "2026-10-04",
+        "routes": []
+      },
+      {
+        "classification": "confirmed",
+        "event_id": 103,
+        "local_date": "2026-09-19",
+        "routes": [
+          "c2826848fcd274014cc2189ccbbea05820c7fd30cd508e8fc9770265638c0023"
+        ]
+      },
+      {
+        "classification": "confirmed",
+        "event_id": 104,
+        "local_date": "2026-09-20",
+        "routes": [
+          "c2826848fcd274014cc2189ccbbea05820c7fd30cd508e8fc9770265638c0023"
+        ]
+      },
+      {
+        "classification": "confirmed",
+        "event_id": 105,
+        "local_date": "2026-09-21",
+        "routes": [
+          "c2826848fcd274014cc2189ccbbea05820c7fd30cd508e8fc9770265638c0023"
+        ]
+      },
+      {
+        "classification": "enrollment_missing",
+        "event_id": 106,
+        "local_date": "2026-09-26",
+        "routes": [
+          "c2826848fcd274014cc2189ccbbea05820c7fd30cd508e8fc9770265638c0023"
+        ]
+      },
+      {
+        "classification": "enrollment_missing",
+        "event_id": 107,
+        "local_date": "2026-09-27",
+        "routes": [
+          "c2826848fcd274014cc2189ccbbea05820c7fd30cd508e8fc9770265638c0023"
+        ]
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 108,
+        "local_date": "2026-10-04",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 109,
+        "local_date": "2026-10-04",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 110,
+        "local_date": "2026-10-10",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 111,
+        "local_date": "2026-10-11",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 112,
+        "local_date": "2026-10-12",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 113,
+        "local_date": "2026-10-17",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 114,
+        "local_date": "2026-10-18",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 115,
+        "local_date": "2026-10-18",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 116,
+        "local_date": "2026-10-24",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 117,
+        "local_date": "2026-10-25",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 191,
+        "local_date": "2026-09-22",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 192,
+        "local_date": "2026-09-23",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 193,
+        "local_date": "2026-09-30",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 194,
+        "local_date": "2026-10-01",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 195,
+        "local_date": "2026-10-06",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 196,
+        "local_date": "2026-10-07",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 197,
+        "local_date": "2026-10-08",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 198,
+        "local_date": "2026-10-12",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 491,
+        "local_date": "2026-09-18",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 492,
+        "local_date": "2026-09-18",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 493,
+        "local_date": "2026-09-19",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 494,
+        "local_date": "2026-09-19",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 495,
+        "local_date": "2026-09-19",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 496,
+        "local_date": "2026-09-19",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 497,
+        "local_date": "2026-09-25",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 498,
+        "local_date": "2026-09-26",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 499,
+        "local_date": "2026-09-26",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 500,
+        "local_date": "2026-09-26",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 501,
+        "local_date": "2026-09-26",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 502,
+        "local_date": "2026-09-26",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 503,
+        "local_date": "2026-09-26",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 504,
+        "local_date": "2026-09-26",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 505,
+        "local_date": "2026-09-26",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 506,
+        "local_date": "2026-09-26",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 507,
+        "local_date": "2026-09-26",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 508,
+        "local_date": "2026-09-27",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 509,
+        "local_date": "2026-09-27",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 510,
+        "local_date": "2026-09-27",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 511,
+        "local_date": "2026-09-27",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 512,
+        "local_date": "2026-09-27",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 513,
+        "local_date": "2026-10-02",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 514,
+        "local_date": "2026-10-02",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 515,
+        "local_date": "2026-10-02",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 516,
+        "local_date": "2026-10-03",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 517,
+        "local_date": "2026-10-03",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 518,
+        "local_date": "2026-10-03",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 519,
+        "local_date": "2026-10-03",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 520,
+        "local_date": "2026-10-03",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 521,
+        "local_date": "2026-10-03",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 522,
+        "local_date": "2026-10-03",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 523,
+        "local_date": "2026-10-03",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 524,
+        "local_date": "2026-10-03",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 525,
+        "local_date": "2026-10-03",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 526,
+        "local_date": "2026-10-03",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 527,
+        "local_date": "2026-10-03",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 528,
+        "local_date": "2026-10-03",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 529,
+        "local_date": "2026-10-03",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 530,
+        "local_date": "2026-10-03",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 531,
+        "local_date": "2026-10-04",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 532,
+        "local_date": "2026-10-04",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 533,
+        "local_date": "2026-10-04",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 534,
+        "local_date": "2026-10-04",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 535,
+        "local_date": "2026-10-04",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 536,
+        "local_date": "2026-10-09",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 537,
+        "local_date": "2026-10-10",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 538,
+        "local_date": "2026-10-10",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 539,
+        "local_date": "2026-10-11",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 540,
+        "local_date": "2026-10-17",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 541,
+        "local_date": "2026-10-17",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 542,
+        "local_date": "2026-10-18",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 543,
+        "local_date": "2026-10-23",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 544,
+        "local_date": "2026-10-23",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 545,
+        "local_date": "2026-10-24",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 546,
+        "local_date": "2026-10-24",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 547,
+        "local_date": "2026-10-25",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 548,
+        "local_date": "2026-10-25",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 770,
+        "local_date": "2026-09-19",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 771,
+        "local_date": "2026-09-19",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 772,
+        "local_date": "2026-09-19",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 773,
+        "local_date": "2026-10-02",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 774,
+        "local_date": "2026-10-03",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 775,
+        "local_date": "2026-10-03",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 776,
+        "local_date": "2026-10-03",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 777,
+        "local_date": "2026-10-03",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 778,
+        "local_date": "2026-10-03",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 779,
+        "local_date": "2026-10-04",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 780,
+        "local_date": "2026-10-04",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 781,
+        "local_date": "2026-10-04",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 782,
+        "local_date": "2026-10-04",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 783,
+        "local_date": "2026-10-04",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 784,
+        "local_date": "2026-10-04",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 785,
+        "local_date": "2026-10-10",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 786,
+        "local_date": "2026-10-18",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 787,
+        "local_date": "2026-10-25",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 788,
+        "local_date": "2026-10-25",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 789,
+        "local_date": "2026-10-25",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 790,
+        "local_date": "2026-10-25",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 791,
+        "local_date": "2026-10-25",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 792,
+        "local_date": "2026-10-25",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 793,
+        "local_date": "2026-10-26",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 794,
+        "local_date": "2026-10-26",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 828,
+        "local_date": "2026-09-17",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 829,
+        "local_date": "2026-09-17",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 830,
+        "local_date": "2026-09-17",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 831,
+        "local_date": "2026-09-22",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 832,
+        "local_date": "2026-09-22",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 833,
+        "local_date": "2026-09-26",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 834,
+        "local_date": "2026-09-30",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 835,
+        "local_date": "2026-10-11",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 836,
+        "local_date": "2026-10-11",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 837,
+        "local_date": "2026-10-11",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 838,
+        "local_date": "2026-10-11",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 839,
+        "local_date": "2026-10-17",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 840,
+        "local_date": "2026-10-17",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 841,
+        "local_date": "2026-10-17",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 842,
+        "local_date": "2026-10-24",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 969,
+        "local_date": "2026-09-19",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 970,
+        "local_date": "2026-09-19",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 971,
+        "local_date": "2026-09-24",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 972,
+        "local_date": "2026-09-25",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 973,
+        "local_date": "2026-09-25",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 974,
+        "local_date": "2026-09-25",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 975,
+        "local_date": "2026-09-26",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 976,
+        "local_date": "2026-09-26",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 977,
+        "local_date": "2026-10-03",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 978,
+        "local_date": "2026-10-03",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 979,
+        "local_date": "2026-10-03",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 980,
+        "local_date": "2026-10-09",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 981,
+        "local_date": "2026-10-09",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 982,
+        "local_date": "2026-10-09",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 983,
+        "local_date": "2026-10-09",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 984,
+        "local_date": "2026-10-09",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 985,
+        "local_date": "2026-10-10",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 986,
+        "local_date": "2026-10-10",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 987,
+        "local_date": "2026-10-10",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 988,
+        "local_date": "2026-10-10",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 989,
+        "local_date": "2026-10-17",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 990,
+        "local_date": "2026-10-17",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 991,
+        "local_date": "2026-10-17",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 992,
+        "local_date": "2026-10-17",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 993,
+        "local_date": "2026-10-24",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 994,
+        "local_date": "2026-10-24",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 995,
+        "local_date": "2026-10-24",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 19604,
+        "local_date": "2026-09-27",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 19605,
+        "local_date": "2026-10-01",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 19606,
+        "local_date": "2026-10-19",
+        "routes": []
+      },
+      {
+        "classification": "unsupported_region",
+        "event_id": 19607,
+        "local_date": "2026-10-25",
+        "routes": []
+      }
+    ],
+    "total": 153
+  },
+  "events": [
+    {
+      "admission": {
+        "admitted": true,
+        "authority": "data_sync",
+        "reason_code": ""
+      },
+      "bindings": [
+        {
+          "binding_manifest_sha256": "8511da60f7f20f3dc3720768c3913d8b2c541ef02d450c90dd0b9a73f611aab1",
+          "capabilities": [
+            "result"
+          ],
+          "id": 1,
+          "proof_digest": "bbdfb4144f7d109eeb913e0414c732cb101f2629c8c1e45f7dc71ac0c0f6cca8",
+          "route_digest": "c2826848fcd274014cc2189ccbbea05820c7fd30cd508e8fc9770265638c0023",
+          "source_identity_id": 18,
+          "state": "active"
+        }
+      ],
+      "checkpoints": [
+        {
+          "circuit_reason": "",
+          "consecutive_failures": 0,
+          "data_kind": "result",
+          "last_attempt_at": "2026-09-25T19:32:13.967Z",
+          "last_observation_hash": "8f65731a6e12976f5666180bf557ea1533e757d5db2033d806c99e13c6324887",
+          "last_success_at": "2026-09-25T19:32:13.967Z",
+          "next_poll_at": "2026-09-26T19:32:13.967Z",
+          "source_key": "jra"
+        }
+      ],
+      "confirmed_at": "2026-09-21T19:27:22.255Z",
+      "discovery": {
+        "last_checked_at": "2026-09-21T19:27:00.009865+00:00",
+        "last_outcomes": [
+          {
+            "provider": "jra",
+            "reason": "acquired"
+          }
+        ],
+        "lease_until": null,
+        "next_poll_at": "2026-09-22T01:27:00.009865+00:00",
+        "route_cursor": 1,
+        "token": ""
+      },
+      "enrollments": [
+        {
+          "authority_version": 2,
+          "created_at": "2026-09-21T19:27:06.962Z",
+          "enrollment_generation": 1,
+          "entry_sha256": "b95fbaf065f948957aa3a8b5e7ca250d666518eb510889daef47bca2daedff31",
+          "id": 16,
+          "manifest_sha256": "b95fbaf065f948957aa3a8b5e7ca250d666518eb510889daef47bca2daedff31",
+          "source_identity_id": 18,
+          "source_set_digest": "7a77d9fb9ba6157f076a832265cfacfb68560300874f5da558ca41658cea827c",
+          "source_set_generation": 1,
+          "state": "enrolled"
+        }
+      ],
+      "id": 103,
+      "identity_key_count": 1,
+      "incidents": [
+        {
+          "alert_sent_at": null,
+          "details": {
+            "classification": "enrollment_missing",
+            "issue": "result_overdue",
+            "policy_digest": "d28a690bfc7ed326f8b675775f48764d874ed4024d8414fbe2b6ec700d47f993"
+          },
+          "id": 16,
+          "last_seen_at": "2026-09-21T19:37:00.037Z",
+          "opened_at": "2026-09-21T19:27:00.009Z",
+          "resolved_at": "2026-09-21T19:37:00.037Z",
+          "status": "resolved"
+        }
+      ],
+      "name": "阪神ジャンプS",
+      "observations": [
+        {
+          "error_code": "",
+          "id": 64,
+          "normalized_sha256": "7e015e6d467739f52d0bda1874c28659cb6d9a451aac5222afaaaf0f91a3fec8",
+          "observed_at": "2026-09-21T19:27:20.986Z",
+          "parser_version": "jra-cname-v2",
+          "raw_sha256": "d1da6a304a93bbac486f9f874cf5800cf7c177b2ac5f4e3ff61dd2766edaa935",
+          "result_phase": "official",
+          "source_identity_id": 18
+        },
+        {
+          "error_code": "",
+          "id": 70,
+          "normalized_sha256": "aed2527530cd4aca3f40f75ffb0ebe7cf5b8ec162f3ca01c40fb948feb74c3a6",
+          "observed_at": "2026-09-22T19:28:00.155Z",
+          "parser_version": "jra-cname-v2",
+          "raw_sha256": "6326f36df0615e5f8672356ebf560ead1add880a7a4d6902374e70f3c9dfaee7",
+          "result_phase": "official",
+          "source_identity_id": 18
+        },
+        {
+          "error_code": "",
+          "id": 73,
+          "normalized_sha256": "6a7ed3dcfce5b25f3c1209cb7f441a7e1514c9e405ec2e7c5c843f17819e1341",
+          "observed_at": "2026-09-23T19:29:00.135Z",
+          "parser_version": "jra-cname-v2",
+          "raw_sha256": "8f65731a6e12976f5666180bf557ea1533e757d5db2033d806c99e13c6324887",
+          "result_phase": "official",
+          "source_identity_id": 18
+        }
+      ],
+      "projection": [
+        {
+          "current_racecard_revision_id": null,
+          "current_result_revision_id": 60,
+          "owner_generation": 1,
+          "write_owner": "data_sync"
+        }
+      ],
+      "public": {
+        "effective_mode": "official_public",
+        "phase": "official",
+        "reason": "data_sync_public_read_allowed",
+        "revision_id": 60,
+        "visible": true
+      },
+      "publications": [
+        {
+          "authorization_kind": "official_route",
+          "coverage_proof_digest": "7e015e6d467739f52d0bda1874c28659cb6d9a451aac5222afaaaf0f91a3fec8",
+          "id": 13,
+          "published_at": "2026-09-21T19:27:22.255Z",
+          "revision_id": 60
+        }
+      ],
+      "results": 12,
+      "revisions": [
+        {
+          "content_sha256": "7e015e6d467739f52d0bda1874c28659cb6d9a451aac5222afaaaf0f91a3fec8",
+          "id": 60,
+          "kind": "result",
+          "official_confirmed_at": "2026-09-21T19:27:22.255Z",
+          "phase": "official",
+          "primary_observation_id": 64,
+          "published_at": "2026-09-21T19:27:22.255Z",
+          "revision_no": 1
+        }
+      ],
+      "runners": 12,
+      "sources": [
+        {
+          "canonical_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1009202604050420260919/F4",
+          "created_at": "2026-09-21T19:27:06.947Z",
+          "external_race_id": "09202604050420260919",
+          "id": 18,
+          "identity_fields": {
+            "multisource_v2": {
+              "canonical_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1009202604050420260919/F4",
+              "external_race_id": "09202604050420260919",
+              "fetched_at": "2026-09-21T19:27:00.009865+00:00",
+              "identity_namespace": "jra-race-v1",
+              "identity_seed_receipt": {
+                "candidate_id": 40408,
+                "event_id": 103,
+                "event_snapshot_sha256": "668f1f957d02e0d88ee5b7627ae1b955ddb8d3e7601b16527f9808f7a7733c48",
+                "fetched_at": "2026-09-21T19:27:00.009865+00:00",
+                "fresh_raw_sha256": "d1da6a304a93bbac486f9f874cf5800cf7c177b2ac5f4e3ff61dd2766edaa935",
+                "link_chain": [
+                  "https://www.jra.go.jp/JRADB/accessD.html?CNAME=pw01dde0109202604050420260919/59",
+                  "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1009202604050420260919/F4"
+                ],
+                "matcher_version": "race-identity-v2",
+                "previous_evidence_sha256": "394e918213dfd8a1a9fd47045ceddc5d643d45ad05ad2109573d0141bf63cf87",
+                "route_digest": "c2826848fcd274014cc2189ccbbea05820c7fd30cd508e8fc9770265638c0023",
+                "verified_fields": {
+                  "external_race_id": "09202604050420260919",
+                  "local_date": "2026-09-19",
+                  "race_number": "4",
+                  "venue_key": "hanshin"
+                }
+              },
+              "local_date": "2026-09-19",
+              "meeting_session": "04-05",
+              "off_time": "2026-09-19T11:20:00+09:00",
+              "operator": "jra",
+              "parser_version": "jra-cname-v2",
+              "provider": "jra",
+              "race_number": "4",
+              "raw_names": [
+                "阪神ジャンプステークス"
+              ],
+              "raw_sha256": "d1da6a304a93bbac486f9f874cf5800cf7c177b2ac5f4e3ff61dd2766edaa935",
+              "region": "japan_jra",
+              "result_phase": "official",
+              "roster": [
+                {
+                  "barrier": "6",
+                  "carried_weight": "60.0",
+                  "external_runner_id": "number:8",
+                  "field_provenance": {
+                    "raw_sha256": "d1da6a304a93bbac486f9f874cf5800cf7c177b2ac5f4e3ff61dd2766edaa935",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1009202604050420260919/F4"
+                  },
+                  "finish_time": "3:27.4",
+                  "horse_name": "オオキニ",
+                  "jockey_name": "森 一馬",
+                  "margin": "",
+                  "number": "8",
+                  "raw_status": "1",
+                  "reported_finish_position": 1,
+                  "status": "finished",
+                  "trainer_name": "鈴木 孝志"
+                },
+                {
+                  "barrier": "2",
+                  "carried_weight": "61.0",
+                  "external_runner_id": "number:2",
+                  "field_provenance": {
+                    "raw_sha256": "d1da6a304a93bbac486f9f874cf5800cf7c177b2ac5f4e3ff61dd2766edaa935",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1009202604050420260919/F4"
+                  },
+                  "finish_time": "3:28.0",
+                  "horse_name": "ジューンベロシティ",
+                  "jockey_name": "高田 潤",
+                  "margin": "３ 1/2",
+                  "number": "2",
+                  "raw_status": "2",
+                  "reported_finish_position": 2,
+                  "status": "finished",
+                  "trainer_name": "武 英智"
+                },
+                {
+                  "barrier": "4",
+                  "carried_weight": "60.0",
+                  "external_runner_id": "number:4",
+                  "field_provenance": {
+                    "raw_sha256": "d1da6a304a93bbac486f9f874cf5800cf7c177b2ac5f4e3ff61dd2766edaa935",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1009202604050420260919/F4"
+                  },
+                  "finish_time": "3:29.3",
+                  "horse_name": "アトラクティーボ",
+                  "jockey_name": "坂口 智康",
+                  "margin": "８",
+                  "number": "4",
+                  "raw_status": "3",
+                  "reported_finish_position": 3,
+                  "status": "finished",
+                  "trainer_name": "武藤 善則"
+                },
+                {
+                  "barrier": "3",
+                  "carried_weight": "61.0",
+                  "external_runner_id": "number:3",
+                  "field_provenance": {
+                    "raw_sha256": "d1da6a304a93bbac486f9f874cf5800cf7c177b2ac5f4e3ff61dd2766edaa935",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1009202604050420260919/F4"
+                  },
+                  "finish_time": "3:29.9",
+                  "horse_name": "シホノスペランツァ",
+                  "jockey_name": "小牧 加矢太",
+                  "margin": "３ 1/2",
+                  "number": "3",
+                  "raw_status": "4",
+                  "reported_finish_position": 4,
+                  "status": "finished",
+                  "trainer_name": "寺島 良"
+                },
+                {
+                  "barrier": "5",
+                  "carried_weight": "60.0",
+                  "external_runner_id": "number:5",
+                  "field_provenance": {
+                    "raw_sha256": "d1da6a304a93bbac486f9f874cf5800cf7c177b2ac5f4e3ff61dd2766edaa935",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1009202604050420260919/F4"
+                  },
+                  "finish_time": "3:29.9",
+                  "horse_name": "ホウオウプロサンゲ",
+                  "jockey_name": "小野寺 祐太",
+                  "margin": "クビ",
+                  "number": "5",
+                  "raw_status": "5",
+                  "reported_finish_position": 5,
+                  "status": "finished",
+                  "trainer_name": "矢作 芳人"
+                },
+                {
+                  "barrier": "7",
+                  "carried_weight": "60.0",
+                  "external_runner_id": "number:10",
+                  "field_provenance": {
+                    "raw_sha256": "d1da6a304a93bbac486f9f874cf5800cf7c177b2ac5f4e3ff61dd2766edaa935",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1009202604050420260919/F4"
+                  },
+                  "finish_time": "3:30.0",
+                  "horse_name": "ロードリベラシオン",
+                  "jockey_name": "五十嵐 雄祐",
+                  "margin": "１／２",
+                  "number": "10",
+                  "raw_status": "6",
+                  "reported_finish_position": 6,
+                  "status": "finished",
+                  "trainer_name": "尾形 和幸"
+                },
+                {
+                  "barrier": "8",
+                  "carried_weight": "60.0",
+                  "external_runner_id": "number:12",
+                  "field_provenance": {
+                    "raw_sha256": "d1da6a304a93bbac486f9f874cf5800cf7c177b2ac5f4e3ff61dd2766edaa935",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1009202604050420260919/F4"
+                  },
+                  "finish_time": "3:30.4",
+                  "horse_name": "モンツァフレイバー",
+                  "jockey_name": "草野 太郎",
+                  "margin": "２",
+                  "number": "12",
+                  "raw_status": "7",
+                  "reported_finish_position": 7,
+                  "status": "finished",
+                  "trainer_name": "久保田 貴士"
+                },
+                {
+                  "barrier": "8",
+                  "carried_weight": "60.0",
+                  "external_runner_id": "number:11",
+                  "field_provenance": {
+                    "raw_sha256": "d1da6a304a93bbac486f9f874cf5800cf7c177b2ac5f4e3ff61dd2766edaa935",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1009202604050420260919/F4"
+                  },
+                  "finish_time": "3:32.1",
+                  "horse_name": "トーアモルペウス",
+                  "jockey_name": "大江原 圭",
+                  "margin": "１０",
+                  "number": "11",
+                  "raw_status": "8",
+                  "reported_finish_position": 8,
+                  "status": "finished",
+                  "trainer_name": "辻 哲英"
+                },
+                {
+                  "barrier": "5",
+                  "carried_weight": "60.0",
+                  "external_runner_id": "number:6",
+                  "field_provenance": {
+                    "raw_sha256": "d1da6a304a93bbac486f9f874cf5800cf7c177b2ac5f4e3ff61dd2766edaa935",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1009202604050420260919/F4"
+                  },
+                  "finish_time": "3:33.2",
+                  "horse_name": "ヴァランセカズマ",
+                  "jockey_name": "江田 勇亮",
+                  "margin": "７",
+                  "number": "6",
+                  "raw_status": "9",
+                  "reported_finish_position": 9,
+                  "status": "finished",
+                  "trainer_name": "蛯名 利弘"
+                },
+                {
+                  "barrier": "6",
+                  "carried_weight": "60.0",
+                  "external_runner_id": "number:7",
+                  "field_provenance": {
+                    "raw_sha256": "d1da6a304a93bbac486f9f874cf5800cf7c177b2ac5f4e3ff61dd2766edaa935",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1009202604050420260919/F4"
+                  },
+                  "finish_time": "3:34.9",
+                  "horse_name": "ネイチャーシップ",
+                  "jockey_name": "伴 啓太",
+                  "margin": "１０",
+                  "number": "7",
+                  "raw_status": "10",
+                  "reported_finish_position": 10,
+                  "status": "finished",
+                  "trainer_name": "畠山 吉宏"
+                },
+                {
+                  "barrier": "7",
+                  "carried_weight": "60.0",
+                  "external_runner_id": "number:9",
+                  "field_provenance": {
+                    "raw_sha256": "d1da6a304a93bbac486f9f874cf5800cf7c177b2ac5f4e3ff61dd2766edaa935",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1009202604050420260919/F4"
+                  },
+                  "finish_time": "3:35.7",
+                  "horse_name": "アルヴィア",
+                  "jockey_name": "上野 翔",
+                  "margin": "５",
+                  "number": "9",
+                  "raw_status": "11",
+                  "reported_finish_position": 11,
+                  "status": "finished",
+                  "trainer_name": "和田 雄二"
+                },
+                {
+                  "barrier": "1",
+                  "carried_weight": "60.0",
+                  "external_runner_id": "number:1",
+                  "field_provenance": {
+                    "raw_sha256": "d1da6a304a93bbac486f9f874cf5800cf7c177b2ac5f4e3ff61dd2766edaa935",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1009202604050420260919/F4"
+                  },
+                  "finish_time": "3:43.3",
+                  "horse_name": "ドラギニャン",
+                  "jockey_name": "井上 敏樹",
+                  "margin": "大差",
+                  "number": "1",
+                  "raw_status": "12",
+                  "reported_finish_position": 12,
+                  "status": "finished",
+                  "trainer_name": "河嶋 宏樹"
+                }
+              ],
+              "roster_complete": true,
+              "timezone": "Asia/Tokyo",
+              "venue_key": "hanshin"
+            }
+          },
+          "identity_namespace": "jra-race-v1",
+          "source_key": "jra"
+        }
+      ],
+      "status": "finished"
+    },
+    {
+      "admission": {
+        "admitted": true,
+        "authority": "data_sync",
+        "reason_code": ""
+      },
+      "bindings": [
+        {
+          "binding_manifest_sha256": "7d36eda08786099ea37ceacd71b780a336e8ea7cbff85ec148c592ef929ad636",
+          "capabilities": [
+            "result"
+          ],
+          "id": 2,
+          "proof_digest": "bbdfb4144f7d109eeb913e0414c732cb101f2629c8c1e45f7dc71ac0c0f6cca8",
+          "route_digest": "c2826848fcd274014cc2189ccbbea05820c7fd30cd508e8fc9770265638c0023",
+          "source_identity_id": 19,
+          "state": "active"
+        }
+      ],
+      "checkpoints": [
+        {
+          "circuit_reason": "",
+          "consecutive_failures": 0,
+          "data_kind": "result",
+          "last_attempt_at": "2026-09-26T07:35:09.559Z",
+          "last_observation_hash": "9082e747d2d155c10305b4b9302e73cd6cabfed1663e833a630223023ec5800c",
+          "last_success_at": "2026-09-26T07:35:09.559Z",
+          "next_poll_at": "2026-09-27T07:35:09.559Z",
+          "source_key": "jra"
+        }
+      ],
+      "confirmed_at": "2026-09-21T19:27:23.557Z",
+      "discovery": {
+        "last_checked_at": "2026-09-21T19:27:00.009865+00:00",
+        "last_outcomes": [
+          {
+            "provider": "jra",
+            "reason": "acquired"
+          }
+        ],
+        "lease_until": null,
+        "next_poll_at": "2026-09-22T01:27:00.009865+00:00",
+        "route_cursor": 1,
+        "token": ""
+      },
+      "enrollments": [
+        {
+          "authority_version": 2,
+          "created_at": "2026-09-21T19:27:11.959Z",
+          "enrollment_generation": 1,
+          "entry_sha256": "714a14adc17569033191d52ff8b42c53b0850f832fd0ae529f5a27ebc404fe59",
+          "id": 17,
+          "manifest_sha256": "714a14adc17569033191d52ff8b42c53b0850f832fd0ae529f5a27ebc404fe59",
+          "source_identity_id": 19,
+          "source_set_digest": "173dfe38ede06ca370f967514398e01e0de8fbe6cba68b48eef1a9042d7d96b9",
+          "source_set_generation": 1,
+          "state": "enrolled"
+        }
+      ],
+      "id": 104,
+      "identity_key_count": 1,
+      "incidents": [
+        {
+          "alert_sent_at": null,
+          "details": {
+            "classification": "enrollment_missing",
+            "issue": "result_overdue",
+            "policy_digest": "d28a690bfc7ed326f8b675775f48764d874ed4024d8414fbe2b6ec700d47f993"
+          },
+          "id": 17,
+          "last_seen_at": "2026-09-21T19:37:00.037Z",
+          "opened_at": "2026-09-21T19:27:00.009Z",
+          "resolved_at": "2026-09-21T19:37:00.037Z",
+          "status": "resolved"
+        }
+      ],
+      "name": "オールカマー",
+      "observations": [
+        {
+          "error_code": "",
+          "id": 65,
+          "normalized_sha256": "8738d5fff89c183505f289ae461ca5b0b4988d0bccc0b69d96466f754de71184",
+          "observed_at": "2026-09-21T19:27:22.764Z",
+          "parser_version": "jra-cname-v2",
+          "raw_sha256": "c515c9c83215838f791468b16a5c65136586d1ea01ed89a15c7cf773a957d985",
+          "result_phase": "official",
+          "source_identity_id": 19
+        },
+        {
+          "error_code": "",
+          "id": 67,
+          "normalized_sha256": "1833ac57f728e88b7ffb574052bb437e3a2f821bc46ad7f2f6dfb19fad79f2ce",
+          "observed_at": "2026-09-22T01:28:00.142Z",
+          "parser_version": "jra-cname-v2",
+          "raw_sha256": "199486805cd08c83bbd99350116ad9f4860f3719fb28489d2be394049ba94f5f",
+          "result_phase": "official",
+          "source_identity_id": 19
+        },
+        {
+          "error_code": "",
+          "id": 72,
+          "normalized_sha256": "af182e492b3d9a10b911dc1e6aad4b361b3982a267a094cd48442b455238bfb5",
+          "observed_at": "2026-09-23T07:29:00.112Z",
+          "parser_version": "jra-cname-v2",
+          "raw_sha256": "6418f42c5b7a6ea596fd0697aa5579613d1dd4d4e20b2994544dc6a49bc0c776",
+          "result_phase": "official",
+          "source_identity_id": 19
+        },
+        {
+          "error_code": "",
+          "id": 74,
+          "normalized_sha256": "89b273c3502943faa682f8d5563beb77f1d2f667a73160939c70a957a3f44072",
+          "observed_at": "2026-09-24T07:30:02.426Z",
+          "parser_version": "jra-cname-v2",
+          "raw_sha256": "9082e747d2d155c10305b4b9302e73cd6cabfed1663e833a630223023ec5800c",
+          "result_phase": "official",
+          "source_identity_id": 19
+        }
+      ],
+      "projection": [
+        {
+          "current_racecard_revision_id": null,
+          "current_result_revision_id": 61,
+          "owner_generation": 1,
+          "write_owner": "data_sync"
+        }
+      ],
+      "public": {
+        "effective_mode": "official_public",
+        "phase": "official",
+        "reason": "data_sync_public_read_allowed",
+        "revision_id": 61,
+        "visible": true
+      },
+      "publications": [
+        {
+          "authorization_kind": "official_route",
+          "coverage_proof_digest": "8738d5fff89c183505f289ae461ca5b0b4988d0bccc0b69d96466f754de71184",
+          "id": 14,
+          "published_at": "2026-09-21T19:27:23.557Z",
+          "revision_id": 61
+        }
+      ],
+      "results": 13,
+      "revisions": [
+        {
+          "content_sha256": "8738d5fff89c183505f289ae461ca5b0b4988d0bccc0b69d96466f754de71184",
+          "id": 61,
+          "kind": "result",
+          "official_confirmed_at": "2026-09-21T19:27:23.557Z",
+          "phase": "official",
+          "primary_observation_id": 65,
+          "published_at": "2026-09-21T19:27:23.557Z",
+          "revision_no": 1
+        }
+      ],
+      "runners": 13,
+      "sources": [
+        {
+          "canonical_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1006202604061120260920/71",
+          "created_at": "2026-09-21T19:27:11.953Z",
+          "external_race_id": "06202604061120260920",
+          "id": 19,
+          "identity_fields": {
+            "multisource_v2": {
+              "canonical_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1006202604061120260920/71",
+              "external_race_id": "06202604061120260920",
+              "fetched_at": "2026-09-21T19:27:00.009865+00:00",
+              "identity_namespace": "jra-race-v1",
+              "identity_seed_receipt": {
+                "candidate_id": 40409,
+                "event_id": 104,
+                "event_snapshot_sha256": "f42e4fb1839b88914321607eaafd6be615f1063e260e7331373a82fed17d9640",
+                "fetched_at": "2026-09-21T19:27:00.009865+00:00",
+                "fresh_raw_sha256": "c515c9c83215838f791468b16a5c65136586d1ea01ed89a15c7cf773a957d985",
+                "link_chain": [
+                  "https://www.jra.go.jp/JRADB/accessD.html?CNAME=pw01dde0106202604061120260920/D6",
+                  "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1006202604061120260920/71"
+                ],
+                "matcher_version": "race-identity-v2",
+                "previous_evidence_sha256": "61787dd30466f60c36ea5312f60befcaf02395e7d0b445b56cb8988973463fed",
+                "route_digest": "c2826848fcd274014cc2189ccbbea05820c7fd30cd508e8fc9770265638c0023",
+                "verified_fields": {
+                  "external_race_id": "06202604061120260920",
+                  "local_date": "2026-09-20",
+                  "race_number": "11",
+                  "venue_key": "nakayama"
+                }
+              },
+              "local_date": "2026-09-20",
+              "meeting_session": "04-06",
+              "off_time": "2026-09-20T15:45:00+09:00",
+              "operator": "jra",
+              "parser_version": "jra-cname-v2",
+              "provider": "jra",
+              "race_number": "11",
+              "raw_names": [
+                "産経賞オールカマー"
+              ],
+              "raw_sha256": "c515c9c83215838f791468b16a5c65136586d1ea01ed89a15c7cf773a957d985",
+              "region": "japan_jra",
+              "result_phase": "official",
+              "roster": [
+                {
+                  "barrier": "6",
+                  "carried_weight": "57.0",
+                  "external_runner_id": "number:8",
+                  "field_provenance": {
+                    "raw_sha256": "c515c9c83215838f791468b16a5c65136586d1ea01ed89a15c7cf773a957d985",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1006202604061120260920/71"
+                  },
+                  "finish_time": "2:16.9",
+                  "horse_name": "メイショウゲキリン",
+                  "jockey_name": "田辺 裕信",
+                  "margin": "",
+                  "number": "8",
+                  "raw_status": "1",
+                  "reported_finish_position": 1,
+                  "status": "finished",
+                  "trainer_name": "笹田 和秀"
+                },
+                {
+                  "barrier": "1",
+                  "carried_weight": "57.0",
+                  "external_runner_id": "number:1",
+                  "field_provenance": {
+                    "raw_sha256": "c515c9c83215838f791468b16a5c65136586d1ea01ed89a15c7cf773a957d985",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1006202604061120260920/71"
+                  },
+                  "finish_time": "2:16.9",
+                  "horse_name": "キャントウェイト",
+                  "jockey_name": "横山 典弘",
+                  "margin": "ハナ",
+                  "number": "1",
+                  "raw_status": "2",
+                  "reported_finish_position": 2,
+                  "status": "finished",
+                  "trainer_name": "萱野 浩二"
+                },
+                {
+                  "barrier": "4",
+                  "carried_weight": "55.0",
+                  "external_runner_id": "number:4",
+                  "field_provenance": {
+                    "raw_sha256": "c515c9c83215838f791468b16a5c65136586d1ea01ed89a15c7cf773a957d985",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1006202604061120260920/71"
+                  },
+                  "finish_time": "2:17.2",
+                  "horse_name": "ヴーレヴー",
+                  "jockey_name": "吉田 隼人",
+                  "margin": "１ 3/4",
+                  "number": "4",
+                  "raw_status": "3",
+                  "reported_finish_position": 3,
+                  "status": "finished",
+                  "trainer_name": "武 幸四郎"
+                },
+                {
+                  "barrier": "5",
+                  "carried_weight": "56.0",
+                  "external_runner_id": "number:7",
+                  "field_provenance": {
+                    "raw_sha256": "c515c9c83215838f791468b16a5c65136586d1ea01ed89a15c7cf773a957d985",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1006202604061120260920/71"
+                  },
+                  "finish_time": "2:17.4",
+                  "horse_name": "レガレイラ",
+                  "jockey_name": "戸崎 圭太",
+                  "margin": "１ 1/4",
+                  "number": "7",
+                  "raw_status": "4",
+                  "reported_finish_position": 4,
+                  "status": "finished",
+                  "trainer_name": "木村 哲也"
+                },
+                {
+                  "barrier": "2",
+                  "carried_weight": "57.0",
+                  "external_runner_id": "number:2",
+                  "field_provenance": {
+                    "raw_sha256": "c515c9c83215838f791468b16a5c65136586d1ea01ed89a15c7cf773a957d985",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1006202604061120260920/71"
+                  },
+                  "finish_time": "2:17.7",
+                  "horse_name": "ワイドエンペラー",
+                  "jockey_name": "C.ルメール",
+                  "margin": "１ 3/4",
+                  "number": "2",
+                  "raw_status": "5",
+                  "reported_finish_position": 5,
+                  "status": "finished",
+                  "trainer_name": "藤岡 健一"
+                },
+                {
+                  "barrier": "5",
+                  "carried_weight": "57.0",
+                  "external_runner_id": "number:6",
+                  "field_provenance": {
+                    "raw_sha256": "c515c9c83215838f791468b16a5c65136586d1ea01ed89a15c7cf773a957d985",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1006202604061120260920/71"
+                  },
+                  "finish_time": "2:17.7",
+                  "horse_name": "パンジャ",
+                  "jockey_name": "丹内 祐次",
+                  "margin": "クビ",
+                  "number": "6",
+                  "raw_status": "6",
+                  "reported_finish_position": 6,
+                  "status": "finished",
+                  "trainer_name": "金成 貴史"
+                },
+                {
+                  "barrier": "8",
+                  "carried_weight": "58.0",
+                  "external_runner_id": "number:13",
+                  "field_provenance": {
+                    "raw_sha256": "c515c9c83215838f791468b16a5c65136586d1ea01ed89a15c7cf773a957d985",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1006202604061120260920/71"
+                  },
+                  "finish_time": "2:18.1",
+                  "horse_name": "ジューンテイク",
+                  "jockey_name": "武 豊",
+                  "margin": "２ 1/2",
+                  "number": "13",
+                  "raw_status": "7",
+                  "reported_finish_position": 7,
+                  "status": "finished",
+                  "trainer_name": "武 英智"
+                },
+                {
+                  "barrier": "7",
+                  "carried_weight": "57.0",
+                  "external_runner_id": "number:10",
+                  "field_provenance": {
+                    "raw_sha256": "c515c9c83215838f791468b16a5c65136586d1ea01ed89a15c7cf773a957d985",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1006202604061120260920/71"
+                  },
+                  "finish_time": "2:19.4",
+                  "horse_name": "コスモブッドレア",
+                  "jockey_name": "津村 明秀",
+                  "margin": "８",
+                  "number": "10",
+                  "raw_status": "8",
+                  "reported_finish_position": 8,
+                  "status": "finished",
+                  "trainer_name": "小野 次郎"
+                },
+                {
+                  "barrier": "8",
+                  "carried_weight": "55.0",
+                  "external_runner_id": "number:12",
+                  "field_provenance": {
+                    "raw_sha256": "c515c9c83215838f791468b16a5c65136586d1ea01ed89a15c7cf773a957d985",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1006202604061120260920/71"
+                  },
+                  "finish_time": "2:19.9",
+                  "horse_name": "エセルフリーダ",
+                  "jockey_name": "武藤 雅",
+                  "margin": "２ 1/2",
+                  "number": "12",
+                  "raw_status": "9",
+                  "reported_finish_position": 9,
+                  "status": "finished",
+                  "trainer_name": "武藤 善則"
+                },
+                {
+                  "barrier": "3",
+                  "carried_weight": "57.0",
+                  "external_runner_id": "number:3",
+                  "field_provenance": {
+                    "raw_sha256": "c515c9c83215838f791468b16a5c65136586d1ea01ed89a15c7cf773a957d985",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1006202604061120260920/71"
+                  },
+                  "finish_time": "2:20.0",
+                  "horse_name": "リビアングラス",
+                  "jockey_name": "西村 淳也",
+                  "margin": "１／２",
+                  "number": "3",
+                  "raw_status": "10",
+                  "reported_finish_position": 10,
+                  "status": "finished",
+                  "trainer_name": "矢作 芳人"
+                },
+                {
+                  "barrier": "6",
+                  "carried_weight": "57.0",
+                  "external_runner_id": "number:9",
+                  "field_provenance": {
+                    "raw_sha256": "c515c9c83215838f791468b16a5c65136586d1ea01ed89a15c7cf773a957d985",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1006202604061120260920/71"
+                  },
+                  "finish_time": "2:21.9",
+                  "horse_name": "コスモキュランダ",
+                  "jockey_name": "横山 武史",
+                  "margin": "大差",
+                  "number": "9",
+                  "raw_status": "11",
+                  "reported_finish_position": 11,
+                  "status": "finished",
+                  "trainer_name": "加藤 士津八"
+                },
+                {
+                  "barrier": "4",
+                  "carried_weight": "57.0",
+                  "external_runner_id": "number:5",
+                  "field_provenance": {
+                    "raw_sha256": "c515c9c83215838f791468b16a5c65136586d1ea01ed89a15c7cf773a957d985",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1006202604061120260920/71"
+                  },
+                  "finish_time": "2:23.1",
+                  "horse_name": "アスクドゥポルテ",
+                  "jockey_name": "岩田 康誠",
+                  "margin": "７",
+                  "number": "5",
+                  "raw_status": "12",
+                  "reported_finish_position": 12,
+                  "status": "finished",
+                  "trainer_name": "梅田 智之"
+                },
+                {
+                  "barrier": "7",
+                  "carried_weight": "57.0",
+                  "external_runner_id": "number:11",
+                  "field_provenance": {
+                    "raw_sha256": "c515c9c83215838f791468b16a5c65136586d1ea01ed89a15c7cf773a957d985",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1006202604061120260920/71"
+                  },
+                  "finish_time": "2:23.3",
+                  "horse_name": "セイウンプラチナ",
+                  "jockey_name": "内田 博幸",
+                  "margin": "１ 1/2",
+                  "number": "11",
+                  "raw_status": "13",
+                  "reported_finish_position": 13,
+                  "status": "finished",
+                  "trainer_name": "千葉 直人"
+                }
+              ],
+              "roster_complete": true,
+              "timezone": "Asia/Tokyo",
+              "venue_key": "nakayama"
+            }
+          },
+          "identity_namespace": "jra-race-v1",
+          "source_key": "jra"
+        }
+      ],
+      "status": "finished"
+    },
+    {
+      "admission": {
+        "admitted": true,
+        "authority": "data_sync",
+        "reason_code": ""
+      },
+      "bindings": [
+        {
+          "binding_manifest_sha256": "13570a643bea64db65d4cad05e58fdf21adff44495537dfbd75c5d5bce2e5661",
+          "capabilities": [
+            "result"
+          ],
+          "id": 3,
+          "proof_digest": "bbdfb4144f7d109eeb913e0414c732cb101f2629c8c1e45f7dc71ac0c0f6cca8",
+          "route_digest": "c2826848fcd274014cc2189ccbbea05820c7fd30cd508e8fc9770265638c0023",
+          "source_identity_id": 20,
+          "state": "active"
+        }
+      ],
+      "checkpoints": [
+        {
+          "circuit_reason": "",
+          "consecutive_failures": 0,
+          "data_kind": "result",
+          "last_attempt_at": "2026-09-26T07:41:01.757Z",
+          "last_observation_hash": "b8b0e7e250d5d74afa0769dd2ac39ae7e52777cf2cadba06ef0dc46ed7e1b6f2",
+          "last_success_at": "2026-09-26T07:41:01.757Z",
+          "next_poll_at": "2026-09-27T07:41:01.757Z",
+          "source_key": "jra"
+        }
+      ],
+      "confirmed_at": "2026-09-21T19:28:00.659Z",
+      "discovery": {
+        "last_checked_at": "2026-09-21T19:27:00.009865+00:00",
+        "last_outcomes": [
+          {
+            "provider": "jra",
+            "reason": "acquired"
+          }
+        ],
+        "lease_until": null,
+        "next_poll_at": "2026-09-22T01:27:00.009865+00:00",
+        "route_cursor": 1,
+        "token": ""
+      },
+      "enrollments": [
+        {
+          "authority_version": 2,
+          "created_at": "2026-09-21T19:27:17.244Z",
+          "enrollment_generation": 1,
+          "entry_sha256": "92206473ff22ea35033472f55a0268818e2bb0474aa774ba658ebae68e2c3df2",
+          "id": 18,
+          "manifest_sha256": "92206473ff22ea35033472f55a0268818e2bb0474aa774ba658ebae68e2c3df2",
+          "source_identity_id": 20,
+          "source_set_digest": "a9c71f7550ce51662cb01f0e21d9c7c48e41deb441bf64c155e84a7c22f6878f",
+          "source_set_generation": 1,
+          "state": "enrolled"
+        }
+      ],
+      "id": 105,
+      "identity_key_count": 1,
+      "incidents": [
+        {
+          "alert_sent_at": null,
+          "details": {
+            "classification": "enrollment_missing",
+            "issue": "result_overdue",
+            "policy_digest": "d28a690bfc7ed326f8b675775f48764d874ed4024d8414fbe2b6ec700d47f993"
+          },
+          "id": 18,
+          "last_seen_at": "2026-09-21T19:37:00.037Z",
+          "opened_at": "2026-09-21T19:27:00.009Z",
+          "resolved_at": "2026-09-21T19:37:00.037Z",
+          "status": "resolved"
+        }
+      ],
+      "name": "神戸新聞杯",
+      "observations": [
+        {
+          "error_code": "",
+          "id": 66,
+          "normalized_sha256": "33af80d9be071afef3521b487c47524270d7670e78faf41db1e8b44bb5bfa4a3",
+          "observed_at": "2026-09-21T19:28:00.127Z",
+          "parser_version": "jra-cname-v2",
+          "raw_sha256": "d6c5e21ab9cac82275266a1c30435b8ed6f4e554c1726a0dadfce106973b3c6c",
+          "result_phase": "official",
+          "source_identity_id": 20
+        },
+        {
+          "error_code": "",
+          "id": 68,
+          "normalized_sha256": "b6b58c45b0a558d870e0c2b5d95660c345f60022584ca1cf4cf7c84ca2dc120b",
+          "observed_at": "2026-09-22T01:29:00.228Z",
+          "parser_version": "jra-cname-v2",
+          "raw_sha256": "65c24e056258a88fca14f9b6f0ad7d1e03f2ec4efa2eb03604547a223a929157",
+          "result_phase": "official",
+          "source_identity_id": 20
+        },
+        {
+          "error_code": "",
+          "id": 69,
+          "normalized_sha256": "b23b5ec5f396841190d05669d9f603277bb453baa2f61cf197d445285cf912e5",
+          "observed_at": "2026-09-22T07:30:00.335Z",
+          "parser_version": "jra-cname-v2",
+          "raw_sha256": "8edffdaf764a315244a7448dcda9a929b1f33ef6cdb740fe60acedb60425d692",
+          "result_phase": "official",
+          "source_identity_id": 20
+        },
+        {
+          "error_code": "",
+          "id": 71,
+          "normalized_sha256": "6fb7b043d4075da305de5b8f55aace5f9aa3b9dcc20f10264435185918c20fae",
+          "observed_at": "2026-09-22T19:36:37.595Z",
+          "parser_version": "jra-cname-v2",
+          "raw_sha256": "212b1c501a5345fe9e3c669587fec9c8f7de524d26b6e741638b599456ec9165",
+          "result_phase": "official",
+          "source_identity_id": 20
+        },
+        {
+          "error_code": "",
+          "id": 75,
+          "normalized_sha256": "219029c7bdf8100cefe235ace7b22fd832e9c74616cd6196c3c1bce3d9f97dda",
+          "observed_at": "2026-09-24T07:39:00.188Z",
+          "parser_version": "jra-cname-v2",
+          "raw_sha256": "b8b0e7e250d5d74afa0769dd2ac39ae7e52777cf2cadba06ef0dc46ed7e1b6f2",
+          "result_phase": "official",
+          "source_identity_id": 20
+        }
+      ],
+      "projection": [
+        {
+          "current_racecard_revision_id": null,
+          "current_result_revision_id": 62,
+          "owner_generation": 1,
+          "write_owner": "data_sync"
+        }
+      ],
+      "public": {
+        "effective_mode": "official_public",
+        "phase": "official",
+        "reason": "data_sync_public_read_allowed",
+        "revision_id": 62,
+        "visible": true
+      },
+      "publications": [
+        {
+          "authorization_kind": "official_route",
+          "coverage_proof_digest": "33af80d9be071afef3521b487c47524270d7670e78faf41db1e8b44bb5bfa4a3",
+          "id": 15,
+          "published_at": "2026-09-21T19:28:00.659Z",
+          "revision_id": 62
+        }
+      ],
+      "results": 11,
+      "revisions": [
+        {
+          "content_sha256": "33af80d9be071afef3521b487c47524270d7670e78faf41db1e8b44bb5bfa4a3",
+          "id": 62,
+          "kind": "result",
+          "official_confirmed_at": "2026-09-21T19:28:00.659Z",
+          "phase": "official",
+          "primary_observation_id": 66,
+          "published_at": "2026-09-21T19:28:00.659Z",
+          "revision_no": 1
+        }
+      ],
+      "runners": 11,
+      "sources": [
+        {
+          "canonical_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1009202604071120260921/7F",
+          "created_at": "2026-09-21T19:27:17.239Z",
+          "external_race_id": "09202604071120260921",
+          "id": 20,
+          "identity_fields": {
+            "multisource_v2": {
+              "canonical_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1009202604071120260921/7F",
+              "external_race_id": "09202604071120260921",
+              "fetched_at": "2026-09-21T19:27:00.009865+00:00",
+              "identity_namespace": "jra-race-v1",
+              "identity_seed_receipt": {
+                "candidate_id": 40456,
+                "event_id": 105,
+                "event_snapshot_sha256": "0d80df964e1c8e573d32cd05f0f8c542486c6a9628e5402d76fc61f14e86ff62",
+                "fetched_at": "2026-09-21T19:27:00.009865+00:00",
+                "fresh_raw_sha256": "d6c5e21ab9cac82275266a1c30435b8ed6f4e554c1726a0dadfce106973b3c6c",
+                "link_chain": [
+                  "https://www.jra.go.jp/JRADB/accessD.html?CNAME=pw01dde0109202604071120260921/E4",
+                  "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1009202604071120260921/7F"
+                ],
+                "matcher_version": "race-identity-v2",
+                "previous_evidence_sha256": "7dff21f6f7b805f958616393cd22b10ae028860b81c3b6f9dc0a41a251aea39d",
+                "route_digest": "c2826848fcd274014cc2189ccbbea05820c7fd30cd508e8fc9770265638c0023",
+                "verified_fields": {
+                  "external_race_id": "09202604071120260921",
+                  "local_date": "2026-09-21",
+                  "race_number": "11",
+                  "venue_key": "hanshin"
+                }
+              },
+              "local_date": "2026-09-21",
+              "meeting_session": "04-07",
+              "off_time": "2026-09-21T15:45:00+09:00",
+              "operator": "jra",
+              "parser_version": "jra-cname-v2",
+              "provider": "jra",
+              "race_number": "11",
+              "raw_names": [
+                "神戸新聞杯"
+              ],
+              "raw_sha256": "d6c5e21ab9cac82275266a1c30435b8ed6f4e554c1726a0dadfce106973b3c6c",
+              "region": "japan_jra",
+              "result_phase": "official",
+              "roster": [
+                {
+                  "barrier": "1",
+                  "carried_weight": "57.0",
+                  "external_runner_id": "number:1",
+                  "field_provenance": {
+                    "raw_sha256": "d6c5e21ab9cac82275266a1c30435b8ed6f4e554c1726a0dadfce106973b3c6c",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1009202604071120260921/7F"
+                  },
+                  "finish_time": "2:25.9",
+                  "horse_name": "ロブチェン",
+                  "jockey_name": "松山 弘平",
+                  "margin": "",
+                  "number": "1",
+                  "raw_status": "1",
+                  "reported_finish_position": 1,
+                  "status": "finished",
+                  "trainer_name": "杉山 晴紀"
+                },
+                {
+                  "barrier": "4",
+                  "carried_weight": "57.0",
+                  "external_runner_id": "number:4",
+                  "field_provenance": {
+                    "raw_sha256": "d6c5e21ab9cac82275266a1c30435b8ed6f4e554c1726a0dadfce106973b3c6c",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1009202604071120260921/7F"
+                  },
+                  "finish_time": "2:25.9",
+                  "horse_name": "アルトラムス",
+                  "jockey_name": "岩田 望来",
+                  "margin": "ハナ",
+                  "number": "4",
+                  "raw_status": "2",
+                  "reported_finish_position": 2,
+                  "status": "finished",
+                  "trainer_name": "野中 賢二"
+                },
+                {
+                  "barrier": "7",
+                  "carried_weight": "57.0",
+                  "external_runner_id": "number:8",
+                  "field_provenance": {
+                    "raw_sha256": "d6c5e21ab9cac82275266a1c30435b8ed6f4e554c1726a0dadfce106973b3c6c",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1009202604071120260921/7F"
+                  },
+                  "finish_time": "2:26.0",
+                  "horse_name": "シートゥサミット",
+                  "jockey_name": "酒井 学",
+                  "margin": "１／２",
+                  "number": "8",
+                  "raw_status": "3",
+                  "reported_finish_position": 3,
+                  "status": "finished",
+                  "trainer_name": "吉岡 辰弥"
+                },
+                {
+                  "barrier": "3",
+                  "carried_weight": "57.0",
+                  "external_runner_id": "number:3",
+                  "field_provenance": {
+                    "raw_sha256": "d6c5e21ab9cac82275266a1c30435b8ed6f4e554c1726a0dadfce106973b3c6c",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1009202604071120260921/7F"
+                  },
+                  "finish_time": "2:26.0",
+                  "horse_name": "ゴーラッキー",
+                  "jockey_name": "C.ルメール",
+                  "margin": "クビ",
+                  "number": "3",
+                  "raw_status": "4",
+                  "reported_finish_position": 4,
+                  "status": "finished",
+                  "trainer_name": "黒岩 陽一"
+                },
+                {
+                  "barrier": "6",
+                  "carried_weight": "57.0",
+                  "external_runner_id": "number:6",
+                  "field_provenance": {
+                    "raw_sha256": "d6c5e21ab9cac82275266a1c30435b8ed6f4e554c1726a0dadfce106973b3c6c",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1009202604071120260921/7F"
+                  },
+                  "finish_time": "2:26.0",
+                  "horse_name": "エムズビギン",
+                  "jockey_name": "武 豊",
+                  "margin": "ハナ",
+                  "number": "6",
+                  "raw_status": "5",
+                  "reported_finish_position": 5,
+                  "status": "finished",
+                  "trainer_name": "友道 康夫"
+                },
+                {
+                  "barrier": "6",
+                  "carried_weight": "57.0",
+                  "external_runner_id": "number:7",
+                  "field_provenance": {
+                    "raw_sha256": "d6c5e21ab9cac82275266a1c30435b8ed6f4e554c1726a0dadfce106973b3c6c",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1009202604071120260921/7F"
+                  },
+                  "finish_time": "2:26.2",
+                  "horse_name": "コンジェスタス",
+                  "jockey_name": "西村 淳也",
+                  "margin": "３／４",
+                  "number": "7",
+                  "raw_status": "6",
+                  "reported_finish_position": 6,
+                  "status": "finished",
+                  "trainer_name": "高野 友和"
+                },
+                {
+                  "barrier": "2",
+                  "carried_weight": "57.0",
+                  "external_runner_id": "number:2",
+                  "field_provenance": {
+                    "raw_sha256": "d6c5e21ab9cac82275266a1c30435b8ed6f4e554c1726a0dadfce106973b3c6c",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1009202604071120260921/7F"
+                  },
+                  "finish_time": "2:26.3",
+                  "horse_name": "エイシンインアウト",
+                  "jockey_name": "横山 琉人",
+                  "margin": "３／４",
+                  "number": "2",
+                  "raw_status": "7",
+                  "reported_finish_position": 7,
+                  "status": "finished",
+                  "trainer_name": "中尾 秀正"
+                },
+                {
+                  "barrier": "7",
+                  "carried_weight": "57.0",
+                  "external_runner_id": "number:9",
+                  "field_provenance": {
+                    "raw_sha256": "d6c5e21ab9cac82275266a1c30435b8ed6f4e554c1726a0dadfce106973b3c6c",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1009202604071120260921/7F"
+                  },
+                  "finish_time": "2:26.3",
+                  "horse_name": "グリーンエナジー",
+                  "jockey_name": "戸崎 圭太",
+                  "margin": "クビ",
+                  "number": "9",
+                  "raw_status": "8",
+                  "reported_finish_position": 8,
+                  "status": "finished",
+                  "trainer_name": "上原 佑紀"
+                },
+                {
+                  "barrier": "5",
+                  "carried_weight": "57.0",
+                  "external_runner_id": "number:5",
+                  "field_provenance": {
+                    "raw_sha256": "d6c5e21ab9cac82275266a1c30435b8ed6f4e554c1726a0dadfce106973b3c6c",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1009202604071120260921/7F"
+                  },
+                  "finish_time": "2:26.6",
+                  "horse_name": "カムアップローゼス",
+                  "jockey_name": "北村 友一",
+                  "margin": "１ 1/2",
+                  "number": "5",
+                  "raw_status": "9",
+                  "reported_finish_position": 9,
+                  "status": "finished",
+                  "trainer_name": "浜田 多実雄"
+                },
+                {
+                  "barrier": "8",
+                  "carried_weight": "57.0",
+                  "external_runner_id": "number:11",
+                  "field_provenance": {
+                    "raw_sha256": "d6c5e21ab9cac82275266a1c30435b8ed6f4e554c1726a0dadfce106973b3c6c",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1009202604071120260921/7F"
+                  },
+                  "finish_time": "2:26.8",
+                  "horse_name": "ショウナンハヤナミ",
+                  "jockey_name": "池添 謙一",
+                  "margin": "１ 1/4",
+                  "number": "11",
+                  "raw_status": "10",
+                  "reported_finish_position": 10,
+                  "status": "finished",
+                  "trainer_name": "渡辺 薫彦"
+                },
+                {
+                  "barrier": "8",
+                  "carried_weight": "57.0",
+                  "external_runner_id": "number:10",
+                  "field_provenance": {
+                    "raw_sha256": "d6c5e21ab9cac82275266a1c30435b8ed6f4e554c1726a0dadfce106973b3c6c",
+                    "source_url": "https://www.jra.go.jp/JRADB/accessS.html?CNAME=pw01sde1009202604071120260921/7F"
+                  },
+                  "finish_time": "2:27.0",
+                  "horse_name": "カフジエメンタール",
+                  "jockey_name": "坂井 瑠星",
+                  "margin": "１ 1/2",
+                  "number": "10",
+                  "raw_status": "11",
+                  "reported_finish_position": 11,
+                  "status": "finished",
+                  "trainer_name": "矢作 芳人"
+                }
+              ],
+              "roster_complete": true,
+              "timezone": "Asia/Tokyo",
+              "venue_key": "hanshin"
+            }
+          },
+          "identity_namespace": "jra-race-v1",
+          "source_key": "jra"
+        }
+      ],
+      "status": "finished"
+    },
+    {
+      "admission": {
+        "admitted": false,
+        "authority": "",
+        "reason_code": "writer_owner_conflict"
+      },
+      "bindings": [],
+      "checkpoints": [],
+      "confirmed_at": null,
+      "discovery": {
+        "last_checked_at": "2026-09-26T09:37:00.037887+00:00",
+        "last_outcomes": [
+          {
+            "provider": "jra",
+            "reason": "source_identity_missing"
+          }
+        ],
+        "lease_until": null,
+        "next_poll_at": "2026-09-26T09:47:00.037887+00:00",
+        "route_cursor": 1,
+        "token": ""
+      },
+      "enrollments": [],
+      "id": 106,
+      "identity_key_count": 0,
+      "incidents": [
+        {
+          "alert_sent_at": null,
+          "details": {
+            "classification": "enrollment_missing",
+            "issue": "enrollment_missing",
+            "policy_digest": "d28a690bfc7ed326f8b675775f48764d874ed4024d8414fbe2b6ec700d47f993"
+          },
+          "id": 22,
+          "last_seen_at": "2026-09-26T09:47:00.013Z",
+          "opened_at": "2026-09-24T15:07:00.007Z",
+          "resolved_at": null,
+          "status": "open"
+        }
+      ],
+      "name": "シリウスS",
+      "observations": [],
+      "projection": [],
+      "public": {
+        "effective_mode": "off",
+        "phase": "",
+        "reason": "control_missing",
+        "revision_id": null,
+        "visible": false
+      },
+      "publications": [],
+      "results": 0,
+      "revisions": [],
+      "runners": 0,
+      "sources": [],
+      "status": "scheduled"
+    },
+    {
+      "admission": {
+        "admitted": false,
+        "authority": "",
+        "reason_code": "writer_owner_conflict"
+      },
+      "bindings": [],
+      "checkpoints": [],
+      "confirmed_at": null,
+      "discovery": {
+        "last_checked_at": "2026-09-26T09:27:00.019882+00:00",
+        "last_outcomes": [
+          {
+            "provider": "jra",
+            "reason": "source_identity_missing"
+          }
+        ],
+        "lease_until": null,
+        "next_poll_at": "2026-09-26T10:27:00.019882+00:00",
+        "route_cursor": 1,
+        "token": ""
+      },
+      "enrollments": [],
+      "id": 107,
+      "identity_key_count": 0,
+      "incidents": [
+        {
+          "alert_sent_at": null,
+          "details": {
+            "classification": "enrollment_missing",
+            "issue": "enrollment_missing",
+            "policy_digest": "d28a690bfc7ed326f8b675775f48764d874ed4024d8414fbe2b6ec700d47f993"
+          },
+          "id": 23,
+          "last_seen_at": "2026-09-26T09:47:00.013Z",
+          "opened_at": "2026-09-25T15:07:00.016Z",
+          "resolved_at": null,
+          "status": "open"
+        }
+      ],
+      "name": "スプリンターズS",
+      "observations": [],
+      "projection": [],
+      "public": {
+        "effective_mode": "off",
+        "phase": "",
+        "reason": "control_missing",
+        "revision_id": null,
+        "visible": false
+      },
+      "publications": [],
+      "results": 0,
+      "revisions": [],
+      "runners": 0,
+      "sources": [],
+      "status": "scheduled"
+    }
+  ],
+  "flags": {
+    "RACE_DATA_COVERAGE_ALERTS_ENABLED": true,
+    "RACE_DATA_MULTISOURCE_APPLY_ENABLED": true,
+    "RACE_DATA_MULTISOURCE_DISCOVERY_ENABLED": true,
+    "RACE_DATA_MULTISOURCE_POLICY_SHA256": "d28a690bfc7ed326f8b675775f48764d874ed4024d8414fbe2b6ec700d47f993",
+    "RACE_DATA_SYNC_ENABLED_PROVIDERS": [
+      "horse_racing_nation",
+      "sporting_life",
+      "the_racing_api",
+      "zeturf",
+      "jra"
+    ],
+    "RACE_LIVE_MONITOR_ENABLED": false,
+    "RACE_LIVE_SCHEDULER_ENABLED": false
+  }
+}
