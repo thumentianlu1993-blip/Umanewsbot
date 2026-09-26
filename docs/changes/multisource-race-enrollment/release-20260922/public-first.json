@@ -1,0 +1,58 @@
+{
+  "captured_at": "2026-09-21T19:28:14.790971+00:00",
+  "pages": [
+    {
+      "event_id": 103,
+      "url": "https://umafans.run/races/2026/jra-2026-0919-01/",
+      "status": 200,
+      "sha256": "f7f74c4f1ad8f922acfcb7ccf97bd4bf79c3ca1f82ebfa93c59f484f6514c3e0",
+      "hero_class": [
+        "race-hero",
+        "state-finished"
+      ],
+      "result_rows": 12,
+      "runner_rows": 12,
+      "expected_rows": 12,
+      "result_label": "赛果",
+      "winner": "1 8 オオキニ 森 一馬 鈴木 孝志 3分27.4秒 — — / —"
+    },
+    {
+      "event_id": 104,
+      "url": "https://umafans.run/races/2026/jra-2026-0920-01/",
+      "status": 200,
+      "sha256": "42f9d48c0f562e63d83e32365f47c38ef3a1cea2d95ef68043d4141d496962e5",
+      "hero_class": [
+        "race-hero",
+        "state-finished"
+      ],
+      "result_rows": 13,
+      "runner_rows": 13,
+      "expected_rows": 13,
+      "result_label": "赛果",
+      "winner": "1 8 名将冲冠 田辺 裕信 笹田 和秀 2分16.9秒 — — / —"
+    },
+    {
+      "event_id": 105,
+      "url": "https://umafans.run/races/2026/jra-2026-0921-01/",
+      "status": 200,
+      "sha256": "3af9bac7f4d612296844aaffe3ab3ff7a7491b45556da4923eea97cc04d342ff",
+      "hero_class": [
+        "race-hero",
+        "state-finished"
+      ],
+      "result_rows": 11,
+      "runner_rows": 11,
+      "expected_rows": 11,
+      "result_label": "赛果",
+      "winner": "1 1 ロブチェン 松山 弘平 杉山 晴紀 2分25.9秒 — — / —"
+    },
+    {
+      "health_host": "umafans.run",
+      "status": 200
+    },
+    {
+      "health_host": "www.umafans.run",
+      "status": 200
+    }
+  ]
+}

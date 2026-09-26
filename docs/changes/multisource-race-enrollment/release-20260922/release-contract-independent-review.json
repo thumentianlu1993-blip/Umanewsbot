@@ -1,0 +1,12 @@
+{
+  "head": "2670660205fbee04b882dd7d01030c52788b5faf",
+  "release_tests": 67,
+  "skip": 0,
+  "fingerprint": "4b5f9d8dfbdbf836d102cc53797d413e514375200f4deaa7b50d87e6b954b22b",
+  "fingerprint_base": "a88bcbf669bd609e30f97c8a07f009881d2da705",
+  "before_after_identical": true,
+  "input_sha_match": true,
+  "migration_drift": false,
+  "content_manifest_entries_verified": 1595,
+  "stable_extra_skip_passes_dedicated_job": true
+}

@@ -1,3 +1,9 @@
+## 2026-09-22 PR212：0079与独立JRA配置激活
+
+本次实际运行目录、固定镜像、两个生产备份的SHA/TOC、完成收据、精确恢复命令见[发布记录](changes/multisource-race-enrollment/release-20260922/README.md)。0079已完成；JRA激活同schema同镜像，失败保留共享锁并使用原意图继续或恢复关闭态。生产dump本次验证归档/目录，未进行完整隔离还原；本地PG合同另有还原测试，二者不能混称。
+
+0079仅由 `deploy/deploy_0079.sh` 协调、原唯一release task拥有DDL。v2启用后保留0079及审计数据，异常通过固定activation脚本rollback恢复各自原.env，不降旧镜像、不反迁移。实际常驻配置优先于旧canonical.env；race-live保持关闭、马匹导入未恢复。自然业务验收另见发布记录。
+
 ## 2026-09-22 0079 独立发布入口准备（未执行）
 
 新增 `deploy/deploy_0079.sh deploy|resume`，绑定当前候选SHA/image、0078→0079或0079同schema、私有dump/manifest/intent、原服务/配置、关闭态预检和同inode完成凭据。旧0078发布合同继续拒绝0079；旧入口也拒绝未完成的0079意图。完整动作、恢复与验收见[发布包](changes/multisource-race-enrollment/release-0079.md)，当前未上线。

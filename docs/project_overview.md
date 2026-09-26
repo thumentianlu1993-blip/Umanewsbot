@@ -1,3 +1,7 @@
+## 2026-09-22 多来源登记代码已上线，JRA首批启用
+
+PR212已合并，生产schema0079和多来源链路已启用：公开日历→任一准入来源强身份命中→单登记/多来源能力绑定→精确claim→生命周期及公开revision。首批真实策略只覆盖JRA阪神/中山官方result，其他地区保留proof缺口；实际状态、范围及自然验收见[发布记录](changes/multisource-race-enrollment/release-20260922/README.md)。下方为历史阶段记录。
+
 ## 2026-09-20 赛事多来源登记链路（代码阶段）
 
 隔离分支已实现“公开日历赛事→任一合格来源强身份命中→单登记/多来源能力绑定→精确claim→既有生命周期与revision/publication”。生产仍未切换；地区proof缺口和验证见[实施记录](changes/multisource-race-enrollment/implementation.md)。
