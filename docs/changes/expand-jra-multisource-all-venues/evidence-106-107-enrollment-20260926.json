@@ -1,0 +1,66 @@
+{
+  "captured_at": "2026-09-26T17:40:00+00:00",
+  "origin": "production host read-only (psql via ssh)",
+  "events": [
+    {
+      "status": "finished",
+      "results": 16,
+      "runners": 16,
+      "event_id": 106,
+      "confirmed": 16,
+      "enrollment": "enrolled",
+      "original_name": "シリウスS",
+      "race_datetime": "2026-09-26T06:45:00+00:00",
+      "result_confirmed_at": "2026-09-26T13:21:04.06412+00:00"
+    },
+    {
+      "status": "scheduled",
+      "results": 0,
+      "runners": 0,
+      "event_id": 107,
+      "confirmed": 0,
+      "enrollment": "enrolled",
+      "original_name": "スプリンターズS",
+      "race_datetime": "2026-09-27T06:40:00+00:00",
+      "result_confirmed_at": null
+    }
+  ],
+  "audit_trail": [
+    {
+      "task": "repair_race_106_107_full_name_aliases",
+      "status": "success",
+      "created_at": "2026-09-26T12:06:00.180157+00:00"
+    },
+    {
+      "task": "accelerate_106_107_poll_hints",
+      "status": "success",
+      "created_at": "2026-09-26T12:56:08.323669+00:00"
+    }
+  ],
+  "incidents": [
+    {
+      "id": 22,
+      "status": "resolved",
+      "scope_key": "106",
+      "resolved_at": "2026-09-26T13:07:00.014318+00:00"
+    },
+    {
+      "id": 23,
+      "status": "resolved",
+      "scope_key": "107",
+      "resolved_at": "2026-09-26T14:07:00.037008+00:00"
+    },
+    {
+      "id": 24,
+      "status": "resolved",
+      "scope_key": "106",
+      "resolved_at": "2026-09-26T13:27:00.008122+00:00"
+    },
+    {
+      "id": 25,
+      "status": "resolved",
+      "scope_key": "106",
+      "resolved_at": "2026-09-26T13:23:05.021952+00:00"
+    }
+  ]
+}
