@@ -1697,6 +1697,8 @@ def rebind_multisource_enrollment(*, event_id, policy, now, expected_route_diges
         )
         if enrollment is None or projection is None or tracking is None:
             raise ValueError("rebind_enrollment_missing")
+        if lifecycle is None:
+            raise ValueError("rebind_lifecycle_missing")
         if enrollment.authority_version != 2 or enrollment.state != "enrolled":
             raise ValueError("rebind_not_enrolled_v2")
         if not policy.valid(now):
@@ -1706,8 +1708,18 @@ def rebind_multisource_enrollment(*, event_id, policy, now, expected_route_diges
             .filter(tracking=tracking)
             .order_by("pk")
         )
+        binding_rows = list(
+            enrollment.source_bindings.filter(state="active").order_by("id")
+        )
+        locked_sources = {
+            s.pk: s
+            for s in models.RaceResultSourceIdentity.objects.select_for_update().filter(
+                pk__in=[b.source_identity_id for b in binding_rows]
+            ).order_by("pk")
+        }
         bindings = list(
-            enrollment.source_bindings.select_related("source_identity")
+            enrollment.source_bindings.select_for_update()
+            .select_related("source_identity")
             .filter(state="active")
             .order_by("id")
         )
@@ -1728,17 +1740,25 @@ def rebind_multisource_enrollment(*, event_id, policy, now, expected_route_diges
             if not route.permits_url(source.canonical_url):
                 raise ValueError("rebind_identity_url_rejected")
             routes[binding.pk] = (source, route)
-        if enrollment.standing_policy_digest == policy.digest and all(
-            routes[b.pk][1].digest == b.route_digest for b in bindings
-        ):
-            return {"event_id": event.pk, "action": "replay"}
         changes = []
-        new_route_digests = set()
+        new_route_digests = {routes[b.pk][1].digest for b in bindings}
+        if len(new_route_digests) != 1:
+            raise ValueError("rebind_route_ambiguous")
+        new_route_digest = new_route_digests.pop()
+        if enrollment.standing_policy_digest == policy.digest and all(
+            b.route_digest == new_route_digest for b in bindings
+        ):
+            return {
+                "event_id": event.pk,
+                "action": "replay",
+                "old_route_digest": expected_route_digest,
+                "new_route_digest": new_route_digest,
+                "bindings": [b.pk for b in bindings],
+            }
         for binding in bindings:
             source, route = routes[binding.pk]
             if binding.route_digest != expected_route_digest:
                 raise ValueError("rebind_baseline_drift")
-            new_route_digests.add(route.digest)
             manifest = dict(
                 event_id=event.pk,
                 source_identity_id=source.pk,
@@ -1752,9 +1772,6 @@ def rebind_multisource_enrollment(*, event_id, policy, now, expected_route_diges
             if canonical_sha(manifest["identity_evidence"]) != binding.identity_evidence_sha256:
                 raise ValueError("rebind_evidence_drift")
             changes.append((binding, source, route, manifest))
-        if len(new_route_digests) != 1:
-            raise ValueError("rebind_route_ambiguous")
-        new_route_digest = new_route_digests.pop()
         if not apply:
             transaction.set_rollback(True)
             return {
@@ -1806,6 +1823,12 @@ def rebind_multisource_enrollment(*, event_id, policy, now, expected_route_diges
                 update_fields=("registry_digest", "contract_digest", "updated_at")
             )
         _multisource_manifest(enrollment, projection, policy, now)
+        enrollment.refresh_from_db()
+        selected = enrollment.source_set_manifest.get("selected", {})
+        for binding, _, _, _ in changes:
+            for kind in binding.capabilities:
+                if selected.get(kind) != binding.pk:
+                    raise ValueError("rebind_selection_lost")
         models.OperationLog.objects.create(
             admin=None,
             action_type="multisource_rebind",

@@ -955,3 +955,25 @@ class MultisourceRebindTests(JraColdStartTests):
             self.assertEqual(self.binding().route_digest, old)
             call_command("rebind_multisource_enrollments", manifest=path, sha256=sha, apply=True)
             self.assertEqual(self.binding().route_digest, policy_v2.routes[0].digest)
+
+    def test_rebind_fails_closed_when_runtime_flags_off(self):
+        from stable.services.race_data_sync_enrollment import rebind_multisource_enrollment
+        self.enroll()
+        old = self.binding().route_digest
+        with override_settings(RACE_DATA_SYNC_ENABLED_PROVIDERS=()):
+            with self.assertRaisesMessage(ValueError, "rebind_selection_lost"):
+                rebind_multisource_enrollment(
+                    event_id=self.event.pk, policy=self.policy_v2(), now=NOW,
+                    expected_route_digest=old, apply=True)
+        self.assertEqual(self.binding().route_digest, old)
+        self.assertFalse(models.OperationLog.objects.filter(
+            action_type="multisource_rebind").exists())
+
+    def test_rebind_rejects_missing_lifecycle(self):
+        from stable.services.race_data_sync_enrollment import rebind_multisource_enrollment
+        self.enroll()
+        models.RaceEventLifecycleControl.objects.filter(event=self.event).delete()
+        with self.assertRaisesMessage(ValueError, "rebind_lifecycle_missing"):
+            rebind_multisource_enrollment(
+                event_id=self.event.pk, policy=self.policy_v2(), now=NOW,
+                expected_route_digest=self.binding().route_digest, apply=True)
