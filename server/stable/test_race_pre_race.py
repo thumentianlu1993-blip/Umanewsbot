@@ -358,10 +358,31 @@ class JraNameNormalizationTests(TestCase):
     def test_normalize_jra_race_name(self):
         cases = {'シリウスステークス': 'シリウスS', 'シリウスS': 'シリウスS', 'GⅢ シリウスS': 'シリウスS',
                  'J・GⅢ 阪神ジャンプS': '阪神ジャンプS', 'NHKマイルカップ': 'NHKマイルC', 'NHKマイルC': 'NHKマイルC',
+                 'アイルランドトロフィー': 'アイルランドT', 'アイルランドT': 'アイルランドT',
+                 '阪神ジュベナイルフィリーズ': '阪神ジュベナイルF', '阪神ジュベナイルF': '阪神ジュベナイルF',
+                 'テストフィリーズ': 'テストF', 'テストT': 'テストT',
                  '神戸新聞杯': '神戸新聞杯', '産経賞オールカマー': '産経賞オールカマー', '': '', None: ''}
         for value, expected in cases.items():
             with self.subTest(value=value):
                 self.assertEqual(pre.normalize_jra_race_name(value), expected)
+
+    def test_tf_suffix_page_matches_short_event_name(self):
+        target = self.sirius()
+        for long_name in ('アイルランドトロフィー', '阪神ジュベナイルフィリーズ'):
+            with self.subTest(long_name=long_name):
+                html = self.SIRIUS_HTML.replace('シリウスステークス', long_name)
+                target.original_name = pre.normalize_jra_race_name(long_name)
+                target.save()
+                self.assertEqual(pre.parse_jra_card(html, event=target, url=self.SIRIUS_URL)['stage'], 'declared')
+                target.original_name = 'シリウスS'
+                target.save()
+
+    def test_tf_suffix_different_body_still_rejected(self):
+        target = self.sirius()
+        # 归一后以 T/F 结尾但本体不同的名字不得合并
+        html = self.SIRIUS_HTML.replace('シリウスステークス', 'シリウストロフィー')
+        with self.assertRaises(ValueError):
+            pre.parse_jra_card(html, event=target, url=self.SIRIUS_URL)
 
     def test_long_form_page_matches_short_event_name(self):
         target = self.sirius()
