@@ -1,6 +1,6 @@
 # 计划：JRA 多来源登记扩展至全部 10 个中央马场
 
-> 状态：计划草案 v2（已按独立审阅第一轮 REVISE 修订）。待复审与用户批准。未实施、未改生产。
+> 状态：计划草案 v3（已按独立审阅第 1、2 轮 REVISE 修订；v2 的轮换对策经代码核实不成立，已重写为新增受审 v2 换绑路径）。待复审与用户批准。未实施、未改生产。
 > 审阅记录：见同目录 REVIEW.md。
 
 ## 1. 背景与当前真实状态（2026-09-26 核验）
@@ -10,7 +10,7 @@
   - provider `jra` / region `japan_jra` / capabilities `["result"]`；
   - `venue_aliases` 仅 `hanshin`（阪神）与 `nakayama`（中山）；
   - 有效期至 `2026-10-21T17:14:43Z`。
-- 已完成自然闭环证据：103/104/105（9/22）与 106/107（9/26）均走完 身份→登记→正式赛果→公网；107 正式赛果预计 9/27 赛后自然闭环。
+- 已完成自然闭环证据：103/104/105（9/22，见 `docs/changes/multisource-race-enrollment/release-20260922/README.md`）与 106/107（9/26 晚间生产实测：106 于 13:17 UTC 登记、13:21 官方赛果确认、16/16 confirmed、双域名公开；107 于 13:57 UTC 登记、赛前出马表已公开——记录在 `docs/current_state.md` 2026-09-26 顶部条目，随 PR #217 入库）；107 正式赛果预计 9/27 赛后自然闭环。既有登记共 5 条（103–107），均为 v2 `authority_version=2` 形态。
 - 赛前 seed 路径（`discover_jra_pre_race`）本身覆盖全部 10 个 JRA 马场（`JRA_COURSES`），CNAME 解析表 `_JRA_VENUE_CODES` 也已内置 01–10 全部马场代码；瓶颈只在 policy 的 venue 范围。
 - 名称匹配已上线确定性归一（PR216）：等级前缀 + `ステークス→S`／`カップ→C`。JRA 官方缩写字母为 S/C/T/F 四个，剩余系统性差异为 `T=トロフィー`、`F=フィリーズ`（111 アイルランドトロフィー已经 JRA 官方出马表页证实；138 阪神ジュベナイルフィリーズ为 GⅠ 官方赛事名，实施前以真实页面复核）。
 - 当前后果：下周末 108 毎日王冠（10/4 東京）、109 京都大賞典（10/4 京都）等政策外赛事会赛前有出马表预览、但不登记、不闭环正式赛果，且因分类为范围外而不产生覆盖告警。
@@ -48,7 +48,16 @@
 - admission（`race_data_sync_admission.py:459-463`）以 `binding_contract_drift` 拒绝；
 - `attach_multisource_observation`（`race_data_sync_enrollment.py:1486-1487`）要求 `enrollment.standing_policy_digest == policy.digest`，否则 `enrollment_policy_drift`，既有 enrollment 无法自行 re-attach。
 
-**对策（选择"受控轮换"而非"接受断链"）**：policy 切换后立即对既有 103–107 五条登记执行既有的受审轮换链路：`repair_data_sync_stalled_events` / `adopt_stalled_event_policy` → `race_data_sync_control.rotate_enrollment`（9/7 用于 755/756/757 的同款 stale-digest 轮换，含 dry-run SHA 锁定候选、apply、独立 verifier、adoption OperationLog、incident 收口）。轮换后既有 source identity 保留，下一自然周期 re-attach 到新 route digest。验收：103–107 的 result checkpoint 在轮换后各自至少一次自然成功、`binding_route_missing`/`enrollment_policy_drift` 为 0、公开赛果行数不变。
+**复审进一步证实：现有代码不存在可用的换绑路径**——`adopt_stalled_event_policy` 明确拒绝 v2 登记（`race_data_sync_repair.py:108-111`，authority_version=2 直接返回 `multisource_claim_required`）；stalled 扫描只覆盖未公开/有 open incident 的赛事，扫不到健康的 103–107；`rotate_enrollment` 走 legacy provider 注册表（不含 multisource jra route）且从不更新 `RaceDataSyncSourceBinding`；`disenroll` 后 re-attach 会被 `enrollment_not_active` 拒绝。
+
+**对策（新增受审的 v2 换绑路径，独立 PR 先行）**：在 `race_data_sync_enrollment.py` 新增 `rebind_multisource_enrollment`（或同级服务函数）+ 管理命令，语义为：
+
+- 输入为 SHA 绑定的 manifest（逐 event 列出 binding 旧 digest → 新 digest），dry-run 默认；
+- 逐场单事务：要求 event 处于 enrolled、binding 当前 digest 精确等于旧 route digest、既有 source identity 的 canonical_url 在新 route 下仍 `permits_url` 且 CNAME/venue 解析不变，然后原子更新 binding 的 `route_digest/proof_digest/binding_manifest` 与 enrollment 的 `standing_policy_digest`，写 OperationLog/审计；任何一项不满足即该场 fail closed；
+- 身份行（source identity）不变、不重建；不重抓网络；
+- 验收：轮换后 103–107 的 result checkpoint 至少一次自然成功、`binding_route_missing`/`enrollment_policy_drift` 为 0、公开赛果行数不变。
+
+该 PR 必须与 3.2 的 T/F 归一 PR 先后合并部署（顺序不限，但激活必须绑定两者之后的生产 commit）。
 
 ### 3.2 名称归一补齐 T/F（代码小改，独立 PR 先行发布）
 
@@ -91,7 +100,7 @@ proof 产物（页面 SHA、解析结果、逐场校验明细）归档进 releas
 
 | 风险 | 缓解 |
 |---|---|
-| 既有 103–107 登记 digest 漂移断链 | 3.1 受控轮换为激活的必要步骤；轮换未完成前不宣布激活完成 |
+| 既有 103–107 登记 digest 漂移断链 | 3.1 新增受审 v2 换绑路径为激活的必要前置；换绑未完成前不宣布激活完成 |
 | 某马场页头结构与阪神/中山样本不同 | 3.3 逐马场 proof 先行，任一马场不过则分批入 policy |
 | 名称差异超出 S/C/T/F 与等级前缀（如赞助前缀） | 仍 fail closed 到 `jra_race_identity_no_match`；按 9/26 Track A 同款 SHA 绑定别名修复，不为消缺放宽匹配 |
 | policy 到期 | 新有效期 30 天；到期前按同流程续期，proof 复用需重新核验页面可解析 |
@@ -101,17 +110,20 @@ proof 产物（页面 SHA、解析结果、逐场校验明细）归档进 releas
 ## 5. 任务清单（含时间约束）
 
 1. (integration) 归一规则追加 T/F 后缀 + 回归测试（RED→GREEN），独立 PR 合并并同 schema 发布。
-2. (integration) 定位 v1 `proof_digest` 的生成方式并记录；生成 v2 policy 草案（10 venue_aliases），离线校验 schema 与 venue 代码一致性。
-3. (operations) 逐马场真实 proof 采集与离线解析校验，产出 proof_digest 与证据目录（任一马场失败则该马场移出本批并记录）。
-4. (operations) 生产只读预检：当前登记/告警/预算基线；服务器 `release_0079` 模块与 `.env` 实际状态核对；新 policy 文件落盘与 SHA 绑定。
-5. (operations) **时间约束：107（9/27）正式赛果自然闭环之后、108/109 seed 窗口打开（约 9/30）之前**，执行激活：新写激活脚本经独立审阅 → 排空 → 原子切换 policy → 立即执行 103–107 受控轮换 → 旧 policy_id incident 收口。
-6. (operations) 激活后观察：108/109（10/4）自然闭环 身份→登记→正式赛果→双域名公开；103–107 轮换后至少一次自然刷新成功；告警行为按 3.5 实测。
-7. (application) 文档回写：current_state、deploy_runbook、handoff 第 4 节 P0 项状态更新。
+2. (integration) 新增受审的 v2 换绑路径（3.1 对策段）+ 回归测试（含 binding digest 旧→新、identity 不变、非 enrolled/漂移不符即 fail closed），独立 PR 合并并同 schema 发布。
+3. (integration) 定位 v1 `proof_digest` 的生成方式并记录；生成 v2 policy 草案（10 venue_aliases），离线校验 schema 与 venue 代码一致性。
+4. (operations) 逐马场真实 proof 采集与离线解析校验，产出 proof_digest 与证据目录（任一马场失败则该马场移出本批并记录）。
+5. (operations) 生产只读预检：当前登记/告警/预算基线；服务器 `release_0079` 模块与 `.env` 实际状态核对；新 policy 文件落盘与 SHA 绑定。
+6. (operations) **时间约束：107（9/27）正式赛果自然闭环之后、108/109 seed 窗口打开（约 9/30）之前**，执行激活：新写激活脚本经独立审阅 → 排空 → 原子切换 policy → 立即执行 103–107 换绑（任务 2 的新路径）→ 旧 policy_id incident 收口。
+7. (operations) 激活后观察：108/109（10/4）自然闭环 身份→登记→正式赛果→双域名公开；103–107 换绑后至少一次自然刷新成功；告警行为按 3.5 实测。
+8. (application) 文档回写：current_state、deploy_runbook、handoff 第 4 节 P0 项状态更新。
+
+**降级预案**：若任务 1–5 未能在 9/30 前全部就绪（含新激活脚本独立审阅），则 108/109 放弃作为验收样本，激活顺延到下一周赛事（10/10–12 的 110/111/112）之前；顺延期间 103–107 继续在 v1 policy 下正常运行，不做任何切换。
 
 ## 6. 完成标准（精确口径）
 
 - 10 个马场各有至少一条真实 proof 通过解析合同（或明确记录某马场延后及原因）；proof_digest 与 policy SHA 绑定。
-- 108 或 109 自然完成全流程（不手工触发业务任务、不固定 ID 回填），公网双域名赛果与官方一致。
+- 108 或 109 自然完成全流程（不手工触发业务任务、不固定 ID 回填），公网双域名赛果与官方一致；若按降级预案顺延，则以 110/111/112 中的自然闭环替代验收。
 - 告警口径与代码一致：`enrollment_missing` 于 T−1 日开单；有 `race_datetime` 的已登记赛事 T+30 分钟无正式赛果开 `result_overdue`；无 `race_datetime` 的 T+1 日开 `time_unknown_overdue`；范围内漏管不被静默；旧 policy_id incident 无残留重复 open。
-- 103–107 既有登记经轮换后持续自然刷新（checkpoint 成功、`binding_route_missing`=0），公开赛果行数不回退。
-- 任一阶段失败可回到 v1 policy；已轮换登记与新登记不回滚。
+- 103–107 既有登记经新换绑路径迁移后持续自然刷新（checkpoint 成功、`binding_route_missing`=0），公开赛果行数不回退。
+- 任一阶段失败可回到 v1 policy；已换绑登记与新登记不回滚。

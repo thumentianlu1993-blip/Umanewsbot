@@ -18,6 +18,19 @@
 
 审阅者未覆盖声明（实施前必须补齐核对）：服务器运行态（`.env`、锁、`release_0079` 模块）；`race_data_sync_control.py` 未通读；v1 `proof_digest` 生成方式未定位（已列为任务 2）。
 
-## 第 2 轮
+## 第 2 轮（2026-09-26，同一独立审阅者）：REVISE
 
-待同一审阅者复审 v2 修订稿。
+P1-1、P2-1~P2-5 逐条确认已闭合。P0-1 **未闭合**：复审证实 v2 引用的"9/7 同款轮换"链路对 v2 登记不可用——`adopt_stalled_event_policy` 拒绝 authority_version=2（`race_data_sync_repair.py:108-111`）；stalled 扫描扫不到健康的 103–107（`repair.py:49-89`）；`rotate_enrollment` 走 legacy provider 注册表且从不更新 `RaceDataSyncSourceBinding`（`control.py:840-930`）；`disenroll` 后 re-attach 被 `enrollment_not_active` 拒绝（`enrollment.py:1484-1485`）。结论：当前代码库不存在任何可让 v2 登记换绑新 route digest 的已审阅路径。
+
+新发现：N1（P1）背景段 106/107 闭环陈述与 release README 旧证据冲突，需补新证据引用；N2（P2）9/30 前链路偏紧，需降级预案；N3（P2）目标与完成标准随 P0-1 对策失效而悬空。
+
+**v3 修订处置**：
+
+- 3.1 整段重写为"新增受审的 v2 换绑路径"（`rebind_multisource_enrollment` 语义、SHA 绑定 manifest、逐场单事务、identity 不变、fail closed），作为独立 PR 与激活前置；删除对 755/756/757 旧轮换的错误引用。
+- N1：背景段补充 106/107 于 9/26 晚间闭环的新证据出处（current_state 2026-09-26 顶部条目，随 PR #217 入库），既有登记明确为 5 条。
+- N2：任务清单增加降级预案（9/30 未就绪则 108/109 放弃作验收样本，顺延至 110/111/112，期间不切换）。
+- N3：第 2 节目标与第 6 节完成标准改由新换绑路径支撑，措辞同步。
+
+## 第 3 轮
+
+待同一审阅者复审 v3 修订稿。
