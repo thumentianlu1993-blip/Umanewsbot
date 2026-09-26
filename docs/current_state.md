@@ -3,7 +3,7 @@
 - 按用户"尽快修复、不等 107 闭环"指令，激活提前到 9/27 执行（原计划 10/1 后）：经六轮独立审阅的计划（PR #218）+ 激活脚本（SHA `cd9c2f8a…`，独立审阅通过，重定向 diff 仅四行数据）+ intent `79b9f629…53d5`（独立审阅允许 apply）。
 - 执行：prepare（含 602,509,752 字节备份 `a9cc0f61…e9708`）→ apply 切换 `RACE_DATA_MULTISOURCE_POLICY_FILE/SHA256` 至 v2 policy（`738403e3…035d`，10 马场、有效期至 2026-10-26T18:00Z、proof_digest `6e708be2…`）→ 立即用已上线的 `rebind_multisource_enrollments`（manifest SHA `a31421f6…610b`）把既有 v2 登记 103–107 全部换绑到新 route digest（5/5 rebound，digest 闭集完整），digest 漂移窗口约 2 分钟。旧 policy_id 无残留重复 incident。
 - 并行事件：另一线程在其间合并并部署了 PR #222（TRA registry 续期至 2026-12-31，生产 commit `9c8891b8`、镜像 `37c04448`）；本激活已重定向到该 ROOT/commit，与 TRA 续期键面不重叠、互不覆盖。
-- 换绑后自然刷新验证点：106/103 的 result checkpoint 分别在 19:21/19:32 UTC 到期，届时应自然成功（10/4 前 CNAME 级 proof 对东京/京都/中京补齐；出马表发布前这些马场物理上无页面可写）。
+- 换绑后自然刷新已验证（19:49 UTC 只读）：106 于 19:24 UTC 在新 route digest 下自然刷新成功；104/105/107 排程正常（107 为赛后 06:43 UTC）；103 因 T+7 补入窗口到期自然停止轮询（`calculate_multisource_next_poll` 设计行为，非换绑回归）；无 binding_route_missing 类失败、无新增 incident。10/4 前 CNAME 级 proof 对东京/京都/中京补齐（出马表发布前这些马场物理上无页面可写）。
 - 巡检不依赖本机：生产已安装只读巡检 `/opt/umanewsbot-persistent/ops-watch/race-chain-check.sh`，每 3 小时把关键赛事/登记/告警快照追加到 `watch.jsonl`，任何会话可读。
 - 107 正式赛果待 9/27 赛后自然闭环；108/109（10/4）为扩版后首个自然闭环验收样本。马匹采集仍保持暂停。
 
