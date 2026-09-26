@@ -1,3 +1,11 @@
+## 2026-09-27 JRA 全马场扩展：计划六轮审阅通过，前置代码已上线
+
+- 用户批准 PR #218 计划并指示"尽快修复、激活不等 107 闭环"。计划见[扩展计划](changes/expand-jra-multisource-all-venues/PLAN.md)（六轮独立审阅 APPROVED；P0 为 policy 扩版导致既有登记 digest 漂移断链，对策为新增受审换绑路径）。
+- 前置代码已上线：PR #219（T/F 归一补齐，外部事实有 JRA 官方页面证据）与 PR #221（v2 换绑路径 + rebind_multisource_enrollments 命令，含审阅加固）合并为 `b11faa8a`/`15c79f22`；经 `deploy_0079.sh` 同 schema 发布，发布目录 `/opt/umanews-release-15c79f22-jra-all-venues-20260927/umanewsbot`，intent SHA `15dc06c6…d146`；四应用同镜像、restarts=0/OOM=false、schema 0079、队列 0/0/7543、双域名及 106/107 页面正常，容器内探针确认新代码已加载。
+- 111/138 别名已按用户确认写入生产（manifest SHA `1b50911e…42b8`，恢复点为 9/26 0079 发布备份 `96a70972…b6fc`）：111 补 `アイルランドトロフィー`；138 补 `阪神ジュベナイルフィリーズ` 且中文名改为"阪神两岁牝马锦标"（原名保留为别名）。审计 `repair_race_111_138_full_name_aliases`。
+- 结构级 proof 8 马场 8/8 通过（证据包随 PR #218 入库，SHA `e2816af9…f45`）；东京/京都/中京的 CNAME 级 proof 待 10/1 出马表发布；激活脚本待独立审阅；激活目标在 10/4 赛事前。107 正式赛果待 9/27 赛后自然闭环（已登记）。
+- 马匹采集仍保持暂停。
+
 ## 2026-09-26 106/107 来源身份根因修复，两场已登记、106 正式赛果闭环
 
 - 根因（已从生产 source_refs 与 JRA 官网实页双向复现）：106 シリウスS／107 スプリンターズS 的 JRA 出马表页面标题为全名（シリウスステークス／スプリンターズステークス），库内只有短名，标题精确匹配失败 → 赛前 seed 候选无法 validated（`jra_race_identity_not_unique`，106 失败 8 轮）→ v2 多来源 JRA route 无独立 URL 发现（policy 仅 result 能力、无 discovery_urls），每周期 `source_identity_missing`。TRA free 日本 racecards 持续 response_empty 是平行缺口，不是当前瓶颈。
