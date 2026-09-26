@@ -1,3 +1,11 @@
+## 2026-09-26 106/107 来源身份根因修复，两场已登记、106 正式赛果闭环
+
+- 根因（已从生产 source_refs 与 JRA 官网实页双向复现）：106 シリウスS／107 スプリンターズS 的 JRA 出马表页面标题为全名（シリウスステークス／スプリンターズステークス），库内只有短名，标题精确匹配失败 → 赛前 seed 候选无法 validated（`jra_race_identity_not_unique`，106 失败 8 轮）→ v2 多来源 JRA route 无独立 URL 发现（policy 仅 result 能力、无 discovery_urls），每周期 `source_identity_missing`。TRA free 日本 racecards 持续 response_empty 是平行缺口，不是当前瓶颈。
+- 修复 Track A（用户授权）：经 SHA 绑定 manifest（`60371af5…e7e6`）为 106/107 各补一条官方全名日语别名（`シリウスステークス`／`スプリンターズステークス`），写前备份 `rds_horse_news_20260926T114232Z_523520.dump`（600,598,916 字节、0600、custom format、TOC 1401、SHA `01c33977…19c9`），TaskExecutionLog `repair_race_106_107_full_name_aliases` 留痕；另按用户"立即修复"指令将两场的 jra_pre_race/v2 调度 next_poll_at 提前到当前时刻（`accelerate_106_107_poll_hints` 留痕），内容与写入仍全部走正常校验管线。
+- 自然闭环证据（UTC）：12:57 两场 seed validated（出马表 16 匹）；106 于 13:17 登记、13:21 官方赛果确认，16/16 confirmed、official 名次齐全、16 出走/16 赛果，双域名详情页出马表+赛果公开；107 于 13:57 登记，赛前出马表已在双域名公开，赛事为 9/27 15:40 JST，正式赛果待明日自然闭环。incident 22/24/25（106）与 23（107）均已自动 resolved。
+- 修复 Track B（结构性，未上线）：Draft PR #216（分支 codex/fix-jra-race-name-normalization，`55a3bebb`）把标题匹配改为确定性归一（去空白与等级前缀、ステークス→S／カップ→C），并拆分 no_match/ambiguous 诊断；34+57+72 项相关测试、check、migration drift、diff check 通过。合并与部署仍待 G2。在 Track B 上线前，后续 JRA 长短名不一致的新赛事仍需人工补全名别名。
+- 马匹采集仍保持暂停，未恢复；本轮其他生产状态（828/830/924、491/492/494/495、race_live=7543）未变。
+
 ## 2026-09-26 跨任务交接已更新
 
 已将原9月6–15日交接更新至9月26日，并同步future_work_roadmap：覆盖#201–213发布、历史129场/1209行回填、归一化/北京时间/自然刷新、JRA多来源登记，以及其他任务的马匹采集暂停和长期产品待办。详见[统一交接](changes/release-pr201-production/handoff.md)，旧原文保留为历史。
