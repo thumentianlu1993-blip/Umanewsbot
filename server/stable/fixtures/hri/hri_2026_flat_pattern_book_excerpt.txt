@@ -1,0 +1,121 @@
+# fixture 来源：hri_2026_flatpattbook.pdf（pdfplumber extract_text 摘录）
+Irish Pattern Races, Listed Races and
+Premier Handicaps
+2026
+INDEX TO CONTENTS
+Page
+Group Races ................................................................................... 2
+Listed Races ................................................................................ 4-5
+Premier Handicaps ....................................................................... 6
+Pattern, Listed Race and Premier Handicap Overview ........ 7-10
+Conditions of Races ................................................................ 11-45
+The data contained in this booklet is for information purposes only and is subject to alteration
+without notice.
+Owners and Trainers are advised to consult the Racing Calendar for final details.
+Publishers Office:
+Horse Racing Ireland
+Ballymany,
+The Curragh,
+Co. Kildare
+© Horse Racing Ireland
+Last Updated September 24th
+GROUP 1, 2 & 3 RACES 2026 (72)
+DATE TRACK RACE NAME EBF AGE SEX TYPE DIST € STAKES
+Apr 03 Curragh Park Express Stakes EBF 3+ F Gr 3 8f 100,000
+Apr 12 Leopardstown Leopardstown 2,000 Guineas Trial Stakes 3 C&G Gr 3 7f 70,000
+Apr 12 Leopardstown Leopardstown 1,000 Guineas Trial Stakes 3 F Gr 3 7f 70,000
+Apr 12 Leopardstown Ballysax Stakes 3 Gr 3 10f 70,000
+Apr 19 Curragh Alleged Stakes 4+ Gr 3 10f 70,000
+Apr 25 Navan Salsabil Stakes EBF 3 F Gr 3 10f 70,000
+May 04 Curragh Mooresbridge Stakes EBF 4+ Gr 2 10f 130,000
+May 04 Curragh Athasi Stakes EBF 3 F Gr 3 8f 70,000
+May 10 Leopardstown Derby Trial Stakes 3 Gr 3 10f 100,000
+May 10 Leopardstown Cornelscourt Stakes 3+ F Gr 3 7f 70,000
+May 15 Leopardstown Saval Beg Stakes 4+ Gr 3 14f 70,000
+May 17 Naas Juvenile Fillies Sprint Stakes EBF 2 F Gr 3 5f+ 70,000
+May 17 Naas Lacken Stakes 3 Gr 3 5f+ 70,000
+May 23 Curragh Irish 2,000 Guineas 3 C&F Gr 1 8f 500,000
+May 23 Curragh Greenlands Stakes 4+ Gr 2 6f 130,000
+May 23 Curragh Gallinule Stakes 3 Gr 3 10f 70,000
+May 24 Curragh Gold Cup 4+ Gr 1 10f+ 500,000
+May 24 Curragh Irish 1,000 Guineas 3 F Gr 1 8f 500,000
+May 24 Curragh Ridgewood Pearl Stakes 4+ F Gr 2 8f 130,000
+May 24 Curragh Marble Hill Stakes 2 Gr 3 6f 70,000
+Jun 11 Leopardstown Ballycorus Stakes 3+ Gr 3 7f 70,000
+Jun 14 Cork Munster Oaks Stakes 3+ F Gr 3 12f 70,000
+Jun 24 Naas Blue Wind Stakes EBF 3 F Gr 3 10f 75,000
+Jun 27 Curragh Pretty Polly Stakes 3+ F Gr 1 10f 400,000
+Jun 27 Curragh Balanchine Stakes 2 F Gr 2 6f 130,000
+Jun 27 Curragh Anglesey Stakes 2 Gr 3 6f 70,000
+Jun 28 Curragh Irish Derby 3 C&F Gr 1 12f 1,250,000
+Jun 28 Curragh International Stakes 3+ Gr 3 10f 100,000
+Jul 08 Fairyhouse Stanerra Stakes EBF 3+ F Gr 3 14f 70,000
+Jul 09 Leopardstown Brownstown Stakes EBF 3+ F Gr 3 7f 70,000
+Jul 16 Leopardstown Meld Stakes 3+ Gr 3 9f 70,000
+Jul 18 Curragh Irish Oaks 3 F Gr 1 12f 500,000
+Jul 18 Curragh Railway Stakes 2 Gr 2 6f 130,000
+Jul 18 Curragh Sapphire Stakes 3+ Gr 2 5f 130,000
+Jul 18 Curragh Rathbride Stakes 4+ F Gr 3 10f 70,000
+Jul 19 Curragh Minstrel Stakes 3+ Gr 2 7f 130,000
+Jul 19 Curragh Curragh Cup 3+ Gr 2 14f 130,000
+Jul 23 Leopardstown Silver Flash Stakes 2 F Gr 3 7f 70,000
+Jul 23 Leopardstown Tyros Stakes 2 Gr 3 7f 70,000
+Aug 06 Leopardstown Desmond Stakes 3+ Gr 3 8f 70,000
+Aug 06 Leopardstown Ballyroan Stakes 3+ Gr 3 12f 70,000
+Aug 09 Curragh Phoenix Stakes 2 C&F Gr 1 6f 400,000
+Aug 09 Curragh Phoenix Sprint Stakes 3+ Gr 3 6f 70,000
+Aug 14 Cork Give Thanks Stakes EBF 3+ F Gr 3 12f 70,000
+Aug 16 Curragh Royal Whip Stakes 3+ Gr 3 10f 70,000
+Aug 22 Curragh Futurity Stakes EBF 2 Gr 2 7f 130,000
+Aug 22 Curragh Debutante Stakes 2 F Gr 2 7f 130,000
+Aug 22 Curragh Ballycullen Stakes 3+ Gr 3 14f 70,000
+Aug 23 Naas Ballyogan Stakes EBF 3+ F Gr 3 5f+ 100,000
+Aug 29 Curragh Flame Of Tara Stakes EBF 2 F Gr 3 8f 70,000
+Aug 29 Curragh Round Tower Stakes 2 Gr 3 6f 70,000
+Aug 29 Curragh Snow Fairy Stakes 3+ F Gr 3 9f 70,000
+Aug 30 Cork Fairy Bridge Stakes 3+ F Gr 3 7f 70,000
+Sep 12 Leopardstown Irish Champion Stakes 3+ Gr 1 10f 1,250,000
+Sep 12 Leopardstown Golden Fleece Stakes 2 C&F Gr 1 9f 400,000
+Sep 12 Leopardstown Matron Stakes 3+ F Gr 1 8f 400,000
+Sep 12 Leopardstown Solonaway Stakes 3+ Gr 2 8f 200,000
+Sep 12 Leopardstown Kilternan Stakes 3+ Gr 3 12f 100,000
+Sep 13 Curragh Irish St. Leger 3+ Gr 1 14f 500,000
+2
+Sep 13 Curragh Moyglare Stud Stakes 2 F Gr 1 7f 400,000
+Sep 13 Curragh Flying Five Stakes 3+ Gr 1 5f 400,000
+Sep 13 Curragh Vincent O'Brien National Stakes 2 C&F Gr 1 7f 400,000
+Sep 13 Curragh Blandford Stakes 3+ F Gr 2 10f 200,000
+Sep 19 Gowran Park Denny Cordell Lavarack & Lanwades Stud Stakes 3+ F Gr 3 9f 70,000
+Sep 26 Curragh Beresford Stakes 2 Gr 2 8f 130,000
+Sep 27 Curragh Weld Park Stakes 2 F Gr 3 7f 70,000
+Sep 27 Curragh Renaissance Stakes 3+ Gr 3 6f 70,000
+Oct 17 Leopardstown Eyrefield Stakes 2 Gr 3 9f 70,000
+Oct 17 Leopardstown Killavullan Stakes 2 Gr 3 7f 70,000
+Oct 20 Curragh Silken Glider Stakes 2 F Gr 3 8f 70,000
+Oct 23 Dundalk Mercury Stakes 2+ Gr 3 5f 70,000
+Nov 01 Curragh Loughbrown Stakes 3+ Gr 3 16f 70,000
+3
+# --- 以下为 LISTED 节开头，用于验证节终止 ---
+LISTED RACES 2026 (60)
+DATE TRACK RACE NAME EBF AGE SEX TYPE DIST € STAKES
+Mar 22 Naas Devoy Stakes EBF 4+ Listed 10f 50,000
+Mar 28 Curragh Gladness Stakes 3+ Listed 7f 50,000
+Apr 04 Cork Cork Stakes EBF 3+ Listed 6f 50,000
+Apr 04 Cork Noblesse Stakes EBF 4+ F Listed 12f 50,000
+Apr 15 Leopardstown Heritage Stakes EBF 4+ Listed 8f 50,000
+Apr 25 Navan Vintage Crop Stakes 4+ Listed 14f 52,500
+# --- 以下为总览页开头，含 Mon DD 开头的非索引行，用于验证不产生假行 ---
+2-Y-O GROUP RACES, LISTED RACES & PREMIER NURSERIES 2026 (33)
+DATE VENUE RACE NAME 5 6 7 8 9 10 11 12 13 14
+May 04 CU First Flier Stakes L
+May 17 NS Juvenile Fillies Sprint Stakes Gr 3-f
+May 24 CU Marble Hill Stakes Gr 3
+DATE VENUE RACE NAME 5 6 7 8 9 10 11 12 13 14
+Jun 27 CU Balanchine Stakes Gr 2-f
+Jun 27 CU Anglesey Stakes Gr 3
+DATE VENUE RACE NAME 5 6 7 8 9 10 11 12 13 14
+Jul 04 NS Tipperary Stakes L
+Jul 04 NS Pat Smullen Stakes L
+Jul 18 CU Railway Stakes Gr 2
+Jul 22 NS Marwell Stakes L-f
+Jul 23 LP Silver Flash Stakes Gr 3-f

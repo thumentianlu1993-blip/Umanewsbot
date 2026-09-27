@@ -24,6 +24,13 @@ SOURCE_PROVIDERS = {
     "nsa_official_result_pdf": "nsa",
     "zeturf": "zeturf",
     "zone_turf": "zone_turf",
+    "ireland_irishracing": "ireland_irishracing",
+    "deutscher_galopp_result": "deutscher_galopp",
+    "hri_ras_result": "hri_ras",
+    "racing_australia_results": "racing_australia",
+    "just_horse_racing_results": "just_horse_racing",
+    "era_racecard_results": "era",
+    "jcsa_meeting_results": "jcsa",
 }
 
 

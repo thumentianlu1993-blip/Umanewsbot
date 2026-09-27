@@ -25,14 +25,28 @@ FIELDS = (
     "raw_source_url",
 )
 VENUE_KEYS = {
-    "ASCT": "Ascot", "BLMT": "Belmont", "CANB": "Canberra",
+    # 2024-25 及更早赛季页使用的 venue 代码
+    "ASCT": "Ascot", "BEND": "Bendigo", "BLMT": "Belmont", "CANB": "Canberra",
     "CAUL": "Caulfield", "DOOM": "Doomben", "E FM": "Eagle Farm",
-    "FLEM": "Flemington", "GCST": "Gold Coast", "HAWK": "Hawkesbury",
-    "HOB": "Hobart", "KEMB": "Kembla Grange", "LAUN": "Launceston",
+    "FLEM": "Flemington", "GCST": "Gold Coast", "GEEL": "Geelong",
+    "GOSF": "Gosford", "HAWK": "Hawkesbury", "HOB": "Hobart",
+    "K GR": "Kembla Grange", "KEMB": "Kembla Grange", "LAUN": "Launceston",
     "MORP": "Morphettville", "MORPP": "Morphettville Parks",
     "NCLE": "Newcastle", "NTHM": "Northam", "RAND": "Royal Randwick",
-    "RHIL": "Rosehill Gardens", "SCNE": "Scone", "SCTC": "Sunshine Coast",
-    "THE VALLEY": "The Valley",
+    "RHIL": "Rosehill Gardens", "SANH": "Sandown Hillside", "SCNE": "Scone",
+    "SCTC": "Sunshine Coast", "THE VALLEY": "The Valley", "WYNG": "Wyong",
+    # 2025-26 赛季起使用的 venue 全名（含冠名前缀变体，归一到正式马场名）
+    "Ascot": "Ascot", "Belmont": "Belmont", "Bendigo": "Bendigo",
+    "Canberra": "Canberra", "Caulfield": "Caulfield", "Doomben": "Doomben",
+    "Eagle Farm": "Eagle Farm", "Flemington": "Flemington", "Geelong": "Geelong",
+    "Gold Coast": "Gold Coast", "Gosford": "Gosford", "Hawkesbury": "Hawkesbury",
+    "Hobart": "Hobart", "Kembla Grange": "Kembla Grange", "Launceston": "Launceston",
+    "Morphettville": "Morphettville", "Morphettville Parks": "Morphettville Parks",
+    "Newcastle": "Newcastle", "Northam": "Northam", "Rosehill Gardens": "Rosehill Gardens",
+    "Royal Randwick": "Royal Randwick", "Scone": "Scone", "Sunshine Coast": "Sunshine Coast",
+    "The Valley": "The Valley", "Wyong": "Wyong",
+    "Aquis Park Gold Coast": "Gold Coast", "Ladbrokes Geelong": "Geelong",
+    "Southside Pakenham": "Pakenham", "Sportsbet Sandown Hillside": "Sandown Hillside",
 }
 STATE_CODES = {"ACT", "NSW", "QLD", "SA", "TAS", "VIC", "WA"}
 
@@ -78,8 +92,35 @@ def validate_adjacent_seasons(sources: list[tuple[str, Path]], *, year: int) -> 
         raise CatalogError("source files must use the controlled source/australia cache directory")
 
 
-def parse_rows(url: str, path: Path, *, year: int) -> list[dict[str, str]]:
+def _require_season_table(soup: BeautifulSoup, url: str) -> None:
+    """fail closed：缓存文件必须含数据表；RA 404 错误页没有任何 table，直接拒绝。"""
+    if soup.find("table") is None:
+        raise CatalogError(
+            f"Racing Australia season source is not a valid Group/Listed table (possible 404 error page): {url}"
+        )
+    table = soup.find("table", class_="tableizer-table")
+    if table is not None:
+        first_row = table.find("tr")
+        header = (
+            [" ".join(cell.get_text(" ", strip=True).split()) for cell in first_row.find_all(["th", "td"])]
+            if first_row is not None
+            else []
+        )
+        if not header or header[0] != "Meeting Date" or "Registered Race Name" not in header:
+            raise CatalogError(
+                f"Racing Australia season source has an unrecognised tableizer header (possible 404 error page): {url}"
+            )
+
+
+def parse_rows(
+    url: str,
+    path: Path,
+    *,
+    year: int,
+    unknown_venues: set[str] | None = None,
+) -> list[dict[str, str]]:
     soup = BeautifulSoup(path.read_bytes(), "html.parser")
+    _require_season_table(soup, url)
     rows = []
     for tr in soup.find_all("tr"):
         cells = [" ".join(cell.get_text(" ", strip=True).split()) for cell in tr.find_all("td")]
@@ -105,7 +146,12 @@ def parse_rows(url: str, path: Path, *, year: int) -> list[dict[str, str]]:
         if not group_id.isdigit() or not distance.isdigit():
             raise CatalogError("Racing Australia row identity is invalid")
         venue_key = cells[6]
-        racecourse = VENUE_KEYS.get(venue_key, venue_key)
+        racecourse = VENUE_KEYS.get(venue_key)
+        if racecourse is None:
+            # 未知 venue：保留原文并记录，不静默丢弃、不臆造映射
+            racecourse = venue_key
+            if unknown_venues is not None:
+                unknown_venues.add(venue_key)
         registered_name = cells[13]
         source_race_name = cells[7]
         if not registered_name or not source_race_name or not racecourse:
@@ -135,6 +181,10 @@ def parse_rows(url: str, path: Path, *, year: int) -> list[dict[str, str]]:
                 "raw_source_url": url,
             }
         )
+    if not rows:
+        # 每个赛季页都必须为目标日历年贡献 G1-G3 行；否则 fail closed，
+        # 避免单季缺数据时只产出半个日历年
+        raise CatalogError(f"Racing Australia season source yielded no {year} G1-G3 rows: {url}")
     return rows
 
 
@@ -149,7 +199,12 @@ def main() -> int:
             raise CatalogError("exactly two adjacent season sources are required")
         sources = [parse_source(spec) for spec in args.source]
         validate_adjacent_seasons(sources, year=args.year)
-        rows = [row for url, path in sources for row in parse_rows(url, path, year=args.year)]
+        unknown_venues: set[str] = set()
+        rows = [
+            row
+            for url, path in sources
+            for row in parse_rows(url, path, year=args.year, unknown_venues=unknown_venues)
+        ]
         rows.sort(key=lambda row: (row["local_date"], int(row["provider_group_id"])))
         keys = [row["series_key"] for row in rows]
         if not rows or len(keys) != len(set(keys)):
@@ -169,6 +224,7 @@ def main() -> int:
             "year": args.year,
             "row_count": len(rows),
             "grade_counts": {grade: sum(row["grade_text"] == grade for row in rows) for grade in ("G1", "G2", "G3")},
+            "unknown_venues": sorted(unknown_venues),
             "output_sha256": sha256(output),
             "sources": [
                 {"url": url, "cache_path": f"source/australia/{path.name}", "sha256": sha256(path)}
