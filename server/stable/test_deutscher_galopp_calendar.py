@@ -143,6 +143,26 @@ class RenntermineTextTests(SimpleTestCase):
             self.assertEqual(row["surface"], "turf")
             self.assertEqual(row["source_refs"]["surface_inferred"], "turf")
 
+    def test_series_key_matches_ics_baseline_slug(self):
+        # series_key 必须与 ICS 基线 CSV 一致（同名赛事）：
+        # ICS stable_series_key 用 NFKD ascii 化（ü->u），不是德语展开（ü->ue）
+        rows = self.module.parse_renntermine_text(_renntermine_text(), year=2026)
+        by_key = {r["series_key"]: r for r in rows}
+        self.assertEqual(
+            by_key["germany-fruhjahrs-meile"]["canonical_name_original"], "Frühjahrs Meile"
+        )
+        self.assertEqual(
+            by_key["germany-furstenberg-rennen"]["canonical_name_original"], "Fürstenberg-Rennen"
+        )
+        self.assertEqual(
+            by_key["germany-grosser-preis-der-landeshauptstadt-dusseldorf"]["racecourse"],
+            "Düsseldorf",
+        )
+        self.assertEqual(
+            by_key["germany-preis-der-winterkonigin"]["canonical_name_original"],
+            "Preis der Winterkönigin",
+        )
+
 
 class ErgebnisseSnapshotTests(SimpleTestCase):
     """Wayback ergebnisse accordion 快照解析（2025 赛季）。"""
@@ -188,6 +208,23 @@ class ErgebnisseSnapshotTests(SimpleTestCase):
             self.module.parse_ergebnisse_snapshot(
                 "<html><body><div class=\"elementAccordion\"></div></body></html>", year=2025
             )
+
+    def test_betting_pool_suffix_with_hyphen_stripped(self):
+        # 投注池后缀有 V4/1（斜杠）与 V4-3（连字符）两种写法，均须剥离
+        html = (
+            "<html><body><div class=\"elementAccordion\">"
+            "<h3 class=\"accordionHeader\">01.05.25 München</h3>"
+            "<div class=\"accordionElementOuter\">"
+            "<a class=\"accordionLink\" href=\"/gr/renntage/rennen.php?id=1\">"
+            "<div class=\"accordionRennNr\"><div class=\"accordionRennNrInner\">6</div></div>"
+            "<div class=\"accordionTitel\">WETTSTAR.de - Bavarian Classic - V4-3</div>"
+            "<div class=\"accordionAusschreibung\">Gruppe III, 2.000 m</div>"
+            "</a></div></div></body></html>"
+        )
+        rows = self.module.parse_ergebnisse_snapshot(html, year=2025)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["canonical_name_original"], "Bavarian Classic")
+        self.assertEqual(rows[0]["series_key"], "germany-bavarian-classic")
 
 
 class CalendarCliTests(SimpleTestCase):

@@ -13,6 +13,7 @@ import argparse
 import hashlib
 import json
 import re
+import unicodedata
 from datetime import date, datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse
@@ -94,7 +95,7 @@ SPONSOR_PREFIXES = (
 SPONSOR_INFIX_RE = re.compile(r"\s+(?:Allianz|Lotto)\s+")
 _ORDINAL_PREFIX_RE = re.compile(r"^\d+\.\s+")
 _ORDINAL_INFIX_RE = re.compile(r"\b\d+\.\s+")
-_BETTING_POOL_SUFFIX_RE = re.compile(r"\s+-\s+V\d+/\d+\s*$")
+_BETTING_POOL_SUFFIX_RE = re.compile(r"\s+-\s+V\d+[/\-]\d+\s*$")
 _EX_NAME_RE = re.compile(r"\(ex\s+([^)]+)\)\s*$")
 
 _UMLAUTS = {"ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss"}
@@ -109,11 +110,14 @@ def _collapse(value: str) -> str:
 
 
 def _slugify(value: str) -> str:
-    value = (value or "").lower()
-    for src, dst in _UMLAUTS.items():
-        value = value.replace(src, dst)
-    value = re.sub(r"[^a-z0-9]+", "-", value).strip("-")
-    return value or "race"
+    """与 prepare_tjcis_ics_catalog.stable_series_key 同款 slug：camelCase 拆分 +
+    标点/符号空格化 + NFKD ascii 化（ü->u），保证同名赛事 series_key 与 ICS 基线一致。"""
+    value = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", value or "")
+    punctuation_spaced = "".join(
+        " " if unicodedata.category(char)[0] in {"P", "S"} else char for char in value
+    )
+    ascii_value = unicodedata.normalize("NFKD", punctuation_spaced).encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"[^a-z0-9]+", "-", ascii_value.casefold()).strip("-") or "race"
 
 
 def _normalize_key(value: str) -> str:
