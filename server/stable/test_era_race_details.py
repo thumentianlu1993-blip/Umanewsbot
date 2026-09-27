@@ -127,6 +127,16 @@ class EraResultsPageTests(SimpleTestCase):
                 race_number="3",
             )
 
+    def test_blank_race_number_raises_domain_error_not_value_error(self):
+        for bad in ("", "abc", "0"):
+            with self.subTest(race_number=bad), self.assertRaises(RuntimeError) as caught:
+                self.module._parse_results_all_page(
+                    _fixture("era_ajax_racecard-results_2026-03-28_r9.html"),
+                    source_url=ALL_DAY_URL,
+                    race_number=bad,
+                )
+            self.assertIn("场次号", str(caught.exception))
+
     def test_empty_table_raises(self):
         html = """
         <h2 class="racecard__heading order-lg-1 mb-3">Race 9 - Dubai World Cup Sponsored by Emirates Airline</h2>

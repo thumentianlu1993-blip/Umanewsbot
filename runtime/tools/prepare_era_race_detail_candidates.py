@@ -229,6 +229,9 @@ def _page_header_metadata(soup) -> dict:
 
 
 def _parse_results_all_page(html: str, *, source_url: str, race_number: str) -> tuple[list[dict], list[dict], dict]:
+    race_number = str(race_number or "").strip()
+    if not race_number.isdigit() or int(race_number) < 1:
+        raise RuntimeError(f"ERA 解析缺少有效场次号：{race_number or '<empty>'}")
     soup = BeautifulSoup(html, "lxml")
     date_param = (parse_qs(urlparse(source_url).query).get("date") or [""])[0]
     metadata: dict = {"local_date": date_param, "racecourse": "", "race_title": ""}
