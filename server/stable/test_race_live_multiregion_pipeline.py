@@ -754,7 +754,7 @@ class RaceLiveRegistryImageContractTests(SimpleTestCase):
         ).hexdigest()
         self.assertEqual(
             registry_sha,
-            "3bac3b644c631ed165b8430343822b2c70c5a88c5036b63dcb557c83c0e0a6da",
+            "0e1cdff89052b7b5f482b4761f1e39e3f38eefdf30405ae6a5d45b64e737b322",
         )
         for relative_path in (
             ".env.example",

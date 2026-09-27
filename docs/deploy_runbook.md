@@ -1,3 +1,23 @@
+## 2026-09-27 TRA registry 周期续期操作要点（本包执行中）
+
+TRA registry 不随账单续期：`valid_until` 硬期限 + `verified_at` 31 天 staleness，每月需人工核验条款后续期。
+续期步骤（详见 [changes/renew-tra-registry-20260927](changes/renew-tra-registry-20260927/rollout.md)）：
+
+1. 重新抓取 `https://www.theracingapi.com/terms-of-service` 与 `https://api.theracingapi.com/documentation`
+   留证（HTTP 200 + 内容 SHA + 抓取时间），用户确认条款仍允许当前自动化用途。
+2. 同步更新两份仓库副本（`runtime/policies/race_live/` 与 `docs/changes/realtime-race-results/`，
+   后者是 Dockerfile 实际烘焙来源），只改 `valid_until` 与 `evidence.verified_at`。
+3. 重算 registry SHA-256，更新钉扎：`.env.example`、三个 compose 文件共 8 处 `:-默认钉扎`、
+   `test_race_live_multiregion_pipeline.py`、`test_race_data_sync_audit.py`。
+4. 用 `render_race_data_sync_standing_policy`（原样保留 policy_id/有效期，审批元数据记本次续期）重渲
+   `runtime/policies/race_data_sync/standing_policy.json`；roster 摘要闭集导致 13 条 route_digest 全部轮换
+   属预期；更新 `RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256` 钉扎（含生产 `.env`）。
+5. 生产：镜像重建（registry 烘焙进镜像）+ `.env` 两枚钉扎 + 重建 web/worker/beat/race_sync_v2_worker；
+   部署后用 `repair_data_sync_stalled_events`（dry-run 绑定候选 SHA 后 apply）把旧 route_digest 的
+   TRA 登记轮换到新 digest；JRA multisource 登记不受影响。
+6. 验收：`_read_registry_contract(now)` 通过、`audit_race_data_sync` 的 `route_drift=[]`、
+   下一周期出现新的 `RaceDataTransportCapacityLedger` 行。
+
 ## 2026-09-26 交接与恢复入口校正（无生产变更）
 
 跨任务交接更新见[统一交接](changes/release-pr201-production/handoff.md)。当前应用26706602、0079；旧0078/9月15日包只是历史，不可当当前恢复包执行。PR212恢复仍绑定其原intent与激活脚本，见[发布记录](changes/multisource-race-enrollment/release-20260922/README.md)。马匹批9保持暂停，下次恢复必须检查原14→15差异、当前release/网关合同和实际锁进程；本次文档更新未完成这些恢复门禁，也没有恢复任务。

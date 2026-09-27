@@ -109,7 +109,7 @@ class RaceDataSyncAuditCommandTests(TestCase):
                 "result",
             ),
             RACE_LIVE_TRA_REGISTRY_SHA256=(
-                "3bac3b644c631ed165b8430343822b2c70c5a88c5036b63dcb557c83c0e0a6da"
+                "0e1cdff89052b7b5f482b4761f1e39e3f38eefdf30405ae6a5d45b64e737b322"
             ),
             RACE_DATA_SYNC_REFERENCE_REGISTRY_SHA256=(
                 "740a93774927765f9c848cc97e4b87b78ab36d473c4c3e2e644d56a6f856cff2"
@@ -118,7 +118,7 @@ class RaceDataSyncAuditCommandTests(TestCase):
                 ROOT / "runtime/policies/race_data_sync/standing_policy.json"
             ),
             RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256=(
-                "4e000fd7510c076eb798345ff1d9dd5cded8043477dd2d55613cecebead31a07"
+                "80fe5cf3383daf7d38ffa26b95cf815d6b7a3d0250ae07ca12ccbfb9a7828df2"
             ),
             RACE_DATA_RAW_MAX_COMPRESSED_BYTES=2 * 1024 * 1024,
             RACE_DATA_RAW_MAX_UNCOMPRESSED_BYTES=8 * 1024 * 1024,

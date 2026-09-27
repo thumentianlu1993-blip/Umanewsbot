@@ -1,3 +1,15 @@
+## 2026-09-27：TRA registry 续期门禁的周期性质与换绑分工
+
+TRA 合同 registry（`runtime/policies/race_live/source_registry_the_racing_api_free.json`）是项目自建的
+fail-closed 门禁，与 TRA 账单续费无关：`valid_until` 是硬期限，`verified_at` 有 31 天 staleness 门禁，
+因此每月必须重新核验条款并续期，无论账单是否正常。2026-09-26 用户确认条款仍允许当前自动化用途，
+批准续期至 2026-12-31。
+
+续期的 digest 影响面：roster 摘要对全部 route 条目闭集，registry SHA 变化会让 standing policy 全部
+13 条 route_digest（含非 TRA 路线）轮换；生产已登记赛事必须用 `repair_data_sync_stalled_events`
+（standing policy 路线）或 `rebind_multisource_enrollments`（multisource 路线，PR #221）换绑到新 digest，
+否则 fail closed。JRA multisource policy 的 proof（`bbdfb414…`）独立于 TRA registry，不受影响。
+
 ## 2026-09-22：多来源登记按真实proof分范围启用
 
 通用任一准入来源登记/强身份去重随PR212上线；首批生产只启用具备真实赛卡、官方结果、网络读取和隔离全链路证据的JRA阪神/中山result来源。policy无event-ID allowlist，窗口为当地T−7日至T+30日；其余地区保留缺口，不以合成合同宣称实网覆盖。策略有效期至2026-10-21T17:14:43.162859Z，续期须重核来源proof。名称只召回，自动合并仍依赖强身份。
