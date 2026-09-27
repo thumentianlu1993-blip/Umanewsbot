@@ -117,7 +117,7 @@ Dec 28 Limerick Tim Duggan Memorial Handicap Steeplechase 4+ Listed 19f 45,000
 6
 # --- 以下为正文条件页开头，用于验证节外文本不产生数据行 ---
 KILLARNEY BALLINROBE KILBEGGAN
-SATURDAY, 9TH MAY, 2026 MONDAY, 25TH MAY, 2026 FRIDAY, 10TH JULY, 2026
+SATURDAY, 9TH MAY, 2026 MONDAY, 11TH MAY, 2026 MONDAY, 25TH MAY, 2026 FRIDAY, 10TH JULY, 2026
 CLOSING: TUESDAY, 5TH MAY CLOSING: WEDNESDAY, 13TH MAY CLOSING: WEDNESDAY, 24TH JUNE
 The MD O'Shea's Tourist Attraction Mares The McHale Mayo National Handicap The Kilmurray Group Midlands National
 Hurdle of €26,000 Steeplechase of €100,000 Handicap Steeplechase of €100,000

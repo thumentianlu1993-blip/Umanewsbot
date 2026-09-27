@@ -25,7 +25,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 
-PARSER_VERSION = "hri-pattern-calendar.v1"
+PARSER_VERSION = "hri-pattern-calendar.v2"
 
 ALLOWED_URL_HOSTS = {"hri-ras.ie", "www.hri-ras.ie", "web.archive.org"}
 
@@ -35,7 +35,7 @@ EXPECTED_GRADE1_COUNTS = {2025: 13, 2026: 14}
 
 FIELDS = (
     "record_type", "country_region", "country", "year", "series_key",
-    "canonical_name_original", "source_race_name", "grade_text", "racecourse",
+    "canonical_name_original", "original_name", "grade_text", "racecourse",
     "local_date", "distance_text", "surface", "expectation_status",
     "source_scope", "discipline", "season_label",
     "raw_source_cache_path", "raw_source_cache_sha256", "raw_source_url",
@@ -71,7 +71,8 @@ NH_SECTION_RE = re.compile(
 )
 
 _ROW_ANCHORS = (
-    r"^(?P<month>Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(?P<day>\d{1,2})\s+"
+    r"^(?:(?P<month>Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(?P<day>\d{1,2})"
+    r"|(?P<day_first>\d{1,2})\s+(?P<month_first>Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec))\s+"
     r"(?P<body>\S.*?)"
 )
 _ROW_TAIL = (
@@ -141,9 +142,11 @@ def _parse_row(line: str, pattern: re.Pattern) -> dict | None:
     if not match:
         return None
     track, name = _split_track(match.group("body").strip(), line=line)
+    month_text = match.group("month") or match.group("month_first")
+    day_text = match.group("day") or match.group("day_first")
     return {
-        "month": MONTHS[match.group("month")],
-        "day": int(match.group("day")),
+        "month": MONTHS[month_text],
+        "day": int(day_text),
         "racecourse": track,
         "race_name": name,
         "novice": bool(match.groupdict().get("novice")),
@@ -178,13 +181,13 @@ def _timeline_row(parsed: dict, *, year: int, discipline: str, season_label: str
     if parsed.get("race_category"):
         source_refs["race_category"] = parsed["race_category"]
     return {
-        "record_type": "calendar",
+        "record_type": "timeline",
         "country_region": "ireland",
         "country": "ireland",
         "year": str(year),
         "series_key": f"ireland-{_slug(parsed['race_name'])}",
         "canonical_name_original": parsed["race_name"],
-        "source_race_name": parsed["race_name"],
+        "original_name": parsed["race_name"],
         "grade_text": parsed["grade_text"],
         "racecourse": parsed["racecourse"],
         "local_date": local_date,
@@ -246,6 +249,8 @@ def parse_flat_pattern_text(text: str, *, year: int, source: dict | None = None)
 def _default_year_map(season_label: str) -> dict[int, int]:
     """赛季默认公历年映射：5-12 月归首年、1-4 月归次年。
 
+    仅用于非 5 月行；5 月在 Part 1 属首年、Part 2 属次年，必须以
+    extract_nh_date_evidence 的正文日期证据为准（见 parse_nh_pattern_text）。
     依据：2026/2027 Part 1 年册正文页明确写有 SATURDAY, 9TH MAY, 2026 等日期，
     且 Galway Hurdle 固定在 Galway 节周四（2026-07-30）。
     """
@@ -254,6 +259,46 @@ def _default_year_map(season_label: str) -> dict[int, int]:
         raise CalendarError(f"invalid season label: {season_label!r}")
     first = int(match.group(1))
     return {**{month: first for month in range(5, 13)}, **{month: first + 1 for month in range(1, 5)}}
+
+
+EVIDENCE_MONTHS = {
+    "JANUARY": 1, "FEBRUARY": 2, "MARCH": 3, "APRIL": 4, "MAY": 5, "JUNE": 6,
+    "JULY": 7, "AUGUST": 8, "SEPTEMBER": 9, "OCTOBER": 10, "NOVEMBER": 11, "DECEMBER": 12,
+}
+
+NH_DATE_EVIDENCE_RE = re.compile(
+    r"\b(?P<weekday>MONDAY|TUESDAY|WEDNESDAY|THURSDAY|FRIDAY|SATURDAY|SUNDAY),\s+"
+    r"(?P<day>\d{1,2})(?:ST|ND|RD|TH)\s+"
+    r"(?P<month>JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER)"
+    r",\s+(?P<year>\d{4})\b"
+)
+
+
+def extract_nh_date_evidence(text: str) -> dict[tuple[int, int], int]:
+    """从正文页 "SATURDAY, 9TH MAY, 2026" 行提取 (month, day) -> year 证据。
+
+    星期与公历日期必须真实一致（防御 pdfplumber 栏错位）；同一 (month, day)
+    出现两个年份时 fail closed。
+    """
+    evidence: dict[tuple[int, int], int] = {}
+    for match in NH_DATE_EVIDENCE_RE.finditer(text):
+        month = EVIDENCE_MONTHS[match.group("month")]
+        day = int(match.group("day"))
+        year = int(match.group("year"))
+        try:
+            actual_weekday = datetime(year, month, day).strftime("%A").upper()
+        except ValueError as exc:
+            raise CalendarError(f"invalid NH date evidence: {match.group(0)!r}") from exc
+        if actual_weekday != match.group("weekday"):
+            raise CalendarError(f"NH date evidence weekday mismatch: {match.group(0)!r}")
+        key = (month, day)
+        if key in evidence and evidence[key] != year:
+            raise CalendarError(
+                f"conflicting NH date evidence for month={month} day={day}: "
+                f"{evidence[key]} vs {year}"
+            )
+        evidence[key] = year
+    return evidence
 
 
 def _nh_category(section: str) -> str:
@@ -272,14 +317,23 @@ def _nh_category(section: str) -> str:
 
 
 def parse_nh_pattern_text(
-    text: str, *, season_label: str, year_map: dict, source: dict | None = None
+    text: str, *, season_label: str, year_map: dict, date_map: dict | None = None,
+    source: dict | None = None,
 ) -> list[dict]:
-    """解析障碍 Pattern 年册（跨年赛季）的 GRADED/LISTED 各节。"""
+    """解析障碍 Pattern 年册（跨年赛季）的 GRADED/LISTED 各节。
+
+    年份归属：5 月行必须命中正文日期证据（Part 1 属首年、Part 2 属次年）；
+    其余月份用 year_map，且若正文证据存在则不得与之矛盾。
+    """
     match = re.fullmatch(r"(\d{4})/(\d{4})", season_label)
     if not match or int(match.group(2)) != int(match.group(1)) + 1:
         raise CalendarError(f"invalid season label: {season_label!r}")
+    season_first = int(match.group(1))
+    season_years = {season_first, season_first + 1}
     if not year_map:
         year_map = _default_year_map(season_label)
+    if date_map is None:
+        date_map = extract_nh_date_evidence(text)
     rows = []
     sections_seen = 0
     current_count = None
@@ -291,6 +345,26 @@ def parse_nh_pattern_text(
             raise CalendarError(
                 f"NH section {current_section!r} row count {current_rows} != header count {current_count}"
             )
+
+    def _resolve_year(parsed: dict) -> int:
+        month = parsed["month"]
+        day = parsed["day"]
+        if month == 5:
+            if (month, day) not in date_map:
+                raise CalendarError(
+                    f"May row requires NH body date evidence: {parsed['line_raw']!r}"
+                )
+            return date_map[(month, day)]
+        if month not in year_map:
+            raise CalendarError(f"month {month} missing from NH year map: {parsed['line_raw']!r}")
+        year = int(year_map[month])
+        evidence_year = date_map.get((month, day))
+        if evidence_year is not None and evidence_year != year:
+            raise CalendarError(
+                f"NH date evidence contradicts season year map: {parsed['line_raw']!r} "
+                f"evidence={evidence_year} map={year}"
+            )
+        return year
 
     for raw_line in text.splitlines():
         line = raw_line.strip()
@@ -311,15 +385,17 @@ def parse_nh_pattern_text(
         parsed = _parse_row(line, NH_ROW_RE)
         if parsed is None:
             continue
-        month = parsed["month"]
-        if month not in year_map:
-            raise CalendarError(f"month {month} missing from NH year map: {parsed['line_raw']!r}")
+        year = _resolve_year(parsed)
+        if year not in season_years:
+            raise CalendarError(
+                f"NH row year {year} outside season {season_label}: {parsed['line_raw']!r}"
+            )
         parsed["section"] = current_section
         parsed["race_category"] = _nh_category(current_section)
         rows.append(
             _timeline_row(
                 parsed,
-                year=int(year_map[month]),
+                year=year,
                 discipline="jump",
                 season_label=season_label,
                 source=source,

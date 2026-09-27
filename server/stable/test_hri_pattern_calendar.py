@@ -81,7 +81,8 @@ class HriFlatPatternBookTests(SimpleTestCase):
         self.assertEqual(row["source_scope"], "official_calendar")
         self.assertEqual(row["country_region"], "ireland")
         self.assertEqual(row["year"], "2025")
-        self.assertEqual(row["record_type"], "calendar")
+        self.assertEqual(row["record_type"], "timeline")
+        self.assertEqual(row["original_name"], "Irish Derby")
         self.assertEqual(row["expectation_status"], "held")
         self.assertEqual(row["source_refs"]["distance_unit"], "furlong")
         self.assertEqual(row["source_refs"]["stakes_raw"], "1,250,000")
@@ -191,9 +192,58 @@ class HriNationalHuntPatternBookTests(SimpleTestCase):
         self.assertGreater(len(listed), 0)
 
     def test_year_map_missing_month_raises(self):
-        broken = {month: 2026 for month in range(6, 13)}
+        # 缺 12 月：fixture 含大量 Dec 行，必须 fail closed
+        broken = {month: 2026 for month in range(5, 12)}
         with self.assertRaises(Exception):
             self.module.parse_nh_pattern_text(self.text, season_label="2026/2027", year_map=broken)
+
+    def test_day_first_inverted_row_parses(self):
+        # 官方年册偶发日-月倒序行（2025/2026 Part1 "28 Dec Limerick Tim Duggan ..."）
+        anchor = "Nov 21 Punchestown Morgiana Hurdle 4+ Gr 1 16f+ 150,000"
+        mutated = self.text.replace(anchor, "21 Nov Punchestown Morgiana Hurdle 4+ Gr 1 16f+ 150,000")
+        rows = self.module.parse_nh_pattern_text(
+            mutated, season_label="2026/2027", year_map=dict(NH_YEAR_MAP)
+        )
+        self.assertEqual(len(rows), 80)
+        row = next(row for row in rows if row["series_key"] == "ireland-morgiana-hurdle")
+        self.assertEqual(row["local_date"], "2026-11-21")
+
+    def test_may_row_requires_date_evidence(self):
+        # 5 月同时出现在 Part 1（赛季首年）与 Part 2（次年），必须依赖正文日期证据
+        mutated = self.text.replace("SATURDAY, 9TH MAY, 2026", "SATURDAY, 9TH XXX, 2026")
+        with self.assertRaisesRegex(Exception, "May"):
+            self.module.parse_nh_pattern_text(mutated, season_label="2026/2027", year_map=dict(NH_YEAR_MAP))
+
+    def test_may_row_maps_to_second_year_with_part2_evidence(self):
+        # 模拟 Part 2 语义：5 月证据行属于赛季次年（2027）
+        mutated = (
+            self.text.replace("SATURDAY, 9TH MAY, 2026", "SUNDAY, 9TH MAY, 2027")
+            .replace("MONDAY, 11TH MAY, 2026", "TUESDAY, 11TH MAY, 2027")
+            .replace("MONDAY, 25TH MAY, 2026", "TUESDAY, 25TH MAY, 2027")
+        )
+        rows = self.module.parse_nh_pattern_text(
+            mutated, season_label="2026/2027", year_map=dict(NH_YEAR_MAP)
+        )
+        self.assertEqual(len(rows), 80)
+        by_key = {row["series_key"]: row for row in rows}
+        self.assertEqual(by_key["ireland-tourist-attraction-mares-hurdle"]["local_date"], "2027-05-09")
+        self.assertEqual(by_key["ireland-an-riocht-steeplechase"]["local_date"], "2027-05-11")
+        self.assertEqual(by_key["ireland-mayo-national-handicap-steeplechase"]["local_date"], "2027-05-25")
+
+    def test_evidence_weekday_mismatch_raises(self):
+        mutated = self.text.replace("SATURDAY, 9TH MAY, 2026", "MONDAY, 9TH MAY, 2026")
+        with self.assertRaisesRegex(Exception, "weekday"):
+            self.module.parse_nh_pattern_text(mutated, season_label="2026/2027", year_map=dict(NH_YEAR_MAP))
+
+    def test_conflicting_date_evidence_raises(self):
+        mutated = self.text + "\nSUNDAY, 9TH MAY, 2027\n"
+        with self.assertRaisesRegex(Exception, "conflict"):
+            self.module.parse_nh_pattern_text(mutated, season_label="2026/2027", year_map=dict(NH_YEAR_MAP))
+
+    def test_non_may_evidence_contradicting_year_map_raises(self):
+        mutated = self.text + "\nSUNDAY, 21ST NOVEMBER, 2027\n"
+        with self.assertRaisesRegex(Exception, "contradict"):
+            self.module.parse_nh_pattern_text(mutated, season_label="2026/2027", year_map=dict(NH_YEAR_MAP))
 
     def test_season_label_mismatch_raises(self):
         with self.assertRaises(Exception):
@@ -233,6 +283,8 @@ class HriPatternCalendarCliTests(SimpleTestCase):
             rows = [json.loads(line) for line in jsonl.read_text(encoding="utf-8").splitlines()]
             self.assertEqual(len(rows), 72 + 72 + 80)
             for row in rows:
+                self.assertEqual(row["record_type"], "timeline")
+                self.assertTrue(row["original_name"])
                 self.assertEqual(len(row["raw_source_cache_sha256"]), 64)
                 self.assertTrue(row["raw_source_url"].startswith("https://"))
                 self.assertTrue(row["raw_source_cache_path"])
