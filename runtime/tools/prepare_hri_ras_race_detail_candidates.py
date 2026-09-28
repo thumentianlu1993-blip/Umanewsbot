@@ -100,6 +100,7 @@ def _parse_race_header(soup: BeautifulSoup, *, source_url: str) -> dict:
         "ran_count": None,
         "going": "",
         "purse_text": "",
+        "registered_name": "",
         "venue_code": "",
     }
     if not metadata["racecourse"] or not metadata["race_title"]:
@@ -123,6 +124,8 @@ def _parse_race_header(soup: BeautifulSoup, *, source_url: str) -> dict:
         purse = details.find("p")
         if purse is not None:
             metadata["purse_text"] = _collapse(purse.get_text(" ", strip=True))
+            registered = REGISTERED_NAME_RE.search(metadata["purse_text"])
+            metadata["registered_name"] = _collapse(registered.group(1)) if registered else ""
     for strong in soup.find_all("strong"):
         if strong.get_text(" ", strip=True).upper().startswith("GOING"):
             em = strong.find("em")
@@ -251,6 +254,34 @@ def _tote_value(raw: str) -> str:
     return match.group(1) if match else ""
 
 
+NON_FINISH_STATUS = {
+    "n.r.": "non_runner",
+    "nr": "non_runner",
+    "p.u.": "pulled_up",
+    "pu": "pulled_up",
+    "fell": "fell",
+    "f": "fell",
+    "u.r.": "unseated_rider",
+    "ur": "unseated_rider",
+    "b.d.": "did_not_finish",
+    "bd": "did_not_finish",
+    "r.f.": "refused",
+    "d.s.q.": "disqualified",
+    "dq": "disqualified",
+}
+REGISTERED_NAME_RE = re.compile(r"\(\s*Registered as\s+(?:the\s+)?([^)]+?)\s*\)", re.IGNORECASE)
+
+
+def _running_status(finish_raw: str) -> str:
+    if _ordinal_position(finish_raw) > 0:
+        return "finished"
+    marker = re.sub(r"\s+", "", (finish_raw or "").lower())
+    status = NON_FINISH_STATUS.get(marker) or NON_FINISH_STATUS.get(marker.rstrip("."))
+    if status is None:
+        raise RuntimeError(f"HRI 页面出现未登记的非名次标记：{finish_raw!r}")
+    return status
+
+
 def _parse_result_page(html: str, *, source_url: str) -> tuple[list[dict], list[dict], dict]:
     soup = BeautifulSoup(html, "lxml")
     metadata = _parse_race_header(soup, source_url=source_url)
@@ -265,6 +296,7 @@ def _parse_result_page(html: str, *, source_url: str) -> tuple[list[dict], list[
         if not horse_name:
             continue
         finish_position = _ordinal_position(parsed["finish_raw"])
+        running_status = _running_status(parsed["finish_raw"])
         source_refs = {
             "primary": source_url,
             "source_language": "en",
@@ -291,7 +323,7 @@ def _parse_result_page(html: str, *, source_url: str) -> tuple[list[dict], list[
             "trainer_name": parsed["trainer_name"],
             "carried_weight": parsed["carried_weight"],
             "odds_value": _tote_value(detail["tote_win_raw"]),
-            "running_status": "declared",
+            "running_status": running_status,
             "source_refs": source_refs,
         }
         runners.append(base)
@@ -319,9 +351,9 @@ def _parse_result_page(html: str, *, source_url: str) -> tuple[list[dict], list[
         row["finish_position"] = display_position
         row["official_finish_position"] = official_position
     metadata.update({"row_count": len(runners), "result_count": len(results)})
-    if metadata.get("ran_count") is not None and metadata["ran_count"] != len(runners):
+    if metadata.get("ran_count") is not None and metadata["ran_count"] != len(result_rows):
         raise RuntimeError(
-            f"HRI 页面标注 {metadata['ran_count']} 匹出走，实际解析 {len(runners)} 匹"
+            f"HRI 页面标注 {metadata['ran_count']} 匹完赛，实际解析名次 {len(result_rows)} 匹"
         )
     return runners, results, metadata
 
@@ -351,8 +383,13 @@ def _page_matches_event(event: dict, metadata: dict) -> bool:
     if not _course_match(str(event.get("racecourse") or ""), str(metadata.get("racecourse") or "")):
         return False
     expected_tokens = _name_tokens(str(event.get("original_name") or ""))
-    actual_tokens = _name_tokens(str(metadata.get("race_title") or ""))
-    return bool(expected_tokens and expected_tokens <= actual_tokens)
+    if not expected_tokens:
+        return False
+    candidates = [str(metadata.get("race_title") or "")]
+    registered_name = str(metadata.get("registered_name") or "")
+    if registered_name:
+        candidates.append(registered_name)
+    return any(expected_tokens <= _name_tokens(candidate) for candidate in candidates if candidate)
 
 
 def _approved_result_url(event: dict, *, provider: str) -> str:

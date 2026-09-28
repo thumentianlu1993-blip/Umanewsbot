@@ -116,7 +116,7 @@ class HriRasResultPageParseTests(SimpleTestCase):
 
     def test_all_runners_declared(self):
         for row in self.runners:
-            self.assertEqual(row["running_status"], "declared")
+            self.assertEqual(row["running_status"], "finished")
 
     def test_url_date_mismatch_raises(self):
         bad_url = "https://www.hri-ras.ie/results/race-result/?date=2025-06-30&race=1610&venue=CU"
@@ -178,6 +178,69 @@ class HriRasResultPageParseTests(SimpleTestCase):
             self.module.validate_https_url(
                 "https://evil.example/results/race-result/", allowed_hosts=self.module.ALLOWED_HOSTS
             )
+
+
+class HriRasNonFinishMarkerTests(SimpleTestCase):
+    """2025-05-02 Punchestown Tickell Novice Hurdle：9 面板 = 7 名次 + fell + N.R.，页头 7 ran。"""
+
+    TICKELL_FIXTURE = FIXTURES / "hri_result_2025-05-02_punchestown_tickell_novice_hurdle.html"
+    TICKELL_URL = "https://www.hri-ras.ie/results/race-result/?date=2025-05-02&race=1805&venue=PU"
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.module = _load_module()
+        cls.html = cls.TICKELL_FIXTURE.read_text(encoding="utf-8")
+        cls.runners, cls.results, cls.metadata = cls.module._parse_result_page(
+            cls.html, source_url=cls.TICKELL_URL
+        )
+
+    def test_nine_panels_but_seven_results(self):
+        self.assertEqual(len(self.runners), 9)
+        self.assertEqual(len(self.results), 7)
+        self.assertEqual(self.metadata["row_count"], 9)
+        self.assertEqual(self.metadata["result_count"], 7)
+        self.assertEqual(self.metadata["ran_count"], 7)
+
+    def test_winner_and_placed_are_finished(self):
+        self.assertEqual(self.results[0]["horse_name"], "Final Demand")
+        for row in self.results:
+            self.assertEqual(row["running_status"], "finished")
+
+    def test_fell_and_nr_classified_not_in_results(self):
+        by_name = {row["horse_name"]: row for row in self.runners}
+        self.assertEqual(by_name["The Yellow Clay"]["running_status"], "fell")
+        self.assertEqual(by_name["Mr Percy"]["running_status"], "non_runner")
+        self.assertNotIn("The Yellow Clay", {row["horse_name"] for row in self.results})
+        self.assertNotIn("Mr Percy", {row["horse_name"] for row in self.results})
+
+    def test_ran_count_mismatch_still_raises(self):
+        tampered = self.html.replace("7 <text>ran</text>", "6 <text>ran</text>", 1)
+        self.assertNotEqual(tampered, self.html)
+        with self.assertRaises(Exception):
+            self.module._parse_result_page(tampered, source_url=self.TICKELL_URL)
+
+    def test_unknown_non_finish_marker_raises(self):
+        tampered = self.html.replace("<b>fell</b>", "<b>ro</b>", 1)
+        self.assertNotEqual(tampered, self.html)
+        with self.assertRaises(Exception):
+            self.module._parse_result_page(tampered, source_url=self.TICKELL_URL)
+
+    def test_registered_name_accepted_by_page_guard(self):
+        # 页面 h2 为冠名 "The Alanna Homes Champion Novice Hurdle (Grade 1)"，
+        # 注册名在 purse 段 "(Registered as the Tickell Novice Hurdle)"
+        self.assertEqual(self.metadata["race_title"], "The Alanna Homes Champion Novice Hurdle (Grade 1)")
+        event = {
+            "local_date": "2025-05-02",
+            "racecourse": "Punchestown",
+            "original_name": "Tickell Novice Hurdle",
+        }
+        self.assertTrue(self.module._page_matches_event(event, self.metadata))
+        self.assertFalse(
+            self.module._page_matches_event(
+                {**event, "original_name": "Morgiana Hurdle"}, self.metadata
+            )
+        )
 
 
 class HriRasPrepareCandidatesTests(SimpleTestCase):

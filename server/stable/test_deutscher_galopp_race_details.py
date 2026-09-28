@@ -402,3 +402,65 @@ class PrepareCandidatesTests(SimpleTestCase):
             self._break_diana_date(tmp)
             with self.assertRaises(Exception):
                 self.module.prepare_candidates(args)
+
+
+DERBY_URL = "https://www.deutscher-galopp.de/gr/renntage/rennen.php?id=1355793&d=20250706&s=R"
+STUTENPREIS_URL = "https://www.deutscher-galopp.de/gr/renntage/rennen.php?id=1363220&d=20260905&s=R"
+
+
+class NonStarterNameNormalizationTests(SimpleTestCase):
+    """2025-07-06 Hamburg Deutsches Derby：表尾 NICHTSTARTER 无角色后缀，出赛表马名带后缀。"""
+
+    def setUp(self):
+        self.module = _load()
+        self.runners, self.results, self.metadata = self.module._parse_result_page(
+            _fixture("dg_20250706_hamburg_deutsches_derby.html"), source_url=DERBY_URL
+        )
+
+    def test_non_starter_suffix_mismatch_no_longer_rejected(self):
+        # 表尾 NICHTSTARTER: Juwelier；出赛表为 "Juwelier (IRE) O."
+        non_runners = [row for row in self.runners if row["running_status"] == "non_runner"]
+        self.assertEqual([row["horse_name"] for row in non_runners], ["Juwelier"])
+
+    def test_winner_hochkoenig(self):
+        self.assertEqual(self.results[0]["horse_name"], "Hochkönig")
+        self.assertEqual(self.metadata["race_time"], "2:37,10")
+
+    def test_runner_names_strip_role_suffix_and_country(self):
+        for row in self.runners:
+            self.assertNotRegex(row["horse_name"], r"\s\([A-Z]{2,3}\)$")
+            self.assertNotRegex(row["horse_name"], r"\s(?:O|H|St|Sb|Skl|Bl|N|Hl|W)\.$")
+
+
+class NameTokenAliasTests(SimpleTestCase):
+    """2026-09-05 Baden-Baden T. von Zastrow Stutenpreis：ICS 名 "T.v.Zastrow" 的 v≈von 别名。"""
+
+    def setUp(self):
+        self.module = _load()
+        self.runners, self.results, self.metadata = self.module._parse_result_page(
+            _fixture("dg_20260905_baden-baden_stutenpreis.html"), source_url=STUTENPREIS_URL
+        )
+
+    def test_v_von_token_alias(self):
+        # "von" 是德语通用词会被过滤；别名使 ICS 缩写与官方全称归一到同一集合
+        expected = self.module._name_tokens("T.v.Zastrow Stutenpreis")
+        official = self.module._name_tokens("T. von Zastrow Stutenpreis")
+        self.assertEqual(expected, {"t", "zastrow", "stutenpreis"})
+        self.assertEqual(expected, official)
+
+    def test_page_guard_accepts_ics_spelling(self):
+        event = {
+            "local_date": "2026-09-05",
+            "racecourse": "Baden-Baden",
+            "original_name": "T.v.Zastrow Stutenpreis",
+        }
+        self.assertTrue(self.module._page_matches_event(event, self.metadata))
+        self.assertFalse(
+            self.module._page_matches_event(
+                {**event, "original_name": "Grosser Preis von Baden"}, self.metadata
+            )
+        )
+
+    def test_stutenpreis_results_parsed(self):
+        self.assertGreaterEqual(len(self.results), 5)
+        self.assertTrue(self.results[0]["horse_name"])

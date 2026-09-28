@@ -33,6 +33,8 @@ SOURCE_NAME = "deutscher_galopp_result"
 REGION_PROVIDERS = {"germany": PROVIDER}
 
 COUNTRY_SUFFIX_RE = re.compile(r"\s*\([A-Z]{2,3}\)")
+# 出赛表马名尾部的性别/状态角色后缀（表尾 NICHTSTARTER 不带这些后缀）
+ROLE_SUFFIX_RE = re.compile(r"\s+(?:O|H|St|Sb|Skl|Bl|N|Hl|W)\.$")
 TITLE_RE = re.compile(
     r"^(?P<race_title>.+),\s+(?P<racecourse>[^,]+?)\s+"
     r"(?P<day>\d{2})\.(?P<month>\d{2})\.(?P<year>\d{4})\s+-\s+Deutscher\s+Galopp\s*$"
@@ -58,6 +60,10 @@ def _collapse(value: str) -> str:
 
 def _strip_country_suffix(value: str) -> str:
     return _collapse(COUNTRY_SUFFIX_RE.sub("", value or ""))
+
+
+def _normalize_horse_name(value: str) -> str:
+    return _collapse(ROLE_SUFFIX_RE.sub("", _strip_country_suffix(value)))
 
 
 def _decimal_de(value: str) -> str:
@@ -173,7 +179,7 @@ def _parse_result_page(html: str, *, source_url: str) -> tuple[list[dict], list[
         if not number.isdigit():
             continue
         entry_row_count += 1
-        horse_name = _strip_country_suffix(name_raw)
+        horse_name = _normalize_horse_name(name_raw)
         if not horse_name:
             raise RuntimeError(f"出赛表行缺少马名：{cells!r}")
         is_non_runner = odds.upper() == "NS"
@@ -213,7 +219,7 @@ def _parse_result_page(html: str, *, source_url: str) -> tuple[list[dict], list[
         if len(cells) != 11:
             raise RuntimeError(f"结果表行列数异常：{cells!r}")
         place, name_raw, number, box, margin, prize, owner, trainer, jockey, weight, odds = cells
-        horse_name = _strip_country_suffix(name_raw)
+        horse_name = _normalize_horse_name(name_raw)
         if not horse_name:
             raise RuntimeError(f"结果表行缺少马名：{cells!r}")
         position_match = re.fullmatch(r"(\d+)\.", place)
@@ -275,7 +281,7 @@ def _parse_result_page(html: str, *, source_url: str) -> tuple[list[dict], list[
         parsed_non_runners = {
             row["horse_name"] for row in runners.values() if row["running_status"] == "non_runner"
         }
-        footer_names = {_strip_country_suffix(name) for name in footer_info["non_starter_names"]}
+        footer_names = {_normalize_horse_name(name) for name in footer_info["non_starter_names"]}
         if footer_names != parsed_non_runners:
             raise RuntimeError(
                 f"退赛马不一致：表尾 NICHTSTARTER={sorted(footer_names)}，解析={sorted(parsed_non_runners)}"
@@ -306,11 +312,17 @@ def _name_tokens(value: str) -> set[str]:
     value = re.sub(r"\bv\d+/\d+\b", " ", value)
     tokens = set()
     for token in re.split(r"[^a-z0-9]+", value):
-        if not token or token.isdigit() or token in GENERIC_NAME_TOKENS:
+        if not token or token.isdigit():
             continue
         if token.endswith(".") or re.fullmatch(r"\d+\.", token):
             continue
-        tokens.add(token.rstrip("."))
+        token = token.rstrip(".")
+        # ICS 缩写与官方全称的别名（T.v.Zastrow ≡ T. von Zastrow；别名先于通用词过滤，
+        # 使两侧同归通用词集合）
+        token = {"v": "von"}.get(token, token)
+        if token in GENERIC_NAME_TOKENS:
+            continue
+        tokens.add(token)
     tokens.discard("")
     return tokens
 
