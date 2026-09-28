@@ -319,6 +319,94 @@ def discover_p0_racecard_urls_task() -> dict:
 
 
 @shared_task
+def race_calendar_refresh_dry_run_task() -> dict:
+    """周期赛历刷新薄壳：生成 diff 候选并通知，不自动 apply。
+
+    apply 永远走 refresh_race_calendar 门禁命令（manifest sha + 审批人绑定）。
+    输入来自只读配置：RACE_CALENDAR_REFRESH_INCOMING（URL=PATH 列表）、
+    RACE_CALENDAR_REFRESH_EXISTING_SNAPSHOT（既有目标快照导出）、
+    RACE_CALENDAR_REFRESH_COVERS（官方全集覆盖声明 REGION:YEAR 列表）。
+    """
+    if getattr(settings, "RACE_CALENDAR_REFRESH_BEAT_ENABLED", False) is not True:
+        return {"enabled": False, "status": "disabled"}
+    incoming_specs = [
+        str(item).strip()
+        for item in (getattr(settings, "RACE_CALENDAR_REFRESH_INCOMING", []) or [])
+        if str(item).strip()
+    ]
+    existing_snapshot = str(
+        getattr(settings, "RACE_CALENDAR_REFRESH_EXISTING_SNAPSHOT", "") or ""
+    ).strip()
+    if not incoming_specs or not existing_snapshot:
+        return {"enabled": True, "status": "skipped", "reason": "missing_inputs"}
+
+    import importlib.util
+    import sys
+    from pathlib import Path
+
+    tool_root = Path(
+        str(getattr(settings, "HISTORICAL_RUNNER_TOOL_ROOT", "") or "runtime/tools")
+    )
+    tool_path = tool_root / "diff_race_calendar.py"
+    if not tool_path.is_file():
+        raise RuntimeError(f"race calendar diff tool is missing: {tool_path}")
+    spec = importlib.util.spec_from_file_location("diff_race_calendar_beat", tool_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"race calendar diff tool is unloadable: {tool_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.path.insert(0, str(tool_root))
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.path.pop(0)
+
+    incoming = [module.parse_incoming_spec(value) for value in incoming_specs]
+    covers = module.parse_covers(
+        getattr(settings, "RACE_CALENDAR_REFRESH_COVERS", []) or []
+    )
+    output_root = Path(
+        str(
+            getattr(settings, "RACE_CALENDAR_REFRESH_OUTPUT_ROOT", "")
+            or "runtime/race_calendar_refresh"
+        )
+    )
+    output_dir = output_root / timezone.now().strftime("%Y%m%dT%H%M%SZ")
+    summary = module.generate_diff(
+        incoming=incoming,
+        existing_path=existing_snapshot,
+        covers=covers,
+        today=timezone.localdate(),
+        output_dir=output_dir,
+    )
+    counts = summary["counts"]
+    actionable = sum(
+        counts["buckets"].get(bucket, 0) for bucket in ("new", "changed", "cancelled")
+    )
+    notified = 0
+    if actionable:
+        notified = len(
+            send_ops_notification(
+                notification_type=NotificationType.OPS_SUMMARY,
+                title="UmaFans 赛历刷新 diff 候选",
+                payload={
+                    "output_dir": str(output_dir),
+                    "counts": counts,
+                    "covers": summary["covers"],
+                    "apply_hint": "人工审核后按 refresh_race_calendar 门禁命令 apply",
+                },
+            )
+        )
+    return {
+        "enabled": True,
+        "status": "completed",
+        "output_dir": str(output_dir),
+        "counts": counts,
+        "actionable": actionable,
+        "notified": notified,
+    }
+
+
+@shared_task
 def select_due_race_live_events_task() -> dict:
     if getattr(settings, "RACE_LIVE_SCHEDULER_ENABLED", False) is not True:
         return {"enabled": False, "claimed": 0, "dispatched": 0}
