@@ -66,13 +66,13 @@
 
 | 用途 | 来源 | URL / 说明 |
 |---|---|---|
-| 年度全集/赛程 | **HRI RÁS Flat Pattern 年册 PDF** + ICS 爱尔兰章节 | `https://www.hri-ras.ie/flat-pattern-races`（2026 版直链 `.../2026-FlatPattBook.pdf`）；ICS 2026 爱尔兰：G1×14 / G2×13 / G3×45（平地），另有障碍章节 |
+| 年度全集/赛程 | **HRI RÁS Flat Pattern 年册 PDF** + ICS 爱尔兰章节 | `https://www.hri-ras.ie/flat-pattern-races`（2026 版直链 `.../getmedia/<GUID>/2026-FlatPattBook.pdf`）；索引节 `Mon DD Track Name … Gr N` 每年 72 行可机械解析。历史年份官网不留直链，**GUID 经 Wayback 快照恢复**（已验证 2025 版流程）。障碍赛另有 National Hunt Pattern 年册（分 Part 1/2 跨年，5 月行须以正文日期证据定年） |
 | 全年赛期历 | HRI 年度 Fixture List | `https://www.hri.ie/.../2026-Irish-Racing-Fixture-List-(Weekly).pdf`；**2027 版已于 2026-09-24 公布** |
-| 赛果（官方） | HRI RÁS results / results archive | `https://www.hri-ras.ie/results`（按马场+年份检索） |
-| 交叉验证 | irishracing.com | 服务端渲染、URL 含日期/马场，历史可回溯至 1990 年代；已被既有 uk/france 详情源复用 |
+| 赛果（官方） | HRI RÁS results | 日列表 `https://www.hri-ras.ie/results?date=YYYY-MM-DD&venue=XX`（马场两位代码，如 Curragh=CU）→ 单场 `…/results/race-result/?date=…&race=HHMM&venue=XX`；服务端渲染，全出走面板。**注意：`N ran` 页头计数 = 完赛名次数（不含 fell/p.u./u.r./N.R.）**；无 SP 仅 Tote；冠名页注册名在 purse 段 `(Registered as …)` |
+| 交叉验证 | irishracing.com | 结果页 `https://www.irishracing.com/raceresults/<Weekday-DDth-Mon-YYYY>/<Course>/<HHMM>`；含 SP；已被既有 uk/france 详情源复用 |
 | 赛历公布节奏 | **前一年 9 月下旬**（HRI 新闻稿） | 9 月底触发次年全国对账 |
 | TRA 路线 | 完整覆盖（2025 年 2,892 场） | 可登记；加入 standing policy 待实施 |
-| catalog adapter | `hri_pattern_catalog`（2026-09 新增） | ICS 解析 `Pt I—IRELAND`/`IRE` + Irish Jumps 页头 |
+| catalog adapter | `hri_pattern_catalog`；详情 `hri_ras_result`（官方）/ `ireland_irishracing`（交叉） | |
 
 ## 法国
 
@@ -98,24 +98,26 @@
 
 | 用途 | 来源 | URL / 说明 |
 |---|---|---|
-| 年度全集/赛程 | **Racing Australia 官方 Group/Listed 全国表** + ICS 澳洲章节 | `https://racingaustralia.horse/FreeFields/GroupAndListedRaces.aspx`（2026: G1×76 / G2×94 / G3×167）；分州赛期 `Calendar.aspx?State=…` |
+| 年度全集/赛程 | **Racing Australia 官方 Group/Listed 全国日期表** + ICS 澳洲章节 | `https://racingaustralia.horse/arb/Group_ListedRaceDates/{season}.aspx`（如 2025-2026）；服务端渲染单表，含日期/州/马场/级别/途程；2025-26: G1×76/G2×97/G3×174。**新一季表约 7 月发布，发布前次年 8-12 月挂账** |
 | 分级变更官宣 | Asian Pattern Committee / ARF 公告 | 每年 7 月（如 2026-27：Apollo Stakes 升 G1、Stan Fox 降级） |
-| 赛果（官方） | RA `Calendar_Results.aspx?State=…` 分州赛果；Racing NSW / Racing Victoria | 各州官方结构不同，优先 RA 汇总 |
-| 交叉验证 | Racenet `racenet.com.au/group-one-races`、Punters、breedingracing.com 赛季表 | breedingracing 含冠军/父系，结构化好 |
+| 赛果（官方） | RA 分州赛果 | `https://racingaustralia.horse/FreeFields/Results.aspx?Key={YYYYMonDD},{STATE},{Venue}`（一日一页含全部场次，`table.race-strip-fields`）；**滚动保留窗口约 11 个月**，出窗页面返回 "not currently available"（fail-closed 挂账，不臆造） |
+| 赛果兜底 | justhorseracing.com.au | 与 RA 同构 race-strip-fields；URL 含 slug+数字 ID 不可机械构造，需检索发现；个别大热场（Melbourne Cup）无 SP 列 |
+| 交叉验证 | Racenet（对固定 UA 403，暂不可用）/ breedingracing.com | breedingracing 含冠军/父系 |
 | 赛历公布节奏 | 各州 4-6 月（RV 2026-04-30）；7 月 RA 全国表刷新 | 赛季 8/1 开始前落地；**赛季跨年按 local_date 归年** |
 | TRA 路线 | 仅 group 级（2025 年 403 场），全量为 regional add-on（暂不可购） | 不作主源；可做 G1 级临近补充 |
-| catalog adapter | `racing_australia_pattern_catalog`（已存在） | providers: racing_australia + tjcis |
+| catalog adapter | `racing_australia_pattern_catalog`（已存在）；详情 `racing_australia_results` / `just_horse_racing_results` | |
 
 ## 德国
 
 | 用途 | 来源 | URL / 说明 |
 |---|---|---|
-| 年度全集/赛程 | **Deutscher Galopp 官方 Renntermine PDF** + ICS 德国章节 | `https://www.deutscher-galopp.de/gr-wAssets/docs/renntermine2026.pdf`（2026: G1×7 / G2×9 / G3×26） |
-| 赛果（官方） | Deutscher Galopp Ergebnisse | `https://www.deutscher-galopp.de/gr/renntage/ergebnisse/` |
-| 交叉验证 | galopp-sieger.de（历年冠军库）/ turf-times.de 年度 black-type 汇总 | turf-times 年度计数可与 ICS 对账 |
+| 年度全集/赛程 | **Deutscher Galopp 官方 Renntermine PDF** + ICS 德国章节 | `https://www.deutscher-galopp.de/gr-wAssets/docs/renntermine2026.pdf`（2026: G1×7 / G2×9 / G3×26）。注意：历年 PDF 不保留（2025 版 404 且未归档），2025 日期用 Wayback `…/gr/renntage/ergebnisse/` 快照链重建（每份约覆盖 50 个赛马日，含 Gruppe I/II/III 标注） |
+| 赛果（官方） | Deutscher Galopp 赛果页 | `https://www.deutscher-galopp.de/gr/renntage/rennen.php?id={race_id}&d={YYYYMMDD}&s=R`；服务端渲染、字段全（名次/马号/闸位/头马距离德语原文/奖金/马主/练马师/骑师/负磅/赔率），表尾 STARTER/NICHTSTARTER 自校验。**race_id 无年份导航，历史只能从 ergebnisse 索引（现网约 14 周滚动窗）或 Wayback 快照获得** |
+| 交叉验证 | galopp-sieger.de（历年冠军库）/ turf-times.de 年度 black-type 汇总 | galopp-sieger **仅 HTTP** 且 ISO-8859-1；只列冠军+前三，适合冠军级交叉 |
+| 解析注意 | | 出赛表马名带角色后缀（`O.`/`Sb.`/`Skl.` 等）需剥离；ICS 缩写与官方全称别名（`v`≈`von`）；renntermine PDF 存在连字错位需白名单对账 |
 | 赛历公布节奏 | 前一年 12 月中旬，1 月修订 | 12 月触发次年对账 |
 | TRA 路线 | 仅 group 级（2025 年 74 场） | 不作主源 |
-| catalog adapter | `deutscher_galopp_pattern_catalog`（已存在） | |
+| catalog adapter | `deutscher_galopp_pattern_catalog`（已存在）；详情 `deutscher_galopp_result` | |
 
 ## 中东（阿联酋 + 沙特；卡塔尔/巴林仅 ICS 收录时）
 
@@ -123,14 +125,14 @@
 
 | 用途 | 来源 | URL / 说明 |
 |---|---|---|
-| UAE 全集/赛程 | **Dubai Racing Club Carnival 赛程+条件 PDF** | `https://drcwebblob.blob.core.windows.net/drcwebmediacontent/…/Dubai Racing Carnival {season} Race Schedule and Conditions.pdf`；Meydan 赛历 `meydanracing.com/full-race-calendar/` |
-| UAE 赛果（官方） | Emirates Racing Authority | `https://emiratesracing.com/racecard/{yyyy-mm-dd}/{raceNo}/results`（服务端渲染可用；赛季历页为 SPA，必要时解析其后端接口或用官方 PDF） |
-| 沙特全集/赛程 | JCSA 官网赛历/赛事页 + 沙特杯官网 | `https://jcsa.sa/en/`；沙特杯 2027 = 2027-02-05/06 |
-| 沙特赛果（官方） | JCSA meetings/races/results | 同上 |
+| UAE 全集/赛程 | **Dubai Racing Club Carnival 赛程+条件 PDF** | `https://drcwebblob.blob.core.windows.net/drcwebmediacontent/…/Dubai Racing Carnival {season} Race Schedule and Conditions.pdf`（ Carnival 16 赛日；PDF 有叠字/日历网格噪音，需清洗规则）；**DWC 赛日不在 PDF 内**，由 ERA 整日场头补齐 |
+| UAE 赛果（官方） | Emirates Racing Authority | **真实数据端点（2026-09 实测）**：外壳页 `/racecard/{date}/{raceNo}/results` 为 htmx 懒加载，数据走 `GET https://emiratesracing.com/ajax/racecard-results-all?date=YYYY-MM-DD`（一整日一次请求，全部场次名次/骑师/练马师/负磅/SP/时间/差距）与 `/ajax/racecard-results?date=…&race=N`（单场）；纯 GET 可用，无需 Sprig 重放 |
+| 沙特全集/赛程 | JCSA 官网 API + 沙特杯官网 | 月历 `https://jcsa.sa/api/race/en/{year}/{month}`；赛季 11-4 月 |
+| 沙特赛果（官方） | JCSA meeting API | 赛日卡 `https://jcsa.sa/api/meeting-info/en/{yyyymmdd}/0/All/False` → 单场 `…/{raceNo}/Results/True`（名次/马名内联 J/T/O/负重/评分/时间/差距/奖金，**无赔率**）；注意同名国内赛（Local Gr.1）与国际场区分，级别以 ICS 白名单为准；COTHM Cup 在独立赛日（2025-01-25/2026-01-17），不在沙特杯周末 |
 | 交叉验证 | horse-races.net / TDN / America's Best Racing | |
 | 赛历公布节奏 | DRC 前一年 7 月；JCSA 前一年 8 月中旬 | 赛季 11 月-次年 4 月，跨年按 local_date 归年 |
 | TRA 路线 | 阿联酋 223 场/年（group 级），沙特≈无 | 官方为主 |
-| catalog adapter | `middle_east_official_pattern_catalog`（已存在，providers: era/jcsa/qrec/bahrain_turf_club/tjcis） | 生产地区键为单一 `middle_east`，国家经 series key 前缀与 source_refs 区分 |
+| catalog adapter | `middle_east_official_pattern_catalog`（已存在，providers: era/jcsa/qrec/bahrain_turf_club/tjcis）；详情 `era_racecard_results` / `jcsa_meeting_results` | 生产地区键为单一 `middle_east`，国家经 series key 前缀（united-arab-emirates/saudi-arabia）与 source_refs 区分；卡塔尔/巴林仅 ICS 收录场次（暂无官方抓取源，挂账） |
 
 ## 临近同步（出马表/赛果/状态流转）路线现状
 
