@@ -13,6 +13,7 @@ from typing import Any, Iterable
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Count, Q
+from django.utils import timezone as dj_timezone
 
 from stable.models import (
     HistoricalRaceEventTarget,
@@ -176,7 +177,12 @@ def _locked_historical_target(target_id: int):
     )
 
 
-def materialize_historical_event(target: HistoricalRaceEventTarget, *, actor=None) -> RaceEvent | None:
+def _materialize_historical_event(
+    target: HistoricalRaceEventTarget,
+    *,
+    actor=None,
+    scheduled: bool,
+) -> RaceEvent | None:
     if target.expectation_status == HistoricalRaceExpectationStatus.NOT_HELD:
         if target.event_id:
             raise InventoryValidationError("not-held target must not have a RaceEvent")
@@ -204,6 +210,11 @@ def materialize_historical_event(target: HistoricalRaceEventTarget, *, actor=Non
                 f"not-due target existing RaceEvent year identity is invalid: {exc}"
             ) from exc
         return event
+    if scheduled:
+        # 排期物化只接受未来日期；已到期的 target 必须走 materialize_historical_event（FINISHED）
+        today = dj_timezone.localdate()
+        if target.local_date is None or target.local_date <= today:
+            raise InventoryValidationError("scheduled historical event requires a future local_date")
     if target.race_series.review_status != RaceSeriesReviewStatus.APPROVED:
         raise InventoryValidationError("target series is not approved")
     if target.resolution_status not in {
@@ -239,6 +250,9 @@ def materialize_historical_event(target: HistoricalRaceEventTarget, *, actor=Non
             raise InventoryValidationError(f"historical event year identity is invalid: {exc}") from exc
         if locked_identity != identity:
             raise InventoryValidationError("historical event year identity changed before materialization")
+        if scheduled and (locked.local_date is None or locked.local_date <= dj_timezone.localdate()):
+            # 锁定行复检，防止选择后 local_date 漂移成过去日期
+            raise InventoryValidationError("scheduled historical event requires a future local_date")
         event = locked.event or (
             RaceEvent.objects.filter(race_series=locked.race_series)
             .filter(
@@ -275,6 +289,8 @@ def materialize_historical_event(target: HistoricalRaceEventTarget, *, actor=Non
                 status=(
                     RaceEventStatus.CANCELLED
                     if locked.expectation_status == HistoricalRaceExpectationStatus.CANCELLED
+                    else RaceEventStatus.SCHEDULED
+                    if scheduled
                     else RaceEventStatus.FINISHED
                 ),
                 visibility_status=RaceEventVisibility.DRAFT,
@@ -317,6 +333,17 @@ def materialize_historical_event(target: HistoricalRaceEventTarget, *, actor=Non
             },
         )
     return event
+
+
+def materialize_historical_event(target: HistoricalRaceEventTarget, *, actor=None) -> RaceEvent | None:
+    return _materialize_historical_event(target, actor=actor, scheduled=False)
+
+
+def materialize_scheduled_historical_event(
+    target: HistoricalRaceEventTarget, *, actor=None
+) -> RaceEvent | None:
+    # 与 materialize_historical_event 共享身份校验；差异：仅接受未来 local_date，创建 SCHEDULED 草稿
+    return _materialize_historical_event(target, actor=actor, scheduled=True)
 
 
 def target_identity(target: HistoricalRaceEventTarget) -> dict[str, Any]:
