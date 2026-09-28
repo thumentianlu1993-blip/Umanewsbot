@@ -221,7 +221,7 @@ class HriRasNonFinishMarkerTests(SimpleTestCase):
             self.module._parse_result_page(tampered, source_url=self.TICKELL_URL)
 
     def test_unknown_non_finish_marker_raises(self):
-        tampered = self.html.replace("<b>fell</b>", "<b>ro</b>", 1)
+        tampered = self.html.replace("<b>fell</b>", "<b>w.u.</b>", 1)
         self.assertNotEqual(tampered, self.html)
         with self.assertRaises(Exception):
             self.module._parse_result_page(tampered, source_url=self.TICKELL_URL)
@@ -382,3 +382,21 @@ class HriRasPrepareCandidatesTests(SimpleTestCase):
 
             self.assertEqual(summary["events"], 0)
             self.assertEqual(len(summary["errors"]), 1)
+
+
+class HriRasExtendedMarkerTests(SimpleTestCase):
+    """缓存批次中实测出现的补充标记：s.u.（slipped up）与 r.o.（ran out）。"""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.module = _load_module()
+
+    def test_su_ro_map_to_did_not_finish(self):
+        for marker in ("s.u.", "r.o.", "S.U.", "R.O.", "su", "ro"):
+            with self.subTest(marker=marker):
+                self.assertEqual(self.module._running_status(marker), "did_not_finish")
+
+    def test_empty_marker_raises(self):
+        with self.assertRaises(Exception):
+            self.module._running_status("")
