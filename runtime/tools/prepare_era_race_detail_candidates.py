@@ -281,6 +281,9 @@ def _parse_results_all_page(html: str, *, source_url: str, race_number: str) -> 
     for index, row in enumerate(runners, start=1):
         row["sort_order"] = index
     results.sort(key=lambda row: (row["finish_position"], _numeric_sort(row["horse_number"])))
+    # 展示名次唯一化（并列保留在 official_finish_position），满足 (event, finish_position) 唯一约束
+    for display_position, row in enumerate(results, start=1):
+        row["finish_position"] = display_position
     if not runners:
         raise RuntimeError(f"ERA 页面缺少实际出走（race={race_number}）")
     if not results:

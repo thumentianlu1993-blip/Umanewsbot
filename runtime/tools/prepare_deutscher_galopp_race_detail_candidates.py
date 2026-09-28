@@ -291,6 +291,9 @@ def _parse_result_page(html: str, *, source_url: str) -> tuple[list[dict], list[
     for index, row in enumerate(ordered_runners, start=1):
         row["sort_order"] = index
     result_rows.sort(key=lambda row: (row["finish_position"], _numeric_sort(row["horse_number"])))
+    # 展示名次唯一化（并列保留在 official_finish_position），满足 (event, finish_position) 唯一约束
+    for display_position, row in enumerate(result_rows, start=1):
+        row["finish_position"] = display_position
     metadata.update(
         {
             "row_count": len(ordered_runners),

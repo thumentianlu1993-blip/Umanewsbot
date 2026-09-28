@@ -464,3 +464,28 @@ class NameTokenAliasTests(SimpleTestCase):
     def test_stutenpreis_results_parsed(self):
         self.assertGreaterEqual(len(self.results), 5)
         self.assertTrue(self.results[0]["horse_name"])
+
+
+class DeadHeatDisplayPositionTests(SimpleTestCase):
+    """2025-07-06 Deutsches Derby 第 4 名并列（Path of Soldier / Enzian）：
+
+    finish_position 必须展示唯一化（1..N 连续），official_finish_position 保留官方并列，
+    以满足 stable_raceeventresult 的 (event, finish_position) 唯一约束。
+    """
+
+    def setUp(self):
+        self.module = _load()
+        _runners, self.results, _meta = self.module._parse_result_page(
+            _fixture("dg_20250706_hamburg_deutsches_derby.html"), source_url=DERBY_URL
+        )
+
+    def test_finish_positions_are_unique_display_positions(self):
+        display = [row["finish_position"] for row in self.results]
+        self.assertEqual(display, list(range(1, len(self.results) + 1)))
+
+    def test_dead_heat_pair_keeps_official_position(self):
+        dead_heat = [row for row in self.results if row["official_finish_position"] == 4]
+        self.assertEqual(
+            sorted(row["horse_name"] for row in dead_heat), ["Enzian", "Path of Soldier"]
+        )
+        self.assertNotIn(5, {row["official_finish_position"] for row in self.results})

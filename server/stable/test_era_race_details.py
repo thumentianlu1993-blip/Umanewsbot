@@ -291,3 +291,34 @@ class EraCandidateFlowTests(SimpleTestCase):
                     timeout=10,
                     sleep_seconds=0,
                 )
+
+
+DEADHEAT_URL = "https://emiratesracing.com/ajax/racecard-results-all?date=2026-02-28"
+
+
+class EraDeadHeatTests(SimpleTestCase):
+    """2026-02-28 Nad Al Sheba Turf Sprint（race 3）：第 5 名并列（ARABIE / RAYEVKA）。
+
+    finish_position 展示唯一化（1..N 连续），official_finish_position 保留官方并列。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.module = _load("prepare_era_race_detail_candidates.py")
+        cls.runners, cls.results, cls.metadata = cls.module._parse_results_all_page(
+            _fixture("era_ajax_racecard-results-all_2026-02-28_r3_deadheat.html"),
+            source_url=DEADHEAT_URL,
+            race_number="3",
+        )
+
+    def test_finish_positions_are_unique_display_positions(self):
+        display = [row["finish_position"] for row in self.results]
+        self.assertEqual(display, list(range(1, len(self.results) + 1)))
+
+    def test_dead_heat_pair_keeps_official_position(self):
+        dead_heat = [row for row in self.results if row["official_finish_position"] == 5]
+        self.assertEqual(
+            sorted(row["horse_name"] for row in dead_heat), ["ARABIE", "RAYEVKA"]
+        )
+        self.assertNotIn(6, {row["official_finish_position"] for row in self.results})
