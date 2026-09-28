@@ -122,7 +122,13 @@ def _page_matches_event(event: dict, metadata: dict) -> bool:
         return False
     expected_tokens = _name_tokens(str(event.get("original_name") or ""))
     actual_tokens = _name_tokens(str(metadata.get("race_title") or ""))
-    return bool(expected_tokens and expected_tokens <= actual_tokens)
+    if not expected_tokens or not actual_tokens:
+        return False
+    if expected_tokens <= actual_tokens:
+        return True
+    # 官方事件名常带赞助商前缀（Lexus Melbourne Cup），页面用净名（Melbourne Cup）：
+    # 页面净名至少 2 个区别性 token 且全部落入事件名时放行
+    return len(actual_tokens) >= 2 and actual_tokens <= expected_tokens
 
 
 def _approved_result_url(event: dict, *, provider: str) -> str:
@@ -491,7 +497,7 @@ def prepare_candidates(args) -> dict:
                 entry = {"slug": event.get("slug"), "error": str(exc)}
                 reason = getattr(exc, "reason", None)
                 if reason:
-                    entry["reason"] = reason
+                    entry["reason"] = str(reason)
                 summary["errors"].append(entry)
                 if args.fail_fast:
                     raise

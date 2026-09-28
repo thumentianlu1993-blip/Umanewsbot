@@ -357,6 +357,43 @@ class AustraliaPageMatchGuardTests(SimpleTestCase):
         self.assertFalse(self.module._page_matches_event({**base, "original_name": "Cox Plate"}, metadata))
         self.assertFalse(self.module._page_matches_event({**base, "racecourse": "Caulfield"}, metadata))
 
+    def test_sponsored_event_name_matches_clean_page_title(self):
+        # 官方事件名带赞助商前缀（LEXUS MELBOURNE CUP），JHR 页面用净名（Melbourne Cup）：
+        # 页面净名 ≥2 个区别性 token 且全部落入事件名时放行（日期/马场已先行校验）
+        _runners, _results, metadata = self.module._parse_just_horse_racing_page(
+            _fixture("justhorseracing_melbourne_cup_2025_results.html"),
+            source_url=JHR_MELBOURNE_CUP_URL,
+        )
+        event = {
+            "local_date": "2025-11-04",
+            "racecourse": "Flemington",
+            "original_name": "Lexus Melbourne Cup",
+        }
+        self.assertTrue(self.module._page_matches_event(event, metadata))
+
+    def test_single_token_reverse_match_rejected(self):
+        # 页面净名只剩一个区别性 token 时，反向子集太弱，不得放行
+        metadata = {"local_date": "2025-11-04", "racecourse": "Flemington", "race_title": "Oaks"}
+        event = {
+            "local_date": "2025-11-04",
+            "racecourse": "Flemington",
+            "original_name": "Lexus Melbourne Cup",
+        }
+        self.assertFalse(self.module._page_matches_event(event, metadata))
+
+    def test_reverse_match_still_rejects_wrong_race(self):
+        _runners, _results, metadata = self.module._parse_just_horse_racing_page(
+            _fixture("justhorseracing_melbourne_cup_2025_results.html"),
+            source_url=JHR_MELBOURNE_CUP_URL,
+        )
+        event = {
+            "local_date": "2025-11-04",
+            "racecourse": "Flemington",
+            "original_name": "Caulfield Cup",
+        }
+        self.assertFalse(self.module._page_matches_event(event, metadata))
+
+
 
 class AustraliaPrepareCandidatesTests(SimpleTestCase):
     def setUp(self):
@@ -657,3 +694,33 @@ class AustraliaPrepareCandidatesTests(SimpleTestCase):
 
             self.assertEqual(summary["events_requested"], 0)
             self.assertEqual(summary["events"], 0)
+
+    def test_error_reason_objects_are_serialized_as_strings(self):
+        # 真实批次中 URLError.reason（异常对象）曾让 summary.json 的 json.dumps 崩溃
+        from urllib.error import URLError
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            events = self._write_events(
+                root,
+                [
+                    self._event_row(
+                        slug="australia-melbourne-cup-2025",
+                        provider="just_horse_racing",
+                        url=JHR_MELBOURNE_CUP_URL,
+                        date="2025-11-04",
+                        course="Flemington",
+                        name="Melbourne Cup",
+                    )
+                ],
+            )
+            args = self._args(root, events, source_provider="just_horse_racing")
+            with patch.object(
+                self.module, "_download", side_effect=URLError(OSError("boom"))
+            ):
+                summary = self.module.prepare_candidates(args)
+            self.assertEqual(len(summary["errors"]), 1)
+            payload = json.loads(
+                (Path(args.output_dir) / "summary.json").read_text(encoding="utf-8")
+            )
+            self.assertIsInstance(payload["errors"][0].get("reason"), str)
