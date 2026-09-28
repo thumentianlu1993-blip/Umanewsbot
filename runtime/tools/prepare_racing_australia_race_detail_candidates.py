@@ -34,6 +34,7 @@ ALLOWED_HOSTS = (
     "www.racingaustralia.horse",
     "justhorseracing.com.au",
     "www.justhorseracing.com.au",
+    "web.archive.org",
 )
 PROVIDER_SOURCE_NAMES = {
     "racing_australia": "racing_australia_results",
@@ -242,6 +243,12 @@ def _parse_strip_rows(
         elif finish_upper == "DQ":
             # 取消资格：完成出赛但页面不公布数字名次，不臆造 official_finish_position
             running_status = "unknown"
+        elif finish_upper == "FF":
+            # Fell：跌倒未完赛
+            running_status = "fell"
+        elif finish_upper == "LR":
+            # Lost Rider：骑师落马/失骑未完赛
+            running_status = "unseated_rider"
         else:
             match = re.match(r"^(\d+)", finish_text)
             if not match:
@@ -278,11 +285,12 @@ def _parse_strip_rows(
         row["sort_order"] = index
     result_rows.sort(key=lambda item: (item[0], _numeric_sort(item[2]["horse_number"])))
     results = []
-    for official_position, margin, runner in result_rows:
+    # 展示名次唯一化（并列保留在 official_finish_position），满足 (event, finish_position) 唯一约束
+    for display_position, (official_position, margin, runner) in enumerate(result_rows, start=1):
         results.append(
             {
                 **runner,
-                "finish_position": official_position,
+                "finish_position": display_position,
                 "official_finish_position": official_position,
                 "finish_time": "",
                 "margin": margin,

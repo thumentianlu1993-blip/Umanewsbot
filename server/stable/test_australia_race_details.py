@@ -38,6 +38,10 @@ JHR_COX_PLATE_URL = (
     "https://www.justhorseracing.com.au/fields-results/results/"
     "cox-plate-results-and-replay-via-sistina-2025/868422"
 )
+WAYBACK_CAULFIELD_URL = (
+    "https://web.archive.org/web/20251023160442/"
+    "https://www.racingaustralia.horse/FreeFields/Results.aspx?Key=2025Oct18%2CVIC%2CCaulfield"
+)
 
 
 def _load():
@@ -221,6 +225,22 @@ class RacingAustraliaResultsPageTests(SimpleTestCase):
                 race_number="10",
             )
 
+    def test_wayback_wrapped_page_with_toolbar_parses(self):
+        # 夹具从 2025-10-18 Caulfield 真实 Wayback 快照（含 toolbar 注入与改写链接）裁剪
+        html = _fixture("wayback_ra_results_2025-10-18_caulfield.html")
+        self.assertIn("BEGIN WAYBACK TOOLBAR INSERT", html)
+
+        runners, results, metadata = self.module._parse_results_page(
+            html, source_url=WAYBACK_CAULFIELD_URL, race_number="7"
+        )
+
+        self.assertEqual(metadata["local_date"], "2025-10-18")
+        self.assertEqual(metadata["racecourse"], "Caulfield")
+        self.assertEqual(metadata["race_title"], "Schweppes Thousand Guineas")
+        self.assertEqual(len(runners), 12)
+        self.assertEqual(len(results), 12)
+        self.assertEqual(results[0]["horse_name"], "OLE DANCER")
+
 
 class JustHorseRacingPageTests(SimpleTestCase):
     """justhorseracing.com.au 单场赛果页 parser。"""
@@ -262,8 +282,9 @@ class JustHorseRacingPageTests(SimpleTestCase):
         self.assertNotIn(17, positions)
         dead_heat = {row["horse_name"] for row in results if row["official_finish_position"] == 16}
         self.assertEqual(dead_heat, {"VALIANT KING", "ONESMOOTHOPERATOR"})
-        for row in results:
-            self.assertEqual(row["finish_position"], row["official_finish_position"])
+        # 展示名次唯一化（满足 (event, finish_position) 唯一约束），官方名次保留并列
+        display = [row["finish_position"] for row in results]
+        self.assertEqual(display, list(range(1, len(results) + 1)))
         last = results[-1]
         # 末行缺 Penalty/SP 单元格（只有 9 个 td）：仍要按列名对齐解析
         self.assertEqual(last["horse_name"], "BUCKAROO")
@@ -724,3 +745,145 @@ class AustraliaPrepareCandidatesTests(SimpleTestCase):
                 (Path(args.output_dir) / "summary.json").read_text(encoding="utf-8")
             )
             self.assertIsInstance(payload["errors"][0].get("reason"), str)
+
+    def test_source_map_accepts_wayback_wrapped_url(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source_map = root / "source_map.json"
+            source_map.write_text(
+                json.dumps(
+                    {
+                        "sources": [
+                            {
+                                "year": 2025,
+                                "slug": "australia-thousand-guineas-2025",
+                                "source_provider": "racing_australia",
+                                "source_url": WAYBACK_CAULFIELD_URL,
+                                "race_number": "7",
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            mapped = self.module._read_source_map(str(source_map))
+
+        self.assertEqual(mapped[(2025, "australia-thousand-guineas-2025")]["url"], WAYBACK_CAULFIELD_URL)
+
+    def test_wayback_wrapped_source_url_flow_uses_cache(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            events = self._write_events(
+                root,
+                [
+                    self._event_row(
+                        slug="australia-thousand-guineas-2025",
+                        provider="racing_australia",
+                        url="",
+                        date="2025-10-18",
+                        course="Caulfield",
+                        name="Schweppes Thousand Guineas",
+                    )
+                ],
+            )
+            source_map = root / "source_map.json"
+            source_map.write_text(
+                json.dumps(
+                    {
+                        "sources": [
+                            {
+                                "year": 2025,
+                                "slug": "australia-thousand-guineas-2025",
+                                "source_provider": "racing_australia",
+                                "source_url": WAYBACK_CAULFIELD_URL,
+                                "race_number": "7",
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            args = self._args(root, events, source_map_json=str(source_map))
+            cache_dir = root / "out" / "sources"
+            cache_dir.mkdir(parents=True)
+            (cache_dir / "source_racing_australia_2025_australia-thousand-guineas-2025.html").write_text(
+                _fixture("wayback_ra_results_2025-10-18_caulfield.html"), encoding="utf-8"
+            )
+            with patch.object(self.module, "fetch_https") as fetch, patch.object(
+                self.module, "before_network_request"
+            ) as budget:
+                summary = self.module.prepare_candidates(args)
+
+            fetch.assert_not_called()
+            budget.assert_not_called()
+            self.assertEqual(summary["events"], 1)
+            self.assertEqual(summary["errors"], [])
+            jsonl = root / "out" / "racing_australia_detail_candidates.jsonl"
+            record = json.loads(jsonl.read_text(encoding="utf-8").strip())
+            self.assertEqual(record["source_name"], "racing_australia_results")
+            self.assertEqual(record["source_url"], WAYBACK_CAULFIELD_URL)
+            self.assertEqual(record["modules"]["results"]["items"][0]["horse_name"], "OLE DANCER")
+            self.assertEqual(record["metadata"]["race_number"], "7")
+
+
+class AustraliaFinishCodeTests(SimpleTestCase):
+    """Wayback/JHR 批次实测：FF（Fell）与 LR（Lost Rider） Finish 代码。"""
+
+    def setUp(self):
+        self.module = _load()
+
+    def _strip(self, finish_values: list[str]):
+        from bs4 import BeautifulSoup
+
+        rows = "".join(
+            f"<tr><td></td><td>{finish}</td><td>{i}</td><td class='horse'>Horse {i}</td>"
+            f"<td>T. T</td><td>J. J</td><td></td><td>1</td><td>55</td><td></td><td>$5.00</td></tr>"
+            for i, finish in enumerate(finish_values, start=1)
+        )
+        html = (
+            "<table class='race-strip-fields'><tr><th>Colour</th><th>Finish</th><th>No.</th>"
+            "<th>Horse</th><th>Trainer</th><th>Jockey</th><th>Margin</th><th>Bar.</th>"
+            "<th>Weight</th><th>Penalty</th><th>Starting Price</th></tr>"
+            f"{rows}</table>"
+        )
+        return BeautifulSoup(html, "html.parser").find("table")
+
+    def test_ff_and_lr_classified_not_in_results(self):
+        strip = self._strip(["1", "FF", "LR", "2"])
+        runners, results = self.module._parse_strip_rows(
+            strip, source_url="https://racingaustralia.horse/x", source_kind="test", race_number="1"
+        )
+        by_name = {row["horse_name"]: row for row in runners}
+        self.assertEqual(by_name["Horse 2"]["running_status"], "fell")
+        self.assertEqual(by_name["Horse 3"]["running_status"], "unseated_rider")
+        self.assertEqual([row["horse_name"] for row in results], ["Horse 1", "Horse 4"])
+
+    def test_unknown_finish_code_still_raises(self):
+        strip = self._strip(["1", "ZZ", "2"])
+        with self.assertRaises(RuntimeError):
+            self.module._parse_strip_rows(
+                strip, source_url="https://racingaustralia.horse/x", source_kind="test", race_number="1"
+            )
+
+
+class AustraliaDeadHeatDisplayTests(SimpleTestCase):
+    """Melbourne Cup 2025 第 16 名并列：finish_position 展示唯一化，official 保留。"""
+
+    def setUp(self):
+        self.module = _load()
+        _runners, self.results, _meta = self.module._parse_just_horse_racing_page(
+            _fixture("justhorseracing_melbourne_cup_2025_results.html"),
+            source_url=JHR_MELBOURNE_CUP_URL,
+        )
+
+    def test_finish_positions_are_unique_display_positions(self):
+        display = [row["finish_position"] for row in self.results]
+        self.assertEqual(display, list(range(1, len(self.results) + 1)))
+
+    def test_dead_heat_pair_keeps_official_position(self):
+        dead_heat = [row for row in self.results if row["official_finish_position"] == 16]
+        self.assertEqual(
+            sorted(row["horse_name"] for row in dead_heat),
+            ["ONESMOOTHOPERATOR", "VALIANT KING"],
+        )
+        self.assertNotIn(17, {row["official_finish_position"] for row in self.results})
