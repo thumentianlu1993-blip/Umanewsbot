@@ -20,7 +20,23 @@ from prepare_hkjc_race_detail_candidates import (
     _converter as hkjc_converter,
     _parse_local_result_page as parse_hkjc_detail,
 )
+from prepare_deutscher_galopp_race_detail_candidates import (
+    _parse_result_page as parse_deutscher_galopp_detail,
+)
+from prepare_era_race_detail_candidates import (
+    _parse_results_all_page as parse_era_detail,
+)
+from prepare_hri_ras_race_detail_candidates import (
+    _parse_result_page as parse_hri_ras_detail,
+)
 from prepare_irishracing_race_detail_candidates import _parse_result_page as parse_irishracing_detail
+from prepare_jcsa_race_detail_candidates import (
+    _parse_results_page as parse_jcsa_detail,
+)
+from prepare_racing_australia_race_detail_candidates import (
+    _parse_just_horse_racing_page as parse_just_horse_racing_detail,
+    _parse_results_page as parse_racing_australia_detail,
+)
 from prepare_uk_sportinglife_race_detail_candidates import _parse_detail_page as parse_sportinglife_detail
 from prepare_us_equibase_archived_race_detail_candidates import (
     _parse_chart_text as parse_equibase_chart_text,
@@ -34,8 +50,12 @@ REGION_SOURCES = {
     "japan": ("jra", "netkeiba"),
     "hong_kong": ("hkjc",),
     "united_kingdom": ("racing_post", "sporting_life", "irishracing"),
+    "ireland": ("irishracing", "hri_ras"),
     "france": ("france_galop", "zeturf", "irishracing"),
     "united_states": ("equibase_chart", "equibase_archive", "horse_racing_nation"),
+    "australia": ("racing_australia", "just_horse_racing"),
+    "germany": ("deutscher_galopp",),
+    "middle_east": ("era", "jcsa"),
 }
 PARSE_CORES = {
     region: "historical_race_detail_adapters.parse_cached_sources"
@@ -49,11 +69,18 @@ PROVIDER_ALIASES = {
     "irishracing": "irishracing",
     "uk_irishracing": "uk_irishracing",
     "france_irishracing": "france_irishracing",
+    "ireland_irishracing": "ireland_irishracing",
     "zeturf": "zeturf",
     "equibase": "equibase",
     "equibase_chart": "equibase_chart",
     "equibase_archive": "equibase_chart",
     "nsa": "nsa",
+    "deutscher_galopp": "deutscher_galopp",
+    "hri_ras": "hri_ras",
+    "racing_australia": "racing_australia",
+    "just_horse_racing": "just_horse_racing",
+    "era": "era",
+    "jcsa": "jcsa",
 }
 DEFAULT_SOURCE_NAMES = {
     "jra": "jra_official_result_page",
@@ -61,10 +88,17 @@ DEFAULT_SOURCE_NAMES = {
     "sporting_life": "sporting_life",
     "uk_irishracing": "irishracing_uk",
     "france_irishracing": "irishracing_france",
+    "ireland_irishracing": "ireland_irishracing",
     "zeturf": "zeturf",
     "equibase": "equibase_yearbook",
     "equibase_chart": "equibase_pdf_chart",
     "nsa": "nsa_official_result_pdf",
+    "deutscher_galopp": "deutscher_galopp_result",
+    "hri_ras": "hri_ras_result",
+    "racing_australia": "racing_australia_results",
+    "just_horse_racing": "just_horse_racing_results",
+    "era": "era_racecard_results",
+    "jcsa": "jcsa_meeting_results",
 }
 ADAPTER_SPECS = {
     (region, stage): {
@@ -271,7 +305,13 @@ def _provider_for_request(request: dict, *, region: str) -> str:
     raw = str(request.get("source_provider") or "")
     provider = PROVIDER_ALIASES.get(raw)
     if provider == "irishracing":
-        provider = "uk_irishracing" if region == "united_kingdom" else "france_irishracing"
+        provider = (
+            "uk_irishracing"
+            if region == "united_kingdom"
+            else "ireland_irishracing"
+            if region == "ireland"
+            else "france_irishracing"
+        )
     if provider is None:
         raise DetailAdapterError(f"unsupported offline detail provider: {raw}")
     return provider
@@ -310,8 +350,39 @@ def _parse_cached_request(
         runners, results, metadata = parse_sportinglife_detail(
             source_path.read_text(encoding="utf-8", errors="replace"), source_url=source_url
         )
-    elif provider in {"uk_irishracing", "france_irishracing"}:
+    elif provider in {"uk_irishracing", "france_irishracing", "ireland_irishracing"}:
         runners, results, metadata = parse_irishracing_detail(
+            source_path.read_text(encoding="utf-8", errors="replace"), source_url=source_url
+        )
+    elif provider == "deutscher_galopp":
+        runners, results, metadata = parse_deutscher_galopp_detail(
+            source_path.read_text(encoding="utf-8", errors="replace"), source_url=source_url
+        )
+    elif provider == "hri_ras":
+        runners, results, metadata = parse_hri_ras_detail(
+            source_path.read_text(encoding="utf-8", errors="replace"), source_url=source_url
+        )
+    elif provider == "racing_australia":
+        runners, results, metadata = parse_racing_australia_detail(
+            source_path.read_text(encoding="utf-8", errors="replace"),
+            source_url=source_url,
+            race_number=str(request.get("race_number") or ""),
+        )
+    elif provider == "just_horse_racing":
+        runners, results, metadata = parse_just_horse_racing_detail(
+            source_path.read_text(encoding="utf-8", errors="replace"), source_url=source_url
+        )
+    elif provider == "era":
+        race_number = str(request.get("race_number") or "")
+        if not race_number:
+            raise DetailAdapterError("ERA cached request has no race number")
+        runners, results, metadata = parse_era_detail(
+            source_path.read_text(encoding="utf-8", errors="replace"),
+            source_url=source_url,
+            race_number=race_number,
+        )
+    elif provider == "jcsa":
+        runners, results, metadata = parse_jcsa_detail(
             source_path.read_text(encoding="utf-8", errors="replace"), source_url=source_url
         )
     elif provider == "zeturf":

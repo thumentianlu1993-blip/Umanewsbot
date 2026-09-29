@@ -1945,7 +1945,9 @@ def discover_multisource_events(*, now, policy=None, fetcher=None):
         aware,
     )
     from stable.services.race_data_sync_alerts import (
+        resolve_multisource_policy_incident,
         stage_multisource_coverage_incidents,
+        stage_multisource_policy_incident,
     )
     import secrets
 
@@ -1956,8 +1958,11 @@ def discover_multisource_events(*, now, policy=None, fetcher=None):
         return {"enabled": False, "reason": "disabled"}
     try:
         policy = policy or load_multisource_policy(now=now)
-    except (ValueError, TypeError, OSError):
+    except (ValueError, TypeError, OSError) as exc:
+        # fail-closed 不变：仍拒绝登记，但留一条内部 incident 避免静默消失。
+        stage_multisource_policy_incident(now=now, reason=str(exc))
         return {"enabled": True, "reason": "multisource_policy_unavailable"}
+    resolve_multisource_policy_incident(now=now)
     coverage = build_multisource_coverage(now=now, policy=policy)
     if getattr(settings, "RACE_DATA_COVERAGE_ALERTS_ENABLED", False):
         stage_multisource_coverage_incidents(coverage=coverage, policy=policy, now=now)

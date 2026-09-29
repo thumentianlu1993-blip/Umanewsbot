@@ -633,7 +633,19 @@ _EVENT_REGION_BY_CONTRACT_REGION = {
     "united_kingdom": models.RacingRegion.UNITED_KINGDOM,
     "france": models.RacingRegion.FRANCE,
     "united_states": models.RacingRegion.UNITED_STATES,
-    "ireland": models.RacingRegion.OTHER,
+    "ireland": models.RacingRegion.IRELAND,
+}
+# 存量兼容：ireland 合同赛事在一等化前归入 other 桶，生产仍存在该形态的赛事与登记；
+# 归 region 判定必须同时接受一等地区与存量桶。
+_LEGACY_EVENT_REGIONS_BY_CONTRACT_REGION = {
+    "ireland": (models.RacingRegion.OTHER,),
+}
+_EVENT_REGIONS_BY_CONTRACT_REGION = {
+    contract_region: (
+        event_region,
+        *_LEGACY_EVENT_REGIONS_BY_CONTRACT_REGION.get(contract_region, ()),
+    )
+    for contract_region, event_region in _EVENT_REGION_BY_CONTRACT_REGION.items()
 }
 
 
@@ -1401,8 +1413,8 @@ def _reconcile_racecard_observation_atomic(
         if (
             not isinstance(allowed_fields, (list, tuple))
             or not all(isinstance(value, str) for value in allowed_fields)
-            or _EVENT_REGION_BY_CONTRACT_REGION.get(contract_region)
-            != source.event.country_region
+            or source.event.country_region
+            not in _EVENT_REGIONS_BY_CONTRACT_REGION.get(contract_region, ())
         ):
             return RacecardReconciliationDecision(
                 "rejected", "source_contract_mismatch", expected_event_id, observation.pk

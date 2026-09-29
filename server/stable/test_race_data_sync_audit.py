@@ -118,7 +118,8 @@ class RaceDataSyncAuditCommandTests(TestCase):
                 ROOT / "runtime/policies/race_data_sync/standing_policy.json"
             ),
             RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256=(
-                "80fe5cf3383daf7d38ffa26b95cf815d6b7a3d0250ae07ca12ccbfb9a7828df2"
+                # 阶段 3c：ireland 一等化新增 1 条 TRA 路线（13->14），digest 轮换属发布包钉扎事项
+                "e73a4e3b556cf1670caed6ca0cae46e5c01dbe711c74712a8fbe9c3fc527d679"
             ),
             RACE_DATA_RAW_MAX_COMPRESSED_BYTES=2 * 1024 * 1024,
             RACE_DATA_RAW_MAX_UNCOMPRESSED_BYTES=8 * 1024 * 1024,

@@ -6,9 +6,11 @@ from stable.services.race_source_identity import (
     resolve_observation,
 )
 from stable.services.race_data_source_adapters import (
+    discover_source_url,
     parse_multisource_policy,
 )
 from stable.services.race_data_sync_enrollment import attach_multisource_observation
+from stable.services.race_pre_race import baseline as pre_race_baseline
 
 NOW = datetime(2026, 9, 20, 7, tzinfo=timezone.utc)
 
@@ -244,3 +246,128 @@ class IdentityTests(TestCase):
         self.assertEqual(len(value["roster"]), 13)
         self.assertEqual(value["roster"][0]["number"], "8")
         self.assertEqual(value["result_phase"], "official")
+
+
+JRA_CARD_URL = (
+    "https://www.jra.go.jp/JRADB/accessD.html"
+    "?CNAME=pw01dde0106202604061120260920/D6"
+)
+JRA_RESULT_URL = (
+    "https://www.jra.go.jp/JRADB/accessS.html"
+    "?CNAME=pw01sde0106202604061120260920/92"
+)
+
+
+class JraDiscoveryHintTests(TestCase):
+    """赛前链路写下的 jra_pre_race 绑定/URL 仅作发现提示；baseline 漂移即废弃。"""
+
+    def setUp(self):
+        self.event = models.RaceEvent.objects.create(
+            year=2026,
+            slug="all-comers-hint",
+            original_name="オールカマー",
+            chinese_name="产经赏All Comers",
+            country_region="japan",
+            racecourse="中山",
+            local_date=date(2026, 9, 20),
+            timezone_name="Asia/Tokyo",
+            visibility_status="published",
+            status="scheduled",
+        )
+        self.baseline = pre_race_baseline(self.event)
+
+    def route(self, prefixes=("/JRADB/accessD.html", "/JRADB/accessS.html"), discovery=()):
+        payload = policy_payload()
+        payload["routes"][0]["allowed_path_prefixes"] = list(prefixes)
+        if discovery:
+            payload["routes"][0]["discovery_urls"] = list(discovery)
+        return parse_multisource_policy(payload, now=NOW).routes[0]
+
+    def save_refs(self, refs):
+        self.event.source_refs = refs
+        self.event.save(update_fields=("source_refs", "updated_at"))
+
+    def never_fetch(self, *args, **kwargs):
+        raise AssertionError("hint 命中失败时不应触发发现抓取")
+
+    def test_discover_source_url_uses_jra_pre_race_binding_when_baseline_matches(self):
+        # 日本赛事 primary 是年鉴页，不过 JRA route 许可；绑定 URL 是唯一许可提示。
+        self.save_refs(
+            {
+                "primary": "https://www.jra.go.jp/keiba/thisweek/",
+                "jra_pre_race_url": JRA_CARD_URL,
+                "jra_pre_race_binding": {
+                    "url": JRA_CARD_URL,
+                    "baseline": self.baseline,
+                },
+            }
+        )
+        self.assertEqual(
+            discover_source_url(
+                event=self.event, route=self.route(), now=NOW, fetcher=self.never_fetch
+            ),
+            JRA_CARD_URL,
+        )
+
+    def test_discover_source_url_rejects_jra_pre_race_binding_on_baseline_drift(self):
+        self.save_refs(
+            {
+                "jra_pre_race_url": JRA_CARD_URL,
+                "jra_pre_race_binding": {
+                    "url": JRA_CARD_URL,
+                    "baseline": self.baseline,
+                },
+            }
+        )
+        # baseline 口径与 race_pre_race 一致：任一赛事字段变化即视为漂移。
+        self.event.original_name = "差し替えられた名前"
+        self.event.save(update_fields=("original_name", "updated_at"))
+        with self.assertRaisesMessage(ValueError, "source_identity_missing"):
+            discover_source_url(
+                event=self.event, route=self.route(), now=NOW, fetcher=self.never_fetch
+            )
+
+    def test_discover_source_url_ignores_non_permitted_jra_hint(self):
+        self.save_refs(
+            {
+                "jra_pre_race_binding": {
+                    "url": JRA_CARD_URL,
+                    "baseline": self.baseline,
+                }
+            }
+        )
+        # route 只放行 accessS 结果页；accessD 卡页提示必须被许可过滤。
+        with self.assertRaisesMessage(ValueError, "source_identity_missing"):
+            discover_source_url(
+                event=self.event,
+                route=self.route(prefixes=("/JRADB/accessS.html",)),
+                now=NOW,
+                fetcher=self.never_fetch,
+            )
+
+    def test_discover_source_url_ambiguous_when_hint_and_reference_disagree(self):
+        self.save_refs(
+            {
+                "reference_urls": [JRA_RESULT_URL],
+                "jra_pre_race_binding": {
+                    "url": JRA_CARD_URL,
+                    "baseline": self.baseline,
+                },
+            }
+        )
+        page = (
+            '<a href="/JRADB/accessD.html?CNAME=pw01dde0106202604061120260920/D6">'
+            "オールカマー</a>"
+            '<a href="/JRADB/accessS.html?CNAME=pw01sde0106202604061120260920/92">'
+            "オールカマー</a>"
+        )
+        with self.assertRaisesMessage(ValueError, "source_discovery_ambiguous"):
+            discover_source_url(
+                event=self.event,
+                route=self.route(
+                    prefixes=("/JRADB/",),
+                    discovery=("https://www.jra.go.jp/JRADB/index.html",),
+                ),
+                now=NOW,
+                fetcher=lambda *args, **kwargs: page,
+            )

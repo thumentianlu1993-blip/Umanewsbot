@@ -216,17 +216,14 @@ PUBLIC_REGION_TABS = [
     {"value": RacingRegion.JAPAN, "label": "日本", "color": "#B51E2E"},
     {"value": RacingRegion.HONG_KONG, "label": "中国香港", "color": "#6B2D8E"},
     {"value": RacingRegion.UNITED_KINGDOM, "label": "英国", "color": "#1D4E9E"},
+    {"value": RacingRegion.IRELAND, "label": "爱尔兰", "color": "#1E7A46"},
     {"value": RacingRegion.FRANCE, "label": "法国", "color": "#2A7FBF"},
+    {"value": RacingRegion.GERMANY, "label": "德国", "color": "#4A4E57"},
     {"value": RacingRegion.UNITED_STATES, "label": "美国", "color": "#3E5C3A"},
+    {"value": RacingRegion.AUSTRALIA, "label": "澳大利亚", "color": "#C28A00"},
+    {"value": RacingRegion.MIDDLE_EAST, "label": "中东", "color": "#0E7C7B"},
 ]
-PUBLIC_REGION_COLORS = {
-    "": "#14181F",
-    RacingRegion.JAPAN: "#B51E2E",
-    RacingRegion.HONG_KONG: "#6B2D8E",
-    RacingRegion.UNITED_KINGDOM: "#1D4E9E",
-    RacingRegion.FRANCE: "#2A7FBF",
-    RacingRegion.UNITED_STATES: "#3E5C3A",
-}
+PUBLIC_REGION_COLORS = {tab["value"]: tab["color"] for tab in PUBLIC_REGION_TABS}
 
 
 class BackendLoginView(LoginView):

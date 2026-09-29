@@ -557,6 +557,7 @@ def _event_contract_region(event: models.RaceEvent) -> str:
         models.RacingRegion.UNITED_KINGDOM: "united_kingdom",
         models.RacingRegion.FRANCE: "france",
         models.RacingRegion.UNITED_STATES: "united_states",
+        models.RacingRegion.IRELAND: "ireland",
     }.get(event.country_region)
     if direct:
         return direct

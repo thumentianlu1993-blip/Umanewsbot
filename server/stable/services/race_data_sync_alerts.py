@@ -236,7 +236,15 @@ def stage_multisource_coverage_incidents(*, coverage, policy, now):
         except (ValueError, KeyError):
             # census 后字段可能被并发修改；未知状态仍保留原 incident。
             continue
-        if event.race_datetime and now >= event.race_datetime + timedelta(minutes=30):
+        # 到点未转态优先于赛果逾期：仍 scheduled 说明链路根本没启动，
+        # result_overdue 只描述已转态但未确认的情形。
+        if (
+            event.race_datetime
+            and event.status == "scheduled"
+            and now >= event.race_datetime + timedelta(minutes=5)
+        ):
+            issue = "lifecycle_not_advanced"
+        elif event.race_datetime and now >= event.race_datetime + timedelta(minutes=30):
             issue = "result_overdue"
         elif age is not None and age >= 1 and event.race_datetime is None:
             issue = "time_unknown_overdue"
@@ -287,3 +295,62 @@ def stage_multisource_coverage_incidents(*, coverage, policy, now):
         if not created:
             incident.last_seen_at = now
             incident.save(update_fields=("last_seen_at", "updated_at"))
+
+
+def stage_multisource_policy_incident(*, now: datetime, reason: str) -> int | None:
+    """policy 失效只落一条 record-only 内部 incident；无发送任务，不解除 fail-closed。"""
+    from stable.services.race_data_source_adapters import canonical_sha
+
+    if timezone.is_naive(now):
+        return None
+    details = {
+        "issue": "multisource_policy_unavailable",
+        "reason": str(reason)[:64],
+    }
+    incident, created = models.RaceLiveAlertIncident.objects.get_or_create(
+        dedupe_key=canonical_sha(
+            dict(
+                scope="multisource_policy",
+                issue="multisource_policy_unavailable",
+            )
+        ),
+        defaults=dict(
+            alert_type=models.RaceLiveAlertType.SOURCE_FAILURES,
+            scope_type="multisource_policy",
+            scope_key="multisource_policy",
+            reference_version="",
+            status=models.RaceLiveAlertIncidentStatus.OPEN,
+            opened_at=now,
+            last_seen_at=now,
+            next_attempt_at=None,
+            details=details,
+        ),
+    )
+    if not created:
+        incident.last_seen_at = now
+        incident.details = details
+        update_fields = ["last_seen_at", "details", "updated_at"]
+        if incident.status == models.RaceLiveAlertIncidentStatus.RESOLVED:
+            # 恢复后再次失效：同一条 incident 重新打开，不另起新行。
+            incident.status = models.RaceLiveAlertIncidentStatus.OPEN
+            incident.opened_at = now
+            incident.resolved_at = None
+            update_fields += ["status", "opened_at", "resolved_at"]
+        incident.save(update_fields=update_fields)
+    return incident.pk
+
+
+def resolve_multisource_policy_incident(*, now: datetime) -> int:
+    """policy 恢复可用后解除内部 incident；返回解除条数。"""
+    if timezone.is_naive(now):
+        return 0
+    return (
+        models.RaceLiveAlertIncident.objects.filter(scope_type="multisource_policy")
+        .exclude(status=models.RaceLiveAlertIncidentStatus.RESOLVED)
+        .update(
+            status=models.RaceLiveAlertIncidentStatus.RESOLVED,
+            resolved_at=now,
+            last_seen_at=now,
+            updated_at=now,
+        )
+    )

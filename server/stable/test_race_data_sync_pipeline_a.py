@@ -2374,6 +2374,31 @@ class RaceDataRaceLiveRefreshAdmissionTests(TestCase):
         )
 
     @override_settings(RACE_DATA_SYNC_ENABLED_REGIONS=("ireland",))
+    def test_first_class_ireland_event_routes_to_ireland(self):
+        self.event.country_region = models.RacingRegion.IRELAND
+        self.event.timezone_name = "Europe/Dublin"
+        self.event.source_refs = {}
+        self.event.save(
+            update_fields=(
+                "country_region",
+                "timezone_name",
+                "source_refs",
+                "updated_at",
+            )
+        )
+        self.source.identity_fields = {}
+        self.source.save(update_fields=("identity_fields", "updated_at"))
+
+        decision = self._refresh(
+            raw_sha256="7" * 64,
+            payload={**self._payload(), "region": "IE"},
+        )
+
+        self.assertTrue(decision.applied, decision.reason)
+        observation = models.RaceResultObservation.objects.get()
+        self.assertEqual(observation.field_provenance["region"], "ireland")
+
+    @override_settings(RACE_DATA_SYNC_ENABLED_REGIONS=("ireland",))
     def test_audited_source_identity_marker_can_route_other_region_to_ireland(self):
         self._mark_event_as_other(
             source_marker={"race_data_region": "ireland"},

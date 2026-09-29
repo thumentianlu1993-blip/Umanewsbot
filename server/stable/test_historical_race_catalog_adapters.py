@@ -76,6 +76,7 @@ class HistoricalRaceCatalogAdapterTests(SimpleTestCase):
     def test_tjcis_compact_grades_are_accepted_by_uk_and_france_adapters(self):
         for adapter_key in (
             "bha_pattern_catalog",
+            "hri_pattern_catalog",
             "france_galop_pattern_catalog",
             "racing_australia_pattern_catalog",
             "deutscher_galopp_pattern_catalog",

@@ -167,3 +167,75 @@ class MultisourceClaimTests(TestCase):
         self.assertEqual(decision.action, "attached", decision)
         claim = self.claim()[0]
         self.assertEqual(claim.checkpoint_plan[0]["source_key"], "alternate")
+
+
+@override_settings(
+    RACE_DATA_MULTISOURCE_DISCOVERY_ENABLED=True,
+    RACE_DATA_SYNC_ENABLED=True,
+)
+class MultisourcePolicyIncidentTests(TestCase):
+    """policy 失效只记录 record-only 内部 incident；登记行为 fail-closed 不变。"""
+
+    def discover(self, at, **kwargs):
+        from stable.services.race_data_sync_enrollment import (
+            discover_multisource_events,
+        )
+
+        return discover_multisource_events(now=at, **kwargs)
+
+    def unavailable(self):
+        return patch(
+            "stable.services.race_data_source_adapters.load_multisource_policy",
+            side_effect=ValueError("multisource_policy_expired"),
+        )
+
+    def test_policy_unavailable_stages_internal_incident(self):
+        with self.unavailable():
+            result = self.discover(NOW)
+        self.assertEqual(
+            result, {"enabled": True, "reason": "multisource_policy_unavailable"}
+        )
+        incident = models.RaceLiveAlertIncident.objects.get()
+        self.assertEqual(incident.scope_type, "multisource_policy")
+        self.assertEqual(incident.status, "open")
+        self.assertIsNone(incident.next_attempt_at)
+        self.assertEqual(incident.delivery_attempts, 0)
+        self.assertEqual(
+            incident.details["issue"], "multisource_policy_unavailable"
+        )
+        self.assertEqual(incident.details["reason"], "multisource_policy_expired")
+        # 持续失败不重复建行，只推进 last_seen 与最新原因。
+        later = NOW + timedelta(minutes=10)
+        with patch(
+            "stable.services.race_data_source_adapters.load_multisource_policy",
+            side_effect=ValueError("multisource_policy_sha_mismatch"),
+        ):
+            self.assertEqual(
+                self.discover(later)["reason"], "multisource_policy_unavailable"
+            )
+        self.assertEqual(models.RaceLiveAlertIncident.objects.count(), 1)
+        incident.refresh_from_db()
+        self.assertEqual(incident.status, "open")
+        self.assertEqual(incident.last_seen_at, later)
+        self.assertEqual(incident.details["reason"], "multisource_policy_sha_mismatch")
+
+    def test_policy_incident_resolves_on_recovery_and_reopens_on_refailure(self):
+        with self.unavailable():
+            self.discover(NOW)
+        incident = models.RaceLiveAlertIncident.objects.get()
+        policy = parse_multisource_policy(policy_payload(), now=NOW)
+        recovered = NOW + timedelta(minutes=20)
+        result = self.discover(recovered, policy=policy)
+        self.assertTrue(result["enabled"])
+        incident.refresh_from_db()
+        self.assertEqual(incident.status, "resolved")
+        self.assertEqual(incident.resolved_at, recovered)
+        # 恢复后再次失效：同一条 incident 重新打开，不另起新行。
+        refailed = NOW + timedelta(minutes=30)
+        with self.unavailable():
+            self.discover(refailed)
+        incident.refresh_from_db()
+        self.assertEqual(incident.status, "open")
+        self.assertEqual(incident.opened_at, refailed)
+        self.assertIsNone(incident.resolved_at)
+        self.assertEqual(models.RaceLiveAlertIncident.objects.count(), 1)

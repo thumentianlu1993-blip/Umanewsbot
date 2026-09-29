@@ -1,0 +1,128 @@
+# fixture 来源：hri_2026-2027_nh_pattern_booklet_part1.pdf（pdfplumber extract_text 摘录）
+Irish N.H. WFA Graded Races, WFA
+Listed Races and Graded Handicaps
+2026/2027 (Part 1)
+INDEX TO CONTENTS
+Page
+Graded/Listed Bumpers ................................................................ 2
+Graded/Listed Hurdles ................................................................. 2
+Graded/Listed Steeplechases ....................................................... 3
+Graded/Listed Handicap Hurdles ................................................ 4
+Graded/Listed Handicap Steeplechases ...................................... 4
+Conditions of Races .................................................................. 5-18
+The data contained in this booklet is for information purposes only and is subject to alteration
+without notice.
+Owners and Trainers are advised to consult the Racing Calendar for final details.
+Publishers Office:
+Horse Racing Ireland
+Ballymany,
+The Curragh,
+Co. Kildare
+©Horse Racing Ireland
+Last Updated September 24th
+GRADED/LISTED BUMPERS - NATIONAL HUNT 2026/2027 (3)
+DATE TRACK RACE NAME NOV EBF AGE SEX TYPE DIST € STAKES
+Oct 02 Gowran Park Mucklemeg Mares I.N.H. Flat Race EBF 46 F Listed 16f 30,000
+Nov 15 Navan Aries Girl Mares I.N.H. Flat Race EBF 46 F Listed 16f 32,500
+Dec 13 Navan Future Champions I.N.H. Flat Race EBF 46 Listed 16f 25,000
+2
+GRADED/LISTED HURDLES - NATIONAL HUNT 2026/2027 (29)
+DATE TRACK RACE NAME NOV EBF AGE SEX TYPE DIST € STAKES
+May 09 Killarney Tourist Attraction Mares Hurdle 4+ F Listed 17f 26,000
+Jul 02 Limerick Grimes Hurdle 4+ Gr 3 16f+ 70,000
+Jul 28 Galway Castlegar Novice Hurdle Y 4+ Listed 16f+ 35,000
+Oct 03 Gowran Park Joe Mac Novice Hurdle Y 4+ Gr 3 16f 42,000
+Oct 03 Gowran Park Tipperary Hurdle 4+ Listed 16f 25,000
+Oct 17 Limerick Cailin Alainn Mares Hurdle EBF 4+ F Listed 22f+ 27,500
+Oct 17 Limerick Greenmount Novice Hurdle Y 4+ Listed 21f 25,000
+Oct 30 Down Royal Feathard Lady Mares Novice Hurdle Y EBF 4+ F Gr 3 16f+ 42,000
+Oct 30 Down Royal Jezki Hurdle 4+ Listed 16f+ 25,000
+Nov 01 Cork Youghal Novice Hurdle Y EBF 4+ Listed 24f 27,500
+Nov 14 Navan Lismullen Hurdle 4+ Gr 2 20f 70,000
+Nov 14 Navan For Auction Novice Hurdle Y 4+ Gr 3 16f 42,000
+Nov 15 Navan Monksfield Novice Hurdle Y 4+ Gr 3 20f 42,000
+Nov 21 Punchestown Morgiana Hurdle 4+ Gr 1 16f+ 150,000
+Nov 22 Punchestown Grabel Mares Hurdle 4+ F Listed 18f 25,000
+Nov 28 Fairyhouse Mullinam Hurdle 4 Gr 3 16f 55,000
+Nov 29 Fairyhouse Hatton's Grace Hurdle 4+ Gr 1 20f 120,000
+Nov 29 Fairyhouse Royal Bond Novice Hurdle Y 4+ Gr 2 16f 85,000
+Nov 29 Fairyhouse Winter Festival Juvenile Hurdle 3 Gr 3 16f 40,000
+Dec 05 Navan Navan Novice Hurdle Y 4+ Gr 2 20f 60,000
+Dec 06 Cork Cork Stayers Novice Hurdle Y 4+ Gr 3 24f 42,000
+Dec 08 Punchestown Voler La Vedette Mares Novice Hurdle Y 4+ F Listed 19f 25,000
+Dec 19 Thurles Boreen Belle Mares Novice Hurdle Y EBF 4+ F Listed 16f 27,500
+Dec 26 Leopardstown Leopardstown Juvenile Hurdle 3 Gr 2 16f 50,000
+Dec 26 Limerick Dorans Pride Novice Hurdle Y 4+ Gr 2 23f 60,000
+Dec 27 Leopardstown Future Champions Novice Hurdle Y 4+ Gr 1 16f 100,000
+Dec 28 Leopardstown Christmas Hurdle 4+ Gr 1 23f 150,000
+Dec 29 Leopardstown December Hurdle 4+ Gr 1 16f 150,000
+Dec 29 Leopardstown Kerrymount Mares Hurdle EBF 4+ F Gr 3 20f 55,000
+3
+GRADED/LISTED STEEPLECHASES - NATIONAL HUNT 2026/2027 (27)
+DATE TRACK RACE NAME NOV EBF AGE SEX TYPE DIST € STAKES
+May 11 Killarney An Riocht Steeplechase 5+ Gr 3 20f 55,000
+Jul 30 Galway Ballybrit Novice Steeplechase Y 4+ Gr 3 18f 42,000
+Sep 28 Roscommon Kilbegnet Novice Steeplechase Y EBF 4+ Gr 3 16f+ 42,000
+Oct 03 Gowran Park Danoli Steeplechase 5+ Gr 2 20f 70,000
+Oct 03 Gowran Park Like A Butterfly Novice Steeplechase Y 4+ Gr 3 20f 42,000
+Oct 14 Punchestown Carvill's Hill Steeplechase 5+ Gr 3 23f 55,000
+Oct 14 Punchestown Buck House Novice Steeplechase Y 4+ Gr 3 18f 42,000
+Oct 26 Wexford Bettyville Steeplechase 5+ Listed 23f 25,000
+Oct 31 Down Royal Kauto Star Steeplechase 5+ Gr 1 24f 160,000
+Oct 31 Down Royal Skymas Steeplechase 4+ Gr 2 19f+ 70,000
+Nov 01 Cork Kildorrery Novice Steeplechase Y EBF 5+ Gr 3 20f 42,000
+Nov 05 Clonmel Clonmel Steeplechase 4+ Gr 2 20f+ 70,000
+Nov 05 Clonmel T.A. Morris Memorial Mares Steeplechase EBF 4+ F Listed 20f+ 27,500
+Nov 08 Naas Poplar Square Steeplechase 4+ Gr 3 16f 55,000
+Nov 14 Navan Fortria Steeplechase 5+ Gr 2 16f 70,000
+Nov 21 Punchestown Florida Pearl Novice Steeplechase Y 5+ Gr 2 24f 60,000
+Nov 22 Punchestown Punchestown Steeplechase 5+ Gr 1 19f+ 150,000
+Nov 22 Punchestown Craddockstown Novice Steeplechase Y 4+ Gr 2 16f 60,000
+Nov 26 Thurles Thurles Steeplechase 5+ Listed 22f 25,500
+Nov 29 Fairyhouse Drinmore Novice Steeplechase Y 4+ Gr 1 20f 90,000
+Dec 06 Cork Hilly Way Steeplechase 5+ Gr 2 16f+ 100,000
+Dec 06 Cork Put The Kettle On Mares Novice Steeplechase Y EBF 4+ F Gr 2 16f+ 60,000
+Dec 26 Leopardstown Christmas Novice Steeplechase Y 4+ Gr 1 17f 100,000
+Dec 27 Leopardstown Bohernabreena Steeplechase 5+ Gr 1 17f 125,000
+Dec 27 Limerick Dawn Run Mares Novice Steeplechase Y EBF 4+ F Gr 2 22f+ 60,000
+Dec 28 Leopardstown Leopardstown Christmas Steeplechase 5+ Gr 1 24f 175,000
+Dec 28 Limerick Faugheen Novice Steeplechase Y 4+ Gr 1 21f 100,000
+4
+GRADED HANDICAP HURDLES - NATIONAL HUNT 2026/2027 (9)
+DATE TRACK RACE NAME NOV EBF AGE SEX TYPE DIST € STAKES
+Jul 30 Galway Galway Hurdle Handicap Hurdle 4+ Gr 3 16f 270,000
+Aug 01 Galway Mervue Handicap Hurdle 4+ Listed 22f 110,000
+Sep 24 Listowel Lartigue Handicap Hurdle 4 Listed 16f 60,000
+Sep 25 Listowel Island Handicap Hurdle 5+ Listed 16f 100,000
+Nov 08 Naas Brown Lad Handicap Hurdle 4+ Listed 20f 45,000
+Nov 29 Fairyhouse New Stand Handicap Hurdle 4+ Listed 16f 100,000
+Dec 05 Navan Proudstown Handicap Hurdle 4+ Listed 25f 100,000
+Dec 29 Leopardstown Rathdown Handicap Hurdle 4+ Listed 20f 100,000
+Dec 29 Limerick Sporting Limerick Handicap Hurdle 34 Listed 16f 45,000
+5
+GRADED HANDICAP STEEPLECHASES - NATIONAL HUNT 2026/2027 (12)
+DATE TRACK RACE NAME NOV EBF AGE SEX TYPE DIST € STAKES
+May 25 Ballinrobe Mayo National Handicap Steeplechase 4+ Listed 23f 100,000
+Jul 10 Kilbeggan Midlands National Handicap Steeplechase 5+ Listed 25f 100,000
+Jul 29 Galway Galway Plate Handicap Steeplechase 4+ Gr 3 22f+ 270,000
+Aug 22 Killarney Lough Leane Handicap Steeplechase 4+ Listed 20f+ 45,000
+Sep 23 Listowel Kerry National Handicap Steeplechase 4+ Gr 3 23f+ 200,000
+Oct 18 Limerick Munster National Handicap Steeplechase 4+ Gr 3 24f 100,000
+Nov 15 Navan Troytown Handicap Steeplechase 4+ Gr 3 24f 100,000
+Nov 28 Fairyhouse Ballyhack Handicap Steeplechase 4+ Listed 17f 45,000
+Nov 29 Fairyhouse Porterstown Handicap Steeplechase 4+ Listed 30f 45,000
+Dec 05 Navan Foxrock Handicap Steeplechase 4+ Listed 20f+ 45,000
+Dec 27 Leopardstown Clonskeagh Handicap Steeplechase 5+ Listed 24f 200,000
+Dec 28 Limerick Tim Duggan Memorial Handicap Steeplechase 4+ Listed 19f 45,000
+6
+# --- 以下为正文条件页开头，用于验证节外文本不产生数据行 ---
+KILLARNEY BALLINROBE KILBEGGAN
+SATURDAY, 9TH MAY, 2026 MONDAY, 11TH MAY, 2026 MONDAY, 25TH MAY, 2026 FRIDAY, 10TH JULY, 2026
+CLOSING: TUESDAY, 5TH MAY CLOSING: WEDNESDAY, 13TH MAY CLOSING: WEDNESDAY, 24TH JUNE
+The MD O'Shea's Tourist Attraction Mares The McHale Mayo National Handicap The Kilmurray Group Midlands National
+Hurdle of €26,000 Steeplechase of €100,000 Handicap Steeplechase of €100,000
+(Listed Race) (Listed Race) (Listed Race)
+(Generously sponsored by MD O'Shea's) (Generously sponsored by McHale) (Generously sponsored by Dermot & Conor
+Winner will receive €15,600 Winner will receive €60,000 Kilmurray)
+(Penalty Value: €15,314) (Penalty Value: €58,900) Winner will receive €60,000
+Second will receive €5,200 Second will receive €20,000 (Penalty Value: €58,900)

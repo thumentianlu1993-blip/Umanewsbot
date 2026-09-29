@@ -1,3 +1,25 @@
+## 2026-09-29：九地区赛事日历工程的关键数据约定
+
+- **赛果名次双字段**：`finish_position` 是展示位（每赛事唯一、1..N 连续，满足
+  `stable_raceeventresult(event_id, finish_position)` 唯一约束），`official_finish_position` 保留官方名次
+  （并列场次两马同号、随后跳号）。所有新 parser（deutscher_galopp/hri_ras/racing_australia/
+  just_horse_racing/era/jcsa）统一遵守，与 irishracing 既有约定一致。
+- **非完赛标记词汇表**：映射到 `RaceRunnerStatus`（fell/pulled_up/unseated_rider/did_not_finish/
+  non_runner/refused/disqualified）；**未登记标记 fail closed**（宁可拦下整场也不臆造），
+  新标记须先实测证据再入词汇表（HRI 实测枚举：fell/p.u./u.r./b.d./N.R./s.u./r.o.；RA/JHR：空/SCR/SB/DQ/FF/LR）。
+- **HRI `N ran` 语义** = 完赛名次数（不含 fell/p.u./N.R.），300/300 缓存页实证；解析不变量按此校验。
+- **部分赛果不入库**：JHR 摘要文章只有前四名时整场均不产候选（记 `jhr_top4_only` 挂账），
+  不以不完整赛果冒充完整。
+- **官方赛历优先级与赛季归年**：跨年赛季（香港 9-7、澳洲 8-7、中东 11-4）一律按 `local_date`
+  公历年归属；澳洲 RA 全国表 7 月才刷新（2026-27 表未发布期间的 8-12 月赛事挂账
+  `calendar_not_published`，不臆造）；德国 2025 赛历 PDF 已失效时以 Wayback ergebnisse 快照链重建。
+- **身份差异不现场改名**：ICS 名、官方赛历名、赛果页冠名之间的差异一律进身份映射/审核队列
+  （双键对、冠名变体、Millenium/Millennium 拼写等），series_key 以 ICS 基线为准。
+- **ireland TRA 路线一等化采用"翻转+存量兼容层"**：`_EVENT_REGION_BY_CONTRACT_REGION` 翻转为
+  IRELAND，`_LEGACY_EVENT_REGIONS_BY_CONTRACT_REGION` 保留 other 桶兼容存量登记；其他地区映射逐字节不变。
+- **周期赛历刷新默认关闭**：`RACE_CALENDAR_REFRESH_BEAT_ENABLED` 默认关；beat 薄壳只产 diff 候选与
+  通知，apply 永远走门禁命令（manifest sha + 审批人绑定 + BACKFILL 开关）。
+
 ## 2026-09-27：TRA registry 续期门禁的周期性质与换绑分工
 
 TRA 合同 registry（`runtime/policies/race_live/source_registry_the_racing_api_free.json`）是项目自建的

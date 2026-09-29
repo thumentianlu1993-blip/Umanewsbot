@@ -319,6 +319,15 @@ HISTORICAL_RACE_BACKFILL_MIN_FREE_DISK_BYTES = int(
 )
 HISTORICAL_RUNNER_TOOL_ROOT = env("HISTORICAL_RUNNER_TOOL_ROOT", "/app/runtime/tools")
 
+# 周期赛历刷新（diff 候选生成）默认关闭；apply 永远走 refresh_race_calendar 门禁命令
+RACE_CALENDAR_REFRESH_BEAT_ENABLED = env_bool("RACE_CALENDAR_REFRESH_BEAT_ENABLED", False)
+RACE_CALENDAR_REFRESH_INCOMING = env_list("RACE_CALENDAR_REFRESH_INCOMING", "")
+RACE_CALENDAR_REFRESH_EXISTING_SNAPSHOT = env("RACE_CALENDAR_REFRESH_EXISTING_SNAPSHOT", "")
+RACE_CALENDAR_REFRESH_COVERS = env_list("RACE_CALENDAR_REFRESH_COVERS", "")
+RACE_CALENDAR_REFRESH_OUTPUT_ROOT = env(
+    "RACE_CALENDAR_REFRESH_OUTPUT_ROOT", "runtime/race_calendar_refresh"
+)
+
 # 全站赛事信息严格展示；不修改写入、统计或旧显示开关
 RACE_INFORMATION_NORMALIZED_DISPLAY_ENABLED = env_bool("RACE_INFORMATION_NORMALIZED_DISPLAY_ENABLED", False)
 
@@ -998,6 +1007,18 @@ def build_race_data_sync_beat_schedule(
     return schedule
 
 
+def build_race_calendar_refresh_beat_schedule(*, refresh_enabled: bool = False) -> dict:
+    """周期赛历 diff 候选生成；默认关闭，apply 不走 beat。"""
+    schedule = {}
+    if refresh_enabled:
+        schedule["race-calendar-refresh-diff-candidates"] = {
+            "task": "stable.tasks.race_calendar_refresh_dry_run_task",
+            "schedule": crontab(minute=42, hour=3),
+            "options": {"queue": "celery", "expires": 3300},
+        }
+    return schedule
+
+
 CELERY_BEAT_SCHEDULE = {
     "scheduled-race-result-review": {
         "task": "stable.tasks.scheduled_race_result_review_task",
@@ -1094,6 +1115,11 @@ CELERY_BEAT_SCHEDULE.update(
         scheduler_enabled=RACE_DATA_SYNC_SCHEDULER_ENABLED,
         future_discovery_enabled=RACE_DATA_SYNC_FUTURE_DISCOVERY_ENABLED,
         lifecycle_apply_enabled=RACE_DATA_SYNC_LIFECYCLE_APPLY_ENABLED,
+    )
+)
+CELERY_BEAT_SCHEDULE.update(
+    build_race_calendar_refresh_beat_schedule(
+        refresh_enabled=RACE_CALENDAR_REFRESH_BEAT_ENABLED,
     )
 )
 

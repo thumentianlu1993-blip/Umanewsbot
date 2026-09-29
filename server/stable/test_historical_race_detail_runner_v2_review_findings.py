@@ -344,12 +344,18 @@ class HistoricalDetailRunnerV2ReviewFindingTests(SimpleTestCase):
             validated_path.write_text(
                 json.dumps(parsed_candidate("Validated Winner")) + "\n", encoding="utf-8"
             )
+            parse_gap_path = run_root / "parse-gaps.json"
+            parse_gap_path.write_text("[]\n", encoding="utf-8")
+            validation_gap_path = run_root / "validation-gaps.json"
+            validation_gap_path.write_text("[]\n", encoding="utf-8")
             (stage_root / "validate.json").write_text(
                 json.dumps(
                     {
                         "stage": "validate",
                         "candidate_jsonl": str(raw_path),
                         "validated_candidate_jsonl": str(validated_path),
+                        "parse_gap_json": str(parse_gap_path),
+                        "validation_gap_json": str(validation_gap_path),
                     }
                 ),
                 encoding="utf-8",

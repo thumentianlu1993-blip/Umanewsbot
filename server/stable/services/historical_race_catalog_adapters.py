@@ -25,7 +25,7 @@ from stable.services.historical_race_inventory import (
 
 
 CATALOG_SCHEMA_VERSION = "1.0"
-ADAPTER_PARSER_VERSION = "2026.07.4"
+ADAPTER_PARSER_VERSION = "2026.09.1"
 REQUIRED_COLUMNS = {
     "record_type",
     "year",
@@ -87,6 +87,16 @@ ADAPTER_CONFIGS = {
         key="bha_pattern_catalog",
         region=RacingRegion.UNITED_KINGDOM,
         providers=frozenset({"bha", "bhb", "jockey_club_archive", "tjcis"}),
+        grade_patterns=_patterns(
+            (r"^(?:(?:Group|Grade)\s*1|G1)$", RaceGrade.G1),
+            (r"^(?:(?:Group|Grade)\s*2|G2)$", RaceGrade.G2),
+            (r"^(?:(?:Group|Grade)\s*3|G3)$", RaceGrade.G3),
+        ),
+    ),
+    "hri_pattern_catalog": CatalogAdapterConfig(
+        key="hri_pattern_catalog",
+        region=RacingRegion.IRELAND,
+        providers=frozenset({"hri", "tjcis"}),
         grade_patterns=_patterns(
             (r"^(?:(?:Group|Grade)\s*1|G1)$", RaceGrade.G1),
             (r"^(?:(?:Group|Grade)\s*2|G2)$", RaceGrade.G2),

@@ -1,5 +1,7 @@
 # 五地区历史赛事目录来源矩阵
 
+> 2025 年起面向未来的九地区来源注册表（含爱尔兰/澳洲/德国/中东与各地赛历公布节奏）见 [race_calendar_source_registry.md](race_calendar_source_registry.md)；本文保留 1984 起逐年历史目录口径。
+
 ## 使用边界
 
 - 本文记录 `backfill-race-events-to-1984` 的逐年目录和系列 timeline 来源调查，不代表已经抓取或批准任何历史总账。
