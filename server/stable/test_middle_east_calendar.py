@@ -35,6 +35,28 @@ def _grid_word(page, top, x0, x1, text):
     return json.dumps({"page": page, "top": top, "x0": x0, "x1": x1, "text": text})
 
 
+def _grid_obj_char(page, top, x0, x1, text):
+    return json.dumps({"kind": "char", "page": page, "top": top, "x0": x0, "x1": x1, "text": text})
+
+
+def _grid_obj_rect(page, top, bottom, x0, x1, color):
+    return json.dumps({"kind": "rect", "page": page, "top": top, "bottom": bottom, "x0": x0, "x1": x1, "color": color})
+
+
+def _grid_text_chars(page, top, x0, text, char_width=2.5, spacing=0.5, space_width=1.3, space_gap=2.2):
+    """生成字母间距排版的字符对象（对齐真实网格 PDF：空格也是字符，词内字符间隔 ≤0.5pt）。"""
+    lines = []
+    x = x0
+    for ch in text:
+        if ch == " ":
+            lines.append(_grid_obj_char(page, top, round(x, 2), round(x + space_width, 2), " "))
+            x += space_width + space_gap
+            continue
+        lines.append(_grid_obj_char(page, top, round(x, 2), round(x + char_width, 2), ch))
+        x += char_width + spacing
+    return lines
+
+
 class DrcScheduleTextTests(SimpleTestCase):
     """Dubai Racing Carnival 2025-26 PDF 文本解析。"""
 
@@ -124,6 +146,195 @@ class DrcScheduleTextTests(SimpleTestCase):
         self.assertNotEqual(broken, text)
         with self.assertRaises(RuntimeError):
             self.module.parse_drc_schedule_text(broken, season="2025-2026")
+
+
+class DrcScheduleGridTests(SimpleTestCase):
+    """Dubai Racing Carnival 2026-27 Race Schedule Grid（赛日×距离单页矩阵，字符+底色 JSONL）解析。
+
+    夹具为全量单页派生对象（网格仅一页，无法按页裁剪；对齐 2024-25 手册夹具保留全部网格页的原则）。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.module = _load("prepare_middle_east_calendar.py")
+
+    def _parse(self, text, season="2026-2027"):
+        return self.module.parse_drc_schedule_grid(text, season=season)
+
+    def _synthetic_grid(self):
+        """两列最小网格：06-Nov（G2 dirt）+ 01-Jan（Gr3 turf），各带一个未分级单元格。"""
+        lines = [
+            # 列头：马场名行定列中心，日期行定赛日
+            _grid_obj_char(1, 74.2, 95.4, 115.2, "Meydan"),
+            _grid_obj_char(1, 74.2, 150.8, 170.6, "Meydan"),
+            _grid_obj_char(1, 82.9, 97.3, 114.6, "06-Nov"),
+            _grid_obj_char(1, 82.9, 152.2, 169.4, "01-Jan"),
+            # 左轴距离带标签
+            _grid_obj_char(1, 310.5, 53.4, 65.0, "1600"),
+            _grid_obj_char(1, 414.8, 53.4, 65.0, "1800"),
+            # 底部 Purebred Arabian 区标签（排除带起点）
+            _grid_obj_char(1, 735.9, 46.6, 55.3, "Pure Arabian"),
+            # 单元格底色：橙=dirt，绿=turf
+            _grid_obj_rect(1, 282.0, 308.0, 90.0, 125.0, [1.0, 0.753, 0.0]),
+            _grid_obj_rect(1, 282.0, 308.0, 145.0, 180.0, [0.663, 0.855, 0.455]),
+        ]
+        # col0：Test Mile Stakes (Group 2) AED 1.000.000 @ 1600 带
+        lines += _grid_text_chars(1, 288.9, 92.0, "Test Mile Stakes")
+        lines += _grid_text_chars(1, 294.5, 95.0, "(Group 2)")
+        lines += _grid_text_chars(1, 300.2, 93.0, "AED 1.000.000")
+        # col0：未分级让赛（无赛名、无级别，不产行）
+        lines += _grid_text_chars(1, 410.1, 97.0, "Hcp 80-100")
+        lines += _grid_text_chars(1, 415.7, 96.0, "AED 250,000")
+        # col1：Test Turf Stakes (Gr3) AED 700.000 @ 1600 带（级别变体 Gr3）
+        lines += _grid_text_chars(1, 288.9, 147.0, "Test Turf Stakes")
+        lines += _grid_text_chars(1, 294.5, 152.0, "(Gr3)")
+        lines += _grid_text_chars(1, 300.2, 149.0, "AED 700.000")
+        # col1：Listed 不产行
+        lines += _grid_text_chars(1, 410.1, 148.0, "Test Listed")
+        lines += _grid_text_chars(1, 415.7, 150.0, "(Listed)")
+        lines += _grid_text_chars(1, 421.4, 149.0, "AED 500.000")
+        return "\n".join(lines)
+
+    def test_synthetic_minimal_grid(self):
+        rows = self._parse(self._synthetic_grid(), season="2099-2100")
+        self.assertEqual(len(rows), 2)
+        first, second = rows
+        # 跨年归年：11 月归赛季起年，1 月归赛季终年
+        self.assertEqual(first["local_date"], "2099-11-06")
+        self.assertEqual(first["year"], 2099)
+        self.assertEqual(second["local_date"], "2100-01-01")
+        self.assertEqual(second["year"], 2100)
+        # 表面来自单元格底色（橙=dirt / 绿=turf），不在文本中
+        self.assertEqual(first["surface"], "dirt")
+        self.assertEqual(second["surface"], "turf")
+        # 级别变体 (Gr3) 与标准 (Group 2) 等价
+        self.assertEqual(first["grade_text"], "G2")
+        self.assertEqual(second["grade_text"], "G3")
+        self.assertEqual(first["distance_text"], "1600")
+        self.assertEqual(first["source_refs"]["prize_text"], "AED 1.000.000")
+        self.assertEqual(first["series_key"], "united-arab-emirates-test-mile-stakes")
+        self.assertEqual(first["racecourse"], "Meydan")
+        self.assertEqual(first["record_type"], "timeline")
+        self.assertEqual(first["country"], "uae")
+        self.assertEqual(first["country_region"], "middle_east")
+        self.assertEqual(first["season_label"], "2099-2100")
+        self.assertEqual(first["source_scope"], "official_calendar")
+        self.assertEqual(first["source_refs"]["source_kind"], "drc_carnival_race_schedule_grid")
+        # expectation 词表无 scheduled（held=应举办）；未来赛事的 scheduled 由物化层按日期派生
+        self.assertEqual(first["expectation_status"], "held")
+
+    def test_full_fixture_counts_and_days(self):
+        rows = self._parse(_fixture("drc_carnival_2026-2027_schedule_grid_objects.jsonl"))
+        # 官方口径：网格 17 列 = 16 个 Carnival 赛日 + DWC 赛日同版（"16 thrilling meetings" 见 DRC 官网）；
+        # 逐格人工复核（analyze_grid 输出）：Carnival G1×2/G2×10/G3×11 + DWC 赛日 G1×5/G2×3 = G1×7/G2×13/G3×11；
+        # 17 个赛日列的计数自校验在工具内 fail-closed，此处断言 9 个含 Group 赛的赛日
+        self.assertEqual(len(rows), 31)
+        grade_counts = {grade: sum(row["grade_text"] == grade for row in rows) for grade in ("G1", "G2", "G3")}
+        self.assertEqual(grade_counts, {"G1": 7, "G2": 13, "G3": 11})
+        self.assertEqual(len({row["local_date"] for row in rows}), 9)
+        self.assertEqual(
+            sorted({row["local_date"] for row in rows}),
+            [
+                "2026-12-18", "2027-01-01", "2027-01-15", "2027-01-22", "2027-01-29",
+                "2027-02-19", "2027-02-27", "2027-03-05", "2027-03-27",
+            ],
+        )
+
+    def test_full_fixture_year_attribution_and_status(self):
+        rows = self._parse(_fixture("drc_carnival_2026-2027_schedule_grid_objects.jsonl"))
+        # 2026 年 11-12 月仅 Festive Friday 两场 Group 赛；其余 29 行归 2027
+        rows_2026 = [row for row in rows if row["year"] == 2026]
+        self.assertEqual(len(rows_2026), 2)
+        self.assertEqual({row["canonical_name_original"] for row in rows_2026}, {"Al Maktoum Mile", "Al Rashidiya"})
+        self.assertEqual({row["local_date"] for row in rows_2026}, {"2026-12-18"})
+        self.assertEqual(sum(row["year"] == 2027 for row in rows), 29)
+        # 赛季未开赛但 expectation 口径为 held（应举办；词表无 scheduled）；
+        # 物化层按 local_date > today 产 scheduled 草稿，见阶段 3d 物化报告
+        self.assertTrue(all(row["expectation_status"] == "held" for row in rows))
+
+    def test_full_fixture_spot_checks(self):
+        rows = self._parse(_fixture("drc_carnival_2026-2027_schedule_grid_objects.jsonl"))
+        by_name = {row["canonical_name_original"]: row for row in rows}
+        # DWC 赛日 2027-03-27（官方公告周六，与网格列头一致）
+        dwc = by_name["Dubai World Cup"]
+        self.assertEqual(dwc["local_date"], "2027-03-27")
+        self.assertEqual(dwc["grade_text"], "G1")
+        self.assertEqual(dwc["distance_text"], "2000")
+        self.assertEqual(dwc["surface"], "dirt")
+        self.assertEqual(dwc["source_refs"]["prize_text"], "$12,000,000")
+        self.assertEqual(dwc["source_refs"]["day_label"], "Dubai World Cup")
+        self.assertEqual(dwc["series_key"], "united-arab-emirates-dubai-world-cup")
+        sheema = by_name["Dubai Sheema Classic"]
+        self.assertEqual(sheema["grade_text"], "G1")
+        self.assertEqual(sheema["distance_text"], "2410")
+        self.assertEqual(sheema["surface"], "turf")
+        self.assertEqual(by_name["Al Quoz Sprint"]["surface"], "turf")
+        self.assertEqual(by_name["Al Quoz Sprint"]["distance_text"], "1200")
+        self.assertEqual(by_name["UAE Derby"]["source_refs"]["conditions"], "3YO's")
+        self.assertEqual(by_name["UAE Derby"]["surface"], "dirt")
+        # Fashion Friday 2027-01-22：8 场 Group 赛（与 2024-25/2025-26 同构）
+        fashion = [row for row in rows if row["local_date"] == "2027-01-22"]
+        self.assertEqual(len(fashion), 8)
+        self.assertEqual({row["source_refs"]["day_label"] for row in fashion}, {"Fashion Friday"})
+        jebel = by_name["Jebel Hatta"]
+        self.assertEqual(jebel["grade_text"], "G1")
+        self.assertEqual(jebel["surface"], "turf")
+        self.assertEqual(jebel["source_refs"]["prize_text"], "AED 1.850.000")
+        # (Gr3) 级别变体
+        khail = by_name["Al Khail Trophy"]
+        self.assertEqual(khail["grade_text"], "G3")
+        self.assertEqual(khail["distance_text"], "2810")
+        self.assertEqual(khail["surface"], "turf")
+        # Emirates Super Saturday = 2027-02-27（周六），6 场 Group 赛
+        super_sat = [row for row in rows if row["local_date"] == "2027-02-27"]
+        self.assertEqual(len(super_sat), 6)
+        self.assertEqual({row["source_refs"]["day_label"] for row in super_sat}, {"Emirates Super Saturday"})
+        self.assertEqual(by_name["Dubai City of Gold"]["distance_text"], "2410")
+        # 雌马限定条件保留在 conditions，不进赛名
+        self.assertEqual(by_name["Cape Verdi"]["source_refs"]["conditions"], "Fillies & Mares")
+        self.assertEqual(by_name["Balanchine"]["source_refs"]["conditions"], "Fillies & Mares")
+        # Festive Friday 标签归 2026-12-18
+        self.assertEqual(by_name["Al Maktoum Mile"]["source_refs"]["day_label"], "Festive Friday")
+        # 2026-27 官方程序取消 UAE Oaks（2025-26 为 G3）：网格中无此行，命名差异交人工复核
+        self.assertNotIn("UAE Oaks", by_name)
+
+    def test_count_self_check_raises_on_missing_race(self):
+        # 删掉 Jebel Hatta 的级别行字符：该单元格不再产行，G1 计数 6 != 7 fail closed
+        kept = []
+        for line in _fixture("drc_carnival_2026-2027_schedule_grid_objects.jsonl").splitlines():
+            obj = json.loads(line)
+            if obj["kind"] == "char" and 414.5 <= obj["top"] <= 416.5 and 534.0 <= obj["x0"] <= 560.0:
+                continue
+            kept.append(line)
+        with self.assertRaises(RuntimeError):
+            self._parse("\n".join(kept))
+
+    def test_missing_day_header_fails_closed(self):
+        # 删掉 12-Mar 列日期：该 Meydan 列无赛日头，结构不完整 fail closed
+        kept = []
+        for line in _fixture("drc_carnival_2026-2027_schedule_grid_objects.jsonl").splitlines():
+            obj = json.loads(line)
+            if obj["kind"] == "char" and obj["top"] < 100 and 908.0 <= obj["x0"] <= 930.0:
+                continue
+            kept.append(line)
+        with self.assertRaises(RuntimeError):
+            self._parse("\n".join(kept))
+
+    def test_missing_surface_fill_fails_closed(self):
+        # 删掉 Jebel Hatta 单元格底色：Group 赛无表面证据 fail closed（不允许臆造 surface）
+        kept = []
+        for line in _fixture("drc_carnival_2026-2027_schedule_grid_objects.jsonl").splitlines():
+            obj = json.loads(line)
+            if (
+                obj["kind"] == "rect"
+                and obj["top"] <= 412.0 <= obj["bottom"]
+                and obj["x0"] <= 538.0 <= obj["x1"]
+            ):
+                continue
+            kept.append(line)
+        with self.assertRaises(RuntimeError):
+            self._parse("\n".join(kept))
 
 
 class DrcBrochureGridTests(SimpleTestCase):
@@ -504,3 +715,16 @@ class JcsaMeetingCardTests(SimpleTestCase):
         self.assertEqual(row["race_number"], "8")
         self.assertEqual(row["distance_text"], "1800")
         self.assertEqual(row["surface"], "dirt")
+
+    def test_future_card_without_results_marker_stays_held(self):
+        # 未来赛日卡无 Results 标记：expectation 词表无 scheduled，
+        # 应举办口径恒为 held，scheduled 形态由物化层按日期派生
+        html = _fixture("jcsa_api_meeting-info_en_20260214_0_All_False.html")
+        self.assertIn("Results", html)
+        mutated = html.replace("Results", "Entries")
+        self.assertNotEqual(mutated, html)
+        rows = self.module.parse_jcsa_meeting_card(mutated, date="2027-02-06")
+        self.assertTrue(rows)
+        for row in rows:
+            self.assertEqual(row["expectation_status"], "held")
+            self.assertFalse(row["source_refs"]["results_link_present"])

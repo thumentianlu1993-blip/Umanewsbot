@@ -63,9 +63,14 @@ DRC_RACE_RE = re.compile(
 )
 # Carnival 官方口径自校验（PDF/手册均载明 "consists of 16 race meetings"）：
 # 2024-25 = 2025-26 = 16 赛日，G1×2/G2×10/G3×12
+# 2026-27 Race Schedule Grid 为单页「赛日×距离」矩阵，17 列 = 16 个 Carnival 赛日 + DWC 赛日同版
+# （DRC 官网："The 2026–2027 season features 16 thrilling meetings"）：
+# Carnival G1×2/G2×10/G3×11 + DWC 赛日 G1×5/G2×3，合计 G1×7/G2×13/G3×11
+# （纯血马 Group 赛口径，网格底部 Purebred Arabian 区不收录）。
 DRC_EXPECTED_COUNTS = {
     "2024-2025": {"days": 16, "G1": 2, "G2": 10, "G3": 12},
     "2025-2026": {"days": 16, "G1": 2, "G2": 10, "G3": 12},
+    "2026-2027": {"days": 17, "G1": 7, "G2": 13, "G3": 11},
 }
 DRC_RACECOURSE = "Meydan"
 
@@ -80,6 +85,30 @@ GRID_GROUP_RE = re.compile(r"^(?P<name>.+?)\s*\(Group\s+(?P<grade>[123])\)\s*(?P
 GRID_COND_RE = re.compile(
     r"^(?P<age>\dYO\+?)\s*\|\s*(?P<distance>\d+)m\s*\|\s*(?P<surface>Dirt|Turf)\s*\|\s*AED\s*(?P<prize>[\d,]+)$"
 )
+
+# DRC Race Schedule Grid（2026-27 起）：单页「赛日列 × 距离带」矩阵的解析常量。
+# 单元格文字为居中字母间距排版，相邻列同距离带的行纵向交错约 2.9pt；
+# 表面不在文本中，由单元格底色编码（橙=dirt，两种绿色阶=turf）。
+SCHEDULE_GRID_TOP_TOLERANCE = 1.6
+SCHEDULE_GRID_GAP_SPLIT = 6.0
+SCHEDULE_GRID_AXIS_X_MAX = 1005.0  # 右侧纵轴距离标签起点（左轴按 x0<70 滤除）
+SCHEDULE_GRID_BAND_LABEL_X_MAX = 70.0
+SCHEDULE_GRID_BAND_AMBIGUITY_MARGIN = 4.0
+SCHEDULE_GRID_BAND_MAX_OFFSET = 40.0
+SCHEDULE_GRID_SURFACE_COLORS = {
+    (1.0, 0.753, 0.0): "dirt",
+    (0.663, 0.855, 0.455): "turf",
+    (0.573, 0.816, 0.314): "turf",
+}
+SCHEDULE_GRID_DATE_RE = re.compile(r"^(\d{2})-(Nov|Dec|Jan|Feb|Mar)$")
+SCHEDULE_GRID_DAY_LABELS = ("Festive Friday", "Fashion Friday", "Emirates Super Saturday", "Dubai World Cup")
+SCHEDULE_GRID_GRADE_RE = re.compile(r"^\((?:Group ([123])|Gr\.?\s?([123]))\)$")
+SCHEDULE_GRID_LISTED_RE = re.compile(r"^\(Listed\)$")
+SCHEDULE_GRID_PRIZE_RE = re.compile(r"^(?:AED|\$)\s?[\d.,]+$")
+SCHEDULE_GRID_COND_RE = re.compile(
+    r"^(?:\dYO'?s?\+?|Fillies(?: & Mares)?|Hcp\b.*|Benchmark\b.*|Maiden\b.*|Cond\.?\b.*|Purebred\b.*)$"
+)
+SCHEDULE_GRID_BAND_LABEL_RE = re.compile(r"^\d{3,4}$")
 
 ERA_HEADING_RE = re.compile(r"^Race\s+(\d+)\s+-\s+(?P<name>.+)$")
 ERA_TRACK_ICON_RE = re.compile(r"/assets/tracks/(?P<course>[a-z0-9-]+?)--(?P<distance>\d+)m")
@@ -194,6 +223,8 @@ def _drc_timeline_row(*, name, grade, race_date, distance, surface, conditions, 
         local_date=race_date.isoformat(),
         distance_text=distance,
         surface=surface.lower(),
+        # expectation 词表（held=应举办/cancelled/not_due/not_held）不含 scheduled；
+        # 未来赛事的 scheduled 形态由物化层按 local_date > today 派生（event.status=scheduled + draft）
         expectation_status="held",
         source_scope="official_calendar",
         discipline="flat",
@@ -345,6 +376,198 @@ def parse_drc_brochure_grid(grid_text: str, *, season: str) -> list[dict]:
             if pending is not None:
                 raise RuntimeError(f"网格赛名段缺少条件段：{pending.group(0)} @ {race_date}")
     _check_drc_counts(rows, days, season=season)
+    return rows
+
+
+# ---------------------------------------------------------- DRC Race Schedule Grid
+
+
+def _schedule_grid_segments(chars: list[dict]) -> list[dict]:
+    """字符 -> 行（top 容差 1.6pt，分开相邻列约 2.9pt 的纵向交错）-> 段（行内间隔 >6pt 切段）。"""
+    lines: list[list[dict]] = []
+    for char in sorted(chars, key=lambda c: (c["page"], c["top"], c["x0"])):
+        if (
+            lines
+            and lines[-1][0]["page"] == char["page"]
+            and abs(lines[-1][0]["top"] - char["top"]) <= SCHEDULE_GRID_TOP_TOLERANCE
+        ):
+            lines[-1].append(char)
+        else:
+            lines.append([char])
+    segments: list[dict] = []
+    for line_chars in lines:
+        run: list[dict] = []
+        prev = None
+        for char in sorted(line_chars, key=lambda c: c["x0"]):
+            if prev is not None and run and char["x0"] - prev["x1"] > SCHEDULE_GRID_GAP_SPLIT:
+                text = _collapse("".join(c["text"] for c in run))
+                if text:
+                    segments.append({"top": run[0]["top"], "x0": run[0]["x0"], "x1": run[-1]["x1"], "text": text})
+                run = []
+            run.append(char)
+            prev = char
+        if run:
+            text = _collapse("".join(c["text"] for c in run))
+            if text:
+                segments.append({"top": run[0]["top"], "x0": run[0]["x0"], "x1": run[-1]["x1"], "text": text})
+    return segments
+
+
+def _schedule_grid_surface(rects: list[dict], segment: dict) -> str:
+    """单元格表面取赛名行锚点处底色；无填充或未知颜色均 fail closed（不臆造 surface）。"""
+    px, py = segment["x0"] + 2.0, segment["top"] + 1.0
+    hits = [
+        r for r in rects
+        if r["x0"] <= px <= r["x1"] and r["top"] <= py <= r["bottom"]
+    ]
+    if not hits:
+        raise RuntimeError(f"Group 赛单元格无底色填充证据：{segment['text']!r} @ top={segment['top']}")
+    surfaces = set()
+    unknown = set()
+    for hit in hits:
+        color = hit["color"]
+        key = (color,) if isinstance(color, (int, float)) else tuple(color)
+        if key in SCHEDULE_GRID_SURFACE_COLORS:
+            surfaces.add(SCHEDULE_GRID_SURFACE_COLORS[key])
+        else:
+            unknown.add(key)
+    if len(surfaces) == 1:
+        return next(iter(surfaces))
+    raise RuntimeError(f"Group 赛单元格底色无法判定表面：{segment['text']!r} colors={sorted(map(str, unknown))}")
+
+
+def parse_drc_schedule_grid(payload: str, *, season: str) -> list[dict]:
+    """解析 DRC Race Schedule Grid 派生对象 JSONL（kind=char/rect 行），只产纯血马 Group 1/2/3 行。
+
+    结构：列头三行（马场名 Meydan 定列中心 / 日期 dd-Mmm / Turf rail 位置），左右纵轴为距离带
+    标签；单元格纵向堆叠 赛名[/条件]/(Group N|GrN|Listed)/奖金，以奖金行收尾；网格底部为
+    Purebred Arabian 区（ICS UAE 章节不收录阿拉伯马，整体排除）；TBA 空格不产行。
+    """
+    chars: list[dict] = []
+    rects: list[dict] = []
+    for raw_line in payload.splitlines():
+        if not raw_line.strip():
+            continue
+        obj = json.loads(raw_line)
+        if obj["kind"] == "char":
+            chars.append(obj)
+        elif obj["kind"] == "rect":
+            rects.append(obj)
+    if not chars:
+        raise RuntimeError("Race Schedule Grid 派生对象为空")
+    segments = _schedule_grid_segments(chars)
+
+    # 列中心：马场名列头行；每个列必须有唯一赛日日期
+    centers = sorted((s["x0"] + s["x1"]) / 2 for s in segments if s["text"] == "Meydan" and 70 < s["top"] < 80)
+    if len(centers) < 2:
+        raise RuntimeError(f"Race Schedule Grid 列头不足：{len(centers)} 列")
+
+    def _nearest_center(x: float) -> int:
+        return min(range(len(centers)), key=lambda i: abs(centers[i] - x))
+
+    day_dates: dict[int, date_type] = {}
+    start_year = int(season.split("-")[0])
+    for seg in segments:
+        match = SCHEDULE_GRID_DATE_RE.match(seg["text"])
+        if not match or seg["top"] >= 100:
+            continue
+        month = MONTHS_ABBR[match.group(2).upper()]
+        year = start_year if month >= 9 else start_year + 1
+        index = _nearest_center((seg["x0"] + seg["x1"]) / 2)
+        parsed = date_type(year, month, int(match.group(1)))
+        if index in day_dates and day_dates[index] != parsed:
+            raise RuntimeError(f"赛日列日期冲突：{day_dates[index]} vs {parsed}")
+        day_dates[index] = parsed
+    missing = [i for i in range(len(centers)) if i not in day_dates]
+    if missing:
+        raise RuntimeError(f"赛日列缺少日期头：列索引 {missing}")
+
+    day_labels: dict[int, str] = {}
+    for seg in segments:
+        if 55 < seg["top"] < 75 and seg["text"] in SCHEDULE_GRID_DAY_LABELS:
+            day_labels[_nearest_center((seg["x0"] + seg["x1"]) / 2)] = seg["text"]
+
+    # Purebred Arabian 区起点：左轴 "Pure Arabian" 标签；找不到说明版式变化，fail closed
+    arabian_marks = [s["top"] for s in segments if s["x0"] < 70 and s["top"] > 700 and re.search(r"arabian", s["text"], re.IGNORECASE)]
+    if not arabian_marks:
+        raise RuntimeError("Race Schedule Grid 缺少 Purebred Arabian 区标签，无法确定排除带")
+    arabian_top = min(arabian_marks) - 12.0
+
+    # 距离带：左轴数字标签
+    bands = sorted(
+        (s["top"], s["text"]) for s in segments
+        if SCHEDULE_GRID_BAND_LABEL_RE.match(s["text"]) and s["x0"] < SCHEDULE_GRID_BAND_LABEL_X_MAX and s["top"] < arabian_top
+    )
+    if len(bands) < 2:
+        raise RuntimeError(f"Race Schedule Grid 距离带标签不足：{len(bands)}")
+
+    def _band_of(cell: list[dict]) -> str:
+        center = (cell[0]["top"] + cell[-1]["top"]) / 2
+        nearest = sorted(bands, key=lambda band: abs(band[0] - center))[:2]
+        if abs(nearest[0][0] - center) > SCHEDULE_GRID_BAND_MAX_OFFSET:
+            raise RuntimeError(f"单元格纵向中心距最近距离带过远：{cell[0]['text']!r} center={center}")
+        if len(nearest) == 2 and abs(nearest[1][0] - center) - abs(nearest[0][0] - center) < SCHEDULE_GRID_BAND_AMBIGUITY_MARGIN:
+            raise RuntimeError(f"单元格距离带归属歧义：{cell[0]['text']!r} center={center} bands={nearest}")
+        return nearest[0][1]
+
+    # 单元格：列内按 top 堆叠，奖金行收尾；TBA 为独立空格
+    by_column: dict[int, list[dict]] = {i: [] for i in range(len(centers))}
+    for seg in segments:
+        if 95 < seg["top"] < arabian_top and 70 < seg["x0"] < SCHEDULE_GRID_AXIS_X_MAX:
+            by_column[_nearest_center((seg["x0"] + seg["x1"]) / 2)].append(seg)
+
+    rows: list[dict] = []
+    for index, column in enumerate(centers):
+        cells: list[list[dict]] = []
+        pending: list[dict] = []
+        for seg in sorted(by_column[index], key=lambda s: s["top"]):
+            if seg["text"] == "TBA":
+                continue
+            pending.append(seg)
+            if SCHEDULE_GRID_PRIZE_RE.match(seg["text"]):
+                cells.append(pending)
+                pending = []
+        if any(SCHEDULE_GRID_GRADE_RE.match(s["text"]) or SCHEDULE_GRID_LISTED_RE.match(s["text"]) for s in pending):
+            raise RuntimeError(f"分级赛单元格缺少奖金行收尾：{[s['text'] for s in pending]} @ {day_dates[index]}")
+        for cell in cells:
+            texts = [s["text"] for s in cell]
+            listed = any(SCHEDULE_GRID_LISTED_RE.match(text) for text in texts)
+            grades = [i for i, text in enumerate(texts) if SCHEDULE_GRID_GRADE_RE.match(text)]
+            if listed:
+                if grades:
+                    raise RuntimeError(f"单元格同时出现 Listed 与 Group 级别：{texts} @ {day_dates[index]}")
+                continue  # Listed 不产行
+            if not grades:
+                continue  # Hcp/Benchmark/Maiden/Cond 等未分级单元格
+            if len(grades) > 1:
+                raise RuntimeError(f"单元格出现多个级别行：{texts} @ {day_dates[index]}")
+            grade_index = grades[0]
+            tail = texts[grade_index + 1:-1]
+            if tail:
+                raise RuntimeError(f"级别行与奖金行之间存在多余行：{texts} @ {day_dates[index]}")
+            name_parts = [text for text in texts[:grade_index] if not SCHEDULE_GRID_COND_RE.match(text)]
+            conditions = [text for text in texts[:grade_index] if SCHEDULE_GRID_COND_RE.match(text)]
+            if not name_parts:
+                raise RuntimeError(f"Group 赛单元格缺少赛名：{texts} @ {day_dates[index]}")
+            name = " ".join(name_parts)
+            grade_match = SCHEDULE_GRID_GRADE_RE.match(texts[grade_index])
+            grade = f"G{grade_match.group(1) or grade_match.group(2)}"
+            rows.append(
+                _drc_timeline_row(
+                    name=name,
+                    grade=grade,
+                    race_date=day_dates[index],
+                    distance=_band_of(cell),
+                    surface=_schedule_grid_surface(rects, cell[0]),
+                    conditions=" ".join(conditions),
+                    prize_text=texts[-1],
+                    season=season,
+                    day_label=day_labels.get(index, ""),
+                    source_kind="drc_carnival_race_schedule_grid",
+                    source_race_name=" / ".join(texts),
+                )
+            )
+    _check_drc_counts(rows, set(day_dates.values()), season=season)
     return rows
 
 
@@ -519,7 +742,7 @@ def parse_jcsa_meeting_card(html: str, *, date: str) -> list[dict]:
                 local_date=date,
                 distance_text=distance,
                 surface=surface,
-                expectation_status="held" if held else "scheduled",
+                expectation_status="held",
                 source_scope="official_calendar",
                 discipline="flat",
                 race_number=race_number,
@@ -530,6 +753,7 @@ def parse_jcsa_meeting_card(html: str, *, date: str) -> list[dict]:
                     "prize_text": stats.get("money", ""),
                     "info_raw": info,
                     "grade_source": grade_source,
+                    "results_link_present": held,
                 },
             )
         )
@@ -612,6 +836,14 @@ def build_timeline(args) -> dict:
         rows.extend(parsed)
         summary["sources"].append({"kind": "drc_grid", "url": url, "path": str(path), "season": season})
         summary["row_counts"][f"drc_grid:{season}"] = len(parsed)
+    for spec in args.drc_schedule_grid or []:
+        url, path = _parse_source(spec)
+        season = _drc_season_from_source(url, path)
+        parsed = parse_drc_schedule_grid(path.read_text(encoding="utf-8"), season=season)
+        _enrich_source_identity(parsed, url=url, path=path)
+        rows.extend(parsed)
+        summary["sources"].append({"kind": "drc_schedule_grid", "url": url, "path": str(path), "season": season})
+        summary["row_counts"][f"drc_schedule_grid:{season}"] = len(parsed)
     for spec in args.era_html or []:
         url, path = _parse_source(spec)
         date = _era_date_from_url(url)
@@ -647,6 +879,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--drc-txt", action="append", help="DRC 赛历 PDF 文本，URL=PATH，可多个")
     parser.add_argument("--drc-grid", action="append", help="DRC 手册赛程网格词坐标 JSONL，URL=PATH，可多个")
+    parser.add_argument("--drc-schedule-grid", action="append", help="DRC Race Schedule Grid 字符+底色 JSONL，URL=PATH，可多个")
     parser.add_argument("--era-html", action="append", help="ERA 整日场头页，URL=PATH，可多个")
     parser.add_argument("--jcsa-html", action="append", help="JCSA 赛日卡，URL=PATH，可多个")
     parser.add_argument("--output-dir", required=True)
