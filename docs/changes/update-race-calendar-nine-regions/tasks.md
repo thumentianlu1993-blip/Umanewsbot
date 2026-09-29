@@ -39,14 +39,36 @@
 - [ ] (application) 新地区 2026 剩余 + 2027 已公布赛历（HRI 2027 已公布、DRC/JCSA 2026-27、澳洲 2026-27）经 descriptor 门禁导入（draft）
 - [ ] (operations) 逐地区 ICS 应办集合 vs 已采集集合 diff 归零或逐项挂账
 
-## 阶段 3：持续更新机制（待进行）
+## 阶段 3：持续更新机制（代码已完成 2026-09-29，待生产启用）
 
-- [ ] (application) 周期赛历刷新命令/任务：按各地区公布节奏从官方赛历 diff 新增/改期/取消 → 候选 → 门禁导入
-- [ ] (integration) 日本登记修复（JRA 身份发现、census 赛后补入、SLO 覆盖应登记未登记）——承接 2026-09-20 根因报告
-- [ ] (integration) TRA registry 续验流程入 runbook；新地区 TRA 路线 proof（ireland 可直接用；澳/德/中东评估 group 级 + 官方兜底）
-- [ ] (operations) 2027 赛历按公布节奏滚动导入
+- [x] (application) 周期赛历刷新：`runtime/tools/diff_race_calendar.py` + `refresh_race_calendar` 门禁命令
+      （new/changed/cancelled + uncovered 降级、计数守恒、乐观并发、跨年改期拒绝）；Celery 挂载默认关闭，
+      薄壳只产候选不自动 apply
+- [x] (integration) 日本登记修复：S1 JRA 冷启动 hint（baseline+permits 校验）、S2 multisource policy 失效
+      内部 incident、S3 lifecycle_not_advanced 覆盖告警；JRA policy v2 续期（2026-10-26 到期）入 runbook
+- [x] (integration) TRA 路线：ireland 一等化（翻转+兼容层，policy 重渲 13→14）；澳/德/中东 TRA 扩展
+      属 G3（扩大付费覆盖）→ 留用户拍板；TRA registry 月度续验流程已在 runbook
+- [x] (operations) 2027 滚动导入：UAE 2026-27 网格赛历 29 场物化 scheduled draft；爱尔兰 2027 分级年册
+      未发布、沙特 2027 未挂 API（探测记录，复探节奏：爱尔兰 2027-01 中旬、沙特 2026-12）
 
-## 阶段 4：公开与文档（待进行）
+## 阶段 4：公开与文档（代码已完成 2026-09-29；发布待用户确认）
 
-- [ ] (application) 前台四地区 tab/颜色/徽章支持；用户确认后批量发布 draft 赛事
-- [ ] (operations) 文档回写：current_state/decisions/deploy_runbook/source registry 维护
+- [x] (application) 前台四地区 tab/颜色注册（PUBLIC_REGION_TABS/COLORS 单一来源派生）；
+      赛事日历 choices 驱动天然支持；draft 公开面不可见
+- [ ] (operations) **批量发布 draft 赛事：等用户确认**
+- [x] (operations) 文档回写：current_state / decisions / deploy_runbook / source registry / 本文件
+
+## 验收与独立测试记录
+
+独立测试代理（agent-15）十轮验收全部 ALL_PASS：①四地区 parser+fixture（169 项）②接线契约（17 项）
+③赛历装配演进 ④物化命令 ⑤批次守卫修复（HRI N ran/DG 后缀/AU 反向子集）⑥澳洲尾部（FF/LR/并列/wayback）
+⑦阶段 3a+3b+2-E 总账 ⑧ireland TRA 一等化 ⑨阶段 3d ⑩阶段 4。main 既有失败族（first-acceptance 九地区
+枚举、runner_v2 陈旧 fixture 等）逐项 stash/基线对照确认与本分支无关；runner_v2 陈旧 fixture 已顺手修复。
+
+## 剩余挂账（上线包外）
+
+- 澳洲 2025 上半年全表赛果源缺口（359 场 JHR top4-only + 64 场未收录）：需 Racenet 渲染身份或
+  TRA regional add-on 采购决策
+- 2026-08..12 澳洲赛历待 RA 2026-27 表发布后补跑；爱尔兰 2027 年册、沙特 2027 复探
+- 身份治理：129 组双键系列对、命名变体对、COTHM/Blue Diamond Prelude 等键碰撞（见 2-E 总账）
+- main 既有失败测试族修复（与本工程无关但建议择期）

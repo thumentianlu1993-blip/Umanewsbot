@@ -1,3 +1,14 @@
+## 2026-09-29 赛事日历九地区更新：阶段 1-4 开发全部完成（待用户确认上线）
+
+变更文档 [update-race-calendar-nine-regions](changes/update-race-calendar-nine-regions/spec.md)，分支 `kimi/race-calendar-nine-regions`（基线 origin/main c71dcdfc；main 已前进，发布前需对账）。**全部产物在本地/分支，生产零写入**；独立测试代理（agent-15）十轮验收全部 ALL_PASS。
+
+- **阶段 1（五地区 2025/2026 补缺候选）**：香港 12 场（HKJC 官方，已 APPROVED）、日本 2 场 J-G1 + NAR 12 场 Jpn1、英国 Dick Poole 改期补场 + 13 场冠名身份挂接、美国 Remsen/Matron + 4 场障碍（NSA 官方 PDF）+ 4 场 not_held、2026 身份映射 artifact（法 67/英 183/日 65/美 48）、184 组同日重复合并候选、滞留/零赛果修复候选（英 5/法 8/日 3/美 20）。全部候选落 `runtime/race_calendar_nine_regions/`，待生产 apply 门禁。
+- **阶段 2（新四地区建链路）**：四地区来源探测 PARSER_READY；parser×8 + 详情 adapter 接线（deutscher_galopp/hri_ras/racing_australia/just_horse_racing/era/jcsa + ireland_irishracing 分派修复）；官方赛历装配（德 43+42、爱 244+242、澳 346+187、中东 78）+ ICS 逐项对账；库存 v2（871 series/1666 targets/1180 dated/conflicts=0）；新门禁命令 `materialize_dated_race_targets`；本地 scratch DB 端到端物化 1180 场 draft（1101 finished + 79 scheduled）；详情批量候选德 75/76、爱 357/416、中东 73/76、澳 99/533，本地导入 604 场赛果验证（含并列名次展示位唯一化修复）。总账 `final_ledger_20260928/`（1218 行 ICS 全覆盖：ok 555、赛果 527；gap 逐项挂账——澳洲 359 场 JHR 仅前四名摘要 + RA 保留窗口、2026-27 官方表未发布 144、卡塔尔/巴林无官方源 9、身份待审若干）。
+- **阶段 3（持续更新机制）**：周期赛历刷新链路 `diff_race_calendar.py` + `refresh_race_calendar` 门禁命令（new/changed/cancelled diff，Celery 挂载默认关闭、薄壳只产候选不自动 apply）；日本登记三缺口补丁（JRA 冷启动 hint、multisource policy 失效内部 incident、`lifecycle_not_advanced` 覆盖告警）；ireland TRA 路线一等化（映射翻转 + 存量兼容层，standing policy 重渲 13→14 条，新 SHA e73a4e3b…）；UAE 2027 赛历（DRC 2026-27 网格新版式）29 场物化为 scheduled draft；爱尔兰 2027 分级年册未发布、沙特 2027 未挂 API（探测如实记录）。
+- **阶段 4（公开展示）**：PUBLIC_REGION_TABS/COLORS 注册四地区（颜色互异、标签随模型）；赛事日历天然支持（choices 驱动）；draft 赛事公开面不可见，**批量发布待用户确认**。
+
+**待用户拍板**（上线包另附）：① 生产发布包（合并+迁移+库存提交+物化+详情导入+发布 draft）；② 澳/德/中东 TRA 路线扩展（G3：扩大付费调用覆盖，当前 allowed_region_codes 不含）；③ 覆盖告警触达（内部 incident → 邮件/QQ，G3）；④ NAR 官方登记路线立项；⑤ 澳洲 2025 上半年全表赛果源（JHR top4 不收；需 Racenet 渲染身份或 TRA regional add-on 采购决策）；⑥ 既有 main 失败测试族（first-acceptance 九地区枚举适配等）是否本包一并修。
+
 ## 2026-09-27 TRA registry 续期至 2026-12-31（已上线）
 
 用户确认 TRA 条款仍允许当前自动化用途（账单按月自动续费正常），批准将项目自建的 TRA 合同 registry

@@ -1,3 +1,31 @@
+## 2026-09-29 九地区工程运维条目（deploy 前必读）
+
+**JRA multisource policy v2 续期（硬期限 2026-10-26T18:00Z）**：
+- 失效即发现/attach 全停且 coverage 告警静默消失（本分支已为失效分支落内部 incident，scope
+  `multisource_policy`，record-only 不发送）。
+- 续期 = 新 proof 复核 + 新 policy 文件 + `.env` 两枚钉扎（`RACE_DATA_MULTISOURCE_POLICY_FILE/SHA256`）
+  + 重建；沿用 09-22/09-26 既有流程（证据 `docs/changes/multisource-race-enrollment/release-20260922/`）。
+- 建议 2026-10-19 前完成复核，不要等最后一周。
+
+**ireland TRA 一等化发布附带事项**（本分支含）：
+- standing policy 重渲后 digest 变化（`80fe5cf3…` → `e73a4e3b…`）：发布包必须同步更新
+  `.env.example` 与生产 `.env` 的 `RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256`，并重建容器。
+- 部署后用 `repair_data_sync_stalled_events`（先 dry-run 核对候选集再 apply）把存量登记的
+  standing_policy_digest 轮换到新值；存量 `other`+ireland 标记赛事**无需**改 country_region
+  （兼容层保证链路不变），批量改判属数据治理另议。
+
+**新地区批量导入顺序**（生产 apply 时按此序，全部走门禁）：
+1. 库存 commit（`build_historical_race_inventory --commit --artifact-dir … --approval …`）；
+2. `materialize_dated_race_targets`（dry-run→apply→verify）；
+3. `import_race_event_detail_candidates`（--expected-sha256 逐文件）；
+4. `publish_historical_race_targets` 发布 draft（**用户确认后**）。
+全程 scratch 证据参照 `runtime/race_calendar_nine_regions/materialization_dryrun_20260928/` 与
+`materialization_2027_20260929/`。
+
+**新地区采集运维要点**：RA 赛果滚动保留约 11 个月（出窗转 Wayback 快照或挂账）；
+galopp-sieger 仅 HTTP；JCSA 需 `SSL_CERT_FILE` 指 certifi；ERA 结果走 `/ajax/racecard-results-all?date=`；
+HRI 历史年册 GUID 经 Wayback 快照恢复。
+
 ## 2026-09-27 TRA registry 周期续期操作要点（本包执行中）
 
 TRA registry 不随账单续期：`valid_until` 硬期限 + `verified_at` 31 天 staleness，每月需人工核验条款后续期。
