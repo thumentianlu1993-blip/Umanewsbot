@@ -5175,6 +5175,7 @@ def apply_race_live_racecard_refresh(
             RacingRegion.UNITED_KINGDOM: "united_kingdom",
             RacingRegion.FRANCE: "france",
             RacingRegion.UNITED_STATES: "united_states",
+            RacingRegion.IRELAND: "ireland",
         }
         contract_region = contract_region_by_event_region.get(event.country_region)
         if event.country_region == RacingRegion.OTHER:

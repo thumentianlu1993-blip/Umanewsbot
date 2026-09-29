@@ -9,7 +9,7 @@ from django.utils import timezone
 
 from stable import models
 from stable.services.race_data_sync_pipeline import (
-    _EVENT_REGION_BY_CONTRACT_REGION,
+    _EVENT_REGIONS_BY_CONTRACT_REGION,
     build_race_data_provider_roster,
     resolve_race_data_provider_route,
 )
@@ -48,10 +48,12 @@ class Command(BaseCommand):
             if not entry.enabled_data_kinds:
                 continue
             for contract_region in entry.regions:
-                country_region = _EVENT_REGION_BY_CONTRACT_REGION.get(
+                # 同一合同地区可能同时服务一等赛事地区与存量兼容桶
+                # （如 ireland 一等化后仍须保住 other+ireland 标记存量赛事的路线）。
+                event_regions = _EVENT_REGIONS_BY_CONTRACT_REGION.get(
                     contract_region
                 )
-                if country_region is None:
+                if not event_regions:
                     continue
                 for identity_namespace in entry.identity_namespaces:
                     route = resolve_race_data_provider_route(
@@ -62,20 +64,21 @@ class Command(BaseCommand):
                     )
                     if route is None:
                         continue
-                    routes.append(
-                        {
-                            "country_region": country_region,
-                            "provider": entry.provider,
-                            "region_code": contract_region,
-                            "identity_namespace": identity_namespace,
-                            "route_digest": route.route_digest,
-                            "data_kinds": list(entry.enabled_data_kinds),
-                            "enrollment_eligible": (
-                                tuple(sorted(set(entry.enabled_data_kinds)))
-                                == tuple(sorted(models.RaceDataSyncDataKind.values))
-                            ),
-                        }
-                    )
+                    for country_region in event_regions:
+                        routes.append(
+                            {
+                                "country_region": country_region,
+                                "provider": entry.provider,
+                                "region_code": contract_region,
+                                "identity_namespace": identity_namespace,
+                                "route_digest": route.route_digest,
+                                "data_kinds": list(entry.enabled_data_kinds),
+                                "enrollment_eligible": (
+                                    tuple(sorted(set(entry.enabled_data_kinds)))
+                                    == tuple(sorted(models.RaceDataSyncDataKind.values))
+                                ),
+                            }
+                        )
         if not routes:
             raise CommandError("当前配置没有可运行的 provider route")
         routes.sort(
