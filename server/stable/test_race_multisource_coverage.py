@@ -89,3 +89,75 @@ class CoverageTests(TestCase):
         )
         incident.refresh_from_db()
         self.assertEqual(incident.status, "resolved")
+
+    def stage(self, now=fixtures.NOW):
+        stage_multisource_coverage_incidents(
+            coverage=build_multisource_coverage(now=now, policy=self.policy),
+            policy=self.policy,
+            now=now,
+        )
+
+    def open_issues(self):
+        return set(
+            models.RaceLiveAlertIncident.objects.exclude(status="resolved")
+            .values_list("details__issue", flat=True)
+        )
+
+    def test_lifecycle_not_advanced_issue_staged_after_t5(self):
+        # T+5 前不触发：仍按 enrollment_missing 口径。
+        self.event.race_datetime = fixtures.NOW - timedelta(minutes=4)
+        self.event.save()
+        self.stage()
+        self.assertEqual(self.open_issues(), {"enrollment_missing"})
+        # T+5 后仍 scheduled：转 lifecycle_not_advanced，旧 issue 由 stale 清理 resolve。
+        self.event.race_datetime = fixtures.NOW - timedelta(minutes=6)
+        self.event.save()
+        self.stage()
+        self.assertEqual(self.open_issues(), {"lifecycle_not_advanced"})
+        # 越过 T+30 仍未转态：lifecycle_not_advanced 优先于 result_overdue。
+        self.event.race_datetime = fixtures.NOW - timedelta(minutes=45)
+        self.event.save()
+        self.stage()
+        self.assertEqual(self.open_issues(), {"lifecycle_not_advanced"})
+        incidents = models.RaceLiveAlertIncident.objects.exclude(status="resolved")
+        self.assertEqual(incidents.count(), 1)
+        incident = incidents.get()
+        self.assertEqual(incident.alert_type, "official_overdue")
+        self.assertIsNone(incident.next_attempt_at)
+
+    def test_lifecycle_not_advanced_resolves_on_status_change(self):
+        self.event.race_datetime = fixtures.NOW - timedelta(minutes=6)
+        self.event.save()
+        self.stage()
+        lifecycle = models.RaceLiveAlertIncident.objects.get()
+        self.assertEqual(lifecycle.details["issue"], "lifecycle_not_advanced")
+        # 转态 running：lifecycle issue 条件不再成立，stale 清理将其 resolve。
+        self.event.status = "running"
+        self.event.save()
+        self.stage()
+        lifecycle.refresh_from_db()
+        self.assertEqual(lifecycle.status, "resolved")
+        self.assertEqual(lifecycle.resolved_at, fixtures.NOW)
+        self.assertEqual(self.open_issues(), {"enrollment_missing"})
+        # 终态 confirmed：既有 resolve 分支清掉全部未决 incident。
+        self.event.status = "finished"
+        self.event.result_confirmed_at = fixtures.NOW
+        self.event.save()
+        self.stage()
+        self.assertFalse(
+            models.RaceLiveAlertIncident.objects.exclude(status="resolved").exists()
+        )
+
+    def test_manual_pause_never_stages_lifecycle_issue(self):
+        self.event.race_datetime = fixtures.NOW - timedelta(minutes=45)
+        self.event.manual_lock_flags = {"race_datetime": True}
+        self.event.save()
+        self.stage()
+        self.assertFalse(models.RaceLiveAlertIncident.objects.exists())
+        self.event.manual_lock_flags = {}
+        self.event.save()
+        models.RaceEventLifecycleControl.objects.create(
+            event=self.event, manual_pause_reason="ops hold"
+        )
+        self.stage()
+        self.assertFalse(models.RaceLiveAlertIncident.objects.exists())

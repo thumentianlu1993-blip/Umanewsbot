@@ -1424,6 +1424,17 @@ def discover_source_url(*, event, route, now, fetcher):
     hints = [refs.get("primary", "")] + (
         references if isinstance(references, list) else []
     )
+    # JRA 赛前链路写下的绑定/URL 同样只是取数提示：baseline 口径与
+    # race_pre_race 一致，漂移后绑定与旧 URL 一并废弃，且仍须过 route 许可。
+    binding = refs.get("jra_pre_race_binding")
+    if isinstance(binding, dict) or refs.get("jra_pre_race_url"):
+        from stable.services.race_pre_race import baseline as pre_race_baseline
+
+        if isinstance(binding, dict):
+            if binding.get("baseline") == pre_race_baseline(event):
+                hints.append(binding.get("url", ""))
+        else:
+            hints.append(refs.get("jra_pre_race_url", ""))
     urls = [u for u in hints if isinstance(u, str) and route.permits_url(u)]
     if len(set(urls)) == 1:
         return urls[0]
