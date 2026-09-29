@@ -1,3 +1,15 @@
+## 2026-09-29 赛事日历九地区已上线（draft 形态，公开待确认）
+
+PR #220 合并为 main `3ef45b42`（CI 全绿）并已发布生产：release
+`/opt/umanews-release-3ef45b42-nine-regions-20260929/umanewsbot`，四容器重建、healthz 全 200、
+audit ready/route_drift=[]、standing policy 14 条含 ireland TRA 一等路线（新钉扎 e73a4e3b… 生效）。
+生产数据动作完成：新四地区库存 872 系列 + 1695 target；物化 1209 场 draft（finished 1101 +
+scheduled 108，含 UAE 2027×29）；赛果导入 604 场（德 75/爱 357/ERA 59/JCSA 14/RA 51/JHR 48，
+oracle 冠军抽查正确）。**全部新内容为 draft+incomplete，公开面不可见**；批量公开与阶段 1
+五地区补缺候选 apply 等用户确认。digest 轮换 dry-run 0 候选（3 个 source_identity_expired 为
+既有遗留，走 #221 换绑路径）。执行详情见
+[rollout 执行结果](changes/update-race-calendar-nine-regions/rollout.md)。
+
 ## 2026-09-29 赛事日历九地区更新：阶段 1-4 开发全部完成（待用户确认上线）
 
 变更文档 [update-race-calendar-nine-regions](changes/update-race-calendar-nine-regions/spec.md)，分支 `kimi/race-calendar-nine-regions`（基线 origin/main c71dcdfc；main 已前进，发布前需对账）。**全部产物在本地/分支，生产零写入**；独立测试代理（agent-15）十轮验收全部 ALL_PASS。
