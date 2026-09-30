@@ -1,3 +1,14 @@
+## 2026-09-30 阶段1补缺与批量公开发布完成（新地区全部公开）
+
+用户批准的两项已执行完毕：阶段 1 五地区补缺候选生产 apply（HK 11+1、JRA 2、NAR 12、US 2、
+UK 1、障碍 4、not_held 5、stuck 25 全部落库，计数与 scratch 验证逐格一致）+ 批量发布
+733 场（门禁发布 617：604 新地区完赛有赛果 + 13 阶段1；另按既有口径发布 108 场未来赛事
+与 8 场无 target 赛事）。497 场已完赛无赛果的新地区赛事保持 draft 并逐项挂账（源端限制，
+不与"finished 零赛果"反模式同流）。B0 三项数据修正（HK target 归年、JRA expectation、
+陈旧 legacy 重定向清理）均带 OperationLog 审计。公开面终验：四地区日历/详情页渲染正确，
+现有地区不受影响。执行结果见
+[rollout 2026-09-30 记录](changes/update-race-calendar-nine-regions/rollout.md)。
+
 ## 2026-09-29 赛事日历九地区已上线（draft 形态，公开待确认）
 
 PR #220 合并为 main `3ef45b42`（CI 全绿）并已发布生产：release
