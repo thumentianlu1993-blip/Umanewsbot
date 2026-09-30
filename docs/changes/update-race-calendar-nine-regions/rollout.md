@@ -44,3 +44,38 @@
 - **生产终态**：2025+ 赛事按地区 australia 533 / germany 85 / ireland 486 / middle_east 105（含 2027×29）；新地区 1209 场全部 `draft+incomplete`（finished 1101 + scheduled 108）；抽查 Lambourn/Goliath/Forever Young 冠军正确；公开面 ire­land tab 200 且 draft 不可见。
 - **健康观察**：7 个 open incident 全部为 9-17/19/26 的既有 provisional_overdue（与本次无关）；最近 TRA 记账 01:19 UTC（部署前，当前时段无窗口内赛事属正常安静期）。
 - **传输完整性**：release bundle 40 文件 SHA256SUMS 宿主机与容器内双侧核验通过（仅清单自引用除外）。
+
+## 阶段 1 补缺 + 批量公开发布：生产执行结果（2026-09-30）
+
+用户批准"阶段 1 五地区补缺候选生产 apply + 新地区 draft 批量公开"。全部经门禁命令与带 OperationLog 的受审修正完成；装配计划与验证证据在本地 `runtime/race_calendar_nine_regions/phase1_apply_20260930/`（APPLY_PLAN.md / REPORT.md / SHA256SUMS.txt，scratch 全链验证通过）。
+
+### B0 数据修正（OperationLog 审计）
+
+- HK 11 target（49452 等）：`year` 2026→2025（马季跨年按 `local_date.year` 归档，证据 HKJC 官方结果页日期）；
+- JRA 2 target（53232/53233）：`expectation_status` not_held→held（JRA 官方 jyusyo_2025.html 证实两场 2025 J-G1 均举办）；
+- 清理 12 条陈旧 `legacy` 公开路径重定向（year=2025，旧马季错位修复的历史遗留，遮挡真实 2025 版赛事的 canonical 路径）。
+
+### 批次结果（dry-run→apply→verify，计数与 scratch 逐格一致）
+
+| 批次 | 结果 |
+|---|---|
+| B1 HK 11 | date-discovery commit applied=11（READY+finished draft event）；详情 11 scopes（135 出走/132 赛果） |
+| B1b 香港杯 2025 | 新建 event（2025-12-14，冠军 浪漫勇士，7 赛果）；target 49460 属 2026 版既有赛事，不动 |
+| B2 JRA 2 | applied=2 + 详情（エコロデュエル×2 冠军，22/21） |
+| B3 NAR 12 | created=12（published）+ 详情 163/160（川崎纪念 メイショウハリオ ✓） |
+| B4 US×2 | created=2 + 详情 24/19（Paladin/Final Accord） |
+| B5 障碍×4 | created=4 + 详情 31/28（NSA 官方 PDF，4 冠军全对） |
+| B6 UK×1 | created=1 + 详情 13/11（Dick Poole 改期场 Anthelia） |
+| B7 not_held×5 | created=5（cancelled+draft，UK Classic 冰冻取消 + US×4 2025 未举办） |
+| B8 stuck 25 | bundle（sha 829bbf66…）dry-run 196 行 → apply 25/25 → verify 25/25 verified；12 场挂账不臆造 |
+
+### 发布（draft→published）
+
+- 状态归一（OperationLog）：604 个有赛果 target 置 `imported`（赛果实经 slug 键控详情导入）；6377+168 runner 补 `derived_from_results` 溯源标记。
+- 门禁发布：`publish_historical_race_targets`（eligible manifest 617 场：604 新地区 + 13 阶段1），dry-run 0 blocked → apply `published_count=617` → verify `ok=true, error_count=0`。
+- scheduled/targetless：108 场未来赛事（2026×79 + 2027×29）+ 8 场无 target 赛事（香港杯/US×2/UK×1/障碍×4）按既有 published+partial 口径发布（116 场，OperationLog 逐条）。
+- **保持 draft**：497 场已完赛但无赛果的新地区赛事（澳洲 434 / 爱尔兰 59 / 中东 3 / 德国 1，逐项挂账于 final_ledger）——不与既有"finished 零赛果"反模式同流。
+
+### 公开面终验
+
+爱尔兰 2025 日历（Curragh/Leopardstown 内容渲染）、Irish Derby 详情 200（Lambourn）、Melbourne Cup（HALF YOURS ×4）、香港杯 2025（浪漫勇士）、Saudi Cup 200（Forever Young）、中东 2027 日历（Dubai World Cup 在列）；draft 赛事公开面不可见（发布前实测）。TRA 同步/审计无新增 incident；`audit_race_data_sync` ready。
