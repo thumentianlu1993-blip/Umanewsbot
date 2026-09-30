@@ -1,3 +1,15 @@
+## 2026-09-30 date-only 公开日历修复上线（"未来赛事不显示"残余根因闭环）
+
+用户报告发布后线上仍未显示未来赛事。根因：`public_time`/`annotate_public_time` 的 date-only
+（无 race_datetime、无当地开赛时刻）回退仅限 Asia/Shanghai，其余时区赛事 public_date=NULL 被
+日期窗口静默排除——九地区赛事因此进不了"即将开赛"。PR #227 修复（回退推广到全部时区，
+有时刻无 UTC 仍不推断时区）+ 物化按地区写真实时区（`_MATERIALIZE_REGION_TIMEZONES`，
+沙特 saudi-arabia- 前缀 Asia/Riyadh）+ 既有合同适配（完整性工具年份锚点按真实赛日、
+查询预算 14→15 常数级）。生产修正 1239 场 timezone_name（OperationLog 审计）。
+部署 release `/opt/umanews-release-31058870-dateonly-fix-20260930/umanewsbot`（deploy_0079），
+公网验收："即将开赛"页出现德国 Hoppegarten、爱尔兰 Gowran Park 等新地区未来赛事，
+331 场已发布未来赛事按地区分布可见；健康检查与 audit 全绿。
+
 ## 2026-09-30 阶段1补缺与批量公开发布完成（新地区全部公开）
 
 用户批准的两项已执行完毕：阶段 1 五地区补缺候选生产 apply（HK 11+1、JRA 2、NAR 12、US 2、
