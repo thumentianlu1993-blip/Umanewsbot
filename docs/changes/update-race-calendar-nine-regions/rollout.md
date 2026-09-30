@@ -79,3 +79,11 @@
 ### 公开面终验
 
 爱尔兰 2025 日历（Curragh/Leopardstown 内容渲染）、Irish Derby 详情 200（Lambourn）、Melbourne Cup（HALF YOURS ×4）、香港杯 2025（浪漫勇士）、Saudi Cup 200（Forever Young）、中东 2027 日历（Dubai World Cup 在列）；draft 赛事公开面不可见（发布前实测）。TRA 同步/审计无新增 incident；`audit_race_data_sync` ready。
+
+## date-only 公开日历修复（2026-09-30，PR #227）
+
+发布后用户发现未来赛事仍不显示。根因与修复见 current_state 2026-09-30 末节。
+要点：公开时间 date-only 回退推广到全部时区；物化写真实地区时区；生产 1239 场
+timezone_name 修正（含 18 场历史 2025 香港赛事附带修正）；既有合同测试三处适配
+（真实赛日锚点、null 组锚点改真无日期、查询预算常数 +1）。独立复测第十一轮 ALL_PASS，
+CI 全绿含新增失败检查。
