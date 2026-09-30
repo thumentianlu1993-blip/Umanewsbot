@@ -711,3 +711,43 @@ class MaterializeDatedRaceTargetsCommandTests(DatedTargetFixtures, TestCase):
             self._run("dry-run", manifest_path, manifest_sha, output)
             with self.assertRaisesMessage(CommandError, "输出文件已存在"):
                 self._run("dry-run", manifest_path, manifest_sha, output)
+
+
+class MaterializeTimezoneTests(DatedTargetFixtures, TestCase):
+    """物化赛事的 timezone_name 必须按地区真实时区（不再落到模型默认 Asia/Tokyo）。"""
+
+    def test_region_timezone_mapping_on_materialize(self):
+        cases = [
+            (RacingRegion.JAPAN, "Asia/Tokyo"),
+            (RacingRegion.HONG_KONG, "Asia/Hong_Kong"),
+            (RacingRegion.UNITED_KINGDOM, "Europe/London"),
+            (RacingRegion.IRELAND, "Europe/Dublin"),
+            (RacingRegion.FRANCE, "Europe/Paris"),
+            (RacingRegion.GERMANY, "Europe/Berlin"),
+            (RacingRegion.UNITED_STATES, "America/New_York"),
+            (RacingRegion.AUSTRALIA, "Australia/Sydney"),
+            (RacingRegion.MIDDLE_EAST, "Asia/Dubai"),
+        ]
+        for region, expected_tz in cases:
+            with self.subTest(region=region):
+                series = self._series(f"tz-{region}", region=region)
+                target = self._target(
+                    series, self.past, resolution=HistoricalRaceResolutionStatus.READY
+                )
+                event = materialize_historical_event(target, actor=self.operator)
+                self.assertEqual(event.timezone_name, expected_tz)
+
+    def test_saudi_series_uses_riyadh_not_dubai(self):
+        # 生产 middle_east 系列键按国家前缀（saudi-arabia-/united-arab-emirates-/qatar-/bahrain-）
+        series = RaceSeries.objects.create(
+            key="saudi-arabia-saudi-cup",
+            country_region=RacingRegion.MIDDLE_EAST,
+            canonical_name_original="Saudi Cup",
+            chinese_name="沙特杯",
+            review_status=RaceSeriesReviewStatus.APPROVED,
+        )
+        target = self._target(
+            series, self.past, resolution=HistoricalRaceResolutionStatus.READY
+        )
+        event = materialize_historical_event(target, actor=self.operator)
+        self.assertEqual(event.timezone_name, "Asia/Riyadh")

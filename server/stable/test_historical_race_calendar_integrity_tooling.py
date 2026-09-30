@@ -339,7 +339,7 @@ class HistoricalRaceCalendarIntegrityToolingTests(TransactionTestCase):
             key="apply-cache",
             evidence_classification="ordinary_season_year_shift",
         )
-        self.assertEqual(public_race_calendar_years(), [2025])
+        self.assertEqual(public_race_calendar_years(), [2024])  # date-only 回退扩展后按真实赛日（2024）公开
         arguments = self.apply_arguments(self.prepare())
 
         real_on_commit = transaction.on_commit
@@ -349,7 +349,7 @@ class HistoricalRaceCalendarIntegrityToolingTests(TransactionTestCase):
         ) as invalidate:
             def register_deferred(callback, *args, **kwargs):
                 self.assertTrue(connection.in_atomic_block)
-                self.assertEqual(public_race_calendar_years(), [2025])
+                self.assertEqual(public_race_calendar_years(), [2024])  # date-only 回退扩展后按真实赛日（2024）公开
                 invalidate.assert_not_called()
 
                 def after_commit():
@@ -398,7 +398,7 @@ class HistoricalRaceCalendarIntegrityToolingTests(TransactionTestCase):
             key="rollback-cache",
             evidence_classification="ordinary_season_year_shift",
         )
-        self.assertEqual(public_race_calendar_years(), [2025])
+        self.assertEqual(public_race_calendar_years(), [2024])  # date-only 回退扩展后按真实赛日（2024）公开
         arguments = self.apply_arguments(self.prepare())
         applied = apply_historical_race_calendar_integrity(**arguments)
         self.assertEqual(public_race_calendar_years(), [2024])
@@ -420,7 +420,7 @@ class HistoricalRaceCalendarIntegrityToolingTests(TransactionTestCase):
                 invalidate.assert_not_called()
                 self.assertEqual(len(callbacks), 1)
             invalidate.assert_called_once_with()
-            self.assertEqual(public_race_calendar_years(), [2025])
+            self.assertEqual(public_race_calendar_years(), [2024])  # date-only 回退扩展后按真实赛日（2024）公开
 
     def test_failed_apply_discards_cache_invalidation_callback(self):
         from stable.services.historical_race_calendar_integrity import (
@@ -434,7 +434,7 @@ class HistoricalRaceCalendarIntegrityToolingTests(TransactionTestCase):
             key="failed-apply-cache",
             evidence_classification="ordinary_season_year_shift",
         )
-        self.assertEqual(public_race_calendar_years(), [2025])
+        self.assertEqual(public_race_calendar_years(), [2024])  # date-only 回退扩展后按真实赛日（2024）公开
         arguments = self.apply_arguments(self.prepare())
 
         with mock.patch(
@@ -453,7 +453,7 @@ class HistoricalRaceCalendarIntegrityToolingTests(TransactionTestCase):
         invalidate.assert_not_called()
         event.refresh_from_db()
         self.assertEqual(event.year, 2025)
-        self.assertEqual(public_race_calendar_years(), [2025])
+        self.assertEqual(public_race_calendar_years(), [2024])  # date-only 回退扩展后按真实赛日（2024）公开
 
     def test_prepare_is_zero_write_and_emits_bound_artifacts(self):
         self.make_mismatch(key="zero-write")

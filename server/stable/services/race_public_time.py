@@ -26,8 +26,13 @@ def public_time(obj):
             if instant.tzinfo is None: return PublicTime(reason="invalid_datetime")
             local=instant.astimezone(ZoneInfo(zone))
             if (day and local.date()!=day) or (clock and local.time()!=clock): return PublicTime(reason="time_conflict")
-        elif zone == 'Asia/Shanghai' and day:
-            if clock is None: return PublicTime(day=day)
+        elif day:
+            if clock is None:
+                # date-only 赛事（无 UTC 时刻、无当地开赛时刻）：按当地赛日公开，
+                # 九地区后不限于 Asia/Shanghai；不推断缺失时区的时刻。
+                return PublicTime(day=day)
+            if zone != 'Asia/Shanghai':
+                return PublicTime()
             # Only the observed modern fixed +08 legacy form is admitted.
             if day.year < 1992: return PublicTime()
             instant=datetime.combine(day,clock,BEIJING)
@@ -73,6 +78,8 @@ class _PublicInstant(Func):
 def annotate_public_time(queryset):
     return queryset.annotate(public_instant=_PublicInstant(F('race_datetime'),F('local_date'),F('local_start_time'),F('timezone_name'))).annotate(
         public_date=Coalesce(TruncDate('public_instant',tzinfo=BEIJING),Case(
-            When(race_datetime__isnull=True,local_start_time__isnull=True,timezone_name='Asia/Shanghai',then=F('local_date')),
+            # date-only 赛事（无 UTC 时刻、无当地开赛时刻）按当地赛日参与公开日期窗口；
+            # 九地区后不再限于 Asia/Shanghai。当地开赛时刻存在时仍不推断时区。
+            When(race_datetime__isnull=True,local_start_time__isnull=True,then=F('local_date')),
             output_field=DateField())),
         public_start_time=TruncTime('public_instant',tzinfo=BEIJING))
