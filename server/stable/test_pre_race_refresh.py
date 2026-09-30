@@ -274,7 +274,7 @@ class BeijingEdgeTests(TestCase):
         factory=BeijingContractTests.make
         early=factory(self,'early',timezone_name='Asia/Shanghai',local_date=date(2026,9,19),local_start_time=time(3),race_datetime=datetime(2026,9,18,19,tzinfo=tz.utc))
         late=factory(self,'unknown-time',timezone_name='Asia/Shanghai',local_date=date(2026,9,19),local_start_time=None,race_datetime=None)
-        unknown=factory(self,'unknown-day',local_start_time=None,race_datetime=None)
+        unknown=factory(self,'unknown-day',local_date=None,local_start_time=None,race_datetime=None)
         filters=dict(tab='all',region='',year='',q='unknown',grade='',when='')
         cursor=encode_race_calendar_cursor(unknown,filters=filters)
         r=self.client.get('/races/',{**filters,'cursor':cursor,'direction':'past'})

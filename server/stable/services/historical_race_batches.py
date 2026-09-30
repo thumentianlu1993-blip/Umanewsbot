@@ -168,6 +168,30 @@ def historical_event_slug(
     return f"{base[: 160 - len(suffix)]}{suffix}"
 
 
+# 物化赛事的默认时区：按地区真实当地时区（middle_east 内沙特按 series_key 前缀细分）。
+# 不让赛事落到模型默认 Asia/Tokyo——那会污染 date-only 公开回退与后续 TRA 接入的时区一致性校验。
+_MATERIALIZE_REGION_TIMEZONES = {
+    "japan": "Asia/Tokyo",
+    "hong_kong": "Asia/Hong_Kong",
+    "united_kingdom": "Europe/London",
+    "ireland": "Europe/Dublin",
+    "france": "Europe/Paris",
+    "germany": "Europe/Berlin",
+    "united_states": "America/New_York",
+    "australia": "Australia/Sydney",
+    "middle_east": "Asia/Dubai",
+}
+_MATERIALIZE_SERIES_TZ_PREFIXES = (("saudi-arabia-", "Asia/Riyadh"),)
+
+
+def _materialize_timezone(target: HistoricalRaceEventTarget) -> str:
+    series_key = target.race_series.key or ""
+    for prefix, zone in _MATERIALIZE_SERIES_TZ_PREFIXES:
+        if series_key.startswith(prefix):
+            return zone
+    return _MATERIALIZE_REGION_TIMEZONES.get(target.country_region, "Asia/Tokyo")
+
+
 def _locked_historical_target(target_id: int):
     # event is nullable; joining it here makes PostgreSQL reject FOR UPDATE.
     return (
@@ -286,6 +310,7 @@ def _materialize_historical_event(
                 surface=locked.surface,
                 distance_text=locked.distance_text,
                 local_date=locked.local_date,
+                timezone_name=_materialize_timezone(locked),
                 status=(
                     RaceEventStatus.CANCELLED
                     if locked.expectation_status == HistoricalRaceExpectationStatus.CANCELLED
