@@ -1,3 +1,11 @@
+## 2026-10-02 赛事覆盖上线验收补充
+
+PR229 已上线并恢复七场结果，首轮自然监控曾排在普通 celery 的 452 条业务任务后，期限 270 秒；旗标、Beat 配置或任务入队均不代表执行。队列补正改用已有 race_sync_v2 consumer，需核对其存活与 active_queues，并验自然任务及 SMTP 收据；当前手动首投成功不计自然周期验收。普通队列排空时可在同一发布协调者的锁和 intent 下暂停旧 worker 取新任务，待在途任务结束；保留消息给新 worker，不能清空队列。详细批次见[发布记录](changes/race-coverage-recovery-20261002/rollout.md)。
+
+## 2026-10-02 赛事上线前附加恢复演练
+
+七场恢复在真实数据副本通过，生产尚未切换。整库恢复发现新闻和术语候选的两个既有唯一约束重复问题，不能把归档 SHA/TOC 成功称为灾备恢复成功；详见 [备份恢复缺陷记录](reports/2026-10-02-backup-restore-findings.md)。本轮不修改生产重复数据，赛事相关约束和触发器已在副本完成核验。
+
 ## 2026-10-02 赛事日历只读审查与后续验收补充
 
 - 当前运行 revision 为 `31058870`（9/30 date-only release），不能用主工作区 `horse_data` 判断生产。使用生产 Django shell 的 `transaction.atomic()` + `SET TRANSACTION READ ONLY` + 15 秒 statement_timeout 查询；准入函数必须 `lock=False`，不要调用会落 incident/lease 的发现或监控函数冒充只读。
