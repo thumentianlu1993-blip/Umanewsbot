@@ -1,0 +1,89 @@
+{
+  "ci_run": 36924688047,
+  "comparison": {
+    "commits": {
+      "baseline": "070eaedac1c7b81104a1431b28316ed77fa69f6d",
+      "candidate": "ec461daad2001806b1cd00e548243ff3a76d3343"
+    },
+    "baseline_tests": 5653,
+    "candidate_tests": 5678,
+    "new_failures": [],
+    "fixed_failures": []
+  },
+  "results": {
+    "baseline": {
+      "tests": 5653,
+      "failures": 22,
+      "errors": 28,
+      "skipped": 21,
+      "artifact_sha256": {
+        "result.json": "6ffb3547626b8b442bec69c75c518d0e6f9d0657b05a23c2d7a0b8100e223b27",
+        "stable.log": "8fe14cb00c26afbdb74919c1d21ffeebc5ba7df2f3d9ebc4b02866f24b172e42",
+        "commit.txt": "f33ec71c6be21c3ab16b764f26c9039af58b488f804b6a75b006392c7e42c512"
+      }
+    },
+    "candidate": {
+      "tests": 5678,
+      "failures": 22,
+      "errors": 28,
+      "skipped": 21,
+      "artifact_sha256": {
+        "result.json": "e90f0f64c237ae33d0477e8a030a558b39747140ecf2746eb737b97994f37b70",
+        "stable.log": "b991d2205cb708b9e69f6a6d94b7de9b64658064e661b377fd25004e261b468e",
+        "commit.txt": "b29d5a8ebfa2b6fd0cc6eed43194bbff70415928b7fb34136ab3508f6d5e21da"
+      }
+    }
+  },
+  "changed_final_exception": [
+    {
+      "test": "stable.tests_legacy.MultiRegionAttributionAndGateTests.test_public_region_display_fallback_hides_related_regions_without_deleting_them",
+      "baseline": "AssertionError: False is not true : Couldn't find '主地区：' in the following response",
+      "candidate": "AssertionError: False is not true : Couldn't find '主地区：' in the following response",
+      "baseline_sha256": "9a875da2fc4be16bc7c54c5f65ceba285530bce5ca5678c0f98f4cd8a666ce9f",
+      "candidate_sha256": "2bf9047fa120dde69bc14338f53adcb01a6021ae7e6012d76583207bbc27f908"
+    },
+    {
+      "test": "stable.tests_legacy.MultiRegionAttributionAndGateTests.test_region_display_and_qq_message_show_primary_before_related_regions",
+      "baseline": "AssertionError: False is not true : Couldn't find '主地区：' in the following response",
+      "candidate": "AssertionError: False is not true : Couldn't find '主地区：' in the following response",
+      "baseline_sha256": "9a875da2fc4be16bc7c54c5f65ceba285530bce5ca5678c0f98f4cd8a666ce9f",
+      "candidate_sha256": "2bf9047fa120dde69bc14338f53adcb01a6021ae7e6012d76583207bbc27f908"
+    },
+    {
+      "test": "stable.tests_legacy.P0HorseProfileDataCompletionTests.test_public_detail_basic_tier_renders_with_in_progress_badge",
+      "baseline": "AssertionError: False is not true : Couldn't find '资料补全中' in the following response",
+      "candidate": "AssertionError: False is not true : Couldn't find '资料补全中' in the following response",
+      "baseline_sha256": "8ba3a008627a07ae96201cf5413ddca1a777db5f1485c86564e779f272217239",
+      "candidate_sha256": "d02af44b03dd4f55027e8b37c5727081e4510236475e8eb10f3f743c86156cc0"
+    },
+    {
+      "test": "stable.tests_legacy.P0HorseProfileDataCompletionTests.test_public_horse_detail_uses_original_name_when_translation_is_pending",
+      "baseline": "AssertionError: False is not true : Couldn't find '中文译名待补' in the following response",
+      "candidate": "AssertionError: False is not true : Couldn't find '中文译名待补' in the following response",
+      "baseline_sha256": "584f1dd0ba0daaea3635f24e208f9e60c3ff9c539f7bd923e3b63215df195117",
+      "candidate_sha256": "a8f7267b55ee63977a1edd79cc3786986981b1da270cd316614e1f12ddb899bb"
+    },
+    {
+      "test": "stable.tests_legacy.P0HorseProfileDataCompletionTests.test_public_index_keeps_positive_label_for_complete_profiles",
+      "baseline": "AssertionError: False is not true : Couldn't find '完整马匹资料' in the following response",
+      "candidate": "AssertionError: False is not true : Couldn't find '完整马匹资料' in the following response",
+      "baseline_sha256": "9178ef836cafbac823b43db42fe1ce028d84b3d8a6fe30932087466eed7a8575",
+      "candidate_sha256": "63e77b2301b95289966cfaec3417e69f4573be852fd6fb3fe8aac38040cbeb84"
+    },
+    {
+      "test": "stable.tests_legacy.P0HorseProfileDataCompletionTests.test_public_index_shows_in_progress_badge_for_incomplete_profiles",
+      "baseline": "AssertionError: False is not true : Couldn't find '资料补全中' in the following response",
+      "candidate": "AssertionError: False is not true : Couldn't find '资料补全中' in the following response",
+      "baseline_sha256": "e665ee7e661283289d0dc59240214a23e8d29d1ef2ec6ceadfb8c0d1d5ebbae3",
+      "candidate_sha256": "bb888aeaa2f86c8b7a20f2ed32b7a464cee5548a7185a28480115046ec912c7f"
+    },
+    {
+      "test": "stable.test_lifecycle_shadow_hardening.SupportedDeployOneOffInventoryTests.test_all_deploy_wrapper_run_calls_are_canonical_and_lock_contracts_remain",
+      "baseline": "AssertionError: Items in the first set but not the second:",
+      "candidate": "AssertionError: Items in the first set but not the second:",
+      "baseline_sha256": "b023a53f906dca55d6c2597181bbc9c3e5c5e70730097988a0d8c72b84eddcd0",
+      "candidate_sha256": "35249084c227b068843a832b5739b6991ac0a4d56fa00d5ff8de2139147e6ab3"
+    }
+  ],
+  "note": "50 项既有失败名称完全一致，新增 0；7 项异常尾部文本有差异，但异常断言相同。保留两端原始产物 SHA，不声称 traceback 逐字节相同。"
+}
