@@ -46,3 +46,6 @@ news_detail.html
 news_detail_mobile.html
 netkeiba_news_test.json
 netkeiba_news_detail_test.json
+
+# 本批恢复的原始网页与运行快照仅保存在本地/生产恢复包
+runtime/race_coverage_recovery_20261002/

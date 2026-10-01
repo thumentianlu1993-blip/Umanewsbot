@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import hashlib
 import json
 
+from django.conf import settings
 from django.db import transaction
 from django.db.models import CharField, Exists, OuterRef, Q
 from django.db.models.functions import Cast
@@ -16,6 +17,9 @@ _RESULT_SLO = timedelta(minutes=30)
 
 
 def _resolve_data_sync_event_incidents(*, event_id: int, now: datetime) -> int:
+    # 全覆盖启用时只有新 census 可以关闭事件缺口；确认入库不等于公开可读。
+    if getattr(settings, "RACE_DATA_COVERAGE_ALERTS_ENABLED", False):
+        return 0
     return models.RaceLiveAlertIncident.objects.filter(
         scope_type="data_sync_event",
         scope_key=str(event_id),
@@ -37,6 +41,8 @@ def stage_data_sync_result_overdue_alert(
 ) -> int | None:
     """Stage one data-sync-owned T+30 incident without dispatching legacy work."""
 
+    if getattr(settings, "RACE_DATA_COVERAGE_ALERTS_ENABLED", False):
+        return None
     if timezone.is_naive(now):
         return None
     enrollment = (
@@ -121,6 +127,8 @@ def stage_data_sync_result_overdue_alert(
 def monitor_data_sync_result_slo(
     *, now: datetime, batch_size: int = 100
 ) -> tuple[int, ...]:
+    if getattr(settings, "RACE_DATA_COVERAGE_ALERTS_ENABLED", False):
+        return ()
     if (
         timezone.is_naive(now)
         or isinstance(batch_size, bool)
@@ -335,7 +343,14 @@ def stage_multisource_policy_incident(*, now: datetime, reason: str) -> int | No
             incident.status = models.RaceLiveAlertIncidentStatus.OPEN
             incident.opened_at = now
             incident.resolved_at = None
-            update_fields += ["status", "opened_at", "resolved_at"]
+            incident.alert_sent_at = None
+            incident.delivery_attempts = 0
+            incident.next_attempt_at = None
+            incident.delivery_token = ""
+            incident.delivery_lease_expires_at = None
+            update_fields += ["status", "opened_at", "resolved_at", "alert_sent_at",
+                              "delivery_attempts", "next_attempt_at", "delivery_token",
+                              "delivery_lease_expires_at"]
         incident.save(update_fields=update_fields)
     return incident.pk
 

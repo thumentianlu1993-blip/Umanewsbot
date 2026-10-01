@@ -654,6 +654,19 @@ def monitor_race_data_sync_result_slo_task() -> dict:
 
 
 @shared_task
+def monitor_public_race_coverage_task() -> dict:
+    """普通队列的全量覆盖对账和汇总告警；不触发 provider 抓取。"""
+    if not getattr(settings, "RACE_DATA_COVERAGE_ALERTS_ENABLED", False):
+        return {"enabled": False, "status": "disabled"}
+    from stable.services.race_public_coverage import reconcile_public_race_coverage, deliver_coverage_digest
+    now = timezone.now()
+    report = reconcile_public_race_coverage(now=now)
+    delivery = deliver_coverage_digest(now=timezone.now())
+    return {"enabled": True, "total": report["total"], "counts": report["counts"],
+            "issue_counts": report["issue_counts"], "delivery": delivery}
+
+
+@shared_task
 def cleanup_race_data_sync_artifacts_task() -> dict:
     """Bound cleanup of raw observations and unreferenced shared snapshots."""
 

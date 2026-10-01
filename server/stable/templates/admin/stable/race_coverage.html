@@ -1,0 +1,20 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<p>检查时点：{{ report.as_of }}。全部公开主赛事：{{ report.total }} 场。</p>
+<p>覆盖检查只诊断资料缺口，不授予抓取权限，不自动修改比赛状态。下次检查时间不代表已排定抓取。</p>
+<p><a href="?scope=issues">查看缺口</a> | <a href="?scope=all">查看全部</a> | <a href="{% url 'admin:stable_racelivealertincident_changelist' %}">告警发送与重试记录</a></p>
+<details><summary>分类统计</summary><ul>{% for key, value in report.counts.items %}<li>{{ key }}：{{ value }}</li>{% endfor %}</ul></details>
+<div style="overflow-x:auto"><table>
+<thead><tr><th>赛事</th><th>当地日期 / 地区</th><th>覆盖分类 / 缺口</th><th>原因</th><th>下一步</th><th>下次覆盖检查</th><th>已排定抓取 / 最后尝试</th></tr></thead>
+<tbody>{% for row in page_obj %}<tr>
+<td><a href="{% url 'admin:stable_raceevent_change' row.event_id %}">{{ row.event_name }}</a>（{{ row.event_id }}）</td>
+<td>{{ row.local_date|default:"未知" }} / {{ row.region }}</td>
+<td>{{ row.classification }} / {{ row.issue|default:"无" }}</td><td>{{ row.reason_code }}</td>
+<td>{{ row.next_action }}</td><td>{{ row.next_check_at }}</td>
+<td>{{ row.next_poll_at|default:"未排定" }} / {{ row.last_attempt_at|default:"无记录" }}</td>
+</tr>{% empty %}<tr><td colspan="7">当前没有符合筛选条件的赛事。</td></tr>{% endfor %}</tbody>
+</table></div>
+<p>第 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 页，共 {{ page_obj.paginator.count }} 场。
+{% if page_obj.has_previous %}<a href="?scope={{ scope|urlencode }}&amp;page={{ page_obj.previous_page_number }}">上一页</a>{% endif %}
+{% if page_obj.has_next %}<a href="?scope={{ scope|urlencode }}&amp;page={{ page_obj.next_page_number }}">下一页</a>{% endif %}</p>
+{% endblock %}

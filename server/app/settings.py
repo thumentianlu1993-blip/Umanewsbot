@@ -916,6 +916,7 @@ CELERY_TASK_ROUTES = {
     "stable.tasks.discover_future_race_data_sync_task": {"queue": "race_sync_v2"},
     "stable.tasks.advance_race_data_sync_lifecycle_task": {"queue": "celery"},
     "stable.tasks.monitor_race_data_sync_result_slo_task": {"queue": "celery"},
+    "stable.tasks.monitor_public_race_coverage_task": {"queue": "celery"},
     "stable.tasks.cleanup_race_data_sync_artifacts_task": {"queue": "race_sync_v2"},
     "stable.tasks.advance_race_event_lifecycle_task": {"queue": "celery"},
     "stable.tasks.scheduled_race_result_review_task": {"queue": "celery"},
@@ -1168,5 +1169,11 @@ if LOG_DIR:
 RACE_DATA_MULTISOURCE_DISCOVERY_ENABLED = env_bool("RACE_DATA_MULTISOURCE_DISCOVERY_ENABLED", False)
 RACE_DATA_MULTISOURCE_APPLY_ENABLED = env_bool("RACE_DATA_MULTISOURCE_APPLY_ENABLED", False)
 RACE_DATA_COVERAGE_ALERTS_ENABLED = env_bool("RACE_DATA_COVERAGE_ALERTS_ENABLED", False)
+if RACE_DATA_COVERAGE_ALERTS_ENABLED:
+    CELERY_BEAT_SCHEDULE["monitor-public-race-coverage"] = {
+        "task": "stable.tasks.monitor_public_race_coverage_task",
+        "schedule": crontab(minute="*/5"),
+        "options": {"queue": "celery", "expires": 270},
+    }
 RACE_DATA_MULTISOURCE_POLICY_FILE = env("RACE_DATA_MULTISOURCE_POLICY_FILE", "")
 RACE_DATA_MULTISOURCE_POLICY_SHA256 = env("RACE_DATA_MULTISOURCE_POLICY_SHA256", "")
