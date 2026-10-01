@@ -99,8 +99,11 @@ def build_public_race_coverage(*, now, event_ids=None):
         # 既有历史导入可有 confirmed canonical rows 而没有 live 确认时间。
         # data-sync 自有投影仍要求其正式确认字段，不能用零散行绕过发布门禁。
         live_owned = projection and projection.write_owner == "data_sync"
-        if not event.has_unconfirmed_rows and (
-            event.result_confirmed_at or (event.has_confirmed_rows and not live_owned)
+        if (
+            event.status == "finished"
+            and event.has_confirmed_rows
+            and not event.has_unconfirmed_rows
+            and (event.result_confirmed_at or not live_owned)
         ):
             row.update(
                 classification="confirmed",

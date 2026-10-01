@@ -1,5 +1,5 @@
 {
-  "as_of": "2026-10-01T20:44:41.796374+00:00",
+  "as_of": "2026-10-01T20:51:01.639314+00:00",
   "total": 10578,
   "counts": {
     "confirmed": 10208,
@@ -28,7 +28,7 @@
       "issue": "time_unknown_overdue",
       "reason_code": "enrollment_missing",
       "next_action": "运营核验实际赛程与完整赛果；不能按日期自动确认完赛",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": null
     },
@@ -41,7 +41,7 @@
       "issue": "time_unknown_overdue",
       "reason_code": "enrollment_missing",
       "next_action": "运营核验实际赛程与完整赛果；不能按日期自动确认完赛",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": null
     },
@@ -54,7 +54,7 @@
       "issue": "time_unknown_overdue",
       "reason_code": "enrollment_missing",
       "next_action": "运营核验实际赛程与完整赛果；不能按日期自动确认完赛",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": null
     },
@@ -67,7 +67,7 @@
       "issue": "time_unknown_overdue",
       "reason_code": "enrollment_missing",
       "next_action": "运营核验实际赛程与完整赛果；不能按日期自动确认完赛",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": null
     },
@@ -80,7 +80,7 @@
       "issue": "time_unknown_overdue",
       "reason_code": "enrollment_missing",
       "next_action": "运营核验实际赛程与完整赛果；不能按日期自动确认完赛",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": null
     },
@@ -93,7 +93,7 @@
       "issue": "time_unknown_overdue",
       "reason_code": "enrollment_missing",
       "next_action": "运营核验实际赛程与完整赛果；不能按日期自动确认完赛",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": null
     },
@@ -106,7 +106,7 @@
       "issue": "time_unknown_overdue",
       "reason_code": "enrollment_missing",
       "next_action": "运营核验实际赛程与完整赛果；不能按日期自动确认完赛",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": null
     },
@@ -119,7 +119,7 @@
       "issue": "time_unknown_overdue",
       "reason_code": "enrollment_missing",
       "next_action": "运营核验实际赛程与完整赛果；不能按日期自动确认完赛",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": null
     },
@@ -132,7 +132,7 @@
       "issue": "time_unknown_overdue",
       "reason_code": "enrollment_missing",
       "next_action": "运营核验实际赛程与完整赛果；不能按日期自动确认完赛",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": null
     },
@@ -145,7 +145,7 @@
       "issue": "time_unknown_overdue",
       "reason_code": "enrollment_missing",
       "next_action": "运营核验实际赛程与完整赛果；不能按日期自动确认完赛",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": null
     },
@@ -158,7 +158,7 @@
       "issue": "time_unknown_overdue",
       "reason_code": "enrollment_missing",
       "next_action": "运营核验实际赛程与完整赛果；不能按日期自动确认完赛",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": null
     },
@@ -171,7 +171,7 @@
       "issue": "time_unknown_overdue",
       "reason_code": "enrollment_missing",
       "next_action": "运营核验实际赛程与完整赛果；不能按日期自动确认完赛",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": null
     },
@@ -184,7 +184,7 @@
       "issue": "time_unknown_overdue",
       "reason_code": "enrollment_missing",
       "next_action": "运营核验实际赛程与完整赛果；不能按日期自动确认完赛",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": null
     },
@@ -197,7 +197,7 @@
       "issue": "time_unknown_overdue",
       "reason_code": "enrollment_missing",
       "next_action": "运营核验实际赛程与完整赛果；不能按日期自动确认完赛",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": null
     },
@@ -210,7 +210,7 @@
       "issue": "time_unknown_overdue",
       "reason_code": "enrollment_missing",
       "next_action": "运营核验实际赛程与完整赛果；不能按日期自动确认完赛",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": null
     },
@@ -223,7 +223,7 @@
       "issue": "time_unknown_overdue",
       "reason_code": "enrollment_missing",
       "next_action": "运营核验实际赛程与完整赛果；不能按日期自动确认完赛",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": null
     },
@@ -236,7 +236,7 @@
       "issue": "time_unknown_overdue",
       "reason_code": "enrollment_missing",
       "next_action": "运营核验实际赛程与完整赛果；不能按日期自动确认完赛",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": null
     },
@@ -249,7 +249,7 @@
       "issue": "time_unknown_overdue",
       "reason_code": "enrollment_missing",
       "next_action": "运营核验实际赛程与完整赛果；不能按日期自动确认完赛",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": null
     },
@@ -262,7 +262,7 @@
       "issue": "enrollment_missing",
       "reason_code": "enrollment_missing",
       "next_action": "等待来源身份发现；无可用来源时由运营安排补采",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": null
     },
@@ -275,7 +275,7 @@
       "issue": "enrollment_missing",
       "reason_code": "enrollment_missing",
       "next_action": "等待来源身份发现；无可用来源时由运营安排补采",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": null
     },
@@ -288,7 +288,7 @@
       "issue": "enrollment_missing",
       "reason_code": "enrollment_missing",
       "next_action": "等待来源身份发现；无可用来源时由运营安排补采",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": null
     },
@@ -301,7 +301,7 @@
       "issue": "publication_blocked",
       "reason_code": "data_sync_enrollment_policy_drift",
       "next_action": "核验历史发布依据与当前公开门禁；保留现有赛果和证据，不绕过权限",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": "2026-09-06T17:22:00.007255+00:00"
     },
@@ -314,7 +314,7 @@
       "issue": "publication_blocked",
       "reason_code": "data_sync_enrollment_policy_drift",
       "next_action": "核验历史发布依据与当前公开门禁；保留现有赛果和证据，不绕过权限",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": "2026-09-07T13:51:18.613044+00:00"
     },
@@ -327,7 +327,7 @@
       "issue": "publication_blocked",
       "reason_code": "data_sync_enrollment_policy_drift",
       "next_action": "核验历史发布依据与当前公开门禁；保留现有赛果和证据，不绕过权限",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": "2026-09-06T16:37:00.048594+00:00"
     },
@@ -340,7 +340,7 @@
       "issue": "result_overdue",
       "reason_code": "enrollment_policy_drift",
       "next_action": "核验正式完整结果并补采；若来源受阻，先处理所列阻断原因",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": "2026-09-27T14:45:15.163863+00:00",
       "last_attempt_at": "2026-09-26T14:45:13.488269+00:00",
       "source_key": "the_racing_api",
@@ -355,7 +355,7 @@
       "issue": "enrollment_missing",
       "reason_code": "enrollment_missing",
       "next_action": "等待来源身份发现；无可用来源时由运营安排补采",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": null
     },
@@ -368,7 +368,7 @@
       "issue": "result_overdue",
       "reason_code": "enrollment_policy_drift",
       "next_action": "核验正式完整结果并补采；若来源受阻，先处理所列阻断原因",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": "2026-09-27T12:40:02.166706+00:00",
       "last_attempt_at": "2026-09-26T12:40:01.328617+00:00",
       "source_key": "the_racing_api",
@@ -383,7 +383,7 @@
       "issue": "result_overdue",
       "reason_code": "enrollment_policy_drift",
       "next_action": "核验正式完整结果并补采；若来源受阻，先处理所列阻断原因",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": "2026-09-27T12:40:01.981402+00:00",
       "last_attempt_at": "2026-09-26T12:40:01.328617+00:00",
       "source_key": "the_racing_api",
@@ -398,7 +398,7 @@
       "issue": "result_overdue",
       "reason_code": "enrollment_policy_drift",
       "next_action": "核验正式完整结果并补采；若来源受阻，先处理所列阻断原因",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": "2026-09-26T18:03:04.853525+00:00",
       "last_attempt_at": "2026-09-26T17:33:00.026525+00:00",
       "source_key": "the_racing_api",
@@ -413,7 +413,7 @@
       "issue": "time_unknown_overdue",
       "reason_code": "enrollment_missing",
       "next_action": "运营核验实际赛程与完整赛果；不能按日期自动确认完赛",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": null
     },
@@ -426,7 +426,7 @@
       "issue": "owner_conflict",
       "reason_code": "owner_conflict",
       "next_action": "由运营核对现有写入者；不自动抢占",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": "2026-07-18T14:14:40.843702+00:00"
     },
@@ -439,7 +439,7 @@
       "issue": "publication_blocked",
       "reason_code": "data_sync_source_identity_expired",
       "next_action": "核验历史发布依据与当前公开门禁；保留现有赛果和证据，不绕过权限",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": "2026-09-06T16:38:03.458720+00:00"
     },
@@ -452,7 +452,7 @@
       "issue": "publication_blocked",
       "reason_code": "data_sync_enrollment_policy_drift",
       "next_action": "核验历史发布依据与当前公开门禁；保留现有赛果和证据，不绕过权限",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": "2026-09-18T00:08:00.021002+00:00"
     },
@@ -465,7 +465,7 @@
       "issue": "publication_blocked",
       "reason_code": "data_sync_enrollment_policy_drift",
       "next_action": "核验历史发布依据与当前公开门禁；保留现有赛果和证据，不绕过权限",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": "2026-09-18T00:07:00.029871+00:00"
     },
@@ -478,7 +478,7 @@
       "issue": "publication_blocked",
       "reason_code": "data_sync_enrollment_policy_drift",
       "next_action": "核验历史发布依据与当前公开门禁；保留现有赛果和证据，不绕过权限",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": "2026-09-18T18:14:00.004831+00:00"
     },
@@ -491,7 +491,7 @@
       "issue": "publication_blocked",
       "reason_code": "data_sync_enrollment_policy_drift",
       "next_action": "核验历史发布依据与当前公开门禁；保留现有赛果和证据，不绕过权限",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": "2026-09-18T18:19:00.008870+00:00"
     },
@@ -504,7 +504,7 @@
       "issue": "publication_blocked",
       "reason_code": "data_sync_enrollment_policy_drift",
       "next_action": "核验历史发布依据与当前公开门禁；保留现有赛果和证据，不绕过权限",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": "2026-09-19T18:15:00.279916+00:00"
     },
@@ -517,7 +517,7 @@
       "issue": "publication_blocked",
       "reason_code": "data_sync_enrollment_policy_drift",
       "next_action": "核验历史发布依据与当前公开门禁；保留现有赛果和证据，不绕过权限",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": "2026-09-19T18:15:00.279916+00:00"
     },
@@ -530,7 +530,7 @@
       "issue": "publication_blocked",
       "reason_code": "data_sync_enrollment_policy_drift",
       "next_action": "核验历史发布依据与当前公开门禁；保留现有赛果和证据，不绕过权限",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": "2026-09-19T18:15:00.279916+00:00"
     },
@@ -543,7 +543,7 @@
       "issue": "result_overdue",
       "reason_code": "enrollment_policy_drift",
       "next_action": "核验正式完整结果并补采；若来源受阻，先处理所列阻断原因",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": "2026-09-27T12:51:02.070506+00:00",
       "last_attempt_at": "2026-09-26T12:51:00.137014+00:00",
       "source_key": "the_racing_api",
@@ -558,7 +558,7 @@
       "issue": "result_overdue",
       "reason_code": "enrollment_policy_drift",
       "next_action": "核验正式完整结果并补采；若来源受阻，先处理所列阻断原因",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": "2026-09-26T17:43:05.364168+00:00",
       "last_attempt_at": "2026-09-26T17:13:00.218622+00:00",
       "source_key": "the_racing_api",
@@ -573,7 +573,7 @@
       "issue": "result_overdue",
       "reason_code": "enrollment_policy_drift",
       "next_action": "核验正式完整结果并补采；若来源受阻，先处理所列阻断原因",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": "2026-09-26T17:40:07.662464+00:00",
       "last_attempt_at": "2026-09-26T17:10:02.986346+00:00",
       "source_key": "the_racing_api",
@@ -588,7 +588,7 @@
       "issue": "time_unknown_overdue",
       "reason_code": "enrollment_missing",
       "next_action": "运营核验实际赛程与完整赛果；不能按日期自动确认完赛",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": null
     },
@@ -601,7 +601,7 @@
       "issue": "time_unknown_overdue",
       "reason_code": "enrollment_missing",
       "next_action": "运营核验实际赛程与完整赛果；不能按日期自动确认完赛",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": null
     },
@@ -614,10 +614,10 @@
       "issue": "enrollment_missing",
       "reason_code": "enrollment_missing",
       "next_action": "等待来源身份发现；无可用来源时由运营安排补采",
-      "next_check_at": "2026-10-01T20:49:41.796374+00:00",
+      "next_check_at": "2026-10-01T20:56:01.639314+00:00",
       "next_poll_at": null,
       "last_attempt_at": null
     }
   ],
-  "elapsed_seconds": 2.082
+  "elapsed_seconds": 1.525
 }

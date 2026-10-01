@@ -64,6 +64,9 @@ class PublicCoverageTests(TestCase):
             owner_generation=1,
             owner_manifest_sha256="a" * 64,
         )
+        models.RaceEventResult.objects.create(
+            event=event, finish_position=1, horse_name="A", is_confirmed=True
+        )
         with patch(
             "stable.services.race_public_coverage.resolve_race_live_public_read",
             return_value=SimpleNamespace(
@@ -84,6 +87,16 @@ class PublicCoverageTests(TestCase):
         self.assertEqual(
             models.RaceLiveAlertIncident.objects.get(scope_key=str(event.pk)).status,
             "open",
+        )
+
+    def test_confirmation_timestamp_without_rows_and_scheduled_rows_are_gaps(self):
+        self.event(status="finished", result_confirmed_at=NOW)
+        scheduled = self.event(status="scheduled")
+        models.RaceEventResult.objects.create(
+            event=scheduled, finish_position=1, horse_name="A", is_confirmed=True
+        )
+        self.assertTrue(
+            all(row["issue"] for row in build_public_race_coverage(now=NOW)["entries"])
         )
 
     def event(self, **kw):

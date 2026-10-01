@@ -195,3 +195,18 @@ class CoverageRecoveryTests(TestCase):
         )
         with self.assertRaisesRegex(recovery.RecoveryBlocked, "applied_result_drift"):
             self.run_batch(apply=True)
+
+    def test_idempotence_checks_reported_position_and_owner_generation(self):
+        self.run_batch(apply=True)
+        row = models.RaceEventResult.objects.filter(running_status="fell").first()
+        row.reported_finish_position = 2
+        row.save(update_fields=["reported_finish_position"])
+        with self.assertRaisesRegex(recovery.RecoveryBlocked, "applied_result_drift"):
+            self.run_batch(apply=True)
+        row.reported_finish_position = None
+        row.save(update_fields=["reported_finish_position"])
+        models.RaceEventProjectionControl.objects.filter(event_id=row.event_id).update(
+            owner_generation=999
+        )
+        with self.assertRaisesRegex(recovery.RecoveryBlocked, "applied_result_drift"):
+            self.run_batch(apply=True)

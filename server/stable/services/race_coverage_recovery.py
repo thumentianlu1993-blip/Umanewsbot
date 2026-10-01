@@ -156,6 +156,38 @@ def verify_package(*, manifest_path, expected_sha256):
     return payloads
 
 
+def _applied_rows_match(results, payload, manifest_sha256):
+    expected_by_number = {r["horse_number"]: r for r in payload["results"]}
+    for row in results:
+        expected = expected_by_number.get(row.horse_number)
+        if not expected or row.reported_finish_position != (
+            None if row.running_status == "fell" else row.finish_position
+        ):
+            return False
+        if row.source_refs != {
+            "bundle_sha256": manifest_sha256,
+            "source_authority": "third_party_high_access",
+            "approval_authority": "human_reviewed_reference",
+            "public_label": "参考赛果（完整性已核验）",
+            RECOVERY_KEY: manifest_sha256,
+            "review_method": "codex_source_and_full_runner_verification",
+            "evidence": payload["proofs"],
+        }:
+            return False
+        for field in (
+            "jockey_name",
+            "trainer_name",
+            "finish_time",
+            "margin",
+            "carried_weight",
+            "odds_value",
+            "barrier",
+        ):
+            if getattr(row, field) != (expected.get(field) or ""):
+                return False
+    return True
+
+
 def _preflight(payload, manifest_sha256, now, lock):
     event_id = payload["event_id"]
 
@@ -232,9 +264,18 @@ def _preflight(payload, manifest_sha256, now, lock):
                 and r.source_refs.get(RECOVERY_KEY) == manifest_sha256
                 for r in results
             )
+            and _applied_rows_match(results, payload, manifest_sha256)
+            and owner.owner_generation == payload["owner_generation"] + 2
+            and owner.current_result_revision_id is None
             and event.result_confirmed_at is not None
             and enrollment.state == "retired"
-            and not tracking.tracking_enabled,
+            and enrollment.manifest_sha256 == payload["owner_manifest_sha256"]
+            and not tracking.tracking_enabled
+            and tracking.next_poll_at is None
+            and not tracking.active_attempt_token
+            and not models.RaceEventLiveProviderCheckpoint.objects.filter(
+                tracking=tracking, next_poll_at__isnull=False
+            ).exists(),
             "applied_result_drift",
         )
         _require(

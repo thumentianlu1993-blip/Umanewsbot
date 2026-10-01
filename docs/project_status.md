@@ -1,3 +1,7 @@
+## 2026-10-02 赛事闭环第一批实现（尚未上线）
+
+用户已授权第一批实现、上线后设计第二阶段。隔离分支 `codex/race-coverage-recovery-20261002` 的 [PR229](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/229) 已包含全公开赛事覆盖监控、下一步后台、汇总邮件与固定七场恢复工具。85 项相关 PostgreSQL 回归及 18 项发布合同通过，旧两项 repair 失败已在主线基线复现；最终 review/CI 进行中。生产只读核验 10578 场、45 个缺口，七场恢复 dry-run ready；尚未部署或执行生产数据动作。范围和发布包见 [执行记录](changes/race-coverage-recovery-20261002/rollout.md)。
+
 ## 2026-10-02 赛事自动化机制讨论
 
 建议对赛事自动化子系统做渐进重构，保留现有数据/证据/并发基础，统一跟踪责任、状态证据、能力调度和策略升级闭环。建议尚未采纳或实施，详见[机制设计讨论](reports/2026-10-02-race-mechanism-design-review.md)。

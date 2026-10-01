@@ -4,7 +4,7 @@
 
 用户已明确要求“先做 1，做完让它上线，然后设计 2”，本包在该授权范围内连续执行。发布前完成回归和独立只读 review；不扩大抓取权限、不启动马匹历史导入。
 
-- 分支 `codex/race-coverage-recovery-20261002`，基线 `070eaeda`；PR/固定提交待冻结后补记。
+- 分支 `codex/race-coverage-recovery-20261002`，基线 `070eaeda`；[PR229](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/229)，固定代码提交由实际生产记录补记。
 - 生产当前 `310588704a5dd2cef477300eff626987491411cb`，目录 `/opt/umanews-release-31058870-dateonly-fix-20260930/umanewsbot`，schema 0079。
 - 无迁移；配置值不变化。沿用已启用的 coverage flag，新 Beat 任务每五分钟运行，原内部 coverage incident 增加汇总邮件投递，使用既有单个运营收件人；不输出邮箱/凭据。
 - 经 `deploy/deploy_0079.sh` 同 schema 前向发布，重建/排空/重启 web、worker、beat、race_sync_v2_worker；DB、Redis、Nginx、OneBot 沿用，Nginx 按发布工具更新 upstream 解析。
@@ -21,4 +21,4 @@
 
 ## 当前状态
 
-代码和恢复包已形成，尚未部署/执行生产数据动作。独立复审及基线失败归因进行中。第二阶段尚未开始设计。
+代码和恢复包已形成，尚未部署/执行生产数据动作。本地 85 项相关回归和 18 项发布合同通过，旧两项失败在原基线重现；最终复审与云端 CI 进行中。第二阶段尚未开始设计。
