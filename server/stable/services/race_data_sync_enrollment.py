@@ -1946,7 +1946,6 @@ def discover_multisource_events(*, now, policy=None, fetcher=None):
     )
     from stable.services.race_data_sync_alerts import (
         resolve_multisource_policy_incident,
-        stage_multisource_coverage_incidents,
         stage_multisource_policy_incident,
     )
     import secrets
@@ -1964,8 +1963,8 @@ def discover_multisource_events(*, now, policy=None, fetcher=None):
         return {"enabled": True, "reason": "multisource_policy_unavailable"}
     resolve_multisource_policy_incident(now=now)
     coverage = build_multisource_coverage(now=now, policy=policy)
-    if getattr(settings, "RACE_DATA_COVERAGE_ALERTS_ENABLED", False):
-        stage_multisource_coverage_incidents(coverage=coverage, policy=policy, now=now)
+    # 抓取候选仍受 policy 窗口约束；告警由独立全公开赛事对账统一负责。
+    # policy 到期或 provider 无路线时也不能缩小监控分母。
     eligible = [
         e
         for e in coverage["entries"]

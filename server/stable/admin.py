@@ -1166,6 +1166,29 @@ class HistoricalRaceEventTargetAdmin(HistoricalInventoryReadOnlyAdmin):
 
 @admin.register(RaceEvent)
 class RaceEventAdmin(admin.ModelAdmin):
+    change_list_template = "admin/stable/race_event_change_list.html"
+
+    def get_urls(self):
+        return [path("coverage/", self.admin_site.admin_view(self.coverage_view),
+                     name="stable_raceevent_coverage")] + super().get_urls()
+
+    def coverage_view(self, request):
+        if not self.has_view_permission(request):
+            raise PermissionDenied
+        from django.core.paginator import Paginator
+        from stable.services.race_public_coverage import build_public_race_coverage
+
+        report = build_public_race_coverage(now=timezone.now())
+        rows = report["entries"]
+        selected = request.GET.get("scope", "issues")
+        if selected != "all":
+            rows = [row for row in rows if row["issue"]]
+        page = Paginator(rows, 100).get_page(request.GET.get("page"))
+        return render(request, "admin/stable/race_coverage.html", {
+            **self.admin_site.each_context(request), "title": "赛事覆盖与下一步",
+            "opts": self.model._meta, "report": report, "page_obj": page, "scope": selected,
+        })
+
     list_display = (
         "chinese_name",
         "original_name",

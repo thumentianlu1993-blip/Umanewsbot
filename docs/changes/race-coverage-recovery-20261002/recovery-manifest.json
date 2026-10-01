@@ -1,0 +1,839 @@
+{
+  "schema_version": 1,
+  "operation": "race_coverage_recovery_20261002",
+  "review_method": "Codex verifies source snapshots, full runner identities and result order under user-authorized recovery",
+  "events": [
+    {
+      "event_id": 772,
+      "baseline_sha256": "ddb170157cc4da330534acafd1160b8d97df1c4ddd6caa5de58a61158849036b",
+      "owner_generation": 1,
+      "owner_manifest_sha256": "28c44ac0f725803cd233606aaa5542083b164384353515cc99517b6dd9c89cd8",
+      "event_name": "PRIX BERTRAND DE TARRAGON - FONDS EUROPEEN DE L ’ELEVAGE",
+      "local_date": "2026-09-19",
+      "racecourse": "Chantilly",
+      "results": [
+        {
+          "finish_position": 1,
+          "horse_number": "3",
+          "horse_name": "Anakova",
+          "running_status": "declared",
+          "jockey_name": "M Guyon",
+          "trainer_name": "A Fabre",
+          "finish_time": "1m 47.14s",
+          "margin": "",
+          "carried_weight": "9-3",
+          "odds_value": "16/1",
+          "barrier": "5"
+        },
+        {
+          "finish_position": 2,
+          "horse_number": "5",
+          "horse_name": "Pierchic",
+          "running_status": "declared",
+          "jockey_name": "C Demuro",
+          "trainer_name": "H A Pantall",
+          "finish_time": "",
+          "margin": "¾",
+          "carried_weight": "8-11",
+          "odds_value": "10/3",
+          "barrier": "3"
+        },
+        {
+          "finish_position": 3,
+          "horse_number": "1",
+          "horse_name": "Gaga Girl",
+          "running_status": "declared",
+          "jockey_name": "M Barzalona",
+          "trainer_name": "G Mosse",
+          "finish_time": "",
+          "margin": "1",
+          "carried_weight": "9-3",
+          "odds_value": "5/1",
+          "barrier": "1"
+        },
+        {
+          "finish_position": 4,
+          "horse_number": "8",
+          "horse_name": "Lethal Beauty",
+          "running_status": "declared",
+          "jockey_name": "R Thomas",
+          "trainer_name": "C Lerner",
+          "finish_time": "",
+          "margin": "¾",
+          "carried_weight": "8-11",
+          "odds_value": "28/1",
+          "barrier": "8"
+        },
+        {
+          "finish_position": 5,
+          "horse_number": "2",
+          "horse_name": "Noche Clasica",
+          "running_status": "declared",
+          "jockey_name": "Pierre-Charles Boudot",
+          "trainer_name": "E Bethell",
+          "finish_time": "",
+          "margin": "3",
+          "carried_weight": "9-3",
+          "odds_value": "11/10",
+          "barrier": "4"
+        },
+        {
+          "finish_position": 6,
+          "horse_number": "6",
+          "horse_name": "Awaken",
+          "running_status": "declared",
+          "jockey_name": "A Pouchin",
+          "trainer_name": "G Boughey",
+          "finish_time": "",
+          "margin": "3",
+          "carried_weight": "8-11",
+          "odds_value": "22/1",
+          "barrier": "6"
+        },
+        {
+          "finish_position": 7,
+          "horse_number": "4",
+          "horse_name": "Evita",
+          "running_status": "declared",
+          "jockey_name": "C Soumillon",
+          "trainer_name": "C Lerner",
+          "finish_time": "",
+          "margin": "3 ½",
+          "carried_weight": "8-11",
+          "odds_value": "10/1",
+          "barrier": "7"
+        },
+        {
+          "finish_position": 8,
+          "horse_number": "7",
+          "horse_name": "Sacred Ground",
+          "running_status": "declared",
+          "jockey_name": "S Pasquier",
+          "trainer_name": "J & T Gosden",
+          "finish_time": "",
+          "margin": "2 ½",
+          "carried_weight": "8-11",
+          "odds_value": "16/1",
+          "barrier": "2"
+        }
+      ],
+      "reviewed_row_digest": "9bc051e60e63b00249ea7161248f16ba68f1b1e1af0bfec331943c44837820f2",
+      "proofs": [
+        {
+          "url": "https://www.zeturf.fr/fr/course-du-jour/2026-09-19/R1C5-chantilly-prix-bertrand-de-tarragon",
+          "sha256": "85262297b63f97e595e1994fdba164288cc10a57d93e002121312f8ac3d6c996",
+          "file": "sources/772.html",
+          "fetched_at": "2026-10-01T20:28:31.149002+00:00"
+        },
+        {
+          "url": "https://www.sportinglife.com/racing/results/2026-09-19/chantilly/939805/prix-bertrand-de-tarragon-fonds-europeen-de-lelevage-stakes-group-3",
+          "sha256": "f5bd34ec04f34f86ef033c6046a03afdd6d4316adc3d59c7c8de08f4b404009b",
+          "file": "sources/772-supplement.html"
+        }
+      ],
+      "fallen_numbers": []
+    },
+    {
+      "event_id": 828,
+      "baseline_sha256": "ccfd6337111065f2167be17195696c83a163329030716ead46b9eb6212496e32",
+      "owner_generation": 1,
+      "owner_manifest_sha256": "d3d71f903b1ffabcff11acfb45a8e4075b8cd6131c23094dd9b63967f8721064",
+      "event_name": "PRIX ROBERT LEJEUNE",
+      "local_date": "2026-09-17",
+      "racecourse": "Auteuil",
+      "results": [
+        {
+          "finish_position": 1,
+          "horse_number": "1",
+          "horse_name": "Huron Bleu",
+          "running_status": "declared",
+          "jockey_name": "Meunier Gab.",
+          "trainer_name": "Bressou D.",
+          "finish_time": "",
+          "margin": "",
+          "carried_weight": "68 kg",
+          "odds_value": "",
+          "barrier": ""
+        },
+        {
+          "finish_position": 2,
+          "horse_number": "2",
+          "horse_name": "Navy Du Seuil",
+          "running_status": "declared",
+          "jockey_name": "Philipperon L.",
+          "trainer_name": "Seror M.",
+          "finish_time": "",
+          "margin": "17 L",
+          "carried_weight": "67 kg",
+          "odds_value": "",
+          "barrier": ""
+        },
+        {
+          "finish_position": 3,
+          "horse_number": "6",
+          "horse_name": "Naruto Banbou",
+          "running_status": "declared",
+          "jockey_name": "Behocaray Max.",
+          "trainer_name": "Bressou D.",
+          "finish_time": "",
+          "margin": "2 L",
+          "carried_weight": "65 kg",
+          "odds_value": "",
+          "barrier": ""
+        },
+        {
+          "finish_position": 4,
+          "horse_number": "7",
+          "horse_name": "Roi Danaos",
+          "running_status": "declared",
+          "jockey_name": "Nabet K.",
+          "trainer_name": "Pitart M.",
+          "finish_time": "",
+          "margin": "10 L",
+          "carried_weight": "65 kg",
+          "odds_value": "",
+          "barrier": ""
+        },
+        {
+          "finish_position": 5,
+          "horse_number": "3",
+          "horse_name": "Sommerkonig",
+          "running_status": "declared",
+          "jockey_name": "De Giles F.",
+          "trainer_name": "George & A N.",
+          "finish_time": "",
+          "margin": "9 L",
+          "carried_weight": "65 kg",
+          "odds_value": "",
+          "barrier": ""
+        },
+        {
+          "finish_position": 6,
+          "horse_number": "5",
+          "horse_name": "Nom D'Un Chien",
+          "running_status": "declared",
+          "jockey_name": "Zuliani A.",
+          "trainer_name": "Nicolle F.",
+          "finish_time": "",
+          "margin": "30 L",
+          "carried_weight": "65 kg",
+          "odds_value": "",
+          "barrier": ""
+        },
+        {
+          "finish_position": 7,
+          "horse_number": "4",
+          "horse_name": "Supreme Light",
+          "running_status": "fell",
+          "jockey_name": "Le Clerc B.",
+          "trainer_name": "Menato Mme G.",
+          "finish_time": "",
+          "margin": "",
+          "carried_weight": "65 kg",
+          "odds_value": "",
+          "barrier": ""
+        }
+      ],
+      "reviewed_row_digest": "d95c7687afc40c723693127f233da397f203a28ee1b9f6c8d4346e1b6066ab84",
+      "proofs": [
+        {
+          "url": "https://www.zeturf.fr/fr/course-du-jour/2026-09-17/R2C3-auteuil-prix-robert-lejeune",
+          "sha256": "fa2a7a3342162232473af13098970c20946c073c90ac269eaf09a300640253f8",
+          "file": "sources/828.html",
+          "fetched_at": "2026-10-01T20:28:24.717921+00:00"
+        }
+      ],
+      "fallen_numbers": [
+        "4"
+      ]
+    },
+    {
+      "event_id": 830,
+      "baseline_sha256": "6e583155d083858fe74b79d8621214cdc6ee110989defade54024e7c55e85061",
+      "owner_generation": 1,
+      "owner_manifest_sha256": "d3d71f903b1ffabcff11acfb45a8e4075b8cd6131c23094dd9b63967f8721064",
+      "event_name": "PRIX DE COMPIEGNE",
+      "local_date": "2026-09-17",
+      "racecourse": "Auteuil",
+      "results": [
+        {
+          "finish_position": 1,
+          "horse_number": "5",
+          "horse_name": "Diamond Dice",
+          "running_status": "declared",
+          "jockey_name": "De Giles F.",
+          "trainer_name": "George & A N.",
+          "finish_time": "",
+          "margin": "",
+          "carried_weight": "66 kg",
+          "odds_value": "",
+          "barrier": ""
+        },
+        {
+          "finish_position": 2,
+          "horse_number": "4",
+          "horse_name": "Kyrov",
+          "running_status": "declared",
+          "jockey_name": "Nabet K.",
+          "trainer_name": "Nicolle F.",
+          "finish_time": "",
+          "margin": "1 L 1/2",
+          "carried_weight": "66 kg",
+          "odds_value": "",
+          "barrier": ""
+        },
+        {
+          "finish_position": 3,
+          "horse_number": "1",
+          "horse_name": "Losange Bleu",
+          "running_status": "declared",
+          "jockey_name": "Charron J.",
+          "trainer_name": "Bressou D.",
+          "finish_time": "",
+          "margin": "2 L",
+          "carried_weight": "70 kg",
+          "odds_value": "",
+          "barrier": ""
+        },
+        {
+          "finish_position": 4,
+          "horse_number": "3",
+          "horse_name": "Kirikou Des Mers",
+          "running_status": "declared",
+          "jockey_name": "Le Clerc B.",
+          "trainer_name": "Menato Mme G.",
+          "finish_time": "",
+          "margin": "13 L",
+          "carried_weight": "66 kg",
+          "odds_value": "",
+          "barrier": ""
+        },
+        {
+          "finish_position": 5,
+          "horse_number": "2",
+          "horse_name": "Bon Garcon",
+          "running_status": "declared",
+          "jockey_name": "Masure G.",
+          "trainer_name": "Chaille-chaille & Pamart",
+          "finish_time": "",
+          "margin": "3/4 L",
+          "carried_weight": "66 kg",
+          "odds_value": "",
+          "barrier": ""
+        }
+      ],
+      "reviewed_row_digest": "1322948d7c5beb461b396c074974e7089e341597a5296e673884d6edc642e1b6",
+      "proofs": [
+        {
+          "url": "https://www.zeturf.fr/fr/course-du-jour/2026-09-17/R2C6-auteuil-prix-de-compiegne",
+          "sha256": "fc4d2e6f163d2d31b975c1d0c4d3ff4d2eb57fea920b3e932b6577f784c1d0d4",
+          "file": "sources/830.html",
+          "fetched_at": "2026-10-01T20:28:27.890687+00:00"
+        }
+      ],
+      "fallen_numbers": []
+    },
+    {
+      "event_id": 833,
+      "baseline_sha256": "d78b16dbd0bc4fa1ff05292f83a4544e6365313d475f36448249e5c5a363c2d3",
+      "owner_generation": 1,
+      "owner_manifest_sha256": "c7fc69065aceb3824e270c4071674fca6b763f6806840ff3b9087f9854d8154c",
+      "event_name": "PRIX DE MAISONS-LAFFITTE",
+      "local_date": "2026-09-26",
+      "racecourse": "Auteuil",
+      "results": [
+        {
+          "finish_position": 1,
+          "horse_number": "6",
+          "horse_name": "Guadalquivir",
+          "running_status": "declared",
+          "jockey_name": "Reveley J.",
+          "trainer_name": "George & A N.",
+          "finish_time": "",
+          "margin": "",
+          "carried_weight": "66.5 kg",
+          "odds_value": "",
+          "barrier": ""
+        },
+        {
+          "finish_position": 2,
+          "horse_number": "3",
+          "horse_name": "Delmegan",
+          "running_status": "declared",
+          "jockey_name": "Meunier Gab.",
+          "trainer_name": "Allaire E.",
+          "finish_time": "",
+          "margin": "7 L",
+          "carried_weight": "67 kg",
+          "odds_value": "",
+          "barrier": ""
+        },
+        {
+          "finish_position": 3,
+          "horse_number": "2",
+          "horse_name": "Maharaja",
+          "running_status": "declared",
+          "jockey_name": "Le Clerc Mme Bry.",
+          "trainer_name": "Seror M.",
+          "finish_time": "",
+          "margin": "2 L 1/2",
+          "carried_weight": "68 kg",
+          "odds_value": "",
+          "barrier": ""
+        },
+        {
+          "finish_position": 4,
+          "horse_number": "8",
+          "horse_name": "Mysoko Star",
+          "running_status": "declared",
+          "jockey_name": "Brechet Léo P.",
+          "trainer_name": "Pontoir L. Mlle",
+          "finish_time": "",
+          "margin": "3 L 1/2",
+          "carried_weight": "64 kg",
+          "odds_value": "",
+          "barrier": ""
+        },
+        {
+          "finish_position": 5,
+          "horse_number": "1",
+          "horse_name": "Leopard Du Berlais",
+          "running_status": "declared",
+          "jockey_name": "Charron J.",
+          "trainer_name": "Cottin D.",
+          "finish_time": "",
+          "margin": "2 L",
+          "carried_weight": "70 kg",
+          "odds_value": "",
+          "barrier": ""
+        },
+        {
+          "finish_position": 6,
+          "horse_number": "4",
+          "horse_name": "Its Now",
+          "running_status": "declared",
+          "jockey_name": "Chevillard T.",
+          "trainer_name": "Sourdeau De Beauregard D.",
+          "finish_time": "",
+          "margin": "30 L",
+          "carried_weight": "66 kg",
+          "odds_value": "",
+          "barrier": ""
+        },
+        {
+          "finish_position": 7,
+          "horse_number": "5",
+          "horse_name": "Olga De Kiev",
+          "running_status": "declared",
+          "jockey_name": "Philipperon L.",
+          "trainer_name": "Seror M.",
+          "finish_time": "",
+          "margin": "14 L",
+          "carried_weight": "66 kg",
+          "odds_value": "",
+          "barrier": ""
+        },
+        {
+          "finish_position": 8,
+          "horse_number": "7",
+          "horse_name": "Pinot Blanc",
+          "running_status": "fell",
+          "jockey_name": "Blais Adr.",
+          "trainer_name": "Grall E.",
+          "finish_time": "",
+          "margin": "",
+          "carried_weight": "66 kg",
+          "odds_value": "",
+          "barrier": ""
+        }
+      ],
+      "reviewed_row_digest": "7cec5911d95a80d723927a7561f7dff96153783d8941905b9b205ba36b67eebc",
+      "proofs": [
+        {
+          "url": "https://www.zeturf.fr/fr/course-du-jour/2026-09-26/R1C4-auteuil-prix-de-maisons-laffitte",
+          "sha256": "7972983c4cc120518865b68fbd39a14067cdeb823c040f5bd39674c8eb52222d",
+          "file": "sources/833.html",
+          "fetched_at": "2026-10-01T20:28:34.202499+00:00"
+        }
+      ],
+      "fallen_numbers": [
+        "7"
+      ]
+    },
+    {
+      "event_id": 970,
+      "baseline_sha256": "13dcc467ea41a4a6617343f0dc9fa912f42bcb24f1a4e434e509e09da00ecc8f",
+      "owner_generation": 1,
+      "owner_manifest_sha256": "137a4c7ecedbd499fe1a0a4511efb60432f03103d42f96fbc0c34148c0a0dda0",
+      "event_name": "DUBAI INTERNATIONAL AIRPORT WORLD TROPHY STAKES",
+      "local_date": "2026-09-19",
+      "racecourse": "NEWBURY",
+      "results": [
+        {
+          "finish_position": 1,
+          "horse_number": "11",
+          "horse_name": "Miss Yechance",
+          "running_status": "declared",
+          "jockey_name": "Jack Nicholls",
+          "trainer_name": "K R Burke",
+          "finish_time": "59.01s",
+          "margin": "",
+          "carried_weight": "8-13",
+          "odds_value": "12/1",
+          "barrier": "6"
+        },
+        {
+          "finish_position": 2,
+          "horse_number": "4",
+          "horse_name": "Shagraan",
+          "running_status": "declared",
+          "jockey_name": "S De Sousa",
+          "trainer_name": "C G Cox",
+          "finish_time": "",
+          "margin": "nk",
+          "carried_weight": "9-3",
+          "odds_value": "11/1",
+          "barrier": "4"
+        },
+        {
+          "finish_position": 3,
+          "horse_number": "1",
+          "horse_name": "Diligent Harry",
+          "running_status": "declared",
+          "jockey_name": "R L Moore",
+          "trainer_name": "C G Cox",
+          "finish_time": "",
+          "margin": "2",
+          "carried_weight": "9-3",
+          "odds_value": "18/1",
+          "barrier": "8"
+        },
+        {
+          "finish_position": 4,
+          "horse_number": "5",
+          "horse_name": "Starlust",
+          "running_status": "declared",
+          "jockey_name": "Rossa Ryan",
+          "trainer_name": "R M Beckett",
+          "finish_time": "",
+          "margin": "nk",
+          "carried_weight": "9-3",
+          "odds_value": "9/4",
+          "barrier": "9"
+        },
+        {
+          "finish_position": 5,
+          "horse_number": "10",
+          "horse_name": "First Instinct",
+          "running_status": "declared",
+          "jockey_name": "Cieren Fallon",
+          "trainer_name": "W J Haggas",
+          "finish_time": "",
+          "margin": "½",
+          "carried_weight": "9-0",
+          "odds_value": "6/1",
+          "barrier": "5"
+        },
+        {
+          "finish_position": 6,
+          "horse_number": "3",
+          "horse_name": "Redorange",
+          "running_status": "declared",
+          "jockey_name": "Callum Rodriguez",
+          "trainer_name": "C G Cox",
+          "finish_time": "",
+          "margin": "hd",
+          "carried_weight": "9-3",
+          "odds_value": "3/1",
+          "barrier": "2"
+        },
+        {
+          "finish_position": 7,
+          "horse_number": "9",
+          "horse_name": "Azure Angel",
+          "running_status": "declared",
+          "jockey_name": "Connor Beasley",
+          "trainer_name": "E Bethell",
+          "finish_time": "",
+          "margin": "1",
+          "carried_weight": "9-0",
+          "odds_value": "25/1",
+          "barrier": "7"
+        },
+        {
+          "finish_position": 8,
+          "horse_number": "2",
+          "horse_name": "Naana's Sparkle",
+          "running_status": "declared",
+          "jockey_name": "K T O'Neill",
+          "trainer_name": "Lemos Souza",
+          "finish_time": "",
+          "margin": "nk",
+          "carried_weight": "9-3",
+          "odds_value": "12/1",
+          "barrier": "3"
+        },
+        {
+          "finish_position": 9,
+          "horse_number": "7",
+          "horse_name": "Dickensian",
+          "running_status": "declared",
+          "jockey_name": "Shane Gray",
+          "trainer_name": "K A Ryan",
+          "finish_time": "",
+          "margin": "sh",
+          "carried_weight": "9-2",
+          "odds_value": "7/1",
+          "barrier": "1"
+        },
+        {
+          "finish_position": 10,
+          "horse_number": "6",
+          "horse_name": "Aspect Island",
+          "running_status": "declared",
+          "jockey_name": "L Morris",
+          "trainer_name": "James Owen",
+          "finish_time": "",
+          "margin": "½",
+          "carried_weight": "9-2",
+          "odds_value": "28/1",
+          "barrier": "10"
+        },
+        {
+          "finish_position": 11,
+          "horse_number": "8",
+          "horse_name": "Hallo Spaceboy",
+          "running_status": "declared",
+          "jockey_name": "K Shoemark",
+          "trainer_name": "E Walker",
+          "finish_time": "",
+          "margin": "4",
+          "carried_weight": "9-2",
+          "odds_value": "33/1",
+          "barrier": "11"
+        }
+      ],
+      "reviewed_row_digest": "0e3c2770be555ad20659d558e36f5ad3e98672922c58df7f00f2815f8b2d878d",
+      "proofs": [
+        {
+          "url": "https://www.sportinglife.com/racing/results/2026-09-19/newbury/935856/dubai-international-airport-world-trophy-stakes-group-3",
+          "sha256": "f27f9c37862dce0da0934143ced7fd431d2c2ac818527cb3d51bdf193c36513d",
+          "file": "sources/970.html",
+          "fetched_at": "2026-10-01T20:28:37.037673+00:00"
+        }
+      ],
+      "fallen_numbers": []
+    },
+    {
+      "event_id": 975,
+      "baseline_sha256": "42a9fe84e86c031aedac03e19a846de95e4d79d40090398b0f036f520e77f302",
+      "owner_generation": 1,
+      "owner_manifest_sha256": "d97a13ff619e405a18cfd3c2679cddc30b5cf2705041220df67ef2db372a9439",
+      "event_name": "TATTERSALLS MIDDLE PARK STAKES",
+      "local_date": "2026-09-26",
+      "racecourse": "NEWMARKET",
+      "results": [
+        {
+          "finish_position": 1,
+          "horse_number": "6",
+          "horse_name": "Orthodox",
+          "running_status": "declared",
+          "jockey_name": "Rossa Ryan",
+          "trainer_name": "C G Cox",
+          "finish_time": "1m 9.96s",
+          "margin": "",
+          "carried_weight": "9-2",
+          "odds_value": "7/2",
+          "barrier": "7"
+        },
+        {
+          "finish_position": 2,
+          "horse_number": "2",
+          "horse_name": "Force Noir",
+          "running_status": "declared",
+          "jockey_name": "D Egan",
+          "trainer_name": "Robson Aguiar",
+          "finish_time": "",
+          "margin": "nk",
+          "carried_weight": "9-2",
+          "odds_value": "28/1",
+          "barrier": "3"
+        },
+        {
+          "finish_position": 3,
+          "horse_number": "3",
+          "horse_name": "Hell of A Spin",
+          "running_status": "declared",
+          "jockey_name": "Mikey Sheehy",
+          "trainer_name": "A Keatley",
+          "finish_time": "",
+          "margin": "1",
+          "carried_weight": "9-2",
+          "odds_value": "33/1",
+          "barrier": "2"
+        },
+        {
+          "finish_position": 4,
+          "horse_number": "7",
+          "horse_name": "Push The Boat Out",
+          "running_status": "declared",
+          "jockey_name": "Shane Foley",
+          "trainer_name": "M O'Callaghan",
+          "finish_time": "",
+          "margin": "hd",
+          "carried_weight": "9-2",
+          "odds_value": "4/1",
+          "barrier": "6"
+        },
+        {
+          "finish_position": 5,
+          "horse_number": "4",
+          "horse_name": "Inner City Blues",
+          "running_status": "declared",
+          "jockey_name": "W Buick",
+          "trainer_name": "C Appleby",
+          "finish_time": "",
+          "margin": "2 ¼",
+          "carried_weight": "9-2",
+          "odds_value": "6/4",
+          "barrier": "4"
+        },
+        {
+          "finish_position": 6,
+          "horse_number": "5",
+          "horse_name": "Marco Polo",
+          "running_status": "declared",
+          "jockey_name": "R L Moore",
+          "trainer_name": "A P O'Brien",
+          "finish_time": "",
+          "margin": "2 ¾",
+          "carried_weight": "9-2",
+          "odds_value": "9/2",
+          "barrier": "5"
+        },
+        {
+          "finish_position": 7,
+          "horse_number": "1",
+          "horse_name": "Confucius",
+          "running_status": "declared",
+          "jockey_name": "Tom Marquand",
+          "trainer_name": "A P O'Brien",
+          "finish_time": "",
+          "margin": "2 ¼",
+          "carried_weight": "9-2",
+          "odds_value": "25/1",
+          "barrier": "1"
+        }
+      ],
+      "reviewed_row_digest": "1bdba597ac0022125bc6e5c5eeeb86b4b692b96a44f3ef276c745dd1e96f8251",
+      "proofs": [
+        {
+          "url": "https://www.sportinglife.com/racing/results/2026-09-26/newmarket/933603/tattersalls-middle-park-stakes-group-1",
+          "sha256": "7a031c70289d151e95d2a348683fdac92a7a0e305b52d578bc3f827483d0f631",
+          "file": "sources/975.html",
+          "fetched_at": "2026-10-01T20:28:39.830874+00:00"
+        }
+      ],
+      "fallen_numbers": []
+    },
+    {
+      "event_id": 976,
+      "baseline_sha256": "e48d86c66a83aed17094cd8acf34ec9245c43a1fff49ca3239cb55e91c8a0cf0",
+      "owner_generation": 1,
+      "owner_manifest_sha256": "d97a13ff619e405a18cfd3c2679cddc30b5cf2705041220df67ef2db372a9439",
+      "event_name": "TATTERSALLS SCEPTRE SESSIONS CHEVELEY PARK STAKES",
+      "local_date": "2026-09-26",
+      "racecourse": "NEWMARKET",
+      "results": [
+        {
+          "finish_position": 1,
+          "horse_number": "6",
+          "horse_name": "Sun Goddess",
+          "running_status": "declared",
+          "jockey_name": "R L Moore",
+          "trainer_name": "A P O'Brien",
+          "finish_time": "1m 9.08s",
+          "margin": "",
+          "carried_weight": "9-2",
+          "odds_value": "5/6",
+          "barrier": "6"
+        },
+        {
+          "finish_position": 2,
+          "horse_number": "2",
+          "horse_name": "Libertango",
+          "running_status": "declared",
+          "jockey_name": "Billy Loughnane",
+          "trainer_name": "G Boughey",
+          "finish_time": "",
+          "margin": "1",
+          "carried_weight": "9-2",
+          "odds_value": "13/2",
+          "barrier": "2"
+        },
+        {
+          "finish_position": 3,
+          "horse_number": "1",
+          "horse_name": "Alwaysanangel",
+          "running_status": "declared",
+          "jockey_name": "W Buick",
+          "trainer_name": "J P O'Brien",
+          "finish_time": "",
+          "margin": "1 ½",
+          "carried_weight": "9-2",
+          "odds_value": "15/2",
+          "barrier": "3"
+        },
+        {
+          "finish_position": 4,
+          "horse_number": "3",
+          "horse_name": "Moonrise",
+          "running_status": "declared",
+          "jockey_name": "Tom Marquand",
+          "trainer_name": "A M Balding",
+          "finish_time": "",
+          "margin": "nk",
+          "carried_weight": "9-2",
+          "odds_value": "28/1",
+          "barrier": "5"
+        },
+        {
+          "finish_position": 5,
+          "horse_number": "4",
+          "horse_name": "Senorita Bonita",
+          "running_status": "declared",
+          "jockey_name": "Oisin Murphy",
+          "trainer_name": "S & E Crisford",
+          "finish_time": "",
+          "margin": "1 ¾",
+          "carried_weight": "9-2",
+          "odds_value": "11/4",
+          "barrier": "1"
+        },
+        {
+          "finish_position": 6,
+          "horse_number": "5",
+          "horse_name": "Snowing",
+          "running_status": "declared",
+          "jockey_name": "Rossa Ryan",
+          "trainer_name": "A P O'Brien",
+          "finish_time": "",
+          "margin": "6 ½",
+          "carried_weight": "9-2",
+          "odds_value": "150/1",
+          "barrier": "4"
+        }
+      ],
+      "reviewed_row_digest": "02f1c416b7d67849c56effc3b5a7d7a9290180880468ded7a28b16cf5c14ad0d",
+      "proofs": [
+        {
+          "url": "https://www.sportinglife.com/racing/results/2026-09-26/newmarket/933602/tattersalls-sceptre-sessions-cheveley-park-stakes-fillies-group-1",
+          "sha256": "b6beb253c76846f84d9c966892d94057237000a39ff66148e3bb5c8241f32c7e",
+          "file": "sources/976.html",
+          "fetched_at": "2026-10-01T20:28:42.459323+00:00"
+        }
+      ],
+      "fallen_numbers": []
+    }
+  ]
+}

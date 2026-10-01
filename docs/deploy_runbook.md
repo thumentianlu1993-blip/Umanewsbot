@@ -1,3 +1,11 @@
+## 2026-10-02 赛事日历只读审查与后续验收补充
+
+- 当前运行 revision 为 `31058870`（9/30 date-only release），不能用主工作区 `horse_data` 判断生产。使用生产 Django shell 的 `transaction.atomic()` + `SET TRANSACTION READ ONLY` + 15 秒 statement_timeout 查询；准入函数必须 `lock=False`，不要调用会落 incident/lease 的发现或监控函数冒充只读。
+- 实测 18 条旧 v1 登记均 `enrollment_policy_drift`，5 条 JRA v2 准入通过。策略续期/重渲验收必须覆盖未闭环存量登记的摘要换绑与来源身份有效期；只验 policy 可加载、容器健康或 route roster 无漂移不足以证明业务继续运行。
+- 828/830/970/772/975/976/833 七场结果未闭环，975/976/833 同时有 9/27 到期身份；恢复须重新核验来源与受审修复路径，不能直接改摘要或关闭校验。后续以新尝试、正式赛果、公开页面和 incident 关闭共同验收。
+- 日历 date-only 可见、候选卡可见、每场登记、正式赛果必须分别检查。108/109 目前候选卡可见但 `jra_roster_partial` 未登记；10/4 前后需自然闭环验收。旧 race_live 调度关闭，不能把该队列 7543 历史消息当成本次 v2 待办，也不能擅自消费。
+- 具体证据、函数入口及优先级见[审查报告](reports/2026-10-02-race-calendar-audit.md)。本轮未部署、写业务数据、修复登记或恢复采集。
+
 ## 2026-09-29 九地区工程运维条目（deploy 前必读）
 
 **JRA multisource policy v2 续期（硬期限 2026-10-26T18:00Z）**：

@@ -1,0 +1,5 @@
+{% extends "admin/change_list.html" %}
+{% block object-tools-items %}
+<li><a href="{% url 'admin:stable_raceevent_coverage' %}">赛事覆盖与下一步</a></li>
+{{ block.super }}
+{% endblock %}
