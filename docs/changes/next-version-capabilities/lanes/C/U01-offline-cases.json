@@ -375,7 +375,7 @@
       },
       "expected": {
         "code": null,
-        "label": "待核实",
+        "label": "—",
         "family": null
       },
       "display_flags": [

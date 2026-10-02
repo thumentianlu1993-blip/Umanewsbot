@@ -19,7 +19,7 @@
 
     <section class="race-hero state-{{ event.status }}">
       <div class="race-hero-top">
-        <span class="grade-badge {{ event.grade_badge_class }}">{% race_field event "grade" event.grade_badge_label %}</span>
+        <span class="grade-badge {% race_grade_class event %}">{% race_field event "grade" event.grade_badge_label %}</span>
         <span class="race-hero-meta-text">{{ event.get_country_region_display }} · {% race_field event "racecourse" event.racecourse %} · {% if event.distance_text %}{% race_field event "distance" event.distance_text %}{% else %}{% race_field event "surface" event.get_surface_display %}{% endif %}</span>
         {% if series_events %}
           <details class="race-year-switcher">
