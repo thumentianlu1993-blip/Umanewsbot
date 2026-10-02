@@ -19357,6 +19357,31 @@ class QQShutdownTests(TestCase):
         self.assertEqual(self.client.post(reverse('api-article-push', args=[999999])).status_code, 404)
         self.post.assert_not_called()
 
+    def test_admin_get_and_invalid_post_explicitly_report_shutdown(self):
+        from django.contrib.messages import get_messages
+        url = reverse('admin:stable_newsarticle_push', args=[self.article.pk])
+        with patch('stable.admin.enqueue_push_for_article') as queued:
+            for method in (self.client.get, self.client.post):
+                with self.subTest(method=method.__name__):
+                    response = method(url)
+                    self.assertEqual(response.status_code, 302)
+                    self.assertTrue(any('QQ渠道已停用' in str(m) for m in get_messages(response.wsgi_request)))
+        queued.assert_not_called()
+        self.post.assert_not_called()
+
+    def test_warning_email_dedup_is_independent_of_qq_shutdown(self):
+        from stable.services.notifications import send_high_value_warning_notification
+        from stable.models import NotificationStatus
+        self.article.gate_issues = [{'severity': 'warning', 'code': 'synthetic', 'message': 'synthetic warning'}]
+        with override_settings(AUTOMATION_WARNING_EMAIL_ENABLED=True,
+                               AUTOMATION_WARNING_NOTIFY_EMAILS=['warning@example.invalid']),              patch('stable.services.notifications.is_high_value_article', return_value=True),              patch('stable.services.notifications.send_mail') as mail:
+            first = send_high_value_warning_notification(self.article)
+            second = send_high_value_warning_notification(self.article)
+        self.assertEqual(first[0].status, NotificationStatus.SENT)
+        self.assertEqual(second[0].status, NotificationStatus.SKIPPED)
+        mail.assert_called_once()
+        self.post.assert_not_called()
+
     def test_publish_window_rerun_is_not_disabled_with_qq(self):
         from types import SimpleNamespace
         start = timezone.now()
