@@ -799,6 +799,9 @@
       "stable.test_single_migration_owner.MigrationDriftGuardTests.test_t19_no_new_migration_files",
       "stable.tests.test_race_event_lifecycle_enrollment.LifecycleEnrollmentCommandTests.test_output_dir_rejects_unresolved_macos_temporary_alias",
       "stable.tests.test_race_event_lifecycle_enrollment.LifecycleEnrollmentCommandTests.test_prepare_command_does_not_resolve_away_temporary_alias"
+    ],
+    "content_contracts": [
+      "stable.test_content_contracts"
     ]
   },
   "dependencies": {
@@ -2476,6 +2479,12 @@
       "domains": [
         "infrastructure"
       ]
+    },
+    "server/stable/test_content_contracts.py": {
+      "label": "stable.test_content_contracts",
+      "domains": [
+        "content_contracts"
+      ]
     }
   },
   "profiles": {
@@ -2754,7 +2763,8 @@
     "scripts.tests.test_impact_delivery": "python",
     "stable.test_impact_core": "django",
     "scripts.tests.test_impact_evolution": "python",
-    "scripts.tests.test_impact_verifier_e2e": "python"
+    "scripts.tests.test_impact_verifier_e2e": "python",
+    "stable.test_content_contracts": "python"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
