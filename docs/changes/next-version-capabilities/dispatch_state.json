@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "timezone": "Asia/Shanghai",
-  "updated_at": "2026-10-03T03:04:08.628751+08:00",
+  "updated_at": "2026-10-03T03:16:19.425719+08:00",
   "coordinator_thread_id": "01a0fdb2-b88c-7f93-8c9e-ba9564c33c93",
   "coordinator_worktree": "/Users/mentianlu/.codex/worktrees/516a/umanews",
   "deadline_at": "2026-10-30T18:00:00+08:00",
@@ -16,7 +16,7 @@
       "worktree": "/Users/mentianlu/.codex/worktrees/5482/umanews",
       "branch": "codex/next-version-race-data-20261003",
       "status": "已启动",
-      "last_cursor": "857bc711-5dad-460a-9c00-d1ac5bb0c979:6",
+      "last_cursor": "857bc711-5dad-460a-9c00-d1ac5bb0c979:8",
       "model": "gpt-6.1-sol",
       "reasoning_effort": "medium",
       "initial_head": "63b5781e",
@@ -30,7 +30,7 @@
       "worktree": "/Users/mentianlu/.codex/worktrees/a14d/umanews",
       "branch": "codex/next-version-news-ai-20261003",
       "status": "已启动",
-      "last_cursor": "b39a81c2-6866-44bf-8df1-a536e3d41532:5",
+      "last_cursor": "b39a81c2-6866-44bf-8df1-a536e3d41532:6",
       "model": "gpt-6.1-sol",
       "reasoning_effort": "medium",
       "initial_head": "4c9725c9",
@@ -44,7 +44,7 @@
       "worktree": "/Users/mentianlu/.codex/worktrees/bc9b/umanews",
       "branch": "codex/next-version-product-ui-20261003",
       "status": "已启动",
-      "last_cursor": "1bb9b1cd-6b22-4865-9d87-78fbf289661d:4",
+      "last_cursor": "1bb9b1cd-6b22-4865-9d87-78fbf289661d:5",
       "model": "gpt-6.1-sol",
       "reasoning_effort": "medium",
       "initial_head": "dbcc87a4",
@@ -58,7 +58,7 @@
       "worktree": "/Users/mentianlu/.codex/worktrees/3ab1/umanews",
       "branch": "codex/next-version-review-20261003",
       "status": "已启动",
-      "last_cursor": "6afb1d41-cb4a-4026-a141-43c0a48e9cae:4",
+      "last_cursor": "6afb1d41-cb4a-4026-a141-43c0a48e9cae:5",
       "model": "gpt-6.1-sol",
       "reasoning_effort": "medium",
       "initial_head": "d00eaf18",
@@ -135,10 +135,10 @@
       "deps": [],
       "deadline_at": "2026-10-05T18:00:00+08:00",
       "status": "进行中",
-      "phase": "三P2修复完成，追加真实runtime适配包后原R复审",
-      "commit": "910353a51685310c5dc6bcf7ea8ca3d3c1a18880",
+      "phase": "三P2实现及输出转存方案已送原R",
+      "commit": "15b293ce6cc70a717eafee25c9e4120c9280b58f",
       "pr": null,
-      "review": "21 offline GREEN；原R尚未关闭finding；通用runtime挂载不存在，禁止执行旧模板",
+      "review": "原R在C后复审；21 offline GREEN；wrapper/verifier尚未实现；生产模板不得执行",
       "evidence": [
         "/Users/mentianlu/.codex/worktrees/a14d/umanews/docs/changes/next-version-capabilities/lanes/B/B-001-status.md"
       ],
@@ -366,10 +366,10 @@
       ],
       "deadline_at": "2026-10-08T18:00:00+08:00",
       "status": "进行中",
-      "phase": "固定候选代码review/PG验证排队",
-      "commit": "a8d07e6c76ca9495b9b4d701d6c15ed55ef1f9f2",
+      "phase": "P2返修原R复审/PG验证排队",
+      "commit": "2b9398f756507c5e58deb7f534d0d2b624850ae4",
       "pr": null,
-      "review": "原R审3ac行为对象并核a8d纯文档增量；候选树已冻结；正式映射及PG/Linux待证",
+      "review": "C003-P2-01已修：尊重马匹记录prepared grade；真实RED+39宿主GREEN；原R短复审中",
       "evidence": [
         "/Users/mentianlu/.codex/worktrees/bc9b/umanews/docs/changes/next-version-capabilities/lanes/C/U01-implementation-review.md"
       ],
@@ -2176,8 +2176,8 @@
     {
       "scope": "F02导出器/命令/映射proposal代码技术审核",
       "base": "a2704b2d7ef93a6ee8518fca2f63ada4a43c2b64",
-      "head": "910353a51685310c5dc6bcf7ea8ca3d3c1a18880",
-      "status": "三P2已修，待无服务变更runtime适配合包送原R",
+      "head": "15b293ce6cc70a717eafee25c9e4120c9280b58f",
+      "status": "已送原R：910三P2修复+15b纯转存方案；等待C后审核",
       "script_sha256": "fcdb8e6a130b3c98dd0ab500df6328e42d8ac817d3475a18cbdc46f79be997a5",
       "findings": [
         "B002-P2-01",
@@ -2190,9 +2190,17 @@
       "scope": "U01行为实现代码review",
       "base": "907f8de699b31a6fcc80acc78e9ba070aadc4f28",
       "approved_plan": "2919dd3558950466e18a8886ec8bc7f85a119f5a",
-      "head": "a8d07e6c76ca9495b9b4d701d6c15ed55ef1f9f2",
-      "status": "已送原R，PG/Linux待证",
-      "behavior_head": "3ac1e3a750e68bafe7950fa726481a02ecccfad6"
+      "head": "2b9398f756507c5e58deb7f534d0d2b624850ae4",
+      "status": "C003-P2-01已修，原R限定复审中",
+      "behavior_head": "3ac1e3a750e68bafe7950fa726481a02ecccfad6",
+      "red_commit": "e534ccf664836131d158042e5edbb45f1d56462b"
+    },
+    {
+      "scope": "root共享影响映射修正",
+      "base": "84b439a23bd8c1ef3b66d4cdcbdec5d2caa72bba",
+      "head": "c9c798ac6190c1ad3f6ed8abb804b453641bc507",
+      "status": "APPROVED",
+      "report": "/Users/mentianlu/.codex/worktrees/3ab1/umanews/docs/changes/next-version-capabilities/lanes/R/R-root-impact-mapping-review.md"
     }
   ],
   "quota_policy": {
@@ -2208,7 +2216,7 @@
     "allow_reset_credit": false,
     "last_observed_remaining_percent": 6,
     "last_observed_used_percent": 94,
-    "last_observed_at": "2026-10-03T03:04:08.628751+08:00",
+    "last_observed_at": "2026-10-03T03:16:19.425719+08:00",
     "state": "正常，实时剩余6%，阈值未触发",
     "limitation": "调度侧控制；非账单硬上限",
     "unknown_usage_policy": "3次有界重试，仍未知暂缓新增耗时模型工作；读数恢复>1自动解除未知保护"
@@ -2267,7 +2275,7 @@
         "collection_tests": 6182,
         "collection_batches": 41,
         "collection_labels": 294,
-        "last_progress": "10/41分片、1507项、0 failure/error、8 skip未完成豁免核对，尚非最终通过"
+        "last_progress": "40/41分片完成，完整集合/skip/收尾/候选外收据待A提交"
       },
       "temporary_directory": "每线独立/Users/mentianlu/.codex/runtime目录作为TMPDIR；mac /var/folders未共享",
       "queue": [
@@ -2275,13 +2283,13 @@
           "lane": "C",
           "scope": "短RED及PG16语法/Unicode/来源上下文/分页前一致性集合",
           "red_commit": "5c66088d821c249e41141dd5f8ba062c3edaf210",
-          "candidate_sha": "a8d07e6c76ca9495b9b4d701d6c15ed55ef1f9f2",
+          "candidate_sha": "2b9398f756507c5e58deb7f534d0d2b624850ae4",
           "status": "A窗口完成后优先，先固定候选与影响计划"
         },
         {
           "lane": "B",
           "scope": "F02新路径映射后的必要交付测试",
-          "candidate_sha": "48c51fb19f328eb9add14dd5fca40d4ceffaae63",
+          "candidate_sha": "15b293ce6cc70a717eafee25c9e4120c9280b58f",
           "status": "待R技术审核与映射衔接后安排"
         }
       ]
@@ -2290,7 +2298,9 @@
       "decision": "F01需显式映射；mapping变更按现行规则运行固定候选一套full，不改策略规避",
       "owner": "A，R审核",
       "B": "proposal固定于48c51fb1 lanes/B/B-002-test-mapping-proposal.json，待A增量稳定后衔接；未覆盖共享配置",
-      "shared_blocker": "实际PR基线907f包含未映射继承JSON/HTML；C还含两个view函数与U01 fixture。root统一核精确用途与映射，保留真实base，不手选/跳full。"
+      "shared_blocker": "九静态路径、U01 fixture与两view函数已精确补齐；A先完成旧0e在途，再消费控制生成真实base计划，不自动重复full",
+      "shared_control_sha": "c9c798ac6190c1ad3f6ed8abb804b453641bc507",
+      "shared_control_review": "APPROVED，R独立30tests与边界验证PASS；真实main计划和full仍待"
     }
   },
   "source_main_last_verified": {
