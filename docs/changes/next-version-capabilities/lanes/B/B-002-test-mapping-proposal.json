@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "task_id": "B-002",
+  "status": "proposal_only_not_applied",
+  "script_commit": "aac463100652b5d8ef9576825133b6084a888d2b",
+  "new_paths": [
+    "scripts/f02_readonly_export.py",
+    "scripts/tests/test_f02_readonly_export.py"
+  ],
+  "rules_paths_additions": {
+    "scripts/f02_readonly_export.py": [
+      "module:scripts.tests.test_f02_readonly_export"
+    ],
+    "scripts/tests/test_f02_readonly_export.py": [
+      "module:scripts.tests.test_f02_readonly_export"
+    ]
+  },
+  "catalog_domains_additions": {
+    "module:scripts.tests.test_f02_readonly_export": [
+      "scripts.tests.test_f02_readonly_export"
+    ]
+  },
+  "catalog_tests_additions": {
+    "scripts/tests/test_f02_readonly_export.py": {
+      "label": "scripts.tests.test_f02_readonly_export",
+      "domains": [
+        "module:scripts.tests.test_f02_readonly_export"
+      ]
+    }
+  },
+  "core_policy": "preserve existing automatic core selection",
+  "mapping_evolution_policy": "preserve current old+new full regression on rules/catalog changes; coordinator integrates after A patch",
+  "evidence_status": "17 local offline unittest cases green; no fixed Linux delivery receipt",
+  "linux_environment": "wait A validated dedicated DOCKER_CONFIG with local socket; do not set DOCKER_CONTEXT/DOCKER_HOST; shared batch limit2",
+  "artifact_runtime": "/Users/mentianlu/.codex/artifacts/umanews-next-version-B/B-002/"
+}
