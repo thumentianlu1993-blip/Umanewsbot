@@ -156,4 +156,13 @@ class RealMappingTests(unittest.TestCase):
         for path in ('server/stable/test_migration_database_helpers.py','server/stable/tests/__init__.py'):
             self.assertEqual(self.select_path(path)['mode'],'full')
 
+    def test_historical_runner_selects_recovery_phase_permissions(self):
+        labels=self.select_path('server/stable/services/historical_batch_runner.py')['labels']
+        self.assertIn('stable.test_race_result_recovery_integration.RaceResultRecoveryCoverageAndRunnerIntegrationTests.test_recovery_commands_have_disjoint_runner_phase_classification',labels)
+
+    def test_collector_selects_hurdles_and_integrity_contracts(self):
+        labels=self.select_path('runtime/research/collect_graded_race_participants.py')['labels']
+        for module in ('test_collect_graded_race_participants_hurdles','test_collect_graded_race_participants_integrity_contract'):
+            self.assertIn('runtime.research.'+module,labels)
+
 if __name__ == "__main__": unittest.main()

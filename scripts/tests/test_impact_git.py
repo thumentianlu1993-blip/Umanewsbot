@@ -27,6 +27,14 @@ class GitInputTests(unittest.TestCase):
         result=inputs(self.root,self.base,self.base,self.base,local=True)
         self.assertIn('deploy.sh',[c['path'] for c in result['changes']])
 
+    def test_staged_deletion_retaining_worktree_is_still_a_change(self):
+        original=inputs(self.root,self.base,self.base,self.base,local=True)
+        self.git('rm','--cached','deploy.sh')
+        result=inputs(self.root,self.base,self.base,self.base,local=True)
+        self.assertIn('deploy.sh',[c['path'] for c in result['changes']])
+        self.assertIn('deploy.sh',result['paths'])
+        self.assertNotEqual(original['content_digest'],result['content_digest'])
+
     def test_deleted_renamed_untracked_included(self):
         (self.root/'deploy.sh').rename(self.root/'renamed.sh');(self.root/'new.py').write_text('x=1')
         result=inputs(self.root,self.base,self.base,self.base,local=True)

@@ -147,7 +147,7 @@ from plan_affected_tests import create_plan
 from tools.test_impact.core import verify_results
 x=json.loads(Path(sys.argv[2]).read_text()); p=x['plan']
 e=create_plan(Path(x['root']),x['base'],x['head'],x['test'],bootstrap=p['bootstrap'])
-for field in ('domains','labels','hashes','changed_paths','content_digest','allowed_skips'):
+for field in ('domains','labels','hashes','changed_paths','content_digest','allowed_skips','deleted_test_modules','deleted_declared_test_ids','superseded_test_labels'):
  if p[field]!=e[field]: raise ValueError('trusted plan mismatch: '+field)
 if sys.argv[3]=='selection': print(json.dumps(e))
 else: print(json.dumps(verify_results(p,x['reports'])))

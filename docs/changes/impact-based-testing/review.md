@@ -26,3 +26,12 @@
   "rollout.md": "5e95670a449c0cfc5a0f0619ca9ead5f696cc97dfbf6957bc2aabc8e5b062da7"
 }
 ```
+
+## 独立代码审核
+
+- `0e6ac960..209ba770`：REVISE，9项finding，指纹`0a18966ed9916f7271182349e3de40a89a363d87e73aa824a7b61285c96a52d6`。
+- `0e6ac960..d6a6b8da`：前9项关闭，REVISE，剩余4项：index删除、canonical重导出删除、类/方法标签改名、历史恢复及collector直接合同漏选。
+  独立执行42项通过，完整原生review前后指纹一致`e377d79f55d280e1d815194f89dca8f74e08224a0e5017bc7435c659806ff649`。
+- 4项已统一返修，5项新增RED转GREEN、本地47项通过；下一轮仅复审返修差异与直接回归，结论待回写。
+
+上述均非激活或发布授权。实际非文档候选外核验、full首次校准、strict保护及策略启用仍未完成。

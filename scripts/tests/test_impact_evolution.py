@@ -48,6 +48,27 @@ class PlanEvolutionTests(unittest.TestCase):
         self.catalog['tests']['server/stable/test_c.py']={'label':'stable.test_c','domains':['horse']};self.save()
         self.assertIn('stable.test_c',self.plan()['labels'])
 
+    def test_deleting_reexport_preserves_existing_canonical_module(self):
+        alias='server/stable/tests/__init__.py'
+        self.write(alias,'from stable.test_a import *\n')
+        self.catalog['tests'][alias]={'label':'stable.test_a','domains':['horse']}
+        self.save();self.base=self.commit()
+        (self.root/alias).unlink();del self.catalog['tests'][alias];self.save()
+        p=self.plan()
+        self.assertIn('stable.test_a',p['labels'])
+        self.assertNotIn('stable.test_a',p['deleted_test_modules'])
+
+    def test_renamed_class_or_method_expands_old_requirement_to_live_module(self):
+        old_labels=['stable.test_a.T','stable.test_b.T.test_x']
+        self.catalog['domains']['horse']=old_labels;self.save();self.base=self.commit()
+        self.write('server/stable/test_a.py','class Renamed:\n def test_x(self): pass\n')
+        self.write('server/stable/test_b.py','class T:\n def test_renamed(self): pass\n')
+        self.catalog['domains']['horse']=['stable.test_a.Renamed','stable.test_b.T.test_renamed']
+        self.save();p=self.plan()
+        for label in old_labels:self.assertNotIn(label,p['labels'])
+        self.assertIn('stable.test_a',p['labels']);self.assertIn('stable.test_b',p['labels'])
+        self.assertEqual(set(p['superseded_test_labels']),set(old_labels))
+
     def test_explicit_release_same_sha_does_not_require_a_diff(self):
         from unittest.mock import patch
         from scripts import impact_ci

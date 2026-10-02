@@ -194,6 +194,7 @@
         "stable.test_race_live_official_publication.RaceLiveOfficialAuthorizationBehaviorTests",
         "stable.test_race_live_official_publication.RaceLiveOfficialAuthorizationCommandTests.test_authorization_apply_exact_replay_is_idempotent",
         "stable.test_race_live_target_eligibility",
+        "stable.test_race_result_recovery_integration.RaceResultRecoveryCoverageAndRunnerIntegrationTests.test_recovery_commands_have_disjoint_runner_phase_classification",
         "stable.test_release_commit",
         "stable.tests_legacy.PublicHomeInfoFeedTests",
         "stable.tests_legacy.PublishWindowServiceTests"
@@ -222,6 +223,7 @@
         "stable.test_race_live_official_publication.RaceLiveOfficialAuthorizationBehaviorTests",
         "stable.test_race_live_official_publication.RaceLiveOfficialAuthorizationCommandTests.test_authorization_apply_exact_replay_is_idempotent",
         "stable.test_race_live_target_eligibility",
+        "stable.test_race_result_recovery_integration.RaceResultRecoveryCoverageAndRunnerIntegrationTests.test_recovery_commands_have_disjoint_runner_phase_classification",
         "stable.test_release_commit",
         "stable.tests_legacy.PublicHomeInfoFeedTests",
         "stable.tests_legacy.PublishWindowServiceTests"
@@ -250,6 +252,7 @@
         "stable.test_race_live_official_publication.RaceLiveOfficialAuthorizationBehaviorTests",
         "stable.test_race_live_official_publication.RaceLiveOfficialAuthorizationCommandTests.test_authorization_apply_exact_replay_is_idempotent",
         "stable.test_race_live_target_eligibility",
+        "stable.test_race_result_recovery_integration.RaceResultRecoveryCoverageAndRunnerIntegrationTests.test_recovery_commands_have_disjoint_runner_phase_classification",
         "stable.test_release_commit",
         "stable.tests_legacy.PublicHomeInfoFeedTests",
         "stable.tests_legacy.PublishWindowServiceTests"

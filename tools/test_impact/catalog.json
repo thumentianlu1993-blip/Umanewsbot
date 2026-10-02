@@ -52,7 +52,8 @@
       "stable.test_historical_batch_runner_postgres",
       "stable.test_historical_race_batches",
       "stable.test_historical_race_detail_import_receipt",
-      "stable.test_historical_race_detail_chunk_import"
+      "stable.test_historical_race_detail_chunk_import",
+      "stable.test_race_result_recovery_integration.RaceResultRecoveryCoverageAndRunnerIntegrationTests.test_recovery_commands_have_disjoint_runner_phase_classification"
     ],
     "p0_bridge": [
       "runtime.research.test_build_p0_participant_completion_batches",
@@ -69,7 +70,9 @@
       "runtime.research.test_build_graded_race_completion_bundle",
       "test_graded_race_participants_workflow",
       "test_workflow_contract",
-      "scripts.tests.test_research_synthetic"
+      "scripts.tests.test_research_synthetic",
+      "runtime.research.test_collect_graded_race_participants_hurdles",
+      "runtime.research.test_collect_graded_race_participants_integrity_contract"
     ],
     "release": [
       "stable.test_release_0078_recovery",
@@ -921,13 +924,15 @@
     "runtime/research/test_collect_graded_race_participants_hurdles.py": {
       "label": "runtime.research.test_collect_graded_race_participants_hurdles",
       "domains": [
-        "module:runtime.research.test_collect_graded_race_participants_hurdles"
+        "module:runtime.research.test_collect_graded_race_participants_hurdles",
+        "research_contracts"
       ]
     },
     "runtime/research/test_collect_graded_race_participants_integrity_contract.py": {
       "label": "runtime.research.test_collect_graded_race_participants_integrity_contract",
       "domains": [
-        "module:runtime.research.test_collect_graded_race_participants_integrity_contract"
+        "module:runtime.research.test_collect_graded_race_participants_integrity_contract",
+        "research_contracts"
       ]
     },
     "runtime/research/test_collect_official_graded_race_results.py": {

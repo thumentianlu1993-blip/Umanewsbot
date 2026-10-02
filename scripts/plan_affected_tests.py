@@ -24,10 +24,13 @@ def create_plan(root, base, head, test, local=False, full_reason=None, bootstrap
         raise ValueError('catalog drift: ' + ', '.join(missing))
     old_rules, old_catalog = (rules, catalog) if bootstrap else [read_json(root, base, p) for p in (RULES, CATALOG)]
     removed = [c for c in data['changes'] if c['status']=='deleted' and c['path'] in old_catalog['tests']]
-    removed_labels = {old_catalog['tests'][c['path']]['label'] for c in removed}
+    live_modules = {entry['label'] for path,entry in catalog['tests'].items() if path in data['paths']}
+    removed_labels = {old_catalog['tests'][c['path']]['label'] for c in removed} - live_modules
     deleted_ids = []
     for c in removed:
         module = old_catalog['tests'][c['path']]['label']
+        if module not in removed_labels:
+            continue
         for cls in ast.parse(c['before']).body:
             if isinstance(cls, ast.ClassDef):
                 deleted_ids.extend(module+'.'+cls.name+'.'+m.name for m in cls.body
@@ -59,11 +62,24 @@ def create_plan(root, base, head, test, local=False, full_reason=None, bootstrap
             if prior_changes:
                 chosen = union_selection(select_changes(prior_changes, old_rules, old_catalog), chosen)
     chosen['labels'] = [v for v in chosen['labels'] if not any(v==label or v.startswith(label+'.') for label in removed_labels)]
+    # catalog 演进时，旧的精细类/方法标签可能已改名。保留整个现存模块的覆盖，
+    # 不加载失效旧名称，也不单凭候选缩小旧覆盖要求。
+    candidate_labels = {v for values in catalog['domains'].values() for v in values}
+    old_modules = {entry['label'] for entry in old_catalog['tests'].values()}
+    superseded = {}
+    for label in chosen['labels']:
+        if label in candidate_labels:
+            continue
+        matches = [module for module in old_modules & live_modules if label.startswith(module+'.')]
+        if matches:
+            superseded[label] = max(matches, key=len)
+    chosen['labels'] = sorted({superseded.get(v,v) for v in chosen['labels']})
     hashes = {p: digest(json.loads((root / p).read_text()) if local else read_json(root, test, p)) for p in (RULES, CATALOG)}
     return {**{k: v for k, v in data.items() if k not in ('changes', 'paths')}, **chosen,
             'schema_version': 1, 'hashes': hashes, 'bootstrap': bootstrap,
             'changed_paths': [{k:v for k,v in c.items() if k not in ('before','after')} for c in data['changes']],
-            'deleted_test_modules': sorted(removed_labels), 'deleted_declared_test_ids': sorted(deleted_ids), 'allowed_skips': catalog.get('allowed_skips', {}),
+            'deleted_test_modules': sorted(removed_labels), 'deleted_declared_test_ids': sorted(deleted_ids),
+            'superseded_test_labels': superseded, 'allowed_skips': catalog.get('allowed_skips', {}),
             'run_id': os.environ.get('GITHUB_RUN_ID', 'local'), 'run_attempt': os.environ.get('GITHUB_RUN_ATTEMPT', 'local')}
 
 

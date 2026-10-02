@@ -12,7 +12,7 @@
 
 # 启用、恢复与交接
 
-本轮只设计，不改 CI、不触发定时全量、不部署服务。人工确认只引用根 AGENTS.md。
+本轮已实现 CI 和选测工具，在分支进行有界验证；未启用定时全量、未部署服务。人工确认只引用根 AGENTS.md。
 前置 PR232 已上线；本方案不是该发布包中的追加生产动作。
 
 ## 后续实施顺序
@@ -64,3 +64,15 @@ Python子进程、curl外网均阻断，独立Docker容器不可用；只收集6
 
 只读查询：rules/branches/main返回[]，传统branches/main/protection返回404 Branch not protected，IMPACT_TEST_POLICY未设置。
 尚未做G2配置或合并。actionlint1.7.12对四份新增/重写工作流通过；研究手动工作流的空choice既有告警在base也复现，13项原有结构合同通过，未改变该输入语义。
+
+## 第三轮固定版本与最终边界返修
+
+`d6a6b8dad2a5622d8e3de0756de077c90bb50c4d` 的 [CI36999240204](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/36999240204)
+通过277项（65/195/17三批），零失败/错误/skip；总run约2分19秒，不等于P95。
+目录仅收集6157个canonical ID、34批、最大200。声明skip9项，另有1项运行时环境skip登记；没有执行这些全量测试。
+三批均证明Python/curl外网阻断、Docker daemon不可用，包含Compose配置、迁移漂移及Linux符号链接合同。
+
+整轮独立review对该版本提出4项：暂存删除漏记、删除重导出误删canonical测试、精细标签改名失效、直接合同遗漏。
+已新增5个真实失败回归后修复，本地47项通过；旧精细标签扩大为现存模块覆盖并记录superseded_test_labels，
+候选外交付核验同步重算删除及替换审计。补齐历史恢复阶段权限与collector身份/断点/完整性合同。
+下一固定版本仍只做有界验证，最终复审结果待回写。

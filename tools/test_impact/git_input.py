@@ -60,16 +60,23 @@ def inputs(root, base, head, test, local=False):
         untracked = set(git(root, 'ls-files', '--others', '--exclude-standard', '-z').decode().split('\0')) - {''}
         new = {}
         new_modes = {}
+        indexed_paths = set()
         for record in git(root,'ls-files','--stage','-z').split(b'\0'):
             if not record: continue
             meta, raw_path = record.split(b'\t',1)
             mode, oid, stage = meta.decode().split(); path = safe_path(raw_path.decode())
+            indexed_paths.add(path)
             if stage != '0': raise ValueError('unmerged local index')
             if mode not in ('100644','100755'): raise ValueError('unsafe index entry')
             if old.get(path)!=oid or old_modes.get(path)!=mode:
                 before=blob(root,base,path) if path in old else b''
                 after=git(root,'cat-file','blob',oid)
                 index_changes.append({'path':path,'before':before.decode('utf-8','replace'),'after':after.decode('utf-8','replace'),'status':'index','before_hash':hashlib.sha256(before).hexdigest(),'after_hash':hashlib.sha256(after).hexdigest(),'mode':mode})
+        for path in sorted(old.keys() - indexed_paths):
+            before = blob(root, base, path)
+            index_changes.append({'path':path,'before':before.decode('utf-8','replace'),'after':'',
+                                  'status':'index-deleted','before_hash':hashlib.sha256(before).hexdigest(),
+                                  'after_hash':hashlib.sha256(b'').hexdigest(),'mode':None})
         for path in sorted(tracked | untracked):
             safe_path(path)
             file = Path(root) / path
