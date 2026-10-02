@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "timezone": "Asia/Shanghai",
-  "updated_at": "2026-10-03T02:30:29.747393+08:00",
+  "updated_at": "2026-10-03T02:33:23.245395+08:00",
   "coordinator_thread_id": "01a0fdb2-b88c-7f93-8c9e-ba9564c33c93",
   "coordinator_worktree": "/Users/mentianlu/.codex/worktrees/516a/umanews",
   "deadline_at": "2026-10-30T18:00:00+08:00",
@@ -363,10 +363,10 @@
       ],
       "deadline_at": "2026-10-08T18:00:00+08:00",
       "status": "进行中",
-      "phase": "小切片方案准备",
-      "commit": null,
+      "phase": "方案审核",
+      "commit": "2919dd3558950466e18a8886ec8bc7f85a119f5a",
       "pr": null,
-      "review": null,
+      "review": "已送原R，开关两状态等级一致决定已发C",
       "evidence": [],
       "merged": false,
       "deployed": false,
@@ -2143,7 +2143,13 @@
     }
   ],
   "planning_commit": "d0cec076019f35b6f7db56b09ebee291e57fd9f9",
-  "review_queue": [],
+  "review_queue": [
+    {
+      "scope": "U01方案",
+      "head": "2919dd3558950466e18a8886ec8bc7f85a119f5a",
+      "status": "已送R"
+    }
+  ],
   "quota_policy": {
     "source": "本协调会话用户2026-10-03直接补充",
     "weekly_window_minutes": 10080,
@@ -2157,14 +2163,14 @@
     "allow_reset_credit": false,
     "last_observed_remaining_percent": 8,
     "last_observed_used_percent": 92,
-    "last_observed_at": "2026-10-03T02:30:29.747393+08:00",
+    "last_observed_at": "2026-10-03T02:33:23.245395+08:00",
     "state": "正常，阈值未触发",
     "limitation": "调度侧控制；非账单硬上限",
     "unknown_usage_policy": "3次有界重试，仍未知暂缓新增耗时模型工作；读数恢复>1自动解除未知保护"
   },
   "next_actions": [
     "每轮首先核验周额度；瞬时失败先有界重试，实际<=1停各线再停heartbeat和自身",
-    "核验Colima umanews-impact-ci就绪后向A提供明确Docker context",
+    "控制三线共享Linux测试profile总计最多2批并发；固定SHA与独立运行产物，不复用错误候选证据",
     "F05映射限定复审，后续U01方案审核",
     "B准备固定SHA本地导出器与命令包后送R，未审前不运行生产查询",
     "F01 RED/GREEN、映射与必要Linux验证后送原R代码审核，未完成依赖不得解锁",
@@ -2187,12 +2193,23 @@
   "resources": {
     "local_linux_tests": {
       "profile": "umanews-impact-ci",
-      "status": "正在启动既有专用Colima profile",
+      "status": "就绪，daemon实时核验成功；无运行容器",
       "cpu": 2,
       "memory_gib": 4,
       "disk_gib": 20,
       "owner": "coordinator",
-      "parallel_batches_max_initial": 2
+      "parallel_batches_max_initial": 2,
+      "docker_context": "colima-umanews-impact-ci",
+      "docker_host": "unix:///Users/mentianlu/.colima/umanews-impact-ci/docker.sock",
+      "default_context_preserved": "colima",
+      "server_version": "29.2.1",
+      "os": "linux",
+      "arch": "aarch64",
+      "cached_images": [
+        "umanews-impact-base:verified",
+        "umanews-impact-calibration:python3"
+      ],
+      "verification_limit": "daemon与缓存可用；不是候选测试通过证据"
     },
     "test_mapping": {
       "decision": "F01需显式映射；mapping变更按现行规则运行固定候选一套full，不改策略规避",
