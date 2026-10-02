@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "timezone": "Asia/Shanghai",
-  "updated_at": "2026-10-03T03:24:13.676900+08:00",
+  "updated_at": "2026-10-03T03:49:35.077545+08:00",
   "coordinator_thread_id": "01a0fdb2-b88c-7f93-8c9e-ba9564c33c93",
   "coordinator_worktree": "/Users/mentianlu/.codex/worktrees/516a/umanews",
   "deadline_at": "2026-10-30T18:00:00+08:00",
@@ -16,13 +16,13 @@
       "worktree": "/Users/mentianlu/.codex/worktrees/5482/umanews",
       "branch": "codex/next-version-race-data-20261003",
       "status": "已启动",
-      "last_cursor": "857bc711-5dad-460a-9c00-d1ac5bb0c979:8",
+      "last_cursor": "857bc711-5dad-460a-9c00-d1ac5bb0c979:9",
       "model": "gpt-6.1-sol",
       "reasoning_effort": "medium",
       "initial_head": "63b5781e",
       "title": "Umanews 10.30｜A 赛事与资料管线",
       "model_evidence": "create_thread 显式指定 gpt-6.1-sol 和 medium，创建成功；启动回报已收取",
-      "quota_policy_status": "已确认并独立实时复核剩余8%；无运行子代理/模型CLI"
+      "quota_policy_status": "遵守<=1暂停；本轮各线最近回报剩余5%，后续仍须实时复核"
     },
     "B": {
       "thread_id": "01a0fdc6-e1a2-7ae1-9749-6889626d9bf4",
@@ -30,13 +30,13 @@
       "worktree": "/Users/mentianlu/.codex/worktrees/a14d/umanews",
       "branch": "codex/next-version-news-ai-20261003",
       "status": "已启动",
-      "last_cursor": "b39a81c2-6866-44bf-8df1-a536e3d41532:6",
+      "last_cursor": "b39a81c2-6866-44bf-8df1-a536e3d41532:7",
       "model": "gpt-6.1-sol",
       "reasoning_effort": "medium",
       "initial_head": "4c9725c9",
       "title": "Umanews 10.30｜B 新闻模型与名称",
       "model_evidence": "create_thread 显式指定 gpt-6.1-sol 和 medium，创建成功；启动回报已收取",
-      "quota_policy_status": "已确认并独立实时复核剩余8%；无运行子代理/模型CLI"
+      "quota_policy_status": "遵守<=1暂停；本轮各线最近回报剩余5%，后续仍须实时复核"
     },
     "C": {
       "thread_id": "01a0fdc7-5154-7e51-aafa-f1b34d8f46f9",
@@ -44,13 +44,13 @@
       "worktree": "/Users/mentianlu/.codex/worktrees/bc9b/umanews",
       "branch": "codex/next-version-product-ui-20261003",
       "status": "已启动",
-      "last_cursor": "1bb9b1cd-6b22-4865-9d87-78fbf289661d:5",
+      "last_cursor": "1bb9b1cd-6b22-4865-9d87-78fbf289661d:6",
       "model": "gpt-6.1-sol",
       "reasoning_effort": "medium",
       "initial_head": "dbcc87a4",
       "title": "Umanews 10.30｜C 页面关联与后台",
       "model_evidence": "create_thread 显式指定 gpt-6.1-sol 和 medium，创建成功；启动回报已收取",
-      "quota_policy_status": "已确认并独立实时复核剩余8%；无运行子代理/模型CLI"
+      "quota_policy_status": "遵守<=1暂停；本轮各线最近回报剩余5%，后续仍须实时复核"
     },
     "R": {
       "thread_id": "01a0fdc6-2d8d-7d10-9662-a7b042e56ef0",
@@ -58,14 +58,14 @@
       "worktree": "/Users/mentianlu/.codex/worktrees/3ab1/umanews",
       "branch": "codex/next-version-review-20261003",
       "status": "已启动",
-      "last_cursor": "6afb1d41-cb4a-4026-a141-43c0a48e9cae:5",
+      "last_cursor": "6afb1d41-cb4a-4026-a141-43c0a48e9cae:6",
       "model": "gpt-6.1-sol",
       "reasoning_effort": "medium",
       "initial_head": "d00eaf18",
       "title": "Umanews 10.30｜R 独立审核与验收",
       "model_evidence": "create_thread 显式指定 gpt-6.1-sol 和 medium，创建成功；启动回报已收取",
-      "quota_policy_status": "已确认并独立实时复核剩余8%；无运行子代理/模型CLI",
-      "latest_report_commit": "5ee68b5c5b63c5c1e2d6eec6e38ad7a9204ef05d"
+      "quota_policy_status": "遵守<=1暂停；本轮各线最近回报剩余5%，后续仍须实时复核",
+      "latest_report_commit": "bf3bd91ed8baf0bfe8b2d9c19276a09f833308f6"
     }
   },
   "tasks": {
@@ -75,10 +75,10 @@
       "deps": [],
       "deadline_at": "2026-10-04T18:00:00+08:00",
       "status": "进行中",
-      "phase": "合同/业务代码开发验证完成；真实PR映射待最后两路径",
-      "commit": "0e05029c1ed00713a6f66e461e6753c1e4dadb27",
+      "phase": "合同/开发验证及全部映射复审完成，已纳入隔离集成，正式full待证",
+      "commit": "815b3181fa61e7fbbff714c7d7326e5598dc71a6",
       "pr": null,
-      "review": "APPROVED@0e05029c；A002-P2-01/02 CLOSED；独立17 tests PASS；完整Linux/skip/收据待核",
+      "review": "代码APPROVED@0e05029c，两P2 CLOSED；剩余映射APPROVED@815b3181；6182项开发验证通过含10既定skip，正式PR收据待证",
       "evidence": [
         "/Users/mentianlu/.codex/worktrees/5482/umanews/docs/changes/next-version-capabilities/lanes/A/A-001-report.md"
       ],
@@ -135,19 +135,21 @@
       ],
       "deadline_at": "2026-10-05T18:00:00+08:00",
       "status": "进行中",
-      "phase": "方案/既有资料只读盘点",
+      "phase": "受审方案的离线回放与缺口验证",
       "commit": null,
       "pr": null,
-      "review": null,
+      "review": "方案APPROVED@54e97250；45格/55blob结构摘要通过，业务回放/真实权限待证",
       "evidence": [],
       "merged": false,
       "deployed": false,
       "enabled": false,
       "public_verified": false,
-      "dispatch_id": "A-003",
+      "dispatch_id": "A-004",
       "owner_thread_id": "01a0fdc6-8c4e-7ff1-af4b-9db4baff8fb1",
       "dependency_input_sha": "0e05029c1ed00713a6f66e461e6753c1e4dadb27",
-      "dependency_limit": "F01业务合同已独立审核和Linux全量开发验证，正式PR收据仍待；本阶段只读准备，不扩大网络或付费"
+      "dependency_limit": "F01业务合同已独立审核和Linux全量开发验证，正式PR收据仍待；本阶段只读准备，不扩大网络或付费",
+      "plan_artifact": "/Users/mentianlu/.codex/runtime/a003-f03-815b3181/",
+      "plan_digest": "cfbec6d7658a5fdca98d4c192148ef633684ea9d20f780d7e0f7886454c1147f"
     },
     "F02": {
       "lane": "B",
@@ -155,10 +157,10 @@
       "deps": [],
       "deadline_at": "2026-10-05T18:00:00+08:00",
       "status": "进行中",
-      "phase": "导出器三P2复审通过，转存wrapper测试先行实现",
-      "commit": "15b293ce6cc70a717eafee25c9e4120c9280b58f",
+      "phase": "转存组件代码审核REVISE，B003-P2-01返修；实际adapter/PG/样本待证",
+      "commit": "72ac3074086350c71a82ddfae5cf21a34642ceec",
       "pr": null,
-      "review": "APPROVED@15b293ce，三P2 CLOSED；转存方案APPROVED，待wrapper/verifier实现、正式Linux与有界现场取样",
+      "review": "原exporter APPROVED@15b293ce；wrapper REVISE@72ac3074，44 fake PASS但未知counts文本可进入摘要",
       "evidence": [
         "/Users/mentianlu/.codex/worktrees/a14d/umanews/docs/changes/next-version-capabilities/lanes/B/B-001-status.md"
       ],
@@ -233,16 +235,16 @@
       ],
       "deadline_at": "2026-10-06T18:00:00+08:00",
       "status": "进行中",
-      "phase": "方案与mock测试设计",
-      "commit": null,
+      "phase": "受审方案测试先行与实现",
+      "commit": "5e6c1daf33aa4cfddbceb34b0cefc5741402df3c",
       "pr": null,
-      "review": null,
+      "review": "方案APPROVED@54e97250；最小RED@0215846a，扩展13例23行为failures/0errors@6700efa9；GREEN实现中，预留短PG窗口",
       "evidence": [],
       "merged": false,
       "deployed": false,
       "enabled": false,
       "public_verified": false,
-      "dispatch_id": "C-004",
+      "dispatch_id": "C-005",
       "owner_thread_id": "01a0fdc7-5154-7e51-aafa-f1b34d8f46f9",
       "dependency_input_sha": "0e05029c1ed00713a6f66e461e6753c1e4dadb27"
     },
@@ -257,11 +259,13 @@
       ],
       "deadline_at": "2026-10-06T18:00:00+08:00",
       "status": "进行中",
-      "phase": "规划/收集输入",
+      "phase": "生产政策摘要与资源已只读核对；套餐/分母/吞吐/预算待证",
       "commit": null,
       "pr": null,
       "review": null,
-      "evidence": [],
+      "evidence": [
+        "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/F06-policy-capacity-readonly-20261003.md"
+      ],
       "merged": false,
       "deployed": false,
       "enabled": false,
@@ -281,7 +285,8 @@
       "pr": null,
       "review": null,
       "evidence": [
-        "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/O01-runtime-readonly-20261003.md"
+        "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/O01-runtime-readonly-20261003.md",
+        "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/F06-policy-capacity-readonly-20261003.md"
       ],
       "merged": false,
       "deployed": false,
@@ -392,7 +397,7 @@
       "phase": "代码复审/PG短验证完成，待正式集成full",
       "commit": "03e5afbbfd2f31cef19285de3f0758a8d6134602",
       "pr": null,
-      "review": "APPROVED@2b9398f7，C003-P2-01 CLOSED；PG/目标能力/正式impact及Linux交付待证",
+      "review": "APPROVED@2b9398f7；39例隔离PG验证通过，198输入等价；生产PG能力及正式集成PR收据待证",
       "evidence": [
         "/Users/mentianlu/.codex/worktrees/bc9b/umanews/docs/changes/next-version-capabilities/lanes/C/U01-implementation-review.md"
       ],
@@ -2176,6 +2181,26 @@
       "scope": "QQ全发送路径关闭与网页解耦的方案和mock测试设计",
       "status": "已送达",
       "sent_at": "2026-10-03T03:24:13.676900+08:00"
+    },
+    {
+      "id": "A-004",
+      "lane": "A",
+      "task_ids": [
+        "F03"
+      ],
+      "scope": "受审F03离线回放与真实/synthetic分类，不扩大网络/付费",
+      "status": "已送达",
+      "sent_at": "2026-10-03T03:39:00.172355+08:00"
+    },
+    {
+      "id": "C-005",
+      "lane": "C",
+      "task_ids": [
+        "Q01"
+      ],
+      "scope": "受审18场景RED-GREEN及QQ路径统一停用，不操作生产/外发",
+      "status": "已送达",
+      "sent_at": "2026-10-03T03:39:00.172355+08:00"
     }
   ],
   "decisions": [
@@ -2226,6 +2251,20 @@
       "owner": "coordinator/R",
       "status": "已分配职责，待产出",
       "summary": "R托管保留集；B做development初标；机器初标/独立核验/人类核验分层记录，疑难事实带证据交协调者，不能虚称人工gold。"
+    },
+    {
+      "id": "F06-BUDGET-001",
+      "owner": "user",
+      "status": "已异步请求，未答",
+      "summary": "第三方数据与产品模型API每日及本版总费用上限和币种；与Codex套餐额度分开",
+      "due": "2026-10-06T18:00:00+08:00"
+    },
+    {
+      "id": "F06-POLICY-RENEWAL-001",
+      "owner": "coordinator/A",
+      "status": "风险已登记，待核proof并准备精确包",
+      "summary": "JRA硬期限10/27 02:00；TRA当前证据据主线31天门槛10/27 01:15后stale。10/19 18:00前完成核验/续期包，O05前获准执行，不自动续日期或换绑",
+      "due": "2026-10-19T18:00:00+08:00"
     }
   ],
   "planning_commit": "d0cec076019f35b6f7db56b09ebee291e57fd9f9",
@@ -2271,6 +2310,23 @@
       "head": "c9c798ac6190c1ad3f6ed8abb804b453641bc507",
       "status": "APPROVED",
       "report": "/Users/mentianlu/.codex/worktrees/3ab1/umanews/docs/changes/next-version-capabilities/lanes/R/R-root-impact-mapping-review.md"
+    },
+    {
+      "scope": "F01剩余fixture/报告两路径映射",
+      "base": "2ace4fc3109d118701c630f230e22127f5c26198",
+      "head": "815b3181fa61e7fbbff714c7d7326e5598dc71a6",
+      "status": "APPROVED，无finding",
+      "review_commit": "5fd82fb4ef8772ddb288370568070d18185a370d"
+    },
+    {
+      "scope": "B003转存组件代码review",
+      "base": "15b293ce6cc70a717eafee25c9e4120c9280b58f",
+      "head": "72ac3074086350c71a82ddfae5cf21a34642ceec",
+      "status": "REVISE，已交B最小返修并回原R",
+      "findings": [
+        "B003-P2-01"
+      ],
+      "review_commit": "bf3bd91ed8baf0bfe8b2d9c19276a09f833308f6"
     }
   ],
   "quota_policy": {
@@ -2284,20 +2340,20 @@
     "resume_requires_user": true,
     "allow_credits": false,
     "allow_reset_credit": false,
-    "last_observed_remaining_percent": 6,
-    "last_observed_used_percent": 94,
-    "last_observed_at": "2026-10-03T03:16:19.425719+08:00",
-    "state": "正常，实时剩余6%，阈值未触发",
+    "last_observed_remaining_percent": 5,
+    "last_observed_used_percent": 95,
+    "last_observed_at": "2026-10-03T03:49:35.077545+08:00",
+    "state": "正常，实时剩余5%，未触发停止",
     "limitation": "调度侧控制；非账单硬上限",
     "unknown_usage_policy": "3次有界重试，仍未知暂缓新增耗时模型工作；读数恢复>1自动解除未知保护"
   },
   "next_actions": [
-    "每轮首先核额度，<=1停止全部本版会话及heartbeat",
-    "收A最后两路径映射固定补丁送原R；A-003只读F03矩阵准备",
-    "收B-003 wrapper/verifier固定实现送原R；来源样本仍0，不执行旧模板",
-    "收C-004 Q01方案给原R，U01固定03e5交协调集成",
-    "准备真实main上的首批固定集成候选（F01/U01/F02基础），应用所有行为映射并按现行规则正式full；不盲逐线重复",
-    "O01补锁/intent/DB租约/队列/实际PG能力与预算；F06等待来源和分母"
+    "每轮首先核额度，<=1停止本版全部会话及heartbeat",
+    "收B003-P2-01最小修复交原R；B004 PG/真实adapter方案冻结树外准备",
+    "收A004固定离线回放证据与C005 GREEN/短PG候选，分别交原R",
+    "把B003批准固定SHA加入既有首批集成工作树，完整映射复审后建Draft PR取得正式Linux full及候选外交付收据",
+    "F06核套餐权限/请求吞吐、等预算回复；政策续期准备10/19前，O05前按精确获准包执行",
+    "O01继续补锁/intent/DB租约/队列/生产PG能力；不恢复旧暂停任务"
   ],
   "resilience_policy": {
     "source": "用户2026-10-03明确要求临时异常快速恢复，不能因一次报错暂停",
@@ -2316,7 +2372,7 @@
   "resources": {
     "local_linux_tests": {
       "profile": "umanews-impact-ci",
-      "status": "C短PG完成并释放，无分配中长任务；等待固定集成候选正式full",
+      "status": "C-005短PG窗口已预留，待固定GREEN候选启动；集成正式full走真实PR",
       "cpu": 2,
       "memory_gib": 4,
       "disk_gib": 20,
@@ -2334,35 +2390,35 @@
       ],
       "verification_limit": "daemon与缓存可用；不是候选测试通过证据",
       "runner_connection": "A专用DOCKER_CONFIG/context仅绑定本地socket，原verify_local_docker已PASS；各线使用独立配置目录，不覆盖全局context",
-      "current_allocation": null,
+      "current_allocation": {
+        "lane": "C",
+        "task": "C-005/Q01",
+        "status": "reserved",
+        "head": null,
+        "parallel_batches_max": 2,
+        "scope": "CAS两连接/事务on_commit/迟到任务"
+      },
       "temporary_directory": "每线独立/Users/mentianlu/.codex/runtime目录作为TMPDIR；mac /var/folders未共享",
-      "queue": [
-        {
-          "lane": "B",
-          "scope": "F02新路径映射后的必要交付测试",
-          "candidate_sha": "15b293ce6cc70a717eafee25c9e4120c9280b58f",
-          "status": "待R技术审核与映射衔接后安排"
-        }
-      ],
+      "queue": [],
       "previous_allocation": {
         "lane": "A",
         "head": "0e05029c1ed00713a6f66e461e6753c1e4dadb27",
         "parallel_batches": 2,
         "output": "/tmp/umanews-a002-evidence/linux-full-0e05029c",
-        "status": "41/41 runner exit0；A完整集合/skip/收尾/收据核验中，窗口已释放",
+        "status": "已完成可信verify_test_plan核验，6182项/41批/10既定skip/0失败错误；开发证据非正式PR交付",
         "built_image": "sha256:fcf8cdaf63af51b1b8a6e30e3d2fdf871d127c3c1461bfd00c9fc6d610eab905",
         "collection_blocker": null,
         "collection_tests": 6182,
         "collection_batches": 41,
         "collection_labels": 294,
-        "last_progress": "40/41分片完成，完整集合/skip/收尾/候选外收据待A提交"
+        "last_progress": "41/41完成，窗口已释放"
       },
       "previous_c_allocation": {
         "lane": "C",
         "head": "4c11df4ba9899efb64d544e14246eabd13dfb1c8",
         "scope": "短RED与PG16等价诊断，非正式full交付",
         "parallel_batches": 1,
-        "status": "Linux原RED有效失败，39项PG GREEN一批运行；不自动full",
+        "status": "39项PG PASS，198输入等价，窗口已释放",
         "formal_plan": {
           "base": "907f8de699b31a6fcc80acc78e9ba070aadc4f28",
           "mode": "full",
@@ -2379,10 +2435,31 @@
       "shared_blocker": "九静态路径、U01 fixture与两view函数已精确补齐；A先完成旧0e在途，再消费控制生成真实base计划，不自动重复full",
       "shared_control_sha": "c9c798ac6190c1ad3f6ed8abb804b453641bc507",
       "shared_control_review": "APPROVED，R独立30tests与边界验证PASS；真实main计划和full仍待",
-      "A_remaining": [
-        "F01-contract-examples.json:真实行为fixture -> content_contracts",
-        "F01-validation.json:纯报告 -> 精确docs；A固定补丁后送R"
-      ]
+      "A_remaining": []
+    },
+    "integration": {
+      "worktree": "/Users/mentianlu/.codex/worktrees/next-version-integration-20261003/umanews",
+      "branch": "codex/next-version-first-integration-20261003",
+      "main_base": "907f8de699b31a6fcc80acc78e9ba070aadc4f28",
+      "head": "a61cfb4b20ccf1907d359c6c090e126aeaf5d8e8",
+      "status": "固定a61组合保持clean，待B003最小返修通过后合并；真实PR自动Linux full，避免本地重复整套",
+      "inputs": {
+        "coordination": "54b6b58d",
+        "U01": "03e5afbbfd2f31cef19285de3f0758a8d6134602",
+        "F01": "815b3181fa61e7fbbff714c7d7326e5598dc71a6",
+        "F02_exporter": "15b293ce6cc70a717eafee25c9e4120c9280b58f"
+      },
+      "conflict_resolution": "共同规划文档保持协调版；A rules stage3经逐字段/集合核为现有C/root映射超集，完整保留双方；无业务代码冲突",
+      "lock": "/Users/mentianlu/.codex/runtime/umanews-integration.lock",
+      "lock_semantics": "fcntl非阻塞独占，持有进程owner/thread/operation/SHA/resource/start/PID可核，finally释放；最后状态released",
+      "formal_static_plan": {
+        "mode": "full",
+        "domains": 248,
+        "labels": 295,
+        "digest": "a4836a22c9fc8d07e5ac83e39923bfcbe770b08bda174b66b0cdfc3aef268c51",
+        "path": "/Users/mentianlu/.codex/runtime/first-integration-evidence/static-plan-before-transfer.json"
+      },
+      "pending_mapping_review": "a61应用已审B proposal到实际rules/catalog/profile，proposal JSON按行为fixture；sample_inventory.json无代码消费者精确docs，随最终集成复审"
     }
   },
   "source_main_last_verified": {
