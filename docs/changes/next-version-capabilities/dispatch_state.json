@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "timezone": "Asia/Shanghai",
-  "updated_at": "2026-10-03T02:48:52.630413+08:00",
+  "updated_at": "2026-10-03T02:49:20.529875+08:00",
   "coordinator_thread_id": "01a0fdb2-b88c-7f93-8c9e-ba9564c33c93",
   "coordinator_worktree": "/Users/mentianlu/.codex/worktrees/516a/umanews",
   "deadline_at": "2026-10-30T18:00:00+08:00",
@@ -75,7 +75,7 @@
       "deps": [],
       "deadline_at": "2026-10-04T18:00:00+08:00",
       "status": "进行中",
-      "phase": "返修原R复审/Linux收集与全量验证",
+      "phase": "原R限定复审/Linux full运行中",
       "commit": "0e05029c1ed00713a6f66e461e6753c1e4dadb27",
       "pr": null,
       "review": "两项P2已修，17 host GREEN；已送原R限定复审；Linux仍待证",
@@ -2218,7 +2218,7 @@
   "resources": {
     "local_linux_tests": {
       "profile": "umanews-impact-ci",
-      "status": "daemon就绪，A固定镜像已构建；旧候选collect发现profile遗漏，尚无full收据",
+      "status": "A新固定树收集通过，full正在运行",
       "cpu": 2,
       "memory_gib": 4,
       "disk_gib": 20,
@@ -2241,9 +2241,12 @@
         "head": "0e05029c1ed00713a6f66e461e6753c1e4dadb27",
         "parallel_batches": 2,
         "output": "/tmp/umanews-a002-evidence/linux-full-0e05029c",
-        "status": "新固定树collect进行中；成功后2并发full；旧e9/650无full",
+        "status": "collect通过，full已开始，最多2批并发",
         "built_image": "sha256:fcf8cdaf63af51b1b8a6e30e3d2fdf871d127c3c1461bfd00c9fc6d610eab905",
-        "collection_blocker": "profile遗漏已修并送R，等待实际新树收集结果"
+        "collection_blocker": null,
+        "collection_tests": 6182,
+        "collection_batches": 41,
+        "collection_labels": 294
       },
       "temporary_directory": "每线独立/Users/mentianlu/.codex/runtime目录作为TMPDIR；mac /var/folders未共享"
     },
