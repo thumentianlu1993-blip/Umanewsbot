@@ -21,3 +21,9 @@ GREEN：同一行为测试通过后再扩展负例/规范化测试；保存命�
 新路径映射需独立受审；Docker尚不可用已报告协调者。全量/映射演进由既有规则决定，不做空选集。
 
 原R补充mutation：action两个预期版本副本以True/1.0替代整数1分别拒绝；公开identity_state在verified/unresolved/revoked三状态间六种错配拒绝，匹配不变；不只比较Python宽松dict相等或kind/id。
+
+# A-006 / H01 实施测试设计（非未决部分已原R批准）
+
+原R方案6a07acd5批准971a08a2非未决部分；冻结初始窗口、赛季缺证unknown、优先元组、生效指针/legacy冲突与120秒/5秒SQL/250ms锁/24SELECT/500行/2MiB初测。JG1保持unresolved并阻断完整历史与complete snapshot；不实施streaming。18个业务mutation沿H01-test-matrix.md，外加只读工具：默认不连接、schema不符停止、每SQL/总预算、行数/字节截断、事务READ ONLY+RR+rollback、SQL/连接失败脱敏且不重试；模拟查询不证明真实生产数量。
+
+API骨架正常导入，第一组测试直接调用未实现plan_inventory/run_counts得到NotImplementedError，非import错误。之后分窗口/身份→版本/优先/分层→读取预算循环RED/GREEN；输入schema/哈希/固定时刻、只读producer边界与测试编号在A006报告固定。不涉及模型/迁移/Celery/writer；无需PG，所有测试stdlib unittest，SQL使用受控连接fake并验证fail-closed、事务和截断行为。Linux固定树专项证据与宿主开发证据分开，新增领域/path/profile映射只提出proposal交root，不能编辑共享映射绕过规则。
