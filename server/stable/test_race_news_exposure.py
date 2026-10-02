@@ -1643,6 +1643,7 @@ class WindowQQAtomicityTests(TestCase):
             window_end=now,
         )
 
+    @override_settings(QQ_CHANNEL_ENABLED=True)
     def test_quota_rejection_leaves_no_orphan_exposure(self) -> None:
         """quota 拒绝后不得残留 exposure / delivery（同事务回滚）。"""
         try:
