@@ -41,7 +41,8 @@
     "scripts/tests/test_f02_readonly_export.py": {
       "label": "scripts.tests.test_f02_readonly_export",
       "domains": [
-        "module:scripts.tests.test_f02_readonly_export"
+        "module:scripts.tests.test_f02_readonly_export",
+        "module:scripts.tests.test_f02_transfer"
       ]
     },
     "scripts/tests/test_f02_transfer.py": {
@@ -62,5 +63,6 @@
   },
   "script_commit_binding": "fixed post-review head in coordinator stage message",
   "review_fix_parent_sha": "48c51fb19f328eb9add14dd5fca40d4ceffaae63",
-  "script_sha256": "fcdb8e6a130b3c98dd0ab500df6328e42d8ac817d3475a18cbdc46f79be997a5"
+  "script_sha256": "fcdb8e6a130b3c98dd0ab500df6328e42d8ac817d3475a18cbdc46f79be997a5",
+  "integration_dependency_fix": "INT001-P2-01: catalog.tests takes precedence; exporter test fixture maps export+transfer, proposal only; root owns shared integration"
 }
