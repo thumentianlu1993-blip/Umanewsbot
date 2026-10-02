@@ -8,7 +8,7 @@
 ## 已有本地证据
 
 17 个合成/fake 单元测试通过，代码字段对 model AST 校验通过。
-默认 `--mode plan` 实测不连数据库，产物在本线 `runtime/next_version/F02/b002-offline-plan-v1/`，manifest SHA256：
+默认 `--mode plan` 实测不连数据库，产物在本线专用工作树外目录 `/Users/mentianlu/.codex/artifacts/umanews-next-version-B/B-002/runtime/next_version/F02/b002-offline-plan-v1/`，manifest SHA256：
 `1103cfa974be5330a99a55f97ef00a8790df4bdd3c2d06db2b8ce99161c19c8c`。
 这是离线执行/合同产物，不是生产样本，也不是固定Linux受测树交付收据。
 
