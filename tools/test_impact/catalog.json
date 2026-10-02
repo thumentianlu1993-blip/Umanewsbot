@@ -2763,7 +2763,8 @@
     "scripts.tests.test_impact_delivery": "python",
     "stable.test_impact_core": "django",
     "scripts.tests.test_impact_evolution": "python",
-    "scripts.tests.test_impact_verifier_e2e": "python"
+    "scripts.tests.test_impact_verifier_e2e": "python",
+    "stable.test_content_contracts": "python"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {

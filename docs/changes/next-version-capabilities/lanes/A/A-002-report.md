@@ -32,3 +32,5 @@ Linux交付：专用Colima umanews-impact-ci由协调者恢复；固定候选的
 
 当前额度最新每周已用93%、剩7%；无子代理/模型CLI。持续检查与用户<=1%停止约束保持。
 临时异常按2s/5s最多3次有界恢复，未知写入结果先读收据，不重复派单或改生产。
+
+首次Linux收集发现新测试未登记catalog.profiles，fail closed为unowned test；已补显式python profile（纯stdlib），不改变runner或豁免。原e9未开始执行full；新候选重新收集，旧结果仅归e9。Docker默认temp挂载问题已用本线Users下TMPDIR解决，镜像已按原Dockerfile成功构建。
