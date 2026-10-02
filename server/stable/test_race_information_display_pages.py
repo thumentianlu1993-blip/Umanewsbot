@@ -183,3 +183,25 @@ class DisplayPageTests(TestCase):
         self.assertEqual(candidate.candidate_payload['items'][0],{'horse_name':'Candidate','finish_position':4})
         row=RaceEventResult(finish_position=4,horse_name='Database row')
         self.assertNotEqual(row_fields(row)['position'].text,'4')
+
+
+class PublicGradeFilterParityTests(TestCase):
+    """公开等级投影必须在分页前用于查询，而不能仅修饰卡片。"""
+
+    def test_raw_g1_without_stored_code_remains_in_g1_filter_under_both_flags(self):
+        event = RaceEvent.objects.create(
+            year=2025, slug='germany-raw-grade-red', original_name='German grade fixture',
+            chinese_name='德国等级回放', country_region='germany', racecourse='Hamburg',
+            grade_text='G1', normalized_grade='', local_date=date(2025, 7, 6),
+            visibility_status='published', status='finished',
+        )
+        for flag in (True, False):
+            with self.subTest(flag=flag), override_settings(RACE_INFORMATION_NORMALIZED_DISPLAY_ENABLED=flag):
+                params = {'year': '2025', 'region': 'germany', 'tab': 'all'}
+                baseline = self.client.get('/races/', params)
+                self.assertContains(baseline, '德国等级回放')
+                filtered = self.client.get('/races/', {**params, 'grade': 'g1'})
+                self.assertIn(event.pk, [item.pk for group in filtered.context['groups'] for item in group['events']])
+                self.assertContains(filtered, 'grade-badge g1')
+        event.refresh_from_db()
+        self.assertEqual((event.grade_text, event.normalized_grade), ('G1', ''))
