@@ -70,10 +70,10 @@
       "deps": [],
       "deadline_at": "2026-10-04T18:00:00+08:00",
       "status": "进行中",
-      "phase": "方案审核",
+      "phase": "方案返修",
       "commit": "adff62b0bc0bb060b1a4d2f232f59c292d4049da",
       "pr": null,
-      "review": "已送R，排队",
+      "review": "REVISE: F01-M-01 样例与DTO字段/规范化不一致，已发A修复",
       "evidence": [
         "/Users/mentianlu/.codex/worktrees/5482/umanews/docs/changes/next-version-capabilities/lanes/A/A-001-report.md"
       ],
@@ -2056,9 +2056,11 @@
       "id": "D-001",
       "date": "2026-10-03",
       "subject": "观察窗口与报告时序修正",
-      "status": "R已反馈原两项finding可关闭；待固定复审报告落盘",
+      "status": "R原上下文复审APPROVED，两项finding CLOSED",
       "reason": "原O05至N09仅144小时；R16早于最后观察窗口，报告证据不闭合。",
-      "changes": "O05 10/20 12:00；N09 10/27 14:00；O06 10/23 16:00；O08 10/28 16:00；R16 10/30 16:30；V06 17:00；V07 18:00。"
+      "changes": "O05 10/20 12:00；N09 10/27 14:00；O06 10/23 16:00；O08 10/28 16:00；R16 10/30 16:30；V06 17:00；V07 18:00。",
+      "reviewed_head": "7df6e38f11c150b8be5b7069fc41ca04fef52d95",
+      "review_report": "/Users/mentianlu/.codex/worktrees/3ab1/umanews/docs/changes/next-version-capabilities/lanes/R/R-BOOT-001-plan-rereview.md"
     },
     {
       "id": "D-002",
@@ -2101,16 +2103,13 @@
   "planning_commit": "d0cec076019f35b6f7db56b09ebee291e57fd9f9",
   "review_queue": [
     {
-      "scope": "R-BOOT-001 两条findings复审",
-      "head": "7df6e38f11c150b8be5b7069fc41ca04fef52d95"
-    },
-    {
-      "scope": "F01方案",
-      "head": "adff62b0bc0bb060b1a4d2f232f59c292d4049da"
+      "scope": "F01限定复审",
+      "status": "等A返修固定SHA"
     },
     {
       "scope": "F02方案",
-      "head": "53d29e8da474573ddd86b9d2f277330a305f2a39"
+      "head": "53d29e8da474573ddd86b9d2f277330a305f2a39",
+      "status": "R审核中"
     }
   ]
 }
