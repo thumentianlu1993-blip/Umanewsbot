@@ -56,3 +56,9 @@ P2-03已获契约RED：proposal缺python profile返回None；补profile提案后
 建议容器producer包经精确ID的docker cp转到私有host stage，独立核manifest/文件/hash/bounds后原子提交final及transfer receipt，再直接交R。
 未转存、unknown、持久host verified、source lost、R收包分别记状态；先核实际结果，不盲重采。wrapper/verifier尚未实现，不把方案称为执行证据。
 本次仅文档适配，三P2修复脚本字节仍与910353a5一致；待原R同上下文核对。
+
+## 原R复审与B-003承接
+
+协调者转述原R@5ee68b5c已APPROVED固定15b293ce，B002三P2 CLOSED，transfer方案APPROVED（仅本地实现）。
+本线按该范围完成新模块/fake验证，见[B-003状态](B-003-status.md)与[新命令包](B-003-command-package.md)。
+新代码仍待原R代码review；原exporter字节不变。此前“wrapper/verifier未实现”是当时阶段事实，由B-003承接；不代表生产执行已完成。
