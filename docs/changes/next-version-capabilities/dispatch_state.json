@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "timezone": "Asia/Shanghai",
-  "updated_at": "2026-10-03T02:18:40.623603+08:00",
+  "updated_at": "2026-10-03T02:19:55.085378+08:00",
   "coordinator_thread_id": "01a0fdb2-b88c-7f93-8c9e-ba9564c33c93",
   "coordinator_worktree": "/Users/mentianlu/.codex/worktrees/516a/umanews",
   "deadline_at": "2026-10-30T18:00:00+08:00",
@@ -75,10 +75,10 @@
       "deps": [],
       "deadline_at": "2026-10-04T18:00:00+08:00",
       "status": "进行中",
-      "phase": "方案返修",
-      "commit": "adff62b0bc0bb060b1a4d2f232f59c292d4049da",
+      "phase": "方案复审",
+      "commit": "7c78f67d04cc156520d21916f3eb0a3ef066305e",
       "pr": null,
-      "review": "REVISE: F01-M-01 样例与DTO字段/规范化不一致，已发A修复",
+      "review": "F01-M-01修订已送原R限定复审",
       "evidence": [
         "/Users/mentianlu/.codex/worktrees/5482/umanews/docs/changes/next-version-capabilities/lanes/A/A-001-report.md"
       ],
@@ -2117,7 +2117,8 @@
     },
     {
       "scope": "F01限定复审",
-      "status": "等A返修固定SHA"
+      "status": "已送R",
+      "head": "7c78f67d04cc156520d21916f3eb0a3ef066305e"
     },
     {
       "scope": "F02限定复审及有界导出方案",
@@ -2137,7 +2138,7 @@
     "allow_reset_credit": false,
     "last_observed_remaining_percent": 8,
     "last_observed_used_percent": 92,
-    "last_observed_at": "2026-10-03T02:16:30.172582+08:00",
+    "last_observed_at": "2026-10-03T02:19:55.085378+08:00",
     "state": "正常，阈值未触发",
     "limitation": "调度侧控制；非账单硬上限"
   },
