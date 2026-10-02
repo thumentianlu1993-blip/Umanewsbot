@@ -1,0 +1,39 @@
+{
+  "tested_commit": "4949317ff47cf0fcfd443cb6e86bdaef92eea667",
+  "run_url": "https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/37000293909",
+  "summary": {
+    "status": "passed",
+    "skipped_count": 0,
+    "mode": "validation-only",
+    "count": 296,
+    "plan_digest": "f0670817cf36bb276664c63631b170104e8d9239dbfe9433867472f63c62716d",
+    "run_id": "37000293909",
+    "run_attempt": "1",
+    "test_tree": "8473f83aac2ecd18a7adc46af34afdedbb557ce2"
+  },
+  "image_id": "sha256:ab8494e6202dced04a6c2b5b885b3d1f2d9c80776ec8ae8d97f3552aae6b3ecc",
+  "batch_counts": [
+    65,
+    197,
+    34
+  ],
+  "independent_local_tests": 47,
+  "review_verdict": "APPROVE",
+  "review_fingerprint": "399a8451b8e2d22937e464d14ba9c5627d9dbe92915e878e36dd48d3822bd76d",
+  "inventory": {
+    "collected_only": true,
+    "count": 6162,
+    "batches": 34,
+    "max_batch": 200,
+    "declarative_skips": 9
+  },
+  "full_executed": false,
+  "activated": false,
+  "production_changed": false,
+  "pending": [
+    "first full calibration",
+    "non-document trusted delivery receipt",
+    "strict branch protection",
+    "policy activation"
+  ]
+}

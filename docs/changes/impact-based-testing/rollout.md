@@ -1,6 +1,6 @@
 # 实施与激活状态
 
-截至当前：实现主体已提交到PR #233，正在有界验证与独立返修。**未合并、未激活策略、未配置保护、未执行full校准。**
+截至当前：实现及独立返修已完成，PR #233 保持Draft；固定代码版本有界验证和独立复审通过。**未合并、未激活策略、未配置保护、未执行full校准。**
 首次Linux工具链run [36996581104](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/36996581104)：
 222项分成29/193两批，221通过、1个UTF-8环境问题失败；未过滤失败，门禁失败。修复为`initdb --encoding=UTF8`后另跑固定版本。
 选测RED为12项中的11个断言失败；Git权限/index两项真实RED；空分片伪证据一项真实RED；对应小型GREEN已通过。
@@ -76,3 +76,17 @@ Python子进程、curl外网均阻断，独立Docker容器不可用；只收集6
 已新增5个真实失败回归后修复，本地47项通过；旧精细标签扩大为现存模块覆盖并记录superseded_test_labels，
 候选外交付核验同步重算删除及替换审计。补齐历史恢复阶段权限与collector身份/断点/完整性合同。
 下一固定版本仍只做有界验证，最终复审结果待回写。
+
+## 最终代码验收（策略尚未启用）
+
+受验代码 `4949317ff47cf0fcfd443cb6e86bdaef92eea667`，测试tree `8473f83aac2ecd18a7adc46af34afdedbb557ce2`。
+[CI37000293909](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/37000293909) **SUCCESS：296项，65/197/34三批，零失败/错误/skip**。
+全run约2分21秒；批内执行约17.5/5.1/0.8秒，非P95。完整目录仅收集6162个canonical ID、34批、最大200，未全量执行。
+镜像`sha256:ab8494e6202dced04a6c2b5b885b3d1f2d9c80776ec8ae8d97f3552aae6b3ecc`；各批独立PG/无网络隔离检查通过。
+
+原reviewer对最终返修差异及直接回归给出 **APPROVE**，4项全部关闭；独立47项小测试通过，原生review无finding。
+详见[审核记录](review.md)与[机器可读验证摘要](validation.json)。随后只回写文档，不改变已受验代码；后续交付仍须绑定最终候选tree，不能复用旧tree冒充新head验证。
+
+剩余运行验证：首次固定SHA full校准、实际非文档候选外delivery核验、strict required checks/admin约束、shadow后策略激活。
+本轮遵守不执行全量要求，以上均未进行。当前Draft不可在inactive状态直接合并，以免移除旧入口后阻断业务PR。
+没有生产迁移、配置、数据动作、服务重启或外部消息发送；后续精确交付包仍按根AGENTS.md处理。
