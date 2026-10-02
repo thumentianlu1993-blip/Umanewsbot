@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "timezone": "Asia/Shanghai",
-  "updated_at": "2026-10-03T02:19:55.085378+08:00",
+  "updated_at": "2026-10-03T02:21:26.102941+08:00",
   "coordinator_thread_id": "01a0fdb2-b88c-7f93-8c9e-ba9564c33c93",
   "coordinator_worktree": "/Users/mentianlu/.codex/worktrees/516a/umanews",
   "deadline_at": "2026-10-30T18:00:00+08:00",
@@ -133,10 +133,10 @@
       "deps": [],
       "deadline_at": "2026-10-05T18:00:00+08:00",
       "status": "进行中",
-      "phase": "方案返修",
-      "commit": "fcf8a31e605c2a5d8837121c3b77f5b0120dd3be",
+      "phase": "方案复审/导出方案审核",
+      "commit": "a2704b2d7ef93a6ee8518fca2f63ada4a43c2b64",
       "pr": null,
-      "review": "F02-M-01 holdout消费/调参隔离待返修；导出方案待合并复审",
+      "review": "F02-M-01返修及有界导出方案已送原R，尚无新快照/gold，任务未完成",
       "evidence": [
         "/Users/mentianlu/.codex/worktrees/a14d/umanews/docs/changes/next-version-capabilities/lanes/B/B-001-status.md"
       ],
@@ -2122,7 +2122,8 @@
     },
     {
       "scope": "F02限定复审及有界导出方案",
-      "status": "等B返修固定SHA"
+      "status": "已送R",
+      "head": "a2704b2d7ef93a6ee8518fca2f63ada4a43c2b64"
     }
   ],
   "quota_policy": {
@@ -2138,7 +2139,7 @@
     "allow_reset_credit": false,
     "last_observed_remaining_percent": 8,
     "last_observed_used_percent": 92,
-    "last_observed_at": "2026-10-03T02:19:55.085378+08:00",
+    "last_observed_at": "2026-10-03T02:21:26.102941+08:00",
     "state": "正常，阈值未触发",
     "limitation": "调度侧控制；非账单硬上限"
   },
