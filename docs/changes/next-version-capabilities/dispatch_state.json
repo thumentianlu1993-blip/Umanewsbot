@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "timezone": "Asia/Shanghai",
-  "updated_at": "2026-10-03T02:33:23.245395+08:00",
+  "updated_at": "2026-10-03T02:35:43.640132+08:00",
   "coordinator_thread_id": "01a0fdb2-b88c-7f93-8c9e-ba9564c33c93",
   "coordinator_worktree": "/Users/mentianlu/.codex/worktrees/516a/umanews",
   "deadline_at": "2026-10-30T18:00:00+08:00",
@@ -65,7 +65,7 @@
       "title": "Umanews 10.30｜R 独立审核与验收",
       "model_evidence": "create_thread 显式指定 gpt-6.1-sol 和 medium，创建成功；启动回报已收取",
       "quota_policy_status": "已确认并独立实时复核剩余8%；无运行子代理/模型CLI",
-      "latest_report_commit": "503a52ee7929bbcb3623229e95016e51716b5ddc"
+      "latest_report_commit": "f4fc85807d9a792a2e61f7e7959152e846eab082"
     }
   },
   "tasks": {
@@ -363,17 +363,18 @@
       ],
       "deadline_at": "2026-10-08T18:00:00+08:00",
       "status": "进行中",
-      "phase": "方案审核",
+      "phase": "测试先行/实现",
       "commit": "2919dd3558950466e18a8886ec8bc7f85a119f5a",
       "pr": null,
-      "review": "已送原R，开关两状态等级一致决定已发C",
+      "review": "方案APPROVED@2919dd35；行为未完成/未代码review",
       "evidence": [],
       "merged": false,
       "deployed": false,
       "enabled": false,
       "public_verified": false,
-      "dispatch_id": "C-002",
-      "owner_thread_id": "01a0fdc7-5154-7e51-aafa-f1b34d8f46f9"
+      "dispatch_id": "C-003",
+      "owner_thread_id": "01a0fdc7-5154-7e51-aafa-f1b34d8f46f9",
+      "approved_plan_sha": "2919dd3558950466e18a8886ec8bc7f85a119f5a"
     },
     "H02": {
       "lane": "A",
@@ -2090,6 +2091,16 @@
       "scope": "受审有界只读导出方案的本地导出器、离线验证与精确命令包，不直接运行生产查询",
       "status": "已送达",
       "sent_at": "2026-10-03T02:30:29.747393+08:00"
+    },
+    {
+      "id": "C-003",
+      "lane": "C",
+      "task_ids": [
+        "U01"
+      ],
+      "scope": "受审等级筛选/标签一致小切片，真实RED/GREEN、PG等价、无schema及生产写入",
+      "status": "已送达",
+      "sent_at": "2026-10-03T02:35:43.640132+08:00"
     }
   ],
   "decisions": [
@@ -2143,13 +2154,7 @@
     }
   ],
   "planning_commit": "d0cec076019f35b6f7db56b09ebee291e57fd9f9",
-  "review_queue": [
-    {
-      "scope": "U01方案",
-      "head": "2919dd3558950466e18a8886ec8bc7f85a119f5a",
-      "status": "已送R"
-    }
-  ],
+  "review_queue": [],
   "quota_policy": {
     "source": "本协调会话用户2026-10-03直接补充",
     "weekly_window_minutes": 10080,
@@ -2163,7 +2168,7 @@
     "allow_reset_credit": false,
     "last_observed_remaining_percent": 7,
     "last_observed_used_percent": 93,
-    "last_observed_at": "2026-10-03T02:33:23.245395+08:00",
+    "last_observed_at": "2026-10-03T02:35:43.640132+08:00",
     "state": "正常，实时剩余7%，阈值未触发",
     "limitation": "调度侧控制；非账单硬上限",
     "unknown_usage_policy": "3次有界重试，仍未知暂缓新增耗时模型工作；读数恢复>1自动解除未知保护"
@@ -2209,7 +2214,8 @@
         "umanews-impact-base:verified",
         "umanews-impact-calibration:python3"
       ],
-      "verification_limit": "daemon与缓存可用；不是候选测试通过证据"
+      "verification_limit": "daemon与缓存可用；不是候选测试通过证据",
+      "runner_connection": "禁止DOCKER_CONTEXT/DOCKER_HOST override；A准备独立DOCKER_CONFIG绑定已核验socket，原validator通过后各线独立复用"
     },
     "test_mapping": {
       "decision": "F01需显式映射；mapping变更按现行规则运行固定候选一套full，不改策略规避",
