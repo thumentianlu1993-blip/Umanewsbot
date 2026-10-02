@@ -23,3 +23,15 @@
 生产 dump 在隔离副本恢复时发现两处既有非赛事唯一约束问题，详见[恢复缺陷记录](../../reports/2026-10-02-backup-restore-findings.md)。整库恢复不计通过。
 
 在仅排除上述两个失败约束的副本中，赛事表的 340 约束/244 索引/7 触发器通过比较；固定恢复包 ready → applied → already_applied，七个公开详情共 52 行、两条“跌倒”均正确，覆盖报告七场 confirmed，新后台 200 且没有 incident 写入。演练没有连接生产 Redis、队列或第三方服务，没有修改生产业务数据。
+
+## PR230：监控队列补正的固定候选验证
+
+固定候选 `95edc4c2901d2ccf428e1c497c4fcfc37ff567ed`，基线 `3afde43abfd2df98744bf092f5f9839b5eae9409`。仅把覆盖任务的 Beat options 和直接调用路由从 celery 改到现有 race_sync_v2；无迁移、无配置值变化，不重复七场数据写入。
+
+本地 146 项隔离 PostgreSQL 相关回归通过；四项新增测试包括普通队列 100 条消息积压的独立消费，以及环境/传输隔离。测试环境清空贯穿 settings 加载和消息操作，mock dotenv loader、禁止 socket 连接、隔离 Kombu memory 全局状态并先断言 memory transport；没有 purge 操作。DOTENV_DISABLED 在当前 python-dotenv 版本不能独立保证隔离。
+
+同一只读 reviewer 初审发现测试隔离 P1，补充两条安全反例取得 RED 后修复。固定 95ed 复审 APPROVED，无剩余 actionable findings；前后 scope 指纹均为 `ccb807a1a92a47636891c09351bca2b81124fca4782ce21b4a064b476888c48c`。reviewer 独立四项测试通过，并核验主执行者 146 项 PostgreSQL 日志。
+
+[CI36934098673](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/36934098673) 成功：49 项 0078 合同、18 项 0079 合同、Django check、migration drift 均通过。全量基线 5678 项、候选 5682 项，两端均 22 failures、28 errors、21 skipped；失败集合相同，新增 0、修复 0，不是全量零失败。五项 traceback 尾部不同，但核验异常断言相同，差异为集合输出顺序/页面响应文本；保留两端原始产物摘要，见 [queue-ci-validation.json](queue-ci-validation.json)。
+
+PR230 于 2026-10-02 07:12 北京时间合并为 `0aedc238d6af3d093d430f3cf4a913a1fdf790c5`，与受验候选文件树同为 `311c679d88d5e823782ae6db1abefaa573554dd8`。预构建镜像 `sha256:d8ea010f339f16fccc4f08ce13856508f1e6efbe402908a4b7061d52cf05fe14` 的无网络烟测通过：开关开启时任务注册且 Beat/直接调用都路由到 race_sync_v2；关闭时无排程且执行返回 disabled；迁移无变化。实际部署镜像与自然周期结果以 rollout.md 最终执行记录为准。

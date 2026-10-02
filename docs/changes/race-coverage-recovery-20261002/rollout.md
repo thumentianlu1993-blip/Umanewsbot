@@ -1,6 +1,6 @@
 # 第一批发布包与执行记录
 
-## 待发布包
+## 初始发布包（历史）
 
 用户已明确要求“先做 1，做完让它上线，然后设计 2”，本包在该授权范围内连续执行。发布前完成回归和独立只读 review；不扩大抓取权限、不启动马匹历史导入。
 
@@ -19,7 +19,7 @@
 
 回滚保持 schema 0079，不普通降级镜像、不全库覆盖运行中的新数据。新监控异常可关闭既有 coverage flag 并经受保护发布重载，保留 incident；代码问题用同 schema 前向修复。数据动作在单事务内失败自动回滚；完成后若发现来源事实错误，使用本次备份及 manifest/OperationLog 生成新的受审更正，不盲目重放过期 owner。精确发布恢复只使用本次 0079 intent/镜像/backup，实际路径待生成后补记。
 
-## 当前状态
+## 实施前状态（历史）
 
 代码和恢复包已形成，尚未部署/执行生产数据动作。本地 85 项相关回归和 18 项发布合同通过，旧两项失败在原基线重现；最终复审与云端 CI 进行中。第二阶段尚未开始设计。
 
@@ -43,3 +43,31 @@
 为完成本次已授权投递，在 manual-release 锁保护下手动执行当前版本 monitor 函数一次，返回 delivered=true / delivery_completed / count=44；未清空队列、未改写其他赛事业务事实。这是**手动首投**，不能声称自然任务已经通过。欧洲当地日期跨午夜后新增 6 项近期登记缺口，因此从 05:57 的 38 项增为 44 项，与七场恢复无冲突。
 
 补正发布范围：只把新监控的 Beat options 和直接 dispatch route 改到现有 race_sync_v2 队列，更新函数说明与隔离回归；业务处理、SMTP 收件人、开关值、数据库 schema 和七场恢复数据不变。仍按固定提交/镜像、无迁移的 deploy_0079 前向发布，排空和重建原四应用；**不再次执行七场写入**。配置无需变更，发布前确认赛事 worker 消费该队列；发布后用自然执行收据和第二周期无重复投递验收。队列回退同样需受保护发布，不修改或删除消息。
+
+## 2026-10-02 07:21 北京时间：队列补正上线
+
+PR230 已合并为 `0aedc238d6af3d093d430f3cf4a913a1fdf790c5`，实际部署受验候选 `95edc4c2901d2ccf428e1c497c4fcfc37ff567ed`；两者树相同。四应用已使用镜像 `sha256:6bcae2608d47a0a184a3daf4ae65c99f645a551ebf70634bef2ec4be423658e6`，文件层和除 Compose classic 标签以外的配置与预构建镜像一致。
+
+运行目录 `/opt/umanews-release-95edc4c2-coverage-queue-20261002/umanewsbot`。`deploy_0079.sh` 完整结束，schema 保持 0079、迁移计划为空；配置 SHA `3ed8596fee3558fb1efe9a6adc22c40cc08a4d320cc9043bbd04808784e2f789` 不变，web/db/redis healthy，其余既有服务 running，发布锁与 active intent 指针已释放。
+
+本次 release ID `08c267170f76318381e906c4eef25886c733e6ef8531959b85bad83e16235a4c`；intent SHA `9004a18df79c2ee31354c091d398982ffa0a43f759cab387fdedf79d209954cf`，manifest SHA `56501406d6f28ab6abc781e2e3ecee980ff08a2e2c3c1c701dc955b938172a42`，complete SHA `453905f8f1c03d60129cf223a662a69549e9df2afc2ce871d1acf69b54d0bd4b`。同目录 backup 为 `rds_horse_news_20261001T231419Z_2569443.dump`，637353791 字节，SHA `7a9730300023fb1d5ebf0544e1ab5192881e62401d9d11934692b1168c449ad5`，TOC 1401 行。仍只确认该备份的归档/摘要合同，不声称整库恢复已通过。
+
+发布前 07:13 队列 1/0/7543、无 active/reserved；备份期间普通队列又产生 42 条业务任务。在同一 intent/锁下核对旧 worker 镜像与 hostname 后取消其继续消费 celery，等待已取任务完成，再由新 worker 接续。没有 purge/revoke 或强停在途任务。七场数据没有再次写入。
+
+部署后数据库七场 52 行、historical owner generation=3、retired 登记和七条 resolved 告警复核通过；双域名 14 个详情页再次通过（每域名 52 行、两条跌倒）。07:23 配置/consumer 核验：Beat options 和直接 route 都为 race_sync_v2，实际 worker `celery@cfc3783dc34c` 只消费 race_sync_v2，普通 worker 消费 celery。新队列自然周期验收已通过，见下文最终记录。
+
+## 已取得的自然执行和自动邮件证据
+
+首发版本在普通队列积压缓解后，于 06:38:10 起有真实 Celery SUCCESS 收据；06:40/45/50/55 均完成对账且 `no_new_gaps`。07:00 因英国等当地日期跨午夜，新增 7 项近期未登记缺口；自然任务 `d35038ce-d5e7-4847-93e0-2498c93c9149` 返回 delivered=true/count=7，digest 62 为 sent、alert_sent_at=`2026-10-01T23:00:06.483727Z`、无错误。SMTP 接受不等于收件箱到达/已读。
+
+07:03 同时刻全覆盖分母 10578、confirmed=10215；issue=51（时间未知逾期21、近期未登记18、公开阻断11、owner冲突1）。这与 05:57 恢复后 38 项、06:02 的44项是不同日期窗口，不能直接当成修复回退。
+
+生产文件日志未见任务 INFO 行，验收改用 Redis result backend 中精确匹配 monitor 返回结构的 SUCCESS 收据、DB last_seen_at、已解析告警、实际 queue/consumer 和镜像交叉证明。探针只读，不提交任务或调用 monitor.run；扫描有 100000 keys/20 秒上限，实测约 78000 keys/2 秒，无队列修改。
+
+## 最终自然周期验收与交付边界
+
+07:25:04 UTC+8 的任务 `cabd9cbb-0eda-4130-8cb9-3df52ab5357a` 首轮成功。后续只读复核取得13:40:04任务 `1d8ad839-5f08-4c4f-a9be-641c6d12a139`、13:45:04任务 `3f4bdac2-2c2f-4aca-9af9-fb32faf629cc` 的相邻自然周期SUCCESS；两次均no_new_gaps，未重复投递。51→59的缺口变化已随运行态另计，不能据此要求全站告警数保持固定。
+
+13:45快照：分母10578、confirmed10215，缺口59（时间未知逾期21、近期未登记26、历史结果公开阻断11、owner冲突1）；另有5场处于enrolled分类。所有活跃incident.last_seen_at均推进到`2026-10-02T05:45:00.019809Z`，七场旧incident仍resolved；digest62为sent、最近SMTP接受时间`2026-10-02T04:00:05.767495Z`、无错误。当前镜像、queue、consumer与已验候选一致。
+
+这证明首轮及后续相邻周期自然执行、对账与去重；不据两次抽样声称观察间隔内每个周期均已逐条检查。汇总证据见[production-validation.json](production-validation.json)。第一批目标已完成上线验收；[第二阶段方案](../race-event-unified-decision/spec.md)设计完成，未实施/未部署。其它资料缺口和整库恢复限制继续保留。

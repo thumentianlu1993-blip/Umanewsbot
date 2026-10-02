@@ -1,0 +1,105 @@
+{
+  "run_id": 36934098673,
+  "candidate": "95edc4c2901d2ccf428e1c497c4fcfc37ff567ed",
+  "baseline": "3afde43abfd2df98744bf092f5f9839b5eae9409",
+  "local_postgres_tests": 146,
+  "release_0078_tests": 49,
+  "release_0079_tests": 18,
+  "review": "approved_no_actionable",
+  "review_fingerprint": "ccb807a1a92a47636891c09351bca2b81124fca4782ce21b4a064b476888c48c",
+  "release_artifacts": {
+    "0079-contract-tests.log": "09ff74cde2d8de3623187dcfd9b76d631416814c4f826e9f58ae1c2457a5bdfe",
+    "commit.txt": "ef373ee085f27dd5fc82d42851ee600179185e7131c9ec50dd49b585b70faca9",
+    "contract-tests.log": "94ae529be820e13c978dd910a31c0d203f51987a7db1fdf02183e1f6dd08216a",
+    "django-check.log": "1e3e63f221bde88816c4a4ef7367691607b20cc1d194028a02ec9ae0586cf9b1",
+    "input-sha256.txt": "31daa571fbb3f597306834f993c1230c5390a34385f97c560ea43d1c26cb70dd",
+    "migration-drift.log": "a2bfa7b376c38062f77ce2b1e703876aaa04662f96355cdf5dc9d0d075302b05",
+    "review-fingerprint-after.txt": "f83f5469c73544788b839bff4ccf278ead1ad04e10e10ddf5308718622b35fe8",
+    "review-fingerprint-before.txt": "f83f5469c73544788b839bff4ccf278ead1ad04e10e10ddf5308718622b35fe8",
+    "versions.txt": "3d288c5627d19a6a3ae16cccee7dc536d00a9330b7ffac3e655a88b9e57424e3"
+  },
+  "full_comparison": "passed_no_new_failures",
+  "comparison": {
+    "commits": {
+      "baseline": "3afde43abfd2df98744bf092f5f9839b5eae9409",
+      "candidate": "95edc4c2901d2ccf428e1c497c4fcfc37ff567ed"
+    },
+    "baseline_tests": 5678,
+    "candidate_tests": 5682,
+    "new_failures": [],
+    "fixed_failures": []
+  },
+  "results": {
+    "baseline": {
+      "tests": 5678,
+      "failures": 22,
+      "errors": 28,
+      "skipped": 21,
+      "artifact_sha256": {
+        "workflow-contract-check.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+        "commit.txt": "638a30cba1ab396bbb38a84f21755fddbfd0d26853dbdb22c36104038a3ec408",
+        "result.json": "60128bd48f1d77a3aa3f385e2098f8c111e4af7196c60fdf2c4efcf6f2a740c4",
+        "workflow-contract-tests.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+        "workflow-contract-tests.log": "8667fc03d87335bcf6e7e510bf318e9f00f9a5426b7770f47ba3fc540599344f",
+        "exit-code.txt": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+        "stable.log": "9cb7e173a161b61dd69118ddd678f9ab972a1c35cfa45220b02039dc62d0ae6f",
+        "workflow-contract-check.log": "d441358e01bb8cb61eccf621d76a79d6e5f38321c4c7067ac4f6bf4969f604f9"
+      }
+    },
+    "candidate": {
+      "tests": 5682,
+      "failures": 22,
+      "errors": 28,
+      "skipped": 21,
+      "artifact_sha256": {
+        "workflow-contract-check.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+        "commit.txt": "ef373ee085f27dd5fc82d42851ee600179185e7131c9ec50dd49b585b70faca9",
+        "result.json": "3b017d7f155000ec1a883fdc5efa59053d81bf5418b062bccf9b6a8dab1b6119",
+        "workflow-contract-tests.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+        "workflow-contract-tests.log": "f2e0c40078c5fce524a5a55b1f6523a9a006a23269af84e573a967ca0480592c",
+        "exit-code.txt": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+        "stable.log": "a695687687be984f70007b94325a968f8eeb14c67f1f327909b6baa5acb7be1b",
+        "workflow-contract-check.log": "d441358e01bb8cb61eccf621d76a79d6e5f38321c4c7067ac4f6bf4969f604f9"
+      }
+    }
+  },
+  "full_suite_zero_failures": false,
+  "changed_final_exception": [
+    {
+      "test": "stable.test_lifecycle_shadow_hardening.SupportedDeployOneOffInventoryTests.test_all_deploy_wrapper_run_calls_are_canonical_and_lock_contracts_remain",
+      "baseline": "'deploy/resume_stopped_release.sh' : [('deploy/deploy.sh', 55, '\"$COMPOSE\" -f \"$COMPOSE_FILE\" run --rm --no-deps nginx nginx -t'), ('deploy/deploy_lowcost.sh', 55, '\"$COMPOSE\" -f \"$COMPOSE_FILE\" run --rm --no-deps nginx nginx -t'), ('deploy/deploy_ra",
+      "candidate": "'deploy/deploy_lowcost.sh' : [('deploy/deploy.sh', 55, '\"$COMPOSE\" -f \"$COMPOSE_FILE\" run --rm --no-deps nginx nginx -t'), ('deploy/deploy_lowcost.sh', 55, '\"$COMPOSE\" -f \"$COMPOSE_FILE\" run --rm --no-deps nginx nginx -t'), ('deploy/deploy_race_live_",
+      "baseline_sha256": "1d82b4b166cde9599a6da047f27fd1b46229c192f8eec197ac7e891e938c60d5",
+      "candidate_sha256": "97b6774ca3659997b6f363effe26271bd8f7a5b09b9dce1446eb14dc2e5e3c17"
+    },
+    {
+      "test": "stable.tests_legacy.P0HorseProfileDataCompletionTests.test_public_detail_basic_tier_renders_with_in_progress_badge",
+      "baseline": "b'\\n<!doctype html>\\n<html lang=\"zh-Hans\">\\n<head>\\n  <meta charset=\"utf-8\">\\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\\n  <title>Forever Young</title>\\n  <link rel=\"stylesheet\" href=\"/static/stable/public.css\">\\n</head>\\",
+      "candidate": "b'\\n<!doctype html>\\n<html lang=\"zh-Hans\">\\n<head>\\n  <meta charset=\"utf-8\">\\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\\n  <title>Forever Young</title>\\n  <link rel=\"stylesheet\" href=\"/static/stable/public.css\">\\n</head>\\",
+      "baseline_sha256": "50e31409340b251b18f282ff8e55e399dd89021ca8f6d130f25d4687895129f0",
+      "candidate_sha256": "342f2f4a5a55abbecb73691a972162bca4b57c61a78a7a7b2735b17dde05ec65"
+    },
+    {
+      "test": "stable.tests_legacy.P0HorseProfileDataCompletionTests.test_public_horse_detail_uses_original_name_when_translation_is_pending",
+      "baseline": "b'\\n<!doctype html>\\n<html lang=\"zh-Hans\">\\n<head>\\n  <meta charset=\"utf-8\">\\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\\n  <title>Forever Young</title>\\n  <link rel=\"stylesheet\" href=\"/static/stable/public.css\">\\n</head>\\",
+      "candidate": "b'\\n<!doctype html>\\n<html lang=\"zh-Hans\">\\n<head>\\n  <meta charset=\"utf-8\">\\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\\n  <title>Forever Young</title>\\n  <link rel=\"stylesheet\" href=\"/static/stable/public.css\">\\n</head>\\",
+      "baseline_sha256": "c6ffd5797073b0d963b7e7960f99a1d12bbafb915a8e3700fc208426234cc3fd",
+      "candidate_sha256": "b2571f09d16339c107240fe03d6ef03205375c54a0878bb8ff1276b37852c7f1"
+    },
+    {
+      "test": "stable.tests_legacy.P0HorseProfileDataCompletionTests.test_public_index_keeps_positive_label_for_complete_profiles",
+      "baseline": "b'\\n<!doctype html>\\n<html lang=\"zh-Hans\">\\n<head>\\n  <meta charset=\"utf-8\">\\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\\n  <title>\\xe9\\xa9\\xac\\xe5\\x8c\\xb9\\xe6\\xa1\\xa3\\xe6\\xa1\\x88</title>\\n  <link rel=\"stylesheet\" href=\"/s",
+      "candidate": "b'\\n<!doctype html>\\n<html lang=\"zh-Hans\">\\n<head>\\n  <meta charset=\"utf-8\">\\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\\n  <title>\\xe9\\xa9\\xac\\xe5\\x8c\\xb9\\xe6\\xa1\\xa3\\xe6\\xa1\\x88</title>\\n  <link rel=\"stylesheet\" href=\"/s",
+      "baseline_sha256": "b6857d900a712823ecb8c9a2092e0c3363356e42d64c83ac99c6898416dd85e5",
+      "candidate_sha256": "b8c6f0fe66a02c2759d170cf20170f9bd20b6892989750cb7a465140da846b72"
+    },
+    {
+      "test": "stable.tests_legacy.P0HorseProfileDataCompletionTests.test_public_index_shows_in_progress_badge_for_incomplete_profiles",
+      "baseline": "b'\\n<!doctype html>\\n<html lang=\"zh-Hans\">\\n<head>\\n  <meta charset=\"utf-8\">\\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\\n  <title>\\xe9\\xa9\\xac\\xe5\\x8c\\xb9\\xe6\\xa1\\xa3\\xe6\\xa1\\x88</title>\\n  <link rel=\"stylesheet\" href=\"/s",
+      "candidate": "b'\\n<!doctype html>\\n<html lang=\"zh-Hans\">\\n<head>\\n  <meta charset=\"utf-8\">\\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\\n  <title>\\xe9\\xa9\\xac\\xe5\\x8c\\xb9\\xe6\\xa1\\xa3\\xe6\\xa1\\x88</title>\\n  <link rel=\"stylesheet\" href=\"/s",
+      "baseline_sha256": "0df3af4cc83cd52b52a8b02f98d05725f54fcddf61c169c77738b465b491b2ad",
+      "candidate_sha256": "cd0d1d7d71b0f87b4a0114260e77acb7116f0fde9d47cd1f2e65437bca353878"
+    }
+  ],
+  "trace_tail_differences_note": "5 tails differ; all exception/assertion lines independently compared equal. Preserve raw hashes; do not claim byte-identical tracebacks."
+}
