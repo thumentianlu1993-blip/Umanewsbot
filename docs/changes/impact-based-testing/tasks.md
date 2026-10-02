@@ -1,6 +1,6 @@
 # 任务与状态
 
-主体及返修已完成；固定4949317f的296项Linux有界验证通过，原reviewer独立47项通过、复审APPROVE；未全量校准或激活。
+主体、返修、独立复审、首次full校准、候选外核验及CI激活已完成；6165项分41批，6155通过、10项既定环境skip。
 
 ## 测试先行
 
@@ -23,8 +23,8 @@
 
 - [x] (operations) 同一计划下完成最小GREEN、相关分批、workflow表达式和全量目录完整性验证。
 - [x] (operations) 独立 code review、原 reviewer 返修复审，保存指纹和有限范围验证证据。
-- [ ] (operations) 完成后续专门安排的一套 full profile 首次校准，明确范围、失败及跳过，不伪报通过。
-- [ ] (operations) 只比较计划的shadow验收后，在既有门禁下切换 CI；检查真实仓库 branch rules 与新gate接入。
+- [x] (operations) 完成专门安排的一套 full profile 首次校准，明确范围、失败及跳过，不伪报通过。
+- [x] (operations) 只比较计划的shadow验收后，在既有门禁下切换 CI；检查真实仓库 branch rules 与新gate接入。
 - [x] (operations) 用10个真实历史单文件diff回放选集；有界run仅摘要输出，更新状态/决策/操作说明。
 - [ ] (operations) 积累代表性小迭代实际执行耗时和token统计；当前单次2分19秒不证明P95目标。
 

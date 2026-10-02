@@ -42,3 +42,14 @@
 4项finding全部关闭，无新增可操作问题。独立47项小测试通过；原生review无finding，另32项检查及3个内存场景通过。
 前后工作树clean，范围指纹一致`399a8451b8e2d22937e464d14ba9c5627d9dbe92915e878e36dd48d3822bd76d`。
 原生review session `01a0fc57-c15c-7661-9698-4654d182b893`。此次为代码审核通过，不代表策略激活或发布授权。
+
+## 启用阶段独立复审
+
+- 引导required-check前缀修复：APPROVE，指纹`e9f656ae139aec4baadcb76ac83a95b6816ea5513fc141d3a1080e234d20bd93`。
+- 136998b3校准返修：APPROVE，独立49项工具测试及37项PG报告复核，指纹`6b8f4b95fda9c117e85c708c8981b14505c63a8b4a66f5c3e1f90adc728d1b5a`。
+- 136998b3..7067935e线程连接清理：APPROVE、无finding；8项同类PG回归和数据库销毁正常，原生review无finding，
+  前后指纹一致`e78b9335b17eda31df8b26c6008b1ceef38ce48728b4d9e099964bd7a8883868`。
+
+最终PR入口及手动交付限制修复：独立人工审核APPROVE，50项独立工具测试通过；附加原生工具停在初始化，已停止，未记为通过。
+最终候选外审核文件SHA256为`094fe56f5b6b5285f6907eac899973662efc7b61e095591194289b2a79c97a94`，
+绑定`185a7d072e399576d35a53ddea4f94f136bb7228`及19个control blobs，指纹`70e1fc0ab0eecab68dc557babecdafd545dac122b12d25949c83de366fe18b1e`。独立审核本身不替代交付核验。
