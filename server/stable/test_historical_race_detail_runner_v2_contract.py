@@ -634,12 +634,12 @@ class HistoricalDetailRunnerV2HostLockAndCheckpointTests(SimpleTestCase):
     def test_shared_host_lock_limits_two_processes_and_appends_both_shards(self):
         _load_v2()
         with TemporaryDirectory() as tmp:
-            root = Path(tmp)
+            root = Path(tmp).resolve()
             state = root / "www.jra.go.jp.last-start.json"
             log = root / "www.jra.go.jp.requests.jsonl"
             code = (
                 "import importlib.util, pathlib, sys; "
-                "p=pathlib.Path(sys.argv[1]); "
+                "p=pathlib.Path(sys.argv[1]); sys.path.insert(0, str(p.parent)); "
                 "s=importlib.util.spec_from_file_location('runner_v2_child', p); "
                 "m=importlib.util.module_from_spec(s); s.loader.exec_module(m); "
                 "print(m.reserve_host_start(pathlib.Path(sys.argv[2]), pathlib.Path(sys.argv[3]), "

@@ -1435,7 +1435,7 @@ class RaceEventCrawlFirstAcceptanceFixtureTests(RaceEventCrawlOrchestrationTestC
 
     def test_first_acceptance_rejects_missing_region_adapter_coverage(self):
         module = self._module()
-        fixture = Path("server/stable/fixtures/race_event_crawl/first_acceptance_plan.json")
+        fixture = (Path(__file__).resolve().parent / "fixtures/race_event_crawl/first_acceptance_plan.json")
         plan = json.loads(fixture.read_text(encoding="utf-8"))
         plan["adapters"] = [
             key for key in plan["adapters"] if key != "france_wikipedia_history_winners"

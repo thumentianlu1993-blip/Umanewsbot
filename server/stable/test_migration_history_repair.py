@@ -371,47 +371,29 @@ class MigrationHistoryRepairLeafSetRedTests(TestCase):
     def test_management_command_accepts_repeated_complete_leaf_set(self):
         from io import StringIO
 
-        output = StringIO()
-        with patch(
-            "stable.services.historical_calendar_release_b_schema."
-            "MigrationRecorder.applied_migrations",
-            return_value={M0067, M0068, M0070},
-        ), patch(
-            "stable.services.historical_calendar_release_b_schema.database_vendor_contract",
-            return_value={"ok": True, "expected": "postgresql", "actual": "postgresql"},
-        ), patch(
-            "stable.services.historical_calendar_release_b_schema."
-            "MigrationLoader.check_consistent_history"
-        ), patch(
-            "stable.services.historical_calendar_release_b_schema._postgres_catalog_state",
-            return_value={"ok": True, "drift_paths": [], "catalog_sha256": "c" * 64},
-        ):
-            call_command(
-                "check_historical_calendar_release_b_schema",
-                direction="forward",
-                json_output=True,
-                expected_migration_leaf_set=[
-                    f"{M0068[0]}.{M0068[1]}",
-                    f"{M0070[0]}.{M0070[1]}",
-                ],
-                stdout=output,
-            )
-        payload = json.loads(output.getvalue())
-        self.assertEqual(
-            payload["schema_version"], "migration-history-repair-preflight/v3"
-        )
-        self.assertEqual(
-            payload["migration_leaf_set"],
-            [f"{M0068[0]}.{M0068[1]}", f"{M0070[0]}.{M0070[1]}"],
-        )
-        self.assertEqual(
-            payload["migration_plan"],
-            [
-                M0069[1], M0071[1], M0072[1], M0073[1], M0074[1],
-                M0075[1], M0076[1], M0077[1],
-            ],
-        )
-        self.assertTrue(payload["migration_state_allowed"])
+        # 这里只验证重复 CLI 参数被当作完整集合；世代准入由 schema 合同测试负责。
+        leaves = [f"{M0068[0]}.{M0068[1]}", f"{M0070[0]}.{M0070[1]}"]
+        for supplied, accepted in ((leaves, True), (leaves[:1], False)):
+            with self.subTest(supplied=supplied):
+                output = StringIO()
+                with patch(
+                    "stable.management.commands.check_historical_calendar_release_b_schema."
+                    "check_release_b_schema_compatibility",
+                    return_value={"ok": True, "migration_leaf_set": leaves},
+                ) as check:
+                    args = ["--direction=forward", "--json"]
+                    for leaf in reversed(supplied):
+                        args.extend(["--expected-migration-leaf-set", leaf])
+                    if accepted:
+                        call_command("check_historical_calendar_release_b_schema", *args, stdout=output)
+                    else:
+                        with self.assertRaises(CommandError):
+                            call_command("check_historical_calendar_release_b_schema", *args, stdout=output)
+                check.assert_called_once_with(direction="forward", enforce_production_audit=False)
+                payload = json.loads(output.getvalue())
+                self.assertEqual(payload["migration_leaf_set"], leaves)
+                self.assertEqual(payload["identity_ok"], accepted)
+                self.assertEqual(payload["ok"], accepted)
 
     def test_illegal_partial_leaf_set_fails_closed(self):
         from io import StringIO

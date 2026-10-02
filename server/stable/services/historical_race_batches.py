@@ -41,6 +41,11 @@ from stable.services.race_event_years import (
 
 STANDARD_REGION_BATCH_LIMIT = 250
 MAX_REGION_PROGRESS_LEAD = 100
+# 首批验收是固定五地区合同，不能随公开地区枚举扩展。
+FIRST_ACCEPTANCE_REGIONS = (
+    RacingRegion.JAPAN, RacingRegion.HONG_KONG, RacingRegion.UNITED_KINGDOM,
+    RacingRegion.FRANCE, RacingRegion.UNITED_STATES,
+)
 FIRST_ACCEPTANCE_TARGETS_PER_REGION = 9
 FIRST_ACCEPTANCE_SERIES_PER_REGION = 3
 FIRST_ACCEPTANCE_TOTAL_MIN = 40
@@ -499,9 +504,9 @@ def select_first_acceptance_targets(
     if len(anchors) != 3 or len(set(anchors)) != 3:
         raise InventoryValidationError("first acceptance requires 3 unique anchors")
     fixed_ids = {int(value) for value in required_target_ids or []}
-    if required_target_ids is not None and len(fixed_ids) != FIRST_ACCEPTANCE_TARGETS_PER_REGION * 5:
+    if required_target_ids is not None and len(fixed_ids) != FIRST_ACCEPTANCE_TARGETS_PER_REGION * len(FIRST_ACCEPTANCE_REGIONS):
         raise InventoryValidationError("post-discovery acceptance must use the same target ids")
-    for region in sorted(region for region in RacingRegion.values if region not in {RacingRegion.OTHER}):
+    for region in sorted(FIRST_ACCEPTANCE_REGIONS):
         series_keys = list(dict.fromkeys(series_keys_by_region.get(region) or []))
         if len(series_keys) != FIRST_ACCEPTANCE_SERIES_PER_REGION:
             raise InventoryValidationError(f"{region} first acceptance requires exactly 3 series")

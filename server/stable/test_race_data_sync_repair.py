@@ -61,6 +61,9 @@ class StalledEventRepairTests(TestCase):
     def setUp(self):
         self._artifact_directory = TemporaryDirectory()
         self.addCleanup(self._artifact_directory.cleanup)
+        artifact_settings = override_settings(BASE_DIR=Path(self._artifact_directory.name) / "server")
+        artifact_settings.enable()
+        self.addCleanup(artifact_settings.disable)
         self.roster = build_race_data_provider_roster(configuration_only=True)
         route = resolve_race_data_provider_route(
             provider="the_racing_api",
@@ -328,7 +331,7 @@ class StalledEventRepairTests(TestCase):
         )
         public = race_events.resolve_race_live_public_read(
             event_id=self.event.pk,
-            now=timezone_now(),
+            now=NOW,
         )
         self.assertTrue(public.visible, public.reason)
 
@@ -390,9 +393,12 @@ class StalledEventRepairTests(TestCase):
 
     def test_apply_rejects_entry_closed_since_dry_run(self):
         report = self._dry_run()
-        models.RaceEventRevision.objects.filter(pk=self.revision_id).update(
-            published_at=NOW
+        revision = models.RaceEventRevision.objects.get(pk=self.revision_id)
+        models.RaceEventRevisionPublication.objects.create(
+            revision=revision, published_at=NOW, reason="test publication before repair",
         )
+        revision.published_at = NOW
+        revision.save(update_fields=("published_at", "updated_at"))
 
         output = StringIO()
         call_command(

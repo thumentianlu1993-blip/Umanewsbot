@@ -1,26 +1,20 @@
+"""临时 runner 已退役；直接验证仓库正式工具的等价安全边界。"""
 from __future__ import annotations
 
-import hashlib
-import importlib.util
 import json
+import os
+from datetime import date
 from pathlib import Path
-import sys
 from tempfile import TemporaryDirectory
+import sys
+import time
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.test import SimpleTestCase
 
-
-ROOT = Path(__file__).resolve().parents[2]
-
-
-def load_script(name):
-    path = ROOT / "tmp" / name
-    spec = importlib.util.spec_from_file_location(f"{name}_under_test", path)
-    module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(module)
-    return module
+from stable import test_historical_race_calendar_pipeline as fixtures
+from stable import test_current_year_race_due_checks as due_fixtures
 
 
 def write_jsonl(path, rows):
@@ -32,702 +26,225 @@ def read_jsonl(path):
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
 
-def identity(path):
-    body = path.read_bytes()
-    return {"path": path.name, "sha256": hashlib.sha256(body).hexdigest(), "size": len(body)}
-
-
 class KnownCalendarShardRunnerTests(SimpleTestCase):
     def setUp(self):
-        self.module = load_script("run_known_calendar_shards.py")
+        self.tool = fixtures._load("prepare_historical_race_calendar_inputs.py")
+        self.request_tool = fixtures._load("build_historical_race_calendar_requests.py")
+        self.cache_state = fixtures._load("historical_race_calendar_cache_state.py")
 
-    def test_parse_artifact_reuse_requires_exact_selection_catalog_and_tool_identity(self):
+    def _prepare_inputs(self, root):
+        target = fixtures._target(1, region="united_kingdom", year=2024,
+                                  name="Alpha Stakes", course="Ascot", distance="1m")
+        source = fixtures._source("bha-2024", region="united_kingdom", year=2024,
+                                  adapter="uk_bha", parser="bha_flat",
+                                  url="https://www.britishhorseracing.com/files/2024.pdf")
+        selection, catalog, cache = root / "selection.json", root / "catalog.json", root / "cache"
+        fixtures._write_selection(selection, [target])
+        fixtures._write_catalog(catalog, [source])
+        cache.mkdir()
+        manifest, ledger = fixtures._write_cache_bundle(
+            cache, [source], {source["id"]: b'" 1 ASCOT Jun. 15 ALPHA STAKES (P1.)\n'}, [target])
+        self.request_tool.build_calendar_requests(selection_path=selection, catalog_path=catalog,
+                                                 output_dir=root / "requests")
+        return dict(selection_path=selection, catalog_path=catalog, source_cache_root=cache,
+                    source_cache_manifest_path=manifest, request_ledger_path=ledger,
+                    request_manifest_path=root / "requests/manifest.json",
+                    country_region="united_kingdom", year=2024, recorded_at=fixtures.RECORDED_AT)
+
+    def test_prepare_recomputes_with_current_parser_and_binds_inputs(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
-            current_selection = root / "selection.json"
-            current_catalog = root / "catalog.json"
-            current_tool = root / "parser.py"
-            current_selection.write_text('{"targets":[1]}')
-            current_catalog.write_text('{"sources":[1]}')
-            current_tool.write_text("VERSION = 1\n")
-            parse_root = root / "parse"
-            parse_root.mkdir()
-            summary = parse_root / "summary.json"
-            summary.write_text('{"scope_count":1}')
-            (parse_root / "manifest.json").write_text(
-                json.dumps(
-                    {
-                        "selection": identity(current_selection),
-                        "source_catalog": identity(current_catalog),
-                    }
-                )
-            )
-            (parse_root / "execution-identity.json").write_text(
-                json.dumps({"tools": {"parser.py": identity(current_tool)}})
-            )
-            cache_summary = root / "cache-summary.json"
-            cache_summary.write_text('{"failure_count":0}')
+            kwargs = self._prepare_inputs(root)
+            first = self.tool.prepare_calendar_inputs(**kwargs, output_dir=root / "first")
+            self.assertEqual(first["complete_count"], 1)
+            parser = self.tool.parse_bha_flat_schedule_text
 
-            self.assertTrue(
-                self.module.parse_artifact_is_reusable(
-                    summary_path=summary,
-                    cache_summary_path=cache_summary,
-                    selection_path=current_selection,
-                    catalog_path=current_catalog,
-                    tool_paths={"parser.py": current_tool},
-                )
-            )
+            def changed_parser(text, *, year):
+                # 模拟代码升级后相同源文本得到不同日期，不能复用上次结果。
+                return parser(text.replace("Jun. 15", "Jun. 16"), year=year)
 
-            current_selection.write_text('{"targets":[2]}')
-            self.assertFalse(
-                self.module.parse_artifact_is_reusable(
-                    summary_path=summary,
-                    cache_summary_path=cache_summary,
-                    selection_path=current_selection,
-                    catalog_path=current_catalog,
-                    tool_paths={"parser.py": current_tool},
-                )
-            )
-            current_selection.write_text('{"targets":[1]}')
-            current_catalog.write_text('{"sources":[2]}')
-            self.assertFalse(
-                self.module.parse_artifact_is_reusable(
-                    summary_path=summary,
-                    cache_summary_path=cache_summary,
-                    selection_path=current_selection,
-                    catalog_path=current_catalog,
-                    tool_paths={"parser.py": current_tool},
-                )
-            )
-            current_catalog.write_text('{"sources":[1]}')
-            current_tool.write_text("VERSION = 2\n")
-            self.assertFalse(
-                self.module.parse_artifact_is_reusable(
-                    summary_path=summary,
-                    cache_summary_path=cache_summary,
-                    selection_path=current_selection,
-                    catalog_path=current_catalog,
-                    tool_paths={"parser.py": current_tool},
-                )
-            )
+            with patch.object(self.tool, "parse_bha_flat_schedule_text", side_effect=changed_parser) as parse:
+                self.tool.prepare_calendar_inputs(**kwargs, output_dir=root / "second")
+            parse.assert_called_once()
+            self.assertEqual(read_jsonl(root / "first/date_matches.jsonl")[0]["local_date"], "2024-06-15")
+            self.assertEqual(read_jsonl(root / "second/date_matches.jsonl")[0]["local_date"], "2024-06-16")
+            manifest = json.loads((root / "second/manifest.json").read_text())
+            self.assertEqual(manifest["selection"], self.tool.file_identity(kwargs["selection_path"]))
+            self.assertEqual(manifest["source_catalog"], self.tool.file_identity(kwargs["catalog_path"]))
+            for name in ("selection_path", "catalog_path"):
+                path = kwargs[name]
+                original = path.read_bytes()
+                path.write_bytes(original + b"\n")
+                with self.assertRaisesRegex(self.tool.CalendarPrepareError, "identity does not match"):
+                    self.tool.prepare_calendar_inputs(**kwargs, output_dir=root / "rejected")
+                self.assertFalse((root / "rejected").exists())
+                path.write_bytes(original)
 
-    def test_toba_fetch_uses_guarded_docker_network_stage(self):
+    def test_prepare_refuses_existing_output_without_modifying_it(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
-            shard = root / "united_states-2024-01"
-            write_jsonl(
-                shard / "requests" / "provider_rows.jsonl",
-                [
-                    {
-                        "adapter_key": "toba",
-                        "target_id": 1,
-                        "urls": {
-                            "calendar_source": {
-                                "url": "https://toba.org/graded-stakes/2024-races/"
-                            }
-                        },
-                    }
-                ],
-            )
-            commands = []
+            kwargs = self._prepare_inputs(root)
+            output = root / "output"
+            self.tool.prepare_calendar_inputs(**kwargs, output_dir=output)
+            before = {p.name: p.read_bytes() for p in output.iterdir()}
+            self.assertNotIn("execution-identity.json", before)
+            with self.assertRaisesRegex(self.tool.CalendarPrepareError, "already exists"):
+                self.tool.prepare_calendar_inputs(**kwargs, output_dir=output)
+            self.assertEqual(before, {p.name: p.read_bytes() for p in output.iterdir()})
 
-            with patch.object(self.module, "RUNTIME_HOST", root), patch.object(
-                self.module, "RUNTIME_CONTAINER", Path("/runs")
-            ), patch.object(
-                self.module, "run", side_effect=lambda command, cwd: commands.append(command)
-            ), patch.object(
-                self.module, "reuse_existing_complete_cache", return_value=False
-            ), patch.object(
-                self.module, "finish_cache_retry"
-            ):
-                self.module.cache_toba(worktree=ROOT, shard_root=shard, year=2024)
-
-        self.assertEqual(len(commands), 1)
-        command = commands[0]
-        self.assertEqual(command[:3], ["docker", "run", "--rm"])
-        self.assertNotIn("curl", command)
-        self.assertIn("HISTORICAL_RACE_BACKFILL_ENABLED=true", command)
-        self.assertIn("HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=true", command)
-        self.assertTrue(any(value.startswith("RACE_EVENT_CRAWL_REQUEST_BUDGET_ARTIFACT=") for value in command))
-        self.assertTrue(any(value.startswith("RACE_EVENT_CRAWL_HOST_INTERVAL_ARTIFACT=") for value in command))
-        self.assertIn("RACE_EVENT_CRAWL_MIN_FREE_DISK_BYTES=5368709120", command)
-        self.assertIn("runtime/tools/cache_historical_race_date_sources.py", command)
-        self.assertIn("--allow-network", command)
-
-    def _assert_partial_cache_retry(self, cache_method, *, urls, year):
+    def _retry(self, adapter, host, *, succeeds):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
-            run_root = root / "runs"
-            shard = run_root / f"fixture-{year}-01"
-            provider_path = shard / "requests" / "provider_rows.jsonl"
-            write_jsonl(
-                provider_path,
-                [
-                    {
-                        "adapter_key": "toba" if "toba.org" in url else "jra",
-                        "target_id": index,
-                        "urls": {"calendar_source": {"url": url}},
-                    }
-                    for index, url in enumerate(urls, start=1)
-                ],
-            )
-            cache = shard / "cache"
+            cache = root / "cache"
             cache.mkdir()
-            initial_rows = [
-                {"source_url": urls[0], "status": "succeeded"},
-                *[
-                    {"source_url": url, "status": "failed", "error": "timeout"}
-                    for url in urls[1:]
-                ],
-            ] if len(urls) > 1 else [
-                {"source_url": urls[0], "status": "failed", "error": "timeout"}
-            ]
-            write_jsonl(cache / "request-ledger.jsonl", initial_rows)
-            (cache / "summary.json").write_text(
-                json.dumps(
-                    {
-                        "request_count": len(initial_rows),
-                        "success_count": sum(row["status"] == "succeeded" for row in initial_rows),
-                        "failure_count": sum(row["status"] == "failed" for row in initial_rows),
-                    }
-                )
-            )
-            commands = []
-
-            def fake_run(command, *, cwd):
-                commands.append(command)
-                provider_container = command[command.index("--provider-jsonl") + 1]
-                retry_path = run_root / Path(provider_container).relative_to("/runs")
-                retry_rows = read_jsonl(retry_path)
-                self.assertEqual(
-                    [row["urls"]["calendar_source"]["url"] for row in retry_rows],
-                    urls[1:] if len(urls) > 1 else urls,
-                )
-                write_jsonl(
-                    cache / "request-ledger.jsonl",
-                    [
-                        {
-                            "source_url": row["urls"]["calendar_source"]["url"],
-                            "status": "succeeded",
-                        }
-                        for row in retry_rows
-                    ],
-                )
-                (cache / "summary.json").write_text(
-                    json.dumps(
-                        {
-                            "request_count": len(retry_rows),
-                            "success_count": len(retry_rows),
-                            "failure_count": 0,
-                        }
-                    )
-                )
-
-            with patch.object(self.module, "RUNTIME_HOST", run_root), patch.object(
-                self.module, "RUNTIME_CONTAINER", Path("/runs")
-            ), patch.object(self.module, "run", side_effect=fake_run):
-                kwargs = {"worktree": ROOT, "shard_root": shard}
-                if cache_method.__name__ == "cache_toba":
-                    kwargs["year"] = year
-                cache_method(**kwargs)
-
-            final_rows = read_jsonl(cache / "request-ledger.jsonl")
+            provider = root / "provider.jsonl"
+            urls = [f"https://{host}/a", f"https://{host}/b"]
+            write_jsonl(provider, [{"adapter_key": adapter, "target_id": i + 1,
+                        "urls": {"calendar_source": {"url": url}}} for i, url in enumerate(urls)])
+            previous = [{"source_url": urls[0], "status": "succeeded"},
+                        {"source_url": urls[1], "status": "failed", "error": "timeout"}]
+            write_jsonl(cache / "request-ledger.jsonl", previous)
+            (cache / "summary.json").write_text(json.dumps({"failure_count": 1}))
+            retry, old = self.cache_state.begin_cache_retry(cache, provider)
+            self.assertEqual([r["urls"]["calendar_source"]["url"] for r in read_jsonl(retry)], [urls[1]])
+            write_jsonl(cache / "request-ledger.jsonl", [{"source_url": urls[1],
+                        "status": "succeeded" if succeeds else "failed"}])
+            (cache / "summary.json").write_text(json.dumps({"failure_count": int(not succeeds)}))
+            self.cache_state.finish_cache_retry(cache, provider, old)
+            final = read_jsonl(cache / "request-ledger.jsonl")
+            self.assertEqual({r["source_url"] for r in final}, set(urls))
+            self.assertEqual(final[0], previous[0])
             attempts = read_jsonl(cache / "request-attempt-ledger.jsonl")
-            attempt_summaries = read_jsonl(cache / "request-attempt-summaries.jsonl")
+            self.assertEqual(len(attempts), 3)
+            self.assertEqual(attempts[1], previous[1])
+            self.assertEqual(self.cache_state.cache_is_complete(cache, provider), succeeds)
+            self.assertEqual(json.loads((cache / "summary.json").read_text())["failure_count"], int(not succeeds))
+            self.assertEqual([r["phase"] for r in read_jsonl(cache / "request-attempt-summaries.jsonl")],
+                             ["before_retry", "retry"])
 
-        self.assertEqual(len(commands), 1)
-        self.assertEqual({row["source_url"] for row in final_rows}, set(urls))
-        self.assertTrue(all(row["status"] == "succeeded" for row in final_rows))
-        self.assertEqual(len(attempts), len(initial_rows) + len(urls[1:] or urls))
-        self.assertEqual([row["phase"] for row in attempt_summaries], ["before_retry", "retry"])
+    def test_standard_cache_retry_preserves_success_and_attempts(self):
+        self._retry("france_galop", "www.france-galop.com", succeeds=True)
 
-    def test_standard_cache_retries_only_failed_urls_and_preserves_attempt_audit(self):
-        self._assert_partial_cache_retry(
-            self.module.cache_standard,
-            urls=[
-                "https://www.jra.go.jp/a.html",
-                "https://www.jra.go.jp/b.html",
-            ],
-            year=2020,
-        )
+    def test_toba_cache_retry_preserves_failed_attempts(self):
+        self._retry("toba", "toba.org", succeeds=True)
 
-    def test_toba_cache_retries_failed_url_and_preserves_attempt_audit(self):
-        self._assert_partial_cache_retry(
-            self.module.cache_toba,
-            urls=["https://toba.org/graded-stakes/2024-races/"],
-            year=2024,
-        )
-
-    def test_parse_rebuilds_successful_artifact_without_current_execution_identity(self):
+    def test_cache_cli_enforces_network_budget_interval_and_disk(self):
+        tool = fixtures._load("cache_historical_race_date_sources.py")
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
-            shard = root / "japan-2020-01"
-            bootstrap = shard / "bootstrap"
-            cache = shard / "cache"
-            output = shard / "parse"
-            bootstrap.mkdir(parents=True)
-            cache.mkdir()
-            output.mkdir()
-            (bootstrap / "selection_snapshot.json").write_text('{"selection":1}')
-            (bootstrap / "source_catalog.json").write_text('{"catalog":1}')
-            (cache / "summary.json").write_text('{"failure_count":0}')
-            (output / "summary.json").write_text('{"scope_count":1}')
-            commands = []
+            provider = root / "provider.jsonl"
+            urls = ["https://toba.org/a", "https://toba.org/b", "https://toba.org/c"]
+            write_jsonl(provider, [{"adapter_key": "toba", "target_id": i + 1,
+                        "urls": {"calendar_source": {"url": url}}} for i, url in enumerate(urls)])
+            args = ["cache", "--provider-jsonl", str(provider), "--output-root", str(root / "cache"),
+                    "--request-ledger", str(root / "ledger.jsonl"), "--summary", str(root / "summary.json"),
+                    "--allow-network"]
+            env = {"HISTORICAL_RACE_BACKFILL_ENABLED": "true", "HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK": "true",
+                   "RACE_EVENT_CRAWL_MAX_REQUESTS": "2", "RACE_EVENT_CRAWL_REQUEST_INTERVAL_SECONDS": "0.03",
+                   "RACE_EVENT_CRAWL_REQUEST_BUDGET_ARTIFACT": str(root / "budget.json"),
+                   "RACE_EVENT_CRAWL_HOST_INTERVAL_ARTIFACT": str(root / "interval.json"),
+                   "RACE_EVENT_CRAWL_SOURCE_CACHE_ROOT": str(root / "cache"),
+                   "RACE_EVENT_CRAWL_SOURCE_CACHE_MANIFEST": str(root / "cache/source_cache_manifest.json")}
+            calls = []
 
-            def fake_run(command, *, cwd):
-                commands.append(command)
-                rebuilt = shard / "parse"
-                rebuilt.mkdir()
-                (rebuilt / "summary.json").write_text('{"scope_count":1}')
+            def fetch(url, **kwargs):
+                calls.append(time.monotonic())
+                return b"<html>valid source</html>", {"status": 200, "final_url": url,
+                        "redirect_chain": [], "headers": {"content-type": "text/html"}}
 
-            with patch.object(self.module, "RUNTIME_HOST", root), patch.object(
-                self.module, "RUNTIME_CONTAINER", Path("/runs")
-            ), patch.object(self.module, "run", side_effect=fake_run):
-                result = self.module.parse(
-                    worktree=ROOT,
-                    shard_root=shard,
-                    region="japan",
-                    year=2020,
-                )
-
-            archived = sorted(shard.glob("parse-before-identity-rebuild-*"))
-
-        self.assertEqual(result["scope_count"], 1)
-        self.assertEqual(len(commands), 1)
-        self.assertEqual(len(archived), 1)
+            with patch.object(tool, "fetch_https", side_effect=fetch) as http:
+                for missing in ("cli", "HISTORICAL_RACE_BACKFILL_ENABLED", "HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK"):
+                    gate_env = {k: v for k, v in env.items() if k != missing}
+                    with self.subTest(missing=missing), patch.dict(os.environ, gate_env, clear=True), patch.object(
+                            sys, "argv", args[:-1] if missing == "cli" else args):
+                        with self.assertRaises(SystemExit):
+                            tool.main()
+                    http.assert_not_called()
+                with patch.dict(os.environ, env, clear=True), patch.object(sys, "argv", args):
+                    self.assertEqual(tool.main(), 2)
+                self.assertEqual(http.call_count, 2)
+                self.assertGreaterEqual(calls[1] - calls[0], 0.025)
+                self.assertEqual(json.loads((root / "budget.json").read_text())["request_count"], 2)
+                self.assertEqual([r["status"] for r in read_jsonl(root / "ledger.jsonl")],
+                                 ["succeeded", "succeeded", "failed"])
+                self.assertIn("budget exhausted", read_jsonl(root / "ledger.jsonl")[-1]["error"])
+                # 新缓存目录低磁盘，真实写入保护必须留下失败而非成功产物。
+                low = {**env, "RACE_EVENT_CRAWL_MAX_REQUESTS": "0", "RACE_EVENT_CRAWL_MIN_FREE_DISK_BYTES": "100",
+                       "RACE_EVENT_CRAWL_SOURCE_CACHE_ROOT": str(root / "low"),
+                       "RACE_EVENT_CRAWL_SOURCE_CACHE_MANIFEST": str(root / "low/source_cache_manifest.json")}
+                low_args = [str(root / "low") if v == str(root / "cache") else v for v in args]
+                with patch.dict(os.environ, low, clear=True), patch.object(sys, "argv", low_args), patch(
+                        "race_event_source_cache.shutil.disk_usage", return_value=SimpleNamespace(free=0)):
+                    self.assertEqual(tool.main(), 2)
+                self.assertTrue(all(r["status"] == "failed" and "disk floor" in r["error"]
+                                    for r in read_jsonl(root / "ledger.jsonl")))
+                self.assertEqual(json.loads((root / "low/source_cache_manifest.json").read_text())["files"], {})
 
 
 class CurrentYearSourceOverrideRunnerTests(SimpleTestCase):
     def setUp(self):
-        self.module = load_script("run_current_year_source_override.py")
+        self.tool = fixtures._load("prepare_historical_race_calendar_inputs.py")
+        self.request_tool = fixtures._load("build_historical_race_calendar_requests.py")
+        self.cache_state = fixtures._load("historical_race_calendar_cache_state.py")
 
-    def test_classified_reuse_rejects_old_cutoff_identity(self):
+    _retry = KnownCalendarShardRunnerTests._retry
+    _partial_hkjc_fixture = fixtures.HistoricalRaceCalendarPrepareTests._partial_hkjc_fixture
+
+    def test_partial_cache_retry_failure_remains_auditable(self):
+        self._retry("france_galop", "www.france-galop.com", succeeds=False)
+
+    def _hkjc_inputs(self, root):
+        _target, _source, selection, catalog, requests, cache, manifest, ledger = self._partial_hkjc_fixture(
+            root, body=b"WED 07/01/26 January Cup G3 3yo+ 1800\n")
+        return dict(selection_path=selection, catalog_path=catalog, source_cache_root=cache,
+                    source_cache_manifest_path=manifest, request_ledger_path=ledger,
+                    request_manifest_path=requests / "manifest.json", country_region="hong_kong",
+                    year=2026, recorded_at=fixtures.RECORDED_AT, hkjc_cutoff_date=date(2026, 7, 15))
+
+    def test_hkjc_request_and_prepare_require_identical_cutoff(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
-            selection = root / "selection_snapshot.json"
-            date_matches = root / "date_matches.jsonl"
-            gaps = root / "gaps.jsonl"
-            selection.write_text("{}")
-            date_matches.write_text("")
-            gaps.write_text("")
-            classified = root / "classified-v2"
-            classified.mkdir()
-            (classified / "summary.json").write_text(
-                '{"cutoff_date":"2026-07-14"}'
-            )
-            (classified / "manifest.json").write_text(
-                json.dumps(
-                    {
-                        "cutoff_date": "2026-07-14",
-                        "inputs": {
-                            "selection": identity(selection),
-                            "date_matches": identity(date_matches),
-                            "gaps": identity(gaps),
-                        },
-                        "apply_artifacts": {},
-                    }
-                )
-            )
-            (classified / "apply_descriptor.json").write_text(
-                json.dumps(
-                    {
-                        "cutoff_date": "2026-07-14",
-                        "apply_artifacts": {},
-                    }
-                )
-            )
+            kwargs = self._hkjc_inputs(root)
+            self.tool.prepare_calendar_inputs(**kwargs, output_dir=root / "valid")
+            request = json.loads(kwargs["request_manifest_path"].read_text())
+            prepared = json.loads((root / "valid/manifest.json").read_text())
+            self.assertEqual(request["coverage_policy"], prepared["coverage_policy"])
+            kwargs["hkjc_cutoff_date"] = date(2026, 7, 14)
+            with self.assertRaisesRegex(self.tool.CalendarPrepareError, "coverage policy identity"):
+                self.tool.prepare_calendar_inputs(**kwargs, output_dir=root / "invalid")
+            self.assertFalse((root / "invalid").exists())
 
-            reusable = self.module._classified_is_reusable(
-                classified,
-                selection=selection,
-                date_matches=date_matches,
-                gaps=gaps,
-            )
-
-        self.assertFalse(reusable)
-
-    def test_partial_cache_retries_failed_url_and_preserves_attempt_audit(self):
+    def test_hkjc_pre_cutoff_catalog_is_rejected_without_mutation(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
-            run_root = root / "runs"
-            shard_id = "france-2026-01"
-            shard = run_root / shard_id
-            (shard / "bootstrap-v2").mkdir(parents=True)
-            (shard / "requests-v2").mkdir()
-            cache = shard / "cache-v2"
-            cache.mkdir()
-            (shard / "bootstrap-v2" / "selection_snapshot.json").write_text("{}")
-            (shard / "bootstrap-v2" / "source_catalog.json").write_text("{}")
-            urls = ["https://www.france-galop.com/a.pdf", "https://www.france-galop.com/b.pdf"]
-            write_jsonl(
-                shard / "requests-v2" / "provider_rows.jsonl",
-                [
-                    {
-                        "adapter_key": "france_galop",
-                        "target_id": index,
-                        "urls": {"calendar_source": {"url": url}},
-                    }
-                    for index, url in enumerate(urls, start=1)
-                ],
-            )
-            write_jsonl(
-                cache / "request-ledger.jsonl",
-                [
-                    {"source_url": urls[0], "status": "succeeded"},
-                    {"source_url": urls[1], "status": "failed", "error": "timeout"},
-                ],
-            )
-            (cache / "summary.json").write_text(
-                json.dumps({"request_count": 2, "success_count": 1, "failure_count": 1})
-            )
-            commands = []
+            kwargs = self._hkjc_inputs(root)
+            catalog = kwargs["catalog_path"]
+            content = json.loads(catalog.read_text())
+            content["sources"][0]["options"] = {"season_end_year": 2026}
+            catalog.write_text(json.dumps(content))
+            before = catalog.read_bytes()
+            with self.assertRaises(self.tool.CalendarPrepareError):
+                self.tool.prepare_calendar_inputs(**kwargs, output_dir=root / "invalid")
+            self.assertFalse((root / "invalid").exists())
+            self.assertEqual(catalog.read_bytes(), before)
 
-            def fake_run(command, *, cwd):
-                commands.append(command)
-                if any(
-                    value.endswith("cache_historical_race_date_sources.py")
-                    for value in command
-                ):
-                    provider_path = Path(
-                        str(command[command.index("--provider-jsonl") + 1]).replace(
-                            "/runs", str(run_root)
-                        )
-                    )
-                    retry_rows = [
-                        json.loads(line)
-                        for line in provider_path.read_text().splitlines()
-                        if line.strip()
-                    ]
-                    self.assertEqual(
-                        [row["urls"]["calendar_source"]["url"] for row in retry_rows],
-                        [urls[1]],
-                    )
-                    write_jsonl(
-                        cache / "request-ledger.jsonl",
-                        [{"source_url": urls[1], "status": "succeeded"}],
-                    )
-                    (cache / "summary.json").write_text(
-                        json.dumps({"request_count": 1, "success_count": 1, "failure_count": 0})
-                    )
-                elif any(
-                    value.endswith("prepare_historical_race_calendar_inputs.py")
-                    for value in command
-                ):
-                    output = shard / "parse-v2"
-                    output.mkdir()
-                    (output / "summary.json").write_text('{"scope_count":2}')
-                    (output / "manifest.json").write_text("{}")
-                    write_jsonl(
-                        output / "date_matches.jsonl",
-                        [
-                            {
-                                "target_id": 1,
-                                "local_date": "2026-01-01",
-                                "country_region": "france",
-                            },
-                            {
-                                "target_id": 2,
-                                "local_date": "2026-08-01",
-                                "country_region": "france",
-                            },
-                        ],
-                    )
-                    write_jsonl(output / "gaps.jsonl", [])
-                elif any(
-                    value.endswith("classify_current_year_race_due_checks.py")
-                    for value in command
-                ):
-                    classified = shard / "classified-v2"
-                    classified.mkdir()
-                    (classified / "summary.json").write_text('{"scope_count":2}')
-                    (classified / "manifest.json").write_text("{}")
-                    (classified / "apply_descriptor.json").write_text(
-                        '{"apply_artifacts":{"events_france":{}}}'
-                    )
-
-            argv = [
-                "run_current_year_source_override.py",
-                "--worktree",
-                str(ROOT),
-                "--plan-root",
-                str(root / "plan"),
-                "--run-root",
-                str(run_root),
-                "--shard-id",
-                shard_id,
-                "--region",
-                "france",
-            ]
-            with patch.object(self.module, "RUNTIME_HOST", run_root), patch.object(
-                self.module, "RUNTIME_CONTAINER", Path("/runs")
-            ), patch.object(self.module, "run", side_effect=fake_run), patch.object(
-                sys, "argv", argv
-            ):
-                self.module.main()
-
-            final_rows = [
-                json.loads(line)
-                for line in (cache / "request-ledger.jsonl").read_text().splitlines()
-                if line.strip()
-            ]
-            attempts = [
-                json.loads(line)
-                for line in (cache / "request-attempt-ledger.jsonl").read_text().splitlines()
-                if line.strip()
-            ]
-
-        self.assertEqual({row["source_url"] for row in final_rows}, set(urls))
-        self.assertTrue(all(row["status"] == "succeeded" for row in final_rows))
-        self.assertEqual(len(attempts), 3)
-        self.assertEqual(attempts[1]["status"], "failed")
-        self.assertTrue(
-            any(
-                any(value.endswith("cache_historical_race_date_sources.py") for value in row)
-                for row in commands
-            )
-        )
-
-    def test_hong_kong_runner_binds_same_cutoff_and_request_manifest_to_both_stages(self):
+    def test_classifier_recomputes_for_new_cutoff(self):
+        tool = due_fixtures.MODULE
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
-            run_root = root / "runs"
-            shard_id = "hong-kong-2026-01"
-            shard = run_root / shard_id
-            bootstrap = shard / "bootstrap-v2"
-            bootstrap.mkdir(parents=True)
-            (bootstrap / "selection_snapshot.json").write_text("{}")
-            (bootstrap / "source_catalog.json").write_text("{}")
-            commands = []
-
-            def fake_run(command, *, cwd):
-                commands.append(command)
-                if any(
-                    value.endswith("build_historical_race_calendar_requests.py")
-                    for value in command
-                ):
-                    requests = shard / "requests-v2"
-                    requests.mkdir()
-                    (requests / "provider_rows.jsonl").write_text("")
-                    (requests / "manifest.json").write_text("{}")
-                elif any(
-                    value.endswith("prepare_historical_race_calendar_inputs.py")
-                    for value in command
-                ):
-                    output = shard / "parse-v2"
-                    output.mkdir()
-                    (output / "summary.json").write_text('{"scope_count":1}')
-                    write_jsonl(
-                        output / "date_matches.jsonl",
-                        [
-                            {
-                                "target_id": 1,
-                                "local_date": "2026-01-07",
-                                "country_region": "hong_kong",
-                            }
-                        ],
-                    )
-                    write_jsonl(output / "gaps.jsonl", [])
-                    (output / "manifest.json").write_text("{}")
-                elif any(
-                    value.endswith("classify_current_year_race_due_checks.py")
-                    for value in command
-                ):
-                    classified = shard / "classified-v2"
-                    classified.mkdir()
-                    (classified / "summary.json").write_text(
-                        '{"scope_count":1,"due_event_count":1}'
-                    )
-                    (classified / "manifest.json").write_text("{}")
-                    (classified / "apply_descriptor.json").write_text(
-                        '{"apply_artifacts":{"events_hong_kong":{}}}'
-                    )
-
-            argv = [
-                "run_current_year_source_override.py",
-                "--worktree",
-                str(ROOT),
-                "--plan-root",
-                str(root / "plan"),
-                "--run-root",
-                str(run_root),
-                "--shard-id",
-                shard_id,
-                "--region",
-                "hong_kong",
-            ]
-            with patch.object(self.module, "RUNTIME_HOST", run_root), patch.object(
-                self.module, "RUNTIME_CONTAINER", Path("/runs")
-            ), patch.object(self.module, "run", side_effect=fake_run), patch.object(
-                self.module, "cache_is_complete", return_value=True
-            ), patch.object(sys, "argv", argv):
-                self.module.main()
-
-        request_command = next(
-            command
-            for command in commands
-            if any(
-                value.endswith("build_historical_race_calendar_requests.py")
-                for value in command
-            )
-        )
-        prepare_command = next(
-            command
-            for command in commands
-            if any(
-                value.endswith("prepare_historical_race_calendar_inputs.py")
-                for value in command
-            )
-        )
-        classify_command = next(
-            command
-            for command in commands
-            if any(
-                value.endswith("classify_current_year_race_due_checks.py")
-                for value in command
-            )
-        )
-        self.assertIn("--hkjc-cutoff-date", request_command)
-        self.assertEqual(
-            request_command[request_command.index("--hkjc-cutoff-date") + 1],
-            "2026-07-15",
-        )
-        self.assertIn("--request-manifest", prepare_command)
-        self.assertIn("--hkjc-cutoff-date", prepare_command)
-        self.assertEqual(
-            prepare_command[prepare_command.index("--hkjc-cutoff-date") + 1],
-            "2026-07-15",
-        )
-        self.assertIn("--date-matches", classify_command)
-        self.assertIn("--gaps", classify_command)
-        self.assertIn("classified-v2", " ".join(classify_command))
-
-    def test_hong_kong_runner_archives_and_rebuilds_pre_cutoff_bootstrap(self):
-        with TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            run_root = root / "runs"
-            shard_id = "hong-kong-2026-01"
-            shard = run_root / shard_id
-            bootstrap = shard / "bootstrap-v2"
-            bootstrap.mkdir(parents=True)
-            (bootstrap / "selection_snapshot.json").write_text('{"schema_version":"1.0"}')
-            (bootstrap / "source_catalog.json").write_text(
-                json.dumps(
-                    {
-                        "schema_version": "1.0",
-                        "sources": [
-                            {
-                                "parser": "hkjc_pattern",
-                                "options": {"season_end_year": 2026},
-                            }
-                        ],
-                    }
-                )
-            )
-            for name in ("requests-v2", "cache-v2", "parse-v2", "classified-v2"):
-                dependency = shard / name
-                dependency.mkdir()
-                (dependency / "old-evidence.txt").write_text(name)
-            commands = []
-
-            def fake_run(command, *, cwd):
-                commands.append(command)
-                if "tmp/build_current_year_source_override.py" in command:
-                    bootstrap.mkdir()
-                    (bootstrap / "selection_snapshot.json").write_text(
-                        '{"schema_version":"1.0"}'
-                    )
-                    (bootstrap / "source_catalog.json").write_text("{}")
-                elif any(
-                    value.endswith("build_historical_race_calendar_requests.py")
-                    for value in command
-                ):
-                    requests = shard / "requests-v2"
-                    requests.mkdir()
-                    (requests / "provider_rows.jsonl").write_text("")
-                    (requests / "manifest.json").write_text("{}")
-                elif any(
-                    value.endswith("prepare_historical_race_calendar_inputs.py")
-                    for value in command
-                ):
-                    output = shard / "parse-v2"
-                    output.mkdir()
-                    (output / "summary.json").write_text('{"scope_count":1}')
-                    write_jsonl(output / "date_matches.jsonl", [])
-                    write_jsonl(
-                        output / "gaps.jsonl",
-                        [{"target_id": 1, "reason_code": "missing"}],
-                    )
-                    (output / "manifest.json").write_text("{}")
-                elif any(
-                    value.endswith("classify_current_year_race_due_checks.py")
-                    for value in command
-                ):
-                    classified = shard / "classified-v2"
-                    classified.mkdir()
-                    (classified / "summary.json").write_text(
-                        '{"scope_count":1,"due_check_pending_count":1}'
-                    )
-                    (classified / "manifest.json").write_text("{}")
-                    (classified / "apply_descriptor.json").write_text(
-                        '{"apply_artifacts":{}}'
-                    )
-
-            argv = [
-                "run_current_year_source_override.py",
-                "--worktree",
-                str(ROOT),
-                "--plan-root",
-                str(root / "plan"),
-                "--run-root",
-                str(run_root),
-                "--shard-id",
-                shard_id,
-                "--region",
-                "hong_kong",
-            ]
-            with patch.object(self.module, "RUNTIME_HOST", run_root), patch.object(
-                self.module, "RUNTIME_CONTAINER", Path("/runs")
-            ), patch.object(self.module, "run", side_effect=fake_run), patch.object(
-                self.module, "cache_is_complete", return_value=True
-            ), patch.object(sys, "argv", argv):
-                self.module.main()
-
-            archived = sorted(shard.glob("cutoff-policy-chain-before-*"))
-            archived_names = (
-                {
-                    path.name
-                    for path in archived[0].iterdir()
-                    if path.is_dir()
-                }
-                if archived
-                else set()
-            )
-            evidence_preserved = bool(archived) and all(
-                (archived[0] / name / "old-evidence.txt").read_text() == name
-                for name in ("requests-v2", "cache-v2", "parse-v2", "classified-v2")
-            )
-
-        self.assertEqual(len(archived), 1)
-        self.assertEqual(
-            archived_names,
-            {
-                "bootstrap-v2",
-                "requests-v2",
-                "cache-v2",
-                "parse-v2",
-                "classified-v2",
-            },
-        )
-        self.assertTrue(evidence_preserved)
-        self.assertTrue(
-            any("tmp/build_current_year_source_override.py" in command for command in commands)
-        )
-        self.assertTrue(
-            any(
-                any(
-                    value.endswith("classify_current_year_race_due_checks.py")
-                    for value in command
-                )
-                for command in commands
-            )
-        )
+            selection, matches, gaps = root / "selection.json", root / "matches.jsonl", root / "gaps.jsonl"
+            selection.write_text(json.dumps(due_fixtures.selection_payload([due_fixtures.target(1)])))
+            write_jsonl(matches, [{"target_id": 1, "local_date": "2026-07-16", "country_region": "france",
+                                  "status": "finished", "source_refs": {}}])
+            write_jsonl(gaps, [])
+            inputs = due_fixtures.pipeline_inputs(root, selection=selection, date_matches=matches, gaps=gaps)
+            kwargs = dict(selection_path=selection, **inputs, date_matches_path=matches, gaps_path=gaps)
+            first = tool.classify_due_checks(**kwargs, cutoff=date(2026, 7, 15), output_dir=root / "first")
+            before = (root / "first/manifest.json").read_bytes()
+            second = tool.classify_due_checks(**kwargs, cutoff=date(2026, 7, 16), output_dir=root / "second")
+            self.assertEqual(first["due_event_count"], 0)
+            self.assertEqual(second["due_event_count"], 1)
+            self.assertNotEqual(before, (root / "second/manifest.json").read_bytes())
+            self.assertEqual(before, (root / "first/manifest.json").read_bytes())
+            with self.assertRaises(tool.DueCheckError):
+                tool.classify_due_checks(**kwargs, cutoff=date(2026, 7, 16), output_dir=root / "first")

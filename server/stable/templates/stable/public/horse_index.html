@@ -29,6 +29,7 @@
           <div class="horse-card-top"><span class="region-mark"></span><span class="region-label">{{ profile.get_racing_region_display }}</span></div>
           <h2 class="horse-card-name"><a href="{{ profile.public_path }}">{{ profile.display_name }}</a></h2>
           <p class="horse-card-original">{{ profile.original_name|default:profile.english_name|default:"资料整理中" }}</p>
+          <p class="muted">{{ profile.public_completeness_badge }}</p>
           <div class="horse-record" aria-label="战绩">
             <span>{{ profile.starts_count }} 战</span><b>{{ profile.wins_count }} 冠</b><span>{{ profile.seconds_count }} 亚</span><span>{{ profile.thirds_count }} 季</span>
           </div>

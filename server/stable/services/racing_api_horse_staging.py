@@ -1256,7 +1256,7 @@ def apply_targeted_artifact(
             racing_region=RacingRegion.OTHER,
             source_language=SourceLanguage.ENGLISH,
             target_type=(
-                "targeted_horse_profile_snapshot_v1"
+                "horse_profile_snapshot_v1"
                 if existing_receipt is not None
                 else "targeted_horse_artifact"
             ),
