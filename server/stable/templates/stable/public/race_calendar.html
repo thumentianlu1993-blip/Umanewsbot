@@ -115,7 +115,7 @@
           <div class="agenda-races">
             {% for event in group.events %}
               <a class="cal-card" href="{{ event.public_path }}">
-                <span class="grade-badge {{ event.grade_badge_class }}">{% race_field event "grade" event.grade_badge_label %}</span>
+                <span class="grade-badge {% race_grade_class event %}">{% race_field event "grade" event.grade_badge_label %}</span>
                 <span class="cal-card-main">
                   <span class="cal-card-name">{% race_field event "name" event.chinese_name %}{% if event.original_name and event.original_name != event.chinese_name %}<small>{{ event.original_name }}</small>{% endif %}</span>
                   <span class="cal-card-meta">

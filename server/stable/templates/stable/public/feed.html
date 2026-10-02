@@ -20,7 +20,7 @@
             </div>
             {% for entry in today_races %}
               <a class="race-row" href="{{ entry.event.public_path }}">
-                <span class="grade-badge {{ entry.event.grade_badge_class }}">{% race_field entry.event "grade" entry.event.grade_badge_label %}</span>
+                <span class="grade-badge {% race_grade_class entry.event %}">{% race_field entry.event "grade" entry.event.grade_badge_label %}</span>
                 <span class="race-row-main">
                   <span class="race-row-name">{% race_field entry.event "name" entry.event.chinese_name %}</span>
                   <span class="race-row-meta">{{ entry.event.get_country_region_display }} · {% race_field entry.event "racecourse" entry.event.racecourse %}{% if entry.event.distance_text %} · {% race_field entry.event "distance" entry.event.distance_text %}{% endif %}</span>
