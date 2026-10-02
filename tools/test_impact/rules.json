@@ -13,7 +13,8 @@
     "docs/reports/2026-10-02-capability-evidence/backlog-browser-observations.json",
     "docs/reports/2026-10-02-capability-evidence/browser-observations.json",
     "docs/reports/2026-10-02-capability-evidence/news-design-home-observation.json",
-    "docs/reports/2026-10-02-capability-evidence/thread-requirements.json"
+    "docs/reports/2026-10-02-capability-evidence/thread-requirements.json",
+    "docs/changes/next-version-capabilities/lanes/A/F01-validation.json"
   ],
   "high_risk": [
     ".codex/agents/application.toml",
@@ -1145,6 +1146,9 @@
       "content_contracts"
     ],
     "docs/changes/next-version-capabilities/lanes/A/validate_f01_contract.py": [
+      "content_contracts"
+    ],
+    "docs/changes/next-version-capabilities/lanes/A/F01-contract-examples.json": [
       "content_contracts"
     ]
   },
