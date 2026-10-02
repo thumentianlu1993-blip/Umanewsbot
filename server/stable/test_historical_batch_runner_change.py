@@ -759,7 +759,7 @@ class HistoricalBatchRunnerCommandTests(TestCase):
                 HISTORICAL_RUNNER_TOOL_ROOT=str(tool_root),
                 HISTORICAL_RACE_BACKFILL_ENABLED=True,
                 HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=True,
-            ):
+            ), patch("shutil.disk_usage", return_value=SimpleNamespace(free=10 * 1024**3)):
                 call_command(
                     "run_historical_batch_stage",
                     plan=str(plan_path),

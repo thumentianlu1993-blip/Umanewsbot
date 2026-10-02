@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """仅由 network-none 非 root 容器调用；收集或执行一个有界分片。"""
 import contextlib
+import faulthandler
 import importlib
 import io
 import json
@@ -105,6 +106,7 @@ def execute(plan, batch):
             'python':platform.python_version(),'os':platform.platform()}
     class Result(unittest.TextTestResult):
         def startTest(self,test):
+            print('RUN '+test.id(), flush=True)
             report['executed'].append(test.id()); super().startTest(test)
         def addSkip(self,test,reason):
             report['skips'].append({'id':test.id(),'reason':reason}); super().addSkip(test,reason)
@@ -123,6 +125,7 @@ def execute(plan, batch):
         if len(actual)!=len(set(actual)) or set(actual)!=set(batch['ids']) or not 0<len(actual)<=200:
             raise ValueError('batch selection mismatch')
         result_holder=[]
+        faulthandler.dump_traceback_later(120, repeat=True)
         if batch['profile']=='django':
             from django.test.runner import DiscoverRunner
             class Runner(DiscoverRunner):
@@ -141,6 +144,8 @@ def execute(plan, batch):
         report['exit_code']=int(bool(status)); report['lifecycle']='complete'
     except BaseException:
         report['errors'].append({'id':'infrastructure','traceback':traceback.format_exc()})
+    finally:
+        faulthandler.cancel_dump_traceback_later()
     report['seconds']=time.monotonic()-started
     return report
 

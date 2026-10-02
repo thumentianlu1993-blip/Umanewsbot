@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone as dt_timezone
+from unittest.mock import patch
 
 from django.test import TestCase, override_settings
 
@@ -34,6 +35,9 @@ LIFECYCLE_ENROLLMENT = "f" * 64
 )
 class RaceDataSyncLifecycleTests(TestCase):
     def setUp(self):
+        clock = patch("stable.services.race_event_lifecycle_enforce.django_timezone.now", return_value=NOW)
+        clock.start()
+        self.addCleanup(clock.stop)
         self.event = models.RaceEvent.objects.create(
             year=2026,
             slug="data-sync-lifecycle",
