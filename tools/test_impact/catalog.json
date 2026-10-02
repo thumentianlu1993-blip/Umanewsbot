@@ -802,6 +802,9 @@
     ],
     "content_contracts": [
       "stable.test_content_contracts"
+    ],
+    "module:scripts.tests.test_f02_readonly_export": [
+      "scripts.tests.test_f02_readonly_export"
     ]
   },
   "dependencies": {
@@ -2485,6 +2488,12 @@
       "domains": [
         "content_contracts"
       ]
+    },
+    "scripts/tests/test_f02_readonly_export.py": {
+      "label": "scripts.tests.test_f02_readonly_export",
+      "domains": [
+        "module:scripts.tests.test_f02_readonly_export"
+      ]
     }
   },
   "profiles": {
@@ -2764,7 +2773,8 @@
     "stable.test_impact_core": "django",
     "scripts.tests.test_impact_evolution": "python",
     "scripts.tests.test_impact_verifier_e2e": "python",
-    "stable.test_content_contracts": "python"
+    "stable.test_content_contracts": "python",
+    "scripts.tests.test_f02_readonly_export": "python"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {

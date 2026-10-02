@@ -14,7 +14,8 @@
     "docs/reports/2026-10-02-capability-evidence/browser-observations.json",
     "docs/reports/2026-10-02-capability-evidence/news-design-home-observation.json",
     "docs/reports/2026-10-02-capability-evidence/thread-requirements.json",
-    "docs/changes/next-version-capabilities/lanes/A/F01-validation.json"
+    "docs/changes/next-version-capabilities/lanes/A/F01-validation.json",
+    "docs/changes/next-version-capabilities/lanes/B/sample_inventory.json"
   ],
   "high_risk": [
     ".codex/agents/application.toml",
@@ -1150,6 +1151,15 @@
     ],
     "docs/changes/next-version-capabilities/lanes/A/F01-contract-examples.json": [
       "content_contracts"
+    ],
+    "scripts/f02_readonly_export.py": [
+      "module:scripts.tests.test_f02_readonly_export"
+    ],
+    "scripts/tests/test_f02_readonly_export.py": [
+      "module:scripts.tests.test_f02_readonly_export"
+    ],
+    "docs/changes/next-version-capabilities/lanes/B/B-002-test-mapping-proposal.json": [
+      "module:scripts.tests.test_f02_readonly_export"
     ]
   },
   "symbols": {
