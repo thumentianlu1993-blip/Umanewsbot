@@ -40,7 +40,11 @@
       "stable.test_race_data_sync_results",
       "stable.test_race_data_sync_result_admission",
       "stable.test_race_live_official_publication",
-      "stable.test_race_result_recovery_integration"
+      "stable.test_race_result_recovery_integration",
+      "stable.test_race_data_sync_chain_e2e",
+      "stable.test_race_data_sync_repair",
+      "stable.test_race_data_sync_r0_postgres",
+      "stable.test_race_multisource_jra"
     ],
     "historical_batch": [
       "stable.test_historical_batch_pipeline",
@@ -77,7 +81,9 @@
       "scripts.tests.test_test_impact",
       "scripts.tests.test_bounded_stable_tests",
       "scripts.tests.test_impact_git",
-      "scripts.tests.test_impact_delivery"
+      "scripts.tests.test_impact_delivery",
+      "scripts.tests.test_impact_evolution",
+      "scripts.tests.test_impact_verifier_e2e"
     ],
     "module:runtime.research.test_audit_france_galop_bulletin_occurrences": [
       "runtime.research.test_audit_france_galop_bulletin_occurrences"
@@ -780,6 +786,16 @@
     ],
     "module:stable.tests.test_write_paths": [
       "stable.tests.test_write_paths"
+    ],
+    "horse_publish": [
+      "stable.test_p0_horse_completion_batch.P0HorseBatchAutoPublishTests"
+    ],
+    "environment_contracts": [
+      "stable.test_single_migration_owner.ShellAndComposeStaticValidationTests.test_t16_standard_compose_config_is_valid",
+      "stable.test_single_migration_owner.ShellAndComposeStaticValidationTests.test_t16_lowcost_compose_config_is_valid",
+      "stable.test_single_migration_owner.MigrationDriftGuardTests.test_t19_no_new_migration_files",
+      "stable.tests.test_race_event_lifecycle_enrollment.LifecycleEnrollmentCommandTests.test_output_dir_rejects_unresolved_macos_temporary_alias",
+      "stable.tests.test_race_event_lifecycle_enrollment.LifecycleEnrollmentCommandTests.test_prepare_command_does_not_resolve_away_temporary_alias"
     ]
   },
   "dependencies": {
@@ -788,6 +804,9 @@
     ],
     "research_contracts": [
       "p0_bridge"
+    ],
+    "horse_publish": [
+      "horse_page"
     ]
   },
   "tests": {
@@ -2440,6 +2459,18 @@
       "domains": [
         "core"
       ]
+    },
+    "scripts/tests/test_impact_evolution.py": {
+      "label": "scripts.tests.test_impact_evolution",
+      "domains": [
+        "infrastructure"
+      ]
+    },
+    "scripts/tests/test_impact_verifier_e2e.py": {
+      "label": "scripts.tests.test_impact_verifier_e2e",
+      "domains": [
+        "infrastructure"
+      ]
     }
   },
   "profiles": {
@@ -2716,14 +2747,78 @@
     "stable.tests.test_write_paths": "django",
     "scripts.tests.test_impact_git": "python",
     "scripts.tests.test_impact_delivery": "python",
-    "stable.test_impact_core": "django"
+    "stable.test_impact_core": "django",
+    "scripts.tests.test_impact_evolution": "python",
+    "scripts.tests.test_impact_verifier_e2e": "python"
   },
-  "allowed_skips": {},
+  "allowed_skips": {
+    "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
+      "profile": "django",
+      "reason": "Sporting Life real cache root not configured",
+      "review_by": "2026-10-16",
+      "follow_up": "补受审专用环境或冻结真实缓存夹具；当前full结论必须单列该覆盖缺口，不可自动延期"
+    },
+    "stable.test_historical_race_detail_distance_metadata.HistoricalRaceDetailDistanceMetadataRealCacheTests.test_jra_2005_legacy_page_preserves_distance_unit": {
+      "profile": "django",
+      "reason": "real cache root not configured",
+      "review_by": "2026-10-16",
+      "follow_up": "补受审专用环境或冻结真实缓存夹具；当前full结论必须单列该覆盖缺口，不可自动延期"
+    },
+    "stable.test_historical_race_detail_distance_metadata.HistoricalRaceDetailDistanceMetadataRealCacheTests.test_sporting_life_race_118984_preserves_distance_units": {
+      "profile": "django",
+      "reason": "real cache root not configured",
+      "review_by": "2026-10-16",
+      "follow_up": "补受审专用环境或冻结真实缓存夹具；当前full结论必须单列该覆盖缺口，不可自动延期"
+    },
+    "stable.test_historical_race_detail_distance_metadata.HistoricalRaceDetailDistanceMetadataRealCacheTests.test_equibase_yearbook_result_preserves_distance_unit": {
+      "profile": "django",
+      "reason": "real cache root not configured",
+      "review_by": "2026-10-16",
+      "follow_up": "补受审专用环境或冻结真实缓存夹具；当前full结论必须单列该覆盖缺口，不可自动延期"
+    },
+    "stable.test_historical_race_detail_runner_v2_package_identity.HistoricalRaceDetailRunnerV2PackageIdentityRealSmokeTests.test_empty_event_distance_uses_real_parsed_metadata_with_original_units": {
+      "profile": "django",
+      "reason": "real cache root not configured",
+      "review_by": "2026-10-16",
+      "follow_up": "补受审专用环境或冻结真实缓存夹具；当前full结论必须单列该覆盖缺口，不可自动延期"
+    },
+    "stable.test_historical_race_detail_runner_v2_package_identity.HistoricalRaceDetailRunnerV2PackageIdentityRealSmokeTests.test_nonempty_event_and_parsed_distance_conflict_becomes_validation_gap": {
+      "profile": "django",
+      "reason": "real cache root not configured",
+      "review_by": "2026-10-16",
+      "follow_up": "补受审专用环境或冻结真实缓存夹具；当前full结论必须单列该覆盖缺口，不可自动延期"
+    },
+    "stable.test_historical_race_detail_runner_v2_package_identity.HistoricalRaceDetailRunnerV2PackageIdentityRealSmokeTests.test_hk_real_validated_candidate_packages_with_plan_inventory_identity": {
+      "profile": "django",
+      "reason": "real cache root not configured",
+      "review_by": "2026-10-16",
+      "follow_up": "补受审专用环境或冻结真实缓存夹具；当前full结论必须单列该覆盖缺口，不可自动延期"
+    },
+    "stable.test_historical_race_detail_runner_v2_package_identity.HistoricalRaceDetailRunnerV2PackageIdentityRealSmokeTests.test_hk_package_rejects_raw_candidate_without_validation_evidence": {
+      "profile": "django",
+      "reason": "real cache root not configured",
+      "review_by": "2026-10-16",
+      "follow_up": "补受审专用环境或冻结真实缓存夹具；当前full结论必须单列该覆盖缺口，不可自动延期"
+    },
+    "stable.test_migration_history_repair.MigrationHistoryRepairDockerImageContractTests.test_candidate_image_contains_only_the_exact_reviewed_audit_file": {
+      "profile": "django",
+      "reason": "set RUN_MIGRATION_REPAIR_DOCKER_CONTRACT=true for the real image contract",
+      "review_by": "2026-10-16",
+      "follow_up": "补受审专用环境或冻结真实缓存夹具；当前full结论必须单列该覆盖缺口，不可自动延期"
+    },
+    "stable.test_race_live_gate_remediation.RollbackGateBehaviorRemediationTests.test_root_artifact_is_exact_0700_0600_secret_free_and_no_replace": {
+      "profile": "django",
+      "reason": "root-owned artifact contract requires root EUID",
+      "review_by": "2026-10-16",
+      "follow_up": "补受审专用环境或冻结真实缓存夹具；当前full结论必须单列该覆盖缺口，不可自动延期"
+    }
+  },
   "owners": {
     "horse_page": "application: 马匹公开页面与发布边界",
     "news_translation": "integration: 翻译与内容公开边界",
     "race_parser": "integration: 来源解析到结果规范化",
     "race_results": "integration: 持久化及官方公开判定",
-    "historical_batch": "integration: 历史批次收据和事务"
+    "historical_batch": "integration: 历史批次收据和事务",
+    "horse_publish": "integration: 首次发布、批次重试及冻结排除"
   }
 }

@@ -50,3 +50,17 @@ GitHub strict挡住核验后再次前移的竞态。没有新tree证据就不调
 base/head/test SHA/tree；规则/catalog/依赖/runner摘要；计划与选择理由；执行/跳过/失败全集；
 CI run/attempt/job状态；原 reviewer 与 findings；是否启用 required checks/定时任务；已测/未测范围。
 隔离本地、Linux CI 和生产验收分别报告；没有业务/数据库变更就不安排一次多余的生产重启。
+
+## 第二轮固定版本验证与整轮审查
+
+`209ba770cd612b1e1a4135a02f33f36c05c1942e` 的 [CI36997377841](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/36997377841)
+通过258项（60项Django/198项Python，约21.2秒/5.0秒），零失败/错误/skip。
+Python子进程、curl外网均阻断，独立Docker容器不可用；只收集6143个canonical ID、34批、最大200，没有执行全量。
+
+独立整轮review对0e6ac960..209ba770给出REVISE，前后指纹一致。
+9项finding：模式伪装、容器Git初始状态、已知环境skip、下游漏选、共享夹具、映射演进、文档合同退化、manual引导、同SHA补合同。
+正在统一返修，新增真实Git演进和候选外CLI端到端测试；下一固定版本复审前不得宣称最终通过。
+10项环境skip逐项设2026-10-16复核期限；它们仍是覆盖缺口，不算执行通过。源码存在的Compose配置检查改为仅提供无daemon的CLI。
+
+只读查询：rules/branches/main返回[]，传统branches/main/protection返回404 Branch not protected，IMPACT_TEST_POLICY未设置。
+尚未做G2配置或合并。actionlint1.7.12对四份新增/重写工作流通过；研究手动工作流的空choice既有告警在base也复现，13项原有结构合同通过，未改变该输入语义。

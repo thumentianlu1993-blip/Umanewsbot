@@ -269,7 +269,10 @@
       "labels": [
         "stable.test_horse_profile_publish.BasicPublishGateTests",
         "stable.test_impact_core",
+        "stable.test_race_data_sync_chain_e2e",
         "stable.test_race_data_sync_r0.RaceDataSyncR0FlagContractTests.test_celery_route_and_beat_schedule_are_isolated",
+        "stable.test_race_data_sync_r0_postgres",
+        "stable.test_race_data_sync_repair",
         "stable.test_race_data_sync_result_admission",
         "stable.test_race_data_sync_results",
         "stable.test_race_live_official_publication",

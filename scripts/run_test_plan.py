@@ -115,6 +115,13 @@ def main():
         with ThreadPoolExecutor(max_workers=4) as pool:
             codes=list(pool.map(lambda b:invoke('run',b['key'],b['profile']),batches))
         print(json.dumps({'mode':plan['mode'],'count':sum(len(b['ids']) for b in batches),'batches':len(batches),'failed_batches':sum(bool(c) for c in codes)}))
+        failures=[]
+        for batch in batches:
+            file=output/(batch['key']+'.json')
+            if file.exists():
+                report=json.loads(file.read_text())
+                failures.extend({'id':item['id'],'reason':item['traceback'].splitlines()[-1][:240]} for item in report['failures']+report['errors'])
+        if failures: print(json.dumps({'failure_count':len(failures),'first_failures':failures[:10]},ensure_ascii=False))
         if any(codes): raise SystemExit(1)
 
 

@@ -194,3 +194,8 @@ smoke启动与续跑不是可随意删掉的重复。手动研究运行仍必须
 - full调度使用成功artifact内真正受测SHA，不能使用触发workflow的ref代替手动输入。
 - PostgreSQL16明确UTF-8；历史性能合同明确开启合成环境性能flag；research离线profile包含其已有脚本导入路径。
 - 完整catalog收集可以单独进行，输出“只收集，未执行”；与运行全部测试分开报告。
+
+- 纯文档使用精确base提取的候选外只读checker，保留原有门禁唯一性等全部合同，候选Python测试只在隔离容器执行。
+- 首次manual引导须base尚无工具、独立审核绑定exact head、实际步骤/控制文件匹配，且受测完整tree等于实时合并tree；其后不适用此例外。
+- 显式release/toolchain不要求差异非空；普通affected空差异仍拒绝。删除测试记录旧模块及其声明ID，继承展开不冒充静态声明清单。
+- 非root及无真实缓存/daemon导致的10项既有skip按精确ID和原因登记至2026-10-16，报告单列覆盖缺口；不放宽其他skip。

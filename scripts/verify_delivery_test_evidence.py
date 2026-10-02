@@ -43,9 +43,26 @@ def verify_protection(protection):
             'strict required test-plan-gate including admins is not active')
 
 
+def verify_mode(expected, reported):
+    require(reported == expected or (expected == 'targeted' and reported == 'expanded'), 'trusted mode mismatch')
+
+
 def compare_collection(plan, collected):
-    require(plan['batches']==collected['batches'] and plan['count']==collected['count'],
+    require(plan.get('mode')==collected.get('mode') and plan['batches']==collected['batches'] and plan['count']==collected['count'],
             'independent collection mismatch')
+
+
+def authorize_run(run, plan, review, base_has_catalog, head, merge):
+    if run['event']=='pull_request':
+        require(run['path']=='.github/workflows/affected_tests.yml' and plan['test_sha']==merge,
+                'ordinary PR requires exact merge workflow')
+        return ''
+    require(run['event']=='workflow_dispatch' and not base_has_catalog and plan['bootstrap']
+            and review and review.get('commit')==head and plan['head_sha']==head,
+            'manual delivery requires independently reviewed bootstrap')
+    require(run['path'] in ('.github/workflows/affected_tests.yml','.github/workflows/release_0078_contract.yml'),
+            'untrusted bootstrap workflow')
+    return 'impact-validation / ' if run['path'].endswith('/release_0078_contract.yml') else ''
 
 
 def main():
@@ -81,11 +98,9 @@ def main():
     # 校验运行的本文件来自声明的受信对象。
     require(git('show',a.trusted_sha+':scripts/verify_delivery_test_evidence.py')==Path(__file__).read_bytes(),'verifier provenance mismatch')
     run=api(a.repo,f'actions/runs/{a.run}')
-    require(run['event']=='pull_request' and run['head_sha']==head and run['conclusion']=='success','not successful exact PR run')
-    require(run['path']=='.github/workflows/affected_tests.yml','wrong workflow')
+    require(run['head_sha']==head and run['conclusion']=='success','not successful exact head run')
     attempt=run['run_attempt']
     jobs=api(a.repo,f'actions/runs/{a.run}/attempts/{attempt}/jobs?per_page=100')['jobs']
-    verify_jobs(jobs)
     artifacts=api(a.repo,f'actions/runs/{a.run}/artifacts?per_page=100')['artifacts']
     matches=[x for x in artifacts if x['name']==f'impact-{a.run}-{attempt}' and not x['expired']]
     require(len(matches)==1,'missing/ambiguous artifact')
@@ -96,17 +111,22 @@ def main():
         plan=json.loads(z.read('execution-plan.json'))
         reports=[json.loads(z.read(n)) for n in names if re.fullmatch('batch-[0-9]+.json',n)]
     require(plan['source']=='git' and plan['mode']!='validation-only','diagnostic evidence is not deliverable')
-    require(plan['base_sha']==base and plan['head_sha']==head and plan['test_sha']==test,'STALE_BASE or stale head')
+    require(plan['base_sha']==base and plan['head_sha']==head,'STALE_BASE or stale head')
+    require(plan['test_sha'] in (head,test),'unexpected tested commit')
     require(plan['test_tree']==git('rev-parse',test+'^{tree}').decode().strip(),'tree mismatch')
     require(plan['run_id']==str(a.run) and plan['run_attempt']==str(attempt),'artifact run mismatch')
     entries={record.split(b'\t',1)[1].decode():record.split(b'\t',1)[0].decode().split()[2] for record in git('ls-tree','-rz',test).split(b'\0') if record}
-    controls={path:oid for path,oid in entries.items() if path.startswith(('tools/test_impact/','deploy/test-impact/')) or path in (
+    controls={path:oid for path,oid in entries.items() if path.startswith(('tools/test_impact/','deploy/test-impact/','.github/workflows/')) or path in (
         'requirements.txt','scripts/plan_affected_tests.py','scripts/run_test_plan.py','scripts/test_plan_worker.py',
         'scripts/verify_test_plan.py','scripts/impact_ci.py','scripts/run_bounded_stable_tests.py',
         '.github/workflows/affected_tests.yml','.github/workflows/full_regression.yml')}
     require(plan['control_blobs']==controls,'missing or unexpected control identities')
     base_has_catalog=bool(git('ls-tree',base,'tools/test_impact/catalog.json').strip())
     require(plan['bootstrap'] is (not base_has_catalog),'forged bootstrap bypass')
+    prefix = authorize_run(run, plan, review, base_has_catalog, head, test)
+    normalized_jobs=[{**j,'name':j['name'][len(prefix):] if j['name'].startswith(prefix) else j['name']} for j in jobs]
+    verify_jobs(normalized_jobs)
+    require(plan['test_tree']==git('rev-parse',plan['test_sha']+'^{tree}').decode().strip(),'tested source tree mismatch')
     for path,oid in controls.items():
         require(git('rev-parse',test+':'+path).decode().strip()==oid,'candidate control mismatch: '+path)
         try:trusted=git('rev-parse',base+':'+path).decode().strip()
@@ -118,8 +138,24 @@ def main():
         paths=['tools/test_impact/core.py','tools/test_impact/git_input.py','scripts/plan_affected_tests.py','scripts/run_test_plan.py']
         for path in paths:
             out=bundle/path;out.parent.mkdir(parents=True,exist_ok=True);out.write_bytes(git('show',a.trusted_sha+':'+path))
-        if plan['mode']!='docs-only':
-            steps={s['name']:s['conclusion'] for j in jobs if j['name']=='tests' for s in j['steps']}
+        config=bundle/'input.json'
+        config.write_text(json.dumps({'root':str(root),'base':base,'head':head,'test':plan['test_sha'],'plan':plan,'reports':reports}))
+        program="""import json,sys
+from pathlib import Path
+sys.path[:0]=[sys.argv[1],sys.argv[1]+'/scripts']
+from plan_affected_tests import create_plan
+from tools.test_impact.core import verify_results
+x=json.loads(Path(sys.argv[2]).read_text()); p=x['plan']
+e=create_plan(Path(x['root']),x['base'],x['head'],x['test'],bootstrap=p['bootstrap'])
+for field in ('domains','labels','hashes','changed_paths','content_digest','allowed_skips'):
+ if p[field]!=e[field]: raise ValueError('trusted plan mismatch: '+field)
+if sys.argv[3]=='selection': print(json.dumps(e))
+else: print(json.dumps(verify_results(p,x['reports'])))
+"""
+        expected=json.loads(checked([sys.executable,'-I','-c',program,str(bundle),str(config),'selection']))
+        verify_mode(expected['mode'],plan['mode'])
+        if expected['mode']!='docs-only':
+            steps={s['name']:s['conclusion'] for j in normalized_jobs if j['name']=='tests' for s in j['steps']}
             require(steps.get('upload-test-image')=='success','missing actual image upload step')
             images=[x for x in artifacts if x['name']==f'impact-image-{a.run}-{attempt}' and not x['expired']]
             require(len(images)==1,'missing exact-run test image')
@@ -135,7 +171,7 @@ def main():
             require(not os.environ.get('DOCKER_HOST') and not os.environ.get('DOCKER_CONTEXT') and endpoint.startswith('unix://'),'local Docker required')
             checked(['docker','load','-i',str(image_path)])
             require(re.fullmatch('sha256:[0-9a-f]{64}',plan['image_id']),'invalid image ID')
-            source_plan=bundle/'selection.json';source_plan.write_text(json.dumps(plan))
+            source_plan=bundle/'selection.json';source_plan.write_text(json.dumps({**plan,'mode':expected['mode']}))
             trusted_controls=bundle/'execution-controls'
             for path in ('scripts/test_plan_worker.py','scripts/run_bounded_stable_tests.py','deploy/test-impact/entrypoint.sh','tools/test_impact/core.py'):
                 control=trusted_controls/path;control.parent.mkdir(parents=True,exist_ok=True)
@@ -145,27 +181,13 @@ def main():
                      '--plan',str(source_plan),'--output',str(collection_dir),'--collect-only','--image',plan['image_id'],'--controls',str(trusted_controls)])
             compare_collection(plan,json.loads((collection_dir/'execution-plan.json').read_text()))
         else:
-            compare_collection(plan,{'batches':[],'count':0})
-        config=bundle/'input.json'
-        config.write_text(json.dumps({'root':str(root),'base':base,'head':head,'test':test,'plan':plan,'reports':reports}))
-        program="""import json,sys
-from pathlib import Path
-sys.path[:0]=[sys.argv[1],sys.argv[1]+'/scripts']
-from plan_affected_tests import create_plan
-from tools.test_impact.core import verify_results
-x=json.loads(Path(sys.argv[2]).read_text()); p=x['plan']
-e=create_plan(Path(x['root']),x['base'],x['head'],x['test'],bootstrap=p['bootstrap'])
-for field in ('domains','labels','hashes','changed_paths','content_digest','allowed_skips'):
- if p[field]!=e[field]: raise ValueError('trusted plan mismatch: '+field)
-if e['mode']=='full' and p['mode']!='full': raise ValueError('full scope downgraded')
-print(json.dumps(verify_results(p,x['reports'])))
-"""
-        verified=json.loads(checked([sys.executable,'-I','-c',program,str(bundle),str(config)]))
+            compare_collection(plan,{'mode':'docs-only','batches':[],'count':0})
+        verified=json.loads(checked([sys.executable,'-I','-c',program,str(bundle),str(config),'results']))
     protection=api(a.repo,'branches/main/protection')
     verify_protection(protection)
     # 第二次读取收尾；实际 merge 仍由 strict 服务端检查防止之后的竞态。
     require(api(a.repo,'commits/main')['sha']==base and api(a.repo,f'pulls/{a.pr}')['head']['sha']==head,'STALE_BASE')
-    receipt={'status':'verified','base_sha':base,'head_sha':head,'test_sha':test,'test_tree':plan['test_tree'],
+    receipt={'status':'verified','base_sha':base,'head_sha':head,'test_sha':plan['test_sha'],'merge_sha':test,'test_tree':plan['test_tree'],
              'run_id':a.run,'run_attempt':attempt,'artifact_id':matches[0]['id'],
              'artifact_sha256':hashlib.sha256(archive).hexdigest(),'trusted_sha':a.trusted_sha,
              'verifier_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'summary':verified}

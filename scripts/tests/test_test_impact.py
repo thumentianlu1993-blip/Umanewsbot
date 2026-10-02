@@ -133,4 +133,27 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual(core.union_selection(old,new)['mode'],'full')
 
 
+
+
+
+class RealMappingTests(unittest.TestCase):
+    def select_path(self,path):
+        import json
+        rules=json.loads((ROOT/'tools/test_impact/rules.json').read_text())
+        catalog=json.loads((ROOT/'tools/test_impact/catalog.json').read_text())
+        return core.select_changes([change(path)],rules,catalog)
+
+    def test_result_write_selects_public_read_and_repair_contracts(self):
+        labels=self.select_path('server/stable/services/race_data_sync_results.py')['labels']
+        self.assertIn('stable.test_race_data_sync_chain_e2e',labels)
+        self.assertIn('stable.test_race_data_sync_repair',labels)
+
+    def test_publish_service_selects_frozen_exclusion_batch_contract(self):
+        labels=self.select_path('server/stable/services/horse_profile_publish.py')['labels']
+        self.assertIn('stable.test_p0_horse_completion_batch.P0HorseBatchAutoPublishTests',labels)
+
+    def test_shared_fixture_is_high_risk(self):
+        for path in ('server/stable/test_migration_database_helpers.py','server/stable/tests/__init__.py'):
+            self.assertEqual(self.select_path(path)['mode'],'full')
+
 if __name__ == "__main__": unittest.main()

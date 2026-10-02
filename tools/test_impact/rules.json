@@ -948,11 +948,13 @@
     "scripts/research_offline_labels.py",
     "scripts/test_plan_worker.py",
     "scripts/replay_impact_diffs.py",
-    "docs/changes/impact-based-testing/*.json"
+    "docs/changes/impact-based-testing/*.json",
+    "server/stable/test_migration_database_helpers.py",
+    "server/stable/tests/__init__.py"
   ],
   "paths": {
     "server/stable/services/horse_profile_publish.py": [
-      "horse_page"
+      "horse_publish"
     ],
     "server/stable/services/japanese_racing_translation.py": [
       "news_translation"

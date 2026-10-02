@@ -1,6 +1,6 @@
 FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && apt-get install -y --no-install-recommends python3.12 python3.12-venv postgresql-16 postgresql-client-16 curl ca-certificates git ruby && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends python3.12 python3.12-venv postgresql-16 postgresql-client-16 curl ca-certificates git ruby docker.io docker-compose-v2 && rm -rf /var/lib/apt/lists/*
 RUN python3.12 -m venv /venv
 COPY requirements.txt /tmp/requirements.txt
 RUN /venv/bin/pip install --no-cache-dir -r /tmp/requirements.txt

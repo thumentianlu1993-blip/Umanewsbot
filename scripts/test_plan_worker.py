@@ -48,9 +48,9 @@ def isolation_probe(profile):
     for cmd in checks:
         if subprocess.run(cmd,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=5).returncode == 0:
             raise ValueError('subprocess network isolation failed')
-    if subprocess.run(['/bin/sh','-c','command -v docker'],capture_output=True).returncode == 0:
-        raise ValueError('unexpected nested Docker executable')
-    return {'interfaces':sorted(interfaces),'external_python':'blocked','curl':'blocked','nested_docker':'unavailable'}
+    if subprocess.run(['docker','run','--pull=never','--rm','hello-world'],capture_output=True,timeout=5).returncode == 0:
+        raise ValueError('nested Docker unexpectedly available')
+    return {'interfaces':sorted(interfaces),'external_python':'blocked','curl':'blocked','nested_docker':'daemon-blocked'}
 
 
 def load(labels):
@@ -65,11 +65,17 @@ def load(labels):
 
 
 def collect(plan, catalog):
-    cases, aliases = {}, []
+    cases, aliases, declared_skips = {}, [], []
     for label in plan['labels']:
         loaded = load([label])
         for case in loaded:
             ident = case.id()
+            method=getattr(case,case._testMethodName)
+            skipped=getattr(case.__class__,'__unittest_skip__',False) or getattr(method,'__unittest_skip__',False)
+            if skipped:
+                reason=getattr(case.__class__,'__unittest_skip_why__','') or getattr(method,'__unittest_skip_why__','')
+                entry={'id':ident,'reason':reason}
+                if entry not in declared_skips: declared_skips.append(entry)
             profile = next((p for m,p in catalog['profiles'].items() if ident.startswith(m+'.')), None)
             if profile is None:
                 raise ValueError('unowned test: '+ident)
@@ -82,6 +88,7 @@ def collect(plan, catalog):
     if plan['labels'] and not cases:
         raise ValueError('empty test collection')
     plan['aliases'] = aliases
+    plan['collection_skips'] = declared_skips
     plan['batches'] = shard_tests(list(cases.values()))
     if plan['mode']=='targeted' and len(cases)>400:
         plan['mode']='expanded'

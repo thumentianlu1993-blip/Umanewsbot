@@ -1,7 +1,7 @@
 """交付不可仅凭同名绿色job或旧run的结果。"""
 from datetime import datetime, timezone, timedelta
 import unittest
-from scripts.verify_delivery_test_evidence import verify_jobs, verify_protection, compare_collection
+from scripts.verify_delivery_test_evidence import verify_jobs, verify_protection, compare_collection, verify_mode
 from scripts.decide_full_regression import should_run
 
 
@@ -45,3 +45,25 @@ class CollectionEvidenceTests(unittest.TestCase):
         collected={'batches':[{'key':'batch-000','profile':'python','ids':['m.C.test_x']}],'count':1}
         with self.assertRaisesRegex(ValueError,'collection'):
             compare_collection(plan,collected)
+
+
+class ScopeEvidenceTests(unittest.TestCase):
+    def test_targeted_cannot_claim_documentation_to_skip_collection(self):
+        with self.assertRaisesRegex(ValueError,'mode'):
+            verify_mode('targeted','docs-only')
+
+
+class BootstrapTests(unittest.TestCase):
+    def test_only_reviewed_first_manual_bootstrap_is_accepted(self):
+        from scripts.verify_delivery_test_evidence import authorize_run
+        run={'event':'workflow_dispatch','path':'.github/workflows/release_0078_contract.yml'}
+        plan={'bootstrap':True,'head_sha':'head','test_sha':'head'};review={'commit':'head'}
+        self.assertEqual(authorize_run(run,plan,review,False,'head','merge'),'impact-validation / ')
+        for has_catalog,approval in [(True,review),(False,None),(False,{'commit':'other'})]:
+            with self.assertRaises(ValueError):authorize_run(run,plan,approval,has_catalog,'head','merge')
+
+    def test_ordinary_pr_still_requires_exact_merge_identity(self):
+        from scripts.verify_delivery_test_evidence import authorize_run
+        with self.assertRaises(ValueError):
+            authorize_run({'event':'pull_request','path':'.github/workflows/affected_tests.yml'},
+                          {'test_sha':'head'},None,True,'head','merge')

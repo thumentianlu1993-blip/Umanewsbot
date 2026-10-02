@@ -64,6 +64,8 @@ jobs:
           TEST_SHA: ${{ github.event.pull_request.merge_commit_sha || inputs.candidate_sha }}
         run: |
           git diff --check "$BASE_SHA" "$TEST_SHA"
+          git show "$BASE_SHA:.codex/scripts/check_workflow_contract.py" > "$RUNNER_TEMP/trusted-workflow-contract.py"
+          python -I "$RUNNER_TEMP/trusted-workflow-contract.py" --root "$GITHUB_WORKSPACE"
           ruby -e 'require "yaml"; Dir[".github/workflows/*.yml"].each { |p| YAML.load_file(p) }'
           python -I - <<'PY'
           import ast, pathlib, re, os, subprocess, urllib.parse

@@ -35,6 +35,8 @@ def symbols(source):
 
 
 def validate_catalog(catalog):
+    if catalog.get('schema_version') != 1:
+        raise ValueError('unsupported catalog schema')
     domains = catalog['domains']
     if 'core' not in domains:
         raise ValueError('catalog missing core')
@@ -168,5 +170,6 @@ def verify_results(plan, reports):
             policy = allowed.get(item['id'])
             if not policy or policy['profile'] != batch['profile'] or policy['reason'] != item['reason'] or date.fromisoformat(policy['review_by']) < date.today():
                 raise ValueError('unexpected/expired skip')
-    return {'status': 'passed', 'mode': plan['mode'], 'count': sum(len(b['ids']) for b in expected.values()),
+    skipped = sum(len(r['skips']) for r in reports)
+    return {'status': 'passed', 'skipped_count': skipped, 'mode': plan['mode'], 'count': sum(len(b['ids']) for b in expected.values()),
             'plan_digest': digest(plan), 'run_id': plan['run_id'], 'run_attempt': plan['run_attempt'], 'test_tree': plan['test_tree']}
