@@ -2161,10 +2161,10 @@
     "resume_requires_user": true,
     "allow_credits": false,
     "allow_reset_credit": false,
-    "last_observed_remaining_percent": 8,
-    "last_observed_used_percent": 92,
+    "last_observed_remaining_percent": 7,
+    "last_observed_used_percent": 93,
     "last_observed_at": "2026-10-03T02:33:23.245395+08:00",
-    "state": "正常，阈值未触发",
+    "state": "正常，实时剩余7%，阈值未触发",
     "limitation": "调度侧控制；非账单硬上限",
     "unknown_usage_policy": "3次有界重试，仍未知暂缓新增耗时模型工作；读数恢复>1自动解除未知保护"
   },
