@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "timezone": "Asia/Shanghai",
-  "updated_at": "2026-10-03T02:47:59.407660+08:00",
+  "updated_at": "2026-10-03T02:48:52.630413+08:00",
   "coordinator_thread_id": "01a0fdb2-b88c-7f93-8c9e-ba9564c33c93",
   "coordinator_worktree": "/Users/mentianlu/.codex/worktrees/516a/umanews",
   "deadline_at": "2026-10-30T18:00:00+08:00",
@@ -75,10 +75,10 @@
       "deps": [],
       "deadline_at": "2026-10-04T18:00:00+08:00",
       "status": "进行中",
-      "phase": "代码review返修/必要映射修正",
-      "commit": "e9a322102e29573f79735bf0655dee54a4051f88",
+      "phase": "返修原R复审/Linux收集与全量验证",
+      "commit": "0e05029c1ed00713a6f66e461e6753c1e4dadb27",
       "pr": null,
-      "review": "REVISE@e9a32210，两项P2；严格generation与公开identity_state绑定，已转A；旧候选未运行full",
+      "review": "两项P2已修，17 host GREEN；已送原R限定复审；Linux仍待证",
       "evidence": [
         "/Users/mentianlu/.codex/worktrees/5482/umanews/docs/changes/next-version-capabilities/lanes/A/A-001-report.md"
       ],
@@ -2158,13 +2158,14 @@
     {
       "scope": "F01实现与映射增量复审",
       "base": "7c78f67d04cc156520d21916f3eb0a3ef066305e",
-      "head": "e9a322102e29573f79735bf0655dee54a4051f88",
-      "status": "REVISE，待A新固定head",
+      "head": "0e05029c1ed00713a6f66e461e6753c1e4dadb27",
+      "status": "返修已送原R，含catalog profile增量",
       "findings": [
         "A002-P2-01",
         "A002-P2-02"
       ],
-      "report": "/Users/mentianlu/.codex/worktrees/3ab1/umanews/docs/changes/next-version-capabilities/lanes/R/A-002-F01-code-review.md"
+      "report": "/Users/mentianlu/.codex/worktrees/3ab1/umanews/docs/changes/next-version-capabilities/lanes/R/A-002-F01-code-review.md",
+      "incremental_base": "e9a322102e29573f79735bf0655dee54a4051f88"
     },
     {
       "scope": "F02导出器/命令/映射proposal代码技术审核",
@@ -2187,7 +2188,7 @@
     "allow_reset_credit": false,
     "last_observed_remaining_percent": 7,
     "last_observed_used_percent": 93,
-    "last_observed_at": "2026-10-03T02:35:43.640132+08:00",
+    "last_observed_at": "2026-10-03T02:48:52.630413+08:00",
     "state": "正常，实时剩余7%，阈值未触发",
     "limitation": "调度侧控制；非账单硬上限",
     "unknown_usage_policy": "3次有界重试，仍未知暂缓新增耗时模型工作；读数恢复>1自动解除未知保护"
@@ -2237,12 +2238,12 @@
       "runner_connection": "A专用DOCKER_CONFIG/context仅绑定本地socket，原verify_local_docker已PASS；各线使用独立配置目录，不覆盖全局context",
       "current_allocation": {
         "lane": "A",
-        "head": "e9a322102e29573f79735bf0655dee54a4051f88",
+        "head": "0e05029c1ed00713a6f66e461e6753c1e4dadb27",
         "parallel_batches": 2,
-        "output": "/tmp/umanews-a002-evidence",
-        "status": "A保留窗口；待两项P2和profile映射合并修复后的新固定SHA，旧e9未启动full",
+        "output": "/tmp/umanews-a002-evidence/linux-full-0e05029c",
+        "status": "新固定树collect进行中；成功后2并发full；旧e9/650无full",
         "built_image": "sha256:fcf8cdaf63af51b1b8a6e30e3d2fdf871d127c3c1461bfd00c9fc6d610eab905",
-        "collection_blocker": "catalog.profiles漏新模块，A已补python profile；待复审及重收集"
+        "collection_blocker": "profile遗漏已修并送R，等待实际新树收集结果"
       },
       "temporary_directory": "每线独立/Users/mentianlu/.codex/runtime目录作为TMPDIR；mac /var/folders未共享"
     },
