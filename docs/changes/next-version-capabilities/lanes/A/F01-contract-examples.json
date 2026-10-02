@@ -14,12 +14,12 @@
           "schema_version": "f01.input.v1",
           "scope": [
             "entity",
-            "materials",
             "evidence",
-            "protection",
-            "policy_ref"
+            "materials",
+            "policy_ref",
+            "protection"
           ],
-          "content_sha256": "bb658087ad502eb8a798200fdc1ddc29d5a6122999223ffea86a3ea3cc0bfa4f",
+          "content_sha256": "bbafea780a06460a93ef60eaff0909f5fc3739a94de963e43c0494d420f8685a",
           "generations": {
             "owner": null,
             "schedule": null,
@@ -87,7 +87,8 @@
             "modules": [],
             "reason": "",
             "actor_ref": null,
-            "changed_at": null
+            "changed_at": null,
+            "protection_sha256": "7019f6f92bcbac36c1b52326311d33f263324be1faae9a1b4f747619b20a1701"
           },
           "policy_ref": "f01-policy-draft"
         }
@@ -111,12 +112,12 @@
           "schema_version": "f01.input.v1",
           "scope": [
             "entity",
-            "materials",
             "evidence",
-            "protection",
-            "policy_ref"
+            "materials",
+            "policy_ref",
+            "protection"
           ],
-          "content_sha256": "bb658087ad502eb8a798200fdc1ddc29d5a6122999223ffea86a3ea3cc0bfa4f",
+          "content_sha256": "bbafea780a06460a93ef60eaff0909f5fc3739a94de963e43c0494d420f8685a",
           "generations": {
             "owner": null,
             "schedule": null,
@@ -124,7 +125,7 @@
             "source_set": null
           }
         },
-        "input_fingerprint": "3a8df2e24255997da3bbc918f872adab984cfd27ad153149051dcc2cc30d40e7",
+        "input_fingerprint": "c56d5ee08b22fc80bb1bc04175973d34a0450b2e3c4f241e6a7e2bf5544a3bb3",
         "evaluated_at": "2026-10-03T01:10:00Z",
         "entity": {
           "kind": "horse",
@@ -152,12 +153,12 @@
               "schema_version": "f01.input.v1",
               "scope": [
                 "entity",
-                "materials",
                 "evidence",
-                "protection",
-                "policy_ref"
+                "materials",
+                "policy_ref",
+                "protection"
               ],
-              "content_sha256": "bb658087ad502eb8a798200fdc1ddc29d5a6122999223ffea86a3ea3cc0bfa4f",
+              "content_sha256": "bbafea780a06460a93ef60eaff0909f5fc3739a94de963e43c0494d420f8685a",
               "generations": {
                 "owner": null,
                 "schedule": null,
@@ -193,12 +194,12 @@
           "schema_version": "f01.input.v1",
           "scope": [
             "entity",
-            "materials",
             "evidence",
-            "protection",
-            "policy_ref"
+            "materials",
+            "policy_ref",
+            "protection"
           ],
-          "content_sha256": "a0f5bcbc952b8675d609ac87bf81dfe145611715febb161b8b564030c986a01a",
+          "content_sha256": "913b250492ef1638309dfb1fa67451fc7c06f44a58a1872df9503ded1779695a",
           "generations": {
             "owner": null,
             "schedule": null,
@@ -312,7 +313,8 @@
             "modules": [],
             "reason": "",
             "actor_ref": null,
-            "changed_at": null
+            "changed_at": null,
+            "protection_sha256": "7019f6f92bcbac36c1b52326311d33f263324be1faae9a1b4f747619b20a1701"
           },
           "policy_ref": "f01-policy-draft"
         }
@@ -348,12 +350,12 @@
           "schema_version": "f01.input.v1",
           "scope": [
             "entity",
-            "materials",
             "evidence",
-            "protection",
-            "policy_ref"
+            "materials",
+            "policy_ref",
+            "protection"
           ],
-          "content_sha256": "a0f5bcbc952b8675d609ac87bf81dfe145611715febb161b8b564030c986a01a",
+          "content_sha256": "913b250492ef1638309dfb1fa67451fc7c06f44a58a1872df9503ded1779695a",
           "generations": {
             "owner": null,
             "schedule": null,
@@ -361,7 +363,7 @@
             "source_set": null
           }
         },
-        "input_fingerprint": "88a7c33747fd4e72b6c79aa80ae62e0680dd488d57e745e1186d7654386d1b34",
+        "input_fingerprint": "a4171bd22372b5890c51694053f5e5f2a218c60fcdef7a8820e8ed8787963327",
         "evaluated_at": "2026-10-03T01:10:00Z",
         "entity": {
           "kind": "horse",
@@ -370,11 +372,13 @@
           "source_refs": [
             {
               "namespace": "fixture-uk",
-              "external_id": "echo-2018"
+              "external_id": "echo-2018",
+              "source": "fixture-registry"
             },
             {
               "namespace": "fixture-us",
-              "external_id": "echo-2020"
+              "external_id": "echo-2020",
+              "source": "fixture-registry"
             }
           ],
           "candidate_ids": [
@@ -401,12 +405,12 @@
               "schema_version": "f01.input.v1",
               "scope": [
                 "entity",
-                "materials",
                 "evidence",
-                "protection",
-                "policy_ref"
+                "materials",
+                "policy_ref",
+                "protection"
               ],
-              "content_sha256": "a0f5bcbc952b8675d609ac87bf81dfe145611715febb161b8b564030c986a01a",
+              "content_sha256": "913b250492ef1638309dfb1fa67451fc7c06f44a58a1872df9503ded1779695a",
               "generations": {
                 "owner": null,
                 "schedule": null,
@@ -458,12 +462,12 @@
           "schema_version": "f01.input.v1",
           "scope": [
             "entity",
-            "materials",
             "evidence",
-            "protection",
-            "policy_ref"
+            "materials",
+            "policy_ref",
+            "protection"
           ],
-          "content_sha256": "4f6223e24cd043f233fc1b009cbc64bc116e48f9c7f37b411f9dc049b02d8984",
+          "content_sha256": "6e79401348126ea0bf49b833e33903518e14d722c6e77498c210851f1897bcc8",
           "generations": {
             "owner": null,
             "schedule": null,
@@ -481,31 +485,6 @@
             "evidence_refs": []
           },
           "materials": [
-            {
-              "capability": "roster",
-              "maturity": "confirmed",
-              "completeness": "complete",
-              "validation": "passed",
-              "revision_ref": "fixture-revision-2",
-              "supersedes_ref": null,
-              "evidence_refs": [
-                "e-roster-final"
-              ],
-              "data": {
-                "participants": [
-                  {
-                    "stable_key": "p1",
-                    "horse_ref": "fixture-horse-love",
-                    "status": "declared"
-                  },
-                  {
-                    "stable_key": "p2",
-                    "horse_ref": "fixture-horse-echo-2018",
-                    "status": "declared"
-                  }
-                ]
-              }
-            },
             {
               "capability": "roster",
               "maturity": "predicted",
@@ -527,6 +506,31 @@
                     "stable_key": "p3",
                     "horse_ref": "fixture-horse-other",
                     "status": "unknown"
+                  }
+                ]
+              }
+            },
+            {
+              "capability": "roster",
+              "maturity": "confirmed",
+              "completeness": "complete",
+              "validation": "passed",
+              "revision_ref": "fixture-revision-2",
+              "supersedes_ref": null,
+              "evidence_refs": [
+                "e-roster-final"
+              ],
+              "data": {
+                "participants": [
+                  {
+                    "stable_key": "p1",
+                    "horse_ref": "fixture-horse-love",
+                    "status": "declared"
+                  },
+                  {
+                    "stable_key": "p2",
+                    "horse_ref": "fixture-horse-echo-2018",
+                    "status": "declared"
                   }
                 ]
               }
@@ -586,7 +590,8 @@
             "modules": [],
             "reason": "",
             "actor_ref": null,
-            "changed_at": null
+            "changed_at": null,
+            "protection_sha256": "7019f6f92bcbac36c1b52326311d33f263324be1faae9a1b4f747619b20a1701"
           },
           "policy_ref": "f01-policy-draft"
         }
@@ -621,12 +626,12 @@
           "schema_version": "f01.input.v1",
           "scope": [
             "entity",
-            "materials",
             "evidence",
-            "protection",
-            "policy_ref"
+            "materials",
+            "policy_ref",
+            "protection"
           ],
-          "content_sha256": "4f6223e24cd043f233fc1b009cbc64bc116e48f9c7f37b411f9dc049b02d8984",
+          "content_sha256": "6e79401348126ea0bf49b833e33903518e14d722c6e77498c210851f1897bcc8",
           "generations": {
             "owner": null,
             "schedule": null,
@@ -634,7 +639,7 @@
             "source_set": null
           }
         },
-        "input_fingerprint": "26865a4ae8399537c0e680672f6607665895f4050febd686816d0c783fd9f31b",
+        "input_fingerprint": "6e9f1135b22c44b227b81a38a4d6720ac8b4158006d4a24a016a2585fefa8dd4",
         "evaluated_at": "2026-10-03T01:10:00Z",
         "entity": {
           "kind": "race_event",
@@ -662,12 +667,12 @@
               "schema_version": "f01.input.v1",
               "scope": [
                 "entity",
-                "materials",
                 "evidence",
-                "protection",
-                "policy_ref"
+                "materials",
+                "policy_ref",
+                "protection"
               ],
-              "content_sha256": "4f6223e24cd043f233fc1b009cbc64bc116e48f9c7f37b411f9dc049b02d8984",
+              "content_sha256": "6e79401348126ea0bf49b833e33903518e14d722c6e77498c210851f1897bcc8",
               "generations": {
                 "owner": null,
                 "schedule": null,
@@ -703,12 +708,12 @@
           "schema_version": "f01.input.v1",
           "scope": [
             "entity",
-            "materials",
             "evidence",
-            "protection",
-            "policy_ref"
+            "materials",
+            "policy_ref",
+            "protection"
           ],
-          "content_sha256": "c72843bbe401d51091a49915fabfa60bf46ea160cc605778637c3c95b558b06b",
+          "content_sha256": "1a161e1ead860f0059e408dbc22308e494cb66c3fbac02cacc2b2b18aa2291ec",
           "generations": {
             "owner": null,
             "schedule": null,
@@ -727,23 +732,6 @@
           },
           "materials": [
             {
-              "capability": "schedule",
-              "maturity": "confirmed",
-              "completeness": "partial",
-              "validation": "passed",
-              "revision_ref": null,
-              "supersedes_ref": null,
-              "evidence_refs": [
-                "e-date"
-              ],
-              "data": {
-                "local_date": "2026-10-03",
-                "timezone_name": "Europe/London",
-                "race_datetime": null,
-                "date_precision": "date_only"
-              }
-            },
-            {
               "capability": "career",
               "maturity": "unknown",
               "completeness": "partial",
@@ -760,6 +748,23 @@
                   "official_or_source_start_count": 0,
                   "validation": "passed"
                 }
+              }
+            },
+            {
+              "capability": "schedule",
+              "maturity": "confirmed",
+              "completeness": "partial",
+              "validation": "passed",
+              "revision_ref": null,
+              "supersedes_ref": null,
+              "evidence_refs": [
+                "e-date"
+              ],
+              "data": {
+                "local_date": "2026-10-03",
+                "timezone_name": "Europe/London",
+                "race_datetime": null,
+                "date_precision": "date_only"
               }
             }
           ],
@@ -796,7 +801,8 @@
             "modules": [],
             "reason": "编辑核验时区",
             "actor_ref": "fixture-editor",
-            "changed_at": "2026-10-03T00:59:00Z"
+            "changed_at": "2026-10-03T00:59:00Z",
+            "protection_sha256": "89c982b49b32a4e501efdcbb791f57c084763d138e6436fcd40c3a1a85f49a17"
           },
           "policy_ref": "f01-policy-draft"
         }
@@ -834,12 +840,12 @@
           "schema_version": "f01.input.v1",
           "scope": [
             "entity",
-            "materials",
             "evidence",
-            "protection",
-            "policy_ref"
+            "materials",
+            "policy_ref",
+            "protection"
           ],
-          "content_sha256": "c72843bbe401d51091a49915fabfa60bf46ea160cc605778637c3c95b558b06b",
+          "content_sha256": "1a161e1ead860f0059e408dbc22308e494cb66c3fbac02cacc2b2b18aa2291ec",
           "generations": {
             "owner": null,
             "schedule": null,
@@ -847,7 +853,7 @@
             "source_set": null
           }
         },
-        "input_fingerprint": "9a54b81b926f007aa1c967bff3c2bbb4d1c16773bde43709c9288fe5b6d4d2bd",
+        "input_fingerprint": "4fe46faa422c97895317002329a91a0efeb0cf14a26a8f49c23951a564c95c6d",
         "evaluated_at": "2026-10-03T01:10:00Z",
         "entity": {
           "kind": "race_event",
@@ -875,12 +881,12 @@
               "schema_version": "f01.input.v1",
               "scope": [
                 "entity",
-                "materials",
                 "evidence",
-                "protection",
-                "policy_ref"
+                "materials",
+                "policy_ref",
+                "protection"
               ],
-              "content_sha256": "c72843bbe401d51091a49915fabfa60bf46ea160cc605778637c3c95b558b06b",
+              "content_sha256": "1a161e1ead860f0059e408dbc22308e494cb66c3fbac02cacc2b2b18aa2291ec",
               "generations": {
                 "owner": null,
                 "schedule": null,

@@ -1,6 +1,6 @@
-# A-001 / F01 共享合同方案 v0.1
+# A-001 / F01 共享合同方案 v0.2
 
-状态：方案可审，未定版、未实现。DDL：2026-10-04 18:00 Asia/Shanghai。
+状态：F01-M-01 已修订，待原 R 限定复审，未定版、未实现。DDL：2026-10-04 18:00 Asia/Shanghai。
 本轮派单只交付方案与样例；独立 R 审核及协调者定值后才能成为下游冻结合同。
 
 ## 范围与证据
@@ -56,7 +56,7 @@ JSON 只接受有限值；未知 enum/schema 必须拒绝，字段形状错误�
 
 | 类型/字段 | 精确值域及约束 |
 |---|---|
-| Envelope | `schema_version="f01.v1"`、`entity`、`input_version`、`evaluated_at`（显式 UTC RFC3339）、`policy_ref` |
+| LoaderInput | 必需 `schema_version="f01.v1"`、`snapshot`、`input_version`、`evaluated_at`（显式 UTC RFC3339）、`policy_ref`；entity 在 snapshot 中，不在输入顶层重复 |
 | EntityRef | `kind=article/race_event/horse`；`canonical_id` 为字符串或 null；`source_refs[]={source,namespace,external_id}`；`identity_state=verified/ambiguous/unresolved/revoked`；`candidate_ids[]`；`evidence_refs[]` |
 | 身份约束 | verified 必须唯一 canonical 或唯一经核验源身份；尚未建档不伪造 DB ID。ambiguous 不输出单一 canonical。source+namespace+external_id 是作用域键，马号只属于 event-local participant；跨地区同马经已核验映射去重。赛事届次属于实体身份 |
 | EvidenceRef | `evidence_id,provider_key,source_class=licensed_api/official_operator/trusted_publisher/community/manual_supplement,independence_key,capability,artifact_sha256,locator,observed_at,source_time,contract_ref`；locator 为 artifact 内位置/事实位置；URL 单独保留在后台证据 |
@@ -75,6 +75,38 @@ JSON 只接受有限值；未知 enum/schema 必须拒绝，字段形状错误�
 `data` 按 capability 定义窄白名单；模型未知字段不可直接透传写库。姓名必须包括原文、name_kind、证据；
 赛事名单必须包括稳定 participant 引用、顺序及 runner 状态；统计数量用 `int|null`，0 仅表示已知零。
 赔率/奖金等边缘字段缺失不妨碍关键名单完整，但 `gaps` 要明确；结果须覆盖已核验全体实际出赛者与非完赛状态。
+
+## 必需、可空与派生字段（F01-M-01 修订）
+
+类型表列出的对象成员全部必需，无省略可选字段；未知必须用明确 enum/null，未知成员拒绝。
+LoaderInput.snapshot 必需 `entity/materials/evidence/protection/policy_ref`。
+DecisionOutput 必需 `schema_version/decision_version/input_version/input_fingerprint/evaluated_at/entity/policy_ref`，
+以及 `fact_phase/fact_evidence_refs/clock_hint/material_state/execution_state/actions/next_action_id/next_due_at/next_review_at/next_review_reason/blockers/public_summary`。
+数组必需，空集合用 `[]`；canonical_id、revision_ref、supersedes_ref、source_binding_ref、deadline、
+各 source_time 时刻、各 generation、actor_ref、changed_at、next_action_id、next_due_at、
+next_review_at/reason 和 public_summary 可空，不能因此省略键。其余成员不得以 null 代替有效值。
+entity.source_refs 每条都必需 source/namespace/external_id 三个非空字符串，输入输出完全一致。
+样例 expected 是额外断言与控制反例，不属于业务 DTO；input/output 才是严格 wire 正例。
+
+Protection.protection_sha256 由 loader 派生：只对 `paused/fields/modules/reason/actor_ref/changed_at`
+六成员的 canonical JSON 计算 SHA256，排除 digest 自身；fields/modules 去重校验并按字符串排序。
+wire 必须携带此摘要，消费端复算；缺失/篡改拒绝，不在消费端补值掩盖坏输入。
+生产者先规范化再生成 protection/content digest；消费端拒绝非规范 wire，不能先修坏摘要再接受。
+
+无序集合规范化：scope、candidate_ids、各 evidence_refs、保护字段与模块按字符串排序；source_refs
+按 (source,namespace,external_id) 排序；evidence 按 evidence_id；materials 是候选集合，按
+(capability,revision_ref 或空字符串,单个 material canonical 摘要) 排序。重复引用/无序字符串成员拒绝。
+Material.data.participants 的顺序具有业务含义，原样保留；名单重排必须改变 content_sha256。
+不改变对象字典语义的键序、上述无序集合重排，经生产者规范化后不得改变 content version。
+
+四个 fixture 的强制 scope 为排序后的 `entity/evidence/materials/policy_ref/protection`，content_sha256
+覆盖整个规范化 snapshot（含 protection_sha256）；input_fingerprint 覆盖规范化 LoaderInput 整体，
+不包含 output/expected。所有 action.expected_input_version 与 output.input_version 指回同一个 input 版本。
+真实动作依赖闭集仍由后续实现确定，不能拿 fixture 的整体 scope 推断任意 writer 已安全实现。
+
+[离线文档校验器](validate_f01_contract.py) 仅验本文 fixture，不供业务 import，不是可执行共享类型/writer。
+它检查输入/输出必需字段、source 作用域、规范 scope、保护摘要、全部版本和动作引用；
+覆盖缺 source、缺/篡改保护摘要、非规范 scope 的拒绝，以及无序重排稳定/名单重排摘要改变。
 
 ## input_version 与并发合同
 
@@ -119,21 +151,26 @@ canonical JSON：UTF-8、键排序、紧凑分隔符、禁止 NaN/Infinity、日
 
 ## 首版参数与定值责任
 
-| 参数 | 来源/状态 | 推荐值与处理 |
-|---|---|---|
-| 赛事范围/新闻范围 | 用户明确，继承 spec §1.1 | 赛事既有九地区；新闻日/港/英/法/美。不扩大实网权限 |
-| 错误/卡顿/确定资料公开时限 | 用户明确 | 按场严格 <1% / <3%；常规 10 分钟、重点 5 分钟；包含排队到公开，缺资料另报覆盖率 |
-| 近期马/名称 | 用户明确方向、精确窗口为建议 | 近三年优先、2020 起 G1 全名单名称（含 Jpn1/港本土 G1）；窗口建议 2023-10-03..2026-10-03 含边界，按赛地 local_date；H01 冻结 as_of/增量去向 |
-| 重点赛事规则 | 待协调者定值，10/04 | 推荐现有 `priority=P0` ∪ G1/Jpn1/香港本土 G1；P0 为工程近似，不能假定所有旧人工重点等于 P0。H01/F03 导出逐场 inclusion_reason 与疑义，不以赛名字符串猜等级 |
-| 存量新闻关系/近期新闻优先 | 待协调者定值 | 关系建议近 90 天；优先队列 future 30 天、current season、近期新闻；近期新闻 lookback 建议复用 90 天，季节按地区日历；不得默认为已授权数字 |
-| 出马阶段/赛果/前瞻 | 待协调者定值，地区窗口 F03 校准 | T−60 预警、T−30 异常、实际开跑优先否则已确认计划 T+30；前瞻 T−24h/T−60m；date-only 使用当地赛日结束、不造 T/00:00；审议保留超时原因 |
-| 社区名称来源清单 | 未核验，B H04/H05 + 协调者，10/04 标清单/10/06 可行性 | HKJC 优先；一个认可专业社区有明确名称使用和强身份即可，冲突待核。现无可确认的社区准入名单，建议候选隔离、不默许全网；协调者提供认可来源或先记录未定 |
-| 工具/金额预算入口 | M02/B 实现，F06/协调者 10/06 定额 | 配置对象按 task_type 定 max_input/output_tokens、tool_reads、wall_seconds、review_rounds、daily_amount、currency、price_version、effective_at；建议前瞻 60 reads/1200s、3 轮审校；金额未知为 null，真实付费任务不启动，绝非 unlimited |
-| 引用路径 | 首版工程建议，B/C 消费 | 默认受控自有查询工具；内置搜索公开成稿路径保持待单独核验引用展示合同，本轮不启用/不扩大来源 |
-| 验收样例阈值 | 计划建议，F06 定值 | 300 场九地区各20、100篇五地区、20场完整前瞻；禁止把建议数声称用户已确认。源码基线与自然结果分开 |
+下表的“协调决定”来自协调会话 `01a0fdb2-b88c-7f93-8c9e-ba9564c33c93` 于本轮发送的参数定值，
+依据本版架构/产品协调授权；不冒称老板逐项确认。可配置默认值不得静默改成更低验收线。
 
-协调者需要判断的两类：可在现有范围内采纳的参数建议；需老板明确的社区认可/预算/范围选择。
-推荐先固定配置键、未知值与责任，不用编造额度阻塞 B 的 mock 开发；F01 最终定版必须附协调者决定和固定 SHA。
+| 参数 | 来源/状态 | 本轮值与责任 |
+|---|---|---|
+| 赛事/新闻范围 | 用户明确，继承 spec §1.1 | 赛事既有九地区；新闻日/港/英/法/美，不扩大实网权限 |
+| 错误/卡顿/公开时限 | 用户明确 | 按场严格 <1%/<3%；常规10分钟、重点5分钟；缺资料另报覆盖率 |
+| 近期马/历史名称 | 用户明确方向；窗口为协调决定 | 三年滚动，初始2023-10-03..2026-10-03含边界，记录as_of及赛地local_date；2020起G1全名单含Jpn1/港本土G1。H01冻结并留增量 |
+| 重点集合 | 协调决定 | 可解释P0/明确重点标记 ∪ G1/Jpn1/香港本土G1，逐场inclusion_reason；不强行等同P0与全部人工重点，不按赛名猜等级 |
+| 新闻/未来参赛优先 | 协调决定 | 存量关系及近期新闻90天，未来参赛优先30天；地区当前赛季按日历，H01列优先来源 |
+| 赛前/赛后阶段与前瞻 | 协调决定 | T−60预警/T−30异常/T+30赛果；可信实际开跑优先、否则已确认计划时刻；前瞻T−24h研究/T−60m复验；date-only不造精确T，按当地赛日结束检查 |
+| 地区校准 | 协调决定 | F03按地区来源证据校准可配置参数；显著改变结果先报协调者，保留依据与旧超时事实 |
+| 社区名称清单 | 显式pending，B整理、协调者判断 | HKJC优先；认可社区须实际用名证据与强身份；候选隔离，不能凭空准入。不阻塞共享字段/mock；B H04/H05整理既有认可依据及候选，10/06核可行性 |
+| 工具预算 | 协调决定的待实测有界默认 | 60次工具读取/1200秒/3轮审校；M02实现逐任务token/read/wall/review/daily_amount/currency/price_version/effective_at配置 |
+| 金额与套餐 | F06/协调者10/06定额 | daily_amount=null时不执行真实付费，不解释为unlimited，不影响B mock；不猜账号单价/剩余额度 |
+| 引用路径 | 首版工程建议 | 默认受控自有查询；内置搜索成稿另核引用展示合同，本轮不启用 |
+| 最低样例计划 | 协调决定 | 300场（九地区各至少20）、100篇（五地区）、20场完整前瞻；缺证如实报告，不降阈值；离线与自然结果分开 |
+
+F01最终冻结须含原R复审与固定SHA；社区pending和金额null有明确责任，不用编造外部值阻塞mock。
+可执行共享类型如另获派单，仍须真实RED/GREEN和独立代码复审，JSON校验不代表行为实现完成。
 
 ## 四组样例与验收
 
@@ -156,4 +193,4 @@ B：候选携带 entity/evidence/input_version；预算缺省不可调用真实�
 C：公开读模型显示成熟度/完整度/更新时间；后台按 root cause 聚合例外并保持保护/CAS；不取内部 evidence 当公开 API。
 
 请 R 重点检查：第三方确认兼容边界、hash 依赖闭集与末端权限、旧锁不被缩小、未知与0、迁移与回滚顺序。
-待协调者：参数定值、社区名单/预算负责人，以及 R 审核派发。F01 为“方案可审”，F03/H01 未开始实施、未完成。
+待协调者：原 R 限定复审及最终冻结；社区清单与金额额度仍按上表责任推进。F01 为“方案可审”，F03/H01 未开始实施、未完成。
