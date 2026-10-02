@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "timezone": "Asia/Shanghai",
-  "updated_at": "2026-10-03T02:52:54.582406+08:00",
+  "updated_at": "2026-10-03T02:53:35.217413+08:00",
   "coordinator_thread_id": "01a0fdb2-b88c-7f93-8c9e-ba9564c33c93",
   "coordinator_worktree": "/Users/mentianlu/.codex/worktrees/516a/umanews",
   "deadline_at": "2026-10-30T18:00:00+08:00",
@@ -65,7 +65,7 @@
       "title": "Umanews 10.30｜R 独立审核与验收",
       "model_evidence": "create_thread 显式指定 gpt-6.1-sol 和 medium，创建成功；启动回报已收取",
       "quota_policy_status": "已确认并独立实时复核剩余8%；无运行子代理/模型CLI",
-      "latest_report_commit": "836c9f18"
+      "latest_report_commit": "f1eb3b4996a148cc3eead0b0c5497e56e7ccd2b5"
     }
   },
   "tasks": {
@@ -134,10 +134,10 @@
       "deps": [],
       "deadline_at": "2026-10-05T18:00:00+08:00",
       "status": "进行中",
-      "phase": "本地导出器/命令技术审核",
+      "phase": "代码review三项P2返修",
       "commit": "48c51fb19f328eb9add14dd5fca40d4ceffaae63",
       "pr": null,
-      "review": "方案已APPROVED；脚本/命令与映射proposal已送原R；17 offline GREEN非PG或Linux证据",
+      "review": "REVISE@48c51fb1：reason allowlist、实际来源包/selection归属绑定、catalog profile；已转B，17 fake GREEN不替代PG/live",
       "evidence": [
         "/Users/mentianlu/.codex/worktrees/a14d/umanews/docs/changes/next-version-capabilities/lanes/B/B-001-status.md"
       ],
@@ -2172,8 +2172,14 @@
       "scope": "F02导出器/命令/映射proposal代码技术审核",
       "base": "a2704b2d7ef93a6ee8518fca2f63ada4a43c2b64",
       "head": "48c51fb19f328eb9add14dd5fca40d4ceffaae63",
-      "status": "已送原R",
-      "script_sha256": "9c49d5d4e90cf5074591e42b1ba96f583b1f8b683bd15d3e758db85ddb00de34"
+      "status": "REVISE，已转B待新固定head",
+      "script_sha256": "9c49d5d4e90cf5074591e42b1ba96f583b1f8b683bd15d3e758db85ddb00de34",
+      "findings": [
+        "B002-P2-01",
+        "B002-P2-02",
+        "B002-P2-03"
+      ],
+      "report": "/Users/mentianlu/.codex/worktrees/3ab1/umanews/docs/changes/next-version-capabilities/lanes/R/B-002-F02-code-review.md"
     }
   ],
   "quota_policy": {
