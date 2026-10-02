@@ -941,7 +941,8 @@ class GoldSetQualityTests(TestCase):
 
 
 class AttributionRunLedgerTests(TransactionTestCase):
-    reset_sequences = True
+    # Initial data may contain rows: resetting sequences to 1 can collide with
+    # them when this class starts a fresh shard. All assertions use actual IDs.
 
     def test_lock_prevents_overlapping_runs_and_can_be_renewed(self):
         from stable.services.attribution_runs import acquire_attribution_lease, create_attribution_run, renew_attribution_lease

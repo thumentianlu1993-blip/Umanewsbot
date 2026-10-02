@@ -225,7 +225,8 @@ class P0HorseProductionApplyPostgresTests(TransactionTestCase):
             except Exception as exc:  # pragma: no cover - asserted after join
                 errors.append(exc)
             finally:
-                close_old_connections()
+                # 测试线程退出时必须关闭自己的连接，不能只清理过期连接。
+                connection.close()
 
         def writer():
             close_old_connections()
@@ -247,7 +248,8 @@ class P0HorseProductionApplyPostgresTests(TransactionTestCase):
             except Exception as exc:  # pragma: no cover - asserted after join
                 errors.append(exc)
             finally:
-                close_old_connections()
+                # 测试线程退出时必须关闭自己的连接，不能只清理过期连接。
+                connection.close()
 
         locker_thread = threading.Thread(target=locker)
         writer_thread = threading.Thread(target=writer)
@@ -299,7 +301,8 @@ class P0HorseProductionApplyPostgresTests(TransactionTestCase):
             except Exception as exc:  # pragma: no cover - asserted after join
                 holder_errors.append(exc)
             finally:
-                close_old_connections()
+                # 测试线程退出时必须关闭自己的连接，不能只清理过期连接。
+                connection.close()
 
         holder_thread = threading.Thread(target=conflicting_lock_holder)
         holder_thread.start()
@@ -345,6 +348,7 @@ class P0HorseProductionApplyPostgresTests(TransactionTestCase):
         barrier = threading.Barrier(2)
         results = []
         errors = []
+        closed_connections = []
 
         def worker():
             close_old_connections()
@@ -362,7 +366,9 @@ class P0HorseProductionApplyPostgresTests(TransactionTestCase):
             except Exception as exc:  # pragma: no cover - asserted after join
                 errors.append(exc)
             finally:
-                close_old_connections()
+                # 测试线程退出时必须关闭自己的连接，不能只清理过期连接。
+                connection.close()
+                closed_connections.append(connection.connection is None)
 
         with self.helper._validated_release_for_business_tests(
             release_path, release_sha,
@@ -373,6 +379,7 @@ class P0HorseProductionApplyPostgresTests(TransactionTestCase):
             for thread in threads:
                 thread.join(timeout=30)
         self.assertFalse(errors)
+        self.assertEqual(closed_connections, [True, True])
         self.assertEqual(len(results), 2)
         self.assertEqual(HorseProfile.objects.count(), 1)
         self.assertEqual(TermEntry.objects.filter(term_type="horse").count(), 1)

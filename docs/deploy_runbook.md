@@ -1,3 +1,7 @@
+## 2026-10-02 PR232 发布完成
+
+当前发布目录 `/opt/umanews-release-ad50abdb-test-fixes-20261002/umanewsbot`，固定候选 `ad50abdb` / 镜像 `73ee1dcf7edb` / schema0079。四应用、双域名、马匹提示、队列消费和配置指纹验证通过；无迁移/配置/批量数据动作。原任务自然排空，未取消消费或清队列。精确备份、intent、manifest、complete 与恢复边界见[执行记录](changes/fix-known-test-failures/rollout.md)。下方旧运行目录为历史，不可作为当前发布恢复依据。
+
 ## 2026-10-02 已知失败修复的有界验证入口
 
 本次修复使用 `.github/workflows/release_0078_contract.yml` 的手动输入
@@ -9806,3 +9810,15 @@ RACE_DATA_RAW_ARTIFACT_ROOTS=/run/race-data-sync
 ## 2026-09-19 赛前刷新只读诊断补充
 
 当前433de627下的人工补卡预览不具备自动刷新入口，TRA身份发现成功与名单/赔率更新成功不是同一结果。排查须同时读取event的预览候选、enrollment、provider checkpoint、pre_race_checks及真实页面，不依据candidate.fetched_at或Celery成功单独归因。实例491无纳管/名单checkpoint且赔率公开硬编码空，772已纳管并持续成功。此次无生产写入/派发/开关/部署；后续验收需覆盖自然周期到页面的完整证据，见[诊断](changes/pre-race-display-refresh-20260919/EVIDENCE.md)。
+
+## 按范围测试的发布前补证据
+
+新工具的实施和激活是不同阶段，真实状态见 [按范围测试记录](changes/impact-based-testing/rollout.md)。
+新策略启用后，应用上线前复用同一受测 Git tree 的有效 Linux 证据；若缺发布/恢复合同，
+只通过 `affected_tests` 的手动 `release` scope 补该专用组（当前49+18项），不补跑 stable 全量。
+`toolchain` 只验证测试工具及核心场景，`release` 只验证发布合同，都标 validation-only，不能冒充该 PR 所需的业务回归。
+生产仍执行原有配置/迁移计划校验、备份、队列排空、版本及页面验收；人工门禁只引用根 `AGENTS.md`。
+
+候选外核验器需要本地 Linux Docker、Git 对象、GitHub只读权限和该run的镜像artifact。
+镜像在依赖准备完成后固定ID，实际测试及交付时重新收集均使用 network none、非root、无宿主凭据的容器。
+准备阶段可以下载依赖，测试阶段不可出站；交付重收集只列名称，不重新执行全部测试。

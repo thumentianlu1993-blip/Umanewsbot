@@ -744,9 +744,10 @@ class LifecycleEnrollmentCommandTests(TestCase):
             approved_commit=APPROVED_COMMIT,
         )
         with TemporaryDirectory() as tmp:
-            unresolved_parent = Path(tmp)
-            if unresolved_parent == unresolved_parent.resolve():
-                self.skipTest("temporary directory has no symlink ancestor")
+            real_parent = Path(tmp).resolve() / "real-parent"
+            real_parent.mkdir()
+            unresolved_parent = Path(tmp).resolve() / "temporary-alias"
+            unresolved_parent.symlink_to(real_parent, target_is_directory=True)
             requested_output = unresolved_parent / "artifact"
             resolved_output = unresolved_parent.resolve() / "artifact"
             with self.assertRaises(EnrollmentError):
@@ -761,9 +762,10 @@ class LifecycleEnrollmentCommandTests(TestCase):
     def test_prepare_command_does_not_resolve_away_temporary_alias(self):
         event = _make_event(slug="command-unresolved-system-alias")
         with TemporaryDirectory() as tmp:
-            unresolved_parent = Path(tmp)
-            if unresolved_parent == unresolved_parent.resolve():
-                self.skipTest("temporary directory has no symlink ancestor")
+            real_parent = Path(tmp).resolve() / "real-parent"
+            real_parent.mkdir()
+            unresolved_parent = Path(tmp).resolve() / "temporary-alias"
+            unresolved_parent.symlink_to(real_parent, target_is_directory=True)
             requested_output = unresolved_parent / "artifact"
             resolved_output = unresolved_parent.resolve() / "artifact"
 

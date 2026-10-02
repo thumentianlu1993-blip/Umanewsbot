@@ -1164,32 +1164,43 @@ class PostgresConcurrencyTests(TransactionTestCase):
 
         import threading
         results = []
+        versions_read = threading.Barrier(2, timeout=10)
 
         def set_a():
             try:
                 state = get_headline_state()
+                versions_read.wait()
                 set_manual_headline(a_pk, user=self._worker_user(), expected_version=state["version"])
                 results.append("A_ok")
             except Exception as e:
                 results.append(f"A_failed:{e}")
+            finally:
+                connection.close()
 
         def set_b():
             try:
                 state = get_headline_state()
+                versions_read.wait()
                 set_manual_headline(b_pk, user=self._worker_user(), expected_version=state["version"])
                 results.append("B_ok")
             except Exception as e:
                 results.append(f"B_failed:{e}")
+            finally:
+                connection.close()
 
-        t1 = threading.Thread(target=set_a)
-        t2 = threading.Thread(target=set_b)
+        t1 = threading.Thread(target=set_a, daemon=True)
+        t2 = threading.Thread(target=set_b, daemon=True)
         t1.start()
         t2.start()
-        t1.join()
-        t2.join()
+        t1.join(timeout=30)
+        t2.join(timeout=30)
+        self.assertFalse(t1.is_alive() or t2.is_alive(), "concurrent headline workers did not finish")
 
         successes = sum(1 for r in results if r.endswith("_ok"))
         self.assertEqual(successes, 1, "Exactly one concurrent set should succeed — got results: " + str(results))
+        failures = [r for r in results if "_failed:" in r]
+        self.assertEqual(len(failures), 1, results)
+        self.assertIn("Version conflict:", failures[0])
 
     def test_concurrent_generate_recommendation(self):
         """Two connections generating recommendations — only one active recommendation."""

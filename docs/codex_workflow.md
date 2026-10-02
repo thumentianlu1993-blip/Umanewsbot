@@ -82,3 +82,18 @@ python3 .codex/scripts/check_workflow_contract.py
 python3 .codex/scripts/test_workflow_contract.py
 git diff --check
 ```
+
+## 按改动范围验证与停止
+
+测试计划工具见 `scripts/plan_affected_tests.py` 和 `tools/test_impact/`。
+最小 RED → 同例 GREEN → 影响计划要求的回归 → 停止。没有新增修改、失败或明确风险时，
+不以“更保险”为由继续升级到 app suite/全量，也不对相同受测树重复验证。
+本地脏工作区只能出诊断计划；Linux 无网络容器的固定 Git 树结果才作为交付证据。
+未知路径、规则漂移、缺片、意外 skip、收尾失败均阻断，不能转成空选集或偷偷全量。
+普通计划按领域加核心检查，超过400项标 expanded；每批最多200项、最多4批并发。
+
+交付协调者从固定 main 或独立审核绑定对象提取 `scripts/verify_delivery_test_evidence.py`，
+在候选目录外用 `python -I` 调用。它只读核验当前 base/head、实际 job/步骤、workflow/runner对象、
+镜像、独立收集的完整 ID 和执行结果，再生成收据。精确 head 的合并由服务器 strict 检查约束，禁止 admin bypass。
+仓库保护、首次 full 校准与策略激活状态必须分别记录，不能把诊断通过称为默认策略已启用。
+当前引导进度见 [按范围测试交付记录](changes/impact-based-testing/rollout.md)。

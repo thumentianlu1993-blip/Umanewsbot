@@ -1,0 +1,44 @@
+name: 显式与定时全量回归
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: 精确40位候选SHA
+        required: true
+        type: string
+      reason:
+        description: 全量原因
+        required: true
+        type: string
+  schedule:
+    - cron: '30 19 * * *'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  decide:
+    if: github.event_name == 'workflow_dispatch' || vars.IMPACT_TEST_POLICY == 'active'
+    runs-on: ubuntu-24.04
+    outputs:
+      run: ${{ steps.decision.outputs.run }}
+      sha: ${{ steps.decision.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: decide-full-run
+        id: decision
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_SHA: ${{ inputs.candidate_sha }}
+          REQUESTED_REASON: ${{ inputs.reason }}
+        run: python scripts/decide_full_regression.py
+  full:
+    needs: decide
+    if: needs.decide.outputs.run == 'true'
+    uses: ./.github/workflows/affected_tests.yml
+    with:
+      base_sha: ${{ needs.decide.outputs.sha }}
+      candidate_sha: ${{ needs.decide.outputs.sha }}
+      scope: full
+      reason: ${{ inputs.reason || 'main变化或距离上次成功全量超过七天；失败后重试' }}

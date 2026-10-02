@@ -1,0 +1,212 @@
+{
+  "as_of": "2026-10-02T10:02:17.200061+00:00",
+  "sha": "ad50abdb74b89669ab8ada2958b040877c1a1849",
+  "image": "sha256:73ee1dcf7edb5b7c7bda49f5d6baedffe030d639fcc5bf191b831ece6e9f5930",
+  "release_directory": "/opt/umanews-release-ad50abdb-test-fixes-20261002/umanewsbot",
+  "services": {
+    "web": {
+      "image": "sha256:73ee1dcf7edb5b7c7bda49f5d6baedffe030d639fcc5bf191b831ece6e9f5930",
+      "revision": "ad50abdb74b89669ab8ada2958b040877c1a1849",
+      "status": "running",
+      "health": "healthy",
+      "restarts": 0,
+      "oom": false
+    },
+    "worker": {
+      "image": "sha256:73ee1dcf7edb5b7c7bda49f5d6baedffe030d639fcc5bf191b831ece6e9f5930",
+      "revision": "ad50abdb74b89669ab8ada2958b040877c1a1849",
+      "status": "running",
+      "health": null,
+      "restarts": 0,
+      "oom": false
+    },
+    "race_sync_v2_worker": {
+      "image": "sha256:73ee1dcf7edb5b7c7bda49f5d6baedffe030d639fcc5bf191b831ece6e9f5930",
+      "revision": "ad50abdb74b89669ab8ada2958b040877c1a1849",
+      "status": "running",
+      "health": null,
+      "restarts": 0,
+      "oom": false
+    },
+    "beat": {
+      "image": "sha256:73ee1dcf7edb5b7c7bda49f5d6baedffe030d639fcc5bf191b831ece6e9f5930",
+      "revision": "ad50abdb74b89669ab8ada2958b040877c1a1849",
+      "status": "running",
+      "health": null,
+      "restarts": 0,
+      "oom": false
+    },
+    "db": {
+      "image": "sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777",
+      "revision": null,
+      "status": "running",
+      "health": "healthy",
+      "restarts": 0,
+      "oom": false
+    },
+    "redis": {
+      "image": "sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99",
+      "revision": null,
+      "status": "running",
+      "health": "healthy",
+      "restarts": 0,
+      "oom": false
+    },
+    "nginx": {
+      "image": "sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10",
+      "revision": null,
+      "status": "running",
+      "health": null,
+      "restarts": 0,
+      "oom": false
+    },
+    "onebot": {
+      "image": "sha256:9254ec12af101576c5eeb4910847abd1d219297bc6d9a35c52511e12500f0f45",
+      "revision": "60dc2d72126890a0ae88a36f64000c08b7b8bf7a",
+      "status": "running",
+      "health": null,
+      "restarts": 0,
+      "oom": false
+    }
+  },
+  "process": {
+    "owner": "codex/fix-known-test-failures-20261002",
+    "thread": "94e4",
+    "operation": "deploy-pr232",
+    "sha": "ad50abdb74b89669ab8ada2958b040877c1a1849",
+    "resources": [
+      "web",
+      "worker",
+      "race_sync_v2_worker",
+      "beat"
+    ],
+    "pid": 2741700,
+    "started_at": "2026-10-02T09:53:34.348516+00:00",
+    "alive": false,
+    "exit_code": 0,
+    "finished_at": "2026-10-02T10:00:42.873768+00:00"
+  },
+  "release_lock_released": true,
+  "config_sha256": "3ed8596fee3558fb1efe9a6adc22c40cc08a4d320cc9043bbd04808784e2f789",
+  "release_id": "9285ebdebdb14105f864aea4b04d7704a90a196bd89a8bc49735f407beefc6a9",
+  "recovery": {
+    "intent.json": {
+      "path": "/opt/umanews-release-ad50abdb-test-fixes-20261002/umanewsbot/runtime/migration_history_repair/release-0079-recovery/9285ebdebdb14105f864aea4b04d7704a90a196bd89a8bc49735f407beefc6a9/intent.json",
+      "sha256": "255fb5f0d9033e5a02f1a857992c1212f8fdc005ebe42986ceee242454e75cbb"
+    },
+    "manifest.json": {
+      "path": "/opt/umanews-release-ad50abdb-test-fixes-20261002/umanewsbot/runtime/migration_history_repair/release-0079-recovery/9285ebdebdb14105f864aea4b04d7704a90a196bd89a8bc49735f407beefc6a9/manifest.json",
+      "sha256": "1d876b00883c5dc865156d5cce4e7e34d4ead82d275157d42e9b48507f7c472e"
+    },
+    "complete.json": {
+      "path": "/opt/umanews-release-ad50abdb-test-fixes-20261002/umanewsbot/runtime/migration_history_repair/release-0079-recovery/9285ebdebdb14105f864aea4b04d7704a90a196bd89a8bc49735f407beefc6a9/complete.json",
+      "sha256": "aa511dbe55fb1137f623708e120d7eb34ed172f0fd5c978887840bdf57ca2834"
+    }
+  },
+  "active_intent_released": true,
+  "restore_services": {
+    "beat": true,
+    "nginx": true,
+    "race_live_worker": false,
+    "race_sync_v2_worker": true,
+    "web": true,
+    "worker": true
+  },
+  "backup": {
+    "path": "/opt/umanews-release-ad50abdb-test-fixes-20261002/umanewsbot/runtime/migration_history_repair/release-0079-recovery/9285ebdebdb14105f864aea4b04d7704a90a196bd89a8bc49735f407beefc6a9/backup/rds_horse_news_20261002T095603Z_2744535.dump",
+    "bytes": 639666774,
+    "sha256": "57a3c698c72854eade3ba60c8fbb02fa8b81a780c53f0d8547e524013e3abd2a",
+    "toc_entries": 1386
+  },
+  "application": {
+    "schema": "0079_multisource_race_enrollment",
+    "migration_plan_count": 0,
+    "horse_samples": [
+      {
+        "id": 46588,
+        "path": "/horses/46588/",
+        "badge": "资料补全中",
+        "pending_translation": true
+      },
+      {
+        "id": 3866,
+        "path": "/horses/3866/",
+        "badge": "完整二代血统",
+        "pending_translation": false
+      },
+      {
+        "id": 46588,
+        "path": "/horses/46588/",
+        "badge": "资料补全中",
+        "pending_translation": true
+      }
+    ],
+    "active_queues": {
+      "celery@78c9d141f636": [
+        "celery"
+      ],
+      "celery@63983e585693": [
+        "race_sync_v2"
+      ]
+    },
+    "code_sha256": {
+      "server/stable/services/historical_race_batches.py": "7ad61cc9893eed3b2c20a9b93dfa8c13ac9c5cf893fb2811c8a7923c8ff0dcd5",
+      "server/stable/services/racing_api_horse_staging.py": "bc2db89a09132967fb6664bcf746019be249e5f31a784b20a02bba0a58ced775",
+      "server/stable/templates/stable/public/horse_detail.html": "282ce7b7bde18ff45875dbde45f41dc46e5aa2d2b707f8852ef7de8b94399818",
+      "server/stable/templates/stable/public/horse_index.html": "6a71dfa2f2db93d0e47640abc1fe0cc4bfad544ac43f6f24d8c5a84688f1d614"
+    }
+  },
+  "django_check": "System check identified no issues (0 silenced).",
+  "nginx_check": "passed",
+  "http": [
+    {
+      "host": "umafans.run",
+      "path": "/healthz/",
+      "status": 200
+    },
+    {
+      "host": "umafans.run",
+      "path": "/horses/",
+      "status": 200
+    },
+    {
+      "host": "umafans.run",
+      "path": "/horses/46588/",
+      "status": 200,
+      "badge": "资料补全中",
+      "translation_hint_correct": true
+    },
+    {
+      "host": "umafans.run",
+      "path": "/horses/3866/",
+      "status": 200,
+      "badge": "完整二代血统",
+      "translation_hint_correct": true
+    },
+    {
+      "host": "www.umafans.run",
+      "path": "/healthz/",
+      "status": 200
+    },
+    {
+      "host": "www.umafans.run",
+      "path": "/horses/",
+      "status": 200
+    },
+    {
+      "host": "www.umafans.run",
+      "path": "/horses/46588/",
+      "status": 200,
+      "badge": "资料补全中",
+      "translation_hint_correct": true
+    },
+    {
+      "host": "www.umafans.run",
+      "path": "/horses/3866/",
+      "status": 200,
+      "badge": "完整二代血统",
+      "translation_hint_correct": true
+    }
+  ],
+  "passed": true
+}

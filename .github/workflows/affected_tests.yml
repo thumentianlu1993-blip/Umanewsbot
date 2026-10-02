@@ -1,0 +1,143 @@
+name: 按改动范围测试
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      base_sha:
+        description: 精确40位基线SHA
+        required: true
+        type: string
+      candidate_sha:
+        description: 精确40位候选SHA
+        required: true
+        type: string
+      scope:
+        description: toolchain仅验证新工具；不能作为业务交付证明
+        type: choice
+        options: [toolchain, affected, release, full]
+        default: toolchain
+        required: true
+      reason:
+        description: 本次手动验证原因
+        type: string
+        required: true
+  workflow_call:
+    inputs:
+      base_sha:
+        type: string
+        required: true
+      candidate_sha:
+        type: string
+        required: true
+      scope:
+        type: string
+        default: full
+      reason:
+        type: string
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: impact-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    outputs:
+      mode: ${{ steps.plan.outputs.mode }}
+      executed: ${{ steps.execute.outcome }}
+    steps:
+      - name: checkout-test-tree
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.sha || inputs.candidate_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: static-contracts
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || inputs.base_sha }}
+          TEST_SHA: ${{ github.event_name == 'pull_request' && github.sha || inputs.candidate_sha }}
+        run: |
+          git diff --check "$BASE_SHA" "$TEST_SHA"
+          git show "$BASE_SHA:.codex/scripts/check_workflow_contract.py" > "$RUNNER_TEMP/trusted-workflow-contract.py"
+          python -I "$RUNNER_TEMP/trusted-workflow-contract.py" --root "$GITHUB_WORKSPACE"
+          ruby -e 'require "yaml"; Dir[".github/workflows/*.yml"].each { |p| YAML.load_file(p) }'
+          python -I - <<'PY'
+          import ast, pathlib, re, os, subprocess, urllib.parse
+          # 只解析源文本；不导入/执行候选测试或应用。
+          for root in ('tools/test_impact', 'scripts'):
+              for file in pathlib.Path(root).glob('*.py'):
+                  ast.parse(file.read_text(), filename=str(file))
+          text = pathlib.Path('AGENTS.md').read_text()
+          assert all(marker in text for marker in ('### G1：范围确认', '### G2：交付确认', '### G3：高影响动作确认'))
+          diff = subprocess.check_output(['git','diff','--unified=0',os.environ['BASE_SHA'],os.environ['TEST_SHA'],'--','*.md'], text=True)
+          source = None
+          for line in diff.splitlines():
+              if line.startswith('+++ b/'): source = pathlib.Path(line[6:])
+              elif source and line.startswith('+') and not line.startswith('+++'):
+                  for target in re.findall(r'\]\(([^)]+)\)', line):
+                      target = target.strip('<>').split('#',1)[0]
+                      if not target or urllib.parse.urlsplit(target).scheme or target.startswith('/') or '{{' in target: continue
+                      assert (source.parent / urllib.parse.unquote(target)).exists(), f'missing added reference: {source}: {target}'
+          PY
+      - name: generate-plan
+        id: plan
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || inputs.base_sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || inputs.candidate_sha }}
+          TEST_SHA: ${{ github.event_name == 'pull_request' && github.sha || inputs.candidate_sha }}
+          SCOPE: ${{ github.event_name == 'pull_request' && 'affected' || inputs.scope }}
+          REASON: ${{ inputs.reason }}
+        run: python scripts/impact_ci.py --base "$BASE_SHA" --head "$HEAD_SHA" --test "$TEST_SHA" --scope "$SCOPE" --reason "$REASON" --output evidence/plan.json
+      - name: execute-isolated-plan
+        id: execute
+        if: github.event_name != 'pull_request' || vars.IMPACT_TEST_POLICY == 'active' || steps.plan.outputs.mode == 'docs-only'
+        run: python scripts/run_test_plan.py --plan evidence/plan.json --output evidence --build --export-image "$RUNNER_TEMP/impact-image.tar"
+      - name: verify-execution
+        if: steps.execute.outcome == 'success'
+        run: python scripts/verify_test_plan.py --plan evidence/execution-plan.json --reports evidence --output evidence/summary.json
+      - name: collect-catalog-without-running
+        if: inputs.scope == 'toolchain' && steps.execute.outcome == 'success'
+        env:
+          BASE_SHA: ${{ inputs.base_sha }}
+          TEST_SHA: ${{ inputs.candidate_sha }}
+        run: |
+          python scripts/impact_ci.py --base "$BASE_SHA" --head "$TEST_SHA" --test "$TEST_SHA" --scope inventory --reason '只收集完整目录，不执行全量测试' --output evidence/inventory-selection.json
+          python scripts/run_test_plan.py --plan evidence/inventory-selection.json --output evidence/inventory --collect-only
+      - name: upload-test-image
+        if: steps.execute.outcome == 'success' && steps.plan.outputs.mode != 'docs-only'
+        uses: actions/upload-artifact@v4
+        with:
+          name: impact-image-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/impact-image.tar
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 1
+      - name: upload-evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: impact-${{ github.run_id }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 30
+  test-plan-gate:
+    if: always()
+    needs: tests
+    runs-on: ubuntu-24.04
+    steps:
+      - name: require-complete-plan
+        env:
+          RESULT: ${{ needs.tests.result }}
+          EXECUTED: ${{ needs.tests.outputs.executed }}
+          MODE: ${{ needs.tests.outputs.mode }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          test "$RESULT" = success
+          test "$EXECUTED" = success
+          if [ "$EVENT" = pull_request ]; then test "$MODE" != validation-only; fi

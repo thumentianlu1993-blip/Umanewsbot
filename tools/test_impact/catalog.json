@@ -1,0 +1,2833 @@
+{
+  "schema_version": 1,
+  "domains": {
+    "core": [
+      "stable.test_release_commit",
+      "stable.test_race_live_target_eligibility",
+      "stable.test_horse_profile_publish.BasicPublishGateTests",
+      "stable.tests_legacy.PublishWindowServiceTests",
+      "stable.test_impact_core",
+      "stable.tests_legacy.PublicHomeInfoFeedTests",
+      "stable.test_race_live_official_publication.RaceLiveOfficialAuthorizationBehaviorTests",
+      "stable.test_race_live_official_publication.RaceLiveOfficialAuthorizationCommandTests.test_authorization_apply_exact_replay_is_idempotent",
+      "stable.test_race_data_sync_r0.RaceDataSyncR0FlagContractTests.test_celery_route_and_beat_schedule_are_isolated"
+    ],
+    "horse_page": [
+      "stable.tests_legacy.HorseProfilePageMvpTests",
+      "stable.test_horse_profile_publish",
+      "stable.test_public_navigation_and_attribution",
+      "stable.tests_legacy.P0HorseProfileDataCompletionTests",
+      "stable.tests.test_page_regression",
+      "stable.tests.test_term_display"
+    ],
+    "news_translation": [
+      "stable.tests_legacy.TranslationWorkflowTests",
+      "stable.tests_legacy.CrawlAutoTranslateTests",
+      "stable.test_translation_failure_recovery_change",
+      "stable.test_japanese_racing_translation_normalization",
+      "stable.test_term_gate_reprocessing",
+      "stable.test_news_content_boundaries",
+      "stable.test_external_english_horse_context_gate"
+    ],
+    "race_parser": [
+      "stable.test_race_reference_sources",
+      "stable.test_race_multisource_jra",
+      "stable.test_realtime_race_results",
+      "stable.test_race_reference_sources_postgres",
+      "stable.test_race_reference_management_commands"
+    ],
+    "race_results": [
+      "stable.test_race_data_sync_results",
+      "stable.test_race_data_sync_result_admission",
+      "stable.test_race_live_official_publication",
+      "stable.test_race_result_recovery_integration",
+      "stable.test_race_data_sync_chain_e2e",
+      "stable.test_race_data_sync_repair",
+      "stable.test_race_data_sync_r0_postgres",
+      "stable.test_race_multisource_jra"
+    ],
+    "historical_batch": [
+      "stable.test_historical_batch_pipeline",
+      "stable.test_historical_batch_runner_change",
+      "stable.test_historical_batch_runner_postgres",
+      "stable.test_historical_race_batches",
+      "stable.test_historical_race_detail_import_receipt",
+      "stable.test_historical_race_detail_chunk_import",
+      "stable.test_race_result_recovery_integration.RaceResultRecoveryCoverageAndRunnerIntegrationTests.test_recovery_commands_have_disjoint_runner_phase_classification"
+    ],
+    "p0_bridge": [
+      "runtime.research.test_build_p0_participant_completion_batches",
+      "runtime.research.test_p0_participant_execution_ledger",
+      "stable.test_p0_horse_participant_batch_contract"
+    ],
+    "research_contracts": [
+      "runtime.research.test_collect_graded_race_participants",
+      "runtime.research.test_audit_graded_horse_artifact",
+      "runtime.research.test_official_graded_race_sources",
+      "runtime.research.test_collect_official_graded_race_results",
+      "runtime.research.test_build_official_graded_race_manifest",
+      "runtime.research.test_validate_official_graded_race_package",
+      "runtime.research.test_build_graded_race_completion_bundle",
+      "test_graded_race_participants_workflow",
+      "test_workflow_contract",
+      "scripts.tests.test_research_synthetic",
+      "runtime.research.test_collect_graded_race_participants_hurdles",
+      "runtime.research.test_collect_graded_race_participants_integrity_contract"
+    ],
+    "release": [
+      "stable.test_release_0078_recovery",
+      "stable.test_release_0078_entrypoints",
+      "stable.test_release_0078_recovery_postgres",
+      "stable.test_release_0079"
+    ],
+    "infrastructure": [
+      "scripts.tests.test_test_impact",
+      "scripts.tests.test_bounded_stable_tests",
+      "scripts.tests.test_impact_git",
+      "scripts.tests.test_impact_delivery",
+      "scripts.tests.test_impact_evolution",
+      "scripts.tests.test_impact_verifier_e2e"
+    ],
+    "module:runtime.research.test_audit_france_galop_bulletin_occurrences": [
+      "runtime.research.test_audit_france_galop_bulletin_occurrences"
+    ],
+    "module:runtime.research.test_audit_hri_graded_winner_candidates": [
+      "runtime.research.test_audit_hri_graded_winner_candidates"
+    ],
+    "module:runtime.research.test_audit_legacy_historical_detail_bundle": [
+      "runtime.research.test_audit_legacy_historical_detail_bundle"
+    ],
+    "module:runtime.research.test_audit_racing_api_bulk_partition_readiness": [
+      "runtime.research.test_audit_racing_api_bulk_partition_readiness"
+    ],
+    "module:runtime.research.test_audit_stable_id_enrichment_readiness": [
+      "runtime.research.test_audit_stable_id_enrichment_readiness"
+    ],
+    "module:runtime.research.test_build_held_actual_starter_census": [
+      "runtime.research.test_build_held_actual_starter_census"
+    ],
+    "module:runtime.research.test_build_stable_id_reconciliation_coverage": [
+      "runtime.research.test_build_stable_id_reconciliation_coverage"
+    ],
+    "module:runtime.research.test_build_target_runner_stable_id_ledger": [
+      "runtime.research.test_build_target_runner_stable_id_ledger"
+    ],
+    "module:runtime.research.test_capture_netkeiba_manual_result_reference": [
+      "runtime.research.test_capture_netkeiba_manual_result_reference"
+    ],
+    "module:runtime.research.test_capture_racing_api_host_process_preflight": [
+      "runtime.research.test_capture_racing_api_host_process_preflight"
+    ],
+    "module:runtime.research.test_capture_racing_api_openapi_fingerprint": [
+      "runtime.research.test_capture_racing_api_openapi_fingerprint"
+    ],
+    "module:runtime.research.test_collect_graded_race_participants_hurdles": [
+      "runtime.research.test_collect_graded_race_participants_hurdles"
+    ],
+    "module:runtime.research.test_collect_graded_race_participants_integrity_contract": [
+      "runtime.research.test_collect_graded_race_participants_integrity_contract"
+    ],
+    "module:runtime.research.test_extract_official_targeted_horse_seed_delta": [
+      "runtime.research.test_extract_official_targeted_horse_seed_delta"
+    ],
+    "module:runtime.research.test_extract_targeted_horse_seed_execution_delta": [
+      "runtime.research.test_extract_targeted_horse_seed_execution_delta"
+    ],
+    "module:runtime.research.test_materialize_racing_api_targeted_batch": [
+      "runtime.research.test_materialize_racing_api_targeted_batch"
+    ],
+    "module:runtime.research.test_merge_official_targeted_horse_seed_supplements": [
+      "runtime.research.test_merge_official_targeted_horse_seed_supplements"
+    ],
+    "module:runtime.research.test_merge_target_runner_stable_id_ledgers": [
+      "runtime.research.test_merge_target_runner_stable_id_ledgers"
+    ],
+    "module:runtime.research.test_prepare_bha_pattern_book_winner_candidates": [
+      "runtime.research.test_prepare_bha_pattern_book_winner_candidates"
+    ],
+    "module:runtime.research.test_prepare_external_result_actual_starter_census": [
+      "runtime.research.test_prepare_external_result_actual_starter_census"
+    ],
+    "module:runtime.research.test_prepare_france_galop_bulletin_occurrences": [
+      "runtime.research.test_prepare_france_galop_bulletin_occurrences"
+    ],
+    "module:runtime.research.test_prepare_graded_winner_source_events": [
+      "runtime.research.test_prepare_graded_winner_source_events"
+    ],
+    "module:runtime.research.test_prepare_graded_winner_targeted_seeds": [
+      "runtime.research.test_prepare_graded_winner_targeted_seeds"
+    ],
+    "module:runtime.research.test_prepare_held_census_tra_reconciliation": [
+      "runtime.research.test_prepare_held_census_tra_reconciliation"
+    ],
+    "module:runtime.research.test_prepare_held_winner_seed_extension": [
+      "runtime.research.test_prepare_held_winner_seed_extension"
+    ],
+    "module:runtime.research.test_prepare_hri_graded_winner_candidates": [
+      "runtime.research.test_prepare_hri_graded_winner_candidates"
+    ],
+    "module:runtime.research.test_prepare_hri_unmatched_official_targeted_seeds": [
+      "runtime.research.test_prepare_hri_unmatched_official_targeted_seeds"
+    ],
+    "module:runtime.research.test_prepare_racing_api_bulk_range_batch_plan": [
+      "runtime.research.test_prepare_racing_api_bulk_range_batch_plan"
+    ],
+    "module:runtime.research.test_prepare_racing_api_stable_id_enrichment_batch_plan": [
+      "runtime.research.test_prepare_racing_api_stable_id_enrichment_batch_plan"
+    ],
+    "module:runtime.research.test_prepare_racing_api_targeted_batch_plan": [
+      "runtime.research.test_prepare_racing_api_targeted_batch_plan"
+    ],
+    "module:runtime.research.test_prepare_racing_australia_graded_catalog": [
+      "runtime.research.test_prepare_racing_australia_graded_catalog"
+    ],
+    "module:runtime.research.test_publish_held_census_tra_reconciliation_approval": [
+      "runtime.research.test_publish_held_census_tra_reconciliation_approval"
+    ],
+    "module:runtime.research.test_racing_api_account_budget": [
+      "runtime.research.test_racing_api_account_budget"
+    ],
+    "module:runtime.research.test_racing_api_bulk_range_batch_export": [
+      "runtime.research.test_racing_api_bulk_range_batch_export"
+    ],
+    "module:runtime.research.test_racing_api_bulk_range_execution_ledger": [
+      "runtime.research.test_racing_api_bulk_range_execution_ledger"
+    ],
+    "module:runtime.research.test_racing_api_bulk_results_export": [
+      "runtime.research.test_racing_api_bulk_results_export"
+    ],
+    "module:runtime.research.test_racing_api_content_pool": [
+      "runtime.research.test_racing_api_content_pool"
+    ],
+    "module:runtime.research.test_racing_api_horse_export": [
+      "runtime.research.test_racing_api_horse_export"
+    ],
+    "module:runtime.research.test_racing_api_targeted_batch_execution_ledger": [
+      "runtime.research.test_racing_api_targeted_batch_execution_ledger"
+    ],
+    "module:runtime.research.test_racing_api_targeted_batch_export": [
+      "runtime.research.test_racing_api_targeted_batch_export"
+    ],
+    "module:stable.test_attribution_gold_review": [
+      "stable.test_attribution_gold_review"
+    ],
+    "module:stable.test_australia_race_details": [
+      "stable.test_australia_race_details"
+    ],
+    "module:stable.test_backfill_article_race_links": [
+      "stable.test_backfill_article_race_links"
+    ],
+    "module:stable.test_bind_historical_gap_candidates": [
+      "stable.test_bind_historical_gap_candidates"
+    ],
+    "module:stable.test_contextual_news_entities": [
+      "stable.test_contextual_news_entities"
+    ],
+    "module:stable.test_current_year_race_apply_descriptor": [
+      "stable.test_current_year_race_apply_descriptor"
+    ],
+    "module:stable.test_current_year_race_due_checks": [
+      "stable.test_current_year_race_due_checks"
+    ],
+    "module:stable.test_deutscher_galopp_calendar": [
+      "stable.test_deutscher_galopp_calendar"
+    ],
+    "module:stable.test_deutscher_galopp_race_details": [
+      "stable.test_deutscher_galopp_race_details"
+    ],
+    "module:stable.test_diff_race_calendar": [
+      "stable.test_diff_race_calendar"
+    ],
+    "module:stable.test_editorial_headlines": [
+      "stable.test_editorial_headlines"
+    ],
+    "module:stable.test_english_term_context_gates": [
+      "stable.test_english_term_context_gates"
+    ],
+    "module:stable.test_era_race_details": [
+      "stable.test_era_race_details"
+    ],
+    "module:stable.test_extended_racing_regions": [
+      "stable.test_extended_racing_regions"
+    ],
+    "module:stable.test_external_english_horse_context_gate": [
+      "stable.test_external_english_horse_context_gate"
+    ],
+    "module:stable.test_france_news_freshness_change": [
+      "stable.test_france_news_freshness_change"
+    ],
+    "module:stable.test_historical_calendar_release_a_postgres": [
+      "stable.test_historical_calendar_release_a_postgres"
+    ],
+    "module:stable.test_historical_calendar_release_b": [
+      "stable.test_historical_calendar_release_b"
+    ],
+    "module:stable.test_historical_calendar_review_fixes": [
+      "stable.test_historical_calendar_review_fixes"
+    ],
+    "module:stable.test_historical_calendar_runner_helpers": [
+      "stable.test_historical_calendar_runner_helpers"
+    ],
+    "module:stable.test_historical_jra_legacy_details": [
+      "stable.test_historical_jra_legacy_details"
+    ],
+    "module:stable.test_historical_race_cached_details": [
+      "stable.test_historical_race_cached_details"
+    ],
+    "module:stable.test_historical_race_calendar_integrity": [
+      "stable.test_historical_race_calendar_integrity"
+    ],
+    "module:stable.test_historical_race_calendar_integrity_tooling": [
+      "stable.test_historical_race_calendar_integrity_tooling"
+    ],
+    "module:stable.test_historical_race_calendar_pipeline": [
+      "stable.test_historical_race_calendar_pipeline"
+    ],
+    "module:stable.test_historical_race_catalog_adapters": [
+      "stable.test_historical_race_catalog_adapters"
+    ],
+    "module:stable.test_historical_race_coverage_policy": [
+      "stable.test_historical_race_coverage_policy"
+    ],
+    "module:stable.test_historical_race_date_discovery": [
+      "stable.test_historical_race_date_discovery"
+    ],
+    "module:stable.test_historical_race_detail_chunk_import": [
+      "stable.test_historical_race_detail_chunk_import"
+    ],
+    "module:stable.test_historical_race_detail_direct_urls": [
+      "stable.test_historical_race_detail_direct_urls"
+    ],
+    "module:stable.test_historical_race_detail_distance_metadata": [
+      "stable.test_historical_race_detail_distance_metadata"
+    ],
+    "module:stable.test_historical_race_detail_http_budget": [
+      "stable.test_historical_race_detail_http_budget"
+    ],
+    "module:stable.test_historical_race_detail_import_packager": [
+      "stable.test_historical_race_detail_import_packager"
+    ],
+    "module:stable.test_historical_race_detail_import_primitives": [
+      "stable.test_historical_race_detail_import_primitives"
+    ],
+    "module:stable.test_historical_race_detail_runner_v2_contract": [
+      "stable.test_historical_race_detail_runner_v2_contract"
+    ],
+    "module:stable.test_historical_race_detail_runner_v2_package_identity": [
+      "stable.test_historical_race_detail_runner_v2_package_identity"
+    ],
+    "module:stable.test_historical_race_detail_runner_v2_review_findings": [
+      "stable.test_historical_race_detail_runner_v2_review_findings"
+    ],
+    "module:stable.test_historical_race_detail_runner_v2_validation_gaps": [
+      "stable.test_historical_race_detail_runner_v2_validation_gaps"
+    ],
+    "module:stable.test_historical_race_detail_sources": [
+      "stable.test_historical_race_detail_sources"
+    ],
+    "module:stable.test_historical_race_inventory_models": [
+      "stable.test_historical_race_inventory_models"
+    ],
+    "module:stable.test_historical_race_inventory_service": [
+      "stable.test_historical_race_inventory_service"
+    ],
+    "module:stable.test_historical_race_network_logging": [
+      "stable.test_historical_race_network_logging"
+    ],
+    "module:stable.test_historical_race_publication_command": [
+      "stable.test_historical_race_publication_command"
+    ],
+    "module:stable.test_historical_race_source_discovery_gap_packager": [
+      "stable.test_historical_race_source_discovery_gap_packager"
+    ],
+    "module:stable.test_historical_race_source_discovery_tools": [
+      "stable.test_historical_race_source_discovery_tools"
+    ],
+    "module:stable.test_historical_race_sportinglife_url_discovery": [
+      "stable.test_historical_race_sportinglife_url_discovery"
+    ],
+    "module:stable.test_hkjc_season_gap_candidates": [
+      "stable.test_hkjc_season_gap_candidates"
+    ],
+    "module:stable.test_hri_pattern_calendar": [
+      "stable.test_hri_pattern_calendar"
+    ],
+    "module:stable.test_hri_ras_race_details": [
+      "stable.test_hri_ras_race_details"
+    ],
+    "module:stable.test_hrn_source_term_translation": [
+      "stable.test_hrn_source_term_translation"
+    ],
+    "module:stable.test_ireland_tra_route_policy": [
+      "stable.test_ireland_tra_route_policy"
+    ],
+    "module:stable.test_jcsa_race_details": [
+      "stable.test_jcsa_race_details"
+    ],
+    "module:stable.test_jra_race_detail_year_param": [
+      "stable.test_jra_race_detail_year_param"
+    ],
+    "module:stable.test_lifecycle_shadow_hardening": [
+      "stable.test_lifecycle_shadow_hardening"
+    ],
+    "module:stable.test_materialize_dated_race_targets": [
+      "stable.test_materialize_dated_race_targets"
+    ],
+    "module:stable.test_middle_east_calendar": [
+      "stable.test_middle_east_calendar"
+    ],
+    "module:stable.test_migration_database_helpers": [
+      "stable.test_migration_database_helpers"
+    ],
+    "module:stable.test_migration_database_isolation": [
+      "stable.test_migration_database_isolation"
+    ],
+    "module:stable.test_migration_history_repair": [
+      "stable.test_migration_history_repair"
+    ],
+    "module:stable.test_migration_history_repair_postgres": [
+      "stable.test_migration_history_repair_postgres"
+    ],
+    "module:stable.test_multiregion_attribution_change": [
+      "stable.test_multiregion_attribution_change"
+    ],
+    "module:stable.test_multiregion_rollout_change": [
+      "stable.test_multiregion_rollout_change"
+    ],
+    "module:stable.test_nar_racelist_events": [
+      "stable.test_nar_racelist_events"
+    ],
+    "module:stable.test_new_region_detail_wiring": [
+      "stable.test_new_region_detail_wiring"
+    ],
+    "module:stable.test_news_body_history": [
+      "stable.test_news_body_history"
+    ],
+    "module:stable.test_news_production_integrity": [
+      "stable.test_news_production_integrity"
+    ],
+    "module:stable.test_nsa_race_segmentation": [
+      "stable.test_nsa_race_segmentation"
+    ],
+    "module:stable.test_p0_horse_candidate_extraction": [
+      "stable.test_p0_horse_candidate_extraction"
+    ],
+    "module:stable.test_p0_horse_career_history": [
+      "stable.test_p0_horse_career_history"
+    ],
+    "module:stable.test_p0_horse_completion_adapters": [
+      "stable.test_p0_horse_completion_adapters"
+    ],
+    "module:stable.test_p0_horse_completion_batch": [
+      "stable.test_p0_horse_completion_batch"
+    ],
+    "module:stable.test_p0_horse_completion_source_clients": [
+      "stable.test_p0_horse_completion_source_clients"
+    ],
+    "module:stable.test_p0_horse_identity_bootstrap": [
+      "stable.test_p0_horse_identity_bootstrap"
+    ],
+    "module:stable.test_p0_horse_identity_enrichment": [
+      "stable.test_p0_horse_identity_enrichment"
+    ],
+    "module:stable.test_p0_horse_migrations_postgres": [
+      "stable.test_p0_horse_migrations_postgres"
+    ],
+    "module:stable.test_p0_horse_netkeiba_client": [
+      "stable.test_p0_horse_netkeiba_client"
+    ],
+    "module:stable.test_p0_horse_participant_release": [
+      "stable.test_p0_horse_participant_release"
+    ],
+    "module:stable.test_p0_horse_production_apply": [
+      "stable.test_p0_horse_production_apply"
+    ],
+    "module:stable.test_p0_horse_production_apply_postgres": [
+      "stable.test_p0_horse_production_apply_postgres"
+    ],
+    "module:stable.test_p0_racecard_url_discovery": [
+      "stable.test_p0_racecard_url_discovery"
+    ],
+    "module:stable.test_pre_race_refresh": [
+      "stable.test_pre_race_refresh"
+    ],
+    "module:stable.test_pre_race_review_fixes": [
+      "stable.test_pre_race_review_fixes"
+    ],
+    "module:stable.test_production_audit_baseline": [
+      "stable.test_production_audit_baseline"
+    ],
+    "module:stable.test_public_new_regions": [
+      "stable.test_public_new_regions"
+    ],
+    "module:stable.test_public_term_consistency": [
+      "stable.test_public_term_consistency"
+    ],
+    "module:stable.test_publish_ready_backlog": [
+      "stable.test_publish_ready_backlog"
+    ],
+    "module:stable.test_race_calendar_default_date_window": [
+      "stable.test_race_calendar_default_date_window"
+    ],
+    "module:stable.test_race_calendar_ics_reconciliation": [
+      "stable.test_race_calendar_ics_reconciliation"
+    ],
+    "module:stable.test_race_calendar_responsive_ui": [
+      "stable.test_race_calendar_responsive_ui"
+    ],
+    "module:stable.test_race_coverage_queue": [
+      "stable.test_race_coverage_queue"
+    ],
+    "module:stable.test_race_coverage_recovery": [
+      "stable.test_race_coverage_recovery"
+    ],
+    "module:stable.test_race_data_sync_admission": [
+      "stable.test_race_data_sync_admission"
+    ],
+    "module:stable.test_race_data_sync_alerts": [
+      "stable.test_race_data_sync_alerts"
+    ],
+    "module:stable.test_race_data_sync_audit": [
+      "stable.test_race_data_sync_audit"
+    ],
+    "module:stable.test_race_data_sync_chain_e2e": [
+      "stable.test_race_data_sync_chain_e2e"
+    ],
+    "module:stable.test_race_data_sync_discovery": [
+      "stable.test_race_data_sync_discovery"
+    ],
+    "module:stable.test_race_data_sync_lifecycle": [
+      "stable.test_race_data_sync_lifecycle"
+    ],
+    "module:stable.test_race_data_sync_lifecycle_advance": [
+      "stable.test_race_data_sync_lifecycle_advance"
+    ],
+    "module:stable.test_race_data_sync_lifecycle_wiring": [
+      "stable.test_race_data_sync_lifecycle_wiring"
+    ],
+    "module:stable.test_race_data_sync_pipeline_a": [
+      "stable.test_race_data_sync_pipeline_a"
+    ],
+    "module:stable.test_race_data_sync_pipeline_a_postgres": [
+      "stable.test_race_data_sync_pipeline_a_postgres"
+    ],
+    "module:stable.test_race_data_sync_policy": [
+      "stable.test_race_data_sync_policy"
+    ],
+    "module:stable.test_race_data_sync_policy_v2": [
+      "stable.test_race_data_sync_policy_v2"
+    ],
+    "module:stable.test_race_data_sync_providers": [
+      "stable.test_race_data_sync_providers"
+    ],
+    "module:stable.test_race_data_sync_r0": [
+      "stable.test_race_data_sync_r0"
+    ],
+    "module:stable.test_race_data_sync_r0_postgres": [
+      "stable.test_race_data_sync_r0_postgres"
+    ],
+    "module:stable.test_race_data_sync_repair": [
+      "stable.test_race_data_sync_repair"
+    ],
+    "module:stable.test_race_display_name_translation_2026": [
+      "stable.test_race_display_name_translation_2026"
+    ],
+    "module:stable.test_race_event_coverage_reconciliation": [
+      "stable.test_race_event_coverage_reconciliation"
+    ],
+    "module:stable.test_race_event_crawl_orchestration": [
+      "stable.test_race_event_crawl_orchestration"
+    ],
+    "module:stable.test_race_event_distance_display": [
+      "stable.test_race_event_distance_display"
+    ],
+    "module:stable.test_race_event_lifecycle": [
+      "stable.test_race_event_lifecycle"
+    ],
+    "module:stable.test_race_event_lifecycle_enrollment_postgres": [
+      "stable.test_race_event_lifecycle_enrollment_postgres"
+    ],
+    "module:stable.test_race_event_lifecycle_postgres": [
+      "stable.test_race_event_lifecycle_postgres"
+    ],
+    "module:stable.test_race_event_source_cache": [
+      "stable.test_race_event_source_cache"
+    ],
+    "module:stable.test_race_event_years": [
+      "stable.test_race_event_years"
+    ],
+    "module:stable.test_race_information_display": [
+      "stable.test_race_information_display"
+    ],
+    "module:stable.test_race_information_display_pages": [
+      "stable.test_race_information_display_pages"
+    ],
+    "module:stable.test_race_information_preview": [
+      "stable.test_race_information_preview"
+    ],
+    "module:stable.test_race_live_gate_remediation": [
+      "stable.test_race_live_gate_remediation"
+    ],
+    "module:stable.test_race_live_gate_remediation_postgres": [
+      "stable.test_race_live_gate_remediation_postgres"
+    ],
+    "module:stable.test_race_live_initialization": [
+      "stable.test_race_live_initialization"
+    ],
+    "module:stable.test_race_live_initialization_postgres": [
+      "stable.test_race_live_initialization_postgres"
+    ],
+    "module:stable.test_race_live_initialization_v2": [
+      "stable.test_race_live_initialization_v2"
+    ],
+    "module:stable.test_race_live_manual_official_evidence": [
+      "stable.test_race_live_manual_official_evidence"
+    ],
+    "module:stable.test_race_live_multiregion_pipeline": [
+      "stable.test_race_live_multiregion_pipeline"
+    ],
+    "module:stable.test_race_live_multiregion_selector": [
+      "stable.test_race_live_multiregion_selector"
+    ],
+    "module:stable.test_race_live_p0_deployment_contract": [
+      "stable.test_race_live_p0_deployment_contract"
+    ],
+    "module:stable.test_race_live_publication_transition": [
+      "stable.test_race_live_publication_transition"
+    ],
+    "module:stable.test_race_live_publication_transition_postgres": [
+      "stable.test_race_live_publication_transition_postgres"
+    ],
+    "module:stable.test_race_live_racecard_sync": [
+      "stable.test_race_live_racecard_sync"
+    ],
+    "module:stable.test_race_live_rollback_contract": [
+      "stable.test_race_live_rollback_contract"
+    ],
+    "module:stable.test_race_live_sla_monitor": [
+      "stable.test_race_live_sla_monitor"
+    ],
+    "module:stable.test_race_live_source_proof": [
+      "stable.test_race_live_source_proof"
+    ],
+    "module:stable.test_race_live_target_eligibility": [
+      "stable.test_race_live_target_eligibility"
+    ],
+    "module:stable.test_race_multisource_conversion": [
+      "stable.test_race_multisource_conversion"
+    ],
+    "module:stable.test_race_multisource_coverage": [
+      "stable.test_race_multisource_coverage"
+    ],
+    "module:stable.test_race_multisource_enrollment": [
+      "stable.test_race_multisource_enrollment"
+    ],
+    "module:stable.test_race_multisource_identity": [
+      "stable.test_race_multisource_identity"
+    ],
+    "module:stable.test_race_multisource_postgres": [
+      "stable.test_race_multisource_postgres"
+    ],
+    "module:stable.test_race_multisource_regions": [
+      "stable.test_race_multisource_regions"
+    ],
+    "module:stable.test_race_name_handicap_cleanup": [
+      "stable.test_race_name_handicap_cleanup"
+    ],
+    "module:stable.test_race_news_exposure": [
+      "stable.test_race_news_exposure"
+    ],
+    "module:stable.test_race_pre_race": [
+      "stable.test_race_pre_race"
+    ],
+    "module:stable.test_race_public_coverage": [
+      "stable.test_race_public_coverage"
+    ],
+    "module:stable.test_race_public_time": [
+      "stable.test_race_public_time"
+    ],
+    "module:stable.test_race_reference_management_commands": [
+      "stable.test_race_reference_management_commands"
+    ],
+    "module:stable.test_race_reference_sources_postgres": [
+      "stable.test_race_reference_sources_postgres"
+    ],
+    "module:stable.test_race_section_gaps": [
+      "stable.test_race_section_gaps"
+    ],
+    "module:stable.test_race_section_identity_repair": [
+      "stable.test_race_section_identity_repair"
+    ],
+    "module:stable.test_race_series_identity_2026_review": [
+      "stable.test_race_series_identity_2026_review"
+    ],
+    "module:stable.test_race_series_identity_2026_review_postgres": [
+      "stable.test_race_series_identity_2026_review_postgres"
+    ],
+    "module:stable.test_race_series_identity_review": [
+      "stable.test_race_series_identity_review"
+    ],
+    "module:stable.test_racing_api_exclusive_account_preflight": [
+      "stable.test_racing_api_exclusive_account_preflight"
+    ],
+    "module:stable.test_racing_api_horse_identity_models": [
+      "stable.test_racing_api_horse_identity_models"
+    ],
+    "module:stable.test_racing_api_horse_staging": [
+      "stable.test_racing_api_horse_staging"
+    ],
+    "module:stable.test_racing_api_horse_staging_migration": [
+      "stable.test_racing_api_horse_staging_migration"
+    ],
+    "module:stable.test_racing_api_horse_staging_postgresql": [
+      "stable.test_racing_api_horse_staging_postgresql"
+    ],
+    "module:stable.test_racing_australia_graded_catalog": [
+      "stable.test_racing_australia_graded_catalog"
+    ],
+    "module:stable.test_realtime_race_results_postgres": [
+      "stable.test_realtime_race_results_postgres"
+    ],
+    "module:stable.test_refresh_race_calendar": [
+      "stable.test_refresh_race_calendar"
+    ],
+    "module:stable.test_release_0077_recovery_manifest": [
+      "stable.test_release_0077_recovery_manifest"
+    ],
+    "module:stable.test_release_commit": [
+      "stable.test_release_commit"
+    ],
+    "module:stable.test_single_migration_owner": [
+      "stable.test_single_migration_owner"
+    ],
+    "module:stable.test_stage_racing_api_targeted_batch_command": [
+      "stable.test_stage_racing_api_targeted_batch_command"
+    ],
+    "module:stable.test_tjcis_ics_catalog": [
+      "stable.test_tjcis_ics_catalog"
+    ],
+    "module:stable.test_verify_calendar_gap_rows": [
+      "stable.test_verify_calendar_gap_rows"
+    ],
+    "module:stable.tests_legacy": [
+      "stable.tests_legacy"
+    ],
+    "module:stable.tests.test_backup_operations_contract": [
+      "stable.tests.test_backup_operations_contract"
+    ],
+    "module:stable.tests.test_lifecycle_enforce_canary": [
+      "stable.tests.test_lifecycle_enforce_canary"
+    ],
+    "module:stable.tests.test_lifecycle_enforce_canary_application": [
+      "stable.tests.test_lifecycle_enforce_canary_application"
+    ],
+    "module:stable.tests.test_lifecycle_enforce_canary_operations": [
+      "stable.tests.test_lifecycle_enforce_canary_operations"
+    ],
+    "module:stable.tests.test_lifecycle_enforce_canary_postgres": [
+      "stable.tests.test_lifecycle_enforce_canary_postgres"
+    ],
+    "module:stable.tests.test_lifecycle_enforce_full_cohort": [
+      "stable.tests.test_lifecycle_enforce_full_cohort"
+    ],
+    "module:stable.tests.test_lifecycle_enforce_full_cohort_operations": [
+      "stable.tests.test_lifecycle_enforce_full_cohort_operations"
+    ],
+    "module:stable.tests.test_lifecycle_enforce_full_cohort_postgres": [
+      "stable.tests.test_lifecycle_enforce_full_cohort_postgres"
+    ],
+    "module:stable.tests.test_management_command": [
+      "stable.tests.test_management_command"
+    ],
+    "module:stable.tests.test_models_migrations": [
+      "stable.tests.test_models_migrations"
+    ],
+    "module:stable.tests.test_nginx_production_contract": [
+      "stable.tests.test_nginx_production_contract"
+    ],
+    "module:stable.tests.test_page_regression": [
+      "stable.tests.test_page_regression"
+    ],
+    "module:stable.tests.test_race_event_lifecycle_enrollment": [
+      "stable.tests.test_race_event_lifecycle_enrollment"
+    ],
+    "module:stable.tests.test_race_field_normalization": [
+      "stable.tests.test_race_field_normalization"
+    ],
+    "module:stable.tests.test_race_result_recovery_application_commands": [
+      "stable.tests.test_race_result_recovery_application_commands"
+    ],
+    "module:stable.tests.test_race_result_recovery_application_inventory": [
+      "stable.tests.test_race_result_recovery_application_inventory"
+    ],
+    "module:stable.tests.test_race_result_recovery_application_pages": [
+      "stable.tests.test_race_result_recovery_application_pages"
+    ],
+    "module:stable.tests.test_race_result_recovery_application_postgres": [
+      "stable.tests.test_race_result_recovery_application_postgres"
+    ],
+    "module:stable.tests.test_race_result_recovery_application_projection": [
+      "stable.tests.test_race_result_recovery_application_projection"
+    ],
+    "module:stable.tests.test_reviewed_gap_backfill": [
+      "stable.tests.test_reviewed_gap_backfill"
+    ],
+    "module:stable.tests.test_reviewed_pre_race": [
+      "stable.tests.test_reviewed_pre_race"
+    ],
+    "module:stable.tests.test_scheduled_race_result_review_contracts": [
+      "stable.tests.test_scheduled_race_result_review_contracts"
+    ],
+    "module:stable.tests.test_scheduled_race_result_review_postgres": [
+      "stable.tests.test_scheduled_race_result_review_postgres"
+    ],
+    "module:stable.tests.test_stats_business_logic": [
+      "stable.tests.test_stats_business_logic"
+    ],
+    "module:stable.tests.test_term_display": [
+      "stable.tests.test_term_display"
+    ],
+    "module:stable.tests.test_write_paths": [
+      "stable.tests.test_write_paths"
+    ],
+    "horse_publish": [
+      "stable.test_p0_horse_completion_batch.P0HorseBatchAutoPublishTests"
+    ],
+    "environment_contracts": [
+      "stable.test_single_migration_owner.ShellAndComposeStaticValidationTests.test_t16_standard_compose_config_is_valid",
+      "stable.test_single_migration_owner.ShellAndComposeStaticValidationTests.test_t16_lowcost_compose_config_is_valid",
+      "stable.test_single_migration_owner.MigrationDriftGuardTests.test_t19_no_new_migration_files",
+      "stable.tests.test_race_event_lifecycle_enrollment.LifecycleEnrollmentCommandTests.test_output_dir_rejects_unresolved_macos_temporary_alias",
+      "stable.tests.test_race_event_lifecycle_enrollment.LifecycleEnrollmentCommandTests.test_prepare_command_does_not_resolve_away_temporary_alias"
+    ]
+  },
+  "dependencies": {
+    "race_parser": [
+      "race_results"
+    ],
+    "research_contracts": [
+      "p0_bridge"
+    ],
+    "horse_publish": [
+      "horse_page"
+    ]
+  },
+  "tests": {
+    ".codex/scripts/test_graded_race_participants_workflow.py": {
+      "label": "test_graded_race_participants_workflow",
+      "domains": [
+        "research_contracts"
+      ]
+    },
+    ".codex/scripts/test_workflow_contract.py": {
+      "label": "test_workflow_contract",
+      "domains": [
+        "research_contracts"
+      ]
+    },
+    "runtime/research/test_audit_france_galop_bulletin_occurrences.py": {
+      "label": "runtime.research.test_audit_france_galop_bulletin_occurrences",
+      "domains": [
+        "module:runtime.research.test_audit_france_galop_bulletin_occurrences"
+      ]
+    },
+    "runtime/research/test_audit_graded_horse_artifact.py": {
+      "label": "runtime.research.test_audit_graded_horse_artifact",
+      "domains": [
+        "research_contracts"
+      ]
+    },
+    "runtime/research/test_audit_hri_graded_winner_candidates.py": {
+      "label": "runtime.research.test_audit_hri_graded_winner_candidates",
+      "domains": [
+        "module:runtime.research.test_audit_hri_graded_winner_candidates"
+      ]
+    },
+    "runtime/research/test_audit_legacy_historical_detail_bundle.py": {
+      "label": "runtime.research.test_audit_legacy_historical_detail_bundle",
+      "domains": [
+        "module:runtime.research.test_audit_legacy_historical_detail_bundle"
+      ]
+    },
+    "runtime/research/test_audit_racing_api_bulk_partition_readiness.py": {
+      "label": "runtime.research.test_audit_racing_api_bulk_partition_readiness",
+      "domains": [
+        "module:runtime.research.test_audit_racing_api_bulk_partition_readiness"
+      ]
+    },
+    "runtime/research/test_audit_stable_id_enrichment_readiness.py": {
+      "label": "runtime.research.test_audit_stable_id_enrichment_readiness",
+      "domains": [
+        "module:runtime.research.test_audit_stable_id_enrichment_readiness"
+      ]
+    },
+    "runtime/research/test_build_graded_race_completion_bundle.py": {
+      "label": "runtime.research.test_build_graded_race_completion_bundle",
+      "domains": [
+        "research_contracts"
+      ]
+    },
+    "runtime/research/test_build_held_actual_starter_census.py": {
+      "label": "runtime.research.test_build_held_actual_starter_census",
+      "domains": [
+        "module:runtime.research.test_build_held_actual_starter_census"
+      ]
+    },
+    "runtime/research/test_build_official_graded_race_manifest.py": {
+      "label": "runtime.research.test_build_official_graded_race_manifest",
+      "domains": [
+        "research_contracts"
+      ]
+    },
+    "runtime/research/test_build_p0_participant_completion_batches.py": {
+      "label": "runtime.research.test_build_p0_participant_completion_batches",
+      "domains": [
+        "p0_bridge"
+      ]
+    },
+    "runtime/research/test_build_stable_id_reconciliation_coverage.py": {
+      "label": "runtime.research.test_build_stable_id_reconciliation_coverage",
+      "domains": [
+        "module:runtime.research.test_build_stable_id_reconciliation_coverage"
+      ]
+    },
+    "runtime/research/test_build_target_runner_stable_id_ledger.py": {
+      "label": "runtime.research.test_build_target_runner_stable_id_ledger",
+      "domains": [
+        "module:runtime.research.test_build_target_runner_stable_id_ledger"
+      ]
+    },
+    "runtime/research/test_capture_netkeiba_manual_result_reference.py": {
+      "label": "runtime.research.test_capture_netkeiba_manual_result_reference",
+      "domains": [
+        "module:runtime.research.test_capture_netkeiba_manual_result_reference"
+      ]
+    },
+    "runtime/research/test_capture_racing_api_host_process_preflight.py": {
+      "label": "runtime.research.test_capture_racing_api_host_process_preflight",
+      "domains": [
+        "module:runtime.research.test_capture_racing_api_host_process_preflight"
+      ]
+    },
+    "runtime/research/test_capture_racing_api_openapi_fingerprint.py": {
+      "label": "runtime.research.test_capture_racing_api_openapi_fingerprint",
+      "domains": [
+        "module:runtime.research.test_capture_racing_api_openapi_fingerprint"
+      ]
+    },
+    "runtime/research/test_collect_graded_race_participants.py": {
+      "label": "runtime.research.test_collect_graded_race_participants",
+      "domains": [
+        "research_contracts"
+      ]
+    },
+    "runtime/research/test_collect_graded_race_participants_hurdles.py": {
+      "label": "runtime.research.test_collect_graded_race_participants_hurdles",
+      "domains": [
+        "module:runtime.research.test_collect_graded_race_participants_hurdles",
+        "research_contracts"
+      ]
+    },
+    "runtime/research/test_collect_graded_race_participants_integrity_contract.py": {
+      "label": "runtime.research.test_collect_graded_race_participants_integrity_contract",
+      "domains": [
+        "module:runtime.research.test_collect_graded_race_participants_integrity_contract",
+        "research_contracts"
+      ]
+    },
+    "runtime/research/test_collect_official_graded_race_results.py": {
+      "label": "runtime.research.test_collect_official_graded_race_results",
+      "domains": [
+        "research_contracts"
+      ]
+    },
+    "runtime/research/test_extract_official_targeted_horse_seed_delta.py": {
+      "label": "runtime.research.test_extract_official_targeted_horse_seed_delta",
+      "domains": [
+        "module:runtime.research.test_extract_official_targeted_horse_seed_delta"
+      ]
+    },
+    "runtime/research/test_extract_targeted_horse_seed_execution_delta.py": {
+      "label": "runtime.research.test_extract_targeted_horse_seed_execution_delta",
+      "domains": [
+        "module:runtime.research.test_extract_targeted_horse_seed_execution_delta"
+      ]
+    },
+    "runtime/research/test_materialize_racing_api_targeted_batch.py": {
+      "label": "runtime.research.test_materialize_racing_api_targeted_batch",
+      "domains": [
+        "module:runtime.research.test_materialize_racing_api_targeted_batch"
+      ]
+    },
+    "runtime/research/test_merge_official_targeted_horse_seed_supplements.py": {
+      "label": "runtime.research.test_merge_official_targeted_horse_seed_supplements",
+      "domains": [
+        "module:runtime.research.test_merge_official_targeted_horse_seed_supplements"
+      ]
+    },
+    "runtime/research/test_merge_target_runner_stable_id_ledgers.py": {
+      "label": "runtime.research.test_merge_target_runner_stable_id_ledgers",
+      "domains": [
+        "module:runtime.research.test_merge_target_runner_stable_id_ledgers"
+      ]
+    },
+    "runtime/research/test_official_graded_race_sources.py": {
+      "label": "runtime.research.test_official_graded_race_sources",
+      "domains": [
+        "research_contracts"
+      ]
+    },
+    "runtime/research/test_p0_participant_execution_ledger.py": {
+      "label": "runtime.research.test_p0_participant_execution_ledger",
+      "domains": [
+        "p0_bridge"
+      ]
+    },
+    "runtime/research/test_prepare_bha_pattern_book_winner_candidates.py": {
+      "label": "runtime.research.test_prepare_bha_pattern_book_winner_candidates",
+      "domains": [
+        "module:runtime.research.test_prepare_bha_pattern_book_winner_candidates"
+      ]
+    },
+    "runtime/research/test_prepare_external_result_actual_starter_census.py": {
+      "label": "runtime.research.test_prepare_external_result_actual_starter_census",
+      "domains": [
+        "module:runtime.research.test_prepare_external_result_actual_starter_census"
+      ]
+    },
+    "runtime/research/test_prepare_france_galop_bulletin_occurrences.py": {
+      "label": "runtime.research.test_prepare_france_galop_bulletin_occurrences",
+      "domains": [
+        "module:runtime.research.test_prepare_france_galop_bulletin_occurrences"
+      ]
+    },
+    "runtime/research/test_prepare_graded_winner_source_events.py": {
+      "label": "runtime.research.test_prepare_graded_winner_source_events",
+      "domains": [
+        "module:runtime.research.test_prepare_graded_winner_source_events"
+      ]
+    },
+    "runtime/research/test_prepare_graded_winner_targeted_seeds.py": {
+      "label": "runtime.research.test_prepare_graded_winner_targeted_seeds",
+      "domains": [
+        "module:runtime.research.test_prepare_graded_winner_targeted_seeds"
+      ]
+    },
+    "runtime/research/test_prepare_held_census_tra_reconciliation.py": {
+      "label": "runtime.research.test_prepare_held_census_tra_reconciliation",
+      "domains": [
+        "module:runtime.research.test_prepare_held_census_tra_reconciliation"
+      ]
+    },
+    "runtime/research/test_prepare_held_winner_seed_extension.py": {
+      "label": "runtime.research.test_prepare_held_winner_seed_extension",
+      "domains": [
+        "module:runtime.research.test_prepare_held_winner_seed_extension"
+      ]
+    },
+    "runtime/research/test_prepare_hri_graded_winner_candidates.py": {
+      "label": "runtime.research.test_prepare_hri_graded_winner_candidates",
+      "domains": [
+        "module:runtime.research.test_prepare_hri_graded_winner_candidates"
+      ]
+    },
+    "runtime/research/test_prepare_hri_unmatched_official_targeted_seeds.py": {
+      "label": "runtime.research.test_prepare_hri_unmatched_official_targeted_seeds",
+      "domains": [
+        "module:runtime.research.test_prepare_hri_unmatched_official_targeted_seeds"
+      ]
+    },
+    "runtime/research/test_prepare_racing_api_bulk_range_batch_plan.py": {
+      "label": "runtime.research.test_prepare_racing_api_bulk_range_batch_plan",
+      "domains": [
+        "module:runtime.research.test_prepare_racing_api_bulk_range_batch_plan"
+      ]
+    },
+    "runtime/research/test_prepare_racing_api_stable_id_enrichment_batch_plan.py": {
+      "label": "runtime.research.test_prepare_racing_api_stable_id_enrichment_batch_plan",
+      "domains": [
+        "module:runtime.research.test_prepare_racing_api_stable_id_enrichment_batch_plan"
+      ]
+    },
+    "runtime/research/test_prepare_racing_api_targeted_batch_plan.py": {
+      "label": "runtime.research.test_prepare_racing_api_targeted_batch_plan",
+      "domains": [
+        "module:runtime.research.test_prepare_racing_api_targeted_batch_plan"
+      ]
+    },
+    "runtime/research/test_prepare_racing_australia_graded_catalog.py": {
+      "label": "runtime.research.test_prepare_racing_australia_graded_catalog",
+      "domains": [
+        "module:runtime.research.test_prepare_racing_australia_graded_catalog"
+      ]
+    },
+    "runtime/research/test_publish_held_census_tra_reconciliation_approval.py": {
+      "label": "runtime.research.test_publish_held_census_tra_reconciliation_approval",
+      "domains": [
+        "module:runtime.research.test_publish_held_census_tra_reconciliation_approval"
+      ]
+    },
+    "runtime/research/test_racing_api_account_budget.py": {
+      "label": "runtime.research.test_racing_api_account_budget",
+      "domains": [
+        "module:runtime.research.test_racing_api_account_budget"
+      ]
+    },
+    "runtime/research/test_racing_api_bulk_range_batch_export.py": {
+      "label": "runtime.research.test_racing_api_bulk_range_batch_export",
+      "domains": [
+        "module:runtime.research.test_racing_api_bulk_range_batch_export"
+      ]
+    },
+    "runtime/research/test_racing_api_bulk_range_execution_ledger.py": {
+      "label": "runtime.research.test_racing_api_bulk_range_execution_ledger",
+      "domains": [
+        "module:runtime.research.test_racing_api_bulk_range_execution_ledger"
+      ]
+    },
+    "runtime/research/test_racing_api_bulk_results_export.py": {
+      "label": "runtime.research.test_racing_api_bulk_results_export",
+      "domains": [
+        "module:runtime.research.test_racing_api_bulk_results_export"
+      ]
+    },
+    "runtime/research/test_racing_api_content_pool.py": {
+      "label": "runtime.research.test_racing_api_content_pool",
+      "domains": [
+        "module:runtime.research.test_racing_api_content_pool"
+      ]
+    },
+    "runtime/research/test_racing_api_horse_export.py": {
+      "label": "runtime.research.test_racing_api_horse_export",
+      "domains": [
+        "module:runtime.research.test_racing_api_horse_export"
+      ]
+    },
+    "runtime/research/test_racing_api_targeted_batch_execution_ledger.py": {
+      "label": "runtime.research.test_racing_api_targeted_batch_execution_ledger",
+      "domains": [
+        "module:runtime.research.test_racing_api_targeted_batch_execution_ledger"
+      ]
+    },
+    "runtime/research/test_racing_api_targeted_batch_export.py": {
+      "label": "runtime.research.test_racing_api_targeted_batch_export",
+      "domains": [
+        "module:runtime.research.test_racing_api_targeted_batch_export"
+      ]
+    },
+    "runtime/research/test_validate_official_graded_race_package.py": {
+      "label": "runtime.research.test_validate_official_graded_race_package",
+      "domains": [
+        "research_contracts"
+      ]
+    },
+    "scripts/tests/test_bounded_stable_tests.py": {
+      "label": "scripts.tests.test_bounded_stable_tests",
+      "domains": [
+        "infrastructure"
+      ]
+    },
+    "scripts/tests/test_research_synthetic.py": {
+      "label": "scripts.tests.test_research_synthetic",
+      "domains": [
+        "research_contracts"
+      ]
+    },
+    "scripts/tests/test_test_impact.py": {
+      "label": "scripts.tests.test_test_impact",
+      "domains": [
+        "infrastructure"
+      ]
+    },
+    "server/stable/test_attribution_gold_review.py": {
+      "label": "stable.test_attribution_gold_review",
+      "domains": [
+        "module:stable.test_attribution_gold_review"
+      ]
+    },
+    "server/stable/test_australia_race_details.py": {
+      "label": "stable.test_australia_race_details",
+      "domains": [
+        "module:stable.test_australia_race_details"
+      ]
+    },
+    "server/stable/test_backfill_article_race_links.py": {
+      "label": "stable.test_backfill_article_race_links",
+      "domains": [
+        "module:stable.test_backfill_article_race_links"
+      ]
+    },
+    "server/stable/test_bind_historical_gap_candidates.py": {
+      "label": "stable.test_bind_historical_gap_candidates",
+      "domains": [
+        "module:stable.test_bind_historical_gap_candidates"
+      ]
+    },
+    "server/stable/test_contextual_news_entities.py": {
+      "label": "stable.test_contextual_news_entities",
+      "domains": [
+        "module:stable.test_contextual_news_entities"
+      ]
+    },
+    "server/stable/test_current_year_race_apply_descriptor.py": {
+      "label": "stable.test_current_year_race_apply_descriptor",
+      "domains": [
+        "module:stable.test_current_year_race_apply_descriptor"
+      ]
+    },
+    "server/stable/test_current_year_race_due_checks.py": {
+      "label": "stable.test_current_year_race_due_checks",
+      "domains": [
+        "module:stable.test_current_year_race_due_checks"
+      ]
+    },
+    "server/stable/test_deutscher_galopp_calendar.py": {
+      "label": "stable.test_deutscher_galopp_calendar",
+      "domains": [
+        "module:stable.test_deutscher_galopp_calendar"
+      ]
+    },
+    "server/stable/test_deutscher_galopp_race_details.py": {
+      "label": "stable.test_deutscher_galopp_race_details",
+      "domains": [
+        "module:stable.test_deutscher_galopp_race_details"
+      ]
+    },
+    "server/stable/test_diff_race_calendar.py": {
+      "label": "stable.test_diff_race_calendar",
+      "domains": [
+        "module:stable.test_diff_race_calendar"
+      ]
+    },
+    "server/stable/test_editorial_headlines.py": {
+      "label": "stable.test_editorial_headlines",
+      "domains": [
+        "module:stable.test_editorial_headlines"
+      ]
+    },
+    "server/stable/test_english_term_context_gates.py": {
+      "label": "stable.test_english_term_context_gates",
+      "domains": [
+        "module:stable.test_english_term_context_gates"
+      ]
+    },
+    "server/stable/test_era_race_details.py": {
+      "label": "stable.test_era_race_details",
+      "domains": [
+        "module:stable.test_era_race_details"
+      ]
+    },
+    "server/stable/test_extended_racing_regions.py": {
+      "label": "stable.test_extended_racing_regions",
+      "domains": [
+        "module:stable.test_extended_racing_regions"
+      ]
+    },
+    "server/stable/test_external_english_horse_context_gate.py": {
+      "label": "stable.test_external_english_horse_context_gate",
+      "domains": [
+        "module:stable.test_external_english_horse_context_gate"
+      ]
+    },
+    "server/stable/test_france_news_freshness_change.py": {
+      "label": "stable.test_france_news_freshness_change",
+      "domains": [
+        "module:stable.test_france_news_freshness_change"
+      ]
+    },
+    "server/stable/test_historical_batch_pipeline.py": {
+      "label": "stable.test_historical_batch_pipeline",
+      "domains": [
+        "historical_batch"
+      ]
+    },
+    "server/stable/test_historical_batch_runner_change.py": {
+      "label": "stable.test_historical_batch_runner_change",
+      "domains": [
+        "historical_batch"
+      ]
+    },
+    "server/stable/test_historical_batch_runner_postgres.py": {
+      "label": "stable.test_historical_batch_runner_postgres",
+      "domains": [
+        "historical_batch"
+      ]
+    },
+    "server/stable/test_historical_calendar_release_a_postgres.py": {
+      "label": "stable.test_historical_calendar_release_a_postgres",
+      "domains": [
+        "module:stable.test_historical_calendar_release_a_postgres"
+      ]
+    },
+    "server/stable/test_historical_calendar_release_b.py": {
+      "label": "stable.test_historical_calendar_release_b",
+      "domains": [
+        "module:stable.test_historical_calendar_release_b"
+      ]
+    },
+    "server/stable/test_historical_calendar_review_fixes.py": {
+      "label": "stable.test_historical_calendar_review_fixes",
+      "domains": [
+        "module:stable.test_historical_calendar_review_fixes"
+      ]
+    },
+    "server/stable/test_historical_calendar_runner_helpers.py": {
+      "label": "stable.test_historical_calendar_runner_helpers",
+      "domains": [
+        "module:stable.test_historical_calendar_runner_helpers"
+      ]
+    },
+    "server/stable/test_historical_jra_legacy_details.py": {
+      "label": "stable.test_historical_jra_legacy_details",
+      "domains": [
+        "module:stable.test_historical_jra_legacy_details"
+      ]
+    },
+    "server/stable/test_historical_race_batches.py": {
+      "label": "stable.test_historical_race_batches",
+      "domains": [
+        "historical_batch"
+      ]
+    },
+    "server/stable/test_historical_race_cached_details.py": {
+      "label": "stable.test_historical_race_cached_details",
+      "domains": [
+        "module:stable.test_historical_race_cached_details"
+      ]
+    },
+    "server/stable/test_historical_race_calendar_integrity.py": {
+      "label": "stable.test_historical_race_calendar_integrity",
+      "domains": [
+        "module:stable.test_historical_race_calendar_integrity"
+      ]
+    },
+    "server/stable/test_historical_race_calendar_integrity_tooling.py": {
+      "label": "stable.test_historical_race_calendar_integrity_tooling",
+      "domains": [
+        "module:stable.test_historical_race_calendar_integrity_tooling"
+      ]
+    },
+    "server/stable/test_historical_race_calendar_pipeline.py": {
+      "label": "stable.test_historical_race_calendar_pipeline",
+      "domains": [
+        "module:stable.test_historical_race_calendar_pipeline"
+      ]
+    },
+    "server/stable/test_historical_race_catalog_adapters.py": {
+      "label": "stable.test_historical_race_catalog_adapters",
+      "domains": [
+        "module:stable.test_historical_race_catalog_adapters"
+      ]
+    },
+    "server/stable/test_historical_race_coverage_policy.py": {
+      "label": "stable.test_historical_race_coverage_policy",
+      "domains": [
+        "module:stable.test_historical_race_coverage_policy"
+      ]
+    },
+    "server/stable/test_historical_race_date_discovery.py": {
+      "label": "stable.test_historical_race_date_discovery",
+      "domains": [
+        "module:stable.test_historical_race_date_discovery"
+      ]
+    },
+    "server/stable/test_historical_race_detail_chunk_import.py": {
+      "label": "stable.test_historical_race_detail_chunk_import",
+      "domains": [
+        "module:stable.test_historical_race_detail_chunk_import"
+      ]
+    },
+    "server/stable/test_historical_race_detail_direct_urls.py": {
+      "label": "stable.test_historical_race_detail_direct_urls",
+      "domains": [
+        "module:stable.test_historical_race_detail_direct_urls"
+      ]
+    },
+    "server/stable/test_historical_race_detail_distance_metadata.py": {
+      "label": "stable.test_historical_race_detail_distance_metadata",
+      "domains": [
+        "module:stable.test_historical_race_detail_distance_metadata"
+      ]
+    },
+    "server/stable/test_historical_race_detail_http_budget.py": {
+      "label": "stable.test_historical_race_detail_http_budget",
+      "domains": [
+        "module:stable.test_historical_race_detail_http_budget"
+      ]
+    },
+    "server/stable/test_historical_race_detail_import_packager.py": {
+      "label": "stable.test_historical_race_detail_import_packager",
+      "domains": [
+        "module:stable.test_historical_race_detail_import_packager"
+      ]
+    },
+    "server/stable/test_historical_race_detail_import_primitives.py": {
+      "label": "stable.test_historical_race_detail_import_primitives",
+      "domains": [
+        "module:stable.test_historical_race_detail_import_primitives"
+      ]
+    },
+    "server/stable/test_historical_race_detail_import_receipt.py": {
+      "label": "stable.test_historical_race_detail_import_receipt",
+      "domains": [
+        "historical_batch"
+      ]
+    },
+    "server/stable/test_historical_race_detail_runner_v2_contract.py": {
+      "label": "stable.test_historical_race_detail_runner_v2_contract",
+      "domains": [
+        "module:stable.test_historical_race_detail_runner_v2_contract"
+      ]
+    },
+    "server/stable/test_historical_race_detail_runner_v2_package_identity.py": {
+      "label": "stable.test_historical_race_detail_runner_v2_package_identity",
+      "domains": [
+        "module:stable.test_historical_race_detail_runner_v2_package_identity"
+      ]
+    },
+    "server/stable/test_historical_race_detail_runner_v2_review_findings.py": {
+      "label": "stable.test_historical_race_detail_runner_v2_review_findings",
+      "domains": [
+        "module:stable.test_historical_race_detail_runner_v2_review_findings"
+      ]
+    },
+    "server/stable/test_historical_race_detail_runner_v2_validation_gaps.py": {
+      "label": "stable.test_historical_race_detail_runner_v2_validation_gaps",
+      "domains": [
+        "module:stable.test_historical_race_detail_runner_v2_validation_gaps"
+      ]
+    },
+    "server/stable/test_historical_race_detail_sources.py": {
+      "label": "stable.test_historical_race_detail_sources",
+      "domains": [
+        "module:stable.test_historical_race_detail_sources"
+      ]
+    },
+    "server/stable/test_historical_race_inventory_models.py": {
+      "label": "stable.test_historical_race_inventory_models",
+      "domains": [
+        "module:stable.test_historical_race_inventory_models"
+      ]
+    },
+    "server/stable/test_historical_race_inventory_service.py": {
+      "label": "stable.test_historical_race_inventory_service",
+      "domains": [
+        "module:stable.test_historical_race_inventory_service"
+      ]
+    },
+    "server/stable/test_historical_race_network_logging.py": {
+      "label": "stable.test_historical_race_network_logging",
+      "domains": [
+        "module:stable.test_historical_race_network_logging"
+      ]
+    },
+    "server/stable/test_historical_race_publication_command.py": {
+      "label": "stable.test_historical_race_publication_command",
+      "domains": [
+        "module:stable.test_historical_race_publication_command"
+      ]
+    },
+    "server/stable/test_historical_race_source_discovery_gap_packager.py": {
+      "label": "stable.test_historical_race_source_discovery_gap_packager",
+      "domains": [
+        "module:stable.test_historical_race_source_discovery_gap_packager"
+      ]
+    },
+    "server/stable/test_historical_race_source_discovery_tools.py": {
+      "label": "stable.test_historical_race_source_discovery_tools",
+      "domains": [
+        "module:stable.test_historical_race_source_discovery_tools"
+      ]
+    },
+    "server/stable/test_historical_race_sportinglife_url_discovery.py": {
+      "label": "stable.test_historical_race_sportinglife_url_discovery",
+      "domains": [
+        "module:stable.test_historical_race_sportinglife_url_discovery"
+      ]
+    },
+    "server/stable/test_hkjc_season_gap_candidates.py": {
+      "label": "stable.test_hkjc_season_gap_candidates",
+      "domains": [
+        "module:stable.test_hkjc_season_gap_candidates"
+      ]
+    },
+    "server/stable/test_horse_profile_publish.py": {
+      "label": "stable.test_horse_profile_publish",
+      "domains": [
+        "horse_page"
+      ]
+    },
+    "server/stable/test_hri_pattern_calendar.py": {
+      "label": "stable.test_hri_pattern_calendar",
+      "domains": [
+        "module:stable.test_hri_pattern_calendar"
+      ]
+    },
+    "server/stable/test_hri_ras_race_details.py": {
+      "label": "stable.test_hri_ras_race_details",
+      "domains": [
+        "module:stable.test_hri_ras_race_details"
+      ]
+    },
+    "server/stable/test_hrn_source_term_translation.py": {
+      "label": "stable.test_hrn_source_term_translation",
+      "domains": [
+        "module:stable.test_hrn_source_term_translation"
+      ]
+    },
+    "server/stable/test_ireland_tra_route_policy.py": {
+      "label": "stable.test_ireland_tra_route_policy",
+      "domains": [
+        "module:stable.test_ireland_tra_route_policy"
+      ]
+    },
+    "server/stable/test_japanese_racing_translation_normalization.py": {
+      "label": "stable.test_japanese_racing_translation_normalization",
+      "domains": [
+        "news_translation"
+      ]
+    },
+    "server/stable/test_jcsa_race_details.py": {
+      "label": "stable.test_jcsa_race_details",
+      "domains": [
+        "module:stable.test_jcsa_race_details"
+      ]
+    },
+    "server/stable/test_jra_race_detail_year_param.py": {
+      "label": "stable.test_jra_race_detail_year_param",
+      "domains": [
+        "module:stable.test_jra_race_detail_year_param"
+      ]
+    },
+    "server/stable/test_lifecycle_shadow_hardening.py": {
+      "label": "stable.test_lifecycle_shadow_hardening",
+      "domains": [
+        "module:stable.test_lifecycle_shadow_hardening"
+      ]
+    },
+    "server/stable/test_materialize_dated_race_targets.py": {
+      "label": "stable.test_materialize_dated_race_targets",
+      "domains": [
+        "module:stable.test_materialize_dated_race_targets"
+      ]
+    },
+    "server/stable/test_middle_east_calendar.py": {
+      "label": "stable.test_middle_east_calendar",
+      "domains": [
+        "module:stable.test_middle_east_calendar"
+      ]
+    },
+    "server/stable/test_migration_database_helpers.py": {
+      "label": "stable.test_migration_database_helpers",
+      "domains": [
+        "module:stable.test_migration_database_helpers"
+      ]
+    },
+    "server/stable/test_migration_database_isolation.py": {
+      "label": "stable.test_migration_database_isolation",
+      "domains": [
+        "module:stable.test_migration_database_isolation"
+      ]
+    },
+    "server/stable/test_migration_history_repair.py": {
+      "label": "stable.test_migration_history_repair",
+      "domains": [
+        "module:stable.test_migration_history_repair"
+      ]
+    },
+    "server/stable/test_migration_history_repair_postgres.py": {
+      "label": "stable.test_migration_history_repair_postgres",
+      "domains": [
+        "module:stable.test_migration_history_repair_postgres"
+      ]
+    },
+    "server/stable/test_multiregion_attribution_change.py": {
+      "label": "stable.test_multiregion_attribution_change",
+      "domains": [
+        "module:stable.test_multiregion_attribution_change"
+      ]
+    },
+    "server/stable/test_multiregion_rollout_change.py": {
+      "label": "stable.test_multiregion_rollout_change",
+      "domains": [
+        "module:stable.test_multiregion_rollout_change"
+      ]
+    },
+    "server/stable/test_nar_racelist_events.py": {
+      "label": "stable.test_nar_racelist_events",
+      "domains": [
+        "module:stable.test_nar_racelist_events"
+      ]
+    },
+    "server/stable/test_new_region_detail_wiring.py": {
+      "label": "stable.test_new_region_detail_wiring",
+      "domains": [
+        "module:stable.test_new_region_detail_wiring"
+      ]
+    },
+    "server/stable/test_news_body_history.py": {
+      "label": "stable.test_news_body_history",
+      "domains": [
+        "module:stable.test_news_body_history"
+      ]
+    },
+    "server/stable/test_news_content_boundaries.py": {
+      "label": "stable.test_news_content_boundaries",
+      "domains": [
+        "news_translation"
+      ]
+    },
+    "server/stable/test_news_production_integrity.py": {
+      "label": "stable.test_news_production_integrity",
+      "domains": [
+        "module:stable.test_news_production_integrity"
+      ]
+    },
+    "server/stable/test_nsa_race_segmentation.py": {
+      "label": "stable.test_nsa_race_segmentation",
+      "domains": [
+        "module:stable.test_nsa_race_segmentation"
+      ]
+    },
+    "server/stable/test_p0_horse_candidate_extraction.py": {
+      "label": "stable.test_p0_horse_candidate_extraction",
+      "domains": [
+        "module:stable.test_p0_horse_candidate_extraction"
+      ]
+    },
+    "server/stable/test_p0_horse_career_history.py": {
+      "label": "stable.test_p0_horse_career_history",
+      "domains": [
+        "module:stable.test_p0_horse_career_history"
+      ]
+    },
+    "server/stable/test_p0_horse_completion_adapters.py": {
+      "label": "stable.test_p0_horse_completion_adapters",
+      "domains": [
+        "module:stable.test_p0_horse_completion_adapters"
+      ]
+    },
+    "server/stable/test_p0_horse_completion_batch.py": {
+      "label": "stable.test_p0_horse_completion_batch",
+      "domains": [
+        "module:stable.test_p0_horse_completion_batch"
+      ]
+    },
+    "server/stable/test_p0_horse_completion_source_clients.py": {
+      "label": "stable.test_p0_horse_completion_source_clients",
+      "domains": [
+        "module:stable.test_p0_horse_completion_source_clients"
+      ]
+    },
+    "server/stable/test_p0_horse_identity_bootstrap.py": {
+      "label": "stable.test_p0_horse_identity_bootstrap",
+      "domains": [
+        "module:stable.test_p0_horse_identity_bootstrap"
+      ]
+    },
+    "server/stable/test_p0_horse_identity_enrichment.py": {
+      "label": "stable.test_p0_horse_identity_enrichment",
+      "domains": [
+        "module:stable.test_p0_horse_identity_enrichment"
+      ]
+    },
+    "server/stable/test_p0_horse_migrations_postgres.py": {
+      "label": "stable.test_p0_horse_migrations_postgres",
+      "domains": [
+        "module:stable.test_p0_horse_migrations_postgres"
+      ]
+    },
+    "server/stable/test_p0_horse_netkeiba_client.py": {
+      "label": "stable.test_p0_horse_netkeiba_client",
+      "domains": [
+        "module:stable.test_p0_horse_netkeiba_client"
+      ]
+    },
+    "server/stable/test_p0_horse_participant_batch_contract.py": {
+      "label": "stable.test_p0_horse_participant_batch_contract",
+      "domains": [
+        "p0_bridge"
+      ]
+    },
+    "server/stable/test_p0_horse_participant_release.py": {
+      "label": "stable.test_p0_horse_participant_release",
+      "domains": [
+        "module:stable.test_p0_horse_participant_release"
+      ]
+    },
+    "server/stable/test_p0_horse_production_apply.py": {
+      "label": "stable.test_p0_horse_production_apply",
+      "domains": [
+        "module:stable.test_p0_horse_production_apply"
+      ]
+    },
+    "server/stable/test_p0_horse_production_apply_postgres.py": {
+      "label": "stable.test_p0_horse_production_apply_postgres",
+      "domains": [
+        "module:stable.test_p0_horse_production_apply_postgres"
+      ]
+    },
+    "server/stable/test_p0_racecard_url_discovery.py": {
+      "label": "stable.test_p0_racecard_url_discovery",
+      "domains": [
+        "module:stable.test_p0_racecard_url_discovery"
+      ]
+    },
+    "server/stable/test_pre_race_refresh.py": {
+      "label": "stable.test_pre_race_refresh",
+      "domains": [
+        "module:stable.test_pre_race_refresh"
+      ]
+    },
+    "server/stable/test_pre_race_review_fixes.py": {
+      "label": "stable.test_pre_race_review_fixes",
+      "domains": [
+        "module:stable.test_pre_race_review_fixes"
+      ]
+    },
+    "server/stable/test_production_audit_baseline.py": {
+      "label": "stable.test_production_audit_baseline",
+      "domains": [
+        "module:stable.test_production_audit_baseline"
+      ]
+    },
+    "server/stable/test_public_navigation_and_attribution.py": {
+      "label": "stable.test_public_navigation_and_attribution",
+      "domains": [
+        "horse_page"
+      ]
+    },
+    "server/stable/test_public_new_regions.py": {
+      "label": "stable.test_public_new_regions",
+      "domains": [
+        "module:stable.test_public_new_regions"
+      ]
+    },
+    "server/stable/test_public_term_consistency.py": {
+      "label": "stable.test_public_term_consistency",
+      "domains": [
+        "module:stable.test_public_term_consistency"
+      ]
+    },
+    "server/stable/test_publish_ready_backlog.py": {
+      "label": "stable.test_publish_ready_backlog",
+      "domains": [
+        "module:stable.test_publish_ready_backlog"
+      ]
+    },
+    "server/stable/test_race_calendar_default_date_window.py": {
+      "label": "stable.test_race_calendar_default_date_window",
+      "domains": [
+        "module:stable.test_race_calendar_default_date_window"
+      ]
+    },
+    "server/stable/test_race_calendar_ics_reconciliation.py": {
+      "label": "stable.test_race_calendar_ics_reconciliation",
+      "domains": [
+        "module:stable.test_race_calendar_ics_reconciliation"
+      ]
+    },
+    "server/stable/test_race_calendar_responsive_ui.py": {
+      "label": "stable.test_race_calendar_responsive_ui",
+      "domains": [
+        "module:stable.test_race_calendar_responsive_ui"
+      ]
+    },
+    "server/stable/test_race_coverage_queue.py": {
+      "label": "stable.test_race_coverage_queue",
+      "domains": [
+        "module:stable.test_race_coverage_queue"
+      ]
+    },
+    "server/stable/test_race_coverage_recovery.py": {
+      "label": "stable.test_race_coverage_recovery",
+      "domains": [
+        "module:stable.test_race_coverage_recovery"
+      ]
+    },
+    "server/stable/test_race_data_sync_admission.py": {
+      "label": "stable.test_race_data_sync_admission",
+      "domains": [
+        "module:stable.test_race_data_sync_admission"
+      ]
+    },
+    "server/stable/test_race_data_sync_alerts.py": {
+      "label": "stable.test_race_data_sync_alerts",
+      "domains": [
+        "module:stable.test_race_data_sync_alerts"
+      ]
+    },
+    "server/stable/test_race_data_sync_audit.py": {
+      "label": "stable.test_race_data_sync_audit",
+      "domains": [
+        "module:stable.test_race_data_sync_audit"
+      ]
+    },
+    "server/stable/test_race_data_sync_chain_e2e.py": {
+      "label": "stable.test_race_data_sync_chain_e2e",
+      "domains": [
+        "module:stable.test_race_data_sync_chain_e2e"
+      ]
+    },
+    "server/stable/test_race_data_sync_discovery.py": {
+      "label": "stable.test_race_data_sync_discovery",
+      "domains": [
+        "module:stable.test_race_data_sync_discovery"
+      ]
+    },
+    "server/stable/test_race_data_sync_lifecycle.py": {
+      "label": "stable.test_race_data_sync_lifecycle",
+      "domains": [
+        "module:stable.test_race_data_sync_lifecycle"
+      ]
+    },
+    "server/stable/test_race_data_sync_lifecycle_advance.py": {
+      "label": "stable.test_race_data_sync_lifecycle_advance",
+      "domains": [
+        "module:stable.test_race_data_sync_lifecycle_advance"
+      ]
+    },
+    "server/stable/test_race_data_sync_lifecycle_wiring.py": {
+      "label": "stable.test_race_data_sync_lifecycle_wiring",
+      "domains": [
+        "module:stable.test_race_data_sync_lifecycle_wiring"
+      ]
+    },
+    "server/stable/test_race_data_sync_pipeline_a.py": {
+      "label": "stable.test_race_data_sync_pipeline_a",
+      "domains": [
+        "module:stable.test_race_data_sync_pipeline_a"
+      ]
+    },
+    "server/stable/test_race_data_sync_pipeline_a_postgres.py": {
+      "label": "stable.test_race_data_sync_pipeline_a_postgres",
+      "domains": [
+        "module:stable.test_race_data_sync_pipeline_a_postgres"
+      ]
+    },
+    "server/stable/test_race_data_sync_policy.py": {
+      "label": "stable.test_race_data_sync_policy",
+      "domains": [
+        "module:stable.test_race_data_sync_policy"
+      ]
+    },
+    "server/stable/test_race_data_sync_policy_v2.py": {
+      "label": "stable.test_race_data_sync_policy_v2",
+      "domains": [
+        "module:stable.test_race_data_sync_policy_v2"
+      ]
+    },
+    "server/stable/test_race_data_sync_providers.py": {
+      "label": "stable.test_race_data_sync_providers",
+      "domains": [
+        "module:stable.test_race_data_sync_providers"
+      ]
+    },
+    "server/stable/test_race_data_sync_r0.py": {
+      "label": "stable.test_race_data_sync_r0",
+      "domains": [
+        "module:stable.test_race_data_sync_r0"
+      ]
+    },
+    "server/stable/test_race_data_sync_r0_postgres.py": {
+      "label": "stable.test_race_data_sync_r0_postgres",
+      "domains": [
+        "module:stable.test_race_data_sync_r0_postgres"
+      ]
+    },
+    "server/stable/test_race_data_sync_repair.py": {
+      "label": "stable.test_race_data_sync_repair",
+      "domains": [
+        "module:stable.test_race_data_sync_repair"
+      ]
+    },
+    "server/stable/test_race_data_sync_result_admission.py": {
+      "label": "stable.test_race_data_sync_result_admission",
+      "domains": [
+        "race_results"
+      ]
+    },
+    "server/stable/test_race_data_sync_results.py": {
+      "label": "stable.test_race_data_sync_results",
+      "domains": [
+        "race_results"
+      ]
+    },
+    "server/stable/test_race_display_name_translation_2026.py": {
+      "label": "stable.test_race_display_name_translation_2026",
+      "domains": [
+        "module:stable.test_race_display_name_translation_2026"
+      ]
+    },
+    "server/stable/test_race_event_coverage_reconciliation.py": {
+      "label": "stable.test_race_event_coverage_reconciliation",
+      "domains": [
+        "module:stable.test_race_event_coverage_reconciliation"
+      ]
+    },
+    "server/stable/test_race_event_crawl_orchestration.py": {
+      "label": "stable.test_race_event_crawl_orchestration",
+      "domains": [
+        "module:stable.test_race_event_crawl_orchestration"
+      ]
+    },
+    "server/stable/test_race_event_distance_display.py": {
+      "label": "stable.test_race_event_distance_display",
+      "domains": [
+        "module:stable.test_race_event_distance_display"
+      ]
+    },
+    "server/stable/test_race_event_lifecycle.py": {
+      "label": "stable.test_race_event_lifecycle",
+      "domains": [
+        "module:stable.test_race_event_lifecycle"
+      ]
+    },
+    "server/stable/test_race_event_lifecycle_enrollment_postgres.py": {
+      "label": "stable.test_race_event_lifecycle_enrollment_postgres",
+      "domains": [
+        "module:stable.test_race_event_lifecycle_enrollment_postgres"
+      ]
+    },
+    "server/stable/test_race_event_lifecycle_postgres.py": {
+      "label": "stable.test_race_event_lifecycle_postgres",
+      "domains": [
+        "module:stable.test_race_event_lifecycle_postgres"
+      ]
+    },
+    "server/stable/test_race_event_source_cache.py": {
+      "label": "stable.test_race_event_source_cache",
+      "domains": [
+        "module:stable.test_race_event_source_cache"
+      ]
+    },
+    "server/stable/test_race_event_years.py": {
+      "label": "stable.test_race_event_years",
+      "domains": [
+        "module:stable.test_race_event_years"
+      ]
+    },
+    "server/stable/test_race_information_display.py": {
+      "label": "stable.test_race_information_display",
+      "domains": [
+        "module:stable.test_race_information_display"
+      ]
+    },
+    "server/stable/test_race_information_display_pages.py": {
+      "label": "stable.test_race_information_display_pages",
+      "domains": [
+        "module:stable.test_race_information_display_pages"
+      ]
+    },
+    "server/stable/test_race_information_preview.py": {
+      "label": "stable.test_race_information_preview",
+      "domains": [
+        "module:stable.test_race_information_preview"
+      ]
+    },
+    "server/stable/test_race_live_gate_remediation.py": {
+      "label": "stable.test_race_live_gate_remediation",
+      "domains": [
+        "module:stable.test_race_live_gate_remediation"
+      ]
+    },
+    "server/stable/test_race_live_gate_remediation_postgres.py": {
+      "label": "stable.test_race_live_gate_remediation_postgres",
+      "domains": [
+        "module:stable.test_race_live_gate_remediation_postgres"
+      ]
+    },
+    "server/stable/test_race_live_initialization.py": {
+      "label": "stable.test_race_live_initialization",
+      "domains": [
+        "module:stable.test_race_live_initialization"
+      ]
+    },
+    "server/stable/test_race_live_initialization_postgres.py": {
+      "label": "stable.test_race_live_initialization_postgres",
+      "domains": [
+        "module:stable.test_race_live_initialization_postgres"
+      ]
+    },
+    "server/stable/test_race_live_initialization_v2.py": {
+      "label": "stable.test_race_live_initialization_v2",
+      "domains": [
+        "module:stable.test_race_live_initialization_v2"
+      ]
+    },
+    "server/stable/test_race_live_manual_official_evidence.py": {
+      "label": "stable.test_race_live_manual_official_evidence",
+      "domains": [
+        "module:stable.test_race_live_manual_official_evidence"
+      ]
+    },
+    "server/stable/test_race_live_multiregion_pipeline.py": {
+      "label": "stable.test_race_live_multiregion_pipeline",
+      "domains": [
+        "module:stable.test_race_live_multiregion_pipeline"
+      ]
+    },
+    "server/stable/test_race_live_multiregion_selector.py": {
+      "label": "stable.test_race_live_multiregion_selector",
+      "domains": [
+        "module:stable.test_race_live_multiregion_selector"
+      ]
+    },
+    "server/stable/test_race_live_official_publication.py": {
+      "label": "stable.test_race_live_official_publication",
+      "domains": [
+        "race_results"
+      ]
+    },
+    "server/stable/test_race_live_p0_deployment_contract.py": {
+      "label": "stable.test_race_live_p0_deployment_contract",
+      "domains": [
+        "module:stable.test_race_live_p0_deployment_contract"
+      ]
+    },
+    "server/stable/test_race_live_publication_transition.py": {
+      "label": "stable.test_race_live_publication_transition",
+      "domains": [
+        "module:stable.test_race_live_publication_transition"
+      ]
+    },
+    "server/stable/test_race_live_publication_transition_postgres.py": {
+      "label": "stable.test_race_live_publication_transition_postgres",
+      "domains": [
+        "module:stable.test_race_live_publication_transition_postgres"
+      ]
+    },
+    "server/stable/test_race_live_racecard_sync.py": {
+      "label": "stable.test_race_live_racecard_sync",
+      "domains": [
+        "module:stable.test_race_live_racecard_sync"
+      ]
+    },
+    "server/stable/test_race_live_rollback_contract.py": {
+      "label": "stable.test_race_live_rollback_contract",
+      "domains": [
+        "module:stable.test_race_live_rollback_contract"
+      ]
+    },
+    "server/stable/test_race_live_sla_monitor.py": {
+      "label": "stable.test_race_live_sla_monitor",
+      "domains": [
+        "module:stable.test_race_live_sla_monitor"
+      ]
+    },
+    "server/stable/test_race_live_source_proof.py": {
+      "label": "stable.test_race_live_source_proof",
+      "domains": [
+        "module:stable.test_race_live_source_proof"
+      ]
+    },
+    "server/stable/test_race_live_target_eligibility.py": {
+      "label": "stable.test_race_live_target_eligibility",
+      "domains": [
+        "module:stable.test_race_live_target_eligibility"
+      ]
+    },
+    "server/stable/test_race_multisource_conversion.py": {
+      "label": "stable.test_race_multisource_conversion",
+      "domains": [
+        "module:stable.test_race_multisource_conversion"
+      ]
+    },
+    "server/stable/test_race_multisource_coverage.py": {
+      "label": "stable.test_race_multisource_coverage",
+      "domains": [
+        "module:stable.test_race_multisource_coverage"
+      ]
+    },
+    "server/stable/test_race_multisource_enrollment.py": {
+      "label": "stable.test_race_multisource_enrollment",
+      "domains": [
+        "module:stable.test_race_multisource_enrollment"
+      ]
+    },
+    "server/stable/test_race_multisource_identity.py": {
+      "label": "stable.test_race_multisource_identity",
+      "domains": [
+        "module:stable.test_race_multisource_identity"
+      ]
+    },
+    "server/stable/test_race_multisource_jra.py": {
+      "label": "stable.test_race_multisource_jra",
+      "domains": [
+        "race_parser"
+      ]
+    },
+    "server/stable/test_race_multisource_postgres.py": {
+      "label": "stable.test_race_multisource_postgres",
+      "domains": [
+        "module:stable.test_race_multisource_postgres"
+      ]
+    },
+    "server/stable/test_race_multisource_regions.py": {
+      "label": "stable.test_race_multisource_regions",
+      "domains": [
+        "module:stable.test_race_multisource_regions"
+      ]
+    },
+    "server/stable/test_race_name_handicap_cleanup.py": {
+      "label": "stable.test_race_name_handicap_cleanup",
+      "domains": [
+        "module:stable.test_race_name_handicap_cleanup"
+      ]
+    },
+    "server/stable/test_race_news_exposure.py": {
+      "label": "stable.test_race_news_exposure",
+      "domains": [
+        "module:stable.test_race_news_exposure"
+      ]
+    },
+    "server/stable/test_race_pre_race.py": {
+      "label": "stable.test_race_pre_race",
+      "domains": [
+        "module:stable.test_race_pre_race"
+      ]
+    },
+    "server/stable/test_race_public_coverage.py": {
+      "label": "stable.test_race_public_coverage",
+      "domains": [
+        "module:stable.test_race_public_coverage"
+      ]
+    },
+    "server/stable/test_race_public_time.py": {
+      "label": "stable.test_race_public_time",
+      "domains": [
+        "module:stable.test_race_public_time"
+      ]
+    },
+    "server/stable/test_race_reference_management_commands.py": {
+      "label": "stable.test_race_reference_management_commands",
+      "domains": [
+        "module:stable.test_race_reference_management_commands"
+      ]
+    },
+    "server/stable/test_race_reference_sources.py": {
+      "label": "stable.test_race_reference_sources",
+      "domains": [
+        "race_parser"
+      ]
+    },
+    "server/stable/test_race_reference_sources_postgres.py": {
+      "label": "stable.test_race_reference_sources_postgres",
+      "domains": [
+        "module:stable.test_race_reference_sources_postgres"
+      ]
+    },
+    "server/stable/test_race_result_recovery_integration.py": {
+      "label": "stable.test_race_result_recovery_integration",
+      "domains": [
+        "race_results"
+      ]
+    },
+    "server/stable/test_race_section_gaps.py": {
+      "label": "stable.test_race_section_gaps",
+      "domains": [
+        "module:stable.test_race_section_gaps"
+      ]
+    },
+    "server/stable/test_race_section_identity_repair.py": {
+      "label": "stable.test_race_section_identity_repair",
+      "domains": [
+        "module:stable.test_race_section_identity_repair"
+      ]
+    },
+    "server/stable/test_race_series_identity_2026_review.py": {
+      "label": "stable.test_race_series_identity_2026_review",
+      "domains": [
+        "module:stable.test_race_series_identity_2026_review"
+      ]
+    },
+    "server/stable/test_race_series_identity_2026_review_postgres.py": {
+      "label": "stable.test_race_series_identity_2026_review_postgres",
+      "domains": [
+        "module:stable.test_race_series_identity_2026_review_postgres"
+      ]
+    },
+    "server/stable/test_race_series_identity_review.py": {
+      "label": "stable.test_race_series_identity_review",
+      "domains": [
+        "module:stable.test_race_series_identity_review"
+      ]
+    },
+    "server/stable/test_racing_api_exclusive_account_preflight.py": {
+      "label": "stable.test_racing_api_exclusive_account_preflight",
+      "domains": [
+        "module:stable.test_racing_api_exclusive_account_preflight"
+      ]
+    },
+    "server/stable/test_racing_api_horse_identity_models.py": {
+      "label": "stable.test_racing_api_horse_identity_models",
+      "domains": [
+        "module:stable.test_racing_api_horse_identity_models"
+      ]
+    },
+    "server/stable/test_racing_api_horse_staging.py": {
+      "label": "stable.test_racing_api_horse_staging",
+      "domains": [
+        "module:stable.test_racing_api_horse_staging"
+      ]
+    },
+    "server/stable/test_racing_api_horse_staging_migration.py": {
+      "label": "stable.test_racing_api_horse_staging_migration",
+      "domains": [
+        "module:stable.test_racing_api_horse_staging_migration"
+      ]
+    },
+    "server/stable/test_racing_api_horse_staging_postgresql.py": {
+      "label": "stable.test_racing_api_horse_staging_postgresql",
+      "domains": [
+        "module:stable.test_racing_api_horse_staging_postgresql"
+      ]
+    },
+    "server/stable/test_racing_australia_graded_catalog.py": {
+      "label": "stable.test_racing_australia_graded_catalog",
+      "domains": [
+        "module:stable.test_racing_australia_graded_catalog"
+      ]
+    },
+    "server/stable/test_realtime_race_results.py": {
+      "label": "stable.test_realtime_race_results",
+      "domains": [
+        "race_parser"
+      ]
+    },
+    "server/stable/test_realtime_race_results_postgres.py": {
+      "label": "stable.test_realtime_race_results_postgres",
+      "domains": [
+        "module:stable.test_realtime_race_results_postgres"
+      ]
+    },
+    "server/stable/test_refresh_race_calendar.py": {
+      "label": "stable.test_refresh_race_calendar",
+      "domains": [
+        "module:stable.test_refresh_race_calendar"
+      ]
+    },
+    "server/stable/test_release_0077_recovery_manifest.py": {
+      "label": "stable.test_release_0077_recovery_manifest",
+      "domains": [
+        "module:stable.test_release_0077_recovery_manifest"
+      ]
+    },
+    "server/stable/test_release_0078_entrypoints.py": {
+      "label": "stable.test_release_0078_entrypoints",
+      "domains": [
+        "release"
+      ]
+    },
+    "server/stable/test_release_0078_recovery.py": {
+      "label": "stable.test_release_0078_recovery",
+      "domains": [
+        "release"
+      ]
+    },
+    "server/stable/test_release_0078_recovery_postgres.py": {
+      "label": "stable.test_release_0078_recovery_postgres",
+      "domains": [
+        "release"
+      ]
+    },
+    "server/stable/test_release_0079.py": {
+      "label": "stable.test_release_0079",
+      "domains": [
+        "release"
+      ]
+    },
+    "server/stable/test_release_commit.py": {
+      "label": "stable.test_release_commit",
+      "domains": [
+        "module:stable.test_release_commit"
+      ]
+    },
+    "server/stable/test_single_migration_owner.py": {
+      "label": "stable.test_single_migration_owner",
+      "domains": [
+        "module:stable.test_single_migration_owner"
+      ]
+    },
+    "server/stable/test_stage_racing_api_targeted_batch_command.py": {
+      "label": "stable.test_stage_racing_api_targeted_batch_command",
+      "domains": [
+        "module:stable.test_stage_racing_api_targeted_batch_command"
+      ]
+    },
+    "server/stable/test_term_gate_reprocessing.py": {
+      "label": "stable.test_term_gate_reprocessing",
+      "domains": [
+        "news_translation"
+      ]
+    },
+    "server/stable/test_tjcis_ics_catalog.py": {
+      "label": "stable.test_tjcis_ics_catalog",
+      "domains": [
+        "module:stable.test_tjcis_ics_catalog"
+      ]
+    },
+    "server/stable/test_translation_failure_recovery_change.py": {
+      "label": "stable.test_translation_failure_recovery_change",
+      "domains": [
+        "news_translation"
+      ]
+    },
+    "server/stable/test_verify_calendar_gap_rows.py": {
+      "label": "stable.test_verify_calendar_gap_rows",
+      "domains": [
+        "module:stable.test_verify_calendar_gap_rows"
+      ]
+    },
+    "server/stable/tests/__init__.py": {
+      "label": "stable.tests_legacy",
+      "domains": [
+        "module:stable.tests_legacy"
+      ]
+    },
+    "server/stable/tests/test_backup_operations_contract.py": {
+      "label": "stable.tests.test_backup_operations_contract",
+      "domains": [
+        "module:stable.tests.test_backup_operations_contract"
+      ]
+    },
+    "server/stable/tests/test_lifecycle_enforce_canary.py": {
+      "label": "stable.tests.test_lifecycle_enforce_canary",
+      "domains": [
+        "module:stable.tests.test_lifecycle_enforce_canary"
+      ]
+    },
+    "server/stable/tests/test_lifecycle_enforce_canary_application.py": {
+      "label": "stable.tests.test_lifecycle_enforce_canary_application",
+      "domains": [
+        "module:stable.tests.test_lifecycle_enforce_canary_application"
+      ]
+    },
+    "server/stable/tests/test_lifecycle_enforce_canary_operations.py": {
+      "label": "stable.tests.test_lifecycle_enforce_canary_operations",
+      "domains": [
+        "module:stable.tests.test_lifecycle_enforce_canary_operations"
+      ]
+    },
+    "server/stable/tests/test_lifecycle_enforce_canary_postgres.py": {
+      "label": "stable.tests.test_lifecycle_enforce_canary_postgres",
+      "domains": [
+        "module:stable.tests.test_lifecycle_enforce_canary_postgres"
+      ]
+    },
+    "server/stable/tests/test_lifecycle_enforce_full_cohort.py": {
+      "label": "stable.tests.test_lifecycle_enforce_full_cohort",
+      "domains": [
+        "module:stable.tests.test_lifecycle_enforce_full_cohort"
+      ]
+    },
+    "server/stable/tests/test_lifecycle_enforce_full_cohort_operations.py": {
+      "label": "stable.tests.test_lifecycle_enforce_full_cohort_operations",
+      "domains": [
+        "module:stable.tests.test_lifecycle_enforce_full_cohort_operations"
+      ]
+    },
+    "server/stable/tests/test_lifecycle_enforce_full_cohort_postgres.py": {
+      "label": "stable.tests.test_lifecycle_enforce_full_cohort_postgres",
+      "domains": [
+        "module:stable.tests.test_lifecycle_enforce_full_cohort_postgres"
+      ]
+    },
+    "server/stable/tests/test_management_command.py": {
+      "label": "stable.tests.test_management_command",
+      "domains": [
+        "module:stable.tests.test_management_command"
+      ]
+    },
+    "server/stable/tests/test_models_migrations.py": {
+      "label": "stable.tests.test_models_migrations",
+      "domains": [
+        "module:stable.tests.test_models_migrations"
+      ]
+    },
+    "server/stable/tests/test_nginx_production_contract.py": {
+      "label": "stable.tests.test_nginx_production_contract",
+      "domains": [
+        "module:stable.tests.test_nginx_production_contract"
+      ]
+    },
+    "server/stable/tests/test_page_regression.py": {
+      "label": "stable.tests.test_page_regression",
+      "domains": [
+        "module:stable.tests.test_page_regression"
+      ]
+    },
+    "server/stable/tests/test_race_event_lifecycle_enrollment.py": {
+      "label": "stable.tests.test_race_event_lifecycle_enrollment",
+      "domains": [
+        "module:stable.tests.test_race_event_lifecycle_enrollment"
+      ]
+    },
+    "server/stable/tests/test_race_field_normalization.py": {
+      "label": "stable.tests.test_race_field_normalization",
+      "domains": [
+        "module:stable.tests.test_race_field_normalization"
+      ]
+    },
+    "server/stable/tests/test_race_result_recovery_application_commands.py": {
+      "label": "stable.tests.test_race_result_recovery_application_commands",
+      "domains": [
+        "module:stable.tests.test_race_result_recovery_application_commands"
+      ]
+    },
+    "server/stable/tests/test_race_result_recovery_application_inventory.py": {
+      "label": "stable.tests.test_race_result_recovery_application_inventory",
+      "domains": [
+        "module:stable.tests.test_race_result_recovery_application_inventory"
+      ]
+    },
+    "server/stable/tests/test_race_result_recovery_application_pages.py": {
+      "label": "stable.tests.test_race_result_recovery_application_pages",
+      "domains": [
+        "module:stable.tests.test_race_result_recovery_application_pages"
+      ]
+    },
+    "server/stable/tests/test_race_result_recovery_application_postgres.py": {
+      "label": "stable.tests.test_race_result_recovery_application_postgres",
+      "domains": [
+        "module:stable.tests.test_race_result_recovery_application_postgres"
+      ]
+    },
+    "server/stable/tests/test_race_result_recovery_application_projection.py": {
+      "label": "stable.tests.test_race_result_recovery_application_projection",
+      "domains": [
+        "module:stable.tests.test_race_result_recovery_application_projection"
+      ]
+    },
+    "server/stable/tests/test_reviewed_gap_backfill.py": {
+      "label": "stable.tests.test_reviewed_gap_backfill",
+      "domains": [
+        "module:stable.tests.test_reviewed_gap_backfill"
+      ]
+    },
+    "server/stable/tests/test_reviewed_pre_race.py": {
+      "label": "stable.tests.test_reviewed_pre_race",
+      "domains": [
+        "module:stable.tests.test_reviewed_pre_race"
+      ]
+    },
+    "server/stable/tests/test_scheduled_race_result_review_contracts.py": {
+      "label": "stable.tests.test_scheduled_race_result_review_contracts",
+      "domains": [
+        "module:stable.tests.test_scheduled_race_result_review_contracts"
+      ]
+    },
+    "server/stable/tests/test_scheduled_race_result_review_postgres.py": {
+      "label": "stable.tests.test_scheduled_race_result_review_postgres",
+      "domains": [
+        "module:stable.tests.test_scheduled_race_result_review_postgres"
+      ]
+    },
+    "server/stable/tests/test_stats_business_logic.py": {
+      "label": "stable.tests.test_stats_business_logic",
+      "domains": [
+        "module:stable.tests.test_stats_business_logic"
+      ]
+    },
+    "server/stable/tests/test_term_display.py": {
+      "label": "stable.tests.test_term_display",
+      "domains": [
+        "module:stable.tests.test_term_display"
+      ]
+    },
+    "server/stable/tests/test_write_paths.py": {
+      "label": "stable.tests.test_write_paths",
+      "domains": [
+        "module:stable.tests.test_write_paths"
+      ]
+    },
+    "server/stable/tests_legacy.py": {
+      "label": "stable.tests_legacy",
+      "domains": [
+        "module:stable.tests_legacy"
+      ]
+    },
+    "scripts/tests/test_impact_git.py": {
+      "label": "scripts.tests.test_impact_git",
+      "domains": [
+        "infrastructure"
+      ]
+    },
+    "scripts/tests/test_impact_delivery.py": {
+      "label": "scripts.tests.test_impact_delivery",
+      "domains": [
+        "infrastructure"
+      ]
+    },
+    "server/stable/test_impact_core.py": {
+      "label": "stable.test_impact_core",
+      "domains": [
+        "core"
+      ]
+    },
+    "scripts/tests/test_impact_evolution.py": {
+      "label": "scripts.tests.test_impact_evolution",
+      "domains": [
+        "infrastructure"
+      ]
+    },
+    "scripts/tests/test_impact_verifier_e2e.py": {
+      "label": "scripts.tests.test_impact_verifier_e2e",
+      "domains": [
+        "infrastructure"
+      ]
+    }
+  },
+  "profiles": {
+    "test_graded_race_participants_workflow": "python",
+    "test_workflow_contract": "python",
+    "runtime.research.test_audit_france_galop_bulletin_occurrences": "python",
+    "runtime.research.test_audit_graded_horse_artifact": "python",
+    "runtime.research.test_audit_hri_graded_winner_candidates": "python",
+    "runtime.research.test_audit_legacy_historical_detail_bundle": "python",
+    "runtime.research.test_audit_racing_api_bulk_partition_readiness": "python",
+    "runtime.research.test_audit_stable_id_enrichment_readiness": "python",
+    "runtime.research.test_build_graded_race_completion_bundle": "python",
+    "runtime.research.test_build_held_actual_starter_census": "python",
+    "runtime.research.test_build_official_graded_race_manifest": "python",
+    "runtime.research.test_build_p0_participant_completion_batches": "python",
+    "runtime.research.test_build_stable_id_reconciliation_coverage": "python",
+    "runtime.research.test_build_target_runner_stable_id_ledger": "python",
+    "runtime.research.test_capture_netkeiba_manual_result_reference": "python",
+    "runtime.research.test_capture_racing_api_host_process_preflight": "python",
+    "runtime.research.test_capture_racing_api_openapi_fingerprint": "python",
+    "runtime.research.test_collect_graded_race_participants": "python",
+    "runtime.research.test_collect_graded_race_participants_hurdles": "python",
+    "runtime.research.test_collect_graded_race_participants_integrity_contract": "python",
+    "runtime.research.test_collect_official_graded_race_results": "python",
+    "runtime.research.test_extract_official_targeted_horse_seed_delta": "python",
+    "runtime.research.test_extract_targeted_horse_seed_execution_delta": "python",
+    "runtime.research.test_materialize_racing_api_targeted_batch": "python",
+    "runtime.research.test_merge_official_targeted_horse_seed_supplements": "python",
+    "runtime.research.test_merge_target_runner_stable_id_ledgers": "python",
+    "runtime.research.test_official_graded_race_sources": "python",
+    "runtime.research.test_p0_participant_execution_ledger": "python",
+    "runtime.research.test_prepare_bha_pattern_book_winner_candidates": "python",
+    "runtime.research.test_prepare_external_result_actual_starter_census": "python",
+    "runtime.research.test_prepare_france_galop_bulletin_occurrences": "python",
+    "runtime.research.test_prepare_graded_winner_source_events": "python",
+    "runtime.research.test_prepare_graded_winner_targeted_seeds": "python",
+    "runtime.research.test_prepare_held_census_tra_reconciliation": "python",
+    "runtime.research.test_prepare_held_winner_seed_extension": "python",
+    "runtime.research.test_prepare_hri_graded_winner_candidates": "python",
+    "runtime.research.test_prepare_hri_unmatched_official_targeted_seeds": "python",
+    "runtime.research.test_prepare_racing_api_bulk_range_batch_plan": "python",
+    "runtime.research.test_prepare_racing_api_stable_id_enrichment_batch_plan": "python",
+    "runtime.research.test_prepare_racing_api_targeted_batch_plan": "python",
+    "runtime.research.test_prepare_racing_australia_graded_catalog": "python",
+    "runtime.research.test_publish_held_census_tra_reconciliation_approval": "python",
+    "runtime.research.test_racing_api_account_budget": "python",
+    "runtime.research.test_racing_api_bulk_range_batch_export": "python",
+    "runtime.research.test_racing_api_bulk_range_execution_ledger": "python",
+    "runtime.research.test_racing_api_bulk_results_export": "python",
+    "runtime.research.test_racing_api_content_pool": "python",
+    "runtime.research.test_racing_api_horse_export": "python",
+    "runtime.research.test_racing_api_targeted_batch_execution_ledger": "python",
+    "runtime.research.test_racing_api_targeted_batch_export": "python",
+    "runtime.research.test_validate_official_graded_race_package": "python",
+    "scripts.tests.test_bounded_stable_tests": "python",
+    "scripts.tests.test_research_synthetic": "python",
+    "scripts.tests.test_test_impact": "python",
+    "stable.test_attribution_gold_review": "django",
+    "stable.test_australia_race_details": "django",
+    "stable.test_backfill_article_race_links": "django",
+    "stable.test_bind_historical_gap_candidates": "django",
+    "stable.test_contextual_news_entities": "django",
+    "stable.test_current_year_race_apply_descriptor": "django",
+    "stable.test_current_year_race_due_checks": "django",
+    "stable.test_deutscher_galopp_calendar": "django",
+    "stable.test_deutscher_galopp_race_details": "django",
+    "stable.test_diff_race_calendar": "django",
+    "stable.test_editorial_headlines": "django",
+    "stable.test_english_term_context_gates": "django",
+    "stable.test_era_race_details": "django",
+    "stable.test_extended_racing_regions": "django",
+    "stable.test_external_english_horse_context_gate": "django",
+    "stable.test_france_news_freshness_change": "django",
+    "stable.test_historical_batch_pipeline": "django",
+    "stable.test_historical_batch_runner_change": "django",
+    "stable.test_historical_batch_runner_postgres": "django",
+    "stable.test_historical_calendar_release_a_postgres": "django",
+    "stable.test_historical_calendar_release_b": "django",
+    "stable.test_historical_calendar_review_fixes": "django",
+    "stable.test_historical_calendar_runner_helpers": "django",
+    "stable.test_historical_jra_legacy_details": "django",
+    "stable.test_historical_race_batches": "django",
+    "stable.test_historical_race_cached_details": "django",
+    "stable.test_historical_race_calendar_integrity": "django",
+    "stable.test_historical_race_calendar_integrity_tooling": "django",
+    "stable.test_historical_race_calendar_pipeline": "django",
+    "stable.test_historical_race_catalog_adapters": "django",
+    "stable.test_historical_race_coverage_policy": "django",
+    "stable.test_historical_race_date_discovery": "django",
+    "stable.test_historical_race_detail_chunk_import": "django",
+    "stable.test_historical_race_detail_direct_urls": "django",
+    "stable.test_historical_race_detail_distance_metadata": "django",
+    "stable.test_historical_race_detail_http_budget": "django",
+    "stable.test_historical_race_detail_import_packager": "django",
+    "stable.test_historical_race_detail_import_primitives": "django",
+    "stable.test_historical_race_detail_import_receipt": "django",
+    "stable.test_historical_race_detail_runner_v2_contract": "django",
+    "stable.test_historical_race_detail_runner_v2_package_identity": "django",
+    "stable.test_historical_race_detail_runner_v2_review_findings": "django",
+    "stable.test_historical_race_detail_runner_v2_validation_gaps": "django",
+    "stable.test_historical_race_detail_sources": "django",
+    "stable.test_historical_race_inventory_models": "django",
+    "stable.test_historical_race_inventory_service": "django",
+    "stable.test_historical_race_network_logging": "django",
+    "stable.test_historical_race_publication_command": "django",
+    "stable.test_historical_race_source_discovery_gap_packager": "django",
+    "stable.test_historical_race_source_discovery_tools": "django",
+    "stable.test_historical_race_sportinglife_url_discovery": "django",
+    "stable.test_hkjc_season_gap_candidates": "django",
+    "stable.test_horse_profile_publish": "django",
+    "stable.test_hri_pattern_calendar": "django",
+    "stable.test_hri_ras_race_details": "django",
+    "stable.test_hrn_source_term_translation": "django",
+    "stable.test_ireland_tra_route_policy": "django",
+    "stable.test_japanese_racing_translation_normalization": "django",
+    "stable.test_jcsa_race_details": "django",
+    "stable.test_jra_race_detail_year_param": "django",
+    "stable.test_lifecycle_shadow_hardening": "django",
+    "stable.test_materialize_dated_race_targets": "django",
+    "stable.test_middle_east_calendar": "django",
+    "stable.test_migration_database_helpers": "django",
+    "stable.test_migration_database_isolation": "django",
+    "stable.test_migration_history_repair": "django",
+    "stable.test_migration_history_repair_postgres": "django",
+    "stable.test_multiregion_attribution_change": "django",
+    "stable.test_multiregion_rollout_change": "django",
+    "stable.test_nar_racelist_events": "django",
+    "stable.test_new_region_detail_wiring": "django",
+    "stable.test_news_body_history": "django",
+    "stable.test_news_content_boundaries": "django",
+    "stable.test_news_production_integrity": "django",
+    "stable.test_nsa_race_segmentation": "django",
+    "stable.test_p0_horse_candidate_extraction": "django",
+    "stable.test_p0_horse_career_history": "django",
+    "stable.test_p0_horse_completion_adapters": "django",
+    "stable.test_p0_horse_completion_batch": "django",
+    "stable.test_p0_horse_completion_source_clients": "django",
+    "stable.test_p0_horse_identity_bootstrap": "django",
+    "stable.test_p0_horse_identity_enrichment": "django",
+    "stable.test_p0_horse_migrations_postgres": "django",
+    "stable.test_p0_horse_netkeiba_client": "django",
+    "stable.test_p0_horse_participant_batch_contract": "django",
+    "stable.test_p0_horse_participant_release": "django",
+    "stable.test_p0_horse_production_apply": "django",
+    "stable.test_p0_horse_production_apply_postgres": "django",
+    "stable.test_p0_racecard_url_discovery": "django",
+    "stable.test_pre_race_refresh": "django",
+    "stable.test_pre_race_review_fixes": "django",
+    "stable.test_production_audit_baseline": "django",
+    "stable.test_public_navigation_and_attribution": "django",
+    "stable.test_public_new_regions": "django",
+    "stable.test_public_term_consistency": "django",
+    "stable.test_publish_ready_backlog": "django",
+    "stable.test_race_calendar_default_date_window": "django",
+    "stable.test_race_calendar_ics_reconciliation": "django",
+    "stable.test_race_calendar_responsive_ui": "django",
+    "stable.test_race_coverage_queue": "django",
+    "stable.test_race_coverage_recovery": "django",
+    "stable.test_race_data_sync_admission": "django",
+    "stable.test_race_data_sync_alerts": "django",
+    "stable.test_race_data_sync_audit": "django",
+    "stable.test_race_data_sync_chain_e2e": "django",
+    "stable.test_race_data_sync_discovery": "django",
+    "stable.test_race_data_sync_lifecycle": "django",
+    "stable.test_race_data_sync_lifecycle_advance": "django",
+    "stable.test_race_data_sync_lifecycle_wiring": "django",
+    "stable.test_race_data_sync_pipeline_a": "django",
+    "stable.test_race_data_sync_pipeline_a_postgres": "django",
+    "stable.test_race_data_sync_policy": "django",
+    "stable.test_race_data_sync_policy_v2": "django",
+    "stable.test_race_data_sync_providers": "django",
+    "stable.test_race_data_sync_r0": "django",
+    "stable.test_race_data_sync_r0_postgres": "django",
+    "stable.test_race_data_sync_repair": "django",
+    "stable.test_race_data_sync_result_admission": "django",
+    "stable.test_race_data_sync_results": "django",
+    "stable.test_race_display_name_translation_2026": "django",
+    "stable.test_race_event_coverage_reconciliation": "django",
+    "stable.test_race_event_crawl_orchestration": "django",
+    "stable.test_race_event_distance_display": "django",
+    "stable.test_race_event_lifecycle": "django",
+    "stable.test_race_event_lifecycle_enrollment_postgres": "django",
+    "stable.test_race_event_lifecycle_postgres": "django",
+    "stable.test_race_event_source_cache": "django",
+    "stable.test_race_event_years": "django",
+    "stable.test_race_information_display": "django",
+    "stable.test_race_information_display_pages": "django",
+    "stable.test_race_information_preview": "django",
+    "stable.test_race_live_gate_remediation": "django",
+    "stable.test_race_live_gate_remediation_postgres": "django",
+    "stable.test_race_live_initialization": "django",
+    "stable.test_race_live_initialization_postgres": "django",
+    "stable.test_race_live_initialization_v2": "django",
+    "stable.test_race_live_manual_official_evidence": "django",
+    "stable.test_race_live_multiregion_pipeline": "django",
+    "stable.test_race_live_multiregion_selector": "django",
+    "stable.test_race_live_official_publication": "django",
+    "stable.test_race_live_p0_deployment_contract": "django",
+    "stable.test_race_live_publication_transition": "django",
+    "stable.test_race_live_publication_transition_postgres": "django",
+    "stable.test_race_live_racecard_sync": "django",
+    "stable.test_race_live_rollback_contract": "django",
+    "stable.test_race_live_sla_monitor": "django",
+    "stable.test_race_live_source_proof": "django",
+    "stable.test_race_live_target_eligibility": "django",
+    "stable.test_race_multisource_conversion": "django",
+    "stable.test_race_multisource_coverage": "django",
+    "stable.test_race_multisource_enrollment": "django",
+    "stable.test_race_multisource_identity": "django",
+    "stable.test_race_multisource_jra": "django",
+    "stable.test_race_multisource_postgres": "django",
+    "stable.test_race_multisource_regions": "django",
+    "stable.test_race_name_handicap_cleanup": "django",
+    "stable.test_race_news_exposure": "django",
+    "stable.test_race_pre_race": "django",
+    "stable.test_race_public_coverage": "django",
+    "stable.test_race_public_time": "django",
+    "stable.test_race_reference_management_commands": "django",
+    "stable.test_race_reference_sources": "django",
+    "stable.test_race_reference_sources_postgres": "django",
+    "stable.test_race_result_recovery_integration": "django",
+    "stable.test_race_section_gaps": "django",
+    "stable.test_race_section_identity_repair": "django",
+    "stable.test_race_series_identity_2026_review": "django",
+    "stable.test_race_series_identity_2026_review_postgres": "django",
+    "stable.test_race_series_identity_review": "django",
+    "stable.test_racing_api_exclusive_account_preflight": "django",
+    "stable.test_racing_api_horse_identity_models": "django",
+    "stable.test_racing_api_horse_staging": "django",
+    "stable.test_racing_api_horse_staging_migration": "django",
+    "stable.test_racing_api_horse_staging_postgresql": "django",
+    "stable.test_racing_australia_graded_catalog": "django",
+    "stable.test_realtime_race_results": "django",
+    "stable.test_realtime_race_results_postgres": "django",
+    "stable.test_refresh_race_calendar": "django",
+    "stable.test_release_0077_recovery_manifest": "django",
+    "stable.test_release_0078_entrypoints": "release-postgres",
+    "stable.test_release_0078_recovery": "release-postgres",
+    "stable.test_release_0078_recovery_postgres": "release-postgres",
+    "stable.test_release_0079": "django",
+    "stable.test_release_commit": "django",
+    "stable.test_single_migration_owner": "django",
+    "stable.test_stage_racing_api_targeted_batch_command": "django",
+    "stable.test_term_gate_reprocessing": "django",
+    "stable.test_tjcis_ics_catalog": "django",
+    "stable.test_translation_failure_recovery_change": "django",
+    "stable.test_verify_calendar_gap_rows": "django",
+    "stable.tests_legacy": "django",
+    "stable.tests.test_backup_operations_contract": "django",
+    "stable.tests.test_lifecycle_enforce_canary": "django",
+    "stable.tests.test_lifecycle_enforce_canary_application": "django",
+    "stable.tests.test_lifecycle_enforce_canary_operations": "django",
+    "stable.tests.test_lifecycle_enforce_canary_postgres": "django",
+    "stable.tests.test_lifecycle_enforce_full_cohort": "django",
+    "stable.tests.test_lifecycle_enforce_full_cohort_operations": "django",
+    "stable.tests.test_lifecycle_enforce_full_cohort_postgres": "django",
+    "stable.tests.test_management_command": "django",
+    "stable.tests.test_models_migrations": "django",
+    "stable.tests.test_nginx_production_contract": "django",
+    "stable.tests.test_page_regression": "django",
+    "stable.tests.test_race_event_lifecycle_enrollment": "django",
+    "stable.tests.test_race_field_normalization": "django",
+    "stable.tests.test_race_result_recovery_application_commands": "django",
+    "stable.tests.test_race_result_recovery_application_inventory": "django",
+    "stable.tests.test_race_result_recovery_application_pages": "django",
+    "stable.tests.test_race_result_recovery_application_postgres": "django",
+    "stable.tests.test_race_result_recovery_application_projection": "django",
+    "stable.tests.test_reviewed_gap_backfill": "django",
+    "stable.tests.test_reviewed_pre_race": "django",
+    "stable.tests.test_scheduled_race_result_review_contracts": "django",
+    "stable.tests.test_scheduled_race_result_review_postgres": "django",
+    "stable.tests.test_stats_business_logic": "django",
+    "stable.tests.test_term_display": "django",
+    "stable.tests.test_write_paths": "django",
+    "scripts.tests.test_impact_git": "python",
+    "scripts.tests.test_impact_delivery": "python",
+    "stable.test_impact_core": "django",
+    "scripts.tests.test_impact_evolution": "python",
+    "scripts.tests.test_impact_verifier_e2e": "python"
+  },
+  "allowed_skips": {
+    "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
+      "profile": "django",
+      "reason": "Sporting Life real cache root not configured",
+      "review_by": "2026-10-16",
+      "follow_up": "补受审专用环境或冻结真实缓存夹具；当前full结论必须单列该覆盖缺口，不可自动延期"
+    },
+    "stable.test_historical_race_detail_distance_metadata.HistoricalRaceDetailDistanceMetadataRealCacheTests.test_jra_2005_legacy_page_preserves_distance_unit": {
+      "profile": "django",
+      "reason": "real cache root not configured",
+      "review_by": "2026-10-16",
+      "follow_up": "补受审专用环境或冻结真实缓存夹具；当前full结论必须单列该覆盖缺口，不可自动延期"
+    },
+    "stable.test_historical_race_detail_distance_metadata.HistoricalRaceDetailDistanceMetadataRealCacheTests.test_sporting_life_race_118984_preserves_distance_units": {
+      "profile": "django",
+      "reason": "real cache root not configured",
+      "review_by": "2026-10-16",
+      "follow_up": "补受审专用环境或冻结真实缓存夹具；当前full结论必须单列该覆盖缺口，不可自动延期"
+    },
+    "stable.test_historical_race_detail_distance_metadata.HistoricalRaceDetailDistanceMetadataRealCacheTests.test_equibase_yearbook_result_preserves_distance_unit": {
+      "profile": "django",
+      "reason": "real cache root not configured",
+      "review_by": "2026-10-16",
+      "follow_up": "补受审专用环境或冻结真实缓存夹具；当前full结论必须单列该覆盖缺口，不可自动延期"
+    },
+    "stable.test_historical_race_detail_runner_v2_package_identity.HistoricalRaceDetailRunnerV2PackageIdentityRealSmokeTests.test_empty_event_distance_uses_real_parsed_metadata_with_original_units": {
+      "profile": "django",
+      "reason": "real cache root not configured",
+      "review_by": "2026-10-16",
+      "follow_up": "补受审专用环境或冻结真实缓存夹具；当前full结论必须单列该覆盖缺口，不可自动延期"
+    },
+    "stable.test_historical_race_detail_runner_v2_package_identity.HistoricalRaceDetailRunnerV2PackageIdentityRealSmokeTests.test_nonempty_event_and_parsed_distance_conflict_becomes_validation_gap": {
+      "profile": "django",
+      "reason": "real cache root not configured",
+      "review_by": "2026-10-16",
+      "follow_up": "补受审专用环境或冻结真实缓存夹具；当前full结论必须单列该覆盖缺口，不可自动延期"
+    },
+    "stable.test_historical_race_detail_runner_v2_package_identity.HistoricalRaceDetailRunnerV2PackageIdentityRealSmokeTests.test_hk_real_validated_candidate_packages_with_plan_inventory_identity": {
+      "profile": "django",
+      "reason": "real cache root not configured",
+      "review_by": "2026-10-16",
+      "follow_up": "补受审专用环境或冻结真实缓存夹具；当前full结论必须单列该覆盖缺口，不可自动延期"
+    },
+    "stable.test_historical_race_detail_runner_v2_package_identity.HistoricalRaceDetailRunnerV2PackageIdentityRealSmokeTests.test_hk_package_rejects_raw_candidate_without_validation_evidence": {
+      "profile": "django",
+      "reason": "real cache root not configured",
+      "review_by": "2026-10-16",
+      "follow_up": "补受审专用环境或冻结真实缓存夹具；当前full结论必须单列该覆盖缺口，不可自动延期"
+    },
+    "stable.test_migration_history_repair.MigrationHistoryRepairDockerImageContractTests.test_candidate_image_contains_only_the_exact_reviewed_audit_file": {
+      "profile": "django",
+      "reason": "set RUN_MIGRATION_REPAIR_DOCKER_CONTRACT=true for the real image contract",
+      "review_by": "2026-10-16",
+      "follow_up": "补受审专用环境或冻结真实缓存夹具；当前full结论必须单列该覆盖缺口，不可自动延期"
+    },
+    "stable.test_race_live_gate_remediation.RollbackGateBehaviorRemediationTests.test_root_artifact_is_exact_0700_0600_secret_free_and_no_replace": {
+      "profile": "django",
+      "reason": "root-owned artifact contract requires root EUID",
+      "review_by": "2026-10-16",
+      "follow_up": "补受审专用环境或冻结真实缓存夹具；当前full结论必须单列该覆盖缺口，不可自动延期"
+    }
+  },
+  "owners": {
+    "horse_page": "application: 马匹公开页面与发布边界",
+    "news_translation": "integration: 翻译与内容公开边界",
+    "race_parser": "integration: 来源解析到结果规范化",
+    "race_results": "integration: 持久化及官方公开判定",
+    "historical_batch": "integration: 历史批次收据和事务",
+    "horse_publish": "integration: 首次发布、批次重试及冻结排除"
+  },
+  "dedicated_batch_modules": [
+    "stable.test_migration_history_repair_postgres",
+    "stable.test_migration_database_isolation"
+  ]
+}
