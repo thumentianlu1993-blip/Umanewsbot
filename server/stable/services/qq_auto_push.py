@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import requests
 from django.conf import settings
@@ -339,7 +339,13 @@ def _is_stale_sending(delivery: QQPushDelivery) -> bool:
     return delivery.last_attempt_at <= timezone.now() - timedelta(seconds=_sending_stale_after())
 
 
-def _claim_delivery_attempt(delivery: QQPushDelivery, *, message: str, public_url: str) -> bool:
+@dataclass(frozen=True)
+class DeliveryClaim:
+    attempt_count: int
+    last_attempt_at: datetime
+
+
+def _claim_delivery_attempt(delivery: QQPushDelivery, *, message: str, public_url: str) -> DeliveryClaim | None:
     stale_cutoff = timezone.now() - timedelta(seconds=_sending_stale_after())
     claimable_status = Q(
         status__in=[
@@ -352,28 +358,34 @@ def _claim_delivery_attempt(delivery: QQPushDelivery, *, message: str, public_ur
     stale_sending = Q(status=QQPushDeliveryStatus.SENDING) & (
         Q(last_attempt_at__lte=stale_cutoff) | Q(last_attempt_at__isnull=True)
     )
-    locked = QQPushDelivery.objects.filter(
-        Q(pk=delivery.pk),
-        claimable_status | stale_sending,
-        attempt_count__lt=F("max_attempts"),
-    ).update(
-        status=QQPushDeliveryStatus.SENDING,
-        attempt_count=F("attempt_count") + 1,
-        last_attempt_at=timezone.now(),
-        request_payload={"message": message, "public_url": public_url},
-    )
-    return bool(locked)
+    # UPDATE持有行锁至事务提交；在同一事务读取本人领取凭证，禁止refresh后借用他人凭证。
+    with transaction.atomic():
+        locked = QQPushDelivery.objects.filter(
+            Q(pk=delivery.pk),
+            claimable_status | stale_sending,
+            attempt_count__lt=F("max_attempts"),
+        ).update(
+            status=QQPushDeliveryStatus.SENDING,
+            attempt_count=F("attempt_count") + 1,
+            last_attempt_at=timezone.now(),
+            request_payload={"message": message, "public_url": public_url},
+        )
+        if not locked:
+            return None
+        attempt, claimed_at = QQPushDelivery.objects.values_list(
+            "attempt_count", "last_attempt_at").get(pk=delivery.pk)
+        return DeliveryClaim(attempt, claimed_at)
 
 
 def is_disabled_qq_delivery(delivery: QQPushDelivery) -> bool:
     return delivery.status == QQPushDeliveryStatus.SKIPPED and delivery.last_error == QQ_CHANNEL_DISABLED
 
 
-def skip_disabled_qq_delivery(delivery: QQPushDelivery, *, claimed_here=False) -> QQPushDelivery:
+def skip_disabled_qq_delivery(delivery: QQPushDelivery, *, claim: DeliveryClaim | None = None) -> QQPushDelivery:
     """CAS封存可处理状态；不覆盖SENT或其他执行者正在发送的回执。"""
-    if claimed_here:
+    if claim is not None:
         eligible = Q(status=QQPushDeliveryStatus.SENDING,
-                     attempt_count=delivery.attempt_count, attempt_count__gt=0, last_attempt_at=delivery.last_attempt_at)
+                     attempt_count=claim.attempt_count, attempt_count__gt=0, last_attempt_at=claim.last_attempt_at)
     else:
         eligible = Q(status__in=[QQPushDeliveryStatus.PENDING, QQPushDeliveryStatus.RETRYING,
                                 QQPushDeliveryStatus.FAILED, QQPushDeliveryStatus.SKIPPED])
@@ -382,7 +394,7 @@ def skip_disabled_qq_delivery(delivery: QQPushDelivery, *, claimed_here=False) -
             Q(last_attempt_at__isnull=True))
     values = dict(status=QQPushDeliveryStatus.SKIPPED, last_error_type=QQPushErrorType.NOT_ELIGIBLE,
                   last_error=QQ_CHANNEL_DISABLED, updated_at=timezone.now())
-    if claimed_here:
+    if claim is not None:
         values['attempt_count'] = F('attempt_count') - 1
     QQPushDelivery.objects.filter(eligible, pk=delivery.pk).exclude(
         status=QQPushDeliveryStatus.SKIPPED, last_error=QQ_CHANNEL_DISABLED).update(**values)
@@ -422,13 +434,18 @@ def process_qq_push_delivery(delivery: QQPushDelivery) -> QQPushDelivery:
             error=status_error or "onebot_offline",
         )
 
-    if not _claim_delivery_attempt(delivery, message=message, public_url=public_url):
+    claim = _claim_delivery_attempt(delivery, message=message, public_url=public_url)
+    if claim is None:
         delivery.refresh_from_db()
         return delivery
 
     delivery.refresh_from_db()
+    if (delivery.status != QQPushDeliveryStatus.SENDING or
+            delivery.attempt_count != claim.attempt_count or
+            delivery.last_attempt_at != claim.last_attempt_at):
+        return delivery
     if not qq_channel_enabled():
-        return skip_disabled_qq_delivery(delivery, claimed_here=True)
+        return skip_disabled_qq_delivery(delivery, claim=claim)
     accessible, error = is_public_url_accessible(public_url)
     if not accessible:
         return _set_delivery_failure(
@@ -440,7 +457,7 @@ def process_qq_push_delivery(delivery: QQPushDelivery) -> QQPushDelivery:
     try:
         response = pusher.send_group_message(delivery.target.group_id, message)
     except QQChannelDisabled:
-        return skip_disabled_qq_delivery(delivery, claimed_here=True)
+        return skip_disabled_qq_delivery(delivery, claim=claim)
     except Exception as exc:
         delivery.refresh_from_db()
         return _set_delivery_failure(
