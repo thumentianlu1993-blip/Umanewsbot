@@ -19,3 +19,5 @@ RED：先提供无行为API骨架（NotImplementedError）供正常导入，测�
 GREEN：同一行为测试通过后再扩展负例/规范化测试；保存命令、退出状态、结果。
 测试为stdlib unittest，无DB/Redis/队列/第三方；Linux固定树证据仍走现行test-impact，不以宿主结果替代。
 新路径映射需独立受审；Docker尚不可用已报告协调者。全量/映射演进由既有规则决定，不做空选集。
+
+原R补充mutation：action两个预期版本副本以True/1.0替代整数1分别拒绝；公开identity_state在verified/unresolved/revoked三状态间六种错配拒绝，匹配不变；不只比较Python宽松dict相等或kind/id。

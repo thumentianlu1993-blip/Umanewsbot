@@ -279,14 +279,18 @@ def _snapshot(raw, *, derive=False):
     return value
 
 
+def _generations(value):
+    _object(value, 'owner schedule enrollment source_set')
+    for generation in value.values():
+        _count(generation, nullable=True)
+
+
 def _version(value):
     _object(value, 'schema_version scope content_sha256 generations')
     _require(value['schema_version'] == 'f01.input.v1', 'input_schema')
     _require(value['scope'] == _strings(value['scope']) == list(INPUT_SCOPE), 'input_scope')
     _hash(value['content_sha256'])
-    _object(value['generations'], 'owner schedule enrollment source_set')
-    for generation in value['generations'].values():
-        _count(generation, nullable=True)
+    _generations(value['generations'])
 
 
 def _validate_input(value):
@@ -330,6 +334,8 @@ def _validate_decision(value):
         _text(action['action_id']); _enum(action['kind'], ACTIONS); _enum(action['capability'], CAPABILITIES)
         _text(action['source_binding_ref'], nullable=True); _text(action['reason_code'])
         _time(action['not_before']); _time(action['deadline'], nullable=True)
+        _version(action['expected_input_version'])
+        _generations(action['expected_generations'])
         _require(action['expected_input_version'] == value['input_version'] and action['expected_generations'] == value['input_version']['generations'], 'action_version_binding')
     ids = [a['action_id'] for a in value['actions']]
     _require(len(ids) == len(set(ids)), 'duplicate_action')
@@ -351,7 +357,8 @@ def _validate_decision(value):
         _public(value['public_summary'])
         public_entity = value['public_summary']['entity_ref']
         _require(public_entity['kind'] == value['entity']['kind'] and
-                 public_entity['canonical_id'] == value['entity']['canonical_id'], 'public_entity_binding')
+                 public_entity['canonical_id'] == value['entity']['canonical_id'] and
+                 public_entity['identity_state'] == value['entity']['identity_state'], 'public_entity_binding')
 
 
 @dataclass(frozen=True)

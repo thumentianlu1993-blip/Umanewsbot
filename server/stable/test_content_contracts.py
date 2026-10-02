@@ -199,3 +199,52 @@ class ContentContractTests(unittest.TestCase):
         imported = [n.module.split('.')[0] for n in ast.walk(ast.parse(source)) if isinstance(n,ast.ImportFrom)]
         imported += [alias.name.split('.')[0] for n in ast.walk(ast.parse(source)) if isinstance(n,ast.Import) for alias in n.names]
         self.assertFalse(set(imported) & {'django','celery','requests','socket','urllib','stable'})
+
+    def test_action_generation_types_are_strict_before_equality(self):
+        case = copy.deepcopy(self.cases[0])
+        original = case['input']
+        original['input_version']['generations']['owner'] = 1
+        document = contracts.parse_input(original)
+        output = case['output']
+        output['input_version'] = copy.deepcopy(original['input_version'])
+        import hashlib
+        output['input_fingerprint'] = hashlib.sha256(document.to_json().encode()).hexdigest()
+        for action in output['actions']:
+            action['expected_input_version'] = copy.deepcopy(original['input_version'])
+            action['expected_generations'] = copy.deepcopy(original['input_version']['generations'])
+        for key in ('expected_generations', 'expected_input_version'):
+            for bad in (True, 1.0):
+                candidate = copy.deepcopy(output)
+                target = candidate['actions'][0][key]
+                if key == 'expected_input_version':
+                    target = target['generations']
+                target['owner'] = bad
+                with self.subTest(field=key,bad=bad), self.assertRaises(contracts.ContractError):
+                    contracts.parse_decision(candidate,input_document=document)
+
+    def test_public_identity_state_must_match_internal_entity(self):
+        original = self.cases[0]['input']
+        for internal_state in ('verified', 'unresolved', 'revoked'):
+            snapshot = copy.deepcopy(original['snapshot'])
+            snapshot['entity']['identity_state'] = internal_state
+            document = contracts.build_input(snapshot,evaluated_at=original['evaluated_at'],
+                policy_ref=original['policy_ref'],generations=original['input_version']['generations'])
+            import hashlib
+            for public_state in ('verified', 'unresolved', 'revoked'):
+                output = copy.deepcopy(self.cases[0]['output'])
+                output['entity'] = copy.deepcopy(snapshot['entity'])
+                output['input_version'] = document.to_dict()['input_version']
+                output['input_fingerprint'] = hashlib.sha256(document.to_json().encode()).hexdigest()
+                for action in output['actions']:
+                    action['expected_input_version'] = copy.deepcopy(output['input_version'])
+                public_entity = copy.deepcopy(snapshot['entity'])
+                public_entity['identity_state'] = public_state
+                output['public_summary'] = dict(entity_ref=public_entity,public_version='v1',
+                    material_state='confirmed',fact_phase='unknown',clock_hint='unknown',
+                    updated_at='2026-10-03T01:10:00Z',completeness='complete',gaps=[])
+                with self.subTest(internal=internal_state,public=public_state):
+                    if internal_state == public_state:
+                        contracts.parse_decision(output,input_document=document)
+                    else:
+                        with self.assertRaises(contracts.ContractError):
+                            contracts.parse_decision(output,input_document=document)

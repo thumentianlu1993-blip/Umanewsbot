@@ -34,3 +34,5 @@ Linux交付：专用Colima umanews-impact-ci由协调者恢复；固定候选的
 临时异常按2s/5s最多3次有界恢复，未知写入结果先读收据，不重复派单或改生产。
 
 首次Linux收集发现新测试未登记catalog.profiles，fail closed为unowned test；已补显式python profile（纯stdlib），不改变runner或豁免。原e9未开始执行full；新候选重新收集，旧结果仅归e9。Docker默认temp挂载问题已用本线Users下TMPDIR解决，镜像已按原Dockerfile成功构建。
+
+原R代码review @836c9f18：A002-P2-01/02 REVISE。两项聚焦RED为2方法5个失败（动作两个副本各bool/float，公开身份状态错配）；修复后17/17宿主GREEN。动作expected_input_version复用_version，expected_generations复用严格_generations；公开kind/id/identity_state同时绑定，三种身份状态匹配正常、六种不匹配拒绝。原R限定复审待返。原e9及650未执行任何full批次，待新固定树收集。
