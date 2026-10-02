@@ -12,6 +12,8 @@ import re
 import shutil
 import signal
 import sys
+import stat
+from datetime import datetime, timedelta
 from urllib.parse import urlsplit, urlunsplit
 
 
@@ -50,9 +52,16 @@ def clean_row(row, dataset):
     result = {key: row[key] for key in FIELDS[dataset] if key in row}
     for key in CODE_FIELDS & result.keys():
         value = result[key]
-        if value is not None and (not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9_.:/-]{0,128}", value)):
+        if key == "reason":
+            if not valid_reason(value):
+                result[key] = "unknown"
+        elif value is not None and (not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9_.:/-]{0,128}", value)):
             result[key] = "unknown"
     return result
+
+
+def valid_reason(value):
+    return isinstance(value, str) and (value == "" or re.fullmatch(r"[a-z][a-z0-9_]{0,127}", value) is not None)
 
 
 def safe_root(output_root, observation_id):
@@ -75,7 +84,7 @@ def write_files(output_root, observation_id, files, receipt):
     directory.mkdir(mode=0o700)  # exclusive; do not replace a previous/unknown outcome
     try:
         payloads = dict(files)
-        payloads["receipt.json"] = encoded(receipt)
+        payloads["receipt.json"] = encoded({**receipt, "observation_id": observation_id})
         hashes = {}
         for name, payload in payloads.items():
             fd = os.open(directory / name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -124,7 +133,8 @@ def publish_metadata(snapshot, output_root, observation_id):
     safe_observation = {key: observation.get(key) for key in ("observed_at", "start", "read_only", "isolation", "release_sha", "script_sha256", "schema_sha256")}
     receipt = {"kind": "metadata", "counts": counts, "region_counts": regions, "observation": safe_observation,
                "complete": True, "effective_settings_verified": False, "holdout_status": "waiting_R_split",
-               "human_verification_status": "not_reviewed", "limits": LIMITS}
+               "human_verification_status": "not_reviewed", "limits": LIMITS,
+               "redaction_counts": {"decisions_reason_unknown": sum(not valid_reason(row.get("reason")) for row in snapshot["decisions"])}}
     return write_files(output_root, observation_id, files, receipt)
 
 
@@ -206,6 +216,8 @@ def publish_content(rows, selection, output_root, observation_id):
         raise ExportError("serialized_content_budget_exceeded")
     receipt = {"kind": "sealed_content", "counts": {"articles": len(rows)}, "custodian": "R",
                "source_observation_id": selection["source_observation_id"], "release_sha": selection["release_sha"],
+               "source_metadata_manifest_sha256": selection.get("source_metadata_manifest_sha256"),
+               "source_schema_sha256": selection.get("source_schema_sha256"),
                "selection_sha256": digest(encoded(selection)), "complete": True, "input_bytes": total,
                "holdout_status": "waiting_R_split", "redaction_limits": "No raw offsets; redacted-away blocks remain unevaluable",
                "human_verification_status": "not_reviewed"}
@@ -395,6 +407,85 @@ def bound_selection(path, expected_sha, release_sha):
     return selection
 
 
+def metadata_bytes(path, maximum):
+    if any(p.is_symlink() for p in (path, *path.parents)):
+        raise ExportError("source_metadata_symlink")
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        with os.fdopen(fd, "rb") as stream:
+            info = os.fstat(stream.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_mode & 0o077 or info.st_size > maximum:
+                raise ExportError("source_metadata_file_invalid")
+            data = stream.read(maximum + 1)
+            if len(data) > maximum:
+                raise ExportError("source_metadata_byte_budget_exceeded")
+            return data
+    except OSError:
+        raise ExportError("source_metadata_file_unavailable") from None
+
+
+def verify_source_metadata(selection, metadata_dir):
+    """Validate the actual producer bundle before a content DB connection or read."""
+    selected = validate_selection(selection)
+    if metadata_dir is None:
+        raise ExportError("missing_source_metadata_package")
+    directory = Path(metadata_dir)
+    if not directory.is_absolute() or ".." in directory.parts or directory.parent.parts[-3:] != ("runtime", "next_version", "F02"):
+        raise ExportError("invalid_source_metadata_path")
+    if directory.name != selection["source_observation_id"]:
+        raise ExportError("source_observation_mismatch")
+    manifest_bytes = metadata_bytes(directory / "manifest.json", 64 * 1024)
+    if digest(manifest_bytes) != selection.get("source_metadata_manifest_sha256"):
+        raise ExportError("source_metadata_manifest_mismatch")
+    manifest = json.loads(manifest_bytes)
+    expected_names = {FILENAMES.get(key, key + ".jsonl") for key in (*LIMITS, "aggregates")} | {"receipt.json"}
+    if (manifest.get("schema_version") != 1 or manifest.get("kind") != "metadata" or manifest.get("complete") is not True
+            or manifest.get("observation_id") != selection["source_observation_id"] or set(manifest.get("files", {})) != expected_names):
+        raise ExportError("source_metadata_manifest_invalid")
+    saved = {}
+    total = 0
+    for name in sorted(expected_names):
+        maximum = 64 * 1024 if name == "receipt.json" else (16 * 1024 * 1024 if name == "cohort_metadata.jsonl" else 64 * 1024 * 1024)
+        data = metadata_bytes(directory / name, maximum)
+        total += len(data)
+        if total > 128 * 1024 * 1024:
+            raise ExportError("source_metadata_total_budget_exceeded")
+        if digest(data) != manifest["files"][name]:
+            raise ExportError("source_metadata_file_hash_mismatch")
+        if name in {"receipt.json", "cohort_metadata.jsonl"}:
+            saved[name] = data
+    receipt = json.loads(saved["receipt.json"])
+    observation = receipt.get("observation", {})
+    if (receipt.get("kind") != "metadata" or receipt.get("complete") is not True
+            or receipt.get("observation_id") != selection["source_observation_id"]
+            or observation.get("schema_sha256") != selection.get("source_schema_sha256")
+            or observation.get("release_sha") != selection["release_sha"]
+            or observation.get("read_only") != "on" or observation.get("isolation") != "repeatable read"):
+        raise ExportError("source_metadata_receipt_mismatch")
+    start, cutoff = (datetime.fromisoformat(observation[key]) for key in ("start", "observed_at"))
+    if start.tzinfo is None or cutoff.tzinfo is None or cutoff - start != timedelta(days=28):
+        raise ExportError("source_metadata_window_invalid")
+    cohort = [json.loads(line) for line in saved["cohort_metadata.jsonl"].splitlines() if line]
+    count = receipt.get("counts", {}).get("cohort")
+    if type(count) is not int or not 0 <= count <= LIMITS["cohort"] or len(cohort) != count:
+        raise ExportError("source_metadata_cohort_count_mismatch")
+    by_id = {}
+    regions = {region: 0 for region in REGIONS}
+    for row in cohort:
+        first_seen = datetime.fromisoformat(row["first_seen_at"])
+        if (type(row["id"]) is not int or row["id"] <= 0 or row["id"] in by_id or row["racing_region"] not in regions
+                or first_seen.tzinfo is None or not start <= first_seen < cutoff or not HASH_RE.fullmatch(row["input_sha256"])):
+            raise ExportError("source_metadata_cohort_invalid")
+        by_id[row["id"]] = row
+        regions[row["racing_region"]] += 1
+    if regions != receipt.get("region_counts"):
+        raise ExportError("source_metadata_region_count_mismatch")
+    for article_id, item in selected.items():
+        reference = by_id.get(article_id)
+        if reference is None or any(reference.get(key) != item[key] for key in ("input_sha256", "updated_at")):
+            raise ExportError("selection_outside_source_metadata")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mode", choices=["plan", "metadata", "content"], default="plan")
@@ -405,6 +496,7 @@ def main(argv=None):
     parser.add_argument("--resident-marker", type=Path, default=Path("/app/.umanews-release-commit"))
     parser.add_argument("--selection", type=Path)
     parser.add_argument("--selection-sha256")
+    parser.add_argument("--source-metadata-dir", type=Path)
     args = parser.parse_args(argv)
     connection = None
     prior_handler = None
@@ -425,15 +517,16 @@ def main(argv=None):
                 raise ExportError("invalid_release_binding")
             if args.resident_marker.read_text().strip() != args.expected_release_sha:
                 raise ExportError("resident_release_mismatch")
+            def expire(signum, frame):
+                raise ExportError("wall_timeout")
+            prior_handler = signal.signal(signal.SIGALRM, expire)
+            signal.alarm(180)
             selection = None
             if args.mode == "content":
                 if args.selection is None:
                     raise ExportError("missing_R_selection")
                 selection = bound_selection(args.selection, args.selection_sha256, args.expected_release_sha)
-            def expire(signum, frame):
-                raise ExportError("wall_timeout")
-            prior_handler = signal.signal(signal.SIGALRM, expire)
-            signal.alarm(180)
+                verify_source_metadata(selection, args.source_metadata_dir)
             connection = connect_database()
             if args.mode == "metadata":
                 snapshot = collect_metadata(connection, args.expected_release_sha, script_sha)

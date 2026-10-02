@@ -26,3 +26,9 @@
 
 RED记录必须来自已可导入接口的行为缺失，不以ImportError/依赖缺失为RED；先X01/X08等例，再最小GREEN与边界回归。
 候选影响计划需登记新scripts/test路径；不得因未映射而当docs-only或偷偷全量。当前shared rules/catalog尚未改，交协调者按测试政策组织登记/回归。
+
+## B002-P2 返修专用案例
+
+- P2-01：URL reason、控制字、129字符转unknown，合法selected/region_window_limit/空码保留；receipt记录实际替换数，防止重新开放URL。
+- P2-02：实际来源包manifest/file摘要、receipt/schema/release/observation、固定28天cohort与每个ID/hash/updated_at绑定；错误manifest、错observation/release/schema、缺receipt、篡改cohort、越范围ID/hash/updated_at均在连接前拒绝；匹配案例content收据保留来源摘要。所有包是离线synthetic。
+- P2-03：proposal必须为该测试模块登记python profile；不修改共享配置或runner。

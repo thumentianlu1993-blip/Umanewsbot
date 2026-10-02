@@ -34,6 +34,22 @@ def sample_snapshot():
 
 
 class MetadataTests(unittest.TestCase):
+    def test_reason_codes_reject_URL_controls_and_length_with_counted_replacements(self):
+        reasons = ["https://example.test/private-path-token", "selected\nSECRET", "x" * 129,
+                   "selected", "region_window_limit", ""]
+        for reason in reasons:
+            expected = reason if reason in {"selected", "region_window_limit", ""} else "unknown"
+            self.assertEqual(export.clean_row({"reason": reason}, "decisions")["reason"], expected)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve() / "runtime/next_version/F02"
+            snapshot = sample_snapshot()
+            snapshot["decisions"] = [{"id": i + 1, "reason": value} for i, value in enumerate(reasons)]
+            snapshot["counts"]["decisions"] = len(reasons)
+            export.publish_metadata(snapshot, root, "reasons")
+            receipt = json.loads((root / "reasons/receipt.json").read_text())
+            self.assertEqual(receipt["redaction_counts"]["decisions_reason_unknown"], 3)
+            self.assertNotIn("private-path-token", (root / "reasons/decisions.jsonl").read_text())
+
     def test_failed_unpublished_and_unknown_crawl_retained_without_raw_content(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp).resolve() / "runtime/next_version/F02"
@@ -147,6 +163,21 @@ def sample_content():
     return row, selection
 
 
+def source_metadata_package(root):
+    row, selection = sample_content()
+    snapshot = sample_snapshot()
+    snapshot["cohort"] = [dict(snapshot["cohort"][0], id=7, input_sha256=selection["samples"][0]["input_sha256"],
+                               updated_at=row["updated_at"], first_seen_at="2026-10-02T00:00:00+00:00")]
+    snapshot["counts"]["cohort"] = 1
+    snapshot["region_counts"] = {"japan": 1}
+    snapshot["aggregates"] = snapshot["aggregates"][:1]
+    snapshot["observation"]["schema_sha256"] = export.digest(export.encoded(synthetic_schema()))
+    receipt = export.publish_metadata(snapshot, root, "synthetic-metadata")
+    selection["source_metadata_manifest_sha256"] = receipt["manifest_sha256"]
+    selection["source_schema_sha256"] = snapshot["observation"]["schema_sha256"]
+    return root / "synthetic-metadata", selection
+
+
 class ContentTests(unittest.TestCase):
     def test_content_only_to_R_files_stdout_receipt_has_no_text(self):
         row, selection = sample_content()
@@ -250,6 +281,37 @@ def synthetic_schema():
 
 
 class DatabaseContractTests(unittest.TestCase):
+    def test_metadata_mismatch_missing_tamper_and_out_of_cohort_fail_before_content_query(self):
+        for mutation in ["manifest", "observation", "release", "schema", "missing", "tamper", "out_of_cohort", "hash", "updated_at"]:
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp).resolve() / "runtime/next_version/F02"
+                source, selection = source_metadata_package(root)
+                if mutation == "manifest": selection["source_metadata_manifest_sha256"] = "f" * 64
+                if mutation == "observation": selection["source_observation_id"] = "another-observation"
+                if mutation == "release": selection["release_sha"] = "b" * 40
+                if mutation == "schema": selection["source_schema_sha256"] = "f" * 64
+                if mutation == "missing": (source / "receipt.json").unlink()
+                if mutation == "tamper": (source / "cohort_metadata.jsonl").write_text('{"id": 99}\n')
+                if mutation == "out_of_cohort": selection["samples"][0]["id"] = 99
+                if mutation == "hash": selection["samples"][0]["input_sha256"] = "f" * 64
+                if mutation == "updated_at": selection["samples"][0]["updated_at"] = "2026-10-04T00:00:00+00:00"
+                selected_path = Path(tmp).resolve() / "selection.json"
+                selected_path.write_bytes(export.encoded(selection))
+                selected_path.chmod(0o600)
+                selected_sha = export.digest(selected_path.read_bytes())
+                marker = Path(tmp).resolve() / "marker"
+                marker.write_text(selection["release_sha"])
+                output = StringIO()
+                with redirect_stdout(output), patch.object(export, "connect_database") as connect:
+                    result = export.main(["--mode", "content", "--output-root", str(root), "--observation-id", "content-invalid",
+                                          "--expected-release-sha", selection["release_sha"], "--resident-marker", str(marker),
+                                          "--expected-script-sha256", export.digest(Path(export.__file__).read_bytes()),
+                                          "--selection", str(selected_path), "--selection-sha256", selected_sha,
+                                          "--source-metadata-dir", str(source)])
+                self.assertEqual(result, 1)
+                connect.assert_not_called()
+                self.assertFalse((root / "content-invalid").exists())
+
     def test_readonly_snapshot_timeout_and_schema_before_business_queries(self):
         connection = FakeConnection()
         snapshot = export.collect_metadata(connection, "a" * 40, "d" * 64)
@@ -290,6 +352,32 @@ class DatabaseContractTests(unittest.TestCase):
 
 
 class CommandTests(unittest.TestCase):
+    def test_mapping_proposal_assigns_python_worker_profile(self):
+        proposal = Path(__file__).resolve().parents[2] / "docs/changes/next-version-capabilities/lanes/B/B-002-test-mapping-proposal.json"
+        mapping = json.loads(proposal.read_text())
+        self.assertEqual(mapping.get("catalog_profiles_additions", {}).get("scripts.tests.test_f02_readonly_export"), "python")
+
+    def test_matching_metadata_selection_binds_source_receipt_and_precedes_DB(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve() / "runtime/next_version/F02"
+            source, selection = source_metadata_package(root)
+            selected_path = Path(tmp).resolve() / "selection.json"
+            selected_path.write_bytes(export.encoded(selection))
+            selected_path.chmod(0o600)
+            marker = Path(tmp).resolve() / "marker"
+            marker.write_text("a" * 40)
+            output = StringIO()
+            with redirect_stdout(output), patch.object(export, "connect_database", return_value=FakeConnection()):
+                result = export.main(["--mode", "content", "--output-root", str(root), "--observation-id", "content-matching",
+                                      "--expected-release-sha", "a" * 40, "--resident-marker", str(marker),
+                                      "--expected-script-sha256", export.digest(Path(export.__file__).read_bytes()),
+                                      "--selection", str(selected_path), "--selection-sha256", export.digest(selected_path.read_bytes()),
+                                      "--source-metadata-dir", str(source)])
+            self.assertEqual(result, 0)
+            receipt = json.loads((root / "content-matching/receipt.json").read_text())
+            self.assertEqual(receipt["source_metadata_manifest_sha256"], selection["source_metadata_manifest_sha256"])
+            self.assertEqual(receipt["source_schema_sha256"], selection["source_schema_sha256"])
+            self.assertNotIn("Synthetic First", output.getvalue())
     def test_wrong_script_or_resident_binding_stops_before_connection_and_output(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp).resolve() / "runtime/next_version/F02"

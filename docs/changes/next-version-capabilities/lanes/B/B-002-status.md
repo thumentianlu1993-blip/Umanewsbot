@@ -39,3 +39,12 @@ macOS /var临时目录symlink导致的fixture失败不计目标RED，测试使�
 最近实时额度为周used93%/remaining7%，只作当时证据，无子代理或模型CLI运行。
 临时异常最多3次（2秒/5秒）核对后恢复；未知写入结果先查收据。额度查询临时失败可有界重试，恢复>1%自动解除未知保护；实际≤1%按用户要求停工，待用户明确恢复且实时>1%。不使用积分/重置券。
 持续每5分钟、每轮/长任务/review前检查，≤3%逐批次检查。Linux资源接入待协调者/A验证专属DOCKER_CONFIG方案，不修改runner或全局context。
+
+## 原R三项P2返修（当前阶段）
+
+原审核 @48c51fb1：REVISE，无P0/P1；17例独立fake PASS为旧版本证据，保留不改。
+P2-01已获真实RED：URL reason原样泄漏导致断言失败；修复为明确码正则/unknown及替换计数，GREEN。
+P2-02已获真实RED：合法内容路径receipt缺来源摘要，9组反例仍尝试连接DB；仅补CLI参数入口后的测试已证明行为缺失，非参数/导入错误。修复实际metadata全包/receipt/cohort绑定后，同例GREEN。
+P2-03已获契约RED：proposal缺python profile返回None；补profile提案后GREEN。实际shared rules/catalog仍未改。
+返修后局部回归21/21 PASS，约0.86秒；新离线plan已生成，仍未连接数据库。命令包已绑定新script/test摘要和--source-metadata-dir，真实生产槽位仍待核验。
+原R限定复审仍待，不自称findings关闭；无新真实样本/PG/Linux正式收据。最近实时周剩余6%，无子代理/模型CLI。
