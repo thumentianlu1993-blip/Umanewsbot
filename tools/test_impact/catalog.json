@@ -799,6 +799,9 @@
       "stable.test_single_migration_owner.MigrationDriftGuardTests.test_t19_no_new_migration_files",
       "stable.tests.test_race_event_lifecycle_enrollment.LifecycleEnrollmentCommandTests.test_output_dir_rejects_unresolved_macos_temporary_alias",
       "stable.tests.test_race_event_lifecycle_enrollment.LifecycleEnrollmentCommandTests.test_prepare_command_does_not_resolve_away_temporary_alias"
+    ],
+    "content_contracts": [
+      "stable.test_content_contracts"
     ]
   },
   "dependencies": {
@@ -2475,6 +2478,12 @@
       "label": "scripts.tests.test_impact_verifier_e2e",
       "domains": [
         "infrastructure"
+      ]
+    },
+    "server/stable/test_content_contracts.py": {
+      "label": "stable.test_content_contracts",
+      "domains": [
+        "content_contracts"
       ]
     }
   },

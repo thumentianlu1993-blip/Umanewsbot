@@ -1126,6 +1126,12 @@
     ],
     "runtime/research/validate_official_graded_race_package.py": [
       "research_contracts"
+    ],
+    "server/stable/services/content_contracts.py": [
+      "content_contracts"
+    ],
+    "docs/changes/next-version-capabilities/lanes/A/validate_f01_contract.py": [
+      "content_contracts"
     ]
   },
   "symbols": {
