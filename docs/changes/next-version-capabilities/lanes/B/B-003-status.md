@@ -33,3 +33,12 @@
 - 正式capsule/host路径/owner/空间/执行Python环境/transport argv仍待协调者绑定，原runtime模板持续失效。
 - 无Linux正式delivery/真实DB查询/生产转存/R收包/新增真实样本；不能把local GREEN称发布或F02完成。
 - 最近周额度实时剩余5%，没有子代理/模型CLI或后台长进程。本线不合并、不部署。
+
+## B003-P2-01最小返修（待原R限定复审）
+
+原R报告bf3bd91ed8baf0bfe8b2d9c19276a09f833308f6指出counts额外文本字段被原样输出；已读原报告，同上下文返修。
+新增CountsSchemaReviewFixTests两例覆盖metadata/content各自extra string与nested字段、缺键/非dict/严格整数与预算，以及CLI与transfer直接路径。
+有效RED：extra反例方法exit1，24个边界断言失败：两kind CLI exit0并带合成注入文本，transfer host_verified且transfer.complete存在；严格schema方法exit1，18组非法counts未给固定schema错误码。均为行为失败，不是导入或环境问题。
+最小GREEN：counts验证精确键/预算后从白名单重构摘要；同两例PASS。最终25新+21原=46/46 PASS，约1.14秒。CLI对两kind/string/nested反例非零且无注入文本；transfer为invalid_package且无transfer.complete。
+本次workflow contract PASS、4契约tests PASS、diff check PASS，原exporter字节与72ac3074完全一致。共享rules/catalog、真实adapter、生产与Linux正式收据仍未改/执行。
+B-004只进行静态代码读取，尚无实施或验证执行；本轮优先最小finding闭环。周最近实时剩余5%，无后台进程。

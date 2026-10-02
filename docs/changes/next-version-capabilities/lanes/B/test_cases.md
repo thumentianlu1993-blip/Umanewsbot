@@ -51,3 +51,8 @@ RED记录必须来自已可导入接口的行为缺失，不以ImportError/依�
 | T10 | CLI错误只输出固定code；所有fake异常含合成PRIVATE也不泄露；影响proposal含新模块/测试、既有export测试读取的fixture与python profile | traceback/正文输出、fixture映射docs-only |
 
 测试使用合成producer包、注入FakeAdapter、fake disk/time/故障；不会以callback合同声称真实传输超时已证明。真实命令adapter/capsule仍待精确技术核对，Linux正式收据另行由协调者安排。
+
+### B003-P2-01返修
+
+T10增加metadata/content counts精确键集与严格整数预算测试；extra string/nested字段必须CLI固定错误码/nonzero且无注入文本，transfer不得生成host_verified/transfer.complete。
+覆盖缺键、非dict、bool/float/string/null/nested/负数/超限；有效包白名单整数摘要保留。可捕获mutation为去掉set(counts)精确匹配、放宽type is int或重新原样输出receipt.counts。

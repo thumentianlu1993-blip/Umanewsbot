@@ -494,3 +494,64 @@ class VerificationTimerTests(unittest.TestCase):
             self.assertEqual(signal.getsignal(signal.SIGALRM), previous)
             self.assertEqual(signal.getitimer(signal.ITIMER_REAL), (0.0, 0.0))
             self.assertEqual(transfer.verify_bundle(directory, capsule, metadata)['kind'], 'sealed_content')
+
+
+class CountsSchemaReviewFixTests(unittest.TestCase):
+    def mutated(self, base, kind, mutate):
+        directory, capsule, metadata = fixture(base, kind)
+        receipt = read_json(directory / 'receipt.json')
+        mutate(receipt)
+        write_json(directory / 'receipt.json', receipt)
+        capsule['manifest_sha256'] = rehash(directory)
+        return directory, capsule, metadata
+
+    def test_extra_string_or_nested_counts_rejected_without_CLI_leak_or_host_receipt(self):
+        for kind in ('metadata', 'sealed_content'):
+            for injected in ('SYNTHETIC_PRIVATE_COUNT_PAYLOAD', {'body': 'SYNTHETIC_PRIVATE_COUNT_PAYLOAD'}):
+                with self.subTest(kind=kind, injected=injected), tempfile.TemporaryDirectory() as temp:
+                    base = Path(temp).resolve()
+                    directory, capsule, metadata = self.mutated(
+                        base, kind, lambda receipt: receipt['counts'].update(extra_text=injected))
+                    capsule_path = base / 'capsule.json'
+                    write_json(capsule_path, capsule)
+                    stdout = StringIO()
+                    with redirect_stdout(stdout):
+                        code = transfer.main(['verify', '--capsule', str(capsule_path), '--bundle', str(directory),
+                                              '--source-metadata-dir', str(metadata)])
+                    with self.subTest(boundary='CLI_exit'):
+                        self.assertNotEqual(code, 0)
+                    with self.subTest(boundary='CLI_content'):
+                        self.assertNotIn('SYNTHETIC_PRIVATE_COUNT_PAYLOAD', stdout.getvalue())
+                    with self.subTest(boundary='CLI_code'):
+                        self.assertEqual(json.loads(stdout.getvalue()).get('code'), 'invalid_counts_schema')
+                    adapter = FakeAdapter(directory, capsule)
+                    root = base / 'host'
+                    result = transfer.transfer(capsule, root, adapter, 'attempt1', source_metadata_dir=metadata,
+                                               disk_free=lambda _: 10**10)
+                    with self.subTest(boundary='transfer_state'):
+                        self.assertEqual(result['state'], 'invalid_package')
+                    with self.subTest(boundary='transfer_content'):
+                        self.assertNotIn('SYNTHETIC_PRIVATE_COUNT_PAYLOAD', json.dumps(result))
+                    with self.subTest(boundary='host_receipt'):
+                        self.assertFalse((root / transfer.capsule_sha(capsule) / 'transfer.complete').exists())
+
+    def test_counts_exact_keys_strict_integer_and_budgets(self):
+        for kind in ('metadata', 'sealed_content'):
+            key = 'cohort' if kind == 'metadata' else 'articles'
+            limit = export.LIMITS[key] if kind == 'metadata' else 150
+            mutations = [lambda r: r.update(counts='SYNTHETIC_PRIVATE_COUNT_PAYLOAD'),
+                         lambda r: r['counts'].pop(key),
+                         *[lambda r, value=value: r['counts'].update({key: value})
+                           for value in (True, 1.0, '1', None, {}, -1, limit + 1)]]
+            for mutate in mutations:
+                with self.subTest(kind=kind, mutate=mutate), tempfile.TemporaryDirectory() as temp:
+                    directory, capsule, metadata = self.mutated(Path(temp), kind, mutate)
+                    with self.assertRaisesRegex(transfer.TransferError, 'invalid_counts_schema'):
+                        transfer.verify_bundle(directory, capsule, metadata)
+        for kind in ('metadata', 'sealed_content'):
+            with self.subTest(valid=kind), tempfile.TemporaryDirectory() as temp:
+                directory, capsule, metadata = fixture(Path(temp), kind)
+                result = transfer.verify_bundle(directory, capsule, metadata)
+                expected_keys = set(export.LIMITS) if kind == 'metadata' else {'articles'}
+                self.assertEqual(set(result['counts']), expected_keys)
+                self.assertTrue(all(type(value) is int for value in result['counts'].values()))

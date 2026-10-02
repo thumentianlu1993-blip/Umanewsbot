@@ -136,6 +136,14 @@ def valid_count(count, limit):
     return type(count) is int and 0 <= count <= limit
 
 
+def validated_counts(value, kind):
+    """精确schema与严格整数预算；摘要只能使用此重构对象。"""
+    limits = export.LIMITS if kind == 'metadata' else {'articles': 150}
+    require(type(value) is dict and set(value) == set(limits), 'invalid_counts_schema')
+    require(all(valid_count(value[key], limit) for key, limit in limits.items()), 'invalid_counts_schema')
+    return {key: value[key] for key in limits}
+
+
 def verify_metadata(saved, receipt, c):
     observation = receipt.get('observation', {})
     require(all(observation.get(key) == value for key, value in {
@@ -229,11 +237,12 @@ def _verify_bundle(directory, capsule, source_metadata_dir=None):
         require(receipt.get('complete') is True and receipt.get('kind') == capsule['kind']
                 and receipt.get('observation_id') == capsule['observation_id']
                 and receipt.get('human_verification_status') == 'not_reviewed', 'invalid_receipt')
+        counts = validated_counts(receipt.get('counts'), capsule['kind'])
         if capsule['kind'] == 'metadata':
             verify_metadata(saved, receipt, capsule)
         else:
             verify_content(saved, receipt, capsule, source_metadata_dir)
-        return {'kind': capsule['kind'], 'observation_id': capsule['observation_id'], 'counts': receipt['counts'],
+        return {'kind': capsule['kind'], 'observation_id': capsule['observation_id'], 'counts': counts,
                 'manifest_sha256': capsule['manifest_sha256'], 'bytes': total, 'human_verification_status': 'not_reviewed'}
     except TransferError:
         raise

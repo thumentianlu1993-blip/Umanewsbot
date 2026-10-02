@@ -5,8 +5,8 @@
 
 ## 固定代码及依赖
 
-- `scripts/f02_transfer.py` SHA256：`78b7d3965e46f61fd1f7ba533c3b1e83469019856d48acb09667d4c9d2376042`。
-- `scripts/tests/test_f02_transfer.py` SHA256：`85f54d60d048fbe92922b0af077fc61047bd0d91f1c3fdd145dfb7d47d8dd9dd`。
+- `scripts/f02_transfer.py` SHA256：`55a9df5efb82b4bee99884919efba6e25af9adb21ecaac2784bd9abb650cd1ed`。
+- `scripts/tests/test_f02_transfer.py` SHA256：`a2a9a61363f9d67b932695b123015d9570a08418780aa0ebd4645a1f7abf4807`。
 - 固定delivery HEAD由阶段消息绑定；从Git对象提取上述模块及原exporter，禁止依赖可变化的工作树。
 - 原 `scripts/f02_readonly_export.py` 与15b293ce字节一致，SHA256仍为 `fcdb8e6a130b3c98dd0ab500df6328e42d8ac817d3475a18cbdc46f79be997a5`；不引入Django、psycopg或网络依赖。
 - 新模块使用Python标准库及POSIX flock/ITIMER_REAL，必须在主线程验证；遇已有timer不覆盖而停止。嵌套source验证共用外层deadline，不重置预算。
@@ -64,3 +64,10 @@ CLI只返回计数/摘要/固定错误码，不输出行数据、异常正文或
 
 原R需review新模块/测试、HMAC认证调用边界和host工具包布局；协调者需固定实际路径/owner/空间、resident身份、正式probe/copy runner及超时/进程回收合同、capsule SHA和R托管路径。未绑定前不执行。
 目前只有本地合成故障证据；无真实Docker/SSH/DB动作、没有持久host现场收据、没有R真实收包、没有Linux正式delivery收据，也没有新增真实样本。
+
+## B003-P2-01计数schema返修
+
+原R@bf3bd91e对72ac3074提出counts额外文本键泄漏；本次最小返修固定SHA由阶段消息绑定。
+metadata counts精确为export.LIMITS六键，sealed_content精确为articles一键；每值type is int且在原预算内。
+未知/缺键、字符串/nested/bool/float/null/负数/超限统一固定invalid_counts_schema，不输出payload。
+CLI、transfer、host receipt与inspect的计数来源为已验证白名单整数重构对象；不再原样返回receipt.counts。原exporter字节不变。
