@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "timezone": "Asia/Shanghai",
-  "updated_at": "2026-10-03T02:21:26.102941+08:00",
+  "updated_at": "2026-10-03T02:24:55.609606+08:00",
   "coordinator_thread_id": "01a0fdb2-b88c-7f93-8c9e-ba9564c33c93",
   "coordinator_worktree": "/Users/mentianlu/.codex/worktrees/516a/umanews",
   "deadline_at": "2026-10-30T18:00:00+08:00",
@@ -65,7 +65,7 @@
       "title": "Umanews 10.30｜R 独立审核与验收",
       "model_evidence": "create_thread 显式指定 gpt-6.1-sol 和 medium，创建成功；启动回报已收取",
       "quota_policy_status": "已确认并独立实时复核剩余8%；无运行子代理/模型CLI",
-      "latest_report_commit": "daf142397e6b6dcfb2fb4eac1365c58580125831"
+      "latest_report_commit": "93d10138a0039bb5fea9a36f381759cd5eb0483b"
     }
   },
   "tasks": {
@@ -75,10 +75,10 @@
       "deps": [],
       "deadline_at": "2026-10-04T18:00:00+08:00",
       "status": "进行中",
-      "phase": "方案复审",
+      "phase": "测试先行/共享类型实现",
       "commit": "7c78f67d04cc156520d21916f3eb0a3ef066305e",
       "pr": null,
-      "review": "F01-M-01修订已送原R限定复审",
+      "review": "方案APPROVED@7c78f67d；代码未完成/未review",
       "evidence": [
         "/Users/mentianlu/.codex/worktrees/5482/umanews/docs/changes/next-version-capabilities/lanes/A/A-001-report.md"
       ],
@@ -86,8 +86,9 @@
       "deployed": false,
       "enabled": false,
       "public_verified": false,
-      "dispatch_id": "A-001",
-      "owner_thread_id": "01a0fdc6-8c4e-7ff1-af4b-9db4baff8fb1"
+      "dispatch_id": "A-002",
+      "owner_thread_id": "01a0fdc6-8c4e-7ff1-af4b-9db4baff8fb1",
+      "approved_plan_sha": "7c78f67d04cc156520d21916f3eb0a3ef066305e"
     },
     "F04": {
       "lane": "C",
@@ -95,10 +96,10 @@
       "deps": [],
       "deadline_at": "2026-10-04T18:00:00+08:00",
       "status": "进行中",
-      "phase": "方案审核",
+      "phase": "方案通过/文档原型已交付",
       "commit": "1c90ee2e4edc79af2ea1ee3fc8a4ae7586d34eba",
       "pr": null,
-      "review": "已送R，排队",
+      "review": "方案APPROVED@1c90ee2e；真实后台计时待测",
       "evidence": [
         "/Users/mentianlu/.codex/worktrees/bc9b/umanews/docs/changes/next-version-capabilities/lanes/C/C-001-handoff.md"
       ],
@@ -153,10 +154,10 @@
       "deps": [],
       "deadline_at": "2026-10-05T18:00:00+08:00",
       "status": "进行中",
-      "phase": "证据待复核",
+      "phase": "文档返修",
       "commit": "1c90ee2e4edc79af2ea1ee3fc8a4ae7586d34eba",
       "pr": null,
-      "review": "已送R，排队",
+      "review": "F05-M-01 U01/U03映射反置，证据边界接受",
       "evidence": [],
       "merged": false,
       "deployed": false,
@@ -360,8 +361,8 @@
         "F05"
       ],
       "deadline_at": "2026-10-08T18:00:00+08:00",
-      "status": "未开始",
-      "phase": "待派发",
+      "status": "进行中",
+      "phase": "小切片方案准备",
       "commit": null,
       "pr": null,
       "review": null,
@@ -369,7 +370,9 @@
       "merged": false,
       "deployed": false,
       "enabled": false,
-      "public_verified": false
+      "public_verified": false,
+      "dispatch_id": "C-002",
+      "owner_thread_id": "01a0fdc7-5154-7e51-aafa-f1b34d8f46f9"
     },
     "H02": {
       "lane": "A",
@@ -2056,6 +2059,26 @@
       "scope": "首轮总体方案及首批任务方案审核",
       "status": "审核中，已收到时间窗口findings",
       "sent_at": "2026-10-03T02:05:20.092968+08:00"
+    },
+    {
+      "id": "A-002",
+      "lane": "A",
+      "task_ids": [
+        "F01"
+      ],
+      "scope": "受审合同的最小共享类型与RED/GREEN实现，不含writer/迁移",
+      "status": "已送达",
+      "sent_at": "2026-10-03T02:24:55.609606+08:00"
+    },
+    {
+      "id": "C-002",
+      "lane": "C",
+      "task_ids": [
+        "U01"
+      ],
+      "scope": "小切片方案准备；先闭合F05映射文档finding",
+      "status": "已送达",
+      "sent_at": "2026-10-03T02:24:55.609606+08:00"
     }
   ],
   "decisions": [
@@ -2111,19 +2134,13 @@
   "planning_commit": "d0cec076019f35b6f7db56b09ebee291e57fd9f9",
   "review_queue": [
     {
-      "scope": "F04方案/F05证据",
-      "head": "1c90ee2e4edc79af2ea1ee3fc8a4ae7586d34eba",
-      "status": "已送R，可立即审核"
-    },
-    {
-      "scope": "F01限定复审",
-      "status": "已送R",
-      "head": "7c78f67d04cc156520d21916f3eb0a3ef066305e"
-    },
-    {
       "scope": "F02限定复审及有界导出方案",
       "status": "已送R",
       "head": "a2704b2d7ef93a6ee8518fca2f63ada4a43c2b64"
+    },
+    {
+      "scope": "F05限定复审",
+      "status": "等C映射修复SHA"
     }
   ],
   "quota_policy": {
@@ -2139,7 +2156,7 @@
     "allow_reset_credit": false,
     "last_observed_remaining_percent": 8,
     "last_observed_used_percent": 92,
-    "last_observed_at": "2026-10-03T02:21:26.102941+08:00",
+    "last_observed_at": "2026-10-03T02:24:55.609606+08:00",
     "state": "正常，阈值未触发",
     "limitation": "调度侧控制；非账单硬上限"
   },
