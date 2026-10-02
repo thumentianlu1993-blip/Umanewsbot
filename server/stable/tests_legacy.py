@@ -19503,6 +19503,8 @@ class QQShutdownConcurrencyTests(TransactionTestCase):
         from threading import Event
         from django.db import connections
         from stable.services import qq_auto_push as service
+        self.target.push_scope = 'all_public'
+        self.target.save(update_fields=['push_scope'])
         claimed, replaced = Event(), Event()
         original_claim = service._claim_delivery_attempt
         replacement = {}
