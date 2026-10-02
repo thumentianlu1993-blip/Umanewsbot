@@ -42,7 +42,7 @@
       "worktree": "/Users/mentianlu/.codex/worktrees/bc9b/umanews",
       "branch": "codex/next-version-product-ui-20261003",
       "status": "已启动",
-      "last_cursor": "1bb9b1cd-6b22-4865-9d87-78fbf289661d:1",
+      "last_cursor": "1bb9b1cd-6b22-4865-9d87-78fbf289661d:2",
       "model": "gpt-6.1-sol",
       "reasoning_effort": "medium",
       "initial_head": "dbcc87a4",
@@ -55,7 +55,7 @@
       "worktree": "/Users/mentianlu/.codex/worktrees/3ab1/umanews",
       "branch": "codex/next-version-review-20261003",
       "status": "已启动",
-      "last_cursor": "6afb1d41-cb4a-4026-a141-43c0a48e9cae:1",
+      "last_cursor": "6afb1d41-cb4a-4026-a141-43c0a48e9cae:2",
       "model": "gpt-6.1-sol",
       "reasoning_effort": "medium",
       "initial_head": "d00eaf18",
@@ -70,11 +70,13 @@
       "deps": [],
       "deadline_at": "2026-10-04T18:00:00+08:00",
       "status": "进行中",
-      "phase": "规划/只读基线",
-      "commit": null,
+      "phase": "方案审核",
+      "commit": "adff62b0bc0bb060b1a4d2f232f59c292d4049da",
       "pr": null,
-      "review": null,
-      "evidence": [],
+      "review": "已送R，排队",
+      "evidence": [
+        "/Users/mentianlu/.codex/worktrees/5482/umanews/docs/changes/next-version-capabilities/lanes/A/A-001-report.md"
+      ],
       "merged": false,
       "deployed": false,
       "enabled": false,
@@ -124,11 +126,13 @@
       "deps": [],
       "deadline_at": "2026-10-05T18:00:00+08:00",
       "status": "进行中",
-      "phase": "规划/只读基线",
-      "commit": null,
+      "phase": "方案审核",
+      "commit": "53d29e8da474573ddd86b9d2f277330a305f2a39",
       "pr": null,
-      "review": null,
-      "evidence": [],
+      "review": "已送R，排队",
+      "evidence": [
+        "/Users/mentianlu/.codex/worktrees/a14d/umanews/docs/changes/next-version-capabilities/lanes/B/B-001-status.md"
+      ],
       "merged": false,
       "deployed": false,
       "enabled": false,
@@ -2052,11 +2056,61 @@
       "id": "D-001",
       "date": "2026-10-03",
       "subject": "观察窗口与报告时序修正",
-      "status": "已落盘，待原reviewer复核",
+      "status": "R已反馈原两项finding可关闭；待固定复审报告落盘",
       "reason": "原O05至N09仅144小时；R16早于最后观察窗口，报告证据不闭合。",
       "changes": "O05 10/20 12:00；N09 10/27 14:00；O06 10/23 16:00；O08 10/28 16:00；R16 10/30 16:30；V06 17:00；V07 18:00。"
+    },
+    {
+      "id": "D-002",
+      "date": "2026-10-03",
+      "subject": "F01首版可配置参数",
+      "status": "已发A，待R方案意见后定版",
+      "defaults": {
+        "recent_years": 3,
+        "news_lookback_days": 90,
+        "upcoming_days": 30,
+        "roster_warn_minutes_before": 60,
+        "roster_exception_minutes_before": 30,
+        "result_deadline_minutes_after": 30,
+        "preview_hours_before": 24,
+        "preview_recheck_minutes_before": 60,
+        "preview_tool_reads": 60,
+        "preview_wall_seconds": 1200,
+        "review_rounds": 3,
+        "daily_amount": null
+      },
+      "note": "沿既有计划由产品协调者采纳；社区准入pending、金额unknown不启动对应真实调用；重点范围保留P0/明确重点与指定G1类逐场理由；并非逐项用户新增批准。"
     }
   ],
-  "questions": [],
-  "planning_commit": "d0cec076019f35b6f7db56b09ebee291e57fd9f9"
+  "questions": [
+    {
+      "id": "B-INPUT-001",
+      "owner": "coordinator",
+      "status": "现有SSH只读容器列表已成功，等待F02有界导出方案",
+      "summary": "B线现有SSH别名只读探测一次失败；当前漏斗/有效配置和新holdout未知。先准备有界导出方案，不扩大权限。",
+      "due": "2026-10-04T18:00:00+08:00",
+      "resolution": "协调者以现有alias/权限读取docker ps成功，未改配置；仅证明传输与容器读取，未读取DB或证明业务状态。已回传B。"
+    },
+    {
+      "id": "B-LABEL-001",
+      "owner": "coordinator/R",
+      "status": "已分配职责，待产出",
+      "summary": "R托管保留集；B做development初标；机器初标/独立核验/人类核验分层记录，疑难事实带证据交协调者，不能虚称人工gold。"
+    }
+  ],
+  "planning_commit": "d0cec076019f35b6f7db56b09ebee291e57fd9f9",
+  "review_queue": [
+    {
+      "scope": "R-BOOT-001 两条findings复审",
+      "head": "7df6e38f11c150b8be5b7069fc41ca04fef52d95"
+    },
+    {
+      "scope": "F01方案",
+      "head": "adff62b0bc0bb060b1a4d2f232f59c292d4049da"
+    },
+    {
+      "scope": "F02方案",
+      "head": "53d29e8da474573ddd86b9d2f277330a305f2a39"
+    }
+  ]
 }
