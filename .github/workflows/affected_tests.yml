@@ -1,0 +1,104 @@
+name: 按改动范围测试
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      base_sha:
+        description: 精确40位基线SHA
+        required: true
+        type: string
+      candidate_sha:
+        description: 精确40位候选SHA
+        required: true
+        type: string
+      scope:
+        description: toolchain仅验证新工具；不能作为业务交付证明
+        type: choice
+        options: [toolchain, affected, release, full]
+        default: toolchain
+        required: true
+      reason:
+        description: 本次手动验证原因
+        type: string
+        required: true
+  workflow_call:
+    inputs:
+      base_sha:
+        type: string
+        required: true
+      candidate_sha:
+        type: string
+        required: true
+      scope:
+        type: string
+        default: full
+      reason:
+        type: string
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: impact-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    outputs:
+      mode: ${{ steps.plan.outputs.mode }}
+      executed: ${{ steps.execute.outcome }}
+    steps:
+      - name: checkout-test-tree
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha || inputs.candidate_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: static-contracts
+        run: |
+          git diff --check
+          python .codex/scripts/check_workflow_contract.py
+          python -m unittest scripts.tests.test_test_impact -q
+      - name: generate-plan
+        id: plan
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || inputs.base_sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || inputs.candidate_sha }}
+          TEST_SHA: ${{ github.event.pull_request.merge_commit_sha || inputs.candidate_sha }}
+          SCOPE: ${{ github.event_name == 'pull_request' && 'affected' || inputs.scope }}
+          REASON: ${{ inputs.reason }}
+        run: python scripts/impact_ci.py --base "$BASE_SHA" --head "$HEAD_SHA" --test "$TEST_SHA" --scope "$SCOPE" --reason "$REASON" --output evidence/plan.json
+      - name: execute-isolated-plan
+        id: execute
+        if: github.event_name != 'pull_request' || vars.IMPACT_TEST_POLICY == 'active' || steps.plan.outputs.mode == 'docs-only'
+        run: python scripts/run_test_plan.py --plan evidence/plan.json --output evidence --build
+      - name: verify-execution
+        if: steps.execute.outcome == 'success'
+        run: python scripts/verify_test_plan.py --plan evidence/execution-plan.json --reports evidence --output evidence/summary.json
+      - name: upload-evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: impact-${{ github.run_id }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 30
+  test-plan-gate:
+    if: always()
+    needs: tests
+    runs-on: ubuntu-24.04
+    steps:
+      - name: require-complete-plan
+        env:
+          RESULT: ${{ needs.tests.result }}
+          EXECUTED: ${{ needs.tests.outputs.executed }}
+          MODE: ${{ needs.tests.outputs.mode }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          test "$RESULT" = success
+          test "$EXECUTED" = success
+          if [ "$EVENT" = pull_request ]; then test "$MODE" != validation-only; fi

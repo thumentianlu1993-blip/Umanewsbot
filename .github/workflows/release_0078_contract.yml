@@ -1,35 +1,30 @@
 name: 0078 发布与恢复合同
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - 'deploy/**'
-      - 'docker-compose.prod*.yml'
-      - 'server/stable/**'
-      - 'scripts/test_release_0078_contract.sh'
-      - '.github/workflows/release_0078_contract.yml'
-      - 'scripts/run_bounded_stable_tests.py'
-      - 'scripts/verify_bounded_stable_evidence.py'
-      - 'docs/changes/fix-known-test-failures/*.json'
   workflow_dispatch:
     inputs:
       baseline_sha:
-        description: '用于同环境对照的完整40位基线提交SHA'
+        description: '精确40位基线提交SHA；不自动执行基线全量'
         required: true
         type: string
       validation_scope:
         description: '本次验证范围；有界入口不表示全量通过'
         required: true
-        default: full
+        default: known-failures
         type: choice
-        options: [full, known-failures]
+        options: [full, known-failures, toolchain]
+
+      reason:
+        description: 本次显式验证原因
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 jobs:
   release-contract:
+    if: inputs.validation_scope == 'known-failures'
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     services:
@@ -80,157 +75,14 @@ jobs:
           path: ${{ runner.temp }}/release-0078-test-evidence
           if-no-files-found: error
 
-  stable-baseline-comparison:
-    if: github.event_name != 'workflow_dispatch' || inputs.validation_scope != 'known-failures'
-    name: stable 全量对照 (${{ matrix.revision }})
-    runs-on: ubuntu-24.04
-    timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        revision: [baseline, candidate]
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_DB: release_0078_ci
-          POSTGRES_USER: release_0078_ci
-          POSTGRES_PASSWORD: synthetic-ci-only
-        ports: ['5432:5432']
-        options: >-
-          --health-cmd "pg_isready -U release_0078_ci -d release_0078_ci"
-          --health-interval 5s --health-timeout 5s --health-retries 12
-    env:
-      DB_ENGINE: postgres
-      POSTGRES_HOST: 127.0.0.1
-      POSTGRES_PORT: '5432'
-      POSTGRES_DB: release_0078_ci
-      POSTGRES_USER: release_0078_ci
-      POSTGRES_PASSWORD: synthetic-ci-only
-      RELEASE_0078_TEST_POSTGRES: '0'
-      DJANGO_SETTINGS_MODULE: app.settings
-      PYTHONDONTWRITEBYTECODE: '1'
-      PYTHONUNBUFFERED: '1'
-      DOTENV_DISABLED: '1'
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          fetch-depth: 0
-      - name: 固定本次比较的基线
-        if: matrix.revision == 'baseline'
-        env:
-          BASELINE_SHA: ${{ github.event.pull_request.base.sha || inputs.baseline_sha }}
-        run: |
-          [[ "$BASELINE_SHA" =~ ^[0-9a-f]{40}$ ]]
-          git fetch --depth=1 origin "$BASELINE_SHA"
-          git checkout --detach "$BASELINE_SHA"
-          test "$(git rev-parse HEAD)" = "$BASELINE_SHA"
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: pip
-      - run: python -m pip install --disable-pip-version-check -r requirements.txt
-      - name: 安装隔离备份恢复测试客户端
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y postgresql-client-16
-          echo /usr/lib/postgresql/16/bin >> "$GITHUB_PATH"
-      - name: 记录同环境工作流合同基线
-        run: |
-          mkdir -p evidence
-          set +e
-          python .codex/scripts/check_workflow_contract.py > evidence/workflow-contract-check.log 2>&1
-          echo "$?" > evidence/workflow-contract-check.exit
-          python .codex/scripts/test_workflow_contract.py > evidence/workflow-contract-tests.log 2>&1
-          echo "$?" > evidence/workflow-contract-tests.exit
-          set -e
-      - name: 全量 stable 运行并保存实际失败集合
-        run: |
-          test ! -e .env
-          test ! -e server/.env
-          mkdir -p evidence
-          git rev-parse HEAD > evidence/commit.txt
-          cd server
-          python - <<'PY' > ../evidence/stable.log 2>&1
-          import json, pathlib, socket, sys
-          sys.argv = ['manage.py', 'test', 'stable']
-          import django
-          # Application tests may talk only to local synthetic services.
-          original_connect = socket.socket.connect
-          def connect(self, address):
-              if isinstance(address, tuple) and address[0] not in ('127.0.0.1', 'localhost', '::1'):
-                  raise RuntimeError('External network disabled in isolated stable tests')
-              return original_connect(self, address)
-          socket.socket.connect = connect
-          django.setup()
-          from django.test.runner import DiscoverRunner
-          class EvidenceRunner(DiscoverRunner):
-              def run_suite(self, suite, **kwargs):
-                  result = super().run_suite(suite, **kwargs)
-                  payload = {
-                      'tests_run': result.testsRun,
-                      'failures': [{'test': case.id(), 'traceback': error} for case, error in result.failures],
-                      'errors': [{'test': case.id(), 'traceback': error} for case, error in result.errors],
-                      'skipped': [{'test': case.id(), 'reason': reason} for case, reason in result.skipped],
-                  }
-                  pathlib.Path('../evidence/result.json').write_text(json.dumps(payload, ensure_ascii=False, indent=2))
-                  return result
-          # Existing failures are evidence for comparison, not an accepted green baseline.
-          result = EvidenceRunner(verbosity=1, interactive=False).run_tests(['stable'])
-          pathlib.Path('../evidence/exit-code.txt').write_text(str(int(bool(result))))
-          PY
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: stable-${{ matrix.revision }}
-          path: evidence
-          if-no-files-found: error
-
-  compare-stable-failures:
-    name: stable 新增失败检查
-    needs: stable-baseline-comparison
-    if: always() && (github.event_name != 'workflow_dispatch' || inputs.validation_scope != 'known-failures')
-    runs-on: ubuntu-24.04
-    permissions:
-      actions: read
-      contents: read
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: stable-*
-          path: evidence
-      - name: 比较固定基线与候选的失败名称
-        env:
-          EXPECTED_BASELINE_SHA: ${{ github.event.pull_request.base.sha || inputs.baseline_sha }}
-          EXPECTED_CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: |
-          python - <<'PY'
-          import json, os, pathlib, re
-          root = pathlib.Path('evidence')
-          commits = {}
-          for revision in ('baseline', 'candidate'):
-              expected = os.environ[f'EXPECTED_{revision.upper()}_SHA']
-              actual = (root/f'stable-{revision}/commit.txt').read_text().strip()
-              if not re.fullmatch(r'[0-9a-f]{40}', expected) or actual != expected:
-                  raise SystemExit(f'{revision} artifact commit mismatch: {actual} != {expected}')
-              commits[revision] = actual
-          baseline = json.loads((root/'stable-baseline/result.json').read_text())
-          candidate = json.loads((root/'stable-candidate/result.json').read_text())
-          def failed(value):
-              return {row['test'] for row in value['failures'] + value['errors']}
-          new = sorted(failed(candidate) - failed(baseline))
-          fixed = sorted(failed(baseline) - failed(candidate))
-          output = {'commits': commits, 'baseline_tests': baseline['tests_run'], 'candidate_tests': candidate['tests_run'], 'new_failures': new, 'fixed_failures': fixed}
-          (root/'comparison.json').write_text(json.dumps(output, indent=2))
-          print(json.dumps(output, indent=2))
-          raise SystemExit(1 if new else 0)
-          PY
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: stable-comparison
-          path: evidence/comparison.json
+  impact-validation:
+    if: inputs.validation_scope != 'known-failures'
+    uses: ./.github/workflows/affected_tests.yml
+    with:
+      base_sha: ${{ inputs.baseline_sha }}
+      candidate_sha: ${{ github.sha }}
+      scope: ${{ inputs.validation_scope }}
+      reason: ${{ inputs.reason }}
 
   bounded-regression:
     name: 已知失败相关回归 (${{ matrix.batch }})

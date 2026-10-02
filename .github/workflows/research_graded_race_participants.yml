@@ -1,34 +1,6 @@
 name: 单年度分级赛全部参赛马研究
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - runtime/research/collect_graded_race_participants.py
-      - runtime/research/test_collect_graded_race_participants.py
-      - runtime/research/audit_graded_horse_artifact.py
-      - runtime/research/test_audit_graded_horse_artifact.py
-      - runtime/research/official_graded_race_sources.py
-      - runtime/research/test_official_graded_race_sources.py
-      - runtime/research/collect_official_graded_race_results.py
-      - runtime/research/test_collect_official_graded_race_results.py
-      - runtime/research/build_official_graded_race_manifest.py
-      - runtime/research/test_build_official_graded_race_manifest.py
-      - runtime/research/validate_official_graded_race_package.py
-      - runtime/research/test_validate_official_graded_race_package.py
-      - runtime/research/build_graded_race_completion_bundle.py
-      - runtime/research/test_build_graded_race_completion_bundle.py
-      - runtime/research/build_p0_participant_completion_batches.py
-      - runtime/research/test_build_p0_participant_completion_batches.py
-      - runtime/research/p0_participant_execution_ledger.py
-      - runtime/research/test_p0_participant_execution_ledger.py
-      - server/stable/services/p0_horse_completion_adapters.py
-      - server/stable/test_p0_horse_participant_batch_contract.py
-      - runtime/research/README_graded_race_participants.md
-      - runtime/research/region_manifests/**
-      - runtime/research/reviewed_packages/**
-      - .codex/scripts/test_graded_race_participants_workflow.py
-      - .github/workflows/research_graded_race_participants.yml
   workflow_dispatch:
     inputs:
       year:
@@ -243,17 +215,7 @@ jobs:
             server/stable/services/p0_horse_completion_adapters.py \
             server/stable/test_p0_horse_participant_batch_contract.py \
             .codex/scripts/test_graded_race_participants_workflow.py
-          python -m unittest \
-            runtime.research.test_collect_graded_race_participants \
-            runtime.research.test_audit_graded_horse_artifact \
-            runtime.research.test_official_graded_race_sources \
-            runtime.research.test_collect_official_graded_race_results \
-            runtime.research.test_build_official_graded_race_manifest \
-            runtime.research.test_validate_official_graded_race_package \
-            runtime.research.test_build_graded_race_completion_bundle \
-            runtime.research.test_build_p0_participant_completion_batches \
-            runtime.research.test_p0_participant_execution_ledger \
-            -v
+          python scripts/research_offline_labels.py
           if [[ -n "$OFFICIAL_RESULT_PACKAGE_DIR" ]]; then
             python runtime/research/validate_official_graded_race_package.py \
               --package-dir "$OFFICIAL_RESULT_PACKAGE_DIR" \
@@ -266,26 +228,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          set +e
-          python "$COLLECTOR" \
-            --year "$SMOKE_YEAR" \
-            --stage synthetic_smoke \
-            --limit 1 \
-            --output-dir "$SMOKE_DIR"
-          code=$?
-          set -e
-          [[ "$code" -eq "$SAFE_STOP_CODE" ]] || {
-            echo "synthetic 首次运行必须以 75 安全停止，实际为 $code" >&2
-            exit 1
-          }
-          python "$COLLECTOR" \
-            --year "$SMOKE_YEAR" \
-            --stage synthetic_smoke \
-            --resume \
-            --output-dir "$SMOKE_DIR"
-          python -c \
-            'import json,sys; p=json.load(open(sys.argv[1], encoding="utf-8")); assert p["byte_equivalent"] is True; assert len(p["final_files"]) == 7' \
-            "$SMOKE_DIR/synthetic_smoke_report.json"
+          # synthetic_smoke 首次75、续跑0、7文件逐字节一致；与PR共用场景。
+          python scripts/research_synthetic.py --output "$SMOKE_DIR"
       - name: 上传 synthetic checkpoint 证据
         uses: actions/upload-artifact@v4
         with:
