@@ -19494,3 +19494,66 @@ class QQShutdownConcurrencyTests(TransactionTestCase):
         self.assertEqual(self.delivery.message_id, 'synthetic-existing-receipt')
         self.assertIsNotNone(self.delivery.sent_at)
         self.assertEqual(self.delivery.attempt_count, 1)
+
+
+    def test_expired_claim_owner_cannot_disable_fresh_replacement_claim(self):
+        if connection.vendor != 'postgresql':
+            self.skipTest('PG16 two-connection evidence required')
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Event
+        from django.db import connections
+        from stable.services import qq_auto_push as service
+        claimed, replaced = Event(), Event()
+        original_claim = service._claim_delivery_attempt
+        replacement = {}
+
+        def paused_claim(row, **kwargs):
+            token = original_claim(row, **kwargs)
+            if not token:
+                raise AssertionError('first worker did not claim')
+            claimed.set()
+            if not replaced.wait(10):
+                raise RuntimeError('replacement barrier timeout')
+            return token
+
+        def old_worker():
+            connections.close_all()
+            try:
+                row = QQPushDelivery.objects.get(pk=self.delivery.pk)
+                return service.process_qq_push_delivery(row).status
+            finally:
+                connections.close_all()
+
+        def new_worker():
+            connections.close_all()
+            try:
+                if not claimed.wait(10):
+                    raise RuntimeError('claim barrier timeout')
+                # 真实第二连接模拟lease过期；不等待生产stale时长。
+                QQPushDelivery.objects.filter(pk=self.delivery.pk).update(
+                    last_attempt_at=timezone.now()-timedelta(seconds=service._sending_stale_after()+1))
+                row = QQPushDelivery.objects.get(pk=self.delivery.pk)
+                self.assertTrue(original_claim(row, message='replacement', public_url='https://fixture.invalid/new'))
+                row.refresh_from_db()
+                replacement.update(attempt=row.attempt_count, at=row.last_attempt_at, payload=row.request_payload)
+            finally:
+                replaced.set()
+                connections.close_all()
+
+        with patch.object(service, 'qq_channel_enabled', side_effect=lambda: not replaced.is_set()), \
+             patch.object(service, '_claim_delivery_attempt', side_effect=paused_claim), \
+             patch.object(service.BotPusher, 'is_online', return_value=(True, None)), \
+             patch.object(service.BotPusher, 'send_group_message') as send, \
+             patch.object(service, 'is_public_url_accessible') as probe:
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                old = pool.submit(old_worker)
+                new = pool.submit(new_worker)
+                new.result(timeout=15)
+                self.assertEqual(old.result(timeout=15), QQPushDeliveryStatus.SENDING)
+            send.assert_not_called()
+            probe.assert_not_called()
+        self.delivery.refresh_from_db()
+        self.assertEqual(self.delivery.attempt_count, replacement['attempt'])
+        self.assertEqual(self.delivery.last_attempt_at, replacement['at'])
+        self.assertEqual(self.delivery.request_payload, replacement['payload'])
+        self.assertEqual(self.delivery.last_error, '')
