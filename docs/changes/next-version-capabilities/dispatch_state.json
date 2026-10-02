@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "timezone": "Asia/Shanghai",
-  "updated_at": "2026-10-03T03:16:19.425719+08:00",
+  "updated_at": "2026-10-03T03:17:18.269119+08:00",
   "coordinator_thread_id": "01a0fdb2-b88c-7f93-8c9e-ba9564c33c93",
   "coordinator_worktree": "/Users/mentianlu/.codex/worktrees/516a/umanews",
   "deadline_at": "2026-10-30T18:00:00+08:00",
@@ -75,7 +75,7 @@
       "deps": [],
       "deadline_at": "2026-10-04T18:00:00+08:00",
       "status": "进行中",
-      "phase": "代码复审通过，Linux full运行中",
+      "phase": "代码复审通过，41批完成，完整收据核验中",
       "commit": "0e05029c1ed00713a6f66e461e6753c1e4dadb27",
       "pr": null,
       "review": "APPROVED@0e05029c；A002-P2-01/02 CLOSED；独立17 tests PASS；完整Linux/skip/收据待核",
@@ -366,10 +366,10 @@
       ],
       "deadline_at": "2026-10-08T18:00:00+08:00",
       "status": "进行中",
-      "phase": "P2返修原R复审/PG验证排队",
+      "phase": "代码复审通过，消费受审映射及短PG验证",
       "commit": "2b9398f756507c5e58deb7f534d0d2b624850ae4",
       "pr": null,
-      "review": "C003-P2-01已修：尊重马匹记录prepared grade；真实RED+39宿主GREEN；原R短复审中",
+      "review": "APPROVED@2b9398f7，C003-P2-01 CLOSED；PG/目标能力/正式impact及Linux交付待证",
       "evidence": [
         "/Users/mentianlu/.codex/worktrees/bc9b/umanews/docs/changes/next-version-capabilities/lanes/C/U01-implementation-review.md"
       ],
@@ -2191,9 +2191,10 @@
       "base": "907f8de699b31a6fcc80acc78e9ba070aadc4f28",
       "approved_plan": "2919dd3558950466e18a8886ec8bc7f85a119f5a",
       "head": "2b9398f756507c5e58deb7f534d0d2b624850ae4",
-      "status": "C003-P2-01已修，原R限定复审中",
+      "status": "APPROVED，C003-P2-01 CLOSED，交付测试待证",
       "behavior_head": "3ac1e3a750e68bafe7950fa726481a02ecccfad6",
-      "red_commit": "e534ccf664836131d158042e5edbb45f1d56462b"
+      "red_commit": "e534ccf664836131d158042e5edbb45f1d56462b",
+      "report": "/Users/mentianlu/.codex/worktrees/3ab1/umanews/docs/changes/next-version-capabilities/lanes/R/C-003-U01-code-rereview.md"
     },
     {
       "scope": "root共享影响映射修正",
@@ -2246,7 +2247,7 @@
   "resources": {
     "local_linux_tests": {
       "profile": "umanews-impact-ci",
-      "status": "A新固定树收集通过，full正在运行",
+      "status": "A无在途批次，C短PG窗口已分配",
       "cpu": 2,
       "memory_gib": 4,
       "disk_gib": 20,
@@ -2265,34 +2266,34 @@
       "verification_limit": "daemon与缓存可用；不是候选测试通过证据",
       "runner_connection": "A专用DOCKER_CONFIG/context仅绑定本地socket，原verify_local_docker已PASS；各线使用独立配置目录，不覆盖全局context",
       "current_allocation": {
-        "lane": "A",
-        "head": "0e05029c1ed00713a6f66e461e6753c1e4dadb27",
+        "lane": "C",
+        "head": "待消费c9后固定",
+        "scope": "短RED与PG16等价诊断，非正式full交付",
         "parallel_batches": 2,
-        "output": "/tmp/umanews-a002-evidence/linux-full-0e05029c",
-        "status": "collect通过，full已开始，最多2批并发",
-        "built_image": "sha256:fcf8cdaf63af51b1b8a6e30e3d2fdf871d127c3c1461bfd00c9fc6d610eab905",
-        "collection_blocker": null,
-        "collection_tests": 6182,
-        "collection_batches": 41,
-        "collection_labels": 294,
-        "last_progress": "40/41分片完成，完整集合/skip/收尾/候选外收据待A提交"
+        "status": "已派发短窗口，结果后释放；不自动full"
       },
       "temporary_directory": "每线独立/Users/mentianlu/.codex/runtime目录作为TMPDIR；mac /var/folders未共享",
       "queue": [
-        {
-          "lane": "C",
-          "scope": "短RED及PG16语法/Unicode/来源上下文/分页前一致性集合",
-          "red_commit": "5c66088d821c249e41141dd5f8ba062c3edaf210",
-          "candidate_sha": "2b9398f756507c5e58deb7f534d0d2b624850ae4",
-          "status": "A窗口完成后优先，先固定候选与影响计划"
-        },
         {
           "lane": "B",
           "scope": "F02新路径映射后的必要交付测试",
           "candidate_sha": "15b293ce6cc70a717eafee25c9e4120c9280b58f",
           "status": "待R技术审核与映射衔接后安排"
         }
-      ]
+      ],
+      "previous_allocation": {
+        "lane": "A",
+        "head": "0e05029c1ed00713a6f66e461e6753c1e4dadb27",
+        "parallel_batches": 2,
+        "output": "/tmp/umanews-a002-evidence/linux-full-0e05029c",
+        "status": "41/41 runner exit0；A完整集合/skip/收尾/收据核验中，窗口已释放",
+        "built_image": "sha256:fcf8cdaf63af51b1b8a6e30e3d2fdf871d127c3c1461bfd00c9fc6d610eab905",
+        "collection_blocker": null,
+        "collection_tests": 6182,
+        "collection_batches": 41,
+        "collection_labels": 294,
+        "last_progress": "40/41分片完成，完整集合/skip/收尾/候选外收据待A提交"
+      }
     },
     "test_mapping": {
       "decision": "F01需显式映射；mapping变更按现行规则运行固定候选一套full，不改策略规避",
