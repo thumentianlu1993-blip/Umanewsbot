@@ -1,3 +1,11 @@
+## 2026-10-03 下一版本进入开发调度
+
+用户已要求由协调会话承担架构与产品协调，创建三条开发线及独立审核支持，目标仍为 10/30 完全上线。已在独立工作树继承原规划并保留来源哈希；模型固定 gpt-6.1-sol / medium。实际派单与会话状态见 [开发调度](changes/next-version-capabilities/coordination.md) 和 [执行台账](changes/next-version-capabilities/dispatch_state.json)。本条不表示任何功能已实现、合并或发布。
+
+## 2026-10-03 下一版本整体规划已形成（文档，未实施）
+
+已将八模块需求汇总为 [10 月 30 日整体规划与开发任务](changes/next-version-capabilities/tasks.md)：按用户确认的三条开发线、独立审核与发布协调，拆成四轮迭代、100 张有依赖和 DDL 的任务卡，并配套验收与上线计划。建议 10/22 完成开发、10/23 完整候选灰度、10/28 全量、10/30 最终验收；工时和数据吞吐需于 10/06 校准。此为规划落盘，不代表代码、生产、付费调用或数据操作已经开始；以下原有实施/运行记录保持原时点语义。
+
 ## 2026-10-03 00:21 按改动范围测试已启用（北京时间）
 
 [PR #233](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/233) 已合并，仓库变量 `IMPACT_TEST_POLICY=active`；主线要求 `test-plan-gate`，strict 和管理员约束均已核验。
