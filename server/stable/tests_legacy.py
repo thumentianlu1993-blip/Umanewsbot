@@ -19117,3 +19117,62 @@ class P0HorseProfileDataCompletionTests(TestCase):
         # it lands on page 2.
         self.assertNotContains(first, "香港马")
         self.assertContains(second, "香港马")
+
+
+@override_settings(QQ_CHANNEL_ENABLED=False, QQ_PUSH_ENABLED=True,
+                   CELERY_TASK_ALWAYS_EAGER=False, QQ_PUSH_MIN_INTERVAL_SECONDS=60,
+                   QQ_PUSH_SCOPE='all_public')
+class QQShutdownTests(TestCase):
+    """停用后的旧入口与迟到消息必须无发送、无派生重试。"""
+    def setUp(self):
+        QQAutoPushTests.setUp(self)
+        self.staff = get_user_model().objects.create_user('qq-shutdown-staff', is_staff=True)
+        self.client.force_login(self.staff)
+        self.post = patch('stable.services.onebot.requests.post').start()
+        self.get = patch('stable.services.onebot.requests.get').start()
+        self.addCleanup(patch.stopall)
+        for mocked in (self.post, self.get):
+            mocked.return_value.json.return_value = {'status': 'ok', 'retcode': 0, 'data': {'online': True}}
+
+    def test_manual_api_reports_disabled_without_queue_or_article_mutation(self):
+        before = (self.article.status, self.article.workflow_status, self.article.published_to_web_at)
+        with patch('stable.tasks.push_article_task.delay') as queued:
+            response = self.client.post(reverse('api-article-push', args=[self.article.pk]),
+                data=json.dumps({'target_ids': [self.target.pk]}), content_type='application/json')
+        self.assertEqual(response.status_code, 410)
+        self.assertEqual(response.json(), {'queued': False, 'reason': 'qq_channel_disabled'})
+        queued.assert_not_called()
+        self.article.refresh_from_db()
+        self.assertEqual((self.article.status, self.article.workflow_status, self.article.published_to_web_at), before)
+        self.post.assert_not_called()
+
+    def test_terminal_disabled_blocks_text_image_fallback_and_direct_post(self):
+        from stable.services.onebot import BotPusher
+        pusher = BotPusher()
+        for image in (None, 'https://fixture.invalid/image.png'):
+            with self.subTest(image=image):
+                try:
+                    pusher.send_group_message('synthetic-group', 'synthetic', image_url=image)
+                except RuntimeError:
+                    pass
+                self.post.assert_not_called()
+        try:
+            pusher._post_message('synthetic-group', [])
+        except RuntimeError:
+            pass
+        self.post.assert_not_called()
+
+    def test_late_delivery_is_skipped_before_throttle_or_retry(self):
+        delivery = QQPushDelivery.objects.create(article=self.article, target=self.target,
+            status=QQPushDeliveryStatus.RETRYING, attempt_count=1, last_attempt_at=timezone.now())
+        with patch('stable.tasks.qq_push_delivery_task.apply_async') as retry, \
+             patch('stable.services.qq_auto_push.is_public_url_accessible') as url_check:
+            result = qq_push_delivery_task.run(delivery.pk)
+        self.assertEqual(result['status'], QQPushDeliveryStatus.SKIPPED)
+        retry.assert_not_called()
+        url_check.assert_not_called()
+        delivery.refresh_from_db()
+        self.assertEqual(delivery.attempt_count, 1)
+        self.assertEqual(delivery.last_error, 'qq_channel_disabled')
+        self.get.assert_not_called()
+        self.post.assert_not_called()
