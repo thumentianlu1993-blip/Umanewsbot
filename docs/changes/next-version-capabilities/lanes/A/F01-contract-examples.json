@@ -1,0 +1,923 @@
+{
+  "schema_version": "f01.examples.v1",
+  "status": "draft_for_review",
+  "fixture_only": true,
+  "cases": [
+    {
+      "case_id": "ordinary_horse_word",
+      "label": "普通词马名",
+      "input": {
+        "schema_version": "f01.v1",
+        "evaluated_at": "2026-10-03T01:10:00Z",
+        "policy_ref": "f01-policy-draft",
+        "input_version": {
+          "schema_version": "f01.input.v1",
+          "scope": [
+            "entity",
+            "materials",
+            "evidence",
+            "protection",
+            "policy_ref"
+          ],
+          "content_sha256": "bb658087ad502eb8a798200fdc1ddc29d5a6122999223ffea86a3ea3cc0bfa4f",
+          "generations": {
+            "owner": null,
+            "schedule": null,
+            "enrollment": null,
+            "source_set": null
+          }
+        },
+        "snapshot": {
+          "entity": {
+            "kind": "horse",
+            "canonical_id": "fixture-horse-love",
+            "identity_state": "verified",
+            "source_refs": [],
+            "candidate_ids": [],
+            "evidence_refs": []
+          },
+          "materials": [
+            {
+              "capability": "identity",
+              "maturity": "confirmed",
+              "completeness": "complete",
+              "validation": "passed",
+              "revision_ref": null,
+              "supersedes_ref": null,
+              "evidence_refs": [
+                "e-love"
+              ],
+              "data": {
+                "original_name": "Love",
+                "name_kind": "registered",
+                "namespace": "fixture-registry",
+                "external_id": "love-2019",
+                "birth_year": 2019
+              }
+            }
+          ],
+          "evidence": [
+            {
+              "evidence_id": "e-love",
+              "provider_key": "fixture-official_operator",
+              "source_class": "official_operator",
+              "independence_key": "fixture-origin-e-love",
+              "capability": "identity",
+              "artifact_sha256": "c31c8d586ccae0ff0644103c2ed6bf6dabbd69bbb3a90922346defcce37df151",
+              "locator": "/facts/0",
+              "observed_at": "2026-10-03T01:00:00Z",
+              "source_time": {
+                "precision": "unknown",
+                "published_at": null,
+                "last_absent_at": null,
+                "first_seen_at": "2026-10-03T01:00:00Z"
+              },
+              "contract_ref": {
+                "route_digest": "e050efd0a0e23d85c6a1f4dc256aaf88bc6179d0a5a69a50fe274c3e414ddda7",
+                "contract_digest": "304aeb6aeb9281204cf0b2723b2d0d855d70719de14de5aa270752aa275e307b",
+                "proof_digest": "b5a666eb4586fa4015f3c37018c0e6d6f37d28297d8484dd74150d488b0a4338",
+                "valid_until": "2026-10-30T00:00:00Z",
+                "revoked": false
+              }
+            }
+          ],
+          "protection": {
+            "paused": false,
+            "fields": [],
+            "modules": [],
+            "reason": "",
+            "actor_ref": null,
+            "changed_at": null
+          },
+          "policy_ref": "f01-policy-draft"
+        }
+      },
+      "expected": {
+        "entity_resolution": "verified",
+        "linked_entity_id": "fixture-horse-love",
+        "display_name": "Love",
+        "generated_chinese_name": null,
+        "ordinary_prose_control": {
+          "text": "We love racing.",
+          "identity_state": "unresolved",
+          "linked_entity_id": null
+        },
+        "exceptions": []
+      },
+      "output": {
+        "schema_version": "f01.v1",
+        "decision_version": "f01.decision.draft",
+        "input_version": {
+          "schema_version": "f01.input.v1",
+          "scope": [
+            "entity",
+            "materials",
+            "evidence",
+            "protection",
+            "policy_ref"
+          ],
+          "content_sha256": "bb658087ad502eb8a798200fdc1ddc29d5a6122999223ffea86a3ea3cc0bfa4f",
+          "generations": {
+            "owner": null,
+            "schedule": null,
+            "enrollment": null,
+            "source_set": null
+          }
+        },
+        "input_fingerprint": "3a8df2e24255997da3bbc918f872adab984cfd27ad153149051dcc2cc30d40e7",
+        "evaluated_at": "2026-10-03T01:10:00Z",
+        "entity": {
+          "kind": "horse",
+          "canonical_id": "fixture-horse-love",
+          "identity_state": "verified",
+          "source_refs": [],
+          "candidate_ids": [],
+          "evidence_refs": []
+        },
+        "fact_phase": "unknown",
+        "fact_evidence_refs": [],
+        "clock_hint": "unknown",
+        "material_state": "unknown",
+        "execution_state": "unobserved",
+        "actions": [
+          {
+            "action_id": "fixture-action-ordinary_horse_word",
+            "kind": "wait",
+            "capability": "identity",
+            "source_binding_ref": null,
+            "not_before": "2026-10-03T01:10:00Z",
+            "deadline": null,
+            "reason_code": "identity_resolved",
+            "expected_input_version": {
+              "schema_version": "f01.input.v1",
+              "scope": [
+                "entity",
+                "materials",
+                "evidence",
+                "protection",
+                "policy_ref"
+              ],
+              "content_sha256": "bb658087ad502eb8a798200fdc1ddc29d5a6122999223ffea86a3ea3cc0bfa4f",
+              "generations": {
+                "owner": null,
+                "schedule": null,
+                "enrollment": null,
+                "source_set": null
+              }
+            },
+            "expected_generations": {
+              "owner": null,
+              "schedule": null,
+              "enrollment": null,
+              "source_set": null
+            }
+          }
+        ],
+        "next_action_id": "fixture-action-ordinary_horse_word",
+        "next_due_at": "2026-10-03T01:10:00Z",
+        "next_review_at": null,
+        "next_review_reason": null,
+        "blockers": [],
+        "public_summary": null,
+        "policy_ref": "f01-policy-draft"
+      }
+    },
+    {
+      "case_id": "same_name_two_horses",
+      "label": "同名异马",
+      "input": {
+        "schema_version": "f01.v1",
+        "evaluated_at": "2026-10-03T01:10:00Z",
+        "policy_ref": "f01-policy-draft",
+        "input_version": {
+          "schema_version": "f01.input.v1",
+          "scope": [
+            "entity",
+            "materials",
+            "evidence",
+            "protection",
+            "policy_ref"
+          ],
+          "content_sha256": "a0f5bcbc952b8675d609ac87bf81dfe145611715febb161b8b564030c986a01a",
+          "generations": {
+            "owner": null,
+            "schedule": null,
+            "enrollment": null,
+            "source_set": null
+          }
+        },
+        "snapshot": {
+          "entity": {
+            "kind": "horse",
+            "canonical_id": null,
+            "identity_state": "ambiguous",
+            "source_refs": [
+              {
+                "namespace": "fixture-uk",
+                "external_id": "echo-2018",
+                "source": "fixture-registry"
+              },
+              {
+                "namespace": "fixture-us",
+                "external_id": "echo-2020",
+                "source": "fixture-registry"
+              }
+            ],
+            "candidate_ids": [
+              "fixture-horse-echo-2018",
+              "fixture-horse-echo-2020"
+            ],
+            "evidence_refs": []
+          },
+          "materials": [
+            {
+              "capability": "identity",
+              "maturity": "unknown",
+              "completeness": "partial",
+              "validation": "conflict",
+              "revision_ref": null,
+              "supersedes_ref": null,
+              "evidence_refs": [
+                "e-echo-uk",
+                "e-echo-us"
+              ],
+              "data": {
+                "original_name": "Echo",
+                "candidates": [
+                  {
+                    "id": "fixture-horse-echo-2018",
+                    "birth_year": 2018,
+                    "sire": "Sire A"
+                  },
+                  {
+                    "id": "fixture-horse-echo-2020",
+                    "birth_year": 2020,
+                    "sire": "Sire B"
+                  }
+                ]
+              }
+            }
+          ],
+          "evidence": [
+            {
+              "evidence_id": "e-echo-uk",
+              "provider_key": "fixture-official_operator",
+              "source_class": "official_operator",
+              "independence_key": "fixture-origin-e-echo-uk",
+              "capability": "identity",
+              "artifact_sha256": "bb80af329b845826f98f0150c9304b948115a3fa73be49fbb3133892772e7e29",
+              "locator": "/facts/0",
+              "observed_at": "2026-10-03T01:00:00Z",
+              "source_time": {
+                "precision": "unknown",
+                "published_at": null,
+                "last_absent_at": null,
+                "first_seen_at": "2026-10-03T01:00:00Z"
+              },
+              "contract_ref": {
+                "route_digest": "e050efd0a0e23d85c6a1f4dc256aaf88bc6179d0a5a69a50fe274c3e414ddda7",
+                "contract_digest": "304aeb6aeb9281204cf0b2723b2d0d855d70719de14de5aa270752aa275e307b",
+                "proof_digest": "b5a666eb4586fa4015f3c37018c0e6d6f37d28297d8484dd74150d488b0a4338",
+                "valid_until": "2026-10-30T00:00:00Z",
+                "revoked": false
+              }
+            },
+            {
+              "evidence_id": "e-echo-us",
+              "provider_key": "fixture-official_operator",
+              "source_class": "official_operator",
+              "independence_key": "fixture-origin-e-echo-us",
+              "capability": "identity",
+              "artifact_sha256": "491b99bb53b7092469b40e560259c6d25cb861b03b63886ca899148feae416f8",
+              "locator": "/facts/0",
+              "observed_at": "2026-10-03T01:00:00Z",
+              "source_time": {
+                "precision": "unknown",
+                "published_at": null,
+                "last_absent_at": null,
+                "first_seen_at": "2026-10-03T01:00:00Z"
+              },
+              "contract_ref": {
+                "route_digest": "e050efd0a0e23d85c6a1f4dc256aaf88bc6179d0a5a69a50fe274c3e414ddda7",
+                "contract_digest": "304aeb6aeb9281204cf0b2723b2d0d855d70719de14de5aa270752aa275e307b",
+                "proof_digest": "b5a666eb4586fa4015f3c37018c0e6d6f37d28297d8484dd74150d488b0a4338",
+                "valid_until": "2026-10-30T00:00:00Z",
+                "revoked": false
+              }
+            }
+          ],
+          "protection": {
+            "paused": false,
+            "fields": [],
+            "modules": [],
+            "reason": "",
+            "actor_ref": null,
+            "changed_at": null
+          },
+          "policy_ref": "f01-policy-draft"
+        }
+      },
+      "expected": {
+        "entity_resolution": "ambiguous",
+        "linked_entity_id": null,
+        "merge_allowed": false,
+        "next_action_kind": "operator_review",
+        "next_review_at": "2026-10-03T13:10:00Z",
+        "exceptions": [
+          {
+            "code": "identity_conflict",
+            "capability": "identity",
+            "field_paths": [
+              "entity"
+            ],
+            "severity": "blocking",
+            "root_cause_key": "fixture-echo-collision",
+            "evidence_refs": [
+              "e-echo-uk",
+              "e-echo-us"
+            ],
+            "retryability": "operator_required",
+            "next_review_at": "2026-10-03T13:10:00Z"
+          }
+        ]
+      },
+      "output": {
+        "schema_version": "f01.v1",
+        "decision_version": "f01.decision.draft",
+        "input_version": {
+          "schema_version": "f01.input.v1",
+          "scope": [
+            "entity",
+            "materials",
+            "evidence",
+            "protection",
+            "policy_ref"
+          ],
+          "content_sha256": "a0f5bcbc952b8675d609ac87bf81dfe145611715febb161b8b564030c986a01a",
+          "generations": {
+            "owner": null,
+            "schedule": null,
+            "enrollment": null,
+            "source_set": null
+          }
+        },
+        "input_fingerprint": "88a7c33747fd4e72b6c79aa80ae62e0680dd488d57e745e1186d7654386d1b34",
+        "evaluated_at": "2026-10-03T01:10:00Z",
+        "entity": {
+          "kind": "horse",
+          "canonical_id": null,
+          "identity_state": "ambiguous",
+          "source_refs": [
+            {
+              "namespace": "fixture-uk",
+              "external_id": "echo-2018"
+            },
+            {
+              "namespace": "fixture-us",
+              "external_id": "echo-2020"
+            }
+          ],
+          "candidate_ids": [
+            "fixture-horse-echo-2018",
+            "fixture-horse-echo-2020"
+          ],
+          "evidence_refs": []
+        },
+        "fact_phase": "unknown",
+        "fact_evidence_refs": [],
+        "clock_hint": "unknown",
+        "material_state": "unknown",
+        "execution_state": "unobserved",
+        "actions": [
+          {
+            "action_id": "fixture-action-same_name_two_horses",
+            "kind": "operator_review",
+            "capability": "identity",
+            "source_binding_ref": null,
+            "not_before": "2026-10-03T01:10:00Z",
+            "deadline": null,
+            "reason_code": "identity_conflict",
+            "expected_input_version": {
+              "schema_version": "f01.input.v1",
+              "scope": [
+                "entity",
+                "materials",
+                "evidence",
+                "protection",
+                "policy_ref"
+              ],
+              "content_sha256": "a0f5bcbc952b8675d609ac87bf81dfe145611715febb161b8b564030c986a01a",
+              "generations": {
+                "owner": null,
+                "schedule": null,
+                "enrollment": null,
+                "source_set": null
+              }
+            },
+            "expected_generations": {
+              "owner": null,
+              "schedule": null,
+              "enrollment": null,
+              "source_set": null
+            }
+          }
+        ],
+        "next_action_id": "fixture-action-same_name_two_horses",
+        "next_due_at": "2026-10-03T01:10:00Z",
+        "next_review_at": "2026-10-03T13:10:00Z",
+        "next_review_reason": "identity_conflict",
+        "blockers": [
+          {
+            "code": "identity_conflict",
+            "capability": "identity",
+            "field_paths": [
+              "entity"
+            ],
+            "severity": "blocking",
+            "root_cause_key": "fixture-echo-collision",
+            "evidence_refs": [
+              "e-echo-uk",
+              "e-echo-us"
+            ],
+            "retryability": "operator_required",
+            "next_review_at": "2026-10-03T13:10:00Z"
+          }
+        ],
+        "public_summary": null,
+        "policy_ref": "f01-policy-draft"
+      }
+    },
+    {
+      "case_id": "confirmed_vs_predicted",
+      "label": "确定名单与预想名单冲突",
+      "input": {
+        "schema_version": "f01.v1",
+        "evaluated_at": "2026-10-03T01:10:00Z",
+        "policy_ref": "f01-policy-draft",
+        "input_version": {
+          "schema_version": "f01.input.v1",
+          "scope": [
+            "entity",
+            "materials",
+            "evidence",
+            "protection",
+            "policy_ref"
+          ],
+          "content_sha256": "4f6223e24cd043f233fc1b009cbc64bc116e48f9c7f37b411f9dc049b02d8984",
+          "generations": {
+            "owner": null,
+            "schedule": null,
+            "enrollment": null,
+            "source_set": null
+          }
+        },
+        "snapshot": {
+          "entity": {
+            "kind": "race_event",
+            "canonical_id": "fixture-race-1",
+            "identity_state": "verified",
+            "source_refs": [],
+            "candidate_ids": [],
+            "evidence_refs": []
+          },
+          "materials": [
+            {
+              "capability": "roster",
+              "maturity": "confirmed",
+              "completeness": "complete",
+              "validation": "passed",
+              "revision_ref": "fixture-revision-2",
+              "supersedes_ref": null,
+              "evidence_refs": [
+                "e-roster-final"
+              ],
+              "data": {
+                "participants": [
+                  {
+                    "stable_key": "p1",
+                    "horse_ref": "fixture-horse-love",
+                    "status": "declared"
+                  },
+                  {
+                    "stable_key": "p2",
+                    "horse_ref": "fixture-horse-echo-2018",
+                    "status": "declared"
+                  }
+                ]
+              }
+            },
+            {
+              "capability": "roster",
+              "maturity": "predicted",
+              "completeness": "partial",
+              "validation": "passed",
+              "revision_ref": "fixture-candidate-3",
+              "supersedes_ref": null,
+              "evidence_refs": [
+                "e-roster-predicted"
+              ],
+              "data": {
+                "participants": [
+                  {
+                    "stable_key": "p1",
+                    "horse_ref": "fixture-horse-love",
+                    "status": "declared"
+                  },
+                  {
+                    "stable_key": "p3",
+                    "horse_ref": "fixture-horse-other",
+                    "status": "unknown"
+                  }
+                ]
+              }
+            }
+          ],
+          "evidence": [
+            {
+              "evidence_id": "e-roster-final",
+              "provider_key": "fixture-trusted_publisher",
+              "source_class": "trusted_publisher",
+              "independence_key": "fixture-origin-e-roster-final",
+              "capability": "roster",
+              "artifact_sha256": "fa38d349f6f6d46808d774998480262910f2b6a57ad609c61380a950b6b50d6f",
+              "locator": "/facts/0",
+              "observed_at": "2026-10-03T01:00:00Z",
+              "source_time": {
+                "precision": "unknown",
+                "published_at": null,
+                "last_absent_at": null,
+                "first_seen_at": "2026-10-03T01:00:00Z"
+              },
+              "contract_ref": {
+                "route_digest": "e050efd0a0e23d85c6a1f4dc256aaf88bc6179d0a5a69a50fe274c3e414ddda7",
+                "contract_digest": "304aeb6aeb9281204cf0b2723b2d0d855d70719de14de5aa270752aa275e307b",
+                "proof_digest": "b5a666eb4586fa4015f3c37018c0e6d6f37d28297d8484dd74150d488b0a4338",
+                "valid_until": "2026-10-30T00:00:00Z",
+                "revoked": false
+              }
+            },
+            {
+              "evidence_id": "e-roster-predicted",
+              "provider_key": "fixture-official_operator",
+              "source_class": "official_operator",
+              "independence_key": "fixture-origin-e-roster-predicted",
+              "capability": "roster",
+              "artifact_sha256": "586d54ef7ac314d01eb48389955581d91e92af6a5dceb6af21642b85ed2f860a",
+              "locator": "/facts/0",
+              "observed_at": "2026-10-03T01:05:00Z",
+              "source_time": {
+                "precision": "unknown",
+                "published_at": null,
+                "last_absent_at": null,
+                "first_seen_at": "2026-10-03T01:05:00Z"
+              },
+              "contract_ref": {
+                "route_digest": "e050efd0a0e23d85c6a1f4dc256aaf88bc6179d0a5a69a50fe274c3e414ddda7",
+                "contract_digest": "304aeb6aeb9281204cf0b2723b2d0d855d70719de14de5aa270752aa275e307b",
+                "proof_digest": "b5a666eb4586fa4015f3c37018c0e6d6f37d28297d8484dd74150d488b0a4338",
+                "valid_until": "2026-10-30T00:00:00Z",
+                "revoked": false
+              }
+            }
+          ],
+          "protection": {
+            "paused": false,
+            "fields": [],
+            "modules": [],
+            "reason": "",
+            "actor_ref": null,
+            "changed_at": null
+          },
+          "policy_ref": "f01-policy-draft"
+        }
+      },
+      "expected": {
+        "effective_revision_ref": "fixture-revision-2",
+        "maturity": "confirmed",
+        "completeness": "complete",
+        "source_class": "trusted_publisher",
+        "official_direct": false,
+        "public_eligibility": "requires_runtime_validator",
+        "replace_with_predicted": false,
+        "next_action_kind": "refresh_roster",
+        "conflict_control": {
+          "incoming_maturity": "confirmed",
+          "incoming_validation": "conflict",
+          "effective_revision_ref": "fixture-revision-2",
+          "next_action_kind": "operator_review"
+        },
+        "stale_control": {
+          "changed_paths": [
+            "materials.roster.participants"
+          ],
+          "write_allowed": false,
+          "reason_code": "stale_input"
+        }
+      },
+      "output": {
+        "schema_version": "f01.v1",
+        "decision_version": "f01.decision.draft",
+        "input_version": {
+          "schema_version": "f01.input.v1",
+          "scope": [
+            "entity",
+            "materials",
+            "evidence",
+            "protection",
+            "policy_ref"
+          ],
+          "content_sha256": "4f6223e24cd043f233fc1b009cbc64bc116e48f9c7f37b411f9dc049b02d8984",
+          "generations": {
+            "owner": null,
+            "schedule": null,
+            "enrollment": null,
+            "source_set": null
+          }
+        },
+        "input_fingerprint": "26865a4ae8399537c0e680672f6607665895f4050febd686816d0c783fd9f31b",
+        "evaluated_at": "2026-10-03T01:10:00Z",
+        "entity": {
+          "kind": "race_event",
+          "canonical_id": "fixture-race-1",
+          "identity_state": "verified",
+          "source_refs": [],
+          "candidate_ids": [],
+          "evidence_refs": []
+        },
+        "fact_phase": "unknown",
+        "fact_evidence_refs": [],
+        "clock_hint": "unknown",
+        "material_state": "confirmed",
+        "execution_state": "unobserved",
+        "actions": [
+          {
+            "action_id": "fixture-action-confirmed_vs_predicted",
+            "kind": "refresh_roster",
+            "capability": "roster",
+            "source_binding_ref": "fixture-binding-roster",
+            "not_before": "2026-10-03T01:10:00Z",
+            "deadline": "2026-10-03T01:20:00Z",
+            "reason_code": "retain_confirmed_roster",
+            "expected_input_version": {
+              "schema_version": "f01.input.v1",
+              "scope": [
+                "entity",
+                "materials",
+                "evidence",
+                "protection",
+                "policy_ref"
+              ],
+              "content_sha256": "4f6223e24cd043f233fc1b009cbc64bc116e48f9c7f37b411f9dc049b02d8984",
+              "generations": {
+                "owner": null,
+                "schedule": null,
+                "enrollment": null,
+                "source_set": null
+              }
+            },
+            "expected_generations": {
+              "owner": null,
+              "schedule": null,
+              "enrollment": null,
+              "source_set": null
+            }
+          }
+        ],
+        "next_action_id": "fixture-action-confirmed_vs_predicted",
+        "next_due_at": "2026-10-03T01:10:00Z",
+        "next_review_at": null,
+        "next_review_reason": null,
+        "blockers": [],
+        "public_summary": null,
+        "policy_ref": "f01-policy-draft"
+      }
+    },
+    {
+      "case_id": "unknown_zero_and_manual",
+      "label": "未知值与人工保护",
+      "input": {
+        "schema_version": "f01.v1",
+        "evaluated_at": "2026-10-03T01:10:00Z",
+        "policy_ref": "f01-policy-draft",
+        "input_version": {
+          "schema_version": "f01.input.v1",
+          "scope": [
+            "entity",
+            "materials",
+            "evidence",
+            "protection",
+            "policy_ref"
+          ],
+          "content_sha256": "c72843bbe401d51091a49915fabfa60bf46ea160cc605778637c3c95b558b06b",
+          "generations": {
+            "owner": null,
+            "schedule": null,
+            "enrollment": null,
+            "source_set": null
+          }
+        },
+        "snapshot": {
+          "entity": {
+            "kind": "race_event",
+            "canonical_id": "fixture-race-date-only",
+            "identity_state": "verified",
+            "source_refs": [],
+            "candidate_ids": [],
+            "evidence_refs": []
+          },
+          "materials": [
+            {
+              "capability": "schedule",
+              "maturity": "confirmed",
+              "completeness": "partial",
+              "validation": "passed",
+              "revision_ref": null,
+              "supersedes_ref": null,
+              "evidence_refs": [
+                "e-date"
+              ],
+              "data": {
+                "local_date": "2026-10-03",
+                "timezone_name": "Europe/London",
+                "race_datetime": null,
+                "date_precision": "date_only"
+              }
+            },
+            {
+              "capability": "career",
+              "maturity": "unknown",
+              "completeness": "partial",
+              "validation": "pending",
+              "revision_ref": null,
+              "supersedes_ref": null,
+              "evidence_refs": [],
+              "data": {
+                "horse_ref": "fixture-horse-love",
+                "official_or_source_start_count": null,
+                "collected_start_count": 0,
+                "known_zero_control": {
+                  "horse_ref": "fixture-horse-new",
+                  "official_or_source_start_count": 0,
+                  "validation": "passed"
+                }
+              }
+            }
+          ],
+          "evidence": [
+            {
+              "evidence_id": "e-date",
+              "provider_key": "fixture-official_operator",
+              "source_class": "official_operator",
+              "independence_key": "fixture-origin-e-date",
+              "capability": "schedule",
+              "artifact_sha256": "7d04b56f52155f69f7a8c32e0c5c737a2a5fa3f7e53f35c108b7ff45edbaad77",
+              "locator": "/facts/0",
+              "observed_at": "2026-10-03T01:00:00Z",
+              "source_time": {
+                "precision": "unknown",
+                "published_at": null,
+                "last_absent_at": null,
+                "first_seen_at": "2026-10-03T01:00:00Z"
+              },
+              "contract_ref": {
+                "route_digest": "e050efd0a0e23d85c6a1f4dc256aaf88bc6179d0a5a69a50fe274c3e414ddda7",
+                "contract_digest": "304aeb6aeb9281204cf0b2723b2d0d855d70719de14de5aa270752aa275e307b",
+                "proof_digest": "b5a666eb4586fa4015f3c37018c0e6d6f37d28297d8484dd74150d488b0a4338",
+                "valid_until": "2026-10-30T00:00:00Z",
+                "revoked": false
+              }
+            }
+          ],
+          "protection": {
+            "paused": false,
+            "fields": [
+              "race_event.race_datetime"
+            ],
+            "modules": [],
+            "reason": "编辑核验时区",
+            "actor_ref": "fixture-editor",
+            "changed_at": "2026-10-03T00:59:00Z"
+          },
+          "policy_ref": "f01-policy-draft"
+        }
+      },
+      "expected": {
+        "fact_phase": "unknown",
+        "clock_hint": "unknown",
+        "race_datetime": null,
+        "starts_display": null,
+        "known_zero_display": 0,
+        "write_fields": [],
+        "independent_capability_can_proceed": "identity",
+        "execution_state": "unobserved",
+        "next_action_kind": "operator_review",
+        "next_review_at": "2026-10-03T13:10:00Z",
+        "exceptions": [
+          {
+            "code": "manual_protection",
+            "capability": "schedule",
+            "field_paths": [
+              "race_event.race_datetime"
+            ],
+            "severity": "blocking",
+            "root_cause_key": "fixture-time-lock",
+            "evidence_refs": [],
+            "retryability": "operator_required",
+            "next_review_at": "2026-10-03T13:10:00Z"
+          }
+        ]
+      },
+      "output": {
+        "schema_version": "f01.v1",
+        "decision_version": "f01.decision.draft",
+        "input_version": {
+          "schema_version": "f01.input.v1",
+          "scope": [
+            "entity",
+            "materials",
+            "evidence",
+            "protection",
+            "policy_ref"
+          ],
+          "content_sha256": "c72843bbe401d51091a49915fabfa60bf46ea160cc605778637c3c95b558b06b",
+          "generations": {
+            "owner": null,
+            "schedule": null,
+            "enrollment": null,
+            "source_set": null
+          }
+        },
+        "input_fingerprint": "9a54b81b926f007aa1c967bff3c2bbb4d1c16773bde43709c9288fe5b6d4d2bd",
+        "evaluated_at": "2026-10-03T01:10:00Z",
+        "entity": {
+          "kind": "race_event",
+          "canonical_id": "fixture-race-date-only",
+          "identity_state": "verified",
+          "source_refs": [],
+          "candidate_ids": [],
+          "evidence_refs": []
+        },
+        "fact_phase": "unknown",
+        "fact_evidence_refs": [],
+        "clock_hint": "unknown",
+        "material_state": "unknown",
+        "execution_state": "unobserved",
+        "actions": [
+          {
+            "action_id": "fixture-action-unknown_zero_and_manual",
+            "kind": "operator_review",
+            "capability": "schedule",
+            "source_binding_ref": null,
+            "not_before": "2026-10-03T01:10:00Z",
+            "deadline": null,
+            "reason_code": "manual_protection",
+            "expected_input_version": {
+              "schema_version": "f01.input.v1",
+              "scope": [
+                "entity",
+                "materials",
+                "evidence",
+                "protection",
+                "policy_ref"
+              ],
+              "content_sha256": "c72843bbe401d51091a49915fabfa60bf46ea160cc605778637c3c95b558b06b",
+              "generations": {
+                "owner": null,
+                "schedule": null,
+                "enrollment": null,
+                "source_set": null
+              }
+            },
+            "expected_generations": {
+              "owner": null,
+              "schedule": null,
+              "enrollment": null,
+              "source_set": null
+            }
+          }
+        ],
+        "next_action_id": "fixture-action-unknown_zero_and_manual",
+        "next_due_at": "2026-10-03T01:10:00Z",
+        "next_review_at": "2026-10-03T13:10:00Z",
+        "next_review_reason": "manual_protection",
+        "blockers": [
+          {
+            "code": "manual_protection",
+            "capability": "schedule",
+            "field_paths": [
+              "race_event.race_datetime"
+            ],
+            "severity": "blocking",
+            "root_cause_key": "fixture-time-lock",
+            "evidence_refs": [],
+            "retryability": "operator_required",
+            "next_review_at": "2026-10-03T13:10:00Z"
+          }
+        ],
+        "public_summary": null,
+        "policy_ref": "f01-policy-draft"
+      }
+    }
+  ],
+  "note": "input.snapshot 为 loader 输出；output 为纯决策提案；expected 为场景断言及附加反例。fixture 许可/绑定只是占位证据，不能执行网络或公开发布；public_summary=null 表示尚无公开 validator 证据。"
+}

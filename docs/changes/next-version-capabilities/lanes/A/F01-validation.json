@@ -1,0 +1,28 @@
+{
+  "status": "pass",
+  "scope": "documentation_and_synthetic_contract_fixtures_only",
+  "code_base": "907f8de699b31a6fcc80acc78e9ba070aadc4f28",
+  "cases": 4,
+  "checks": [
+    "JSON parse",
+    "unique cases",
+    "canonical input hash",
+    "decision fingerprint",
+    "evidence reference closure",
+    "action and next_due reference closure",
+    "no public validator evidence => null public_summary",
+    "relative document links",
+    "source symbol anchors"
+  ],
+  "files": {
+    "docs/changes/next-version-capabilities/lanes/A/F01-contract-examples.json": "8e47ac70796606a5d5343b9cf7d96c57c9e2dc881ca239220a43389a6da9d286",
+    "docs/changes/next-version-capabilities/lanes/A/F01-plan.md": "46d0e4a9717bee9e78013ea92508501afe51a99111a6fc53f3ec55904eaaea22",
+    "docs/changes/next-version-capabilities/lanes/A/F03-H01-readonly-preparation.md": "8699708041890efcd9b316a872857e219689ede14d55915e68dc747b3f983992"
+  },
+  "limitations": [
+    "No implementation RED/GREEN",
+    "No production/network/paid invocation",
+    "Independent R review pending",
+    "No frozen product parameters"
+  ]
+}
