@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "timezone": "Asia/Shanghai",
-  "updated_at": "2026-10-03T02:35:43.640132+08:00",
+  "updated_at": "2026-10-03T02:47:59.407660+08:00",
   "coordinator_thread_id": "01a0fdb2-b88c-7f93-8c9e-ba9564c33c93",
   "coordinator_worktree": "/Users/mentianlu/.codex/worktrees/516a/umanews",
   "deadline_at": "2026-10-30T18:00:00+08:00",
@@ -16,7 +16,7 @@
       "worktree": "/Users/mentianlu/.codex/worktrees/5482/umanews",
       "branch": "codex/next-version-race-data-20261003",
       "status": "已启动",
-      "last_cursor": "857bc711-5dad-460a-9c00-d1ac5bb0c979:2",
+      "last_cursor": "857bc711-5dad-460a-9c00-d1ac5bb0c979:4",
       "model": "gpt-6.1-sol",
       "reasoning_effort": "medium",
       "initial_head": "63b5781e",
@@ -30,7 +30,7 @@
       "worktree": "/Users/mentianlu/.codex/worktrees/a14d/umanews",
       "branch": "codex/next-version-news-ai-20261003",
       "status": "已启动",
-      "last_cursor": "b39a81c2-6866-44bf-8df1-a536e3d41532:2",
+      "last_cursor": "b39a81c2-6866-44bf-8df1-a536e3d41532:4",
       "model": "gpt-6.1-sol",
       "reasoning_effort": "medium",
       "initial_head": "4c9725c9",
@@ -44,7 +44,7 @@
       "worktree": "/Users/mentianlu/.codex/worktrees/bc9b/umanews",
       "branch": "codex/next-version-product-ui-20261003",
       "status": "已启动",
-      "last_cursor": "1bb9b1cd-6b22-4865-9d87-78fbf289661d:2",
+      "last_cursor": "1bb9b1cd-6b22-4865-9d87-78fbf289661d:3",
       "model": "gpt-6.1-sol",
       "reasoning_effort": "medium",
       "initial_head": "dbcc87a4",
@@ -58,14 +58,14 @@
       "worktree": "/Users/mentianlu/.codex/worktrees/3ab1/umanews",
       "branch": "codex/next-version-review-20261003",
       "status": "已启动",
-      "last_cursor": "6afb1d41-cb4a-4026-a141-43c0a48e9cae:2",
+      "last_cursor": "6afb1d41-cb4a-4026-a141-43c0a48e9cae:3",
       "model": "gpt-6.1-sol",
       "reasoning_effort": "medium",
       "initial_head": "d00eaf18",
       "title": "Umanews 10.30｜R 独立审核与验收",
       "model_evidence": "create_thread 显式指定 gpt-6.1-sol 和 medium，创建成功；启动回报已收取",
       "quota_policy_status": "已确认并独立实时复核剩余8%；无运行子代理/模型CLI",
-      "latest_report_commit": "f4fc85807d9a792a2e61f7e7959152e846eab082"
+      "latest_report_commit": "836c9f18"
     }
   },
   "tasks": {
@@ -75,10 +75,10 @@
       "deps": [],
       "deadline_at": "2026-10-04T18:00:00+08:00",
       "status": "进行中",
-      "phase": "Linux全量验证/独立代码审核",
+      "phase": "代码review返修/必要映射修正",
       "commit": "e9a322102e29573f79735bf0655dee54a4051f88",
       "pr": null,
-      "review": "已送原R代码review；宿主15 GREEN不是Linux交付证据",
+      "review": "REVISE@e9a32210，两项P2；严格generation与公开identity_state绑定，已转A；旧候选未运行full",
       "evidence": [
         "/Users/mentianlu/.codex/worktrees/5482/umanews/docs/changes/next-version-capabilities/lanes/A/A-001-report.md"
       ],
@@ -134,10 +134,10 @@
       "deps": [],
       "deadline_at": "2026-10-05T18:00:00+08:00",
       "status": "进行中",
-      "phase": "本地导出器/离线验证准备",
-      "commit": "a2704b2d7ef93a6ee8518fca2f63ada4a43c2b64",
+      "phase": "本地导出器/命令技术审核",
+      "commit": "48c51fb19f328eb9add14dd5fca40d4ceffaae63",
       "pr": null,
-      "review": "方案与有界导出方案APPROVED@a2704b2d；F02-M-01 CLOSED；脚本/命令未审核",
+      "review": "方案已APPROVED；脚本/命令与映射proposal已送原R；17 offline GREEN非PG或Linux证据",
       "evidence": [
         "/Users/mentianlu/.codex/worktrees/a14d/umanews/docs/changes/next-version-capabilities/lanes/B/B-001-status.md"
       ],
@@ -363,10 +363,10 @@
       ],
       "deadline_at": "2026-10-08T18:00:00+08:00",
       "status": "进行中",
-      "phase": "测试先行/实现",
+      "phase": "真实RED已取得，行为实现中",
       "commit": "2919dd3558950466e18a8886ec8bc7f85a119f5a",
       "pr": null,
-      "review": "方案APPROVED@2919dd35；行为未完成/未代码review",
+      "review": "方案APPROVED；最小宿主SQLite RED两flag均失败；PG等价与代码review待完成",
       "evidence": [],
       "merged": false,
       "deployed": false,
@@ -2119,7 +2119,7 @@
       "id": "D-002",
       "date": "2026-10-03",
       "subject": "F01首版可配置参数",
-      "status": "已发A，待R方案意见后定版",
+      "status": "默认参数已纳入F01方案并经原R APPROVED@7c78f67d；实现仍待返修验证",
       "defaults": {
         "recent_years": 3,
         "news_lookback_days": 90,
@@ -2156,10 +2156,22 @@
   "planning_commit": "d0cec076019f35b6f7db56b09ebee291e57fd9f9",
   "review_queue": [
     {
-      "scope": "F01实现及映射代码review",
+      "scope": "F01实现与映射增量复审",
       "base": "7c78f67d04cc156520d21916f3eb0a3ef066305e",
       "head": "e9a322102e29573f79735bf0655dee54a4051f88",
-      "status": "已送R"
+      "status": "REVISE，待A新固定head",
+      "findings": [
+        "A002-P2-01",
+        "A002-P2-02"
+      ],
+      "report": "/Users/mentianlu/.codex/worktrees/3ab1/umanews/docs/changes/next-version-capabilities/lanes/R/A-002-F01-code-review.md"
+    },
+    {
+      "scope": "F02导出器/命令/映射proposal代码技术审核",
+      "base": "a2704b2d7ef93a6ee8518fca2f63ada4a43c2b64",
+      "head": "48c51fb19f328eb9add14dd5fca40d4ceffaae63",
+      "status": "已送原R",
+      "script_sha256": "9c49d5d4e90cf5074591e42b1ba96f583b1f8b683bd15d3e758db85ddb00de34"
     }
   ],
   "quota_policy": {
@@ -2181,12 +2193,12 @@
     "unknown_usage_policy": "3次有界重试，仍未知暂缓新增耗时模型工作；读数恢复>1自动解除未知保护"
   },
   "next_actions": [
-    "每轮首先核验周额度；瞬时失败先有界重试，实际<=1停各线再停heartbeat和自身",
-    "控制三线共享Linux测试profile总计最多2批并发；固定SHA与独立运行产物，不复用错误候选证据",
-    "F05映射限定复审，后续U01方案审核",
-    "B准备固定SHA本地导出器与命令包后送R，未审前不运行生产查询",
-    "F01 RED/GREEN、映射与必要Linux验证后送原R代码审核，未完成依赖不得解锁",
-    "O01核对实际生产release lock/长任务/暂停批次；只读docker ps可用不等于该核对完成"
+    "每轮首先核验周额度；瞬时失败有界重试，实际<=1停各线再停heartbeat和自身",
+    "收A两项P2及profile增量固定head，送同R复审后在新SHA执行必要Linux验证，旧SHA收据不迁移",
+    "收B脚本/命令技术审核，按finding返修；真实生产槽位未绑定前不运行metadata/content",
+    "C按受审U01边界完成GREEN与PG等价；Linux長验证等待A窗口",
+    "A映射稳定后协调B映射衔接；不改选测策略规避full",
+    "O01待实时核生产release lock/长任务/暂停批次；F06待真实分母/来源预算输入"
   ],
   "resilience_policy": {
     "source": "用户2026-10-03明确要求临时异常快速恢复，不能因一次报错暂停",
@@ -2205,7 +2217,7 @@
   "resources": {
     "local_linux_tests": {
       "profile": "umanews-impact-ci",
-      "status": "就绪，daemon实时核验成功；无运行容器",
+      "status": "daemon就绪，A固定镜像已构建；旧候选collect发现profile遗漏，尚无full收据",
       "cpu": 2,
       "memory_gib": 4,
       "disk_gib": 20,
@@ -2228,13 +2240,16 @@
         "head": "e9a322102e29573f79735bf0655dee54a4051f88",
         "parallel_batches": 2,
         "output": "/tmp/umanews-a002-evidence",
-        "status": "已分配，先构建收集后执行full；其他长测试排队"
-      }
+        "status": "A保留窗口；待两项P2和profile映射合并修复后的新固定SHA，旧e9未启动full",
+        "built_image": "sha256:fcf8cdaf63af51b1b8a6e30e3d2fdf871d127c3c1461bfd00c9fc6d610eab905",
+        "collection_blocker": "catalog.profiles漏新模块，A已补python profile；待复审及重收集"
+      },
+      "temporary_directory": "每线独立/Users/mentianlu/.codex/runtime目录作为TMPDIR；mac /var/folders未共享"
     },
     "test_mapping": {
       "decision": "F01需显式映射；mapping变更按现行规则运行固定候选一套full，不改策略规避",
       "owner": "A，R审核",
-      "B": "先做离线实现并提交精确映射需求，A首补丁固定后协调衔接，不并发重写共享rules/catalog"
+      "B": "proposal固定于48c51fb1 lanes/B/B-002-test-mapping-proposal.json，待A增量稳定后衔接；未覆盖共享配置"
     }
   }
 }
