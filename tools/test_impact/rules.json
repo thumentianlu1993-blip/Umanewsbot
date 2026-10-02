@@ -4,7 +4,18 @@
     "docs/*.md",
     "docs/**/*.md",
     "README.md",
-    "AGENTS.md"
+    "AGENTS.md",
+    "docs/changes/next-version-capabilities/dispatch_state.json",
+    "docs/changes/next-version-capabilities/inheritance.json",
+    "docs/changes/next-version-capabilities/task_index.json",
+    "docs/changes/next-version-capabilities/lanes/C/F04-prototype.html",
+    "docs/changes/next-version-capabilities/lanes/C/F05-public-evidence.json",
+    "docs/reports/2026-10-02-capability-evidence/backlog-browser-observations.json",
+    "docs/reports/2026-10-02-capability-evidence/browser-observations.json",
+    "docs/reports/2026-10-02-capability-evidence/news-design-home-observation.json",
+    "docs/reports/2026-10-02-capability-evidence/thread-requirements.json",
+    "docs/changes/next-version-capabilities/lanes/A/F01-validation.json",
+    "docs/changes/next-version-capabilities/lanes/B/sample_inventory.json"
   ],
   "high_risk": [
     ".codex/agents/application.toml",
@@ -953,6 +964,11 @@
     "server/stable/tests/__init__.py"
   ],
   "paths": {
+    "docs/changes/next-version-capabilities/lanes/C/U01-offline-cases.json": [
+      "module:stable.test_race_information_display_pages",
+      "module:stable.test_race_information_display",
+      "module:stable.tests.test_race_field_normalization"
+    ],
     "server/stable/services/horse_profile_publish.py": [
       "horse_publish"
     ],
@@ -1126,6 +1142,33 @@
     ],
     "runtime/research/validate_official_graded_race_package.py": [
       "research_contracts"
+    ],
+    "server/stable/services/content_contracts.py": [
+      "content_contracts"
+    ],
+    "docs/changes/next-version-capabilities/lanes/A/validate_f01_contract.py": [
+      "content_contracts"
+    ],
+    "docs/changes/next-version-capabilities/lanes/A/F01-contract-examples.json": [
+      "content_contracts"
+    ],
+    "scripts/f02_readonly_export.py": [
+      "module:scripts.tests.test_f02_readonly_export",
+      "module:scripts.tests.test_f02_transfer"
+    ],
+    "scripts/tests/test_f02_readonly_export.py": [
+      "module:scripts.tests.test_f02_readonly_export",
+      "module:scripts.tests.test_f02_transfer"
+    ],
+    "docs/changes/next-version-capabilities/lanes/B/B-002-test-mapping-proposal.json": [
+      "module:scripts.tests.test_f02_readonly_export",
+      "module:scripts.tests.test_f02_transfer"
+    ],
+    "scripts/f02_transfer.py": [
+      "module:scripts.tests.test_f02_transfer"
+    ],
+    "scripts/tests/test_f02_transfer.py": [
+      "module:scripts.tests.test_f02_transfer"
     ]
   },
   "symbols": {
@@ -1153,6 +1196,26 @@
       ],
       "public_horse_follows": [
         "horse_page"
+      ],
+      "_public_race_calendar_base_queryset": [
+        "module:stable.test_race_information_display_pages",
+        "module:stable.test_race_information_display",
+        "module:stable.test_historical_race_calendar_integrity",
+        "module:stable.test_race_calendar_default_date_window",
+        "module:stable.test_race_calendar_responsive_ui",
+        "module:stable.test_race_public_time",
+        "module:stable.test_public_new_regions",
+        "module:stable.test_race_news_exposure"
+      ],
+      "_public_weekly_focus_events": [
+        "module:stable.test_race_information_display_pages",
+        "module:stable.test_race_information_display",
+        "module:stable.test_historical_race_calendar_integrity",
+        "module:stable.test_race_calendar_default_date_window",
+        "module:stable.test_race_calendar_responsive_ui",
+        "module:stable.test_race_public_time",
+        "module:stable.test_public_new_regions",
+        "module:stable.test_race_news_exposure"
       ]
     }
   },

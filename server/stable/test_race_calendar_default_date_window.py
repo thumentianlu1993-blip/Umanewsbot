@@ -480,12 +480,22 @@ class DefaultRaceDateWindowTests(TestCase):
         )
 
     def test_grade_filter_scopes_window(self):
-        _make_event(local_date=FIXED_TODAY, chinese_name="无级别今日", normalized_grade="")
+        ungraded = _make_event(local_date=FIXED_TODAY, chinese_name="无级别今日", normalized_grade="")
+        # helper默认原始G1；本例需要原始与存储等级均为空，避免把真实G1当无级别。
+        ungraded.grade_text = ""
+        ungraded.normalized_grade = ""
+        ungraded.save(update_fields=["grade_text", "normalized_grade"])
         _make_event(local_date=date(2026, 8, 8), chinese_name="G1未来",
                     normalized_grade=RaceGrade.G1)
+        _make_event(local_date=date(2026, 7, 29), chinese_name="G2非匹配",
+                    normalized_grade=RaceGrade.G2)
+        _make_event(local_date=date(2026, 8, 10), chinese_name="G3非匹配",
+                    normalized_grade=RaceGrade.G3)
         html = self._html(tab="all", grade="g1")
         self.assertEqual(_axis_ids(html), [_anchor_id(date(2026, 8, 8))])
         self.assertNotIn("无级别今日", html)
+        self.assertNotIn("G2非匹配", html)
+        self.assertNotIn("G3非匹配", html)
         section = _agenda_section(html, _anchor_id(date(2026, 8, 8)))
         self.assertIn("G1未来", section)
         self._assert_single_anchor(

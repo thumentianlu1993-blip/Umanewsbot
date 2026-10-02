@@ -6,8 +6,10 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from urllib.parse import urlsplit
 import re
 import unicodedata
+import logging
 
 from django.conf import settings
+from django.db.models import CharField, Func
 
 from stable.services.race_field_normalization import (
     display_field, parse_display_distance, parse_display_grade, parse_display_eligibility,
@@ -116,6 +118,104 @@ def event_grade_field(obj, *, context=None):
     return parse_display_grade(value(obj, 'grade_text'), normalized_grade=value(obj, 'normalized_grade'), context=ctx,
                                verified_race_name=value(obj, 'original_name') if ctx['catalog_profile'] == 'jra_graded_2026_meter_v1' else '')
 
+
+
+def _postgresql_grade_capable(connection):
+    """每个物理连接只读探测一次；缺少Unicode能力时关闭等级筛选投影。"""
+    connection.ensure_connection()
+    cached = getattr(connection, '_public_grade_capability', None)
+    if cached is not None and cached[0] is connection.connection:
+        return cached[1]
+    with connection.cursor() as cursor:
+        cursor.execute("""SELECT current_setting('server_encoding') = 'UTF8'
+            AND EXISTS (SELECT 1 FROM pg_catalog.pg_proc p
+                        JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
+                        WHERE n.nspname = 'pg_catalog' AND p.proname = 'normalize')
+            AND EXISTS (SELECT 1 FROM pg_catalog.pg_collation
+                        WHERE collname = 'und-x-icu' AND collprovider = 'i')""")
+        capable = bool(cursor.fetchone()[0])
+    connection._public_grade_capability = (connection.connection, capable)
+    if not capable:
+        logging.getLogger(__name__).error('公开等级查询所需的 PostgreSQL UTF8/NFKC/ICU 能力缺失；等级投影已关闭')
+    return capable
+
+
+class PublicGradeCode(Func):
+    """分页前的可信等级表达式；不创建数据库函数或写持久字段。"""
+    output_field = CharField()
+
+    def __init__(self):
+        super().__init__('grade_text', 'normalized_grade', 'original_name',
+                         'country_region', 'year', 'source_refs')
+
+    def as_sqlite(self, compiler, connection, **extra_context):
+        # SQLite 开发环境没有 NFKC；连接级纯函数在 WHERE 中执行同一解析器。
+        import json
+        connection.ensure_connection()
+
+        def code(raw, stored, name, region, year, refs):
+            obj = dict(grade_text=raw, normalized_grade=stored, original_name=name,
+                       country_region=region, year=year, source_refs=json.loads(refs or '{}'))
+            return event_grade_field(obj).code or ''
+
+        connection.connection.create_function('uma_public_grade_code', 6, code, deterministic=True)
+        return super().as_sql(compiler, connection, function='uma_public_grade_code', **extra_context)
+
+    def as_postgresql(self, compiler, connection, **extra_context):
+        if not _postgresql_grade_capable(connection):
+            return '%s', ['']
+        # 与 str.strip()/re 的 Unicode 空白集合一致；NFKC 由 PostgreSQL 原生执行。
+        whitespace = ''.join(chr(i) for i in range(0x3001) if chr(i).isspace())
+        # PostgreSQL text 不允许NUL；其余C0前导字符与urlsplit清理规则一致。
+        controls = ''.join(chr(i) for i in range(1, 33))
+        compiled = [compiler.compile(expr) for expr in self.source_expressions]
+        fields = ', '.join(sql for sql, _ in compiled)
+        params = [param for _, values in compiled for param in values]
+        from .race_field_normalization import _DISPLAY_GRADE_LABELS, _DISPLAY_GRADE_PATTERN
+        labels = tuple(_DISPLAY_GRADE_LABELS)
+        # URLsplit 的 scheme/hostname 不区分大小写，目录 path 则严格匹配。
+        host = ''.join('[' + c.lower() + c.upper() + ']' if c.isalpha() else ('[.]' if c == '.' else c)
+                       for c in 'https://www.jra.go.jp')
+        url_pattern = '^' + host + r'(?::(?:0*443)?)?/datafile/seiseki/replay/2026/jyusyo[.]html(?:[?#].*)?$'
+        sql = """(SELECT CASE
+            WHEN original_text = '' THEN CASE WHEN stored = ANY(%s) THEN stored ELSE '' END
+            WHEN char_length(original_text) > 512 THEN ''
+            WHEN parsed_code <> '' AND (stored = '' OR stored = parsed_code) THEN parsed_code
+            ELSE '' END
+          FROM (SELECT CASE
+              WHEN parts IS NOT NULL THEN
+                (CASE WHEN parts[1] IN ('JPN','JG') THEN parts[1] ELSE 'G' END) ||
+                (CASE parts[2] WHEN 'I' THEN '1' WHEN 'II' THEN '2' WHEN 'III' THEN '3' ELSE parts[2] END)
+              WHEN compact IN ('L','LISTED','リステッド','リステッド競走') THEN 'L'
+              WHEN compact IN ('OP','OPEN','オープン') THEN 'OP'
+              ELSE '' END AS parsed_code, original_text, stored
+            FROM (SELECT regexp_match(compact, %s) AS parts,
+                         compact, original_text, stored
+              FROM (SELECT regexp_replace(regexp_replace(text, %s, ''), %s, '', 'g') AS compact,
+                           original_text, stored
+                FROM (SELECT CASE WHEN verified_name <> '' AND right(original_text, char_length(verified_name)+1) = ' ' || verified_name
+                          THEN rtrim(left(original_text, char_length(original_text)-char_length(verified_name)-1), %s)
+                          ELSE original_text END AS text, original_text, stored
+                  FROM (SELECT upper(btrim(normalize(coalesce(raw,''), NFKC), %s) COLLATE "und-x-icu") AS original_text,
+                               upper(btrim(normalize(coalesce(norm,''), NFKC), %s) COLLATE "und-x-icu") AS stored,
+                               CASE WHEN region = 'japan' AND edition = 2026
+                                 AND refs->>'source_kind' = 'jra_official_graded_race_list'
+                                 AND jsonb_typeof(refs->'primary') = 'string'
+                                 AND regexp_replace(ltrim(refs->>'primary', %s), E'[\\t\\r\\n]', '', 'g') ~ %s
+                                 THEN upper(btrim(normalize(coalesce(name,''), NFKC), %s) COLLATE "und-x-icu")
+                                 ELSE '' END AS verified_name
+                    FROM (SELECT """ + fields + """ ) AS input(raw,norm,name,region,edition,refs)
+                  ) AS normalized
+                ) AS suffix_checked
+              ) AS compacted
+            ) AS matched
+          ) AS resolved)"""
+        return sql, [list(labels), '^'+_DISPLAY_GRADE_PATTERN+'$', '^重[赏賞]['+whitespace+']*', '['+whitespace+'・.\\-]',
+                     whitespace, whitespace, whitespace, controls, url_pattern, whitespace, *params]
+
+
+def filter_public_grade(queryset, codes):
+    return queryset.alias(credible_public_grade=PublicGradeCode()).filter(credible_public_grade__in=codes)
 
 def event_fields(obj):
     ctx = source_context(obj)

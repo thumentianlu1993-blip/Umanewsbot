@@ -3151,6 +3151,8 @@ def _public_race_calendar_base_queryset(filters: dict, *, today):
     """赛事日历公开基础 queryset：published、排除 active canonical duplicate、
     tab/region/grade/when。默认日期窗口与赛事列表复用同一基础 queryset；
     read-gate 展示 annotation 只在最终赛事对象查询上加。"""
+    from .services.race_information_display import filter_public_grade
+
     queryset = annotate_public_time(RaceEvent.objects.all()).filter(
         visibility_status=RaceEventVisibility.PUBLISHED
     ).exclude(canonical_product_links__is_active=True)
@@ -3161,12 +3163,10 @@ def _public_race_calendar_base_queryset(filters: dict, *, today):
     )
     if filters["tab"] == "key":
         if selected_year is not None and selected_year < today.year:
-            queryset = queryset.filter(
-                normalized_grade__in=[
+            queryset = filter_public_grade(queryset, [
                     *PUBLIC_RACE_GRADE_FILTERS["g1"],
                     *PUBLIC_RACE_GRADE_FILTERS["g2"],
-                ]
-            )
+                ])
         else:
             queryset = queryset.filter(
                 Q(
@@ -3180,7 +3180,7 @@ def _public_race_calendar_base_queryset(filters: dict, *, today):
     if filters["region"]:
         queryset = queryset.filter(country_region=filters["region"])
     if filters["grade"]:
-        queryset = queryset.filter(normalized_grade__in=PUBLIC_RACE_GRADE_FILTERS[filters["grade"]])
+        queryset = filter_public_grade(queryset, PUBLIC_RACE_GRADE_FILTERS[filters["grade"]])
     if filters["when"] == "upcoming":
         queryset = _upcoming_race_queryset(queryset, timezone.now())
     elif filters["when"] == "finished":
@@ -3414,6 +3414,8 @@ def _group_race_events_by_date(events, *, today, anchor_date=None):
 
 
 def _public_weekly_focus_events(region: str = "", *, events: list[RaceEvent] | None = None, today=None) -> list[RaceEvent]:
+    from .services.race_information_display import event_grade_field, filter_public_grade
+
     if today is None:
         today = timezone.localdate(timezone=BEIJING)
     week_start = today - timedelta(days=today.weekday())
@@ -3424,15 +3426,15 @@ def _public_weekly_focus_events(region: str = "", *, events: list[RaceEvent] | N
             for event in events
             if public_time(event).day
             and week_start <= public_time(event).day <= week_end
-            and event.normalized_grade in PUBLIC_RACE_GRADE_FILTERS["g1"]
+            and event_grade_field(event).code in PUBLIC_RACE_GRADE_FILTERS["g1"]
             and (not region or event.country_region == region)
         ][:3]
     queryset = annotate_public_time(RaceEvent.objects.all()).filter(
         visibility_status=RaceEventVisibility.PUBLISHED,
         public_date__gte=week_start,
         public_date__lte=week_end,
-        normalized_grade__in=PUBLIC_RACE_GRADE_FILTERS["g1"],
     ).exclude(canonical_product_links__is_active=True)
+    queryset = filter_public_grade(queryset, PUBLIC_RACE_GRADE_FILTERS["g1"])
     if region:
         queryset = queryset.filter(country_region=region)
     return list(queryset.order_by("public_date", "public_start_time", "id")[:3])
