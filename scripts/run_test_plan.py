@@ -32,6 +32,9 @@ def verify_local_docker():
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--repository',type=Path,default=ROOT)
+    parser.add_argument('--controls',type=Path,help='候选外核验器提供的受信执行文件目录')
+    parser.add_argument('--export-image',type=Path)
     parser.add_argument('--plan',type=Path,required=True)
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--collect-only',action='store_true')
@@ -39,10 +42,11 @@ def main():
     parser.add_argument('--image',default='umanews-test-impact:local')
     parser.add_argument('--build',action='store_true')
     args=parser.parse_args()
+    root=args.repository.resolve()
     plan=json.loads(args.plan.read_text())
     if plan['source']!='git':
         raise ValueError('local dirty plans are diagnostic only; commit snapshot before execution')
-    if git(ROOT,'rev-parse',plan['test_sha']+'^{tree}').decode().strip()!=plan['test_tree']:
+    if git(root,'rev-parse',plan['test_sha']+'^{tree}').decode().strip()!=plan['test_tree']:
         raise ValueError('test tree mismatch')
     output=args.output.resolve(); output.mkdir(parents=True,exist_ok=True)
     if plan['mode']=='docs-only':
@@ -53,9 +57,15 @@ def main():
     verify_local_docker()
     with tempfile.TemporaryDirectory(prefix='impact-') as temp:
         temp=Path(temp); source=temp/'source'; source.mkdir()
-        archive=temp/'source.tar'; archive.write_bytes(git(ROOT,'archive',plan['test_sha']))
+        archive=temp/'source.tar'; archive.write_bytes(git(root,'archive',plan['test_sha']))
         with tarfile.open(archive) as tar:
             tar.extractall(source,filter='data')
+        if args.controls:
+            for file in args.controls.rglob('*'):
+                if file.is_file():
+                    target=source/file.relative_to(args.controls)
+                    if target.read_bytes()!=file.read_bytes(): raise ValueError('trusted execution control mismatch')
+                    shutil.copyfile(file,target)
         if args.build:
             context=temp/'build'; context.mkdir()
             shutil.copy(source/'requirements.txt',context/'requirements.txt')
@@ -63,6 +73,9 @@ def main():
             with (output/'image-build.log').open('w') as log:
                 docker('build','-t',args.image,str(context),stdout=log,stderr=subprocess.STDOUT)
         image_id=subprocess.check_output(['docker','image','inspect','--format','{{.Id}}',args.image],text=True).strip()
+        if args.export_image:
+            with args.export_image.open('wb') as image_file:
+                docker('save',image_id,stdout=image_file)
         plan['image_id']=image_id
         control=temp/'control'; control.mkdir()
         (control/'plan.json').write_text(json.dumps(plan))
@@ -79,7 +92,10 @@ def main():
                     completed=subprocess.run(['docker',*command],stdout=log,stderr=subprocess.STDOUT,timeout=2100 if profile=='release-postgres' else 600)
                 finally:
                     subprocess.run(['docker','rm','-f',container_name],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=30)
-            for file in out.glob('*.json'): shutil.copy(file,output/file.name)
+            expected='execution-plan.json' if mode=='collect' else key+'.json'
+            returned=[file.name for file in out.iterdir()]
+            if returned != [expected]: raise ValueError('unexpected/missing container output: '+str(returned))
+            shutil.copy(out/expected,output/expected)
             return completed.returncode
         if not args.batch:
             if invoke('collect'):

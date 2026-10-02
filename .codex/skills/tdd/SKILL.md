@@ -43,7 +43,7 @@ description: Umanews 的 Django/Celery/Python 测试先行兜底。仅在进入�
 
 ## Django/Celery 隔离规则
 
-- 失败时先运行最小的 test class/test method；确认局部行为后再扩大到 app suite 和全量回归。
+- 失败时先运行最小的 test class/test method；GREEN 后只运行影响计划要求的领域与核心检查。计划通过即停止，新增改动、失败或明确风险才扩大；不得默认升级到 app suite 或全量。
 - 自动化测试不得访问真实外部网络、生产数据库、生产 Redis、真实队列或第三方服务。
 - 使用 mock/fake、受控 fixture、测试数据库和 eager/隔离 worker；同时保留能验证任务边界而不是只验证 mock 调用次数的断言。
 - 时间、随机数、重试延迟、锁 owner、task id 和外部响应必须可控。
@@ -52,13 +52,13 @@ description: Umanews 的 Django/Celery/Python 测试先行兜底。仅在进入�
 
 ## 验证层次
 
-按风险逐级扩大，不得用后一层的“可能会通过”替代前一层证据：
+验证顺序是最小 RED → 同例 GREEN → 按影响计划回归 → 停止。
 
-1. 最小行为测试
-2. 相关 test class/module
-3. 相关 Django app 或 Celery 集成测试
-4. 项目全量回归
-5. 必要时的本地 PostgreSQL/Docker 生产形状验证
+- 纯说明文档只做静态检查；局部业务改动跑登记领域与核心检查。
+- 共享模型、迁移、装载、依赖及测试基础设施变化才选择明确 full profile。
+- 未映射先补规则，不偷偷退回 `manage.py test stable`；领域超过400项明确报告 expanded，不截断。
+- 单批最多200项，按类分组，最多4批并发。已经取得同一tree的有效Linux证据，不在上线前重复全量；缺发布合同只补对应专用组。
+- 首个引导版本的全量校准和策略启用状态见 `docs/changes/impact-based-testing/rollout.md`；未完成不得宣称已全面切换。
 
 本地验证、预发布验证和生产真相必须分别报告。
 
@@ -81,7 +81,7 @@ description: Umanews 的 Django/Celery/Python 测试先行兜底。仅在进入�
 - 对应 `test_cases.md` 条目
 - RED 命令、退出状态和失败摘要
 - GREEN 命令、退出状态和通过摘要
-- 相关测试集与 full regression 的命令、结果；未运行时说明原因和剩余风险
+- 影响计划要求的相关测试集命令和结果；仅当计划要求 full 时报告 full regression，未运行说明原因和剩余风险
 - 测试可捕获的 mutation
 - 本分支修改文件清单
 

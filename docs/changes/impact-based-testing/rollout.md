@@ -1,3 +1,15 @@
+# 实施与激活状态
+
+截至当前：实现主体已提交到PR #233，正在有界验证与独立返修。**未合并、未激活策略、未配置保护、未执行full校准。**
+首次Linux工具链run [36996581104](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/36996581104)：
+222项分成29/193两批，221通过、1个UTF-8环境问题失败；未过滤失败，门禁失败。修复为`initdb --encoding=UTF8`后另跑固定版本。
+选测RED为12项中的11个断言失败；Git权限/index两项真实RED；空分片伪证据一项真实RED；对应小型GREEN已通过。
+完整catalog只收集名称和分片，不等于全量执行。10个真实历史单文件diff回放见[产物](diff_replay.json)。
+
+激活使用仓库变量`IMPACT_TEST_POLICY=active`；当前未设置。inactive的业务PR gate拒绝通过，docs-only仍可静态验证。
+因此本PR不能在未完成切换前草率合并，否则旧PR入口已移除而业务PR会被阻断。
+后续按根`AGENTS.md`交付；本次不操作生产数据库、应用容器、服务、队列或开关。
+
 # 启用、恢复与交接
 
 本轮只设计，不改 CI、不触发定时全量、不部署服务。人工确认只引用根 AGENTS.md。

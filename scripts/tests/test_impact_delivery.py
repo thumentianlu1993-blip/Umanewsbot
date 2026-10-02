@@ -1,7 +1,7 @@
 """交付不可仅凭同名绿色job或旧run的结果。"""
 from datetime import datetime, timezone, timedelta
 import unittest
-from scripts.verify_delivery_test_evidence import verify_jobs, verify_protection
+from scripts.verify_delivery_test_evidence import verify_jobs, verify_protection, compare_collection
 from scripts.decide_full_regression import should_run
 
 
@@ -30,8 +30,18 @@ class DeliveryTests(unittest.TestCase):
 
     def test_nightly_failed_same_sha_retries_weekly_unchanged_runs(self):
         now=datetime.now(timezone.utc)
-        latest={'head_sha':'a','conclusion':'success','updated_at':now.isoformat()}
+        latest={'tested_sha':'a','conclusion':'success','updated_at':now.isoformat()}
         self.assertFalse(should_run('a',latest,now))
         self.assertTrue(should_run('b',latest,now))
+        latest['head_sha']='b'
+        self.assertTrue(should_run('b',latest,now), 'workflow ref must not replace tested SHA')
         latest['conclusion']='failure';self.assertTrue(should_run('a',latest,now))
         latest['conclusion']='success';self.assertTrue(should_run('a',latest,now+timedelta(days=7)))
+
+
+class CollectionEvidenceTests(unittest.TestCase):
+    def test_empty_self_consistent_evidence_is_rejected(self):
+        plan={'batches':[],'count':0}
+        collected={'batches':[{'key':'batch-000','profile':'python','ids':['m.C.test_x']}],'count':1}
+        with self.assertRaisesRegex(ValueError,'collection'):
+            compare_collection(plan,collected)

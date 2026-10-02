@@ -59,10 +59,30 @@ jobs:
         with:
           python-version: '3.12'
       - name: static-contracts
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || inputs.base_sha }}
+          TEST_SHA: ${{ github.event.pull_request.merge_commit_sha || inputs.candidate_sha }}
         run: |
-          git diff --check
-          python .codex/scripts/check_workflow_contract.py
-          python -m unittest scripts.tests.test_test_impact -q
+          git diff --check "$BASE_SHA" "$TEST_SHA"
+          ruby -e 'require "yaml"; Dir[".github/workflows/*.yml"].each { |p| YAML.load_file(p) }'
+          python -I - <<'PY'
+          import ast, pathlib, re, os, subprocess, urllib.parse
+          # 只解析源文本；不导入/执行候选测试或应用。
+          for root in ('tools/test_impact', 'scripts'):
+              for file in pathlib.Path(root).glob('*.py'):
+                  ast.parse(file.read_text(), filename=str(file))
+          text = pathlib.Path('AGENTS.md').read_text()
+          assert all(marker in text for marker in ('### G1：范围确认', '### G2：交付确认', '### G3：高影响动作确认'))
+          diff = subprocess.check_output(['git','diff','--unified=0',os.environ['BASE_SHA'],os.environ['TEST_SHA'],'--','*.md'], text=True)
+          source = None
+          for line in diff.splitlines():
+              if line.startswith('+++ b/'): source = pathlib.Path(line[6:])
+              elif source and line.startswith('+') and not line.startswith('+++'):
+                  for target in re.findall(r'\]\(([^)]+)\)', line):
+                      target = target.strip('<>').split('#',1)[0]
+                      if not target or urllib.parse.urlsplit(target).scheme or target.startswith('/') or '{{' in target: continue
+                      assert (source.parent / urllib.parse.unquote(target)).exists(), f'missing added reference: {source}: {target}'
+          PY
       - name: generate-plan
         id: plan
         env:
@@ -75,10 +95,27 @@ jobs:
       - name: execute-isolated-plan
         id: execute
         if: github.event_name != 'pull_request' || vars.IMPACT_TEST_POLICY == 'active' || steps.plan.outputs.mode == 'docs-only'
-        run: python scripts/run_test_plan.py --plan evidence/plan.json --output evidence --build
+        run: python scripts/run_test_plan.py --plan evidence/plan.json --output evidence --build --export-image "$RUNNER_TEMP/impact-image.tar"
       - name: verify-execution
         if: steps.execute.outcome == 'success'
         run: python scripts/verify_test_plan.py --plan evidence/execution-plan.json --reports evidence --output evidence/summary.json
+      - name: collect-catalog-without-running
+        if: inputs.scope == 'toolchain' && steps.execute.outcome == 'success'
+        env:
+          BASE_SHA: ${{ inputs.base_sha }}
+          TEST_SHA: ${{ inputs.candidate_sha }}
+        run: |
+          python scripts/impact_ci.py --base "$BASE_SHA" --head "$TEST_SHA" --test "$TEST_SHA" --scope inventory --reason '只收集完整目录，不执行全量测试' --output evidence/inventory-selection.json
+          python scripts/run_test_plan.py --plan evidence/inventory-selection.json --output evidence/inventory --collect-only
+      - name: upload-test-image
+        if: steps.execute.outcome == 'success' && steps.plan.outputs.mode != 'docs-only'
+        uses: actions/upload-artifact@v4
+        with:
+          name: impact-image-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/impact-image.tar
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 1
       - name: upload-evidence
         if: always()
         uses: actions/upload-artifact@v4

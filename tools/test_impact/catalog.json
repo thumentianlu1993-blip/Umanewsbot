@@ -5,13 +5,20 @@
       "stable.test_release_commit",
       "stable.test_race_live_target_eligibility",
       "stable.test_horse_profile_publish.BasicPublishGateTests",
-      "stable.tests_legacy.PublishWindowServiceTests"
+      "stable.tests_legacy.PublishWindowServiceTests",
+      "stable.test_impact_core",
+      "stable.tests_legacy.PublicHomeInfoFeedTests",
+      "stable.test_race_live_official_publication.RaceLiveOfficialAuthorizationBehaviorTests",
+      "stable.test_race_live_official_publication.RaceLiveOfficialAuthorizationCommandTests.test_authorization_apply_exact_replay_is_idempotent",
+      "stable.test_race_data_sync_r0.RaceDataSyncR0FlagContractTests.test_celery_route_and_beat_schedule_are_isolated"
     ],
     "horse_page": [
       "stable.tests_legacy.HorseProfilePageMvpTests",
       "stable.test_horse_profile_publish",
       "stable.test_public_navigation_and_attribution",
-      "stable.tests_legacy.P0HorseProfileDataCompletionTests"
+      "stable.tests_legacy.P0HorseProfileDataCompletionTests",
+      "stable.tests.test_page_regression",
+      "stable.tests.test_term_display"
     ],
     "news_translation": [
       "stable.tests_legacy.TranslationWorkflowTests",
@@ -19,12 +26,15 @@
       "stable.test_translation_failure_recovery_change",
       "stable.test_japanese_racing_translation_normalization",
       "stable.test_term_gate_reprocessing",
-      "stable.test_news_content_boundaries"
+      "stable.test_news_content_boundaries",
+      "stable.test_external_english_horse_context_gate"
     ],
     "race_parser": [
       "stable.test_race_reference_sources",
       "stable.test_race_multisource_jra",
-      "stable.test_realtime_race_results"
+      "stable.test_realtime_race_results",
+      "stable.test_race_reference_sources_postgres",
+      "stable.test_race_reference_management_commands"
     ],
     "race_results": [
       "stable.test_race_data_sync_results",
@@ -37,7 +47,8 @@
       "stable.test_historical_batch_runner_change",
       "stable.test_historical_batch_runner_postgres",
       "stable.test_historical_race_batches",
-      "stable.test_historical_race_detail_import_receipt"
+      "stable.test_historical_race_detail_import_receipt",
+      "stable.test_historical_race_detail_chunk_import"
     ],
     "p0_bridge": [
       "runtime.research.test_build_p0_participant_completion_batches",
@@ -2423,6 +2434,12 @@
       "domains": [
         "infrastructure"
       ]
+    },
+    "server/stable/test_impact_core.py": {
+      "label": "stable.test_impact_core",
+      "domains": [
+        "core"
+      ]
     }
   },
   "profiles": {
@@ -2698,7 +2715,8 @@
     "stable.tests.test_term_display": "django",
     "stable.tests.test_write_paths": "django",
     "scripts.tests.test_impact_git": "python",
-    "scripts.tests.test_impact_delivery": "python"
+    "scripts.tests.test_impact_delivery": "python",
+    "stable.test_impact_core": "django"
   },
   "allowed_skips": {},
   "owners": {

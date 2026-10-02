@@ -1,6 +1,6 @@
 # 测试计划与执行设计
 
-状态：待审核的实现方案；本文中的新文件、命令、检查名和定时配置均尚未创建或启用。
+状态：方案已获用户批准，实施中；代码已创建，默认策略、strict检查和定时运行尚未激活。
 
 ## 1. 一次迭代怎样流转
 
@@ -23,7 +23,7 @@
 
 复用已有有界 runner 的隔离、收集、失败传播和证据校验实现；提取共用模块时保留
 `run_bounded_stable_tests.py --group/--batch` 的原 50 项映射合同，不把它悄悄改成另一种语义。
-不在本轮方案中直接改任何可执行文件。
+当前已进入实现阶段，保留原有界入口语义。
 
 ## 2. 判断影响范围
 
@@ -97,7 +97,7 @@ runner 摘要、执行集及收尾结果，输出绑定 base/head/tree 的 deliv
 `docker run --network none --cap-drop ALL --security-opt no-new-privileges` 运行非 root 进程，
 不挂载 Docker socket、SSH agent、生产路径、云凭据或宿主网络。容器仅有 loopback；PG16 的 server/client
 预装在同一测试容器中，合成 PG 进程只监听 127.0.0.1，按 profile 创建 bounded_ci/release_0078_ci。
-各分片是不同容器/数据目录；纯Python配置不启动PG。必要时增加只允许指定loopback端口的进程级检查，
+各分片是不同容器/数据目录；纯Python配置不启动PG。当前采用单个CI执行job内最多4个容器并行，各自独立限时及报告，避免重复下载镜像。必要时增加只允许指定loopback端口的进程级检查，
 但它只是辅助，真实出站隔离由网络命名空间保证。
 
 因此独立 Python、curl、pg_dump 和管理命令子进程仍位于同一无出站网络的容器内。
@@ -127,7 +127,7 @@ runner 摘要、执行集及收尾结果，输出绑定 base/head/tree 的 deliv
 轻检查并报告通过，避免必须检查永远 pending。门禁聚合使用 always()，只接受计划所需 job 全部成功；
 取消、漏 artifact、缺片、错 test tree、意外 skip、teardown 错误、超时均失败。
 同 PR 新提交取消旧测试任务；只取消隔离自动测试，不取消生产发布或现有手动真实抓取工作流。
-矩阵每批独立 PG 与临时目录，单批 timeout 10 分钟（专用恢复合同保留现有上限），失败保留证据。
+每批容器独立 PG 与临时目录，单批 timeout 10 分钟（专用恢复合同保留现有上限），失败保留证据。
 
 PR 分类为 high-risk 时直接调用相同 full profile；纯局部改动不能因“未命中缓存”或“准备上线”自动 full。
 全量调度建议北京时间每天 03:30 检查 main；main 自上次成功完整运行后发生变化则执行，无变更每周至少一次，
@@ -185,3 +185,12 @@ smoke启动与续跑不是可随意删掉的重复。手动研究运行仍必须
 
 设计依据：[GitHub严格状态检查](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)、
 [Docker none 网络](https://docs.docker.com/engine/network/drivers/none/)。这些说明支撑机制选择，不代表仓库已经配置。
+
+
+## 实现审查后的细化
+
+- 交付时保存并取回同run的测试镜像，由候选外的受信runner/worker/entrypoint独立重收集，再比较精确分片和ID；不建立需要每次新增测试都改动的全站ID清单。
+- 分片只允许回传自身唯一结果文件，不能覆盖收集计划。超时后明确删除容器，不只终止Docker客户端。
+- full调度使用成功artifact内真正受测SHA，不能使用触发workflow的ref代替手动输入。
+- PostgreSQL16明确UTF-8；历史性能合同明确开启合成环境性能flag；research离线profile包含其已有脚本导入路径。
+- 完整catalog收集可以单独进行，输出“只收集，未执行”；与运行全部测试分开报告。

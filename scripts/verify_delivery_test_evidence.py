@@ -43,6 +43,11 @@ def verify_protection(protection):
             'strict required test-plan-gate including admins is not active')
 
 
+def compare_collection(plan, collected):
+    require(plan['batches']==collected['batches'] and plan['count']==collected['count'],
+            'independent collection mismatch')
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--repository',type=Path,required=True)
@@ -110,9 +115,37 @@ def main():
     # 从受信 Git 对象提取纯数据规划器；绝不以候选目录作为 Python 搜索路径。
     with tempfile.TemporaryDirectory(prefix='trusted-impact-') as raw:
         bundle=Path(raw)
-        paths=['tools/test_impact/core.py','tools/test_impact/git_input.py','scripts/plan_affected_tests.py']
+        paths=['tools/test_impact/core.py','tools/test_impact/git_input.py','scripts/plan_affected_tests.py','scripts/run_test_plan.py']
         for path in paths:
             out=bundle/path;out.parent.mkdir(parents=True,exist_ok=True);out.write_bytes(git('show',a.trusted_sha+':'+path))
+        if plan['mode']!='docs-only':
+            steps={s['name']:s['conclusion'] for j in jobs if j['name']=='tests' for s in j['steps']}
+            require(steps.get('upload-test-image')=='success','missing actual image upload step')
+            images=[x for x in artifacts if x['name']==f'impact-image-{a.run}-{attempt}' and not x['expired']]
+            require(len(images)==1,'missing exact-run test image')
+            image_archive=checked(['gh','api',f'repos/{a.repo}/actions/artifacts/{images[0]["id"]}/zip'])
+            with zipfile.ZipFile(io.BytesIO(image_archive)) as z:
+                require(z.namelist()==['impact-image.tar'] and z.getinfo('impact-image.tar').file_size<4_000_000_000,'invalid image artifact')
+                image_path=bundle/'image.tar'
+                with z.open('impact-image.tar') as src,image_path.open('wb') as dst:
+                    import shutil
+                    shutil.copyfileobj(src,dst)
+            # 校验本地Docker上下文，不允许生产/远程daemon；加载后按digest运行。
+            endpoint=checked(['docker','context','inspect','--format','{{.Endpoints.docker.Host}}']).decode().strip()
+            require(not os.environ.get('DOCKER_HOST') and not os.environ.get('DOCKER_CONTEXT') and endpoint.startswith('unix://'),'local Docker required')
+            checked(['docker','load','-i',str(image_path)])
+            require(re.fullmatch('sha256:[0-9a-f]{64}',plan['image_id']),'invalid image ID')
+            source_plan=bundle/'selection.json';source_plan.write_text(json.dumps(plan))
+            trusted_controls=bundle/'execution-controls'
+            for path in ('scripts/test_plan_worker.py','scripts/run_bounded_stable_tests.py','deploy/test-impact/entrypoint.sh','tools/test_impact/core.py'):
+                control=trusted_controls/path;control.parent.mkdir(parents=True,exist_ok=True)
+                control.write_bytes(git('cat-file','blob',controls[path]))
+            collection_dir=bundle/'collection'
+            checked([sys.executable,'-I',str(bundle/'scripts/run_test_plan.py'),'--repository',str(root),
+                     '--plan',str(source_plan),'--output',str(collection_dir),'--collect-only','--image',plan['image_id'],'--controls',str(trusted_controls)])
+            compare_collection(plan,json.loads((collection_dir/'execution-plan.json').read_text()))
+        else:
+            compare_collection(plan,{'batches':[],'count':0})
         config=bundle/'input.json'
         config.write_text(json.dumps({'root':str(root),'base':base,'head':head,'test':test,'plan':plan,'reports':reports}))
         program="""import json,sys

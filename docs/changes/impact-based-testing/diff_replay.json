@@ -1,0 +1,292 @@
+{
+  "cases": [
+    {
+      "base_sha": "58d7cdea4e92ba2d8f4b5b8bfc64053cb4a756b1",
+      "head_sha": "ad50abdb74b89669ab8ada2958b040877c1a1849",
+      "path": "server/stable/templates/stable/public/horse_detail.html",
+      "scope": "historical-single-file-diff",
+      "mode": "targeted",
+      "domains": [
+        "core",
+        "horse_page"
+      ],
+      "labels": [
+        "stable.test_horse_profile_publish",
+        "stable.test_horse_profile_publish.BasicPublishGateTests",
+        "stable.test_impact_core",
+        "stable.test_public_navigation_and_attribution",
+        "stable.test_race_data_sync_r0.RaceDataSyncR0FlagContractTests.test_celery_route_and_beat_schedule_are_isolated",
+        "stable.test_race_live_official_publication.RaceLiveOfficialAuthorizationBehaviorTests",
+        "stable.test_race_live_official_publication.RaceLiveOfficialAuthorizationCommandTests.test_authorization_apply_exact_replay_is_idempotent",
+        "stable.test_race_live_target_eligibility",
+        "stable.test_release_commit",
+        "stable.tests.test_page_regression",
+        "stable.tests.test_term_display",
+        "stable.tests_legacy.HorseProfilePageMvpTests",
+        "stable.tests_legacy.P0HorseProfileDataCompletionTests",
+        "stable.tests_legacy.PublicHomeInfoFeedTests",
+        "stable.tests_legacy.PublishWindowServiceTests"
+      ]
+    },
+    {
+      "base_sha": "91410e7aa077a0b3ea963cccfcd64b935f4369d1",
+      "head_sha": "71a820bd80d3ea68437a55416c54accea73b5004",
+      "path": "server/stable/templates/stable/public/horse_detail.html",
+      "scope": "historical-single-file-diff",
+      "mode": "targeted",
+      "domains": [
+        "core",
+        "horse_page"
+      ],
+      "labels": [
+        "stable.test_horse_profile_publish",
+        "stable.test_horse_profile_publish.BasicPublishGateTests",
+        "stable.test_impact_core",
+        "stable.test_public_navigation_and_attribution",
+        "stable.test_race_data_sync_r0.RaceDataSyncR0FlagContractTests.test_celery_route_and_beat_schedule_are_isolated",
+        "stable.test_race_live_official_publication.RaceLiveOfficialAuthorizationBehaviorTests",
+        "stable.test_race_live_official_publication.RaceLiveOfficialAuthorizationCommandTests.test_authorization_apply_exact_replay_is_idempotent",
+        "stable.test_race_live_target_eligibility",
+        "stable.test_release_commit",
+        "stable.tests.test_page_regression",
+        "stable.tests.test_term_display",
+        "stable.tests_legacy.HorseProfilePageMvpTests",
+        "stable.tests_legacy.P0HorseProfileDataCompletionTests",
+        "stable.tests_legacy.PublicHomeInfoFeedTests",
+        "stable.tests_legacy.PublishWindowServiceTests"
+      ]
+    },
+    {
+      "base_sha": "48aafbb666b7b4c9214955e2c71f8aa700e52062",
+      "head_sha": "d6a6c5221778d258507b6b0bacdd45ed6065edf6",
+      "path": "server/stable/templates/stable/public/horse_detail.html",
+      "scope": "historical-single-file-diff",
+      "mode": "targeted",
+      "domains": [
+        "core",
+        "horse_page"
+      ],
+      "labels": [
+        "stable.test_horse_profile_publish",
+        "stable.test_horse_profile_publish.BasicPublishGateTests",
+        "stable.test_impact_core",
+        "stable.test_public_navigation_and_attribution",
+        "stable.test_race_data_sync_r0.RaceDataSyncR0FlagContractTests.test_celery_route_and_beat_schedule_are_isolated",
+        "stable.test_race_live_official_publication.RaceLiveOfficialAuthorizationBehaviorTests",
+        "stable.test_race_live_official_publication.RaceLiveOfficialAuthorizationCommandTests.test_authorization_apply_exact_replay_is_idempotent",
+        "stable.test_race_live_target_eligibility",
+        "stable.test_release_commit",
+        "stable.tests.test_page_regression",
+        "stable.tests.test_term_display",
+        "stable.tests_legacy.HorseProfilePageMvpTests",
+        "stable.tests_legacy.P0HorseProfileDataCompletionTests",
+        "stable.tests_legacy.PublicHomeInfoFeedTests",
+        "stable.tests_legacy.PublishWindowServiceTests"
+      ]
+    },
+    {
+      "base_sha": "97a38cf5e2a692b7336c8518a4cdd6dfcc511d2a",
+      "head_sha": "1c34a00715aa3a0ac49153553622360afa10e049",
+      "path": "server/stable/services/japanese_racing_translation.py",
+      "scope": "historical-single-file-diff",
+      "mode": "targeted",
+      "domains": [
+        "core",
+        "news_translation"
+      ],
+      "labels": [
+        "stable.test_external_english_horse_context_gate",
+        "stable.test_horse_profile_publish.BasicPublishGateTests",
+        "stable.test_impact_core",
+        "stable.test_japanese_racing_translation_normalization",
+        "stable.test_news_content_boundaries",
+        "stable.test_race_data_sync_r0.RaceDataSyncR0FlagContractTests.test_celery_route_and_beat_schedule_are_isolated",
+        "stable.test_race_live_official_publication.RaceLiveOfficialAuthorizationBehaviorTests",
+        "stable.test_race_live_official_publication.RaceLiveOfficialAuthorizationCommandTests.test_authorization_apply_exact_replay_is_idempotent",
+        "stable.test_race_live_target_eligibility",
+        "stable.test_release_commit",
+        "stable.test_term_gate_reprocessing",
+        "stable.test_translation_failure_recovery_change",
+        "stable.tests_legacy.CrawlAutoTranslateTests",
+        "stable.tests_legacy.PublicHomeInfoFeedTests",
+        "stable.tests_legacy.PublishWindowServiceTests",
+        "stable.tests_legacy.TranslationWorkflowTests"
+      ]
+    },
+    {
+      "base_sha": "4737c53b99841c3429c942893e65c6978272c343",
+      "head_sha": "873845dacb1cec0353ed9b9834417a1a00cc6311",
+      "path": "server/stable/services/japanese_racing_translation.py",
+      "scope": "historical-single-file-diff",
+      "mode": "targeted",
+      "domains": [
+        "core",
+        "news_translation"
+      ],
+      "labels": [
+        "stable.test_external_english_horse_context_gate",
+        "stable.test_horse_profile_publish.BasicPublishGateTests",
+        "stable.test_impact_core",
+        "stable.test_japanese_racing_translation_normalization",
+        "stable.test_news_content_boundaries",
+        "stable.test_race_data_sync_r0.RaceDataSyncR0FlagContractTests.test_celery_route_and_beat_schedule_are_isolated",
+        "stable.test_race_live_official_publication.RaceLiveOfficialAuthorizationBehaviorTests",
+        "stable.test_race_live_official_publication.RaceLiveOfficialAuthorizationCommandTests.test_authorization_apply_exact_replay_is_idempotent",
+        "stable.test_race_live_target_eligibility",
+        "stable.test_release_commit",
+        "stable.test_term_gate_reprocessing",
+        "stable.test_translation_failure_recovery_change",
+        "stable.tests_legacy.CrawlAutoTranslateTests",
+        "stable.tests_legacy.PublicHomeInfoFeedTests",
+        "stable.tests_legacy.PublishWindowServiceTests",
+        "stable.tests_legacy.TranslationWorkflowTests"
+      ]
+    },
+    {
+      "base_sha": "b7dab422d48ea0294627dd0b499f47ff2a147be0",
+      "head_sha": "910cd0fc46a149fef9b62e4d587ee9f531e754e5",
+      "path": "server/stable/services/japanese_racing_translation.py",
+      "scope": "historical-single-file-diff",
+      "mode": "targeted",
+      "domains": [
+        "core",
+        "news_translation"
+      ],
+      "labels": [
+        "stable.test_external_english_horse_context_gate",
+        "stable.test_horse_profile_publish.BasicPublishGateTests",
+        "stable.test_impact_core",
+        "stable.test_japanese_racing_translation_normalization",
+        "stable.test_news_content_boundaries",
+        "stable.test_race_data_sync_r0.RaceDataSyncR0FlagContractTests.test_celery_route_and_beat_schedule_are_isolated",
+        "stable.test_race_live_official_publication.RaceLiveOfficialAuthorizationBehaviorTests",
+        "stable.test_race_live_official_publication.RaceLiveOfficialAuthorizationCommandTests.test_authorization_apply_exact_replay_is_idempotent",
+        "stable.test_race_live_target_eligibility",
+        "stable.test_release_commit",
+        "stable.test_term_gate_reprocessing",
+        "stable.test_translation_failure_recovery_change",
+        "stable.tests_legacy.CrawlAutoTranslateTests",
+        "stable.tests_legacy.PublicHomeInfoFeedTests",
+        "stable.tests_legacy.PublishWindowServiceTests",
+        "stable.tests_legacy.TranslationWorkflowTests"
+      ]
+    },
+    {
+      "base_sha": "a59956b327157d29630fab1f1c98ba9c9cacfed0",
+      "head_sha": "88cc4eafe4a7b5263aa2a6c30cd7d70978323989",
+      "path": "server/stable/services/historical_batch_runner.py",
+      "scope": "historical-single-file-diff",
+      "mode": "targeted",
+      "domains": [
+        "core",
+        "historical_batch"
+      ],
+      "labels": [
+        "stable.test_historical_batch_pipeline",
+        "stable.test_historical_batch_runner_change",
+        "stable.test_historical_batch_runner_postgres",
+        "stable.test_historical_race_batches",
+        "stable.test_historical_race_detail_chunk_import",
+        "stable.test_historical_race_detail_import_receipt",
+        "stable.test_horse_profile_publish.BasicPublishGateTests",
+        "stable.test_impact_core",
+        "stable.test_race_data_sync_r0.RaceDataSyncR0FlagContractTests.test_celery_route_and_beat_schedule_are_isolated",
+        "stable.test_race_live_official_publication.RaceLiveOfficialAuthorizationBehaviorTests",
+        "stable.test_race_live_official_publication.RaceLiveOfficialAuthorizationCommandTests.test_authorization_apply_exact_replay_is_idempotent",
+        "stable.test_race_live_target_eligibility",
+        "stable.test_release_commit",
+        "stable.tests_legacy.PublicHomeInfoFeedTests",
+        "stable.tests_legacy.PublishWindowServiceTests"
+      ]
+    },
+    {
+      "base_sha": "201ab2d8c5d5ce2c2ad2ad3da3a20d2e69c7e035",
+      "head_sha": "f1b801ba6231730241d942e299e60fb9dfdaadc1",
+      "path": "server/stable/services/historical_batch_runner.py",
+      "scope": "historical-single-file-diff",
+      "mode": "targeted",
+      "domains": [
+        "core",
+        "historical_batch"
+      ],
+      "labels": [
+        "stable.test_historical_batch_pipeline",
+        "stable.test_historical_batch_runner_change",
+        "stable.test_historical_batch_runner_postgres",
+        "stable.test_historical_race_batches",
+        "stable.test_historical_race_detail_chunk_import",
+        "stable.test_historical_race_detail_import_receipt",
+        "stable.test_horse_profile_publish.BasicPublishGateTests",
+        "stable.test_impact_core",
+        "stable.test_race_data_sync_r0.RaceDataSyncR0FlagContractTests.test_celery_route_and_beat_schedule_are_isolated",
+        "stable.test_race_live_official_publication.RaceLiveOfficialAuthorizationBehaviorTests",
+        "stable.test_race_live_official_publication.RaceLiveOfficialAuthorizationCommandTests.test_authorization_apply_exact_replay_is_idempotent",
+        "stable.test_race_live_target_eligibility",
+        "stable.test_release_commit",
+        "stable.tests_legacy.PublicHomeInfoFeedTests",
+        "stable.tests_legacy.PublishWindowServiceTests"
+      ]
+    },
+    {
+      "base_sha": "d6d6f58b2b5b90301d8fa633a650df28379c09e7",
+      "head_sha": "6b1bcb6af79ff2ec91e3eae051d02ac7f3d8996e",
+      "path": "server/stable/services/historical_batch_runner.py",
+      "scope": "historical-single-file-diff",
+      "mode": "targeted",
+      "domains": [
+        "core",
+        "historical_batch"
+      ],
+      "labels": [
+        "stable.test_historical_batch_pipeline",
+        "stable.test_historical_batch_runner_change",
+        "stable.test_historical_batch_runner_postgres",
+        "stable.test_historical_race_batches",
+        "stable.test_historical_race_detail_chunk_import",
+        "stable.test_historical_race_detail_import_receipt",
+        "stable.test_horse_profile_publish.BasicPublishGateTests",
+        "stable.test_impact_core",
+        "stable.test_race_data_sync_r0.RaceDataSyncR0FlagContractTests.test_celery_route_and_beat_schedule_are_isolated",
+        "stable.test_race_live_official_publication.RaceLiveOfficialAuthorizationBehaviorTests",
+        "stable.test_race_live_official_publication.RaceLiveOfficialAuthorizationCommandTests.test_authorization_apply_exact_replay_is_idempotent",
+        "stable.test_race_live_target_eligibility",
+        "stable.test_release_commit",
+        "stable.tests_legacy.PublicHomeInfoFeedTests",
+        "stable.tests_legacy.PublishWindowServiceTests"
+      ]
+    },
+    {
+      "base_sha": "6ac08e40ffbabdade2befe7e803170cc1d2ff1c9",
+      "head_sha": "c3d177b218845bd477a0f92fe7ccb547051f7679",
+      "path": "server/stable/services/race_reference_sources.py",
+      "scope": "historical-single-file-diff",
+      "mode": "targeted",
+      "domains": [
+        "core",
+        "race_parser",
+        "race_results"
+      ],
+      "labels": [
+        "stable.test_horse_profile_publish.BasicPublishGateTests",
+        "stable.test_impact_core",
+        "stable.test_race_data_sync_r0.RaceDataSyncR0FlagContractTests.test_celery_route_and_beat_schedule_are_isolated",
+        "stable.test_race_data_sync_result_admission",
+        "stable.test_race_data_sync_results",
+        "stable.test_race_live_official_publication",
+        "stable.test_race_live_official_publication.RaceLiveOfficialAuthorizationBehaviorTests",
+        "stable.test_race_live_official_publication.RaceLiveOfficialAuthorizationCommandTests.test_authorization_apply_exact_replay_is_idempotent",
+        "stable.test_race_live_target_eligibility",
+        "stable.test_race_multisource_jra",
+        "stable.test_race_reference_management_commands",
+        "stable.test_race_reference_sources",
+        "stable.test_race_reference_sources_postgres",
+        "stable.test_race_result_recovery_integration",
+        "stable.test_realtime_race_results",
+        "stable.test_release_commit",
+        "stable.tests_legacy.PublicHomeInfoFeedTests",
+        "stable.tests_legacy.PublishWindowServiceTests"
+      ]
+    }
+  ],
+  "executed_business_tests": 0
+}

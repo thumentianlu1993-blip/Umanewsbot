@@ -13,7 +13,7 @@ import time
 import traceback
 import unittest
 ROOT = Path(__file__).resolve().parents[1]
-sys.path[:0] = [str(ROOT), str(ROOT/'server'), str(ROOT/'.codex/scripts'), str(ROOT/'scripts')]
+sys.path[:0] = [str(ROOT), str(ROOT/'server'), str(ROOT/'.codex/scripts'), str(ROOT/'scripts'), str(ROOT/'runtime/research')]
 from tools.test_impact.core import digest, shard_tests
 from run_bounded_stable_tests import isolated_environment, flatten
 
@@ -56,10 +56,11 @@ def isolation_probe(profile):
 def load(labels):
     if len(labels) != len(set(labels)):
         raise ValueError('duplicate human labels')
-    suite = unittest.TestLoader().loadTestsFromNames(labels)
+    loader = unittest.TestLoader()
+    suite = loader.loadTestsFromNames(labels)
     cases = list(flatten(suite))
     if any(isinstance(c,unittest.loader._FailedTest) for c in cases):
-        raise ValueError('collection failed: '+str(suite))
+        raise ValueError('collection failed: '+'\n'.join(loader.errors))
     return cases
 
 

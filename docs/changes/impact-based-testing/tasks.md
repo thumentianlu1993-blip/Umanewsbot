@@ -1,6 +1,6 @@
 # 任务与状态
 
-当前仅方案，所有实现项均未开始；不把勾选计划审核等同于 CI 已启用。
+当前已实现主体，正在有界Linux验证与独立返修；未全量校准或激活。
 
 ## 测试先行
 
@@ -8,16 +8,16 @@
 - [ ] (operations) 为计划选择、Git 边界、规则降级、分片完整性、skip/收尾失败编写小型 RED 测试。
 - [ ] (integration) 为跨领域依赖、子进程网络/配置隔离及 PostgreSQL profile 编写 RED 测试。
 
-## 实现（待用户审阅后另行推进）
+## 实现（用户已批准）
 
-- [ ] (operations) 建立受审规则/catalog，覆盖文档、模板、独立服务和共享高风险路径；未知路径显式阻断。
-- [ ] (operations) 实现固定 Git 输入、合并树与本地未提交内容的计划生成；复用已有 runner 核心且兼容50项旧入口。
-- [ ] (integration) 实现network none的非root PG/测试镜像、子进程/容器拒绝验证、按类≤200分批及最多4并发。
-- [ ] (operations) 实现候选目录外的交付核验器、workflow/审核身份核验、STALE_BASE和strict配合；保留引导证据。
-- [ ] (operations) 实现真实状态聚合和简短日志，三份旧工作流按唯一归属迁移且保留研究手动依赖链。
-- [ ] (operations) 接入统一 PR gate，移除默认双全量；迁移现有离线合同，保留手动真实网络流程。
-- [ ] (operations) 实现高风险/手动/日周 full profile、失败处理和跨 run 身份核验。
-- [ ] (operations) 修改 TDD skill/codex_workflow 的停止规则；更新 deploy_runbook 中“补合同不补全量”的用法。
+- [x] (operations) 建立受审规则/catalog，覆盖文档、模板、独立服务和共享高风险路径；未知路径显式阻断。
+- [x] (operations) 实现固定 Git 输入、合并树与本地未提交内容的计划生成；复用已有 runner 核心且兼容50项旧入口。
+- [x] (integration) 实现network none的非root PG/测试镜像、子进程/容器拒绝验证、按类≤200分批及最多4并发。
+- [x] (operations) 实现候选目录外的交付核验器、workflow/审核身份核验、STALE_BASE和strict配合；保留引导证据。
+- [x] (operations) 实现真实状态聚合和简短日志，三份旧工作流按唯一归属迁移且保留研究手动依赖链。
+- [x] (operations) 接入统一 PR gate，移除默认双全量；迁移现有离线合同，保留手动真实网络流程。
+- [x] (operations) 实现高风险/手动/日周 full profile、失败处理和跨 run 身份核验。
+- [x] (operations) 修改 TDD skill/codex_workflow 的停止规则；更新 deploy_runbook 中“补合同不补全量”的用法。
 
 ## 验证与交付
 

@@ -946,7 +946,9 @@
     "scripts/decide_full_regression.py",
     "scripts/research_synthetic.py",
     "scripts/research_offline_labels.py",
-    "scripts/test_plan_worker.py"
+    "scripts/test_plan_worker.py",
+    "scripts/replay_impact_diffs.py",
+    "docs/changes/impact-based-testing/*.json"
   ],
   "paths": {
     "server/stable/services/horse_profile_publish.py": [
