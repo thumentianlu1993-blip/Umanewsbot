@@ -1,3 +1,7 @@
+## 2026-10-02 PR232 发布完成
+
+当前发布目录 `/opt/umanews-release-ad50abdb-test-fixes-20261002/umanewsbot`，固定候选 `ad50abdb` / 镜像 `73ee1dcf7edb` / schema0079。四应用、双域名、马匹提示、队列消费和配置指纹验证通过；无迁移/配置/批量数据动作。原任务自然排空，未取消消费或清队列。精确备份、intent、manifest、complete 与恢复边界见[执行记录](changes/fix-known-test-failures/rollout.md)。下方旧运行目录为历史，不可作为当前发布恢复依据。
+
 ## 2026-10-02 已知失败修复的有界验证入口
 
 本次修复使用 `.github/workflows/release_0078_contract.yml` 的手动输入
