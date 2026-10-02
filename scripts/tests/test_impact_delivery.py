@@ -28,6 +28,14 @@ class DeliveryTests(unittest.TestCase):
         valid['enforce_admins']['enabled']=False
         with self.assertRaises(ValueError):verify_protection(valid)
 
+    def test_bootstrap_requires_actual_prefixed_check_without_weakening_normal_pr(self):
+        bootstrap='impact-validation / test-plan-gate'
+        valid={'required_status_checks':{'strict':True,'contexts':[bootstrap]},'enforce_admins':{'enabled':True}}
+        verify_protection(valid, bootstrap)
+        with self.assertRaises(ValueError):verify_protection(valid)
+        valid['required_status_checks']['contexts']=['test-plan-gate']
+        with self.assertRaises(ValueError):verify_protection(valid, bootstrap)
+
     def test_nightly_failed_same_sha_retries_weekly_unchanged_runs(self):
         now=datetime.now(timezone.utc)
         latest={'tested_sha':'a','conclusion':'success','updated_at':now.isoformat()}

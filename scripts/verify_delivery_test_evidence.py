@@ -35,12 +35,12 @@ def verify_jobs(jobs):
         require(all(actual.get(s)=='success' for s in steps),f'missing/skipped step: {name}')
 
 
-def verify_protection(protection):
+def verify_protection(protection, required_context='test-plan-gate'):
     checks=protection.get('required_status_checks') or {}
     contexts=set(checks.get('contexts',[])) | {c['context'] for c in checks.get('checks',[])}
-    require(checks.get('strict') is True and 'test-plan-gate' in contexts and
+    require(checks.get('strict') is True and required_context in contexts and
             protection.get('enforce_admins',{}).get('enabled') is True,
-            'strict required test-plan-gate including admins is not active')
+            'strict required '+required_context+' including admins is not active')
 
 
 def verify_mode(expected, reported):
@@ -184,7 +184,7 @@ else: print(json.dumps(verify_results(p,x['reports'])))
             compare_collection(plan,{'mode':'docs-only','batches':[],'count':0})
         verified=json.loads(checked([sys.executable,'-I','-c',program,str(bundle),str(config),'results']))
     protection=api(a.repo,'branches/main/protection')
-    verify_protection(protection)
+    verify_protection(protection, prefix+'test-plan-gate')
     # 第二次读取收尾；实际 merge 仍由 strict 服务端检查防止之后的竞态。
     require(api(a.repo,'commits/main')['sha']==base and api(a.repo,f'pulls/{a.pr}')['head']['sha']==head,'STALE_BASE')
     receipt={'status':'verified','base_sha':base,'head_sha':head,'test_sha':plan['test_sha'],'merge_sha':test,'test_tree':plan['test_tree'],
