@@ -19176,3 +19176,154 @@ class QQShutdownTests(TestCase):
         self.assertEqual(delivery.last_error, 'qq_channel_disabled')
         self.get.assert_not_called()
         self.post.assert_not_called()
+
+    def test_online_probe_does_not_contact_disabled_gateway(self):
+        from stable.services.onebot import BotPusher
+        self.assertEqual(BotPusher().is_online(), (False, 'qq_channel_disabled'))
+        self.get.assert_not_called()
+
+    def test_direct_manual_service_and_late_task_do_not_change_web_status(self):
+        from stable.services.pushing import enqueue_push_for_article
+        from stable.tasks import push_article_task
+        before = self.article.status
+        self.assertEqual(push_article_to_targets(self.article, [self.target]), [])
+        with patch('stable.tasks.push_article_task.delay') as queued:
+            enqueue_push_for_article(self.article, [self.target])
+        queued.assert_not_called()
+        result = push_article_task.run(self.article.pk, [self.target.pk])
+        self.assertEqual(result['reason'], 'qq_channel_disabled')
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.status, before)
+        self.assertEqual(PushLog.objects.count(), 0)
+        self.post.assert_not_called()
+
+    def test_direct_auto_services_do_not_create_deliveries_or_quotas(self):
+        from stable.services.qq_windows import select_qq_window_deliveries
+        self.assertEqual(ensure_qq_push_deliveries(self.article, [self.target]), [])
+        result = select_qq_window_deliveries(RacingRegion.JAPAN, window=Mock(), targets=[self.target])
+        self.assertEqual(result.zero_reasons, ['qq_channel_disabled'])
+        self.assertEqual(QQPushDelivery.objects.count(), 0)
+        self.assertEqual(QuotaLedger.objects.count(), 0)
+
+    def test_all_old_task_entrypoints_skip_without_fanout(self):
+        from stable.tasks import qq_region_window_task, qq_production_regions_window_task, _qq_push_after_source_elevation
+        with override_settings(MULTIREGION_PRODUCTION_WINDOWS_ENABLED=True,
+                               MULTIREGION_PRODUCTION_WINDOWS_QQ_ENABLED=True), \
+             patch('stable.tasks.dispatch_task') as dispatch, \
+             patch('stable.tasks.qq_push_delivery_task.delay') as delivery_queue:
+            for task, args in [(qq_auto_push_article_task, [self.article.pk]),
+                               (qq_production_regions_window_task, []),
+                               (qq_region_window_task, [RacingRegion.JAPAN])]:
+                with self.subTest(task=task.name):
+                    self.assertEqual(task.run(*args).get('reason'), 'qq_channel_disabled')
+            self.assertIsNone(_qq_push_after_source_elevation(self.article, source_elevated=True))
+        dispatch.assert_not_called()
+        delivery_queue.assert_not_called()
+        self.assertEqual(QQPushDelivery.objects.count(), 0)
+        self.assertEqual(ProductionWindow.objects.count(), 0)
+
+    def test_commit_callback_rechecks_shutdown_before_enqueuing(self):
+        from stable.services.qq_auto_push import enqueue_qq_auto_push_for_article
+        with self.captureOnCommitCallbacks() as callbacks, override_settings(QQ_CHANNEL_ENABLED=True):
+            enqueue_qq_auto_push_for_article(self.article.pk)
+        with patch('stable.tasks.qq_auto_push_article_task.delay') as queued:
+            for callback in callbacks:
+                callback()
+        queued.assert_not_called()
+
+    def test_web_publication_survives_gateway_failure(self):
+        from stable.services.automation import publish_article_automatically
+        from stable.tasks import publish_article
+        self.post.side_effect = RuntimeError('gateway unavailable')
+        with patch('stable.tasks.qq_auto_push_article_task.delay') as queued, \
+             patch('stable.tasks.dispatch_task') as scan, self.captureOnCommitCallbacks(execute=True):
+            publish_article(self.article, self.staff)
+            publish_article_automatically(self.article)
+        queued.assert_not_called()
+        scan.assert_called_once()
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.workflow_status, WorkflowStatus.PUBLISHED)
+        self.assertIsNotNone(self.article.published_to_web_at)
+        self.assertEqual(self.client.get(reverse('public-article-detail', args=[self.article.pk])).status_code, 200)
+        self.post.assert_not_called()
+
+    def test_ops_email_and_automation_email_continue_while_qq_skips(self):
+        from stable.models import NotificationType, NotificationChannel, NotificationStatus
+        from stable.services.ops_notifications import send_ops_notification
+        from stable.services.notifications import send_automation_notification
+        with override_settings(MULTIREGION_OPS_NOTIFICATIONS_ENABLED=True,
+                MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID='synthetic-group',
+                MULTIREGION_OPS_NOTIFICATION_EMAILS=['ops@example.invalid'],
+                AUTOMATION_ENABLE_EMAIL=True, AUTOMATION_NOTIFY_EMAILS=['ops@example.invalid']), \
+             patch('stable.services.ops_notifications.send_mail') as ops_mail, \
+             patch('stable.services.notifications.send_mail') as automation_mail:
+            logs = send_ops_notification(notification_type=NotificationType.OPS_SUMMARY,
+                                        title='synthetic ops', payload={})
+            auto_logs = send_automation_notification(NotificationType.BACKLOG, {},
+                channels=[NotificationChannel.QQ, NotificationChannel.EMAIL, NotificationChannel.SMS, NotificationChannel.WECHAT])
+        qq_logs = [l for l in logs + auto_logs if l.channel == NotificationChannel.QQ]
+        self.assertTrue(qq_logs)
+        self.assertTrue(all(l.status == NotificationStatus.SKIPPED and l.error_message == 'qq_channel_disabled' for l in qq_logs))
+        ops_mail.assert_called_once()
+        automation_mail.assert_called_once()
+        self.post.assert_not_called()
+
+    def test_old_disabled_delivery_does_not_resume_when_channel_is_reenabled(self):
+        from stable.services.qq_auto_push import process_qq_push_delivery
+        delivery = QQPushDelivery.objects.create(article=self.article, target=self.target,
+            status=QQPushDeliveryStatus.SKIPPED, last_error='qq_channel_disabled')
+        with override_settings(QQ_CHANNEL_ENABLED=True), \
+             patch('stable.services.qq_auto_push.is_public_url_accessible', return_value=(True, '')), \
+             patch('stable.tasks.qq_push_delivery_task.apply_async') as retry:
+            updated = process_qq_push_delivery(delivery)
+            result = qq_push_delivery_task.run(delivery.pk)
+            self.assertEqual(ensure_qq_push_deliveries(self.article, [self.target]), [])
+        self.assertEqual(updated.status, QQPushDeliveryStatus.SKIPPED)
+        self.assertEqual(result['status'], QQPushDeliveryStatus.SKIPPED)
+        retry.assert_not_called()
+        self.post.assert_not_called()
+
+    def test_pending_states_skip_but_sent_and_fresh_sending_are_preserved(self):
+        from stable.services.qq_auto_push import process_qq_push_delivery
+        self.url_patch = patch('stable.services.qq_auto_push.is_public_url_accessible', return_value=(True, '')).start()
+        for status in [QQPushDeliveryStatus.PENDING, QQPushDeliveryStatus.RETRYING,
+                       QQPushDeliveryStatus.FAILED, QQPushDeliveryStatus.SKIPPED,
+                       QQPushDeliveryStatus.SENDING, QQPushDeliveryStatus.SENT]:
+            for fresh in ([False, True] if status == QQPushDeliveryStatus.SENDING else [False]):
+                with self.subTest(status=status, fresh=fresh):
+                    QQPushDelivery.objects.all().delete()
+                    delivery = QQPushDelivery.objects.create(article=self.article, target=self.target,
+                        status=status, attempt_count=1, message_id='historical-id',
+                        last_attempt_at=timezone.now() if fresh else timezone.now()-timedelta(hours=1))
+                    expected = status if status == QQPushDeliveryStatus.SENT or fresh else QQPushDeliveryStatus.SKIPPED
+                    result = process_qq_push_delivery(delivery)
+                    self.assertEqual(result.status, expected)
+                    self.assertEqual(result.attempt_count, 1)
+                    self.assertEqual(result.message_id, 'historical-id')
+        self.get.assert_not_called()
+        self.post.assert_not_called()
+
+    def test_admin_post_and_qq_window_rerun_are_disabled_before_mutation(self):
+        with patch('stable.admin.enqueue_push_for_article') as admin_queue:
+            response = self.client.post(reverse('admin:stable_newsarticle_push', args=[self.article.pk]),
+                                       {'targets': [self.target.pk]})
+        admin_queue.assert_not_called()
+        self.assertEqual(response.status_code, 302)
+        start = timezone.now()
+        window = ProductionWindow.objects.create(kind=ProductionWindowKind.QQ_PUSH,
+            scope_key='synthetic-qq', racing_region=RacingRegion.JAPAN,
+            window_start=start, window_end=start+timedelta(minutes=15), status=ProductionWindowStatus.SUCCEEDED)
+        with patch('stable.views.select_qq_window_deliveries', return_value=Mock(deliveries=[], zero_reasons=[])) as selection, \
+             patch('stable.views.dispatch_task') as dispatch, \
+             patch('stable.services.pushing.enqueue_push_for_article') as queue:
+            response = self.client.post(reverse('console-production-window-rerun', args=[window.pk]))
+            preview = self.client.get(reverse('console-production-window-preview', args=[window.pk]))
+        self.assertEqual(response.status_code, 302)
+        self.assertContains(preview, 'qq_channel_disabled')
+        window.refresh_from_db()
+        self.assertEqual(window.rerun_count, 0)
+        self.assertEqual(window.status, ProductionWindowStatus.SUCCEEDED)
+        selection.assert_not_called()
+        dispatch.assert_not_called()
+        self.get.assert_not_called()
+        self.post.assert_not_called()
