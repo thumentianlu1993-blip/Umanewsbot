@@ -29,3 +29,16 @@
 
 实际GitHub check-run名包含reusable workflow调用前缀。核验器从已验证的bootstrap workflow推导唯一required context；
 普通PR仍严格要求无前缀的`test-plan-gate`，不得用引导检查替代。新增小测试先RED，再48项GREEN；等待独立复审。
+
+## 首次校准返修记录
+
+`37010615475`因首次保护检查名兼容修复取消，不计校准通过。
+`37011044271`对ae9dbb19分批校准失败：21份完整报告、4065个开始执行的ID；另13批无完整报告，未冒充全量通过。
+确认并修复：头条同版本并发夹具、单个runner命令测试的宿主磁盘依赖、镜像缺少标准python3入口、
+事务测试重置序列与初始数据碰撞、固定日期registry夹具过期。37项隔离PG直接回归全部通过、零skip。
+两类真实迁移测试按完整类单独分批，保持全量集合及类边界，避免与普通测试挤满200项造成600秒超时。
+逐例开始日志写入artifact供超时定位；本机跨架构诊断的faulthandler自动堆栈触发解释器崩溃，已移除该临时诊断，仅保留逐例日志。
+新分片合同先RED再通过，本地工具49项通过。后续仍需最终SHA完整校准与独立review。
+
+本机交付核验使用专用`colima-umanews-impact-ci`、classic image store及本地unix socket，与CI镜像config ID一致。
+Docker29默认containerd store导入同tar返回manifest ID，不能将其当作CI config ID使用；未放宽镜像身份校验。

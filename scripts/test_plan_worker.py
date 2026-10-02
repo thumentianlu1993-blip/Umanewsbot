@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """仅由 network-none 非 root 容器调用；收集或执行一个有界分片。"""
 import contextlib
-import faulthandler
 import importlib
 import io
 import json
@@ -85,7 +84,8 @@ def collect(plan, catalog):
                 if cases[ident]['profile'] != profile:
                     raise ValueError('profile ownership conflict')
             else:
-                cases[ident] = {'id':ident,'profile':profile}
+                cases[ident] = {'id':ident,'profile':profile,
+                                'dedicated_batch':any(ident.startswith(module+'.') for module in catalog.get('dedicated_batch_modules',[]))}
     if plan['labels'] and not cases:
         raise ValueError('empty test collection')
     plan['aliases'] = aliases
@@ -125,7 +125,6 @@ def execute(plan, batch):
         if len(actual)!=len(set(actual)) or set(actual)!=set(batch['ids']) or not 0<len(actual)<=200:
             raise ValueError('batch selection mismatch')
         result_holder=[]
-        faulthandler.dump_traceback_later(120, repeat=True)
         if batch['profile']=='django':
             from django.test.runner import DiscoverRunner
             class Runner(DiscoverRunner):
@@ -144,8 +143,6 @@ def execute(plan, batch):
         report['exit_code']=int(bool(status)); report['lifecycle']='complete'
     except BaseException:
         report['errors'].append({'id':'infrastructure','traceback':traceback.format_exc()})
-    finally:
-        faulthandler.cancel_dump_traceback_later()
     report['seconds']=time.monotonic()-started
     return report
 

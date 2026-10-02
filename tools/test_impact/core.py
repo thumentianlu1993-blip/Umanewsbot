@@ -138,12 +138,16 @@ def shard_tests(tests, limit=200):
         seen.add(key)
         classes.setdefault((test['profile'], key.rsplit('.', 1)[0]), []).append(key)
     batches = []
+    dedicated = {(t['profile'], t['id'].rsplit('.',1)[0]) for t in tests if t.get('dedicated_batch')}
+    previous_dedicated = False
     for (profile, cls), ids in sorted(classes.items()):
         if len(ids) > limit:
             raise ValueError(f'class exceeds {limit}: {cls}')
-        if not batches or batches[-1]['profile'] != profile or len(batches[-1]['ids']) + len(ids) > limit:
+        separate = (profile, cls) in dedicated
+        if not batches or previous_dedicated or separate or batches[-1]['profile'] != profile or len(batches[-1]['ids']) + len(ids) > limit:
             batches.append({'key': f'batch-{len(batches):03}', 'profile': profile, 'ids': []})
         batches[-1]['ids'].extend(sorted(ids))
+        previous_dedicated = separate
     return batches
 
 

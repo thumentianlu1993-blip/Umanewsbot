@@ -2825,5 +2825,9 @@
     "race_results": "integration: 持久化及官方公开判定",
     "historical_batch": "integration: 历史批次收据和事务",
     "horse_publish": "integration: 首次发布、批次重试及冻结排除"
-  }
+  },
+  "dedicated_batch_modules": [
+    "stable.test_migration_history_repair_postgres",
+    "stable.test_migration_database_isolation"
+  ]
 }

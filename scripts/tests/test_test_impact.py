@@ -126,6 +126,13 @@ class EvidenceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'duplicate'):
             core.shard_tests([{'id':'m.C.test_x','profile':'django'}]*2)
 
+    def test_expensive_migration_classes_get_separate_batches(self):
+        tests=[{'id':f'm.{cls}.test_{i}','profile':'django','dedicated_batch':cls=='B'}
+               for cls in ('A','B','C') for i in range(2)]
+        batches=core.shard_tests(tests)
+        self.assertEqual([len(b['ids']) for b in batches],[2,2,2])
+        self.assertEqual({i for b in batches for i in b['ids']},{t['id'] for t in tests})
+
     def test_rule_downgrade_retains_old_requirements(self):
         old={'mode':'full','domains':['old'],'labels':['m.old'],'reasons':[]}
         new={'mode':'docs-only','domains':[],'labels':[],'reasons':[]}
