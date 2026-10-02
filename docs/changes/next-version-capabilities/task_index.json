@@ -1,0 +1,3180 @@
+{
+  "title": "Umanews 2026-10-30 版本任务索引",
+  "timezone": "Asia/Shanghai",
+  "status": "原始规划索引；动态执行状态见 dispatch_state.json",
+  "source": "tasks.md",
+  "tasks": [
+    {
+      "id": "F01",
+      "lane": "A",
+      "role": "integration",
+      "it": 1,
+      "start": "2026-10-03",
+      "due": "2026-10-04",
+      "h": 4,
+      "deps": [],
+      "gaps": [
+        "RG-01",
+        "RG-03",
+        "HG-05",
+        "AG-01",
+        "EG-02"
+      ],
+      "area": "contract",
+      "title": "冻结跨模块字段及首版产品参数",
+      "change": "将身份、资料成熟度、来源证据、input_version、下一动作、异常原因、手动保护字段写为共享类型；补迁移/索引草图。采用总规划的默认参数，逐项标注已确认与建议；10/04 锁定首批重点赛事选择规则、社区来源清单和预算配置入口。",
+      "test": "用普通词马名、同名异马、确定名单与预想名单冲突、未知值四组输入验证类型能表达；不把提供方与成熟度合并为一个 official 布尔值。",
+      "done": "输出接口样例和兼容策略；A/B/C 均可据此独立实现；仍未知的外部额度有负责人及 10/06 处理结论。",
+      "deadline": "2026-10-04 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-04T18:00:00+08:00",
+      "read_paths": [
+        "docs/changes/next-version-capabilities/design.md",
+        "docs/changes/race-event-unified-decision/spec.md",
+        "server/stable/models.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "F04",
+      "lane": "C",
+      "role": "application",
+      "it": 1,
+      "start": "2026-10-03",
+      "due": "2026-10-04",
+      "h": 4,
+      "deps": [],
+      "gaps": [
+        "EG-01",
+        "UG-05"
+      ],
+      "area": "console",
+      "title": "冻结编辑后台关键任务与交互原型",
+      "change": "记录找待办、核对差异、改正文、改名称、处理赛事冲突、修复后续跑六条现有路径的步骤/耗时；画出待处理、内容、资料、自动化四入口及手机原型。",
+      "test": "使用相同样例操作旧流程，区分已有保存发布合一与真正冗余；无登录证据时标记待实测，不伪造耗时。",
+      "done": "形成前后操作对照和组件清单；关键动作不依赖桌面宽表或多次跳页。",
+      "deadline": "2026-10-04 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-04T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/admin.py",
+        "server/stable/templates/stable/console/dashboard.html",
+        "server/stable/templates/stable/console/article_editor.html"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "F03",
+      "lane": "A",
+      "role": "integration",
+      "it": 1,
+      "start": "2026-10-04",
+      "due": "2026-10-05",
+      "h": 5,
+      "deps": [
+        "F01"
+      ],
+      "gaps": [
+        "RG-02"
+      ],
+      "area": "source",
+      "title": "盘点九地区主备来源与现有 TRA 套餐",
+      "change": "按地区×赛程/名单/退赛/结果/更正记录可用端点、稳定身份、更新时刻、最终状态语义、速率和现有权限；每格给主源、备源或缺口，输出固定回放证据。",
+      "test": "验证一个合格第三方即可给出确定资料；空响应、只给前三名和镜像转载不能冒充完整独立来源。",
+      "done": "九地区矩阵无空白格；缺能力项有修复归属和最迟 10/06 可行性结论；不得以付费事实推断端点覆盖。",
+      "deadline": "2026-10-05 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-05T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_data_sync_providers.py",
+        "server/stable/services/race_source_identity.py",
+        "server/stable/services/race_data_sync_enrollment.py",
+        "server/stable/test_race_multisource_identity.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "F02",
+      "lane": "B",
+      "role": "integration",
+      "it": 1,
+      "start": "2026-10-03",
+      "due": "2026-10-05",
+      "h": 5,
+      "deps": [],
+      "gaps": [
+        "NG-01",
+        "NG-07",
+        "AG-07"
+      ],
+      "area": "news",
+      "title": "建立新闻漏斗与模型黄金样例",
+      "change": "只读统计五地区抓取、清洗、翻译、选择、公开和曝光；按失败原因拆解 JRA 倾斜。保存脱敏的原文/正确实体/重要事件标注，固定训练样例与保留验收集。",
+      "test": "每地区至少 20 篇，共至少 100 篇；包含广告、误删、普通词、重复报道和重大消息。检查分母同时覆盖未发布和失败文章。",
+      "done": "交付基线表、固定 fixture 与标注指南；明确实际生产配置与代码默认值的差异。",
+      "deadline": "2026-10-05 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-05T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/article_content.py",
+        "server/stable/adapters/international.py",
+        "server/stable/services/automation.py",
+        "server/stable/services/publishing_windows.py",
+        "server/stable/test_news_content_boundaries.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "F05",
+      "lane": "C",
+      "role": "application",
+      "it": 1,
+      "start": "2026-10-04",
+      "due": "2026-10-05",
+      "h": 3,
+      "deps": [],
+      "gaps": [
+        "UG-01",
+        "UG-02",
+        "UG-03"
+      ],
+      "area": "public",
+      "title": "复验域名与公开缺陷并固定回归样例",
+      "change": "复验域名、凯旋门重复、德国 G1 筛选、兰秀赛果、女皇杯缺行、三个马匹统计例；为每例保留 URL、对象 ID、时间和实际结果。",
+      "test": "重测美艺力量 45 条分页、已消失的新闻污染和前导零，防止将已关闭问题重新计入。",
+      "done": "每项标明复现/未复现/待证；域名目标从现有部署配置核实，未知时给出待决项而非自行改站点。",
+      "deadline": "2026-10-05 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-05T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/templates/stable/public/race_detail.html",
+        "server/stable/templates/stable/public/horse_detail.html",
+        "server/stable/templates/stable/public/detail.html"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "H01",
+      "lane": "A",
+      "role": "integration",
+      "it": 1,
+      "start": "2026-10-04",
+      "due": "2026-10-06",
+      "h": 5,
+      "deps": [
+        "F01"
+      ],
+      "gaps": [
+        "HG-01",
+        "HG-07"
+      ],
+      "area": "horse",
+      "title": "生成近三年与历史 G1 全参赛马目标集",
+      "change": "去重生成近三年参赛集合、当前赛季/未来 30 天/近期新闻优先队列、2020 年以来 G1 全参赛马名称集合；纳入未建档对象、Jpn1 与香港本土 G1，列出地区和缺口。",
+      "test": "按最近参赛时间而非马龄排序；同马跨地区只算一次；历史集合不能缩成胜马；窗口边界及并发新增目标可重复计算。",
+      "done": "目标数量和优先级账本可复算；未知身份与缺来源保留在分母；缓存、staging、正式公开分别计数。",
+      "deadline": "2026-10-06 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-06T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/p0_horse_profiles.py",
+        "server/stable/services/horse_profile_completion.py",
+        "server/stable/services/horse_profile_publish.py",
+        "server/stable/services/horse_race_records.py",
+        "server/stable/test_horse_profile_publish.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "M01",
+      "lane": "B",
+      "role": "integration",
+      "it": 1,
+      "start": "2026-10-05",
+      "due": "2026-10-06",
+      "h": 5,
+      "deps": [
+        "F01",
+        "F02"
+      ],
+      "gaps": [
+        "AG-01"
+      ],
+      "area": "ai",
+      "title": "增加 GPT-6 Responses 适配及结构输出",
+      "change": "在现有 provider 旁新增可配置 Responses 适配，定义实体/事实/证据/缺口输出 schema；保留现有翻译对照路径并记录模型与提示词版本。",
+      "test": "用 mock 响应覆盖合法结构、拒答、字段缺失、截断、429 和超时；自动测试不使用真实 API。",
+      "done": "业务层不依赖具体模型 SDK 响应形状；账号实测作为有边界的运行验证，不当作单元测试。",
+      "deadline": "2026-10-06 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-06T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/translation.py",
+        "server/stable/services/rewriting.py",
+        "server/stable/services/translation_recovery.py",
+        "server/app/settings.py",
+        "server/stable/tasks.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "Q01",
+      "lane": "C",
+      "role": "integration",
+      "it": 1,
+      "start": "2026-10-05",
+      "due": "2026-10-06",
+      "h": 3,
+      "deps": [
+        "F01"
+      ],
+      "gaps": [
+        "QG-01"
+      ],
+      "area": "qq",
+      "title": "关闭 QQ 全发送路径并解耦网页发布",
+      "change": "统一禁止自动、手动、重试与遗留定时发送；网站发布成功不依赖 OneBot；保留配置与历史记录便于诊断。",
+      "test": "mock OneBot，测试迟到 Celery 消息与手动接口均不发送；新闻照常发布，其他非 QQ 通知不受影响。",
+      "done": "TC-Q01 通过；列出生产停用所需配置和可恢复范围，当前开发任务不实际对外发送。",
+      "deadline": "2026-10-06 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-06T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/onebot.py",
+        "server/stable/services/notifications.py",
+        "server/stable/tasks.py",
+        "server/stable/admin.py",
+        "server/app/settings.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "F06",
+      "lane": "R",
+      "role": "operations",
+      "it": 1,
+      "start": "2026-10-03",
+      "due": "2026-10-06",
+      "h": 4,
+      "deps": [
+        "F01",
+        "F02",
+        "F03",
+        "H01"
+      ],
+      "gaps": [
+        "HG-01",
+        "RG-02",
+        "AG-08"
+      ],
+      "area": "qa",
+      "title": "核定数据量、预算和迭代可行性",
+      "change": "汇总目标马匹数量、可复用缓存、需新增请求数、来源额度、模型账号能力及三线剩余小时；用小样或既有日志估计吞吐和单位成本，记录高低区间。",
+      "test": "用剩余数量/保守吞吐计算完成日期；将超配额、低可用地区、需人工消歧和无法获取的名称单列；未授权付费调用只做配置/历史证据核验。",
+      "done": "10/06 产出容量风险表；有不足必须提出增加容量/减少非核心修饰等具体调整，不暗改用户质量阈值或把 10/30 改成代码完成。",
+      "deadline": "2026-10-06 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-06T18:00:00+08:00",
+      "read_paths": [
+        "docs/reports/2026-10-02-current-capabilities.md",
+        "docs/reports/2026-10-02-backlog-evidence-reconciliation.md",
+        "docs/changes/next-version-capabilities/test_cases.md"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "O01",
+      "lane": "R",
+      "role": "operations",
+      "it": 1,
+      "start": "2026-10-03",
+      "due": "2026-10-06",
+      "h": 3,
+      "deps": [
+        "F01"
+      ],
+      "gaps": [
+        "UG-06"
+      ],
+      "area": "ops",
+      "title": "冻结集成与发布资源安排",
+      "change": "记录三线 worktree、共享文件负责人、schema 变更顺序、发布协调人、环境及现有锁；安排 10/21、10/23、10/28 窗口和前后备份。",
+      "test": "与现有长任务/暂停批次核对；不消费冻结旧队列，不假设其他线程已停止。",
+      "done": "形成按根 AGENTS.md 执行的发布日程和资源表；不另设人工确认规则。",
+      "deadline": "2026-10-06 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-06T18:00:00+08:00",
+      "read_paths": [
+        "deploy/deploy.sh",
+        "deploy/backup_db.sh",
+        "deploy/restore_db.sh",
+        "deploy/rollback.sh",
+        "docker-compose.prod.yml",
+        "docker-compose.prod.lowcost.yml"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "R01",
+      "lane": "A",
+      "role": "integration",
+      "it": 1,
+      "start": "2026-10-06",
+      "due": "2026-10-07",
+      "h": 4,
+      "deps": [
+        "F01",
+        "F03"
+      ],
+      "gaps": [
+        "RG-01",
+        "RG-07"
+      ],
+      "area": "race",
+      "title": "实现阶段与端到端时效账本",
+      "change": "记录应跟踪目标、阶段截止、来源首次可得区间、发现/排队/验证/公开时间；实现按场次错误和卡顿的查询与地区切片。",
+      "test": "未登记、无来源、任务从未执行及缺资料均不能从应推进分母消失；修复后的短暂错误仍保留历史。",
+      "done": "TC-R01/02 通过；能生成总量、缺失量、超时原因和 5/10 分钟替换时延，未知来源发布时间不冒充精确 SLA。",
+      "deadline": "2026-10-07 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-07T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_event_lifecycle.py",
+        "server/stable/services/race_data_sync_policy.py",
+        "server/stable/services/race_public_coverage.py",
+        "server/stable/test_race_data_sync_policy_v2.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "M02",
+      "lane": "B",
+      "role": "integration",
+      "it": 1,
+      "start": "2026-10-06",
+      "due": "2026-10-07",
+      "h": 5,
+      "deps": [
+        "M01"
+      ],
+      "gaps": [
+        "AG-08"
+      ],
+      "area": "ai",
+      "title": "实现有界多轮任务执行与恢复",
+      "change": "在 Celery 上持久化步骤、预算、截止时间和幂等键；限制工具轮次/token/请求；进程中断可续跑，重复任务复用同版本结果。",
+      "test": "模拟 worker 崩溃、工具超时、预算耗尽、重投和旧版本迟到；网络读取不得在数据库事务或业务锁内进行。",
+      "done": "退出原因明确；无重复发布/扣账；模型不可用不阻断可靠结构化更新。",
+      "deadline": "2026-10-07 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-07T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/translation.py",
+        "server/stable/services/rewriting.py",
+        "server/stable/services/translation_recovery.py",
+        "server/app/settings.py",
+        "server/stable/tasks.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "Q02",
+      "lane": "C",
+      "role": "application",
+      "it": 1,
+      "start": "2026-10-06",
+      "due": "2026-10-07",
+      "h": 2,
+      "deps": [
+        "Q01"
+      ],
+      "gaps": [
+        "QG-02"
+      ],
+      "area": "qq",
+      "title": "移除 QQ 使用入口及专属运行依赖",
+      "change": "隐藏推送按钮/状态误导，标记旧任务终止原因；盘点仅 QQ 使用的服务、健康告警和依赖，生成停用差异。",
+      "test": "后台和前台不再诱导进入无服务流程；共享消息/日志组件不得随 QQ 一并删除。",
+      "done": "停用清单可供 O06 发布；数据保留，专属依赖退出不会破坏 Web/worker。",
+      "deadline": "2026-10-07 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-07T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/onebot.py",
+        "server/stable/services/notifications.py",
+        "server/stable/tasks.py",
+        "server/stable/admin.py",
+        "server/app/settings.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "R02",
+      "lane": "A",
+      "role": "integration",
+      "it": 1,
+      "start": "2026-10-07",
+      "due": "2026-10-08",
+      "h": 4,
+      "deps": [
+        "R01"
+      ],
+      "gaps": [
+        "RG-04",
+        "EG-02"
+      ],
+      "area": "race",
+      "title": "提取统一纯决策并接入影子比较",
+      "change": "复用既有统一决策方案，输入事实/时钟/成熟度/执行健康，输出唯一下一动作和原因；旧执行路径继续使用原有 owner/lease。",
+      "test": "相同输入与 now 输出一致；影子比较无网络、业务写入和通知；时间到达不能单独确认发车或完赛。",
+      "done": "历史和新输入可比较，差异可解释；新增决策服务标为新文件，旧调用路径仍兼容。",
+      "deadline": "2026-10-08 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-08T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_event_lifecycle.py",
+        "server/stable/services/race_data_sync_policy.py",
+        "server/stable/services/race_public_coverage.py",
+        "server/stable/test_race_data_sync_policy_v2.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "M03",
+      "lane": "B",
+      "role": "integration",
+      "it": 1,
+      "start": "2026-10-07",
+      "due": "2026-10-08",
+      "h": 4,
+      "deps": [
+        "M02",
+        "F03"
+      ],
+      "gaps": [
+        "AG-02"
+      ],
+      "area": "ai",
+      "title": "封装内部查询与证据读取工具",
+      "change": "提供当前名单、马匹身份/译名、已收录新闻和来源证据读取；工具参数绑定目标和来源，输出真实 evidence ID、内容时间与读取时间。",
+      "test": "拒绝伪造实体/证据、越界 URL 和页面夹带指令；不暴露任意 SQL、直接发布或修改权限工具。",
+      "done": "多轮查询能回到真实证据；同一证据可被翻译、关联、前瞻复用。",
+      "deadline": "2026-10-08 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-08T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/translation.py",
+        "server/stable/services/rewriting.py",
+        "server/stable/services/translation_recovery.py",
+        "server/app/settings.py",
+        "server/stable/tasks.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "U01",
+      "lane": "C",
+      "role": "application",
+      "it": 1,
+      "start": "2026-10-07",
+      "due": "2026-10-08",
+      "h": 3,
+      "deps": [
+        "F05"
+      ],
+      "gaps": [
+        "UG-02"
+      ],
+      "area": "public",
+      "title": "统一赛事等级筛选与卡片标签",
+      "change": "统一规范等级解析、数据库查询和标签投影，处理空值/别名；为存量差异生成候选修复清单。",
+      "test": "德国 2025 G1 案例及 G2/G3/Jpn1/Local G1 边界回放；禁止为修一个 URL 改写所有等级。",
+      "done": "列表与筛选集合一致；需要数据修复的内容交 H09/O06，不夹带生产写入。",
+      "deadline": "2026-10-08 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-08T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/templates/stable/public/race_detail.html",
+        "server/stable/templates/stable/public/horse_detail.html",
+        "server/stable/templates/stable/public/detail.html"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "H02",
+      "lane": "A",
+      "role": "integration",
+      "it": 1,
+      "start": "2026-10-06",
+      "due": "2026-10-09",
+      "h": 4,
+      "deps": [
+        "H01",
+        "F03"
+      ],
+      "gaps": [
+        "HG-02",
+        "HG-05"
+      ],
+      "area": "horse",
+      "title": "复用缓存与强身份建立补全输入包",
+      "change": "检查既有批次/缓存哈希、来源时间和外部稳定 ID，输出可复用/需刷新/冲突清单；建立按实体与版本去重的输入包。",
+      "test": "同名异马、失效缓存、只在 staging 的马匹不能误报公开；处理重跑不恢复已暂停的旧采集任务。",
+      "done": "近期目标的候选输入可直接交给 H03；无需重抓全部历史；无身份候选有可操作原因。",
+      "deadline": "2026-10-09 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-09T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/p0_horse_profiles.py",
+        "server/stable/services/horse_profile_completion.py",
+        "server/stable/services/horse_profile_publish.py",
+        "server/stable/services/horse_race_records.py",
+        "server/stable/test_horse_profile_publish.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "R03",
+      "lane": "A",
+      "role": "integration",
+      "it": 1,
+      "start": "2026-10-08",
+      "due": "2026-10-09",
+      "h": 5,
+      "deps": [
+        "R02"
+      ],
+      "gaps": [
+        "RG-03",
+        "UG-04"
+      ],
+      "area": "result",
+      "title": "实现赛前赛后成熟度统一读模型",
+      "change": "提供预想/确定名单、待确认/已确认结果与真实赛事进程的组合投影；冠军卡、名单和结果表使用同一公开 revision。",
+      "test": "预测更新不能覆盖已确认结果；只有部分名次不得标完整；第三方终态可通过能力校验确认。",
+      "done": "TC-R03/06 通过；旧页面字段兼容，来源身份和资料成熟度分别保存。",
+      "deadline": "2026-10-09 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-09T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_data_sync_results.py",
+        "server/stable/services/race_information_display.py",
+        "server/stable/services/race_pre_race.py",
+        "server/stable/test_race_data_sync_results.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "N01",
+      "lane": "B",
+      "role": "integration",
+      "it": 1,
+      "start": "2026-10-08",
+      "due": "2026-10-09",
+      "h": 4,
+      "deps": [
+        "F02"
+      ],
+      "gaps": [
+        "NG-02"
+      ],
+      "area": "news",
+      "title": "保存正文区块与清洗差异",
+      "change": "为来源适配器输出稳定区块 ID、原文与保留/删除原因，修正宽容器回退；保存必要正文证据供模型检查。",
+      "test": "固定广告、导航、引语、表格和图片说明案例；非空正文仍可能是错误容器，重要段落误删必须失败。",
+      "done": "TC-N01 通过；至少覆盖五地区现有启用来源模板，不将完整网页框架作为正文后备。",
+      "deadline": "2026-10-09 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-09T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/article_content.py",
+        "server/stable/adapters/international.py",
+        "server/stable/services/automation.py",
+        "server/stable/services/publishing_windows.py",
+        "server/stable/test_news_content_boundaries.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "O02",
+      "lane": "C",
+      "role": "operations",
+      "it": 1,
+      "start": "2026-10-07",
+      "due": "2026-10-09",
+      "h": 5,
+      "deps": [
+        "O01"
+      ],
+      "gaps": [
+        "UG-06"
+      ],
+      "area": "ops",
+      "title": "修复已知备份恢复约束问题",
+      "change": "在隔离 PostgreSQL 复现新闻/术语唯一约束恢复问题，定位导出或恢复顺序并做最小修复；不得直接批量清洗生产数据。",
+      "test": "恢复副本能重建约束、行数和关键关系；二次恢复行为明确；检查历史版本与新 schema 兼容。",
+      "done": "附恢复日志、校验查询和恢复时长；发现超出原缺陷的新数据问题单独记录，不伪报灾备通过。",
+      "deadline": "2026-10-09 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-09T18:00:00+08:00",
+      "read_paths": [
+        "deploy/deploy.sh",
+        "deploy/backup_db.sh",
+        "deploy/restore_db.sh",
+        "deploy/rollback.sh",
+        "docker-compose.prod.yml",
+        "docker-compose.prod.lowcost.yml"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "U02",
+      "lane": "C",
+      "role": "application",
+      "it": 1,
+      "start": "2026-10-08",
+      "due": "2026-10-09",
+      "h": 3,
+      "deps": [
+        "F05"
+      ],
+      "gaps": [
+        "UG-03"
+      ],
+      "area": "public",
+      "title": "补齐近期赛事首页与详情旧交互要求",
+      "change": "首页改为今天起七天、最多四场、缺时刻留空；移除指定详情届次控件，保留日历年份筛选；列表返回保留条件。",
+      "test": "跨月跨年、无赛日、只有当地日期和四场以上排序；不把远期重点赛事塞回近期范围。",
+      "done": "历史待办对应条目逐项复验，标题与实际范围一致。",
+      "deadline": "2026-10-09 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-09T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/templates/stable/public/race_detail.html",
+        "server/stable/templates/stable/public/horse_detail.html",
+        "server/stable/templates/stable/public/detail.html"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "V01",
+      "lane": "R",
+      "role": "operations",
+      "it": 1,
+      "start": "2026-10-09",
+      "due": "2026-10-09",
+      "h": 4,
+      "deps": [
+        "F06",
+        "H02",
+        "R03",
+        "M03",
+        "N01",
+        "Q02",
+        "U01",
+        "U02",
+        "O02"
+      ],
+      "gaps": [
+        "RG-07",
+        "NG-07",
+        "UG-06"
+      ],
+      "area": "qa",
+      "title": "迭代一接口与失败路径验收",
+      "change": "审核字段合同、来源矩阵、目标数量、主干兼容和可独立上线修复；冻结下一轮接口版本。",
+      "test": "运行对应离线合同测试及隔离恢复；检查依赖、工时和外部缺口均已归属。",
+      "done": "提交 I1 验收表和修正清单；未解决高影响问题不得仅改状态为完成。",
+      "deadline": "2026-10-09 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-09T18:00:00+08:00",
+      "read_paths": [
+        "docs/reports/2026-10-02-current-capabilities.md",
+        "docs/reports/2026-10-02-backlog-evidence-reconciliation.md",
+        "docs/changes/next-version-capabilities/test_cases.md"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "R04",
+      "lane": "A",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-10",
+      "due": "2026-10-11",
+      "h": 5,
+      "deps": [
+        "V01"
+      ],
+      "gaps": [
+        "RG-02",
+        "RG-04"
+      ],
+      "area": "source",
+      "title": "按成熟度与新鲜度实现主备源仲裁",
+      "change": "替换固定来源等级先拒绝的逻辑，按能力/身份/成熟度/新鲜度/健康选择；高等级旧值失效时允许合格备源接管，保存原因。",
+      "test": "官方晚于第三方、同源转载、旧确定与新预测、两源冲突；不足证据返回补查，不变成最后写入覆盖。",
+      "done": "TC-R04 通过；单写入者不变，切源只改变有证据的字段。",
+      "deadline": "2026-10-11 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-11T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_data_sync_providers.py",
+        "server/stable/services/race_source_identity.py",
+        "server/stable/services/race_data_sync_enrollment.py",
+        "server/stable/test_race_multisource_identity.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "N02",
+      "lane": "B",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-10",
+      "due": "2026-10-11",
+      "h": 4,
+      "deps": [
+        "N01",
+        "M03"
+      ],
+      "gaps": [
+        "NG-02",
+        "AG-03"
+      ],
+      "area": "news",
+      "title": "接入正文污染审查与模板变化检测",
+      "change": "模型只返回区块保留/删除及依据，程序实施清洗；对异常短文/噪声比例/模板变化记录质量原因及有界重试。",
+      "test": "广告与正文用词相似、引语含推广词、重要段落误删、模型不可用；回放 F02 保留集。",
+      "done": "TC-N01 达标，清洗前后差异可供后台查看；失败不得静默发布网页框架。",
+      "deadline": "2026-10-11 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-11T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/article_content.py",
+        "server/stable/adapters/international.py",
+        "server/stable/services/automation.py",
+        "server/stable/services/publishing_windows.py",
+        "server/stable/test_news_content_boundaries.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "E01",
+      "lane": "C",
+      "role": "application",
+      "it": 2,
+      "start": "2026-10-10",
+      "due": "2026-10-11",
+      "h": 4,
+      "deps": [
+        "F04",
+        "R02"
+      ],
+      "gaps": [
+        "EG-02"
+      ],
+      "area": "console",
+      "title": "统一自动处理恢复与人工例外分类",
+      "change": "定义 exception 的对象、原因、证据、影响、截止、自动恢复动作和关联运行；技术瞬态先自动重试，语义冲突才转人工。",
+      "test": "网络抖动不能产生成百上千审批；同一根因聚合，临近比赛优先；正常任务无人工必经节点。",
+      "done": "TC-E01 通过；新闻/赛事/马匹均有可映射的异常契约。",
+      "deadline": "2026-10-11 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-11T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/admin.py",
+        "server/stable/templates/stable/console/dashboard.html",
+        "server/stable/templates/stable/console/article_editor.html"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "H06",
+      "lane": "C",
+      "role": "application",
+      "it": 2,
+      "start": "2026-10-10",
+      "due": "2026-10-11",
+      "h": 4,
+      "deps": [
+        "F01",
+        "H02"
+      ],
+      "gaps": [
+        "HG-05",
+        "UG-04"
+      ],
+      "area": "public",
+      "title": "统一名称展示搜索与更名追踪",
+      "change": "封装公开名称选择器，支持原文、中文和别名搜索；采用原名回退、译名来源状态和更名历史，预留 H04/H05 采纳事件。",
+      "test": "改名不改变 URL/实体 ID；无中文名不显示空标题；新闻、赛事、档案统一显示已采纳名。",
+      "done": "TC-H02 通过；接口 mock 与名称输入合同一致，后续名称批次无需改前端。",
+      "deadline": "2026-10-11 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-11T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/templates/stable/public/race_detail.html",
+        "server/stable/templates/stable/public/horse_detail.html",
+        "server/stable/templates/stable/public/detail.html"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "R05",
+      "lane": "A",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-11",
+      "due": "2026-10-12",
+      "h": 5,
+      "deps": [
+        "R04",
+        "R01"
+      ],
+      "gaps": [
+        "RG-04"
+      ],
+      "area": "race",
+      "title": "调度明确资料替换期限与容量预留",
+      "change": "在确定资料开放和赛前赛后窗口缩短轮询，按 5/10 分钟倒扣排队/解析/备用时间；加入阶段超时和下一动作。",
+      "test": "模拟队列积压、低额度、首次发现时间区间和来源迟延；重试不能无限延后业务截止。",
+      "done": "压力回放符合 TC-R02；轮询频率与 F03 额度计算一致，不靠等待后台人工点击推进。",
+      "deadline": "2026-10-12 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-12T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_event_lifecycle.py",
+        "server/stable/services/race_data_sync_policy.py",
+        "server/stable/services/race_public_coverage.py",
+        "server/stable/test_race_data_sync_policy_v2.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "R11-HK",
+      "lane": "A",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-10",
+      "due": "2026-10-12",
+      "h": 2,
+      "deps": [
+        "R04",
+        "F03"
+      ],
+      "gaps": [
+        "RG-02",
+        "RG-05",
+        "RG-07"
+      ],
+      "area": "source",
+      "title": "中国香港来源合同与解析缺口切片",
+      "change": "只处理 F03 矩阵中中国香港已明确的适配缺口：身份、赛程、名单/退赛、结果/更正。沿既有 adapter 修最小差异，保留主备来源证据与能力标记；已满足的格只补验证，不重写。",
+      "test": "至少覆盖 跨年赛季、繁简马名、退赛和名次状态；对照固定 raw 响应验证规范输出，正常/部分/冲突/过期各一组。真实请求与离线测试分离。",
+      "done": "交付该地区能力矩阵及 fixture/最小补丁；自然实测与回放分别标记；新增站点或超出 2 小时的实质解析工作必须在 F06 时拆增量卡并使用预留容量，不在最后隐性延期。",
+      "deadline": "2026-10-12 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-12T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_data_sync_providers.py",
+        "server/stable/services/race_source_identity.py",
+        "server/stable/services/race_data_sync_enrollment.py",
+        "server/stable/test_race_multisource_identity.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "R11-JP",
+      "lane": "A",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-10",
+      "due": "2026-10-12",
+      "h": 2,
+      "deps": [
+        "R04",
+        "F03"
+      ],
+      "gaps": [
+        "RG-02",
+        "RG-05",
+        "RG-07"
+      ],
+      "area": "source",
+      "title": "日本来源合同与解析缺口切片",
+      "change": "只处理 F03 矩阵中日本已明确的适配缺口：身份、赛程、名单/退赛、结果/更正。沿既有 adapter 修最小差异，保留主备来源证据与能力标记；已满足的格只补验证，不重写。",
+      "test": "至少覆盖 JRA 与 Jpn1 范围、日文身份和明确赛果入口；对照固定 raw 响应验证规范输出，正常/部分/冲突/过期各一组。真实请求与离线测试分离。",
+      "done": "交付该地区能力矩阵及 fixture/最小补丁；自然实测与回放分别标记；新增站点或超出 2 小时的实质解析工作必须在 F06 时拆增量卡并使用预留容量，不在最后隐性延期。",
+      "deadline": "2026-10-12 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-12T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_data_sync_providers.py",
+        "server/stable/services/race_source_identity.py",
+        "server/stable/services/race_data_sync_enrollment.py",
+        "server/stable/test_race_multisource_identity.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "N03",
+      "lane": "B",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-11",
+      "due": "2026-10-12",
+      "h": 5,
+      "deps": [
+        "N02",
+        "M03"
+      ],
+      "gaps": [
+        "NG-03",
+        "AG-03"
+      ],
+      "area": "names",
+      "title": "接入上下文实体识别和专名保护",
+      "change": "结合词库与强模型发现实体 occurrence，核验字符区间和稳定身份后生成保护占位；未知马名保留原名。",
+      "test": "普通词马名、同名异马、重复词、日英文混合、无中文名、错误区间与漏识别；占位恢复必须逐一一致。",
+      "done": "TC-N02 达标；不通过模型自造名消除缺口；实体结果可被 L01 复用。",
+      "deadline": "2026-10-12 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-12T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/terms.py",
+        "server/stable/services/term_discovery.py",
+        "server/stable/services/termbase_seed.py",
+        "server/stable/services/term_consistency.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "E02",
+      "lane": "C",
+      "role": "application",
+      "it": 2,
+      "start": "2026-10-11",
+      "due": "2026-10-12",
+      "h": 4,
+      "deps": [
+        "E01"
+      ],
+      "gaps": [
+        "EG-03"
+      ],
+      "area": "console",
+      "title": "实现统一待办列表与原因详情",
+      "change": "建设待处理入口、影响优先级、地区/类型筛选、证据详情和分页；原后台入口渐进跳转，不删除底层能力。",
+      "test": "权限隔离、重复原因聚合、过期与已恢复状态、分页总数；隐藏对象不泄露到非 staff 用户。",
+      "done": "六条 F04 任务可从同一入口找到，展示下一动作而非只有失败代码。",
+      "deadline": "2026-10-12 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-12T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/admin.py",
+        "server/stable/templates/stable/console/dashboard.html",
+        "server/stable/templates/stable/console/article_editor.html"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "O03",
+      "lane": "C",
+      "role": "operations",
+      "it": 2,
+      "start": "2026-10-10",
+      "due": "2026-10-12",
+      "h": 4,
+      "deps": [
+        "R01",
+        "O01"
+      ],
+      "gaps": [
+        "UG-06"
+      ],
+      "area": "ops",
+      "title": "建设队列外公开结果与执行健康探针",
+      "change": "检查来源变化到公开版本、下一动作真实入队、worker/beat 心跳和内容过期；使用独立于被检查执行器的运行位置。",
+      "test": "HTTP 200 但资料没变、队列停摆、heartbeat 自身失效；通知使用已有渠道和批准收件范围。",
+      "done": "TC-O01 通过；系统失活可发现，探针不是每轮无变化都发消息。",
+      "deadline": "2026-10-12 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-12T18:00:00+08:00",
+      "read_paths": [
+        "deploy/deploy.sh",
+        "deploy/backup_db.sh",
+        "deploy/restore_db.sh",
+        "deploy/rollback.sh",
+        "docker-compose.prod.yml",
+        "docker-compose.prod.lowcost.yml"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "R06",
+      "lane": "A",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-12",
+      "due": "2026-10-13",
+      "h": 4,
+      "deps": [
+        "R05"
+      ],
+      "gaps": [
+        "RG-05"
+      ],
+      "area": "race",
+      "title": "贯通延迟改期取消及旧任务失效",
+      "change": "将来源变化归一化为证据事件，更新 schedule generation、未来截止与页面；取消结束无意义轮询但保留合法更正入口。",
+      "test": "先取消后旧任务到达、改期跨日、只知日期、来源暂时无响应；任务失败不自动当延期。",
+      "done": "TC-R05 通过；旧时钟不能把已取消赛事重新推进为进行中。",
+      "deadline": "2026-10-13 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-13T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_event_lifecycle.py",
+        "server/stable/services/race_data_sync_policy.py",
+        "server/stable/services/race_public_coverage.py",
+        "server/stable/test_race_data_sync_policy_v2.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "N04",
+      "lane": "B",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-12",
+      "due": "2026-10-13",
+      "h": 4,
+      "deps": [
+        "N03"
+      ],
+      "gaps": [
+        "NG-04",
+        "AG-03"
+      ],
+      "area": "ai",
+      "title": "加入译后事实审校与有界修复",
+      "change": "先核对姓名/数字/日期/名次，再审否定/计划/引语归属；记录具体差异，限定自动重译次数，重要失败优先待办。",
+      "test": "漏否定、未来计划误译已发生、单位变更和模型结构正确但事实错误；重试不丢原文和已核验术语。",
+      "done": "TC-N03 达标；现有正常翻译继续，失败只阻断受影响文章。",
+      "deadline": "2026-10-13 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-13T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/translation.py",
+        "server/stable/services/rewriting.py",
+        "server/stable/services/translation_recovery.py",
+        "server/app/settings.py",
+        "server/stable/tasks.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "L01",
+      "lane": "C",
+      "role": "application",
+      "it": 2,
+      "start": "2026-10-12",
+      "due": "2026-10-13",
+      "h": 4,
+      "deps": [
+        "N03",
+        "F01"
+      ],
+      "gaps": [
+        "LG-01",
+        "AG-03"
+      ],
+      "area": "links",
+      "title": "实现共享实体及赛事届次解析",
+      "change": "消费 N03 实体结果，用强身份/届次绑定新闻和马匹，区分本届、历史背景和赛事系列；歧义只保留候选。",
+      "test": "同名异马、跨年同赛事、无中文名、只提父母/后代、正文多个赛事；名称相似不自动写关联。",
+      "done": "TC-L01 通过；不用另起一套模型识别重复调用。",
+      "deadline": "2026-10-13 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-13T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/article_entity_reprocessing.py",
+        "server/stable/services/race_news_exposure.py",
+        "server/stable/views.py",
+        "server/stable/test_backfill_article_race_links.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "R07",
+      "lane": "A",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-13",
+      "due": "2026-10-14",
+      "h": 4,
+      "deps": [
+        "R04",
+        "R03"
+      ],
+      "gaps": [
+        "RG-05",
+        "RG-06"
+      ],
+      "area": "result",
+      "title": "统一退赛非完赛并列与完整名单核验",
+      "change": "分别表示未出赛、非完赛、失格、未知缺行；用稳定身份对账预定/实际出赛/结果，保留原始和派生依据。",
+      "test": "女皇杯缺行、并列名次、全部取消、退赛未出现在结果 API、仅前三名摘要；不得给缺行补造名次。",
+      "done": "TC-R06 通过；完整性不依赖 HTML 表闭合或简单结果条数等于报名数。",
+      "deadline": "2026-10-14 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-14T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_data_sync_results.py",
+        "server/stable/services/race_information_display.py",
+        "server/stable/services/race_pre_race.py",
+        "server/stable/test_race_data_sync_results.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "H04",
+      "lane": "B",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-13",
+      "due": "2026-10-14",
+      "h": 4,
+      "deps": [
+        "N03",
+        "H02"
+      ],
+      "gaps": [
+        "HG-03",
+        "HG-05"
+      ],
+      "area": "names",
+      "title": "补齐 HKJC 现成译名和名称证据",
+      "change": "按稳定 ID/受审身份映射提取现成繁体名，沿既有规则规范简体并保留别名、来源位置和时间；同步词库与档案候选。",
+      "test": "同名不同年出生、繁简冲突、已有人工保护名和 HKJC 没有名称；无来源不填入候选。",
+      "done": "TC-H02 通过；名称被采纳后可供翻译和所有公开入口复用。",
+      "deadline": "2026-10-14 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-14T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/terms.py",
+        "server/stable/services/term_discovery.py",
+        "server/stable/services/termbase_seed.py",
+        "server/stable/services/term_consistency.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "L02",
+      "lane": "C",
+      "role": "application",
+      "it": 2,
+      "start": "2026-10-13",
+      "due": "2026-10-14",
+      "h": 4,
+      "deps": [
+        "L01"
+      ],
+      "gaps": [
+        "LG-02"
+      ],
+      "area": "links",
+      "title": "建立双向关系更新与更正传播",
+      "change": "发布、编辑、撤回、名称/身份更正和目标后来建档都触发幂等关系重算；人工否决关系保留，双向计数统一过滤。",
+      "test": "乱序事件、失败补投、重复重跑和撤回后旧任务到达；不得把被删除的错误关系复活。",
+      "done": "TC-L02 通过；写关系与下游重算可在事务提交后重试。",
+      "deadline": "2026-10-14 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-14T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/article_entity_reprocessing.py",
+        "server/stable/services/race_news_exposure.py",
+        "server/stable/views.py",
+        "server/stable/test_backfill_article_race_links.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "R08",
+      "lane": "A",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-14",
+      "due": "2026-10-15",
+      "h": 5,
+      "deps": [
+        "R06",
+        "R07"
+      ],
+      "gaps": [
+        "RG-03",
+        "RG-06"
+      ],
+      "area": "result",
+      "title": "原子发布资料更正与统一缓存失效",
+      "change": "以公开 revision 一次更新冠军/名单/赛果投影；延迟任务拒绝覆盖新版本，更新后触发缓存和下游变更事件。",
+      "test": "并发更正、发布中断、重复重放、旧缓存读和人工保护字段；分别验证数据库和公开页面。",
+      "done": "TC-R07 通过；卡片与详情无跨版本组合；下游事件可补投且幂等。",
+      "deadline": "2026-10-15 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-15T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_data_sync_results.py",
+        "server/stable/services/race_information_display.py",
+        "server/stable/services/race_pre_race.py",
+        "server/stable/test_race_data_sync_results.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "R11-GB",
+      "lane": "A",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-13",
+      "due": "2026-10-15",
+      "h": 2,
+      "deps": [
+        "R07",
+        "F03"
+      ],
+      "gaps": [
+        "RG-02",
+        "RG-05",
+        "RG-07"
+      ],
+      "area": "source",
+      "title": "英国来源合同与解析缺口切片",
+      "change": "只处理 F03 矩阵中英国已明确的适配缺口：身份、赛程、名单/退赛、结果/更正。沿既有 adapter 修最小差异，保留主备来源证据与能力标记；已满足的格只补验证，不重写。",
+      "test": "至少覆盖 TRA 与可信第三方的赛卡/结果成熟度及缺行；对照固定 raw 响应验证规范输出，正常/部分/冲突/过期各一组。真实请求与离线测试分离。",
+      "done": "交付该地区能力矩阵及 fixture/最小补丁；自然实测与回放分别标记；新增站点或超出 2 小时的实质解析工作必须在 F06 时拆增量卡并使用预留容量，不在最后隐性延期。",
+      "deadline": "2026-10-15 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-15T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_data_sync_providers.py",
+        "server/stable/services/race_source_identity.py",
+        "server/stable/services/race_data_sync_enrollment.py",
+        "server/stable/test_race_multisource_identity.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "R11-IE",
+      "lane": "A",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-13",
+      "due": "2026-10-15",
+      "h": 2,
+      "deps": [
+        "R07",
+        "F03"
+      ],
+      "gaps": [
+        "RG-02",
+        "RG-05",
+        "RG-07"
+      ],
+      "area": "source",
+      "title": "爱尔兰来源合同与解析缺口切片",
+      "change": "只处理 F03 矩阵中爱尔兰已明确的适配缺口：身份、赛程、名单/退赛、结果/更正。沿既有 adapter 修最小差异，保留主备来源证据与能力标记；已满足的格只补验证，不重写。",
+      "test": "至少覆盖 地区旧桶兼容、原始非完赛标记和实际出赛数量；对照固定 raw 响应验证规范输出，正常/部分/冲突/过期各一组。真实请求与离线测试分离。",
+      "done": "交付该地区能力矩阵及 fixture/最小补丁；自然实测与回放分别标记；新增站点或超出 2 小时的实质解析工作必须在 F06 时拆增量卡并使用预留容量，不在最后隐性延期。",
+      "deadline": "2026-10-15 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-15T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_data_sync_providers.py",
+        "server/stable/services/race_source_identity.py",
+        "server/stable/services/race_data_sync_enrollment.py",
+        "server/stable/test_race_multisource_identity.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "H05",
+      "lane": "B",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-14",
+      "due": "2026-10-15",
+      "h": 5,
+      "deps": [
+        "H04",
+        "M03"
+      ],
+      "gaps": [
+        "HG-04",
+        "HG-05",
+        "AG-03"
+      ],
+      "area": "names",
+      "title": "接入认可社区名称提取与冲突处理",
+      "change": "实现来源名单配置和现成名提取，视频材料保存作品链接与时间点/字幕证据；单个认可来源且同马身份清楚可采纳，冲突进入复核。",
+      "test": "只有昵称、引用他人译名、来源失效、错马和模型自造名；无可读字幕时不得假称看过视频。",
+      "done": "TC-H02 通过；不强制两源一致，不用模型翻译补足；审核界面能定位原始使用位置。",
+      "deadline": "2026-10-15 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-15T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/terms.py",
+        "server/stable/services/term_discovery.py",
+        "server/stable/services/termbase_seed.py",
+        "server/stable/services/term_consistency.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "U03",
+      "lane": "C",
+      "role": "application",
+      "it": 2,
+      "start": "2026-10-14",
+      "due": "2026-10-15",
+      "h": 4,
+      "deps": [
+        "F05",
+        "L02"
+      ],
+      "gaps": [
+        "UG-02"
+      ],
+      "area": "links",
+      "title": "修复重复赛事身份和旧链接去向",
+      "change": "对固定复现的重复实例建立受审映射和 dry-run 合并工具；重指向名单、新闻和履历，保留旧地址跳转及审计。",
+      "test": "不同届次、同日同场不同比赛不可合并；唯一约束冲突可中止；重复执行无额外关系和赛绩。",
+      "done": "TC-U01 通过；产出明确对象清单供发布包使用，不直接扫描全库自动合并。",
+      "deadline": "2026-10-15 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-15T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/article_entity_reprocessing.py",
+        "server/stable/services/race_news_exposure.py",
+        "server/stable/views.py",
+        "server/stable/test_backfill_article_race_links.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "O04",
+      "lane": "R",
+      "role": "operations",
+      "it": 2,
+      "start": "2026-10-14",
+      "due": "2026-10-15",
+      "h": 4,
+      "deps": [
+        "O02",
+        "R05",
+        "M02"
+      ],
+      "gaps": [
+        "UG-06",
+        "AG-08"
+      ],
+      "area": "ops",
+      "title": "验证备份恢复与队列容量边界",
+      "change": "在隔离副本恢复代表数据，压测赛事控制、模型长任务和普通新闻并行；核算内存、并发、队列及请求预算。",
+      "test": "慢模型不得占满赛事执行容量；恢复后约束、关系和新旧程序读路径正确；禁止测试连接生产服务。",
+      "done": "TC-O02/03 通过；实际容量偏差回写排期风险及配置建议。",
+      "deadline": "2026-10-15 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-15T18:00:00+08:00",
+      "read_paths": [
+        "deploy/deploy.sh",
+        "deploy/backup_db.sh",
+        "deploy/restore_db.sh",
+        "deploy/rollback.sh",
+        "docker-compose.prod.yml",
+        "docker-compose.prod.lowcost.yml"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "H03",
+      "lane": "A",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-15",
+      "due": "2026-10-16",
+      "h": 5,
+      "deps": [
+        "H02"
+      ],
+      "gaps": [
+        "HG-02",
+        "LG-06"
+      ],
+      "area": "horse",
+      "title": "打通基础档案及可独立存在的生涯记录",
+      "change": "将可核验候选从缓存/staging 经身份绑定发布到档案；履历允许 event 为空，保留出道、OP、Listed 和跨地区记录。",
+      "test": "无中文名可用原名；同场不同来源去重；后续绑定赛事页不新增一场；未出赛不计入出赛次数。",
+      "done": "TC-H01/03 通过；公开档案可显示近期资料与覆盖范围，不等待所有早年履历补齐。",
+      "deadline": "2026-10-16 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-16T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/p0_horse_profiles.py",
+        "server/stable/services/horse_profile_completion.py",
+        "server/stable/services/horse_profile_publish.py",
+        "server/stable/services/horse_race_records.py",
+        "server/stable/test_horse_profile_publish.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "R09",
+      "lane": "A",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-15",
+      "due": "2026-10-16",
+      "h": 4,
+      "deps": [
+        "R08"
+      ],
+      "gaps": [
+        "RG-06",
+        "UG-04"
+      ],
+      "area": "result",
+      "title": "审计历史结果公开依据与兼容修复",
+      "change": "重新读取此前 11 场受阻清单，逐场核实当前状态与历史 publication 证据，修复有合法依据的旧读路径；缺证明确挂账。",
+      "test": "当前采集权限到期与历史公开依据分离；显式撤销/身份错误必须仍可停止公开，不能补造 proof。",
+      "done": "产出固定对象修复候选与前后判定；不以全部显示作为放松规则的标准。",
+      "deadline": "2026-10-16 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-16T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_data_sync_results.py",
+        "server/stable/services/race_information_display.py",
+        "server/stable/services/race_pre_race.py",
+        "server/stable/test_race_data_sync_results.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "R11-FR",
+      "lane": "A",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-15",
+      "due": "2026-10-16",
+      "h": 2,
+      "deps": [
+        "R07",
+        "F03"
+      ],
+      "gaps": [
+        "RG-02",
+        "RG-05",
+        "RG-07"
+      ],
+      "area": "source",
+      "title": "法国来源合同与解析缺口切片",
+      "change": "只处理 F03 矩阵中法国已明确的适配缺口：身份、赛程、名单/退赛、结果/更正。沿既有 adapter 修最小差异，保留主备来源证据与能力标记；已满足的格只补验证，不重写。",
+      "test": "至少覆盖 冠名变体、法文非完赛、当地时间与赛果更正；对照固定 raw 响应验证规范输出，正常/部分/冲突/过期各一组。真实请求与离线测试分离。",
+      "done": "交付该地区能力矩阵及 fixture/最小补丁；自然实测与回放分别标记；新增站点或超出 2 小时的实质解析工作必须在 F06 时拆增量卡并使用预留容量，不在最后隐性延期。",
+      "deadline": "2026-10-16 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-16T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_data_sync_providers.py",
+        "server/stable/services/race_source_identity.py",
+        "server/stable/services/race_data_sync_enrollment.py",
+        "server/stable/test_race_multisource_identity.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "M04",
+      "lane": "B",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-15",
+      "due": "2026-10-16",
+      "h": 5,
+      "deps": [
+        "M03",
+        "R04"
+      ],
+      "gaps": [
+        "AG-04"
+      ],
+      "area": "ai",
+      "title": "实现多源研究与冲突候选输出",
+      "change": "按赛事资料缺口选择下一工具，区分旧消息/预想/确定/更正；输出逐字段候选、支持与冲突证据、退出原因，交统一赛事决策验证。",
+      "test": "一个已验证可信终态源、两个镜像、过期消息、缺马、来源断网；结构化完整结果不等待研究。",
+      "done": "TC-A02 通过；研究结果可以安全自动采纳或退回补证，不能直接写任意数据库字段。",
+      "deadline": "2026-10-16 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-16T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/translation.py",
+        "server/stable/services/rewriting.py",
+        "server/stable/services/translation_recovery.py",
+        "server/app/settings.py",
+        "server/stable/tasks.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "L03",
+      "lane": "C",
+      "role": "application",
+      "it": 2,
+      "start": "2026-10-15",
+      "due": "2026-10-16",
+      "h": 3,
+      "deps": [
+        "L02",
+        "H06"
+      ],
+      "gaps": [
+        "LG-03",
+        "LG-05"
+      ],
+      "area": "public",
+      "title": "增加新闻标签及赛事马匹跳转",
+      "change": "新闻实体标签链接到正确届次和马匹；名单、赛果、冠军区域以身份提供跳转；无档案记录进入补齐队列。",
+      "test": "移动端点击、重复标签、退赛马、改名、目标撤回或缺失；不生成空赛事页凑链接。",
+      "done": "TC-L03 通过；匿名用户完整走通新闻到赛事到马匹。",
+      "deadline": "2026-10-16 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-16T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/templates/stable/public/race_detail.html",
+        "server/stable/templates/stable/public/horse_detail.html",
+        "server/stable/templates/stable/public/detail.html"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "Q03",
+      "lane": "C",
+      "role": "application",
+      "it": 2,
+      "start": "2026-10-16",
+      "due": "2026-10-16",
+      "h": 2,
+      "deps": [
+        "F01",
+        "L02"
+      ],
+      "gaps": [
+        "QG-03"
+      ],
+      "area": "contract",
+      "title": "形成长期只读内容 API 合同",
+      "change": "写明未来新闻/赛事/马匹读取范围、稳定 ID、版本/更正、分页、鉴权/限流候选和内容稳定前置条件；不复用 staff 管理接口直接公开。",
+      "test": "以一个消费者读取并追踪更正的样例核对合同；标记授权与商业条件待后续确定。",
+      "done": "交付设计文档及本版可复用字段清单；公开 API 服务按用户长期方向保留，不算 10/30 已上线功能。",
+      "deadline": "2026-10-16 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-16T18:00:00+08:00",
+      "read_paths": [
+        "docs/changes/next-version-capabilities/design.md",
+        "docs/changes/race-event-unified-decision/spec.md",
+        "server/stable/models.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "V02",
+      "lane": "R",
+      "role": "operations",
+      "it": 2,
+      "start": "2026-10-16",
+      "due": "2026-10-16",
+      "h": 4,
+      "deps": [
+        "R09",
+        "H03",
+        "H05",
+        "M04",
+        "L03",
+        "Q03",
+        "E02",
+        "O04",
+        "R11-JP",
+        "R11-HK",
+        "R11-GB",
+        "R11-IE",
+        "R11-FR"
+      ],
+      "gaps": [
+        "RG-07",
+        "HG-07",
+        "NG-07"
+      ],
+      "area": "qa",
+      "title": "迭代二端到端候选验收",
+      "change": "在隔离环境连接抓取证据、翻译、状态更新、档案和双向关系；审核 schema/数据变更与首批运行范围。",
+      "test": "完整跑一场赛前到赛后及一篇新闻到公开关联；回放延期/退赛/更正；未解决的九地区缺口不能隐藏。",
+      "done": "I2 验收通过才切入首批生产准备；输出可复用的固定输入和预期公开结果。",
+      "deadline": "2026-10-16 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-16T18:00:00+08:00",
+      "read_paths": [
+        "docs/reports/2026-10-02-current-capabilities.md",
+        "docs/reports/2026-10-02-backlog-evidence-reconciliation.md",
+        "docs/changes/next-version-capabilities/test_cases.md"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "R10",
+      "lane": "A",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-17",
+      "due": "2026-10-18",
+      "h": 4,
+      "deps": [
+        "V02"
+      ],
+      "gaps": [
+        "RG-04"
+      ],
+      "area": "race",
+      "title": "完成策略换代与持续跟踪恢复",
+      "change": "按统一决策处理过期/变更策略和 owner 冲突，恢复合法登记的下一动作；历史公开依据保持独立。",
+      "test": "旧 generation/lease 到达、政策到期与续期、历史已发布对象、无来源身份；不得自动延长未知权限。",
+      "done": "TC-R08 通过；阻断都有负责人和下次检查，恢复后不双写。",
+      "deadline": "2026-10-18 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-18T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_event_lifecycle.py",
+        "server/stable/services/race_data_sync_policy.py",
+        "server/stable/services/race_public_coverage.py",
+        "server/stable/test_race_data_sync_policy_v2.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "N05",
+      "lane": "B",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-17",
+      "due": "2026-10-18",
+      "h": 4,
+      "deps": [
+        "V02"
+      ],
+      "gaps": [
+        "NG-05",
+        "AG-03"
+      ],
+      "area": "news",
+      "title": "按事件重要性和新增事实选择新闻",
+      "change": "合并跨来源同事件候选，模型识别重要性和新事实；取消为凑量降低门槛的自动兜底，重大更新可突破常规上限。",
+      "test": "不同赛事同名、重大退赛、政策新闻、旧稿新标题和同事件实质更新；重要消息不得因去重被吞掉。",
+      "done": "TC-N04 通过；每次选/不选有可解释原因和事件关联。",
+      "deadline": "2026-10-18 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-18T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/article_content.py",
+        "server/stable/adapters/international.py",
+        "server/stable/services/automation.py",
+        "server/stable/services/publishing_windows.py",
+        "server/stable/test_news_content_boundaries.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "L04",
+      "lane": "C",
+      "role": "application",
+      "it": 3,
+      "start": "2026-10-17",
+      "due": "2026-10-18",
+      "h": 4,
+      "deps": [
+        "V02",
+        "L02"
+      ],
+      "gaps": [
+        "LG-04"
+      ],
+      "area": "public",
+      "title": "实现赛事相关新闻统计与重点排序",
+      "change": "按本届赛事及公开关系聚合，赛果报告、重要更正/取消优先，分页和总数同一过滤口径。",
+      "test": "兰秀赛前稿误放赛后、同名跨届、撤回后计数、并列优先级和无相关新闻。",
+      "done": "TC-L03 通过；重点稿排序原因可解释，新闻点击到对应公开页。",
+      "deadline": "2026-10-18 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-18T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/templates/stable/public/race_detail.html",
+        "server/stable/templates/stable/public/horse_detail.html",
+        "server/stable/templates/stable/public/detail.html"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "R11",
+      "lane": "A",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-18",
+      "due": "2026-10-19",
+      "h": 2,
+      "deps": [
+        "R10",
+        "F03",
+        "R11-JP",
+        "R11-HK",
+        "R11-GB",
+        "R11-IE",
+        "R11-FR",
+        "R11-US",
+        "R11-AU",
+        "R11-DE",
+        "R11-ME"
+      ],
+      "gaps": [
+        "RG-02",
+        "RG-05"
+      ],
+      "area": "source",
+      "title": "汇总九地区适配与能力验收矩阵",
+      "change": "汇总九张地区切片的解析结果和证据，核对 F03 每格状态、主备切换和统一决策的消费方式；适配修复在地区卡计工时，不重复实现。",
+      "test": "时区、日期赛、跨语言、延迟取消、非完赛和来源更正；九地区均有覆盖，不以日本样本代替。",
+      "done": "TC-R04/05/06 的地区矩阵闭合；若新增适配超出 4 小时切片，10/06 风险表已拆子任务和重排，不临近上线再发现。",
+      "deadline": "2026-10-19 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-19T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_data_sync_providers.py",
+        "server/stable/services/race_source_identity.py",
+        "server/stable/services/race_data_sync_enrollment.py",
+        "server/stable/test_race_multisource_identity.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "R11-AU",
+      "lane": "A",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-17",
+      "due": "2026-10-19",
+      "h": 2,
+      "deps": [
+        "V02",
+        "F03"
+      ],
+      "gaps": [
+        "RG-02",
+        "RG-05",
+        "RG-07"
+      ],
+      "area": "source",
+      "title": "澳大利亚来源合同与解析缺口切片",
+      "change": "只处理 F03 矩阵中澳大利亚已明确的适配缺口：身份、赛程、名单/退赛、结果/更正。沿既有 adapter 修最小差异，保留主备来源证据与能力标记；已满足的格只补验证，不重写。",
+      "test": "至少覆盖 跨年赛季、SCR/SB 等标记及摘要前几名不完整；对照固定 raw 响应验证规范输出，正常/部分/冲突/过期各一组。真实请求与离线测试分离。",
+      "done": "交付该地区能力矩阵及 fixture/最小补丁；自然实测与回放分别标记；新增站点或超出 2 小时的实质解析工作必须在 F06 时拆增量卡并使用预留容量，不在最后隐性延期。",
+      "deadline": "2026-10-19 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-19T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_data_sync_providers.py",
+        "server/stable/services/race_source_identity.py",
+        "server/stable/services/race_data_sync_enrollment.py",
+        "server/stable/test_race_multisource_identity.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "R11-DE",
+      "lane": "A",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-17",
+      "due": "2026-10-19",
+      "h": 2,
+      "deps": [
+        "V02",
+        "F03"
+      ],
+      "gaps": [
+        "RG-02",
+        "RG-05",
+        "RG-07"
+      ],
+      "area": "source",
+      "title": "德国来源合同与解析缺口切片",
+      "change": "只处理 F03 矩阵中德国已明确的适配缺口：身份、赛程、名单/退赛、结果/更正。沿既有 adapter 修最小差异，保留主备来源证据与能力标记；已满足的格只补验证，不重写。",
+      "test": "至少覆盖 等级规范、来源稳定身份、取消或延期与全名单；对照固定 raw 响应验证规范输出，正常/部分/冲突/过期各一组。真实请求与离线测试分离。",
+      "done": "交付该地区能力矩阵及 fixture/最小补丁；自然实测与回放分别标记；新增站点或超出 2 小时的实质解析工作必须在 F06 时拆增量卡并使用预留容量，不在最后隐性延期。",
+      "deadline": "2026-10-19 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-19T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_data_sync_providers.py",
+        "server/stable/services/race_source_identity.py",
+        "server/stable/services/race_data_sync_enrollment.py",
+        "server/stable/test_race_multisource_identity.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "R11-ME",
+      "lane": "A",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-17",
+      "due": "2026-10-19",
+      "h": 2,
+      "deps": [
+        "V02",
+        "F03"
+      ],
+      "gaps": [
+        "RG-02",
+        "RG-05",
+        "RG-07"
+      ],
+      "area": "source",
+      "title": "中东来源合同与解析缺口切片",
+      "change": "只处理 F03 矩阵中中东已明确的适配缺口：身份、赛程、名单/退赛、结果/更正。沿既有 adapter 修最小差异，保留主备来源证据与能力标记；已满足的格只补验证，不重写。",
+      "test": "至少覆盖 不同主办地区的来源能力、当地日期、非完赛与改期；对照固定 raw 响应验证规范输出，正常/部分/冲突/过期各一组。真实请求与离线测试分离。",
+      "done": "交付该地区能力矩阵及 fixture/最小补丁；自然实测与回放分别标记；新增站点或超出 2 小时的实质解析工作必须在 F06 时拆增量卡并使用预留容量，不在最后隐性延期。",
+      "deadline": "2026-10-19 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-19T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_data_sync_providers.py",
+        "server/stable/services/race_source_identity.py",
+        "server/stable/services/race_data_sync_enrollment.py",
+        "server/stable/test_race_multisource_identity.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "R11-US",
+      "lane": "A",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-17",
+      "due": "2026-10-19",
+      "h": 2,
+      "deps": [
+        "V02",
+        "F03"
+      ],
+      "gaps": [
+        "RG-02",
+        "RG-05",
+        "RG-07"
+      ],
+      "area": "source",
+      "title": "美国来源合同与解析缺口切片",
+      "change": "只处理 F03 矩阵中美国已明确的适配缺口：身份、赛程、名单/退赛、结果/更正。沿既有 adapter 修最小差异，保留主备来源证据与能力标记；已满足的格只补验证，不重写。",
+      "test": "至少覆盖 多时区、主赛与分组身份、非出赛/取消资格；对照固定 raw 响应验证规范输出，正常/部分/冲突/过期各一组。真实请求与离线测试分离。",
+      "done": "交付该地区能力矩阵及 fixture/最小补丁；自然实测与回放分别标记；新增站点或超出 2 小时的实质解析工作必须在 F06 时拆增量卡并使用预留容量，不在最后隐性延期。",
+      "deadline": "2026-10-19 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-19T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_data_sync_providers.py",
+        "server/stable/services/race_source_identity.py",
+        "server/stable/services/race_data_sync_enrollment.py",
+        "server/stable/test_race_multisource_identity.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "M09",
+      "lane": "B",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-17",
+      "due": "2026-10-19",
+      "h": 4,
+      "deps": [
+        "M04",
+        "R08",
+        "L01"
+      ],
+      "gaps": [
+        "AG-06"
+      ],
+      "area": "ai",
+      "title": "将新闻事实转为资料变更候选",
+      "change": "提取计划参赛、确定退赛、取消、更正等时间语义，附 evidence ID 和目标版本，调用统一资料候选入口。",
+      "test": "传闻、否定、旧报道、同名赛、计划变确定和重复转载；新闻实体关系不能直接成为事实更新授权。",
+      "done": "TC-A02 通过；合格候选按现有规则自动落地，冲突返回例外。",
+      "deadline": "2026-10-19 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-19T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/translation.py",
+        "server/stable/services/rewriting.py",
+        "server/stable/services/translation_recovery.py",
+        "server/app/settings.py",
+        "server/stable/tasks.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "N06",
+      "lane": "B",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-18",
+      "due": "2026-10-19",
+      "h": 4,
+      "deps": [
+        "N05",
+        "F02"
+      ],
+      "gaps": [
+        "NG-06"
+      ],
+      "area": "news",
+      "title": "实施五地区周覆盖与来源健康调节",
+      "change": "移除不合理的固定来源偏置，按周合格事件覆盖/曝光调节；零产出拆成来源不足、抓取失败、翻译阻断和未选中。",
+      "test": "某地区无合格新闻时不凑数；重大事件允许倾斜但保留其他地区发现；跨地区稿只按约定计主归属。",
+      "done": "TC-N05 通过；五地区有稳定来源和不足原因，报告候选/合格/公开/曝光四组数量。",
+      "deadline": "2026-10-19 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-19T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/article_content.py",
+        "server/stable/adapters/international.py",
+        "server/stable/services/automation.py",
+        "server/stable/services/publishing_windows.py",
+        "server/stable/test_news_content_boundaries.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "L05",
+      "lane": "C",
+      "role": "application",
+      "it": 3,
+      "start": "2026-10-18",
+      "due": "2026-10-19",
+      "h": 4,
+      "deps": [
+        "L04",
+        "H03"
+      ],
+      "gaps": [
+        "LG-06",
+        "LG-07"
+      ],
+      "area": "public",
+      "title": "完善马匹全生涯与近期新闻导航",
+      "change": "履历展示出道/OP/Listed，存在 event 才给内部链接；近期新闻区分本马与亲属背景，取消错误强关联。",
+      "test": "无赛事页记录、后续补链不重复、分页返回、改名和撤回；统计不得只算日历比赛。",
+      "done": "TC-L03/H03 通过；新闻—赛事—马匹—履历/新闻往返可用。",
+      "deadline": "2026-10-19 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-19T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/templates/stable/public/race_detail.html",
+        "server/stable/templates/stable/public/horse_detail.html",
+        "server/stable/templates/stable/public/detail.html"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "H08",
+      "lane": "A",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-19",
+      "due": "2026-10-20",
+      "h": 5,
+      "deps": [
+        "R08",
+        "H03",
+        "V02"
+      ],
+      "gaps": [
+        "HG-06"
+      ],
+      "area": "horse",
+      "title": "将新赛果和更正持续同步到履历统计",
+      "change": "订阅已公开赛事版本，幂等更新马匹履历、出赛/名次汇总与主胜鞍；原值、覆盖和缺失区别保存。",
+      "test": "相同赛果重发、更正取消资格、退赛、旧版本迟到及缺部分生涯；无完整覆盖时不展示虚假的生涯总数。",
+      "done": "TC-H03/04 通过；A Wave Of The Sea、拯救者和主胜鞍案例数据一致。",
+      "deadline": "2026-10-20 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-20T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/p0_horse_profiles.py",
+        "server/stable/services/horse_profile_completion.py",
+        "server/stable/services/horse_profile_publish.py",
+        "server/stable/services/horse_race_records.py",
+        "server/stable/test_horse_profile_publish.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "M05",
+      "lane": "B",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-19",
+      "due": "2026-10-20",
+      "h": 4,
+      "deps": [
+        "M04",
+        "N06",
+        "H05"
+      ],
+      "gaps": [
+        "AG-05"
+      ],
+      "area": "ai",
+      "title": "建立全参赛者前瞻资料表",
+      "change": "以具体赛事与名单版本逐匹生成资料项：身份、现成名、近绩、距离场地经验、可靠训练采访和缺口；只补过期资料。",
+      "test": "全部冷门马、无中文名、同名异马、查询失败和无近况；必须每匹有结果而非只写热门。",
+      "done": "TC-A03 通过；名单覆盖 100%，无额外马匹；资料缺口不被编造填满。",
+      "deadline": "2026-10-20 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-20T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/translation.py",
+        "server/stable/services/rewriting.py",
+        "server/stable/services/translation_recovery.py",
+        "server/app/settings.py",
+        "server/stable/tasks.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "H07",
+      "lane": "C",
+      "role": "application",
+      "it": 3,
+      "start": "2026-10-19",
+      "due": "2026-10-20",
+      "h": 4,
+      "deps": [
+        "H03",
+        "H06"
+      ],
+      "gaps": [
+        "HG-06",
+        "UG-03",
+        "UG-04"
+      ],
+      "area": "public",
+      "title": "修正完整度主胜鞍与统计展示",
+      "change": "区分基础档案/近期成绩/完整生涯/名称可用性，未知不显示 0；按实际等级计算主胜鞍；完整档案优先排序需使用可信完整度。",
+      "test": "DINOZZO 占位、A Wave Of The Sea 汇总、Art Power 主胜鞍和 45 条分页；缺中文名不阻止原名档案。",
+      "done": "TC-H04 通过；列表、详情、卡片统计一致，内部占位文字不公开。",
+      "deadline": "2026-10-20 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-20T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/templates/stable/public/race_detail.html",
+        "server/stable/templates/stable/public/horse_detail.html",
+        "server/stable/templates/stable/public/detail.html"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "H09",
+      "lane": "A",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-20",
+      "due": "2026-10-21",
+      "h": 4,
+      "deps": [
+        "H08",
+        "H05",
+        "U03",
+        "R09"
+      ],
+      "gaps": [
+        "HG-01",
+        "HG-02",
+        "HG-07"
+      ],
+      "area": "horse",
+      "title": "准备可恢复的数据修复与补齐批次",
+      "change": "按 F06 数量和优先级生成固定输入包：近期档案、历史译名、已知赛果与重复赛事；每类独立 dry-run、备份影响表和回滚映射。正文污染另由 N07 在 10/22 形成独立包。",
+      "test": "事务边界、重复 apply、部分失败重跑、并发在线更新、恢复后关系守恒；既有暂停批次不被隐式恢复。",
+      "done": "包内对象和变更量可审核，公开完成/暂存/冲突分开；后续批次使用相同验证合同。",
+      "deadline": "2026-10-21 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-21T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/p0_horse_profiles.py",
+        "server/stable/services/horse_profile_completion.py",
+        "server/stable/services/horse_profile_publish.py",
+        "server/stable/services/horse_race_records.py",
+        "server/stable/test_horse_profile_publish.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "M06",
+      "lane": "B",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-20",
+      "due": "2026-10-21",
+      "h": 5,
+      "deps": [
+        "M05"
+      ],
+      "gaps": [
+        "AG-05"
+      ],
+      "area": "ai",
+      "title": "生成带事实出处的重点赛事前瞻",
+      "change": "按基本信息/看点/逐马情况/有依据对比/不确定性生成主稿；逐段关键事实映射证据，事实与分析分开，关联赛事和马匹。",
+      "test": "无训练伤情采访证据、跨语言误引、资料互相矛盾；对照用户认可样稿，尚未取得时用已冻结格式不假称已读。",
+      "done": "TC-A03/04 通过；首批仅重点赛事，预算用量和单篇成本可见。",
+      "deadline": "2026-10-21 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-21T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/translation.py",
+        "server/stable/services/rewriting.py",
+        "server/stable/services/translation_recovery.py",
+        "server/app/settings.py",
+        "server/stable/tasks.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "E03",
+      "lane": "C",
+      "role": "application",
+      "it": 3,
+      "start": "2026-10-20",
+      "due": "2026-10-21",
+      "h": 5,
+      "deps": [
+        "E02",
+        "N04",
+        "H05",
+        "R03"
+      ],
+      "gaps": [
+        "EG-04",
+        "NG-07"
+      ],
+      "area": "console",
+      "title": "完成原位编辑证据差异与预览",
+      "change": "正文清洗差异、术语身份冲突、赛事资料版本在一个任务详情中核验；复用自动保存/发布动作，减少跨页和重复输入，适配手机。",
+      "test": "保存失败、草稿恢复、无权限、窄屏长内容和预览不同版本；已存在合一动作不重复建设。",
+      "done": "TC-E02 通过；六条高频任务按 F04 原型完成，错误提示指向可修复字段。",
+      "deadline": "2026-10-21 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-21T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/admin.py",
+        "server/stable/templates/stable/console/dashboard.html",
+        "server/stable/templates/stable/console/article_editor.html"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "O05",
+      "lane": "R",
+      "role": "operations",
+      "it": 3,
+      "start": "2026-10-21",
+      "due": "2026-10-21",
+      "h": 4,
+      "deps": [
+        "V02",
+        "R11",
+        "H05",
+        "N06",
+        "L05",
+        "O03",
+        "O04"
+      ],
+      "gaps": [
+        "UG-06",
+        "RG-07"
+      ],
+      "area": "ops",
+      "title": "首批核心链路生产灰度及自然观察",
+      "change": "针对 I2 及已审核增量准备精确发布包，按根 AGENTS.md 执行；名单固定覆盖各有事件地区，启用新闻质量/赛事链和名称更新的有限范围。",
+      "test": "验证原始证据、数据、revision、关系及公开页面，记录自然时延；已批准包以外的模型/来源/数据动作不混入。",
+      "done": "10/21 18:00 前进入有效观察；缺少实赛的地区用回放并单列，不能伪报自然证据。",
+      "deadline": "2026-10-21 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-21T18:00:00+08:00",
+      "read_paths": [
+        "deploy/deploy.sh",
+        "deploy/backup_db.sh",
+        "deploy/restore_db.sh",
+        "deploy/rollback.sh",
+        "docker-compose.prod.yml",
+        "docker-compose.prod.lowcost.yml"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "R12",
+      "lane": "A",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-21",
+      "due": "2026-10-22",
+      "h": 4,
+      "deps": [
+        "R11",
+        "H08"
+      ],
+      "gaps": [
+        "RG-07"
+      ],
+      "area": "race",
+      "title": "完成跨来源与异常回放验收集",
+      "change": "固化至少 300 场保留验收样例，九地区各至少 20 场，其余补异常；覆盖名单成熟、延期取消、退赛、并列、超时和更正。",
+      "test": "冻结样例后运行候选版本与旧版对照，错误按场、卡顿按应推进场次；不能用调参样例充当独立验收。",
+      "done": "TC-R09 通过，关键身份错配/伪造确定为零；输出分地区 N、分子和失败对象。",
+      "deadline": "2026-10-22 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_event_lifecycle.py",
+        "server/stable/services/race_data_sync_policy.py",
+        "server/stable/services/race_public_coverage.py",
+        "server/stable/test_race_data_sync_policy_v2.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "R13",
+      "lane": "A",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-22",
+      "due": "2026-10-22",
+      "h": 4,
+      "deps": [
+        "R12",
+        "O03"
+      ],
+      "gaps": [
+        "RG-01",
+        "RG-07"
+      ],
+      "area": "race",
+      "title": "接通真实公开时延与阶段质量面板",
+      "change": "生产候选探针记录外部发布/首次可见区间与页面 revision；按日和滚动 28 天展示错误、卡顿、缺失和各阶段时延。",
+      "test": "来源无精确时间、事件跨窗口仍超时、未登记赛事；页面更新成功但统计滞后要暴露。",
+      "done": "指标可追到证据对象；不足 28 天明确观察时长，不能展示长期达标徽章。",
+      "deadline": "2026-10-22 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_event_lifecycle.py",
+        "server/stable/services/race_data_sync_policy.py",
+        "server/stable/services/race_public_coverage.py",
+        "server/stable/test_race_data_sync_policy_v2.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "M07",
+      "lane": "B",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-21",
+      "due": "2026-10-22",
+      "h": 4,
+      "deps": [
+        "M06",
+        "R06",
+        "L02"
+      ],
+      "gaps": [
+        "AG-05",
+        "AG-08"
+      ],
+      "area": "ai",
+      "title": "实现前瞻发布前复验与增量更正",
+      "change": "发布前读取最新名单/时间/状态；退赛及延期触发更新同一主稿；取消/开赛拒绝旧前瞻，版本锁防旧任务覆盖。",
+      "test": "研究期间退赛、同场两个生成任务、已开赛才返回、重试重复发布、名单预想转确定。",
+      "done": "TC-A05 通过；显示稿件版本和更新时间；不让前瞻队列阻断 5/10 分钟资料更新。",
+      "deadline": "2026-10-22 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/translation.py",
+        "server/stable/services/rewriting.py",
+        "server/stable/services/translation_recovery.py",
+        "server/app/settings.py",
+        "server/stable/tasks.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "M08",
+      "lane": "B",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-22",
+      "due": "2026-10-22",
+      "h": 4,
+      "deps": [
+        "M06",
+        "R08"
+      ],
+      "gaps": [
+        "AG-06"
+      ],
+      "area": "ai",
+      "title": "实现赛后综合报道",
+      "change": "读取完整赛果、可靠赛程报道与采访，生成独立赛后稿；复用证据与关联但保留赛前稿历史。",
+      "test": "只有结果表、并列/非完赛、赛后更正、采访缺失；不能虚构比赛走势或引语。",
+      "done": "TC-A04 通过；关键名次与赛事公开版本一致，综合稿类型可被赛事页优先展示。",
+      "deadline": "2026-10-22 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/translation.py",
+        "server/stable/services/rewriting.py",
+        "server/stable/services/translation_recovery.py",
+        "server/app/settings.py",
+        "server/stable/tasks.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "M10",
+      "lane": "B",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-19",
+      "due": "2026-10-22",
+      "h": 4,
+      "deps": [
+        "M04",
+        "E02"
+      ],
+      "gaps": [
+        "AG-04",
+        "EG-02"
+      ],
+      "area": "ai",
+      "title": "提供异常证据归因与恢复建议",
+      "change": "从已有日志/证据读取模板变化、身份歧义和来源停更线索，产出支持证据与建议动作；只调用已有适用恢复动作。",
+      "test": "日志夹带指令、证据不足、错误归因和重复异常；模型不可修改策略、额度或凭据。",
+      "done": "TC-E01 通过；后台说明可读，未经证实原因用可能性表达，正常路径无需模型批准。",
+      "deadline": "2026-10-22 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/translation.py",
+        "server/stable/services/rewriting.py",
+        "server/stable/services/translation_recovery.py",
+        "server/app/settings.py",
+        "server/stable/tasks.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "N07",
+      "lane": "B",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-22",
+      "due": "2026-10-22",
+      "h": 2,
+      "deps": [
+        "N02",
+        "N04"
+      ],
+      "gaps": [
+        "NG-02",
+        "NG-04"
+      ],
+      "area": "news",
+      "title": "生成历史污染与误译重处理候选",
+      "change": "扫描 F02 确认影响的来源/时间切片，生成旧正文、清洗差异、保护实体、译文和关联变化的固定清单。",
+      "test": "已有人工改稿保护、重复重跑、没有原文证据的文章；未复现旧样例不强行改写。",
+      "done": "dry-run 数量及快照齐全，交 N08 执行；不将本轮范围扩大为全历史重译。",
+      "deadline": "2026-10-22 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/article_content.py",
+        "server/stable/adapters/international.py",
+        "server/stable/services/automation.py",
+        "server/stable/services/publishing_windows.py",
+        "server/stable/test_news_content_boundaries.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "E04",
+      "lane": "C",
+      "role": "application",
+      "it": 3,
+      "start": "2026-10-21",
+      "due": "2026-10-22",
+      "h": 4,
+      "deps": [
+        "E03",
+        "L02"
+      ],
+      "gaps": [
+        "EG-05"
+      ],
+      "area": "console",
+      "title": "实现人工修复后自动续跑与字段保护",
+      "change": "保存时校验对象版本，记录人工修改字段保护及审计；修复成功只重跑受影响阶段，下游关联自动更新。",
+      "test": "两人并发编辑、自动任务迟到、重复点继续、人工否决关系和失败回滚；不得用旧数据覆盖人工确定结果。",
+      "done": "TC-E03 通过；一次解决例外后不需要人工逐步推进后续正常任务。",
+      "deadline": "2026-10-22 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/admin.py",
+        "server/stable/templates/stable/console/dashboard.html",
+        "server/stable/templates/stable/console/article_editor.html"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "E05",
+      "lane": "C",
+      "role": "application",
+      "it": 3,
+      "start": "2026-10-22",
+      "due": "2026-10-22",
+      "h": 4,
+      "deps": [
+        "E04",
+        "R10",
+        "N06"
+      ],
+      "gaps": [
+        "EG-02",
+        "EG-06"
+      ],
+      "area": "console",
+      "title": "打通自动完成与技术恢复的后台闭环",
+      "change": "把新闻/赛事/马匹正常完成、自动重试、待人工三类结果统一统计；根因恢复后批量关闭派生待办。",
+      "test": "无人打开后台仍持续更新；临时网络失败不积累永久待审；失败记录与公开结果可互相定位。",
+      "done": "TC-E01/03 通过；后台角色由推进每条内容转为处理必要例外。",
+      "deadline": "2026-10-22 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/admin.py",
+        "server/stable/templates/stable/console/dashboard.html",
+        "server/stable/templates/stable/console/article_editor.html"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "U04",
+      "lane": "C",
+      "role": "application",
+      "it": 3,
+      "start": "2026-10-22",
+      "due": "2026-10-22",
+      "h": 2,
+      "deps": [
+        "H07",
+        "L05",
+        "R03"
+      ],
+      "gaps": [
+        "UG-04",
+        "UG-05"
+      ],
+      "area": "public",
+      "title": "统一缺失失败新鲜度及订阅文案",
+      "change": "区分无匹配、尚无资料、读取失败；展示合适的暂定/确定及更新时间；跟随/聚合文案与实际能力一致。",
+      "test": "只有当地赛日不能伪造北京时间；QQ 下线后无暗示主动推送的入口；失败可重试。",
+      "done": "TC-U02 通过；读者可理解缺了什么和当前资料阶段，不暴露内部故障码。",
+      "deadline": "2026-10-22 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/templates/stable/public/race_detail.html",
+        "server/stable/templates/stable/public/horse_detail.html",
+        "server/stable/templates/stable/public/detail.html"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "O06",
+      "lane": "R",
+      "role": "operations",
+      "it": 3,
+      "start": "2026-10-23",
+      "due": "2026-10-23",
+      "h": 4,
+      "deps": [
+        "V03",
+        "O05",
+        "Q02",
+        "H09"
+      ],
+      "gaps": [
+        "QG-01",
+        "QG-02",
+        "AG-05",
+        "UG-06"
+      ],
+      "area": "ops",
+      "title": "发布完整候选并开始七天验收窗口",
+      "change": "发布全部能力的候选版本，QQ 停用、已核验数据修复和重点赛事前瞻按发布包逐项启用；逐地区/来源保留可定位的开关及回滚点。",
+      "test": "校验 schema、新旧版本兼容、任务积压、实际请求边界、前台版本及资源；首批前瞻关键事实抽检。",
+      "done": "10/23 18:00 前所有本版能力已部署，按灰度范围运行；启动至 10/30 的自然指标账本，仍不宣称已经全量验收。",
+      "deadline": "2026-10-23 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-23T18:00:00+08:00",
+      "read_paths": [
+        "deploy/deploy.sh",
+        "deploy/backup_db.sh",
+        "deploy/restore_db.sh",
+        "deploy/rollback.sh",
+        "docker-compose.prod.yml",
+        "docker-compose.prod.lowcost.yml"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "V03",
+      "lane": "R",
+      "role": "operations",
+      "it": 3,
+      "start": "2026-10-22",
+      "due": "2026-10-23",
+      "h": 6,
+      "deps": [
+        "R13",
+        "M07",
+        "M08",
+        "M09",
+        "M10",
+        "N07",
+        "H09",
+        "L05",
+        "H07",
+        "E05",
+        "U04"
+      ],
+      "gaps": [
+        "AG-07",
+        "RG-07",
+        "UG-06"
+      ],
+      "area": "qa",
+      "title": "功能冻结与独立集成审核",
+      "change": "10/22 完成开发，10/23 对固定候选做影响回归、schema/并发/幂等/权限审查；比对新旧 CI 失败集合。",
+      "test": "TC 全矩阵，逐项核实 51 个 Gap 映射；已知基线失败须确认不覆盖本次路径，不能以存量名义跳过。",
+      "done": "10/23 12:00 前给出审核结论及固定 SHA；没有阻断项才交 O06；后续仅缺陷修复和验收。",
+      "deadline": "2026-10-23 12:00 Asia/Shanghai",
+      "deadline_at": "2026-10-23T12:00:00+08:00",
+      "read_paths": [
+        "docs/reports/2026-10-02-current-capabilities.md",
+        "docs/reports/2026-10-02-backlog-evidence-reconciliation.md",
+        "docs/changes/next-version-capabilities/test_cases.md"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "H10",
+      "lane": "A",
+      "role": "integration",
+      "it": 4,
+      "start": "2026-10-24",
+      "due": "2026-10-25",
+      "h": 5,
+      "deps": [
+        "O06",
+        "H09"
+      ],
+      "gaps": [
+        "HG-01",
+        "HG-02",
+        "HG-07"
+      ],
+      "area": "horse",
+      "title": "完成近期优先目标的正式公开批次",
+      "change": "执行冻结近期目标的可得基础资料/近期履历及名称批次，按优先级持续补入新参赛和新闻对象；每批验证公开页和关联。",
+      "test": "核对处理数=公开成功+无可信数据+身份冲突+运行失败，逐项保留证据；统计采集成功不替代公开成功。",
+      "done": "首版目标中可取得且身份明确的资料全部公开；剩余项逐马列原因和下一动作，不虚报全世界所有马已补齐。",
+      "deadline": "2026-10-25 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-25T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/p0_horse_profiles.py",
+        "server/stable/services/horse_profile_completion.py",
+        "server/stable/services/horse_profile_publish.py",
+        "server/stable/services/horse_race_records.py",
+        "server/stable/test_horse_profile_publish.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "R14",
+      "lane": "A",
+      "role": "integration",
+      "it": 4,
+      "start": "2026-10-24",
+      "due": "2026-10-25",
+      "h": 4,
+      "deps": [
+        "O06",
+        "R13"
+      ],
+      "gaps": [
+        "RG-04",
+        "RG-07"
+      ],
+      "area": "race",
+      "title": "修复自然观察暴露的资料时效问题",
+      "change": "按实际超时对象复盘发现、队列、验证和公开耗时，只修具体根因；保留原始失败和修复后的新窗口统计。",
+      "test": "重放对应真实事件并加入回归；任何身份、成熟度或来源边界变化重走相关验收。",
+      "done": "已观察关键错误和可复现卡点闭合；无问题时输出观察证据，不为填任务制造代码改动。",
+      "deadline": "2026-10-25 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-25T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_event_lifecycle.py",
+        "server/stable/services/race_data_sync_policy.py",
+        "server/stable/services/race_public_coverage.py",
+        "server/stable/test_race_data_sync_policy_v2.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "E06",
+      "lane": "C",
+      "role": "application",
+      "it": 4,
+      "start": "2026-10-24",
+      "due": "2026-10-25",
+      "h": 4,
+      "deps": [
+        "O06",
+        "E05"
+      ],
+      "gaps": [
+        "EG-04",
+        "EG-06",
+        "UG-05"
+      ],
+      "area": "console",
+      "title": "验证后台六条高频路径并修复交互阻碍",
+      "change": "使用 F04 相同任务复测桌面与手机的步骤、耗时和失败恢复；只修影响完成任务的具体问题。",
+      "test": "编辑中刷新、窄屏、长证据、多候选冲突和并发保存；校验用户权限及人工保护字段。",
+      "done": "TC-E02/03 达标；记录前后中位耗时与点击次数，不用页面数量下降代替可用性。",
+      "deadline": "2026-10-25 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-25T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/admin.py",
+        "server/stable/templates/stable/console/dashboard.html",
+        "server/stable/templates/stable/console/article_editor.html"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "L06",
+      "lane": "C",
+      "role": "application",
+      "it": 4,
+      "start": "2026-10-24",
+      "due": "2026-10-25",
+      "h": 4,
+      "deps": [
+        "O06",
+        "L05",
+        "H09"
+      ],
+      "gaps": [
+        "LG-02",
+        "LG-07"
+      ],
+      "area": "links",
+      "title": "补齐存量关系并验收跨页导航",
+      "change": "在 F06 冻结的近期/重点存量新闻范围重建关系；检查新建档目标补链、撤回同步和人工否决保护。",
+      "test": "按新闻→赛事→马匹→生涯/新闻完整点击，含无赛事页履历和手机端；总数、分页、目标版本一致。",
+      "done": "TC-L01–03 通过；历史范围和实际完成量公开，不把标签生成当链接验收。",
+      "deadline": "2026-10-25 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-25T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/article_entity_reprocessing.py",
+        "server/stable/services/race_news_exposure.py",
+        "server/stable/views.py",
+        "server/stable/test_backfill_article_race_links.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "O07",
+      "lane": "R",
+      "role": "operations",
+      "it": 4,
+      "start": "2026-10-24",
+      "due": "2026-10-25",
+      "h": 4,
+      "deps": [
+        "O06",
+        "O04"
+      ],
+      "gaps": [
+        "UG-06"
+      ],
+      "area": "ops",
+      "title": "验证完整候选回滚与恢复交接",
+      "change": "以固定候选在隔离副本演练停新任务、回退读路径/代码、保留新 schema/已发布证据、恢复人工字段；核验数据批次快照。",
+      "test": "候选文章已发布、名称已更新和新 revision 存在时回滚不丢审计；兼容代码无法读新数据时必须有恢复策略。",
+      "done": "TC-O02 通过；精确 RTO/RPO 实测值与缺口可见，旧队列和无关服务保持原边界。",
+      "deadline": "2026-10-25 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-25T18:00:00+08:00",
+      "read_paths": [
+        "deploy/deploy.sh",
+        "deploy/backup_db.sh",
+        "deploy/restore_db.sh",
+        "deploy/rollback.sh",
+        "docker-compose.prod.yml",
+        "docker-compose.prod.lowcost.yml"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "H11",
+      "lane": "A",
+      "role": "integration",
+      "it": 4,
+      "start": "2026-10-25",
+      "due": "2026-10-26",
+      "h": 5,
+      "deps": [
+        "H10",
+        "H05"
+      ],
+      "gaps": [
+        "HG-03",
+        "HG-04",
+        "HG-07"
+      ],
+      "area": "names",
+      "title": "完成历史 G1 全参赛马名称检索与采纳批次",
+      "change": "对冻结的 2020 年以来 G1 全参赛马逐一走 HKJC/认可社区名称检索，采纳可验证现名，关联别名并核对页面。",
+      "test": "所有参赛者均有处理结果；不是胜马名单；缺可用名称、冲突和不可访问来源分别计数；无出处不能自造。",
+      "done": "冻结名单检索覆盖 100%，已发现且身份明确的现名采纳完成；无可信译名明确保留原名，不把检索完成写成中文覆盖 100%。",
+      "deadline": "2026-10-26 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-26T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/terms.py",
+        "server/stable/services/term_discovery.py",
+        "server/stable/services/termbase_seed.py",
+        "server/stable/services/term_consistency.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "M11",
+      "lane": "B",
+      "role": "integration",
+      "it": 4,
+      "start": "2026-10-24",
+      "due": "2026-10-26",
+      "h": 6,
+      "deps": [
+        "O06",
+        "F02",
+        "M08",
+        "M10"
+      ],
+      "gaps": [
+        "AG-07",
+        "AG-08"
+      ],
+      "area": "ai",
+      "title": "完成模型质量时延成本对照与参数收敛",
+      "change": "比较规则/现有模型/增强链，按每篇合格产出、每场研究计算成本和 p50/p95 时延；限制无收益重复查询，固定最终配置。",
+      "test": "使用未参与调参的保留集及真实灰度输出，覆盖拒答、模型不可用、证据不支持与冷门马资料缺失。",
+      "done": "TC-A01–05 达标；成本在 F06 锁定预算内，模型自信评分不作为验收。",
+      "deadline": "2026-10-26 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-26T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/translation.py",
+        "server/stable/services/rewriting.py",
+        "server/stable/services/translation_recovery.py",
+        "server/app/settings.py",
+        "server/stable/tasks.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "N08",
+      "lane": "B",
+      "role": "integration",
+      "it": 4,
+      "start": "2026-10-24",
+      "due": "2026-10-26",
+      "h": 6,
+      "deps": [
+        "O06",
+        "N07"
+      ],
+      "gaps": [
+        "NG-02",
+        "NG-04"
+      ],
+      "area": "news",
+      "title": "完成污染和误译清单的受控重处理",
+      "change": "按固定清单执行修复并保护人工稿，重算关联/曝光；逐篇保存前后内容与恢复点。",
+      "test": "同一包重跑幂等、正文误删、已撤回文章和人工改动；公开抽样与快照差异一致。",
+      "done": "本轮受影响清单完成或有逐条真实阻断，不能用全量重译替代局部修复。",
+      "deadline": "2026-10-26 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-26T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/article_content.py",
+        "server/stable/adapters/international.py",
+        "server/stable/services/automation.py",
+        "server/stable/services/publishing_windows.py",
+        "server/stable/test_news_content_boundaries.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "V04",
+      "lane": "R",
+      "role": "operations",
+      "it": 4,
+      "start": "2026-10-24",
+      "due": "2026-10-26",
+      "h": 4,
+      "deps": [
+        "O06"
+      ],
+      "gaps": [
+        "HG-07",
+        "LG-07",
+        "NG-07",
+        "UG-05"
+      ],
+      "area": "qa",
+      "title": "执行真实用户旅程和保留样例验收",
+      "change": "独立核查新闻阅读/筛选→赛事资料→马匹履历及后台异常修复，覆盖五地区新闻、九地区赛事和不同资料成熟度。",
+      "test": "将代码测试、隔离数据库、生产只读、受控数据动作证据分开；逐条记录实际结果与截图/日志时间。",
+      "done": "所有发布阻断问题进入本轮修复；不以一张截图替代完整路径。",
+      "deadline": "2026-10-26 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-26T18:00:00+08:00",
+      "read_paths": [
+        "docs/reports/2026-10-02-current-capabilities.md",
+        "docs/reports/2026-10-02-backlog-evidence-reconciliation.md",
+        "docs/changes/next-version-capabilities/test_cases.md"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "R15",
+      "lane": "A",
+      "role": "integration",
+      "it": 4,
+      "start": "2026-10-26",
+      "due": "2026-10-27",
+      "h": 4,
+      "deps": [
+        "R14",
+        "H11"
+      ],
+      "gaps": [
+        "RG-05",
+        "RG-07"
+      ],
+      "area": "race",
+      "title": "执行断源与积压恢复演练",
+      "change": "在隔离环境重放真实目标的主源断开、备用接管、worker 中断及迟到更正；对照生产只读探针的实际配置。",
+      "test": "主源失效后可在期限内切换；剩余预算不足时如实标记超时，不无限重试；恢复不重复写入。",
+      "done": "TC-R04/08 与 TC-O03 通过，回滚和恢复步骤可由发布协调人执行。",
+      "deadline": "2026-10-27 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-27T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_event_lifecycle.py",
+        "server/stable/services/race_data_sync_policy.py",
+        "server/stable/services/race_public_coverage.py",
+        "server/stable/test_race_data_sync_policy_v2.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "N09",
+      "lane": "B",
+      "role": "integration",
+      "it": 4,
+      "start": "2026-10-26",
+      "due": "2026-10-27",
+      "h": 4,
+      "deps": [
+        "N08",
+        "N06",
+        "O05"
+      ],
+      "gaps": [
+        "NG-05",
+        "NG-06",
+        "NG-07"
+      ],
+      "area": "news",
+      "title": "验收五地区周覆盖与重要事件保留",
+      "change": "以 10/21 起的真实候选、发布和曝光验证周覆盖，抽检重大事件清单、被拒稿及少发后的信息保留。",
+      "test": "地区供给不足与选择偏置分别计算；调整参数要在固定保留集复测，不用低质补量达数。",
+      "done": "TC-N04/05 通过；交付每地区合格覆盖和漏报原因，预设重大事件无漏发。",
+      "deadline": "2026-10-27 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-27T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/article_content.py",
+        "server/stable/adapters/international.py",
+        "server/stable/services/automation.py",
+        "server/stable/services/publishing_windows.py",
+        "server/stable/test_news_content_boundaries.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "U05",
+      "lane": "C",
+      "role": "application",
+      "it": 4,
+      "start": "2026-10-26",
+      "due": "2026-10-27",
+      "h": 4,
+      "deps": [
+        "L06",
+        "E06",
+        "U04"
+      ],
+      "gaps": [
+        "UG-01",
+        "UG-05"
+      ],
+      "area": "public",
+      "title": "完成域名手机空态与性能复验",
+      "change": "对正式域名/别名、新闻/赛事/马匹路径、长表、分页返回和失败重试统一验收；修复明确的 N+1 查询或阻断布局。",
+      "test": "固定数据量下比较旧新 p95 和查询数；浏览器实际点击，不能仅靠模板测试；未知来源时间保持真实表达。",
+      "done": "TC-U01/02 通过；无断链/横向遮挡关键操作；非功能提升数字必须有测量。",
+      "deadline": "2026-10-27 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-27T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/templates/stable/public/race_detail.html",
+        "server/stable/templates/stable/public/horse_detail.html",
+        "server/stable/templates/stable/public/detail.html"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "V05",
+      "lane": "R",
+      "role": "operations",
+      "it": 4,
+      "start": "2026-10-27",
+      "due": "2026-10-27",
+      "h": 4,
+      "deps": [
+        "H11",
+        "R15",
+        "N09",
+        "M11",
+        "L06",
+        "E06",
+        "U05",
+        "O07",
+        "V04"
+      ],
+      "gaps": [
+        "RG-07",
+        "HG-07",
+        "AG-07",
+        "UG-06"
+      ],
+      "area": "qa",
+      "title": "固定全量发布候选并独立复审",
+      "change": "对最终 SHA、迁移、配置、来源/模型/数据范围和失败集合重新核对；风险修改补影响回归；检查 51 个 Gap 去向。",
+      "test": "RC 对照回归、全部关键合同和恢复证据；观察窗口中出现错误必须保留并给修复结果。",
+      "done": "10/27 18:00 前具备可审核的全量包；M12/E07 的 10/28 上午运行验收作为 O08 必要输入。",
+      "deadline": "2026-10-27 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-27T18:00:00+08:00",
+      "read_paths": [
+        "docs/reports/2026-10-02-current-capabilities.md",
+        "docs/reports/2026-10-02-backlog-evidence-reconciliation.md",
+        "docs/changes/next-version-capabilities/test_cases.md"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "M12",
+      "lane": "B",
+      "role": "integration",
+      "it": 4,
+      "start": "2026-10-27",
+      "due": "2026-10-28",
+      "h": 3,
+      "deps": [
+        "M11",
+        "N09"
+      ],
+      "gaps": [
+        "AG-08"
+      ],
+      "area": "ai",
+      "title": "验证模型降级与最终发布配置",
+      "change": "演练 API 不可用、预算耗尽和超时，确认已验证结构化更新继续，依赖语义判定的任务有界等待并呈现缺口。",
+      "test": "不能静默切弱模型后保留原准确率声明；前瞻过期禁止补发；恢复后不重发同篇稿。",
+      "done": "10/28 12:00 前复验已冻结配置和回退清单；若需变更配置或代码，必须补 V05 对应复审后再交 O08，不以本卡测试代替审核；关键任务无依赖模型的单点卡死。",
+      "deadline": "2026-10-28 12:00 Asia/Shanghai",
+      "deadline_at": "2026-10-28T12:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/translation.py",
+        "server/stable/services/rewriting.py",
+        "server/stable/services/translation_recovery.py",
+        "server/app/settings.py",
+        "server/stable/tasks.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "E07",
+      "lane": "C",
+      "role": "application",
+      "it": 4,
+      "start": "2026-10-27",
+      "due": "2026-10-28",
+      "h": 3,
+      "deps": [
+        "E06",
+        "U05",
+        "R15"
+      ],
+      "gaps": [
+        "EG-06"
+      ],
+      "area": "console",
+      "title": "验收自动完成率与人工干预收益",
+      "change": "统计正常自动完成、自动恢复、人工介入和待办年龄，与 F04 基线及前台质量联查；补操作说明。",
+      "test": "减少人工不能以漏发/错误/长期停留交换；失败任务、未知来源和新对象均在分母。",
+      "done": "10/28 12:00 前交效率与质量对照；未达到建议收益时报告实际差距，但关键质量门槛不可降低。",
+      "deadline": "2026-10-28 12:00 Asia/Shanghai",
+      "deadline_at": "2026-10-28T12:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/admin.py",
+        "server/stable/templates/stable/console/dashboard.html",
+        "server/stable/templates/stable/console/article_editor.html"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "O08",
+      "lane": "R",
+      "role": "operations",
+      "it": 4,
+      "start": "2026-10-28",
+      "due": "2026-10-28",
+      "h": 4,
+      "deps": [
+        "V05",
+        "M12",
+        "E07"
+      ],
+      "gaps": [
+        "UG-06"
+      ],
+      "area": "ops",
+      "title": "执行全量上线与公开范围核验",
+      "change": "依据根 AGENTS.md 对固定发布包交付，覆盖所有本版目标地区/对象/功能；仅按包内范围应用配置和数据，保留精确回滚。",
+      "test": "逐模块检查已开启范围、实际公开内容、真实定时运行、历史入口与性能；不能把全量部署但开关仍灰度算完成。",
+      "done": "10/28 18:00 前完成全量切换并开始 48 小时观察；未达标则停止扩大并如实报告。",
+      "deadline": "2026-10-28 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-28T18:00:00+08:00",
+      "read_paths": [
+        "deploy/deploy.sh",
+        "deploy/backup_db.sh",
+        "deploy/restore_db.sh",
+        "deploy/rollback.sh",
+        "docker-compose.prod.yml",
+        "docker-compose.prod.lowcost.yml"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "R16",
+      "lane": "A",
+      "role": "integration",
+      "it": 4,
+      "start": "2026-10-28",
+      "due": "2026-10-30",
+      "h": 4,
+      "deps": [
+        "O08",
+        "R15"
+      ],
+      "gaps": [
+        "RG-01",
+        "RG-07"
+      ],
+      "area": "race",
+      "title": "复核全量赛事质量与剩余数据缺口",
+      "change": "从全量运行账本逐场核对关键资料和卡顿分母，检查九地区与历史数据修复清单；跟踪到 10/30。",
+      "test": "原始错误不因修好而删除；公开空缺、source 时间不确定和样本不足单列；全量范围不能只统计健康路由。",
+      "done": "10/30 12:00 前交质量证据；若门槛未过，明确未完成及影响，不提交虚假通过。",
+      "deadline": "2026-10-30 12:00 Asia/Shanghai",
+      "deadline_at": "2026-10-30T12:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_event_lifecycle.py",
+        "server/stable/services/race_data_sync_policy.py",
+        "server/stable/services/race_public_coverage.py",
+        "server/stable/test_race_data_sync_policy_v2.py"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "O09",
+      "lane": "R",
+      "role": "operations",
+      "it": 4,
+      "start": "2026-10-30",
+      "due": "2026-10-30",
+      "h": 2,
+      "deps": [
+        "V07"
+      ],
+      "gaps": [
+        "UG-06",
+        "QG-03"
+      ],
+      "area": "ops",
+      "title": "完成维护交接与长期事项归档",
+      "change": "更新 current_state、project_status、decisions 及实际受影响运维文档，交接来源续期、预算、异常处理和长期 API 合同。",
+      "test": "交接链接、任务归属、恢复入口和剩余数据缺口逐项可读；不将长期 API 或不可得中文名标为本版已实现。",
+      "done": "10/30 20:00 前交接完毕；用户可从统一入口找到上线版本和后续真实剩余项。",
+      "deadline": "2026-10-30 20:00 Asia/Shanghai",
+      "deadline_at": "2026-10-30T20:00:00+08:00",
+      "read_paths": [
+        "deploy/deploy.sh",
+        "deploy/backup_db.sh",
+        "deploy/restore_db.sh",
+        "deploy/rollback.sh",
+        "docker-compose.prod.yml",
+        "docker-compose.prod.lowcost.yml"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "V06",
+      "lane": "R",
+      "role": "operations",
+      "it": 4,
+      "start": "2026-10-28",
+      "due": "2026-10-30",
+      "h": 6,
+      "deps": [
+        "O08"
+      ],
+      "gaps": [
+        "RG-07",
+        "NG-07",
+        "HG-07",
+        "EG-06",
+        "AG-07"
+      ],
+      "area": "qa",
+      "title": "完成全量运行的 48 小时观察",
+      "change": "持续检查自然资料变化、五地区新闻、重点前瞻、名称/履历更新、无人值守异常恢复和 QQ 零发送。",
+      "test": "指标与用户路径双核验；期间修复要重测影响路径，并记录剩余观察时长；关键回退后不能沿用旧稳定窗口。",
+      "done": "10/30 18:00 形成 48 小时有效观察证据；若临近发生关键回退，明确原 DDL 未满足。",
+      "deadline": "2026-10-30 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-30T18:00:00+08:00",
+      "read_paths": [
+        "docs/reports/2026-10-02-current-capabilities.md",
+        "docs/reports/2026-10-02-backlog-evidence-reconciliation.md",
+        "docs/changes/next-version-capabilities/test_cases.md"
+      ],
+      "status": "未开始"
+    },
+    {
+      "id": "V07",
+      "lane": "R",
+      "role": "operations",
+      "it": 4,
+      "start": "2026-10-30",
+      "due": "2026-10-30",
+      "h": 3,
+      "deps": [
+        "V06",
+        "R16"
+      ],
+      "gaps": [
+        "RG-07",
+        "HG-07",
+        "UG-06"
+      ],
+      "area": "qa",
+      "title": "汇总最终验收及逐任务完成证据",
+      "change": "将每张任务卡关联 commit/PR、部署版本、范围、开关、测试和公开验收；列清代码完成/部署/启用/验证四种状态。",
+      "test": "核对错误率 <1%、卡顿率 <3%、5/10 分钟时限和数据覆盖；28 天尚未满不能声明长期达标。",
+      "done": "10/30 18:00 与 V06 一并提交最终报告；任一核心能力未过时标为部分上线而非完全上线。",
+      "deadline": "2026-10-30 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-30T18:00:00+08:00",
+      "read_paths": [
+        "docs/reports/2026-10-02-current-capabilities.md",
+        "docs/reports/2026-10-02-backlog-evidence-reconciliation.md",
+        "docs/changes/next-version-capabilities/test_cases.md"
+      ],
+      "status": "未开始"
+    }
+  ],
+  "execution_state_source": "dispatch_state.json"
+}

@@ -1,0 +1,203 @@
+{
+  "code_sha": "fc1eed938beb8b431e0d4b37953f7599a40a72ce",
+  "note": "公开页面只读观察；不是生产数据库或官方原始赛事核验。新闻只保存污染关键词计数，不归档正文。",
+  "observations": [
+    {
+      "url": "https://umafans.run/races/2025/hong_kong-hong-kong-queen-elizabeth-ii-cup-2025/",
+      "title": "女皇杯 2025",
+      "observedAt": "2026-10-02T11:02:46.660Z",
+      "text": "返回赛事日历\n返回首页\nG1\n中国香港 · 沙田马场 · 待核实\n2025\n女皇杯\n\nQueen Elizabeth II Cup [FWD] · 2025-04-27 · 北京时间待定\n\nWINNER · 冠军\n键琴高奏\n骑师\n连达文\n练马师\n堀宣行\n完赛时间\n2分0.51秒\n2名 先见（待核实）\n3名 奇力驹（待核实）\n概览\n出马表\n赛果\n历年冠军\n基础资料\n场地\n草地\n等级\nG1\n日期\n2025-04-27\n时间\n北京时间待定\n马场\n沙田马场\n距离\n待核实\n状态\n已完赛\n出马表\n闸位\t马号\t马名\t骑师\t练马师\t负重\t赔率 / 热门排名\t状态\n9\t1\t歌利巨人\t苏铭伦\t葛威法\t待核实\t待核实 / —\t已出走登记\n6\t2\t先见\t麦道朗\t中内田充正\t待核实\t待核实 / —\t已出走登记\n10\t3\t键琴高奏\t连达文\t堀宣行\t待核实\t待核实 / —\t已出走登记\n2\t4\t奇力驹\t范以诚\t纳斯\t待核实\t待核实 / —\t已出走登记\n1\t5\t赢家\t潘顿\t马晏殊\t待核实\t待核实 / —\t已出走登记\n5\t6\t直线力山\t潘明辉\t姚本辉\t待核实\t待核实 / —\t已出走登记\n4\t7\t安骋\t艾道拿\t蔡约翰\t待核实\t待核实 / —\t已出走登记\n7\t8\t智取神驹\t莫雷拉\t沈集成\t待核实\t待核实 / —\t已出走登记\n8\t9\t百贺飞驹\t韦纪力\t吕健威\t待核实\t待核实 / —\t已出走登记\n3\t10\t球星\t布文\t大卫希斯\t待核实\t待核实 / —\t已出走登记\n11\t11\t自由岛\t川田将雅\t中内田充正\t待核实\t待核实 / —\t已出走登记\n赛果\n名次\t马号\t马名\t骑师\t练马师\t时间\t差距\t赔率 / 热门排名\n1\t3\t键琴高奏\t连达文\t堀宣行\t2分0.51秒\t待核实\t待核实 / —\n2\t2\t先见\t麦道朗\t中内田充正\t2分0.80秒\t待核实\t待核实 / —\n3\t4\t奇力驹\t范以诚\t纳斯\t2分0.85秒\t待核实\t待核实 / —\n4\t7\t安骋\t艾道拿\t蔡约翰\t2分0.96秒\t待核实\t待核实 / —\n5\t9\t百贺飞驹\t韦纪力\t吕健威\t2分0.98秒\t待核实\t待核实 / —\n6\t10\t球星\t布文\t大卫希斯\t2分0.99秒\t待核实\t待核实 / —\n7\t8\t智取神驹\t莫雷拉\t沈集成\t2分1.11秒\t待核实\t待核实 / —\n8\t6\t直线力山\t潘明辉\t姚本辉\t2分1.27秒\t待核实\t待核实 / —\n9\t1\t歌利巨人\t苏铭伦\t葛威法\t2分1.60秒\t待核实\t待核实 / —\n10\t5\t赢家\t潘顿\t马晏殊\t2分1.91秒\t待核实\t待核实 / —\n历年冠军\n2026\n浪漫勇士\n麦道朗 · 沈集成 · 2分0.64秒\n2025\n键琴高奏\n连达文 · 堀宣行 · 2分0.51秒\n2024\n浪漫勇士\n麦道朗 · 沈集成 · 2分1.02秒\n2023\n浪漫勇士\n麦道朗 · 沈集成 · 2分1.92秒\n2022\n浪漫勇士\n田泰安 · 沈集成 · 2分0.13秒\n2021\n唯独爱你\n何泽尧 · 矢作芳人 · 2分1.22秒\n2020\n时时精彩\n潘顿 · A S Cruz · 2分0.00秒\n2019\n胜出光采\n松冈正海 · Y Hatakeyama · 1分58.81秒\n2018\n巴基之星\n布宜学 · A S Cruz · 2分0.21秒\n2017\n新写实派\n莫雷拉 · 堀宣行 · 2分4.59秒\n展开更多年份（2）",
+      "tables": [
+        {
+          "head": "闸位\t马号\t马名\t骑师\t练马师\t负重\t赔率 / 热门排名\t状态\n",
+          "rows": [
+            "9\t1\t歌利巨人\t苏铭伦\t葛威法\t待核实\t待核实 / —\t已出走登记",
+            "6\t2\t先见\t麦道朗\t中内田充正\t待核实\t待核实 / —\t已出走登记",
+            "10\t3\t键琴高奏\t连达文\t堀宣行\t待核实\t待核实 / —\t已出走登记",
+            "2\t4\t奇力驹\t范以诚\t纳斯\t待核实\t待核实 / —\t已出走登记",
+            "1\t5\t赢家\t潘顿\t马晏殊\t待核实\t待核实 / —\t已出走登记",
+            "5\t6\t直线力山\t潘明辉\t姚本辉\t待核实\t待核实 / —\t已出走登记",
+            "4\t7\t安骋\t艾道拿\t蔡约翰\t待核实\t待核实 / —\t已出走登记",
+            "7\t8\t智取神驹\t莫雷拉\t沈集成\t待核实\t待核实 / —\t已出走登记",
+            "8\t9\t百贺飞驹\t韦纪力\t吕健威\t待核实\t待核实 / —\t已出走登记",
+            "3\t10\t球星\t布文\t大卫希斯\t待核实\t待核实 / —\t已出走登记",
+            "11\t11\t自由岛\t川田将雅\t中内田充正\t待核实\t待核实 / —\t已出走登记"
+          ]
+        },
+        {
+          "head": "名次\t马号\t马名\t骑师\t练马师\t时间\t差距\t赔率 / 热门排名\n",
+          "rows": [
+            "1\t3\t键琴高奏\t连达文\t堀宣行\t2分0.51秒\t待核实\t待核实 / —",
+            "2\t2\t先见\t麦道朗\t中内田充正\t2分0.80秒\t待核实\t待核实 / —",
+            "3\t4\t奇力驹\t范以诚\t纳斯\t2分0.85秒\t待核实\t待核实 / —",
+            "4\t7\t安骋\t艾道拿\t蔡约翰\t2分0.96秒\t待核实\t待核实 / —",
+            "5\t9\t百贺飞驹\t韦纪力\t吕健威\t2分0.98秒\t待核实\t待核实 / —",
+            "6\t10\t球星\t布文\t大卫希斯\t2分0.99秒\t待核实\t待核实 / —",
+            "7\t8\t智取神驹\t莫雷拉\t沈集成\t2分1.11秒\t待核实\t待核实 / —",
+            "8\t6\t直线力山\t潘明辉\t姚本辉\t2分1.27秒\t待核实\t待核实 / —",
+            "9\t1\t歌利巨人\t苏铭伦\t葛威法\t2分1.60秒\t待核实\t待核实 / —",
+            "10\t5\t赢家\t潘顿\t马晏殊\t2分1.91秒\t待核实\t待核实 / —"
+          ]
+        }
+      ]
+    },
+    {
+      "url": "https://umafans.run/horses/7669/",
+      "title": "美艺力量",
+      "observedAt": "2026-10-02T11:02:46.777Z",
+      "text": "返回马匹\n我的关注\n法国 · 完整马匹资料\n美艺力量\n\nArt Power · 2017 年生 · gr · g\n\n练马师：T D Easterby\n主胜鞍：Tote Guarantee, Never Beaten By SP Renaissance Stakes (Group 3) / Qipco British Champions Sprint Stakes (Group 1) (British Champions Series) / Barberstown Castle Sapphire Stakes (Group 2)\n☆ 关注\n45\n出赛\n10\n冠军\n1\n亚军\n3\n季军\n22%\n胜率\n基础资料\n国家/地区\nIRE\n马主\nKing Power Racing Co Ltd\n练马师\nT D Easterby\n生产牧场\nJ F Tuthill\n血统\n父\nDark Angel\n母\nEvening Time\n父父\nAcclamation\n父母\nMidnight Angel\n母父\nKeltos\n母母\nShadow Casting\n参赛履历\n9\n2026-03-28\nWilliam Hill Price Boosts Every Day Cammidge Trophy Stakes (Listed)\nDoncaster · 3966英尺（约1209米） · —\n—\n9\n2025-11-08\nVirgin Bet Supports Safe Gambling Wentworth Stakes (Listed)\nDoncaster · 3966英尺（约1209米） · —\n—\n13\n2025-10-18\nQipco British Champions Sprint Stakes (Group 1)\nAscot · 0.75英里（约1207米） · —\n—\n1\n2025-09-28\nTote Guarantee, Never Beaten By SP Renaissance Stakes (Group 3)\nCurragh · 0.75英里（约1207米） · —\n—\n10\n2025-09-14\nBar One Racing Flying Five Stakes (Group 1)\nCurragh · 0.625英里（约1006米） · —\n—\n4\n2025-08-09\nFBD Hotels And Resorts Phoenix Sprint Stakes (Group 3)\nCurragh · 0.75英里（约1207米） · —\n—\n13\n2024-10-19\nQipco British Champions Sprint Stakes (Group 1) (British Champions Series)\nAscot · 0.75英里（约1207米） · —\n—\n16\n2024-09-07\nBetfair Sprint Cup Stakes (Group 1) (British Champions Series)\nHaydock · 0.75英里（约1207米） · —\n—\n5\n2024-08-24\nSky Bet City Of York Stakes (Group 2)\nYork · 0.875英里（约1408米） · —\n—\n2\n2024-07-30\nHKJC World Pool Lennox Stakes (Group 2)\nGoodwood · 0.875英里（约1408米） · —\n—\n4\n2024-07-13\nMy Pension Expert July Cup Stakes (Group 1) (British Champions Series)\nNewmarket · 0.75英里（约1207米） · —\n—\n12\n2024-06-22\nQueen Elizabeth II Jubilee Stakes (Group 1) (British Champions Series)\nRoyal Ascot · 0.75英里（约1207米） · —\n—\n4\n2024-05-25\nWeatherbys Ireland Greenlands Stakes (Group 2)\nCurragh · 0.75英里（约1207米） · —\n—\n5\n2024-05-15\n1895 Duke Of York Clipper Stakes (Group 2)\nYork · 0.75英里（约1207米） · —\n—\n1\n2023-10-21\nQipco British Champions Sprint Stakes (Group 1) (British Champions Series)\nAscot · 0.75英里（约1207米） · —\n—\n17\n2023-10-01\nPrix de l'Abbaye de Longchamp Longines (Group 1)\nParisLongchamp · 3279英尺（约999米） · —\n—\n6\n2023-09-10\nAl Basti Equiworld, Dubai Flying Five Stakes (Group 1)\nCurragh · 0.625英里（约1006米） · —\n—\n5\n2023-08-06\nArc Prix Maurice de Gheest (Group 1)\nDeauville · 4263英尺（约1299米） · —\n—\n1\n2023-07-22\nBarberstown Castle Sapphire Stakes (Group 2)\nCurragh · 0.625英里（约1006米） · —\n—\n4\n2023-07-15\nPertemps Network July Cup Stakes (Group 1) (British Champions Series)\nNewmarket · 0.75英里（约1207米） · —\n—\n第 1 / 3 页\n下一页",
+      "tables": []
+    },
+    {
+      "url": "https://umafans.run/horses/21607/",
+      "title": "DINOZZO",
+      "observedAt": "2026-10-02T11:02:46.888Z",
+      "text": "返回马匹\n我的关注\n中国香港 · 完整马匹资料\nDINOZZO\n\nDINOZZO · 2013 年生 · Bay · Gelding\n\n中文译名待补\n\n练马师：J Size\n主胜鞍：HKJC local result 2018-02-04 ST R3 / HKJC local result 2018-01-31 HV R5 / HKJC local result 2017-11-19 ST R5\n☆ 关注\n40\n出赛\n5\n冠军\n5\n亚军\n8\n季军\n12%\n胜率\n基础资料\n国家/地区\nIRE\n马主\nSiu Pak Kwan\n练马师\nJ Size\n生产牧场\nSwordlestown Little\n血统\n父\nLilbourne Lad\n母\nNisriyna\n父父\nAcclamation\n父母\nSogno Verde\n母父\nIntikhab\n母母\nNarmina\n参赛履历\n6\n2019-07-14\nHKJC local result 2019-07-14 ST R8\nST / Turf / \"A\" · 待核实 · —\n—\n10\n2019-06-23\nHKJC local result 2019-06-23 ST R8\nST / Turf / \"A\" · 待核实 · —\n—\n8\n2019-06-02\nHKJC local result 2019-06-02 ST R9\nST / Turf / \"B\" · 待核实 · —\n—\n8\n2019-04-28\nHKJC local result 2019-04-28 ST R8\nST / Turf / \"A\" · 待核实 · —\n—\n8\n2019-04-07\nHKJC local result 2019-04-07 ST R7\nST / Turf / \"B+2\" · 待核实 · —\n—\n3\n2019-03-10\nHKJC local result 2019-03-10 ST R8\nST / Turf / \"C+3\" · 待核实 · —\n—\n3\n2019-02-17\nHKJC local result 2019-02-17 ST R7\nST / Turf / \"A+3\" · 待核实 · —\n—\n2\n2019-01-27\nHKJC local result 2019-01-27 ST R7\nST / Turf / \"B+2\" · 待核实 · —\n—\n5\n2019-01-09\nHKJC local result 2019-01-09 HV R6\nHV / Turf / \"A\" · 待核实 · —\n—\n6\n2018-12-23\nHKJC local result 2018-12-23 ST R7\nST / Turf / \"A+3\" · 待核实 · —\n—\n5\n2018-11-25\nHKJC local result 2018-11-25 ST R7\nST / Turf / \"C\" · 待核实 · —\n—\n8\n2018-11-04\nHKJC local result 2018-11-04 ST R7\nST / Turf / \"C+3\" · 待核实 · —\n—\n12\n2018-10-21\nHKJC local result 2018-10-21 ST R8\nST / Turf / \"A\" · 待核实 · —\n—\n14\n2018-10-01\nHKJC local result 2018-10-01 ST R8\nST / Turf / \"A+3\" · 待核实 · —\n—\n9\n2018-07-15\nHKJC local result 2018-07-15 ST R8\nST / Turf / \"A\" · 待核实 · —\n—\n3\n2018-06-24\nHKJC local result 2018-06-24 ST R3\nST / Turf / \"A\" · 待核实 · —\n—\n4\n2018-06-03\nHKJC local result 2018-06-03 ST R7\nST / Turf / \"B\" · 待核实 · —\n—\n6\n2018-04-29\nHKJC local result 2018-04-29 ST R8\nST / Turf / \"A\" · 待核实 · —\n—\n6\n2018-04-08\nHKJC local result 2018-04-08 ST R8\nST / Turf / \"C\" · 待核实 · —\n—\n3\n2018-03-28\nHKJC local result 2018-03-28 HV R6\nHV / Turf / \"C+3\" · 待核实 · —\n—\n第 1 / 2 页\n下一页",
+      "tables": []
+    },
+    {
+      "url": "https://umafans.run/news/9623/",
+      "title": "种马档案：Pavel今夏意外成为成功典范 · UmaFans",
+      "observedAt": "2026-10-02T11:03:18.131Z",
+      "bodyLength": 4001,
+      "suspectTerms": [
+        {
+          "term": "当前",
+          "count": 0
+        },
+        {
+          "term": "热门",
+          "count": 0
+        },
+        {
+          "term": "CCA橡树",
+          "count": 0
+        },
+        {
+          "term": "正面交锋",
+          "count": 0
+        },
+        {
+          "term": "公平赔率",
+          "count": 0
+        },
+        {
+          "term": "登录",
+          "count": 0
+        },
+        {
+          "term": "免费注册",
+          "count": 0
+        }
+      ],
+      "headings": [
+        "种马档案：Pavel今夏意外成为成功典范"
+      ],
+      "paragraphCount": 39
+    },
+    {
+      "url": "https://umafans.run/races/2026/uk-bha-flat-2026-0730-078/",
+      "title": "兰秀锦标 2026",
+      "observedAt": "2026-10-02T11:03:18.001Z",
+      "text": "返回赛事日历\n返回首页\nG1\n英国 · 古活 · 草地\n2026\n兰秀锦标\n\nQATAR NASSAU STAKES · 2026-07-30 · 22:35（北京时间）\n\nWINNER · 冠军\nDiamond Necklace\n待核实名 友情至上\n待核实名 See The Fire\n概览\n出马表\n赛果\n历年冠军\n相关新闻\n基础资料\n场地\n草地\n等级\nG1\n日期\n2026-07-30\n时间\n22:35（北京时间）\n马场\n古活\n场地\n草地\n状态\n已完赛\n出马表\n闸位\t马号\t马名\t骑师\t练马师\t负重\t赔率 / 热门排名\t状态\n—\t1\t下凡仙姬\t—\tK R Burke\t待核实\t— / —\t已出走登记\n—\t2\t友情至上\tWilliam Buick\tJohn & Thady Gosden\t待核实\t— / —\t已出走登记\n—\t3\tMinnie Hauk\t—\tA P O'Brien\t待核实\t— / —\t已出走登记\n—\t4\tSee The Fire\tOisin Murphy\t包义定\t待核实\t— / —\t已出走登记\n—\t5\tBeautify\t—\tA P O'Brien\t待核实\t— / —\t已出走登记\n—\t6\tBotagoz\tRay Dawson\tRoger Varian\t待核实\t— / —\t已出走登记\n—\t7\t创作\t—\tA P O'Brien\t待核实\t— / —\t已出走登记\n—\t8\tDiamond Necklace\t—\tA P O'Brien\t待核实\t— / —\t已出走登记\n—\t9\t当时行乐\t—\tA P O'Brien\t待核实\t— / —\t已出走登记\n—\t10\t花样奢华\t夏俊升\tCharlie Johnston\t待核实\t— / —\t已出走登记\n赛果\n名次\t马号\t马名\t骑师\t练马师\t时间\t差距\t赔率 / 热门排名\n待核实\t4\tDiamond Necklace\t—\t—\t—\t—\t— / —\n待核实\t1\t友情至上\t—\t—\t—\t—\t— / —\n待核实\t2\tSee The Fire\t—\t—\t—\t—\t— / —\n待核实\t3\tBotagoz\t—\t—\t—\t—\t— / —\n待核实\t5\t当时行乐\t—\t—\t—\t—\t— / —\n历年冠军\n2026\nDiamond Necklace\n— · —\n相关新闻\n赛前新闻\n07-25 04:53\n卡塔尔古活赛马节第三日前瞻：兰秀锦标等赛事分析与预测\n\n【卡塔尔古活赛马节第三日焦点】兰秀锦标大热门Diamond Necklace面临Friendly Soul强力挑战；利治蒙锦标新星Flann Sunna表现抢眼；英皇佐治五世锦标...\n\n🏆 兰秀锦标\n🏆 哥顿锦标\n赛后新闻\n07-25 06:01\n钻石项链闪耀兰秀锦标阵容 异域风情缺席古活大战\n\n【焦点战报】钻石项链领衔古活兰秀锦标十驹阵容，异域风情因战略调整缺席。岳伯仁马房派出三驹围剿，包括不败雌马钻石项链。伯特训练的G1冠军堕落天使再度对决See The Fire。练...\n\n🏆 兰秀锦标",
+      "tables": [
+        {
+          "head": "闸位\t马号\t马名\t骑师\t练马师\t负重\t赔率 / 热门排名\t状态\n",
+          "rows": [
+            "—\t1\t下凡仙姬\t—\tK R Burke\t待核实\t— / —\t已出走登记",
+            "—\t2\t友情至上\tWilliam Buick\tJohn & Thady Gosden\t待核实\t— / —\t已出走登记",
+            "—\t3\tMinnie Hauk\t—\tA P O'Brien\t待核实\t— / —\t已出走登记",
+            "—\t4\tSee The Fire\tOisin Murphy\t包义定\t待核实\t— / —\t已出走登记",
+            "—\t5\tBeautify\t—\tA P O'Brien\t待核实\t— / —\t已出走登记",
+            "—\t6\tBotagoz\tRay Dawson\tRoger Varian\t待核实\t— / —\t已出走登记",
+            "—\t7\t创作\t—\tA P O'Brien\t待核实\t— / —\t已出走登记",
+            "—\t8\tDiamond Necklace\t—\tA P O'Brien\t待核实\t— / —\t已出走登记",
+            "—\t9\t当时行乐\t—\tA P O'Brien\t待核实\t— / —\t已出走登记",
+            "—\t10\t花样奢华\t夏俊升\tCharlie Johnston\t待核实\t— / —\t已出走登记"
+          ]
+        },
+        {
+          "head": "名次\t马号\t马名\t骑师\t练马师\t时间\t差距\t赔率 / 热门排名\n",
+          "rows": [
+            "待核实\t4\tDiamond Necklace\t—\t—\t—\t—\t— / —",
+            "待核实\t1\t友情至上\t—\t—\t—\t—\t— / —",
+            "待核实\t2\tSee The Fire\t—\t—\t—\t—\t— / —",
+            "待核实\t3\tBotagoz\t—\t—\t—\t—\t— / —",
+            "待核实\t5\t当时行乐\t—\t—\t—\t—\t— / —"
+          ]
+        }
+      ]
+    }
+  ],
+  "art_power_pagination": [
+    {
+      "url": "https://umafans.run/horses/7669/",
+      "observedAt": "2026-10-02T11:03:30.644Z",
+      "pageLabel": "第 1 / 3 页\n下一页",
+      "rows": [
+        "9\n2026-03-28\nWilliam Hill Price Boosts Every Day Cammidge Trophy Stakes (Listed)\nDoncaster · 3966英尺（约1209米） · —\n—",
+        "9\n2025-11-08\nVirgin Bet Supports Safe Gambling Wentworth Stakes (Listed)\nDoncaster · 3966英尺（约1209米） · —\n—",
+        "13\n2025-10-18\nQipco British Champions Sprint Stakes (Group 1)\nAscot · 0.75英里（约1207米） · —\n—",
+        "1\n2025-09-28\nTote Guarantee, Never Beaten By SP Renaissance Stakes (Group 3)\nCurragh · 0.75英里（约1207米） · —\n—",
+        "10\n2025-09-14\nBar One Racing Flying Five Stakes (Group 1)\nCurragh · 0.625英里（约1006米） · —\n—",
+        "4\n2025-08-09\nFBD Hotels And Resorts Phoenix Sprint Stakes (Group 3)\nCurragh · 0.75英里（约1207米） · —\n—",
+        "13\n2024-10-19\nQipco British Champions Sprint Stakes (Group 1) (British Champions Series)\nAscot · 0.75英里（约1207米） · —\n—",
+        "16\n2024-09-07\nBetfair Sprint Cup Stakes (Group 1) (British Champions Series)\nHaydock · 0.75英里（约1207米） · —\n—",
+        "5\n2024-08-24\nSky Bet City Of York Stakes (Group 2)\nYork · 0.875英里（约1408米） · —\n—",
+        "2\n2024-07-30\nHKJC World Pool Lennox Stakes (Group 2)\nGoodwood · 0.875英里（约1408米） · —\n—",
+        "4\n2024-07-13\nMy Pension Expert July Cup Stakes (Group 1) (British Champions Series)\nNewmarket · 0.75英里（约1207米） · —\n—",
+        "12\n2024-06-22\nQueen Elizabeth II Jubilee Stakes (Group 1) (British Champions Series)\nRoyal Ascot · 0.75英里（约1207米） · —\n—",
+        "4\n2024-05-25\nWeatherbys Ireland Greenlands Stakes (Group 2)\nCurragh · 0.75英里（约1207米） · —\n—",
+        "5\n2024-05-15\n1895 Duke Of York Clipper Stakes (Group 2)\nYork · 0.75英里（约1207米） · —\n—",
+        "1\n2023-10-21\nQipco British Champions Sprint Stakes (Group 1) (British Champions Series)\nAscot · 0.75英里（约1207米） · —\n—",
+        "17\n2023-10-01\nPrix de l'Abbaye de Longchamp Longines (Group 1)\nParisLongchamp · 3279英尺（约999米） · —\n—",
+        "6\n2023-09-10\nAl Basti Equiworld, Dubai Flying Five Stakes (Group 1)\nCurragh · 0.625英里（约1006米） · —\n—",
+        "5\n2023-08-06\nArc Prix Maurice de Gheest (Group 1)\nDeauville · 4263英尺（约1299米） · —\n—",
+        "1\n2023-07-22\nBarberstown Castle Sapphire Stakes (Group 2)\nCurragh · 0.625英里（约1006米） · —\n—",
+        "4\n2023-07-15\nPertemps Network July Cup Stakes (Group 1) (British Champions Series)\nNewmarket · 0.75英里（约1207米） · —\n—"
+      ],
+      "stats": "45\n出赛\n10\n冠军\n1\n亚军\n3\n季军\n22%\n胜率"
+    },
+    {
+      "url": "https://umafans.run/horses/7669/?records_page=2",
+      "observedAt": "2026-10-02T11:03:31.502Z",
+      "pageLabel": "上一页\n第 2 / 3 页\n下一页",
+      "rows": [
+        "12\n2023-06-24\nQueen Elizabeth II Jubilee Stakes (Group 1) (British Champions Series)\nRoyal Ascot · 0.75英里（约1207米） · —\n—",
+        "1\n2023-05-27\nWeatherbys Ireland Greenlands Stakes (Group 2)\nCurragh · 0.75英里（约1207米） · —\n—",
+        "8\n2023-05-17\n1895 Duke Of York Clipper Stakes (Group 2)\nYork · 0.75英里（约1207米） · —\n—",
+        "6\n2022-12-26\nTop Odds Every Day With BetUK Conditions Stakes (GBB Race)\nWolverhampton · 4020英尺（约1225米） · —\n—",
+        "6\n2022-12-02\nBetUK Over 40,000 Live Streamed Races Conditions Stakes (GBB Race)\nNewcastle · 0.625英里（约1006米） · —\n—",
+        "3\n2022-11-05\nDownload The BetGoodwin App Wentworth Stakes (Listed)\nDoncaster · 3966英尺（约1209米） · —\n—",
+        "8\n2022-10-15\nQipco British Champions Sprint Stakes (Group 1) (British Champions Series)\nAscot · 0.75英里（约1207米） · —\n—",
+        "1\n2022-09-25\nWilliam Hill Ireland Renaissance Stakes (Group 3)\nCurragh · 0.75英里（约1207米） · —\n—",
+        "8\n2022-09-03\nBetfair Sprint Cup Stakes (Group 1) (British Champions Series)\nHaydock · 0.75英里（约1207米） · —\n—",
+        "4\n2022-08-20\nSky Bet City Of York Stakes (Group 2)\nYork · 0.875英里（约1408米） · —\n—",
+        "4\n2021-10-16\nQipco British Champions Sprint Stakes (Group 1)\nAscot · 0.75英里（约1207米） · —\n—",
+        "1\n2021-09-25\nWilliam Hill Ireland Renaissance Stakes (Group 3)\nCurragh · 0.75英里（约1207米） · —\n—",
+        "5\n2021-09-04\nBetfair Sprint Cup Stakes (Group 1) (British Champions Series)\nHaydock · 0.75英里（约1207米） · —\n—",
+        "8\n2021-07-30\nKing George Qatar Stakes (Group 2)\nGoodwood · 0.625英里（约1006米） · —\n—",
+        "4\n2021-07-10\nDarley July Cup Stakes (Group 1)\nNewmarket · 0.75英里（约1207米） · —\n—",
+        "3\n2021-06-19\nDiamond Jubilee Stakes (Group 1) (British Champions Series)\nRoyal Ascot · 0.75英里（约1207米） · —\n—",
+        "6\n2021-05-12\nDuke Of York Clipper Logistics Stakes (Group 2)\nYork · 0.75英里（约1207米） · —\n—",
+        "4\n2020-10-17\nQipco British Champions Sprint Stakes (Group 1)\nAscot · 0.75英里（约1207米） · —\n—",
+        "4\n2020-09-05\nBetfair Sprint Cup Stakes (Group 1)\nHaydock · 0.75英里（约1207米） · —\n—",
+        "6\n2020-08-21\nCoolmore Nunthorpe Stakes (Group 1)\nYork · 0.625英里（约1006米） · —\n—"
+      ],
+      "stats": "45\n出赛\n10\n冠军\n1\n亚军\n3\n季军\n22%\n胜率"
+    },
+    {
+      "url": "https://umafans.run/horses/7669/?records_page=3",
+      "observedAt": "2026-10-02T11:03:32.305Z",
+      "pageLabel": "上一页\n第 3 / 3 页",
+      "rows": [
+        "1\n2020-07-04\nCoolmore Sioux Nation Lacken Stakes (Group 3)\nNaas · 0.75英里（约1207米） · —\n—",
+        "1\n2020-06-19\nPalace Of Holyroodhouse Handicap\nRoyal Ascot · 0.625英里（约1006米） · —\n—",
+        "1\n2020-06-01\nBetway Novice Stakes (Div 2)\nNewcastle · 0.75英里（约1207米） · —\n—",
+        "1\n2019-10-11\nMorag's 10 Years At Racing To School EBF Novice Stakes (Plus 10)\nYork · 0.625英里（约1006米） · —\n—",
+        "3\n2019-09-06\nNorthumbrian Water Group/EBF Novice Stakes (Plus 10)\nNewcastle · 0.75英里（约1207米） · —\n—"
+      ],
+      "stats": "45\n出赛\n10\n冠军\n1\n亚军\n3\n季军\n22%\n胜率"
+    }
+  ]
+}

@@ -1,0 +1,1994 @@
+{
+  "schema_version": 1,
+  "timezone": "Asia/Shanghai",
+  "updated_at": "2026-10-03T01:58:03.411900+08:00",
+  "coordinator_thread_id": "01a0fdb2-b88c-7f93-8c9e-ba9564c33c93",
+  "coordinator_worktree": "/Users/mentianlu/.codex/worktrees/516a/umanews",
+  "deadline_at": "2026-10-30T18:00:00+08:00",
+  "handoff_deadline_at": "2026-10-30T20:00:00+08:00",
+  "model": "gpt-6.1-sol",
+  "reasoning_effort": "medium",
+  "automation_id": null,
+  "lanes": {
+    "A": {
+      "thread_id": null,
+      "host_id": "local",
+      "worktree": null,
+      "branch": null,
+      "status": "待创建",
+      "last_cursor": null,
+      "model": "gpt-6.1-sol",
+      "reasoning_effort": "medium"
+    },
+    "B": {
+      "thread_id": null,
+      "host_id": "local",
+      "worktree": null,
+      "branch": null,
+      "status": "待创建",
+      "last_cursor": null,
+      "model": "gpt-6.1-sol",
+      "reasoning_effort": "medium"
+    },
+    "C": {
+      "thread_id": null,
+      "host_id": "local",
+      "worktree": null,
+      "branch": null,
+      "status": "待创建",
+      "last_cursor": null,
+      "model": "gpt-6.1-sol",
+      "reasoning_effort": "medium"
+    },
+    "R": {
+      "thread_id": null,
+      "host_id": "local",
+      "worktree": null,
+      "branch": null,
+      "status": "待创建",
+      "last_cursor": null,
+      "model": "gpt-6.1-sol",
+      "reasoning_effort": "medium"
+    }
+  },
+  "tasks": {
+    "F01": {
+      "lane": "A",
+      "title": "冻结跨模块字段及首版产品参数",
+      "deps": [],
+      "deadline_at": "2026-10-04T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "F04": {
+      "lane": "C",
+      "title": "冻结编辑后台关键任务与交互原型",
+      "deps": [],
+      "deadline_at": "2026-10-04T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "F03": {
+      "lane": "A",
+      "title": "盘点九地区主备来源与现有 TRA 套餐",
+      "deps": [
+        "F01"
+      ],
+      "deadline_at": "2026-10-05T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "F02": {
+      "lane": "B",
+      "title": "建立新闻漏斗与模型黄金样例",
+      "deps": [],
+      "deadline_at": "2026-10-05T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "F05": {
+      "lane": "C",
+      "title": "复验域名与公开缺陷并固定回归样例",
+      "deps": [],
+      "deadline_at": "2026-10-05T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "H01": {
+      "lane": "A",
+      "title": "生成近三年与历史 G1 全参赛马目标集",
+      "deps": [
+        "F01"
+      ],
+      "deadline_at": "2026-10-06T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "M01": {
+      "lane": "B",
+      "title": "增加 GPT-6 Responses 适配及结构输出",
+      "deps": [
+        "F01",
+        "F02"
+      ],
+      "deadline_at": "2026-10-06T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "Q01": {
+      "lane": "C",
+      "title": "关闭 QQ 全发送路径并解耦网页发布",
+      "deps": [
+        "F01"
+      ],
+      "deadline_at": "2026-10-06T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "F06": {
+      "lane": "R",
+      "title": "核定数据量、预算和迭代可行性",
+      "deps": [
+        "F01",
+        "F02",
+        "F03",
+        "H01"
+      ],
+      "deadline_at": "2026-10-06T18:00:00+08:00",
+      "status": "进行中",
+      "phase": "规划/收集输入",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "owner": "coordinator"
+    },
+    "O01": {
+      "lane": "R",
+      "title": "冻结集成与发布资源安排",
+      "deps": [
+        "F01"
+      ],
+      "deadline_at": "2026-10-06T18:00:00+08:00",
+      "status": "进行中",
+      "phase": "规划/收集输入",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "owner": "coordinator"
+    },
+    "R01": {
+      "lane": "A",
+      "title": "实现阶段与端到端时效账本",
+      "deps": [
+        "F01",
+        "F03"
+      ],
+      "deadline_at": "2026-10-07T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "M02": {
+      "lane": "B",
+      "title": "实现有界多轮任务执行与恢复",
+      "deps": [
+        "M01"
+      ],
+      "deadline_at": "2026-10-07T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "Q02": {
+      "lane": "C",
+      "title": "移除 QQ 使用入口及专属运行依赖",
+      "deps": [
+        "Q01"
+      ],
+      "deadline_at": "2026-10-07T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "R02": {
+      "lane": "A",
+      "title": "提取统一纯决策并接入影子比较",
+      "deps": [
+        "R01"
+      ],
+      "deadline_at": "2026-10-08T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "M03": {
+      "lane": "B",
+      "title": "封装内部查询与证据读取工具",
+      "deps": [
+        "M02",
+        "F03"
+      ],
+      "deadline_at": "2026-10-08T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "U01": {
+      "lane": "C",
+      "title": "统一赛事等级筛选与卡片标签",
+      "deps": [
+        "F05"
+      ],
+      "deadline_at": "2026-10-08T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "H02": {
+      "lane": "A",
+      "title": "复用缓存与强身份建立补全输入包",
+      "deps": [
+        "H01",
+        "F03"
+      ],
+      "deadline_at": "2026-10-09T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "R03": {
+      "lane": "A",
+      "title": "实现赛前赛后成熟度统一读模型",
+      "deps": [
+        "R02"
+      ],
+      "deadline_at": "2026-10-09T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "N01": {
+      "lane": "B",
+      "title": "保存正文区块与清洗差异",
+      "deps": [
+        "F02"
+      ],
+      "deadline_at": "2026-10-09T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "O02": {
+      "lane": "C",
+      "title": "修复已知备份恢复约束问题",
+      "deps": [
+        "O01"
+      ],
+      "deadline_at": "2026-10-09T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "U02": {
+      "lane": "C",
+      "title": "补齐近期赛事首页与详情旧交互要求",
+      "deps": [
+        "F05"
+      ],
+      "deadline_at": "2026-10-09T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "V01": {
+      "lane": "R",
+      "title": "迭代一接口与失败路径验收",
+      "deps": [
+        "F06",
+        "H02",
+        "R03",
+        "M03",
+        "N01",
+        "Q02",
+        "U01",
+        "U02",
+        "O02"
+      ],
+      "deadline_at": "2026-10-09T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "R04": {
+      "lane": "A",
+      "title": "按成熟度与新鲜度实现主备源仲裁",
+      "deps": [
+        "V01"
+      ],
+      "deadline_at": "2026-10-11T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "N02": {
+      "lane": "B",
+      "title": "接入正文污染审查与模板变化检测",
+      "deps": [
+        "N01",
+        "M03"
+      ],
+      "deadline_at": "2026-10-11T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "E01": {
+      "lane": "C",
+      "title": "统一自动处理恢复与人工例外分类",
+      "deps": [
+        "F04",
+        "R02"
+      ],
+      "deadline_at": "2026-10-11T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "H06": {
+      "lane": "C",
+      "title": "统一名称展示搜索与更名追踪",
+      "deps": [
+        "F01",
+        "H02"
+      ],
+      "deadline_at": "2026-10-11T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "R05": {
+      "lane": "A",
+      "title": "调度明确资料替换期限与容量预留",
+      "deps": [
+        "R04",
+        "R01"
+      ],
+      "deadline_at": "2026-10-12T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "R11-HK": {
+      "lane": "A",
+      "title": "中国香港来源合同与解析缺口切片",
+      "deps": [
+        "R04",
+        "F03"
+      ],
+      "deadline_at": "2026-10-12T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "R11-JP": {
+      "lane": "A",
+      "title": "日本来源合同与解析缺口切片",
+      "deps": [
+        "R04",
+        "F03"
+      ],
+      "deadline_at": "2026-10-12T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "N03": {
+      "lane": "B",
+      "title": "接入上下文实体识别和专名保护",
+      "deps": [
+        "N02",
+        "M03"
+      ],
+      "deadline_at": "2026-10-12T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "E02": {
+      "lane": "C",
+      "title": "实现统一待办列表与原因详情",
+      "deps": [
+        "E01"
+      ],
+      "deadline_at": "2026-10-12T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "O03": {
+      "lane": "C",
+      "title": "建设队列外公开结果与执行健康探针",
+      "deps": [
+        "R01",
+        "O01"
+      ],
+      "deadline_at": "2026-10-12T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "R06": {
+      "lane": "A",
+      "title": "贯通延迟改期取消及旧任务失效",
+      "deps": [
+        "R05"
+      ],
+      "deadline_at": "2026-10-13T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "N04": {
+      "lane": "B",
+      "title": "加入译后事实审校与有界修复",
+      "deps": [
+        "N03"
+      ],
+      "deadline_at": "2026-10-13T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "L01": {
+      "lane": "C",
+      "title": "实现共享实体及赛事届次解析",
+      "deps": [
+        "N03",
+        "F01"
+      ],
+      "deadline_at": "2026-10-13T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "R07": {
+      "lane": "A",
+      "title": "统一退赛非完赛并列与完整名单核验",
+      "deps": [
+        "R04",
+        "R03"
+      ],
+      "deadline_at": "2026-10-14T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "H04": {
+      "lane": "B",
+      "title": "补齐 HKJC 现成译名和名称证据",
+      "deps": [
+        "N03",
+        "H02"
+      ],
+      "deadline_at": "2026-10-14T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "L02": {
+      "lane": "C",
+      "title": "建立双向关系更新与更正传播",
+      "deps": [
+        "L01"
+      ],
+      "deadline_at": "2026-10-14T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "R08": {
+      "lane": "A",
+      "title": "原子发布资料更正与统一缓存失效",
+      "deps": [
+        "R06",
+        "R07"
+      ],
+      "deadline_at": "2026-10-15T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "R11-GB": {
+      "lane": "A",
+      "title": "英国来源合同与解析缺口切片",
+      "deps": [
+        "R07",
+        "F03"
+      ],
+      "deadline_at": "2026-10-15T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "R11-IE": {
+      "lane": "A",
+      "title": "爱尔兰来源合同与解析缺口切片",
+      "deps": [
+        "R07",
+        "F03"
+      ],
+      "deadline_at": "2026-10-15T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "H05": {
+      "lane": "B",
+      "title": "接入认可社区名称提取与冲突处理",
+      "deps": [
+        "H04",
+        "M03"
+      ],
+      "deadline_at": "2026-10-15T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "U03": {
+      "lane": "C",
+      "title": "修复重复赛事身份和旧链接去向",
+      "deps": [
+        "F05",
+        "L02"
+      ],
+      "deadline_at": "2026-10-15T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "O04": {
+      "lane": "R",
+      "title": "验证备份恢复与队列容量边界",
+      "deps": [
+        "O02",
+        "R05",
+        "M02"
+      ],
+      "deadline_at": "2026-10-15T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "H03": {
+      "lane": "A",
+      "title": "打通基础档案及可独立存在的生涯记录",
+      "deps": [
+        "H02"
+      ],
+      "deadline_at": "2026-10-16T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "R09": {
+      "lane": "A",
+      "title": "审计历史结果公开依据与兼容修复",
+      "deps": [
+        "R08"
+      ],
+      "deadline_at": "2026-10-16T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "R11-FR": {
+      "lane": "A",
+      "title": "法国来源合同与解析缺口切片",
+      "deps": [
+        "R07",
+        "F03"
+      ],
+      "deadline_at": "2026-10-16T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "M04": {
+      "lane": "B",
+      "title": "实现多源研究与冲突候选输出",
+      "deps": [
+        "M03",
+        "R04"
+      ],
+      "deadline_at": "2026-10-16T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "L03": {
+      "lane": "C",
+      "title": "增加新闻标签及赛事马匹跳转",
+      "deps": [
+        "L02",
+        "H06"
+      ],
+      "deadline_at": "2026-10-16T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "Q03": {
+      "lane": "C",
+      "title": "形成长期只读内容 API 合同",
+      "deps": [
+        "F01",
+        "L02"
+      ],
+      "deadline_at": "2026-10-16T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "V02": {
+      "lane": "R",
+      "title": "迭代二端到端候选验收",
+      "deps": [
+        "R09",
+        "H03",
+        "H05",
+        "M04",
+        "L03",
+        "Q03",
+        "E02",
+        "O04",
+        "R11-JP",
+        "R11-HK",
+        "R11-GB",
+        "R11-IE",
+        "R11-FR"
+      ],
+      "deadline_at": "2026-10-16T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "R10": {
+      "lane": "A",
+      "title": "完成策略换代与持续跟踪恢复",
+      "deps": [
+        "V02"
+      ],
+      "deadline_at": "2026-10-18T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "N05": {
+      "lane": "B",
+      "title": "按事件重要性和新增事实选择新闻",
+      "deps": [
+        "V02"
+      ],
+      "deadline_at": "2026-10-18T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "L04": {
+      "lane": "C",
+      "title": "实现赛事相关新闻统计与重点排序",
+      "deps": [
+        "V02",
+        "L02"
+      ],
+      "deadline_at": "2026-10-18T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "R11": {
+      "lane": "A",
+      "title": "汇总九地区适配与能力验收矩阵",
+      "deps": [
+        "R10",
+        "F03",
+        "R11-JP",
+        "R11-HK",
+        "R11-GB",
+        "R11-IE",
+        "R11-FR",
+        "R11-US",
+        "R11-AU",
+        "R11-DE",
+        "R11-ME"
+      ],
+      "deadline_at": "2026-10-19T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "R11-AU": {
+      "lane": "A",
+      "title": "澳大利亚来源合同与解析缺口切片",
+      "deps": [
+        "V02",
+        "F03"
+      ],
+      "deadline_at": "2026-10-19T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "R11-DE": {
+      "lane": "A",
+      "title": "德国来源合同与解析缺口切片",
+      "deps": [
+        "V02",
+        "F03"
+      ],
+      "deadline_at": "2026-10-19T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "R11-ME": {
+      "lane": "A",
+      "title": "中东来源合同与解析缺口切片",
+      "deps": [
+        "V02",
+        "F03"
+      ],
+      "deadline_at": "2026-10-19T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "R11-US": {
+      "lane": "A",
+      "title": "美国来源合同与解析缺口切片",
+      "deps": [
+        "V02",
+        "F03"
+      ],
+      "deadline_at": "2026-10-19T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "M09": {
+      "lane": "B",
+      "title": "将新闻事实转为资料变更候选",
+      "deps": [
+        "M04",
+        "R08",
+        "L01"
+      ],
+      "deadline_at": "2026-10-19T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "N06": {
+      "lane": "B",
+      "title": "实施五地区周覆盖与来源健康调节",
+      "deps": [
+        "N05",
+        "F02"
+      ],
+      "deadline_at": "2026-10-19T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "L05": {
+      "lane": "C",
+      "title": "完善马匹全生涯与近期新闻导航",
+      "deps": [
+        "L04",
+        "H03"
+      ],
+      "deadline_at": "2026-10-19T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "H08": {
+      "lane": "A",
+      "title": "将新赛果和更正持续同步到履历统计",
+      "deps": [
+        "R08",
+        "H03",
+        "V02"
+      ],
+      "deadline_at": "2026-10-20T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "M05": {
+      "lane": "B",
+      "title": "建立全参赛者前瞻资料表",
+      "deps": [
+        "M04",
+        "N06",
+        "H05"
+      ],
+      "deadline_at": "2026-10-20T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "H07": {
+      "lane": "C",
+      "title": "修正完整度主胜鞍与统计展示",
+      "deps": [
+        "H03",
+        "H06"
+      ],
+      "deadline_at": "2026-10-20T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "H09": {
+      "lane": "A",
+      "title": "准备可恢复的数据修复与补齐批次",
+      "deps": [
+        "H08",
+        "H05",
+        "U03",
+        "R09"
+      ],
+      "deadline_at": "2026-10-21T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "M06": {
+      "lane": "B",
+      "title": "生成带事实出处的重点赛事前瞻",
+      "deps": [
+        "M05"
+      ],
+      "deadline_at": "2026-10-21T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "E03": {
+      "lane": "C",
+      "title": "完成原位编辑证据差异与预览",
+      "deps": [
+        "E02",
+        "N04",
+        "H05",
+        "R03"
+      ],
+      "deadline_at": "2026-10-21T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "O05": {
+      "lane": "R",
+      "title": "首批核心链路生产灰度及自然观察",
+      "deps": [
+        "V02",
+        "R11",
+        "H05",
+        "N06",
+        "L05",
+        "O03",
+        "O04"
+      ],
+      "deadline_at": "2026-10-21T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "R12": {
+      "lane": "A",
+      "title": "完成跨来源与异常回放验收集",
+      "deps": [
+        "R11",
+        "H08"
+      ],
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "R13": {
+      "lane": "A",
+      "title": "接通真实公开时延与阶段质量面板",
+      "deps": [
+        "R12",
+        "O03"
+      ],
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "M07": {
+      "lane": "B",
+      "title": "实现前瞻发布前复验与增量更正",
+      "deps": [
+        "M06",
+        "R06",
+        "L02"
+      ],
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "M08": {
+      "lane": "B",
+      "title": "实现赛后综合报道",
+      "deps": [
+        "M06",
+        "R08"
+      ],
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "M10": {
+      "lane": "B",
+      "title": "提供异常证据归因与恢复建议",
+      "deps": [
+        "M04",
+        "E02"
+      ],
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "N07": {
+      "lane": "B",
+      "title": "生成历史污染与误译重处理候选",
+      "deps": [
+        "N02",
+        "N04"
+      ],
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "E04": {
+      "lane": "C",
+      "title": "实现人工修复后自动续跑与字段保护",
+      "deps": [
+        "E03",
+        "L02"
+      ],
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "E05": {
+      "lane": "C",
+      "title": "打通自动完成与技术恢复的后台闭环",
+      "deps": [
+        "E04",
+        "R10",
+        "N06"
+      ],
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "U04": {
+      "lane": "C",
+      "title": "统一缺失失败新鲜度及订阅文案",
+      "deps": [
+        "H07",
+        "L05",
+        "R03"
+      ],
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "O06": {
+      "lane": "R",
+      "title": "发布完整候选并开始七天验收窗口",
+      "deps": [
+        "V03",
+        "O05",
+        "Q02",
+        "H09"
+      ],
+      "deadline_at": "2026-10-23T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "V03": {
+      "lane": "R",
+      "title": "功能冻结与独立集成审核",
+      "deps": [
+        "R13",
+        "M07",
+        "M08",
+        "M09",
+        "M10",
+        "N07",
+        "H09",
+        "L05",
+        "H07",
+        "E05",
+        "U04"
+      ],
+      "deadline_at": "2026-10-23T12:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "H10": {
+      "lane": "A",
+      "title": "完成近期优先目标的正式公开批次",
+      "deps": [
+        "O06",
+        "H09"
+      ],
+      "deadline_at": "2026-10-25T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "R14": {
+      "lane": "A",
+      "title": "修复自然观察暴露的资料时效问题",
+      "deps": [
+        "O06",
+        "R13"
+      ],
+      "deadline_at": "2026-10-25T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "E06": {
+      "lane": "C",
+      "title": "验证后台六条高频路径并修复交互阻碍",
+      "deps": [
+        "O06",
+        "E05"
+      ],
+      "deadline_at": "2026-10-25T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "L06": {
+      "lane": "C",
+      "title": "补齐存量关系并验收跨页导航",
+      "deps": [
+        "O06",
+        "L05",
+        "H09"
+      ],
+      "deadline_at": "2026-10-25T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "O07": {
+      "lane": "R",
+      "title": "验证完整候选回滚与恢复交接",
+      "deps": [
+        "O06",
+        "O04"
+      ],
+      "deadline_at": "2026-10-25T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "H11": {
+      "lane": "A",
+      "title": "完成历史 G1 全参赛马名称检索与采纳批次",
+      "deps": [
+        "H10",
+        "H05"
+      ],
+      "deadline_at": "2026-10-26T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "M11": {
+      "lane": "B",
+      "title": "完成模型质量时延成本对照与参数收敛",
+      "deps": [
+        "O06",
+        "F02",
+        "M08",
+        "M10"
+      ],
+      "deadline_at": "2026-10-26T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "N08": {
+      "lane": "B",
+      "title": "完成污染和误译清单的受控重处理",
+      "deps": [
+        "O06",
+        "N07"
+      ],
+      "deadline_at": "2026-10-26T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "V04": {
+      "lane": "R",
+      "title": "执行真实用户旅程和保留样例验收",
+      "deps": [
+        "O06"
+      ],
+      "deadline_at": "2026-10-26T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "R15": {
+      "lane": "A",
+      "title": "执行断源与积压恢复演练",
+      "deps": [
+        "R14",
+        "H11"
+      ],
+      "deadline_at": "2026-10-27T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "N09": {
+      "lane": "B",
+      "title": "验收五地区周覆盖与重要事件保留",
+      "deps": [
+        "N08",
+        "N06",
+        "O05"
+      ],
+      "deadline_at": "2026-10-27T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "U05": {
+      "lane": "C",
+      "title": "完成域名手机空态与性能复验",
+      "deps": [
+        "L06",
+        "E06",
+        "U04"
+      ],
+      "deadline_at": "2026-10-27T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "V05": {
+      "lane": "R",
+      "title": "固定全量发布候选并独立复审",
+      "deps": [
+        "H11",
+        "R15",
+        "N09",
+        "M11",
+        "L06",
+        "E06",
+        "U05",
+        "O07",
+        "V04"
+      ],
+      "deadline_at": "2026-10-27T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "M12": {
+      "lane": "B",
+      "title": "验证模型降级与最终发布配置",
+      "deps": [
+        "M11",
+        "N09"
+      ],
+      "deadline_at": "2026-10-28T12:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "E07": {
+      "lane": "C",
+      "title": "验收自动完成率与人工干预收益",
+      "deps": [
+        "E06",
+        "U05",
+        "R15"
+      ],
+      "deadline_at": "2026-10-28T12:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "O08": {
+      "lane": "R",
+      "title": "执行全量上线与公开范围核验",
+      "deps": [
+        "V05",
+        "M12",
+        "E07"
+      ],
+      "deadline_at": "2026-10-28T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "R16": {
+      "lane": "A",
+      "title": "复核全量赛事质量与剩余数据缺口",
+      "deps": [
+        "O08",
+        "R15"
+      ],
+      "deadline_at": "2026-10-30T12:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "O09": {
+      "lane": "R",
+      "title": "完成维护交接与长期事项归档",
+      "deps": [
+        "V07"
+      ],
+      "deadline_at": "2026-10-30T20:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "V06": {
+      "lane": "R",
+      "title": "完成全量运行的 48 小时观察",
+      "deps": [
+        "O08"
+      ],
+      "deadline_at": "2026-10-30T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "V07": {
+      "lane": "R",
+      "title": "汇总最终验收及逐任务完成证据",
+      "deps": [
+        "V06",
+        "R16"
+      ],
+      "deadline_at": "2026-10-30T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    }
+  },
+  "dispatches": [],
+  "decisions": [],
+  "questions": []
+}
