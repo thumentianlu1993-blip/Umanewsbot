@@ -21,7 +21,8 @@
       "reasoning_effort": "medium",
       "initial_head": "63b5781e",
       "title": "Umanews 10.30｜A 赛事与资料管线",
-      "model_evidence": "create_thread 显式指定 gpt-6.1-sol 和 medium，创建成功；启动回报已收取"
+      "model_evidence": "create_thread 显式指定 gpt-6.1-sol 和 medium，创建成功；启动回报已收取",
+      "quota_policy_status": "已送达，待确认"
     },
     "B": {
       "thread_id": "01a0fdc6-e1a2-7ae1-9749-6889626d9bf4",
@@ -34,7 +35,8 @@
       "reasoning_effort": "medium",
       "initial_head": "4c9725c9",
       "title": "Umanews 10.30｜B 新闻模型与名称",
-      "model_evidence": "create_thread 显式指定 gpt-6.1-sol 和 medium，创建成功；启动回报已收取"
+      "model_evidence": "create_thread 显式指定 gpt-6.1-sol 和 medium，创建成功；启动回报已收取",
+      "quota_policy_status": "已送达，待确认"
     },
     "C": {
       "thread_id": "01a0fdc7-5154-7e51-aafa-f1b34d8f46f9",
@@ -47,7 +49,8 @@
       "reasoning_effort": "medium",
       "initial_head": "dbcc87a4",
       "title": "Umanews 10.30｜C 页面关联与后台",
-      "model_evidence": "create_thread 显式指定 gpt-6.1-sol 和 medium，创建成功；启动回报已收取"
+      "model_evidence": "create_thread 显式指定 gpt-6.1-sol 和 medium，创建成功；启动回报已收取",
+      "quota_policy_status": "已确认，实时剩余8%，无运行子代理/模型CLI"
     },
     "R": {
       "thread_id": "01a0fdc6-2d8d-7d10-9662-a7b042e56ef0",
@@ -60,7 +63,8 @@
       "reasoning_effort": "medium",
       "initial_head": "d00eaf18",
       "title": "Umanews 10.30｜R 独立审核与验收",
-      "model_evidence": "create_thread 显式指定 gpt-6.1-sol 和 medium，创建成功；启动回报已收取"
+      "model_evidence": "create_thread 显式指定 gpt-6.1-sol 和 medium，创建成功；启动回报已收取",
+      "quota_policy_status": "已送达，待确认"
     }
   },
   "tasks": {
@@ -90,11 +94,13 @@
       "deps": [],
       "deadline_at": "2026-10-04T18:00:00+08:00",
       "status": "进行中",
-      "phase": "规划/只读基线",
-      "commit": null,
+      "phase": "方案审核",
+      "commit": "1c90ee2e4edc79af2ea1ee3fc8a4ae7586d34eba",
       "pr": null,
-      "review": null,
-      "evidence": [],
+      "review": "已送R，排队",
+      "evidence": [
+        "/Users/mentianlu/.codex/worktrees/bc9b/umanews/docs/changes/next-version-capabilities/lanes/C/C-001-handoff.md"
+      ],
       "merged": false,
       "deployed": false,
       "enabled": false,
@@ -145,11 +151,11 @@
       "title": "复验域名与公开缺陷并固定回归样例",
       "deps": [],
       "deadline_at": "2026-10-05T18:00:00+08:00",
-      "status": "已派发",
-      "phase": "规划/只读基线",
-      "commit": null,
+      "status": "进行中",
+      "phase": "证据待复核",
+      "commit": "1c90ee2e4edc79af2ea1ee3fc8a4ae7586d34eba",
       "pr": null,
-      "review": null,
+      "review": "已送R，排队",
       "evidence": [],
       "merged": false,
       "deployed": false,
@@ -2110,6 +2116,28 @@
       "scope": "F02方案",
       "head": "53d29e8da474573ddd86b9d2f277330a305f2a39",
       "status": "R审核中"
+    },
+    {
+      "scope": "F04方案/F05证据",
+      "head": "1c90ee2e4edc79af2ea1ee3fc8a4ae7586d34eba",
+      "status": "已送R，按额度条件排队"
     }
-  ]
+  ],
+  "quota_policy": {
+    "source": "本协调会话用户2026-10-03直接补充",
+    "weekly_window_minutes": 10080,
+    "pause_at_remaining_percent_lte": 1,
+    "active_check_interval_minutes_max": 5,
+    "check_every_tool_batch_at_remaining_percent_lte": 3,
+    "check_before_new_turn_or_spawn_or_model_review": true,
+    "pause_heartbeat_on_threshold": true,
+    "resume_requires_user": true,
+    "allow_credits": false,
+    "allow_reset_credit": false,
+    "last_observed_remaining_percent": 8,
+    "last_observed_used_percent": 92,
+    "last_observed_at": "2026-10-03T02:16:30.172582+08:00",
+    "state": "正常，阈值未触发",
+    "limitation": "调度侧控制；非账单硬上限"
+  }
 }
