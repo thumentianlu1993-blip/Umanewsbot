@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "timezone": "Asia/Shanghai",
-  "updated_at": "2026-10-03T02:53:35.217413+08:00",
+  "updated_at": "2026-10-03T02:55:00.442123+08:00",
   "coordinator_thread_id": "01a0fdb2-b88c-7f93-8c9e-ba9564c33c93",
   "coordinator_worktree": "/Users/mentianlu/.codex/worktrees/516a/umanews",
   "deadline_at": "2026-10-30T18:00:00+08:00",
@@ -16,7 +16,7 @@
       "worktree": "/Users/mentianlu/.codex/worktrees/5482/umanews",
       "branch": "codex/next-version-race-data-20261003",
       "status": "已启动",
-      "last_cursor": "857bc711-5dad-460a-9c00-d1ac5bb0c979:4",
+      "last_cursor": "857bc711-5dad-460a-9c00-d1ac5bb0c979:5",
       "model": "gpt-6.1-sol",
       "reasoning_effort": "medium",
       "initial_head": "63b5781e",
@@ -65,7 +65,7 @@
       "title": "Umanews 10.30｜R 独立审核与验收",
       "model_evidence": "create_thread 显式指定 gpt-6.1-sol 和 medium，创建成功；启动回报已收取",
       "quota_policy_status": "已确认并独立实时复核剩余8%；无运行子代理/模型CLI",
-      "latest_report_commit": "f1eb3b4996a148cc3eead0b0c5497e56e7ccd2b5"
+      "latest_report_commit": "6acff163a1cfcae17d30774c264cbbbbb2a1dc18"
     }
   },
   "tasks": {
@@ -75,10 +75,10 @@
       "deps": [],
       "deadline_at": "2026-10-04T18:00:00+08:00",
       "status": "进行中",
-      "phase": "原R限定复审/Linux full运行中",
+      "phase": "代码复审通过，Linux full运行中",
       "commit": "0e05029c1ed00713a6f66e461e6753c1e4dadb27",
       "pr": null,
-      "review": "两项P2已修，17 host GREEN；已送原R限定复审；Linux仍待证",
+      "review": "APPROVED@0e05029c；A002-P2-01/02 CLOSED；独立17 tests PASS；完整Linux/skip/收据待核",
       "evidence": [
         "/Users/mentianlu/.codex/worktrees/5482/umanews/docs/changes/next-version-capabilities/lanes/A/A-001-report.md"
       ],
@@ -88,7 +88,8 @@
       "public_verified": false,
       "dispatch_id": "A-002",
       "owner_thread_id": "01a0fdc6-8c4e-7ff1-af4b-9db4baff8fb1",
-      "approved_plan_sha": "7c78f67d04cc156520d21916f3eb0a3ef066305e"
+      "approved_plan_sha": "7c78f67d04cc156520d21916f3eb0a3ef066305e",
+      "review_commit": "6acff163a1cfcae17d30774c264cbbbbb2a1dc18"
     },
     "F04": {
       "lane": "C",
@@ -2160,12 +2161,12 @@
       "scope": "F01实现与映射增量复审",
       "base": "7c78f67d04cc156520d21916f3eb0a3ef066305e",
       "head": "0e05029c1ed00713a6f66e461e6753c1e4dadb27",
-      "status": "返修已送原R，含catalog profile增量",
+      "status": "APPROVED，两P2 CLOSED；交付测试证据待核",
       "findings": [
         "A002-P2-01",
         "A002-P2-02"
       ],
-      "report": "/Users/mentianlu/.codex/worktrees/3ab1/umanews/docs/changes/next-version-capabilities/lanes/R/A-002-F01-code-review.md",
+      "report": "/Users/mentianlu/.codex/worktrees/3ab1/umanews/docs/changes/next-version-capabilities/lanes/R/A-002-F01-code-rereview.md",
       "incremental_base": "e9a322102e29573f79735bf0655dee54a4051f88"
     },
     {
@@ -2253,7 +2254,8 @@
         "collection_blocker": null,
         "collection_tests": 6182,
         "collection_batches": 41,
-        "collection_labels": 294
+        "collection_labels": 294,
+        "last_progress": "10/41分片、1507项、0 failure/error、8 skip未完成豁免核对，尚非最终通过"
       },
       "temporary_directory": "每线独立/Users/mentianlu/.codex/runtime目录作为TMPDIR；mac /var/folders未共享",
       "queue": [
