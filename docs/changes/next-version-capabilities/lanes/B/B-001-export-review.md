@@ -151,6 +151,7 @@ T 是实际只读事务 observation 时刻，start 从它派生；不能用今�
 - `funnel_aggregates.json`、`cohort_metadata.jsonl`、`sources.jsonl`、`crawl_jobs.jsonl`、`windows.jsonl`、`decisions.jsonl`、`homepage_exposures.jsonl`：只含 allowlist。
 - `effective_config.json`：allowlist 生产值与取得时间/SHA，未知保持 null；不输出 API key/base URL/token/完整 env。
 - `development/`：B 可消费的经批准开发原文与草标；`holdout_commitment.json`：只含 R 托管计数和摘要。
+- `holdout_access_consumption.jsonl`：由 R 在受控路径维护访问/协议/版本/消费账本；B 只收状态与汇总。M11 之后原文、标签和逐篇输出仍留 R，不解封给 B。
 - 保留原文/标签不放 B 树，R/协调者使用单独访问控制目录；仅“放 R worktree”不是物理访问隔离，默认靠读取约定防上下文泄漏，需更强隔离时由协调者提供受限存储。
 - `manifest.json`：逐文件 SHA256、输入/脱敏摘要、计数、schema与标签版本；原始保留集摘要只由 R 计算并输出承诺。
 
@@ -158,6 +159,10 @@ T 是实际只读事务 observation 时刻，start 从它派生；不能用今�
 所有地区聚合之和必须等于精确 cohort 数；明细超预算时 `complete=false`，不能出完整基线收据。
 检查至少200候选/地区的可用性与真实失败/未公开层；不足按实际值报，类别未知不伪造。
 运行终止或任何检查失败不冻结 fixture、不给 M01 完成证明。当前这份文档只通过本地字段/引用检查，无生产执行证据。
+
+M11 评估接口继承 [采样方案的最终保留集消费合同](B-001-plan.md)：R 在代码/模型/提示词/配置与评分协议冻结后独立执行，B 只收 allowlist 汇总。
+反馈用于进一步调参或逐篇内容泄漏时标 consumed；同集之后只出非独立回归结果，新版本的独立结论必须来自未消费且无事件泄漏的另一个集合。
+此规则不授权新增抓取/真实模型调用；所有内容交接直接进入 R 托管路径，B 不先读全集。
 
 ## 执行命令包草案（仍未执行）
 
