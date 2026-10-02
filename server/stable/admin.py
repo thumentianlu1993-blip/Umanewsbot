@@ -90,6 +90,7 @@ from .services.operations import log_operation
 from .services.race_events import disable_race_event_live_tracking
 from .services.production_windows import update_major_race_boost_window
 from .services.pushing import enqueue_push_for_article
+from .services.onebot import qq_channel_enabled
 from .services.queueing import dispatch_task
 from .tasks import crawl_news_source_task, translate_article_task
 
@@ -873,6 +874,9 @@ class NewsArticleAdmin(admin.ModelAdmin):
 
     def push_view(self, request: HttpRequest, article_id: int):
         article = get_object_or_404(NewsArticle, pk=article_id)
+        if not qq_channel_enabled():
+            self.message_user(request, "QQ渠道已停用，未加入发送队列。", messages.WARNING)
+            return redirect(reverse("admin:stable_newsarticle_change", args=[article.pk]))
         if request.method == "POST":
             form = PushArticleForm(request.POST)
             if form.is_valid():

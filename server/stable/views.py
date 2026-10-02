@@ -139,7 +139,7 @@ from .services.horse_race_records import refresh_career_history_completeness, up
 from .services.media_assets import localize_news_image, set_cover_asset
 from .services.multiregion import PRODUCTION_REGIONS, region_production_rows
 from .services.news_production_integrity import source_health_snapshot
-from .services.onebot import BotPusher
+from .services.onebot import BotPusher, qq_channel_enabled, QQ_CHANNEL_DISABLED
 from .services.operations import log_operation
 from .services.race_calendar import (
     decode_race_calendar_cursor,
@@ -1308,7 +1308,10 @@ def production_window_preview(request: HttpRequest, window_id: int):
     zero_reasons: list[str] = []
     unsupported = window.kind not in {ProductionWindowKind.PUBLISH, ProductionWindowKind.QQ_PUSH}
 
-    if not unsupported:
+    qq_disabled = window.kind == ProductionWindowKind.QQ_PUSH and not qq_channel_enabled()
+    if qq_disabled:
+        zero_reasons = [QQ_CHANNEL_DISABLED]
+    if not unsupported and not qq_disabled:
         with transaction.atomic():
             if window.kind == ProductionWindowKind.PUBLISH:
                 result = select_publish_candidates(window.racing_region, window=window, now=window.window_end)
@@ -1353,6 +1356,9 @@ def production_window_rerun(request: HttpRequest, window_id: int):
     if denied:
         return denied
     window = get_object_or_404(ProductionWindow, pk=window_id)
+    if window.kind == ProductionWindowKind.QQ_PUSH and not qq_channel_enabled():
+        messages.warning(request, "QQ渠道已停用，窗口不会重跑。")
+        return redirect("console-production-window-detail", window_id=window.id)
     if window.kind not in {ProductionWindowKind.PUBLISH, ProductionWindowKind.QQ_PUSH}:
         messages.warning(request, "抓取窗口默认不从这里重跑，避免重新请求外部来源。")
         return redirect("console-production-window-detail", window_id=window.id)
@@ -4531,6 +4537,8 @@ def article_push_api(request: HttpRequest, article_id: int) -> JsonResponse:
     if denied:
         return JsonResponse({"detail": "forbidden"}, status=403)
     article = get_object_or_404(NewsArticle, pk=article_id)
+    if not qq_channel_enabled():
+        return JsonResponse({"queued": False, "reason": QQ_CHANNEL_DISABLED}, status=410)
     payload = json.loads(request.body.decode("utf-8"))
     target_ids = payload.get("target_ids") or []
     targets = list(PushTarget.objects.filter(pk__in=target_ids, is_active=True))

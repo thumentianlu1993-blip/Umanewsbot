@@ -7,6 +7,7 @@ from django.core.mail import send_mail
 from django.utils import timezone
 
 from stable.models import NewsArticle, NotificationChannel, NotificationLog, NotificationStatus, NotificationType
+from stable.services.onebot import qq_channel_enabled, QQ_CHANNEL_DISABLED
 from stable.services.automation import is_high_value_article
 from stable.services.validation import SEVERITY_BLOCKER, SEVERITY_WARNING, warning_signature
 
@@ -63,6 +64,9 @@ def send_automation_notification(notification_type: str, payload: dict, channels
                     )
                     status = NotificationStatus.SENT
                     sent_at = timezone.now()
+            elif channel == NotificationChannel.QQ and not qq_channel_enabled():
+                target = channel
+                error_message = QQ_CHANNEL_DISABLED
             else:
                 target = channel
                 status = NotificationStatus.SKIPPED

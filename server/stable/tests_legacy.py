@@ -19,7 +19,7 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, connection
-from django.test import Client, TestCase, override_settings
+from django.test import Client, TestCase, TransactionTestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
@@ -3932,6 +3932,7 @@ class PublishWindowServiceTests(TestCase):
         self.assertEqual(result["reason"], "multiregion_windows_enabled")
 
 
+@override_settings(QQ_CHANNEL_ENABLED=True)
 class QQWindowServiceTests(TestCase):
     def _target(self, **overrides):
         payload = {
@@ -9458,6 +9459,7 @@ class GlobalRacingImportOutputAuditTests(TestCase):
                 )
 
 
+@override_settings(QQ_CHANNEL_ENABLED=True)
 class PushTests(TestCase):
     def setUp(self):
         self.article = NewsArticle.objects.create(
@@ -9511,6 +9513,7 @@ class PushTests(TestCase):
     CELERY_TASK_EAGER_PROPAGATES=False,
     QQ_PUSH_SCOPE="all_public",
 )
+@override_settings(QQ_CHANNEL_ENABLED=True)
 class QQAutoPushTests(TestCase):
     def setUp(self):
         self.article = NewsArticle.objects.create(
@@ -13709,6 +13712,7 @@ class CrawlAutoTranslateTests(TestCase):
         self.assertEqual(source.last_crawl_message, "新增 0，重复 1")
 
     @override_settings(AUTO_TRANSLATE_ON_INGEST=False, QQ_PUSH_ENABLED=True)
+    @override_settings(QQ_CHANNEL_ENABLED=True)
     def test_source_elevated_public_article_dispatches_qq_auto_push(self):
         sync_builtin_sources()
         source = NewsSource.objects.get(source_site=SourceSite.NETKEIBA, source_mode=SourceMode.ACCESS)
@@ -13811,6 +13815,7 @@ class CrawlAutoTranslateTests(TestCase):
         )
 
     @override_settings(AUTO_TRANSLATE_ON_INGEST=False, QQ_PUSH_ENABLED=True)
+    @override_settings(QQ_CHANNEL_ENABLED=True)
     def test_international_source_elevated_public_article_dispatches_qq_auto_push(self):
         sync_builtin_sources()
         source = NewsSource.objects.get(source_site=SourceSite.SKY_SPORTS_RACING, source_mode=SourceMode.ACCESS)
@@ -19147,19 +19152,15 @@ class QQShutdownTests(TestCase):
         self.post.assert_not_called()
 
     def test_terminal_disabled_blocks_text_image_fallback_and_direct_post(self):
-        from stable.services.onebot import BotPusher
+        from stable.services.onebot import BotPusher, QQChannelDisabled
         pusher = BotPusher()
         for image in (None, 'https://fixture.invalid/image.png'):
             with self.subTest(image=image):
-                try:
+                with self.assertRaises(QQChannelDisabled):
                     pusher.send_group_message('synthetic-group', 'synthetic', image_url=image)
-                except RuntimeError:
-                    pass
                 self.post.assert_not_called()
-        try:
+        with self.assertRaises(QQChannelDisabled):
             pusher._post_message('synthetic-group', [])
-        except RuntimeError:
-            pass
         self.post.assert_not_called()
 
     def test_late_delivery_is_skipped_before_throttle_or_retry(self):
@@ -19183,6 +19184,7 @@ class QQShutdownTests(TestCase):
         self.get.assert_not_called()
 
     def test_direct_manual_service_and_late_task_do_not_change_web_status(self):
+        from stable.models import PushLog
         from stable.services.pushing import enqueue_push_for_article
         from stable.tasks import push_article_task
         before = self.article.status
@@ -19327,3 +19329,143 @@ class QQShutdownTests(TestCase):
         dispatch.assert_not_called()
         self.get.assert_not_called()
         self.post.assert_not_called()
+
+    def test_terminal_shutdown_is_not_manual_failure_or_retry_after_claim(self):
+        from stable.services.onebot import QQChannelDisabled
+        from stable.services.qq_auto_push import process_qq_push_delivery
+        from stable.models import PushLog
+        before = self.article.status
+        with override_settings(QQ_CHANNEL_ENABLED=True), \
+             patch('stable.services.onebot.BotPusher.send_group_message', side_effect=QQChannelDisabled()):
+            self.assertEqual(push_article_to_targets(self.article, [self.target]), [])
+            delivery = QQPushDelivery.objects.create(article=self.article, target=self.target)
+            with patch('stable.services.qq_auto_push.is_public_url_accessible', return_value=(True, '')):
+                result = process_qq_push_delivery(delivery)
+        self.assertEqual(result.status, QQPushDeliveryStatus.SKIPPED)
+        self.assertEqual(result.attempt_count, 0)
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.status, before)
+        self.assertEqual(PushLog.objects.count(), 0)
+
+    def test_disabled_api_keeps_auth_and_missing_object_contract(self):
+        self.client.logout()
+        self.assertEqual(self.client.post(reverse('api-article-push', args=[self.article.pk])).status_code, 302)
+        regular = get_user_model().objects.create_user('qq-ordinary')
+        self.client.force_login(regular)
+        self.assertEqual(self.client.post(reverse('api-article-push', args=[self.article.pk])).status_code, 403)
+        self.client.force_login(self.staff)
+        self.assertEqual(self.client.post(reverse('api-article-push', args=[999999])).status_code, 404)
+        self.post.assert_not_called()
+
+    def test_publish_window_rerun_is_not_disabled_with_qq(self):
+        from types import SimpleNamespace
+        start = timezone.now()
+        window = ProductionWindow.objects.create(kind=ProductionWindowKind.PUBLISH,
+            scope_key='synthetic-publish', racing_region=RacingRegion.JAPAN,
+            window_start=start, window_end=start+timedelta(minutes=15), status=ProductionWindowStatus.SUCCEEDED)
+        with patch('stable.views.select_publish_candidates', return_value=SimpleNamespace(selected=[], zero_reasons=['no_candidates'])) as select:
+            response = self.client.post(reverse('console-production-window-rerun', args=[window.pk]))
+        self.assertEqual(response.status_code, 302)
+        select.assert_called_once()
+        window.refresh_from_db()
+        self.assertEqual(window.rerun_count, 1)
+        self.assertEqual(window.status, ProductionWindowStatus.SUCCEEDED)
+        self.post.assert_not_called()
+
+    def test_channel_permission_requires_boolean_true_and_missing_fails_closed(self):
+        from stable.services.onebot import qq_channel_enabled
+        for value in (False, None, 1, 'true', 'false'):
+            with self.subTest(value=value), override_settings(QQ_CHANNEL_ENABLED=value):
+                self.assertFalse(qq_channel_enabled())
+        with override_settings(QQ_CHANNEL_ENABLED=True):
+            self.assertTrue(qq_channel_enabled())
+        with override_settings() as overrides:
+            del django_settings.QQ_CHANNEL_ENABLED
+            self.assertFalse(qq_channel_enabled())
+
+    def test_enabled_gateway_still_validates_protocol_and_image_fallback(self):
+        from stable.services.onebot import BotPusher, OneBotRequestError
+        with override_settings(QQ_CHANNEL_ENABLED=True):
+            self.post.side_effect = [requests.RequestException('image rejected'), self.post.return_value]
+            self.assertEqual(BotPusher().send_group_message('synthetic', 'body', image_url='https://fixture.invalid/image.png')['status'], 'ok')
+            self.assertEqual(self.post.call_count, 2)
+            self.post.side_effect = None
+            self.post.return_value.json.return_value = {'status': 'failed', 'retcode': 1}
+            with self.assertRaises(OneBotRequestError):
+                BotPusher().send_group_message('synthetic', 'body')
+
+
+@override_settings(QQ_CHANNEL_ENABLED=False)
+class QQShutdownConcurrencyTests(TransactionTestCase):
+    """隔离PG两连接的CAS竞争，宿主SQLite明确跳过而不冒充并发证明。"""
+    def setUp(self):
+        QQAutoPushTests.setUp(self)
+        self.delivery = QQPushDelivery.objects.create(article=self.article, target=self.target,
+            attempt_count=1, request_payload={'historical': True})
+
+    def test_two_workers_disable_same_delivery_without_attempts_or_duplicate_side_effects(self):
+        if connection.vendor != 'postgresql':
+            self.skipTest('PG16 two-connection evidence required')
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Barrier
+        from django.db import connections
+        from stable.services.qq_auto_push import skip_disabled_qq_delivery
+        gate = Barrier(2)
+        def worker():
+            connections.close_all()
+            try:
+                row = QQPushDelivery.objects.get(pk=self.delivery.pk)
+                gate.wait(timeout=10)
+                return skip_disabled_qq_delivery(row).status
+            finally:
+                connections.close_all()
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            futures = [pool.submit(worker) for _ in range(2)]
+            self.assertEqual([f.result(timeout=15) for f in futures], [QQPushDeliveryStatus.SKIPPED]*2)
+        self.delivery.refresh_from_db()
+        self.assertEqual(self.delivery.attempt_count, 1)
+        self.assertEqual(self.delivery.request_payload, {'historical': True})
+
+    def test_sender_commit_wins_over_stale_shutdown_snapshot(self):
+        if connection.vendor != 'postgresql':
+            self.skipTest('PG16 two-connection evidence required')
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Event
+        from django.db import connections, transaction
+        from stable.services.qq_auto_push import skip_disabled_qq_delivery
+        locked, shutdown_started, release = Event(), Event(), Event()
+        def sender():
+            connections.close_all()
+            try:
+                with transaction.atomic():
+                    row = QQPushDelivery.objects.select_for_update().get(pk=self.delivery.pk)
+                    row.status = QQPushDeliveryStatus.SENT
+                    row.message_id = 'synthetic-existing-receipt'
+                    row.sent_at = timezone.now()
+                    row.save(update_fields=['status', 'message_id', 'sent_at'])
+                    locked.set()
+                    if not release.wait(10):
+                        raise RuntimeError('sender barrier timeout')
+            finally:
+                connections.close_all()
+        def shutdown():
+            connections.close_all()
+            try:
+                shutdown_started.set()
+                return skip_disabled_qq_delivery(self.delivery).status
+            finally:
+                connections.close_all()
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            sent = pool.submit(sender)
+            try:
+                self.assertTrue(locked.wait(10))
+                stopped = pool.submit(shutdown)
+                self.assertTrue(shutdown_started.wait(10))
+            finally:
+                release.set()
+            sent.result(timeout=15)
+            self.assertEqual(stopped.result(timeout=15), QQPushDeliveryStatus.SENT)
+        self.delivery.refresh_from_db()
+        self.assertEqual(self.delivery.message_id, 'synthetic-existing-receipt')
+        self.assertIsNotNone(self.delivery.sent_at)
+        self.assertEqual(self.delivery.attempt_count, 1)
