@@ -2495,7 +2495,8 @@
     "scripts/tests/test_f02_readonly_export.py": {
       "label": "scripts.tests.test_f02_readonly_export",
       "domains": [
-        "module:scripts.tests.test_f02_readonly_export"
+        "module:scripts.tests.test_f02_readonly_export",
+        "module:scripts.tests.test_f02_transfer"
       ]
     },
     "scripts/tests/test_f02_transfer.py": {
