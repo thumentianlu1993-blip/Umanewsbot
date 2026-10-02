@@ -48,3 +48,11 @@ P2-02已获真实RED：合法内容路径receipt缺来源摘要，9组反例仍�
 P2-03已获契约RED：proposal缺python profile返回None；补profile提案后GREEN。实际shared rules/catalog仍未改。
 返修后局部回归21/21 PASS，约0.86秒；新离线plan已生成，仍未连接数据库。命令包已绑定新script/test摘要和--source-metadata-dir，真实生产槽位仍待核验。
 原R限定复审仍待，不自称findings关闭；无新真实样本/PG/Linux正式收据。最近实时周剩余6%，无子代理/模型CLI。
+
+## O01 输出路径适配（方案阶段）
+
+协调者已实核resident web没有通用F02持久挂载，只有horse_profile_completion挂载。本线未再次探测生产。协调者另核psycopg可用、五项POSTGRES键存在、uid0和/tmp可写；DB二进制16.14，仍未执行DB查询。
+已写 [容器临时目录与宿主artifact转存方案](B-002-transfer-plan.md)，标记旧持久挂载模板失效；不改Compose/挂载/服务或借用horse目录。
+建议容器producer包经精确ID的docker cp转到私有host stage，独立核manifest/文件/hash/bounds后原子提交final及transfer receipt，再直接交R。
+未转存、unknown、持久host verified、source lost、R收包分别记状态；先核实际结果，不盲重采。wrapper/verifier尚未实现，不把方案称为执行证据。
+本次仅文档适配，三P2修复脚本字节仍与910353a5一致；待原R同上下文核对。

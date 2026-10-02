@@ -1,6 +1,7 @@
 # B-002 固定导出脚本与命令包（待技术核对）
 
 本地实现日期：2026-10-03，Asia/Shanghai。生产执行状态：未执行。
+> O01新增时点证据确认web没有通用F02持久runtime挂载。下文 `/app/runtime/next_version/F02` 挂载假设与argv已失效，不得执行；新的可审替代方案见 [容器临时目录与宿主转存](B-002-transfer-plan.md)。脚本三P2返修与传输适配都待原R技术核对。
 源脚本 `scripts/f02_readonly_export.py`，SHA256 `fcdb8e6a130b3c98dd0ab500df6328e42d8ac817d3475a18cbdc46f79be997a5`。
 测试 `scripts/tests/test_f02_readonly_export.py`，SHA256 `5e50b3c6e251ef1b8c02581f1d9baf60ded2afb4982ef9037543d54cc1954ece`。
 提交 SHA 由阶段消息绑定；执行者从该固定 Git 对象提取脚本，禁止使用随合并变化的 checkout 文件。
@@ -18,7 +19,7 @@
 
 - DELIVERY_HEAD：本阶段固定提交；SCRIPT_SHA256：上述摘要；EXPECTED_RELEASE_SHA：resident marker 与镜像标签一致的完整 40 位 SHA。
 - WEB_ID：docker ps/inspect 实时核对的唯一 resident web 完整容器 ID，IMAGE_ID：只读 inspect 的实际镜像 ID。
-- SCRIPT_PATH：同一个已核对的 runtime 挂载内脚本绝对路径，内容与固定脚本SHA一致；OUTPUT_ROOT 固定为该容器 `/app/runtime/next_version/F02`。
+- SCRIPT_PATH/OUTPUT_ROOT：旧持久挂载假设已失效；应按新转存方案绑定独立容器临时目录及宿主artifact路径，内容与固定脚本SHA一致。
 - OBSERVATION_ID：新的元数据 observation，例如 `F02-20261003-metadata-01`，不得覆盖旧包；内容包另用新 ID。
 - 执行用户、目录权限与 R 托管路径；已有 POSTGRES_HOST/PORT/DB/USER/PASSWORD 必须明确存在，脚本不加载 .env、不猜密码、不输出环境。
 - content 模式另绑定由 R 交接的 selection 文件路径/文件 SHA与实际来源metadata目录、source_metadata_manifest_sha256、source_schema_sha256、release SHA、最多150个明确ID/input SHA/updated_at。实际目录必须为OUTPUT_ROOT下source_observation_id对应完整包，不能只给一个合法形状摘要。
