@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "timezone": "Asia/Shanghai",
-  "updated_at": "2026-10-03T03:20:42.196658+08:00",
+  "updated_at": "2026-10-03T03:24:13.676900+08:00",
   "coordinator_thread_id": "01a0fdb2-b88c-7f93-8c9e-ba9564c33c93",
   "coordinator_worktree": "/Users/mentianlu/.codex/worktrees/516a/umanews",
   "deadline_at": "2026-10-30T18:00:00+08:00",
@@ -65,7 +65,7 @@
       "title": "Umanews 10.30｜R 独立审核与验收",
       "model_evidence": "create_thread 显式指定 gpt-6.1-sol 和 medium，创建成功；启动回报已收取",
       "quota_policy_status": "已确认并独立实时复核剩余8%；无运行子代理/模型CLI",
-      "latest_report_commit": "6acff163a1cfcae17d30774c264cbbbbb2a1dc18"
+      "latest_report_commit": "5ee68b5c5b63c5c1e2d6eec6e38ad7a9204ef05d"
     }
   },
   "tasks": {
@@ -155,10 +155,10 @@
       "deps": [],
       "deadline_at": "2026-10-05T18:00:00+08:00",
       "status": "进行中",
-      "phase": "三P2实现及输出转存方案已送原R",
+      "phase": "导出器三P2复审通过，转存wrapper测试先行实现",
       "commit": "15b293ce6cc70a717eafee25c9e4120c9280b58f",
       "pr": null,
-      "review": "原R在C后复审；21 offline GREEN；wrapper/verifier尚未实现；生产模板不得执行",
+      "review": "APPROVED@15b293ce，三P2 CLOSED；转存方案APPROVED，待wrapper/verifier实现、正式Linux与有界现场取样",
       "evidence": [
         "/Users/mentianlu/.codex/worktrees/a14d/umanews/docs/changes/next-version-capabilities/lanes/B/B-001-status.md"
       ],
@@ -166,7 +166,7 @@
       "deployed": false,
       "enabled": false,
       "public_verified": false,
-      "dispatch_id": "B-002",
+      "dispatch_id": "B-003",
       "owner_thread_id": "01a0fdc6-e1a2-7ae1-9749-6889626d9bf4"
     },
     "F05": {
@@ -232,8 +232,8 @@
         "F01"
       ],
       "deadline_at": "2026-10-06T18:00:00+08:00",
-      "status": "未开始",
-      "phase": "待派发",
+      "status": "进行中",
+      "phase": "方案与mock测试设计",
       "commit": null,
       "pr": null,
       "review": null,
@@ -241,7 +241,10 @@
       "merged": false,
       "deployed": false,
       "enabled": false,
-      "public_verified": false
+      "public_verified": false,
+      "dispatch_id": "C-004",
+      "owner_thread_id": "01a0fdc7-5154-7e51-aafa-f1b34d8f46f9",
+      "dependency_input_sha": "0e05029c1ed00713a6f66e461e6753c1e4dadb27"
     },
     "F06": {
       "lane": "R",
@@ -386,8 +389,8 @@
       ],
       "deadline_at": "2026-10-08T18:00:00+08:00",
       "status": "进行中",
-      "phase": "正式main基线选测已生成，短PG诊断运行中",
-      "commit": "4c11df4ba9899efb64d544e14246eabd13dfb1c8",
+      "phase": "代码复审/PG短验证完成，待正式集成full",
+      "commit": "03e5afbbfd2f31cef19285de3f0758a8d6134602",
       "pr": null,
       "review": "APPROVED@2b9398f7，C003-P2-01 CLOSED；PG/目标能力/正式impact及Linux交付待证",
       "evidence": [
@@ -400,7 +403,23 @@
       "dispatch_id": "C-003",
       "owner_thread_id": "01a0fdc7-5154-7e51-aafa-f1b34d8f46f9",
       "approved_plan_sha": "2919dd3558950466e18a8886ec8bc7f85a119f5a",
-      "red_commit": "5c66088d821c249e41141dd5f8ba062c3edaf210"
+      "red_commit": "5c66088d821c249e41141dd5f8ba062c3edaf210",
+      "development_validation": {
+        "head": "4c11df4ba9899efb64d544e14246eabd13dfb1c8",
+        "tests": 39,
+        "cases": 198,
+        "failures": 0,
+        "errors": 0,
+        "skips": 0,
+        "postgres": "16.15 Ubuntu aarch64",
+        "python": "3.12.3",
+        "django": "5.2.1",
+        "capabilities": "UTF8/normalize/und-x-icu实际assertTrue",
+        "receipt": "/Users/mentianlu/.codex/runtime/c003-impact-evidence/green-4c11/batch-000.json",
+        "receipt_sha256": "8db64b35964cdd8fa15d90ebb42ef11b6b29e3db3b50c23a412527f5ec0e7834",
+        "formal_delivery_receipt": false,
+        "production_capabilities_verified": false
+      }
     },
     "H02": {
       "lane": "A",
@@ -2137,6 +2156,26 @@
       "scope": "受测F01合同上的方案与既有来源只读矩阵，送审冻结期间树外准备",
       "status": "已送达",
       "sent_at": "2026-10-03T03:20:42.196658+08:00"
+    },
+    {
+      "id": "B-003",
+      "lane": "B",
+      "task_ids": [
+        "F02"
+      ],
+      "scope": "受审转存方案的本地wrapper/verifier及fake故障RED/GREEN",
+      "status": "已送达",
+      "sent_at": "2026-10-03T03:24:13.676900+08:00"
+    },
+    {
+      "id": "C-004",
+      "lane": "C",
+      "task_ids": [
+        "Q01"
+      ],
+      "scope": "QQ全发送路径关闭与网页解耦的方案和mock测试设计",
+      "status": "已送达",
+      "sent_at": "2026-10-03T03:24:13.676900+08:00"
     }
   ],
   "decisions": [
@@ -2207,14 +2246,14 @@
       "scope": "F02导出器/命令/映射proposal代码技术审核",
       "base": "a2704b2d7ef93a6ee8518fca2f63ada4a43c2b64",
       "head": "15b293ce6cc70a717eafee25c9e4120c9280b58f",
-      "status": "已送原R：910三P2修复+15b纯转存方案；等待C后审核",
+      "status": "APPROVED，三P2 CLOSED；转存方案APPROVED，待B-003实现",
       "script_sha256": "fcdb8e6a130b3c98dd0ab500df6328e42d8ac817d3475a18cbdc46f79be997a5",
       "findings": [
         "B002-P2-01",
         "B002-P2-02",
         "B002-P2-03"
       ],
-      "report": "/Users/mentianlu/.codex/worktrees/3ab1/umanews/docs/changes/next-version-capabilities/lanes/R/B-002-F02-code-review.md"
+      "report": "/Users/mentianlu/.codex/worktrees/3ab1/umanews/docs/changes/next-version-capabilities/lanes/R/B-002-F02-code-rereview.md"
     },
     {
       "scope": "U01行为实现代码review",
@@ -2253,12 +2292,12 @@
     "unknown_usage_policy": "3次有界重试，仍未知暂缓新增耗时模型工作；读数恢复>1自动解除未知保护"
   },
   "next_actions": [
-    "每轮首先核周额度，<=1停止全部本版会话及heartbeat；普通异常有界恢复",
-    "收A固定0e完整Linux/skip/收据，释放C短PG资源；真实PR基线映射补齐前不解锁交付",
-    "收C原R固定a8d代码审核和PG等价；正式影响计划未知路径保持阻断",
-    "B三P2+runtime输出转存适配合包后回同R复审，旧生产模板不执行",
-    "root组织继承文档及B/C精确映射，保留策略/真实base，按现行规则补必要验证",
-    "O01尚需实际锁/intent/DB租约/队列与资源预算；F06待来源/分母输入"
+    "每轮首先核额度，<=1停止全部本版会话及heartbeat",
+    "收A最后两路径映射固定补丁送原R；A-003只读F03矩阵准备",
+    "收B-003 wrapper/verifier固定实现送原R；来源样本仍0，不执行旧模板",
+    "收C-004 Q01方案给原R，U01固定03e5交协调集成",
+    "准备真实main上的首批固定集成候选（F01/U01/F02基础），应用所有行为映射并按现行规则正式full；不盲逐线重复",
+    "O01补锁/intent/DB租约/队列/实际PG能力与预算；F06等待来源和分母"
   ],
   "resilience_policy": {
     "source": "用户2026-10-03明确要求临时异常快速恢复，不能因一次报错暂停",
@@ -2277,7 +2316,7 @@
   "resources": {
     "local_linux_tests": {
       "profile": "umanews-impact-ci",
-      "status": "A无在途批次，C短PG窗口已分配",
+      "status": "C短PG完成并释放，无分配中长任务；等待固定集成候选正式full",
       "cpu": 2,
       "memory_gib": 4,
       "disk_gib": 20,
@@ -2295,20 +2334,7 @@
       ],
       "verification_limit": "daemon与缓存可用；不是候选测试通过证据",
       "runner_connection": "A专用DOCKER_CONFIG/context仅绑定本地socket，原verify_local_docker已PASS；各线使用独立配置目录，不覆盖全局context",
-      "current_allocation": {
-        "lane": "C",
-        "head": "4c11df4ba9899efb64d544e14246eabd13dfb1c8",
-        "scope": "短RED与PG16等价诊断，非正式full交付",
-        "parallel_batches": 1,
-        "status": "Linux原RED有效失败，39项PG GREEN一批运行；不自动full",
-        "formal_plan": {
-          "base": "907f8de699b31a6fcc80acc78e9ba070aadc4f28",
-          "mode": "full",
-          "domains": 246,
-          "labels": 293,
-          "digest": "8745a9fd93504ace9d34f99f0723f4f551a1f0d7250c10eedd24dc6096069e2d"
-        }
-      },
+      "current_allocation": null,
       "temporary_directory": "每线独立/Users/mentianlu/.codex/runtime目录作为TMPDIR；mac /var/folders未共享",
       "queue": [
         {
@@ -2330,12 +2356,26 @@
         "collection_batches": 41,
         "collection_labels": 294,
         "last_progress": "40/41分片完成，完整集合/skip/收尾/候选外收据待A提交"
+      },
+      "previous_c_allocation": {
+        "lane": "C",
+        "head": "4c11df4ba9899efb64d544e14246eabd13dfb1c8",
+        "scope": "短RED与PG16等价诊断，非正式full交付",
+        "parallel_batches": 1,
+        "status": "Linux原RED有效失败，39项PG GREEN一批运行；不自动full",
+        "formal_plan": {
+          "base": "907f8de699b31a6fcc80acc78e9ba070aadc4f28",
+          "mode": "full",
+          "domains": 246,
+          "labels": 293,
+          "digest": "8745a9fd93504ace9d34f99f0723f4f551a1f0d7250c10eedd24dc6096069e2d"
+        }
       }
     },
     "test_mapping": {
       "decision": "F01需显式映射；mapping变更按现行规则运行固定候选一套full，不改策略规避",
       "owner": "A，R审核",
-      "B": "proposal固定于48c51fb1 lanes/B/B-002-test-mapping-proposal.json，待A增量稳定后衔接；未覆盖共享配置",
+      "B": "B-003提交完整proposal后由root统一应用；B-002-test-mapping-proposal.json是真实测试fixture，必须行为domain。新wrapper/test/profile需覆盖。",
       "shared_blocker": "九静态路径、U01 fixture与两view函数已精确补齐；A先完成旧0e在途，再消费控制生成真实base计划，不自动重复full",
       "shared_control_sha": "c9c798ac6190c1ad3f6ed8abb804b453641bc507",
       "shared_control_review": "APPROVED，R独立30tests与边界验证PASS；真实main计划和full仍待",
