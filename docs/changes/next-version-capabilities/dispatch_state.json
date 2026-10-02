@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "timezone": "Asia/Shanghai",
-  "updated_at": "2026-10-03T02:05:20.092968+08:00",
+  "updated_at": "2026-10-03T02:18:40.623603+08:00",
   "coordinator_thread_id": "01a0fdb2-b88c-7f93-8c9e-ba9564c33c93",
   "coordinator_worktree": "/Users/mentianlu/.codex/worktrees/516a/umanews",
   "deadline_at": "2026-10-30T18:00:00+08:00",
@@ -16,13 +16,13 @@
       "worktree": "/Users/mentianlu/.codex/worktrees/5482/umanews",
       "branch": "codex/next-version-race-data-20261003",
       "status": "已启动",
-      "last_cursor": "857bc711-5dad-460a-9c00-d1ac5bb0c979:1",
+      "last_cursor": "857bc711-5dad-460a-9c00-d1ac5bb0c979:2",
       "model": "gpt-6.1-sol",
       "reasoning_effort": "medium",
       "initial_head": "63b5781e",
       "title": "Umanews 10.30｜A 赛事与资料管线",
       "model_evidence": "create_thread 显式指定 gpt-6.1-sol 和 medium，创建成功；启动回报已收取",
-      "quota_policy_status": "已送达，待确认"
+      "quota_policy_status": "已确认并独立实时复核剩余8%；无运行子代理/模型CLI"
     },
     "B": {
       "thread_id": "01a0fdc6-e1a2-7ae1-9749-6889626d9bf4",
@@ -30,13 +30,13 @@
       "worktree": "/Users/mentianlu/.codex/worktrees/a14d/umanews",
       "branch": "codex/next-version-news-ai-20261003",
       "status": "已启动",
-      "last_cursor": "b39a81c2-6866-44bf-8df1-a536e3d41532:1",
+      "last_cursor": "b39a81c2-6866-44bf-8df1-a536e3d41532:2",
       "model": "gpt-6.1-sol",
       "reasoning_effort": "medium",
       "initial_head": "4c9725c9",
       "title": "Umanews 10.30｜B 新闻模型与名称",
       "model_evidence": "create_thread 显式指定 gpt-6.1-sol 和 medium，创建成功；启动回报已收取",
-      "quota_policy_status": "已送达，待确认"
+      "quota_policy_status": "已确认并独立实时复核剩余8%；无运行子代理/模型CLI"
     },
     "C": {
       "thread_id": "01a0fdc7-5154-7e51-aafa-f1b34d8f46f9",
@@ -50,7 +50,7 @@
       "initial_head": "dbcc87a4",
       "title": "Umanews 10.30｜C 页面关联与后台",
       "model_evidence": "create_thread 显式指定 gpt-6.1-sol 和 medium，创建成功；启动回报已收取",
-      "quota_policy_status": "已确认，实时剩余8%，无运行子代理/模型CLI"
+      "quota_policy_status": "已确认并独立实时复核剩余8%；无运行子代理/模型CLI"
     },
     "R": {
       "thread_id": "01a0fdc6-2d8d-7d10-9662-a7b042e56ef0",
@@ -64,7 +64,8 @@
       "initial_head": "d00eaf18",
       "title": "Umanews 10.30｜R 独立审核与验收",
       "model_evidence": "create_thread 显式指定 gpt-6.1-sol 和 medium，创建成功；启动回报已收取",
-      "quota_policy_status": "已送达，待确认"
+      "quota_policy_status": "已确认并独立实时复核剩余8%；无运行子代理/模型CLI",
+      "latest_report_commit": "daf142397e6b6dcfb2fb4eac1365c58580125831"
     }
   },
   "tasks": {
@@ -132,10 +133,10 @@
       "deps": [],
       "deadline_at": "2026-10-05T18:00:00+08:00",
       "status": "进行中",
-      "phase": "方案审核",
-      "commit": "53d29e8da474573ddd86b9d2f277330a305f2a39",
+      "phase": "方案返修",
+      "commit": "fcf8a31e605c2a5d8837121c3b77f5b0120dd3be",
       "pr": null,
-      "review": "已送R，排队",
+      "review": "F02-M-01 holdout消费/调参隔离待返修；导出方案待合并复审",
       "evidence": [
         "/Users/mentianlu/.codex/worktrees/a14d/umanews/docs/changes/next-version-capabilities/lanes/B/B-001-status.md"
       ],
@@ -2066,7 +2067,8 @@
       "reason": "原O05至N09仅144小时；R16早于最后观察窗口，报告证据不闭合。",
       "changes": "O05 10/20 12:00；N09 10/27 14:00；O06 10/23 16:00；O08 10/28 16:00；R16 10/30 16:30；V06 17:00；V07 18:00。",
       "reviewed_head": "7df6e38f11c150b8be5b7069fc41ca04fef52d95",
-      "review_report": "/Users/mentianlu/.codex/worktrees/3ab1/umanews/docs/changes/next-version-capabilities/lanes/R/R-BOOT-001-plan-rereview.md"
+      "review_report": "/Users/mentianlu/.codex/worktrees/3ab1/umanews/docs/changes/next-version-capabilities/lanes/R/R-BOOT-001-plan-rereview.md",
+      "review_report_commit": "daf142397e6b6dcfb2fb4eac1365c58580125831"
     },
     {
       "id": "D-002",
@@ -2109,18 +2111,17 @@
   "planning_commit": "d0cec076019f35b6f7db56b09ebee291e57fd9f9",
   "review_queue": [
     {
+      "scope": "F04方案/F05证据",
+      "head": "1c90ee2e4edc79af2ea1ee3fc8a4ae7586d34eba",
+      "status": "已送R，可立即审核"
+    },
+    {
       "scope": "F01限定复审",
       "status": "等A返修固定SHA"
     },
     {
-      "scope": "F02方案",
-      "head": "53d29e8da474573ddd86b9d2f277330a305f2a39",
-      "status": "R审核中"
-    },
-    {
-      "scope": "F04方案/F05证据",
-      "head": "1c90ee2e4edc79af2ea1ee3fc8a4ae7586d34eba",
-      "status": "已送R，按额度条件排队"
+      "scope": "F02限定复审及有界导出方案",
+      "status": "等B返修固定SHA"
     }
   ],
   "quota_policy": {
@@ -2139,5 +2140,13 @@
     "last_observed_at": "2026-10-03T02:16:30.172582+08:00",
     "state": "正常，阈值未触发",
     "limitation": "调度侧控制；非账单硬上限"
-  }
+  },
+  "next_actions": [
+    "每轮首先核验周额度，<=1立即停各线再停heartbeat和自身",
+    "收A/B技术返修固定SHA并送原R复审",
+    "收C方案/证据审核结论后在既有范围派单",
+    "审核F02精确只读导出包并交R托管holdout；当前尚未取得生产DB快照",
+    "F01共享合同及实现证据就绪后解锁F03/H01/M01/Q01，未完成依赖不得跳过",
+    "O01核对实际生产release lock/长任务/暂停批次；当前只读docker ps可用不等于该核对完成"
+  ]
 }
