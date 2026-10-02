@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "timezone": "Asia/Shanghai",
-  "updated_at": "2026-10-03T02:49:20.529875+08:00",
+  "updated_at": "2026-10-03T02:52:54.582406+08:00",
   "coordinator_thread_id": "01a0fdb2-b88c-7f93-8c9e-ba9564c33c93",
   "coordinator_worktree": "/Users/mentianlu/.codex/worktrees/516a/umanews",
   "deadline_at": "2026-10-30T18:00:00+08:00",
@@ -363,10 +363,10 @@
       ],
       "deadline_at": "2026-10-08T18:00:00+08:00",
       "status": "进行中",
-      "phase": "真实RED已取得，行为实现中",
+      "phase": "本地最小GREEN，固定候选与PG等价待证",
       "commit": "2919dd3558950466e18a8886ec8bc7f85a119f5a",
       "pr": null,
-      "review": "方案APPROVED；最小宿主SQLite RED两flag均失败；PG等价与代码review待完成",
+      "review": "方案APPROVED；宿主最小GREEN；PG NFKC/und-x-icu及目标环境能力待证，候选代码review待送",
       "evidence": [],
       "merged": false,
       "deployed": false,
@@ -374,7 +374,8 @@
       "public_verified": false,
       "dispatch_id": "C-003",
       "owner_thread_id": "01a0fdc7-5154-7e51-aafa-f1b34d8f46f9",
-      "approved_plan_sha": "2919dd3558950466e18a8886ec8bc7f85a119f5a"
+      "approved_plan_sha": "2919dd3558950466e18a8886ec8bc7f85a119f5a",
+      "red_commit": "5c66088d821c249e41141dd5f8ba062c3edaf210"
     },
     "H02": {
       "lane": "A",
@@ -2248,7 +2249,22 @@
         "collection_batches": 41,
         "collection_labels": 294
       },
-      "temporary_directory": "每线独立/Users/mentianlu/.codex/runtime目录作为TMPDIR；mac /var/folders未共享"
+      "temporary_directory": "每线独立/Users/mentianlu/.codex/runtime目录作为TMPDIR；mac /var/folders未共享",
+      "queue": [
+        {
+          "lane": "C",
+          "scope": "短RED及PG16语法/Unicode/来源上下文/分页前一致性集合",
+          "red_commit": "5c66088d821c249e41141dd5f8ba062c3edaf210",
+          "candidate_sha": null,
+          "status": "A窗口完成后优先，先固定候选与影响计划"
+        },
+        {
+          "lane": "B",
+          "scope": "F02新路径映射后的必要交付测试",
+          "candidate_sha": "48c51fb19f328eb9add14dd5fca40d4ceffaae63",
+          "status": "待R技术审核与映射衔接后安排"
+        }
+      ]
     },
     "test_mapping": {
       "decision": "F01需显式映射；mapping变更按现行规则运行固定候选一套full，不改策略规避",
