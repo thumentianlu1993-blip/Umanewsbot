@@ -69,7 +69,7 @@ from stable.services.news_attribution import apply_article_attribution
 from stable.services.notifications import send_automation_notification, send_high_value_warning_notification
 from stable.services.operations import log_operation
 from stable.services.ops_notifications import send_ops_notification, send_production_summary_notification
-from stable.services.onebot import BotPusher
+from stable.services.onebot import BotPusher, qq_channel_enabled, QQ_CHANNEL_DISABLED
 from stable.services.production_windows import (
     active_major_race_window,
     claim_window,
@@ -1356,7 +1356,7 @@ def _discover_terms_after_ingest(article: NewsArticle) -> dict | None:
 
 
 def _qq_push_after_source_elevation(article: NewsArticle, *, source_elevated: bool) -> dict | None:
-    if not source_elevated or not getattr(settings, "QQ_PUSH_ENABLED", False) or not is_article_public(article):
+    if not source_elevated or not qq_channel_enabled() or not getattr(settings, "QQ_PUSH_ENABLED", False) or not is_article_public(article):
         return None
     try:
         return dispatch_task(qq_auto_push_article_task, article.id)
@@ -2554,6 +2554,9 @@ def batch_translate_articles_task(article_ids: list[int] | None = None, limit: i
 @shared_task
 def push_article_task(article_id: int, target_ids: list[int], user_id: int | None = None) -> dict:
     log = _log_start("push_article", {"article_id": article_id, "target_ids": target_ids})
+    if not qq_channel_enabled():
+        _log_success(log, QQ_CHANNEL_DISABLED)
+        return {"article_id": article_id, "skipped": True, "reason": QQ_CHANNEL_DISABLED}
     try:
         article = NewsArticle.objects.get(pk=article_id)
         targets = list(PushTarget.objects.filter(pk__in=target_ids, is_active=True))
@@ -2569,6 +2572,9 @@ def push_article_task(article_id: int, target_ids: list[int], user_id: int | Non
 @shared_task
 def qq_region_window_task(region: str, now_iso: str | None = None) -> dict:
     log = _log_start("qq_region_window", {"region": region, "now_iso": now_iso})
+    if not qq_channel_enabled():
+        _log_success(log, QQ_CHANNEL_DISABLED)
+        return {"skipped": True, "reason": QQ_CHANNEL_DISABLED, "delivery_ids": []}
     if (
         not getattr(settings, "MULTIREGION_PRODUCTION_WINDOWS_ENABLED", False)
         or not getattr(settings, "MULTIREGION_PRODUCTION_WINDOWS_QQ_ENABLED", False)
@@ -2718,6 +2724,9 @@ def qq_region_window_task(region: str, now_iso: str | None = None) -> dict:
 @shared_task
 def qq_production_regions_window_task(now_iso: str | None = None) -> dict:
     log = _log_start("qq_production_regions_window", {"now_iso": now_iso})
+    if not qq_channel_enabled():
+        _log_success(log, QQ_CHANNEL_DISABLED)
+        return {"skipped": True, "reason": QQ_CHANNEL_DISABLED, "delivery_ids": []}
     if (
         not getattr(settings, "MULTIREGION_PRODUCTION_WINDOWS_ENABLED", False)
         or not getattr(settings, "MULTIREGION_PRODUCTION_WINDOWS_QQ_ENABLED", False)
@@ -2788,6 +2797,9 @@ def _qq_push_retry_countdown(attempt_count: int) -> int:
 @shared_task
 def qq_auto_push_article_task(article_id: int) -> dict:
     log = _log_start("qq_auto_push_article", {"article_id": article_id})
+    if not qq_channel_enabled():
+        _log_success(log, QQ_CHANNEL_DISABLED)
+        return {"skipped": True, "reason": QQ_CHANNEL_DISABLED, "delivery_ids": []}
     if not getattr(settings, "QQ_PUSH_ENABLED", False):
         _log_success(log, "qq push disabled")
         return {"article_id": article_id, "skipped": True, "reason": "disabled"}
@@ -2882,6 +2894,15 @@ def qq_push_delivery_task(self, delivery_id: int) -> dict:
     log = _log_start("qq_push_delivery", {"delivery_id": delivery_id})
     try:
         delivery = QQPushDelivery.objects.select_related("article", "target").get(pk=delivery_id)
+        from stable.services.qq_auto_push import skip_disabled_qq_delivery, is_disabled_qq_delivery
+        if not qq_channel_enabled() or is_disabled_qq_delivery(delivery):
+            if not qq_channel_enabled():
+                delivery = skip_disabled_qq_delivery(delivery)
+            _log_success(log, QQ_CHANNEL_DISABLED)
+            return {"delivery_id": delivery.id, "status": delivery.status,
+                    "attempt_count": delivery.attempt_count, "skipped": True,
+                    "reason": QQ_CHANNEL_DISABLED,
+                    "in_flight": delivery.status == QQPushDeliveryStatus.SENDING}
         throttle_delay = qq_push_next_attempt_delay(delivery)
         if throttle_delay > 0 and not getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False):
             self.apply_async(args=(delivery_id,), countdown=throttle_delay)

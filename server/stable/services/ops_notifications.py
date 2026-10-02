@@ -8,7 +8,7 @@ from django.core.mail import send_mail
 from django.utils import timezone
 
 from stable.models import NotificationChannel, NotificationLog, NotificationStatus, NotificationType
-from stable.services.onebot import BotPusher
+from stable.services.onebot import BotPusher, qq_channel_enabled, QQChannelDisabled, QQ_CHANNEL_DISABLED
 
 
 def send_ops_notification(*, notification_type: str, title: str, payload: dict) -> list[NotificationLog]:
@@ -39,9 +39,14 @@ def send_ops_notification(*, notification_type: str, title: str, payload: dict) 
             payload_summary=summary,
         )
         try:
+            if not qq_channel_enabled():
+                raise QQChannelDisabled()
             BotPusher().send_group_message(qq_group_id, f"{title}\n{summary}")
             log.status = NotificationStatus.SENT
             log.sent_at = timezone.now()
+        except QQChannelDisabled:
+            log.status = NotificationStatus.SKIPPED
+            log.error_message = QQ_CHANNEL_DISABLED
         except Exception as exc:
             log.status = NotificationStatus.FAILED
             log.error_message = str(exc)[:2000]
