@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "timezone": "Asia/Shanghai",
-  "updated_at": "2026-10-03T02:58:26.655114+08:00",
+  "updated_at": "2026-10-03T03:04:08.628751+08:00",
   "coordinator_thread_id": "01a0fdb2-b88c-7f93-8c9e-ba9564c33c93",
   "coordinator_worktree": "/Users/mentianlu/.codex/worktrees/516a/umanews",
   "deadline_at": "2026-10-30T18:00:00+08:00",
@@ -135,10 +135,10 @@
       "deps": [],
       "deadline_at": "2026-10-05T18:00:00+08:00",
       "status": "进行中",
-      "phase": "代码review三项P2返修",
-      "commit": "48c51fb19f328eb9add14dd5fca40d4ceffaae63",
+      "phase": "三P2修复完成，追加真实runtime适配包后原R复审",
+      "commit": "910353a51685310c5dc6bcf7ea8ca3d3c1a18880",
       "pr": null,
-      "review": "REVISE@48c51fb1：reason allowlist、实际来源包/selection归属绑定、catalog profile；已转B，17 fake GREEN不替代PG/live",
+      "review": "21 offline GREEN；原R尚未关闭finding；通用runtime挂载不存在，禁止执行旧模板",
       "evidence": [
         "/Users/mentianlu/.codex/worktrees/a14d/umanews/docs/changes/next-version-capabilities/lanes/B/B-001-status.md"
       ],
@@ -253,11 +253,13 @@
       ],
       "deadline_at": "2026-10-06T18:00:00+08:00",
       "status": "进行中",
-      "phase": "规划/收集输入",
+      "phase": "运行拓扑/默认锁/进程只读预查已得，资源互斥仍待核",
       "commit": null,
       "pr": null,
       "review": null,
-      "evidence": [],
+      "evidence": [
+        "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/O01-runtime-readonly-20261003.md"
+      ],
       "merged": false,
       "deployed": false,
       "enabled": false,
@@ -365,9 +367,9 @@
       "deadline_at": "2026-10-08T18:00:00+08:00",
       "status": "进行中",
       "phase": "固定候选代码review/PG验证排队",
-      "commit": "3ac1e3a750e68bafe7950fa726481a02ecccfad6",
+      "commit": "a8d07e6c76ca9495b9b4d701d6c15ed55ef1f9f2",
       "pr": null,
-      "review": "已送原R；198输入、37宿主SQLite PASS；PG/Linux/目标能力未证",
+      "review": "原R审3ac行为对象并核a8d纯文档增量；候选树已冻结；正式映射及PG/Linux待证",
       "evidence": [
         "/Users/mentianlu/.codex/worktrees/bc9b/umanews/docs/changes/next-version-capabilities/lanes/C/U01-implementation-review.md"
       ],
@@ -2174,9 +2176,9 @@
     {
       "scope": "F02导出器/命令/映射proposal代码技术审核",
       "base": "a2704b2d7ef93a6ee8518fca2f63ada4a43c2b64",
-      "head": "48c51fb19f328eb9add14dd5fca40d4ceffaae63",
-      "status": "REVISE，已转B待新固定head",
-      "script_sha256": "9c49d5d4e90cf5074591e42b1ba96f583b1f8b683bd15d3e758db85ddb00de34",
+      "head": "910353a51685310c5dc6bcf7ea8ca3d3c1a18880",
+      "status": "三P2已修，待无服务变更runtime适配合包送原R",
+      "script_sha256": "fcdb8e6a130b3c98dd0ab500df6328e42d8ac817d3475a18cbdc46f79be997a5",
       "findings": [
         "B002-P2-01",
         "B002-P2-02",
@@ -2188,8 +2190,9 @@
       "scope": "U01行为实现代码review",
       "base": "907f8de699b31a6fcc80acc78e9ba070aadc4f28",
       "approved_plan": "2919dd3558950466e18a8886ec8bc7f85a119f5a",
-      "head": "3ac1e3a750e68bafe7950fa726481a02ecccfad6",
-      "status": "已送原R，PG/Linux待证"
+      "head": "a8d07e6c76ca9495b9b4d701d6c15ed55ef1f9f2",
+      "status": "已送原R，PG/Linux待证",
+      "behavior_head": "3ac1e3a750e68bafe7950fa726481a02ecccfad6"
     }
   ],
   "quota_policy": {
@@ -2203,20 +2206,20 @@
     "resume_requires_user": true,
     "allow_credits": false,
     "allow_reset_credit": false,
-    "last_observed_remaining_percent": 7,
-    "last_observed_used_percent": 93,
-    "last_observed_at": "2026-10-03T02:48:52.630413+08:00",
-    "state": "正常，实时剩余7%，阈值未触发",
+    "last_observed_remaining_percent": 6,
+    "last_observed_used_percent": 94,
+    "last_observed_at": "2026-10-03T03:04:08.628751+08:00",
+    "state": "正常，实时剩余6%，阈值未触发",
     "limitation": "调度侧控制；非账单硬上限",
     "unknown_usage_policy": "3次有界重试，仍未知暂缓新增耗时模型工作；读数恢复>1自动解除未知保护"
   },
   "next_actions": [
-    "每轮首先核验周额度；瞬时失败有界重试，实际<=1停各线再停heartbeat和自身",
-    "收A两项P2及profile增量固定head，送同R复审后在新SHA执行必要Linux验证，旧SHA收据不迁移",
-    "收B脚本/命令技术审核，按finding返修；真实生产槽位未绑定前不运行metadata/content",
-    "C按受审U01边界完成GREEN与PG等价；Linux長验证等待A窗口",
-    "A映射稳定后协调B映射衔接；不改选测策略规避full",
-    "O01待实时核生产release lock/长任务/暂停批次；F06待真实分母/来源预算输入"
+    "每轮首先核周额度，<=1停止全部本版会话及heartbeat；普通异常有界恢复",
+    "收A固定0e完整Linux/skip/收据，释放C短PG资源；真实PR基线映射补齐前不解锁交付",
+    "收C原R固定a8d代码审核和PG等价；正式影响计划未知路径保持阻断",
+    "B三P2+runtime输出转存适配合包后回同R复审，旧生产模板不执行",
+    "root组织继承文档及B/C精确映射，保留策略/真实base，按现行规则补必要验证",
+    "O01尚需实际锁/intent/DB租约/队列与资源预算；F06待来源/分母输入"
   ],
   "resilience_policy": {
     "source": "用户2026-10-03明确要求临时异常快速恢复，不能因一次报错暂停",
@@ -2272,7 +2275,7 @@
           "lane": "C",
           "scope": "短RED及PG16语法/Unicode/来源上下文/分页前一致性集合",
           "red_commit": "5c66088d821c249e41141dd5f8ba062c3edaf210",
-          "candidate_sha": "3ac1e3a750e68bafe7950fa726481a02ecccfad6",
+          "candidate_sha": "a8d07e6c76ca9495b9b4d701d6c15ed55ef1f9f2",
           "status": "A窗口完成后优先，先固定候选与影响计划"
         },
         {
@@ -2286,7 +2289,8 @@
     "test_mapping": {
       "decision": "F01需显式映射；mapping变更按现行规则运行固定候选一套full，不改策略规避",
       "owner": "A，R审核",
-      "B": "proposal固定于48c51fb1 lanes/B/B-002-test-mapping-proposal.json，待A增量稳定后衔接；未覆盖共享配置"
+      "B": "proposal固定于48c51fb1 lanes/B/B-002-test-mapping-proposal.json，待A增量稳定后衔接；未覆盖共享配置",
+      "shared_blocker": "实际PR基线907f包含未映射继承JSON/HTML；C还含两个view函数与U01 fixture。root统一核精确用途与映射，保留真实base，不手选/跳full。"
     }
   },
   "source_main_last_verified": {
