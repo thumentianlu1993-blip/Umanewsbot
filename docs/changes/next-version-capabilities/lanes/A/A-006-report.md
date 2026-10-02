@@ -9,3 +9,5 @@
 功能：固定初始近期实际出赛、历史全一级名单及pending JG1；强身份去重/未解与冲突保留；可信版本引用优先/legacy无有效版本补充，date/start/名单缺证partial；未来/赛季/新闻与模块优先；缓存/staging/profile/public分层及不可变输入SHA/delta。容量工具默认无连接，执行入口绑定脚本摘要、固定SQL/字段/窗口、RR READ ONLY及预算，异常/截断立即停止rollback，错误不回显敏感输入；输出都是容量聚合，不声称真正档案公开。
 
 仍待原R：固定代码与producer边界、SQL/预算控制审核，必要真实短PG语法/事务验证排队；JG1用户答复、root/F06生产只读与输入完整冻结。未运行生产查询、网络/付费、旧采集恢复或写入/发布。F03后续源/样本/35文件缺口原样保留。
+
+固定Linux开发专项验证：代码提交 `3780b662b19327ea2c40419f900053d6213ad0a7`，tree `ffa87d3807de54a94d1b9175b78290f795effab1`，既有镜像 `sha256:fcf8cdaf63af51b1b8a6e30e3d2fdf871d127c3c1461bfd00c9fc6d610eab905`。以只读git archive挂载、network none、非root既有镜像、1 CPU/1 GiB、read-only rootfs执行上述两个unittest模块，28例PASS、exit 0，未启动PG。证据目录 `/Users/mentianlu/.codex/runtime/a006-h01-linux-3780b662`；`result.json`记录命令/绑定/时间/退出码，日志SHA256 `f2a9ae0f23e9f3b0c2a2f6d8da27018fde3ca41840df299de30a2e1cf5f3f690`。这是手工开发诊断，尚非正式test-impact计划或主线收据；SQL fake与实际PG边界不变。
