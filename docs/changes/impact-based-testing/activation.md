@@ -61,3 +61,9 @@ PR37025319082在计划阶段被正确阻断：payload的TEST_SHA仍为旧head的
 正式交付核验收紧为仅接受真实pull_request，首版独立审核的trusted-sha机制仍保留。strict/admin/app15368持续有效，未产生无required-check空窗。
 
 入口修复后，本地50项工具合同全部通过；未启动本地业务全量。最终真实PR校验及交付凭证仍待执行。
+
+## 最终启用状态
+
+连接清理修复的8项PostgreSQL直接回归零失败/错误/skip，独立复审APPROVE。最终185a7d07的真实PR完整校验通过，
+候选外交付核验、保护配置、策略开关及PR233合并均已完成；精确证据见[启用证据](activation-evidence.md)。
+此前各段“待完成”是历史状态。真实文档PR验收随本记录PR执行；未为该验收重跑全量。

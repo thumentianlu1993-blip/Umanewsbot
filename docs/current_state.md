@@ -1,16 +1,17 @@
-## 2026-10-02 按改动范围测试实现及复审完成（尚未切换）
+## 2026-10-03 00:21 按改动范围测试已启用（北京时间）
 
-PR #233 已实现领域映射、固定Git身份、每批≤200/最多4批并发的无网络容器运行、结果完整性及候选外交付核验。
-受验代码4949317f的Linux有界验证296项分65/197/34三批全部通过、零skip；6162项目录只收集未执行。
-原reviewer全部finding返修闭环、独立47项通过、最终APPROVE。10个真实历史单文件diff计划回放通过。
-尚未full首次校准、实际非文档delivery核验、合并、激活IMPACT_TEST_POLICY或配置strict保护；PR保持Draft，inactive状态不可直接合并。
-生产无本次变动；完整证据和待办见[交付记录](changes/impact-based-testing/rollout.md)。
+[PR #233](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/233) 已合并，仓库变量 `IMPACT_TEST_POLICY=active`；主线要求 `test-plan-gate`，strict 和管理员约束均已核验。
+固定候选185a7d07的[真实PR完整校验](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/37028610440)完成6165项、41批：6155通过、10项既定环境skip，零失败/错误，全部正常收尾。
+独立复审APPROVE，候选目录外delivery核验通过；校准中的测试夹具及并发连接清理问题已修复。
+普通PR按领域及依赖选测，纯文档只做静态检查；高风险改动和受控日周/手动入口保留单候选分批full，未知路径阻断。
+本次仅变更CI，无生产数据库、数据动作、应用镜像或服务重启。真实文档PR验收随本记录PR执行，以该PR检查及交付回执为准。
+完整证据见[启用记录](changes/impact-based-testing/activation-evidence.md)。
 
 ## 2026-10-02 18:03 已知测试失败修复已上线
 
 PR #232 已合并，受验候选 `ad50abdb` 已通过 0079 同 schema 发布。四应用同镜像 `73ee1dcf7edb`，无迁移、配置或数据修复动作；双域名和马匹资料提示验收通过，队列消费恢复、锁/intent 闭合。501 项分批回归、12 项入口自测、67 项发布合同通过，本次没有全量测试。详见[发布记录](changes/fix-known-test-failures/rollout.md)。
 
-用户要求先上线、再设计按改动范围测试。第二部分方案经独立 reviewer 修订复审通过，随后用户已批准实施；最新进度见本文顶部，远端主线策略尚未切换。方案见[设计入口](changes/impact-based-testing/spec.md)。
+用户要求先上线、再设计按改动范围测试。第二部分方案经独立 reviewer 修订复审通过，随后用户已批准实施；最新进度见本文顶部；当时远端主线策略尚未切换。方案见[设计入口](changes/impact-based-testing/spec.md)。
 
 ## 2026-10-02 已知测试失败修复（本地完成，待云端验证与交付）
 
