@@ -163,6 +163,46 @@ class DisplayPageTests(TestCase):
             self.assertContains(response,text)
         self.assertNotContains(response,'Hidden event secret')
 
+    def test_horse_grade_respects_prepared_public_event_without_queries_or_writes(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+        from stable.models import HorseProfile, HorseRaceRecord
+        from stable.templatetags.race_information import race_field
+        term = TermEntry.objects.create(term_type='horse', source_ja='Grade Horse', target_zh='等级马')
+        horse = HorseProfile.objects.create(primary_term=term, display_name_zh='等级马', review_status='published')
+        record = HorseRaceRecord.objects.create(horse_profile=horse, race_name='历史等级赛事',
+            race_date=date(2025, 1, 2), race_year=2025, grade_text='GIII', event=self.event)
+        for visibility, expected in [('published', 'G2'), ('draft', 'G3')]:
+            self.event.visibility_status = visibility
+            self.event.save()
+            with self.subTest(visibility=visibility), CaptureQueriesContext(connection) as queries:
+                response = self.client.get(horse.public_path)
+            self.assertEqual(response.status_code, 200)
+            displayed = list(response.context['race_records'])[0]
+            self.assertEqual(displayed.public_display['grade'].text, expected)
+            with self.assertNumQueries(0):
+                self.assertEqual(race_field(displayed, 'grade'), expected)
+            self.assertContains(response, ' · ' + expected)
+            self.assertFalse(any(q['sql'].lstrip().split()[0].upper() in {'INSERT', 'UPDATE', 'DELETE'}
+                                 for q in queries.captured_queries))
+            record.refresh_from_db()
+            self.event.refresh_from_db()
+            self.assertEqual(record.grade_text, 'GIII')
+            self.assertEqual((self.event.grade_text, self.event.normalized_grade), ('Grade 2', 'G2'))
+
+    def test_grade_tag_does_not_fetch_uncached_record_event(self):
+        from stable.models import HorseProfile, HorseRaceRecord
+        from stable.templatetags.race_information import race_field
+        term = TermEntry.objects.create(term_type='horse', source_ja='Uncached Horse', target_zh='无缓存马')
+        horse = HorseProfile.objects.create(primary_term=term, display_name_zh='无缓存马')
+        saved = HorseRaceRecord.objects.create(horse_profile=horse, race_name='历史赛',
+            grade_text='GIII', event=self.event)
+        record = HorseRaceRecord.objects.get(pk=saved.pk)
+        self.assertNotIn('event', record._state.fields_cache)
+        with self.assertNumQueries(0):
+            self.assertEqual(race_field(record, 'grade'), 'G3')
+        self.assertNotIn('event', record._state.fields_cache)
+
     def test_linked_event_without_date_preserves_record_date_and_major_win_name(self):
         from stable.models import HorseProfile, HorseRaceRecord
         term=TermEntry.objects.create(term_type='horse',source_ja='Winner',target_zh='获胜马')
