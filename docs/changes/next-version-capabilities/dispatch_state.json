@@ -1,54 +1,66 @@
 {
   "schema_version": 1,
   "timezone": "Asia/Shanghai",
-  "updated_at": "2026-10-03T01:58:03.411900+08:00",
+  "updated_at": "2026-10-03T02:05:20.092968+08:00",
   "coordinator_thread_id": "01a0fdb2-b88c-7f93-8c9e-ba9564c33c93",
   "coordinator_worktree": "/Users/mentianlu/.codex/worktrees/516a/umanews",
   "deadline_at": "2026-10-30T18:00:00+08:00",
   "handoff_deadline_at": "2026-10-30T20:00:00+08:00",
   "model": "gpt-6.1-sol",
   "reasoning_effort": "medium",
-  "automation_id": null,
+  "automation_id": "umanews-10-30",
   "lanes": {
     "A": {
-      "thread_id": null,
+      "thread_id": "01a0fdc6-8c4e-7ff1-af4b-9db4baff8fb1",
       "host_id": "local",
-      "worktree": null,
-      "branch": null,
-      "status": "待创建",
-      "last_cursor": null,
+      "worktree": "/Users/mentianlu/.codex/worktrees/5482/umanews",
+      "branch": "codex/next-version-race-data-20261003",
+      "status": "已启动",
+      "last_cursor": "857bc711-5dad-460a-9c00-d1ac5bb0c979:1",
       "model": "gpt-6.1-sol",
-      "reasoning_effort": "medium"
+      "reasoning_effort": "medium",
+      "initial_head": "63b5781e",
+      "title": "Umanews 10.30｜A 赛事与资料管线",
+      "model_evidence": "create_thread 显式指定 gpt-6.1-sol 和 medium，创建成功；启动回报已收取"
     },
     "B": {
-      "thread_id": null,
+      "thread_id": "01a0fdc6-e1a2-7ae1-9749-6889626d9bf4",
       "host_id": "local",
-      "worktree": null,
-      "branch": null,
-      "status": "待创建",
-      "last_cursor": null,
+      "worktree": "/Users/mentianlu/.codex/worktrees/a14d/umanews",
+      "branch": "codex/next-version-news-ai-20261003",
+      "status": "已启动",
+      "last_cursor": "b39a81c2-6866-44bf-8df1-a536e3d41532:1",
       "model": "gpt-6.1-sol",
-      "reasoning_effort": "medium"
+      "reasoning_effort": "medium",
+      "initial_head": "4c9725c9",
+      "title": "Umanews 10.30｜B 新闻模型与名称",
+      "model_evidence": "create_thread 显式指定 gpt-6.1-sol 和 medium，创建成功；启动回报已收取"
     },
     "C": {
-      "thread_id": null,
+      "thread_id": "01a0fdc7-5154-7e51-aafa-f1b34d8f46f9",
       "host_id": "local",
-      "worktree": null,
-      "branch": null,
-      "status": "待创建",
-      "last_cursor": null,
+      "worktree": "/Users/mentianlu/.codex/worktrees/bc9b/umanews",
+      "branch": "codex/next-version-product-ui-20261003",
+      "status": "已启动",
+      "last_cursor": "1bb9b1cd-6b22-4865-9d87-78fbf289661d:1",
       "model": "gpt-6.1-sol",
-      "reasoning_effort": "medium"
+      "reasoning_effort": "medium",
+      "initial_head": "dbcc87a4",
+      "title": "Umanews 10.30｜C 页面关联与后台",
+      "model_evidence": "create_thread 显式指定 gpt-6.1-sol 和 medium，创建成功；启动回报已收取"
     },
     "R": {
-      "thread_id": null,
+      "thread_id": "01a0fdc6-2d8d-7d10-9662-a7b042e56ef0",
       "host_id": "local",
-      "worktree": null,
-      "branch": null,
-      "status": "待创建",
-      "last_cursor": null,
+      "worktree": "/Users/mentianlu/.codex/worktrees/3ab1/umanews",
+      "branch": "codex/next-version-review-20261003",
+      "status": "已启动",
+      "last_cursor": "6afb1d41-cb4a-4026-a141-43c0a48e9cae:1",
       "model": "gpt-6.1-sol",
-      "reasoning_effort": "medium"
+      "reasoning_effort": "medium",
+      "initial_head": "d00eaf18",
+      "title": "Umanews 10.30｜R 独立审核与验收",
+      "model_evidence": "create_thread 显式指定 gpt-6.1-sol 和 medium，创建成功；启动回报已收取"
     }
   },
   "tasks": {
@@ -57,8 +69,8 @@
       "title": "冻结跨模块字段及首版产品参数",
       "deps": [],
       "deadline_at": "2026-10-04T18:00:00+08:00",
-      "status": "未开始",
-      "phase": "待派发",
+      "status": "进行中",
+      "phase": "规划/只读基线",
       "commit": null,
       "pr": null,
       "review": null,
@@ -66,15 +78,17 @@
       "merged": false,
       "deployed": false,
       "enabled": false,
-      "public_verified": false
+      "public_verified": false,
+      "dispatch_id": "A-001",
+      "owner_thread_id": "01a0fdc6-8c4e-7ff1-af4b-9db4baff8fb1"
     },
     "F04": {
       "lane": "C",
       "title": "冻结编辑后台关键任务与交互原型",
       "deps": [],
       "deadline_at": "2026-10-04T18:00:00+08:00",
-      "status": "未开始",
-      "phase": "待派发",
+      "status": "进行中",
+      "phase": "规划/只读基线",
       "commit": null,
       "pr": null,
       "review": null,
@@ -82,7 +96,9 @@
       "merged": false,
       "deployed": false,
       "enabled": false,
-      "public_verified": false
+      "public_verified": false,
+      "dispatch_id": "C-001",
+      "owner_thread_id": "01a0fdc7-5154-7e51-aafa-f1b34d8f46f9"
     },
     "F03": {
       "lane": "A",
@@ -107,8 +123,8 @@
       "title": "建立新闻漏斗与模型黄金样例",
       "deps": [],
       "deadline_at": "2026-10-05T18:00:00+08:00",
-      "status": "未开始",
-      "phase": "待派发",
+      "status": "进行中",
+      "phase": "规划/只读基线",
       "commit": null,
       "pr": null,
       "review": null,
@@ -116,15 +132,17 @@
       "merged": false,
       "deployed": false,
       "enabled": false,
-      "public_verified": false
+      "public_verified": false,
+      "dispatch_id": "B-001",
+      "owner_thread_id": "01a0fdc6-e1a2-7ae1-9749-6889626d9bf4"
     },
     "F05": {
       "lane": "C",
       "title": "复验域名与公开缺陷并固定回归样例",
       "deps": [],
       "deadline_at": "2026-10-05T18:00:00+08:00",
-      "status": "未开始",
-      "phase": "待派发",
+      "status": "已派发",
+      "phase": "规划/只读基线",
       "commit": null,
       "pr": null,
       "review": null,
@@ -132,7 +150,9 @@
       "merged": false,
       "deployed": false,
       "enabled": false,
-      "public_verified": false
+      "public_verified": false,
+      "dispatch_id": "C-001",
+      "owner_thread_id": "01a0fdc7-5154-7e51-aafa-f1b34d8f46f9"
     },
     "H01": {
       "lane": "A",
@@ -1361,7 +1381,7 @@
         "O03",
         "O04"
       ],
-      "deadline_at": "2026-10-21T18:00:00+08:00",
+      "deadline_at": "2026-10-20T12:00:00+08:00",
       "status": "未开始",
       "phase": "待派发",
       "commit": null,
@@ -1556,7 +1576,7 @@
         "Q02",
         "H09"
       ],
-      "deadline_at": "2026-10-23T18:00:00+08:00",
+      "deadline_at": "2026-10-23T16:00:00+08:00",
       "status": "未开始",
       "phase": "待派发",
       "commit": null,
@@ -1796,7 +1816,7 @@
         "N06",
         "O05"
       ],
-      "deadline_at": "2026-10-27T18:00:00+08:00",
+      "deadline_at": "2026-10-27T14:00:00+08:00",
       "status": "未开始",
       "phase": "待派发",
       "commit": null,
@@ -1901,7 +1921,7 @@
         "M12",
         "E07"
       ],
-      "deadline_at": "2026-10-28T18:00:00+08:00",
+      "deadline_at": "2026-10-28T16:00:00+08:00",
       "status": "未开始",
       "phase": "待派发",
       "commit": null,
@@ -1920,7 +1940,7 @@
         "O08",
         "R15"
       ],
-      "deadline_at": "2026-10-30T12:00:00+08:00",
+      "deadline_at": "2026-10-30T16:30:00+08:00",
       "status": "未开始",
       "phase": "待派发",
       "commit": null,
@@ -1954,9 +1974,10 @@
       "lane": "R",
       "title": "完成全量运行的 48 小时观察",
       "deps": [
-        "O08"
+        "O08",
+        "R16"
       ],
-      "deadline_at": "2026-10-30T18:00:00+08:00",
+      "deadline_at": "2026-10-30T17:00:00+08:00",
       "status": "未开始",
       "phase": "待派发",
       "commit": null,
@@ -1988,7 +2009,54 @@
       "public_verified": false
     }
   },
-  "dispatches": [],
-  "decisions": [],
-  "questions": []
+  "dispatches": [
+    {
+      "id": "A-001",
+      "lane": "A",
+      "task_ids": [
+        "F01"
+      ],
+      "status": "已送达并开始",
+      "sent_at": "2026-10-03T02:05:20.092968+08:00"
+    },
+    {
+      "id": "B-001",
+      "lane": "B",
+      "task_ids": [
+        "F02"
+      ],
+      "status": "已送达并开始",
+      "sent_at": "2026-10-03T02:05:20.092968+08:00"
+    },
+    {
+      "id": "C-001",
+      "lane": "C",
+      "task_ids": [
+        "F04",
+        "F05"
+      ],
+      "status": "已送达并开始",
+      "sent_at": "2026-10-03T02:05:20.092968+08:00"
+    },
+    {
+      "id": "R-BOOT-001",
+      "lane": "R",
+      "task_ids": [],
+      "scope": "首轮总体方案及首批任务方案审核",
+      "status": "审核中，已收到时间窗口findings",
+      "sent_at": "2026-10-03T02:05:20.092968+08:00"
+    }
+  ],
+  "decisions": [
+    {
+      "id": "D-001",
+      "date": "2026-10-03",
+      "subject": "观察窗口与报告时序修正",
+      "status": "已落盘，待原reviewer复核",
+      "reason": "原O05至N09仅144小时；R16早于最后观察窗口，报告证据不闭合。",
+      "changes": "O05 10/20 12:00；N09 10/27 14:00；O06 10/23 16:00；O08 10/28 16:00；R16 10/30 16:30；V06 17:00；V07 18:00。"
+    }
+  ],
+  "questions": [],
+  "planning_commit": "d0cec076019f35b6f7db56b09ebee291e57fd9f9"
 }
