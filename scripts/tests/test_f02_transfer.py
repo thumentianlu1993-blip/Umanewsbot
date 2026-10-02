@@ -367,7 +367,8 @@ class DeliveryAndCLITests(unittest.TestCase):
         self.assertIn('module:scripts.tests.test_f02_readonly_export', proposal['rules_paths_additions'][fixture_path])
         self.assertEqual(proposal['catalog_profiles_additions']['scripts.tests.test_f02_transfer'], 'python')
         self.assertEqual(proposal['catalog_domains_additions'][domain], ['scripts.tests.test_f02_transfer'])
-        self.assertEqual(proposal['catalog_tests_additions']['scripts/tests/test_f02_transfer.py']['domains'], [domain])
+        self.assertEqual(set(proposal['catalog_tests_additions']['scripts/tests/test_f02_transfer.py']['domains']),
+                         {domain, 'module:scripts.tests.test_f02_docker_adapter', 'module:scripts.tests.test_f02_receipt_bridge'})
 
 
 class AdditionalFailureTests(unittest.TestCase):

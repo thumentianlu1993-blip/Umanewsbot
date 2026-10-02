@@ -1,32 +1,80 @@
 {
   "schema_version": 1,
-  "task_id": "B-002/B-003",
+  "task_id": "B-002/B-003/B-005",
   "status": "proposal_only_not_applied",
   "script_commit": null,
   "new_paths": [
     "scripts/f02_readonly_export.py",
     "scripts/tests/test_f02_readonly_export.py",
     "scripts/f02_transfer.py",
-    "scripts/tests/test_f02_transfer.py"
+    "scripts/tests/test_f02_transfer.py",
+    "scripts/f02_docker_adapter.py",
+    "scripts/f02_container_probe.py",
+    "scripts/f02_tool_package.py",
+    "scripts/f02_receipt_bridge.py",
+    "scripts/tests/f02_pg_schema.sql",
+    "scripts/tests/test_f02_docker_adapter.py",
+    "scripts/tests/test_f02_tool_package.py",
+    "scripts/tests/test_f02_receipt_bridge.py",
+    "scripts/tests/test_f02_export_postgres.py"
   ],
   "rules_paths_additions": {
     "scripts/f02_readonly_export.py": [
       "module:scripts.tests.test_f02_readonly_export",
-      "module:scripts.tests.test_f02_transfer"
+      "module:scripts.tests.test_f02_transfer",
+      "module:scripts.tests.test_f02_docker_adapter",
+      "module:scripts.tests.test_f02_tool_package",
+      "module:scripts.tests.test_f02_receipt_bridge",
+      "module:scripts.tests.test_f02_export_postgres"
     ],
     "scripts/tests/test_f02_readonly_export.py": [
       "module:scripts.tests.test_f02_readonly_export",
-      "module:scripts.tests.test_f02_transfer"
+      "module:scripts.tests.test_f02_transfer",
+      "module:scripts.tests.test_f02_docker_adapter",
+      "module:scripts.tests.test_f02_receipt_bridge"
     ],
     "scripts/f02_transfer.py": [
-      "module:scripts.tests.test_f02_transfer"
+      "module:scripts.tests.test_f02_transfer",
+      "module:scripts.tests.test_f02_docker_adapter",
+      "module:scripts.tests.test_f02_tool_package",
+      "module:scripts.tests.test_f02_receipt_bridge",
+      "module:scripts.tests.test_f02_export_postgres"
     ],
     "scripts/tests/test_f02_transfer.py": [
-      "module:scripts.tests.test_f02_transfer"
+      "module:scripts.tests.test_f02_transfer",
+      "module:scripts.tests.test_f02_docker_adapter",
+      "module:scripts.tests.test_f02_receipt_bridge"
     ],
     "docs/changes/next-version-capabilities/lanes/B/B-002-test-mapping-proposal.json": [
       "module:scripts.tests.test_f02_readonly_export",
       "module:scripts.tests.test_f02_transfer"
+    ],
+    "scripts/f02_docker_adapter.py": [
+      "module:scripts.tests.test_f02_docker_adapter"
+    ],
+    "scripts/f02_container_probe.py": [
+      "module:scripts.tests.test_f02_docker_adapter"
+    ],
+    "scripts/f02_tool_package.py": [
+      "module:scripts.tests.test_f02_tool_package"
+    ],
+    "scripts/f02_receipt_bridge.py": [
+      "module:scripts.tests.test_f02_receipt_bridge"
+    ],
+    "scripts/tests/f02_pg_schema.sql": [
+      "module:scripts.tests.test_f02_export_postgres"
+    ],
+    "scripts/tests/test_f02_docker_adapter.py": [
+      "module:scripts.tests.test_f02_docker_adapter"
+    ],
+    "scripts/tests/test_f02_tool_package.py": [
+      "module:scripts.tests.test_f02_tool_package"
+    ],
+    "scripts/tests/test_f02_receipt_bridge.py": [
+      "module:scripts.tests.test_f02_receipt_bridge"
+    ],
+    "scripts/tests/test_f02_export_postgres.py": [
+      "module:scripts.tests.test_f02_export_postgres"
     ]
   },
   "catalog_domains_additions": {
@@ -35,6 +83,18 @@
     ],
     "module:scripts.tests.test_f02_transfer": [
       "scripts.tests.test_f02_transfer"
+    ],
+    "module:scripts.tests.test_f02_docker_adapter": [
+      "scripts.tests.test_f02_docker_adapter"
+    ],
+    "module:scripts.tests.test_f02_tool_package": [
+      "scripts.tests.test_f02_tool_package"
+    ],
+    "module:scripts.tests.test_f02_receipt_bridge": [
+      "scripts.tests.test_f02_receipt_bridge"
+    ],
+    "module:scripts.tests.test_f02_export_postgres": [
+      "scripts.tests.test_f02_export_postgres"
     ]
   },
   "catalog_tests_additions": {
@@ -42,27 +102,69 @@
       "label": "scripts.tests.test_f02_readonly_export",
       "domains": [
         "module:scripts.tests.test_f02_readonly_export",
-        "module:scripts.tests.test_f02_transfer"
+        "module:scripts.tests.test_f02_transfer",
+        "module:scripts.tests.test_f02_docker_adapter",
+        "module:scripts.tests.test_f02_receipt_bridge"
       ]
     },
     "scripts/tests/test_f02_transfer.py": {
       "label": "scripts.tests.test_f02_transfer",
       "domains": [
-        "module:scripts.tests.test_f02_transfer"
+        "module:scripts.tests.test_f02_transfer",
+        "module:scripts.tests.test_f02_docker_adapter",
+        "module:scripts.tests.test_f02_receipt_bridge"
+      ]
+    },
+    "scripts/tests/test_f02_docker_adapter.py": {
+      "label": "scripts.tests.test_f02_docker_adapter",
+      "domains": [
+        "module:scripts.tests.test_f02_docker_adapter"
+      ]
+    },
+    "scripts/tests/test_f02_tool_package.py": {
+      "label": "scripts.tests.test_f02_tool_package",
+      "domains": [
+        "module:scripts.tests.test_f02_tool_package"
+      ]
+    },
+    "scripts/tests/test_f02_receipt_bridge.py": {
+      "label": "scripts.tests.test_f02_receipt_bridge",
+      "domains": [
+        "module:scripts.tests.test_f02_receipt_bridge"
+      ]
+    },
+    "scripts/tests/test_f02_export_postgres.py": {
+      "label": "scripts.tests.test_f02_export_postgres",
+      "domains": [
+        "module:scripts.tests.test_f02_export_postgres"
       ]
     }
   },
   "core_policy": "preserve existing automatic core selection",
   "mapping_evolution_policy": "preserve current old+new full regression on rules/catalog changes; coordinator integrates after A patch",
-  "evidence_status": "B-002 21 local offline cases green; B-003 local evidence in B-003-status.md; no fixed Linux delivery receipt",
+  "evidence_status": "B005 local 63 PASS and 12 PG skipped; real PG/Docker receipts absent; original B003 46 preserved",
   "linux_environment": "wait A validated dedicated DOCKER_CONFIG with local socket; do not set DOCKER_CONTEXT/DOCKER_HOST; shared batch limit2",
   "artifact_runtime": "/Users/mentianlu/.codex/artifacts/umanews-next-version-B/B-002/",
   "catalog_profiles_additions": {
     "scripts.tests.test_f02_readonly_export": "python",
-    "scripts.tests.test_f02_transfer": "python"
+    "scripts.tests.test_f02_transfer": "python",
+    "scripts.tests.test_f02_docker_adapter": "python",
+    "scripts.tests.test_f02_tool_package": "python",
+    "scripts.tests.test_f02_receipt_bridge": "python",
+    "scripts.tests.test_f02_export_postgres": "python"
   },
   "script_commit_binding": "fixed post-review head in coordinator stage message",
   "review_fix_parent_sha": "48c51fb19f328eb9add14dd5fca40d4ceffaae63",
   "script_sha256": "fcdb8e6a130b3c98dd0ab500df6328e42d8ac817d3475a18cbdc46f79be997a5",
-  "integration_dependency_fix": "INT001-P2-01: catalog.tests takes precedence; exporter test fixture maps export+transfer, proposal only; root owns shared integration"
+  "integration_dependency_fix": "INT001-P2-01: catalog.tests takes precedence; exporter test fixture maps export+transfer, proposal only; root owns shared integration",
+  "specialized_validation": {
+    "scripts.tests.test_f02_export_postgres": {
+      "default": "guard_only_12_skipped",
+      "acceptance_requires": "fixed_manifest_and_isolated_PG16",
+      "expected_real_cases": 12
+    },
+    "scripts.tests.test_f02_docker_adapter": {
+      "Docker_smoke": "separate_synthetic_short_window_not_yet_run"
+    }
+  }
 }
