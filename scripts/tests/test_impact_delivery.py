@@ -1,5 +1,8 @@
 """交付不可仅凭同名绿色job或旧run的结果。"""
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
+import re
+from types import SimpleNamespace
 import unittest
 from scripts.verify_delivery_test_evidence import verify_jobs, verify_protection, compare_collection, verify_mode
 from scripts.decide_full_regression import should_run
@@ -62,16 +65,44 @@ class ScopeEvidenceTests(unittest.TestCase):
 
 
 class BootstrapTests(unittest.TestCase):
-    def test_only_reviewed_first_manual_bootstrap_is_accepted(self):
+    def test_manual_calibration_cannot_substitute_pr_delivery(self):
         from scripts.verify_delivery_test_evidence import authorize_run
         run={'event':'workflow_dispatch','path':'.github/workflows/release_0078_contract.yml'}
         plan={'bootstrap':True,'head_sha':'head','test_sha':'head'};review={'commit':'head'}
-        self.assertEqual(authorize_run(run,plan,review,False,'head','merge'),'impact-validation / ')
+        with self.assertRaisesRegex(ValueError,'pull_request'):
+            authorize_run(run,plan,review,False,'head','merge')
         for has_catalog,approval in [(True,review),(False,None),(False,{'commit':'other'})]:
             with self.assertRaises(ValueError):authorize_run(run,plan,approval,has_catalog,'head','merge')
 
     def test_ordinary_pr_still_requires_exact_merge_identity(self):
         from scripts.verify_delivery_test_evidence import authorize_run
+        for has_catalog in (False, True):
+            self.assertEqual(authorize_run(
+                {'event':'pull_request','path':'.github/workflows/affected_tests.yml'},
+                {'test_sha':'merge'}, {'commit':'head'}, has_catalog, 'head', 'merge'), '')
         with self.assertRaises(ValueError):
             authorize_run({'event':'pull_request','path':'.github/workflows/affected_tests.yml'},
                           {'test_sha':'head'},None,True,'head','merge')
+
+
+class WorkflowIdentityTests(unittest.TestCase):
+    def test_all_pr_source_bindings_use_event_merge_not_cached_payload(self):
+        workflow = Path(__file__).resolve().parents[2] / '.github/workflows/affected_tests.yml'
+        bindings = re.findall(r'^\s*(?:ref|TEST_SHA): \$\{\{ (.+) \}\}$', workflow.read_text().split('      - name: collect-catalog-without-running', 1)[0], re.M)
+        self.assertEqual(len(bindings), 3)  # checkout、静态检查、计划必须绑定同一个事件。
+        for event, cached_merge, expected in (
+            ('pull_request', 'stale-merge-for-previous-head', 'current-event-merge'),
+            ('pull_request', None, 'current-event-merge'),
+            ('pull_request', 'current-event-merge', 'current-event-merge'),
+            ('workflow_dispatch', None, 'explicit-candidate'),
+            ('schedule', None, 'explicit-candidate'),
+        ):
+            context = {
+                'github': SimpleNamespace(event_name=event, sha='current-event-merge',
+                    event=SimpleNamespace(pull_request=SimpleNamespace(merge_commit_sha=cached_merge))),
+                'inputs': SimpleNamespace(candidate_sha='explicit-candidate'),
+            }
+            for expression in bindings:
+                with self.subTest(event=event, cached_merge=cached_merge, expression=expression):
+                    actual = eval(expression.replace('&&', 'and').replace('||', 'or'), {'__builtins__': {}}, context)
+                    self.assertEqual(actual, expected)

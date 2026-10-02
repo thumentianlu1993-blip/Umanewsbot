@@ -52,7 +52,7 @@ jobs:
       - name: checkout-test-tree
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.merge_commit_sha || inputs.candidate_sha }}
+          ref: ${{ github.event_name == 'pull_request' && github.sha || inputs.candidate_sha }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-python@v5
@@ -61,7 +61,7 @@ jobs:
       - name: static-contracts
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || inputs.base_sha }}
-          TEST_SHA: ${{ github.event.pull_request.merge_commit_sha || inputs.candidate_sha }}
+          TEST_SHA: ${{ github.event_name == 'pull_request' && github.sha || inputs.candidate_sha }}
         run: |
           git diff --check "$BASE_SHA" "$TEST_SHA"
           git show "$BASE_SHA:.codex/scripts/check_workflow_contract.py" > "$RUNNER_TEMP/trusted-workflow-contract.py"
@@ -90,7 +90,7 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || inputs.base_sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || inputs.candidate_sha }}
-          TEST_SHA: ${{ github.event.pull_request.merge_commit_sha || inputs.candidate_sha }}
+          TEST_SHA: ${{ github.event_name == 'pull_request' && github.sha || inputs.candidate_sha }}
           SCOPE: ${{ github.event_name == 'pull_request' && 'affected' || inputs.scope }}
           REASON: ${{ inputs.reason }}
         run: python scripts/impact_ci.py --base "$BASE_SHA" --head "$HEAD_SHA" --test "$TEST_SHA" --scope "$SCOPE" --reason "$REASON" --output evidence/plan.json

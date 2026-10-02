@@ -53,16 +53,12 @@ def compare_collection(plan, collected):
 
 
 def authorize_run(run, plan, review, base_has_catalog, head, merge):
-    if run['event']=='pull_request':
-        require(run['path']=='.github/workflows/affected_tests.yml' and plan['test_sha']==merge,
-                'ordinary PR requires exact merge workflow')
-        return ''
-    require(run['event']=='workflow_dispatch' and not base_has_catalog and plan['bootstrap']
-            and review and review.get('commit')==head and plan['head_sha']==head,
-            'manual delivery requires independently reviewed bootstrap')
-    require(run['path'] in ('.github/workflows/affected_tests.yml','.github/workflows/release_0078_contract.yml'),
-            'untrusted bootstrap workflow')
-    return 'impact-validation / ' if run['path'].endswith('/release_0078_contract.yml') else ''
+    # 手动校准不属于 GitHub 的 PR 必需检查；首版也必须由真实 PR 事件交付。
+    # 引导控制文件的独立审核身份由 main 中的 trusted_sha/control_blobs 校验负责。
+    require(run['event']=='pull_request', 'delivery requires a pull_request run; manual calibration is not a PR gate')
+    require(run['path']=='.github/workflows/affected_tests.yml' and plan['test_sha']==merge,
+            'ordinary PR requires exact merge workflow')
+    return ''
 
 
 def main():

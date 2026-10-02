@@ -8,7 +8,7 @@
 
 - 单候选full首次校准：每批≤200，最多4容器并发，不执行基线全量；所有失败/skip显式记录。
 - 独立review通过后，从受信Git对象提取核验器到候选目录外，以同run镜像重新收集并核验证据。
-- GitHub main保护：strict required checks与enforce_admins；引导阶段要求实际检查名`impact-validation / test-plan-gate`，合并切换后要求普通PR的`test-plan-gate`。不增加人工审批人数或旁路身份。
+- GitHub main保护：strict required checks与enforce_admins；正式交付统一要求真实PR的`test-plan-gate`；手动校准的prefixed check不计入GitHub PR门禁。不增加人工审批人数或旁路身份。
 - 设置仓库变量`IMPACT_TEST_POLICY=active`，合并PR233，切换统一PR gate，启用受控高风险及日周full入口。
 - 没有数据库迁移、生产配置/数据动作、应用镜像重建或服务重启；没有QQ、邮件、通知或真实抓取动作。
 
@@ -50,3 +50,14 @@ Docker29默认containerd store导入同tar返回manifest ID，不能将其当作
 并发写入测试使用`close_old_connections`，未过期的线程连接未真正关闭。新增直接清理断言，
 单例RED得到`[False, False] != [True, True]`并再次出现删库被占用；四处线程finally改为显式关闭自己的连接。
 原有并发、锁、幂等及事务断言保留，未改业务代码或放宽测试库清理门禁。后续记录直接GREEN、独立复审及最终校准。
+
+## 真实PR引导兼容修复
+
+手动校准37017985056在7067935e上完成6164项/41批：6154通过、10项既定skip、零失败/错误。
+旧核验器输出的manual verified仅证明其当时的证据核验，不构成GitHub PR合并依据：真实merge被必需检查门禁拒绝，未绕过保护。
+独立审核批准改为真实PR事件；空提交d0f2b7eb与7067935e的tree及19个controls完全相同。
+PR37025319082在计划阶段被正确阻断：payload的TEST_SHA仍为旧head的a243b576，而HEAD_SHA已是d0f2b7eb，未启动整套测试。
+已先复现三处PR旧/空merge缓存选错及manual误作交付的7个RED断言，再改为事件`github.sha`；manual/定时复用入口仍用显式candidate。
+正式交付核验收紧为仅接受真实pull_request，首版独立审核的trusted-sha机制仍保留。strict/admin/app15368持续有效，未产生无required-check空窗。
+
+入口修复后，本地50项工具合同全部通过；未启动本地业务全量。最终真实PR校验及交付凭证仍待执行。

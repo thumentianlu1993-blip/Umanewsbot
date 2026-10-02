@@ -16,6 +16,7 @@
 | PR 删除映射/依赖边、修改 gate 工作流 | base 侧检查及新旧规则并集/高风险 | 候选能自证“无需测试” |
 | 删掉base校验步骤、伪造同名成功job | 候选外核验workflow/blob/步骤和受信计划，拒绝merge | 只看job名字/结论 |
 | 候选提供伪造审核名单或替换核验器 | 只接受协调者绑定的受信对象，拒绝候选目录import | 从artifact取自授权名单 |
+| PR payload 缓存旧/空 merge SHA；手动及定时复用 | PR 三处统一使用事件 github.sha；非 PR 使用显式 candidate；手动成功不得充当 PR 交付 | 使用异步缓存 merge_commit_sha 或接受 workflow_dispatch 合并凭证 |
 | 固定 base/head 与合并树；head不变base前移 | STALE_BASE阻止merge，更新所属分支触发synchronize | 只看 PR head 旧绿灯 |
 | 核验后main再次前移、尝试admin bypass | 服务端strict拒绝；工具不使用bypass | 合并前检查与合并间竞态 |
 | Git 失败/冲突/非法 SHA/路径逃逸 | fail closed、非零退出 | Git 错误解释成空 diff |
