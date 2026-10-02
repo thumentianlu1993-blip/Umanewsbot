@@ -42,3 +42,11 @@
 
 本机交付核验使用专用`colima-umanews-impact-ci`、classic image store及本地unix socket，与CI镜像config ID一致。
 Docker29默认containerd store导入同tar返回manifest ID，不能将其当作CI config ID使用；未放宽镜像身份校验。
+
+## 第二轮完整校准的清理问题
+
+`37014124643`在136998b3上执行6164项、41批，零业务断言失败、10项既定环境skip，
+但batch-019在销毁测试库时发现遗留连接，因此整体失败，未合并或激活。其余40批完整通过。
+并发写入测试使用`close_old_connections`，未过期的线程连接未真正关闭。新增直接清理断言，
+单例RED得到`[False, False] != [True, True]`并再次出现删库被占用；四处线程finally改为显式关闭自己的连接。
+原有并发、锁、幂等及事务断言保留，未改业务代码或放宽测试库清理门禁。后续记录直接GREEN、独立复审及最终校准。
