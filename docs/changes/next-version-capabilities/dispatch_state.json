@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "timezone": "Asia/Shanghai",
-  "updated_at": "2026-10-03T03:17:18.269119+08:00",
+  "updated_at": "2026-10-03T03:20:42.196658+08:00",
   "coordinator_thread_id": "01a0fdb2-b88c-7f93-8c9e-ba9564c33c93",
   "coordinator_worktree": "/Users/mentianlu/.codex/worktrees/516a/umanews",
   "deadline_at": "2026-10-30T18:00:00+08:00",
@@ -75,7 +75,7 @@
       "deps": [],
       "deadline_at": "2026-10-04T18:00:00+08:00",
       "status": "进行中",
-      "phase": "代码复审通过，41批完成，完整收据核验中",
+      "phase": "合同/业务代码开发验证完成；真实PR映射待最后两路径",
       "commit": "0e05029c1ed00713a6f66e461e6753c1e4dadb27",
       "pr": null,
       "review": "APPROVED@0e05029c；A002-P2-01/02 CLOSED；独立17 tests PASS；完整Linux/skip/收据待核",
@@ -89,7 +89,23 @@
       "dispatch_id": "A-002",
       "owner_thread_id": "01a0fdc6-8c4e-7ff1-af4b-9db4baff8fb1",
       "approved_plan_sha": "7c78f67d04cc156520d21916f3eb0a3ef066305e",
-      "review_commit": "6acff163a1cfcae17d30774c264cbbbbb2a1dc18"
+      "review_commit": "6acff163a1cfcae17d30774c264cbbbbb2a1dc18",
+      "development_validation": {
+        "head": "0e05029c1ed00713a6f66e461e6753c1e4dadb27",
+        "base": "7c78f67d04cc156520d21916f3eb0a3ef066305e",
+        "status": "passed",
+        "executed": 6182,
+        "batches": 41,
+        "failures": 0,
+        "errors": 0,
+        "allowed_skips": 10,
+        "all_lifecycle_complete": true,
+        "trusted_verifier_source": "907f8de699b31a6fcc80acc78e9ba070aadc4f28",
+        "summary": "/tmp/umanews-a002-evidence/linux-full-0e05029c/summary.json",
+        "plan_digest": "d1dd7ec5c6c62cce97eb101327fc3d3199f2ba68600c656295b3177d505668b3",
+        "test_tree": "be3cee831b2359ecec7b4e946a0a3a16753d826e",
+        "formal_delivery_receipt": false
+      }
     },
     "F04": {
       "lane": "C",
@@ -118,8 +134,8 @@
         "F01"
       ],
       "deadline_at": "2026-10-05T18:00:00+08:00",
-      "status": "未开始",
-      "phase": "待派发",
+      "status": "进行中",
+      "phase": "方案/既有资料只读盘点",
       "commit": null,
       "pr": null,
       "review": null,
@@ -127,7 +143,11 @@
       "merged": false,
       "deployed": false,
       "enabled": false,
-      "public_verified": false
+      "public_verified": false,
+      "dispatch_id": "A-003",
+      "owner_thread_id": "01a0fdc6-8c4e-7ff1-af4b-9db4baff8fb1",
+      "dependency_input_sha": "0e05029c1ed00713a6f66e461e6753c1e4dadb27",
+      "dependency_limit": "F01业务合同已独立审核和Linux全量开发验证，正式PR收据仍待；本阶段只读准备，不扩大网络或付费"
     },
     "F02": {
       "lane": "B",
@@ -366,8 +386,8 @@
       ],
       "deadline_at": "2026-10-08T18:00:00+08:00",
       "status": "进行中",
-      "phase": "代码复审通过，消费受审映射及短PG验证",
-      "commit": "2b9398f756507c5e58deb7f534d0d2b624850ae4",
+      "phase": "正式main基线选测已生成，短PG诊断运行中",
+      "commit": "4c11df4ba9899efb64d544e14246eabd13dfb1c8",
       "pr": null,
       "review": "APPROVED@2b9398f7，C003-P2-01 CLOSED；PG/目标能力/正式impact及Linux交付待证",
       "evidence": [
@@ -2107,6 +2127,16 @@
       "scope": "受审等级筛选/标签一致小切片，真实RED/GREEN、PG等价、无schema及生产写入",
       "status": "已送达",
       "sent_at": "2026-10-03T02:35:43.640132+08:00"
+    },
+    {
+      "id": "A-003",
+      "lane": "A",
+      "task_ids": [
+        "F03"
+      ],
+      "scope": "受测F01合同上的方案与既有来源只读矩阵，送审冻结期间树外准备",
+      "status": "已送达",
+      "sent_at": "2026-10-03T03:20:42.196658+08:00"
     }
   ],
   "decisions": [
@@ -2267,10 +2297,17 @@
       "runner_connection": "A专用DOCKER_CONFIG/context仅绑定本地socket，原verify_local_docker已PASS；各线使用独立配置目录，不覆盖全局context",
       "current_allocation": {
         "lane": "C",
-        "head": "待消费c9后固定",
+        "head": "4c11df4ba9899efb64d544e14246eabd13dfb1c8",
         "scope": "短RED与PG16等价诊断，非正式full交付",
-        "parallel_batches": 2,
-        "status": "已派发短窗口，结果后释放；不自动full"
+        "parallel_batches": 1,
+        "status": "Linux原RED有效失败，39项PG GREEN一批运行；不自动full",
+        "formal_plan": {
+          "base": "907f8de699b31a6fcc80acc78e9ba070aadc4f28",
+          "mode": "full",
+          "domains": 246,
+          "labels": 293,
+          "digest": "8745a9fd93504ace9d34f99f0723f4f551a1f0d7250c10eedd24dc6096069e2d"
+        }
       },
       "temporary_directory": "每线独立/Users/mentianlu/.codex/runtime目录作为TMPDIR；mac /var/folders未共享",
       "queue": [
@@ -2301,7 +2338,11 @@
       "B": "proposal固定于48c51fb1 lanes/B/B-002-test-mapping-proposal.json，待A增量稳定后衔接；未覆盖共享配置",
       "shared_blocker": "九静态路径、U01 fixture与两view函数已精确补齐；A先完成旧0e在途，再消费控制生成真实base计划，不自动重复full",
       "shared_control_sha": "c9c798ac6190c1ad3f6ed8abb804b453641bc507",
-      "shared_control_review": "APPROVED，R独立30tests与边界验证PASS；真实main计划和full仍待"
+      "shared_control_review": "APPROVED，R独立30tests与边界验证PASS；真实main计划和full仍待",
+      "A_remaining": [
+        "F01-contract-examples.json:真实行为fixture -> content_contracts",
+        "F01-validation.json:纯报告 -> 精确docs；A固定补丁后送R"
+      ]
     }
   },
   "source_main_last_verified": {
