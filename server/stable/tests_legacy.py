@@ -396,7 +396,8 @@ class MultiRegionAttributionAndGateTests(TestCase):
         response = self.client.get("/", {"region": RacingRegion.FRANCE})
 
         self.assertEqual(list(visible), [article])
-        self.assertContains(response, article.title_zh)
+        self.assertRedirects(response, "/", status_code=301)
+        self.assertContains(self.client.get(response.url), article.title_zh)
 
     @override_settings(
         QQ_PUSH_SCOPE="all_public",
@@ -577,10 +578,12 @@ class MultiRegionAttributionAndGateTests(TestCase):
         self.assertEqual(article.region_display_text, "美国 · 相关：日本 / 法国")
         self.assertIn("地区：美国", message)
         self.assertIn("关联地区：日本 / 法国", message)
-        self.assertContains(response, "主地区：")
-        self.assertContains(response, "美国")
-        self.assertContains(response, "关联地区：")
-        self.assertContains(response, "日本 / 法国")
+        self.assertNotContains(response, "主地区：")
+        self.assertContains(response, article.title_zh)
+        self.assertNotContains(response, "关联地区：")
+        self.assertNotContains(response, "日本 / 法国")
+        self.assertEqual(article.related_region_links.count(), 2)
+        self.assertLess(message.index("地区：美国"), message.index("关联地区：日本 / 法国"))
 
     @override_settings(MULTIREGION_RELATED_REGION_QUERIES_ENABLED=False)
     def test_public_region_display_fallback_hides_related_regions_without_deleting_them(self):
@@ -597,8 +600,8 @@ class MultiRegionAttributionAndGateTests(TestCase):
 
         self.assertEqual(article.region_display_text, "美国")
         self.assertEqual(article.related_region_display_text, "")
-        self.assertContains(detail_response, "主地区：")
-        self.assertContains(detail_response, "美国")
+        self.assertNotContains(detail_response, "主地区：")
+        self.assertContains(detail_response, article.title_zh)
         self.assertNotContains(detail_response, "关联地区：")
         self.assertContains(home_response, article.title_zh)
         self.assertNotContains(home_response, "相关：日本")
@@ -14611,7 +14614,7 @@ class TermbaseSeedDataPreparationTests(TestCase):
             root = Path(tmp)
             input_dir = root / "fixtures"
             output_dir = root / "out"
-            terms_seed_before = Path("server/stable/data/terms_seed.csv").read_text(encoding="utf-8")
+            terms_seed_before = (Path(__file__).resolve().parent / "data/terms_seed.csv").read_text(encoding="utf-8")
             counts_before = {
                 "term_entries": TermEntry.objects.count(),
                 "term_aliases": TermAlias.objects.count(),
@@ -14661,7 +14664,7 @@ class TermbaseSeedDataPreparationTests(TestCase):
             self.assertTrue(candidates_path.exists())
             self.assertTrue(conflicts_path.exists())
             self.assertTrue(summary_path.exists())
-            self.assertEqual(Path("server/stable/data/terms_seed.csv").read_text(encoding="utf-8"), terms_seed_before)
+            self.assertEqual((Path(__file__).resolve().parent / "data/terms_seed.csv").read_text(encoding="utf-8"), terms_seed_before)
             self.assertEqual(TermEntry.objects.count(), counts_before["term_entries"])
             self.assertEqual(TermAlias.objects.count(), counts_before["term_aliases"])
             self.assertEqual(TermCandidate.objects.count(), counts_before["term_candidates"])
@@ -16252,7 +16255,7 @@ class RaceEventPageMVPTests(TestCase):
             csv_path = Path(tmp) / "invalid-races.csv"
             csv_path.write_text(
                 "year,slug,original_name,chinese_name,country_region,racecourse,grade_text,surface,priority\n"
-                "2026,bad-race,Bad Race,错误赛事,japan,东京竞马场,G1,grass,P9\n",
+                "2025,bad-race,Bad Race,错误赛事,japan,东京竞马场,G1,grass,P9\n",
                 encoding="utf-8",
             )
 
@@ -16267,7 +16270,7 @@ class RaceEventPageMVPTests(TestCase):
             csv_path = Path(tmp) / "synthetic-races.csv"
             csv_path.write_text(
                 "year,slug,original_name,chinese_name,country_region,racecourse,grade_text,surface,local_date,visibility_status\n"
-                "2026,synthetic-stakes,Synthetic Stakes,Synthetic Stakes,united_states,Turfway Park,G3,synthetic,2026-03-21,published\n",
+                "2025,synthetic-stakes,Synthetic Stakes,Synthetic Stakes,united_states,Turfway Park,G3,synthetic,2025-03-21,published\n",
                 encoding="utf-8",
             )
             call_command("import_race_events", "--csv", str(csv_path), stdout=StringIO())
@@ -16280,10 +16283,14 @@ class RaceEventPageMVPTests(TestCase):
 
     def test_seed_sample_import_covers_five_regions_and_calendar_visibility(self):
         sample_path = Path(django_settings.BASE_DIR) / "stable" / "data" / "race_events_seed_sample.csv"
-        call_command("import_race_events", "--csv", str(sample_path), stdout=StringIO())
+        # 该测试只验证 CSV 格式和五地区显示；当年 descriptor 另有正反例。
+        with tempfile.TemporaryDirectory() as tmp:
+            historical_sample = Path(tmp) / "sample-2025.csv"
+            historical_sample.write_text(sample_path.read_text().replace("2026", "2025"))
+            call_command("import_race_events", "--csv", str(historical_sample), stdout=StringIO())
 
         regions = set(RaceEvent.objects.exclude(slug="takarazuka-kinen").values_list("country_region", flat=True))
-        response = self.client.get(reverse("public-race-calendar"), {"tab": "all", "direction": "future", "cursor": "2026-06-28"})
+        response = self.client.get(reverse("public-race-calendar"), {"tab": "all", "direction": "future", "cursor": "2025-06-28"})
 
         self.assertTrue(
             {

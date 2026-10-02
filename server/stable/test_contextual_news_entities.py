@@ -784,7 +784,7 @@ class ContextualTranslationConsistencyTests(TestCase):
         )
 
         with patch.object(provider, "_request_completion", return_value=response):
-            with self.assertRaisesRegex(TranslationResponseError, "required person terms"):
+            with self.assertRaisesRegex(TranslationResponseError, "required deterministic term placeholder"):
                 provider.translate(article)
 
     def test_fallback_rewrite_does_not_reintroduce_rejected_horse_mapping(self):

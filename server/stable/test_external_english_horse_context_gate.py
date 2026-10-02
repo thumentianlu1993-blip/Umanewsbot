@@ -1375,7 +1375,7 @@ class ExternalEnglishHorseContextGateTests(TestCase):
     def test_rewrite_provider_alias_only_placeholders_only_confirmed_source_occurrence(self):
         self._external_alias(
             "Brilliant",
-            external_id="sl-rewrite-occurrence-placeholder",
+            external_id="sl-rewrite-occurrence",
         )
         article = self._article(
             source_article_id="rewrite-alias-occurrence-placeholder",

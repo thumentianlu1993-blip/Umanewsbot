@@ -68,7 +68,7 @@ class P0RacecardUrlDiscoveryConfigurationTests(SimpleTestCase):
             encoding="utf-8"
         )
         self.assertIn(
-            "./runtime/upcoming_racecard_urls:"
+            "${UMANEWS_PERSISTENT_RUNTIME_ROOT:-./runtime}/upcoming_racecard_urls:"
             "/app/runtime/upcoming_racecard_urls:rw",
             compose,
         )

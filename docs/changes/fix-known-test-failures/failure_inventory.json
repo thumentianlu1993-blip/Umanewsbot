@@ -1,0 +1,256 @@
+{
+  "source_run": 36934098673,
+  "source_sha": "95edc4c2901d2ccf428e1c497c4fcfc37ff567ed",
+  "failures": [
+    {
+      "group": 1,
+      "test": "stable.test_racing_api_horse_staging.RacingApiHorseStagingTests.test_existing_v1_receipt_is_upgraded_once_with_page_snapshot",
+      "replacement": "stable.test_racing_api_horse_staging.RacingApiHorseStagingTests.test_existing_v1_receipt_is_upgraded_once_with_page_snapshot"
+    },
+    {
+      "group": 2,
+      "test": "stable.test_historical_race_batches.HistoricalRaceBatchTests.test_first_acceptance_selects_five_regions_three_series_and_three_eras",
+      "replacement": "stable.test_historical_race_batches.HistoricalRaceBatchTests.test_first_acceptance_selects_five_regions_three_series_and_three_eras"
+    },
+    {
+      "group": 2,
+      "test": "stable.test_historical_race_batches.HistoricalRaceImporterTests.test_first_acceptance_selects_five_regions_three_series_and_three_eras",
+      "replacement": "stable.test_historical_race_batches.HistoricalRaceImporterTests.test_first_acceptance_selects_five_regions_three_series_and_three_eras"
+    },
+    {
+      "group": 2,
+      "test": "stable.test_historical_race_date_discovery.HistoricalRaceDateDiscoveryTests.test_acceptance_batch_command_exports_pending_snapshot",
+      "replacement": "stable.test_historical_race_date_discovery.HistoricalRaceDateDiscoveryTests.test_acceptance_batch_command_exports_pending_snapshot"
+    },
+    {
+      "group": 2,
+      "test": "stable.test_historical_race_date_discovery.HistoricalRaceDateDiscoveryTests.test_post_discovery_selection_requires_same_target_ids",
+      "replacement": "stable.test_historical_race_date_discovery.HistoricalRaceDateDiscoveryTests.test_post_discovery_selection_requires_same_target_ids"
+    },
+    {
+      "group": 2,
+      "test": "stable.test_historical_race_date_discovery.HistoricalRaceDateDiscoveryTests.test_pre_discovery_selection_uses_pending_targets_in_1998_stage",
+      "replacement": "stable.test_historical_race_date_discovery.HistoricalRaceDateDiscoveryTests.test_pre_discovery_selection_uses_pending_targets_in_1998_stage"
+    },
+    {
+      "group": 3,
+      "test": "stable.test_race_data_sync_providers.TheRacingApiDataSyncAdapterTests.test_one_provider_run_applies_time_racecard_and_result",
+      "replacement": "stable.test_race_data_sync_providers.TheRacingApiDataSyncAdapterTests.test_one_provider_run_applies_time_racecard_and_result"
+    },
+    {
+      "group": 3,
+      "test": "stable.test_race_data_sync_providers.TheRacingApiDataSyncAdapterTests.test_racecard_without_status_preserves_withdrawal_and_nr_is_explicit",
+      "replacement": "stable.test_race_data_sync_providers.TheRacingApiDataSyncAdapterTests.test_racecard_without_status_preserves_withdrawal_and_nr_is_explicit"
+    },
+    {
+      "group": 3,
+      "test": "stable.test_race_data_sync_providers.TheRacingApiDataSyncAdapterTests.test_same_day_exact_detail_supplies_real_terminal_evidence",
+      "replacement": "stable.test_race_data_sync_providers.TheRacingApiDataSyncAdapterTests.test_same_day_exact_detail_supplies_real_terminal_evidence"
+    },
+    {
+      "group": 3,
+      "test": "stable.test_race_data_sync_providers.TheRacingApiDataSyncAdapterTests.test_today_result_without_terminal_marker_stays_provisional",
+      "replacement": "stable.test_race_data_sync_providers.TheRacingApiDataSyncAdapterTests.test_today_result_without_terminal_marker_stays_provisional"
+    },
+    {
+      "group": 3,
+      "test": "stable.test_race_data_sync_providers.TheRacingApiDataSyncAdapterTests.test_two_events_reuse_one_region_day_racecard_snapshot",
+      "replacement": "stable.test_race_data_sync_providers.TheRacingApiDataSyncAdapterTests.test_two_events_reuse_one_region_day_racecard_snapshot"
+    },
+    {
+      "group": 4,
+      "test": "stable.test_race_live_gate_remediation_postgres.CoupledRunnerRefreshPostgresRemediationTests.test_refresh_persists_both_shared_number_legacy_rows_by_external_id",
+      "replacement": "stable.test_race_live_gate_remediation_postgres.CoupledRunnerRefreshPostgresRemediationTests.test_refresh_persists_both_shared_number_legacy_rows_by_external_id"
+    },
+    {
+      "group": 5,
+      "test": "stable.test_news_production_integrity.StaleCrawlManifestTests.test_integrity_audit_command_is_read_only",
+      "replacement": "stable.test_news_production_integrity.StaleCrawlManifestTests.test_integrity_audit_command_is_read_only"
+    },
+    {
+      "group": 6,
+      "test": "stable.test_contextual_news_entities.ContextualTranslationConsistencyTests.test_person_term_placeholder_loss_rejects_transliterated_name",
+      "replacement": "stable.test_contextual_news_entities.ContextualTranslationConsistencyTests.test_person_term_placeholder_loss_rejects_transliterated_name"
+    },
+    {
+      "group": 7,
+      "test": "stable.test_race_data_sync_repair.StalledEventRepairTests.test_apply_repairs_stalled_event",
+      "replacement": "stable.test_race_data_sync_repair.StalledEventRepairTests.test_apply_repairs_stalled_event"
+    },
+    {
+      "group": 8,
+      "test": "stable.test_external_english_horse_context_gate.ExternalEnglishHorseContextGateTests.test_rewrite_provider_alias_only_placeholders_only_confirmed_source_occurrence",
+      "replacement": "stable.test_external_english_horse_context_gate.ExternalEnglishHorseContextGateTests.test_rewrite_provider_alias_only_placeholders_only_confirmed_source_occurrence"
+    },
+    {
+      "group": 9,
+      "test": "stable.test_racing_api_horse_staging_postgresql.RacingApiHorseStagingPostgresqlConcurrencyTests.test_same_manifest_concurrency_creates_one_receipt_and_one_replay",
+      "replacement": "stable.test_racing_api_horse_staging_postgresql.RacingApiHorseStagingPostgresqlConcurrencyTests.test_same_manifest_concurrency_creates_one_receipt_and_one_replay"
+    },
+    {
+      "group": 10,
+      "test": "stable.test_historical_calendar_runner_helpers.CurrentYearSourceOverrideRunnerTests.test_classified_reuse_rejects_old_cutoff_identity",
+      "replacement": "stable.test_historical_calendar_runner_helpers.CurrentYearSourceOverrideRunnerTests.test_classifier_recomputes_for_new_cutoff"
+    },
+    {
+      "group": 10,
+      "test": "stable.test_historical_calendar_runner_helpers.CurrentYearSourceOverrideRunnerTests.test_hong_kong_runner_archives_and_rebuilds_pre_cutoff_bootstrap",
+      "replacement": "stable.test_historical_calendar_runner_helpers.CurrentYearSourceOverrideRunnerTests.test_hkjc_pre_cutoff_catalog_is_rejected_without_mutation"
+    },
+    {
+      "group": 10,
+      "test": "stable.test_historical_calendar_runner_helpers.CurrentYearSourceOverrideRunnerTests.test_hong_kong_runner_binds_same_cutoff_and_request_manifest_to_both_stages",
+      "replacement": "stable.test_historical_calendar_runner_helpers.CurrentYearSourceOverrideRunnerTests.test_hkjc_request_and_prepare_require_identical_cutoff"
+    },
+    {
+      "group": 10,
+      "test": "stable.test_historical_calendar_runner_helpers.CurrentYearSourceOverrideRunnerTests.test_partial_cache_retries_failed_url_and_preserves_attempt_audit",
+      "replacement": "stable.test_historical_calendar_runner_helpers.CurrentYearSourceOverrideRunnerTests.test_partial_cache_retry_failure_remains_auditable"
+    },
+    {
+      "group": 10,
+      "test": "stable.test_historical_calendar_runner_helpers.KnownCalendarShardRunnerTests.test_parse_artifact_reuse_requires_exact_selection_catalog_and_tool_identity",
+      "replacement": "stable.test_historical_calendar_runner_helpers.KnownCalendarShardRunnerTests.test_prepare_recomputes_with_current_parser_and_binds_inputs"
+    },
+    {
+      "group": 10,
+      "test": "stable.test_historical_calendar_runner_helpers.KnownCalendarShardRunnerTests.test_parse_rebuilds_successful_artifact_without_current_execution_identity",
+      "replacement": "stable.test_historical_calendar_runner_helpers.KnownCalendarShardRunnerTests.test_prepare_refuses_existing_output_without_modifying_it"
+    },
+    {
+      "group": 10,
+      "test": "stable.test_historical_calendar_runner_helpers.KnownCalendarShardRunnerTests.test_standard_cache_retries_only_failed_urls_and_preserves_attempt_audit",
+      "replacement": "stable.test_historical_calendar_runner_helpers.KnownCalendarShardRunnerTests.test_standard_cache_retry_preserves_success_and_attempts"
+    },
+    {
+      "group": 10,
+      "test": "stable.test_historical_calendar_runner_helpers.KnownCalendarShardRunnerTests.test_toba_cache_retries_failed_url_and_preserves_attempt_audit",
+      "replacement": "stable.test_historical_calendar_runner_helpers.KnownCalendarShardRunnerTests.test_toba_cache_retry_preserves_failed_attempts"
+    },
+    {
+      "group": 10,
+      "test": "stable.test_historical_calendar_runner_helpers.KnownCalendarShardRunnerTests.test_toba_fetch_uses_guarded_docker_network_stage",
+      "replacement": "stable.test_historical_calendar_runner_helpers.KnownCalendarShardRunnerTests.test_cache_cli_enforces_network_budget_interval_and_disk"
+    },
+    {
+      "group": 11,
+      "test": "stable.test_race_event_crawl_orchestration.RaceEventCrawlFirstAcceptanceFixtureTests.test_first_acceptance_rejects_missing_region_adapter_coverage",
+      "replacement": "stable.test_race_event_crawl_orchestration.RaceEventCrawlFirstAcceptanceFixtureTests.test_first_acceptance_rejects_missing_region_adapter_coverage"
+    },
+    {
+      "group": 11,
+      "test": "stable.tests_legacy.TermbaseSeedDataPreparationTests.test_prepare_seed_command_generates_review_files_without_db_writes",
+      "replacement": "stable.tests_legacy.TermbaseSeedDataPreparationTests.test_prepare_seed_command_generates_review_files_without_db_writes"
+    },
+    {
+      "group": 12,
+      "test": "stable.test_historical_race_detail_runner_v2_contract.HistoricalDetailRunnerV2HostLockAndCheckpointTests.test_shared_host_lock_limits_two_processes_and_appends_both_shards",
+      "replacement": "stable.test_historical_race_detail_runner_v2_contract.HistoricalDetailRunnerV2HostLockAndCheckpointTests.test_shared_host_lock_limits_two_processes_and_appends_both_shards"
+    },
+    {
+      "group": 13,
+      "test": "stable.test_historical_batch_pipeline.HistoricalBatchStageVerifierTests.test_verifier_reports_date_source_count_status_and_visibility_drift",
+      "replacement": "stable.test_historical_batch_pipeline.HistoricalBatchStageVerifierTests.test_verifier_reports_date_source_count_status_and_visibility_drift"
+    },
+    {
+      "group": 13,
+      "test": "stable.test_race_data_sync_repair.StalledEventRepairTests.test_apply_rejects_entry_closed_since_dry_run",
+      "replacement": "stable.test_race_data_sync_repair.StalledEventRepairTests.test_apply_rejects_entry_closed_since_dry_run"
+    },
+    {
+      "group": 13,
+      "test": "stable.tests.test_race_result_recovery_application_projection.RecoveryProjectionContractTests.test_apply_rejects_manifest_bound_current_revision_drift",
+      "replacement": "stable.tests.test_race_result_recovery_application_projection.RecoveryProjectionContractTests.test_apply_rejects_manifest_bound_current_revision_drift"
+    },
+    {
+      "group": 14,
+      "test": "stable.tests.test_page_regression.CalendarPageTermDisplayTests.test_calendar_race_name_shows_chinese",
+      "replacement": "stable.tests.test_page_regression.CalendarPageTermDisplayTests.test_calendar_race_name_shows_chinese"
+    },
+    {
+      "group": 14,
+      "test": "stable.tests.test_page_regression.CalendarQueryCountTests.test_calendar_40_events_query_count_gate",
+      "replacement": "stable.tests.test_page_regression.CalendarQueryCountTests.test_calendar_40_events_query_count_gate"
+    },
+    {
+      "group": 14,
+      "test": "stable.tests.test_race_result_recovery_application_projection.CanonicalProductLinkContractTests.test_service_rejects_cross_region_year_chain_and_cycle",
+      "replacement": "stable.tests.test_race_result_recovery_application_projection.CanonicalProductLinkContractTests.test_service_rejects_cross_region_year_chain_and_cycle"
+    },
+    {
+      "group": 15,
+      "test": "stable.tests_legacy.RaceEventPageMVPTests.test_csv_import_dry_run_rejects_invalid_choice_values",
+      "replacement": "stable.tests_legacy.RaceEventPageMVPTests.test_csv_import_dry_run_rejects_invalid_choice_values"
+    },
+    {
+      "group": 15,
+      "test": "stable.tests_legacy.RaceEventPageMVPTests.test_csv_import_supports_synthetic_surface",
+      "replacement": "stable.tests_legacy.RaceEventPageMVPTests.test_csv_import_supports_synthetic_surface"
+    },
+    {
+      "group": 15,
+      "test": "stable.tests_legacy.RaceEventPageMVPTests.test_seed_sample_import_covers_five_regions_and_calendar_visibility",
+      "replacement": "stable.tests_legacy.RaceEventPageMVPTests.test_seed_sample_import_covers_five_regions_and_calendar_visibility"
+    },
+    {
+      "group": 16,
+      "test": "stable.test_migration_history_repair.MigrationHistoryRepairLeafSetRedTests.test_management_command_accepts_repeated_complete_leaf_set",
+      "replacement": "stable.test_migration_history_repair.MigrationHistoryRepairLeafSetRedTests.test_management_command_accepts_repeated_complete_leaf_set"
+    },
+    {
+      "group": 17,
+      "test": "stable.test_multiregion_rollout_change.SingleArticleVisibilityTests.test_related_queries_are_ineffective_outside_enforce",
+      "replacement": "stable.test_multiregion_rollout_change.SingleArticleVisibilityTests.test_related_queries_are_ineffective_outside_enforce"
+    },
+    {
+      "group": 17,
+      "test": "stable.test_multiregion_rollout_change.SingleArticleVisibilityTests.test_related_region_page_returns_one_article_with_stable_pagination",
+      "replacement": "stable.test_multiregion_rollout_change.SingleArticleVisibilityTests.test_related_region_page_returns_one_article_with_stable_pagination"
+    },
+    {
+      "group": 17,
+      "test": "stable.tests_legacy.MultiRegionAttributionAndGateTests.test_public_feed_region_filter_includes_related_region_articles",
+      "replacement": "stable.tests_legacy.MultiRegionAttributionAndGateTests.test_public_feed_region_filter_includes_related_region_articles"
+    },
+    {
+      "group": 18,
+      "test": "stable.tests_legacy.MultiRegionAttributionAndGateTests.test_public_region_display_fallback_hides_related_regions_without_deleting_them",
+      "replacement": "stable.tests_legacy.MultiRegionAttributionAndGateTests.test_public_region_display_fallback_hides_related_regions_without_deleting_them"
+    },
+    {
+      "group": 18,
+      "test": "stable.tests_legacy.MultiRegionAttributionAndGateTests.test_region_display_and_qq_message_show_primary_before_related_regions",
+      "replacement": "stable.tests_legacy.MultiRegionAttributionAndGateTests.test_region_display_and_qq_message_show_primary_before_related_regions"
+    },
+    {
+      "group": 19,
+      "test": "stable.tests_legacy.P0HorseProfileDataCompletionTests.test_public_detail_basic_tier_renders_with_in_progress_badge",
+      "replacement": "stable.tests_legacy.P0HorseProfileDataCompletionTests.test_public_detail_basic_tier_renders_with_in_progress_badge"
+    },
+    {
+      "group": 19,
+      "test": "stable.tests_legacy.P0HorseProfileDataCompletionTests.test_public_horse_detail_uses_original_name_when_translation_is_pending",
+      "replacement": "stable.tests_legacy.P0HorseProfileDataCompletionTests.test_public_horse_detail_uses_original_name_when_translation_is_pending"
+    },
+    {
+      "group": 19,
+      "test": "stable.tests_legacy.P0HorseProfileDataCompletionTests.test_public_index_keeps_positive_label_for_complete_profiles",
+      "replacement": "stable.tests_legacy.P0HorseProfileDataCompletionTests.test_public_index_keeps_positive_label_for_complete_profiles"
+    },
+    {
+      "group": 19,
+      "test": "stable.tests_legacy.P0HorseProfileDataCompletionTests.test_public_index_shows_in_progress_badge_for_incomplete_profiles",
+      "replacement": "stable.tests_legacy.P0HorseProfileDataCompletionTests.test_public_index_shows_in_progress_badge_for_incomplete_profiles"
+    },
+    {
+      "group": 20,
+      "test": "stable.test_lifecycle_shadow_hardening.SupportedDeployOneOffInventoryTests.test_all_deploy_wrapper_run_calls_are_canonical_and_lock_contracts_remain",
+      "replacement": "stable.test_lifecycle_shadow_hardening.SupportedDeployOneOffInventoryTests.test_all_deploy_wrapper_run_calls_are_canonical_and_lock_contracts_remain"
+    },
+    {
+      "group": 21,
+      "test": "stable.test_p0_racecard_url_discovery.P0RacecardUrlDiscoveryConfigurationTests.test_production_worker_mounts_the_persistent_document_directory",
+      "replacement": "stable.test_p0_racecard_url_discovery.P0RacecardUrlDiscoveryConfigurationTests.test_production_worker_mounts_the_persistent_document_directory"
+    }
+  ]
+}

@@ -1,3 +1,15 @@
+## 2026-10-02 已知测试失败修复（本地完成，待云端验证与交付）
+
+已对 CI36934098673 的50项既有失败建立逐项映射：修复马匹快照回执类型超长、历史首批五地区
+范围漂移及马匹公开提示；其余测试按当前合同修正时间、合法fixture、路径和旧规则，9项临时脚本
+测试迁到正式工具。501项直接相关回归按122/141/147/91四批通过、零失败零跳过；本地18项0079
+合同与12项入口自测通过。方案独立审核已修订通过，代码review两项验证工具finding已修复，原 reviewer 复审APPROVED。
+
+新增手动 known-failures CI入口，默认全量行为暂未改造；本次按用户要求不运行全量stable。
+无迁移、生产配置或数据动作，未合并/未发布。新鲜只读生产仍95edc4c2/0079；
+详见[方案与范围](changes/fix-known-test-failures/spec.md)、[验证](changes/fix-known-test-failures/validation.md)
+及[发布包](changes/fix-known-test-failures/rollout.md)。最终固定SHA云端结果以该PR检查和交付记录为准。
+
 ## 2026-10-02 第一批上线验收完成，第二阶段设计完成（未实施）
 
 PR229 恢复与 PR230 队列补正均已合并上线。当前实际运行目录 `/opt/umanews-release-95edc4c2-coverage-queue-20261002/umanewsbot`，候选 `95edc4c2`、镜像 `sha256:6bcae2608d47a0a184a3daf4ae65c99f645a551ebf70634bef2ec4be423658e6`，四应用一致、schema0079/迁移空计划、配置值不变、发布锁已释放。固定 CI：基线5678/候选5682，两端50项既有失败、新增0；67项发布合同及146项本地相关回归通过。

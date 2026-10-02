@@ -300,7 +300,8 @@ class StaleCrawlManifestTests(TestCase):
         payload = json.loads(stdout.getvalue())
         self.assertEqual(before["jobs"], CrawlJob.objects.count())
         self.assertEqual(before["logs"], TaskExecutionLog.objects.count())
-        self.assertFalse(payload["index"]["supported"])
+        from django.db import connection
+        self.assertEqual(payload["index"]["supported"], connection.vendor == "postgresql")
         self.assertEqual(payload["crawl_jobs"]["failed"], 1)
         self.assertEqual(payload["sources"][0]["failure_categories"]["parse_error"], 1)
 

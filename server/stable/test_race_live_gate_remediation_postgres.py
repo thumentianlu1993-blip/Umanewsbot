@@ -354,6 +354,9 @@ class CoupledRunnerInitializationPostgresRemediationTests(
 
 
 @skipUnless(connection.vendor == "postgresql", "requires PostgreSQL")
+@override_settings(
+    **multiregion_tests.RaceLiveRacecardRefreshBehaviorTests._overridden_settings
+)
 class CoupledRunnerRefreshPostgresRemediationTests(TransactionTestCase):
     reset_sequences = True
     NOW = multiregion_tests.RaceLiveRacecardRefreshBehaviorTests.NOW

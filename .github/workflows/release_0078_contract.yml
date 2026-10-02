@@ -9,12 +9,21 @@ on:
       - 'server/stable/**'
       - 'scripts/test_release_0078_contract.sh'
       - '.github/workflows/release_0078_contract.yml'
+      - 'scripts/run_bounded_stable_tests.py'
+      - 'scripts/verify_bounded_stable_evidence.py'
+      - 'docs/changes/fix-known-test-failures/*.json'
   workflow_dispatch:
     inputs:
       baseline_sha:
         description: '用于同环境对照的完整40位基线提交SHA'
         required: true
         type: string
+      validation_scope:
+        description: '本次验证范围；有界入口不表示全量通过'
+        required: true
+        default: full
+        type: choice
+        options: [full, known-failures]
 
 permissions:
   contents: read
@@ -72,6 +81,7 @@ jobs:
           if-no-files-found: error
 
   stable-baseline-comparison:
+    if: github.event_name != 'workflow_dispatch' || inputs.validation_scope != 'known-failures'
     name: stable 全量对照 (${{ matrix.revision }})
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -180,7 +190,7 @@ jobs:
   compare-stable-failures:
     name: stable 新增失败检查
     needs: stable-baseline-comparison
-    if: always()
+    if: always() && (github.event_name != 'workflow_dispatch' || inputs.validation_scope != 'known-failures')
     runs-on: ubuntu-24.04
     permissions:
       actions: read
@@ -221,3 +231,71 @@ jobs:
         with:
           name: stable-comparison
           path: evidence/comparison.json
+
+  bounded-regression:
+    name: 已知失败相关回归 (${{ matrix.batch }})
+    if: github.event_name == 'workflow_dispatch' && inputs.validation_scope == 'known-failures'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        batch: ['1', '2', '3', '4']
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: bounded_ci
+          POSTGRES_USER: bounded_ci
+          POSTGRES_PASSWORD: synthetic-ci-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U bounded_ci -d bounded_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: '5432'
+      POSTGRES_DB: bounded_ci
+      POSTGRES_USER: bounded_ci
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: 验证有界入口并运行固定批次
+        run: |
+          python scripts/tests/test_bounded_stable_tests.py
+          python scripts/run_bounded_stable_tests.py --batch '${{ matrix.batch }}' --output evidence/result.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bounded-${{ matrix.batch }}
+          path: evidence
+          if-no-files-found: error
+
+  bounded-completeness:
+    name: 有界回归完整性（不是全量测试）
+    needs: [bounded-regression, release-contract]
+    if: always() && github.event_name == 'workflow_dispatch' && inputs.validation_scope == 'known-failures'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: bounded-*
+          path: evidence
+      - name: 核对 SHA、四批完整集合、50项归宿及零跳过
+        env:
+          RELEASE_RESULT: ${{ needs.release-contract.result }}
+          BOUNDED_RESULT: ${{ needs.bounded-regression.result }}
+        run: |
+          test "$RELEASE_RESULT" = success
+          test "$BOUNDED_RESULT" = success
+          python scripts/verify_bounded_stable_evidence.py --root evidence --sha '${{ github.sha }}'

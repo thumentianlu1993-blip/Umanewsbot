@@ -9,9 +9,10 @@
     <section class="horse-hero">
       <div class="horse-hero-top">
         <div class="horse-hero-main">
-          <span class="horse-hero-kicker">{{ profile.get_racing_region_display }} · {{ profile.get_completeness_status_display }}</span>
+          <span class="horse-hero-kicker">{{ profile.get_racing_region_display }} · {{ profile.public_completeness_badge }}</span>
           <h1 class="horse-hero-name">{{ profile.display_name }}</h1>
           <p class="horse-hero-original">{{ profile.original_name|default:profile.english_name }}{% if profile.birth_date %} · {{ profile.birth_date|date:"Y" }} 年生{% endif %}{% if profile.color %} · {{ profile.color }}{% endif %}{% if profile.sex %} · {{ profile.sex }}{% endif %}</p>
+          {% if not profile.display_name_zh and not profile.primary_term.target_zh %}<p class="muted">中文译名待补</p>{% endif %}
           <div class="horse-hero-meta">
             {% if profile.trainer_name %}<span>练马师：{{ profile.trainer_name }}</span>{% endif %}
             {% if major_wins %}<span>主胜鞍：{% for record in major_wins|slice:":3" %}{% race_field record "name" record.display_race_name %}{% if not forloop.last %} / {% endif %}{% endfor %}</span>{% endif %}

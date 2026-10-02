@@ -39,8 +39,8 @@ class RacingApiHorseStagingPostgresqlConcurrencyTests(TransactionTestCase):
             rendezvous = Barrier(2)
             original_validate = staging_service._validate_and_plan
 
-            def synchronized_validate(normalized):
-                plan = original_validate(normalized)
+            def synchronized_validate(normalized, **kwargs):
+                plan = original_validate(normalized, **kwargs)
                 rendezvous.wait(timeout=15)
                 return plan
 

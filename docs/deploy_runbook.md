@@ -1,3 +1,18 @@
+## 2026-10-02 已知失败修复的有界验证入口
+
+本次修复使用 `.github/workflows/release_0078_contract.yml` 的手动输入
+`validation_scope=known-failures`，共501项/4批，每批上限200；同时保留67项发布合同。
+默认 `full` 和其他PR触发规则仍沿用原行为。本次PR提交包含 `[skip ci]`，避免自动全量；
+随后对精确分支候选手动触发，不能把跳过的自动任务当通过。
+
+本地命令：`python scripts/run_bounded_stable_tests.py --batch 1 --output /tmp/batch1.json`，
+批次1至4逐批运行，要求专用合成PG（默认127.0.0.1:55482/bounded_ci，固定合成密码），
+不得指向生产。CI提供独立PG16。runner禁用dotenv/外部网络、使用memory broker与本地cache。
+
+交付须核验run的head SHA、四矩阵job及release-contract成功、完整性job通过。
+汇总拒绝漏项、重复、测试跳过、错误SHA和任一失败，包括测试数据库清理异常。
+这是明确范围的回归结果，不代表stable全量通过。生产门禁仍只引用根AGENTS.md。
+
 ## 2026-10-02 覆盖监控发布与验收口径
 
 当前运行目录 `/opt/umanews-release-95edc4c2-coverage-queue-20261002/umanewsbot`，95edc4c2 / 6bcae2608d47、schema0079；PR230无迁移和配置值变化，不重复七场恢复。精确intent/镜像/备份/complete摘要见[执行记录](changes/race-coverage-recovery-20261002/rollout.md)，恢复必须使用该批证据，不能用旧控制镜像或普通compose up替代。

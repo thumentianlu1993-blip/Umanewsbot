@@ -965,7 +965,7 @@ class RacingApiHorseStagingTests(TestCase):
         )
         self.assertEqual(
             ExternalDataImportRun.objects.filter(
-                target_type="targeted_horse_profile_snapshot_v1"
+                target_type="horse_profile_snapshot_v1"
             ).count(),
             1,
         )

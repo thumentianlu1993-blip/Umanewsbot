@@ -92,12 +92,15 @@ class SingleArticleVisibilityTests(TestCase):
         NewsArticleRelatedRegion.objects.create(article=article, region=RacingRegion.FRANCE, source="test")
         NewsArticleRelatedRegion.objects.create(article=article, region=RacingRegion.JAPAN, source="test")
 
-        first = self.client.get("/", {"region": RacingRegion.FRANCE, "page": 1})
-        second = self.client.get("/", {"region": RacingRegion.FRANCE, "page": 1})
+        redirect = self.client.get("/", {"region": RacingRegion.FRANCE, "page": 1})
+        self.assertRedirects(redirect, "/?page=1", status_code=301)
+        first = self.client.get(redirect.url)
+        second = self.client.get(redirect.url)
 
         self.assertEqual(first.status_code, 200)
         self.assertContains(first, article.title_zh)
-        self.assertEqual(first.content, second.content)
+        self.assertEqual(list(first.context["page_obj"]), list(second.context["page_obj"]))
+        self.assertEqual(first.context["page_obj"].paginator.count, 1)
         self.assertEqual(NewsArticle.objects.filter(pk=article.pk).count(), 1)
 
     @override_settings(
@@ -110,7 +113,8 @@ class SingleArticleVisibilityTests(TestCase):
 
         response = self.client.get("/", {"region": RacingRegion.FRANCE})
 
-        self.assertNotContains(response, article.title_zh)
+        self.assertRedirects(response, "/", status_code=301)
+        self.assertContains(self.client.get(response.url), article.title_zh)
 
     @override_settings(
         MULTIREGION_ATTRIBUTION_MODE="enforce",

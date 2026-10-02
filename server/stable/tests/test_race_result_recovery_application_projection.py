@@ -428,7 +428,7 @@ class CanonicalProductLinkContractTests(
             "identity-foreign",
             region=models.RacingRegion.FRANCE,
         )
-        foreign_year = self._event("identity-year", year=2025)
+        foreign_year = self._event("identity-year", year=2025, local_date=date(2025, 7, 20))
 
         for target, reason in (
             (foreign_region, "canonical_region_mismatch"),
@@ -760,7 +760,8 @@ class RecoveryProjectionContractTests(
             applied_by=self.user,
         )
         control.current_result_revision = drift
-        control.save(update_fields=("current_result_revision", "updated_at"))
+        control.next_result_revision_no = drift.revision_no + 1
+        control.save(update_fields=("current_result_revision", "next_result_revision_no", "updated_at"))
         with tempfile.TemporaryDirectory() as temporary:
             with self.assertRaises(projection.RecoveryApplyBlocked) as caught:
                 projection.apply_recovery_event(

@@ -2018,19 +2018,19 @@ class HistoricalBatchStageVerifierTests(TestCase):
                         output=str(root / f"report-{label}.json"),
                     )
 
-            RaceEvent.objects.filter(pk=self.event.pk).update(local_date=date(2024, 1, 2))
+            self.event.local_date = date(2024, 1, 2)
+            self.event.save(update_fields=("local_date", "updated_at"))
             assert_rejected("date")
-            RaceEvent.objects.filter(pk=self.event.pk).update(local_date=date(2024, 1, 1))
+            self.event.local_date = date(2024, 1, 1)
+            self.event.save(update_fields=("local_date", "updated_at"))
 
-            RaceEvent.objects.filter(pk=self.event.pk).update(source_refs={})
+            self.event.source_refs = {}
+            self.event.save(update_fields=("source_refs", "updated_at"))
             assert_rejected("source")
-            RaceEvent.objects.filter(pk=self.event.pk).update(
-                source_refs={
-                    "detail_discovery": {
-                        "approved_detail_sources": [{"url": "https://example.test/1"}]
-                    }
-                }
-            )
+            self.event.source_refs = {
+                "detail_discovery": {"approved_detail_sources": [{"url": "https://example.test/1"}]}
+            }
+            self.event.save(update_fields=("source_refs", "updated_at"))
 
             RaceEventRunner.objects.filter(event=self.event).delete()
             assert_rejected("runner-count")

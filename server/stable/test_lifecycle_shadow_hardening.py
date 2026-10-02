@@ -1638,6 +1638,10 @@ class SupportedDeployOneOffInventoryTests(SimpleTestCase):
         self.assertEqual(
             paths,
             {
+                "deploy/deploy.sh",
+                "deploy/deploy_lowcost.sh",
+                "deploy/resume_stopped_release.sh",
+                "deploy/rollback_pre_single_owner.sh",
                 "deploy/run_release_tasks.sh",
                 "deploy/run_historical_calendar_release_b_preflight.sh",
                 "deploy/deploy_race_live_p0_closed.sh",
@@ -1649,6 +1653,11 @@ class SupportedDeployOneOffInventoryTests(SimpleTestCase):
         for path, line_number, line in calls:
             with self.subTest(path=path, line=line_number):
                 self.assertRegex(line, r"\brun\s+--rm\s+--no-deps\b")
+                if path in {"deploy/deploy.sh", "deploy/deploy_lowcost.sh"}:
+                    self.assertRegex(line, r"run --rm --no-deps nginx nginx -t$")
+                if path in {"deploy/resume_stopped_release.sh", "deploy/rollback_pre_single_owner.sh"}:
+                    self.assertIn("web python manage.py check_historical_calendar_release_b_schema", line)
+                    self.assertIn("--expected-migration-leaf-set=stable.", line)
 
         release = (deploy / "run_release_tasks.sh").read_text(encoding="utf-8")
         p0 = (deploy / "deploy_race_live_p0_closed.sh").read_text(encoding="utf-8")

@@ -180,6 +180,10 @@ class RaceDataTransportCapacityTests(TestCase):
 )
 class TheRacingApiDataSyncAdapterTests(TestCase):
     def setUp(self):
+        # 来源有效期、观察时间和下游合同检查共用同一时钟。
+        clock = patch("django.utils.timezone.now", return_value=NOW)
+        clock.start()
+        self.addCleanup(clock.stop)
         self.artifact_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.artifact_dir.cleanup)
         artifact_override = override_settings(
