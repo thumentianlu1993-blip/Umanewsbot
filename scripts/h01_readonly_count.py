@@ -10,6 +10,9 @@ import os
 from pathlib import Path
 import re
 import time
+import math
+import multiprocessing
+import tempfile
 
 MAX_SECONDS=120
 MAX_SELECTS=24
@@ -75,25 +78,34 @@ def templates():
     return [{'name':n,'sql':sql,'params':params,'sha256':hashlib.sha256(sql.encode()).hexdigest()} for n,sql,params in QUERIES]
 
 
-def run_counts(connection, *, revision, clock=time.monotonic):
+def run_counts(connection, *, revision, clock=time.monotonic, deadline=None):
     result=dict(status='partial',reason='not_started',declared_revision=revision if type(revision) is str and re.fullmatch('[0-9a-f]{40}',revision) else None,revision_binding='caller_metadata; not independently verified by reader',selects=0,rows=0,queries=[],inventory_complete=False,cache_coverage='unknown',account_entitlements='unknown')
     cursor=None
     try:
-        start=clock()
+        start=clock();deadline=start+MAX_SECONDS if deadline is None else min(deadline,start+MAX_SECONDS)
         if type(revision) is not str or not re.fullmatch('[0-9a-f]{40}',revision):raise ValueError('revision_binding')
         connection.set_session(readonly=True,isolation_level='REPEATABLE READ',autocommit=False)
         cursor=connection.cursor()
-        cursor.execute('SET LOCAL statement_timeout = 5000')
-        cursor.execute('SET LOCAL lock_timeout = 250')
-        cursor.execute('SET LOCAL idle_in_transaction_session_timeout = 5000')
         for name,sql,params in QUERIES:
-            if clock()-start>=MAX_SECONDS:result['reason']='wall_time';break
+            remaining=deadline-clock()
+            if remaining<=0:result['reason']='wall_time';break
             if result['selects']>=MAX_SELECTS:result['reason']='query_limit';break
+            # Round down: never grant a statement more than its remaining budget.
+            milliseconds=min(5000,int(remaining*1000))
+            if milliseconds<1:result['reason']='wall_time';break
+            cursor.execute('SET LOCAL statement_timeout = '+str(milliseconds))
+            cursor.execute('SET LOCAL lock_timeout = '+str(min(250,milliseconds)))
+            cursor.execute('SET LOCAL idle_in_transaction_session_timeout = '+str(milliseconds))
+            remaining=deadline-clock()
+            if remaining<=0:result['reason']='wall_time';break
+            milliseconds=min(5000,int(remaining*1000))
+            if milliseconds<1:result['reason']='wall_time';break
+            cursor.execute('SET LOCAL statement_timeout = '+str(milliseconds))
             began=clock();result['selects']+=1
             cursor.execute(sql,params)
             rows=cursor.fetchmany(MAX_ROWS-result['rows']+1)
             elapsed=clock()-began
-            if clock()-start>=MAX_SECONDS or elapsed>5:result['reason']='wall_time' if clock()-start>=MAX_SECONDS else 'statement_time';break
+            if clock()>=deadline or elapsed>5:result['reason']='wall_time' if clock()>=deadline else 'statement_time';break
             if result['rows']+len(rows)>MAX_ROWS:result['reason']='row_limit';break
             if name=='schema' and (len(rows)!=len(COLUMNS) or {r[0] for r in rows}!={'stable_'+t for t in COLUMNS} or any(r[1] is not True for r in rows)):
                 result['reason']='schema_mismatch';break
@@ -118,7 +130,61 @@ def run_counts(connection, *, revision, clock=time.monotonic):
     return result
 
 
+def _bounded_worker(operation, *, deadline):
+    """Mandatory CLI envelope: forked worker owns all DB calls, including cleanup.
+
+    No driver/thread cancellation is trusted. Parent kills a still-live process
+    at the deadline, closing its DB socket; backend rollback requires PG proof.
+    Direct run_counts is a diagnostic helper, not the production execution API.
+    """
+    partial=dict(status='partial',reason='wall_time',inventory_complete=False)
+    if 'fork' not in multiprocessing.get_all_start_methods():
+        return {**partial,'reason':'bounded_runtime_unavailable'}
+    with tempfile.TemporaryDirectory(prefix='h01-count-') as directory:
+        output=Path(directory)/'result.json'
+        def work():
+            try:
+                value=operation()
+                output.write_text(json.dumps(value,ensure_ascii=False,default=str))
+            except BaseException:
+                output.write_text(json.dumps({**partial,'reason':'database_or_input_error'}))
+        process=multiprocessing.get_context('fork').Process(target=work)
+        try:
+            if time.monotonic()>=deadline:return partial
+            process.start()
+            process.join(max(0,deadline-time.monotonic()))
+            if process.is_alive() or time.monotonic()>=deadline:
+                return partial
+            if process.exitcode!=0 or not output.exists():
+                return {**partial,'reason':'worker_failed'}
+            if output.stat().st_size>MAX_BYTES:
+                return {**partial,'reason':'byte_limit'}
+            return json.loads(output.read_text())
+        finally:
+            if process.pid is not None:
+                if process.is_alive():process.kill()
+                process.join(timeout=0.1)
+                if not process.is_alive():process.close()
+
+
+def _execute_database(revision, *, deadline):
+    try:
+        import psycopg2
+        remaining=deadline-time.monotonic()
+        if remaining<=0:return dict(status='partial',reason='wall_time',inventory_complete=False)
+        connection=psycopg2.connect(os.environ['H01_READONLY_DSN'],connect_timeout=max(1,min(3,math.floor(remaining))))
+    except Exception:
+        return dict(status='partial',reason='connection_failed',inventory_complete=False)
+    # Connect time consumes the same fixed outer budget; it is never added back.
+    remaining=deadline-time.monotonic()
+    if remaining<=0:
+        connection.close()
+        return dict(status='partial',reason='wall_time',inventory_complete=False)
+    return run_counts(connection,revision=revision,deadline=deadline)
+
+
 def main(argv=None):
+    deadline=time.monotonic()+MAX_SECONDS
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--execute',action='store_true')
     parser.add_argument('--revision')
@@ -129,12 +195,7 @@ def main(argv=None):
     digest=hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
     if args.expected_tool_sha256!=digest or not args.revision or not re.fullmatch('[0-9a-f]{40}',args.revision):
         print(json.dumps(dict(status='partial',reason='fixed_package_binding_missing')));return 2
-    try:
-        import psycopg2
-        connection=psycopg2.connect(os.environ['H01_READONLY_DSN'],connect_timeout=3)
-    except Exception:
-        print(json.dumps(dict(status='partial',reason='connection_failed')));return 2
-    result=run_counts(connection,revision=args.revision)
+    result=_bounded_worker(lambda:_execute_database(args.revision,deadline=deadline),deadline=deadline)
     print(json.dumps(result,ensure_ascii=False,default=str));return 0 if result['status']=='capacity_preflight_finished' else 2
 
 if __name__=='__main__':raise SystemExit(main())

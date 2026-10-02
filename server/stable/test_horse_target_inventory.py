@@ -17,6 +17,27 @@ def identity(key='jra:1', profile=1, **changes):
 class InventoryTests(unittest.TestCase):
     def plan(self, events=None, rows=None, ids=None, **changes):
         p=document();p.update(events=events or [event()],participations=rows or [row()],identities=ids if ids is not None else [identity()]);p.update(changes);return plan_inventory(p)
+    def test_unverified_old_grade_retains_locatable_candidate(self):
+        x=self.plan([event(local_date='2021-01-01',grade='UNKNOWN',grade_verified=False)])
+        self.assertEqual(len(x['targets']),1)
+        self.assertEqual(x['targets'][0]['refs'],['r1'])
+        self.assertIn('candidate',x['targets'][0]['memberships'])
+        self.assertEqual(x['counts']['historical_targets'],0)
+        self.assertEqual(x['counts']['recent_targets'],0)
+
+    def test_news_identity_conflict_rejected_consistent_and_profile_only_kept(self):
+        news=dict(horse_key='jra:1',profile_id=2,published_date='2026-10-03',confirmed=True)
+        with self.assertRaisesRegex(ValueError,'news_identity_conflict'):
+            self.plan(news=[news])
+        for ids in ([identity(),identity(profile=2)], [identity(status='retired')], [identity(status='rejected')]):
+            with self.assertRaisesRegex(ValueError,'news_identity_conflict'):
+                self.plan(ids=ids,news=[news])
+        news['profile_id']=1
+        self.assertIn('recent_news',self.plan(news=[news])['targets'][0]['reasons'])
+        news.update(horse_key=None,profile_id=2)
+        x=self.plan(news=[news])
+        self.assertIn('profile:2',{t['key'] for t in x['targets']})
+
     def test_fixed_window_not_age_and_pending_jg1(self):
         x=self.plan();self.assertEqual(x['targets'][0]['memberships'],['historical','recent']);self.assertFalse(x['complete']);self.assertIn('jg1_unresolved',x['gaps']);self.assertEqual(x['counts']['recent_targets'],1)
     def test_window_edges(self):

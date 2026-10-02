@@ -178,6 +178,7 @@ def plan_inventory(payload):
     rows_by_ref={row['ref']:row for row in p['participations']}
     def target(horse_key,event_key=None,participant_key=None,profile_id=None):
         matches=identities.get(horse_key,set())
+        if profile_id is not None and any(i['profile_id']!=profile_id for i in identity_rows.get(horse_key,[])):_fail('news_identity_conflict')
         if len(matches)>1:gaps.add('identity_conflict')
         resolved=len(matches)==1 or (profile_id is not None and not matches)
         pid=next(iter(matches)) if len(matches)==1 else profile_id if not matches else None
@@ -217,6 +218,8 @@ def plan_inventory(payload):
                 if date(2023,10,3)<=day<=date(2026,10,3) and day<=as_of:
                     if r['start_evidence'] is True:memberships.add('recent')
                     elif r['start_evidence'] is None:memberships.add('start_pending');gaps.add('start_unconfirmed')
+                if date(2020,1,1)<=day<=as_of and not e['grade_verified']:
+                    memberships.add('candidate')
                 if date(2020,1,1)<=day<=as_of and e['grade_verified']:
                     if e['grade'] in ('G1','JPN1') or (e['region']=='hong_kong' and e['hk_local_g1']):memberships.add('historical')
                     elif e['grade']=='JG1':memberships.add('historical_pending')

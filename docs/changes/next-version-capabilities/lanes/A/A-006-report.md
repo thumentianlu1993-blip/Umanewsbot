@@ -11,3 +11,13 @@
 仍待原R：固定代码与producer边界、SQL/预算控制审核，必要真实短PG语法/事务验证排队；JG1用户答复、root/F06生产只读与输入完整冻结。未运行生产查询、网络/付费、旧采集恢复或写入/发布。F03后续源/样本/35文件缺口原样保留。
 
 固定Linux开发专项验证：代码提交 `3780b662b19327ea2c40419f900053d6213ad0a7`，tree `ffa87d3807de54a94d1b9175b78290f795effab1`，既有镜像 `sha256:fcf8cdaf63af51b1b8a6e30e3d2fdf871d127c3c1461bfd00c9fc6d610eab905`。以只读git archive挂载、network none、非root既有镜像、1 CPU/1 GiB、read-only rootfs执行上述两个unittest模块，28例PASS、exit 0，未启动PG。证据目录 `/Users/mentianlu/.codex/runtime/a006-h01-linux-3780b662`；`result.json`记录命令/绑定/时间/退出码，日志SHA256 `f2a9ae0f23e9f3b0c2a2f6d8da27018fde3ca41840df299de30a2e1cf5f3f690`。这是手工开发诊断，尚非正式test-impact计划或主线收据；SQL fake与实际PG边界不变。
+
+## 原R首轮三项P2返修（待同上下文复审）
+
+P2-01：2020起精确日期但等级未证的行保留candidate及participant ref，不加入确证historical；2021旧于近期窗口用例真实RED targets0→GREEN保留1候选，历史/近期分母0。P2-02：同时给horse_key/profile_id且与现有身份观察矛盾时固定news_identity_conflict拒绝；覆盖唯一verified、多映射和retired/rejected冲突，不静默覆盖；一致引用及profile-only仍可用。新增用例先复现未raise再GREEN。
+
+P2-03：固定--execute入口强制fork worker，父进程从main入口绑定一个monotonic deadline，连接/会话/execute/fetch/rollback/close全在worker，期限到达终止仍存活worker；驱动不被信任可及时取消。每SQLstatement_timeout向下取整min(5000ms,remaining)，设置控制后执行前复算，内部也按共同deadline判partial，不把连接时间加回。剩余1秒固定5秒的行为RED已保存；实际10秒阻塞的session/cursor/execute/fetch/rollback/close及CLI连接路径各在50ms截止被终止，既有reader标签内验证，无新增harness路径。fork不可用fail closed，禁止无外层降级执行。
+
+32本地开发测试PASS，diff check PASS。证据 `/Users/mentianlu/.codex/runtime/a006-h01-review-fixes/`：p2-01-02-red/green、p2-02-03-red、p2-01-03-green1、p2-03-blocking-green、p2-01-03-green-final日志。尚未固定Linux复验或原R复审，不将本地pass当review批准。
+
+限时接口边界：run_counts仍是可注入fake连接/clock的内部开发诊断，不单独授予生产执行能力；受信执行必须经过绑定脚本摘要的main --execute强制worker包，不能以调用方metadata代替限时。截止时先kill worker，再最多100ms回收进程，这是终止后的本地资源回收，不能延长数据库执行预算；worker终止会关闭其客户端句柄，但真实PG后端连接释放/事务rollback与服务端超时仍需短PG窗口证明。父进程输出partial无重试，未把整体改成125秒，也未宣称取消后的生产恢复已验证。

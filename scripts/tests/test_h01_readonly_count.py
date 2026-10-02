@@ -18,6 +18,52 @@ class Connection:
     def rollback(self):self.rolled_back=True
     def close(self):self.closed=True
 class CountTests(unittest.TestCase):
+    def test_remaining_second_limits_sql_and_blocking_worker_is_terminated(self):
+        class Clock:
+            value=0
+            def __call__(self):
+                old=self.value
+                self.value=119
+                return old
+        c=Connection(self.good_rows())
+        run_counts(c,revision='a'*40,clock=Clock())
+        self.assertTrue(any('statement_timeout' in sql and '1000' in sql for sql,_ in c.cursor_value.sql))
+        import time
+        def blocked():
+            time.sleep(10)
+            return {'status':'incorrect_success'}
+        before=time.monotonic()
+        result=reader._bounded_worker(blocked,deadline=before+0.1)
+        self.assertLess(time.monotonic()-before,0.5)
+        self.assertEqual(result['reason'],'wall_time')
+        self.assertEqual(result['status'],'partial')
+
+    def test_actual_blocked_driver_phases_and_cli_share_kill_deadline(self):
+        import time
+        import multiprocessing
+        for phase in ('set_session','cursor','execute','fetchmany','rollback','close'):
+            with self.subTest(phase=phase):
+                c=Connection(self.good_rows())
+                owner=c if phase in ('set_session','cursor','rollback','close') else c.cursor_value
+                original=getattr(owner,phase)
+                def blocked(*args, _original=original, **kwargs):
+                    time.sleep(10)
+                    return _original(*args,**kwargs)
+                setattr(owner,phase,blocked)
+                before=time.monotonic()
+                result=reader._bounded_worker(lambda:run_counts(c,revision='a'*40),deadline=before+0.05)
+                self.assertLess(time.monotonic()-before,0.5)
+                self.assertEqual(result['reason'],'wall_time')
+                self.assertFalse(any(child.is_alive() for child in multiprocessing.active_children()))
+        def blocked_database(*args,**kwargs):
+            time.sleep(10)
+        digest=reader.hashlib.sha256(reader.Path(reader.__file__).read_bytes()).hexdigest()
+        with patch.object(reader,'MAX_SECONDS',0.05),patch.object(reader,'_execute_database',blocked_database),redirect_stdout(io.StringIO()) as output:
+            before=time.monotonic()
+            self.assertEqual(reader.main(['--execute','--revision','a'*40,'--expected-tool-sha256',digest]),2)
+            self.assertLess(time.monotonic()-before,0.5)
+        self.assertEqual(json.loads(output.getvalue())['reason'],'wall_time')
+
     def test_readonly_and_schema_fail_closed(self):
         c=Connection([[('missing_schema',False)]])
         r=run_counts(c,revision='a'*40,clock=lambda:0)

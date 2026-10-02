@@ -13,3 +13,7 @@ producer责任（未在本轮生产执行）：先核source scope/policy、schem
 SQL聚合为raw事件/参与项/已关联profile等容量预检。staging_source_id_candidates只说明键候选；profile published_at/hidden_at计数不等于真实公开可见；raw参加行不等于唯一马。没有完整loader/各地区来源覆盖、cache内容证明、身份枚举或来源权限时仍unknown，inventory_complete始终false。最近新闻上界用下日零时exclusive；不实施另包20k行/20MiB streaming。连接fake验证代码控制，不证明PostgreSQL SQL接受/真实事务或生产数量，真实PG验证如必要由root另排短窗口。
 
 本轮无shared模型/迁移/F01变更，F03剩余35文件与真实来源缺口保留。新增测试使用纯unittest；映射proposal交root，未改共享catalog/rules。不生成假的targeted plan或把手动专项Linux运行称正式PR收据。
+
+### 原R返修后的限时与冲突接口
+
+等级未证历史行保留candidate/ref；新闻双引用与任何现有身份观察不一致固定拒绝news_identity_conflict，不给冲突档案新闻优先。生产读取执行入口仅固定摘要的main --execute；该入口强制fork worker及统一120秒monotonic deadline，覆盖连接至cleanup，期限kill仍存活worker后回收。直接run_counts为开发/fake诊断，不能作为绕过外层的生产调用。fork不可用fail closed；不依赖driver取消承诺。SQL按剩余预算向下取整至ms并与5秒取min。真实PG后台回滚/释放待短窗口验证，当前实际阻塞测试只证明本地worker终止，不能证明生产数据库状态。
