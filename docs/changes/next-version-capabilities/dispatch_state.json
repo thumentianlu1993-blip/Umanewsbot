@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "timezone": "Asia/Shanghai",
-  "updated_at": "2026-10-03T03:30:29.412507+08:00",
+  "updated_at": "2026-10-03T03:39:00.172355+08:00",
   "coordinator_thread_id": "01a0fdb2-b88c-7f93-8c9e-ba9564c33c93",
   "coordinator_worktree": "/Users/mentianlu/.codex/worktrees/516a/umanews",
   "deadline_at": "2026-10-30T18:00:00+08:00",
@@ -65,7 +65,7 @@
       "title": "Umanews 10.30｜R 独立审核与验收",
       "model_evidence": "create_thread 显式指定 gpt-6.1-sol 和 medium，创建成功；启动回报已收取",
       "quota_policy_status": "已确认并独立实时复核剩余8%；无运行子代理/模型CLI",
-      "latest_report_commit": "5ee68b5c5b63c5c1e2d6eec6e38ad7a9204ef05d"
+      "latest_report_commit": "54e972504ab677f5f6edd66775898b53ffc9344c"
     }
   },
   "tasks": {
@@ -75,7 +75,7 @@
       "deps": [],
       "deadline_at": "2026-10-04T18:00:00+08:00",
       "status": "进行中",
-      "phase": "开发验证完成，最后两映射原R限定复审，正式集成待证",
+      "phase": "合同/开发验证及全部映射复审完成，已纳入隔离集成，正式full待证",
       "commit": "815b3181fa61e7fbbff714c7d7326e5598dc71a6",
       "pr": null,
       "review": "APPROVED@0e05029c；A002-P2-01/02 CLOSED；独立17 tests PASS；完整Linux/skip/收据待核",
@@ -135,19 +135,21 @@
       ],
       "deadline_at": "2026-10-05T18:00:00+08:00",
       "status": "进行中",
-      "phase": "方案/既有资料只读盘点",
+      "phase": "受审方案的离线回放与缺口验证",
       "commit": null,
       "pr": null,
-      "review": null,
+      "review": "方案APPROVED@54e97250；45格/55blob结构摘要通过，业务回放/真实权限待证",
       "evidence": [],
       "merged": false,
       "deployed": false,
       "enabled": false,
       "public_verified": false,
-      "dispatch_id": "A-003",
+      "dispatch_id": "A-004",
       "owner_thread_id": "01a0fdc6-8c4e-7ff1-af4b-9db4baff8fb1",
       "dependency_input_sha": "0e05029c1ed00713a6f66e461e6753c1e4dadb27",
-      "dependency_limit": "F01业务合同已独立审核和Linux全量开发验证，正式PR收据仍待；本阶段只读准备，不扩大网络或付费"
+      "dependency_limit": "F01业务合同已独立审核和Linux全量开发验证，正式PR收据仍待；本阶段只读准备，不扩大网络或付费",
+      "plan_artifact": "/Users/mentianlu/.codex/runtime/a003-f03-815b3181/",
+      "plan_digest": "cfbec6d7658a5fdca98d4c192148ef633684ea9d20f780d7e0f7886454c1147f"
     },
     "F02": {
       "lane": "B",
@@ -233,16 +235,16 @@
       ],
       "deadline_at": "2026-10-06T18:00:00+08:00",
       "status": "进行中",
-      "phase": "方案与mock测试设计",
-      "commit": null,
+      "phase": "受审方案测试先行与实现",
+      "commit": "5e6c1daf33aa4cfddbceb34b0cefc5741402df3c",
       "pr": null,
-      "review": null,
+      "review": "方案APPROVED@54e97250；18场景未执行，尚非代码完成",
       "evidence": [],
       "merged": false,
       "deployed": false,
       "enabled": false,
       "public_verified": false,
-      "dispatch_id": "C-004",
+      "dispatch_id": "C-005",
       "owner_thread_id": "01a0fdc7-5154-7e51-aafa-f1b34d8f46f9",
       "dependency_input_sha": "0e05029c1ed00713a6f66e461e6753c1e4dadb27"
     },
@@ -2176,6 +2178,26 @@
       "scope": "QQ全发送路径关闭与网页解耦的方案和mock测试设计",
       "status": "已送达",
       "sent_at": "2026-10-03T03:24:13.676900+08:00"
+    },
+    {
+      "id": "A-004",
+      "lane": "A",
+      "task_ids": [
+        "F03"
+      ],
+      "scope": "受审F03离线回放与真实/synthetic分类，不扩大网络/付费",
+      "status": "已送达",
+      "sent_at": "2026-10-03T03:39:00.172355+08:00"
+    },
+    {
+      "id": "C-005",
+      "lane": "C",
+      "task_ids": [
+        "Q01"
+      ],
+      "scope": "受审18场景RED-GREEN及QQ路径统一停用，不操作生产/外发",
+      "status": "已送达",
+      "sent_at": "2026-10-03T03:39:00.172355+08:00"
     }
   ],
   "decisions": [
@@ -2276,7 +2298,8 @@
       "scope": "F01剩余fixture/报告两路径映射",
       "base": "2ace4fc3109d118701c630f230e22127f5c26198",
       "head": "815b3181fa61e7fbbff714c7d7326e5598dc71a6",
-      "status": "已送原R，A冻结树外准备F03"
+      "status": "APPROVED，无finding",
+      "review_commit": "5fd82fb4ef8772ddb288370568070d18185a370d"
     }
   ],
   "quota_policy": {
@@ -2394,15 +2417,25 @@
       "worktree": "/Users/mentianlu/.codex/worktrees/next-version-integration-20261003/umanews",
       "branch": "codex/next-version-first-integration-20261003",
       "main_base": "907f8de699b31a6fcc80acc78e9ba070aadc4f28",
-      "head": "59431d0d951997631607f6d86406a3ccd1413594",
-      "status": "已组合协调计划和U01，尚待A最终映射审核及B转存实现；未启动正式full/PR",
+      "head": "a61cfb4b20ccf1907d359c6c090e126aeaf5d8e8",
+      "status": "F01/U01/F02导出器已组合，等待B-003转存实现固定包后最终review/正式full",
       "inputs": {
         "coordination": "54b6b58d",
-        "U01": "03e5afbbfd2f31cef19285de3f0758a8d6134602"
+        "U01": "03e5afbbfd2f31cef19285de3f0758a8d6134602",
+        "F01": "815b3181fa61e7fbbff714c7d7326e5598dc71a6",
+        "F02_exporter": "15b293ce6cc70a717eafee25c9e4120c9280b58f"
       },
-      "conflict_resolution": "仅七份共同规划文档add/add，保留协调者最新已审排期/状态；无业务代码冲突",
+      "conflict_resolution": "共同规划文档保持协调版；A rules stage3经逐字段/集合核为现有C/root映射超集，完整保留双方；无业务代码冲突",
       "lock": "/Users/mentianlu/.codex/runtime/umanews-integration.lock",
-      "lock_semantics": "fcntl非阻塞独占，持有进程owner/thread/operation/SHA/resource/start/PID可核，finally释放；最后状态released"
+      "lock_semantics": "fcntl非阻塞独占，持有进程owner/thread/operation/SHA/resource/start/PID可核，finally释放；最后状态released",
+      "formal_static_plan": {
+        "mode": "full",
+        "domains": 248,
+        "labels": 295,
+        "digest": "a4836a22c9fc8d07e5ac83e39923bfcbe770b08bda174b66b0cdfc3aef268c51",
+        "path": "/Users/mentianlu/.codex/runtime/first-integration-evidence/static-plan-before-transfer.json"
+      },
+      "pending_mapping_review": "a61应用已审B proposal到实际rules/catalog/profile，proposal JSON按行为fixture；sample_inventory.json无代码消费者精确docs，随最终集成复审"
     }
   },
   "source_main_last_verified": {
