@@ -32,3 +32,27 @@ RED记录必须来自已可导入接口的行为缺失，不以ImportError/依�
 - P2-01：URL reason、控制字、129字符转unknown，合法selected/region_window_limit/空码保留；receipt记录实际替换数，防止重新开放URL。
 - P2-02：实际来源包manifest/file摘要、receipt/schema/release/observation、固定28天cohort与每个ID/hash/updated_at绑定；错误manifest、错observation/release/schema、缺receipt、篡改cohort、越范围ID/hash/updated_at均在连接前拒绝；匹配案例content收据保留来源摘要。所有包是离线synthetic。
 - P2-03：proposal必须为该测试模块登记python profile；不修改共享配置或runner。
+
+## B-003 转存与宿主验证测试设计
+
+依据原R对15b293ce的APPROVED transfer方案，在本地实现；接口仅注入copy/probe动作，CLI只核本地包，无DB/docker/SSH调用。完整方案的验收映射如下；模型/人类事实核验仍保持原状态。保留已审exporter字节。无Django/Celery/迁移/服务改动。
+
+| 用例 | 验收 | mutation |
+|---|---|---|
+| T01 | metadata/content manifest、精确文件清单、SHA、receipt、来源selection/schema/release、全部数量/地区/时间/输入/脱敏hash一致；正文不输出 | 跳过任一身份/hash/来源或数量校验 |
+| T02 | 路径绝对且无..，目录0700/文件0600，无symlink/hardlink/FIFO/额外文件，文件与总量边界等号接受/超限拒绝 | resolve吞链接、无限读取、忽略权限/extra |
+| T03 | copy前后固定container/image/release/script/manifest核验；漂移拒绝，无DB重采 | 省略post probe或改包后仍final |
+| T04 | 中断、timeout、回传丢失保留attempt/source commitment；先inspect/恢复同attempt，不新开复制；部分包不complete | unknown后再次copy、partial当成功 |
+| T05 | final同包幂等不再copy；不同包/损坏冲突，不覆盖；并发lock自动释放 | 覆盖final或裸永久lock |
+| T06 | 空间不足在copy前停止；预算≥包上限加staging副本；phase超时不交付 | copy后才检查空间、超时继续rename |
+| T07 | source_lost且无完整stage标丢失；有完整stage及已绑定pre承诺可独立验收，无承诺保持unknown | 原容器消失伪造成功或盲重采 |
+| T08 | 同FS rename、file/dir fsync；final或receipt写失败保持unknown，恢复先查final；不能以rename成功猜receipt完成 | 忽略fsync/receipt错误、自删未核产物 |
+| T09 | host_verified后仍R未收；只有独立R回执精确绑定capsule/manifest/obs才delivered_to_R | producer自签R交付、错hash回执 |
+| T10 | CLI错误只输出固定code；所有fake异常含合成PRIVATE也不泄露；影响proposal含新模块/测试、既有export测试读取的fixture与python profile | traceback/正文输出、fixture映射docs-only |
+
+测试使用合成producer包、注入FakeAdapter、fake disk/time/故障；不会以callback合同声称真实传输超时已证明。真实命令adapter/capsule仍待精确技术核对，Linux正式收据另行由协调者安排。
+
+### B003-P2-01返修
+
+T10增加metadata/content counts精确键集与严格整数预算测试；extra string/nested字段必须CLI固定错误码/nonzero且无注入文本，transfer不得生成host_verified/transfer.complete。
+覆盖缺键、非dict、bool/float/string/null/nested/负数/超限；有效包白名单整数摘要保留。可捕获mutation为去掉set(counts)精确匹配、放宽type is int或重新原样输出receipt.counts。

@@ -84,3 +84,7 @@ producer结构校验不冒充独立机器核验，machine_validation_status 初�
 固定Linux/full证据按现行runner取得，不能把上述21例本地GREEN当默认策略已全面启用。
 
 返修后offline plan产物为同一专用root下 `b002-reviewfix-plan-v2/`，manifest SHA256 `374347aa39bd13e09fa1835b5963cf7a0adfb18f8a87b01f76195f1158d42881`；仍无数据库访问。
+
+## B-003本地转存实现承接
+
+15b293ce方案及三P2已由原R复审通过；新模块与命令/接口合同见[B-003命令包](B-003-command-package.md)，新代码待原R review。旧mount模板仍然失效；本轮未执行生产。
