@@ -1,0 +1,415 @@
+{
+  "release": {
+    "captured_at": "2026-10-01T23:21:22.040086+00:00",
+    "commit": "95edc4c2901d2ccf428e1c497c4fcfc37ff567ed",
+    "image": "sha256:6bcae2608d47a0a184a3daf4ae65c99f645a551ebf70634bef2ec4be423658e6",
+    "image_label_diff": {
+      "com.docker.compose.image.builder": [
+        null,
+        "classic"
+      ]
+    },
+    "operation": "same-schema",
+    "source_leaf": "stable.0079_multisource_race_enrollment",
+    "target_leaf": "stable.0079_multisource_race_enrollment",
+    "config_sha256": "3ed8596fee3558fb1efe9a6adc22c40cc08a4d320cc9043bbd04808784e2f789",
+    "release_dir": "/opt/umanews-release-95edc4c2-coverage-queue-20261002/umanewsbot/runtime/migration_history_repair/release-0079-recovery/08c267170f76318381e906c4eef25886c733e6ef8531959b85bad83e16235a4c",
+    "intent_sha256": "9004a18df79c2ee31354c091d398982ffa0a43f759cab387fdedf79d209954cf",
+    "manifest_sha256": "56501406d6f28ab6abc781e2e3ecee980ff08a2e2c3c1c701dc955b938172a42",
+    "complete_sha256": "453905f8f1c03d60129cf223a662a69549e9df2afc2ce871d1acf69b54d0bd4b",
+    "backup_path": "/opt/umanews-release-95edc4c2-coverage-queue-20261002/umanewsbot/runtime/migration_history_repair/release-0079-recovery/08c267170f76318381e906c4eef25886c733e6ef8531959b85bad83e16235a4c/backup/rds_horse_news_20261001T231419Z_2569443.dump",
+    "backup_sha256": "7a9730300023fb1d5ebf0544e1ab5192881e62401d9d11934692b1168c449ad5",
+    "backup_bytes": 637353791,
+    "backup_toc_lines": 1401,
+    "schema_receipt_path": "/opt/umanews-release-95edc4c2-coverage-queue-20261002/umanewsbot/runtime/migration_history_repair/restricted-recovery.completed.dc4a8d01c0e1946bbb133106fec283b04e6f8e65d781e621a1d1cab2937c58b2.json",
+    "services": [
+      {
+        "service": "web",
+        "image": "sha256:6bcae2608d47a0a184a3daf4ae65c99f645a551ebf70634bef2ec4be423658e6",
+        "state": "running",
+        "health": "healthy"
+      },
+      {
+        "service": "worker",
+        "image": "sha256:6bcae2608d47a0a184a3daf4ae65c99f645a551ebf70634bef2ec4be423658e6",
+        "state": "running",
+        "health": null
+      },
+      {
+        "service": "beat",
+        "image": "sha256:6bcae2608d47a0a184a3daf4ae65c99f645a551ebf70634bef2ec4be423658e6",
+        "state": "running",
+        "health": null
+      },
+      {
+        "service": "race_sync_v2_worker",
+        "image": "sha256:6bcae2608d47a0a184a3daf4ae65c99f645a551ebf70634bef2ec4be423658e6",
+        "state": "running",
+        "health": null
+      },
+      {
+        "service": "nginx",
+        "image": "sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10",
+        "state": "running",
+        "health": null
+      },
+      {
+        "service": "db",
+        "image": "sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777",
+        "state": "running",
+        "health": "healthy"
+      },
+      {
+        "service": "redis",
+        "image": "sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99",
+        "state": "running",
+        "health": "healthy"
+      },
+      {
+        "service": "onebot",
+        "image": "sha256:9254ec12af101576c5eeb4910847abd1d219297bc6d9a35c52511e12500f0f45",
+        "state": "running",
+        "health": null
+      }
+    ],
+    "empty_migration_plan": true,
+    "release_lock_released": true,
+    "full_restore_verified": false
+  },
+  "public_pages": {
+    "pages": 14,
+    "rows_per_domain": 52,
+    "fell_rows_per_domain": 2,
+    "artifact_sha256": "86cc44fb3a4f24d7e341446cfbf861add94de9715ffce52b1208ea0eb02f9ac4"
+  },
+  "monitor": {
+    "captured_at": "2026-10-02T05:46:30.701673+00:00",
+    "image": "sha256:6bcae2608d47a0a184a3daf4ae65c99f645a551ebf70634bef2ec4be423658e6",
+    "task_route": {
+      "queue": "race_sync_v2"
+    },
+    "beat_options": {
+      "queue": "race_sync_v2",
+      "expires": 270
+    },
+    "worker_queues": {
+      "celery@cfc3783dc34c": [
+        "race_sync_v2"
+      ],
+      "celery@aa4f51ccf4f1": [
+        "celery"
+      ]
+    },
+    "first_cycle": {
+      "status": "SUCCESS",
+      "result": {
+        "enabled": true,
+        "total": 10578,
+        "counts": {
+          "confirmed": 10215,
+          "awaiting_source_window": 278,
+          "enrollment_missing": 70,
+          "manual_pause": 1,
+          "cancelled": 2,
+          "publication_blocked": 11,
+          "owner_conflict": 1
+        },
+        "issue_counts": {
+          "time_unknown_overdue": 21,
+          "enrollment_missing": 18,
+          "publication_blocked": 11,
+          "owner_conflict": 1
+        },
+        "delivery": {
+          "delivered": false,
+          "reason": "no_new_gaps"
+        }
+      },
+      "traceback": null,
+      "children": [],
+      "date_done": "2026-10-01T23:25:04.844527+00:00",
+      "task_id": "cabd9cbb-0eda-4130-8cb9-3df52ab5357a"
+    },
+    "later_consecutive_cycles": [
+      {
+        "status": "SUCCESS",
+        "result": {
+          "enabled": true,
+          "total": 10578,
+          "counts": {
+            "confirmed": 10215,
+            "awaiting_source_window": 278,
+            "enrollment_missing": 65,
+            "enrolled": 5,
+            "manual_pause": 1,
+            "cancelled": 2,
+            "publication_blocked": 11,
+            "owner_conflict": 1
+          },
+          "issue_counts": {
+            "time_unknown_overdue": 21,
+            "enrollment_missing": 26,
+            "publication_blocked": 11,
+            "owner_conflict": 1
+          },
+          "delivery": {
+            "delivered": false,
+            "reason": "no_new_gaps"
+          }
+        },
+        "traceback": null,
+        "children": [],
+        "date_done": "2026-10-02T05:40:04.745053+00:00",
+        "task_id": "1d8ad839-5f08-4c4f-a9be-641c6d12a139"
+      },
+      {
+        "status": "SUCCESS",
+        "result": {
+          "enabled": true,
+          "total": 10578,
+          "counts": {
+            "confirmed": 10215,
+            "awaiting_source_window": 278,
+            "enrollment_missing": 65,
+            "enrolled": 5,
+            "manual_pause": 1,
+            "cancelled": 2,
+            "publication_blocked": 11,
+            "owner_conflict": 1
+          },
+          "issue_counts": {
+            "time_unknown_overdue": 21,
+            "enrollment_missing": 26,
+            "publication_blocked": 11,
+            "owner_conflict": 1
+          },
+          "delivery": {
+            "delivered": false,
+            "reason": "no_new_gaps"
+          }
+        },
+        "traceback": null,
+        "children": [],
+        "date_done": "2026-10-02T05:45:04.073017+00:00",
+        "task_id": "3f4bdac2-2c2f-4aca-9af9-fb32faf629cc"
+      }
+    ],
+    "active_last_seen_range": [
+      "2026-10-02 05:45:00.019809+00:00",
+      "2026-10-02 05:45:00.019809+00:00"
+    ],
+    "digest": [
+      {
+        "id": 62,
+        "scope_type": "data_sync_digest",
+        "scope_key": "public_calendar",
+        "status": "sent",
+        "last_seen_at": null,
+        "resolved_at": null,
+        "alert_sent_at": "2026-10-02 04:00:05.767495+00:00",
+        "delivery_attempts": 1,
+        "last_error_code": ""
+      }
+    ],
+    "seven_incidents": [
+      {
+        "id": 15,
+        "scope_type": "data_sync_event",
+        "scope_key": "772",
+        "status": "resolved",
+        "last_seen_at": "2026-10-01 22:05:02.530652+00:00",
+        "resolved_at": "2026-10-01 22:05:02.530652+00:00",
+        "alert_sent_at": null,
+        "delivery_attempts": 0,
+        "last_error_code": ""
+      },
+      {
+        "id": 13,
+        "scope_type": "data_sync_event",
+        "scope_key": "830",
+        "status": "resolved",
+        "last_seen_at": "2026-10-01 22:05:02.530652+00:00",
+        "resolved_at": "2026-10-01 22:05:02.530652+00:00",
+        "alert_sent_at": null,
+        "delivery_attempts": 0,
+        "last_error_code": ""
+      },
+      {
+        "id": 14,
+        "scope_type": "data_sync_event",
+        "scope_key": "970",
+        "status": "resolved",
+        "last_seen_at": "2026-10-01 22:05:02.530652+00:00",
+        "resolved_at": "2026-10-01 22:05:02.530652+00:00",
+        "alert_sent_at": null,
+        "delivery_attempts": 0,
+        "last_error_code": ""
+      },
+      {
+        "id": 12,
+        "scope_type": "data_sync_event",
+        "scope_key": "828",
+        "status": "resolved",
+        "last_seen_at": "2026-10-01 22:05:02.530652+00:00",
+        "resolved_at": "2026-10-01 22:05:02.530652+00:00",
+        "alert_sent_at": null,
+        "delivery_attempts": 0,
+        "last_error_code": ""
+      },
+      {
+        "id": 26,
+        "scope_type": "data_sync_event",
+        "scope_key": "976",
+        "status": "resolved",
+        "last_seen_at": "2026-10-01 22:05:02.530652+00:00",
+        "resolved_at": "2026-10-01 22:05:02.530652+00:00",
+        "alert_sent_at": null,
+        "delivery_attempts": 0,
+        "last_error_code": ""
+      },
+      {
+        "id": 28,
+        "scope_type": "data_sync_event",
+        "scope_key": "975",
+        "status": "resolved",
+        "last_seen_at": "2026-10-01 22:05:02.530652+00:00",
+        "resolved_at": "2026-10-01 22:05:02.530652+00:00",
+        "alert_sent_at": null,
+        "delivery_attempts": 0,
+        "last_error_code": ""
+      },
+      {
+        "id": 27,
+        "scope_type": "data_sync_event",
+        "scope_key": "833",
+        "status": "resolved",
+        "last_seen_at": "2026-10-01 22:05:02.530652+00:00",
+        "resolved_at": "2026-10-01 22:05:02.530652+00:00",
+        "alert_sent_at": null,
+        "delivery_attempts": 0,
+        "last_error_code": ""
+      }
+    ]
+  },
+  "limits": [
+    "SMTP accepted does not establish inbox receipt/read",
+    "50 pre-existing CI failures remain; no new failures",
+    "full database restore not verified: two existing non-race unique constraints",
+    "phase2 design only; not implemented"
+  ],
+  "final_read_only": {
+    "runtime": {
+      "captured_at": "2026-10-02T05:50:40.159706+00:00",
+      "services": [
+        {
+          "service": "web",
+          "image": "sha256:6bcae2608d47a0a184a3daf4ae65c99f645a551ebf70634bef2ec4be423658e6",
+          "running": true,
+          "health": "healthy"
+        },
+        {
+          "service": "worker",
+          "image": "sha256:6bcae2608d47a0a184a3daf4ae65c99f645a551ebf70634bef2ec4be423658e6",
+          "running": true,
+          "health": null
+        },
+        {
+          "service": "beat",
+          "image": "sha256:6bcae2608d47a0a184a3daf4ae65c99f645a551ebf70634bef2ec4be423658e6",
+          "running": true,
+          "health": null
+        },
+        {
+          "service": "race_sync_v2_worker",
+          "image": "sha256:6bcae2608d47a0a184a3daf4ae65c99f645a551ebf70634bef2ec4be423658e6",
+          "running": true,
+          "health": null
+        },
+        {
+          "service": "db",
+          "image": "sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777",
+          "running": true,
+          "health": "healthy"
+        },
+        {
+          "service": "redis",
+          "image": "sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99",
+          "running": true,
+          "health": "healthy"
+        },
+        {
+          "service": "nginx",
+          "image": "sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10",
+          "running": true,
+          "health": null
+        },
+        {
+          "service": "onebot",
+          "image": "sha256:9254ec12af101576c5eeb4910847abd1d219297bc6d9a35c52511e12500f0f45",
+          "running": true,
+          "health": null
+        }
+      ],
+      "config_sha256": "3ed8596fee3558fb1efe9a6adc22c40cc08a4d320cc9043bbd04808784e2f789",
+      "release_lock_released": true
+    },
+    "health": {
+      "captured_at": "2026-10-02T05:47:34.850456+00:00",
+      "checks": [
+        {
+          "url": "https://umafans.run/healthz/",
+          "status": 200
+        },
+        {
+          "url": "https://www.umafans.run/healthz/",
+          "status": 200
+        }
+      ]
+    },
+    "business": {
+      "captured_at": "2026-10-02 05:47:37.917978+00:00",
+      "coverage": {
+        "as_of": "2026-10-02T05:47:35.245253+00:00",
+        "total": 10578,
+        "counts": {
+          "confirmed": 10215,
+          "awaiting_source_window": 278,
+          "enrollment_missing": 65,
+          "enrolled": 5,
+          "manual_pause": 1,
+          "cancelled": 2,
+          "publication_blocked": 11,
+          "owner_conflict": 1
+        },
+        "issue_counts": {
+          "time_unknown_overdue": 21,
+          "enrollment_missing": 26,
+          "publication_blocked": 11,
+          "owner_conflict": 1
+        }
+      },
+      "target_rows": 52,
+      "seven_incidents_resolved": true
+    },
+    "anonymous_admin": {
+      "captured_at": "2026-10-01T23:25:26.341098+00:00",
+      "checks": [
+        {
+          "url": "https://umafans.run/healthz/",
+          "status": 200,
+          "location": ""
+        },
+        {
+          "url": "https://www.umafans.run/healthz/",
+          "status": 200,
+          "location": ""
+        },
+        {
+          "url": "https://umafans.run/django-admin/stable/raceevent/coverage/",
+          "status": 302,
+          "location": "/django-admin/login/?next=/django-admin/stable/raceevent/coverage/"
+        }
+      ]
+    }
+  }
+}

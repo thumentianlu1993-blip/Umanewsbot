@@ -1,3 +1,15 @@
+## 2026-10-02 覆盖监控发布与验收口径
+
+当前运行目录 `/opt/umanews-release-95edc4c2-coverage-queue-20261002/umanewsbot`，95edc4c2 / 6bcae2608d47、schema0079；PR230无迁移和配置值变化，不重复七场恢复。精确intent/镜像/备份/complete摘要见[执行记录](changes/race-coverage-recovery-20261002/rollout.md)，恢复必须使用该批证据，不能用旧控制镜像或普通compose up替代。
+
+- 发布前核实际容器/image/工作目录、锁、在途/预取任务、队列、资源和导入任务。若积压妨碍排空，可在同一协调者的锁/intent校验下暂停**旧节点**继续消费，等待其已取任务结束，由新worker接续；不清队列、不撤销任务。此次07:19只对旧 `celery@9823e1d22c45` 执行，节点名不可复用到后续发布。
+- 覆盖任务的Beat options与直接route均为race_sync_v2；实际active_queues、自然任务SUCCESS及DB last_seen/incident关闭需交叉核验。当前日志没有任务INFO行，不能据此推断任务未运行；只读读取结果backend，不手动调用monitor.run冒充自然调度。
+- 本次公开验收入口为 `https://umafans.run/healthz/`、www同路径、七个实际赛事详情及 `/django-admin/stable/raceevent/coverage/`。匿名后台预期302到登录页；`/admin/`是另一套业务路由，不能据此判断Django后台是否上线。
+- SMTP接受、收件箱到达和已读分别记录；相同缺口不重复发信，新/重开缺口按现有汇总节流投递。不同当地日期边界产生的新缺口，应附as_of比较。
+- dump的SHA/TOC通过不替代完整恢复；[已知两处恢复缺陷](reports/2026-10-02-backup-restore-findings.md)仍需独立处理。后续新增schema/service先扩充受保护部署与恢复合同，不借本次0079同schema发布包上线。
+
+以下为历史阶段记录。
+
 ## 2026-10-02 赛事覆盖上线验收补充
 
 PR229 已上线并恢复七场结果，首轮自然监控曾排在普通 celery 的 452 条业务任务后，期限 270 秒；旗标、Beat 配置或任务入队均不代表执行。队列补正改用已有 race_sync_v2 consumer，需核对其存活与 active_queues，并验自然任务及 SMTP 收据；当前手动首投成功不计自然周期验收。普通队列排空时可在同一发布协调者的锁和 intent 下暂停旧 worker 取新任务，待在途任务结束；保留消息给新 worker，不能清空队列。详细批次见[发布记录](changes/race-coverage-recovery-20261002/rollout.md)。

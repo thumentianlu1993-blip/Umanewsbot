@@ -1,3 +1,9 @@
+## 2026-10-02 赛事闭环第一批上线，统一决策方案已形成
+
+PR229/230已合并上线，当前95edc4c2、schema0079：七场52行参考赛果公开，全10578场公开canonical赛事进入覆盖监控、后台下一步及汇总邮件。普通队列积压问题已通过现有赛事队列隔离补正，07:25首轮及13:40/13:45后续相邻自然周期验收通过，未重复发信。截至13:45其余59项缺口保留，不伪报全站资料齐全。
+
+[第一批验收](changes/race-coverage-recovery-20261002/rollout.md)与[第二阶段设计](changes/race-event-unified-decision/spec.md)已分开记录。第二阶段只有方案、验收矩阵和实施拆分，没有代码/生产动作；采用渐进统一规则，保留现有数据和授权基础。完整备份恢复两处既有非赛事约束缺陷另行挂账。以下均为历史阶段状态，以current_state最新记录为准。
+
 ## 2026-10-02 赛事闭环第一批实现（尚未上线）
 
 用户已授权第一批实现、上线后设计第二阶段。隔离分支 `codex/race-coverage-recovery-20261002` 的 [PR229](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/229) 已包含全公开赛事覆盖监控、下一步后台、汇总邮件与固定七场恢复工具。85 项相关 PostgreSQL 回归及 18 项发布合同通过，旧两项 repair 失败已在主线基线复现；最终 review/CI 进行中。生产只读核验 10578 场、45 个缺口，七场恢复 dry-run ready；尚未部署或执行生产数据动作。范围和发布包见 [执行记录](changes/race-coverage-recovery-20261002/rollout.md)。
