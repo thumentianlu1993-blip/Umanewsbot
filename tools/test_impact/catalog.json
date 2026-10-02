@@ -805,6 +805,9 @@
     ],
     "module:scripts.tests.test_f02_readonly_export": [
       "scripts.tests.test_f02_readonly_export"
+    ],
+    "module:scripts.tests.test_f02_transfer": [
+      "scripts.tests.test_f02_transfer"
     ]
   },
   "dependencies": {
@@ -2494,6 +2497,12 @@
       "domains": [
         "module:scripts.tests.test_f02_readonly_export"
       ]
+    },
+    "scripts/tests/test_f02_transfer.py": {
+      "label": "scripts.tests.test_f02_transfer",
+      "domains": [
+        "module:scripts.tests.test_f02_transfer"
+      ]
     }
   },
   "profiles": {
@@ -2774,7 +2783,8 @@
     "scripts.tests.test_impact_evolution": "python",
     "scripts.tests.test_impact_verifier_e2e": "python",
     "stable.test_content_contracts": "python",
-    "scripts.tests.test_f02_readonly_export": "python"
+    "scripts.tests.test_f02_readonly_export": "python",
+    "scripts.tests.test_f02_transfer": "python"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {

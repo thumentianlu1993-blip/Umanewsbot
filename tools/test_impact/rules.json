@@ -1153,13 +1153,22 @@
       "content_contracts"
     ],
     "scripts/f02_readonly_export.py": [
-      "module:scripts.tests.test_f02_readonly_export"
+      "module:scripts.tests.test_f02_readonly_export",
+      "module:scripts.tests.test_f02_transfer"
     ],
     "scripts/tests/test_f02_readonly_export.py": [
-      "module:scripts.tests.test_f02_readonly_export"
+      "module:scripts.tests.test_f02_readonly_export",
+      "module:scripts.tests.test_f02_transfer"
     ],
     "docs/changes/next-version-capabilities/lanes/B/B-002-test-mapping-proposal.json": [
-      "module:scripts.tests.test_f02_readonly_export"
+      "module:scripts.tests.test_f02_readonly_export",
+      "module:scripts.tests.test_f02_transfer"
+    ],
+    "scripts/f02_transfer.py": [
+      "module:scripts.tests.test_f02_transfer"
+    ],
+    "scripts/tests/test_f02_transfer.py": [
+      "module:scripts.tests.test_f02_transfer"
     ]
   },
   "symbols": {
