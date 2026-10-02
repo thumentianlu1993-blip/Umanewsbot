@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "timezone": "Asia/Shanghai",
-  "updated_at": "2026-10-03T02:55:00.442123+08:00",
+  "updated_at": "2026-10-03T02:58:26.655114+08:00",
   "coordinator_thread_id": "01a0fdb2-b88c-7f93-8c9e-ba9564c33c93",
   "coordinator_worktree": "/Users/mentianlu/.codex/worktrees/516a/umanews",
   "deadline_at": "2026-10-30T18:00:00+08:00",
@@ -16,7 +16,7 @@
       "worktree": "/Users/mentianlu/.codex/worktrees/5482/umanews",
       "branch": "codex/next-version-race-data-20261003",
       "status": "已启动",
-      "last_cursor": "857bc711-5dad-460a-9c00-d1ac5bb0c979:5",
+      "last_cursor": "857bc711-5dad-460a-9c00-d1ac5bb0c979:6",
       "model": "gpt-6.1-sol",
       "reasoning_effort": "medium",
       "initial_head": "63b5781e",
@@ -30,7 +30,7 @@
       "worktree": "/Users/mentianlu/.codex/worktrees/a14d/umanews",
       "branch": "codex/next-version-news-ai-20261003",
       "status": "已启动",
-      "last_cursor": "b39a81c2-6866-44bf-8df1-a536e3d41532:4",
+      "last_cursor": "b39a81c2-6866-44bf-8df1-a536e3d41532:5",
       "model": "gpt-6.1-sol",
       "reasoning_effort": "medium",
       "initial_head": "4c9725c9",
@@ -44,7 +44,7 @@
       "worktree": "/Users/mentianlu/.codex/worktrees/bc9b/umanews",
       "branch": "codex/next-version-product-ui-20261003",
       "status": "已启动",
-      "last_cursor": "1bb9b1cd-6b22-4865-9d87-78fbf289661d:3",
+      "last_cursor": "1bb9b1cd-6b22-4865-9d87-78fbf289661d:4",
       "model": "gpt-6.1-sol",
       "reasoning_effort": "medium",
       "initial_head": "dbcc87a4",
@@ -58,7 +58,7 @@
       "worktree": "/Users/mentianlu/.codex/worktrees/3ab1/umanews",
       "branch": "codex/next-version-review-20261003",
       "status": "已启动",
-      "last_cursor": "6afb1d41-cb4a-4026-a141-43c0a48e9cae:3",
+      "last_cursor": "6afb1d41-cb4a-4026-a141-43c0a48e9cae:4",
       "model": "gpt-6.1-sol",
       "reasoning_effort": "medium",
       "initial_head": "d00eaf18",
@@ -364,11 +364,13 @@
       ],
       "deadline_at": "2026-10-08T18:00:00+08:00",
       "status": "进行中",
-      "phase": "本地最小GREEN，固定候选与PG等价待证",
-      "commit": "2919dd3558950466e18a8886ec8bc7f85a119f5a",
+      "phase": "固定候选代码review/PG验证排队",
+      "commit": "3ac1e3a750e68bafe7950fa726481a02ecccfad6",
       "pr": null,
-      "review": "方案APPROVED；宿主最小GREEN；PG NFKC/und-x-icu及目标环境能力待证，候选代码review待送",
-      "evidence": [],
+      "review": "已送原R；198输入、37宿主SQLite PASS；PG/Linux/目标能力未证",
+      "evidence": [
+        "/Users/mentianlu/.codex/worktrees/bc9b/umanews/docs/changes/next-version-capabilities/lanes/C/U01-implementation-review.md"
+      ],
       "merged": false,
       "deployed": false,
       "enabled": false,
@@ -2181,6 +2183,13 @@
         "B002-P2-03"
       ],
       "report": "/Users/mentianlu/.codex/worktrees/3ab1/umanews/docs/changes/next-version-capabilities/lanes/R/B-002-F02-code-review.md"
+    },
+    {
+      "scope": "U01行为实现代码review",
+      "base": "907f8de699b31a6fcc80acc78e9ba070aadc4f28",
+      "approved_plan": "2919dd3558950466e18a8886ec8bc7f85a119f5a",
+      "head": "3ac1e3a750e68bafe7950fa726481a02ecccfad6",
+      "status": "已送原R，PG/Linux待证"
     }
   ],
   "quota_policy": {
@@ -2263,7 +2272,7 @@
           "lane": "C",
           "scope": "短RED及PG16语法/Unicode/来源上下文/分页前一致性集合",
           "red_commit": "5c66088d821c249e41141dd5f8ba062c3edaf210",
-          "candidate_sha": null,
+          "candidate_sha": "3ac1e3a750e68bafe7950fa726481a02ecccfad6",
           "status": "A窗口完成后优先，先固定候选与影响计划"
         },
         {
@@ -2279,5 +2288,10 @@
       "owner": "A，R审核",
       "B": "proposal固定于48c51fb1 lanes/B/B-002-test-mapping-proposal.json，待A增量稳定后衔接；未覆盖共享配置"
     }
+  },
+  "source_main_last_verified": {
+    "sha": "907f8de699b31a6fcc80acc78e9ba070aadc4f28",
+    "at": "2026-10-03T02:58:26.655114+08:00",
+    "method": "git fetch origin main"
   }
 }
