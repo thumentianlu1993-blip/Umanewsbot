@@ -8,7 +8,9 @@ register = template.Library()
 def race_field(obj, field, legacy=''):
     if field == 'grade':
         from stable.services.race_information_display import event_grade_field
-        return event_grade_field(obj).text
+        # 马匹历史记录的公开关联来源已由 prepare_context 选择；不重读关联。
+        prepared = (value(obj, 'public_display', {}) or {}).get('grade')
+        return (prepared if prepared is not None else event_grade_field(obj)).text
     if field in {'date', 'time'} and (hasattr(obj, 'local_date') or isinstance(obj, dict) and 'local_date' in obj):
         from stable.services.race_information_display import _time_fields
         return _time_fields(obj)[0 if field == 'date' else 1].text
