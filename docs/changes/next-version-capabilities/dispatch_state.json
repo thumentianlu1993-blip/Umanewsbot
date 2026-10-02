@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "timezone": "Asia/Shanghai",
-  "updated_at": "2026-10-03T02:24:55.609606+08:00",
+  "updated_at": "2026-10-03T02:30:29.747393+08:00",
   "coordinator_thread_id": "01a0fdb2-b88c-7f93-8c9e-ba9564c33c93",
   "coordinator_worktree": "/Users/mentianlu/.codex/worktrees/516a/umanews",
   "deadline_at": "2026-10-30T18:00:00+08:00",
@@ -65,7 +65,7 @@
       "title": "Umanews 10.30｜R 独立审核与验收",
       "model_evidence": "create_thread 显式指定 gpt-6.1-sol 和 medium，创建成功；启动回报已收取",
       "quota_policy_status": "已确认并独立实时复核剩余8%；无运行子代理/模型CLI",
-      "latest_report_commit": "93d10138a0039bb5fea9a36f381759cd5eb0483b"
+      "latest_report_commit": "503a52ee7929bbcb3623229e95016e51716b5ddc"
     }
   },
   "tasks": {
@@ -95,8 +95,8 @@
       "title": "冻结编辑后台关键任务与交互原型",
       "deps": [],
       "deadline_at": "2026-10-04T18:00:00+08:00",
-      "status": "进行中",
-      "phase": "方案通过/文档原型已交付",
+      "status": "部分完成",
+      "phase": "方案/原型通过，真实后台计时待测",
       "commit": "1c90ee2e4edc79af2ea1ee3fc8a4ae7586d34eba",
       "pr": null,
       "review": "方案APPROVED@1c90ee2e；真实后台计时待测",
@@ -134,10 +134,10 @@
       "deps": [],
       "deadline_at": "2026-10-05T18:00:00+08:00",
       "status": "进行中",
-      "phase": "方案复审/导出方案审核",
+      "phase": "本地导出器/离线验证准备",
       "commit": "a2704b2d7ef93a6ee8518fca2f63ada4a43c2b64",
       "pr": null,
-      "review": "F02-M-01返修及有界导出方案已送原R，尚无新快照/gold，任务未完成",
+      "review": "方案与有界导出方案APPROVED@a2704b2d；F02-M-01 CLOSED；脚本/命令未审核",
       "evidence": [
         "/Users/mentianlu/.codex/worktrees/a14d/umanews/docs/changes/next-version-capabilities/lanes/B/B-001-status.md"
       ],
@@ -145,7 +145,7 @@
       "deployed": false,
       "enabled": false,
       "public_verified": false,
-      "dispatch_id": "B-001",
+      "dispatch_id": "B-002",
       "owner_thread_id": "01a0fdc6-e1a2-7ae1-9749-6889626d9bf4"
     },
     "F05": {
@@ -153,18 +153,19 @@
       "title": "复验域名与公开缺陷并固定回归样例",
       "deps": [],
       "deadline_at": "2026-10-05T18:00:00+08:00",
-      "status": "进行中",
-      "phase": "文档返修",
-      "commit": "1c90ee2e4edc79af2ea1ee3fc8a4ae7586d34eba",
+      "status": "开发完成",
+      "phase": "只读基线交付",
+      "commit": "6fd64c87155be14f382c6ab09b8f4b5c94284dd4",
       "pr": null,
-      "review": "F05-M-01 U01/U03映射反置，证据边界接受",
+      "review": "APPROVED@6fd64c87，F05-M-01 CLOSED；不代表缺陷修复或生产验收",
       "evidence": [],
       "merged": false,
       "deployed": false,
       "enabled": false,
       "public_verified": false,
       "dispatch_id": "C-001",
-      "owner_thread_id": "01a0fdc7-5154-7e51-aafa-f1b34d8f46f9"
+      "owner_thread_id": "01a0fdc7-5154-7e51-aafa-f1b34d8f46f9",
+      "review_commit": "503a52ee7929bbcb3623229e95016e51716b5ddc"
     },
     "H01": {
       "lane": "A",
@@ -2079,6 +2080,16 @@
       "scope": "小切片方案准备；先闭合F05映射文档finding",
       "status": "已送达",
       "sent_at": "2026-10-03T02:24:55.609606+08:00"
+    },
+    {
+      "id": "B-002",
+      "lane": "B",
+      "task_ids": [
+        "F02"
+      ],
+      "scope": "受审有界只读导出方案的本地导出器、离线验证与精确命令包，不直接运行生产查询",
+      "status": "已送达",
+      "sent_at": "2026-10-03T02:30:29.747393+08:00"
     }
   ],
   "decisions": [
@@ -2132,17 +2143,7 @@
     }
   ],
   "planning_commit": "d0cec076019f35b6f7db56b09ebee291e57fd9f9",
-  "review_queue": [
-    {
-      "scope": "F02限定复审及有界导出方案",
-      "status": "已送R",
-      "head": "a2704b2d7ef93a6ee8518fca2f63ada4a43c2b64"
-    },
-    {
-      "scope": "F05限定复审",
-      "status": "等C映射修复SHA"
-    }
-  ],
+  "review_queue": [],
   "quota_policy": {
     "source": "本协调会话用户2026-10-03直接补充",
     "weekly_window_minutes": 10080,
@@ -2156,16 +2157,47 @@
     "allow_reset_credit": false,
     "last_observed_remaining_percent": 8,
     "last_observed_used_percent": 92,
-    "last_observed_at": "2026-10-03T02:24:55.609606+08:00",
+    "last_observed_at": "2026-10-03T02:30:29.747393+08:00",
     "state": "正常，阈值未触发",
-    "limitation": "调度侧控制；非账单硬上限"
+    "limitation": "调度侧控制；非账单硬上限",
+    "unknown_usage_policy": "3次有界重试，仍未知暂缓新增耗时模型工作；读数恢复>1自动解除未知保护"
   },
   "next_actions": [
-    "每轮首先核验周额度，<=1立即停各线再停heartbeat和自身",
-    "收A/B技术返修固定SHA并送原R复审",
-    "收C方案/证据审核结论后在既有范围派单",
-    "审核F02精确只读导出包并交R托管holdout；当前尚未取得生产DB快照",
-    "F01共享合同及实现证据就绪后解锁F03/H01/M01/Q01，未完成依赖不得跳过",
-    "O01核对实际生产release lock/长任务/暂停批次；当前只读docker ps可用不等于该核对完成"
-  ]
+    "每轮首先核验周额度；瞬时失败先有界重试，实际<=1停各线再停heartbeat和自身",
+    "核验Colima umanews-impact-ci就绪后向A提供明确Docker context",
+    "F05映射限定复审，后续U01方案审核",
+    "B准备固定SHA本地导出器与命令包后送R，未审前不运行生产查询",
+    "F01 RED/GREEN、映射与必要Linux验证后送原R代码审核，未完成依赖不得解锁",
+    "O01核对实际生产release lock/长任务/暂停批次；只读docker ps可用不等于该核对完成"
+  ],
+  "resilience_policy": {
+    "source": "用户2026-10-03明确要求临时异常快速恢复，不能因一次报错暂停",
+    "max_attempts": 3,
+    "retry_wait_seconds": [
+      2,
+      5
+    ],
+    "unknown_mutation_result": "先核实际结果及幂等收据，不盲重试",
+    "recover_same_thread": true,
+    "preserve_fixed_sha_and_uncommitted_work": true,
+    "heartbeat_interval_minutes": 5,
+    "quota_read_transient_failure": "重试恢复后自动继续；仅真实<=1保持额度暂停等用户恢复",
+    "persistent_failure": "隔离受影响步骤，推进独立工作并向协调者报告"
+  },
+  "resources": {
+    "local_linux_tests": {
+      "profile": "umanews-impact-ci",
+      "status": "正在启动既有专用Colima profile",
+      "cpu": 2,
+      "memory_gib": 4,
+      "disk_gib": 20,
+      "owner": "coordinator",
+      "parallel_batches_max_initial": 2
+    },
+    "test_mapping": {
+      "decision": "F01需显式映射；mapping变更按现行规则运行固定候选一套full，不改策略规避",
+      "owner": "A，R审核",
+      "B": "先做离线实现并提交精确映射需求，A首补丁固定后协调衔接，不并发重写共享rules/catalog"
+    }
+  }
 }
