@@ -1,0 +1,654 @@
+{
+  "schema_version": 1,
+  "task": "C-002/U01",
+  "basis": "合成fixture准备，未执行RED/GREEN，不是线上字段快照；expected沿现有明确等级解析和协调者决定，待R核验",
+  "cases": [
+    {
+      "id": "g1_raw_only",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "germany",
+        "year": 2025,
+        "grade_text": "G1",
+        "normalized_grade": ""
+      },
+      "expected": {
+        "code": "G1",
+        "label": "G1",
+        "family": "g1"
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    },
+    {
+      "id": "group_roman_1",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "germany",
+        "year": 2025,
+        "grade_text": "Group I",
+        "normalized_grade": ""
+      },
+      "expected": {
+        "code": "G1",
+        "label": "G1",
+        "family": "g1"
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    },
+    {
+      "id": "fullwidth_1",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "germany",
+        "year": 2025,
+        "grade_text": "Ｇ1",
+        "normalized_grade": ""
+      },
+      "expected": {
+        "code": "G1",
+        "label": "G1",
+        "family": "g1"
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    },
+    {
+      "id": "jpn_1",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "japan",
+        "year": 2025,
+        "grade_text": "JpnⅠ",
+        "normalized_grade": "JPN1"
+      },
+      "expected": {
+        "code": "JPN1",
+        "label": "Jpn1",
+        "family": "g1"
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    },
+    {
+      "id": "jg_1",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "japan",
+        "year": 2025,
+        "grade_text": "J・GⅠ",
+        "normalized_grade": ""
+      },
+      "expected": {
+        "code": "JG1",
+        "label": "J-G1",
+        "family": "g1"
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    },
+    {
+      "id": "g2_raw_only",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "germany",
+        "year": 2025,
+        "grade_text": "G2",
+        "normalized_grade": ""
+      },
+      "expected": {
+        "code": "G2",
+        "label": "G2",
+        "family": "g2"
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    },
+    {
+      "id": "group_roman_2",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "germany",
+        "year": 2025,
+        "grade_text": "Group II",
+        "normalized_grade": ""
+      },
+      "expected": {
+        "code": "G2",
+        "label": "G2",
+        "family": "g2"
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    },
+    {
+      "id": "fullwidth_2",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "germany",
+        "year": 2025,
+        "grade_text": "Ｇ2",
+        "normalized_grade": ""
+      },
+      "expected": {
+        "code": "G2",
+        "label": "G2",
+        "family": "g2"
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    },
+    {
+      "id": "jpn_2",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "japan",
+        "year": 2025,
+        "grade_text": "JpnⅡ",
+        "normalized_grade": "JPN2"
+      },
+      "expected": {
+        "code": "JPN2",
+        "label": "Jpn2",
+        "family": "g2"
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    },
+    {
+      "id": "jg_2",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "japan",
+        "year": 2025,
+        "grade_text": "J・GⅡ",
+        "normalized_grade": ""
+      },
+      "expected": {
+        "code": "JG2",
+        "label": "J-G2",
+        "family": "g2"
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    },
+    {
+      "id": "g3_raw_only",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "germany",
+        "year": 2025,
+        "grade_text": "G3",
+        "normalized_grade": ""
+      },
+      "expected": {
+        "code": "G3",
+        "label": "G3",
+        "family": "g3"
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    },
+    {
+      "id": "group_roman_3",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "germany",
+        "year": 2025,
+        "grade_text": "Group III",
+        "normalized_grade": ""
+      },
+      "expected": {
+        "code": "G3",
+        "label": "G3",
+        "family": "g3"
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    },
+    {
+      "id": "fullwidth_3",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "germany",
+        "year": 2025,
+        "grade_text": "Ｇ3",
+        "normalized_grade": ""
+      },
+      "expected": {
+        "code": "G3",
+        "label": "G3",
+        "family": "g3"
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    },
+    {
+      "id": "jpn_3",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "japan",
+        "year": 2025,
+        "grade_text": "JpnⅢ",
+        "normalized_grade": "JPN3"
+      },
+      "expected": {
+        "code": "JPN3",
+        "label": "Jpn3",
+        "family": "g3"
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    },
+    {
+      "id": "jg_3",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "japan",
+        "year": 2025,
+        "grade_text": "J・GⅢ",
+        "normalized_grade": ""
+      },
+      "expected": {
+        "code": "JG3",
+        "label": "J-G3",
+        "family": "g3"
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    },
+    {
+      "id": "canonical_only",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "germany",
+        "year": 2025,
+        "grade_text": "",
+        "normalized_grade": "G1"
+      },
+      "expected": {
+        "code": "G1",
+        "label": "G1",
+        "family": "g1"
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    },
+    {
+      "id": "case_space",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "germany",
+        "year": 2025,
+        "grade_text": "  gRaDe 1  ",
+        "normalized_grade": ""
+      },
+      "expected": {
+        "code": "G1",
+        "label": "G1",
+        "family": "g1"
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    },
+    {
+      "id": "hk_international",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "hong_kong",
+        "year": 2025,
+        "grade_text": "G1",
+        "normalized_grade": "G1"
+      },
+      "expected": {
+        "code": "G1",
+        "label": "G1",
+        "family": "g1"
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    },
+    {
+      "id": "conflict",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "germany",
+        "year": 2025,
+        "grade_text": "G2",
+        "normalized_grade": "G1"
+      },
+      "expected": {
+        "code": null,
+        "label": "待核实",
+        "family": null
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    },
+    {
+      "id": "empty",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "germany",
+        "year": 2025,
+        "grade_text": "",
+        "normalized_grade": ""
+      },
+      "expected": {
+        "code": null,
+        "label": "待核实",
+        "family": null
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    },
+    {
+      "id": "ambiguous",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "germany",
+        "year": 2025,
+        "grade_text": "G1 G2",
+        "normalized_grade": ""
+      },
+      "expected": {
+        "code": null,
+        "label": "待核实",
+        "family": null
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    },
+    {
+      "id": "out_of_range",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "germany",
+        "year": 2025,
+        "grade_text": "G10",
+        "normalized_grade": ""
+      },
+      "expected": {
+        "code": null,
+        "label": "待核实",
+        "family": null
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    },
+    {
+      "id": "suffix_unverified",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "germany",
+        "year": 2025,
+        "grade_text": "G1 Handicap",
+        "normalized_grade": ""
+      },
+      "expected": {
+        "code": null,
+        "label": "待核实",
+        "family": null
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    },
+    {
+      "id": "local_hk",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "hong_kong",
+        "year": 2025,
+        "grade_text": "香港一级赛",
+        "normalized_grade": ""
+      },
+      "expected": {
+        "code": null,
+        "label": "待核实",
+        "family": null
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    },
+    {
+      "id": "local_hkg",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "hong_kong",
+        "year": 2025,
+        "grade_text": "HKG1",
+        "normalized_grade": ""
+      },
+      "expected": {
+        "code": null,
+        "label": "待核实",
+        "family": null
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    },
+    {
+      "id": "local_english",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "hong_kong",
+        "year": 2025,
+        "grade_text": "Local G1",
+        "normalized_grade": ""
+      },
+      "expected": {
+        "code": null,
+        "label": "待核实",
+        "family": null
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    },
+    {
+      "id": "bad_stored",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "germany",
+        "year": 2025,
+        "grade_text": "",
+        "normalized_grade": "OTHER"
+      },
+      "expected": {
+        "code": null,
+        "label": "待核实",
+        "family": null
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    },
+    {
+      "id": "listed",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "germany",
+        "year": 2025,
+        "grade_text": "Listed",
+        "normalized_grade": ""
+      },
+      "expected": {
+        "code": "L",
+        "label": "L",
+        "family": null
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    },
+    {
+      "id": "open",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "germany",
+        "year": 2025,
+        "grade_text": "Open",
+        "normalized_grade": ""
+      },
+      "expected": {
+        "code": "OP",
+        "label": "OP",
+        "family": null
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    },
+    {
+      "id": "race_class",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "japan",
+        "year": 2025,
+        "grade_text": "1勝クラス",
+        "normalized_grade": ""
+      },
+      "expected": {
+        "code": null,
+        "label": "—",
+        "family": null
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    },
+    {
+      "id": "verified_jra_suffix",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "japan",
+        "year": 2026,
+        "grade_text": "GⅢ 京成杯オータムH",
+        "normalized_grade": "",
+        "original_name": "京成杯オータムH",
+        "source_refs": {
+          "source_kind": "jra_official_graded_race_list",
+          "primary": "https://www.jra.go.jp/datafile/seiseki/replay/2026/jyusyo.html"
+        }
+      },
+      "expected": {
+        "code": "G3",
+        "label": "G3",
+        "family": "g3"
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    },
+    {
+      "id": "jra_suffix_no_source",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "japan",
+        "year": 2026,
+        "grade_text": "GⅢ 京成杯オータムH",
+        "normalized_grade": "",
+        "original_name": "京成杯オータムH",
+        "source_refs": {}
+      },
+      "expected": {
+        "code": null,
+        "label": "待核实",
+        "family": null
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    },
+    {
+      "id": "jra_suffix_wrong_name",
+      "fixture_kind": "合成离线合同场景",
+      "event": {
+        "country_region": "japan",
+        "year": 2026,
+        "grade_text": "GⅢ 京成杯オータムH",
+        "normalized_grade": "",
+        "original_name": "Other",
+        "source_refs": {
+          "source_kind": "jra_official_graded_race_list",
+          "primary": "https://www.jra.go.jp/datafile/seiseki/replay/2026/jyusyo.html"
+        }
+      },
+      "expected": {
+        "code": null,
+        "label": "待核实",
+        "family": null
+      },
+      "display_flags": [
+        false,
+        true
+      ]
+    }
+  ],
+  "regression_constraints": [
+    "分页之前按family过滤",
+    "未知/冲突不进入g1/g2/g3",
+    "同样例开关两状态code/label/family一致",
+    "GET不持久写两等级字段",
+    "地区/年份/canonical/published条件保留",
+    "JRA名称后缀只在既有2026官方profile及匹配赛事名时移除"
+  ]
+}
