@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "timezone": "Asia/Shanghai",
-  "updated_at": "2026-10-03T03:24:13.676900+08:00",
+  "updated_at": "2026-10-03T03:30:29.412507+08:00",
   "coordinator_thread_id": "01a0fdb2-b88c-7f93-8c9e-ba9564c33c93",
   "coordinator_worktree": "/Users/mentianlu/.codex/worktrees/516a/umanews",
   "deadline_at": "2026-10-30T18:00:00+08:00",
@@ -75,8 +75,8 @@
       "deps": [],
       "deadline_at": "2026-10-04T18:00:00+08:00",
       "status": "进行中",
-      "phase": "合同/业务代码开发验证完成；真实PR映射待最后两路径",
-      "commit": "0e05029c1ed00713a6f66e461e6753c1e4dadb27",
+      "phase": "开发验证完成，最后两映射原R限定复审，正式集成待证",
+      "commit": "815b3181fa61e7fbbff714c7d7326e5598dc71a6",
       "pr": null,
       "review": "APPROVED@0e05029c；A002-P2-01/02 CLOSED；独立17 tests PASS；完整Linux/skip/收据待核",
       "evidence": [
@@ -2271,6 +2271,12 @@
       "head": "c9c798ac6190c1ad3f6ed8abb804b453641bc507",
       "status": "APPROVED",
       "report": "/Users/mentianlu/.codex/worktrees/3ab1/umanews/docs/changes/next-version-capabilities/lanes/R/R-root-impact-mapping-review.md"
+    },
+    {
+      "scope": "F01剩余fixture/报告两路径映射",
+      "base": "2ace4fc3109d118701c630f230e22127f5c26198",
+      "head": "815b3181fa61e7fbbff714c7d7326e5598dc71a6",
+      "status": "已送原R，A冻结树外准备F03"
     }
   ],
   "quota_policy": {
@@ -2284,10 +2290,10 @@
     "resume_requires_user": true,
     "allow_credits": false,
     "allow_reset_credit": false,
-    "last_observed_remaining_percent": 6,
-    "last_observed_used_percent": 94,
-    "last_observed_at": "2026-10-03T03:16:19.425719+08:00",
-    "state": "正常，实时剩余6%，阈值未触发",
+    "last_observed_remaining_percent": 5,
+    "last_observed_used_percent": 95,
+    "last_observed_at": "2026-10-03T03:30:29.412507+08:00",
+    "state": "正常，实时剩余5%，阈值未触发",
     "limitation": "调度侧控制；非账单硬上限",
     "unknown_usage_policy": "3次有界重试，仍未知暂缓新增耗时模型工作；读数恢复>1自动解除未知保护"
   },
@@ -2383,6 +2389,20 @@
         "F01-contract-examples.json:真实行为fixture -> content_contracts",
         "F01-validation.json:纯报告 -> 精确docs；A固定补丁后送R"
       ]
+    },
+    "integration": {
+      "worktree": "/Users/mentianlu/.codex/worktrees/next-version-integration-20261003/umanews",
+      "branch": "codex/next-version-first-integration-20261003",
+      "main_base": "907f8de699b31a6fcc80acc78e9ba070aadc4f28",
+      "head": "59431d0d951997631607f6d86406a3ccd1413594",
+      "status": "已组合协调计划和U01，尚待A最终映射审核及B转存实现；未启动正式full/PR",
+      "inputs": {
+        "coordination": "54b6b58d",
+        "U01": "03e5afbbfd2f31cef19285de3f0758a8d6134602"
+      },
+      "conflict_resolution": "仅七份共同规划文档add/add，保留协调者最新已审排期/状态；无业务代码冲突",
+      "lock": "/Users/mentianlu/.codex/runtime/umanews-integration.lock",
+      "lock_semantics": "fcntl非阻塞独占，持有进程owner/thread/operation/SHA/resource/start/PID可核，finally释放；最后状态released"
     }
   },
   "source_main_last_verified": {
