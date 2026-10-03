@@ -3440,7 +3440,7 @@ exit 99
             # Non-sensitive empty .env: absence must not be reported as a product failure.
             (work / ".env").write_text("", encoding="utf-8")
             result = subprocess.run(
-                ["sh", str(wrapper), "-f", compose_file, "config"],
+                ["sh", str(wrapper), "-f", compose_file, "--profile", "*", "config", "--format", "json"],
                 cwd=work,
                 text=True,
                 capture_output=True,
@@ -3448,6 +3448,35 @@ exit 99
                 check=False,
             )
         self.assertEqual(result.returncode, 0, result.stderr)
+        services = json.loads(result.stdout)["services"]
+        self.assertNotIn("onebot", services, "QQ 专属服务不得继续声明")
+        for name, service in services.items():
+            with self.subTest(service=name):
+                self.assertNotIn("onebot", service.get("depends_on", {}))
+                self.assertNotIn("with-onebot", service.get("profiles", []))
+        self.assertTrue({"web", "worker", "beat", "redis", "nginx"} <= set(services))
+
+    def test_q02_beat_keeps_web_pipeline_without_qq_schedule(self):
+        from django.conf import settings
+
+        schedule = settings.CELERY_BEAT_SCHEDULE
+        self.assertNotIn("qq-production-regions-window", schedule)
+        legacy_qq_tasks = {
+            "stable.tasks.push_article_task",
+            "stable.tasks.qq_region_window_task",
+            "stable.tasks.qq_production_regions_window_task",
+            "stable.tasks.qq_auto_push_article_task",
+            "stable.tasks.qq_push_delivery_task",
+        }
+        self.assertFalse(legacy_qq_tasks & {item["task"] for item in schedule.values()})
+        for key, task in {
+            "publish-production-regions-window": "stable.tasks.publish_production_regions_window_task",
+            "auto-publish-batch": "stable.tasks.auto_publish_batch_task",
+            "crawl-production-sources-window": "stable.tasks.crawl_production_sources_window_task",
+            "retry-failed-translations": "stable.tasks.translation_retry_selector_task",
+        }.items():
+            with self.subTest(schedule=key):
+                self.assertEqual(schedule[key]["task"], task)
 
     def test_t16_standard_compose_config_is_valid(self):
         self._assert_compose_config(COMPOSE_STANDARD)
