@@ -1,0 +1,37 @@
+{
+  "status": "proposal_only_not_applied",
+  "base_sha": "7e3f70c22c2a83558b0b7623711a6fba70760afc",
+  "head_sha": "370c20936641f1474341acf0ce9bbc0c7e1c0060",
+  "unknown_path": "server/stable/views.py",
+  "symbols": {
+    "region_production": [
+      "module:stable.tests_legacy",
+      "module:stable.test_multiregion_rollout_change"
+    ],
+    "production_window_detail": [
+      "module:stable.tests_legacy",
+      "module:stable.test_multiregion_rollout_change"
+    ],
+    "production_window_preview": [
+      "module:stable.tests_legacy",
+      "module:stable.test_multiregion_rollout_change"
+    ]
+  },
+  "new_test_module_paths": [],
+  "new_test_ids": [
+    "stable.tests_legacy.QQRetiredUITests.test_disabled_admin_labels_legacy_push_state_as_history_without_rewriting_it",
+    "stable.tests_legacy.QQRetiredUITests.test_disabled_admin_pages_hide_push_link_and_legacy_action_keep_translation",
+    "stable.tests_legacy.QQRetiredUITests.test_disabled_direct_preview_has_reason_without_send_projection_or_side_effect",
+    "stable.tests_legacy.QQRetiredUITests.test_disabled_legacy_action_forged_post_and_direct_callback_do_not_mutate",
+    "stable.tests_legacy.QQRetiredUITests.test_disabled_qq_window_hides_send_controls_retains_historical_decision",
+    "stable.tests_legacy.QQRetiredUITests.test_empty_region_history_still_explains_retired_channel",
+    "stable.tests_legacy.QQRetiredUITests.test_enabled_admin_retains_link_action_and_existing_state_contract",
+    "stable.tests_legacy.QQRetiredUITests.test_existing_auth_object_csrf_and_post_contracts_survive",
+    "stable.tests_legacy.QQRetiredUITests.test_historical_admin_models_and_inlines_remain_available",
+    "stable.tests_legacy.QQRetiredUITests.test_publish_controls_and_enabled_qq_controls_are_preserved",
+    "stable.tests_legacy.QQRetiredUITests.test_region_disabled_counts_are_historical_and_enabled_counts_keep_waiting"
+  ],
+  "catalog_change_required": false,
+  "preserve_full_denominator": true,
+  "shared_rules_modified": false
+}
