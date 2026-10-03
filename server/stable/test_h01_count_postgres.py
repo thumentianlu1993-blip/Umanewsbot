@@ -71,10 +71,11 @@ class RecordingConnection:
         self.raw.close()
 
 
-def _observe_backend(params, application, expected_user, channel):
-    """Own libpq connection, created after fork; no inherited driver is used."""
-    result = dict(seen_active=False, pid=None, query_stopped_at=None,
-                  disappeared_at=None, locks_after=None, identity_matches=False)
+def _observe_backend(params, application, expected_user, channel, rollback=None, barrier=None):
+    """Own post-fork libpq connection; rollback mode checks the actual row lock."""
+    result = dict(seen_active=False, seen_transaction=False, pid=None, query_stopped_at=None,
+                  transaction_ended_at=None, disappeared_at=None, locks_after=None,
+                  identity_matches=False)
     database = None
     try:
         database = psycopg2.connect(**params, application_name="h01-observer-" + uuid4().hex)
@@ -94,9 +95,41 @@ def _observe_backend(params, application, expected_user, channel):
                     raise AssertionError("ambiguous local backend")
                 if rows:
                     pid, dbname, username, state, query, transaction_started = rows[0]
-                    if state == "active" and "pg_sleep" in query and transaction_started:
-                        result.update(seen_active=True, pid=pid,
-                                      identity_matches=dbname == params["dbname"] and username == expected_user)
+                    identity_matches = dbname == params["dbname"] and username == expected_user
+                    if rollback is not None:
+                        transaction_present = state == "idle in transaction" and transaction_started is not None
+                        expected_update = "Uncommitted synthetic" in query
+                        row_locked = False
+                        unchanged = False
+                        if transaction_present and expected_update:
+                            cursor.execute("SELECT count(*) FROM pg_locks WHERE pid=%s "
+                                           "AND relation='public.stable_raceevent'::regclass "
+                                           "AND mode='RowExclusiveLock' AND granted", (pid,))
+                            relation_locks = cursor.fetchone()[0]
+                            cursor.execute("SELECT chinese_name FROM public.stable_raceevent WHERE id=%s", (rollback["row_id"],))
+                            unchanged = cursor.fetchone() == (rollback["old_value"],)
+                            try:
+                                cursor.execute("SELECT id FROM public.stable_raceevent WHERE id=%s FOR UPDATE NOWAIT", (rollback["row_id"],))
+                            except psycopg2.errors.LockNotAvailable:
+                                row_locked = relation_locks > 0
+                        if transaction_present and expected_update and row_locked and unchanged and identity_matches:
+                            result.update(seen_transaction=True, pid=pid, identity_matches=True,
+                                          locks_before=relation_locks)
+                            if "transaction_at" not in result:
+                                result["transaction_at"] = time.monotonic()
+                                channel.send({"transaction_observation": {key: result[key] for key in
+                                              ("pid", "identity_matches", "transaction_at", "locks_before")}})
+                            now = time.monotonic()
+                            # Fresh near-kill evidence, not an old observation from setup.
+                            if rollback["deadline"] - 0.2 <= now < rollback["deadline"] and "prekill" not in result:
+                                result["prekill"] = dict(pid=pid, at=now, row_locked=True,
+                                    transaction_present=True, identity_matches=True,
+                                    committed_value_unchanged=True)
+                                barrier.set()
+                        elif result["seen_transaction"] and result["transaction_ended_at"] is None:
+                            result["transaction_ended_at"] = time.monotonic()
+                    elif state == "active" and "pg_sleep" in query and transaction_started:
+                        result.update(seen_active=True, pid=pid, identity_matches=identity_matches)
                         cursor.execute("SELECT count(*) FROM pg_locks WHERE pid=%s AND granted", (pid,))
                         result["locks_before"] = cursor.fetchone()[0]
                         if "active_at" not in result:
@@ -105,10 +138,11 @@ def _observe_backend(params, application, expected_user, channel):
                                           ("pid", "identity_matches", "active_at", "locks_before")}})
                     elif result["seen_active"] and result["query_stopped_at"] is None:
                         result["query_stopped_at"] = time.monotonic()
-                elif result["seen_active"]:
+                elif result["seen_active"] or result["seen_transaction"]:
                     result["disappeared_at"] = time.monotonic()
-                    if result["query_stopped_at"] is None:
-                        result["query_stopped_at"] = result["disappeared_at"]
+                    end_key = "transaction_ended_at" if rollback is not None else "query_stopped_at"
+                    if result[end_key] is None:
+                        result[end_key] = result["disappeared_at"]
                     cursor.execute("SELECT count(*) FROM pg_locks WHERE pid=%s", (result["pid"],))
                     result["locks_after"] = cursor.fetchone()[0]
                     break
@@ -314,11 +348,11 @@ class H01CountPostgresTests(TransactionTestCase):
             self.assertEqual(cursor.fetchone()[0], 0)
         return result, tracked
 
-    def _observe(self, application, expected_user):
+    def _observe(self, application, expected_user, *, rollback=None, barrier=None):
         connections.close_all()
         receiver, sender = multiprocessing.get_context("fork").Pipe(duplex=False)
         process = multiprocessing.get_context("fork").Process(
-            target=_observe_backend, args=(self.params, application, expected_user, sender))
+            target=_observe_backend, args=(self.params, application, expected_user, sender, rollback, barrier))
         process.start()
         sender.close()
         self.processes.append((process, receiver))
@@ -327,16 +361,32 @@ class H01CountPostgresTests(TransactionTestCase):
         self.assertEqual(receiver.recv(), {"ready": True})
         return process, receiver
 
-    def _check_observation(self, process, receiver, deadline):
+    def _check_observation(self, process, receiver, deadline, *, require_kill_causality=True):
         self.assertTrue(receiver.poll(0.5), "observer never reported a real active backend")
         first = receiver.recv()
-        self.assertIn("active_observation", first)
-        print("H01_PG_ACTIVE " + json.dumps(first["active_observation"], sort_keys=True))
+        first_key = "transaction_observation" if require_kill_causality else "active_observation"
+        self.assertIn(first_key, first)
+        print("H01_PG_INITIAL " + json.dumps(first[first_key], sort_keys=True))
         self.assertTrue(receiver.poll(3), "backend did not disappear in observation window")
         result = receiver.recv()
         process.join(timeout=0.5)
         self.assertFalse(process.is_alive())
-        self.assertTrue(result.get("seen_active"), "observer never saw a real active query")
+        if require_kill_causality:
+            self.assertTrue(result.get("seen_transaction"), "observer never saw the pending transaction")
+            prekill = result.get("prekill")
+            self.assertIsNotNone(prekill, "missing independent near-kill transaction/row-lock barrier")
+            self.assertEqual(prekill["pid"], result.get("pid"))
+            self.assertTrue(all(prekill.get(key) is True for key in
+                                ("row_locked", "transaction_present", "identity_matches", "committed_value_unchanged")))
+            self.assertGreaterEqual(prekill["at"], deadline - 0.3)
+            self.assertLess(prekill["at"], deadline)
+            self.assertIsNotNone(result.get("transaction_ended_at"))
+            self.assertGreaterEqual(result["transaction_ended_at"], deadline,
+                                    "transaction ended before the parent kill deadline")
+            self.assertGreaterEqual(result.get("disappeared_at", 0), deadline,
+                                    "backend disappeared before the parent kill deadline")
+        else:
+            self.assertTrue(result.get("seen_active"), "observer never saw a real active query")
         self.assertTrue(result.get("identity_matches"))
         self.assertGreater(result.get("locks_before", 0), 0)
         self.assertIsNotNone(result.get("disappeared_at"))
@@ -464,7 +514,7 @@ class H01CountPostgresTests(TransactionTestCase):
         self.assertEqual(status, 2)
         self.assertEqual(json.loads(output.getvalue())["reason"], "wall_time")
         self.assertLess(time.monotonic() - started, 2)
-        self._check_observation(process, receiver, deadline)
+        self._check_observation(process, receiver, deadline, require_kill_causality=False)
 
     def test_killed_local_transaction_rolls_back(self):
         event = self._event("rollback")
@@ -475,23 +525,49 @@ class H01CountPostgresTests(TransactionTestCase):
             cursor.execute("SELECT chinese_name FROM public.stable_raceevent WHERE id=%s", (event.pk,))
             self.assertEqual(cursor.fetchone()[0], "Synthetic rollback")
         application = "h01-rollback-" + uuid4().hex
-        process, receiver = self._observe(application, self.params["user"])
+        started = time.monotonic()
+        deadline = started + 2
+        barrier = multiprocessing.get_context("fork").Event()
+        process, receiver = self._observe(application, self.params["user"],
+            rollback=dict(row_id=event.pk, old_value="Synthetic rollback", deadline=deadline), barrier=barrier)
         def write_without_commit():
             database = psycopg2.connect(**self.params, application_name=application)
             with database.cursor() as cursor:
-                cursor.execute("SET LOCAL statement_timeout = 1000")
-                cursor.execute("SET LOCAL idle_in_transaction_session_timeout = 1000")
+                # Local admin diagnostic only. Neither server timeout can win
+                # before the two-second parent kill and invalidate causality.
+                cursor.execute("SET LOCAL statement_timeout = 10000")
+                cursor.execute("SET LOCAL idle_in_transaction_session_timeout = 10000")
                 cursor.execute("UPDATE public.stable_raceevent SET chinese_name='Uncommitted synthetic' WHERE id=%s", (event.pk,))
-                try:
-                    cursor.execute("SELECT pg_sleep(10)")
-                finally:
-                    time.sleep(10)
-        started = time.monotonic()
-        deadline = started + 1.5
-        result = reader._bounded_worker(write_without_commit, deadline=deadline)
+                if cursor.rowcount != 1:
+                    raise AssertionError("missing synthetic transaction target")
+                # Backend is idle in a live uncommitted transaction. Observer
+                # confirms the exact row lock just before kill, then releases
+                # this client-side barrier. No rollback/commit/SQL follows it.
+                barrier.wait(timeout=10)
+                time.sleep(10)
+        context = multiprocessing.get_context("fork")
+        original_factory = context.Process
+        kill_record = {}
+        def process_factory(*args, **kwargs):
+            worker = original_factory(*args, **kwargs)
+            original_kill = worker.kill
+            def kill():
+                # Observe the actual parent's kill call, not a caller-supplied
+                # deadline. Always perform it, even if a barrier assertion fails.
+                kill_record.update(at=time.monotonic(), client_pid=worker.pid,
+                                   barrier_confirmed=barrier.is_set())
+                return original_kill()
+            worker.kill = kill
+            return worker
+        with patch.object(context, "Process", process_factory):
+            result = reader._bounded_worker(write_without_commit, deadline=deadline)
         self.assertEqual(result["reason"], "wall_time")
-        self.assertLess(time.monotonic() - started, 2)
-        self._check_observation(process, receiver, deadline)
+        self.assertIn("at", kill_record, "no actual worker kill occurred")
+        self.assertTrue(kill_record["barrier_confirmed"], "kill occurred without the independent transaction/row-lock barrier")
+        self.assertGreaterEqual(kill_record["at"], deadline)
+        self.assertLess(time.monotonic() - started, 2.5)
+        print("H01_PG_KILL " + json.dumps(kill_record, sort_keys=True))
+        self._check_observation(process, receiver, kill_record["at"])
         with self._database() as independent, independent.cursor() as cursor:
             cursor.execute("SELECT chinese_name FROM public.stable_raceevent WHERE id=%s", (event.pk,))
             self.assertEqual(cursor.fetchone()[0], "Synthetic rollback")
