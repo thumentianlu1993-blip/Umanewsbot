@@ -1233,6 +1233,9 @@
     ],
     "server/stable/test_h01_count_postgres.py": [
       "horse_target_inventory"
+    ],
+    "server/stable/services/race_timeliness_contracts.py": [
+      "race_timeliness_contracts"
     ]
   },
   "symbols": {

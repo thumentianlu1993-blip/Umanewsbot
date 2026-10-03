@@ -825,6 +825,10 @@
       "stable.test_horse_target_inventory",
       "scripts.tests.test_h01_readonly_count",
       "stable.test_h01_count_postgres"
+    ],
+    "race_timeliness_contracts": [
+      "stable.test_race_timeliness_contracts",
+      "stable.test_content_contracts"
     ]
   },
   "dependencies": {
@@ -836,6 +840,9 @@
     ],
     "horse_publish": [
       "horse_page"
+    ],
+    "content_contracts": [
+      "race_timeliness_contracts"
     ]
   },
   "tests": {
@@ -2567,6 +2574,12 @@
       "domains": [
         "horse_target_inventory"
       ]
+    },
+    "server/stable/test_race_timeliness_contracts.py": {
+      "label": "stable.test_race_timeliness_contracts",
+      "domains": [
+        "race_timeliness_contracts"
+      ]
     }
   },
   "profiles": {
@@ -2855,7 +2868,8 @@
     "scripts.tests.test_f02_export_postgres": "django",
     "stable.test_horse_target_inventory": "python",
     "scripts.tests.test_h01_readonly_count": "python",
-    "stable.test_h01_count_postgres": "django"
+    "stable.test_h01_count_postgres": "django",
+    "stable.test_race_timeliness_contracts": "python"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
@@ -2926,7 +2940,8 @@
     "race_results": "integration: 持久化及官方公开判定",
     "historical_batch": "integration: 历史批次收据和事务",
     "horse_publish": "integration: 首次发布、批次重试及冻结排除",
-    "horse_target_inventory": "integration: H01目标清单与只读容量合同"
+    "horse_target_inventory": "integration: H01目标清单与只读容量合同",
+    "race_timeliness_contracts": "integration: R01纯合同、时延边界和错误历史"
   },
   "dedicated_batch_modules": [
     "stable.test_migration_history_repair_postgres",
