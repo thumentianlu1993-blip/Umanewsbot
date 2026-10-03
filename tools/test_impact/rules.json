@@ -1156,21 +1156,78 @@
     ],
     "scripts/f02_readonly_export.py": [
       "module:scripts.tests.test_f02_readonly_export",
-      "module:scripts.tests.test_f02_transfer"
+      "module:scripts.tests.test_f02_transfer",
+      "module:scripts.tests.test_f02_docker_adapter",
+      "module:scripts.tests.test_f02_tool_package",
+      "module:scripts.tests.test_f02_receipt_bridge",
+      "module:scripts.tests.test_f02_export_postgres"
     ],
     "scripts/tests/test_f02_readonly_export.py": [
       "module:scripts.tests.test_f02_readonly_export",
-      "module:scripts.tests.test_f02_transfer"
+      "module:scripts.tests.test_f02_transfer",
+      "module:scripts.tests.test_f02_docker_adapter",
+      "module:scripts.tests.test_f02_receipt_bridge"
     ],
     "docs/changes/next-version-capabilities/lanes/B/B-002-test-mapping-proposal.json": [
       "module:scripts.tests.test_f02_readonly_export",
       "module:scripts.tests.test_f02_transfer"
     ],
     "scripts/f02_transfer.py": [
-      "module:scripts.tests.test_f02_transfer"
+      "module:scripts.tests.test_f02_transfer",
+      "module:scripts.tests.test_f02_docker_adapter",
+      "module:scripts.tests.test_f02_tool_package",
+      "module:scripts.tests.test_f02_receipt_bridge",
+      "module:scripts.tests.test_f02_export_postgres"
     ],
     "scripts/tests/test_f02_transfer.py": [
-      "module:scripts.tests.test_f02_transfer"
+      "module:scripts.tests.test_f02_transfer",
+      "module:scripts.tests.test_f02_docker_adapter",
+      "module:scripts.tests.test_f02_receipt_bridge"
+    ],
+    "scripts/f02_docker_adapter.py": [
+      "module:scripts.tests.test_f02_docker_adapter"
+    ],
+    "scripts/f02_container_probe.py": [
+      "module:scripts.tests.test_f02_docker_adapter"
+    ],
+    "scripts/f02_tool_package.py": [
+      "module:scripts.tests.test_f02_tool_package"
+    ],
+    "scripts/f02_receipt_bridge.py": [
+      "module:scripts.tests.test_f02_receipt_bridge"
+    ],
+    "scripts/tests/f02_pg_schema.sql": [
+      "module:scripts.tests.test_f02_export_postgres"
+    ],
+    "scripts/tests/test_f02_docker_adapter.py": [
+      "module:scripts.tests.test_f02_docker_adapter"
+    ],
+    "scripts/tests/test_f02_tool_package.py": [
+      "module:scripts.tests.test_f02_tool_package"
+    ],
+    "scripts/tests/test_f02_receipt_bridge.py": [
+      "module:scripts.tests.test_f02_receipt_bridge"
+    ],
+    "scripts/tests/test_f02_export_postgres.py": [
+      "module:scripts.tests.test_f02_export_postgres"
+    ],
+    "scripts/tests/f02_pg_fixture.py": [
+      "module:scripts.tests.test_f02_export_postgres"
+    ],
+    "server/stable/services/horse_target_inventory.py": [
+      "horse_target_inventory"
+    ],
+    "server/stable/test_horse_target_inventory.py": [
+      "horse_target_inventory"
+    ],
+    "scripts/h01_readonly_count.py": [
+      "horse_target_inventory"
+    ],
+    "scripts/tests/test_h01_readonly_count.py": [
+      "horse_target_inventory"
+    ],
+    "server/stable/test_h01_count_postgres.py": [
+      "horse_target_inventory"
     ]
   },
   "symbols": {

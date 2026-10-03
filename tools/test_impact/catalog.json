@@ -808,6 +808,23 @@
     ],
     "module:scripts.tests.test_f02_transfer": [
       "scripts.tests.test_f02_transfer"
+    ],
+    "module:scripts.tests.test_f02_docker_adapter": [
+      "scripts.tests.test_f02_docker_adapter"
+    ],
+    "module:scripts.tests.test_f02_tool_package": [
+      "scripts.tests.test_f02_tool_package"
+    ],
+    "module:scripts.tests.test_f02_receipt_bridge": [
+      "scripts.tests.test_f02_receipt_bridge"
+    ],
+    "module:scripts.tests.test_f02_export_postgres": [
+      "scripts.tests.test_f02_export_postgres"
+    ],
+    "horse_target_inventory": [
+      "stable.test_horse_target_inventory",
+      "scripts.tests.test_h01_readonly_count",
+      "stable.test_h01_count_postgres"
     ]
   },
   "dependencies": {
@@ -2496,13 +2513,59 @@
       "label": "scripts.tests.test_f02_readonly_export",
       "domains": [
         "module:scripts.tests.test_f02_readonly_export",
-        "module:scripts.tests.test_f02_transfer"
+        "module:scripts.tests.test_f02_transfer",
+        "module:scripts.tests.test_f02_docker_adapter",
+        "module:scripts.tests.test_f02_receipt_bridge"
       ]
     },
     "scripts/tests/test_f02_transfer.py": {
       "label": "scripts.tests.test_f02_transfer",
       "domains": [
-        "module:scripts.tests.test_f02_transfer"
+        "module:scripts.tests.test_f02_transfer",
+        "module:scripts.tests.test_f02_docker_adapter",
+        "module:scripts.tests.test_f02_receipt_bridge"
+      ]
+    },
+    "scripts/tests/test_f02_docker_adapter.py": {
+      "label": "scripts.tests.test_f02_docker_adapter",
+      "domains": [
+        "module:scripts.tests.test_f02_docker_adapter"
+      ]
+    },
+    "scripts/tests/test_f02_tool_package.py": {
+      "label": "scripts.tests.test_f02_tool_package",
+      "domains": [
+        "module:scripts.tests.test_f02_tool_package"
+      ]
+    },
+    "scripts/tests/test_f02_receipt_bridge.py": {
+      "label": "scripts.tests.test_f02_receipt_bridge",
+      "domains": [
+        "module:scripts.tests.test_f02_receipt_bridge"
+      ]
+    },
+    "scripts/tests/test_f02_export_postgres.py": {
+      "label": "scripts.tests.test_f02_export_postgres",
+      "domains": [
+        "module:scripts.tests.test_f02_export_postgres"
+      ]
+    },
+    "server/stable/test_horse_target_inventory.py": {
+      "label": "stable.test_horse_target_inventory",
+      "domains": [
+        "horse_target_inventory"
+      ]
+    },
+    "scripts/tests/test_h01_readonly_count.py": {
+      "label": "scripts.tests.test_h01_readonly_count",
+      "domains": [
+        "horse_target_inventory"
+      ]
+    },
+    "server/stable/test_h01_count_postgres.py": {
+      "label": "stable.test_h01_count_postgres",
+      "domains": [
+        "horse_target_inventory"
       ]
     }
   },
@@ -2785,7 +2848,14 @@
     "scripts.tests.test_impact_verifier_e2e": "python",
     "stable.test_content_contracts": "python",
     "scripts.tests.test_f02_readonly_export": "python",
-    "scripts.tests.test_f02_transfer": "python"
+    "scripts.tests.test_f02_transfer": "python",
+    "scripts.tests.test_f02_docker_adapter": "python",
+    "scripts.tests.test_f02_tool_package": "python",
+    "scripts.tests.test_f02_receipt_bridge": "python",
+    "scripts.tests.test_f02_export_postgres": "django",
+    "stable.test_horse_target_inventory": "python",
+    "scripts.tests.test_h01_readonly_count": "python",
+    "stable.test_h01_count_postgres": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
@@ -2855,10 +2925,12 @@
     "race_parser": "integration: 来源解析到结果规范化",
     "race_results": "integration: 持久化及官方公开判定",
     "historical_batch": "integration: 历史批次收据和事务",
-    "horse_publish": "integration: 首次发布、批次重试及冻结排除"
+    "horse_publish": "integration: 首次发布、批次重试及冻结排除",
+    "horse_target_inventory": "integration: H01目标清单与只读容量合同"
   },
   "dedicated_batch_modules": [
     "stable.test_migration_history_repair_postgres",
-    "stable.test_migration_database_isolation"
+    "stable.test_migration_database_isolation",
+    "scripts.tests.test_f02_export_postgres"
   ]
 }
