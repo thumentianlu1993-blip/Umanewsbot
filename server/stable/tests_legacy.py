@@ -19,7 +19,7 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, connection
-from django.test import Client, TestCase, override_settings
+from django.test import Client, TestCase, TransactionTestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
@@ -3932,6 +3932,7 @@ class PublishWindowServiceTests(TestCase):
         self.assertEqual(result["reason"], "multiregion_windows_enabled")
 
 
+@override_settings(QQ_CHANNEL_ENABLED=True)
 class QQWindowServiceTests(TestCase):
     def _target(self, **overrides):
         payload = {
@@ -9458,6 +9459,7 @@ class GlobalRacingImportOutputAuditTests(TestCase):
                 )
 
 
+@override_settings(QQ_CHANNEL_ENABLED=True)
 class PushTests(TestCase):
     def setUp(self):
         self.article = NewsArticle.objects.create(
@@ -9511,6 +9513,7 @@ class PushTests(TestCase):
     CELERY_TASK_EAGER_PROPAGATES=False,
     QQ_PUSH_SCOPE="all_public",
 )
+@override_settings(QQ_CHANNEL_ENABLED=True)
 class QQAutoPushTests(TestCase):
     def setUp(self):
         self.article = NewsArticle.objects.create(
@@ -13709,6 +13712,7 @@ class CrawlAutoTranslateTests(TestCase):
         self.assertEqual(source.last_crawl_message, "新增 0，重复 1")
 
     @override_settings(AUTO_TRANSLATE_ON_INGEST=False, QQ_PUSH_ENABLED=True)
+    @override_settings(QQ_CHANNEL_ENABLED=True)
     def test_source_elevated_public_article_dispatches_qq_auto_push(self):
         sync_builtin_sources()
         source = NewsSource.objects.get(source_site=SourceSite.NETKEIBA, source_mode=SourceMode.ACCESS)
@@ -13811,6 +13815,7 @@ class CrawlAutoTranslateTests(TestCase):
         )
 
     @override_settings(AUTO_TRANSLATE_ON_INGEST=False, QQ_PUSH_ENABLED=True)
+    @override_settings(QQ_CHANNEL_ENABLED=True)
     def test_international_source_elevated_public_article_dispatches_qq_auto_push(self):
         sync_builtin_sources()
         source = NewsSource.objects.get(source_site=SourceSite.SKY_SPORTS_RACING, source_mode=SourceMode.ACCESS)
@@ -19117,3 +19122,591 @@ class P0HorseProfileDataCompletionTests(TestCase):
         # it lands on page 2.
         self.assertNotContains(first, "香港马")
         self.assertContains(second, "香港马")
+
+
+@override_settings(QQ_CHANNEL_ENABLED=False, QQ_PUSH_ENABLED=True,
+                   CELERY_TASK_ALWAYS_EAGER=False, QQ_PUSH_MIN_INTERVAL_SECONDS=60,
+                   QQ_PUSH_SCOPE='all_public')
+class QQShutdownTests(TestCase):
+    """停用后的旧入口与迟到消息必须无发送、无派生重试。"""
+    def setUp(self):
+        QQAutoPushTests.setUp(self)
+        self.staff = get_user_model().objects.create_user('qq-shutdown-staff', is_staff=True)
+        self.client.force_login(self.staff)
+        self.post = patch('stable.services.onebot.requests.post').start()
+        self.get = patch('stable.services.onebot.requests.get').start()
+        self.addCleanup(patch.stopall)
+        for mocked in (self.post, self.get):
+            mocked.return_value.json.return_value = {'status': 'ok', 'retcode': 0, 'data': {'online': True}}
+
+    def test_manual_api_reports_disabled_without_queue_or_article_mutation(self):
+        before = (self.article.status, self.article.workflow_status, self.article.published_to_web_at)
+        with patch('stable.tasks.push_article_task.delay') as queued:
+            response = self.client.post(reverse('api-article-push', args=[self.article.pk]),
+                data=json.dumps({'target_ids': [self.target.pk]}), content_type='application/json')
+        self.assertEqual(response.status_code, 410)
+        self.assertEqual(response.json(), {'queued': False, 'reason': 'qq_channel_disabled'})
+        queued.assert_not_called()
+        self.article.refresh_from_db()
+        self.assertEqual((self.article.status, self.article.workflow_status, self.article.published_to_web_at), before)
+        self.post.assert_not_called()
+
+    def test_terminal_disabled_blocks_text_image_fallback_and_direct_post(self):
+        from stable.services.onebot import BotPusher, QQChannelDisabled
+        pusher = BotPusher()
+        for image in (None, 'https://fixture.invalid/image.png'):
+            with self.subTest(image=image):
+                with self.assertRaises(QQChannelDisabled):
+                    pusher.send_group_message('synthetic-group', 'synthetic', image_url=image)
+                self.post.assert_not_called()
+        with self.assertRaises(QQChannelDisabled):
+            pusher._post_message('synthetic-group', [])
+        self.post.assert_not_called()
+
+    def test_late_delivery_is_skipped_before_throttle_or_retry(self):
+        delivery = QQPushDelivery.objects.create(article=self.article, target=self.target,
+            status=QQPushDeliveryStatus.RETRYING, attempt_count=1, last_attempt_at=timezone.now())
+        with patch('stable.tasks.qq_push_delivery_task.apply_async') as retry, \
+             patch('stable.services.qq_auto_push.is_public_url_accessible') as url_check:
+            result = qq_push_delivery_task.run(delivery.pk)
+        self.assertEqual(result['status'], QQPushDeliveryStatus.SKIPPED)
+        retry.assert_not_called()
+        url_check.assert_not_called()
+        delivery.refresh_from_db()
+        self.assertEqual(delivery.attempt_count, 1)
+        self.assertEqual(delivery.last_error, 'qq_channel_disabled')
+        self.get.assert_not_called()
+        self.post.assert_not_called()
+
+    def test_online_probe_does_not_contact_disabled_gateway(self):
+        from stable.services.onebot import BotPusher
+        self.assertEqual(BotPusher().is_online(), (False, 'qq_channel_disabled'))
+        self.get.assert_not_called()
+
+    def test_direct_manual_service_and_late_task_do_not_change_web_status(self):
+        from stable.models import PushLog
+        from stable.services.pushing import enqueue_push_for_article
+        from stable.tasks import push_article_task
+        before = self.article.status
+        self.assertEqual(push_article_to_targets(self.article, [self.target]), [])
+        with patch('stable.tasks.push_article_task.delay') as queued:
+            enqueue_push_for_article(self.article, [self.target])
+        queued.assert_not_called()
+        result = push_article_task.run(self.article.pk, [self.target.pk])
+        self.assertEqual(result['reason'], 'qq_channel_disabled')
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.status, before)
+        self.assertEqual(PushLog.objects.count(), 0)
+        self.post.assert_not_called()
+
+    def test_direct_auto_services_do_not_create_deliveries_or_quotas(self):
+        from stable.services.qq_windows import select_qq_window_deliveries
+        self.assertEqual(ensure_qq_push_deliveries(self.article, [self.target]), [])
+        result = select_qq_window_deliveries(RacingRegion.JAPAN, window=Mock(), targets=[self.target])
+        self.assertEqual(result.zero_reasons, ['qq_channel_disabled'])
+        self.assertEqual(QQPushDelivery.objects.count(), 0)
+        self.assertEqual(QuotaLedger.objects.count(), 0)
+
+    def test_all_old_task_entrypoints_skip_without_fanout(self):
+        from stable.tasks import qq_region_window_task, qq_production_regions_window_task, _qq_push_after_source_elevation
+        with override_settings(MULTIREGION_PRODUCTION_WINDOWS_ENABLED=True,
+                               MULTIREGION_PRODUCTION_WINDOWS_QQ_ENABLED=True), \
+             patch('stable.tasks.dispatch_task') as dispatch, \
+             patch('stable.tasks.qq_push_delivery_task.delay') as delivery_queue:
+            for task, args in [(qq_auto_push_article_task, [self.article.pk]),
+                               (qq_production_regions_window_task, []),
+                               (qq_region_window_task, [RacingRegion.JAPAN])]:
+                with self.subTest(task=task.name):
+                    self.assertEqual(task.run(*args).get('reason'), 'qq_channel_disabled')
+            self.assertIsNone(_qq_push_after_source_elevation(self.article, source_elevated=True))
+        dispatch.assert_not_called()
+        delivery_queue.assert_not_called()
+        self.assertEqual(QQPushDelivery.objects.count(), 0)
+        self.assertEqual(ProductionWindow.objects.count(), 0)
+
+    def test_commit_callback_rechecks_shutdown_before_enqueuing(self):
+        from stable.services.qq_auto_push import enqueue_qq_auto_push_for_article
+        with self.captureOnCommitCallbacks() as callbacks, override_settings(QQ_CHANNEL_ENABLED=True):
+            enqueue_qq_auto_push_for_article(self.article.pk)
+        with patch('stable.tasks.qq_auto_push_article_task.delay') as queued:
+            for callback in callbacks:
+                callback()
+        queued.assert_not_called()
+
+    def test_web_publication_survives_gateway_failure(self):
+        from stable.services.automation import publish_article_automatically
+        from stable.tasks import publish_article
+        self.post.side_effect = RuntimeError('gateway unavailable')
+        with patch('stable.tasks.qq_auto_push_article_task.delay') as queued, \
+             patch('stable.tasks.dispatch_task') as scan, self.captureOnCommitCallbacks(execute=True):
+            publish_article(self.article, self.staff)
+            publish_article_automatically(self.article)
+        queued.assert_not_called()
+        scan.assert_called_once()
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.workflow_status, WorkflowStatus.PUBLISHED)
+        self.assertIsNotNone(self.article.published_to_web_at)
+        self.assertEqual(self.client.get(reverse('public-article-detail', args=[self.article.pk])).status_code, 200)
+        self.post.assert_not_called()
+
+    def test_ops_email_and_automation_email_continue_while_qq_skips(self):
+        from stable.models import NotificationType, NotificationChannel, NotificationStatus
+        from stable.services.ops_notifications import send_ops_notification
+        from stable.services.notifications import send_automation_notification
+        with override_settings(MULTIREGION_OPS_NOTIFICATIONS_ENABLED=True,
+                MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID='synthetic-group',
+                MULTIREGION_OPS_NOTIFICATION_EMAILS=['ops@example.invalid'],
+                AUTOMATION_ENABLE_EMAIL=True, AUTOMATION_NOTIFY_EMAILS=['ops@example.invalid']), \
+             patch('stable.services.ops_notifications.send_mail') as ops_mail, \
+             patch('stable.services.notifications.send_mail') as automation_mail:
+            logs = send_ops_notification(notification_type=NotificationType.OPS_SUMMARY,
+                                        title='synthetic ops', payload={})
+            auto_logs = send_automation_notification(NotificationType.BACKLOG, {},
+                channels=[NotificationChannel.QQ, NotificationChannel.EMAIL, NotificationChannel.SMS, NotificationChannel.WECHAT])
+        qq_logs = [l for l in logs + auto_logs if l.channel == NotificationChannel.QQ]
+        self.assertTrue(qq_logs)
+        self.assertTrue(all(l.status == NotificationStatus.SKIPPED and l.error_message == 'qq_channel_disabled' for l in qq_logs))
+        ops_mail.assert_called_once()
+        automation_mail.assert_called_once()
+        self.post.assert_not_called()
+
+    def test_old_disabled_delivery_does_not_resume_when_channel_is_reenabled(self):
+        from stable.services.qq_auto_push import process_qq_push_delivery
+        delivery = QQPushDelivery.objects.create(article=self.article, target=self.target,
+            status=QQPushDeliveryStatus.SKIPPED, last_error='qq_channel_disabled')
+        with override_settings(QQ_CHANNEL_ENABLED=True), \
+             patch('stable.services.qq_auto_push.is_public_url_accessible', return_value=(True, '')), \
+             patch('stable.tasks.qq_push_delivery_task.apply_async') as retry:
+            updated = process_qq_push_delivery(delivery)
+            result = qq_push_delivery_task.run(delivery.pk)
+            self.assertEqual(ensure_qq_push_deliveries(self.article, [self.target]), [])
+        self.assertEqual(updated.status, QQPushDeliveryStatus.SKIPPED)
+        self.assertEqual(result['status'], QQPushDeliveryStatus.SKIPPED)
+        retry.assert_not_called()
+        self.post.assert_not_called()
+
+    def test_pending_states_skip_but_sent_and_fresh_sending_are_preserved(self):
+        from stable.services.qq_auto_push import process_qq_push_delivery
+        self.url_patch = patch('stable.services.qq_auto_push.is_public_url_accessible', return_value=(True, '')).start()
+        for status in [QQPushDeliveryStatus.PENDING, QQPushDeliveryStatus.RETRYING,
+                       QQPushDeliveryStatus.FAILED, QQPushDeliveryStatus.SKIPPED,
+                       QQPushDeliveryStatus.SENDING, QQPushDeliveryStatus.SENT]:
+            for fresh in ([False, True] if status == QQPushDeliveryStatus.SENDING else [False]):
+                with self.subTest(status=status, fresh=fresh):
+                    QQPushDelivery.objects.all().delete()
+                    delivery = QQPushDelivery.objects.create(article=self.article, target=self.target,
+                        status=status, attempt_count=1, message_id='historical-id',
+                        last_attempt_at=timezone.now() if fresh else timezone.now()-timedelta(hours=1))
+                    expected = status if status == QQPushDeliveryStatus.SENT or fresh else QQPushDeliveryStatus.SKIPPED
+                    result = process_qq_push_delivery(delivery)
+                    self.assertEqual(result.status, expected)
+                    self.assertEqual(result.attempt_count, 1)
+                    self.assertEqual(result.message_id, 'historical-id')
+        self.get.assert_not_called()
+        self.post.assert_not_called()
+
+    def test_admin_post_and_qq_window_rerun_are_disabled_before_mutation(self):
+        with patch('stable.admin.enqueue_push_for_article') as admin_queue:
+            response = self.client.post(reverse('admin:stable_newsarticle_push', args=[self.article.pk]),
+                                       {'targets': [self.target.pk]})
+        admin_queue.assert_not_called()
+        self.assertEqual(response.status_code, 302)
+        start = timezone.now()
+        window = ProductionWindow.objects.create(kind=ProductionWindowKind.QQ_PUSH,
+            scope_key='synthetic-qq', racing_region=RacingRegion.JAPAN,
+            window_start=start, window_end=start+timedelta(minutes=15), status=ProductionWindowStatus.SUCCEEDED)
+        with patch('stable.views.select_qq_window_deliveries', return_value=Mock(deliveries=[], zero_reasons=[])) as selection, \
+             patch('stable.views.dispatch_task') as dispatch, \
+             patch('stable.services.pushing.enqueue_push_for_article') as queue:
+            response = self.client.post(reverse('console-production-window-rerun', args=[window.pk]))
+            preview = self.client.get(reverse('console-production-window-preview', args=[window.pk]))
+        self.assertEqual(response.status_code, 302)
+        self.assertContains(preview, 'qq_channel_disabled')
+        window.refresh_from_db()
+        self.assertEqual(window.rerun_count, 0)
+        self.assertEqual(window.status, ProductionWindowStatus.SUCCEEDED)
+        selection.assert_not_called()
+        dispatch.assert_not_called()
+        self.get.assert_not_called()
+        self.post.assert_not_called()
+
+    def test_terminal_shutdown_is_not_manual_failure_or_retry_after_claim(self):
+        from stable.services.onebot import QQChannelDisabled
+        from stable.services.qq_auto_push import process_qq_push_delivery
+        from stable.models import PushLog
+        before = self.article.status
+        with override_settings(QQ_CHANNEL_ENABLED=True), \
+             patch('stable.services.onebot.BotPusher.send_group_message', side_effect=QQChannelDisabled()):
+            self.assertEqual(push_article_to_targets(self.article, [self.target]), [])
+            delivery = QQPushDelivery.objects.create(article=self.article, target=self.target)
+            with patch('stable.services.qq_auto_push.is_public_url_accessible', return_value=(True, '')):
+                result = process_qq_push_delivery(delivery)
+        self.assertEqual(result.status, QQPushDeliveryStatus.SKIPPED)
+        self.assertEqual(result.attempt_count, 0)
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.status, before)
+        self.assertEqual(PushLog.objects.count(), 0)
+
+    def test_disabled_api_keeps_auth_and_missing_object_contract(self):
+        self.client.logout()
+        self.assertEqual(self.client.post(reverse('api-article-push', args=[self.article.pk])).status_code, 302)
+        regular = get_user_model().objects.create_user('qq-ordinary')
+        self.client.force_login(regular)
+        self.assertEqual(self.client.post(reverse('api-article-push', args=[self.article.pk])).status_code, 403)
+        self.client.force_login(self.staff)
+        self.assertEqual(self.client.post(reverse('api-article-push', args=[999999])).status_code, 404)
+        self.post.assert_not_called()
+
+    def test_admin_get_and_invalid_post_explicitly_report_shutdown(self):
+        from django.contrib.messages import get_messages
+        url = reverse('admin:stable_newsarticle_push', args=[self.article.pk])
+        with patch('stable.admin.enqueue_push_for_article') as queued:
+            for method in (self.client.get, self.client.post):
+                with self.subTest(method=method.__name__):
+                    response = method(url)
+                    self.assertEqual(response.status_code, 302)
+                    self.assertTrue(any('QQ渠道已停用' in str(m) for m in get_messages(response.wsgi_request)))
+        queued.assert_not_called()
+        self.post.assert_not_called()
+
+    def test_warning_email_dedup_is_independent_of_qq_shutdown(self):
+        from stable.services.notifications import send_high_value_warning_notification
+        from stable.models import NotificationStatus
+        self.article.gate_issues = [{'severity': 'warning', 'code': 'synthetic', 'message': 'synthetic warning'}]
+        with override_settings(AUTOMATION_WARNING_EMAIL_ENABLED=True,
+                               AUTOMATION_WARNING_NOTIFY_EMAILS=['warning@example.invalid']),              patch('stable.services.notifications.is_high_value_article', return_value=True),              patch('stable.services.notifications.send_mail') as mail:
+            first = send_high_value_warning_notification(self.article)
+            second = send_high_value_warning_notification(self.article)
+        self.assertEqual(first[0].status, NotificationStatus.SENT)
+        self.assertEqual(second[0].status, NotificationStatus.SKIPPED)
+        mail.assert_called_once()
+        self.post.assert_not_called()
+
+    def test_publish_window_rerun_is_not_disabled_with_qq(self):
+        from types import SimpleNamespace
+        start = timezone.now()
+        window = ProductionWindow.objects.create(kind=ProductionWindowKind.PUBLISH,
+            scope_key='synthetic-publish', racing_region=RacingRegion.JAPAN,
+            window_start=start, window_end=start+timedelta(minutes=15), status=ProductionWindowStatus.SUCCEEDED)
+        with patch('stable.views.select_publish_candidates', return_value=SimpleNamespace(selected=[], zero_reasons=['no_candidates'])) as select:
+            response = self.client.post(reverse('console-production-window-rerun', args=[window.pk]))
+        self.assertEqual(response.status_code, 302)
+        select.assert_called_once()
+        window.refresh_from_db()
+        self.assertEqual(window.rerun_count, 1)
+        self.assertEqual(window.status, ProductionWindowStatus.SUCCEEDED)
+        self.post.assert_not_called()
+
+    def test_channel_permission_requires_boolean_true_and_missing_fails_closed(self):
+        from stable.services.onebot import qq_channel_enabled
+        for value in (False, None, 1, 'true', 'false'):
+            with self.subTest(value=value), override_settings(QQ_CHANNEL_ENABLED=value):
+                self.assertFalse(qq_channel_enabled())
+        with override_settings(QQ_CHANNEL_ENABLED=True):
+            self.assertTrue(qq_channel_enabled())
+        with override_settings() as overrides:
+            del django_settings.QQ_CHANNEL_ENABLED
+            self.assertFalse(qq_channel_enabled())
+
+    def test_enabled_gateway_still_validates_protocol_and_image_fallback(self):
+        from stable.services.onebot import BotPusher, OneBotRequestError
+        with override_settings(QQ_CHANNEL_ENABLED=True):
+            self.post.side_effect = [requests.RequestException('image rejected'), self.post.return_value]
+            self.assertEqual(BotPusher().send_group_message('synthetic', 'body', image_url='https://fixture.invalid/image.png')['status'], 'ok')
+            self.assertEqual(self.post.call_count, 2)
+            self.post.side_effect = None
+            self.post.return_value.json.return_value = {'status': 'failed', 'retcode': 1}
+            with self.assertRaises(OneBotRequestError):
+                BotPusher().send_group_message('synthetic', 'body')
+
+
+@override_settings(QQ_CHANNEL_ENABLED=False)
+class QQShutdownConcurrencyTests(TransactionTestCase):
+    """隔离PG两连接的CAS竞争，宿主SQLite明确跳过而不冒充并发证明。"""
+    def setUp(self):
+        QQAutoPushTests.setUp(self)
+        self.delivery = QQPushDelivery.objects.create(article=self.article, target=self.target,
+            attempt_count=1, request_payload={'historical': True})
+
+    def test_two_workers_disable_same_delivery_without_attempts_or_duplicate_side_effects(self):
+        if connection.vendor != 'postgresql':
+            self.skipTest('PG16 two-connection evidence required')
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Barrier
+        from django.db import connections
+        from stable.services.qq_auto_push import skip_disabled_qq_delivery
+        gate = Barrier(2)
+        def worker():
+            connections.close_all()
+            try:
+                row = QQPushDelivery.objects.get(pk=self.delivery.pk)
+                gate.wait(timeout=10)
+                return skip_disabled_qq_delivery(row).status
+            finally:
+                connections.close_all()
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            futures = [pool.submit(worker) for _ in range(2)]
+            self.assertEqual([f.result(timeout=15) for f in futures], [QQPushDeliveryStatus.SKIPPED]*2)
+        self.delivery.refresh_from_db()
+        self.assertEqual(self.delivery.attempt_count, 1)
+        self.assertEqual(self.delivery.request_payload, {'historical': True})
+
+    def test_sender_commit_wins_over_stale_shutdown_snapshot(self):
+        if connection.vendor != 'postgresql':
+            self.skipTest('PG16 two-connection evidence required')
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Event
+        from django.db import connections, transaction
+        from stable.services.qq_auto_push import skip_disabled_qq_delivery
+        locked, shutdown_started, release = Event(), Event(), Event()
+        def sender():
+            connections.close_all()
+            try:
+                with transaction.atomic():
+                    row = QQPushDelivery.objects.select_for_update().get(pk=self.delivery.pk)
+                    row.status = QQPushDeliveryStatus.SENT
+                    row.message_id = 'synthetic-existing-receipt'
+                    row.sent_at = timezone.now()
+                    row.save(update_fields=['status', 'message_id', 'sent_at'])
+                    locked.set()
+                    if not release.wait(10):
+                        raise RuntimeError('sender barrier timeout')
+            finally:
+                connections.close_all()
+        def shutdown():
+            connections.close_all()
+            try:
+                shutdown_started.set()
+                return skip_disabled_qq_delivery(self.delivery).status
+            finally:
+                connections.close_all()
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            sent = pool.submit(sender)
+            try:
+                self.assertTrue(locked.wait(10))
+                stopped = pool.submit(shutdown)
+                self.assertTrue(shutdown_started.wait(10))
+            finally:
+                release.set()
+            sent.result(timeout=15)
+            self.assertEqual(stopped.result(timeout=15), QQPushDeliveryStatus.SENT)
+        self.delivery.refresh_from_db()
+        self.assertEqual(self.delivery.message_id, 'synthetic-existing-receipt')
+        self.assertIsNotNone(self.delivery.sent_at)
+        self.assertEqual(self.delivery.attempt_count, 1)
+
+
+    def test_expired_claim_owner_cannot_disable_fresh_replacement_claim(self):
+        if connection.vendor != 'postgresql':
+            self.skipTest('PG16 two-connection evidence required')
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Event
+        from django.db import connections
+        from stable.services import qq_auto_push as service
+        self.target.push_scope = 'all_public'
+        self.target.save(update_fields=['push_scope'])
+        claimed, replaced = Event(), Event()
+        original_claim = service._claim_delivery_attempt
+        replacement = {}
+
+        def paused_claim(row, **kwargs):
+            token = original_claim(row, **kwargs)
+            if not token:
+                raise AssertionError('first worker did not claim')
+            claimed.set()
+            if not replaced.wait(10):
+                raise RuntimeError('replacement barrier timeout')
+            return token
+
+        def old_worker():
+            connections.close_all()
+            try:
+                row = QQPushDelivery.objects.get(pk=self.delivery.pk)
+                return service.process_qq_push_delivery(row).status
+            finally:
+                connections.close_all()
+
+        def new_worker():
+            connections.close_all()
+            try:
+                if not claimed.wait(10):
+                    raise RuntimeError('claim barrier timeout')
+                # 真实第二连接模拟lease过期；不等待生产stale时长。
+                QQPushDelivery.objects.filter(pk=self.delivery.pk).update(
+                    last_attempt_at=timezone.now()-timedelta(seconds=service._sending_stale_after()+1))
+                row = QQPushDelivery.objects.get(pk=self.delivery.pk)
+                self.assertTrue(original_claim(row, message='replacement', public_url='https://fixture.invalid/new'))
+                row.refresh_from_db()
+                replacement.update(attempt=row.attempt_count, at=row.last_attempt_at, payload=row.request_payload)
+            finally:
+                replaced.set()
+                connections.close_all()
+
+        with patch.object(service, 'qq_channel_enabled', side_effect=lambda: not replaced.is_set()), \
+             patch.object(service, '_claim_delivery_attempt', side_effect=paused_claim), \
+             patch.object(service.BotPusher, 'is_online', return_value=(True, None)), \
+             patch.object(service.BotPusher, 'send_group_message') as send, \
+             patch.object(service, 'is_public_url_accessible') as probe:
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                old = pool.submit(old_worker)
+                new = pool.submit(new_worker)
+                new.result(timeout=15)
+                self.assertEqual(old.result(timeout=15), QQPushDeliveryStatus.SENDING)
+            send.assert_not_called()
+            probe.assert_not_called()
+        self.delivery.refresh_from_db()
+        self.assertEqual(self.delivery.attempt_count, replacement['attempt'])
+        self.assertEqual(self.delivery.last_attempt_at, replacement['at'])
+        self.assertEqual(self.delivery.request_payload, replacement['payload'])
+        self.assertEqual(self.delivery.last_error, '')
+
+
+@override_settings(QQ_CHANNEL_ENABLED=False, CELERY_TASK_ALWAYS_EAGER=False)
+class QQRetiredUITests(TestCase):
+    """Q02停用呈现及旧action边界；不改变Q01发送/历史合同。"""
+    def setUp(self):
+        QQShutdownTests.setUp(self)
+        self.staff.is_superuser = True
+        self.staff.save(update_fields=['is_superuser'])
+
+    def _window(self, kind=ProductionWindowKind.QQ_PUSH):
+        now = timezone.now()
+        return ProductionWindow.objects.create(kind=kind, scope_key='q02-'+kind,
+            racing_region=RacingRegion.JAPAN, window_start=now,
+            window_end=now+timedelta(minutes=15))
+
+    def test_disabled_admin_pages_hide_push_link_and_legacy_action_keep_translation(self):
+        push_url = reverse('admin:stable_newsarticle_push', args=[self.article.pk])
+        listing = self.client.get(reverse('admin:stable_newsarticle_changelist'))
+        detail = self.client.get(reverse('admin:stable_newsarticle_change', args=[self.article.pk]))
+        self.assertNotContains(listing, push_url)
+        self.assertNotContains(detail, push_url)
+        self.assertNotContains(listing, 'value="mark_published_ready"')
+        self.assertContains(listing, 'value="queue_translation"')
+        self.assertContains(detail, reverse('admin:stable_newsarticle_translate', args=[self.article.pk]))
+
+    def test_disabled_legacy_action_forged_post_and_direct_callback_do_not_mutate(self):
+        from django.contrib import admin
+        from django.test import RequestFactory
+        before = (self.article.status, self.article.workflow_status, self.article.published_to_web_at)
+        with patch('stable.admin.enqueue_push_for_article') as enqueue:
+            self.client.post(reverse('admin:stable_newsarticle_changelist'),
+                {'action': 'mark_published_ready', '_selected_action': [self.article.pk]})
+            request = RequestFactory().post('/synthetic-admin-action/')
+            request.user = self.staff
+            model_admin = admin.site._registry[NewsArticle]
+            with patch.object(model_admin, 'message_user'):
+                model_admin.mark_published_ready(request, NewsArticle.objects.filter(pk=self.article.pk))
+        self.article.refresh_from_db()
+        self.assertEqual((self.article.status, self.article.workflow_status, self.article.published_to_web_at), before)
+        enqueue.assert_not_called()
+        self.get.assert_not_called()
+        self.post.assert_not_called()
+
+    def test_enabled_admin_retains_link_action_and_existing_state_contract(self):
+        from stable.models import ArticleStatus
+        before = (self.article.workflow_status, self.article.published_to_web_at)
+        with override_settings(QQ_CHANNEL_ENABLED=True):
+            response = self.client.get(reverse('admin:stable_newsarticle_changelist'))
+            self.assertContains(response, reverse('admin:stable_newsarticle_push', args=[self.article.pk]))
+            self.assertContains(response, 'value="mark_published_ready"')
+            self.client.post(reverse('admin:stable_newsarticle_changelist'),
+                {'action': 'mark_published_ready', '_selected_action': [self.article.pk]})
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.status, ArticleStatus.PUSH_READY)
+        self.assertEqual((self.article.workflow_status, self.article.published_to_web_at), before)
+        self.post.assert_not_called()
+
+    def test_disabled_qq_window_hides_send_controls_retains_historical_decision(self):
+        from stable.models import WindowTargetDecision
+        window = self._window()
+        decision = WindowTargetDecision.objects.create(window=window, target=self.target,
+            article=self.article, decision_key='q02-history', status='skipped', reason='synthetic-history')
+        response = self.client.get(reverse('console-production-window-detail', args=[window.pk]))
+        self.assertNotContains(response, 'href="'+reverse('console-production-window-preview', args=[window.pk])+'"')
+        self.assertNotContains(response, 'action="'+reverse('console-production-window-rerun', args=[window.pk])+'"')
+        self.assertContains(response, 'QQ渠道已停用')
+        self.assertContains(response, 'synthetic-history')
+        decision.refresh_from_db()
+        self.assertEqual(decision.reason, 'synthetic-history')
+
+    def test_disabled_direct_preview_has_reason_without_send_projection_or_side_effect(self):
+        window = self._window()
+        before = (window.status, window.rerun_count)
+        with patch('stable.views.select_qq_window_deliveries') as selector:
+            response = self.client.get(reverse('console-production-window-preview', args=[window.pk]))
+        self.assertContains(response, 'qq_channel_disabled')
+        self.assertContains(response, 'QQ渠道已停用')
+        self.assertNotContains(response, '预计 QQ 文章')
+        selector.assert_not_called()
+        window.refresh_from_db()
+        self.assertEqual((window.status, window.rerun_count), before)
+        self.get.assert_not_called()
+        self.post.assert_not_called()
+
+    def test_publish_controls_and_enabled_qq_controls_are_preserved(self):
+        publish = self._window(ProductionWindowKind.PUBLISH)
+        qq = self._window()
+        for window, enabled in ((publish, False), (qq, True)):
+            with self.subTest(kind=window.kind), override_settings(QQ_CHANNEL_ENABLED=enabled):
+                response = self.client.get(reverse('console-production-window-detail', args=[window.pk]))
+                self.assertContains(response, 'href="'+reverse('console-production-window-preview', args=[window.pk])+'"')
+                self.assertContains(response, 'action="'+reverse('console-production-window-rerun', args=[window.pk])+'"')
+                self.assertNotContains(response, 'QQ渠道已停用')
+
+    def test_region_disabled_counts_are_historical_and_enabled_counts_keep_waiting(self):
+        row = {'qq_sent': 4, 'qq_pending': 7, 'qq_skipped': 2, 'qq_failed': 3}
+        with patch('stable.views.region_production_rows', return_value=[row]):
+            response = self.client.get(reverse('console-region-production'))
+            self.assertContains(response, 'QQ渠道已停用')
+            self.assertContains(response, '历史计数')
+            self.assertContains(response, '已发送 4 / 未发送 7 / 跳过 2 / 失败 3')
+            with override_settings(QQ_CHANNEL_ENABLED=True):
+                enabled = self.client.get(reverse('console-region-production'))
+        self.assertContains(enabled, '成功 4 / 等待 7 / 跳过 2 / 失败 3')
+        self.assertNotContains(enabled, 'QQ渠道已停用')
+
+    def test_existing_auth_object_csrf_and_post_contracts_survive(self):
+        window = self._window()
+        detail = reverse('console-production-window-detail', args=[window.pk])
+        self.client.logout()
+        self.assertEqual(self.client.get(detail).status_code, 302)
+        ordinary = get_user_model().objects.create_user('q02-ordinary')
+        self.client.force_login(ordinary)
+        self.assertEqual(self.client.get(detail).status_code, 403)
+        self.client.force_login(self.staff)
+        self.assertEqual(self.client.get(reverse('console-production-window-detail', args=[999999])).status_code, 404)
+        self.assertEqual(self.client.get(reverse('console-production-window-rerun', args=[window.pk])).status_code, 405)
+        protected = Client(enforce_csrf_checks=True)
+        protected.force_login(self.staff)
+        self.assertEqual(protected.post(reverse('console-production-window-rerun', args=[window.pk])).status_code, 403)
+        self.assertEqual(protected.post(reverse('admin:stable_newsarticle_changelist'),
+            {'action': 'mark_published_ready', '_selected_action': [self.article.pk]}).status_code, 403)
+
+    def test_historical_admin_models_and_inlines_remain_available(self):
+        from django.contrib import admin
+        from stable.models import PushLog, NotificationLog, TaskExecutionLog
+        for model in (PushTarget, QQPushDelivery, PushLog, NotificationLog, TaskExecutionLog):
+            self.assertIn(model, admin.site._registry)
+        model_admin = admin.site._registry[NewsArticle]
+        self.assertTrue(any(inline.model is QQPushDelivery for inline in model_admin.inlines))
+        self.assertTrue(any(inline.model is PushLog for inline in model_admin.inlines))
+        self.assertContains(self.client.get(reverse('admin:stable_pushtarget_changelist')), self.target.name)
+
+
+    def test_empty_region_history_still_explains_retired_channel(self):
+        with patch('stable.views.region_production_rows', return_value=[]):
+            response = self.client.get(reverse('console-region-production'))
+        self.assertContains(response, 'QQ渠道已停用')
+        self.assertContains(response, '历史计数')
+
+    def test_disabled_admin_labels_legacy_push_state_as_history_without_rewriting_it(self):
+        from stable.models import ArticleStatus
+        self.article.status = ArticleStatus.PUSH_FAILED
+        self.article.save(update_fields=['status'])
+        listing = self.client.get(reverse('admin:stable_newsarticle_changelist'))
+        detail = self.client.get(reverse('admin:stable_newsarticle_change', args=[self.article.pk]))
+        self.assertContains(listing, '历史QQ状态')
+        self.assertContains(detail, 'QQ推送状态仅为历史记录')
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.status, ArticleStatus.PUSH_FAILED)

@@ -8,6 +8,18 @@ class OneBotRequestError(RuntimeError):
     pass
 
 
+QQ_CHANNEL_DISABLED = 'qq_channel_disabled'
+
+
+class QQChannelDisabled(OneBotRequestError):
+    def __init__(self):
+        super().__init__(QQ_CHANNEL_DISABLED)
+
+
+def qq_channel_enabled() -> bool:
+    return getattr(settings, 'QQ_CHANNEL_ENABLED', False) is True
+
+
 def _sanitize_error(message: str) -> str:
     token = getattr(settings, "ONEBOT_ACCESS_TOKEN", None)
     if token:
@@ -35,6 +47,8 @@ class BotPusher:
             self.headers["Authorization"] = f"Bearer {settings.ONEBOT_ACCESS_TOKEN}"
 
     def is_online(self) -> tuple[bool, str]:
+        if not qq_channel_enabled():
+            return False, QQ_CHANNEL_DISABLED
         try:
             response = requests.get(
                 f"{self.base_url}/get_status",
@@ -65,6 +79,8 @@ class BotPusher:
         return False, f"onebot_offline: {data}"
 
     def send_group_message(self, group_id: str, text: str, image_url: str | None = None) -> dict:
+        if not qq_channel_enabled():
+            raise QQChannelDisabled()
         if image_url:
             try:
                 return self._post_message(
@@ -74,11 +90,15 @@ class BotPusher:
                         {"type": "image", "data": {"file": image_url}},
                     ],
                 )
+            except QQChannelDisabled:
+                raise
             except Exception:
                 return self._post_message(group_id, [{"type": "text", "data": {"text": text}}])
         return self._post_message(group_id, [{"type": "text", "data": {"text": text}}])
 
     def _post_message(self, group_id: str, message: list[dict]) -> dict:
+        if not qq_channel_enabled():
+            raise QQChannelDisabled()
         try:
             response = requests.post(
                 f"{self.base_url}/send_group_msg",

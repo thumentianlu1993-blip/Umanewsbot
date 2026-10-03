@@ -16,3 +16,20 @@
 正常外部恢复、超时、Celery重投等不在U01新增行为范围；生产取数不用于自动测试。保存版本保护仍由既有路径保证，U01只消费读字段。未知后端/SQL失败不能回退全表后过滤。返回旧代码SHA即可回滚代码，数据字段不需要反向迁移。
 
 首个RED最小测试在现有 `test_race_information_display_pages.PublicGradeFilterParityTests`；从真实断言漏对象开始，再同例GREEN与受影响计划回归。宿主SQLite结果只作诊断，不作为固定Linux交付证据。测试模块沿既有catalog，修改后执行影响计划；每批最多200项，共享VM总最多2批。
+
+## C008 / Q02 UI/action实施测试设计
+
+依据固定Q02@7e3f及原R C007 APPROVED@e97406d7。仅admin/views/console模板，没有事务/任务/数据库约束或部署实现变化；五旧task已有终止审计，保持不动。复用既有权限/CSRF与Q01发送安全边界。
+
+| 用例 | 真实断言与mutation |
+|---|---|
+| Q02-ADMIN-HIDE | false真实Admin列表/详情无push URL及PUSH_READY动作，翻译仍存在；历史PUSH状态标明历史、不重写值；捕获仅改文案/只藏列表不藏fieldset/把旧失败当可重试 |
+| Q02-ACTION-GUARD | false旧action伪造POST与直接callback都不改变status/workflow/publication，不入队；捕获只过滤get_actions缺callback guard |
+| Q02-TRUE | true原push URL/菜单保留，原action只写PUSH_READY；不发送真实消息；捕获删除兼容或改网页workflow |
+| Q02-QQ-WINDOW | false QQ详情无rerun/发送preview链接，明确停用且历史target决策可读；直达preview无预计QQ文章，不调用选择器，不修改决策/rerun |
+| Q02-PUBLISH | false publish详情preview/rerun仍存在，原QQ shutdown publish测试与区域测试覆盖业务；捕获模板误把全部窗口停用 |
+| Q02-REGION | false地区QQ计数改历史/停用说明且数字不丢；true既有等待展示保留；捕获删除计数或把停用作为仍可重试 |
+| Q02-PERMISSIONS | 匿名重定向、非staff403、缺对象404、CSRF缺token403、rerun GET405；历史Admin数据注册/view权限保持，无新权限体系 |
+| Q02-REGRESSION | 既有Q01普通停用/邮件与enabled Admin/窗口回归按实际diff选测；不重跑已审PG竞争，代码未变不迁移旧PG证据为新实现 |
+
+宿主清env/禁dotenv/:memory:SQLite、memory broker/locmem邮件与缓存，全mock OneBot。先最小真实行为RED后UI实现，再同例GREEN及对应回归；新case注册既有stable.tests_legacy，mapping建议单独报告，不修改共享rules/catalog。LinuxPG窗口若另需只能root分配。本实施不改变settings/Compose/调度/生产停用/外发。
