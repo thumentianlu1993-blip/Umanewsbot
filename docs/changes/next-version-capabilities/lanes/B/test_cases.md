@@ -56,3 +56,16 @@ RED记录必须来自已可导入接口的行为缺失，不以ImportError/依�
 
 T10增加metadata/content counts精确键集与严格整数预算测试；extra string/nested字段必须CLI固定错误码/nonzero且无注入文本，transfer不得生成host_verified/transfer.complete。
 覆盖缺键、非dict、bool/float/string/null/nested/负数/超限；有效包白名单整数摘要保留。可捕获mutation为去掉set(counts)精确匹配、放宽type is int或重新原样输出receipt.counts。
+
+## B005 CI-v2 补充测试设计（原 R 已审 v2 方案范围）
+
+- 保留 PGGuardTests 1 项、PostgreSQLContracts P01-P12 全部原 ID；正式 collect 零连接、无 skip，默认 Django profile 实际执行。
+- InternalCIGuardTests 12 项：监听端点/inode owner、PID 重用、四类 namespace、私有 tmpfs、owner/mode、symlink、嵌套 mount、propagation、device、未知字段及 collect。每个拒绝分支通过 connect spy 证明零连接；mutation 为删除对应 preconnect check。
+- 正常路径：实核固定 PG PID/start/socket/namespace/tmpfs 后 bootstrap 专用 DB/角色/nonce，再运行原 PG12（SQLSTATE、RR、timeout、budget/UTF8/hash）。本地模拟证明不替代真 PG。
+- 权限/异常：admin 非 superuser/createdb/createrole，reader SELECT only；后端归属或 SQL 目标错连接后零写入；创建途中失败只清理本次已核 ownership 的对象，未知保留并由自有容器生命周期回收。
+- 外部 manifest 模式保留原严格 schema/源码/hash/目标保护；internal-CI 显式独立，拒绝继承环境、未知模式、伪造 image。无 Django migrations / Celery / 生产网络。
+- 单容器480秒含清理，最后20秒预留；原13项分母不减少，新增守卫 IDs 报 coordinator；formal worker PG GREEN 与 Linux隔离 proof 尚待窗口。
+
+### B005 CI-v2 创建回执丢失返修
+
+FixtureFailureTests 六项覆盖第一/第二角色 CREATE/OID、DB CREATE/OID 回执丢失：假数据库先实际记录成功再抛异常；CREATE之前私有intent journal已存在，未取得可靠OID/owner不能known。cleanup必须保留pending journal/runtime且status=unknown_container_cleanup_required，禁止任何DROP或按名字接管；mutation为延后记录intent、忽略pending或把unknown当complete。原25ID保留，加6共31；只mock SQL/文件，不连接PG。
