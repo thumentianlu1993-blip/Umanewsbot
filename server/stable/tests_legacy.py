@@ -19559,3 +19559,136 @@ class QQShutdownConcurrencyTests(TransactionTestCase):
         self.assertEqual(self.delivery.last_attempt_at, replacement['at'])
         self.assertEqual(self.delivery.request_payload, replacement['payload'])
         self.assertEqual(self.delivery.last_error, '')
+
+
+@override_settings(QQ_CHANNEL_ENABLED=False, CELERY_TASK_ALWAYS_EAGER=False)
+class QQRetiredUITests(TestCase):
+    """Q02停用呈现及旧action边界；不改变Q01发送/历史合同。"""
+    def setUp(self):
+        QQShutdownTests.setUp(self)
+        self.staff.is_superuser = True
+        self.staff.save(update_fields=['is_superuser'])
+
+    def _window(self, kind=ProductionWindowKind.QQ_PUSH):
+        now = timezone.now()
+        return ProductionWindow.objects.create(kind=kind, scope_key='q02-'+kind,
+            racing_region=RacingRegion.JAPAN, window_start=now,
+            window_end=now+timedelta(minutes=15))
+
+    def test_disabled_admin_pages_hide_push_link_and_legacy_action_keep_translation(self):
+        push_url = reverse('admin:stable_newsarticle_push', args=[self.article.pk])
+        listing = self.client.get(reverse('admin:stable_newsarticle_changelist'))
+        detail = self.client.get(reverse('admin:stable_newsarticle_change', args=[self.article.pk]))
+        self.assertNotContains(listing, push_url)
+        self.assertNotContains(detail, push_url)
+        self.assertNotContains(listing, 'value="mark_published_ready"')
+        self.assertContains(listing, 'value="queue_translation"')
+        self.assertContains(detail, reverse('admin:stable_newsarticle_translate', args=[self.article.pk]))
+
+    def test_disabled_legacy_action_forged_post_and_direct_callback_do_not_mutate(self):
+        from django.contrib import admin
+        from django.test import RequestFactory
+        before = (self.article.status, self.article.workflow_status, self.article.published_to_web_at)
+        with patch('stable.admin.enqueue_push_for_article') as enqueue:
+            self.client.post(reverse('admin:stable_newsarticle_changelist'),
+                {'action': 'mark_published_ready', '_selected_action': [self.article.pk]})
+            request = RequestFactory().post('/synthetic-admin-action/')
+            request.user = self.staff
+            model_admin = admin.site._registry[NewsArticle]
+            with patch.object(model_admin, 'message_user'):
+                model_admin.mark_published_ready(request, NewsArticle.objects.filter(pk=self.article.pk))
+        self.article.refresh_from_db()
+        self.assertEqual((self.article.status, self.article.workflow_status, self.article.published_to_web_at), before)
+        enqueue.assert_not_called()
+        self.get.assert_not_called()
+        self.post.assert_not_called()
+
+    def test_enabled_admin_retains_link_action_and_existing_state_contract(self):
+        from stable.models import ArticleStatus
+        before = (self.article.workflow_status, self.article.published_to_web_at)
+        with override_settings(QQ_CHANNEL_ENABLED=True):
+            response = self.client.get(reverse('admin:stable_newsarticle_changelist'))
+            self.assertContains(response, reverse('admin:stable_newsarticle_push', args=[self.article.pk]))
+            self.assertContains(response, 'value="mark_published_ready"')
+            self.client.post(reverse('admin:stable_newsarticle_changelist'),
+                {'action': 'mark_published_ready', '_selected_action': [self.article.pk]})
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.status, ArticleStatus.PUSH_READY)
+        self.assertEqual((self.article.workflow_status, self.article.published_to_web_at), before)
+        self.post.assert_not_called()
+
+    def test_disabled_qq_window_hides_send_controls_retains_historical_decision(self):
+        from stable.models import WindowTargetDecision
+        window = self._window()
+        decision = WindowTargetDecision.objects.create(window=window, target=self.target,
+            article=self.article, decision_key='q02-history', status='skipped', reason='synthetic-history')
+        response = self.client.get(reverse('console-production-window-detail', args=[window.pk]))
+        self.assertNotContains(response, 'href="'+reverse('console-production-window-preview', args=[window.pk])+'"')
+        self.assertNotContains(response, 'action="'+reverse('console-production-window-rerun', args=[window.pk])+'"')
+        self.assertContains(response, 'QQ渠道已停用')
+        self.assertContains(response, 'synthetic-history')
+        decision.refresh_from_db()
+        self.assertEqual(decision.reason, 'synthetic-history')
+
+    def test_disabled_direct_preview_has_reason_without_send_projection_or_side_effect(self):
+        window = self._window()
+        before = (window.status, window.rerun_count)
+        with patch('stable.views.select_qq_window_deliveries') as selector:
+            response = self.client.get(reverse('console-production-window-preview', args=[window.pk]))
+        self.assertContains(response, 'qq_channel_disabled')
+        self.assertContains(response, 'QQ渠道已停用')
+        self.assertNotContains(response, '预计 QQ 文章')
+        selector.assert_not_called()
+        window.refresh_from_db()
+        self.assertEqual((window.status, window.rerun_count), before)
+        self.get.assert_not_called()
+        self.post.assert_not_called()
+
+    def test_publish_controls_and_enabled_qq_controls_are_preserved(self):
+        publish = self._window(ProductionWindowKind.PUBLISH)
+        qq = self._window()
+        for window, enabled in ((publish, False), (qq, True)):
+            with self.subTest(kind=window.kind), override_settings(QQ_CHANNEL_ENABLED=enabled):
+                response = self.client.get(reverse('console-production-window-detail', args=[window.pk]))
+                self.assertContains(response, 'href="'+reverse('console-production-window-preview', args=[window.pk])+'"')
+                self.assertContains(response, 'action="'+reverse('console-production-window-rerun', args=[window.pk])+'"')
+                self.assertNotContains(response, 'QQ渠道已停用')
+
+    def test_region_disabled_counts_are_historical_and_enabled_counts_keep_waiting(self):
+        row = {'qq_sent': 4, 'qq_pending': 7, 'qq_skipped': 2, 'qq_failed': 3}
+        with patch('stable.views.region_production_rows', return_value=[row]):
+            response = self.client.get(reverse('console-region-production'))
+            self.assertContains(response, 'QQ渠道已停用')
+            self.assertContains(response, '历史计数')
+            self.assertContains(response, '已发送 4 / 未发送 7 / 跳过 2 / 失败 3')
+            with override_settings(QQ_CHANNEL_ENABLED=True):
+                enabled = self.client.get(reverse('console-region-production'))
+        self.assertContains(enabled, '成功 4 / 等待 7 / 跳过 2 / 失败 3')
+        self.assertNotContains(enabled, 'QQ渠道已停用')
+
+    def test_existing_auth_object_csrf_and_post_contracts_survive(self):
+        window = self._window()
+        detail = reverse('console-production-window-detail', args=[window.pk])
+        self.client.logout()
+        self.assertEqual(self.client.get(detail).status_code, 302)
+        ordinary = get_user_model().objects.create_user('q02-ordinary')
+        self.client.force_login(ordinary)
+        self.assertEqual(self.client.get(detail).status_code, 403)
+        self.client.force_login(self.staff)
+        self.assertEqual(self.client.get(reverse('console-production-window-detail', args=[999999])).status_code, 404)
+        self.assertEqual(self.client.get(reverse('console-production-window-rerun', args=[window.pk])).status_code, 405)
+        protected = Client(enforce_csrf_checks=True)
+        protected.force_login(self.staff)
+        self.assertEqual(protected.post(reverse('console-production-window-rerun', args=[window.pk])).status_code, 403)
+        self.assertEqual(protected.post(reverse('admin:stable_newsarticle_changelist'),
+            {'action': 'mark_published_ready', '_selected_action': [self.article.pk]}).status_code, 403)
+
+    def test_historical_admin_models_and_inlines_remain_available(self):
+        from django.contrib import admin
+        from stable.models import PushLog, NotificationLog, TaskExecutionLog
+        for model in (PushTarget, QQPushDelivery, PushLog, NotificationLog, TaskExecutionLog):
+            self.assertIn(model, admin.site._registry)
+        model_admin = admin.site._registry[NewsArticle]
+        self.assertTrue(any(inline.model is QQPushDelivery for inline in model_admin.inlines))
+        self.assertTrue(any(inline.model is PushLog for inline in model_admin.inlines))
+        self.assertContains(self.client.get(reverse('admin:stable_pushtarget_changelist')), self.target.name)
