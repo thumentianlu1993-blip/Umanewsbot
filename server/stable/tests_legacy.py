@@ -19738,3 +19738,324 @@ class PublicUpcomingWeekTests(TestCase):
         self.assertEqual([entry['event'].pk for entry in response.context['today_races']], [d0.pk, d6.pk])
         self.assertContains(response, 'aria-label="近期赛事"')
         self.assertContains(response, '今天起七天')
+
+    def test_date_only_home_clock_is_empty_in_both_display_modes(self):
+        self.make_event(clock=False, timezone_name='Europe/London')
+        for flag in (False, True):
+            with self.subTest(flag=flag), override_settings(RACE_INFORMATION_NORMALIZED_DISPLAY_ENABLED=flag), patch('stable.views.timezone.now', return_value=self.now):
+                response = self.client.get('/')
+                panel = response.content.decode().split('<aside class="hero-races"', 1)[1].split('</aside>', 1)[0]
+                self.assertIn('当地赛日', panel)
+                self.assertNotIn('北京时间待定', panel)
+                self.assertNotIn('00:00', panel)
+
+    def test_home_empty_window_keeps_panel_and_does_not_fill_featured(self):
+        self.make_event(7, priority=RaceEventPriority.P0, is_featured=True)
+        with patch('stable.views.timezone.now', return_value=self.now):
+            response = self.client.get('/')
+        self.assertEqual(response.context['today_races'], [])
+        self.assertFalse(response.context['today_races_is_fallback'])
+        self.assertContains(response, '今天起七天暂无已登记赛事')
+        self.assertContains(response, '完整日历')
+
+    def test_only_detail_edition_control_removed_calendar_year_and_history_stay(self):
+        from stable.models import RaceSeries, RaceSeriesReviewStatus, RaceEventHistoryWinner
+        series = RaceSeries.objects.create(key='u02-series', country_region=RacingRegion.JAPAN,
+                                            canonical_name_original='Series', review_status=RaceSeriesReviewStatus.APPROVED)
+        event = self.make_event(race_series=series)
+        prior = self.make_event(-365, race_series=series)
+        RaceEventHistoryWinner.objects.create(event=prior, winner_year=prior.year, horse_name='历史冠军保留')
+        detail = self.client.get(event.public_path)
+        self.assertEqual(detail.status_code, 200)
+        self.assertNotContains(detail, 'race-year-switcher')
+        self.assertContains(detail, 'race-hero-year')
+        self.assertContains(detail, '历史冠军保留')
+        calendar = self.client.get('/races/', {'year': str(event.year), 'tab': 'all'})
+        self.assertContains(calendar, 'name="year"')
+        self.assertEqual(calendar.context['filters']['year'], str(event.year))
+
+
+    def test_window_beijing_source_boundaries_and_known_time_order_cap(self):
+        now = datetime(2027, 1, 1, 0, 30, tzinfo=ZoneInfo('Asia/Shanghai'))
+        london = self.make_event(local_date=now.date()-timedelta(days=1), year=2026,
+                                 local_start_time=datetime(2026,12,31,23,30).time(), timezone_name='Europe/London',
+                                 race_datetime=datetime(2026,12,31,23,30,tzinfo=ZoneInfo('Europe/London')))
+        auckland = self.make_event(local_date=now.date(), year=2027,
+                                   local_start_time=datetime(2027,1,1,0,30).time(), timezone_name='Pacific/Auckland',
+                                   race_datetime=datetime(2027,1,1,0,30,tzinfo=ZoneInfo('Pacific/Auckland')))
+        with patch('stable.views.timezone.now', return_value=now):
+            response = self.client.get('/')
+        self.assertEqual([row['event'].pk for row in response.context['today_races']], [london.pk])
+        self.assertNotIn(auckland.pk, [row['event'].pk for row in response.context['today_races']])
+
+    def test_four_rows_sort_date_then_known_clock_then_id_in_database(self):
+        unknown = self.make_event(clock=False)
+        early = self.make_event(local_start_time=self.now.replace(hour=8).time())
+        same1 = self.make_event(local_start_time=self.now.replace(hour=15).time())
+        same2 = self.make_event(local_start_time=self.now.replace(hour=15).time())
+        late = self.make_event(local_start_time=self.now.replace(hour=19).time())
+        self.make_event(1)
+        with patch('stable.views.timezone.now', return_value=self.now), CaptureQueriesContext(connection) as queries:
+            response = self.client.get('/')
+        self.assertEqual([row['event'].pk for row in response.context['today_races']], [early.pk, same1.pk, same2.pk, late.pk])
+        self.assertTrue(any('FROM "stable_raceevent"' in q['sql'] and 'LIMIT 4' in q['sql'] for q in queries))
+        late.visibility_status = RaceEventVisibility.DRAFT
+        late.save(update_fields=['visibility_status'])
+        with patch('stable.views.timezone.now', return_value=self.now):
+            response = self.client.get('/')
+        self.assertEqual([row['event'].pk for row in response.context['today_races']], [early.pk, same1.pk, same2.pk, unknown.pk])
+
+    def test_today_past_and_existing_result_status_are_preserved(self):
+        past = self.make_event(local_start_time=self.now.replace(hour=8).time())
+        finished = self.make_event(status=RaceEventStatus.FINISHED)
+        RaceEventResult.objects.create(event=finished, finish_position=1, horse_name='确认冠军', is_confirmed=True)
+        cancelled = self.make_event(status=RaceEventStatus.CANCELLED)
+        postponed = self.make_event(status=RaceEventStatus.POSTPONED)
+        with patch('stable.views.timezone.now', return_value=self.now):
+            response = self.client.get('/')
+        rows = {row['event'].pk: row for row in response.context['today_races']}
+        self.assertEqual(rows[past.pk]['status_label'], '赛期已过，资料待补')
+        self.assertEqual(rows[finished.pk]['winner'], '确认冠军')
+        self.assertEqual(rows[finished.pk]['status_label'], '已完赛')
+        self.assertEqual(rows[cancelled.pk]['status_label'], '取消')
+        self.assertEqual(rows[postponed.pk]['status_label'], '延期')
+
+
+class PublicListNavigationTests(TestCase):
+    """U02：从真实列表HTML经过详情返回，验证签名导航与公开边界。"""
+    now = PublicUpcomingWeekTests.now
+    make_event = PublicUpcomingWeekTests.make_event
+    make_article = PublicHomeInfoFeedTests.make_article
+    _term = HorseProfilePageMvpTests._term
+    _profile = HorseProfilePageMvpTests._profile
+
+    @staticmethod
+    def href(response, path):
+        import html
+        import re
+        from urllib.parse import urlsplit
+        links = [html.unescape(x) for x in re.findall(r'href="([^"]+)"', response.content.decode())]
+        return next(link for link in links if urlsplit(link).path == path)
+
+    @staticmethod
+    def back_href(response):
+        import html
+        import re
+        nav = response.content.decode().split('<nav class="article-actions"', 1)[1].split('</nav>', 1)[0]
+        return html.unescape(re.search(r'href="([^"]+)"', nav).group(1))
+
+    @staticmethod
+    def token(kind, filters, **extra):
+        from django.core import signing
+        return signing.dumps({'v': 1, 'list': kind, 'filters': filters, **extra},
+                             salt='stable.public-list-return.v1', compress=True)
+
+    def test_calendar_main_card_detail_and_return_keep_filters_without_long_redirect(self):
+        event = self.make_event(chinese_name='测试返回条件')
+        params = {'tab': 'all', 'region': 'japan', 'year': str(event.year), 'grade': 'g2', 'q': '返回条件'}
+        listing = self.client.get('/races/', params)
+        href = self.href(listing, event.public_path)
+        self.assertIn('return_nav=', href)
+        detail = self.client.get(href)
+        back = self.back_href(detail)
+        self.assertIn('return_nav=', back)
+        returned = self.client.get(back)
+        self.assertEqual(returned.status_code, 200)
+        for key, value in params.items():
+            self.assertEqual(returned.context['filters'][key], value)
+        self.assertEqual(returned.context['groups'][0]['events'][0].pk, event.pk)
+
+    def test_horse_search_detail_returns_same_query_and_page(self):
+        profile = self._profile()
+        listing = self.client.get('/horses/', {'q': '春秋分', 'page': '1'})
+        href = self.href(listing, profile.public_path)
+        self.assertIn('return_nav=', href)
+        detail = self.client.get(href)
+        returned = self.client.get(self.back_href(detail))
+        self.assertEqual(returned.status_code, 200)
+        self.assertEqual(returned.context['filters']['q'], '春秋分')
+        self.assertEqual(returned.context['page_obj'].number, 1)
+
+    @override_settings(PUBLIC_FEED_PAGE_SIZE=1)
+    def test_news_page_detail_returns_page_without_restoring_legacy_region(self):
+        with patch('stable.views.PUBLIC_FEED_PAGE_SIZE', 1):
+            self.make_article('u02-older', '分页文章旧', published_to_web_at=self.now-timedelta(hours=1))
+            article = self.make_article('u02-newer', '分页文章新', published_to_web_at=self.now)
+            listing = self.client.get('/', {'page': '2'})
+            href = self.href(listing, article.public_path)
+            self.assertIn('return_nav=', href)
+            detail = self.client.get(href)
+            back = self.back_href(detail)
+            returned = self.client.get(back)
+        self.assertEqual(returned.status_code, 200)
+        self.assertEqual(returned.context['page_obj'].number, 2)
+        self.assertNotIn('region=', back)
+
+    def test_token_only_list_rejects_mixing_duplicate_wrong_kind_and_unknown_fields(self):
+        token = self.token('races', {'tab': 'all', 'q': '过滤条件'})
+        from urllib.parse import urlencode
+        cases = [{'return_nav': token, 'q': '混入'},
+                 [('return_nav', token), ('return_nav', token)],
+                 {'return_nav': self.token('horses', {'q': '跨类'})},
+                 {'return_nav': self.token('races', {'q': '过滤条件'}, url='//external.invalid')},
+                 {'return_nav': self.token('races', {'year': 'bad'})}]
+        for params in cases:
+            with self.subTest(params_kind=type(params).__name__):
+                response = self.client.get('/races/?'+urlencode(params))
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.context['filters']['q'], '')
+                self.assertEqual(response.context['filters']['tab'], 'key')
+
+    def test_default_calendar_cursor_keeps_existing_default_tab_fingerprint(self):
+        self.make_event(priority=RaceEventPriority.P0)
+        self.make_event(2, priority=RaceEventPriority.P0)
+        with patch('stable.views.timezone.now', return_value=self.now):
+            listing = self.client.get('/races/')
+            next_url = listing.context['next_url']
+            self.assertIn('cursor=', next_url)
+            returned = self.client.get(next_url)
+        self.assertEqual(returned.status_code, 200)
+        self.assertEqual(returned.context['filters']['tab'], 'key')
+        self.assertEqual(returned.context['filters']['direction'], 'future')
+
+    def test_horse_follow_and_records_links_keep_source_token(self):
+        import html
+        import re
+        profile = self._profile()
+        token = self.token('horses', {'q': '春秋分', 'page': '1'})
+        with patch('stable.views.PUBLIC_HORSE_RACE_RECORD_PAGE_SIZE', 1):
+            HorseRaceRecord.objects.create(horse_profile=profile, race_name='履历1', race_year=2026)
+            HorseRaceRecord.objects.create(horse_profile=profile, race_name='履历2', race_year=2025)
+            response = self.client.get(profile.public_path, {'return_nav': token})
+        text = response.content.decode()
+        next_value = html.unescape(re.search(r'name="next" value="([^"]+)"', text).group(1))
+        self.assertIn('return_nav=', next_value)
+        paging = [html.unescape(link) for link in re.findall(r'href="([^"]+)"', text) if 'records_page=' in link]
+        self.assertTrue(paging)
+        self.assertTrue(all('return_nav=' in link for link in paging))
+        followed = self.client.post(reverse('public-horse-follow', args=[profile.pk]), {'next': next_value})
+        self.assertEqual(followed.status_code, 302)
+        self.assertIn('return_nav=', followed['Location'])
+
+    def test_valid_token_expiry_is_safe_default_after_successful_roundtrip(self):
+        from django.core import signing
+        import time as clock
+        event = self.make_event(chinese_name='有效筛选')
+        filters = {'tab': 'all', 'q': '有效筛选', 'year': str(event.year)}
+        issued = clock.time()
+        with patch('django.core.signing.time.time', return_value=issued):
+            token = self.token('races', filters)
+        valid = self.client.get(event.public_path, {'return_nav': token})
+        returned = self.client.get(self.back_href(valid))
+        self.assertEqual(returned.context['filters']['q'], filters['q'])
+        with patch('django.core.signing.time.time', return_value=issued+86401):
+            expired = self.client.get(event.public_path, {'return_nav': token})
+        self.assertEqual(self.back_href(expired), '/races/')
+        self.assertContains(expired, '默认列表')
+        self.assertNotIn('return_nav=', self.back_href(expired))
+
+    def test_unicode_and_long_ascii_cursor_roundtrip_final_hrefs_fit_real_http_budget(self):
+        import random
+        from django.http import QueryDict
+        from urllib.parse import urlsplit
+        from stable.services.race_calendar import encode_race_calendar_cursor
+        generator = random.Random(20261003)
+        unicode_query = ''.join(chr(generator.randrange(0x10000, 0x10FFFE)) for _ in range(200))
+        event = self.make_event(chinese_name=unicode_query, slug='x'*255)
+        filters = {'tab': 'all', 'region': 'japan', 'grade': 'g2', 'when': 'upcoming', 'year': str(event.year), 'q': unicode_query}
+        cursor = encode_race_calendar_cursor(event, filters=filters)
+        listing = self.client.get('/races/', filters)
+        href = self.href(listing, event.public_path)
+        self.assertIn('return_nav=', href)
+        self.assertLessEqual(len(('GET '+href+' HTTP/1.1\r\n').encode('ascii')), 3800)
+        for query in (unicode_query, 'abc'*1000):
+            with self.subTest(q_length=len(query)):
+                source = {**filters, 'q': query}
+                source['cursor'] = encode_race_calendar_cursor(event, filters=source)
+                source['direction'] = 'future'
+                token = self.token('races', source)
+                detail = self.client.get(event.public_path, {'return_nav': token})
+                back = self.back_href(detail)
+                self.assertIn('return_nav=', back)
+                self.assertLessEqual(len(('GET '+back+' HTTP/1.1\r\n').encode('ascii')), 3800)
+                returned = self.client.get(back)
+                self.assertEqual(returned.status_code, 200)
+                self.assertEqual(returned.context['filters']['q'], query)
+                self.assertEqual(returned.context['filters']['cursor'], source['cursor'])
+                self.assertEqual(returned.context['filters']['direction'], 'future')
+        self.assertEqual(QueryDict(urlsplit(href).query)['return_nav'][:1], '.')
+
+    def test_invalid_signed_shape_bombs_trailing_stream_and_html_are_safe(self):
+        from django.core import signing
+        import zlib
+        event = self.make_event()
+        cases = [self.token('races', {'q': 'A'*200000}), self.token('races', {'q': ['not-string']}),
+                 self.token('races', {'q': 'x'}, v=2), self.token('races', {'year': '0'}),
+                 self.token('races', {'unknown': 'x'}), self.token('horses', {'q': 'wrong'}), 'x'*3801]
+        duplicate = signing.TimestampSigner(salt='stable.public-list-return.v1').sign(signing.b64_encode(b'{"v":1,"list":"races","filters":{},"v":1}').decode())
+        trailing = signing.TimestampSigner(salt='stable.public-list-return.v1').sign('.'+signing.b64_encode(zlib.compress(b'{"v":1,"list":"races","filters":{}}')+b'extra').decode())
+        for candidate in [*cases, duplicate, trailing]:
+            response = self.client.get(event.public_path, {'return_nav': candidate})
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(self.back_href(response), '/races/')
+            self.assertContains(response, '默认列表')
+        token = self.token('races', {'tab': 'all', 'q': '<script>alert(1)</script>&%2F'})
+        response = self.client.get('/races/', {'return_nav': token})
+        self.assertNotContains(response, '<script>alert(1)</script>')
+        self.assertEqual(response.context['filters']['q'], '<script>alert(1)</script>&%2F')
+
+    def test_payload_exact_boundary_and_no_get_writes(self):
+        from django.core import signing
+        size = len(signing.JSONSerializer().dumps({'v': 1, 'list': 'races', 'filters': {'q': ''}}))
+        for limit, accepted in ((16384, True), (16385, False)):
+            query = 'X'*(limit-size)
+            token = self.token('races', {'q': query})
+            with CaptureQueriesContext(connection) as queries:
+                response = self.client.get('/races/', {'return_nav': token})
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.context['filters']['q'], query if accepted else '')
+            self.assertFalse(any(item['sql'].lstrip().upper().startswith(('UPDATE ', 'INSERT ', 'DELETE ')) for item in queries))
+
+    def test_race_legacy_301_keeps_verified_token_without_changing_public_qualification(self):
+        event = self.make_event()
+        old_path = event.public_path
+        event.slug = 'u02-new-canonical'
+        event.save()
+        token = self.token('races', {'tab': 'all', 'year': str(event.year)})
+        response = self.client.get(old_path, {'return_nav': token})
+        self.assertEqual(response.status_code, 301)
+        self.assertTrue(response['Location'].startswith(event.public_path+'?return_nav='))
+        canonical = self.client.get(response['Location'])
+        self.assertIn('return_nav=', self.back_href(canonical))
+        event.visibility_status = RaceEventVisibility.DRAFT
+        event.save(update_fields=['visibility_status'])
+        self.assertEqual(self.client.get(old_path, {'return_nav': token}).status_code, 404)
+
+    def test_default_horse_follow_next_stays_plain_detail_url(self):
+        profile = self._profile()
+        response = self.client.get(profile.public_path)
+        self.assertContains(response, f'name="next" value="{profile.public_path}"')
+
+    def test_home_race_card_returns_news_page_instead_of_calendar(self):
+        event = self.make_event()
+        with patch('stable.views.timezone.now', return_value=self.now):
+            listing = self.client.get('/')
+        detail = self.client.get(self.href(listing, event.public_path))
+        back = self.back_href(detail)
+        self.assertTrue(back.startswith('/?return_nav='))
+        self.assertContains(detail, '返回首页')
+        self.assertEqual(self.client.get(back).status_code, 200)
+
+    def test_followed_news_card_keeps_current_news_page(self):
+        profile = self._profile()
+        article = self.make_article('u02-followed', '关注文章', published_to_web_at=self.now)
+        # 独立的关注查询可返回未在本页/headline/hot中出现的公开文章对象。
+        with patch('stable.views._public_followed_entries', return_value=[
+            {'article': article, 'horse_profile': profile, 'is_descendant': False}
+        ]), patch('stable.views._build_hot_articles', return_value=[]), patch('stable.views.resolve_homepage_headline', return_value=None), patch('stable.views.PUBLIC_FEED_PAGE_SIZE', 1):
+            self.make_article('u02-followed-older', '旧文章', published_to_web_at=self.now-timedelta(hours=1))
+            listing = self.client.get('/', {'page': '2'})
+        detail = self.client.get(self.href(listing, article.public_path))
+        with patch('stable.views.PUBLIC_FEED_PAGE_SIZE', 1):
+            returned = self.client.get(self.back_href(detail))
+        self.assertEqual(returned.context['page_obj'].number, 2)

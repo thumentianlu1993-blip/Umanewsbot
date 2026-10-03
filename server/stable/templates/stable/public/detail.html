@@ -7,7 +7,7 @@
   <main class="article-wrap">
     <article class="article-detail" data-public-detail>
       <nav class="article-actions" aria-label="文章操作">
-        <a href="/">← 返回首页</a>
+        <a href="{{ public_return_url }}">{{ public_return_label }}{% if public_return_default %}（默认列表）{% endif %}</a>
       </nav>
       <h1 class="article-title">{{ article.effective_title }}</h1>
       <div class="article-meta">

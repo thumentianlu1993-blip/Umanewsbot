@@ -3,7 +3,7 @@
     {% if follow_entry %}<span class="follow-source-tag">{% if follow_entry.is_descendant %}子代相关 · {% else %}来自：{% endif %}{{ follow_entry.source_horse_profile.display_name }}</span>{% endif %}
     <span class="feed-card-time tabular">{{ article.published_to_web_at|date:"m-d H:i" }}</span>
   </div>
-  <h3 class="feed-card-title"><a href="{{ article.public_path }}">{{ article.effective_title }}</a></h3>
+  <h3 class="feed-card-title"><a href="{{ article.public_list_detail_url|default:article.public_path }}">{{ article.effective_title }}</a></h3>
   {% if article.effective_summary %}
     <p class="feed-card-summary">{{ article.effective_summary|truncatechars:92 }}</p>
   {% endif %}
