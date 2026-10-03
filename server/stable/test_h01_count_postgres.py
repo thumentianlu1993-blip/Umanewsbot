@@ -15,9 +15,10 @@ import time
 from unittest.mock import patch
 from uuid import uuid4
 
-import psycopg2
-from psycopg2 import sql
-from psycopg2.extensions import connection as PgConnection, cursor as PgCursor, make_dsn
+import psycopg
+from psycopg import sql
+from psycopg import Cursor as PgCursor
+from psycopg.conninfo import make_conninfo
 from django.db import connection, connections
 from django.test import TransactionTestCase
 
@@ -38,8 +39,8 @@ class RecordingCursor:
             query, params = self.owner.before(query, params)
         try:
             value = self.raw.execute(query, params)
-        except psycopg2.Error as error:
-            self.owner.error_codes.append(error.pgcode)
+        except psycopg.Error as error:
+            self.owner.error_codes.append(error.sqlstate)
             raise
         if self.owner.after:
             self.owner.after(query, params)
@@ -55,11 +56,17 @@ class RecordingCursor:
 class RecordingConnection:
     def __init__(self, raw, *, before=None, after=None):
         self.raw, self.before, self.after = raw, before, after
-        self.pid = raw.get_backend_pid()
+        self.pid = raw.info.backend_pid
         self.statements, self.error_codes = [], []
 
-    def set_session(self, **kwargs):
-        self.raw.set_session(**kwargs)
+    def set_autocommit(self, value):
+        self.raw.set_autocommit(value)
+
+    def set_read_only(self, value):
+        self.raw.set_read_only(value)
+
+    def set_isolation_level(self, value):
+        self.raw.set_isolation_level(value)
 
     def cursor(self):
         return RecordingCursor(self.raw.cursor(), self)
@@ -78,7 +85,7 @@ def _observe_backend(params, application, expected_user, channel, rollback=None,
                   identity_matches=False)
     database = None
     try:
-        database = psycopg2.connect(**params, application_name="h01-observer-" + uuid4().hex)
+        database = psycopg.connect(**params, application_name="h01-observer-" + uuid4().hex)
         database.autocommit = True
         with database.cursor() as cursor:
             cursor.execute("SET statement_timeout = 1000")
@@ -110,7 +117,7 @@ def _observe_backend(params, application, expected_user, channel, rollback=None,
                             unchanged = cursor.fetchone() == (rollback["old_value"],)
                             try:
                                 cursor.execute("SELECT id FROM public.stable_raceevent WHERE id=%s FOR UPDATE NOWAIT", (rollback["row_id"],))
-                            except psycopg2.errors.LockNotAvailable:
+                            except psycopg.errors.LockNotAvailable:
                                 row_locked = relation_locks > 0
                         if transaction_present and expected_update and row_locked and unchanged and identity_matches:
                             result.update(seen_transaction=True, pid=pid, identity_matches=True,
@@ -168,12 +175,6 @@ class BlockingSchemaCursor(PgCursor):
         return super().execute(query, params)
 
 
-class BlockingSchemaConnection(PgConnection):
-    def cursor(self, *args, **kwargs):
-        kwargs["cursor_factory"] = BlockingSchemaCursor
-        return super().cursor(*args, **kwargs)
-
-
 class H01CountPostgresTests(TransactionTestCase):
     @classmethod
     def setUpClass(cls):
@@ -224,7 +225,7 @@ class H01CountPostgresTests(TransactionTestCase):
         params = {**self.params, "user": self.role if read_role else self.params["user"]}
         if application:
             params["application_name"] = application
-        database = psycopg2.connect(**params)
+        database = psycopg.connect(**params)
         database.autocommit = autocommit
         try:
             if autocommit:
@@ -339,7 +340,7 @@ class H01CountPostgresTests(TransactionTestCase):
     def _read(self, *, before=None, after=None, seconds=10):
         application = "h01-count-" + uuid4().hex
         self.apps.append(application)
-        raw = psycopg2.connect(**{**self.params, "user": self.role}, application_name=application)
+        raw = psycopg.connect(**{**self.params, "user": self.role}, application_name=application)
         tracked = RecordingConnection(raw, before=before, after=after)
         result = reader.run_counts(tracked, revision=IMPLEMENTATION_SHA, deadline=time.monotonic() + seconds)
         self.assertTrue(raw.closed)
@@ -431,7 +432,7 @@ class H01CountPostgresTests(TransactionTestCase):
                               "UPDATE public.stable_raceevent SET chinese_name=chinese_name WHERE false",
                               "DELETE FROM public.stable_raceevent WHERE false",
                               "CREATE TABLE public.h01_forbidden(id int)"):
-                with self.assertRaises(psycopg2.errors.InsufficientPrivilege):
+                with self.assertRaises(psycopg.errors.InsufficientPrivilege):
                     cursor.execute(statement)
 
     def test_repeatable_read_does_not_see_later_commit(self):
@@ -500,15 +501,15 @@ class H01CountPostgresTests(TransactionTestCase):
     def test_cli_deadline_stops_active_backend(self):
         application = "h01-cli-" + uuid4().hex
         process, receiver = self._observe(application, self.role)
-        original_connect = psycopg2.connect
+        original_connect = psycopg.connect
         def connect(*args, **kwargs):
-            kwargs["connection_factory"] = BlockingSchemaConnection
+            kwargs["cursor_factory"] = BlockingSchemaCursor
             return original_connect(*args, **kwargs)
-        dsn = make_dsn(**{**self.params, "user": self.role, "application_name": application})
+        dsn = make_conninfo(**{**self.params, "user": self.role, "application_name": application})
         digest = hashlib.sha256(Path(reader.__file__).read_bytes()).hexdigest()
         started = time.monotonic()
         deadline = started + 1.5
-        with patch.object(reader, "MAX_SECONDS", 1.5), patch.object(psycopg2, "connect", connect), \
+        with patch.object(reader, "MAX_SECONDS", 1.5), patch.object(psycopg, "connect", connect), \
                 patch.dict(os.environ, {"H01_READONLY_DSN": dsn}), contextlib.redirect_stdout(io.StringIO()) as output:
             status = reader.main(["--execute", "--revision", IMPLEMENTATION_SHA, "--expected-tool-sha256", digest])
         self.assertEqual(status, 2)
@@ -531,7 +532,7 @@ class H01CountPostgresTests(TransactionTestCase):
         process, receiver = self._observe(application, self.params["user"],
             rollback=dict(row_id=event.pk, old_value="Synthetic rollback", deadline=deadline), barrier=barrier)
         def write_without_commit():
-            database = psycopg2.connect(**self.params, application_name=application)
+            database = psycopg.connect(**self.params, application_name=application)
             with database.cursor() as cursor:
                 # Local admin diagnostic only. Neither server timeout can win
                 # before the two-second parent kill and invalidate causality.

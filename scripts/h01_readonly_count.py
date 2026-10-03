@@ -84,7 +84,10 @@ def run_counts(connection, *, revision, clock=time.monotonic, deadline=None):
     try:
         start=clock();deadline=start+MAX_SECONDS if deadline is None else min(deadline,start+MAX_SECONDS)
         if type(revision) is not str or not re.fullmatch('[0-9a-f]{40}',revision):raise ValueError('revision_binding')
-        connection.set_session(readonly=True,isolation_level='REPEATABLE READ',autocommit=False)
+        from psycopg import IsolationLevel
+        connection.set_autocommit(False)
+        connection.set_read_only(True)
+        connection.set_isolation_level(IsolationLevel.REPEATABLE_READ)
         cursor=connection.cursor()
         for name,sql,params in QUERIES:
             remaining=deadline-clock()
@@ -169,10 +172,10 @@ def _bounded_worker(operation, *, deadline):
 
 def _execute_database(revision, *, deadline):
     try:
-        import psycopg2
+        import psycopg
         remaining=deadline-time.monotonic()
         if remaining<=0:return dict(status='partial',reason='wall_time',inventory_complete=False)
-        connection=psycopg2.connect(os.environ['H01_READONLY_DSN'],connect_timeout=max(1,min(3,math.floor(remaining))))
+        connection=psycopg.connect(os.environ['H01_READONLY_DSN'],connect_timeout=max(1,min(3,math.floor(remaining))))
     except Exception:
         return dict(status='partial',reason='connection_failed',inventory_complete=False)
     # Connect time consumes the same fixed outer budget; it is never added back.

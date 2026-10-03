@@ -12,12 +12,59 @@ class Cursor:
     def fetchmany(self,n):return self.rows.pop(0)[:n]
     def close(self):pass
 class Connection:
-    def __init__(self,rows):self.cursor_value=Cursor(rows);self.session=None;self.rolled_back=False;self.closed=False
-    def set_session(self,**kw):self.session=kw
+    def __init__(self,rows):self.cursor_value=Cursor(rows);self.session={};self.rolled_back=False;self.closed=False
+    def set_autocommit(self,value):self.session['autocommit']=value
+    def set_read_only(self,value):self.session['readonly']=value
+    def set_isolation_level(self,value):self.session['isolation_level']=value
     def cursor(self):return self.cursor_value
     def rollback(self):self.rolled_back=True
     def close(self):self.closed=True
 class CountTests(unittest.TestCase):
+    def test_project_psycopg3_connect_and_transaction_contract(self):
+        import psycopg
+        events=[]
+        class Driver3Connection:
+            def __init__(self):
+                self.cursor_value=Cursor(CountTests().good_rows())
+                self.rolled_back=self.closed=False
+            def set_autocommit(self,value):events.append(('autocommit',value))
+            def set_read_only(self,value):events.append(('read_only',value))
+            def set_isolation_level(self,value):events.append(('isolation_level',value))
+            def cursor(self):
+                events.append(('cursor',None))
+                return self.cursor_value
+            def rollback(self):self.rolled_back=True
+            def close(self):self.closed=True
+        database=Driver3Connection()
+        with patch('psycopg.connect',return_value=database) as connect, \
+                patch.dict('sys.modules',{'psycopg2':None}), \
+                patch.dict(reader.os.environ,{'H01_READONLY_DSN':'synthetic-dsn'}):
+            result=reader._execute_database('a'*40,deadline=reader.time.monotonic()+2.9)
+        self.assertEqual(result['status'],'capacity_preflight_finished')
+        connect.assert_called_once_with('synthetic-dsn',connect_timeout=2)
+        self.assertEqual(events[:4],[('autocommit',False),('read_only',True),
+            ('isolation_level',psycopg.IsolationLevel.REPEATABLE_READ),('cursor',None)])
+        self.assertTrue(database.rolled_back and database.closed)
+
+    def test_project_psycopg3_transaction_setup_failure_is_closed(self):
+        class Driver3Connection:
+            rolled_back=closed=False
+            def set_autocommit(self,value):pass
+            def set_read_only(self,value):raise RuntimeError('private setting')
+            def set_isolation_level(self,value):raise AssertionError('must stop')
+            def cursor(self):raise AssertionError('no SELECT before valid transaction')
+            def rollback(self):self.rolled_back=True
+            def close(self):self.closed=True
+        database=Driver3Connection()
+        with patch('psycopg.connect',return_value=database), \
+                patch.dict('sys.modules',{'psycopg2':None}), \
+                patch.dict(reader.os.environ,{'H01_READONLY_DSN':'synthetic-dsn'}):
+            result=reader._execute_database('a'*40,deadline=reader.time.monotonic()+2)
+        self.assertEqual(result['reason'],'database_or_input_error')
+        self.assertEqual(result['selects'],0)
+        self.assertTrue(database.rolled_back and database.closed)
+        self.assertNotIn('private',json.dumps(result))
+
     def test_remaining_second_limits_sql_and_blocking_worker_is_terminated(self):
         class Clock:
             value=0
@@ -41,10 +88,10 @@ class CountTests(unittest.TestCase):
     def test_actual_blocked_driver_phases_and_cli_share_kill_deadline(self):
         import time
         import multiprocessing
-        for phase in ('set_session','cursor','execute','fetchmany','rollback','close'):
+        for phase in ('set_autocommit','set_read_only','set_isolation_level','cursor','execute','fetchmany','rollback','close'):
             with self.subTest(phase=phase):
                 c=Connection(self.good_rows())
-                owner=c if phase in ('set_session','cursor','rollback','close') else c.cursor_value
+                owner=c if phase in ('set_autocommit','set_read_only','set_isolation_level','cursor','rollback','close') else c.cursor_value
                 original=getattr(owner,phase)
                 def blocked(*args, _original=original, **kwargs):
                     time.sleep(10)
@@ -67,7 +114,7 @@ class CountTests(unittest.TestCase):
     def test_readonly_and_schema_fail_closed(self):
         c=Connection([[('missing_schema',False)]])
         r=run_counts(c,revision='a'*40,clock=lambda:0)
-        self.assertEqual(r['status'],'partial');self.assertEqual(r['reason'],'schema_mismatch');self.assertTrue(c.rolled_back);self.assertTrue(c.closed);self.assertEqual(c.session,dict(readonly=True,isolation_level='REPEATABLE READ',autocommit=False))
+        self.assertEqual(r['status'],'partial');self.assertEqual(r['reason'],'schema_mismatch');self.assertTrue(c.rolled_back);self.assertTrue(c.closed);self.assertEqual(c.session,dict(readonly=True,isolation_level=__import__('psycopg').IsolationLevel.REPEATABLE_READ,autocommit=False))
         self.assertEqual(r['selects'],1)
     def test_timeout_partial_does_not_retry(self):
         c=Connection([]);times=iter([0,121]);r=run_counts(c,revision='a'*40,clock=lambda:next(times))
