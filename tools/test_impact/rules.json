@@ -17,7 +17,12 @@
     "docs/changes/next-version-capabilities/lanes/A/F01-validation.json",
     "docs/changes/next-version-capabilities/lanes/B/sample_inventory.json",
     "docs/changes/next-version-capabilities/lanes/C/Q02-offline-inventory.json",
-    "docs/changes/next-version-capabilities/lanes/C/Q02-impact-mapping-proposal.json"
+    "docs/changes/next-version-capabilities/lanes/C/Q02-impact-mapping-proposal.json",
+    "docs/changes/next-version-capabilities/lanes/C/O02-offline-inventory.json",
+    "docs/changes/next-version-capabilities/lanes/C/O02-reference-query-design.json",
+    "docs/changes/next-version-capabilities/lanes/C/U02-compact-navigation-probe.json",
+    "docs/changes/next-version-capabilities/lanes/C/U02-navigation-budget.json",
+    "docs/changes/next-version-capabilities/lanes/C/U02-offline-inventory.json"
   ],
   "high_risk": [
     ".codex/agents/application.toml",
@@ -1245,10 +1250,12 @@
         "horse_page"
       ],
       "public_horse_index": [
-        "horse_page"
+        "horse_page",
+        "module:stable.tests_legacy"
       ],
       "public_horse_detail": [
-        "horse_page"
+        "horse_page",
+        "module:stable.tests_legacy"
       ],
       "public_horse_follow": [
         "horse_page"
@@ -1295,6 +1302,96 @@
       "production_window_rerun": [
         "module:stable.tests_legacy",
         "module:stable.test_multiregion_rollout_change"
+      ],
+      "_public_unpack_nav": [
+        "module:stable.tests_legacy",
+        "horse_page",
+        "module:stable.test_race_calendar_default_date_window"
+      ],
+      "_public_nav_filters": [
+        "module:stable.tests_legacy",
+        "horse_page",
+        "module:stable.test_race_calendar_default_date_window"
+      ],
+      "_public_read_nav": [
+        "module:stable.tests_legacy",
+        "horse_page",
+        "module:stable.test_race_calendar_default_date_window"
+      ],
+      "_public_nav_token": [
+        "module:stable.tests_legacy",
+        "horse_page",
+        "module:stable.test_race_calendar_default_date_window"
+      ],
+      "_public_href": [
+        "module:stable.tests_legacy",
+        "horse_page",
+        "module:stable.test_race_calendar_default_date_window"
+      ],
+      "_public_list_href": [
+        "module:stable.tests_legacy",
+        "horse_page",
+        "module:stable.test_race_calendar_default_date_window"
+      ],
+      "_public_apply_list_nav": [
+        "module:stable.tests_legacy",
+        "horse_page",
+        "module:stable.test_race_calendar_default_date_window"
+      ],
+      "_public_attach_nav": [
+        "module:stable.tests_legacy",
+        "horse_page",
+        "module:stable.test_race_calendar_default_date_window"
+      ],
+      "_public_detail_nav": [
+        "module:stable.tests_legacy",
+        "horse_page",
+        "module:stable.test_race_calendar_default_date_window"
+      ],
+      "_public_pagination_nav": [
+        "module:stable.tests_legacy",
+        "horse_page",
+        "module:stable.test_race_calendar_default_date_window"
+      ],
+      "_public_today_races": [
+        "module:stable.tests_legacy",
+        "module:stable.test_race_information_display_pages",
+        "module:stable.test_race_public_time"
+      ],
+      "_public_race_status_label": [
+        "module:stable.tests_legacy",
+        "module:stable.test_race_information_display_pages",
+        "module:stable.test_race_public_time"
+      ],
+      "public_news_feed": [
+        "module:stable.tests_legacy",
+        "horse_page",
+        "module:stable.test_race_information_display_pages",
+        "module:stable.test_race_news_exposure"
+      ],
+      "public_article_detail": [
+        "module:stable.tests_legacy",
+        "horse_page",
+        "module:stable.test_race_information_display_pages",
+        "module:stable.test_race_news_exposure"
+      ],
+      "public_race_calendar": [
+        "module:stable.tests_legacy",
+        "horse_page",
+        "module:stable.test_race_calendar_default_date_window",
+        "module:stable.test_race_information_display_pages",
+        "module:stable.test_historical_race_calendar_integrity",
+        "module:stable.test_race_public_time",
+        "module:stable.test_race_news_exposure"
+      ],
+      "public_race_detail": [
+        "module:stable.tests_legacy",
+        "horse_page",
+        "module:stable.test_race_calendar_default_date_window",
+        "module:stable.test_race_information_display_pages",
+        "module:stable.test_historical_race_calendar_integrity",
+        "module:stable.test_race_public_time",
+        "module:stable.test_race_news_exposure"
       ]
     }
   },
