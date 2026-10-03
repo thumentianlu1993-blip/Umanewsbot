@@ -773,7 +773,22 @@ class NewsArticleAdmin(admin.ModelAdmin):
 
     def get_list_display(self, request):
         fields = super().get_list_display(request)
-        return fields if qq_channel_enabled() else tuple(f for f in fields if f != "push_action_link")
+        return fields if qq_channel_enabled() else tuple(
+            "article_status_summary" if f == "status" else f
+            for f in fields if f != "push_action_link")
+
+    @admin.display(description="内容状态", ordering="status")
+    def article_status_summary(self, obj):
+        label = obj.get_status_display()
+        if not qq_channel_enabled() and obj.status in (
+                ArticleStatus.PUSH_READY, ArticleStatus.PUSHED, ArticleStatus.PUSH_FAILED):
+            return f"历史QQ状态：{label}"
+        return label
+
+    def formfield_for_choice_field(self, db_field, request, **kwargs):
+        if db_field.name == "status" and not qq_channel_enabled():
+            kwargs["help_text"] = f"{db_field.help_text} QQ推送状态仅为历史记录，QQ渠道已停用。".strip()
+        return super().formfield_for_choice_field(db_field, request, **kwargs)
 
     def get_readonly_fields(self, request, obj=None):
         fields = super().get_readonly_fields(request, obj)
