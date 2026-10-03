@@ -15,7 +15,9 @@
     "docs/reports/2026-10-02-capability-evidence/news-design-home-observation.json",
     "docs/reports/2026-10-02-capability-evidence/thread-requirements.json",
     "docs/changes/next-version-capabilities/lanes/A/F01-validation.json",
-    "docs/changes/next-version-capabilities/lanes/B/sample_inventory.json"
+    "docs/changes/next-version-capabilities/lanes/B/sample_inventory.json",
+    "docs/changes/next-version-capabilities/lanes/C/Q02-offline-inventory.json",
+    "docs/changes/next-version-capabilities/lanes/C/Q02-impact-mapping-proposal.json"
   ],
   "high_risk": [
     ".codex/agents/application.toml",
@@ -1216,6 +1218,18 @@
         "module:stable.test_race_public_time",
         "module:stable.test_public_new_regions",
         "module:stable.test_race_news_exposure"
+      ],
+      "region_production": [
+        "module:stable.tests_legacy",
+        "module:stable.test_multiregion_rollout_change"
+      ],
+      "production_window_detail": [
+        "module:stable.tests_legacy",
+        "module:stable.test_multiregion_rollout_change"
+      ],
+      "production_window_preview": [
+        "module:stable.tests_legacy",
+        "module:stable.test_multiregion_rollout_change"
       ]
     }
   },
