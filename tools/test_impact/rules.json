@@ -1230,6 +1230,14 @@
       "production_window_preview": [
         "module:stable.tests_legacy",
         "module:stable.test_multiregion_rollout_change"
+      ],
+      "article_push_api": [
+        "module:stable.tests_legacy",
+        "module:stable.test_multiregion_rollout_change"
+      ],
+      "production_window_rerun": [
+        "module:stable.tests_legacy",
+        "module:stable.test_multiregion_rollout_change"
       ]
     }
   },
