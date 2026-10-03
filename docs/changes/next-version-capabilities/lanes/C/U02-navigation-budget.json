@@ -1,0 +1,37 @@
+{
+  "diagnostic_only": true,
+  "django_version": "5.2.1",
+  "calls": "actual encode/decode, JSONSerializer, signing.loads and QueryDict/urlencode; no DB/network",
+  "q_codepoints": 200,
+  "q_utf8_bytes": 800,
+  "json_bytes": 2647,
+  "current_cursor_characters": 3581,
+  "base64_upper_bound": 3530,
+  "timestamp_base62_upper_bound": 11,
+  "sha256_signature_characters": 43,
+  "cursor_upper_bound": 3586,
+  "current_relative_url_characters": 6083,
+  "relative_url_upper_bound": 6088,
+  "outer_query_characters": 7733,
+  "inner_url_percent_encoded_characters": 7723,
+  "proposed_cursor_max": 4096,
+  "proposed_decoded_return_to_max": 8192,
+  "literal_roundtrip": true,
+  "decoded_filter_and_signed_cursor_roundtrip": true,
+  "scope_q_compatibility": "existing calendar/horse views have no q length cap; >200 existing searches remain usable but return metadata safely defaults by scoped budget",
+  "over_budget_negative_design": {
+    "cursor": 4097,
+    "decoded_return_to": 8193,
+    "q_codepoints": 201
+  },
+  "source_digests": {
+    "server/stable/services/race_calendar.py": "a70059a8bdbbc40d5d21860fe04564767c6528b226f8c6eec6e70f86ad287919",
+    "server/stable/services/race_public_time.py": "08aec597c6fb2732c16b75c23a3ff33f21a84622b1eedec6777fd63bf5f55ecf"
+  },
+  "receipt_sha256": "5a1a163d8215a7d5ec80212f9201d1e509cdcd864571c97f2f8e903a376408dc",
+  "runtime_receipt_path": "/Users/mentianlu/.codex/runtime/u02-navigation-budget/worst-payload-receipt.json",
+  "behavior_guard_executed": false,
+  "transport_limit_verified": false,
+  "historical_diagnostic_not_current_contract": true,
+  "superseded_by": "U02-compact-navigation-probe.json / bidirectional compressed token and total budget; no q/cursor independent cap"
+}

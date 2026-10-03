@@ -90,6 +90,7 @@ from .services.operations import log_operation
 from .services.race_events import disable_race_event_live_tracking
 from .services.production_windows import update_major_race_boost_window
 from .services.pushing import enqueue_push_for_article
+from .services.onebot import qq_channel_enabled
 from .services.queueing import dispatch_task
 from .tasks import crawl_news_source_task, translate_article_task
 
@@ -770,6 +771,44 @@ class NewsArticleAdmin(admin.ModelAdmin):
         ("操作", {"fields": ("translate_action_link", "push_action_link")}),
     )
 
+    def get_list_display(self, request):
+        fields = super().get_list_display(request)
+        return fields if qq_channel_enabled() else tuple(
+            "article_status_summary" if f == "status" else f
+            for f in fields if f != "push_action_link")
+
+    @admin.display(description="内容状态", ordering="status")
+    def article_status_summary(self, obj):
+        label = obj.get_status_display()
+        if not qq_channel_enabled() and obj.status in (
+                ArticleStatus.PUSH_READY, ArticleStatus.PUSHED, ArticleStatus.PUSH_FAILED):
+            return f"历史QQ状态：{label}"
+        return label
+
+    def formfield_for_choice_field(self, db_field, request, **kwargs):
+        if db_field.name == "status" and not qq_channel_enabled():
+            kwargs["help_text"] = f"{db_field.help_text} QQ推送状态仅为历史记录，QQ渠道已停用。".strip()
+        return super().formfield_for_choice_field(db_field, request, **kwargs)
+
+    def get_readonly_fields(self, request, obj=None):
+        fields = super().get_readonly_fields(request, obj)
+        return fields if qq_channel_enabled() else tuple(f for f in fields if f != "push_action_link")
+
+    def get_fieldsets(self, request, obj=None):
+        fieldsets = super().get_fieldsets(request, obj)
+        if qq_channel_enabled():
+            return fieldsets
+        # 复制每层声明，避免停用请求永久修改共享ModelAdmin类字段。
+        return tuple((title, {**options, "fields": tuple(
+            field for field in options["fields"] if field != "push_action_link"
+        )}) for title, options in fieldsets)
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        if not qq_channel_enabled():
+            actions.pop("mark_published_ready", None)
+        return actions
+
     def save_model(self, request, obj, form, change):
         changed = set(form.changed_data) & {"title_zh", "summary_zh", "body_zh", "editor_notes"}
         if changed:
@@ -796,6 +835,9 @@ class NewsArticleAdmin(admin.ModelAdmin):
 
     @admin.action(description="标记为可推送")
     def mark_published_ready(self, request, queryset):
+        if not qq_channel_enabled():
+            self.message_user(request, "QQ渠道已停用，未修改推送状态。", messages.WARNING)
+            return
         count = queryset.update(status=ArticleStatus.PUSH_READY)
         self.message_user(request, f"已将 {count} 篇文章标记为可推送。", messages.SUCCESS)
 
@@ -873,6 +915,9 @@ class NewsArticleAdmin(admin.ModelAdmin):
 
     def push_view(self, request: HttpRequest, article_id: int):
         article = get_object_or_404(NewsArticle, pk=article_id)
+        if not qq_channel_enabled():
+            self.message_user(request, "QQ渠道已停用，未加入发送队列。", messages.WARNING)
+            return redirect(reverse("admin:stable_newsarticle_change", args=[article.pk]))
         if request.method == "POST":
             form = PushArticleForm(request.POST)
             if form.is_valid():

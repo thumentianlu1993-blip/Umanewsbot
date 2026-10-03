@@ -144,6 +144,7 @@ class SingleArticleVisibilityTests(TestCase):
         self.assertEqual(decision.reason, "related_region_waiting_primary_region")
 
 
+@override_settings(QQ_CHANNEL_ENABLED=True)
 class SingleQQDeliveryTests(TestCase):
     @override_settings(
         MULTIREGION_ATTRIBUTION_MODE="enforce",

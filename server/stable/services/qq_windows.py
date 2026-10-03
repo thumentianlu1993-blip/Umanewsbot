@@ -20,7 +20,8 @@ from stable.models import (
     WindowTargetDecision,
     WorkflowStatus,
 )
-from stable.services.qq_auto_push import ensure_qq_push_deliveries, should_push_news_to_qq
+from stable.services.qq_auto_push import ensure_qq_push_deliveries, should_push_news_to_qq, is_disabled_qq_delivery
+from stable.services.onebot import qq_channel_enabled, QQ_CHANNEL_DISABLED
 from stable.services.news_attribution import filter_articles_visible_in_region
 
 
@@ -118,6 +119,8 @@ def _reserve_qq_quotas(
 
 
 def _existing_delivery_skip_reason(delivery: QQPushDelivery) -> str:
+    if is_disabled_qq_delivery(delivery):
+        return QQ_CHANNEL_DISABLED
     if delivery.status == QQPushDeliveryStatus.SENT:
         return "already_sent"
     if delivery.status in {
@@ -138,6 +141,8 @@ def select_qq_window_deliveries(
     targets: list[PushTarget] | None = None,
     now=None,
 ) -> QQWindowResult:
+    if not qq_channel_enabled():
+        return QQWindowResult(deliveries=[], zero_reasons=[QQ_CHANNEL_DISABLED])
     now = now or timezone.now()
     targets = targets if targets is not None else list(PushTarget.objects.filter(is_active=True))
     if not targets:

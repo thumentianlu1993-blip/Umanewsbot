@@ -1,0 +1,216 @@
+{
+  "baseline_sha": "b899421995d39341572791d2c3e2a2053b7d980b",
+  "executed_production_queries": false,
+  "restored_dump": false,
+  "source_files": [
+    {
+      "path": "server/stable/models.py",
+      "sha256": "7dfdbe43e9586aa794c5de0fadb8e817de0dc7c8473f8f8568de7d4a8d3dcf63"
+    },
+    {
+      "path": "server/stable/services/term_candidate_review.py",
+      "sha256": "ed8a3eb0dbf8755807a46558f6d9ab476011badc3d79a9812e976b351c6c6d8d"
+    },
+    {
+      "path": "server/stable/services/term_discovery.py",
+      "sha256": "375d3e4d1eedb3493d06925a8e6367b27aefb0c707b4fc3a6a15411735d13720"
+    },
+    {
+      "path": "deploy/backup_db.sh",
+      "sha256": "3f760ae641038f90c910281d23e972bceb5d0fbf8d7467a96922b3388153a97c"
+    },
+    {
+      "path": "deploy/restore_db.sh",
+      "sha256": "f697e31680ed8cf631eef5486741b26d1a9478aae43658a86144fdc656ca7447"
+    },
+    {
+      "path": "deploy/rollback.sh",
+      "sha256": "e06412fc0944a9da8bedd03a9520697f619107427b452aa3a0749c0f80f40dfa"
+    },
+    {
+      "path": "server/stable/tests/test_backup_operations_contract.py",
+      "sha256": "038d120a45033d9d36458a8a222e9bf3f16ea83884f39dddff6674f9b8e38949"
+    },
+    {
+      "path": "docs/reports/2026-10-02-backup-restore-findings.md",
+      "sha256": "005031c84008d0cae4ed70e6cfe6205a83d610af177840776f8a96fffa29ccbb"
+    }
+  ],
+  "declared_inbound_relations": [
+    {
+      "model": "ArticleRaceLink",
+      "field": "article",
+      "target": "NewsArticle",
+      "line": 3566,
+      "on_delete": "models.CASCADE",
+      "nullable": "False"
+    },
+    {
+      "model": "ArticleHorseLink",
+      "field": "article",
+      "target": "NewsArticle",
+      "line": 4172,
+      "on_delete": "models.CASCADE",
+      "nullable": "False"
+    },
+    {
+      "model": "NewsArticle",
+      "field": "duplicate_of",
+      "target": "NewsArticle",
+      "line": 4331,
+      "on_delete": "models.SET_NULL",
+      "nullable": "True"
+    },
+    {
+      "model": "NewsArticleRelatedRegion",
+      "field": "article",
+      "target": "NewsArticle",
+      "line": 4620,
+      "on_delete": "models.CASCADE",
+      "nullable": "False"
+    },
+    {
+      "model": "NewsImage",
+      "field": "article",
+      "target": "NewsArticle",
+      "line": 4656,
+      "on_delete": "models.CASCADE",
+      "nullable": "False"
+    },
+    {
+      "model": "MediaAsset",
+      "field": "article",
+      "target": "NewsArticle",
+      "line": 4679,
+      "on_delete": "models.CASCADE",
+      "nullable": "False"
+    },
+    {
+      "model": "NewsSnapshot",
+      "field": "article",
+      "target": "NewsArticle",
+      "line": 4715,
+      "on_delete": "models.CASCADE",
+      "nullable": "False"
+    },
+    {
+      "model": "TermCandidate",
+      "field": "merged_into_candidate",
+      "target": "TermCandidate",
+      "line": 5347,
+      "on_delete": "models.SET_NULL",
+      "nullable": "True"
+    },
+    {
+      "model": "TermCandidateEvidence",
+      "field": "candidate",
+      "target": "TermCandidate",
+      "line": 5380,
+      "on_delete": "models.CASCADE",
+      "nullable": "False"
+    },
+    {
+      "model": "TermCandidateEvidence",
+      "field": "article",
+      "target": "NewsArticle",
+      "line": 5381,
+      "on_delete": "models.CASCADE",
+      "nullable": "False"
+    },
+    {
+      "model": "PushLog",
+      "field": "article",
+      "target": "NewsArticle",
+      "line": 5425,
+      "on_delete": "models.CASCADE",
+      "nullable": "False"
+    },
+    {
+      "model": "QQPushDelivery",
+      "field": "article",
+      "target": "NewsArticle",
+      "line": 5445,
+      "on_delete": "models.CASCADE",
+      "nullable": "False"
+    },
+    {
+      "model": "WindowCandidateDecision",
+      "field": "article",
+      "target": "NewsArticle",
+      "line": 5540,
+      "on_delete": "models.CASCADE",
+      "nullable": "False"
+    },
+    {
+      "model": "WindowTargetDecision",
+      "field": "article",
+      "target": "NewsArticle",
+      "line": 5563,
+      "on_delete": "models.CASCADE",
+      "nullable": "True"
+    },
+    {
+      "model": "TranslationRun",
+      "field": "article",
+      "target": "NewsArticle",
+      "line": 5617,
+      "on_delete": "models.CASCADE",
+      "nullable": "False"
+    },
+    {
+      "model": "AutomationLog",
+      "field": "article",
+      "target": "NewsArticle",
+      "line": 5744,
+      "on_delete": "models.CASCADE",
+      "nullable": "False"
+    },
+    {
+      "model": "HomepageHeadlineSelection",
+      "field": "article",
+      "target": "NewsArticle",
+      "line": 5890,
+      "on_delete": "models.SET_NULL",
+      "nullable": "True"
+    },
+    {
+      "model": "HomepageHeadlineRecommendation",
+      "field": "article",
+      "target": "NewsArticle",
+      "line": 5923,
+      "on_delete": "models.SET_NULL",
+      "nullable": "True"
+    },
+    {
+      "model": "RaceEventFieldAuthority",
+      "field": "article",
+      "target": "NewsArticle",
+      "line": 6244,
+      "on_delete": "models.SET_NULL",
+      "nullable": "True"
+    },
+    {
+      "model": "RaceEventFieldChange",
+      "field": "article",
+      "target": "NewsArticle",
+      "line": 6310,
+      "on_delete": "models.SET_NULL",
+      "nullable": "True"
+    },
+    {
+      "model": "RaceNewsExposure",
+      "field": "article",
+      "target": "NewsArticle",
+      "line": 6471,
+      "on_delete": "models.CASCADE",
+      "nullable": "False"
+    }
+  ],
+  "non_fk_followups": [
+    "MultiregionAttributionRun.completed_article_ids",
+    "OperationLog target_type/target_id and audit payloads",
+    "JSON selectors/payload/evidence and cached/task external article identifiers",
+    "public URLs/slugs, source references, media storage keys"
+  ],
+  "completeness": "仅本文件静态声明；实际catalog、其他app及非FK业务引用未闭合"
+}

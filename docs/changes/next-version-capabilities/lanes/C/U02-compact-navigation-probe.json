@@ -1,0 +1,92 @@
+{
+  "diagnostic_only": true,
+  "no_db_network_or_app_changes": true,
+  "source_sha": "7cb9c137da9204ec60501642ba3665ee0216c217",
+  "payload_contract": "v/list/whitelisted filters only; compact token in both directions, list expands only in memory",
+  "salt": "stable.public-list-return.v1",
+  "ttl_seconds": 86400,
+  "samples": [
+    {
+      "name": "unicode_200_repeat",
+      "q_codepoints": 200,
+      "json_bytes": 6138,
+      "token_chars": 686,
+      "href_bytes": 970,
+      "request_line_bytes": 985,
+      "return_list_request_line_bytes": 724,
+      "raw_uncompressed_list_request_line_bytes": 6098,
+      "fits": true,
+      "query_and_cursor_roundtrip": true
+    },
+    {
+      "name": "unicode_200_varied",
+      "q_codepoints": 200,
+      "json_bytes": 6138,
+      "token_chars": 3471,
+      "href_bytes": 3755,
+      "request_line_bytes": 3770,
+      "return_list_request_line_bytes": 3509,
+      "raw_uncompressed_list_request_line_bytes": 6098,
+      "fits": true,
+      "query_and_cursor_roundtrip": true
+    },
+    {
+      "name": "ascii_700_varied",
+      "q_codepoints": 700,
+      "json_bytes": 2171,
+      "token_chars": 2238,
+      "href_bytes": 2522,
+      "request_line_bytes": 2537,
+      "return_list_request_line_bytes": 2276,
+      "raw_uncompressed_list_request_line_bytes": 2131,
+      "fits": true,
+      "query_and_cursor_roundtrip": true
+    },
+    {
+      "name": "ascii_3000_repeat",
+      "q_codepoints": 3000,
+      "json_bytes": 7538,
+      "token_chars": 666,
+      "href_bytes": 950,
+      "request_line_bytes": 965,
+      "return_list_request_line_bytes": 704,
+      "raw_uncompressed_list_request_line_bytes": 7498,
+      "fits": true,
+      "query_and_cursor_roundtrip": true
+    }
+  ],
+  "negative_probes_rejected": [
+    "bad_signature",
+    "expired_signature",
+    "signed_unknown_url_field",
+    "signed_wrong_list",
+    "input_3801",
+    "valid_signature_decompression_over_16KiB",
+    "signed_trailing_compression_stream",
+    "decoded_payload_16385",
+    "signed_duplicate_json_field"
+  ],
+  "boundary": {
+    "decoded_payload_exact_16384": "accepted_by_bounded_decoder",
+    "decoded_payload_16385": "rejected",
+    "request_line_exact_3800": "accepted_by_budget_probe",
+    "request_line_3801": "default_return_by_budget_probe",
+    "decoded_payload_limit": 16384,
+    "signed_input_limit": 3800
+  },
+  "producer_oversized_payload_defaulted": true,
+  "application_navigation_helper_implemented": false,
+  "HTTP_transport_live_tested": false,
+  "existing_cursor_signature_contract_changed": false,
+  "source_digests": {
+    "server/stable/services/race_calendar.py": "a70059a8bdbbc40d5d21860fe04564767c6528b226f8c6eec6e70f86ad287919",
+    "server/stable/services/race_public_time.py": "08aec597c6fb2732c16b75c23a3ff33f21a84622b1eedec6777fd63bf5f55ecf"
+  },
+  "probe_path": "/Users/mentianlu/.codex/runtime/u02-navigation-budget/compact-token-probe.py",
+  "probe_sha256": "c32ff582435ee6ab2a03defcecf2bb7d2eeb244e385ce0efcfe0ac94fc43164e",
+  "receipt_path": "/Users/mentianlu/.codex/runtime/u02-navigation-budget/compact-token-receipt.json",
+  "receipt_sha256": "051ff58ffd0dc64abe90a901141812ee74f95f6880f29293cfe5c1037195a649",
+  "supersedes": "7cb9c137 plaintext return_to budget only; retained as intermediate evidence",
+  "parameter_conflict_scan": "rg return_nav server scripts: no matches",
+  "root_confirmed_bidirectional_contract": true
+}

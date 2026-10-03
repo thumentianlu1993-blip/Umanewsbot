@@ -7,7 +7,7 @@
         {% for entry in hot_articles %}
           <li>
             <span class="hot-num tabular">{{ forloop.counter|stringformat:"02d" }}</span>
-            <a href="{{ entry.article.public_path }}">{{ entry.article.effective_title }}</a>
+            <a href="{{ entry.article.public_list_detail_url|default:entry.article.public_path }}">{{ entry.article.effective_title }}</a>
           </li>
         {% endfor %}
       </ol>
@@ -20,7 +20,7 @@
       {% for entry in followed_entries %}
         <div class="follow-item">
           <span class="star">★</span>
-          <a href="{{ entry.article.public_path }}">{{ entry.article.effective_title|truncatechars:18 }}</a>
+          <a href="{{ entry.article.public_list_detail_url|default:entry.article.public_path }}">{{ entry.article.effective_title|truncatechars:18 }}</a>
           <span class="follow-meta">{{ entry.horse_profile.display_name }}</span>
         </div>
       {% endfor %}

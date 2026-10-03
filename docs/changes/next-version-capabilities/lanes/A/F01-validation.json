@@ -1,0 +1,35 @@
+{
+  "status": "pass",
+  "scope": "offline_document_contract_only",
+  "positive_cases": 4,
+  "negative_cases": {
+    "missing_output_source": "required_or_unknown_field",
+    "missing_input_source": "required_or_unknown_field",
+    "tampered_protection": "protection_digest_mismatch",
+    "missing_protection_digest": "required_or_unknown_field",
+    "noncanonical_scope": "noncanonical_scope"
+  },
+  "unordered_permutation_cases": 4,
+  "business_roster_order_change": "digest_changed",
+  "code_base": "907f8de699b31a6fcc80acc78e9ba070aadc4f28",
+  "review_finding": "F01-M-01",
+  "review_status": "pending_original_R_rereview",
+  "product_parameters": "coordinator_decided_defaults_community_pending_amount_null",
+  "workflow_contract": "PASS",
+  "workflow_tests": "4/4 PASS",
+  "diff_check": "PASS",
+  "document_links": "PASS",
+  "files": {
+    "docs/changes/next-version-capabilities/lanes/A/A-001-report.md": "17da3c5487a32142081f6f379ada86254173ea055990fce4ddf57647f0ad341c",
+    "docs/changes/next-version-capabilities/lanes/A/F01-contract-examples.json": "4df8008fcf203c413721a1600afc6206ad4fe8f269bd3035d807e4e2eff77f89",
+    "docs/changes/next-version-capabilities/lanes/A/F01-plan.md": "b38cf86e464de01660f9a3fc087120ef7c99f7706c2e362b64e0c69db01892da",
+    "docs/changes/next-version-capabilities/lanes/A/F03-H01-readonly-preparation.md": "8699708041890efcd9b316a872857e219689ede14d55915e68dc747b3f983992",
+    "docs/changes/next-version-capabilities/lanes/A/validate_f01_contract.py": "79a27c5bd6351df7775a50747b6dbe70e8f70e0a212a78afad1eff4b3741a3b9"
+  },
+  "limitations": [
+    "No application type/writer implementation",
+    "No behavior RED/GREEN or Linux delivery evidence",
+    "No production/network/paid invocation",
+    "Original R rereview pending"
+  ]
+}

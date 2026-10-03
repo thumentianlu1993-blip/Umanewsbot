@@ -1,0 +1,13 @@
+# O02 固定pilot后续小包交接（未执行）
+
+runtime：/Users/mentianlu/.codex/runtime/c010-o02-pilot-followup/。
+
+manifest SHA256 ecee18ee55b2b73044dc2849a7ac046de358a0ff2dcc4f937b1807469b61a0d9；container-followup.py SHA24671d2bec19567417e87d695dcdd2dc7968fffdee8a5029b4debe951a910e2d；remote-followup.py SHA7b0ec022e163458b489780372f4a0638cedb850760927715f77fc09154024851；followup-spec.json SHAbecd0e0cb67e64e8d6240074ff1f5197d1f36d0e557accb39a02d2c317d08903。原私有pilot输入SHA509033d22c6fec32faec63005bb9232f4650c1d6e40dca8e841e33376eb7e949，IDs只由root私有读取并stdin绑定，不在参数/包spec/stdout/仓库出现。
+
+运行argv与所有准确SQL在runtime README/manifest/spec；root审包后自行选择一次references-1..7或semantics及新私有输出目录，不自动loop。只取新闻8组47条及术语前20组40条，来源总226组不是本包范围。实际private source owner600、完整SHA、completed/rollback/close与固定web/image/marker先验；变化拒绝，不更换容器或扩大组数。
+
+每reference batch一个RR readonly连接6SELECT（3计数/3EXPLAIN非ANALYZE），semantics为4SELECT；各stmt3s、lock250ms/idle5s，work4MB/temp16MB/parallel0，alarm25s/wrapper30s。强制heap且EXPLAIN必须目标SeqScan/无Index或Parallel。LIMIT50001截断及超时只记unknown，不放宽；zero引用组显式0，父缺行显式missing。不同batch不是同一snapshot，最终manifest与引用守恒须在固定副本复验。
+
+语义层从真实133列catalog验列后设计：新闻identity/content/manual/public_basis/references；术语identity/content/review/references/evidence_counters/times。sha256在数据库计算，结果仅分层diff布尔/计数；不把整行ID/updated时间不同当内容冲突，不将digest相同当来源正确。内容有差异不直接覆盖人工稿或选择最小ID。
+
+验证：Python AST/JSON、源pilot SHA与私有map结构/数量校验、无DB无网络self-check；未原生PostgreSQL执行，不算行为PASS。该包不含碰撞/非FK查询、任何repair/写入/索引/服务/配置/真实来源调用。先由root取有限引用和父差异证据，再决定必要碰撞/非FK及根因复现的下一最小步。

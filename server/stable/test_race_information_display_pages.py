@@ -163,6 +163,46 @@ class DisplayPageTests(TestCase):
             self.assertContains(response,text)
         self.assertNotContains(response,'Hidden event secret')
 
+    def test_horse_grade_respects_prepared_public_event_without_queries_or_writes(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+        from stable.models import HorseProfile, HorseRaceRecord
+        from stable.templatetags.race_information import race_field
+        term = TermEntry.objects.create(term_type='horse', source_ja='Grade Horse', target_zh='等级马')
+        horse = HorseProfile.objects.create(primary_term=term, display_name_zh='等级马', review_status='published')
+        record = HorseRaceRecord.objects.create(horse_profile=horse, race_name='历史等级赛事',
+            race_date=date(2025, 1, 2), race_year=2025, grade_text='GIII', event=self.event)
+        for visibility, expected in [('published', 'G2'), ('draft', 'G3')]:
+            self.event.visibility_status = visibility
+            self.event.save()
+            with self.subTest(visibility=visibility), CaptureQueriesContext(connection) as queries:
+                response = self.client.get(horse.public_path)
+            self.assertEqual(response.status_code, 200)
+            displayed = list(response.context['race_records'])[0]
+            self.assertEqual(displayed.public_display['grade'].text, expected)
+            with self.assertNumQueries(0):
+                self.assertEqual(race_field(displayed, 'grade'), expected)
+            self.assertContains(response, ' · ' + expected)
+            self.assertFalse(any(q['sql'].lstrip().split()[0].upper() in {'INSERT', 'UPDATE', 'DELETE'}
+                                 for q in queries.captured_queries))
+            record.refresh_from_db()
+            self.event.refresh_from_db()
+            self.assertEqual(record.grade_text, 'GIII')
+            self.assertEqual((self.event.grade_text, self.event.normalized_grade), ('Grade 2', 'G2'))
+
+    def test_grade_tag_does_not_fetch_uncached_record_event(self):
+        from stable.models import HorseProfile, HorseRaceRecord
+        from stable.templatetags.race_information import race_field
+        term = TermEntry.objects.create(term_type='horse', source_ja='Uncached Horse', target_zh='无缓存马')
+        horse = HorseProfile.objects.create(primary_term=term, display_name_zh='无缓存马')
+        saved = HorseRaceRecord.objects.create(horse_profile=horse, race_name='历史赛',
+            grade_text='GIII', event=self.event)
+        record = HorseRaceRecord.objects.get(pk=saved.pk)
+        self.assertNotIn('event', record._state.fields_cache)
+        with self.assertNumQueries(0):
+            self.assertEqual(race_field(record, 'grade'), 'G3')
+        self.assertNotIn('event', record._state.fields_cache)
+
     def test_linked_event_without_date_preserves_record_date_and_major_win_name(self):
         from stable.models import HorseProfile, HorseRaceRecord
         term=TermEntry.objects.create(term_type='horse',source_ja='Winner',target_zh='获胜马')
@@ -183,3 +223,152 @@ class DisplayPageTests(TestCase):
         self.assertEqual(candidate.candidate_payload['items'][0],{'horse_name':'Candidate','finish_position':4})
         row=RaceEventResult(finish_position=4,horse_name='Database row')
         self.assertNotEqual(row_fields(row)['position'].text,'4')
+
+
+class PublicGradeFilterParityTests(TestCase):
+    """公开等级投影必须在分页前用于查询，而不能仅修饰卡片。"""
+
+    def test_raw_g1_without_stored_code_remains_in_g1_filter_under_both_flags(self):
+        event = RaceEvent.objects.create(
+            year=2025, slug='germany-raw-grade-red', original_name='German grade fixture',
+            chinese_name='德国等级回放', country_region='germany', racecourse='Hamburg',
+            grade_text='G1', normalized_grade='', local_date=date(2025, 7, 6),
+            visibility_status='published', status='finished',
+        )
+        for flag in (True, False):
+            with self.subTest(flag=flag), override_settings(RACE_INFORMATION_NORMALIZED_DISPLAY_ENABLED=flag):
+                params = {'year': '2025', 'region': 'germany', 'tab': 'all'}
+                baseline = self.client.get('/races/', params)
+                self.assertContains(baseline, '德国等级回放')
+                filtered = self.client.get('/races/', {**params, 'grade': 'g1'})
+                self.assertIn(event.pk, [item.pk for group in filtered.context['groups'] for item in group['events']])
+                self.assertContains(filtered, 'grade-badge g1')
+        event.refresh_from_db()
+        self.assertEqual((event.grade_text, event.normalized_grade), ('G1', ''))
+
+    def test_query_code_matches_parser_for_supported_syntax_and_provenance(self):
+        import json
+        from pathlib import Path
+        from stable.services.race_information_display import PublicGradeCode, event_grade_field, filter_public_grade
+        cases = json.loads((Path(__file__).resolve().parents[2] /
+                            'docs/changes/next-version-capabilities/lanes/C/U01-offline-cases.json').read_text())['cases']
+        inputs = [item['event'] for item in cases]
+        # 不只测一个Unicode表面写法：包括兼容字母、空白、大小写和符号。
+        for prefix in ('G', 'GROUP', 'GRADE', 'GROUPE', 'JPN', 'JG'):
+            for suffix in ('I', 'II', 'III', '1', '2', '3'):
+                for text in (prefix + suffix, prefix.lower() + ' ' + suffix.lower(),
+                             '重賞\t' + prefix + '\u2003' + suffix,
+                             prefix + '・-' + suffix):
+                    inputs.append(dict(country_region='germany', year=2025,
+                                       grade_text=text, normalized_grade=''))
+        inputs.extend([
+            dict(country_region='germany', year=2025, grade_text='𝔊Ⅰ', normalized_grade=''),
+            dict(country_region='germany', year=2025, grade_text='\x1cG1\x1f', normalized_grade=''),
+            dict(country_region='germany', year=2025, grade_text='G1'+' '*120, normalized_grade=''),
+            dict(country_region='germany', year=2025, grade_text='ﷺ'*40+'G1', normalized_grade=''),
+        ])
+        refs = {'source_kind':'jra_official_graded_race_list',
+                'primary':'https://www.jra.go.jp/datafile/seiseki/replay/2026/jyusyo.html'}
+        for url in (refs['primary'], 'HTTPS://WWW.JRA.GO.JP/datafile/seiseki/replay/2026/jyusyo.html',
+                    refs['primary']+'?x=1#result', '\x1c '+refs['primary'],
+                    refs['primary'].replace('https://', 'https:\t//'),
+                    refs['primary'].replace('.jp/', '.jp:bad/'),
+                    refs['primary'].replace('.jp/', '.jp:443/'),
+                    refs['primary'].replace('.jp/', '.jp:0443/'),
+                    refs['primary'].replace('.jp/', '.jp:/'),
+                    refs['primary'].replace('.jp/', '.jp:444/'),
+                    refs['primary'].replace('.jp/', '.jp.evil.example/'),
+                    refs['primary'].replace('replay/', 'REPLAY/'),
+                    refs['primary'].replace('https://', 'https://user:password@'),
+                    None, 42, {}, []):
+            inputs.append(dict(country_region='japan', year=2026, grade_text='GIII STRASSE',
+                               normalized_grade='', original_name='Straße',
+                               source_refs={**refs, 'primary':url}))
+        events = []
+        for index, payload in enumerate(inputs):
+            event = RaceEvent.objects.create(slug=f'grade-parity-{index}',
+                chinese_name=f'等级等价{index}', original_name=payload.get('original_name', 'Fixture'),
+                country_region=payload['country_region'], year=payload['year'],
+                grade_text=payload['grade_text'], normalized_grade=payload['normalized_grade'],
+                source_refs=payload.get('source_refs', {}), local_date=date(payload['year'], 7, 6),
+                visibility_status='published', status='finished')
+            events.append(event)
+        queryset = RaceEvent.objects.filter(pk__in=[e.pk for e in events])
+        from django.db import connection
+        if connection.vendor == 'postgresql':
+            from stable.services.race_information_display import _postgresql_grade_capable
+            self.assertTrue(_postgresql_grade_capable(connection))
+        with self.assertNumQueries(1):
+            actual = dict(queryset.annotate(code=PublicGradeCode()).values_list('pk', 'code'))
+        for event, item in zip(events, cases):
+            self.assertEqual(event_grade_field(event).code or '', item['expected']['code'] or '', item['id'])
+            self.assertEqual(event_grade_field(event).text, item['expected']['label'], item['id'])
+        for event in events:
+            self.assertEqual(actual[event.pk], event_grade_field(event).code or '', event.grade_text)
+        for family in (1, 2, 3):
+            codes = [f'G{family}', f'JG{family}', f'JPN{family}']
+            expected = {e.pk for e in events if event_grade_field(e).code in codes}
+            self.assertSetEqual(set(filter_public_grade(queryset, codes).values_list('pk', flat=True)), expected)
+        for event in events:
+            saved = queryset.get(pk=event.pk)
+            self.assertEqual((saved.grade_text, saved.normalized_grade, saved.source_refs),
+                             (event.grade_text, event.normalized_grade, event.source_refs))
+
+    def test_missing_postgresql_unicode_capability_closes_grade_projection(self):
+        from unittest.mock import Mock, patch
+        from stable.services.race_information_display import PublicGradeCode
+        compiler = Mock()
+        with patch('stable.services.race_information_display._postgresql_grade_capable', return_value=False):
+            self.assertEqual(PublicGradeCode().as_postgresql(compiler, Mock()), ('%s', ['']))
+        compiler.compile.assert_not_called()
+
+    def test_conflict_does_not_enter_grade_filter_and_unknown_uses_neutral_badge(self):
+        from django.template import Context, Template
+        from stable.services.race_information_display import filter_public_grade
+        event = RaceEvent.objects.create(year=2025, slug='grade-conflict',
+            original_name='Conflict', chinese_name='等级冲突', country_region='germany',
+            grade_text='G2', normalized_grade='G1', local_date=date(2025, 7, 6),
+            visibility_status='published')
+        for flag in (False, True):
+            with self.subTest(flag=flag), override_settings(RACE_INFORMATION_NORMALIZED_DISPLAY_ENABLED=flag):
+                self.assertFalse(filter_public_grade(RaceEvent.objects.filter(pk=event.pk), ['G1']).exists())
+                html = Template('{% load race_information %}{% race_grade_class event %}|{% race_field event "grade" event.grade_badge_label %}').render(Context({'event':event}))
+                self.assertEqual(html, 'g-other|待核实')
+
+    def test_weekly_focus_object_and_query_paths_share_credible_grade(self):
+        from stable.views import _public_weekly_focus_events
+        from datetime import timedelta
+        today = date(2026, 7, 6)
+        valid = RaceEvent.objects.create(year=2026, slug='focus-raw', original_name='Focus',
+            chinese_name='焦点原始G1', country_region='germany', grade_text='Group I',
+            normalized_grade='', local_date=today, visibility_status='published')
+        conflict = RaceEvent.objects.create(year=2026, slug='focus-conflict', original_name='Conflict',
+            chinese_name='焦点冲突', country_region='germany', grade_text='G2',
+            normalized_grade='G1', local_date=today + timedelta(days=1), visibility_status='published')
+        hidden = RaceEvent.objects.create(year=2026, slug='focus-hidden', original_name='Hidden',
+            chinese_name='隐藏等级', country_region='germany', grade_text='G1',
+            normalized_grade='', local_date=today, visibility_status='draft')
+        self.assertEqual([e.pk for e in _public_weekly_focus_events('germany', today=today)], [valid.pk])
+        # 对象分支的输入已由公开query过滤；不绕过可见性边界传入hidden。
+        self.assertEqual([e.pk for e in _public_weekly_focus_events('germany', events=[valid,conflict], today=today)], [valid.pk])
+
+    def test_historical_key_applies_credible_grade_before_pagination(self):
+        from stable.views import _race_calendar_queryset
+        from django.test import RequestFactory
+        from stable.services.race_information_display import event_grade_field
+        for index in range(5):
+            RaceEvent.objects.create(year=2025, slug=f'paging-g2-{index}', original_name='G2 Fixture',
+                chinese_name=f'二级{index}', country_region='germany', grade_text='Group II',
+                normalized_grade='', local_date=date(2025, 7, index+1), visibility_status='published')
+        targets = []
+        for index in range(4):
+            targets.append(RaceEvent.objects.create(year=2025, slug=f'paging-g1-{index}', original_name='G1 Fixture',
+                chinese_name=f'一级{index}', country_region='germany', grade_text='Group I',
+                normalized_grade='', local_date=date(2025, 8, index+1), visibility_status='published'))
+        rf = RequestFactory()
+        with patch('stable.views.RACE_CALENDAR_PAGE_SIZE', 2):
+            rows, _, _, pagination = _race_calendar_queryset(rf.get('/races/',
+                {'year':'2025','region':'germany','tab':'key','grade':'g1'}), today=date(2026, 7, 6))
+        self.assertEqual([e.pk for e in rows], [e.pk for e in targets[:2]])
+        self.assertTrue(pagination['has_next'])
+        self.assertTrue(all(event_grade_field(e).code=='G1' for e in rows))
