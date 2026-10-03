@@ -19961,7 +19961,7 @@ class PublicListNavigationTests(TestCase):
         from stable.services.race_calendar import encode_race_calendar_cursor
         generator = random.Random(20261003)
         unicode_query = ''.join(chr(generator.randrange(0x10000, 0x10FFFE)) for _ in range(200))
-        event = self.make_event(chinese_name=unicode_query, slug='x'*255)
+        event = self.make_event(chinese_name=unicode_query, slug='x'*RaceEvent._meta.get_field('slug').max_length)
         filters = {'tab': 'all', 'region': 'japan', 'grade': 'g2', 'when': 'upcoming', 'year': str(event.year), 'q': unicode_query}
         cursor = encode_race_calendar_cursor(event, filters=filters)
         listing = self.client.get('/races/', filters)
