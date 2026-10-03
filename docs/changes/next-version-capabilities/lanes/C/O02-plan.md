@@ -71,3 +71,9 @@ backup_db.sh当前custom/no-owner/no-privileges、私有临时文件与SHA/TOC�
 私有duplicates-receipt.json SHA256为5b0f57e98b0d1481ff56a4ae436a8be1c134acedaf74c070395b6688c9694fc3。Q5新闻8组/47行/多余39/max13；Q6术语226组/558行/多余332/max19。此前EXPLAIN FORMAT JSON非ANALYZE核目标SeqScan且无Index/Parallel节点；materialized byte键、关闭index/indexonly/bitmap/hashagg，RR readonly，聚合0.0604/0.0527s，rollback/closed true。未读取原始报错键、正文或ID列表。
 
 观察证明当时存在同字节键重复，不能仅以不同字节的collation等价解释；尚不能据此定位历史写入、索引漏项/损坏、环境升级或dump路径根因。术语558行超过单批200候选ID设计，需要按完整重复组分批，不能切开组或把已统计226组当永久分母。下一轮只是私有重复组映射/字段差异/引用与碰撞诊断；不选择survivor。
+
+## 20:14:06 第一pilot收据（root执行，本线核私有SHA）
+
+第一包原manifest413c0681980ecc24773c04870340a3f91af09b27b8c3f93562ba7414ad7dda73执行completed，固定ad50/73ee/web9f03；新闻完整8组47条、术语仅前20完整组40条，实际总226组558条与旧观察未变。unique/outgoing/所需列catalog分别35/54/133行，两RR只读会话4/3SELECT全部rollback/close，容器私有临时收据已清理。摘要SHA72a9361aeadd2e610709b4d3fb02e82ee56fcb1152474db8b9888d608f6674f5，600私有收据SHA509033d22c6fec32faec63005bb9232f4650c1d6e40dca8e841e33376eb7e949（106293字节）；本线只读取catalog并在runtime内使用私有映射，不复制IDs/原文进仓库或消息。
+
+已准备第二有限runtime包，绑定原pilot SHA，仅这28组/47+40对象。七个显式reference batch各3条FK计数+3EXPLAIN，另一个semantics batch为2条分层父差异+2EXPLAIN；每次一个RR只读连接≤6SELECT、相同3s/250ms/5s/4MB/16MB/parallel0、alarm25s/wrapper30s，不自动串行跑全部。FK匹配上限50001，截断unknown，0引用显式0；父内容/人工/公开/引用等字段只在DB内参与SHA，输出差异布尔/缺失成员，不输出原文，不定survivor。当前包尚未执行，引用行数、实际语义冲突、非FK、根因和完整恢复仍待证据。
