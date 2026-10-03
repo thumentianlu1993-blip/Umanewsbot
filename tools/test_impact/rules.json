@@ -1236,6 +1236,9 @@
     ],
     "server/stable/services/race_timeliness_contracts.py": [
       "race_timeliness_contracts"
+    ],
+    "server/stable/services/public_probe_contracts.py": [
+      "public_probe_contracts"
     ]
   },
   "symbols": {

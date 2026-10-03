@@ -193,4 +193,26 @@ class RealMappingTests(unittest.TestCase):
                 self.assertIn('stable.test_race_timeliness_contracts',selection['labels'])
                 self.assertIn('stable.test_content_contracts',selection['labels'])
 
+    def test_public_probe_core_and_tests_select_pure_contract_regressions(self):
+        import json
+        catalog=json.loads((ROOT/'tools/test_impact/catalog.json').read_text())
+        for path in ('server/stable/services/public_probe_contracts.py',
+                     'server/stable/test_public_probe_contracts.py'):
+            with self.subTest(path=path):
+                selection=self.select_path(path)
+                self.assertEqual(selection['mode'],'targeted')
+                self.assertIn('stable.test_public_probe_contracts',selection['labels'])
+                self.assertIn('stable.test_content_contracts',selection['labels'])
+        self.assertEqual(catalog['profiles']['stable.test_public_probe_contracts'],'python')
+
+    def test_f01_changes_include_public_probe_downstream(self):
+        for path in ('server/stable/services/content_contracts.py',
+                     'docs/changes/next-version-capabilities/lanes/A/F01-contract-examples.json'):
+            with self.subTest(path=path):
+                selection=self.select_path(path)
+                self.assertEqual(selection['mode'],'targeted')
+                self.assertIn('stable.test_public_probe_contracts',selection['labels'])
+                self.assertIn('stable.test_race_timeliness_contracts',selection['labels'])
+                self.assertIn('stable.test_content_contracts',selection['labels'])
+
 if __name__ == "__main__": unittest.main()

@@ -12,6 +12,8 @@ A013 固定修订 `2a7ccbfe159a1878e3d9ee03258110757bdc259b`，原 R `f8b1f33fc3
 
 ## 尚待组合与交付证据
 
-C013 公开探针纯核心 `baa6345e87203e35fde6cb2c7e913fae28826ecd` 正在原 R 独立审核，尚未纳入。B012 的受控 fake 监管器仍在开发。后续只组合通过独立审核的固定输入，再审核实际共享映射与控制文件，并按现有策略运行最终固定候选的一套 Linux CI；映射变更仍要求 full，不以本地 26/61 项代替正式交付，也不在候选未冻结时反复运行旧 full。
+C013 公开探针纯核心 `baa6345e87203e35fde6cb2c7e913fae28826ecd` 已由原 R `c924ec6d84b6b99f3f461e274328d60cd2c968a5` APPROVED，独立49项通过；两个新增Python文件及C交付文档按原Git字节纳入。新增 `public_probe_contracts` 领域、测试条目、python profile，以及F01到公开探针的反向依赖；两个映射反例先RED再GREEN。实际组合纯测试93 PASS（A44+C32+F01 17），映射模块28 PASS，均零skip/failure/error。原字节清单及真实日志见同runtime的 `c013-integration-precommit-receipt.json`、`c013-mapping-RED.log`、`combined-mapping-GREEN.log`、`combined-pure-GREEN.log`。
+
+B012 的受控 fake 监管器仍在开发，未纳入本候选。下一步审核实际组合映射与控制文件，再按现有策略运行最终固定候选的一套 Linux CI；映射变更仍要求 full，不以本地28/93项代替正式交付，不重复运行原候选full。
 
 R01 数据库账本/写入 hook/真实 scope 与 F03，O03 公开版本/执行 origin/独立宿主/真实请求预算，F02 现场权限与凭据传递/故障验收仍待对应证据。这里没有迁移、真实采集、自动化启用或外发，不代表 R01/O03/F02 整卡完成。
