@@ -1,0 +1,206 @@
+{
+  "receipt_sha256": "0b60dc3ffe0092e714e65a894a9d9b56fb72e747b0e0231bcf877b5123f8e14d",
+  "observed_at": "2026-10-03T19:52:18+08:00",
+  "execution_status": "designed_not_executed",
+  "query_count": 21,
+  "queries": [
+    {
+      "id": "FK-01",
+      "source_table": "stable_articlehorselink",
+      "column": "article_id",
+      "target_table": "stable_newsarticle",
+      "constraint_name": "stable_articlehorsel_article_id_d77f5388_fk_stable_ne",
+      "sql_parameter_kind": "private_article_group_map",
+      "sql": "WITH map AS MATERIALIZED (\n  SELECT old_id, group_no FROM jsonb_to_recordset(%s::jsonb)\n    AS x(old_id bigint, group_no integer)\n), matched AS MATERIALIZED (\n  SELECT m.old_id,m.group_no FROM public.stable_articlehorselink AS c\n  JOIN map AS m ON c.article_id=m.old_id LIMIT 50001\n)\nSELECT g.group_no,coalesce(s.referencing_rows,0) AS referencing_rows,\n       coalesce(s.referenced_parent_count,0) AS referenced_parent_count,\n       (SELECT count(*)>=50001 FROM matched) AS capped\nFROM (SELECT DISTINCT group_no FROM map) AS g\nLEFT JOIN (SELECT group_no,count(*) AS referencing_rows,\n           count(DISTINCT old_id) AS referenced_parent_count\n           FROM matched GROUP BY group_no) AS s USING (group_no)\nORDER BY g.group_no;"
+    },
+    {
+      "id": "FK-02",
+      "source_table": "stable_articleracelink",
+      "column": "article_id",
+      "target_table": "stable_newsarticle",
+      "constraint_name": "stable_articleraceli_article_id_db3feeef_fk_stable_ne",
+      "sql_parameter_kind": "private_article_group_map",
+      "sql": "WITH map AS MATERIALIZED (\n  SELECT old_id, group_no FROM jsonb_to_recordset(%s::jsonb)\n    AS x(old_id bigint, group_no integer)\n), matched AS MATERIALIZED (\n  SELECT m.old_id,m.group_no FROM public.stable_articleracelink AS c\n  JOIN map AS m ON c.article_id=m.old_id LIMIT 50001\n)\nSELECT g.group_no,coalesce(s.referencing_rows,0) AS referencing_rows,\n       coalesce(s.referenced_parent_count,0) AS referenced_parent_count,\n       (SELECT count(*)>=50001 FROM matched) AS capped\nFROM (SELECT DISTINCT group_no FROM map) AS g\nLEFT JOIN (SELECT group_no,count(*) AS referencing_rows,\n           count(DISTINCT old_id) AS referenced_parent_count\n           FROM matched GROUP BY group_no) AS s USING (group_no)\nORDER BY g.group_no;"
+    },
+    {
+      "id": "FK-03",
+      "source_table": "stable_automationlog",
+      "column": "article_id",
+      "target_table": "stable_newsarticle",
+      "constraint_name": "stable_automationlog_article_id_8d525ca8_fk_stable_ne",
+      "sql_parameter_kind": "private_article_group_map",
+      "sql": "WITH map AS MATERIALIZED (\n  SELECT old_id, group_no FROM jsonb_to_recordset(%s::jsonb)\n    AS x(old_id bigint, group_no integer)\n), matched AS MATERIALIZED (\n  SELECT m.old_id,m.group_no FROM public.stable_automationlog AS c\n  JOIN map AS m ON c.article_id=m.old_id LIMIT 50001\n)\nSELECT g.group_no,coalesce(s.referencing_rows,0) AS referencing_rows,\n       coalesce(s.referenced_parent_count,0) AS referenced_parent_count,\n       (SELECT count(*)>=50001 FROM matched) AS capped\nFROM (SELECT DISTINCT group_no FROM map) AS g\nLEFT JOIN (SELECT group_no,count(*) AS referencing_rows,\n           count(DISTINCT old_id) AS referenced_parent_count\n           FROM matched GROUP BY group_no) AS s USING (group_no)\nORDER BY g.group_no;"
+    },
+    {
+      "id": "FK-04",
+      "source_table": "stable_homepageheadlinerecommendation",
+      "column": "article_id",
+      "target_table": "stable_newsarticle",
+      "constraint_name": "stable_homepageheadl_article_id_6a3972a3_fk_stable_ne",
+      "sql_parameter_kind": "private_article_group_map",
+      "sql": "WITH map AS MATERIALIZED (\n  SELECT old_id, group_no FROM jsonb_to_recordset(%s::jsonb)\n    AS x(old_id bigint, group_no integer)\n), matched AS MATERIALIZED (\n  SELECT m.old_id,m.group_no FROM public.stable_homepageheadlinerecommendation AS c\n  JOIN map AS m ON c.article_id=m.old_id LIMIT 50001\n)\nSELECT g.group_no,coalesce(s.referencing_rows,0) AS referencing_rows,\n       coalesce(s.referenced_parent_count,0) AS referenced_parent_count,\n       (SELECT count(*)>=50001 FROM matched) AS capped\nFROM (SELECT DISTINCT group_no FROM map) AS g\nLEFT JOIN (SELECT group_no,count(*) AS referencing_rows,\n           count(DISTINCT old_id) AS referenced_parent_count\n           FROM matched GROUP BY group_no) AS s USING (group_no)\nORDER BY g.group_no;"
+    },
+    {
+      "id": "FK-05",
+      "source_table": "stable_homepageheadlineselection",
+      "column": "article_id",
+      "target_table": "stable_newsarticle",
+      "constraint_name": "stable_homepageheadl_article_id_4ec07a58_fk_stable_ne",
+      "sql_parameter_kind": "private_article_group_map",
+      "sql": "WITH map AS MATERIALIZED (\n  SELECT old_id, group_no FROM jsonb_to_recordset(%s::jsonb)\n    AS x(old_id bigint, group_no integer)\n), matched AS MATERIALIZED (\n  SELECT m.old_id,m.group_no FROM public.stable_homepageheadlineselection AS c\n  JOIN map AS m ON c.article_id=m.old_id LIMIT 50001\n)\nSELECT g.group_no,coalesce(s.referencing_rows,0) AS referencing_rows,\n       coalesce(s.referenced_parent_count,0) AS referenced_parent_count,\n       (SELECT count(*)>=50001 FROM matched) AS capped\nFROM (SELECT DISTINCT group_no FROM map) AS g\nLEFT JOIN (SELECT group_no,count(*) AS referencing_rows,\n           count(DISTINCT old_id) AS referenced_parent_count\n           FROM matched GROUP BY group_no) AS s USING (group_no)\nORDER BY g.group_no;"
+    },
+    {
+      "id": "FK-06",
+      "source_table": "stable_mediaasset",
+      "column": "article_id",
+      "target_table": "stable_newsarticle",
+      "constraint_name": "stable_mediaasset_article_id_ae24036e_fk_stable_newsarticle_id",
+      "sql_parameter_kind": "private_article_group_map",
+      "sql": "WITH map AS MATERIALIZED (\n  SELECT old_id, group_no FROM jsonb_to_recordset(%s::jsonb)\n    AS x(old_id bigint, group_no integer)\n), matched AS MATERIALIZED (\n  SELECT m.old_id,m.group_no FROM public.stable_mediaasset AS c\n  JOIN map AS m ON c.article_id=m.old_id LIMIT 50001\n)\nSELECT g.group_no,coalesce(s.referencing_rows,0) AS referencing_rows,\n       coalesce(s.referenced_parent_count,0) AS referenced_parent_count,\n       (SELECT count(*)>=50001 FROM matched) AS capped\nFROM (SELECT DISTINCT group_no FROM map) AS g\nLEFT JOIN (SELECT group_no,count(*) AS referencing_rows,\n           count(DISTINCT old_id) AS referenced_parent_count\n           FROM matched GROUP BY group_no) AS s USING (group_no)\nORDER BY g.group_no;"
+    },
+    {
+      "id": "FK-07",
+      "source_table": "stable_newsarticle",
+      "column": "duplicate_of_id",
+      "target_table": "stable_newsarticle",
+      "constraint_name": "stable_newsarticle_duplicate_of_id_b7dc7e4e_fk_stable_ne",
+      "sql_parameter_kind": "private_article_group_map",
+      "sql": "WITH map AS MATERIALIZED (\n  SELECT old_id, group_no FROM jsonb_to_recordset(%s::jsonb)\n    AS x(old_id bigint, group_no integer)\n), matched AS MATERIALIZED (\n  SELECT m.old_id,m.group_no FROM public.stable_newsarticle AS c\n  JOIN map AS m ON c.duplicate_of_id=m.old_id LIMIT 50001\n)\nSELECT g.group_no,coalesce(s.referencing_rows,0) AS referencing_rows,\n       coalesce(s.referenced_parent_count,0) AS referenced_parent_count,\n       (SELECT count(*)>=50001 FROM matched) AS capped\nFROM (SELECT DISTINCT group_no FROM map) AS g\nLEFT JOIN (SELECT group_no,count(*) AS referencing_rows,\n           count(DISTINCT old_id) AS referenced_parent_count\n           FROM matched GROUP BY group_no) AS s USING (group_no)\nORDER BY g.group_no;"
+    },
+    {
+      "id": "FK-08",
+      "source_table": "stable_newsarticlerelatedregion",
+      "column": "article_id",
+      "target_table": "stable_newsarticle",
+      "constraint_name": "stable_newsarticlere_article_id_12675b26_fk_stable_ne",
+      "sql_parameter_kind": "private_article_group_map",
+      "sql": "WITH map AS MATERIALIZED (\n  SELECT old_id, group_no FROM jsonb_to_recordset(%s::jsonb)\n    AS x(old_id bigint, group_no integer)\n), matched AS MATERIALIZED (\n  SELECT m.old_id,m.group_no FROM public.stable_newsarticlerelatedregion AS c\n  JOIN map AS m ON c.article_id=m.old_id LIMIT 50001\n)\nSELECT g.group_no,coalesce(s.referencing_rows,0) AS referencing_rows,\n       coalesce(s.referenced_parent_count,0) AS referenced_parent_count,\n       (SELECT count(*)>=50001 FROM matched) AS capped\nFROM (SELECT DISTINCT group_no FROM map) AS g\nLEFT JOIN (SELECT group_no,count(*) AS referencing_rows,\n           count(DISTINCT old_id) AS referenced_parent_count\n           FROM matched GROUP BY group_no) AS s USING (group_no)\nORDER BY g.group_no;"
+    },
+    {
+      "id": "FK-09",
+      "source_table": "stable_newsimage",
+      "column": "article_id",
+      "target_table": "stable_newsarticle",
+      "constraint_name": "stable_newsimage_article_id_c2676db8_fk_stable_newsarticle_id",
+      "sql_parameter_kind": "private_article_group_map",
+      "sql": "WITH map AS MATERIALIZED (\n  SELECT old_id, group_no FROM jsonb_to_recordset(%s::jsonb)\n    AS x(old_id bigint, group_no integer)\n), matched AS MATERIALIZED (\n  SELECT m.old_id,m.group_no FROM public.stable_newsimage AS c\n  JOIN map AS m ON c.article_id=m.old_id LIMIT 50001\n)\nSELECT g.group_no,coalesce(s.referencing_rows,0) AS referencing_rows,\n       coalesce(s.referenced_parent_count,0) AS referenced_parent_count,\n       (SELECT count(*)>=50001 FROM matched) AS capped\nFROM (SELECT DISTINCT group_no FROM map) AS g\nLEFT JOIN (SELECT group_no,count(*) AS referencing_rows,\n           count(DISTINCT old_id) AS referenced_parent_count\n           FROM matched GROUP BY group_no) AS s USING (group_no)\nORDER BY g.group_no;"
+    },
+    {
+      "id": "FK-10",
+      "source_table": "stable_newssnapshot",
+      "column": "article_id",
+      "target_table": "stable_newsarticle",
+      "constraint_name": "stable_newssnapshot_article_id_9dc34e66_fk_stable_ne",
+      "sql_parameter_kind": "private_article_group_map",
+      "sql": "WITH map AS MATERIALIZED (\n  SELECT old_id, group_no FROM jsonb_to_recordset(%s::jsonb)\n    AS x(old_id bigint, group_no integer)\n), matched AS MATERIALIZED (\n  SELECT m.old_id,m.group_no FROM public.stable_newssnapshot AS c\n  JOIN map AS m ON c.article_id=m.old_id LIMIT 50001\n)\nSELECT g.group_no,coalesce(s.referencing_rows,0) AS referencing_rows,\n       coalesce(s.referenced_parent_count,0) AS referenced_parent_count,\n       (SELECT count(*)>=50001 FROM matched) AS capped\nFROM (SELECT DISTINCT group_no FROM map) AS g\nLEFT JOIN (SELECT group_no,count(*) AS referencing_rows,\n           count(DISTINCT old_id) AS referenced_parent_count\n           FROM matched GROUP BY group_no) AS s USING (group_no)\nORDER BY g.group_no;"
+    },
+    {
+      "id": "FK-11",
+      "source_table": "stable_pushlog",
+      "column": "article_id",
+      "target_table": "stable_newsarticle",
+      "constraint_name": "stable_pushlog_article_id_3345c2f7_fk_stable_newsarticle_id",
+      "sql_parameter_kind": "private_article_group_map",
+      "sql": "WITH map AS MATERIALIZED (\n  SELECT old_id, group_no FROM jsonb_to_recordset(%s::jsonb)\n    AS x(old_id bigint, group_no integer)\n), matched AS MATERIALIZED (\n  SELECT m.old_id,m.group_no FROM public.stable_pushlog AS c\n  JOIN map AS m ON c.article_id=m.old_id LIMIT 50001\n)\nSELECT g.group_no,coalesce(s.referencing_rows,0) AS referencing_rows,\n       coalesce(s.referenced_parent_count,0) AS referenced_parent_count,\n       (SELECT count(*)>=50001 FROM matched) AS capped\nFROM (SELECT DISTINCT group_no FROM map) AS g\nLEFT JOIN (SELECT group_no,count(*) AS referencing_rows,\n           count(DISTINCT old_id) AS referenced_parent_count\n           FROM matched GROUP BY group_no) AS s USING (group_no)\nORDER BY g.group_no;"
+    },
+    {
+      "id": "FK-12",
+      "source_table": "stable_qqpushdelivery",
+      "column": "article_id",
+      "target_table": "stable_newsarticle",
+      "constraint_name": "stable_qqpushdeliver_article_id_f62c5b3a_fk_stable_ne",
+      "sql_parameter_kind": "private_article_group_map",
+      "sql": "WITH map AS MATERIALIZED (\n  SELECT old_id, group_no FROM jsonb_to_recordset(%s::jsonb)\n    AS x(old_id bigint, group_no integer)\n), matched AS MATERIALIZED (\n  SELECT m.old_id,m.group_no FROM public.stable_qqpushdelivery AS c\n  JOIN map AS m ON c.article_id=m.old_id LIMIT 50001\n)\nSELECT g.group_no,coalesce(s.referencing_rows,0) AS referencing_rows,\n       coalesce(s.referenced_parent_count,0) AS referenced_parent_count,\n       (SELECT count(*)>=50001 FROM matched) AS capped\nFROM (SELECT DISTINCT group_no FROM map) AS g\nLEFT JOIN (SELECT group_no,count(*) AS referencing_rows,\n           count(DISTINCT old_id) AS referenced_parent_count\n           FROM matched GROUP BY group_no) AS s USING (group_no)\nORDER BY g.group_no;"
+    },
+    {
+      "id": "FK-13",
+      "source_table": "stable_raceeventfieldauthority",
+      "column": "article_id",
+      "target_table": "stable_newsarticle",
+      "constraint_name": "stable_raceeventfiel_article_id_27986117_fk_stable_ne",
+      "sql_parameter_kind": "private_article_group_map",
+      "sql": "WITH map AS MATERIALIZED (\n  SELECT old_id, group_no FROM jsonb_to_recordset(%s::jsonb)\n    AS x(old_id bigint, group_no integer)\n), matched AS MATERIALIZED (\n  SELECT m.old_id,m.group_no FROM public.stable_raceeventfieldauthority AS c\n  JOIN map AS m ON c.article_id=m.old_id LIMIT 50001\n)\nSELECT g.group_no,coalesce(s.referencing_rows,0) AS referencing_rows,\n       coalesce(s.referenced_parent_count,0) AS referenced_parent_count,\n       (SELECT count(*)>=50001 FROM matched) AS capped\nFROM (SELECT DISTINCT group_no FROM map) AS g\nLEFT JOIN (SELECT group_no,count(*) AS referencing_rows,\n           count(DISTINCT old_id) AS referenced_parent_count\n           FROM matched GROUP BY group_no) AS s USING (group_no)\nORDER BY g.group_no;"
+    },
+    {
+      "id": "FK-14",
+      "source_table": "stable_raceeventfieldchange",
+      "column": "article_id",
+      "target_table": "stable_newsarticle",
+      "constraint_name": "stable_raceeventfiel_article_id_778c4b75_fk_stable_ne",
+      "sql_parameter_kind": "private_article_group_map",
+      "sql": "WITH map AS MATERIALIZED (\n  SELECT old_id, group_no FROM jsonb_to_recordset(%s::jsonb)\n    AS x(old_id bigint, group_no integer)\n), matched AS MATERIALIZED (\n  SELECT m.old_id,m.group_no FROM public.stable_raceeventfieldchange AS c\n  JOIN map AS m ON c.article_id=m.old_id LIMIT 50001\n)\nSELECT g.group_no,coalesce(s.referencing_rows,0) AS referencing_rows,\n       coalesce(s.referenced_parent_count,0) AS referenced_parent_count,\n       (SELECT count(*)>=50001 FROM matched) AS capped\nFROM (SELECT DISTINCT group_no FROM map) AS g\nLEFT JOIN (SELECT group_no,count(*) AS referencing_rows,\n           count(DISTINCT old_id) AS referenced_parent_count\n           FROM matched GROUP BY group_no) AS s USING (group_no)\nORDER BY g.group_no;"
+    },
+    {
+      "id": "FK-15",
+      "source_table": "stable_racenewsexposure",
+      "column": "article_id",
+      "target_table": "stable_newsarticle",
+      "constraint_name": "stable_racenewsexpos_article_id_8e5dcc6b_fk_stable_ne",
+      "sql_parameter_kind": "private_article_group_map",
+      "sql": "WITH map AS MATERIALIZED (\n  SELECT old_id, group_no FROM jsonb_to_recordset(%s::jsonb)\n    AS x(old_id bigint, group_no integer)\n), matched AS MATERIALIZED (\n  SELECT m.old_id,m.group_no FROM public.stable_racenewsexposure AS c\n  JOIN map AS m ON c.article_id=m.old_id LIMIT 50001\n)\nSELECT g.group_no,coalesce(s.referencing_rows,0) AS referencing_rows,\n       coalesce(s.referenced_parent_count,0) AS referenced_parent_count,\n       (SELECT count(*)>=50001 FROM matched) AS capped\nFROM (SELECT DISTINCT group_no FROM map) AS g\nLEFT JOIN (SELECT group_no,count(*) AS referencing_rows,\n           count(DISTINCT old_id) AS referenced_parent_count\n           FROM matched GROUP BY group_no) AS s USING (group_no)\nORDER BY g.group_no;"
+    },
+    {
+      "id": "FK-16",
+      "source_table": "stable_termcandidate",
+      "column": "merged_into_candidate_id",
+      "target_table": "stable_termcandidate",
+      "constraint_name": "stable_termcandidate_merged_into_candidat_1243256c_fk_stable_te",
+      "sql_parameter_kind": "private_term_group_map",
+      "sql": "WITH map AS MATERIALIZED (\n  SELECT old_id, group_no FROM jsonb_to_recordset(%s::jsonb)\n    AS x(old_id bigint, group_no integer)\n), matched AS MATERIALIZED (\n  SELECT m.old_id,m.group_no FROM public.stable_termcandidate AS c\n  JOIN map AS m ON c.merged_into_candidate_id=m.old_id LIMIT 50001\n)\nSELECT g.group_no,coalesce(s.referencing_rows,0) AS referencing_rows,\n       coalesce(s.referenced_parent_count,0) AS referenced_parent_count,\n       (SELECT count(*)>=50001 FROM matched) AS capped\nFROM (SELECT DISTINCT group_no FROM map) AS g\nLEFT JOIN (SELECT group_no,count(*) AS referencing_rows,\n           count(DISTINCT old_id) AS referenced_parent_count\n           FROM matched GROUP BY group_no) AS s USING (group_no)\nORDER BY g.group_no;"
+    },
+    {
+      "id": "FK-17",
+      "source_table": "stable_termcandidateevidence",
+      "column": "article_id",
+      "target_table": "stable_newsarticle",
+      "constraint_name": "stable_termcandidate_article_id_3ef1621b_fk_stable_ne",
+      "sql_parameter_kind": "private_article_group_map",
+      "sql": "WITH map AS MATERIALIZED (\n  SELECT old_id, group_no FROM jsonb_to_recordset(%s::jsonb)\n    AS x(old_id bigint, group_no integer)\n), matched AS MATERIALIZED (\n  SELECT m.old_id,m.group_no FROM public.stable_termcandidateevidence AS c\n  JOIN map AS m ON c.article_id=m.old_id LIMIT 50001\n)\nSELECT g.group_no,coalesce(s.referencing_rows,0) AS referencing_rows,\n       coalesce(s.referenced_parent_count,0) AS referenced_parent_count,\n       (SELECT count(*)>=50001 FROM matched) AS capped\nFROM (SELECT DISTINCT group_no FROM map) AS g\nLEFT JOIN (SELECT group_no,count(*) AS referencing_rows,\n           count(DISTINCT old_id) AS referenced_parent_count\n           FROM matched GROUP BY group_no) AS s USING (group_no)\nORDER BY g.group_no;"
+    },
+    {
+      "id": "FK-18",
+      "source_table": "stable_termcandidateevidence",
+      "column": "candidate_id",
+      "target_table": "stable_termcandidate",
+      "constraint_name": "stable_termcandidate_candidate_id_e5651f70_fk_stable_te",
+      "sql_parameter_kind": "private_term_group_map",
+      "sql": "WITH map AS MATERIALIZED (\n  SELECT old_id, group_no FROM jsonb_to_recordset(%s::jsonb)\n    AS x(old_id bigint, group_no integer)\n), matched AS MATERIALIZED (\n  SELECT m.old_id,m.group_no FROM public.stable_termcandidateevidence AS c\n  JOIN map AS m ON c.candidate_id=m.old_id LIMIT 50001\n)\nSELECT g.group_no,coalesce(s.referencing_rows,0) AS referencing_rows,\n       coalesce(s.referenced_parent_count,0) AS referenced_parent_count,\n       (SELECT count(*)>=50001 FROM matched) AS capped\nFROM (SELECT DISTINCT group_no FROM map) AS g\nLEFT JOIN (SELECT group_no,count(*) AS referencing_rows,\n           count(DISTINCT old_id) AS referenced_parent_count\n           FROM matched GROUP BY group_no) AS s USING (group_no)\nORDER BY g.group_no;"
+    },
+    {
+      "id": "FK-19",
+      "source_table": "stable_translationrun",
+      "column": "article_id",
+      "target_table": "stable_newsarticle",
+      "constraint_name": "stable_translationru_article_id_d8c4bda9_fk_stable_ne",
+      "sql_parameter_kind": "private_article_group_map",
+      "sql": "WITH map AS MATERIALIZED (\n  SELECT old_id, group_no FROM jsonb_to_recordset(%s::jsonb)\n    AS x(old_id bigint, group_no integer)\n), matched AS MATERIALIZED (\n  SELECT m.old_id,m.group_no FROM public.stable_translationrun AS c\n  JOIN map AS m ON c.article_id=m.old_id LIMIT 50001\n)\nSELECT g.group_no,coalesce(s.referencing_rows,0) AS referencing_rows,\n       coalesce(s.referenced_parent_count,0) AS referenced_parent_count,\n       (SELECT count(*)>=50001 FROM matched) AS capped\nFROM (SELECT DISTINCT group_no FROM map) AS g\nLEFT JOIN (SELECT group_no,count(*) AS referencing_rows,\n           count(DISTINCT old_id) AS referenced_parent_count\n           FROM matched GROUP BY group_no) AS s USING (group_no)\nORDER BY g.group_no;"
+    },
+    {
+      "id": "FK-20",
+      "source_table": "stable_windowcandidatedecision",
+      "column": "article_id",
+      "target_table": "stable_newsarticle",
+      "constraint_name": "stable_windowcandida_article_id_681b0902_fk_stable_ne",
+      "sql_parameter_kind": "private_article_group_map",
+      "sql": "WITH map AS MATERIALIZED (\n  SELECT old_id, group_no FROM jsonb_to_recordset(%s::jsonb)\n    AS x(old_id bigint, group_no integer)\n), matched AS MATERIALIZED (\n  SELECT m.old_id,m.group_no FROM public.stable_windowcandidatedecision AS c\n  JOIN map AS m ON c.article_id=m.old_id LIMIT 50001\n)\nSELECT g.group_no,coalesce(s.referencing_rows,0) AS referencing_rows,\n       coalesce(s.referenced_parent_count,0) AS referenced_parent_count,\n       (SELECT count(*)>=50001 FROM matched) AS capped\nFROM (SELECT DISTINCT group_no FROM map) AS g\nLEFT JOIN (SELECT group_no,count(*) AS referencing_rows,\n           count(DISTINCT old_id) AS referenced_parent_count\n           FROM matched GROUP BY group_no) AS s USING (group_no)\nORDER BY g.group_no;"
+    },
+    {
+      "id": "FK-21",
+      "source_table": "stable_windowtargetdecision",
+      "column": "article_id",
+      "target_table": "stable_newsarticle",
+      "constraint_name": "stable_windowtargetd_article_id_86613497_fk_stable_ne",
+      "sql_parameter_kind": "private_article_group_map",
+      "sql": "WITH map AS MATERIALIZED (\n  SELECT old_id, group_no FROM jsonb_to_recordset(%s::jsonb)\n    AS x(old_id bigint, group_no integer)\n), matched AS MATERIALIZED (\n  SELECT m.old_id,m.group_no FROM public.stable_windowtargetdecision AS c\n  JOIN map AS m ON c.article_id=m.old_id LIMIT 50001\n)\nSELECT g.group_no,coalesce(s.referencing_rows,0) AS referencing_rows,\n       coalesce(s.referenced_parent_count,0) AS referenced_parent_count,\n       (SELECT count(*)>=50001 FROM matched) AS capped\nFROM (SELECT DISTINCT group_no FROM map) AS g\nLEFT JOIN (SELECT group_no,count(*) AS referencing_rows,\n           count(DISTINCT old_id) AS referenced_parent_count\n           FROM matched GROUP BY group_no) AS s USING (group_no)\nORDER BY g.group_no;"
+    }
+  ],
+  "limits": {
+    "parent_ids": 200,
+    "groups": 20,
+    "matched_cap": 50000,
+    "queries_per_batch": 6,
+    "statement_seconds": 3,
+    "batch_tool_seconds": 30
+  },
+  "requires_private_group_maps": true
+}

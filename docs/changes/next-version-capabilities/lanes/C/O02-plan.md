@@ -59,3 +59,15 @@ backup_db.sh当前custom/no-owner/no-privileges、私有临时文件与SHA/TOC�
 ## 当前交付
 
 已完成仓库静态盘点、最小诊断SQL设计和条件恢复方案；生产新取证、根因定位、隔离复现、修复/完整恢复/RTO-RPO均未完成。本线不声明O02已修复或通过，下一步由root安排有界只读查询，再固定事实与原R方案审。
+
+## 19:52:18 元数据回写（root执行，本线核收据）
+
+私有metadata-receipt.json SHA256为0b60dc3ffe0092e714e65a894a9d9b56fb72e747b0e0231bcf877b5123f8e14d。root固定web9f03/image73ee/ad50身份完成Q1–Q4，RR只读事务、3s/250ms/5s、4MB/16MB/parallel0，rollback及connection_closed均true；四SELECT为0.040/0.022/0.024/0.019s。两表public、PG16.14 UTF8；数据库libc en_US.utf8版本记录与actual均null，表示缺少版本证据，不能判定一致。两unique index均原列btree、无表达式/条件、valid/ready/live，键列5个全部notnull，索引collation OID100=default deterministic。
+
+实际catalog全部入站FK21条与静态逐项对应（新闻19、术语2），均DB NO ACTION/DEFERRABLE INITIALLY DEFERRED；这是数据库声明，不等同Django的CASCADE/SET_NULL语义。估计rows新闻19392/术语12014及heap36.4MB/2.65MB只用于预算，不是精确分母。byte重复汇总和引用行数尚未知；未定位根因、未执行合并/完整恢复。新增reference-statistics及query-design.json只设计下一轮，依赖root私有重复组映射与catalog辅助元数据，不能直接称引用完备。
+
+## 19:53:32 byte重复证据（root执行，本线核收据）
+
+私有duplicates-receipt.json SHA256为5b0f57e98b0d1481ff56a4ae436a8be1c134acedaf74c070395b6688c9694fc3。Q5新闻8组/47行/多余39/max13；Q6术语226组/558行/多余332/max19。此前EXPLAIN FORMAT JSON非ANALYZE核目标SeqScan且无Index/Parallel节点；materialized byte键、关闭index/indexonly/bitmap/hashagg，RR readonly，聚合0.0604/0.0527s，rollback/closed true。未读取原始报错键、正文或ID列表。
+
+观察证明当时存在同字节键重复，不能仅以不同字节的collation等价解释；尚不能据此定位历史写入、索引漏项/损坏、环境升级或dump路径根因。术语558行超过单批200候选ID设计，需要按完整重复组分批，不能切开组或把已统计226组当永久分母。下一轮只是私有重复组映射/字段差异/引用与碰撞诊断；不选择survivor。
