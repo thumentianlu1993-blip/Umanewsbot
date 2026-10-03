@@ -19710,3 +19710,31 @@ class QQRetiredUITests(TestCase):
         self.assertContains(detail, 'QQ推送状态仅为历史记录')
         self.article.refresh_from_db()
         self.assertEqual(self.article.status, ArticleStatus.PUSH_FAILED)
+
+
+class PublicUpcomingWeekTests(TestCase):
+    """U02：受控首页投影；不访问真实来源或写入运营数据。"""
+    now = datetime(2026, 12, 28, 12, tzinfo=ZoneInfo('Asia/Shanghai'))
+
+    def make_event(self, offset=0, *, clock=True, **changes):
+        day = (self.now + timedelta(days=offset)).date()
+        values = dict(year=day.year, slug=f'u02-{uuid.uuid4().hex[:12]}',
+                      original_name='Week race', chinese_name='七天窗口赛事',
+                      country_region=RacingRegion.JAPAN, racecourse='东京',
+                      timezone_name='Asia/Shanghai', local_date=day,
+                      local_start_time=self.now.time() if clock else None,
+                      grade_text='G2', normalized_grade='G2', priority=RaceEventPriority.P2,
+                      status=RaceEventStatus.SCHEDULED, visibility_status=RaceEventVisibility.PUBLISHED)
+        values.update(changes)
+        return RaceEvent.objects.create(**values)
+
+    def test_home_includes_d6_across_year_without_d7_featured_fallback(self):
+        d0 = self.make_event(0)
+        d6 = self.make_event(6)
+        self.make_event(7, priority=RaceEventPriority.P0, is_featured=True)
+        with patch('stable.views.timezone.now', return_value=self.now):
+            response = self.client.get('/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([entry['event'].pk for entry in response.context['today_races']], [d0.pk, d6.pk])
+        self.assertContains(response, 'aria-label="近期赛事"')
+        self.assertContains(response, '今天起七天')
