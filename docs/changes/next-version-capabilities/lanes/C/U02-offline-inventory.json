@@ -179,14 +179,16 @@
         "unknown query keys"
       ],
       "proposed_limits": {
-        "return_to_characters": 4096,
+        "return_to_characters": 8192,
         "q_characters": 200,
-        "cursor_characters": 2048,
+        "cursor_characters": 4096,
         "page_ascii_digits": 10,
         "year_min": 1,
-        "year_max": 9999
+        "year_max": 9999,
+        "q_unit": "Unicode codepoints"
       }
     }
   ],
-  "scope_confirmed_by": "root / 2026-10-03 / C009 delegation"
+  "scope_confirmed_by": "root / 2026-10-03 / C009 delegation",
+  "navigation_budget_receipt": "U02-navigation-budget.json"
 }

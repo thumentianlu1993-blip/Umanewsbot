@@ -24,7 +24,7 @@
 
 列表主卡片传return_to为经过当前列表规范化的相对URL；详情使用允许的对应list path/query重建，不信任HTTP_REFERER或任意next。只允许精确/races/、/horses/、/等对应来源，拒绝scheme/netloc（包括同host absolute）、//、反斜杠、控制字符/CRLF、错类路径、未知/递归导航键。使用urlsplit/QueryDict、每键确定单值与urlencode、模板默认转义；不对不可信字符串二次decode，不接收/admin或任意本站路径。
 
-安全校验拟采用有限输入预算：return_to解码后的总长度最多4096字符，q最多200字符，cursor最多2048字符；page仅1至10位ASCII正整数，year仅1至9999的ASCII整数。tab/region/grade/when/direction复用现有枚举值；cursor复用既有签名、筛选指纹和复合位置校验，不另建身份规则。重复query键拒绝，非法值及超预算整体退回对应默认列表，不截断后猜测。编码形式只允许一次正常query解码后的精确相对path；拒绝编码路径、残留编码结构分隔符/控制字符与二次decode，q中的普通中文及HTML字符仍正常保留并转义。此预算只约束导航元数据，不改变列表本身查询合同。
+安全校验拟采用有限输入预算：return_to解码后的总长度最多8192字符，q最多200个Unicode码点，cursor最多4096字符；page仅1至10位ASCII正整数，year仅1至9999的ASCII整数。tab/region/grade/when/direction复用现有枚举值；cursor复用既有签名、筛选指纹和复合位置校验，不另建身份规则。重复query键拒绝，非法值及超预算整体退回对应默认列表，不截断后猜测。HTTP外层request.GET先正常解码return_to一次，得到带urlencode内层query的相对URL；urlsplit分离path后，QueryDict再按该内层query解码一次，q/cursor保原语义。这是两层独立编码，不是对一个值重复unquote。path必须精确白名单，拒绝其编码路径/残留编码分隔符、scheme/netloc、控制字符；查询q的正常percent编码和字面%文本不能被全URL扫描误拒。不得对已解析值再unquote，模板默认转义。此预算只约束导航元数据，不改变列表本身查询合同。
 
 非法/缺失来源降级现有默认返回，不影响详情200/404资格。有效q中文/空格/page/cursor保语义，不要求字节顺序；回到过期页仍用既有分页/游标安全回退。浏览器Back自然行为不替代可见返回链接。URL canonical/SEO标签保持无return_to；已有legacy→canonical的资格/身份与301规则不改，可仅携带经过验证的导航参数，禁止变为开放重定向。详情records_page/records_order/关注POST不会覆盖来源返回；不动cookie/token/订阅能力。
 
@@ -46,3 +46,13 @@ TC-U02中的网络失败重试/宽表/完整手机旅程分别由U04/U05合并�
 ## 当前状态与下一步
 
 已完成只读盘点及离线fixture设计；未实施、未运行行为RED/GREEN、未改变共享/生产。U02-offline-inventory.json绑定c02文件digest，非生产清单/写入manifest。date-only标签、三类返回及其安全边界已由root确认，下一步交原R方案审，批准后才能按(application)真实RED→实现→相关验证推进。本阶段只新增C文档，按根AGENTS.md边界工作。
+
+## 原R P2导航预算返修（纯文档，待复审）
+
+原4096 URL/2048 cursor预算不足，扩展汉字200字符合法筛选会被误降级。实际基线Django5.2.1既有encode_race_calendar_cursor/decode、JSONSerializer/signing以及QueryDict/urlencode作无DB/网络诊断：q=𠮷×200、最长允许region united_kingdom、tab all/grade g3/when upcoming/year9999/direction future、最大PG bigint id9223372036854775807、date9999-12-31/time23:59:59.999999；JSON2647字节，当前cursor3581字符，相对URL6083字符，HTTP外层query7733字符。真实内外层解析后q与签名cursor完全回环。合成签名值/密钥不写文档，长度和源码digest见U02-navigation-budget.json。
+
+有限上限推导：合法Unicode码点JSON ensure_ascii最大12 ASCII字节（代理对），200字=2400；UTF8百分号编码同为每码点最多12 URL字符。其它filters取各最长已允许枚举/year4位，key用19位有符号bigint正最大值、日期10/时刻15字符，2647字节是当前producer紧凑JSON最坏长。unpadded urlsafe base64≤ceil(4×2647/3)=3530；签名SHA256为43字符、2个冒号，加最多11位base62正64bit timestamp，cursor≤3586。URL键名/枚举和内层percent编码冒号均计入，相对URL≤6088。因此采用4096 cursor与8192已解HTTP外层return_to，留510及2104字符余量；不是将外层完整请求URL限制为8192。未来producer版本/签名算法/字段或枚举扩大需重新推导，不能悄悄截断。
+
+calendar和horse既有q未设200限制；此预算仅明确导航保条件保证q≤200码点，>200原列表查询仍照常，仅来源导航安全回默认，不能给列表新增200上限或修改签名fingerprint。page10位/year1..9999保持原方案。若需要保证更长q的返回保真，须root显式扩大有限预算与验收范围。
+
+补充设计正例为200扩展汉字/最大filters和合法签名cursor真实主列表→详情→返回，内层与外层urlencode后一次各层解析，q/cursor/page语义一致；刚超cursor4097、decoded return_to8193、q201负例安全默认，不影响详情资格。当前诊断只验证既有序列化/回环和长度，拟新增导航helper/页面未实施，负例guard尚未行为验证。

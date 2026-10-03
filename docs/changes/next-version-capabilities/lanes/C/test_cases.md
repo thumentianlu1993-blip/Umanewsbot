@@ -49,7 +49,8 @@
 | U02-EMPTY | 空库、仅远期重点、仅无日期、仅隐藏/active canonical duplicate：固定空态/日历入口，零fallback；没有可靠日期不说实际无赛；捕获填满/隐藏整个面板 |
 | U02-EDITION | approved series+两届公开仍无右上switcher；静态year、历史冠军和calendar年份选择/筛选工作；捕获只删单届、误删历史身份/年份能力 |
 | U02-RETURN | race八键(含year/q/cursor)、horse q/page、news page，列表主卡片→详情→返回保持语义；home卡片return homepage；关注/records分页不丢来源 |
-| U02-RETURN-SAFE | external/samehost absolute、//、javascript、\/CRLF、编码混淆/递归键/错类path、未知键、重复键、非法枚举/page/year、q/cursor/URL长度超限安全降级；中文q与HTML字符默认转义，非法来源不改变404/公开资格；捕获开放redirect/XSS/双decode |
+| U02-RETURN-UNICODE | q为200扩展汉字、全部最长合法filter、max bigint id/date/time签名cursor；真实双层urlencode/request.GET/inner QueryDict回环且字段保真，导航按4096 cursor/8192 decoded URL不误fallback；捕获旧2048/4096预算或全URL残留%误拒 |
+| U02-RETURN-SAFE | external/samehost absolute、//、javascript、\/CRLF、编码混淆/递归键/错类path、未知键、重复键、非法枚举/page/year、q201码点/cursor4097/decoded return_to8193刚超限安全降级；中文q与HTML字符默认转义，非法来源不改变404/公开资格；捕获开放redirect/XSS/双decode |
 | U02-LEGACY | legacy→canonical仍301/公开资格/clean canonical，已验证来源参数仅导航携带；过期cursor/page既有回退；捕获改身份或绕资格 |
 | U02-REGRESSION | 新闻公开与曝光规则、horse现排序/records页、calendar默认锚点/年份/等级/本周焦点不变，右栏独立重点不误改；fixture不触第三方/真实队列 |
 
