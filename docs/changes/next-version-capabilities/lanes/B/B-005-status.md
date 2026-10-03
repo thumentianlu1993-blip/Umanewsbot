@@ -55,3 +55,9 @@ q01 execution-plan/batch log未找到psycopg版本安装收据；requirements只
 - Linux真实socket/mount/PID guard、内部DB权限/部分创建清理和PG12尚未执行；模拟快照不冒称Linux通过。正式full是否通过仍须root整合mapping并取得formal collect/run，无skip/分母缩减。
 - 成功准备stdout只输出allowlist `F02_CI_BINDING`：process/source/dependency摘要与nonce hash；密码/原nonce仅私有binding。cleanup先核server/DB OID/owner/guard及角色OID，未知不删除，报告fixture_cleanup_unknown，最终自有容器销毁。
 - 下一步固定新SHA提交原R代码review；候选480秒包待root核定与窗口，无PG启动/transport/生产授权。额度恢复实时remaining99%；新检查遵循5分钟/低阈值规则，无子代理/模型CLI/后台任务。
+
+### 原 R P2：创建成功但回执/OID丢失的清理状态
+
+1928代码review发现CREATE ROLE/DB后OID读取失败会误报complete。返修在每次CREATE前落0600/0700、fsync/rename的pending intent journal；可靠角色OID或DB OID+owner确认后才写known并清pending。未知intent存在则cleanup零连接/零DROP，保留私有runtime/journal、标unknown_container_cleanup_required，由自有容器生命周期回收，不按名字恢复/接管。
+
+新增FixtureFailureTests 6精确IDs已报root。RED首次5fail/1已有unknown；强化pending持久证据后6fail（5误complete，1缺intent）。GREEN新6+原13守卫=19PASS（31total/12PG未跑），CREATE之前journal存在、pending与unknown状态落盘、零DROP均证明。测试macOS路径resolve仅mock临时目录，用于私有文件验证；生产Linux helper保留严格/tmp路径，不放宽symlink保护。外部manifest/原13ID/runner不变，旧runtimev1/v2固定包冻结不执行。下一包v3须以新SHA/31IDs重绑。

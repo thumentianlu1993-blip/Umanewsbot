@@ -101,6 +101,71 @@ class InternalCIGuardTests(unittest.TestCase):
     def test_device_mismatch_refused(self):self.refuse(device_matches=False)
     def test_unknown_binding_field_refused(self):self.refuse(unknown=True)
 
+class FixtureFailureTests(unittest.TestCase):
+    def lost(self, object_kind, number, stage):
+        import tempfile,types,shutil
+        from unittest.mock import Mock,patch
+        from scripts.tests import f02_pg_fixture as fixture
+        class SQL:
+            def __init__(self,text):self.text=text
+            def format(self,*args):return SQL(self.text.format(*args))
+            def __str__(self):return self.text
+        fake_psycopg=types.SimpleNamespace(sql=types.SimpleNamespace(SQL=SQL,Identifier=lambda s:s,Literal=lambda s:'<private>'))
+        roles={};database={};queries=[];last=[None,None];role_count=[0]
+        class Cursor:
+            def __enter__(self):return self
+            def __exit__(self,*args):return False
+            def execute(self,query,params=None):
+                text=str(query);queries.append(text);last[:]=[text,params]
+                if text.startswith(('CREATE ROLE','CREATE DATABASE')):
+                    journal=json.loads((obj.root/'fixture-intent.json').read_text())
+                    expected_kind='role' if text.startswith('CREATE ROLE') else 'database'
+                    assert len(journal['pending_intents'])==1 and journal['pending_intents'][0]['kind']==expected_kind
+                if text.startswith('CREATE ROLE'):
+                    role_count[0]+=1;name='f02_fixture_'+('admin' if role_count[0]==1 else 'reader');roles[name]=role_count[0]+100
+                    if object_kind=='role' and role_count[0]==number and stage=='create':raise RuntimeError('synthetic response lost')
+                if text.startswith('CREATE DATABASE'):
+                    database['oid']=201
+                    if object_kind=='database' and stage=='create':raise RuntimeError('synthetic response lost')
+            def fetchall(self):return []
+            def fetchone(self):
+                text,params=last
+                if 'FROM pg_roles' in text:
+                    if object_kind=='role' and role_count[0]==number and stage=='oid':raise RuntimeError('synthetic oid response lost')
+                    return {'oid':roles[params[0]]}
+                if 'FROM pg_database' in text:
+                    if not database:return None
+                    if object_kind=='database' and stage=='oid':raise RuntimeError('synthetic oid response lost')
+                    return {'oid':database['oid'],'owner':'f02_fixture_admin'} if 'owner' in text else {'oid':database['oid']}
+                raise AssertionError('unexpected synthetic query')
+        conn=Mock();conn.cursor.side_effect=lambda:Cursor()
+        binding=guard_snapshot();binding['uid']=os.getuid();binding['pgdata_device']=Path('/tmp').stat().st_dev
+        obj=fixture.Fixture(binding,lambda:binding,Mock())
+        obj.connection=Mock(return_value=conn)
+        real_mkdtemp=tempfile.mkdtemp
+        def local_private_temp(*args,**kwargs):return str(Path(real_mkdtemp(*args,**kwargs)).resolve())
+        with patch.dict('sys.modules',{'psycopg':fake_psycopg}),patch.object(fixture,'dependency_proof',return_value={}),patch.object(fixture.tempfile,'mkdtemp',side_effect=local_private_temp):
+            try:
+                with self.assertRaises(RuntimeError):obj.prepare()
+                try:obj.cleanup()
+                except fixture.GuardError:pass
+                self.assertEqual(obj.cleanup_status,'unknown_container_cleanup_required')
+                self.assertTrue(obj.receipt().get('pending_intents'))
+                journal=json.loads((obj.root/'fixture-intent.json').read_text())
+                self.assertEqual(journal['pending_intents'],obj.receipt()['pending_intents'])
+                self.assertEqual(journal['cleanup_status'],'unknown_container_cleanup_required')
+                self.assertFalse(any(query.startswith('DROP ') for query in queries))
+                self.assertTrue(obj.root.is_dir())
+                self.assertTrue(roles or database)
+            finally:
+                if obj.root is not None:shutil.rmtree(obj.root)
+    def test_first_role_create_response_lost(self):self.lost('role',1,'create')
+    def test_first_role_oid_response_lost(self):self.lost('role',1,'oid')
+    def test_second_role_create_response_lost(self):self.lost('role',2,'create')
+    def test_second_role_oid_response_lost(self):self.lost('role',2,'oid')
+    def test_database_create_response_lost(self):self.lost('database',1,'create')
+    def test_database_oid_response_lost(self):self.lost('database',1,'oid')
+
 class PostgreSQLContracts(unittest.TestCase):
     BASE_COHORT=8
 

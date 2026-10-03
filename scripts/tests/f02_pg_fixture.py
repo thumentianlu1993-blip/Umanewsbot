@@ -165,6 +165,7 @@ class Fixture:
     def __init__(self, binding, reader, connector):
         self.binding=binding;self.capture=reader;self.connector=connector
         self.root=None;self.created_roles=[];self.database_oid=None;self.guard_created=False
+        self.pending_intents=[]
         self.run_id='synthetic-b005-'+secrets.token_hex(8)
         self.dbname='f02_'+self.run_id.replace('-','_')
         self.nonce=secrets.token_hex(32)
@@ -200,6 +201,27 @@ class Fixture:
         except BaseException:
             conn.close();raise
 
+    def journal(self, pending=None):
+        from scripts import f02_transfer as verifier
+        payload={'mode':'internal-ci-v2','run_id':self.run_id,
+                 'nonce_sha256':hashlib.sha256(self.nonce.encode()).hexdigest(),
+                 'pending_intents':self.pending_intents if pending is None else pending,
+                 'known_roles':self.created_roles,'known_database_oid':self.database_oid,
+                 'cleanup_status':self.cleanup_status}
+        verifier.atomic_json(self.root/'fixture-intent.json',payload)
+
+    def begin_intent(self, kind, name):
+        require(not self.pending_intents,'previous_creation_unknown')
+        self.pending_intents=[{'kind':kind,'name':name}]
+        # Durable private intent precedes CREATE, including failed/unknown responses.
+        self.journal()
+
+    def finish_intent(self, kind, name):
+        require(self.pending_intents==[{'kind':kind,'name':name}],'intent_mismatch')
+        # Only reliable OID/ownership evidence permits promotion; failed journal leaves pending.
+        self.journal(pending=[])
+        self.pending_intents=[]
+
     def prepare(self):
         from psycopg import sql
         from scripts import f02_readonly_export as exporter,f02_transfer as verifier
@@ -214,11 +236,21 @@ class Fixture:
                 c.execute('SELECT oid FROM pg_database WHERE datname=%s',(self.dbname,));require(c.fetchone() is None,'fixture_database_exists')
                 for role in ('admin','reader'):
                     name='f02_fixture_'+role
+                    self.begin_intent('role',name)
                     c.execute(sql.SQL('CREATE ROLE {} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD {}').format(sql.Identifier(name),sql.Literal(self.passwords[role])))
                     c.execute('SELECT oid FROM pg_roles WHERE rolname=%s',(name,))
-                    self.created_roles.append((name,c.fetchone()['oid']))
+                    row=c.fetchone()
+                    require(isinstance(row,dict) and type(row.get('oid')) is int and row['oid']>0,'role_oid_unknown')
+                    self.created_roles.append((name,row['oid']))
+                    self.finish_intent('role',name)
+                self.begin_intent('database',self.dbname)
                 c.execute(sql.SQL('CREATE DATABASE {} OWNER f02_fixture_admin').format(sql.Identifier(self.dbname)))
-                c.execute('SELECT oid FROM pg_database WHERE datname=%s',(self.dbname,));self.database_oid=c.fetchone()['oid']
+                c.execute('SELECT oid,pg_get_userbyid(datdba) AS owner FROM pg_database WHERE datname=%s',(self.dbname,))
+                row=c.fetchone()
+                require(isinstance(row,dict) and type(row.get('oid')) is int and row['oid']>0
+                        and row.get('owner')=='f02_fixture_admin','database_oid_unknown')
+                self.database_oid=row['oid']
+                self.finish_intent('database',self.dbname)
                 c.execute(sql.SQL('REVOKE ALL ON DATABASE {} FROM PUBLIC').format(sql.Identifier(self.dbname)))
                 c.execute(sql.SQL('GRANT CONNECT ON DATABASE {} TO f02_fixture_reader').format(sql.Identifier(self.dbname)))
         finally:conn.close()
@@ -248,11 +280,12 @@ class Fixture:
                 'nonce_sha256':hashlib.sha256(self.nonce.encode()).hexdigest(),
                 'binding':self.binding,'source':sources,
                 'dependency_sha256':hashlib.sha256(json.dumps(dependency,sort_keys=True,separators=(',',':')).encode()).hexdigest(),
-                'cleanup_status':self.cleanup_status}
+                'cleanup_status':self.cleanup_status,'pending_intents':self.pending_intents}
 
     def cleanup(self):
         from psycopg import sql
         try:
+            require(not self.pending_intents,'creation_outcome_unknown')
             if self.database_oid is not None:
                 if self.guard_created:
                     conn=self.connection('admin')
@@ -286,6 +319,10 @@ class Fixture:
             print('F02_CI_CLEANUP complete',flush=True)
         except BaseException:
             self.cleanup_status='unknown_container_cleanup_required'
+            if self.root is not None:
+                try:self.journal()
+                except Exception:pass
+            print('F02_CI_CLEANUP unknown_container_cleanup_required',flush=True)
             raise GuardError('fixture_cleanup_unknown') from None
 
 def prepare_fixture(*, _capture=None, _connect=None):
