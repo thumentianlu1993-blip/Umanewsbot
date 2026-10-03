@@ -31,3 +31,5 @@ API骨架正常导入，第一组测试直接调用未实现plan_inventory/run_c
 # A007 / H01 真实PG验证设计（未执行）
 
 原R批准4e86466f本地实现，原四Python字节冻结。使用TransactionTestCase + 默认django真实PG profile、真实迁移及synthetic test DB，不skip/opt-in；新增候选label stable.test_h01_count_postgres。五method具体正常/日期空值/身份去重/权限、RR并发、schema缺失/锁statement超时、CLI整体deadline及PG断连rollback设计与mutation列于A-006-PG-validation-preparation.md A007节。observer须独立实查backend/query/锁/原值，客户端kill不能单独当PG完成。当前没有新增harness执行，不虚构RED；初轮环境/迁移失败非行为RED，现有实现若直接通过如实报告验证而不改生产代码。若失败证明实际行为缺口再按该最小测试RED→返修→GREEN；不重复未变32例或full。
+
+R-A007-001 schema负例修正：仅隔离专用test DB管理员可逆RENAME→commit/释放锁→reader新RR精确schema_mismatch/selects=1且无snapshot/业务SELECT→finally恢复commit→独立核19表/列与摘要；清理失败FAIL。未提交ACCESS EXCLUSIVE单列lock_timeout子例，不能以未提交DDL或generic partial代替schema负例。该方案返修不改变原四Python、权限/observer/120秒合同，无新增测试执行。
