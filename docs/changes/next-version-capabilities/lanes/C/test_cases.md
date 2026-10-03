@@ -23,7 +23,7 @@
 
 | 用例 | 真实断言与mutation |
 |---|---|
-| Q02-ADMIN-HIDE | false真实Admin列表/详情无push URL及PUSH_READY动作，翻译仍存在；捕获仅改文案/只藏列表不藏fieldset |
+| Q02-ADMIN-HIDE | false真实Admin列表/详情无push URL及PUSH_READY动作，翻译仍存在；历史PUSH状态标明历史、不重写值；捕获仅改文案/只藏列表不藏fieldset/把旧失败当可重试 |
 | Q02-ACTION-GUARD | false旧action伪造POST与直接callback都不改变status/workflow/publication，不入队；捕获只过滤get_actions缺callback guard |
 | Q02-TRUE | true原push URL/菜单保留，原action只写PUSH_READY；不发送真实消息；捕获删除兼容或改网页workflow |
 | Q02-QQ-WINDOW | false QQ详情无rerun/发送preview链接，明确停用且历史target决策可读；直达preview无预计QQ文章，不调用选择器，不修改决策/rerun |

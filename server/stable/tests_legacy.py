@@ -19699,3 +19699,14 @@ class QQRetiredUITests(TestCase):
             response = self.client.get(reverse('console-region-production'))
         self.assertContains(response, 'QQ渠道已停用')
         self.assertContains(response, '历史计数')
+
+    def test_disabled_admin_labels_legacy_push_state_as_history_without_rewriting_it(self):
+        from stable.models import ArticleStatus
+        self.article.status = ArticleStatus.PUSH_FAILED
+        self.article.save(update_fields=['status'])
+        listing = self.client.get(reverse('admin:stable_newsarticle_changelist'))
+        detail = self.client.get(reverse('admin:stable_newsarticle_change', args=[self.article.pk]))
+        self.assertContains(listing, '历史QQ状态')
+        self.assertContains(detail, 'QQ推送状态仅为历史记录')
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.status, ArticleStatus.PUSH_FAILED)
