@@ -60,4 +60,4 @@ observer是另一进程/连接，使用本次fixture管理员，application_name
 
 ### 状态与交接
 
-当前只有方案/测试设计与映射提案，没有运行新增PG harness。先请原R审隔离、角色、observer、故障注入/收尾边界；通过后静态测试源码固定，再申请B后窗口实际collect/run。源码测试不得依赖CI清理后不存在的env/manifest而全skip。正式test-impact收据由root生成；此方案和后续手工PG诊断都不代表生产取数、source权限、H01整体或main交付。发现需改原4已审文件的行为缺口时带失败证据交root，按同范围技术返修/原R复审执行，不擅自扩大产品边界。
+原R已在8b50d4cdb5650c7157f78b7e19a413627b7992ce批准a2c6005c返修方案。新增五method源码现已准备、静态解析通过，尚未runtime collect/执行PG；源码证据与接口见A-007-report.md。先交原R审核源码及root映射/执行包，再申请B后窗口实际collect/run。源码测试不得依赖CI清理后不存在的env/manifest而全skip。正式test-impact收据由root生成；此方案和后续手工PG诊断都不代表生产取数、source权限、H01整体或main交付。发现需改原4已审文件的行为缺口时带失败证据交root，按同范围技术返修/原R复审执行，不擅自扩大产品边界。

@@ -2,4 +2,12 @@
 
 路径：server/stable/test_h01_count_postgres.py；label：stable.test_h01_count_postgres；domain：horse_target_inventory；profile：复用已有django真实PG profile。原两个planner/reader标签保持python，不将PG测试塞入dummy/python。root统一维护catalog/path规则及选择收据，本线不改共享文件。
 
-5个method与mutation/隔离/observer/预算见A-006-PG-validation-preparation.md A007节。默认collect/run实际执行；非PG或非隔离test DB失败，无opt-in env/manifest，不新增skip allowlist。当前path为授权候选，源码尚未创建，不虚报collected IDs或PG通过。等待原R方案审核与B后排程，尚未启动容器。
+5个method与mutation/隔离/observer/预算见A-006-PG-validation-preparation.md A007节。默认collect/run实际执行；非PG或非隔离test DB失败，无opt-in env/manifest，不新增skip allowlist。授权源码现已创建，AST枚举5个method；尚未runtime collect，不虚报collected IDs或PG通过。等待原R方案审核与B后排程，尚未启动容器。
+
+固定源码预期IDs（仅AST，待runtime collect逐一核对）：
+
+- stable.test_h01_count_postgres.H01CountPostgresTests.test_fixed_templates_aggregates_and_select_role
+- stable.test_h01_count_postgres.H01CountPostgresTests.test_repeatable_read_does_not_see_later_commit
+- stable.test_h01_count_postgres.H01CountPostgresTests.test_schema_mismatch_and_service_timeouts_fail_closed
+- stable.test_h01_count_postgres.H01CountPostgresTests.test_cli_deadline_stops_active_backend
+- stable.test_h01_count_postgres.H01CountPostgresTests.test_killed_local_transaction_rolls_back
