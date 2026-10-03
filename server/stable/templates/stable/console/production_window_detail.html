@@ -10,6 +10,7 @@
     </div>
     <div class="button-row">
       <a class="btn ghost" href="{% url 'console-region-production' %}{% if window.racing_region %}?region={{ window.racing_region }}{% endif %}">返回地区生产</a>
+      {% if not qq_disabled %}
       <a class="btn secondary" href="{% url 'console-production-window-preview' window.id %}">预览</a>
       {% if window.kind == "publish" or window.kind == "qq_push" %}
         <form method="post" action="{% url 'console-production-window-rerun' window.id %}">
@@ -17,8 +18,11 @@
           <button class="btn" type="submit">重跑</button>
         </form>
       {% endif %}
+      {% endif %}
     </div>
   </div>
+
+  {% if qq_disabled %}<section class="panel"><p>QQ渠道已停用，以下仅为历史记录。</p></section>{% endif %}
 
   <section class="panel">
     <h3>摘要</h3>

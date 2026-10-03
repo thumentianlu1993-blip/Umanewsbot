@@ -1,3 +1,9 @@
+## 2026-10-03 Q02 调度与 Compose 声明退出（仓库候选，未部署）
+
+下一版本候选移除了 QQ 专属 Beat 周期和两份 production Compose 中可选 OneBot 占位服务；网页、worker、Beat、Redis、Nginx 及其它周期保持。旧 QQ task 名和安全 guard 保留用于消费迟到任务。此变更不停止已有容器、不删除登录卷、不清理共享队列，也不能证明生产零发送。
+
+完整组合需包含 Q01 和 Q02 UI 实现。O06 发布包须实时识别真实 OneBot 容器/部署源/镜像/卷/监控 owner，核 Q01 各进程版本与许可、持久 Beat schedule 及在途切点，再绑定精确停用与恢复动作；恢复容器不自动授予 QQ 发送许可。人工门禁只引用根 AGENTS.md。当前实现及验证见 [Q02 声明退出记录](changes/next-version-capabilities/Q02-operations-implementation.md)，历史运行记录保留原时点语义。
+
 ## 2026-10-02 PR232 发布完成
 
 当前发布目录 `/opt/umanews-release-ad50abdb-test-fixes-20261002/umanewsbot`，固定候选 `ad50abdb` / 镜像 `73ee1dcf7edb` / schema0079。四应用、双域名、马匹提示、队列消费和配置指纹验证通过；无迁移/配置/批量数据动作。原任务自然排空，未取消消费或清队列。精确备份、intent、manifest、complete 与恢复边界见[执行记录](changes/fix-known-test-failures/rollout.md)。下方旧运行目录为历史，不可作为当前发布恢复依据。

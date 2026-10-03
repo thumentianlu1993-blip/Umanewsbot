@@ -1,0 +1,198 @@
+{
+  "baseline_sha": "c02dd9fb4cde31034a9e37ba957de8f394a05854",
+  "offline_only": true,
+  "live_revisited": false,
+  "f05_evidence": "F05-public-evidence.json / observed 2026-10-03 02:07–02:10 Asia/Shanghai",
+  "items": [
+    {
+      "path": "server/stable/views.py",
+      "symbols": "_public_today_races / public_news_feed",
+      "fact_and_proposal": "D0/D1+远期fallback，limit已4；拟D0..D6无fallback",
+      "sha256": "04cd98206b988bb8c071ae166cdc18145270371b2c67ebb90200259619a85f7b"
+    },
+    {
+      "path": "server/stable/views.py",
+      "symbols": "_public_race_status_label",
+      "fact_and_proposal": "已有状态规则保留；仅首页可传同一captured now避免跨午夜漂移",
+      "sha256": "04cd98206b988bb8c071ae166cdc18145270371b2c67ebb90200259619a85f7b"
+    },
+    {
+      "path": "server/stable/views.py",
+      "symbols": "public_race_calendar / public_race_detail",
+      "fact_and_proposal": "卡片丢返回参数；详情条件届次控件；拟安全列表返回",
+      "sha256": "04cd98206b988bb8c071ae166cdc18145270371b2c67ebb90200259619a85f7b"
+    },
+    {
+      "path": "server/stable/views.py",
+      "symbols": "public_horse_index/detail / public_article_detail",
+      "fact_and_proposal": "仅当前q/page与page列表条件；拟安全往返，不改排序",
+      "sha256": "04cd98206b988bb8c071ae166cdc18145270371b2c67ebb90200259619a85f7b"
+    },
+    {
+      "path": "server/stable/templates/stable/public/feed.html",
+      "symbols": "hero-races / aria / race_field time",
+      "fact_and_proposal": "今日赛事标题；date-only投影待定；拟范围/空态/时刻槽",
+      "sha256": "bc257e88f71cdeed0c8491f2dbd2c0e2eb1af809a59aff523a4b30e97b3bbf93"
+    },
+    {
+      "path": "server/stable/templates/stable/public/race_detail.html",
+      "symbols": "race-year-switcher / 返回赛事日历",
+      "fact_and_proposal": "拟移指定控件并保静态year、历史冠军和默认返回",
+      "sha256": "723b61eed1fc920a71ab1a98f964714a5d77e336fa9f83a65fbb8ae08bce1364"
+    },
+    {
+      "path": "server/stable/templates/stable/public/race_calendar.html",
+      "symbols": "focus-strip / cal-card链接",
+      "fact_and_proposal": "保现year筛选/本周G1焦点，只带验证后的来源query",
+      "sha256": "aaedf17d14e4626b083541344ffb15e3b54f7f58d99b1ea4fd36332a5e40bc82"
+    },
+    {
+      "path": "server/stable/templates/stable/public/horse_index.html",
+      "symbols": "horse-card链接",
+      "fact_and_proposal": "q/page来源，不改完整度排序",
+      "sha256": "6a71dfa2f2db93d0e47640abc1fe0cc4bfad544ac43f6f24d8c5a84688f1d614"
+    },
+    {
+      "path": "server/stable/templates/stable/public/horse_detail.html",
+      "symbols": "返回马匹",
+      "fact_and_proposal": "安全返回，不改关注/records分页",
+      "sha256": "282ce7b7bde18ff45875dbde45f41dc46e5aa2d2b707f8852ef7de8b94399818"
+    },
+    {
+      "path": "server/stable/templates/stable/public/detail.html",
+      "symbols": "返回首页",
+      "fact_and_proposal": "news page来源，不新增新闻搜索/地区能力",
+      "sha256": "b48d55458fd9a9aa4c8f6239b3bd6c2629b0a951aa1aba2ec8060840b34755ff"
+    },
+    {
+      "path": "server/stable/templates/stable/public/_article_card.html",
+      "symbols": "feed-card-title",
+      "fact_and_proposal": "只列表主卡片传来源；跨实体关系链接不扩展本卡",
+      "sha256": "71529bfe135c1f8beb1b24a443e31e30abbc9c972c711182d15dcf9601b61d97"
+    },
+    {
+      "path": "server/stable/services/race_public_time.py",
+      "symbols": "public_time / annotate_public_time",
+      "fact_and_proposal": "保留既有date-only当地赛日/aware北京时间合同，不推断来源时区",
+      "sha256": "08aec597c6fb2732c16b75c23a3ff33f21a84622b1eedec6777fd63bf5f55ecf"
+    },
+    {
+      "path": "server/stable/services/race_information_display.py",
+      "symbols": "prepare_context / time field",
+      "fact_and_proposal": "共用未知时间表达保留；首页模板条件跳过时刻槽，不改全站",
+      "sha256": "bb9df36f2e3f0a6a67dc4c62f5ecfae70637c7278e86912453e5147d1576743f"
+    }
+  ],
+  "planned_fixture_sets": [
+    {
+      "id": "U02-WINDOW",
+      "now": "2026-12-28T12:00:00+08:00",
+      "days_inclusive": [
+        "2026-12-28",
+        "2027-01-03"
+      ],
+      "include": [
+        "today-past-clock",
+        "D2-ordinary",
+        "D6"
+      ],
+      "exclude": [
+        "D-1",
+        "D7-P0-featured",
+        "undated",
+        "hidden",
+        "active-canonical-duplicate"
+      ]
+    },
+    {
+      "id": "U02-BEIJING-BOUNDARY",
+      "now": "2027-01-01T00:30:00+08:00",
+      "samples": [
+        {
+          "local_date": "2026-12-31",
+          "local_time": "23:30",
+          "zone": "Europe/London",
+          "utc": "2026-12-31T23:30:00+00:00",
+          "expected_bj_day": "2027-01-01",
+          "include": true
+        },
+        {
+          "local_date": "2027-01-01",
+          "local_time": "00:30",
+          "zone": "Pacific/Auckland",
+          "utc": "2026-12-31T11:30:00+00:00",
+          "expected_bj_day": "2026-12-31",
+          "include": false
+        }
+      ]
+    },
+    {
+      "id": "U02-DATE-ONLY",
+      "local_date": "2027-01-03",
+      "local_start_time": null,
+      "race_datetime": null,
+      "zone": "Europe/London",
+      "expected_public_day": "2027-01-03",
+      "expected_clock": null,
+      "include_by_existing_contract": true,
+      "date_meta": "当地赛日"
+    },
+    {
+      "id": "U02-CAP-ORDER",
+      "rule": [
+        "public_date ASC",
+        "public_start_time ASC NULLS LAST",
+        "id ASC"
+      ],
+      "max": 4,
+      "counterexample": "six same-day events; unknown time sorts after known; equal clocks use id"
+    },
+    {
+      "id": "U02-RETURN",
+      "allow": {
+        "/races/": [
+          "tab",
+          "region",
+          "grade",
+          "when",
+          "year",
+          "q",
+          "direction",
+          "cursor"
+        ],
+        "/horses/": [
+          "q",
+          "page"
+        ],
+        "/": [
+          "page"
+        ]
+      },
+      "reject": [
+        "https://external.invalid/races/",
+        "//external.invalid/races/",
+        "javascript:alert(1)",
+        "/admin/",
+        "backslash/control chars",
+        "recursive return_to",
+        "wrong list path",
+        "unknown query keys"
+      ],
+      "proposed_limits": {
+        "final_request_line_bytes": 3800,
+        "outer_token_ascii_characters": 3800,
+        "decoded_payload_bytes": 16384,
+        "q_independent_character_cap": null,
+        "cursor_independent_character_cap": null,
+        "page_ascii_digits": 10,
+        "year_min": 1,
+        "year_max": 9999,
+        "nav_ttl_seconds": 86400
+      },
+      "allow_q_above_200_when_total_budget_fits": true
+    }
+  ],
+  "scope_confirmed_by": "root / 2026-10-03 / C009 delegation",
+  "navigation_budget_receipt": "U02-compact-navigation-probe.json",
+  "navigation_transport": "bidirectional compact signed token; list expands verified filters in memory only"
+}

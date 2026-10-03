@@ -7,7 +7,7 @@
   <main class="article-wrap">
     <article class="article-detail" data-public-detail>
       <nav class="article-actions" aria-label="文章操作">
-        <a href="/">← 返回首页</a>
+        <a href="{{ public_return_url }}">{{ public_return_label }}{% if public_return_default %}（默认列表）{% endif %}</a>
       </nav>
       <h1 class="article-title">{{ article.effective_title }}</h1>
       <div class="article-meta">
@@ -38,7 +38,7 @@
 
     {% if teaser_event %}
       <a class="race-teaser" href="{{ teaser_event.public_path }}">
-        <span class="grade-badge {{ teaser_event.grade_badge_class }}">{% race_field teaser_event "grade" teaser_event.grade_badge_label %}</span>
+        <span class="grade-badge {% race_grade_class teaser_event %}">{% race_field teaser_event "grade" teaser_event.grade_badge_label %}</span>
         <span class="race-teaser-main">
           <span class="race-teaser-kicker">赛事预告</span>
           <h3 class="race-teaser-name">{% race_field teaser_event "name" teaser_event.chinese_name %}</h3>

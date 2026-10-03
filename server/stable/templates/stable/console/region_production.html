@@ -6,7 +6,8 @@
   <div class="page-header">
     <div>
       <h2 class="page-title">地区生产</h2>
-      <p class="page-subtitle">按地区查看抓取、翻译、审核、发布、QQ 交付和术语候选状态。</p>
+      <p class="page-subtitle">按地区查看抓取、翻译、审核、发布、{% if qq_enabled %}QQ 交付{% else %}QQ 历史记录{% endif %}和术语候选状态。</p>
+      {% if not qq_enabled %}<p class="muted">QQ渠道已停用，以下为历史计数。</p>{% endif %}
     </div>
     <a class="btn ghost" href="{% url 'console-source-list' %}{% if selected_region %}?region={{ selected_region }}{% endif %}">查看来源</a>
   </div>
@@ -91,7 +92,7 @@
             <th>自动发布</th>
             <th>人工发布</th>
             <th>公开</th>
-            <th>QQ</th>
+            <th>QQ{% if not qq_enabled %}（历史）{% endif %}</th>
             <th>术语候选</th>
             <th>当前赛事</th>
             <th>最近窗口</th>
@@ -127,7 +128,7 @@
               <td>{{ row.auto_published }}</td>
               <td>{{ row.manual_published }}</td>
               <td>{{ row.public }}</td>
-              <td>成功 {{ row.qq_sent }} / 等待 {{ row.qq_pending }} / 跳过 {{ row.qq_skipped }} / 失败 {{ row.qq_failed }}</td>
+              <td>{% if qq_enabled %}成功 {{ row.qq_sent }} / 等待 {{ row.qq_pending }} / 跳过 {{ row.qq_skipped }} / 失败 {{ row.qq_failed }}{% else %}已发送 {{ row.qq_sent }} / 未发送 {{ row.qq_pending }} / 跳过 {{ row.qq_skipped }} / 失败 {{ row.qq_failed }}{% endif %}</td>
               <td>{{ row.pending_term_candidates }}</td>
               <td>
                 {% if row.major_race_window %}

@@ -4,7 +4,25 @@
     "docs/*.md",
     "docs/**/*.md",
     "README.md",
-    "AGENTS.md"
+    "AGENTS.md",
+    "docs/changes/next-version-capabilities/dispatch_state.json",
+    "docs/changes/next-version-capabilities/inheritance.json",
+    "docs/changes/next-version-capabilities/task_index.json",
+    "docs/changes/next-version-capabilities/lanes/C/F04-prototype.html",
+    "docs/changes/next-version-capabilities/lanes/C/F05-public-evidence.json",
+    "docs/reports/2026-10-02-capability-evidence/backlog-browser-observations.json",
+    "docs/reports/2026-10-02-capability-evidence/browser-observations.json",
+    "docs/reports/2026-10-02-capability-evidence/news-design-home-observation.json",
+    "docs/reports/2026-10-02-capability-evidence/thread-requirements.json",
+    "docs/changes/next-version-capabilities/lanes/A/F01-validation.json",
+    "docs/changes/next-version-capabilities/lanes/B/sample_inventory.json",
+    "docs/changes/next-version-capabilities/lanes/C/Q02-offline-inventory.json",
+    "docs/changes/next-version-capabilities/lanes/C/Q02-impact-mapping-proposal.json",
+    "docs/changes/next-version-capabilities/lanes/C/O02-offline-inventory.json",
+    "docs/changes/next-version-capabilities/lanes/C/O02-reference-query-design.json",
+    "docs/changes/next-version-capabilities/lanes/C/U02-compact-navigation-probe.json",
+    "docs/changes/next-version-capabilities/lanes/C/U02-navigation-budget.json",
+    "docs/changes/next-version-capabilities/lanes/C/U02-offline-inventory.json"
   ],
   "high_risk": [
     ".codex/agents/application.toml",
@@ -953,6 +971,11 @@
     "server/stable/tests/__init__.py"
   ],
   "paths": {
+    "docs/changes/next-version-capabilities/lanes/C/U01-offline-cases.json": [
+      "module:stable.test_race_information_display_pages",
+      "module:stable.test_race_information_display",
+      "module:stable.tests.test_race_field_normalization"
+    ],
     "server/stable/services/horse_profile_publish.py": [
       "horse_publish"
     ],
@@ -1126,6 +1149,90 @@
     ],
     "runtime/research/validate_official_graded_race_package.py": [
       "research_contracts"
+    ],
+    "server/stable/services/content_contracts.py": [
+      "content_contracts"
+    ],
+    "docs/changes/next-version-capabilities/lanes/A/validate_f01_contract.py": [
+      "content_contracts"
+    ],
+    "docs/changes/next-version-capabilities/lanes/A/F01-contract-examples.json": [
+      "content_contracts"
+    ],
+    "scripts/f02_readonly_export.py": [
+      "module:scripts.tests.test_f02_readonly_export",
+      "module:scripts.tests.test_f02_transfer",
+      "module:scripts.tests.test_f02_docker_adapter",
+      "module:scripts.tests.test_f02_tool_package",
+      "module:scripts.tests.test_f02_receipt_bridge",
+      "module:scripts.tests.test_f02_export_postgres"
+    ],
+    "scripts/tests/test_f02_readonly_export.py": [
+      "module:scripts.tests.test_f02_readonly_export",
+      "module:scripts.tests.test_f02_transfer",
+      "module:scripts.tests.test_f02_docker_adapter",
+      "module:scripts.tests.test_f02_receipt_bridge"
+    ],
+    "docs/changes/next-version-capabilities/lanes/B/B-002-test-mapping-proposal.json": [
+      "module:scripts.tests.test_f02_readonly_export",
+      "module:scripts.tests.test_f02_transfer"
+    ],
+    "scripts/f02_transfer.py": [
+      "module:scripts.tests.test_f02_transfer",
+      "module:scripts.tests.test_f02_docker_adapter",
+      "module:scripts.tests.test_f02_tool_package",
+      "module:scripts.tests.test_f02_receipt_bridge",
+      "module:scripts.tests.test_f02_export_postgres"
+    ],
+    "scripts/tests/test_f02_transfer.py": [
+      "module:scripts.tests.test_f02_transfer",
+      "module:scripts.tests.test_f02_docker_adapter",
+      "module:scripts.tests.test_f02_receipt_bridge"
+    ],
+    "scripts/f02_docker_adapter.py": [
+      "module:scripts.tests.test_f02_docker_adapter"
+    ],
+    "scripts/f02_container_probe.py": [
+      "module:scripts.tests.test_f02_docker_adapter"
+    ],
+    "scripts/f02_tool_package.py": [
+      "module:scripts.tests.test_f02_tool_package"
+    ],
+    "scripts/f02_receipt_bridge.py": [
+      "module:scripts.tests.test_f02_receipt_bridge"
+    ],
+    "scripts/tests/f02_pg_schema.sql": [
+      "module:scripts.tests.test_f02_export_postgres"
+    ],
+    "scripts/tests/test_f02_docker_adapter.py": [
+      "module:scripts.tests.test_f02_docker_adapter"
+    ],
+    "scripts/tests/test_f02_tool_package.py": [
+      "module:scripts.tests.test_f02_tool_package"
+    ],
+    "scripts/tests/test_f02_receipt_bridge.py": [
+      "module:scripts.tests.test_f02_receipt_bridge"
+    ],
+    "scripts/tests/test_f02_export_postgres.py": [
+      "module:scripts.tests.test_f02_export_postgres"
+    ],
+    "scripts/tests/f02_pg_fixture.py": [
+      "module:scripts.tests.test_f02_export_postgres"
+    ],
+    "server/stable/services/horse_target_inventory.py": [
+      "horse_target_inventory"
+    ],
+    "server/stable/test_horse_target_inventory.py": [
+      "horse_target_inventory"
+    ],
+    "scripts/h01_readonly_count.py": [
+      "horse_target_inventory"
+    ],
+    "scripts/tests/test_h01_readonly_count.py": [
+      "horse_target_inventory"
+    ],
+    "server/stable/test_h01_count_postgres.py": [
+      "horse_target_inventory"
     ]
   },
   "symbols": {
@@ -1143,16 +1250,148 @@
         "horse_page"
       ],
       "public_horse_index": [
-        "horse_page"
+        "horse_page",
+        "module:stable.tests_legacy"
       ],
       "public_horse_detail": [
-        "horse_page"
+        "horse_page",
+        "module:stable.tests_legacy"
       ],
       "public_horse_follow": [
         "horse_page"
       ],
       "public_horse_follows": [
         "horse_page"
+      ],
+      "_public_race_calendar_base_queryset": [
+        "module:stable.test_race_information_display_pages",
+        "module:stable.test_race_information_display",
+        "module:stable.test_historical_race_calendar_integrity",
+        "module:stable.test_race_calendar_default_date_window",
+        "module:stable.test_race_calendar_responsive_ui",
+        "module:stable.test_race_public_time",
+        "module:stable.test_public_new_regions",
+        "module:stable.test_race_news_exposure"
+      ],
+      "_public_weekly_focus_events": [
+        "module:stable.test_race_information_display_pages",
+        "module:stable.test_race_information_display",
+        "module:stable.test_historical_race_calendar_integrity",
+        "module:stable.test_race_calendar_default_date_window",
+        "module:stable.test_race_calendar_responsive_ui",
+        "module:stable.test_race_public_time",
+        "module:stable.test_public_new_regions",
+        "module:stable.test_race_news_exposure"
+      ],
+      "region_production": [
+        "module:stable.tests_legacy",
+        "module:stable.test_multiregion_rollout_change"
+      ],
+      "production_window_detail": [
+        "module:stable.tests_legacy",
+        "module:stable.test_multiregion_rollout_change"
+      ],
+      "production_window_preview": [
+        "module:stable.tests_legacy",
+        "module:stable.test_multiregion_rollout_change"
+      ],
+      "article_push_api": [
+        "module:stable.tests_legacy",
+        "module:stable.test_multiregion_rollout_change"
+      ],
+      "production_window_rerun": [
+        "module:stable.tests_legacy",
+        "module:stable.test_multiregion_rollout_change"
+      ],
+      "_public_unpack_nav": [
+        "module:stable.tests_legacy",
+        "horse_page",
+        "module:stable.test_race_calendar_default_date_window"
+      ],
+      "_public_nav_filters": [
+        "module:stable.tests_legacy",
+        "horse_page",
+        "module:stable.test_race_calendar_default_date_window"
+      ],
+      "_public_read_nav": [
+        "module:stable.tests_legacy",
+        "horse_page",
+        "module:stable.test_race_calendar_default_date_window"
+      ],
+      "_public_nav_token": [
+        "module:stable.tests_legacy",
+        "horse_page",
+        "module:stable.test_race_calendar_default_date_window"
+      ],
+      "_public_href": [
+        "module:stable.tests_legacy",
+        "horse_page",
+        "module:stable.test_race_calendar_default_date_window"
+      ],
+      "_public_list_href": [
+        "module:stable.tests_legacy",
+        "horse_page",
+        "module:stable.test_race_calendar_default_date_window"
+      ],
+      "_public_apply_list_nav": [
+        "module:stable.tests_legacy",
+        "horse_page",
+        "module:stable.test_race_calendar_default_date_window"
+      ],
+      "_public_attach_nav": [
+        "module:stable.tests_legacy",
+        "horse_page",
+        "module:stable.test_race_calendar_default_date_window"
+      ],
+      "_public_detail_nav": [
+        "module:stable.tests_legacy",
+        "horse_page",
+        "module:stable.test_race_calendar_default_date_window"
+      ],
+      "_public_pagination_nav": [
+        "module:stable.tests_legacy",
+        "horse_page",
+        "module:stable.test_race_calendar_default_date_window"
+      ],
+      "_public_today_races": [
+        "module:stable.tests_legacy",
+        "module:stable.test_race_information_display_pages",
+        "module:stable.test_race_public_time"
+      ],
+      "_public_race_status_label": [
+        "module:stable.tests_legacy",
+        "module:stable.test_race_information_display_pages",
+        "module:stable.test_race_public_time"
+      ],
+      "public_news_feed": [
+        "module:stable.tests_legacy",
+        "horse_page",
+        "module:stable.test_race_information_display_pages",
+        "module:stable.test_race_news_exposure"
+      ],
+      "public_article_detail": [
+        "module:stable.tests_legacy",
+        "horse_page",
+        "module:stable.test_race_information_display_pages",
+        "module:stable.test_race_news_exposure"
+      ],
+      "public_race_calendar": [
+        "module:stable.tests_legacy",
+        "horse_page",
+        "module:stable.test_race_calendar_default_date_window",
+        "module:stable.test_race_information_display_pages",
+        "module:stable.test_historical_race_calendar_integrity",
+        "module:stable.test_race_public_time",
+        "module:stable.test_race_news_exposure"
+      ],
+      "public_race_detail": [
+        "module:stable.tests_legacy",
+        "horse_page",
+        "module:stable.test_race_calendar_default_date_window",
+        "module:stable.test_race_information_display_pages",
+        "module:stable.test_historical_race_calendar_integrity",
+        "module:stable.test_race_public_time",
+        "module:stable.test_race_news_exposure"
       ]
     }
   },
