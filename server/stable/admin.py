@@ -771,6 +771,29 @@ class NewsArticleAdmin(admin.ModelAdmin):
         ("操作", {"fields": ("translate_action_link", "push_action_link")}),
     )
 
+    def get_list_display(self, request):
+        fields = super().get_list_display(request)
+        return fields if qq_channel_enabled() else tuple(f for f in fields if f != "push_action_link")
+
+    def get_readonly_fields(self, request, obj=None):
+        fields = super().get_readonly_fields(request, obj)
+        return fields if qq_channel_enabled() else tuple(f for f in fields if f != "push_action_link")
+
+    def get_fieldsets(self, request, obj=None):
+        fieldsets = super().get_fieldsets(request, obj)
+        if qq_channel_enabled():
+            return fieldsets
+        # 复制每层声明，避免停用请求永久修改共享ModelAdmin类字段。
+        return tuple((title, {**options, "fields": tuple(
+            field for field in options["fields"] if field != "push_action_link"
+        )}) for title, options in fieldsets)
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        if not qq_channel_enabled():
+            actions.pop("mark_published_ready", None)
+        return actions
+
     def save_model(self, request, obj, form, change):
         changed = set(form.changed_data) & {"title_zh", "summary_zh", "body_zh", "editor_notes"}
         if changed:
@@ -797,6 +820,9 @@ class NewsArticleAdmin(admin.ModelAdmin):
 
     @admin.action(description="标记为可推送")
     def mark_published_ready(self, request, queryset):
+        if not qq_channel_enabled():
+            self.message_user(request, "QQ渠道已停用，未修改推送状态。", messages.WARNING)
+            return
         count = queryset.update(status=ArticleStatus.PUSH_READY)
         self.message_user(request, f"已将 {count} 篇文章标记为可推送。", messages.SUCCESS)
 

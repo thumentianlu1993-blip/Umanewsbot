@@ -1253,6 +1253,7 @@ def region_production(request: HttpRequest):
         _console_context(
             request,
             rows=rows,
+            qq_enabled=qq_channel_enabled(),
             sources=sources,
             selected_region=selected_region,
             production_regions=PRODUCTION_REGIONS,
@@ -1288,6 +1289,7 @@ def production_window_detail(request: HttpRequest, window_id: int):
         _console_context(
             request,
             window=window,
+            qq_disabled=window.kind == ProductionWindowKind.QQ_PUSH and not qq_channel_enabled(),
             candidate_decisions=window.candidate_decisions.select_related("article").order_by("rank", "-score", "id"),
             target_decisions=window.target_decisions.select_related("article", "target").order_by("target_id", "article_id", "id"),
             quota_ledgers=_window_quota_ledgers(window),
@@ -1340,6 +1342,7 @@ def production_window_preview(request: HttpRequest, window_id: int):
             request,
             window=window,
             unsupported=unsupported,
+            qq_disabled=qq_disabled,
             selected_articles=selected_articles,
             delivery_articles=delivery_articles,
             candidate_decisions=candidate_decisions,

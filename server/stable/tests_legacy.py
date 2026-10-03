@@ -19692,3 +19692,10 @@ class QQRetiredUITests(TestCase):
         self.assertTrue(any(inline.model is QQPushDelivery for inline in model_admin.inlines))
         self.assertTrue(any(inline.model is PushLog for inline in model_admin.inlines))
         self.assertContains(self.client.get(reverse('admin:stable_pushtarget_changelist')), self.target.name)
+
+
+    def test_empty_region_history_still_explains_retired_channel(self):
+        with patch('stable.views.region_production_rows', return_value=[]):
+            response = self.client.get(reverse('console-region-production'))
+        self.assertContains(response, 'QQ渠道已停用')
+        self.assertContains(response, '历史计数')
