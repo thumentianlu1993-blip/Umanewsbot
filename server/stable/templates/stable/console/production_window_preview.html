@@ -11,6 +11,8 @@
     <a class="btn ghost" href="{% url 'console-production-window-detail' window.id %}">返回详情</a>
   </div>
 
+  {% if qq_disabled %}<section class="panel"><p>QQ渠道已停用。</p></section>{% endif %}
+
   {% if unsupported %}
     <section class="panel">
       <p class="muted">抓取窗口默认不预览，避免误解为会重新请求外部来源。</p>
@@ -41,6 +43,7 @@
       </div>
     </section>
 
+    {% if not qq_disabled %}
     <section class="panel">
       <h3>预计 QQ 文章</h3>
       <div class="table-wrap">
@@ -56,6 +59,8 @@
         </table>
       </div>
     </section>
+
+    {% endif %}
 
     <section class="panel">
       <h3>候选/目标决策</h3>
