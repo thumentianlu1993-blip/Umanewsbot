@@ -12,6 +12,7 @@ import multiprocessing
 import os
 from pathlib import Path
 import time
+from unittest import TestCase as UnitTestCase
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -138,8 +139,12 @@ def _observe_backend(params, application, expected_user, channel, rollback=None,
                     elif state == "active" and "pg_sleep" in query and transaction_started:
                         result.update(seen_active=True, pid=pid, identity_matches=identity_matches)
                         cursor.execute("SELECT count(*) FROM pg_locks WHERE pid=%s AND granted", (pid,))
-                        result["locks_before"] = cursor.fetchone()[0]
-                        if "active_at" not in result:
+                        observed_locks = cursor.fetchone()[0]
+                        # pg_stat_activity and pg_locks are separate reads: the
+                        # query can end between them. Keep the first qualified
+                        # observation instead of overwriting it during cleanup.
+                        if "active_at" not in result and identity_matches and observed_locks > 0:
+                            result["locks_before"] = observed_locks
                             result["active_at"] = time.monotonic()
                             channel.send({"active_observation": {key: result[key] for key in
                                           ("pid", "identity_matches", "active_at", "locks_before")}})
@@ -173,6 +178,103 @@ class BlockingSchemaCursor(PgCursor):
             finally:
                 time.sleep(10)
         return super().execute(query, params)
+
+
+class H01ObserverEvidenceTests(UnitTestCase):
+    """Deterministic observer races; no process or PostgreSQL connection."""
+
+    def _observe_samples(self, samples):
+        class Cursor:
+            def __init__(self):
+                self.index = -1
+                self.locks = 0
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def execute(self, query, params=None):
+                if "FROM pg_stat_activity" in query:
+                    self.index += 1
+                elif "FROM pg_locks" in query:
+                    sample = samples[self.index] if self.index < len(samples) else None
+                    self.locks = sample[0] if sample else 0
+
+            def fetchall(self):
+                if self.index >= len(samples):
+                    return []
+                _, username = samples[self.index]
+                return [(42, "synthetic", username, "active", "SELECT pg_sleep(10)", "transaction")]
+
+            def fetchone(self):
+                return (self.locks,)
+
+        class Database:
+            autocommit = False
+
+            def __init__(self):
+                self.cursor_instance = Cursor()
+                self.closed = False
+
+            def cursor(self):
+                return self.cursor_instance
+
+            def close(self):
+                self.closed = True
+
+        class Channel:
+            def __init__(self):
+                self.messages = []
+                self.closed = False
+
+            def send(self, value):
+                self.messages.append(dict(value))
+
+            def close(self):
+                self.closed = True
+
+        database, channel = Database(), Channel()
+        ticks = iter(index / 100 for index in range(1000))
+        with patch.object(psycopg, "connect", return_value=database), \
+                patch.object(time, "monotonic", side_effect=lambda: next(ticks)), \
+                patch.object(time, "sleep"):
+            _observe_backend({"dbname": "synthetic"}, "synthetic-observer", "reader", channel)
+        self.assertTrue(database.closed)
+        self.assertTrue(channel.closed)
+        self.assertFalse(any(message.get("observer_failed") for message in channel.messages))
+        return channel.messages
+
+    def test_later_zero_locks_preserves_initial_positive_evidence(self):
+        messages = self._observe_samples([(1, "reader"), (0, "reader")])
+        initial = [message["active_observation"] for message in messages if "active_observation" in message]
+        self.assertEqual(len(initial), 1)
+        final = messages[-1]
+        self.assertEqual(initial[0]["locks_before"], 1)
+        self.assertEqual(final["locks_before"], 1)
+        self.assertEqual(final["active_at"], initial[0]["active_at"])
+        self.assertEqual(final["pid"], initial[0]["pid"])
+        self.assertEqual(final["locks_after"], 0)
+        self.assertIsNotNone(final["disappeared_at"])
+
+    def test_zero_lock_sample_cannot_be_initial_positive_evidence(self):
+        messages = self._observe_samples([(0, "reader")])
+        self.assertFalse(any("active_observation" in message for message in messages))
+        self.assertNotIn("active_at", messages[-1])
+        self.assertNotIn("locks_before", messages[-1])
+
+    def test_initial_evidence_waits_for_positive_lock_sample(self):
+        messages = self._observe_samples([(0, "reader"), (2, "reader"), (0, "reader")])
+        initial = [message["active_observation"] for message in messages if "active_observation" in message]
+        self.assertEqual(len(initial), 1)
+        self.assertEqual(initial[0]["locks_before"], 2)
+        self.assertEqual(messages[-1]["locks_before"], 2)
+
+    def test_wrong_identity_cannot_supply_initial_positive_evidence(self):
+        messages = self._observe_samples([(1, "different-reader")])
+        self.assertFalse(any("active_observation" in message for message in messages))
+        self.assertNotIn("active_at", messages[-1])
 
 
 class H01CountPostgresTests(TransactionTestCase):
