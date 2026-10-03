@@ -18,19 +18,25 @@
 
 捕获now只为此次首页请求；可给_public_race_status_label加可选now参数供首页传入，默认行为保持，避免窗口与状态跨午夜分叉。不得借此重写RG生命周期/赛果确认规则。
 
-## 列表返回合同与安全
+## 列表返回合同与安全（root已精化，待原R完整复审）
 
-只覆盖三个现有主列表→对应详情：race calendar保存现8键(tab/region/grade/when/year/q/direction/cursor)，horse保存q/page，news首页保存page；新闻/马匹legacy region已被_redirect_legacy_region剥离，不复活任何旧筛选。homepage近期卡片可返回首页当前page。跨实体新闻/马匹/赛事关系链接沿默认返回，关系导航另属L线。
+覆盖三个现有主列表→详情→原列表：race calendar现8键(tab/region/grade/when/year/q/direction/cursor)、horse q/page、news首页page；homepage近期卡片返回news当前page。legacy region不复活，跨实体关系链接沿默认返回。
 
-列表主卡片传return_to为经过当前列表规范化的相对URL；详情使用允许的对应list path/query重建，不信任HTTP_REFERER或任意next。只允许精确/races/、/horses/、/等对应来源，拒绝scheme/netloc（包括同host absolute）、//、反斜杠、控制字符/CRLF、错类路径、未知/递归导航键。使用urlsplit/QueryDict、每键确定单值与urlencode、模板默认转义；不对不可信字符串二次decode，不接收/admin或任意本站路径。
+采用仅本导航使用的紧凑无状态return_nav token（仓库server/scripts检索无现有冲突），Django TimestampSigner独立salt stable.public-list-return.v1，JSON结构精确{v:1,list:races|horses|news,filters:白名单字符串值}。无任意URL/path/Referer/next、无session/cache/DB。Django压缩签名只改变来源导航编码，不改变现有race cursor盐、签名/fingerprint或列表筛选分页规则。token不是授权证明，公开资格/404/CSRF照既有逻辑。
 
-安全校验拟采用有限输入预算：return_to解码后的总长度最多8192字符，q最多200个Unicode码点，cursor最多4096字符；page仅1至10位ASCII正整数，year仅1至9999的ASCII整数。tab/region/grade/when/direction复用现有枚举值；cursor复用既有签名、筛选指纹和复合位置校验，不另建身份规则。重复query键拒绝，非法值及超预算整体退回对应默认列表，不截断后猜测。HTTP外层request.GET先正常解码return_to一次，得到带urlencode内层query的相对URL；urlsplit分离path后，QueryDict再按该内层query解码一次，q/cursor保原语义。这是两层独立编码，不是对一个值重复unquote。path必须精确白名单，拒绝其编码路径/残留编码分隔符、scheme/netloc、控制字符；查询q的正常percent编码和字面%文本不能被全URL扫描误拒。不得对已解析值再unquote，模板默认转义。此预算只约束导航元数据，不改变列表本身查询合同。
+双向闭合：主卡片→详情携短token；详情→精确原列表仍携同token，不把q/cursor重新展开成长浏览器URL。目标列表入口先验证签名、kind/结构/字段及有限预算，只在该请求内展开新的有效QueryDict供既有过滤/分页，禁止重定向为长明文URL。calendar现未知键/污染规范化在token解码及kind检查后使用同一规则，canonical/SEO仍按既有无导航参数输出；原正常query请求继续兼容。首页到race详情可返回news，horse详情只horses，news详情只news；不允许跨类导航目标。
 
-非法/缺失来源降级现有默认返回，不影响详情200/404资格。有效q中文/空格/page/cursor保语义，不要求字节顺序；回到过期页仍用既有分页/游标安全回退。浏览器Back自然行为不替代可见返回链接。URL canonical/SEO标签保持无return_to；已有legacy→canonical的资格/身份与301规则不改，可仅携带经过验证的导航参数，禁止变为开放重定向。详情records_page/records_order/关注POST不会覆盖来源返回；不动cookie/token/订阅能力。
+列表token-only：有return_nav时它必须是唯一query键且唯一值，不得混普通业务query或重键。混用、缺签名/过期/错kind/未知字段/非法类型或值整体进入该列表安全默认，不半取token/半取明文。q无独立200上限；原合法q只要整个序列化/实际href可承载就保留，普通列表本身不加cap。page仍1–10位ASCII正整数、year1..9999；tab/region/grade/when/direction和cursor使用现有规则。详情records_page/records_order/关注为本页原功能，独立处理且不能覆盖token内来源；这不将详情参数混入来源列表filters。
+
+发送前先验未压缩JSON bytes≤16384，再签名压缩；用完整最终percent编码href、实际详情/list path、GET与HTTP/1.1及CRLF计算请求行bytes≤3800，低于现Gunicorn4094并留294余量。检查对象包括初始卡片、详情返回/页内状态链接、三列表后续过滤/分页/首页链接，不能只检查token长度或仅去程。过预算不截断q/cursor，不改Nginx/Gunicorn配置；回默认列表的可见返回文案明确“默认列表／筛选条件未保留”。默认降级无来源时也不推断HTTP_REFERER。
+
+消费时outer token ASCII输入≤3800，TimestampSigner先验签及24小时max_age，再base64解码；压缩体用zlib.decompressobj有界输出最多16385字节，超过16384、未到eof、有unconsumed_tail/unused_data/尾随流均拒绝；未压缩体同预算。解析JSON时拒绝重复键，随后拒绝额外/递归字段，逐类型/枚举与来源kind验证，模板默认HTML escaping。不得直接signing.loads未知压缩输入绕过有界解压。嵌套race cursor被外层JSON总预算约束，先按原盐验签/有界解析，再复用现cursor规则；保留旧producer及无TTL合同，不将outer3800单独套到可压缩的大nested cursor。
+
+q200扩展汉字只为保证样例，不宣称所有输入靠压缩都必定足够。压缩率取决内容，任何实际href超预算明确默认返回；q>200只要总预算内仍保留。合法token返回列表后，过滤/分页导航可规范化已验证filters并生成短token以避免再次增长，GET仍只读。过期页/cursor使用原回退规则，不新建业务恢复路径。旧legacy→canonical的301资格/身份不改，仅已验证且最终href预算通过的导航token可随canonical详情携带，canonical标签无token。
 
 ## 文件与责任函数
 
-- views.py：_public_today_races/public_news_feed及可选now适配；calendar/horse/news列表到详情上下文，建议一个小型公开列表返回校验helper。具体helper归属实施前由root按shared views排队；此阶段不新增符号或maps。
+- views.py：_public_today_races/public_news_feed及可选now适配；calendar/horse/news列表到详情与回程列表上下文，一个仅服务三列表的签名/预算/有效GET适配helper。具体helper归属实施前由root按shared views排队；此阶段不新增符号或maps。
 - public/feed.html：范围/aria/空态、date-only时刻槽；race_detail.html：指定届次控件与返回；race_calendar.html、horse_index.html、_article_card.html及horse_detail/detail.html：仅主列表往返，不改排序/关联身份/分页算法。
 - race_public_time.py、race_information_display.py：本卡只消费、不重写全局合同；models/migrations/Celery/gateway/部署不改。若实现发现必须扩大到时间归一化/权限/身份，先报告root事实，不夹带修复。
 - 测试复用tests_legacy.PublicHomeInfoFeedTests/HorseProfilePageMvpTests、test_race_calendar_default_date_window及test_race_information_display_pages已登记模块。新IDs在既有模块追加，最终按diff提mapping proposal，不写共享rules/catalog。
@@ -47,12 +53,10 @@ TC-U02中的网络失败重试/宽表/完整手机旅程分别由U04/U05合并�
 
 已完成只读盘点及离线fixture设计；未实施、未运行行为RED/GREEN、未改变共享/生产。U02-offline-inventory.json绑定c02文件digest，非生产清单/写入manifest。date-only标签、三类返回及其安全边界已由root确认，下一步交原R方案审，批准后才能按(application)真实RED→实现→相关验证推进。本阶段只新增C文档，按根AGENTS.md边界工作。
 
-## 原R P2导航预算返修（纯文档，待复审）
+## 原R P2及HTTP限制返修证据（2026-10-03）
 
-原4096 URL/2048 cursor预算不足，扩展汉字200字符合法筛选会被误降级。实际基线Django5.2.1既有encode_race_calendar_cursor/decode、JSONSerializer/signing以及QueryDict/urlencode作无DB/网络诊断：q=𠮷×200、最长允许region united_kingdom、tab all/grade g3/when upcoming/year9999/direction future、最大PG bigint id9223372036854775807、date9999-12-31/time23:59:59.999999；JSON2647字节，当前cursor3581字符，相对URL6083字符，HTTP外层query7733字符。真实内外层解析后q与签名cursor完全回环。合成签名值/密钥不写文档，长度和源码digest见U02-navigation-budget.json。
+R-C009-U02-PLAN-001-P2-01（报告commit b590f274）指出旧2048 cursor/4096 URL丢合法扩展汉字；7cb9c137把预算改4096/8192，真实producer最坏2647 JSON bytes/cursor上界3586/相对URL上界6088。该中间稿不是最终方案：root随后核当前ad50 Gunicorn22.0.0 LimitRequestLine.default=4094且无配置override，旧外层query7733在到Django前失败。只增helper预算不足，且详情返回展开原列表URL也有6098字节请求行，双向都须短token。
 
-有限上限推导：合法Unicode码点JSON ensure_ascii最大12 ASCII字节（代理对），200字=2400；UTF8百分号编码同为每码点最多12 URL字符。其它filters取各最长已允许枚举/year4位，key用19位有符号bigint正最大值、日期10/时刻15字符，2647字节是当前producer紧凑JSON最坏长。unpadded urlsafe base64≤ceil(4×2647/3)=3530；签名SHA256为43字符、2个冒号，加最多11位base62正64bit timestamp，cursor≤3586。URL键名/枚举和内层percent编码冒号均计入，相对URL≤6088。因此采用4096 cursor与8192已解HTTP外层return_to，留510及2104字符余量；不是将外层完整请求URL限制为8192。未来producer版本/签名算法/字段或枚举扩大需重新推导，不能悄悄截断。
+按root裁定采用上节紧凑token及两端有效GET适配；实际零DB/网络探针使用既有encode/decode cursor、Django签名/QueryDict/urlencode和有界zlib。最长allowed filters、19位PG bigint ID、9999年/最大microsecond time、255字符合法slug：重复200非BMP字符去程985/回程724 bytes；固定seed 200个不同非BMP去程3770/回程3509；随机ASCII700去程2537/回程2276；重复ASCII3000去程965/回程704，全部≤3800<4094且过滤和原签名cursor回环。数值绑定本次收据，签名timestamp改变时重新计算实际href，不能写死旧长度。不同非BMP例是压力正例，不是对所有压缩内容的数学最坏保证。
 
-calendar和horse既有q未设200限制；此预算仅明确导航保条件保证q≤200码点，>200原列表查询仍照常，仅来源导航安全回默认，不能给列表新增200上限或修改签名fingerprint。page10位/year1..9999保持原方案。若需要保证更长q的返回保真，须root显式扩大有限预算与验收范围。
-
-补充设计正例为200扩展汉字/最大filters和合法签名cursor真实主列表→详情→返回，内层与外层urlencode后一次各层解析，q/cursor/page语义一致；刚超cursor4097、decoded return_to8193、q201负例安全默认，不影响详情资格。当前诊断只验证既有序列化/回环和长度，拟新增导航helper/页面未实施，负例guard尚未行为验证。
+探针拒绝错误/过期签名、带任意url字段、错list、3801字符outer输入、有效签名但解压超16KiB、尾随压缩流/重复JSON键；解码JSON16384通过/16385拒绝。超过producer JSON预算降级，最终requestline3800允许/3801降级。实际应用helper和页面仍未实施，原生HTTP/Gunicorn旅程尚未实跑，不能把本地编码探针称应用GREEN/生产验收。U02-compact-navigation-probe.json仅保存指标、源码/探针/收据digest，无签名值、密钥、原生产数据。

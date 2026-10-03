@@ -179,16 +179,20 @@
         "unknown query keys"
       ],
       "proposed_limits": {
-        "return_to_characters": 8192,
-        "q_characters": 200,
-        "cursor_characters": 4096,
+        "final_request_line_bytes": 3800,
+        "outer_token_ascii_characters": 3800,
+        "decoded_payload_bytes": 16384,
+        "q_independent_character_cap": null,
+        "cursor_independent_character_cap": null,
         "page_ascii_digits": 10,
         "year_min": 1,
         "year_max": 9999,
-        "q_unit": "Unicode codepoints"
-      }
+        "nav_ttl_seconds": 86400
+      },
+      "allow_q_above_200_when_total_budget_fits": true
     }
   ],
   "scope_confirmed_by": "root / 2026-10-03 / C009 delegation",
-  "navigation_budget_receipt": "U02-navigation-budget.json"
+  "navigation_budget_receipt": "U02-compact-navigation-probe.json",
+  "navigation_transport": "bidirectional compact signed token; list expands verified filters in memory only"
 }

@@ -31,5 +31,7 @@
   "receipt_sha256": "5a1a163d8215a7d5ec80212f9201d1e509cdcd864571c97f2f8e903a376408dc",
   "runtime_receipt_path": "/Users/mentianlu/.codex/runtime/u02-navigation-budget/worst-payload-receipt.json",
   "behavior_guard_executed": false,
-  "transport_limit_verified": false
+  "transport_limit_verified": false,
+  "historical_diagnostic_not_current_contract": true,
+  "superseded_by": "U02-compact-navigation-probe.json / bidirectional compressed token and total budget; no q/cursor independent cap"
 }
