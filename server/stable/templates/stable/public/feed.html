@@ -6,24 +6,23 @@
 {% block content %}
   <main class="wrap home-page">
 
-    {% if headline_article or today_races %}
       <section class="hero">
         {% if headline_article %}
           {% include "stable/public/_headline.html" %}
         {% endif %}
-        {% if today_races %}
-          <aside class="hero-races" aria-label="今日赛事">
+          <aside class="hero-races" aria-label="近期赛事">
             <div class="panel-head">
               <span class="gold-dot"></span>
-              <h2>{% if today_races_is_fallback %}近期赛事{% else %}今日赛事{% endif %}</h2>
+              <h2>近期赛事</h2>
+              <span class="muted">今天起七天</span>
               <a class="panel-more" href="{% url 'public-race-calendar' %}">完整日历 →</a>
             </div>
             {% for entry in today_races %}
-              <a class="race-row" href="{{ entry.event.public_path }}">
+              <a class="race-row" href="{{ entry.event.public_list_detail_url|default:entry.event.public_path }}">
                 <span class="grade-badge {% race_grade_class entry.event %}">{% race_field entry.event "grade" entry.event.grade_badge_label %}</span>
                 <span class="race-row-main">
                   <span class="race-row-name">{% race_field entry.event "name" entry.event.chinese_name %}</span>
-                  <span class="race-row-meta">{{ entry.event.get_country_region_display }} · {% race_field entry.event "racecourse" entry.event.racecourse %}{% if entry.event.distance_text %} · {% race_field entry.event "distance" entry.event.distance_text %}{% endif %}</span>
+                  <span class="race-row-meta">{{ entry.date_label }}{% if entry.date_only %}（当地赛日）{% endif %} · {{ entry.event.get_country_region_display }} · {% race_field entry.event "racecourse" entry.event.racecourse %}{% if entry.event.distance_text %} · {% race_field entry.event "distance" entry.event.distance_text %}{% endif %}</span>
                 </span>
                 <span class="race-row-status">
                   {% if entry.event.status == "finished" %}
@@ -31,15 +30,15 @@
                     {% if entry.winner %}<div class="race-row-winner">冠军 <b>{% if race_information_enabled %}{{ entry.display_winner }}{% else %}{{ entry.winner }}{% endif %}</b></div>{% endif %}
                   {% else %}
                     <span class="status-chip soon">{{ entry.status_label }}</span>
-                    <div class="race-row-winner tabular">{% race_field entry.event "time" entry.event.public_time_label %}</div>
+                    {% if entry.clock_known %}<div class="race-row-winner tabular">{% race_field entry.event "time" entry.event.public_time_label %}</div>{% endif %}
                   {% endif %}
                 </span>
               </a>
+            {% empty %}
+              <p class="muted">今天起七天暂无已登记赛事</p>
             {% endfor %}
           </aside>
-        {% endif %}
       </section>
-    {% endif %}
 
     <div class="home-grid">
       <section class="feed" aria-label="最新新闻">

@@ -6,6 +6,8 @@ import math
 import re
 import unicodedata
 import uuid
+import zlib
+from urllib.parse import quote, urlencode
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -15,6 +17,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView, LogoutView
+from django.core import signing
 from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
 from django.core.signing import BadSignature, SignatureExpired
@@ -27,6 +30,7 @@ from django.http import (
     HttpResponse,
     HttpResponseForbidden,
     JsonResponse,
+    QueryDict,
 )
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -2979,6 +2983,160 @@ RACE_CALENDAR_QUERY_KEYS = frozenset(
 RACE_CALENDAR_MALFORMED_QUERY_MARKERS = ("®ion=", "Â®ion=")
 
 
+# U02：仅公开列表来源导航；不保存会话或改变既有 cursor 签名合同。
+PUBLIC_NAV_SALT = "stable.public-list-return.v1"
+PUBLIC_NAV_PAYLOAD_LIMIT = 16384
+PUBLIC_NAV_REQUEST_LINE_LIMIT = 3800
+PUBLIC_NAV_TTL = 86400
+PUBLIC_NAV_PATHS = {"races": "/races/", "horses": "/horses/", "news": "/"}
+PUBLIC_NAV_FIELDS = {"races": RACE_CALENDAR_QUERY_KEYS, "horses": {"q", "page"}, "news": {"page"}}
+PUBLIC_NAV_LABELS = {"races": "返回赛事日历", "horses": "返回马匹", "news": "返回首页"}
+
+
+def _public_unpack_nav(token, *, salt=PUBLIC_NAV_SALT, max_age=PUBLIC_NAV_TTL,
+                       input_limit=PUBLIC_NAV_REQUEST_LINE_LIMIT):
+    if not isinstance(token, str) or len(token.encode("ascii")) > input_limit:
+        raise ValueError("navigation input budget")
+    signed = signing.TimestampSigner(salt=salt).unsign(token, max_age=max_age)
+    compressed = signed.startswith(".")
+    raw = signing.b64_decode((signed[1:] if compressed else signed).encode("ascii"))
+    if compressed:
+        decoder = zlib.decompressobj()
+        raw = decoder.decompress(raw, PUBLIC_NAV_PAYLOAD_LIMIT + 1)
+        if not decoder.eof or decoder.unconsumed_tail or decoder.unused_data:
+            raise ValueError("navigation compression stream")
+    if len(raw) > PUBLIC_NAV_PAYLOAD_LIMIT:
+        raise ValueError("navigation payload budget")
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate navigation field")
+            result[key] = value
+        return result
+    return json.loads(raw.decode("latin-1"), object_pairs_hook=unique_object)
+
+
+def _public_nav_filters(kind, filters):
+    if kind not in PUBLIC_NAV_FIELDS or type(filters) is not dict or not set(filters) <= PUBLIC_NAV_FIELDS[kind]:
+        raise ValueError("navigation fields")
+    if not all(type(value) is str for value in filters.values()):
+        raise ValueError("navigation field type")
+    values = {key: value.strip() for key, value in filters.items()}
+    for value in values.values():
+        value.encode("utf-8")
+        if any(ord(char) < 32 or ord(char) == 127 for char in value):
+            raise ValueError("navigation control character")
+    if "page" in values and not re.fullmatch(r"[1-9][0-9]{0,9}", values["page"]):
+        raise ValueError("navigation page")
+    if kind == "races":
+        choices = {"tab": {"", "key", "all"},
+                   "region": {"", *(value for value, _label in RacingRegion.choices if value != RacingRegion.OTHER)},
+                   "grade": {"", *PUBLIC_RACE_GRADE_FILTERS},
+                   "when": {"", *PUBLIC_RACE_WHEN_FILTERS}, "direction": {"", "past", "future"}}
+        if any(key in values and values[key] not in allowed for key, allowed in choices.items()):
+            raise ValueError("navigation enum")
+        if values.get("year") and not re.fullmatch(r"[1-9][0-9]{0,3}", values["year"]):
+            raise ValueError("navigation year")
+        if any(marker in value for value in values.values() for marker in RACE_CALENDAR_MALFORMED_QUERY_MARKERS):
+            raise ValueError("navigation malformed filter")
+        if values.get("cursor"):
+            if values.get("direction") not in {"past", "future"}:
+                raise ValueError("navigation cursor direction")
+            from .services.race_calendar import RACE_CALENDAR_CURSOR_SALT
+            _public_unpack_nav(values["cursor"], salt=RACE_CALENDAR_CURSOR_SALT, max_age=None,
+                               input_limit=PUBLIC_NAV_PAYLOAD_LIMIT)
+            if decode_race_calendar_cursor(values["cursor"], filters={**values, "tab": values.get("tab") or "key"}) is None:
+                raise ValueError("navigation cursor")
+        elif values.get("direction"):
+            raise ValueError("navigation missing cursor")
+    return values
+
+
+def _public_read_nav(token, allowed):
+    data = _public_unpack_nav(token)
+    if type(data) is not dict or set(data) != {"v", "list", "filters"} or type(data["v"]) is not int or data["v"] != 1:
+        raise ValueError("navigation shape")
+    if type(data["list"]) is not str or data["list"] not in allowed:
+        raise ValueError("navigation list")
+    return data["list"], _public_nav_filters(data["list"], data["filters"])
+
+
+def _public_nav_token(kind, filters):
+    try:
+        data = {"v": 1, "list": kind, "filters": _public_nav_filters(kind, filters)}
+        if len(signing.JSONSerializer().dumps(data)) > PUBLIC_NAV_PAYLOAD_LIMIT:
+            return ""
+        return signing.dumps(data, salt=PUBLIC_NAV_SALT, compress=True)
+    except (ValueError, TypeError, UnicodeError, BadSignature, zlib.error, RecursionError):
+        return ""
+
+
+def _public_href(path, params):
+    href = quote(path, safe="/") + ("?" + urlencode(params) if params else "")
+    if len(("GET " + href + " HTTP/1.1\r\n").encode("ascii")) > PUBLIC_NAV_REQUEST_LINE_LIMIT:
+        return ""
+    return href
+
+
+def _public_list_href(kind, filters, *, token=""):
+    path = PUBLIC_NAV_PATHS[kind]
+    if token:
+        return _public_href(path, {"return_nav": token}) or path
+    try:
+        values = _public_nav_filters(kind, filters)
+        ordinary = _public_href(path, values)
+        if ordinary:
+            return ordinary
+        token = _public_nav_token(kind, values)
+        return (_public_href(path, {"return_nav": token}) if token else "") or path
+    except (ValueError, TypeError, UnicodeError, BadSignature, zlib.error, RecursionError):
+        return path
+
+
+def _public_apply_list_nav(request, kind):
+    if "return_nav" not in request.GET:
+        return
+    effective = QueryDict("", mutable=True)
+    try:
+        if set(request.GET) != {"return_nav"} or len(request.GET.getlist("return_nav")) != 1:
+            raise ValueError("navigation query mixing")
+        _kind, filters = _public_read_nav(request.GET["return_nav"], {kind})
+        for key, value in filters.items():
+            effective[key] = value
+    except (ValueError, TypeError, UnicodeError, BadSignature, zlib.error, RecursionError):
+        pass
+    request.GET = effective
+
+
+def _public_attach_nav(items, kind, filters, *, force=False):
+    token = _public_nav_token(kind, filters) if filters or force else ""
+    for item in items:
+        item.public_list_detail_url = (_public_href(item.public_path, {"return_nav": token}) if token else "") or item.public_path
+
+
+def _public_detail_nav(request, *, allowed, default):
+    kind, token = default, ""
+    try:
+        if len(request.GET.getlist("return_nav")) != 1:
+            raise ValueError("missing or duplicate navigation")
+        candidate = request.GET["return_nav"]
+        kind, _filters = _public_read_nav(candidate, allowed)
+        if not _public_href(PUBLIC_NAV_PATHS[kind], {"return_nav": candidate}):
+            raise ValueError("navigation return budget")
+        token = candidate
+    except (ValueError, TypeError, UnicodeError, BadSignature, zlib.error, RecursionError):
+        kind = default
+    return {"public_return_url": _public_list_href(kind, {}, token=token),
+            "public_return_label": PUBLIC_NAV_LABELS[kind], "public_return_default": not bool(token),
+            "public_nav_token": token}
+
+
+def _public_pagination_nav(kind, filters, page):
+    return {"public_previous_url": _public_list_href(kind, {**filters, "page": str(page.previous_page_number())}) if page.has_previous() else "",
+            "public_next_url": _public_list_href(kind, {**filters, "page": str(page.next_page_number())}) if page.has_next() else ""}
+
+
 def _race_date_label(event: RaceEvent, today) -> str:
     if public_time(event).day == today:
         return "今天"
@@ -3048,11 +3206,11 @@ def _finished_race_queryset(queryset, now):
     return queryset.exclude(pk__in=hidden)
 
 
-def _public_race_status_label(event: RaceEvent, today, winner=None) -> str:
+def _public_race_status_label(event: RaceEvent, today, winner=None, *, now=None) -> str:
     event.public_time_label = _race_time_label(event)
     if event.status == RaceEventStatus.FINISHED:
         return "已完赛" if winner else "赛果待确认"
-    now = timezone.now()
+    now = now or timezone.now()
     stamp = public_time(event)
     today = now.astimezone(BEIJING).date()
     if event.status in {RaceEventStatus.SCHEDULED, RaceEventStatus.RUNNING}:
@@ -3083,29 +3241,23 @@ def _public_race_status_label(event: RaceEvent, today, winner=None) -> str:
 
 
 def _public_today_races() -> tuple[list[dict], bool]:
-    """首页"今日赛事"面板：当日与次日公开赛事，空窗时回退到最近的重点赛事。"""
-    today = timezone.localdate(timezone=BEIJING)
+    """首页近期赛事：北京今天及后六天，最多四场，不回填远期。"""
+    now = timezone.now()
+    today = now.astimezone(BEIJING).date()
     base = annotate_public_time(RaceEvent.objects.all()).filter(
         visibility_status=RaceEventVisibility.PUBLISHED,
         public_date__isnull=False,
     ).exclude(canonical_product_links__is_active=True)
     events = list(
-        base.filter(public_date__gte=today, public_date__lte=today + timedelta(days=1)).order_by(
-            "public_date", "public_start_time", "id"
+        base.filter(public_date__gte=today, public_date__lte=today + timedelta(days=6)).order_by(
+            "public_date", F("public_start_time").asc(nulls_last=True), "id"
         )[:PUBLIC_TODAY_RACE_LIMIT]
     )
     is_fallback = False
-    if not events:
-        is_fallback = True
-        events = list(
-            base.filter(public_date__gt=today + timedelta(days=1))
-            .filter(Q(priority__in=[RaceEventPriority.P0, RaceEventPriority.P1]) | Q(is_featured=True))
-            .order_by("public_date", "public_start_time", "id")[:PUBLIC_TODAY_RACE_LIMIT]
-        )
     winners: dict[int, str] = {}
     finished_ids = [event.pk for event in events if event.status == RaceEventStatus.FINISHED]
     if finished_ids:
-        finished_ids = list(_finished_race_queryset(base.filter(pk__in=finished_ids), timezone.now()).values_list("pk", flat=True))
+        finished_ids = list(_finished_race_queryset(base.filter(pk__in=finished_ids), now).values_list("pk", flat=True))
         candidates_by_event: dict[int, list[RaceEventResult]] = {}
         for result in RaceEventResult.objects.filter(
             event_id__in=finished_ids,
@@ -3131,8 +3283,10 @@ def _public_today_races() -> tuple[list[dict], bool]:
         {
             "event": event,
             "winner": winners.get(event.pk, ""),
-            "status_label": _public_race_status_label(event, today, winners.get(event.pk)),
+            "status_label": _public_race_status_label(event, today, winners.get(event.pk), now=now),
             "date_label": _race_date_label(event, today),
+            "clock_known": public_time(event).clock is not None,
+            "date_only": public_time(event).instant is None,
         }
         for event in events
     ]
@@ -3594,6 +3748,7 @@ def _attach_race_term_display_names(event_records):
 
 
 def public_race_calendar(request: HttpRequest):
+    _public_apply_list_nav(request, "races")
     canonical_redirect_url = _race_calendar_canonical_redirect_url(request)
     if canonical_redirect_url:
         return redirect(canonical_redirect_url, permanent=True)
@@ -3631,12 +3786,7 @@ def public_race_calendar(request: HttpRequest):
                 params[key] = value
             else:
                 params.pop(key, None)
-        query_string = params.urlencode()
-        return (
-            f"{request.path}?{query_string}"
-            if query_string
-            else request.path
-        )
+        return _public_list_href("races", dict(params.items()))
 
     region_tabs = [{"value": "", "label": "全部", "is_active": filters["region"] == "", "url": filter_url(region="")}]
     for value, label in RacingRegion.choices:
@@ -3674,13 +3824,16 @@ def public_race_calendar(request: HttpRequest):
         {"value": "", "label": "全部时间", "is_active": filters["when"] == "", "url": filter_url(when="")},
         {"value": "finished", "label": "已完赛", "is_active": filters["when"] == "finished", "url": filter_url(when="finished")},
     ]
+    focus_events = _public_weekly_focus_events(filters["region"], events=events, today=shanghai_today)
+    source_filters = {key: value for key, value in filters.items() if value}
+    _public_attach_nav([*events, *focus_events], "races", source_filters if request.GET else {})
     return _render_race_information(
         request,
         "stable/public/race_calendar.html",
         {
             "groups": groups,
             "filters": filters,
-            "focus_events": _public_weekly_focus_events(filters["region"], events=events, today=shanghai_today),
+            "focus_events": focus_events,
             "default_anchor_date": default_anchor_date,
             "date_axis": [group for group in groups if group["date"]],
             "date_axis_spans_years": date_axis_spans_years,
@@ -3803,12 +3956,12 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
                 )
                 if canonical is None:
                     raise Http404
-                return redirect(
-                    "public-race-detail",
-                    year=canonical.year,
-                    slug=canonical.slug,
-                    permanent=True,
-                )
+                target = reverse("public-race-detail", kwargs={"year": canonical.year, "slug": canonical.slug})
+                navigation = _public_detail_nav(request, allowed={"races", "news"}, default="races")
+                token = navigation["public_nav_token"]
+                if token:
+                    target = _public_href(target, {"return_nav": token}) or target
+                return redirect(target, permanent=True)
             if path_row.path_kind != "canonical":
                 raise Http404
             event_id = path_row.event_id
@@ -3915,16 +4068,6 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
     )
     winner = _confirmed_race_winner(results) if event.status == RaceEventStatus.FINISHED else None
     top_results = results[:5]
-    series_events = []
-    if event.race_series_id and event.race_series.review_status == RaceSeriesReviewStatus.APPROVED:
-        candidates = list(
-            RaceEvent.objects.filter(
-                race_series_id=event.race_series_id,
-                visibility_status=RaceEventVisibility.PUBLISHED,
-            ).order_by("-year", "id")
-        )
-        if len(candidates) > 1:
-            series_events = candidates
     has_news = any(news_groups.values())
     return _render_race_information(
         request,
@@ -3940,7 +4083,6 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
             "history_extra": history_winners[10:],
             "top_results": top_results,
             "winner": winner,
-            "series_events": series_events,
             "news_groups": news_groups,
             "live_result_status": live_result_status,
             "result_section_label": result_section_label,
@@ -3949,6 +4091,7 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
                 if canonical_product_link
                 else None
             ),
+            **_public_detail_nav(request, allowed={"races", "news"}, default="races"),
             "has_news": has_news,
             "status_label": _public_race_status_label(event, timezone.localdate(), winner),
         },
@@ -4003,6 +4146,7 @@ def public_race_sitemap_shard(request: HttpRequest, shard: int):
 
 
 def public_news_feed(request: HttpRequest):
+    _public_apply_list_nav(request, "news")
     redirect_response = _redirect_legacy_region(request)
     if redirect_response:
         return redirect_response
@@ -4043,6 +4187,12 @@ def public_news_feed(request: HttpRequest):
     today_races, today_races_is_fallback = _public_today_races()
     next_key_race = _public_next_key_race()
     flash_race = next((entry for entry in today_races if entry["winner"]), None)
+    followed_entries = _public_followed_entries(request, limit=4)
+    source_filters = {"page": str(page_obj.number)} if "page" in request.GET else {}
+    _public_attach_nav([*feed_articles, *([headline_article] if headline_article else []),
+                        *(entry["article"] for entry in hot_articles),
+                        *(entry["article"] for entry in followed_entries)], "news", source_filters)
+    _public_attach_nav([entry["event"] for entry in today_races], "news", source_filters, force=True)
     return _render_race_information(
         request,
         "stable/public/feed.html",
@@ -4050,9 +4200,10 @@ def public_news_feed(request: HttpRequest):
             "page_obj": page_obj,
             "latest_articles": page_obj,
             "headline_article": headline_article,
+            **_public_pagination_nav("news", {}, page_obj),
             "feed_articles": feed_articles,
             "hot_articles": hot_articles,
-            "followed_entries": _public_followed_entries(request, limit=4),
+            "followed_entries": followed_entries,
             "today_races": today_races,
             "today_races_is_fallback": today_races_is_fallback,
             "next_key_race": next_key_race,
@@ -4122,6 +4273,7 @@ def public_article_detail(request: HttpRequest, article_id: int):
         "stable/public/detail.html",
         {
             "article": article,
+            **_public_detail_nav(request, allowed={"news"}, default="news"),
             "race_links": race_links,
             "horse_links": horse_links,
             "prev_article": prev_article,
@@ -4133,6 +4285,7 @@ def public_article_detail(request: HttpRequest, article_id: int):
 
 
 def public_horse_index(request: HttpRequest):
+    _public_apply_list_nav(request, "horses")
     redirect_response = _redirect_legacy_region(request)
     if redirect_response:
         return redirect_response
@@ -4149,6 +4302,10 @@ def public_horse_index(request: HttpRequest):
         )
     paginator = Paginator(queryset, PUBLIC_HORSE_PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get("page"))
+    source_filters = {"q": query} if query else {}
+    if "page" in request.GET:
+        source_filters["page"] = str(page_obj.number)
+    _public_attach_nav(page_obj.object_list, "horses", source_filters)
     for profile in page_obj.object_list:
         profile.public_region_color = PUBLIC_REGION_COLORS.get(profile.racing_region, "#0E5A38")
     pagination_params = request.GET.copy()
@@ -4158,6 +4315,7 @@ def public_horse_index(request: HttpRequest):
         "stable/public/horse_index.html",
         {
             "page_obj": page_obj,
+            **_public_pagination_nav("horses", {"q": query} if query else {}, page_obj),
             "horse_profiles": page_obj.object_list,
             "filters": {"q": query},
             "pagination_querystring": pagination_params.urlencode(),
@@ -4292,11 +4450,25 @@ def public_horse_detail(request: HttpRequest, profile_id: int):
         HorseProfile.objects.filter(Q(sire_horse_profile=profile) | Q(dam_horse_profile=profile), review_status=HorseProfileStatus.PUBLISHED)
         .order_by("racing_region", "display_name_zh", "id")[:12]
     )
+    navigation = _public_detail_nav(request, allowed={"horses"}, default="horses")
+    detail_params = {"records_order": records_order} if "records_order" in request.GET else {}
+    if navigation["public_nav_token"]:
+        detail_params["return_nav"] = navigation["public_nav_token"]
+    current_params = {**detail_params}
+    if "records_page" in request.GET:
+        current_params["records_page"] = str(race_records_page.number)
+    detail_current = _public_href(request.path, current_params) or request.path
+    records_previous = (_public_href(request.path, {**detail_params, "records_page": str(race_records_page.previous_page_number())}) or request.path) if race_records_page.has_previous() else ""
+    records_next = (_public_href(request.path, {**detail_params, "records_page": str(race_records_page.next_page_number())}) or request.path) if race_records_page.has_next() else ""
     return _render_race_information(
         request,
         "stable/public/horse_detail.html",
         {
             "profile": profile,
+            **navigation,
+            "public_detail_current_url": detail_current,
+            "public_records_previous_url": records_previous,
+            "public_records_next_url": records_next,
             "horse_stats": _horse_stats(profile),
             "major_wins": major_wins_list,
             "article_entries": _public_horse_article_entries(profile),

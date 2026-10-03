@@ -6,7 +6,7 @@
 {% block content %}
   <main class="race-page">
     <nav class="article-actions" aria-label="赛事操作">
-      <a href="{% url 'public-race-calendar' %}">返回赛事日历</a>
+      <a href="{{ public_return_url }}">{{ public_return_label }}{% if public_return_default %}（默认列表）{% endif %}</a>
       <a href="/">返回首页</a>
     </nav>
 
@@ -21,18 +21,7 @@
       <div class="race-hero-top">
         <span class="grade-badge {% race_grade_class event %}">{% race_field event "grade" event.grade_badge_label %}</span>
         <span class="race-hero-meta-text">{{ event.get_country_region_display }} · {% race_field event "racecourse" event.racecourse %} · {% if event.distance_text %}{% race_field event "distance" event.distance_text %}{% else %}{% race_field event "surface" event.get_surface_display %}{% endif %}</span>
-        {% if series_events %}
-          <details class="race-year-switcher">
-            <summary>{{ event.year }}</summary>
-            <div>
-              {% for series_event in series_events %}
-                <a class="{% if series_event.pk == event.pk %}active{% endif %}" href="{{ series_event.public_path }}">{{ series_event.year }}</a>
-              {% endfor %}
-            </div>
-          </details>
-        {% else %}
-          <span class="race-hero-year">{{ event.year }}</span>
-        {% endif %}
+        <span class="race-hero-year">{{ event.year }}</span>
       </div>
       <h1 class="race-hero-name">{% race_field event "name" event.chinese_name %}</h1>
       <p class="race-hero-original">{% if event.original_name and event.original_name != event.chinese_name %}{{ event.original_name }} · {% endif %}{% race_field event "date" %} · {% race_field event "time" event.public_time_label %}</p>

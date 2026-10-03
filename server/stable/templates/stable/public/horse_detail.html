@@ -5,7 +5,7 @@
 
 {% block content %}
   <main class="horse-page">
-    <nav class="article-actions" aria-label="马匹操作"><a href="{% url 'public-horse-index' %}">返回马匹</a><a href="{% url 'public-horse-follows' %}">我的关注</a></nav>
+    <nav class="article-actions" aria-label="马匹操作"><a href="{{ public_return_url }}">{{ public_return_label }}{% if public_return_default %}（默认列表）{% endif %}</a><a href="{% url 'public-horse-follows' %}">我的关注</a></nav>
     <section class="horse-hero">
       <div class="horse-hero-top">
         <div class="horse-hero-main">
@@ -19,7 +19,7 @@
           </div>
         </div>
         <form method="post" action="{% url 'public-horse-follow' profile.id %}">
-          {% csrf_token %}<input type="hidden" name="next" value="{{ request.path }}">
+          {% csrf_token %}<input type="hidden" name="next" value="{{ public_detail_current_url }}">
           {% if is_following %}<button class="horse-follow-btn active" type="submit" name="intent" value="unfollow">★ 已关注</button>{% else %}<input type="hidden" name="include_descendants" value="1"><button class="horse-follow-btn" type="submit">☆ 关注</button>{% endif %}
         </form>
       </div>
@@ -50,9 +50,9 @@
       </div>{% endfor %}</div>{% else %}<p class="muted">暂无参赛履历。</p>{% endif %}
       {% if race_records_page.has_other_pages %}
         <nav class="pagination" aria-label="参赛履历分页">
-          {% if race_records_page.has_previous %}<a href="?{% if records_pagination_querystring %}{{ records_pagination_querystring }}&amp;{% endif %}records_page={{ race_records_page.previous_page_number }}">上一页</a>{% endif %}
+          {% if race_records_page.has_previous %}<a href="{{ public_records_previous_url }}">上一页</a>{% endif %}
           <span>第 {{ race_records_page.number }} / {{ race_records_page.paginator.num_pages }} 页</span>
-          {% if race_records_page.has_next %}<a href="?{% if records_pagination_querystring %}{{ records_pagination_querystring }}&amp;{% endif %}records_page={{ race_records_page.next_page_number }}">下一页</a>{% endif %}
+          {% if race_records_page.has_next %}<a href="{{ public_records_next_url }}">下一页</a>{% endif %}
         </nav>
       {% endif %}
     </section>
