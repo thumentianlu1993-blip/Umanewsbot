@@ -43,3 +43,15 @@ q01 execution-plan/batch log未找到psycopg版本安装收据；requirements只
 
 原R代码review；镜像内psycopg3.2.6实装/依赖digest、真实短窗口manifest和PG12；Linux helper生命周期与synthetic Docker烟测；真实Root/R接收来源绑定和正式执行包。F02新真实样本仍0/M01未解锁，DDL2026-10-05 18:00 Asia/Shanghai。
 最近周剩余2%，每工具批次复核，≤1立即按既定规则保存最小断点并停工；当前无子代理/模型CLI/后台长进程。
+
+## B005 CI-v2 接通实现（2026-10-03 恢复后）
+
+原 R v2 方案 APPROVED / P2 CLOSED@aebe8e2a；固定方案 SHA3994cb9a。仅修改本线测试源码、tests-only helper、B映射提案和测试设计；共享runner/workflow/core/catalog/rules零修改。
+
+- 原 PGGuardTests 1 + PG12 原 IDs 全保留。移除import-time skip，内部模式默认走自包含fixture；collect不准备/连接；外部manifest独立保留原严格validator。proposal改django/profile+dedicated batch，正式整合归root。
+- 新 helper `scripts/tests/f02_pg_fixture.py` 在任何连接前核私有PGDATA目录fd/O_NOFOLLOW、tmpfs mountinfo/statfs/device、config权限、actualsocket inode↔postmaster fd/PID/start、四namespace一致与双采样；未知/错项拒绝。bootstrap fixed loopback/postgres/tester，连接后核SQL目标/PG16、后端父PID/namespace，再创建独立DB与非superuser admin/reader及nonce；每次新连接重新核binding。
+- 新 `InternalCIGuardTests` 12个ID已报root（此前预报PGGuardTests类名已纠正）。攻击端点、inode owner、PID稳定性、4种namespace、tmpfs、权限/owner、symlink、嵌套mount、propagation、device、未知字段；connect spy零调用。原13+新增12=25。
+- RED：12/12失败（class skip True；未实现guard未抛错误）；GREEN：新12+原manifest guard=13 PASS，0.033秒。当前主机默认fixture在Linux前置失败，未调用DB；离线collection 25 unique IDs/12旧PG保留；compile/diff检查PASS。原63和成功v2依赖证据不重复。
+- Linux真实socket/mount/PID guard、内部DB权限/部分创建清理和PG12尚未执行；模拟快照不冒称Linux通过。正式full是否通过仍须root整合mapping并取得formal collect/run，无skip/分母缩减。
+- 成功准备stdout只输出allowlist `F02_CI_BINDING`：process/source/dependency摘要与nonce hash；密码/原nonce仅私有binding。cleanup先核server/DB OID/owner/guard及角色OID，未知不删除，报告fixture_cleanup_unknown，最终自有容器销毁。
+- 下一步固定新SHA提交原R代码review；候选480秒包待root核定与窗口，无PG启动/transport/生产授权。额度恢复实时remaining99%；新检查遵循5分钟/低阈值规则，无子代理/模型CLI/后台任务。

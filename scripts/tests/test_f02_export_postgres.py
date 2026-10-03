@@ -50,17 +50,74 @@ class PGGuardTests(unittest.TestCase):
             with self.assertRaises(GuardError):
                 validate_manifest(value)
 
-@unittest.skipUnless(os.environ.get('F02_SYNTHETIC_MANIFEST'), 'PG16 short window/manifest not bound; no DB access')
+# Guard fixtures contain no real endpoints, credentials or network operations.
+def guard_snapshot():
+    return {'mode':'internal-ci-v2','uid':10001,'python_exe':'/venv/bin/python',
+            'interfaces':['lo'],'docker_socket':False,'endpoint':['127.0.0.1',5432],
+            'listener_inode':123,'listener_owner_pid':77,'pid':77,'start_ticks':987,
+            'stable':True,'namespaces':{'net':1,'mnt':2,'pid':3,'user':4},
+            'python_namespaces':{'net':1,'mnt':2,'pid':3,'user':4},
+            'pgdata':'/tmp/pgdata','pg_uid':10001,'pg_mode':448,'symlinks':False,
+            'fs_type':'tmpfs','fs_magic':16914836,'mount_root':'/','mountpoint':'/tmp',
+            'mount_rw':True,'propagation':False,'nested_mounts':False,'device_matches':True,
+            'pg_exe':'/usr/lib/postgresql/16/bin/postgres','pg_exe_sha256':'a'*64,
+            'pgdata_inode':44,'pgdata_device':55,'mount_id':66,'cmdline_pgdata':'/tmp/pgdata',
+            'python_pid':88,'python_start_ticks':99,'config_private':True,'listener_fd':3}
+
+class InternalCIGuardTests(unittest.TestCase):
+    def refuse(self, **delta):
+        from scripts.tests import f02_pg_fixture as fixture
+        from unittest.mock import Mock
+        self.assertEqual(fixture.validate(guard_snapshot()),guard_snapshot())
+        snapshot=guard_snapshot();snapshot.update(delta)
+        connect=Mock()
+        with self.assertRaises(fixture.GuardError):
+            fixture.prepare_fixture(_capture=lambda:snapshot,_connect=connect)
+        connect.assert_not_called()
+
+    def test_collect_has_no_skip_and_no_connection(self):
+        self.assertFalse(getattr(PostgreSQLContracts,'__unittest_skip__',False))
+        self.assertEqual(len(unittest.TestLoader().getTestCaseNames(PostgreSQLContracts)),12)
+        from scripts.tests import f02_pg_fixture
+        from unittest.mock import patch
+        with patch.object(f02_pg_fixture,'prepare_fixture') as prepare:
+            suite=unittest.TestLoader().loadTestsFromTestCase(PostgreSQLContracts)
+            self.assertEqual(suite.countTestCases(),12)
+            prepare.assert_not_called()
+
+    def test_listener_endpoint_refused(self):self.refuse(endpoint=['0.0.0.0',5432])
+    def test_listener_inode_owner_refused(self):self.refuse(listener_owner_pid=78)
+    def test_pid_reuse_refused(self):self.refuse(stable=False)
+    def test_namespace_mismatch_refused(self):
+        for key in ('net','mnt','pid','user'):
+            value=guard_snapshot()['python_namespaces'];value[key]+=1
+            self.refuse(python_namespaces=value)
+    def test_non_tmpfs_refused(self):self.refuse(fs_type='overlay')
+    def test_pgdata_permissions_refused(self):
+        self.refuse(pg_mode=493);self.refuse(pg_uid=0)
+    def test_symlink_refused(self):self.refuse(symlinks=True)
+    def test_nested_mount_refused(self):self.refuse(nested_mounts=True)
+    def test_mount_propagation_refused(self):self.refuse(propagation=True)
+    def test_device_mismatch_refused(self):self.refuse(device_matches=False)
+    def test_unknown_binding_field_refused(self):self.refuse(unknown=True)
+
 class PostgreSQLContracts(unittest.TestCase):
     BASE_COHORT=8
 
     @classmethod
     def setUpClass(cls):
-        path=Path(os.environ['F02_SYNTHETIC_MANIFEST'])
-        data=transfer.read_file(path,65536)
-        if hashlib.sha256(data).hexdigest()!=os.environ.get('F02_SYNTHETIC_MANIFEST_SHA256'):
-            raise GuardError('manifest_sha_mismatch')
-        cls.config=validate_manifest(json.loads(data))
+        cls.fixture=None
+        if os.environ.get('F02_SYNTHETIC_MANIFEST'):
+            path=Path(os.environ['F02_SYNTHETIC_MANIFEST'])
+            data=transfer.read_file(path,65536)
+            if hashlib.sha256(data).hexdigest()!=os.environ.get('F02_SYNTHETIC_MANIFEST_SHA256'):
+                raise GuardError('manifest_sha_mismatch')
+            cls.config=validate_manifest(json.loads(data))
+        else:
+            from scripts.tests import f02_pg_fixture
+            cls.fixture=f02_pg_fixture.prepare_fixture()
+            cls.addClassCleanup(cls.fixture.cleanup)
+            cls.config=cls.fixture.config
         import psycopg
         from psycopg.rows import dict_row
         if psycopg.__version__!='3.2.6':raise GuardError('unverified_driver_version')
@@ -88,6 +145,8 @@ class PostgreSQLContracts(unittest.TestCase):
 
     @classmethod
     def connect(cls,role='reader'):
+        if cls.fixture is not None:
+            return cls.fixture.connection(role)
         c=cls.config['connection']
         try:
             return cls.psycopg.connect(host=c['host'],port=c['port'],dbname=c['dbname'],user=c[role+'_user'],

@@ -16,7 +16,8 @@
     "scripts/tests/test_f02_docker_adapter.py",
     "scripts/tests/test_f02_tool_package.py",
     "scripts/tests/test_f02_receipt_bridge.py",
-    "scripts/tests/test_f02_export_postgres.py"
+    "scripts/tests/test_f02_export_postgres.py",
+    "scripts/tests/f02_pg_fixture.py"
   ],
   "rules_paths_additions": {
     "scripts/f02_readonly_export.py": [
@@ -74,6 +75,9 @@
       "module:scripts.tests.test_f02_receipt_bridge"
     ],
     "scripts/tests/test_f02_export_postgres.py": [
+      "module:scripts.tests.test_f02_export_postgres"
+    ],
+    "scripts/tests/f02_pg_fixture.py": [
       "module:scripts.tests.test_f02_export_postgres"
     ]
   },
@@ -142,7 +146,7 @@
   },
   "core_policy": "preserve existing automatic core selection",
   "mapping_evolution_policy": "preserve current old+new full regression on rules/catalog changes; coordinator integrates after A patch",
-  "evidence_status": "B005 local 63 PASS and 12 PG skipped; real PG/Docker receipts absent; original B003 46 preserved",
+  "evidence_status": "B005 CI-v2: local guards 13 PASS; PG12 not run; original 63/dependency receipts retained separately",
   "linux_environment": "wait A validated dedicated DOCKER_CONFIG with local socket; do not set DOCKER_CONTEXT/DOCKER_HOST; shared batch limit2",
   "artifact_runtime": "/Users/mentianlu/.codex/artifacts/umanews-next-version-B/B-002/",
   "catalog_profiles_additions": {
@@ -151,7 +155,7 @@
     "scripts.tests.test_f02_docker_adapter": "python",
     "scripts.tests.test_f02_tool_package": "python",
     "scripts.tests.test_f02_receipt_bridge": "python",
-    "scripts.tests.test_f02_export_postgres": "python"
+    "scripts.tests.test_f02_export_postgres": "django"
   },
   "script_commit_binding": "fixed post-review head in coordinator stage message",
   "review_fix_parent_sha": "48c51fb19f328eb9add14dd5fca40d4ceffaae63",
@@ -159,12 +163,16 @@
   "integration_dependency_fix": "INT001-P2-01: catalog.tests takes precedence; exporter test fixture maps export+transfer, proposal only; root owns shared integration",
   "specialized_validation": {
     "scripts.tests.test_f02_export_postgres": {
-      "default": "guard_only_12_skipped",
-      "acceptance_requires": "fixed_manifest_and_isolated_PG16",
-      "expected_real_cases": 12
+      "default": "internal_ci_fixture_actual_execution_no_skip",
+      "acceptance_requires": "formal_collect_run_PG16_v2_binding_and_cleanup",
+      "expected_real_cases": 12,
+      "expected_total_cases": 25
     },
     "scripts.tests.test_f02_docker_adapter": {
       "Docker_smoke": "separate_synthetic_short_window_not_yet_run"
     }
-  }
+  },
+  "catalog_dedicated_batch_modules_additions": [
+    "scripts.tests.test_f02_export_postgres"
+  ]
 }
