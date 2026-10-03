@@ -1086,10 +1086,6 @@ CELERY_BEAT_SCHEDULE = {
         "task": "stable.tasks.publish_production_regions_window_task",
         "schedule": crontab(minute="*/5"),
     },
-    "qq-production-regions-window": {
-        "task": "stable.tasks.qq_production_regions_window_task",
-        "schedule": crontab(minute="*/5"),
-    },
     "detect-automation-anomalies": {
         "task": "stable.tasks.detect_automation_anomalies_task",
         "schedule": crontab(minute="*/30"),
