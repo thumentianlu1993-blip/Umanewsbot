@@ -61,3 +61,9 @@ q01 execution-plan/batch log未找到psycopg版本安装收据；requirements只
 1928代码review发现CREATE ROLE/DB后OID读取失败会误报complete。返修在每次CREATE前落0600/0700、fsync/rename的pending intent journal；可靠角色OID或DB OID+owner确认后才写known并清pending。未知intent存在则cleanup零连接/零DROP，保留私有runtime/journal、标unknown_container_cleanup_required，由自有容器生命周期回收，不按名字恢复/接管。
 
 新增FixtureFailureTests 6精确IDs已报root。RED首次5fail/1已有unknown；强化pending持久证据后6fail（5误complete，1缺intent）。GREEN新6+原13守卫=19PASS（31total/12PG未跑），CREATE之前journal存在、pending与unknown状态落盘、零DROP均证明。测试macOS路径resolve仅mock临时目录，用于私有文件验证；生产Linux helper保留严格/tmp路径，不放宽symlink保护。外部manifest/原13ID/runner不变，旧runtimev1/v2固定包冻结不执行。下一包v3须以新SHA/31IDs重绑。
+
+### v3 首次真实 Linux PG 候选执行与 P08 fixture 参数返修
+
+固定42a92650 / plan a15196bd 的唯一窗口实跑36.033秒，31项全部执行/零skip；30PASS、1ERROR：P08在smallint参数的generate_series重载上遇AmbiguousFunction。batch-0006/00112/0021均PASS，PGbatch003 12执行中11PASS+P08error。actual socket↔postmaster PID/start/fd/inode、四namespace、UID10001/0700/private /tmp tmpfs guard真实通过；fixture cleanup complete、PG stop true、host reaped/container removed true。receipt SHA da0c9c273ec3eb65d06523e68201cfcd523ce78bfb006532cf139c54e2ca2431，位于本机runtime b005-pg-window-v3。不是PG12完整GREEN，不冒称正式full已通过。
+
+最小纯技术修复仅为P08的generate_series两个参数显式::bigint，保留每dataset limit/limit+1及原31 IDs，不改业务SQL/生产代码/validator/权限/runner。真实失败即该缺陷RED，GREEN待新固定包核定后的PG复验；不重复已有19守卫或11PG证据。旧v1/v2/v3均保留，不覆盖收据或盲重跑。

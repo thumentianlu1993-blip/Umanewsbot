@@ -357,7 +357,7 @@ class PostgreSQLContracts(unittest.TestCase):
                 values={'cohort':"n,'japan'",'windows':"n,'publish'",'decisions':"n,1",'homepage_exposures':"n,1,'homepage'"}.get(key,'n')
                 c.execute('INSERT INTO public.'+table+'('+columns+') SELECT '+values+' FROM generate_series(1,%s) AS q(n)',(limit,))
             snapshot=self.metadata();self.assertEqual(snapshot['counts'][key],limit)
-            with self.admin.cursor() as c:c.execute('INSERT INTO public.'+table+'('+columns+') SELECT '+values+' FROM generate_series(%s,%s) AS q(n)',(limit+1,limit+1))
+            with self.admin.cursor() as c:c.execute('INSERT INTO public.'+table+'('+columns+') SELECT '+values+' FROM generate_series(%s::bigint,%s::bigint) AS q(n)',(limit+1,limit+1))
             with self.assertRaisesRegex(export.ExportError,'detail_budget_exceeded'):self.metadata()
             # Reset full fixture after each case so unrelated over-budget tables cannot mask this one.
             if key!=list(export.LIMITS)[-1]:self.setUp()
