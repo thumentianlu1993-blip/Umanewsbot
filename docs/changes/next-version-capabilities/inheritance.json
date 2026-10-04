@@ -1,0 +1,77 @@
+{
+  "source_thread_id": "01a0fc36-8f24-78a3-ab28-fe8de84cece9",
+  "source_worktree": "/Users/mentianlu/.codex/worktrees/4963/umanews",
+  "source_code_sha": "fc1eed938beb8b431e0d4b37953f7599a40a72ce",
+  "coordinator_thread_id": "01a0fdb2-b88c-7f93-8c9e-ba9564c33c93",
+  "current_base_sha": "907f8de699b31a6fcc80acc78e9ba070aadc4f28",
+  "inherited_on": "2026-10-03",
+  "files": [
+    {
+      "path": "docs/changes/next-version-capabilities/rollout.md",
+      "sha256": "8afc82914a575c7f236f299280a60e991349e41a4889f3761146210e309a1a4c"
+    },
+    {
+      "path": "docs/changes/next-version-capabilities/test_cases.md",
+      "sha256": "6a44f8b2b72d724943f21798ec62dcddf75b7a9319dad3567e11ca50fe47dbb5"
+    },
+    {
+      "path": "docs/changes/next-version-capabilities/tasks.md",
+      "sha256": "5972a92ff68aee3d22cd8bd7bc920ca57730aa6bc2e8986fe1171db8f00792d6"
+    },
+    {
+      "path": "docs/changes/next-version-capabilities/task_index.json",
+      "sha256": "84fdcf4ddf2c8e0d468d7a40bc221e592f3d7a081bf6bd427dd013ff76b7062b"
+    },
+    {
+      "path": "docs/changes/next-version-capabilities/spec.md",
+      "sha256": "452e1cbf3bd739b7ca34d6e0146c463aab3401e3781da554a9a1c8ac3c3330b3"
+    },
+    {
+      "path": "docs/changes/next-version-capabilities/design.md",
+      "sha256": "99e6eb5faab28949133d8cf5be029775db98696e8f446e046d0436e2208c0b7d"
+    },
+    {
+      "path": "docs/reports/2026-10-02-current-capabilities.md",
+      "sha256": "637660d343b1cf72257f4bb26d789ce2b0c8f1d82719c034d7276fe37b80c657"
+    },
+    {
+      "path": "docs/reports/2026-10-02-backlog-evidence-reconciliation.md",
+      "sha256": "0fedb0c90ceac68417195e0798a8c1f62b72a87f3385010fd81b21fe89a14e50"
+    },
+    {
+      "path": "docs/reports/2026-10-02-capability-evidence/browser-observations.json",
+      "sha256": "31aeff9d343d81ced9f36ecf784a806ed0ffaf1f74130f0d5c5a5872514ce061"
+    },
+    {
+      "path": "docs/reports/2026-10-02-capability-evidence/news-design-home-observation.json",
+      "sha256": "569daea909902402e9e5103ae93a524c7fc1a9e1169de91ce507b51d112f9efb"
+    },
+    {
+      "path": "docs/reports/2026-10-02-capability-evidence/thread-requirements.json",
+      "sha256": "29aff1eef5251da280dad7f2f7899a7560cce907e2028e5b147dbabb6d1db04d"
+    },
+    {
+      "path": "docs/reports/2026-10-02-capability-evidence/backlog-browser-observations.json",
+      "sha256": "ba52e398f406bd65234458ab322ec8014b0ec955e198380c5c1d9f3669274fe9"
+    }
+  ],
+  "note": "源文件当时未提交；逐文件留 SHA256，原工作树保持原样。四份状态文档仅迁入源新增段落，保留当前主线已有更新。",
+  "execution_copy_transformations": [
+    {
+      "path": "docs/reports/2026-10-02-capability-evidence/thread-requirements.json",
+      "reason": "排除两轮过期的治理指令正文，保留原始turn ID与原始文件哈希；保留50轮产品需求。"
+    },
+    {
+      "path": "docs/reports/2026-10-02-backlog-evidence-reconciliation.md",
+      "reason": "说明执行副本与原始历史证据的差异。"
+    },
+    {
+      "path": "docs/changes/next-version-capabilities/tasks.md",
+      "reason": "添加执行台账链接，原计划任务卡不变。"
+    },
+    {
+      "path": "docs/changes/next-version-capabilities/task_index.json",
+      "reason": "添加动态状态来源，保留原计划。"
+    }
+  ]
+}

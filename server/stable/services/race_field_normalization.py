@@ -1428,6 +1428,7 @@ def parse_display_distance(raw, *, unit_hint='', official_metric_meters=None, co
 _DISPLAY_GRADE_LABELS = {**{f'G{i}': f'G{i}' for i in range(1, 4)},
                          **{f'JPN{i}': f'Jpn{i}' for i in range(1, 4)},
                          **{f'JG{i}': f'J-G{i}' for i in range(1, 4)}, 'L': 'L', 'OP': 'OP'}
+_DISPLAY_GRADE_PATTERN = r'(JPN|JG|GROUP|GROUPE|GRADE|G)(III|II|I|[123])'
 _DISPLAY_CLASSES = {'NEWCOMER': '新马', 'MAIDEN': '未胜利', '1WIN': '1胜级', '2WIN': '2胜级', '3WIN': '3胜级',
                     '新馬': '新马', '新马': '新马', '未勝利': '未胜利', '未胜利': '未胜利'}
 
@@ -1454,7 +1455,7 @@ def parse_display_grade(raw, *, normalized_grade='', context=None, verified_race
     text = re.sub(r'^(?:重赏|重賞)\s*', '', text)
     compact = re.sub(r'[\s・.\-]', '', text)
     code = ''
-    match = re.fullmatch(r'(JPN|JG|GROUP|GROUPE|GRADE|G)(III|II|I|[123])', compact)
+    match = re.fullmatch(_DISPLAY_GRADE_PATTERN, compact)
     if match:
         system = match.group(1)
         number = {'I': '1', 'II': '2', 'III': '3'}.get(match.group(2), match.group(2))

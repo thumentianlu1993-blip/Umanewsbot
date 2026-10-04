@@ -1,0 +1,233 @@
+{
+  "schema_version": 1,
+  "task": "F05",
+  "code_base": "907f8de699b31a6fcc80acc78e9ba070aadc4f28",
+  "method": "本次IAB只读DOM可见信息；摘要由工具输出整理，不是生产数据库/官方来源/完整网页归档。未保存Cookie、隐藏字段、游标或新闻正文。",
+  "timezone": "Asia/Shanghai",
+  "horse_samples": [
+    {
+      "object_id": 7669,
+      "name": "美艺力量",
+      "urls": [
+        "https://umafans.run/horses/7669/",
+        "https://umafans.run/horses/7669/?records_page=2",
+        "https://umafans.run/horses/7669/?records_page=3"
+      ],
+      "observed_at": "2026-10-03T02:07:32.662+08:00",
+      "page_row_counts": [
+        20,
+        20,
+        5
+      ],
+      "displayed_counts": {
+        "starts": 45,
+        "wins": 10,
+        "seconds": 1,
+        "thirds": 3
+      },
+      "record_counts": {
+        "rows": 45,
+        "first": 10,
+        "second": 1,
+        "third": 3
+      },
+      "classification": "未复现指定统计/分页问题",
+      "result": "未复现分页/统计矛盾；主胜鞍混列G3/G1/G2仍复现",
+      "leading_zero_positions": 0
+    },
+    {
+      "object_id": 21607,
+      "name": "DINOZZO",
+      "urls": [
+        "https://umafans.run/horses/21607/",
+        "https://umafans.run/horses/21607/?records_page=2"
+      ],
+      "observed_at": "2026-10-03T02:07:49.271+08:00",
+      "page_row_counts": [
+        20,
+        20
+      ],
+      "displayed_counts": {
+        "starts": 40,
+        "wins": 5,
+        "seconds": 5,
+        "thirds": 8
+      },
+      "record_counts": {
+        "rows": 40,
+        "first": 5,
+        "second": 5,
+        "third": 8
+      },
+      "classification": "未复现指定统计/分页问题",
+      "result": "未复现前导零/统计矛盾",
+      "leading_zero_positions": 0
+    },
+    {
+      "object_id": 46412,
+      "name": "A Wave Of The Sea (IRE)",
+      "urls": [
+        "https://umafans.run/horses/46412/",
+        "https://umafans.run/horses/46412/?records_page=2",
+        "https://umafans.run/horses/46412/?records_page=3",
+        "https://umafans.run/horses/46412/?records_page=4"
+      ],
+      "observed_at": "2026-10-03T02:08:07.984+08:00",
+      "page_row_counts": [
+        20,
+        20,
+        20,
+        5
+      ],
+      "displayed_counts": {
+        "starts": 65,
+        "wins": 0,
+        "seconds": 0,
+        "thirds": 0
+      },
+      "record_counts": {
+        "rows": 65,
+        "first": 10,
+        "second": 4,
+        "third": 7
+      },
+      "classification": "复现",
+      "result": "汇总与公开履历矛盾复现；65条包含8条未完赛，不等于独立核验65次有效出赛",
+      "leading_zero_positions": 0
+    }
+  ],
+  "race_samples": [
+    {
+      "object_ref": {
+        "year": 2025,
+        "slug": "hong_kong-hong-kong-queen-elizabeth-ii-cup-2025",
+        "numeric_id": null
+      },
+      "url": "https://umafans.run/races/2025/hong_kong-hong-kong-queen-elizabeth-ii-cup-2025/",
+      "observed_at": "2026-10-03T02:08:08.833+08:00",
+      "runner_rows": 11,
+      "result_rows": 10,
+      "runner_only": "自由岛",
+      "runner_only_number": "11",
+      "classification": "复现公开缺行",
+      "boundary": "本次未取官方赛果，不能仅凭表差推断具体赛后状态或修复值"
+    },
+    {
+      "object_ref": {
+        "year": 2026,
+        "slug": "uk-bha-flat-2026-0730-078",
+        "numeric_id": null
+      },
+      "url": "https://umafans.run/races/2026/uk-bha-flat-2026-0730-078/",
+      "observed_at": "2026-10-03T02:08:10.037+08:00",
+      "runner_rows": 10,
+      "result_rows": 5,
+      "result_positions": [
+        "待核实",
+        "待核实",
+        "待核实",
+        "待核实",
+        "待核实"
+      ],
+      "winner_summary": "Diamond Necklace",
+      "time_label": "22:35（北京时间）",
+      "classification": "复现公开资料不一致",
+      "boundary": "出马表是登记名单，不能认定其余5匹均为实际出赛或退赛；需上游来源核验"
+    },
+    {
+      "object_ref": {
+        "year": 2026,
+        "slugs": [
+          "prix-de-larc-de-triomphe",
+          "fr-france-galop-2026-1004-100"
+        ],
+        "numeric_ids": null
+      },
+      "url": "https://umafans.run/races/?q=%E5%87%AF%E6%97%8B%E9%97%A8&year=2026&tab=all",
+      "observed_at": "2026-10-03T02:08:33.271+08:00",
+      "cards": [
+        {
+          "name": "凯旋门大赛",
+          "date": "2026-10-04",
+          "course": "ParisLongchamp",
+          "url": "https://umafans.run/races/2026/prix-de-larc-de-triomphe/",
+          "time": "22:05（北京时间）"
+        },
+        {
+          "name": "凯旋门大赛",
+          "date": "2026-10-04",
+          "course": "ParisLongchamp",
+          "url": "https://umafans.run/races/2026/fr-france-galop-2026-1004-100/",
+          "time": "北京时间待定"
+        }
+      ],
+      "classification": "复现同日同名双入口",
+      "boundary": "公开重复表现成立，实际canonical身份和引用迁移尚未核验，不能据页面直接合并数据库"
+    }
+  ],
+  "domains": [
+    {
+      "url": "https://umafans.run",
+      "observed_at": "2026-10-03T02:07:31.346+08:00",
+      "result": "公开详情可访问；首页主机在www别名页面链接可见，未独立复验根URL重定向"
+    },
+    {
+      "url": "https://www.umafans.run/",
+      "observed_at": "2026-10-03T02:10:07.793+08:00",
+      "result": "首页可访问，tab.url保留www，页面导航链接指向umafans.run；不宣称已301跳转"
+    },
+    {
+      "url": "https://umanews.run",
+      "observed_at": "2026-10-03T02:09:02.057+08:00",
+      "result": "net::ERR_CONNECTION_CLOSED"
+    },
+    {
+      "url": "https://www.umanews.run",
+      "observed_at": "2026-10-03T02:10:11.275+08:00",
+      "result": "net::ERR_CONNECTION_CLOSED"
+    }
+  ],
+  "grade_sample": {
+    "object_ref": {
+      "region": "germany",
+      "year": 2025
+    },
+    "urls": [
+      "https://umafans.run/races/?tab=all&region=germany&year=2025",
+      "https://umafans.run/races/?tab=all&region=germany&year=2025&grade=g1"
+    ],
+    "observed_at": [
+      "2026-10-03T02:08:34.757+08:00",
+      "2026-10-03T02:08:36.650+08:00"
+    ],
+    "all_grade_g1_names": [
+      "IDEE 156. Deutsches Derby",
+      "Grosser Dallmayr-Preis - Bayerisches Zuchtrennen ausgetragen seit 1866 - V4/4",
+      "167. Henkel-Preis der Diana - German Oaks",
+      "Westminster 135. Grosser Preis von Berlin",
+      "WETTSTAR.de - 155. Grosser Preis von Baden - V4/2",
+      "Mehl-Mülhens-Stiftung - 63. Preis von Europa"
+    ],
+    "filtered_result": "暂无符合条件的赛事。",
+    "classification": "复现标签与筛选不一致",
+    "boundary": "仅固定2025德国样例，不扩大解释为所有地区/年份；卡片numeric ID未公开取得"
+  },
+  "news_sample": {
+    "object_id": 9623,
+    "url": "https://umafans.run/news/9623/",
+    "observed_at": "2026-10-03T02:08:58.409+08:00",
+    "selector": ".article-body",
+    "paragraph_count": 38,
+    "keyword_counts": {
+      "当前": 0,
+      "热门": 0,
+      "CCA橡树": 0,
+      "正面交锋": 0,
+      "公平赔率": 0,
+      "登录": 0,
+      "免费注册": 0
+    },
+    "classification": "未复现指定污染",
+    "boundary": "不是全文质量合格证明，也不是历史清洗批次完成证明；段落数与历史39不同，未据此推断事实变化"
+  }
+}

@@ -1,0 +1,2514 @@
+{
+  "code_commit": "fc1eed938beb8b431e0d4b37953f7599a40a72ce",
+  "basis": "浏览器只读 DOM；不含登录态、表单隐藏字段、分页签名游标或新闻正文全文。",
+  "domain_attempts": [
+    {
+      "url": "https://umanews.run",
+      "result": "net::ERR_CONNECTION_CLOSED"
+    },
+    {
+      "url": "https://www.umanews.run",
+      "result": "net::ERR_CONNECTION_CLOSED"
+    },
+    {
+      "url": "http://umanews.run",
+      "result": "net::ERR_EMPTY_RESPONSE"
+    }
+  ],
+  "mobile_check": {
+    "url": "https://umafans.run/races/2026/jra-2026-0927-01/",
+    "viewport": "390x844",
+    "document_width": 390,
+    "document_scroll_width": 390,
+    "table_container_width": 316,
+    "table_scroll_width": 760,
+    "overflow_x": "auto",
+    "visual_observation": "冠军卡、分区导航与底部导航可见，表格在容器内横向滚动；只代表该样本"
+  },
+  "pages": [
+    {
+      "id": "calendar",
+      "url": "https://umafans.run/races/",
+      "title": "赛事日历",
+      "observedAt": "2026-10-02T10:46:28.060Z",
+      "text": "Race Calendar\n赛事日历\n本周焦点 · G1\n阿尔西比亚德斯锦标\n2026-10-02 · 坚兰\n太阳战车锦标\n2026-10-03 · 新市场\n香槟锦标\n2026-10-03 · 贝蒙园\n全部\n重点\n全部\n日本\n中国香港\n英国\n爱尔兰\n法国\n美国\n澳大利亚\n德国\n中东\n全部等级\nG1\nG2\nG3\n即将开赛\n全部时间\n已完赛\n9月26日\n星期六\n9月27日\n星期日\n9月30日\n星期三\n10月2日\n星期五 · 今天\n10月3日\n星期六\n10月4日\n星期日\n10月6日\n星期二\n10月7日\n星期三\n10月8日\n星期四\n年份\n全部年份\n2027\n2026\n2025\n2024\n2023\n2022\n2021\n2020\n2019\n2018\n2017\n2016\n2015\n2014\n2013\n2012\n2011\n2010\n2009\n2008\n2007\n2006\n2005\n2001\n2000\n赛事名称\n筛选\n加载更早赛事\n加载未来赛事\n9月\n26日\n星期六\nG2\n埃迪D锦标EDDIE D S.\n美国 · 圣雅尼塔\n4290英尺（约1308米）\n赛期已过，资料待补\n北京时间待定\n9月\n27日\n星期日\nG1\n短途锦标スプリンターズS\n日本 · 中山\n1200米\n3岁及以上\n已完赛\n冠军 纯粹魔法\nG2\n信雅达锦标ZENYATTA S.\n美国 · 圣雅尼塔\n1英里330英尺（约1710米）\n赛期已过，资料待补\n北京时间待定\nG2\n圣雅尼塔短途冠军锦标SANTA ANITA SPRINT CHAMPIONSHIP S.\n美国 · 圣雅尼塔\n0.75英里（约1207米）\n赛期已过，资料待补\n北京时间待定\n9月\n30日\n星期三\nJpn2\n日本テレビ盃\n日本 · 船桥\n1800米\n3岁及以上\n赛期已过，资料待补\n北京时间待定\n10月\n2日\n星期五 · 今天\nG1\n阿尔西比亚德斯锦标DARLEY ALCIBIADES S.\n美国 · 坚兰\n1英里330英尺（约1710米）\n今天\n北京时间待定\nG2\n茉莉锦标JESSAMINE S.\n美国 · 坚兰\n1英里330英尺（约1710米）\n今天\n北京时间待定\nG2\n凤凰锦标STOLL KEENON OGDEN PHOENIX S.\n美国 · 坚兰\n0.75英里（约1207米）\n今天\n北京时间待定\n10月\n3日\n星期六\nG1\n太阳战车锦标BetMGM SUN CHARIOT STAKES\n英国 · 新市场\n草地\n明天\n20:35（北京时间）\nG1\n香槟锦标CHAMPAGNE S.\n美国 · 贝蒙园\n1英里（约1609米）\n明天\n北京时间待定\nG1\n弗里泽特锦标FRIZETTE S.\n美国 · 贝蒙园\n1英里（约1609米）\n明天\n北京时间待定\nG2\n格里洛小姐锦标MISS GRILLO S.\n美国 · 贝蒙园\n1英里330英尺（约1710米）\n明天\n北京时间待定\nG2\n朝圣者锦标PILGRIM S.\n美国 · 贝蒙园\n1英里330英尺（约1710米）\n明天\n北京时间待定\nG1\n美式法老锦标AMERICAN PHAROAH S.\n美国 · 圣雅尼塔\n1英里330英尺（约1710米）\n明天\n北京时间待定\nG2\n橡叶锦标OAK LEAF S.\n美国 · 圣雅尼塔\n1英里330英尺（约1710米）\n明天\n北京时间待定\nG2\n牛仔大道锦标RODEO DRIVE S.\n美国 · 圣雅尼塔\n1.25英里（约2012米）\n明天\n北京时间待定\nG1\n育马者未来锦标CLAIBORNE BREEDERS' FUTURITY\n美国 · 坚兰\n1英里330英尺（约1710米）\n明天\n北京时间待定\nG1\n第一夫人锦标FIRST LADY S.\n美国 · 坚兰\n1英里（约1609米）\n明天\n北京时间待定\nG2\n美国纯种马俱乐部锦标THOROUGHBRED CLUB OF AMERICA S.\n美国 · 坚兰\n0.75英里（约1207米）\n明天\n北京时间待定\nG1\n草地一哩锦标COOLMORE TURF MILE S.\n美国 · 坚兰\n1英里（约1609米）\n明天\n北京时间待定\nG2\n伍德福德锦标WOODFORD S.\n美国 · 坚兰\n3630英尺（约1106米）\n明天\n北京时间待定\nG2\n绍德奈锦标QATAR PRIX CHAUDENAY\n法国 · ParisLongchamp\n3000米\n明天\n北京时间待定\nG2\n维尔登斯坦锦标QATAR PRIX DANIEL WILDENSTEIN\n法国 · ParisLongchamp\n1600米\n明天\n北京时间待定\nG2\n多拉尔锦标QATAR PRIX DOLLAR\n法国 · ParisLongchamp\n1950米\n明天\n北京时间待定\nG1\n皇家地锦标QATAR PRIX DE ROYALLIEU\n法国 · ParisLongchamp\n2800米\n明天\n北京时间待定\nG1\n嘉登大赛QATAR PRIX DU CADRAN\n法国 · ParisLongchamp\n4000米\n明天\n北京时间待定\n10月\n4日\n星期日\nG2\n京都大赏典京都大賞典\n日本 · 京都\n2400米\n3岁及以上\n2天后\n14:30（北京时间）\nG2\n每日王冠毎日王冠\n日本 · 東京\n1800米\n3岁及以上\n2天后\n14:45（北京时间）\nG1\n凯旋门大赛Prix de l'Arc de Triomphe\n法国 · ParisLongchamp\n待核实\n3岁及以上\n2天后\n22:05（北京时间）\nG2\n波本锦标CASTLE & KEY BOURBON S.\n美国 · 坚兰\n1英里330英尺（约1710米）\n2天后\n北京时间待定\nG1\n斯宾斯特锦标JUDDMONTE SPINSTER S.\n美国 · 坚兰\n1.125英里（约1811米）\n2天后\n北京时间待定\nG1\n尚卢利加迪大赛QATAR PRIX JEAN-LUC LAGARDERE\n法国 · ParisLongchamp\n1400米\n2天后\n北京时间待定\nG1\n马素尔大赛QATAR PRIX MARCEL BOUSSAC - CRITERIUM DES POULICHES\n法国 · ParisLongchamp\n1600米\n2天后\n北京时间待定\nG1\n隆尚教堂大赛PRIX DE L ’ABBAYE DE LONGCHAMP LONGINES\n法国 · ParisLongchamp\n1000米\n2天后\n北京时间待定\nG1\n歌剧锦标PRIX DE L ’OPERA LONGINES\n法国 · ParisLongchamp\n2000米\n2天后\n北京时间待定\nG1\n森林大赛QATAR PRIX DE LA FORET\n法国 · ParisLongchamp\n1400米\n2天后\n北京时间待定\nG1\n凯旋门大赛QATAR PRIX DE L ’ARC DE TRIOMPHE\n法国 · ParisLongchamp\n2400米\n2天后\n北京时间待定\n10月\n6日\n星期二\nJpn2\n女士序曲レディスプレリュード\n日本 · 大井\n1800米\n3岁及以上 · 仅限雌马\n4天后\n北京时间待定\n10月\n7日\n星期三\nJpn1\n日本泥地经典赛ジャパンダートクラシック\n日本 · 大井\n2000米\n5天后\n北京时间待定\n10月\n8日\n星期四\nJpn2\n東京盃\n日本 · 大井\n1200米\n3岁及以上\n6天后\n北京时间待定",
+      "links": [
+        {
+          "text": "阿尔西比亚德斯锦标\n2026-10-02 · 坚兰",
+          "url": "https://umafans.run/races/2026/us-toba-2026-1002-304/"
+        },
+        {
+          "text": "太阳战车锦标\n2026-10-03 · 新市场",
+          "url": "https://umafans.run/races/2026/uk-bha-flat-2026-1003-122/"
+        },
+        {
+          "text": "香槟锦标\n2026-10-03 · 贝蒙园",
+          "url": "https://umafans.run/races/2026/us-toba-2026-1003-307/"
+        },
+        {
+          "text": "全部",
+          "url": "https://umafans.run/races/?tab=all"
+        },
+        {
+          "text": "重点",
+          "url": "https://umafans.run/races/?tab=key"
+        },
+        {
+          "text": "全部",
+          "url": "https://umafans.run/races/"
+        },
+        {
+          "text": "日本",
+          "url": "https://umafans.run/races/?region=japan"
+        },
+        {
+          "text": "中国香港",
+          "url": "https://umafans.run/races/?region=hong_kong"
+        },
+        {
+          "text": "英国",
+          "url": "https://umafans.run/races/?region=united_kingdom"
+        },
+        {
+          "text": "爱尔兰",
+          "url": "https://umafans.run/races/?region=ireland"
+        },
+        {
+          "text": "法国",
+          "url": "https://umafans.run/races/?region=france"
+        },
+        {
+          "text": "美国",
+          "url": "https://umafans.run/races/?region=united_states"
+        },
+        {
+          "text": "澳大利亚",
+          "url": "https://umafans.run/races/?region=australia"
+        },
+        {
+          "text": "德国",
+          "url": "https://umafans.run/races/?region=germany"
+        },
+        {
+          "text": "中东",
+          "url": "https://umafans.run/races/?region=middle_east"
+        },
+        {
+          "text": "全部等级",
+          "url": "https://umafans.run/races/"
+        },
+        {
+          "text": "G1",
+          "url": "https://umafans.run/races/?grade=g1"
+        },
+        {
+          "text": "G2",
+          "url": "https://umafans.run/races/?grade=g2"
+        },
+        {
+          "text": "G3",
+          "url": "https://umafans.run/races/?grade=g3"
+        },
+        {
+          "text": "即将开赛",
+          "url": "https://umafans.run/races/?when=upcoming"
+        },
+        {
+          "text": "全部时间",
+          "url": "https://umafans.run/races/"
+        },
+        {
+          "text": "已完赛",
+          "url": "https://umafans.run/races/?when=finished"
+        },
+        {
+          "text": "9月26日\n星期六",
+          "url": "https://umafans.run/races/#race-date-2026-09-26"
+        },
+        {
+          "text": "9月27日\n星期日",
+          "url": "https://umafans.run/races/#race-date-2026-09-27"
+        },
+        {
+          "text": "9月30日\n星期三",
+          "url": "https://umafans.run/races/#race-date-2026-09-30"
+        },
+        {
+          "text": "10月2日\n星期五 · 今天",
+          "url": "https://umafans.run/races/#race-date-2026-10-02"
+        },
+        {
+          "text": "10月3日\n星期六",
+          "url": "https://umafans.run/races/#race-date-2026-10-03"
+        },
+        {
+          "text": "10月4日\n星期日",
+          "url": "https://umafans.run/races/#race-date-2026-10-04"
+        },
+        {
+          "text": "10月6日\n星期二",
+          "url": "https://umafans.run/races/#race-date-2026-10-06"
+        },
+        {
+          "text": "10月7日\n星期三",
+          "url": "https://umafans.run/races/#race-date-2026-10-07"
+        },
+        {
+          "text": "10月8日\n星期四",
+          "url": "https://umafans.run/races/#race-date-2026-10-08"
+        },
+        {
+          "text": "G2\n埃迪D锦标EDDIE D S.\n美国 · 圣雅尼塔\n4290英尺（约1308米）\n赛期已过，资料待补\n北京时间待定",
+          "url": "https://umafans.run/races/2026/us-toba-2026-0926-297/"
+        },
+        {
+          "text": "G1\n短途锦标スプリンターズS\n日本 · 中山\n1200米\n3岁及以上\n已完赛\n冠军 纯粹魔法",
+          "url": "https://umafans.run/races/2026/jra-2026-0927-01/"
+        },
+        {
+          "text": "G2\n信雅达锦标ZENYATTA S.\n美国 · 圣雅尼塔\n1英里330英尺（约1710米）\n赛期已过，资料待补\n北京时间待定",
+          "url": "https://umafans.run/races/2026/us-toba-2026-0927-302/"
+        },
+        {
+          "text": "G2\n圣雅尼塔短途冠军锦标SANTA ANITA SPRINT CHAMPIONSHIP S.\n美国 · 圣雅尼塔\n0.75英里（约1207米）\n赛期已过，资料待补\n北京时间待定",
+          "url": "https://umafans.run/races/2026/us-toba-2026-0927-303/"
+        },
+        {
+          "text": "Jpn2\n日本テレビ盃\n日本 · 船桥\n1800米\n3岁及以上\n赛期已过，资料待补\n北京时间待定",
+          "url": "https://umafans.run/races/2026/nar-dirt-2026-0930-30/"
+        },
+        {
+          "text": "G1\n阿尔西比亚德斯锦标DARLEY ALCIBIADES S.\n美国 · 坚兰\n1英里330英尺（约1710米）\n今天\n北京时间待定",
+          "url": "https://umafans.run/races/2026/us-toba-2026-1002-304/"
+        },
+        {
+          "text": "G2\n茉莉锦标JESSAMINE S.\n美国 · 坚兰\n1英里330英尺（约1710米）\n今天\n北京时间待定",
+          "url": "https://umafans.run/races/2026/us-toba-2026-1002-305/"
+        },
+        {
+          "text": "G2\n凤凰锦标STOLL KEENON OGDEN PHOENIX S.\n美国 · 坚兰\n0.75英里（约1207米）\n今天\n北京时间待定",
+          "url": "https://umafans.run/races/2026/us-toba-2026-1002-306/"
+        },
+        {
+          "text": "G1\n太阳战车锦标BetMGM SUN CHARIOT STAKES\n英国 · 新市场\n草地\n明天\n20:35（北京时间）",
+          "url": "https://umafans.run/races/2026/uk-bha-flat-2026-1003-122/"
+        },
+        {
+          "text": "G1\n香槟锦标CHAMPAGNE S.\n美国 · 贝蒙园\n1英里（约1609米）\n明天\n北京时间待定",
+          "url": "https://umafans.run/races/2026/us-toba-2026-1003-307/"
+        },
+        {
+          "text": "G1\n弗里泽特锦标FRIZETTE S.\n美国 · 贝蒙园\n1英里（约1609米）\n明天\n北京时间待定",
+          "url": "https://umafans.run/races/2026/us-toba-2026-1003-308/"
+        },
+        {
+          "text": "G2\n格里洛小姐锦标MISS GRILLO S.\n美国 · 贝蒙园\n1英里330英尺（约1710米）\n明天\n北京时间待定",
+          "url": "https://umafans.run/races/2026/us-toba-2026-1003-309/"
+        },
+        {
+          "text": "G2\n朝圣者锦标PILGRIM S.\n美国 · 贝蒙园\n1英里330英尺（约1710米）\n明天\n北京时间待定",
+          "url": "https://umafans.run/races/2026/us-toba-2026-1003-311/"
+        },
+        {
+          "text": "G1\n美式法老锦标AMERICAN PHAROAH S.\n美国 · 圣雅尼塔\n1英里330英尺（约1710米）\n明天\n北京时间待定",
+          "url": "https://umafans.run/races/2026/us-toba-2026-1003-313/"
+        },
+        {
+          "text": "G2\n橡叶锦标OAK LEAF S.\n美国 · 圣雅尼塔\n1英里330英尺（约1710米）\n明天\n北京时间待定",
+          "url": "https://umafans.run/races/2026/us-toba-2026-1003-314/"
+        },
+        {
+          "text": "G2\n牛仔大道锦标RODEO DRIVE S.\n美国 · 圣雅尼塔\n1.25英里（约2012米）\n明天\n北京时间待定",
+          "url": "https://umafans.run/races/2026/us-toba-2026-1003-315/"
+        },
+        {
+          "text": "G1\n育马者未来锦标CLAIBORNE BREEDERS' FUTURITY\n美国 · 坚兰\n1英里330英尺（约1710米）\n明天\n北京时间待定",
+          "url": "https://umafans.run/races/2026/us-toba-2026-1003-317/"
+        },
+        {
+          "text": "G1\n第一夫人锦标FIRST LADY S.\n美国 · 坚兰\n1英里（约1609米）\n明天\n北京时间待定",
+          "url": "https://umafans.run/races/2026/us-toba-2026-1003-318/"
+        },
+        {
+          "text": "G2\n美国纯种马俱乐部锦标THOROUGHBRED CLUB OF AMERICA S.\n美国 · 坚兰\n0.75英里（约1207米）\n明天\n北京时间待定",
+          "url": "https://umafans.run/races/2026/us-toba-2026-1003-319/"
+        },
+        {
+          "text": "G1\n草地一哩锦标COOLMORE TURF MILE S.\n美国 · 坚兰\n1英里（约1609米）\n明天\n北京时间待定",
+          "url": "https://umafans.run/races/2026/us-toba-2026-1003-320/"
+        },
+        {
+          "text": "G2\n伍德福德锦标WOODFORD S.\n美国 · 坚兰\n3630英尺（约1106米）\n明天\n北京时间待定",
+          "url": "https://umafans.run/races/2026/us-toba-2026-1003-321/"
+        },
+        {
+          "text": "G2\n绍德奈锦标QATAR PRIX CHAUDENAY\n法国 · ParisLongchamp\n3000米\n明天\n北京时间待定",
+          "url": "https://umafans.run/races/2026/fr-france-galop-2026-1003-090/"
+        },
+        {
+          "text": "G2\n维尔登斯坦锦标QATAR PRIX DANIEL WILDENSTEIN\n法国 · ParisLongchamp\n1600米\n明天\n北京时间待定",
+          "url": "https://umafans.run/races/2026/fr-france-galop-2026-1003-091/"
+        },
+        {
+          "text": "G2\n多拉尔锦标QATAR PRIX DOLLAR\n法国 · ParisLongchamp\n1950米\n明天\n北京时间待定",
+          "url": "https://umafans.run/races/2026/fr-france-galop-2026-1003-092/"
+        },
+        {
+          "text": "G1\n皇家地锦标QATAR PRIX DE ROYALLIEU\n法国 · ParisLongchamp\n2800米\n明天\n北京时间待定",
+          "url": "https://umafans.run/races/2026/fr-france-galop-2026-1003-093/"
+        },
+        {
+          "text": "G1\n嘉登大赛QATAR PRIX DU CADRAN\n法国 · ParisLongchamp\n4000米\n明天\n北京时间待定",
+          "url": "https://umafans.run/races/2026/fr-france-galop-2026-1003-094/"
+        },
+        {
+          "text": "G2\n京都大赏典京都大賞典\n日本 · 京都\n2400米\n3岁及以上\n2天后\n14:30（北京时间）",
+          "url": "https://umafans.run/races/2026/jra-2026-1004-02/"
+        },
+        {
+          "text": "G2\n每日王冠毎日王冠\n日本 · 東京\n1800米\n3岁及以上\n2天后\n14:45（北京时间）",
+          "url": "https://umafans.run/races/2026/jra-2026-1004-01/"
+        },
+        {
+          "text": "G1\n凯旋门大赛Prix de l'Arc de Triomphe\n法国 · ParisLongchamp\n待核实\n3岁及以上\n2天后\n22:05（北京时间）",
+          "url": "https://umafans.run/races/2026/prix-de-larc-de-triomphe/"
+        },
+        {
+          "text": "G2\n波本锦标CASTLE & KEY BOURBON S.\n美国 · 坚兰\n1英里330英尺（约1710米）\n2天后\n北京时间待定",
+          "url": "https://umafans.run/races/2026/us-toba-2026-1004-324/"
+        },
+        {
+          "text": "G1\n斯宾斯特锦标JUDDMONTE SPINSTER S.\n美国 · 坚兰\n1.125英里（约1811米）\n2天后\n北京时间待定",
+          "url": "https://umafans.run/races/2026/us-toba-2026-1004-326/"
+        },
+        {
+          "text": "G1\n尚卢利加迪大赛QATAR PRIX JEAN-LUC LAGARDERE\n法国 · ParisLongchamp\n1400米\n2天后\n北京时间待定",
+          "url": "https://umafans.run/races/2026/fr-france-galop-2026-1004-095/"
+        },
+        {
+          "text": "G1\n马素尔大赛QATAR PRIX MARCEL BOUSSAC - CRITERIUM DES POULICHES\n法国 · ParisLongchamp\n1600米\n2天后\n北京时间待定",
+          "url": "https://umafans.run/races/2026/fr-france-galop-2026-1004-096/"
+        },
+        {
+          "text": "G1\n隆尚教堂大赛PRIX DE L ’ABBAYE DE LONGCHAMP LONGINES\n法国 · ParisLongchamp\n1000米\n2天后\n北京时间待定",
+          "url": "https://umafans.run/races/2026/fr-france-galop-2026-1004-097/"
+        },
+        {
+          "text": "G1\n歌剧锦标PRIX DE L ’OPERA LONGINES\n法国 · ParisLongchamp\n2000米\n2天后\n北京时间待定",
+          "url": "https://umafans.run/races/2026/fr-france-galop-2026-1004-098/"
+        },
+        {
+          "text": "G1\n森林大赛QATAR PRIX DE LA FORET\n法国 · ParisLongchamp\n1400米\n2天后\n北京时间待定",
+          "url": "https://umafans.run/races/2026/fr-france-galop-2026-1004-099/"
+        },
+        {
+          "text": "G1\n凯旋门大赛QATAR PRIX DE L ’ARC DE TRIOMPHE\n法国 · ParisLongchamp\n2400米\n2天后\n北京时间待定",
+          "url": "https://umafans.run/races/2026/fr-france-galop-2026-1004-100/"
+        },
+        {
+          "text": "Jpn2\n女士序曲レディスプレリュード\n日本 · 大井\n1800米\n3岁及以上 · 仅限雌马\n4天后\n北京时间待定",
+          "url": "https://umafans.run/races/2026/nar-dirt-2026-1006-32/"
+        },
+        {
+          "text": "Jpn1\n日本泥地经典赛ジャパンダートクラシック\n日本 · 大井\n2000米\n5天后\n北京时间待定",
+          "url": "https://umafans.run/races/2026/nar-dirt-2026-1007-33/"
+        },
+        {
+          "text": "Jpn2\n東京盃\n日本 · 大井\n1200米\n3岁及以上\n6天后\n北京时间待定",
+          "url": "https://umafans.run/races/2026/nar-dirt-2026-1008-34/"
+        }
+      ],
+      "controls": [
+        {
+          "tag": "SELECT",
+          "name": "year",
+          "type": "select-one",
+          "text": "全部年份\n2027\n2026\n2025\n2024\n2023\n2022\n2021\n2020\n2019\n2018\n2017\n2016\n2015\n2014\n2013\n2012\n2011\n2010\n2009\n2008\n2007\n2006\n2005\n2001\n2000",
+          "value": ""
+        },
+        {
+          "tag": "INPUT",
+          "name": "q",
+          "type": "search",
+          "text": "",
+          "value": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "筛选",
+          "value": ""
+        }
+      ],
+      "tables": []
+    },
+    {
+      "id": "article",
+      "url": "https://umafans.run/news/19343/",
+      "title": "红玛瑙退役…将转任种马　去年短途马锦标夺冠 · UmaFans",
+      "observedAt": "2026-10-02T10:46:28.176Z",
+      "text": "← 返回首页\n红玛瑙退役…将转任种马　去年短途马锦标夺冠\n2026-10-02 18:31 发布\n\n去年短途马锦标冠军红玛瑙（雄9岁，父银幕英雄）已决定退役，今后预定在北海道新冠町的ビッグレッドファーム成为种马。通算37战9胜，获得奖金5亿7436万\n[新闻正文省略，保留功能入口与页面链接供复查]",
+      "links": [
+        {
+          "text": "← 返回首页",
+          "url": "https://umafans.run/"
+        },
+        {
+          "text": "← 上一篇\n【蛋白石S・周五动态】良血马ディアナザール觉醒在即　齐藤崇练马师所求为何　“若能取胜，马也会更有自信”",
+          "url": "https://umafans.run/news/19338/"
+        },
+        {
+          "text": "【蛋白石S・周五动态】良血马ディアナザール觉醒在即　齐藤崇练马师所求为何　“若能取胜，马也会更有自信”",
+          "url": "https://umafans.run/news/19338/"
+        },
+        {
+          "text": "「九州之星」ヨカヨカ的首胎ヨカオウ闪电移籍香港！上月30日注销竞走马登记 九州的灵魂跨越海洋",
+          "url": "https://umafans.run/news/19303/"
+        },
+        {
+          "text": "【京都大赏典排位确定】ダノンシーマ为8档18号，拯救者为2档4号",
+          "url": "https://umafans.run/news/19295/"
+        },
+        {
+          "text": "【京都新马赛】ジーティーギャング　终于揭开面纱　福永师“感受到潜力”",
+          "url": "https://umafans.run/news/19258/"
+        }
+      ],
+      "controls": [],
+      "tables": []
+    },
+    {
+      "id": "horses",
+      "url": "https://umafans.run/horses/",
+      "title": "马匹档案",
+      "observedAt": "2026-10-02T10:46:28.290Z",
+      "text": "Horse Profiles\n马匹档案\n搜索\n☆ 关注\n英国\nA Bit Of Spirit (IRE)\n\nA Bit Of Spirit (IRE)\n\n资料补全中\n\n6 战\n0 冠\n0 亚\n0 季\n☆ 关注\n美国\nA Bourbon For Toby (USA)\n\nA Bourbon For Toby (USA)\n\n资料补全中\n\n1 战\n0 冠\n0 亚\n0 季\n☆ 关注\n英国\nA Boy Named Susie (IRE)\n\nA Boy Named Susie (IRE)\n\n资料补全中\n\n8 战\n0 冠\n0 亚\n0 季\n☆ 关注\n美国\nA Fine Chardonnay (USA)\n\nA Fine Chardonnay (USA)\n\n资料补全中\n\n1 战\n0 冠\n0 亚\n0 季\n☆ 关注\n英国\nA La Prochaine (FR)\n\nA La Prochaine (FR)\n\n资料补全中\n\n3 战\n0 冠\n0 亚\n0 季\n☆ 关注\n其他\nA Little Deep (AUS)\n\nA Little Deep (AUS)\n\n资料补全中\n\n6 战\n0 冠\n0 亚\n0 季\n☆ 关注\n英国\nA Path To Ronda (IRE)\n\nA Path To Ronda (IRE)\n\n资料补全中\n\n8 战\n0 冠\n0 亚\n0 季\n☆ 关注\n英国\nA Taste Of Glory (GER)\n\nA Taste Of Glory (GER)\n\n资料补全中\n\n8 战\n0 冠\n0 亚\n0 季\n☆ 关注\n美国\nA Thousand Miles (USA)\n\nA Thousand Miles (USA)\n\n资料补全中\n\n8 战\n0 冠\n0 亚\n0 季\n☆ 关注\n英国\nA Wave Of The Sea (IRE)\n\nA Wave Of The Sea (IRE)\n\n资料补全中\n\n65 战\n0 冠\n0 亚\n0 季\n☆ 关注\n美国\nA. P.'s Girl (USA)\n\nA. P.'s Girl (USA)\n\n资料补全中\n\n1 战\n0 冠\n0 亚\n0 季\n☆ 关注\n美国\nA. Z. Wildcat (USA)\n\nA. Z. Wildcat (USA)\n\n资料补全中\n\n1 战\n0 冠\n0 亚\n0 季\n☆ 关注\n美国\nAbaan (USA)\n\nAbaan (USA)\n\n资料补全中\n\n13 战\n0 冠\n0 亚\n0 季\n☆ 关注\n其他\nAbachi (GER)\n\nAbachi (GER)\n\n资料补全中\n\n3 战\n0 冠\n0 亚\n0 季\n☆ 关注\n其他\nAbacus (IRE)\n\nAbacus (IRE)\n\n资料补全中\n\n1 战\n0 冠\n0 亚\n0 季\n☆ 关注\n英国\nAbashiri (GB)\n\nAbashiri (GB)\n\n资料补全中\n\n4 战\n0 冠\n0 亚\n0 季\n☆ 关注\n其他\nAberdeen Flyer (AUS)\n\nAberdeen Flyer (AUS)\n\n资料补全中\n\n1 战\n0 冠\n0 亚\n0 季\n☆ 关注\n其他\nAberlour (NZ)\n\nAberlour (NZ)\n\n资料补全中\n\n3 战\n0 冠\n0 亚\n0 季\n☆ 关注\n美国\nAbientot (USA)\n\nAbientot (USA)\n\n资料补全中\n\n5 战\n0 冠\n0 亚\n0 季\n☆ 关注\n美国\nAbigail (USA)\n\nAbigail (USA)\n\n资料补全中\n\n1 战\n0 冠\n0 亚\n0 季\n☆ 关注\n其他\nAbounding (AUS)\n\nAbounding (AUS)\n\n资料补全中\n\n21 战\n0 冠\n0 亚\n0 季\n☆ 关注\n其他\nAbout To Explode (AUS)\n\nAbout To Explode (AUS)\n\n资料补全中\n\n1 战\n0 冠\n0 亚\n0 季\n☆ 关注\n其他\nAbrafo (NZ)\n\nAbrafo (NZ)\n\n资料补全中\n\n1 战\n0 冠\n0 亚\n0 季\n☆ 关注\n英国\nAbraham Lincoln (GB)\n\nAbraham Lincoln (GB)\n\n资料补全中\n\n2 战\n0 冠\n0 亚\n0 季\n第 1 / 369 页\n下一页",
+      "links": [
+        {
+          "text": "A Bit Of Spirit (IRE)",
+          "url": "https://umafans.run/horses/50340/"
+        },
+        {
+          "text": "A Bourbon For Toby (USA)",
+          "url": "https://umafans.run/horses/49585/"
+        },
+        {
+          "text": "A Boy Named Susie (IRE)",
+          "url": "https://umafans.run/horses/50516/"
+        },
+        {
+          "text": "A Fine Chardonnay (USA)",
+          "url": "https://umafans.run/horses/51954/"
+        },
+        {
+          "text": "A La Prochaine (FR)",
+          "url": "https://umafans.run/horses/51188/"
+        },
+        {
+          "text": "A Little Deep (AUS)",
+          "url": "https://umafans.run/horses/47303/"
+        },
+        {
+          "text": "A Path To Ronda (IRE)",
+          "url": "https://umafans.run/horses/49648/"
+        },
+        {
+          "text": "A Taste Of Glory (GER)",
+          "url": "https://umafans.run/horses/50799/"
+        },
+        {
+          "text": "A Thousand Miles (USA)",
+          "url": "https://umafans.run/horses/50908/"
+        },
+        {
+          "text": "A Wave Of The Sea (IRE)",
+          "url": "https://umafans.run/horses/46412/"
+        },
+        {
+          "text": "A. P.'s Girl (USA)",
+          "url": "https://umafans.run/horses/51916/"
+        },
+        {
+          "text": "A. Z. Wildcat (USA)",
+          "url": "https://umafans.run/horses/48910/"
+        },
+        {
+          "text": "Abaan (USA)",
+          "url": "https://umafans.run/horses/46542/"
+        },
+        {
+          "text": "Abachi (GER)",
+          "url": "https://umafans.run/horses/51327/"
+        },
+        {
+          "text": "Abacus (IRE)",
+          "url": "https://umafans.run/horses/52419/"
+        },
+        {
+          "text": "Abashiri (GB)",
+          "url": "https://umafans.run/horses/51280/"
+        },
+        {
+          "text": "Aberdeen Flyer (AUS)",
+          "url": "https://umafans.run/horses/52123/"
+        },
+        {
+          "text": "Aberlour (NZ)",
+          "url": "https://umafans.run/horses/47607/"
+        },
+        {
+          "text": "Abientot (USA)",
+          "url": "https://umafans.run/horses/48957/"
+        },
+        {
+          "text": "Abigail (USA)",
+          "url": "https://umafans.run/horses/51938/"
+        },
+        {
+          "text": "Abounding (AUS)",
+          "url": "https://umafans.run/horses/47644/"
+        },
+        {
+          "text": "About To Explode (AUS)",
+          "url": "https://umafans.run/horses/52414/"
+        },
+        {
+          "text": "Abrafo (NZ)",
+          "url": "https://umafans.run/horses/50155/"
+        },
+        {
+          "text": "Abraham Lincoln (GB)",
+          "url": "https://umafans.run/horses/52367/"
+        },
+        {
+          "text": "下一页",
+          "url": "https://umafans.run/horses/?page=2"
+        }
+      ],
+      "controls": [
+        {
+          "tag": "INPUT",
+          "name": "q",
+          "type": "search",
+          "text": "",
+          "value": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "搜索",
+          "value": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "☆ 关注",
+          "value": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "☆ 关注",
+          "value": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "☆ 关注",
+          "value": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "☆ 关注",
+          "value": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "☆ 关注",
+          "value": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "☆ 关注",
+          "value": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "☆ 关注",
+          "value": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "☆ 关注",
+          "value": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "☆ 关注",
+          "value": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "☆ 关注",
+          "value": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "☆ 关注",
+          "value": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "☆ 关注",
+          "value": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "☆ 关注",
+          "value": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "☆ 关注",
+          "value": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "☆ 关注",
+          "value": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "☆ 关注",
+          "value": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "☆ 关注",
+          "value": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "☆ 关注",
+          "value": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "☆ 关注",
+          "value": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "☆ 关注",
+          "value": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "☆ 关注",
+          "value": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "☆ 关注",
+          "value": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "☆ 关注",
+          "value": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "☆ 关注",
+          "value": ""
+        }
+      ],
+      "tables": []
+    },
+    {
+      "id": "official-result",
+      "url": "https://umafans.run/races/2026/jra-2026-0927-01/",
+      "title": "短途锦标 2026",
+      "observedAt": "2026-10-02T10:46:28.407Z",
+      "text": "返回赛事日历\n返回首页\nG1\n日本 · 中山 · 1200米\n2026\n短途锦标\n\nスプリンターズS · 2026-09-27 · 14:40（北京时间）\n\nWINNER · 冠军\n纯粹魔法\n骑师\n岩田 望来\n练马师\n安田 翔伍\n完赛时间\n1分9.2秒\n2名 ワールズエンド（颈差）\n3名 声动莫莉安娜（鼻差）\n概览\n出马表\n赛果\n历年冠军\n基础资料\n场地\n草地\n等级\nG1\n日期\n2026-09-27\n时间\n14:40（北京时间）\n马场\n中山\n距离\n1200米\n参赛条件\n3岁及以上\n状态\n已完赛\n出马表\n闸位\t马号\t马名\t骑师\t练马师\t负重\t赔率 / 热门排名\t状态\n1\t1\tレッドモンレーヴ\t酒井 学\t蛯名 正義\t待核实\t— / —\t已出走登记\n1\t2\tアイサンサン\t幸 英明\t橋田 宜長\t待核实\t— / —\t已出走登记\n2\t3\t大海女神\t武 豊\t池江 泰寿\t待核实\t— / —\t已出走登记\n2\t4\tジューンブレア\t坂井 瑠星\t武 英智\t待核实\t— / —\t已出走登记\n3\t5\t声动莫莉安娜\t吉田 隼人\t武 英智\t待核实\t— / —\t已出走登记\n3\t6\tワールズエンド\t津村 明秀\t池添 学\t待核实\t— / —\t已出走登记\n4\t7\tペアポルックス\t岩田 康誠\t梅田 智之\t待核实\t— / —\t已出走登记\n4\t8\tエーティーマクフィ\t富田 暁\t武 英智\t待核实\t— / —\t已出走登记\n5\t9\tスターアニス\tC.ルメール\t高野 友和\t待核实\t— / —\t已出走登记\n5\t10\tレイピア\t横山 武史\t中竹 和也\t待核实\t— / —\t已出走登记\n6\t11\t贤德之君\t鮫島 克駿\t杉山 晴紀\t待核实\t— / —\t已出走登记\n6\t12\tブラックチャリス\t浜中 俊\t武 幸四郎\t待核实\t— / —\t已出走登记\n7\t13\t拼胜堡\t松山 弘平\t橋口 慎介\t待核实\t— / —\t已出走登记\n7\t14\tウインカーネリアン\t三浦 皇成\t鹿戸 雄一\t待核实\t— / —\t已出走登记\n8\t15\t闪击刺拳\t西村 淳也\t西園 翔太\t待核实\t— / —\t已出走登记\n8\t16\t纯粹魔法\t岩田 望来\t安田 翔伍\t待核实\t— / —\t已出走登记\n赛果\n名次\t马号\t马名\t骑师\t练马师\t时间\t差距\t赔率 / 热门排名\n1\t16\t纯粹魔法\t岩田 望来\t安田 翔伍\t1分9.2秒\t—\t— / —\n2\t6\tワールズエンド\t津村 明秀\t池添 学\t1分9.2秒\t颈差\t— / —\n3\t5\t声动莫莉安娜\t吉田 隼人\t武 英智\t1分9.2秒\t鼻差\t— / —\n4\t9\tスターアニス\tC.ルメール\t高野 友和\t1分9.4秒\t待核实\t— / —\n5\t1\tレッドモンレーヴ\t酒井 学\t蛯名 正義\t1分9.6秒\t待核实\t— / —\n6\t14\tウインカーネリアン\t三浦 皇成\t鹿戸 雄一\t1分9.6秒\t颈差\t— / —\n7\t8\tエーティーマクフィ\t富田 暁\t武 英智\t1分9.7秒\t颈差\t— / —\n并列第8\t4\tジューンブレア\t坂井 瑠星\t武 英智\t1分9.7秒\t头差\t— / —\n并列第8\t7\tペアポルックス\t岩田 康誠\t梅田 智之\t1分9.7秒\t同着\t— / —\n10\t3\t大海女神\t武 豊\t池江 泰寿\t1分9.7秒\t鼻差\t— / —\n11\t2\tアイサンサン\t幸 英明\t橋田 宜長\t1分9.8秒\t待核实\t— / —\n12\t15\t闪击刺拳\t西村 淳也\t西園 翔太\t1分9.9秒\t待核实\t— / —\n13\t10\tレイピア\t横山 武史\t中竹 和也\t1分10.6秒\t待核实\t— / —\n14\t11\t贤德之君\t鮫島 克駿\t杉山 晴紀\t1分10.8秒\t待核实\t— / —\n15\t13\t拼胜堡\t松山 弘平\t橋口 慎介\t1分11.9秒\t待核实\t— / —\n16\t12\tブラックチャリス\t浜中 俊\t武 幸四郎\t1分12.6秒\t待核实\t— / —\n历年冠军\n2026\n纯粹魔法\n岩田 望来 · 安田 翔伍 · 1分9.2秒\n2025\nウインカーネリアン\n三浦 皇成 · —\n2024\n贤德之君\n西村 淳也 · —\n2023\n大海女神\n川田 将雅 · —\n2022\nジャンダルム\n荻野 極 · —\n2021\nピクシーナイト\n福永 祐一 · —\n2020\n放声欢呼\nC.ルメール · —\n2019\nタワーオブロンドン\nC.ルメール · —\n2018\n铁杵成针\n川田 将雅 · —\n2017\n弯刀赤骏\nM.デムーロ · —\n展开更多年份（15）",
+      "links": [
+        {
+          "text": "返回赛事日历",
+          "url": "https://umafans.run/races/"
+        },
+        {
+          "text": "返回首页",
+          "url": "https://umafans.run/"
+        },
+        {
+          "text": "概览",
+          "url": "https://umafans.run/races/2026/jra-2026-0927-01/#overview"
+        },
+        {
+          "text": "出马表",
+          "url": "https://umafans.run/races/2026/jra-2026-0927-01/#runners"
+        },
+        {
+          "text": "赛果",
+          "url": "https://umafans.run/races/2026/jra-2026-0927-01/#results"
+        },
+        {
+          "text": "历年冠军",
+          "url": "https://umafans.run/races/2026/jra-2026-0927-01/#history"
+        }
+      ],
+      "controls": [],
+      "tables": [
+        {
+          "head": [
+            "闸位",
+            "马号",
+            "马名",
+            "骑师",
+            "练马师",
+            "负重",
+            "赔率 / 热门排名",
+            "状态"
+          ],
+          "rows": 16
+        },
+        {
+          "head": [
+            "名次",
+            "马号",
+            "马名",
+            "骑师",
+            "练马师",
+            "时间",
+            "差距",
+            "赔率 / 热门排名"
+          ],
+          "rows": 16
+        }
+      ]
+    },
+    {
+      "id": "pre-race",
+      "url": "https://umafans.run/races/2026/jra-2026-1004-02/",
+      "title": "京都大赏典 2026",
+      "observedAt": "2026-10-02T10:46:48.463Z",
+      "text": "返回赛事日历\n返回首页\nG2\n日本 · 京都 · 2400米\n2026\n京都大赏典\n\n京都大賞典 · 2026-10-04 · 14:30（北京时间）\n\n2天后14:30（北京时间）\n概览\n出马表\n基础资料\n场地\n草地\n等级\nG2\n日期\n2026-10-04\n时间\n14:30（北京时间）\n马场\n京都\n距离\n2400米\n参赛条件\n3岁及以上\n状态\n2天后\n出马表\n\n更新于2026-10-02 16:07（北京时间）\n\n闸位\t马号\t马名\t骑师\t练马师\t负重\t赔率 / 热门排名\t状态\n—\t1\t西方现今\t横山 和生\t寺島 良 (栗東)\t57千克\t— / —\t已出走登记\n—\t2\t林森处\t古川 吉洋\t宮本 博 (栗東)\t57千克\t— / —\t已出走登记\n—\t3\t大怪奇\t浜中 俊\t池江 泰寿 (栗東)\t58千克\t— / —\t已出走登记\n—\t4\t拯救者\t吉田 隼人\t木村 哲也 (美浦)\t58千克\t— / —\t已出走登记\n—\t5\t金栗娇甜\t川又 賢治\t吉村 圭司 (栗東)\t55千克\t— / —\t已出走登记\n—\t6\tアクアヴァーナル\t松山 弘平\t四位 洋文 (栗東)\t55千克\t— / —\t已出走登记\n—\t7\tリビアングラス\t小沢 大仁\t矢作 芳人 (栗東)\t57千克\t— / —\t已出走登记\n—\t8\t妙力鼓舞\tM.デムーロ\t林 徹 (美浦)\t57千克\t— / —\t已出走登记\n—\t9\t秘路\t松本 大輝\t小林 真也 (栗東)\t58千克\t— / —\t已出走登记\n—\t10\t旷世帝才\t吉村 誠之助\t清水 久詞 (栗東)\t57千克\t— / —\t已出走登记\n—\t11\t聚天伦\t鮫島 克駿\t石坂 公一 (栗東)\t57千克\t— / —\t已出走登记\n—\t12\t大恐龙\t田口 貫太\t大久保 龍志 (栗東)\t57千克\t— / —\t已出走登记\n—\t13\t功成珍宝\t北村 友一\t池添 学 (栗東)\t55千克\t— / —\t已出走登记\n—\t14\t萨沃纳\t斎藤 新\t中竹 和也 (栗東)\t57千克\t— / —\t已出走登记\n—\t15\tメイショウブレゲ\t酒井 学\t本田 優 (栗東)\t57千克\t— / —\t已出走登记\n—\t16\t湘南极点\t池添 謙一\t高野 友和 (栗東)\t57千克\t— / —\t已出走登记\n—\t17\tキングスコール\t吉田 豊\t矢作 芳人 (栗東)\t57千克\t— / —\t已出走登记\n—\t18\tダノンシーマ\t川田 将雅\t中内田 充正 (栗東)\t57千克\t— / —\t已出走登记",
+      "links": [
+        {
+          "text": "返回赛事日历",
+          "url": "https://umafans.run/races/"
+        },
+        {
+          "text": "返回首页",
+          "url": "https://umafans.run/"
+        },
+        {
+          "text": "概览",
+          "url": "https://umafans.run/races/2026/jra-2026-1004-02/#overview"
+        },
+        {
+          "text": "出马表",
+          "url": "https://umafans.run/races/2026/jra-2026-1004-02/#runners"
+        }
+      ],
+      "controls": [],
+      "tables": [
+        {
+          "head": [
+            "闸位",
+            "马号",
+            "马名",
+            "骑师",
+            "练马师",
+            "负重",
+            "赔率 / 热门排名",
+            "状态"
+          ],
+          "rows": 18
+        }
+      ]
+    },
+    {
+      "id": "admin-login",
+      "url": "https://umafans.run/admin/login/?next=/admin/",
+      "title": "登录 - 赛马新闻后台",
+      "observedAt": "2026-10-02T10:47:01.192Z",
+      "text": "马\n赛马新闻后台\n\n单管理员内容生产闭环\n\n用户名或邮箱\n密码\n登录后台",
+      "links": [],
+      "controls": [],
+      "tables": []
+    },
+    {
+      "id": "follows-empty",
+      "url": "https://umafans.run/horses/follows/",
+      "title": "我的关注",
+      "observedAt": "2026-10-02T10:47:01.302Z",
+      "text": "Following\n我的关注\n还没有关注任何马匹\n\n前往马匹档案，关注你关心的赛驹及其后代新闻。\n\n浏览马匹档案",
+      "links": [
+        {
+          "text": "浏览马匹档案",
+          "url": "https://umafans.run/horses/"
+        }
+      ],
+      "controls": [],
+      "tables": []
+    },
+    {
+      "id": "horse-search",
+      "url": "https://umafans.run/horses/?q=%E6%8B%AF%E6%95%91%E8%80%85",
+      "title": "马匹档案",
+      "observedAt": "2026-10-02T10:47:10.745Z",
+      "text": "Horse Profiles\n马匹档案\n搜索\n☆ 关注\n日本\n拯救者\n\nヘデントール\n\n资料补全中\n\n0 战\n0 冠\n0 亚\n0 季\n第 1 / 1 页",
+      "links": [
+        {
+          "text": "拯救者",
+          "url": "https://umafans.run/horses/1026/"
+        }
+      ],
+      "controls": [
+        {
+          "tag": "INPUT",
+          "name": "q",
+          "type": "search",
+          "text": "",
+          "value": "拯救者"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "搜索",
+          "value": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "☆ 关注",
+          "value": ""
+        }
+      ],
+      "tables": []
+    },
+    {
+      "id": "article-linked",
+      "url": "https://umafans.run/news/19295/",
+      "title": "【京都大赏典排位确定】ダノンシーマ为8档18号，拯救者为2档4号 · UmaFans",
+      "observedAt": "2026-10-02T10:47:10.856Z",
+      "text": "← 返回首页\n【京都大赏典排位确定】ダノンシーマ为8档18号，拯救者为2档4号\n2026-10-02 09:30 发布\n本文提及\n🐎 ダノンシーマ\n🐎 拯救者\n\n第61届京都大赏典（3岁及以上・GⅡ・草地2400米）排位确定：重赏三连季的ダノンシ\n[新闻正文省略，保留功能入口与页面链接供复查]",
+      "links": [
+        {
+          "text": "← 返回首页",
+          "url": "https://umafans.run/"
+        },
+        {
+          "text": "🐎 ダノンシーマ",
+          "url": "https://umafans.run/horses/46196/"
+        },
+        {
+          "text": "🐎 拯救者",
+          "url": "https://umafans.run/horses/1026/"
+        },
+        {
+          "text": "← 上一篇\n【京都新马赛】ジーティーギャング　终于揭开面纱　福永师“感受到潜力”",
+          "url": "https://umafans.run/news/19258/"
+        },
+        {
+          "text": "下一篇 →\n「九州之星」ヨカヨカ的首胎ヨカオウ闪电移籍香港！上月30日注销竞走马登记 九州的灵魂跨越海洋",
+          "url": "https://umafans.run/news/19303/"
+        },
+        {
+          "text": "红玛瑙退役…将转任种马　去年短途马锦标夺冠",
+          "url": "https://umafans.run/news/19343/"
+        },
+        {
+          "text": "【蛋白石S・周五动态】良血马ディアナザール觉醒在即　齐藤崇练马师所求为何　“若能取胜，马也会更有自信”",
+          "url": "https://umafans.run/news/19338/"
+        },
+        {
+          "text": "「九州之星」ヨカヨカ的首胎ヨカオウ闪电移籍香港！上月30日注销竞走马登记 九州的灵魂跨越海洋",
+          "url": "https://umafans.run/news/19303/"
+        },
+        {
+          "text": "【京都新马赛】ジーティーギャング　终于揭开面纱　福永师“感受到潜力”",
+          "url": "https://umafans.run/news/19258/"
+        }
+      ],
+      "controls": [],
+      "tables": []
+    },
+    {
+      "id": "germany-upcoming",
+      "url": "https://umafans.run/races/?region=germany&when=upcoming&tab=all",
+      "title": "赛事日历",
+      "observedAt": "2026-10-02T10:47:23.851Z",
+      "text": "Race Calendar\n赛事日历\n全部\n重点\n全部\n日本\n中国香港\n英国\n爱尔兰\n法国\n美国\n澳大利亚\n德国\n中东\n全部等级\nG1\nG2\nG3\n即将开赛\n全部时间\n已完赛\n10月3日\n星期六\n10月4日\n星期日\n10月11日\n星期日\n10月18日\n星期日\n10月25日\n星期日\n10月31日\n星期六\n11月7日\n星期六\n11月14日\n星期六\n年份\n全部年份\n2027\n2026\n2025\n2024\n2023\n2022\n2021\n2020\n2019\n2018\n2017\n2016\n2015\n2014\n2013\n2012\n2011\n2010\n2009\n2008\n2007\n2006\n2005\n2001\n2000\n赛事名称\n筛选\n加载更早赛事\n加载未来赛事\n10月\n3日\n星期六\nG3\nWETTSTAR.de Preis der Deutschen Einheit\n德国 · Hoppegarten\n待核实\n明天\n北京时间待定\n10月\n4日\n星期日\nG3\nGrosser Preis der Landeshauptstadt Düsseldorf\n德国 · Düsseldorf\n待核实\n2天后\n北京时间待定\n10月\n11日\n星期日\nG3\nWETTSTAR.de Preis des Winterfavoriten\n德国 · Köln\n待核实\n9天后\n北京时间待定\n10月\n18日\n星期日\nG3\nHerbst Trophy\n德国 · Baden-Baden\n待核实\n16天后\n北京时间待定\nG3\nPreis der Winterkönigin\n德国 · Baden-Baden\n待核实\n16天后\n北京时间待定\n10月\n25日\n星期日\nG3\nHerbst Stuten-Preis\n德国 · Hannover\n待核实\n23天后\n北京时间待定\n10月\n31日\n星期六\nG3\nSilbernes Pferd\n德国 · Köln\n待核实\n29天后\n北京时间待定\n11月\n7日\n星期六\nG1\nGrosser Allianz Preis von Bayern\n德国 · München\n待核实\n36天后\n北京时间待定\n11月\n14日\n星期六\nG3\nHerzog von Ratibor-Rennen\n德国 · Krefeld\n待核实\n43天后\n北京时间待定",
+      "links": [
+        {
+          "text": "全部",
+          "url": "https://umafans.run/races/?tab=all&region=germany&when=upcoming"
+        },
+        {
+          "text": "重点",
+          "url": "https://umafans.run/races/?tab=key&region=germany&when=upcoming"
+        },
+        {
+          "text": "全部",
+          "url": "https://umafans.run/races/?tab=all&when=upcoming"
+        },
+        {
+          "text": "日本",
+          "url": "https://umafans.run/races/?tab=all&region=japan&when=upcoming"
+        },
+        {
+          "text": "中国香港",
+          "url": "https://umafans.run/races/?tab=all&region=hong_kong&when=upcoming"
+        },
+        {
+          "text": "英国",
+          "url": "https://umafans.run/races/?tab=all&region=united_kingdom&when=upcoming"
+        },
+        {
+          "text": "爱尔兰",
+          "url": "https://umafans.run/races/?tab=all&region=ireland&when=upcoming"
+        },
+        {
+          "text": "法国",
+          "url": "https://umafans.run/races/?tab=all&region=france&when=upcoming"
+        },
+        {
+          "text": "美国",
+          "url": "https://umafans.run/races/?tab=all&region=united_states&when=upcoming"
+        },
+        {
+          "text": "澳大利亚",
+          "url": "https://umafans.run/races/?tab=all&region=australia&when=upcoming"
+        },
+        {
+          "text": "德国",
+          "url": "https://umafans.run/races/?tab=all&region=germany&when=upcoming"
+        },
+        {
+          "text": "中东",
+          "url": "https://umafans.run/races/?tab=all&region=middle_east&when=upcoming"
+        },
+        {
+          "text": "全部等级",
+          "url": "https://umafans.run/races/?tab=all&region=germany&when=upcoming"
+        },
+        {
+          "text": "G1",
+          "url": "https://umafans.run/races/?tab=all&region=germany&when=upcoming&grade=g1"
+        },
+        {
+          "text": "G2",
+          "url": "https://umafans.run/races/?tab=all&region=germany&when=upcoming&grade=g2"
+        },
+        {
+          "text": "G3",
+          "url": "https://umafans.run/races/?tab=all&region=germany&when=upcoming&grade=g3"
+        },
+        {
+          "text": "即将开赛",
+          "url": "https://umafans.run/races/?tab=all&region=germany&when=upcoming"
+        },
+        {
+          "text": "全部时间",
+          "url": "https://umafans.run/races/?tab=all&region=germany"
+        },
+        {
+          "text": "已完赛",
+          "url": "https://umafans.run/races/?tab=all&region=germany&when=finished"
+        },
+        {
+          "text": "10月3日\n星期六",
+          "url": "https://umafans.run/races/?region=germany&when=upcoming&tab=all#race-date-2026-10-03"
+        },
+        {
+          "text": "10月4日\n星期日",
+          "url": "https://umafans.run/races/?region=germany&when=upcoming&tab=all#race-date-2026-10-04"
+        },
+        {
+          "text": "10月11日\n星期日",
+          "url": "https://umafans.run/races/?region=germany&when=upcoming&tab=all#race-date-2026-10-11"
+        },
+        {
+          "text": "10月18日\n星期日",
+          "url": "https://umafans.run/races/?region=germany&when=upcoming&tab=all#race-date-2026-10-18"
+        },
+        {
+          "text": "10月25日\n星期日",
+          "url": "https://umafans.run/races/?region=germany&when=upcoming&tab=all#race-date-2026-10-25"
+        },
+        {
+          "text": "10月31日\n星期六",
+          "url": "https://umafans.run/races/?region=germany&when=upcoming&tab=all#race-date-2026-10-31"
+        },
+        {
+          "text": "11月7日\n星期六",
+          "url": "https://umafans.run/races/?region=germany&when=upcoming&tab=all#race-date-2026-11-07"
+        },
+        {
+          "text": "11月14日\n星期六",
+          "url": "https://umafans.run/races/?region=germany&when=upcoming&tab=all#race-date-2026-11-14"
+        },
+        {
+          "text": "G3\nWETTSTAR.de Preis der Deutschen Einheit\n德国 · Hoppegarten\n待核实\n明天\n北京时间待定",
+          "url": "https://umafans.run/races/2026/germany-preis-der-deutschen-einheit-2026/"
+        },
+        {
+          "text": "G3\nGrosser Preis der Landeshauptstadt Düsseldorf\n德国 · Düsseldorf\n待核实\n2天后\n北京时间待定",
+          "url": "https://umafans.run/races/2026/germany-grosser-preis-der-landeshauptstadt-dusseldorf-2026/"
+        },
+        {
+          "text": "G3\nWETTSTAR.de Preis des Winterfavoriten\n德国 · Köln\n待核实\n9天后\n北京时间待定",
+          "url": "https://umafans.run/races/2026/germany-preis-des-winterfavoriten-2026/"
+        },
+        {
+          "text": "G3\nHerbst Trophy\n德国 · Baden-Baden\n待核实\n16天后\n北京时间待定",
+          "url": "https://umafans.run/races/2026/germany-herbst-trophy-2026/"
+        },
+        {
+          "text": "G3\nPreis der Winterkönigin\n德国 · Baden-Baden\n待核实\n16天后\n北京时间待定",
+          "url": "https://umafans.run/races/2026/germany-preis-der-winterkonigin-2026/"
+        },
+        {
+          "text": "G3\nHerbst Stuten-Preis\n德国 · Hannover\n待核实\n23天后\n北京时间待定",
+          "url": "https://umafans.run/races/2026/germany-herbst-stuten-preis-2026/"
+        },
+        {
+          "text": "G3\nSilbernes Pferd\n德国 · Köln\n待核实\n29天后\n北京时间待定",
+          "url": "https://umafans.run/races/2026/germany-silbernes-pferd-2026/"
+        },
+        {
+          "text": "G1\nGrosser Allianz Preis von Bayern\n德国 · München\n待核实\n36天后\n北京时间待定",
+          "url": "https://umafans.run/races/2026/germany-grosser-preis-von-bayern-2026/"
+        },
+        {
+          "text": "G3\nHerzog von Ratibor-Rennen\n德国 · Krefeld\n待核实\n43天后\n北京时间待定",
+          "url": "https://umafans.run/races/2026/germany-herzog-von-ratibor-rennen-2026/"
+        }
+      ],
+      "controls": [
+        {
+          "tag": "SELECT",
+          "name": "year",
+          "type": "select-one",
+          "text": "全部年份\n2027\n2026\n2025\n2024\n2023\n2022\n2021\n2020\n2019\n2018\n2017\n2016\n2015\n2014\n2013\n2012\n2011\n2010\n2009\n2008\n2007\n2006\n2005\n2001\n2000",
+          "value": ""
+        },
+        {
+          "tag": "INPUT",
+          "name": "q",
+          "type": "search",
+          "text": "",
+          "value": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "筛选",
+          "value": ""
+        }
+      ],
+      "tables": []
+    },
+    {
+      "id": "horse-detail-empty",
+      "url": "https://umafans.run/horses/1026/",
+      "title": "拯救者",
+      "observedAt": "2026-10-02T10:47:23.960Z",
+      "text": "返回马匹\n我的关注\n日本 · 资料补全中\n拯救者\n\nヘデントール\n\n☆ 关注\n0\n出赛\n0\n冠军\n0\n亚军\n0\n季军\n0%\n胜率\n参赛履历\n\n暂无参赛履历。\n\n相关新闻\n来自：拯救者\n10-02 09:30\n【京都大赏典排位确定】ダノンシーマ为8档18号，拯救者为2档4号\n\n第61届京都大赏典（3岁及以上・GⅡ・草地2400米）排位确定：重赏三连季的ダノンシーマ抽得8档18号，去年天皇赏（春）冠军拯救者抽得2档4号，发走时间为15时30分。\n\n🐎 拯救者\n🐎 ダノンシーマ\n来自：拯救者\n10-01 05:02\n【京都大赏典】拯救者 以较强力度完成3马併跑　太田助手「能否顺畅地升挡是跑出好成绩的关键」\n\n京都大赏典中，去年春季天皇赏冠军拯救者在W跑道完成3马併跑，直线上受到较强催策，跑出5F67秒4～1F11秒5。它对外侧的スターフラッシュ落后半马身，与内侧的フィールドノート同时...\n\n🐎 拯救者\n来自：拯救者\n09-29 17:31\n【京都大赏典】2025年春季天皇赏霸主拯救者能否时隔1年5个月再度取胜\n\n2025年春季天皇赏霸主拯救者将出战京都大赏典，力争时隔约1年5个月再度取胜。作为参赛成员中唯一的GⅠ马，其能否复活备受关注。\n\n🐎 拯救者\n来自：拯救者\n09-23 18:30\n【京都大赏典・赛前1周】去年春季天皇赏马力图复权　拯救者阵营称“应该会有好的反应回来”\n\n去年春季天皇赏冠军拯救者将出战10月4日京都竞马场・草地2400米的京都大赏典（G2）。赛前1周，它在美浦W跑道完成追切，太田助手表示“追切符合预期，应该会有好的反应回来”。该马...\n\n🐎 拯救者",
+      "links": [
+        {
+          "text": "返回马匹",
+          "url": "https://umafans.run/horses/"
+        },
+        {
+          "text": "我的关注",
+          "url": "https://umafans.run/horses/follows/"
+        },
+        {
+          "text": "【京都大赏典排位确定】ダノンシーマ为8档18号，拯救者为2档4号",
+          "url": "https://umafans.run/news/19295/"
+        },
+        {
+          "text": "🐎 拯救者",
+          "url": "https://umafans.run/horses/1026/"
+        },
+        {
+          "text": "🐎 ダノンシーマ",
+          "url": "https://umafans.run/horses/46196/"
+        },
+        {
+          "text": "【京都大赏典】拯救者 以较强力度完成3马併跑　太田助手「能否顺畅地升挡是跑出好成绩的关键」",
+          "url": "https://umafans.run/news/19114/"
+        },
+        {
+          "text": "🐎 拯救者",
+          "url": "https://umafans.run/horses/1026/"
+        },
+        {
+          "text": "【京都大赏典】2025年春季天皇赏霸主拯救者能否时隔1年5个月再度取胜",
+          "url": "https://umafans.run/news/18905/"
+        },
+        {
+          "text": "🐎 拯救者",
+          "url": "https://umafans.run/horses/1026/"
+        },
+        {
+          "text": "【京都大赏典・赛前1周】去年春季天皇赏马力图复权　拯救者阵营称“应该会有好的反应回来”",
+          "url": "https://umafans.run/news/18068/"
+        },
+        {
+          "text": "🐎 拯救者",
+          "url": "https://umafans.run/horses/1026/"
+        }
+      ],
+      "controls": [
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "☆ 关注",
+          "value": ""
+        }
+      ],
+      "tables": []
+    },
+    {
+      "id": "germany-history",
+      "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&grade=g1&when=finished",
+      "title": "赛事日历",
+      "observedAt": "2026-10-02T10:47:43.003Z",
+      "text": "Race Calendar\n赛事日历\n全部\n重点\n全部\n日本\n中国香港\n英国\n爱尔兰\n法国\n美国\n澳大利亚\n德国\n中东\n全部等级\nG1\nG2\nG3\n即将开赛\n全部时间\n已完赛\n年份\n全部年份\n2027\n2026\n2025\n2024\n2023\n2022\n2021\n2020\n2019\n2018\n2017\n2016\n2015\n2014\n2013\n2012\n2011\n2010\n2009\n2008\n2007\n2006\n2005\n2001\n2000\n赛事名称\n筛选\n清除\n\n暂无符合条件的赛事。",
+      "links": [
+        {
+          "text": "全部",
+          "url": "https://umafans.run/races/?tab=all&region=germany&grade=g1&when=finished&year=2025"
+        },
+        {
+          "text": "重点",
+          "url": "https://umafans.run/races/?tab=key&region=germany&grade=g1&when=finished&year=2025"
+        },
+        {
+          "text": "全部",
+          "url": "https://umafans.run/races/?tab=all&grade=g1&when=finished&year=2025"
+        },
+        {
+          "text": "日本",
+          "url": "https://umafans.run/races/?tab=all&region=japan&grade=g1&when=finished&year=2025"
+        },
+        {
+          "text": "中国香港",
+          "url": "https://umafans.run/races/?tab=all&region=hong_kong&grade=g1&when=finished&year=2025"
+        },
+        {
+          "text": "英国",
+          "url": "https://umafans.run/races/?tab=all&region=united_kingdom&grade=g1&when=finished&year=2025"
+        },
+        {
+          "text": "爱尔兰",
+          "url": "https://umafans.run/races/?tab=all&region=ireland&grade=g1&when=finished&year=2025"
+        },
+        {
+          "text": "法国",
+          "url": "https://umafans.run/races/?tab=all&region=france&grade=g1&when=finished&year=2025"
+        },
+        {
+          "text": "美国",
+          "url": "https://umafans.run/races/?tab=all&region=united_states&grade=g1&when=finished&year=2025"
+        },
+        {
+          "text": "澳大利亚",
+          "url": "https://umafans.run/races/?tab=all&region=australia&grade=g1&when=finished&year=2025"
+        },
+        {
+          "text": "德国",
+          "url": "https://umafans.run/races/?tab=all&region=germany&grade=g1&when=finished&year=2025"
+        },
+        {
+          "text": "中东",
+          "url": "https://umafans.run/races/?tab=all&region=middle_east&grade=g1&when=finished&year=2025"
+        },
+        {
+          "text": "全部等级",
+          "url": "https://umafans.run/races/?tab=all&region=germany&when=finished&year=2025"
+        },
+        {
+          "text": "G1",
+          "url": "https://umafans.run/races/?tab=all&region=germany&grade=g1&when=finished&year=2025"
+        },
+        {
+          "text": "G2",
+          "url": "https://umafans.run/races/?tab=all&region=germany&grade=g2&when=finished&year=2025"
+        },
+        {
+          "text": "G3",
+          "url": "https://umafans.run/races/?tab=all&region=germany&grade=g3&when=finished&year=2025"
+        },
+        {
+          "text": "即将开赛",
+          "url": "https://umafans.run/races/?tab=all&region=germany&grade=g1&when=upcoming&year=2025"
+        },
+        {
+          "text": "全部时间",
+          "url": "https://umafans.run/races/?tab=all&region=germany&grade=g1&year=2025"
+        },
+        {
+          "text": "已完赛",
+          "url": "https://umafans.run/races/?tab=all&region=germany&grade=g1&when=finished&year=2025"
+        },
+        {
+          "text": "清除",
+          "url": "https://umafans.run/races/?tab=all&region=germany&grade=g1&when=finished"
+        }
+      ],
+      "controls": [
+        {
+          "tag": "SELECT",
+          "name": "year",
+          "type": "select-one",
+          "text": "全部年份\n2027\n2026\n2025\n2024\n2023\n2022\n2021\n2020\n2019\n2018\n2017\n2016\n2015\n2014\n2013\n2012\n2011\n2010\n2009\n2008\n2007\n2006\n2005\n2001\n2000",
+          "value": "2025"
+        },
+        {
+          "tag": "INPUT",
+          "name": "q",
+          "type": "search",
+          "text": "",
+          "value": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "筛选",
+          "value": ""
+        }
+      ],
+      "tables": []
+    },
+    {
+      "id": "horse-career",
+      "url": "https://umafans.run/horses/46412/",
+      "title": "A Wave Of The Sea (IRE)",
+      "observedAt": "2026-10-02T10:47:43.118Z",
+      "text": "返回马匹\n我的关注\n英国 · 资料补全中\nA Wave Of The Sea (IRE)\n\nA Wave Of The Sea (IRE) · G\n\n中文译名待补\n\n主胜鞍：Tattersalls Ireland Spring Juvenile Hurdle (Grade 1)\n☆ 关注\n65\n出赛\n0\n冠军\n0\n亚军\n0\n季军\n0%\n胜率\n基础资料\n国家/地区\nIRE\n血统\n父\nBorn To Sea (IRE)\n母\nJe T'Adore (IRE)\n母父\nMontjeu\n参赛履历\n7\n2026-06-15\nMongey Communications Galway Plate Trial Handicap Chase\nKilbeggan · — · —\n—\n5\n2026-05-15\nShanette Superior Space Handicap Chase\nKilbeggan · — · —\n—\n12\n2026-04-10\nBOYLE Sports Supporting Irish Racing Veterans Handicap Chase\nWexford · — · —\n—\n14\n2026-02-01\nO'Driscolls Irish Whiskey Leopardstown Handicap Chase (Grade 3)\nLeopardstown · — · G3\n—\n4\n2026-01-18\nSupport Thurles Bookmakers Handicap Chase\nThurles · — · —\n—\n17\n2025-12-27\nPaddy Power Chase (Extended Handicap Chase) (0-150) (Listed)\nLeopardstown · — · L\n—\n8\n2025-11-16\nBar One Racing Troytown Handicap Chase (Grade 3)\nNavan · — · G3\n—\n1\n2025-09-05\nKilsaran Handicap Chase\nKilbeggan · — · —\n—\n3\n2025-08-09\nJohn 'Chucky' Dunne Memorial Handicap Chase\nKilbeggan · — · —\n—\n1\n2025-07-25\nEgan Stone Kilbeggan Handicap Chase\nKilbeggan · — · —\n—\n9\n2025-07-01\nTipperary Town Plate Handicap Chase\nTipperary · — · —\n—\n3\n2025-03-22\nKilberry Handicap Chase\nNavan · — · —\n—\n3\n2025-03-03\nJohn Thomas McNamara Series (Q.R.) Handicap Chase\nLeopardstown · — · —\n—\n2\n2024-12-15\nIrish Stallion Farms EBF Handicap Chase (0-116)\nNavan · — · —\n—\n13\n2024-11-17\nBar One Racing 'Bet 10 Get 50 Sign Up Offer' Tara Handicap Hurdle (80-130)\nNavan · — · —\n—\n7\n2024-08-23\nCurragh To Curragh Charity Cycle On Saturday August 31st Handicap Chase\nKilbeggan · — · —\n—\n6\n2024-08-10\nSwissMPC Medical Device And Pharmaceutical Consulting Handicap Chase\nKilbeggan · — · —\n—\n8\n2024-06-21\nABP 'Summer Plate Trial' Handicap Chase\n韦森市场 · — · —\n—\n7\n2024-05-08\nBedmax Handicap Chase\n凯索 · — · —\n—\n未完赛\n2024-03-14\nFulke Walwyn Kim Muir Challenge Cup Amateur Jockeys' Handicap Chase (Sponsored By JRL Group) (GBB Race)\n卓定咸 · — · —\n—\n第 1 / 4 页\n下一页",
+      "links": [
+        {
+          "text": "返回马匹",
+          "url": "https://umafans.run/horses/"
+        },
+        {
+          "text": "我的关注",
+          "url": "https://umafans.run/horses/follows/"
+        },
+        {
+          "text": "下一页",
+          "url": "https://umafans.run/horses/46412/?records_page=2"
+        }
+      ],
+      "controls": [
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "☆ 关注",
+          "value": ""
+        }
+      ],
+      "tables": []
+    },
+    {
+      "id": "germany-history-all",
+      "url": "https://umafans.run/races/?tab=all&region=germany&year=2025",
+      "title": "赛事日历",
+      "observedAt": "2026-10-02T10:48:12.734Z",
+      "text": "Race Calendar\n赛事日历\n全部\n重点\n全部\n日本\n中国香港\n英国\n爱尔兰\n法国\n美国\n澳大利亚\n德国\n中东\n全部等级\nG1\nG2\nG3\n即将开赛\n全部时间\n已完赛\n4月13日\n星期日\n4月21日\n星期一\n4月27日\n星期日\n5月1日\n星期四\n5月4日\n星期日\n5月11日\n星期日\n5月18日\n星期日\n5月25日\n星期日\n5月29日\n星期四\n5月31日\n星期六\n6月1日\n星期日\n6月8日\n星期日\n6月9日\n星期一\n6月22日\n星期日\n7月5日\n星期六\n7月6日\n星期日\n7月8日\n星期二\n7月20日\n星期日\n7月27日\n星期日\n8月3日\n星期日\n8月10日\n星期日\n8月30日\n星期六\n8月31日\n星期日\n9月3日\n星期三\n9月6日\n星期六\n9月7日\n星期日\n9月21日\n星期日\n9月28日\n星期日\n10月3日\n星期五\n10月5日\n星期日\n10月12日\n星期日\n10月19日\n星期日\n10月26日\n星期日\n年份\n全部年份\n2027\n2026\n2025\n2024\n2023\n2022\n2021\n2020\n2019\n2018\n2017\n2016\n2015\n2014\n2013\n2012\n2011\n2010\n2009\n2008\n2007\n2006\n2005\n2001\n2000\n赛事名称\n筛选\n清除\n加载未来赛事\n4月\n13日\n星期日\nG3\nKalkmann-Frühjahrs-Meile\n德国 · Düsseldorf\n待核实\n已完赛\n冠军 Geography\n4月\n21日\n星期一\nG2\nSauren Dachfonds Preis (ex Gerling-Preis)\n德国 · Köln\n待核实\n已完赛\n冠军 Alleno\n4月\n27日\n星期日\nG3\nGroßer Preis der Wohnstätte Krefeld – Dr. Busch-Memorial\n德国 · Krefeld\n待核实\n已完赛\n冠军 Namaron\n5月\n1日\n星期四\nG3\nWETTSTAR.de - Bavarian Classic - V4-3\n德国 · München\n待核实\n已完赛\n冠军 Path of Soldier\n5月\n4日\n星期日\nG3\nKarin Baronin von Ullmann - Schwarzgold-Rennen\n德国 · Köln\n待核实\n已完赛\n冠军 Santagada\n5月\n11日\n星期日\nG2\nComer Group International 54. Oleander-Rennen\n德国 · Berlin-Hoppegarten\n待核实\n已完赛\n冠军 Flatten the Curve\n5月\n18日\n星期日\nG2\nCoolmore City Of Troy German 2000 Guineas\n德国 · Köln\n待核实\n已完赛\n冠军 Matilda\n5月\n25日\n星期日\nG2\nHorn & Company - 105. German 1000 Guineas\n德国 · Düsseldorf\n待核实\n已完赛\n冠军 Lady Ilze\n5月\n29日\n星期四\nG3\n47. Kronimus Badener Meile - V4/1\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Short Final\n5月\n31日\n星期六\nG3\nJapan Racing Association Derby-Trial - V4/1\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Juwelier\n6月\n1日\n星期日\nG2\nGrosser Preis von Tattersalls (ex Grosser Preis der Badischen Wirtschaft)\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Lordano\n6月\n8日\n星期日\nG3\nDiana-Trial der BEST PLACE Immobilien\n德国 · Berlin-Hoppegarten\n待核实\n已完赛\n冠军 Lady Charlotte\n6月\n9日\n星期一\nG2\nSparkasse KölnBonn - 190. Union-Rennen\n德国 · Köln\n待核实\n已完赛\n冠军 Zuckerhut\n6月\n22日\n星期日\nG3\n36. GROSSER PREIS DER WIRTSCHAFT\n德国 · Dortmund\n待核实\n已完赛\n冠军 Best Lightning\n7月\n5日\n星期六\nG2\nWETTSTAR.de - Grosser Hansa-Preis\n德国 · Hamburg\n待核实\n已完赛\n冠军 Augustus\n7月\n6日\n星期日\nG3\nBest Place Immobilien Hamburger Stutenpreis\n德国 · Hamburg\n待核实\n已完赛\n冠军 Nyra\nG1\nIDEE 156. Deutsches Derby\n德国 · Hamburg\n待核实\n已完赛\n冠军 Hochkönig\nG2\nThe President of the United Arab Emirates Cup\n德国 · Hamburg\n待核实\n已完赛\n冠军 HM Alchahine\nG3\nJapan Racing Association Trophy - Hamburger Stuten Meile\n德国 · Hamburg\n待核实\n已完赛\n冠军 Santagada\n7月\n8日\n星期二\nG3\nGrosser Preis von Lotto Hamburg - V4/4\n德国 · Hamburg\n待核实\n已完赛\n冠军 Quest the Moon\n7月\n20日\n星期日\nG3\nGroßer Preis der BBF Gruppe - Fürstenberg-Rennen\n德国 · Berlin-Hoppegarten\n待核实\n已完赛\n冠军 Padre Palou\n7月\n27日\n星期日\nG1\nGrosser Dallmayr-Preis - Bayerisches Zuchtrennen ausgetragen seit 1866 - V4/4\n德国 · München\n待核实\n已完赛\n冠军 Tornado Alert\n8月\n3日\n星期日\nG3\nFritz Henkel-Preis\n德国 · Düsseldorf\n待核实\n已完赛\n冠军 Geography\nG1\n167. Henkel-Preis der Diana - German Oaks\n德国 · Düsseldorf\n待核实\n已完赛\n冠军 Nicoreni\n8月\n10日\n星期日\nG1\nWestminster 135. Grosser Preis von Berlin\n德国 · Berlin-Hoppegarten\n待核实\n已完赛\n冠军 Rebel's Romance\n8月\n30日\n星期六\nG3\n70. Preis der Sparkassen-Finanzgruppe (ex Spreti-Rennen) - V4/1\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Quest the Moon\n8月\n31日\n星期日\nG3\n155. Casino Baden-Baden Goldene Peitsche - V4/1\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 The Strikin Viking\n9月\n3日\n星期三\nG3\n152. Renate und Albrecht Woeste - Zukunfts-Rennen\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Gostam\n9月\n6日\n星期六\nG2\nT. von Zastrow Stutenpreis (Badener Stutenpreis) - V4/1\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Egina\n9月\n7日\n星期日\nG1\nWETTSTAR.de - 155. Grosser Preis von Baden - V4/2\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Goliath\nG2\n92. Brunner - Oettingen-Rennen\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Geography\n9月\n21日\n星期日\nG3\nWETTSTAR.de - 141. Deutsches St. Leger\n德国 · Dortmund\n待核实\n已完赛\n冠军 Caballo De Mar\n9月\n28日\n星期日\nG3\nDinger's Gartencenter Köln - Sprint Trophy\n德国 · Köln\n待核实\n已完赛\n冠军 Shootout\nG1\nMehl-Mülhens-Stiftung - 63. Preis von Europa\n德国 · Köln\n待核实\n已完赛\n冠军 Sibayan\n10月\n3日\n星期五\nG3\nWETTSTAR.de - 35. Preis der Deutschen Einheit\n德国 · Berlin-Hoppegarten\n待核实\n已完赛\n冠军 Santagada\n10月\n5日\n星期日\nG3\n105. Grosser Preis der Landeshauptstadt Düsseldorf\n德国 · Düsseldorf\n待核实\n已完赛\n冠军 Short Final\n10月\n12日\n星期日\nG3\nWETTSTAR.de - Preis des Winterfavoriten\n德国 · Köln\n待核实\n已完赛\n冠军 Gostam\n10月\n19日\n星期日\nG3\nB.A.U. Herbst Trophy - V4/1\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Rashford\nG3\nCarla Kellner Zukunftsrennen - Preis der Winterkönigin\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Alsterperle\n10月\n26日\n星期日\nG3\nShadwell Stallions - Herbst-Stutenpreis\n德国 · Hannover\n待核实\n已完赛\n冠军 Santagada",
+      "links": [
+        {
+          "text": "全部",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025"
+        },
+        {
+          "text": "重点",
+          "url": "https://umafans.run/races/?tab=key&region=germany&year=2025"
+        },
+        {
+          "text": "全部",
+          "url": "https://umafans.run/races/?tab=all&year=2025"
+        },
+        {
+          "text": "日本",
+          "url": "https://umafans.run/races/?tab=all&region=japan&year=2025"
+        },
+        {
+          "text": "中国香港",
+          "url": "https://umafans.run/races/?tab=all&region=hong_kong&year=2025"
+        },
+        {
+          "text": "英国",
+          "url": "https://umafans.run/races/?tab=all&region=united_kingdom&year=2025"
+        },
+        {
+          "text": "爱尔兰",
+          "url": "https://umafans.run/races/?tab=all&region=ireland&year=2025"
+        },
+        {
+          "text": "法国",
+          "url": "https://umafans.run/races/?tab=all&region=france&year=2025"
+        },
+        {
+          "text": "美国",
+          "url": "https://umafans.run/races/?tab=all&region=united_states&year=2025"
+        },
+        {
+          "text": "澳大利亚",
+          "url": "https://umafans.run/races/?tab=all&region=australia&year=2025"
+        },
+        {
+          "text": "德国",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025"
+        },
+        {
+          "text": "中东",
+          "url": "https://umafans.run/races/?tab=all&region=middle_east&year=2025"
+        },
+        {
+          "text": "全部等级",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025"
+        },
+        {
+          "text": "G1",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&grade=g1"
+        },
+        {
+          "text": "G2",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&grade=g2"
+        },
+        {
+          "text": "G3",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&grade=g3"
+        },
+        {
+          "text": "即将开赛",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=upcoming"
+        },
+        {
+          "text": "全部时间",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025"
+        },
+        {
+          "text": "已完赛",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished"
+        },
+        {
+          "text": "4月13日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-04-13"
+        },
+        {
+          "text": "4月21日\n星期一",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-04-21"
+        },
+        {
+          "text": "4月27日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-04-27"
+        },
+        {
+          "text": "5月1日\n星期四",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-05-01"
+        },
+        {
+          "text": "5月4日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-05-04"
+        },
+        {
+          "text": "5月11日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-05-11"
+        },
+        {
+          "text": "5月18日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-05-18"
+        },
+        {
+          "text": "5月25日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-05-25"
+        },
+        {
+          "text": "5月29日\n星期四",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-05-29"
+        },
+        {
+          "text": "5月31日\n星期六",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-05-31"
+        },
+        {
+          "text": "6月1日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-06-01"
+        },
+        {
+          "text": "6月8日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-06-08"
+        },
+        {
+          "text": "6月9日\n星期一",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-06-09"
+        },
+        {
+          "text": "6月22日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-06-22"
+        },
+        {
+          "text": "7月5日\n星期六",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-07-05"
+        },
+        {
+          "text": "7月6日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-07-06"
+        },
+        {
+          "text": "7月8日\n星期二",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-07-08"
+        },
+        {
+          "text": "7月20日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-07-20"
+        },
+        {
+          "text": "7月27日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-07-27"
+        },
+        {
+          "text": "8月3日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-08-03"
+        },
+        {
+          "text": "8月10日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-08-10"
+        },
+        {
+          "text": "8月30日\n星期六",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-08-30"
+        },
+        {
+          "text": "8月31日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-08-31"
+        },
+        {
+          "text": "9月3日\n星期三",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-09-03"
+        },
+        {
+          "text": "9月6日\n星期六",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-09-06"
+        },
+        {
+          "text": "9月7日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-09-07"
+        },
+        {
+          "text": "9月21日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-09-21"
+        },
+        {
+          "text": "9月28日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-09-28"
+        },
+        {
+          "text": "10月3日\n星期五",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-10-03"
+        },
+        {
+          "text": "10月5日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-10-05"
+        },
+        {
+          "text": "10月12日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-10-12"
+        },
+        {
+          "text": "10月19日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-10-19"
+        },
+        {
+          "text": "10月26日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025#race-date-2025-10-26"
+        },
+        {
+          "text": "清除",
+          "url": "https://umafans.run/races/?tab=all&region=germany"
+        },
+        {
+          "text": "G3\nKalkmann-Frühjahrs-Meile\n德国 · Düsseldorf\n待核实\n已完赛\n冠军 Geography",
+          "url": "https://umafans.run/races/2025/germany-kalkmann-fruhjahrs-meile-2025/"
+        },
+        {
+          "text": "G2\nSauren Dachfonds Preis (ex Gerling-Preis)\n德国 · Köln\n待核实\n已完赛\n冠军 Alleno",
+          "url": "https://umafans.run/races/2025/germany-gerling-preis-2025/"
+        },
+        {
+          "text": "G3\nGroßer Preis der Wohnstätte Krefeld – Dr. Busch-Memorial\n德国 · Krefeld\n待核实\n已完赛\n冠军 Namaron",
+          "url": "https://umafans.run/races/2025/germany-groer-preis-der-wohnstatte-krefeld-dr-busch-memorial-2025/"
+        },
+        {
+          "text": "G3\nWETTSTAR.de - Bavarian Classic - V4-3\n德国 · München\n待核实\n已完赛\n冠军 Path of Soldier",
+          "url": "https://umafans.run/races/2025/germany-bavarian-classic-2025/"
+        },
+        {
+          "text": "G3\nKarin Baronin von Ullmann - Schwarzgold-Rennen\n德国 · Köln\n待核实\n已完赛\n冠军 Santagada",
+          "url": "https://umafans.run/races/2025/germany-karin-baronin-von-ullmann-schwarzgold-rennen-2025/"
+        },
+        {
+          "text": "G2\nComer Group International 54. Oleander-Rennen\n德国 · Berlin-Hoppegarten\n待核实\n已完赛\n冠军 Flatten the Curve",
+          "url": "https://umafans.run/races/2025/germany-oleander-rennen-2025/"
+        },
+        {
+          "text": "G2\nCoolmore City Of Troy German 2000 Guineas\n德国 · Köln\n待核实\n已完赛\n冠军 Matilda",
+          "url": "https://umafans.run/races/2025/germany-city-of-troy-german-2000-guineas-2025/"
+        },
+        {
+          "text": "G2\nHorn & Company - 105. German 1000 Guineas\n德国 · Düsseldorf\n待核实\n已完赛\n冠军 Lady Ilze",
+          "url": "https://umafans.run/races/2025/germany-horn-company-german-1000-guineas-2025/"
+        },
+        {
+          "text": "G3\n47. Kronimus Badener Meile - V4/1\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Short Final",
+          "url": "https://umafans.run/races/2025/germany-badener-meile-2025/"
+        },
+        {
+          "text": "G3\nJapan Racing Association Derby-Trial - V4/1\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Juwelier",
+          "url": "https://umafans.run/races/2025/germany-derby-trial-2025/"
+        },
+        {
+          "text": "G2\nGrosser Preis von Tattersalls (ex Grosser Preis der Badischen Wirtschaft)\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Lordano",
+          "url": "https://umafans.run/races/2025/germany-grosser-preis-der-badischen-wirtschaft-2025/"
+        },
+        {
+          "text": "G3\nDiana-Trial der BEST PLACE Immobilien\n德国 · Berlin-Hoppegarten\n待核实\n已完赛\n冠军 Lady Charlotte",
+          "url": "https://umafans.run/races/2025/germany-diana-trial-der-best-place-immobilien-2025/"
+        },
+        {
+          "text": "G2\nSparkasse KölnBonn - 190. Union-Rennen\n德国 · Köln\n待核实\n已完赛\n冠军 Zuckerhut",
+          "url": "https://umafans.run/races/2025/germany-union-rennen-2025/"
+        },
+        {
+          "text": "G3\n36. GROSSER PREIS DER WIRTSCHAFT\n德国 · Dortmund\n待核实\n已完赛\n冠军 Best Lightning",
+          "url": "https://umafans.run/races/2025/germany-grosser-preis-der-wirtschaft-2025/"
+        },
+        {
+          "text": "G2\nWETTSTAR.de - Grosser Hansa-Preis\n德国 · Hamburg\n待核实\n已完赛\n冠军 Augustus",
+          "url": "https://umafans.run/races/2025/germany-grosser-hansa-preis-2025/"
+        },
+        {
+          "text": "G3\nBest Place Immobilien Hamburger Stutenpreis\n德国 · Hamburg\n待核实\n已完赛\n冠军 Nyra",
+          "url": "https://umafans.run/races/2025/germany-best-place-immobilien-hamburger-stutenpreis-2025/"
+        },
+        {
+          "text": "G1\nIDEE 156. Deutsches Derby\n德国 · Hamburg\n待核实\n已完赛\n冠军 Hochkönig",
+          "url": "https://umafans.run/races/2025/germany-deutsches-derby-2025/"
+        },
+        {
+          "text": "G2\nThe President of the United Arab Emirates Cup\n德国 · Hamburg\n待核实\n已完赛\n冠军 HM Alchahine",
+          "url": "https://umafans.run/races/2025/germany-the-president-of-the-united-arab-emirates-cup-2025/"
+        },
+        {
+          "text": "G3\nJapan Racing Association Trophy - Hamburger Stuten Meile\n德国 · Hamburg\n待核实\n已完赛\n冠军 Santagada",
+          "url": "https://umafans.run/races/2025/germany-trophy-hamburger-stuten-meile-2025/"
+        },
+        {
+          "text": "G3\nGrosser Preis von Lotto Hamburg - V4/4\n德国 · Hamburg\n待核实\n已完赛\n冠军 Quest the Moon",
+          "url": "https://umafans.run/races/2025/germany-grosser-preis-von-hamburg-2025/"
+        },
+        {
+          "text": "G3\nGroßer Preis der BBF Gruppe - Fürstenberg-Rennen\n德国 · Berlin-Hoppegarten\n待核实\n已完赛\n冠军 Padre Palou",
+          "url": "https://umafans.run/races/2025/germany-furstenberg-rennen-2025/"
+        },
+        {
+          "text": "G1\nGrosser Dallmayr-Preis - Bayerisches Zuchtrennen ausgetragen seit 1866 - V4/4\n德国 · München\n待核实\n已完赛\n冠军 Tornado Alert",
+          "url": "https://umafans.run/races/2025/germany-grosser-dallmayr-preis-bayerisches-zuchtrennen-ausgetragen-seit-1866-2025/"
+        },
+        {
+          "text": "G3\nFritz Henkel-Preis\n德国 · Düsseldorf\n待核实\n已完赛\n冠军 Geography",
+          "url": "https://umafans.run/races/2025/germany-fritz-henkel-preis-2025/"
+        },
+        {
+          "text": "G1\n167. Henkel-Preis der Diana - German Oaks\n德国 · Düsseldorf\n待核实\n已完赛\n冠军 Nicoreni",
+          "url": "https://umafans.run/races/2025/germany-preis-der-diana-german-oaks-2025/"
+        },
+        {
+          "text": "G1\nWestminster 135. Grosser Preis von Berlin\n德国 · Berlin-Hoppegarten\n待核实\n已完赛\n冠军 Rebel's Romance",
+          "url": "https://umafans.run/races/2025/germany-grosser-preis-von-berlin-2025/"
+        },
+        {
+          "text": "G3\n70. Preis der Sparkassen-Finanzgruppe (ex Spreti-Rennen) - V4/1\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Quest the Moon",
+          "url": "https://umafans.run/races/2025/germany-spreti-rennen-2025/"
+        },
+        {
+          "text": "G3\n155. Casino Baden-Baden Goldene Peitsche - V4/1\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 The Strikin Viking",
+          "url": "https://umafans.run/races/2025/germany-goldene-peitsche-2025/"
+        },
+        {
+          "text": "G3\n152. Renate und Albrecht Woeste - Zukunfts-Rennen\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Gostam",
+          "url": "https://umafans.run/races/2025/germany-zukunfts-rennen-2025/"
+        },
+        {
+          "text": "G2\nT. von Zastrow Stutenpreis (Badener Stutenpreis) - V4/1\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Egina",
+          "url": "https://umafans.run/races/2025/germany-stutenpreis-badener-stutenpreis-2025/"
+        },
+        {
+          "text": "G1\nWETTSTAR.de - 155. Grosser Preis von Baden - V4/2\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Goliath",
+          "url": "https://umafans.run/races/2025/germany-grosser-preis-von-baden-2025/"
+        },
+        {
+          "text": "G2\n92. Brunner - Oettingen-Rennen\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Geography",
+          "url": "https://umafans.run/races/2025/germany-oettingen-rennen-2025/"
+        },
+        {
+          "text": "G3\nWETTSTAR.de - 141. Deutsches St. Leger\n德国 · Dortmund\n待核实\n已完赛\n冠军 Caballo De Mar",
+          "url": "https://umafans.run/races/2025/germany-deutsches-st-leger-2025/"
+        },
+        {
+          "text": "G3\nDinger's Gartencenter Köln - Sprint Trophy\n德国 · Köln\n待核实\n已完赛\n冠军 Shootout",
+          "url": "https://umafans.run/races/2025/germany-dinger-s-gartencenter-koln-sprint-trophy-2025/"
+        },
+        {
+          "text": "G1\nMehl-Mülhens-Stiftung - 63. Preis von Europa\n德国 · Köln\n待核实\n已完赛\n冠军 Sibayan",
+          "url": "https://umafans.run/races/2025/germany-mehl-mulhens-stiftung-preis-von-europa-2025/"
+        },
+        {
+          "text": "G3\nWETTSTAR.de - 35. Preis der Deutschen Einheit\n德国 · Berlin-Hoppegarten\n待核实\n已完赛\n冠军 Santagada",
+          "url": "https://umafans.run/races/2025/germany-preis-der-deutschen-einheit-2025/"
+        },
+        {
+          "text": "G3\n105. Grosser Preis der Landeshauptstadt Düsseldorf\n德国 · Düsseldorf\n待核实\n已完赛\n冠军 Short Final",
+          "url": "https://umafans.run/races/2025/germany-grosser-preis-der-landeshauptstadt-dusseldorf-2025/"
+        },
+        {
+          "text": "G3\nWETTSTAR.de - Preis des Winterfavoriten\n德国 · Köln\n待核实\n已完赛\n冠军 Gostam",
+          "url": "https://umafans.run/races/2025/germany-preis-des-winterfavoriten-2025/"
+        },
+        {
+          "text": "G3\nB.A.U. Herbst Trophy - V4/1\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Rashford",
+          "url": "https://umafans.run/races/2025/germany-b-a-u-herbst-trophy-2025/"
+        },
+        {
+          "text": "G3\nCarla Kellner Zukunftsrennen - Preis der Winterkönigin\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Alsterperle",
+          "url": "https://umafans.run/races/2025/germany-carla-kellner-zukunftsrennen-preis-der-winterkonigin-2025/"
+        },
+        {
+          "text": "G3\nShadwell Stallions - Herbst-Stutenpreis\n德国 · Hannover\n待核实\n已完赛\n冠军 Santagada",
+          "url": "https://umafans.run/races/2025/germany-shadwell-stallions-herbst-stutenpreis-2025/"
+        }
+      ],
+      "controls": [
+        {
+          "tag": "SELECT",
+          "name": "year",
+          "type": "select-one",
+          "text": "全部年份\n2027\n2026\n2025\n2024\n2023\n2022\n2021\n2020\n2019\n2018\n2017\n2016\n2015\n2014\n2013\n2012\n2011\n2010\n2009\n2008\n2007\n2006\n2005\n2001\n2000",
+          "value": "2025"
+        },
+        {
+          "tag": "INPUT",
+          "name": "q",
+          "type": "search",
+          "text": "",
+          "value": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "筛选",
+          "value": ""
+        }
+      ],
+      "tables": []
+    },
+    {
+      "id": "horse-career-page2",
+      "url": "https://umafans.run/horses/46412/?records_page=2",
+      "title": "A Wave Of The Sea (IRE)",
+      "observedAt": "2026-10-02T10:48:12.851Z",
+      "text": "返回马匹\n我的关注\n英国 · 资料补全中\nA Wave Of The Sea (IRE)\n\nA Wave Of The Sea (IRE) · G\n\n中文译名待补\n\n主胜鞍：Tattersalls Ireland Spring Juvenile Hurdle (Grade 1)\n☆ 关注\n65\n出赛\n0\n冠军\n0\n亚军\n0\n季军\n0%\n胜率\n基础资料\n国家/地区\nIRE\n血统\n父\nBorn To Sea (IRE)\n母\nJe T'Adore (IRE)\n母父\nMontjeu\n参赛履历\n7\n2024-02-04\nbet365 Scottish Champion Chase (Handicap Chase) (GBB Race)\n麦锡堡 · — · —\n—\n未完赛\n2023-12-29\nDownload The Racing App Handicap Chase\n唐加士达 · — · —\n—\n未完赛\n2023-12-09\nBoyleSports Best Odds Guaranteed Handicap Chase (GBB Race)\n安树 · — · —\n—\n4\n2023-10-22\nJT McNamara Ladbrokes Munster National Handicap Chase (Grade 3)\nLimerick · — · G3\n—\n15\n2023-09-20\nGuinness Kerry National Handicap Chase (grade 3)\nListowel · — · G3\n—\n4\n2023-08-02\nTote Galway Plate (Grade 3 Handicap Chase)\nGalway · — · G3\n—\n4\n2023-07-06\nKevin McManus Bookmaker Grimes Hurdle (Grade 3)\nTipperary · — · G3\n—\n9\n2023-04-15\n英国国家障碍大赛\n安树 · 待核实 · G3\n—\n未完赛\n2023-03-15\nJohnny Henderson Grand Annual Challenge Cup Handicap Chase (Premier Handicap) (GBB Race)\n卓定咸 · — · —\n—\n3\n2023-02-04\nPaddy Power Cheltenham Fanzone Handicap Chase (0-150) (Grade B)\nLeopardstown · — · 待核实\n—\n14\n2022-12-27\nPaddy Power Chase (Extended Handicap Chase) (0-150) (Grade B)\nLeopardstown · — · 待核实\n—\n未完赛\n2022-11-27\nBar One Racing Troytown Handicap Chase (0-150) (Grade B)\nNavan · — · 待核实\n—\n4\n2022-10-23\nJT McNamara Ladbrokes Munster National Handicap Chase (Grade A)\nLimerick · — · 待核实\n—\n6\n2022-09-21\nGuinness Kerry National Handicap Chase (grade A)\nListowel · — · 待核实\n—\n未完赛\n2022-07-27\nTote Galway Plate (Grade A Handicap Chase)\nGalway · — · 待核实\n—\n6\n2022-06-30\nKevin McManus Bookmaker Grimes Hurdle (Grade 3)\nTipperary · — · G3\n—\n9\n2022-03-16\nJohnny Henderson Grand Annual Challenge Cup Handicap Chase (Grade 3) (GBB Race)\n卓定咸 · — · G3\n—\n1\n2022-02-05\nPaddy Power 'I'm Never Going Back To The Office' Handicap Chase (0-150) (Grade B)\nLeopardstown · — · 待核实\n—\n未完赛\n2021-12-27\nPaddy Power Chase (extended Handicap Chase) (0-150) (grade B)\nLeopardstown · — · 待核实\n—\n2\n2021-10-10\nJT McNamara Ladbrokes Munster National Handicap Chase (Grade A)\nLimerick · — · 待核实\n—\n上一页\n第 2 / 4 页\n下一页",
+      "links": [
+        {
+          "text": "返回马匹",
+          "url": "https://umafans.run/horses/"
+        },
+        {
+          "text": "我的关注",
+          "url": "https://umafans.run/horses/follows/"
+        },
+        {
+          "text": "英国国家障碍大赛",
+          "url": "https://umafans.run/races/2023/united_kingdom-united-kingdom-grand-national-stp-2023/"
+        },
+        {
+          "text": "上一页",
+          "url": "https://umafans.run/horses/46412/?records_page=1"
+        },
+        {
+          "text": "下一页",
+          "url": "https://umafans.run/horses/46412/?records_page=3"
+        }
+      ],
+      "controls": [
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "☆ 关注",
+          "value": ""
+        }
+      ],
+      "tables": []
+    },
+    {
+      "id": "home",
+      "url": "https://umafans.run/",
+      "title": "UmaFans 赛马新闻",
+      "observedAt": "2026-10-02T10:48:29.990Z",
+      "text": "首页已见：头条、最新新闻、今日赛事、热门榜、我的关注、即将开赛、分页。",
+      "links": [
+        {
+          "text": "头条",
+          "url": "https://umafans.run/news/19343/"
+        },
+        {
+          "text": "完整日历 →",
+          "url": "https://umafans.run/races/"
+        },
+        {
+          "text": "G1",
+          "url": "https://umafans.run/races/2026/us-toba-2026-1002-304/"
+        },
+        {
+          "text": "G2",
+          "url": "https://umafans.run/races/2026/us-toba-2026-1002-305/"
+        },
+        {
+          "text": "G2",
+          "url": "https://umafans.run/races/2026/us-toba-2026-1002-306/"
+        },
+        {
+          "text": "G3",
+          "url": "https://umafans.run/races/2026/fr-france-galop-2026-1002-089/"
+        },
+        {
+          "text": "【蛋白石S・周五动态】良血马ディアナザール觉醒在即　齐藤崇练马师所求为何　“若能取胜，马也会更有自信”",
+          "url": "https://umafans.run/news/19338/"
+        },
+        {
+          "text": "🐎 ディアナザール",
+          "url": "https://umafans.run/horses/46133/"
+        },
+        {
+          "text": "抽签编号——2026年卡塔尔阿拉伯马世界杯",
+          "url": "https://umafans.run/news/19317/"
+        },
+        {
+          "text": "「九州之星」ヨカヨカ的首胎ヨカオウ闪电移籍香港！上月30日注销竞走马登记 九州的灵魂跨越海洋",
+          "url": "https://umafans.run/news/19303/"
+        },
+        {
+          "text": "🐎 ヨカオウ",
+          "url": "https://umafans.run/horses/46244/"
+        },
+        {
+          "text": "【京都大赏典排位确定】ダノンシーマ为8档18号，拯救者为2档4号",
+          "url": "https://umafans.run/news/19295/"
+        },
+        {
+          "text": "🐎 拯救者",
+          "url": "https://umafans.run/horses/1026/"
+        },
+        {
+          "text": "🐎 ダノンシーマ",
+          "url": "https://umafans.run/horses/46196/"
+        },
+        {
+          "text": "【京都新马赛】ジーティーギャング　终于揭开面纱　福永师“感受到潜力”",
+          "url": "https://umafans.run/news/19258/"
+        },
+        {
+          "text": "武丰果然名不虚传！凯旋门赏前骑乘サプライズ",
+          "url": "https://umafans.run/news/19253/"
+        },
+        {
+          "text": "西蒙·考克斯在出任BHA主席首日分享对赛马运动的愿景",
+          "url": "https://umafans.run/news/19229/"
+        },
+        {
+          "text": "【注目马动向】在1胜级别、2胜级别接连大胜的ダノンヒストリー，将在菊花赏与李慕华骑手组成新搭档",
+          "url": "https://umafans.run/news/19175/"
+        },
+        {
+          "text": "🐎 ダノンヒストリー",
+          "url": "https://umafans.run/horses/45968/"
+        },
+        {
+          "text": "【注目马动向】声动莫莉安娜瞄准阪神C　エーティーマクフィ力争京阪杯连霸",
+          "url": "https://umafans.run/news/19170/"
+        },
+        {
+          "text": "🐎 声动莫莉安娜",
+          "url": "https://umafans.run/horses/19818/"
+        },
+        {
+          "text": "🐎 エーティーマクフィ",
+          "url": "https://umafans.run/horses/44465/"
+        },
+        {
+          "text": "【注目马动态】回避札幌2岁S的ノヴァヴェローチェ“程度上属于轻伤”　上村调教师也松了一口气",
+          "url": "https://umafans.run/news/19162/"
+        },
+        {
+          "text": "【注目马动向】短途马锦标意外仅获第15名的拼胜堡将年内休养　桥口调教师「希望明年先跑一场，然后能去高松宫纪念」",
+          "url": "https://umafans.run/news/19158/"
+        },
+        {
+          "text": "🐎 拼胜堡",
+          "url": "https://umafans.run/horses/4540/"
+        },
+        {
+          "text": "下一页",
+          "url": "https://umafans.run/?page=2"
+        },
+        {
+          "text": "北十字星将携手C·德穆罗以新组合出战秋季天皇赏",
+          "url": "https://umafans.run/news/19013/"
+        },
+        {
+          "text": "27年度夏季新潟、中京赛马将以7场制举办 比赛实施时间大致为15点至18点30分",
+          "url": "https://umafans.run/news/18788/"
+        },
+        {
+          "text": "表列赛冠军 Sydney Moon 加入 Arqana 凯旋门拍卖会目录",
+          "url": "https://umafans.run/news/18949/"
+        },
+        {
+          "text": "首战获胜马 Muataz 以外卡身份加入 Arqana 凯旋门拍卖会",
+          "url": "https://umafans.run/news/18836/"
+        },
+        {
+          "text": "挑战凯旋门赏的アドマイヤテラ阵营在联合记者会上表达决心　C·德穆罗“想回报日本”",
+          "url": "https://umafans.run/news/19042/"
+        },
+        {
+          "text": "【焦点马动向】杯进酒将由李慕华骑师出战墨尔本杯　友道练马师在法国尚蒂伊透露",
+          "url": "https://umafans.run/news/18906/"
+        },
+        {
+          "text": "管理 →",
+          "url": "https://umafans.run/horses/follows/"
+        },
+        {
+          "text": "去马匹档案看看 →",
+          "url": "https://umafans.run/horses/"
+        }
+      ],
+      "controls": [],
+      "tables": []
+    },
+    {
+      "id": "race-search",
+      "url": "https://umafans.run/races/?q=%E5%87%AF%E6%97%8B%E9%97%A8&year=2026&tab=all",
+      "title": "赛事日历",
+      "observedAt": "2026-10-02T10:48:30.101Z",
+      "text": "Race Calendar\n赛事日历\n本周焦点 · G1\n凯旋门大赛\n2026-10-04 · ParisLongchamp\n凯旋门大赛\n2026-10-04 · ParisLongchamp\n全部\n重点\n全部\n日本\n中国香港\n英国\n爱尔兰\n法国\n美国\n澳大利亚\n德国\n中东\n全部等级\nG1\nG2\nG3\n即将开赛\n全部时间\n已完赛\n10月4日\n星期日\n年份\n全部年份\n2027\n2026\n2025\n2024\n2023\n2022\n2021\n2020\n2019\n2018\n2017\n2016\n2015\n2014\n2013\n2012\n2011\n2010\n2009\n2008\n2007\n2006\n2005\n2001\n2000\n赛事名称\n筛选\n清除\n10月\n4日\n星期日\nG1\n凯旋门大赛Prix de l'Arc de Triomphe\n法国 · ParisLongchamp\n待核实\n3岁及以上\n2天后\n22:05（北京时间）\nG1\n凯旋门大赛QATAR PRIX DE L ’ARC DE TRIOMPHE\n法国 · ParisLongchamp\n2400米\n2天后\n北京时间待定",
+      "links": [
+        {
+          "text": "凯旋门大赛\n2026-10-04 · ParisLongchamp",
+          "url": "https://umafans.run/races/2026/prix-de-larc-de-triomphe/"
+        },
+        {
+          "text": "凯旋门大赛\n2026-10-04 · ParisLongchamp",
+          "url": "https://umafans.run/races/2026/fr-france-galop-2026-1004-100/"
+        },
+        {
+          "text": "全部",
+          "url": "https://umafans.run/races/?tab=all&year=2026&q=%E5%87%AF%E6%97%8B%E9%97%A8"
+        },
+        {
+          "text": "重点",
+          "url": "https://umafans.run/races/?tab=key&year=2026&q=%E5%87%AF%E6%97%8B%E9%97%A8"
+        },
+        {
+          "text": "全部",
+          "url": "https://umafans.run/races/?tab=all&year=2026&q=%E5%87%AF%E6%97%8B%E9%97%A8"
+        },
+        {
+          "text": "日本",
+          "url": "https://umafans.run/races/?tab=all&year=2026&q=%E5%87%AF%E6%97%8B%E9%97%A8&region=japan"
+        },
+        {
+          "text": "中国香港",
+          "url": "https://umafans.run/races/?tab=all&year=2026&q=%E5%87%AF%E6%97%8B%E9%97%A8&region=hong_kong"
+        },
+        {
+          "text": "英国",
+          "url": "https://umafans.run/races/?tab=all&year=2026&q=%E5%87%AF%E6%97%8B%E9%97%A8&region=united_kingdom"
+        },
+        {
+          "text": "爱尔兰",
+          "url": "https://umafans.run/races/?tab=all&year=2026&q=%E5%87%AF%E6%97%8B%E9%97%A8&region=ireland"
+        },
+        {
+          "text": "法国",
+          "url": "https://umafans.run/races/?tab=all&year=2026&q=%E5%87%AF%E6%97%8B%E9%97%A8&region=france"
+        },
+        {
+          "text": "美国",
+          "url": "https://umafans.run/races/?tab=all&year=2026&q=%E5%87%AF%E6%97%8B%E9%97%A8&region=united_states"
+        },
+        {
+          "text": "澳大利亚",
+          "url": "https://umafans.run/races/?tab=all&year=2026&q=%E5%87%AF%E6%97%8B%E9%97%A8&region=australia"
+        },
+        {
+          "text": "德国",
+          "url": "https://umafans.run/races/?tab=all&year=2026&q=%E5%87%AF%E6%97%8B%E9%97%A8&region=germany"
+        },
+        {
+          "text": "中东",
+          "url": "https://umafans.run/races/?tab=all&year=2026&q=%E5%87%AF%E6%97%8B%E9%97%A8&region=middle_east"
+        },
+        {
+          "text": "全部等级",
+          "url": "https://umafans.run/races/?tab=all&year=2026&q=%E5%87%AF%E6%97%8B%E9%97%A8"
+        },
+        {
+          "text": "G1",
+          "url": "https://umafans.run/races/?tab=all&year=2026&q=%E5%87%AF%E6%97%8B%E9%97%A8&grade=g1"
+        },
+        {
+          "text": "G2",
+          "url": "https://umafans.run/races/?tab=all&year=2026&q=%E5%87%AF%E6%97%8B%E9%97%A8&grade=g2"
+        },
+        {
+          "text": "G3",
+          "url": "https://umafans.run/races/?tab=all&year=2026&q=%E5%87%AF%E6%97%8B%E9%97%A8&grade=g3"
+        },
+        {
+          "text": "即将开赛",
+          "url": "https://umafans.run/races/?tab=all&year=2026&q=%E5%87%AF%E6%97%8B%E9%97%A8&when=upcoming"
+        },
+        {
+          "text": "全部时间",
+          "url": "https://umafans.run/races/?tab=all&year=2026&q=%E5%87%AF%E6%97%8B%E9%97%A8"
+        },
+        {
+          "text": "已完赛",
+          "url": "https://umafans.run/races/?tab=all&year=2026&q=%E5%87%AF%E6%97%8B%E9%97%A8&when=finished"
+        },
+        {
+          "text": "10月4日\n星期日",
+          "url": "https://umafans.run/races/?q=%E5%87%AF%E6%97%8B%E9%97%A8&year=2026&tab=all#race-date-2026-10-04"
+        },
+        {
+          "text": "清除",
+          "url": "https://umafans.run/races/?tab=all"
+        },
+        {
+          "text": "G1\n凯旋门大赛Prix de l'Arc de Triomphe\n法国 · ParisLongchamp\n待核实\n3岁及以上\n2天后\n22:05（北京时间）",
+          "url": "https://umafans.run/races/2026/prix-de-larc-de-triomphe/"
+        },
+        {
+          "text": "G1\n凯旋门大赛QATAR PRIX DE L ’ARC DE TRIOMPHE\n法国 · ParisLongchamp\n2400米\n2天后\n北京时间待定",
+          "url": "https://umafans.run/races/2026/fr-france-galop-2026-1004-100/"
+        }
+      ],
+      "controls": [
+        {
+          "tag": "SELECT",
+          "name": "year",
+          "type": "select-one",
+          "text": "全部年份\n2027\n2026\n2025\n2024\n2023\n2022\n2021\n2020\n2019\n2018\n2017\n2016\n2015\n2014\n2013\n2012\n2011\n2010\n2009\n2008\n2007\n2006\n2005\n2001\n2000",
+          "value": "2026"
+        },
+        {
+          "tag": "INPUT",
+          "name": "q",
+          "type": "search",
+          "text": "",
+          "value": "凯旋门"
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "筛选",
+          "value": ""
+        }
+      ],
+      "tables": []
+    },
+    {
+      "id": "germany-grade",
+      "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&grade=g1",
+      "title": "赛事日历",
+      "observedAt": "2026-10-02T10:48:47.024Z",
+      "text": "Race Calendar\n赛事日历\n全部\n重点\n全部\n日本\n中国香港\n英国\n爱尔兰\n法国\n美国\n澳大利亚\n德国\n中东\n全部等级\nG1\nG2\nG3\n即将开赛\n全部时间\n已完赛\n年份\n全部年份\n2027\n2026\n2025\n2024\n2023\n2022\n2021\n2020\n2019\n2018\n2017\n2016\n2015\n2014\n2013\n2012\n2011\n2010\n2009\n2008\n2007\n2006\n2005\n2001\n2000\n赛事名称\n筛选\n清除\n\n暂无符合条件的赛事。",
+      "links": [
+        {
+          "text": "全部",
+          "url": "https://umafans.run/races/?tab=all&region=germany&grade=g1&year=2025"
+        },
+        {
+          "text": "重点",
+          "url": "https://umafans.run/races/?tab=key&region=germany&grade=g1&year=2025"
+        },
+        {
+          "text": "全部",
+          "url": "https://umafans.run/races/?tab=all&grade=g1&year=2025"
+        },
+        {
+          "text": "日本",
+          "url": "https://umafans.run/races/?tab=all&region=japan&grade=g1&year=2025"
+        },
+        {
+          "text": "中国香港",
+          "url": "https://umafans.run/races/?tab=all&region=hong_kong&grade=g1&year=2025"
+        },
+        {
+          "text": "英国",
+          "url": "https://umafans.run/races/?tab=all&region=united_kingdom&grade=g1&year=2025"
+        },
+        {
+          "text": "爱尔兰",
+          "url": "https://umafans.run/races/?tab=all&region=ireland&grade=g1&year=2025"
+        },
+        {
+          "text": "法国",
+          "url": "https://umafans.run/races/?tab=all&region=france&grade=g1&year=2025"
+        },
+        {
+          "text": "美国",
+          "url": "https://umafans.run/races/?tab=all&region=united_states&grade=g1&year=2025"
+        },
+        {
+          "text": "澳大利亚",
+          "url": "https://umafans.run/races/?tab=all&region=australia&grade=g1&year=2025"
+        },
+        {
+          "text": "德国",
+          "url": "https://umafans.run/races/?tab=all&region=germany&grade=g1&year=2025"
+        },
+        {
+          "text": "中东",
+          "url": "https://umafans.run/races/?tab=all&region=middle_east&grade=g1&year=2025"
+        },
+        {
+          "text": "全部等级",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025"
+        },
+        {
+          "text": "G1",
+          "url": "https://umafans.run/races/?tab=all&region=germany&grade=g1&year=2025"
+        },
+        {
+          "text": "G2",
+          "url": "https://umafans.run/races/?tab=all&region=germany&grade=g2&year=2025"
+        },
+        {
+          "text": "G3",
+          "url": "https://umafans.run/races/?tab=all&region=germany&grade=g3&year=2025"
+        },
+        {
+          "text": "即将开赛",
+          "url": "https://umafans.run/races/?tab=all&region=germany&grade=g1&year=2025&when=upcoming"
+        },
+        {
+          "text": "全部时间",
+          "url": "https://umafans.run/races/?tab=all&region=germany&grade=g1&year=2025"
+        },
+        {
+          "text": "已完赛",
+          "url": "https://umafans.run/races/?tab=all&region=germany&grade=g1&year=2025&when=finished"
+        },
+        {
+          "text": "清除",
+          "url": "https://umafans.run/races/?tab=all&region=germany&grade=g1"
+        }
+      ],
+      "controls": [
+        {
+          "tag": "SELECT",
+          "name": "year",
+          "type": "select-one",
+          "text": "全部年份\n2027\n2026\n2025\n2024\n2023\n2022\n2021\n2020\n2019\n2018\n2017\n2016\n2015\n2014\n2013\n2012\n2011\n2010\n2009\n2008\n2007\n2006\n2005\n2001\n2000",
+          "value": "2025"
+        },
+        {
+          "tag": "INPUT",
+          "name": "q",
+          "type": "search",
+          "text": "",
+          "value": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "筛选",
+          "value": ""
+        }
+      ],
+      "tables": []
+    },
+    {
+      "id": "germany-finished",
+      "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished",
+      "title": "赛事日历",
+      "observedAt": "2026-10-02T10:53:26.745Z",
+      "text": "Race Calendar\n赛事日历\n全部\n重点\n全部\n日本\n中国香港\n英国\n爱尔兰\n法国\n美国\n澳大利亚\n德国\n中东\n全部等级\nG1\nG2\nG3\n即将开赛\n全部时间\n已完赛\n4月13日\n星期日\n4月21日\n星期一\n4月27日\n星期日\n5月1日\n星期四\n5月4日\n星期日\n5月11日\n星期日\n5月18日\n星期日\n5月25日\n星期日\n5月29日\n星期四\n5月31日\n星期六\n6月1日\n星期日\n6月8日\n星期日\n6月9日\n星期一\n6月22日\n星期日\n7月5日\n星期六\n7月6日\n星期日\n7月8日\n星期二\n7月20日\n星期日\n7月27日\n星期日\n8月3日\n星期日\n8月10日\n星期日\n8月30日\n星期六\n8月31日\n星期日\n9月3日\n星期三\n9月6日\n星期六\n9月7日\n星期日\n9月21日\n星期日\n9月28日\n星期日\n10月3日\n星期五\n10月5日\n星期日\n10月12日\n星期日\n10月19日\n星期日\n10月26日\n星期日\n年份\n全部年份\n2027\n2026\n2025\n2024\n2023\n2022\n2021\n2020\n2019\n2018\n2017\n2016\n2015\n2014\n2013\n2012\n2011\n2010\n2009\n2008\n2007\n2006\n2005\n2001\n2000\n赛事名称\n筛选\n清除\n加载未来赛事\n4月\n13日\n星期日\nG3\nKalkmann-Frühjahrs-Meile\n德国 · Düsseldorf\n待核实\n已完赛\n冠军 Geography\n4月\n21日\n星期一\nG2\nSauren Dachfonds Preis (ex Gerling-Preis)\n德国 · Köln\n待核实\n已完赛\n冠军 Alleno\n4月\n27日\n星期日\nG3\nGroßer Preis der Wohnstätte Krefeld – Dr. Busch-Memorial\n德国 · Krefeld\n待核实\n已完赛\n冠军 Namaron\n5月\n1日\n星期四\nG3\nWETTSTAR.de - Bavarian Classic - V4-3\n德国 · München\n待核实\n已完赛\n冠军 Path of Soldier\n5月\n4日\n星期日\nG3\nKarin Baronin von Ullmann - Schwarzgold-Rennen\n德国 · Köln\n待核实\n已完赛\n冠军 Santagada\n5月\n11日\n星期日\nG2\nComer Group International 54. Oleander-Rennen\n德国 · Berlin-Hoppegarten\n待核实\n已完赛\n冠军 Flatten the Curve\n5月\n18日\n星期日\nG2\nCoolmore City Of Troy German 2000 Guineas\n德国 · Köln\n待核实\n已完赛\n冠军 Matilda\n5月\n25日\n星期日\nG2\nHorn & Company - 105. German 1000 Guineas\n德国 · Düsseldorf\n待核实\n已完赛\n冠军 Lady Ilze\n5月\n29日\n星期四\nG3\n47. Kronimus Badener Meile - V4/1\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Short Final\n5月\n31日\n星期六\nG3\nJapan Racing Association Derby-Trial - V4/1\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Juwelier\n6月\n1日\n星期日\nG2\nGrosser Preis von Tattersalls (ex Grosser Preis der Badischen Wirtschaft)\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Lordano\n6月\n8日\n星期日\nG3\nDiana-Trial der BEST PLACE Immobilien\n德国 · Berlin-Hoppegarten\n待核实\n已完赛\n冠军 Lady Charlotte\n6月\n9日\n星期一\nG2\nSparkasse KölnBonn - 190. Union-Rennen\n德国 · Köln\n待核实\n已完赛\n冠军 Zuckerhut\n6月\n22日\n星期日\nG3\n36. GROSSER PREIS DER WIRTSCHAFT\n德国 · Dortmund\n待核实\n已完赛\n冠军 Best Lightning\n7月\n5日\n星期六\nG2\nWETTSTAR.de - Grosser Hansa-Preis\n德国 · Hamburg\n待核实\n已完赛\n冠军 Augustus\n7月\n6日\n星期日\nG3\nBest Place Immobilien Hamburger Stutenpreis\n德国 · Hamburg\n待核实\n已完赛\n冠军 Nyra\nG1\nIDEE 156. Deutsches Derby\n德国 · Hamburg\n待核实\n已完赛\n冠军 Hochkönig\nG2\nThe President of the United Arab Emirates Cup\n德国 · Hamburg\n待核实\n已完赛\n冠军 HM Alchahine\nG3\nJapan Racing Association Trophy - Hamburger Stuten Meile\n德国 · Hamburg\n待核实\n已完赛\n冠军 Santagada\n7月\n8日\n星期二\nG3\nGrosser Preis von Lotto Hamburg - V4/4\n德国 · Hamburg\n待核实\n已完赛\n冠军 Quest the Moon\n7月\n20日\n星期日\nG3\nGroßer Preis der BBF Gruppe - Fürstenberg-Rennen\n德国 · Berlin-Hoppegarten\n待核实\n已完赛\n冠军 Padre Palou\n7月\n27日\n星期日\nG1\nGrosser Dallmayr-Preis - Bayerisches Zuchtrennen ausgetragen seit 1866 - V4/4\n德国 · München\n待核实\n已完赛\n冠军 Tornado Alert\n8月\n3日\n星期日\nG3\nFritz Henkel-Preis\n德国 · Düsseldorf\n待核实\n已完赛\n冠军 Geography\nG1\n167. Henkel-Preis der Diana - German Oaks\n德国 · Düsseldorf\n待核实\n已完赛\n冠军 Nicoreni\n8月\n10日\n星期日\nG1\nWestminster 135. Grosser Preis von Berlin\n德国 · Berlin-Hoppegarten\n待核实\n已完赛\n冠军 Rebel's Romance\n8月\n30日\n星期六\nG3\n70. Preis der Sparkassen-Finanzgruppe (ex Spreti-Rennen) - V4/1\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Quest the Moon\n8月\n31日\n星期日\nG3\n155. Casino Baden-Baden Goldene Peitsche - V4/1\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 The Strikin Viking\n9月\n3日\n星期三\nG3\n152. Renate und Albrecht Woeste - Zukunfts-Rennen\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Gostam\n9月\n6日\n星期六\nG2\nT. von Zastrow Stutenpreis (Badener Stutenpreis) - V4/1\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Egina\n9月\n7日\n星期日\nG1\nWETTSTAR.de - 155. Grosser Preis von Baden - V4/2\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Goliath\nG2\n92. Brunner - Oettingen-Rennen\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Geography\n9月\n21日\n星期日\nG3\nWETTSTAR.de - 141. Deutsches St. Leger\n德国 · Dortmund\n待核实\n已完赛\n冠军 Caballo De Mar\n9月\n28日\n星期日\nG3\nDinger's Gartencenter Köln - Sprint Trophy\n德国 · Köln\n待核实\n已完赛\n冠军 Shootout\nG1\nMehl-Mülhens-Stiftung - 63. Preis von Europa\n德国 · Köln\n待核实\n已完赛\n冠军 Sibayan\n10月\n3日\n星期五\nG3\nWETTSTAR.de - 35. Preis der Deutschen Einheit\n德国 · Berlin-Hoppegarten\n待核实\n已完赛\n冠军 Santagada\n10月\n5日\n星期日\nG3\n105. Grosser Preis der Landeshauptstadt Düsseldorf\n德国 · Düsseldorf\n待核实\n已完赛\n冠军 Short Final\n10月\n12日\n星期日\nG3\nWETTSTAR.de - Preis des Winterfavoriten\n德国 · Köln\n待核实\n已完赛\n冠军 Gostam\n10月\n19日\n星期日\nG3\nB.A.U. Herbst Trophy - V4/1\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Rashford\nG3\nCarla Kellner Zukunftsrennen - Preis der Winterkönigin\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Alsterperle\n10月\n26日\n星期日\nG3\nShadwell Stallions - Herbst-Stutenpreis\n德国 · Hannover\n待核实\n已完赛\n冠军 Santagada",
+      "links": [
+        {
+          "text": "全部",
+          "url": "https://umafans.run/races/?tab=all&region=germany&when=finished&year=2025"
+        },
+        {
+          "text": "重点",
+          "url": "https://umafans.run/races/?tab=key&region=germany&when=finished&year=2025"
+        },
+        {
+          "text": "全部",
+          "url": "https://umafans.run/races/?tab=all&when=finished&year=2025"
+        },
+        {
+          "text": "日本",
+          "url": "https://umafans.run/races/?tab=all&region=japan&when=finished&year=2025"
+        },
+        {
+          "text": "中国香港",
+          "url": "https://umafans.run/races/?tab=all&region=hong_kong&when=finished&year=2025"
+        },
+        {
+          "text": "英国",
+          "url": "https://umafans.run/races/?tab=all&region=united_kingdom&when=finished&year=2025"
+        },
+        {
+          "text": "爱尔兰",
+          "url": "https://umafans.run/races/?tab=all&region=ireland&when=finished&year=2025"
+        },
+        {
+          "text": "法国",
+          "url": "https://umafans.run/races/?tab=all&region=france&when=finished&year=2025"
+        },
+        {
+          "text": "美国",
+          "url": "https://umafans.run/races/?tab=all&region=united_states&when=finished&year=2025"
+        },
+        {
+          "text": "澳大利亚",
+          "url": "https://umafans.run/races/?tab=all&region=australia&when=finished&year=2025"
+        },
+        {
+          "text": "德国",
+          "url": "https://umafans.run/races/?tab=all&region=germany&when=finished&year=2025"
+        },
+        {
+          "text": "中东",
+          "url": "https://umafans.run/races/?tab=all&region=middle_east&when=finished&year=2025"
+        },
+        {
+          "text": "全部等级",
+          "url": "https://umafans.run/races/?tab=all&region=germany&when=finished&year=2025"
+        },
+        {
+          "text": "G1",
+          "url": "https://umafans.run/races/?tab=all&region=germany&when=finished&year=2025&grade=g1"
+        },
+        {
+          "text": "G2",
+          "url": "https://umafans.run/races/?tab=all&region=germany&when=finished&year=2025&grade=g2"
+        },
+        {
+          "text": "G3",
+          "url": "https://umafans.run/races/?tab=all&region=germany&when=finished&year=2025&grade=g3"
+        },
+        {
+          "text": "即将开赛",
+          "url": "https://umafans.run/races/?tab=all&region=germany&when=upcoming&year=2025"
+        },
+        {
+          "text": "全部时间",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025"
+        },
+        {
+          "text": "已完赛",
+          "url": "https://umafans.run/races/?tab=all&region=germany&when=finished&year=2025"
+        },
+        {
+          "text": "4月13日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-04-13"
+        },
+        {
+          "text": "4月21日\n星期一",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-04-21"
+        },
+        {
+          "text": "4月27日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-04-27"
+        },
+        {
+          "text": "5月1日\n星期四",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-05-01"
+        },
+        {
+          "text": "5月4日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-05-04"
+        },
+        {
+          "text": "5月11日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-05-11"
+        },
+        {
+          "text": "5月18日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-05-18"
+        },
+        {
+          "text": "5月25日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-05-25"
+        },
+        {
+          "text": "5月29日\n星期四",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-05-29"
+        },
+        {
+          "text": "5月31日\n星期六",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-05-31"
+        },
+        {
+          "text": "6月1日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-06-01"
+        },
+        {
+          "text": "6月8日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-06-08"
+        },
+        {
+          "text": "6月9日\n星期一",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-06-09"
+        },
+        {
+          "text": "6月22日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-06-22"
+        },
+        {
+          "text": "7月5日\n星期六",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-07-05"
+        },
+        {
+          "text": "7月6日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-07-06"
+        },
+        {
+          "text": "7月8日\n星期二",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-07-08"
+        },
+        {
+          "text": "7月20日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-07-20"
+        },
+        {
+          "text": "7月27日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-07-27"
+        },
+        {
+          "text": "8月3日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-08-03"
+        },
+        {
+          "text": "8月10日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-08-10"
+        },
+        {
+          "text": "8月30日\n星期六",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-08-30"
+        },
+        {
+          "text": "8月31日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-08-31"
+        },
+        {
+          "text": "9月3日\n星期三",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-09-03"
+        },
+        {
+          "text": "9月6日\n星期六",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-09-06"
+        },
+        {
+          "text": "9月7日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-09-07"
+        },
+        {
+          "text": "9月21日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-09-21"
+        },
+        {
+          "text": "9月28日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-09-28"
+        },
+        {
+          "text": "10月3日\n星期五",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-10-03"
+        },
+        {
+          "text": "10月5日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-10-05"
+        },
+        {
+          "text": "10月12日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-10-12"
+        },
+        {
+          "text": "10月19日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-10-19"
+        },
+        {
+          "text": "10月26日\n星期日",
+          "url": "https://umafans.run/races/?tab=all&region=germany&year=2025&when=finished#race-date-2025-10-26"
+        },
+        {
+          "text": "清除",
+          "url": "https://umafans.run/races/?tab=all&region=germany&when=finished"
+        },
+        {
+          "text": "G3\nKalkmann-Frühjahrs-Meile\n德国 · Düsseldorf\n待核实\n已完赛\n冠军 Geography",
+          "url": "https://umafans.run/races/2025/germany-kalkmann-fruhjahrs-meile-2025/"
+        },
+        {
+          "text": "G2\nSauren Dachfonds Preis (ex Gerling-Preis)\n德国 · Köln\n待核实\n已完赛\n冠军 Alleno",
+          "url": "https://umafans.run/races/2025/germany-gerling-preis-2025/"
+        },
+        {
+          "text": "G3\nGroßer Preis der Wohnstätte Krefeld – Dr. Busch-Memorial\n德国 · Krefeld\n待核实\n已完赛\n冠军 Namaron",
+          "url": "https://umafans.run/races/2025/germany-groer-preis-der-wohnstatte-krefeld-dr-busch-memorial-2025/"
+        },
+        {
+          "text": "G3\nWETTSTAR.de - Bavarian Classic - V4-3\n德国 · München\n待核实\n已完赛\n冠军 Path of Soldier",
+          "url": "https://umafans.run/races/2025/germany-bavarian-classic-2025/"
+        },
+        {
+          "text": "G3\nKarin Baronin von Ullmann - Schwarzgold-Rennen\n德国 · Köln\n待核实\n已完赛\n冠军 Santagada",
+          "url": "https://umafans.run/races/2025/germany-karin-baronin-von-ullmann-schwarzgold-rennen-2025/"
+        },
+        {
+          "text": "G2\nComer Group International 54. Oleander-Rennen\n德国 · Berlin-Hoppegarten\n待核实\n已完赛\n冠军 Flatten the Curve",
+          "url": "https://umafans.run/races/2025/germany-oleander-rennen-2025/"
+        },
+        {
+          "text": "G2\nCoolmore City Of Troy German 2000 Guineas\n德国 · Köln\n待核实\n已完赛\n冠军 Matilda",
+          "url": "https://umafans.run/races/2025/germany-city-of-troy-german-2000-guineas-2025/"
+        },
+        {
+          "text": "G2\nHorn & Company - 105. German 1000 Guineas\n德国 · Düsseldorf\n待核实\n已完赛\n冠军 Lady Ilze",
+          "url": "https://umafans.run/races/2025/germany-horn-company-german-1000-guineas-2025/"
+        },
+        {
+          "text": "G3\n47. Kronimus Badener Meile - V4/1\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Short Final",
+          "url": "https://umafans.run/races/2025/germany-badener-meile-2025/"
+        },
+        {
+          "text": "G3\nJapan Racing Association Derby-Trial - V4/1\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Juwelier",
+          "url": "https://umafans.run/races/2025/germany-derby-trial-2025/"
+        },
+        {
+          "text": "G2\nGrosser Preis von Tattersalls (ex Grosser Preis der Badischen Wirtschaft)\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Lordano",
+          "url": "https://umafans.run/races/2025/germany-grosser-preis-der-badischen-wirtschaft-2025/"
+        },
+        {
+          "text": "G3\nDiana-Trial der BEST PLACE Immobilien\n德国 · Berlin-Hoppegarten\n待核实\n已完赛\n冠军 Lady Charlotte",
+          "url": "https://umafans.run/races/2025/germany-diana-trial-der-best-place-immobilien-2025/"
+        },
+        {
+          "text": "G2\nSparkasse KölnBonn - 190. Union-Rennen\n德国 · Köln\n待核实\n已完赛\n冠军 Zuckerhut",
+          "url": "https://umafans.run/races/2025/germany-union-rennen-2025/"
+        },
+        {
+          "text": "G3\n36. GROSSER PREIS DER WIRTSCHAFT\n德国 · Dortmund\n待核实\n已完赛\n冠军 Best Lightning",
+          "url": "https://umafans.run/races/2025/germany-grosser-preis-der-wirtschaft-2025/"
+        },
+        {
+          "text": "G2\nWETTSTAR.de - Grosser Hansa-Preis\n德国 · Hamburg\n待核实\n已完赛\n冠军 Augustus",
+          "url": "https://umafans.run/races/2025/germany-grosser-hansa-preis-2025/"
+        },
+        {
+          "text": "G3\nBest Place Immobilien Hamburger Stutenpreis\n德国 · Hamburg\n待核实\n已完赛\n冠军 Nyra",
+          "url": "https://umafans.run/races/2025/germany-best-place-immobilien-hamburger-stutenpreis-2025/"
+        },
+        {
+          "text": "G1\nIDEE 156. Deutsches Derby\n德国 · Hamburg\n待核实\n已完赛\n冠军 Hochkönig",
+          "url": "https://umafans.run/races/2025/germany-deutsches-derby-2025/"
+        },
+        {
+          "text": "G2\nThe President of the United Arab Emirates Cup\n德国 · Hamburg\n待核实\n已完赛\n冠军 HM Alchahine",
+          "url": "https://umafans.run/races/2025/germany-the-president-of-the-united-arab-emirates-cup-2025/"
+        },
+        {
+          "text": "G3\nJapan Racing Association Trophy - Hamburger Stuten Meile\n德国 · Hamburg\n待核实\n已完赛\n冠军 Santagada",
+          "url": "https://umafans.run/races/2025/germany-trophy-hamburger-stuten-meile-2025/"
+        },
+        {
+          "text": "G3\nGrosser Preis von Lotto Hamburg - V4/4\n德国 · Hamburg\n待核实\n已完赛\n冠军 Quest the Moon",
+          "url": "https://umafans.run/races/2025/germany-grosser-preis-von-hamburg-2025/"
+        },
+        {
+          "text": "G3\nGroßer Preis der BBF Gruppe - Fürstenberg-Rennen\n德国 · Berlin-Hoppegarten\n待核实\n已完赛\n冠军 Padre Palou",
+          "url": "https://umafans.run/races/2025/germany-furstenberg-rennen-2025/"
+        },
+        {
+          "text": "G1\nGrosser Dallmayr-Preis - Bayerisches Zuchtrennen ausgetragen seit 1866 - V4/4\n德国 · München\n待核实\n已完赛\n冠军 Tornado Alert",
+          "url": "https://umafans.run/races/2025/germany-grosser-dallmayr-preis-bayerisches-zuchtrennen-ausgetragen-seit-1866-2025/"
+        },
+        {
+          "text": "G3\nFritz Henkel-Preis\n德国 · Düsseldorf\n待核实\n已完赛\n冠军 Geography",
+          "url": "https://umafans.run/races/2025/germany-fritz-henkel-preis-2025/"
+        },
+        {
+          "text": "G1\n167. Henkel-Preis der Diana - German Oaks\n德国 · Düsseldorf\n待核实\n已完赛\n冠军 Nicoreni",
+          "url": "https://umafans.run/races/2025/germany-preis-der-diana-german-oaks-2025/"
+        },
+        {
+          "text": "G1\nWestminster 135. Grosser Preis von Berlin\n德国 · Berlin-Hoppegarten\n待核实\n已完赛\n冠军 Rebel's Romance",
+          "url": "https://umafans.run/races/2025/germany-grosser-preis-von-berlin-2025/"
+        },
+        {
+          "text": "G3\n70. Preis der Sparkassen-Finanzgruppe (ex Spreti-Rennen) - V4/1\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Quest the Moon",
+          "url": "https://umafans.run/races/2025/germany-spreti-rennen-2025/"
+        },
+        {
+          "text": "G3\n155. Casino Baden-Baden Goldene Peitsche - V4/1\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 The Strikin Viking",
+          "url": "https://umafans.run/races/2025/germany-goldene-peitsche-2025/"
+        },
+        {
+          "text": "G3\n152. Renate und Albrecht Woeste - Zukunfts-Rennen\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Gostam",
+          "url": "https://umafans.run/races/2025/germany-zukunfts-rennen-2025/"
+        },
+        {
+          "text": "G2\nT. von Zastrow Stutenpreis (Badener Stutenpreis) - V4/1\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Egina",
+          "url": "https://umafans.run/races/2025/germany-stutenpreis-badener-stutenpreis-2025/"
+        },
+        {
+          "text": "G1\nWETTSTAR.de - 155. Grosser Preis von Baden - V4/2\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Goliath",
+          "url": "https://umafans.run/races/2025/germany-grosser-preis-von-baden-2025/"
+        },
+        {
+          "text": "G2\n92. Brunner - Oettingen-Rennen\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Geography",
+          "url": "https://umafans.run/races/2025/germany-oettingen-rennen-2025/"
+        },
+        {
+          "text": "G3\nWETTSTAR.de - 141. Deutsches St. Leger\n德国 · Dortmund\n待核实\n已完赛\n冠军 Caballo De Mar",
+          "url": "https://umafans.run/races/2025/germany-deutsches-st-leger-2025/"
+        },
+        {
+          "text": "G3\nDinger's Gartencenter Köln - Sprint Trophy\n德国 · Köln\n待核实\n已完赛\n冠军 Shootout",
+          "url": "https://umafans.run/races/2025/germany-dinger-s-gartencenter-koln-sprint-trophy-2025/"
+        },
+        {
+          "text": "G1\nMehl-Mülhens-Stiftung - 63. Preis von Europa\n德国 · Köln\n待核实\n已完赛\n冠军 Sibayan",
+          "url": "https://umafans.run/races/2025/germany-mehl-mulhens-stiftung-preis-von-europa-2025/"
+        },
+        {
+          "text": "G3\nWETTSTAR.de - 35. Preis der Deutschen Einheit\n德国 · Berlin-Hoppegarten\n待核实\n已完赛\n冠军 Santagada",
+          "url": "https://umafans.run/races/2025/germany-preis-der-deutschen-einheit-2025/"
+        },
+        {
+          "text": "G3\n105. Grosser Preis der Landeshauptstadt Düsseldorf\n德国 · Düsseldorf\n待核实\n已完赛\n冠军 Short Final",
+          "url": "https://umafans.run/races/2025/germany-grosser-preis-der-landeshauptstadt-dusseldorf-2025/"
+        },
+        {
+          "text": "G3\nWETTSTAR.de - Preis des Winterfavoriten\n德国 · Köln\n待核实\n已完赛\n冠军 Gostam",
+          "url": "https://umafans.run/races/2025/germany-preis-des-winterfavoriten-2025/"
+        },
+        {
+          "text": "G3\nB.A.U. Herbst Trophy - V4/1\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Rashford",
+          "url": "https://umafans.run/races/2025/germany-b-a-u-herbst-trophy-2025/"
+        },
+        {
+          "text": "G3\nCarla Kellner Zukunftsrennen - Preis der Winterkönigin\n德国 · Baden-Baden\n待核实\n已完赛\n冠军 Alsterperle",
+          "url": "https://umafans.run/races/2025/germany-carla-kellner-zukunftsrennen-preis-der-winterkonigin-2025/"
+        },
+        {
+          "text": "G3\nShadwell Stallions - Herbst-Stutenpreis\n德国 · Hannover\n待核实\n已完赛\n冠军 Santagada",
+          "url": "https://umafans.run/races/2025/germany-shadwell-stallions-herbst-stutenpreis-2025/"
+        }
+      ],
+      "controls": [
+        {
+          "tag": "SELECT",
+          "name": "year",
+          "type": "select-one",
+          "text": "全部年份\n2027\n2026\n2025\n2024\n2023\n2022\n2021\n2020\n2019\n2018\n2017\n2016\n2015\n2014\n2013\n2012\n2011\n2010\n2009\n2008\n2007\n2006\n2005\n2001\n2000",
+          "value": "2025"
+        },
+        {
+          "tag": "INPUT",
+          "name": "q",
+          "type": "search",
+          "text": "",
+          "value": ""
+        },
+        {
+          "tag": "BUTTON",
+          "name": "",
+          "type": "submit",
+          "text": "筛选",
+          "value": ""
+        }
+      ],
+      "tables": []
+    }
+  ]
+}

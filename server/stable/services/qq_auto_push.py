@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import requests
 from django.conf import settings
@@ -30,7 +30,7 @@ from stable.services.news_attribution import (
     related_region_queries_enabled,
 )
 
-from .onebot import BotPusher
+from .onebot import BotPusher, qq_channel_enabled, QQChannelDisabled, QQ_CHANNEL_DISABLED
 
 
 logger = logging.getLogger(__name__)
@@ -257,6 +257,8 @@ def build_qq_auto_push_message(
 
 
 def ensure_qq_push_deliveries(article: NewsArticle, targets: list[PushTarget] | None = None) -> list[QQPushDelivery]:
+    if not qq_channel_enabled():
+        return []
     max_attempts = max(1, int(getattr(settings, "QQ_PUSH_MAX_ATTEMPTS", 3)))
     deliveries: list[QQPushDelivery] = []
     resolved_targets = targets if targets is not None else get_auto_push_targets()
@@ -270,6 +272,8 @@ def ensure_qq_push_deliveries(article: NewsArticle, targets: list[PushTarget] | 
         except IntegrityError:
             delivery = QQPushDelivery.objects.get(article=article, target=target)
             created = False
+        if is_disabled_qq_delivery(delivery):
+            continue
         if not created and delivery.max_attempts != max_attempts and delivery.status != QQPushDeliveryStatus.SENT:
             delivery.max_attempts = max_attempts
             delivery.save(update_fields=["max_attempts", "updated_at"])
@@ -335,7 +339,13 @@ def _is_stale_sending(delivery: QQPushDelivery) -> bool:
     return delivery.last_attempt_at <= timezone.now() - timedelta(seconds=_sending_stale_after())
 
 
-def _claim_delivery_attempt(delivery: QQPushDelivery, *, message: str, public_url: str) -> bool:
+@dataclass(frozen=True)
+class DeliveryClaim:
+    attempt_count: int
+    last_attempt_at: datetime
+
+
+def _claim_delivery_attempt(delivery: QQPushDelivery, *, message: str, public_url: str) -> DeliveryClaim | None:
     stale_cutoff = timezone.now() - timedelta(seconds=_sending_stale_after())
     claimable_status = Q(
         status__in=[
@@ -348,20 +358,55 @@ def _claim_delivery_attempt(delivery: QQPushDelivery, *, message: str, public_ur
     stale_sending = Q(status=QQPushDeliveryStatus.SENDING) & (
         Q(last_attempt_at__lte=stale_cutoff) | Q(last_attempt_at__isnull=True)
     )
-    locked = QQPushDelivery.objects.filter(
-        Q(pk=delivery.pk),
-        claimable_status | stale_sending,
-        attempt_count__lt=F("max_attempts"),
-    ).update(
-        status=QQPushDeliveryStatus.SENDING,
-        attempt_count=F("attempt_count") + 1,
-        last_attempt_at=timezone.now(),
-        request_payload={"message": message, "public_url": public_url},
-    )
-    return bool(locked)
+    # UPDATE持有行锁至事务提交；在同一事务读取本人领取凭证，禁止refresh后借用他人凭证。
+    with transaction.atomic():
+        locked = QQPushDelivery.objects.filter(
+            Q(pk=delivery.pk),
+            claimable_status | stale_sending,
+            attempt_count__lt=F("max_attempts"),
+        ).update(
+            status=QQPushDeliveryStatus.SENDING,
+            attempt_count=F("attempt_count") + 1,
+            last_attempt_at=timezone.now(),
+            request_payload={"message": message, "public_url": public_url},
+        )
+        if not locked:
+            return None
+        attempt, claimed_at = QQPushDelivery.objects.values_list(
+            "attempt_count", "last_attempt_at").get(pk=delivery.pk)
+        return DeliveryClaim(attempt, claimed_at)
+
+
+def is_disabled_qq_delivery(delivery: QQPushDelivery) -> bool:
+    return delivery.status == QQPushDeliveryStatus.SKIPPED and delivery.last_error == QQ_CHANNEL_DISABLED
+
+
+def skip_disabled_qq_delivery(delivery: QQPushDelivery, *, claim: DeliveryClaim | None = None) -> QQPushDelivery:
+    """CAS封存可处理状态；不覆盖SENT或其他执行者正在发送的回执。"""
+    if claim is not None:
+        eligible = Q(status=QQPushDeliveryStatus.SENDING,
+                     attempt_count=claim.attempt_count, attempt_count__gt=0, last_attempt_at=claim.last_attempt_at)
+    else:
+        eligible = Q(status__in=[QQPushDeliveryStatus.PENDING, QQPushDeliveryStatus.RETRYING,
+                                QQPushDeliveryStatus.FAILED, QQPushDeliveryStatus.SKIPPED])
+        eligible |= Q(status=QQPushDeliveryStatus.SENDING) & (
+            Q(last_attempt_at__lte=timezone.now()-timedelta(seconds=_sending_stale_after())) |
+            Q(last_attempt_at__isnull=True))
+    values = dict(status=QQPushDeliveryStatus.SKIPPED, last_error_type=QQPushErrorType.NOT_ELIGIBLE,
+                  last_error=QQ_CHANNEL_DISABLED, updated_at=timezone.now())
+    if claim is not None:
+        values['attempt_count'] = F('attempt_count') - 1
+    QQPushDelivery.objects.filter(eligible, pk=delivery.pk).exclude(
+        status=QQPushDeliveryStatus.SKIPPED, last_error=QQ_CHANNEL_DISABLED).update(**values)
+    delivery.refresh_from_db()
+    return delivery
 
 
 def process_qq_push_delivery(delivery: QQPushDelivery) -> QQPushDelivery:
+    if not qq_channel_enabled():
+        return skip_disabled_qq_delivery(delivery)
+    if is_disabled_qq_delivery(delivery):
+        return delivery
     if delivery.status == QQPushDeliveryStatus.SENT:
         return delivery
     if delivery.status == QQPushDeliveryStatus.SENDING and not _is_stale_sending(delivery):
@@ -381,17 +426,26 @@ def process_qq_push_delivery(delivery: QQPushDelivery) -> QQPushDelivery:
     pusher = BotPusher()
     online, status_error = pusher.is_online()
     if not online:
+        if status_error == QQ_CHANNEL_DISABLED:
+            return skip_disabled_qq_delivery(delivery)
         return _set_delivery_failure(
             delivery,
             error_type=QQPushErrorType.SEND_FAILED,
             error=status_error or "onebot_offline",
         )
 
-    if not _claim_delivery_attempt(delivery, message=message, public_url=public_url):
+    claim = _claim_delivery_attempt(delivery, message=message, public_url=public_url)
+    if claim is None:
         delivery.refresh_from_db()
         return delivery
 
     delivery.refresh_from_db()
+    if (delivery.status != QQPushDeliveryStatus.SENDING or
+            delivery.attempt_count != claim.attempt_count or
+            delivery.last_attempt_at != claim.last_attempt_at):
+        return delivery
+    if not qq_channel_enabled():
+        return skip_disabled_qq_delivery(delivery, claim=claim)
     accessible, error = is_public_url_accessible(public_url)
     if not accessible:
         return _set_delivery_failure(
@@ -402,6 +456,8 @@ def process_qq_push_delivery(delivery: QQPushDelivery) -> QQPushDelivery:
 
     try:
         response = pusher.send_group_message(delivery.target.group_id, message)
+    except QQChannelDisabled:
+        return skip_disabled_qq_delivery(delivery, claim=claim)
     except Exception as exc:
         delivery.refresh_from_db()
         return _set_delivery_failure(
@@ -431,8 +487,11 @@ def process_qq_push_delivery(delivery: QQPushDelivery) -> QQPushDelivery:
 
 
 def enqueue_qq_auto_push_for_article(article_id: int) -> None:
-    if not getattr(settings, "QQ_PUSH_ENABLED", False):
+    if not qq_channel_enabled() or not getattr(settings, "QQ_PUSH_ENABLED", False):
         return
     from stable.tasks import qq_auto_push_article_task
 
-    transaction.on_commit(lambda: qq_auto_push_article_task.delay(article_id))
+    def enqueue_if_enabled():
+        if qq_channel_enabled() and getattr(settings, "QQ_PUSH_ENABLED", False):
+            qq_auto_push_article_task.delay(article_id)
+    transaction.on_commit(enqueue_if_enabled)

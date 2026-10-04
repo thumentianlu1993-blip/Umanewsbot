@@ -1,0 +1,106 @@
+{
+  "code_sha": "7d15ffaa7df5f67233747499ab0c57e94fba25ac",
+  "q01_approved_sha": "924a2a37edda1695a45a9c6275d24403d23bc702",
+  "offline_only": true,
+  "production_observed": false,
+  "items": [
+    {
+      "kind": "ui",
+      "path": "server/stable/admin.py",
+      "symbol_or_surface": "NewsArticleAdmin.push_action_link/get_fieldsets/get_list_display/get_actions",
+      "proposal": "停用时移除发送链接及仅写PUSH_READY的旧动作；直接URL保持Q01终止提示",
+      "blob_sha256": "aa57fd723805e1777674121aa68ed049a06f7551bec46a721b525b559b6d2556"
+    },
+    {
+      "kind": "ui",
+      "path": "server/stable/templates/stable/console/production_window_detail.html",
+      "symbol_or_surface": "qq_push重跑/预览入口",
+      "proposal": "停用QQ窗口去重跑；历史明细继续可读并标渠道停用",
+      "blob_sha256": "570236628eb8956a0a4fdb3223cbac7d510506606195f1dbbdcc672f51300c3d"
+    },
+    {
+      "kind": "ui",
+      "path": "server/stable/templates/stable/console/production_window_preview.html",
+      "symbol_or_surface": "预计QQ文章",
+      "proposal": "停用不展示可发送预期；publish预览保持",
+      "blob_sha256": "79c17c96f8c082adb8976e2e4a8545d58f0ff68a19436b3eefdcd73af6e28222"
+    },
+    {
+      "kind": "ui",
+      "path": "server/stable/templates/stable/console/region_production.html",
+      "symbol_or_surface": "QQ列/说明",
+      "proposal": "明确历史计数与停用，不诱导将等待视为需重试",
+      "blob_sha256": "787894d068faabb44b6ce3f9fe04fb215655182dc9f235b1bc86d1b169290934"
+    },
+    {
+      "kind": "adapter",
+      "path": "server/stable/views.py",
+      "symbol_or_surface": "region_production/production_window_detail/preview",
+      "proposal": "只传停用上下文；复用总许可helper；不改变Q01 API/业务",
+      "blob_sha256": "49e3493d5758005d1a4d390adeef2a64bb55060af84e8ffaf0852367f9b9dc41"
+    },
+    {
+      "kind": "tombstone",
+      "path": "server/stable/tasks.py",
+      "symbol_or_surface": "push_article_task/qq_region_window_task/qq_production_regions_window_task/qq_auto_push_article_task/qq_push_delivery_task",
+      "proposal": "保留任务名/参数注册；补缺失终止原因可观察性，不删除迟到消费者",
+      "blob_sha256": "8f8678a9413ede5f89cb506d7955d8d4a6a1278a610faee1065cf24f87e0fb74"
+    },
+    {
+      "kind": "schedule",
+      "path": "server/app/settings.py",
+      "symbol_or_surface": "CELERY_BEAT_SCHEDULE.qq-production-regions-window",
+      "proposal": "候选代码取消此专属周期键；其它Beat不动",
+      "blob_sha256": "fd07c55a67f31f2125f66e191eb6e188b4e0d347fdfd5937831e1de800874b38"
+    },
+    {
+      "kind": "service",
+      "path": "docker-compose.prod.yml",
+      "symbol_or_surface": "services.onebot / with-onebot",
+      "proposal": "候选移除QQ专属可选声明；实际停止交O06精确资源包",
+      "blob_sha256": "95fc9e5400fc3125deb5f5f02af0b924dc90959e6347dd57f5a715f8a269b51a"
+    },
+    {
+      "kind": "service",
+      "path": "docker-compose.prod.lowcost.yml",
+      "symbol_or_surface": "services.onebot / with-onebot",
+      "proposal": "同上；不down共享栈/不自动remove-orphans",
+      "blob_sha256": "558bc1dcd8f57e06f71c96ddf18a745e35844dfbe10ef48cabe47a51d1da4896"
+    },
+    {
+      "kind": "retain",
+      "path": "server/stable/services/onebot.py",
+      "symbol_or_surface": "gateway typed停用guard",
+      "proposal": "保留兼容进口和安全边界，不删除造成旧worker导入失败",
+      "blob_sha256": "854baf92c4bd17b0468e5e8234f8746d33b476ba534be102a98aeffcf46c15bd"
+    },
+    {
+      "kind": "retain",
+      "path": "server/stable/services/notifications.py",
+      "symbol_or_surface": "send_automation_notification",
+      "proposal": "保留邮件/SMS/WeChat/QQ历史枚举与共享日志",
+      "blob_sha256": "e88aa993c736f9a134009f878f721905df21f8683964d3b77f38d41f1e91154f"
+    },
+    {
+      "kind": "retain",
+      "path": "server/stable/services/ops_notifications.py",
+      "symbol_or_surface": "notify_ops",
+      "proposal": "保留邮件与QQ停用分支",
+      "blob_sha256": "6851a2a091ee6acc429bd9822d632d8fd01acf0ada5586cbd1358b0daa5285e7"
+    },
+    {
+      "kind": "retain",
+      "path": "server/stable/models.py",
+      "symbol_or_surface": "PushTarget/QQPushDelivery/PushLog/TaskExecutionLog/NotificationLog/ProductionWindow",
+      "proposal": "历史模型字段枚举/数据保留；不迁移、不批量重写",
+      "blob_sha256": "7dfdbe43e9586aa794c5de0fadb8e817de0dc7c8473f8f8568de7d4a8d3dcf63"
+    },
+    {
+      "kind": "retain",
+      "path": "requirements.txt",
+      "symbol_or_surface": "requests等共享依赖",
+      "proposal": "未发现QQ专属Python包；不按调用名字删除共享依赖",
+      "blob_sha256": "f3fd408c04cae78ed13d5175fe8cc04674fcde4efab9d9f18d569652eddf3f59"
+    }
+  ]
+}

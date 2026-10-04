@@ -5672,11 +5672,8 @@ class RaceResultRevisionApplyTests(TestCase):
         stable_models.RaceEventProjectionControl.objects.filter(event=self.event).update(write_owner="unmanaged")
         from stable import views as stable_views
 
-        with patch.object(
-            stable_views.timezone,
-            "localdate",
-            return_value=self.event.local_date,
-        ):
+        # 首页从当前瞬时推导北京日期，固定同一时钟以保留冠军顺位断言。
+        with patch.object(stable_views.timezone, "now", return_value=self.NOW):
             entries, is_fallback = stable_views._public_today_races()
 
         self.assertFalse(is_fallback)

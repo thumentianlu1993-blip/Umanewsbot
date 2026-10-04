@@ -1,5 +1,5 @@
 {% if headline_article %}
-  <a class="hero-headline{% if headline_article.cover_image_url %} has-cover{% endif %}" href="{{ headline_article.public_path }}">
+  <a class="hero-headline{% if headline_article.cover_image_url %} has-cover{% endif %}" href="{{ headline_article.public_list_detail_url|default:headline_article.public_path }}">
     {% if headline_article.cover_image_url %}
       <img class="hero-cover" src="{{ headline_article.cover_image_url }}" alt="">
     {% endif %}
