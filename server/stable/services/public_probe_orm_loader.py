@@ -197,7 +197,7 @@ def load_public_result_snapshot(*, event_id, canonical_subject, audience, as_of)
             snapshot = _materialize(event_id, canonical_subject, as_of)
         with transaction.atomic():
             _begin_read()  # 已退出旧 RR，重新获得可见 writer 提交的新快照。
-            fence = _read_fence(event_id,as_of)
+            fence = _read_fence(event_id,timezone.now())
         checked = timezone.now()
         if snapshot.version_fence != fence:
             return replace(snapshot,status="unverified",reason="input_changed",rows=(),revalidated_at=checked)
