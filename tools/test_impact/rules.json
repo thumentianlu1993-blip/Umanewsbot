@@ -1467,7 +1467,8 @@
         "module:stable.test_race_information_display_pages",
         "module:stable.test_historical_race_calendar_integrity",
         "module:stable.test_race_public_time",
-        "module:stable.test_race_news_exposure"
+        "module:stable.test_race_news_exposure",
+        "public_probe_orm_loader"
       ]
     }
   },
