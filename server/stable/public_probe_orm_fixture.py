@@ -1,10 +1,12 @@
 """C026 独立本地 fixture，不提供生产授权或 proof。"""
 from datetime import timedelta
 from django.urls import reverse
+from django.db import transaction
 from stable import models as m
 from stable.services.race_events import build_race_live_canonical_sha256
 
 
+@transaction.atomic
 def create_public_result_fixture(now):
     event = m.RaceEvent.objects.create(year=2026, slug="c026-local", original_name="C026 Local Stakes",
         country_region="united_kingdom", racecourse="Newbury", status="finished",
