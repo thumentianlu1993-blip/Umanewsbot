@@ -8,7 +8,7 @@ from pathlib import Path
 from threading import Barrier
 from unittest import mock, skipUnless
 
-from django.db import close_old_connections, connection
+from django.db import close_old_connections, connection, connections
 from django.test import TransactionTestCase
 
 from stable.models import (
@@ -75,7 +75,7 @@ class RacingApiHorseStagingPostgresqlConcurrencyTests(TransactionTestCase):
                         allow_write=True,
                     )
                 finally:
-                    close_old_connections()
+                    connections.close_all()
 
             with mock.patch.dict(
                 os.environ,

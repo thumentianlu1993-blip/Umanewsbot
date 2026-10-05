@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest import mock, skipUnless
 
 from django.contrib.auth import get_user_model
-from django.db import close_old_connections, connection
+from django.db import close_old_connections, connection, connections
 from django.test import SimpleTestCase, TransactionTestCase
 
 from stable.models import (
@@ -292,7 +292,7 @@ class RaceSeriesIdentity2026SnapshotPostgresTests(TransactionTestCase):
             except BaseException as exc:  # pragma: no cover - surfaced in the parent thread
                 failure.append(exc)
             finally:
-                close_old_connections()
+                connections.close_all()
 
         worker = threading.Thread(target=export_in_thread, name="race-series-2026-export")
         worker.start()
@@ -528,7 +528,7 @@ class RaceSeriesIdentity2026ConcurrentApplyPostgresTests(TransactionTestCase):
                 except BaseException as exc:  # pragma: no cover - asserted in parent thread
                     outcomes[label] = ("failure", exc)
                 finally:
-                    close_old_connections()
+                    connections.close_all()
 
             with mock.patch.object(
                 identity_review,
