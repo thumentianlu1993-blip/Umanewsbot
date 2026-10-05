@@ -833,6 +833,13 @@
     "public_probe_contracts": [
       "stable.test_public_probe_contracts",
       "stable.test_content_contracts"
+    ],
+    "public_probe_render": [
+      "stable.test_public_probe_render"
+    ],
+    "public_probe_template_adapter": [
+      "stable.test_public_probe_template_adapter",
+      "stable.test_public_probe_template_glue"
     ]
   },
   "dependencies": {
@@ -848,6 +855,13 @@
     "content_contracts": [
       "race_timeliness_contracts",
       "public_probe_contracts"
+    ],
+    "public_probe_render": [
+      "public_probe_contracts"
+    ],
+    "public_probe_template_adapter": [
+      "public_probe_render",
+      "content_contracts"
     ]
   },
   "tests": {
@@ -2591,6 +2605,24 @@
       "domains": [
         "public_probe_contracts"
       ]
+    },
+    "server/stable/test_public_probe_render.py": {
+      "label": "stable.test_public_probe_render",
+      "domains": [
+        "public_probe_render"
+      ]
+    },
+    "server/stable/test_public_probe_template_adapter.py": {
+      "label": "stable.test_public_probe_template_adapter",
+      "domains": [
+        "public_probe_template_adapter"
+      ]
+    },
+    "server/stable/test_public_probe_template_glue.py": {
+      "label": "stable.test_public_probe_template_glue",
+      "domains": [
+        "public_probe_template_adapter"
+      ]
     }
   },
   "profiles": {
@@ -2881,7 +2913,10 @@
     "scripts.tests.test_h01_readonly_count": "python",
     "stable.test_h01_count_postgres": "django",
     "stable.test_race_timeliness_contracts": "python",
-    "stable.test_public_probe_contracts": "python"
+    "stable.test_public_probe_contracts": "python",
+    "stable.test_public_probe_render": "python",
+    "stable.test_public_probe_template_adapter": "django",
+    "stable.test_public_probe_template_glue": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
@@ -2954,7 +2989,9 @@
     "horse_publish": "integration: 首次发布、批次重试及冻结排除",
     "horse_target_inventory": "integration: H01目标清单与只读容量合同",
     "race_timeliness_contracts": "integration: R01纯合同、时延边界和错误历史",
-    "public_probe_contracts": "operations: O03公开比较、完成槽与告警状态纯合同"
+    "public_probe_contracts": "operations: O03公开比较、完成槽与告警状态纯合同",
+    "public_probe_render": "operations: O03 离线公开内容解析与原始渲染合同",
+    "public_probe_template_adapter": "application: O03 离线模板适配、测试环境隔离与恢复"
   },
   "dedicated_batch_modules": [
     "stable.test_migration_history_repair_postgres",
