@@ -1,11 +1,13 @@
-"""C020 受审合同的真实模板 RED；执行仅限 root 批准的固定零 DB runner。"""
-from django.test import SimpleTestCase
-from public_probe_template_support import (
+"""C020 受审合同的真实模板测试；类内设置隔离，SQL 由 SimpleTestCase 禁用。"""
+from django.test import SimpleTestCase, override_settings
+from stable.testing_public_probe.support import (
     approved_cases, adapter_inputs, render_case, render_approved_original,
 )
 from stable.services.public_probe_template_adapter import parse_template_render
+from stable.testing_public_probe.settings import TEMPLATE_TEST_SETTINGS
 
 
+@override_settings(**TEMPLATE_TEST_SETTINGS)
 class TemplateAdapterFirstRed(SimpleTestCase):
     databases = set()
 
@@ -68,7 +70,7 @@ class TemplateAdapterFirstRed(SimpleTestCase):
 
     def test_supplementary_baseline_reason_isolation(self):
         """五个独立参数保留旧reason覆盖；不改原72个输入/前置顺序。"""
-        from public_probe_template_support import baseline_reason_inputs, SourceDOM, canonical_bytes
+        from stable.testing_public_probe.support import baseline_reason_inputs, SourceDOM, canonical_bytes
         from copy import deepcopy
         import hashlib
         parameters = (
@@ -392,7 +394,7 @@ class TemplateAdapterFirstRed(SimpleTestCase):
 
     def _review_baseline(self, document, case):
         """先证明相同原件可成功；前置失败不能冒充两项 P2 的 RED。"""
-        from public_probe_template_support import canonical_bytes
+        from stable.testing_public_probe.support import canonical_bytes
         import hashlib
         inputs = adapter_inputs(document, case)
         result = parse_template_render(**inputs)
@@ -410,7 +412,7 @@ class TemplateAdapterFirstRed(SimpleTestCase):
     def _review_observe_edit(self, original, dom, edit, key):
         from copy import deepcopy
         import hashlib
-        from public_probe_template_support import canonical_bytes
+        from stable.testing_public_probe.support import canonical_bytes
         inputs = deepcopy(original)
         inputs['html'] = dom.replace([edit])
         self.assertNotEqual(inputs['html'], original['html'])
@@ -431,7 +433,7 @@ class TemplateAdapterFirstRed(SimpleTestCase):
         return result
 
     def test_review_R01_scalar_nested_nodes_rejected(self):
-        from public_probe_template_support import SourceDOM
+        from stable.testing_public_probe.support import SourceDOM
         document = approved_cases()
         cases = [c for c in document['positive_and_missing_cases']
                  if c['page_type'] == 'detail' and c['template_context']['winner'] is not None]
@@ -452,7 +454,7 @@ class TemplateAdapterFirstRed(SimpleTestCase):
                         self.assertEqual(result['c013_status'], 'not_constructed')
 
     def test_review_R01_scalar_outer_class_and_wrapper_controls(self):
-        from public_probe_template_support import SourceDOM
+        from stable.testing_public_probe.support import SourceDOM
         document = approved_cases()
         cases = [c for c in document['positive_and_missing_cases']
                  if c['case_id'] in ('P-official-old-detail-legacy', 'P-official-old-detail-strict_display_v1')]
@@ -480,7 +482,7 @@ class TemplateAdapterFirstRed(SimpleTestCase):
                         self.assertIsNone(result['receipt'])
 
     def test_review_R02_medal_classes_bound_to_independent_DTO(self):
-        from public_probe_template_support import SourceDOM
+        from stable.testing_public_probe.support import SourceDOM
         document = approved_cases()
         cases = [c for c in document['positive_and_missing_cases'] if c['page_type'] == 'detail']
         self.assertEqual(len(cases), 13)
@@ -505,7 +507,7 @@ class TemplateAdapterFirstRed(SimpleTestCase):
                     self.assertEqual(result['c013_status'], 'not_constructed')
 
     def test_behavioral_negative_matrix(self):
-        from public_probe_template_support import negative_inputs
+        from stable.testing_public_probe.support import negative_inputs
         document = approved_cases()
         cases = [case for case in document['future_negative_cases'] if case['case_id'] not in {
             'N62-equality-budget', 'N65-expected-feedback', 'N67-table-slice'}]
@@ -523,7 +525,7 @@ class TemplateAdapterFirstRed(SimpleTestCase):
         from copy import deepcopy
         import hashlib
         import json
-        from public_probe_template_support import SourceDOM, canonical_bytes
+        from stable.testing_public_probe.support import SourceDOM, canonical_bytes
         document = approved_cases();case = deepcopy(document['positive_and_missing_cases'][0])
         case['projection']['marker']['subject'] = '/races/2026/synthetic-final/?a=1&b=2'
         html = render_case(case, case['projection']);dom = SourceDOM(html)
@@ -541,7 +543,7 @@ class TemplateAdapterFirstRed(SimpleTestCase):
         self.assertIsNone(result['receipt'])
 
     def test_marker_duplicate_key_and_invalid_type(self):
-        from public_probe_template_support import SourceDOM, marker_edit
+        from stable.testing_public_probe.support import SourceDOM, marker_edit
         document = approved_cases();case = document['positive_and_missing_cases'][0]
         inputs = adapter_inputs(document, case);dom = SourceDOM(inputs['html']);node = dom.one(tag='script',attr='data-o03-marker')
         raw = dom.source[node.opening_end:node.closing_start]
@@ -554,7 +556,7 @@ class TemplateAdapterFirstRed(SimpleTestCase):
                 self.assertEqual(result['reason'], 'marker_schema');self.assertIsNone(result['receipt'])
 
     def test_marker_close_and_script_injection_rejected(self):
-        from public_probe_template_support import SourceDOM
+        from stable.testing_public_probe.support import SourceDOM
         document = approved_cases();case = document['positive_and_missing_cases'][0]
         inputs = adapter_inputs(document, case);dom = SourceDOM(inputs['html']);node = dom.one(tag='script',attr='data-o03-marker')
         raw = dom.source[node.opening_end:node.closing_start]
@@ -567,14 +569,14 @@ class TemplateAdapterFirstRed(SimpleTestCase):
         self.assertEqual(_escapejs(raw), str(escapejs(raw)))
         # Encoder equivalence does not widen the API subject regex.
         inputs = adapter_inputs(document, case)
-        from public_probe_template_support import marker_edit
+        from stable.testing_public_probe.support import marker_edit
         marker_edit(inputs, lambda marker: marker.update(subject='/races/<invalid>/'))
         self.assertEqual(parse_template_render(**inputs)['reason'], 'marker_schema')
 
     def test_meta_expected_feedback_is_detected(self):
         from unittest.mock import patch
         from copy import deepcopy
-        from public_probe_template_support import SourceDOM
+        from stable.testing_public_probe.support import SourceDOM
         from stable.services import public_probe_template_adapter as observer
         document = approved_cases();case = next(c for c in document['positive_and_missing_cases'] if c['case_id']=='P-official-old-detail-strict_display_v1')
         inputs = adapter_inputs(document, case);dom = SourceDOM(inputs['html']);table = dom.one(attr='id',value='results')
@@ -591,7 +593,7 @@ class TemplateAdapterFirstRed(SimpleTestCase):
     def test_meta_missing_fourth_row_is_detected(self):
         from unittest.mock import patch
         from copy import deepcopy
-        from public_probe_template_support import SourceDOM
+        from stable.testing_public_probe.support import SourceDOM
         from stable.services import public_probe_template_adapter as observer
         document = approved_cases();case = next(c for c in document['positive_and_missing_cases'] if c['case_id']=='P-official-old-detail-strict_display_v1')
         inputs = adapter_inputs(document, case);dom = SourceDOM(inputs['html']);table = dom.one(attr='id',value='results')
