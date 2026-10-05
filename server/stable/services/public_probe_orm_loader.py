@@ -151,6 +151,7 @@ def _materialize(event_id, canonical_subject, as_of):
     item_map = {item.participant_id:item for item in items}
     if len(identity_map) != len(identities) or len(item_map) != len(items) or len(items) != len(results) or not items:
         return replace(snapshot, reason="ambiguous_row_identity", version_fence=fence)
+    expected_confirmation = revision.phase in (m.RaceResultPhase.OFFICIAL, m.RaceResultPhase.CORRECTED)
     rows = []; seen = set()
     for result in results:
         refs = result.source_refs if isinstance(result.source_refs, dict) else {}
@@ -162,6 +163,7 @@ def _materialize(event_id, canonical_subject, as_of):
         seen.add(participant_id)
         equal_fields = ("official_finish_position", "horse_number", "jockey_name", "trainer_name", "finish_time", "margin", "barrier", "carried_weight")
         if (item.participant.event_id != event_id or result.horse_name != item.participant.canonical_name
+            or result.is_confirmed != expected_confirmation
             or result.running_status != item.status or result.finish_position != item.internal_order
             or any(getattr(result,k) != getattr(item,k) for k in equal_fields)):
             return replace(snapshot, reason="projection_mismatch", version_fence=fence)
