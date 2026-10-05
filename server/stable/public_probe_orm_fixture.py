@@ -21,6 +21,7 @@ def create_public_result_fixture(now):
     m.RaceLiveEventPublicationAllowlist.objects.create(event=event,source_key=source.source_key,
         max_mode="provisional_public",enabled=True,coverage_proof_digest="c"*64,
         official_verification_route="local-review",official_verification_route_version="local-v1",
+        official_verification_contract_digest="e"*64,official_terms_evidence_digest="f"*64,
         official_verification_valid_until=now+timedelta(days=1))
     payload={"external_race_id":source.external_race_id,"participants":[
         {"external_runner_id":f"c026-runner-{i}","official_finish_position":i,"status":"finished"} for i in (1,2)]}
