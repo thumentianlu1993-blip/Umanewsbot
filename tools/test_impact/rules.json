@@ -1239,6 +1239,66 @@
     ],
     "server/stable/services/public_probe_contracts.py": [
       "public_probe_contracts"
+    ],
+    "server/stable/fixtures/public_probe_render_v1/C015-result-golden.json": [
+      "public_probe_render"
+    ],
+    "server/stable/fixtures/public_probe_template_v1/assembly.json": [
+      "public_probe_template_adapter"
+    ],
+    "server/stable/fixtures/public_probe_template_v1/contract.json": [
+      "public_probe_template_adapter"
+    ],
+    "server/stable/fixtures/public_probe_template_v1/descriptor.json": [
+      "public_probe_template_adapter"
+    ],
+    "server/stable/fixtures/public_probe_template_v1/envelope.json": [
+      "public_probe_template_adapter"
+    ],
+    "server/stable/fixtures/public_probe_template_v1/golden.json": [
+      "public_probe_template_adapter"
+    ],
+    "server/stable/fixtures/public_probe_template_v1/golden.schema.json": [
+      "public_probe_template_adapter"
+    ],
+    "server/stable/fixtures/public_probe_template_v6/contract.json": [
+      "public_probe_template_adapter"
+    ],
+    "server/stable/fixtures/public_probe_template_v6/derivation.json": [
+      "public_probe_template_adapter"
+    ],
+    "server/stable/fixtures/public_probe_template_v6/descriptor.json": [
+      "public_probe_template_adapter"
+    ],
+    "server/stable/fixtures/public_probe_template_v6/envelope.json": [
+      "public_probe_template_adapter"
+    ],
+    "server/stable/fixtures/public_probe_template_v6/evidence-contract.json": [
+      "public_probe_template_adapter"
+    ],
+    "server/stable/fixtures/public_probe_template_v6/golden-derived.json": [
+      "public_probe_template_adapter"
+    ],
+    "server/stable/fixtures/public_probe_template_v6/golden.schema.json": [
+      "public_probe_template_adapter"
+    ],
+    "server/stable/services/public_probe_render.py": [
+      "public_probe_render"
+    ],
+    "server/stable/services/public_probe_template_adapter.py": [
+      "public_probe_template_adapter"
+    ],
+    "server/stable/testing_public_probe/__init__.py": [
+      "public_probe_template_adapter"
+    ],
+    "server/stable/testing_public_probe/settings.py": [
+      "public_probe_template_adapter"
+    ],
+    "server/stable/testing_public_probe/support.py": [
+      "public_probe_template_adapter"
+    ],
+    "server/stable/testing_public_probe/urls.py": [
+      "public_probe_template_adapter"
     ]
   },
   "symbols": {

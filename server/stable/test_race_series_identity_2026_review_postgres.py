@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest import mock, skipUnless
 
 from django.contrib.auth import get_user_model
-from django.db import close_old_connections, connection
+from django.db import close_old_connections, connection, connections
 from django.test import SimpleTestCase, TransactionTestCase
 
 from stable.models import (
@@ -26,6 +26,23 @@ from stable.models import (
 )
 from stable.services import race_series_identity_2026_review as review_2026
 from stable.services import race_series_identity_review as identity_review
+
+
+def _assert_worker_sessions_closed(test_case, worker_pids):
+    """只观测已绑定的线程PID；不终止会话，允许正常断开的短暂异步延迟。"""
+    test_case.assertTrue(worker_pids, "no worker backend PID recorded")
+    deadline = time.monotonic() + 2
+    while True:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT pid, datname, state FROM pg_stat_activity WHERE pid = ANY(%s)",
+                [sorted(set(worker_pids))],
+            )
+            lingering = cursor.fetchall()
+        if not lingering or time.monotonic() >= deadline:
+            break
+        time.sleep(0.01)
+    test_case.assertEqual(lingering, [], "worker PostgreSQL sessions still alive")
 
 
 def _classification(
@@ -248,6 +265,7 @@ class RaceSeriesIdentity2026SnapshotPostgresTests(TransactionTestCase):
         result: dict = {}
         failure: list[BaseException] = []
         isolation_levels: list[str] = []
+        worker_pids: list[int] = []
         real_classifier = review_2026.classify_historical_race_event_targets
 
         def pause_after_target_read(targets):
@@ -262,6 +280,9 @@ class RaceSeriesIdentity2026SnapshotPostgresTests(TransactionTestCase):
         def export_in_thread():
             close_old_connections()
             try:
+                with connection.cursor() as cursor:
+                    cursor.execute("SELECT pg_backend_pid()")
+                    worker_pids.append(cursor.fetchone()[0])
                 with mock.patch.object(
                     review_2026,
                     "classify_historical_race_event_targets",
@@ -271,7 +292,7 @@ class RaceSeriesIdentity2026SnapshotPostgresTests(TransactionTestCase):
             except BaseException as exc:  # pragma: no cover - surfaced in the parent thread
                 failure.append(exc)
             finally:
-                close_old_connections()
+                connections.close_all()
 
         worker = threading.Thread(target=export_in_thread, name="race-series-2026-export")
         worker.start()
@@ -313,6 +334,7 @@ class RaceSeriesIdentity2026SnapshotPostgresTests(TransactionTestCase):
         self.assertEqual(snapshot["counts"].get("no_name_match"), 1)
         self.assertEqual(snapshot["all_rows"][0]["target_original_name"], "Snapshot Original")
         self.assertEqual(snapshot["all_rows"][0]["candidate_event_ids"], [])
+        _assert_worker_sessions_closed(self, worker_pids)
 
         target.refresh_from_db()
         self.assertEqual(target.original_name, "Concurrent Match")
@@ -483,6 +505,7 @@ class RaceSeriesIdentity2026ConcurrentApplyPostgresTests(TransactionTestCase):
             start_gate = threading.Barrier(2, timeout=10)
             real_lock_action_rows = identity_review._lock_action_rows
             outcomes: dict[str, tuple[str, object]] = {}
+            worker_pids: dict[str, int] = {}
 
             def synchronized_lock(actions):
                 start_gate.wait()
@@ -491,6 +514,9 @@ class RaceSeriesIdentity2026ConcurrentApplyPostgresTests(TransactionTestCase):
             def apply_in_thread(label: str, artifact: dict):
                 close_old_connections()
                 try:
+                    with connection.cursor() as cursor:
+                        cursor.execute("SELECT pg_backend_pid()")
+                        worker_pids[label] = cursor.fetchone()[0]
                     result = identity_review.apply_race_series_identity_review(
                         artifact_dir=artifact["artifact_dir"],
                         expected_manifest_sha256=artifact["manifest_sha256"],
@@ -502,7 +528,7 @@ class RaceSeriesIdentity2026ConcurrentApplyPostgresTests(TransactionTestCase):
                 except BaseException as exc:  # pragma: no cover - asserted in parent thread
                     outcomes[label] = ("failure", exc)
                 finally:
-                    close_old_connections()
+                    connections.close_all()
 
             with mock.patch.object(
                 identity_review,
@@ -527,6 +553,8 @@ class RaceSeriesIdentity2026ConcurrentApplyPostgresTests(TransactionTestCase):
             self.assertFalse(worker_a.is_alive(), "first apply thread did not finish")
             self.assertFalse(worker_b.is_alive(), "second apply thread did not finish")
             self.assertEqual(set(outcomes), {"a", "b"})
+            self.assertEqual(set(worker_pids), {"a", "b"})
+            _assert_worker_sessions_closed(self, list(worker_pids.values()))
             successes = {
                 label: value
                 for label, (state, value) in outcomes.items()

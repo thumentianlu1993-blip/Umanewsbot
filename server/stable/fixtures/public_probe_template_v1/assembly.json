@@ -1,0 +1,3450 @@
+{
+  "schema_version": "c020.static-assembly.v1",
+  "synthetic_only": true,
+  "roots": [
+    {
+      "path": "server/stable/services/public_probe_render.py",
+      "commit": "8d012700f95370e13034f6eee8b1e1f298ecf8fe"
+    },
+    {
+      "path": "server/stable/services/public_probe_contracts.py",
+      "commit": "baa6345e87203e35fde6cb2c7e913fae28826ecd"
+    },
+    {
+      "path": "server/stable/services/content_contracts.py",
+      "commit": "06b01aea9041eacb3deae9f46968eb06fd459cb6"
+    },
+    {
+      "path": "server/stable/templatetags/race_information.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9"
+    },
+    {
+      "path": "server/stable/apps.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9"
+    },
+    {
+      "path": "server/stable/__init__.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9"
+    },
+    {
+      "path": "server/stable/templatetags/__init__.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9"
+    }
+  ],
+  "repository_modules": [
+    {
+      "path": "server/stable/services/public_probe_render.py",
+      "commit": "8d012700f95370e13034f6eee8b1e1f298ecf8fe",
+      "git_blob": "ce4a91f9c60926417dc28acbb2e2663a7cb73470",
+      "sha256": "55628e12671d9bc0dec3f4f2693d1d9dab6d833e61449984f6ed6dea580c2c0d",
+      "bytes": 35912
+    },
+    {
+      "path": "server/stable/services/public_probe_contracts.py",
+      "commit": "baa6345e87203e35fde6cb2c7e913fae28826ecd",
+      "git_blob": "82becf54d12454288a53e4eb4b7a07917f515d1e",
+      "sha256": "a5222f5a47fb9ab9fd3ec66446cc9b0fb32ceffa19d4eb9e23fa43356ae1927f",
+      "bytes": 15255
+    },
+    {
+      "path": "server/stable/services/content_contracts.py",
+      "commit": "06b01aea9041eacb3deae9f46968eb06fd459cb6",
+      "git_blob": "02fb6565ed4a01123237c75b3ba448cea332e81f",
+      "sha256": "e804296a73436700581e76cff33f0005ac080b7465944373b5ed4956185d1d2d",
+      "bytes": 21203
+    },
+    {
+      "path": "server/stable/templatetags/race_information.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "b9fb67b49fd7068b559be4de70951ee5a00dff38",
+      "sha256": "698afd2add62a742e2b9bbb6e6a09b265cc51249d83464f1b99c17fc8900e173",
+      "bytes": 1600
+    },
+    {
+      "path": "server/stable/apps.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "54f5c65ef86f9063829e2395484b94e7ccc5dbfa",
+      "sha256": "4a77cb0d20ddae28f8436e129f95a138926b505bf8f8180d700c9caf65b9d9f6",
+      "bytes": 258
+    },
+    {
+      "path": "server/stable/__init__.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "server/stable/templatetags/__init__.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "server/stable/services/__init__.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "8b137891791fe96927ad78e64b0aad7bded08bdc",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "bytes": 1
+    },
+    {
+      "path": "server/stable/services/race_information_display.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "4e269ba065c612e43bcddba919c6e4b9610da781",
+      "sha256": "bb9df36f2e3f0a6a67dc4c62f5ecfae70637c7278e86912453e5147d1576743f",
+      "bytes": 25723
+    },
+    {
+      "path": "server/stable/services/race_field_normalization.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "446d3eeef48365f55e345569ffc29e5670b3344d",
+      "sha256": "8bb0fb2a67502310a20562bfd642ecf1285af83078f24dfca98d123261a97fc2",
+      "bytes": 60666
+    },
+    {
+      "path": "server/stable/signals.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "5d2e7a9586f860b51bd3f9bdce6137bb9372ba0e",
+      "sha256": "71b96b497f31db7f1a67b259a7e6577a29c652b02d8b5dfd28edc5725bb8becb",
+      "bytes": 6761
+    },
+    {
+      "path": "server/stable/services/race_term_display.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "b7d972da48aadc5cb96f5f533401ca9af2642d5f",
+      "sha256": "7babd88d98302c10393736ef635c1df17314046a814b01c544061c3f90cfd6a8",
+      "bytes": 13200
+    },
+    {
+      "path": "server/stable/services/race_public_time.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "b2cb7cde740152b4d7a30180f799c1f2ea5ccb2e",
+      "sha256": "08aec597c6fb2732c16b75c23a3ff33f21a84622b1eedec6777fd63bf5f55ecf",
+      "bytes": 4631
+    },
+    {
+      "path": "server/stable/models.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "dbdc187b9c45355bbd716cda691be5e8bbefb3c8",
+      "sha256": "7dfdbe43e9586aa794c5de0fadb8e817de0dc7c8473f8f8568de7d4a8d3dcf63",
+      "bytes": 277445
+    },
+    {
+      "path": "server/stable/services/operations.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "923063afe68141360b8d0082cf679dc53696546d",
+      "sha256": "0b14c70c2f3a7ebf269a2bf41bd8aa1b15d3cc7fc6a97b4d22b237041c21c324",
+      "bytes": 538
+    },
+    {
+      "path": "server/stable/services/race_event_public_cache.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "dfda4e43eddeeac077e2c8b05b951c55c0904d06",
+      "sha256": "5c6b6c4b28849248b3e8f6d3847956144e08a8bc8bee59f2cf939236f54f5de4",
+      "bytes": 1845
+    },
+    {
+      "path": "server/stable/services/editorial_headlines.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "c6d2066f5639a8d901b152db17ddbf7eb81576b4",
+      "sha256": "d6479adf29c23361e3f43bfd1283a91a2b71c8cd4be5e76b70d4a2e428679553",
+      "bytes": 35700
+    },
+    {
+      "path": "server/stable/services/historical_race_calendar_admission.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "625668b13d1876a2721fb09cb7dd4bf04f008c3a",
+      "sha256": "d7df1a197aa54503658bf2ec9814fae313604ff55a7656a975ed151dd762e15d",
+      "bytes": 4356
+    },
+    {
+      "path": "server/stable/services/race_event_years.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "f17a69fc36f5742c48793c574a20df0f1210e121",
+      "sha256": "6b936ac01bcc5ead272acc0b28924ac7aaabc1cec7c185768817e43bfac06135",
+      "bytes": 6560
+    },
+    {
+      "path": "server/stable/services/race_event_public_paths.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "e1a2dbbf85a785e183edf04b034b732cd85b54ba",
+      "sha256": "2e015b1a6b10b41f10766f241ccf0fc54961655cc7e36e882419f8444462b120",
+      "bytes": 1674
+    },
+    {
+      "path": "server/stable/services/news_attribution.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "caa231cb41b26415a8c612440c50f12e04a082b2",
+      "sha256": "5bfb35ac45d4b7d5d93d529f5e08ad8c49840e8016c6be61062e3d9fe6cbb27e",
+      "bytes": 40951
+    },
+    {
+      "path": "server/stable/services/terms.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "9b72b0935a64fb7cf7a4e509c25b25866d75791f",
+      "sha256": "c8acd2b57440eb5e1dfc6d67679fcb60221ab3dcd648d40999a46da81810097d",
+      "bytes": 112722
+    },
+    {
+      "path": "server/stable/services/storage.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "a525d137ec6892c0e73341f4fef9d7200a4270c6",
+      "sha256": "1a792e4bc8b9d3d80b613ae6c712d108228cab79e25b9abdf2026117dc8f2aeb",
+      "bytes": 1522
+    },
+    {
+      "path": "server/stable/services/race_news_exposure.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "57c3db83b969fddde83420e3152358e9a98f6620",
+      "sha256": "885340e94fc474944bfa70864f01adf5f143e47b48ffd03197e1174445077cda",
+      "bytes": 33669
+    },
+    {
+      "path": "server/stable/views.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "1e119f7c3f1b4f89fd6988f89c5d9339cc7717ca",
+      "sha256": "83bc1d98e9d3c836d8651fb98d4dc6e6bf8fadbf5664d6d150d6c35baf0cd502",
+      "bytes": 202456
+    },
+    {
+      "path": "server/stable/forms.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "acd4880f26cefea71b94fc4f41060616a4718e54",
+      "sha256": "c190baf59fc881c2a5effa299f61073ff4dd0e7538aa42550fed960713adbcf8",
+      "bytes": 34312
+    },
+    {
+      "path": "server/stable/services/horse_profiles.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "fa4457659dd7c1aea4868b3d39f874ca5e8f7dec",
+      "sha256": "3745999db21305c8e3e463c6b2bca992ec33b5eb34e85b1e43e28584421d8610",
+      "bytes": 27976
+    },
+    {
+      "path": "server/stable/services/horse_race_records.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "cab14fff0e088bef73e84c6195945a42822db4a8",
+      "sha256": "20466e99c0dd9a19069c34788603d243d03d38603d010a2c901b0c82f0cc126c",
+      "bytes": 45275
+    },
+    {
+      "path": "server/stable/services/media_assets.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "9489fcbab171d9e30d6bfdd6651fe0cdd134faee",
+      "sha256": "68761ce2e82f326b37afdb8aa80e30034583def55e68eb57cdbe2a0b23b7a6a5",
+      "bytes": 1216
+    },
+    {
+      "path": "server/stable/services/multiregion.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "1b5f4d7cb0682f1ba1f49dbafafe7a4f3f65bc6e",
+      "sha256": "f8ad366fe174e16548ab3e1d03daa63640c629deaa70e7163d5632de0355aed1",
+      "bytes": 18413
+    },
+    {
+      "path": "server/stable/services/news_production_integrity.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "8ccddbc95f6da27b4c05af57692837d041ca55cd",
+      "sha256": "ecddd46e372137efafbea11797e9f55732c4c854f47ca3c3663f0be15697aaa7",
+      "bytes": 19475
+    },
+    {
+      "path": "server/stable/services/onebot.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "18a67af3bdbd9e620598ad62ef060712f0ae7bb8",
+      "sha256": "854baf92c4bd17b0468e5e8234f8746d33b476ba534be102a98aeffcf46c15bd",
+      "bytes": 4813
+    },
+    {
+      "path": "server/stable/services/race_calendar.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "6537538f4c6f0c5c7af13b1ac1bf09dd9581caee",
+      "sha256": "a70059a8bdbbc40d5d21860fe04564767c6528b226f8c6eec6e70f86ad287919",
+      "bytes": 9629
+    },
+    {
+      "path": "server/stable/services/production_windows.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "e1e14a8f7a995d60de54f27912aff9d2be1d2a1a",
+      "sha256": "441f34c2f3eb2c7a19cffda92e338b44e87074ff9819b2e71e33b6e9b715d653",
+      "bytes": 11197
+    },
+    {
+      "path": "server/stable/services/p0_horse_profiles.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "bcdb566868c798e86b7dce882d997809d55443f6",
+      "sha256": "c5b0be20681ce87113c8a571434793e025f4270e86803a893b89920a6aa6ed67",
+      "bytes": 133094
+    },
+    {
+      "path": "server/stable/services/publishing_windows.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "181ed13035628043576c0e773a52bda08a56046f",
+      "sha256": "8548b05ec8c2d11dc09d59c441516911989010c9f905dd23d9764789c26b50e4",
+      "bytes": 14446
+    },
+    {
+      "path": "server/stable/services/pushing.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "04c632276716c47d18d61658f812c103a63c295b",
+      "sha256": "50459b746b6bf8c332c90680fb377d47cbcd9eb62021cd1b9f61c3e3bae2fe15",
+      "bytes": 2427
+    },
+    {
+      "path": "server/stable/services/qq_windows.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "ad2b4d801a2fd9a347b1a785ab49575836f77ada",
+      "sha256": "77a51a8647c11da3250e1cf6bcf611f24c1081afecc97f8316642b50399ce65b",
+      "bytes": 12818
+    },
+    {
+      "path": "server/stable/services/queueing.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "8a926e208dfa4e47438626d21368fa5a93f7ecfc",
+      "sha256": "710f46f904d3792a1f283d8ed89ff5aae4603926c7708cff44f795d6ff2b43c7",
+      "bytes": 402
+    },
+    {
+      "path": "server/stable/services/race_events.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "c5d72f434de6e41279d112a58122ebc3100ca92c",
+      "sha256": "28d625f34d1cda432539ddd9215f151cf293be575ad00fb9721b14f1c57a404b",
+      "bytes": 283624
+    },
+    {
+      "path": "server/stable/services/sources.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "0c0f1b977397e5e68f40596329284f606545251c",
+      "sha256": "5ecd9256d0d4d1d76cabae37d41fc95f965b831bcf0449ff82b8ac9065a8dfb8",
+      "bytes": 18275
+    },
+    {
+      "path": "server/stable/services/term_admin.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "35937fbdb6adef8cbd52317178be63cc09be6938",
+      "sha256": "5c46cf4b09d768a0a2ce3251310ab33cd0bd0b2d2a59d68c091a1e7e6f4ce724",
+      "bytes": 21442
+    },
+    {
+      "path": "server/stable/services/term_candidate_review.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "44b0968ece7c7777df2205735ff9cc102e888727",
+      "sha256": "ed8a3eb0dbf8755807a46558f6d9ab476011badc3d79a9812e976b351c6c6d8d",
+      "bytes": 6387
+    },
+    {
+      "path": "server/stable/tasks.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "51064c44b7700b9fe719011d955017854161b9d3",
+      "sha256": "8f8678a9413ede5f89cb506d7955d8d4a6a1278a610faee1065cf24f87e0fb74",
+      "bytes": 134810
+    },
+    {
+      "path": "server/stable/services/race_pre_race.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "b63a5ff1c88534db155e32de2b51bf7d926b2e1e",
+      "sha256": "f9d613d77f9fb8e9bbcbd5e0c4005fa9e7b8eb6c286043232fab7bf092cb5219",
+      "bytes": 31077
+    },
+    {
+      "path": "server/stable/services/race_pre_race_refresh.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "c7647ddaee703965071ea25361d598a75f45d9fe",
+      "sha256": "e2980d2f77bffea5b20af086d107bb93338fb279d94ae6af4440fa3cd5187266",
+      "bytes": 17167
+    },
+    {
+      "path": "server/stable/services/qq_auto_push.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "9c2133f1bf0c3e11784ddd77b35201251040b990",
+      "sha256": "e94c3c7c3fbc8a6918c366e311f1e215180c7003d6cce71399e07f13622cf22d",
+      "bytes": 18761
+    },
+    {
+      "path": "server/stable/services/publish_readiness.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "7a6df7d94a3755098aedc50e5f4c2e6e11bb431d",
+      "sha256": "302553b036415d9606bea22ae942ec5cb1ac9ad0058057acf04d92cc2fb40cb7",
+      "bytes": 2623
+    },
+    {
+      "path": "server/stable/services/term_maintenance.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "6bd981e49fbbc61ba047176a1d68e6e26c7ee982",
+      "sha256": "a25e44b90218b8124b3250c0770accc9fb9f5f80498de5a06d0142fb663614c1",
+      "bytes": 24766
+    },
+    {
+      "path": "server/stable/services/automation.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "2c783c836ffc346bc24a10bc0d9037c474be07f3",
+      "sha256": "fe2c74590582d8918820762bf80753e0994132bad5e02f9249abb8b42b0739f7",
+      "bytes": 34936
+    },
+    {
+      "path": "server/stable/services/historical_race_inventory.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "5f31b4b3a01c525c3baa4d8317baaa5ee2fcd0a2",
+      "sha256": "ff90e7c9262182a06bfb2b3fce1a392d0d814302194088cef03f7022b2a4f4d2",
+      "bytes": 80428
+    },
+    {
+      "path": "server/stable/services/race_data_sync_enrollment.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "84685089499947f1de4746cc2fcbf053926ade47",
+      "sha256": "1ae6cc90f59cc65dbe5e533f8dd00ac6b9fce31ed3cd712053111cd06447e318",
+      "bytes": 89222
+    },
+    {
+      "path": "server/stable/services/race_event_reconciliation.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "243adcb8b612a6965207590d1e410261d7037f67",
+      "sha256": "594d944d05ae6425f4be39b24ebd353d5d37d548bb869dbab171bcf4c8d40d86",
+      "bytes": 48551
+    },
+    {
+      "path": "server/stable/services/race_live_rollback.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "01c68195d23dfb80f29479c244660b67999a8a9e",
+      "sha256": "34936de64d1133cd94d352083b624eac5e5a5c12879ac6fced408057e2f81e4e",
+      "bytes": 44179
+    },
+    {
+      "path": "server/stable/services/race_data_sync_admission.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "65843c7d93ee89be153834ba2ca528bb56c30a40",
+      "sha256": "55cde1ceb4255b501fbe1003036865a0977dfc70cebaed28fac27bd732aff4ea",
+      "bytes": 22340
+    },
+    {
+      "path": "server/stable/services/race_event_lifecycle_enforce.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "76a9adc5c2a01fb65912b949fa9d1230e5d2361d",
+      "sha256": "d18219184813138202d6389d1436fe415df880218515d71695c38bef90533422",
+      "bytes": 61643
+    },
+    {
+      "path": "server/stable/services/race_data_sync_control.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "6b5565af563dfb2af9f1920dd216372f9490cb32",
+      "sha256": "198eb0c6fcde53a7cc86568fb32f6e965a696327525d02ab4bb0d88e913a93d2",
+      "bytes": 122977
+    },
+    {
+      "path": "server/stable/services/race_data_sync_pipeline.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "544c6edf8f7a3ab5b04022dc490d7ee29b7dcb72",
+      "sha256": "4137233a95d4184214f2f9261600514696aef205ecde185e55f811c5358ee6cd",
+      "bytes": 101644
+    },
+    {
+      "path": "server/stable/services/race_grades.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "344c072ef9858a048a51de1f72f44840ac90cf4f",
+      "sha256": "8464b9d7428753cfbd417a25cd7f6a04aff6b2eb5c32b67f2c45868577e8b2b0",
+      "bytes": 3818
+    },
+    {
+      "path": "server/stable/services/term_discovery.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "47e69951ae81d21ddd40c56dcfb98f2f72a5cfe9",
+      "sha256": "375d3e4d1eedb3493d06925a8e6367b27aefb0c707b4fc3a6a15411735d13720",
+      "bytes": 10664
+    },
+    {
+      "path": "server/stable/adapters/jra.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "bfd8a8c286d8d6ef2afcbd86c8c1bd34715d3bba",
+      "sha256": "9f8c1bac339fdd4ae87c1c11a1b652195b5de40245c21747e4b774f841fc1cad",
+      "bytes": 6123
+    },
+    {
+      "path": "server/stable/adapters/__init__.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "8b137891791fe96927ad78e64b0aad7bded08bdc",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "bytes": 1
+    },
+    {
+      "path": "server/stable/adapters/international.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "edd149105bd7c89482f166a545ad12b8c154f601",
+      "sha256": "3101d809c08ccaf728c1e7ca78296bbcba959c29ca7d3d3c1f77c4ec2befa555",
+      "bytes": 37856
+    },
+    {
+      "path": "server/stable/adapters/netkeiba.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "d6241b81aedbe48c6ebfc9cd058e22af4007e654",
+      "sha256": "713cf433b15c5d86e08f6d5082ca5ca1789069dd2c1191debcc7fbf405794209",
+      "bytes": 6681
+    },
+    {
+      "path": "server/stable/services/ingestion.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "56ad25b52b3dc356c63ff080b20343c3832214de",
+      "sha256": "f93a632756f693a9e1d4e654a080cab388a3d01d7db5def1c9d8de6dd7c6c868",
+      "bytes": 8881
+    },
+    {
+      "path": "server/stable/services/notifications.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "13820f711e2c18b4e5a424346e8400d5062d4545",
+      "sha256": "e88aa993c736f9a134009f878f721905df21f8683964d3b77f38d41f1e91154f",
+      "bytes": 7403
+    },
+    {
+      "path": "server/stable/services/ops_notifications.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "7b00a1c6dff6e722ea3a3b267558971650ae8c26",
+      "sha256": "6851a2a091ee6acc429bd9822d632d8fd01acf0ada5586cbd1358b0daa5285e7",
+      "bytes": 3321
+    },
+    {
+      "path": "server/stable/services/p0_racecard_url_discovery.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "8c17867ec5db1d45671079aef04907e4dfa44cfd",
+      "sha256": "fc190ba7452490c07cf5a182aa6f300338fbc44acdaeaedd7e7e69bf41cedb31",
+      "bytes": 53952
+    },
+    {
+      "path": "server/stable/services/rewriting.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "82e4432e03afc83aaa20ea6dccaadb148855454b",
+      "sha256": "86ee595be550d4d21062e0402732ab83328536825013aa56b095acf574971df4",
+      "bytes": 14573
+    },
+    {
+      "path": "server/stable/services/source_polling.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "1b1396efb10568194933a07acd9143a2bce94898",
+      "sha256": "38a6932bd57a12602757afb0058bdb2748655bea30da802f3b7de2183abd95e6",
+      "bytes": 4546
+    },
+    {
+      "path": "server/stable/services/text.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "c4e9ad221624be600ce22974edbb262d57cec41f",
+      "sha256": "e6e7df79994cb0a120338e8ba660a08267b862e8792ab720c32adedaa9ec52f1",
+      "bytes": 1929
+    },
+    {
+      "path": "server/stable/services/translation.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "b7382025e1e77db94ed36f387b02f7f117bc683e",
+      "sha256": "4dcc77131e36f601a73074926c3d18ad69d65897e3ef0ad5f7573a339a82d7ad",
+      "bytes": 49007
+    },
+    {
+      "path": "server/stable/services/validation.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "cb0c03e52abfbb76675d74b4ab1c5c1f9ef3a950",
+      "sha256": "ea0736376c4ef0b005d3334efdb8a01f3e749e17a0e3fa1f9b5ac9b62ca8f336",
+      "bytes": 70803
+    },
+    {
+      "path": "server/stable/services/external_horse_data.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "234f741d741edb06463e8670c283ac76cf64fcdc",
+      "sha256": "cd8d0b1717cebc0f34ad3c41929939013af7040567352f56bbea1eca72259403",
+      "bytes": 29704
+    },
+    {
+      "path": "server/stable/services/scheduled_race_result_review.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "58e59d0d4587c142ea4325ad29000dcf7ba14a53",
+      "sha256": "87b08e58099a75127e577d14e8789d89fa1730407e5d37ecd41aeb19f17a007a",
+      "bytes": 56149
+    },
+    {
+      "path": "server/stable/services/race_data_sync_providers.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "04692c6028f0780affc0f82a57a2f59e48fcaa64",
+      "sha256": "7526930760fb1fc499d9e5caa60fde14e641978dace3e52490ab31c668675bdc",
+      "bytes": 99767
+    },
+    {
+      "path": "server/stable/services/race_data_sync_lifecycle.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "07410b6ca471788ed964b5c529f496bdf2a50c66",
+      "sha256": "0dcd291e4d4e324f394e76ea250348891247f5506afad1d9158d72dc2d2b9819",
+      "bytes": 25135
+    },
+    {
+      "path": "server/stable/services/race_data_sync_alerts.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "38d97baec93bbc7832ae799de1cfbba90e3e18b5",
+      "sha256": "9b572446b9c0faf72893ca108850172a359cab949aa6aff25f5f6c3724e7cfcb",
+      "bytes": 14012
+    },
+    {
+      "path": "server/stable/services/race_public_coverage.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "6c93f72050386590c8bda208e2b2a2c2c60c3f8a",
+      "sha256": "836945a3a4968b8939cc1315a8e92db2c076e064c799ccbd3f015814a19cc1ca",
+      "bytes": 18440
+    },
+    {
+      "path": "server/stable/services/race_live_runner.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "07793d545069f3c4b4a981efe0029aec17ad24f5",
+      "sha256": "8973ecc3666688095f1f3e7867a4747a83d45270b0c77007d5cd4a1bfb29864c",
+      "bytes": 69969
+    },
+    {
+      "path": "server/stable/services/translation_recovery.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "c42499988a30145bfc074269d5ca2a6b88fd2a26",
+      "sha256": "e353f1b417085b2f138c6d2c63124d155c2976a53a7a10dcd78778f5202bb439",
+      "bytes": 17175
+    },
+    {
+      "path": "server/stable/services/race_event_lifecycle.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "5b9c655e7affb7894ea936f4861a85f16a77df7b",
+      "sha256": "ddee3abf605641edb51a9924eeeb136e9d38047a9fffb2f3f06adfe931e557ef",
+      "bytes": 36319
+    },
+    {
+      "path": "server/stable/services/race_data_source_adapters.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "5c87ede3f90685e488ea5b373ddc59b60f85cb03",
+      "sha256": "3b3f44b6809709c86ec6618e228796cae42736d24fd439313d8abef2cbf228ca",
+      "bytes": 63926
+    },
+    {
+      "path": "server/stable/services/race_live_source_proof.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "a564e497d89619a52e8979b7c7ab5b6ea3239708",
+      "sha256": "6308f401942ced93e01ce5a301d607ff4e90bd2fadb70c1104c5979909dba319",
+      "bytes": 27784
+    },
+    {
+      "path": "server/stable/services/race_event_lifecycle_canary.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "d32d4b12a4543801ee67c0f0571b13007b267a65",
+      "sha256": "86aea1ad16338959075cc88f896f16b71d60987e7d5c56c75312bdc597a2ee87",
+      "bytes": 37837
+    },
+    {
+      "path": "server/stable/services/race_data_sync_policy.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "71e0c3e84592945bcb7c53a3fb29fd477198cfaf",
+      "sha256": "26d317d9cfa628d2613670a6386e9e89811eaee366745b980bbc18512857950e",
+      "bytes": 7370
+    },
+    {
+      "path": "server/stable/services/race_pre_race_sources.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "dd9581ab4f44671ec9d0db2ab4cff7aa30a905d8",
+      "sha256": "4e33b5546f6d0b565119a0fc8e73bae51c5162d3114a2e019d375a81a887e22a",
+      "bytes": 10570
+    },
+    {
+      "path": "server/stable/services/term_consistency.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "b2c3cc09c2be235f4830cab85ef0d125a4e1ddb3",
+      "sha256": "cab611c761ba95a3546f2199ec6c8d72c6030d2522f0a08f584e800a2ad4b0fd",
+      "bytes": 54881
+    },
+    {
+      "path": "server/stable/services/race_source_identity.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "dbd6cba7c4d2b3c0d711fdb0fff31428647142e8",
+      "sha256": "064fbeb9f042301ca1afd6995b910b83ed3fdab10c13829a060523246f1f81fe",
+      "bytes": 12990
+    },
+    {
+      "path": "server/stable/services/race_event_lifecycle_enrollment.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "30221284d836ae80f922cca4c02f1654ba9d4702",
+      "sha256": "8e10debb97811af981926bd3ae36ebb412928945f1daed8818eeebd6fe363e28",
+      "bytes": 61003
+    },
+    {
+      "path": "server/stable/services/race_data_sync_results.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "a4ee99f8ac50f6d1f6157c2921909266e6ef0863",
+      "sha256": "a124ef78b03cf677a330e8988cbf176bc3bc12648e24096945af47f2bcd6acc3",
+      "bytes": 44624
+    },
+    {
+      "path": "server/stable/services/http.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "eeb3294f49d0d6d7fbfabef0979950e8eefad918",
+      "sha256": "5ada66c9abdcbf03ae57698083eb5c9f74cce1baf61f9120486047ea1a666b88",
+      "bytes": 572
+    },
+    {
+      "path": "server/stable/adapters/base.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "3f04fc88d52c9c573af564dbc4046ad4b2bb35f3",
+      "sha256": "87b3d65ea2099a0e0c2dbadcf7d97f6c5d99743d2b538269a944f2edf241e30b",
+      "bytes": 2095
+    },
+    {
+      "path": "server/stable/services/article_content.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "67f91255b491c4c1b100bd57af3bc1f1f85ca72a",
+      "sha256": "ab5a5d9f4d27b99f7222fbb267f86323b537a6d8170f76a8253819a4c9304f08",
+      "bytes": 8487
+    },
+    {
+      "path": "server/stable/services/japanese_racing_translation.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "31c0b89dcdc4c54de521482f4cd5dde60fc8c01e",
+      "sha256": "7d47da436f3b0aeaa82072fbec8bcb239eb282872b014286f53499d007db118c",
+      "bytes": 18193
+    },
+    {
+      "path": "server/stable/services/race_event_crawl_orchestration.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "270e08ecdfc8dd28be378b3755d2723dba946410",
+      "sha256": "8e0f7fb049b43b95dc00730459f20a1c1cbecf4e1ccf469d9eb6a424758d1025",
+      "bytes": 151493
+    },
+    {
+      "path": "server/stable/services/race_live_fixtures.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "4de6160c36ef499604c1ff3a88d2d23f67bcf3c3",
+      "sha256": "1ca27260e2b2010e2ade2d6091f3adffa6cd7272efeaa4853f059b5ff5772c7a",
+      "bytes": 11189
+    },
+    {
+      "path": "server/stable/services/race_live_racecard_sync.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "e529a14c74b7eb0f613bc60f2b4f037d1c134fca",
+      "sha256": "c7e686f580751d8ce8914219efb386563c1983e4a5a6963df0a0989d6cb9b2db",
+      "bytes": 42012
+    },
+    {
+      "path": "server/stable/race_reference_parsers/jra.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "2eeaa621caf3ac36d77502fae88f448386ee538d",
+      "sha256": "a420e47f25510c2885366c0e30d0964291cdd7c5e8d055b7a05f0c1a09cb2194",
+      "bytes": 6126
+    },
+    {
+      "path": "server/stable/race_reference_parsers/__init__.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "61453e14e814ae56958004038b730f676d532278",
+      "sha256": "fbc71085676ffca0f71b430fd5f74ceb2cae23bffd33f72bb14a48277011f894",
+      "bytes": 2651
+    },
+    {
+      "path": "server/stable/race_reference_parsers/sporting_life.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "684ec29d35a659d42d20781055de32aa7d33491f",
+      "sha256": "503c1d9af219097cff8cf9bdcf353cb0209d04462776486f3e3b3d00d638e2a7",
+      "bytes": 9916
+    },
+    {
+      "path": "server/stable/race_reference_parsers/zeturf.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "32b423e46e9e0ce710db3d8ed9fcfd8f1f41dbeb",
+      "sha256": "a1f91805946b1e638408a5ce821aefcfcd97924fa3a74b14044635db4f01db13",
+      "bytes": 10154
+    },
+    {
+      "path": "server/stable/race_reference_parsers/horse_racing_nation.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "0c7d2bb4be8a44344cc890fa9868c236f50abf97",
+      "sha256": "ddae0a3bc228c59a126ddecdf9b30d0b88f5532acb5588b9fa73788145e84809",
+      "bytes": 11115
+    },
+    {
+      "path": "server/stable/services/external_hkjc_data.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "5d1eca8544127016b24716cbe87ae7786d289f3c",
+      "sha256": "42dec6ba7793c20b0033789a88bfc60e5e046497de641f496e564b6b065c6110",
+      "bytes": 53025
+    },
+    {
+      "path": "server/stable/services/historical_race_batches.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "6065774242680d2addd82d953ebdf55ad50a224d",
+      "sha256": "7ad61cc9893eed3b2c20a9b93dfa8c13ac9c5cf893fb2811c8a7923c8ff0dcd5",
+      "bytes": 41197
+    },
+    {
+      "path": "server/stable/services/race_result_recovery_inventory.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "8483ec95dba39364d193bf092e66691083b8f204",
+      "sha256": "ab188bf46b497a2a8fc5534dbe7a54bd8296b5c4eb9548d4c6bd85ef872e6ec6",
+      "bytes": 16552
+    },
+    {
+      "path": "server/stable/services/race_live_target_eligibility.py",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "13544eebb5c9367ffc620740028a0d5db383521f",
+      "sha256": "68de599ffee21181446f079d76489e56d9c29233fa07694a7d7a90487b32c9f7",
+      "bytes": 6304
+    }
+  ],
+  "import_edges": [
+    {
+      "from": "server/stable/services/public_probe_render.py",
+      "to": "server/stable/services/__init__.py",
+      "line": 7
+    },
+    {
+      "from": "server/stable/services/public_probe_render.py",
+      "to": "server/stable/services/content_contracts.py",
+      "line": 7
+    },
+    {
+      "from": "server/stable/services/public_probe_render.py",
+      "to": "server/stable/services/__init__.py",
+      "line": 8
+    },
+    {
+      "from": "server/stable/services/public_probe_render.py",
+      "to": "server/stable/services/public_probe_contracts.py",
+      "line": 8
+    },
+    {
+      "from": "server/stable/services/public_probe_contracts.py",
+      "to": "server/stable/services/__init__.py",
+      "line": 8
+    },
+    {
+      "from": "server/stable/services/public_probe_contracts.py",
+      "to": "server/stable/services/content_contracts.py",
+      "line": 8
+    },
+    {
+      "from": "server/stable/templatetags/race_information.py",
+      "to": "server/stable/services/race_information_display.py",
+      "line": 2
+    },
+    {
+      "from": "server/stable/templatetags/race_information.py",
+      "to": "server/stable/services/race_information_display.py",
+      "line": 31
+    },
+    {
+      "from": "server/stable/templatetags/race_information.py",
+      "to": "server/stable/services/race_information_display.py",
+      "line": 10
+    },
+    {
+      "from": "server/stable/templatetags/race_information.py",
+      "to": "server/stable/services/race_information_display.py",
+      "line": 15
+    },
+    {
+      "from": "server/stable/templatetags/race_information.py",
+      "to": "server/stable/services/race_field_normalization.py",
+      "line": 18
+    },
+    {
+      "from": "server/stable/apps.py",
+      "to": "server/stable/__init__.py",
+      "line": 10
+    },
+    {
+      "from": "server/stable/apps.py",
+      "to": "server/stable/signals.py",
+      "line": 10
+    },
+    {
+      "from": "server/stable/services/race_information_display.py",
+      "to": "server/stable/services/race_field_normalization.py",
+      "line": 14
+    },
+    {
+      "from": "server/stable/services/race_information_display.py",
+      "to": "server/stable/services/race_term_display.py",
+      "line": 19
+    },
+    {
+      "from": "server/stable/services/race_information_display.py",
+      "to": "server/stable/services/race_field_normalization.py",
+      "line": 84
+    },
+    {
+      "from": "server/stable/services/race_information_display.py",
+      "to": "server/stable/services/race_public_time.py",
+      "line": 107
+    },
+    {
+      "from": "server/stable/services/race_information_display.py",
+      "to": "server/stable/services/race_field_normalization.py",
+      "line": 225
+    },
+    {
+      "from": "server/stable/services/race_information_display.py",
+      "to": "server/stable/services/race_field_normalization.py",
+      "line": 174
+    },
+    {
+      "from": "server/stable/signals.py",
+      "to": "server/stable/models.py",
+      "line": 11
+    },
+    {
+      "from": "server/stable/signals.py",
+      "to": "server/stable/services/operations.py",
+      "line": 12
+    },
+    {
+      "from": "server/stable/signals.py",
+      "to": "server/stable/services/race_event_public_cache.py",
+      "line": 13
+    },
+    {
+      "from": "server/stable/signals.py",
+      "to": "server/stable/services/editorial_headlines.py",
+      "line": 102
+    },
+    {
+      "from": "server/stable/signals.py",
+      "to": "server/stable/models.py",
+      "line": 136
+    },
+    {
+      "from": "server/stable/services/race_term_display.py",
+      "to": "server/stable/models.py",
+      "line": 16
+    },
+    {
+      "from": "server/stable/services/race_term_display.py",
+      "to": "server/stable/services/race_field_normalization.py",
+      "line": 244
+    },
+    {
+      "from": "server/stable/models.py",
+      "to": "server/stable/services/historical_race_calendar_admission.py",
+      "line": 1119
+    },
+    {
+      "from": "server/stable/models.py",
+      "to": "server/stable/services/historical_race_calendar_admission.py",
+      "line": 1128
+    },
+    {
+      "from": "server/stable/models.py",
+      "to": "server/stable/services/historical_race_calendar_admission.py",
+      "line": 1163
+    },
+    {
+      "from": "server/stable/models.py",
+      "to": "server/stable/services/historical_race_calendar_admission.py",
+      "line": 1178
+    },
+    {
+      "from": "server/stable/models.py",
+      "to": "server/stable/services/historical_race_calendar_admission.py",
+      "line": 1187
+    },
+    {
+      "from": "server/stable/models.py",
+      "to": "server/stable/services/historical_race_calendar_admission.py",
+      "line": 1196
+    },
+    {
+      "from": "server/stable/models.py",
+      "to": "server/stable/services/historical_race_calendar_admission.py",
+      "line": 1205
+    },
+    {
+      "from": "server/stable/models.py",
+      "to": "server/stable/services/race_event_years.py",
+      "line": 1336
+    },
+    {
+      "from": "server/stable/models.py",
+      "to": "server/stable/services/historical_race_calendar_admission.py",
+      "line": 1352
+    },
+    {
+      "from": "server/stable/models.py",
+      "to": "server/stable/services/race_event_public_paths.py",
+      "line": 1355
+    },
+    {
+      "from": "server/stable/models.py",
+      "to": "server/stable/services/race_event_years.py",
+      "line": 1356
+    },
+    {
+      "from": "server/stable/models.py",
+      "to": "server/stable/services/historical_race_calendar_admission.py",
+      "line": 1481
+    },
+    {
+      "from": "server/stable/models.py",
+      "to": "server/stable/services/historical_race_calendar_admission.py",
+      "line": 1564
+    },
+    {
+      "from": "server/stable/models.py",
+      "to": "server/stable/services/historical_race_calendar_admission.py",
+      "line": 1573
+    },
+    {
+      "from": "server/stable/models.py",
+      "to": "server/stable/services/historical_race_calendar_admission.py",
+      "line": 2983
+    },
+    {
+      "from": "server/stable/models.py",
+      "to": "server/stable/services/historical_race_calendar_admission.py",
+      "line": 2997
+    },
+    {
+      "from": "server/stable/models.py",
+      "to": "server/stable/services/news_attribution.py",
+      "line": 4486
+    },
+    {
+      "from": "server/stable/models.py",
+      "to": "server/stable/services/news_attribution.py",
+      "line": 4502
+    },
+    {
+      "from": "server/stable/models.py",
+      "to": "server/stable/services/terms.py",
+      "line": 4538
+    },
+    {
+      "from": "server/stable/models.py",
+      "to": "server/stable/services/race_information_display.py",
+      "line": 1451
+    },
+    {
+      "from": "server/stable/models.py",
+      "to": "server/stable/services/race_information_display.py",
+      "line": 1497
+    },
+    {
+      "from": "server/stable/models.py",
+      "to": "server/stable/services/race_information_display.py",
+      "line": 1511
+    },
+    {
+      "from": "server/stable/models.py",
+      "to": "server/stable/services/storage.py",
+      "line": 4672
+    },
+    {
+      "from": "server/stable/services/operations.py",
+      "to": "server/stable/models.py",
+      "line": 7
+    },
+    {
+      "from": "server/stable/services/race_event_public_cache.py",
+      "to": "server/stable/models.py",
+      "line": 6
+    },
+    {
+      "from": "server/stable/services/race_event_public_cache.py",
+      "to": "server/stable/services/race_public_time.py",
+      "line": 44
+    },
+    {
+      "from": "server/stable/services/editorial_headlines.py",
+      "to": "server/stable/models.py",
+      "line": 16
+    },
+    {
+      "from": "server/stable/services/editorial_headlines.py",
+      "to": "server/stable/services/operations.py",
+      "line": 27
+    },
+    {
+      "from": "server/stable/services/editorial_headlines.py",
+      "to": "server/stable/services/race_news_exposure.py",
+      "line": 454
+    },
+    {
+      "from": "server/stable/services/race_event_public_paths.py",
+      "to": "server/stable/models.py",
+      "line": 14
+    },
+    {
+      "from": "server/stable/services/news_attribution.py",
+      "to": "server/stable/models.py",
+      "line": 12
+    },
+    {
+      "from": "server/stable/services/news_attribution.py",
+      "to": "server/stable/services/terms.py",
+      "line": 24
+    },
+    {
+      "from": "server/stable/services/terms.py",
+      "to": "server/stable/models.py",
+      "line": 15
+    },
+    {
+      "from": "server/stable/services/race_news_exposure.py",
+      "to": "server/stable/models.py",
+      "line": 21
+    },
+    {
+      "from": "server/stable/services/race_news_exposure.py",
+      "to": "server/stable/views.py",
+      "line": 822
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/race_public_time.py",
+      "line": 2
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/forms.py",
+      "line": 42
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/models.py",
+      "line": 58
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/horse_profiles.py",
+      "line": 126
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/horse_race_records.py",
+      "line": 142
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/media_assets.py",
+      "line": 143
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/multiregion.py",
+      "line": 144
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/news_production_integrity.py",
+      "line": 145
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/onebot.py",
+      "line": 146
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/operations.py",
+      "line": 147
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/race_calendar.py",
+      "line": 148
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/race_event_public_cache.py",
+      "line": 154
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/news_attribution.py",
+      "line": 158
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/production_windows.py",
+      "line": 159
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/p0_horse_profiles.py",
+      "line": 160
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/publishing_windows.py",
+      "line": 161
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/pushing.py",
+      "line": 162
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/qq_windows.py",
+      "line": 163
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/queueing.py",
+      "line": 164
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/race_events.py",
+      "line": 165
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/sources.py",
+      "line": 173
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/storage.py",
+      "line": 174
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/term_admin.py",
+      "line": 175
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/term_candidate_review.py",
+      "line": 186
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/race_term_display.py",
+      "line": 187
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/terms.py",
+      "line": 188
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/editorial_headlines.py",
+      "line": 189
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/tasks.py",
+      "line": 199
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/models.py",
+      "line": 1219
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/news_attribution.py",
+      "line": 1220
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/race_information_display.py",
+      "line": 3317
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/race_information_display.py",
+      "line": 3580
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/race_information_display.py",
+      "line": 3682
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/race_pre_race.py",
+      "line": 4078
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/race_pre_race_refresh.py",
+      "line": 4079
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/race_information_display.py",
+      "line": 4904
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/models.py",
+      "line": 4195
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/race_field_normalization.py",
+      "line": 4410
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/race_calendar.py",
+      "line": 3046
+    },
+    {
+      "from": "server/stable/views.py",
+      "to": "server/stable/services/qq_auto_push.py",
+      "line": 2337
+    },
+    {
+      "from": "server/stable/forms.py",
+      "to": "server/stable/models.py",
+      "line": 6
+    },
+    {
+      "from": "server/stable/forms.py",
+      "to": "server/stable/services/term_admin.py",
+      "line": 25
+    },
+    {
+      "from": "server/stable/forms.py",
+      "to": "server/stable/services/news_attribution.py",
+      "line": 26
+    },
+    {
+      "from": "server/stable/forms.py",
+      "to": "server/stable/models.py",
+      "line": 848
+    },
+    {
+      "from": "server/stable/forms.py",
+      "to": "server/stable/services/editorial_headlines.py",
+      "line": 853
+    },
+    {
+      "from": "server/stable/services/horse_profiles.py",
+      "to": "server/stable/models.py",
+      "line": 15
+    },
+    {
+      "from": "server/stable/services/horse_profiles.py",
+      "to": "server/stable/services/operations.py",
+      "line": 37
+    },
+    {
+      "from": "server/stable/services/horse_profiles.py",
+      "to": "server/stable/services/horse_race_records.py",
+      "line": 38
+    },
+    {
+      "from": "server/stable/services/horse_profiles.py",
+      "to": "server/stable/services/terms.py",
+      "line": 39
+    },
+    {
+      "from": "server/stable/services/horse_profiles.py",
+      "to": "server/stable/services/p0_horse_profiles.py",
+      "line": 208
+    },
+    {
+      "from": "server/stable/services/horse_race_records.py",
+      "to": "server/stable/models.py",
+      "line": 15
+    },
+    {
+      "from": "server/stable/services/horse_race_records.py",
+      "to": "server/stable/services/race_field_normalization.py",
+      "line": 25
+    },
+    {
+      "from": "server/stable/services/media_assets.py",
+      "to": "server/stable/models.py",
+      "line": 3
+    },
+    {
+      "from": "server/stable/services/media_assets.py",
+      "to": "server/stable/services/storage.py",
+      "line": 5
+    },
+    {
+      "from": "server/stable/services/multiregion.py",
+      "to": "server/stable/models.py",
+      "line": 12
+    },
+    {
+      "from": "server/stable/services/multiregion.py",
+      "to": "server/stable/services/news_attribution.py",
+      "line": 30
+    },
+    {
+      "from": "server/stable/services/multiregion.py",
+      "to": "server/stable/services/news_production_integrity.py",
+      "line": 31
+    },
+    {
+      "from": "server/stable/services/multiregion.py",
+      "to": "server/stable/services/publish_readiness.py",
+      "line": 32
+    },
+    {
+      "from": "server/stable/services/multiregion.py",
+      "to": "server/stable/services/production_windows.py",
+      "line": 352
+    },
+    {
+      "from": "server/stable/services/news_production_integrity.py",
+      "to": "server/stable/models.py",
+      "line": 13
+    },
+    {
+      "from": "server/stable/services/race_calendar.py",
+      "to": "server/stable/services/race_public_time.py",
+      "line": 62
+    },
+    {
+      "from": "server/stable/services/race_calendar.py",
+      "to": "server/stable/services/race_public_time.py",
+      "line": 231
+    },
+    {
+      "from": "server/stable/services/production_windows.py",
+      "to": "server/stable/models.py",
+      "line": 11
+    },
+    {
+      "from": "server/stable/services/p0_horse_profiles.py",
+      "to": "server/stable/models.py",
+      "line": 20
+    },
+    {
+      "from": "server/stable/services/p0_horse_profiles.py",
+      "to": "server/stable/services/horse_profiles.py",
+      "line": 49
+    },
+    {
+      "from": "server/stable/services/p0_horse_profiles.py",
+      "to": "server/stable/services/horse_race_records.py",
+      "line": 50
+    },
+    {
+      "from": "server/stable/services/p0_horse_profiles.py",
+      "to": "server/stable/services/term_maintenance.py",
+      "line": 58
+    },
+    {
+      "from": "server/stable/services/publishing_windows.py",
+      "to": "server/stable/models.py",
+      "line": 13
+    },
+    {
+      "from": "server/stable/services/publishing_windows.py",
+      "to": "server/stable/services/automation.py",
+      "line": 24
+    },
+    {
+      "from": "server/stable/services/publishing_windows.py",
+      "to": "server/stable/services/news_attribution.py",
+      "line": 25
+    },
+    {
+      "from": "server/stable/services/pushing.py",
+      "to": "server/stable/models.py",
+      "line": 6
+    },
+    {
+      "from": "server/stable/services/pushing.py",
+      "to": "server/stable/services/onebot.py",
+      "line": 8
+    },
+    {
+      "from": "server/stable/services/pushing.py",
+      "to": "server/stable/tasks.py",
+      "line": 58
+    },
+    {
+      "from": "server/stable/services/qq_windows.py",
+      "to": "server/stable/models.py",
+      "line": 10
+    },
+    {
+      "from": "server/stable/services/qq_windows.py",
+      "to": "server/stable/services/qq_auto_push.py",
+      "line": 23
+    },
+    {
+      "from": "server/stable/services/qq_windows.py",
+      "to": "server/stable/services/onebot.py",
+      "line": 24
+    },
+    {
+      "from": "server/stable/services/qq_windows.py",
+      "to": "server/stable/services/news_attribution.py",
+      "line": 25
+    },
+    {
+      "from": "server/stable/services/qq_windows.py",
+      "to": "server/stable/services/race_news_exposure.py",
+      "line": 192
+    },
+    {
+      "from": "server/stable/services/qq_windows.py",
+      "to": "server/stable/models.py",
+      "line": 198
+    },
+    {
+      "from": "server/stable/services/qq_windows.py",
+      "to": "server/stable/models.py",
+      "line": 237
+    },
+    {
+      "from": "server/stable/services/qq_windows.py",
+      "to": "server/stable/services/race_news_exposure.py",
+      "line": 238
+    },
+    {
+      "from": "server/stable/services/race_events.py",
+      "to": "server/stable/models.py",
+      "line": 19
+    },
+    {
+      "from": "server/stable/services/race_events.py",
+      "to": "server/stable/services/operations.py",
+      "line": 74
+    },
+    {
+      "from": "server/stable/services/race_events.py",
+      "to": "server/stable/services/historical_race_inventory.py",
+      "line": 75
+    },
+    {
+      "from": "server/stable/services/race_events.py",
+      "to": "server/stable/services/terms.py",
+      "line": 76
+    },
+    {
+      "from": "server/stable/services/race_events.py",
+      "to": "server/stable/services/race_field_normalization.py",
+      "line": 77
+    },
+    {
+      "from": "server/stable/services/race_events.py",
+      "to": "server/stable/services/race_data_sync_enrollment.py",
+      "line": 84
+    },
+    {
+      "from": "server/stable/services/race_events.py",
+      "to": "server/stable/services/race_event_reconciliation.py",
+      "line": 90
+    },
+    {
+      "from": "server/stable/services/race_events.py",
+      "to": "server/stable/services/race_live_rollback.py",
+      "line": 100
+    },
+    {
+      "from": "server/stable/services/race_events.py",
+      "to": "server/stable/services/__init__.py",
+      "line": 3321
+    },
+    {
+      "from": "server/stable/services/race_events.py",
+      "to": "server/stable/services/race_data_sync_admission.py",
+      "line": 3321
+    },
+    {
+      "from": "server/stable/services/race_events.py",
+      "to": "server/stable/services/race_event_lifecycle_enforce.py",
+      "line": 3343
+    },
+    {
+      "from": "server/stable/services/race_events.py",
+      "to": "server/stable/services/race_data_sync_control.py",
+      "line": 3377
+    },
+    {
+      "from": "server/stable/services/race_events.py",
+      "to": "server/stable/services/race_data_sync_pipeline.py",
+      "line": 3380
+    },
+    {
+      "from": "server/stable/services/race_events.py",
+      "to": "server/stable/services/race_data_sync_admission.py",
+      "line": 4314
+    },
+    {
+      "from": "server/stable/services/race_events.py",
+      "to": "server/stable/services/race_data_sync_pipeline.py",
+      "line": 5199
+    },
+    {
+      "from": "server/stable/services/sources.py",
+      "to": "server/stable/models.py",
+      "line": 5
+    },
+    {
+      "from": "server/stable/services/term_admin.py",
+      "to": "server/stable/models.py",
+      "line": 12
+    },
+    {
+      "from": "server/stable/services/term_admin.py",
+      "to": "server/stable/services/race_grades.py",
+      "line": 13
+    },
+    {
+      "from": "server/stable/services/term_candidate_review.py",
+      "to": "server/stable/models.py",
+      "line": 6
+    },
+    {
+      "from": "server/stable/services/term_candidate_review.py",
+      "to": "server/stable/services/operations.py",
+      "line": 7
+    },
+    {
+      "from": "server/stable/services/term_candidate_review.py",
+      "to": "server/stable/services/term_admin.py",
+      "line": 8
+    },
+    {
+      "from": "server/stable/services/term_candidate_review.py",
+      "to": "server/stable/services/term_discovery.py",
+      "line": 16
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/adapters/jra.py",
+      "line": 15
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/adapters/international.py",
+      "line": 16
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/adapters/netkeiba.py",
+      "line": 17
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/models.py",
+      "line": 18
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/automation.py",
+      "line": 50
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/ingestion.py",
+      "line": 61
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/multiregion.py",
+      "line": 62
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/multiregion.py",
+      "line": 63
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/news_production_integrity.py",
+      "line": 64
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/news_attribution.py",
+      "line": 68
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/notifications.py",
+      "line": 69
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/operations.py",
+      "line": 70
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/ops_notifications.py",
+      "line": 71
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/onebot.py",
+      "line": 72
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/production_windows.py",
+      "line": 73
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/publishing_windows.py",
+      "line": 82
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/p0_racecard_url_discovery.py",
+      "line": 83
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/publish_readiness.py",
+      "line": 88
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/pushing.py",
+      "line": 89
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/qq_auto_push.py",
+      "line": 90
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/qq_windows.py",
+      "line": 98
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/queueing.py",
+      "line": 99
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/rewriting.py",
+      "line": 100
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/sources.py",
+      "line": 101
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/source_polling.py",
+      "line": 102
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/term_discovery.py",
+      "line": 103
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/text.py",
+      "line": 104
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/translation.py",
+      "line": 105
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/validation.py",
+      "line": 106
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/external_horse_data.py",
+      "line": 107
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/race_events.py",
+      "line": 108
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/scheduled_race_result_review.py",
+      "line": 125
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/scheduled_race_result_review.py",
+      "line": 134
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/models.py",
+      "line": 160
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/race_data_sync_control.py",
+      "line": 468
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/race_data_sync_enrollment.py",
+      "line": 504
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/race_data_sync_enrollment.py",
+      "line": 524
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/race_data_sync_providers.py",
+      "line": 529
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/race_data_sync_lifecycle.py",
+      "line": 618
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/race_data_sync_alerts.py",
+      "line": 640
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/race_public_coverage.py",
+      "line": 661
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/race_data_sync_pipeline.py",
+      "line": 678
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/race_data_sync_providers.py",
+      "line": 681
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/race_data_sync_control.py",
+      "line": 735
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/race_data_sync_pipeline.py",
+      "line": 790
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/__init__.py",
+      "line": 796
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/models.py",
+      "line": 796
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/race_data_sync_pipeline.py",
+      "line": 797
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/race_data_sync_providers.py",
+      "line": 801
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/race_live_runner.py",
+      "line": 1050
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/horse_profiles.py",
+      "line": 1181
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/translation_recovery.py",
+      "line": 1986
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/translation_recovery.py",
+      "line": 1994
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/qq_auto_push.py",
+      "line": 2952
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/race_event_lifecycle.py",
+      "line": 2976
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/race_event_lifecycle.py",
+      "line": 3090
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/models.py",
+      "line": 3092
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/race_pre_race.py",
+      "line": 546
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/race_pre_race_refresh.py",
+      "line": 550
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/race_data_source_adapters.py",
+      "line": 746
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/race_data_sync_alerts.py",
+      "line": 928
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/race_live_runner.py",
+      "line": 1018
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/race_live_source_proof.py",
+      "line": 1021
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/news_attribution.py",
+      "line": 2046
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/qq_auto_push.py",
+      "line": 2897
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/translation_recovery.py",
+      "line": 1906
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/race_news_exposure.py",
+      "line": 2823
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/race_event_lifecycle_enforce.py",
+      "line": 2993
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/race_event_lifecycle_canary.py",
+      "line": 3005
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/race_event_lifecycle_enforce.py",
+      "line": 3186
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/race_event_lifecycle_canary.py",
+      "line": 3221
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/services/translation_recovery.py",
+      "line": 1971
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/models.py",
+      "line": 2830
+    },
+    {
+      "from": "server/stable/tasks.py",
+      "to": "server/stable/models.py",
+      "line": 2848
+    },
+    {
+      "from": "server/stable/services/race_pre_race.py",
+      "to": "server/stable/__init__.py",
+      "line": 18
+    },
+    {
+      "from": "server/stable/services/race_pre_race.py",
+      "to": "server/stable/models.py",
+      "line": 18
+    },
+    {
+      "from": "server/stable/services/race_pre_race.py",
+      "to": "server/stable/services/race_data_sync_policy.py",
+      "line": 19
+    },
+    {
+      "from": "server/stable/services/race_pre_race.py",
+      "to": "server/stable/services/race_data_sync_providers.py",
+      "line": 385
+    },
+    {
+      "from": "server/stable/services/race_pre_race.py",
+      "to": "server/stable/services/race_events.py",
+      "line": 386
+    },
+    {
+      "from": "server/stable/services/race_pre_race.py",
+      "to": "server/stable/services/race_pre_race_refresh.py",
+      "line": 566
+    },
+    {
+      "from": "server/stable/services/race_pre_race.py",
+      "to": "server/stable/services/race_pre_race_refresh.py",
+      "line": 102
+    },
+    {
+      "from": "server/stable/services/race_pre_race.py",
+      "to": "server/stable/services/race_pre_race_refresh.py",
+      "line": 288
+    },
+    {
+      "from": "server/stable/services/race_pre_race_refresh.py",
+      "to": "server/stable/__init__.py",
+      "line": 14
+    },
+    {
+      "from": "server/stable/services/race_pre_race_refresh.py",
+      "to": "server/stable/models.py",
+      "line": 14
+    },
+    {
+      "from": "server/stable/services/race_pre_race_refresh.py",
+      "to": "server/stable/services/__init__.py",
+      "line": 15
+    },
+    {
+      "from": "server/stable/services/race_pre_race_refresh.py",
+      "to": "server/stable/services/race_pre_race.py",
+      "line": 15
+    },
+    {
+      "from": "server/stable/services/race_pre_race_refresh.py",
+      "to": "server/stable/services/race_field_normalization.py",
+      "line": 54
+    },
+    {
+      "from": "server/stable/services/race_pre_race_refresh.py",
+      "to": "server/stable/services/race_pre_race_sources.py",
+      "line": 211
+    },
+    {
+      "from": "server/stable/services/qq_auto_push.py",
+      "to": "server/stable/models.py",
+      "line": 14
+    },
+    {
+      "from": "server/stable/services/qq_auto_push.py",
+      "to": "server/stable/services/news_attribution.py",
+      "line": 26
+    },
+    {
+      "from": "server/stable/services/qq_auto_push.py",
+      "to": "server/stable/services/onebot.py",
+      "line": 33
+    },
+    {
+      "from": "server/stable/services/qq_auto_push.py",
+      "to": "server/stable/tasks.py",
+      "line": 492
+    },
+    {
+      "from": "server/stable/services/publish_readiness.py",
+      "to": "server/stable/models.py",
+      "line": 9
+    },
+    {
+      "from": "server/stable/services/term_maintenance.py",
+      "to": "server/stable/models.py",
+      "line": 15
+    },
+    {
+      "from": "server/stable/services/term_maintenance.py",
+      "to": "server/stable/services/term_admin.py",
+      "line": 16
+    },
+    {
+      "from": "server/stable/services/term_maintenance.py",
+      "to": "server/stable/services/terms.py",
+      "line": 17
+    },
+    {
+      "from": "server/stable/services/automation.py",
+      "to": "server/stable/models.py",
+      "line": 10
+    },
+    {
+      "from": "server/stable/services/automation.py",
+      "to": "server/stable/services/terms.py",
+      "line": 26
+    },
+    {
+      "from": "server/stable/services/automation.py",
+      "to": "server/stable/services/multiregion.py",
+      "line": 32
+    },
+    {
+      "from": "server/stable/services/automation.py",
+      "to": "server/stable/services/news_attribution.py",
+      "line": 33
+    },
+    {
+      "from": "server/stable/services/automation.py",
+      "to": "server/stable/services/publish_readiness.py",
+      "line": 34
+    },
+    {
+      "from": "server/stable/services/automation.py",
+      "to": "server/stable/services/race_grades.py",
+      "line": 35
+    },
+    {
+      "from": "server/stable/services/automation.py",
+      "to": "server/stable/services/term_consistency.py",
+      "line": 36
+    },
+    {
+      "from": "server/stable/services/automation.py",
+      "to": "server/stable/services/qq_auto_push.py",
+      "line": 911
+    },
+    {
+      "from": "server/stable/services/historical_race_inventory.py",
+      "to": "server/stable/models.py",
+      "line": 23
+    },
+    {
+      "from": "server/stable/services/historical_race_inventory.py",
+      "to": "server/stable/services/race_event_public_cache.py",
+      "line": 40
+    },
+    {
+      "from": "server/stable/services/historical_race_inventory.py",
+      "to": "server/stable/services/race_event_years.py",
+      "line": 41
+    },
+    {
+      "from": "server/stable/services/historical_race_inventory.py",
+      "to": "server/stable/models.py",
+      "line": 1092
+    },
+    {
+      "from": "server/stable/services/historical_race_inventory.py",
+      "to": "server/stable/models.py",
+      "line": 1292
+    },
+    {
+      "from": "server/stable/services/race_data_sync_enrollment.py",
+      "to": "server/stable/__init__.py",
+      "line": 25
+    },
+    {
+      "from": "server/stable/services/race_data_sync_enrollment.py",
+      "to": "server/stable/models.py",
+      "line": 25
+    },
+    {
+      "from": "server/stable/services/race_data_sync_enrollment.py",
+      "to": "server/stable/services/__init__.py",
+      "line": 26
+    },
+    {
+      "from": "server/stable/services/race_data_sync_enrollment.py",
+      "to": "server/stable/services/race_data_sync_control.py",
+      "line": 26
+    },
+    {
+      "from": "server/stable/services/race_data_sync_enrollment.py",
+      "to": "server/stable/services/race_data_sync_pipeline.py",
+      "line": 27
+    },
+    {
+      "from": "server/stable/services/race_data_sync_enrollment.py",
+      "to": "server/stable/services/race_data_source_adapters.py",
+      "line": 1286
+    },
+    {
+      "from": "server/stable/services/race_data_sync_enrollment.py",
+      "to": "server/stable/services/race_data_source_adapters.py",
+      "line": 1319
+    },
+    {
+      "from": "server/stable/services/race_data_sync_enrollment.py",
+      "to": "server/stable/services/race_data_source_adapters.py",
+      "line": 1393
+    },
+    {
+      "from": "server/stable/services/race_data_sync_enrollment.py",
+      "to": "server/stable/services/race_source_identity.py",
+      "line": 1394
+    },
+    {
+      "from": "server/stable/services/race_data_sync_enrollment.py",
+      "to": "server/stable/services/race_data_source_adapters.py",
+      "line": 1685
+    },
+    {
+      "from": "server/stable/services/race_data_sync_enrollment.py",
+      "to": "server/stable/services/race_data_sync_admission.py",
+      "line": 1686
+    },
+    {
+      "from": "server/stable/services/race_data_sync_enrollment.py",
+      "to": "server/stable/services/race_source_identity.py",
+      "line": 1861
+    },
+    {
+      "from": "server/stable/services/race_data_sync_enrollment.py",
+      "to": "server/stable/services/race_data_source_adapters.py",
+      "line": 1941
+    },
+    {
+      "from": "server/stable/services/race_data_sync_enrollment.py",
+      "to": "server/stable/services/race_data_sync_alerts.py",
+      "line": 1947
+    },
+    {
+      "from": "server/stable/services/race_data_sync_enrollment.py",
+      "to": "server/stable/services/race_data_sync_admission.py",
+      "line": 1305
+    },
+    {
+      "from": "server/stable/services/race_event_reconciliation.py",
+      "to": "server/stable/models.py",
+      "line": 22
+    },
+    {
+      "from": "server/stable/services/race_event_reconciliation.py",
+      "to": "server/stable/services/race_event_years.py",
+      "line": 35
+    },
+    {
+      "from": "server/stable/services/race_live_rollback.py",
+      "to": "server/stable/__init__.py",
+      "line": 21
+    },
+    {
+      "from": "server/stable/services/race_live_rollback.py",
+      "to": "server/stable/models.py",
+      "line": 21
+    },
+    {
+      "from": "server/stable/services/race_live_rollback.py",
+      "to": "server/stable/services/race_events.py",
+      "line": 397
+    },
+    {
+      "from": "server/stable/services/race_live_rollback.py",
+      "to": "server/stable/services/race_events.py",
+      "line": 1270
+    },
+    {
+      "from": "server/stable/services/race_data_sync_admission.py",
+      "to": "server/stable/__init__.py",
+      "line": 10
+    },
+    {
+      "from": "server/stable/services/race_data_sync_admission.py",
+      "to": "server/stable/models.py",
+      "line": 10
+    },
+    {
+      "from": "server/stable/services/race_data_sync_admission.py",
+      "to": "server/stable/services/__init__.py",
+      "line": 11
+    },
+    {
+      "from": "server/stable/services/race_data_sync_admission.py",
+      "to": "server/stable/services/race_data_sync_control.py",
+      "line": 11
+    },
+    {
+      "from": "server/stable/services/race_data_sync_admission.py",
+      "to": "server/stable/services/race_data_sync_enrollment.py",
+      "line": 12
+    },
+    {
+      "from": "server/stable/services/race_data_sync_admission.py",
+      "to": "server/stable/services/race_data_source_adapters.py",
+      "line": 256
+    },
+    {
+      "from": "server/stable/services/race_data_sync_admission.py",
+      "to": "server/stable/services/race_data_source_adapters.py",
+      "line": 429
+    },
+    {
+      "from": "server/stable/services/race_data_sync_admission.py",
+      "to": "server/stable/services/race_data_source_adapters.py",
+      "line": 519
+    },
+    {
+      "from": "server/stable/services/race_data_sync_admission.py",
+      "to": "server/stable/services/race_data_sync_enrollment.py",
+      "line": 279
+    },
+    {
+      "from": "server/stable/services/race_data_sync_admission.py",
+      "to": "server/stable/services/race_source_identity.py",
+      "line": 569
+    },
+    {
+      "from": "server/stable/services/race_event_lifecycle_enforce.py",
+      "to": "server/stable/models.py",
+      "line": 23
+    },
+    {
+      "from": "server/stable/services/race_event_lifecycle_enforce.py",
+      "to": "server/stable/services/race_event_lifecycle.py",
+      "line": 34
+    },
+    {
+      "from": "server/stable/services/race_event_lifecycle_enforce.py",
+      "to": "server/stable/services/race_event_lifecycle_enrollment.py",
+      "line": 35
+    },
+    {
+      "from": "server/stable/services/race_event_lifecycle_enforce.py",
+      "to": "server/stable/services/race_event_lifecycle.py",
+      "line": 1282
+    },
+    {
+      "from": "server/stable/services/race_data_sync_control.py",
+      "to": "server/stable/__init__.py",
+      "line": 25
+    },
+    {
+      "from": "server/stable/services/race_data_sync_control.py",
+      "to": "server/stable/models.py",
+      "line": 25
+    },
+    {
+      "from": "server/stable/services/race_data_sync_control.py",
+      "to": "server/stable/services/race_data_sync_policy.py",
+      "line": 26
+    },
+    {
+      "from": "server/stable/services/race_data_sync_control.py",
+      "to": "server/stable/services/race_data_sync_pipeline.py",
+      "line": 345
+    },
+    {
+      "from": "server/stable/services/race_data_sync_control.py",
+      "to": "server/stable/services/race_events.py",
+      "line": 2655
+    },
+    {
+      "from": "server/stable/services/race_data_sync_control.py",
+      "to": "server/stable/services/race_data_source_adapters.py",
+      "line": 2710
+    },
+    {
+      "from": "server/stable/services/race_data_sync_control.py",
+      "to": "server/stable/services/race_data_sync_admission.py",
+      "line": 2711
+    },
+    {
+      "from": "server/stable/services/race_data_sync_control.py",
+      "to": "server/stable/services/race_data_sync_enrollment.py",
+      "line": 2712
+    },
+    {
+      "from": "server/stable/services/race_data_sync_control.py",
+      "to": "server/stable/services/race_data_sync_admission.py",
+      "line": 2878
+    },
+    {
+      "from": "server/stable/services/race_data_sync_control.py",
+      "to": "server/stable/services/race_data_source_adapters.py",
+      "line": 2879
+    },
+    {
+      "from": "server/stable/services/race_data_sync_control.py",
+      "to": "server/stable/services/race_data_sync_enrollment.py",
+      "line": 2880
+    },
+    {
+      "from": "server/stable/services/race_data_sync_control.py",
+      "to": "server/stable/services/race_data_source_adapters.py",
+      "line": 2998
+    },
+    {
+      "from": "server/stable/services/race_data_sync_control.py",
+      "to": "server/stable/services/race_data_sync_admission.py",
+      "line": 2999
+    },
+    {
+      "from": "server/stable/services/race_data_sync_control.py",
+      "to": "server/stable/services/race_data_sync_enrollment.py",
+      "line": 3000
+    },
+    {
+      "from": "server/stable/services/race_data_sync_control.py",
+      "to": "server/stable/services/race_data_sync_lifecycle.py",
+      "line": 448
+    },
+    {
+      "from": "server/stable/services/race_data_sync_control.py",
+      "to": "server/stable/services/race_data_sync_enrollment.py",
+      "line": 2824
+    },
+    {
+      "from": "server/stable/services/race_data_sync_control.py",
+      "to": "server/stable/services/race_data_source_adapters.py",
+      "line": 2788
+    },
+    {
+      "from": "server/stable/services/race_data_sync_pipeline.py",
+      "to": "server/stable/__init__.py",
+      "line": 21
+    },
+    {
+      "from": "server/stable/services/race_data_sync_pipeline.py",
+      "to": "server/stable/models.py",
+      "line": 21
+    },
+    {
+      "from": "server/stable/services/race_data_sync_pipeline.py",
+      "to": "server/stable/services/race_data_sync_control.py",
+      "line": 22
+    },
+    {
+      "from": "server/stable/services/race_data_sync_pipeline.py",
+      "to": "server/stable/services/race_data_sync_policy.py",
+      "line": 26
+    },
+    {
+      "from": "server/stable/services/race_data_sync_pipeline.py",
+      "to": "server/stable/services/race_event_public_cache.py",
+      "line": 32
+    },
+    {
+      "from": "server/stable/services/race_data_sync_pipeline.py",
+      "to": "server/stable/services/race_data_source_adapters.py",
+      "line": 1438
+    },
+    {
+      "from": "server/stable/services/race_data_sync_pipeline.py",
+      "to": "server/stable/services/race_data_sync_results.py",
+      "line": 1692
+    },
+    {
+      "from": "server/stable/services/race_grades.py",
+      "to": "server/stable/models.py",
+      "line": 6
+    },
+    {
+      "from": "server/stable/services/term_discovery.py",
+      "to": "server/stable/models.py",
+      "line": 11
+    },
+    {
+      "from": "server/stable/services/term_discovery.py",
+      "to": "server/stable/services/terms.py",
+      "line": 19
+    },
+    {
+      "from": "server/stable/adapters/jra.py",
+      "to": "server/stable/models.py",
+      "line": 11
+    },
+    {
+      "from": "server/stable/adapters/jra.py",
+      "to": "server/stable/services/http.py",
+      "line": 12
+    },
+    {
+      "from": "server/stable/adapters/jra.py",
+      "to": "server/stable/services/text.py",
+      "line": 13
+    },
+    {
+      "from": "server/stable/adapters/jra.py",
+      "to": "server/stable/adapters/base.py",
+      "line": 15
+    },
+    {
+      "from": "server/stable/adapters/international.py",
+      "to": "server/stable/models.py",
+      "line": 16
+    },
+    {
+      "from": "server/stable/adapters/international.py",
+      "to": "server/stable/services/article_content.py",
+      "line": 17
+    },
+    {
+      "from": "server/stable/adapters/international.py",
+      "to": "server/stable/services/http.py",
+      "line": 18
+    },
+    {
+      "from": "server/stable/adapters/international.py",
+      "to": "server/stable/services/text.py",
+      "line": 19
+    },
+    {
+      "from": "server/stable/adapters/international.py",
+      "to": "server/stable/adapters/base.py",
+      "line": 21
+    },
+    {
+      "from": "server/stable/adapters/netkeiba.py",
+      "to": "server/stable/models.py",
+      "line": 11
+    },
+    {
+      "from": "server/stable/adapters/netkeiba.py",
+      "to": "server/stable/services/http.py",
+      "line": 12
+    },
+    {
+      "from": "server/stable/adapters/netkeiba.py",
+      "to": "server/stable/services/text.py",
+      "line": 13
+    },
+    {
+      "from": "server/stable/adapters/netkeiba.py",
+      "to": "server/stable/adapters/base.py",
+      "line": 15
+    },
+    {
+      "from": "server/stable/services/ingestion.py",
+      "to": "server/stable/models.py",
+      "line": 9
+    },
+    {
+      "from": "server/stable/services/ingestion.py",
+      "to": "server/stable/services/sources.py",
+      "line": 24
+    },
+    {
+      "from": "server/stable/services/ingestion.py",
+      "to": "server/stable/services/news_attribution.py",
+      "line": 25
+    },
+    {
+      "from": "server/stable/services/ingestion.py",
+      "to": "server/stable/services/storage.py",
+      "line": 26
+    },
+    {
+      "from": "server/stable/services/notifications.py",
+      "to": "server/stable/models.py",
+      "line": 9
+    },
+    {
+      "from": "server/stable/services/notifications.py",
+      "to": "server/stable/services/onebot.py",
+      "line": 10
+    },
+    {
+      "from": "server/stable/services/notifications.py",
+      "to": "server/stable/services/automation.py",
+      "line": 11
+    },
+    {
+      "from": "server/stable/services/notifications.py",
+      "to": "server/stable/services/validation.py",
+      "line": 12
+    },
+    {
+      "from": "server/stable/services/ops_notifications.py",
+      "to": "server/stable/models.py",
+      "line": 10
+    },
+    {
+      "from": "server/stable/services/ops_notifications.py",
+      "to": "server/stable/services/onebot.py",
+      "line": 11
+    },
+    {
+      "from": "server/stable/services/rewriting.py",
+      "to": "server/stable/models.py",
+      "line": 11
+    },
+    {
+      "from": "server/stable/services/rewriting.py",
+      "to": "server/stable/services/terms.py",
+      "line": 20
+    },
+    {
+      "from": "server/stable/services/source_polling.py",
+      "to": "server/stable/models.py",
+      "line": 9
+    },
+    {
+      "from": "server/stable/services/translation.py",
+      "to": "server/stable/models.py",
+      "line": 12
+    },
+    {
+      "from": "server/stable/services/translation.py",
+      "to": "server/stable/services/japanese_racing_translation.py",
+      "line": 14
+    },
+    {
+      "from": "server/stable/services/translation.py",
+      "to": "server/stable/services/terms.py",
+      "line": 22
+    },
+    {
+      "from": "server/stable/services/validation.py",
+      "to": "server/stable/models.py",
+      "line": 14
+    },
+    {
+      "from": "server/stable/services/validation.py",
+      "to": "server/stable/services/terms.py",
+      "line": 29
+    },
+    {
+      "from": "server/stable/services/validation.py",
+      "to": "server/stable/services/news_attribution.py",
+      "line": 44
+    },
+    {
+      "from": "server/stable/services/validation.py",
+      "to": "server/stable/services/publish_readiness.py",
+      "line": 45
+    },
+    {
+      "from": "server/stable/services/validation.py",
+      "to": "server/stable/services/term_consistency.py",
+      "line": 46
+    },
+    {
+      "from": "server/stable/services/external_horse_data.py",
+      "to": "server/stable/models.py",
+      "line": 17
+    },
+    {
+      "from": "server/stable/services/scheduled_race_result_review.py",
+      "to": "server/stable/__init__.py",
+      "line": 27
+    },
+    {
+      "from": "server/stable/services/scheduled_race_result_review.py",
+      "to": "server/stable/models.py",
+      "line": 27
+    },
+    {
+      "from": "server/stable/services/scheduled_race_result_review.py",
+      "to": "server/stable/services/__init__.py",
+      "line": 446
+    },
+    {
+      "from": "server/stable/services/scheduled_race_result_review.py",
+      "to": "server/stable/services/race_event_crawl_orchestration.py",
+      "line": 446
+    },
+    {
+      "from": "server/stable/services/race_data_sync_providers.py",
+      "to": "server/stable/__init__.py",
+      "line": 19
+    },
+    {
+      "from": "server/stable/services/race_data_sync_providers.py",
+      "to": "server/stable/models.py",
+      "line": 19
+    },
+    {
+      "from": "server/stable/services/race_data_sync_providers.py",
+      "to": "server/stable/services/race_data_sync_control.py",
+      "line": 20
+    },
+    {
+      "from": "server/stable/services/race_data_sync_providers.py",
+      "to": "server/stable/services/race_data_sync_pipeline.py",
+      "line": 28
+    },
+    {
+      "from": "server/stable/services/race_data_sync_providers.py",
+      "to": "server/stable/services/race_data_sync_results.py",
+      "line": 36
+    },
+    {
+      "from": "server/stable/services/race_data_sync_providers.py",
+      "to": "server/stable/services/race_events.py",
+      "line": 39
+    },
+    {
+      "from": "server/stable/services/race_data_sync_providers.py",
+      "to": "server/stable/services/race_live_fixtures.py",
+      "line": 45
+    },
+    {
+      "from": "server/stable/services/race_data_sync_providers.py",
+      "to": "server/stable/services/race_live_racecard_sync.py",
+      "line": 49
+    },
+    {
+      "from": "server/stable/services/race_data_sync_providers.py",
+      "to": "server/stable/services/race_live_source_proof.py",
+      "line": 53
+    },
+    {
+      "from": "server/stable/services/race_data_sync_providers.py",
+      "to": "server/stable/services/race_pre_race.py",
+      "line": 667
+    },
+    {
+      "from": "server/stable/services/race_data_sync_providers.py",
+      "to": "server/stable/services/race_data_sync_control.py",
+      "line": 1465
+    },
+    {
+      "from": "server/stable/services/race_data_sync_providers.py",
+      "to": "server/stable/services/race_data_sync_policy.py",
+      "line": 1466
+    },
+    {
+      "from": "server/stable/services/race_data_sync_providers.py",
+      "to": "server/stable/services/race_data_sync_pipeline.py",
+      "line": 1467
+    },
+    {
+      "from": "server/stable/services/race_data_sync_providers.py",
+      "to": "server/stable/services/race_data_sync_pipeline.py",
+      "line": 1622
+    },
+    {
+      "from": "server/stable/services/race_data_sync_providers.py",
+      "to": "server/stable/services/scheduled_race_result_review.py",
+      "line": 1234
+    },
+    {
+      "from": "server/stable/services/race_data_sync_lifecycle.py",
+      "to": "server/stable/__init__.py",
+      "line": 11
+    },
+    {
+      "from": "server/stable/services/race_data_sync_lifecycle.py",
+      "to": "server/stable/models.py",
+      "line": 11
+    },
+    {
+      "from": "server/stable/services/race_data_sync_lifecycle.py",
+      "to": "server/stable/services/race_data_sync_admission.py",
+      "line": 12
+    },
+    {
+      "from": "server/stable/services/race_data_sync_lifecycle.py",
+      "to": "server/stable/services/race_event_lifecycle_enforce.py",
+      "line": 15
+    },
+    {
+      "from": "server/stable/services/race_data_sync_lifecycle.py",
+      "to": "server/stable/services/race_event_lifecycle.py",
+      "line": 91
+    },
+    {
+      "from": "server/stable/services/race_data_sync_lifecycle.py",
+      "to": "server/stable/services/race_data_sync_enrollment.py",
+      "line": 180
+    },
+    {
+      "from": "server/stable/services/race_data_sync_lifecycle.py",
+      "to": "server/stable/services/race_data_sync_enrollment.py",
+      "line": 510
+    },
+    {
+      "from": "server/stable/services/race_data_sync_lifecycle.py",
+      "to": "server/stable/services/race_data_sync_control.py",
+      "line": 549
+    },
+    {
+      "from": "server/stable/services/race_data_sync_alerts.py",
+      "to": "server/stable/__init__.py",
+      "line": 13
+    },
+    {
+      "from": "server/stable/services/race_data_sync_alerts.py",
+      "to": "server/stable/models.py",
+      "line": 13
+    },
+    {
+      "from": "server/stable/services/race_data_sync_alerts.py",
+      "to": "server/stable/services/race_data_source_adapters.py",
+      "line": 203
+    },
+    {
+      "from": "server/stable/services/race_data_sync_alerts.py",
+      "to": "server/stable/services/race_data_source_adapters.py",
+      "line": 310
+    },
+    {
+      "from": "server/stable/services/race_public_coverage.py",
+      "to": "server/stable/__init__.py",
+      "line": 17
+    },
+    {
+      "from": "server/stable/services/race_public_coverage.py",
+      "to": "server/stable/models.py",
+      "line": 17
+    },
+    {
+      "from": "server/stable/services/race_public_coverage.py",
+      "to": "server/stable/services/race_data_sync_admission.py",
+      "line": 18
+    },
+    {
+      "from": "server/stable/services/race_public_coverage.py",
+      "to": "server/stable/services/race_events.py",
+      "line": 21
+    },
+    {
+      "from": "server/stable/services/race_live_runner.py",
+      "to": "server/stable/models.py",
+      "line": 16
+    },
+    {
+      "from": "server/stable/services/race_live_runner.py",
+      "to": "server/stable/services/race_events.py",
+      "line": 24
+    },
+    {
+      "from": "server/stable/services/race_live_runner.py",
+      "to": "server/stable/services/race_live_fixtures.py",
+      "line": 35
+    },
+    {
+      "from": "server/stable/services/race_live_runner.py",
+      "to": "server/stable/services/race_live_source_proof.py",
+      "line": 40
+    },
+    {
+      "from": "server/stable/services/race_live_runner.py",
+      "to": "server/stable/services/race_live_racecard_sync.py",
+      "line": 45
+    },
+    {
+      "from": "server/stable/services/translation_recovery.py",
+      "to": "server/stable/models.py",
+      "line": 14
+    },
+    {
+      "from": "server/stable/services/translation_recovery.py",
+      "to": "server/stable/tasks.py",
+      "line": 453
+    },
+    {
+      "from": "server/stable/services/translation_recovery.py",
+      "to": "server/stable/tasks.py",
+      "line": 333
+    },
+    {
+      "from": "server/stable/services/race_event_lifecycle.py",
+      "to": "server/stable/models.py",
+      "line": 23
+    },
+    {
+      "from": "server/stable/services/race_event_lifecycle.py",
+      "to": "server/stable/services/race_event_public_cache.py",
+      "line": 31
+    },
+    {
+      "from": "server/stable/services/race_event_lifecycle.py",
+      "to": "server/stable/services/race_event_lifecycle_canary.py",
+      "line": 283
+    },
+    {
+      "from": "server/stable/services/race_event_lifecycle.py",
+      "to": "server/stable/services/race_event_lifecycle_canary.py",
+      "line": 339
+    },
+    {
+      "from": "server/stable/services/race_event_lifecycle.py",
+      "to": "server/stable/models.py",
+      "line": 735
+    },
+    {
+      "from": "server/stable/services/race_data_source_adapters.py",
+      "to": "server/stable/services/race_data_sync_control.py",
+      "line": 240
+    },
+    {
+      "from": "server/stable/services/race_data_source_adapters.py",
+      "to": "server/stable/race_reference_parsers/jra.py",
+      "line": 298
+    },
+    {
+      "from": "server/stable/services/race_data_source_adapters.py",
+      "to": "server/stable/services/race_pre_race.py",
+      "line": 460
+    },
+    {
+      "from": "server/stable/services/race_data_source_adapters.py",
+      "to": "server/stable/__init__.py",
+      "line": 510
+    },
+    {
+      "from": "server/stable/services/race_data_source_adapters.py",
+      "to": "server/stable/models.py",
+      "line": 510
+    },
+    {
+      "from": "server/stable/services/race_data_source_adapters.py",
+      "to": "server/stable/services/race_source_identity.py",
+      "line": 541
+    },
+    {
+      "from": "server/stable/services/race_data_source_adapters.py",
+      "to": "server/stable/race_reference_parsers/__init__.py",
+      "line": 655
+    },
+    {
+      "from": "server/stable/services/race_data_source_adapters.py",
+      "to": "server/stable/race_reference_parsers/sporting_life.py",
+      "line": 655
+    },
+    {
+      "from": "server/stable/services/race_data_source_adapters.py",
+      "to": "server/stable/race_reference_parsers/zeturf.py",
+      "line": 655
+    },
+    {
+      "from": "server/stable/services/race_data_source_adapters.py",
+      "to": "server/stable/race_reference_parsers/horse_racing_nation.py",
+      "line": 655
+    },
+    {
+      "from": "server/stable/services/race_data_source_adapters.py",
+      "to": "server/stable/services/race_source_identity.py",
+      "line": 656
+    },
+    {
+      "from": "server/stable/services/race_data_source_adapters.py",
+      "to": "server/stable/services/race_data_sync_control.py",
+      "line": 812
+    },
+    {
+      "from": "server/stable/services/race_data_source_adapters.py",
+      "to": "server/stable/services/race_events.py",
+      "line": 816
+    },
+    {
+      "from": "server/stable/services/race_data_source_adapters.py",
+      "to": "server/stable/services/race_data_sync_results.py",
+      "line": 817
+    },
+    {
+      "from": "server/stable/services/race_data_source_adapters.py",
+      "to": "server/stable/services/race_pre_race_sources.py",
+      "line": 1044
+    },
+    {
+      "from": "server/stable/services/race_data_source_adapters.py",
+      "to": "server/stable/services/race_source_identity.py",
+      "line": 1045
+    },
+    {
+      "from": "server/stable/services/race_data_source_adapters.py",
+      "to": "server/stable/services/external_hkjc_data.py",
+      "line": 1215
+    },
+    {
+      "from": "server/stable/services/race_data_source_adapters.py",
+      "to": "server/stable/services/race_source_identity.py",
+      "line": 1216
+    },
+    {
+      "from": "server/stable/services/race_data_source_adapters.py",
+      "to": "server/stable/services/race_pre_race_sources.py",
+      "line": 1329
+    },
+    {
+      "from": "server/stable/services/race_data_source_adapters.py",
+      "to": "server/stable/race_reference_parsers/sporting_life.py",
+      "line": 1330
+    },
+    {
+      "from": "server/stable/services/race_data_source_adapters.py",
+      "to": "server/stable/services/race_source_identity.py",
+      "line": 1331
+    },
+    {
+      "from": "server/stable/services/race_data_source_adapters.py",
+      "to": "server/stable/services/race_source_identity.py",
+      "line": 1420
+    },
+    {
+      "from": "server/stable/services/race_data_source_adapters.py",
+      "to": "server/stable/services/race_data_sync_providers.py",
+      "line": 1468
+    },
+    {
+      "from": "server/stable/services/race_data_source_adapters.py",
+      "to": "server/stable/services/race_live_source_proof.py",
+      "line": 1475
+    },
+    {
+      "from": "server/stable/services/race_data_source_adapters.py",
+      "to": "server/stable/services/race_live_fixtures.py",
+      "line": 1481
+    },
+    {
+      "from": "server/stable/services/race_data_source_adapters.py",
+      "to": "server/stable/services/race_source_identity.py",
+      "line": 1485
+    },
+    {
+      "from": "server/stable/services/race_data_source_adapters.py",
+      "to": "server/stable/services/race_source_identity.py",
+      "line": 619
+    },
+    {
+      "from": "server/stable/services/race_data_source_adapters.py",
+      "to": "server/stable/services/race_source_identity.py",
+      "line": 838
+    },
+    {
+      "from": "server/stable/services/race_data_source_adapters.py",
+      "to": "server/stable/services/race_pre_race.py",
+      "line": 1431
+    },
+    {
+      "from": "server/stable/services/race_data_source_adapters.py",
+      "to": "server/stable/services/race_data_sync_pipeline.py",
+      "line": 915
+    },
+    {
+      "from": "server/stable/services/race_data_source_adapters.py",
+      "to": "server/stable/services/race_events.py",
+      "line": 1540
+    },
+    {
+      "from": "server/stable/services/race_data_source_adapters.py",
+      "to": "server/stable/race_reference_parsers/sporting_life.py",
+      "line": 1686
+    },
+    {
+      "from": "server/stable/services/race_event_lifecycle_canary.py",
+      "to": "server/stable/models.py",
+      "line": 17
+    },
+    {
+      "from": "server/stable/services/race_event_lifecycle_canary.py",
+      "to": "server/stable/services/race_event_lifecycle_enrollment.py",
+      "line": 24
+    },
+    {
+      "from": "server/stable/services/race_data_sync_policy.py",
+      "to": "server/stable/__init__.py",
+      "line": 7
+    },
+    {
+      "from": "server/stable/services/race_data_sync_policy.py",
+      "to": "server/stable/models.py",
+      "line": 7
+    },
+    {
+      "from": "server/stable/services/race_pre_race_sources.py",
+      "to": "server/stable/services/race_pre_race_refresh.py",
+      "line": 7
+    },
+    {
+      "from": "server/stable/services/race_pre_race_sources.py",
+      "to": "server/stable/race_reference_parsers/sporting_life.py",
+      "line": 18
+    },
+    {
+      "from": "server/stable/services/race_pre_race_sources.py",
+      "to": "server/stable/race_reference_parsers/zeturf.py",
+      "line": 45
+    },
+    {
+      "from": "server/stable/services/term_consistency.py",
+      "to": "server/stable/models.py",
+      "line": 24
+    },
+    {
+      "from": "server/stable/services/term_consistency.py",
+      "to": "server/stable/signals.py",
+      "line": 1121
+    },
+    {
+      "from": "server/stable/services/term_consistency.py",
+      "to": "server/stable/signals.py",
+      "line": 1243
+    },
+    {
+      "from": "server/stable/services/race_source_identity.py",
+      "to": "server/stable/__init__.py",
+      "line": 11
+    },
+    {
+      "from": "server/stable/services/race_source_identity.py",
+      "to": "server/stable/models.py",
+      "line": 11
+    },
+    {
+      "from": "server/stable/services/race_source_identity.py",
+      "to": "server/stable/services/race_data_source_adapters.py",
+      "line": 12
+    },
+    {
+      "from": "server/stable/services/race_source_identity.py",
+      "to": "server/stable/services/race_pre_race.py",
+      "line": 155
+    },
+    {
+      "from": "server/stable/services/race_event_lifecycle_enrollment.py",
+      "to": "server/stable/models.py",
+      "line": 28
+    },
+    {
+      "from": "server/stable/services/race_event_lifecycle_enrollment.py",
+      "to": "server/stable/services/race_event_lifecycle.py",
+      "line": 39
+    },
+    {
+      "from": "server/stable/services/race_data_sync_results.py",
+      "to": "server/stable/__init__.py",
+      "line": 14
+    },
+    {
+      "from": "server/stable/services/race_data_sync_results.py",
+      "to": "server/stable/models.py",
+      "line": 14
+    },
+    {
+      "from": "server/stable/services/race_data_sync_results.py",
+      "to": "server/stable/services/race_data_sync_control.py",
+      "line": 15
+    },
+    {
+      "from": "server/stable/services/race_data_sync_results.py",
+      "to": "server/stable/services/race_data_sync_policy.py",
+      "line": 19
+    },
+    {
+      "from": "server/stable/services/race_data_sync_results.py",
+      "to": "server/stable/services/race_event_public_cache.py",
+      "line": 23
+    },
+    {
+      "from": "server/stable/services/race_data_sync_results.py",
+      "to": "server/stable/services/race_event_lifecycle_enforce.py",
+      "line": 304
+    },
+    {
+      "from": "server/stable/services/race_data_sync_results.py",
+      "to": "server/stable/services/race_data_sync_pipeline.py",
+      "line": 406
+    },
+    {
+      "from": "server/stable/services/race_data_sync_results.py",
+      "to": "server/stable/services/race_data_source_adapters.py",
+      "line": 424
+    },
+    {
+      "from": "server/stable/services/race_data_sync_results.py",
+      "to": "server/stable/services/race_data_sync_admission.py",
+      "line": 345
+    },
+    {
+      "from": "server/stable/adapters/base.py",
+      "to": "server/stable/models.py",
+      "line": 7
+    },
+    {
+      "from": "server/stable/services/article_content.py",
+      "to": "server/stable/models.py",
+      "line": 9
+    },
+    {
+      "from": "server/stable/services/article_content.py",
+      "to": "server/stable/services/text.py",
+      "line": 10
+    },
+    {
+      "from": "server/stable/services/japanese_racing_translation.py",
+      "to": "server/stable/models.py",
+      "line": 6
+    },
+    {
+      "from": "server/stable/services/japanese_racing_translation.py",
+      "to": "server/stable/services/terms.py",
+      "line": 8
+    },
+    {
+      "from": "server/stable/services/race_event_crawl_orchestration.py",
+      "to": "server/stable/models.py",
+      "line": 25
+    },
+    {
+      "from": "server/stable/services/race_event_crawl_orchestration.py",
+      "to": "server/stable/services/historical_race_batches.py",
+      "line": 36
+    },
+    {
+      "from": "server/stable/services/race_event_crawl_orchestration.py",
+      "to": "server/stable/services/race_result_recovery_inventory.py",
+      "line": 37
+    },
+    {
+      "from": "server/stable/services/race_live_fixtures.py",
+      "to": "server/stable/services/race_events.py",
+      "line": 8
+    },
+    {
+      "from": "server/stable/services/race_live_racecard_sync.py",
+      "to": "server/stable/__init__.py",
+      "line": 21
+    },
+    {
+      "from": "server/stable/services/race_live_racecard_sync.py",
+      "to": "server/stable/models.py",
+      "line": 21
+    },
+    {
+      "from": "server/stable/services/race_live_racecard_sync.py",
+      "to": "server/stable/services/race_events.py",
+      "line": 22
+    },
+    {
+      "from": "server/stable/services/race_live_racecard_sync.py",
+      "to": "server/stable/services/race_live_fixtures.py",
+      "line": 27
+    },
+    {
+      "from": "server/stable/services/race_live_racecard_sync.py",
+      "to": "server/stable/services/race_live_source_proof.py",
+      "line": 30
+    },
+    {
+      "from": "server/stable/services/race_live_racecard_sync.py",
+      "to": "server/stable/services/race_live_target_eligibility.py",
+      "line": 36
+    },
+    {
+      "from": "server/stable/services/race_live_racecard_sync.py",
+      "to": "server/stable/services/race_events.py",
+      "line": 208
+    },
+    {
+      "from": "server/stable/race_reference_parsers/sporting_life.py",
+      "to": "server/stable/race_reference_parsers/__init__.py",
+      "line": 11
+    },
+    {
+      "from": "server/stable/race_reference_parsers/zeturf.py",
+      "to": "server/stable/race_reference_parsers/__init__.py",
+      "line": 10
+    },
+    {
+      "from": "server/stable/race_reference_parsers/horse_racing_nation.py",
+      "to": "server/stable/race_reference_parsers/__init__.py",
+      "line": 10
+    },
+    {
+      "from": "server/stable/services/external_hkjc_data.py",
+      "to": "server/stable/models.py",
+      "line": 19
+    },
+    {
+      "from": "server/stable/services/historical_race_batches.py",
+      "to": "server/stable/models.py",
+      "line": 18
+    },
+    {
+      "from": "server/stable/services/historical_race_batches.py",
+      "to": "server/stable/services/historical_race_inventory.py",
+      "line": 30
+    },
+    {
+      "from": "server/stable/services/historical_race_batches.py",
+      "to": "server/stable/services/race_event_years.py",
+      "line": 35
+    },
+    {
+      "from": "server/stable/services/race_result_recovery_inventory.py",
+      "to": "server/stable/__init__.py",
+      "line": 15
+    },
+    {
+      "from": "server/stable/services/race_result_recovery_inventory.py",
+      "to": "server/stable/models.py",
+      "line": 15
+    },
+    {
+      "from": "server/stable/services/race_result_recovery_inventory.py",
+      "to": "server/stable/services/race_event_lifecycle.py",
+      "line": 16
+    },
+    {
+      "from": "server/stable/services/race_live_target_eligibility.py",
+      "to": "server/stable/__init__.py",
+      "line": 12
+    },
+    {
+      "from": "server/stable/services/race_live_target_eligibility.py",
+      "to": "server/stable/models.py",
+      "line": 12
+    }
+  ],
+  "external_import_roots": [
+    "__future__",
+    "abc",
+    "app",
+    "base64",
+    "billiard",
+    "bs4",
+    "celery",
+    "collections",
+    "contextlib",
+    "contextvars",
+    "copy",
+    "csv",
+    "ctypes",
+    "dataclasses",
+    "datetime",
+    "decimal",
+    "difflib",
+    "django",
+    "email",
+    "enum",
+    "errno",
+    "fcntl",
+    "fractions",
+    "functools",
+    "gzip",
+    "hashlib",
+    "hmac",
+    "html",
+    "http",
+    "importlib",
+    "inspect",
+    "io",
+    "ipaddress",
+    "json",
+    "keibascraper",
+    "kombu",
+    "logging",
+    "math",
+    "mimetypes",
+    "openai",
+    "os",
+    "pathlib",
+    "random",
+    "re",
+    "requests",
+    "secrets",
+    "shlex",
+    "shutil",
+    "socket",
+    "ssl",
+    "stat",
+    "subprocess",
+    "sys",
+    "tempfile",
+    "threading",
+    "time",
+    "types",
+    "typing",
+    "unicodedata",
+    "urllib",
+    "uuid",
+    "zlib",
+    "zoneinfo"
+  ],
+  "dynamic_hazards": [
+    {
+      "path": "server/stable/services/historical_race_calendar_admission.py",
+      "line": 43,
+      "call": "apps.get_model"
+    },
+    {
+      "path": "server/stable/services/historical_race_calendar_admission.py",
+      "line": 75,
+      "call": "apps.get_model"
+    },
+    {
+      "path": "server/stable/services/historical_race_calendar_admission.py",
+      "line": 97,
+      "call": "apps.get_model"
+    },
+    {
+      "path": "server/stable/services/historical_race_calendar_admission.py",
+      "line": 118,
+      "call": "apps.get_model"
+    },
+    {
+      "path": "server/stable/views.py",
+      "line": 3963,
+      "call": "apps.get_model"
+    }
+  ],
+  "requirements": {
+    "path": "requirements.txt",
+    "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+    "git_blob": "1b225a5936184e79e84ea6f4c2388df9ef056a44",
+    "sha256": "f3fd408c04cae78ed13d5175fe8cc04674fcde4efab9d9f18d569652eddf3f59",
+    "bytes": 325
+  },
+  "requirements_utf8": "beautifulsoup4==4.12.3\ncelery==5.4.0\ndjango==5.2.1\ndjango-filter==25.1\ngunicorn==22.0.0\nlxml==5.3.0\nkeibascraper==3.1.5\nopencc-python-reimplemented==0.1.7\nopenai==1.75.0\noss2==2.19.1\npdfplumber==0.11.9\npillow==11.2.1\npsycopg[binary]==3.2.6\npython-dotenv==1.1.0\nredis==5.2.1\nrequests==2.32.3\nwhitenoise==6.9.0\nopenpyxl==3.1.5\n",
+  "template_sources": [
+    {
+      "path": "server/stable/templates/stable/public/base.html",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "43b2fe288d16d37cdf124f2f866418bee8f7a736",
+      "sha256": "e2d54f4b3fe8a9c119152908e65dbc29bf89760239fde3734b69668e39b86266",
+      "bytes": 4889
+    },
+    {
+      "path": "server/stable/templates/stable/public/race_detail.html",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "ddcd74fbac1d35cbb4eafc7c1fb68db578923a04",
+      "sha256": "a2eb2fd71fac5101afd7799eddc3703cd004accf535a28e9bca2ff70d08429f5",
+      "bytes": 11760
+    },
+    {
+      "path": "server/stable/templates/stable/public/race_calendar.html",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "ba14da5277bd2e16ea174bd1d2d3b1d653594e2a",
+      "sha256": "1c3d1a973d1a636d13943d1ad4d48e9bb16ba84d02ad1dcebbb9830c442aed48",
+      "bytes": 7215
+    },
+    {
+      "path": "server/stable/templates/stable/public/_article_card.html",
+      "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+      "git_blob": "e406ced0ba266d3251c34f1981a852c5a7a89104",
+      "sha256": "4b24630cfc6714e1cb319d93b52f236fe66c7ddb1951379bf172ad801966fc3b",
+      "bytes": 1184
+    }
+  ],
+  "css_source": {
+    "path": "server/stable/static/stable/public.css",
+    "commit": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+    "git_blob": "a82bef5b544572a4e8dcf11366ea398c76723d44",
+    "sha256": "47fa116cc0a83cc3c6c8639da2b9022c9a3e2ad26af070329ecc7685d9852fb7",
+    "bytes": 45151
+  },
+  "missing_from_candidate": [
+    "server/stable/services/content_contracts.py"
+  ],
+  "execution_resources": "not allocated; root must bind image digest/Python+stdlib+Django5.2.1+all recursive wheel dependencies+timezone data+zeroDB test settings/URLconf and exact assembled tree before execution",
+  "unresolved_runtime_requirements": [
+    "new adapter/test module not implemented",
+    "approved injected-template blobs do not yet exist",
+    "test-only settings/URLconf not assigned",
+    "wheel transitive lock/image digest not assigned"
+  ],
+  "proof": "static local import graph, no import/ORM/render"
+}

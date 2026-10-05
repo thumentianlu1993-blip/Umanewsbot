@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import os
 import tempfile
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from threading import Barrier
 from unittest import mock, skipUnless
 
-from django.db import close_old_connections, connection
+from django.db import close_old_connections, connection, connections
 from django.test import TransactionTestCase
 
 from stable.models import (
@@ -18,6 +19,23 @@ from stable.models import (
 )
 from stable.services import racing_api_horse_staging as staging_service
 from stable.test_racing_api_horse_staging import RacingApiHorseStagingTests
+
+
+def _assert_worker_sessions_closed(test_case, worker_pids):
+    """只观测已绑定的线程PID；不终止会话，允许正常断开的短暂异步延迟。"""
+    test_case.assertTrue(worker_pids, "no worker backend PID recorded")
+    deadline = time.monotonic() + 2
+    while True:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT pid, datname, state FROM pg_stat_activity WHERE pid = ANY(%s)",
+                [sorted(set(worker_pids))],
+            )
+            lingering = cursor.fetchall()
+        if not lingering or time.monotonic() >= deadline:
+            break
+        time.sleep(0.01)
+    test_case.assertEqual(lingering, [], "worker PostgreSQL sessions still alive")
 
 
 @skipUnless(
@@ -37,6 +55,7 @@ class RacingApiHorseStagingPostgresqlConcurrencyTests(TransactionTestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root, manifest_sha = self._artifact(Path(temporary))
             rendezvous = Barrier(2)
+            worker_pids: list[int] = []
             original_validate = staging_service._validate_and_plan
 
             def synchronized_validate(normalized, **kwargs):
@@ -47,13 +66,16 @@ class RacingApiHorseStagingPostgresqlConcurrencyTests(TransactionTestCase):
             def apply_once():
                 close_old_connections()
                 try:
+                    with connection.cursor() as cursor:
+                        cursor.execute("SELECT pg_backend_pid()")
+                        worker_pids.append(cursor.fetchone()[0])
                     return staging_service.apply_targeted_artifact(
                         root,
                         approved_manifest_sha256=manifest_sha,
                         allow_write=True,
                     )
                 finally:
-                    close_old_connections()
+                    connections.close_all()
 
             with mock.patch.dict(
                 os.environ,
@@ -80,3 +102,5 @@ class RacingApiHorseStagingPostgresqlConcurrencyTests(TransactionTestCase):
             1,
         )
         self.assertEqual(ExternalHorseHistory.objects.count(), 1)
+        self.assertEqual(len(set(worker_pids)), 2)
+        _assert_worker_sessions_closed(self, worker_pids)

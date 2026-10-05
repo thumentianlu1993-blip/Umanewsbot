@@ -1,0 +1,3500 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:o03:c020:contract:v1",
+  "title": "C020 封闭静态合同；不是可执行 adapter",
+  "$defs": {
+    "DisplayField": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "normalized",
+            "preserved",
+            "missing",
+            "unknown",
+            "conflict"
+          ]
+        },
+        "reason_code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "input_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "rule_version": {
+          "const": "race-information-display.v1"
+        },
+        "code": {
+          "type": "string"
+        },
+        "meters": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source_unit": {
+          "type": "string"
+        },
+        "approximate": {
+          "type": "boolean"
+        },
+        "min_age": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9223372036854775807
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max_age": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9223372036854775807
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "age_open_ended": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "text",
+        "state",
+        "reason_code",
+        "input_sha256",
+        "rule_version",
+        "code",
+        "meters",
+        "source_unit",
+        "approximate",
+        "min_age",
+        "max_age",
+        "age_open_ended"
+      ],
+      "additionalProperties": false
+    },
+    "EventDisplay": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/DisplayField"
+        },
+        "grade": {
+          "$ref": "#/$defs/DisplayField"
+        },
+        "distance": {
+          "$ref": "#/$defs/DisplayField"
+        },
+        "surface": {
+          "$ref": "#/$defs/DisplayField"
+        },
+        "eligibility": {
+          "$ref": "#/$defs/DisplayField"
+        },
+        "race_type": {
+          "$ref": "#/$defs/DisplayField"
+        },
+        "race_class": {
+          "$ref": "#/$defs/DisplayField"
+        },
+        "racecourse": {
+          "$ref": "#/$defs/DisplayField"
+        },
+        "winner": {
+          "$ref": "#/$defs/DisplayField"
+        }
+      },
+      "required": [
+        "name",
+        "grade",
+        "distance",
+        "surface",
+        "eligibility",
+        "race_type",
+        "race_class",
+        "racecourse",
+        "winner"
+      ],
+      "additionalProperties": false
+    },
+    "RowDisplay": {
+      "type": "object",
+      "properties": {
+        "position": {
+          "$ref": "#/$defs/DisplayField"
+        },
+        "horse_number": {
+          "$ref": "#/$defs/DisplayField"
+        },
+        "horse_name": {
+          "$ref": "#/$defs/DisplayField"
+        },
+        "jockey_name": {
+          "$ref": "#/$defs/DisplayField"
+        },
+        "trainer_name": {
+          "$ref": "#/$defs/DisplayField"
+        },
+        "finish_time": {
+          "$ref": "#/$defs/DisplayField"
+        },
+        "margin": {
+          "$ref": "#/$defs/DisplayField"
+        },
+        "odds": {
+          "$ref": "#/$defs/DisplayField"
+        },
+        "popularity": {
+          "$ref": "#/$defs/DisplayField"
+        },
+        "weight": {
+          "$ref": "#/$defs/DisplayField"
+        },
+        "barrier": {
+          "$ref": "#/$defs/DisplayField"
+        },
+        "status": {
+          "$ref": "#/$defs/DisplayField"
+        }
+      },
+      "required": [
+        "position",
+        "horse_number",
+        "horse_name",
+        "jockey_name",
+        "trainer_name",
+        "finish_time",
+        "margin",
+        "odds",
+        "popularity",
+        "weight",
+        "barrier",
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "SourceRefs": {
+      "type": "object",
+      "properties": {
+        "field_units": {
+          "type": "object",
+          "properties": {
+            "distance_text": {
+              "type": "string"
+            },
+            "carried_weight": {
+              "type": "string"
+            },
+            "odds_value": {
+              "type": "string"
+            },
+            "margin": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "distance_text",
+            "carried_weight",
+            "odds_value",
+            "margin"
+          ],
+          "additionalProperties": false
+        },
+        "source_provider": {
+          "type": "string"
+        },
+        "parser_version": {
+          "type": "string"
+        },
+        "source_language": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "field_units",
+        "source_provider",
+        "parser_version",
+        "source_language"
+      ],
+      "additionalProperties": false
+    },
+    "EventDTO": {
+      "type": "object",
+      "properties": {
+        "dto_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "chinese_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "original_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "year": {
+          "const": 2026
+        },
+        "status": {
+          "enum": [
+            "scheduled",
+            "running",
+            "finished",
+            "postponed",
+            "cancelled"
+          ]
+        },
+        "grade_text": {
+          "type": "string"
+        },
+        "normalized_grade": {
+          "type": "string"
+        },
+        "grade_badge_label": {
+          "type": "string"
+        },
+        "country_region": {
+          "const": "japan"
+        },
+        "get_country_region_display": {
+          "const": "日本"
+        },
+        "distance_text": {
+          "type": "string"
+        },
+        "surface": {
+          "type": "string"
+        },
+        "get_surface_display": {
+          "type": "string"
+        },
+        "racecourse": {
+          "type": "string"
+        },
+        "eligibility_text": {
+          "type": "string"
+        },
+        "local_date": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^2026-[0-9]{2}-[0-9]{2}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "local_start_time": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9]{2}:[0-9]{2}:[0-9]{2}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "race_datetime": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^2026-10-0[45]T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "timezone_name": {
+          "const": "Asia/Shanghai"
+        },
+        "public_time_label": {
+          "type": "string"
+        },
+        "public_list_detail_url": {
+          "type": "string",
+          "pattern": "^/(?!/)[A-Za-z0-9_./?=%&+:-]*$",
+          "maxLength": 4096
+        },
+        "public_path": {
+          "type": "string",
+          "pattern": "^/(?!/)[A-Za-z0-9_./?=%&+:-]*$",
+          "maxLength": 4096
+        },
+        "public_status_label": {
+          "type": "string"
+        },
+        "public_winner_name": {
+          "type": "string"
+        },
+        "source_refs": {
+          "$ref": "#/$defs/SourceRefs"
+        },
+        "public_display": {
+          "$ref": "#/$defs/EventDisplay"
+        }
+      },
+      "required": [
+        "dto_ref",
+        "chinese_name",
+        "original_name",
+        "year",
+        "status",
+        "grade_text",
+        "normalized_grade",
+        "grade_badge_label",
+        "country_region",
+        "get_country_region_display",
+        "distance_text",
+        "surface",
+        "get_surface_display",
+        "racecourse",
+        "eligibility_text",
+        "local_date",
+        "local_start_time",
+        "race_datetime",
+        "timezone_name",
+        "public_time_label",
+        "public_list_detail_url",
+        "public_path",
+        "public_status_label",
+        "public_winner_name",
+        "source_refs",
+        "public_display"
+      ],
+      "additionalProperties": false
+    },
+    "RowDTO": {
+      "type": "object",
+      "properties": {
+        "dto_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "participant_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "finish_position": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9223372036854775807
+        },
+        "reported_finish_position": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9223372036854775807
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "official_finish_position": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9223372036854775807
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "display_finish_position": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9223372036854775807
+            },
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            }
+          ]
+        },
+        "horse_number": {
+          "type": "string"
+        },
+        "horse_name": {
+          "type": "string"
+        },
+        "display_horse_name": {
+          "type": "string"
+        },
+        "jockey_name": {
+          "type": "string"
+        },
+        "display_jockey_name": {
+          "type": "string"
+        },
+        "trainer_name": {
+          "type": "string"
+        },
+        "finish_time": {
+          "type": "string"
+        },
+        "margin": {
+          "type": "string"
+        },
+        "odds_value": {
+          "type": "string"
+        },
+        "popularity": {
+          "type": "string"
+        },
+        "barrier": {
+          "type": "string"
+        },
+        "carried_weight": {
+          "type": "string"
+        },
+        "running_status": {
+          "type": "string"
+        },
+        "get_running_status_display": {
+          "type": "string"
+        },
+        "is_confirmed": {
+          "type": "boolean"
+        },
+        "source_refs": {
+          "$ref": "#/$defs/SourceRefs"
+        },
+        "public_display": {
+          "$ref": "#/$defs/RowDisplay"
+        },
+        "winner_year": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "odds_kind_label": {
+          "type": "string"
+        },
+        "dynamic_updated_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^2026-10-0[45]T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "dto_ref",
+        "participant_ref",
+        "finish_position",
+        "reported_finish_position",
+        "official_finish_position",
+        "display_finish_position",
+        "horse_number",
+        "horse_name",
+        "display_horse_name",
+        "jockey_name",
+        "display_jockey_name",
+        "trainer_name",
+        "finish_time",
+        "margin",
+        "odds_value",
+        "popularity",
+        "barrier",
+        "carried_weight",
+        "running_status",
+        "get_running_status_display",
+        "is_confirmed",
+        "source_refs",
+        "public_display",
+        "winner_year",
+        "odds_kind_label",
+        "dynamic_updated_at"
+      ],
+      "additionalProperties": false
+    },
+    "URLMap": {
+      "type": "object",
+      "properties": {
+        "public-race-calendar": {
+          "const": "/races/"
+        },
+        "public-horse-index": {
+          "const": "/horses/"
+        },
+        "public-horse-follows": {
+          "const": "/horses/follows/"
+        },
+        "static_css": {
+          "const": "/static/stable/public.css"
+        }
+      },
+      "required": [
+        "public-race-calendar",
+        "public-horse-index",
+        "public-horse-follows",
+        "static_css"
+      ],
+      "additionalProperties": false
+    },
+    "DetailLink": {
+      "type": "object",
+      "properties": {
+        "public_path": {
+          "type": "string",
+          "pattern": "^/(?!/)[A-Za-z0-9_./?=%&+:-]*$",
+          "maxLength": 4096
+        },
+        "display_name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "public_path",
+        "display_name"
+      ],
+      "additionalProperties": false
+    },
+    "RaceLink": {
+      "type": "object",
+      "properties": {
+        "public_path": {
+          "type": "string",
+          "pattern": "^/(?!/)[A-Za-z0-9_./?=%&+:-]*$",
+          "maxLength": 4096
+        },
+        "chinese_name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "public_path",
+        "chinese_name"
+      ],
+      "additionalProperties": false
+    },
+    "HorseArticleLink": {
+      "type": "object",
+      "properties": {
+        "horse_profile": {
+          "$ref": "#/$defs/DetailLink"
+        }
+      },
+      "required": [
+        "horse_profile"
+      ],
+      "additionalProperties": false
+    },
+    "RaceArticleLink": {
+      "type": "object",
+      "properties": {
+        "event": {
+          "$ref": "#/$defs/RaceLink"
+        }
+      },
+      "required": [
+        "event"
+      ],
+      "additionalProperties": false
+    },
+    "ArticleDTO": {
+      "type": "object",
+      "properties": {
+        "published_to_web_at": {
+          "type": "string",
+          "pattern": "^2026-10-0[45]T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+        },
+        "public_list_detail_url": {
+          "type": "string",
+          "pattern": "^/(?!/)[A-Za-z0-9_./?=%&+:-]*$",
+          "maxLength": 4096
+        },
+        "public_path": {
+          "type": "string",
+          "pattern": "^/(?!/)[A-Za-z0-9_./?=%&+:-]*$",
+          "maxLength": 4096
+        },
+        "effective_title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "effective_summary": {
+          "type": "string"
+        },
+        "public_horse_links": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/HorseArticleLink"
+          },
+          "minItems": 0,
+          "maxItems": 2
+        },
+        "public_race_links": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RaceArticleLink"
+          },
+          "minItems": 0,
+          "maxItems": 2
+        }
+      },
+      "required": [
+        "published_to_web_at",
+        "public_list_detail_url",
+        "public_path",
+        "effective_title",
+        "effective_summary",
+        "public_horse_links",
+        "public_race_links"
+      ],
+      "additionalProperties": false
+    },
+    "FollowEntry": {
+      "type": "object",
+      "properties": {
+        "is_descendant": {
+          "type": "boolean"
+        },
+        "source_horse_profile": {
+          "$ref": "#/$defs/DetailLink"
+        }
+      },
+      "required": [
+        "is_descendant",
+        "source_horse_profile"
+      ],
+      "additionalProperties": false
+    },
+    "Group": {
+      "type": "object",
+      "properties": {
+        "date": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^2026-[0-9]{2}-[0-9]{2}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "is_today": {
+          "type": "boolean"
+        },
+        "anchor_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EventDTO"
+          },
+          "minItems": 0,
+          "maxItems": 512
+        }
+      },
+      "required": [
+        "date",
+        "is_today",
+        "anchor_id",
+        "events"
+      ],
+      "additionalProperties": false
+    },
+    "AxisGroup": {
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string",
+          "pattern": "^2026-[0-9]{2}-[0-9]{2}$"
+        },
+        "is_today": {
+          "type": "boolean"
+        },
+        "is_anchor": {
+          "type": "boolean"
+        },
+        "anchor_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "date",
+        "is_today",
+        "is_anchor",
+        "anchor_id"
+      ],
+      "additionalProperties": false
+    },
+    "Tab": {
+      "type": "object",
+      "properties": {
+        "is_active": {
+          "type": "boolean"
+        },
+        "url": {
+          "type": "string",
+          "pattern": "^/(?!/)[A-Za-z0-9_./?=%&+:-]*$",
+          "maxLength": 4096
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "is_active",
+        "url",
+        "label"
+      ],
+      "additionalProperties": false
+    },
+    "Filters": {
+      "type": "object",
+      "properties": {
+        "tab": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        },
+        "grade": {
+          "type": "string"
+        },
+        "when": {
+          "type": "string"
+        },
+        "year": {
+          "type": "string"
+        },
+        "q": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "tab",
+        "region",
+        "grade",
+        "when",
+        "year",
+        "q"
+      ],
+      "additionalProperties": false
+    },
+    "SharedContext": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "type": "object",
+          "properties": {
+            "resolver_match": {
+              "type": "object",
+              "properties": {
+                "url_name": {
+                  "enum": [
+                    "public-race-detail",
+                    "public-race-calendar"
+                  ]
+                }
+              },
+              "required": [
+                "url_name"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "resolver_match"
+          ],
+          "additionalProperties": false
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "minItems": 0,
+          "maxItems": 8
+        },
+        "url_map": {
+          "$ref": "#/$defs/URLMap"
+        },
+        "follow_entry": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FollowEntry"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "race_information_enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "request",
+        "messages",
+        "url_map",
+        "follow_entry",
+        "race_information_enabled"
+      ],
+      "additionalProperties": false
+    },
+    "DetailContext": {
+      "type": "object",
+      "properties": {
+        "shared": {
+          "$ref": "#/$defs/SharedContext"
+        },
+        "event": {
+          "$ref": "#/$defs/EventDTO"
+        },
+        "public_return_url": {
+          "type": "string",
+          "pattern": "^/(?!/)[A-Za-z0-9_./?=%&+:-]*$",
+          "maxLength": 4096
+        },
+        "public_return_label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "public_return_default": {
+          "type": "boolean"
+        },
+        "canonical_product_event": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EventDTO"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "winner": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RowDTO"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "top_results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RowDTO"
+          },
+          "minItems": 0,
+          "maxItems": 5
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RowDTO"
+          },
+          "minItems": 0,
+          "maxItems": 512
+        },
+        "runners": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RowDTO"
+          },
+          "minItems": 0,
+          "maxItems": 512
+        },
+        "runner_section_label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "result_section_label": {
+          "const": "赛果"
+        },
+        "runner_preview": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "checked_at": {
+                  "type": "string",
+                  "pattern": "^2026-10-0[45]T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+                },
+                "stale": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "checked_at",
+                "stale"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "live_result_status": {
+          "type": "object",
+          "properties": {
+            "is_stale": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "is_stale"
+          ],
+          "additionalProperties": false
+        },
+        "status_label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "history_winners": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RowDTO"
+          },
+          "minItems": 0,
+          "maxItems": 512
+        },
+        "history_primary": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RowDTO"
+          },
+          "minItems": 0,
+          "maxItems": 10
+        },
+        "history_extra": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RowDTO"
+          },
+          "minItems": 0,
+          "maxItems": 512
+        },
+        "has_news": {
+          "type": "boolean"
+        },
+        "news_groups": {
+          "type": "object",
+          "properties": {
+            "pre_race": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ArticleDTO"
+              },
+              "minItems": 0,
+              "maxItems": 512
+            },
+            "post_race": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ArticleDTO"
+              },
+              "minItems": 0,
+              "maxItems": 512
+            },
+            "related": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ArticleDTO"
+              },
+              "minItems": 0,
+              "maxItems": 512
+            }
+          },
+          "required": [
+            "pre_race",
+            "post_race",
+            "related"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "shared",
+        "event",
+        "public_return_url",
+        "public_return_label",
+        "public_return_default",
+        "canonical_product_event",
+        "winner",
+        "top_results",
+        "results",
+        "runners",
+        "runner_section_label",
+        "result_section_label",
+        "runner_preview",
+        "live_result_status",
+        "status_label",
+        "history_winners",
+        "history_primary",
+        "history_extra",
+        "has_news",
+        "news_groups"
+      ],
+      "additionalProperties": false
+    },
+    "CalendarContext": {
+      "type": "object",
+      "properties": {
+        "shared": {
+          "$ref": "#/$defs/SharedContext"
+        },
+        "focus_events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EventDTO"
+          },
+          "minItems": 0,
+          "maxItems": 512
+        },
+        "filters": {
+          "$ref": "#/$defs/Filters"
+        },
+        "all_tab_url": {
+          "type": "string",
+          "pattern": "^/(?!/)[A-Za-z0-9_./?=%&+:-]*$",
+          "maxLength": 4096
+        },
+        "key_tab_url": {
+          "type": "string",
+          "pattern": "^/(?!/)[A-Za-z0-9_./?=%&+:-]*$",
+          "maxLength": 4096
+        },
+        "region_tabs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Tab"
+          },
+          "minItems": 0,
+          "maxItems": 512
+        },
+        "grade_tabs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Tab"
+          },
+          "minItems": 0,
+          "maxItems": 512
+        },
+        "when_tabs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Tab"
+          },
+          "minItems": 0,
+          "maxItems": 512
+        },
+        "date_axis": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AxisGroup"
+          },
+          "minItems": 0,
+          "maxItems": 512
+        },
+        "date_axis_spans_years": {
+          "type": "boolean"
+        },
+        "default_anchor_date": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^2026-[0-9]{2}-[0-9]{2}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "years": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9223372036854775807
+          },
+          "minItems": 0,
+          "maxItems": 512
+        },
+        "clear_search_url": {
+          "type": "string",
+          "pattern": "^/(?!/)[A-Za-z0-9_./?=%&+:-]*$",
+          "maxLength": 4096
+        },
+        "previous_url": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^/(?!/)[A-Za-z0-9_./?=%&+:-]*$",
+              "maxLength": 4096
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "next_url": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^/(?!/)[A-Za-z0-9_./?=%&+:-]*$",
+              "maxLength": 4096
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Group"
+          },
+          "minItems": 0,
+          "maxItems": 512
+        }
+      },
+      "required": [
+        "shared",
+        "focus_events",
+        "filters",
+        "all_tab_url",
+        "key_tab_url",
+        "region_tabs",
+        "grade_tabs",
+        "when_tabs",
+        "date_axis",
+        "date_axis_spans_years",
+        "default_anchor_date",
+        "years",
+        "clear_search_url",
+        "previous_url",
+        "next_url",
+        "groups"
+      ],
+      "additionalProperties": false
+    },
+    "Limits": {
+      "type": "object",
+      "properties": {
+        "wire_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9223372036854775807
+        },
+        "decoded_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9223372036854775807
+        },
+        "depth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9223372036854775807
+        },
+        "nodes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9223372036854775807
+        },
+        "markers": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9223372036854775807
+        },
+        "fields": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9223372036854775807
+        },
+        "rows": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9223372036854775807
+        }
+      },
+      "required": [
+        "wire_bytes",
+        "decoded_bytes",
+        "depth",
+        "nodes",
+        "markers",
+        "fields",
+        "rows"
+      ],
+      "additionalProperties": false
+    },
+    "Member": {
+      "type": "object",
+      "properties": {
+        "member_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "group_index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "card_index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "dto_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "subject": {
+          "type": "string",
+          "pattern": "^/(?!/)[A-Za-z0-9_./?=%&+:-]*$",
+          "maxLength": 4096
+        },
+        "target_key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "classification": {
+          "enum": [
+            "target_result",
+            "target_correction",
+            "legacy_result_missing_origin",
+            "non_result"
+          ]
+        },
+        "target_ref": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "surface_ref": {
+          "anyOf": [
+            {
+              "const": "calendar.main.result-summary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "missing_evidence": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "origin",
+              "permission",
+              "F01",
+              "strong_row",
+              "mapping"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 5
+        }
+      },
+      "required": [
+        "member_ref",
+        "group_index",
+        "card_index",
+        "dto_ref",
+        "subject",
+        "target_key",
+        "classification",
+        "target_ref",
+        "surface_ref",
+        "missing_evidence"
+      ],
+      "additionalProperties": false
+    },
+    "Target": {
+      "type": "object",
+      "properties": {
+        "target_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "target_key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "subject": {
+          "type": "string",
+          "pattern": "^/(?!/)[A-Za-z0-9_./?=%&+:-]*$",
+          "maxLength": 4096
+        },
+        "surface_ref": {
+          "enum": [
+            "detail.result-family",
+            "calendar.main.result-summary"
+          ]
+        },
+        "capability": {
+          "enum": [
+            "result",
+            "correction"
+          ]
+        },
+        "member_ref": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dto_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "origin_ref": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "permission_ref": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "F01_document_ref": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "display_mapping_ref": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "generation": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "score_state": {
+          "enum": [
+            "required_bound",
+            "required_missing_evidence"
+          ]
+        },
+        "expected_body_ref": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "target_ref",
+        "target_key",
+        "subject",
+        "surface_ref",
+        "capability",
+        "member_ref",
+        "dto_ref",
+        "origin_ref",
+        "permission_ref",
+        "F01_document_ref",
+        "display_mapping_ref",
+        "generation",
+        "score_state",
+        "expected_body_ref"
+      ],
+      "additionalProperties": false
+    },
+    "ResponseContext": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "o03.template-response-context.v1"
+        },
+        "synthetic_only": {
+          "const": true
+        },
+        "requested_url": {
+          "type": "string",
+          "pattern": "^https://synthetic\\.invalid/[^#]*$",
+          "maxLength": 4096
+        },
+        "final_url": {
+          "type": "string",
+          "pattern": "^https://synthetic\\.invalid/[^#]*$",
+          "maxLength": 4096
+        },
+        "status": {
+          "type": "integer",
+          "enum": [
+            200,
+            301,
+            302,
+            403,
+            404,
+            500
+          ]
+        },
+        "body_state": {
+          "enum": [
+            "normal",
+            "truncated",
+            "transport_error",
+            "unknown"
+          ]
+        },
+        "page_type": {
+          "enum": [
+            "detail",
+            "calendar"
+          ]
+        },
+        "audience_ref": {
+          "const": "anonymous"
+        },
+        "envelope_ref": {
+          "const": "o03.django-template-envelope.v1"
+        },
+        "scope_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "scope_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "subject_mapping_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Member"
+          },
+          "minItems": 0,
+          "maxItems": 512
+        },
+        "targets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Target"
+          },
+          "minItems": 0,
+          "maxItems": 512
+        },
+        "limits": {
+          "$ref": "#/$defs/Limits"
+        },
+        "request_started_at": {
+          "type": "string",
+          "pattern": "^2026-10-0[45]T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+        },
+        "response_completed_at": {
+          "type": "string",
+          "pattern": "^2026-10-0[45]T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+        },
+        "clock_error_ms": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9223372036854775807
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "redirect_chain": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "from_url": {
+                "type": "string",
+                "pattern": "^https://synthetic\\.invalid/[^#]*$",
+                "maxLength": 4096
+              },
+              "status": {
+                "enum": [
+                  301,
+                  302
+                ]
+              },
+              "to_url": {
+                "type": "string",
+                "pattern": "^https://synthetic\\.invalid/[^#]*$",
+                "maxLength": 4096
+              }
+            },
+            "required": [
+              "from_url",
+              "status",
+              "to_url"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 0,
+          "maxItems": 4
+        }
+      },
+      "required": [
+        "schema_version",
+        "synthetic_only",
+        "requested_url",
+        "final_url",
+        "status",
+        "body_state",
+        "page_type",
+        "audience_ref",
+        "envelope_ref",
+        "scope_ref",
+        "scope_sha256",
+        "subject_mapping_ref",
+        "members",
+        "targets",
+        "limits",
+        "request_started_at",
+        "response_completed_at",
+        "clock_error_ms",
+        "redirect_chain"
+      ],
+      "additionalProperties": false
+    },
+    "Cells": {
+      "type": "object",
+      "properties": {
+        "position": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "horse_number": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "horse_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "jockey_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "trainer_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "finish_time": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "margin": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "odds": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "popularity": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "position",
+        "horse_number",
+        "horse_name",
+        "jockey_name",
+        "trainer_name",
+        "finish_time",
+        "margin",
+        "odds",
+        "popularity"
+      ],
+      "additionalProperties": false
+    },
+    "ResultRow": {
+      "type": "object",
+      "properties": {
+        "row_token": {
+          "type": "string",
+          "pattern": "^pr2:[0-9a-f]{64}$"
+        },
+        "cells": {
+          "$ref": "#/$defs/Cells"
+        }
+      },
+      "required": [
+        "row_token",
+        "cells"
+      ],
+      "additionalProperties": false
+    },
+    "Column": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "enum": [
+            "position",
+            "horse_number",
+            "horse_name",
+            "jockey_name",
+            "trainer_name",
+            "finish_time",
+            "margin",
+            "odds_popularity"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "key",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "Crew": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "enum": [
+            "jockey_name",
+            "trainer_name",
+            "finish_time",
+            "popularity"
+          ]
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "visible_text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "field",
+        "label",
+        "visible_text"
+      ],
+      "additionalProperties": false
+    },
+    "Hero": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "const": "detail.result.hero"
+        },
+        "row_token": {
+          "type": "string",
+          "pattern": "^pr2:[0-9a-f]{64}$"
+        },
+        "fields": {
+          "type": "object",
+          "properties": {
+            "ribbon": {
+              "const": "WINNER · 冠军"
+            },
+            "horse_name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "jockey_name": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "trainer_name": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "finish_time": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "popularity": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "ribbon",
+            "horse_name",
+            "jockey_name",
+            "trainer_name",
+            "finish_time",
+            "popularity"
+          ],
+          "additionalProperties": false
+        },
+        "crew": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Crew"
+          },
+          "minItems": 0,
+          "maxItems": 4
+        }
+      },
+      "required": [
+        "role",
+        "row_token",
+        "fields",
+        "crew"
+      ],
+      "additionalProperties": false
+    },
+    "PodiumRow": {
+      "type": "object",
+      "properties": {
+        "row_token": {
+          "type": "string",
+          "pattern": "^pr2:[0-9a-f]{64}$"
+        },
+        "cells": {
+          "type": "object",
+          "properties": {
+            "position": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "horse_name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "margin": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "position",
+            "horse_name",
+            "margin"
+          ],
+          "additionalProperties": false
+        },
+        "visible_text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "row_token",
+        "cells",
+        "visible_text"
+      ],
+      "additionalProperties": false
+    },
+    "Podium": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "const": "detail.result.podium"
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PodiumRow"
+          },
+          "minItems": 1,
+          "maxItems": 2
+        }
+      },
+      "required": [
+        "role",
+        "rows"
+      ],
+      "additionalProperties": false
+    },
+    "Stale": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "const": "detail.result.stale"
+        },
+        "text": {
+          "const": "数据可能已过期"
+        }
+      },
+      "required": [
+        "role",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "Nav": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "const": "detail.result.nav"
+        },
+        "fields": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "const": "赛果"
+            },
+            "href": {
+              "const": "#results"
+            }
+          },
+          "required": [
+            "text",
+            "href"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "role",
+        "fields"
+      ],
+      "additionalProperties": false
+    },
+    "Table": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "const": "detail.result.table"
+        },
+        "heading": {
+          "const": "赛果"
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Column"
+          },
+          "minItems": 8,
+          "maxItems": 8
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResultRow"
+          },
+          "minItems": 1,
+          "maxItems": 512
+        }
+      },
+      "required": [
+        "role",
+        "heading",
+        "columns",
+        "rows"
+      ],
+      "additionalProperties": false
+    },
+    "Card": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "const": "calendar.result.card"
+        },
+        "row_token": {
+          "type": "string",
+          "pattern": "^pe2:[0-9a-f]{64}$"
+        },
+        "fields": {
+          "type": "object",
+          "properties": {
+            "href": {
+              "type": "string",
+              "pattern": "^/(?!/)[A-Za-z0-9_./?=%&+:-]*$",
+              "maxLength": 4096
+            },
+            "status": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "winner": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "href",
+            "status",
+            "winner"
+          ],
+          "additionalProperties": false
+        },
+        "winner_visible_text": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "role",
+        "row_token",
+        "fields",
+        "winner_visible_text"
+      ],
+      "additionalProperties": false
+    },
+    "Body": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "o03.result-template-body.v1"
+        },
+        "subject": {
+          "type": "string",
+          "pattern": "^/(?!/)[A-Za-z0-9_./?=%&+:-]*$",
+          "maxLength": 4096
+        },
+        "surface_ref": {
+          "enum": [
+            "detail.result-family",
+            "calendar.main.result-summary"
+          ]
+        },
+        "capability": {
+          "enum": [
+            "result",
+            "correction"
+          ]
+        },
+        "presentation_mode": {
+          "enum": [
+            "legacy",
+            "strict_display_v1"
+          ]
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/Hero"
+              },
+              {
+                "$ref": "#/$defs/Podium"
+              },
+              {
+                "$ref": "#/$defs/Stale"
+              },
+              {
+                "$ref": "#/$defs/Nav"
+              },
+              {
+                "$ref": "#/$defs/Table"
+              },
+              {
+                "$ref": "#/$defs/Card"
+              }
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 5
+        }
+      },
+      "required": [
+        "schema_version",
+        "subject",
+        "surface_ref",
+        "capability",
+        "presentation_mode",
+        "roles"
+      ],
+      "additionalProperties": false
+    },
+    "Marker": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "o03.render.v1"
+        },
+        "subject": {
+          "type": "string",
+          "pattern": "^/(?!/)[A-Za-z0-9_./?=%&+:-]*$",
+          "maxLength": 4096
+        },
+        "surface_ref": {
+          "enum": [
+            "detail.result-family",
+            "calendar.main.result-summary"
+          ]
+        },
+        "capability": {
+          "enum": [
+            "result",
+            "correction"
+          ]
+        },
+        "revision_ref": {
+          "type": "string",
+          "pattern": "^pv2:[0-9a-f]{64}$"
+        },
+        "permission_version": {
+          "type": "string",
+          "pattern": "^pp2:[0-9a-f]{64}$"
+        },
+        "content_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "schema_version",
+        "subject",
+        "surface_ref",
+        "capability",
+        "revision_ref",
+        "permission_version",
+        "content_digest"
+      ],
+      "additionalProperties": false
+    },
+    "InputVersion": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "f01.input.v1"
+        },
+        "scope": {
+          "const": [
+            "entity",
+            "evidence",
+            "materials",
+            "policy_ref",
+            "protection"
+          ]
+        },
+        "content_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "generations": {
+          "type": "object",
+          "properties": {
+            "owner": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9223372036854775807
+            },
+            "schedule": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9223372036854775807
+            },
+            "enrollment": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9223372036854775807
+            },
+            "source_set": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9223372036854775807
+            }
+          },
+          "required": [
+            "owner",
+            "schedule",
+            "enrollment",
+            "source_set"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "scope",
+        "content_sha256",
+        "generations"
+      ],
+      "additionalProperties": false
+    },
+    "PrivateTuple": {
+      "type": "object",
+      "properties": {
+        "candidate_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "subject": {
+          "type": "string",
+          "pattern": "^/(?!/)[A-Za-z0-9_./?=%&+:-]*$",
+          "maxLength": 4096
+        },
+        "target_key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "F01_document_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "input_version": {
+          "$ref": "#/$defs/InputVersion"
+        },
+        "generation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "origin_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "origin_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "permission_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "permission_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "display_mapping_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "display_mapping_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "surface_ref": {
+          "enum": [
+            "detail.result-family",
+            "calendar.main.result-summary"
+          ]
+        },
+        "audience_ref": {
+          "const": "anonymous"
+        },
+        "capability": {
+          "enum": [
+            "result",
+            "correction"
+          ]
+        },
+        "body_contract_version": {
+          "const": "o03.result-template-body.v1"
+        }
+      },
+      "required": [
+        "candidate_sha",
+        "subject",
+        "target_key",
+        "F01_document_ref",
+        "input_version",
+        "generation",
+        "origin_ref",
+        "origin_sha256",
+        "permission_ref",
+        "permission_sha256",
+        "display_mapping_ref",
+        "display_mapping_sha256",
+        "surface_ref",
+        "audience_ref",
+        "capability",
+        "body_contract_version"
+      ],
+      "additionalProperties": false
+    },
+    "RowBinding": {
+      "type": "object",
+      "properties": {
+        "tuple_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "participant_ref": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "horse_ref": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "proof_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "event_proof_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "generation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "tuple_sha256",
+        "participant_ref",
+        "horse_ref",
+        "proof_ref",
+        "event_proof_ref",
+        "generation"
+      ],
+      "additionalProperties": false
+    },
+    "Projection": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "o03.template-projection.v1"
+        },
+        "synthetic_only": {
+          "const": true
+        },
+        "target_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "presentation_mode": {
+          "enum": [
+            "legacy",
+            "strict_display_v1"
+          ]
+        },
+        "complete": {
+          "type": "boolean"
+        },
+        "marker": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Marker"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "hero_row_token": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^pr2:[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "podium_row_tokens": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^pr2:[0-9a-f]{64}$"
+          },
+          "minItems": 0,
+          "maxItems": 2
+        },
+        "table_row_tokens": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^pr2:[0-9a-f]{64}$"
+          },
+          "minItems": 0,
+          "maxItems": 512
+        },
+        "card_row_token": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^pe2:[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "declared_hero": {
+          "type": "boolean"
+        },
+        "declared_podium_rows": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "declared_stale": {
+          "type": "boolean"
+        },
+        "declared_result_rows": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        }
+      },
+      "required": [
+        "schema_version",
+        "synthetic_only",
+        "target_ref",
+        "presentation_mode",
+        "complete",
+        "marker",
+        "hero_row_token",
+        "podium_row_tokens",
+        "table_row_tokens",
+        "card_row_token",
+        "declared_hero",
+        "declared_podium_rows",
+        "declared_stale",
+        "declared_result_rows"
+      ],
+      "additionalProperties": false
+    },
+    "Profile": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "o03.template-profile.v1"
+        },
+        "candidate_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "body_contract_version": {
+          "const": "o03.result-template-body.v1"
+        },
+        "envelope_ref": {
+          "const": "o03.django-template-envelope.v1"
+        },
+        "presentation_mode": {
+          "enum": [
+            "legacy",
+            "strict_display_v1"
+          ]
+        },
+        "required_value_fields": {
+          "const": [
+            "position",
+            "horse_number",
+            "horse_name"
+          ]
+        },
+        "known_missing_fields": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "jockey_name",
+              "trainer_name",
+              "finish_time",
+              "margin",
+              "odds",
+              "popularity"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 6
+        },
+        "declared_hero": {
+          "type": "boolean"
+        },
+        "declared_podium_rows": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "declared_result_rows": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "declared_stale": {
+          "type": "boolean"
+        },
+        "winner_participant_ref": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ordered_participant_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "minItems": 0,
+          "maxItems": 512
+        }
+      },
+      "required": [
+        "schema_version",
+        "candidate_sha",
+        "body_contract_version",
+        "envelope_ref",
+        "presentation_mode",
+        "required_value_fields",
+        "known_missing_fields",
+        "declared_hero",
+        "declared_podium_rows",
+        "declared_result_rows",
+        "declared_stale",
+        "winner_participant_ref",
+        "ordered_participant_refs"
+      ],
+      "additionalProperties": false
+    },
+    "Expectation": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "o03.expected.v1"
+        },
+        "scope_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "candidate_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "input_version": {
+          "$ref": "#/$defs/InputVersion"
+        },
+        "entity": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "race_event"
+            },
+            "canonical_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "source_refs": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 0,
+              "maxItems": 512
+            },
+            "identity_state": {
+              "const": "verified"
+            },
+            "candidate_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 0,
+              "maxItems": 512
+            },
+            "evidence_refs": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              "minItems": 0,
+              "maxItems": 512
+            }
+          },
+          "required": [
+            "kind",
+            "canonical_id",
+            "source_refs",
+            "identity_state",
+            "candidate_ids",
+            "evidence_refs"
+          ],
+          "additionalProperties": false
+        },
+        "capability": {
+          "enum": [
+            "result",
+            "correction"
+          ]
+        },
+        "surface_ref": {
+          "enum": [
+            "detail.result-family",
+            "calendar.main.result-summary"
+          ]
+        },
+        "audience_ref": {
+          "const": "anonymous"
+        },
+        "generation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "revision_ref": {
+          "type": "string",
+          "pattern": "^pv2:[0-9a-f]{64}$"
+        },
+        "permission_version": {
+          "type": "string",
+          "pattern": "^pp2:[0-9a-f]{64}$"
+        },
+        "content_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "visibility": {
+          "const": "visible"
+        }
+      },
+      "required": [
+        "schema_version",
+        "scope_ref",
+        "candidate_sha",
+        "input_version",
+        "entity",
+        "capability",
+        "surface_ref",
+        "audience_ref",
+        "generation",
+        "revision_ref",
+        "permission_version",
+        "content_digest",
+        "visibility"
+      ],
+      "additionalProperties": false
+    },
+    "Anchor": {
+      "type": "object",
+      "properties": {
+        "scope_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "candidate_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "expectation_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "input_version": {
+          "$ref": "#/$defs/InputVersion"
+        },
+        "entity": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "race_event"
+            },
+            "canonical_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "source_refs": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 0,
+              "maxItems": 512
+            },
+            "identity_state": {
+              "const": "verified"
+            },
+            "candidate_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 0,
+              "maxItems": 512
+            },
+            "evidence_refs": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              "minItems": 0,
+              "maxItems": 512
+            }
+          },
+          "required": [
+            "kind",
+            "canonical_id",
+            "source_refs",
+            "identity_state",
+            "candidate_ids",
+            "evidence_refs"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "scope_ref",
+        "candidate_sha",
+        "expectation_sha",
+        "input_version",
+        "entity"
+      ],
+      "additionalProperties": false
+    },
+    "Outcome": {
+      "type": "object",
+      "properties": {
+        "leaf_status": {
+          "enum": [
+            "template_fixture_verified",
+            "unverified",
+            "rejected"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "receipt_constructed": {
+          "type": "boolean"
+        },
+        "c013_status": {
+          "enum": [
+            "public_read_verified",
+            "not_constructed"
+          ]
+        },
+        "synthetic_only": {
+          "const": true
+        },
+        "real_origin_verified": {
+          "const": false
+        },
+        "real_permission_verified": {
+          "const": false
+        },
+        "complete_original_scope": {
+          "const": false
+        },
+        "sla": {
+          "const": "unverified"
+        }
+      },
+      "required": [
+        "leaf_status",
+        "reason",
+        "receipt_constructed",
+        "c013_status",
+        "synthetic_only",
+        "real_origin_verified",
+        "real_permission_verified",
+        "complete_original_scope",
+        "sla"
+      ],
+      "additionalProperties": false
+    },
+    "SourceFile": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "git_blob": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        }
+      },
+      "required": [
+        "path",
+        "commit",
+        "git_blob",
+        "sha256",
+        "bytes"
+      ],
+      "additionalProperties": false
+    },
+    "CandidateDescriptor": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "o03.template-candidate-descriptor.v1"
+        },
+        "candidate_kind": {
+          "const": "static_fixture_contract_only"
+        },
+        "synthetic_only": {
+          "const": true
+        },
+        "body_contract_version": {
+          "const": "o03.result-template-body.v1"
+        },
+        "envelope_version": {
+          "const": "o03.django-template-envelope.v1"
+        },
+        "contract_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "envelope_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "assembly_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SourceFile"
+          },
+          "minItems": 1,
+          "maxItems": 128
+        },
+        "adapter_implementation": {
+          "type": "null"
+        },
+        "injected_templates": {
+          "type": "null"
+        },
+        "trusted_loader": {
+          "type": "null"
+        },
+        "real_public_success_allowed": {
+          "const": false
+        }
+      },
+      "required": [
+        "schema_version",
+        "candidate_kind",
+        "synthetic_only",
+        "body_contract_version",
+        "envelope_version",
+        "contract_sha256",
+        "envelope_sha256",
+        "assembly_sha256",
+        "sources",
+        "adapter_implementation",
+        "injected_templates",
+        "trusted_loader",
+        "real_public_success_allowed"
+      ],
+      "additionalProperties": false
+    },
+    "SyntheticProof": {
+      "type": "object",
+      "properties": {
+        "proof_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "target_key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "participant_ref": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "horse_ref": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "F01_document_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "origin_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "generation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "fixture_source_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "issuer_kind": {
+          "const": "manual_synthetic_fixture"
+        },
+        "synthetic_only": {
+          "const": true
+        },
+        "real_identity_authenticated": {
+          "const": false
+        }
+      },
+      "required": [
+        "proof_ref",
+        "target_key",
+        "participant_ref",
+        "horse_ref",
+        "F01_document_ref",
+        "origin_ref",
+        "generation",
+        "fixture_source_sha256",
+        "issuer_kind",
+        "synthetic_only",
+        "real_identity_authenticated"
+      ],
+      "additionalProperties": false
+    },
+    "URLBinding": {
+      "type": "object",
+      "properties": {
+        "scope_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "requested_url": {
+          "type": "string",
+          "pattern": "^https://synthetic\\.invalid/[^#]*$",
+          "maxLength": 4096
+        },
+        "allowed_final_urls": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^https://synthetic\\.invalid/[^#]*$",
+            "maxLength": 4096
+          },
+          "minItems": 1,
+          "maxItems": 4
+        },
+        "page_type": {
+          "enum": [
+            "detail",
+            "calendar"
+          ]
+        },
+        "detail_subject": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^/(?!/)[A-Za-z0-9_./?=%&+:-]*$",
+              "maxLength": 4096
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "members_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "scope_ref",
+        "requested_url",
+        "allowed_final_urls",
+        "page_type",
+        "detail_subject",
+        "members_sha256"
+      ],
+      "additionalProperties": false
+    },
+    "PrivateInput": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "o03.template-private-input.v1"
+        },
+        "synthetic_only": {
+          "const": true
+        },
+        "candidate_descriptor": {
+          "$ref": "#/$defs/CandidateDescriptor"
+        },
+        "candidate_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "profile_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "profile": {
+          "$ref": "#/$defs/Profile"
+        },
+        "revision_token_index": {
+          "type": "object",
+          "patternProperties": {
+            "^pv2:[0-9a-f]{64}$": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/PrivateTuple"
+              },
+              "minItems": 1,
+              "maxItems": 2
+            }
+          },
+          "additionalProperties": false,
+          "maxProperties": 1024
+        },
+        "permission_token_index": {
+          "type": "object",
+          "patternProperties": {
+            "^pp2:[0-9a-f]{64}$": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/PrivateTuple"
+              },
+              "minItems": 1,
+              "maxItems": 2
+            }
+          },
+          "additionalProperties": false,
+          "maxProperties": 1024
+        },
+        "row_token_index": {
+          "type": "object",
+          "patternProperties": {
+            "^(pr2|pe2):[0-9a-f]{64}$": {
+              "$ref": "#/$defs/RowBinding"
+            }
+          },
+          "additionalProperties": false,
+          "maxProperties": 1024
+        },
+        "proof_documents": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SyntheticProof"
+          },
+          "minItems": 0,
+          "maxItems": 16
+        },
+        "url_binding": {
+          "$ref": "#/$defs/URLBinding"
+        },
+        "origin_document_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "minItems": 0,
+          "maxItems": 8
+        },
+        "permission_document_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "minItems": 0,
+          "maxItems": 8
+        },
+        "f01_document_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "minItems": 0,
+          "maxItems": 8
+        },
+        "display_mapping_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "minItems": 0,
+          "maxItems": 8
+        },
+        "template_context_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "template_context_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "template_context": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/DetailContext"
+            },
+            {
+              "$ref": "#/$defs/CalendarContext"
+            }
+          ]
+        },
+        "css_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "css_url": {
+          "const": "/static/stable/public.css"
+        }
+      },
+      "required": [
+        "schema_version",
+        "synthetic_only",
+        "candidate_descriptor",
+        "candidate_sha",
+        "profile_ref",
+        "profile",
+        "revision_token_index",
+        "permission_token_index",
+        "row_token_index",
+        "proof_documents",
+        "url_binding",
+        "origin_document_refs",
+        "permission_document_refs",
+        "f01_document_refs",
+        "display_mapping_refs",
+        "template_context_ref",
+        "template_context_sha256",
+        "template_context",
+        "css_sha256",
+        "css_url"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "semantic_rules": [
+    "所有 object exact keys；additionalProperties=false。integer 采用 type(x) is int，bool 不能冒 int；不转型、不补默认键、不接受 NaN/Infinity/重复 JSON key；引用在文件内或 descriptor 固定文件内闭合。",
+    "所有 list 保留原顺序；members、targets、table行token、participant refs分别唯一；无排序去重补救。tuple同token只允许一份完整相等原件，不接受任取冲突映射。",
+    "normalization 只用于观察文本：HTML解析一次解码、CRLF、NFC、ASCII布局空白折叠/strip；不NFKC、不二次entity、不改标点/赔率/Unicode空格；script原始字节完全不归一。",
+    "Body.detail roles 严格 [Hero if declared_hero, Podium if declared_podium_rows>0, Stale if declared_stale, Nav, Table]；Podium须有Hero。Hero无时Podium必须无；有Hero单表行时允许无Podium；角色缺失不得用[]假装该节点存在。",
+    "Body.card roles严格[Card]；不含Hero/Podium/Table。surface/mode/subject/capability须与target、private tuple和profile相同。",
+    "columns八项固定顺序position/horse_number/horse_name/jockey_name/trainer_name/finish_time/margin/odds_popularity；最后标题strict=赔率 / 热门排名，legacy=赔率 / 人气；table所有td8项、前七各1逻辑字段、末格odds再popularity且字面分隔 / 。",
+    "全Table行数及顺序等于origin approved完整participants与profile，不slice。required position/horse_number/horse_name不准待核实/-/—；其余placeholder仅经逐字段approved known_missing，空字符串不是placeholder。",
+    "Hero字段来自真实ribbon/name/crew三个兄弟区，crew按jockey_name/trainer_name/finish_time/popularity子序列；每项label和值完整，null iff节点不存在。字段presence来自原template guard，不由字段期望非空反推节点。",
+    "Hero row token与选中winner一致，并等于全表首行；本profile故意只覆盖这个现有选择一致的子域，首行不符unverified，不调整业务赢家或重排表。",
+    "strict Hero popularity为纯字段值，crew label热门排名；legacy字段popularity为数字原值且visible_text为第 {raw} 人气、label人气。其他crew固定label骑师/练马师/完赛时间。抽取legacy raw数字须精确完整包装，不任意trim prefix/suffix。",
+    "Podium实际top_results[1:3]，top_results严格等于results[:5]；有Hero且top_results length>1才有节点。全部0/1/2选择写profile；与table对应行身份/position/name/margin交集一致，不扩到所有前三或所有同着。",
+    "Podium visible_text为position+名 空格+horse_name+[全角（margin） iff raw margin truthy]，strict并列第1仍原样带名；不能清洗成另一个位置。",
+    "Stale iff live_result_status.is_stale真，正文精确数据可能已过期；Nav iffresults非空，href#results文字赛果。合法没有结果不产生Body/receipt。",
+    "Card href从该a实际属性；status实际strong；winner实际small冠军 空格后字段或null iffsmall不存在；scheduled的time small与winner不可互换。完整name/meta/grade等非叶片text仍在envelope严格匹配。",
+    "ResponseContext page_type/request/final URL/redirect chain来自独立调用者，禁止从marker/href重建。detail请求须独立URL map匹配subject；calendar须匹配/races/批准query，不当作卡subject。redirect每步相接，最终URL可接受须在独立map，跨host等不接受。",
+    "scope_sha256=H({scope_ref,page_type,subject_mapping_ref,members,targets})。members从全部groups顺序展平，group_index/card_index连续；dto_ref/subject/分类/目标映射与批准DTO逐项对账。focus及history/news不属主卡members，不借任何值。",
+    "targets保持批准顺序，完整required分母=N=len(targets)，包括required_missing_evidence目标；legacy_result_missing_origin若非required仍列members并单报legacy_unverified，不能删除它或认其成功。classification target_* iff唯一target_ref互指，non_result不得拥有target_ref。",
+    "scope成功 iff全部required target逐项模板合成比较成功且完整envelope/members一致；N=0返回unverified/no_required_targets，不能vacuous success。required missing不可减少分母。",
+    "Projection complete iff全部target私有证据齐全且相同scope/tuple/generation/mode/profile；缺件complete=false、marker=null、所有token null或空、declared计数仍反映实际内容；模板保留legacy正文，adapter无receipt。",
+    "Projection detail hero_row_token可null、podium/table token数量与声明相等、card_row_token=null；card table/podium tokens空、hero=null、declared_result_rows=0、declared_hero/stale=false、card_row_token必有。",
+    "七键Marker精确，无额外mode/body version/私有信息；实际observed marker数量须与具备complete projection targets数相等；任何额外/重复/缺失不任取。public marker只引用opaque pv2/pp2和canonical正文摘要。",
+    "PrivateTuple所有字段非null，candidate绑定本合同/envelope/profile固定摘要；mode由display_mapping固定；F01_document_ref有完整原件、input_version逐字相等、target/entity/材料capability/generation/origin/强participant proof/permission有效区间/surface/audience全部核对。hash形状相等不证明来源认证。",
+    "pv2=prefix+H(PrivateTuple)，pp2=prefix+H({tuple_sha256,permission_sha256})；pr2=prefix+H(RowBinding)，pe2同RowBinding但participant_ref/horse_ref均null、event_proof_ref非空。row binding包含tuple SHA/generation和独立proof refs，不从名字/马号/行序生成身份。",
+    "Fixturepermission仅fixture信任域；valid_from<=now<valid_until，allowed真、F01 evidence.contract_ref.revoked假、scope正确；bool不能permission_generation。fixture refs不允许作为production loader证据。",
+    "DTO全键静态dict/简单不可查询属性；日期/时间由显式ISO字符串在未来测试装配转date/time/aware datetime；DisplayField按exact字段显式构造，不调用prepare_context/resolver/display_field生成golden，不持ORM property/lazy iterable或callable。",
+    "shared flatten到真实context：shared.request/messages/follow_entry/race_information_enabled；url_map只给离线URLconf/static设置；dto_ref/participant_ref仅私有测试识别不公开。禁止隐式context processor/messages storage查询。",
+    "history_primary=history_winners[:10]，history_extra=history_winners[10:]；has_news=bool三个已批准article数组并集。canonical/history/rawrefs只来自批准context，C018门禁另片ORM回归，不能替它自签visible。",
+    "event grade/date/time/eligibility由真实tag的特殊纯函数计算，固定raw和独立approved DisplayField一致；grade class来自真实event_grade_field，不patch；其他字段读public_display(strict)或legacy参数(legacy)，除grade/date/time/eligibility跨模式特例不变。",
+    "原C016代码/API/fixture不改，94方法/54原case分类以及原R4反例完整保留，新方法/case/组合与旧分母分别报告。",
+    "schema语法/引用/手工摘要校验不是业务合同API执行。所有success字段是未来断言，不是本轮结果；true synthetic_only及false real_*永不可解除。",
+    "错误按priority rank→reasons顺序→DOM preorder确定；resource先计整个响应，schema坏limits不猜默认；无法安全parse则不继续。通用403/404和200能力缺失只能unverified无receipt，无marker时不从expected补版本；C013未调用记not_constructed。C013clock unknown可保留字段比较成功但leaf unverified，SLA永unverified。",
+    "PrivateInput文档refs全部解析至golden.json对应固定原件/映射，schema严格使用已固定原件const及Mapping schema；每个SyntheticProof对应F01.material.participants stable_key/horse_ref和origin participant_proof_ref；只有手工fixture信任，不能production签发。PrivateInput.profile_ref由独立case/scoperoot指定，不从marker挑profile。URLBinding独立于观察和marker，requested/final/page/detail_subject/members摘要逐项验证。",
+    "Transport gate在完整资源/通用结构后、envelope前：context不合schema先context_schema；body_state非normal→response_incomplete；HTTP403/404/500→denial_unverified；301/302未完成redirect→redirect_unbound；clock_error_ms null→clock_unknown；200且全部批准target result角色/marker均消失→capability_absence_unverified。不要求错误页套detail/calendar envelope，不给其任何成功receipt。其他200继续完整envelope、独立绑定和抽取。",
+    "PrivateInput.template_context是独立批准的完整envelope输入；template_context_ref只在外部固定fixture信任域解析，SHA与原件一致。对所有当前result DTO raw必需/可选字段及availability与origin逐项核，对public_display与approved mapping逐项核；不得观察HTML反推DTO或用自哈希签发context。非叶片上下文原件由固定fixture/R审核外部绑定；生产未有loader一律不认证。bad mutated旧origin清crew/截table即使重算context SHA也不改变批准origin/全表基数。"
+  ],
+  "priority": [
+    {
+      "rank": 1,
+      "phase": "resource",
+      "status": "rejected",
+      "reasons": [
+        "invalid_limits",
+        "wire_limit",
+        "decoded_limit",
+        "depth_limit",
+        "nodes_limit",
+        "markers_limit",
+        "fields_limit",
+        "rows_limit"
+      ]
+    },
+    {
+      "rank": 2,
+      "phase": "structure",
+      "status": "rejected",
+      "reasons": [
+        "invalid_utf8",
+        "duplicate_json_key",
+        "invalid_structure",
+        "duplicate_attribute",
+        "unexpected_tag",
+        "unexpected_attribute",
+        "unexpected_script",
+        "script_bytes_mismatch",
+        "root_boundary",
+        "void_nesting"
+      ]
+    },
+    {
+      "rank": 3,
+      "phase": "transport_context",
+      "status": "unverified",
+      "reasons": [
+        "context_schema",
+        "response_incomplete",
+        "denial_unverified",
+        "redirect_unbound",
+        "clock_unknown",
+        "capability_absence_unverified"
+      ]
+    },
+    {
+      "rank": 4,
+      "phase": "profile_scope",
+      "status": "unverified",
+      "reasons": [
+        "unknown_profile",
+        "css_version_unbound",
+        "visibility_unbound",
+        "membership_mismatch",
+        "no_required_targets",
+        "role_structure",
+        "unmodeled_visible_content"
+      ]
+    },
+    {
+      "rank": 5,
+      "phase": "binding",
+      "status": "unverified",
+      "reasons": [
+        "missing_marker",
+        "marker_schema",
+        "subject_binding",
+        "surface_binding",
+        "candidate_binding",
+        "token_unbound",
+        "token_conflict",
+        "origin_permission_unbound",
+        "generation_binding",
+        "row_identity_unbound",
+        "permission_expired",
+        "mapping_binding"
+      ]
+    },
+    {
+      "rank": 6,
+      "phase": "observed_fields",
+      "status": "unverified",
+      "reasons": [
+        "missing_role",
+        "duplicate_role",
+        "missing_field",
+        "duplicate_field",
+        "row_cardinality",
+        "duplicate_row",
+        "column_contract",
+        "required_placeholder",
+        "wrapper_mismatch",
+        "related_role_mismatch"
+      ]
+    },
+    {
+      "rank": 7,
+      "phase": "golden_comparison",
+      "status": "unverified",
+      "reasons": [
+        "content_mismatch",
+        "body_digest_mismatch"
+      ]
+    },
+    {
+      "rank": 8,
+      "phase": "C013_comparison",
+      "status": "unverified",
+      "reasons": [
+        "c013_not_verified"
+      ]
+    }
+  ],
+  "normalization": [
+    "UTF8_strict",
+    "one_HTML_entity_decode_by_DOM_only",
+    "CRLF_to_LF",
+    "NFC",
+    "collapse_only_ASCII_layout_whitespace",
+    "strip_ASCII_layout_whitespace"
+  ],
+  "limits": {
+    "wire_bytes": 262144,
+    "decoded_bytes": 262144,
+    "depth": 64,
+    "nodes": 12000,
+    "markers": 64,
+    "fields": 4096,
+    "rows": 512
+  },
+  "runtime_constants": {
+    "LANGUAGE_CODE": "zh-hans",
+    "TIME_ZONE": "Asia/Shanghai",
+    "USE_TZ": true,
+    "STATIC_URL": "/static/",
+    "RACE_INFORMATION_NORMALIZED_DISPLAY_ENABLED": "bool equal to case.mode strict_display_v1",
+    "URLconf": "only shared.url_map finite named routes, explicit test-only module from root; no production views import",
+    "context_processors": [],
+    "messages_storage": "none; messages only explicit fixture list",
+    "DB": "SimpleTestCase no database access; not initialized by C020"
+  }
+}
