@@ -27,10 +27,12 @@ def create_public_result_fixture(now):
         parser_version="local-v1",raw_sha256="a"*64,normalized_sha256=digest,result_phase="provisional",
         normalized_payload=payload,raw_artifact_path="/forbidden/raw",permission_classification="local_fixture")
     revision=m.RaceEventRevision.objects.create(event=event,kind="result",revision_no=1,phase="provisional",
-        content_sha256=digest,source_authority="supplemental",primary_observation=observation,published_at=now)
+        content_sha256=digest,source_authority="supplemental",primary_observation=observation)
     m.RaceEventRevisionPublication.objects.create(revision=revision,published_at=now,reason="provisional_result",
         registry_digest="b"*64,coverage_proof_digest="c"*64,authorization_kind="provisional_policy",
         policy_versions=[[s,k,1] for s,k in (("global","global"),("region",event.country_region),("source",source.source_key),("event",str(event.pk)))])
+    revision.published_at=now
+    revision.save(update_fields=("published_at",))
     control=m.RaceEventProjectionControl.objects.create(event=event,write_owner="live",owner_generation=1,
         owner_manifest_sha256="d"*64,current_result_revision=revision)
     for i in (1,2):
