@@ -9,7 +9,7 @@ def create_public_result_fixture(now):
     event = m.RaceEvent.objects.create(year=2026, slug="c026-local", original_name="C026 Local Stakes",
         country_region="united_kingdom", racecourse="Newbury", status="finished",
         visibility_status="published", race_datetime=now-timedelta(hours=1), local_date=now.date())
-    m.RaceEventPublicPath.objects.create(event=event, year=2026, slug=event.slug, path_kind="canonical")
+    # RaceEvent.save 已创建 canonical registry；不重复写入唯一路径。
     source = m.RaceResultSourceIdentity.objects.create(event=event, source_key="the_racing_api",
         external_race_id="c026-race", review_status="approved", terms_status="approved",
         automation_allowed=True, result_authority="supplemental", valid_until=now+timedelta(days=1), registry_digest="b"*64)

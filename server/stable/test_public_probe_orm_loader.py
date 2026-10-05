@@ -9,6 +9,7 @@ from stable import models as m
 from stable.public_probe_orm_fixture import create_public_result_fixture
 from stable.services import public_probe_orm_loader as loader
 from stable.services.race_events import resolve_race_live_public_read
+from stable.services.race_data_source_adapters import canonical_sha
 
 NOW=datetime(2026,10,5,6,20,tzinfo=dt_timezone.utc)
 
@@ -171,3 +172,37 @@ class PublicProbeOrmPostgresTests(TransactionTestCase):
                 self.assertEqual(self.load().reason,"input_changed")
             # 下一子例先恢复合法 projection，版本增量保留即可。
             m.RaceEventResult.objects.filter(event=self.event,finish_position=1).update(jockey_name="Local Jockey 1")
+
+    def test_multisource_published_fetch_expiry_does_not_revoke_but_identity_revocation_does(self):
+        route={"provider":self.source.source_key,"capabilities":["result"],"parser_version":"local-v1",
+            "valid_from":(NOW-timedelta(days=1)).isoformat(),"valid_until":(NOW+timedelta(days=1)).isoformat()}
+        binding={"event_id":self.event.pk,"source_identity_id":self.source.pk,"route":route,"route_digest":canonical_sha(route)}
+        manifest={"event_id":self.event.pk,"selected":{"result":1},"bindings":[
+            {"id":1,"source_identity_id":self.source.pk,"manifest_sha256":canonical_sha(binding)}]}
+        authority={"binding_manifest":binding,"binding_manifest_sha256":canonical_sha(binding),
+            "source_set_manifest":manifest,"source_set_digest":canonical_sha(manifest)}
+        m.RaceDataSyncEnrollment.objects.create(event=self.event,source_identity=self.source,authority_version=2,
+            state="enrolled",source_set_generation=1,source_set_digest=canonical_sha(manifest),source_set_manifest=manifest,
+            standing_policy_digest="e"*64,route_digest=canonical_sha(route),event_snapshot_sha256="f"*64,
+            projection_owner_generation=1,enrollment_generation=1,manifest_sha256="d"*64,entry_sha256="e"*64,effective_at=NOW)
+        m.RaceEventProjectionControl.objects.filter(pk=self.control.pk).update(write_owner="data_sync")
+        m.RaceEvent.objects.filter(pk=self.event.pk).update(result_confirmed_at=NOW)
+        m.RaceEventRevision.objects.filter(pk=self.revision.pk).update(phase="official")
+        m.RaceResultObservation.objects.filter(pk=self.observation.pk).update(result_phase="official",
+            field_provenance={"multisource_authority":authority,"registry_digest":canonical_sha(route)})
+        m.RaceEventRevisionPublication.objects.filter(revision=self.revision).update(reason="data_sync_result",
+            authorization_kind="official_route",allowlist_version=2,registry_digest=canonical_sha(route),
+            coverage_proof_digest=self.revision.content_sha256,policy_versions=[["race_data_sync_contract","local-v1",1]])
+        m.RaceResultSourceIdentity.objects.filter(pk=self.source.pk).update(valid_until=NOW-timedelta(seconds=1))
+        decision=resolve_race_live_public_read(event_id=self.event.pk,now=NOW)
+        self.assertTrue(decision.visible,decision.reason)
+        self.assertEqual(self.load().status,"read_boundary_loaded")
+        m.RaceResultSourceIdentity.objects.filter(pk=self.source.pk).update(identity_fields={"publication_revoked":True})
+        self.assertFalse(resolve_race_live_public_read(event_id=self.event.pk,now=NOW).visible)
+        self.assertEqual(self.load().status,"not_public")
+
+    def test_bounded_rows_are_rejected_not_truncated(self):
+        with patch.object(loader,"MAX_ROWS",1):
+            snapshot=self.load()
+        self.assertEqual(snapshot.reason,"snapshot_too_large")
+        self.assertEqual(snapshot.rows,())
