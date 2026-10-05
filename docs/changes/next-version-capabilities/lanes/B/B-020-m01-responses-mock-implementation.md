@@ -23,6 +23,19 @@
 
 运行收据 `/Users/mentianlu/.codex/runtime/b020-m01-responses-tests/test-receipt.json`，RED日志及各只读snapshot同目录。源文件AST和git diff --check通过。最终代码提交SHA在ROOT交接消息和该收据绑定；独立代码review由ROOT安排，同原R使用官方review_fingerprint前后，不把本地GREEN称为独立review通过。
 
+## B020-R01 配置解析返修
+
+原R审核 `5a7ecb8602375c64ed95e2228b144036db7e207a` 为REVISE，仅P2 B020-R01：settings模块顶层转换可因新旁路的坏数值环境变量阻断旧服务装载。返修从clean `3ef77c914cd5ceabd6004f30d7c1b12c95085aaa` 开始，仅改本报告、settings所属配置块与原mock测试，不改adapter及旧provider。两个数值转换分别捕获TypeError/ValueError并保留None无效标记；没有把显式坏值替换成可发请求的默认值。缺省90/2400与有效显式30.5/1200保持可解析；adapter已有检查将启用后的None归一为configuration_missing。
+
+测试直接从实际settings源码取env/env_bool定义和完整M01配置块，在隔离os.environ中执行，未用预构造SimpleNamespace代替环境解析。新增2个测试方法，各覆盖timeout/tokens × 空/abc，共8个反例：disabled安全装载且不读key/不构造client；enabled返回configuration_missing且不读key/不构造client，因此0请求。原默认值测试补数值缺省及有效显式值断言。mutation对应移除异常隔离、将坏值偷偷回退默认、缺省值漂移或在配置拒绝前读key/构造client。
+
+- 有效RED：冻结red-valid-snapshot，2 tests、8个子例ValueError、exit1；失败来自真实数值转换。此前测试提取器误含注释尾部的SyntaxError日志单独保留harness-error，明确不算RED。
+- 同例GREEN：冻结green-snapshot，2 tests、0 failure/error/skip、exit0。
+- 必要相邻回归：同一冻结green-snapshot，18 tests = 既有16（含增强默认值方法）+新增2，0 failure/error/skip、exit0。仅执行ResponsesAnalysisTests，不执行旧provider compatibility类；其代码未变，原B020的Linux17项历史证据仍独立保留，不宣称本批重跑17或全量。
+- 全部命令、解释器、逐文件bytes/SHA、退出码与完整日志位于 `/Users/mentianlu/.codex/runtime/b020-r01-config-parse-repair/` 的red-receipt.json、green-receipt.json及各snapshot/source.json。只用主机puremock，socket.connect禁止；无Docker、DB、真实API或生产动作。git diff --check通过。
+
+返修提交绑定在runtime收据和ROOT交接；交ROOT转原R限定复审B020-R01，并由原R记录官方review_fingerprint前后。本段表示返修与本地复验完成，不表示finding已经独立关闭。
+
 ## 仍待进行
 
-当前只是开发子片：新近F02五地区≥100及真实人工gold、账号可用/实际模型参数、模型质量/时延/成本和最终M01仍未完成。产品模型未启用，不读取生产配置/密钥，不调用付费API，不用历史一篇抵扣F02。shared影响映射未改，正式CI交付由ROOT整合安排；本次17项不是全量/正式CI宣称。实施资源已清理，等待原R代码审；任务完成即停，不自动扩到N03、翻译接入或native/Index。
+当前只是开发子片：新近F02五地区≥100及真实人工gold、账号可用/实际模型参数、模型质量/时延/成本和最终M01仍未完成。产品模型未启用，不读取生产配置/密钥，不调用付费API，不用历史一篇抵扣F02。shared影响映射未改，正式CI交付由ROOT整合安排；本次17项不是全量/正式CI宣称。实施资源已清理，原R初审REVISE，等待B020-R01限定复审；任务完成即停，不自动扩到N03、翻译接入或native/Index。

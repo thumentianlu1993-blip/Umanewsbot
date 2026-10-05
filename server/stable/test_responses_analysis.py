@@ -6,6 +6,7 @@ from pathlib import Path
 from dataclasses import replace
 import hashlib
 import json
+import os
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
@@ -187,13 +188,48 @@ class ResponsesAnalysisTests(unittest.TestCase):
         p=payload();p['gaps']=[dict(code='missing',detail='unknown',evidence_refs=[])]*1001
         result,_,_=self.run_request(wire=response(p));self.assertEqual(result.error['code'],'invalid_response')
 
-    def test_config_block_defaults_off_and_empty_model(self):
+    def load_config_block(self, values):
+        # 执行真实 env/env_bool 和完整旁路配置块，含其异常处理。
         path=Path(__file__).resolve().parents[1]/'app/settings.py'
-        tree=ast.parse(path.read_text())
-        nodes=[n for n in tree.body if isinstance(n,ast.Assign)and any(isinstance(t,ast.Name)and t.id.startswith('RESPONSES_ANALYSIS_')for t in n.targets)]
-        scope={'env':lambda k,default=None:default,'env_bool':lambda k,default=False:default}
-        exec(compile(ast.Module(body=nodes,type_ignores=[]),str(path),'exec'),scope)
+        source=path.read_text();tree=ast.parse(source)
+        helpers=[n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name in ('env','env_bool')]
+        block=source.split('# M01 分析旁路默认关闭；',1)[1].split('\n',1)[1].split('\nTRANSLATION_PROVIDER =',1)[0]
+        nodes=helpers+ast.parse(block).body
+        scope={'os':os}
+        with patch.dict(os.environ,values,clear=True):
+            exec(compile(ast.Module(body=nodes,type_ignores=[]),str(path),'exec'),scope)
+        return {k:v for k,v in scope.items() if k.startswith('RESPONSES_ANALYSIS_')}
+
+    def test_config_block_defaults_off_and_empty_model(self):
+        scope=self.load_config_block({})
         self.assertFalse(scope['RESPONSES_ANALYSIS_ENABLED']);self.assertEqual(scope['RESPONSES_ANALYSIS_MODEL'],'');self.assertEqual(scope['RESPONSES_ANALYSIS_BASE_URL'],'')
+        self.assertEqual(scope['RESPONSES_ANALYSIS_TIMEOUT_SECONDS'],90)
+        self.assertEqual(scope['RESPONSES_ANALYSIS_MAX_OUTPUT_TOKENS'],2400)
+        valid=self.load_config_block({'RESPONSES_ANALYSIS_TIMEOUT_SECONDS':'30.5','RESPONSES_ANALYSIS_MAX_OUTPUT_TOKENS':'1200'})
+        self.assertEqual(valid['RESPONSES_ANALYSIS_TIMEOUT_SECONDS'],30.5)
+        self.assertEqual(valid['RESPONSES_ANALYSIS_MAX_OUTPUT_TOKENS'],1200)
+
+    def check_invalid_env_config(self, enabled):
+        class NoKey:
+            def __init__(self,values):self.__dict__.update(values)
+            def __getattr__(self,name):raise AssertionError('unexpected config/key access '+name)
+        for field in ('RESPONSES_ANALYSIS_TIMEOUT_SECONDS','RESPONSES_ANALYSIS_MAX_OUTPUT_TOKENS'):
+            for raw in ('','abc'):
+                with self.subTest(field=field,raw=raw,enabled=enabled):
+                    values={'RESPONSES_ANALYSIS_ENABLED':str(enabled).lower(),
+                            'RESPONSES_ANALYSIS_MODEL':'mock-model',
+                            'RESPONSES_ANALYSIS_BASE_URL':'https://api.openai.com/v1',field:raw}
+                    cfg=NoKey(self.load_config_block(values));factory=Mock()
+                    result=get_analysis_provider(cfg,client_factory=factory).analyze(fixture())
+                    if enabled:self.assertEqual(result.error['code'],'configuration_missing')
+                    else:self.assertEqual(result.status,'disabled')
+                    self.assertIsNone(getattr(cfg,field));factory.assert_not_called()
+
+    def test_invalid_numeric_env_disabled_safe_load_zero_key_and_client(self):
+        self.check_invalid_env_config(False)
+
+    def test_invalid_numeric_env_enabled_configuration_missing_zero_request(self):
+        self.check_invalid_env_config(True)
 
 
 @unittest.skipUnless(importlib.util.find_spec('django') and importlib.util.find_spec('openai'), 'host lacks existing Django/SDK; run in cached image')
