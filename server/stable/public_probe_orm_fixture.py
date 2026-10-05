@@ -36,7 +36,7 @@ def create_public_result_fixture(now):
     revision.published_at=now
     revision.save(update_fields=("published_at",))
     control=m.RaceEventProjectionControl.objects.create(event=event,write_owner="live",owner_generation=1,
-        owner_manifest_sha256="d"*64,current_result_revision=revision)
+        owner_manifest_sha256="d"*64,current_result_revision=revision,next_result_revision_no=2)
     for i in (1,2):
         participant=m.RaceEventParticipant.objects.create(event=event,stable_key=f"c026-{i}",canonical_name="Same Name",review_status="approved")
         m.RaceEventParticipantSourceIdentity.objects.create(participant=participant,source_identity=source,external_runner_id=f"c026-runner-{i}")
