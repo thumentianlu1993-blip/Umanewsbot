@@ -66,6 +66,6 @@ def create_public_result_fixture(now, *, multisource=False, suffix=""):
             official_finish_position=i,status="finished",horse_number=str(i),jockey_name=f"Local Jockey {i}")
         m.RaceEventResult.objects.create(event=event,finish_position=i,official_finish_position=i,
             horse_name=participant.canonical_name,horse_number=str(i),jockey_name=f"Local Jockey {i}",
-            running_status="finished",is_confirmed=False,raw_payload={"secret":"DO_NOT_EXPORT"},source_refs={
+            running_status="finished",is_confirmed=phase in ("official","corrected"),raw_payload={"secret":"DO_NOT_EXPORT"},source_refs={
                 "source_key":source.source_key,"external_race_id":source.external_race_id,"external_runner_id":f"c026-runner-{i}"})
     return event,source,observation,revision,control,reverse("public-race-detail",kwargs={"year":2026,"slug":event.slug})

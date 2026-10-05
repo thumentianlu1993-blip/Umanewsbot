@@ -44,3 +44,8 @@ ROOT将原标准窗口转交到北京时间14:36（含清理）；每次仅1容�
 证据目录 `/Users/mentianlu/.codex/runtime/c026-orm-loader-detail-001`：red-pg16、green-pg16、module-pg16与module-summary、各历史setup目录/计划、实际inspect、最终容器清单、15项test-ids及handoff-receipt。最初继承plan已单列历史，当前计划不继承旧batch元数据。
 
 额度开始71%，最近两次72%；未触及73%/30分钟停止条件。14:36前完成清理和回传，不扩任务。原G1覆盖局部实施；门禁统一引用根 AGENTS.md。ROOT下一步登记15个实际IDs/mapping并交同原R，review返修仍在原范围执行；正式full和最终交付由ROOT协调。
+
+
+## C026-R01 返修准备断点（待实际 RED）
+
+原 R `f77ff5301fc1705517a389f3153b692156a76d41` 唯一P2指出确认标志直接复制projection，未独立核对writer phase规则。当前已修独立official fixture并添加两个错误标志反例；loader仍保留受审旧行为以取得实际RED。没有容器/PG执行，不能继承原15通过作为返修通过。当前ROOT占用窗口，已备最小两项诊断计划，等待调度；返修只涉及owned loader/test/fixture/C文档，不改views/models/writer/权限/schema/proof。起点2026-10-05 14:49:27 Asia/Shanghai，额度73%，本轮最多15分钟或74先到。

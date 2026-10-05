@@ -15,3 +15,9 @@
 | T09 | 缺 F01/source time/execution 保持 unverified；as_of/区间/复核时点分开；无 write/provider调用 | 默认0补版本、签 public_verified/SLA |
 
 先运行 fixture+合法发布最小行为 RED；导入/setup 错误不计 RED。再实现同例 GREEN、完整新模块必要PG/Client回归。使用 TransactionTestCase 和独立线程 writer（finally connections.close_all），不触真实数据库。只在 ROOT 标准窗口运行容器；新测试 mapping 由 ROOT 集成。不启动 formal full。新模块使用独立 helper，不走 stable.tests 重导出。
+
+
+## 原 R C026-R01 局部返修
+
+仅补确认标志与既有writer的phase规则对账：official/corrected=True、provisional=False，不修改公开页面或权限。
+先冻结两个反例并取得实际RED：合法provisional False仍loaded，错误True须projection_mismatch/unverified；合法official True仍loaded，错误False须同样拒绝。期望从revision/writer规则独立产生，禁止只对比同一错误projection与Client。修正official fixture，不改变provisional合法非confirmed表格。两个反例可捕获删除phase→is_confirmed校验或直接复制标志的mutation。原15项仅因本次行为变更在GREEN后作必要回归。资源未分配前不运行PG，setup错误不计RED。

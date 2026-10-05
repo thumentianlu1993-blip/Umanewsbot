@@ -203,3 +203,29 @@ class PublicProbeOrmPostgresTests(TransactionTestCase):
         self.assertEqual(snapshot.reason,"input_changed")
         self.assertEqual(snapshot.rows,())
         self.assertGreater(snapshot.revalidated_at,snapshot.snapshot_finished_at)
+
+
+    def test_provisional_projection_cannot_claim_confirmed_winner(self):
+        self.assertEqual(self.revision.phase,"provisional")
+        self.assertTrue(resolve_race_live_public_read(event_id=self.event.pk,now=NOW).visible)
+        # 独立期望来自既有writer phase规则；合法暂定表格保持可读。
+        self.assertEqual(self.load().status,"read_boundary_loaded")
+        self.assertTrue(all(row.is_confirmed is False for row in self.load().rows))
+        m.RaceEventResult.objects.filter(event=self.event,finish_position=1).update(is_confirmed=True)
+        snapshot=self.load()
+        self.assertEqual(snapshot.status,"unverified")
+        self.assertEqual(snapshot.reason,"projection_mismatch")
+        self.assertEqual(snapshot.rows,())
+
+    def test_official_projection_cannot_lose_confirmation(self):
+        self.event,self.source,self.observation,self.revision,self.control,self.path=create_public_result_fixture(NOW,multisource=True,suffix="-confirmed")
+        self.assertEqual(self.revision.phase,"official")
+        self.assertTrue(resolve_race_live_public_read(event_id=self.event.pk,now=NOW).visible)
+        # official的正确值必须为True，不能从Client或被破坏的projection反推。
+        self.assertEqual(self.load().status,"read_boundary_loaded")
+        self.assertTrue(all(row.is_confirmed is True for row in self.load().rows))
+        m.RaceEventResult.objects.filter(event=self.event,finish_position=1).update(is_confirmed=False)
+        snapshot=self.load()
+        self.assertEqual(snapshot.status,"unverified")
+        self.assertEqual(snapshot.reason,"projection_mismatch")
+        self.assertEqual(snapshot.rows,())
