@@ -4,7 +4,7 @@
 {% block title %}{% race_field event "name" event.chinese_name %} {{ event.year }}{% endblock %}
 
 {% block content %}
-  <main class="race-page">
+  <main class="race-page">{% if public_probe_projection.complete %}<script type="application/json" data-o03-marker="result-family">{"schema_version":"{{ public_probe_projection.marker.schema_version|escapejs }}","subject":"{{ public_probe_projection.marker.subject|escapejs }}","surface_ref":"{{ public_probe_projection.marker.surface_ref|escapejs }}","capability":"{{ public_probe_projection.marker.capability|escapejs }}","revision_ref":"{{ public_probe_projection.marker.revision_ref|escapejs }}","permission_version":"{{ public_probe_projection.marker.permission_version|escapejs }}","content_digest":"{{ public_probe_projection.marker.content_digest|escapejs }}"}</script>{% endif %}
     <nav class="article-actions" aria-label="赛事操作">
       <a href="{{ public_return_url }}">{{ public_return_label }}{% if public_return_default %}（默认列表）{% endif %}</a>
       <a href="/">返回首页</a>
@@ -27,18 +27,18 @@
       <p class="race-hero-original">{% if event.original_name and event.original_name != event.chinese_name %}{{ event.original_name }} · {% endif %}{% race_field event "date" %} · {% race_field event "time" event.public_time_label %}</p>
 
       {% if winner %}
-        <span class="winner-ribbon">WINNER · 冠军</span>
-        <div class="winner-name">{% race_field winner "horse_name" winner.display_horse_name %}</div>
-        <div class="winner-crew">
-          {% if winner.display_jockey_name or race_information_enabled and winner.jockey_name %}<div><span>骑师</span><b>{% race_field winner "jockey_name" winner.display_jockey_name %}</b></div>{% endif %}
-          {% if winner.trainer_name %}<div><span>练马师</span><b>{% race_field winner "trainer_name" winner.trainer_name %}</b></div>{% endif %}
-          {% if winner.finish_time %}<div><span>完赛时间</span><b>{% race_field winner "finish_time" winner.finish_time %}</b></div>{% endif %}
-          {% if winner.popularity %}<div><span>{% if race_information_enabled %}热门排名{% else %}人气{% endif %}</span><b>{% if race_information_enabled %}{% race_field winner "popularity" %}{% else %}第 {{ winner.popularity }} 人气{% endif %}</b></div>{% endif %}
+        <span class="winner-ribbon"{% if public_probe_projection.complete %} data-o03-role="detail.result.hero" data-o03-part="ribbon" data-o03-row="{{ public_probe_projection.hero_row_token }}" data-o03-field="ribbon"{% endif %}>WINNER · 冠军</span>
+        <div class="winner-name"{% if public_probe_projection.complete %} data-o03-role="detail.result.hero" data-o03-part="name" data-o03-row="{{ public_probe_projection.hero_row_token }}" data-o03-field="horse_name"{% endif %}>{% race_field winner "horse_name" winner.display_horse_name %}</div>
+        <div class="winner-crew"{% if public_probe_projection.complete %} data-o03-role="detail.result.hero" data-o03-part="crew" data-o03-row="{{ public_probe_projection.hero_row_token }}"{% endif %}>
+          {% if winner.display_jockey_name or race_information_enabled and winner.jockey_name %}<div><span>骑师</span><b{% if public_probe_projection.complete %} data-o03-field="jockey_name"{% endif %}>{% race_field winner "jockey_name" winner.display_jockey_name %}</b></div>{% endif %}
+          {% if winner.trainer_name %}<div><span>练马师</span><b{% if public_probe_projection.complete %} data-o03-field="trainer_name"{% endif %}>{% race_field winner "trainer_name" winner.trainer_name %}</b></div>{% endif %}
+          {% if winner.finish_time %}<div><span>完赛时间</span><b{% if public_probe_projection.complete %} data-o03-field="finish_time"{% endif %}>{% race_field winner "finish_time" winner.finish_time %}</b></div>{% endif %}
+          {% if winner.popularity %}<div><span>{% if race_information_enabled %}热门排名{% else %}人气{% endif %}</span><b{% if public_probe_projection.complete %} data-o03-field="popularity"{% endif %}>{% if race_information_enabled %}{% race_field winner "popularity" %}{% else %}第 {{ winner.popularity }} 人气{% endif %}</b></div>{% endif %}
         </div>
         {% if top_results|length > 1 %}
-          <div class="podium-line">
+          <div class="podium-line"{% if public_probe_projection.complete %} data-o03-role="detail.result.podium"{% endif %}>
             {% for result in top_results|slice:"1:3" %}
-              <span>{% race_field result "position" result.display_finish_position %}名 <b>{% race_field result "horse_name" result.display_horse_name %}</b>{% if result.margin %}（{% race_field result "margin" result.margin %}）{% endif %}</span>
+              <span{% if public_probe_projection.complete %} data-o03-row="{% for token in public_probe_projection.podium_row_tokens %}{% if forloop.counter0 == forloop.parentloop.counter0 %}{{ token }}{% endif %}{% endfor %}"{% endif %}>{% if public_probe_projection.complete %}<span data-o03-field="position">{% endif %}{% race_field result "position" result.display_finish_position %}{% if public_probe_projection.complete %}</span>{% endif %}名 <b{% if public_probe_projection.complete %} data-o03-field="horse_name"{% endif %}>{% race_field result "horse_name" result.display_horse_name %}</b>{% if result.margin %}（{% if public_probe_projection.complete %}<span data-o03-field="margin">{% endif %}{% race_field result "margin" result.margin %}{% if public_probe_projection.complete %}</span>{% endif %}）{% endif %}</span>
             {% endfor %}
           </div>
         {% endif %}
@@ -46,14 +46,14 @@
         <div class="countdown-hero-digits">{{ status_label }}{% if event.status == 'scheduled' %}<small>{% race_field event "time" event.public_time_label %}</small>{% endif %}</div>
       {% endif %}
       {% if live_result_status.is_stale %}
-        <aside class="race-result-status" role="status">数据可能已过期</aside>
+        <aside class="race-result-status" role="status"{% if public_probe_projection.complete %} data-o03-role="detail.result.stale"{% endif %}>数据可能已过期</aside>
       {% endif %}
     </section>
 
     <nav class="race-subnav" aria-label="赛事详情模块">
       <a href="#overview" class="active">概览</a>
       {% if runners %}<a href="#runners">{{ runner_section_label }}</a>{% endif %}
-      {% if results %}<a href="#results">赛果</a>{% endif %}
+      {% if results %}<a href="#results"{% if public_probe_projection.complete %} data-o03-role="detail.result.nav" data-o03-field="text"{% endif %}>赛果</a>{% endif %}
       {% if history_winners %}<a href="#history">历年冠军</a>{% endif %}
       {% if has_news %}<a href="#news">相关新闻</a>{% endif %}
     </nav>
@@ -105,22 +105,22 @@
     </section>
 
     {% if results %}
-      <section class="panel" id="results">
+      <section class="panel" id="results"{% if public_probe_projection.complete %} data-o03-role="detail.result.table"{% endif %}>
         <h2>{{ result_section_label }}</h2>
         <div class="race-table-wrap">
           <table class="data-table">
             <thead><tr><th>名次</th><th>马号</th><th>马名</th><th>骑师</th><th>练马师</th><th>时间</th><th>差距</th><th>{% if race_information_enabled %}赔率 / 热门排名{% else %}赔率 / 人气{% endif %}</th></tr></thead>
             <tbody>
               {% for result in results %}
-                <tr class="{% if result.display_finish_position == 1 %}medal-1{% elif result.display_finish_position == 2 %}medal-2{% elif result.display_finish_position == 3 %}medal-3{% endif %}">
-                  <td>{% race_field result "position" result.display_finish_position %}</td>
-                  <td class="num">{% race_field result "horse_number" result.horse_number|default:"-" %}</td>
-                  <td><strong>{% race_field result "horse_name" result.display_horse_name %}</strong></td>
-                  <td>{% race_field result "jockey_name" result.display_jockey_name|default:"-" %}</td>
-                  <td>{% race_field result "trainer_name" result.trainer_name|default:"-" %}</td>
-                  <td class="num">{% race_field result "finish_time" result.finish_time|default:"-" %}</td>
-                  <td>{% race_field result "margin" result.margin|default:"-" %}</td>
-                  <td>{% race_field result "odds" result.odds_value|default:"-" %} / {% race_field result "popularity" result.popularity|default:"-" %}</td>
+                <tr class="{% if result.display_finish_position == 1 %}medal-1{% elif result.display_finish_position == 2 %}medal-2{% elif result.display_finish_position == 3 %}medal-3{% endif %}"{% if public_probe_projection.complete %} data-o03-row="{% for token in public_probe_projection.table_row_tokens %}{% if forloop.counter0 == forloop.parentloop.counter0 %}{{ token }}{% endif %}{% endfor %}"{% endif %}>
+                  <td{% if public_probe_projection.complete %} data-o03-field="position"{% endif %}>{% race_field result "position" result.display_finish_position %}</td>
+                  <td class="num"{% if public_probe_projection.complete %} data-o03-field="horse_number"{% endif %}>{% race_field result "horse_number" result.horse_number|default:"-" %}</td>
+                  <td><strong{% if public_probe_projection.complete %} data-o03-field="horse_name"{% endif %}>{% race_field result "horse_name" result.display_horse_name %}</strong></td>
+                  <td{% if public_probe_projection.complete %} data-o03-field="jockey_name"{% endif %}>{% race_field result "jockey_name" result.display_jockey_name|default:"-" %}</td>
+                  <td{% if public_probe_projection.complete %} data-o03-field="trainer_name"{% endif %}>{% race_field result "trainer_name" result.trainer_name|default:"-" %}</td>
+                  <td class="num"{% if public_probe_projection.complete %} data-o03-field="finish_time"{% endif %}>{% race_field result "finish_time" result.finish_time|default:"-" %}</td>
+                  <td{% if public_probe_projection.complete %} data-o03-field="margin"{% endif %}>{% race_field result "margin" result.margin|default:"-" %}</td>
+                  <td>{% if public_probe_projection.complete %}<span data-o03-field="odds">{% endif %}{% race_field result "odds" result.odds_value|default:"-" %}{% if public_probe_projection.complete %}</span>{% endif %} / {% if public_probe_projection.complete %}<span data-o03-field="popularity">{% endif %}{% race_field result "popularity" result.popularity|default:"-" %}{% if public_probe_projection.complete %}</span>{% endif %}</td>
                 </tr>
               {% endfor %}
             </tbody>

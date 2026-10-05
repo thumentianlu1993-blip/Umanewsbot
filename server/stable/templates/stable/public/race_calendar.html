@@ -114,7 +114,7 @@
           </header>
           <div class="agenda-races">
             {% for event in group.events %}
-              <a class="cal-card" href="{{ event.public_list_detail_url|default:event.public_path }}">
+              {% if public_probe_projection.complete and event.public_path == public_probe_projection.marker.subject %}<script type="application/json" data-o03-marker="result-family">{"schema_version":"{{ public_probe_projection.marker.schema_version|escapejs }}","subject":"{{ public_probe_projection.marker.subject|escapejs }}","surface_ref":"{{ public_probe_projection.marker.surface_ref|escapejs }}","capability":"{{ public_probe_projection.marker.capability|escapejs }}","revision_ref":"{{ public_probe_projection.marker.revision_ref|escapejs }}","permission_version":"{{ public_probe_projection.marker.permission_version|escapejs }}","content_digest":"{{ public_probe_projection.marker.content_digest|escapejs }}"}</script>{% endif %}<a class="cal-card"{% if public_probe_projection.complete and event.public_path == public_probe_projection.marker.subject %} data-o03-role="calendar.result.card" data-o03-row="{{ public_probe_projection.card_row_token }}"{% endif %} href="{{ event.public_list_detail_url|default:event.public_path }}">
                 <span class="grade-badge {% race_grade_class event %}">{% race_field event "grade" event.grade_badge_label %}</span>
                 <span class="cal-card-main">
                   <span class="cal-card-name">{% race_field event "name" event.chinese_name %}{% if event.original_name and event.original_name != event.chinese_name %}<small>{{ event.original_name }}</small>{% endif %}</span>
@@ -125,8 +125,8 @@
                   </span>
                 </span>
                 <span class="cal-card-status">
-                  <strong>{{ event.public_status_label }}</strong>
-                  {% if event.public_winner_name %}<small>冠军 {% race_field event "winner" event.public_winner_name %}</small>{% elif event.status == 'scheduled' %}<small>{% race_field event "time" event.public_time_label %}</small>{% endif %}
+                  <strong{% if public_probe_projection.complete and event.public_path == public_probe_projection.marker.subject %} data-o03-field="status"{% endif %}>{{ event.public_status_label }}</strong>
+                  {% if event.public_winner_name %}<small>冠军 {% if public_probe_projection.complete and event.public_path == public_probe_projection.marker.subject %}<span data-o03-field="winner">{% endif %}{% race_field event "winner" event.public_winner_name %}{% if public_probe_projection.complete and event.public_path == public_probe_projection.marker.subject %}</span>{% endif %}</small>{% elif event.status == 'scheduled' %}<small>{% race_field event "time" event.public_time_label %}</small>{% endif %}
                 </span>
               </a>
             {% endfor %}

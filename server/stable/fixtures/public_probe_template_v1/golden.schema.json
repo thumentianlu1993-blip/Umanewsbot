@@ -1,0 +1,1895 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:o03:c020:golden-schema:v1",
+  "$defs": {
+    "Case": {
+      "type": "object",
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "origin_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "mode": {
+          "enum": [
+            "legacy",
+            "strict_display_v1"
+          ]
+        },
+        "page_type": {
+          "enum": [
+            "detail",
+            "calendar"
+          ]
+        },
+        "manual_basis": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "variant": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "response_context": {
+          "$ref": "contract.json#/$defs/ResponseContext"
+        },
+        "template_context": {
+          "oneOf": [
+            {
+              "$ref": "contract.json#/$defs/DetailContext"
+            },
+            {
+              "$ref": "contract.json#/$defs/CalendarContext"
+            }
+          ]
+        },
+        "profile": {
+          "$ref": "contract.json#/$defs/Profile"
+        },
+        "projection": {
+          "$ref": "contract.json#/$defs/Projection"
+        },
+        "private_tuple": {
+          "anyOf": [
+            {
+              "$ref": "contract.json#/$defs/PrivateTuple"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "row_bindings": {
+          "type": "object",
+          "patternProperties": {
+            "^(pr2|pe2):[0-9a-f]{64}$": {
+              "$ref": "contract.json#/$defs/RowBinding"
+            }
+          },
+          "additionalProperties": false
+        },
+        "expected_body": {
+          "anyOf": [
+            {
+              "$ref": "contract.json#/$defs/Body"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expected_body_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expected": {
+          "anyOf": [
+            {
+              "$ref": "contract.json#/$defs/Expectation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "anchor": {
+          "anyOf": [
+            {
+              "$ref": "contract.json#/$defs/Anchor"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "outcome": {
+          "$ref": "contract.json#/$defs/Outcome"
+        },
+        "expected_assertions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "minItems": 1,
+          "maxItems": 12
+        }
+      },
+      "required": [
+        "case_id",
+        "origin_ref",
+        "mode",
+        "page_type",
+        "manual_basis",
+        "variant",
+        "response_context",
+        "template_context",
+        "profile",
+        "projection",
+        "private_tuple",
+        "row_bindings",
+        "expected_body",
+        "expected_body_sha256",
+        "expected",
+        "anchor",
+        "outcome",
+        "expected_assertions"
+      ],
+      "additionalProperties": false
+    },
+    "Negative": {
+      "type": "object",
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "base_case_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "stage": {
+          "const": "future_adapter_test_not_executed"
+        },
+        "mutation": {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "enum": [
+                "dom_replace",
+                "dom_insert",
+                "dom_attribute",
+                "dom_delete",
+                "dom_move",
+                "marker_patch",
+                "private_patch",
+                "transport_patch",
+                "context_patch",
+                "no_change",
+                "adapter_mutation"
+              ]
+            },
+            "location": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "operand_text": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            }
+          },
+          "required": [
+            "operation",
+            "location",
+            "operand_text"
+          ],
+          "additionalProperties": false
+        },
+        "expected_primary_reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "expected_rank": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9223372036854775807
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expected_status": {
+          "enum": [
+            "unverified",
+            "rejected"
+          ]
+        },
+        "receipt_constructed": {
+          "const": false
+        },
+        "c013_status": {
+          "const": "not_constructed"
+        },
+        "assertion_kind": {
+          "enum": [
+            "mutation_or_boundary_meta_test",
+            "single_failure_or_prioritized_counterexample"
+          ]
+        },
+        "synthetic_only": {
+          "const": true
+        }
+      },
+      "required": [
+        "case_id",
+        "base_case_id",
+        "stage",
+        "mutation",
+        "expected_primary_reason",
+        "expected_rank",
+        "expected_status",
+        "receipt_constructed",
+        "c013_status",
+        "assertion_kind",
+        "synthetic_only"
+      ],
+      "additionalProperties": false
+    },
+    "Mapping": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "c020.approved-display-fixture.v1"
+        },
+        "synthetic_only": {
+          "const": true
+        },
+        "origin_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "presentation_mode": {
+          "enum": [
+            "legacy",
+            "strict_display_v1"
+          ]
+        },
+        "body_contract_version": {
+          "const": "o03.result-template-body.v1"
+        },
+        "ordered_rows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "participant_ref": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              "cells": {
+                "$ref": "contract.json#/$defs/Cells"
+              }
+            },
+            "required": [
+              "participant_ref",
+              "cells"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 1,
+          "maxItems": 512
+        },
+        "known_missing": {
+          "type": "object",
+          "patternProperties": {
+            "^fixture:P-[A-D]$": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "position",
+                  "horse_number",
+                  "horse_name",
+                  "jockey_name",
+                  "trainer_name",
+                  "finish_time",
+                  "margin",
+                  "odds",
+                  "popularity"
+                ]
+              },
+              "minItems": 0,
+              "maxItems": 9
+            }
+          },
+          "additionalProperties": false
+        },
+        "review_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "evidence_scope": {
+          "const": "fixture_only_not_real_resolver_receipt"
+        }
+      },
+      "required": [
+        "schema_version",
+        "synthetic_only",
+        "origin_ref",
+        "presentation_mode",
+        "body_contract_version",
+        "ordered_rows",
+        "known_missing",
+        "review_ref",
+        "evidence_scope"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "c020.template-golden-fixture.v1"
+    },
+    "synthetic_only": {
+      "const": true
+    },
+    "not_real_template_render": {
+      "const": true
+    },
+    "not_real_http_response": {
+      "const": true
+    },
+    "static_preparation_only": {
+      "const": true
+    },
+    "candidate_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "original_fixture_sha256": {
+      "const": "590751082dc941127ba053958aed24f2d265649726b2fc8eb5219dc469150218"
+    },
+    "new_origin_lineage": {
+      "const": {
+        "nullable-champion": {
+          "synthetic_only": true,
+          "approval_state": "C020 awaiting original R, not C015 approved",
+          "parent_origin_ref": "fixture-origin:official-old",
+          "parent_original_fixture_sha256": "590751082dc941127ba053958aed24f2d265649726b2fc8eb5219dc469150218",
+          "new_origin_ref": "fixture-origin:nullable-champion",
+          "new_F01_document_ref": "fixture-f01:nullable-champion",
+          "new_permission_ref": "fixture-permission:nullable-champion",
+          "changes": [
+            "origin_ref/target_key/source_revision/generation/F01 entity and evidence IDs and all related summaries",
+            "first participant source_fields jockey_name/trainer_name/finish_time/popularity = null, availability=known_missing; all four participants retained"
+          ],
+          "complete_participant_refs": [
+            "fixture:P-A",
+            "fixture:P-B",
+            "fixture:P-C",
+            "fixture:P-D"
+          ],
+          "origin_sha256": "a052490698813493b77d35c231b8906a2ee7b6a3afded447d6e45579e5a2f993",
+          "F01_input_version": {
+            "schema_version": "f01.input.v1",
+            "scope": [
+              "entity",
+              "evidence",
+              "materials",
+              "policy_ref",
+              "protection"
+            ],
+            "content_sha256": "4b3961825199c34e34191b9cb2846aa9b20ecf71df236397d3d4b718db093a14",
+            "generations": {
+              "owner": 3,
+              "schedule": 3,
+              "enrollment": 2,
+              "source_set": 2
+            }
+          },
+          "real_source_or_permission": false
+        },
+        "single-complete": {
+          "synthetic_only": true,
+          "approval_state": "C020 awaiting original R, not C015 approved",
+          "parent_origin_ref": "fixture-origin:official-old",
+          "parent_original_fixture_sha256": "590751082dc941127ba053958aed24f2d265649726b2fc8eb5219dc469150218",
+          "new_origin_ref": "fixture-origin:single-complete",
+          "new_F01_document_ref": "fixture-f01:single-complete",
+          "new_permission_ref": "fixture-permission:single-complete",
+          "changes": [
+            "origin_ref/target_key/source_revision/generation/F01 entity and evidence IDs and all related summaries",
+            "new source declares complete participant set exactly [P-A]; new F01 material and golden also exactly one; old four-row source unchanged"
+          ],
+          "complete_participant_refs": [
+            "fixture:P-A"
+          ],
+          "origin_sha256": "1365bb4dc63e3a52e27135bbb0084b648833cc5ed2342da8248b9aedae430893",
+          "F01_input_version": {
+            "schema_version": "f01.input.v1",
+            "scope": [
+              "entity",
+              "evidence",
+              "materials",
+              "policy_ref",
+              "protection"
+            ],
+            "content_sha256": "5e45387de549ccb657013feb60772ea35b0ac5341c93b6bad600aff53a01cc02",
+            "generations": {
+              "owner": 4,
+              "schedule": 3,
+              "enrollment": 2,
+              "source_set": 2
+            }
+          },
+          "real_source_or_permission": false
+        }
+      }
+    },
+    "origins": {
+      "const": {
+        "fixture-origin:official-old": {
+          "synthetic_only": true,
+          "origin_kind": "fixture_reviewed_revision",
+          "target_key": "race_event:fixture-race-001",
+          "phase": "official",
+          "supersedes_ref": null,
+          "raw_material": {
+            "synthetic_only": true,
+            "target_key": "race_event:fixture-race-001",
+            "phase": "official",
+            "participants": [
+              {
+                "participant_ref": "fixture:P-A",
+                "horse_ref": "horse:fixture:P-A",
+                "reported_finish_position": 1,
+                "normalized_status": "finished",
+                "is_confirmed": true,
+                "source_order": 1,
+                "source_horse_number": "1",
+                "source_horse_name": "示例甲",
+                "source_fields": {
+                  "jockey_name": "骑师甲",
+                  "trainer_name": "练马师甲",
+                  "finish_time": "1:34.0",
+                  "margin": null,
+                  "odds": "3.0",
+                  "popularity": "2"
+                },
+                "field_availability": {
+                  "jockey_name": "available",
+                  "trainer_name": "available",
+                  "finish_time": "available",
+                  "margin": "known_missing",
+                  "odds": "available",
+                  "popularity": "available"
+                }
+              },
+              {
+                "participant_ref": "fixture:P-B",
+                "horse_ref": "horse:fixture:P-B",
+                "reported_finish_position": 2,
+                "normalized_status": "finished",
+                "is_confirmed": true,
+                "source_order": 2,
+                "source_horse_number": "2",
+                "source_horse_name": "示例乙",
+                "source_fields": {
+                  "jockey_name": "骑师乙",
+                  "trainer_name": "练马师乙",
+                  "finish_time": null,
+                  "margin": "1/2",
+                  "odds": "2.5",
+                  "popularity": "1"
+                },
+                "field_availability": {
+                  "jockey_name": "available",
+                  "trainer_name": "available",
+                  "finish_time": "known_missing",
+                  "margin": "available",
+                  "odds": "available",
+                  "popularity": "available"
+                }
+              },
+              {
+                "participant_ref": "fixture:P-C",
+                "horse_ref": "horse:fixture:P-C",
+                "reported_finish_position": 3,
+                "normalized_status": "finished",
+                "is_confirmed": true,
+                "source_order": 3,
+                "source_horse_number": "3",
+                "source_horse_name": "Café & 星",
+                "source_fields": {
+                  "jockey_name": "骑师丙",
+                  "trainer_name": "练马师丙",
+                  "finish_time": null,
+                  "margin": "1",
+                  "odds": "8.0",
+                  "popularity": "3"
+                },
+                "field_availability": {
+                  "jockey_name": "available",
+                  "trainer_name": "available",
+                  "finish_time": "known_missing",
+                  "margin": "available",
+                  "odds": "available",
+                  "popularity": "available"
+                }
+              },
+              {
+                "participant_ref": "fixture:P-D",
+                "horse_ref": "horse:fixture:P-D",
+                "reported_finish_position": null,
+                "normalized_status": "disqualified",
+                "is_confirmed": true,
+                "source_order": 4,
+                "source_horse_number": "4",
+                "source_horse_name": "示例丁",
+                "source_fields": {
+                  "jockey_name": "骑师丁",
+                  "trainer_name": "练马师丁",
+                  "finish_time": null,
+                  "margin": null,
+                  "odds": "12.0",
+                  "popularity": "4"
+                },
+                "field_availability": {
+                  "jockey_name": "available",
+                  "trainer_name": "available",
+                  "finish_time": "known_missing",
+                  "margin": "known_missing",
+                  "odds": "available",
+                  "popularity": "available"
+                }
+              }
+            ],
+            "source_revision": "official-old"
+          },
+          "raw_material_sha256": "e4b2ccae633fb046397356780e5a50cfca83e7f745b24c847d1ccf62dccb57ab",
+          "participant_proof_refs": {
+            "fixture:P-A": "fixture-strong-proof:fixture:P-A",
+            "fixture:P-B": "fixture-strong-proof:fixture:P-B",
+            "fixture:P-C": "fixture-strong-proof:fixture:P-C",
+            "fixture:P-D": "fixture-strong-proof:fixture:P-D"
+          },
+          "complete_under_fixture_rule_only": true,
+          "fixture_requirement_ref": "fixture-required-core-v1"
+        },
+        "fixture-origin:correction-current": {
+          "synthetic_only": true,
+          "origin_kind": "fixture_reviewed_revision",
+          "target_key": "race_event:fixture-race-001",
+          "phase": "corrected",
+          "supersedes_ref": "fixture-origin:official-old",
+          "raw_material": {
+            "synthetic_only": true,
+            "target_key": "race_event:fixture-race-001",
+            "phase": "corrected",
+            "participants": [
+              {
+                "participant_ref": "fixture:P-B",
+                "horse_ref": "horse:fixture:P-B",
+                "reported_finish_position": 1,
+                "normalized_status": "finished",
+                "is_confirmed": true,
+                "source_order": 1,
+                "source_horse_number": "2",
+                "source_horse_name": "示例乙",
+                "source_fields": {
+                  "jockey_name": "骑师乙",
+                  "trainer_name": "练马师乙",
+                  "finish_time": "1:34.0",
+                  "margin": null,
+                  "odds": "2.5",
+                  "popularity": "1"
+                },
+                "field_availability": {
+                  "jockey_name": "available",
+                  "trainer_name": "available",
+                  "finish_time": "available",
+                  "margin": "known_missing",
+                  "odds": "available",
+                  "popularity": "available"
+                }
+              },
+              {
+                "participant_ref": "fixture:P-A",
+                "horse_ref": "horse:fixture:P-A",
+                "reported_finish_position": 2,
+                "normalized_status": "finished",
+                "is_confirmed": true,
+                "source_order": 2,
+                "source_horse_number": "1",
+                "source_horse_name": "示例甲",
+                "source_fields": {
+                  "jockey_name": "骑师甲",
+                  "trainer_name": "练马师甲",
+                  "finish_time": null,
+                  "margin": "1/2",
+                  "odds": "3.0",
+                  "popularity": "2"
+                },
+                "field_availability": {
+                  "jockey_name": "available",
+                  "trainer_name": "available",
+                  "finish_time": "known_missing",
+                  "margin": "available",
+                  "odds": "available",
+                  "popularity": "available"
+                }
+              },
+              {
+                "participant_ref": "fixture:P-C",
+                "horse_ref": "horse:fixture:P-C",
+                "reported_finish_position": 3,
+                "normalized_status": "finished",
+                "is_confirmed": true,
+                "source_order": 3,
+                "source_horse_number": "3",
+                "source_horse_name": "Café & 星",
+                "source_fields": {
+                  "jockey_name": "骑师丙",
+                  "trainer_name": "练马师丙",
+                  "finish_time": null,
+                  "margin": "1",
+                  "odds": "8.0",
+                  "popularity": "3"
+                },
+                "field_availability": {
+                  "jockey_name": "available",
+                  "trainer_name": "available",
+                  "finish_time": "known_missing",
+                  "margin": "available",
+                  "odds": "available",
+                  "popularity": "available"
+                }
+              },
+              {
+                "participant_ref": "fixture:P-D",
+                "horse_ref": "horse:fixture:P-D",
+                "reported_finish_position": null,
+                "normalized_status": "disqualified",
+                "is_confirmed": true,
+                "source_order": 4,
+                "source_horse_number": "4",
+                "source_horse_name": "示例丁",
+                "source_fields": {
+                  "jockey_name": "骑师丁",
+                  "trainer_name": "练马师丁",
+                  "finish_time": null,
+                  "margin": null,
+                  "odds": "12.0",
+                  "popularity": "4"
+                },
+                "field_availability": {
+                  "jockey_name": "available",
+                  "trainer_name": "available",
+                  "finish_time": "known_missing",
+                  "margin": "known_missing",
+                  "odds": "available",
+                  "popularity": "available"
+                }
+              }
+            ],
+            "source_revision": "correction-current"
+          },
+          "raw_material_sha256": "8d1fd71ea13e9f44bd55166758ee836e7f14a612c92a659200cb510330c90b2f",
+          "participant_proof_refs": {
+            "fixture:P-B": "fixture-strong-proof:fixture:P-B",
+            "fixture:P-A": "fixture-strong-proof:fixture:P-A",
+            "fixture:P-C": "fixture-strong-proof:fixture:P-C",
+            "fixture:P-D": "fixture-strong-proof:fixture:P-D"
+          },
+          "complete_under_fixture_rule_only": true,
+          "fixture_requirement_ref": "fixture-required-core-v1"
+        },
+        "fixture-origin:dead-heat": {
+          "synthetic_only": true,
+          "origin_kind": "fixture_reviewed_revision",
+          "target_key": "race_event:fixture-race-001",
+          "phase": "official",
+          "supersedes_ref": null,
+          "raw_material": {
+            "synthetic_only": true,
+            "target_key": "race_event:fixture-race-001",
+            "phase": "official",
+            "participants": [
+              {
+                "participant_ref": "fixture:P-B",
+                "horse_ref": "horse:fixture:P-B",
+                "reported_finish_position": 1,
+                "normalized_status": "dead_heat",
+                "is_confirmed": true,
+                "source_order": 1,
+                "source_horse_number": "2",
+                "source_horse_name": "示例乙",
+                "source_fields": {
+                  "jockey_name": "骑师乙",
+                  "trainer_name": "练马师乙",
+                  "finish_time": "1:34.0",
+                  "margin": "同着",
+                  "odds": "2.5",
+                  "popularity": "1"
+                },
+                "field_availability": {
+                  "jockey_name": "available",
+                  "trainer_name": "available",
+                  "finish_time": "available",
+                  "margin": "available",
+                  "odds": "available",
+                  "popularity": "available"
+                }
+              },
+              {
+                "participant_ref": "fixture:P-A",
+                "horse_ref": "horse:fixture:P-A",
+                "reported_finish_position": 1,
+                "normalized_status": "dead_heat",
+                "is_confirmed": true,
+                "source_order": 2,
+                "source_horse_number": "1",
+                "source_horse_name": "示例甲",
+                "source_fields": {
+                  "jockey_name": "骑师甲",
+                  "trainer_name": "练马师甲",
+                  "finish_time": null,
+                  "margin": "同着",
+                  "odds": "3.0",
+                  "popularity": "2"
+                },
+                "field_availability": {
+                  "jockey_name": "available",
+                  "trainer_name": "available",
+                  "finish_time": "known_missing",
+                  "margin": "available",
+                  "odds": "available",
+                  "popularity": "available"
+                }
+              },
+              {
+                "participant_ref": "fixture:P-C",
+                "horse_ref": "horse:fixture:P-C",
+                "reported_finish_position": 3,
+                "normalized_status": "finished",
+                "is_confirmed": true,
+                "source_order": 3,
+                "source_horse_number": "3",
+                "source_horse_name": "Café & 星",
+                "source_fields": {
+                  "jockey_name": "骑师丙",
+                  "trainer_name": "练马师丙",
+                  "finish_time": null,
+                  "margin": "1",
+                  "odds": "8.0",
+                  "popularity": "3"
+                },
+                "field_availability": {
+                  "jockey_name": "available",
+                  "trainer_name": "available",
+                  "finish_time": "known_missing",
+                  "margin": "available",
+                  "odds": "available",
+                  "popularity": "available"
+                }
+              },
+              {
+                "participant_ref": "fixture:P-D",
+                "horse_ref": "horse:fixture:P-D",
+                "reported_finish_position": null,
+                "normalized_status": "disqualified",
+                "is_confirmed": true,
+                "source_order": 4,
+                "source_horse_number": "4",
+                "source_horse_name": "示例丁",
+                "source_fields": {
+                  "jockey_name": "骑师丁",
+                  "trainer_name": "练马师丁",
+                  "finish_time": null,
+                  "margin": null,
+                  "odds": "12.0",
+                  "popularity": "4"
+                },
+                "field_availability": {
+                  "jockey_name": "available",
+                  "trainer_name": "available",
+                  "finish_time": "known_missing",
+                  "margin": "known_missing",
+                  "odds": "available",
+                  "popularity": "available"
+                }
+              }
+            ],
+            "source_revision": "dead-heat"
+          },
+          "raw_material_sha256": "549a0b535e95dac2f01a60d934fe4056ce573d0049eac221442ca88dc0421a9f",
+          "participant_proof_refs": {
+            "fixture:P-B": "fixture-strong-proof:fixture:P-B",
+            "fixture:P-A": "fixture-strong-proof:fixture:P-A",
+            "fixture:P-C": "fixture-strong-proof:fixture:P-C",
+            "fixture:P-D": "fixture-strong-proof:fixture:P-D"
+          },
+          "complete_under_fixture_rule_only": true,
+          "fixture_requirement_ref": "fixture-required-core-v1"
+        },
+        "fixture-origin:nullable-champion": {
+          "synthetic_only": true,
+          "origin_kind": "fixture_reviewed_revision",
+          "target_key": "race_event:fixture-nullable-001",
+          "phase": "official",
+          "supersedes_ref": null,
+          "raw_material": {
+            "synthetic_only": true,
+            "target_key": "race_event:fixture-nullable-001",
+            "phase": "official",
+            "participants": [
+              {
+                "participant_ref": "fixture:P-A",
+                "horse_ref": "horse:fixture:P-A",
+                "reported_finish_position": 1,
+                "normalized_status": "finished",
+                "is_confirmed": true,
+                "source_order": 1,
+                "source_horse_number": "1",
+                "source_horse_name": "示例甲",
+                "source_fields": {
+                  "jockey_name": null,
+                  "trainer_name": null,
+                  "finish_time": null,
+                  "margin": null,
+                  "odds": "3.0",
+                  "popularity": null
+                },
+                "field_availability": {
+                  "jockey_name": "known_missing",
+                  "trainer_name": "known_missing",
+                  "finish_time": "known_missing",
+                  "margin": "known_missing",
+                  "odds": "available",
+                  "popularity": "known_missing"
+                }
+              },
+              {
+                "participant_ref": "fixture:P-B",
+                "horse_ref": "horse:fixture:P-B",
+                "reported_finish_position": 2,
+                "normalized_status": "finished",
+                "is_confirmed": true,
+                "source_order": 2,
+                "source_horse_number": "2",
+                "source_horse_name": "示例乙",
+                "source_fields": {
+                  "jockey_name": "骑师乙",
+                  "trainer_name": "练马师乙",
+                  "finish_time": null,
+                  "margin": "1/2",
+                  "odds": "2.5",
+                  "popularity": "1"
+                },
+                "field_availability": {
+                  "jockey_name": "available",
+                  "trainer_name": "available",
+                  "finish_time": "known_missing",
+                  "margin": "available",
+                  "odds": "available",
+                  "popularity": "available"
+                }
+              },
+              {
+                "participant_ref": "fixture:P-C",
+                "horse_ref": "horse:fixture:P-C",
+                "reported_finish_position": 3,
+                "normalized_status": "finished",
+                "is_confirmed": true,
+                "source_order": 3,
+                "source_horse_number": "3",
+                "source_horse_name": "Café & 星",
+                "source_fields": {
+                  "jockey_name": "骑师丙",
+                  "trainer_name": "练马师丙",
+                  "finish_time": null,
+                  "margin": "1",
+                  "odds": "8.0",
+                  "popularity": "3"
+                },
+                "field_availability": {
+                  "jockey_name": "available",
+                  "trainer_name": "available",
+                  "finish_time": "known_missing",
+                  "margin": "available",
+                  "odds": "available",
+                  "popularity": "available"
+                }
+              },
+              {
+                "participant_ref": "fixture:P-D",
+                "horse_ref": "horse:fixture:P-D",
+                "reported_finish_position": null,
+                "normalized_status": "disqualified",
+                "is_confirmed": true,
+                "source_order": 4,
+                "source_horse_number": "4",
+                "source_horse_name": "示例丁",
+                "source_fields": {
+                  "jockey_name": "骑师丁",
+                  "trainer_name": "练马师丁",
+                  "finish_time": null,
+                  "margin": null,
+                  "odds": "12.0",
+                  "popularity": "4"
+                },
+                "field_availability": {
+                  "jockey_name": "available",
+                  "trainer_name": "available",
+                  "finish_time": "known_missing",
+                  "margin": "known_missing",
+                  "odds": "available",
+                  "popularity": "available"
+                }
+              }
+            ],
+            "source_revision": "nullable-champion"
+          },
+          "raw_material_sha256": "8d97cf27089cbfacdd4ef230c7ee0c8bde2824d8d1c57ccfd216376f70730bed",
+          "participant_proof_refs": {
+            "fixture:P-A": "fixture-strong-proof:nullable-champion:fixture:P-A",
+            "fixture:P-B": "fixture-strong-proof:nullable-champion:fixture:P-B",
+            "fixture:P-C": "fixture-strong-proof:nullable-champion:fixture:P-C",
+            "fixture:P-D": "fixture-strong-proof:nullable-champion:fixture:P-D"
+          },
+          "complete_under_fixture_rule_only": true,
+          "fixture_requirement_ref": "fixture-required-core-v1"
+        },
+        "fixture-origin:single-complete": {
+          "synthetic_only": true,
+          "origin_kind": "fixture_reviewed_revision",
+          "target_key": "race_event:fixture-single-001",
+          "phase": "official",
+          "supersedes_ref": null,
+          "raw_material": {
+            "synthetic_only": true,
+            "target_key": "race_event:fixture-single-001",
+            "phase": "official",
+            "participants": [
+              {
+                "participant_ref": "fixture:P-A",
+                "horse_ref": "horse:fixture:P-A",
+                "reported_finish_position": 1,
+                "normalized_status": "finished",
+                "is_confirmed": true,
+                "source_order": 1,
+                "source_horse_number": "1",
+                "source_horse_name": "示例甲",
+                "source_fields": {
+                  "jockey_name": "骑师甲",
+                  "trainer_name": "练马师甲",
+                  "finish_time": "1:34.0",
+                  "margin": null,
+                  "odds": "3.0",
+                  "popularity": "2"
+                },
+                "field_availability": {
+                  "jockey_name": "available",
+                  "trainer_name": "available",
+                  "finish_time": "available",
+                  "margin": "known_missing",
+                  "odds": "available",
+                  "popularity": "available"
+                }
+              }
+            ],
+            "source_revision": "single-complete"
+          },
+          "raw_material_sha256": "fe0da7742283084d66551758a88e03fee50ba9e7941e2b6724d65e13563e9c8a",
+          "participant_proof_refs": {
+            "fixture:P-A": "fixture-strong-proof:single-complete:fixture:P-A"
+          },
+          "complete_under_fixture_rule_only": true,
+          "fixture_requirement_ref": "fixture-required-core-v1"
+        }
+      }
+    },
+    "permissions": {
+      "const": {
+        "fixture-permission:official-old": {
+          "synthetic_only": true,
+          "target_key": "race_event:fixture-race-001",
+          "origin_ref": "fixture-origin:official-old",
+          "capability": "result",
+          "audience_ref": "anonymous",
+          "allowed_surfaces": [
+            "calendar.main.result-summary",
+            "detail.result-family"
+          ],
+          "allowed": true,
+          "valid_from": "2026-10-04T00:01:00Z",
+          "valid_until": "2026-10-05T00:00:00Z",
+          "proof_ref": "fixture-public-permission-only:official-old",
+          "permission_generation": 1,
+          "permission_version": "pp1:3fd62752b900c62c7c7ca218572b9ad72b04cc19e1f71bfa7ad7dc9f68ccf4e7"
+        },
+        "fixture-permission:correction-current": {
+          "synthetic_only": true,
+          "target_key": "race_event:fixture-race-001",
+          "origin_ref": "fixture-origin:correction-current",
+          "capability": "correction",
+          "audience_ref": "anonymous",
+          "allowed_surfaces": [
+            "calendar.main.result-summary",
+            "detail.result-family"
+          ],
+          "allowed": true,
+          "valid_from": "2026-10-04T00:01:00Z",
+          "valid_until": "2026-10-05T00:00:00Z",
+          "proof_ref": "fixture-public-permission-only:correction-current",
+          "permission_generation": 1,
+          "permission_version": "pp1:8a808fc1fad29dfcef35a70f4f3618865aa7ab0ffc7080e027dcb3a2f337bd12"
+        },
+        "fixture-permission:dead-heat": {
+          "synthetic_only": true,
+          "target_key": "race_event:fixture-race-001",
+          "origin_ref": "fixture-origin:dead-heat",
+          "capability": "result",
+          "audience_ref": "anonymous",
+          "allowed_surfaces": [
+            "calendar.main.result-summary",
+            "detail.result-family"
+          ],
+          "allowed": true,
+          "valid_from": "2026-10-04T00:01:00Z",
+          "valid_until": "2026-10-05T00:00:00Z",
+          "proof_ref": "fixture-public-permission-only:dead-heat",
+          "permission_generation": 1,
+          "permission_version": "pp1:adf5ea4f15ce9339a75163fa05dbfd6ab21a0a296a262aa2ffae055e287e6e1b"
+        },
+        "fixture-permission:nullable-champion": {
+          "synthetic_only": true,
+          "target_key": "race_event:fixture-nullable-001",
+          "origin_ref": "fixture-origin:nullable-champion",
+          "capability": "result",
+          "audience_ref": "anonymous",
+          "allowed_surfaces": [
+            "calendar.main.result-summary",
+            "detail.result-family"
+          ],
+          "allowed": true,
+          "valid_from": "2026-10-04T00:01:00Z",
+          "valid_until": "2026-10-05T00:00:00Z",
+          "proof_ref": "fixture-public-permission-only:nullable-champion",
+          "permission_generation": 3,
+          "permission_version": "pp1:cfcec97fe1f5879337ee41edf4802d4ea6c4905d4b2596a47f1396d4276bdf50"
+        },
+        "fixture-permission:single-complete": {
+          "synthetic_only": true,
+          "target_key": "race_event:fixture-single-001",
+          "origin_ref": "fixture-origin:single-complete",
+          "capability": "result",
+          "audience_ref": "anonymous",
+          "allowed_surfaces": [
+            "calendar.main.result-summary",
+            "detail.result-family"
+          ],
+          "allowed": true,
+          "valid_from": "2026-10-04T00:01:00Z",
+          "valid_until": "2026-10-05T00:00:00Z",
+          "proof_ref": "fixture-public-permission-only:single-complete",
+          "permission_generation": 4,
+          "permission_version": "pp1:12c93630fd56265006073caa4df1b3001c3265bed6e345a54691900ce28c6336"
+        }
+      }
+    },
+    "f01_documents": {
+      "const": {
+        "fixture-f01:official-old": {
+          "schema_version": "f01.v1",
+          "evaluated_at": "2026-10-04T00:02:00Z",
+          "policy_ref": "fixture-required-core-v1",
+          "input_version": {
+            "schema_version": "f01.input.v1",
+            "scope": [
+              "entity",
+              "evidence",
+              "materials",
+              "policy_ref",
+              "protection"
+            ],
+            "content_sha256": "37ee428b08cb507e67ebfebcd6beac3bd2b0fae43bd9a6659088b80699c5254a",
+            "generations": {
+              "owner": 1,
+              "schedule": 2,
+              "enrollment": 1,
+              "source_set": 1
+            }
+          },
+          "snapshot": {
+            "entity": {
+              "kind": "race_event",
+              "canonical_id": "race_event:fixture-race-001",
+              "source_refs": [],
+              "identity_state": "verified",
+              "candidate_ids": [],
+              "evidence_refs": [
+                "fixture-evidence:official-old"
+              ]
+            },
+            "evidence": [
+              {
+                "evidence_id": "fixture-evidence:official-old",
+                "provider_key": "synthetic_fixture",
+                "source_class": "manual_supplement",
+                "independence_key": "fixture-independent-origin",
+                "capability": "result",
+                "artifact_sha256": "e4b2ccae633fb046397356780e5a50cfca83e7f745b24c847d1ccf62dccb57ab",
+                "locator": "fixture:official-old",
+                "observed_at": "2026-10-04T00:01:00Z",
+                "source_time": {
+                  "precision": "exact",
+                  "published_at": "2026-10-04T00:01:00Z",
+                  "last_absent_at": null,
+                  "first_seen_at": null
+                },
+                "contract_ref": {
+                  "route_digest": "bb6a9a8b635be4014782be359a1e6cb1c1f99b6951c37fcc9c8459a61a454c7d",
+                  "contract_digest": "811461bb33eb445ef99efb28fd673c67bbce81036497773416eb2ab7693da889",
+                  "proof_digest": "6af5829d5c126a3f6c7d7b77d7c9a6d3bbe26f58b787ca63c2d0dbd18e65d429",
+                  "valid_until": "2026-10-05T00:00:00Z",
+                  "revoked": false
+                }
+              }
+            ],
+            "materials": [
+              {
+                "capability": "result",
+                "maturity": "confirmed",
+                "completeness": "complete",
+                "validation": "passed",
+                "revision_ref": "fixture-origin:official-old",
+                "supersedes_ref": null,
+                "evidence_refs": [
+                  "fixture-evidence:official-old"
+                ],
+                "data": {
+                  "participants": [
+                    {
+                      "stable_key": "fixture:P-A",
+                      "horse_ref": "horse:fixture:P-A",
+                      "status": "finished"
+                    },
+                    {
+                      "stable_key": "fixture:P-B",
+                      "horse_ref": "horse:fixture:P-B",
+                      "status": "finished"
+                    },
+                    {
+                      "stable_key": "fixture:P-C",
+                      "horse_ref": "horse:fixture:P-C",
+                      "status": "finished"
+                    },
+                    {
+                      "stable_key": "fixture:P-D",
+                      "horse_ref": "horse:fixture:P-D",
+                      "status": "disqualified"
+                    }
+                  ]
+                }
+              }
+            ],
+            "protection": {
+              "paused": false,
+              "fields": [],
+              "modules": [],
+              "reason": "",
+              "actor_ref": null,
+              "changed_at": null,
+              "protection_sha256": "7019f6f92bcbac36c1b52326311d33f263324be1faae9a1b4f747619b20a1701"
+            },
+            "policy_ref": "fixture-required-core-v1"
+          }
+        },
+        "fixture-f01:correction-current": {
+          "schema_version": "f01.v1",
+          "evaluated_at": "2026-10-04T00:02:00Z",
+          "policy_ref": "fixture-required-core-v1",
+          "input_version": {
+            "schema_version": "f01.input.v1",
+            "scope": [
+              "entity",
+              "evidence",
+              "materials",
+              "policy_ref",
+              "protection"
+            ],
+            "content_sha256": "72d80026baeb81364eb2d6c03150d9b7327315983f26a092381a13329249a4cc",
+            "generations": {
+              "owner": 1,
+              "schedule": 2,
+              "enrollment": 1,
+              "source_set": 1
+            }
+          },
+          "snapshot": {
+            "entity": {
+              "kind": "race_event",
+              "canonical_id": "race_event:fixture-race-001",
+              "source_refs": [],
+              "identity_state": "verified",
+              "candidate_ids": [],
+              "evidence_refs": [
+                "fixture-evidence:correction-current"
+              ]
+            },
+            "evidence": [
+              {
+                "evidence_id": "fixture-evidence:correction-current",
+                "provider_key": "synthetic_fixture",
+                "source_class": "manual_supplement",
+                "independence_key": "fixture-independent-origin",
+                "capability": "correction",
+                "artifact_sha256": "8d1fd71ea13e9f44bd55166758ee836e7f14a612c92a659200cb510330c90b2f",
+                "locator": "fixture:correction-current",
+                "observed_at": "2026-10-04T00:01:00Z",
+                "source_time": {
+                  "precision": "exact",
+                  "published_at": "2026-10-04T00:01:00Z",
+                  "last_absent_at": null,
+                  "first_seen_at": null
+                },
+                "contract_ref": {
+                  "route_digest": "989bdebeea323c07ca81dffa09c45c871899075d3355862484b503f657045768",
+                  "contract_digest": "c34df734168620f363d5f065ef8cb12d6683f6f5d018be7d997c935440cd4e50",
+                  "proof_digest": "5d0dc87aeca09d520679ec904062e3d435ebaceb52cb304bc46e07e75d93869a",
+                  "valid_until": "2026-10-05T00:00:00Z",
+                  "revoked": false
+                }
+              }
+            ],
+            "materials": [
+              {
+                "capability": "correction",
+                "maturity": "corrected",
+                "completeness": "complete",
+                "validation": "passed",
+                "revision_ref": "fixture-origin:correction-current",
+                "supersedes_ref": "fixture-origin:official-old",
+                "evidence_refs": [
+                  "fixture-evidence:correction-current"
+                ],
+                "data": {
+                  "participants": [
+                    {
+                      "stable_key": "fixture:P-B",
+                      "horse_ref": "horse:fixture:P-B",
+                      "status": "finished"
+                    },
+                    {
+                      "stable_key": "fixture:P-A",
+                      "horse_ref": "horse:fixture:P-A",
+                      "status": "finished"
+                    },
+                    {
+                      "stable_key": "fixture:P-C",
+                      "horse_ref": "horse:fixture:P-C",
+                      "status": "finished"
+                    },
+                    {
+                      "stable_key": "fixture:P-D",
+                      "horse_ref": "horse:fixture:P-D",
+                      "status": "disqualified"
+                    }
+                  ]
+                }
+              }
+            ],
+            "protection": {
+              "paused": false,
+              "fields": [],
+              "modules": [],
+              "reason": "",
+              "actor_ref": null,
+              "changed_at": null,
+              "protection_sha256": "7019f6f92bcbac36c1b52326311d33f263324be1faae9a1b4f747619b20a1701"
+            },
+            "policy_ref": "fixture-required-core-v1"
+          }
+        },
+        "fixture-f01:dead-heat": {
+          "schema_version": "f01.v1",
+          "evaluated_at": "2026-10-04T00:02:00Z",
+          "policy_ref": "fixture-required-core-v1",
+          "input_version": {
+            "schema_version": "f01.input.v1",
+            "scope": [
+              "entity",
+              "evidence",
+              "materials",
+              "policy_ref",
+              "protection"
+            ],
+            "content_sha256": "86ddb4b4d95377ed6ca034a5930f46c489bad4975e9bc809fde2dcb49916d6ea",
+            "generations": {
+              "owner": 1,
+              "schedule": 2,
+              "enrollment": 1,
+              "source_set": 1
+            }
+          },
+          "snapshot": {
+            "entity": {
+              "kind": "race_event",
+              "canonical_id": "race_event:fixture-race-001",
+              "source_refs": [],
+              "identity_state": "verified",
+              "candidate_ids": [],
+              "evidence_refs": [
+                "fixture-evidence:dead-heat"
+              ]
+            },
+            "evidence": [
+              {
+                "evidence_id": "fixture-evidence:dead-heat",
+                "provider_key": "synthetic_fixture",
+                "source_class": "manual_supplement",
+                "independence_key": "fixture-independent-origin",
+                "capability": "result",
+                "artifact_sha256": "549a0b535e95dac2f01a60d934fe4056ce573d0049eac221442ca88dc0421a9f",
+                "locator": "fixture:dead-heat",
+                "observed_at": "2026-10-04T00:01:00Z",
+                "source_time": {
+                  "precision": "exact",
+                  "published_at": "2026-10-04T00:01:00Z",
+                  "last_absent_at": null,
+                  "first_seen_at": null
+                },
+                "contract_ref": {
+                  "route_digest": "270521debfbe1c4fc4092486b4f53b2889dda655e820b8e9f2662364f7791ca9",
+                  "contract_digest": "03a3082924c3ee5f8c88043aec33e58d02b5d7d7c817ef6d95534c8e6ce665c4",
+                  "proof_digest": "f208b5cef3dcee3dfcd4c0063f81b85399c18f1f800a7751878298d70542788b",
+                  "valid_until": "2026-10-05T00:00:00Z",
+                  "revoked": false
+                }
+              }
+            ],
+            "materials": [
+              {
+                "capability": "result",
+                "maturity": "confirmed",
+                "completeness": "complete",
+                "validation": "passed",
+                "revision_ref": "fixture-origin:dead-heat",
+                "supersedes_ref": null,
+                "evidence_refs": [
+                  "fixture-evidence:dead-heat"
+                ],
+                "data": {
+                  "participants": [
+                    {
+                      "stable_key": "fixture:P-B",
+                      "horse_ref": "horse:fixture:P-B",
+                      "status": "dead_heat"
+                    },
+                    {
+                      "stable_key": "fixture:P-A",
+                      "horse_ref": "horse:fixture:P-A",
+                      "status": "dead_heat"
+                    },
+                    {
+                      "stable_key": "fixture:P-C",
+                      "horse_ref": "horse:fixture:P-C",
+                      "status": "finished"
+                    },
+                    {
+                      "stable_key": "fixture:P-D",
+                      "horse_ref": "horse:fixture:P-D",
+                      "status": "disqualified"
+                    }
+                  ]
+                }
+              }
+            ],
+            "protection": {
+              "paused": false,
+              "fields": [],
+              "modules": [],
+              "reason": "",
+              "actor_ref": null,
+              "changed_at": null,
+              "protection_sha256": "7019f6f92bcbac36c1b52326311d33f263324be1faae9a1b4f747619b20a1701"
+            },
+            "policy_ref": "fixture-required-core-v1"
+          }
+        },
+        "fixture-f01:nullable-champion": {
+          "schema_version": "f01.v1",
+          "evaluated_at": "2026-10-04T00:02:00Z",
+          "policy_ref": "fixture-required-core-v1",
+          "input_version": {
+            "schema_version": "f01.input.v1",
+            "scope": [
+              "entity",
+              "evidence",
+              "materials",
+              "policy_ref",
+              "protection"
+            ],
+            "content_sha256": "4b3961825199c34e34191b9cb2846aa9b20ecf71df236397d3d4b718db093a14",
+            "generations": {
+              "owner": 3,
+              "schedule": 3,
+              "enrollment": 2,
+              "source_set": 2
+            }
+          },
+          "snapshot": {
+            "entity": {
+              "kind": "race_event",
+              "canonical_id": "race_event:fixture-nullable-001",
+              "source_refs": [],
+              "identity_state": "verified",
+              "candidate_ids": [],
+              "evidence_refs": [
+                "fixture-evidence:nullable-champion"
+              ]
+            },
+            "evidence": [
+              {
+                "evidence_id": "fixture-evidence:nullable-champion",
+                "provider_key": "synthetic_fixture",
+                "source_class": "manual_supplement",
+                "independence_key": "fixture-independent-origin",
+                "capability": "result",
+                "artifact_sha256": "8d97cf27089cbfacdd4ef230c7ee0c8bde2824d8d1c57ccfd216376f70730bed",
+                "locator": "fixture:nullable-champion",
+                "observed_at": "2026-10-04T00:01:00Z",
+                "source_time": {
+                  "precision": "exact",
+                  "published_at": "2026-10-04T00:01:00Z",
+                  "last_absent_at": null,
+                  "first_seen_at": null
+                },
+                "contract_ref": {
+                  "route_digest": "bb6a9a8b635be4014782be359a1e6cb1c1f99b6951c37fcc9c8459a61a454c7d",
+                  "contract_digest": "811461bb33eb445ef99efb28fd673c67bbce81036497773416eb2ab7693da889",
+                  "proof_digest": "856e33cd23fc610058c6a1fe056c49c59881f23a3f7b50f0e327ed705f64c6cc",
+                  "valid_until": "2026-10-05T00:00:00Z",
+                  "revoked": false
+                }
+              }
+            ],
+            "materials": [
+              {
+                "capability": "result",
+                "maturity": "confirmed",
+                "completeness": "complete",
+                "validation": "passed",
+                "revision_ref": "fixture-origin:nullable-champion",
+                "supersedes_ref": null,
+                "evidence_refs": [
+                  "fixture-evidence:nullable-champion"
+                ],
+                "data": {
+                  "participants": [
+                    {
+                      "stable_key": "fixture:P-A",
+                      "horse_ref": "horse:fixture:P-A",
+                      "status": "finished"
+                    },
+                    {
+                      "stable_key": "fixture:P-B",
+                      "horse_ref": "horse:fixture:P-B",
+                      "status": "finished"
+                    },
+                    {
+                      "stable_key": "fixture:P-C",
+                      "horse_ref": "horse:fixture:P-C",
+                      "status": "finished"
+                    },
+                    {
+                      "stable_key": "fixture:P-D",
+                      "horse_ref": "horse:fixture:P-D",
+                      "status": "disqualified"
+                    }
+                  ]
+                }
+              }
+            ],
+            "protection": {
+              "paused": false,
+              "fields": [],
+              "modules": [],
+              "reason": "",
+              "actor_ref": null,
+              "changed_at": null,
+              "protection_sha256": "7019f6f92bcbac36c1b52326311d33f263324be1faae9a1b4f747619b20a1701"
+            },
+            "policy_ref": "fixture-required-core-v1"
+          }
+        },
+        "fixture-f01:single-complete": {
+          "schema_version": "f01.v1",
+          "evaluated_at": "2026-10-04T00:02:00Z",
+          "policy_ref": "fixture-required-core-v1",
+          "input_version": {
+            "schema_version": "f01.input.v1",
+            "scope": [
+              "entity",
+              "evidence",
+              "materials",
+              "policy_ref",
+              "protection"
+            ],
+            "content_sha256": "5e45387de549ccb657013feb60772ea35b0ac5341c93b6bad600aff53a01cc02",
+            "generations": {
+              "owner": 4,
+              "schedule": 3,
+              "enrollment": 2,
+              "source_set": 2
+            }
+          },
+          "snapshot": {
+            "entity": {
+              "kind": "race_event",
+              "canonical_id": "race_event:fixture-single-001",
+              "source_refs": [],
+              "identity_state": "verified",
+              "candidate_ids": [],
+              "evidence_refs": [
+                "fixture-evidence:single-complete"
+              ]
+            },
+            "evidence": [
+              {
+                "evidence_id": "fixture-evidence:single-complete",
+                "provider_key": "synthetic_fixture",
+                "source_class": "manual_supplement",
+                "independence_key": "fixture-independent-origin",
+                "capability": "result",
+                "artifact_sha256": "fe0da7742283084d66551758a88e03fee50ba9e7941e2b6724d65e13563e9c8a",
+                "locator": "fixture:single-complete",
+                "observed_at": "2026-10-04T00:01:00Z",
+                "source_time": {
+                  "precision": "exact",
+                  "published_at": "2026-10-04T00:01:00Z",
+                  "last_absent_at": null,
+                  "first_seen_at": null
+                },
+                "contract_ref": {
+                  "route_digest": "bb6a9a8b635be4014782be359a1e6cb1c1f99b6951c37fcc9c8459a61a454c7d",
+                  "contract_digest": "811461bb33eb445ef99efb28fd673c67bbce81036497773416eb2ab7693da889",
+                  "proof_digest": "6259a11f58e7e8daa7e231fbbfffd474b92dc2e424aed1ba6ffd1160b96b2904",
+                  "valid_until": "2026-10-05T00:00:00Z",
+                  "revoked": false
+                }
+              }
+            ],
+            "materials": [
+              {
+                "capability": "result",
+                "maturity": "confirmed",
+                "completeness": "complete",
+                "validation": "passed",
+                "revision_ref": "fixture-origin:single-complete",
+                "supersedes_ref": null,
+                "evidence_refs": [
+                  "fixture-evidence:single-complete"
+                ],
+                "data": {
+                  "participants": [
+                    {
+                      "stable_key": "fixture:P-A",
+                      "horse_ref": "horse:fixture:P-A",
+                      "status": "finished"
+                    }
+                  ]
+                }
+              }
+            ],
+            "protection": {
+              "paused": false,
+              "fields": [],
+              "modules": [],
+              "reason": "",
+              "actor_ref": null,
+              "changed_at": null,
+              "protection_sha256": "7019f6f92bcbac36c1b52326311d33f263324be1faae9a1b4f747619b20a1701"
+            },
+            "policy_ref": "fixture-required-core-v1"
+          }
+        }
+      }
+    },
+    "private_inputs": {
+      "type": "object",
+      "properties": {
+        "P-official-old-detail-legacy": {
+          "$ref": "contract.json#/$defs/PrivateInput"
+        },
+        "P-official-old-detail-strict_display_v1": {
+          "$ref": "contract.json#/$defs/PrivateInput"
+        },
+        "P-official-old-card-legacy": {
+          "$ref": "contract.json#/$defs/PrivateInput"
+        },
+        "P-official-old-card-strict_display_v1": {
+          "$ref": "contract.json#/$defs/PrivateInput"
+        },
+        "P-correction-current-detail-legacy": {
+          "$ref": "contract.json#/$defs/PrivateInput"
+        },
+        "P-correction-current-detail-strict_display_v1": {
+          "$ref": "contract.json#/$defs/PrivateInput"
+        },
+        "P-correction-current-card-legacy": {
+          "$ref": "contract.json#/$defs/PrivateInput"
+        },
+        "P-correction-current-card-strict_display_v1": {
+          "$ref": "contract.json#/$defs/PrivateInput"
+        },
+        "P-dead-heat-detail-legacy": {
+          "$ref": "contract.json#/$defs/PrivateInput"
+        },
+        "P-dead-heat-detail-strict_display_v1": {
+          "$ref": "contract.json#/$defs/PrivateInput"
+        },
+        "P-dead-heat-card-legacy": {
+          "$ref": "contract.json#/$defs/PrivateInput"
+        },
+        "P-dead-heat-card-strict_display_v1": {
+          "$ref": "contract.json#/$defs/PrivateInput"
+        },
+        "P-nullable-champion-detail-legacy-C020-origin-extension": {
+          "$ref": "contract.json#/$defs/PrivateInput"
+        },
+        "P-nullable-champion-detail-strict_display_v1-C020-origin-extension": {
+          "$ref": "contract.json#/$defs/PrivateInput"
+        },
+        "P-nullable-champion-card-legacy-C020-origin-extension": {
+          "$ref": "contract.json#/$defs/PrivateInput"
+        },
+        "P-nullable-champion-card-strict_display_v1-C020-origin-extension": {
+          "$ref": "contract.json#/$defs/PrivateInput"
+        },
+        "P-single-complete-detail-legacy-C020-origin-extension": {
+          "$ref": "contract.json#/$defs/PrivateInput"
+        },
+        "P-single-complete-detail-strict_display_v1-C020-origin-extension": {
+          "$ref": "contract.json#/$defs/PrivateInput"
+        },
+        "P-single-complete-card-legacy-C020-origin-extension": {
+          "$ref": "contract.json#/$defs/PrivateInput"
+        },
+        "P-single-complete-card-strict_display_v1-C020-origin-extension": {
+          "$ref": "contract.json#/$defs/PrivateInput"
+        },
+        "P-official-old-detail-strict_display_v1-no-hero": {
+          "$ref": "contract.json#/$defs/PrivateInput"
+        },
+        "P-correction-current-detail-strict_display_v1-stale": {
+          "$ref": "contract.json#/$defs/PrivateInput"
+        },
+        "P-official-old-card-legacy-date-script-off": {
+          "$ref": "contract.json#/$defs/PrivateInput"
+        },
+        "P-official-old-card-legacy-missing-origin": {
+          "$ref": "contract.json#/$defs/PrivateInput"
+        },
+        "P-correction-current-detail-strict_display_v1-complete-nonleaf": {
+          "$ref": "contract.json#/$defs/PrivateInput"
+        }
+      },
+      "required": [
+        "P-official-old-detail-legacy",
+        "P-official-old-detail-strict_display_v1",
+        "P-official-old-card-legacy",
+        "P-official-old-card-strict_display_v1",
+        "P-correction-current-detail-legacy",
+        "P-correction-current-detail-strict_display_v1",
+        "P-correction-current-card-legacy",
+        "P-correction-current-card-strict_display_v1",
+        "P-dead-heat-detail-legacy",
+        "P-dead-heat-detail-strict_display_v1",
+        "P-dead-heat-card-legacy",
+        "P-dead-heat-card-strict_display_v1",
+        "P-nullable-champion-detail-legacy-C020-origin-extension",
+        "P-nullable-champion-detail-strict_display_v1-C020-origin-extension",
+        "P-nullable-champion-card-legacy-C020-origin-extension",
+        "P-nullable-champion-card-strict_display_v1-C020-origin-extension",
+        "P-single-complete-detail-legacy-C020-origin-extension",
+        "P-single-complete-detail-strict_display_v1-C020-origin-extension",
+        "P-single-complete-card-legacy-C020-origin-extension",
+        "P-single-complete-card-strict_display_v1-C020-origin-extension",
+        "P-official-old-detail-strict_display_v1-no-hero",
+        "P-correction-current-detail-strict_display_v1-stale",
+        "P-official-old-card-legacy-date-script-off",
+        "P-official-old-card-legacy-missing-origin",
+        "P-correction-current-detail-strict_display_v1-complete-nonleaf"
+      ],
+      "additionalProperties": false
+    },
+    "display_mappings": {
+      "type": "object",
+      "properties": {
+        "official-old:legacy": {
+          "$ref": "#/$defs/Mapping"
+        },
+        "official-old:strict_display_v1": {
+          "$ref": "#/$defs/Mapping"
+        },
+        "correction-current:legacy": {
+          "$ref": "#/$defs/Mapping"
+        },
+        "correction-current:strict_display_v1": {
+          "$ref": "#/$defs/Mapping"
+        },
+        "dead-heat:legacy": {
+          "$ref": "#/$defs/Mapping"
+        },
+        "dead-heat:strict_display_v1": {
+          "$ref": "#/$defs/Mapping"
+        },
+        "nullable-champion:legacy": {
+          "$ref": "#/$defs/Mapping"
+        },
+        "nullable-champion:strict_display_v1": {
+          "$ref": "#/$defs/Mapping"
+        },
+        "single-complete:legacy": {
+          "$ref": "#/$defs/Mapping"
+        },
+        "single-complete:strict_display_v1": {
+          "$ref": "#/$defs/Mapping"
+        }
+      },
+      "required": [
+        "official-old:legacy",
+        "official-old:strict_display_v1",
+        "correction-current:legacy",
+        "correction-current:strict_display_v1",
+        "dead-heat:legacy",
+        "dead-heat:strict_display_v1",
+        "nullable-champion:legacy",
+        "nullable-champion:strict_display_v1",
+        "single-complete:legacy",
+        "single-complete:strict_display_v1"
+      ],
+      "additionalProperties": false
+    },
+    "positive_and_missing_cases": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Case"
+      },
+      "minItems": 12,
+      "maxItems": 64
+    },
+    "future_negative_cases": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Negative"
+      },
+      "minItems": 1,
+      "maxItems": 128
+    },
+    "original_scope_preservation": {
+      "const": {
+        "C016_methods": 94,
+        "C015_cases": 54,
+        "C015_case_ids": [
+          "P-official-old-detail",
+          "P-official-old-card",
+          "P-correction-current-detail",
+          "P-correction-current-card",
+          "P-dead-heat-detail",
+          "P-dead-heat-card",
+          "P-unicode-NFD",
+          "P-entities",
+          "N01-new-marker-old-body",
+          "N02-hidden-mirror",
+          "N03-data-attribute-correct",
+          "N04-old-hero-new-table",
+          "N05-missing-row",
+          "N06-extra-row",
+          "N07-duplicate-row",
+          "N08-missing-field",
+          "N09-duplicate-field",
+          "N10-missing-role",
+          "N11-duplicate-role",
+          "N12-cross-event",
+          "N13-token-missing",
+          "N14-token-ambiguous",
+          "N15-token-wrong-surface",
+          "N16-raw-source-as-body",
+          "N17-legal-history-no-origin",
+          "N18-generic-403",
+          "N18-generic-404",
+          "N19-200-results-absent",
+          "N20-placeholder",
+          "N21-strong-row-unbound",
+          "N22-double-entity",
+          "N23-NFKC-forbidden",
+          "N24-malformed-nesting",
+          "N25-script-mirror",
+          "N26-CSS-unknown",
+          "N27-wire-limit",
+          "N28-decoded-limit",
+          "N29-depth-limit",
+          "N30-node-limit",
+          "N31-field-limit",
+          "N32-row-limit",
+          "N33-marker-limit",
+          "N34-limits-unbound",
+          "N35-schema-future",
+          "N36-audience-admin",
+          "N37-permission-unbound",
+          "N38-phase-in-body",
+          "N39-cross-event-history",
+          "N40-card-old-winner",
+          "N41-duplicate-marker",
+          "N42-incomplete-origin",
+          "N43-display-map-unbound",
+          "N44-column-label",
+          "N46-hidden-required-cell"
+        ],
+        "original_R_counterexamples": 4,
+        "original_case_results": {
+          "fixture_verified": 8,
+          "rejected": 14,
+          "unverified": 32
+        },
+        "do_not_add_methods_and_subtests": true
+      }
+    },
+    "manual_approval_state": {
+      "const": "awaiting_same_R_contract_review"
+    },
+    "real_loader_available": {
+      "const": false
+    }
+  },
+  "required": [
+    "schema_version",
+    "synthetic_only",
+    "not_real_template_render",
+    "not_real_http_response",
+    "static_preparation_only",
+    "candidate_sha",
+    "original_fixture_sha256",
+    "new_origin_lineage",
+    "origins",
+    "permissions",
+    "f01_documents",
+    "private_inputs",
+    "display_mappings",
+    "positive_and_missing_cases",
+    "future_negative_cases",
+    "original_scope_preservation",
+    "manual_approval_state",
+    "real_loader_available"
+  ],
+  "additionalProperties": false
+}
