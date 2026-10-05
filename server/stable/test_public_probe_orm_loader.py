@@ -190,3 +190,16 @@ class PublicProbeOrmPostgresTests(TransactionTestCase):
             snapshot=self.load()
         self.assertEqual(snapshot.reason,"snapshot_too_large")
         self.assertEqual(snapshot.rows,())
+
+    def test_final_permission_recheck_uses_fresh_time_not_historical_as_of(self):
+        real=loader._materialize
+        def delayed(*args,**kwargs):
+            snapshot=real(*args,**kwargs)
+            self.enterContext(patch("django.utils.timezone.now",return_value=NOW+timedelta(days=2)))
+            return snapshot
+        with patch.object(loader,"_materialize",side_effect=delayed):
+            snapshot=self.load()
+        self.assertEqual(snapshot.as_of,NOW)
+        self.assertEqual(snapshot.reason,"input_changed")
+        self.assertEqual(snapshot.rows,())
+        self.assertGreater(snapshot.revalidated_at,snapshot.snapshot_finished_at)
