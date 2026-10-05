@@ -49,3 +49,16 @@ ROOT将原标准窗口转交到北京时间14:36（含清理）；每次仅1容�
 ## C026-R01 返修准备断点（待实际 RED）
 
 原 R `f77ff5301fc1705517a389f3153b692156a76d41` 唯一P2指出确认标志直接复制projection，未独立核对writer phase规则。当前已修独立official fixture并添加两个错误标志反例；loader仍保留受审旧行为以取得实际RED。没有容器/PG执行，不能继承原15通过作为返修通过。当前ROOT占用窗口，已备最小两项诊断计划，等待调度；返修只涉及owned loader/test/fixture/C文档，不改views/models/writer/权限/schema/proof。起点2026-10-05 14:49:27 Asia/Shanghai，额度73%，本轮最多15分钟或74先到。
+
+
+## C026-R01 实际返修完成（2026-10-05）
+
+同原 R 唯一 P2 已完成本线修复，待原 R 限定复审，不将作者自验视作 review 通过。
+
+- RED source `471c180cc2c655f3f83c8229d2702b9a58979c21`：provisional错误True与official错误False两个反例均实际失败，错误为 `read_boundary_loaded != unverified`；合法gate、正确值和loaded前置断言通过。2 failure、0 error/skip、teardown成功，属于行为RED，无setup失败。
+- GREEN source `6dcea3d50c672154376566f63ec9deadca8324cf`：loader仅增加2行，按既有writer的revision.phase规则推导 expected_confirmation（official/corrected=True、provisional=False），不符返回projection_mismatch/unverified。独立fixture修为同规则，两个反例通过；不改view/model/writer/gate/schema/proof，仍允许合法provisional非confirmed表格。
+- 同一GREEN source完整新模块17方法必要回归通过，原15+新增2；实际canonical ID多重集合精确且无重复，0 failure/error/skip，exit0/lifecycle complete，完整PG teardown成功。包含同名identity、multisource fetch-expiry与revoke、事务/并发、真实Client原语义。本轮没有重跑无关测试或formal full。
+- ROOT重新分配标准窗口起点2026-10-05 14:59:51 Asia/Shanghai，12分钟资源上限；同样单容器/2CPU/4GiB/256pids/networknone/readonly/capdropALL/NNP，固定缓存镜像，私有context；完成提前清理，running=0，仅原无关exited容器保留。
+- 原始证据 `/Users/mentianlu/.codex/runtime/c026-r01-confirmed-projection-repair-001`：red/green/module计划与原JSON/log、17项test-ids、summary、RED和模块实际inspect、owned-container-events及最终资源清单。计划均手工精确诊断，非collector或formal impact证据。GREEN瞬时inspect未捕获，实际CID从该独占窗口daemon events恢复，不伪造inspect。
+- 实际RED CID `4dedc056e9baaa37b9c59d6bb436fa6dfd568e0547c1ec8eb8406276ae56fe94`，17项模块CID `eab89f4a05dcbcd3bc388e6a0613cde24da02b60668ba675eb45a4d8eadc9fa3`；全部自有容器由标准runner自动移除。未改默认Docker context/他人资源，无下载/构建/外部API/生产动作。
+- 起点额度73%，在15分钟/74检查点前完成；资源分配由ROOT回收。本轮只局部修复原finding，mapping与原R官方指纹复审由ROOT协调，不自行新reviewer/合并/发布。
