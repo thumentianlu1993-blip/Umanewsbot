@@ -27,7 +27,8 @@
       "stable.test_japanese_racing_translation_normalization",
       "stable.test_term_gate_reprocessing",
       "stable.test_news_content_boundaries",
-      "stable.test_external_english_horse_context_gate"
+      "stable.test_external_english_horse_context_gate",
+      "stable.test_article_content_trace"
     ],
     "race_parser": [
       "stable.test_race_reference_sources",
@@ -644,7 +645,8 @@
       "stable.test_race_public_coverage"
     ],
     "module:stable.test_race_public_time": [
-      "stable.test_race_public_time"
+      "stable.test_race_public_time",
+      "stable.test_c027_public_time_sqlite"
     ],
     "module:stable.test_race_reference_management_commands": [
       "stable.test_race_reference_management_commands"
@@ -846,6 +848,10 @@
     ],
     "public_probe_orm_loader": [
       "stable.test_public_probe_orm_loader"
+    ],
+    "horse_cache_reuse": [
+      "stable.test_horse_cache_reuse",
+      "stable.test_horse_source_cache_reuse_adapter"
     ]
   },
   "dependencies": {
@@ -874,6 +880,10 @@
     ],
     "public_probe_orm_loader": [
       "race_results"
+    ],
+    "horse_cache_reuse": [
+      "horse_target_inventory",
+      "module:stable.test_p0_horse_completion_source_clients"
     ]
   },
   "tests": {
@@ -2647,6 +2657,30 @@
       "domains": [
         "public_probe_orm_loader"
       ]
+    },
+    "server/stable/test_horse_cache_reuse.py": {
+      "label": "stable.test_horse_cache_reuse",
+      "domains": [
+        "horse_cache_reuse"
+      ]
+    },
+    "server/stable/test_horse_source_cache_reuse_adapter.py": {
+      "label": "stable.test_horse_source_cache_reuse_adapter",
+      "domains": [
+        "horse_cache_reuse"
+      ]
+    },
+    "server/stable/test_c027_public_time_sqlite.py": {
+      "label": "stable.test_c027_public_time_sqlite",
+      "domains": [
+        "module:stable.test_race_public_time"
+      ]
+    },
+    "server/stable/test_article_content_trace.py": {
+      "label": "stable.test_article_content_trace",
+      "domains": [
+        "news_translation"
+      ]
     }
   },
   "profiles": {
@@ -2942,7 +2976,11 @@
     "stable.test_public_probe_template_adapter": "django",
     "stable.test_public_probe_template_glue": "django",
     "stable.test_responses_analysis": "django",
-    "stable.test_public_probe_orm_loader": "django"
+    "stable.test_public_probe_orm_loader": "django",
+    "stable.test_horse_cache_reuse": "python",
+    "stable.test_horse_source_cache_reuse_adapter": "django",
+    "stable.test_c027_public_time_sqlite": "python",
+    "stable.test_article_content_trace": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
@@ -3019,7 +3057,8 @@
     "public_probe_render": "operations: O03 离线公开内容解析与原始渲染合同",
     "public_probe_template_adapter": "application: O03 离线模板适配、测试环境隔离与恢复",
     "responses_analysis": "integration: M01 默认关闭的 Responses 分析与旧 provider 兼容",
-    "public_probe_orm_loader": "application: O03 单赛事匿名结果只读 ORM 与真实页面对账"
+    "public_probe_orm_loader": "application: O03 单赛事匿名结果只读 ORM 与真实页面对账",
+    "horse_cache_reuse": "integration: H02离线缓存分类与绑定HKJC字节适配"
   },
   "dedicated_batch_modules": [
     "stable.test_migration_history_repair_postgres",
