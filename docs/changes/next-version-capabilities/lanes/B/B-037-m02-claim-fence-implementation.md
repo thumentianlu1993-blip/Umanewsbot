@@ -1,6 +1,6 @@
 # B037：自动重试 claim/fence 实施准备
 
-任务 B037-M02-CLAIM-FENCE-IMPLEMENT-001。当前**原 R 代码审核 NEEDS_CHANGES；B037-R01 六个锁等待场景有效 RED 已齐，仅锁后时钟判断已修，待 GREEN 与受影响回归**；原63项通过证据保持。ROOT 已确认原 R `6e05cc18ccc78364cb5d41babbfe4f5f367ee194` 关闭 B036-R01，APPROVED_PLAN_ONLY；该确认不是实现审核或发布授权。
+任务 B037-M02-CLAIM-FENCE-IMPLEMENT-001。当前**B037-R01 六个锁等待场景 RED→GREEN 已完成，47项受影响回归全部通过，待原 R 窄复审**；原R NEEDS_CHANGES结论尚未由复审关闭，原63项通过证据保持。ROOT 已确认原 R `6e05cc18ccc78364cb5d41babbfe4f5f367ee194` 关闭 B036-R01，APPROVED_PLAN_ONLY；该确认不是实现审核或发布授权。
 
 从固定集成 `2c72521c55b6cdc24f7650d172b48079cbff969a` 创建独立树 `/Users/mentianlu/.codex/worktrees/b037-m02-claim-fence/umanews`、分支 `codex/b037-m02-claim-fence`。只从 `82b0c7253a4410cec7a1de31302345f2ba6f986e` 提取最终 B036 方案原字节作输入，未 cherry-pick 旧 B035 实现或 ROOT 协调记录；旧 B035/B034/C028 树未改。
 
@@ -53,5 +53,11 @@ ROOT 新分配 B037-R01-OBSERVER-REPAIRED-THREE-RED-002；固定 `029c050dfd65c6
 得到全部有效RED后，仅把 `_locked_translation_claim` 最终deadline判断从锁前now改为取得article/run两锁后的 `timezone.now()`，保持可注入执行时钟及 `>= deadline` 精确边界。没有修改deadline、field/metadata保存规则、重试/预算、ordinary/force、通知/派发或其他两个服务文件；未运行GREEN。
 
 申请下一精确诊断47IDs：新三例+原本片22+既有recovery22，一个官方django runner，max3PG连接（原单消费并发需主连接+两worker；新锁等待仍两连接），沿既有单容器资源/600秒含30清理。原M01 mock19不再次执行：其服务/测试、settings与legacy provider factory字节均未变化，且不调用本锁后deadline helper，保留先前63PASS中的对应证据；正式full仍ROOT/C安排。固定新SHA后等待ROOT明确GREEN窗口，不沿用已释放RED资源，不把旧63PASS当此修复已通过。
+
+ROOT 接受受影响47ID范围并分配 B037-R01-GREEN-47-PG-WINDOW-001；固定修复 `ef50b1c74d043fc80877db393814fec6fc052be2`、名单 SHA `7b03ba6fc3fff9e3a008dbfa1945fbcb34a6407511c40da6096e59905b4e9e87` 一次实际执行 **47/47 PASS，零 failures/errors/skips，complete、runner exit0**。六新子例均有实际Lock+blocker后跨截止与状态/调用断言通过：consume worker96/98→blocker94、success101/103→99、terminal106/108→104；旧单消费者两backend92/93也通过并关闭连接/线程。旧M01 19证据保留，不改formal/full分母。
+
+业务11.760秒、worker48.11秒、whole59.04秒；原8受信控制/既有镜像/隔离与资源约束保持，max3PG。finally容器=[]、runner退出、FD锁释放，owner11844/runner11893，已回ROOT释放资源。独立runtime `/Users/mentianlu/.codex/runtime/b037-r01-green-47-pg-window-001/green-receipt.json` SHA `aafa9a62588bc9dd67f092f1695ecd4b98e35d303351aba5e195dc4e1ff621a9` 绑定准确47IDs/6锁观察/原日志/结果/控制/隔离/清理。后续只回写两文档，受测应用与测试字节保持ef50相同。
+
+返修交原R限定复审B037-R01：只有锁后实际时钟guard变化、注入时钟/固定deadline/精确截止边界不变，测试覆盖两个锁及消费/成功/terminal。没有取得同R复审通过前，不交C集成；没有PR/push/主线/生产/真实调用/模型启用或预算续期。完整M02及正式catalog/impact/full待办继续保留。
 
 边界保持已审方案：普通/force兼容、指定受管run、外部调用无事务、article+确切run同库原子终态、同轮fence与提交后终态snapshot通知。累计费用预算/SDK跨轮边界、响应恢复、可靠outbox仍是完整M02缺口，不扩大本片。只使用已分配现有镜像的临时隔离测试容器/PG，无生产或真实业务DB/Redis、模型调用、外发、QQ/后台扩张、push/PR/合并/发布或新资源构建。

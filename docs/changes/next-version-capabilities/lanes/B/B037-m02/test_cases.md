@@ -66,7 +66,9 @@ TransactionTestCase 使 on_commit 真实退出最外层事务后执行；邮件�
 
 ROOT新窗口下，029c050d同三IDs一次实际RED得到六个目标业务失败，0errors/0skips；每个consume/success/terminal的article/run锁都以实际blocker匹配后推进时钟，证据在 `/Users/mentianlu/.codex/runtime/b037-r01-observer-repaired-three-red-002`。随后只修锁后执行时钟判断，精确截止保持不变。
 
-修复后申请准确47项GREEN/受影响回归：本模块25（原22+新3）+既有recovery22；保留原M01 mock19的未受影响63PASS证据，其源码/测试/settings/factory均未变且不调用锁后deadline helper，避免重复无关回归。max3PG连接，仍一个官方django batch，候选固定及ROOT窗口到达后才执行。当前仅AST与diff检查，尚无本修复GREEN或原R复审结论。
+修复后申请准确47项GREEN/受影响回归：本模块25（原22+新3）+既有recovery22；保留原M01 mock19的未受影响63PASS证据，其源码/测试/settings/factory均未变且不调用锁后deadline helper，避免重复无关回归。max3PG连接，仍一个官方django batch，候选固定及ROOT窗口到达后才执行。该申请时点仅完成AST与diff检查，尚无本修复GREEN或原R复审结论；后续执行结果如下。
+
+ROOT接受47项范围后明确分配新窗，固定ef50b1c7一次实际执行47/47通过、0failure/error/skip；六锁等待subcases的真实Lock+精确blocker与跨deadline状态/调用断言均通过，旧单消费并发backend92/93通过。准确名单SHA7b03ba6f，独立原结果/日志/控制/资源/cleanup在 `/Users/mentianlu/.codex/runtime/b037-r01-green-47-pg-window-001`。真实RED与GREEN分别绑定029c050d/ef50b1c7，不把首轮三观察失败冒RED，也不把未受影响M01旧证据冒本轮复跑。当前待同R窄复审，正式full未完成。
 
 非法值、空值、旧 preclaimed 消息均 fail closed；普通首次翻译/force/manual 保留现有行为与人工字段保护。无 models/settings/migration变化。无新权限或对外发送开关。deadline只约束准入/回写，跨轮费用预算与outbox不在本片，按方案保留真实缺口。
 
