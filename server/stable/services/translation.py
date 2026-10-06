@@ -1067,12 +1067,21 @@ def get_translation_provider() -> TranslationProvider:
     return DummyTranslationProvider()
 
 
-def translate_article(article: NewsArticle) -> TranslationResult:
+def translate_article(article: NewsArticle, *, managed_run: TranslationRun | None = None) -> TranslationResult:
     provider = get_translation_provider()
     source_text = article.body_ja_normalized or article.body_ja_raw
     resolution = resolve_article_entities_for_article(article)
     terms = _translation_terms(resolution)
-    run = article.translation_runs.filter(status="started").order_by("-created_at", "-id").first()
+    if managed_run is not None:
+        if managed_run.article_id != article.id or managed_run.status != "started":
+            raise ValueError("managed translation run binding invalid")
+        # 受管轮次由 task 在同一 article/run 事务中写终态；provider 不自行写审计状态。
+        if "entity_resolution" in inspect.signature(provider.translate).parameters:
+            return provider.translate(article, entity_resolution=resolution)
+        return provider.translate(article)
+    run = article.translation_runs.filter(status="started").exclude(
+        raw_response__has_key="recovery_claim_v1",
+    ).order_by("-created_at", "-id").first()
     if run is None:
         run = TranslationRun.objects.create(
             article=article,

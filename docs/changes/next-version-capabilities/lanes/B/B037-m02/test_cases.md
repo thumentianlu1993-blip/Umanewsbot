@@ -1,6 +1,6 @@
 # B037 测试清单：自动重试 claim/fence
 
-输入为最终已审 B036 方案（来源 `82b0c725`，原 R 复审由 ROOT 确认 APPROVED_PLAN_ONLY）。固定实现基线 `2c72521c55b6cdc24f7650d172b48079cbff969a`。本清单落成该方案的测试设计，不扩大业务；当前只有测试准备，真实 RED 尚未执行，应用代码尚未修改。
+输入为最终已审 B036 方案（来源 `82b0c725`，原 R 复审由 ROOT 确认 APPROVED_PLAN_ONLY）。固定实现基线 `2c72521c55b6cdc24f7650d172b48079cbff969a`。本清单落成该方案的测试设计，不扩大业务；准备提交 `a4022503` 上五项实际 RED 已取得（5 failures/0 errors/0 skips），之后才修改应用代码，当前待新窗口 GREEN。
 
 ## 首批 RED（五项，单批）
 
@@ -26,7 +26,7 @@ PG并发后续两独立连接在消费点同步，证实只有一位消费成功
 
 ## 执行与资源申请
 
-当前 C029 占用 collector，**未运行 DB 测试、未启动任何容器**。请求 ROOT 释放后分配现有隔离 PG runner，运行首批五项：`python server/manage.py test stable.test_translation_claim_fence.TranslationClaimFenceRedTests --verbosity 2 --noinput`，需 runner 显式使用其测试设置/测试库和 mock-only 环境，不用项目 dotenv/真实 broker。新模块临时精确 label 仅用于 RED 诊断，不是正式 catalog/full 收据。
+准备时 C029 占用 collector，未运行 DB 测试或容器；随后 ROOT 分配精确一次 RED 窗口，实际使用候选外受信 `scripts/run_test_plan.py --batch b037-red-five`、django profile 与指定现有镜像运行表内五ID。其隔离 DiscoverRunner 执行等价五方法测试，不用项目 dotenv/真实 broker。新模块临时精确 label 仅用于 RED 诊断，不是正式 catalog/full 收据。实证见 B037 报告及 `/Users/mentianlu/.codex/runtime/b037-m02-red-pg-window-001`；窗口已实测清理释放，不继续沿用。
 
 首批建议单 runner，2 CPU / 4 GiB、硬超时180秒（库迁移准备由 ROOT 独立计量/复用现有测试库），无其他并行任务、无新镜像或容器构建。如既有 runner 契约更严格沿其约束。命令/实际镜像/隔离DB设置及连接范围由 ROOT 回传后绑定运行 receipt，未经窗口不执行。
 

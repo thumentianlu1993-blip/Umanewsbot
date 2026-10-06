@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import random
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone as dt_timezone
 from email.utils import parsedate_to_datetime
@@ -56,6 +59,8 @@ class TranslationClaimResult:
     claimed: bool
     article_id: int
     reason: str = ""
+    run_id: int | None = None
+    claimed_at: str = ""
 
 
 @dataclass(frozen=True)
@@ -135,6 +140,7 @@ def record_translation_failure(
     now: datetime | None = None,
     is_retry: bool,
     preserve_publication: bool = False,
+    notify: bool = True,
 ) -> TranslationErrorClassification:
     now = now or timezone.now()
     classified = classify_translation_error(error, now=now)
@@ -178,7 +184,7 @@ def record_translation_failure(
             "updated_at",
         ]
     )
-    if not classified.auto_retryable or exhausted:
+    if notify and (not classified.auto_retryable or exhausted):
         notify_terminal_translation_failure(article)
     return classified
 
@@ -204,10 +210,13 @@ def dispatch_due_translation_retries(*, now: datetime | None = None) -> RetryDis
         if not claim.claimed:
             continue
         try:
-            translate_article_task.delay(article_id, preclaimed_retry=True)
+            translate_article_task.delay(
+                article_id, preclaimed_retry=True,
+                claim_run_id=claim.run_id, claim_started_at=claim.claimed_at,
+            )
             dispatched_ids.append(article_id)
         except Exception as exc:
-            release_failed_translation_dispatch(article_id, claimed_at=now, error=exc)
+            release_failed_translation_dispatch(article_id, claimed_at=now, error=exc, run_id=claim.run_id)
     return RetryDispatchResult(dispatched_ids=dispatched_ids)
 
 
@@ -216,7 +225,30 @@ def release_failed_translation_dispatch(
     *,
     claimed_at: datetime,
     error: Exception,
+    run_id: int | None = None,
 ) -> bool:
+    if run_id is not None:
+        with transaction.atomic():
+            article, run, reason = _locked_translation_claim(
+                article_id, run_id, claimed_at.isoformat(), phase="claimed",
+                now=claimed_at, check_deadline=False, check_input=False,
+            )
+            if reason:
+                return False
+            article.translation_status = ArticleTranslationStatus.FAILED
+            article.workflow_status = WorkflowStatus.TRANSLATION_FAILED
+            article.automation_status = AutomationStatus.FAILED
+            article.translation_error_category = "transient_dispatch_failed"
+            article.translation_error_message = str(error)[:2000]
+            article.translation_started_at = None
+            article.translation_next_retry_at = claimed_at + timedelta(seconds=retry_delay_seconds(1))
+            article.save(update_fields=[
+                "translation_status", "workflow_status", "automation_status",
+                "translation_error_category", "translation_error_message",
+                "translation_started_at", "translation_next_retry_at", "updated_at",
+            ])
+            _save_claim_terminal(run, "failed", error=str(error))
+        return True
     next_retry_at = claimed_at + timedelta(seconds=retry_delay_seconds(1))
     updated = NewsArticle.objects.filter(
         pk=article_id,
@@ -263,13 +295,129 @@ def claim_translation_retry(
         if not updated:
             return TranslationClaimResult(False, article_id, "already_claimed_or_changed")
         article = NewsArticle.objects.get(pk=article_id)
-        TranslationRun.objects.create(
+        stamp = now.isoformat()
+        run = TranslationRun.objects.create(
             article=article,
             provider_name=getattr(settings, "TRANSLATION_PROVIDER", ""),
             model_name=getattr(settings, "TRANSLATION_MODEL", ""),
             status=TranslationStatus.STARTED,
+            raw_response={CLAIM_KEY: {
+                "phase": "claimed", "claimed_at": stamp,
+                "deadline_at": (now + timedelta(seconds=int(getattr(settings, "TRANSLATION_STALE_AFTER_SECONDS", 1800)))).isoformat(),
+                "input_sha256": translation_input_sha256(article),
+            }},
         )
-    return TranslationClaimResult(True, article_id)
+    return TranslationClaimResult(True, article_id, run_id=run.id, claimed_at=stamp)
+
+
+CLAIM_KEY = "recovery_claim_v1"
+
+
+def translation_input_sha256(article: NewsArticle) -> str:
+    # 与翻译实际使用的源字段绑定；不把审计 updated_at 当作内容版本。
+    value = {
+        "version": "translation-source-v1", "source_site": article.source_site,
+        "source_language": article.source_language, "title_ja": article.title_ja,
+        "body_field": "body_ja_normalized" if article.body_ja_normalized else "body_ja_raw",
+        "body": article.body_ja_normalized or article.body_ja_raw,
+    }
+    return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def _locked_translation_claim(
+    article_id, run_id, claimed_at, *, phase, now, check_deadline=True, check_input=True,
+):
+    """调用方持 atomic；锁顺序始终 article→指定 run，无外部调用。"""
+    if type(run_id) is not int or run_id <= 0 or type(claimed_at) is not str:
+        return None, None, "claim_missing"
+    article = NewsArticle.objects.select_for_update().filter(pk=article_id).first()
+    run = TranslationRun.objects.select_for_update().filter(pk=run_id, article_id=article_id).first()
+    if article is None or run is None:
+        return article, run, "claim_changed"
+    raw = run.raw_response if isinstance(run.raw_response, dict) else {}
+    claim = raw.get(CLAIM_KEY)
+    if not isinstance(claim, dict) or claim.get("claimed_at") != claimed_at:
+        return article, run, "claim_changed"
+    if claim.get("phase") != phase or run.status != TranslationStatus.STARTED:
+        return article, run, "claim_already_consumed"
+    try:
+        started = datetime.fromisoformat(claimed_at)
+        deadline = datetime.fromisoformat(claim["deadline_at"])
+        if started.utcoffset() is None or deadline.utcoffset() is None:
+            raise ValueError("naive claim timestamp")
+    except (ValueError, TypeError, KeyError):
+        return article, run, "claim_changed"
+    if article.translation_status != ArticleTranslationStatus.TRANSLATING or article.translation_started_at != started:
+        return article, run, "claim_changed"
+    if check_deadline and now >= deadline:
+        return article, run, "claim_expired"
+    if check_input and translation_input_sha256(article) != claim.get("input_sha256"):
+        return article, run, "input_changed"
+    return article, run, ""
+
+
+def consume_translation_claim(article_id, run_id, claimed_at, *, now=None):
+    with transaction.atomic():
+        article, run, reason = _locked_translation_claim(
+            article_id, run_id, claimed_at, phase="claimed", now=now or timezone.now(),
+        )
+        if reason:
+            return article, run, reason
+        run.raw_response = {**run.raw_response, CLAIM_KEY: {**run.raw_response[CLAIM_KEY], "phase": "executing"}}
+        run.prompt_excerpt = (article.body_ja_normalized or article.body_ja_raw)[:800]
+        run.save(update_fields=["raw_response", "prompt_excerpt", "updated_at"])
+    return article, run, ""
+
+
+def _save_claim_terminal(run, phase, *, metadata=None, error=""):
+    claim = {**run.raw_response[CLAIM_KEY], "phase": phase}
+    run.raw_response = {**run.raw_response, **(metadata or {}), CLAIM_KEY: claim}
+    run.status = TranslationStatus.SUCCESS if phase == "completed" else TranslationStatus.FAILED
+    run.error_message = error[:2000]
+    run.model_name = (metadata or {}).get("model") or run.model_name
+    run.provider_name = (metadata or {}).get("provider") or run.provider_name
+    run.terms_used = (metadata or {}).get("terms", run.terms_used)
+    run.save(update_fields=["raw_response", "status", "error_message", "model_name", "provider_name", "terms_used", "updated_at"])
+
+
+def finalize_translation_claim(article_id, run_id, claimed_at, *, result=None, error=None, now=None):
+    """有效结果与 run 原子落库；失主/到期/输入漂移不回写、不通知。"""
+    now = now or timezone.now()
+    with transaction.atomic():
+        article, run, reason = _locked_translation_claim(
+            article_id, run_id, claimed_at, phase="executing", now=now,
+        )
+        if reason:
+            return article, reason
+        if error is not None:
+            classified = record_translation_failure(article, error, now=now, is_retry=True, notify=False)
+            _save_claim_terminal(run, "failed", metadata=getattr(error, "metadata", None), error=str(error))
+            if not classified.auto_retryable or article.translation_retry_exhausted_at is not None:
+                # 捕获该轮终态快照；回调失败不回流 provider/失败状态路径。
+                snapshot = deepcopy(article)
+                transaction.on_commit(lambda: notify_terminal_translation_failure(snapshot), robust=True)
+        else:
+            from stable.models import ArticleStatus
+
+            article.apply_translation_result(result)
+            article.status = ArticleStatus.TRANSLATED
+            article.translation_status = ArticleTranslationStatus.TRANSLATED
+            article.translation_error_message = ""
+            article.translation_error_category = ""
+            article.translation_next_retry_at = None
+            article.translation_retry_exhausted_at = None
+            article.translation_started_at = None
+            article.translated_at = now
+            article.translation_model = result.metadata.get("model", "")
+            article.translation_provider = result.metadata.get("provider", "")
+            if article.workflow_status in {WorkflowStatus.PENDING_TRANSLATION, WorkflowStatus.TRANSLATION_FAILED}:
+                article.workflow_status = WorkflowStatus.PENDING_EDIT
+            article.automation_status = AutomationStatus.PENDING
+            article.translation_metadata = {**article.translation_metadata, **result.metadata}
+            article.decision_reason = {**(article.decision_reason or {}), "translation_recovery": {"recovered_at": now.isoformat()}}
+            article.save()
+            _save_claim_terminal(run, "completed", metadata=result.metadata)
+    return article, ""
 
 
 def recover_stale_translations(*, now: datetime | None = None) -> StaleRecoveryResult:
@@ -311,14 +459,36 @@ def recover_one_stale_translation(
         if article is None:
             return False
         error = requests.Timeout("stale translating worker interrupted")
-        record_translation_failure(article, error, now=now, is_retry=False)
+        managed = list(TranslationRun.objects.select_for_update().filter(
+            article=article, status=TranslationStatus.STARTED,
+            raw_response__has_key=CLAIM_KEY,
+        ))
+        if managed:
+            matching = [run for run in managed if isinstance(run.raw_response.get(CLAIM_KEY), dict)
+                        and run.raw_response[CLAIM_KEY].get("claimed_at") == expected_started_at.isoformat()]
+            if len(matching) != 1:
+                return False
+            run = matching[0]
+            phase = run.raw_response[CLAIM_KEY].get("phase")
+            if phase not in {"claimed", "executing"}:
+                return False
+            _, _, reason = _locked_translation_claim(
+                article_id, run.id, expected_started_at.isoformat(), phase=phase,
+                now=now, check_deadline=False, check_input=False,
+            )
+            if reason:
+                return False
+        record_translation_failure(article, error, now=now, is_retry=False, notify=not managed)
         article.translation_error_category = "transient_stale_worker"
         article.save(update_fields=["translation_error_category", "updated_at"])
-        TranslationRun.objects.filter(article=article, status=TranslationStatus.STARTED).update(
-            status=TranslationStatus.FAILED,
-            error_message="stale translating worker interrupted",
-            updated_at=now,
-        )
+        if managed:
+            _save_claim_terminal(run, "interrupted", error="stale translating worker interrupted")
+        else:
+            TranslationRun.objects.filter(article=article, status=TranslationStatus.STARTED).update(
+                status=TranslationStatus.FAILED,
+                error_message="stale translating worker interrupted",
+                updated_at=now,
+            )
         TaskExecutionLog.objects.create(
             task_name="recover_stale_translations",
             status=TaskStatus.SUCCESS,
