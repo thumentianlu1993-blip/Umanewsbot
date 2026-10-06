@@ -62,6 +62,8 @@ TransactionTestCase 使 on_commit 真实退出最外层事务后执行；邮件�
 
 旧三个测试类AST与63方法保持不变；准备提交不改三应用源码。C032占用期间仅AST/diff检查，未经ROOT新的精确窗口不执行DB/容器。资源和后续修复边界见B037报告。
 
+首轮固定5b703193一次运行：三run锁subcases为有效状态差异RED，三article锁subcases因观察器要求可能截断query的FOR UPDATE尾部而未匹配，不计目标RED。新测试只把观察谓词改为实际Lock+对应表+pg_blocking_pids包含持锁owner，记录query长度/跟踪上限，仍两PG连接；不改应用逻辑、不提高PG配置或改官方控制。准确三canonical IDs不变，六subcases均须得到业务失败后再修实现；旧63PASS证据不覆盖本缺口。
+
 非法值、空值、旧 preclaimed 消息均 fail closed；普通首次翻译/force/manual 保留现有行为与人工字段保护。无 models/settings/migration变化。无新权限或对外发送开关。deadline只约束准入/回写，跨轮费用预算与outbox不在本片，按方案保留真实缺口。
 
 PG并发后续两独立连接在消费点同步，证实只有一位消费成功及统一 article→run 锁顺序，事务不包provider；无需多容器。禁止以顺序测试替代该项。

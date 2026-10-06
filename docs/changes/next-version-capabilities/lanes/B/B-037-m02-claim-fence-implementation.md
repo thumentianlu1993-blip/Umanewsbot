@@ -1,6 +1,6 @@
 # B037：自动重试 claim/fence 实施准备
 
-任务 B037-M02-CLAIM-FENCE-IMPLEMENT-001。当前**原 R 代码审核 NEEDS_CHANGES，唯一 P2 B037-R01 的三个新 RED 反例已准备，尚未执行或修实现**；原63项通过证据保持。ROOT 已确认原 R `6e05cc18ccc78364cb5d41babbfe4f5f367ee194` 关闭 B036-R01，APPROVED_PLAN_ONLY；该确认不是实现审核或发布授权。
+任务 B037-M02-CLAIM-FENCE-IMPLEMENT-001。当前**原 R 代码审核 NEEDS_CHANGES，唯一 P2 B037-R01 首轮得到3个run锁业务RED、3个article锁观察失败；已修测试观察器待新窗口补证，尚未修实现**；原63项通过证据保持。ROOT 已确认原 R `6e05cc18ccc78364cb5d41babbfe4f5f367ee194` 关闭 B036-R01，APPROVED_PLAN_ONLY；该确认不是实现审核或发布授权。
 
 从固定集成 `2c72521c55b6cdc24f7650d172b48079cbff969a` 创建独立树 `/Users/mentianlu/.codex/worktrees/b037-m02-claim-fence/umanews`、分支 `codex/b037-m02-claim-fence`。只从 `82b0c7253a4410cec7a1de31302345f2ba6f986e` 提取最终 B036 方案原字节作输入，未 cherry-pick 旧 B035 实现或 ROOT 协调记录；旧 B035/B034/C028 树未改。
 
@@ -43,5 +43,9 @@ ROOT 另行分配 B037-BOUNDARY-63-PG-WINDOW-001，准确候选 `9498edf185a99d6
 新类 `stable.test_translation_claim_fence.TranslationClaimPostLockDeadlineTests`：消费、成功、terminal异常三个路径。主线程一条PG连接持目标行锁并用其自身连接查询pg_stat_activity、清stats snapshot；worker第二连接实际执行task。明确观察该backend的对应表FOR UPDATE处于Lock等待后才推进注入时钟；article锁精确到期、run锁过期一秒，claim身份/阶段/源内容不改。成功/terminal通过mock provider事件让消费先提交，再在回写前制造锁竞争。修后应保持article/run状态快照、返回claim_expired；消费provider=0，成功/异常只有先前那次provider且后续零派发/通知。线程有界join、finally关闭自己的连接，日志保留每次backend/锁等待；不用额外SQL observer连接。
 
 C032当前占用PG。新RED候选固定后只申请准确三IDs一次官方django隔离窗口，单runner2CPU/4GiB/256pids/3GiBtmpfs/networknone/nonroot/readonly/capdropALL/NNP，最多主持锁/观察+worker两条PG连接，整体600秒含30秒清理。worker目标180秒但若官方无独立参数沿原600秒控制。没有启动容器/DB或运行新例；得到有效业务RED后才只修取得锁后的执行时钟检查，不延长deadline、不扩大M02，修后受影响回归再报新窗口并返同R。
+
+ROOT 随后分配 B037-R01-THREE-RED-PG-WINDOW-001；固定 `5b7031939c38120c6df8f2b5589607ea7ee763d4` 准确三ID/六subcases一次运行，3tests/6failures/0errors/0skips、lifecycle complete、runner exit1。必须分级：run锁三subcases的consume69/success74/terminal79均实际观察PG Lock并在状态快照断言失败，属于有效业务RED；article锁三subcases失败在SQL观察匹配，不推进跨deadline，**不能计入目标RED**。业务16.466秒，整个窗口64.41秒，finally清理containers=[]、runner退出、FD锁释放，owner3912/runner3958。独立runtime `/Users/mentianlu/.codex/runtime/b037-r01-three-red-pg-window-001/partial-red-receipt.json` SHA `7148726e042c5b483c90a7f6fdd849c989b0cf75dc3889eefb4783baaf54e5c7` 明确分级且保存原日志/约束/结果/清理。
+
+首轮观察器要求PG活动query的FOR UPDATE尾部，而完整article SELECT较长；该谓词对可能截断的活动文本不可靠，本轮未记录query长度，不能冒称已测出截断根因。只修测试为Lock+对应表+pg_blocking_pids包含主持锁backend，记录owner/worker/query bytes/track_activity_query_size；主持锁连接本身作观察，不新增连接或修改PG配置。三个应用源码仍不变，首轮不机械重跑，固定新测试SHA申请同三IDs的新窗口，补齐六场景后再进入锁后时钟修复。
 
 边界保持已审方案：普通/force兼容、指定受管run、外部调用无事务、article+确切run同库原子终态、同轮fence与提交后终态snapshot通知。累计费用预算/SDK跨轮边界、响应恢复、可靠outbox仍是完整M02缺口，不扩大本片。只使用已分配现有镜像的临时隔离测试容器/PG，无生产或真实业务DB/Redis、模型调用、外发、QQ/后台扩张、push/PR/合并/发布或新资源构建。

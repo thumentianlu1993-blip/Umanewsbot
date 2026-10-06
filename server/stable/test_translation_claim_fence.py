@@ -505,6 +505,9 @@ class TranslationClaimPostLockDeadlineTests(TranslationClaimFixture):
         self.now = deadline - timedelta(seconds=1)
         backend_ready, provider_ready, release_provider = Event(), Event(), Event()
         backend_ids, results, errors = [], [], []
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT pg_backend_pid()")
+            blocker_pid = cursor.fetchone()[0]
 
         def provider(*_args, **_kwargs):
             self.assertFalse(connection.in_atomic_block)
@@ -536,12 +539,15 @@ class TranslationClaimPostLockDeadlineTests(TranslationClaimFixture):
                     # 主线程同一连接查询活动；不新增第三条 observer 连接。
                     cursor.execute("SELECT pg_stat_clear_snapshot()")
                     cursor.execute(
-                        "SELECT wait_event_type, query FROM pg_stat_activity WHERE pid = %s",
+                        "SELECT wait_event_type, query, pg_blocking_pids(pid), "
+                        "current_setting('track_activity_query_size') FROM pg_stat_activity WHERE pid = %s",
                         [backend_ids[0]],
                     )
                     row = cursor.fetchone()
-                if row and row[0] == "Lock" and "FOR UPDATE" in row[1] and expected_table in row[1]:
-                    print("B037-R01 observed PG lock wait:", mode, lock_target, backend_ids[0], row[0])
+                # 活动query可能被截断，不能要求尾部FOR UPDATE；精确核对实际锁owner更强。
+                if row and row[0] == "Lock" and expected_table in row[1] and blocker_pid in row[2]:
+                    print("B037-R01 observed PG lock wait:", mode, lock_target, backend_ids[0], row[0],
+                          "blocker", blocker_pid, "query_bytes", len(row[1].encode()), "tracking", row[3])
                     return
                 time.sleep(0.01)
             self.fail("worker did not enter the expected PostgreSQL row-lock wait")
