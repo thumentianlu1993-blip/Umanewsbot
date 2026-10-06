@@ -1151,7 +1151,8 @@
       "research_contracts"
     ],
     "server/stable/services/content_contracts.py": [
-      "content_contracts"
+      "content_contracts",
+      "responses_analysis"
     ],
     "docs/changes/next-version-capabilities/lanes/A/validate_f01_contract.py": [
       "content_contracts"
@@ -1299,6 +1300,15 @@
     ],
     "server/stable/testing_public_probe/urls.py": [
       "public_probe_template_adapter"
+    ],
+    "server/stable/services/responses_analysis.py": [
+      "responses_analysis"
+    ],
+    "server/stable/services/public_probe_orm_loader.py": [
+      "public_probe_orm_loader"
+    ],
+    "server/stable/public_probe_orm_fixture.py": [
+      "public_probe_orm_loader"
     ]
   },
   "symbols": {
@@ -1457,7 +1467,8 @@
         "module:stable.test_race_information_display_pages",
         "module:stable.test_historical_race_calendar_integrity",
         "module:stable.test_race_public_time",
-        "module:stable.test_race_news_exposure"
+        "module:stable.test_race_news_exposure",
+        "public_probe_orm_loader"
       ]
     }
   },

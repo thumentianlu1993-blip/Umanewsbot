@@ -840,6 +840,12 @@
     "public_probe_template_adapter": [
       "stable.test_public_probe_template_adapter",
       "stable.test_public_probe_template_glue"
+    ],
+    "responses_analysis": [
+      "stable.test_responses_analysis"
+    ],
+    "public_probe_orm_loader": [
+      "stable.test_public_probe_orm_loader"
     ]
   },
   "dependencies": {
@@ -862,6 +868,12 @@
     "public_probe_template_adapter": [
       "public_probe_render",
       "content_contracts"
+    ],
+    "responses_analysis": [
+      "content_contracts"
+    ],
+    "public_probe_orm_loader": [
+      "race_results"
     ]
   },
   "tests": {
@@ -2623,6 +2635,18 @@
       "domains": [
         "public_probe_template_adapter"
       ]
+    },
+    "server/stable/test_responses_analysis.py": {
+      "label": "stable.test_responses_analysis",
+      "domains": [
+        "responses_analysis"
+      ]
+    },
+    "server/stable/test_public_probe_orm_loader.py": {
+      "label": "stable.test_public_probe_orm_loader",
+      "domains": [
+        "public_probe_orm_loader"
+      ]
     }
   },
   "profiles": {
@@ -2916,7 +2940,9 @@
     "stable.test_public_probe_contracts": "python",
     "stable.test_public_probe_render": "python",
     "stable.test_public_probe_template_adapter": "django",
-    "stable.test_public_probe_template_glue": "django"
+    "stable.test_public_probe_template_glue": "django",
+    "stable.test_responses_analysis": "django",
+    "stable.test_public_probe_orm_loader": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
@@ -2991,7 +3017,9 @@
     "race_timeliness_contracts": "integration: R01纯合同、时延边界和错误历史",
     "public_probe_contracts": "operations: O03公开比较、完成槽与告警状态纯合同",
     "public_probe_render": "operations: O03 离线公开内容解析与原始渲染合同",
-    "public_probe_template_adapter": "application: O03 离线模板适配、测试环境隔离与恢复"
+    "public_probe_template_adapter": "application: O03 离线模板适配、测试环境隔离与恢复",
+    "responses_analysis": "integration: M01 默认关闭的 Responses 分析与旧 provider 兼容",
+    "public_probe_orm_loader": "application: O03 单赛事匿名结果只读 ORM 与真实页面对账"
   },
   "dedicated_batch_modules": [
     "stable.test_migration_history_repair_postgres",
