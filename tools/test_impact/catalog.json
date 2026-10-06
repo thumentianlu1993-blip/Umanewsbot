@@ -30,7 +30,8 @@
       "stable.test_external_english_horse_context_gate",
       "stable.test_article_content_trace",
       "stable.test_translation_claim_fence",
-      "stable.test_translation_result_checkpoint"
+      "stable.test_translation_result_checkpoint",
+      "stable.test_translation_retry_budget"
     ],
     "race_parser": [
       "stable.test_race_reference_sources",
@@ -860,6 +861,9 @@
     ],
     "horse_career_link_cache": [
       "stable.test_horse_career_record_link_from_cache"
+    ],
+    "horse_basic_profile_prepare_command": [
+      "stable.test_horse_basic_profile_from_cache_command"
     ]
   },
   "dependencies": {
@@ -905,6 +909,11 @@
       "horse_page",
       "module:stable.test_p0_horse_career_history",
       "module:stable.test_race_data_sync_admission"
+    ],
+    "horse_basic_profile_prepare_command": [
+      "horse_cache_reuse",
+      "module:stable.test_p0_horse_completion_adapters",
+      "module:stable.test_p0_horse_completion_batch"
     ]
   },
   "tests": {
@@ -2726,6 +2735,18 @@
       "domains": [
         "news_translation"
       ]
+    },
+    "server/stable/test_horse_basic_profile_from_cache_command.py": {
+      "label": "stable.test_horse_basic_profile_from_cache_command",
+      "domains": [
+        "horse_basic_profile_prepare_command"
+      ]
+    },
+    "server/stable/test_translation_retry_budget.py": {
+      "label": "stable.test_translation_retry_budget",
+      "domains": [
+        "news_translation"
+      ]
     }
   },
   "profiles": {
@@ -3029,7 +3050,9 @@
     "stable.test_horse_basic_profile_from_cache": "django",
     "stable.test_translation_claim_fence": "django",
     "stable.test_horse_career_record_link_from_cache": "django",
-    "stable.test_translation_result_checkpoint": "django"
+    "stable.test_translation_result_checkpoint": "django",
+    "stable.test_horse_basic_profile_from_cache_command": "django",
+    "stable.test_translation_retry_budget": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
@@ -3109,7 +3132,8 @@
     "public_probe_orm_loader": "application: O03 单赛事匿名结果只读 ORM 与真实页面对账",
     "horse_cache_reuse": "integration: H02离线缓存分类与绑定HKJC字节适配",
     "horse_basic_profile_cache": "integration: H03绑定缓存的私有基础资料事务与PG并发合同",
-    "horse_career_link_cache": "integration: H03 单条既有赛绩离线补连、强身份/binding 与事务重放边界"
+    "horse_career_link_cache": "integration: H03 单条既有赛绩离线补连、强身份/binding 与事务重放边界",
+    "horse_basic_profile_prepare_command": "integration: H03缓存prepare-only命令与私有待审产物合同"
   },
   "dedicated_batch_modules": [
     "stable.test_migration_history_repair_postgres",
