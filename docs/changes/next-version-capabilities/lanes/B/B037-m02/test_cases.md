@@ -1,6 +1,6 @@
 # B037 测试清单：自动重试 claim/fence
 
-输入为最终已审 B036 方案（来源 `82b0c725`，原 R 复审由 ROOT 确认 APPROVED_PLAN_ONLY）。固定实现基线 `2c72521c55b6cdc24f7650d172b48079cbff969a`。本清单落成该方案的测试设计，不扩大业务；准备提交 `a4022503` 上五项实际 RED 已取得（5 failures/0 errors/0 skips），之后才修改应用代码，当前待新窗口 GREEN。
+输入为最终已审 B036 方案（来源 `82b0c725`，原 R 复审由 ROOT 确认 APPROVED_PLAN_ONLY）。固定实现基线 `2c72521c55b6cdc24f7650d172b48079cbff969a`。本清单落成该方案的测试设计，不扩大业务；准备提交 `a4022503` 上五项实际 RED 已取得（5 failures/0 errors/0 skips），之后才修改应用代码；`bb572df2` 同5IDs已GREEN。当前准备边界/PG真并发及相邻回归清单。
 
 ## 首批 RED（五项，单批）
 
@@ -16,9 +16,35 @@
 
 TransactionTestCase 使 on_commit 真实退出最外层事务后执行；邮件、provider 和 automation 调度均替身。可控交错不是数据库真并发证据。首批完整 canonical ID = `stable.test_translation_claim_fence.TranslationClaimFenceRedTests.` + 表内后缀。
 
-## GREEN 扩展（须各先取得有效 RED）
+## 首批 GREEN 后的边界验证与相邻回归
 
 按 B036 方案再覆盖：源内容改变、run/article身份不符与缺 envelope、claimed_at保持、deadline精确边界与不得续期、保存成功原子回滚、终态重投、派发失败释放与stale归属/通知回滚、notify失败不回流provider、受管翻译明确run及无锁外部调用、JSON claim metadata兼容。分别拒绝删除输入摘要/fence/deadline/指定run/提交后通知的 mutation。
+
+这些新增断言验证首批业务RED后已实现的同一组保护，不因此新增应用行为。首次失败若证明实现缺口，保留新RED及固定SHA再修，不把环境/夹具问题冒RED。当前源码未再改。
+
+新增边界 canonical IDs 前缀 `stable.test_translation_claim_fence.TranslationClaimFenceBoundaryTests.`：
+
+| 后缀 | 验证点 |
+|---|---|
+| test_success_run_save_failure_rolls_back_article_without_dispatch | 成功终态保存失败回滚且零派发 |
+| test_ordinary_service_cannot_overwrite_managed_claim_metadata | 普通服务不覆盖受管JSON |
+| test_ordinary_translation_keeps_existing_manual_field_protection | 普通路径人工字段保护 |
+| test_force_published_keeps_workflow_and_does_not_dispatch | force published工作流及零派发 |
+| test_outer_transaction_denies_external_call_without_consuming | 外层事务下拒绝provider，claim不消费 |
+| test_source_change_rejects_result_and_preserves_current_manual_fields | 输入变化后不覆盖编辑内容 |
+| test_exact_deadline_denies_entry_without_provider_call | 精确到期时零provider |
+| test_result_at_deadline_is_not_committed_or_dispatched | 返回到期时零终态/派发 |
+| test_later_consumption_does_not_reset_start_or_deadline | 领取时间/截止不可延长 |
+| test_old_message_without_envelope_is_closed | 旧消息不借用最新run |
+| test_wrong_run_and_invalid_identity_do_not_consume_current_claim | 非法ID不能消费当前run |
+| test_dispatch_release_only_finishes_bound_run | 释放只终止绑定run |
+| test_stale_recovery_only_finishes_bound_run | stale只终止绑定run |
+| test_recovery_and_release_run_save_failure_leave_no_state_or_notification | 回收/释放保存失败全回滚/零通知 |
+| test_notification_failure_does_not_retry_or_rewrite_translation | 回调失败不回流provider/状态 |
+| test_managed_service_keeps_exact_run_and_metadata_with_no_external_lock | 真服务封装的指定run/metadata/事务外provider |
+| test_two_pg_connections_consume_only_once | 两独立PG backend单消费者/连接清理 |
+
+下一批准确63项：本模块22+既有 `stable.test_translation_failure_recovery_change` 22+`stable.test_responses_analysis` 19；以runtime AST清单固定准确方法ID，未经ROOT窗口不执行。本片原5方法AST保持不变；既有selector仅更新新消息契约断言，未缩其批量/失败范围。不是正式collector/catalog/full证据。
 
 非法值、空值、旧 preclaimed 消息均 fail closed；普通首次翻译/force/manual 保留现有行为与人工字段保护。无 models/settings/migration变化。无新权限或对外发送开关。deadline只约束准入/回写，跨轮费用预算与outbox不在本片，按方案保留真实缺口。
 
