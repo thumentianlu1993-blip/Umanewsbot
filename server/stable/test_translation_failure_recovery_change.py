@@ -189,18 +189,26 @@ class TranslationRetryDispatchTests(TestCase):
 
         self.assertEqual(result.dispatched_ids, [due[0].id, due[1].id])
         self.assertEqual(delay.call_count, 2)
-        delay.assert_any_call(due[0].id, preclaimed_retry=True)
-        delay.assert_any_call(due[1].id, preclaimed_retry=True)
         for article in due[:2]:
             article.refresh_from_db()
             self.assertEqual(article.translation_status, ArticleTranslationStatus.TRANSLATING)
+            delay.assert_any_call(
+                article.id, preclaimed_retry=True,
+                claim_run_id=article.translation_runs.get(status="started").id,
+                claim_started_at=article.translation_started_at.isoformat(),
+            )
         due[2].refresh_from_db()
         self.assertEqual(due[2].translation_status, ArticleTranslationStatus.FAILED)
 
         with patch("stable.services.translation_recovery.translate_article_task.delay") as second_delay:
             second = dispatch_due_translation_retries(now=NOW)
         self.assertEqual(second.dispatched_ids, [due[2].id])
-        second_delay.assert_called_once_with(due[2].id, preclaimed_retry=True)
+        due[2].refresh_from_db()
+        second_delay.assert_called_once_with(
+            due[2].id, preclaimed_retry=True,
+            claim_run_id=due[2].translation_runs.get(status="started").id,
+            claim_started_at=due[2].translation_started_at.isoformat(),
+        )
 
     def test_worker_conditional_claim_allows_only_one_concurrent_execution(self):
         from stable.services.translation_recovery import claim_translation_retry

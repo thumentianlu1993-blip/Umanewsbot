@@ -27,7 +27,13 @@
       "stable.test_japanese_racing_translation_normalization",
       "stable.test_term_gate_reprocessing",
       "stable.test_news_content_boundaries",
-      "stable.test_external_english_horse_context_gate"
+      "stable.test_external_english_horse_context_gate",
+      "stable.test_article_content_trace",
+      "stable.test_translation_claim_fence",
+      "stable.test_translation_result_checkpoint",
+      "stable.test_translation_retry_budget",
+      "stable.test_managed_translation_budget_consumer",
+      "stable.test_managed_translation_dispatch_fence"
     ],
     "race_parser": [
       "stable.test_race_reference_sources",
@@ -644,7 +650,8 @@
       "stable.test_race_public_coverage"
     ],
     "module:stable.test_race_public_time": [
-      "stable.test_race_public_time"
+      "stable.test_race_public_time",
+      "stable.test_c027_public_time_sqlite"
     ],
     "module:stable.test_race_reference_management_commands": [
       "stable.test_race_reference_management_commands"
@@ -846,6 +853,23 @@
     ],
     "public_probe_orm_loader": [
       "stable.test_public_probe_orm_loader"
+    ],
+    "horse_cache_reuse": [
+      "stable.test_horse_cache_reuse",
+      "stable.test_horse_source_cache_reuse_adapter"
+    ],
+    "horse_basic_profile_cache": [
+      "stable.test_horse_basic_profile_from_cache"
+    ],
+    "horse_career_link_cache": [
+      "stable.test_horse_career_record_link_from_cache"
+    ],
+    "horse_basic_profile_prepare_command": [
+      "stable.test_horse_basic_profile_from_cache_command"
+    ],
+    "horse_basic_profile_review_input": [
+      "stable.test_horse_basic_profile_review_consumer",
+      "stable.test_horse_basic_profile_from_review_command"
     ]
   },
   "dependencies": {
@@ -874,6 +898,32 @@
     ],
     "public_probe_orm_loader": [
       "race_results"
+    ],
+    "horse_cache_reuse": [
+      "horse_target_inventory",
+      "module:stable.test_p0_horse_completion_source_clients"
+    ],
+    "horse_basic_profile_cache": [
+      "horse_cache_reuse",
+      "horse_publish",
+      "horse_page"
+    ],
+    "horse_career_link_cache": [
+      "horse_basic_profile_cache",
+      "horse_cache_reuse",
+      "horse_publish",
+      "horse_page",
+      "module:stable.test_p0_horse_career_history",
+      "module:stable.test_race_data_sync_admission"
+    ],
+    "horse_basic_profile_prepare_command": [
+      "horse_cache_reuse",
+      "module:stable.test_p0_horse_completion_adapters",
+      "module:stable.test_p0_horse_completion_batch"
+    ],
+    "horse_basic_profile_review_input": [
+      "horse_basic_profile_prepare_command",
+      "horse_basic_profile_cache"
     ]
   },
   "tests": {
@@ -2647,6 +2697,90 @@
       "domains": [
         "public_probe_orm_loader"
       ]
+    },
+    "server/stable/test_horse_cache_reuse.py": {
+      "label": "stable.test_horse_cache_reuse",
+      "domains": [
+        "horse_cache_reuse"
+      ]
+    },
+    "server/stable/test_horse_source_cache_reuse_adapter.py": {
+      "label": "stable.test_horse_source_cache_reuse_adapter",
+      "domains": [
+        "horse_cache_reuse"
+      ]
+    },
+    "server/stable/test_c027_public_time_sqlite.py": {
+      "label": "stable.test_c027_public_time_sqlite",
+      "domains": [
+        "module:stable.test_race_public_time"
+      ]
+    },
+    "server/stable/test_article_content_trace.py": {
+      "label": "stable.test_article_content_trace",
+      "domains": [
+        "news_translation"
+      ]
+    },
+    "server/stable/test_horse_basic_profile_from_cache.py": {
+      "label": "stable.test_horse_basic_profile_from_cache",
+      "domains": [
+        "horse_basic_profile_cache"
+      ]
+    },
+    "server/stable/test_translation_claim_fence.py": {
+      "label": "stable.test_translation_claim_fence",
+      "domains": [
+        "news_translation"
+      ]
+    },
+    "server/stable/test_horse_career_record_link_from_cache.py": {
+      "label": "stable.test_horse_career_record_link_from_cache",
+      "domains": [
+        "horse_career_link_cache"
+      ]
+    },
+    "server/stable/test_translation_result_checkpoint.py": {
+      "label": "stable.test_translation_result_checkpoint",
+      "domains": [
+        "news_translation"
+      ]
+    },
+    "server/stable/test_horse_basic_profile_from_cache_command.py": {
+      "label": "stable.test_horse_basic_profile_from_cache_command",
+      "domains": [
+        "horse_basic_profile_prepare_command"
+      ]
+    },
+    "server/stable/test_translation_retry_budget.py": {
+      "label": "stable.test_translation_retry_budget",
+      "domains": [
+        "news_translation"
+      ]
+    },
+    "server/stable/test_horse_basic_profile_from_review_command.py": {
+      "label": "stable.test_horse_basic_profile_from_review_command",
+      "domains": [
+        "horse_basic_profile_review_input"
+      ]
+    },
+    "server/stable/test_horse_basic_profile_review_consumer.py": {
+      "label": "stable.test_horse_basic_profile_review_consumer",
+      "domains": [
+        "horse_basic_profile_review_input"
+      ]
+    },
+    "server/stable/test_managed_translation_budget_consumer.py": {
+      "label": "stable.test_managed_translation_budget_consumer",
+      "domains": [
+        "news_translation"
+      ]
+    },
+    "server/stable/test_managed_translation_dispatch_fence.py": {
+      "label": "stable.test_managed_translation_dispatch_fence",
+      "domains": [
+        "news_translation"
+      ]
     }
   },
   "profiles": {
@@ -2942,7 +3076,21 @@
     "stable.test_public_probe_template_adapter": "django",
     "stable.test_public_probe_template_glue": "django",
     "stable.test_responses_analysis": "django",
-    "stable.test_public_probe_orm_loader": "django"
+    "stable.test_public_probe_orm_loader": "django",
+    "stable.test_horse_cache_reuse": "python",
+    "stable.test_horse_source_cache_reuse_adapter": "django",
+    "stable.test_c027_public_time_sqlite": "python",
+    "stable.test_article_content_trace": "django",
+    "stable.test_horse_basic_profile_from_cache": "django",
+    "stable.test_translation_claim_fence": "django",
+    "stable.test_horse_career_record_link_from_cache": "django",
+    "stable.test_translation_result_checkpoint": "django",
+    "stable.test_horse_basic_profile_from_cache_command": "django",
+    "stable.test_translation_retry_budget": "django",
+    "stable.test_horse_basic_profile_from_review_command": "django",
+    "stable.test_horse_basic_profile_review_consumer": "django",
+    "stable.test_managed_translation_budget_consumer": "django",
+    "stable.test_managed_translation_dispatch_fence": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
@@ -3019,7 +3167,12 @@
     "public_probe_render": "operations: O03 离线公开内容解析与原始渲染合同",
     "public_probe_template_adapter": "application: O03 离线模板适配、测试环境隔离与恢复",
     "responses_analysis": "integration: M01 默认关闭的 Responses 分析与旧 provider 兼容",
-    "public_probe_orm_loader": "application: O03 单赛事匿名结果只读 ORM 与真实页面对账"
+    "public_probe_orm_loader": "application: O03 单赛事匿名结果只读 ORM 与真实页面对账",
+    "horse_cache_reuse": "integration: H02离线缓存分类与绑定HKJC字节适配",
+    "horse_basic_profile_cache": "integration: H03绑定缓存的私有基础资料事务与PG并发合同",
+    "horse_career_link_cache": "integration: H03 单条既有赛绩离线补连、强身份/binding 与事务重放边界",
+    "horse_basic_profile_prepare_command": "integration: H03缓存prepare-only命令与私有待审产物合同",
+    "horse_basic_profile_review_input": "integration: H03独立已审输入与原消费者事务/重放合同"
   },
   "dedicated_batch_modules": [
     "stable.test_migration_history_repair_postgres",

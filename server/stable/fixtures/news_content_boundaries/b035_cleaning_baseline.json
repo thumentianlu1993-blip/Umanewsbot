@@ -1,0 +1,78 @@
+{
+  "base_git": "6e6aded22764ebee3d6a97f2834f47d4b4baa7bb",
+  "scope": "existing local DOM fixtures, not F02 gold",
+  "cases": [
+    {
+      "fixture": "hrn_normal_article.html",
+      "adapter": "HorseRacingNationAdapter",
+      "input_sha256": "7f451aea7863da281786d1fa4709de784dafb0eec3f117a738361dcef64b6147",
+      "body": "The trainer opened the season with a patient plan for the unbeaten colt.\n\nThe next target\n\nThe team will use a local prep before travelling in October.\n\nWe will let the horse tell us when he is ready.\n\nA quiet week at the farm.\n\nOne final breeze before entry day.\n\nThe colt returned home sound, and the full campaign remains intact.",
+      "status": "ok",
+      "removed_rules": {}
+    },
+    {
+      "fixture": "hrn_9623.html",
+      "adapter": "HorseRacingNationAdapter",
+      "input_sha256": "93cf0b9468f00174999b2f88880f2e27fbe5239772644ecf39909912da47d87a",
+      "body": "Pavel's first runners have made a fast start at summer meetings across the country.\n\nA patient route to stud\n\nHis connections gave the stallion time, and the decision is now being rewarded.\n\nThe young horses have shown speed, balance and the attitude to improve.\n\nThree juveniles won on dirt.\n\nTwo more placed on turf.\n\nRunner\n\nResult\n\nSummer Promise\n\nFirst\n\nFair odds were available before the race, and owners can sign up for the yearling inspection.\n\nThe next crop will be watched closely when autumn racing begins.",
+      "status": "ok",
+      "removed_rules": {}
+    },
+    {
+      "fixture": "hrn_race_video_dialog.html",
+      "adapter": "HorseRacingNationAdapter",
+      "input_sha256": "d90e9bd655112213f57f2d6e9b8018aa1375b2da9f5086d131baffda06afae85",
+      "body": "The opening paragraph explains why the favorite has improved.\n\nRace shape\n\nRace Video is also the name of a legitimate section discussed in this sentence.\n\nThe inside runner should press the pace.\n\nThe closer needs a clean trip.\n\nPost\n\nHorse\n\n3\n\nPatient Runner\n\nThe rider said the colt is ready for the assignment.\n\nThe 3 × 2 exercise was completed before the final paragraph confirmed the plan.",
+      "status": "ok",
+      "removed_rules": {
+        "hrn_structured_noise": 1
+      }
+    },
+    {
+      "fixture": "sporting_life_8267.html",
+      "adapter": "SportingLifeAdapter",
+      "input_sha256": "f4f4145499046a23f8a3a95d9328bc479b8587571fcbd25a75c820d26a677bac",
+      "body": "The Sky Bet Go Racing In Yorkshire Summer Festival starts at Ripon on Saturday.\n\nThe forecast is dry and warm across the eight days of racing.\n\nBlue Horizon is 7/2 for the feature race after winning at York.\n\nthe popular summer festival covers nine days of racing.\n\nFriday July 24 – York Music Showcase",
+      "status": "ok",
+      "removed_rules": {
+        "betting_promotion": 4,
+        "link_cta": 1,
+        "sponsor_clause": 1,
+        "sporting_life_more": 3,
+        "structured_noise": 1
+      }
+    },
+    {
+      "fixture": "sporting_life_8086.html",
+      "adapter": "SportingLifeAdapter",
+      "input_sha256": "dfbea48bb9954f35c79e4b276f69189966a78c3f67206a418184e38310b90c4e",
+      "body": "Graham Bradley always had time for racing people and made the sport brighter.\n\nAnd the weeks fly by and the years roll on.\n\nI was listening to Brandon Flowers' The Clock Was Tickin' on my day off this week.\n\nGraham Bradley celebrates at Cheltenham",
+      "status": "ok",
+      "removed_rules": {
+        "structured_noise": 1
+      }
+    },
+    {
+      "fixture": "tdn_8316.html",
+      "adapter": "TDNAdapter",
+      "input_sha256": "c7ddd2e6135de6c3186429a4e3458af0ce82e8afaaeca9660070d93e7875bed5",
+      "body": "The event brought together owners, trainers and supporters on Sunday.\n\nOrganisers said the programme will return next year.",
+      "status": "ok",
+      "removed_rules": {
+        "tdn_results_cta": 2
+      }
+    },
+    {
+      "fixture": "tdn_8318.html",
+      "adapter": "TDNAdapter",
+      "input_sha256": "a199793cb463c494767537f1ab488b7838a5fa58c50b9830b7dbff3ec46b2807",
+      "body": "The trainer believes there is more than enough time before the colt's next start.\n\nThe paper trail in the formbook will be reviewed before a final decision.",
+      "status": "ok",
+      "removed_rules": {
+        "link_cta": 1,
+        "tdn_editor_note": 1,
+        "tdn_read_paper": 1
+      }
+    }
+  ]
+}

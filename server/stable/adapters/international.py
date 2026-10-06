@@ -328,7 +328,7 @@ class SportingLifeAdapter(SimpleInternationalNewsAdapter):
     racing_region = RacingRegion.UNITED_KINGDOM
     source_language = SourceLanguage.ENGLISH
     link_path_keywords = ("/racing/news",)
-    body_selector = "[class*='Article__ArticleBody'], article .article-body, article, main"
+    body_selector = "[class*='Article__ArticleBody'], article .article-body"
 
 
 class BHAAdapter(SimpleInternationalNewsAdapter):

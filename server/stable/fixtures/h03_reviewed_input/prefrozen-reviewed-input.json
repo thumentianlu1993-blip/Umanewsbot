@@ -1,0 +1,69 @@
+{
+  "after": {
+    "birth_date": "2020-09-14",
+    "breeder_name": "Hong Kong Breeder",
+    "color": "brown",
+    "country": "AUS",
+    "owner_name": "Hong Kong Owner",
+    "sex": "gelding",
+    "trainer_name": "Hong Kong Trainer"
+  },
+  "before": {
+    "birth_date": null,
+    "breeder_name": "",
+    "color": "",
+    "country": "",
+    "owner_name": "",
+    "sex": "",
+    "trainer_name": ""
+  },
+  "code_sha": "941da3ebc8634cc26678cae3ac8f1f2d15a9282a",
+  "inputs": {
+    "cache": {
+      "path": "cache.json",
+      "sha256": "2ba3faa4706c64f4da1e8c0967713d51cc5cc776264cfccbc317e4638acec7bb"
+    },
+    "candidates": {
+      "path": "combined_candidates.jsonl",
+      "sha256": "cd5c98d797c54137828ce13c5416c911da2f92515457fa0fdff5afa804339dcb"
+    },
+    "manifest": {
+      "path": "manifest.json",
+      "sha256": "ca3feeab3d7fd85d84d9c9c3a117b84c8d376b804e64ee412020ba532aa4e1c2"
+    },
+    "packet": {
+      "path": "packet.json",
+      "sha256": "111d004d7c886300ceb26c2445fd023e0e6ad4ceaab875c74ee73b1c858dbe26"
+    }
+  },
+  "module_reviews": {
+    "profile": {
+      "approved_at": "2026-10-03T00:45:00+00:00",
+      "decision_source_reference": "a041-synthetic-contract-only",
+      "reviewed_by": "a041-synthetic-staff",
+      "status": "approved"
+    }
+  },
+  "reviewer_id": 1,
+  "schema_version": "h03-basic-profile-reviewed-input.v1",
+  "scope": {
+    "fields": [
+      "country",
+      "sex",
+      "color",
+      "birth_date",
+      "owner_name",
+      "trainer_name",
+      "breeder_name"
+    ],
+    "module": "profile"
+  },
+  "target": {
+    "candidate_idempotency_key": "0bad977d4247193ede5604c83334459c3213ee44518843203a4be72fd18745e2",
+    "entity_key": "profile:1",
+    "entity_version": "a036-v1",
+    "h02_sha256": "33039987d5c834d4d1f82d8549fa01cbfa510067efff87f7d2cbf4fb1754b49a",
+    "profile_baseline": "2026-10-02T00:00:00+00:00",
+    "profile_id": 1
+  }
+}

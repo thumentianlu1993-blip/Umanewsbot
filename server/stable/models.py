@@ -6784,3 +6784,111 @@ class RaceReferenceReceipt(models.Model):
         if not self._state.adding:
             raise ValidationError("RaceReferenceReceipt 是不可变记录，禁止删除。")
         return super().delete(*args, **kwargs)
+
+
+class TranslationRetryBudgetQuerySet(models.QuerySet):
+    """普通 ORM 只允许建立记录；状态写入留给后续专用锁内 helper。"""
+
+    def update(self, **kwargs):
+        raise ValidationError("翻译预算账禁止普通 ORM 修改。")
+
+    def bulk_update(self, objs, fields, batch_size=None):
+        raise ValidationError("翻译预算账禁止普通 ORM 修改。")
+
+    def bulk_create(self, objs, **kwargs):
+        if kwargs.get("update_conflicts"):
+            raise ValidationError("翻译预算账禁止冲突更新。")
+        return super().bulk_create(objs, **kwargs)
+
+    def delete(self):
+        raise ValidationError("翻译预算账禁止删除。")
+
+
+class TranslationRequestAttemptQuerySet(TranslationRetryBudgetQuerySet):
+    """请求账使用独立 manager；无文章/run 生命周期关系。"""
+
+
+class TranslationRetryBudget(models.Model):
+    objects = TranslationRetryBudgetQuerySet.as_manager()
+
+    operation_uuid = models.UUIDField(unique=True)
+    budget_uuid = models.UUIDField(unique=True)
+    scope_kind = models.CharField(max_length=48)
+    article_pk_snapshot = models.BigIntegerField(null=True, blank=True)
+    source_site_snapshot = models.CharField(max_length=32)
+    source_article_id_snapshot = models.CharField(max_length=255)
+    identity_sha256 = models.CharField(max_length=64)
+    source_sha256 = models.CharField(max_length=64)
+    provider_snapshot = models.CharField(max_length=128)
+    model_snapshot = models.CharField(max_length=255)
+    policy_snapshot = models.JSONField(default=dict)
+    policy_sha256 = models.CharField(max_length=64)
+    opened_at = models.DateTimeField()
+    deadline_at = models.DateTimeField()
+    request_limit = models.PositiveIntegerField()
+    requests_reserved = models.PositiveIntegerField(default=0)
+    state = models.CharField(max_length=32, default="open")
+    blocked_reason = models.CharField(max_length=128, blank=True)
+    retired_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        base_manager_name = "objects"
+        default_manager_name = "objects"
+        constraints = [
+            models.UniqueConstraint(fields=("scope_kind", "source_site_snapshot", "source_article_id_snapshot"), condition=models.Q(retired_at__isnull=True), name="uq_tr_budget_active_source"),
+            models.CheckConstraint(condition=models.Q(request_limit__gt=0), name="ck_tr_budget_limit_positive"),
+            models.CheckConstraint(condition=models.Q(requests_reserved__gte=0) & models.Q(requests_reserved__lte=models.F("request_limit")), name="ck_tr_budget_reserved_bounds"),
+            models.CheckConstraint(condition=models.Q(deadline_at__gt=models.F("opened_at")), name="ck_tr_budget_deadline"),
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("TranslationRetryBudget 禁止普通 ORM 修改。")
+        kwargs["force_insert"] = True
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("TranslationRetryBudget 禁止删除。")
+
+
+class TranslationRequestAttempt(models.Model):
+    objects = TranslationRequestAttemptQuerySet.as_manager()
+
+    budget = models.ForeignKey("TranslationRetryBudget", on_delete=models.PROTECT, related_name="request_attempts")
+    operation_uuid = models.UUIDField()
+    budget_uuid = models.UUIDField()
+    claim_execution_uuid = models.UUIDField()
+    article_pk_snapshot = models.BigIntegerField(null=True, blank=True)
+    run_pk_snapshot = models.BigIntegerField(null=True, blank=True)
+    claimed_at = models.DateTimeField()
+    source_site_snapshot = models.CharField(max_length=32)
+    source_article_id_snapshot = models.CharField(max_length=255)
+    identity_sha256 = models.CharField(max_length=64)
+    source_sha256 = models.CharField(max_length=64)
+    seq = models.PositiveIntegerField()
+    provider_attempt_index = models.PositiveIntegerField()
+    reserved_at = models.DateTimeField()
+    state = models.CharField(max_length=32, default="reserved")
+    usage_report = models.JSONField(default=dict)
+    usage_validation = models.CharField(max_length=32, default="unknown")
+    reconciliation_state = models.CharField(max_length=48, default="unreconciled")
+    receipt_sha256 = models.CharField(max_length=64, blank=True)
+
+    class Meta:
+        base_manager_name = "objects"
+        default_manager_name = "objects"
+        constraints = [
+            models.UniqueConstraint(fields=("budget", "seq"), name="uq_tr_attempt_budget_seq"),
+            models.UniqueConstraint(fields=("budget", "claim_execution_uuid", "provider_attempt_index"), name="uq_tr_attempt_claim_index"),
+            models.CheckConstraint(condition=models.Q(seq__gt=0), name="ck_tr_attempt_seq_positive"),
+            models.CheckConstraint(condition=models.Q(provider_attempt_index__gt=0), name="ck_tr_attempt_index_positive"),
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("TranslationRequestAttempt 禁止普通 ORM 修改。")
+        kwargs["force_insert"] = True
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("TranslationRequestAttempt 禁止删除。")

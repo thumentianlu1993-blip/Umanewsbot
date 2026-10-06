@@ -1863,19 +1863,100 @@ def discover_term_candidates_task(article_id: int) -> dict:
         raise
 
 
+def _translate_managed_claim_task(article_id, run_id, claimed_at, *, suppress_automation, log):
+    from django.db import connection, transaction
+    from stable.services.translation_recovery import (
+        CLAIM_KEY, TranslationCheckpointError, build_translation_checkpoint, finalize_translation_claim,
+        prepare_translation_claim, save_translation_checkpoint, _current_offline_budget_binding,
+        ManagedTranslationBudgetBlocked, ManagedTranslationAuditFailure,
+        _close_bound_budget_failure, _close_bound_provider_failure,
+    )
+
+    def skipped(reason):
+        _log_success(log, f"skipped article={article_id} reason={reason}")
+        return {"article_id": article_id, "translated": False, "skipped": True, "reason": reason}
+
+    # eager/直接调用的外层事务也不能把 provider 包在业务行锁里。
+    if connection.in_atomic_block:
+        return skipped("claim_outer_transaction")
+    article, run, checkpoint, reason = prepare_translation_claim(
+        article_id, run_id, claimed_at, suppress_automation=suppress_automation,
+    )
+    if reason:
+        return skipped(reason)
+    if checkpoint is None:
+        try:
+            result = translate_article(article, managed_run=run)
+        except (ManagedTranslationAuditFailure, ManagedTranslationBudgetBlocked) as exc:
+            if _current_offline_budget_binding() is None:
+                raise
+            stage = exc.stage if isinstance(exc, ManagedTranslationAuditFailure) else None
+            _, reason, stored = _close_bound_budget_failure(article_id, run_id, claimed_at,
+                core_reason=str(exc), stage=stage)
+            if reason == "checkpoint_exists":
+                return _translate_managed_claim_task(article_id, run_id, claimed_at,
+                    suppress_automation=suppress_automation, log=log)
+            answer = skipped("local_audit_failed" if stored and stage else reason)
+            if stored:
+                answer.update(budget_pk=exc.budget_pk, attempt_pk=exc.attempt_pk, persisted=True)
+            if stage:
+                answer.update(stage=stage, audit_cause_type=type(exc.__cause__).__name__ if exc.__cause__ else "",
+                              audit_cause=str(exc.__cause__ or "")[:2000])
+            return answer
+        except Exception as exc:
+            if _current_offline_budget_binding() is not None:
+                _, reason, _ = _close_bound_provider_failure(article_id, run_id, claimed_at, error=exc)
+            else:
+                _, reason = finalize_translation_claim(article_id, run_id, claimed_at, error=exc)
+            if _current_offline_budget_binding() is not None and reason == "checkpoint_exists":
+                return _translate_managed_claim_task(article_id, run_id, claimed_at,
+                    suppress_automation=suppress_automation, log=log)
+            if reason:
+                return skipped(reason)
+            raise
+        # 本地检查点错误不进入provider异常/重试计次；写入失败保留executing。
+        if timezone.now() >= datetime.fromisoformat(run.raw_response[CLAIM_KEY]["deadline_at"]):
+            return skipped("claim_expired")
+        try:
+            checkpoint = build_translation_checkpoint(
+                article, run, result, suppress_automation=run.raw_response[CLAIM_KEY]["suppress_automation"],
+            )
+            checkpoint, reason = save_translation_checkpoint(article_id, run_id, claimed_at, checkpoint)
+        except TranslationCheckpointError:
+            return skipped("checkpoint_invalid")
+        if reason:
+            return skipped(reason)
+    article, reason = finalize_translation_claim(article_id, run_id, claimed_at, checkpoint=checkpoint)
+    if reason:
+        return skipped(reason)
+    if (_current_offline_budget_binding() is None and getattr(settings, "AUTOMATION_ENABLED", False)
+            and not checkpoint["suppress_automation"]):
+        transaction.on_commit(lambda: dispatch_task(process_article_automation_task, article.id), robust=True)
+    _log_success(log, f"translated article={article_id}")
+    return {
+        "article_id": article_id, "translated": True,
+        "translation_status": article.translation_status, "translation_model": article.translation_model,
+    }
+
+
 @shared_task
 def translate_article_task(
     article_id: int,
     preclaimed_retry: bool = False,
     force: bool = False,
     suppress_automation: bool = False,
+    claim_run_id: int | None = None,
+    claim_started_at: str = "",
 ) -> dict:
+    from stable.services.translation_recovery import _current_offline_budget_binding
+    offline_binding = _current_offline_budget_binding()
     log = _log_start(
         "translate_article",
         {"article_id": article_id, "force": force, "suppress_automation": suppress_automation},
     )
     article = None
     claimed_retry = False
+    managed_retry = False
     force_published = False
     previous_automation_status = ""
     try:
@@ -1887,16 +1968,18 @@ def translate_article_task(
             _log_success(log, f"skipped article={article_id} reason={reason}")
             return {"article_id": article_id, "translated": False, "skipped": True, "reason": reason}
         if preclaimed_retry:
-            if (
-                article.translation_status != ArticleTranslationStatus.TRANSLATING
-                or not article.translation_runs.filter(status=TranslationStatus.STARTED).exists()
-            ):
-                reason = "preclaimed_retry_state_changed"
-                _log_success(log, f"skipped article={article_id} reason={reason}")
-                return {"article_id": article_id, "translated": False, "skipped": True, "reason": reason}
-            claimed_retry = True
+            managed_retry = True
+            return _translate_managed_claim_task(
+                article_id, claim_run_id, claim_started_at,
+                suppress_automation=suppress_automation, log=log,
+            )
         else:
             expected_due_at = article.translation_next_retry_at
+        if (offline_binding is not None and (force or article.translation_status != ArticleTranslationStatus.FAILED
+                or expected_due_at is None)):
+            reason = "bound_claim_identity_missing"
+            _log_success(log, f"skipped article={article_id} reason={reason}")
+            return {"article_id": article_id, "translated": False, "skipped": True, "reason": reason}
         if (
             not force
             and not preclaimed_retry
@@ -1909,8 +1992,11 @@ def translate_article_task(
             if not claim.claimed:
                 _log_success(log, f"skipped article={article_id} reason={claim.reason}")
                 return {"article_id": article_id, "translated": False, "skipped": True, "reason": claim.reason}
-            claimed_retry = True
-            article.refresh_from_db()
+            managed_retry = True
+            return _translate_managed_claim_task(
+                article_id, claim.run_id, claim.claimed_at,
+                suppress_automation=suppress_automation, log=log,
+            )
         else:
             article.translation_status = ArticleTranslationStatus.TRANSLATING
             article.translation_started_at = timezone.now()
@@ -1958,7 +2044,7 @@ def translate_article_task(
             "translation_model": article.translation_model,
         }
     except Exception as exc:
-        if article is not None:
+        if article is not None and not managed_retry and offline_binding is None:
             article.translation_model = article.translation_model or settings.TRANSLATION_MODEL
             article.translation_provider = article.translation_provider or settings.TRANSLATION_PROVIDER
             article.save(

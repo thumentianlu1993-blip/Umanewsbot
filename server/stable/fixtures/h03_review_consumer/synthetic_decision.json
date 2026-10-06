@@ -1,0 +1,13 @@
+{
+  "synthetic_only": true,
+  "purpose": "isolated existing-consumer contract; no file approval implementation",
+  "module": "profile",
+  "decision": "approved",
+  "actor": "a039-synthetic-actor",
+  "trusted_original_sha256": {
+    "packet.json": "111d004d7c886300ceb26c2445fd023e0e6ad4ceaab875c74ee73b1c858dbe26",
+    "cache.json": "2ba3faa4706c64f4da1e8c0967713d51cc5cc776264cfccbc317e4638acec7bb",
+    "manifest.json": "ca3feeab3d7fd85d84d9c9c3a117b84c8d376b804e64ee412020ba532aa4e1c2",
+    "combined_candidates.jsonl": "cd5c98d797c54137828ce13c5416c911da2f92515457fa0fdff5afa804339dcb"
+  }
+}

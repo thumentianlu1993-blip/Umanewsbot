@@ -10939,6 +10939,135 @@ class PublicHomeInfoFeedTests(TestCase):
         self.assertNotIn(headline, response.context["feed_articles"])
         self.assertIn(regular, response.context["feed_articles"])
 
+    def test_u04_headline_only_empty_copy_describes_current_page(self):
+        from bs4 import BeautifulSoup
+
+        article = self.make_article("c041-headline-only", "C041 唯一公开头条")
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["headline_article"], article)
+        self.assertEqual(response.context["feed_articles"], [])
+        soup = BeautifulSoup(response.content, "html.parser")
+        hero = soup.select_one("a.hero-headline")
+        self.assertIsNotNone(hero)
+        self.assertIn(article.effective_title, hero.get_text())
+        detail = self.client.get(hero["href"])
+        self.assertEqual(detail.status_code, 200)
+        self.assertContains(detail, article.effective_title)
+        self.assertContains(detail, article.effective_body)
+        self.assertContains(response, "本页暂无其他新闻。")
+        self.assertNotContains(response, "目前还没有已发布文章。")
+
+    def test_u04_headline_empty_copy_keeps_truly_empty_home(self):
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.context["headline_article"])
+        self.assertEqual(response.context["feed_articles"], [])
+        self.assertContains(response, "目前还没有已发布文章。")
+        self.assertNotContains(response, "本页暂无其他新闻。")
+
+    def test_u04_headline_empty_copy_does_not_disclose_hidden_articles(self):
+        pending = self.make_article(
+            "c041-pending", "C041 未审核对象", workflow_status=WorkflowStatus.PENDING_REVIEW,
+        )
+        withdrawn = self.make_article(
+            "c041-withdrawn", "C041 已撤回对象", workflow_status=WorkflowStatus.WITHDRAWN,
+        )
+        missing_time = self.make_article("c041-null-time", "C041 没有公开时间对象")
+        # make_article(None) defaults to published_at: explicitly create the NULL fixture.
+        NewsArticle.objects.filter(pk=missing_time.pk).update(published_to_web_at=None)
+        missing_time.refresh_from_db()
+        self.assertIsNone(missing_time.published_to_web_at)
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.context["headline_article"])
+        self.assertEqual(response.context["feed_articles"], [])
+        self.assertContains(response, "目前还没有已发布文章。")
+        self.assertNotContains(response, "本页暂无其他新闻。")
+        for article in (pending, withdrawn, missing_time):
+            with self.subTest(article=article.source_article_id):
+                self.assertNotContains(response, article.effective_title)
+                self.assertNotContains(response, article.source_url)
+                self.assertEqual(self.client.get(article.public_path).status_code, 404)
+        self.assertNotContains(response, WorkflowStatus.PENDING_REVIEW.value)
+        self.assertNotContains(response, WorkflowStatus.WITHDRAWN.value)
+
+    def test_u04_headline_with_regular_cards_keeps_dedup_and_no_empty_copy(self):
+        from bs4 import BeautifulSoup
+
+        now = timezone.now()
+        headline = self.make_article(
+            "c041-headline-regular", "C041 重点头条", published_to_web_at=now,
+            score_total=95, race_priority="P0", has_cover=True,
+        )
+        regular = self.make_article(
+            "c041-regular", "C041 普通新闻", published_to_web_at=now - timedelta(minutes=5),
+            score_total=20,
+        )
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["headline_article"], headline)
+        self.assertEqual([a.pk for a in response.context["feed_articles"]], [regular.pk])
+        soup = BeautifulSoup(response.content, "html.parser")
+        feed = soup.select_one('section[aria-label="最新新闻"]')
+        self.assertIsNotNone(feed)
+        cards = feed.select("article.feed-card")
+        self.assertEqual(len(cards), 1)
+        self.assertIn(regular.effective_title, cards[0].get_text())
+        self.assertNotIn(headline.effective_title, feed.get_text())
+        self.assertContains(response, headline.effective_title)
+        self.assertNotContains(response, "本页暂无其他新闻。")
+        self.assertNotContains(response, "目前还没有已发布文章。")
+        # Follow the rendered URL, including its real signed return navigation.
+        detail = self.client.get(cards[0].select_one("h3.feed-card-title a")["href"])
+        self.assertEqual(detail.status_code, 200)
+        self.assertContains(detail, regular.effective_title)
+        detail_soup = BeautifulSoup(detail.content, "html.parser")
+        back = detail_soup.select_one('nav[aria-label="文章操作"] a')
+        self.assertIsNotNone(back)
+        returned = self.client.get(back["href"])
+        self.assertEqual(returned.status_code, 200)
+        self.assertIn(regular, returned.context["feed_articles"])
+
+    def test_u04_headline_only_first_page_preserves_next_page(self):
+        from bs4 import BeautifulSoup
+
+        now = timezone.now()
+        headline = self.make_article(
+            "c041-page-headline", "C041 第一页头条", published_to_web_at=now,
+            score_total=95, race_priority="P0", has_cover=True,
+        )
+        second = self.make_article(
+            "c041-page-second", "C041 第二页新闻", published_to_web_at=now - timedelta(minutes=5),
+            score_total=20,
+        )
+        with patch("stable.views.PUBLIC_FEED_PAGE_SIZE", 1):
+            first = self.client.get("/")
+            self.assertEqual(first.status_code, 200)
+            self.assertEqual(first.context["headline_article"], headline)
+            self.assertEqual(first.context["feed_articles"], [])
+            self.assertEqual(first.context["page_obj"].number, 1)
+            self.assertEqual(first.context["page_obj"].paginator.num_pages, 2)
+            soup = BeautifulSoup(first.content, "html.parser")
+            navigation = soup.find("nav", attrs={"aria-label": "分页"})
+            self.assertIsNotNone(navigation)
+            next_link = navigation.find("a", string=lambda text: text and text.strip() == "下一页")
+            self.assertIsNotNone(next_link)
+            next_page = self.client.get(next_link["href"])
+            self.assertEqual(next_page.status_code, 200)
+            self.assertEqual(next_page.context["page_obj"].number, 2)
+            self.assertEqual([a.pk for a in next_page.context["feed_articles"]], [second.pk])
+            next_soup = BeautifulSoup(next_page.content, "html.parser")
+            next_feed = next_soup.select_one('section[aria-label="最新新闻"]')
+            self.assertIsNotNone(next_feed)
+            self.assertIn(second.effective_title, next_feed.get_text())
+            self.assertNotIn(headline.effective_title, next_feed.get_text())
+            self.assertNotContains(next_page, "目前还没有已发布文章。")
+            self.assertNotContains(next_page, "本页暂无其他新闻。")
+            # Check the new copy only after proving the existing real pagination chain.
+            self.assertContains(first, "本页暂无其他新闻。")
+            self.assertNotContains(first, "目前还没有已发布文章。")
+
     def test_public_home_hot_articles_prioritize_upstream_access_snapshot(self):
         now = timezone.now()
         snapshot_article = self.make_article(
@@ -16444,6 +16573,68 @@ class HorseProfilePageMvpTests(TestCase):
 
         self.assertContains(response, "目前还没有已发布马匹资料。")
         self.assertNotContains(response, "目前还没有已发布文章。")
+
+    def test_u04_unmatched_search_describes_public_search_scope(self):
+        self._profile()
+        response = self.client.get(reverse("public-horse-index"), {"q": "C032-no-match"})
+
+        self.assertContains(response, "没有找到符合搜索条件的已发布马匹资料。")
+        self.assertNotContains(response, "目前还没有已发布马匹资料。")
+        self.assertEqual(list(response.context["horse_profiles"]), [])
+
+    def test_u04_clear_search_restores_cards_and_preserves_anonymous_follow(self):
+        from bs4 import BeautifulSoup
+
+        profile = self._profile()
+        signed_token = signed_follow_token()
+        token_hash = token_hash_from_cookie(signed_token)
+        follow_horse(token_hash, profile, include_descendants=True)
+        self.client.cookies[FOLLOW_COOKIE_NAME] = signed_token
+        response = self.client.get(reverse("public-horse-index"), {"q": "C032-no-match", "page": "2"})
+        links = BeautifulSoup(response.content, "html.parser").find_all("a")
+        clear_links = [link for link in links if link.get_text(strip=True) == "清除搜索"]
+
+        self.assertEqual(len(clear_links), 1)
+        self.assertEqual(clear_links[0]["href"], reverse("public-horse-index"))
+        returned = self.client.get(clear_links[0]["href"])
+        self.assertEqual(returned.status_code, 200)
+        self.assertEqual(returned.context["filters"]["q"], "")
+        self.assertEqual(returned.context["page_obj"].number, 1)
+        self.assertEqual(returned.wsgi_request.GET.dict(), {})
+        self.assertContains(returned, profile.display_name)
+        self.assertContains(returned, "★ 已关注")
+        self.assertEqual(self.client.cookies[FOLLOW_COOKIE_NAME].value, signed_token)
+        self.assertNotIn(FOLLOW_COOKIE_NAME, returned.cookies)
+        self.assertEqual(HorseFollow.objects.filter(token_hash=token_hash, horse_profile=profile).count(), 1)
+
+    def test_u04_hidden_only_search_remains_no_match_without_disclosure(self):
+        profile = self._profile(display_name_zh="C032-PRIVATE 合成隐藏马", review_status=HorseProfileStatus.HIDDEN)
+        response = self.client.get(reverse("public-horse-index"), {"q": "C032-PRIVATE"})
+
+        self.assertContains(response, "没有找到符合搜索条件的已发布马匹资料。")
+        self.assertNotContains(response, "目前还没有已发布马匹资料。")
+        self.assertNotContains(response, profile.display_name)
+        self.assertEqual(list(response.context["horse_profiles"]), [])
+
+    def test_u04_empty_unfiltered_or_whitespace_search_keeps_no_data_copy(self):
+        for params in ({}, {"q": "   "}):
+            with self.subTest(params=params):
+                response = self.client.get(reverse("public-horse-index"), params)
+                self.assertContains(response, "目前还没有已发布马匹资料。")
+                self.assertNotContains(response, "没有找到符合搜索条件的已发布马匹资料。")
+                self.assertNotContains(response, "清除搜索")
+                self.assertEqual(response.context["filters"]["q"], "")
+
+    def test_u04_matching_search_keeps_cards_and_detail_return_navigation(self):
+        profile = self._profile()
+        listing = self.client.get(reverse("public-horse-index"), {"q": profile.display_name})
+
+        self.assertContains(listing, profile.display_name)
+        self.assertNotContains(listing, "没有找到符合搜索条件的已发布马匹资料。")
+        self.assertNotContains(listing, "目前还没有已发布马匹资料。")
+        self.assertNotContains(listing, "清除搜索")
+        self.assertEqual(list(listing.context["horse_profiles"]), [profile])
+        self.assertContains(listing, "return_nav=")
 
     def test_completeness_requires_all_six_pedigree_fields_and_descendants_use_profile_links(self):
         parent = self._profile(sire_text="父", dam_text="母", sire_sire_text="父父", sire_dam_text="父母", dam_sire_text="母父")
