@@ -1,6 +1,6 @@
 # B039：结果检查点 RED 准备交接
 
-任务B039-M02-RESULT-CHECKPOINT-RED-PREP-001。状态：**首轮3项真实RED已完成；ROOT授权后已实现检查点/恢复并补边界，尚未执行GREEN，待新窗口**。
+任务B039-M02-RESULT-CHECKPOINT-RED-PREP-001。状态：**首轮3项真实RED→受影响77项GREEN已完成，待原R代码审核；尚未集成/合并/发布**。
 
 依赖固定C033 `6793f9f2461d1382349dcc8075a7e92dea85a8ed` / tree `aa8b22d59b597d3de19205b42167338474c8c0e9`；ROOT反馈原R `0b7de5e6` APPROVED_INTEGRATION_PREPARATION，尚非formal GREEN/merge。独立树 `/Users/mentianlu/.codex/worktrees/b039-result-checkpoint-red/umanews`，分支codex/b039-result-checkpoint-red。B038原方案a7d5a056fb5c951650ec3edfe49de7ee8e6a86dc与原R30f8ec70 APPROVED_PLAN_ONLY是只读依据；原B037/B038/C033候选保持不变。
 
@@ -45,3 +45,13 @@ JSON合同保持phase=executing；新claim里的suppress可作首次执行策略
 新增16方法，共30方法；原14方法及既有class AST保持受测原样。六锁等待subcases覆盖save/resume entry/resume finalize、两个锁的精确blocker跨截止；原worker与恢复者两真实连接交错；write fail/terminal rollback/异摘要冲突及codec NaN/Inf/循环/子类/精确大小深度边界。此处是已写断言，尚未运行或证明通过；详见test_cases。没有拿旧R01证明新路径。
 
 拟申请下一精确受影响77IDs（30+25+22），独立runtime固定候选/源指纹/名单/计划；不复用已释放RED窗口，A034仍独占时不运行。无DB/PG/collector、真实provider/外发或GREEN证据。AST及git diff --check可用于静态准备，独立R review与formal/full均尚未完成，完整M02和DDL工期风险仍保留。
+
+## 首轮77项实际GREEN（2026-10-06）
+
+ROOT新分配B039-FIRST-77-GREEN-PG-WINDOW-001；固定0096f150a676556207a8fbc4d825cd0861dd5b80 / tree f5c28aaf64a50194294a09e028e74df6126bc81c、原准确77IDs一次实际执行77/77 PASS、零failures/errors/skips、complete、exit0。业务20.411秒、worker58.667秒、whole68.833秒。原3RED均GREEN；新30、既有B03725、recovery22均通过，codec8方法及全部子例通过。原M01 mock19仍只保留既有63证据，不冒本轮复跑，不减formal/full。
+
+六个新增锁等待场景真实Lock+精确blocker后跨deadline并通过：save article worker95/run97→blocker93；resume entry100/102→98；resume finalize105/107→103。双恢复backend73/74只有一胜者；原worker/恢复者backend88/90由恢复者胜出；各线程/连接清理通过。原B037单消费者及六R01锁等待亦通过。Docker top峰值抽样2仅为抽样，不当全程峰值证明。
+
+finally容器=[]、runner退出、FD锁释放，并重新取得/释放验证；host owner39092/runner39135经ps确认不存在。隔离/原8控制/既有镜像保持，无真实provider/通知/队列/生产动作。独立runtime `/Users/mentianlu/.codex/runtime/b039-first-77-green-pg-window-001/green-receipt.json` SHA `49633e6ab9f698c43f06328466005018612308c4d372d7c9a0a2d00299fd1517` 绑定准确实际IDs、原日志/结果、6锁观察、codecs、source/control/plan/隔离/资源清理。
+
+后续仅回写本两份B文档，应用与测试字节保持受测0096f150。交ROOT安排原R代码review；未获review前不交C集成。GREEN不是完整M02、formal/full、主线或生产证明，跨轮预算/unknown费用准入/可靠outbox/保证自动恢复继续缺口。

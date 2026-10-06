@@ -1,6 +1,6 @@
 # B039：已验证结果检查点 RED 测试合同
 
-状态：原14个方法保留，新增16个，共30个；首轮准确3项在ROOT专属PG窗取得真实业务RED，现实现与新增边界均尚未运行GREEN。依据B038已审方案a7d5a056；原R审批由ROOT反馈30f8ec70 APPROVED_PLAN_ONLY。RED准备时没有业务占位；现已按ROOT授权实现，但未取得GREEN证据。
+状态：原14个方法保留，新增16个，共30个；首轮准确3项在ROOT专属PG窗取得真实业务RED，现实现及准确77项受影响断言已通过一次官方PG GREEN，待原R代码审核。依据B038已审方案a7d5a056；原R审批由ROOT反馈30f8ec70 APPROVED_PLAN_ONLY。RED准备时没有业务占位；现已按ROOT授权实现，首轮77项GREEN通过，审核/集成未完成。
 
 ## Fixture与首轮最小RED
 
@@ -61,3 +61,7 @@ ROOT核三项真实RED/清理后授权实施；当前仍未取得新的测试窗
 拟准确受影响 **77 IDs**：新module30 +原B037 claim-fence25 + recovery22。原M01 mock19保留此前未受影响证据（translation.py/Responses/settings/factory/test未改，不调用新helper）；不是本轮复跑，也不降低formal/full分母。一个官方django诊断batch，max3PG（已有消费并发及新双恢复需主+两worker），新增锁等待与原worker竞争为2连接；单容器资源/控制保持。ROOT另给新窗前只AST/指纹/diff，不collector或DB。A034独占期间不竞争资源。
 
 仍待：准确77在候选固定SHA上的GREEN、实际6锁观察/原worker竞争、同R独立review、ROOT/C formal catalog/impact/full。完整M02预算/outbox/自动恢复保证不由这些断言证明。
+
+## 首轮77项GREEN实际结果
+
+ROOT专属B039-FIRST-77-GREEN-PG-WINDOW-001、固定0096f150原77IDs一次77/77通过、0failure/error/skip、complete/exit0。全部3原业务RED、11原边界、16新增、B03725与recovery22通过；8codec方法及其子例通过，新增6锁等待均有实际Lock+blocker与跨截止断言，双恢复者单胜者及原worker-vs-replayer两个真实backend/清理断言通过。日志/JSON与完整证据见独立green-receipt，SHA49633e6ab9f698c43f06328466005018612308c4d372d7c9a0a2d00299fd1517。旧M01 19未复跑，不减formal/full；当前待同R代码审核，不宣称完整M02或发布。
