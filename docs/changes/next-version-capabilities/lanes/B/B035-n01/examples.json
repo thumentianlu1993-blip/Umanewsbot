@@ -1,0 +1,194 @@
+{
+  "scope": "local parser demo, no network/model/DB; not F02 gold",
+  "examples": [
+    {
+      "title": "正常正文",
+      "provenance": "既有开发反例 hrn_normal_article.html（非真实gold）",
+      "captured_at": null,
+      "captured_at_note": "fixture无法确认真实抓取时间；本轮离线演示2026-10-06",
+      "input_html": "<!doctype html>\n<html>\n  <head><meta property=\"og:title\" content=\"Trainer maps an autumn campaign\"></head>\n  <body>\n    <main>\n      <div class=\"article-body mt-2\">\n        <p>The trainer opened the season with a patient plan for the unbeaten colt.</p>\n        <h2>The next target</h2>\n        <p>The team will use a local prep before travelling in October.</p>\n        <blockquote>We will let the horse tell us when he is ready.</blockquote>\n        <ol>\n          <li>A quiet week at the farm.</li>\n          <li>One final breeze before entry day.</li>\n        </ol>\n        <p>The colt returned home sound, and the full campaign remains intact.</p>\n      </div>\n    </main>\n  </body>\n</html>\n",
+      "input_sha256": "7f451aea7863da281786d1fa4709de784dafb0eec3f117a738361dcef64b6147",
+      "page_before": "The trainer opened the season with a patient plan for the unbeaten colt.\n\nThe next target\n\nThe team will use a local prep before travelling in October.\n\nWe will let the horse tell us when he is ready.\n\nA quiet week at the farm.\n\nOne final breeze before entry day.\n\nThe colt returned home sound, and the full campaign remains intact.",
+      "status": "ok",
+      "selector": ".article-body",
+      "body_after": "The trainer opened the season with a patient plan for the unbeaten colt.\n\nThe next target\n\nThe team will use a local prep before travelling in October.\n\nWe will let the horse tell us when he is ready.\n\nA quiet week at the farm.\n\nOne final breeze before entry day.\n\nThe colt returned home sound, and the full campaign remains intact.",
+      "cleaning": {
+        "removed_count": 0,
+        "removed_rules": {},
+        "trace_version": 1,
+        "body_html_sha256": "84b0f95b0e655cac97b348abed732b1aa56484c7b2b0b3e761674241c0c9a68a",
+        "before_text": "The trainer opened the season with a patient plan for the unbeaten colt.\n\nThe next target\n\nThe team will use a local prep before travelling in October.\n\nWe will let the horse tell us when he is ready.\n\nA quiet week at the farm.\n\nOne final breeze before entry day.\n\nThe colt returned home sound, and the full campaign remains intact.",
+        "after_text": "The trainer opened the season with a patient plan for the unbeaten colt.\n\nThe next target\n\nThe team will use a local prep before travelling in October.\n\nWe will let the horse tell us when he is ready.\n\nA quiet week at the farm.\n\nOne final breeze before entry day.\n\nThe colt returned home sound, and the full campaign remains intact.",
+        "blocks": [
+          {
+            "block_id": "body-f3b9a359397a2bf89feb",
+            "locator": "paragraph[0]",
+            "original_text": "The trainer opened the season with a patient plan for the unbeaten colt.",
+            "text": "The trainer opened the season with a patient plan for the unbeaten colt.",
+            "decision": "kept",
+            "reasons": [
+              "article_text"
+            ]
+          },
+          {
+            "block_id": "body-936da9aa2450f082e71c",
+            "locator": "paragraph[1]",
+            "original_text": "The next target",
+            "text": "The next target",
+            "decision": "kept",
+            "reasons": [
+              "article_text"
+            ]
+          },
+          {
+            "block_id": "body-76b3fb1815b1e9c8874c",
+            "locator": "paragraph[2]",
+            "original_text": "The team will use a local prep before travelling in October.",
+            "text": "The team will use a local prep before travelling in October.",
+            "decision": "kept",
+            "reasons": [
+              "article_text"
+            ]
+          },
+          {
+            "block_id": "body-1466b60779cdd6aa206e",
+            "locator": "paragraph[3]",
+            "original_text": "We will let the horse tell us when he is ready.",
+            "text": "We will let the horse tell us when he is ready.",
+            "decision": "kept",
+            "reasons": [
+              "article_text"
+            ]
+          },
+          {
+            "block_id": "body-0085863da44f8e122098",
+            "locator": "paragraph[4]",
+            "original_text": "A quiet week at the farm.",
+            "text": "A quiet week at the farm.",
+            "decision": "kept",
+            "reasons": [
+              "article_text"
+            ]
+          },
+          {
+            "block_id": "body-48bd413ae1a5ded85f58",
+            "locator": "paragraph[5]",
+            "original_text": "One final breeze before entry day.",
+            "text": "One final breeze before entry day.",
+            "decision": "kept",
+            "reasons": [
+              "article_text"
+            ]
+          },
+          {
+            "block_id": "body-78e01640ec0821000ac9",
+            "locator": "paragraph[6]",
+            "original_text": "The colt returned home sound, and the full campaign remains intact.",
+            "text": "The colt returned home sound, and the full campaign remains intact.",
+            "decision": "kept",
+            "reasons": [
+              "article_text"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "title": "导航广告污染",
+      "provenance": "合成开发样例；使用既有Sporting Life Article__ArticleBody结构（非真实gold）",
+      "captured_at": null,
+      "captured_at_note": "fixture无法确认真实抓取时间；本轮离线演示2026-10-06",
+      "input_html": "<h1>Local test</h1><div class=\"Article__ArticleBody\"><nav>Navigation links</nav><p>Blue Horizon is 7/2 for the feature race.</p><p>Book now the festival begins on Saturday.</p><p>Free bets sign up offer.</p><p>The rider said the plan remains unchanged.</p></div>",
+      "input_sha256": "57cf46b705030f0cbf4fe5a2b902d6449a91d8f07128a57c6b6dbe8535d2bc40",
+      "page_before": "Local test\nNavigation links\nBlue Horizon is 7/2 for the feature race.\nBook now the festival begins on Saturday.\nFree bets sign up offer.\nThe rider said the plan remains unchanged.",
+      "status": "ok",
+      "selector": "[class*='Article__ArticleBody']",
+      "body_after": "Blue Horizon is 7/2 for the feature race.\n\nthe festival begins on Saturday.\n\nThe rider said the plan remains unchanged.",
+      "cleaning": {
+        "removed_count": 3,
+        "removed_rules": {
+          "betting_promotion": 1,
+          "link_cta": 1,
+          "structured_noise": 1
+        },
+        "trace_version": 1,
+        "body_html_sha256": "14870e470c6142058cfbdc36e474f88535356f20fc46c7d909a026c7bb5fe583",
+        "before_text": "Navigation links\nBlue Horizon is 7/2 for the feature race.\nBook now the festival begins on Saturday.\nFree bets sign up offer.\nThe rider said the plan remains unchanged.",
+        "after_text": "Blue Horizon is 7/2 for the feature race.\n\nthe festival begins on Saturday.\n\nThe rider said the plan remains unchanged.",
+        "blocks": [
+          {
+            "block_id": "body-020417ad384c01e6ef03",
+            "locator": "container/nav[0]",
+            "original_text": "Navigation links",
+            "text": "",
+            "decision": "removed",
+            "reasons": [
+              "structured_noise"
+            ]
+          },
+          {
+            "block_id": "body-a1f563ef21536bd30fa8",
+            "locator": "paragraph[0]",
+            "original_text": "Blue Horizon is 7/2 for the feature race.",
+            "text": "Blue Horizon is 7/2 for the feature race.",
+            "decision": "kept",
+            "reasons": [
+              "article_text"
+            ]
+          },
+          {
+            "block_id": "body-d7682d2e2ecc1be554c6",
+            "locator": "paragraph[1]",
+            "original_text": "Book now the festival begins on Saturday.",
+            "text": "the festival begins on Saturday.",
+            "decision": "modified",
+            "reasons": [
+              "link_cta"
+            ]
+          },
+          {
+            "block_id": "body-caf915553150c8ce408b",
+            "locator": "paragraph[2]",
+            "original_text": "Free bets sign up offer.",
+            "text": "",
+            "decision": "removed",
+            "reasons": [
+              "betting_promotion"
+            ]
+          },
+          {
+            "block_id": "body-68aee6d7000b26e97ce8",
+            "locator": "paragraph[3]",
+            "original_text": "The rider said the plan remains unchanged.",
+            "text": "The rider said the plan remains unchanged.",
+            "decision": "kept",
+            "reasons": [
+              "article_text"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "title": "正文不足：可信容器缺失",
+      "provenance": "合成模板漂移例（非真实gold）",
+      "captured_at": null,
+      "captured_at_note": "fixture无法确认真实抓取时间；本轮离线演示2026-10-06",
+      "input_html": "<main><h1>Template drift</h1><p>Log in for free bets</p><p>Top Stories</p></main>",
+      "input_sha256": "1665835fc5dca1427a9591b86ecd60385fc725800e3b7e95099fcfc50022f617",
+      "page_before": "Template drift\nLog in for free bets\nTop Stories",
+      "status": "selector_not_found",
+      "selector": "",
+      "body_after": "",
+      "cleaning": {
+        "removed_count": 0,
+        "removed_rules": {},
+        "trace_version": 1,
+        "body_html_sha256": "",
+        "before_text": "",
+        "after_text": "",
+        "blocks": []
+      }
+    }
+  ]
+}
