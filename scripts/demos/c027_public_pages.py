@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import socket
+import subprocess
 import sys
 import types
 from urllib.parse import parse_qs, urlsplit
@@ -122,6 +123,7 @@ def seed_and_verify(runtime):
     assert returned.status_code == 200
     assert returned.context["filters"]["grade"] == "g1" and returned.context["filters"]["year"] == str(today.year)
     (runtime / "verification.json").write_text(json.dumps({"source_main": SOURCE_MAIN,
+        "candidate_sha": subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True).strip(),
         "synthetic": True, "date_beijing": today.isoformat(), "home_card_count": len(entries),
         "home_names": [e["event"].chinese_name for e in entries], "date_only_clock_known": entries[0]["clock_known"],
         "g1_card_names": [e.chinese_name for e in events], "g1_codes": [event_grade_field(e).code for e in events],

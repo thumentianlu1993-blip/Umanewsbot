@@ -71,6 +71,7 @@ class _PublicInstant(Func):
                 if instant.tzinfo is None: instant=instant.replace(tzinfo=timezone.utc)
             value=public_time(dict(race_datetime=instant,local_date=day,local_start_time=clock,timezone_name=zone)).instant
             return value.replace(tzinfo=None).isoformat(' ') if value else None
+        connection.ensure_connection()
         connection.connection.create_function('umanews_public_instant',4,convert,deterministic=True)
         return super().as_sql(compiler,connection,function='umanews_public_instant',**extra_context)
 

@@ -9,6 +9,7 @@ const assert = require('assert/strict');
   assert.equal(new URL(base).hostname, '127.0.0.1');
   const evidence = JSON.parse(fs.readFileSync(path.join(runtime, 'verification.json')));
   const browser = await chromium.launch({headless: true});
+  try {
   const context = await browser.newContext({viewport: {width: 1440, height: 1000}, locale:'zh-CN'});
   const blocked = [], errors = [];
   await context.route('**/*', route => {
@@ -54,10 +55,11 @@ const assert = require('assert/strict');
   assert(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth));
   await shot('home-mobile');
   assert.equal(errors.length,0);
-  const summary={source_main:evidence.source_main,synthetic:true,base,desktop:'1440x1000',mobile:'390x844',
+  const summary={source_main:evidence.source_main,candidate_sha:evidence.candidate_sha,synthetic:true,base,desktop:'1440x1000',mobile:'390x844',
     home_cards:4,date_only_has_no_clock:true,g1_badges:badges,return_url:returnURL,
     screenshots:['home-desktop','g1-calendar-desktop','germany-g1-desktop','detail-with-return','return-preserves-filters','home-mobile'],
     page_errors:errors,blocked_external_requests:blocked};
   fs.writeFileSync(path.join(runtime,'browser-verification.json'),JSON.stringify(summary,null,2)+'\n');
-  console.log(JSON.stringify(summary));await browser.close();
+  console.log(JSON.stringify(summary));
+  } finally {await browser.close();}
 })().catch(e=>{console.error(e);process.exit(1)});
