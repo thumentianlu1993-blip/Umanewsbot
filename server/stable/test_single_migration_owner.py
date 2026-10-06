@@ -3119,7 +3119,7 @@ class DeployFailClosedTests(SimpleTestCase):
         (h.root/'fault.txt').write_text('drain-failure')
         result=h.top_level('deploy/deploy.sh')
         self.assertNotEqual(result.returncode,0)
-        self.assertIn('fault:drain-failure',h.events())
+        self.assertIn('fault:drain-failure',h.events(), result.stderr)
         self.assertIn('stop-with-verified-intent:beat',h.events())
         self.assertNotIn('stop-with-verified-intent:web',h.events())
         self.assertNotIn('closed-written',h.events())

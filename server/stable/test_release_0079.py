@@ -17,9 +17,42 @@ from django.db.migrations.executor import MigrationExecutor
 from stable.services import release_0079_recovery as c
 from stable.services import release_0078_recovery as old
 from stable.services import release_0079_schema as schema
+from stable.release_0078_test_fixture import (
+    RECOVERY_MODULES,
+    use_historical_migration_contract,
+)
 
 
 class Release79ContractTests(SimpleTestCase):
+    def setUp(self):
+        use_historical_migration_contract(self, generation="0079")
+
+    def test_unknown_migration_is_retained_and_rejected_by_historical_contract(self):
+        # 未知未来文件不会被按编号或 glob 自动裁剪，仍进入原合同校验。
+        with tempfile.TemporaryDirectory() as tmp:
+            source_root = Path(tmp)
+            source = source_root / "server/stable/migrations"
+            shutil.copytree(Path(__file__).resolve().parent / "migrations", source)
+            (source / "0081_unknown.py").write_text("# unreviewed fixture\n")
+            with patch("stable.release_0078_test_fixture.ROOT", source_root):
+                for generation in RECOVERY_MODULES:
+                    with self.subTest(generation=generation):
+                        # helper自身会执行真实校验，未知文件应使其立即拒绝。
+                        with self.assertRaisesMessage(
+                            ValueError, generation + " migration file/content contract drift"
+                        ):
+                            use_historical_migration_contract(self, generation=generation)
+
+    def test_current_directory_is_still_refused_by_original_contracts(self):
+        for generation, (module, source) in RECOVERY_MODULES.items():
+            with self.subTest(generation=generation), patch.object(
+                module, "__file__", str(source)
+            ):
+                with self.assertRaisesMessage(
+                    ValueError, generation + " migration file/content contract drift"
+                ):
+                    module.migration_contract()
+
     def test_source_target_contract_is_exact_and_old_generation_still_refuses(self):
         self.assertEqual(c.migration_contract(), c.MIGRATION_CONTRACT_SHA256)
         with self.assertRaisesMessage(
@@ -222,6 +255,7 @@ class Release79ComposeTests(SimpleTestCase):
 
 class Release79ArtifactTests(SimpleTestCase):
     def setUp(self):
+        use_historical_migration_contract(self, generation="0079")
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.root = Path(tmp.name) / "release-0079-recovery"
@@ -417,6 +451,11 @@ class Release79MarkerTests(SimpleTestCase):
 
 class Release79PostgresTests(TransactionTestCase):
     databases = {"default"}
+
+    def setUp(self):
+        use_historical_migration_contract(
+            self, generation="0079", isolate_django_migrations=True
+        )
 
     def test_atomic_upgrade_retries_after_lock_timeout_and_validates_real_catalog(self):
         if connection.vendor != "postgresql":
