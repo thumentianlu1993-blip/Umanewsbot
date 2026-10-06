@@ -35,7 +35,14 @@
           </div>
         </article>
       {% empty %}
-        {% include "stable/public/_empty_state.html" with empty_state_text="目前还没有已发布马匹资料。" %}
+        {% if filters.q %}
+          <div>
+            {% include "stable/public/_empty_state.html" with empty_state_text="没有找到符合搜索条件的已发布马匹资料。" %}
+            <a href="{% url 'public-horse-index' %}">清除搜索</a>
+          </div>
+        {% else %}
+          {% include "stable/public/_empty_state.html" with empty_state_text="目前还没有已发布马匹资料。" %}
+        {% endif %}
       {% endfor %}
     </section>
 
