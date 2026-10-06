@@ -46,3 +46,13 @@ ROOT可用同官方controls/image，固定新候选SHA/tree，诊断plan精确25
 原窗口worker45.8秒/总56.8秒，实际inspect仍约束一致；容器0、owner86466/runner86511实时不存在、flock可重获、六候选文件hash未变，已回ROOT释放。原件 `/Users/mentianlu/.codex/runtime/a032-first-green-25-window-001/green-receipt.json` SHA `44c00b83e701379a66588e51fd1bc8fb52239651a4914f887e18c1d02a373df5`，绑定10原件。原日志完整保留。
 
 修正仅独立tests和本报告，业务service与f3bcf547逐字不变；无DB静态/import/25ID及合成检查通过，精确25ID集合与上一窗口相同。新固定SHA交ROOT申请同25复验，不自行复跑；修正后GREEN尚未执行，独立review仍待。额度起止10%已用、90%剩余。
+
+## 修正版同25 GREEN完成与原R代码审核交接
+
+ROOT明确分配 `A032-SAME25-REPAIR-GREEN-WINDOW-001` 后，只运行固定 `6c36cf4ec79b71932b203b2be186b7abe3fa967d` / tree `71da30a37a6e1de49d5fdbb0cc04cbec4daa692d` 的原准确25IDs一次。官方django worker在PG16.15/Django5.2.1/Linux完成25/25，failures0/errors0/skips0/exit0，首RED用例已转GREEN；不是collector/catalog/full或正式交付证据。
+
+并发原日志实际行：`first_pid=91, second_pid=93, wait_event_type=Lock, blocking_pids=[91]`；固定test同时断言second等待first及释放后already_applied、一候选一次日志。`pg-lock-evidence.json`只从原日志抽取，不推测或补造。日期JSON/现有writer、field/module锁、旧baseline完整原请求重投、新key旧baseline拒、身份/public边界、create/apply/log回滚和计数保护等25项全部通过。只证明隔离合成业务片，真实producer、来源授权与全局身份合同仍未完成，不冒H03全卡或线上完成。
+
+runtime `/Users/mentianlu/.codex/runtime/a032-same25-repair-green-window-001/`，green-receipt SHA `d1bc8661c4b128ae71725844a7b9f9f032a748eb474d8b6bf1f6045172131fac`绑定11原件hash；原log/json/constraints/preflight/cleanup/actual lock都保留。8controls与受信base/main/候选逐字一致；规定镜像/2CPU4GiB256pids3GiBtmpfs/networknone/RO/nonroot/capdrop/NNP实测一致。worker45.19秒、窗口55.93秒；owner90738和runner90778实时不存在、runner进程组也不存在、daemon0容器、flock可重获，全部六候选文件前后hash不变。窗口已回ROOT释放，没有失败重跑或增加资源。
+
+此后仅本报告docs-only固定提交，业务service/tests/fixture和8执行controls与受测6c36cf4e完全不变。交接需同时保留“代码审核候选head”和“实际GREEN受测SHA/tree”，不能将docs-only新head说成重新执行了PG。下一步ROOT转原R独立代码review；actionable技术finding在原R上下文返修/复审。无push/PR/merge/deploy/生产/真实来源/公开/外发；停止业务工作。当前周额度已用10%、剩余90%。
