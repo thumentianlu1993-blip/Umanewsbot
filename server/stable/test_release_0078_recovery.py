@@ -105,6 +105,7 @@ class Release0078MigrationFileContractTests(TestCase):
                 recovery.migration_contract()
 
     def test_historical_graph_reloads_and_cleanup_restores_current_graph(self):
+        current_leaf_nodes = MigrationLoader(None).graph.leaf_nodes("stable")
         isolated_case = TestCase()
         try:
             use_historical_migration_contract(isolated_case, isolate_django_migrations=True)
@@ -113,9 +114,9 @@ class Release0078MigrationFileContractTests(TestCase):
                 self.assertEqual(graph.leaf_nodes("stable"), [("stable", "0078_externalhorse_profile_snapshot")])
         finally:
             isolated_case.doCleanups()
-        self.assertIn(
-            ("stable", "0079_multisource_race_enrollment"),
+        self.assertEqual(
             MigrationLoader(None).graph.leaf_nodes("stable"),
+            current_leaf_nodes,
         )
 
     def test_fixture_preserves_unknown_nested_python_files(self):
