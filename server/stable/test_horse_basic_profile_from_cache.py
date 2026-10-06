@@ -117,7 +117,11 @@ class BasicProfileFromCacheFixture:
 class BasicProfileFromCacheTests(BasicProfileFromCacheFixture, TransactionTestCase):
     def test_persists_seven_fields_and_json_safe_date_without_publication(self):
         request = self.request()
+        protected_before = deepcopy(HorseProfile.objects.values().get(pk=self.profile.pk))
         result = self.assert_applied(request)
+        protected_after = HorseProfile.objects.values().get(pk=self.profile.pk)
+        for field in protected_before.keys() - set(FIELDS) - {"updated_at", "completeness_status"}:
+            self.assertEqual(protected_after[field], protected_before[field], field)
         expected = json.loads(request["raw_bytes"])["basic_profile"]
         expected["birth_date"] = date.fromisoformat(expected["birth_date"])
         self.assertEqual({field: getattr(self.profile, field) for field in FIELDS}, expected)
@@ -247,6 +251,94 @@ class BasicProfileFromCacheTests(BasicProfileFromCacheFixture, TransactionTestCa
         other = TermEntry.objects.create(term_type="horse", source_ja="OTHER SYNTHETIC")
         HorseProfile.objects.create(primary_term=other, source_refs={"horse_identity_verified_keys": ["hkjc:hk-001"]})
         self.assert_blocked_without_writes(request)
+
+
+    def test_ready_profile_is_updated_without_publication(self):
+        self.profile.review_status = HorseProfileStatus.READY
+        self.profile.save(update_fields=["review_status", "updated_at"])
+        self.assert_applied()
+        self.assertEqual(self.profile.review_status, HorseProfileStatus.READY)
+        self.assertIsNone(self.profile.published_at)
+
+    def test_hidden_timestamp_blocks_even_draft(self):
+        self.profile.hidden_at = datetime(2026, 10, 2, tzinfo=timezone.utc)
+        self.profile.save(update_fields=["hidden_at", "updated_at"])
+        self.assert_blocked_without_writes(self.request())
+
+    def test_missing_target_does_not_create_profile_or_candidate(self):
+        request = self.request()
+        self.profile.delete()
+        counts = self.counts()
+        result = apply_basic_profile_from_cache(**request)
+        self.assertEqual(result["status"], "blocked")
+        self.assertEqual(result["reason"], "target_missing")
+        self.assertEqual(self.counts(), counts)
+
+    def test_same_namespace_contradictory_key_blocks(self):
+        self.profile.source_refs["horse_identity_keys"] = ["hkjc:other"]
+        self.profile.save(update_fields=["source_refs", "updated_at"])
+        self.assert_blocked_without_writes(self.request())
+
+    def test_overlong_field_is_rejected_without_truncation(self):
+        payload = json.loads(FIXTURE.read_bytes())
+        payload["basic_profile"]["owner_name"] = "X" * 256
+        self.assert_blocked_without_writes(self.request(payload=payload))
+
+    def test_empty_field_cannot_clear_existing_owner(self):
+        self.profile.owner_name = "Existing Owner"
+        self.profile.save(update_fields=["owner_name", "updated_at"])
+        request = self.request()
+        payload = json.loads(FIXTURE.read_bytes())
+        payload["basic_profile"]["owner_name"] = ""
+        request["raw_bytes"] = (json.dumps(payload) + "\n").encode()
+        request["expected_sha256"] = hashlib.sha256(request["raw_bytes"]).hexdigest()
+        self.assert_blocked_without_writes(request)
+
+    def test_expired_cache_does_not_fetch_or_write(self):
+        request = self.request()
+        request["max_age_seconds"] = 1
+        self.assert_blocked_without_writes(request)
+
+    def test_candidate_save_failure_leaves_no_orphan(self):
+        request = self.request()
+        before = deepcopy(HorseProfile.objects.values().get(pk=self.profile.pk))
+        counts = self.counts()
+        with patch.object(HorseProfileDataCandidate.objects, "create", side_effect=RuntimeError("synthetic save failure")):
+            with self.assertRaisesRegex(RuntimeError, "synthetic save failure"):
+                apply_basic_profile_from_cache(**request)
+        self.assertEqual(HorseProfile.objects.values().get(pk=self.profile.pk), before)
+        self.assertEqual(self.counts(), counts)
+
+    def test_apply_failure_after_writes_rolls_back_everything(self):
+        from stable.services.horse_profiles import apply_data_candidate
+        request = self.request()
+        before = deepcopy(HorseProfile.objects.values().get(pk=self.profile.pk))
+        counts = self.counts()
+
+        def fail_after_apply(*args, **kwargs):
+            apply_data_candidate(*args, **kwargs)
+            raise RuntimeError("synthetic apply failure")
+
+        with patch("stable.services.horse_profiles.apply_data_candidate", side_effect=fail_after_apply):
+            with self.assertRaisesRegex(RuntimeError, "synthetic apply failure"):
+                apply_basic_profile_from_cache(**request)
+        self.assertEqual(HorseProfile.objects.values().get(pk=self.profile.pk), before)
+        self.assertEqual(self.counts(), counts)
+
+    def test_equal_fields_still_consume_and_audit_only_once(self):
+        values = json.loads(FIXTURE.read_bytes())["basic_profile"]
+        for field, value in values.items():
+            setattr(self.profile, field, date.fromisoformat(value) if field == "birth_date" else value)
+        self.profile.save(update_fields=[*FIELDS, "updated_at"])
+        request = self.request()
+        first = apply_basic_profile_from_cache(**request)
+        self.assertEqual(first["status"], "applied")
+        self.assertEqual(first["updated_fields"], [])
+        self.assertEqual(first["publish_gate"], {"eligible": True, "blocking_reasons": []})
+        self.assertEqual(self.counts(), (1, 1, 1, 0, 1))
+        second = apply_basic_profile_from_cache(**request)
+        self.assertEqual(second["status"], "already_applied")
+        self.assertEqual(self.counts(), (1, 1, 1, 0, 1))
 
 
 class BasicProfileCacheConcurrencyTests(BasicProfileFromCacheFixture, TransactionTestCase):
