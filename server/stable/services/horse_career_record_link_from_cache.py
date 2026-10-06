@@ -4,6 +4,7 @@
 旧 writer 的全局并发安全不在此合同中。缺真实既有合同时保持 blocked。
 """
 from copy import deepcopy
+from datetime import date
 import json
 import re
 
@@ -183,6 +184,9 @@ def apply_career_record_link_from_cache(
         normalized = _normalize_race_record(selected)
         if normalized['start_status'] != 'started' or normalized['race_date_precision'] != 'exact':
             return _blocked('record_not_started_exact')
+        # The existing cache normalizer emits an ISO date string; the model
+        # and canonical writer use a typed date. Keep raw fingerprint intact.
+        normalized['race_date'] = date.fromisoformat(normalized['race_date'])
         input_sha = _sha({'candidate': checked, 'snapshot_sha': _sha(snapshot), 'entity_versions': entity_versions,
                          'as_of': as_of, 'max_age_seconds': max_age_seconds, 'source_role': SOURCE_ROLE,
                          'profile_baseline': profile_baseline.isoformat(), 'record_baseline': record_baseline.isoformat(),

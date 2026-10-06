@@ -24,3 +24,12 @@ AST语法通过；原函数完整 keyword 签名与 RED 相同；自动从共享
 五例全部通过后才按实际影响提出精确回归选择：本片局部 H01/H02/A032/共享career writer，以及读取的 binding 合同中直接相关现有方法；不直接扩大相邻全模块，正式 core要求保留。新增路径 catalog未改，交 ROOT/C精确映射或专用窗口。出现共享契约无法承载时交 ROOT，不改 schema、权限或其他 lane。
 
 最新额度13%已用/87%剩余；每5分钟核验/<=1%停止/每批目标<=3%。本地实现待真实五例 GREEN，随后仍需独立 review；未 push/PR/合并/部署/生产/真实网络/付费/公开权限变化。
+
+
+## 首五窗口失败与日期类型技术修正
+
+`A034-FIRST-FIVE-GREEN-PG-WINDOW-001` 固定958e388d/tree43199cd2，仅原五ID一次；实际5 failures/0 errors/0 skips，lifecycle complete，均在共同首次FK None!=event PK断言失败。负向、故障/幂等后续及PG锁子例未走到，不称保护通过或锁证据。原始结果/runtime封存于 `/Users/mentianlu/.codex/runtime/a034-first-five-green-pg-window-001`，green-receipt SHA `db129d87312ec70c8497ca6bc1234bd578d36f63b70c4f45d11cde6b0bb6e0a6`。worker37.451秒/总窗48.636秒；owner26411/runner26436及进程组gone、flock可重取、Docker0、12源码hash未变，已实际释放。
+
+静态确认 `_parse_date_precision` 返回 `parsed.isoformat()`，`_normalize_race_record`保留ISO字符串；模型DateField/readback为date。新入口此前直接事实比较会把有效日期误拒。技术修正仅在新入口确认exact后 `date.fromisoformat(normalized['race_date'])`，不改原bytes/行摘要/共享normalizer/writer，也不改原RED测试/fixture或任何断言。用原 `_record_contract` 的无DB类型诊断可复现字符串导致record_fact_conflict、typed date通过；这仅静态类型衔接诊断，不是五例GREEN证据。原traceback没有输出blocked reason，不能把定位说成原log已记录的唯一原因。
+
+本轮不重跑、不扩大范围；固定修正候选后交ROOT申请同五ID新窗口，剩余实现行为仍待实测。最新额度14%已用/86%剩余。
