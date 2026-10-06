@@ -48,6 +48,20 @@ TransactionTestCase 使 on_commit 真实退出最外层事务后执行；邮件�
 
 上述63项随后已按ROOT明确窗口一次实际执行，全部通过、零failure/error/skip，名单与执行集合逐项相等。PG真并发backend93/94及连接清理断言通过，原日志/完整结果/隔离与清理证据在 `/Users/mentianlu/.codex/runtime/b037-m02-boundary-63-pg-window-001`；固定受测SHA `9498edf185a99d6defc041cfabc714adc039d5a0`。原RED→GREEN与此补证没有替代正式catalog/impact/full或独立代码review。
 
+## B037-R01 新反例：锁等待跨deadline（准备，未执行）
+
+依据原R唯一P2，新增类 `stable.test_translation_claim_fence.TranslationClaimPostLockDeadlineTests`，准确三方法：
+
+| 后缀 | 目标缺失行为 / mutation |
+|---|---|
+| test_consumption_waiting_for_locks_past_deadline_never_calls_provider | 锁前now仍有效，锁等待后已到期；旧判断允许executing/provider，修后零provider且claim仍claimed；捕获删除取得锁后时钟读取 |
+| test_success_waiting_for_locks_past_deadline_never_commits_or_dispatches | 先消费，provider事件把回写暂停在主线程持锁后；旧now允许到期后保存/派发，修后article/run快照不变；捕获成功路径沿用锁前now |
+| test_terminal_error_waiting_for_locks_past_deadline_never_commits_or_notifies | 同上但mock provider抛terminal；旧now允许状态/通知，修后零终态/通知；捕获异常路径缺少锁后deadline检查 |
+
+每方法两subcases：主线程分别持article/run行锁；pg_stat_activity实际显示对应FOR UPDATE的Lock等待才推进时钟，精确到期/过期一秒。claim身份/阶段/输入不变，断言真实状态差异，不以签名、导入、环境错误作RED。主线程持锁连接兼作PG观察（清stats snapshot避免缓存），加一worker连接共两条；所有线程有界、finally close_all。mock provider/通知/send_mail/派发，无真实发送或付费。
+
+旧三个测试类AST与63方法保持不变；准备提交不改三应用源码。C032占用期间仅AST/diff检查，未经ROOT新的精确窗口不执行DB/容器。资源和后续修复边界见B037报告。
+
 非法值、空值、旧 preclaimed 消息均 fail closed；普通首次翻译/force/manual 保留现有行为与人工字段保护。无 models/settings/migration变化。无新权限或对外发送开关。deadline只约束准入/回写，跨轮费用预算与outbox不在本片，按方案保留真实缺口。
 
 PG并发后续两独立连接在消费点同步，证实只有一位消费成功及统一 article→run 锁顺序，事务不包provider；无需多容器。禁止以顺序测试替代该项。

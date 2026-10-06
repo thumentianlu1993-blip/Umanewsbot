@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta, timezone as dt_timezone
 from types import SimpleNamespace
 from threading import Barrier, Event, Thread
+import time
 from unittest.mock import patch
 
 from django.db import connection, connections, transaction
@@ -489,3 +490,122 @@ class TranslationClaimFenceBoundaryTests(TranslationClaimFixture):
         self.assertEqual(translate.call_count, 1)
         self.assertEqual(sum(bool(r.get("skipped")) for r in results), 1)
         self.assertEqual(sum(bool(r.get("translated")) for r in results), 1)
+
+
+class TranslationClaimPostLockDeadlineTests(TranslationClaimFixture):
+    """R01：真实PG锁等待期间越过固定deadline，身份/阶段/源内容不变。"""
+
+    def locked_deadline_case(self, mode, lock_target):
+        self.assertEqual(connection.vendor, "postgresql", "锁等待反例必须使用隔离PG")
+        self.now = NOW
+        if self.article.translation_runs.exists():
+            self.article = article_for_retry(translation_next_retry_at=NOW)
+        args, kwargs, run = self.claimed_message()
+        deadline = NOW + timedelta(seconds=1800)
+        self.now = deadline - timedelta(seconds=1)
+        backend_ready, provider_ready, release_provider = Event(), Event(), Event()
+        backend_ids, results, errors = [], [], []
+
+        def provider(*_args, **_kwargs):
+            self.assertFalse(connection.in_atomic_block)
+            if mode != "consume":
+                provider_ready.set()
+                if not release_provider.wait(10):
+                    raise AssertionError("provider handoff timed out")
+            if mode == "terminal":
+                raise ValueError("invalid mock response")
+            return self.translation_result()
+
+        def worker():
+            try:
+                with connection.cursor() as cursor:
+                    cursor.execute("SELECT pg_backend_pid()")
+                    backend_ids.append(cursor.fetchone()[0])
+                backend_ready.set()
+                results.append(translate_article_task.run(*args, **kwargs))
+            except BaseException as exc:
+                errors.append(exc)
+            finally:
+                connections.close_all()
+
+        def observe_actual_lock_wait():
+            stop = time.monotonic() + 5
+            expected_table = "stable_newsarticle" if lock_target == "article" else "stable_translationrun"
+            while time.monotonic() < stop:
+                with connection.cursor() as cursor:
+                    # 主线程同一连接查询活动；不新增第三条 observer 连接。
+                    cursor.execute("SELECT pg_stat_clear_snapshot()")
+                    cursor.execute(
+                        "SELECT wait_event_type, query FROM pg_stat_activity WHERE pid = %s",
+                        [backend_ids[0]],
+                    )
+                    row = cursor.fetchone()
+                if row and row[0] == "Lock" and "FOR UPDATE" in row[1] and expected_table in row[1]:
+                    print("B037-R01 observed PG lock wait:", mode, lock_target, backend_ids[0], row[0])
+                    return
+                time.sleep(0.01)
+            self.fail("worker did not enter the expected PostgreSQL row-lock wait")
+
+        def state():
+            return (
+                NewsArticle.objects.filter(pk=self.article.pk).values(
+                    "translation_status", "workflow_status", "automation_status", "body_zh",
+                    "translated_body_zh", "translation_retry_count", "translation_next_retry_at",
+                    "translation_started_at", "translated_at", "translation_metadata", "decision_reason",
+                ).get(),
+                TranslationRun.objects.filter(pk=run.pk).values(
+                    "status", "raw_response", "error_message", "model_name", "provider_name",
+                ).get(),
+            )
+
+        thread = Thread(target=worker, daemon=True)
+        self.notification.reset_mock()
+        self.automation.reset_mock()
+        self.mail.reset_mock()
+        with patch("stable.tasks.translate_article", side_effect=provider) as translate:
+            try:
+                if mode != "consume":
+                    thread.start()
+                    self.assertTrue(backend_ready.wait(5))
+                    self.assertTrue(provider_ready.wait(5))
+                with transaction.atomic():
+                    model, pk = (NewsArticle, self.article.pk) if lock_target == "article" else (TranslationRun, run.pk)
+                    model.objects.select_for_update().get(pk=pk)
+                    before = state()
+                    if mode == "consume":
+                        thread.start()
+                        self.assertTrue(backend_ready.wait(5))
+                    else:
+                        release_provider.set()
+                    observe_actual_lock_wait()
+                    # article锁测试精确到期，run锁测试越过一秒；原claim字段不改。
+                    self.now = deadline + timedelta(seconds=int(lock_target == "run"))
+                thread.join(10)
+            finally:
+                release_provider.set()
+                if thread.ident is not None:
+                    thread.join(10)
+        self.assertFalse(thread.is_alive(), "owned worker thread must exit")
+        self.assertEqual(state(), before)
+        self.assertEqual(errors, [])
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].get("reason"), "claim_expired")
+        self.assertEqual(translate.call_count, 0 if mode == "consume" else 1)
+        self.automation.assert_not_called()
+        self.notification.assert_not_called()
+        self.mail.assert_not_called()
+
+    def test_consumption_waiting_for_locks_past_deadline_never_calls_provider(self):
+        for target in ("article", "run"):
+            with self.subTest(lock_target=target):
+                self.locked_deadline_case("consume", target)
+
+    def test_success_waiting_for_locks_past_deadline_never_commits_or_dispatches(self):
+        for target in ("article", "run"):
+            with self.subTest(lock_target=target):
+                self.locked_deadline_case("success", target)
+
+    def test_terminal_error_waiting_for_locks_past_deadline_never_commits_or_notifies(self):
+        for target in ("article", "run"):
+            with self.subTest(lock_target=target):
+                self.locked_deadline_case("terminal", target)

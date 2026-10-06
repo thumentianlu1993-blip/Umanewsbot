@@ -1,6 +1,6 @@
 # B037：自动重试 claim/fence 实施准备
 
-任务 B037-M02-CLAIM-FENCE-IMPLEMENT-001。当前**本地实现及63项边界/PG真并发/相邻回归已完成，待原 R 独立代码 review 和 ROOT/C 正式集成测试**。ROOT 已确认原 R `6e05cc18ccc78364cb5d41babbfe4f5f367ee194` 关闭 B036-R01，APPROVED_PLAN_ONLY；该确认不是实现审核或发布授权。
+任务 B037-M02-CLAIM-FENCE-IMPLEMENT-001。当前**原 R 代码审核 NEEDS_CHANGES，唯一 P2 B037-R01 的三个新 RED 反例已准备，尚未执行或修实现**；原63项通过证据保持。ROOT 已确认原 R `6e05cc18ccc78364cb5d41babbfe4f5f367ee194` 关闭 B036-R01，APPROVED_PLAN_ONLY；该确认不是实现审核或发布授权。
 
 从固定集成 `2c72521c55b6cdc24f7650d172b48079cbff969a` 创建独立树 `/Users/mentianlu/.codex/worktrees/b037-m02-claim-fence/umanews`、分支 `codex/b037-m02-claim-fence`。只从 `82b0c7253a4410cec7a1de31302345f2ba6f986e` 提取最终 B036 方案原字节作输入，未 cherry-pick 旧 B035 实现或 ROOT 协调记录；旧 B035/B034/C028 树未改。
 
@@ -33,5 +33,15 @@ ROOT 另行分配 B037-BOUNDARY-63-PG-WINDOW-001，准确候选 `9498edf185a99d6
 通知回调失败用mock制造，robust日志符合预期；测试报告零error，真实模型/邮件/外部消息调用数为零。普通人工字段、force published、源变化/deadline、精确run、普通服务JSON保护、失败/成功/回收/释放原子回滚、通知无事务与失效零通知、M01关闭/单次请求和旧provider选择等本批断言通过；不借此宣称全站或所有翻译场景已验收。
 
 本地最小片可交原R独立代码review。新增模块catalog登记、共享tasks影响计划及required full由ROOT/C完成；当前63项是明确授权的精确诊断，**没有正式collector/catalog/full交付收据**。没有push、PR、合并、部署、生产写入或模型开关启用。完整M02累计费用预算、未知用量、跨版本响应恢复/复用与可靠下游派发仍缺，不能缩分母或称M02整体完成。
+
+## B037-R01：锁等待跨截止时间，RED 准备
+
+原 R 审核 `25ae204fff05cfcbaf8a6541ba050e053f700cba` 指出唯一P2：consume/finalize在取得两个行锁前固定now，等待期间跨deadline仍可能按旧时间消费/写成功/写terminal并通知。该静态反例不在旧63项覆盖内，不能以旧PASS当新反例已通过。
+
+派单 B037-R01-POST-LOCK-DEADLINE-REPAIR-001。当前只增加三个针对性方法（每方法article/run锁各一subcase）与本B文档，不改应用实现。继承原fixture但不改原三测试类AST或旧方法；仍从selector捕获实际envelope。
+
+新类 `stable.test_translation_claim_fence.TranslationClaimPostLockDeadlineTests`：消费、成功、terminal异常三个路径。主线程一条PG连接持目标行锁并用其自身连接查询pg_stat_activity、清stats snapshot；worker第二连接实际执行task。明确观察该backend的对应表FOR UPDATE处于Lock等待后才推进注入时钟；article锁精确到期、run锁过期一秒，claim身份/阶段/源内容不改。成功/terminal通过mock provider事件让消费先提交，再在回写前制造锁竞争。修后应保持article/run状态快照、返回claim_expired；消费provider=0，成功/异常只有先前那次provider且后续零派发/通知。线程有界join、finally关闭自己的连接，日志保留每次backend/锁等待；不用额外SQL observer连接。
+
+C032当前占用PG。新RED候选固定后只申请准确三IDs一次官方django隔离窗口，单runner2CPU/4GiB/256pids/3GiBtmpfs/networknone/nonroot/readonly/capdropALL/NNP，最多主持锁/观察+worker两条PG连接，整体600秒含30秒清理。worker目标180秒但若官方无独立参数沿原600秒控制。没有启动容器/DB或运行新例；得到有效业务RED后才只修取得锁后的执行时钟检查，不延长deadline、不扩大M02，修后受影响回归再报新窗口并返同R。
 
 边界保持已审方案：普通/force兼容、指定受管run、外部调用无事务、article+确切run同库原子终态、同轮fence与提交后终态snapshot通知。累计费用预算/SDK跨轮边界、响应恢复、可靠outbox仍是完整M02缺口，不扩大本片。只使用已分配现有镜像的临时隔离测试容器/PG，无生产或真实业务DB/Redis、模型调用、外发、QQ/后台扩张、push/PR/合并/发布或新资源构建。
