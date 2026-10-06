@@ -24,3 +24,45 @@ command AST解析；原六IDs/源码、CLI bootstrap、fixture相对RED字节不
 拟复用原镜像 `sha256:fcf8cdaf63af51b1b8a6e30e3d2fdf871d127c3c1461bfd00c9fc6d610eab905`/八controls，ROOT重新核绑定；1container/network-none/2CPU/4GiB/256PID/tmpfs3GiB/nonroot10001/ROsource+controls+root/capdropALL/NNP，600秒含60cleanup、540止测，CLI child每个timeout30秒。新签名/测试tree/source/实际ID/rawlog/lifecycle/inspect/owner-heartbeat-FD锁/PID容器释放证据封存。没有allocation不得启动；若import/fixture/CLI环境错误，先如实记录技术失败，不改业务断言或增apply。
 
 六例全部GREEN后才向ROOT/C提出按实际影响的精确旧adapter/H02/normalizer/workbook回归，不复写原A03225或默认扩大全模块；随后独立review，仍不代表发布或真实资料/完整H03/apply闭环。本A固定候选后停待ROOT分配。
+
+## 六例真实 GREEN 与交接（docs-only）
+
+`A036-FIRST-SIX-GREEN-WINDOW-001` 固定 `6d2b7d152d52179bcf5e976c6468319753c9488d` / tree `b4a18f462c5326c4e1178ea445610b4973f23743`，原六canonical实际列表与批准请求顺序/集合/数量一致，6/6 PASS、0 failure/error/skip/expected/unexpected、lifecycle complete/exit0。真实命令七字段/JSONL/未审CSV/真实workbook及setup前CLI全alias零DB、写参数拒绝、摘要/身份/新鲜度/路径/严格JSON/显示转义/IO故障清理断言通过。原runner未逐个打印成功child/subcase receipt，细分结论依据固定源码断言契约加完整方法零error结果；子例不增加canonical数量。没有测试hostile同UID并发文件系统竞态或post-rename builder异常，不把代码设计称这些情形已实测。
+
+runtime `/Users/mentianlu/.codex/runtime/a036-first-six-green-window-001`，green-receipt SHA `c441be8e9f1b4b01680b0a213c12082c69f99cae24d8f0abd82012da8b3d1915` / 12 seals；worker12.068秒/总窗24.013秒，owner74639/runner74650及runner组gone、FDflock重取、Docker0，24source/control唯一指纹与fixedGit前后一致，资源实际释放。ROOT已验收局部六GREEN。只局部证据，不代formal catalog/core/full、真实来源验收或独立review。此回写仅本A报告，command/tests/fixture/shared/八controls与受测6d2逐bytes相同；tested→final docs-only映射封存在handoff runtime的git-state/receipt，不能把最终文档SHA冒称原受测SHA。
+
+## 最小直接影响旧回归 proposal
+
+建议只选下列**三个已有方法**一次，均实际类内直接定义；workbook类虽然继承prepare测试基类，按精确method ID选择，不展开父类或整模块。三个仍待ROOT/R选择与独立allocation，本卡未执行：
+
+| 精确 canonical ID | 直接影响理由 |
+| --- | --- |
+| `stable.test_p0_horse_completion_batch.P0HorseBatchReviewWorkbookTests.test_workbook_sheets_and_exception_sampling` | 首次将新入口接到原build_batch_review_workbook；核旧阅读消费者sheet/摘要/exception接口，没有改变原batch审批入口 |
+| `stable.test_p0_horse_completion_adapters.P0HorseCompletionCareerPayloadTests.test_unlinked_ordinary_races_stay_unlinked_and_count_mismatch_blocks_completion` | canonical阅读中普通赛绩必须继续event/result None，count mismatch仍partial/gap，不把预览当赛事关联或来源完整性升级 |
+| `stable.test_horse_cache_reuse.CacheReuseTests.test_fresh_at_boundary_reuses_without_publication_claim` | 已有H02 reusable新鲜度边界及不声明公开状态；与命令新的安全文件I/O分开检查原合同 |
+
+IDs、每项理由、真实源码文件SHA、method AST SHA和声明行见 `/Users/mentianlu/.codex/runtime/a036-six-green-handoff/regression-proposal.json`，profile建议django；workbook方法的既有setup需要隔离测试DB，所以不能仅因其他方法无DB而私跑宿主Python。未改catalog，formal core要求由ROOT/C保留。
+
+**零额外旧回归也有明确技术依据，交ROOT/R裁定**：全部共享reader/adapter/H02/normalizer/serializer bytes未变，新六例已真实调用它们并核zeroDB/CSV与workbook公式安全/故障清理；command没有改变共享settings/umask/global contracts，不写profile/race/binding/publication，旧A032/A034写入口不受新caller影响。因此三个proposal是消费接口附加检查，不声称这些旧方法此前在本A036受测，也不机械重跑A03225/A03423。针对直接batch/adapters测试文件未找到旧独立CSV公式安全方法，已由A036第六例对原serializer加显示转义及真实workbook覆盖；不拿full reviewed artifact writer或production approval pipeline凑CSV回归。
+
+## 可见示例、实际临时产物位置与如何查看
+
+六例真实生成的产物在官方容器内 `/tmp/a036-synthetic-<随机后缀>/output/pending/`，CLI方法还生成同根 `ordinary/`、`production_style/`。每个方法独立TemporaryDirectory；方法cleanup已删除目录、容器已销毁。原log没有保存随机后缀或导出XLSX，**当前runtime只有raw结果/断言/来源指纹，没有可重新打开的实测review.xlsx**；不能把不存在的旧临时路径当交付文件。
+
+本次docs/runtime静态准备了原受测fixture的逐bytes副本和原测试snapshot常量生成的packet（没有执行测试/helper/command/workbook），供后续获分配的受控环境复现。输入位于 `/Users/mentianlu/.codex/runtime/a036-six-green-handoff/example-input/`，空私人output-root位于同runtime `example-output/`，两者0700/文件0600；`example-manifest.json`明确STATIC_SYNTHETIC_INPUT_ONLY并封存来源/test/packet SHA。合成原件 source SHA `2ba3faa4706c64f4da1e8c0967713d51cc5cc776264cfccbc317e4638acec7bb`，packet SHA `111d004d7c886300ceb26c2445fd023e0e6ad4ceaab875c74ee73b1c858dbe26`。这两个是固定仓库合成输入绑定，不是现场真实来源/人工reviewed批准。
+
+下面是**真实命令签名及该静态输入的完整示例，未在本卡执行**。从具备现有Django/openpyxl依赖的固定仓库 `server/`目录运行；在下一官方Linux分配环境中须先把这两组本地目录放入显式允许根，并把两个root绝对路径对应替换，不能让容器读取宿主凭据/其他目录，也不能把宿主系统Python当正式执行器替代。
+
+```sh
+python manage.py horse_basic_profile_from_cache \
+  --input-root /Users/mentianlu/.codex/runtime/a036-six-green-handoff/example-input \
+  --input packet.json \
+  --expected-input-sha256 111d004d7c886300ceb26c2445fd023e0e6ad4ceaab875c74ee73b1c858dbe26 \
+  --expected-source-sha256 2ba3faa4706c64f4da1e8c0967713d51cc5cc776264cfccbc317e4638acec7bb \
+  --output-root /Users/mentianlu/.codex/runtime/a036-six-green-handoff/example-output \
+  --output-dir pending
+```
+
+成功才打印JSON `status=prepared/reason=local_pending_review/reviewed=false`、七字段及artifact_dir。七字段来自原fixture：country AUS、sex gelding、color brown、birth_date 2020-09-14、owner_name Hong Kong Owner、trainer_name Hong Kong Trainer、breeder_name Hong Kong Breeder；这些是原测试期望值，不是本卡新增运行结果。实际返回的artifact_dir下打开 `review.xlsx` 查看“汇总/中国香港/异常抽样”完整性/来源/异常摘要；看 `combined_candidates.jsonl` 查看七字段、原canonical/raw记录；看 `review.csv`确认reviewed=False/decision空；`manifest.json`查看双输入SHA/H02候选证据。工作簿不展示逐条赛绩/七字段明细，预览不能用作production artifact批准，existing目录重投固定output_exists而非applied。
+
+此卡只docs/runtime，无测试/PG/容器/网络/实网新样本/DB写/资源占用。固定后交ROOT选择旧回归或零额外路径，原R代码审核由ROOT派，本A不启新工作或宣称review通过。
