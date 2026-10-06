@@ -268,7 +268,8 @@ class BudgetCoreHelpersMixin:
         values.update(overrides)
         self.budget = TranslationRetryBudget.objects.create(**values)
         self.identity = replace(self.identity, source_article_id=self.budget.source_article_id_snapshot,
-                                operation_uuid=self.budget.operation_uuid)
+                                operation_uuid=self.budget.operation_uuid,
+                                article_pk_snapshot=self.budget.article_pk_snapshot)
         return self.budget
 
     def usage(self):

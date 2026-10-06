@@ -101,3 +101,21 @@ ROOT认可RED后授权离线状态实现和必要B测试/文档，禁止自行�
 GREEN候选/完整39 IDs/新旧AST对比/117拟运行IDs封存在新runtime，准备阶段只AST/compile（不导入）和diff检查。精确相关回归为原B03930+B03725+recovery22=77，外加原headlines `stable.test_editorial_headlines.InvalidationTests.test_delete_article_invalidates` 1项，合计39+77+1=117；既有63含M01证据保持，M01本片未改不机械重跑，未缩正式catalog/full分母。
 
 请求ROOT另派精确GREEN SHA的official django PG16窗口：单批117<=200，既有固定image/可信8controls，1container、2CPU/4GiB/256pids/3GiBtmpfs，none/RO/nonroot/capdropALL/NNP，主+2worker最多3连接；600总窗/570止测/30清理、FD锁/存活信息/最终容器进程锁清理。迁移往返仅新独立测试库空账表，不生产migrate。ROOT验证器占用本地资源期间本B不启动DB。下一终点是117实测证据与同R独立只读review；不能以静态检查或代码完成称完整M02/enforce/费用上限完成。
+
+## B041-FIRST-117-GREEN-PG-WINDOW-001 与 fixture 技术返修
+
+ROOT给固定25add5cca32abfab4ecbf91e8b7f3010fdf7dfa9的单次117窗口已运行。receipt `/Users/mentianlu/.codex/runtime/b041-first-117-green-pg-window-001/green-receipt.json` SHA256 `279b08c47e2230939356b3aa297d9b9a4151c72a56743a73bb202fb38ea0175a`，实际117 unique canonical IDs全执行，116PASS/1canonical FAIL（bulk=True子例）/0ERROR/0skip，complete/exit1。业务36.129s/worker72.067s/全窗82.779s。**不是117 GREEN。** 原12及无关78回归全部PASS，B041其余38PASS；PG真锁、unique初建冲突、空账往返都有实际marker。
+
+last-slot预算锁118→115、119→118且单胜者；等锁跨deadline122→120拒绝0slot；迟到usage锁125→123保留计数/期限；数据库唯一冲突`uq_tr_budget_active_source`实际捕获；空testDB0080→0079→0080恢复、原Article保留。admin单删及批删的原对象删除/头条/推荐失效前置断言均过，但bulk最终审计PK断言失败：root/article快照60，传入identity沿用59，attempt按该输入保留59。owner76297/runner76321消失、容器0、FD锁释放且源码clean未改；ROOT已核释放。
+
+ROOT派 `B041-ADMIN-FIXTURE-PK-REPAIR-PREP-001`，只修测试共享`fresh_root`中`replace(identity)`同步`article_pk_snapshot=self.budget.article_pk_snapshot`。业务helper、models/0080、原生产文件及controls不改；39测试方法及其全部断言保持原AST，未降低PK断言或挑单subcase。fixture构造新root后输入现与root审计快照一致；没有新增产品/身份行为。
+
+静态直接调用映射只有5方法，重验请求保留整个方法及所有子例：
+
+- `stable.test_translation_retry_budget.TranslationBudgetBoundaryTests.test_invalid_missing_bool_negative_and_total_usage_stays_unknown`
+- `stable.test_translation_retry_budget.TranslationBudgetBoundaryTests.test_retired_history_and_old_uuid_never_allocate_new_operation`
+- `stable.test_translation_retry_budget.TranslationBudgetBoundaryTests.test_usage_wrong_budget_or_snapshot_cannot_modify_attempt`
+- `stable.test_translation_retry_budget.TranslationBudgetLockTests.test_last_slot_two_actual_locked_consumers_have_one_winner`
+- `stable.test_translation_retry_budget.TranslationBudgetDeleteCompatibilityTests.test_admin_single_and_bulk_delete_keep_audit_and_headline_invalidation`
+
+上述5包括原4PASS方法和完整admin单/批删方法，其他112已PASS不受该fixture调用影响；原116PASS证据保留，无关78不重跑。所有39IDs/所有117完整分母保持，不把局部5重验命名为重跑117，也不缩formal/catalog/full。新固定SHA/单keyword代码diff/15其余源码指纹/5ID映射收据单独封存。此返修仅静态准备，尚未运行DB；ROOT占用PR242验证器资源，需另派新SHA窗口，再交同R独立review。
