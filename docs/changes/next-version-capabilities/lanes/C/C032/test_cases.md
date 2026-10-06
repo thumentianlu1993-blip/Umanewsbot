@@ -1,6 +1,6 @@
 # C032：马匹搜索空态测试先行
 
-基线/已审方案 `46d564a06257797e144960a3fd29e9f2f60272ac`，原 R APPROVED_PLAN_ONLY，ROOT 已授权按原方案实施。只改 horse_index.html empty 分支、既有 HorseProfilePageMvpTests 的相关窄测试与 C 文档；不改 query/view/共享空态/schema/settings/catalog。最初固定准备测试后才申请窗口；实际 RED、模板实现与待 GREEN 状态见同目录 report.md。
+基线/已审方案 `46d564a06257797e144960a3fd29e9f2f60272ac`，原 R APPROVED_PLAN_ONLY，ROOT 已授权按原方案实施。只改 horse_index.html empty 分支、既有 HorseProfilePageMvpTests 的相关窄测试与 C 文档；不改 query/view/共享空态/schema/settings/catalog。最初固定准备测试后才申请窗口；实际 RED、模板实现、同例 GREEN 与待复审状态见同目录 report.md。
 
 五项真实 Django Client 测试位于 `stable.tests_legacy.HorseProfilePageMvpTests`：
 
