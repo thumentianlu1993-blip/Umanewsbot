@@ -119,3 +119,13 @@ ROOT派 `B041-ADMIN-FIXTURE-PK-REPAIR-PREP-001`，只修测试共享`fresh_root`
 - `stable.test_translation_retry_budget.TranslationBudgetDeleteCompatibilityTests.test_admin_single_and_bulk_delete_keep_audit_and_headline_invalidation`
 
 上述5包括原4PASS方法和完整admin单/批删方法，其他112已PASS不受该fixture调用影响；原116PASS证据保留，无关78不重跑。所有39IDs/所有117完整分母保持，不把局部5重验命名为重跑117，也不缩formal/catalog/full。新固定SHA/单keyword代码diff/15其余源码指纹/5ID映射收据单独封存。此返修仅静态准备，尚未运行DB；ROOT占用PR242验证器资源，需另派新SHA窗口，再交同R独立review。
+
+## B041-FIXTURE-REPAIR-FIVE-GREEN-PG-WINDOW-001 最终本地验证
+
+ROOT精确批准固定 `5e9b0cf6fb3a438091f74b31b4df829ceffc0d07` 的5个直接受影响完整方法。实际5/5 PASS、0FAIL/0ERROR/0skip，complete/exit0；官方PG16.15/Django5.2.1，业务2.357s/worker38.102s/全窗48.475s。admin单删和批删全部断言通过，含新root/attempt/原article一致PK快照；last-slot实际预算锁70→67、71→70，单胜者。没有额外迁移往返或生产动作。
+
+receipt `/Users/mentianlu/.codex/runtime/b041-fixture-repair-five-green-pg-window-001/green-receipt.json` SHA256 `1350c0081faa4f731f7edb145e0f98f7b5eb9cc0c344e1babe4c26c49b828bc7`，同目录9原始seals、exact actual5 IDs、raw log、container inspect、cleanup。owner84371/runner84394均ps不存在、Docker空、FD锁实重取释放；测试时16源码/保护指纹与5e9b0cf6完全保持。采样peak1client不能当硬峰值，独立worker/主锁关系由实测marker证明。
+
+最终证据组合是 **5e9b0cf6五项PASS + 25add5cc未受影响112项PASS**（其中34B041+78旧回归），按ROOT最小影响重验授权继承。旧25add117实际曾1fixtureFAIL，原116PASS与失败traceback均保留；**没有在同一SHA重新运行117，也没有改formal/catalog/full分母**。同业务helper/models/0080/12保护源指纹一致，39测试方法/断言AST完全保持，只有共享fixture一个PK输入keyword修正。以上属于离线本地片验证，未激活生产guard/真实费用上限/全站预算/outbox。
+
+本次五项通过后的仓库改动仅B说明及test_cases验证记录，业务源码与固定5e9b0cf6逐字节一致；最终文档提交SHA由外部final-handoff receipt绑定，避免文档自引用提交SHA。等待ROOT原R完整只读代码review；review通过仍不代表共享主线已合并或生产发布。

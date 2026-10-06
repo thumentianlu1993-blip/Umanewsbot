@@ -19,3 +19,12 @@
 | 回归/静态 | B03930+B03725+recovery22共77，旧headlines删除1；生产12指纹/旧modelAST/migration0079均保持 | ledger牵连既有claim/checkpoint/生产调用 |
 
 运行设计：单批<=200；official django PG16固定SHA、network none、最多主+2worker三连接。迁移往返测试另列精确类，最后恢复0080，finally确保state恢复；未授权前不运行。性能界限：每次根行短事务，不跨网络；并发最多两worker、等待超时/线程及连接清理；JSON报告/receipt字节与嵌套上界固定，拒绝非builtin/非finite，不造金额字段。完整M02不在本组分母，缺费用证据不得称生产enforce。
+
+## 本地运行证据（保留SHA边界）
+
+- RED：703e1620，6schemaPASS/6业务FAIL/0ERROR/0skip；receipt278e19bf。
+- 第一117窗口：25add5cc，实际117完整执行，116PASS/1admin bulk fixtureFAIL/0ERROR/0skip；receipt279b08c4。真实预算锁/首建DB唯一冲突/空账迁移往返成功。
+- fixture修复：5e9b0cf6，仅fresh_root同步article_pk_snapshot；39方法/assert AST不变，helper/models/0080/12保护源不变。ROOT限定5个直接调用fresh_root完整方法，5/5PASS/0ERROR/0skip；receipt1350c008。admin单删/批删及last-slot实际PG锁再验通过。
+- 未受影响112项继承25add5cc证据，不重跑无关78；这是跨候选固定源码/影响映射的证据组合，不写作同SHA117全量重跑。生产/付费/费用enforce/outbox均未执行；同R完整独立review待ROOT安排。
+
+完整receipt路径和资源退出证据见相邻B041交付说明；最终文档提交仅更新验证记录，源码字节绑定5e9b0cf6由final-handoff receipt证明。
