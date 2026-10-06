@@ -16445,6 +16445,68 @@ class HorseProfilePageMvpTests(TestCase):
         self.assertContains(response, "目前还没有已发布马匹资料。")
         self.assertNotContains(response, "目前还没有已发布文章。")
 
+    def test_u04_unmatched_search_describes_public_search_scope(self):
+        self._profile()
+        response = self.client.get(reverse("public-horse-index"), {"q": "C032-no-match"})
+
+        self.assertContains(response, "没有找到符合搜索条件的已发布马匹资料。")
+        self.assertNotContains(response, "目前还没有已发布马匹资料。")
+        self.assertEqual(list(response.context["horse_profiles"]), [])
+
+    def test_u04_clear_search_restores_cards_and_preserves_anonymous_follow(self):
+        from bs4 import BeautifulSoup
+
+        profile = self._profile()
+        signed_token = signed_follow_token()
+        token_hash = token_hash_from_cookie(signed_token)
+        follow_horse(token_hash, profile, include_descendants=True)
+        self.client.cookies[FOLLOW_COOKIE_NAME] = signed_token
+        response = self.client.get(reverse("public-horse-index"), {"q": "C032-no-match", "page": "2"})
+        links = BeautifulSoup(response.content, "html.parser").find_all("a")
+        clear_links = [link for link in links if link.get_text(strip=True) == "清除搜索"]
+
+        self.assertEqual(len(clear_links), 1)
+        self.assertEqual(clear_links[0]["href"], reverse("public-horse-index"))
+        returned = self.client.get(clear_links[0]["href"])
+        self.assertEqual(returned.status_code, 200)
+        self.assertEqual(returned.context["filters"]["q"], "")
+        self.assertEqual(returned.context["page_obj"].number, 1)
+        self.assertEqual(returned.wsgi_request.GET.dict(), {})
+        self.assertContains(returned, profile.display_name)
+        self.assertContains(returned, "★ 已关注")
+        self.assertEqual(self.client.cookies[FOLLOW_COOKIE_NAME].value, signed_token)
+        self.assertNotIn(FOLLOW_COOKIE_NAME, returned.cookies)
+        self.assertEqual(HorseFollow.objects.filter(token_hash=token_hash, horse_profile=profile).count(), 1)
+
+    def test_u04_hidden_only_search_remains_no_match_without_disclosure(self):
+        profile = self._profile(display_name_zh="C032-PRIVATE 合成隐藏马", review_status=HorseProfileStatus.HIDDEN)
+        response = self.client.get(reverse("public-horse-index"), {"q": "C032-PRIVATE"})
+
+        self.assertContains(response, "没有找到符合搜索条件的已发布马匹资料。")
+        self.assertNotContains(response, "目前还没有已发布马匹资料。")
+        self.assertNotContains(response, profile.display_name)
+        self.assertEqual(list(response.context["horse_profiles"]), [])
+
+    def test_u04_empty_unfiltered_or_whitespace_search_keeps_no_data_copy(self):
+        for params in ({}, {"q": "   "}):
+            with self.subTest(params=params):
+                response = self.client.get(reverse("public-horse-index"), params)
+                self.assertContains(response, "目前还没有已发布马匹资料。")
+                self.assertNotContains(response, "没有找到符合搜索条件的已发布马匹资料。")
+                self.assertNotContains(response, "清除搜索")
+                self.assertEqual(response.context["filters"]["q"], "")
+
+    def test_u04_matching_search_keeps_cards_and_detail_return_navigation(self):
+        profile = self._profile()
+        listing = self.client.get(reverse("public-horse-index"), {"q": profile.display_name})
+
+        self.assertContains(listing, profile.display_name)
+        self.assertNotContains(listing, "没有找到符合搜索条件的已发布马匹资料。")
+        self.assertNotContains(listing, "目前还没有已发布马匹资料。")
+        self.assertNotContains(listing, "清除搜索")
+        self.assertEqual(list(listing.context["horse_profiles"]), [profile])
+        self.assertContains(listing, "return_nav=")
+
     def test_completeness_requires_all_six_pedigree_fields_and_descendants_use_profile_links(self):
         parent = self._profile(sire_text="父", dam_text="母", sire_sire_text="父父", sire_dam_text="父母", dam_sire_text="母父")
         self.assertEqual(update_completeness(parent), HorseProfileCompleteness.PARTIAL_PEDIGREE)
