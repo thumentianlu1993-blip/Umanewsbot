@@ -24,3 +24,17 @@
 GREEN之后才申请已审五个既有精确回归（不是本次RED窗口自动追加）：三项PublicHomeInfoFeedTests头条选取/fallback/去重，两项PublicNavigationAndAttributionTests头条来源隐藏/无region第二页。准确ID在C040获审方案；本轮未执行或扩窗。
 
 未来GREEN仅feed.html for-empty传固定文案。rollback面为该模板分支的代码回退；部署/生产由ROOT后续精确交付包处理。本轮无部署或迁移，不改当前公开数据。未来桌面/手机可见验收沿已审C040独立合成演示，不改C027现存库/服务。
+
+## GREEN准确十方法申请
+
+C041真实RED已完整得到2文案失败/3保护通过、0errors/skips，原五方法字节冻结在 `a59fed26e8c23a73e6859d66436fb28eb667ce4e`。本轮模板实现后申请一次C041-TEN-GREEN-PG-WINDOW-001，将上表五完整方法和下列原C040获审五旧回归合并为一个准确10方法django batch，不重跑RED候选、不展开整类、不collect/full、不预填执行结果。
+
+| 原有完整canonical ID | 保护合同 |
+| --- | --- |
+| stable.tests_legacy.PublicHomeInfoFeedTests.test_public_home_selects_recent_high_value_cover_article_as_headline | 原高价值带cover头条选取 |
+| stable.tests_legacy.PublicHomeInfoFeedTests.test_public_home_headline_falls_back_to_latest_published_article | 原最新公开稿fallback |
+| stable.tests_legacy.PublicHomeInfoFeedTests.test_public_home_feed_articles_do_not_repeat_headline | 原普通feed头条去重 |
+| stable.test_public_navigation_and_attribution.PublicNavigationAndAttributionTests.test_headline_hides_source_and_region | 原头条来源与region隐藏 |
+| stable.test_public_navigation_and_attribution.PublicNavigationAndAttributionTests.test_unified_feed_page_two_works_without_region | 原统一首页无region真实第二页 |
+
+10ID逐AST定位class/method/line与文件hash；旧回归模块和整份tests_legacy.py不改。GREEN未获PG分配，静态准备不是测试通过。正式delivery/full分母不由此诊断申请变更；独立review和合成桌面/手机可见验收由ROOT后续安排。

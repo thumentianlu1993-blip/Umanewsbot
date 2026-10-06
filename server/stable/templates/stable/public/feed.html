@@ -48,7 +48,11 @@
             {% include "stable/public/_flash_race.html" %}
           {% endif %}
         {% empty %}
-          {% include "stable/public/_empty_state.html" %}
+          {% if headline_article %}
+            {% include "stable/public/_empty_state.html" with empty_state_text="本页暂无其他新闻。" %}
+          {% else %}
+            {% include "stable/public/_empty_state.html" %}
+          {% endif %}
         {% endfor %}
         {% if flash_race and feed_articles|length < 3 %}
           {% include "stable/public/_flash_race.html" %}
