@@ -42,6 +42,6 @@ JSON合同保持phase=executing；新claim里的suppress可作首次执行策略
 
 成功finalize接口改为checkpoint输入（仓库调用者仅该受管task，已静态搜索）；成功必须与当前stored完整checkpoint相同且绑定原claim，不能以内存result绕过。有效provider异常沿原失败/通知逻辑；已有成功checkpoint时拒绝late error覆盖。本地checkpoint RuntimeError只任务审计/抛错，不进入provider失败计次；独立结果写失败仍executing、无盲重调，终态回滚后已存checkpoint可继续本地恢复。错误终态metadata也过滤内部保留键。
 
-新增16方法，共30方法；原14类AST保持受测原样。六锁等待subcases覆盖save/resume entry/resume finalize、两个锁的精确blocker跨截止；原worker与恢复者两真实连接交错；write fail/terminal rollback/异摘要冲突及codec NaN/Inf/循环/子类/精确大小深度边界。此处是已写断言，尚未运行或证明通过；详见test_cases。没有拿旧R01证明新路径。
+新增16方法，共30方法；原14方法及既有class AST保持受测原样。六锁等待subcases覆盖save/resume entry/resume finalize、两个锁的精确blocker跨截止；原worker与恢复者两真实连接交错；write fail/terminal rollback/异摘要冲突及codec NaN/Inf/循环/子类/精确大小深度边界。此处是已写断言，尚未运行或证明通过；详见test_cases。没有拿旧R01证明新路径。
 
 拟申请下一精确受影响77IDs（30+25+22），独立runtime固定候选/源指纹/名单/计划；不复用已释放RED窗口，A034仍独占时不运行。无DB/PG/collector、真实provider/外发或GREEN证据。AST及git diff --check可用于静态准备，独立R review与formal/full均尚未完成，完整M02和DDL工期风险仍保留。

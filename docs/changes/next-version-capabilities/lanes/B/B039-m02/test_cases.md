@@ -1,6 +1,6 @@
 # B039：已验证结果检查点 RED 测试合同
 
-状态：原14个方法保留，新增16个，共30个；首轮准确3项在ROOT专属PG窗取得真实业务RED，现实现与新增边界均尚未运行GREEN。依据B038已审方案a7d5a056；原R审批由ROOT反馈30f8ec70 APPROVED_PLAN_ONLY。没有新增生产接口/占位或GREEN代码。
+状态：原14个方法保留，新增16个，共30个；首轮准确3项在ROOT专属PG窗取得真实业务RED，现实现与新增边界均尚未运行GREEN。依据B038已审方案a7d5a056；原R审批由ROOT反馈30f8ec70 APPROVED_PLAN_ONLY。RED准备时没有业务占位；现已按ROOT授权实现，但未取得GREEN证据。
 
 ## Fixture与首轮最小RED
 
@@ -60,4 +60,4 @@ ROOT核三项真实RED/清理后授权实施；当前仍未取得新的测试窗
 
 拟准确受影响 **77 IDs**：新module30 +原B037 claim-fence25 + recovery22。原M01 mock19保留此前未受影响证据（translation.py/Responses/settings/factory/test未改，不调用新helper）；不是本轮复跑，也不降低formal/full分母。一个官方django诊断batch，max3PG（已有消费并发及新双恢复需主+两worker），新增锁等待与原worker竞争为2连接；单容器资源/控制保持。ROOT另给新窗前只AST/指纹/diff，不collector或DB。A034独占期间不竞争资源。
 
-仍待：准确76在候选固定SHA上的GREEN、实际6锁观察/原worker竞争、同R独立review、ROOT/C formal catalog/impact/full。完整M02预算/outbox/自动恢复保证不由这些断言证明。
+仍待：准确77在候选固定SHA上的GREEN、实际6锁观察/原worker竞争、同R独立review、ROOT/C formal catalog/impact/full。完整M02预算/outbox/自动恢复保证不由这些断言证明。
