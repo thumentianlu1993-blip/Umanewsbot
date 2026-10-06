@@ -1,4 +1,6 @@
-# B041：离线翻译预算 schema 与 RED 技术准备
+# B041：离线翻译预算核心与验证记录
+
+当前进入 `B041-GREEN-OFFLINE-CORE-PREP-001`：离线 helper 已写，尚未运行 GREEN；下文首阶段内容保留为固定703e1620的技术准备历史，最新状态见末节。
 
 任务 `B041-OFFLINE-BUDGET-SCHEMA-RED-PREP-001`。固定起点 C036 `558df2a3bf83d590ccbdb010d3f73dc70d528041`，独立分支 `codex/b041-offline-budget-core`。只读方案输入 B040 `9d2fefbd965629e4fd3ad4d337e0fd5e70b226ad`；ROOT转达同R `8284247bab46ecfcb98951a4e7b7e9908ccb8113` APPROVED_PLAN_ONLY，不代表本候选通过 review 或 CI/main/生产。
 
@@ -65,3 +67,37 @@ runtime `/Users/mentianlu/.codex/runtime/b041-schema-red-prep-001/static-receipt
 - (operations) 交付：ROOT安排同R独立只读 review 和后续集成，B不改C036候选、不合并/迁移/发布。
 
 完整M02的真实金额/token上界/账户日账、可信unknown对账、真实SDK/enforce接入和outbox仍未完成。
+
+
+## B041-FIRST-12-SCHEMA-RED-PG-WINDOW-001 已实测
+
+ROOT 精确批准703e162074b28a8cacc971973604be724e20178a的单次12项官方窗口。receipt `/Users/mentianlu/.codex/runtime/b041-first-12-schema-red-pg-window-001/red-receipt.json` SHA256 `278e19bf4b263a01c6c1a12812d4dddb199026f91a2a18de09eb2e110847f0a7`，ROOT已核原始8seals/IDs/tracebacks并认可RED。
+
+实际6schema PASS、6业务 FAIL、0ERROR、0skip，lifecycle complete/exit1；PG16.15/Django5.2.1，业务3.990s/worker40.266s/全窗50.640s。Django隔离testDB已前进迁移并实际验证独立新表/约束、无原对象FK和原Article/Run删除保留账。失败依次是counter0!=1、未知未给usage_unknown、删建未解析旧root、PK复用未给identity_changed、并发0胜者/应1、首次并发0根/应1。并发当时证明两个独立backend/Barrier，无预算锁实现；采样仅最大1client，不作真实峰值或行锁证据。
+
+owner64564/runner64590均ps不存在、容器0、FD锁实重取释放；固定源码/12指纹未变且工作树clean。此窗口没有逆迁移、额外sqlmigrate/showmigrations、admin/头条回归或生产动作。原候选与runtime封存，不重写该RED证据。
+
+## B041-GREEN-OFFLINE-CORE-PREP-001 当前实现（未运行 GREEN）
+
+ROOT认可RED后授权离线状态实现和必要B测试/文档，禁止自行启动DB；本轮仍无数据库/容器运行。测试设计先记入 `B041-m02/test_cases.md`，沿已审B040合同；新增边界未单独跑RED，遵从本轮禁止DB窗口指令，不伪报它们已有运行证据。
+
+- resolve_budget：mode/输入/外层事务门槛（来源接受普通str或项目SourceSite枚举的持久值，其他自定义字符串不接受）；按旧operation UUID优先，完整精确来源pair（含digest）校验，不按PK/内容猜身份；同源陌生UUID返回保留根+operation_resolution_required，不授权；仅retired历史也不另建。首次只允许精确合成无历史消费baseline，逻辑UUID在账端分配；active-source唯一冲突采用内层savepoint，仅该约束名可处理，随后加锁读取已存在根。再次initial_contract不改上限/期限/policy。没有自动retire/clearunknown/renewal入口。
+- reserve_request：普通外层atomic拒绝；预算根→请求固定次序（不取原Article/Run锁）；幂等claim/index不新授权，reserved/unknown先阻断，合法usage但未对账仍阻断；源/模型/provider/policy漂移不充值；锁后用max(输入now,actual clock)复核固定deadline。计数递增和新attempt同事务，allowed返回前提交，失败整体回滚，不退槽。
+- record_usage：锁预算→确切请求，原操作/预算/来源/摘要快照一致；只接受builtin有限JSON（64KiB/16层），prompt/completion/total为非bool非负整数且sum一致。缺/非法报告留unknown，合法报告没收据仍cost_unreconciled。首份报告冻结，重复幂等、冲突不覆盖；同份已知报告可补一次严格绑定budget UUID/attempt/usage SHA的synthetic_offline_usage_v1收据。无效首份报告需要后续独立审计修复合同，本片不自动替换。迟到报告只改旧请求，不受原文章删除影响、不续预算期限或退槽，也不回写正文。
+- 内部写入只允许预算requests_reserved和请求状态/usage/收据字段，要求短atomic；普通ORM保护不变。原model/migration0080字节与703e1620保持，无新状态字段/索引/原对象关系。缺省production模式直接supported_mode_missing，生产路径零caller。offline_reconciled明确是测试状态，不是真实费用对账/下一真实付费调用授权。
+
+政策hash是明确注入、被冻结的离线版本标识；合成policy/receipt不是价格或实际历史无消耗证据。本片不把token报告总数冒称输入硬预留/账户账，也不提供真实SDK执行器。无SDK/provider/队列/callable/公开CLI/API/Beat、没有把旧selector重试改成预算enforce。
+
+### 原12保持与新增风险用例
+
+原12 IDs及所有assert AST保持；原unknown、同源删建、last-slot三个方法仅在构造新来源pair时补其canonical identity_sha256（原fixture沿用了旧pair摘要），没有降低断言。基础fixture另冻结timezone.now为self.now，支持actual-clock锁后检查与受控跨deadline，不用过期的固定日期导致无关环境失败。原703e1620 RED报告保持不变；这些输入修正有明确diff理由。
+
+新增27方法，总39，无继承测试重复分母：边界22、实际PG锁3、admin/头条1、迁移1。风险覆盖幂等/unknown不退槽、合法用量缺费用证据、synthetic收据及幂等/冲突、JSON/整数非法、身份/历史/版本漂移、外层事务、两处存储回滚、迟到report/错配、ORM identity修改/更新创建、实际两次missing-root读取后的unique冲突（保存实际约束名）、last-slot两worker锁等待/单胜者、等锁跨截止0slot、迟到审计锁序。测试只验证离线状态，未执行前不称GREEN/行锁观察成功。
+
+删除组使用合成superuser直接调用原admin delete_model/delete_queryset，带预算reserved/unknown屏障和原run，核头条selection清空/version+1、推荐失效、原run CASCADE、新账/快照/期限/计数保留；不是线上账号/UI权限实测。迁移组只允许test_前缀隔离PG且两新表为空，执行0080→0079→0080，finally恢复，核旧Article保留；明确drop表会丢账数据，绝非生产回滚测试或授权。
+
+### 固定候选与资源请求边界
+
+GREEN候选/完整39 IDs/新旧AST对比/117拟运行IDs封存在新runtime，准备阶段只AST/compile（不导入）和diff检查。精确相关回归为原B03930+B03725+recovery22=77，外加原headlines `stable.test_editorial_headlines.InvalidationTests.test_delete_article_invalidates` 1项，合计39+77+1=117；既有63含M01证据保持，M01本片未改不机械重跑，未缩正式catalog/full分母。
+
+请求ROOT另派精确GREEN SHA的official django PG16窗口：单批117<=200，既有固定image/可信8controls，1container、2CPU/4GiB/256pids/3GiBtmpfs，none/RO/nonroot/capdropALL/NNP，主+2worker最多3连接；600总窗/570止测/30清理、FD锁/存活信息/最终容器进程锁清理。迁移往返仅新独立测试库空账表，不生产migrate。ROOT验证器占用本地资源期间本B不启动DB。下一终点是117实测证据与同R独立只读review；不能以静态检查或代码完成称完整M02/enforce/费用上限完成。
