@@ -20,6 +20,9 @@ RECOVERY_MODULES = {
     "0078": (recovery, Path(recovery.__file__).resolve()),
     "0079": (release_0079_recovery, Path(release_0079_recovery.__file__).resolve()),
 }
+# 保留旧测试导出：记录导入时真实路径，不随历史夹具的 __file__ patch 改变。
+RECOVERY_MODULE = RECOVERY_MODULES["0078"][1]
+
 POST_GENERATION_MIGRATIONS = {
     "0078": {"0079_multisource_race_enrollment.py", "0080_translation_retry_budget.py"},
     "0079": {"0080_translation_retry_budget.py"},
