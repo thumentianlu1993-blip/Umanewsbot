@@ -42,3 +42,14 @@ AST语法通过；原函数完整 keyword 签名与 RED 相同；自动从共享
 必要测试技术修正只改该安全方法的准备：RaceEvent取新实例、setattr、save(update_fields)，遵守原validate_event_years/路径集中合同；跨届反例提供现有schema合法的**合成负向跨届证据**（actual_year/原因/HTTPS example.test/approved=True），使模型允许保存，再要求首片仍blocked。这不是现实批准、离线权限或正向source/binding许可，不绕过或mock模型验证；日期错位也同样经save。反例目标和H03拒绝/全状态零写断言保留。原指定RED正向方法、其余所有方法和fixture字节语义不变，service保持49e修正字节原样；共享模型/其他lane未改。
 
 修正后仅静态/原RED方法AST对比/工作流契约/4文档测试/diff检查，业务执行为零。固定修正候选交ROOT申请原同五ID新窗口；局部回归清单仍等五GREEN后提出，不自行执行。
+
+
+## 同五 GREEN 已通过，待 ROOT 分配精确回归
+
+`A034-SECURITY-FIXTURE-FIVE-GREEN-001` 固定04226d2c/tree769e026f：同五精确ID实际executed一致，5/5 PASS，0 failure/error/skip/意外成功，lifecycle complete/exit0。负向方法声明25种模型变体+缺4强字段+旧as_of/live期限+policy SHA，六类写后故障/内存或持久issue/写后expiry回滚，原baseline重投和字段/计数保护均走到并无子例失败；子例不是独立collector IDs，覆盖枚举依据固定源码与完整方法零error结果，原runner没有另列成功子例。真实PG first_pid70/second_pid72/Lock/blocking_pids[70]，第一applied第二already_applied、单消费。
+
+worker40.159秒/总窗50.607秒，原官方镜像/八controls/资源限制实证；owner33164/runner33192及进程组gone、flock可重取、Docker0，12个唯一源码hash与固定Git bytes复核未变（before有13项含一重复测试项，未虚增唯一文件数量）。runtime `/Users/mentianlu/.codex/runtime/a034-security-fixture-five-green-001`，green-receipt SHA `06356402116e2ee28bf6d4b9dee033ada206c269ddcd471747cd82fd227a8d28`，13原证据hash含rawlog/JSON/subcase声明/PG锁/资源/PID释放。当前仅局部五例GREEN，不是formal/full/独立review/真实来源或生产验证。
+
+提出**23个已有精确方法**回归（5 A032 identity/date、3 H01、4 H02、4 HKJC adapter、5共享career writer/counters、2既有policy/binding），完整ID与每项理由封存在 `/Users/mentianlu/.codex/runtime/a034-five-green-handoff/regression-proposal.json`。均静态核存在于直接类定义，仅方法选取不展开继承/全模块；原五例已在同业务树取得有效Linux证据，无变化不建议机械重跑。正式catalog/core要求由ROOT/C保留，本清单不替代，不改catalog，不把unknown转空/全量。本轮仅提出和申请同边界新窗口，未执行回归。若ROOT要求正式core或不同清单，应以新精确allocation绑定执行。
+
+本 A报告回写为docs-only；service、原测试/fixture及controls与实测04226d2c字节完全一致，局部GREEN不因docs-only状态说明被改写成其他受测SHA。下一步ROOT核证/回归分配/独立review；A无资源占用、不自行发布。最新额度14%已用/86%剩余。
