@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import random
 from copy import deepcopy
 from dataclasses import dataclass, field
@@ -311,6 +312,127 @@ def claim_translation_retry(
 
 
 CLAIM_KEY = "recovery_claim_v1"
+RESULT_KEY = "recovery_result_v1"
+RESULT_CONTRACT = "translation-result-apply-v1"
+RESULT_MAX_BYTES = 2 * 1024 * 1024
+RESULT_MAX_DEPTH = 32
+
+
+class TranslationCheckpointError(ValueError):
+    """结果不能安全持久化/恢复；不是 provider 失败，不增加付费重试次数。"""
+
+
+def _checkpoint_json(value):
+    active = set()
+
+    def validate(item, depth):
+        if depth > RESULT_MAX_DEPTH:
+            raise TranslationCheckpointError("checkpoint too deep")
+        kind = type(item)
+        if kind in (dict, list):
+            if id(item) in active:
+                raise TranslationCheckpointError("checkpoint cycle")
+            active.add(id(item))
+            try:
+                if kind is dict:
+                    for key, child in item.items():
+                        if type(key) is not str:
+                            raise TranslationCheckpointError("checkpoint key type")
+                        validate(child, depth + 1)
+                else:
+                    for child in item:
+                        validate(child, depth + 1)
+            finally:
+                active.remove(id(item))
+        elif kind is float:
+            if not math.isfinite(item):
+                raise TranslationCheckpointError("checkpoint nonfinite number")
+        elif kind not in (str, bool, int, type(None)):
+            raise TranslationCheckpointError("checkpoint value type")
+
+    validate(value, 0)
+    try:
+        encoded = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+    except (ValueError, UnicodeError, OverflowError) as exc:
+        raise TranslationCheckpointError("checkpoint encoding") from exc
+    if len(encoded) > RESULT_MAX_BYTES:
+        raise TranslationCheckpointError("checkpoint too large")
+    return encoded
+
+
+def decode_translation_checkpoint(payload, article_id, run_id, claimed_at):
+    """锁外严格解码，不重新解析术语或构造 provider；没有跨 claim 缓存。"""
+    from .translation import TranslationResult
+
+    encoded = _checkpoint_json(payload)
+    if type(payload) is not dict:
+        raise TranslationCheckpointError("checkpoint container")
+    required = {
+        "schema_version", "application_contract_version", "article_id", "run_id", "claimed_at",
+        "input_sha256", "deadline_at", "checkpoint_at", "title_zh", "body_zh", "push_summary_zh",
+        "metadata", "suppress_automation", "usage_report", "usage_reconciliation", "payload_sha256",
+    }
+    if set(payload) != required or type(payload["schema_version"]) is not int or payload["schema_version"] != 1:
+        raise TranslationCheckpointError("checkpoint schema")
+    if payload["application_contract_version"] != RESULT_CONTRACT:
+        raise TranslationCheckpointError("checkpoint contract")
+    if (type(payload["article_id"]) is not int or type(payload["run_id"]) is not int
+            or payload["article_id"] != article_id or payload["run_id"] != run_id
+            or payload["claimed_at"] != claimed_at):
+        raise TranslationCheckpointError("checkpoint identity")
+    for key in ("input_sha256", "payload_sha256"):
+        digest = payload[key]
+        if type(digest) is not str or len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
+            raise TranslationCheckpointError("checkpoint digest type")
+    for key in ("title_zh", "body_zh", "push_summary_zh"):
+        if type(payload[key]) is not str or (key != "push_summary_zh" and not payload[key].strip()):
+            raise TranslationCheckpointError("checkpoint text")
+    metadata = payload["metadata"]
+    if type(metadata) is not dict or CLAIM_KEY in metadata or RESULT_KEY in metadata:
+        raise TranslationCheckpointError("checkpoint metadata")
+    for key in ("provider", "model"):
+        if type(metadata.get(key)) is not str:
+            raise TranslationCheckpointError("checkpoint provider metadata")
+    if "terms" in metadata and (type(metadata["terms"]) is not list or any(type(t) is not dict for t in metadata["terms"])):
+        raise TranslationCheckpointError("checkpoint terms")
+    if "machine_horse_tags" in metadata and (type(metadata["machine_horse_tags"]) is not list
+            or any(type(t) is not str for t in metadata["machine_horse_tags"])):
+        raise TranslationCheckpointError("checkpoint tags")
+    if type(payload["suppress_automation"]) is not bool or payload["usage_reconciliation"] != "unreconciled":
+        raise TranslationCheckpointError("checkpoint policy or usage")
+    if _checkpoint_json(payload["usage_report"]) != _checkpoint_json(metadata.get("usage")):
+        raise TranslationCheckpointError("checkpoint usage changed")
+    try:
+        stamps = [datetime.fromisoformat(payload[k]) for k in ("claimed_at", "checkpoint_at", "deadline_at")]
+        if any(s.utcoffset() is None for s in stamps) or not stamps[0] <= stamps[1] <= stamps[2] or stamps[0] >= stamps[2]:
+            raise ValueError("checkpoint timestamps")
+    except (TypeError, ValueError) as exc:
+        raise TranslationCheckpointError("checkpoint timestamps") from exc
+    unsigned = {key: value for key, value in payload.items() if key != "payload_sha256"}
+    if hashlib.sha256(_checkpoint_json(unsigned)).hexdigest() != payload["payload_sha256"]:
+        raise TranslationCheckpointError("checkpoint digest mismatch")
+    # round-trip 只产生内置JSON类型，不触发 deepcopy/自定义对象钩子。
+    snapshot = json.loads(encoded)
+    return snapshot, TranslationResult(
+        title_zh=snapshot["title_zh"], body_zh=snapshot["body_zh"],
+        push_summary_zh=snapshot["push_summary_zh"], metadata=snapshot["metadata"],
+    )
+
+
+def build_translation_checkpoint(article, run, result, *, suppress_automation):
+    claim = run.raw_response[CLAIM_KEY]
+    payload = {
+        "schema_version": 1, "application_contract_version": RESULT_CONTRACT,
+        "article_id": article.pk, "run_id": run.pk, "claimed_at": claim["claimed_at"],
+        "input_sha256": claim["input_sha256"], "deadline_at": claim["deadline_at"],
+        "checkpoint_at": timezone.now().isoformat(), "title_zh": result.title_zh,
+        "body_zh": result.body_zh, "push_summary_zh": result.push_summary_zh,
+        "metadata": result.metadata, "suppress_automation": suppress_automation,
+        "usage_report": result.metadata.get("usage") if type(result.metadata) is dict else None,
+        "usage_reconciliation": "unreconciled",
+    }
+    payload["payload_sha256"] = hashlib.sha256(_checkpoint_json(payload)).hexdigest()
+    return decode_translation_checkpoint(payload, article.pk, run.pk, claim["claimed_at"])[0]
 
 
 def translation_input_sha256(article: NewsArticle) -> str:
@@ -338,7 +460,8 @@ def _locked_translation_claim(
     claim = raw.get(CLAIM_KEY)
     if not isinstance(claim, dict) or claim.get("claimed_at") != claimed_at:
         return article, run, "claim_changed"
-    if claim.get("phase") != phase or run.status != TranslationStatus.STARTED:
+    phases = phase if type(phase) is tuple else (phase,)
+    if claim.get("phase") not in phases or run.status != TranslationStatus.STARTED:
         return article, run, "claim_already_consumed"
     try:
         started = datetime.fromisoformat(claimed_at)
@@ -370,8 +493,64 @@ def consume_translation_claim(article_id, run_id, claimed_at, *, now=None):
     return article, run, ""
 
 
+def prepare_translation_claim(article_id, run_id, claimed_at, *, suppress_automation):
+    with transaction.atomic():
+        article, run, reason = _locked_translation_claim(
+            article_id, run_id, claimed_at, phase=("claimed", "executing"), now=timezone.now(),
+        )
+        if reason:
+            return article, run, None, reason
+        raw, claim = run.raw_response, run.raw_response[CLAIM_KEY]
+        if claim["phase"] == "claimed":
+            if RESULT_KEY in raw or type(suppress_automation) is not bool:
+                return article, run, None, "checkpoint_invalid"
+            run.raw_response = {**raw, CLAIM_KEY: {**claim, "phase": "executing", "suppress_automation": suppress_automation}}
+            run.prompt_excerpt = (article.body_ja_normalized or article.body_ja_raw)[:800]
+            run.save(update_fields=["raw_response", "prompt_excerpt", "updated_at"])
+            return article, run, None, ""
+        if RESULT_KEY not in raw:
+            return article, run, None, "claim_already_consumed"
+        payload = raw[RESULT_KEY]
+    try:
+        checkpoint, _ = decode_translation_checkpoint(payload, article_id, run_id, claimed_at)
+        if not _checkpoint_matches_claim(checkpoint, claim):
+            raise TranslationCheckpointError("checkpoint claim binding")
+    except TranslationCheckpointError:
+        return article, run, None, "checkpoint_invalid"
+    return article, run, checkpoint, ""
+
+
+def _checkpoint_matches_claim(checkpoint, claim):
+    return (checkpoint["input_sha256"] == claim["input_sha256"]
+            and checkpoint["deadline_at"] == claim["deadline_at"]
+            and ("suppress_automation" not in claim or (type(claim["suppress_automation"]) is bool
+                 and checkpoint["suppress_automation"] == claim["suppress_automation"])))
+
+
+def save_translation_checkpoint(article_id, run_id, claimed_at, checkpoint):
+    # 输入校验在锁外；只有既有身份/期限内的 executing 能提交独立结果。
+    checkpoint, _ = decode_translation_checkpoint(checkpoint, article_id, run_id, claimed_at)
+    with transaction.atomic():
+        article, run, reason = _locked_translation_claim(
+            article_id, run_id, claimed_at, phase="executing", now=timezone.now(),
+        )
+        if reason:
+            return None, reason
+        if not _checkpoint_matches_claim(checkpoint, run.raw_response[CLAIM_KEY]):
+            return None, "checkpoint_invalid"
+        if RESULT_KEY in run.raw_response:
+            existing = run.raw_response[RESULT_KEY]
+            if type(existing) is not dict or existing != checkpoint:
+                return None, "checkpoint_conflict"
+            return checkpoint, ""
+        run.raw_response = {**run.raw_response, RESULT_KEY: checkpoint}
+        run.save(update_fields=["raw_response", "updated_at"])
+    return checkpoint, ""
+
+
 def _save_claim_terminal(run, phase, *, metadata=None, error=""):
     claim = {**run.raw_response[CLAIM_KEY], "phase": phase}
+    metadata = {k: v for k, v in (metadata or {}).items() if k not in {CLAIM_KEY, RESULT_KEY}}
     run.raw_response = {**run.raw_response, **(metadata or {}), CLAIM_KEY: claim}
     run.status = TranslationStatus.SUCCESS if phase == "completed" else TranslationStatus.FAILED
     run.error_message = error[:2000]
@@ -381,9 +560,14 @@ def _save_claim_terminal(run, phase, *, metadata=None, error=""):
     run.save(update_fields=["raw_response", "status", "error_message", "model_name", "provider_name", "terms_used", "updated_at"])
 
 
-def finalize_translation_claim(article_id, run_id, claimed_at, *, result=None, error=None, now=None):
+def finalize_translation_claim(article_id, run_id, claimed_at, *, checkpoint=None, error=None, now=None):
     """有效结果与 run 原子落库；失主/到期/输入漂移不回写、不通知。"""
     now = now or timezone.now()
+    if error is None:
+        try:
+            checkpoint, result = decode_translation_checkpoint(checkpoint, article_id, run_id, claimed_at)
+        except TranslationCheckpointError:
+            return None, "checkpoint_invalid"
     with transaction.atomic():
         article, run, reason = _locked_translation_claim(
             article_id, run_id, claimed_at, phase="executing", now=now,
@@ -391,6 +575,8 @@ def finalize_translation_claim(article_id, run_id, claimed_at, *, result=None, e
         if reason:
             return article, reason
         if error is not None:
+            if RESULT_KEY in run.raw_response:
+                return article, "checkpoint_exists"
             classified = record_translation_failure(article, error, now=now, is_retry=True, notify=False)
             _save_claim_terminal(run, "failed", metadata=getattr(error, "metadata", None), error=str(error))
             if not classified.auto_retryable or article.translation_retry_exhausted_at is not None:
@@ -399,6 +585,11 @@ def finalize_translation_claim(article_id, run_id, claimed_at, *, result=None, e
                 transaction.on_commit(lambda: notify_terminal_translation_failure(snapshot), robust=True)
         else:
             from stable.models import ArticleStatus
+
+            stored = run.raw_response.get(RESULT_KEY)
+            if (type(stored) is not dict or stored != checkpoint
+                    or not _checkpoint_matches_claim(checkpoint, run.raw_response[CLAIM_KEY])):
+                return article, "checkpoint_changed"
 
             article.apply_translation_result(result)
             article.status = ArticleStatus.TRANSLATED

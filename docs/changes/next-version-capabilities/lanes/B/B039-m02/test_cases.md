@@ -1,6 +1,6 @@
 # B039：已验证结果检查点 RED 测试合同
 
-状态：14个测试方法已准备；首轮准确3项在ROOT专属PG窗取得真实业务RED，边界11未运行、未取得GREEN。依据B038已审方案a7d5a056；原R审批由ROOT反馈30f8ec70 APPROVED_PLAN_ONLY。没有新增生产接口/占位或GREEN代码。
+状态：原14个方法保留，新增16个，共30个；首轮准确3项在ROOT专属PG窗取得真实业务RED，现实现与新增边界均尚未运行GREEN。依据B038已审方案a7d5a056；原R审批由ROOT反馈30f8ec70 APPROVED_PLAN_ONLY。没有新增生产接口/占位或GREEN代码。
 
 ## Fixture与首轮最小RED
 
@@ -45,3 +45,19 @@
 ## 首轮实际结果
 
 固定e44f0636、ROOT窗口B039-FIRST-THREE-RED-PG-WINDOW-001下原3方法一次执行，均在上表预期业务断言失败：checkpoint不存在、重投未translated、两连接成功数量0。3failures/0errors/0skips/complete/exit1；实际backend68/70，worker连接及线程均关闭，正常fixture与导入无错误。原日志、精确IDs和清理绑定独立red-receipt（SHA9e16f68579553345116e6feb58561906088717955736f5d16eca6bbf956a8851）。其余11方法尚无运行证据；没有实施或执行GREEN。
+
+## B039-GREEN-IMPLEMENT-PREP-001 补齐断言
+
+ROOT核三项真实RED/清理后授权实施；当前仍未取得新的测试窗，未运行GREEN。原e44f0636所有fixture/RED/边界class的AST逐字相同，只有新imports和以下16方法追加；原3RED反例及raw证据不修改。新codec接口形成后添加的测试属于边界验收，不借接口不存在制造RED，未声称已在旧代码失败。
+
+| 新测试类 | 方法数与明确反例 |
+|---|---|
+| TranslationResultCheckpointFailureTests | 5：首次suppress=True终态退出后真实检查点恢复、重投False仍派发0；checkpoint独立save失败不得进provider失败计数、同消息重投provider0；原worker保存checkpoint后暂停让另一个真实PG连接恢复胜出，原worker仅skip且dispatch一次；late error不能覆盖已存成功checkpoint；不同摘要不能覆盖首份结果 |
+| TranslationResultCheckpointLockDeadlineTests | 3方法/6subcases：保存、resume入口、resume终态三个阶段分别article/run锁；实际pg_stat_activity Lock及精确pg_blocking_pids owner后才推进固定clock到精确deadline或之后1秒；状态前后相同、claim_expired、provider分别1/0/0、零dispatch/notify；主连接观察不增加第三连接 |
+| TranslationResultCheckpointCodecTests | 8 SimpleTestCase（无DB）：Unicode/canonical hash/独立snapshot/unknown报告；NaN/±Inf；dict/list循环；非内置类型/非字符串键/自定义hook；精确UTF-8编码字节2MiB及+1、不截断；深度32及33；timestamp/usage report漂移/假known/凭空cost；bool或int子类冒run_id |
+
+新接口无外部调用：build/decode为严格JSON与TranslationResult重建；prepare复用锁后clock、claimed消费或executing读取；save独立atomic持久；finalize只接受checkpoint成功输入或旧错误终态，provider异常与本地写错误分开。新codec数据源是明确非法Python/JSON类型，不通过先写PG非法JSON求数据库编码错误；SimpleTestCase禁止DB。
+
+拟准确受影响 **77 IDs**：新module30 +原B037 claim-fence25 + recovery22。原M01 mock19保留此前未受影响证据（translation.py/Responses/settings/factory/test未改，不调用新helper）；不是本轮复跑，也不降低formal/full分母。一个官方django诊断batch，max3PG（已有消费并发及新双恢复需主+两worker），新增锁等待与原worker竞争为2连接；单容器资源/控制保持。ROOT另给新窗前只AST/指纹/diff，不collector或DB。A034独占期间不竞争资源。
+
+仍待：准确76在候选固定SHA上的GREEN、实际6锁观察/原worker竞争、同R独立review、ROOT/C formal catalog/impact/full。完整M02预算/outbox/自动恢复保证不由这些断言证明。

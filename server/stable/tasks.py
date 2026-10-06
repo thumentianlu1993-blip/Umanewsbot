@@ -1865,7 +1865,10 @@ def discover_term_candidates_task(article_id: int) -> dict:
 
 def _translate_managed_claim_task(article_id, run_id, claimed_at, *, suppress_automation, log):
     from django.db import connection, transaction
-    from stable.services.translation_recovery import consume_translation_claim, finalize_translation_claim
+    from stable.services.translation_recovery import (
+        CLAIM_KEY, TranslationCheckpointError, build_translation_checkpoint, finalize_translation_claim,
+        prepare_translation_claim, save_translation_checkpoint,
+    )
 
     def skipped(reason):
         _log_success(log, f"skipped article={article_id} reason={reason}")
@@ -1874,20 +1877,35 @@ def _translate_managed_claim_task(article_id, run_id, claimed_at, *, suppress_au
     # eager/直接调用的外层事务也不能把 provider 包在业务行锁里。
     if connection.in_atomic_block:
         return skipped("claim_outer_transaction")
-    article, run, reason = consume_translation_claim(article_id, run_id, claimed_at)
+    article, run, checkpoint, reason = prepare_translation_claim(
+        article_id, run_id, claimed_at, suppress_automation=suppress_automation,
+    )
     if reason:
         return skipped(reason)
-    try:
-        result = translate_article(article, managed_run=run)
-    except Exception as exc:
-        _, reason = finalize_translation_claim(article_id, run_id, claimed_at, error=exc)
+    if checkpoint is None:
+        try:
+            result = translate_article(article, managed_run=run)
+        except Exception as exc:
+            _, reason = finalize_translation_claim(article_id, run_id, claimed_at, error=exc)
+            if reason:
+                return skipped(reason)
+            raise
+        # 本地检查点错误不进入provider异常/重试计次；写入失败保留executing。
+        if timezone.now() >= datetime.fromisoformat(run.raw_response[CLAIM_KEY]["deadline_at"]):
+            return skipped("claim_expired")
+        try:
+            checkpoint = build_translation_checkpoint(
+                article, run, result, suppress_automation=run.raw_response[CLAIM_KEY]["suppress_automation"],
+            )
+            checkpoint, reason = save_translation_checkpoint(article_id, run_id, claimed_at, checkpoint)
+        except TranslationCheckpointError:
+            return skipped("checkpoint_invalid")
         if reason:
             return skipped(reason)
-        raise
-    article, reason = finalize_translation_claim(article_id, run_id, claimed_at, result=result)
+    article, reason = finalize_translation_claim(article_id, run_id, claimed_at, checkpoint=checkpoint)
     if reason:
         return skipped(reason)
-    if getattr(settings, "AUTOMATION_ENABLED", False) and not suppress_automation:
+    if getattr(settings, "AUTOMATION_ENABLED", False) and not checkpoint["suppress_automation"]:
         transaction.on_commit(lambda: dispatch_task(process_article_automation_task, article.id), robust=True)
     _log_success(log, f"translated article={article_id}")
     return {
