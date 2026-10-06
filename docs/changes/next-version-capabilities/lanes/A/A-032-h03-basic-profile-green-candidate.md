@@ -34,3 +34,15 @@ ROOT独占分配现有impact-ci PG容器，受信8controls从2c725/6e6导出并�
 ROOT可用同官方controls/image，固定新候选SHA/tree，诊断plan精确25IDs（先同一首RED转GREEN，后其余24），profile=django，非collector/catalog/full/正式交付。仍1容器/2CPU4GiB256pids3GiBtmpfs/RO/networknone；申请同600秒含60秒清理、540秒停止线；并发测试最多3连接（观察者＋2worker），预算失败不扩新build/权限/资源。实际资源分配与B排队由ROOT协调；当前只是候选，未启动容器或DB。
 
 本轮仅service、独立tests和本A报告增补。旧A树保留；未push/PR/merge/deploy/生产/新身份/真实抓取/发布，无subagent/model CLI。最近额度10%已用、90%剩余。交固定候选和runtime后停止，等待GREEN资源；发现需共享schema/全局身份约束时回ROOT，不私扩。
+
+## 首次 GREEN25 结果与测试基线修正
+
+任务 `A032-FIRST-GREEN-25-WINDOW-001`，固定f3bcf547/tree d8a763dd按原25 ID执行一次，未修改被测树/ID/controls，不失败重跑。官方worker完成25项，24通过、1失败、errors0/skips0，PG16.15/Django5.2.1/Linux；唯一首用例在TermEntry总数硬编码1处失败，实际30。其前面的country七字段/date/JSON候选/APPLIED断言已过；其他24含原请求幂等、事务回滚及PG Lock等待断言通过，但此结果不能称整组GREEN。
+
+根因只读定位：0009迁移有14个普通词种子，0030有13个普通术语＋2个概念，合计29；首次test保留迁移种子再加自有TermEntry=30，后续TransactionTestCase flush不重跑数据迁移。原测试假定全库只有自身fixture，是测试基线错误，不删除种子、不改迁移或业务service。修正统一记录setUp结束执行前计数，期望candidate/log各增1，profile/race record/TermEntry计数原样保留；仍严格拒绝术语增删，不把30硬编码为新期望。
+
+并发原例只保留了“必须看到pg_stat_activity wait_event_type=Lock”的通过断言，没有打印原PID/等待行；首次证据只声明断言通过，不制造原始行。新固定测试增补first/second backend PID和pg_blocking_pids：必须明确second等待first，再把实测Lock/阻塞PID打印到官方原日志供后续封存；不加ID、不改业务行为，仍最多3连接。
+
+原窗口worker45.8秒/总56.8秒，实际inspect仍约束一致；容器0、owner86466/runner86511实时不存在、flock可重获、六候选文件hash未变，已回ROOT释放。原件 `/Users/mentianlu/.codex/runtime/a032-first-green-25-window-001/green-receipt.json` SHA `44c00b83e701379a66588e51fd1bc8fb52239651a4914f887e18c1d02a373df5`，绑定10原件。原日志完整保留。
+
+修正仅独立tests和本报告，业务service与f3bcf547逐字不变；无DB静态/import/25ID及合成检查通过，精确25ID集合与上一窗口相同。新固定SHA交ROOT申请同25复验，不自行复跑；修正后GREEN尚未执行，独立review仍待。额度起止10%已用、90%剩余。

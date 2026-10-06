@@ -47,6 +47,7 @@ class BasicProfileFromCacheFixture:
             primary_term=self.term, original_name="HARBOUR TEST", racing_region="hong_kong",
             source_refs={"horse_identity_verified_keys": ["hkjc:hk-001"]},
         )
+        self.initial_counts = self.counts()
         self.clock = patch("stable.services.p0_horse_completion_source_clients.datetime", FrozenDateTime)
         self.clock.start()
         self.addCleanup(self.clock.stop)
@@ -95,6 +96,10 @@ class BasicProfileFromCacheFixture:
         return (HorseProfileDataCandidate.objects.count(), OperationLog.objects.count(),
                 HorseProfile.objects.count(), HorseRaceRecord.objects.count(), TermEntry.objects.count())
 
+    def expected_applied_counts(self):
+        candidates, logs, profiles, records, terms = self.initial_counts
+        return (candidates + 1, logs + 1, profiles, records, terms)
+
     def assert_applied(self, request=None):
         request = request or self.request()
         result = apply_basic_profile_from_cache(**request)
@@ -130,7 +135,7 @@ class BasicProfileFromCacheTests(BasicProfileFromCacheFixture, TransactionTestCa
         self.assertEqual(candidate.candidate_payload["birth_date"], "2020-09-14")
         json.dumps(candidate.diff_payload, allow_nan=False)
         self.assertEqual(candidate.confidence, 0)
-        self.assertEqual(self.counts(), (1, 1, 1, 0, 1))
+        self.assertEqual(self.counts(), self.expected_applied_counts())
         self.assertFalse(result["published"])
         self.assertEqual(self.profile.review_status, HorseProfileStatus.DRAFT)
         self.assertIsNone(self.profile.published_at)
@@ -187,7 +192,7 @@ class BasicProfileFromCacheTests(BasicProfileFromCacheFixture, TransactionTestCa
         request = self.request()
         first = apply_basic_profile_from_cache(**request)
         self.assertEqual(first["status"], "applied")
-        self.assertEqual(self.counts(), (1, 1, 1, 0, 1))
+        self.assertEqual(self.counts(), self.expected_applied_counts())
         self.profile.refresh_from_db()
         self.assertEqual(self.profile.country, "")
         self.profile.manual_lock_flags = {}
@@ -335,10 +340,10 @@ class BasicProfileFromCacheTests(BasicProfileFromCacheFixture, TransactionTestCa
         self.assertEqual(first["status"], "applied")
         self.assertEqual(first["updated_fields"], [])
         self.assertEqual(first["publish_gate"], {"eligible": True, "blocking_reasons": []})
-        self.assertEqual(self.counts(), (1, 1, 1, 0, 1))
+        self.assertEqual(self.counts(), self.expected_applied_counts())
         second = apply_basic_profile_from_cache(**request)
         self.assertEqual(second["status"], "already_applied")
-        self.assertEqual(self.counts(), (1, 1, 1, 0, 1))
+        self.assertEqual(self.counts(), self.expected_applied_counts())
 
 
 class BasicProfileCacheConcurrencyTests(BasicProfileFromCacheFixture, TransactionTestCase):
@@ -354,6 +359,7 @@ class BasicProfileCacheConcurrencyTests(BasicProfileFromCacheFixture, Transactio
         request = self.request()
         first_in_writer = threading.Event()
         release_first = threading.Event()
+        first_pid = []
         second_pid = []
         local = threading.local()
 
@@ -368,10 +374,9 @@ class BasicProfileCacheConcurrencyTests(BasicProfileFromCacheFixture, Transactio
             close_old_connections()
             local.first = first
             try:
-                if not first:
-                    with connections["default"].cursor() as cursor:
-                        cursor.execute("SELECT pg_backend_pid()")
-                        second_pid.append(cursor.fetchone()[0])
+                with connections["default"].cursor() as cursor:
+                    cursor.execute("SELECT pg_backend_pid()")
+                    (first_pid if first else second_pid).append(cursor.fetchone()[0])
                 return apply_basic_profile_from_cache(**request)
             finally:
                 connections["default"].close()
@@ -387,10 +392,15 @@ class BasicProfileCacheConcurrencyTests(BasicProfileFromCacheFixture, Transactio
                     while time.monotonic() < deadline and not second.done():
                         if second_pid:
                             with connection.cursor() as cursor:
-                                cursor.execute("SELECT wait_event_type FROM pg_stat_activity WHERE pid = %s", [second_pid[0]])
+                                cursor.execute("SELECT wait_event_type, pg_blocking_pids(pid) FROM pg_stat_activity WHERE pid = %s", [second_pid[0]])
                                 current = cursor.fetchone()
                                 lock_seen = bool(current and current[0] == "Lock")
                                 if lock_seen:
+                                    self.assertIn(first_pid[0], current[1], "second request must wait for first request transaction")
+                                    print("A032_PG_LOCK_EVIDENCE " + json.dumps({
+                                        "first_pid": first_pid[0], "second_pid": second_pid[0],
+                                        "wait_event_type": current[0], "blocking_pids": current[1],
+                                    }), flush=True)
                                     break
                         time.sleep(0.02)
                     self.assertTrue(lock_seen, "must observe real PostgreSQL lock wait")
@@ -400,4 +410,4 @@ class BasicProfileCacheConcurrencyTests(BasicProfileFromCacheFixture, Transactio
                 self.assertEqual(second.result(timeout=10)["status"], "already_applied")
         self.profile.refresh_from_db()
         self.assertEqual(self.profile.country, "AUS")
-        self.assertEqual(self.counts(), (1, 1, 1, 0, 1))
+        self.assertEqual(self.counts(), self.expected_applied_counts())
