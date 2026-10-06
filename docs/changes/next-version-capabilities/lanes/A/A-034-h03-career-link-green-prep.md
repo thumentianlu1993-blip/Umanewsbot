@@ -1,0 +1,26 @@
+# A034：已有赛绩补连实现准备，待五例 GREEN 窗口
+
+任务 `A034-GREEN-IMPLEMENT-PREP-001`。ROOT 已核固定 RED `af6109eae75dd144d81f6d0c2d949a0eca40d132` 的唯一首例为有效业务失败（真实 fixture 前置成功，record.event_id None!=1，1 failure/0 error/0 skip）；其余四组未执行，不称其已取得 RED。完整测试设计见 [A034 test_cases](A-034-h03-career-link-test_cases.md)，方案基于已审 `44f79a62`。当前指令覆盖本地实现与静态准备；没有 PG 窗口、测试运行或生产授权，G2/G3 未触发。
+
+## 实际实现与责任范围
+
+仅实现新 `horse_career_record_link_from_cache.py`，新增本 A 报告；原 RED 测试/fixture 字节不变，未作测试技术修正。A032 helper/shared writer/admission/models/settings/catalog/B/C 保持原样。原 service 签名原样保留，调用方仍须提供可信原 bytes/独立 expectedSHA/H01-H02候选和版本、明确选中行/目标/binding SHA/profile及record baseline。
+
+1. adapter→H02 真实复算规范摘要一致/reusable/单 cache scope；只选唯一 selected_row_sha，稳定 provider/race/horse ID、slot/operator/venue/date/namespace/timezone 齐全，拒源行直带 event/result 绑定，started/exact 以原 normalizer 判定。原件强马 ID 与 producer source 完全一致。
+2. 外层 atomic，profile 阻塞锁串行化本入口；private/current verified H01 身份/人工 RACE_RECORD 锁核验。record→event→enrollment→source→binding 固定子锁序 nowait。锁前 binding discovery 仅发现 enrollment PK，之后全部归属/合同读取使用锁后对象；绑定 FK cache 显式用锁后实例。不扩大到旧 writer 全局线性化。
+3. timezone.now 服务端实时采样，真实固定 policy loader/parser/route_for 和原 binding_admission_reason(racecard/check_runtime=False)；原 flags/review/terms/有效期/manifest/identity digest/registry/撤销/URL/场地合同保留，额外只读核现有 enrollment authority/state/retired_at 与 binding schema。四个赛事锚与 source/current row 精确一致；首片 same-year/edition，名称不回退。缺既有合同即 blocked，无创建/换绑/flag/网络动作。
+4. 现有 record profile/source ownership、raw 精确行指纹及 normalizer/writer 事实一致、无旧 normalization issues；结果不关联、只允许 unlinked 或本 event 已连。安全检查后再读同 profile/module/H03角色的 H02消费 key：同完整输入 SHA 的 APPLIED 原请求返回 already_applied，跳过 writer/normalization/audit；异输入/歧义拒绝。只有未消费 key 再核两 baseline，所以首写改变 updated_at 后原完整 baseline 可重投。
+5. 完整投影共享 `_race_record_values` 的 **31 个管理字段**，所有旧值保留，仅改 event_id；用原 writer 显式 record 参数，重复/旧歧义固定 blocked。writer 返回 RaceRecordUpsertResult.record，分别检查返回内存 issues 和 refresh_from_db 后 issues/真实关联/同条数；所有其他 record 字段严格保护，profile仅允许原 refresh 的派生字段和时间变化。无变化已关联目标输入跳过 writer，只消费审计一次。
+6. 写后重新采样实时 clock/load policy，要求 policy.digest 与锁后初检一致，再核原 binding 合同。过期/漂移/postcondition 用内部拒绝异常退出外层 atomic 后返回 blocked，避免普通 return 留下写入。candidate APPLIED/默认 confidence0/日期 JSON-safe/inputSHA/H01/H02/原件/binding/policy证据/result和本地actor、单 operation log 与 writer 同事务；数据库/save/log异常回滚并传播，不误记成功。55P03资源忙单独 blocked，不自动重试。
+
+原 writer 已保护 raw/source refs/external idempotency，本片不建立第二个赛绩 writer。来源总数/authority/中文术语/公开状态等完整持久字段后验保护。此片不实现 result马归属、跨年、全量新增/更正/撤销、完整career/full-profile或生产并发；真实现有合同或源强字段缺失仍 blocked，合成 fixture 不提供现实授权。
+
+## 已做与未做的验证
+
+AST语法通过；原函数完整 keyword 签名与 RED 相同；自动从共享 `_race_record_values` AST 提取全部必填/可选管理 key，与 WRITER_FIELDS 集合精确相等（31），并对应真实模型字段。原测试/fixture和所有共享代码/八controls与 RED字节相同。工作流契约、4项文档测试及 diff 检查通过。以上仅静态准备，不证明业务 GREEN、rollback或PG并发已运行。
+
+首五 GREEN 仍是 test_cases 中同一五 canonical IDs；没有新增 ID 或放宽原断言。申请 ROOT 单容器/无网络官方镜像与原八controls的精确五 ID Django 窗口，600秒总窗含60清理/540止测，2CPU/4GiB/256PID/3GiBtmpfs/非root10001/ROsource/NNP。镜像拟复用 `sha256:fcf8cdaf63af51b1b8a6e30e3d2fdf871d127c3c1461bfd00c9fc6d610eab905`，由 ROOT 重新绑定；未分配前不得启动。固定 GREEN SHA、测试 tree、计划/hash、owner/heartbeat/锁、实际 executed IDs/rawlog/lifecycle/inspect/PID清理证据需封存；任何 fixture/import失败不冒充业务失败或 GREEN。
+
+五例全部通过后才按实际影响提出精确回归选择：本片局部 H01/H02/A032/共享career writer，以及读取的 binding 合同中直接相关现有方法；不直接扩大相邻全模块，正式 core要求保留。新增路径 catalog未改，交 ROOT/C精确映射或专用窗口。出现共享契约无法承载时交 ROOT，不改 schema、权限或其他 lane。
+
+最新额度13%已用/87%剩余；每5分钟核验/<=1%停止/每批目标<=3%。本地实现待真实五例 GREEN，随后仍需独立 review；未 push/PR/合并/部署/生产/真实网络/付费/公开权限变化。
