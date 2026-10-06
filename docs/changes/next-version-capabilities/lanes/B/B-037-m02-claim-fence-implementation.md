@@ -1,6 +1,6 @@
 # B037：自动重试 claim/fence 实施准备
 
-任务 B037-M02-CLAIM-FENCE-IMPLEMENT-001。当前**首批五项真实 RED→GREEN 已完成，边界/PG真并发/相邻回归待执行**。ROOT 已确认原 R `6e05cc18ccc78364cb5d41babbfe4f5f367ee194` 关闭 B036-R01，APPROVED_PLAN_ONLY；该确认不是实现审核或发布授权。
+任务 B037-M02-CLAIM-FENCE-IMPLEMENT-001。当前**本地实现及63项边界/PG真并发/相邻回归已完成，待原 R 独立代码 review 和 ROOT/C 正式集成测试**。ROOT 已确认原 R `6e05cc18ccc78364cb5d41babbfe4f5f367ee194` 关闭 B036-R01，APPROVED_PLAN_ONLY；该确认不是实现审核或发布授权。
 
 从固定集成 `2c72521c55b6cdc24f7650d172b48079cbff969a` 创建独立树 `/Users/mentianlu/.codex/worktrees/b037-m02-claim-fence/umanews`、分支 `codex/b037-m02-claim-fence`。只从 `82b0c7253a4410cec7a1de31302345f2ba6f986e` 提取最终 B036 方案原字节作输入，未 cherry-pick 旧 B035 实现或 ROOT 协调记录；旧 B035/B034/C028 树未改。
 
@@ -21,5 +21,17 @@ ROOT 新分配首次五项 GREEN 窗口；固定 `bb572df2fb5707062ef55f6c688fd5
 之后只准备测试扩展，没有新增应用代码：保留首批5方法AST和canonical IDs，提取共用fixture为无测试方法的基类；新增17项边界/两PG连接并发，包含 ordinary人工字段、force published、外层事务拒绝、源版本变化、精确deadline、领取时间不重设、旧/非法envelope、run归属、release/stale局部与回滚、通知失败隔离、真实受管服务metadata及PG并发。只对现有 recovery selector 测试的旧消息断言补入run_id/claimed_at，保持其边界/批量断言，不能继续要求无身份的旧消息契约。源码仍逐字等于首批GREEN候选。
 
 下一诊断批申请准确63IDs：本片22（原5+新增17）、现有recovery22、M01 mock19，全部用官方django profile单runner。AST只是清单准备，尚未实际收集/执行本批；两线程PG测试需分别取得不同backend PID、记录日志并关闭各连接，不冒用顺序交错。真实正式catalog/impact/full及独立review仍ROOT后续安排。
+
+## 63项实际结果与交付边界
+
+ROOT 另行分配 B037-BOUNDARY-63-PG-WINDOW-001，准确候选 `9498edf185a99d6defc041cfabc714adc039d5a0`、名单文件 SHA `a1bb21a89afd550e7f575c163500dd45ff962c4869d2c762854defbb5ee1c1af`。2026-10-06 用同官方django runner/8受信控制/既有镜像和隔离资源一次实际执行全部63IDs：**63/63 PASS，零 failures/errors/skips/expected_failures/unexpected_successes，lifecycle complete、runner exit0**。业务11.686秒、worker48.33秒、整个窗口59.31秒，未超600秒上限。测试DB由容器内DiscoverRunner创建，无宿主业务库/真实Redis/broker。
+
+真实并发测试在日志输出PG backend `[93, 94]`，通过不同PID、同轮1 provider/1成功/1跳过及线程退出、各线程连接关闭的断言。没有额外SQL observer，最多主连接+两线程连接；宿主docker top轮询只采样到峰值1，短并发未被采样捕获，**不把该峰值采样作为并发或全时连接数量的独立证明**。有效并发证据是实际PG16的测试同步、两个不同backend PID及通过断言。
+
+独立runtime `/Users/mentianlu/.codex/runtime/b037-m02-boundary-63-pg-window-001/boundary-receipt.json` SHA `03653f29df7a5282fdbd4e2ba6da7e598f3e6a0422a747044b9f7e7c188d0bf5` 绑定完整63IDs、report、原日志、container inspect、控制来源、进程观察与清理。owner PID88682 / runner88728，finally清理后containers=[]、runner退出且窗口FD锁释放，已回ROOT释放；后续文档提交不修改任何受测应用或测试字节，不要求重复业务测试。
+
+通知回调失败用mock制造，robust日志符合预期；测试报告零error，真实模型/邮件/外部消息调用数为零。普通人工字段、force published、源变化/deadline、精确run、普通服务JSON保护、失败/成功/回收/释放原子回滚、通知无事务与失效零通知、M01关闭/单次请求和旧provider选择等本批断言通过；不借此宣称全站或所有翻译场景已验收。
+
+本地最小片可交原R独立代码review。新增模块catalog登记、共享tasks影响计划及required full由ROOT/C完成；当前63项是明确授权的精确诊断，**没有正式collector/catalog/full交付收据**。没有push、PR、合并、部署、生产写入或模型开关启用。完整M02累计费用预算、未知用量、跨版本响应恢复/复用与可靠下游派发仍缺，不能缩分母或称M02整体完成。
 
 边界保持已审方案：普通/force兼容、指定受管run、外部调用无事务、article+确切run同库原子终态、同轮fence与提交后终态snapshot通知。累计费用预算/SDK跨轮边界、响应恢复、可靠outbox仍是完整M02缺口，不扩大本片。只使用已分配现有镜像的临时隔离测试容器/PG，无生产或真实业务DB/Redis、模型调用、外发、QQ/后台扩张、push/PR/合并/发布或新资源构建。

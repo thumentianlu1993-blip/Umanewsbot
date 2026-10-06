@@ -1,6 +1,6 @@
 # B037 测试清单：自动重试 claim/fence
 
-输入为最终已审 B036 方案（来源 `82b0c725`，原 R 复审由 ROOT 确认 APPROVED_PLAN_ONLY）。固定实现基线 `2c72521c55b6cdc24f7650d172b48079cbff969a`。本清单落成该方案的测试设计，不扩大业务；准备提交 `a4022503` 上五项实际 RED 已取得（5 failures/0 errors/0 skips），之后才修改应用代码；`bb572df2` 同5IDs已GREEN。当前准备边界/PG真并发及相邻回归清单。
+输入为最终已审 B036 方案（来源 `82b0c725`，原 R 复审由 ROOT 确认 APPROVED_PLAN_ONLY）。固定实现基线 `2c72521c55b6cdc24f7650d172b48079cbff969a`。本清单落成该方案的测试设计，不扩大业务；准备提交 `a4022503` 上五项实际 RED 已取得（5 failures/0 errors/0 skips），之后才修改应用代码；`bb572df2` 同5IDs已GREEN。`9498edf1` 全63项已在ROOT另分配的隔离PG16窗口通过，包括两backend真并发；待独立review及正式full。
 
 ## 首批 RED（五项，单批）
 
@@ -45,6 +45,8 @@ TransactionTestCase 使 on_commit 真实退出最外层事务后执行；邮件�
 | test_two_pg_connections_consume_only_once | 两独立PG backend单消费者/连接清理 |
 
 下一批准确63项：本模块22+既有 `stable.test_translation_failure_recovery_change` 22+`stable.test_responses_analysis` 19；以runtime AST清单固定准确方法ID，未经ROOT窗口不执行。本片原5方法AST保持不变；既有selector仅更新新消息契约断言，未缩其批量/失败范围。不是正式collector/catalog/full证据。
+
+上述63项随后已按ROOT明确窗口一次实际执行，全部通过、零failure/error/skip，名单与执行集合逐项相等。PG真并发backend93/94及连接清理断言通过，原日志/完整结果/隔离与清理证据在 `/Users/mentianlu/.codex/runtime/b037-m02-boundary-63-pg-window-001`；固定受测SHA `9498edf185a99d6defc041cfabc714adc039d5a0`。原RED→GREEN与此补证没有替代正式catalog/impact/full或独立代码review。
 
 非法值、空值、旧 preclaimed 消息均 fail closed；普通首次翻译/force/manual 保留现有行为与人工字段保护。无 models/settings/migration变化。无新权限或对外发送开关。deadline只约束准入/回写，跨轮费用预算与outbox不在本片，按方案保留真实缺口。
 
