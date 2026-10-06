@@ -10939,6 +10939,135 @@ class PublicHomeInfoFeedTests(TestCase):
         self.assertNotIn(headline, response.context["feed_articles"])
         self.assertIn(regular, response.context["feed_articles"])
 
+    def test_u04_headline_only_empty_copy_describes_current_page(self):
+        from bs4 import BeautifulSoup
+
+        article = self.make_article("c041-headline-only", "C041 唯一公开头条")
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["headline_article"], article)
+        self.assertEqual(response.context["feed_articles"], [])
+        soup = BeautifulSoup(response.content, "html.parser")
+        hero = soup.select_one("a.hero-headline")
+        self.assertIsNotNone(hero)
+        self.assertIn(article.effective_title, hero.get_text())
+        detail = self.client.get(hero["href"])
+        self.assertEqual(detail.status_code, 200)
+        self.assertContains(detail, article.effective_title)
+        self.assertContains(detail, article.effective_body)
+        self.assertContains(response, "本页暂无其他新闻。")
+        self.assertNotContains(response, "目前还没有已发布文章。")
+
+    def test_u04_headline_empty_copy_keeps_truly_empty_home(self):
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.context["headline_article"])
+        self.assertEqual(response.context["feed_articles"], [])
+        self.assertContains(response, "目前还没有已发布文章。")
+        self.assertNotContains(response, "本页暂无其他新闻。")
+
+    def test_u04_headline_empty_copy_does_not_disclose_hidden_articles(self):
+        pending = self.make_article(
+            "c041-pending", "C041 未审核对象", workflow_status=WorkflowStatus.PENDING_REVIEW,
+        )
+        withdrawn = self.make_article(
+            "c041-withdrawn", "C041 已撤回对象", workflow_status=WorkflowStatus.WITHDRAWN,
+        )
+        missing_time = self.make_article("c041-null-time", "C041 没有公开时间对象")
+        # make_article(None) defaults to published_at: explicitly create the NULL fixture.
+        NewsArticle.objects.filter(pk=missing_time.pk).update(published_to_web_at=None)
+        missing_time.refresh_from_db()
+        self.assertIsNone(missing_time.published_to_web_at)
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.context["headline_article"])
+        self.assertEqual(response.context["feed_articles"], [])
+        self.assertContains(response, "目前还没有已发布文章。")
+        self.assertNotContains(response, "本页暂无其他新闻。")
+        for article in (pending, withdrawn, missing_time):
+            with self.subTest(article=article.source_article_id):
+                self.assertNotContains(response, article.effective_title)
+                self.assertNotContains(response, article.source_url)
+                self.assertEqual(self.client.get(article.public_path).status_code, 404)
+        self.assertNotContains(response, WorkflowStatus.PENDING_REVIEW.value)
+        self.assertNotContains(response, WorkflowStatus.WITHDRAWN.value)
+
+    def test_u04_headline_with_regular_cards_keeps_dedup_and_no_empty_copy(self):
+        from bs4 import BeautifulSoup
+
+        now = timezone.now()
+        headline = self.make_article(
+            "c041-headline-regular", "C041 重点头条", published_to_web_at=now,
+            score_total=95, race_priority="P0", has_cover=True,
+        )
+        regular = self.make_article(
+            "c041-regular", "C041 普通新闻", published_to_web_at=now - timedelta(minutes=5),
+            score_total=20,
+        )
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["headline_article"], headline)
+        self.assertEqual([a.pk for a in response.context["feed_articles"]], [regular.pk])
+        soup = BeautifulSoup(response.content, "html.parser")
+        feed = soup.select_one('section[aria-label="最新新闻"]')
+        self.assertIsNotNone(feed)
+        cards = feed.select("article.feed-card")
+        self.assertEqual(len(cards), 1)
+        self.assertIn(regular.effective_title, cards[0].get_text())
+        self.assertNotIn(headline.effective_title, feed.get_text())
+        self.assertContains(response, headline.effective_title)
+        self.assertNotContains(response, "本页暂无其他新闻。")
+        self.assertNotContains(response, "目前还没有已发布文章。")
+        # Follow the rendered URL, including its real signed return navigation.
+        detail = self.client.get(cards[0].select_one("h3.feed-card-title a")["href"])
+        self.assertEqual(detail.status_code, 200)
+        self.assertContains(detail, regular.effective_title)
+        detail_soup = BeautifulSoup(detail.content, "html.parser")
+        back = detail_soup.select_one('nav[aria-label="文章操作"] a')
+        self.assertIsNotNone(back)
+        returned = self.client.get(back["href"])
+        self.assertEqual(returned.status_code, 200)
+        self.assertIn(regular, returned.context["feed_articles"])
+
+    def test_u04_headline_only_first_page_preserves_next_page(self):
+        from bs4 import BeautifulSoup
+
+        now = timezone.now()
+        headline = self.make_article(
+            "c041-page-headline", "C041 第一页头条", published_to_web_at=now,
+            score_total=95, race_priority="P0", has_cover=True,
+        )
+        second = self.make_article(
+            "c041-page-second", "C041 第二页新闻", published_to_web_at=now - timedelta(minutes=5),
+            score_total=20,
+        )
+        with patch("stable.views.PUBLIC_FEED_PAGE_SIZE", 1):
+            first = self.client.get("/")
+            self.assertEqual(first.status_code, 200)
+            self.assertEqual(first.context["headline_article"], headline)
+            self.assertEqual(first.context["feed_articles"], [])
+            self.assertEqual(first.context["page_obj"].number, 1)
+            self.assertEqual(first.context["page_obj"].paginator.num_pages, 2)
+            soup = BeautifulSoup(first.content, "html.parser")
+            navigation = soup.find("nav", attrs={"aria-label": "分页"})
+            self.assertIsNotNone(navigation)
+            next_link = navigation.find("a", string=lambda text: text and text.strip() == "下一页")
+            self.assertIsNotNone(next_link)
+            next_page = self.client.get(next_link["href"])
+            self.assertEqual(next_page.status_code, 200)
+            self.assertEqual(next_page.context["page_obj"].number, 2)
+            self.assertEqual([a.pk for a in next_page.context["feed_articles"]], [second.pk])
+            next_soup = BeautifulSoup(next_page.content, "html.parser")
+            next_feed = next_soup.select_one('section[aria-label="最新新闻"]')
+            self.assertIsNotNone(next_feed)
+            self.assertIn(second.effective_title, next_feed.get_text())
+            self.assertNotIn(headline.effective_title, next_feed.get_text())
+            self.assertNotContains(next_page, "目前还没有已发布文章。")
+            self.assertNotContains(next_page, "本页暂无其他新闻。")
+            # Check the new copy only after proving the existing real pagination chain.
+            self.assertContains(first, "本页暂无其他新闻。")
+            self.assertNotContains(first, "目前还没有已发布文章。")
+
     def test_public_home_hot_articles_prioritize_upstream_access_snapshot(self):
         now = timezone.now()
         snapshot_article = self.make_article(
