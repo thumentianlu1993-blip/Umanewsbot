@@ -1,6 +1,6 @@
 # B039：已验证结果检查点 RED 测试合同
 
-状态：仅准备，14个测试方法；未执行测试/DB/PG，未取得RED或GREEN。依据B038已审方案a7d5a056；原R审批由ROOT反馈30f8ec70 APPROVED_PLAN_ONLY。没有新增生产接口/占位或GREEN代码。
+状态：14个测试方法已准备；首轮准确3项在ROOT专属PG窗取得真实业务RED，边界11未运行、未取得GREEN。依据B038已审方案a7d5a056；原R审批由ROOT反馈30f8ec70 APPROVED_PLAN_ONLY。没有新增生产接口/占位或GREEN代码。
 
 ## Fixture与首轮最小RED
 
@@ -41,3 +41,7 @@
 当前可做AST、符号存在、源指纹对照、git diff --check；不执行django.setup、collector、DB或manage.py test。首轮ROOT需先明确固定RED SHA/准确3 IDs及新窗口。基础设施/setup/fixture异常立即停止并报告，不记RED，不自行重跑。首轮结果回ROOT后才决定是否实施，不先实现GREEN。C034 collector独占资源，B不得复用。
 
 现有B037锁等待跨原deadline 6子例证据不能证明新的checkpoint保存/恢复helper；将来GREEN前仍需新增这两阶段的真实行锁等待观察（article/run两锁、PG blocker）、原执行与恢复者交错、checkpoint写失败、普通/force兼容及现有回归，不能拿本次3RED代整片验证。完整预算/outbox、跨claim/术语版本复用、deadline后恢复、自动保证重投均不属本片。测试资源只用ROOT既有隔离runner控制及准确窗口；formal catalog/impact/full分母不改。
+
+## 首轮实际结果
+
+固定e44f0636、ROOT窗口B039-FIRST-THREE-RED-PG-WINDOW-001下原3方法一次执行，均在上表预期业务断言失败：checkpoint不存在、重投未translated、两连接成功数量0。3failures/0errors/0skips/complete/exit1；实际backend68/70，worker连接及线程均关闭，正常fixture与导入无错误。原日志、精确IDs和清理绑定独立red-receipt（SHA9e16f68579553345116e6feb58561906088717955736f5d16eca6bbf956a8851）。其余11方法尚无运行证据；没有实施或执行GREEN。

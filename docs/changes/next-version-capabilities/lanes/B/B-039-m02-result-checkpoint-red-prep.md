@@ -1,6 +1,6 @@
 # B039：结果检查点 RED 准备交接
 
-任务B039-M02-RESULT-CHECKPOINT-RED-PREP-001。状态：**测试准备完成，未执行RED、未实现GREEN，待ROOT精确PG窗口**。
+任务B039-M02-RESULT-CHECKPOINT-RED-PREP-001。状态：**首轮准确3项真实业务RED已完成，未实现GREEN，等待ROOT下一派单**。
 
 依赖固定C033 `6793f9f2461d1382349dcc8075a7e92dea85a8ed` / tree `aa8b22d59b597d3de19205b42167338474c8c0e9`；ROOT反馈原R `0b7de5e6` APPROVED_INTEGRATION_PREPARATION，尚非formal GREEN/merge。独立树 `/Users/mentianlu/.codex/worktrees/b039-result-checkpoint-red/umanews`，分支codex/b039-result-checkpoint-red。B038原方案a7d5a056fb5c951650ec3edfe49de7ee8e6a86dc与原R30f8ec70 APPROVED_PLAN_ONLY是只读依据；原B037/B038/C033候选保持不变。
 
@@ -23,3 +23,11 @@ selector截获真实envelope，fixture沿现有consume变executing；首例在�
 首轮预计目标业务失败分别为checkpoint缺失、未恢复translated、成功者0而非1；缺import/fixture/setup/PG资源错误不算RED。源指纹/AST/计划解析/diff检查仅静态证据。后续边界11方法不自动纳入首轮，不承诺都RED；checkpoint阶段新增锁后截止竞争还需GREEN前补齐，不用旧R01证据冒新路径。
 
 本轮终点为正常源码fixture、固定候选与窗口申请交ROOT；不提前实施，也不改共享catalog或full分母。完整M02预算/unknownusage跨轮准入、可靠outbox/自动恢复保证仍未完成，既有DDL工期2026-10-07 18:00 Asia/Shanghai风险保留。
+
+## 首轮准确3项实际RED（2026-10-06）
+
+ROOT分配B039-FIRST-THREE-RED-PG-WINDOW-001，固定e44f0636020a9d28f667b3bfbb915ec23589de51 / tree f6d91a6088b031c4e0fb574e03e48116cad60324、原3IDs一次实际执行：3 failures、0 errors/skips、complete、exit1。fixture/现有入口正常运行，分别缺完整持久checkpoint、重投返回claim_already_consumed而未翻译、两个真实PGbackend都skip使成功数量0而非1。没有缺import/setup/fixture失败。它仅证明三项核心缺失，不替代边界11或正式full，也不是GREEN。
+
+两worker实际backend68/70、关闭连接True且无残线程；业务1.069秒、worker36.602秒、whole47.501秒。原受信控制/固定镜像/隔离未变。finally容器=[]、runner退出；owner28554/runner28591经host ps不存在，FD锁重新取得/释放验证。Docker top抽样peak不能冒实际全程峰值证明，连接上限由fixture主+2worker设计和真实PID断言共同约束。
+
+独立runtime `/Users/mentianlu/.codex/runtime/b039-first-three-red-pg-window-001/red-receipt.json` SHA `9e16f68579553345116e6feb58561906088717955736f5d16eca6bbf956a8851` 绑定准确IDs、原plan/source/8controls封存、完整rawlogs/results/isolation/inspect/cleanup。资源释放与结果已回ROOT；只文档回写，测试和生产源保持受测e44f0636字节，不续窗、不扩大、不实现GREEN。
