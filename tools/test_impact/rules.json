@@ -971,7 +971,8 @@
     "server/stable/tests/__init__.py",
     "scripts/demos/c027_public_pages.py",
     "scripts/demos/c027_capture_pages.cjs",
-    "server/stable/fixtures/news_content_boundaries/b035_cleaning_baseline.json"
+    "server/stable/fixtures/news_content_boundaries/b035_cleaning_baseline.json",
+    "server/stable/services/horse_basic_profile_from_cache.py"
   ],
   "paths": {
     "docs/changes/next-version-capabilities/lanes/C/U01-offline-cases.json": [
@@ -1321,6 +1322,9 @@
     ],
     "docs/changes/next-version-capabilities/lanes/B/B035-n01/examples.json": [
       "news_translation"
+    ],
+    "server/stable/fixtures/h03_basic_profile/hkjc_synthetic.json": [
+      "horse_basic_profile_cache"
     ]
   },
   "symbols": {

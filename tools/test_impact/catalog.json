@@ -28,7 +28,8 @@
       "stable.test_term_gate_reprocessing",
       "stable.test_news_content_boundaries",
       "stable.test_external_english_horse_context_gate",
-      "stable.test_article_content_trace"
+      "stable.test_article_content_trace",
+      "stable.test_translation_claim_fence"
     ],
     "race_parser": [
       "stable.test_race_reference_sources",
@@ -852,6 +853,9 @@
     "horse_cache_reuse": [
       "stable.test_horse_cache_reuse",
       "stable.test_horse_source_cache_reuse_adapter"
+    ],
+    "horse_basic_profile_cache": [
+      "stable.test_horse_basic_profile_from_cache"
     ]
   },
   "dependencies": {
@@ -884,6 +888,11 @@
     "horse_cache_reuse": [
       "horse_target_inventory",
       "module:stable.test_p0_horse_completion_source_clients"
+    ],
+    "horse_basic_profile_cache": [
+      "horse_cache_reuse",
+      "horse_publish",
+      "horse_page"
     ]
   },
   "tests": {
@@ -2681,6 +2690,18 @@
       "domains": [
         "news_translation"
       ]
+    },
+    "server/stable/test_horse_basic_profile_from_cache.py": {
+      "label": "stable.test_horse_basic_profile_from_cache",
+      "domains": [
+        "horse_basic_profile_cache"
+      ]
+    },
+    "server/stable/test_translation_claim_fence.py": {
+      "label": "stable.test_translation_claim_fence",
+      "domains": [
+        "news_translation"
+      ]
     }
   },
   "profiles": {
@@ -2980,7 +3001,9 @@
     "stable.test_horse_cache_reuse": "python",
     "stable.test_horse_source_cache_reuse_adapter": "django",
     "stable.test_c027_public_time_sqlite": "python",
-    "stable.test_article_content_trace": "django"
+    "stable.test_article_content_trace": "django",
+    "stable.test_horse_basic_profile_from_cache": "django",
+    "stable.test_translation_claim_fence": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
@@ -3058,7 +3081,8 @@
     "public_probe_template_adapter": "application: O03 离线模板适配、测试环境隔离与恢复",
     "responses_analysis": "integration: M01 默认关闭的 Responses 分析与旧 provider 兼容",
     "public_probe_orm_loader": "application: O03 单赛事匿名结果只读 ORM 与真实页面对账",
-    "horse_cache_reuse": "integration: H02离线缓存分类与绑定HKJC字节适配"
+    "horse_cache_reuse": "integration: H02离线缓存分类与绑定HKJC字节适配",
+    "horse_basic_profile_cache": "integration: H03绑定缓存的私有基础资料事务与PG并发合同"
   },
   "dedicated_batch_modules": [
     "stable.test_migration_history_repair_postgres",
