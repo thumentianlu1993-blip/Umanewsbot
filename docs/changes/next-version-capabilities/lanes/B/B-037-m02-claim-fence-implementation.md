@@ -1,6 +1,6 @@
 # B037：自动重试 claim/fence 实施准备
 
-任务 B037-M02-CLAIM-FENCE-IMPLEMENT-001。当前**原 R 代码审核 NEEDS_CHANGES，唯一 P2 B037-R01 首轮得到3个run锁业务RED、3个article锁观察失败；已修测试观察器待新窗口补证，尚未修实现**；原63项通过证据保持。ROOT 已确认原 R `6e05cc18ccc78364cb5d41babbfe4f5f367ee194` 关闭 B036-R01，APPROVED_PLAN_ONLY；该确认不是实现审核或发布授权。
+任务 B037-M02-CLAIM-FENCE-IMPLEMENT-001。当前**原 R 代码审核 NEEDS_CHANGES；B037-R01 六个锁等待场景有效 RED 已齐，仅锁后时钟判断已修，待 GREEN 与受影响回归**；原63项通过证据保持。ROOT 已确认原 R `6e05cc18ccc78364cb5d41babbfe4f5f367ee194` 关闭 B036-R01，APPROVED_PLAN_ONLY；该确认不是实现审核或发布授权。
 
 从固定集成 `2c72521c55b6cdc24f7650d172b48079cbff969a` 创建独立树 `/Users/mentianlu/.codex/worktrees/b037-m02-claim-fence/umanews`、分支 `codex/b037-m02-claim-fence`。只从 `82b0c7253a4410cec7a1de31302345f2ba6f986e` 提取最终 B036 方案原字节作输入，未 cherry-pick 旧 B035 实现或 ROOT 协调记录；旧 B035/B034/C028 树未改。
 
@@ -47,5 +47,11 @@ C032当前占用PG。新RED候选固定后只申请准确三IDs一次官方djang
 ROOT 随后分配 B037-R01-THREE-RED-PG-WINDOW-001；固定 `5b7031939c38120c6df8f2b5589607ea7ee763d4` 准确三ID/六subcases一次运行，3tests/6failures/0errors/0skips、lifecycle complete、runner exit1。必须分级：run锁三subcases的consume69/success74/terminal79均实际观察PG Lock并在状态快照断言失败，属于有效业务RED；article锁三subcases失败在SQL观察匹配，不推进跨deadline，**不能计入目标RED**。业务16.466秒，整个窗口64.41秒，finally清理containers=[]、runner退出、FD锁释放，owner3912/runner3958。独立runtime `/Users/mentianlu/.codex/runtime/b037-r01-three-red-pg-window-001/partial-red-receipt.json` SHA `7148726e042c5b483c90a7f6fdd849c989b0cf75dc3889eefb4783baaf54e5c7` 明确分级且保存原日志/约束/结果/清理。
 
 首轮观察器要求PG活动query的FOR UPDATE尾部，而完整article SELECT较长；该谓词对可能截断的活动文本不可靠，本轮未记录query长度，不能冒称已测出截断根因。只修测试为Lock+对应表+pg_blocking_pids包含主持锁backend，记录owner/worker/query bytes/track_activity_query_size；主持锁连接本身作观察，不新增连接或修改PG配置。三个应用源码仍不变，首轮不机械重跑，固定新测试SHA申请同三IDs的新窗口，补齐六场景后再进入锁后时钟修复。
+
+ROOT 新分配 B037-R01-OBSERVER-REPAIRED-THREE-RED-002；固定 `029c050dfd65c643ccc2beb6a385a56e119a2492` 同三ID一次执行，六个subcases均在状态快照断言实际失败，0errors/0skips、complete、runner exit1。六条对应table的Lock等待与blocker均实际匹配：consume worker66/68→blocker64、success71/73→69、terminal76/78→74。article查询文本1023bytes、run643bytes、跟踪上限1kB，证实旧观察谓词缺陷，不修改PG配置。业务1.345秒、worker36.71秒、whole47.26秒；finally容器=[]、runner退出、FD锁释放，owner8093/runner8135。runtime `/Users/mentianlu/.codex/runtime/b037-r01-observer-repaired-three-red-002/red-receipt.json` SHA `ce9b19ec1b0efca6a7aea189c3bc2a8d6c4aadc21ef0c43f584b4a635b22dc3b` 保存准确3ID/6目标失败/6锁观察及原日志/隔离/清理；首轮部分证据不覆盖。
+
+得到全部有效RED后，仅把 `_locked_translation_claim` 最终deadline判断从锁前now改为取得article/run两锁后的 `timezone.now()`，保持可注入执行时钟及 `>= deadline` 精确边界。没有修改deadline、field/metadata保存规则、重试/预算、ordinary/force、通知/派发或其他两个服务文件；未运行GREEN。
+
+申请下一精确诊断47IDs：新三例+原本片22+既有recovery22，一个官方django runner，max3PG连接（原单消费并发需主连接+两worker；新锁等待仍两连接），沿既有单容器资源/600秒含30清理。原M01 mock19不再次执行：其服务/测试、settings与legacy provider factory字节均未变化，且不调用本锁后deadline helper，保留先前63PASS中的对应证据；正式full仍ROOT/C安排。固定新SHA后等待ROOT明确GREEN窗口，不沿用已释放RED资源，不把旧63PASS当此修复已通过。
 
 边界保持已审方案：普通/force兼容、指定受管run、外部调用无事务、article+确切run同库原子终态、同轮fence与提交后终态snapshot通知。累计费用预算/SDK跨轮边界、响应恢复、可靠outbox仍是完整M02缺口，不扩大本片。只使用已分配现有镜像的临时隔离测试容器/PG，无生产或真实业务DB/Redis、模型调用、外发、QQ/后台扩张、push/PR/合并/发布或新资源构建。

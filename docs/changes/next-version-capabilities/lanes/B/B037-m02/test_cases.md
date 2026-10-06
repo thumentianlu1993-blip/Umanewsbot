@@ -64,6 +64,10 @@ TransactionTestCase 使 on_commit 真实退出最外层事务后执行；邮件�
 
 首轮固定5b703193一次运行：三run锁subcases为有效状态差异RED，三article锁subcases因观察器要求可能截断query的FOR UPDATE尾部而未匹配，不计目标RED。新测试只把观察谓词改为实际Lock+对应表+pg_blocking_pids包含持锁owner，记录query长度/跟踪上限，仍两PG连接；不改应用逻辑、不提高PG配置或改官方控制。准确三canonical IDs不变，六subcases均须得到业务失败后再修实现；旧63PASS证据不覆盖本缺口。
 
+ROOT新窗口下，029c050d同三IDs一次实际RED得到六个目标业务失败，0errors/0skips；每个consume/success/terminal的article/run锁都以实际blocker匹配后推进时钟，证据在 `/Users/mentianlu/.codex/runtime/b037-r01-observer-repaired-three-red-002`。随后只修锁后执行时钟判断，精确截止保持不变。
+
+修复后申请准确47项GREEN/受影响回归：本模块25（原22+新3）+既有recovery22；保留原M01 mock19的未受影响63PASS证据，其源码/测试/settings/factory均未变且不调用锁后deadline helper，避免重复无关回归。max3PG连接，仍一个官方django batch，候选固定及ROOT窗口到达后才执行。当前仅AST与diff检查，尚无本修复GREEN或原R复审结论。
+
 非法值、空值、旧 preclaimed 消息均 fail closed；普通首次翻译/force/manual 保留现有行为与人工字段保护。无 models/settings/migration变化。无新权限或对外发送开关。deadline只约束准入/回写，跨轮费用预算与outbox不在本片，按方案保留真实缺口。
 
 PG并发后续两独立连接在消费点同步，证实只有一位消费成功及统一 article→run 锁顺序，事务不包provider；无需多容器。禁止以顺序测试替代该项。

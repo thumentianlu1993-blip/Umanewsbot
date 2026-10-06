@@ -349,7 +349,8 @@ def _locked_translation_claim(
         return article, run, "claim_changed"
     if article.translation_status != ArticleTranslationStatus.TRANSLATING or article.translation_started_at != started:
         return article, run, "claim_changed"
-    if check_deadline and now >= deadline:
+    # 行锁等待会使锁前 now 失效；两锁到手后读取可注入的执行时钟，截止不续期。
+    if check_deadline and timezone.now() >= deadline:
         return article, run, "claim_expired"
     if check_input and translation_input_sha256(article) != claim.get("input_sha256"):
         return article, run, "input_changed"
