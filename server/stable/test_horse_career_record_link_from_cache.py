@@ -254,7 +254,9 @@ class CareerRecordLinkFromCacheTests(TransactionTestCase):
             (self.binding, {'identity_evidence_sha256': '0' * 64}),
             (self.enrollment, {'state': 'paused'}),
             (self.enrollment, {'retired_at': NOW}),
-            (self.event, {'edition_year': 2026}),
+            (self.event, {'edition_year': 2026, 'source_refs': {'cross_year_evidence': {
+                'actual_year': 2025, 'reason': 'a034_synthetic_negative_cross_year',
+                'authority_url': 'https://example.test/a034/synthetic-cross-year', 'approved': True}}}),
             (self.event, {'local_date': date(2025, 12, 8)}),
             (self.profile, {'manual_lock_flags': {models.HorseProfileModule.RACE_RECORD: True}}),
             (self.profile, {'review_status': models.HorseProfileStatus.PUBLISHED}),
@@ -263,7 +265,15 @@ class CareerRecordLinkFromCacheTests(TransactionTestCase):
         ]
         for target, changes in cases:
             with self.subTest(model=type(target).__name__, changes=changes), transaction.atomic():
-                type(target).objects.filter(pk=target.pk).update(**changes)
+                if isinstance(target, models.RaceEvent):
+                    # Respect the existing centralized year/path contract; the
+                    # cross-year evidence above is synthetic negative setup only.
+                    current = models.RaceEvent.objects.get(pk=target.pk)
+                    for field, value in changes.items():
+                        setattr(current, field, deepcopy(value))
+                    current.save(update_fields=[*changes, 'updated_at'])
+                else:
+                    type(target).objects.filter(pk=target.pk).update(**changes)
                 # Original valid-cache as_of cannot bypass the service's live contract time.
                 self.assert_blocked_zero_write(self.request())
                 transaction.set_rollback(True)

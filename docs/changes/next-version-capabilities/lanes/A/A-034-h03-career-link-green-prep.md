@@ -33,3 +33,12 @@ AST语法通过；原函数完整 keyword 签名与 RED 相同；自动从共享
 静态确认 `_parse_date_precision` 返回 `parsed.isoformat()`，`_normalize_race_record`保留ISO字符串；模型DateField/readback为date。新入口此前直接事实比较会把有效日期误拒。技术修正仅在新入口确认exact后 `date.fromisoformat(normalized['race_date'])`，不改原bytes/行摘要/共享normalizer/writer，也不改原RED测试/fixture或任何断言。用原 `_record_contract` 的无DB类型诊断可复现字符串导致record_fact_conflict、typed date通过；这仅静态类型衔接诊断，不是五例GREEN证据。原traceback没有输出blocked reason，不能把定位说成原log已记录的唯一原因。
 
 本轮不重跑、不扩大范围；固定修正候选后交ROOT申请同五ID新窗口，剩余实现行为仍待实测。最新额度14%已用/86%剩余。
+
+
+## 日期修正后四组通过，安全反例准备修正
+
+`A034-DATE-REPAIR-FIVE-GREEN-001` 固定49e28af4/treeb0d616da，原五ID一次。实际0 failures/2 errors/0 skips：实际补连/字段保护、原baseline重投、写后六类故障/issue/expiry回滚、PG两请求锁等待四完整方法通过。安全方法的两项 RaceEvent反例在准备阶段用QuerySet.update写edition_year/local_date，被现有模型集中身份门禁 ValidationError 拒绝；未到其H03 blocked断言，因此仍非五组GREEN。原log确有 A034_PG_LOCK_EVIDENCE first_pid70/second_pid72/Lock/blocking_pids[70]。worker40.920秒/总窗51.811秒；owner30060/runner30094及进程组gone、flock可重取、Docker0、12源码hash未变。runtime `/Users/mentianlu/.codex/runtime/a034-date-repair-five-green-001`，green-receipt SHA `6b2504a8b030cc07989cdfac28b445ad66b68c906b1ea0510bbc704135695c7a`，13原证据封存；未重跑/扩大。
+
+必要测试技术修正只改该安全方法的准备：RaceEvent取新实例、setattr、save(update_fields)，遵守原validate_event_years/路径集中合同；跨届反例提供现有schema合法的**合成负向跨届证据**（actual_year/原因/HTTPS example.test/approved=True），使模型允许保存，再要求首片仍blocked。这不是现实批准、离线权限或正向source/binding许可，不绕过或mock模型验证；日期错位也同样经save。反例目标和H03拒绝/全状态零写断言保留。原指定RED正向方法、其余所有方法和fixture字节语义不变，service保持49e修正字节原样；共享模型/其他lane未改。
+
+修正后仅静态/原RED方法AST对比/工作流契约/4文档测试/diff检查，业务执行为零。固定修正候选交ROOT申请原同五ID新窗口；局部回归清单仍等五GREEN后提出，不自行执行。
