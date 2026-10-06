@@ -38,3 +38,7 @@ C041真实RED已完整得到2文案失败/3保护通过、0errors/skips，原五
 | stable.test_public_navigation_and_attribution.PublicNavigationAndAttributionTests.test_unified_feed_page_two_works_without_region | 原统一首页无region真实第二页 |
 
 10ID逐AST定位class/method/line与文件hash；旧回归模块和整份tests_legacy.py不改。GREEN未获PG分配，静态准备不是测试通过。正式delivery/full分母不由此诊断申请变更；独立review和合成桌面/手机可见验收由ROOT后续安排。
+
+## 实际执行结果
+
+C041-FIVE-RED-PG-WINDOW-001：固定RED a59fed26，精确5 executed、2目标文案业务失败/3保护通过，0errors/skips、complete/exit1。C041-TEN-GREEN-PG-WINDOW-001：固定GREEN `80d0d0c1714520ddec822366dcf27c676a2b5706`，上表原5+既有5共10 executed/PASS、0failures/errors/skips/xfail/xpass、complete/exit0，各窗口仅一次。测试/fixture/断言字节全程保持，不以mock替换真实公开读取或导航；原始日志/结果及隔离清理证据见同目录report的runtime引用。最终只回写文档，应用与测试字节仍等于已测候选；原R复审及独立可见验收尚待进行。

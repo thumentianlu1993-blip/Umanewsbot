@@ -21,7 +21,7 @@ diagnostic-plan仅开发RED精确五方法，非formal collector/catalog/full/G2
 
 固定RED候选SHA/tree、五ID映射、源/控制保护hash、AST和plan/file/semantic digests写入 /Users/mentianlu/.codex/runtime/c041-home-empty-red-prep-001。ROOT分配前停在静态准备。没有push/PR/merge/main或生产/付费/外发；PR242已由ROOT可信核验VERIFIED但未合并/部署，本片不借其业务结果作RED证据。额度最近19%used/81%remain，后续每5分钟复核，按既有停止规则执行。
 
-## C041-HOME-EMPTY-GREEN-PREP-001 当前状态
+## C041-HOME-EMPTY-GREEN-PREP-001 候选准备时状态（历史）
 
 ROOT已核C041-FIVE-RED-PG-WINDOW-001的29原始seals、actual五ID、2业务文案RED/3保护PASS、0errors/skips与完整exit1；wrapper89414/runner89433gone、Docker空和窗口释放。固定RED候选 `a59fed26e8c23a73e6859d66436fb28eb667ce4e` / tree `2590673d39d38de39cc8a31028636de2b11351ea`，真实日志和回执位于 /Users/mentianlu/.codex/runtime/c041-home-empty-red-prep-001/red-window-001。worker36.964s、总48.466s，实际PG客户端采样max1；两项仅在新文案assertContains处失败，详情/真实下一页前置链已先通过。
 
@@ -31,3 +31,15 @@ ROOT已核C041-FIVE-RED-PG-WINDOW-001的29原始seals、actual五ID、2业务文
 - (operations) 申请：C041-TEN-GREEN-PG-WINDOW-001，五原新增+原C040获审五旧回归，各完整ID一次单batch django。申请沿原固定fcf8镜像/12controls/1容器2CPU4GiB256PID3GiBtmpfs/networknone/ROroot-source-control/nonroot/ALL-capdrop/NNP/PG至多3客户端、600s含30清理/570外止。专用配置/TMPDIR与FD owner/心跳/finally自有清理不变。当前未获分配、不先启动资源；A037可见产物准备也排队。
 
 GREEN候选SHA/tree、10ID AST映射、固定模板diff、测试及源/控制保护hash与window proposal写入 /Users/mentianlu/.codex/runtime/c041-home-empty-green-prep-001。候选不是已测GREEN、原Rreview或可见演示；ROOT核GREEN后原R复审，再在独立授权合成演示中验收，不写旧C027库。没有push/PR/merge/main/生产/真实网络/付费/外发。人工门禁唯一来源仍为根AGENTS.md。
+
+## C041-TEN-GREEN-PG-WINDOW-001 当前已测状态
+
+ROOT核8seals、27保护源与唯一模板diff后授予唯一隔离PG窗口。固定已测GREEN `80d0d0c1714520ddec822366dcf27c676a2b5706` / tree `71bd5340b47a4fdaa119583f51beba167d649d82`；一次官方c041-green-ten单batch精确10完整方法，实际10PASS、0failures/errors/skips/expected_failures/unexpected_successes，lifecycle complete、官方exit0。五原新增及C040获审五旧回归全部执行，详情返回/真实分页/来源隐藏保护通过。
+
+计划file SHA `c928fc2f11973311e674d8005e02eb6df4d609f49975132b94ff31ad68ad50c7` / semantic `10becca1e96ab566aa7c78212f9de6d81ad0e8b841fc7915102529acefb20eed` 与实际一致。worker35.968s、总46.346s；所有隔离/inspect约束通过、PG客户端采样max1。wrapper93141/runner93171实际gone、Docker空、自有容器清理与FD锁释放/reacquire验证完成。
+
+- (application) 已完成：唯一模板分支实现、真实RED→同例GREEN与五旧回归、27源/控制和12导出controls字节保护复核。
+- (application) 本次仅文档回写：两份C041文档记录真实结果，最终commit SHA/tree由runtime handoff.json绑定；最终应用/测试文件与已测GREEN字节一致。
+- (application) 仍待进行：ROOT核收据后原R代码review，再安排独立合成桌面/手机可见验收；未宣称review通过、演示完成、合并或发布。
+
+原始结果与日志、green-receipt/report/handoff及evidence-index位于 /Users/mentianlu/.codex/runtime/c041-home-empty-green-prep-001/green-window-001。此为局部开发GREEN，不替代formal/core/full/G2；未追加窗口、重跑RED、collector/build/pull或整类，未改其他树、旧C027演示库、生产、抓取、付费、外发、main。测试资源已交回ROOT。
