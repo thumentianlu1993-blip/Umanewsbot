@@ -1,4 +1,4 @@
-# A034：已有赛绩补连实现准备，待五例 GREEN 窗口
+# A034：已有赛绩补连局部验证与代码审核交接
 
 任务 `A034-GREEN-IMPLEMENT-PREP-001`。ROOT 已核固定 RED `af6109eae75dd144d81f6d0c2d949a0eca40d132` 的唯一首例为有效业务失败（真实 fixture 前置成功，record.event_id None!=1，1 failure/0 error/0 skip）；其余四组未执行，不称其已取得 RED。完整测试设计见 [A034 test_cases](A-034-h03-career-link-test_cases.md)，方案基于已审 `44f79a62`。当前指令覆盖本地实现与静态准备；没有 PG 窗口、测试运行或生产授权，G2/G3 未触发。
 
@@ -53,3 +53,12 @@ worker40.159秒/总窗50.607秒，原官方镜像/八controls/资源限制实证
 提出**23个已有精确方法**回归（5 A032 identity/date、3 H01、4 H02、4 HKJC adapter、5共享career writer/counters、2既有policy/binding），完整ID与每项理由封存在 `/Users/mentianlu/.codex/runtime/a034-five-green-handoff/regression-proposal.json`。均静态核存在于直接类定义，仅方法选取不展开继承/全模块；原五例已在同业务树取得有效Linux证据，无变化不建议机械重跑。正式catalog/core要求由ROOT/C保留，本清单不替代，不改catalog，不把unknown转空/全量。本轮仅提出和申请同边界新窗口，未执行回归。若ROOT要求正式core或不同清单，应以新精确allocation绑定执行。
 
 本 A报告回写为docs-only；service、原测试/fixture及controls与实测04226d2c字节完全一致，局部GREEN不因docs-only状态说明被改写成其他受测SHA。下一步ROOT核证/回归分配/独立review；A无资源占用、不自行发布。最新额度14%已用/86%剩余。
+
+
+## 23精确回归通过，交 ROOT→原 R 代码审核
+
+`A034-EXACT23-REGRESSION-PG-WINDOW-001` 固定5db7dccc/tree44f90056，批准proposal SHA `98586a1d348b473a2e1a0993552dcf71436e11d59387268b8f30ff4ee71a7cd8`的23既有方法实际全部执行：23/23 PASS、0 failure/error/skip/意外成功，lifecycle complete/exit0；Django执行顺序有重排，集合/数量完全相符、无额外ID，无五GREEN重复或继承整类展开。worker41.492秒/总窗51.737秒，1原固定官方隔离容器，owner36150/runner36207及进程组gone、flock可重取、Docker0，26唯一源码/control/回归输入hash及固定Git bytes不变。runtime `/Users/mentianlu/.codex/runtime/a034-exact23-regression-pg-window-001`，regression-receipt SHA `45e1081c7cd9b051068415a6cfb0a20613e0a21c280d611504e6e0c03f6c3ef2`，11原证据hash封存；plan SHA `7a45bbb49827c7e8ef0b783311cc6e11a7bda33e376218c3b2732bc37c717f00`。
+
+实际局部证据是五新入口方法（04226d2c）+23既有回归方法（其docs-only子提交5db7dccc），二者业务源码/test/fixture/controls相同；原单例有效RED af6109ea保留，之前失败窗口不抹去。现有binding权限与真实输入缺强字段的blocked边界不变。局部28方法通过不代formal core/catalog/full，不代独立review、真实来源业务验收或生产部署。没有继续扩大回归、其他片实现、push/PR/merge/生产/网络/付费动作。
+
+本次仅A报告docs-only回写，service/test/fixture/共享及8controls与两次实测树逐bytes相同；固定审核head交ROOT转派原R，建议审核A034整体base44f79a62→最终head的唯一新service/独立tests/fixture/A文档，并重点核身份/合同、投影保护、replay及事务/liveclock/PG局部锁边界。审核前不标review完成；actionable技术finding在原R上下文修复复审，不把独立review当发布授权。A停止在待原R代码审核，资源窗口全部实际释放，额度14%已用86%剩余。
