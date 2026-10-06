@@ -4,7 +4,13 @@ import json
 import inspect
 import math
 import re
+import os
+from contextlib import contextmanager
+from contextvars import ContextVar
+from threading import Event, get_ident
+from types import SimpleNamespace
 from dataclasses import dataclass
+from datetime import datetime
 
 from django.conf import settings
 from openai import OpenAI
@@ -29,6 +35,170 @@ from .terms import (
     serialize_recognized_horse_names,
     serialize_terms,
 )
+
+
+# B043接口前置：没有reserve/record_usage/预算拒绝收口实现。
+_offline_sdk_binding = ContextVar("_offline_sdk_binding", default=None)
+
+
+def _offline_error(reason):
+    from .translation_recovery import OfflineBudgetScopeError
+    return OfflineBudgetScopeError(reason)
+
+
+class _ClosedOfflineSDKResponse:
+    def __init__(self, client, content, usage, finish_reason, wait_for_receipt=False):
+        self._client = client
+        self._content = content
+        self.usage = usage
+        self._finish_reason = finish_reason
+        self._wait_for_receipt = wait_for_receipt
+
+    @property
+    def choices(self):
+        self._client._observe("choices")
+        if self._wait_for_receipt:
+            self._client.choices_ready.set()
+            if not self._client.choices_release.wait(8):
+                raise _offline_error("offline_fake_gate_timeout")
+        return [SimpleNamespace(message=SimpleNamespace(content=self._content),
+                                finish_reason=self._finish_reason)]
+
+
+class _ClosedOfflineSDKClient:
+    """有限纯数据脚本；无网络、动态导入、工厂或任意callback。"""
+    def __init__(self, script: list[dict], *, budget_pk: int):
+        from .translation_retry_budget import _json_snapshot
+        if type(script) is not list or not 1 <= len(script) <= 16 or type(budget_pk) is not int or budget_pk < 1:
+            raise _offline_error("offline_sdk_dependency_invalid")
+        copied, _ = _json_snapshot({"script": script})
+        self._script = copied["script"]
+        for item in self._script:
+            if type(item) is not dict or set(item) - {"content", "usage", "finish_reason", "wait_for_receipt", "error"}:
+                raise _offline_error("offline_sdk_dependency_invalid")
+            if type(item.get("content", "")) is not str or type(item.get("finish_reason", "stop")) is not str:
+                raise _offline_error("offline_sdk_dependency_invalid")
+            if type(item.get("wait_for_receipt", False)) is not bool:
+                raise _offline_error("offline_sdk_dependency_invalid")
+            if item.get("error") not in (None, "timeout", "exit"):
+                raise _offline_error("offline_sdk_dependency_invalid")
+        self._budget_pk = budget_pk
+        self._scope_nonce = None
+        self._owner = None
+        self._closed = False
+        self._index = 0
+        self.trace = []
+        self.choices_ready, self.choices_release = Event(), Event()
+
+    @property
+    def chat(self):
+        return self
+
+    @property
+    def completions(self):
+        return self
+
+    def _observe(self, event):
+        # SDK外部边界只读快照；不判断许可、不建/改账，不在fake内抛业务断言。
+        from django.db import connection
+        from stable.models import TranslationRetryBudget, TranslationRequestAttempt
+        root = TranslationRetryBudget.objects.get(pk=self._budget_pk)
+        rows = list(TranslationRequestAttempt.objects.filter(budget_id=self._budget_pk)
+                    .order_by("seq").values("seq", "state", "usage_report", "provider_attempt_index")[:16])
+        if len(self.trace) >= 32:
+            raise _offline_error("offline_fake_trace_exhausted")
+        self.trace.append({"event": event, "requests_reserved": root.requests_reserved,
+                           "attempts": rows, "in_atomic_block": connection.in_atomic_block})
+
+    def create(self, **kwargs):
+        _require_offline_sdk_dependency(self._scope_nonce)
+        from .translation_retry_budget import _json_snapshot
+        captured, _ = _json_snapshot({"messages": kwargs.get("messages")})
+        if self._index >= len(self._script):
+            raise _offline_error("offline_fake_script_exhausted")
+        self._observe("create")
+        self.trace[-1]["messages"] = captured["messages"]
+        item = self._script[self._index]
+        self._index += 1
+        if item.get("error") == "timeout":
+            raise TimeoutError("synthetic offline SDK timeout")
+        if item.get("error") == "exit":
+            raise SystemExit("synthetic offline SDK exit")
+        return _ClosedOfflineSDKResponse(self, item.get("content", ""), item.get("usage"),
+                                         item.get("finish_reason", "stop"), item.get("wait_for_receipt", False))
+
+
+@contextmanager
+def _offline_sdk_dependency(client):
+    from .translation_recovery import _current_offline_budget_binding
+    binding = _current_offline_budget_binding()
+    if binding is None:
+        raise _offline_error("offline_scope_missing")
+    if _offline_sdk_binding.get() is not None or type(client) is not _ClosedOfflineSDKClient:
+        raise _offline_error("offline_sdk_dependency_invalid")
+    if client._closed or client._scope_nonce is not None:
+        raise _offline_error("offline_sdk_dependency_closed")
+    client._scope_nonce = binding.scope_nonce
+    client._owner = (os.getpid(), get_ident())
+    token = _offline_sdk_binding.set(client)
+    try:
+        yield client
+    finally:
+        client._closed = True
+        _offline_sdk_binding.reset(token)
+
+
+def _require_offline_sdk_dependency(scope_nonce):
+    from .translation_recovery import _current_offline_budget_binding
+    binding = _current_offline_budget_binding()
+    if binding is None:
+        raise _offline_error("offline_scope_missing")
+    client = _offline_sdk_binding.get()
+    if client is None:
+        raise _offline_error("offline_sdk_dependency_missing")
+    if type(client) is not _ClosedOfflineSDKClient:
+        raise _offline_error("offline_sdk_dependency_invalid")
+    if client._closed:
+        raise _offline_error("offline_sdk_dependency_closed")
+    if (scope_nonce != binding.scope_nonce or client._scope_nonce != scope_nonce
+            or client._owner != (os.getpid(), get_ident())):
+        raise _offline_error("offline_scope_mismatch")
+    return client
+
+
+def _validate_offline_provider_binding(article, managed_run):
+    """仅验证构造依赖/真实绑定；不检查余额或预留/usage/终态。"""
+    from django.utils import timezone
+    from stable.models import TranslationRetryBudget
+    from . import translation_retry_budget as core
+    from .translation_recovery import (CLAIM_KEY, _current_offline_budget_binding,
+                                       translation_input_sha256)
+    binding = _current_offline_budget_binding()
+    refusal = core._preflight(binding.mode, binding.identity, timezone.now())
+    if refusal:
+        raise _offline_error(refusal.reason)
+    identity = binding.identity
+    if (article is None or managed_run is None or identity.operation_uuid is None
+            or (article.source_site, article.source_article_id) != (identity.source_site, identity.source_article_id)
+            or article.pk != identity.article_pk_snapshot or managed_run.article_id != article.pk
+            or managed_run.status != "started"):
+        raise _offline_error("offline_scope_mismatch")
+    claim = managed_run.raw_response.get(CLAIM_KEY, {})
+    if (claim.get("phase") != "executing" or article.translation_started_at is None
+            or claim.get("claimed_at") != article.translation_started_at.isoformat()
+            or claim.get("input_sha256") != translation_input_sha256(article)
+            or identity.source_sha256 != translation_input_sha256(article)):
+        raise _offline_error("offline_scope_mismatch")
+    root = TranslationRetryBudget.objects.filter(operation_uuid=identity.operation_uuid).first()
+    if root is None:
+        raise _offline_error("budget_missing")
+    reason = core._identity_reason(root, identity)
+    if reason:
+        raise _offline_error(reason)
+    client = _require_offline_sdk_dependency(binding.scope_nonce)
+    if client._budget_pk != root.pk:
+        raise _offline_error("offline_scope_mismatch")
+    return client
 
 
 @dataclass
@@ -301,8 +471,24 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
     _CANONICAL_PLACEHOLDER_PREFIXES = ("UMAKEEP", "UMATERM", "UMAFORMAT", "UMASEED")
     _PLACEHOLDER_TOKEN_CHAR_RE = re.compile(r"[A-Za-z0-9_./ \t-]")
 
-    def __init__(self, *, api_key: str, base_url: str, provider_name: str | None = None) -> None:
+    def __init__(self, *, api_key: str, base_url: str, provider_name: str | None = None,
+                 offline_client: _ClosedOfflineSDKClient | None = None) -> None:
+        from .translation_recovery import _current_offline_budget_binding
+        binding = _current_offline_budget_binding()
         self.name = provider_name or self.name
+        if binding is not None:
+            from .translation_retry_budget import _preflight
+            from django.utils import timezone
+            refusal = _preflight(binding.mode, binding.identity, timezone.now())
+            if refusal:
+                raise _offline_error(refusal.reason)
+            if offline_client is not _require_offline_sdk_dependency(binding.scope_nonce):
+                raise _offline_error("offline_sdk_dependency_invalid")
+            self.client = offline_client
+            self._offline_request_index = 0
+            return
+        if offline_client is not None or _offline_sdk_binding.get() is not None:
+            raise _offline_error("offline_scope_missing")
         kwargs = {
             "api_key": api_key,
             "base_url": base_url.strip(),
@@ -372,7 +558,28 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
         ]
 
     def _request_completion(self, messages: list[dict]):
-        return self.client.chat.completions.create(
+        from .translation_recovery import (_current_offline_budget_binding, _reserve_managed_translation_request,
+            ManagedTranslationBudgetBlocked, ManagedTranslationAuditFailure)
+        binding = _current_offline_budget_binding()
+        decision = None
+        if binding is not None:
+            from django.db import connection
+            from django.utils import timezone
+            from . import translation_retry_budget as core
+            _require_offline_sdk_dependency(binding.scope_nonce)
+            if not hasattr(self, "_offline_run_id"):
+                raise ManagedTranslationBudgetBlocked("bound_claim_identity_missing")
+            self._offline_request_index += 1
+            decision = _reserve_managed_translation_request(
+                self._offline_article_id, self._offline_run_id, self._offline_claimed_at,
+                self._offline_request_index, now=timezone.now())
+            if not decision.allowed:
+                raise ManagedTranslationBudgetBlocked(decision.reason, decision.budget_pk, decision.attempt_pk)
+            if connection.in_atomic_block:
+                raise ManagedTranslationBudgetBlocked("outer_transaction_forbidden", decision.budget_pk, decision.attempt_pk)
+            if timezone.now() >= self._offline_deadline:
+                raise ManagedTranslationBudgetBlocked("claim_expired", decision.budget_pk, decision.attempt_pk)
+        response = self.client.chat.completions.create(
             model=settings.TRANSLATION_MODEL,
             temperature=0,
             response_format={"type": "json_object"},
@@ -380,6 +587,19 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             max_tokens=settings.TRANSLATION_MAX_TOKENS,
             timeout=settings.TRANSLATION_TIMEOUT_SECONDS,
         )
+
+        if binding is not None:
+            from django.db import DatabaseError
+            # 一拿到response就原样审计；不能让choices/JSON/质量失败跳过这个提交。
+            try:
+                report = self._usage_to_dict(getattr(response, "usage", None))
+                audit = core.record_usage(budget_pk=decision.budget_pk, attempt_pk=decision.attempt_pk,
+                                          mode=binding.mode, usage_report=report)
+                if audit.reason not in {"usage_unknown", "cost_unreconciled", "offline_usage_reconciled", "usage_already_recorded"}:
+                    raise ManagedTranslationAuditFailure("usage", decision.budget_pk, decision.attempt_pk)
+            except DatabaseError as exc:
+                raise ManagedTranslationAuditFailure("usage", decision.budget_pk, decision.attempt_pk) from exc
+        return response
 
     @staticmethod
     def _count_sentences(text: str) -> int:
@@ -1056,7 +1276,23 @@ class SiliconFlowTranslationProvider(OpenAICompatibleTranslationProvider):
         )
 
 
-def get_translation_provider() -> TranslationProvider:
+def get_translation_provider(*, article=None, managed_run=None) -> TranslationProvider:
+    from .translation_recovery import _current_offline_budget_binding
+    if _current_offline_budget_binding() is not None:
+        from django.db import DatabaseError
+        from .translation_recovery import ManagedTranslationAuditFailure
+        try:
+            client = _validate_offline_provider_binding(article, managed_run)
+        except DatabaseError as exc:
+            raise ManagedTranslationAuditFailure("reserve") from exc
+        provider = OpenAICompatibleTranslationProvider(api_key="", base_url="",
+                                                       provider_name="offline-synthetic", offline_client=client)
+        provider._offline_article_id, provider._offline_run_id = article.pk, managed_run.pk
+        provider._offline_claimed_at = managed_run.raw_response["recovery_claim_v1"]["claimed_at"]
+        provider._offline_deadline = datetime.fromisoformat(managed_run.raw_response["recovery_claim_v1"]["deadline_at"])
+        return provider
+    if _offline_sdk_binding.get() is not None:
+        raise _offline_error("offline_scope_missing")
     if settings.TRANSLATION_PROVIDER == "siliconflow" and settings.SILICONFLOW_API_KEY:
         return SiliconFlowTranslationProvider()
     if settings.TRANSLATION_PROVIDER in {"openai", "openai-compatible"} and settings.OPENAI_API_KEY:
@@ -1068,7 +1304,11 @@ def get_translation_provider() -> TranslationProvider:
 
 
 def translate_article(article: NewsArticle, *, managed_run: TranslationRun | None = None) -> TranslationResult:
-    provider = get_translation_provider()
+    from .translation_recovery import _current_offline_budget_binding
+    if _current_offline_budget_binding() is not None:
+        provider = get_translation_provider(article=article, managed_run=managed_run)
+    else:
+        provider = get_translation_provider()
     source_text = article.body_ja_normalized or article.body_ja_raw
     resolution = resolve_article_entities_for_article(article)
     terms = _translation_terms(resolution)

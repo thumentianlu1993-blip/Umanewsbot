@@ -1,0 +1,69 @@
+{
+  "schema_version": "h03-prepare-input.v1",
+  "source_file": "cache.json",
+  "cache_ref": "cache:a036",
+  "source_ref": "fixture:a036-hkjc",
+  "snapshot": {
+    "schema_version": 1,
+    "as_of": "2026-10-03",
+    "snapshot_at": "2026-10-03T00:00:00+00:00",
+    "input_complete": true,
+    "policy_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "jg1_scope": "unresolved",
+    "events": [
+      {
+        "key": "e1",
+        "region": "hong_kong",
+        "local_date": "2026-10-03",
+        "date_precision": "exact",
+        "grade": "G1",
+        "grade_verified": true,
+        "hk_local_g1": false,
+        "current_racecard": null,
+        "current_result": null,
+        "known_roster_count": 1
+      }
+    ],
+    "participations": [
+      {
+        "ref": "r1",
+        "event_key": "e1",
+        "participant_key": "p1",
+        "horse_key": "hkjc:HK-001",
+        "revision_ref": null,
+        "kind": "legacy",
+        "status": "finished",
+        "start_evidence": true,
+        "birth_year": 2020
+      }
+    ],
+    "identities": [
+      {
+        "horse_key": "hkjc:HK-001",
+        "profile_id": 1,
+        "status": "verified",
+        "evidence_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "verified_at": "2026-10-02T00:00:00+00:00"
+      }
+    ],
+    "layers": [
+      {
+        "target_key": "profile:1",
+        "cache": "present",
+        "staging": "matched",
+        "profile_exists": true,
+        "public_state": "unpublished",
+        "starts": 0,
+        "incomplete_modules": 1
+      }
+    ],
+    "news": [],
+    "seasons": []
+  },
+  "entity_versions": {
+    "profile:1": "a036-v1"
+  },
+  "as_of": "2026-10-03T01:00:00+00:00",
+  "max_age_seconds": 6656400,
+  "profile_baseline": "2026-10-02T00:00:00+00:00"
+}

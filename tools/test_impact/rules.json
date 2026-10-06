@@ -975,7 +975,9 @@
     "server/stable/services/horse_basic_profile_from_cache.py",
     "server/stable/services/horse_career_record_link_from_cache.py",
     "server/stable/management/commands/horse_basic_profile_from_cache.py",
-    "server/stable/services/translation_retry_budget.py"
+    "server/stable/services/translation_retry_budget.py",
+    "server/stable/management/commands/horse_basic_profile_from_review.py",
+    "server/stable/services/horse_basic_profile_prepare_input.py"
   ],
   "paths": {
     "docs/changes/next-version-capabilities/lanes/C/U01-offline-cases.json": [
@@ -1338,13 +1340,56 @@
       "horse_career_link_cache"
     ],
     "server/stable/management/commands/horse_basic_profile_from_cache.py": [
-      "horse_basic_profile_prepare_command"
+      "horse_basic_profile_prepare_command",
+      "horse_basic_profile_review_input"
     ],
     "server/stable/fixtures/h03_prepare_command/hkjc_synthetic.json": [
       "horse_basic_profile_prepare_command"
     ],
     "server/stable/services/translation_retry_budget.py": [
       "news_translation"
+    ],
+    "server/stable/fixtures/h03_review_consumer/cache.json": [
+      "horse_basic_profile_review_input"
+    ],
+    "server/stable/fixtures/h03_review_consumer/combined_candidates.jsonl": [
+      "horse_basic_profile_review_input"
+    ],
+    "server/stable/fixtures/h03_review_consumer/frozen_sha256.json": [
+      "horse_basic_profile_review_input"
+    ],
+    "server/stable/fixtures/h03_review_consumer/manifest.json": [
+      "horse_basic_profile_review_input"
+    ],
+    "server/stable/fixtures/h03_review_consumer/packet.json": [
+      "horse_basic_profile_review_input"
+    ],
+    "server/stable/fixtures/h03_review_consumer/synthetic_decision.json": [
+      "horse_basic_profile_review_input"
+    ],
+    "server/stable/fixtures/h03_reviewed_input/cache.json": [
+      "horse_basic_profile_review_input"
+    ],
+    "server/stable/fixtures/h03_reviewed_input/combined_candidates.jsonl": [
+      "horse_basic_profile_review_input"
+    ],
+    "server/stable/fixtures/h03_reviewed_input/frozen_sha256.json": [
+      "horse_basic_profile_review_input"
+    ],
+    "server/stable/fixtures/h03_reviewed_input/manifest.json": [
+      "horse_basic_profile_review_input"
+    ],
+    "server/stable/fixtures/h03_reviewed_input/packet.json": [
+      "horse_basic_profile_review_input"
+    ],
+    "server/stable/fixtures/h03_reviewed_input/prefrozen-reviewed-input.json": [
+      "horse_basic_profile_review_input"
+    ],
+    "server/stable/management/commands/horse_basic_profile_from_review.py": [
+      "horse_basic_profile_review_input"
+    ],
+    "server/stable/services/horse_basic_profile_prepare_input.py": [
+      "horse_basic_profile_review_input"
     ]
   },
   "symbols": {

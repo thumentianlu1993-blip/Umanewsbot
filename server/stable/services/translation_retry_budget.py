@@ -116,16 +116,31 @@ def _json_snapshot(value):
     return json.loads(raw), hashlib.sha256(raw).hexdigest()
 
 
-def _preflight(mode, identity=None, now=None):
+def _validate_mode(mode):
     if type(mode) is not str or mode != "offline_test":
         return _decision("supported_mode_missing")
-    if connection.in_atomic_block:
-        return _decision("outer_transaction_forbidden")
+    return None
+
+
+def _validate_identity_clock(identity=None, now=None):
     if identity is not None and not _identity_valid(identity):
         return _decision("invalid_identity")
     if identity is not None and not _aware(now):
         return _decision("invalid_clock")
     return None
+
+
+def _validate_call(mode, identity=None, now=None):
+    return _validate_mode(mode) or _validate_identity_clock(identity, now)
+
+
+def _reject_outer_atomic():
+    return _decision("outer_transaction_forbidden") if connection.in_atomic_block else None
+
+
+def _preflight(mode, identity=None, now=None):
+    # 保持原公开拒绝优先级：mode→outer→identity/clock。
+    return _validate_mode(mode) or _reject_outer_atomic() or _validate_identity_clock(identity, now)
 
 
 def _actual_now(now):
@@ -282,33 +297,44 @@ def reserve_request(identity: BudgetIdentity, *, mode: str, now: datetime,
         reason = _identity_reason(root, identity) or resolution_reason
         if reason:
             return _decision(reason, root)
-        existing = root.request_attempts.filter(claim_execution_uuid=claim_execution_uuid,
-                                               provider_attempt_index=provider_attempt_index).first()
-        if existing:
-            return _decision("request_already_reserved", root, existing)
-        actual = _actual_now(now)
-        reason = _admission(root, identity, actual)
-        if reason:
-            return _decision(reason, root)
-        if claimed_at < root.opened_at or claimed_at > actual:
-            return _decision("invalid_claim_identity", root)
-        actual = _actual_now(now)
-        if actual >= root.deadline_at:
-            return _decision("budget_deadline_expired", root)
-        next_seq = root.requests_reserved + 1
-        _write_locked(TranslationRetryBudget, root.pk, requests_reserved=next_seq)
-        attempt = TranslationRequestAttempt.objects.create(
-            budget=root, operation_uuid=root.operation_uuid, budget_uuid=root.budget_uuid,
-            claim_execution_uuid=claim_execution_uuid, article_pk_snapshot=identity.article_pk_snapshot,
-            run_pk_snapshot=run_pk_snapshot, claimed_at=claimed_at,
-            source_site_snapshot=root.source_site_snapshot,
-            source_article_id_snapshot=root.source_article_id_snapshot,
-            identity_sha256=root.identity_sha256, source_sha256=root.source_sha256,
-            seq=next_seq, provider_attempt_index=provider_attempt_index, reserved_at=actual,
+        attempt, reason = _reserve_locked(
+            root, identity, claim_execution_uuid=claim_execution_uuid, claimed_at=claimed_at,
+            provider_attempt_index=provider_attempt_index, run_pk_snapshot=run_pk_snapshot, now=now,
         )
-        decision = _decision("request_reserved", root, attempt, allowed=True)
-    # 返回 allowed 之前 reservation 必须已提交；网络能力不存在。
-    return decision
+    # 只有事务成功退出后才生成SDK可消费的提交许可。
+    return _decision(reason, root, attempt, allowed=reason == "request_reserved")
+
+
+def _reserve_locked(root, identity, *, claim_execution_uuid, claimed_at,
+                    provider_attempt_index, run_pk_snapshot, now, effective_deadline=None):
+    """已锁root；唯一预留实现，返回未提交row/reason，不是SDK许可。"""
+    existing = root.request_attempts.filter(claim_execution_uuid=claim_execution_uuid,
+                                           provider_attempt_index=provider_attempt_index).first()
+    if existing:
+        return existing, "request_already_reserved"
+    actual = _actual_now(now)
+    reason = _admission(root, identity, actual)
+    if reason:
+        return None, reason
+    if claimed_at < root.opened_at or claimed_at > actual:
+        return None, "invalid_claim_identity"
+    actual = _actual_now(now)
+    if actual >= root.deadline_at:
+        return None, "budget_deadline_expired"
+    if effective_deadline is not None and actual >= effective_deadline:
+        return None, "claim_expired"
+    next_seq = root.requests_reserved + 1
+    _write_locked(TranslationRetryBudget, root.pk, requests_reserved=next_seq)
+    attempt = TranslationRequestAttempt.objects.create(
+        budget=root, operation_uuid=root.operation_uuid, budget_uuid=root.budget_uuid,
+        claim_execution_uuid=claim_execution_uuid, article_pk_snapshot=identity.article_pk_snapshot,
+        run_pk_snapshot=run_pk_snapshot, claimed_at=claimed_at,
+        source_site_snapshot=root.source_site_snapshot,
+        source_article_id_snapshot=root.source_article_id_snapshot,
+        identity_sha256=root.identity_sha256, source_sha256=root.source_sha256,
+        seq=next_seq, provider_attempt_index=provider_attempt_index, reserved_at=actual,
+    )
+    return attempt, "request_reserved"
 
 
 def record_usage(*, budget_pk: int, attempt_pk: int, mode: str,
