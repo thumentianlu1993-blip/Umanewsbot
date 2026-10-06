@@ -16,3 +16,7 @@
 RED使用SimpleTestCase（不需要DB），socket连接强制拒绝。最小body blocks缺失断言与SL污染fallback断言先失败；GREEN后同例及现有代表模板逐字正文回归，停止。输出大小随原正文区块线性增长；只保存必要文本/路径/hash，不复制图片或整个网页入trace。并发/lease/事务/部署不涉及，本轮不以SQLite/mock冒称其正确。
 
 剩余：五地区真实启用模板覆盖、独立gold误删/污染率、模型审查、UI展示和生产验收未完成。F02真实样本缺口不能被这次fixture填充。
+
+## B035-R01修复：script/style文本证据边界
+
+根script/style不可进入removed.original_text（捕捉直接extract_article_text(root)复制源码mutation）；以空文本+实际节点HTML SHA/locator/reason追踪，计数仍2、正文仍Fact。嵌套nav中script/style仍不进文本，保留Menu的导航证据且计数1。原HTML字段不变；复验原10组、七fixture逐字基线。先新单例真实断言RED，再同例GREEN/全部12组；独立原R继续复审，不改catalog。

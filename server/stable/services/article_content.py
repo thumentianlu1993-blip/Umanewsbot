@@ -149,8 +149,14 @@ class _CleaningAudit:
 
     def remove(self, matches: list[Tag], reason: str) -> None:
         for match in matches:
-            original = extract_article_text(match)
-            self.noise.append(_block(self.source, self.paths[id(match)], original, context_sha=self.body_html_sha256, reason=reason))
+            # The text extractor skips nested script/style tags, but a root
+            # script/style exposes its direct text. Keep only its fingerprint.
+            executable = match.name in {"script", "style"}
+            original = "" if executable else extract_article_text(match)
+            block = _block(self.source, self.paths[id(match)], original, context_sha=self.body_html_sha256, reason=reason)
+            if executable:
+                block["original_html_sha256"] = hashlib.sha256(str(match).encode()).hexdigest()
+            self.noise.append(block)
 
 
 def _remove_structured_noise(node: Tag, removed: Counter[str], audit: _CleaningAudit) -> None:

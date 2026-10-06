@@ -34,3 +34,11 @@
 正文output文本保持但body_cleaning metadata新增字段，旧历史repair manifest若绑定整个解析metadata摘要可能触发输出漂移fail-closed；不复用旧批准结果或自动重处理历史数据。保留已合并后台/QQ代码，不做下线或回滚。
 
 交ROOT后原R只读复审业务切片与精确提交；测试登记和五地区质量缺口分别记账。没有push、PR、合并、部署、外发或生产计数。
+
+## B035-R01：script/style trace 局部返修
+
+原R正式审核Git `9e6de9ad48d611142a705dbfefac9d24e9ac4469` 指出P2：`_CleaningAudit.remove`直接提取script/style根Tag时会取得直接文本，虽正文/before_text跳过其子Tag，却把源码复制到removed.original_text。此前“不复制源码”声明在该路径不成立，本次修正。
+
+仅对script/style删除记录置空original_text/text；保留block ID、DOM locator、body捕获摘要、structured_noise原因，新增original_html_sha256为该节点删除前DOM序列化HTML摘要（不是网络原件byte认证）。嵌套在nav等常规节点的script/style继续由既有extract_article_text子Tag跳过语义排除；保留正常导航文本。正文、删除计数、SourceArticleDetail.original_content_html字段、选择器及其余规则不变，不改共享text.py。
+
+新单例真实RED exit1/1 assertion failure，证实SCRIPT_SENTINEL进入文本metadata；同例GREEN exit0，含hash与定位断言。全部12组GREEN（原10组+2新例），七fixture正文/status/removed_rules及block重建全文不漂移；新例保证Fact非空、直接噪声计数2、嵌套nav计数1，原HTML依然保存输入。原始日志在独立`/Users/mentianlu/.codex/runtime/b035-r01-script-style-trace-repair-001`，旧B035证据不覆盖。修复固定提交由包外handoff receipt绑定，返回同原R复审；catalog登记仍ROOT负责，自动CI、五地区gold及生产结论未取得。

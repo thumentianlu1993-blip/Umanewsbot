@@ -138,3 +138,44 @@ class ArticleContentTraceTests(SimpleTestCase):
         self.assertEqual(detail.body_ja_raw, 'Full fact.')
         self.assertEqual(detail.metadata['body_cleaning']['removed_rules']['structured_noise'], 2)
         self.assertTrue(any(b['original_text'] == 'Inner menu' for b in detail.metadata['body_cleaning']['blocks']))
+
+    def test_script_style_root_noise_keeps_hash_and_locator_without_source_text(self):
+        import hashlib
+        import json
+        html = '<div class="Article__ArticleBody"><script>window.inlineTracking = SCRIPT_SENTINEL;</script>' \
+               '<style>.STYLE_SENTINEL{color:red}</style><p>Fact.</p></div>'
+        detail = SportingLifeAdapter().parse_detail_html(html, url='https://fixture.invalid/executable-noise')
+        evidence = detail.metadata['body_cleaning']
+        self.assertEqual(detail.body_ja_raw, 'Fact.')
+        self.assertEqual(evidence['before_text'], 'Fact.')
+        self.assertEqual(evidence['removed_rules'], {'structured_noise': 2})
+        serialized = json.dumps(evidence)
+        self.assertNotIn('SCRIPT_SENTINEL', serialized)
+        self.assertNotIn('STYLE_SENTINEL', serialized)
+        removed = [b for b in evidence['blocks'] if b['decision'] == 'removed']
+        self.assertEqual(len(removed), 2)
+        for block in removed:
+            self.assertEqual(block['original_text'], '')
+            self.assertEqual(block['text'], '')
+            self.assertEqual(block['reasons'], ['structured_noise'])
+            self.assertTrue(block['locator'] and block['block_id'])
+        expected = {
+            hashlib.sha256(b'<script>window.inlineTracking = SCRIPT_SENTINEL;</script>').hexdigest(),
+            hashlib.sha256(b'<style>.STYLE_SENTINEL{color:red}</style>').hexdigest(),
+        }
+        self.assertEqual({b['original_html_sha256'] for b in removed}, expected)
+        self.assertIn('SCRIPT_SENTINEL', detail.original_content_html)
+        self.assertIn('STYLE_SENTINEL', detail.original_content_html)
+
+    def test_nested_script_style_inside_removed_navigation_do_not_enter_trace_text(self):
+        import json
+        html = '<div class="Article__ArticleBody"><nav>Menu<script>SCRIPT_SENTINEL</script>' \
+               '<style>.STYLE_SENTINEL{color:red}</style></nav><p>Fact.</p></div>'
+        detail = SportingLifeAdapter().parse_detail_html(html, url='https://fixture.invalid/nested-code')
+        evidence = detail.metadata['body_cleaning']
+        self.assertEqual(detail.body_ja_raw, 'Fact.')
+        self.assertEqual(evidence['removed_rules'], {'structured_noise': 1})
+        self.assertNotIn('SCRIPT_SENTINEL', json.dumps(evidence))
+        self.assertNotIn('STYLE_SENTINEL', json.dumps(evidence))
+        removed = [b for b in evidence['blocks'] if b['decision'] == 'removed']
+        self.assertEqual([b['original_text'] for b in removed], ['Menu'])
