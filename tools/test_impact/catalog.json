@@ -33,7 +33,8 @@
       "stable.test_translation_result_checkpoint",
       "stable.test_translation_retry_budget",
       "stable.test_managed_translation_budget_consumer",
-      "stable.test_managed_translation_dispatch_fence"
+      "stable.test_managed_translation_dispatch_fence",
+      "stable.test_managed_readonly_steps"
     ],
     "race_parser": [
       "stable.test_race_reference_sources",
@@ -870,6 +871,9 @@
     "horse_basic_profile_review_input": [
       "stable.test_horse_basic_profile_review_consumer",
       "stable.test_horse_basic_profile_from_review_command"
+    ],
+    "horse_career_review_consumer": [
+      "stable.test_horse_career_record_from_review"
     ]
   },
   "dependencies": {
@@ -924,6 +928,13 @@
     "horse_basic_profile_review_input": [
       "horse_basic_profile_prepare_command",
       "horse_basic_profile_cache"
+    ],
+    "horse_career_review_consumer": [
+      "horse_page",
+      "horse_cache_reuse",
+      "horse_career_link_cache",
+      "horse_basic_profile_review_input",
+      "horse_target_inventory"
     ]
   },
   "tests": {
@@ -2778,6 +2789,18 @@
     },
     "server/stable/test_managed_translation_dispatch_fence.py": {
       "label": "stable.test_managed_translation_dispatch_fence",
+      "domains": [
+        "news_translation"
+      ]
+    },
+    "server/stable/test_horse_career_record_from_review.py": {
+      "label": "stable.test_horse_career_record_from_review",
+      "domains": [
+        "horse_career_review_consumer"
+      ]
+    },
+    "server/stable/test_managed_readonly_steps.py": {
+      "label": "stable.test_managed_readonly_steps",
       "domains": [
         "news_translation"
       ]
