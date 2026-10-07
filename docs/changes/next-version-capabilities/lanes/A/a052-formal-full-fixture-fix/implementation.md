@@ -2,11 +2,12 @@
 
 PR245 的 head `511fcd87`，实际 merge `13a07e9339d5ac7d03cb984fac9e6955acd822c2`
 与已审源码 tree 相同。pull_request run `37593926987` attempt1 正式 full 失败：
-48 个 batch 报告记录 6816 唯一 ID，6 个失败 batch、166 个唯一失败方法；
+48 个 batch 报告记录 6816 唯一 ID，6 个失败 batch、166 个失败报告 ID
+（含 76 个参数化 subtest 项），对应 115 个实际方法；
 原42和A050新增10无skip/error/failure/expected-failure，原10runtime skip保持。
 整体 full 未通过，不能用这些局部结果作为集成交付 GREEN。
 
-166 方法全部属于旧0078/0079 release、rollback、单迁移owner或schema preflight测试。
+这些失败报告 ID 对应的 115 个方法全部属于旧0078/0079 release、rollback、单迁移owner或schema preflight测试。
 共同根因是 `release_0078_test_fixture.py` 的两代历史目录复制，仅显式剔除0079/0080，
 0081被带入历史目录，导致原历史摘要和精确rollback ceiling按设计拒绝。
 失败 artifact SHA256 `7998fe2b181d739e3d7b3cce8fd1e54a072522c6565d370c6b73e46aa4ffe68b`，
