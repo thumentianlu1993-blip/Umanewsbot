@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """固定 Git 快照，在无外网容器中收集/执行；不提供宿主回退。"""
 import argparse
+import base64
 from concurrent.futures import ThreadPoolExecutor
 import json
 import os
@@ -13,8 +14,9 @@ import tempfile
 import uuid
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from tools.test_impact.git_input import git
+from tools.test_impact.git_input import git, commit
 from tools.test_impact.core import digest
+from tools.test_impact.source_binding import validate_source_plan, verify_source_binding
 
 
 def docker(*args, **kw):
@@ -46,7 +48,9 @@ def main():
     plan=json.loads(args.plan.read_text())
     if plan['source']!='git':
         raise ValueError('local dirty plans are diagnostic only; commit snapshot before execution')
-    if git(root,'rev-parse',plan['test_sha']+'^{tree}').decode().strip()!=plan['test_tree']:
+    test_sha, test_tree = validate_source_plan(plan)
+    commit(root, test_sha)
+    if git(root,'rev-parse',test_sha+'^{tree}').decode().strip()!=test_tree:
         raise ValueError('test tree mismatch')
     output=args.output.resolve(); output.mkdir(parents=True,exist_ok=True)
     if plan['mode']=='docs-only':
@@ -66,6 +70,17 @@ def main():
                     target=source/file.relative_to(args.controls)
                     if target.read_bytes()!=file.read_bytes(): raise ValueError('trusted execution control mismatch')
                     shutil.copyfile(file,target)
+        entries={}
+        for record in git(root,'ls-tree','-rz',test_sha).split(b'\0'):
+            if not record: continue
+            meta, path=record.split(b'\t',1)
+            mode, kind, oid=meta.decode().split()
+            if kind!='blob': raise ValueError('non-blob frozen source')
+            entries[path.decode()]={'mode':mode,'blob':oid}
+        raw_commit=git(root,'cat-file','commit',test_sha)
+        binding={'test_sha':test_sha,'test_tree':test_tree,'files':entries,
+                 'commit_base64':base64.b64encode(raw_commit).decode('ascii')}
+        verify_source_binding(plan,binding,source)
         if args.build:
             context=temp/'build'; context.mkdir()
             shutil.copy(source/'requirements.txt',context/'requirements.txt')
@@ -78,6 +93,8 @@ def main():
                 docker('save',image_id,stdout=image_file)
         plan['image_id']=image_id
         control=temp/'control'; control.mkdir()
+        (control/'test-commit.raw').write_bytes(raw_commit)
+        (control/'source-binding.json').write_text(json.dumps(binding))
         (control/'plan.json').write_text(json.dumps(plan))
         def invoke(mode,key='',profile=''):
             out=temp/(key or 'collection'); out.mkdir(); out.chmod(0o777)

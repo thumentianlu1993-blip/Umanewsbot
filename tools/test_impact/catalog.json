@@ -3113,7 +3113,9 @@
     "stable.test_horse_basic_profile_from_review_command": "django",
     "stable.test_horse_basic_profile_review_consumer": "django",
     "stable.test_managed_translation_budget_consumer": "django",
-    "stable.test_managed_translation_dispatch_fence": "django"
+    "stable.test_managed_translation_dispatch_fence": "django",
+    "stable.test_horse_career_record_from_review": "django",
+    "stable.test_managed_readonly_steps": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
