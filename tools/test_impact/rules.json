@@ -22,7 +22,10 @@
     "docs/changes/next-version-capabilities/lanes/C/O02-reference-query-design.json",
     "docs/changes/next-version-capabilities/lanes/C/U02-compact-navigation-probe.json",
     "docs/changes/next-version-capabilities/lanes/C/U02-navigation-budget.json",
-    "docs/changes/next-version-capabilities/lanes/C/U02-offline-inventory.json"
+    "docs/changes/next-version-capabilities/lanes/C/U02-offline-inventory.json",
+    "docs/changes/next-version-capabilities/lanes/B/B053-m02-read-translation-consumer/obligations.json",
+    "docs/changes/next-version-capabilities/lanes/B/B055-completed-redelivery-receipt-fix/obligations.json",
+    "docs/changes/next-version-capabilities/lanes/B/B057-remaining7-end-to-end-test-prep/obligations.json"
   ],
   "high_risk": [
     ".codex/agents/application.toml",
@@ -1402,6 +1405,15 @@
       "horse_career_review_consumer"
     ],
     "server/stable/services/managed_readonly_steps.py": [
+      "news_translation"
+    ],
+    "server/stable/readonly_translation_e2e_fixture.py": [
+      "news_translation"
+    ],
+    "server/stable/services/managed_readonly_translation.py": [
+      "news_translation"
+    ],
+    "server/stable/test_managed_readonly_translation.py": [
       "news_translation"
     ]
   },

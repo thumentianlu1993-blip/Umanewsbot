@@ -293,6 +293,7 @@ def release_failed_translation_dispatch(
                 article_id, run_id, claimed_at.isoformat(), phase="claimed",
                 now=claimed_at, check_deadline=False, check_input=False,
             )
+            reason = reason or _ordinary_registered_run_reason(run)
             if reason:
                 return False
             article.translation_status = ArticleTranslationStatus.FAILED
@@ -309,28 +310,32 @@ def release_failed_translation_dispatch(
             ])
             _save_claim_terminal(run, "failed", error=str(error))
         return True
-    next_retry_at = claimed_at + timedelta(seconds=retry_delay_seconds(1))
-    updated = NewsArticle.objects.filter(
-        pk=article_id,
-        translation_status=ArticleTranslationStatus.TRANSLATING,
-        translation_started_at=claimed_at,
-    ).update(
-        translation_status=ArticleTranslationStatus.FAILED,
-        workflow_status=WorkflowStatus.TRANSLATION_FAILED,
-        automation_status=AutomationStatus.FAILED,
-        translation_error_category="transient_dispatch_failed",
-        translation_error_message=str(error)[:2000],
-        translation_started_at=None,
-        translation_next_retry_at=next_retry_at,
-        updated_at=claimed_at,
-    )
-    if updated:
-        TranslationRun.objects.filter(article_id=article_id, status=TranslationStatus.STARTED).update(
-            status=TranslationStatus.FAILED,
-            error_message=f"Celery dispatch failed: {str(error)[:1900]}",
+    with transaction.atomic():
+        NewsArticle.objects.select_for_update().filter(pk=article_id).first()
+        if _ordinary_registered_article(article_id):
+            return False
+        next_retry_at = claimed_at + timedelta(seconds=retry_delay_seconds(1))
+        updated = NewsArticle.objects.filter(
+            pk=article_id,
+            translation_status=ArticleTranslationStatus.TRANSLATING,
+            translation_started_at=claimed_at,
+        ).update(
+            translation_status=ArticleTranslationStatus.FAILED,
+            workflow_status=WorkflowStatus.TRANSLATION_FAILED,
+            automation_status=AutomationStatus.FAILED,
+            translation_error_category="transient_dispatch_failed",
+            translation_error_message=str(error)[:2000],
+            translation_started_at=None,
+            translation_next_retry_at=next_retry_at,
             updated_at=claimed_at,
         )
-    return bool(updated)
+        if updated:
+            TranslationRun.objects.filter(article_id=article_id, status=TranslationStatus.STARTED).update(
+                status=TranslationStatus.FAILED,
+                error_message=f"Celery dispatch failed: {str(error)[:1900]}",
+                updated_at=claimed_at,
+            )
+        return bool(updated)
 
 
 def claim_translation_retry(
@@ -343,6 +348,9 @@ def claim_translation_retry(
     if _current_offline_budget_binding() is not None:
         return _claim_bound_translation_retry(article_id, expected_due_at=expected_due_at, now=now)
     with transaction.atomic():
+        NewsArticle.objects.select_for_update().filter(pk=article_id).first()
+        if _ordinary_registered_article(article_id):
+            return TranslationClaimResult(False, article_id, "registered_job_wrapper_required")
         updated = NewsArticle.objects.filter(
             pk=article_id,
             translation_status=ArticleTranslationStatus.FAILED,
@@ -370,6 +378,21 @@ def claim_translation_retry(
             }},
         )
     return TranslationClaimResult(True, article_id, run_id=run.id, claimed_at=stamp)
+
+
+def _ordinary_registered_run_reason(run):
+    from .managed_readonly_translation import ordinary_run_refusal
+    return ordinary_run_refusal(run)
+
+
+def _ordinary_registered_article(article_id):
+    from .managed_readonly_translation import registered_article_pending
+    return registered_article_pending(article_id)
+
+
+def _provider_business_metadata(metadata):
+    from .managed_readonly_translation import business_metadata
+    return business_metadata(metadata)
 
 
 CLAIM_KEY = "recovery_claim_v1"
@@ -422,6 +445,10 @@ def _checkpoint_json(value):
 
 
 def decode_translation_checkpoint(payload, article_id, run_id, claimed_at):
+    return _decode_translation_checkpoint(payload, article_id, run_id, claimed_at)
+
+
+def _decode_translation_checkpoint(payload, article_id, run_id, claimed_at, *, provenance=None):
     """锁外严格解码，不重新解析术语或构造 provider；没有跨 claim 缓存。"""
     from .translation import TranslationResult
 
@@ -449,6 +476,14 @@ def decode_translation_checkpoint(payload, article_id, run_id, claimed_at):
         if type(payload[key]) is not str or (key != "push_summary_zh" and not payload[key].strip()):
             raise TranslationCheckpointError("checkpoint text")
     metadata = payload["metadata"]
+    if provenance is None:
+        _provider_business_metadata(metadata)
+    else:
+        from .managed_readonly_translation import PROVENANCE_KEY
+        if (type(metadata) is not dict
+                or _checkpoint_json(metadata.get(PROVENANCE_KEY)) != _checkpoint_json(provenance)):
+            raise TranslationCheckpointError("registered provenance changed")
+        _provider_business_metadata({k: v for k, v in metadata.items() if k != PROVENANCE_KEY})
     if type(metadata) is not dict or CLAIM_KEY in metadata or RESULT_KEY in metadata:
         raise TranslationCheckpointError("checkpoint metadata")
     for key in ("provider", "model"):
@@ -633,6 +668,8 @@ def _claim_bound_translation_retry(article_id, *, expected_due_at, now):
                 or article.translation_next_retry_at != expected_due_at
                 or article.translation_retry_exhausted_at is not None):
             return TranslationClaimResult(False, article_id, "already_claimed_or_changed")
+        if _ordinary_registered_article(article_id):
+            return TranslationClaimResult(False, article_id, "registered_job_wrapper_required")
         try:
             identity = _active_bound_identity(article, binding)
         except ManagedTranslationBudgetBlocked as exc:
@@ -685,6 +722,7 @@ def _reserve_managed_translation_request(article_id, run_id, claimed_at, provide
                 return core._decision(root_reason, root)
             article, run, reason = _locked_translation_claim(
                 article_id, run_id, claimed_at, phase="executing", now=now)
+            reason = reason or _ordinary_registered_run_reason(run)
             if reason:
                 return core._decision(reason, root)
             if RESULT_KEY in run.raw_response:
@@ -720,6 +758,7 @@ def _close_bound_failure(article_id, run_id, claimed_at, *, reason=None, error=N
         if root is None or root_reason:
             return None, root_reason or "budget_missing", False
         article, run, fence = _locked_translation_claim(article_id, run_id, claimed_at, phase="executing", now=now)
+        fence = fence or _ordinary_registered_run_reason(run)
         if fence:
             return article, fence, False
         if RESULT_KEY in run.raw_response:
@@ -788,7 +827,7 @@ def _recover_bound_stale_translation(article_id, *, expected_started_at, now):
         run = matching[0]
         _, _, fence = _locked_translation_claim(article_id, run.pk, expected_started_at.isoformat(),
             phase=("claimed", "executing"), now=now, check_deadline=False)
-        if fence or RESULT_KEY in run.raw_response:
+        if fence or _ordinary_registered_run_reason(run) or RESULT_KEY in run.raw_response:
             return False
         _, fence = _claim_uuid_history_reason(root, article, run, expected_started_at.isoformat())
         if fence:
@@ -805,6 +844,7 @@ def consume_translation_claim(article_id, run_id, claimed_at, *, now=None):
         article, run, reason = _locked_translation_claim(
             article_id, run_id, claimed_at, phase="claimed", now=now or timezone.now(),
         )
+        reason = reason or _ordinary_registered_run_reason(run)
         if reason:
             return article, run, reason
         run.raw_response = {**run.raw_response, CLAIM_KEY: {**run.raw_response[CLAIM_KEY], "phase": "executing"}}
@@ -818,6 +858,7 @@ def prepare_translation_claim(article_id, run_id, claimed_at, *, suppress_automa
         article, run, reason = _locked_translation_claim(
             article_id, run_id, claimed_at, phase=("claimed", "executing"), now=timezone.now(),
         )
+        reason = reason or _ordinary_registered_run_reason(run)
         if reason:
             return article, run, None, reason
         raw, claim = run.raw_response, run.raw_response[CLAIM_KEY]
@@ -854,6 +895,7 @@ def save_translation_checkpoint(article_id, run_id, claimed_at, checkpoint):
         article, run, reason = _locked_translation_claim(
             article_id, run_id, claimed_at, phase="executing", now=timezone.now(),
         )
+        reason = reason or _ordinary_registered_run_reason(run)
         if reason:
             return None, reason
         if not _checkpoint_matches_claim(checkpoint, run.raw_response[CLAIM_KEY]):
@@ -869,8 +911,10 @@ def save_translation_checkpoint(article_id, run_id, claimed_at, checkpoint):
 
 
 def _save_claim_terminal(run, phase, *, metadata=None, error=""):
+    if _ordinary_registered_run_reason(run):
+        raise TranslationCheckpointError("registered_job_wrapper_required")
+    metadata = _provider_business_metadata(metadata)
     claim = {**run.raw_response[CLAIM_KEY], "phase": phase}
-    metadata = {k: v for k, v in (metadata or {}).items() if k not in {CLAIM_KEY, RESULT_KEY}}
     run.raw_response = {**run.raw_response, **(metadata or {}), CLAIM_KEY: claim}
     run.status = TranslationStatus.SUCCESS if phase == "completed" else TranslationStatus.FAILED
     run.error_message = error[:2000]
@@ -892,6 +936,7 @@ def finalize_translation_claim(article_id, run_id, claimed_at, *, checkpoint=Non
         article, run, reason = _locked_translation_claim(
             article_id, run_id, claimed_at, phase="executing", now=now,
         )
+        reason = reason or _ordinary_registered_run_reason(run)
         if reason:
             return article, reason
         if error is not None:
@@ -912,23 +957,7 @@ def finalize_translation_claim(article_id, run_id, claimed_at, *, checkpoint=Non
                     or not _checkpoint_matches_claim(checkpoint, run.raw_response[CLAIM_KEY])):
                 return article, "checkpoint_changed"
 
-            article.apply_translation_result(result)
-            article.status = ArticleStatus.TRANSLATED
-            article.translation_status = ArticleTranslationStatus.TRANSLATED
-            article.translation_error_message = ""
-            article.translation_error_category = ""
-            article.translation_next_retry_at = None
-            article.translation_retry_exhausted_at = None
-            article.translation_started_at = None
-            article.translated_at = now
-            article.translation_model = result.metadata.get("model", "")
-            article.translation_provider = result.metadata.get("provider", "")
-            if article.workflow_status in {WorkflowStatus.PENDING_TRANSLATION, WorkflowStatus.TRANSLATION_FAILED}:
-                article.workflow_status = WorkflowStatus.PENDING_EDIT
-            article.automation_status = AutomationStatus.PENDING
-            article.translation_metadata = {**article.translation_metadata, **result.metadata}
-            article.decision_reason = {**(article.decision_reason or {}), "translation_recovery": {"recovered_at": now.isoformat()}}
-            article.save()
+            _apply_translation_result_locked(article, result, now)
             _save_claim_terminal(run, "completed", metadata=result.metadata)
     return article, ""
 
@@ -991,7 +1020,7 @@ def recover_one_stale_translation(
                 article_id, run.id, expected_started_at.isoformat(), phase=phase,
                 now=now, check_deadline=False, check_input=False,
             )
-            if reason:
+            if reason or _ordinary_registered_run_reason(run):
                 return False
         record_translation_failure(article, error, now=now, is_retry=False, notify=not managed)
         article.translation_error_category = "transient_stale_worker"
@@ -1136,3 +1165,25 @@ def notify_terminal_translation_failure(article: NewsArticle) -> None:
 
 
 from stable.tasks import translate_article_task  # noqa: E402
+
+
+def _apply_translation_result_locked(article, result, now):
+    """调用方已锁Article/Run并验证应用权限；只复用原文章字段写入。"""
+    from stable.models import ArticleStatus
+    article.apply_translation_result(result)
+    article.status = ArticleStatus.TRANSLATED
+    article.translation_status = ArticleTranslationStatus.TRANSLATED
+    article.translation_error_message = ""
+    article.translation_error_category = ""
+    article.translation_next_retry_at = None
+    article.translation_retry_exhausted_at = None
+    article.translation_started_at = None
+    article.translated_at = now
+    article.translation_model = result.metadata.get("model", "")
+    article.translation_provider = result.metadata.get("provider", "")
+    if article.workflow_status in {WorkflowStatus.PENDING_TRANSLATION, WorkflowStatus.TRANSLATION_FAILED}:
+        article.workflow_status = WorkflowStatus.PENDING_EDIT
+    article.automation_status = AutomationStatus.PENDING
+    article.translation_metadata = {**article.translation_metadata, **result.metadata}
+    article.decision_reason = {**(article.decision_reason or {}), "translation_recovery": {"recovered_at": now.isoformat()}}
+    article.save()

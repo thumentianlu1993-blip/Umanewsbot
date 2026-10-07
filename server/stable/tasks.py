@@ -1947,13 +1947,22 @@ def translate_article_task(
     suppress_automation: bool = False,
     claim_run_id: int | None = None,
     claim_started_at: str = "",
+    readonly_job_uuid: str = "",
 ) -> dict:
     from stable.services.translation_recovery import _current_offline_budget_binding
-    offline_binding = _current_offline_budget_binding()
     log = _log_start(
         "translate_article",
         {"article_id": article_id, "force": force, "suppress_automation": suppress_automation},
     )
+    from stable.services.managed_readonly_translation import route_registered_job
+    registered_reason = route_registered_job(article_id, claim_run_id, claim_started_at, readonly_job_uuid)
+    if type(registered_reason) is dict:
+        _log_success(log, f"registered article={article_id} translated={registered_reason.get('translated', False)}")
+        return registered_reason
+    if registered_reason is not None:
+        _log_success(log, f"skipped article={article_id} reason={registered_reason}")
+        return {"article_id": article_id, "translated": False, "skipped": True, "reason": registered_reason}
+    offline_binding = _current_offline_budget_binding()
     article = None
     claimed_retry = False
     managed_retry = False

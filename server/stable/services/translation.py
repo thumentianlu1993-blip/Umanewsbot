@@ -563,6 +563,12 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
         binding = _current_offline_budget_binding()
         decision = None
         if binding is not None:
+            from .managed_readonly_translation import ordinary_run_refusal
+            from stable.models import TranslationRun
+            run = TranslationRun.objects.filter(pk=getattr(self, "_offline_run_id", None)).first()
+            if ordinary_run_refusal(run):
+                raise _offline_error("registered_job_wrapper_required")
+        if binding is not None:
             from django.db import connection
             from django.utils import timezone
             from . import translation_retry_budget as core
@@ -1277,6 +1283,9 @@ class SiliconFlowTranslationProvider(OpenAICompatibleTranslationProvider):
 
 
 def get_translation_provider(*, article=None, managed_run=None) -> TranslationProvider:
+    from .managed_readonly_translation import ordinary_run_refusal, registered_article_pending
+    if ordinary_run_refusal(managed_run) or (article is not None and registered_article_pending(article.pk)):
+        raise _offline_error("registered_job_wrapper_required")
     from .translation_recovery import _current_offline_budget_binding
     if _current_offline_budget_binding() is not None:
         from django.db import DatabaseError
@@ -1304,11 +1313,8 @@ def get_translation_provider(*, article=None, managed_run=None) -> TranslationPr
 
 
 def translate_article(article: NewsArticle, *, managed_run: TranslationRun | None = None) -> TranslationResult:
-    from .translation_recovery import _current_offline_budget_binding
-    if _current_offline_budget_binding() is not None:
-        provider = get_translation_provider(article=article, managed_run=managed_run)
-    else:
-        provider = get_translation_provider()
+    # 持久登记目标在缺scope时也必须传给guard，先拒绝再构造provider。
+    provider = get_translation_provider(article=article, managed_run=managed_run)
     source_text = article.body_ja_normalized or article.body_ja_raw
     resolution = resolve_article_entities_for_article(article)
     terms = _translation_terms(resolution)
@@ -1345,14 +1351,16 @@ def translate_article(article: NewsArticle, *, managed_run: TranslationRun | Non
             result = provider.translate(article)
         run.status = "success"
         run.model_name = result.metadata.get("model") or run.model_name
-        run.raw_response = result.metadata
+        from .managed_readonly_translation import business_metadata
+        run.raw_response = business_metadata(result.metadata)
         run.error_message = ""
         run.save(update_fields=["status", "model_name", "raw_response", "error_message", "updated_at"])
         return result
     except Exception as exc:
         run.status = "failed"
         if getattr(exc, "metadata", None):
-            run.raw_response = getattr(exc, "metadata")
+            from .managed_readonly_translation import business_metadata
+            run.raw_response = business_metadata(getattr(exc, "metadata"))
         run.error_message = str(exc)
         run.save(update_fields=["status", "raw_response", "error_message", "updated_at"])
         raise
