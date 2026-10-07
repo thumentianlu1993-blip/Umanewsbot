@@ -302,3 +302,67 @@ class FrozenWorkerBindingTests(unittest.TestCase):
                                'commit','--allow-empty','-qm','different actual HEAD'])
         with self.assertRaisesRegex(ValueError,'actual frozen HEAD mismatch'):
             verify_source_binding(self.plan,self.binding,self.source,require_git_head=True)
+
+
+class HistoricalMigrationFixtureCompatibilityTests(unittest.TestCase):
+    """Real historical hash functions with AST-only fixture extraction, no Django."""
+    def fixture_functions(self, root):
+        import ast
+        import hashlib
+        import shutil
+        source=Path(__file__).resolve().parents[2]
+        tree=ast.parse((source/'server/stable/release_0078_test_fixture.py').read_text())
+        nodes=[n for n in tree.body if (isinstance(n,ast.FunctionDef) and n.name=='copy_historical_migrations') or
+               (isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='POST_GENERATION_MIGRATIONS' for t in n.targets))]
+        namespace={'ROOT':root,'Path':Path,'shutil':shutil}
+        exec(compile(ast.Module(body=nodes,type_ignores=[]),'actual-historical-fixture','exec'),namespace)
+        return namespace['copy_historical_migrations']
+
+    def contract(self, generation, module_path):
+        import ast
+        import hashlib
+        root=Path(__file__).resolve().parents[2]
+        t=ast.parse((root/('server/stable/services/release_'+generation+'_recovery.py')).read_text())
+        nodes=[n for n in t.body if (isinstance(n,ast.FunctionDef) and n.name=='migration_contract') or
+               (isinstance(n,ast.Assign) and any(isinstance(a,ast.Name) and a.id=='MIGRATION_CONTRACT_SHA256' for a in n.targets))]
+        namespace={'Path':Path,'hashlib':hashlib,'__file__':str(module_path)}
+        exec(compile(ast.Module(body=nodes,type_ignores=[]),'actual-historical-contract-'+generation,'exec'),namespace)
+        return namespace['migration_contract'],namespace['MIGRATION_CONTRACT_SHA256']
+
+    def test_exact_historical_copies_match_original_0078_and_0079_hashes(self):
+        import tempfile
+        root=Path(__file__).resolve().parents[2]
+        copy=self.fixture_functions(root)
+        with tempfile.TemporaryDirectory() as tmp:
+            for generation in ('0078','0079'):
+                with self.subTest(generation=generation):
+                    target=Path(tmp)/generation/'stable/migrations';target.parent.mkdir(parents=True)
+                    copy(target,generation=generation)
+                    contract,expected=self.contract(generation,target.parent/'services/release.py')
+                    self.assertEqual(contract(),expected)
+                    self.assertFalse((target/'0081_managed_readonly_steps.py').exists())
+                    self.assertTrue((target/'0078_externalhorse_profile_snapshot.py').exists())
+                    self.assertEqual((target/'0079_multisource_race_enrollment.py').exists(),generation=='0079')
+
+    def test_unknown_future_and_nested_known_names_remain_in_hash_and_are_refused(self):
+        import tempfile
+        import shutil
+        original=Path(__file__).resolve().parents[2]
+        for relative in ('0082_unknown.py','0081_unknown.py','nested/0081_managed_readonly_steps.py','__pycache__/0081_managed_readonly_steps.py'):
+            with self.subTest(relative=relative),tempfile.TemporaryDirectory() as tmp:
+                root=Path(tmp)/'source';directory=root/'server/stable/migrations';directory.parent.mkdir(parents=True)
+                shutil.copytree(original/'server/stable/migrations',directory)
+                extra=directory/relative;extra.parent.mkdir(exist_ok=True);extra.write_text('# unreviewed migration\n')
+                copy=self.fixture_functions(root)
+                for generation in ('0078','0079'):
+                    target=Path(tmp)/generation/'stable/migrations';target.parent.mkdir(parents=True);copy(target,generation=generation)
+                    self.assertTrue((target/relative).exists())
+                    contract,_=self.contract(generation,target.parent/'services/release.py')
+                    with self.assertRaisesRegex(ValueError,generation+' migration file/content contract drift'):contract()
+
+    def test_current_directory_is_still_refused_by_unchanged_production_contracts(self):
+        root=Path(__file__).resolve().parents[2]
+        for generation in ('0078','0079'):
+            contract,_=self.contract(generation,root/('server/stable/services/release_'+generation+'_recovery.py'))
+            with self.subTest(generation=generation),self.assertRaisesRegex(ValueError,generation+' migration file/content contract drift'):
+                contract()

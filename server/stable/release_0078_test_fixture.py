@@ -24,8 +24,8 @@ RECOVERY_MODULES = {
 RECOVERY_MODULE = RECOVERY_MODULES["0078"][1]
 
 POST_GENERATION_MIGRATIONS = {
-    "0078": {"0079_multisource_race_enrollment.py", "0080_translation_retry_budget.py"},
-    "0079": {"0080_translation_retry_budget.py"},
+    "0078": {"0079_multisource_race_enrollment.py", "0080_translation_retry_budget.py", "0081_managed_readonly_steps.py"},
+    "0079": {"0080_translation_retry_budget.py", "0081_managed_readonly_steps.py"},
 }
 
 
