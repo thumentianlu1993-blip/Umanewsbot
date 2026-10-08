@@ -7,8 +7,12 @@ mkdir -p /tmp/work
 cp -a /source/. /tmp/work/
 cd /tmp/work
 git init -q
-git add -A
-git -c user.name=synthetic-ci -c user.email=synthetic@example.invalid commit -qm "isolated test snapshot"
+git add -Af .
+# Preserve the executor-verified commit identity; parents are unnecessary for tests.
+test_commit=$(git hash-object -t commit -w /control/test-commit.raw)
+[[ "$(git write-tree)" == "$(git rev-parse "$test_commit^{tree}")" ]]
+git update-ref refs/heads/impact "$test_commit"
+git symbolic-ref HEAD refs/heads/impact
 if [[ "$1" == collect || "$3" != python ]]; then
   initdb -D /tmp/pgdata -A trust --encoding=UTF8 --no-locale >/tmp/pg-init.log
   pg_ctl -D /tmp/pgdata -l /tmp/postgres.log -o '-h 127.0.0.1 -p 5432 -k /tmp' -w start >/tmp/pg-start.log

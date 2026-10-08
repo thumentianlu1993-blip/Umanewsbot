@@ -606,6 +606,8 @@ def _race_record_values(payload: dict) -> dict[str, Any]:
         "source_url": payload.get("source_url", ""),
         "raw_payload": payload.get("raw_payload", payload),
     }
+    if "eligibility_text" in payload:
+        values["eligibility_text"] = payload["eligibility_text"]
     if "event_id" in payload:
         values["event_id"] = payload.get("event_id") or None
     if "result_id" in payload:

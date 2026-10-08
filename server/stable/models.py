@@ -6892,3 +6892,99 @@ class TranslationRequestAttempt(models.Model):
 
     def delete(self, *args, **kwargs):
         raise ValidationError("TranslationRequestAttempt 禁止删除。")
+
+
+class ManagedReadonlyLedgerQuerySet(models.QuerySet):
+    """只读step审计仅允许初始insert，普通writer不可改变已存合同或结果。"""
+    def update(self, **kwargs):
+        raise ValidationError("只读step账禁止普通 ORM 修改。")
+
+    def bulk_update(self, objs, fields, batch_size=None):
+        raise ValidationError("只读step账禁止普通 ORM 修改。")
+
+    def bulk_create(self, objs, **kwargs):
+        if kwargs.get("update_conflicts"):
+            raise ValidationError("只读step账禁止冲突更新。")
+        return super().bulk_create(objs, **kwargs)
+
+    def delete(self):
+        raise ValidationError("只读step账禁止删除。")
+
+
+class ManagedReadonlyTaskBudget(models.Model):
+    objects = ManagedReadonlyLedgerQuerySet.as_manager()
+    parent_budget = models.OneToOneField("TranslationRetryBudget", on_delete=models.PROTECT, related_name="readonly_task_budget")
+    operation_uuid = models.UUIDField(unique=True)
+    read_budget_uuid = models.UUIDField(unique=True)
+    article_pk_snapshot = models.BigIntegerField()
+    source_site_snapshot = models.CharField(max_length=32)
+    source_article_id_snapshot = models.CharField(max_length=255)
+    source_sha256 = models.CharField(max_length=64)
+    workflow_version = models.CharField(max_length=64)
+    query_version = models.CharField(max_length=64)
+    result_version = models.CharField(max_length=64)
+    permission_epoch = models.PositiveIntegerField(default=1)
+    allowed_tools = models.JSONField(default=list)
+    opened_at = models.DateTimeField()
+    deadline_at = models.DateTimeField()
+    tool_read_limit = models.PositiveSmallIntegerField()
+    tool_reads_reserved = models.PositiveSmallIntegerField(default=0)
+    state = models.CharField(max_length=32, default="open")
+    blocked_reason = models.CharField(max_length=128, blank=True)
+
+    class Meta:
+        base_manager_name = "objects"
+        default_manager_name = "objects"
+        constraints = [
+            models.CheckConstraint(condition=models.Q(tool_read_limit__lte=2), name="ck_ro_limit_fixture_bound"),
+            models.CheckConstraint(condition=models.Q(tool_reads_reserved__lte=models.F("tool_read_limit")), name="ck_ro_counter_bounds"),
+            models.CheckConstraint(condition=models.Q(deadline_at__gt=models.F("opened_at")), name="ck_ro_deadline"),
+            models.CheckConstraint(condition=models.Q(permission_epoch__gte=1), name="ck_ro_permission_epoch"),
+            models.CheckConstraint(condition=models.Q(state__in=["open", "revoked", "blocked_unknown", "expired"]), name="ck_ro_root_state"),
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("只读任务预算禁止普通 ORM 修改。")
+        kwargs["force_insert"] = True
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("只读任务预算禁止删除。")
+
+
+class ManagedReadonlyStep(models.Model):
+    objects = ManagedReadonlyLedgerQuerySet.as_manager()
+    read_budget = models.ForeignKey("ManagedReadonlyTaskBudget", on_delete=models.PROTECT, related_name="steps")
+    step_uuid = models.UUIDField(unique=True)
+    logical_step_name = models.CharField(max_length=32)
+    idempotency_sha256 = models.CharField(max_length=64)
+    envelope = models.JSONField(default=dict)
+    params_sha256 = models.CharField(max_length=64)
+    reservation_token = models.UUIDField(unique=True)
+    state = models.CharField(max_length=32, default="inflight")
+    reserved_at = models.DateTimeField()
+    read_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    result = models.JSONField(default=dict)
+    result_sha256 = models.CharField(max_length=64, blank=True)
+    error_reason = models.CharField(max_length=128, blank=True)
+
+    class Meta:
+        base_manager_name = "objects"
+        default_manager_name = "objects"
+        constraints = [
+            models.UniqueConstraint(fields=("read_budget", "logical_step_name"), name="uq_ro_logical_step"),
+            models.CheckConstraint(condition=models.Q(logical_step_name="source_excerpt:1"), name="ck_ro_fixed_logical_step"),
+            models.CheckConstraint(condition=models.Q(state__in=["inflight", "completed", "unknown", "failed", "expired", "denied"]), name="ck_ro_step_state"),
+            models.CheckConstraint(condition=~models.Q(state="completed") | (models.Q(read_at__isnull=False) & models.Q(completed_at__isnull=False) & models.Q(result_sha256__regex=r"^[0-9a-f]{64}$") & ~models.Q(result={})), name="ck_ro_completed_result"),
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("只读step禁止普通 ORM 修改。")
+        kwargs["force_insert"] = True
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("只读step禁止删除。")

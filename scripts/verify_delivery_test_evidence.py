@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """候选目录外的交付核验器。只读 Git/GitHub；不合并、不导入候选代码。"""
 import argparse
+import ast
 import hashlib
 import io
 import json
@@ -59,6 +60,52 @@ def authorize_run(run, plan, review, base_has_catalog, head, merge):
     require(run['path']=='.github/workflows/affected_tests.yml' and plan['test_sha']==merge,
             'ordinary PR requires exact merge workflow')
     return ''
+
+
+def extract_trusted_bundle(git, trusted_sha, bundle, controls):
+    """从同一固定获审对象提取依赖闭包；禁止混用候选路径或旧执行协议。"""
+    require(re.fullmatch('[0-9a-f]{40}', trusted_sha), 'exact trusted bundle SHA required')
+    pending = ['tools/test_impact/core.py', 'tools/test_impact/git_input.py',
+               'scripts/plan_affected_tests.py', 'scripts/run_test_plan.py',
+               'tools/test_impact/source_binding.py', 'scripts/test_plan_worker.py',
+               'scripts/run_bounded_stable_tests.py', 'deploy/test-impact/entrypoint.sh']
+    files = {}
+    while pending:
+        path = pending.pop(0)
+        if path in files:
+            continue
+        require(path.startswith(('tools/test_impact/', 'scripts/', 'deploy/test-impact/'))
+                and '..' not in path.split('/') and '\\' not in path, 'unsafe trusted dependency')
+        data = git('show', trusted_sha+':'+path)
+        blob = git('rev-parse', trusted_sha+':'+path).decode().strip()
+        actual_blob = hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
+        require(blob == actual_blob and controls.get(path) == blob,
+                'trusted dependency/protocol mismatch: '+path)
+        dependencies = set()
+        if path.endswith('.py'):
+            package = path[:-3].split('/')[:-1]
+            for node in ast.walk(ast.parse(data)):
+                modules = []
+                if isinstance(node, ast.Import):
+                    modules = [alias.name for alias in node.names]
+                elif isinstance(node, ast.ImportFrom):
+                    module = node.module or ''
+                    if node.level:
+                        require(node.level <= len(package), 'escaping trusted relative import')
+                        module = '.'.join(package[:len(package)-node.level+1]+module.split('.'))
+                    modules = [module]
+                for module in modules:
+                    if module.startswith(('tools.test_impact.', 'scripts.')):
+                        dependencies.add(module.replace('.', '/')+'.py')
+                    elif module in ('plan_affected_tests', 'run_test_plan', 'run_bounded_stable_tests'):
+                        dependencies.add('scripts/'+module+'.py')
+        out = bundle/path
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(data)
+        files[path] = {'blob':blob, 'sha256':hashlib.sha256(data).hexdigest(),
+                       'bytes':len(data), 'dependencies':sorted(dependencies)}
+        pending.extend(sorted(dependencies-files.keys()))
+    return {'trusted_sha':trusted_sha, 'files':files}
 
 
 def main():
@@ -131,9 +178,7 @@ def main():
     # 从受信 Git 对象提取纯数据规划器；绝不以候选目录作为 Python 搜索路径。
     with tempfile.TemporaryDirectory(prefix='trusted-impact-') as raw:
         bundle=Path(raw)
-        paths=['tools/test_impact/core.py','tools/test_impact/git_input.py','scripts/plan_affected_tests.py','scripts/run_test_plan.py']
-        for path in paths:
-            out=bundle/path;out.parent.mkdir(parents=True,exist_ok=True);out.write_bytes(git('show',a.trusted_sha+':'+path))
+        bundle_provenance=extract_trusted_bundle(git,a.trusted_sha,bundle,controls)
         config=bundle/'input.json'
         config.write_text(json.dumps({'root':str(root),'base':base,'head':head,'test':plan['test_sha'],'plan':plan,'reports':reports}))
         program="""import json,sys
@@ -169,9 +214,9 @@ else: print(json.dumps(verify_results(p,x['reports'])))
             require(re.fullmatch('sha256:[0-9a-f]{64}',plan['image_id']),'invalid image ID')
             source_plan=bundle/'selection.json';source_plan.write_text(json.dumps({**plan,'mode':expected['mode']}))
             trusted_controls=bundle/'execution-controls'
-            for path in ('scripts/test_plan_worker.py','scripts/run_bounded_stable_tests.py','deploy/test-impact/entrypoint.sh','tools/test_impact/core.py'):
+            for path in ('scripts/test_plan_worker.py','scripts/run_bounded_stable_tests.py','deploy/test-impact/entrypoint.sh','tools/test_impact/core.py','tools/test_impact/source_binding.py'):
                 control=trusted_controls/path;control.parent.mkdir(parents=True,exist_ok=True)
-                control.write_bytes(git('cat-file','blob',controls[path]))
+                control.write_bytes((bundle/path).read_bytes())
             collection_dir=bundle/'collection'
             checked([sys.executable,'-I',str(bundle/'scripts/run_test_plan.py'),'--repository',str(root),
                      '--plan',str(source_plan),'--output',str(collection_dir),'--collect-only','--image',plan['image_id'],'--controls',str(trusted_controls)])
@@ -186,7 +231,8 @@ else: print(json.dumps(verify_results(p,x['reports'])))
     receipt={'status':'verified','base_sha':base,'head_sha':head,'test_sha':plan['test_sha'],'merge_sha':test,'test_tree':plan['test_tree'],
              'run_id':a.run,'run_attempt':attempt,'artifact_id':matches[0]['id'],
              'artifact_sha256':hashlib.sha256(archive).hexdigest(),'trusted_sha':a.trusted_sha,
-             'verifier_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'summary':verified}
+             'verifier_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+             'trusted_bundle':bundle_provenance,'summary':verified}
     a.output.write_text(json.dumps(receipt,ensure_ascii=False,indent=2)+'\n');print(json.dumps(receipt))
 
 

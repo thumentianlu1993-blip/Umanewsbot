@@ -22,7 +22,10 @@
     "docs/changes/next-version-capabilities/lanes/C/O02-reference-query-design.json",
     "docs/changes/next-version-capabilities/lanes/C/U02-compact-navigation-probe.json",
     "docs/changes/next-version-capabilities/lanes/C/U02-navigation-budget.json",
-    "docs/changes/next-version-capabilities/lanes/C/U02-offline-inventory.json"
+    "docs/changes/next-version-capabilities/lanes/C/U02-offline-inventory.json",
+    "docs/changes/next-version-capabilities/lanes/B/B053-m02-read-translation-consumer/obligations.json",
+    "docs/changes/next-version-capabilities/lanes/B/B055-completed-redelivery-receipt-fix/obligations.json",
+    "docs/changes/next-version-capabilities/lanes/B/B057-remaining7-end-to-end-test-prep/obligations.json"
   ],
   "high_risk": [
     ".codex/agents/application.toml",
@@ -977,7 +980,8 @@
     "server/stable/management/commands/horse_basic_profile_from_cache.py",
     "server/stable/services/translation_retry_budget.py",
     "server/stable/management/commands/horse_basic_profile_from_review.py",
-    "server/stable/services/horse_basic_profile_prepare_input.py"
+    "server/stable/services/horse_basic_profile_prepare_input.py",
+    "server/stable/migrations/0081_managed_readonly_steps.py"
   ],
   "paths": {
     "docs/changes/next-version-capabilities/lanes/C/U01-offline-cases.json": [
@@ -1390,6 +1394,27 @@
     ],
     "server/stable/services/horse_basic_profile_prepare_input.py": [
       "horse_basic_profile_review_input"
+    ],
+    "server/stable/services/horse_career_record_from_review.py": [
+      "horse_career_review_consumer"
+    ],
+    "server/stable/management/commands/horse_career_record_from_review.py": [
+      "horse_career_review_consumer"
+    ],
+    "scripts/verify_a047_record_audit_stdlib.py": [
+      "horse_career_review_consumer"
+    ],
+    "server/stable/services/managed_readonly_steps.py": [
+      "news_translation"
+    ],
+    "server/stable/readonly_translation_e2e_fixture.py": [
+      "news_translation"
+    ],
+    "server/stable/services/managed_readonly_translation.py": [
+      "news_translation"
+    ],
+    "server/stable/test_managed_readonly_translation.py": [
+      "news_translation"
     ]
   },
   "symbols": {
