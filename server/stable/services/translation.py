@@ -1351,16 +1351,16 @@ def translate_article(article: NewsArticle, *, managed_run: TranslationRun | Non
             result = provider.translate(article)
         run.status = "success"
         run.model_name = result.metadata.get("model") or run.model_name
-        from .managed_readonly_translation import business_metadata
-        run.raw_response = business_metadata(result.metadata)
+        from .managed_readonly_translation import ordinary_business_metadata
+        run.raw_response = ordinary_business_metadata(result.metadata)
         run.error_message = ""
         run.save(update_fields=["status", "model_name", "raw_response", "error_message", "updated_at"])
         return result
     except Exception as exc:
         run.status = "failed"
         if getattr(exc, "metadata", None):
-            from .managed_readonly_translation import business_metadata
-            run.raw_response = business_metadata(getattr(exc, "metadata"))
+            from .managed_readonly_translation import ordinary_business_metadata
+            run.raw_response = ordinary_business_metadata(getattr(exc, "metadata"))
         run.error_message = str(exc)
         run.save(update_fields=["status", "raw_response", "error_message", "updated_at"])
         raise

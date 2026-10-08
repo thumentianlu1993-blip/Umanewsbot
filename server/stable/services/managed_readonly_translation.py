@@ -251,16 +251,29 @@ def ordinary_run_refusal(run):
     return "registered_job_wrapper_required" if run is not None and has_registered_job(run.raw_response) else ""
 
 
-def business_metadata(metadata):
-    """provider不能造/覆盖claim、result、job或程序provenance；普通任务也保护。"""
+def _business_metadata_without_reserved_keys(metadata):
+    """两个持久化边界均拒绝provider伪造claim、result、job或程序provenance。"""
     if metadata is None:
         return {}
     if type(metadata) is not dict or any(type(k) is not str for k in metadata):
         raise recovery.TranslationCheckpointError("reserved metadata invalid")
     if any(k in {recovery.CLAIM_KEY, recovery.RESULT_KEY, PROVENANCE_KEY} or k.startswith(PREFIX) for k in metadata):
         raise recovery.TranslationCheckpointError("reserved metadata overwrite")
-    # Keep original checkpoint's wider business-JSON codec; control codec doesn't limit terms/usage.
-    return json.loads(recovery._checkpoint_json(metadata))
+    return metadata
+
+
+def business_metadata(metadata):
+    """私有checkpoint保持原精确JSON类型、深度和大小围栏。"""
+    return json.loads(recovery._checkpoint_json(_business_metadata_without_reserved_keys(metadata)))
+
+
+def ordinary_business_metadata(metadata):
+    """普通JSONField语义允许tuple转数组，仍拒绝控制键及不可持久化值。"""
+    metadata = _business_metadata_without_reserved_keys(metadata)
+    try:
+        return json.loads(json.dumps(metadata, ensure_ascii=False, allow_nan=False))
+    except (TypeError, ValueError, OverflowError, RecursionError, UnicodeError) as exc:
+        raise recovery.TranslationCheckpointError("ordinary metadata encoding") from exc
 
 
 def _dependencies():

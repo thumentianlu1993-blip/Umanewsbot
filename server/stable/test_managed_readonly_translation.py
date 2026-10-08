@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from dataclasses import replace
 from datetime import timedelta
 import json
+import unittest
 from uuid import uuid4
 from unittest.mock import patch
 
@@ -621,3 +622,111 @@ class ManagedReadonlyTranslationEndToEndTests(RemainingReadonlyE2EFixture, Manag
         self.assertEqual(refusal, "registered_job_wrapper_required")
         self.assertEqual(self.business_snapshot(), before)
         self.assertEqual(NotificationLog.objects.count(), 0)
+
+
+class BusinessMetadataBoundaryTests(unittest.TestCase):
+    """执行真实纯函数源码；无需导入DB/SDK，集成用例仍由原类负责。"""
+
+    def setUp(self):
+        import ast
+        import math
+        from dataclasses import asdict, dataclass
+        from pathlib import Path
+        from types import SimpleNamespace
+        root = Path(__file__).resolve().parent / "services"
+
+        def load(path, names, namespace):
+            parsed = ast.parse(path.read_text())
+            selected = [node for node in parsed.body if getattr(node, "name", None) in names]
+            self.assertEqual({node.name for node in selected}, set(names))
+            exec(compile(ast.Module(body=selected, type_ignores=[]), str(path), "exec"), namespace)
+            return namespace
+
+        codec_globals = {"json": json, "math": math}
+        for node in ast.parse((root / "translation_recovery.py").read_text()).body:
+            if (isinstance(node, ast.Assign) and len(node.targets) == 1
+                    and isinstance(node.targets[0], ast.Name)
+                    and node.targets[0].id in {"RESULT_MAX_DEPTH", "RESULT_MAX_BYTES", "CLAIM_KEY", "RESULT_KEY"}):
+                exec(compile(ast.Module(body=[node], type_ignores=[]), str(root / "translation_recovery.py"), "exec"), codec_globals)
+        codec = load(root / "translation_recovery.py", {"TranslationCheckpointError", "_checkpoint_json"}, codec_globals)
+        recovery = SimpleNamespace(**codec)
+        service_path = root / "managed_readonly_translation.py"
+        available = {getattr(node, "name", None) for node in ast.parse(service_path.read_text()).body}
+        names = {"business_metadata", "_business_metadata_without_reserved_keys", "ordinary_business_metadata"} & available
+        service_globals = {"json": json, "recovery": recovery}
+        for node in ast.parse(service_path.read_text()).body:
+            if (isinstance(node, ast.Assign) and len(node.targets) == 1
+                    and isinstance(node.targets[0], ast.Name)
+                    and node.targets[0].id in {"PROVENANCE_KEY", "PREFIX"}):
+                exec(compile(ast.Module(body=[node], type_ignores=[]), str(service_path), "exec"), service_globals)
+        service = load(service_path, names, service_globals)
+        self.reserved_keys = (recovery.CLAIM_KEY, recovery.RESULT_KEY, service["PROVENANCE_KEY"],
+                              *(service["PREFIX"] + name for name in ("plan_v1", "progress_v1", "final_v1", "future_v99")))
+        self.strict = service["business_metadata"]
+        # 在修复前对实际ordinary原入口取得RED；修复后使用新的明确边界。
+        self.ordinary = service.get("ordinary_business_metadata", self.strict)
+        self.error = codec["TranslationCheckpointError"]
+        terms = load(root / "terms.py", {"RecognizedHorseName", "serialize_recognized_horse_names"},
+                     {"dataclass": dataclass, "asdict": asdict, "__name__": __name__})
+        self.horse = terms["RecognizedHorseName"]
+        self.serialize = terms["serialize_recognized_horse_names"]
+
+    def test_real_recognized_horse_serializer_tuple_is_ordinary_json_array(self):
+        horse = self.horse(name_ja="Brilliant", source="term", matched_text="Brilliant", confidence=100,
+                           external_horse_ids=[], primary_external_horse_id="", needs_preserve=True,
+                           has_translation=True, first_position=0, detection_reason="horse_context",
+                           conflict_flags=[], matched_span=(0, 9))
+        metadata = {"recognized_horse_names": self.serialize([horse]), "model": "offline"}
+        self.assertIs(type(metadata["recognized_horse_names"][0]["matched_span"]), tuple)
+        result = self.ordinary(metadata)
+        self.assertEqual(result["recognized_horse_names"][0]["matched_span"], [0, 9])
+        self.assertIs(type(metadata["recognized_horse_names"][0]["matched_span"]), tuple)
+
+    def test_ordinary_json_is_detached_and_preserves_scalar_types(self):
+        metadata = {"usage": {"count": 1, "known": True, "cost": 0.5}, "terms": ["Brilliant"], "empty": None}
+        result = self.ordinary(metadata)
+        self.assertIs(type(result["usage"]["count"]), int)
+        self.assertIs(type(result["usage"]["known"]), bool)
+        result["terms"].append("other")
+        self.assertEqual(metadata["terms"], ["Brilliant"])
+
+    def test_reserved_control_domains_are_rejected_by_both_boundaries(self):
+        for key in self.reserved_keys:
+            for boundary in (self.ordinary, self.strict):
+                with self.subTest(key=key, boundary=boundary.__name__):
+                    with self.assertRaisesRegex(self.error, "reserved metadata overwrite"):
+                        boundary({"provider": "offline", key: {}})
+
+    def test_invalid_top_level_metadata_and_nonstring_keys_are_rejected(self):
+        for metadata in ([], "provider", {1: "not a string key"}, {True: "boolean key"}):
+            for boundary in (self.ordinary, self.strict):
+                with self.subTest(metadata=metadata, boundary=boundary.__name__):
+                    with self.assertRaisesRegex(self.error, "reserved metadata invalid"):
+                        boundary(metadata)
+        self.assertEqual(self.ordinary(None), {})
+
+    def test_nonjson_objects_cycles_and_nonfinite_values_are_rejected(self):
+        cycle = {}; cycle["cycle"] = cycle
+        for metadata in ({"value": object()}, {"value": {1}}, {"value": float("nan")},
+                         {"value": float("inf")}, cycle):
+            for boundary in (self.ordinary, self.strict):
+                with self.subTest(boundary=boundary.__name__):
+                    with self.assertRaises(self.error):
+                        boundary(metadata)
+
+    def test_private_checkpoint_still_rejects_tuple_metadata(self):
+        with self.assertRaisesRegex(self.error, "checkpoint value type"):
+            self.strict({"matched_span": (0, 9)})
+
+    def test_private_checkpoint_retains_depth_and_size_limits(self):
+        deep = {}; cursor = deep
+        for _ in range(34):
+            cursor["child"] = {}; cursor = cursor["child"]
+        for metadata, reason in ((deep, "checkpoint too deep"),
+                                 ({"value": "x" * (2 * 1024 * 1024)}, "checkpoint too large")):
+            with self.assertRaisesRegex(self.error, reason):
+                self.strict(metadata)
+
+    def test_private_checkpoint_accepts_original_finite_json(self):
+        metadata = {"provider": "offline", "usage": {"known": True, "count": 1}, "terms": ["Brilliant"]}
+        self.assertEqual(self.strict(metadata), metadata)

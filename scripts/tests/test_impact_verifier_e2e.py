@@ -18,9 +18,10 @@ class OutsideVerifierTests(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
         self.work=Path(self.temp.name);self.repo=self.work/'repo';self.repo.mkdir()
         self.git('init','-q');self.git('config','user.email','ci@example.invalid');self.git('config','user.name','ci')
-        names=['scripts/verify_delivery_test_evidence.py','scripts/plan_affected_tests.py','scripts/run_test_plan.py',
-               'tools/test_impact/core.py','tools/test_impact/git_input.py']
-        for name in names:
+        self.trusted_dependencies=['tools/test_impact/core.py','tools/test_impact/git_input.py',
+               'scripts/plan_affected_tests.py','scripts/run_test_plan.py','tools/test_impact/source_binding.py',
+               'scripts/test_plan_worker.py','scripts/run_bounded_stable_tests.py','deploy/test-impact/entrypoint.sh']
+        for name in ['scripts/verify_delivery_test_evidence.py',*self.trusted_dependencies]:
             p=self.repo/name;p.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(ROOT/name,p)
         self.rules={'schema_version':1,'docs':['docs/*.md'],'high_risk':['tools/test_impact/**','.github/**'],
                     'paths':{'service.py':['core']},'symbols':{}}
@@ -58,21 +59,34 @@ class OutsideVerifierTests(unittest.TestCase):
         bin_dir=self.work/'bin';bin_dir.mkdir()
         gh=bin_dir/'gh';gh.write_text('#!'+sys.executable+'\n'+'''import json,os,pathlib,sys
 root=pathlib.Path(os.environ['FAKE_API_ROOT']); path=sys.argv[2].removeprefix('repos/fixture/project/')
+with (root/'api-calls.jsonl').open('a') as trace: trace.write(json.dumps(path)+'\\n')
 if path=='actions/artifacts/22/zip':sys.stdout.buffer.write((root/'artifact.zip').read_bytes())
 else:print(json.dumps(json.loads((root/'responses.json').read_text())[path]))
 ''');gh.chmod(0o755)
+        # 任意误入镜像/容器分支都先在自有fixture中拒绝，不接触宿主daemon。
+        docker=bin_dir/'docker'
+        docker.write_text('#!'+sys.executable+'\n'+'''import os,pathlib
+(pathlib.Path(os.environ['FAKE_API_ROOT'])/'docker-invoked').write_text('forbidden')
+raise SystemExit('Docker is forbidden in these offline fixture tests')
+''');docker.chmod(0o755)
         return plan
 
     def run_verifier(self):
         (self.work/'responses.json').write_text(json.dumps(self.responses))
         env={**os.environ,'PATH':str(self.work/'bin')+os.pathsep+os.environ['PATH'],'FAKE_API_ROOT':str(self.work)}
-        return subprocess.run([sys.executable,'-I',str(self.verifier),'--repository',str(self.repo),'--repo','fixture/project',
+        result=subprocess.run([sys.executable,'-I',str(self.verifier),'--repository',str(self.repo),'--repo','fixture/project',
                                '--pr','1','--run','11','--trusted-sha',self.base,'--output',str(self.work/'receipt.json')],
                               capture_output=True,text=True,env=env,timeout=30)
+        self.assertFalse((self.work/'docker-invoked').exists(), 'offline verifier fixture reached Docker')
+        return result
 
     def test_true_docs_only_generates_receipt_outside_candidate(self):
         self.prepare();result=self.run_verifier();self.assertEqual(result.returncode,0,result.stderr)
-        self.assertEqual(json.loads((self.work/'receipt.json').read_text())['summary']['count'],0)
+        receipt=json.loads((self.work/'receipt.json').read_text())
+        self.assertEqual(receipt['summary']['count'],0)
+        self.assertEqual(set(receipt['trusted_bundle']['files']),set(self.trusted_dependencies))
+        for path,entry in receipt['trusted_bundle']['files'].items():
+            self.assertEqual(entry['blob'],self.git('rev-parse',self.base+':'+path))
 
     def test_business_disguised_as_docs_is_rejected_before_image_download(self):
         self.prepare(business=True);result=self.run_verifier()
@@ -86,3 +100,21 @@ else:print(json.dumps(json.loads((root/'responses.json').read_text())[path]))
     def test_base_advance_is_rejected(self):
         self.prepare();self.responses['commits/main']['sha']='f'*40
         result=self.run_verifier();self.assertNotEqual(result.returncode,0);self.assertIn('STALE_BASE',result.stderr)
+
+    def test_missing_trusted_dependency_is_rejected(self):
+        dependency = self.repo/'tools/test_impact/source_binding.py'
+        if dependency.exists():
+            dependency.unlink();self.git('add','-A');self.git('commit','-qm','missing trusted dependency')
+            self.base=self.git('rev-parse','HEAD')
+        self.prepare();result=self.run_verifier()
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn('source_binding.py',result.stderr)
+        self.assertFalse((self.work/'receipt.json').exists())
+
+    def test_unreviewed_candidate_control_is_rejected(self):
+        control=self.repo/'tools/test_impact/core.py'
+        control.write_text(control.read_text()+'\n# unreviewed candidate change\n')
+        self.prepare();result=self.run_verifier()
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn('unreviewed control: tools/test_impact/core.py',result.stderr)
+        self.assertFalse((self.work/'receipt.json').exists())
