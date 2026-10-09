@@ -15,15 +15,28 @@ import os
 from threading import Event, get_ident
 
 from django.db import DatabaseError, connection, models, transaction
-from django.db.models.functions import Substr
+from django.db.models.functions import Cast, Substr
 from django.utils import timezone
 
 from stable.models import ManagedReadonlyTaskBudget, ManagedReadonlyStep, NewsArticle
 from . import translation_recovery as recovery, translation_retry_budget as core
+from . import source_publication_receipt as publication
 
 WORKFLOW_VERSION = "managed-source-excerpt-v1"
 QUERY_VERSION = "source_excerpt_v1"
 RESULT_VERSION = "readonly-result-v1"
+RECEIPT_VERSIONS = {
+    1: (WORKFLOW_VERSION, QUERY_VERSION, RESULT_VERSION),
+    2: ("managed-source-excerpt-v2", "source_excerpt_v2", "readonly-result-v2"),
+}
+
+
+def registered_versions(versions):
+    if versions == RECEIPT_VERSIONS[1]:
+        return versions == (WORKFLOW_VERSION, QUERY_VERSION, RESULT_VERSION)
+    return versions == RECEIPT_VERSIONS[2]
+
+
 LOGICAL_STEP = "source_excerpt:1"
 RESULT_MAX_BYTES = 8192
 
@@ -102,9 +115,9 @@ def readonly_scope(root_pk, *, workflow_version=None, query_version=None, result
     root = ManagedReadonlyTaskBudget.objects.filter(pk=root_pk).first()
     if root is None or root.operation_uuid != binding.identity.operation_uuid:
         raise ReadonlyRefusal("readonly_scope_mismatch")
-    versions = (WORKFLOW_VERSION if workflow_version is None else workflow_version,
-                QUERY_VERSION if query_version is None else query_version,
-                RESULT_VERSION if result_version is None else result_version)
+    versions = (root.workflow_version if workflow_version is None else workflow_version,
+                root.query_version if query_version is None else query_version,
+                root.result_version if result_version is None else result_version)
     if any(type(v) is not str or not 0 < len(v) <= 64 for v in versions):
         raise ReadonlyRefusal("readonly_scope_mismatch")
     token = _read_scope.set(_ReadScope(root.pk, root.permission_epoch, *versions,
@@ -123,8 +136,11 @@ def _parent_identity_valid(parent, identity):
         raise ReadonlyRefusal("read_identity_changed")
 
 
-def initialize_read_budget(*, tool_read_limit, baseline, now):
+def initialize_read_budget(*, tool_read_limit, baseline, now, receipt_version=1):
     binding = _parent_binding(now)
+    if type(receipt_version) is not int or receipt_version not in RECEIPT_VERSIONS:
+        raise ReadonlyRefusal("step_version_changed")
+    versions = RECEIPT_VERSIONS[receipt_version]
     if (type(tool_read_limit) is not int or tool_read_limit not in (0, 1, 2)
             or type(baseline) is not dict or baseline != {
                 "kind": "synthetic_no_prior_tool_reads", "operation_uuid": str(binding.identity.operation_uuid)}):
@@ -140,15 +156,16 @@ def initialize_read_budget(*, tool_read_limit, baseline, now):
             raise ReadonlyRefusal("read_deadline_expired")
         existing = ManagedReadonlyTaskBudget.objects.filter(parent_budget=parent).first()
         if existing:
-            if existing.tool_read_limit != tool_read_limit:
+            if (existing.tool_read_limit != tool_read_limit
+                    or (existing.workflow_version, existing.query_version, existing.result_version) != versions):
                 raise ReadonlyRefusal("read_budget_contract_changed")
             return existing
         return ManagedReadonlyTaskBudget.objects.create(parent_budget=parent,
             operation_uuid=parent.operation_uuid, read_budget_uuid=uuid4(),
             article_pk_snapshot=parent.article_pk_snapshot, source_site_snapshot=parent.source_site_snapshot,
             source_article_id_snapshot=parent.source_article_id_snapshot, source_sha256=parent.source_sha256,
-            workflow_version=WORKFLOW_VERSION, query_version=QUERY_VERSION, result_version=RESULT_VERSION,
-            permission_epoch=1, allowed_tools=[QUERY_VERSION], opened_at=parent.opened_at,
+            workflow_version=versions[0], query_version=versions[1], result_version=versions[2],
+            permission_epoch=1, allowed_tools=[versions[1]], opened_at=parent.opened_at,
             deadline_at=parent.deadline_at, tool_read_limit=tool_read_limit)
 
 
@@ -185,7 +202,8 @@ def _locked_context(binding, scope, envelope, now):
              parent.source_sha256, parent.opened_at, parent.deadline_at)):
         raise ReadonlyRefusal("read_identity_changed")
     article, run, reason = recovery._locked_translation_claim(envelope.article_id, envelope.run_id,
-        envelope.claimed_at, phase="executing", now=now)
+        envelope.claimed_at, phase="executing", now=now,
+        defer_publication_evidence=(scope.result_version == RECEIPT_VERSIONS[2][2]))
     if reason:
         raise ReadonlyRefusal(reason)
     claim = run.raw_response[recovery.CLAIM_KEY]
@@ -203,12 +221,10 @@ def _locked_context(binding, scope, envelope, now):
         raise ReadonlyRefusal("read_identity_changed")
     if recovery.translation_input_sha256(article) != root.source_sha256:
         raise ReadonlyRefusal("input_changed")
-    if (root.workflow_version, root.query_version, root.result_version) != (
-            scope.workflow_version, scope.query_version, scope.result_version) or (
-            scope.workflow_version, scope.query_version, scope.result_version) != (
-            WORKFLOW_VERSION, QUERY_VERSION, RESULT_VERSION):
+    versions = (scope.workflow_version, scope.query_version, scope.result_version)
+    if (root.workflow_version, root.query_version, root.result_version) != versions or not registered_versions(versions):
         raise ReadonlyRefusal("step_version_changed")
-    if root.state == "revoked" or root.permission_epoch != scope.permission_epoch or root.allowed_tools != [QUERY_VERSION]:
+    if root.state == "revoked" or root.permission_epoch != scope.permission_epoch or root.allowed_tools != [scope.query_version]:
         raise ReadonlyRefusal("read_permission_revoked")
     if root.state != "open":
         raise ReadonlyRefusal("read_root_unavailable")
@@ -240,9 +256,14 @@ def _read_source_excerpt_once(envelope, params, expected):
     raw_body = models.Q(body_ja_normalized="") | models.Q(body_ja_normalized__isnull=True)
     body = models.Case(models.When(raw_body, then=models.F("body_ja_raw")), default=models.F("body_ja_normalized"))
     field = models.Case(models.When(raw_body, then=models.Value("body_ja_raw")), default=models.Value("body_ja_normalized"))
-    row = NewsArticle.objects.filter(pk=envelope.article_id).annotate(
-        _ro_title=Substr("title_ja", 1, 65537), _ro_body=Substr(body, 1, 65537), _ro_field=field,
-    ).values("pk", "source_site", "source_article_id", "source_language", "_ro_title", "_ro_body", "_ro_field").first()
+    annotations = {"_ro_title": Substr("title_ja", 1, 65537), "_ro_body": Substr(body, 1, 65537), "_ro_field": field}
+    fields = ["pk", "source_site", "source_article_id", "source_language", "_ro_title", "_ro_body", "_ro_field"]
+    with_publication = expected["result_version"] == RECEIPT_VERSIONS[2][2]
+    if with_publication:
+        annotations["_ro_publication_evidence"] = Substr(
+            Cast("published_at_evidence", output_field=models.TextField()), 1, publication.EVIDENCE_MAX_BYTES + 1)
+        fields += ["published_at", "published_at_verified", "_ro_publication_evidence"]
+    row = NewsArticle.objects.filter(pk=envelope.article_id).annotate(**annotations).values(*fields).first()
     if row is None or len(row["_ro_title"]) > 65536 or len(row["_ro_body"]) > 65536:
         raise ReadonlyRefusal("read_source_missing_or_oversized")
     snapshot = SimpleNamespace(source_site=row["source_site"], source_language=row["source_language"],
@@ -252,11 +273,16 @@ def _read_source_excerpt_once(envelope, params, expected):
     if ((row["source_site"], row["source_article_id"]) != (expected["source_site"], expected["source_article_id"])
             or actual_sha != expected["input_sha256"]):
         raise ReadonlyRefusal("read_snapshot_changed")
-    result = {"query_version": QUERY_VERSION, "result_version": RESULT_VERSION,
+    result = {"query_version": expected["query_version"], "result_version": expected["result_version"],
         "article_id": row["pk"], "run_id": envelope.run_id, "source_site": row["source_site"],
         "source_article_id": row["source_article_id"], "input_sha256": actual_sha,
         "title": row["_ro_title"][:256], "body_excerpt": row["_ro_body"][:params["body_chars"]],
         "body_chars": params["body_chars"], "read_at": timezone.now().isoformat()}
+    if with_publication:
+        try:
+            result["publication"] = publication.from_projection(row["published_at"], row["published_at_verified"], row["_ro_publication_evidence"])
+        except publication.PublicationReceiptInvalid as exc:
+            raise ReadonlyRefusal(str(exc)) from exc
     if len(json.dumps(result, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()) > RESULT_MAX_BYTES:
         raise ReadonlyRefusal("read_result_oversized")
     return result
@@ -363,7 +389,7 @@ def _identity_bytes(value):
 
 def _contract(expected, params):
     # Fresh nonce is deliberately excluded: the stored logical identity must survive a fresh scope.
-    return {"identity": expected, "params": params, "logical_step": LOGICAL_STEP, "tool": QUERY_VERSION}
+    return {"identity": expected, "params": params, "logical_step": LOGICAL_STEP, "tool": expected["query_version"]}
 
 
 def _step_identity(step, expected, params):
@@ -380,8 +406,15 @@ def _validated_result(step, expected, params):
     result = step.result
     fields = {"query_version", "result_version", "article_id", "run_id", "source_site", "source_article_id",
               "input_sha256", "title", "body_excerpt", "body_chars", "read_at", "step_uuid", "idempotency_sha256"}
+    if expected["result_version"] == RECEIPT_VERSIONS[2][2]:
+        fields.add("publication")
     if type(result) is not dict or set(result) != fields:
         raise ReadonlyRefusal("step_result_invalid")
+    if "publication" in fields:
+        try:
+            publication.validate_receipt(result["publication"])
+        except (publication.PublicationReceiptInvalid, UnicodeError) as exc:
+            raise ReadonlyRefusal("step_result_invalid") from exc
     required = {"query_version": expected["query_version"], "result_version": expected["result_version"],
                 "article_id": expected["article_id"], "run_id": expected["run_id"],
                 "source_site": expected["source_site"], "source_article_id": expected["source_article_id"],
