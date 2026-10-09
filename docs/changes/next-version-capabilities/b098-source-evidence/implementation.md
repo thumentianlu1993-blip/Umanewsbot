@@ -87,3 +87,36 @@ v2 reported-token stop 的正常对照、停止、unknown 重投与免费 checkp
 不改 CI 权限、供应链、skip 豁免、worker、镜像或测试选择逻辑，不以手动 full 绕过正式 PR 模式推导。
 后续交付 head 为该必要映射与验证记录变化，不是再次改动已审核应用代码。
 完整 M02/M03、v2 跨进程恢复与生产验证仍开放；Draft、CI、review 不等同合并或发布。
+
+## 首轮正式 CI 失败与测试生命周期修复
+
+Draft PR #248 的 run `37950136915` 在交付 head `0d6c68fa` 上终态失败。
+原生计划 6,863 个唯一 ID、49 批，所有 ID 均有 startTest 记录；47 批完整退出 0，
+包含 6,485 个 ID。不得把 startTest 全覆盖称为全量通过。两项失败分别为：
+
+- batch-038 的 184 个断言在日志中为 OK，但 Django teardown 删除 `test_bounded_ci`
+  时仍有两个会话，因此生命周期 incomplete、worker exit 1。该批次两个 PostgreSQL
+  并发测试模块的四个线程函数在 finally 中仅调用 `close_old_connections()`；默认
+  `CONN_MAX_AGE=60`，批次断言运行 26.785 秒，健康未过期连接不会由该函数保证关闭。
+  已保留的产物没有会话 PID，不能将实际两个会话分别归属到某个函数。
+- batch-046 的 collector 测试把两个会增长模块的总数固定为 29；本次增加 8 个方法后
+  原生 AST 共 37 个，导致断言失败。
+
+修复范围仅为测试 fixture 与 collector 契约：
+`test_race_result_recovery_application_postgres.py` 的 `approve` / `apply`，
+以及 `test_reviewed_gap_backfill.py` 两个并发类的 `apply`，在线程 finally 中
+关闭该线程自己的默认 `connection`。保留进入线程时的清理、原屏障/锁/并发及业务断言；
+正常返回时验证底层连接为 None，不创建 cursor，也不让该关闭断言覆盖正在传播的线程异常。
+不杀会话，不修改应用代码、runner、数据库设置或测试资源协议。
+
+collector 保留原方法 ID，以固定 base `275e9859` 的原 29 个完整 ID 为显式基线，
+另列本次新增 8 个完整 ID；要求旧/新集合不相交、源 AST 精确等于两者并集且无重复，
+真实 collect 输出完整集合、数量和逐 ID Django profile 均匹配，缺失 profile 仍拒绝。
+离线 `FrozenWorkerBindingTests` 全类 10 个方法通过；这不代替真实 PostgreSQL teardown 验证。
+
+原 CI 的 10 个 skips 已逐 ID 核对现行 catalog：原因、Django profile 均匹配，
+`review_by=2026-10-16` 尚未过期。覆盖缺口为真实历史缓存 8 项、真实迁移修复镜像 1 项、
+root EUID 回滚产物 1 项；未添加或延长豁免。完整 artifact、运行日志及逐项核对回执
+保存在本任务 runtime，原失败证据不覆盖。新的固定修复 SHA 须由原 reviewer 复审，
+并在 ROOT 分配的原 runner 上完成受影响 PostgreSQL 类/模块的必要实际验证，再执行正式 CI。
+已接受的应用 195 个方法不因测试 fixture 修复而原样重跑。
