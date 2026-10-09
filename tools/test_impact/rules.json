@@ -898,6 +898,7 @@
     "server/stable/services/terms.py",
     "server/stable/services/text.py",
     "server/stable/services/translation.py",
+    "server/stable/services/source_publication_receipt.py",
     "server/stable/services/translation_recovery.py",
     "server/stable/services/validation.py",
     "server/stable/signals.py",
