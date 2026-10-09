@@ -1870,6 +1870,7 @@ def _translate_managed_claim_task(article_id, run_id, claimed_at, *, suppress_au
         prepare_translation_claim, save_translation_checkpoint, _current_offline_budget_binding,
         ManagedTranslationBudgetBlocked, ManagedTranslationAuditFailure,
         _close_bound_budget_failure, _close_bound_provider_failure,
+        _diagnose_failed_reported_token_stop,
     )
 
     def skipped(reason):
@@ -1879,6 +1880,9 @@ def _translate_managed_claim_task(article_id, run_id, claimed_at, *, suppress_au
     # eager/直接调用的外层事务也不能把 provider 包在业务行锁里。
     if connection.in_atomic_block:
         return skipped("claim_outer_transaction")
+    reason = _diagnose_failed_reported_token_stop(article_id, run_id, claimed_at)
+    if reason:
+        return skipped(reason)
     article, run, checkpoint, reason = prepare_translation_claim(
         article_id, run_id, claimed_at, suppress_automation=suppress_automation,
     )

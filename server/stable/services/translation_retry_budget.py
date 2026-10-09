@@ -175,6 +175,58 @@ def _identity_reason(root, identity):
     return None
 
 
+REPORTED_TOKEN_STOP = "reported_token_stop_reached"
+MAX_REPORTED_TOKENS = 2**63 - 1
+
+
+def _reported_token_policy(policy, policy_sha256):
+    """v1摘要保持旧合同；v2仅接纳固定、不可覆盖的完整canonical JSON。"""
+    if type(policy) is not dict or policy.get("mode") != "offline_test":
+        return None, "invalid_policy_snapshot"
+    version = policy.get("version")
+    if type(version) is int and version == 1 and set(policy) == {"mode", "version"}:
+        return None, None
+    if (type(version) is not int or version != 2
+            or set(policy) != {"mode", "version", "reported_token_stop_v1"}):
+        return None, "invalid_policy_snapshot"
+    stop = policy["reported_token_stop_v1"]
+    if (type(stop) is not dict or set(stop) != {"total_tokens_limit"}
+            or not _integer(stop["total_tokens_limit"], 1)
+            or stop["total_tokens_limit"] > MAX_REPORTED_TOKENS):
+        return None, "invalid_policy_snapshot"
+    _, digest = _json_snapshot(policy)
+    if digest != policy_sha256:
+        return None, "policy_digest_mismatch"
+    return stop["total_tokens_limit"], None
+
+
+def _reported_token_total(root, attempts):
+    """调用方持root锁并已核unknown/对账/身份；损坏与溢出绝不当0。"""
+    total = 0
+    for attempt in attempts:
+        if (not _integer(attempt.seq, 1) or not _integer(attempt.provider_attempt_index, 1)
+                or type(attempt.claim_execution_uuid) is not UUID or not _aware(attempt.claimed_at)
+                or (root.article_pk_snapshot is not None and attempt.article_pk_snapshot != root.article_pk_snapshot)):
+            return None, "ledger_inconsistent"
+        report = attempt.usage_report
+        try:
+            _, digest = _json_snapshot(report)
+            values = [report.get(k) for k in ("prompt_tokens", "completion_tokens", "total_tokens")]
+            if (not all(_integer(v) and v <= MAX_REPORTED_TOKENS for v in values)
+                    or values[0] + values[1] != values[2]):
+                return None, "ledger_inconsistent"
+            receipt = {"kind": "synthetic_offline_usage_v1", "budget_uuid": str(root.budget_uuid),
+                       "attempt_pk": attempt.pk, "usage_sha256": digest}
+            if attempt.receipt_sha256 != _json_snapshot(receipt)[1]:
+                return None, "ledger_inconsistent"
+            total += values[2]
+            if total > MAX_REPORTED_TOKENS:
+                return None, "ledger_inconsistent"
+        except (ValueError, UnicodeError):
+            return None, "ledger_inconsistent"
+    return total, None
+
+
 def _admission(root, identity, now):
     reason = _identity_reason(root, identity)
     if reason:
@@ -204,6 +256,15 @@ def _admission(root, identity, now):
     now = _actual_now(now)
     if now < root.opened_at or now >= root.deadline_at:
         return "budget_deadline_expired"
+    limit, reason = _reported_token_policy(root.policy_snapshot, root.policy_sha256)
+    if reason:
+        return reason
+    if limit is not None:
+        total, reason = _reported_token_total(root, attempts)
+        if reason:
+            return reason
+        if total >= limit:
+            return REPORTED_TOKEN_STOP
     if root.requests_reserved >= root.request_limit:
         return "request_limit_exhausted"
     return None
@@ -249,6 +310,9 @@ def resolve_budget(identity: BudgetIdentity, *, mode: str, now: datetime,
                 return _decision("legacy_usage_unknown")
             if policy.get("mode") != "offline_test":
                 return _decision("supported_mode_missing")
+            _, reason = _reported_token_policy(policy, identity.policy_sha256)
+            if reason:
+                return _decision(reason)
             actual = _actual_now(now)
             if not opened <= actual < deadline:
                 return _decision("budget_deadline_expired")

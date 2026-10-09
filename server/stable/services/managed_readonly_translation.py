@@ -804,6 +804,20 @@ def _consume_registered_job(envelope):
             reason = "model_refused"
         else:
             raise
+        if reason == core.REPORTED_TOKEN_STOP:
+            # 不扩v1 progress枚举；当前owner停止仅记诊断，fresh仍model_start_unknown。
+            dependencies = _dependencies()
+            with transaction.atomic():
+                binding, _, _, parent, _, article, run, current = _live(envelope, dependencies)
+                progress = current[PROGRESS_KEY]
+                if (progress["state"] != "model_started" or progress["model_owner_token"] != invocation.owner
+                        or progress["owner_binding_sha256"] != invocation.binding_sha
+                        or progress["last_provider_attempt_index"] != invocation.index):
+                    _fail("model_start_unknown")
+                identity = recovery._active_bound_identity(article, binding)
+                if recovery._bound_admission(parent, identity, binding, core._actual_now(timezone.now())) != reason:
+                    _fail("registered_scope_mismatch")
+                recovery._record_reported_token_stop_locked(parent, article, run)
         if reason in EXIT_REASONS and reason != "storage_failed":
             _block_owned_invocation(invocation, reason)
         raise RegisteredJobRefusal(reason) from exc

@@ -17,7 +17,7 @@ from email.utils import parsedate_to_datetime
 import requests
 from django.conf import settings
 from django.core.mail import send_mail
-from django.db import DatabaseError, transaction
+from django.db import DatabaseError, connection, transaction
 from django.utils import timezone
 
 from stable.models import (
@@ -596,7 +596,11 @@ def _bound_preflight(now):
 def _bound_admission(root, identity, binding, now):
     from . import translation_retry_budget as core
     # 私有绑定版本与实际SDK数据都核验，仍复用同一core；未结消费优先于任何版本漂移。
-    return core._admission(root, binding.identity, now) or core._admission(root, identity, now)
+    bound_reason = core._admission(root, binding.identity, now)
+    if bound_reason != core.REPORTED_TOKEN_STOP:
+        return bound_reason or core._admission(root, identity, now)
+    # 只延迟新停止原因；当前source/provider/model围栏仍必须有效。
+    return core._admission(root, identity, now) or bound_reason
 
 
 def _claim_uuid_history_reason(root, article, run, claimed_at, provider_attempt_index=None):
@@ -652,6 +656,81 @@ def _budget_failure_fields(article, reason):
     article.translation_error_message = reason[:2000]
     article.save(update_fields=["translation_status", "translation_started_at", "translation_next_retry_at",
                                "translation_error_category", "translation_error_message", "updated_at"])
+
+
+def _record_reported_token_stop_locked(root, article, run):
+    """仅在已验证停止的root锁事务内记录有限身份，不授予执行/重试权限。"""
+    from . import translation_retry_budget as core
+    limit, reason = core._reported_token_policy(root.policy_snapshot, root.policy_sha256)
+    total, ledger_reason = core._reported_token_total(root, list(root.request_attempts.order_by("seq")))
+    if not connection.in_atomic_block or reason or ledger_reason or limit is None or total < limit:
+        raise ValueError("reported token stop audit without valid locked evidence")
+    claim = run.raw_response[CLAIM_KEY]
+    OperationLog.objects.create(
+        action_type="translation_budget_stopped", target_type="article", target_id=str(article.pk),
+        detail=json.dumps({"reason": core.REPORTED_TOKEN_STOP, "operation_uuid": str(root.operation_uuid),
+                          "budget_uuid": str(root.budget_uuid), "budget_pk": root.pk, "run_id": run.pk,
+                          "claim_execution_uuid": claim["claim_execution_uuid"],
+                          "claimed_at": claim["claimed_at"], "reported_total": total, "limit": limit},
+                         sort_keys=True, separators=(",", ":")),
+    )
+
+
+def _diagnose_failed_reported_token_stop(article_id, run_id, claimed_at):
+    """原普通failed消息只读诊断；没有完整持久收口证据就交回原prepare拒绝。"""
+    from . import translation_retry_budget as core
+    if _current_offline_budget_binding() is None:
+        return None
+    binding, refusal = _bound_preflight(timezone.now())
+    if refusal:
+        return refusal.reason
+    if (type(article_id) is not int or article_id <= 0 or type(run_id) is not int
+            or run_id <= 0 or type(claimed_at) is not str):
+        return None
+    with transaction.atomic():
+        root, root_reason = core._locked_root(binding.identity)
+        article = NewsArticle.objects.select_for_update().filter(pk=article_id).first()
+        run = TranslationRun.objects.select_for_update().filter(pk=run_id, article_id=article_id).first()
+        if root is None or article is None or run is None:
+            return None
+        raw = run.raw_response
+        claim = raw.get(CLAIM_KEY) if type(raw) is dict else None
+        if (type(claim) is not dict or claim.get("claimed_at") != claimed_at
+                or claim.get("phase") != "failed" or run.status != TranslationStatus.FAILED
+                or claim.get("budget_blocked_reason") != core.REPORTED_TOKEN_STOP
+                or article.translation_status != ArticleTranslationStatus.FAILED
+                or article.translation_next_retry_at is not None or article.translation_started_at is not None
+                or RESULT_KEY in raw or _ordinary_registered_run_reason(run)
+                or TranslationRun.objects.filter(article_id=article_id, pk__gt=run_id).exists()):
+            return None
+        try:
+            started, deadline = datetime.fromisoformat(claimed_at), datetime.fromisoformat(claim["deadline_at"])
+            if not core._aware(started) or not core._aware(deadline) or not root.opened_at <= started < deadline <= root.deadline_at:
+                return "claim_changed"
+            identity = _active_bound_identity(article, binding)
+        except ManagedTranslationBudgetBlocked as exc:
+            return exc.core_reason
+        except (ValueError, TypeError, KeyError):
+            return "claim_changed"
+        if translation_input_sha256(article) != claim.get("input_sha256"):
+            return "input_changed"
+        _, reason = _claim_uuid_history_reason(root, article, run, claimed_at)
+        if reason:
+            return reason
+        reason = core._identity_reason(root, identity) or root_reason
+        if reason:
+            return reason
+        if core._actual_now(timezone.now()) >= deadline:
+            return "claim_expired"
+        reason = _bound_admission(root, identity, binding, core._actual_now(timezone.now()))
+        if reason != core.REPORTED_TOKEN_STOP:
+            return reason or None
+        attempts = list(root.request_attempts.filter(claim_execution_uuid=UUID(claim["claim_execution_uuid"])).order_by("provider_attempt_index"))
+        if (not attempts or [a.provider_attempt_index for a in attempts] != list(range(1, len(attempts) + 1))
+                or raw.get("usage") != attempts[-1].usage_report):
+            return "ledger_inconsistent"
+        _record_reported_token_stop_locked(root, article, run)
+        return core.REPORTED_TOKEN_STOP
 
 
 def _claim_bound_translation_retry(article_id, *, expected_due_at, now):
@@ -779,6 +858,8 @@ def _close_bound_failure(article_id, run_id, claimed_at, *, reason=None, error=N
             run.raw_response = {**run.raw_response, CLAIM_KEY: {
                 **run.raw_response[CLAIM_KEY], "budget_blocked_reason": reason}}
             _save_claim_terminal(run, "interrupted", error=reason)
+            if reason == core.REPORTED_TOKEN_STOP:
+                _record_reported_token_stop_locked(root, article, run)
         else:
             record_translation_failure(article, error, now=now, is_retry=True, notify=False)
             budget_reason = _bound_admission(root, identity, binding, core._actual_now(now))
@@ -788,6 +869,9 @@ def _close_bound_failure(article_id, run_id, claimed_at, *, reason=None, error=N
             run.raw_response = {**run.raw_response, CLAIM_KEY: {
                 **run.raw_response[CLAIM_KEY], "budget_blocked_reason": budget_reason or ""}}
             _save_claim_terminal(run, "failed", metadata=getattr(error, "metadata", None), error=str(error))
+            if budget_reason == core.REPORTED_TOKEN_STOP:
+                _record_reported_token_stop_locked(root, article, run)
+                reason = budget_reason
     return article, reason or "", True
 
 
