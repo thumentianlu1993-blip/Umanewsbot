@@ -8,6 +8,7 @@ from dataclasses import replace
 from datetime import timedelta
 import json
 import inspect
+import traceback
 import unittest
 from uuid import uuid4
 from unittest.mock import patch
@@ -157,19 +158,37 @@ class ManagedReadonlyTranslationEndToEndTests(RemainingReadonlyE2EFixture, Manag
         self.assertEqual(run.raw_response[recovery.RESULT_KEY]["metadata"][job.PROVENANCE_KEY]["read_result_sha256"], step.result_sha256)
 
     def test_publication_v2_lifecycle_only_fetches_bounded_evidence_projection(self):
+        from stable.models import HomepageHeadlineRecommendation, HomepageHeadlineSelection
         self.user_retry_message(receipt_version=2)
-        with CaptureQueriesContext(connection) as queries:
+        selection, _ = HomepageHeadlineSelection.objects.update_or_create(
+            slot=HomepageHeadlineSelection.SLOT_HOMEPAGE_PRIMARY, defaults={"article": self.article, "version": 2})
+        recommendation = HomepageHeadlineRecommendation.objects.create(article=self.article,
+            status=HomepageHeadlineRecommendation.Status.ACTIVE, reason="offline v2 fixture", engine_version="offline-test-v1")
+        evidence_reads = []
+        def observe(execute, sql, params, many, context):
+            if sql.lstrip().upper().startswith("SELECT") and '"published_at_evidence"' in sql:
+                evidence_reads.append({"sql_without_params": sql, "caller_functions": [frame.name for frame in traceback.extract_stack()
+                    if frame.filename.endswith(("signals.py", "editorial_headlines.py", "managed_readonly_steps.py", "managed_readonly_translation.py"))]})
+            return execute(sql, params, many, context)
+        with CaptureQueriesContext(connection) as queries, connection.execute_wrapper(observe):
             self.register()
             initial = self.consume()
             repeated = self.consume()
         self.assertTrue(initial.get("translated"), initial)
         self.assertEqual(repeated.get("final_receipt"), initial["final_receipt"])
         selects = [q["sql"] for q in queries if q["sql"].lstrip().upper().startswith("SELECT") and '"published_at_evidence"' in q["sql"]]
-        self.assertEqual(len(selects), 1, "v2 registration/claim/source/model/checkpoint/final/replay must not fetch unbounded JSON")
+        self.assertEqual(len(selects), 1, "v2 registration/claim/source/model/checkpoint/final/replay must not fetch unbounded JSON: "
+                         + json.dumps(evidence_reads, ensure_ascii=False))
         self.assertIn('AS "_ro_publication_evidence"', selects[0])
         self.assertIn("4097", selects[0])
         self.assertEqual(self.reads(), 1)
         self.assertEqual(len(self.creates()), 1)
+        selection.refresh_from_db(); recommendation.refresh_from_db()
+        self.assertIsNone(selection.article_id)
+        self.assertEqual(selection.version, 3)
+        self.assertEqual(recommendation.status, recommendation.Status.INVALIDATED)
+        self.assertEqual(OperationLog.objects.filter(action_type="headline_invalidated").count(), 1)
+        self.assertEqual(OperationLog.objects.filter(action_type="headline_recommendation_invalidated").count(), 1)
         self.assertEqual(self.plan["payload"]["job_kind"], "readonly_translation_retry_v2")
         self.assertEqual(self.plan["payload"]["steps"][0]["tool"], "source_excerpt_v2")
         # A re-signed mixed plan still cannot turn v2 result identity into a v1 job.

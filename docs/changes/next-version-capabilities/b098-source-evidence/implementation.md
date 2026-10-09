@@ -4,7 +4,9 @@
 真实 RED 候选 `6eb44b73bbb0fddc8acb25056abecc04eba7eedf` 的两个方法已由 ROOT 在实际
 PostgreSQL/Django 执行，三个 DB verified 子场景及消费者共四条缺 publication 的 FAIL，0 ERROR/skip；
 原 R 回执 `ACCEPTED_ACTUAL_EXACT2_PUBLICATION_RED`，报告提交 `164320393f6ede79a69b5e5770357b81e70abc33`。
-本候选实现与新增测试已完成静态检查；实际 GREEN、直接回归及原 R 代码审核待执行。
+首个实现候选 `ee5aec43dc0a21f7dfcf0082644c527c339c7e06` 已实际 exact2 GREEN（2 PASS，0 FAIL/ERROR/SKIP）。
+六模块原生收集 135 唯一 IDs/1 批/0 声明跳过；实际回归 135 执行、2 FAIL、0 ERROR/SKIP。
+当前为这两项失败的定因返修；新候选定向复验、扩大后的原生模块收集/回归和原 R 代码审核待执行。
 
 ## 实现合同
 
@@ -48,3 +50,22 @@ v2 reported-token stop 的正常对照、停止、unknown 重投与免费 checkp
 实际测试由 ROOT 分配原固定 runner 资源窗口；静态 codec 检查不计实际 ORM GREEN。
 恢复测试为 fresh scoped invocation，未声称跨进程重启证明或完整 M02/M03 验收。
 无 push/PR、合并、发布、生产操作、真实 SDK、付费调用或扩抓。
+
+## 首次实际回归返修
+
+- 独立 reader 测试继承原 30 分钟 parent，而新测试误按注册消费者的 10 分钟合同，
+  将时钟移到第 11 分钟。修为实际 `root.deadline_at + 1 秒`，保留拒绝断言并加强拒绝原因与槽不变；
+  业务期限围栏不改。原 exact2 RED 方法不改。
+- 文章最终保存触发真实 `post_save` → `on_commit` → 头条失效函数，后者重新 SELECT 完整 Article，
+  造成专用受限 evidence SELECT 之外又取一次完整 JSON。ROOT 追加授权仅修改该 receiver/callback
+  与该失效函数：注册 callback 时捕获实例是否已 defer evidence 的原生 bool；失效函数默认 False，
+  True 只延迟该字段。此 bool 是字段加载约束，不是 v2 身份或权限证明；其他本来 defer 此字段的保存
+  也继承该加载约束，普通已加载实例仍沿原行为。on_commit 时机、selection→recommendation→Article
+  锁顺序、资格判断、清空/version/审计及原异常处理保留。
+- 加强原 v2 生命周期测试：真实 selection/recommendation 均指向文章，要求完成态失效/双审计仍发生，
+  全链仍只有一条带 evidence 的受限材料 SELECT。失败诊断只捕获 SQL 结构与调用函数，不输出 SQL 参数。
+  新增三个头条直接方法验证 deferred 保存、注册后实例状态变化、普通默认加载和仍合格文章。
+  回归追加 `stable.test_editorial_headlines`，须重新真实收集；旧 135 个 ID 不减，不伪称新分母仍为 135。
+
+首轮失败实际报告 SHA `6f0062bcfbddd451845553ccf7d119ad41e1acc350acc2f96e389f1a4e7eb570`；
+旧 RED/GREEN/collect/native135 实际 runtime 保持只读，ROOT 独立 FREE 已确认。

@@ -230,13 +230,21 @@ class ManagedReadonlyStepTests(ManagedTranslationBudgetConsumerFixture):
                 self.assertTrue(original.allowed)
                 if fence == "grant":
                     with self.scope():ro.revoke_read_grant(self.readroot.pk)
-                elif fence == "deadline":self.clock.return_value = NOW + timedelta(minutes=11)
+                elif fence == "deadline":
+                    # This standalone reader fixture inherits a 30-minute parent;
+                    # expire its actual persisted deadline, not the registered-job 10-minute limit.
+                    self.clock.return_value = self.readroot.deadline_at + timedelta(seconds=1)
+                    self.assertGreater(self.clock.return_value, self.readroot.deadline_at)
                 elif fence == "body":NewsArticle.objects.filter(pk=self.article.pk).update(body_ja_raw="changed", body_ja_normalized="changed")
                 else:
                     models.QuerySet.update(ManagedReadonlyTaskBudget.objects.filter(pk=self.readroot.pk), result_version=ro.RESULT_VERSION)
                 rejected, reader = self.invoke()
                 self.assertFalse(rejected.allowed)
+                if fence == "deadline":
+                    self.assertIn(rejected.reason, {"claim_expired", "read_deadline_expired"})
                 self.assertEqual(reader.trace, [])
+                self.readroot.refresh_from_db()
+                self.assertEqual(self.readroot.tool_reads_reserved, 1)
                 self.assertEqual(self.step().result, original.result)
 
     def step(self):

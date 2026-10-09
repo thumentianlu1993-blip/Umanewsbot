@@ -93,19 +93,24 @@ def _invalidate_headline_on_article_change(sender, instance, **kwargs):
     """When an article is saved, after the transaction commits, check if it
     invalidates the current headline selection or active recommendation."""
     from django.db import transaction as db_transaction
+    article_id = instance.id
+    # Capture a field-loading constraint now, not mutable instance state at commit.
+    # This is not v2 identity or permission; any already-deferred evidence stays deferred.
+    defer_evidence = "published_at_evidence" in instance.get_deferred_fields()
     db_transaction.on_commit(
-        lambda: _invalidate_headline_for_article(instance.id)
+        lambda: _invalidate_headline_for_article(article_id, defer_publication_evidence=defer_evidence)
     )
 
 
-def _invalidate_headline_for_article(article_id: int):
+def _invalidate_headline_for_article(article_id: int, *, defer_publication_evidence=False):
     from stable.services.editorial_headlines import (
         invalidate_headline_state_for_article,
     )
 
     try:
+        options = {"defer_publication_evidence": True} if defer_publication_evidence else {}
         invalidate_headline_state_for_article(
-            article_id, reason="article_became_ineligible"
+            article_id, reason="article_became_ineligible", **options
         )
     except Exception:
         logger.exception(
