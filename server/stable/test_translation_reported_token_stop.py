@@ -16,7 +16,7 @@ from unittest.mock import patch
 from django.contrib.admin import AdminSite
 from django.contrib.auth import get_user_model
 from django.contrib.messages.storage.fallback import FallbackStorage
-from django.db import connection, connections, transaction
+from django.db import OperationalError, connection, connections, transaction
 from django.db.models import QuerySet
 from django.test import RequestFactory
 
@@ -156,7 +156,8 @@ class ReportedTokenStopTests(RemainingReadonlyE2EFixture, ManagedTranslationBudg
         fixture_requirement(sdk._closed and (reader is None or reader.closed), "closed dependencies released")
         self.constructor.assert_not_called()
 
-    def run_quality_scenario(self, *, registered, token_limit, max_attempts=2, expect_provider_failure=False):
+    def run_quality_scenario(self, *, registered, token_limit, max_attempts=2, expect_provider_failure=False,
+                             expect_audit_failure=False):
         self.prepare_scenario(registered=registered, token_limit=token_limit)
         script = [{"content": json.dumps({**self.payload, "body_zh": ""}, ensure_ascii=False),
                    "usage": REPORTED_USAGE, "wait_for_receipt": True}, *self.normal_script()]
@@ -170,6 +171,10 @@ class ReportedTokenStopTests(RemainingReadonlyE2EFixture, ManagedTranslationBudg
                     if not expect_provider_failure:
                         raise
                     return {"provider_failure": True}
+                except OperationalError as exc:
+                    if not expect_audit_failure:
+                        raise
+                    return {"raised_audit_error": str(exc)}
         with self.settings(TRANSLATION_MAX_ATTEMPTS=max_attempts):
             with self.running_workers(consume, releases=(sdk.choices_release,)) as state:
                 fixture_requirement(sdk.choices_ready.wait(8),
@@ -183,6 +188,7 @@ class ReportedTokenStopTests(RemainingReadonlyE2EFixture, ManagedTranslationBudg
                 audited = core.record_usage(budget_pk=self.budget.pk, attempt_pk=attempt.pk,
                                             mode="offline_test", usage_report=REPORTED_USAGE, receipt=receipt)
                 fixture_requirement(audited.allowed, "real synthetic reconciliation prerequisite: " + audited.reason)
+                self.receipt_gate_snapshot = self.stop_snapshot()
                 sdk.choices_release.set()
             self.workers_clean(state)
         self.constructor.assert_not_called()
@@ -325,9 +331,46 @@ class ReportedTokenStopTests(RemainingReadonlyE2EFixture, ManagedTranslationBudg
         self.assertEqual(self.stop_snapshot(), before)
         self.assertEqual(OperationLog.objects.filter(action_type="translation_budget_stopped", target_id=str(self.article.pk)).count(), logs + 1)
         self.assert_stop_log()
-        with self.dependencies([]):
+        before = self.stop_snapshot()
+        logs = OperationLog.objects.filter(action_type="translation_budget_stopped", target_id=str(self.article.pk)).count()
+        with self.settings(TRANSLATION_MODEL="changed-model"):
+            refused, sdk = self.replay()
+        self.assertEqual(refused.get("reason"), "budget_version_changed")
+        self.assertEqual(sdk.trace, [])
+        self.assertEqual(self.stop_snapshot(), before)
+        self.assertEqual(OperationLog.objects.filter(action_type="translation_budget_stopped", target_id=str(self.article.pk)).count(), logs)
+        restored, sdk = self.replay()
+        self.assertEqual(restored.get("reason"), core.REPORTED_TOKEN_STOP)
+        self.assertEqual(sdk.trace, [])
+        self.assertEqual(self.stop_snapshot(), before)
+        self.assertEqual(OperationLog.objects.filter(action_type="translation_budget_stopped", target_id=str(self.article.pk)).count(), logs + 1)
+        with self.dependencies(self.normal_script()) as sdk:
             unbound_message = translate_article_task.run(self.article.pk, suppress_automation=True)
         self.assertEqual(unbound_message.get("reason"), "bound_claim_identity_missing")
+        self.assertEqual(sdk.trace, [])
+        # Fail only the finite persistent stop-log save, never mock admission or audit success.
+        saved = OperationLog.save
+        hits = []
+        def fail_stop_log(log, *args, **kwargs):
+            if log.action_type == "translation_budget_stopped":
+                hits.append(log.target_id)
+                raise OperationalError("B091 stop diagnostic save fault")
+            return saved(log, *args, **kwargs)
+        with patch.object(OperationLog, "save", new=fail_stop_log):
+            result, creates = self.run_quality_scenario(registered=False, token_limit=3, max_attempts=1,
+                                                        expect_audit_failure=True)
+        self.assertEqual(result, {"raised_audit_error": "B091 stop diagnostic save fault"})
+        self.assertEqual(hits, [str(self.article.pk)])
+        self.assertEqual(len(creates), 1)
+        self.assertEqual(self.stop_snapshot(), self.receipt_gate_snapshot)
+        self.assertEqual(self.actual_run().status, "started")
+        self.assertEqual(self.actual_run().raw_response[recovery.CLAIM_KEY]["phase"], "executing")
+        self.assertNotIn("budget_blocked_reason", self.actual_run().raw_response[recovery.CLAIM_KEY])
+        self.assertFalse(OperationLog.objects.filter(action_type="translation_budget_stopped", target_id=str(self.article.pk)).exists())
+        failed_log = TaskExecutionLog.objects.filter(task_name="translate_article",
+            detail__contains="B091 stop diagnostic save fault").first()
+        self.assertIsNotNone(failed_log)
+        self.assertEqual(failed_log.status, "failed")
         # Corrupting an existing negative fixture cannot create new stop/claim evidence.
         for fault in ("missing_stop", "phase", "status", "raw", "usage", "claim_uuid", "source", "policy", "deadline", "new_run", "unknown", "unreconciled"):
             with self.subTest(fault=fault):

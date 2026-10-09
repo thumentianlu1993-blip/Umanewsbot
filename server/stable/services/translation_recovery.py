@@ -596,7 +596,11 @@ def _bound_preflight(now):
 def _bound_admission(root, identity, binding, now):
     from . import translation_retry_budget as core
     # 私有绑定版本与实际SDK数据都核验，仍复用同一core；未结消费优先于任何版本漂移。
-    return core._admission(root, binding.identity, now) or core._admission(root, identity, now)
+    bound_reason = core._admission(root, binding.identity, now)
+    if bound_reason != core.REPORTED_TOKEN_STOP:
+        return bound_reason or core._admission(root, identity, now)
+    # 只延迟新停止原因；当前source/provider/model围栏仍必须有效。
+    return core._admission(root, identity, now) or bound_reason
 
 
 def _claim_uuid_history_reason(root, article, run, claimed_at, provider_attempt_index=None):

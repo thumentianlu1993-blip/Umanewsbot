@@ -40,3 +40,14 @@ ROOT 已明确授权既有 M02 本地 G1 范围，固定实施合同 b318988257d
 候选 manifest 包含 exact6、原35原 ID 与字节，以及全部本次直接引用消费者的预算/claim/checkpoint/重试/metadata 与翻译兼容模块；是待 ROOT/C 锁定执行批次的输入，不是实际收集分母，不替代 formal/full 义务。ROOT 转原 R 代码审后另给固定执行包与 fresh 窗口。未来 GREEN 采集应在下一包精确修旧 literal_eval 枚举缺陷，并用现存原日志离线校准；不得改业务断言以迎合 formatter。
 
 未合并/部署/迁移/启用/生产验收，M02/M03 整体仍未完成；原35、必要预算影响及完整质量义务保留，原逾期与10/23候选观察窗口不变。
+
+
+## 原 R 两项 finding 窄修订（B091-F01-F02-CODE-REPAIR-001）
+
+原候选607c23870及原runtime封存保留，原 R c88fdf89报告CHANGES_REQUIRED（F01/F02各P2），receipt SHA1843a2ba5bffebdfe35af9b75434265df1d481db01c99e6ccb748c166eef079e。ROOT授权既有M02 G1内技术修订，仅改translation_recovery.py、新六方法测试与本说明；本修订仍待同原R窄复审，不自行关闭finding。
+
+F01：_bound_admission仅延迟新增reported_token_stop_reached，待实际source/provider/model身份的原core准入有效后才保留；原bound unknown/未对账/其它拒绝和v1路径不变。普通真实failed消息子场景更改TRANSLATION_MODEL，要求budget_version_changed、SDK trace空、停止日志数和完整业务快照不变；退出settings恢复后原停止诊断可用。
+
+F02：无原message子场景使用已有非空normal_script依赖并断言拒绝后trace空，不放宽closedSDK原1..16脚本合同。顺带在同ordinary方法仅对translation_budget_stopped的OperationLog.save注入一次OperationalError；真实max1质量失败和usage对账gate之后，收口事务实际抛错，测试要求Article/Run/账与gate前快照完全相同、Run仍executing且无停止字段/日志，TaskExecutionLog真实failed。不mock业务成功或构造新due/claim，故障观察不是task成功输出。
+
+六方法分母、原35和11整模块候选保持。新必要runtime为/Users/mentianlu/.codex/runtime/b091-f01-f02-code-repair-001；静态准入顺序校准仅隔离AST，不代表实际ORM回滚已执行。没有重跑RED、改旧B090包、native collect、GREEN或Docker/PG/FD/网络SDK操作。
