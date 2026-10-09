@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from dataclasses import replace
 from datetime import timedelta
 import json
+import inspect
 import unittest
 from uuid import uuid4
 from unittest.mock import patch
@@ -54,7 +55,7 @@ class ManagedReadonlyTranslationEndToEndTests(RemainingReadonlyE2EFixture, Manag
         self.plan = None
         self.addCleanup(connections.close_all)
 
-    def user_retry_message(self):
+    def user_retry_message(self, receipt_version=1):
         """真实admin→OperationLog/due→selector/claim；仅外部broker dispatch capture。"""
         fixture_requirement(connection.vendor == "postgresql" and not connection.in_atomic_block,
                             "B051必须ROOT独占真实PG、无外层atomic")
@@ -94,8 +95,11 @@ class ManagedReadonlyTranslationEndToEndTests(RemainingReadonlyE2EFixture, Manag
             fixture_requirement(kwargs.get("preclaimed_retry") is True and type(kwargs.get("claim_run_id")) is int
                                 and kwargs.get("claim_started_at") == NOW.isoformat(), "claim envelope不完整")
             self.envelope = ro.ReadEnvelope(self.article.pk, kwargs["claim_run_id"], kwargs["claim_started_at"])
-            self.readroot = ro.initialize_read_budget(tool_read_limit=1, now=NOW, baseline={
-                "kind": "synthetic_no_prior_tool_reads", "operation_uuid": str(self.identity.operation_uuid)})
+            options = {"tool_read_limit": 1, "now": NOW, "baseline": {
+                "kind": "synthetic_no_prior_tool_reads", "operation_uuid": str(self.identity.operation_uuid)}}
+            if "receipt_version" in inspect.signature(ro.initialize_read_budget).parameters:
+                options["receipt_version"] = receipt_version
+            self.readroot = ro.initialize_read_budget(**options)
         fixture_requirement(self.budget.requests_reserved == 0 and self.budget.request_attempts.count() == 0
                             and self.readroot.steps.count() == 0, "新合成baseline不能已有消费")
 
@@ -130,6 +134,26 @@ class ManagedReadonlyTranslationEndToEndTests(RemainingReadonlyE2EFixture, Manag
             result = translate_article_task.run(*args, **kwargs)
         print("B051_ACTUAL_CONSUMER", self.envelope, result, flush=True)
         return result
+
+    def test_publication_receipt_real_consumer_checkpoint(self):
+        publication = NOW - timedelta(days=3)
+        self.article.published_at = publication
+        self.article.published_at_verified = None
+        self.article.published_at_evidence = {"method": "stored-db"}
+        self.article.save(update_fields=["published_at", "published_at_verified", "published_at_evidence"])
+        self.user_retry_message(receipt_version=2)
+        self.register()
+        outcome = self.consume()
+        run = TranslationRun.objects.get(pk=self.envelope.run_id)
+        step = self.readroot.steps.get()
+        self.assertEqual(run.status, "success", outcome)
+        self.assertEqual(self.reads(), 1)
+        self.assertIn("publication", step.result)
+        self.assertEqual(step.result["publication"]["published_at"], publication.isoformat())
+        self.assertIsNone(step.result["publication"]["verified"])
+        progress = run.raw_response[job.PROGRESS_KEY]
+        self.assertEqual(progress["read_reference"], {"step_uuid": str(step.step_uuid), "result_sha256": step.result_sha256})
+        self.assertEqual(run.raw_response[recovery.RESULT_KEY]["metadata"][job.PROVENANCE_KEY]["read_result_sha256"], step.result_sha256)
 
     def reads(self):
         return sum(sum(event["event"] == "business_read" for event in reader.trace) for reader in self.readers)

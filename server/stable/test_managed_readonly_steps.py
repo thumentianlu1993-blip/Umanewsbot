@@ -3,6 +3,7 @@ from contextlib import contextmanager
 from dataclasses import replace
 from datetime import datetime, timedelta
 import hashlib
+import inspect
 import json
 from uuid import UUID, uuid4
 from threading import Thread
@@ -53,6 +54,41 @@ class ManagedReadonlyStepTests(ManagedTranslationBudgetConsumerFixture):
                                      now=self.clock.return_value)
         self.assertTrue(reader.closed)
         return result, reader
+
+    def init_publication_receipt(self):
+        # RED baseline reaches the original real ORM reader when opt-in API is absent.
+        # GREEN must explicitly select v2; no business result or permission is mocked.
+        options = {"tool_read_limit": 1, "now": NOW, "baseline": {
+            "kind": "synthetic_no_prior_tool_reads", "operation_uuid": str(self.identity.operation_uuid)}}
+        if "receipt_version" in inspect.signature(ro.initialize_read_budget).parameters:
+            options["receipt_version"] = 2
+        with recovery._offline_budget_scope(self.identity):
+            self.readroot = ro.initialize_read_budget(**options)
+
+    def test_publication_receipt_real_orm_three_states(self):
+        for verified in (True, False, None):
+            with self.subTest(verified=verified):
+                self.new_case()
+                publication = NOW - timedelta(days=2)
+                self.article.published_at = publication
+                self.article.published_at_verified = verified
+                self.article.published_at_evidence = {"method": "stored-db", "source_url": "https://example.test/source"}
+                self.article.save(update_fields=["published_at", "published_at_verified", "published_at_evidence"])
+                self.init_publication_receipt()
+                result, reader = self.invoke()
+                self.assertTrue(result.allowed, result.reason)
+                self.assertEqual(sum(e["event"] == "business_read" for e in reader.trace), 1)
+                self.assertIn("publication", result.result)
+                receipt = result.result["publication"]
+                self.assertEqual(receipt["published_at"], publication.isoformat())
+                self.assertIs(receipt["verified"], verified)
+                self.assertNotEqual(receipt["published_at"], result.result["read_at"])
+                self.assertEqual(receipt["evidence_status"], "projected")
+                self.assertEqual(receipt["evidence"], self.article.published_at_evidence)
+                step = self.step()
+                self.assertEqual(result.result["step_uuid"], str(step.step_uuid))
+                self.assertEqual(step.result, result.result)
+                self.assertEqual(step.result_sha256, ro._sha(result.result))
 
     def step(self):
         step = self.readroot.steps.first()
