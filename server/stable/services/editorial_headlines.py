@@ -882,7 +882,7 @@ def accept_headline_recommendation(
 
 
 def invalidate_headline_state_for_article(
-    article_id, *, reason="article_became_ineligible"
+    article_id, *, reason="article_became_ineligible", defer_publication_evidence=False,
 ) -> int:
     """Check and clear headline state that references an ineligible article.
 
@@ -899,6 +899,9 @@ def invalidate_headline_state_for_article(
     int
         Number of records modified (0, 1, or 2).
     """
+    # Optional field-loading constraint; never a permission or eligibility signal.
+    if type(defer_publication_evidence) is not bool:
+        raise ValueError("defer_publication_evidence must be bool")
     changes = 0
     with transaction.atomic():
         # Lock selection (singleton row via get_or_create, then lock it)
@@ -922,7 +925,10 @@ def invalidate_headline_state_for_article(
 
         # Lock the article so eligibility check is consistent with the write
         try:
-            article = NewsArticle.objects.select_for_update().get(pk=article_id)
+            articles = NewsArticle.objects.select_for_update()
+            if defer_publication_evidence:
+                articles = articles.defer("published_at_evidence")
+            article = articles.get(pk=article_id)
         except NewsArticle.DoesNotExist:
             article = None
 

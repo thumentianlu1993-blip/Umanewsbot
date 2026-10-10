@@ -7,6 +7,8 @@ from contextlib import contextmanager
 from dataclasses import replace
 from datetime import timedelta
 import json
+import inspect
+import traceback
 import unittest
 from uuid import uuid4
 from unittest.mock import patch
@@ -16,6 +18,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.db import connection, connections
 from django.test import RequestFactory
+from django.test.utils import CaptureQueriesContext
 
 from stable import admin as article_admin
 from stable.models import (ArticleStatus, ArticleTranslationStatus, NewsArticle, NotificationLog,
@@ -54,7 +57,7 @@ class ManagedReadonlyTranslationEndToEndTests(RemainingReadonlyE2EFixture, Manag
         self.plan = None
         self.addCleanup(connections.close_all)
 
-    def user_retry_message(self):
+    def user_retry_message(self, receipt_version=1):
         """真实admin→OperationLog/due→selector/claim；仅外部broker dispatch capture。"""
         fixture_requirement(connection.vendor == "postgresql" and not connection.in_atomic_block,
                             "B051必须ROOT独占真实PG、无外层atomic")
@@ -94,8 +97,11 @@ class ManagedReadonlyTranslationEndToEndTests(RemainingReadonlyE2EFixture, Manag
             fixture_requirement(kwargs.get("preclaimed_retry") is True and type(kwargs.get("claim_run_id")) is int
                                 and kwargs.get("claim_started_at") == NOW.isoformat(), "claim envelope不完整")
             self.envelope = ro.ReadEnvelope(self.article.pk, kwargs["claim_run_id"], kwargs["claim_started_at"])
-            self.readroot = ro.initialize_read_budget(tool_read_limit=1, now=NOW, baseline={
-                "kind": "synthetic_no_prior_tool_reads", "operation_uuid": str(self.identity.operation_uuid)})
+            options = {"tool_read_limit": 1, "now": NOW, "baseline": {
+                "kind": "synthetic_no_prior_tool_reads", "operation_uuid": str(self.identity.operation_uuid)}}
+            if "receipt_version" in inspect.signature(ro.initialize_read_budget).parameters:
+                options["receipt_version"] = receipt_version
+            self.readroot = ro.initialize_read_budget(**options)
         fixture_requirement(self.budget.requests_reserved == 0 and self.budget.request_attempts.count() == 0
                             and self.readroot.steps.count() == 0, "新合成baseline不能已有消费")
 
@@ -130,6 +136,136 @@ class ManagedReadonlyTranslationEndToEndTests(RemainingReadonlyE2EFixture, Manag
             result = translate_article_task.run(*args, **kwargs)
         print("B051_ACTUAL_CONSUMER", self.envelope, result, flush=True)
         return result
+
+    def test_publication_receipt_real_consumer_checkpoint(self):
+        publication = NOW - timedelta(days=3)
+        self.article.published_at = publication
+        self.article.published_at_verified = None
+        self.article.published_at_evidence = {"method": "stored-db"}
+        self.article.save(update_fields=["published_at", "published_at_verified", "published_at_evidence"])
+        self.user_retry_message(receipt_version=2)
+        self.register()
+        outcome = self.consume()
+        run = TranslationRun.objects.get(pk=self.envelope.run_id)
+        step = self.readroot.steps.get()
+        self.assertEqual(run.status, "success", outcome)
+        self.assertEqual(self.reads(), 1)
+        self.assertIn("publication", step.result)
+        self.assertEqual(step.result["publication"]["published_at"], publication.isoformat())
+        self.assertIsNone(step.result["publication"]["verified"])
+        progress = run.raw_response[job.PROGRESS_KEY]
+        self.assertEqual(progress["read_reference"], {"step_uuid": str(step.step_uuid), "result_sha256": step.result_sha256})
+        self.assertEqual(run.raw_response[recovery.RESULT_KEY]["metadata"][job.PROVENANCE_KEY]["read_result_sha256"], step.result_sha256)
+
+    def test_publication_v2_lifecycle_only_fetches_bounded_evidence_projection(self):
+        from stable.models import HomepageHeadlineRecommendation, HomepageHeadlineSelection
+        self.user_retry_message(receipt_version=2)
+        selection, _ = HomepageHeadlineSelection.objects.update_or_create(
+            slot=HomepageHeadlineSelection.SLOT_HOMEPAGE_PRIMARY, defaults={"article": self.article, "version": 2})
+        recommendation = HomepageHeadlineRecommendation.objects.create(article=self.article,
+            status=HomepageHeadlineRecommendation.Status.ACTIVE, reason="offline v2 fixture", engine_version="offline-test-v1")
+        evidence_reads = []
+        def observe(execute, sql, params, many, context):
+            if sql.lstrip().upper().startswith("SELECT") and '"published_at_evidence"' in sql:
+                evidence_reads.append({"sql_without_params": sql, "caller_functions": [frame.name for frame in traceback.extract_stack()
+                    if frame.filename.endswith(("signals.py", "editorial_headlines.py", "managed_readonly_steps.py", "managed_readonly_translation.py"))]})
+            return execute(sql, params, many, context)
+        with CaptureQueriesContext(connection) as queries, connection.execute_wrapper(observe):
+            self.register()
+            initial = self.consume()
+            repeated = self.consume()
+        self.assertTrue(initial.get("translated"), initial)
+        self.assertEqual(repeated.get("final_receipt"), initial["final_receipt"])
+        selects = [q["sql"] for q in queries if q["sql"].lstrip().upper().startswith("SELECT") and '"published_at_evidence"' in q["sql"]]
+        self.assertEqual(len(selects), 1, "v2 registration/claim/source/model/checkpoint/final/replay must not fetch unbounded JSON: "
+                         + json.dumps(evidence_reads, ensure_ascii=False))
+        self.assertIn('AS "_ro_publication_evidence"', selects[0])
+        self.assertIn("4097", selects[0])
+        self.assertEqual(self.reads(), 1)
+        self.assertEqual(len(self.creates()), 1)
+        selection.refresh_from_db(); recommendation.refresh_from_db()
+        self.assertIsNone(selection.article_id)
+        self.assertEqual(selection.version, 3)
+        self.assertEqual(recommendation.status, recommendation.Status.INVALIDATED)
+        self.assertEqual(OperationLog.objects.filter(action_type="headline_invalidated").count(), 1)
+        self.assertEqual(OperationLog.objects.filter(action_type="headline_recommendation_invalidated").count(), 1)
+        self.assertEqual(self.plan["payload"]["job_kind"], "readonly_translation_retry_v2")
+        self.assertEqual(self.plan["payload"]["steps"][0]["tool"], "source_excerpt_v2")
+        # A re-signed mixed plan still cannot turn v2 result identity into a v1 job.
+        altered = deepcopy(self.actual_run().raw_response)
+        altered[job.PLAN_KEY]["payload"]["job_kind"] = "readonly_translation_retry_v1"
+        altered[job.PLAN_KEY]["payload_sha256"] = job._sha(altered[job.PLAN_KEY]["payload"])
+        with self.assertRaises(job.RegisteredJobRefusal):job.decode_control(altered)
+
+    def test_publication_v2_read_checkpoint_final_reuse_preserves_original_receipt(self):
+        self.user_retry_message(receipt_version=2); self.register()
+        with self.scope(reader_fault="exit_after_commit"):
+            job.prepare_registered_read_phase(self.envelope)
+            with self.assertRaises(ro.ReadFixtureExit):ro.execute_step(self.envelope, {"body_chars": 256}, now=NOW)
+        step = self.readroot.steps.get()
+        original = deepcopy((step.step_uuid, step.read_at, step.result_sha256, step.result))
+        NewsArticle.objects.filter(pk=self.article.pk).update(published_at=NOW-timedelta(days=20), published_at_verified=True,
+            published_at_evidence={"method": "changed-after-read"})
+        # Exit after the actual checkpoint transaction; resume gets no new model/read charge.
+        with self.checkpoint_commit_gate(exit_after=True):
+            with self.assertRaises(CommittedFixtureExit):self.consume()
+        run = self.actual_run()
+        self.assertEqual(run.raw_response[job.PROGRESS_KEY]["state"], "checkpoint_saved")
+        checkpoint = deepcopy(run.raw_response[recovery.RESULT_KEY])
+        before = (self.reads(), len(self.creates()), self.counters())
+        completed = self.consume()
+        self.assertTrue(completed.get("translated"), completed)
+        replay = self.consume()
+        self.assertEqual(replay.get("final_receipt"), completed["final_receipt"])
+        self.assertEqual(self.actual_run().raw_response[recovery.RESULT_KEY], checkpoint)
+        self.assertEqual((self.reads(), len(self.creates()), self.counters()), before)
+        step.refresh_from_db()
+        self.assertEqual((step.step_uuid, step.read_at, step.result_sha256, step.result), original)
+        self.assertEqual(completed["final_receipt"]["payload"]["read_step_uuid"], str(step.step_uuid))
+        self.assertEqual(completed["final_receipt"]["payload"]["read_result_sha256"], step.result_sha256)
+
+    def test_publication_v2_invalid_material_prevents_provider_and_stays_unknown(self):
+        self.article.published_at_evidence = {"raw": "x" * 10000}
+        self.article.save(update_fields=["published_at_evidence"])
+        self.user_retry_message(receipt_version=2); self.register()
+        denied = self.consume()
+        self.assertFalse(denied.get("translated"), denied)
+        self.assertEqual(denied.get("reason"), "publication_evidence_oversized")
+        self.assertEqual((self.reads(), self.creates(), self.counters()), (1, [], (1, 0, 1, 0)))
+        self.assertNotIn(recovery.RESULT_KEY, self.actual_run().raw_response)
+        repeated = self.consume()
+        self.assertIn(repeated.get("reason"), {"step_result_unknown", "read_unknown"})
+        self.assertEqual((self.reads(), self.creates(), self.counters()), (1, [], (1, 0, 1, 0)))
+
+    def test_publication_v2_model_started_unknown_never_reissued(self):
+        self.user_retry_message(receipt_version=2); self.register()
+        def create(client, **kwargs):raise CommittedFixtureExit("actual CAS and request slot before wire")
+        with patch.object(translation._ClosedOfflineSDKClient, "create", new=create):
+            with self.assertRaises(CommittedFixtureExit):self.consume()
+        progress = deepcopy(self.actual_run().raw_response[job.PROGRESS_KEY])
+        self.assertEqual(progress["state"], "model_started")
+        self.assertEqual(self.counters(), (1, 1, 1, 1))
+        repeated = self.consume()
+        self.assertEqual(repeated.get("reason"), "model_start_unknown")
+        self.assertEqual(self.actual_run().raw_response[job.PROGRESS_KEY], progress)
+        self.assertEqual((self.reads(), self.creates(), self.counters()), (1, [], (1, 1, 1, 1)))
+
+    def test_publication_v2_checkpoint_apply_rejects_revocation_expiry_and_source_change(self):
+        for fence in ("grant", "deadline", "source"):
+            with self.subTest(fence=fence):
+                # Only the fixture's explicit initialization option is varied.
+                with patch.object(self, "user_retry_message", wraps=lambda: type(self).user_retry_message(self, receipt_version=2)):
+                    self.new_scenario()
+                with self.checkpoint_commit_gate(exit_after=True):
+                    with self.assertRaises(CommittedFixtureExit):self.case_consume()
+                checkpoint = deepcopy(self.actual_run().raw_response[recovery.RESULT_KEY])
+                self.mutate_fence(fence); before = self.business_snapshot()
+                denied = self.case_consume()
+                self.assertFalse(denied.get("translated"), denied)
+                self.assertEqual(self.business_snapshot(), before)
+                self.assertEqual(self.actual_run().raw_response[recovery.RESULT_KEY], checkpoint)
+                self.assertEqual((self.case_reads(), len(self.case_creates()), self.counters()), (1, 1, (1, 1, 1, 1)))
+                self.assert_not_applied()
 
     def reads(self):
         return sum(sum(event["event"] == "business_read" for event in reader.trace) for reader in self.readers)

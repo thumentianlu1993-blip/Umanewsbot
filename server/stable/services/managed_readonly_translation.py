@@ -35,6 +35,21 @@ FIXED_STEPS = [{"step_key": "source_excerpt:1", "tool": "source_excerpt_v1", "pa
 FIXED_LIMITS = {"tool_limit": 1, "request_limit": 2, "quality_round_limit": 2, "overall_seconds": 600}
 
 
+JOB_VERSIONS = {
+    ro.RECEIPT_VERSIONS[1]: ("readonly_translation_retry_v1", "program_fixed_translation_retry_v1", FIXED_STEPS),
+    ro.RECEIPT_VERSIONS[2]: ("readonly_translation_retry_v2", "program_fixed_translation_retry_v2", [
+        {"step_key": "source_excerpt:1", "tool": "source_excerpt_v2", "params": {"body_chars": 256}},
+        {"step_key": "translation_result:1", "tool": "translate_full_source_v1", "params": {}}]),
+}
+
+
+def _job_contract(identity):
+    versions = tuple(identity.get(k) for k in ("workflow_version", "query_version", "result_version"))
+    if any(type(v) is not str for v in versions) or versions not in JOB_VERSIONS:
+        _fail("version_changed")
+    return JOB_VERSIONS[versions]
+
+
 class RegisteredJobRefusal(ValueError):
     pass
 
@@ -152,13 +167,13 @@ def decode_control(raw):
     plan = raw[PLAN_KEY]
     payload = _signed(plan, {"plan_uuid", "job_kind", "plan_origin", "identity", "steps", "limits"})
     _uuid(payload["plan_uuid"])
-    if (payload["job_kind"] != "readonly_translation_retry_v1"
-            or payload["plan_origin"] != "program_fixed_translation_retry_v1"
-            or _json_bytes(payload["steps"]) != _json_bytes(FIXED_STEPS)
-            or _json_bytes(payload["limits"]) != _json_bytes(FIXED_LIMITS)):
-        _fail()
     identity = payload["identity"]
     _fields(identity, IDENTITY_FIELDS)
+    kind, origin, steps = _job_contract(identity)
+    if (payload["job_kind"] != kind or payload["plan_origin"] != origin
+            or _json_bytes(payload["steps"]) != _json_bytes(steps)
+            or _json_bytes(payload["limits"]) != _json_bytes(FIXED_LIMITS)):
+        _fail()
     for key in ("operation_uuid", "parent_budget_uuid", "read_budget_uuid", "claim_execution_uuid"):
         _uuid(identity[key])
     for key in ("input_sha256", "policy_sha256"):
@@ -342,7 +357,8 @@ def _locked_registration_context(binding, scope, sdk, envelope, *, phases, allow
             or sdk._budget_pk != parent.pk or parent.retired_at is not None):
         _fail("registered_scope_mismatch")
     article, run, reason = recovery._locked_translation_claim(
-        envelope.article_id, envelope.run_id, envelope.claimed_at, phase=phases, now=timezone.now())
+        envelope.article_id, envelope.run_id, envelope.claimed_at, phase=phases, now=timezone.now(),
+        defer_publication_evidence=(scope.result_version == ro.RECEIPT_VERSIONS[2][2]))
     if reason == "claim_already_consumed" and allow_completed:
         reason = _completed_claim_reason(article, run, envelope)
     if reason:
@@ -351,12 +367,12 @@ def _locked_registration_context(binding, scope, sdk, envelope, *, phases, allow
     actual = core._actual_now(timezone.now())
     deadline = min(root.deadline_at, datetime.fromisoformat(claim["deadline_at"]))
     if (root.state != "open" or root.permission_epoch != scope.permission_epoch
-            or root.allowed_tools != [ro.QUERY_VERSION]):
+            or root.allowed_tools != [scope.query_version]):
         _fail("grant_revoked")
     if actual >= deadline:
         _fail("deadline_expired")
-    if ((root.workflow_version, root.query_version, root.result_version) != (ro.WORKFLOW_VERSION, ro.QUERY_VERSION, ro.RESULT_VERSION)
-            or (scope.workflow_version, scope.query_version, scope.result_version) != (ro.WORKFLOW_VERSION, ro.QUERY_VERSION, ro.RESULT_VERSION)):
+    if ((root.workflow_version, root.query_version, root.result_version) != (scope.workflow_version, scope.query_version, scope.result_version)
+            or not ro.registered_versions((scope.workflow_version, scope.query_version, scope.result_version))):
         _fail("version_changed")
     if ((root.article_pk_snapshot, root.source_site_snapshot, root.source_article_id_snapshot, root.source_sha256,
          root.opened_at, root.deadline_at) != (parent.article_pk_snapshot, parent.source_site_snapshot,
@@ -433,9 +449,10 @@ def register_offline_readonly_translation_job(envelope):
             return controls[PLAN_KEY]
         if recovery.RESULT_KEY in run.raw_response or parent.request_attempts.exists() or root.steps.exists():
             _fail("registered_plan_invalid")
-        payload = {"plan_uuid": str(uuid4()), "job_kind": "readonly_translation_retry_v1",
-                   "plan_origin": "program_fixed_translation_retry_v1", "identity": identity,
-                   "steps": FIXED_STEPS, "limits": FIXED_LIMITS}
+        kind, origin, steps = _job_contract(identity)
+        payload = {"plan_uuid": str(uuid4()), "job_kind": kind,
+                   "plan_origin": origin, "identity": identity,
+                   "steps": steps, "limits": FIXED_LIMITS}
         plan = {"schema_version": 1, "payload": payload, "payload_sha256": _sha(payload)}
         progress = {"schema_version": 1, "plan_sha256": plan["payload_sha256"], "revision": 0, "state": "registered",
                     "model_owner_token": None, "owner_binding_sha256": None, "last_provider_attempt_index": 0,

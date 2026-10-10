@@ -11,6 +11,7 @@ import importlib
 from pathlib import Path
 from threading import Barrier
 import tempfile
+import sys
 from unittest import skipUnless
 
 from django.db import close_old_connections, connection
@@ -92,7 +93,12 @@ class RaceResultRecoveryPostgresConcurrencyTests(
             except service.CanonicalIdentityApprovalError as exc:
                 return ("blocked", exc.reason_code)
             finally:
-                close_old_connections()
+                # This worker owns the thread-local connection; healthy persistent
+                # connections are not closed by close_old_connections().
+                connection.close()
+                # Do not replace an in-flight worker failure with this assertion.
+                if sys.exc_info()[0] is None:
+                    self.assertIsNone(connection.connection)
 
         with ThreadPoolExecutor(max_workers=2) as executor:
             first = executor.submit(
@@ -146,7 +152,12 @@ class RaceResultRecoveryPostgresConcurrencyTests(
                     )
                     return result["status"]
                 finally:
-                    close_old_connections()
+                    # This worker owns the thread-local connection; healthy persistent
+                    # connections are not closed by close_old_connections().
+                    connection.close()
+                    # Do not replace an in-flight worker failure with this assertion.
+                    if sys.exc_info()[0] is None:
+                        self.assertIsNone(connection.connection)
 
             with ThreadPoolExecutor(max_workers=2) as executor:
                 first = executor.submit(apply)

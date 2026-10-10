@@ -5,6 +5,7 @@ import json
 import tempfile
 from datetime import date
 from pathlib import Path
+import sys
 
 from django.conf import settings
 from django.test import TestCase, TransactionTestCase
@@ -226,7 +227,12 @@ class ReviewedGapBackfillPostgresTests(BackfillFixture, TransactionTestCase):
                 started.set()
                 return self.run_package(package)
             finally:
-                close_old_connections()
+                # This worker owns the thread-local connection; healthy persistent
+                # connections are not closed by close_old_connections().
+                connection.close()
+                # Do not replace an in-flight worker failure with this assertion.
+                if sys.exc_info()[0] is None:
+                    self.assertIsNone(connection.connection)
         with ThreadPoolExecutor(max_workers=1) as pool:
             with transaction.atomic():
                 event = m.RaceEvent.objects.select_for_update().get(pk=self.event.pk)
@@ -314,7 +320,12 @@ class RetiredShadowConcurrencyTests(RetiredShadowFixture, TransactionTestCase):
                 started.set()
                 return self.run_package(package)
             finally:
-                close_old_connections()
+                # This worker owns the thread-local connection; healthy persistent
+                # connections are not closed by close_old_connections().
+                connection.close()
+                # Do not replace an in-flight worker failure with this assertion.
+                if sys.exc_info()[0] is None:
+                    self.assertIsNone(connection.connection)
         with ThreadPoolExecutor(max_workers=1) as pool:
             with transaction.atomic():
                 acquire_registry_exclusive_advisory_lock()

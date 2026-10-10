@@ -55,7 +55,7 @@ class ReportedTokenStopTests(RemainingReadonlyE2EFixture, ManagedTranslationBudg
         self.addCleanup(connections.close_all)
         self.scenario_count = 0
 
-    def prepare_scenario(self, *, registered, token_limit):
+    def prepare_scenario(self, *, registered, token_limit, receipt_version=1):
         fixture_requirement(connection.vendor == "postgresql" and not connection.in_atomic_block,
                             "B089 requires ROOT's real PG window, without outer atomic")
         self.clock.return_value = NOW
@@ -120,7 +120,7 @@ class ReportedTokenStopTests(RemainingReadonlyE2EFixture, ManagedTranslationBudg
                                 and kwargs.get("claim_started_at") == NOW.isoformat(),
                                 "exact real claim message prerequisite")
             self.envelope = ro.ReadEnvelope(self.article.pk, kwargs["claim_run_id"], kwargs["claim_started_at"])
-            self.readroot = ro.initialize_read_budget(tool_read_limit=1, now=NOW, baseline={
+            self.readroot = ro.initialize_read_budget(tool_read_limit=1, now=NOW, receipt_version=receipt_version, baseline={
                 "kind": "synthetic_no_prior_tool_reads", "operation_uuid": str(self.identity.operation_uuid),
             }) if registered else None
         if registered:
@@ -157,8 +157,8 @@ class ReportedTokenStopTests(RemainingReadonlyE2EFixture, ManagedTranslationBudg
         self.constructor.assert_not_called()
 
     def run_quality_scenario(self, *, registered, token_limit, max_attempts=2, expect_provider_failure=False,
-                             expect_audit_failure=False):
-        self.prepare_scenario(registered=registered, token_limit=token_limit)
+                             expect_audit_failure=False, receipt_version=1):
+        self.prepare_scenario(registered=registered, token_limit=token_limit, receipt_version=receipt_version)
         script = [{"content": json.dumps({**self.payload, "body_zh": ""}, ensure_ascii=False),
                    "usage": REPORTED_USAGE, "wait_for_receipt": True}, *self.normal_script()]
         sdk = self.fake(script)
@@ -254,6 +254,36 @@ class ReportedTokenStopTests(RemainingReadonlyE2EFixture, ManagedTranslationBudg
             self.assertEqual((self.readroot.tool_reads_reserved, step.state), (1, "completed"))
             self.assertEqual(sum(e["event"] == "business_read" for reader in self.readers[
                 self.case_reader_index:] for e in reader.trace), 1)
+
+    def test_publication_v2_retains_reported_token_stop_and_free_checkpoint(self):
+        control, creates = self.run_quality_scenario(registered=True, token_limit=4, receipt_version=2)
+        self.assertTrue(control.get("translated"), control)
+        self.assertEqual(len(creates), 2)
+        self.assertIn("publication", self.readroot.steps.get().result)
+        stopped, creates = self.run_quality_scenario(registered=True, token_limit=3, receipt_version=2)
+        self.assertEqual(stopped.get("reason"), core.REPORTED_TOKEN_STOP)
+        self.assertEqual(len(creates), 1)
+        before = self.stop_snapshot()
+        repeated, sdk = self.replay()
+        self.assertEqual(repeated.get("reason"), "model_start_unknown")
+        self.assertEqual(sdk.trace, [])
+        self.assertEqual(self.stop_snapshot(), before)
+        self.prepare_scenario(registered=True, token_limit=3, receipt_version=2)
+        with self.storage_fault("final_article"):
+            with self.assertRaises(OperationalError):self.replay()
+        self.assertEqual(self.actual_run().raw_response[job.PROGRESS_KEY]["state"], "checkpoint_saved")
+        step = self.readroot.steps.get()
+        self.reconcile_report(self.budget.request_attempts.get())
+        self.assertEqual(core.resolve_budget(self.identity, mode="offline_test", now=NOW).reason, core.REPORTED_TOKEN_STOP)
+        checkpoint = deepcopy(self.actual_run().raw_response[recovery.RESULT_KEY])
+        ledger = deepcopy(list(self.budget.request_attempts.values()))
+        finished, sdk = self.replay()
+        self.assertTrue(finished.get("translated"), finished)
+        self.assertEqual(sdk.trace, [])
+        self.assertEqual(self.actual_run().raw_response[recovery.RESULT_KEY], checkpoint)
+        self.assertEqual(list(self.budget.request_attempts.values()), ledger)
+        self.assertEqual(finished["final_receipt"]["payload"]["read_result_sha256"], step.result_sha256)
+        self.assertEqual(sum(e["event"] == "business_read" for r in self.readers[self.case_reader_index:] for e in r.trace), 1)
 
     def test_registered_quality_retry_stops_when_reported_total_reaches_limit(self):
         self.assert_limit4_control(registered=True)

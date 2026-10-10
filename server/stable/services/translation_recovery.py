@@ -544,11 +544,19 @@ def translation_input_sha256(article: NewsArticle) -> str:
 
 def _locked_translation_claim(
     article_id, run_id, claimed_at, *, phase, now, check_deadline=True, check_input=True,
+    defer_publication_evidence=False,
 ):
-    """调用方持 atomic；锁顺序始终 article→指定 run，无外部调用。"""
-    if type(run_id) is not int or run_id <= 0 or type(claimed_at) is not str:
+    """调用方持 atomic；锁顺序始终 article→指定 run，无外部调用。
+
+    私有 v2 调用仅延迟 evidence 字段；claim/source/deadline 校验保持原样。
+    """
+    if (type(run_id) is not int or run_id <= 0 or type(claimed_at) is not str
+            or type(defer_publication_evidence) is not bool):
         return None, None, "claim_missing"
-    article = NewsArticle.objects.select_for_update().filter(pk=article_id).first()
+    articles = NewsArticle.objects.select_for_update().filter(pk=article_id)
+    if defer_publication_evidence:
+        articles = articles.defer("published_at_evidence")
+    article = articles.first()
     run = TranslationRun.objects.select_for_update().filter(pk=run_id, article_id=article_id).first()
     if article is None or run is None:
         return article, run, "claim_changed"

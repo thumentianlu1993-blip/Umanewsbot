@@ -165,14 +165,71 @@ class FrozenWorkerBindingTests(unittest.TestCase):
             t=ast.parse((self.root/'server'/Path(label.replace('.','/')).with_suffix('.py')).read_text())
             ids.extend(label+'.'+cls.name+'.'+fn.name for cls in t.body if isinstance(cls,ast.ClassDef)
                        for fn in cls.body if isinstance(fn,ast.FunctionDef) and fn.name.startswith('test'))
-        self.assertEqual(len(ids),29)
+        # Frozen original 29 IDs from base 275e985; retain them as modules grow.
+        baseline_methods = {
+            'stable.test_horse_career_record_from_review.ReviewedCareerRecordConsumerTests': (
+                'test_legacy_writer_preserves_explicit_eligibility',
+                'test_create_replay_and_original_legal_link_same_record',
+                'test_binding_private_baseline_identity_and_manual_lock_fail_closed',
+                'test_nonstarter_ignore_and_dry_run_do_not_consume',
+                'test_writer_normalization_and_audit_failures_roll_back',
+                'test_classification_preserves_explicit_source_attributes',
+                'test_command_uses_private_frozen_files_and_postcommit_stdout_failure',
+                'test_two_identical_requests_observe_real_lock_then_one_consumption',
+                'test_actor_revocation_serializes_consumption_and_replay',
+                'test_actor_lock_wait_crossing_ttl_rejects_without_writes',
+            ),
+            'stable.test_managed_readonly_steps.ManagedReadonlyStepTests': (
+                'test_limit_exhausted_before_call_reads_zero',
+                'test_first_read_observes_committed_independent_slot',
+                'test_timeout_and_unknown_never_refund_or_reread',
+                'test_crash_after_reservation_before_read_stays_unknown',
+                'test_crash_after_result_save_reuses_same_result',
+                'test_two_waiting_replayers_allocate_one_read',
+                'test_workflow_query_result_versions_and_params_reject_old_step',
+                'test_changed_source_input_claim_and_reused_pk_reject',
+                'test_expired_or_lock_wait_crossing_deadline_rejects_cache_and_read',
+                'test_revoked_permission_rejects_new_cached_and_late_result',
+                'test_read_and_commit_storage_failures_do_not_forge_result',
+                'test_model_unavailable_keeps_structured_step_available',
+                'test_missing_foreign_scope_outer_atomic_and_prod_mode_refuse',
+                'test_result_json_bounds_tamper_and_embedded_instructions',
+                'test_unique_schema_lifecycle_and_same_source_no_topup',
+                'test_existing_request_checkpoint_and_unbound_paths_unchanged',
+            ),
+            'stable.test_managed_readonly_steps.ManagedReadonlySchemaTests': (
+                'test_schema_unique_counter_and_completed_constraints',
+                'test_ordinary_writers_cannot_mutate_ledger',
+                'test_0081_reverse_forward_keeps_original_article_and_requestroot',
+            ),
+        }
+        baseline_ids = {cls+'.'+method for cls, methods in baseline_methods.items() for method in methods}
+        publication_ids = {
+            'stable.test_managed_readonly_steps.ManagedReadonlyStepTests.test_publication_cached_foreign_uuid_and_malformed_receipt_rejected',
+            'stable.test_managed_readonly_steps.ManagedReadonlyStepTests.test_publication_completed_receipt_replays_original_snapshot_and_hash',
+            'stable.test_managed_readonly_steps.ManagedReadonlyStepTests.test_publication_invalid_and_oversized_never_commit_refund_or_reread',
+            'stable.test_managed_readonly_steps.ManagedReadonlyStepTests.test_publication_projection_codec_rejects_truncation_duplicates_and_non_native_types',
+            'stable.test_managed_readonly_steps.ManagedReadonlyStepTests.test_publication_projection_sql_bounds_and_inert_material',
+            'stable.test_managed_readonly_steps.ManagedReadonlyStepTests.test_publication_receipt_real_orm_three_states',
+            'stable.test_managed_readonly_steps.ManagedReadonlyStepTests.test_publication_v1_default_has_original_exact_fields_and_no_upgrade',
+            'stable.test_managed_readonly_steps.ManagedReadonlyStepTests.test_publication_v2_unknown_and_existing_source_permission_time_fences',
+        }
+        self.assertEqual(len(baseline_ids),29)
+        self.assertEqual(len(publication_ids),8)
+        self.assertTrue(baseline_ids.isdisjoint(publication_ids))
+        self.assertTrue(baseline_ids.issubset(ids))
+        self.assertTrue(publication_ids.issubset(ids))
+        self.assertEqual(set(ids),baseline_ids | publication_ids)
+        self.assertEqual(len(ids),len(set(ids)))
         def case(ident):
             return SimpleNamespace(id=lambda:ident,_testMethodName='test_case',test_case=lambda:None)
         collect=self.worker_function('collect',load=lambda labels:[case(i) for i in ids if i.startswith(labels[0]+'.')],shard_tests=shard_tests)
         actual=collect({'labels':labels,'mode':'full'},catalog)
-        self.assertEqual(actual['count'],29)
+        self.assertEqual(actual['count'],len(baseline_ids | publication_ids))
         self.assertEqual({i for b in actual['batches'] for i in b['ids']},set(ids))
         self.assertEqual({b['profile'] for b in actual['batches']},{'django'})
+        self.assertEqual({i:b['profile'] for b in actual['batches'] for i in b['ids']},
+                         {i:'django' for i in baseline_ids | publication_ids})
         self.assertEqual(actual['collection_skips'],[])
         for label in labels:
             bad={**catalog,'profiles':{k:v for k,v in catalog['profiles'].items() if k!=label}}

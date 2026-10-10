@@ -467,6 +467,58 @@ class InvalidationTests(TestCase):
             f"Expected audit log '{action_type}'",
         )
 
+    def _publication_selection_and_recommendation(self):
+        from stable.models import HomepageHeadlineRecommendation, HomepageHeadlineSelection
+        self._set_headline_and_get_state()
+        selection = HomepageHeadlineSelection.objects.get(article_id=self.article.pk)
+        recommendation = HomepageHeadlineRecommendation.objects.create(article=self.article,
+            status=HomepageHeadlineRecommendation.Status.ACTIVE, reason="offline test", engine_version="offline-test-v1")
+        return selection, recommendation
+
+    def test_publication_deferred_signal_preserves_invalidation_audit_and_captured_flag(self):
+        selection, recommendation = self._publication_selection_and_recommendation()
+        article = NewsArticle.objects.defer("published_at_evidence").get(pk=self.article.pk)
+        self.assertIn("published_at_evidence", article.get_deferred_fields())
+        article.workflow_status = WorkflowStatus.WITHDRAWN
+        version = selection.version
+        with CaptureQueriesContext(connection) as queries:
+            with self.captureOnCommitCallbacks(execute=True):
+                article.save(update_fields=["workflow_status"])
+                # Change instance loading state after callback registration. Its captured
+                # field constraint must still prevent a full evidence SELECT at commit.
+                article.published_at_evidence = {"method": "changed-in-memory"}
+        self.assertFalse(any('"published_at_evidence"' in q["sql"] for q in queries))
+        selection.refresh_from_db(); recommendation.refresh_from_db()
+        self.assertIsNone(selection.article_id)
+        self.assertEqual(selection.version, version + 1)
+        self.assertEqual(recommendation.status, recommendation.Status.INVALIDATED)
+        self.assertEqual(OperationLog.objects.filter(action_type="headline_invalidated").count(), 1)
+        self.assertEqual(OperationLog.objects.filter(action_type="headline_recommendation_invalidated").count(), 1)
+
+    def test_publication_default_signal_keeps_original_loading_and_invalidation(self):
+        selection, recommendation = self._publication_selection_and_recommendation()
+        self.assertNotIn("published_at_evidence", self.article.get_deferred_fields())
+        self.article.workflow_status = WorkflowStatus.WITHDRAWN
+        with CaptureQueriesContext(connection) as queries:
+            with self.captureOnCommitCallbacks(execute=True):self.article.save(update_fields=["workflow_status"])
+        self.assertTrue(any('"published_at_evidence"' in q["sql"] for q in queries))
+        selection.refresh_from_db(); recommendation.refresh_from_db()
+        self.assertIsNone(selection.article_id)
+        self.assertEqual(recommendation.status, recommendation.Status.INVALIDATED)
+        self._assert_audit_exists("headline_invalidated")
+        self._assert_audit_exists("headline_recommendation_invalidated")
+
+    def test_publication_deferred_eligible_signal_keeps_selection_and_recommendation(self):
+        selection, recommendation = self._publication_selection_and_recommendation()
+        article = NewsArticle.objects.defer("published_at_evidence").get(pk=self.article.pk)
+        before = (selection.article_id, selection.version, recommendation.status)
+        with CaptureQueriesContext(connection) as queries:
+            with self.captureOnCommitCallbacks(execute=True):article.save(update_fields=["title_ja"])
+        self.assertFalse(any('"published_at_evidence"' in q["sql"] for q in queries))
+        selection.refresh_from_db(); recommendation.refresh_from_db()
+        self.assertEqual((selection.article_id, selection.version, recommendation.status), before)
+        self.assertFalse(OperationLog.objects.filter(action_type__in=["headline_invalidated", "headline_recommendation_invalidated"]).exists())
+
     def test_withdraw_invalidates(self):
         """Withdrawing the headline article clears the selection and logs audit."""
         self._set_headline_and_get_state()
