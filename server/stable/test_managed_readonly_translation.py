@@ -23,7 +23,8 @@ from django.test.utils import CaptureQueriesContext
 from stable import admin as article_admin
 from stable.models import (ArticleStatus, ArticleTranslationStatus, NewsArticle, NotificationLog,
                            OperationLog, TranslationRetryBudget, TranslationRun, WorkflowStatus,
-                           TermEntry, TermAlias, TermType, ExternalHorseAlias)
+                           TermEntry, TermAlias, TermType, ExternalHorseAlias, RaceEvent, RaceEventRunner,
+                           RaceEventResult, ArticleRaceLink, ArticleRaceLinkStatus)
 from stable.services import managed_readonly_steps as ro, managed_readonly_translation as job
 from stable.services import translation, translation_recovery as recovery, translation_retry_budget as core
 from stable.tasks import translate_article_task
@@ -366,9 +367,9 @@ class ManagedReadonlyTranslationEndToEndTests(RemainingReadonlyE2EFixture, Manag
         self.assertEqual(len(self.creates()), 1)
 
     def test_article_term_receipt_v2_resume_uses_frozen_resolution_without_dictionary_select(self):
-        """B106 RED2：真实read提交后改词典；新scope实际provider须收到原解析。"""
-        self.article.title_ja = "Stewards review Irad Ortiz Jr."
-        self.article.body_ja_raw = "Jockey Irad Ortiz Jr. had enough time after the sale. " + self.article.body_ja_raw
+        """B107 GREEN2：显式v3冻结解析复用；原真实v2 RED保留。"""
+        self.article.title_ja = "Irad Ortiz Jr."
+        self.article.body_ja_raw = "Jockey Irad Ortiz Jr. rode. " + "There is time. " * 6
         self.article.body_ja_normalized = self.article.body_ja_raw
         self.article.save(update_fields=["title_ja", "body_ja_raw", "body_ja_normalized", "updated_at"])
         term = TermEntry.objects.create(term_type=TermType.JOCKEY,
@@ -376,24 +377,37 @@ class ManagedReadonlyTranslationEndToEndTests(RemainingReadonlyE2EFixture, Manag
             source_ja="Irad Ortiz Jr.", target_zh="奥天信", priority=100)
         alias = TermAlias.objects.create(term=term, source_language=self.article.source_language,
                                          text="Irad Ortiz")
-        baseline = translation.resolve_article_entities_for_article(self.article)
-        fixture_requirement(term.pk in baseline.accepted_term_ids and alias.is_active,
-                            "B106原resolver必须识别实际人物词条")
-        expected = deepcopy(baseline.as_dict())
         # 原质量门禁逐字段保留人物出现次数；原文标题/正文各一次，正文不能整句复制占位符。
         self.payload = {"title_zh": "裁判复核__UMA_TERM_1__的骑乘",
                         "body_zh": "骑师__UMA_TERM_1__在拍卖后有时间考虑。"
                                    + "拍卖后仍有十分充足的时间考虑并作出决定。" * 6,
                         "push_summary_zh": "裁判复核__UMA_TERM_1__的骑乘。"}
+        relations = None
+        if getattr(self,"_term_material_relation_delete",False):
+            self.article.body_ja_raw="Jockey Irad Ortiz Jr. rode Blue Horizon."
+            self.article.body_ja_normalized=self.article.body_ja_raw
+            self.article.save(update_fields=["body_ja_raw","body_ja_normalized","updated_at"])
+            external=ExternalHorseAlias.objects.create(source_language="en",external_horse_id="b107-horse",
+                name_ja="Blue Horizon",normalized_name="Blue Horizon")
+            event=RaceEvent.objects.create(year=2026,slug="b107-"+str(uuid4()),original_name="B107")
+            link=ArticleRaceLink.objects.create(article=self.article,event=event,status=ArticleRaceLinkStatus.AUTO)
+            runner=RaceEventRunner.objects.create(event=event,horse_name="Blue Horizon")
+            race_result=RaceEventResult.objects.create(event=event,horse_name="Blue Horizon",finish_position=1)
+            relations=(external,link,runner,race_result)
+            self.payload["body_zh"]="骑师__UMA_TERM_1__策骑__UMA_KEEP_1__。"+"拍卖后仍有十分充足的时间考虑并作出决定。"*6
+        baseline = translation.resolve_article_entities_for_article(self.article)
+        fixture_requirement(term.pk in baseline.accepted_term_ids and alias.is_active,
+                            "B106原resolver必须识别实际人物词条")
+        expected = deepcopy(baseline.as_dict())
         fixture_requirement(self.article.title_ja.count(term.source_ja) == 1
                             and self.article.body_ja_normalized.count(term.source_ja) == 1
                             and self.payload["title_zh"].count("__UMA_TERM_1__") == 1
                             and self.payload["body_zh"].count("__UMA_TERM_1__") == 1,
                             "B106人物原文/响应逐字段必须各一次；错误为fixture ERROR")
-        self.user_retry_message(receipt_version=2); self.register()
+        self.user_retry_message(receipt_version=3); self.register()
         fixture_requirement((self.readroot.workflow_version, self.readroot.query_version,
-                             self.readroot.result_version) == ro.RECEIPT_VERSIONS[2],
-                            "B106必须实际v2；不支持版本是ERROR")
+                             self.readroot.result_version) == ro.RECEIPT_VERSIONS[3],
+                            "B107必须实际v3；不支持版本是ERROR")
         with self.scope(reader_fault="exit_after_commit"):
             job.prepare_registered_read_phase(self.envelope)
             with self.assertRaises(ro.ReadFixtureExit):
@@ -412,6 +426,10 @@ class ManagedReadonlyTranslationEndToEndTests(RemainingReadonlyE2EFixture, Manag
         term.save(update_fields=["target_zh", "updated_at"])
         fixture_requirement(TermEntry.objects.get(pk=term.pk).target_zh == "奥天信更新名",
                             "B106词典变化必须真实提交")
+        if relations is not None:
+            # 真正删除本case捕获的词典/关联，source与grant不改；不能查库补恢复映射。
+            term.delete()
+            for row in relations:row.delete()
         observed = []
         real_factory = job._registered_provider
 
@@ -489,7 +507,8 @@ class ManagedReadonlyTranslationEndToEndTests(RemainingReadonlyE2EFixture, Manag
                             and self.reads() == 1 and len(self.creates()) == 1
                             and (step.pk, step.step_uuid, step.result_sha256, step.read_at, step.result) == before,
                             "B106恢复必须实际到达provider和Article终态且不重读；失败是ERROR")
-        tables = (TermEntry._meta.db_table, TermAlias._meta.db_table, ExternalHorseAlias._meta.db_table)
+        tables = tuple(model._meta.db_table for model in (TermEntry,TermAlias,ExternalHorseAlias,
+                      RaceEventRunner,RaceEventResult,ArticleRaceLink))
         dictionary_selects = [q["sql"] for q in captured_queries
                               if q["sql"].lstrip().upper().startswith("SELECT")
                               and any('"' + table + '"' in q["sql"] for table in tables)]
@@ -498,6 +517,10 @@ class ManagedReadonlyTranslationEndToEndTests(RemainingReadonlyE2EFixture, Manag
         self.assertEqual(observed[0], expected,
                          "read提交后新scope的实际provider重新解析了已变化词典")
         self.assertEqual(dictionary_selects, [], "恢复消费不得新增词典SELECT")
+
+    def test_article_term_receipt_v3_deleted_dictionary_and_relations_resume_without_select(self):
+        self._term_material_relation_delete=True
+        self.test_article_term_receipt_v2_resume_uses_frozen_resolution_without_dictionary_select()
 
     def test_completed_job_redelivery_returns_same_final_receipt(self):
         self.user_retry_message(); self.register()

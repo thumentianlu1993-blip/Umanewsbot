@@ -68,7 +68,7 @@ class ManagedReadonlyStepTests(ManagedTranslationBudgetConsumerFixture):
             self.readroot = ro.initialize_read_budget(**options)
 
     def test_article_term_receipt_v2_real_orm_missing_candidate_material(self):
-        """B106 RED1：真实v2完成read缺少已识别词条/alias材料；前置失败为ERROR。"""
+        """B107 GREEN1：显式v3实际ORM持久候选；旧v2 RED原件保留。"""
         self.new_case(title="Stewards review the incident",
                       body="Jockey Irad Ortiz Jr. had enough time after the sale.")
         term = TermEntry.objects.create(term_type=TermType.JOCKEY,
@@ -79,10 +79,12 @@ class ManagedReadonlyStepTests(ManagedTranslationBudgetConsumerFixture):
         baseline = translation.resolve_article_entities_for_article(self.article)
         fixture_requirement(term.pk in baseline.accepted_term_ids and alias.is_active,
                             "B106人物词条/alias必须真实入库且原resolver识别人物")
-        self.init_publication_receipt()
+        with recovery._offline_budget_scope(self.identity):
+            self.readroot = ro.initialize_read_budget(tool_read_limit=1, now=NOW, receipt_version=3,
+                baseline={"kind": "synthetic_no_prior_tool_reads", "operation_uuid": str(self.identity.operation_uuid)})
         fixture_requirement((self.readroot.workflow_version, self.readroot.query_version,
-                             self.readroot.result_version) == ro.RECEIPT_VERSIONS[2],
-                            "B106必须实际v2；不支持版本是ERROR")
+                             self.readroot.result_version) == ro.RECEIPT_VERSIONS[3],
+                            "B107必须实际v3；不支持版本是ERROR")
         decision, reader = self.invoke()
         step = self.readroot.steps.get()
         self.budget.refresh_from_db(); self.readroot.refresh_from_db()
@@ -94,6 +96,91 @@ class ManagedReadonlyStepTests(ManagedTranslationBudgetConsumerFixture):
               sorted(step.result), term.pk, alias.pk, flush=True)
         self.assertIn("term_snapshot", step.result,
                       "实际v2持久化read缺少来源绑定的候选材料与冻结resolution")
+
+        from stable.services import article_term_receipt
+        frozen = article_term_receipt.decode(step.result["term_snapshot"],
+                                              article_term_receipt.source_view(self.article, {"input_sha256": self.identity.source_sha256, "source_site":self.article.source_site,"source_article_id":self.article.source_article_id}),
+                                              self.article.pk, self.identity.source_sha256)
+        self.assertEqual(frozen.as_dict(), baseline.as_dict())
+        self.assertIn(("term", term.pk), {(r["kind"],r["id"]) for r in step.result["term_snapshot"]["inputs"]})
+        self.assertIn(("alias", alias.pk), {(r["kind"],r["id"]) for r in step.result["term_snapshot"]["inputs"]})
+
+    def _term_v3_init(self):
+        with recovery._offline_budget_scope(self.identity):
+            self.readroot = ro.initialize_read_budget(tool_read_limit=1, now=NOW, receipt_version=3,
+                baseline={"kind":"synthetic_no_prior_tool_reads", "operation_uuid":str(self.identity.operation_uuid)})
+
+    def test_article_term_receipt_v3_limit_preserves_slot_and_unknown_replay(self):
+        self.new_case(title="", body="Irad Ortiz Jr. rode.")
+        TermEntry.objects.create(source_language="en", term_type=TermType.JOCKEY,
+                                 source_ja="Irad Ortiz Jr.", target_zh="奥天信", notes="x"*4097)
+        self._term_v3_init()
+        denied, _ = self.invoke()
+        self.assertEqual((denied.allowed,denied.reason),(False,"read_terms_limit"))
+        self.readroot.refresh_from_db(); self.budget.refresh_from_db()
+        self.assertEqual((self.readroot.tool_reads_reserved,self.readroot.steps.get().state,
+                          self.budget.requests_reserved),(1,"inflight",0))
+        with CaptureQueriesContext(connection) as queries:
+            repeated, reader = self.invoke()
+        self.assertEqual((repeated.allowed,repeated.reason),(False,"step_result_unknown"))
+        self.assertEqual(reader.trace,[])
+        self.assertFalse(any('"stable_termentry"' in q["sql"] or '"stable_termalias"' in q["sql"] for q in queries))
+
+    def test_article_term_receipt_v3_cached_source_permission_deadline_and_version_fences(self):
+        for fence in ("source","permission","deadline","version","mapping"):
+            with self.subTest(fence=fence):
+                self.new_case(title="", body="Irad Ortiz Jr. rode.")
+                TermEntry.objects.all().delete()
+                TermEntry.objects.create(source_language="en",term_type=TermType.JOCKEY,
+                                         source_ja="Irad Ortiz Jr.",target_zh="奥天信")
+                self._term_v3_init(); completed,_=self.invoke()
+                fixture_requirement(completed.allowed,"B107必须先实际完成v3 read")
+                step=self.readroot.steps.get()
+                if fence=="source":
+                    NewsArticle.objects.filter(pk=self.article.pk).update(title_ja="changed")
+                elif fence=="permission":
+                    with self.scope():ro.revoke_read_grant(self.readroot.pk)
+                elif fence=="deadline":
+                    self.clock.return_value=self.readroot.deadline_at+timedelta(seconds=1)
+                elif fence=="version":
+                    ManagedReadonlyTaskBudget.objects.filter(pk=self.readroot.pk).update(query_version="source_excerpt_v2")
+                else:
+                    step.result["term_snapshot"]["resolution"]["entities"][0]["term_id"]=9223372036854775807
+                    step.result_sha256=ro._sha(step.result)
+                    step.save(update_fields=["result","result_sha256"])
+                with CaptureQueriesContext(connection) as queries:
+                    denied,_=self.invoke()
+                self.assertFalse(denied.allowed)
+                self.assertFalse(any('"stable_termentry"' in q["sql"] or '"stable_termalias"' in q["sql"] for q in queries))
+                self.readroot.refresh_from_db();self.budget.refresh_from_db()
+                self.assertEqual((self.readroot.tool_reads_reserved,self.budget.requests_reserved),(1,0))
+
+    def test_article_term_receipt_v3_v1_v2_exact_keys_and_no_root_upgrade(self):
+        base={"query_version","result_version","article_id","run_id","source_site","source_article_id",
+              "input_sha256","title","body_excerpt","body_chars","read_at","step_uuid","idempotency_sha256"}
+        for version in (1,2):
+            with self.subTest(version=version):
+                self.new_case(title="",body="Irad Ortiz Jr. rode.")
+                if version==1:self.init()
+                else:self.init_publication_receipt()
+                decision,_=self.invoke()
+                self.assertTrue(decision.allowed)
+                self.assertEqual(set(decision.result),base | ({"publication"} if version==2 else set()))
+                with recovery._offline_budget_scope(self.identity), self.assertRaisesRegex(ro.ReadonlyRefusal,"read_budget_contract_changed"):
+                    ro.initialize_read_budget(tool_read_limit=1,now=NOW,receipt_version=3,
+                        baseline={"kind":"synthetic_no_prior_tool_reads","operation_uuid":str(self.identity.operation_uuid)})
+
+    def test_article_term_receipt_v3_read_finish_source_grant_and_timeout_fences(self):
+        for fault in ("change_before_read","revoke_after_read","timeout_after_read"):
+            with self.subTest(fault=fault):
+                self.new_case(title="",body="Irad Ortiz Jr. rode.")
+                self._term_v3_init()
+                denied,_=self.invoke(fault=fault)
+                self.assertFalse(denied.allowed)
+                self.readroot.refresh_from_db();self.budget.refresh_from_db()
+                self.assertEqual((self.readroot.tool_reads_reserved,self.budget.requests_reserved),(1,0))
+                self.assertEqual(self.readroot.steps.get().state,"inflight")
+                self.assertEqual(self.readroot.steps.get().result,{})
 
     def test_publication_receipt_real_orm_three_states(self):
         for verified in (True, False, None):
