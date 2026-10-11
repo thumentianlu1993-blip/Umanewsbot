@@ -775,6 +775,267 @@ class ManagedReadonlyStepTests(ManagedTranslationBudgetConsumerFixture):
         self.assert_no_request_change(before)
 
 
+    def _v3_dedicated_setup(self):
+        from stable.models import NotificationLog
+        self.new_case(title="", body="Irad Ortiz Jr. rode.")
+        self.readers = []
+        self._v3_term, _ = TermEntry.objects.get_or_create(
+            source_language="en", term_type=TermType.JOCKEY, source_ja="Irad Ortiz Jr.",
+            defaults={"target_zh": "奥天信"})
+        self._term_v3_init()
+        self.assertEqual((self.readroot.workflow_version, self.readroot.query_version,
+                          self.readroot.result_version), ro.RECEIPT_VERSIONS[3])
+        self._v3_run_before = TranslationRun.objects.values().get(pk=self.envelope.run_id)
+        self._v3_parent_before = TranslationRetryBudget.objects.values().get(pk=self.budget.pk)
+        self._v3_notifications_before = NotificationLog.objects.count()
+        self._v3_public_body_before = NewsArticle.objects.values_list("body_zh", flat=True).get(pk=self.article.pk)
+
+    @contextmanager
+    def _v3_dedicated_capture_gate(self):
+        from threading import Event
+        ready, release = Event(), Event()
+        observed = []
+        original = ro.term_receipt.capture
+
+        def capture(*args, **kwargs):
+            self.assertFalse(connection.in_atomic_block, "capture不得持业务事务锁")
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT pg_backend_pid()")
+                pid = cursor.fetchone()[0]
+            observed.append({"pid": pid, "article_id": args[1], "source_sha256": args[2]})
+            ready.set()
+            if not release.wait(8):
+                raise RuntimeError("B120真实capture观察gate未释放")
+            return original(*args, **kwargs)
+
+        with patch.object(ro.term_receipt, "capture", side_effect=capture):
+            try:
+                yield ready, release, observed
+            finally:
+                release.set()
+
+    @contextmanager
+    def _v3_dedicated_workers(self, *, count=1, releases=(), cross_deadline=None):
+        from threading import Event
+        import time
+        self.assertIn(count, (1, 2))
+        self.assertEqual(connection.vendor, "postgresql")
+        state = {"pids": {}, "results": {}, "errors": {}, "closed": {},
+                 "ready": [Event() for _ in range(count)], "done": [Event() for _ in range(count)]}
+
+        def worker(index):
+            try:
+                with connections["default"].cursor() as cursor:
+                    cursor.execute("SELECT pg_backend_pid()")
+                    state["pids"][index] = cursor.fetchone()[0]
+                state["ready"][index].set()
+                state["results"][index] = self.invoke()
+            except BaseException as exc:
+                state["errors"][index] = repr(exc)
+            finally:
+                connections.close_all()
+                state["closed"][index] = connections["default"].connection is None
+                state["ready"][index].set()
+                state["done"][index].set()
+
+        threads = [Thread(target=worker, args=(i,), daemon=True) for i in range(count)]
+        try:
+            with transaction.atomic():
+                ManagedReadonlyTaskBudget.objects.select_for_update().get(pk=self.readroot.pk)
+                with connection.cursor() as cursor:
+                    cursor.execute("SELECT pg_backend_pid()")
+                    owner = cursor.fetchone()[0]
+                for thread in threads:
+                    thread.start()
+                for ready in state["ready"]:
+                    fixture_requirement(ready.wait(8), "B120独立PG worker前置")
+                self.assertEqual(state["errors"], {})
+                self.assertEqual(len(set(state["pids"].values())), count)
+                self.assertNotIn(owner, state["pids"].values())
+                stop, rows, verified = time.monotonic() + 8, [], []
+                while time.monotonic() < stop:
+                    with connection.cursor() as cursor:
+                        cursor.execute("SELECT pid, wait_event_type, pg_blocking_pids(pid) "
+                                       "FROM pg_stat_activity WHERE pid = ANY(%s)",
+                                       [list(state["pids"].values()) + [owner]])
+                        rows = cursor.fetchall()
+                    graph = {pid: (wait, blockers) for pid, wait, blockers in rows}
+                    allowed = set(state["pids"].values()) | {owner}
+
+                    def reaches_owner(pid, path):
+                        if pid == owner:
+                            return owner in graph and connection.in_atomic_block
+                        if pid in path or pid not in graph:
+                            return False
+                        wait, blockers = graph[pid]
+                        return (wait == "Lock" and bool(blockers)
+                                and all(b in allowed and reaches_owner(b, path | {pid}) for b in blockers))
+
+                    verified = [pid for pid in state["pids"].values() if reaches_owner(pid, set())]
+                    if len(verified) == count:
+                        break
+                    time.sleep(.025)
+                print("B120_V3_LOCK_GRAPH", owner, state["pids"], rows, verified, flush=True)
+                self.assertEqual(len(verified), count, "须真实等待且全部边最终抵达主owner")
+                state["owner"] = owner
+                state["lock_graph"] = rows
+                if cross_deadline is not None:
+                    self.assertGreater(cross_deadline, self.clock.return_value)
+                    self.clock.return_value = cross_deadline
+            yield state
+        finally:
+            for release in releases:
+                release.set()
+            for thread in threads:
+                if thread.ident is not None:
+                    thread.join(12)
+            print("B120_V3_WORKER_CLEANUP", state["pids"], state["errors"], state["closed"],
+                  [t.is_alive() for t in threads], flush=True)
+            self.assertFalse(any(t.is_alive() for t in threads), "daemon超时不得继续下一方法")
+            self.assertEqual(state["closed"], {i: True for i in range(count)})
+        self.assertEqual(state["errors"], {})
+        self.assertEqual(set(state["results"]), set(range(count)))
+
+    def _v3_dedicated_assert_inert(self):
+        from stable.models import NotificationLog
+        self.budget.refresh_from_db()
+        self.assertEqual(TranslationRetryBudget.objects.values().get(pk=self.budget.pk),
+                         self._v3_parent_before)
+        self.assertEqual(self.readroot.tool_read_limit, 1)
+        self.assertEqual(self.budget.requests_reserved, 0)
+        self.assertEqual(self.budget.request_attempts.count(), 0)
+        self.constructor.assert_not_called()
+        self.assertEqual(NotificationLog.objects.count(), self._v3_notifications_before)
+        self.assertEqual(TranslationRun.objects.values().get(pk=self.envelope.run_id), self._v3_run_before)
+        self.assertNotIn(recovery.RESULT_KEY, self._v3_run_before["raw_response"])
+        self.assertEqual(NewsArticle.objects.values_list("body_zh", flat=True).get(pk=self.article.pk),
+                         self._v3_public_body_before)
+
+    def test_v3_two_read_consumers_have_one_capture_and_immutable_receipt(self):
+        self._v3_dedicated_setup()
+        with self._v3_dedicated_capture_gate() as (ready, release, observed):
+            with self._v3_dedicated_workers(count=2, releases=(release,)) as state:
+                fixture_requirement(ready.wait(8), "唯一reader必须到达真实v3capture")
+                self.assertEqual(len(observed), 1)
+                self.assertEqual(observed[0]["article_id"], self.article.pk)
+                winner = next(i for i, pid in state["pids"].items() if pid == observed[0]["pid"])
+                loser = 1 - winner
+                fixture_requirement(state["done"][loser].wait(8), "败者须在赢家capture暂停时退出")
+                self.assertEqual(state["errors"], {})
+                denied, reader = state["results"][loser]
+                self.assertEqual((denied.allowed, denied.reason), (False, "step_result_unknown"))
+                self.assertEqual(reader.trace, [])
+                inflight = ManagedReadonlyStep.objects.values().get(read_budget=self.readroot)
+                self.assertEqual(inflight["state"], "inflight")
+                self.readroot.refresh_from_db()
+                self.assertEqual(self.readroot.tool_reads_reserved, 1)
+                self.assertEqual(self.readroot.steps.count(), 1)
+                self.assertFalse(state["done"][winner].is_set())
+                release.set()
+        completed, reader = state["results"][winner]
+        self.assertTrue(completed.allowed, completed)
+        self.assertFalse(completed.cached)
+        self.assertEqual(len(observed), 1)
+        self.assertEqual(self.business_reads(), 1)
+        step = ManagedReadonlyStep.objects.values().get(read_budget=self.readroot)
+        self.assertEqual(step["state"], "completed")
+        self.assertEqual(step["step_uuid"], inflight["step_uuid"])
+        self.assertEqual(step["reservation_token"], inflight["reservation_token"])
+        self.assertEqual(step["idempotency_sha256"], inflight["idempotency_sha256"])
+        self.assertEqual(step["result_sha256"], ro._sha(step["result"]))
+        self.assertIn("term_snapshot", completed.result)
+        self.assertIn(("term", self._v3_term.pk),
+                      {(row["kind"], row["id"]) for row in completed.result["term_snapshot"]["inputs"]})
+        for _ in range(2):
+            replay, reader = self.invoke()
+            self.assertTrue(replay.allowed, replay)
+            self.assertTrue(replay.cached)
+            self.assertEqual(replay.result, completed.result)
+            self.assertEqual(reader.trace, [])
+            self.assertEqual(ManagedReadonlyStep.objects.values().get(read_budget=self.readroot), step)
+        self.assertEqual(self.business_reads(), 1)
+        self.readroot.refresh_from_db()
+        self.assertEqual(self.readroot.tool_reads_reserved, 1)
+        self._v3_dedicated_assert_inert()
+
+    def test_v3_independent_source_and_grant_writer_during_capture_refuses_receipt(self):
+        for fence, reason in (("source", "input_changed"), ("grant", "read_permission_revoked")):
+            with self.subTest(fence=fence):
+                self._v3_dedicated_setup()
+                with self._v3_dedicated_capture_gate() as (ready, release, observed):
+                    with self._v3_dedicated_workers(releases=(release,)) as state:
+                        fixture_requirement(ready.wait(8), "reader须在真实capture处暂停")
+                        self.assertEqual(len(observed), 1)
+                        self.assertEqual(observed[0]["article_id"], self.article.pk)
+                        self.assertNotEqual(state["owner"], observed[0]["pid"])
+                        self.assertEqual(observed[0]["source_sha256"], self.identity.source_sha256)
+                        inflight = ManagedReadonlyStep.objects.values().get(read_budget=self.readroot)
+                        self.assertEqual(inflight["state"], "inflight")
+                        if fence == "source":
+                            self.assertEqual(NewsArticle.objects.filter(pk=self.article.pk).update(
+                                title_ja="B120 independently committed source change"), 1)
+                            self.assertNotEqual(recovery.translation_input_sha256(
+                                NewsArticle.objects.get(pk=self.article.pk)), self.identity.source_sha256)
+                        else:
+                            epoch = self.readroot.permission_epoch
+                            with self.scope():
+                                ro.revoke_read_grant(self.readroot.pk)
+                            self.readroot.refresh_from_db()
+                            self.assertEqual((self.readroot.state, self.readroot.permission_epoch),
+                                             ("revoked", epoch + 1))
+                        self.assertFalse(connection.in_atomic_block, "writer须独立提交再释放capture")
+                        self.assertFalse(state["done"][0].is_set())
+                        print("B120_V3_CAPTURE_WRITER", fence, state["owner"], observed, flush=True)
+                        release.set()
+                denied, reader = state["results"][0]
+                self.assertEqual((denied.allowed, denied.reason), (False, reason))
+                self.assertIsNone(denied.result)
+                self.assertEqual(self.business_reads(), 1)
+                self.assertEqual(ManagedReadonlyStep.objects.values().get(read_budget=self.readroot), inflight)
+                self.assertEqual(inflight["result"], {})
+                self.assertEqual(inflight["result_sha256"], "")
+                repeated, reader = self.invoke()
+                self.assertFalse(repeated.allowed)
+                self.assertIsNone(repeated.result)
+                self.assertEqual(reader.trace, [])
+                self.readroot.refresh_from_db()
+                self.assertEqual((self.readroot.tool_reads_reserved, self.readroot.steps.count()), (1, 1))
+                self.assertEqual(self.business_reads(), 1)
+                self._v3_dedicated_assert_inert()
+
+    def test_v3_real_lock_wait_crossing_effective_deadline_refuses_new_and_cached_read(self):
+        for cached in (False, True):
+            with self.subTest(cached=cached):
+                self._v3_dedicated_setup()
+                if cached:
+                    completed, _ = self.invoke()
+                    fixture_requirement(completed.allowed, "缓存子场景须先真实完成v3read")
+                before = list(self.readroot.steps.values())
+                reads_before = self.business_reads()
+                slots_before = ManagedReadonlyTaskBudget.objects.get(pk=self.readroot.pk).tool_reads_reserved
+                claim = TranslationRun.objects.get(pk=self.envelope.run_id).raw_response[recovery.CLAIM_KEY]
+                effective = min(self.readroot.deadline_at, datetime.fromisoformat(claim["deadline_at"]))
+                with self._v3_dedicated_workers(cross_deadline=effective + timedelta(microseconds=1)) as state:
+                    pass
+                denied, reader = state["results"][0]
+                self.assertFalse(denied.allowed)
+                self.assertIn(denied.reason, ("claim_expired", "read_deadline_expired", "budget_deadline_expired"))
+                self.assertIsNone(denied.result)
+                self.assertFalse(denied.cached)
+                self.assertEqual(reader.trace, [])
+                self.assertEqual(self.business_reads(), reads_before)
+                self.assertEqual(list(self.readroot.steps.values()), before)
+                self.readroot.refresh_from_db()
+                self.assertEqual(self.readroot.tool_reads_reserved, slots_before)
+                repeated, reader = self.invoke()
+                self.assertFalse(repeated.allowed)
+                self.assertIsNone(repeated.result)
+                self.assertFalse(repeated.cached)
+                self.assertEqual(reader.trace, [])
+                self.assertEqual(list(self.readroot.steps.values()), before)
+                self._v3_dedicated_assert_inert()
+
+
 @override_settings(AUTOMATION_ENABLED=False, TRANSLATION_FAILURE_EMAIL_ENABLED=False, TRANSLATION_FAILURE_NOTIFY_EMAILS=[])
 class ManagedReadonlySchemaTests(TransactionTestCase):
     def setUp(self):
