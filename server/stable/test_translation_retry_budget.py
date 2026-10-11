@@ -696,13 +696,23 @@ class TranslationBudgetMigrationBoundaryTests(TransactionTestCase):
     def test_empty_test_database_reverse_and_forward_keep_original_article(self):
         from django.db.migrations.executor import MigrationExecutor
         from django.db.migrations.recorder import MigrationRecorder
-        from stable.models import NewsArticle
+        from stable.models import ManagedReadonlyTaskBudget, ManagedReadonlyStep, NewsArticle
 
         self.assertEqual(connection.vendor, "postgresql")
         self.assertTrue(connection.settings_dict["NAME"].startswith("test_"), "只允许 Django 隔离 testDB")
         self.assertEqual(TranslationRetryBudget.objects.count(), 0, "逆迁移仅针对空账表")
         article = article_for_retry(source_article_id="migration-original-kept")
         tables = {TranslationRetryBudget._meta.db_table, TranslationRequestAttempt._meta.db_table}
+        entry_applied = MigrationRecorder(connection).applied_migrations()
+        entry_leaves = [node for node in MigrationExecutor(connection).loader.graph.leaf_nodes("stable")
+                        if node in entry_applied]
+        self.assertEqual(len(entry_leaves), 1, "入口必须有唯一已应用的当前 stable leaf")
+        entry_leaf = entry_leaves[0]
+        self.assertEqual(entry_leaf, ("stable", "0081_managed_readonly_steps"))
+        readonly_tables = {ManagedReadonlyTaskBudget._meta.db_table, ManagedReadonlyStep._meta.db_table}
+        self.assertTrue(readonly_tables <= set(connection.introspection.table_names()),
+                        "入口当前 leaf 的 readonly 两表必须存在")
+        self.assertEqual((ManagedReadonlyTaskBudget.objects.count(), ManagedReadonlyStep.objects.count()), (0, 0))
         try:
             MigrationExecutor(connection).migrate([("stable", "0079_multisource_race_enrollment")])
             self.assertFalse(tables & set(connection.introspection.table_names()))
@@ -716,6 +726,11 @@ class TranslationBudgetMigrationBoundaryTests(TransactionTestCase):
         self.assertEqual(TranslationRetryBudget.objects.count(), 0)
         self.assertIn(("stable", "0080_translation_retry_budget"),
                       MigrationRecorder(connection).applied_migrations())
+        self.assertIn(entry_leaf, MigrationRecorder(connection).applied_migrations(),
+                      "MIGRATION_CURRENT_LEAF_RESTORE_MISSING: finally 未恢复入口已应用的当前 leaf")
+        self.assertTrue(readonly_tables <= set(connection.introspection.table_names()),
+                        "恢复当前 leaf 后 readonly 两表必须存在")
+        self.assertEqual((ManagedReadonlyTaskBudget.objects.count(), ManagedReadonlyStep.objects.count()), (0, 0))
         print("B041_EMPTY_LEDGER_MIGRATION_BOUNDARY", {
             "reverse": "0079", "forward_restored": "0080", "tables": sorted(tables),
             "original_article_kept": True, "empty_budget_tables_only": True}, flush=True)
