@@ -22,7 +22,8 @@ from django.test.utils import CaptureQueriesContext
 
 from stable import admin as article_admin
 from stable.models import (ArticleStatus, ArticleTranslationStatus, NewsArticle, NotificationLog,
-                           OperationLog, TranslationRetryBudget, TranslationRun, WorkflowStatus)
+                           OperationLog, TranslationRetryBudget, TranslationRun, WorkflowStatus,
+                           TermEntry, TermAlias, TermType, ExternalHorseAlias)
 from stable.services import managed_readonly_steps as ro, managed_readonly_translation as job
 from stable.services import translation, translation_recovery as recovery, translation_retry_budget as core
 from stable.tasks import translate_article_task
@@ -363,6 +364,79 @@ class ManagedReadonlyTranslationEndToEndTests(RemainingReadonlyE2EFixture, Manag
         self.assertEqual(self.readroot.tool_reads_reserved, 1)
         self.assertEqual(self.readroot.deadline_at, original_deadline)
         self.assertEqual(len(self.creates()), 1)
+
+    def test_article_term_receipt_v2_resume_uses_frozen_resolution_without_dictionary_select(self):
+        """B106 RED2：真实read提交后改词典；新scope实际provider须收到原解析。"""
+        self.article.title_ja = "Stewards review Irad Ortiz Jr."
+        self.article.body_ja_raw = "Jockey Irad Ortiz Jr. had enough time after the sale. " + self.article.body_ja_raw
+        self.article.body_ja_normalized = self.article.body_ja_raw
+        self.article.save(update_fields=["title_ja", "body_ja_raw", "body_ja_normalized", "updated_at"])
+        term = TermEntry.objects.create(term_type=TermType.JOCKEY,
+            source_language=self.article.source_language, racing_region=self.article.racing_region,
+            source_ja="Irad Ortiz Jr.", target_zh="奥天信", priority=100)
+        alias = TermAlias.objects.create(term=term, source_language=self.article.source_language,
+                                         text="Irad Ortiz")
+        baseline = translation.resolve_article_entities_for_article(self.article)
+        fixture_requirement(term.pk in baseline.accepted_term_ids and alias.is_active,
+                            "B106原resolver必须识别实际人物词条")
+        expected = deepcopy(baseline.as_dict())
+        # 原人物质量门禁要求SDK返回占位符；恢复由实际provider按实际resolution完成。
+        self.payload = {"title_zh": "裁判复核__UMA_TERM_1__的骑乘",
+                        "body_zh": "骑师__UMA_TERM_1__在拍卖后仍有十分充足的时间考虑并作出决定。" * 6,
+                        "push_summary_zh": "裁判复核__UMA_TERM_1__的骑乘。"}
+        self.user_retry_message(receipt_version=2); self.register()
+        fixture_requirement((self.readroot.workflow_version, self.readroot.query_version,
+                             self.readroot.result_version) == ro.RECEIPT_VERSIONS[2],
+                            "B106必须实际v2；不支持版本是ERROR")
+        with self.scope(reader_fault="exit_after_commit"):
+            job.prepare_registered_read_phase(self.envelope)
+            with self.assertRaises(ro.ReadFixtureExit):
+                ro.execute_step(self.envelope, {"body_chars": 256}, now=NOW)
+        step = self.readroot.steps.get()
+        before = (step.pk, step.step_uuid, step.result_sha256, step.read_at, deepcopy(step.result))
+        self.readroot.refresh_from_db(); self.budget.refresh_from_db()
+        run = TranslationRun.objects.get(pk=self.envelope.run_id)
+        fixture_requirement(step.state == "completed" and self.reads() == 1
+                            and self.readroot.tool_reads_reserved == 1 and self.budget.requests_reserved == 0
+                            and self.budget.request_attempts.count() == 0 and self.creates() == []
+                            and run.raw_response[recovery.CLAIM_KEY]["phase"] == "executing"
+                            and recovery.RESULT_KEY not in run.raw_response,
+                            "B106真实read提交/model未开始断点必须成立")
+        term.target_zh = "奥天信更新名"
+        term.save(update_fields=["target_zh", "updated_at"])
+        fixture_requirement(TermEntry.objects.get(pk=term.pk).target_zh == "奥天信更新名",
+                            "B106词典变化必须真实提交")
+        observed = []
+        real_factory = job._registered_provider
+
+        def observe_provider(*args, **kwargs):
+            provider = real_factory(*args, **kwargs)
+            real_translate = provider.translate
+
+            def observe_translate(article, *, entity_resolution=None):
+                observed.append(deepcopy(entity_resolution.as_dict()))
+                return real_translate(article, entity_resolution=entity_resolution)
+
+            provider.translate = observe_translate
+            return provider
+
+        # 只旁观实际factory/provider参数，所有resolver、授权、SDK离线边界、保存仍沿原链。
+        with patch.object(job, "_registered_provider", side_effect=observe_provider), CaptureQueriesContext(connection) as queries:
+            result = self.consume()
+        step.refresh_from_db(); self.readroot.refresh_from_db()
+        fixture_requirement(result.get("translated") and len(observed) == 1
+                            and self.reads() == 1 and len(self.creates()) == 1
+                            and (step.pk, step.step_uuid, step.result_sha256, step.read_at, step.result) == before,
+                            "B106恢复必须实际到达provider和Article终态且不重读；失败是ERROR")
+        tables = (TermEntry._meta.db_table, TermAlias._meta.db_table, ExternalHorseAlias._meta.db_table)
+        dictionary_selects = [q["sql"] for q in queries.captured_queries
+                              if q["sql"].lstrip().upper().startswith("SELECT")
+                              and any('"' + table + '"' in q["sql"] for table in tables)]
+        print("B106_RED2_ACTUAL", "dictionary_selects", len(dictionary_selects),
+              "expected", expected, "provider_resolution", observed[0], flush=True)
+        self.assertEqual(observed[0], expected,
+                         "read提交后新scope的实际provider重新解析了已变化词典")
+        self.assertEqual(dictionary_selects, [], "恢复消费不得新增词典SELECT")
 
     def test_completed_job_redelivery_returns_same_final_receipt(self):
         self.user_retry_message(); self.register()

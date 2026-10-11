@@ -15,7 +15,8 @@ from django.test import TransactionTestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 
 from stable.models import (ManagedReadonlyTaskBudget, ManagedReadonlyStep, NewsArticle,
-                           TranslationRun, TranslationRetryBudget)
+                           TranslationRun, TranslationRetryBudget, TermEntry, TermAlias, TermType)
+from stable.services import translation
 from stable.services import managed_readonly_steps as ro, translation_recovery as recovery, translation_retry_budget as core
 from stable.test_managed_translation_budget_consumer import (
     ManagedTranslationBudgetConsumerFixture, NOW, fixture_requirement,
@@ -65,6 +66,34 @@ class ManagedReadonlyStepTests(ManagedTranslationBudgetConsumerFixture):
             options["receipt_version"] = 2
         with recovery._offline_budget_scope(self.identity):
             self.readroot = ro.initialize_read_budget(**options)
+
+    def test_article_term_receipt_v2_real_orm_missing_candidate_material(self):
+        """B106 RED1：真实v2完成read缺少已识别词条/alias材料；前置失败为ERROR。"""
+        self.new_case(title="Stewards review the incident",
+                      body="Jockey Irad Ortiz Jr. had enough time after the sale.")
+        term = TermEntry.objects.create(term_type=TermType.JOCKEY,
+            source_language=self.article.source_language, racing_region=self.article.racing_region,
+            source_ja="Irad Ortiz Jr.", target_zh="奥天信", priority=100)
+        alias = TermAlias.objects.create(term=term, source_language=self.article.source_language,
+                                         text="Irad Ortiz")
+        baseline = translation.resolve_article_entities_for_article(self.article)
+        fixture_requirement(term.pk in baseline.accepted_term_ids and alias.is_active,
+                            "B106人物词条/alias必须真实入库且原resolver识别人物")
+        self.init_publication_receipt()
+        fixture_requirement((self.readroot.workflow_version, self.readroot.query_version,
+                             self.readroot.result_version) == ro.RECEIPT_VERSIONS[2],
+                            "B106必须实际v2；不支持版本是ERROR")
+        decision, reader = self.invoke()
+        step = self.readroot.steps.get()
+        self.budget.refresh_from_db(); self.readroot.refresh_from_db()
+        fixture_requirement(decision.allowed and step.state == "completed" and reader.closed
+                            and self.readroot.tool_reads_reserved == 1
+                            and self.budget.requests_reserved == 0,
+                            "B106必须先完成真实v2 ORM read且尚未开始model")
+        print("B106_RED1_ACTUAL", step.step_uuid, step.result_sha256,
+              sorted(step.result), term.pk, alias.pk, flush=True)
+        self.assertIn("term_snapshot", step.result,
+                      "实际v2持久化read缺少来源绑定的候选材料与冻结resolution")
 
     def test_publication_receipt_real_orm_three_states(self):
         for verified in (True, False, None):
