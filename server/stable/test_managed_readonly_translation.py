@@ -380,10 +380,16 @@ class ManagedReadonlyTranslationEndToEndTests(RemainingReadonlyE2EFixture, Manag
         fixture_requirement(term.pk in baseline.accepted_term_ids and alias.is_active,
                             "B106原resolver必须识别实际人物词条")
         expected = deepcopy(baseline.as_dict())
-        # 原人物质量门禁要求SDK返回占位符；恢复由实际provider按实际resolution完成。
+        # 原质量门禁逐字段保留人物出现次数；原文标题/正文各一次，正文不能整句复制占位符。
         self.payload = {"title_zh": "裁判复核__UMA_TERM_1__的骑乘",
-                        "body_zh": "骑师__UMA_TERM_1__在拍卖后仍有十分充足的时间考虑并作出决定。" * 6,
+                        "body_zh": "骑师__UMA_TERM_1__在拍卖后有时间考虑。"
+                                   + "拍卖后仍有十分充足的时间考虑并作出决定。" * 6,
                         "push_summary_zh": "裁判复核__UMA_TERM_1__的骑乘。"}
+        fixture_requirement(self.article.title_ja.count(term.source_ja) == 1
+                            and self.article.body_ja_normalized.count(term.source_ja) == 1
+                            and self.payload["title_zh"].count("__UMA_TERM_1__") == 1
+                            and self.payload["body_zh"].count("__UMA_TERM_1__") == 1,
+                            "B106人物原文/响应逐字段必须各一次；错误为fixture ERROR")
         self.user_retry_message(receipt_version=2); self.register()
         fixture_requirement((self.readroot.workflow_version, self.readroot.query_version,
                              self.readroot.result_version) == ro.RECEIPT_VERSIONS[2],
@@ -415,7 +421,18 @@ class ManagedReadonlyTranslationEndToEndTests(RemainingReadonlyE2EFixture, Manag
 
             def observe_translate(article, *, entity_resolution=None):
                 observed.append(deepcopy(entity_resolution.as_dict()))
-                return real_translate(article, entity_resolution=entity_resolution)
+                try:
+                    result = real_translate(article, entity_resolution=entity_resolution)
+                except Exception as exc:
+                    # 透明旁观：记录真实原异常后原样重抛，consumer的业务拒绝路径保持。
+                    print("B106_RED2_ACTUAL_PROVIDER_EXCEPTION", type(exc).__name__, str(exc),
+                          "metadata", getattr(exc, "metadata", None), flush=True)
+                    raise
+                print("B106_RED2_ACTUAL_PROVIDER_RESULT", "lengths",
+                      (len(result.title_zh), len(result.body_zh), len(result.push_summary_zh)),
+                      "usage", result.metadata.get("usage"), "attempt", result.metadata.get("attempt"),
+                      flush=True)
+                return result
 
             provider.translate = observe_translate
             return provider
@@ -462,6 +479,12 @@ class ManagedReadonlyTranslationEndToEndTests(RemainingReadonlyE2EFixture, Manag
         fixture_requirement(len(state["results"]) == 1, "B106恢复worker必须返回唯一真实结果")
         result = state["results"][0]
         step.refresh_from_db(); self.readroot.refresh_from_db()
+        run.refresh_from_db(); self.budget.refresh_from_db()
+        print("B106_RED2_ACTUAL_RESUME_STATE", result, "provider_calls", len(observed),
+              "reads_creates", (self.reads(), len(self.creates())), "run_status", run.status,
+              "progress", run.raw_response.get(job.PROGRESS_KEY),
+              "checkpoint_present", recovery.RESULT_KEY in run.raw_response,
+              "requests_reserved", self.budget.requests_reserved, flush=True)
         fixture_requirement(result.get("translated") and len(observed) == 1
                             and self.reads() == 1 and len(self.creates()) == 1
                             and (step.pk, step.step_uuid, step.result_sha256, step.read_at, step.result) == before,
