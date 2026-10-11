@@ -224,13 +224,31 @@ class ManagedReadonlyStepTests(ManagedTranslationBudgetConsumerFixture):
         self.assertEqual(set(result.result), {"query_version", "result_version", "article_id", "run_id", "source_site",
             "source_article_id", "input_sha256", "title", "body_excerpt", "body_chars", "read_at", "step_uuid", "idempotency_sha256"})
         self.assertEqual((self.readroot.workflow_version, self.readroot.query_version, self.readroot.result_version), ro.RECEIPT_VERSIONS[1])
-        with recovery._offline_budget_scope(self.identity), self.assertRaisesMessage(ro.ReadonlyRefusal, "read_budget_contract_changed"):
-            ro.initialize_read_budget(tool_read_limit=1, receipt_version=2, now=NOW, baseline={
-                "kind": "synthetic_no_prior_tool_reads", "operation_uuid": str(self.identity.operation_uuid)})
-        for version in (True, 2.0, "2", 3):
-            with self.subTest(version=version), recovery._offline_budget_scope(self.identity), self.assertRaisesMessage(ro.ReadonlyRefusal, "step_version_changed"):
-                ro.initialize_read_budget(tool_read_limit=1, receipt_version=version, now=NOW, baseline={
-                    "kind": "synthetic_no_prior_tool_reads", "operation_uuid": str(self.identity.operation_uuid)})
+        from stable.models import ExternalHorseAlias, RaceEventRunner, RaceEventResult, ArticleRaceLink
+        before_root = ManagedReadonlyTaskBudget.objects.values().get(pk=self.readroot.pk)
+        before_step = self.readroot.steps.values().get()
+        before_budget = TranslationRetryBudget.objects.values().get(pk=self.budget.pk)
+        material_tables = tuple(model._meta.db_table for model in
+            (TermEntry, TermAlias, ExternalHorseAlias, RaceEventRunner, RaceEventResult, ArticleRaceLink))
+        # Supported versions reach the existing immutable-root contract fence.
+        # Unknown versions and non-native ints fail earlier, before any root lookup.
+        cases = ((2, "read_budget_contract_changed"), (3, "read_budget_contract_changed"),
+                 (True, "step_version_changed"), (2.0, "step_version_changed"),
+                 ("2", "step_version_changed"), (4, "step_version_changed"))
+        for version, reason in cases:
+            with self.subTest(version=version), CaptureQueriesContext(connection) as queries:
+                with recovery._offline_budget_scope(self.identity), self.assertRaisesMessage(ro.ReadonlyRefusal, reason):
+                    ro.initialize_read_budget(tool_read_limit=1, receipt_version=version, now=NOW, baseline={
+                        "kind": "synthetic_no_prior_tool_reads", "operation_uuid": str(self.identity.operation_uuid)})
+            self.assertFalse(any(q["sql"].lstrip().upper().startswith("SELECT")
+                                 and any('"' + table + '"' in q["sql"] for table in material_tables)
+                                 for q in queries))
+            self.assertEqual(ManagedReadonlyTaskBudget.objects.values().get(pk=self.readroot.pk), before_root)
+            self.assertEqual(self.readroot.steps.values().get(), before_step)
+            self.assertEqual(TranslationRetryBudget.objects.values().get(pk=self.budget.pk), before_budget)
+            self.assertEqual(before_budget["requests_reserved"], 0)
+            self.assertEqual(self.budget.request_attempts.count(), 0)
+            self.constructor.assert_not_called()
 
     def test_publication_projection_sql_bounds_and_inert_material(self):
         self.article.published_at_verified = None
