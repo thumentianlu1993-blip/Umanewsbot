@@ -421,15 +421,53 @@ class ManagedReadonlyTranslationEndToEndTests(RemainingReadonlyE2EFixture, Manag
             return provider
 
         # 只旁观实际factory/provider参数，所有resolver、授权、SDK离线边界、保存仍沿原链。
-        with patch.object(job, "_registered_provider", side_effect=observe_provider), CaptureQueriesContext(connection) as queries:
-            result = self.consume()
+        captured_queries = []
+
+        def resume_with_query_observation(_):
+            # CaptureQueriesContext必须在消费worker的实际PG连接内，不能捕获控制连接。
+            with CaptureQueriesContext(connection) as queries:
+                result = self.consume()
+            captured_queries.extend(queries.captured_queries)
+            return result
+
+        self.case_reader_index, self.case_sdk_index = len(self.readers), len(self.sdks)
+        with patch.object(job, "_registered_provider", side_effect=observe_provider), \
+                self.wire_gate("after_usage_choices") as (ready, release, wire):
+            with self.running_workers(resume_with_query_observation, count=1, releases=(release,)) as state:
+                fixture_requirement(ready.wait(8), "B106恢复必须到达真实usage提交后的choices边界")
+                attempt = self.budget.request_attempts.get()
+                fixture_requirement(attempt.state == "usage_reported" and attempt.usage_report == USAGE
+                                    and attempt.usage_validation == "known"
+                                    and attempt.reconciliation_state == "unreconciled"
+                                    and not attempt.receipt_sha256 and len(observed) == 1,
+                                    "B106恢复须由实际provider产生已知但未结算usage")
+                self.no_business_locks(wire["pid"])
+                # 独立控制连接向原API提交真实journal绑定的离线receipt；SDK不供应成本许可。
+                receipt = {"kind": "synthetic_offline_usage_v1",
+                           "budget_uuid": str(self.budget.budget_uuid), "attempt_pk": attempt.pk,
+                           "usage_sha256": core._json_snapshot(attempt.usage_report)[1]}
+                decision = core.record_usage(budget_pk=self.budget.pk, attempt_pk=attempt.pk,
+                                             mode="offline_test", usage_report=attempt.usage_report,
+                                             receipt=receipt)
+                attempt.refresh_from_db()
+                fixture_requirement(decision.allowed and decision.reason == "offline_usage_reconciled"
+                                    and attempt.state == "reconciled"
+                                    and attempt.reconciliation_state == "offline_reconciled"
+                                    and attempt.usage_report == USAGE and bool(attempt.receipt_sha256),
+                                    "B106真实成本对账必须成功；错误不计目标RED")
+                print("B106_RED2_ACTUAL_COST_RECEIPT", attempt.pk, attempt.state,
+                      attempt.receipt_sha256, decision.reason, flush=True)
+                release.set()
+            self.workers_clean(state)
+        fixture_requirement(len(state["results"]) == 1, "B106恢复worker必须返回唯一真实结果")
+        result = state["results"][0]
         step.refresh_from_db(); self.readroot.refresh_from_db()
         fixture_requirement(result.get("translated") and len(observed) == 1
                             and self.reads() == 1 and len(self.creates()) == 1
                             and (step.pk, step.step_uuid, step.result_sha256, step.read_at, step.result) == before,
                             "B106恢复必须实际到达provider和Article终态且不重读；失败是ERROR")
         tables = (TermEntry._meta.db_table, TermAlias._meta.db_table, ExternalHorseAlias._meta.db_table)
-        dictionary_selects = [q["sql"] for q in queries.captured_queries
+        dictionary_selects = [q["sql"] for q in captured_queries
                               if q["sql"].lstrip().upper().startswith("SELECT")
                               and any('"' + table + '"' in q["sql"] for table in tables)]
         print("B106_RED2_ACTUAL", "dictionary_selects", len(dictionary_selects),
