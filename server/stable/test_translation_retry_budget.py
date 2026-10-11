@@ -720,7 +720,7 @@ class TranslationBudgetMigrationBoundaryTests(TransactionTestCase):
                              MigrationRecorder(connection).applied_migrations())
             self.assertTrue(NewsArticle.objects.filter(pk=article.pk).exists())
         finally:
-            MigrationExecutor(connection).migrate([("stable", "0080_translation_retry_budget")])
+            MigrationExecutor(connection).migrate([entry_leaf])
         self.assertTrue(tables <= set(connection.introspection.table_names()))
         self.assertTrue(NewsArticle.objects.filter(pk=article.pk).exists())
         self.assertEqual(TranslationRetryBudget.objects.count(), 0)
