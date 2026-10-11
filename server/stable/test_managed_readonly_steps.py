@@ -143,14 +143,21 @@ class ManagedReadonlyStepTests(ManagedTranslationBudgetConsumerFixture):
                 elif fence=="deadline":
                     self.clock.return_value=self.readroot.deadline_at+timedelta(seconds=1)
                 elif fence=="version":
-                    ManagedReadonlyTaskBudget.objects.filter(pk=self.readroot.pk).update(query_version="source_excerpt_v2")
+                    # Existing test-only single-row corruption; production ORM guard stays intact.
+                    changed = models.QuerySet.update(ManagedReadonlyTaskBudget.objects.filter(pk=self.readroot.pk),
+                                                     query_version="source_excerpt_v2")
+                    fixture_requirement(changed == 1, "B108 version corruption must persist one real root")
                 else:
                     step.result["term_snapshot"]["resolution"]["entities"][0]["term_id"]=9223372036854775807
                     step.result_sha256=ro._sha(step.result)
-                    step.save(update_fields=["result","result_sha256"])
+                    changed = models.QuerySet.update(ManagedReadonlyStep.objects.filter(pk=step.pk),
+                                                     result=step.result, result_sha256=step.result_sha256)
+                    fixture_requirement(changed == 1, "B108 mapping corruption must persist one real step")
                 with CaptureQueriesContext(connection) as queries:
                     denied,_=self.invoke()
                 self.assertFalse(denied.allowed)
+                if fence == "version": self.assertEqual(denied.reason, "step_version_changed")
+                if fence == "mapping": self.assertEqual(denied.reason, "step_result_invalid")
                 self.assertFalse(any('"stable_termentry"' in q["sql"] or '"stable_termalias"' in q["sql"] for q in queries))
                 self.readroot.refresh_from_db();self.budget.refresh_from_db()
                 self.assertEqual((self.readroot.tool_reads_reserved,self.budget.requests_reserved),(1,0))

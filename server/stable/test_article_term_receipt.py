@@ -94,6 +94,39 @@ class ArticleTermReceiptMaterialTests(TestCase):
         self.assertIn('LIMIT 129',sql);self.assertIn('LIMIT 65',sql)
         self.assertIn('4097',sql);self.assertIn('_cap_notes',sql)
 
+    def test_frozen_real_horse_metadata_is_json_native_for_strict_checkpoint(self):
+        from stable.services import managed_readonly_translation as job
+        article = self.article(body='Blue Horizon won.')
+        ExternalHorseAlias.objects.create(source_language='en', external_horse_id='b108-horse',
+            normalized_name='Blue Horizon', name_ja='Blue Horizon', confidence=100)
+        view = receipt.source_view(article, {'input_sha256': recovery.translation_input_sha256(article),
+            'source_site': article.source_site, 'source_article_id': article.source_article_id})
+        snapshot = receipt.capture(view, article.pk, recovery.translation_input_sha256(article), timezone.now().isoformat())
+        frozen = receipt.decode(snapshot, view, article.pk, recovery.translation_input_sha256(article))
+        recognized = terms.recognized_horses_from_resolution(frozen)
+        self.assertTrue(recognized)
+        metadata = {'provider': 'offline', 'model': 'offline',
+                    'recognized_horse_names': terms.serialize_recognized_horse_names(recognized)}
+        decoded = job.business_metadata(metadata)
+        self.assertEqual(decoded['recognized_horse_names'][0]['matched_span'], [0, 12])
+        # Internal dataclass coordinate stays a tuple; only its serialized JSON boundary changes.
+        self.assertIs(type(recognized[0].matched_span), tuple)
+        self.assertIs(type(metadata['recognized_horse_names'][0]['matched_span']), list)
+        with self.assertRaisesRegex(recovery.TranslationCheckpointError, 'checkpoint value type'):
+            job.business_metadata({'matched_span': (0, 12)})
+
+    def test_real_person_only_metadata_still_passes_strict_checkpoint(self):
+        from stable.services import managed_readonly_translation as job
+        article = self.article(body='Jockey Irad Ortiz Jr. rode.')
+        self.term('Irad Ortiz Jr.', term_type=TermType.JOCKEY, target_zh='奥天信')
+        frozen = self.decode(self.capture(article), article)
+        self.assertTrue(frozen.accepted_terms)
+        recognized = terms.recognized_horses_from_resolution(frozen)
+        self.assertEqual(recognized, [])
+        metadata = {'provider': 'offline', 'model': 'offline',
+                    'recognized_horse_names': terms.serialize_recognized_horse_names(recognized)}
+        self.assertEqual(job.business_metadata(metadata), metadata)
+
     def test_no_keys_avoids_dictionary_queries(self):
         article=self.article(language='ja',body='')
         with CaptureQueriesContext(connection) as q:snapshot=self.capture(article)

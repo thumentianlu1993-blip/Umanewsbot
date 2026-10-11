@@ -971,10 +971,27 @@ class BusinessMetadataBoundaryTests(unittest.TestCase):
                            has_translation=True, first_position=0, detection_reason="horse_context",
                            conflict_flags=[], matched_span=(0, 9))
         metadata = {"recognized_horse_names": self.serialize([horse]), "model": "offline"}
-        self.assertIs(type(metadata["recognized_horse_names"][0]["matched_span"]), tuple)
+        self.assertIs(type(metadata["recognized_horse_names"][0]["matched_span"]), list)
+        self.assertEqual(self.strict(metadata), self.ordinary(metadata))
         result = self.ordinary(metadata)
         self.assertEqual(result["recognized_horse_names"][0]["matched_span"], [0, 9])
-        self.assertIs(type(metadata["recognized_horse_names"][0]["matched_span"]), tuple)
+        self.assertIs(type(metadata["recognized_horse_names"][0]["matched_span"]), list)
+
+    def test_recognized_horse_serializer_preserves_empty_none_and_other_fields(self):
+        horse = self.horse(name_ja='Brilliant', source='heuristic', matched_text='Brilliant',
+            confidence=100, external_horse_ids=[], primary_external_horse_id='',
+            needs_preserve=True, has_translation=False, first_position=0,
+            detection_reason='horse_context', conflict_flags=[], matched_span=None)
+        from dataclasses import asdict
+        original = asdict(horse)
+        metadata = {'recognized_horse_names': self.serialize([horse])}
+        self.assertEqual(metadata['recognized_horse_names'], [original])
+        self.assertEqual(self.strict(metadata), self.ordinary(metadata))
+        self.assertEqual(self.serialize([]), [])
+        horse.matched_span = ()
+        expected = asdict(horse); expected['matched_span'] = []
+        self.assertEqual(self.serialize([horse]), [expected])
+        self.assertIs(type(horse.matched_span), tuple)
 
     def test_ordinary_json_is_detached_and_preserves_scalar_types(self):
         metadata = {"usage": {"count": 1, "known": True, "cost": 0.5}, "terms": ["Brilliant"], "empty": None}

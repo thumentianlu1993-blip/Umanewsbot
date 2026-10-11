@@ -2612,7 +2612,11 @@ def serialize_terms(items: list[ResolvedTerm]) -> list[dict]:
 
 
 def serialize_recognized_horse_names(items: list[RecognizedHorseName]) -> list[dict]:
-    return [asdict(item) for item in items]
+    payloads = [asdict(item) for item in items]
+    for payload in payloads:
+        if type(payload['matched_span']) is tuple:
+            payload['matched_span'] = list(payload['matched_span'])
+    return payloads
 
 
 def apply_term_mappings(text: str, source_language: str | None = None) -> str:
