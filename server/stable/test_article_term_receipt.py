@@ -485,6 +485,110 @@ class ArticleTermReceiptMaterialTests(TestCase):
         snapshot['inputs'].append(deepcopy(snapshot['inputs'][0]))
         with self.assertRaises(TermCaptureRefusal):self.decode(snapshot,article)
 
+    def _english_merge_index(self):
+        self.term(target_zh='甲')
+        self.term(target_zh='乙')
+        for source in ('one', 'two'):
+            ExternalHorseAlias.objects.create(source_language='en', source=source,
+                external_horse_id='same-horse', normalized_name='Blue Horizon',
+                name_ja='Blue Horizon', confidence=100)
+        return terms._build_article_entity_index([('en', 'Blue Horizon won.')])
+
+    def _observe_english_string_merge(self, index, owner, field, *, exhausted=None):
+        # Observe the real ORM-preloaded English resolver. All patched helpers call their
+        # original implementation; the only injection is the budget at the actual merge.
+        import ast
+        import inspect
+        from unittest.mock import patch
+        tree = ast.parse(inspect.getsource(terms._resolve_english_entities))
+        offset = inspect.getsourcelines(terms._resolve_english_entities)[1] - 1
+        ranges = [(n.lineno + offset, n.end_lineno + offset)
+                  for n in ast.walk(tree) if isinstance(n, ast.Assign)
+                  and any(isinstance(t, ast.Attribute) and isinstance(t.value, ast.Name)
+                          and t.value.id == owner and t.attr == field for t in n.targets)]
+        budget = CaptureBudget()
+        observed = {'consumed': [], 'armed': False, 'string_fees': [], 'tracking': False}
+        original_string = budget.string
+        def charge_string(value):
+            if observed['tracking']: observed['string_fees'].append(value)
+            return original_string(value)
+        budget.string = charge_string
+        originals = {name: getattr(terms, name) for name in
+                     ('capture_list', 'capture_strings', 'capture_unique_strings')}
+        def observer(name):
+            def call(values=(), capture_budget=None):
+                frame = inspect.currentframe().f_back
+                selected = (frame.f_code is terms._resolve_english_entities.__code__
+                            and any(lo <= frame.f_lineno <= hi for lo, hi in ranges)
+                            and not (name == 'capture_list' and isinstance(values, (list, tuple))
+                                     and not values))
+                if selected and not observed['armed']:
+                    observed['armed'] = True
+                    entity = frame.f_locals[owner]
+                    observed.update(entity=entity, before=list(getattr(entity, field)),
+                                    collections_before=budget.collections)
+                    if exhausted == 'items': budget.strings = 1024
+                    if exhausted == 'bytes': budget.string_bytes = 128 * 1024
+                    def inputs(source=values):
+                        for item in source:
+                            observed['consumed'].append(item)
+                            yield item
+                    values = inputs()
+                before_tracking = observed['tracking']
+                observed['tracking'] = selected
+                try:
+                    result = originals[name](values, capture_budget)
+                finally:
+                    observed['tracking'] = before_tracking
+                if selected and name != 'capture_list':
+                    observed['result'] = list(result)
+                return result
+            return call
+        with patch.multiple(terms, **{n: observer(n) for n in originals}):
+            if exhausted:
+                with self.assertRaisesRegex(TermCaptureRefusal, 'read_terms_limit'):
+                    terms.resolve_article_entities('', 'Blue Horizon won.', source_language='en',
+                        preloaded_index=index, capture_budget=budget)
+                self.assertTrue(observed['armed'])
+                self.assertEqual(getattr(observed['entity'], field), observed['before'])
+                self.assertEqual(budget.collections, observed['collections_before'])
+            else:
+                value = terms.resolve_article_entities('', 'Blue Horizon won.', source_language='en',
+                    preloaded_index=index, capture_budget=budget)
+                plain = terms.resolve_article_entities('', 'Blue Horizon won.', source_language='en',
+                    preloaded_index=index)
+                self.assertEqual(value.as_dict(), plain.as_dict())
+        return observed, budget
+
+    def test_real_english_merges_precharge_strings_before_consuming_remainder(self):
+        index = self._english_merge_index()
+        for owner, field in (('existing', 'external_horse_ids'), ('primary', 'external_horse_ids'),
+                             ('primary', 'evidence'), ('primary', 'entity_evidence'),
+                             ('primary', 'conflict_flags')):
+            for exhausted in ('items', 'bytes'):
+                with self.subTest(owner=owner, field=field, exhausted=exhausted):
+                    observed, _ = self._observe_english_string_merge(index, owner, field,
+                                                                    exhausted=exhausted)
+                    self.assertEqual(len(observed['consumed']), 1,
+                                     'first string must refuse before copying later merge inputs')
+                    print('B107_R01_ENGLISH_PRECHARGE', owner, field, exhausted,
+                          'consumed', len(observed['consumed']), 'target_unchanged', True,
+                          'collection_growth', 0, flush=True)
+
+    def test_real_english_duplicate_merge_inputs_are_charged_and_order_is_preserved(self):
+        index = self._english_merge_index()
+        for owner, field in (('primary', 'evidence'),):
+            with self.subTest(owner=owner, field=field):
+                observed, budget = self._observe_english_string_merge(index, owner, field)
+                self.assertTrue(observed['armed'])
+                self.assertGreater(len(observed['consumed']), len(set(observed['consumed'])))
+                self.assertEqual(observed['result'], list(dict.fromkeys(observed['consumed'])))
+                from collections import Counter
+                fees, inputs = Counter(observed['string_fees']), Counter(observed['consumed'])
+                for item, count in inputs.items(): self.assertGreaterEqual(fees[item], count)
+                print('B107_R01_ENGLISH_DUPLICATES', 'input_fees', dict(inputs),
+                      'all_string_fees', dict(fees), 'dedupe_order_preserved', True, flush=True)
+
     def test_protected_people_and_suppressed_language_branches_keep_original(self):
         fixtures=[('en','Irad Ortiz Jr. said Blue Horizon won.','Irad Ortiz Jr.','Blue Horizon'),
                   ('ja','ジョン・スミス騎手がブルーホライズンを騎乗。','ジョン・スミス','スミス'),

@@ -907,12 +907,7 @@ def _resolve_english_entities(
                             canonical_text=entry.source_ja,
                             target_zh=entry.target_zh,
                             confidence=100,
-                            evidence=capture_list(
-                                (
-                                    'formal_person_term',
-                                ),
-                                capture_budget
-                            ),
+                            evidence=('formal_person_term',),
                             term=entry,
                             capture_budget=capture_budget
                         )
@@ -973,12 +968,7 @@ def _resolve_english_entities(
                     canonical_text=term.source_ja if term else matched,
                     target_zh=term.target_zh if term else '',
                     confidence=95,
-                    evidence=capture_list(
-                        (
-                            'person_job_context',
-                        ),
-                        capture_budget
-                    ),
+                    evidence=('person_job_context',),
                     term=term,
                     capture_budget=capture_budget
                 )
@@ -1053,18 +1043,8 @@ def _resolve_english_entities(
                             match.start(),
                             match.end(),
                             confidence=0,
-                            evidence=capture_list(
-                                (
-                                    'person_surname_candidate',
-                                ),
-                                capture_budget
-                            ),
-                            conflict_flags=capture_list(
-                                (
-                                    'ambiguous_person_surname',
-                                ),
-                                capture_budget
-                            ),
+                            evidence=('person_surname_candidate',),
+                            conflict_flags=('ambiguous_person_surname',),
                             capture_budget=capture_budget
                         )
                     )
@@ -1082,18 +1062,8 @@ def _resolve_english_entities(
                             match.start(),
                             match.end(),
                             confidence=0,
-                            evidence=capture_list(
-                                (
-                                    'person_surname_candidate',
-                                ),
-                                capture_budget
-                            ),
-                            conflict_flags=capture_list(
-                                (
-                                    'surname_before_full_name',
-                                ),
-                                capture_budget
-                            ),
+                            evidence=('person_surname_candidate',),
+                            conflict_flags=('surname_before_full_name',),
                             capture_budget=capture_budget
                         )
                     )
@@ -1110,12 +1080,7 @@ def _resolve_english_entities(
                         canonical_text=owner.canonical_text,
                         target_zh=owner.target_zh,
                         confidence=95,
-                        evidence=capture_list(
-                            (
-                                'person_surname_coreference',
-                            ),
-                            capture_budget
-                        ),
+                        evidence=('person_surname_coreference',),
                         term=next(
                             (
                                 entry for entry in entries if entry.id == owner.term_id
@@ -1161,18 +1126,8 @@ def _resolve_english_entities(
                                 canonical_text=entry.source_ja,
                                 target_zh=entry.target_zh,
                                 confidence=0,
-                                evidence=capture_list(
-                                    (
-                                        'term_candidate',
-                                    ),
-                                    capture_budget
-                                ),
-                                conflict_flags=capture_list(
-                                    (
-                                        'inside_person_span',
-                                    ),
-                                    capture_budget
-                                ),
+                                evidence=('term_candidate',),
+                                conflict_flags=('inside_person_span',),
                                 term=entry,
                                 capture_budget=capture_budget
                             )
@@ -1192,19 +1147,8 @@ def _resolve_english_entities(
                                 canonical_text=entry.source_ja,
                                 target_zh=entry.target_zh,
                                 confidence=decision.confidence,
-                                evidence=capture_list(
-                                    decision.evidence,
-                                    capture_budget
-                                ),
-                                conflict_flags=capture_list(
-                                    (),
-                                    capture_budget
-                                ) if decision.classification == 'confirmed_horse' else capture_list(
-                                    (
-                                        'horse_term_without_strong_context',
-                                    ),
-                                    capture_budget
-                                ),
+                                evidence=decision.evidence,
+                                conflict_flags=() if decision.classification == 'confirmed_horse' else ('horse_term_without_strong_context',),
                                 needs_preserve=decision.classification == 'confirmed_horse' and (
                                     not entry.has_translation
                                 ),
@@ -1233,12 +1177,7 @@ def _resolve_english_entities(
                                 canonical_text=entry.source_ja,
                                 target_zh=entry.target_zh,
                                 confidence=95,
-                                evidence=capture_list(
-                                    (
-                                        'formal_term',
-                                    ),
-                                    capture_budget
-                                ),
+                                evidence=('formal_term',),
                                 term=entry,
                                 capture_budget=capture_budget
                             )
@@ -1258,24 +1197,9 @@ def _resolve_english_entities(
                             match.end(),
                             canonical_text=alias_text,
                             confidence=0,
-                            evidence=capture_list(
-                                (
-                                    'external_horse_alias',
-                                ),
-                                capture_budget
-                            ),
-                            conflict_flags=capture_list(
-                                (
-                                    'inside_person_span',
-                                ),
-                                capture_budget
-                            ),
-                            external_horse_ids=capture_list(
-                                (
-                                    alias.external_horse_id,
-                                ),
-                                capture_budget
-                            ),
+                            evidence=('external_horse_alias',),
+                            conflict_flags=('inside_person_span',),
+                            external_horse_ids=(alias.external_horse_id,),
                             capture_budget=capture_budget
                         )
                     )
@@ -1290,18 +1214,7 @@ def _resolve_english_entities(
                 )
                 if existing:
                     existing.external_horse_ids = capture_unique_strings(
-                        capture_list(
-                            _capture_chain(
-                                existing.external_horse_ids or capture_list(
-                                    (),
-                                    capture_budget
-                                ),
-                                (
-                                    alias.external_horse_id,
-                                )
-                            ),
-                            capture_budget
-                        ),
+                        _capture_chain(existing.external_horse_ids or (), (alias.external_horse_id,)),
                         capture_budget
                     )
                     if 'external_horse_alias' not in existing.evidence:
@@ -1322,31 +1235,10 @@ def _resolve_english_entities(
                             decision.confidence,
                             alias.confidence if decision.classification == 'confirmed_horse' else 0
                         ),
-                        evidence=capture_list(
-                            _capture_chain(
-                                (
-                                    'external_horse_alias',
-                                ),
-                                decision.evidence
-                            ),
-                            capture_budget
-                        ),
-                        conflict_flags=capture_list(
-                            (),
-                            capture_budget
-                        ) if decision.classification == 'confirmed_horse' else capture_list(
-                            (
-                                'horse_alias_without_strong_context',
-                            ),
-                            capture_budget
-                        ),
+                        evidence=_capture_chain(('external_horse_alias',), decision.evidence),
+                        conflict_flags=() if decision.classification == 'confirmed_horse' else ('horse_alias_without_strong_context',),
                         needs_preserve=decision.classification == 'confirmed_horse',
-                        external_horse_ids=capture_list(
-                            (
-                                alias.external_horse_id,
-                            ),
-                            capture_budget
-                        ),
+                        external_horse_ids=(alias.external_horse_id,),
                         classification=decision.classification,
                         reason=decision.reason,
                         matched_context=context_for(
@@ -1419,62 +1311,25 @@ def _resolve_english_entities(
         primary.needs_preserve = primary.classification == 'confirmed_horse'
         primary.priority = max((entity.priority for entity in group))
         primary.external_horse_ids = capture_unique_strings(
-            (
-                external_id for entity in group for external_id in entity.external_horse_ids or capture_list(
-                    (),
-                    capture_budget
-                )
-            ),
+            (external_id for entity in group for external_id in entity.external_horse_ids or ()),
             capture_budget
         )
         primary.evidence = capture_unique_strings(
-            capture_list(
-                _capture_chain(
-                    (
-                        item for entity in group for item in entity.evidence
-                    ),
-                    (
-                        'ambiguous_formal_horse_name',
-                    ),
-                    (
-                        f'formal_term_id:{
-                            term_id
-                        }' for term_id in term_ids
-                    ),
-                    (
-                        f'formal_target_zh:{
-                            target
-                        }' for target in target_values
-                    )
-                ),
-                capture_budget
+            _capture_chain(
+                (item for entity in group for item in entity.evidence),
+                ('ambiguous_formal_horse_name',),
+                (f'formal_term_id:{term_id}' for term_id in term_ids),
+                (f'formal_target_zh:{target}' for target in target_values)
             ),
             capture_budget
         )
-        primary.entity_evidence = capture_strings(
-            capture_list(
-                primary.evidence,
-                capture_budget
-            ),
-            capture_budget
-        )
+        primary.entity_evidence = capture_strings(primary.evidence, capture_budget)
         primary.conflict_flags = capture_unique_strings(
-            capture_list(
-                _capture_chain(
-                    (
-                        item for entity in group for item in entity.conflict_flags
-                    ),
-                    (
-                        'ambiguous_formal_horse_name',
-                    ),
-                    (
-                        'conflicting_formal_term_ids',
-                    ),
-                    (
-                        'conflicting_formal_targets',
-                    )
-                ),
-                capture_budget
+            _capture_chain(
+                (item for entity in group for item in entity.conflict_flags),
+                ('ambiguous_formal_horse_name',),
+                ('conflicting_formal_term_ids',),
+                ('conflicting_formal_targets',)
             ),
             capture_budget
         )
@@ -1625,12 +1480,7 @@ def _resolve_japanese_entities(
                     0
                 ].target_zh if exact_people else '',
                 confidence=100 if exact_people else 96,
-                evidence=capture_list(
-                    (
-                        'formal_person_term' if exact_people else 'japanese_person_role_context',
-                    ),
-                    capture_budget
-                ),
+                evidence=('formal_person_term' if exact_people else 'japanese_person_role_context',),
                 term=exact_people[
                     0
                 ] if exact_people else None,
@@ -1657,18 +1507,8 @@ def _resolve_japanese_entities(
                             canonical_text=term.source_ja,
                             target_zh=term.target_zh,
                             confidence=0,
-                            evidence=capture_list(
-                                (
-                                    'term_candidate',
-                                ),
-                                capture_budget
-                            ),
-                            conflict_flags=capture_list(
-                                (
-                                    'inside_person_span',
-                                ),
-                                capture_budget
-                            ),
+                            evidence=('term_candidate',),
+                            conflict_flags=('inside_person_span',),
                             term=term,
                             capture_budget=capture_budget
                         )
@@ -1713,12 +1553,7 @@ def _resolve_japanese_entities(
                     canonical_text=owner.canonical_text,
                     target_zh=owner.target_zh,
                     confidence=94,
-                    evidence=capture_list(
-                        (
-                            'japanese_person_coreference',
-                        ),
-                        capture_budget
-                    ),
+                    evidence=('japanese_person_coreference',),
                     term=next(
                         (
                             entry for entry in entries if entry.id == owner.term_id
@@ -1807,18 +1642,8 @@ def _resolve_japanese_entities(
                     match.start(),
                     match.end(),
                     confidence=100,
-                    evidence=capture_list(
-                        (
-                            'japanese_common_word_seed',
-                        ),
-                        capture_budget
-                    ),
-                    conflict_flags=capture_list(
-                        (
-                            'horse_candidate_common_word',
-                        ),
-                        capture_budget
-                    ),
+                    evidence=('japanese_common_word_seed',),
+                    conflict_flags=('horse_candidate_common_word',),
                     capture_budget=capture_budget
                 )
                 entities.append(common_word)
@@ -1837,18 +1662,8 @@ def _resolve_japanese_entities(
                             canonical_text=term.source_ja,
                             target_zh=term.target_zh,
                             confidence=0,
-                            evidence=capture_list(
-                                (
-                                    'term_candidate',
-                                ),
-                                capture_budget
-                            ),
-                            conflict_flags=capture_list(
-                                (
-                                    'inside_common_word_span',
-                                ),
-                                capture_budget
-                            ),
+                            evidence=('term_candidate',),
+                            conflict_flags=('inside_common_word_span',),
                             term=term,
                             capture_budget=capture_budget
                         )
@@ -1867,12 +1682,7 @@ def _resolve_japanese_entities(
                     canonical_text=term.source_ja,
                     target_zh=term.target_zh,
                     confidence=100,
-                    evidence=capture_list(
-                        (
-                            'formal_full_horse_term',
-                        ),
-                        capture_budget
-                    ),
+                    evidence=('formal_full_horse_term',),
                     needs_preserve=not term.has_translation,
                     term=term,
                     capture_budget=capture_budget
@@ -1889,19 +1699,9 @@ def _resolve_japanese_entities(
                             alias.confidence for alias in aliases
                         )
                     ),
-                    evidence=capture_list(
-                        (
-                            'external_full_horse_alias',
-                        ),
-                        capture_budget
-                    ),
+                    evidence=('external_full_horse_alias',),
                     needs_preserve=True,
-                    external_horse_ids=capture_list(
-                        (
-                            alias.external_horse_id for alias in aliases if alias.external_horse_id
-                        ),
-                        capture_budget
-                    ),
+                    external_horse_ids=(alias.external_horse_id for alias in aliases if alias.external_horse_id),
                     capture_budget=capture_budget
                 )
             elif exact_non_horse_terms:
@@ -1914,13 +1714,7 @@ def _resolve_japanese_entities(
                     match.start(),
                     match.end(),
                     confidence=90 if internal_horse_terms else 78,
-                    evidence=capture_list(
-                        (
-                            'longest_full_horse_token',
-                            'internal_horse_term' if internal_horse_terms else 'strong_horse_context'
-                        ),
-                        capture_budget
-                    ),
+                    evidence=('longest_full_horse_token', 'internal_horse_term' if internal_horse_terms else 'strong_horse_context'),
                     needs_preserve=True,
                     capture_budget=capture_budget
                 )
@@ -1942,18 +1736,8 @@ def _resolve_japanese_entities(
                         canonical_text=term.source_ja,
                         target_zh=term.target_zh,
                         confidence=0,
-                        evidence=capture_list(
-                            (
-                                'formal_internal_horse_term',
-                            ),
-                            capture_budget
-                        ),
-                        conflict_flags=capture_list(
-                            (
-                                'inside_longer_entity',
-                            ),
-                            capture_budget
-                        ),
+                        evidence=('formal_internal_horse_term',),
+                        conflict_flags=('inside_longer_entity',),
                         term=term,
                         capture_budget=capture_budget
                     )
@@ -1993,18 +1777,8 @@ def _resolve_japanese_entities(
                                     canonical_text=entry.source_ja,
                                     target_zh=entry.target_zh,
                                     confidence=95,
-                                    evidence=capture_list(
-                                        (
-                                            'ordinary_japanese_context',
-                                        ),
-                                        capture_budget
-                                    ),
-                                    conflict_flags=capture_list(
-                                        (
-                                            'horse_term_without_strong_context',
-                                        ),
-                                        capture_budget
-                                    ),
+                                    evidence=('ordinary_japanese_context',),
+                                    conflict_flags=('horse_term_without_strong_context',),
                                     term=entry,
                                     capture_budget=capture_budget
                                 )
@@ -2022,12 +1796,7 @@ def _resolve_japanese_entities(
                             canonical_text=entry.source_ja,
                             target_zh=entry.target_zh,
                             confidence=100,
-                            evidence=capture_list(
-                                (
-                                    'formal_term',
-                                ),
-                                capture_budget
-                            ),
+                            evidence=('formal_term',),
                             needs_preserve=entry.term_type == TermType.HORSE and (
                                 not entry.has_translation
                             ),
@@ -2102,12 +1871,7 @@ def _resolve_formal_entities(
                             canonical_text=entry.source_ja,
                             target_zh=entry.target_zh,
                             confidence=100,
-                            evidence=capture_list(
-                                (
-                                    'formal_term',
-                                ),
-                                capture_budget
-                            ),
+                            evidence=('formal_term',),
                             needs_preserve=entry.term_type == TermType.HORSE and (
                                 not entry.has_translation
                             ),
@@ -2131,19 +1895,9 @@ def _resolve_formal_entities(
                         match.end(),
                         canonical_text=alias_text,
                         confidence=alias.confidence,
-                        evidence=capture_list(
-                            (
-                                'external_horse_alias',
-                            ),
-                            capture_budget
-                        ),
+                        evidence=('external_horse_alias',),
                         needs_preserve=True,
-                        external_horse_ids=capture_list(
-                            (
-                                alias.external_horse_id,
-                            ),
-                            capture_budget
-                        ),
+                        external_horse_ids=(alias.external_horse_id,),
                         capture_budget=capture_budget
                     )
                 )

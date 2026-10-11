@@ -168,6 +168,8 @@ def capture_unique_strings(values, budget=None):
     result = capture_strings(budget=budget)
     seen = capture_set(budget=budget)
     for value in values:
+        # Charge the streamed input before copying or deduplicating it. A refused
+        # string must never be inserted into an intermediate collection first.
         budget.string(value)
         if value not in seen:
             result.append(value)
