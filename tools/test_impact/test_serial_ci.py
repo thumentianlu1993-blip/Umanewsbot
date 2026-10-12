@@ -237,7 +237,7 @@ class SerialTests(unittest.TestCase):
         result=Executor().run([sys.executable,'-c','import time; time.sleep(30)'],time.monotonic()+.05,ledger)
         self.assertTrue(result['cancelled'])
         self.assertNotEqual(result['exit'],0)
-        self.assertEqual(json.loads(ledger.read_text())['kind'],'supervisor-process')
+        self.assertEqual(json.loads(ledger.read_text().splitlines()[0])['kind'],'supervisor-process')
 
     def test_pure_subprocess_signal_cancel_is_partial(self):
         ledger=self.root/'signal-events'
@@ -344,6 +344,168 @@ class OwnedTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             observer=OwnedObserver(Path(d)/'events',0,600)
             with self.assertRaises(RuntimeError):observer.admission(2100)
+
+
+class ExceptionFailureTests(unittest.TestCase):
+    def spawned(self, action, grouped):
+        real=subprocess.Popen;created=[]
+        def popen(*args,**kw):
+            proc=real(*args,**kw);created.append(proc);return proc
+        try:
+            with patch('tools.test_impact.serial_ci.subprocess.Popen',side_effect=popen):action(created)
+        finally:
+            for proc in created:
+                if proc.poll() is None:
+                    if grouped: __import__('os').killpg(proc.pid,__import__('signal').SIGKILL)
+                    else:proc.kill()
+                proc.wait(timeout=5)
+                for stream in (proc.stdout,proc.stderr):
+                    if stream:stream.close()
+
+    def test_supervisor_append_failure_reaps_spawned_group(self):
+        with tempfile.TemporaryDirectory() as d:
+            def action(created):
+                with patch('tools.test_impact.serial_ci.append',side_effect=OSError(28,'ledger full')):
+                    with self.assertRaises(OSError):Executor().run([sys.executable,'-c','import time;time.sleep(30)'],time.monotonic()+2,Path(d)/'events')
+                self.assertIsNotNone(created[0].poll(),'ledger failure left owned child alive')
+            self.spawned(action,True)
+
+    def test_observer_event_failure_reaps_exact_child(self):
+        with tempfile.TemporaryDirectory() as d:
+            observer=OwnedObserver(Path(d)/'events',time.monotonic()+6600,600)
+            def action(created):
+                with patch.object(observer,'event',side_effect=OSError(28,'event full')):
+                    with self.assertRaises(OSError):observer.run([sys.executable,'-c','import time;time.sleep(30)'],'build',timeout=2)
+                self.assertIsNotNone(created[0].poll(),'observer event failure left owned child alive')
+            self.spawned(action,False)
+
+    def test_signal_install_failure_reaps_and_keeps_first_error(self):
+        with tempfile.TemporaryDirectory() as d:
+            def action(created):
+                with patch('tools.test_impact.serial_ci.signal.signal',side_effect=OSError('signal install original')):
+                    with self.assertRaisesRegex(OSError,'signal install original'):
+                        Executor().run([sys.executable,'-c','import time;time.sleep(30)'],time.monotonic()+2,Path(d)/'events')
+                self.assertIsNotNone(created[0].poll())
+            self.spawned(action,True)
+
+    def test_serial_run_exception_still_attempts_cleanup_without_washing(self):
+        with tempfile.TemporaryDirectory() as d:
+            calls=[]
+            class Broken:
+                def run(self,*args):raise OSError('primary run error')
+                def cleanup(self,*args):calls.append('cleanup');raise ValueError('secondary cleanup')
+            serial=Serial(Path(d),{'start':0},Broken(),clock=lambda:0)
+            with self.assertRaisesRegex(OSError,'primary run error'):serial.call(['fake'],'batch-000')
+            self.assertEqual(calls,['cleanup'])
+            self.assertTrue(serial.status['fatal'])
+
+    def test_cleanup_exception_preserves_native_bytes_after_temp_exit(self):
+        node=next(n for n in ast.walk(ast.parse(Path('scripts/run_test_plan.py').read_text())) if isinstance(n,ast.FunctionDef) and n.name=='invoke')
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);output=root/'evidence';output.mkdir();payload=b'{"marker":"original complete JSON bytes"}\n'
+            observer=OwnedObserver(root/'events',time.monotonic()+6600,600)
+            with tempfile.TemporaryDirectory() as transient:
+                temp=Path(transient);src=temp/'source';src.mkdir();ctrl=temp/'control';ctrl.mkdir()
+                def run(command,stage,**kwargs):
+                    (temp/'batch-000'/'batch-000.json').write_bytes(payload)
+                    return types.SimpleNamespace(returncode=0)
+                observer.run=run
+                def cleanup(*args):raise RuntimeError('original rm9')
+                observer.cleanup=cleanup
+                namespace=dict(temp=temp,source=src,control=ctrl,image_id='sha256:fake',output=output,uuid=uuid,shutil=shutil,subprocess=subprocess,OBSERVER=observer)
+                exec(compile(ast.Module(body=[node],type_ignores=[]),'native-partial-invoke','exec'),namespace)
+                with self.assertRaisesRegex(RuntimeError,'original rm9'):namespace['invoke']('run','batch-000','django')
+            blobs=list(output.rglob('native-output.bin'))
+            self.assertEqual(len(blobs),1,'cleanup failure destroyed already-written native JSON')
+            self.assertEqual(blobs[0].read_bytes(),payload)
+            self.assertFalse(list(output.rglob('batch-*.json')))
+            with self.assertRaises(ValueError):verify_results({'batches':[{'key':'batch-000','ids':['m.C.test_a'],'profile':'django'}]},[])
+
+
+    def test_fsync_failure_reaps_group(self):
+        with tempfile.TemporaryDirectory() as d:
+            def action(created):
+                with patch('tools.test_impact.serial_ci.os.fsync',side_effect=OSError(28,'fsync full')):
+                    with self.assertRaisesRegex(OSError,'fsync full'):Executor().run([sys.executable,'-c','import time;time.sleep(30)'],time.monotonic()+2,Path(d)/'events')
+                self.assertIsNotNone(created[0].poll())
+            self.spawned(action,True)
+
+    def test_communicate_exception_reaps_group(self):
+        with tempfile.TemporaryDirectory() as d:
+            real=subprocess.Popen;created=[]
+            def popen(*args,**kwargs):
+                proc=real(*args,**kwargs);proc.communicate=lambda **kw:(_ for _ in ()).throw(OSError('communicate primary'));created.append(proc);return proc
+            with patch('tools.test_impact.serial_ci.subprocess.Popen',side_effect=popen):
+                with self.assertRaisesRegex(OSError,'communicate primary'):Executor().run([sys.executable,'-c','import time;time.sleep(30)'],time.monotonic()+2,Path(d)/'events')
+            self.assertIsNotNone(created[0].poll())
+
+    def test_run_exception_stops_unstarted_batch_even_cleanup_raises(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);selection=root/'selection';save(selection,dict(mode='full',source='git',test_sha='a'*40,test_tree='b'*40,run_id='9',run_attempt='1',labels=['m','r']))
+            fake=FakeExecutor(root);serial=Serial(root/'out',{'start':0},fake,clock=lambda:0);serial.collect(selection,root/'image')
+            def failure(*args):raise OSError('first run cause')
+            fake.run=failure
+            fake.cleanup=lambda *args:(_ for _ in ()).throw(ValueError('second cleanup cause'))
+            with self.assertRaisesRegex(OSError,'first run cause'):serial.execute()
+            self.assertEqual(serial.status['not_started'],['batch-001'])
+            self.assertTrue(serial.status['fatal'])
+            self.assertIn('first run cause',serial.status['phase_results']['batch-000']['error'])
+
+    def partial_case(self, fault, produce=True):
+        node=next(n for n in ast.walk(ast.parse(Path('scripts/run_test_plan.py').read_text())) if isinstance(n,ast.FunctionDef) and n.name=='invoke')
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);output=root/'out';output.mkdir();payload=b'{"marker":"unaltered native bytes"}\n'
+            observer=OwnedObserver(root/'events',time.monotonic()+6600,600)
+            with tempfile.TemporaryDirectory() as transient:
+                temp=Path(transient);src=temp/'source';src.mkdir();ctrl=temp/'control';ctrl.mkdir()
+                def run(*args,**kwargs):
+                    if produce:(temp/'batch-000'/'batch-000.json').write_bytes(payload)
+                    if fault=='timeout':raise subprocess.TimeoutExpired(['fake'],600)
+                    if fault=='cancel':raise __import__('tools.test_impact.serial_ci',fromlist=['SerialCancelled']).SerialCancelled('cancel primary')
+                    return types.SimpleNamespace(returncode=0)
+                def cleanup(*args):
+                    if fault=='inspect':raise OSError('inspect unavailable')
+                    if fault=='cleanup-timeout':raise subprocess.TimeoutExpired(['rm'],30)
+                observer.run=run;observer.cleanup=cleanup
+                ns=dict(temp=temp,source=src,control=ctrl,image_id='fake',output=output,uuid=uuid,shutil=shutil,subprocess=subprocess,OBSERVER=observer)
+                exec(compile(ast.Module(body=[node],type_ignores=[]),'native-preserve','exec'),ns)
+                with self.assertRaises(BaseException):ns['invoke']('run','batch-000','django')
+            indexes=list(output.rglob('index.json'));self.assertEqual(len(indexes),1)
+            meta=json.loads(indexes[0].read_text());self.assertTrue(meta['partial']);self.assertFalse(meta['complete']);self.assertEqual(meta['key'],'batch-000')
+            self.assertEqual(meta['missing'],not produce)
+            if produce:
+                self.assertEqual((indexes[0].parent/'native-output.bin').read_bytes(),payload)
+                self.assertEqual(meta['raw_sha256'],__import__('hashlib').sha256(payload).hexdigest())
+            self.assertFalse(list(output.rglob('batch-*.json')))
+            with self.assertRaises(ValueError):verify_results({'batches':[{'key':'batch-000','ids':['m.C.test'],'profile':'django'}]},[])
+
+    def test_inspect_timeout_cancel_preserve_opaque_bytes(self):
+        for fault in ('inspect','cleanup-timeout','timeout','cancel'):
+            with self.subTest(fault=fault):self.partial_case(fault)
+
+    def test_no_native_json_recorded_missing_without_fabrication(self):self.partial_case('inspect',False)
+
+    def test_evidence_full_retains_unique_temp_and_first_error(self):
+        from scripts.run_test_plan import ObservedTemporaryDirectory
+        node=next(n for n in ast.walk(ast.parse(Path('scripts/run_test_plan.py').read_text())) if isinstance(n,ast.FunctionDef) and n.name=='invoke')
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);output=root/'out';output.mkdir();payload=b'{"diskfull":"unique original"}'
+            observer=OwnedObserver(root/'events',time.monotonic()+6600,600);cleanups=[]
+            with ObservedTemporaryDirectory(observer) as transient:
+                temp=Path(transient);self.addCleanup(shutil.rmtree,temp,ignore_errors=True);src=temp/'source';src.mkdir();ctrl=temp/'control';ctrl.mkdir()
+                def run(*a,**kw):(temp/'batch-000'/'batch-000.json').write_bytes(payload);return types.SimpleNamespace(returncode=0)
+                def cleanup(*a):cleanups.append(True);raise RuntimeError('primary cleanup cause')
+                observer.run=run;observer.cleanup=cleanup
+                ns=dict(temp=temp,source=src,control=ctrl,image_id='fake',output=output,uuid=uuid,shutil=shutil,subprocess=subprocess,OBSERVER=observer)
+                exec(compile(ast.Module(body=[node],type_ignores=[]),'native-diskfull','exec'),ns)
+                original=Path.open
+                def diskfull(path,*a,**kw):
+                    if path.name=='native-output.bin':raise OSError(28,'evidence full')
+                    return original(path,*a,**kw)
+                with patch.object(Path,'open',diskfull),self.assertRaisesRegex(RuntimeError,'primary cleanup cause'):ns['invoke']('run','batch-000','django')
+            self.assertEqual(cleanups,[True]);self.assertTrue(observer.retain_temp)
+            self.assertEqual((temp/'batch-000'/'batch-000.json').read_bytes(),payload)
+            self.assertFalse(observer.preservation_errors[0]['persisted'])
 
 
 if __name__=='__main__':unittest.main()

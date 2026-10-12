@@ -38,6 +38,22 @@ def verify_local_docker():
     docker('info',stdout=subprocess.DEVNULL)
 
 
+class ObservedTemporaryDirectory:
+    """证据无法落盘时保留唯一原件；不改变默认native临时目录行为。"""
+    def __init__(self, observer):self.observer=observer;self.name=None
+    def __enter__(self):
+        self.name=tempfile.mkdtemp(prefix='impact-');return self.name
+    def __exit__(self,*error):
+        if self.observer.retain_temp:
+            try:print('OWNED_TEMP_RETAINED '+self.name,file=sys.stderr,flush=True)
+            except BaseException:pass
+        else:shutil.rmtree(self.name)
+
+
+def source_temporary(observer):
+    return ObservedTemporaryDirectory(observer) if observer else tempfile.TemporaryDirectory(prefix='impact-')
+
+
 def main():
     global OBSERVER, STAGE
     parser=argparse.ArgumentParser(description=__doc__)
@@ -76,7 +92,7 @@ def main():
     if OBSERVER and not args.collect_only and not args.batch:
         raise ValueError('owned observation requires collect-only or exactly one original batch')
     verify_local_docker()
-    with tempfile.TemporaryDirectory(prefix='impact-') as temp:
+    with source_temporary(OBSERVER) as temp:
         temp=Path(temp); source=temp/'source'; source.mkdir()
         archive=temp/'source.tar'; archive.write_bytes(git(root,'archive',plan['test_sha']))
         with tarfile.open(archive) as tar:
@@ -128,29 +144,45 @@ def main():
                      '--mount',f'type=bind,src={control},dst=/control,readonly',
                      '--mount',f'type=bind,src={out},dst=/output',image_id,mode,key,profile]
             cidfile=None
-            if OBSERVER:
-                cids=output/'owned-cids'; cids.mkdir(exist_ok=True)
-                cidfile=cids/(container_name+'.cid')
-                # 可选owned模式由checked rm负责删除；默认native仍保留--rm。
-                command.remove('--rm')
-                command[1:1]=['--cidfile',str(cidfile)]
-                OBSERVER.start(container_name,cidfile,key,profile)
-            with (output/((key or 'collection')+'.log')).open('w') as log:
-                try:
+            expected='execution-plan.json' if mode=='collect' else key+'.json'
+            primary=None;completed=None
+            try:
+                if OBSERVER:
+                    cids=output/'owned-cids'; cids.mkdir(exist_ok=True)
+                    cidfile=cids/(container_name+'.cid')
+                    # 可选owned模式由checked rm负责删除；默认native仍保留--rm。
+                    command.remove('--rm')
+                    command[1:1]=['--cidfile',str(cidfile)]
+                    OBSERVER.start(container_name,cidfile,key,profile)
+                with (output/((key or 'collection')+'.log')).open('w') as log:
                     if OBSERVER:
                         completed=OBSERVER.run(['docker',*command],key or 'collection',stdout=log,stderr=subprocess.STDOUT,timeout=seconds)
                     else:
                         completed=subprocess.run(['docker',*command],stdout=log,stderr=subprocess.STDOUT,timeout=2100 if profile=='release-postgres' else 600)
-                finally:
-                    if OBSERVER:
-                        OBSERVER.cleanup(container_name,cidfile)
+            except BaseException as exc:primary=exc
+            finally:
+                try:
+                    if OBSERVER and cidfile is not None:OBSERVER.cleanup(container_name,cidfile)
+                    elif not OBSERVER:subprocess.run(['docker','rm','-f',container_name],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=30)
+                except BaseException as exc:
+                    if primary is None:primary=exc
                     else:
-                        subprocess.run(['docker','rm','-f',container_name],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=30)
-            expected='execution-plan.json' if mode=='collect' else key+'.json'
-            returned=[file.name for file in out.iterdir()]
-            if returned != [expected]: raise ValueError('unexpected/missing container output: '+str(returned))
-            shutil.copy(out/expected,output/expected)
-            return completed.returncode
+                        try:primary.add_note('secondary invoke cleanup: '+repr(exc))
+                        except BaseException:pass
+            try:
+                if primary is not None:raise primary
+                returned=[file.name for file in out.iterdir()]
+                if returned != [expected]:raise ValueError('unexpected/missing container output: '+str(returned))
+                shutil.copy(out/expected,output/expected)
+                return completed.returncode
+            except BaseException as exc:
+                if OBSERVER:
+                    try:OBSERVER.preserve_partial(out,output,expected,key,mode,exc)
+                    except BaseException as preserve:
+                        OBSERVER.retain_temp=True
+                        try:exc.add_note('secondary partial preservation: '+repr(preserve))
+                        except BaseException:pass
+                raise
         if not args.batch:
             if invoke('collect'):
                 raise ValueError('collection failed; see collection.log')

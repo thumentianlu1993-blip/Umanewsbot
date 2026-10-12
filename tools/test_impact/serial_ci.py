@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 import signal
 import subprocess
+import uuid
 import sys
 import time
 from tools.test_impact.core import digest
@@ -63,6 +64,57 @@ def remove_owned(name, run=None, deadline=None):
             'absent': absent(inspect, name), 'clean': rm.returncode == 0 and absent(inspect, name)}
 
 
+def note_first(error, message):
+    try: error.add_note(message)
+    except BaseException: pass
+
+
+def reap_owned(process, deadline, group=False, force=False):
+    """仅终止本Popen的PID或明确新session组；记录失效不依赖ledger。"""
+    facts={'pid':process.pid,'pgid':process.pid if group else None,'actions':[],'errors':[],'absent':False}
+    def alive():
+        try:
+            if group: os.killpg(process.pid,0)
+            else: os.kill(process.pid,0)
+            return True
+        except ProcessLookupError: return False
+        except BaseException as exc:
+            facts['errors'].append(repr(exc));return True
+    try:
+        running=process.poll() is None
+    except BaseException as exc:
+        running=True;facts['errors'].append(repr(exc))
+    needs_stop=running or group and alive()
+    facts['unexpected_residual']=not force and not running and needs_stop
+    def send(sig):
+        try:
+            if group:os.killpg(process.pid,sig)
+            elif sig==signal.SIGTERM:process.terminate()
+            else:process.kill()
+            facts['actions'].append(int(sig))
+        except ProcessLookupError:pass
+        except BaseException as exc:facts['errors'].append(repr(exc))
+    try:
+        if needs_stop:send(signal.SIGTERM)
+        try:process.wait(timeout=max(0,min(5,deadline-time.monotonic())))
+        except subprocess.TimeoutExpired:
+            send(signal.SIGKILL)
+            process.wait(timeout=max(0,min(5,deadline-time.monotonic())))
+        if group and alive():
+            stop=min(deadline,time.monotonic()+.1)
+            while alive() and time.monotonic()<stop:time.sleep(.01)
+            if alive():send(signal.SIGKILL)
+            while alive() and time.monotonic()<deadline:time.sleep(.01)
+        facts['absent']=not alive() and process.poll() is not None
+    except BaseException as exc:facts['errors'].append(repr(exc))
+    finally:
+        for stream in (getattr(process,'stdout',None),getattr(process,'stderr',None)):
+            try:
+                if stream:stream.close()
+            except BaseException as exc:facts['errors'].append(repr(exc))
+    return facts
+
+
 class OwnedObserver:
     """原runner可选接口；无ledger时原算法不走此分支。"""
     def __init__(self, ledger, deadline, final_reserve):
@@ -72,6 +124,11 @@ class OwnedObserver:
         self.ledger.parent.mkdir(parents=True, exist_ok=True)
         self.deadline = deadline
         self.final_reserve = final_reserve
+        self.containers = {}
+        self.cleanup_facts = {}
+        self.processes = {}
+        self.retain_temp = False
+        self.preservation_errors = []
 
     def event(self, kind, **values):
         append(self.ledger, dict(kind=kind, run_id=os.environ.get('GITHUB_RUN_ID', 'local'),
@@ -84,33 +141,90 @@ class OwnedObserver:
 
     def run(self, command, stage, **kwargs):
         remaining = self.deadline - self.final_reserve - time.monotonic()
-        if remaining <= 0:
-            raise RuntimeError('business deadline exhausted')
+        if remaining <= 0:raise RuntimeError('business deadline exhausted')
         timeout = min(kwargs.pop('timeout', remaining), remaining)
         check = kwargs.pop('check', False)
-        process = subprocess.Popen(command, **kwargs)
-        self.event('process-start', stage=stage, pid=process.pid, pgid=os.getpgid(process.pid))
+        primary=None;code=None;facts=None;pgid=None;process=None
         try:
+            process = subprocess.Popen(command, **kwargs)
+            pgid=os.getpgid(process.pid)
+            self.processes[process.pid]={'pid':process.pid,'pgid':pgid,'stage':stage}
+            self.event('process-start', stage=stage, pid=process.pid, pgid=pgid)
             code = process.wait(timeout=timeout)
+        except BaseException as exc:primary=exc
         finally:
-            self.event('process-observed', stage=stage, pid=process.pid, returncode=process.poll())
-        if check and code:
-            raise subprocess.CalledProcessError(code, command)
-        return subprocess.CompletedProcess(command, code)
+            if process is not None:
+                facts=reap_owned(process,min(self.deadline,time.monotonic()+10),force=primary is not None)
+                facts['pgid']=pgid
+                self.processes[process.pid]=facts
+                try:self.event('process-observed',stage=stage,pid=process.pid,returncode=process.poll(),owned_cleanup=facts)
+                except BaseException as exc:
+                    if primary is None:primary=exc
+                    else:note_first(primary,'secondary exit record: '+repr(exc))
+        if primary is not None:
+            try:primary.owned_cleanup=facts
+            except BaseException as secondary:note_first(primary,'secondary memory record: '+repr(secondary))
+            note_first(primary,'owned child cleanup: '+repr(facts))
+            raise primary
+        if not facts['absent'] or facts['errors']:raise RuntimeError('owned child absence unknown: '+repr(facts))
+        if check and code:raise subprocess.CalledProcessError(code,command)
+        return subprocess.CompletedProcess(command,code)
 
     def start(self, name, cidfile, key, profile):
+        self.containers[name]={'name':name,'cidfile':str(cidfile),'key':key,'profile':profile}
         self.event('container-start', name=name, cidfile=str(cidfile), key=key, profile=profile)
 
     def cleanup(self, name, cidfile):
-        identity = Path(cidfile).read_text().strip() if Path(cidfile).exists() else None
-        if identity is not None and not re.fullmatch('[0-9a-f]{64}', identity):
-            self.event('identity-invalid', name=name, container_id=identity)
-            raise RuntimeError('invalid owned cidfile')
-        facts = remove_owned(identity or name)
-        facts.update(name=name, cleanup_target=identity or name)
-        self.event('container-cleanup', container_id=identity, **facts)
-        if not facts['clean']:
-            raise RuntimeError('owned cleanup failed or absence unknown')
+        if name not in self.containers:raise RuntimeError('unregistered owned container')
+        identity=None;primary=None;facts=None
+        try:
+            identity=Path(cidfile).read_text().strip() if Path(cidfile).exists() else None
+            if identity is not None and not re.fullmatch('[0-9a-f]{64}',identity):
+                raise RuntimeError('invalid owned cidfile')
+            self.containers[name]['container_id']=identity
+        except BaseException as exc:
+            primary=exc;identity=None
+        try:
+            facts=remove_owned(identity or name,deadline=min(self.deadline,time.monotonic()+40))
+            facts.update(name=name,cleanup_target=identity or name)
+            self.cleanup_facts[name]=facts
+            if not facts['clean'] and primary is None:primary=RuntimeError('owned cleanup failed or absence unknown')
+        except BaseException as exc:
+            self.cleanup_facts[name]={'name':name,'clean':False,'error':repr(exc)}
+            if primary is None:primary=exc
+            else:note_first(primary,'secondary container cleanup: '+repr(exc))
+        try:self.event('container-cleanup',container_id=identity,**self.cleanup_facts[name])
+        except BaseException as exc:
+            if primary is None:primary=exc
+            else:note_first(primary,'secondary cleanup record: '+repr(exc))
+        if primary is not None:
+            note_first(primary,'owned container cleanup: '+repr(self.cleanup_facts[name]))
+            raise primary
+
+    def preserve_partial(self, out, output, expected, key, phase, primary):
+        """cleanup之后保全原字节；写盘失败留唯一临时原件，不晋升正常report。"""
+        source=Path(out)/expected
+        meta={'key':key,'phase':phase,'original_name':expected,'source':str(source),
+              'partial':True,'complete':False,'primary_error':repr(primary),'missing':not source.exists(),
+              'raw_sha256':None,'raw_bytes':None,'persisted':False}
+        try:
+            directory=Path(output)/'partial-evidence'/((key or 'collection')+'-'+uuid.uuid4().hex)
+            directory.mkdir(parents=True,exist_ok=False)
+            if source.exists():
+                raw=source.read_bytes()
+                meta.update(raw_sha256=hashlib.sha256(raw).hexdigest(),raw_bytes=len(raw))
+                with (directory/'native-output.bin').open('xb') as stream:
+                    stream.write(raw);stream.flush();os.fsync(stream.fileno())
+            meta['persisted']=True
+            save(directory/'index.json',meta)
+        except BaseException as exc:
+            self.retain_temp=True
+            meta.update(persisted=False,preservation_error=repr(exc),retained_source=str(source))
+            self.preservation_errors.append(meta)
+            note_first(primary,'partial evidence persistence failed; retain '+str(source)+': '+repr(exc))
+            try:print('PARTIAL_EVIDENCE_PERSISTENCE_FAILED '+json.dumps(meta,ensure_ascii=False),file=sys.stderr,flush=True)
+            except BaseException:pass
+        return meta
 
 
 class SerialCancelled(BaseException):
@@ -122,42 +236,47 @@ class Executor:
     def run(self, command, deadline, event_file):
         if time.monotonic() >= deadline:
             return {'exit':1,'stdout':'','stderr':'process budget refused before launch','process_absent':True,'cancelled':False}
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                   text=True, start_new_session=True)
-        append(event_file, {'kind': 'supervisor-process', 'pid': process.pid, 'pgid': process.pid,
-                            'command': command})
-        cancelled = False
-        old = {}
-        def interrupt(signum, frame):
-            raise SerialCancelled('signal ' + str(signum))
-        for signum in (signal.SIGTERM, signal.SIGINT):
-            old[signum] = signal.signal(signum, interrupt)
+        primary=None;reason=None;stdout='';stderr='';old={};facts=None;process=None
         try:
-            stdout, stderr = process.communicate(timeout=max(.001, deadline - time.monotonic()))
-        except (subprocess.TimeoutExpired, SerialCancelled) as exc:
-            cancelled = True
-            os.killpg(process.pid, signal.SIGTERM)
-            try:
-                stdout, stderr = process.communicate(timeout=5)
-            except subprocess.TimeoutExpired:
-                os.killpg(process.pid, signal.SIGKILL)
-                stdout, stderr = process.communicate(timeout=5)
-            stderr += '\n' + repr(exc)
+            process = subprocess.Popen(command,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,start_new_session=True)
+            append(event_file,{'kind':'supervisor-process','pid':process.pid,'pgid':process.pid,'command':command})
+            def interrupt(signum,frame):raise SerialCancelled('signal '+str(signum))
+            for signum in (signal.SIGTERM,signal.SIGINT):
+                old[signum]=signal.getsignal(signum)
+                signal.signal(signum,interrupt)
+            stdout,stderr=process.communicate(timeout=max(.001,deadline-time.monotonic()))
+        except (subprocess.TimeoutExpired,SerialCancelled) as exc:reason=exc
+        except BaseException as exc:primary=exc
         finally:
-            for signum, handler in old.items():
-                signal.signal(signum, handler)
-        try:
-            os.killpg(process.pid, 0)
-            group_absent = False
-            os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            group_absent = True
-        return {'exit': process.returncode, 'stdout': stdout, 'stderr': stderr,
-                'pid':process.pid,'pgid':process.pid,'finished':time.monotonic(),
-                'process_absent': group_absent, 'cancelled': cancelled}
+            limit=min(getattr(self,'cleanup_deadline',deadline+60),time.monotonic()+10)
+            if process is not None:
+                facts=reap_owned(process,limit,group=True,force=primary is not None or reason is not None)
+            for signum,handler in old.items():
+                try:signal.signal(signum,handler)
+                except BaseException as exc:
+                    if primary is None and reason is None:primary=exc
+                    else:note_first(primary or reason,'secondary signal restore: '+repr(exc))
+            if process is not None:
+                try:append(event_file,{'kind':'supervisor-exit','pid':process.pid,'pgid':process.pid,'exit':process.poll(),'owned_cleanup':facts})
+                except BaseException as exc:
+                    if primary is None and reason is None:primary=exc
+                    else:note_first(primary or reason,'secondary exit record: '+repr(exc))
+        if primary is not None:
+            try:primary.owned_cleanup=facts
+            except BaseException as secondary:note_first(primary,'secondary memory record: '+repr(secondary))
+            note_first(primary,'owned group cleanup: '+repr(facts))
+            raise primary
+        if reason is not None:stderr+='\n'+repr(reason)
+        return {'exit':process.returncode,'stdout':stdout,'stderr':stderr,'pid':process.pid,'pgid':process.pid,
+                'finished':time.monotonic(),'process_absent':facts['absent'],
+                'ownership_failure':bool(facts['errors'] or facts['unexpected_residual']),
+                'cancelled':reason is not None,'owned_cleanup':facts}
 
     def cleanup(self, ledger, deadline=None):
-        events = [json.loads(line) for line in Path(ledger).read_text().splitlines()] if Path(ledger).exists() else []
+        events=[];ledger_errors=[]
+        for line in Path(ledger).read_text().splitlines() if Path(ledger).exists() else []:
+            try:events.append(json.loads(line))
+            except BaseException as exc:ledger_errors.append(repr(exc))
         starts = {e['name']: e for e in events if e['kind'] == 'container-start'}
         facts = []
         deadline = deadline or time.monotonic() + 60
@@ -182,6 +301,7 @@ class Executor:
                 result.update(name=name,container_id=identity,cleanup_target=target)
                 result['clean'] = result['clean'] and not failed_before
                 facts.append(result)
+        if ledger_errors:facts.append({'clean':False,'ledger_errors':ledger_errors})
         return all(f['clean'] for f in facts) and not any(e['kind'] == 'identity-invalid' for e in events), facts
 
 
@@ -214,18 +334,31 @@ class Serial:
         return plan
 
     def call(self, command, phase, final=False):
-        deadline = min(self.clock() + FINAL[phase], self.budget['start'] + SOFT) if final else self.budget['start'] + BUSINESS
-        append(self.events, {'kind':'phase-start','phase':phase,'command':command,'deadline':deadline})
-        result = self.executor.run(command, deadline, self.events)
+        deadline=min(self.clock()+FINAL[phase],self.budget['start']+SOFT) if final else self.budget['start']+BUSINESS
+        primary=None;result=None;clean=False;facts=[]
+        self.executor.cleanup_deadline=min(deadline if final else deadline+60,self.budget['start']+SOFT)
         try:
-            clean, facts = self.executor.cleanup(self.events, min(self.clock() + 60, deadline if final else self.budget['start'] + SOFT))
+            append(self.events,{'kind':'phase-start','phase':phase,'command':command,'deadline':deadline})
+            result=self.executor.run(command,deadline,self.events)
         except BaseException as exc:
-            clean, facts = False, [{'clean':False,'error':repr(exc),'unknown':True}]
-        result.update(clean=clean, owned_postcheck=facts)
-        self.status['phase_results'][phase] = result
-        if not clean or not result['process_absent'] or result.get('cancelled'):
-            self.status['fatal'] = True
-        self.persist()
+            primary=exc;owned=getattr(exc,'owned_cleanup',{})
+            result={'exit':None,'stdout':getattr(exc,'stdout',None) or '',
+                    'stderr':getattr(exc,'stderr',None) or repr(exc),'error':repr(exc),
+                    'process_absent':owned.get('absent',False),'owned_cleanup':owned,'cancelled':False}
+        finally:
+            try:clean,facts=self.executor.cleanup(self.events,min(self.clock()+60,self.budget['start']+SOFT,deadline if final else deadline+60))
+            except BaseException as exc:
+                facts=[{'clean':False,'error':repr(exc),'unknown':True}]
+                if primary is not None:note_first(primary,'secondary cleanup: '+repr(exc))
+        result.update(clean=clean,owned_postcheck=facts)
+        self.status['phase_results'][phase]=result
+        if primary is not None or not clean or not result['process_absent'] or result.get('cancelled') or result.get('ownership_failure'):
+            self.status['fatal']=True
+        try:self.persist()
+        except BaseException as exc:
+            if primary is None:primary=exc
+            else:note_first(primary,'secondary status persistence: '+repr(exc))
+        if primary is not None:raise primary
         return result
 
     def inventory(self):
