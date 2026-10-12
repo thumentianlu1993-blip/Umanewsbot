@@ -508,4 +508,85 @@ class ExceptionFailureTests(unittest.TestCase):
             self.assertFalse(observer.preservation_errors[0]['persisted'])
 
 
+class FirstcausePersistenceTests(unittest.TestCase):
+    def setUp(self):
+        self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup);self.root=Path(self.temp.name)
+        self.selection=self.root/'selection';save(self.selection,dict(mode='full',source='git',test_sha='a'*40,test_tree='b'*40,run_id='9',run_attempt='1',labels=['m','r']))
+        self.fake=FakeExecutor(self.root);self.serial=Serial(self.root/'out',{'start':0},self.fake,clock=lambda:0)
+        self.first=OSError('original post-spawn ledger failure');self.disk=OSError(28,'secondary status ENOSPC');self.cleanups=[]
+
+    def failure(self, collect_first=True):
+        if collect_first:self.serial.collect(self.selection,self.root/'image')
+        def run(*a):raise self.first
+        def cleanup(*a):self.cleanups.append(True);raise ValueError('secondary cleanup error')
+        self.fake.run=run;self.fake.cleanup=cleanup
+        original=self.serial.persist;count=[0]
+        def disk_full():
+            count[0]+=1
+            if count[0]>=2:raise self.disk
+            original()
+        self.serial.persist=disk_full
+
+    def assert_first(self, action, next_pending=True):
+        try:action()
+        except BaseException as actual:self.assertIs(actual,self.first,'persistent ENOSPC replaced original exception object')
+        else:self.fail('primary failure hidden')
+        self.assertEqual(self.cleanups,[True])
+        if next_pending:self.assertEqual(self.serial.status['not_started'],['batch-001'])
+        self.assertTrue(self.serial.status['fatal'])
+        self.assertTrue(any('secondary status ENOSPC' in n for n in self.first.__notes__))
+        self.assertFalse(self.serial.status.get('success',False))
+
+    def test_execute_run_cleanup_and_persistent_disk_error_keep_identity(self):
+        self.failure();self.assert_first(self.serial.execute)
+
+    def test_collect_finally_persistent_disk_error_keeps_identity(self):
+        self.failure(False);self.assert_first(lambda:self.serial.collect(self.selection,self.root/'image'),False)
+
+    def test_main_exit_persistent_disk_error_keeps_identity(self):
+        from tools.test_impact import serial_ci as module
+        self.failure();budget=self.root/'budget';save(budget,dict(start=0,run_id=__import__('os').environ.get('GITHUB_RUN_ID','local'),run_attempt=__import__('os').environ.get('GITHUB_RUN_ATTEMPT','local'),job=__import__('os').environ.get('GITHUB_JOB')))
+        argv=['serial','execute','--output',str(self.serial.output),'--budget',str(budget)]
+        with patch.object(module,'Serial',return_value=self.serial),patch.object(sys,'argv',argv):self.assert_first(module.main)
+
+    def test_verify_diagnostic_save_keeps_primary_identity(self):
+        from tools.test_impact import serial_ci as module
+        self.serial.collect(self.selection,self.root/'image');self.serial.execute()
+        first=ValueError('original frozen plan failure');self.serial.check_plan=lambda:(_ for _ in ()).throw(first)
+        original=module.save;count=[0]
+        def full(*a,**kw):
+            count[0]+=1
+            if count[0]>=2:raise self.disk
+            return original(*a,**kw)
+        with patch.object(module,'save',side_effect=full):
+            try:self.serial.verify()
+            except BaseException as actual:self.assertIs(actual,first)
+            else:self.fail('verify primary hidden')
+        self.assertTrue(any('secondary status ENOSPC' in n for n in first.__notes__))
+
+    def test_first_persist_failure_without_prior_exception_is_primary(self):
+        self.serial.collect(self.selection,self.root/'image')
+        self.serial.persist=lambda:(_ for _ in ()).throw(self.disk)
+        try:self.serial.execute()
+        except BaseException as actual:self.assertIs(actual,self.disk)
+        else:self.fail('first disk failure hidden')
+        self.assertEqual(len(self.fake.calls),1)
+
+
+    def test_main_collect_exit_keeps_same_primary_object(self):
+        from tools.test_impact import serial_ci as module
+        self.failure(False);budget=self.root/'budget';save(budget,dict(start=0,run_id=__import__('os').environ.get('GITHUB_RUN_ID','local'),run_attempt=__import__('os').environ.get('GITHUB_RUN_ATTEMPT','local'),job=__import__('os').environ.get('GITHUB_JOB')))
+        argv=['serial','collect','--output',str(self.serial.output),'--budget',str(budget),'--selection',str(self.selection),'--image',str(self.root/'image')]
+        with patch.object(module,'Serial',return_value=self.serial),patch.object(sys,'argv',argv):self.assert_first(module.main,False)
+        self.assertTrue(self.serial.status['diagnostic_unpersisted'])
+
+    def test_finish_cleanup_firstcause_survives_status_failure(self):
+        def cleanup(*a):self.cleanups.append(True);raise self.first
+        self.fake.cleanup=cleanup;self.serial.persist=lambda:(_ for _ in ()).throw(self.disk)
+        try:self.serial.finish()
+        except BaseException as actual:self.assertIs(actual,self.first)
+        else:self.fail('finish primary hidden')
+        self.assertEqual(self.cleanups,[True]);self.assertTrue(self.serial.status['diagnostic_unpersisted'])
+        self.assertTrue(any('secondary status ENOSPC' in n for n in self.first.__notes__))
+
 if __name__=='__main__':unittest.main()

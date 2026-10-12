@@ -69,6 +69,22 @@ def note_first(error, message):
     except BaseException: pass
 
 
+def guard_secondary(primary, action, label, status=None):
+    """已有首因时诊断仅best-effort；无首因的首次保存错误照常抛出。"""
+    if primary is None:return action()
+    try:return action()
+    except BaseException as secondary:
+        note_first(primary,label+': '+repr(secondary))
+        if status is not None:
+            try:
+                status.setdefault('diagnostic_failures',[]).append({'phase':label,'error':repr(secondary),'primary':repr(primary)})
+                status.update(success=False,diagnostic_unpersisted=True)
+            except BaseException as memory:note_first(primary,'secondary memory diagnostic: '+repr(memory))
+        try:print('DIAGNOSTIC_PERSISTENCE_FAILED '+label+' '+repr(secondary),file=sys.stderr,flush=True)
+        except BaseException as stderr:note_first(primary,'secondary stderr diagnostic: '+repr(stderr))
+        return None
+
+
 def reap_owned(process, deadline, group=False, force=False):
     """仅终止本Popen的PID或明确新session组；记录失效不依赖ledger。"""
     facts={'pid':process.pid,'pgid':process.pid if group else None,'actions':[],'errors':[],'absent':False}
@@ -399,20 +415,25 @@ class Serial:
         # Mark before any resource creation, including failed attempts.
         self.status['phase_results']['collection'] = {'started': True}
         self.persist()
+        primary=None
         try:
             result = self.call(self.native(selection, collect_only=True, build=True, export_image=image), 'collection')
+            if result['exit'] != 0 or self.status['fatal']:
+                raise RuntimeError('collection failed/cleanup uncertain')
+        except BaseException as exc:
+            primary=exc
+            raise
         finally:
-            exported = Path(image)
-            self.status['partial_image'] = {'path':str(exported),'exists':exported.exists(),
-                'bytes':exported.stat().st_size if exported.exists() else None,
-                'sha256':None,
-                'collect_success_confirmed':False}
-            if exported.exists() and not self.status['fatal'] and self.clock() < self.budget['start']+BUSINESS:
-                try: self.status['partial_image']['sha256']=checksum(exported,self.budget['start']+BUSINESS,self.clock)
-                except TimeoutError as exc: self.status['partial_image']['checksum_error']=repr(exc)
-            self.persist()
-        if result['exit'] != 0 or self.status['fatal']:
-            raise RuntimeError('collection failed/cleanup uncertain')
+            def remember_partial():
+                exported = Path(image)
+                self.status['partial_image'] = {'path':str(exported),'exists':exported.exists(),
+                    'bytes':exported.stat().st_size if exported.exists() else None,
+                    'sha256':None,'collect_success_confirmed':False}
+                if exported.exists() and not self.status['fatal'] and self.clock() < self.budget['start']+BUSINESS:
+                    try: self.status['partial_image']['sha256']=checksum(exported,self.budget['start']+BUSINESS,self.clock)
+                    except TimeoutError as exc: self.status['partial_image']['checksum_error']=repr(exc)
+                self.persist()
+            guard_secondary(primary,remember_partial,'collect-finally',self.status)
         plan = json.loads((self.output / 'execution-plan.json').read_text())
         if hashlib.sha256(Path(selection).read_bytes()).hexdigest() != self.status['selection_raw']:
             raise ValueError('selection changed during collection')
@@ -477,7 +498,7 @@ class Serial:
                 failed |= result['exit'] != 0 or bool(report['failures'] or report['errors'] or report['expected_failures'] or report['unexpected_successes'])
             except BaseException as exc:
                 self.status.update(fatal=True, error=repr(exc))
-                self.persist()
+                guard_secondary(exc,self.persist,'execute-error',self.status)
                 raise
             self.persist()
         if failed:
@@ -505,19 +526,24 @@ class Serial:
             if result['exit'] or self.status['fatal'] or self.status['not_started'] or report_diff['extra'] or report_diff['duplicates'] or report_diff['missing'] or not (self.output / 'summary.json').exists():
                 raise RuntimeError('original verifier failed or summary absent')
         except BaseException as exc:
-            evidence = json.loads(attempt.read_text())
-            evidence.update(error=repr(exc), summary_exists=(self.output / 'summary.json').exists())
-            save(attempt, evidence)
+            def remember_verify():
+                evidence = json.loads(attempt.read_text())
+                evidence.update(error=repr(exc), summary_exists=(self.output / 'summary.json').exists())
+                save(attempt, evidence)
+            guard_secondary(exc,remember_verify,'verify-error',self.status)
             raise
 
     def finish(self):
+        primary=None
         try:
             clean, facts = self.executor.cleanup(self.events, min(self.clock() + 60, self.budget['start'] + SOFT))
         except BaseException as exc:
+            primary=exc
             clean, facts = False, [{'clean':False,'error':repr(exc),'unknown':True}]
         self.status.update(final_owned_postcheck=facts, cleanup_complete=clean,
                            fatal=self.status['fatal'] or not clean)
-        self.persist()
+        guard_secondary(primary,self.persist,'finish-error',self.status)
+        if primary is not None:raise primary
         if self.status['fatal']:
             raise RuntimeError('cleanup/identity uncertain')
 
@@ -575,11 +601,14 @@ def main():
         else:
             try:
                 serial.final(args.image_outcome,args.evidence_outcome)
-            finally:
+            except BaseException as exc:
+                guard_secondary(exc,lambda:print(json.dumps(serial.status,ensure_ascii=False)),'final-output',serial.status)
+                raise
+            else:
                 print(json.dumps(serial.status,ensure_ascii=False))
     except BaseException as exc:
         serial.status.update(error=repr(exc), success=False)
-        serial.persist()
+        guard_secondary(exc,serial.persist,'main-error',serial.status)
         raise
     if args.phase == 'collect' and os.environ.get('GITHUB_OUTPUT'):
         with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
