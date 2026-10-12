@@ -1416,6 +1416,12 @@
     ],
     "server/stable/test_managed_readonly_translation.py": [
       "news_translation"
+    ],
+    "server/stable/services/article_term_receipt.py": [
+      "news_translation"
+    ],
+    "server/stable/services/term_capture_budget.py": [
+      "news_translation"
     ]
   },
   "symbols": {

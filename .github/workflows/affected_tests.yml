@@ -49,6 +49,14 @@ jobs:
       mode: ${{ steps.plan.outputs.mode }}
       executed: ${{ steps.execute.outcome }}
     steps:
+      - name: start-serial-budget
+        run: |
+          python -I - <<'PY'
+          import json, os, pathlib, time
+          pathlib.Path(os.environ['RUNNER_TEMP'], 'serial-budget.json').write_text(json.dumps({
+              'start': time.monotonic(), 'run_id': os.environ['GITHUB_RUN_ID'],
+              'run_attempt': os.environ['GITHUB_RUN_ATTEMPT'], 'job': os.environ['GITHUB_JOB']}))
+          PY
       - name: checkout-test-tree
         uses: actions/checkout@v4
         with:
@@ -85,6 +93,7 @@ jobs:
                       if not target or urllib.parse.urlsplit(target).scheme or target.startswith('/') or '{{' in target: continue
                       assert (source.parent / urllib.parse.unquote(target)).exists(), f'missing added reference: {source}: {target}'
           PY
+          python -m unittest tools.test_impact.test_serial_ci
       - name: generate-plan
         id: plan
         env:
@@ -94,23 +103,35 @@ jobs:
           SCOPE: ${{ github.event_name == 'pull_request' && 'affected' || inputs.scope }}
           REASON: ${{ inputs.reason }}
         run: python scripts/impact_ci.py --base "$BASE_SHA" --head "$HEAD_SHA" --test "$TEST_SHA" --scope "$SCOPE" --reason "$REASON" --output evidence/plan.json
+      - name: collect-isolated-plan
+        id: collect
+        if: github.event_name != 'pull_request' || vars.IMPACT_TEST_POLICY == 'active' || steps.plan.outputs.mode == 'docs-only'
+        run: python -m tools.test_impact.serial_ci collect --selection evidence/plan.json --output evidence --budget "$RUNNER_TEMP/serial-budget.json" --image "$RUNNER_TEMP/impact-image.tar"
       - name: execute-isolated-plan
         id: execute
-        if: github.event_name != 'pull_request' || vars.IMPACT_TEST_POLICY == 'active' || steps.plan.outputs.mode == 'docs-only'
-        run: python scripts/run_test_plan.py --plan evidence/plan.json --output evidence --build --export-image "$RUNNER_TEMP/impact-image.tar"
+        if: steps.collect.outcome == 'success'
+        run: python -m tools.test_impact.serial_ci execute --output evidence --budget "$RUNNER_TEMP/serial-budget.json"
       - name: verify-execution
-        if: steps.execute.outcome == 'success'
-        run: python scripts/verify_test_plan.py --plan evidence/execution-plan.json --reports evidence --output evidence/summary.json
+        id: verify
+        if: always() && steps.collect.outcome == 'success'
+        timeout-minutes: 1
+        run: python -m tools.test_impact.serial_ci verify --output evidence --budget "$RUNNER_TEMP/serial-budget.json"
       - name: collect-catalog-without-running
         if: inputs.scope == 'toolchain' && steps.execute.outcome == 'success'
-        env:
-          BASE_SHA: ${{ inputs.base_sha }}
-          TEST_SHA: ${{ inputs.candidate_sha }}
-        run: |
-          python scripts/impact_ci.py --base "$BASE_SHA" --head "$TEST_SHA" --test "$TEST_SHA" --scope inventory --reason '只收集完整目录，不执行全量测试' --output evidence/inventory-selection.json
-          python scripts/run_test_plan.py --plan evidence/inventory-selection.json --output evidence/inventory --collect-only
+        run: python -m tools.test_impact.serial_ci inventory --output evidence --budget "$RUNNER_TEMP/serial-budget.json"
+      - name: owned-cleanup-postcheck
+        id: cleanup
+        if: always() && steps.collect.outcome != 'skipped'
+        timeout-minutes: 1
+        run: python -m tools.test_impact.serial_ci finish --output evidence --budget "$RUNNER_TEMP/serial-budget.json"
+      - name: reserve-image-upload
+        id: image_budget
+        if: always() && steps.collect.outcome == 'success' && steps.plan.outputs.mode != 'docs-only' && steps.collect.outputs.image_complete == 'true'
+        run: python -m tools.test_impact.serial_ci reserve --stage image --output evidence --budget "$RUNNER_TEMP/serial-budget.json"
       - name: upload-test-image
-        if: steps.execute.outcome == 'success' && steps.plan.outputs.mode != 'docs-only'
+        id: image_upload
+        if: always() && steps.collect.outcome == 'success' && steps.plan.outputs.mode != 'docs-only' && steps.collect.outputs.image_complete == 'true' && steps.image_budget.outcome == 'success'
+        timeout-minutes: 4
         uses: actions/upload-artifact@v4
         with:
           name: impact-image-${{ github.run_id }}-${{ github.run_attempt }}
@@ -118,14 +139,24 @@ jobs:
           if-no-files-found: error
           retention-days: 14
           compression-level: 1
-      - name: upload-evidence
+      - name: reserve-evidence-upload
+        id: evidence_budget
         if: always()
+        run: python -m tools.test_impact.serial_ci reserve --stage evidence --output evidence --budget "$RUNNER_TEMP/serial-budget.json"
+      - name: upload-evidence
+        id: evidence_upload
+        if: always() && steps.evidence_budget.outcome == 'success'
+        timeout-minutes: 3
         uses: actions/upload-artifact@v4
         with:
           name: impact-${{ github.run_id }}-${{ github.run_attempt }}
           path: evidence/
           if-no-files-found: error
           retention-days: 30
+      - name: final-serial-status
+        if: always()
+        timeout-minutes: 1
+        run: python -m tools.test_impact.serial_ci final --output evidence --budget "$RUNNER_TEMP/serial-budget.json" --image-outcome '${{ steps.image_upload.outcome }}' --evidence-outcome '${{ steps.evidence_upload.outcome }}'
   test-plan-gate:
     if: always()
     needs: tests
