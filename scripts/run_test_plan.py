@@ -16,10 +16,16 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from tools.test_impact.git_input import git, commit
 from tools.test_impact.core import digest
+from tools.test_impact.serial_ci import OwnedObserver
 from tools.test_impact.source_binding import validate_source_plan, verify_source_binding
 
 
+OBSERVER=None
+STAGE='preflight'
+
 def docker(*args, **kw):
+    if OBSERVER is not None:
+        return OBSERVER.run(['docker',*args],STAGE,check=True,**kw)
     return subprocess.run(['docker',*args],check=True,**kw)
 
 
@@ -33,6 +39,7 @@ def verify_local_docker():
 
 
 def main():
+    global OBSERVER, STAGE
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--repository',type=Path,default=ROOT)
     parser.add_argument('--controls',type=Path,help='候选外核验器提供的受信执行文件目录')
@@ -43,7 +50,15 @@ def main():
     parser.add_argument('--batch')
     parser.add_argument('--image',default='umanews-test-impact:local')
     parser.add_argument('--build',action='store_true')
+    parser.add_argument('--resource-ledger',type=Path)
+    parser.add_argument('--invoke-deadline-monotonic',type=float)
+    parser.add_argument('--final-reserve-seconds',type=float,default=600)
     args=parser.parse_args()
+    if args.resource_ledger:
+        if args.invoke_deadline_monotonic is None: raise ValueError('owned observation requires deadline')
+        OBSERVER=OwnedObserver(args.resource_ledger,args.invoke_deadline_monotonic,args.final_reserve_seconds)
+    else:
+        OBSERVER=None
     root=args.repository.resolve()
     plan=json.loads(args.plan.read_text())
     if plan['source']!='git':
@@ -58,6 +73,8 @@ def main():
         plan.update(batches=[],count=0)
         (output/'execution-plan.json').write_text(json.dumps(plan,ensure_ascii=False,indent=2)+'\n')
         return
+    if OBSERVER and not args.collect_only and not args.batch:
+        raise ValueError('owned observation requires collect-only or exactly one original batch')
     verify_local_docker()
     with tempfile.TemporaryDirectory(prefix='impact-') as temp:
         temp=Path(temp); source=temp/'source'; source.mkdir()
@@ -82,6 +99,7 @@ def main():
                  'commit_base64':base64.b64encode(raw_commit).decode('ascii')}
         verify_source_binding(plan,binding,source)
         if args.build:
+            STAGE='image-build'
             context=temp/'build'; context.mkdir()
             shutil.copy(source/'requirements.txt',context/'requirements.txt')
             shutil.copy(source/'deploy/test-impact/Dockerfile',context/'Dockerfile')
@@ -89,6 +107,7 @@ def main():
                 docker('build','-t',args.image,str(context),stdout=log,stderr=subprocess.STDOUT)
         image_id=subprocess.check_output(['docker','image','inspect','--format','{{.Id}}',args.image],text=True).strip()
         if args.export_image:
+            STAGE='image-export'
             with args.export_image.open('wb') as image_file:
                 docker('save',image_id,stdout=image_file)
         plan['image_id']=image_id
@@ -97,6 +116,10 @@ def main():
         (control/'source-binding.json').write_text(json.dumps(binding))
         (control/'plan.json').write_text(json.dumps(plan))
         def invoke(mode,key='',profile=''):
+            seconds=2100 if profile=='release-postgres' else 600
+            if OBSERVER:
+                OBSERVER.admission(seconds)
+                if key and any((output/(key+s)).exists() for s in ('.json','.log')): raise ValueError('owned duplicate batch output')
             out=temp/(key or 'collection'); out.mkdir(); out.chmod(0o777)
             container_name='impact-'+uuid.uuid4().hex
             command=['run','--name',container_name,'--rm','--network','none','--cap-drop','ALL','--security-opt','no-new-privileges',
@@ -104,11 +127,25 @@ def main():
                      '--mount',f'type=bind,src={source},dst=/source,readonly',
                      '--mount',f'type=bind,src={control},dst=/control,readonly',
                      '--mount',f'type=bind,src={out},dst=/output',image_id,mode,key,profile]
+            cidfile=None
+            if OBSERVER:
+                cids=output/'owned-cids'; cids.mkdir(exist_ok=True)
+                cidfile=cids/(container_name+'.cid')
+                # 可选owned模式由checked rm负责删除；默认native仍保留--rm。
+                command.remove('--rm')
+                command[1:1]=['--cidfile',str(cidfile)]
+                OBSERVER.start(container_name,cidfile,key,profile)
             with (output/((key or 'collection')+'.log')).open('w') as log:
                 try:
-                    completed=subprocess.run(['docker',*command],stdout=log,stderr=subprocess.STDOUT,timeout=2100 if profile=='release-postgres' else 600)
+                    if OBSERVER:
+                        completed=OBSERVER.run(['docker',*command],key or 'collection',stdout=log,stderr=subprocess.STDOUT,timeout=seconds)
+                    else:
+                        completed=subprocess.run(['docker',*command],stdout=log,stderr=subprocess.STDOUT,timeout=2100 if profile=='release-postgres' else 600)
                 finally:
-                    subprocess.run(['docker','rm','-f',container_name],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=30)
+                    if OBSERVER:
+                        OBSERVER.cleanup(container_name,cidfile)
+                    else:
+                        subprocess.run(['docker','rm','-f',container_name],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=30)
             expected='execution-plan.json' if mode=='collect' else key+'.json'
             returned=[file.name for file in out.iterdir()]
             if returned != [expected]: raise ValueError('unexpected/missing container output: '+str(returned))
