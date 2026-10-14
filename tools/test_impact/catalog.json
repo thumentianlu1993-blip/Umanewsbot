@@ -37,7 +37,8 @@
       "stable.test_managed_readonly_steps",
       "stable.test_managed_readonly_translation",
       "stable.test_translation_reported_token_stop",
-      "stable.test_content_review_decisions"
+      "stable.test_content_review_decisions",
+      "stable.test_content_review_shadow"
     ],
     "race_parser": [
       "stable.test_race_reference_sources",
@@ -2825,6 +2826,12 @@
       "domains": [
         "news_translation"
       ]
+    },
+    "server/stable/test_content_review_shadow.py": {
+      "label": "stable.test_content_review_shadow",
+      "domains": [
+        "news_translation"
+      ]
     }
   },
   "profiles": {
@@ -3139,7 +3146,8 @@
     "stable.test_managed_readonly_steps": "django",
     "stable.test_managed_readonly_translation": "django",
     "stable.test_translation_reported_token_stop": "django",
-    "stable.test_content_review_decisions": "django"
+    "stable.test_content_review_decisions": "django",
+    "stable.test_content_review_shadow": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {

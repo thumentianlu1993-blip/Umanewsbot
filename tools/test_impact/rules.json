@@ -1419,6 +1419,9 @@
     ],
     "server/stable/services/content_review_decisions.py": [
       "news_translation"
+    ],
+    "server/stable/services/content_review_shadow.py": [
+      "news_translation"
     ]
   },
   "symbols": {
