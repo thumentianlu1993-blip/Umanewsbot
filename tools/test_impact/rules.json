@@ -1416,6 +1416,14 @@
     ],
     "server/stable/test_managed_readonly_translation.py": [
       "news_translation"
+    ],
+    "server/stable/services/race_source_arbitration.py": [
+      "r04_arbitration",
+      "race_results"
+    ],
+    "server/stable/services/race_result_arbitration_shadow.py": [
+      "r04_arbitration",
+      "race_results"
     ]
   },
   "symbols": {

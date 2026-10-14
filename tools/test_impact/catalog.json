@@ -876,6 +876,10 @@
     ],
     "horse_career_review_consumer": [
       "stable.test_horse_career_record_from_review"
+    ],
+    "r04_arbitration": [
+      "stable.test_race_source_arbitration",
+      "stable.test_race_result_arbitration_shadow"
     ]
   },
   "dependencies": {
@@ -937,6 +941,9 @@
       "horse_career_link_cache",
       "horse_basic_profile_review_input",
       "horse_target_inventory"
+    ],
+    "race_results": [
+      "r04_arbitration"
     ]
   },
   "tests": {
@@ -2818,6 +2825,18 @@
       "domains": [
         "news_translation"
       ]
+    },
+    "server/stable/test_race_source_arbitration.py": {
+      "label": "stable.test_race_source_arbitration",
+      "domains": [
+        "r04_arbitration"
+      ]
+    },
+    "server/stable/test_race_result_arbitration_shadow.py": {
+      "label": "stable.test_race_result_arbitration_shadow",
+      "domains": [
+        "r04_arbitration"
+      ]
     }
   },
   "profiles": {
@@ -3131,7 +3150,9 @@
     "stable.test_horse_career_record_from_review": "django",
     "stable.test_managed_readonly_steps": "django",
     "stable.test_managed_readonly_translation": "django",
-    "stable.test_translation_reported_token_stop": "django"
+    "stable.test_translation_reported_token_stop": "django",
+    "stable.test_race_source_arbitration": "python",
+    "stable.test_race_result_arbitration_shadow": "python"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
@@ -3213,7 +3234,8 @@
     "horse_basic_profile_cache": "integration: H03绑定缓存的私有基础资料事务与PG并发合同",
     "horse_career_link_cache": "integration: H03 单条既有赛绩离线补连、强身份/binding 与事务重放边界",
     "horse_basic_profile_prepare_command": "integration: H03缓存prepare-only命令与私有待审产物合同",
-    "horse_basic_profile_review_input": "integration: H03独立已审输入与原消费者事务/重放合同"
+    "horse_basic_profile_review_input": "integration: H03独立已审输入与原消费者事务/重放合同",
+    "r04_arbitration": "integration: A reviewed R04 pure selection and caller-shaped shadow diagnostics; no writer/hook/source"
   },
   "dedicated_batch_modules": [
     "stable.test_migration_history_repair_postgres",
