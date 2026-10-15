@@ -6988,3 +6988,61 @@ class ManagedReadonlyStep(models.Model):
 
     def delete(self, *args, **kwargs):
         raise ValidationError("只读step禁止删除。")
+
+
+class NewsFeedClock(models.Model):
+    """Private Q03 schema preparation; last_seq is a transactional column."""
+    scope = models.CharField(max_length=64, primary_key=True)
+    generation = models.UUIDField()
+    last_seq = models.BigIntegerField(default=0)
+    initialized = models.BooleanField(default=False)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=models.Q(last_seq__gte=0), name="ck_feed_clock_nonnegative"),
+        ]
+
+
+class NewsFeedState(models.Model):
+    scope = models.ForeignKey(NewsFeedClock, on_delete=models.PROTECT)
+    generation = models.UUIDField()
+    news_id = models.BigIntegerField()
+    current_visible = models.BooleanField(default=False)
+    ever_public = models.BooleanField(default=False)
+    revision_seq = models.BigIntegerField(default=0)
+    fingerprint = models.CharField(max_length=72, null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=("scope", "generation", "news_id"), name="uq_feed_state_identity"),
+            models.CheckConstraint(condition=models.Q(news_id__gt=0), name="ck_feed_state_news_positive"),
+            models.CheckConstraint(condition=models.Q(revision_seq__gte=0), name="ck_feed_state_revision"),
+            models.CheckConstraint(
+                condition=(models.Q(current_visible=True, ever_public=True, fingerprint__isnull=False)
+                           | models.Q(current_visible=False, fingerprint__isnull=True)),
+                name="ck_feed_state_visibility",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("scope", "generation", "current_visible", "news_id"), name="feed_state_public_idx"),
+        ]
+
+
+class NewsFeedChange(models.Model):
+    scope = models.ForeignKey(NewsFeedClock, on_delete=models.PROTECT)
+    generation = models.UUIDField()
+    seq = models.BigIntegerField()
+    news_id = models.BigIntegerField()
+    kind = models.CharField(max_length=8, choices=[(k, k) for k in ("publish", "correct", "withdraw")])
+    observed_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=("scope", "generation", "seq"), name="uq_feed_change_position"),
+            models.CheckConstraint(condition=models.Q(seq__gt=0), name="ck_feed_change_seq_positive"),
+            models.CheckConstraint(condition=models.Q(news_id__gt=0), name="ck_feed_change_news_positive"),
+            models.CheckConstraint(condition=models.Q(kind__in=("publish", "correct", "withdraw")), name="ck_feed_change_kind"),
+        ]
+        indexes = [
+            models.Index(fields=("scope", "generation", "seq"), name="feed_change_scan_idx"),
+        ]

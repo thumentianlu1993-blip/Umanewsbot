@@ -36,7 +36,8 @@
       "stable.test_managed_translation_dispatch_fence",
       "stable.test_managed_readonly_steps",
       "stable.test_managed_readonly_translation",
-      "stable.test_translation_reported_token_stop"
+      "stable.test_translation_reported_token_stop",
+      "stable.test_news_feed_translation_finalize_postgres"
     ],
     "race_parser": [
       "stable.test_race_reference_sources",
@@ -876,6 +877,14 @@
     ],
     "horse_career_review_consumer": [
       "stable.test_horse_career_record_from_review"
+    ],
+    "q03_news_feed": [
+      "stable.test_news_feed_commit_postgres",
+      "stable.test_news_feed_semantics",
+      "stable.test_public_news_snapshot",
+      "stable.test_public_news_snapshot_http",
+      "stable.test_public_news_snapshot_loader",
+      "stable.test_news_feed_translation_finalize_postgres"
     ]
   },
   "dependencies": {
@@ -937,6 +946,13 @@
       "horse_career_link_cache",
       "horse_basic_profile_review_input",
       "horse_target_inventory"
+    ],
+    "q03_news_feed": [
+      "module:stable.tests_legacy",
+      "module:stable.test_editorial_headlines",
+      "module:stable.test_race_news_exposure",
+      "module:stable.test_public_new_regions",
+      "module:stable.test_public_term_consistency"
     ]
   },
   "tests": {
@@ -2818,6 +2834,43 @@
       "domains": [
         "news_translation"
       ]
+    },
+    "server/stable/test_news_feed_commit_postgres.py": {
+      "label": "stable.test_news_feed_commit_postgres",
+      "domains": [
+        "q03_news_feed"
+      ]
+    },
+    "server/stable/test_news_feed_semantics.py": {
+      "label": "stable.test_news_feed_semantics",
+      "domains": [
+        "q03_news_feed"
+      ]
+    },
+    "server/stable/test_public_news_snapshot.py": {
+      "label": "stable.test_public_news_snapshot",
+      "domains": [
+        "q03_news_feed"
+      ]
+    },
+    "server/stable/test_public_news_snapshot_http.py": {
+      "label": "stable.test_public_news_snapshot_http",
+      "domains": [
+        "q03_news_feed"
+      ]
+    },
+    "server/stable/test_public_news_snapshot_loader.py": {
+      "label": "stable.test_public_news_snapshot_loader",
+      "domains": [
+        "q03_news_feed"
+      ]
+    },
+    "server/stable/test_news_feed_translation_finalize_postgres.py": {
+      "label": "stable.test_news_feed_translation_finalize_postgres",
+      "domains": [
+        "q03_news_feed",
+        "news_translation"
+      ]
     }
   },
   "profiles": {
@@ -3131,7 +3184,13 @@
     "stable.test_horse_career_record_from_review": "django",
     "stable.test_managed_readonly_steps": "django",
     "stable.test_managed_readonly_translation": "django",
-    "stable.test_translation_reported_token_stop": "django"
+    "stable.test_translation_reported_token_stop": "django",
+    "stable.test_news_feed_commit_postgres": "django",
+    "stable.test_news_feed_semantics": "python",
+    "stable.test_public_news_snapshot": "django",
+    "stable.test_public_news_snapshot_http": "django",
+    "stable.test_public_news_snapshot_loader": "django",
+    "stable.test_news_feed_translation_finalize_postgres": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
@@ -3213,11 +3272,14 @@
     "horse_basic_profile_cache": "integration: H03绑定缓存的私有基础资料事务与PG并发合同",
     "horse_career_link_cache": "integration: H03 单条既有赛绩离线补连、强身份/binding 与事务重放边界",
     "horse_basic_profile_prepare_command": "integration: H03缓存prepare-only命令与私有待审产物合同",
-    "horse_basic_profile_review_input": "integration: H03独立已审输入与原消费者事务/重放合同"
+    "horse_basic_profile_review_input": "integration: H03独立已审输入与原消费者事务/重放合同",
+    "q03_news_feed": "integration: Q03 private PG RED candidate only; not merge/activation approval"
   },
   "dedicated_batch_modules": [
     "stable.test_migration_history_repair_postgres",
     "stable.test_migration_database_isolation",
-    "scripts.tests.test_f02_export_postgres"
+    "scripts.tests.test_f02_export_postgres",
+    "stable.test_news_feed_commit_postgres",
+    "stable.test_news_feed_translation_finalize_postgres"
   ]
 }
