@@ -7,7 +7,9 @@
 from contextlib import contextmanager
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone as dt_timezone
-from threading import Event, Thread
+from threading import Event, Thread, get_ident
+import json
+import sys
 import time
 from unittest.mock import patch
 from uuid import UUID
@@ -44,6 +46,99 @@ def sqlstate(error):
             return value
         error = error.__cause__
     return None
+
+
+def _cleanup_error_identity(error):
+    """只保留异常类型/SQLSTATE/约束名/帧位置，不记录消息、参数或 SQL。"""
+    chain, seen = [], set()
+    for _ in range(8):
+        if error is None or id(error) in seen:
+            break
+        seen.add(id(error))
+        diag = getattr(error, 'diag', None)
+        code = getattr(error, 'sqlstate', None) or getattr(error, 'pgcode', None)
+        constraint = getattr(diag, 'constraint_name', None) if diag is not None else None
+        if code is not None and not isinstance(code, str):
+            raise TypeError('diagnostic SQLSTATE must be text')
+        if constraint is not None and not isinstance(constraint, str):
+            raise TypeError('diagnostic constraint name must be text')
+        frames, tb = [], error.__traceback__
+        while tb is not None and len(frames) < 16:
+            frames.append({'function': tb.tb_frame.f_code.co_name, 'line': tb.tb_lineno})
+            tb = tb.tb_next
+        chain.append({'type': type(error).__module__ + '.' + type(error).__name__,
+                      'sqlstate': code, 'constraint_name': constraint, 'frames': frames})
+        error = error.__cause__ if error.__cause__ is not None else error.__context__
+    return chain
+
+
+def _cleanup_diagnostic_step(record, phase, action):
+    """诊断错误延至独立 unittest cleanup ERROR；原 close/异常链继续执行。"""
+    event = {'phase': phase, 'thread': get_ident(), 'started': time.monotonic()}
+    try:
+        event['value'] = action()
+        json.dumps(event)  # 禁止通过 default=str/repr 将 wrapper/driver 泄入日志。
+    except BaseException as error:
+        # 包括控制异常也必须记账并在主线程 cleanup 报 ERROR，不能阻断 owner close。
+        # 跨线程只交纯 dict；不传异常、traceback、wrapper 或 driver 对象。
+        try:
+            identity = _cleanup_error_identity(error)
+        except BaseException as formatter_error:
+            identity = [{'type': type(error).__module__ + '.' + type(error).__name__,
+                         'formatter_error_type': type(formatter_error).__name__}]
+        event.pop('value', None)
+        event['diagnostic_error'] = identity
+        record['errors'].append({'phase': phase, 'identity': identity})
+    finally:
+        event['finished'] = time.monotonic()
+        record['events'].append(event)
+
+
+def _cleanup_local_state(db, driver):
+    if db is None:
+        return {'wrapper_present': False, 'driver_present': driver is not None}
+    values = db.__dict__
+    result = {'wrapper_present': True, 'wrapper_id': id(db), 'alias': values['alias'],
+              'owner_thread': values['_thread_ident'], 'observing_thread': get_ident(),
+              'driver_present': driver is not None,
+              'wrapper_connection_none': values['connection'] is None,
+              'pool_config_enabled': bool(values['settings_dict'].get('OPTIONS', {}).get('pool'))}
+    for key in ('autocommit', 'in_atomic_block', 'needs_rollback', 'closed_in_transaction'):
+        value = values[key]
+        if not isinstance(value, bool):
+            raise TypeError('diagnostic wrapper flag must be boolean')
+        result[key] = value
+    if driver is not None:
+        result.update(driver_id=id(driver), driver_type=type(driver).__module__ + '.' + type(driver).__name__)
+        # psycopg closed 只读取本地 PGconn.status；不读 pool/info/get_autocommit。
+        closed = driver.closed
+        if not isinstance(closed, (bool, int)):
+            raise TypeError('diagnostic driver closed must be a local flag')
+        result['driver_closed'] = bool(closed)
+    return result
+
+
+def _cleanup_backend_rows(cursor, target_pid):
+    """仅原有健康连接/既有 observer cursor；绝不在关闭后的 target 上调用。"""
+    if not isinstance(target_pid, int) or isinstance(target_pid, bool) or target_pid <= 0:
+        raise RuntimeError('diagnostic target PID must already be known')
+    state = _cleanup_local_state(cursor.db, cursor.db.__dict__['connection'])
+    if (not state['autocommit'] or state['in_atomic_block'] or state['needs_rollback']
+            or state['wrapper_connection_none'] or state.get('driver_closed', True)
+            or state['owner_thread'] != state['observing_thread']):
+        raise RuntimeError('diagnostic SQL requires an existing healthy owner-thread autocommit session')
+    cursor.execute('SELECT pid, backend_start, datname, usename, application_name, backend_type, '
+                   'state, wait_event_type, wait_event, xact_start FROM pg_stat_activity '
+                   'WHERE pid=pg_backend_pid() OR pid=%s ORDER BY pid', [target_pid])
+    keys = ('pid', 'backend_start', 'datname', 'usename', 'application_name', 'backend_type',
+            'state', 'wait_event_type', 'wait_event', 'xact_start')
+    rows = []
+    for row in cursor.fetchall():
+        values = dict(zip(keys, row))
+        for key in ('backend_start', 'xact_start'):
+            values[key] = values[key].isoformat() if values[key] is not None else None
+        rows.append(values)
+    return {'local': state, 'rows': rows}
 
 
 @override_settings(NEWS_FEED_CAPTURE_ENABLED=True,
@@ -200,7 +295,10 @@ class NewsFeedTranslationFinalizePostgresTests(TransactionTestCase):
     def worker(self, action, *, lock_timeout='2s'):
         facts = dict(ready=Event(), done=Event(), errors=[], results=[], pid=None,
                      closed=False, joined=False)
+        diagnostic = self._new_cleanup_diagnostic('worker')
+        facts['cleanup_diagnostic'] = diagnostic  # 只共享 JSON 兼容字典。
         def run():
+            db, owner_driver = None, None
             try:
                 db = connections['default']
                 with db.cursor() as cursor:
@@ -211,12 +309,27 @@ class NewsFeedTranslationFinalizePostgresTests(TransactionTestCase):
                     cursor.execute("SELECT set_config('lock_timeout',%s,false), "
                                    "set_config('statement_timeout','10s',false), "
                                    "set_config('application_name','c159-B',false)", [lock_timeout])
+                    owner_driver = db.__dict__['connection']
+                    _cleanup_diagnostic_step(diagnostic, 'owner_identity_in_existing_cursor',
+                                             lambda: self._cleanup_owner_identity(cursor, facts['pid'], diagnostic))
                 facts['ready'].set()
                 facts['results'].append(action())
             except BaseException as error:
                 facts['errors'].append(error)
             finally:
-                connections.close_all()  # 当前 worker 自己拥有的连接。
+                driver = db.__dict__.get('connection') if db is not None else None
+                _cleanup_diagnostic_step(diagnostic, 'owner_before_close',
+                                         lambda: self._cleanup_owner_state(db, driver, owner_driver, diagnostic))
+                _cleanup_diagnostic_step(diagnostic, 'owner_close_start', lambda: None)
+                close_returned = False
+                try:
+                    connections.close_all()  # 当前 worker 自己拥有的连接。
+                    close_returned = True
+                finally:
+                    _cleanup_diagnostic_step(diagnostic, 'owner_close_end',
+                                             lambda: {'local': _cleanup_local_state(db, driver),
+                                                      'close_returned': close_returned,
+                                                      'close_error': _cleanup_error_identity(sys.exception()) if not close_returned else []})
                 facts['closed'] = connections['default'].connection is None
                 facts['done'].set()
         facts['thread'] = Thread(target=run, daemon=True)
@@ -238,6 +351,8 @@ class NewsFeedTranslationFinalizePostgresTests(TransactionTestCase):
         self.assertTrue(facts['closed'], 'owned worker must close its own session')
         with connection.cursor() as cursor:
             cursor.execute('SELECT pg_stat_clear_snapshot()')
+            _cleanup_diagnostic_step(facts['cleanup_diagnostic'], 'observer_after_existing_clear',
+                                     lambda: self._cleanup_observer(cursor, facts['pid'], facts['cleanup_diagnostic']))
             cursor.execute('SELECT pid FROM pg_stat_activity WHERE pid=%s', [facts['pid']])
             self.assertEqual(cursor.fetchall(), [], 'owned backend must actually disappear')
         facts['joined'] = True
@@ -299,16 +414,26 @@ class NewsFeedTranslationFinalizePostgresTests(TransactionTestCase):
 
     @contextmanager
     def constraint(self, model, name, expression):
+        diagnostic = self._new_cleanup_diagnostic('constraint')
         table = connection.ops.quote_name(model._meta.db_table)
         quoted = connection.ops.quote_name(name)
         with connection.cursor() as cursor:
             cursor.execute(f'ALTER TABLE {table} ADD CONSTRAINT {quoted} CHECK ({expression})')
+        def record_sql_error(execute, sql, params, many, context):
+            try:
+                return execute(sql, params, many, context)
+            except BaseException as error:
+                _cleanup_diagnostic_step(diagnostic, 'body_sql_error',
+                                         lambda: _cleanup_error_identity(error))
+                raise  # 不改 SQLSTATE 分类，不替换原异常/traceback。
         try:
-            yield
+            with connection.execute_wrapper(record_sql_error):
+                yield
         finally:
             # 独立健康测试连接清约束；必须在 owning outer 已退出后执行。
             clean = connection.copy(alias='c159-cleanup')
             pid = None
+            owner_driver = None
             try:
                 with clean.cursor() as cursor:
                     cursor.execute('SELECT pg_backend_pid(), current_database()')
@@ -317,18 +442,87 @@ class NewsFeedTranslationFinalizePostgresTests(TransactionTestCase):
                         raise RuntimeError('C159 cleanup target mismatch')
                     cursor.execute("SET statement_timeout='10s'")
                     cursor.execute("SET lock_timeout='2s'")
+                    owner_driver = clean.__dict__['connection']
+                    _cleanup_diagnostic_step(diagnostic, 'owner_identity_in_existing_cursor',
+                                             lambda: self._cleanup_owner_identity(cursor, pid, diagnostic))
                     cursor.execute(f'ALTER TABLE {table} DROP CONSTRAINT {quoted}')
                     cursor.execute('SELECT conname FROM pg_constraint WHERE conrelid=%s::regclass '
                                    'AND conname=%s', [model._meta.db_table, name])
                     self.assertEqual(cursor.fetchall(), [], 'owned CHECK must be absent')
             finally:
-                clean.close()
+                driver = clean.__dict__.get('connection')
+                _cleanup_diagnostic_step(diagnostic, 'owner_before_close',
+                                         lambda: self._cleanup_owner_state(clean, driver, owner_driver, diagnostic))
+                _cleanup_diagnostic_step(diagnostic, 'owner_close_start', lambda: None)
+                close_returned = False
+                try:
+                    clean.close()
+                    close_returned = True
+                finally:
+                    _cleanup_diagnostic_step(diagnostic, 'owner_close_end',
+                                             lambda: {'local': _cleanup_local_state(clean, driver),
+                                                      'close_returned': close_returned,
+                                                      'close_error': _cleanup_error_identity(sys.exception()) if not close_returned else []})
             self.assertIsNone(clean.connection)
             with connection.cursor() as cursor:
                 cursor.execute('SELECT pg_stat_clear_snapshot()')
+                _cleanup_diagnostic_step(diagnostic, 'observer_after_existing_clear',
+                                         lambda: self._cleanup_observer(cursor, pid, diagnostic))
                 cursor.execute('SELECT pid FROM pg_stat_activity WHERE pid=%s', [pid])
                 self.assertEqual(cursor.fetchall(), [], 'cleanup backend must disappear')
             print('C159_CHECK_REMOVED', self.id(), model._meta.db_table, name, pid, flush=True)
+
+    def _new_cleanup_diagnostic(self, kind):
+        record = {'schema': 'B151-cleanup-v1', 'test': self.id(), 'kind': kind,
+                  'registered_thread': get_ident(), 'events': [], 'errors': [], 'target': None}
+        self.addCleanup(self._finish_cleanup_diagnostic, record)
+        return record
+
+    def _finish_cleanup_diagnostic(self, record):
+        encoded = json.dumps(record, sort_keys=True)
+        try:
+            print('B151_CLEANUP_DIAGNOSTIC ' + encoded, flush=True)
+        finally:
+            if record['errors']:
+                # 独立 ERROR 不取代 test-body/原 helper 的 FAIL 或 ERROR。
+                raise RuntimeError('B151 diagnostic errors retained separately: ' +
+                                   json.dumps(record['errors'], sort_keys=True))
+
+    def _cleanup_owner_identity(self, cursor, pid, record):
+        if pid is None:
+            raise RuntimeError('diagnostic owner PID unavailable')
+        sample = _cleanup_backend_rows(cursor, pid)  # 原有 cursor，不新开目标 cursor。
+        if len(sample['rows']) != 1 or sample['rows'][0]['pid'] != pid:
+            raise RuntimeError('diagnostic owner identity mismatch')
+        record['target'] = sample['rows'][0]
+        if record['target']['datname'] != self.database or record['target']['usename'] != 'bounded_ci':
+            raise RuntimeError('diagnostic owner private target mismatch')
+        return sample
+
+    def _cleanup_owner_state(self, db, driver, owner_driver, record):
+        local = _cleanup_local_state(db, driver)
+        record['owner_local_before_close'] = local
+        if driver is None or driver is not owner_driver or record['target'] is None:
+            raise RuntimeError('diagnostic owner driver/identity changed or missing before close')
+        return local
+
+    def _cleanup_observer(self, cursor, pid, record):
+        sample = _cleanup_backend_rows(cursor, pid)
+        # 先保留实际同轮样本；身份异常仍单独 ERROR，不过滤成 absence。
+        record['events'].append({'phase': 'observer_sample', 'thread': get_ident(),
+                                 'observed': time.monotonic(), 'value': sample})
+        observer = [row for row in sample['rows'] if row['pid'] == self.a_pid]
+        if (len(observer) != 1 or self.a_pid == pid
+                or observer[0]['datname'] != self.database or observer[0]['usename'] != 'bounded_ci'):
+            raise RuntimeError('diagnostic observer identity mismatch')
+        target = record['target']
+        if target is None:
+            raise RuntimeError('diagnostic close-before target identity missing')
+        identity_keys = ('pid', 'backend_start', 'datname', 'usename', 'application_name', 'backend_type')
+        for row in sample['rows']:
+            if row['pid'] == pid and any(row[key] != target[key] for key in identity_keys):
+                raise RuntimeError('diagnostic target identity drift; original absence check unchanged')
+        return {'observer_pid': self.a_pid, 'target_pid': pid}
 
     @contextmanager
     def after_change_insert(self, callback):
