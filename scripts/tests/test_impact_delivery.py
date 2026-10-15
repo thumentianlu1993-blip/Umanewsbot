@@ -395,8 +395,12 @@ class HistoricalMigrationFixtureCompatibilityTests(unittest.TestCase):
                 with self.subTest(generation=generation):
                     target=Path(tmp)/generation/'stable/migrations';target.parent.mkdir(parents=True)
                     copy(target,generation=generation)
+                    self.assertFalse((target/'0082_news_feed_commit_primitive.py').exists(),
+                                     'historical root must exclude the exact reviewed 0082')
                     contract,expected=self.contract(generation,target.parent/'services/release.py')
-                    self.assertEqual(contract(),expected)
+                    actual=contract()
+                    self.assertEqual(actual,expected)
+                    print('C155_HISTORICAL_SHA',generation,actual,flush=True)
                     self.assertFalse((target/'0081_managed_readonly_steps.py').exists())
                     self.assertTrue((target/'0078_externalhorse_profile_snapshot.py').exists())
                     self.assertEqual((target/'0079_multisource_race_enrollment.py').exists(),generation=='0079')
@@ -405,17 +409,26 @@ class HistoricalMigrationFixtureCompatibilityTests(unittest.TestCase):
         import tempfile
         import shutil
         original=Path(__file__).resolve().parents[2]
-        for relative in ('0082_unknown.py','0081_unknown.py','nested/0081_managed_readonly_steps.py','__pycache__/0081_managed_readonly_steps.py'):
+        for relative in ('0082_unknown.py','0081_unknown.py','nested/0081_managed_readonly_steps.py','__pycache__/0081_managed_readonly_steps.py',
+                         'nested/0082_news_feed_commit_primitive.py','__pycache__/0082_news_feed_commit_primitive.py'):
             with self.subTest(relative=relative),tempfile.TemporaryDirectory() as tmp:
                 root=Path(tmp)/'source';directory=root/'server/stable/migrations';directory.parent.mkdir(parents=True)
                 shutil.copytree(original/'server/stable/migrations',directory)
-                extra=directory/relative;extra.parent.mkdir(exist_ok=True);extra.write_text('# unreviewed migration\n')
+                extra=directory/relative;extra.parent.mkdir(exist_ok=True)
+                if relative.endswith('/0082_news_feed_commit_primitive.py'):
+                    extra.write_bytes((original/'server/stable/migrations/0082_news_feed_commit_primitive.py').read_bytes())
+                else:
+                    extra.write_text('# unreviewed migration\n')
                 copy=self.fixture_functions(root)
                 for generation in ('0078','0079'):
                     target=Path(tmp)/generation/'stable/migrations';target.parent.mkdir(parents=True);copy(target,generation=generation)
+                    self.assertFalse((target/'0082_news_feed_commit_primitive.py').exists(),
+                                     'reject the intended extra path, not a leaked root 0082')
                     self.assertTrue((target/relative).exists())
                     contract,_=self.contract(generation,target.parent/'services/release.py')
-                    with self.assertRaisesRegex(ValueError,generation+' migration file/content contract drift'):contract()
+                    with self.assertRaisesRegex(ValueError,generation+' migration file/content contract drift') as refused:
+                        contract()
+                    print('C155_REJECTED_PATH',generation,relative,type(refused.exception).__name__,str(refused.exception),flush=True)
 
     def test_current_directory_is_still_refused_by_unchanged_production_contracts(self):
         root=Path(__file__).resolve().parents[2]
