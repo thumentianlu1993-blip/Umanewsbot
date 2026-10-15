@@ -1416,6 +1416,24 @@
     ],
     "server/stable/test_managed_readonly_translation.py": [
       "news_translation"
+    ],
+    "server/stable/services/news_feed_commit.py": [
+      "q03_news_feed"
+    ],
+    "server/stable/services/news_feed_semantics.py": [
+      "q03_news_feed"
+    ],
+    "server/stable/services/public_news_queries.py": [
+      "q03_news_feed"
+    ],
+    "server/stable/services/public_news_snapshot.py": [
+      "q03_news_feed"
+    ],
+    "server/stable/services/public_news_snapshot_loader.py": [
+      "q03_news_feed"
+    ],
+    "server/stable/public_news_snapshot_http.py": [
+      "q03_news_feed"
     ]
   },
   "symbols": {
@@ -1550,7 +1568,8 @@
         "module:stable.tests_legacy",
         "horse_page",
         "module:stable.test_race_information_display_pages",
-        "module:stable.test_race_news_exposure"
+        "module:stable.test_race_news_exposure",
+        "q03_news_feed"
       ],
       "public_article_detail": [
         "module:stable.tests_legacy",
@@ -1576,6 +1595,12 @@
         "module:stable.test_race_public_time",
         "module:stable.test_race_news_exposure",
         "public_probe_orm_loader"
+      ],
+      "_public_published_articles": [
+        "q03_news_feed"
+      ],
+      "article_update_api": [
+        "q03_news_feed"
       ]
     }
   },

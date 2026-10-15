@@ -2670,6 +2670,8 @@ def _redirect_legacy_region(request):
 
 
 def _public_published_articles():
+    from stable.services.public_news_queries import public_article_queryset
+
     confirmed_race_links = (
         ArticleRaceLink.objects.filter(
             status__in=[ArticleRaceLinkStatus.AUTO, ArticleRaceLinkStatus.MANUAL],
@@ -2687,15 +2689,13 @@ def _public_published_articles():
         .order_by("id")
     )
     queryset = (
-        NewsArticle.objects.select_related("cover_media_asset")
+        public_article_queryset().select_related("cover_media_asset")
         .prefetch_related(
             "images",
             "related_region_links",
             Prefetch("race_links", queryset=confirmed_race_links, to_attr="public_race_links"),
             Prefetch("horse_links", queryset=confirmed_horse_links, to_attr="public_horse_links"),
         )
-        .filter(workflow_status=WorkflowStatus.PUBLISHED, published_to_web_at__isnull=False)
-        .order_by("-published_to_web_at", "-id")
     )
     return queryset
 
@@ -4155,26 +4155,9 @@ def public_news_feed(request: HttpRequest):
 
     queryset = _public_published_articles()
 
-    # -- Exposure governance: filter same-event articles at DB level --
-    _exposure_homepage_max = getattr(dj_settings, "RACE_NEWS_HOMEPAGE_MAX", 2)
-    if getattr(dj_settings, "RACE_NEWS_EXPOSURE_ENABLED", False) and _exposure_homepage_max > 0:
-        from stable.models import RaceNewsExposure, RaceNewsExposureStatus, RaceNewsExposureChannel
-        from django.db.models import Exists, OuterRef
-        # Exclude race-linked articles that lack an active homepage exposure slot.
-        # This is ONE EXISTS subquery per article — no in-memory ID lists.
-        has_race_link = ArticleRaceLink.objects.filter(
-            article_id=OuterRef("pk"),
-            status__in=(ArticleRaceLinkStatus.AUTO, ArticleRaceLinkStatus.MANUAL),
-        )
-        has_active_exposure = RaceNewsExposure.objects.filter(
-            article_id=OuterRef("pk"),
-            channel=RaceNewsExposureChannel.HOMEPAGE,
-            scope_key="site",
-            status=RaceNewsExposureStatus.ACTIVE,
-        )
-        queryset = queryset.exclude(
-            Exists(has_race_link) & ~Exists(has_active_exposure)
-        )
+    from stable.services.public_news_queries import filter_homepage_exposure
+
+    queryset = filter_homepage_exposure(queryset)
 
     headline_article = resolve_homepage_headline(queryset)
     hot_articles = _build_hot_articles(queryset)
@@ -4685,24 +4668,26 @@ def article_update_api(request: HttpRequest, article_id: int) -> JsonResponse:
     denied = _ensure_staff(request)
     if denied:
         return JsonResponse({"detail": "forbidden"}, status=403)
-    article = get_object_or_404(NewsArticle, pk=article_id)
-    payload = json.loads(request.body.decode("utf-8"))
-    changed_fields: list[str] = []
-    for field in ("title_zh", "summary_zh", "body_zh", "push_summary_zh", "editor_notes", "workflow_status", "status"):
-        if field in payload:
-            setattr(article, field, payload[field])
-            changed_fields.append(field)
-    if changed_fields:
-        article.mark_manual_edits(changed_fields)
-        article.save()
-        log_operation(
-            action_type="article_updated_api",
-            target_type="article",
-            target_id=article.pk,
-            detail=f"通过 API 更新字段：{', '.join(changed_fields)}",
-            admin=request.user,
-        )
-    return JsonResponse({"updated": True, "fields": changed_fields})
+    from stable.services.news_feed_commit import capture_news_change
+    with capture_news_change(article_id):
+        article = get_object_or_404(NewsArticle, pk=article_id)
+        payload = json.loads(request.body.decode("utf-8"))
+        changed_fields: list[str] = []
+        for field in ("title_zh", "summary_zh", "body_zh", "push_summary_zh", "editor_notes", "workflow_status", "status"):
+            if field in payload:
+                setattr(article, field, payload[field])
+                changed_fields.append(field)
+        if changed_fields:
+            article.mark_manual_edits(changed_fields)
+            article.save()
+            log_operation(
+                action_type="article_updated_api",
+                target_type="article",
+                target_id=article.pk,
+                detail=f"通过 API 更新字段：{', '.join(changed_fields)}",
+                admin=request.user,
+            )
+        return JsonResponse({"updated": True, "fields": changed_fields})
 
 
 @login_required
