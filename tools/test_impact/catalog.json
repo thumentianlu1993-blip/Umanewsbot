@@ -36,7 +36,8 @@
       "stable.test_managed_translation_dispatch_fence",
       "stable.test_managed_readonly_steps",
       "stable.test_managed_readonly_translation",
-      "stable.test_translation_reported_token_stop"
+      "stable.test_translation_reported_token_stop",
+      "stable.test_news_feed_translation_finalize_postgres"
     ],
     "race_parser": [
       "stable.test_race_reference_sources",
@@ -882,7 +883,8 @@
       "stable.test_news_feed_semantics",
       "stable.test_public_news_snapshot",
       "stable.test_public_news_snapshot_http",
-      "stable.test_public_news_snapshot_loader"
+      "stable.test_public_news_snapshot_loader",
+      "stable.test_news_feed_translation_finalize_postgres"
     ]
   },
   "dependencies": {
@@ -2862,6 +2864,13 @@
       "domains": [
         "q03_news_feed"
       ]
+    },
+    "server/stable/test_news_feed_translation_finalize_postgres.py": {
+      "label": "stable.test_news_feed_translation_finalize_postgres",
+      "domains": [
+        "q03_news_feed",
+        "news_translation"
+      ]
     }
   },
   "profiles": {
@@ -3180,7 +3189,8 @@
     "stable.test_news_feed_semantics": "python",
     "stable.test_public_news_snapshot": "django",
     "stable.test_public_news_snapshot_http": "django",
-    "stable.test_public_news_snapshot_loader": "django"
+    "stable.test_public_news_snapshot_loader": "django",
+    "stable.test_news_feed_translation_finalize_postgres": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
@@ -3269,6 +3279,7 @@
     "stable.test_migration_history_repair_postgres",
     "stable.test_migration_database_isolation",
     "scripts.tests.test_f02_export_postgres",
-    "stable.test_news_feed_commit_postgres"
+    "stable.test_news_feed_commit_postgres",
+    "stable.test_news_feed_translation_finalize_postgres"
   ]
 }
