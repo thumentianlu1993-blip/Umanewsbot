@@ -136,7 +136,7 @@ def _block(source: str, locator: str, original: str, *, context_sha: str, reason
 class _CleaningAudit:
     def __init__(self, node: Tag, source: str):
         self.source = source
-        self.before_text = extract_article_text(node)
+        self.before_text = "" if node.name in {"script", "style"} else extract_article_text(node)
         self.body_html_sha256 = hashlib.sha256(str(node).encode()).hexdigest()
         self.noise: list[dict[str, object]] = []
         # Capture paths before decompose changes sibling positions. Compare by
@@ -160,6 +160,12 @@ class _CleaningAudit:
 
 
 def _remove_structured_noise(node: Tag, removed: Counter[str], audit: _CleaningAudit) -> None:
+    # Bare tag selectors also apply when the selected body is itself noise.
+    if node.name in _STRUCTURED_NOISE_SELECTORS:
+        audit.remove([node], "structured_noise")
+        removed["structured_noise"] += 1
+        node.clear()
+        return
     for selector in _STRUCTURED_NOISE_SELECTORS:
         matches = list(node.select(selector))
         audit.remove(matches, "structured_noise")
