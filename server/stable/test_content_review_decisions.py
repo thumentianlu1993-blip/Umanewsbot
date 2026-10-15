@@ -271,3 +271,50 @@ class ContentReviewDecisionTests(unittest.TestCase):
         self.assertIn('quality_policy_unresolved',first['quality_gaps'])
         self.assertIn('template_baseline_missing',first['quality_gaps'])
         self.assertIn('test_only_profile',first['quality_gaps'])
+
+    def test_direct_kernel_rejects_metaclass_equality_without_calling_hook(self):
+        calls = []
+
+        class RecordingMeta(type):
+            def __eq__(cls, other):
+                calls.append('type-equality')
+                return False
+
+        class NonJson(metaclass=RecordingMeta):
+            pass
+
+        verdict = copy.deepcopy(self.verdict)
+        verdict['decisions'][0]['reason'] = NonJson()
+        result = kernel.review_candidate(self.packet, verdict, profile=PROFILE)
+        self.assertEqual(calls, [], 'Reject non-JSON values without type equality hooks')
+        self.assertEqual(result['status'], 'review_blocked')
+        self.assertEqual(result['reason'], 'json_type_invalid')
+        self.assertIsNone(result['candidate_text'])
+        self.assertEqual(result['diff'], [])
+        self.assertIs(result['publish_eligible'], False)
+        self.assertIs(result['qualified'], False)
+
+    def test_direct_kernel_blocks_throwing_metaclass_without_exception_escape(self):
+        calls = []
+
+        class ThrowingMeta(type):
+            def __eq__(cls, other):
+                calls.append('type-equality')
+                raise RuntimeError('metaclass equality must not run')
+
+        class NonJson(metaclass=ThrowingMeta):
+            pass
+
+        verdict = copy.deepcopy(self.verdict)
+        verdict['decisions'][0]['reason'] = NonJson()
+        try:
+            result = kernel.review_candidate(self.packet, verdict, profile=PROFILE)
+        except Exception as exc:
+            self.fail(f'Non-JSON input escaped the blocked envelope: {type(exc).__name__}: {exc}')
+        self.assertEqual(calls, [])
+        self.assertEqual(result['status'], 'review_blocked')
+        self.assertEqual(result['reason'], 'json_type_invalid')
+        self.assertIsNone(result['candidate_text'])
+        self.assertEqual(result['diff'], [])
+        self.assertIs(result['publish_eligible'], False)
+        self.assertIs(result['qualified'], False)

@@ -54,7 +54,7 @@ def _wire(value, byte_limit, depth_limit):
         if depth > depth_limit:
             _fail("depth_limit")
         kind = type(item)
-        if kind in (dict, list):
+        if kind is dict or kind is list:
             if id(item) in ancestors or len(item) > byte_limit:
                 _fail("container_invalid")
             ancestors.add(id(item))
@@ -76,7 +76,7 @@ def _wire(value, byte_limit, depth_limit):
         elif kind is str:
             if len(item) > byte_limit: _fail("byte_size_limit")
             emit(json.dumps(item, ensure_ascii=False))
-        elif kind in (int, bool) or item is None:
+        elif kind is int or kind is bool or item is None:
             if kind is int and item.bit_length() > 63: _fail("integer_range")
             emit(json.dumps(item))
         else:
