@@ -156,8 +156,12 @@ class ArticleRaceReturnNavigationTests(TestCase):
         targets = [a for a in soup.select('section.feed[aria-label="最新新闻"] .feed-card-title a')
                    if urlsplit(a.get('href', '')).path == self.article.public_path]
         self.assertEqual(len(targets), 1)
-        self.assertEqual(parse_qs(urlsplit(self._local_href(targets[0])).query),
-                         {'return_nav': [token]})
+        # 列表会重新signing.dumps；新签名时间可变，只比较验证后的新闻分页语义。
+        renewed = parse_qs(urlsplit(self._local_href(targets[0])).query)
+        self.assertEqual(set(renewed), {'return_nav'})
+        self.assertEqual(len(renewed['return_nav']), 1)
+        self.assertEqual(_public_read_nav(renewed['return_nav'][0], {'news'}),
+                         ('news', {'page': '2'}))
 
     def test_fixture_control_page_two_article_and_both_event_entries_are_visible(self):
         detail, _token = self._article_from_page_two()
