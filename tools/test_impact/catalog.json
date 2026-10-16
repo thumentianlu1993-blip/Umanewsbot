@@ -18,7 +18,8 @@
       "stable.test_public_navigation_and_attribution",
       "stable.tests_legacy.P0HorseProfileDataCompletionTests",
       "stable.tests.test_page_regression",
-      "stable.tests.test_term_display"
+      "stable.tests.test_term_display",
+      "stable.test_article_race_navigation"
     ],
     "news_translation": [
       "stable.tests_legacy.TranslationWorkflowTests",
@@ -2818,6 +2819,12 @@
       "domains": [
         "news_translation"
       ]
+    },
+    "server/stable/test_article_race_navigation.py": {
+      "label": "stable.test_article_race_navigation",
+      "domains": [
+        "horse_page"
+      ]
     }
   },
   "profiles": {
@@ -3131,7 +3138,8 @@
     "stable.test_horse_career_record_from_review": "django",
     "stable.test_managed_readonly_steps": "django",
     "stable.test_managed_readonly_translation": "django",
-    "stable.test_translation_reported_token_stop": "django"
+    "stable.test_translation_reported_token_stop": "django",
+    "stable.test_article_race_navigation": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
