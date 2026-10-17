@@ -93,7 +93,8 @@ class NumericSurfaceValidationDiagnosticsTests(TestCase):
 
     def _build(self, *, article=None, source_title="report 2", source_body=None,
                translated_title="report 3", translated_body=None,
-               content_source="base_translation", existing_details=None):
+               content_source="base_translation", existing_details=None,
+               source_fields=None, target_selectors=None):
         # 缺 helper 在该方法内如实报接口 ERROR；不阻止 public caller 测试收集。
         builder = getattr(validation, "_numeric_surface_diagnostics")
         return builder(
@@ -104,6 +105,10 @@ class NumericSurfaceValidationDiagnosticsTests(TestCase):
             publish_title=translated_title,
             publish_body="3 " + BODY if translated_body is None else translated_body,
             existing_details={} if existing_details is None else existing_details,
+            source_fields={"title": "title_ja", "body": "body_ja_normalized"}
+                          if source_fields is None else source_fields,
+            target_selectors={"title": "_publish_title", "body": "_publish_body"}
+                             if target_selectors is None else target_selectors,
         )
 
     def _bodies(self, source, translated, *, article=None, existing_details=None):
@@ -121,6 +126,11 @@ class NumericSurfaceValidationDiagnosticsTests(TestCase):
         self.assertEqual(diagnostic["coordinate_space"], "diagnostic_input_string")
         self.assertNotIn("passed", diagnostic)
         self.assertEqual(set(diagnostic["fields"]), {"title", "body"})
+        self.assertEqual(diagnostic["fields"]["title"]["source_field"], "title_ja")
+        self.assertIn(diagnostic["fields"]["body"]["source_field"],
+                      {"body_ja_normalized", "body_ja_raw"})
+        self.assertEqual(diagnostic["fields"]["title"]["target_selector"], "_publish_title")
+        self.assertEqual(diagnostic["fields"]["body"]["target_selector"], "_publish_body")
 
     def _assert_unavailable(self, diagnostic, reason, resource_limit=None):
         self.assertEqual(diagnostic["status"], "diagnostic_unavailable")
@@ -208,12 +218,54 @@ class NumericSurfaceValidationDiagnosticsTests(TestCase):
         _, diagnostic = self._public_diagnostic()
         field = diagnostic["fields"]["body"]
         self._assert_inputs(field, "4 " + BODY, "3 " + BODY)
+        self.assertEqual(field["source_field"], "body_ja_normalized")
+        self.assertEqual(field["target_selector"], "_publish_body")
         self.assertEqual([d["token"] for d in field["audit"]["differences"]], ["4", "3"])
 
     def test_public_empty_normalized_source_uses_complete_raw_source(self):
         self.article.body_ja_normalized = ""
         _, diagnostic = self._public_diagnostic()
         self._assert_inputs(diagnostic["fields"]["body"], "2 " + BODY, "3 " + BODY)
+        self.assertEqual(diagnostic["fields"]["body"]["source_field"], "body_ja_raw")
+        self.assertEqual(diagnostic["fields"]["title"]["source_field"], "title_ja")
+        self.assertEqual(diagnostic["fields"]["title"]["target_selector"], "_publish_title")
+        self.assertEqual(diagnostic["fields"]["body"]["target_selector"], "_publish_body")
+
+    def test_same_text_source_selection_changes_hash_and_survives_real_log_roundtrip(self):
+        normalized_outcome, normalized = self._public_diagnostic()
+        self._assert_original_normal_gate(normalized_outcome)
+        # QuerySet.update不写auto_now；两次观察的id/time/完整文本/hash保持相同。
+        NewsArticle.objects.filter(id=self.article.id).update(body_ja_normalized="")
+        self.article.refresh_from_db()
+        raw_outcome, raw = self._public_diagnostic()
+        self._assert_original_normal_gate(raw_outcome)
+        self.assertEqual(normalized["fields"]["body"]["source_field"], "body_ja_normalized")
+        self.assertEqual(raw["fields"]["body"]["source_field"], "body_ja_raw")
+        for key in ("source_text", "translated_text", "source_sha256", "translated_sha256",
+                    "raw_source_sha256", "raw_translated_sha256", "audit"):
+            self.assertEqual(normalized["fields"]["body"][key], raw["fields"]["body"][key])
+        self.assertEqual(normalized["article_updated_at"], STAMP_JSON)
+        self.assertEqual(raw["article_updated_at"], STAMP_JSON)
+        self._assert_snapshot_hash(normalized)
+        self._assert_snapshot_hash(raw)
+        self.assertNotEqual(normalized["snapshot_sha256"], raw["snapshot_sha256"])
+        normalized_body = json.loads(json.dumps(normalized))
+        raw_body = json.loads(json.dumps(raw))
+        normalized_body.pop("snapshot_sha256")
+        raw_body.pop("snapshot_sha256")
+        normalized_body["fields"]["body"]["source_field"] = "body_ja_raw"
+        self.assertEqual(normalized_body, raw_body)
+        validation.apply_validation_outcome(self.article, normalized_outcome)
+        first_log = AutomationLog.objects.filter(article=self.article).latest("id")
+        self.assertEqual(first_log.payload["numeric_surface_audit"], normalized)
+        self.assertEqual(first_log.payload["numeric_surface_audit"]["fields"]["body"]["source_field"],
+                         "body_ja_normalized")
+        validation.apply_validation_outcome(self.article, raw_outcome)
+        second_log = AutomationLog.objects.filter(article=self.article).latest("id")
+        self.assertNotEqual(first_log.id, second_log.id)
+        self.assertEqual(second_log.payload["numeric_surface_audit"], raw)
+        self.assertEqual(second_log.payload["numeric_surface_audit"]["fields"]["body"]["source_field"],
+                         "body_ja_raw")
 
     def test_public_current_edit_fields_win_over_base_translation_fields(self):
         self.article.title_zh = "report 4"
@@ -223,6 +275,8 @@ class NumericSurfaceValidationDiagnosticsTests(TestCase):
         _, diagnostic = self._public_diagnostic()
         self.assertEqual(diagnostic["fields"]["title"]["translated_text"], "report 4")
         self.assertEqual(diagnostic["fields"]["body"]["translated_text"], "4 " + BODY)
+        self.assertEqual(diagnostic["fields"]["title"]["target_selector"], "_publish_title")
+        self.assertEqual(diagnostic["fields"]["body"]["target_selector"], "_publish_body")
 
     def test_public_empty_edit_fields_use_translation_fallback(self):
         self.article.title_zh = ""
@@ -230,6 +284,8 @@ class NumericSurfaceValidationDiagnosticsTests(TestCase):
         _, diagnostic = self._public_diagnostic()
         self.assertEqual(diagnostic["fields"]["title"]["translated_text"], "report 3")
         self.assertEqual(diagnostic["fields"]["body"]["translated_text"], "3 " + BODY)
+        self.assertEqual(diagnostic["fields"]["title"]["target_selector"], "_publish_title")
+        self.assertEqual(diagnostic["fields"]["body"]["target_selector"], "_publish_body")
 
     @override_settings(AUTO_REWRITE_ENABLED=True, AUTO_PUBLISH_CONTENT_SOURCE="rewrite")
     def test_public_rewrite_selection_is_diagnosed_without_changing_gate(self):
@@ -242,6 +298,8 @@ class NumericSurfaceValidationDiagnosticsTests(TestCase):
         self.assertEqual(diagnostic["content_source"], "rewrite")
         self.assertEqual(diagnostic["fields"]["title"]["translated_text"], "report 6")
         self.assertEqual(diagnostic["fields"]["body"]["translated_text"], "6 " + BODY)
+        self.assertEqual(diagnostic["fields"]["title"]["target_selector"], "_publish_title")
+        self.assertEqual(diagnostic["fields"]["body"]["target_selector"], "_publish_body")
 
     def test_public_all_languages_clean_both_inputs_with_separate_original_hashes(self):
         source = "<p>2 " + BODY + "</p><aside>99</aside>"
@@ -317,11 +375,15 @@ class NumericSurfaceValidationDiagnosticsTests(TestCase):
         minimal = NewsArticle.objects.only("id").get(id=self.article.id)
         loaded_keys = set(minimal.__dict__)
         with self.assertNumQueries(0):
-            diagnostic = self._build(article=minimal)
+            diagnostic = self._build(
+                article=minimal, source_fields={"title": "title_ja", "body": "body_ja_raw"},
+                target_selectors={"title": "_publish_title", "body": "_publish_body"},
+            )
         self.assertEqual(set(minimal.__dict__), loaded_keys)
         self._assert_available(diagnostic)
         self.assertIsNone(diagnostic["article_updated_at"])
         self.assertEqual(diagnostic["updated_at_observation"], "field_not_loaded")
+        self.assertEqual(diagnostic["fields"]["body"]["source_field"], "body_ja_raw")
         self._assert_inputs(diagnostic["fields"]["body"], "2 " + BODY, "3 " + BODY)
 
     def test_loaded_optional_timestamp_states_do_not_fabricate_a_time(self):
@@ -514,6 +576,10 @@ class NumericSurfaceValidationDiagnosticsTests(TestCase):
         validation.apply_validation_outcome(self.article, outcome)
         log = AutomationLog.objects.get(article=self.article)
         self.assertEqual(log.payload["numeric_surface_audit"], diagnostic)
+        self.assertEqual(log.payload["numeric_surface_audit"]["fields"]["title"]["source_field"], "title_ja")
+        self.assertEqual(log.payload["numeric_surface_audit"]["fields"]["body"]["source_field"], "body_ja_normalized")
+        self.assertEqual(log.payload["numeric_surface_audit"]["fields"]["title"]["target_selector"], "_publish_title")
+        self.assertEqual(log.payload["numeric_surface_audit"]["fields"]["body"]["target_selector"], "_publish_body")
         self.assertEqual(log.payload["numeric_surface_audit"]["fields"]["body"]["audit"]["differences"], ZERO_CHANGE)
         self._assert_snapshot_hash(log.payload["numeric_surface_audit"])
         self.assertEqual(log.payload["issue_counts"], {"blocker": 0, "warning": 0, "info": 0})
