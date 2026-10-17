@@ -173,8 +173,7 @@ class BindingDiagnosticCommandTests(TestCase):
         self.assertEqual(len(captured), queries)
         self.assertEqual(len(values), queries)
         if queries:
-            self.assertEqual(set(values[0][0]), set(VALUES_FIELDS))
-            self.assertEqual(len(values[0][0]), 8)
+            self.assertEqual(values[0][0], VALUES_FIELDS)
             self.assertEqual(values[0][1], {})
         self.assertEqual(self.state(), before)
         output = out.getvalue()
