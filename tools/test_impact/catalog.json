@@ -811,7 +811,9 @@
       "stable.tests.test_race_event_lifecycle_enrollment.LifecycleEnrollmentCommandTests.test_prepare_command_does_not_resolve_away_temporary_alias"
     ],
     "content_contracts": [
-      "stable.test_content_contracts"
+      "stable.test_content_contracts",
+      "stable.test_article_entity_binding",
+      "stable.test_article_entity_binding_diagnostics"
     ],
     "module:scripts.tests.test_f02_readonly_export": [
       "scripts.tests.test_f02_readonly_export"
@@ -2818,6 +2820,18 @@
       "domains": [
         "news_translation"
       ]
+    },
+    "server/stable/test_article_entity_binding.py": {
+      "label": "stable.test_article_entity_binding",
+      "domains": [
+        "content_contracts"
+      ]
+    },
+    "server/stable/test_article_entity_binding_diagnostics.py": {
+      "label": "stable.test_article_entity_binding_diagnostics",
+      "domains": [
+        "content_contracts"
+      ]
     }
   },
   "profiles": {
@@ -3131,7 +3145,9 @@
     "stable.test_horse_career_record_from_review": "django",
     "stable.test_managed_readonly_steps": "django",
     "stable.test_managed_readonly_translation": "django",
-    "stable.test_translation_reported_token_stop": "django"
+    "stable.test_translation_reported_token_stop": "django",
+    "stable.test_article_entity_binding": "python",
+    "stable.test_article_entity_binding_diagnostics": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
