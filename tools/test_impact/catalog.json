@@ -876,6 +876,9 @@
     ],
     "horse_career_review_consumer": [
       "stable.test_horse_career_record_from_review"
+    ],
+    "module:stable.test_calendar_empty_filter_recovery": [
+      "stable.test_calendar_empty_filter_recovery"
     ]
   },
   "dependencies": {
@@ -2818,6 +2821,12 @@
       "domains": [
         "news_translation"
       ]
+    },
+    "server/stable/test_calendar_empty_filter_recovery.py": {
+      "label": "stable.test_calendar_empty_filter_recovery",
+      "domains": [
+        "module:stable.test_calendar_empty_filter_recovery"
+      ]
     }
   },
   "profiles": {
@@ -3131,7 +3140,8 @@
     "stable.test_horse_career_record_from_review": "django",
     "stable.test_managed_readonly_steps": "django",
     "stable.test_managed_readonly_translation": "django",
-    "stable.test_translation_reported_token_stop": "django"
+    "stable.test_translation_reported_token_stop": "django",
+    "stable.test_calendar_empty_filter_recovery": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
