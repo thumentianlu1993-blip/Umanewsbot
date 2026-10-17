@@ -65,6 +65,17 @@ class NumericSurfaceAuditTests(unittest.TestCase):
              "translated_count": 1, "source_spans": [], "translated_spans": [[50, 51]]},
         ])
 
+    def test_difference_after_twenty_four_distinct_two_digit_tokens_is_retained(self):
+        source = "10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34"
+        translated = "10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 99"
+        result = self._audit(source, translated, "surface_difference", 25, 25)
+        self.assertEqual(result["differences"], [
+            {"token": "34", "code": "source_excess", "source_count": 1,
+             "translated_count": 0, "source_spans": [[72, 74]], "translated_spans": []},
+            {"token": "99", "code": "translation_excess", "source_count": 0,
+             "translated_count": 1, "source_spans": [], "translated_spans": [[72, 74]]},
+        ])
+
     def test_spans_use_original_unicode_character_offsets(self):
         result = self._audit("马🐎 12", "马🐎 13", "surface_difference", 1, 1)
         self.assertEqual(result["differences"], [
