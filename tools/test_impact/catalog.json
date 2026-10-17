@@ -2,7 +2,8 @@
   "schema_version": 1,
   "domains": {
     "numeric_surface_audit": [
-      "stable.test_numeric_surface_audit"
+      "stable.test_numeric_surface_audit",
+      "stable.test_numeric_surface_validation_diagnostics"
     ],
     "core": [
       "stable.test_release_commit",
@@ -943,6 +944,12 @@
     ]
   },
   "tests": {
+    "server/stable/test_numeric_surface_validation_diagnostics.py": {
+      "label": "stable.test_numeric_surface_validation_diagnostics",
+      "domains": [
+        "numeric_surface_audit"
+      ]
+    },
     "server/stable/test_numeric_surface_audit.py": {
       "label": "stable.test_numeric_surface_audit",
       "domains": [
@@ -2830,6 +2837,7 @@
     }
   },
   "profiles": {
+    "stable.test_numeric_surface_validation_diagnostics": "django",
     "stable.test_numeric_surface_audit": "python",
     "test_graded_race_participants_workflow": "python",
     "test_workflow_contract": "python",
