@@ -50,7 +50,7 @@ def refresh_occurrence(c, index=0):
     c["packs"][index]["assertions"][0]["occurrence"] = copy.deepcopy(occ)
 
 
-def retarget(c, kind, canonical, role):
+def retarget(c, kind, canonical, role, *, align_entity=True):
     t = c["identity_inputs"][0]
     t["snapshot"]["entity"].update(kind=kind, canonical_id=canonical)
     target = document(t)
@@ -62,10 +62,17 @@ def retarget(c, kind, canonical, role):
     c["contexts"][0].update(target_identity_input_wire_sha256=digest(target.to_dict()), role=role)
     m = c["relation_inputs"][0]["snapshot"]["materials"][0]
     m["data"].update(target_ref=canonical, relation_type=role)
+    if align_entity and kind == "race_event":
+        # Actual N03 _make_entity("term", ..., term=RACE) wire, not a horse.
+        e = c["resolution_payload"]["entities"][0]
+        e.update(entity_type="term", term_type="race", classification="", term_id=501, confidence=95,
+                 evidence=["formal_term"], entity_evidence=["formal_term"], needs_preserve=False,
+                 reason="", matched_context="")
+        refresh_occurrence(c)
 
 
 class ArticleEntityBindingTests(unittest.TestCase):
-    def invoke(self, c):
+    def invoke(self, c, *, overrides=None):
         before = copy.deepcopy(c)
         article = document(c["article_input"])
         identities = [document(x) for x in c["identity_inputs"]]
@@ -82,9 +89,12 @@ class ArticleEntityBindingTests(unittest.TestCase):
         # Every semantic case reaches real F01 parsing before L01.
         for doc in [article, *identities, *relations]:
             self.assertEqual(f01.parse_input(doc.to_json()).to_dict(), doc.to_dict())
-        result = plan_article_entity_bindings(c["resolution_payload"], article_input=article,
+        arguments = dict(resolution_payload=c["resolution_payload"], article_input=article,
             identity_inputs=identities, relation_inputs=relations, source_document=raw(c["source_document"]),
             relationship_artifacts=artifacts, contexts=contexts)
+        if overrides is not None:
+            arguments.update(overrides)
+        result = plan_article_entity_bindings(**arguments)
         self.assertEqual(c, before)
         self.assertEqual(result["scope"], "conditional_structural_proposals_only")
         return result
@@ -139,7 +149,8 @@ class ArticleEntityBindingTests(unittest.TestCase):
                 c = fixture(); retarget(c, "horse", "horse-H1", role); self.candidate(c, "role_not_bindable")
 
     def test_same_occurrence_two_target_claims_are_ambiguous(self):
-        c = fixture(); other = fixture(); retarget(other, "race_event", "event-E2026", "event_current")
+        c = fixture(); retarget(c, "race_event", "event-E2025", "event_current")
+        other = fixture(); retarget(other, "race_event", "event-E2026", "event_current")
         c["identity_inputs"].extend(other["identity_inputs"]); c["relation_inputs"].extend(other["relation_inputs"])
         c["packs"].extend(other["packs"]); c["contexts"].extend(other["contexts"])
         c["relation_indices"].append(1); c["evidence_pack_indices"].append([1])
@@ -263,3 +274,109 @@ class ArticleEntityBindingTests(unittest.TestCase):
         c = fixture(); c["contexts"][0]["occurrence"]["start"] = True
         with self.assertRaisesRegex(BindingInputError, "structure"):
             self.invoke(c)
+
+    def _metaclass_boundary(self, raising):
+        hooks = []
+        class HostileMeta(type):
+            def __eq__(cls, other):
+                hooks.append("eq")
+                if raising:
+                    raise AssertionError("untrusted metaclass equality executed")
+                return False
+            def __ne__(cls, other):
+                hooks.append("ne")
+                if raising:
+                    raise AssertionError("untrusted metaclass inequality executed")
+                return True
+        class Alien(metaclass=HostileMeta):
+            pass
+        for argument in ("resolution_payload", "identity_inputs", "relation_inputs", "contexts", "article_input", "relationship_artifacts"):
+            with self.subTest(argument=argument, raising=raising):
+                with self.assertRaisesRegex(BindingInputError, "^structure$"):
+                    self.invoke(fixture(), overrides={argument: Alien()})
+                self.assertEqual(hooks, [])
+        bad = copy.deepcopy(LITERAL["resolution_payload"])
+        bad["entities"][0]["confidence"] = Alien()
+        with self.assertRaisesRegex(BindingInputError, "^structure$"):
+            self.invoke(fixture(), overrides={"resolution_payload": bad})
+        self.assertEqual(hooks, [])
+
+    def test_recording_metaclass_is_never_called_at_public_boundary(self):
+        self._metaclass_boundary(False)
+
+    def test_raising_metaclass_is_never_called_at_public_boundary(self):
+        self._metaclass_boundary(True)
+
+    def test_n03_existing_horse_matrix_keeps_positive_bindings(self):
+        for entity_type, term_type, classification in (
+            ("horse", "horse", "confirmed_horse"), ("horse", "horse", ""),
+            ("unknown_horse", "", "confirmed_horse"), ("unknown_horse", "", ""),
+        ):
+            with self.subTest(entity_type=entity_type, term_type=term_type, classification=classification):
+                c = fixture()
+                c["resolution_payload"]["entities"][0].update(entity_type=entity_type, term_type=term_type, classification=classification)
+                refresh_occurrence(c)
+                r = self.invoke(c)
+                self.assertEqual(len(r["proposed_bindings"]), 1)
+                self.assertEqual(r["proposed_bindings"][0]["target"]["kind"], "horse")
+                self.assertEqual(r["candidates"], [])
+
+    def test_horse_occurrence_cannot_be_redeclared_race_event(self):
+        c = fixture()
+        retarget(c, "race_event", "event-E2025", "event_historical", align_entity=False)
+        self.assertEqual(c["resolution_payload"]["entities"][0]["classification"], "confirmed_horse")
+        self.candidate(c, "entity_kind_mismatch")
+
+    def test_race_occurrence_cannot_be_redeclared_horse(self):
+        c = fixture(); retarget(c, "race_event", "event-E2025", "event_historical")
+        retarget(c, "horse", "horse-H1", "horse_subject", align_entity=False)
+        self.assertEqual(c["resolution_payload"]["entities"][0]["term_type"], "race")
+        self.candidate(c, "entity_kind_mismatch")
+
+    def test_ambiguous_classification_and_unsupported_n03_combinations(self):
+        for entity_type, term_type, classification in (
+            ("horse", "horse", "ambiguous"), ("horse", "horse", "common_word"),
+            ("term", "race", "confirmed_horse"), ("term", "jockey", ""),
+            ("race_event", "race", ""), ("horse", "race", "confirmed_horse"),
+        ):
+            with self.subTest(entity_type=entity_type, term_type=term_type, classification=classification):
+                c = fixture()
+                c["resolution_payload"]["entities"][0].update(entity_type=entity_type, term_type=term_type, classification=classification)
+                refresh_occurrence(c)
+                self.candidate(c, "entity_not_eligible")
+
+    def _span_case(self, field, text, start, end, matched):
+        c = fixture(); c["source_document"][field] = text
+        c["article_input"]["snapshot"]["evidence"][0]["locator"] = "/" + field
+        e = c["resolution_payload"]["entities"][0]
+        e.update(field_name=field, start=start, end=end, matched_span=[start, end],
+                 matched_text=matched, canonical_text=matched, matched_context=text)
+        refresh_article(c); refresh_occurrence(c)
+        return c
+
+    def test_exact_source_end_is_valid_for_title_and_body(self):
+        for field in ("title", "body"):
+            with self.subTest(field=field):
+                c = self._span_case(field, "Aurora", 0, 6, "Aurora")
+                r = self.invoke(c)
+                self.assertEqual(len(r["proposed_bindings"]), 1)
+                self.assertEqual(r["proposed_bindings"][0]["occurrence"]["end"], 6)
+                self.assertEqual(r["candidates"], [])
+
+    def test_source_end_plus_one_and_large_overrun_are_candidates(self):
+        for field in ("title", "body"):
+            for end in (7, 1000000):
+                with self.subTest(field=field, end=end):
+                    c = self._span_case(field, "Aurora", 0, end, "Aurora")
+                    self.candidate(c, "occurrence_binding_mismatch")
+
+    def test_unicode_span_uses_codepoints_and_rejects_truncated_overrun(self):
+        for field in ("title", "body"):
+            with self.subTest(field=field):
+                c = self._span_case(field, "星🌟馬", 1, 3, "🌟馬")
+                r = self.invoke(c)
+                self.assertEqual(len(r["proposed_bindings"]), 1)
+                self.assertEqual(r["proposed_bindings"][0]["occurrence"]["matched_text"], "🌟馬")
+                self.assertEqual(r["proposed_bindings"][0]["occurrence"]["end"], 3)
+                c = self._span_case(field, "星🌟馬", 1, 4, "🌟馬")
+                self.candidate(c, "occurrence_binding_mismatch")

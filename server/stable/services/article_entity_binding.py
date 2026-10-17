@@ -37,7 +37,7 @@ def _guard(value, depth=0, budget=None):
         for item in value:
             _guard(item, depth + 1, budget)
     else:
-        _require(value is None or type(value) in (str, int, bool))
+        _require(value is None or type(value) is str or type(value) is int or type(value) is bool)
 
 
 def _raw(value):
@@ -134,7 +134,7 @@ def _assertion(value):
 
 
 def _documents(values):
-    _require(type(values) in (list, tuple))
+    _require(type(values) is list or type(values) is tuple)
     result = {}
     for value in values:
         _require(type(value) is f01.LoaderInput)
@@ -162,6 +162,25 @@ def _ready(doc, kind, evaluated):
             and entity["canonical_id"] is not None and not entity["candidate_ids"]
             and not snapshot["protection"]["paused"] and bool(evidence)
             and all(_evidence_ready(e, evaluated) for e in evidence))
+
+
+def _entity_kind(entity):
+    """Only combinations emitted by current N03, never a sidecar override.
+
+    Japanese formal horses/aliases leave classification empty; English horse
+    decisions use confirmed_horse. Non-horse formal race terms use term/race/"".
+    A verified F01 identity cannot upgrade an unsupported N03 classification.
+    """
+    values = (entity["entity_type"], entity.get("term_type"), entity.get("classification"))
+    if not all(type(value) is str for value in values):
+        return None
+    return {
+        ("horse", "horse", "confirmed_horse"): "horse",
+        ("horse", "horse", ""): "horse",
+        ("unknown_horse", "", "confirmed_horse"): "horse",
+        ("unknown_horse", "", ""): "horse",
+        ("term", "race", ""): "race_event",
+    }.get(values)
 
 
 def _key(occurrence):
@@ -229,7 +248,7 @@ def plan_article_entity_bindings(resolution_payload, *, article_input, identity_
                                  "accepted_term_ids", "machine_horse_tags"))
     for key in ("entities", "suppressed_candidates", "accepted_terms", "accepted_term_ids", "machine_horse_tags"):
         _require(type(resolution_payload[key]) is list)
-    _require(type(contexts) in (list, tuple) and type(relationship_artifacts) is dict)
+    _require((type(contexts) is list or type(contexts) is tuple) and type(relationship_artifacts) is dict)
     articles = _documents([article_input]); article_wire, article = next(iter(articles.items()))
     identities = _documents(identity_inputs); relations = _documents(relation_inputs)
     source = _read(source_document); _object(source, ("title", "body"))
@@ -256,7 +275,7 @@ def plan_article_entity_bindings(resolution_payload, *, article_input, identity_
     def group(occ):
         key = _key(occ)
         if key not in groups:
-            groups[key] = {"occurrences": [], "contexts": [], "claims": [], "errors": set()}
+            groups[key] = {"occurrences": [], "contexts": [], "claims": [], "errors": set(), "entity_kinds": set()}
         return groups[key]
     suppressed = {_hash(e) for e in resolution_payload["suppressed_candidates"]}
     for entity in resolution_payload["entities"]:
@@ -265,9 +284,15 @@ def plan_article_entity_bindings(resolution_payload, *, article_input, identity_
                  and all(type(flag) is str for flag in entity["conflict_flags"]))
         occ = {k: entity[k] for k in ("field_name", "start", "end", "matched_text")}; occ["entity_payload_sha256"] = _hash(entity)
         _occurrence(occ); g = group(occ); g["occurrences"].append(occ)
+        kind = _entity_kind(entity)
+        if kind is None:
+            g["errors"].add("entity_not_eligible")
+        else:
+            g["entity_kinds"].add(kind)
         if (entity["entity_type"] in ("common_word", "ambiguous") or entity["conflict_flags"] or _hash(entity) in suppressed):
             g["errors"].add("entity_not_eligible")
-        if (source[occ["field_name"]][occ["start"]:occ["end"]] != occ["matched_text"]
+        if (occ["end"] > len(source[occ["field_name"]])
+                or source[occ["field_name"]][occ["start"]:occ["end"]] != occ["matched_text"]
                 or ("matched_span" in entity and entity["matched_span"] != [occ["start"], occ["end"]])):
             g["errors"].add("occurrence_binding_mismatch")
     for context in contexts:
@@ -290,6 +315,8 @@ def plan_article_entity_bindings(resolution_payload, *, article_input, identity_
             if claim["article"] != article_ref or _key(claim["occurrence"]) not in groups:
                 continue
             g = groups[_key(claim["occurrence"])]; g["claims"].append(claim)
+            if claim["target"]["kind"] not in g["entity_kinds"]:
+                g["errors"].add("entity_kind_mismatch")
             evidence_proofs = proofs.get((digest, index), [])
             if not evidence_proofs:
                 g["errors"].add("assertion_unbound")
@@ -330,6 +357,8 @@ def plan_article_entity_bindings(resolution_payload, *, article_input, identity_
             if not match or pack is None or int(match[1]) >= len(pack):
                 errors.add("assertion_unbound"); continue
             claim = pack[int(match[1])]
+            if claim["target"]["kind"] not in g["entity_kinds"]:
+                errors.add("entity_kind_mismatch")
             if claim["article"] != article_ref:
                 errors.add("article_binding_mismatch")
             if claim["occurrence"] != context["occurrence"]:
