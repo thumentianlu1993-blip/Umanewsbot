@@ -199,10 +199,11 @@ def _claim_errors(claim, relation, evidence, target, article_ref, evaluated):
     if ((role == "horse_subject" and claim["target"]["kind"] != "horse")
             or (role in ("event_current", "event_historical") and claim["target"]["kind"] != "race_event")):
         errors.add("role_binding_mismatch")
+    # Material applicability is established by the evidence-to-record link,
+    # not just article/target IDs: another occurrence may discuss the same
+    # target in a different role. All records for this group are scanned above.
     materials = [m for m in relation["snapshot"]["materials"] if m["capability"] == "relationship"
-                 and (evidence["evidence_id"] in m["evidence_refs"] or (
-                     m["data"].get("source_ref") == article_ref["canonical_id"]
-                     and m["data"].get("target_ref") == claim["target"]["canonical_id"]))]
+                 and evidence["evidence_id"] in m["evidence_refs"]]
     if not materials:
         errors.add("material_binding_mismatch")
     for material in materials:
