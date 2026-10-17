@@ -2,6 +2,8 @@
 
 日期：2026-10-17（Asia/Shanghai）。任务 `D001-PUBLIC-EXPERIENCE-INDEPENDENT-SLICE-PLAN-001`，仅只读定位及方案，待 ROOT 路由专属 R_D。工作树 `/Users/mentianlu/.codex/worktrees/2076/umanews`，分支 `codex/d-public-experience-20261017`，固定 base `1dd5e0a508957672bcddd1c33e454fbbef1b75c1`；初始无脏改动，HEAD 与本地 origin/main 一致，未 fetch 或核验远端实时 head。
 
+本次修订任务 `D002-CALENDAR-EMPTY-RESET-DEFAULT-RULE-WORDING-PLAN-REPAIR-001`，仅修订 RD-D001-01。原稿保存在受审提交 `cabdc28cbc5bc7124bdad3f5f4a0ae54a36a4e30`，Git blob `b5f120cc9ac1e08d1e524538f0d8723fd800760c`，SHA-256 `53c6b8efc94c7da30288d2ae60732b3f56ca8b06041e8282b5799695261505ff`；原 R_D 报告提交 `e4802eeb408c14a4ed059456a8561bfa2c0e6002`，路径 `docs/changes/next-version-capabilities/lanes/R_D/D001/plan-review-001.md`。本修订不是 finding 已关闭的声明，待 ROOT 转同原 R_D 复审。
+
 ## 目标与当前证据
 
 U04/TC-U02 的一个独立切片：让读者从赛事日历空结果一次回到不带用户筛选的公开列表。源码已能确定缺口，尚未启动服务、浏览器或行为测试；不声称生产复现。
@@ -15,16 +17,17 @@ U04/TC-U02 的一个独立切片：让读者从赛事日历空结果一次回到
 
 ## Before → After 与范围
 
-示例：现有公开日本普通赛事；请求 `/races/?tab=key&region=de&grade=g1&when=finished` 返回空。Before：只有统一空文案，无顶部“清除”；读者必须逐个改变范围。After：空分支显示“当前列表暂无可展示的已发布赛事。”和真实链接“重置筛选，查看全部赛事”，链接固定为 `{% url 'public-race-calendar' %}?tab=all`。点击只读 GET，移除 region/grade/when/year/q/cursor/direction/return_nav 及未知查询参数，全部范围导航激活，合成公开日本普通赛事可以展示。
+示例：现有公开日本普通赛事；请求 `/races/?tab=key&region=de&grade=g1&when=finished` 返回空。Before：只有统一空文案，无顶部“清除”；读者必须逐个改变范围。After：空分支显示“当前列表暂无可展示的已发布赛事。”和真实链接“重置筛选，返回默认赛事列表”，链接固定为 `{% url 'public-race-calendar' %}?tab=all`。点击只读 GET，移除 region/grade/when/year/q/cursor/direction/return_nav 及未知查询参数，全部范围导航激活，合成公开日本普通赛事可以展示。
 
-“全部赛事”指现有公开日历的全部范围标签，仍分页并采用原默认日期窗口，不承诺一屏展示所有历史或来源覆盖完整。入口旁补一句“重置后显示默认日期窗口内的已发布赛事。”。若需要保证查看所有年份，必须另行定义跨期导航，不在本片改变默认窗口。
+入口旁说明为“重置后按赛事日历的默认规则显示。”。现有默认规则包括正常日期窗口，以及公开基础集合没有有效公开日期时的跨期列表回退；后者可以展示日期待定的公开赛事（固定 views.py:3397–3399、3417–3467）。保持原分页及公开资格，不承诺全部历史同屏或来源覆盖完整，不通过排除无日期赛事、修改查询或默认窗口迁就文案。
 
 入口条件：`groups` 为空，且规范 filters 含任一 region/grade/when/year/q/cursor/direction，或 tab 为 key。`tab=all` 且其余规范筛选为空时，保持原空文案，无无效重置链接。有结果时不显示本片空态或重置链接。只使用服务端既有规范 filters，不直接回显用户输入，不保留 return_nav，也不拼接任意 URL。
 
 拟改文件仅：
 
 1. `server/stable/templates/stable/public/race_calendar.html` 的 `{% empty %}` 分支（现 135–136 行）。保留上方所有筛选/卡片/O03 marker/分页结构；复用现有 empty-state 样式，不新增 CSS、脚本、共享组件。
-2. 新增独立 `server/stable/test_calendar_empty_filter_recovery.py`，仅负责本片真实 Django Client 渲染与 GET 恢复。测试 helper 自有，不改他线测试或共享 fixture。选测映射以 proposal 交 ROOT 管理，不自行改总 catalog。
+2. 新增独立 `server/stable/test_calendar_empty_filter_recovery.py`，仅负责本片真实 Django Client 渲染与 GET 恢复。测试 helper 自有，不改他线测试或共享 fixture。
+3. 未来测试包同时准备 `tools/test_impact/catalog.json` 与 `tools/test_impact/rules.json` 的精确映射草稿交 ROOT：新文件路径 → 模块 `stable.test_calendar_empty_filter_recovery`；catalog 的 domains/tests/profiles 登记 django profile，rules 路径与相同行为域一致。由 ROOT 组织核对选择输出，不能声称未创建的模块已登记/选中或已运行。不改 runner/workflow/skip；本轮不写实际映射。
 
 本轮只新增本 D 方案文件。上述模板不属于派单列出的三个需先划独占块的详情模板；如 ROOT 存在其他占用，先按这一个精确 empty 块协调，不能覆盖他线改动。`views.py`、三个详情模板、models/migrations、tasks/settings、生产配置和总任务台账均无改动。
 
@@ -37,10 +40,13 @@ U04/TC-U02 的一个独立切片：让读者从赛事日历空结果一次回到
 | published 日本普通赛事；重点/德国/G1/已完赛交集为空 | 新空文案和唯一重置入口出现，href 精确 `/races/?tab=all`；不是失败/采集中/全球无资料声明 | RED：缺文案/链接 |
 | 从上述 DOM 提取真实 href 后 Client GET | 该公开赛事出现，all 激活；filters 其余为空，无 cursor/direction/return_nav；旧筛选不再生效 | RED：缺链接，恢复断言仅 GREEN 后实测 |
 | 分别只有 q、year、region、grade、when 或默认 key 导致空集 | 每个独立限制均有相同恢复入口；原顶部清除合同保留 | RED：缺入口 |
-| 有效签名 return_nav 还原空筛选；以及可构造的有效末页游标空页 | 恢复 URL 不携旧 token/cursor，点击恢复默认窗口；不把签名错误视为业务 RED | RED：缺入口；先用真实 producer 生成 token |
+| 有效签名 return_nav 还原空筛选 | 使用现有 `_public_nav_token` 生产，查询仅含单个 return_nav，不混普通筛选；先断言实际还原规范 filters，再提取 href GET 恢复默认列表，无旧 token | RED：缺入口；错误/过期/混参 token 不满足此前件 |
+| 有效末页游标空页 | 用 `encode_race_calendar_cursor` 为集合末项生成、绑定同 filters，direction=future；先断言 decode 成功及规范 filters，再验空页入口和 href GET 恢复默认列表 | RED：缺入口；非法 cursor 回退不冒充成功游标覆盖 |
+| 唯一可展示赛事已发布但无有效公开日期；先用不匹配 q 得空集 | 实际 Client 空态提取固定 href 后 GET；断言该无日期赛事出现、日期待定表达保留、无伪造日期/00:00，按既有跨期回退且公开资格不变；说明不承诺默认日期窗口 | RED：缺入口；恢复及回退断言仅 GREEN 后实测 |
 | `tab=all` 空库 / 只有 hidden 或 active canonical duplicate | 原空文案，无重置入口、不泄漏隐藏名称或状态 | 原实现应通过 |
 | 受限筛选确有匹配赛事 | 正常卡片，空态及本片入口均不出现；详情签名返回仍可用 | 原实现应通过 |
 | q 含 HTML/扩展汉字、非法筛选或非法 cursor | 文案固定，无原文注入；依据现有规范 filters 决定入口，无任意跳转；无业务状态伪造 | 保护断言 |
+| unknown 查询参数触发现行 canonical 301 | 分别断言初始 301 与 Location，再跟随跳转断言最终规范 filters/空态；不将 301 响应缺入口计作行为 RED | 保护断言 |
 | 新旧规范展示开关两态，date-only 赛事、合法结果读门禁 | 返回集合/等级/时间/公开资格保持当前合同，不新增北京时间 00:00 或冠军 | 保护断言 |
 
 按测试 → 模板实现 → 同例 GREEN → 最近相关导航/日期窗口/公开展示回归 → R_D 代码复审排列。预计关键 RED 是页面缺入口，不能先修改产品再倒填 RED。以上是计划，尚无任何执行通过数字。新模块映射的正式 CI 范围交 ROOT/R_D 按现行规则判定，不修改到期 skip 或降低准入。
