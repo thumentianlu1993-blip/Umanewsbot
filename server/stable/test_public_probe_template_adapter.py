@@ -642,3 +642,74 @@ class TemplateAdapterFirstRed(SimpleTestCase):
                 below=deepcopy(exact);below['context']['limits'][key]=value-1
                 expected = 'invalid_limits' if value == 1 else {'wire_bytes': 'wire_limit', 'decoded_bytes': 'decoded_limit'}.get(key, key + '_limit')
                 self.assertEqual(parse_template_render(**below)['reason'],expected)
+
+
+@override_settings(**TEMPLATE_TEST_SETTINGS)
+class PublicProbeNavEnvelopeContractTests(SimpleTestCase):
+    """新导航属性的正例与单属性篡改保护；保留独立 expected。"""
+    databases = set()
+    nav_labels = ('公开站点导航', '移动端导航')
+
+    def _verified_baseline(self):
+        from stable.testing_public_probe.support import SourceDOM
+        document = approved_cases()
+        case = next(case for case in document['positive_and_missing_cases']
+                    if case['case_id'] == 'P-official-old-detail-legacy')
+        inputs = adapter_inputs(document, case)
+        result = parse_template_render(**inputs)
+        self.assertEqual(result['leaf_status'], 'template_fixture_verified')
+        self.assertEqual(result['body'], case['expected_body'])
+        self.assertIsNotNone(result['receipt'])
+        dom = SourceDOM(inputs['html'])
+        for label in self.nav_labels:
+            nav = dom.one(tag='nav', attr='aria-label', value=label)
+            links = dom.select(root=nav, tag='a')
+            self.assertEqual(len(links), 4)
+            current = [link for link in links if 'aria-current' in link.attrs]
+            self.assertEqual(len(current), 1)
+            self.assertEqual(current[0].attrs['href'], '/races/')
+            self.assertEqual(current[0].attrs['aria-current'], 'location')
+            self.assertTrue(current[0].has_class('active'))
+            for link in links:
+                if link is not current[0]:
+                    self.assertNotIn('aria-current', link.attrs)
+        return inputs, dom
+
+    def _assert_nav_mutation_rejected(self, operation):
+        for label in self.nav_labels:
+            with self.subTest(nav=label, operation=operation):
+                inputs, dom = self._verified_baseline()
+                nav = dom.one(tag='nav', attr='aria-label', value=label)
+                target = dom.one(root=nav, tag='a', attr='href',
+                                 value='/horses/' if operation == 'nonactive' else '/races/')
+                if operation == 'missing':
+                    edit = dom.attribute_edit(target, 'aria-current', remove=True)
+                elif operation == 'wrong-location':
+                    edit = dom.attribute_edit(target, 'aria-current', 'page')
+                elif operation == 'nonactive':
+                    self.assertNotIn('aria-current', target.attrs)
+                    self.assertFalse(target.has_class('active'))
+                    edit = dom.attribute_edit(target, 'aria-current', 'location')
+                else:
+                    raise AssertionError(operation)
+                changed = dict(inputs)
+                changed['html'] = dom.replace([edit])
+                self.assertNotEqual(changed['html'], inputs['html'])
+                self.assertEqual({key: value for key, value in changed.items() if key != 'html'},
+                                 {key: value for key, value in inputs.items() if key != 'html'})
+                result = parse_template_render(**changed)
+                self.assertEqual(result['leaf_status'], 'unverified')
+                self.assertEqual(result['reason'], 'unmodeled_visible_content')
+                self.assertIsNone(result['receipt'])
+
+    def test_new_nav_current_location_is_verified(self):
+        self._verified_baseline()
+
+    def test_missing_current_location_is_rejected(self):
+        self._assert_nav_mutation_rejected('missing')
+
+    def test_wrong_current_location_value_is_rejected(self):
+        self._assert_nav_mutation_rejected('wrong-location')
+
+    def test_current_location_on_nonactive_link_is_rejected(self):
+        self._assert_nav_mutation_rejected('nonactive')
