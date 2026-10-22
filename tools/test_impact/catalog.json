@@ -1,6 +1,8 @@
 {
   "schema_version": 1,
   "domains": {
+    "race_result_roster_orm": ["stable.test_race_result_roster_orm"],
+    "race_result_roster_reconciliation": ["stable.test_race_result_roster_reconciliation"],
     "core": [
       "stable.test_release_commit",
       "stable.test_race_live_target_eligibility",
@@ -940,6 +942,8 @@
     ]
   },
   "tests": {
+    "server/stable/test_race_result_roster_orm.py": {"label": "stable.test_race_result_roster_orm", "domains": ["race_result_roster_orm"]},
+    "server/stable/test_race_result_roster_reconciliation.py": {"label": "stable.test_race_result_roster_reconciliation", "domains": ["race_result_roster_reconciliation"]},
     ".codex/scripts/test_graded_race_participants_workflow.py": {
       "label": "test_graded_race_participants_workflow",
       "domains": [
@@ -2821,6 +2825,8 @@
     }
   },
   "profiles": {
+    "stable.test_race_result_roster_orm": "django",
+    "stable.test_race_result_roster_reconciliation": "python",
     "test_graded_race_participants_workflow": "python",
     "test_workflow_contract": "python",
     "runtime.research.test_audit_france_galop_bulletin_occurrences": "python",
