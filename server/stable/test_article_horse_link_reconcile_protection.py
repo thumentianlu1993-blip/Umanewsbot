@@ -439,7 +439,35 @@ class ArticleHorseLinkReconcileProtectionPGTests(TransactionTestCase):
             article = self.article(title=old_title, body=old_body)
             scenario.article_id = article.pk
             existing_link = self.link(article, existing_profile)
-            old_dry = horse_profiles.scan_article_horse_links(article=article, commit=False)
+            # C208: observe this same real dry-run; never substitute its result.
+            real_dry_reconcile = horse_profiles.reconcile_article_horse_links
+            def observe_dry_reconcile(actual_article, actual_resolution, *, commit=True):
+                matching = {"source_language": actual_resolution.source_language}
+                for name in ("entities", "suppressed_candidates"):
+                    entities = getattr(actual_resolution, name)
+                    matching[name] = {
+                        "total": len(entities), "limit": 8,
+                        "rows": [{"term_id": item.term_id, "entity_type": item.entity_type,
+                                  "field_name": item.field_name, "classification": item.classification,
+                                  "confidence": item.confidence, "start": item.start, "end": item.end,
+                                  "matched_text": item.matched_text[:160],
+                                  "matched_text_codepoints": len(item.matched_text)}
+                                 for item in entities[:8]],
+                    }
+                scenario.note(M5_actual_dry_matching=matching)
+                plan = real_dry_reconcile(actual_article, actual_resolution, commit=commit)
+                scenario.note(M5_actual_reconcile_dry_plan=copy.deepcopy(plan))
+                return plan
+            with patch.object(horse_profiles, "reconcile_article_horse_links", new=observe_dry_reconcile):
+                old_dry = horse_profiles.scan_article_horse_links(article=article, commit=False)
+            scenario.note(M5_actual_old_dry_full=copy.deepcopy(old_dry), M5_fixture={
+                "article_id": article.pk, "existing_link_id": existing_link.pk,
+                "source_fields": {"title_ja": article.title_ja, "body_ja_raw": article.body_ja_raw,
+                                  "body_ja_normalized": article.body_ja_normalized,
+                                  "source_language": article.source_language},
+                "L": {"profile_id": existing_profile.pk, "term_id": existing_profile.primary_term_id},
+                "N": {"profile_id": new_profile.pk, "term_id": new_profile.primary_term_id},
+            })
             require(old_dry["created"] == 1 and old_dry["updated"] == 1
                     and old_dry["deleted"] == 0 and old_dry["candidate"] == 0,
                     "old real source must plan AUTO old L and new N")
