@@ -314,6 +314,9 @@ class PersistedRosterPostgresTests(TransactionTestCase):
         # Each immutable identity is set at INSERT, never rewritten for a negative case.
         wrong_phase = m.RaceEventRevision.objects.create(pk=211, event=self.event, kind="racecard",
             revision_no=2, phase="provisional", content_sha256="c" * 64)
+        for item_id, participant_id, order in ((417, 301, 1), (418, 302, 2), (419, 303, 3)):
+            m.RaceEventRevisionItem.objects.create(pk=item_id, revision=wrong_phase,
+                participant_id=participant_id, internal_order=order, status="declared")
         with self.assertRaises(ValueError):
             self.load(racecard_revision_id=wrong_phase.pk)
         other = m.RaceEvent.objects.create(pk=102, year=2026, slug="a114-wrong-event", original_name="Other",
