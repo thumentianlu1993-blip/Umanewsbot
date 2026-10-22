@@ -2110,6 +2110,10 @@ def fail_race_data_sync_claim(
                     event.status == models.RaceEventStatus.POSTPONED
                     and checkpoint.data_kind == models.RaceDataSyncDataKind.RESULT
                 )
+                or (
+                    event.status == models.RaceEventStatus.FINISHED
+                    and checkpoint.data_kind != models.RaceDataSyncDataKind.RESULT
+                )
                 else retry_at
             )
             checkpoint.lock_version += 1
