@@ -713,3 +713,100 @@ class PublicProbeNavEnvelopeContractTests(SimpleTestCase):
 
     def test_current_location_on_nonactive_link_is_rejected(self):
         self._assert_nav_mutation_rejected('nonactive')
+
+
+@override_settings(**TEMPLATE_TEST_SETTINGS)
+class PublicProbeNavThreeStateCausalTests(SimpleTestCase):
+    """同一语义输入的旧/新 base 与 v6/v7 合同对照；不修改 adapter。"""
+    databases = set()
+
+    def _state_inputs(self, document, case, directory, old_base=None):
+        from copy import deepcopy
+        from django.conf import settings
+        templates = deepcopy(TEMPLATE_TEST_SETTINGS['TEMPLATES'])
+        if old_base is not None:
+            templates[0]['OPTIONS']['loaders'].insert(
+                0, ('django.template.loaders.locmem.Loader',
+                    {'stable/public/base.html': old_base}))
+        previous_templates = deepcopy(settings.TEMPLATES)
+        with override_settings(TEMPLATES=templates):
+            inputs = adapter_inputs(document, case)
+        self.assertEqual(settings.TEMPLATES, previous_templates)
+        inputs['envelope_contract'] = (directory / 'envelope.json').read_bytes()
+        inputs['schema_contract'] = (directory / 'contract.json').read_bytes()
+        return inputs
+
+    def _inverse_body_rows(self, body, inverse):
+        if isinstance(body, list):
+            return [self._inverse_body_rows(value, inverse) for value in body]
+        if isinstance(body, dict):
+            return {key: inverse[value] if key == 'row_token'
+                    else self._inverse_body_rows(value, inverse)
+                    for key, value in body.items()}
+        return body
+
+    def test_old_v6_new_v6_new_v7_causal_control(self):
+        from copy import deepcopy
+        import hashlib
+        import json
+        from pathlib import Path
+        root = Path(__file__).resolve().parent
+        directories = {version: root / 'fixtures' / ('public_probe_template_' + version)
+                       for version in ('v6', 'v7')}
+        documents = {version: json.loads((directory / 'golden-derived.json').read_bytes())
+                     for version, directory in directories.items()}
+        cases = {version: next(case for case in document['positive_and_missing_cases']
+                               if case['case_id'] == 'P-official-old-detail-legacy')
+                 for version, document in documents.items()}
+        for field in ('template_context', 'response_context', 'outcome'):
+            self.assertEqual(cases['v6'][field], cases['v7'][field])
+        for field in ('origins', 'permissions', 'f01_documents', 'display_mappings'):
+            self.assertEqual(documents['v6'][field], documents['v7'][field])
+        envelope = json.loads((directories['v6'] / 'envelope.json').read_bytes())
+        program = next(item for item in envelope['template_programs']
+                       if item['template'] == 'server/stable/templates/stable/public/base.html')
+        old_base = ''.join(token['source'] for token in program['tokens'])
+        old_whole = 'e2d54f4b3fe8a9c119152908e65dbc29bf89760239fde3734b69668e39b86266'
+        self.assertEqual(hashlib.sha256(old_base.encode('utf-8')).hexdigest(), old_whole)
+        self.assertEqual(program['source']['sha256'], old_whole)
+        new_base_path = root / 'templates/stable/public/base.html'
+        new_base = new_base_path.read_bytes()
+        self.assertEqual(hashlib.sha256(new_base).hexdigest(),
+                         '58299d58628d180933dff86114fb68341f85870b2a69fbc597e259987fd388d5')
+        identities = json.loads((directories['v7'] / 'derivation.json').read_bytes())['identity_members']
+        inverse = {new: old for old, new in identities.items() if old.startswith(('pr2:', 'pe2:'))}
+        self.assertEqual(self._inverse_body_rows(cases['v7']['expected_body'], inverse),
+                         cases['v6']['expected_body'])
+        inputs_by_state, results = {}, {}
+        states = (('old-base+v6', 'v6', old_base),
+                  ('new-base+v6', 'v6', None),
+                  ('new-base+v7', 'v7', None))
+        for state, version, source in states:
+            with self.subTest(state=state):
+                case = cases[version]
+                inputs = self._state_inputs(documents[version], case, directories[version], source)
+                descriptor = json.loads((directories[version] / 'descriptor.json').read_bytes())
+                self.assertEqual(inputs['private']['candidate_descriptor'], descriptor)
+                result = parse_template_render(**inputs)
+                inputs_by_state[state], results[state] = inputs, result
+                if state == 'new-base+v6':
+                    self.assertEqual(result['leaf_status'], 'unverified')
+                    self.assertEqual(result['reason'], 'unmodeled_visible_content')
+                    self.assertIsNone(result['receipt'])
+                else:
+                    self.assertEqual(result['leaf_status'], 'template_fixture_verified')
+                    self.assertEqual(result['body'], case['expected_body'])
+                    self.assertEqual(result['body_digest'], case['expected_body_sha256'])
+                    self.assertIsNotNone(result['receipt'])
+        self.assertEqual(set(results), {state for state, _, _ in states})
+        old_inputs = deepcopy(inputs_by_state['old-base+v6'])
+        new_inputs = deepcopy(inputs_by_state['new-base+v6'])
+        self.assertNotEqual(old_inputs.pop('html'), new_inputs.pop('html'))
+        self.assertEqual(old_inputs, new_inputs)
+        self.assertEqual(inputs_by_state['new-base+v6']['context'],
+                         inputs_by_state['new-base+v7']['context'])
+        self.assertEqual(inputs_by_state['new-base+v6']['evidence_documents'],
+                         inputs_by_state['new-base+v7']['evidence_documents'])
+        self.assertEqual(self._inverse_body_rows(results['new-base+v7']['body'], inverse),
+                         results['old-base+v6']['body'])
+        self.assertEqual(new_base_path.read_bytes(), new_base)
