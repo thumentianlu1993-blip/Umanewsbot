@@ -589,4 +589,100 @@ class FirstcausePersistenceTests(unittest.TestCase):
         self.assertEqual(self.cleanups,[True]);self.assertTrue(self.serial.status['diagnostic_unpersisted'])
         self.assertTrue(any('secondary status ENOSPC' in n for n in self.first.__notes__))
 
+class RunFramingTests(unittest.TestCase):
+    # Exact independently preserved B193 line 9 and B191 line 238 (70 ASCII '-').
+    suffix_id = 'scripts.tests.test_f02_export_postgres.InternalCIGuardTests.test_non_tmpfs_refused'
+    prefix_id = 'stable.tests.test_nginx_production_contract.ProductionNginxContractTests.test_retired_hipilot_host_remains_gone'
+    suffix_line = 'RUN scripts.tests.test_f02_export_postgres.InternalCIGuardTests.test_non_tmpfs_refused----------------------------------------------------------------------'
+    prefix_line = '----------------------------------------------------------------------RUN stable.tests.test_nginx_production_contract.ProductionNginxContractTests.test_retired_hipilot_host_remains_gone'
+
+    def prepare(self, lines, drift=None):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        root = Path(temp.name)
+        output = root / 'evidence'
+        selection = root / 'selection.json'
+        save(selection, dict(base_sha='a'*40, mode='full', source='git', test_sha='a'*40,
+                             test_tree='b'*40, run_id='9', run_attempt='1', labels=['m', 'r']))
+        fake = FakeExecutor(root)
+        fake.drift = drift
+        original_run = fake.run
+        raw = ('Django diagnostic\n' + '\n'.join(lines) + '\n').encode()
+
+        def run(command, deadline, ledger):
+            result = original_run(command, deadline, ledger)
+            if '--collect-only' in command:
+                plan_path = output / 'execution-plan.json'
+                plan = json.loads(plan_path.read_text())
+                plan['batches'][0]['ids'] = [self.suffix_id, self.prefix_id]
+                plan['count'] = 3
+                save(plan_path, plan)
+            elif '--batch' in command and command[command.index('--batch')+1] == 'batch-000':
+                (output / 'batch-000.log').write_bytes(raw)
+            return result
+
+        fake.run = run
+        serial = Serial(output, {'start': 0}, fake, clock=lambda: 0)
+        serial.collect(selection, root / 'image.tar')
+        return serial, fake, raw
+
+    def test_observed_literal_forms_and_persisted_receipts(self):
+        import hashlib
+        serial, fake, raw = self.prepare([self.suffix_line, self.prefix_line])
+        serial.execute()
+        self.assertEqual((serial.output / 'batch-000.log').read_bytes(), raw)
+        state = json.loads(serial.status_path.read_text())
+        receipts = state['attempted']['batch-000']['run_framing']
+        self.assertEqual(receipts, [
+            dict(line_number=n, raw_line=line, raw_line_sha256=hashlib.sha256(line.encode()).hexdigest(),
+                 framing=framing, id=native_id)
+            for n, line, framing, native_id in [
+                (2, self.suffix_line, 'django-separator-suffix-70', self.suffix_id),
+                (3, self.prefix_line, 'django-separator-prefix-70', self.prefix_id)]])
+        self.assertTrue(state['attempted']['batch-001']['complete'])
+
+    def test_ordinary_run_lines_remain_valid(self):
+        serial, fake, raw = self.prepare(['RUN '+self.suffix_id, 'RUN '+self.prefix_id])
+        serial.execute()
+        self.assertEqual((serial.output / 'batch-000.log').read_bytes(), raw)
+        self.assertFalse(serial.status['fatal'])
+
+    def test_unapproved_framing_fails_closed(self):
+        valid = ['RUN '+self.suffix_id, 'RUN '+self.prefix_id]
+        malformed = [
+            '-'*n+'RUN '+self.suffix_id for n in (1, 69, 71, 140)] + [
+            'RUN '+self.suffix_id+'-'*n for n in (1, 69, 71, 140)] + [
+            'garbage RUN '+self.suffix_id, ' RUN '+self.suffix_id,
+            'RUN '+self.suffix_id+' garbage', '-'*70+'RUN '+self.suffix_id+'-'*70,
+            'RUN\t'+self.suffix_id, '-'*70+'RUN\t'+self.suffix_id]
+        for line in malformed:
+            with self.subTest(line=line):
+                # A valid log plus an unknown event must not silently drop that event.
+                serial, fake, raw = self.prepare(valid + [line])
+                with self.assertRaises(ValueError): serial.execute()
+                self.assertTrue(serial.status['fatal'])
+                self.assertEqual((serial.output / 'batch-000.log').read_bytes(), raw)
+                self.assertFalse(any('--batch' in c and c[c.index('--batch')+1] == 'batch-001'
+                                     for c in fake.calls))
+
+    def test_duplicate_reordered_missing_extra_ids_fail_closed(self):
+        a, b = self.suffix_line, self.prefix_line
+        for lines in ([a, b, a], [b, a], [a], [a, b, 'RUN extra.C.test_x']):
+            with self.subTest(lines=lines):
+                serial, fake, raw = self.prepare(lines)
+                with self.assertRaises(ValueError): serial.execute()
+                self.assertTrue(serial.status['fatal'])
+
+    def test_framing_does_not_bypass_identity_or_cleanup(self):
+        for drift in ('report', 'plan', 'bool'):
+            with self.subTest(drift=drift):
+                serial, fake, raw = self.prepare([self.suffix_line, self.prefix_line], drift)
+                with self.assertRaises(ValueError): serial.execute()
+                self.assertTrue(serial.status['fatal'])
+        serial, fake, raw = self.prepare([self.suffix_line, self.prefix_line])
+        fake.clean = False
+        with self.assertRaises((ValueError, RuntimeError)): serial.execute()
+        self.assertTrue(serial.status['fatal'])
+
+
 if __name__=='__main__':unittest.main()

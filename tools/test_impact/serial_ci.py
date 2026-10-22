@@ -485,9 +485,26 @@ class Serial:
                     raise ValueError('report/image identity drift')
                 executed = report['executed']
                 lines = (self.output / (key + '.log')).read_text().splitlines()
-                if any(line.startswith('RUN') and not line.startswith('RUN ') for line in lines):
-                    raise ValueError('malformed RUN line')
-                run = [line[4:] for line in lines if line.startswith('RUN ')]
+                run, framing = [], []
+                self.status['attempted'][key]['run_framing'] = framing
+                separator = '-' * 70
+                for number, line in enumerate(lines, 1):
+                    # Only the two observed Django separator joins are compatible.
+                    suffix = re.fullmatch(r'RUN ([A-Za-z0-9_.]+)' + separator, line)
+                    prefix = re.fullmatch(separator + r'RUN ([A-Za-z0-9_.]+)', line)
+                    if suffix or prefix:
+                        native_id = (suffix or prefix).group(1)
+                        run.append(native_id)
+                        framing.append(dict(line_number=number, raw_line=line,
+                            raw_line_sha256=hashlib.sha256(line.encode()).hexdigest(),
+                            framing='django-separator-' + ('suffix' if suffix else 'prefix') + '-70',
+                            id=native_id))
+                    elif line.startswith('RUN '):
+                        run.append(line[4:])
+                    elif line.startswith('RUN') or re.search(r'RUN(?:\s|$)', line):
+                        # Unknown RUN-bearing text must not hide extra native events.
+                        raise ValueError('malformed RUN line')
+                self.persist()
                 if type(report['exit_code']) is not int or type(result['exit']) is not int or report['lifecycle'] != 'complete' or len(executed) != len(set(executed)) or set(executed) != set(batch['ids']) or run != executed:
                     raise ValueError('strict native lifecycle/RUN/identity failure')
                 if any(type(report[f]) is not list for f in ('failures', 'errors', 'skips', 'expected_failures', 'unexpected_successes')):
