@@ -711,6 +711,21 @@ class DiagnosticResourceSeamTests(SimpleTestCase):
             self.rejected(fn, ids, "invalid_ids", explicit=True)
 
 
+    def test_resolution_non_entity_notes_and_suppressed_entity_string_scopes(self):
+        fn = self.helper("native_preflight")
+        value = resolution()
+        term = {"term_type": "race", "source_ja": "A", "target_zh": "A", "matched_text": "A",
+                "race_grade": "", "priority": 0, "notes": "x" * 4097}
+        value["accepted_terms"] = [term]
+        fn(value, scope="resolution")  # non-entity note remains within metadata16384
+        value["suppressed_candidates"] = [copy.deepcopy(value["entities"][0])]
+        value["suppressed_candidates"][0]["matched_context"] = "x" * 4097
+        self.rejected(fn, value, scope="resolution")
+        value["suppressed_candidates"] = []
+        term["notes"] = "x" * 16385
+        self.rejected(fn, value, scope="resolution")
+
+
 class DiagnosticFileAdmissionTests(SimpleTestCase):
     def setUp(self):
         DiagnosticResourceSeamTests.setUp(self)

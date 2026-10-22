@@ -759,9 +759,13 @@ def _binding_diagnostic_native_preflight(value, *, scope):
                         string_tag="MAX_METADATA_STRING_UTF8_BYTES")
         tag = "MAX_METADATA_CANONICAL_BYTES"
     elif scope == "resolution":
-        _bd_native_tree(value, string_limit=_BD_LIMITS["MAX_ENTITY_STRING_UTF8_BYTES"],
-                        string_tag="MAX_ENTITY_STRING_UTF8_BYTES")
+        _bd_native_tree(value, string_limit=_BD_LIMITS["MAX_METADATA_STRING_UTF8_BYTES"],
+                        string_tag="MAX_METADATA_STRING_UTF8_BYTES")
         _bd_resolution_shape(value)
+        for key in ("entities", "suppressed_candidates"):
+            for entity in value[key]:
+                _bd_native_tree(entity, string_limit=_BD_LIMITS["MAX_ENTITY_STRING_UTF8_BYTES"],
+                                string_tag="MAX_ENTITY_STRING_UTF8_BYTES")
         tag = "MAX_RESOLUTION_CANONICAL_BYTES"
     else:
         _bd_fail("invalid_snapshot")
