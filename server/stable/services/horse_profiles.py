@@ -457,17 +457,53 @@ def reconcile_article_horse_links(
     }
     if not commit:
         return result
-    if delete_links:
-        ArticleHorseLink.objects.filter(id__in=result["delete_ids"]).delete()
-    for payload in create_payloads:
-        profile_id = payload["horse_profile_id"]
-        defaults = {key: value for key, value in payload.items() if key != "horse_profile_id"}
-        ArticleHorseLink.objects.create(article=article, horse_profile_id=profile_id, **defaults)
-    for payload in update_payloads:
-        link_id = payload["link_id"]
-        defaults = {key: value for key, value in payload.items() if key not in {"link_id", "horse_profile_id"}}
-        defaults["updated_at"] = timezone.now()
-        ArticleHorseLink.objects.filter(pk=link_id).update(**defaults)
+    with transaction.atomic():
+        NewsArticle.objects.select_for_update().get(pk=article.pk)
+        locked_links = list(
+            ArticleHorseLink.objects.select_for_update()
+            .filter(pk__in=[item.id for item in existing])
+            .order_by("id")
+        )
+        original_profiles = {item.id: item.horse_profile_id for item in existing}
+        current_links = {
+            item.id: item
+            for item in locked_links
+            if item.article_id == article.pk
+            and item.horse_profile_id == original_profiles[item.id]
+        }
+        mutable_statuses = {ArticleHorseLinkStatus.AUTO, ArticleHorseLinkStatus.CANDIDATE}
+        protected = [
+            item for item in current_links.values()
+            if item.status in {ArticleHorseLinkStatus.MANUAL, ArticleHorseLinkStatus.REMOVED}
+        ]
+        result = {
+            "create": [],
+            "update": [],
+            "delete_ids": [],
+            "protected_ids": [item.id for item in protected],
+            "protected": [{"link_id": item.id, "status": item.status} for item in protected],
+        }
+        delete_ids = [
+            item.id for item in delete_links
+            if item.id in current_links and current_links[item.id].status in mutable_statuses
+        ]
+        if delete_ids:
+            ArticleHorseLink.objects.filter(pk__in=delete_ids).delete()
+            result["delete_ids"] = delete_ids
+        for payload in create_payloads:
+            profile_id = payload["horse_profile_id"]
+            defaults = {key: value for key, value in payload.items() if key != "horse_profile_id"}
+            ArticleHorseLink.objects.create(article=article, horse_profile_id=profile_id, **defaults)
+            result["create"].append(payload)
+        for payload in update_payloads:
+            link_id = payload["link_id"]
+            link = current_links.get(link_id)
+            if link is None or link.status not in mutable_statuses:
+                continue
+            defaults = {key: value for key, value in payload.items() if key not in {"link_id", "horse_profile_id"}}
+            defaults["updated_at"] = timezone.now()
+            if ArticleHorseLink.objects.filter(pk=link_id).update(**defaults):
+                result["update"].append(payload)
     return result
 
 
