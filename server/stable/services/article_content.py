@@ -160,8 +160,8 @@ class _CleaningAudit:
 
 
 def _remove_structured_noise(node: Tag, removed: Counter[str], audit: _CleaningAudit) -> None:
-    # Bare tag selectors also apply when the selected body is itself noise.
-    if node.name in _STRUCTURED_NOISE_SELECTORS:
+    # Existing selectors apply to both the selected root and its descendants.
+    if any(node.css.match(selector) for selector in _STRUCTURED_NOISE_SELECTORS):
         audit.remove([node], "structured_noise")
         removed["structured_noise"] += 1
         node.clear()
