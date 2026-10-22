@@ -84,6 +84,14 @@ def build_article_entity_reprocess_plan(
     }
 
 
+def _resolution_binding_sha256(value) -> str:
+    """Hash producer schema values without the read-only diagnostic admission caps."""
+    digest = hashlib.sha256()
+    for chunk in _bd_canonical_chunks(value):
+        digest.update(chunk)
+    return digest.hexdigest()
+
+
 def _commit_article(article_id: int, *, translate_sync: bool) -> dict:
     with transaction.atomic():
         article = NewsArticle.objects.select_for_update().get(pk=article_id)
@@ -107,17 +115,46 @@ def _commit_article(article_id: int, *, translate_sync: bool) -> dict:
                     f"article={article.id} outcome={translation_outcome!r}"
                 )
             article.refresh_from_db()
+        # Capture the refreshed source and exact final call, preserving raw values
+        # separately from body selection and the effective language fallback.
+        source_fields = {
+            "title_ja": article.title_ja,
+            "body_ja_raw": article.body_ja_raw,
+            "body_ja_normalized": article.body_ja_normalized,
+            "source_language": article.source_language,
+        }
+        body_field = "body_ja_normalized" if source_fields["body_ja_normalized"] else "body_ja_raw"
+        resolver_inputs = {
+            "title": source_fields["title_ja"],
+            "body": source_fields[body_field],
+            "effective_language": source_fields["source_language"] or SourceLanguage.JAPANESE,
+        }
         resolution = resolve_article_entities(
-            article.title_ja,
-            article.body_ja_normalized or article.body_ja_raw,
-            source_language=article.source_language or SourceLanguage.JAPANESE,
+            resolver_inputs["title"],
+            resolver_inputs["body"],
+            source_language=resolver_inputs["effective_language"],
         )
+        resolution_data = resolution.as_dict()
         tag_plan = pre_translation_tag_plan if translate_sync else _tag_plan(article, resolution)
         if not tag_plan["locked"]:
             article.tags_json = tag_plan["after"]
         metadata = dict(article.translation_metadata or {})
         metadata["machine_horse_tags"] = list(resolution.machine_horse_tags)
-        metadata["article_entity_resolution"] = resolution.as_dict()
+        metadata["article_entity_resolution"] = resolution_data
+        # This local producer record binds inputs and the saved DTO only. It does
+        # not establish canonical identity, visible spans, authorization or roles.
+        metadata["article_entity_resolution_binding"] = {
+            "schema_version": "n03.resolution-input-binding.v1",
+            "producer": "article_entity_reprocessing._commit_article.final",
+            "article_id": article.id,
+            "source_fields_sha256": _resolution_binding_sha256(source_fields),
+            "resolver_inputs_sha256": _resolution_binding_sha256(resolver_inputs),
+            "resolution_sha256": _resolution_binding_sha256(resolution_data),
+            "source_selection": {"title": "title_ja", "body": body_field},
+            "basis": "exact_resolver_arguments",
+            "unit": "python_codepoints",
+            "input_proof_scope": "producer_inputs_only",
+        }
         article.translation_metadata = metadata
         article.save(update_fields=["tags_json", "translation_metadata", "updated_at"])
         link_plan = reconcile_article_horse_links(article, resolution, commit=True)
@@ -142,7 +179,7 @@ def _commit_article(article_id: int, *, translate_sync: bool) -> dict:
         return {
             "article_id": article.id,
             "status": "committed",
-            "entities": resolution.as_dict(),
+            "entities": resolution_data,
             "terms": [item.__dict__ for item in resolution.accepted_terms],
             "tags": tag_plan,
             "links": link_plan,
