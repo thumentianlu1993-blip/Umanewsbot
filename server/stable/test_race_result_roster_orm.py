@@ -1,6 +1,7 @@
 """Real persisted R07 caller contracts; no ORM or reconciliation mocks."""
 from dataclasses import FrozenInstanceError
 from io import StringIO
+import hashlib
 import json
 from threading import Event, Thread
 from unittest.mock import patch
@@ -19,6 +20,91 @@ from stable.services.race_result_roster_orm import load_persisted_roster_reconci
 DIGEST = "8740c6b5eb371f1ce59281158f55900ec73cd09751116e9eccefa7349cb2aead"
 SCOPE = "r07:event:101:racecard:201:result:202:sha256:" + DIGEST
 ROSTER = "db:racecard-revision:201:sha256:" + DIGEST
+
+
+# Independent complete literals; fixed digests were sealed before these fixture edits.
+CARD_HASH_MATERIAL = {'event_id': 101,
+ 'revisions': [{'id': 211,
+                'event_id': 101,
+                'kind': 'racecard',
+                'phase': 'racecard',
+                'content_sha256': 'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd'},
+               {'id': 202,
+                'event_id': 101,
+                'kind': 'result',
+                'phase': 'provisional',
+                'content_sha256': 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'}],
+ 'racecard_items': [{'id': 411,
+                     'revision_id': 211,
+                     'participant_id': 301,
+                     'status': 'declared',
+                     'reported_finish_position': None},
+                    {'id': 412,
+                     'revision_id': 211,
+                     'participant_id': 302,
+                     'status': 'declared',
+                     'reported_finish_position': None},
+                    {'id': 413,
+                     'revision_id': 211,
+                     'participant_id': 303,
+                     'status': 'declared',
+                     'reported_finish_position': None}],
+ 'result_items': [{'id': 404,
+                   'revision_id': 202,
+                   'participant_id': 301,
+                   'status': 'finished',
+                   'reported_finish_position': 1},
+                  {'id': 405,
+                   'revision_id': 202,
+                   'participant_id': 302,
+                   'status': 'non_runner',
+                   'reported_finish_position': None}],
+ 'participants': [{'id': 301, 'event_id': 101, 'stable_key': 'p:301'},
+                  {'id': 302, 'event_id': 101, 'stable_key': 'p:302'},
+                  {'id': 303, 'event_id': 101, 'stable_key': 'p:303'}]}
+CARD_HASH_DIGEST = '3a5654edea8b87552a477b8c93697efa3cb87fb4879a3a149c5251bf187ae48b'
+
+RESULT_PHASE_MATERIAL = {'event_id': 101,
+ 'revisions': [{'id': 201,
+                'event_id': 101,
+                'kind': 'racecard',
+                'phase': 'racecard',
+                'content_sha256': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'},
+               {'id': 212,
+                'event_id': 101,
+                'kind': 'result',
+                'phase': 'official',
+                'content_sha256': 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'}],
+ 'racecard_items': [{'id': 401,
+                     'revision_id': 201,
+                     'participant_id': 301,
+                     'status': 'declared',
+                     'reported_finish_position': None},
+                    {'id': 402,
+                     'revision_id': 201,
+                     'participant_id': 302,
+                     'status': 'declared',
+                     'reported_finish_position': None},
+                    {'id': 403,
+                     'revision_id': 201,
+                     'participant_id': 303,
+                     'status': 'declared',
+                     'reported_finish_position': None}],
+ 'result_items': [{'id': 414,
+                   'revision_id': 212,
+                   'participant_id': 301,
+                   'status': 'finished',
+                   'reported_finish_position': 1},
+                  {'id': 415,
+                   'revision_id': 212,
+                   'participant_id': 302,
+                   'status': 'non_runner',
+                   'reported_finish_position': None}],
+ 'participants': [{'id': 301, 'event_id': 101, 'stable_key': 'p:301'},
+                  {'id': 302, 'event_id': 101, 'stable_key': 'p:302'},
+                  {'id': 303, 'event_id': 101, 'stable_key': 'p:303'}]}
+RESULT_PHASE_DIGEST = '11cdb6e9770f118390ce863f51c73cf20b5adc8eb81148d5b32b8b797d4a53ec'
+
 
 
 def expected_envelope():
@@ -147,7 +233,12 @@ class PersistedRosterPostgresTests(TransactionTestCase):
                                                    phase="official", content_sha256="c" * 64)
         m.RaceEventRevisionItem.objects.create(revision=newer, participant_id=303,
                                               internal_order=1, status="finished", reported_finish_position=99)
-        m.RaceEventProjectionControl.objects.create(event=self.event, current_result_revision=newer)
+        control = m.RaceEventProjectionControl.objects.create(
+            event=self.event, current_result_revision=newer,
+            next_result_revision_no=newer.revision_no + 1)
+        control.refresh_from_db()
+        self.assertEqual(control.current_result_revision_id, newer.pk)
+        self.assertEqual(control.next_result_revision_no, 3)
         self.assertEqual(self.command(), expected_envelope())
 
     def test_horse_record_explicit_or_derived_start_is_never_a_participation_producer(self):
@@ -220,19 +311,29 @@ class PersistedRosterPostgresTests(TransactionTestCase):
                      {"racecard_revision_id": 202}, {"result_revision_id": 201}):
             with self.subTest(args=args), self.assertRaises(ValueError):
                 self.load(**args)
-        m.RaceEventRevision.objects.filter(pk=201).update(phase="provisional")
+        # Each immutable identity is set at INSERT, never rewritten for a negative case.
+        wrong_phase = m.RaceEventRevision.objects.create(pk=211, event=self.event, kind="racecard",
+            revision_no=2, phase="provisional", content_sha256="c" * 64)
         with self.assertRaises(ValueError):
-            self.load()
-        m.RaceEventRevision.objects.filter(pk=201).update(phase="racecard")
-        other = m.RaceEvent.objects.create(year=2026, slug="a114-wrong-event", original_name="Other",
+            self.load(racecard_revision_id=wrong_phase.pk)
+        other = m.RaceEvent.objects.create(pk=102, year=2026, slug="a114-wrong-event", original_name="Other",
                                           country_region="japan", racecourse="Tokyo")
-        m.RaceEventRevision.objects.filter(pk=202).update(event=other)
+        wrong_event = m.RaceEventRevision.objects.create(pk=212, event=other, kind="result",
+            revision_no=1, phase="provisional", content_sha256="d" * 64)
         with self.assertRaises(ValueError):
-            self.load()
-        m.RaceEventRevision.objects.filter(pk=202).update(event=self.event)
-        m.RaceEventParticipant.objects.filter(pk=302).update(event=other)
+            self.load(result_revision_id=wrong_event.pk)
+        wrong_kind = m.RaceEventRevision.objects.create(pk=213, event=self.event, kind="result",
+            revision_no=2, phase="provisional", content_sha256="e" * 64)
         with self.assertRaises(ValueError):
-            self.load()
+            self.load(racecard_revision_id=wrong_kind.pk)
+        foreign_participant = m.RaceEventParticipant.objects.create(pk=304, event=other,
+            stable_key="p:304", canonical_name="Same Name")
+        cross_event_result = m.RaceEventRevision.objects.create(pk=214, event=self.event, kind="result",
+            revision_no=3, phase="provisional", content_sha256="f" * 64)
+        m.RaceEventRevisionItem.objects.create(pk=416, revision=cross_event_result,
+            participant=foreign_participant, internal_order=1, status="non_runner")
+        with self.assertRaises(ValueError):
+            self.load(result_revision_id=cross_event_result.pk)
 
     def test_legacy_rows_do_not_replace_empty_card_and_invalid_rank_is_not_fixed(self):
         m.RaceEventResult.objects.create(event=self.event, horse_name="Same Name", finish_position=1)
@@ -267,14 +368,53 @@ class PersistedRosterPostgresTests(TransactionTestCase):
             (m.RaceEventRevisionItem, 405, "status", "refused", "non_runner"),
             (m.RaceEventRevisionItem, 401, "status", "withdrawn", "declared"),
             (m.RaceEventParticipant, 301, "stable_key", "changed", "p:301"),
-            (m.RaceEventRevision, 201, "content_sha256", "d" * 64, "a" * 64),
-            (m.RaceEventRevision, 202, "phase", "official", "provisional"),
         ):
             with self.subTest(field=field, pk=pk):
                 model.objects.filter(pk=pk).update(**{field: value})
                 self.assertNotEqual(self.load().material_sha256, DIGEST)
                 model.objects.filter(pk=pk).update(**{field: restore})
                 self.assertEqual(self.load().material_sha256, DIGEST)
+
+
+        # Exact expected hashes bind every literal field, including phase/content hash;
+        # comparing only against DIGEST would also change when the selected IDs change.
+        with self.subTest(field="content_sha256", revision_id=211):
+            self.assertEqual(hashlib.sha256(json.dumps(CARD_HASH_MATERIAL, sort_keys=True,
+                separators=(",", ":"), ensure_ascii=False).encode()).hexdigest(), CARD_HASH_DIGEST)
+            alternate_card = m.RaceEventRevision.objects.create(pk=211, event=self.event, kind="racecard",
+                revision_no=2, phase="racecard", content_sha256="d" * 64)
+            m.RaceEventRevisionItem.objects.create(pk=411, revision=alternate_card, participant_id=301,
+                internal_order=1, status="declared")
+            m.RaceEventRevisionItem.objects.create(pk=412, revision=alternate_card, participant_id=302,
+                internal_order=2, status="declared")
+            m.RaceEventRevisionItem.objects.create(pk=413, revision=alternate_card, participant_id=303,
+                internal_order=3, status="declared")
+            hash_case = self.load(racecard_revision_id=211)
+            self.assertEqual(hash_case.material_sha256, CARD_HASH_DIGEST)
+            self.assertEqual(hash_case.ledger.scope_ref,
+                             "r07:event:101:racecard:211:result:202:sha256:" + CARD_HASH_DIGEST)
+            self.assertEqual([(b.participant_id, b.stable_key, b.racecard_item_id)
+                              for b in hash_case.participant_bindings],
+                             [(301, "p:301", 411), (302, "p:302", 412), (303, "p:303", 413)])
+
+        with self.subTest(field="phase", revision_id=212):
+            self.assertEqual(hashlib.sha256(json.dumps(RESULT_PHASE_MATERIAL, sort_keys=True,
+                separators=(",", ":"), ensure_ascii=False).encode()).hexdigest(), RESULT_PHASE_DIGEST)
+            alternate_result = m.RaceEventRevision.objects.create(pk=212, event=self.event, kind="result",
+                revision_no=2, phase="official", content_sha256="b" * 64)
+            m.RaceEventRevisionItem.objects.create(pk=414, revision=alternate_result, participant_id=301,
+                internal_order=1, status="finished", reported_finish_position=1)
+            m.RaceEventRevisionItem.objects.create(pk=415, revision=alternate_result, participant_id=302,
+                internal_order=2, status="non_runner")
+            phase_case = self.load(result_revision_id=212)
+            self.assertEqual(phase_case.material_sha256, RESULT_PHASE_DIGEST)
+            self.assertEqual(phase_case.ledger.scope_ref,
+                             "r07:event:101:racecard:201:result:212:sha256:" + RESULT_PHASE_DIGEST)
+            self.assertEqual([(row.runner_id, row.outcome_status, row.reported_finish_position, row.result_ref)
+                              for row in phase_case.ledger.ledger],
+                             [(301, "finished", 1, "db:revision-item:414"),
+                              (302, "non_runner", None, "db:revision-item:415"),
+                              (303, None, None, None)])
 
     def test_repeatable_read_keeps_old_snapshot_during_independent_writer_commit(self):
         snapshot_read, writer_finished = Event(), Event()
