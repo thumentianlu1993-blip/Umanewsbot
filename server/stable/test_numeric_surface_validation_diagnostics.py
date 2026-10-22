@@ -7,7 +7,7 @@ import time
 import tracemalloc
 from datetime import datetime, timedelta, timezone
 
-from django.db import connection
+from django.db import connection, transaction
 from django.test import TestCase, override_settings
 
 from stable.models import (
@@ -616,7 +616,8 @@ class NumericSurfaceValidationDiagnosticsTests(TestCase):
         self._assert_unavailable(diagnostic, "resource_refusal", "existing_payload_type")
         outcome.details["numeric_surface_audit"] = diagnostic
         with self.assertRaises(TypeError):
-            validation.apply_validation_outcome(self.article, outcome)
+            with transaction.atomic():
+                validation.apply_validation_outcome(self.article, outcome)
         self.assertIs(outcome.details["legacy_value"], legacy_value)
         self.assertEqual(AutomationLog.objects.filter(article=self.article).count(), 0)
 
