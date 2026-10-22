@@ -10,6 +10,7 @@ import base64
 import copy
 import errno
 import hashlib
+import importlib
 import io
 import json
 import os
@@ -84,6 +85,9 @@ def bundle_file(data):
 
 @contextmanager
 def real_spies():
+    # Load before any temporary service Mock: the command's from-import must
+    # capture the original function, and keep it after this context exits.
+    command_module = importlib.import_module("stable.management.commands.reprocess_article_entities")
     # Capture direct imports as well as canonical functions. One shared wrapper
     # counts one actual invocation, and delegates the unchanged original.
     with ExitStack() as stack:
@@ -100,7 +104,11 @@ def real_spies():
         stack.enter_context(patch.object(f01, "build_input", side_effect=AssertionError("no producer repair")))
         for name in ("resolve_article_entities", "_tag_plan", "reconcile_article_horse_links",
                      "build_article_entity_reprocess_plan", "_commit_article", "reprocess_article_entities"):
-            stack.enter_context(patch.object(service, name, side_effect=AssertionError("forbidden " + name)))
+            guard = stack.enter_context(patch.object(service, name, side_effect=AssertionError("forbidden " + name)))
+            if name == "reprocess_article_entities":
+                # Guard where Command.handle looks up the function as well as
+                # the service attribute. ExitStack restores both on exceptions.
+                stack.enter_context(patch.object(command_module, name, guard))
         stack.enter_context(patch.object(service.translate_article_task, "run", side_effect=AssertionError("translate")))
         stack.enter_context(patch.object(service.translate_article_task, "delay", side_effect=AssertionError("enqueue")))
         yield spies
