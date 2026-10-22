@@ -521,8 +521,14 @@ class DefaultRaceDateWindowTests(TestCase):
         resp = self._get(tab="all", region=RacingRegion.FRANCE)
         self.assertEqual(resp.status_code, 200)
         html = resp.content.decode("utf-8")
-        self.assertIn("暂无符合条件的赛事", html)
+        self.assertIn("当前列表暂无可展示的已发布赛事。", html)
+        reset_url = reverse("public-race-calendar") + "?tab=all"
+        self.assertIn(
+            f'<a href="{reset_url}">重置筛选，返回默认赛事列表</a>', html,
+        )
         self.assertEqual(_axis_links(html), [])
+        self.assertNotIn("日本赛事", html)
+        self.assertNotRegex(html, r'class="[^"]*\bcal-card\b')
 
     # ------------------------------------------------------------------
     # 公开资格

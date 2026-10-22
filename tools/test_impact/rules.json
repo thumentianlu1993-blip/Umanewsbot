@@ -1445,6 +1445,18 @@
     ],
     "server/stable/services/race_result_roster_reconciliation.py": [
       "race_result_roster_reconciliation"
+    ],
+    "server/stable/test_calendar_empty_filter_recovery.py": [
+      "module:stable.test_calendar_empty_filter_recovery"
+    ],
+    "server/stable/templates/stable/public/race_calendar.html": [
+      "module:stable.test_calendar_empty_filter_recovery"
+    ],
+    "server/stable/services/race_calendar.py": [
+      "module:stable.test_calendar_empty_filter_recovery"
+    ],
+    "server/stable/services/race_public_time.py": [
+      "module:stable.test_calendar_empty_filter_recovery"
     ]
   },
   "symbols": {
@@ -1483,7 +1495,8 @@
         "module:stable.test_race_calendar_responsive_ui",
         "module:stable.test_race_public_time",
         "module:stable.test_public_new_regions",
-        "module:stable.test_race_news_exposure"
+        "module:stable.test_race_news_exposure",
+        "module:stable.test_calendar_empty_filter_recovery"
       ],
       "_public_weekly_focus_events": [
         "module:stable.test_race_information_display_pages",
@@ -1528,12 +1541,14 @@
       "_public_read_nav": [
         "module:stable.tests_legacy",
         "horse_page",
-        "module:stable.test_race_calendar_default_date_window"
+        "module:stable.test_race_calendar_default_date_window",
+        "module:stable.test_calendar_empty_filter_recovery"
       ],
       "_public_nav_token": [
         "module:stable.tests_legacy",
         "horse_page",
-        "module:stable.test_race_calendar_default_date_window"
+        "module:stable.test_race_calendar_default_date_window",
+        "module:stable.test_calendar_empty_filter_recovery"
       ],
       "_public_href": [
         "module:stable.tests_legacy",
@@ -1548,7 +1563,8 @@
       "_public_apply_list_nav": [
         "module:stable.tests_legacy",
         "horse_page",
-        "module:stable.test_race_calendar_default_date_window"
+        "module:stable.test_race_calendar_default_date_window",
+        "module:stable.test_calendar_empty_filter_recovery"
       ],
       "_public_attach_nav": [
         "module:stable.tests_legacy",
@@ -1594,7 +1610,8 @@
         "module:stable.test_race_information_display_pages",
         "module:stable.test_historical_race_calendar_integrity",
         "module:stable.test_race_public_time",
-        "module:stable.test_race_news_exposure"
+        "module:stable.test_race_news_exposure",
+        "module:stable.test_calendar_empty_filter_recovery"
       ],
       "public_race_detail": [
         "module:stable.tests_legacy",

@@ -894,6 +894,9 @@
     ],
     "race_result_roster_reconciliation": [
       "stable.test_race_result_roster_reconciliation"
+    ],
+    "module:stable.test_calendar_empty_filter_recovery": [
+      "stable.test_calendar_empty_filter_recovery"
     ]
   },
   "dependencies": {
@@ -2899,6 +2902,12 @@
       "domains": [
         "horse_page"
       ]
+    },
+    "server/stable/test_calendar_empty_filter_recovery.py": {
+      "label": "stable.test_calendar_empty_filter_recovery",
+      "domains": [
+        "module:stable.test_calendar_empty_filter_recovery"
+      ]
     }
   },
   "profiles": {
@@ -3222,7 +3231,8 @@
     "stable.test_race_result_arbitration_shadow": "python",
     "stable.test_race_result_roster_orm": "django",
     "stable.test_race_result_roster_reconciliation": "python",
-    "stable.test_article_race_navigation": "django"
+    "stable.test_article_race_navigation": "django",
+    "stable.test_calendar_empty_filter_recovery": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
