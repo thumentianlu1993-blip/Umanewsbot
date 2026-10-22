@@ -1,6 +1,10 @@
 {
   "schema_version": 1,
   "domains": {
+    "numeric_surface_audit": [
+      "stable.test_numeric_surface_audit",
+      "stable.test_numeric_surface_validation_diagnostics"
+    ],
     "core": [
       "stable.test_release_commit",
       "stable.test_race_live_target_eligibility",
@@ -940,6 +944,18 @@
     ]
   },
   "tests": {
+    "server/stable/test_numeric_surface_validation_diagnostics.py": {
+      "label": "stable.test_numeric_surface_validation_diagnostics",
+      "domains": [
+        "numeric_surface_audit"
+      ]
+    },
+    "server/stable/test_numeric_surface_audit.py": {
+      "label": "stable.test_numeric_surface_audit",
+      "domains": [
+        "numeric_surface_audit"
+      ]
+    },
     ".codex/scripts/test_graded_race_participants_workflow.py": {
       "label": "test_graded_race_participants_workflow",
       "domains": [
@@ -2821,6 +2837,8 @@
     }
   },
   "profiles": {
+    "stable.test_numeric_surface_validation_diagnostics": "django",
+    "stable.test_numeric_surface_audit": "python",
     "test_graded_race_participants_workflow": "python",
     "test_workflow_contract": "python",
     "runtime.research.test_audit_france_galop_bulletin_occurrences": "python",
@@ -3196,6 +3214,7 @@
     }
   },
   "owners": {
+    "numeric_surface_audit": "integration: B线 N04离线数字表面差异核心",
     "horse_page": "application: 马匹公开页面与发布边界",
     "news_translation": "integration: 翻译与内容公开边界",
     "race_parser": "integration: 来源解析到结果规范化",
