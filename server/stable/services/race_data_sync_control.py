@@ -2104,7 +2104,19 @@ def fail_race_data_sync_claim(
             checkpoint.last_attempt_at = now
             checkpoint.consecutive_failures += 1
             checkpoint.circuit_reason = reason_code
-            checkpoint.next_poll_at = retry_at
+            checkpoint.next_poll_at = (
+                None
+                if event.status == models.RaceEventStatus.CANCELLED
+                or (
+                    event.status == models.RaceEventStatus.POSTPONED
+                    and checkpoint.data_kind == models.RaceDataSyncDataKind.RESULT
+                )
+                or (
+                    event.status == models.RaceEventStatus.FINISHED
+                    and checkpoint.data_kind != models.RaceDataSyncDataKind.RESULT
+                )
+                else retry_at
+            )
             checkpoint.lock_version += 1
             checkpoint.save(
                 update_fields=(

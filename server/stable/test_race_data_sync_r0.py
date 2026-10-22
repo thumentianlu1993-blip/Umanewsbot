@@ -630,6 +630,183 @@ class RaceDataSyncEnrollmentControlTests(TestCase):
         with self.subTest("cancelled_state_unchanged"):
             self.assertEqual(self._a100_claim_state(self.event), before)
 
+    def _a105_claim(self, *, data_kinds=("race_time", "racecard", "result")):
+        claims = race_data_sync_control.claim_due_enrollments(
+            now=NOW, batch_size=10, ttl_seconds=60,
+            enabled_providers=("jra",), enabled_regions=("japan",),
+            enabled_data_kinds=data_kinds,
+        )
+        self.assertEqual(len(claims), 1)
+        claim = claims[0]
+        self.assertEqual(claim.event_id, self.event.pk)
+        self.assertEqual(claim.data_kinds, data_kinds)
+        self.assertEqual(
+            claim.checkpoint_plan,
+            tuple({"source_key": "jra", "data_kind": kind, "lock_version": 0}
+                  for kind in data_kinds),
+        )
+        self.assertEqual(claim.enrollment_entry_sha256, SHA_A)
+        self.assertRegex(claim.plan_sha256, r"^[0-9a-f]{64}$")
+        return claim
+
+    def _a105_fail(self, claim, *, now, retry_at):
+        decision = race_data_sync_control.fail_race_data_sync_claim(
+            event_id=claim.event_id,
+            expected_enrollment_generation=claim.enrollment_generation,
+            expected_owner_generation=claim.owner_generation,
+            expected_claim_generation=claim.claim_generation,
+            attempt_token=claim.attempt_token,
+            data_kinds=claim.data_kinds,
+            checkpoint_plan=claim.checkpoint_plan,
+            expected_enrollment_entry_sha256=claim.enrollment_entry_sha256,
+            expected_plan_sha256=claim.plan_sha256,
+            reason_code="provider_timeout", retry_at=retry_at, now=now,
+        )
+        self.assertEqual(decision.action, "failed")
+        self.assertEqual(decision.reason_code, "provider_timeout")
+        return decision
+
+    def _a105_state(self):
+        return {
+            "event": list(models.RaceEvent.objects.filter(pk=self.event.pk).values()),
+            "source": list(models.RaceResultSourceIdentity.objects.filter(event=self.event).order_by("pk").values()),
+            "owner": list(models.RaceEventProjectionControl.objects.filter(event=self.event).values()),
+            "enrollment": list(models.RaceDataSyncEnrollment.objects.filter(event=self.event).values()),
+            "tracking": list(models.RaceEventLiveTracking.objects.filter(event=self.event).values()),
+            "checkpoints": list(models.RaceEventLiveProviderCheckpoint.objects.filter(tracking__event=self.event).order_by("pk").values()),
+            "lifecycle": list(models.RaceEventLifecycleControl.objects.filter(event=self.event).values()),
+        }
+
+    def test_postponed_failure_keeps_schedule_retry_but_disables_result_retry(self):
+        self.assertEqual(self._acquire().action, "acquired")
+        self.event.status = models.RaceEventStatus.POSTPONED
+        self.event.save(update_fields=("status", "updated_at"))
+        claim = self._a105_claim()
+        before = self._a105_state()
+        failed_at = NOW + timedelta(seconds=1)
+        retry_at = NOW + timedelta(minutes=5)
+        self._a105_fail(claim, now=failed_at, retry_at=retry_at)
+        after = self._a105_state()
+        checkpoints = {row["data_kind"]: row for row in after["checkpoints"]}
+        with self.subTest("postponed_result_has_no_retry"):
+            self.assertIsNone(checkpoints["result"]["next_poll_at"])
+        with self.subTest("schedule_retries_and_failure_metadata_preserved"):
+            self.assertEqual(checkpoints["race_time"]["next_poll_at"], retry_at)
+            self.assertEqual(checkpoints["racecard"]["next_poll_at"], retry_at)
+            for row in checkpoints.values():
+                self.assertEqual(row["last_attempt_at"], failed_at)
+                self.assertEqual(row["consecutive_failures"], 1)
+                self.assertEqual(row["circuit_reason"], "provider_timeout")
+                self.assertEqual(row["lock_version"], 1)
+            tracking = after["tracking"][0]
+            self.assertEqual(tracking["next_poll_at"], retry_at)
+            self.assertEqual(tracking["active_attempt_token"], "")
+            self.assertIsNone(tracking["claim_expires_at"])
+            self.assertEqual(tracking["consecutive_failures"], 1)
+            self.assertEqual(tracking["circuit_reason"], "provider_timeout")
+            for key in ("event", "source", "owner", "enrollment", "lifecycle"):
+                self.assertEqual(after[key], before[key])
+
+    def test_inflight_postponed_failure_does_not_reclaim_obsolete_result(self):
+        self.assertEqual(self._acquire().action, "acquired")
+        claim = self._a105_claim()
+        before_status = self._a105_state()
+        self.event.status = models.RaceEventStatus.POSTPONED
+        self.event.save(update_fields=("status", "updated_at"))
+        after_status = self._a105_state()
+        # This is explicitly status-only: no canonical replan is claimed here.
+        for key in ("source", "owner", "enrollment", "tracking", "checkpoints", "lifecycle"):
+            self.assertEqual(after_status[key], before_status[key])
+        retry_at = NOW + timedelta(minutes=5)
+        self._a105_fail(claim, now=NOW + timedelta(seconds=1), retry_at=retry_at)
+        next_claims = race_data_sync_control.claim_due_enrollments(
+            now=retry_at, batch_size=10, ttl_seconds=60,
+            enabled_providers=("jra",), enabled_regions=("japan",),
+            enabled_data_kinds=("race_time", "racecard", "result"),
+        )
+        self.assertEqual(len(next_claims), 1)
+        next_claim = next_claims[0]
+        self.assertEqual(next_claim.event_id, self.event.pk)
+        with self.subTest("next_claim_only_rechecks_schedule"):
+            self.assertEqual(next_claim.data_kinds, ("race_time", "racecard"))
+        with self.subTest("obsolete_result_remains_disabled"):
+            self.assertIsNone(models.RaceEventLiveProviderCheckpoint.objects.get(
+                tracking__event=self.event, data_kind="result",
+            ).next_poll_at)
+
+        # Freeze a synthetic post-replan fence state, not a source/pipeline run.
+        # Advance and clear; never restore old tokens or recompute the old plan.
+        tracking = models.RaceEventLiveTracking.objects.get(event=self.event)
+        tracking.claim_generation += 1
+        tracking.active_attempt_token = ""
+        tracking.claim_expires_at = None
+        tracking.save(update_fields=("claim_generation", "active_attempt_token", "claim_expires_at", "updated_at"))
+        lifecycle = models.RaceEventLifecycleControl.objects.get(event=self.event)
+        lifecycle.schedule_generation += 1
+        lifecycle.claim_token = ""
+        lifecycle.claim_expires_at = None
+        lifecycle.save(update_fields=("schedule_generation", "claim_token", "claim_expires_at", "updated_at"))
+        for checkpoint in models.RaceEventLiveProviderCheckpoint.objects.filter(tracking=tracking):
+            checkpoint.lock_version += 1
+            checkpoint.save(update_fields=("lock_version", "updated_at"))
+        fenced = self._a105_state()
+        stale = race_data_sync_control.fail_race_data_sync_claim(
+            event_id=next_claim.event_id,
+            expected_enrollment_generation=next_claim.enrollment_generation,
+            expected_owner_generation=next_claim.owner_generation,
+            expected_claim_generation=next_claim.claim_generation,
+            attempt_token=next_claim.attempt_token,
+            data_kinds=next_claim.data_kinds,
+            checkpoint_plan=next_claim.checkpoint_plan,
+            expected_enrollment_entry_sha256=next_claim.enrollment_entry_sha256,
+            expected_plan_sha256=next_claim.plan_sha256,
+            reason_code="provider_timeout", retry_at=retry_at + timedelta(minutes=5),
+            now=retry_at + timedelta(seconds=1),
+        )
+        self.assertEqual(stale.action, "rejected")
+        self.assertEqual(stale.reason_code, "claim_cas_stale")
+        self.assertEqual(self._a105_state(), fenced)
+
+    def test_scheduled_failure_preserves_retry_without_inventing_postponement(self):
+        self.assertEqual(self._acquire().action, "acquired")
+        claim = self._a105_claim()
+        before = self._a105_state()
+        retry_at = NOW + timedelta(minutes=5)
+        self._a105_fail(claim, now=NOW + timedelta(seconds=1), retry_at=retry_at)
+        after = self._a105_state()
+        self.assertEqual(after["event"], before["event"])
+        self.assertEqual(after["event"][0]["status"], models.RaceEventStatus.SCHEDULED)
+        self.assertEqual({row["data_kind"]: row["next_poll_at"] for row in after["checkpoints"]},
+                         {kind: retry_at for kind in ("race_time", "racecard", "result")})
+        self.assertEqual(after["tracking"][0]["next_poll_at"], retry_at)
+        self.assertEqual(after["tracking"][0]["active_attempt_token"], "")
+        self.assertIsNone(after["tracking"][0]["claim_expires_at"])
+
+    def test_finished_result_failure_remains_retryable(self):
+        self.assertEqual(self._acquire().action, "acquired")
+        self.event.status = models.RaceEventStatus.FINISHED
+        self.event.save(update_fields=("status", "updated_at"))
+        models.RaceEventLiveProviderCheckpoint.objects.filter(
+            tracking__event=self.event, data_kind="result",
+        ).update(next_poll_at=NOW)
+        claim = self._a105_claim(data_kinds=("result",))
+        before = self._a105_state()
+        retry_at = NOW + timedelta(minutes=5)
+        self._a105_fail(claim, now=NOW + timedelta(seconds=1), retry_at=retry_at)
+        after = self._a105_state()
+        self.assertEqual(after["event"], before["event"])
+        self.assertEqual(after["enrollment"], before["enrollment"])
+        self.assertEqual(after["event"][0]["status"], models.RaceEventStatus.FINISHED)
+        result = next(row for row in after["checkpoints"] if row["data_kind"] == "result")
+        self.assertEqual(result["next_poll_at"], retry_at)
+        self.assertEqual(result["consecutive_failures"], 1)
+        self.assertEqual(result["circuit_reason"], "provider_timeout")
+        self.assertEqual(after["tracking"][0]["active_attempt_token"], "")
+        self.assertIsNone(after["tracking"][0]["claim_expires_at"])
+        for kind in ("race_time", "racecard"):
+            self.assertEqual(next(row for row in after["checkpoints"] if row["data_kind"] == kind),
+                             next(row for row in before["checkpoints"] if row["data_kind"] == kind))
+
     def test_acquire_replay_and_disenroll_owner_cas(self):
         acquired = self._acquire()
         self.assertEqual(acquired.action, "acquired")
@@ -1404,6 +1581,227 @@ class RaceDataSyncEnrollmentControlTests(TestCase):
         self.assertTrue(tracking.tracking_enabled)
         legacy_other_source_checkpoint.refresh_from_db()
         self.assertIsNone(legacy_other_source_checkpoint.next_poll_at)
+
+
+    def test_cancelled_inflight_failure_stops_all_claimed_periodic_retries(self):
+        self.assertEqual(self.event.status, models.RaceEventStatus.SCHEDULED)
+        self.assertEqual(self._acquire().action, "acquired")
+        claim = self._a105_claim()
+        before_status = self._a105_state()
+        self.assertEqual(len(before_status["checkpoints"]), 3)
+        self.assertEqual(before_status["owner"][0]["write_owner"],
+                         models.RaceEventProjectionWriteOwner.DATA_SYNC)
+        self.assertEqual(before_status["owner"][0]["owner_generation"], claim.owner_generation)
+        self.assertEqual(before_status["enrollment"][0]["enrollment_generation"],
+                         claim.enrollment_generation)
+        self.assertEqual(before_status["enrollment"][0]["entry_sha256"],
+                         claim.enrollment_entry_sha256)
+        self.assertEqual(before_status["tracking"][0]["claim_generation"], claim.claim_generation)
+        self.assertEqual(before_status["tracking"][0]["active_attempt_token"], claim.attempt_token)
+        self.assertEqual(before_status["tracking"][0]["claim_expires_at"],
+                         NOW + timedelta(seconds=60))
+        self.event.status = models.RaceEventStatus.CANCELLED
+        self.event.save(update_fields=("status", "updated_at"))
+        before_failure = self._a105_state()
+        self.assertEqual(before_failure["event"][0]["status"],
+                         models.RaceEventStatus.CANCELLED)
+        # A status-only save must leave this real claim and its frozen plan valid.
+        for key in ("source", "owner", "enrollment", "tracking", "checkpoints", "lifecycle"):
+            self.assertEqual(before_failure[key], before_status[key])
+        failed_at = NOW + timedelta(seconds=1)
+        retry_at = NOW + timedelta(minutes=5)
+        self._a105_fail(claim, now=failed_at, retry_at=retry_at)
+        after = self._a105_state()
+        for key in ("event", "source", "owner", "enrollment", "lifecycle"):
+            self.assertEqual(after[key], before_failure[key])
+        before_checkpoints = {row["id"]: row
+                              for row in before_failure["checkpoints"]}
+        for row in after["checkpoints"]:
+            previous = before_checkpoints[row["id"]]
+            self.assertEqual(row["last_attempt_at"], failed_at)
+            self.assertEqual(row["consecutive_failures"], previous["consecutive_failures"] + 1)
+            self.assertEqual(row["circuit_reason"], "provider_timeout")
+            self.assertEqual(row["lock_version"], previous["lock_version"] + 1)
+        tracking = after["tracking"][0]
+        previous_tracking = before_failure["tracking"][0]
+        self.assertEqual(tracking["active_attempt_token"], "")
+        self.assertIsNone(tracking["claim_expires_at"])
+        self.assertEqual(tracking["claim_generation"], claim.claim_generation)
+        self.assertEqual(tracking["consecutive_failures"],
+                         previous_tracking["consecutive_failures"] + 1)
+        self.assertEqual(tracking["circuit_reason"], "provider_timeout")
+        self.assertEqual(tracking["lock_version"], previous_tracking["lock_version"] + 1)
+        self.assertEqual(
+            {row["data_kind"]: row["next_poll_at"] for row in after["checkpoints"]},
+            {"race_time": None, "racecard": None, "result": None},
+        )
+        self.assertIsNone(tracking["next_poll_at"])
+
+    def test_cancelled_inflight_failure_has_no_due_reclaim_after_retry_time(self):
+        self.assertEqual(self.event.status, models.RaceEventStatus.SCHEDULED)
+        self.assertEqual(self._acquire().action, "acquired")
+        claim = self._a105_claim()
+        before_status = self._a105_state()
+        self.assertEqual(len(before_status["checkpoints"]), 3)
+        self.assertEqual(before_status["owner"][0]["write_owner"],
+                         models.RaceEventProjectionWriteOwner.DATA_SYNC)
+        self.assertEqual(before_status["owner"][0]["owner_generation"], claim.owner_generation)
+        self.assertEqual(before_status["enrollment"][0]["enrollment_generation"],
+                         claim.enrollment_generation)
+        self.assertEqual(before_status["enrollment"][0]["entry_sha256"],
+                         claim.enrollment_entry_sha256)
+        self.assertEqual(before_status["tracking"][0]["claim_generation"], claim.claim_generation)
+        self.assertEqual(before_status["tracking"][0]["active_attempt_token"], claim.attempt_token)
+        self.assertEqual(before_status["tracking"][0]["claim_expires_at"],
+                         NOW + timedelta(seconds=60))
+        self.event.status = models.RaceEventStatus.CANCELLED
+        self.event.save(update_fields=("status", "updated_at"))
+        before_failure = self._a105_state()
+        self.assertEqual(before_failure["event"][0]["status"],
+                         models.RaceEventStatus.CANCELLED)
+        for key in ("source", "owner", "enrollment", "tracking", "checkpoints", "lifecycle"):
+            self.assertEqual(before_failure[key], before_status[key])
+        retry_at = NOW + timedelta(minutes=5)
+        self._a105_fail(claim, now=NOW + timedelta(seconds=1), retry_at=retry_at)
+        after_failure = self._a105_state()
+        for key in ("event", "source", "owner", "enrollment", "lifecycle"):
+            self.assertEqual(after_failure[key], before_failure[key])
+        tracking = after_failure["tracking"][0]
+        self.assertEqual(tracking["active_attempt_token"], "")
+        self.assertIsNone(tracking["claim_expires_at"])
+        self.assertEqual(tracking["claim_generation"], claim.claim_generation)
+        self.assertEqual(tracking["circuit_reason"], "provider_timeout")
+        self.assertEqual(tracking["consecutive_failures"],
+                         before_failure["tracking"][0]["consecutive_failures"] + 1)
+        claims = race_data_sync_control.claim_due_enrollments(
+            now=retry_at, batch_size=10, ttl_seconds=60,
+            enabled_providers=("jra",), enabled_regions=("japan",),
+            enabled_data_kinds=("race_time", "racecard", "result"),
+        )
+        self.assertEqual(claims, ())
+        self.assertEqual(self._a105_state(), after_failure)
+
+
+    def test_finished_inflight_failure_stops_nonresult_retries_keeps_result_retry(self):
+        self.assertEqual(self.event.status, models.RaceEventStatus.SCHEDULED)
+        self.assertEqual(self._acquire().action, "acquired")
+        claim = self._a105_claim()
+        before_status = self._a105_state()
+        self.assertEqual(len(before_status["checkpoints"]), 3)
+        self.assertEqual(before_status["owner"][0]["write_owner"],
+                         models.RaceEventProjectionWriteOwner.DATA_SYNC)
+        self.assertEqual(before_status["owner"][0]["owner_generation"], claim.owner_generation)
+        self.assertEqual(before_status["enrollment"][0]["enrollment_generation"],
+                         claim.enrollment_generation)
+        self.assertEqual(before_status["enrollment"][0]["entry_sha256"],
+                         claim.enrollment_entry_sha256)
+        self.assertEqual(before_status["tracking"][0]["claim_generation"], claim.claim_generation)
+        self.assertEqual(before_status["tracking"][0]["active_attempt_token"], claim.attempt_token)
+        self.assertEqual(before_status["tracking"][0]["claim_expires_at"],
+                         NOW + timedelta(seconds=60))
+        self.event.status = models.RaceEventStatus.FINISHED
+        self.event.save(update_fields=("status", "updated_at"))
+        before_failure = self._a105_state()
+        self.assertEqual(before_failure["event"][0]["status"], models.RaceEventStatus.FINISHED)
+        for key in ("source", "owner", "enrollment", "tracking", "checkpoints", "lifecycle"):
+            self.assertEqual(before_failure[key], before_status[key])
+        failed_at = NOW + timedelta(seconds=1)
+        retry_at = NOW + timedelta(minutes=5)
+        self._a105_fail(claim, now=failed_at, retry_at=retry_at)
+        after = self._a105_state()
+        for key in ("event", "source", "owner", "enrollment", "lifecycle"):
+            self.assertEqual(after[key], before_failure[key])
+        before_checkpoints = {row["id"]: row for row in before_failure["checkpoints"]}
+        for row in after["checkpoints"]:
+            previous = before_checkpoints[row["id"]]
+            self.assertEqual(row["last_attempt_at"], failed_at)
+            self.assertEqual(row["consecutive_failures"], previous["consecutive_failures"] + 1)
+            self.assertEqual(row["circuit_reason"], "provider_timeout")
+            self.assertEqual(row["lock_version"], previous["lock_version"] + 1)
+        tracking = after["tracking"][0]
+        previous_tracking = before_failure["tracking"][0]
+        self.assertEqual(tracking["active_attempt_token"], "")
+        self.assertIsNone(tracking["claim_expires_at"])
+        self.assertEqual(tracking["claim_generation"], claim.claim_generation)
+        self.assertEqual(tracking["consecutive_failures"],
+                         previous_tracking["consecutive_failures"] + 1)
+        self.assertEqual(tracking["circuit_reason"], "provider_timeout")
+        self.assertEqual(tracking["lock_version"], previous_tracking["lock_version"] + 1)
+        self.assertEqual(
+            {row["data_kind"]: row["next_poll_at"] for row in after["checkpoints"]},
+            {"race_time": None, "racecard": None, "result": retry_at},
+        )
+        self.assertEqual(tracking["next_poll_at"], retry_at)
+
+    def test_finished_inflight_failure_reclaims_only_result_after_retry_time(self):
+        self.assertEqual(self.event.status, models.RaceEventStatus.SCHEDULED)
+        self.assertEqual(self._acquire().action, "acquired")
+        claim = self._a105_claim()
+        before_status = self._a105_state()
+        self.assertEqual(len(before_status["checkpoints"]), 3)
+        self.assertEqual(before_status["owner"][0]["write_owner"],
+                         models.RaceEventProjectionWriteOwner.DATA_SYNC)
+        self.assertEqual(before_status["owner"][0]["owner_generation"], claim.owner_generation)
+        self.assertEqual(before_status["enrollment"][0]["enrollment_generation"],
+                         claim.enrollment_generation)
+        self.assertEqual(before_status["enrollment"][0]["entry_sha256"],
+                         claim.enrollment_entry_sha256)
+        self.assertEqual(before_status["tracking"][0]["claim_generation"], claim.claim_generation)
+        self.assertEqual(before_status["tracking"][0]["active_attempt_token"], claim.attempt_token)
+        self.assertEqual(before_status["tracking"][0]["claim_expires_at"],
+                         NOW + timedelta(seconds=60))
+        self.event.status = models.RaceEventStatus.FINISHED
+        self.event.save(update_fields=("status", "updated_at"))
+        before_failure = self._a105_state()
+        self.assertEqual(before_failure["event"][0]["status"], models.RaceEventStatus.FINISHED)
+        for key in ("source", "owner", "enrollment", "tracking", "checkpoints", "lifecycle"):
+            self.assertEqual(before_failure[key], before_status[key])
+        failed_at = NOW + timedelta(seconds=1)
+        retry_at = NOW + timedelta(minutes=5)
+        self._a105_fail(claim, now=failed_at, retry_at=retry_at)
+        after_failure = self._a105_state()
+        for key in ("event", "source", "owner", "enrollment", "lifecycle"):
+            self.assertEqual(after_failure[key], before_failure[key])
+        tracking = after_failure["tracking"][0]
+        self.assertEqual(tracking["active_attempt_token"], "")
+        self.assertIsNone(tracking["claim_expires_at"])
+        self.assertEqual(tracking["claim_generation"], claim.claim_generation)
+        self.assertEqual(tracking["consecutive_failures"],
+                         before_failure["tracking"][0]["consecutive_failures"] + 1)
+        self.assertEqual(tracking["circuit_reason"], "provider_timeout")
+        self.assertEqual(tracking["next_poll_at"], retry_at)
+        claims = race_data_sync_control.claim_due_enrollments(
+            now=retry_at, batch_size=10, ttl_seconds=60,
+            enabled_providers=("jra",), enabled_regions=("japan",),
+            enabled_data_kinds=("race_time", "racecard", "result"),
+        )
+        self.assertEqual(len(claims), 1)
+        next_claim = claims[0]
+        self.assertEqual(next_claim.event_id, claim.event_id)
+        self.assertEqual(next_claim.owner_generation, claim.owner_generation)
+        self.assertEqual(next_claim.enrollment_generation, claim.enrollment_generation)
+        self.assertEqual(next_claim.enrollment_entry_sha256, claim.enrollment_entry_sha256)
+        self.assertEqual(next_claim.route_digest, claim.route_digest)
+        self.assertEqual(next_claim.claim_generation, claim.claim_generation + 1)
+        self.assertRegex(next_claim.attempt_token, r"^[0-9a-f]{32}$")
+        self.assertNotEqual(next_claim.attempt_token, claim.attempt_token)
+        self.assertEqual(next_claim.data_kinds, ("result",))
+        self.assertEqual(next_claim.checkpoint_plan,
+                         ({"source_key": "jra", "data_kind": "result", "lock_version": 1},))
+        self.assertRegex(next_claim.plan_sha256, r"^[0-9a-f]{64}$")
+        self.assertNotEqual(next_claim.plan_sha256, claim.plan_sha256)
+        after_reclaim = self._a105_state()
+        for key in ("event", "source", "owner", "enrollment", "lifecycle"):
+            self.assertEqual(after_reclaim[key], after_failure[key])
+        before_checkpoints = {row["data_kind"]: row for row in after_failure["checkpoints"]}
+        after_checkpoints = {row["data_kind"]: row for row in after_reclaim["checkpoints"]}
+        for kind in ("race_time", "racecard"):
+            self.assertEqual(after_checkpoints[kind], before_checkpoints[kind])
+            self.assertIsNone(after_checkpoints[kind]["next_poll_at"])
+        self.assertEqual(after_reclaim["tracking"][0]["claim_generation"], next_claim.claim_generation)
+        self.assertEqual(after_reclaim["tracking"][0]["active_attempt_token"], next_claim.attempt_token)
+        self.assertEqual(after_reclaim["tracking"][0]["claim_expires_at"],
+                         retry_at + timedelta(seconds=60))
 
 
 class RaceDataSnapshotLeaseControlTests(TestCase):
