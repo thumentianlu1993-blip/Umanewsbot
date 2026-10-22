@@ -15,7 +15,8 @@ from django.test import TransactionTestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 
 from stable.models import (ManagedReadonlyTaskBudget, ManagedReadonlyStep, NewsArticle,
-                           TranslationRun, TranslationRetryBudget)
+                           TranslationRun, TranslationRetryBudget, TermEntry, TermAlias, TermType)
+from stable.services import translation
 from stable.services import managed_readonly_steps as ro, translation_recovery as recovery, translation_retry_budget as core
 from stable.test_managed_translation_budget_consumer import (
     ManagedTranslationBudgetConsumerFixture, NOW, fixture_requirement,
@@ -66,6 +67,128 @@ class ManagedReadonlyStepTests(ManagedTranslationBudgetConsumerFixture):
         with recovery._offline_budget_scope(self.identity):
             self.readroot = ro.initialize_read_budget(**options)
 
+    def test_article_term_receipt_v2_real_orm_missing_candidate_material(self):
+        """B107 GREEN1：显式v3实际ORM持久候选；旧v2 RED原件保留。"""
+        self.new_case(title="Stewards review the incident",
+                      body="Jockey Irad Ortiz Jr. had enough time after the sale.")
+        term = TermEntry.objects.create(term_type=TermType.JOCKEY,
+            source_language=self.article.source_language, racing_region=self.article.racing_region,
+            source_ja="Irad Ortiz Jr.", target_zh="奥天信", priority=100)
+        alias = TermAlias.objects.create(term=term, source_language=self.article.source_language,
+                                         text="Irad Ortiz")
+        baseline = translation.resolve_article_entities_for_article(self.article)
+        fixture_requirement(term.pk in baseline.accepted_term_ids and alias.is_active,
+                            "B106人物词条/alias必须真实入库且原resolver识别人物")
+        with recovery._offline_budget_scope(self.identity):
+            self.readroot = ro.initialize_read_budget(tool_read_limit=1, now=NOW, receipt_version=3,
+                baseline={"kind": "synthetic_no_prior_tool_reads", "operation_uuid": str(self.identity.operation_uuid)})
+        fixture_requirement((self.readroot.workflow_version, self.readroot.query_version,
+                             self.readroot.result_version) == ro.RECEIPT_VERSIONS[3],
+                            "B107必须实际v3；不支持版本是ERROR")
+        decision, reader = self.invoke()
+        step = self.readroot.steps.get()
+        self.budget.refresh_from_db(); self.readroot.refresh_from_db()
+        fixture_requirement(decision.allowed and step.state == "completed" and reader.closed
+                            and self.readroot.tool_reads_reserved == 1
+                            and self.budget.requests_reserved == 0,
+                            "B106必须先完成真实v2 ORM read且尚未开始model")
+        print("B106_RED1_ACTUAL", step.step_uuid, step.result_sha256,
+              sorted(step.result), term.pk, alias.pk, flush=True)
+        self.assertIn("term_snapshot", step.result,
+                      "实际v2持久化read缺少来源绑定的候选材料与冻结resolution")
+
+        from stable.services import article_term_receipt
+        frozen = article_term_receipt.decode(step.result["term_snapshot"],
+                                              article_term_receipt.source_view(self.article, {"input_sha256": self.identity.source_sha256, "source_site":self.article.source_site,"source_article_id":self.article.source_article_id}),
+                                              self.article.pk, self.identity.source_sha256)
+        self.assertEqual(frozen.as_dict(), baseline.as_dict())
+        self.assertIn(("term", term.pk), {(r["kind"],r["id"]) for r in step.result["term_snapshot"]["inputs"]})
+        self.assertIn(("alias", alias.pk), {(r["kind"],r["id"]) for r in step.result["term_snapshot"]["inputs"]})
+
+    def _term_v3_init(self):
+        with recovery._offline_budget_scope(self.identity):
+            self.readroot = ro.initialize_read_budget(tool_read_limit=1, now=NOW, receipt_version=3,
+                baseline={"kind":"synthetic_no_prior_tool_reads", "operation_uuid":str(self.identity.operation_uuid)})
+
+    def test_article_term_receipt_v3_limit_preserves_slot_and_unknown_replay(self):
+        self.new_case(title="", body="Irad Ortiz Jr. rode.")
+        TermEntry.objects.create(source_language="en", term_type=TermType.JOCKEY,
+                                 source_ja="Irad Ortiz Jr.", target_zh="奥天信", notes="x"*4097)
+        self._term_v3_init()
+        denied, _ = self.invoke()
+        self.assertEqual((denied.allowed,denied.reason),(False,"read_terms_limit"))
+        self.readroot.refresh_from_db(); self.budget.refresh_from_db()
+        self.assertEqual((self.readroot.tool_reads_reserved,self.readroot.steps.get().state,
+                          self.budget.requests_reserved),(1,"inflight",0))
+        with CaptureQueriesContext(connection) as queries:
+            repeated, reader = self.invoke()
+        self.assertEqual((repeated.allowed,repeated.reason),(False,"step_result_unknown"))
+        self.assertEqual(reader.trace,[])
+        self.assertFalse(any('"stable_termentry"' in q["sql"] or '"stable_termalias"' in q["sql"] for q in queries))
+
+    def test_article_term_receipt_v3_cached_source_permission_deadline_and_version_fences(self):
+        for fence in ("source","permission","deadline","version","mapping"):
+            with self.subTest(fence=fence):
+                self.new_case(title="", body="Irad Ortiz Jr. rode.")
+                TermEntry.objects.all().delete()
+                TermEntry.objects.create(source_language="en",term_type=TermType.JOCKEY,
+                                         source_ja="Irad Ortiz Jr.",target_zh="奥天信")
+                self._term_v3_init(); completed,_=self.invoke()
+                fixture_requirement(completed.allowed,"B107必须先实际完成v3 read")
+                step=self.readroot.steps.get()
+                if fence=="source":
+                    NewsArticle.objects.filter(pk=self.article.pk).update(title_ja="changed")
+                elif fence=="permission":
+                    with self.scope():ro.revoke_read_grant(self.readroot.pk)
+                elif fence=="deadline":
+                    self.clock.return_value=self.readroot.deadline_at+timedelta(seconds=1)
+                elif fence=="version":
+                    # Existing test-only single-row corruption; production ORM guard stays intact.
+                    changed = models.QuerySet.update(ManagedReadonlyTaskBudget.objects.filter(pk=self.readroot.pk),
+                                                     query_version="source_excerpt_v2")
+                    fixture_requirement(changed == 1, "B108 version corruption must persist one real root")
+                else:
+                    step.result["term_snapshot"]["resolution"]["entities"][0]["term_id"]=9223372036854775807
+                    step.result_sha256=ro._sha(step.result)
+                    changed = models.QuerySet.update(ManagedReadonlyStep.objects.filter(pk=step.pk),
+                                                     result=step.result, result_sha256=step.result_sha256)
+                    fixture_requirement(changed == 1, "B108 mapping corruption must persist one real step")
+                with CaptureQueriesContext(connection) as queries:
+                    denied,_=self.invoke()
+                self.assertFalse(denied.allowed)
+                if fence == "version": self.assertEqual(denied.reason, "step_version_changed")
+                if fence == "mapping": self.assertEqual(denied.reason, "step_result_invalid")
+                self.assertFalse(any('"stable_termentry"' in q["sql"] or '"stable_termalias"' in q["sql"] for q in queries))
+                self.readroot.refresh_from_db();self.budget.refresh_from_db()
+                self.assertEqual((self.readroot.tool_reads_reserved,self.budget.requests_reserved),(1,0))
+
+    def test_article_term_receipt_v3_v1_v2_exact_keys_and_no_root_upgrade(self):
+        base={"query_version","result_version","article_id","run_id","source_site","source_article_id",
+              "input_sha256","title","body_excerpt","body_chars","read_at","step_uuid","idempotency_sha256"}
+        for version in (1,2):
+            with self.subTest(version=version):
+                self.new_case(title="",body="Irad Ortiz Jr. rode.")
+                if version==1:self.init()
+                else:self.init_publication_receipt()
+                decision,_=self.invoke()
+                self.assertTrue(decision.allowed)
+                self.assertEqual(set(decision.result),base | ({"publication"} if version==2 else set()))
+                with recovery._offline_budget_scope(self.identity), self.assertRaisesRegex(ro.ReadonlyRefusal,"read_budget_contract_changed"):
+                    ro.initialize_read_budget(tool_read_limit=1,now=NOW,receipt_version=3,
+                        baseline={"kind":"synthetic_no_prior_tool_reads","operation_uuid":str(self.identity.operation_uuid)})
+
+    def test_article_term_receipt_v3_read_finish_source_grant_and_timeout_fences(self):
+        for fault in ("change_before_read","revoke_after_read","timeout_after_read"):
+            with self.subTest(fault=fault):
+                self.new_case(title="",body="Irad Ortiz Jr. rode.")
+                self._term_v3_init()
+                denied,_=self.invoke(fault=fault)
+                self.assertFalse(denied.allowed)
+                self.readroot.refresh_from_db();self.budget.refresh_from_db()
+                self.assertEqual((self.readroot.tool_reads_reserved,self.budget.requests_reserved),(1,0))
+                self.assertEqual(self.readroot.steps.get().state,"inflight")
+                self.assertEqual(self.readroot.steps.get().result,{})
+
     def test_publication_receipt_real_orm_three_states(self):
         for verified in (True, False, None):
             with self.subTest(verified=verified):
@@ -101,13 +224,31 @@ class ManagedReadonlyStepTests(ManagedTranslationBudgetConsumerFixture):
         self.assertEqual(set(result.result), {"query_version", "result_version", "article_id", "run_id", "source_site",
             "source_article_id", "input_sha256", "title", "body_excerpt", "body_chars", "read_at", "step_uuid", "idempotency_sha256"})
         self.assertEqual((self.readroot.workflow_version, self.readroot.query_version, self.readroot.result_version), ro.RECEIPT_VERSIONS[1])
-        with recovery._offline_budget_scope(self.identity), self.assertRaisesMessage(ro.ReadonlyRefusal, "read_budget_contract_changed"):
-            ro.initialize_read_budget(tool_read_limit=1, receipt_version=2, now=NOW, baseline={
-                "kind": "synthetic_no_prior_tool_reads", "operation_uuid": str(self.identity.operation_uuid)})
-        for version in (True, 2.0, "2", 3):
-            with self.subTest(version=version), recovery._offline_budget_scope(self.identity), self.assertRaisesMessage(ro.ReadonlyRefusal, "step_version_changed"):
-                ro.initialize_read_budget(tool_read_limit=1, receipt_version=version, now=NOW, baseline={
-                    "kind": "synthetic_no_prior_tool_reads", "operation_uuid": str(self.identity.operation_uuid)})
+        from stable.models import ExternalHorseAlias, RaceEventRunner, RaceEventResult, ArticleRaceLink
+        before_root = ManagedReadonlyTaskBudget.objects.values().get(pk=self.readroot.pk)
+        before_step = self.readroot.steps.values().get()
+        before_budget = TranslationRetryBudget.objects.values().get(pk=self.budget.pk)
+        material_tables = tuple(model._meta.db_table for model in
+            (TermEntry, TermAlias, ExternalHorseAlias, RaceEventRunner, RaceEventResult, ArticleRaceLink))
+        # Supported versions reach the existing immutable-root contract fence.
+        # Unknown versions and non-native ints fail earlier, before any root lookup.
+        cases = ((2, "read_budget_contract_changed"), (3, "read_budget_contract_changed"),
+                 (True, "step_version_changed"), (2.0, "step_version_changed"),
+                 ("2", "step_version_changed"), (4, "step_version_changed"))
+        for version, reason in cases:
+            with self.subTest(version=version), CaptureQueriesContext(connection) as queries:
+                with recovery._offline_budget_scope(self.identity), self.assertRaisesMessage(ro.ReadonlyRefusal, reason):
+                    ro.initialize_read_budget(tool_read_limit=1, receipt_version=version, now=NOW, baseline={
+                        "kind": "synthetic_no_prior_tool_reads", "operation_uuid": str(self.identity.operation_uuid)})
+            self.assertFalse(any(q["sql"].lstrip().upper().startswith("SELECT")
+                                 and any('"' + table + '"' in q["sql"] for table in material_tables)
+                                 for q in queries))
+            self.assertEqual(ManagedReadonlyTaskBudget.objects.values().get(pk=self.readroot.pk), before_root)
+            self.assertEqual(self.readroot.steps.values().get(), before_step)
+            self.assertEqual(TranslationRetryBudget.objects.values().get(pk=self.budget.pk), before_budget)
+            self.assertEqual(before_budget["requests_reserved"], 0)
+            self.assertEqual(self.budget.request_attempts.count(), 0)
+            self.constructor.assert_not_called()
 
     def test_publication_projection_sql_bounds_and_inert_material(self):
         self.article.published_at_verified = None
@@ -632,6 +773,267 @@ class ManagedReadonlyStepTests(ManagedTranslationBudgetConsumerFixture):
         self.assertEqual(NewsArticle.objects.values().get(pk=self.article.pk), before_article)
         self.assertEqual(TranslationRun.objects.values().get(pk=self.envelope.run_id), before_run)
         self.assert_no_request_change(before)
+
+
+    def _v3_dedicated_setup(self):
+        from stable.models import NotificationLog
+        self.new_case(title="", body="Irad Ortiz Jr. rode.")
+        self.readers = []
+        self._v3_term, _ = TermEntry.objects.get_or_create(
+            source_language="en", term_type=TermType.JOCKEY, source_ja="Irad Ortiz Jr.",
+            defaults={"target_zh": "奥天信"})
+        self._term_v3_init()
+        self.assertEqual((self.readroot.workflow_version, self.readroot.query_version,
+                          self.readroot.result_version), ro.RECEIPT_VERSIONS[3])
+        self._v3_run_before = TranslationRun.objects.values().get(pk=self.envelope.run_id)
+        self._v3_parent_before = TranslationRetryBudget.objects.values().get(pk=self.budget.pk)
+        self._v3_notifications_before = NotificationLog.objects.count()
+        self._v3_public_body_before = NewsArticle.objects.values_list("body_zh", flat=True).get(pk=self.article.pk)
+
+    @contextmanager
+    def _v3_dedicated_capture_gate(self):
+        from threading import Event
+        ready, release = Event(), Event()
+        observed = []
+        original = ro.term_receipt.capture
+
+        def capture(*args, **kwargs):
+            self.assertFalse(connection.in_atomic_block, "capture不得持业务事务锁")
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT pg_backend_pid()")
+                pid = cursor.fetchone()[0]
+            observed.append({"pid": pid, "article_id": args[1], "source_sha256": args[2]})
+            ready.set()
+            if not release.wait(8):
+                raise RuntimeError("B120真实capture观察gate未释放")
+            return original(*args, **kwargs)
+
+        with patch.object(ro.term_receipt, "capture", side_effect=capture):
+            try:
+                yield ready, release, observed
+            finally:
+                release.set()
+
+    @contextmanager
+    def _v3_dedicated_workers(self, *, count=1, releases=(), cross_deadline=None):
+        from threading import Event
+        import time
+        self.assertIn(count, (1, 2))
+        self.assertEqual(connection.vendor, "postgresql")
+        state = {"pids": {}, "results": {}, "errors": {}, "closed": {},
+                 "ready": [Event() for _ in range(count)], "done": [Event() for _ in range(count)]}
+
+        def worker(index):
+            try:
+                with connections["default"].cursor() as cursor:
+                    cursor.execute("SELECT pg_backend_pid()")
+                    state["pids"][index] = cursor.fetchone()[0]
+                state["ready"][index].set()
+                state["results"][index] = self.invoke()
+            except BaseException as exc:
+                state["errors"][index] = repr(exc)
+            finally:
+                connections.close_all()
+                state["closed"][index] = connections["default"].connection is None
+                state["ready"][index].set()
+                state["done"][index].set()
+
+        threads = [Thread(target=worker, args=(i,), daemon=True) for i in range(count)]
+        try:
+            with transaction.atomic():
+                ManagedReadonlyTaskBudget.objects.select_for_update().get(pk=self.readroot.pk)
+                with connection.cursor() as cursor:
+                    cursor.execute("SELECT pg_backend_pid()")
+                    owner = cursor.fetchone()[0]
+                for thread in threads:
+                    thread.start()
+                for ready in state["ready"]:
+                    fixture_requirement(ready.wait(8), "B120独立PG worker前置")
+                self.assertEqual(state["errors"], {})
+                self.assertEqual(len(set(state["pids"].values())), count)
+                self.assertNotIn(owner, state["pids"].values())
+                stop, rows, verified = time.monotonic() + 8, [], []
+                while time.monotonic() < stop:
+                    with connection.cursor() as cursor:
+                        cursor.execute("SELECT pid, wait_event_type, pg_blocking_pids(pid) "
+                                       "FROM pg_stat_activity WHERE pid = ANY(%s)",
+                                       [list(state["pids"].values()) + [owner]])
+                        rows = cursor.fetchall()
+                    graph = {pid: (wait, blockers) for pid, wait, blockers in rows}
+                    allowed = set(state["pids"].values()) | {owner}
+
+                    def reaches_owner(pid, path):
+                        if pid == owner:
+                            return owner in graph and connection.in_atomic_block
+                        if pid in path or pid not in graph:
+                            return False
+                        wait, blockers = graph[pid]
+                        return (wait == "Lock" and bool(blockers)
+                                and all(b in allowed and reaches_owner(b, path | {pid}) for b in blockers))
+
+                    verified = [pid for pid in state["pids"].values() if reaches_owner(pid, set())]
+                    if len(verified) == count:
+                        break
+                    time.sleep(.025)
+                print("B120_V3_LOCK_GRAPH", owner, state["pids"], rows, verified, flush=True)
+                self.assertEqual(len(verified), count, "须真实等待且全部边最终抵达主owner")
+                state["owner"] = owner
+                state["lock_graph"] = rows
+                if cross_deadline is not None:
+                    self.assertGreater(cross_deadline, self.clock.return_value)
+                    self.clock.return_value = cross_deadline
+            yield state
+        finally:
+            for release in releases:
+                release.set()
+            for thread in threads:
+                if thread.ident is not None:
+                    thread.join(12)
+            print("B120_V3_WORKER_CLEANUP", state["pids"], state["errors"], state["closed"],
+                  [t.is_alive() for t in threads], flush=True)
+            self.assertFalse(any(t.is_alive() for t in threads), "daemon超时不得继续下一方法")
+            self.assertEqual(state["closed"], {i: True for i in range(count)})
+        self.assertEqual(state["errors"], {})
+        self.assertEqual(set(state["results"]), set(range(count)))
+
+    def _v3_dedicated_assert_inert(self):
+        from stable.models import NotificationLog
+        self.budget.refresh_from_db()
+        self.assertEqual(TranslationRetryBudget.objects.values().get(pk=self.budget.pk),
+                         self._v3_parent_before)
+        self.assertEqual(self.readroot.tool_read_limit, 1)
+        self.assertEqual(self.budget.requests_reserved, 0)
+        self.assertEqual(self.budget.request_attempts.count(), 0)
+        self.constructor.assert_not_called()
+        self.assertEqual(NotificationLog.objects.count(), self._v3_notifications_before)
+        self.assertEqual(TranslationRun.objects.values().get(pk=self.envelope.run_id), self._v3_run_before)
+        self.assertNotIn(recovery.RESULT_KEY, self._v3_run_before["raw_response"])
+        self.assertEqual(NewsArticle.objects.values_list("body_zh", flat=True).get(pk=self.article.pk),
+                         self._v3_public_body_before)
+
+    def test_v3_two_read_consumers_have_one_capture_and_immutable_receipt(self):
+        self._v3_dedicated_setup()
+        with self._v3_dedicated_capture_gate() as (ready, release, observed):
+            with self._v3_dedicated_workers(count=2, releases=(release,)) as state:
+                fixture_requirement(ready.wait(8), "唯一reader必须到达真实v3capture")
+                self.assertEqual(len(observed), 1)
+                self.assertEqual(observed[0]["article_id"], self.article.pk)
+                winner = next(i for i, pid in state["pids"].items() if pid == observed[0]["pid"])
+                loser = 1 - winner
+                fixture_requirement(state["done"][loser].wait(8), "败者须在赢家capture暂停时退出")
+                self.assertEqual(state["errors"], {})
+                denied, reader = state["results"][loser]
+                self.assertEqual((denied.allowed, denied.reason), (False, "step_result_unknown"))
+                self.assertEqual(reader.trace, [])
+                inflight = ManagedReadonlyStep.objects.values().get(read_budget=self.readroot)
+                self.assertEqual(inflight["state"], "inflight")
+                self.readroot.refresh_from_db()
+                self.assertEqual(self.readroot.tool_reads_reserved, 1)
+                self.assertEqual(self.readroot.steps.count(), 1)
+                self.assertFalse(state["done"][winner].is_set())
+                release.set()
+        completed, reader = state["results"][winner]
+        self.assertTrue(completed.allowed, completed)
+        self.assertFalse(completed.cached)
+        self.assertEqual(len(observed), 1)
+        self.assertEqual(self.business_reads(), 1)
+        step = ManagedReadonlyStep.objects.values().get(read_budget=self.readroot)
+        self.assertEqual(step["state"], "completed")
+        self.assertEqual(step["step_uuid"], inflight["step_uuid"])
+        self.assertEqual(step["reservation_token"], inflight["reservation_token"])
+        self.assertEqual(step["idempotency_sha256"], inflight["idempotency_sha256"])
+        self.assertEqual(step["result_sha256"], ro._sha(step["result"]))
+        self.assertIn("term_snapshot", completed.result)
+        self.assertIn(("term", self._v3_term.pk),
+                      {(row["kind"], row["id"]) for row in completed.result["term_snapshot"]["inputs"]})
+        for _ in range(2):
+            replay, reader = self.invoke()
+            self.assertTrue(replay.allowed, replay)
+            self.assertTrue(replay.cached)
+            self.assertEqual(replay.result, completed.result)
+            self.assertEqual(reader.trace, [])
+            self.assertEqual(ManagedReadonlyStep.objects.values().get(read_budget=self.readroot), step)
+        self.assertEqual(self.business_reads(), 1)
+        self.readroot.refresh_from_db()
+        self.assertEqual(self.readroot.tool_reads_reserved, 1)
+        self._v3_dedicated_assert_inert()
+
+    def test_v3_independent_source_and_grant_writer_during_capture_refuses_receipt(self):
+        for fence, reason in (("source", "input_changed"), ("grant", "read_permission_revoked")):
+            with self.subTest(fence=fence):
+                self._v3_dedicated_setup()
+                with self._v3_dedicated_capture_gate() as (ready, release, observed):
+                    with self._v3_dedicated_workers(releases=(release,)) as state:
+                        fixture_requirement(ready.wait(8), "reader须在真实capture处暂停")
+                        self.assertEqual(len(observed), 1)
+                        self.assertEqual(observed[0]["article_id"], self.article.pk)
+                        self.assertNotEqual(state["owner"], observed[0]["pid"])
+                        self.assertEqual(observed[0]["source_sha256"], self.identity.source_sha256)
+                        inflight = ManagedReadonlyStep.objects.values().get(read_budget=self.readroot)
+                        self.assertEqual(inflight["state"], "inflight")
+                        if fence == "source":
+                            self.assertEqual(NewsArticle.objects.filter(pk=self.article.pk).update(
+                                title_ja="B120 independently committed source change"), 1)
+                            self.assertNotEqual(recovery.translation_input_sha256(
+                                NewsArticle.objects.get(pk=self.article.pk)), self.identity.source_sha256)
+                        else:
+                            epoch = self.readroot.permission_epoch
+                            with self.scope():
+                                ro.revoke_read_grant(self.readroot.pk)
+                            self.readroot.refresh_from_db()
+                            self.assertEqual((self.readroot.state, self.readroot.permission_epoch),
+                                             ("revoked", epoch + 1))
+                        self.assertFalse(connection.in_atomic_block, "writer须独立提交再释放capture")
+                        self.assertFalse(state["done"][0].is_set())
+                        print("B120_V3_CAPTURE_WRITER", fence, state["owner"], observed, flush=True)
+                        release.set()
+                denied, reader = state["results"][0]
+                self.assertEqual((denied.allowed, denied.reason), (False, reason))
+                self.assertIsNone(denied.result)
+                self.assertEqual(self.business_reads(), 1)
+                self.assertEqual(ManagedReadonlyStep.objects.values().get(read_budget=self.readroot), inflight)
+                self.assertEqual(inflight["result"], {})
+                self.assertEqual(inflight["result_sha256"], "")
+                repeated, reader = self.invoke()
+                self.assertFalse(repeated.allowed)
+                self.assertIsNone(repeated.result)
+                self.assertEqual(reader.trace, [])
+                self.readroot.refresh_from_db()
+                self.assertEqual((self.readroot.tool_reads_reserved, self.readroot.steps.count()), (1, 1))
+                self.assertEqual(self.business_reads(), 1)
+                self._v3_dedicated_assert_inert()
+
+    def test_v3_real_lock_wait_crossing_effective_deadline_refuses_new_and_cached_read(self):
+        for cached in (False, True):
+            with self.subTest(cached=cached):
+                self._v3_dedicated_setup()
+                if cached:
+                    completed, _ = self.invoke()
+                    fixture_requirement(completed.allowed, "缓存子场景须先真实完成v3read")
+                before = list(self.readroot.steps.values())
+                reads_before = self.business_reads()
+                slots_before = ManagedReadonlyTaskBudget.objects.get(pk=self.readroot.pk).tool_reads_reserved
+                claim = TranslationRun.objects.get(pk=self.envelope.run_id).raw_response[recovery.CLAIM_KEY]
+                effective = min(self.readroot.deadline_at, datetime.fromisoformat(claim["deadline_at"]))
+                with self._v3_dedicated_workers(cross_deadline=effective + timedelta(microseconds=1)) as state:
+                    pass
+                denied, reader = state["results"][0]
+                self.assertFalse(denied.allowed)
+                self.assertIn(denied.reason, ("claim_expired", "read_deadline_expired", "budget_deadline_expired"))
+                self.assertIsNone(denied.result)
+                self.assertFalse(denied.cached)
+                self.assertEqual(reader.trace, [])
+                self.assertEqual(self.business_reads(), reads_before)
+                self.assertEqual(list(self.readroot.steps.values()), before)
+                self.readroot.refresh_from_db()
+                self.assertEqual(self.readroot.tool_reads_reserved, slots_before)
+                repeated, reader = self.invoke()
+                self.assertFalse(repeated.allowed)
+                self.assertIsNone(repeated.result)
+                self.assertFalse(repeated.cached)
+                self.assertEqual(reader.trace, [])
+                self.assertEqual(list(self.readroot.steps.values()), before)
+                self._v3_dedicated_assert_inert()
 
 
 @override_settings(AUTOMATION_ENABLED=False, TRANSLATION_FAILURE_EMAIL_ENABLED=False, TRANSLATION_FAILURE_NOTIFY_EMAILS=[])

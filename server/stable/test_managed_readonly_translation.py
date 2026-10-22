@@ -22,7 +22,9 @@ from django.test.utils import CaptureQueriesContext
 
 from stable import admin as article_admin
 from stable.models import (ArticleStatus, ArticleTranslationStatus, NewsArticle, NotificationLog,
-                           OperationLog, TranslationRetryBudget, TranslationRun, WorkflowStatus)
+                           OperationLog, TranslationRetryBudget, TranslationRun, WorkflowStatus,
+                           TermEntry, TermAlias, TermType, ExternalHorseAlias, RaceEvent, RaceEventRunner,
+                           RaceEventResult, ArticleRaceLink, ArticleRaceLinkStatus)
 from stable.services import managed_readonly_steps as ro, managed_readonly_translation as job
 from stable.services import translation, translation_recovery as recovery, translation_retry_budget as core
 from stable.tasks import translate_article_task
@@ -363,6 +365,162 @@ class ManagedReadonlyTranslationEndToEndTests(RemainingReadonlyE2EFixture, Manag
         self.assertEqual(self.readroot.tool_reads_reserved, 1)
         self.assertEqual(self.readroot.deadline_at, original_deadline)
         self.assertEqual(len(self.creates()), 1)
+
+    def test_article_term_receipt_v2_resume_uses_frozen_resolution_without_dictionary_select(self):
+        """B107 GREEN2：显式v3冻结解析复用；原真实v2 RED保留。"""
+        self.article.title_ja = "Irad Ortiz Jr."
+        self.article.body_ja_raw = "Jockey Irad Ortiz Jr. rode. " + "There is time. " * 6
+        self.article.body_ja_normalized = self.article.body_ja_raw
+        self.article.save(update_fields=["title_ja", "body_ja_raw", "body_ja_normalized", "updated_at"])
+        term = TermEntry.objects.create(term_type=TermType.JOCKEY,
+            source_language=self.article.source_language, racing_region=self.article.racing_region,
+            source_ja="Irad Ortiz Jr.", target_zh="奥天信", priority=100)
+        alias = TermAlias.objects.create(term=term, source_language=self.article.source_language,
+                                         text="Irad Ortiz")
+        # 原质量门禁逐字段保留人物出现次数；原文标题/正文各一次，正文不能整句复制占位符。
+        self.payload = {"title_zh": "裁判复核__UMA_TERM_1__的骑乘",
+                        "body_zh": "骑师__UMA_TERM_1__在拍卖后有时间考虑。"
+                                   + "拍卖后仍有十分充足的时间考虑并作出决定。" * 6,
+                        "push_summary_zh": "裁判复核__UMA_TERM_1__的骑乘。"}
+        relations = None
+        if getattr(self,"_term_material_relation_delete",False):
+            self.article.body_ja_raw="Jockey Irad Ortiz Jr. rode Blue Horizon."
+            self.article.body_ja_normalized=self.article.body_ja_raw
+            self.article.save(update_fields=["body_ja_raw","body_ja_normalized","updated_at"])
+            external=ExternalHorseAlias.objects.create(source_language="en",external_horse_id="b107-horse",
+                name_ja="Blue Horizon",normalized_name="Blue Horizon")
+            event=RaceEvent.objects.create(year=2026,slug="b107-"+str(uuid4()),original_name="B107")
+            link=ArticleRaceLink.objects.create(article=self.article,event=event,status=ArticleRaceLinkStatus.AUTO)
+            runner=RaceEventRunner.objects.create(event=event,horse_name="Blue Horizon")
+            race_result=RaceEventResult.objects.create(event=event,horse_name="Blue Horizon",finish_position=1)
+            relations=(external,link,runner,race_result)
+            self.payload["body_zh"]="骑师__UMA_TERM_1__策骑__UMA_KEEP_1__。"+"拍卖后仍有十分充足的时间考虑并作出决定。"*6
+        baseline = translation.resolve_article_entities_for_article(self.article)
+        fixture_requirement(term.pk in baseline.accepted_term_ids and alias.is_active,
+                            "B106原resolver必须识别实际人物词条")
+        expected = deepcopy(baseline.as_dict())
+        fixture_requirement(self.article.title_ja.count(term.source_ja) == 1
+                            and self.article.body_ja_normalized.count(term.source_ja) == 1
+                            and self.payload["title_zh"].count("__UMA_TERM_1__") == 1
+                            and self.payload["body_zh"].count("__UMA_TERM_1__") == 1,
+                            "B106人物原文/响应逐字段必须各一次；错误为fixture ERROR")
+        self.user_retry_message(receipt_version=3); self.register()
+        fixture_requirement((self.readroot.workflow_version, self.readroot.query_version,
+                             self.readroot.result_version) == ro.RECEIPT_VERSIONS[3],
+                            "B107必须实际v3；不支持版本是ERROR")
+        with self.scope(reader_fault="exit_after_commit"):
+            job.prepare_registered_read_phase(self.envelope)
+            with self.assertRaises(ro.ReadFixtureExit):
+                ro.execute_step(self.envelope, {"body_chars": 256}, now=NOW)
+        step = self.readroot.steps.get()
+        before = (step.pk, step.step_uuid, step.result_sha256, step.read_at, deepcopy(step.result))
+        self.readroot.refresh_from_db(); self.budget.refresh_from_db()
+        run = TranslationRun.objects.get(pk=self.envelope.run_id)
+        fixture_requirement(step.state == "completed" and self.reads() == 1
+                            and self.readroot.tool_reads_reserved == 1 and self.budget.requests_reserved == 0
+                            and self.budget.request_attempts.count() == 0 and self.creates() == []
+                            and run.raw_response[recovery.CLAIM_KEY]["phase"] == "executing"
+                            and recovery.RESULT_KEY not in run.raw_response,
+                            "B106真实read提交/model未开始断点必须成立")
+        term.target_zh = "奥天信更新名"
+        term.save(update_fields=["target_zh", "updated_at"])
+        fixture_requirement(TermEntry.objects.get(pk=term.pk).target_zh == "奥天信更新名",
+                            "B106词典变化必须真实提交")
+        if relations is not None:
+            # 真正删除本case捕获的词典/关联，source与grant不改；不能查库补恢复映射。
+            term.delete()
+            for row in relations:row.delete()
+        observed = []
+        real_factory = job._registered_provider
+
+        def observe_provider(*args, **kwargs):
+            provider = real_factory(*args, **kwargs)
+            real_translate = provider.translate
+
+            def observe_translate(article, *, entity_resolution=None):
+                observed.append(deepcopy(entity_resolution.as_dict()))
+                try:
+                    result = real_translate(article, entity_resolution=entity_resolution)
+                except Exception as exc:
+                    # 透明旁观：记录真实原异常后原样重抛，consumer的业务拒绝路径保持。
+                    print("B106_RED2_ACTUAL_PROVIDER_EXCEPTION", type(exc).__name__, str(exc),
+                          "metadata", getattr(exc, "metadata", None), flush=True)
+                    raise
+                print("B106_RED2_ACTUAL_PROVIDER_RESULT", "lengths",
+                      (len(result.title_zh), len(result.body_zh), len(result.push_summary_zh)),
+                      "usage", result.metadata.get("usage"), "attempt", result.metadata.get("attempt"),
+                      flush=True)
+                return result
+
+            provider.translate = observe_translate
+            return provider
+
+        # 只旁观实际factory/provider参数，所有resolver、授权、SDK离线边界、保存仍沿原链。
+        captured_queries = []
+
+        def resume_with_query_observation(_):
+            # CaptureQueriesContext必须在消费worker的实际PG连接内，不能捕获控制连接。
+            with CaptureQueriesContext(connection) as queries:
+                result = self.consume()
+            captured_queries.extend(queries.captured_queries)
+            return result
+
+        self.case_reader_index, self.case_sdk_index = len(self.readers), len(self.sdks)
+        with patch.object(job, "_registered_provider", side_effect=observe_provider), \
+                self.wire_gate("after_usage_choices") as (ready, release, wire):
+            with self.running_workers(resume_with_query_observation, count=1, releases=(release,)) as state:
+                fixture_requirement(ready.wait(8), "B106恢复必须到达真实usage提交后的choices边界")
+                attempt = self.budget.request_attempts.get()
+                fixture_requirement(attempt.state == "usage_reported" and attempt.usage_report == USAGE
+                                    and attempt.usage_validation == "known"
+                                    and attempt.reconciliation_state == "unreconciled"
+                                    and not attempt.receipt_sha256 and len(observed) == 1,
+                                    "B106恢复须由实际provider产生已知但未结算usage")
+                self.no_business_locks(wire["pid"])
+                # 独立控制连接向原API提交真实journal绑定的离线receipt；SDK不供应成本许可。
+                receipt = {"kind": "synthetic_offline_usage_v1",
+                           "budget_uuid": str(self.budget.budget_uuid), "attempt_pk": attempt.pk,
+                           "usage_sha256": core._json_snapshot(attempt.usage_report)[1]}
+                decision = core.record_usage(budget_pk=self.budget.pk, attempt_pk=attempt.pk,
+                                             mode="offline_test", usage_report=attempt.usage_report,
+                                             receipt=receipt)
+                attempt.refresh_from_db()
+                fixture_requirement(decision.allowed and decision.reason == "offline_usage_reconciled"
+                                    and attempt.state == "reconciled"
+                                    and attempt.reconciliation_state == "offline_reconciled"
+                                    and attempt.usage_report == USAGE and bool(attempt.receipt_sha256),
+                                    "B106真实成本对账必须成功；错误不计目标RED")
+                print("B106_RED2_ACTUAL_COST_RECEIPT", attempt.pk, attempt.state,
+                      attempt.receipt_sha256, decision.reason, flush=True)
+                release.set()
+            self.workers_clean(state)
+        fixture_requirement(len(state["results"]) == 1, "B106恢复worker必须返回唯一真实结果")
+        result = state["results"][0]
+        step.refresh_from_db(); self.readroot.refresh_from_db()
+        run.refresh_from_db(); self.budget.refresh_from_db()
+        print("B106_RED2_ACTUAL_RESUME_STATE", result, "provider_calls", len(observed),
+              "reads_creates", (self.reads(), len(self.creates())), "run_status", run.status,
+              "progress", run.raw_response.get(job.PROGRESS_KEY),
+              "checkpoint_present", recovery.RESULT_KEY in run.raw_response,
+              "requests_reserved", self.budget.requests_reserved, flush=True)
+        fixture_requirement(result.get("translated") and len(observed) == 1
+                            and self.reads() == 1 and len(self.creates()) == 1
+                            and (step.pk, step.step_uuid, step.result_sha256, step.read_at, step.result) == before,
+                            "B106恢复必须实际到达provider和Article终态且不重读；失败是ERROR")
+        tables = tuple(model._meta.db_table for model in (TermEntry,TermAlias,ExternalHorseAlias,
+                      RaceEventRunner,RaceEventResult,ArticleRaceLink))
+        dictionary_selects = [q["sql"] for q in captured_queries
+                              if q["sql"].lstrip().upper().startswith("SELECT")
+                              and any('"' + table + '"' in q["sql"] for table in tables)]
+        print("B106_RED2_ACTUAL", "dictionary_selects", len(dictionary_selects),
+              "expected", expected, "provider_resolution", observed[0], flush=True)
+        self.assertEqual(observed[0], expected,
+                         "read提交后新scope的实际provider重新解析了已变化词典")
+        self.assertEqual(dictionary_selects, [], "恢复消费不得新增词典SELECT")
+
+    def test_article_term_receipt_v3_deleted_dictionary_and_relations_resume_without_select(self):
+        self._term_material_relation_delete=True
+        self.test_article_term_receipt_v2_resume_uses_frozen_resolution_without_dictionary_select()
 
     def test_completed_job_redelivery_returns_same_final_receipt(self):
         self.user_retry_message(); self.register()
@@ -813,10 +971,27 @@ class BusinessMetadataBoundaryTests(unittest.TestCase):
                            has_translation=True, first_position=0, detection_reason="horse_context",
                            conflict_flags=[], matched_span=(0, 9))
         metadata = {"recognized_horse_names": self.serialize([horse]), "model": "offline"}
-        self.assertIs(type(metadata["recognized_horse_names"][0]["matched_span"]), tuple)
+        self.assertIs(type(metadata["recognized_horse_names"][0]["matched_span"]), list)
+        self.assertEqual(self.strict(metadata), self.ordinary(metadata))
         result = self.ordinary(metadata)
         self.assertEqual(result["recognized_horse_names"][0]["matched_span"], [0, 9])
-        self.assertIs(type(metadata["recognized_horse_names"][0]["matched_span"]), tuple)
+        self.assertIs(type(metadata["recognized_horse_names"][0]["matched_span"]), list)
+
+    def test_recognized_horse_serializer_preserves_empty_none_and_other_fields(self):
+        horse = self.horse(name_ja='Brilliant', source='heuristic', matched_text='Brilliant',
+            confidence=100, external_horse_ids=[], primary_external_horse_id='',
+            needs_preserve=True, has_translation=False, first_position=0,
+            detection_reason='horse_context', conflict_flags=[], matched_span=None)
+        from dataclasses import asdict
+        original = asdict(horse)
+        metadata = {'recognized_horse_names': self.serialize([horse])}
+        self.assertEqual(metadata['recognized_horse_names'], [original])
+        self.assertEqual(self.strict(metadata), self.ordinary(metadata))
+        self.assertEqual(self.serialize([]), [])
+        horse.matched_span = ()
+        expected = asdict(horse); expected['matched_span'] = []
+        self.assertEqual(self.serialize([horse]), [expected])
+        self.assertIs(type(horse.matched_span), tuple)
 
     def test_ordinary_json_is_detached_and_preserves_scalar_types(self):
         metadata = {"usage": {"count": 1, "known": True, "cost": 0.5}, "terms": ["Brilliant"], "empty": None}
