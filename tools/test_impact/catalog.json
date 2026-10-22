@@ -887,6 +887,12 @@
     "r04_arbitration": [
       "stable.test_race_source_arbitration",
       "stable.test_race_result_arbitration_shadow"
+    ],
+    "race_result_roster_orm": [
+      "stable.test_race_result_roster_orm"
+    ],
+    "race_result_roster_reconciliation": [
+      "stable.test_race_result_roster_reconciliation"
     ]
   },
   "dependencies": {
@@ -2874,6 +2880,18 @@
       "domains": [
         "r04_arbitration"
       ]
+    },
+    "server/stable/test_race_result_roster_orm.py": {
+      "label": "stable.test_race_result_roster_orm",
+      "domains": [
+        "race_result_roster_orm"
+      ]
+    },
+    "server/stable/test_race_result_roster_reconciliation.py": {
+      "label": "stable.test_race_result_roster_reconciliation",
+      "domains": [
+        "race_result_roster_reconciliation"
+      ]
     }
   },
   "profiles": {
@@ -3194,7 +3212,9 @@
     "stable.test_content_review_decisions": "django",
     "stable.test_content_review_shadow": "django",
     "stable.test_race_source_arbitration": "python",
-    "stable.test_race_result_arbitration_shadow": "python"
+    "stable.test_race_result_arbitration_shadow": "python",
+    "stable.test_race_result_roster_orm": "django",
+    "stable.test_race_result_roster_reconciliation": "python"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {

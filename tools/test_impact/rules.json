@@ -1439,6 +1439,12 @@
     "server/stable/services/race_result_arbitration_shadow.py": [
       "r04_arbitration",
       "race_results"
+    ],
+    "server/stable/services/race_result_roster_orm.py": [
+      "race_result_roster_orm"
+    ],
+    "server/stable/services/race_result_roster_reconciliation.py": [
+      "race_result_roster_reconciliation"
     ]
   },
   "symbols": {
