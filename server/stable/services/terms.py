@@ -2274,7 +2274,12 @@ def _raw_span_for_visible_entity(
     except ValueError:
         return None
     visible_raw_spans: list[tuple[int, int]] = []
+    original_visible = clean_visible_source_text(text)
     marker = "__UMA_VISIBLE_OCCURRENCE_MARKER__"
+    marker_suffix = 0
+    while marker in text or marker in original_visible:
+        marker_suffix += 1
+        marker = f"__UMA_VISIBLE_OCCURRENCE_MARKER_{marker_suffix}__"
     for match in _iter_candidate_matches(text, entity.matched_text, SourceLanguage.ENGLISH):
         marked = text[: match.start()] + marker + text[match.end() :]
         if marker in clean_visible_source_text(marked):
