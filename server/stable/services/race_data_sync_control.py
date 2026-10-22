@@ -2105,8 +2105,11 @@ def fail_race_data_sync_claim(
             checkpoint.circuit_reason = reason_code
             checkpoint.next_poll_at = (
                 None
-                if event.status == models.RaceEventStatus.POSTPONED
-                and checkpoint.data_kind == models.RaceDataSyncDataKind.RESULT
+                if event.status == models.RaceEventStatus.CANCELLED
+                or (
+                    event.status == models.RaceEventStatus.POSTPONED
+                    and checkpoint.data_kind == models.RaceDataSyncDataKind.RESULT
+                )
                 else retry_at
             )
             checkpoint.lock_version += 1
