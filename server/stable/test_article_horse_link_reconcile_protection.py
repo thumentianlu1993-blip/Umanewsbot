@@ -434,7 +434,7 @@ class ArticleHorseLinkReconcileProtectionPGTests(TransactionTestCase):
         with _Scenario(None, deadline) as scenario:
             existing_profile = self.profile("Do Deuce", "多爵")
             new_profile = self.profile("Art Power", "艺术力量")
-            old_title = "Do Deuce and Art Power will race."
+            old_title = "Do Deuce will race. Art Power will race."
             old_body = "Do Deuce ran at the course. Art Power ran at the course."
             article = self.article(title=old_title, body=old_body)
             scenario.article_id = article.pk
