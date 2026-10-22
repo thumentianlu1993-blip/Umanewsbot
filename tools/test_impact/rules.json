@@ -1297,6 +1297,27 @@
     "server/stable/fixtures/public_probe_template_v6/golden.schema.json": [
       "public_probe_template_adapter"
     ],
+    "server/stable/fixtures/public_probe_template_v7/contract.json": [
+      "public_probe_template_adapter"
+    ],
+    "server/stable/fixtures/public_probe_template_v7/derivation.json": [
+      "public_probe_template_adapter"
+    ],
+    "server/stable/fixtures/public_probe_template_v7/descriptor.json": [
+      "public_probe_template_adapter"
+    ],
+    "server/stable/fixtures/public_probe_template_v7/envelope.json": [
+      "public_probe_template_adapter"
+    ],
+    "server/stable/fixtures/public_probe_template_v7/evidence-contract.json": [
+      "public_probe_template_adapter"
+    ],
+    "server/stable/fixtures/public_probe_template_v7/golden-derived.json": [
+      "public_probe_template_adapter"
+    ],
+    "server/stable/fixtures/public_probe_template_v7/golden.schema.json": [
+      "public_probe_template_adapter"
+    ],
     "server/stable/services/public_probe_render.py": [
       "public_probe_render"
     ],
