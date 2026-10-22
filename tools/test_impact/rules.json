@@ -1478,6 +1478,9 @@
     ],
     "server/stable/services/race_public_time.py": [
       "module:stable.test_calendar_empty_filter_recovery"
+    ],
+    "server/stable/services/article_entity_binding.py": [
+      "content_contracts"
     ]
   },
   "symbols": {
