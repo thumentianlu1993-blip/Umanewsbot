@@ -33,7 +33,7 @@
       {% if article.cover_image_url %}
         <img class="article-cover" src="{{ article.cover_image_url }}" alt="">
       {% endif %}
-      <div class="article-body">{{ article.effective_body|linebreaks }}</div>
+      <div class="article-body">{% if article.effective_body %}{{ article.effective_body|linebreaks }}{% else %}<p class="muted">本文暂无正文。</p>{% endif %}</div>
     </article>
 
     {% if teaser_event %}
