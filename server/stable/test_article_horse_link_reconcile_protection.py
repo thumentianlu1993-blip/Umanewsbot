@@ -108,7 +108,46 @@ class _Scenario:
                 "set_config('lock_timeout', %s, false)",
                 (str(statement_ms) + "ms", str(lock_ms) + "ms"),
             )
-        return execute(sql, params, many, context)
+        if threading.get_ident() != self.worker_ident:
+            return execute(sql, params, many, context)
+        # Only observe the actual worker execute; never change SQL/params/results.
+        import hashlib
+        import re
+        full_sql = sql if isinstance(sql, str) and len(sql) <= 16384 else None
+        encoded = full_sql.encode("utf-8") if full_sql is not None else None
+        if encoded is not None and len(encoded) > 16384:
+            full_sql = encoded = None
+        operation = (full_sql.split(None, 1)[0].upper() if full_sql else None)
+        from_tables = re.findall(r'\bFROM\s+"([^"]+)"', full_sql or "", re.I)
+        for_update_targets = (from_tables if operation == "SELECT" and len(from_tables) == 1
+                              and not re.search(r'\bJOIN\b|;', full_sql, re.I)
+                              and re.search(r'\bFOR UPDATE\s*$', full_sql, re.I) else [])
+        insert = re.match(r'INSERT\s+INTO\s+"([^"]+)"', full_sql or "", re.I)
+        with self.receipt_lock:
+            self._worker_sql_sequence = getattr(self, "_worker_sql_sequence", 0) + 1
+            statement = {
+                "pid": self.worker_pid, "sequence": self._worker_sql_sequence,
+                "thread_ident": threading.get_ident(),
+                "same_worker_connection": context["connection"].connection is self.worker_raw,
+                "sql_capture_complete": full_sql is not None, "sql_full": full_sql,
+                "sql_prefix": full_sql.strip()[:192] if full_sql else None,
+                "sql_sha256": hashlib.sha256(encoded).hexdigest() if encoded is not None else None,
+                "operation": operation, "for_update_targets": for_update_targets,
+                "insert_target": insert.group(1) if insert else None, "running": True,
+            }
+            self._active_worker_statement = statement
+        returned_normally = False
+        try:
+            result = execute(sql, params, many, context)
+            returned_normally = True
+            return result
+        finally:
+            with self.receipt_lock:
+                statement["running"] = False
+                if for_update_targets or insert:
+                    self.receipts.append({"B_execute_finished": {
+                        **statement, "returned_normally": returned_normally,
+                    }})
 
     def __enter__(self):
         require(self.remaining() > 0, "fixture setup exhausted overall 40-second budget")
@@ -273,6 +312,12 @@ def _observe_real_blocking_until(scenario, end):
     while time.monotonic() < end:
         scenario.raise_worker_error()
         require(not scenario.worker_done.is_set(), "B ended before an actual lock wait")
+        with scenario.receipt_lock:
+            active = getattr(scenario, "_active_worker_statement", None)
+            before = dict(active) if active is not None else None
+        if not before or not before["running"] or before["operation"] == "BEGIN":
+            scenario.worker_done.wait(min(0.02, max(0.0, end - time.monotonic())))
+            continue
         with scenario.main.cursor() as cursor:
             # A is inside _commit_article.atomic: explicitly invalidate cached stats.
             cursor.execute("SELECT pg_stat_clear_snapshot()")
@@ -281,26 +326,49 @@ def _observe_real_blocking_until(scenario, end):
                 "FROM pg_stat_activity WHERE pid = %s", [scenario.worker_pid],
             )
             row = cursor.fetchone()
+        with scenario.receipt_lock:
+            active = getattr(scenario, "_active_worker_statement", None)
+            after = dict(active) if active is not None else None
         if row and row[0] == "Lock" and scenario.main_pid in row[3]:
             query = row[2].strip()
-            normalized = query.lower()
-            if (normalized.startswith("select") and "for update" in normalized
-                    and NewsArticle._meta.db_table.lower() in normalized):
+            correlated = bool(
+                after and before["running"] and after["running"]
+                and before["sequence"] == after["sequence"]
+                and before["pid"] == after["pid"] == scenario.worker_pid
+                and before["thread_ident"] == after["thread_ident"] == scenario.worker_ident
+                and before["same_worker_connection"] and after["same_worker_connection"]
+                and before["sql_capture_complete"] and after["sql_capture_complete"]
+                and before["sql_sha256"] == after["sql_sha256"]
+                and before["sql_prefix"] and query.startswith(before["sql_prefix"])
+            )
+            # Retain real PG facts even if association/phase classification fails.
+            scenario.note(lock_wait_diagnostic={
+                "wait_event_type": row[0], "wait_event": row[1],
+                "blocking_pids": row[3], "A_pid": scenario.main_pid, "B_pid": scenario.worker_pid,
+                "B_query": row[2][:4096], "B_query_capture_complete": len(row[2]) <= 4096,
+                "B_execute_before": before, "B_execute_after": after,
+                "same_inflight_execute_correlated": correlated,
+                "statistics_snapshot_cleared_in_A_transaction": True,
+            })
+            require(correlated, "UNKNOWN: actual lock wait is not correlated to one in-flight B execute")
+            if (before["operation"] == "SELECT"
+                    and before["for_update_targets"] == [NewsArticle._meta.db_table]):
                 phase = "parent_first_article_wait"
                 require(not scenario.parent_acquired.is_set() and not scenario.link_acquired.is_set(),
                         "B completed a parent/link lock before the observed first parent wait")
-            elif ((normalized.startswith("insert")
-                   and ArticleHorseLink._meta.db_table.lower() in normalized)
-                  or normalized.startswith("commit")
-                  or normalized.startswith("set constraints")):
+            elif ((before["operation"] == "INSERT"
+                   and before["insert_target"] == ArticleHorseLink._meta.db_table)
+                  or before["sql_full"].upper() == "COMMIT"
+                  or before["sql_full"].upper().startswith("SET CONSTRAINTS ")):
                 phase = "baseline_fk_wait_control"
                 require(not scenario.link_acquired.is_set(),
                         "reverse order observed: B already holds link then waits for A article")
             else:
-                raise PGScenarioError("unsupported blocking SQL phase: " + query)
+                raise PGScenarioError("unsupported correlated blocking SQL structure; see raw diagnostic")
             receipt = {
                 "observed": True, "phase": phase, "wait_event_type": row[0],
-                "wait_event": row[1], "blocking_pids": row[3], "B_query": query,
+                "wait_event": row[1], "blocking_pids": row[3], "B_query": row[2][:4096],
+                "B_execute": before, "same_inflight_execute_correlated": correlated,
                 "B_parent_query_completed": scenario.parent_acquired.is_set(),
                 "B_link_query_completed": scenario.link_acquired.is_set(),
                 "statistics_snapshot_cleared_in_A_transaction": True,
