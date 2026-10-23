@@ -812,7 +812,8 @@
     ],
     "content_contracts": [
       "stable.test_content_contracts",
-      "stable.test_u04_horse_follow_copy"
+      "stable.test_u04_horse_follow_copy",
+      "stable.test_u04_article_body_empty_copy"
     ],
     "module:scripts.tests.test_f02_readonly_export": [
       "scripts.tests.test_f02_readonly_export"
@@ -2617,6 +2618,12 @@
         "content_contracts"
       ]
     },
+    "server/stable/test_u04_article_body_empty_copy.py": {
+      "label": "stable.test_u04_article_body_empty_copy",
+      "domains": [
+        "content_contracts"
+      ]
+    },
     "scripts/tests/test_f02_readonly_export.py": {
       "label": "scripts.tests.test_f02_readonly_export",
       "domains": [
@@ -3106,6 +3113,7 @@
     "scripts.tests.test_impact_verifier_e2e": "python",
     "stable.test_content_contracts": "python",
     "stable.test_u04_horse_follow_copy": "django",
+    "stable.test_u04_article_body_empty_copy": "django",
     "scripts.tests.test_f02_readonly_export": "python",
     "scripts.tests.test_f02_transfer": "python",
     "scripts.tests.test_f02_docker_adapter": "python",
