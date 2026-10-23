@@ -458,7 +458,7 @@ def reconcile_article_horse_links(
     if not commit:
         return result
     with transaction.atomic():
-        NewsArticle.objects.select_for_update().get(pk=article.pk)
+        current_article = NewsArticle.objects.select_for_update().get(pk=article.pk)
         locked_links = list(
             ArticleHorseLink.objects.select_for_update()
             .filter(pk__in=[item.id for item in existing])
@@ -483,6 +483,8 @@ def reconcile_article_horse_links(
             "protected_ids": [item.id for item in protected],
             "protected": [{"link_id": item.id, "status": item.status} for item in protected],
         }
+        if current_article.workflow_status == WorkflowStatus.WITHDRAWN:
+            return result
         delete_ids = [
             item.id for item in delete_links
             if item.id in current_links and current_links[item.id].status in mutable_statuses
