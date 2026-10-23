@@ -255,6 +255,49 @@ class RaceEventLifecyclePostponementTests(TestCase):
         self.assertEqual(result.action, "generation_stale")
 
 
+    def test_date_only_current_generation_refresh_does_not_cross_local_midnight(self):
+        now = datetime(2026, 6, 2, 14, 58, tzinfo=dt_timezone.utc)
+        midnight = datetime(2026, 6, 2, 15, 0, tzinfo=dt_timezone.utc)
+        # Frozen post-replan state: June 2 date-only, Asia/Tokyo 23:58.
+        # This tests the lifecycle consumer, not canonical source/reschedule apply.
+        event = _make_event(
+            slug="date-only-replan-midnight", status="scheduled",
+            race_datetime=None, local_date=date(2026, 6, 2),
+            timezone_name="Asia/Tokyo",
+        )
+        control = _make_control(
+            event, mode="enforce", next_refresh_at=now, schedule_generation=2,
+        )
+        before_control = stable_models.RaceEventLifecycleControl.objects.filter(
+            pk=control.pk,
+        ).values().get()
+        stale = _apply(event, expected_generation=1, now=now)
+        self.assertEqual(stale.action, "generation_stale")
+        self.assertEqual(
+            stable_models.RaceEventLifecycleControl.objects.filter(
+                pk=control.pk,
+            ).values().get(),
+            before_control,
+        )
+
+        current = _apply(event, expected_generation=2, now=now)
+        self.assertEqual(current.action, "noop")
+        self.assertEqual(current.reason_code, "before_local_midnight")
+        self.assertIsNone(current.error)
+        event.refresh_from_db()
+        control.refresh_from_db()
+        self.assertEqual(event.status, "scheduled")
+        self.assertIsNone(event.race_datetime)
+        self.assertEqual(event.local_date, date(2026, 6, 2))
+        self.assertEqual(control.schedule_generation, 2)
+        self.assertEqual(control.consecutive_failures, 0)
+        self.assertEqual(
+            stable_models.RaceEventLifecycleTransition.objects.filter(event=event).count(),
+            0,
+        )
+        self.assertEqual(control.next_refresh_at, midnight)
+
+
 # ── A16, A18: idempotency & claim ────────────────────────────────────
 
 class RaceEventLifecycleIdempotencyTests(TestCase):
