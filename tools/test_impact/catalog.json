@@ -815,6 +815,7 @@
       "stable.test_u04_horse_follow_copy",
       "stable.test_u04_article_body_empty_copy",
       "stable.test_u04_horse_basic_profile_empty_copy",
+      "stable.test_u04_horse_index_japanese_fallback",
       "stable.test_u04_result_publication_time"
     ],
     "module:scripts.tests.test_f02_readonly_export": [
@@ -2633,6 +2634,12 @@
         "content_contracts"
       ]
     },
+    "server/stable/test_u04_horse_index_japanese_fallback.py": {
+      "label": "stable.test_u04_horse_index_japanese_fallback",
+      "domains": [
+        "content_contracts"
+      ]
+    },
     "server/stable/test_u04_result_publication_time.py": {
       "label": "stable.test_u04_result_publication_time",
       "domains": [
@@ -3136,6 +3143,7 @@
     "stable.test_u04_horse_follow_copy": "django",
     "stable.test_u04_article_body_empty_copy": "django",
     "stable.test_u04_horse_basic_profile_empty_copy": "django",
+    "stable.test_u04_horse_index_japanese_fallback": "django",
     "stable.test_u04_result_publication_time": "django",
     "scripts.tests.test_f02_readonly_export": "python",
     "scripts.tests.test_f02_transfer": "python",
