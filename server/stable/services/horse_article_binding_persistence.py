@@ -395,38 +395,58 @@ def commit_strong_horse_binding(handle_id, actor):
             if receipt[1]["decision_sha256"] != decision_sha:
                 return _result("historical_applied_drifted", link, receipt)
             return state
-        metadata = dict(schema_version="l01.horse-link-metadata.v1", request_key=key, payload_sha256=payload_sha,
-            decision_sha256=decision_sha, provider_ref=provider, occurrence=proposal["occurrence"], evidence=proposal["evidence"])
+        # Only the new-created branch consults the private first archive.
+        # Replays/old zero-write statuses above never create or repair an index.
+        from stable.services.horse_article_pair_receipt_index import (
+            INDEX_UNIQUES, _capture_created_receipt, _has_indexed_conflict,
+        )
+        if _has_indexed_conflict(article.pk, profile.pk, key):
+            return _result("history_conflict")
         try:
-            # Catch outside the savepoint; the outer transaction remains usable.
+            # The savepoint includes ALL new rows, not only the index INSERT.
+            # Keep parent locks/admission/CAS above in their original order.
             with transaction.atomic():
-                link = ArticleHorseLink.objects.create(**pair, status="auto", source=SOURCE, confidence=0,
-                    matched_text=proposal["occurrence"]["matched_text"][:255], match_reason="bound horse_subject evidence",
-                    metadata=metadata)
+                metadata = dict(schema_version="l01.horse-link-metadata.v1", request_key=key, payload_sha256=payload_sha,
+                    decision_sha256=decision_sha, provider_ref=provider, occurrence=proposal["occurrence"], evidence=proposal["evidence"])
+                try:
+                    # Catch outside the savepoint; the outer transaction remains usable.
+                    with transaction.atomic():
+                        link = ArticleHorseLink.objects.create(**pair, status="auto", source=SOURCE, confidence=0,
+                            matched_text=proposal["occurrence"]["matched_text"][:255], match_reason="bound horse_subject evidence",
+                            metadata=metadata)
+                except IntegrityError as error:
+                    if getattr(getattr(error.__cause__, "diag", None), "constraint_name", None) != "uq_article_horse_link":
+                        raise
+                    # Re-run current authority and history classification, never INSERT again.
+                    try:
+                        recovered = _admit(handle_id, actor)
+                        _require(recovered[0] == scope and recovered[2] == payload_sha)
+                        _identity_current(bundle, identity)
+                    except (*_PARSE_ERRORS, OSError, get_user_model().DoesNotExist):
+                        return _result("blocked_current_authority")
+                    rows = list(OperationLog.objects.filter(action_type=ACTION, target_type=TARGET, target_id=key).order_by("pk"))
+                    try:
+                        receipt = _receipt(rows, key, bundle, payload_sha, provider)
+                    except _PARSE_ERRORS:
+                        return _result("history_conflict")
+                    link = ArticleHorseLink.objects.select_for_update().filter(**pair).first()
+                    replay_matches = matches and (receipt is None or receipt[1]["decision_sha256"] == decision_sha)
+                    return _classify(link, receipt, replay_matches) or _result("concurrent_state_changed")
+                after = _snapshot(link)
+                data = dict(schema_version="l01.horse-link-receipt.v1", request_key=key, payload_sha256=payload_sha,
+                    payload_revision=bundle["payload_revision"], article_id=article.pk, profile_id=profile.pk,
+                    identity_id=identity.pk, provider_ref=provider, decision_sha256=decision_sha, link_id=link.pk,
+                    before="absent", after=after, after_sha256=_sha(_raw(after)), actor_id=current_actor.pk)
+                # Failure here escapes: outer atomic rolls back both link and receipt.
+                log = OperationLog.objects.create(admin=current_actor, action_type=ACTION, target_type=TARGET,
+                                                  target_id=key, detail=_raw(data).decode("utf-8"))
+                _capture_created_receipt(scope, current_actor, article, profile, link, log)
+                return _result("created", link, (log, data))
         except IntegrityError as error:
-            if getattr(getattr(error.__cause__, "diag", None), "constraint_name", None) != "uq_article_horse_link":
+            cause = error.__cause__
+            code = getattr(cause, "sqlstate", None) or getattr(cause, "pgcode", None)
+            name = getattr(getattr(cause, "diag", None), "constraint_name", None)
+            if code != "23505" or name not in INDEX_UNIQUES:
                 raise
-            # Re-run current authority and history classification, never INSERT again.
-            try:
-                recovered = _admit(handle_id, actor)
-                _require(recovered[0] == scope and recovered[2] == payload_sha)
-                _identity_current(bundle, identity)
-            except (*_PARSE_ERRORS, OSError, get_user_model().DoesNotExist):
-                return _result("blocked_current_authority")
-            rows = list(OperationLog.objects.filter(action_type=ACTION, target_type=TARGET, target_id=key).order_by("pk"))
-            try:
-                receipt = _receipt(rows, key, bundle, payload_sha, provider)
-            except _PARSE_ERRORS:
-                return _result("history_conflict")
-            link = ArticleHorseLink.objects.select_for_update().filter(**pair).first()
-            replay_matches = matches and (receipt is None or receipt[1]["decision_sha256"] == decision_sha)
-            return _classify(link, receipt, replay_matches) or _result("concurrent_state_changed")
-        after = _snapshot(link)
-        data = dict(schema_version="l01.horse-link-receipt.v1", request_key=key, payload_sha256=payload_sha,
-            payload_revision=bundle["payload_revision"], article_id=article.pk, profile_id=profile.pk,
-            identity_id=identity.pk, provider_ref=provider, decision_sha256=decision_sha, link_id=link.pk,
-            before="absent", after=after, after_sha256=_sha(_raw(after)), actor_id=current_actor.pk)
-        # Failure here escapes: outer atomic rolls back both link and receipt.
-        log = OperationLog.objects.create(admin=current_actor, action_type=ACTION, target_type=TARGET,
-                                          target_id=key, detail=_raw(data).decode("utf-8"))
-        return _result("created", link, (log, data))
+            # The link/log/index savepoint has fully rolled back at this point.
+            return _result("history_conflict")
