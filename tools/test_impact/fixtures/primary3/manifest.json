@@ -1,0 +1,89 @@
+{
+  "schema": 1,
+  "id": "b239-primary3-v1",
+  "origin_tar_sha256": "61fba523e090052fa723bf604f0a8d3ff70cae291cd1705278f8165aeafca6d7",
+  "native_ids": [
+    "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses",
+    "stable.test_historical_race_detail_distance_metadata.HistoricalRaceDetailDistanceMetadataRealCacheTests.test_jra_2005_legacy_page_preserves_distance_unit",
+    "stable.test_historical_race_detail_distance_metadata.HistoricalRaceDetailDistanceMetadataRealCacheTests.test_equibase_yearbook_result_preserves_distance_unit"
+  ],
+  "files": {
+    "uk-status/united_kingdom-2018-sporting-life-irishracing-01/source-cache/source_cache_manifest.json": {
+      "bytes": 10224,
+      "sha256": "a42e814bd5ab8b7f1b9b2e945b314046849d6f009c77806ec1a8a5f6eb64c2b3"
+    },
+    "uk-status/united_kingdom-2018-sporting-life-irishracing-01/source-cache/ea466a540417e785e831ecbac9a01781d3964b86af732dd1523d73da27a6401b.html": {
+      "bytes": 360262,
+      "sha256": "f0c05c607b26527747f4ee0bc507c575a5e7b887f92ce532998c6ef3b40ebb4c"
+    },
+    "uk-status/united_kingdom-2020-sporting-life-irishracing-02/source-cache/source_cache_manifest.json": {
+      "bytes": 2742,
+      "sha256": "8e79d67198c420525542dfca5af7e2ff41e3e0a5ad402b131b180bb6a8dbcb5f"
+    },
+    "uk-status/united_kingdom-2020-sporting-life-irishracing-02/source-cache/c41ae87f71d8042b9cd02e3cd34d9e6fa0497e155b6366f746479b7e268771a9.html": {
+      "bytes": 378716,
+      "sha256": "12b583d052bcf3c0da572d98c41c072f46657ab973b2f222de99603b3b605cdc"
+    },
+    "uk-status/united_kingdom-2022-sporting-life-irishracing-01/source-cache/source_cache_manifest.json": {
+      "bytes": 6896,
+      "sha256": "c96593a2e7e4636861824ed88d03e368bde2c3e6f86fcfbcc5ed60fa34ce97b2"
+    },
+    "uk-status/united_kingdom-2022-sporting-life-irishracing-01/source-cache/bd3b263718aae7cd25155f4038ec493e40b1fb22ca0d754d6f441a7d3b50d69e.html": {
+      "bytes": 360772,
+      "sha256": "98fd4c13d20c7b6da6849c7f24f8dcdca93512f515877bb0b971657c658f73b8"
+    },
+    "smoke/run/smoke-japan-50556/source-cache/source_cache_manifest.json": {
+      "bytes": 705,
+      "sha256": "75dac303fedf1607428c5812d69afcfc7561b51d6144d137e3d6730f196e728d"
+    },
+    "smoke/run/smoke-japan-50556/source-cache/ad7ba45bc97fd0070b65d40f624b6ec1faf950701bec20c5914e4b9486020e74.html": {
+      "bytes": 79845,
+      "sha256": "2dbe222766b6ed2e9a5c3c60c348ec98896e55acbbefbfdb8d5b3c0e2177bf4a"
+    },
+    "smoke/run/smoke-united_states-70844/source-cache/source_cache_manifest.json": {
+      "bytes": 736,
+      "sha256": "a3009ad63fd7ab31daaacd6a5d260665ceda8679be7336c38c951fa3d29b9b50"
+    },
+    "smoke/run/smoke-united_states-70844/source-cache/7a0d5ab380f77dd8c9420aa85e4be398b6d4a72cbcef7d99fab2a0b2c8643db2.cfm": {
+      "bytes": 117375,
+      "sha256": "52f7e3de1570f9b5d28376f07c054e639a4778998684871b5fdfa939d80ada8c"
+    }
+  },
+  "selections": [
+    {
+      "native_id": "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses",
+      "manifest": "uk-status/united_kingdom-2018-sporting-life-irishracing-01/source-cache/source_cache_manifest.json",
+      "filename": "ea466a540417e785e831ecbac9a01781d3964b86af732dd1523d73da27a6401b.html",
+      "source_url": "https://www.sportinglife.com/racing/results/2018-03-13/cheltenham/460687/unibet-champion-hurdle-challenge-trophy-grade-1",
+      "single_identity": false
+    },
+    {
+      "native_id": "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses",
+      "manifest": "uk-status/united_kingdom-2020-sporting-life-irishracing-02/source-cache/source_cache_manifest.json",
+      "filename": "c41ae87f71d8042b9cd02e3cd34d9e6fa0497e155b6366f746479b7e268771a9.html",
+      "source_url": "https://www.sportinglife.com/racing/results/2020-03-13/cheltenham/559948/jcb-triumph-hurdle-grade-1",
+      "single_identity": false
+    },
+    {
+      "native_id": "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses",
+      "manifest": "uk-status/united_kingdom-2022-sporting-life-irishracing-01/source-cache/source_cache_manifest.json",
+      "filename": "bd3b263718aae7cd25155f4038ec493e40b1fb22ca0d754d6f441a7d3b50d69e.html",
+      "source_url": "https://www.sportinglife.com/racing/results/2022-12-26/kempton/715575/ladbrokes-christmas-hurdle-grade-1-gbb-race",
+      "single_identity": false
+    },
+    {
+      "native_id": "stable.test_historical_race_detail_distance_metadata.HistoricalRaceDetailDistanceMetadataRealCacheTests.test_jra_2005_legacy_page_preserves_distance_unit",
+      "manifest": "smoke/run/smoke-japan-50556/source-cache/source_cache_manifest.json",
+      "filename": "ad7ba45bc97fd0070b65d40f624b6ec1faf950701bec20c5914e4b9486020e74.html",
+      "source_url": "https://www.jra.go.jp/datafile/seiseki/replay/2005/99.html",
+      "single_identity": true
+    },
+    {
+      "native_id": "stable.test_historical_race_detail_distance_metadata.HistoricalRaceDetailDistanceMetadataRealCacheTests.test_equibase_yearbook_result_preserves_distance_unit",
+      "manifest": "smoke/run/smoke-united_states-70844/source-cache/source_cache_manifest.json",
+      "filename": "7a0d5ab380f77dd8c9420aa85e4be398b6d4a72cbcef7d99fab2a0b2c8643db2.cfm",
+      "source_url": "https://www.equibase.com/yearbook/Result.cfm?cy=USA&de=D&rd=2018-09-29&rn=8&tk=CD",
+      "single_identity": true
+    }
+  ]
+}

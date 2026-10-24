@@ -16,16 +16,21 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT), str(ROOT/'server'), str(ROOT/'.codex/scripts'), str(ROOT/'scripts'), str(ROOT/'runtime/research')]
 from tools.test_impact.core import digest, shard_tests
 from tools.test_impact.source_binding import verify_source_binding
+from tools.test_impact.fixture_inputs import ENVIRONMENT, fixture_environment, validate_selection
 from run_bounded_stable_tests import isolated_environment, flatten
 
 
-def setup(profile, plan, binding):
-    code_sha = verify_source_binding(plan, binding, ROOT, require_git_head=True)
+def setup(profile, plan, binding, *, collecting=False):
+    inherited_fixture_keys = set(os.environ).intersection(ENVIRONMENT)
     source = {'PATH':os.environ['PATH'], 'HOME':'/home/tester','POSTGRES_PORT':'5432',
               'POSTGRES_DB':'release_0078_ci' if profile=='release-postgres' else 'bounded_ci',
               'POSTGRES_USER':'release_0078_ci' if profile=='release-postgres' else 'bounded_ci'}
     os.environ.clear()
+    code_sha = verify_source_binding(plan, binding, ROOT, require_git_head=True)
+    fixtures = fixture_environment(plan, binding, code_sha, profile, collecting=collecting,
+                                   inherited_keys=inherited_fixture_keys)
     os.environ.update(isolated_environment(source))
+    os.environ.update(fixtures)
     os.environ.update(DOTENV_DISABLED='1', RELEASE_0078_TEST_POSTGRES='1', RUN_HISTORICAL_PIPELINE_PERF='1',
                       A045_TEST_CODE_SHA=code_sha)
     import dotenv
@@ -157,9 +162,10 @@ def main():
     plan=json.loads(Path('/control/plan.json').read_text())
     profile='django' if mode=='collect' else args[2]
     binding=json.loads(Path('/control/source-binding.json').read_text())
-    setup(profile, plan, binding)
+    setup(profile, plan, binding, collecting=mode=='collect')
     if mode=='collect':
         plan=collect(plan,json.loads((ROOT/'tools/test_impact/catalog.json').read_text()))
+        validate_selection(plan)
         Path('/output/execution-plan.json').write_text(json.dumps(plan,ensure_ascii=False,indent=2)+'\n')
         return 0
     batch=next(b for b in plan['batches'] if b['key']==args[1])
