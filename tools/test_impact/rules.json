@@ -1428,6 +1428,9 @@
     ],
     "server/stable/services/horse_article_binding_diagnostics.py": [
       "content_contracts"
+    ],
+    "server/stable/services/horse_article_pair_receipt_index.py": [
+      "content_contracts"
     ]
   },
   "symbols": {

@@ -822,7 +822,8 @@
       "stable.test_horse_article_binding_persistence",
       "stable.test_profile_strong_backfill_trigger",
       "stable.test_horse_article_strong_evidence_protection",
-      "stable.test_horse_article_binding_diagnostics"
+      "stable.test_horse_article_binding_diagnostics",
+      "stable.test_horse_article_pair_receipt_index"
     ],
     "module:scripts.tests.test_f02_readonly_export": [
       "scripts.tests.test_f02_readonly_export"
@@ -2895,6 +2896,12 @@
       "domains": [
         "content_contracts"
       ]
+    },
+    "server/stable/test_horse_article_pair_receipt_index.py": {
+      "label": "stable.test_horse_article_pair_receipt_index",
+      "domains": [
+        "content_contracts"
+      ]
     }
   },
   "profiles": {
@@ -3219,7 +3226,8 @@
     "stable.test_horse_article_binding_persistence": "django",
     "stable.test_profile_strong_backfill_trigger": "django",
     "stable.test_horse_article_strong_evidence_protection": "django",
-    "stable.test_horse_article_binding_diagnostics": "django"
+    "stable.test_horse_article_binding_diagnostics": "django",
+    "stable.test_horse_article_pair_receipt_index": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
