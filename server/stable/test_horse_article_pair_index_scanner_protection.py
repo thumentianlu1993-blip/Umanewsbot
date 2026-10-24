@@ -361,31 +361,75 @@ class PairIndexScannerProtectionTests(TransactionTestCase):
                 self.assertEqual(len(task_delta),1);self.assertEqual(task_delta[0]['task_name'],'horse_article_link_scan')
                 self.assertEqual(task_delta[0]['status'],'success')
 
+    def transaction_key(self, actual):
+        return tuple(actual[k] for k in ('alias','pid','raw_connection','xid'))
+
+    def admission_shows(self, observer, key, level):
+        shows=[n for n in observer.notes
+               if re.fullmatch(r'\s*SHOW\s+"?transaction_isolation"?\s*;?\s*',n['sql'],re.I)
+               and n['execution_state']=='completed'
+               and n['metadata_origin']=='immediate_actual_sample'
+               and self.transaction_key(n['actual'])==key]
+        self.assertTrue(shows,'each actual transaction needs its own completed SHOW')
+        for note in shows:
+            actual=note['actual']
+            self.assertTrue(actual['atomic']);self.assertFalse(actual['autocommit'])
+            self.assertIsNotNone(actual['xid']);self.assertEqual(actual['isolation'],level)
+        return shows
+
+    def check_rejected_transaction(self, observer, level):
+        # Lock-note metadata was sampled BEFORE execute: its xid may still be
+        # unassigned. The next existing immediate sample is AFTER that completed
+        # parent lock. Use that sample, without adding observational SQL.
+        parents=[n for n in observer.notes if self.actual_parent(n)
+                 and n['execution_state']=='completed']
+        self.assertTrue(parents,'real parent lock must have completed before rejection')
+        for parent in parents:
+            following=[n for n in observer.notes if n['sequence']>parent['sequence']
+                       and n['metadata_origin']=='immediate_actual_sample']
+            self.assertTrue(following,'post-parent actual transaction sample required')
+            sample=following[0]['actual'];key=self.transaction_key(sample)
+            self.assertEqual(key[:3],self.transaction_key(parent['actual'])[:3])
+            self.assertTrue(sample['atomic']);self.assertFalse(sample['autocommit'])
+            self.assertIsNotNone(sample['xid']);self.assertEqual(sample['isolation'],level)
+            if parent['actual']['xid'] is not None:
+                self.assertEqual(parent['actual']['xid'],sample['xid'])
+            shows=self.admission_shows(observer,key,level)
+            self.assertTrue(any(n['sequence']>parent['sequence'] for n in shows))
+        self.assertEqual(observer.reader_calls,[])
+        self.assertEqual(observer.weak_dml(),[])
+
     def check_observation(self, observer, d, *, pair_count=1):
         self.assertEqual(observer.forbidden,[])
         self.assertTrue(observer.data(),'real new-table observation must occur')
         self.assertEqual(len({(x['article_id'],x['profile_id']) for x in observer.reader_calls}),pair_count)
         self.assertEqual(len(observer.reader_calls),pair_count,'one real reader call per pair/unit')
         self.assertLessEqual(len(observer.data()),2*pair_count)
-        shows=[x for x in observer.notes if re.fullmatch(r'\s*SHOW\s+"?transaction_isolation"?\s*;?\s*',x['sql'],re.I)]
-        self.assertTrue(shows,'actual transaction SHOW, not a driver default')
-        first_history=min(x['sequence'] for x in observer.data())
-        self.assertTrue(any(x['sequence']<first_history and x['actual']['isolation']=='read committed' for x in shows))
+        groups={self.transaction_key(x) for x in observer.reader_calls}
+        self.assertEqual({self.transaction_key(n['actual']) for n in observer.data()},groups)
         for x in observer.reader_calls:
             self.assertTrue(x['atomic']);self.assertFalse(x['autocommit']);self.assertEqual(x['isolation'],'read committed')
             self.assertEqual(x['pid'],observer.initial['pid'])
             self.assertIsNotNone(x['xid'],'reader must run inside the actual parent-locked transaction')
+        show_count=0
+        for key in groups:
+            history=[n for n in observer.data() if self.transaction_key(n['actual'])==key]
+            shows=self.admission_shows(observer,key,'read committed');show_count+=len(shows)
+            first_history=min(n['sequence'] for n in history)
+            self.assertTrue(any(n['sequence']<first_history for n in shows),'same-transaction SHOW must precede its first history SELECT')
+            mutations=[n for n in observer.weak_dml() if self.transaction_key(n['actual'])==key]
+            for mutation in mutations:
+                self.assertTrue(any(n['sequence']<mutation['sequence'] for n in shows))
+            if mutations:
+                self.assertLess(max(n['sequence'] for n in history),min(n['sequence'] for n in mutations),
+                                'preclassify this actual transaction before any weak DML')
+        self.assertTrue(all(self.transaction_key(n['actual']) in groups for n in observer.weak_dml()),
+                        'no weak DML may borrow another transaction admission or classification')
         for note in observer.data():
             self.assertRegex(note['sql'],r'"article_id_snapshot"\s*=\s*%s')
             self.assertRegex(note['sql'],r'"profile_id_snapshot"\s*=\s*%s')
-        for mutation in observer.weak_dml():
-            actual=mutation['actual']
-            prior=[n for n in observer.data() if n['actual']['pid']==actual['pid'] and n['actual']['xid']==actual['xid'] and n['sequence']<mutation['sequence']]
-            self.assertTrue(prior,'actual same-transaction history observation must precede weak DML')
-        for xid in {n['actual']['xid'] for n in observer.weak_dml()}:
-            first=min(n['sequence'] for n in observer.weak_dml() if n['actual']['xid']==xid)
-            self.assertTrue(all(n['sequence']<first for n in observer.data() if n['actual']['xid']==xid),'preclassify this article unit before deleting any pair')
-        emit('history_observation_contract',pair_count=pair_count,reader_calls=observer.reader_calls,data_SELECTs=len(observer.data()),fixed_SHOW_count=len(shows))
+        emit('history_observation_contract',pair_count=pair_count,reader_calls=observer.reader_calls,
+             transaction_groups=sorted(groups),data_SELECTs=len(observer.data()),fixed_SHOW_count=show_count)
 
     def normal_protected(self, d, path):
         d.weak_precondition('profile' if path in ('profile','global','profile_pair','scan_cli') else 'article')
@@ -588,21 +632,31 @@ class PairIndexScannerProtectionTests(TransactionTestCase):
     def test_real_elapsed_guard_budget_rejects_before_any_ordinary_delete(self):
         with self.domain('elapsed-budget') as d:
             self.ordinary_delete_set(d,PAIR_LIMIT);before=self.state();delays=[]
+            caller=metadata(connection)
             def after(note):
-                if INDEX_TABLE in note['sql'] and note['sql'].lstrip().upper().startswith('SELECT'):
-                    # Actual wall-clock delay after the unchanged real read;
-                    # no invented response, patched clock or reader return.
-                    started=time.monotonic();time.sleep(.4)
-                    delays.append(time.monotonic()-started)
+                if not delays and INDEX_TABLE in note['sql'] and note['sql'].lstrip().upper().startswith('SELECT'):
+                    # Exactly one bounded real wait after the unchanged actual
+                    # SELECT completed. SQL/parse overhead also counts elapsed.
+                    delay=dict(read=copy.deepcopy(note),before=time.monotonic())
+                    delays.append(delay);time.sleep(5.1)
+                    delay['after']=time.monotonic();delay['seconds']=delay['after']-delay['before']
             started=time.monotonic()
             with _Observe(connection,after=after) as observer:
                 result,error=self.outcome(lambda:self.invoke(d,'direct'))
-            seconds=time.monotonic()-started;after_state=self.state()
-            emit('actual_elapsed_budget_result',seconds=seconds,actual_read_delays=delays,
+            seconds=time.monotonic()-started;restored=metadata(connection);after_state=self.state()
+            emit('actual_elapsed_budget_result',seconds=seconds,actual_read_delays=delays,caller=caller,restored=restored,
                  result=result,error_type=type(error).__name__ if error else None,error=str(error))
             self.check_preserved(before,after_state,d,'direct',observer,error=True)
             self.assertIsInstance(error,ValueError);self.assertEqual(str(error),ELAPSED_BUDGET_CODE)
-            self.assertGreaterEqual(sum(delays),5);self.assertLess(seconds,TOTAL_SECONDS)
+            self.assertEqual(len(delays),1,'no Index read means no injected delay; real weak DML remains business FAIL')
+            self.assertEqual(delays[0]['read']['execution_state'],'completed')
+            self.assertTrue(delays[0]['read']['original_statement_executed'])
+            self.assertGreater(delays[0]['after'],delays[0]['before'])
+            self.assertGreaterEqual(seconds,5);self.assertLess(seconds,TOTAL_SECONDS)
+            self.assertEqual((restored['statement_timeout'],restored['lock_timeout']),
+                             (caller['statement_timeout'],caller['lock_timeout']))
+            self.assertEqual((restored['alias'],restored['pid'],restored['raw_connection'],restored['atomic'],restored['autocommit']),
+                             (caller['alias'],caller['pid'],caller['raw_connection'],caller['atomic'],caller['autocommit']))
             self.assertLessEqual(len(observer.data()),DATA_SELECT_LIMIT)
 
     def test_temporary_GUC_never_relaxes_stricter_caller_and_restores_normally(self):
@@ -646,7 +700,7 @@ class PairIndexScannerProtectionTests(TransactionTestCase):
                          error=str(error),SQLSTATE=sqlstate(error),test_outer_rollback_only_cleanup=True)
                     self.check_isolation_error(error);self.check_preserved(before,after,d,path,observer,error=True)
                     self.assertEqual(observer.reader_calls,[],'no old-snapshot history lookup before rejection')
-                    self.assertTrue(any(re.fullmatch(r'\s*SHOW\s+"?transaction_isolation"?\s*;?\s*',x['sql'],re.I) for x in observer.notes))
+                    self.check_rejected_transaction(observer,level.lower())
 
     def test_readonly_pair_reader_remains_usable_in_real_RR_transaction(self):
         with self.domain('readonly-RR') as d:
@@ -796,6 +850,7 @@ class PairIndexScannerProtectionTests(TransactionTestCase):
         self.assertEqual(b['observer'].reader_calls,[],'no new history read from an admitted old RR snapshot')
         shows=[x for x in b['observer'].notes if re.fullmatch(r'\s*SHOW\s+"?transaction_isolation"?\s*;?\s*',x['sql'],re.I)]
         self.assertTrue(shows)
+        self.check_rejected_transaction(b['observer'],'repeatable read')
         self.assertTrue(all(x['actual']['pid']==b['pid'] and x['actual']['isolation']=='repeatable read' for x in shows))
         self.assertTrue(all(x['actual']['isolation']=='repeatable read' for x in b['observer'].notes),'product cannot silently switch isolation')
         self.assertFalse(any(re.match(r'\s*SET\s+(TRANSACTION|SESSION)\b',x['sql'],re.I) for x in b['observer'].notes),'no product isolation change')
