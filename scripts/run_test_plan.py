@@ -145,6 +145,9 @@ def main():
             out=temp/(key or 'collection'); out.mkdir(); out.chmod(0o777)
             # 按值捕获phase输入；无共享可替换/control请求/plan，max_workers4保持。
             control,request=lifecycle.prepare_control(temp,frozen_plan_bytes,frozen_binding_bytes,raw_commit,mode,key,profile)
+            lifecycle.require(lifecycle.SCHEMA=='pg-lifecycle-v2' and type(request.get('schema_version')) is str
+                              and request['schema_version']==lifecycle.SCHEMA, 'LIFECYCLE_VERSION_MISMATCH')
+            lifecycle.validate_request(request,lifecycle.decode_json(frozen_plan_bytes),mode,key,profile)
             request_bytes=lifecycle.read_regular(control/'pg-lifecycle-request.json')
             saved_request=output/lifecycle.request_filename(mode,key)
             container_name='impact-'+uuid.uuid4().hex

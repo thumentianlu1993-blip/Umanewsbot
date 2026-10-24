@@ -210,13 +210,14 @@ for field in ('domains','labels','hashes','changed_paths','content_digest','allo
  if p[field]!=e[field]: raise ValueError('trusted plan mismatch: '+field)
 if sys.argv[3]=='selection': print(json.dumps(e))
 elif sys.argv[3]=='pg':
- from tools.test_impact.pg_lifecycle import verify_saved_lifecycle
+ from tools.test_impact.pg_lifecycle import SCHEMA,verify_saved_lifecycle
+ if SCHEMA!='pg-lifecycle-v2': raise ValueError('LIFECYCLE_VERSION_MISMATCH')
  selection={**e,'run_id':p['run_id'],'run_attempt':p['run_attempt'],'control_blobs':p['control_blobs'],'image_id':p['image_id']}
  verify_saved_lifecycle(Path(x['artifact_pg']),selection,'collect','','django')
  for b in p['batches']: verify_saved_lifecycle(Path(x['artifact_pg']),p,'run',b['key'],b['profile'])
  independent_input={**p,'mode':e['mode']}
  verify_saved_lifecycle(Path(x['independent_pg']),independent_input,'collect','','django',require_owned=False)
- print(json.dumps({'pg_numeric_data_contract':'verified','independent_outer_CID':'not_claimed'}))
+ print(json.dumps({'pg_numeric_data_contract':'verified','lifecycle_schema':SCHEMA,'independent_outer_CID':'not_claimed'}))
 else: print(json.dumps(verify_results(p,x['reports'])))
 """
         expected=json.loads(checked([sys.executable,'-I','-c',program,str(bundle),str(config),'selection']))

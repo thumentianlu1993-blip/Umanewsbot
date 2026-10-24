@@ -5,6 +5,8 @@
 """
 import base64
 import copy
+import errno
+import math
 import hashlib
 import json
 import os
@@ -21,7 +23,7 @@ import uuid
 from tools.test_impact.core import digest
 from tools.test_impact.source_binding import validate_source_plan, verify_source_binding
 
-SCHEMA = 'pg-lifecycle-v1'
+SCHEMA = 'pg-lifecycle-v2'
 MAX_BYTES = 16 * 1024 * 1024
 LOG_LIMIT = 512 * 1024
 REQUEST_FIELDS = frozenset(('schema_version','nonce','mode','key','profile','test_sha','test_tree',
@@ -29,7 +31,7 @@ REQUEST_FIELDS = frozenset(('schema_version','nonce','mode','key','profile','tes
     'invoke_seconds','inner_seconds','cleanup_seconds'))
 RECEIPT_FIELDS = REQUEST_FIELDS | frozenset(('pg_required','namespace','supervisor_pid','uid','gid',
     'worker','postmaster','pg_stop','tools','orphans','logs','primary_error','secondary_errors',
-    'signal_events','last_phase','complete','supervisor_exit','native_raw_sha256','output_plan_digest'))
+    'signal_events','last_phase','complete','supervisor_exit','native_raw_sha256','output_plan_digest','adopted_wait'))
 
 
 class ReceiptError(ValueError):
@@ -139,7 +141,9 @@ def make_request(plan, mode, key, profile, nonce):
 
 
 def validate_request(request, plan, mode, key, profile):
-    require(type(request) is dict and set(request) == REQUEST_FIELDS, 'REQUEST_SCHEMA')
+    require(type(request) is dict, 'REQUEST_SCHEMA')
+    require(type(request.get('schema_version')) is str and request['schema_version']==SCHEMA, 'LIFECYCLE_VERSION_MISMATCH')
+    require(set(request) == REQUEST_FIELDS, 'REQUEST_SCHEMA')
     expected = make_request(plan,mode,key,profile,request['nonce'])
     require(request['input_plan_digest'] == expected['input_plan_digest'], 'INPUT_PLAN_DIGEST_MISMATCH')
     require(canonical(request) == canonical(expected), 'REQUEST_IDENTITY_MISMATCH')
@@ -173,12 +177,15 @@ def step_record(status='NOT_STARTED'):
 
 
 def new_receipt(request):
+    require(type(request) is dict, 'REQUEST_SCHEMA')
+    require(type(request.get('schema_version')) is str and request['schema_version']==SCHEMA, 'LIFECYCLE_VERSION_MISMATCH')
     required = request['mode'] == 'collect' or request['profile'] != 'python'
     try: namespace = os.readlink('/proc/self/ns/pid')
     except OSError: namespace = 'host-process-not-qualified-container'
     return dict(copy.deepcopy(request),pg_required=required,namespace=namespace,supervisor_pid=os.getpid(),uid=os.getuid(),gid=os.getgid(),
                 worker=step_record(),postmaster=step_record('NOT_STARTED' if required else 'NOT_APPLICABLE'),
                 pg_stop=step_record('NOT_STARTED' if required else 'NOT_APPLICABLE'),tools=[],orphans=[],logs={},
+                adopted_wait=dict(status='NOT_STARTED',deadline_monotonic=None,echild=False,error=None,events=[]),
                 primary_error=None,secondary_errors=[],signal_events=[],last_phase='source-verified',complete=False,
                 supervisor_exit=None,native_raw_sha256=None,output_plan_digest=None)
 
@@ -190,7 +197,56 @@ def _numeric(step, parent, zero=False):
             and step.get('timed_out') is False and step.get('status') == 'REAPED')
 
 
+def _adopted_proof_valid(receipt):
+    """Validate positive ECHILD evidence independently of complete/worker success."""
+    try:
+        if type(receipt) is not dict:return False
+        proof=receipt.get('adopted_wait');orphans=receipt.get('orphans')
+        if type(proof) is not dict or set(proof)!={'status','deadline_monotonic','echild','error','events'}:return False
+        if type(proof['status']) is not str or proof['status']!='ECHILD' or proof['echild'] is not True or proof['error'] is not None:return False
+        deadline=proof['deadline_monotonic']
+        if type(deadline) not in (int,float) or not math.isfinite(deadline) or deadline<0:return False
+        events=proof['events']
+        if type(events) is not list or not events or type(orphans) is not list:return False
+        reaped={};terminal=0
+        def child(value):
+            if type(value) is not dict or set(value)!={'pid','status','returncode','namespace'}:return False
+            pid=value['pid'];status=value['status'];code=value['returncode'];namespace=value['namespace']
+            return (type(pid) is int and pid>0 and type(status) is int and status>=0
+                    and (os.WIFEXITED(status) or os.WIFSIGNALED(status))
+                    and type(code) is int and os.waitstatus_to_exitcode(status)==code
+                    and type(namespace) is str and bool(namespace)
+                    and type(receipt.get('namespace')) is str and namespace==receipt['namespace'])
+        for index,event in enumerate(events):
+            if type(event) is not dict or type(event.get('kind')) is not str:return False
+            kind=event['kind']
+            if kind=='REAPED':
+                if set(event)!={'kind','pid','status','returncode','namespace'}:return False
+                value={k:v for k,v in event.items() if k!='kind'}
+                if not child(value) or value['pid'] in reaped:return False
+                reaped[value['pid']]=value
+            elif kind=='ECHILD':
+                if set(event)!={'kind','errno'} or type(event['errno']) is not int or event['errno']!=errno.ECHILD or index!=len(events)-1:return False
+                terminal+=1
+            elif kind=='EINTR':
+                if set(event)!={'kind','errno'} or type(event['errno']) is not int or event['errno']!=errno.EINTR:return False
+            elif kind=='NOT_READY':
+                if set(event)!={'kind','pid','status','returncode'} or type(event['pid']) is not int or event['pid']!=0 or type(event['status']) is not int or event['status']!=0 or event['returncode'] is not None:return False
+            else:return False
+        observed={}
+        for value in orphans:
+            if not child(value) or value['pid'] in observed:return False
+            observed[value['pid']]=value
+        return terminal==1 and reaped==observed
+    except (KeyError,TypeError,ValueError,OverflowError,OSError):return False
+
+
 def validate_receipt(receipt, request, native_bytes):
+    require(type(request) is dict, 'REQUEST_SCHEMA')
+    require(type(receipt) is dict, 'RECEIPT_SCHEMA')
+    require(type(request.get('schema_version')) is str and request['schema_version']==SCHEMA
+            and type(receipt.get('schema_version')) is str and receipt['schema_version']==SCHEMA, 'LIFECYCLE_VERSION_MISMATCH')
+    require(_adopted_proof_valid(receipt), 'ADOPTED_REAP_INCOMPLETE')
     require(type(receipt) is dict and set(receipt) == RECEIPT_FIELDS, 'RECEIPT_SCHEMA')
     require(receipt['input_plan_digest'] == request['input_plan_digest'], 'INPUT_PLAN_DIGEST_MISMATCH')
     require(receipt['nonce'] == request['nonce'], 'NONCE_MISMATCH')
@@ -247,7 +303,7 @@ def verify_saved_lifecycle(output, plan, mode, key, profile, require_owned=True)
     native=read_regular(output/native_filename(mode,key));validate_receipt(receipt,request,native)
     host=read_json(output/host_filename(mode,key))
     require(type(host) is dict and set(host)=={'schema_version','ownership','request_sha256','receipt_sha256','native_sha256','cleanup'}
-            and host['schema_version']==SCHEMA and host['request_sha256']==raw_hash(request_bytes)
+            and type(host['schema_version']) is str and host['schema_version']==SCHEMA and host['request_sha256']==raw_hash(request_bytes)
             and host['receipt_sha256']==raw_hash(receipt_bytes) and host['native_sha256']==raw_hash(native), 'HOST_BINDING_MISMATCH')
     if require_owned:
         require(host['ownership']=='owned-cid', 'OWNED_CID_REQUIRED')
@@ -374,7 +430,7 @@ class Session:
     def stop_and_wait(self):
         if self.closed:return
         # 所有阶段共享原内deadline；不足就记录UNKNOWN，不追加超时。
-        cleanup_end=min(self.deadline,time.monotonic()+30)
+        cleanup_end=min(self.deadline,time.monotonic()+min(30,self.request['cleanup_seconds']))
         for name in list(self.processes):
             if name not in ('postmaster','pg_stop'):
                 try:self._terminate(name,min(cleanup_end,time.monotonic()+7))
@@ -409,14 +465,60 @@ class Session:
                         os.killpg(process.pid,signal.SIGKILL);self.records['postmaster']['signals'].append(signal.SIGKILL)
                     self._wait('postmaster',min(cleanup_end,time.monotonic()+3),False)
                 except BaseException as secondary:self.error('PG_REAP_UNKNOWN:'+repr(secondary))
-        # 先逐个自有Popen wait，再处理PID1可能收养的后代，不能偷走直接child wait。
-        if all(p.returncode is not None for p in self.processes.values()):
-            while time.monotonic()<cleanup_end:
-                try:pid,status=os.waitpid(-1,os.WNOHANG)
-                except ChildProcessError:break
-                if pid==0:
-                    self.error('ADOPTED_CHILD_STILL_RUNNING');break
-                self.receipt['orphans'].append(dict(pid=pid,status=status,namespace=self.receipt['namespace']))
+        # Direct handles must be reaped before waitpid(-1); never steal their waits or signal adopted PIDs.
+        proof=dict(status='WAITING',deadline_monotonic=cleanup_end,echild=False,error=None,events=[])
+        self.receipt['adopted_wait']=proof
+        def unknown(reason):
+            proof.update(status='UNKNOWN',echild=False,error=reason)
+            self.error('ADOPTED_REAP_UNKNOWN:'+reason)
+        if not all(type(p.returncode) is int for p in self.processes.values()):
+            unknown('DIRECT_CHILD_UNREAPED')
+        else:
+            seen=set()
+            while proof['status']=='WAITING':
+                if time.monotonic()>=cleanup_end:
+                    unknown('DEADLINE');break
+                try:
+                    pid,status=os.waitpid(-1,os.WNOHANG)
+                except ChildProcessError as exc:
+                    if type(exc.errno) is int and exc.errno==errno.ECHILD:
+                        proof['events'].append(dict(kind='ECHILD',errno=errno.ECHILD))
+                        proof.update(status='ECHILD',echild=True,error=None)
+                    else:
+                        proof['events'].append(dict(kind='ERROR',exception_type=type(exc).__name__,errno=exc.errno,detail=str(exc)))
+                        unknown('WAITPID_ERROR')
+                    break
+                except InterruptedError as exc:
+                    if type(exc.errno) is int and exc.errno==errno.EINTR:
+                        proof['events'].append(dict(kind='EINTR',errno=errno.EINTR));continue
+                    proof['events'].append(dict(kind='ERROR',exception_type=type(exc).__name__,errno=exc.errno,detail=str(exc)))
+                    unknown('WAITPID_ERROR');break
+                except OSError as exc:
+                    proof['events'].append(dict(kind='ERROR',exception_type=type(exc).__name__,errno=exc.errno,detail=str(exc)))
+                    unknown('WAITPID_ERROR');break
+                except BaseException as exc:
+                    proof['events'].append(dict(kind='ERROR',exception_type=type(exc).__name__,errno=getattr(exc,'errno',None),detail=str(exc)))
+                    unknown('INTERRUPTED');break
+                if type(pid) is int and pid==0 and type(status) is int and status==0:
+                    proof['events'].append(dict(kind='NOT_READY',pid=0,status=0,returncode=None))
+                    try:time.sleep(min(.05,max(0,cleanup_end-time.monotonic())))
+                    except BaseException as exc:
+                        proof['events'].append(dict(kind='ERROR',exception_type=type(exc).__name__,errno=getattr(exc,'errno',None),detail=str(exc)))
+                        unknown('INTERRUPTED')
+                    continue
+                try:
+                    valid=(type(pid) is int and pid>0 and pid not in seen and type(status) is int and status>=0
+                           and (os.WIFEXITED(status) or os.WIFSIGNALED(status)))
+                    code=os.waitstatus_to_exitcode(status) if valid else None
+                    valid=valid and type(code) is int
+                except (ValueError,OverflowError,OSError):valid=False
+                if not valid:
+                    proof['events'].append(dict(kind='INVALID_STATUS',pid=pid,status=status))
+                    unknown('INVALID_STATUS');break
+                seen.add(pid)
+                child=dict(pid=pid,status=status,returncode=code,namespace=self.receipt['namespace'])
+                self.receipt['orphans'].append(child)
+                proof['events'].append(dict(kind='REAPED',**child))
         try:
             total=0
             for path in sorted(self.log_dir.iterdir()):
@@ -453,7 +555,7 @@ class Session:
             self.receipt['output_plan_digest']=digest(decode_json(native)) if self.request['mode']=='collect' else self.request['input_plan_digest']
         except BaseException as exc:self.error('OUTPUT_OR_LOG:'+repr(exc))
         worker=self.receipt['worker']['returncode']
-        clean=(_numeric(self.receipt['worker'],os.getpid()) and not self.cancelled
+        clean=(_adopted_proof_valid(self.receipt) and _numeric(self.receipt['worker'],os.getpid()) and not self.cancelled
                and (not self.receipt['pg_required'] or (_numeric(self.receipt['pg_stop'],os.getpid(),True) and _numeric(self.receipt['postmaster'],os.getpid(),True)))
                and not self.receipt['secondary_errors']
                and (self.receipt['primary_error'] is None or self.receipt['primary_error'].startswith('WORKER_EXIT:')))

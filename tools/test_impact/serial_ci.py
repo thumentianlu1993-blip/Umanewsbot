@@ -477,7 +477,7 @@ class Serial:
         if plan['mode'] != 'docs-only':
             try:
                 pg=verify_saved_lifecycle(self.output,{**selected,'image_id':plan['image_id']},'collect','','django')
-                self.status['collection_pg_lifecycle']={k:pg[k] for k in ('nonce','input_plan_digest','native_raw_sha256')}
+                self.status['collection_pg_lifecycle']={k:pg[k] for k in ('schema_version','nonce','input_plan_digest','native_raw_sha256')}
                 self.status['collection_pg_lifecycle'].update(pg_stop_wait=pg['pg_stop']['returncode'],postmaster_wait=pg['postmaster']['returncode'])
             except BaseException as exc:
                 self.status.update(fatal=True,error='PG lifecycle: '+repr(exc));self.persist();raise
@@ -544,7 +544,7 @@ class Serial:
                 if any(type(report[f]) is not list for f in ('failures', 'errors', 'skips', 'expected_failures', 'unexpected_successes')):
                     raise ValueError('malformed outcomes')
                 pg=verify_saved_lifecycle(self.output,plan,'run',key,batch['profile'])
-                self.status['attempted'][key]['pg_lifecycle']={k:pg[k] for k in ('nonce','input_plan_digest','native_raw_sha256')}
+                self.status['attempted'][key]['pg_lifecycle']={k:pg[k] for k in ('schema_version','nonce','input_plan_digest','native_raw_sha256')}
                 self.status['attempted'][key]['pg_lifecycle'].update(pg_stop_wait=pg['pg_stop']['returncode'],postmaster_wait=pg['postmaster']['returncode'])
                 if self.status['fatal'] or result['exit'] != report['exit_code']:
                     raise ValueError('cleanup/process/native exit mismatch')
