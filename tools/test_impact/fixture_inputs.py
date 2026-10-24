@@ -1,4 +1,4 @@
-"""限定三项 native 的固定缓存准入；仅使用标准库，不导入应用或测试。"""
+"""限定显式 native 集合的固定缓存准入；仅使用标准库，不导入应用或测试。"""
 import hashlib
 import json
 import os
@@ -7,6 +7,7 @@ import re
 import stat
 
 RESOURCE_ID = 'b239-primary3-v1'
+SECONDARY_RESOURCE_ID = 'b243-secondary2-v1'
 MANIFEST_SHA256 = 'b169ea447a8f6dbc00bb5123df24fe9de50d5da25652eb0329ba5698b5d1ebf9'
 RESOURCE_PATH = Path('tools/test_impact/fixtures/primary3')
 NATIVE_IDS = (
@@ -25,9 +26,9 @@ def _require(condition, message):
         raise ValueError('fixture inputs: '+message)
 
 
-def _exact_ids(ids):
+def _exact_ids(ids, admitted=NATIVE_IDS):
     _require(type(ids) is list and all(type(i) is str for i in ids), 'native ID list required')
-    _require(len(ids) == 3 and set(ids) == set(NATIVE_IDS), 'exact three unique native IDs required')
+    _require(len(ids) == len(admitted) and set(ids) == set(admitted), 'exact admitted unique native IDs required')
 
 
 def validate_selection(plan, *, collecting=False):
@@ -37,22 +38,27 @@ def validate_selection(plan, *, collecting=False):
     control = plan['fixture_inputs']
     _require(type(control) is dict and set(control) == {
         'id', 'manifest_sha256', 'source_sha', 'source_tree'}, 'unexpected control fields')
-    _require(control['id'] == RESOURCE_ID and control['manifest_sha256'] == MANIFEST_SHA256,
-             'resource identity mismatch')
+    admitted, manifest_sha = NATIVE_IDS, MANIFEST_SHA256
+    if control['id'] == SECONDARY_RESOURCE_ID:
+        from tools.test_impact import fixture_inputs_secondary as secondary
+        admitted, manifest_sha = secondary.NATIVE_IDS, secondary.MANIFEST_SHA256
+    _require(control['id'] in (RESOURCE_ID, SECONDARY_RESOURCE_ID)
+             and control['manifest_sha256'] == manifest_sha, 'resource identity mismatch')
+    count = len(admitted)
     for field, source_field in (('source_sha', 'test_sha'), ('source_tree', 'test_tree')):
         value = control[field]
         _require(type(value) is str and re.fullmatch(r'[0-9a-f]{40}', value) is not None
                  and value == plan.get(source_field), 'source identity mismatch')
     _require(plan.get('source') == 'git' and plan.get('mode') == 'targeted', 'targeted Git plan required')
-    _exact_ids(plan.get('labels'))
+    _exact_ids(plan.get('labels'), admitted)
     batches = plan.get('batches', [])
     _require(type(batches) is list, 'batch list required')
     if collecting and not batches:
-        _require('count' not in plan or type(plan['count']) is int and plan['count'] in (0, 3),
+        _require('count' not in plan or type(plan['count']) is int and plan['count'] in (0, count),
                  'invalid collection count')
         return
-    _require(batches and type(plan.get('count')) is int and plan['count'] == 3,
-             'three collected natives required')
+    _require(batches and type(plan.get('count')) is int and plan['count'] == count,
+             'exact collected natives required')
     ids, keys = [], []
     for batch in batches:
         _require(type(batch) is dict and batch.get('profile') == 'django', 'Django batch required')
@@ -63,7 +69,7 @@ def validate_selection(plan, *, collecting=False):
         ids.extend(batch['ids'])
         keys.append(key)
     _require(len(keys) == len(set(keys)), 'duplicate batch key')
-    _exact_ids(ids)
+    _exact_ids(ids, admitted)
 
 
 def _relative(value):
@@ -101,7 +107,7 @@ def _json(data):
 
 def fixture_environment(plan, binding, code_sha, profile, *, collecting=False,
                         inherited_keys=(), source_root=Path('/source')):
-    """envclear 后调用；验证全部字节后才返回两个固定只读路径。"""
+    """envclear 后调用；验证全部字节后才返回固定只读路径。"""
     _require(not set(inherited_keys).intersection(ENVIRONMENT)
              and not set(os.environ).intersection(ENVIRONMENT), 'host fixture environment injection')
     validate_selection(plan, collecting=collecting)
@@ -114,6 +120,9 @@ def fixture_environment(plan, binding, code_sha, profile, *, collecting=False,
     source_root = Path(source_root)
     _require(source_root.is_absolute() and stat.S_ISDIR(source_root.lstat().st_mode),
              'regular absolute source directory required')
+    if plan['fixture_inputs']['id'] == SECONDARY_RESOURCE_ID:
+        from tools.test_impact.fixture_inputs_secondary import resource_environment
+        return resource_environment(source_root)
     root = _regular(source_root, str(RESOURCE_PATH/'manifest.json')).parent
     raw = (root/'manifest.json').read_bytes()
     _require(len(raw) <= 32768 and hashlib.sha256(raw).hexdigest() == MANIFEST_SHA256,

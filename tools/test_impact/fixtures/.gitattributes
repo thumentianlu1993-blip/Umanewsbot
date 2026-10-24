@@ -2,3 +2,5 @@
 primary3/** -text
 primary3/**/*.html -diff
 primary3/**/*.cfm -diff
+secondary2/** -text
+secondary2/**/*.html -diff
