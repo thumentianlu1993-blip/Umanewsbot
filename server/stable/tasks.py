@@ -1176,6 +1176,21 @@ def deliver_race_live_alert_task(incident_id: int) -> dict:
     }
 
 
+@shared_task(bind=True, max_retries=2)
+def backfill_profile_strong_article_links_task(self, profile_id: int, actor_id: int) -> dict:
+    """C-line registered task; direct fallback is not durable queued retry."""
+    from django.db import InterfaceError, OperationalError
+    from stable.services.horse_article_strong_backfill import backfill_profile_strong_bindings
+
+    try:
+        return backfill_profile_strong_bindings(profile_id, actor_id)
+    except (OperationalError, InterfaceError) as error:
+        if (not self.request.called_directly and not getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False)
+                and self.request.retries < 2):
+            raise self.retry(exc=error, countdown=(2, 5)[self.request.retries], max_retries=2)
+        raise
+
+
 @shared_task
 def scan_article_horse_links_task(article_id: int | None = None, profile_id: int | None = None, limit: int = 500, commit: bool = True) -> dict:
     from stable.services.horse_profiles import scan_article_horse_links

@@ -259,26 +259,53 @@ def transition_review_status(
     user: User | None = None,
     note: str = "",
 ) -> HorseProfile:
-    now = timezone.now()
-    profile.review_status = status
-    profile.review_notes = note or profile.review_notes
-    update_fields = ["review_status", "review_notes", "updated_at"]
-    if status == HorseProfileStatus.PUBLISHED:
-        profile.published_at = now
-        profile.published_by = user
-        update_fields.extend(["published_at", "published_by"])
-    if status == HorseProfileStatus.HIDDEN:
-        profile.hidden_at = now
-        profile.hidden_by = user
-        update_fields.extend(["hidden_at", "hidden_by"])
-    profile.save(update_fields=update_fields)
-    log_operation(
-        action_type="horse_profile_status_changed",
-        target_type="horse_profile",
-        target_id=profile.pk,
-        detail=f"马匹资料状态改为 {status}；备注：{note}",
-        admin=user,
-    )
+    def after_commit(profile_id, actor_id):
+        # Even direct/eager fallback runs only after the outer Profile lock
+        # has been released; the writer may then lock Article -> Profile.
+        import logging
+
+        logger = logging.getLogger(__name__)
+        try:
+            from stable.services.horse_article_strong_backfill import enqueue_profile_strong_backfill
+
+            enqueue_profile_strong_backfill(profile_id, actor_id)
+        except Exception as error:
+            logger.exception("strong backfill dispatch failed profile=%s actor=%s", profile_id, actor_id)
+            try:
+                TaskExecutionLog.objects.create(task_name="horse_strong_backfill_dispatch", status=TaskStatus.FAILED,
+                    payload={"profile_id": profile_id, "actor_id": actor_id},
+                    detail="dispatch_or_direct_execution_failed:"+type(error).__name__, finished_at=timezone.now())
+            except Exception:
+                logger.exception("strong backfill dispatch failure audit unavailable profile=%s", profile_id)
+
+    with transaction.atomic():
+        current = HorseProfile.objects.select_for_update().only("review_status", "published_at").get(pk=profile.pk)
+        first_publication = (status == HorseProfileStatus.PUBLISHED
+                             and current.review_status != HorseProfileStatus.PUBLISHED and current.published_at is None)
+        now = timezone.now()
+        profile.review_status = status
+        profile.review_notes = note or profile.review_notes
+        update_fields = ["review_status", "review_notes", "updated_at"]
+        if status == HorseProfileStatus.PUBLISHED:
+            profile.published_at = now
+            profile.published_by = user
+            update_fields.extend(["published_at", "published_by"])
+        if status == HorseProfileStatus.HIDDEN:
+            profile.hidden_at = now
+            profile.hidden_by = user
+            update_fields.extend(["hidden_at", "hidden_by"])
+        profile.save(update_fields=update_fields)
+        log_operation(
+            action_type="horse_profile_status_changed",
+            target_type="horse_profile",
+            target_id=profile.pk,
+            detail=f"马匹资料状态改为 {status}；备注：{note}",
+            admin=user,
+        )
+        actor_id = getattr(user, "pk", None)
+        if first_publication and type(actor_id) is int and actor_id > 0:
+            profile_id = profile.pk
+            transaction.on_commit(lambda: after_commit(profile_id, actor_id), robust=True)
     return profile
 
 
