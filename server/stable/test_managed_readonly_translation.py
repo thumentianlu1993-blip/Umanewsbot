@@ -771,6 +771,160 @@ class ManagedReadonlyTranslationEndToEndTests(RemainingReadonlyE2EFixture, Manag
                 self.assertEqual(self.business_snapshot(), before)
                 self.assertEqual((self.case_reads(), len(self.case_creates())), (1, 1))
 
+    def test_inflight_read_loser_does_not_block_live_owner(self):
+        from time import monotonic
+        from uuid import UUID
+
+        self.new_scenario()
+        published, start_b, finished_b, finished_a = Event(), Event(), Event(), Event()
+        owner = {}
+        workers = {name: {"pid": None, "result": None, "error": None} for name in ("A", "B")}
+        observed = {}
+        state = None
+
+        def snapshot():
+            step = self.readroot.steps.get()
+            run = self.actual_run()
+            return {"progress": deepcopy(run.raw_response[job.PROGRESS_KEY]),
+                    "claim_phase": run.raw_response[recovery.CLAIM_KEY]["phase"],
+                    "step": {"pk": step.pk, "uuid": str(step.step_uuid),
+                             "token": str(step.reservation_token), "state": step.state,
+                             "result": deepcopy(step.result), "result_sha256": step.result_sha256,
+                             "read_at": step.read_at, "completed_at": step.completed_at},
+                    "counts": self.counters(), "reads": self.case_reads(),
+                    "creates": deepcopy(self.case_creates())}
+
+        def action(index):
+            name = "A" if index == 0 else "B"
+            try:
+                with connection.cursor() as cursor:
+                    cursor.execute("SELECT pg_backend_pid()")
+                    workers[name]["pid"] = cursor.fetchone()[0]
+                if index == 0:
+                    with self.case_scope(reader_fault="pause_before_read") as (reader, _):
+                        owner["reader"] = reader
+                        owner["task_started_at"] = monotonic()
+                        published.set()
+                        args, kwargs = self.message
+                        result = translate_article_task.run(*args, **kwargs)
+                else:
+                    fixture_requirement(start_b.wait(8), "B227 B必须等待控制连接确认真实read预约")
+                    result = self.case_consume()
+                workers[name]["result"] = result
+                return result
+            except BaseException:
+                workers[name]["error"] = traceback.format_exc()
+                raise
+            finally:
+                if index == 0:
+                    published.set()  # 失败也唤醒控制连接；缺reader仍是前置ERROR。
+                    finished_a.set()
+                else:
+                    finished_b.set()  # 专属B，且在真实task及case_scope返回之后。
+
+        try:
+            # 同一个helper上下文必须跨越B快照；退出helper会自动释放所有reader gate。
+            with self.running_workers(action, count=2, releases=(start_b,)) as state:
+                try:
+                    fixture_requirement(published.wait(8) and "reader" in owner,
+                                        "B227 A必须发布真实封闭reader；异常不是业务RED")
+                    reader = owner["reader"]
+                    fixture_requirement(reader.before_read_ready.wait(8), "B227 A必须到达已提交预约后的读前gate")
+                    with connection.cursor() as cursor:
+                        cursor.execute("SELECT pg_backend_pid()")
+                        observed["control_pid"] = cursor.fetchone()[0]
+                    fixture_requirement(observed["control_pid"] not in state["pids"]
+                                        and not connection.in_atomic_block,
+                                        "B227控制连接必须独立于两个真实worker且无外层事务")
+                    before = observed["owner_paused"] = snapshot()
+                    events = [event for event in reader.trace if event["event"] == "before_read"]
+                    fixture_requirement(len(events) == 1 and events[0]["backend_pid"] == workers["A"]["pid"]
+                                        and not events[0]["in_atomic"] and events[0]["reserved"] == 1
+                                        and events[0]["inflight_count"] == 1,
+                                        "B227真实read guard/独立PG PID与已提交slot前置")
+                    try:
+                        self.no_business_locks(workers["A"]["pid"])
+                    except self.failureException:
+                        observed["lock_prerequisite_error"] = traceback.format_exc()
+                        fixture_requirement(False, "B227读前仍有业务锁是前置ERROR，不是竞态RED")
+                    fixture_requirement(before["claim_phase"] == "executing"
+                                        and before["progress"]["state"] == "registered"
+                                        and before["progress"]["model_owner_token"] is None
+                                        and before["step"]["state"] == "inflight"
+                                        and str(UUID(before["step"]["uuid"])) == before["step"]["uuid"]
+                                        and str(UUID(before["step"]["token"])) == before["step"]["token"]
+                                        and not before["step"]["result_sha256"]
+                                        and before["step"]["read_at"] is None
+                                        and before["step"]["completed_at"] is None
+                                        and before["counts"] == (1, 0, 1, 0)
+                                        and before["reads"] == 0 and before["creates"] == []
+                                        and not reader.before_read_release.is_set() and not finished_a.is_set(),
+                                        "B227真实inflight/未读/无model前置，不伪造completed或owner")
+                    start_b.set()
+                    fixture_requirement(finished_b.wait(8), "B227必须等专属B实际返回，不能用共享finished")
+                    held = observed["b_returned_a_still_paused"] = snapshot()
+                    observed["held_task_window_seconds"] = monotonic() - owner["task_started_at"]
+                    fixture_requirement(workers["B"]["error"] is None
+                                        and type(workers["B"]["result"]) is dict
+                                        and workers["B"]["result"].get("reason") == "step_result_unknown"
+                                        and not workers["B"]["result"].get("translated")
+                                        and not reader.before_read_release.is_set() and not finished_a.is_set()
+                                        and held["step"] == before["step"]
+                                        and held["counts"] == (1, 0, 1, 0)
+                                        and held["reads"] == 0 and held["creates"] == []
+                                        and observed["held_task_window_seconds"] < 8
+                                        and held["progress"]["model_owner_token"] is None,
+                                        "B227 B须真实拒绝且A仍暂停；超时/异常/提前release均为ERROR")
+                    observed["snapshot_before_helper_exit"] = True
+                finally:
+                    start_b.set()
+                    if "reader" in owner:
+                        observed["owner_release_window_seconds"] = monotonic() - owner["task_started_at"]
+                        owner["reader"].before_read_release.set()  # 明确释放A，再让helper有界join。
+                        observed["owner_explicitly_released"] = True
+        finally:
+            # 即使前置或后续oracle失败，也保留实际结果；不把未到达断言计为通过。
+            try:
+                observed["after_join"] = snapshot()
+            except Exception:
+                observed["snapshot_error"] = traceback.format_exc()
+            observed["workers"] = workers
+            observed["closed"] = state["closed"] if state is not None else []
+            observed["helper_pids"] = state["pids"] if state is not None else []
+            observed["helper_errors"] = ["".join(traceback.format_exception(type(error), error, error.__traceback__))
+                                         for error in state["errors"]] if state is not None else []
+            observed["reader_traces"] = [deepcopy(reader.trace) for reader in self.readers[self.case_reader_index:]]
+            observed["sdk_traces"] = [deepcopy(sdk.trace) for sdk in self.sdks[self.case_sdk_index:]]
+            print("B227_OWNER_RACE_DIAGNOSTIC", json.dumps(observed, default=str, ensure_ascii=False, sort_keys=True),
+                  flush=True)
+        try:
+            self.workers_clean(state)
+        except self.failureException:
+            fixture_requirement(False, "B227 worker结果收尾不完整是ERROR，不是竞态RED")
+        fixture_requirement("snapshot_error" not in observed, "B227收尾真实状态必须可读取")
+        fixture_requirement(observed["owner_release_window_seconds"] < 8,
+                            "B227必须在A原8秒gate超时前显式释放；超时不能算竞态RED")
+        self.assertEqual(sum(result.get("translated") is True for result in state["results"]), 1, observed)
+        self.assertEqual(observed["b_returned_a_still_paused"]["progress"], observed["owner_paused"]["progress"],
+                         "无read reservation的败者不得封锁或推进活跃A的共享progress")
+        self.assertEqual((self.case_reads(), len(self.case_creates()), self.counters()), (1, 1, (1, 1, 1, 1)))
+        run = self.actual_run()
+        self.assertEqual(run.raw_response[job.PROGRESS_KEY]["state"], "final_applied")
+        self.assertIsNotNone(run.raw_response[job.PROGRESS_KEY]["model_owner_token"])
+        self.assertEqual(run.status, "success")
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.translation_status, ArticleTranslationStatus.TRANSLATED)
+        final = run.raw_response[job.FINAL_KEY]
+        winner = next(result for result in state["results"] if result.get("translated") is True)
+        self.assertEqual(winner.get("final_receipt"), final)
+        before_replay = self.business_snapshot()
+        repeated = self.case_consume()
+        self.assertEqual(repeated.get("final_receipt"), final)
+        self.assertFalse(repeated.get("translated"))
+        self.assertEqual(self.business_snapshot(), before_replay)
+        self.assertEqual((self.case_reads(), len(self.case_creates()), self.counters()), (1, 1, (1, 1, 1, 1)))
+        self.assertEqual(NotificationLog.objects.count(), 0)
+
     def test_two_redeliveries_have_one_model_owner_and_one_final_apply(self):
         with self.subTest(phase="registered_read_race"):
             # 先从真实registered/未读状态竞争，不能用事先completed read掩盖read-inflight竞态。
