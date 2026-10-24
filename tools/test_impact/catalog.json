@@ -852,7 +852,8 @@
     ],
     "public_probe_template_adapter": [
       "stable.test_public_probe_template_adapter",
-      "stable.test_public_probe_template_glue"
+      "stable.test_public_probe_template_glue",
+      "stable.test_u04_publication_probe_rejection"
     ],
     "responses_analysis": [
       "stable.test_responses_analysis"
@@ -2714,6 +2715,12 @@
         "public_probe_template_adapter"
       ]
     },
+    "server/stable/test_u04_publication_probe_rejection.py": {
+      "label": "stable.test_u04_publication_probe_rejection",
+      "domains": [
+        "public_probe_template_adapter"
+      ]
+    },
     "server/stable/test_public_probe_template_glue.py": {
       "label": "stable.test_public_probe_template_glue",
       "domains": [
@@ -3135,6 +3142,7 @@
     "stable.test_public_probe_contracts": "python",
     "stable.test_public_probe_render": "python",
     "stable.test_public_probe_template_adapter": "django",
+    "stable.test_u04_publication_probe_rejection": "django",
     "stable.test_public_probe_template_glue": "django",
     "stable.test_responses_analysis": "django",
     "stable.test_public_probe_orm_loader": "django",
