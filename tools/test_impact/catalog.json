@@ -811,7 +811,12 @@
       "stable.tests.test_race_event_lifecycle_enrollment.LifecycleEnrollmentCommandTests.test_prepare_command_does_not_resolve_away_temporary_alias"
     ],
     "content_contracts": [
-      "stable.test_content_contracts"
+      "stable.test_content_contracts",
+      "stable.test_u04_horse_follow_copy",
+      "stable.test_u04_article_body_empty_copy",
+      "stable.test_u04_horse_basic_profile_empty_copy",
+      "stable.test_u04_horse_index_japanese_fallback",
+      "stable.test_u04_result_publication_time"
     ],
     "module:scripts.tests.test_f02_readonly_export": [
       "scripts.tests.test_f02_readonly_export"
@@ -849,7 +854,8 @@
     ],
     "public_probe_template_adapter": [
       "stable.test_public_probe_template_adapter",
-      "stable.test_public_probe_template_glue"
+      "stable.test_public_probe_template_glue",
+      "stable.test_u04_publication_probe_rejection"
     ],
     "responses_analysis": [
       "stable.test_responses_analysis"
@@ -2610,6 +2616,36 @@
         "content_contracts"
       ]
     },
+    "server/stable/test_u04_horse_follow_copy.py": {
+      "label": "stable.test_u04_horse_follow_copy",
+      "domains": [
+        "content_contracts"
+      ]
+    },
+    "server/stable/test_u04_article_body_empty_copy.py": {
+      "label": "stable.test_u04_article_body_empty_copy",
+      "domains": [
+        "content_contracts"
+      ]
+    },
+    "server/stable/test_u04_horse_basic_profile_empty_copy.py": {
+      "label": "stable.test_u04_horse_basic_profile_empty_copy",
+      "domains": [
+        "content_contracts"
+      ]
+    },
+    "server/stable/test_u04_horse_index_japanese_fallback.py": {
+      "label": "stable.test_u04_horse_index_japanese_fallback",
+      "domains": [
+        "content_contracts"
+      ]
+    },
+    "server/stable/test_u04_result_publication_time.py": {
+      "label": "stable.test_u04_result_publication_time",
+      "domains": [
+        "content_contracts"
+      ]
+    },
     "scripts/tests/test_f02_readonly_export.py": {
       "label": "scripts.tests.test_f02_readonly_export",
       "domains": [
@@ -2689,6 +2725,12 @@
     },
     "server/stable/test_public_probe_template_adapter.py": {
       "label": "stable.test_public_probe_template_adapter",
+      "domains": [
+        "public_probe_template_adapter"
+      ]
+    },
+    "server/stable/test_u04_publication_probe_rejection.py": {
+      "label": "stable.test_u04_publication_probe_rejection",
       "domains": [
         "public_probe_template_adapter"
       ]
@@ -3098,6 +3140,11 @@
     "scripts.tests.test_impact_evolution": "python",
     "scripts.tests.test_impact_verifier_e2e": "python",
     "stable.test_content_contracts": "python",
+    "stable.test_u04_horse_follow_copy": "django",
+    "stable.test_u04_article_body_empty_copy": "django",
+    "stable.test_u04_horse_basic_profile_empty_copy": "django",
+    "stable.test_u04_horse_index_japanese_fallback": "django",
+    "stable.test_u04_result_publication_time": "django",
     "scripts.tests.test_f02_readonly_export": "python",
     "scripts.tests.test_f02_transfer": "python",
     "scripts.tests.test_f02_docker_adapter": "python",
@@ -3111,6 +3158,7 @@
     "stable.test_public_probe_contracts": "python",
     "stable.test_public_probe_render": "python",
     "stable.test_public_probe_template_adapter": "django",
+    "stable.test_u04_publication_probe_rejection": "django",
     "stable.test_public_probe_template_glue": "django",
     "stable.test_responses_analysis": "django",
     "stable.test_public_probe_orm_loader": "django",
