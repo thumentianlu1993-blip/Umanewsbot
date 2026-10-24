@@ -9,7 +9,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core import signing
 from django.db import transaction
-from django.db.models import Q, QuerySet
+from django.db.models import OuterRef, Q, QuerySet, Subquery
 from django.utils import timezone
 
 from stable.models import (
@@ -716,27 +716,34 @@ def followed_horse_ids(token_hash: str, *, include_descendants: bool = True) -> 
 
 def followed_articles(token_hash: str, *, limit: int = 20) -> list[dict[str, Any]]:
     horse_ids = followed_horse_ids(token_hash, include_descendants=True)
-    if not horse_ids:
+    if not horse_ids or limit == 0:
         return []
-    links = (
-        ArticleHorseLink.objects.filter(
-            horse_profile_id__in=horse_ids,
-            horse_profile__review_status=HorseProfileStatus.PUBLISHED,
-            status__in=[ArticleHorseLinkStatus.AUTO, ArticleHorseLinkStatus.MANUAL],
-            article__workflow_status=WorkflowStatus.PUBLISHED,
-            article__published_to_web_at__isnull=False,
-        )
-        .select_related("article", "horse_profile")
-        .order_by("-article__published_to_web_at", "-article_id")[:limit]
+    eligible_links = ArticleHorseLink.objects.filter(
+        horse_profile_id__in=horse_ids,
+        horse_profile__review_status=HorseProfileStatus.PUBLISHED,
+        status__in=[ArticleHorseLinkStatus.AUTO, ArticleHorseLinkStatus.MANUAL],
+        article__workflow_status=WorkflowStatus.PUBLISHED,
+        article__published_to_web_at__isnull=False,
     )
-    seen_articles: set[int] = set()
-    entries: list[dict[str, Any]] = []
-    for link in links:
-        if link.article_id in seen_articles:
-            continue
-        seen_articles.add(link.article_id)
-        entries.append({"article": link.article, "horse_profile": link.horse_profile, "link": link})
-    return entries
+    # 先按唯一文章限额；所有中间结果留在数据库，不把重复关系载入 Python。
+    articles = (
+        NewsArticle.objects.filter(
+            pk__in=Subquery(eligible_links.order_by().values("article_id"))
+        )
+        .order_by("-published_to_web_at", "-pk")[:limit]
+    )
+    # 同文任取一个合格代表，不新增关系优先级；标量子查询只返回一行。
+    representative_ids = articles.annotate(
+        followed_link_id=Subquery(
+            eligible_links.filter(article_id=OuterRef("pk")).order_by().values("pk")[:1]
+        )
+    ).values("followed_link_id")
+    links = (
+        eligible_links.filter(pk__in=Subquery(representative_ids))
+        .select_related("article", "horse_profile")
+        .order_by("-article__published_to_web_at", "-article_id")
+    )
+    return [{"article": link.article, "horse_profile": link.horse_profile, "link": link} for link in links]
 
 
 def classify_completion_payload(payload: dict) -> str:
