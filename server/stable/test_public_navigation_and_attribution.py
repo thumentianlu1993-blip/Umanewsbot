@@ -606,3 +606,276 @@ class PublicNavigationAndAttributionTests(TestCase):
         redirect_response = self.client.get(reverse("public-horse-index"), {"region": RacingRegion.JAPAN})
         self.assertEqual(redirect_response.status_code, 301)
         self.assertEqual(redirect_response["Location"], reverse("public-horse-index"))
+
+
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}},
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+)
+class PublicNavCurrentLocationTests(TestCase):
+    """真实页面导航语义候选；D016只准备源码，不把静态检查称作RED。
+
+    每次GET先核HTTP、固定链接和原active映射，再检查新语义。只限制
+    关注cookie和HorseFollow无写，允许CSRF cookie正常产生；不输出token/HTML。
+    """
+
+    def setUp(self):
+        self.serial = 0
+
+    def _profile(self, *, hidden=False):
+        self.serial += 1
+        term = TermEntry(
+            term_type=TermType.HORSE, source_language=SourceLanguage.JAPANESE,
+            source_ja=f"D016 Synthetic Horse {self.serial}",
+            target_zh=f"导航合成马{self.serial}", racing_region=RacingRegion.JAPAN,
+        )
+        term.full_clean()
+        term.save()
+        profile = HorseProfile(
+            primary_term=term, display_name_zh=term.target_zh,
+            original_name=term.source_ja, racing_region=RacingRegion.JAPAN,
+            review_status=HorseProfileStatus.HIDDEN if hidden else HorseProfileStatus.PUBLISHED,
+        )
+        profile.full_clean()
+        profile.save()
+        return profile
+
+    def _event(self, *, hidden=False):
+        self.serial += 1
+        day = timezone.localdate() + timedelta(days=1)
+        event = RaceEvent(
+            year=day.year, edition_year=day.year, slug=f"d016-navigation-{self.serial}",
+            original_name=f"D016 Synthetic Race {self.serial}",
+            chinese_name=f"导航合成赛{self.serial}", country_region=RacingRegion.JAPAN,
+            racecourse="D016 Synthetic Park", grade_text="G1", surface="turf",
+            local_date=day,
+            visibility_status=RaceEventVisibility.HIDDEN if hidden else RaceEventVisibility.PUBLISHED,
+        )
+        event.full_clean()
+        event.save()
+        return event
+
+    def _article(self):
+        self.serial += 1
+        now = timezone.now()
+        article = NewsArticle(
+            source_site=SourceSite.NETKEIBA, source_mode=SourceMode.LATEST,
+            source_article_id=f"d016-navigation-{self.serial}",
+            source_url=f"https://example.com/d016/{self.serial}",
+            title_ja="D016 Synthetic News", title_zh="导航合成新闻",
+            translated_title_zh="导航合成新闻", body_ja_raw="Synthetic body",
+            body_ja_normalized="Synthetic body", body_zh="导航合成正文",
+            translated_body_zh="导航合成正文", published_at=now,
+            published_to_web_at=now, workflow_status=WorkflowStatus.PUBLISHED,
+        )
+        article.full_clean()
+        article.save()
+        return article
+
+    def _read(self, url, *, status=200):
+        from stable.services.horse_profiles import FOLLOW_COOKIE_NAME
+
+        before = list(HorseFollow.objects.order_by("pk").values())
+        cookie = self.client.cookies.get(FOLLOW_COOKIE_NAME)
+        cookie_before = cookie.value if cookie is not None else None
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status, "前件：真实GET状态不符")
+        after = list(HorseFollow.objects.order_by("pk").values())
+        self.assertTrue(before == after, "GET改变HorseFollow行/字段/归属")
+        self.assertFalse(FOLLOW_COOKIE_NAME in response.cookies,
+                         "GET不应新建/替换关注cookie；允许正常CSRF cookie")
+        cookie = self.client.cookies.get(FOLLOW_COOKIE_NAME)
+        cookie_after = cookie.value if cookie is not None else None
+        self.assertTrue(cookie_before == cookie_after, "GET旋转/创建关注cookie")
+        return response
+
+    @staticmethod
+    def _parse_menus(html):
+        from html.parser import HTMLParser
+
+        class Menus(HTMLParser):
+            def __init__(self):
+                super().__init__(convert_charrefs=True)
+                self.menus = []
+                self.stack = []
+                self.current = None
+                self.link = None
+
+            def handle_starttag(self, tag, attrs):
+                values = dict(attrs)
+                if tag == "nav":
+                    self.stack.append(self.current)
+                    if values.get("aria-label") in {"公开站点导航", "移动端导航"}:
+                        self.current = {"attrs": values, "links": []}
+                        self.menus.append(self.current)
+                    else:
+                        self.current = None
+                elif tag == "a" and self.current is not None:
+                    self.link = {"attrs": values, "pairs": attrs, "text": ""}
+
+            def handle_data(self, data):
+                if self.link is not None:
+                    self.link["text"] += data
+
+            def handle_endtag(self, tag):
+                if tag == "a" and self.link is not None:
+                    self.current["links"].append(self.link)
+                    self.link = None
+                elif tag == "nav" and self.stack:
+                    self.current = self.stack.pop()
+
+        parser = Menus()
+        parser.feed(html)
+        return parser.menus
+
+    def _menus(self, url, *, section, route, empty_context=None, expected_query=None):
+        response = self._read(url)
+        self.assertEqual(response.resolver_match.url_name, route,
+                         "前件：必须到达预期真实路由")
+        if empty_context is not None:
+            self.assertEqual(len(response.context[empty_context]), 0,
+                             "前件：指定空态必须由真实context确认")
+        if expected_query is not None:
+            self.assertTrue(response.context["filters"]["q"] == expected_query,
+                            "前件：真实搜索条件必须保留")
+        menus = self._parse_menus(response.content.decode("utf-8"))
+        self.assertEqual(len(menus), 2, "前件：两个导航区域必须均存在")
+        urls = [reverse("public-news-feed"), reverse("public-race-calendar"),
+                reverse("public-horse-index"), reverse("public-horse-follows")]
+        selected = None if section is None else {
+            "home": urls[0], "races": urls[1], "horses": urls[2], "follows": urls[3],
+        }[section]
+        expected = {
+            "公开站点导航": ("site-nav", ["首页", "赛事日历", "马匹", "我的关注"]),
+            "移动端导航": ("mobile-tabbar", ["首页", "赛事", "马匹", "关注"]),
+        }
+        result = {}
+        for label, (css_class, texts) in expected.items():
+            found = [menu for menu in menus if menu["attrs"].get("aria-label") == label]
+            self.assertEqual(len(found), 1, "前件：导航区域不能重复/缺失")
+            menu = found[0]
+            self.assertTrue(css_class in menu["attrs"].get("class", "").split())
+            self.assertEqual(len(menu["links"]), 4, "前件：原四链接保留")
+            actual = [(link["attrs"].get("href"), " ".join(link["text"].split()))
+                      for link in menu["links"]]
+            self.assertTrue(actual == list(zip(urls, texts)), "前件：固定导航文字/href不符")
+            for link, href in zip(menu["links"], urls):
+                self.assertEqual(len(link["pairs"]), len(link["attrs"]),
+                                 "导航链接不能含重复HTML属性")
+                wanted = ["active"] if href == selected else []
+                self.assertTrue(link["attrs"].get("class", "").split() == wanted,
+                                "前件：原active映射不符；期望来自固定route而非class")
+            result[label] = menu
+        return result
+
+    def _current(self, menu, expected_href):
+        marked = [link for link in menu["links"] if "aria-current" in link["attrs"]]
+        if expected_href is None:
+            self.assertFalse(marked, "回归：新闻详情原无当前频道，不新增映射")
+        else:
+            self.assertEqual(len(marked), 1, "业务 RED：已知频道必须唯一指定当前项")
+            self.assertTrue(marked[0]["attrs"].get("href") == expected_href
+                            and marked[0]["attrs"].get("aria-current") == "location",
+                            "业务 RED：当前频道需要正确对象的aria-current=location")
+
+    def _both_current(self, menus, expected_href):
+        self._current(menus["公开站点导航"], expected_href)
+        self._current(menus["移动端导航"], expected_href)
+
+    def test_empty_follow_header_requires_current_location(self):
+        url = reverse("public-horse-follows")
+        menus = self._menus(url, section="follows", route="public-horse-follows",
+                            empty_context="follows")
+        self._current(menus["公开站点导航"], url)
+
+    def test_empty_follow_mobile_requires_current_location(self):
+        url = reverse("public-horse-follows")
+        menus = self._menus(url, section="follows", route="public-horse-follows",
+                            empty_context="follows")
+        self._current(menus["移动端导航"], url)
+
+    def test_empty_home_has_current_home_in_both_menus(self):
+        url = reverse("public-news-feed")
+        menus = self._menus(url, section="home", route="public-news-feed")
+        self._both_current(menus, url)
+
+    def test_empty_horse_index_has_current_horses_in_both_menus(self):
+        url = reverse("public-horse-index")
+        menus = self._menus(url, section="horses", route="public-horse-index",
+                            empty_context="horse_profiles")
+        self._both_current(menus, url)
+
+    def test_horse_search_empty_keeps_current_horses(self):
+        from urllib.parse import urlencode
+
+        self._profile()
+        url = reverse("public-horse-index")
+        menus = self._menus(url + "?" + urlencode({"q": "D016-no-match"}),
+                            section="horses", route="public-horse-index",
+                            empty_context="horse_profiles", expected_query="D016-no-match")
+        self._both_current(menus, url)
+
+    def test_calendar_canonical_get_has_current_races(self):
+        url = reverse("public-race-calendar")
+        menus = self._menus(url + "?tab=all", section="races", route="public-race-calendar")
+        self._both_current(menus, url)
+
+    def test_published_horse_detail_has_current_horses(self):
+        profile = self._profile()
+        menus = self._menus(profile.public_path, section="horses", route="public-horse-detail")
+        self._both_current(menus, reverse("public-horse-index"))
+
+    def test_published_race_detail_has_current_races(self):
+        event = self._event()
+        menus = self._menus(event.public_path, section="races", route="public-race-detail")
+        self._both_current(menus, reverse("public-race-calendar"))
+
+    def test_legacy_race_path_redirects_then_has_current_races(self):
+        from urllib.parse import urlsplit
+
+        event = self._event()
+        old_path = event.public_path
+        event.slug += "-canonical"
+        event.full_clean()
+        event.save()
+        redirect = self._read(old_path, status=301)
+        target = redirect["Location"]
+        parsed = urlsplit(target)
+        self.assertTrue(not parsed.scheme and not parsed.netloc
+                        and parsed.path == event.public_path,
+                        "前件：真实旧路径301必须指向本赛事canonical")
+        menus = self._menus(target, section="races", route="public-race-detail")
+        self._both_current(menus, reverse("public-race-calendar"))
+
+    def test_article_detail_keeps_both_menus_without_current_item(self):
+        article = self._article()
+        menus = self._menus(article.public_path, section=None, route="public-article-detail")
+        self._both_current(menus, None)
+
+    def test_hidden_horse_and_race_details_are_404(self):
+        profile = self._profile(hidden=True)
+        event = self._event(hidden=True)
+        self._read(profile.public_path, status=404)
+        self._read(event.public_path, status=404)
+
+    def test_follow_get_preserves_rows_and_follower_cookie(self):
+        from stable.services.horse_profiles import (
+            FOLLOW_COOKIE_NAME, follow_horse, signed_follow_token, token_hash_from_cookie,
+        )
+
+        profile = self._profile()
+        cookie = signed_follow_token()
+        token_hash = token_hash_from_cookie(cookie)
+        self.assertTrue(bool(token_hash), "前件：真实关注producer/decoder")
+        follow_horse(token_hash, profile, include_descendants=True)
+        self.assertEqual(HorseFollow.objects.count(), 1, "前件：既有关注行必须实际存在")
+        self.client.cookies[FOLLOW_COOKIE_NAME] = cookie
+        self._menus(reverse("public-horse-follows"), section="follows", route="public-horse-follows")
+
+    def test_calendar_query_redirect_is_precondition_before_race_marker(self):
+        url = reverse("public-race-calendar")
+        redirect = self._read(url + "?tab=all&grade=g1%C2%AEion%3Dfrance&tracking=meta", status=301)
+        self.assertTrue(redirect["Location"] == url + "?tab=all",
+                        "前件：既有canonical301目标不符")
+        menus = self._menus(redirect["Location"], section="races", route="public-race-calendar")
+        self._both_current(menus, url)

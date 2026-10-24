@@ -22,7 +22,7 @@
             <a class="entity-chip" href="{{ link.horse_profile.public_path }}">🐎 {{ link.horse_profile.display_name }}</a>
           {% endfor %}
           {% for link in race_links %}
-            <a class="entity-chip race" href="{{ link.event.public_path }}">🏆 {% race_field link.event "name" link.event.chinese_name %} {{ link.event.year }}</a>
+            <a class="entity-chip race" href="{{ link.event.public_list_detail_url }}">🏆 {% race_field link.event "name" link.event.chinese_name %} {{ link.event.year }}</a>
           {% endfor %}
         </div>
       {% endif %}
@@ -33,11 +33,11 @@
       {% if article.cover_image_url %}
         <img class="article-cover" src="{{ article.cover_image_url }}" alt="">
       {% endif %}
-      <div class="article-body">{{ article.effective_body|linebreaks }}</div>
+      <div class="article-body">{% if article.effective_body %}{{ article.effective_body|linebreaks }}{% else %}<p class="muted">本文暂无正文。</p>{% endif %}</div>
     </article>
 
     {% if teaser_event %}
-      <a class="race-teaser" href="{{ teaser_event.public_path }}">
+      <a class="race-teaser" href="{{ teaser_event.public_list_detail_url }}">
         <span class="grade-badge {% race_grade_class teaser_event %}">{% race_field teaser_event "grade" teaser_event.grade_badge_label %}</span>
         <span class="race-teaser-main">
           <span class="race-teaser-kicker">赛事预告</span>

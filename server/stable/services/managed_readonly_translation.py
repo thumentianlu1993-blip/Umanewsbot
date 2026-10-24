@@ -40,6 +40,9 @@ JOB_VERSIONS = {
     ro.RECEIPT_VERSIONS[2]: ("readonly_translation_retry_v2", "program_fixed_translation_retry_v2", [
         {"step_key": "source_excerpt:1", "tool": "source_excerpt_v2", "params": {"body_chars": 256}},
         {"step_key": "translation_result:1", "tool": "translate_full_source_v1", "params": {}}]),
+    ro.RECEIPT_VERSIONS[3]: ("readonly_translation_retry_v3", "program_fixed_translation_retry_v3", [
+        {"step_key": "source_excerpt:1", "tool": "source_terms_v3", "params": {"body_chars": 256}},
+        {"step_key": "translation_result:1", "tool": "translate_full_source_v1", "params": {}}]),
 }
 
 
@@ -358,7 +361,7 @@ def _locked_registration_context(binding, scope, sdk, envelope, *, phases, allow
         _fail("registered_scope_mismatch")
     article, run, reason = recovery._locked_translation_claim(
         envelope.article_id, envelope.run_id, envelope.claimed_at, phase=phases, now=timezone.now(),
-        defer_publication_evidence=(scope.result_version == ro.RECEIPT_VERSIONS[2][2]))
+        defer_publication_evidence=(scope.result_version in (ro.RECEIPT_VERSIONS[2][2], ro.RECEIPT_VERSIONS[3][2])))
     if reason == "claim_already_consumed" and allow_completed:
         reason = _completed_claim_reason(article, run, envelope)
     if reason:
@@ -399,7 +402,7 @@ def _locked_registration_context(binding, scope, sdk, envelope, *, phases, allow
     return parent, root, article, run, identity
 
 
-def _validate_live_controls(controls, parent, root, run):
+def _validate_live_controls(controls, parent, root, run, article):
     """锁后结构与真实ledger校验；只拒绝，绝不修复进度/授予model permit。"""
     identity = controls[PLAN_KEY]["payload"]["identity"]
     progress = controls[PROGRESS_KEY]
@@ -412,7 +415,7 @@ def _validate_live_controls(controls, parent, root, run):
     for step in steps:
         ro._step_identity(step, expected, {"body_chars": 256})
         if step.state == "completed":
-            ro._validated_result(step, expected, {"body_chars": 256})
+            ro._validated_result(step, expected, {"body_chars": 256}, article=article)
     reference = progress["read_reference"]
     if reference is not None and (not steps or steps[0].state != "completed"
             or reference != {"step_uuid": str(steps[0].step_uuid), "result_sha256": steps[0].result_sha256}):
@@ -445,7 +448,7 @@ def register_offline_readonly_translation_job(envelope):
             controls = decode_control(run.raw_response)
             if controls[PLAN_KEY]["payload"]["identity"] != identity:
                 _fail("registered_scope_mismatch")
-            _validate_live_controls(controls, parent, root, run)
+            _validate_live_controls(controls, parent, root, run, article)
             return controls[PLAN_KEY]
         if recovery.RESULT_KEY in run.raw_response or parent.request_attempts.exists() or root.steps.exists():
             _fail("registered_plan_invalid")
@@ -472,7 +475,7 @@ def prepare_registered_read_phase(envelope):
         controls = decode_control(run.raw_response)
         if controls[PLAN_KEY]["payload"]["identity"] != identity or controls[PROGRESS_KEY]["state"] != "registered":
             _fail("registered_scope_mismatch")
-        _validate_live_controls(controls, parent, root, run)
+        _validate_live_controls(controls, parent, root, run, article)
         if parent.request_attempts.exists() or root.steps.exists() or recovery.RESULT_KEY in run.raw_response:
             _fail("registered_plan_invalid")
         run.raw_response = {**run.raw_response, recovery.CLAIM_KEY: {
@@ -506,13 +509,13 @@ def route_registered_job(article_id, run_id, claimed_at, job_uuid=""):
         binding, scope, sdk = _dependencies()
         # Validate exact scope/read identity under original lock order, with no state mutation.
         with transaction.atomic():
-            parent, root, _, locked_run, current = _locked_registration_context(
+            parent, root, article, locked_run, current = _locked_registration_context(
                 binding, scope, sdk, ro.ReadEnvelope(article_id, run_id, claimed_at), phases=("claimed", "executing"),
                 allow_completed=controls[PROGRESS_KEY]["state"] == "final_applied")
             locked = decode_control(locked_run.raw_response)
             if locked != controls or current != identity:
                 _fail("registered_scope_mismatch")
-            _validate_live_controls(locked, parent, root, locked_run)
+            _validate_live_controls(locked, parent, root, locked_run, article)
         return _consume_registered_job(ro.ReadEnvelope(article_id, run_id, claimed_at))
     except (RegisteredJobRefusal, ro.ReadonlyRefusal) as exc:
         return str(exc)
@@ -528,7 +531,7 @@ def _live(envelope, dependencies, *, phases="executing", allow_completed=False):
     controls = decode_control(run.raw_response)
     if controls[PLAN_KEY]["payload"]["identity"] != identity:
         _fail("registered_scope_mismatch")
-    _validate_live_controls(controls, parent, root, run)
+    _validate_live_controls(controls, parent, root, run, article)
     return binding, scope, sdk, parent, root, article, run, controls
 
 
@@ -579,8 +582,8 @@ def _read_ready(envelope):
         prepare_registered_read_phase(envelope)
     decision = ro.execute_step(envelope, {"body_chars": 256}, now=timezone.now())
     if not decision.allowed:
-        if decision.reason == "step_result_unknown":
-            _block_unknown_read(envelope)
+        # 拒绝结果只终止本次调用；unknown不证明原reader已退出。
+        # inflight/token/counter继续由原read ledger约束，不封锁共享progress。
         _fail(decision.reason)
     dependencies = _dependencies()
     with transaction.atomic():
@@ -800,7 +803,13 @@ def _consume_registered_job(envelope):
     article, run, controls, material = _read_ready(envelope)
     invocation = _ModelInvocation(envelope, controls)
     from . import translation
-    resolution = translation.resolve_article_entities_for_article(article)
+    if controls[PLAN_KEY]["payload"]["identity"]["result_version"] == ro.RECEIPT_VERSIONS[3][2]:
+        from . import article_term_receipt
+        identity = controls[PLAN_KEY]["payload"]["identity"]
+        view = article_term_receipt.source_view(article, identity)
+        resolution = article_term_receipt.decode(material["term_snapshot"], view, article.pk, identity["input_sha256"])
+    else:
+        resolution = translation.resolve_article_entities_for_article(article)
     provider = _registered_provider(invocation, material, _provenance(controls))
     try:
         result = provider.translate(article, entity_resolution=resolution)
@@ -839,12 +848,3 @@ def _consume_registered_job(envelope):
             _block_owned_invocation(invocation, reason)
         raise RegisteredJobRefusal(reason) from exc
     return _apply_registered_checkpoint(envelope)
-
-
-def _block_unknown_read(envelope):
-    dependencies = _dependencies()
-    with transaction.atomic():
-        *_, run, controls = _live(envelope, dependencies)
-        progress = controls[PROGRESS_KEY]
-        if progress["state"] == "registered" and progress["model_owner_token"] is None:
-            _advance(run, controls, state="blocked_unknown", exit_reason="read_unknown")
