@@ -582,8 +582,8 @@ def _read_ready(envelope):
         prepare_registered_read_phase(envelope)
     decision = ro.execute_step(envelope, {"body_chars": 256}, now=timezone.now())
     if not decision.allowed:
-        if decision.reason == "step_result_unknown":
-            _block_unknown_read(envelope)
+        # 拒绝结果只终止本次调用；unknown不证明原reader已退出。
+        # inflight/token/counter继续由原read ledger约束，不封锁共享progress。
         _fail(decision.reason)
     dependencies = _dependencies()
     with transaction.atomic():
@@ -848,12 +848,3 @@ def _consume_registered_job(envelope):
             _block_owned_invocation(invocation, reason)
         raise RegisteredJobRefusal(reason) from exc
     return _apply_registered_checkpoint(envelope)
-
-
-def _block_unknown_read(envelope):
-    dependencies = _dependencies()
-    with transaction.atomic():
-        *_, run, controls = _live(envelope, dependencies)
-        progress = controls[PROGRESS_KEY]
-        if progress["state"] == "registered" and progress["model_owner_token"] is None:
-            _advance(run, controls, state="blocked_unknown", exit_reason="read_unknown")
