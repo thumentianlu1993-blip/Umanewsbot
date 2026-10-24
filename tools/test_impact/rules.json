@@ -1399,6 +1399,9 @@
     "server/stable/services/horse_career_record_from_review.py": [
       "horse_career_review_consumer"
     ],
+    "server/stable/services/horse_independent_career_row_prepare.py": [
+      "horse_career_review_consumer"
+    ],
     "server/stable/management/commands/horse_career_record_from_review.py": [
       "horse_career_review_consumer"
     ],
