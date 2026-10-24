@@ -1066,6 +1066,8 @@ def upsert_race_record(
         result = RaceEventResult.objects.only("event_id").get(pk=payload["result_id"])
         if payload.get("event_id") and int(payload["event_id"]) != result.event_id:
             raise ValueError("result does not belong to event")
+        if payload.get("event_id") is None:
+            payload["event_id"] = result.event_id
         payload.setdefault("event_id", result.event_id)
 
     key_payload = _inherit_external_identity(record, payload) if record is not None else payload
