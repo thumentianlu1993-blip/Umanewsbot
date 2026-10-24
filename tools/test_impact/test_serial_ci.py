@@ -12,6 +12,7 @@ import shutil
 import uuid
 import subprocess
 from unittest.mock import patch
+from tools.test_impact.test_pg_lifecycle import save_synthetic_lifecycle, native_fixture_inputs
 from tools.test_impact.core import digest, verify_results
 from tools.test_impact.serial_ci import Serial, Executor, OwnedObserver, append, absent, remove_owned, save
 
@@ -50,11 +51,12 @@ class FakeExecutor:
             return dict(exit=0,stdout='',stderr='',process_absent=True,cancelled=False)
         out.mkdir(parents=True, exist_ok=True)
         plan = json.loads(Path(command[command.index('--plan') + 1]).read_text())
+        input_plan = copy.deepcopy(plan)
         if '--collect-only' in command:
             if plan['mode'] == 'docs-only':
                 plan.update(batches=[], count=0)
             else:
-                plan.update(image_id='sha256:fake', count=2, aliases=[{'id':'m.C.test_a','label':'m'}],
+                plan.update(image_id=('sha256:'+'f'*64), count=2, aliases=[{'id':'m.C.test_a','label':'m'}],
                             batches=[{'key':'batch-000','profile':self.profiles[0],'ids':['m.C.test_a']},
                                      {'key':'batch-001','profile':self.profiles[1],'ids':['r.C.test_b']}])
                 if '--export-image' in command:
@@ -82,6 +84,12 @@ class FakeExecutor:
             if self.drift == 'plan':
                 plan['aliases']=[]
                 save(out / 'execution-plan.json',plan)
+        if plan['mode'] != 'docs-only':
+            if '--collect-only' in command:
+                input_plan['image_id'] = plan['image_id']
+                save_synthetic_lifecycle(out, input_plan, 'collect')
+            else:
+                save_synthetic_lifecycle(out, input_plan, 'run', key, batch['profile'], code)
         self.active -= 1
         return dict(exit=self.code.get(key,0),stdout='',stderr='',process_absent=not self.cancel,cancelled=self.cancel)
 
@@ -110,7 +118,7 @@ class SerialTests(unittest.TestCase):
         self.assertEqual(self.fake.peak,1)
         self.assertEqual(sum('--collect-only' in c for c in self.fake.calls),1)
         self.assertEqual(sum('--build' in c for c in self.fake.calls),1)
-        self.assertEqual([c[c.index('--image')+1] for c in self.fake.calls[1:]],['sha256:fake']*2)
+        self.assertEqual([c[c.index('--image')+1] for c in self.fake.calls[1:]],[('sha256:'+'f'*64)]*2)
         self.assertEqual(raw,(self.output/'execution-plan.json').read_bytes())
         self.assertEqual(self.serial.status['not_started'],[])
         self.assertTrue((self.output/'batch-000.json').exists() and (self.output/'batch-001.json').exists())
@@ -214,7 +222,7 @@ class SerialTests(unittest.TestCase):
         self.assertEqual(raw,(self.output/'execution-plan.json').read_bytes())
         self.assertTrue(self.serial.status['inventory_complete'])
         self.assertNotIn('--build',self.fake.calls[-1])
-        self.assertIn('sha256:fake',self.fake.calls[-1])
+        self.assertIn(('sha256:'+'f'*64),self.fake.calls[-1])
         self.assertFalse(list((self.output/'inventory').glob('batch-*.json')))
 
     def test_verify_failure_missing_batch_preserves_diagnostics(self):
@@ -329,7 +337,8 @@ class OwnedTests(unittest.TestCase):
             observer.run=native_run
             def docker(cmd,**kw):
                 return types.SimpleNamespace(returncode=9 if cmd[1]=='rm' else 1,stdout='',stderr='' if cmd[1]=='rm' else 'Error: No such object: '+'c'*64)
-            namespace=dict(temp=root,source=src,control=ctrl,image_id='sha256:fake',output=output,uuid=uuid,shutil=shutil,subprocess=subprocess,OBSERVER=observer)
+            namespace=dict(temp=root,source=src,control=ctrl,image_id=('sha256:'+'f'*64),output=output,uuid=uuid,shutil=shutil,subprocess=subprocess,OBSERVER=observer)
+            namespace.update(native_fixture_inputs(namespace))
             exec(compile(ast.Module(body=[node],type_ignores=[]),'native-owned-invoke','exec'),namespace)
             with patch('tools.test_impact.serial_ci.subprocess.run',side_effect=docker), self.assertRaises(RuntimeError):
                 namespace['invoke']('run','batch-000','django')
@@ -412,7 +421,8 @@ class ExceptionFailureTests(unittest.TestCase):
                 observer.run=run
                 def cleanup(*args):raise RuntimeError('original rm9')
                 observer.cleanup=cleanup
-                namespace=dict(temp=temp,source=src,control=ctrl,image_id='sha256:fake',output=output,uuid=uuid,shutil=shutil,subprocess=subprocess,OBSERVER=observer)
+                namespace=dict(temp=temp,source=src,control=ctrl,image_id=('sha256:'+'f'*64),output=output,uuid=uuid,shutil=shutil,subprocess=subprocess,OBSERVER=observer)
+                namespace.update(native_fixture_inputs(namespace))
                 exec(compile(ast.Module(body=[node],type_ignores=[]),'native-partial-invoke','exec'),namespace)
                 with self.assertRaisesRegex(RuntimeError,'original rm9'):namespace['invoke']('run','batch-000','django')
             blobs=list(output.rglob('native-output.bin'))
@@ -468,6 +478,7 @@ class ExceptionFailureTests(unittest.TestCase):
                     if fault=='cleanup-timeout':raise subprocess.TimeoutExpired(['rm'],30)
                 observer.run=run;observer.cleanup=cleanup
                 ns=dict(temp=temp,source=src,control=ctrl,image_id='fake',output=output,uuid=uuid,shutil=shutil,subprocess=subprocess,OBSERVER=observer)
+                ns.update(native_fixture_inputs(ns))
                 exec(compile(ast.Module(body=[node],type_ignores=[]),'native-preserve','exec'),ns)
                 with self.assertRaises(BaseException):ns['invoke']('run','batch-000','django')
             indexes=list(output.rglob('index.json'));self.assertEqual(len(indexes),1)
@@ -497,6 +508,7 @@ class ExceptionFailureTests(unittest.TestCase):
                 def cleanup(*a):cleanups.append(True);raise RuntimeError('primary cleanup cause')
                 observer.run=run;observer.cleanup=cleanup
                 ns=dict(temp=temp,source=src,control=ctrl,image_id='fake',output=output,uuid=uuid,shutil=shutil,subprocess=subprocess,OBSERVER=observer)
+                ns.update(native_fixture_inputs(ns))
                 exec(compile(ast.Module(body=[node],type_ignores=[]),'native-diskfull','exec'),ns)
                 original=Path.open
                 def diskfull(path,*a,**kw):
@@ -617,6 +629,8 @@ class RunFramingTests(unittest.TestCase):
                 plan['batches'][0]['ids'] = [self.suffix_id, self.prefix_id]
                 plan['count'] = 3
                 save(plan_path, plan)
+                input_plan=json.loads(Path(command[command.index('--plan')+1]).read_text())
+                save_synthetic_lifecycle(output, {**input_plan,'image_id':plan['image_id']}, 'collect')
             elif '--batch' in command and command[command.index('--batch')+1] == 'batch-000':
                 (output / 'batch-000.log').write_bytes(raw)
             return result
@@ -686,3 +700,32 @@ class RunFramingTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+
+class PGReceiptConsumerTests(unittest.TestCase):
+    def test_native_pass_but_missing_pg_receipt_is_fatal_without_rewriting_report(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);selection=root/'selection';output=root/'out'
+            save(selection,dict(source='git',test_sha='a'*40,test_tree='b'*40,run_id='9',run_attempt='1',mode='full',labels=['m','r']))
+            fake=FakeExecutor(root);serial=Serial(output,{'start':0},fake,clock=lambda:0)
+            serial.collect(selection,root/'image')
+            original=fake.run
+            def run(command,deadline,ledger):
+                result=original(command,deadline,ledger)
+                if '--batch' in command:
+                    (output/'lifecycle-batch-000.json').unlink()
+                return result
+            fake.run=run
+            with self.assertRaises(ValueError):serial.execute()
+            self.assertEqual(json.loads((output/'batch-000.json').read_text())['exit_code'],0)
+            self.assertTrue(serial.status['fatal'])
+
+    def test_partial_preserves_both_original_types(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);out=root/'raw';out.mkdir()
+            (out/'batch-000.json').write_bytes(b'original native')
+            (out/'lifecycle-batch-000.json').write_bytes(b'original lifecycle')
+            observer=OwnedObserver(root/'events',time.monotonic()+6600,600)
+            observer.preserve_partial(out,root/'saved','batch-000.json','batch-000','run',RuntimeError('first'))
+            self.assertEqual(next((root/'saved').rglob('native-output.bin')).read_bytes(),b'original native')
+            self.assertEqual(next((root/'saved').rglob('lifecycle-output.bin')).read_bytes(),b'original lifecycle')

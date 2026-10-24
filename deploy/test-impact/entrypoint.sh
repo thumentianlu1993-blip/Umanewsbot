@@ -13,13 +13,4 @@ test_commit=$(git hash-object -t commit -w /control/test-commit.raw)
 [[ "$(git write-tree)" == "$(git rev-parse "$test_commit^{tree}")" ]]
 git update-ref refs/heads/impact "$test_commit"
 git symbolic-ref HEAD refs/heads/impact
-if [[ "$1" == collect || "$3" != python ]]; then
-  initdb -D /tmp/pgdata -A trust --encoding=UTF8 --no-locale >/tmp/pg-init.log
-  pg_ctl -D /tmp/pgdata -l /tmp/postgres.log -o '-h 127.0.0.1 -p 5432 -k /tmp' -w start >/tmp/pg-start.log
-  trap 'pg_ctl -D /tmp/pgdata -m immediate -w stop >/dev/null' EXIT
-  createuser -h 127.0.0.1 -U tester --superuser bounded_ci
-  createuser -h 127.0.0.1 -U tester --superuser release_0078_ci
-  createdb -h 127.0.0.1 -U tester -O bounded_ci bounded_ci
-  createdb -h 127.0.0.1 -U tester -O release_0078_ci release_0078_ci
-fi
-python scripts/test_plan_worker.py "$@"
+exec python -B -m tools.test_impact.pg_lifecycle "$@"

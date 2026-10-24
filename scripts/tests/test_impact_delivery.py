@@ -439,3 +439,31 @@ class HistoricalMigrationFixtureCompatibilityTests(unittest.TestCase):
             contract,_=self.contract(generation,root/('server/stable/services/release_'+generation+'_recovery.py'))
             with self.subTest(generation=generation),self.assertRaisesRegex(ValueError,generation+' migration file/content contract drift'):
                 contract()
+
+
+class PGLifecycleTrustedClosureTests(unittest.TestCase):
+    def test_shell_launched_pg_module_is_required_in_trusted_bundle(self):
+        import tempfile
+        import hashlib
+        from scripts.verify_delivery_test_evidence import extract_trusted_bundle
+        root=Path(__file__).resolve().parents[2]
+        paths=['tools/test_impact/core.py','tools/test_impact/git_input.py','tools/test_impact/source_binding.py',
+               'tools/test_impact/serial_ci.py','tools/test_impact/pg_lifecycle.py','scripts/plan_affected_tests.py',
+               'scripts/run_test_plan.py','scripts/test_plan_worker.py','scripts/run_bounded_stable_tests.py',
+               'deploy/test-impact/entrypoint.sh','tools/test_impact/fixture_inputs.py',
+               'tools/test_impact/fixture_inputs_secondary.py','tools/test_impact/fixture_inputs_remaining.py']
+        blobs={p:(root/p).read_bytes() for p in paths}
+        oid=lambda data:hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
+        controls={p:oid(data) for p,data in blobs.items()}
+        def git(command, ref):
+            p=ref.split(':',1)[1]
+            if p not in blobs: raise AssertionError('undeclared dependency '+p)
+            return blobs[p] if command=='show' else oid(blobs[p]).encode()
+        with tempfile.TemporaryDirectory() as d:
+            bundle=Path(d)
+            proof=extract_trusted_bundle(git,'a'*40,bundle,controls)
+            self.assertIn('tools/test_impact/pg_lifecycle.py',proof['files'])
+            self.assertEqual((bundle/'tools/test_impact/pg_lifecycle.py').read_bytes(),blobs['tools/test_impact/pg_lifecycle.py'])
+        controls.pop('tools/test_impact/pg_lifecycle.py')
+        with tempfile.TemporaryDirectory() as d,self.assertRaisesRegex(ValueError,'trusted dependency/protocol mismatch'):
+            extract_trusted_bundle(git,'a'*40,Path(d),controls)

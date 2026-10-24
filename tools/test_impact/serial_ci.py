@@ -12,6 +12,7 @@ import uuid
 import sys
 import time
 from tools.test_impact.core import digest
+from tools.test_impact.pg_lifecycle import verify_saved_lifecycle, receipt_filename, read_regular
 
 SOFT = 6600
 BUSINESS = 6000
@@ -186,13 +187,14 @@ class OwnedObserver:
         if check and code:raise subprocess.CalledProcessError(code,command)
         return subprocess.CompletedProcess(command,code)
 
-    def start(self, name, cidfile, key, profile):
-        self.containers[name]={'name':name,'cidfile':str(cidfile),'key':key,'profile':profile}
+    def start(self, name, cidfile, key, profile, image_id=None):
+        self.containers[name]={'name':name,'cidfile':str(cidfile),'key':key,'profile':profile,'image_id':image_id}
         self.event('container-start', name=name, cidfile=str(cidfile), key=key, profile=profile)
 
     def cleanup(self, name, cidfile):
         if name not in self.containers:raise RuntimeError('unregistered owned container')
-        identity=None;primary=None;facts=None
+        identity=None;primary=None;facts=None;exit_state=None;exit_inspect=None
+        cleanup_deadline=min(self.deadline,time.monotonic()+40)
         try:
             identity=Path(cidfile).read_text().strip() if Path(cidfile).exists() else None
             if identity is not None and not re.fullmatch('[0-9a-f]{64}',identity):
@@ -200,9 +202,27 @@ class OwnedObserver:
             self.containers[name]['container_id']=identity
         except BaseException as exc:
             primary=exc;identity=None
+        if self.containers[name].get('image_id') is not None:
+            try:
+                if identity is None:raise RuntimeError('owned lifecycle CID missing')
+                left=cleanup_deadline-time.monotonic()
+                if left<=0:raise TimeoutError('owned inspect budget exhausted')
+                observed=subprocess.run(['docker','inspect',identity],capture_output=True,text=True,timeout=min(5,left))
+                exit_inspect=dict(argv=['docker','inspect',identity],returncode=observed.returncode,stdout=observed.stdout,stderr=observed.stderr)
+                if observed.returncode!=0:raise RuntimeError('owned exit inspect failed: '+observed.stderr)
+                values=json.loads(observed.stdout)
+                if len(values)!=1:raise RuntimeError('owned exit inspect count')
+                exit_state=values[0];state=exit_state['State']
+                if (exit_state['Id']!=identity or exit_state['Image']!=self.containers[name]['image_id']
+                    or state['Running'] is not False or state['Pid']!=0 or state['OOMKilled'] is not False):
+                    raise RuntimeError('owned exit identity/state mismatch')
+            except BaseException as exc:
+                if primary is None:primary=exc
+                else:note_first(primary,'secondary exit-state inspection: '+repr(exc))
         try:
-            facts=remove_owned(identity or name,deadline=min(self.deadline,time.monotonic()+40))
-            facts.update(name=name,cleanup_target=identity or name)
+            facts=remove_owned(identity or name,deadline=cleanup_deadline)
+            facts.update(name=name,cleanup_target=identity or name,exit_state=exit_state,exit_inspect=exit_inspect)
+            if primary is not None:facts['clean']=False
             self.cleanup_facts[name]=facts
             if not facts['clean'] and primary is None:primary=RuntimeError('owned cleanup failed or absence unknown')
         except BaseException as exc:
@@ -231,6 +251,13 @@ class OwnedObserver:
                 meta.update(raw_sha256=hashlib.sha256(raw).hexdigest(),raw_bytes=len(raw))
                 with (directory/'native-output.bin').open('xb') as stream:
                     stream.write(raw);stream.flush();os.fsync(stream.fileno())
+            lifecycle=Path(out)/receipt_filename(phase,key)
+            meta['lifecycle_missing']=not lifecycle.exists()
+            if lifecycle.exists():
+                life_raw=read_regular(lifecycle)
+                meta.update(lifecycle_sha256=hashlib.sha256(life_raw).hexdigest(),lifecycle_bytes=len(life_raw))
+                with (directory/'lifecycle-output.bin').open('xb') as stream:
+                    stream.write(life_raw);stream.flush();os.fsync(stream.fileno())
             meta['persisted']=True
             save(directory/'index.json',meta)
         except BaseException as exc:
@@ -447,6 +474,13 @@ class Serial:
         ids = [i for b in plan['batches'] for i in b['ids']]
         if len(ids) != len(set(ids)):
             raise ValueError('duplicate native IDs')
+        if plan['mode'] != 'docs-only':
+            try:
+                pg=verify_saved_lifecycle(self.output,{**selected,'image_id':plan['image_id']},'collect','','django')
+                self.status['collection_pg_lifecycle']={k:pg[k] for k in ('nonce','input_plan_digest','native_raw_sha256')}
+                self.status['collection_pg_lifecycle'].update(pg_stop_wait=pg['pg_stop']['returncode'],postmaster_wait=pg['postmaster']['returncode'])
+            except BaseException as exc:
+                self.status.update(fatal=True,error='PG lifecycle: '+repr(exc));self.persist();raise
         self.status.update(expected=keys, plan_raw=hashlib.sha256((self.output / 'execution-plan.json').read_bytes()).hexdigest(),
                            plan_canonical=digest(plan), image=plan.get('image_id'), image_complete=False)
         if plan['mode'] != 'docs-only':
@@ -509,6 +543,9 @@ class Serial:
                     raise ValueError('strict native lifecycle/RUN/identity failure')
                 if any(type(report[f]) is not list for f in ('failures', 'errors', 'skips', 'expected_failures', 'unexpected_successes')):
                     raise ValueError('malformed outcomes')
+                pg=verify_saved_lifecycle(self.output,plan,'run',key,batch['profile'])
+                self.status['attempted'][key]['pg_lifecycle']={k:pg[k] for k in ('nonce','input_plan_digest','native_raw_sha256')}
+                self.status['attempted'][key]['pg_lifecycle'].update(pg_stop_wait=pg['pg_stop']['returncode'],postmaster_wait=pg['postmaster']['returncode'])
                 if self.status['fatal'] or result['exit'] != report['exit_code']:
                     raise ValueError('cleanup/process/native exit mismatch')
                 self.status['attempted'][key].update(exit=result['exit'], complete=True)

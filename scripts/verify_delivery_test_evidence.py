@@ -68,7 +68,8 @@ def extract_trusted_bundle(git, trusted_sha, bundle, controls):
     pending = ['tools/test_impact/core.py', 'tools/test_impact/git_input.py',
                'scripts/plan_affected_tests.py', 'scripts/run_test_plan.py',
                'tools/test_impact/source_binding.py', 'scripts/test_plan_worker.py',
-               'scripts/run_bounded_stable_tests.py', 'deploy/test-impact/entrypoint.sh']
+               'scripts/run_bounded_stable_tests.py', 'deploy/test-impact/entrypoint.sh',
+               'tools/test_impact/pg_lifecycle.py']
     files = {}
     while pending:
         path = pending.pop(0)
@@ -153,6 +154,20 @@ def main():
         names=z.namelist();require(len(names)==len(set(names)),'duplicate zip names')
         plan=json.loads(z.read('execution-plan.json'))
         reports=[json.loads(z.read(n)) for n in names if re.fullmatch('batch-[0-9]+.json',n)]
+        pg_artifacts={}
+        if plan['mode']!='docs-only':
+            # 精确命名读取，不解压任意候选路径；PG文件不进入native batch glob。
+            stems=['collection']
+            for batch in plan['batches']:
+                require(type(batch['key']) is str and re.fullmatch(r'batch-[0-9]{3,}',batch['key']),'unsafe lifecycle batch key')
+                stems.append(batch['key'])
+            required={'execution-plan.json'}
+            for stem in stems:
+                required.update({'lifecycle-'+stem+'.json','lifecycle-request-'+stem+'.json','lifecycle-host-'+stem+'.json'})
+                if stem!='collection':required.add(stem+'.json')
+            require(required <= set(names),'missing exact PG lifecycle artifact')
+            pg_artifacts={name:z.read(name) for name in required}
+
     require(plan['source']=='git' and plan['mode']!='validation-only','diagnostic evidence is not deliverable')
     require(plan['base_sha']==base and plan['head_sha']==head,'STALE_BASE or stale head')
     require(plan['test_sha'] in (head,test),'unexpected tested commit')
@@ -179,8 +194,11 @@ def main():
     with tempfile.TemporaryDirectory(prefix='trusted-impact-') as raw:
         bundle=Path(raw)
         bundle_provenance=extract_trusted_bundle(git,a.trusted_sha,bundle,controls)
+        artifact_pg=bundle/'artifact-pg';artifact_pg.mkdir()
+        for name,data in pg_artifacts.items():(artifact_pg/name).write_bytes(data)
         config=bundle/'input.json'
-        config.write_text(json.dumps({'root':str(root),'base':base,'head':head,'test':plan['test_sha'],'plan':plan,'reports':reports}))
+        config_data={'root':str(root),'base':base,'head':head,'test':plan['test_sha'],'plan':plan,'reports':reports,'artifact_pg':str(artifact_pg)}
+        config.write_text(json.dumps(config_data))
         program="""import json,sys
 from pathlib import Path
 sys.path[:0]=[sys.argv[1],sys.argv[1]+'/scripts']
@@ -191,6 +209,14 @@ e=create_plan(Path(x['root']),x['base'],x['head'],x['test'],bootstrap=p['bootstr
 for field in ('domains','labels','hashes','changed_paths','content_digest','allowed_skips','deleted_test_modules','deleted_declared_test_ids','superseded_test_labels'):
  if p[field]!=e[field]: raise ValueError('trusted plan mismatch: '+field)
 if sys.argv[3]=='selection': print(json.dumps(e))
+elif sys.argv[3]=='pg':
+ from tools.test_impact.pg_lifecycle import verify_saved_lifecycle
+ selection={**e,'run_id':p['run_id'],'run_attempt':p['run_attempt'],'control_blobs':p['control_blobs'],'image_id':p['image_id']}
+ verify_saved_lifecycle(Path(x['artifact_pg']),selection,'collect','','django')
+ for b in p['batches']: verify_saved_lifecycle(Path(x['artifact_pg']),p,'run',b['key'],b['profile'])
+ independent_input={**p,'mode':e['mode']}
+ verify_saved_lifecycle(Path(x['independent_pg']),independent_input,'collect','','django',require_owned=False)
+ print(json.dumps({'pg_numeric_data_contract':'verified','independent_outer_CID':'not_claimed'}))
 else: print(json.dumps(verify_results(p,x['reports'])))
 """
         expected=json.loads(checked([sys.executable,'-I','-c',program,str(bundle),str(config),'selection']))
@@ -214,13 +240,15 @@ else: print(json.dumps(verify_results(p,x['reports'])))
             require(re.fullmatch('sha256:[0-9a-f]{64}',plan['image_id']),'invalid image ID')
             source_plan=bundle/'selection.json';source_plan.write_text(json.dumps({**plan,'mode':expected['mode']}))
             trusted_controls=bundle/'execution-controls'
-            for path in ('scripts/test_plan_worker.py','scripts/run_bounded_stable_tests.py','deploy/test-impact/entrypoint.sh','tools/test_impact/core.py','tools/test_impact/source_binding.py'):
+            for path in ('scripts/test_plan_worker.py','scripts/run_bounded_stable_tests.py','deploy/test-impact/entrypoint.sh','tools/test_impact/core.py','tools/test_impact/source_binding.py','tools/test_impact/pg_lifecycle.py'):
                 control=trusted_controls/path;control.parent.mkdir(parents=True,exist_ok=True)
                 control.write_bytes((bundle/path).read_bytes())
             collection_dir=bundle/'collection'
             checked([sys.executable,'-I',str(bundle/'scripts/run_test_plan.py'),'--repository',str(root),
                      '--plan',str(source_plan),'--output',str(collection_dir),'--collect-only','--image',plan['image_id'],'--controls',str(trusted_controls)])
             compare_collection(plan,json.loads((collection_dir/'execution-plan.json').read_text()))
+            config_data['independent_pg']=str(collection_dir);config.write_text(json.dumps(config_data))
+            checked([sys.executable,'-I','-c',program,str(bundle),str(config),'pg'])
         else:
             compare_collection(plan,{'mode':'docs-only','batches':[],'count':0})
         verified=json.loads(checked([sys.executable,'-I','-c',program,str(bundle),str(config),'results']))

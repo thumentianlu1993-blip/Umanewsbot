@@ -19,6 +19,7 @@ from unittest.mock import patch
 from tools.test_impact.core import digest
 from tools.test_impact.serial_ci import Serial, save
 from tools.test_impact.test_serial_ci import FakeExecutor
+from tools.test_impact.test_pg_lifecycle import save_synthetic_lifecycle
 
 
 OBSERVED_ID = 'stable.test_race_event_lifecycle.ManifestUSZoneValidationTests.test_non_us_omits_allowlist_succeeds'
@@ -121,6 +122,8 @@ class NativeRunProducerTests(unittest.TestCase):
                 plan = json.loads(path.read_text())
                 plan['batches'][0]['ids'] = [OBSERVED_ID]
                 save(path, plan)
+                input_plan=json.loads(Path(command[command.index('--plan')+1]).read_text())
+                save_synthetic_lifecycle(output,{**input_plan,'image_id':plan['image_id']},'collect')
             elif '--batch' in command and command[command.index('--batch') + 1] == 'batch-000':
                 (output / 'batch-000.log').write_bytes(raw)
             return result
