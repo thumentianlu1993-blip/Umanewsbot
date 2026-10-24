@@ -229,3 +229,9 @@ def apply_basic_profile_from_cache(
         stored.raw_payload["h03_result"] = _json_safe(result)
         stored.save(update_fields=["raw_payload", "updated_at"])
         return result
+
+
+def consume_reviewed_basic_module(request):
+    """许可权威合同缺位：所有请求恒拒绝，不读DB、委派或模拟应用。"""
+    return dict(status='blocked', reason='permission_authority_unavailable', applied=False,
+                committed=False, published=False, candidate_id=None)
