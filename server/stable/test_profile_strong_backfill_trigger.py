@@ -259,3 +259,77 @@ class ProfileStrongBackfillTriggerTests(TransactionTestCase):
                     task.pop_request()
                 self.assertFalse(ArticleHorseLink.objects.exists())
                 self.assertEqual(self.receipts(), [])
+
+    def test_unknown_operational_and_interface_errors_do_not_retry(self):
+        from django.db import InterfaceError
+
+        self.publish_POST()
+        self.install_current_fixture_handle()
+        task = tasks.backfill_profile_strong_article_links_task
+        # Error text, even with the allowed code/phrase, is not driver evidence.
+        errors = [OperationalError("57014 canceling statement due to statement timeout"),
+                  InterfaceError("57014 canceling statement due to statement timeout")]
+        for error in errors:
+            with self.subTest(error_type=type(error).__name__):
+                def unknown_insert(execute, sql, params, many, context):
+                    if sql.startswith('INSERT INTO "stable_articlehorselink"'):
+                        raise error
+                    return execute(sql, params, many, context)
+                task.push_request(called_directly=False, is_eager=False, retries=0,
+                                  args=(self.horse.pk, self.actor.pk), kwargs={}, id="isolated-c242-unknown")
+                try:
+                    with override_settings(CELERY_TASK_ALWAYS_EAGER=False):
+                        with patch.object(task, "apply_async", return_value=None) as transport:
+                            with self.assertLogs("stable", level="ERROR"):
+                                with connection.execute_wrapper(unknown_insert):
+                                    with self.assertRaises(type(error)) as raised:
+                                        task.run(self.horse.pk, self.actor.pk)
+                            self.assertIs(raised.exception, error)
+                            self.assertIsNone(error.__cause__)
+                            self.assertEqual(transport.call_count, 0)
+                finally:
+                    task.pop_request()
+                self.assertFalse(ArticleHorseLink.objects.exists())
+                self.assertEqual(self.receipts(), [])
+                self.assertEqual(TaskExecutionLog.objects.filter(task_name=TASK_NAME).latest("pk").status, "failed")
+
+    def test_permanent_and_user_cancel_driver_diagnostics_do_not_retry(self):
+        self.publish_POST()
+        self.install_current_fixture_handle()
+        task = tasks.backfill_profile_strong_article_links_task
+        cases = [("28P01", "isolated permanent authentication error"),
+                 ("57014", "canceling statement due to user request")]
+        for code, message in cases:
+            with self.subTest(sqlstate=code):
+                failures = []
+                def server_error(execute, sql, params, many, context):
+                    if sql.startswith('INSERT INTO "stable_articlehorselink"'):
+                        # Literal fixture SQL executes on the isolated server;
+                        # the cause/diag are produced by the actual PG driver.
+                        statement = ("DO $c242$ BEGIN RAISE EXCEPTION '"+message+
+                                     "' USING ERRCODE = '"+code+"'; END; $c242$;")
+                        try:
+                            return execute(statement, None, False, context)
+                        except OperationalError as exc:
+                            failures.append(exc)
+                            raise
+                    return execute(sql, params, many, context)
+                task.push_request(called_directly=False, is_eager=False, retries=0,
+                                  args=(self.horse.pk, self.actor.pk), kwargs={}, id="isolated-c242-diagnostic")
+                try:
+                    with override_settings(CELERY_TASK_ALWAYS_EAGER=False):
+                        with patch.object(task, "apply_async", return_value=None) as transport:
+                            with self.assertLogs("stable", level="ERROR"):
+                                with connection.execute_wrapper(server_error):
+                                    with self.assertRaises(OperationalError) as raised:
+                                        task.run(self.horse.pk, self.actor.pk)
+                            self.assertIs(raised.exception, failures[-1])
+                            cause = raised.exception.__cause__
+                            self.assertEqual(getattr(cause, "sqlstate", getattr(cause, "pgcode", None)), code)
+                            self.assertEqual(cause.diag.message_primary, message)
+                            self.assertEqual(transport.call_count, 0)
+                finally:
+                    task.pop_request()
+                self.assertFalse(ArticleHorseLink.objects.exists())
+                self.assertEqual(self.receipts(), [])
+                self.assertEqual(TaskExecutionLog.objects.filter(task_name=TASK_NAME).latest("pk").status, "failed")
