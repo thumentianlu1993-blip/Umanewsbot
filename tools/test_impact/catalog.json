@@ -862,7 +862,8 @@
       "stable.test_horse_source_cache_reuse_adapter"
     ],
     "horse_basic_profile_cache": [
-      "stable.test_horse_basic_profile_from_cache"
+      "stable.test_horse_basic_profile_from_cache",
+      "stable.test_h03_basic_module_input"
     ],
     "horse_career_link_cache": [
       "stable.test_horse_career_record_link_from_cache"
@@ -2735,6 +2736,12 @@
         "news_translation"
       ]
     },
+    "server/stable/test_h03_basic_module_input.py": {
+      "label": "stable.test_h03_basic_module_input",
+      "domains": [
+        "horse_basic_profile_cache"
+      ]
+    },
     "server/stable/test_horse_basic_profile_from_cache.py": {
       "label": "stable.test_horse_basic_profile_from_cache",
       "domains": [
@@ -3118,6 +3125,7 @@
     "stable.test_horse_source_cache_reuse_adapter": "django",
     "stable.test_c027_public_time_sqlite": "python",
     "stable.test_article_content_trace": "django",
+    "stable.test_h03_basic_module_input": "django",
     "stable.test_horse_basic_profile_from_cache": "django",
     "stable.test_translation_claim_fence": "django",
     "stable.test_horse_career_record_link_from_cache": "django",
