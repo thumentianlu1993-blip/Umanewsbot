@@ -278,27 +278,117 @@ class PrivateBasicModuleTransactionTests(RealProfileFixture, TransactionTestCase
         self.assertEqual(self.state(),before)
 
     def test_real_actor_lock_wait_rechecks_source_expiry_before_any_write(self):
+        from queue import Empty, Queue
+        import traceback
+        import psycopg
+
         private,=self.need(consumer,"_apply_basic_module_transaction")
-        request=self.request();before=self.state();started=Event()
+        request=self.request();before=self.state();channel=Queue()
         now=[timezone.now()]
+        diagnostics=dict(events=[], samples=[], holder=None, observer=None)
+        def identity(cursor):
+            cursor.execute("SELECT pg_backend_pid(),current_database(),current_user")
+            pid,database,user=cursor.fetchone()
+            return dict(pid=pid,database=database,user=user)
+        def describe(error):
+            cause=error.__cause__
+            return dict(type=type(error).__module__+"."+type(error).__qualname__,
+                        message=str(error),sqlstate=getattr(error,"sqlstate",None) or getattr(cause,"sqlstate",None),
+                        traceback="".join(traceback.format_exception(error)))
         def worker():
-            close_old_connections();started.set()
-            try:private(**request)
-            except CommandError as error:return str(error)
-            finally:close_old_connections()
-            return "UNEXPECTED_SUCCESS"
-        with patch.object(consumer,"_basic_module_now",side_effect=lambda:now[0]),ThreadPoolExecutor(max_workers=1) as pool:
-            with transaction.atomic():
-                get_user_model().objects.select_for_update(no_key=True).get(pk=self.actor.pk)
-                future=pool.submit(worker);self.assertTrue(started.wait(5))
-                deadline=time.monotonic()+8;blocked=False
-                while time.monotonic()<deadline:
-                    with connection.cursor() as cursor:
-                        cursor.execute("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid() AND wait_event_type='Lock' AND query LIKE %s",["%"+get_user_model()._meta.db_table+"%"])
-                        blocked=cursor.fetchone()[0]>0
-                    if blocked:break
-                    time.sleep(0.05)
-                self.assertTrue(blocked,"must observe actual PostgreSQL actor-row lock wait")
-                now[0]=now[0]+timedelta(hours=2)
-            self.assertEqual(future.result(timeout=8),"source_expired")
+            stage="connecting"
+            try:
+                close_old_connections();connection.ensure_connection()
+                with connection.cursor() as cursor:backend=identity(cursor)
+                channel.put(dict(phase="connected",at=time.monotonic(),**backend))
+                stage="private_call"
+                channel.put(dict(phase=stage,at=time.monotonic(),**backend))
+                result=private(**request)
+                channel.put(dict(phase="worker_returned",at=time.monotonic(),result=result))
+                return result
+            except BaseException as error:
+                channel.put(dict(phase="worker_exception",stage=stage,at=time.monotonic(),error=describe(error)))
+                raise
+            finally:
+                connection.close()
+                channel.put(dict(phase="worker_connection_closed",at=time.monotonic()))
+        with patch.object(consumer,"_basic_module_now",side_effect=lambda:now[0]):
+            pool=ThreadPoolExecutor(max_workers=1)
+            future=None;observer=None;primary=None;worker_error=None;worker_result=None
+            try:
+                configured=connection.get_connection_params()
+                params={key:configured[key] for key in ("dbname","user","password","host","port") if key in configured}
+                observer=psycopg.connect(**params,connect_timeout=5,application_name="a153-lockwait-observer",autocommit=True)
+                with observer.cursor() as cursor:
+                    cursor.execute("SET statement_timeout=1000")
+                    diagnostics["observer"]=identity(cursor)
+                diagnostics["holder_scope_entered"]=True
+                with transaction.atomic():
+                    get_user_model().objects.select_for_update(no_key=True).get(pk=self.actor.pk)
+                    with connection.cursor() as cursor:holder=identity(cursor)
+                    diagnostics.update(holder=holder,holder_actor_id=self.actor.pk,holder_lock_acquired=True)
+                    future=pool.submit(worker)
+                    ready=channel.get(timeout=5);diagnostics["events"].append(ready)
+                    self.assertEqual(ready["phase"],"connected","worker must identify an established backend")
+                    self.assertEqual(ready["database"],holder["database"])
+                    self.assertEqual(ready["user"],holder["user"])
+                    self.assertEqual(diagnostics["observer"]["database"],holder["database"])
+                    self.assertEqual(diagnostics["observer"]["user"],holder["user"])
+                    self.assertEqual(len({ready["pid"],holder["pid"],diagnostics["observer"]["pid"]}),3)
+                    deadline=time.monotonic()+8;blocked=False
+                    while time.monotonic()<deadline:
+                        if future.done():
+                            diagnostics["worker_completed_before_positive_wait"]=True
+                            break
+                        with observer.cursor() as cursor:
+                            cursor.execute("SELECT pid,datname,usename,state,wait_event_type,wait_event,query,pg_blocking_pids(pid) "
+                                           "FROM pg_stat_activity WHERE pid=%s",[ready["pid"]])
+                            row=cursor.fetchone()
+                        sample=dict(at=time.monotonic(),backend=None)
+                        if row:
+                            sample["backend"]=dict(zip(("pid","database","user","state","wait_event_type","wait_event","query","blocking_pids"),row))
+                            activity=sample["backend"]
+                            blocked=(activity["pid"]==ready["pid"] and activity["database"]==holder["database"]
+                                     and activity["user"]==holder["user"] and activity["state"]=="active"
+                                     and activity["wait_event_type"]=="Lock" and holder["pid"] in activity["blocking_pids"]
+                                     and get_user_model()._meta.db_table in activity["query"]
+                                     and "FOR NO KEY UPDATE" in activity["query"])
+                        diagnostics["samples"].append(sample)
+                        if blocked:
+                            diagnostics["positive_wait"]=sample
+                            break
+                        time.sleep(0.05)
+                    self.assertTrue(blocked,"must observe actual PostgreSQL actor-row lock wait")
+                    now[0]=now[0]+timedelta(hours=2)
+                    diagnostics["clock_advanced_after_positive_wait"]=True
+            except BaseException as error:
+                primary=error
+                diagnostics["primary_failure"]=describe(error)
+            finally:
+                # The atomic holder scope has exited before result/exception retrieval.
+                diagnostics["holder_scope_exited"]=diagnostics.get("holder_scope_entered",False)
+                if future is not None:
+                    try:
+                        worker_result=future.result(timeout=8)
+                        diagnostics["worker_result"]=worker_result
+                    except BaseException as error:
+                        worker_error=error
+                        diagnostics["worker_future_exception"]=describe(error)
+                    diagnostics["worker_done_after_collection"]=future.done()
+                if observer is not None:
+                    try:observer.close()
+                    except BaseException as error:
+                        diagnostics["observer_close_exception"]=describe(error)
+                        if primary is None:primary=error
+                pool.shutdown(wait=False,cancel_futures=True)
+                while True:
+                    try:diagnostics["events"].append(channel.get_nowait())
+                    except Empty:break
+                print("A153_LOCKWAIT_DIAGNOSTICS "+json.dumps(diagnostics,default=str,sort_keys=True),flush=True)
+            if primary is not None:
+                if worker_error is not None:raise primary.with_traceback(primary.__traceback__) from worker_error
+                raise primary.with_traceback(primary.__traceback__)
+            if worker_error is None:self.fail("worker returned without source_expired: "+repr(worker_result))
+            if not isinstance(worker_error,CommandError):raise worker_error.with_traceback(worker_error.__traceback__)
+            self.assertEqual(str(worker_error),"source_expired")
         self.assertEqual(self.state(),before)
