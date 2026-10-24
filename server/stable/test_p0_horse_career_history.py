@@ -568,6 +568,101 @@ class P0HorseCareerHistoryTests(TestCase):
         self.assertEqual(self.profile.linked_race_event_count, 1)
         self.assertEqual(self.profile.unlinked_race_record_count, 0)
 
+    def _h03_event_and_result(self, slug):
+        event = RaceEvent.objects.create(
+            year=2024,
+            slug=slug,
+            original_name="Race 1",
+            chinese_name="生涯测试赛",
+            country_region=RacingRegion.UNITED_KINGDOM,
+            racecourse="Ascot",
+            grade_text="",
+            surface="turf",
+            local_date=date(2024, 1, 1),
+            visibility_status=RaceEventVisibility.PUBLISHED,
+        )
+        result = RaceEventResult.objects.create(
+            event=event,
+            finish_position=5,
+            horse_name=self.profile.original_name,
+        )
+        return event, result
+
+    def test_null_event_with_valid_result_links_existing_record_without_duplicate(self):
+        original = upsert_race_record(self.profile, self._payload()).record
+        self.assertIsNone(original.event_id)
+        self.assertIsNone(original.result_id)
+        event, result = self._h03_event_and_result("h03-null-event-result")
+        result.refresh_from_db()
+        self.assertEqual(result.event_id, event.pk)
+        self.assertEqual(result.horse_name, self.profile.original_name)
+        payload = self._payload(
+            event_id=None,
+            result_id=result.pk,
+            source_name="second_source",
+            source_url="https://example.com/second/1",
+        )
+        self.assertIn("event_id", payload)
+        self.assertIsNone(payload["event_id"])
+        self.assertEqual(payload["result_id"], result.pk)
+
+        linked = upsert_race_record(self.profile, payload).record
+        linked.refresh_from_db()
+        self.assertEqual(linked.pk, original.pk)
+        self.assertEqual(linked.result_id, result.pk)
+        self.assertEqual(
+            HorseRaceRecord.objects.filter(horse_profile=self.profile).count(), 1,
+        )
+        self.assertEqual(linked.event_id, event.pk)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.linked_race_event_count, 1)
+        self.assertEqual(self.profile.unlinked_race_record_count, 0)
+
+        replayed = upsert_race_record(self.profile, payload).record
+        self.assertEqual((replayed.pk, replayed.event_id, replayed.result_id),
+                         (original.pk, event.pk, result.pk))
+        self.assertEqual(
+            HorseRaceRecord.objects.filter(horse_profile=self.profile).count(), 1,
+        )
+
+    def test_valid_result_with_conflicting_event_rejects_without_writes(self):
+        upsert_race_record(self.profile, self._payload())
+        event, result = self._h03_event_and_result("h03-result-owner")
+        other_event, _other_result = self._h03_event_and_result("h03-wrong-event")
+        self.assertNotEqual(event.pk, other_event.pk)
+        self.assertEqual(result.event_id, event.pk)
+
+        def snapshot():
+            return {
+                "records": list(HorseRaceRecord.objects.order_by("pk").values()),
+                "profiles": list(HorseProfile.objects.order_by("pk").values()),
+                "events": list(RaceEvent.objects.order_by("pk").values()),
+                "results": list(RaceEventResult.objects.order_by("pk").values()),
+            }
+
+        before = snapshot()
+        with self.assertRaisesMessage(ValueError, "result does not belong to event"):
+            upsert_race_record(
+                self.profile,
+                self._payload(event_id=other_event.pk, result_id=result.pk),
+            )
+        self.assertEqual(snapshot(), before)
+
+    def test_explicit_null_event_and_result_keep_independent_history(self):
+        payload = self._payload(event_id=None, result_id=None)
+        first = upsert_race_record(self.profile, payload).record
+        replayed = upsert_race_record(self.profile, payload).record
+        replayed.refresh_from_db()
+        self.assertEqual(replayed.pk, first.pk)
+        self.assertIsNone(replayed.event_id)
+        self.assertIsNone(replayed.result_id)
+        self.assertEqual(
+            HorseRaceRecord.objects.filter(horse_profile=self.profile).count(), 1,
+        )
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.linked_race_event_count, 0)
+        self.assertEqual(self.profile.unlinked_race_record_count, 1)
+
     def test_full_profile_requires_independent_complete_career_status(self):
         for field_name, value in {
             "country": "GB",
