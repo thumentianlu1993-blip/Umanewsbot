@@ -1416,6 +1416,21 @@
     ],
     "server/stable/test_managed_readonly_translation.py": [
       "news_translation"
+    ],
+    "server/stable/services/article_entity_binding.py": [
+      "content_contracts"
+    ],
+    "server/stable/services/horse_article_binding_persistence.py": [
+      "content_contracts"
+    ],
+    "server/stable/services/horse_article_strong_backfill.py": [
+      "content_contracts"
+    ],
+    "server/stable/services/horse_article_binding_diagnostics.py": [
+      "content_contracts"
+    ],
+    "server/stable/services/horse_article_pair_receipt_index.py": [
+      "content_contracts"
     ]
   },
   "symbols": {
