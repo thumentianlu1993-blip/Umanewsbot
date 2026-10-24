@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import hashlib
+import re
 import secrets
+import time
 from dataclasses import dataclass
 from typing import Any, Iterable
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core import signing
-from django.db import transaction
+from django.db import connection, connections, transaction
 from django.db.models import OuterRef, Q, QuerySet, Subquery
 from django.utils import timezone
 
@@ -410,12 +412,152 @@ def _article_horse_link_protection(link):
     return None
 
 
+class PairHistoryTransactionError(ValueError):
+    """不能确认同一实际 RC 写事务时，拒绝新增弱关系动作。"""
+
+
+class PairHistoryContractError(ValueError):
+    """历史 reader 的私有 DTO 不符合冻结合同。"""
+
+
+_PAIR_HISTORY_MAX_PAIRS = 16
+_PAIR_HISTORY_MAX_SELECTS = 32
+_PAIR_HISTORY_MAX_RAW_BYTES = 64 * 1024 * 1024
+_PAIR_HISTORY_SECONDS = 5
+_PAIR_HISTORY_TIMEOUT_MS = 2000
+_PAIR_HISTORY_REFERENCES = frozenset((
+    "index_id", "request_key", "operation_log_id", "original_link_id", "original_actor_id",
+    "receipt_detail_sha256", "after_sha256",
+))
+_PAIR_HISTORY_BOUNDARIES = {
+    "schema_version": "l02.pair-receipt-history.v1",
+    "historical_coverage": "indexed_receipt_only",
+    "historical_request_uniqueness": "not_proved",
+    "current_write_authority": "not_evaluated",
+    "source_license": "not_evaluated",
+    "automatic_action": "none",
+}
+
+
+def _pair_history_alias(article_locks, link_locks, *instances):
+    # The frozen reader uses connection.alias. Bind both writes and locks to
+    # that same alias; do not let routers give a different backend its SHOW.
+    using = article_locks.db
+    if (using != connection.alias or link_locks.db != using
+            or any(item._state.db != using for item in instances)):
+        raise PairHistoryTransactionError("pair_history_requires_read_committed")
+    return using
+
+
+def _pair_history_elapsed(started):
+    if time.monotonic() - started >= _PAIR_HISTORY_SECONDS:
+        raise ValueError("pair_history_elapsed_budget_exceeded")
+
+
+def _pair_history_reason(value, article_id, profile_id):
+    """NO_INDEX 只表示未命中新增保护，不授予弱写许可。"""
+    keys = set(_PAIR_HISTORY_BOUNDARIES) | _PAIR_HISTORY_REFERENCES | {
+        "state", "article_id", "profile_id", "weak_mutation_allowed",
+    }
+    valid = (type(value) is dict and set(value) == keys
+             and all(value[k] == expected for k, expected in _PAIR_HISTORY_BOUNDARIES.items())
+             and value["weak_mutation_allowed"] is False
+             and type(value["article_id"]) is int and value["article_id"] == article_id
+             and type(value["profile_id"]) is int and value["profile_id"] == profile_id)
+    if not valid:
+        raise PairHistoryContractError("invalid_pair_history_result")
+    state = value["state"]
+    if state == "INDEXED_HISTORY":
+        valid = all(type(value[k]) is int and 0 < value[k] <= 9_223_372_036_854_775_807
+                    for k in ("index_id", "operation_log_id", "original_link_id", "original_actor_id"))
+        valid = valid and all(type(value[k]) is str and re.fullmatch(r"[0-9a-f]{64}", value[k])
+                              for k in ("request_key", "receipt_detail_sha256", "after_sha256"))
+        reason = "indexed_pair_history"
+    elif state in ("UNKNOWN_NO_INDEX", "UNKNOWN_CORRUPT_OR_UNSUPPORTED", "UNKNOWN_CONFLICT"):
+        valid = all(value[k] is None for k in _PAIR_HISTORY_REFERENCES)
+        reason = None if state == "UNKNOWN_NO_INDEX" else "pair_history_unknown"
+    else:
+        valid = False
+        reason = None
+    if not valid:
+        raise PairHistoryContractError("invalid_pair_history_result")
+    return reason
+
+
+def _pair_history_timeout(value):
+    # PostgreSQL normalizes these millisecond GUCs to integral display units.
+    match = re.fullmatch(r"([0-9]+)(ms|s|min|h|d)?", value) if type(value) is str else None
+    if match is None:
+        raise PairHistoryContractError("invalid_pair_history_timeout")
+    current = int(match[1]) * {None: 1, "ms": 1, "s": 1000, "min": 60000,
+                               "h": 3600000, "d": 86400000}[match[2]]
+    return f"{min(current or _PAIR_HISTORY_TIMEOUT_MS, _PAIR_HISTORY_TIMEOUT_MS)}ms"
+
+
+def _observe_pair_histories(article_id, profile_ids, *, using, writable):
+    """同一原事务内逐 pair 读一次，只保留小的保护原因映射。
+
+    固定 reader 每 pair 至多两条 data SELECT、单条原始 UTF8 至多4MiB；
+    预留最坏原始输入量，不冒充 Python 堆硬上限。DB/driver 错误原样抛出，
+    异常时由调用方 atomic/savepoint 回滚 GUC，绝不在坏事务 finally 发 SQL。
+    """
+    pairs = sorted(set(profile_ids))
+    if not pairs:
+        return {}, None
+    started = time.monotonic()
+    from stable.services.horse_article_pair_receipt_index import MAX_BYTES, classify_pair_receipt_history
+
+    db = connections[using]
+    if (using != connection.alias or db.vendor != "postgresql"
+            or not db.in_atomic_block or db.get_autocommit()):
+        raise PairHistoryTransactionError("pair_history_requires_read_committed")
+    with db.cursor() as cursor:
+        if writable:
+            cursor.execute("SHOW transaction_isolation")
+            actual = cursor.fetchone()
+            if actual != ("read committed",):
+                raise PairHistoryTransactionError("pair_history_requires_read_committed")
+        if (len(pairs) > _PAIR_HISTORY_MAX_PAIRS or 2 * len(pairs) > _PAIR_HISTORY_MAX_SELECTS
+                or len(pairs) * MAX_BYTES > _PAIR_HISTORY_MAX_RAW_BYTES):
+            raise ValueError("pair_history_pair_budget_exceeded")
+        cursor.execute("SHOW statement_timeout")
+        statement = cursor.fetchone()[0]
+        cursor.execute("SHOW lock_timeout")
+        lock = cursor.fetchone()[0]
+        cursor.execute("SELECT set_config('statement_timeout', %s, true), set_config('lock_timeout', %s, true)",
+                       (_pair_history_timeout(statement), _pair_history_timeout(lock)))
+        blocked = {}
+        for profile_id in pairs:
+            _pair_history_elapsed(started)
+            reason = _pair_history_reason(classify_pair_receipt_history(article_id, profile_id), article_id, profile_id)
+            _pair_history_elapsed(started)
+            if reason is not None:
+                blocked[profile_id] = reason
+        cursor.execute("SELECT set_config('statement_timeout', %s, true), set_config('lock_timeout', %s, true)",
+                       (statement, lock))
+    _pair_history_elapsed(started)
+    return blocked, started
+
+
+def _add_pair_history_protection(protected, current_by_profile, blocked):
+    protected_ids = {item["link_id"] for item in protected}
+    for profile_id, reason in blocked.items():
+        current = current_by_profile.get(profile_id)
+        if current is not None and current.id not in protected_ids:
+            protected.append({"link_id": current.id, "status": current.status, "reason": reason})
+            protected_ids.add(current.id)
+    return protected_ids
+
+
 def reconcile_article_horse_links(
     article: NewsArticle,
     resolution: ArticleEntityResolution,
     *,
     commit: bool = True,
 ) -> dict[str, list]:
+    article_locks = NewsArticle.objects.select_for_update()
+    link_locks = ArticleHorseLink.objects.select_for_update()
+    using = _pair_history_alias(article_locks, link_locks, article)
     horse_entities = [item for item in resolution.entities if item.entity_type in {"horse", "unknown_horse"}]
     term_ids = {item.term_id for item in horse_entities if item.term_id}
     candidate_names = {
@@ -437,6 +579,8 @@ def reconcile_article_horse_links(
         .select_related("primary_term")
         .order_by("id")
     ) if term_ids or candidate_names else []
+    if any(profile._state.db != using for profile in profiles):
+        raise PairHistoryTransactionError("pair_history_requires_read_committed")
     desired: dict[int, dict] = {}
     for profile in profiles:
         matches = [
@@ -466,7 +610,7 @@ def reconcile_article_horse_links(
             "metadata": {"entity": match.as_dict()},
         }
 
-    existing = list(ArticleHorseLink.objects.filter(article=article).order_by("id"))
+    existing = list(ArticleHorseLink.objects.using(using).filter(article=article).order_by("id"))
     existing_by_profile = {item.horse_profile_id: item for item in existing}
     delete_links = [
         item
@@ -488,17 +632,27 @@ def reconcile_article_horse_links(
     if not commit:
         protected = [value for item in existing if (value := _article_horse_link_protection(item)) is not None]
         protected_ids = {item["link_id"] for item in protected}
+        action_profiles = (
+            {item["horse_profile_id"] for item in create_payloads}
+            | {item["horse_profile_id"] for item in update_payloads if item["link_id"] not in protected_ids}
+            | {item.horse_profile_id for item in delete_links if item.id not in protected_ids}
+        )
+        with transaction.atomic(using=using):
+            blocked, _ = _observe_pair_histories(article.pk, action_profiles, using=using, writable=False)
+        _add_pair_history_protection(protected, existing_by_profile, blocked)
         return {
-            "create": create_payloads,
-            "update": [item for item in update_payloads if item["link_id"] not in protected_ids],
-            "delete_ids": [item.id for item in delete_links if item.id not in protected_ids],
+            "create": [item for item in create_payloads if item["horse_profile_id"] not in blocked],
+            "update": [item for item in update_payloads if item["link_id"] not in protected_ids
+                       and item["horse_profile_id"] not in blocked],
+            "delete_ids": [item.id for item in delete_links if item.id not in protected_ids
+                           and item.horse_profile_id not in blocked],
             "protected_ids": [item["link_id"] for item in protected],
             "protected": protected,
         }
-    with transaction.atomic():
-        current_article = NewsArticle.objects.select_for_update().get(pk=article.pk)
+    with transaction.atomic(using=using):
+        current_article = article_locks.using(using).get(pk=article.pk)
         locked_links = list(
-            ArticleHorseLink.objects.select_for_update()
+            link_locks.using(using)
             .filter(article_id=current_article.pk)
             .order_by("id")
         )
@@ -530,16 +684,37 @@ def reconcile_article_horse_links(
             if item.id in current_links and current_links[item.id].status in mutable_statuses
             and item.id not in protected_ids
         ]
+        # 全部实际可执行动作先分类，再开始任何关系 DML；保留原 PK/profile
+        # CAS 和 mutable_statuses，不把锁后新出现的行当成旧计划可改目标。
+        action_profiles = (
+            {current_links[link_id].horse_profile_id for link_id in delete_ids}
+            | {item["horse_profile_id"] for item in create_payloads
+               if current_by_profile.get(item["horse_profile_id"]) is None
+               or current_by_profile[item["horse_profile_id"]].id not in protected_ids}
+            | {current_links[item["link_id"]].horse_profile_id for item in update_payloads
+               if item["link_id"] in current_links
+               and current_links[item["link_id"]].status in mutable_statuses
+               and item["link_id"] not in protected_ids}
+        )
+        blocked, history_started = _observe_pair_histories(
+            current_article.pk, action_profiles, using=using, writable=True)
+        protected_ids = _add_pair_history_protection(protected, current_by_profile, blocked)
+        result["protected_ids"] = [item["link_id"] for item in protected]
+        delete_ids = [link_id for link_id in delete_ids if current_links[link_id].horse_profile_id not in blocked]
         if delete_ids:
-            ArticleHorseLink.objects.filter(pk__in=delete_ids).delete()
+            _pair_history_elapsed(history_started)
+            ArticleHorseLink.objects.using(using).filter(pk__in=delete_ids).delete()
             result["delete_ids"] = delete_ids
         for payload in create_payloads:
             profile_id = payload["horse_profile_id"]
+            if profile_id in blocked:
+                continue
             current = current_by_profile.get(profile_id)
             if current is not None and current.id in protected_ids:
                 continue
             defaults = {key: value for key, value in payload.items() if key != "horse_profile_id"}
-            ArticleHorseLink.objects.create(article=article, horse_profile_id=profile_id, **defaults)
+            _pair_history_elapsed(history_started)
+            ArticleHorseLink.objects.using(using).create(article=current_article, horse_profile_id=profile_id, **defaults)
             result["create"].append(payload)
         for payload in update_payloads:
             link_id = payload["link_id"]
@@ -548,7 +723,8 @@ def reconcile_article_horse_links(
                 continue
             defaults = {key: value for key, value in payload.items() if key not in {"link_id", "horse_profile_id"}}
             defaults["updated_at"] = timezone.now()
-            if ArticleHorseLink.objects.filter(pk=link_id).update(**defaults):
+            _pair_history_elapsed(history_started)
+            if ArticleHorseLink.objects.using(using).filter(pk=link_id).update(**defaults):
                 result["update"].append(payload)
     return result
 
@@ -595,7 +771,11 @@ def scan_article_horse_links(
                 continue
             if match.status == ArticleHorseLinkStatus.CANDIDATE:
                 candidate += 1
-            existing = ArticleHorseLink.objects.filter(horse_profile=profile_item, article=article_item).first()
+            article_locks = NewsArticle.objects.select_for_update()
+            link_locks = ArticleHorseLink.objects.select_for_update()
+            using = _pair_history_alias(article_locks, link_locks, article_item, profile_item)
+            existing = ArticleHorseLink.objects.using(using).filter(
+                horse_profile=profile_item, article=article_item).order_by("id").first()
             if existing and existing.status == ArticleHorseLinkStatus.REMOVED:
                 skipped_removed += 1
                 continue
@@ -603,6 +783,9 @@ def scan_article_horse_links(
                 skipped_manual += 1
                 continue
             if not commit:
+                if existing is None or _article_horse_link_protection(existing) is None:
+                    with transaction.atomic(using=using):
+                        _observe_pair_histories(article_item.pk, (profile_item.pk,), using=using, writable=False)
                 continue
             defaults = {
                 "status": match.status,
@@ -613,9 +796,25 @@ def scan_article_horse_links(
                 "metadata": {},
             }
             # 初读不持锁；实际写入逐对采用既有的父文章→关系锁序。
-            with transaction.atomic():
-                current_article = NewsArticle.objects.select_for_update().get(pk=article_item.pk)
-                link, was_created = ArticleHorseLink.objects.select_for_update().get_or_create(
+            with transaction.atomic(using=using):
+                current_article = article_locks.using(using).get(pk=article_item.pk)
+                current = link_locks.using(using).filter(
+                    article_id=current_article.pk, horse_profile_id=profile_item.pk).order_by("id").first()
+                if current is not None:
+                    if current.status == ArticleHorseLinkStatus.REMOVED:
+                        skipped_removed += 1
+                        continue
+                    if current.status == ArticleHorseLinkStatus.MANUAL:
+                        skipped_manual += 1
+                        continue
+                    if _article_horse_link_protection(current) is not None:
+                        continue
+                blocked, history_started = _observe_pair_histories(
+                    current_article.pk, (profile_item.pk,), using=using, writable=True)
+                if profile_item.pk in blocked:
+                    continue
+                _pair_history_elapsed(history_started)
+                link, was_created = link_locks.using(using).get_or_create(
                     horse_profile=profile_item,
                     article=current_article,
                     defaults=defaults,
@@ -631,7 +830,8 @@ def scan_article_horse_links(
                         continue
                     for field, value in defaults.items():
                         setattr(link, field, value)
-                    link.save(update_fields=[*defaults, "updated_at"])
+                    _pair_history_elapsed(history_started)
+                    link.save(using=using, update_fields=[*defaults, "updated_at"])
             created += int(was_created)
             updated += int(not was_created)
     result = {
