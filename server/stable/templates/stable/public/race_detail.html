@@ -45,6 +45,9 @@
       {% else %}
         <div class="countdown-hero-digits">{{ status_label }}{% if event.status == 'scheduled' %}<small>{% race_field event "time" event.public_time_label %}</small>{% endif %}</div>
       {% endif %}
+      {% if live_result_status.published_at %}
+        {% timezone "Asia/Shanghai" %}<p class="muted">赛果发布于{{ live_result_status.published_at|date:"Y-m-d H:i" }}（北京时间）</p>{% endtimezone %}
+      {% endif %}
       {% if live_result_status.is_stale %}
         <aside class="race-result-status" role="status"{% if public_probe_projection.complete %} data-o03-role="detail.result.stale"{% endif %}>数据可能已过期</aside>
       {% endif %}
