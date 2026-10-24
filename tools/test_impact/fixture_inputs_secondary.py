@@ -5,6 +5,7 @@ import io
 import os
 from pathlib import Path
 import stat
+from urllib.parse import urlsplit
 
 from tools.test_impact.fixture_inputs import _json, _regular, _relative, _require
 
@@ -22,6 +23,27 @@ def _canonical(value):
     import json
     return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True,
                                      separators=(',', ':')).encode()).hexdigest()
+
+
+def _validate_discovery(smoke, refs, event, request, allowed_hosts):
+    if smoke == 'smoke-japan-50556':
+        detail = refs['detail_discovery']
+        result = detail['urls']['result_url']
+        _require(detail['adapter_key'] == request['source_provider'] == 'jra'
+                 and result['source_provider'] == request['source_provider']
+                 and result['url'] == request['source_url'], 'secondary JP detail discovery mismatch')
+    elif smoke == 'smoke-hong_kong-49451':
+        calendar = refs['calendar_discovery']
+        url = urlsplit(calendar['calendar_source_url'])
+        _require(calendar['calendar_source_provider'] == request['source_provider'] == 'hkjc'
+                 and calendar['calendar_source_authority'] == 'official'
+                 and calendar['edition_year'] == request['year'] == int(event['year'])
+                 and calendar['local_date'] == request['local_date']
+                 and url.scheme == 'https' and url.hostname in allowed_hosts and bool(url.path)
+                 and url.username is None and url.password is None and not url.fragment,
+                 'secondary HK calendar discovery mismatch')
+    else:
+        raise ValueError('fixture inputs: unadmitted secondary smoke')
 
 
 def resource_environment(source_root):
@@ -96,8 +118,7 @@ def resource_environment(source_root):
             _require(len(identities) == 1 and identities[0]['sha256'] == files[name]['sha256']
                      and identities[0]['size'] == files[name]['bytes'], 'secondary adapter input identity mismatch')
         refs = _json(event['source_refs'])
-        _require(refs['detail_discovery']['urls']['result_url']['url'] == request['source_url'],
-                 'secondary event/source URL mismatch')
+        _validate_discovery(smoke, refs, event, request, view['request_policy']['allowed_hosts'])
         if smoke == 'smoke-japan-50556':
             cache_name = 'smoke/run/'+smoke+'/source-cache/source_cache_manifest.json'
             identities = list(_json(data[cache_name])['files'].values())
