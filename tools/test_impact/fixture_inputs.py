@@ -8,6 +8,7 @@ import stat
 
 RESOURCE_ID = 'b239-primary3-v1'
 SECONDARY_RESOURCE_ID = 'b243-secondary2-v1'
+REMAINING_RESOURCE_ID = 'b243-remaining3-fixture-bound-v1'
 MANIFEST_SHA256 = 'b169ea447a8f6dbc00bb5123df24fe9de50d5da25652eb0329ba5698b5d1ebf9'
 RESOURCE_PATH = Path('tools/test_impact/fixtures/primary3')
 NATIVE_IDS = (
@@ -42,7 +43,10 @@ def validate_selection(plan, *, collecting=False):
     if control['id'] == SECONDARY_RESOURCE_ID:
         from tools.test_impact import fixture_inputs_secondary as secondary
         admitted, manifest_sha = secondary.NATIVE_IDS, secondary.MANIFEST_SHA256
-    _require(control['id'] in (RESOURCE_ID, SECONDARY_RESOURCE_ID)
+    elif control['id'] == REMAINING_RESOURCE_ID:
+        from tools.test_impact import fixture_inputs_remaining as remaining
+        admitted, manifest_sha = remaining.NATIVE_IDS, remaining.MANIFEST_SHA256
+    _require(control['id'] in (RESOURCE_ID, SECONDARY_RESOURCE_ID, REMAINING_RESOURCE_ID)
              and control['manifest_sha256'] == manifest_sha, 'resource identity mismatch')
     count = len(admitted)
     for field, source_field in (('source_sha', 'test_sha'), ('source_tree', 'test_tree')):
@@ -122,6 +126,9 @@ def fixture_environment(plan, binding, code_sha, profile, *, collecting=False,
              'regular absolute source directory required')
     if plan['fixture_inputs']['id'] == SECONDARY_RESOURCE_ID:
         from tools.test_impact.fixture_inputs_secondary import resource_environment
+        return resource_environment(source_root)
+    if plan['fixture_inputs']['id'] == REMAINING_RESOURCE_ID:
+        from tools.test_impact.fixture_inputs_remaining import resource_environment
         return resource_environment(source_root)
     root = _regular(source_root, str(RESOURCE_PATH/'manifest.json')).parent
     raw = (root/'manifest.json').read_bytes()

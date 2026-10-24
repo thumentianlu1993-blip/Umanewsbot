@@ -1,0 +1,16 @@
+{
+  "files": {
+    "c973922de919d472df520deb93e5743945a8c1dd357fecf731f23ac91f72db85.html": {
+      "cached_at": "2026-07-15T19:25:34.250333+00:00",
+      "path": "c973922de919d472df520deb93e5743945a8c1dd357fecf731f23ac91f72db85.html",
+      "protected_by": [],
+      "sha256": "1c56bbfe3393204f2d0d06f8bab4a4555c1fee6a6ef7899233eddd4c7d643cb7",
+      "size": 211229,
+      "source_url": "https://racing.hkjc.com/zh-hk/local/information/localresults?Racecourse=ST&racedate=2026%2F01%2F04&RaceNo=8"
+    }
+  },
+  "root": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6/smoke/run/smoke-hong_kong-49451/source-cache",
+  "schema_version": "1.0",
+  "total_bytes": 211229,
+  "updated_at": "2026-07-15T19:25:34.250342+00:00"
+}

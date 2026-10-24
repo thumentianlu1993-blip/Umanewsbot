@@ -1,0 +1,41 @@
+{
+  "artifact_kind": "historical_race_detail_source_fragment",
+  "plan_id": "detail-crawl-1998-2026-v6-smoke",
+  "region": "japan",
+  "requests": [
+    {
+      "evidence_source_url": "https://www.jra.go.jp/datafile/seiseki/replay/2005/99.html",
+      "fixture_identity": {
+        "path": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6/smoke/fixtures/japan-50556.html",
+        "sha256": "2dbe222766b6ed2e9a5c3c60c348ec98896e55acbbefbfdb8d5b3c0e2177bf4a",
+        "size": 79845
+      },
+      "local_date": "2005-10-15",
+      "recovery_evidence": [
+        {
+          "kind": "v1_source_fragment",
+          "path": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v1/source_fragments/japan-2005-jra-01.json",
+          "sha256": "c9bc967abf06f91347643337b70f026dc3448f88ffac3b0faff661ed0f50be1e",
+          "size": 6753
+        },
+        {
+          "kind": "v1_events_csv",
+          "path": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v1/events/japan-2005-jra-01.csv",
+          "sha256": "deba2becf7d504a71c1db578ef0ae6824f27b36957b90ced5debe6496420abb7",
+          "size": 7129
+        }
+      ],
+      "region": "japan",
+      "slug": "japan-daily-hai-nisai-2005",
+      "source_name": "jra_official_result_page",
+      "source_provider": "jra",
+      "source_url": "https://www.jra.go.jp/datafile/seiseki/replay/2005/99.html",
+      "target_id": "50556",
+      "target_sha256": "cd03d88f02caabb59f24afc341d48a2f5f5e1e74c6ea3ef2d9fd7b6926c07bae",
+      "year": 2005
+    }
+  ],
+  "schema_version": "2.0",
+  "shard_id": "smoke-japan-50556",
+  "target_count": 1
+}

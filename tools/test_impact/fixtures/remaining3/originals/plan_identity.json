@@ -1,0 +1,55 @@
+{
+  "adapter_identity": {
+    "path": "/Users/mentianlu/Code/umanews/runtime/race_event_crawl_runs/dev-worktrees/historical-progress-guard/runtime/tools/historical_race_detail_adapters.py",
+    "sha256": "12af4de51989aa1e956a885442bb5b6debf0901eac1a0f3e0cfe250e69f560b7",
+    "size": 33856
+  },
+  "artifact_kind": "historical_race_detail_master_plan_identity",
+  "image": {
+    "architecture": "arm64",
+    "digest": "sha256:af28703508bdd86930f1e4ccd7d54ebc52d0a6da30f055bcf91d0ae0643f9bf9",
+    "image_id": "sha256:af28703508bdd86930f1e4ccd7d54ebc52d0a6da30f055bcf91d0ae0643f9bf9",
+    "os": "linux",
+    "platform": "linux/arm64",
+    "revision": "d6d6f58b2b5b90301d8fa633a650df28379c09e7",
+    "tag": "umanews-historical-detail-v6:local"
+  },
+  "jra_parser_identities": {
+    "cache_dispatch": {
+      "path": "/Users/mentianlu/Code/umanews/runtime/race_event_crawl_runs/dev-worktrees/historical-progress-guard/runtime/tools/prepare_cached_historical_race_details.py",
+      "sha256": "5b7e91c2c2d18f661e2942aa17aad261d47b6bf81f10e4f1b6eb5c781a7e4141",
+      "size": 13040
+    },
+    "entrypoint": {
+      "path": "/Users/mentianlu/Code/umanews/runtime/race_event_crawl_runs/dev-worktrees/historical-progress-guard/runtime/tools/prepare_jra_race_detail_candidates.py",
+      "sha256": "0a0383ae69ad1706828d3f1d730309eb75d1ec11ef520a057e0c95cbfb04e8f7",
+      "size": 15351
+    },
+    "legacy_table_parser": {
+      "path": "/Users/mentianlu/Code/umanews/runtime/race_event_crawl_runs/dev-worktrees/historical-progress-guard/runtime/tools/jra_legacy_replay_detail_parser.py",
+      "sha256": "5217a48fcb39f7aa8c950419a1749366702e83d1b27d47ec92e63f567876d8ea",
+      "size": 6665
+    }
+  },
+  "plan_id": "detail-crawl-1998-2026-v6",
+  "recovery_input": {
+    "artifact_kind": "v5_source_recovery_ledger",
+    "sha256": "5f4006a7f83f025a9728d36b04b5adbe53ae967f12c88c59a042ce13d0370f2c",
+    "size": 10278201
+  },
+  "repo_root": "/Users/mentianlu/Code/umanews/runtime/race_event_crawl_runs/dev-worktrees/historical-progress-guard",
+  "schema_version": "2.0",
+  "scope_count": 8032,
+  "source_manifest_identity": {
+    "path": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v5/manifest.json",
+    "sha256": "fc8d6f0c986e474ba7b6a489c0fdca4c881cda8962cd9ad075414dc9b8d0223a",
+    "size": 176346
+  },
+  "source_manifest_sha256": "fc8d6f0c986e474ba7b6a489c0fdca4c881cda8962cd9ad075414dc9b8d0223a",
+  "source_plan_id": "detail-crawl-1998-2026-v5",
+  "tool_identity": {
+    "path": "/Users/mentianlu/Code/umanews/runtime/race_event_crawl_runs/dev-worktrees/historical-progress-guard/runtime/tools/historical_race_detail_runner_v2.py",
+    "sha256": "be86b15f971efab232dffeefe6eb577e6e01f26bc7ee261a73327e9125a4d406",
+    "size": 71997
+  }
+}

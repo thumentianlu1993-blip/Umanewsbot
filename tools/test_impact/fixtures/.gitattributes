@@ -4,3 +4,6 @@ primary3/**/*.html -diff
 primary3/**/*.cfm -diff
 secondary2/** -text
 secondary2/**/*.html -diff
+remaining3/** -text
+remaining3/**/*.html -diff
+remaining3/**/*.cfm -diff
