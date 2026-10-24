@@ -156,6 +156,57 @@ def main():
             cidfile=None
             expected=lifecycle.native_filename(mode,key);life=lifecycle.receipt_filename(mode,key)
             primary=None;completed=None;cleanup=None
+            def _retain_output():
+                if OBSERVER:OBSERVER.retain_temp=True
+                else:temporary.retain_temp=True
+
+            def _classify_outputs():
+                # 只看本invoke目录项名称及已知项类型；绝不打开/解析未知内容。
+                import stat as _stat
+                try:
+                    entries=tuple(out.iterdir())
+                    returned={entry.name for entry in entries}
+                    if returned != {expected,life}:
+                        _retain_output()
+                        return lifecycle.ReceiptError('OUTPUT_SET_MISMATCH',str(sorted(returned)))
+                    if any(not _stat.S_ISREG(entry.lstat().st_mode) for entry in entries):
+                        _retain_output()
+                        return lifecycle.ReceiptError('OUTPUT_SET_MISMATCH','nonregular known output')
+                except BaseException as classification:
+                    _retain_output()
+                    try:classification.add_note('output classification failed; unique invoke originals retained')
+                    except BaseException:pass
+                    return classification
+                return None
+
+            def _preserve_known(exc):
+                if OBSERVER:
+                    try:
+                        # known名称也不能让非普通/过大对象绕过安全分类去读任意内容。
+                        import stat as _stat
+                        native=out/expected
+                        if native.exists() or native.is_symlink():
+                            metadata=native.lstat()
+                            lifecycle.require(_stat.S_ISREG(metadata.st_mode),'UNSAFE_FILE',expected)
+                            lifecycle.require(metadata.st_size<=lifecycle.MAX_BYTES,'OVERSIZE_FILE',expected)
+                        OBSERVER.preserve_partial(out,output,expected,key,mode,exc)
+                    except BaseException as preserve:
+                        OBSERVER.retain_temp=True
+                        try:exc.add_note('secondary partial preservation: '+repr(preserve))
+                        except BaseException:pass
+                else:
+                    try:
+                        directory=output/'partial-evidence'/((key or 'collection')+'-'+uuid.uuid4().hex)
+                        directory.mkdir(parents=True,exist_ok=False)
+                        for name,target in ((expected,'native-output.bin'),(life,'lifecycle-output.bin')):
+                            if (out/name).exists():
+                                with (directory/target).open('xb') as stream:stream.write(lifecycle.read_regular(out/name))
+                        lifecycle.write_receipt(directory/'index.json',dict(primary_error=repr(exc),request=request,complete=False))
+                    except BaseException as preserve:
+                        temporary.retain_temp=True
+                        try:exc.add_note('secondary partial preservation: '+repr(preserve))
+                        except BaseException:pass
+
             try:
                 with saved_request.open('xb') as stream:stream.write(request_bytes)
                 try:
@@ -183,13 +234,13 @@ def main():
                         else:
                             try:primary.add_note('secondary invoke cleanup: '+repr(exc))
                             except BaseException:pass
+                classification=_classify_outputs()
+                if classification is not None:
+                    if primary is None:primary=classification
+                    else:
+                        try:primary.add_note('secondary output classification: '+repr(classification))
+                        except BaseException:pass
                 if primary is not None:raise primary
-                returned={file.name for file in out.iterdir()}
-                if returned != {expected,life}:
-                    # 遗留原子写temp/未知输出保留唯一现场，不把它晋升为正常report。
-                    if OBSERVER:OBSERVER.retain_temp=True
-                    else:temporary.retain_temp=True
-                    raise lifecycle.ReceiptError('OUTPUT_SET_MISMATCH',str(sorted(returned)))
                 native_bytes=lifecycle.read_regular(out/expected);receipt_bytes=lifecycle.read_regular(out/life)
                 receipt=lifecycle.decode_json(receipt_bytes)
                 lifecycle.validate_receipt(receipt,request,native_bytes)
@@ -202,28 +253,22 @@ def main():
                 lifecycle.verify_saved_lifecycle(output,lifecycle.decode_json(frozen_plan_bytes),mode,key,profile,require_owned=OBSERVER is not None)
                 return completed.returncode
             except BaseException as exc:
-                if OBSERVER:
-                    try:OBSERVER.preserve_partial(out,output,expected,key,mode,exc)
-                    except BaseException as preserve:
-                        OBSERVER.retain_temp=True
-                        try:exc.add_note('secondary partial preservation: '+repr(preserve))
-                        except BaseException:pass
-                else:
-                    try:
-                        directory=output/'partial-evidence'/((key or 'collection')+'-'+uuid.uuid4().hex)
-                        directory.mkdir(parents=True,exist_ok=False)
-                        for name,target in ((expected,'native-output.bin'),(life,'lifecycle-output.bin')):
-                            if (out/name).exists():
-                                with (directory/target).open('xb') as stream:stream.write(lifecycle.read_regular(out/name))
-                        lifecycle.write_receipt(directory/'index.json',dict(primary_error=repr(exc),request=request,complete=False))
-                    except BaseException as preserve:
-                        temporary.retain_temp=True
-                        try:exc.add_note('secondary partial preservation: '+repr(preserve))
-                        except BaseException:pass
+                classification=_classify_outputs()
+                if classification is not None and classification is not exc:
+                    try:exc.add_note('secondary output classification: '+repr(classification))
+                    except BaseException:pass
+                _preserve_known(exc)
                 raise
             finally:
                 import sys as _sys
                 active_error=_sys.exc_info()[1]
+                classification=_classify_outputs()
+                if classification is not None:
+                    if active_error is None:
+                        _preserve_known(classification)
+                        raise classification
+                    try:active_error.add_note('final output classification: '+repr(classification))
+                    except BaseException:pass
                 if not (OBSERVER.retain_temp if OBSERVER else temporary.retain_temp):
                     try:lifecycle.release_control(control)
                     except BaseException as release:
