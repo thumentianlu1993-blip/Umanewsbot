@@ -324,6 +324,8 @@ def _source_evidence_identity_matches(profile: HorseProfile, payload: dict) -> l
     source_name = str(payload.get("source_name") or "").strip().casefold()
     if not external_ids or not source_name:
         return []
+    incoming_result_id = str(payload.get("external_result_id") or "").strip()
+    incoming_race_id = str(payload.get("external_race_id") or "").strip()
     matches: list[HorseRaceRecord] = []
     for record in HorseRaceRecord.objects.filter(horse_profile=profile).order_by("id").iterator():
         evidence_items = [record.raw_payload, record.source_refs]
@@ -335,7 +337,25 @@ def _source_evidence_identity_matches(profile: HorseProfile, payload: dict) -> l
             evidence_source = _evidence_source_name(evidence).casefold()
             if evidence_source != source_name:
                 continue
-            if _external_identity_values(evidence) & external_ids:
+            shared_ids = _external_identity_values(evidence) & external_ids
+            if shared_ids:
+                evidence_result_id = str(evidence.get("external_result_id") or "").strip()
+                evidence_race_id = str(evidence.get("external_race_id") or "").strip()
+                alias_ids = {
+                    str(payload.get("idempotency_key") or "").strip(),
+                    str(evidence.get("idempotency_key") or "").strip(),
+                } - {""}
+                if (
+                    incoming_result_id
+                    and incoming_race_id
+                    and evidence_result_id
+                    and evidence_race_id
+                    and incoming_result_id != evidence_result_id
+                    and incoming_race_id != evidence_race_id
+                    and not (shared_ids & alias_ids)
+                ):
+                    # Reject only this evidence's result/race cross-field coincidence.
+                    continue
                 matches.append(record)
                 break
         if len(matches) == 2:
@@ -1066,6 +1086,8 @@ def upsert_race_record(
         result = RaceEventResult.objects.only("event_id").get(pk=payload["result_id"])
         if payload.get("event_id") and int(payload["event_id"]) != result.event_id:
             raise ValueError("result does not belong to event")
+        if payload.get("event_id") is None:
+            payload["event_id"] = result.event_id
         payload.setdefault("event_id", result.event_id)
 
     key_payload = _inherit_external_identity(record, payload) if record is not None else payload
