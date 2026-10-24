@@ -878,7 +878,8 @@
     ],
     "horse_career_review_consumer": [
       "stable.test_horse_career_record_from_review",
-      "stable.test_h03_independent_career_row_prepare"
+      "stable.test_h03_independent_career_row_prepare",
+      "stable.test_h03_private_independent_career_row_consumption"
     ]
   },
   "dependencies": {
@@ -2834,6 +2835,12 @@
         "horse_basic_profile_cache"
       ]
     },
+    "server/stable/test_h03_private_independent_career_row_consumption.py": {
+      "label": "stable.test_h03_private_independent_career_row_consumption",
+      "domains": [
+        "horse_career_review_consumer"
+      ]
+    },
     "server/stable/test_h03_independent_career_row_prepare.py": {
       "label": "stable.test_h03_independent_career_row_prepare",
       "domains": [
@@ -3155,6 +3162,7 @@
     "stable.test_managed_readonly_translation": "django",
     "stable.test_translation_reported_token_stop": "django",
     "stable.test_h03_private_basic_module_transaction": "django",
+    "stable.test_h03_private_independent_career_row_consumption": "django",
     "stable.test_h03_independent_career_row_prepare": "django"
   },
   "allowed_skips": {
