@@ -879,8 +879,8 @@ class ManagedReadonlyTranslationEndToEndTests(RemainingReadonlyE2EFixture, Manag
                 finally:
                     start_b.set()
                     if "reader" in owner:
+                        owner["reader"].before_read_release.set()  # 先完成真实release，再记录完成时间上界。
                         observed["owner_release_window_seconds"] = monotonic() - owner["task_started_at"]
-                        owner["reader"].before_read_release.set()  # 明确释放A，再让helper有界join。
                         observed["owner_explicitly_released"] = True
         finally:
             # 即使前置或后续oracle失败，也保留实际结果；不把未到达断言计为通过。
