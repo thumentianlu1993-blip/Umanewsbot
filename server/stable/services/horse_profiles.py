@@ -560,18 +560,32 @@ def scan_article_horse_links(
                 continue
             if not commit:
                 continue
-            _, was_created = ArticleHorseLink.objects.update_or_create(
-                horse_profile=profile_item,
-                article=article_item,
-                defaults={
-                    "status": match.status,
-                    "source": "auto_match",
-                    "confidence": match.confidence,
-                    "matched_text": match.matched_text[:255],
-                    "match_reason": match.reason,
-                    "metadata": {},
-                },
-            )
+            defaults = {
+                "status": match.status,
+                "source": "auto_match",
+                "confidence": match.confidence,
+                "matched_text": match.matched_text[:255],
+                "match_reason": match.reason,
+                "metadata": {},
+            }
+            # 初读不持锁；实际写入逐对采用既有的父文章→关系锁序。
+            with transaction.atomic():
+                current_article = NewsArticle.objects.select_for_update().get(pk=article_item.pk)
+                link, was_created = ArticleHorseLink.objects.select_for_update().get_or_create(
+                    horse_profile=profile_item,
+                    article=current_article,
+                    defaults=defaults,
+                )
+                if not was_created:
+                    if link.status == ArticleHorseLinkStatus.REMOVED:
+                        skipped_removed += 1
+                        continue
+                    if link.status == ArticleHorseLinkStatus.MANUAL:
+                        skipped_manual += 1
+                        continue
+                    for field, value in defaults.items():
+                        setattr(link, field, value)
+                    link.save(update_fields=[*defaults, "updated_at"])
             created += int(was_created)
             updated += int(not was_created)
     result = {
