@@ -224,31 +224,42 @@ def _inputs_match(bundle, article, profile, identity):
             (article.source_language or "ja"))
 
 
-def _receipt(rows, key, bundle, payload_sha, provider):
-    if not rows:
-        return None
-    _require(len(rows) == 1)
-    row = rows[0]
+def _decode_receipt(row):
+    """Canonical stored data only; no current identity or write authority."""
     receipt = _read(row.detail.encode("utf-8"))
     _require(type(receipt) is dict and set(receipt) == _RECEIPT_KEYS)
-    wanted = dict(schema_version="l01.horse-link-receipt.v1", request_key=key, payload_sha256=payload_sha,
-        payload_revision=bundle["payload_revision"], article_id=bundle["article_id"], profile_id=bundle["profile_id"],
-        identity_id=bundle["identity_id"], provider_ref=provider, before="absent")
-    for name, value in wanted.items():
-        _require(type(receipt[name]) is type(value) and receipt[name] == value)
+    return receipt
+
+
+def _validate_receipt_after(row, receipt, key, payload_sha, article_id, profile_id, provider):
+    """The original receipt's after predicates, shared without changing bytes."""
     _id(receipt["link_id"]); _id(receipt["actor_id"])
     _require(type(receipt["decision_sha256"]) is str and HASH.fullmatch(receipt["decision_sha256"]))
     _require(row.admin_id == receipt["actor_id"])
     _require(type(receipt["after"]) is dict and receipt["after_sha256"] == _sha(_raw(receipt["after"])))
     _require(set(receipt["after"]) == {f.attname for f in ArticleHorseLink._meta.concrete_fields})
-    _require(receipt["after"]["id"] == receipt["link_id"] and receipt["after"]["article_id"] == bundle["article_id"]
-             and receipt["after"]["horse_profile_id"] == bundle["profile_id"] and receipt["after"]["status"] == "auto"
+    _require(receipt["after"]["id"] == receipt["link_id"] and receipt["after"]["article_id"] == article_id
+             and receipt["after"]["horse_profile_id"] == profile_id and receipt["after"]["status"] == "auto"
              and receipt["after"]["source"] == SOURCE)
     metadata = receipt["after"]["metadata"]
     _require(type(metadata) is dict and metadata.get("schema_version") == "l01.horse-link-metadata.v1")
     for name, value in {"request_key": key, "payload_sha256": payload_sha,
                         "provider_ref": provider, "decision_sha256": receipt["decision_sha256"]}.items():
         _require(metadata.get(name) == value)
+
+
+def _receipt(rows, key, bundle, payload_sha, provider):
+    if not rows:
+        return None
+    _require(len(rows) == 1)
+    row = rows[0]
+    receipt = _decode_receipt(row)
+    wanted = dict(schema_version="l01.horse-link-receipt.v1", request_key=key, payload_sha256=payload_sha,
+        payload_revision=bundle["payload_revision"], article_id=bundle["article_id"], profile_id=bundle["profile_id"],
+        identity_id=bundle["identity_id"], provider_ref=provider, before="absent")
+    for name, value in wanted.items():
+        _require(type(receipt[name]) is type(value) and receipt[name] == value)
+    _validate_receipt_after(row, receipt, key, payload_sha, bundle["article_id"], bundle["profile_id"], provider)
     return row, receipt
 
 
@@ -283,6 +294,56 @@ def _classify(link, receipt, matches):
 # swallowed into a business result. No logger writes on rejection or replay.
 _PARSE_ERRORS = (BindingAdmissionError, BindingInputError, ValueError, TypeError, KeyError,
                  UnicodeError, RecursionError, OverflowError, binascii.Error)
+
+
+def classify_existing_strong_evidence(link):
+    """Read-only stored-row protection, never an identity/permission grant.
+
+    Only marked current rows query their exact request key. Unknown marked
+    states also stop automatic mutation; unmarked legacy rows remain mutable.
+    No handle admission, historical-pair discovery, repair or audit write occurs.
+    """
+    if link.status in {"manual", "removed"}:
+        return "protected_current"
+    metadata = link.metadata
+    schema = metadata.get("schema_version") if type(metadata) is dict else None
+    marked = (
+        type(link.source) is str and link.source.startswith("strong_identity.")
+        or type(schema) is str and schema.startswith("l01.horse-link-metadata.")
+        or type(metadata) is dict and "request_key" in metadata
+        and ("payload_sha256" in metadata or "decision_sha256" in metadata)
+    )
+    if not marked:
+        return None
+    try:
+        _require(type(metadata) is dict and schema == "l01.horse-link-metadata.v1")
+        key, payload_sha, provider = metadata["request_key"], metadata["payload_sha256"], metadata["provider_ref"]
+        for value in (key, payload_sha):
+            _require(type(value) is str and HASH.fullmatch(value))
+        _require(type(provider) is dict and set(provider) == {"source", "namespace", "external_id"})
+        for value in provider.values():
+            _text(value)
+    except _PARSE_ERRORS:
+        return "strong_unknown_or_drifted"
+    # ORM/driver evaluation must not be converted into a parsing rejection.
+    rows = list(OperationLog.objects.filter(action_type=ACTION, target_type=TARGET, target_id=key)
+                .order_by("pk")[:2])
+    try:
+        _require(len(rows) == 1)
+        row = rows[0]
+        receipt = _decode_receipt(row)
+        # Current pair and marker values are comparison inputs, not a bundle
+        # fabricated from this receipt to enter the original write boundary.
+        wanted = dict(schema_version="l01.horse-link-receipt.v1", request_key=key, payload_sha256=payload_sha,
+            article_id=link.article_id, profile_id=link.horse_profile_id, provider_ref=provider, before="absent")
+        for name, value in wanted.items():
+            _require(type(receipt[name]) is type(value) and receipt[name] == value)
+        _id(receipt["payload_revision"]); _id(receipt["identity_id"])
+        _validate_receipt_after(row, receipt, key, payload_sha, link.article_id, link.horse_profile_id, provider)
+        _require(_raw(_snapshot(link)) == _raw(receipt["after"]))
+    except _PARSE_ERRORS:
+        return "strong_unknown_or_drifted"
+    return "stored_strong_match"
 
 
 def commit_strong_horse_binding(handle_id, actor):

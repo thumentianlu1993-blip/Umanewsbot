@@ -399,6 +399,17 @@ def _match_article(article: NewsArticle, profile: HorseProfile, terms: list[tupl
     return None
 
 
+def _article_horse_link_protection(link):
+    if link.status in {ArticleHorseLinkStatus.MANUAL, ArticleHorseLinkStatus.REMOVED}:
+        return {"link_id": link.id, "status": link.status}
+    from stable.services.horse_article_binding_persistence import classify_existing_strong_evidence
+
+    reason = classify_existing_strong_evidence(link)
+    if reason is not None:
+        return {"link_id": link.id, "status": link.status, "reason": reason}
+    return None
+
+
 def reconcile_article_horse_links(
     article: NewsArticle,
     resolution: ArticleEntityResolution,
@@ -457,7 +468,6 @@ def reconcile_article_horse_links(
 
     existing = list(ArticleHorseLink.objects.filter(article=article).order_by("id"))
     existing_by_profile = {item.horse_profile_id: item for item in existing}
-    protected = [item for item in existing if item.status in {ArticleHorseLinkStatus.MANUAL, ArticleHorseLinkStatus.REMOVED}]
     delete_links = [
         item
         for item in existing
@@ -475,59 +485,66 @@ def reconcile_article_horse_links(
         if profile_id in existing_by_profile
         and existing_by_profile[profile_id].status not in {ArticleHorseLinkStatus.MANUAL, ArticleHorseLinkStatus.REMOVED}
     ]
-    result = {
-        "create": create_payloads,
-        "update": update_payloads,
-        "delete_ids": [item.id for item in delete_links],
-        "protected_ids": [item.id for item in protected],
-        "protected": [{"link_id": item.id, "status": item.status} for item in protected],
-    }
     if not commit:
-        return result
+        protected = [value for item in existing if (value := _article_horse_link_protection(item)) is not None]
+        protected_ids = {item["link_id"] for item in protected}
+        return {
+            "create": create_payloads,
+            "update": [item for item in update_payloads if item["link_id"] not in protected_ids],
+            "delete_ids": [item.id for item in delete_links if item.id not in protected_ids],
+            "protected_ids": [item["link_id"] for item in protected],
+            "protected": protected,
+        }
     with transaction.atomic():
         current_article = NewsArticle.objects.select_for_update().get(pk=article.pk)
         locked_links = list(
             ArticleHorseLink.objects.select_for_update()
-            .filter(pk__in=[item.id for item in existing])
+            .filter(article_id=current_article.pk)
             .order_by("id")
         )
         original_profiles = {item.id: item.horse_profile_id for item in existing}
         current_links = {
             item.id: item
             for item in locked_links
-            if item.article_id == article.pk
+            if item.id in original_profiles and item.article_id == article.pk
             and item.horse_profile_id == original_profiles[item.id]
         }
+        current_by_profile = {item.horse_profile_id: item for item in locked_links}
         mutable_statuses = {ArticleHorseLinkStatus.AUTO, ArticleHorseLinkStatus.CANDIDATE}
         protected = [
-            item for item in current_links.values()
-            if item.status in {ArticleHorseLinkStatus.MANUAL, ArticleHorseLinkStatus.REMOVED}
+            value for item in locked_links
+            if (value := _article_horse_link_protection(item)) is not None
         ]
+        protected_ids = {item["link_id"] for item in protected}
         result = {
             "create": [],
             "update": [],
             "delete_ids": [],
-            "protected_ids": [item.id for item in protected],
-            "protected": [{"link_id": item.id, "status": item.status} for item in protected],
+            "protected_ids": [item["link_id"] for item in protected],
+            "protected": protected,
         }
         if current_article.workflow_status == WorkflowStatus.WITHDRAWN:
             return result
         delete_ids = [
             item.id for item in delete_links
             if item.id in current_links and current_links[item.id].status in mutable_statuses
+            and item.id not in protected_ids
         ]
         if delete_ids:
             ArticleHorseLink.objects.filter(pk__in=delete_ids).delete()
             result["delete_ids"] = delete_ids
         for payload in create_payloads:
             profile_id = payload["horse_profile_id"]
+            current = current_by_profile.get(profile_id)
+            if current is not None and current.id in protected_ids:
+                continue
             defaults = {key: value for key, value in payload.items() if key != "horse_profile_id"}
             ArticleHorseLink.objects.create(article=article, horse_profile_id=profile_id, **defaults)
             result["create"].append(payload)
         for payload in update_payloads:
             link_id = payload["link_id"]
             link = current_links.get(link_id)
-            if link is None or link.status not in mutable_statuses:
+            if link is None or link.status not in mutable_statuses or link_id in protected_ids:
                 continue
             defaults = {key: value for key, value in payload.items() if key not in {"link_id", "horse_profile_id"}}
             defaults["updated_at"] = timezone.now()
@@ -609,6 +626,8 @@ def scan_article_horse_links(
                         continue
                     if link.status == ArticleHorseLinkStatus.MANUAL:
                         skipped_manual += 1
+                        continue
+                    if _article_horse_link_protection(link) is not None:
                         continue
                     for field, value in defaults.items():
                         setattr(link, field, value)
