@@ -11,6 +11,7 @@ import hashlib
 import importlib
 import inspect
 import json
+import re
 import sys
 import tempfile
 import threading
@@ -85,6 +86,89 @@ def sqlstate(error):
 
 def emit(kind, **data):
     print("\nC255_PAIR_INDEX " + json.dumps({"kind": kind, **data}, ensure_ascii=False, default=str), flush=True)
+
+
+def _lock_query_target(sql):
+    """Observe generated SELECT row locks, never rewrite or execute SQL.
+
+    Keep quoted names/literals opaque and ignore nested SELECT's FROM. An OF
+    list names relation aliases; absent OF locks all eligible FROM relations,
+    including JOINs. Unsupported row-lock shapes raise instead of disappearing
+    from the observed sequence. This is a test observer, not a SQL authority.
+    """
+    tokens=re.findall(r'''--[^\n]*|/\*.*?\*/|"(?:[^"]|"")*"|'(?:[^']|'')*'|[A-Za-z_][A-Za-z_0-9$]*|%s|[^\s]''',sql,re.S)
+    top=[];depth=0
+    for token in tokens:
+        if token.startswith(('--','/*')):continue
+        if token==')':depth-=1
+        if depth==0:top.append(token)
+        if token=='(':depth+=1
+        if depth<0:raise ValueError('unbalanced SQL parentheses')
+    if depth:raise ValueError('unbalanced SQL parentheses')
+    def word(token,value):return not token.startswith(('"',"'")) and token.upper()==value
+    def identifier(token):
+        if token.startswith('"') and token.endswith('"'):return token[1:-1].replace('""','"')
+        if re.fullmatch(r'[A-Za-z_][A-Za-z_0-9$]*',token):return token.lower()
+        raise ValueError('unsupported relation/alias token: '+token)
+    strengths=(('NO','KEY','UPDATE'),('KEY','SHARE'),('UPDATE',),('SHARE',))
+    locks=[]
+    for i,token in enumerate(top):
+        if not word(token,'FOR'):continue
+        for strength in strengths:
+            if len(top)>i+len(strength) and all(word(top[i+1+j],v) for j,v in enumerate(strength)):
+                locks.append((i,' '.join(strength),i+1+len(strength)));break
+    lexical_locks=sum(
+        any(len(tokens)>i+len(s) and all(word(tokens[i+1+j],v) for j,v in enumerate(s)) for s in strengths)
+        for i,x in enumerate(tokens) if word(x,'FOR'))
+    if lexical_locks!=len(locks):raise ValueError('nested row-lock clause is not a main-relation observation')
+    if not locks:return None
+    if len(locks)!=1 or not word(top[0],'SELECT'):raise ValueError('unsupported top-level row-lock statement')
+    lock_at,strength,after_lock=locks[0]
+    from_positions=[i for i,x in enumerate(top[:lock_at]) if word(x,'FROM')]
+    if len(from_positions)!=1:raise ValueError('ambiguous main FROM')
+    start=from_positions[0]+1
+    reserved={'JOIN','INNER','LEFT','RIGHT','FULL','CROSS','NATURAL','OUTER','ON','USING',
+              'WHERE','GROUP','HAVING','ORDER','LIMIT','OFFSET','FETCH','FOR','WINDOW',
+              'UNION','INTERSECT','EXCEPT','TABLESAMPLE'}
+    def relation(i):
+        if i>=len(top):raise ValueError('missing FROM relation')
+        if word(top[i],'ONLY'):i+=1
+        if i>=len(top):raise ValueError('missing ONLY relation')
+        parts=[identifier(top[i])];i+=1
+        while i+1<len(top) and top[i]=='.':parts.append(identifier(top[i+1]));i+=2
+        alias=None
+        if i<len(top) and word(top[i],'AS'):
+            if i+1>=len(top):raise ValueError('missing FROM alias')
+            alias=identifier(top[i+1]);i+=2
+        elif i<len(top) and (top[i].startswith('"') or re.fullmatch(r'[A-Za-z_][A-Za-z_0-9$]*',top[i])) and top[i].upper() not in reserved:
+            alias=identifier(top[i]);i+=1
+        return dict(relation_parts=parts,table=parts[-1],alias=alias,lock_name=alias or parts[-1]),i
+    primary,end=relation(start);relations=[primary]
+    from_end=next((i for i in range(end,lock_at) if any(word(top[i],x) for x in
+                  ('WHERE','GROUP','HAVING','ORDER','LIMIT','OFFSET','FETCH','WINDOW'))),lock_at)
+    for i in range(end,from_end):
+        if word(top[i],'JOIN') or top[i]==',':relations.append(relation(i+1)[0])
+    of=[]
+    if after_lock<len(top) and word(top[after_lock],'OF'):
+        i=after_lock+1
+        while i<len(top):
+            of.append(identifier(top[i]));i+=1
+            if i>=len(top) or top[i]!=',':break
+            i+=1
+        if not of:raise ValueError('empty row-lock OF list')
+    else:i=after_lock
+    if i<len(top) and word(top[i],'NOWAIT'):i+=1
+    elif i+1<len(top) and word(top[i],'SKIP') and word(top[i+1],'LOCKED'):i+=2
+    if top[i:] not in ([],[';']):raise ValueError('unsupported row-lock suffix')
+    by_name={r['lock_name']:r for r in relations}
+    if len(by_name)!=len(relations) or any(x not in by_name for x in of):
+        raise ValueError('unresolved or duplicate row-lock alias')
+    return dict(primary_table=primary['table'],primary_relation=primary,
+                joined_relations=relations[1:],strength=strength,of_aliases=of,
+                lock_scope='explicit_OF' if of else 'implicit_all_FROM_relations',
+                locked_relations=[by_name[x] for x in of] if of else relations,
+                primary_locked=not of or primary['lock_name'] in of,
+                basis='top-level SELECT FROM relation plus alias-resolved FOR lock clause')
 
 
 class _Producer:
@@ -659,8 +743,44 @@ class HorseArticlePairReceiptIndexTests(TransactionTestCase):
 
     def test_real_parent_lock_and_uncommitted_capture_visibility_two_sessions(self):
         """Catches reversed parent order or capture committed separately; no weak scanner is called."""
+        started=time.monotonic()
+        emit('two_PG_capture_boundary',boundary='before_observer_controls',final_event_reached=False)
+        # Observer-only literal controls; no SQL execution or fabricated writer.
+        # A joined table must never replace the exact primary FROM relation.
+        for sql,wanted in (
+            ('SELECT "stable_articlehorselink".id FROM "stable_articlehorselink" INNER JOIN "stable_horseprofile" '
+             'ON "stable_articlehorselink".horse_profile_id="stable_horseprofile".id '
+             'ORDER BY "stable_horseprofile".original_name FOR UPDATE',
+             ('stable_articlehorselink',None,'implicit_all_FROM_relations',[],True,['stable_horseprofile'])),
+            ('SELECT l.id FROM "stable_articlehorselink" l JOIN "stable_horseprofile" h ON l.horse_profile_id=h.id '
+             'ORDER BY h.original_name FOR UPDATE',('stable_articlehorselink','l','implicit_all_FROM_relations',[],True,['stable_horseprofile'])),
+            ('SELECT U0.id FROM "stable_newsarticle" U0 FOR UPDATE OF U0',
+             ('stable_newsarticle','u0','explicit_OF',['u0'],True,[])),
+            ('SELECT l.id FROM public."stable_articlehorselink" AS "linkAlias" JOIN "stable_horseprofile" AS h '
+             'ON "linkAlias".horse_profile_id=h.id FOR UPDATE OF "linkAlias" NOWAIT',
+             ('stable_articlehorselink','linkAlias','explicit_OF',['linkAlias'],True,['stable_horseprofile'])),
+            ('SELECT l.id FROM "stable_articlehorselink" l JOIN "stable_horseprofile" h ON l.horse_profile_id=h.id '
+             'FOR UPDATE OF h SKIP LOCKED',('stable_articlehorselink','l','explicit_OF',['h'],False,['stable_horseprofile'])),
+            ('SELECT l.id FROM "stable_articlehorselink" l JOIN "stable_horseprofile" h ON l.horse_profile_id=h.id '
+             'FOR UPDATE OF l,h',('stable_articlehorselink','l','explicit_OF',['l','h'],True,['stable_horseprofile'])),
+            ('''SELECT 'FOR UPDATE FROM "stable_horseprofile"', (SELECT id FROM "stable_horseprofile" LIMIT 1)
+                FROM "stable_articlehorselink" FOR UPDATE''',
+             ('stable_articlehorselink',None,'implicit_all_FROM_relations',[],True,[])),
+        ):
+            with self.subTest(observer_SQL=sql):
+                info=_lock_query_target(sql)
+                self.assertEqual((info['primary_table'],info['primary_relation']['alias'],info['lock_scope'],
+                    info['of_aliases'],info['primary_locked'],[x['table'] for x in info['joined_relations']]),wanted)
+                self.assertEqual(info['strength'],'UPDATE')
+        self.assertIsNone(_lock_query_target('SELECT \'FOR UPDATE\' FROM "stable_newsarticle"'))
+        for sql in ('SELECT id FROM "stable_newsarticle" n FOR UPDATE OF missing_alias',
+                    'SELECT id FROM "stable_newsarticle" FOR UPDATE OF',
+                    'SELECT (SELECT id FROM "stable_horseprofile" FOR UPDATE) FROM "stable_newsarticle"'):
+            with self.subTest(unsupported_observer_SQL=sql),self.assertRaises(ValueError):_lock_query_target(sql)
         attempted,pending,release,done=(threading.Event() for unused in range(4))
-        worker_raw=[];results=[];errors=[];pids=[];lock_tables=[];started=time.monotonic();table=self.Index._meta.db_table
+        worker_raw=[];results=[];errors=[];pids=[];lock_tables=[];table=self.Index._meta.db_table
+        lock_SQL=[];main_pid=None;blockers=[];milestones=dict(parent_block_observed=False,
+            pending_index_insert=False,uncommitted_tuple_invisible=False)
         def worker():
             db=connections['default']
             try:
@@ -669,13 +789,35 @@ class HorseArticlePairReceiptIndexTests(TransactionTestCase):
                     cursor.execute("SET statement_timeout='10s'");cursor.execute("SET lock_timeout='5s'")
                     cursor.execute('SELECT pg_backend_pid()');pids.append(cursor.fetchone()[0])
                 def observe(execute,sql,params,many,context):
-                    if 'FOR UPDATE' in sql.upper():
-                        for model in (NewsArticle,HorseProfile,HorseExternalIdentity,ArticleHorseLink):
-                            if model._meta.db_table in sql:lock_tables.append(model._meta.db_table);break
-                    if 'stable_newsarticle' in sql and 'FOR UPDATE' in sql.upper():attempted.set()
+                    note=None;classification_error=None
+                    try:info=_lock_query_target(sql)
+                    except ValueError as error:info=None;classification_error=str(error)
+                    if info is not None or classification_error is not None:
+                        note=dict(sequence=len(lock_SQL)+1,sql=sql,params=copy.deepcopy(params),many=many,
+                            thread_ident=threading.get_ident(),thread_name=threading.current_thread().name,
+                            backend_pid=pids[0],classification=info,classification_error=classification_error,
+                            execution_state='attempted')
+                        lock_SQL.append(note)
+                        primary_locked=info is not None and info['primary_locked'] and info['strength']=='UPDATE'
+                        lock_tables.append(info['primary_table'] if primary_locked else None)
+                        emit('two_PG_lock_SQL_attempt',observation=copy.deepcopy(note))
+                        if primary_locked and info['primary_table']==NewsArticle._meta.db_table:attempted.set()
                     if sql.lstrip().upper().startswith('INSERT') and table in sql:
                         pending.set();require(release.wait(BARRIER_SECONDS),'before-index release deadline')
-                    return execute(sql,params,many,context)
+                    try:
+                        value=execute(sql,params,many,context)
+                        if note is not None:
+                            note['execution_state']='completed'
+                            require(classification_error is None,'unclassified actual lock SQL: '+str(classification_error))
+                            require(primary_locked,'actual row lock does not UPDATE-lock its primary FROM relation')
+                        return value
+                    except BaseException as error:
+                        if note is not None:
+                            note['raised_type']=type(error).__name__;note['raised_message']=str(error)
+                            if note['execution_state']=='attempted':note['execution_state']='raised'
+                        raise
+                    finally:
+                        if note is not None:emit('two_PG_lock_SQL_result',observation=copy.deepcopy(note))
                 with db.execute_wrapper(observe):result=self.d.call()
                 results.append(result)
             except Exception:errors.append(traceback.format_exc())
@@ -693,19 +835,30 @@ class HorseArticlePairReceiptIndexTests(TransactionTestCase):
                     if main_pid in blockers:break
                     time.sleep(.01)
                 require(main_pid in blockers,'actual PG parent blocking sample not observed')
+                milestones['parent_block_observed']=True
                 self._read('UNKNOWN_NO_INDEX')
             require(pending.wait(BARRIER_SECONDS),'real worker never reached index INSERT')
+            milestones['pending_index_insert']=True
             require(not errors,'worker failed before pending capture: '+repr(errors))
             self.assertFalse(ArticleHorseLink.objects.filter(article=self.d.article,horse_profile=self.d.horse).exists())
             self.assertFalse(OperationLog.objects.filter(action_type='horse_binding_committed').exists())
             self._read('UNKNOWN_NO_INDEX')
+            milestones['uncommitted_tuple_invisible']=True
             release.set();require(done.wait(BARRIER_SECONDS),'natural writer completion deadline')
         finally:
             release.set()
-            if thread.ident is not None:
-                thread.join(5)
-                if thread.is_alive() and worker_raw:worker_raw[0].cancel();thread.join(3)
-                require(not thread.is_alive(),'worker bounded cleanup failed')
+            try:
+                if thread.ident is not None:
+                    thread.join(5)
+                    if thread.is_alive() and worker_raw:worker_raw[0].cancel();thread.join(3)
+                    require(not thread.is_alive(),'worker bounded cleanup failed')
+            finally:
+                emit('two_PG_capture_boundary',boundary='cleanup_finished_before_final_assertions',
+                     final_event_reached=False,main_pid=main_pid,worker_pids=list(pids),
+                     actual_parent_blockers=blockers,milestones=copy.deepcopy(milestones),
+                     worker_results=copy.deepcopy(results),worker_errors=list(errors),
+                     worker_cleanup_complete=not thread.is_alive(),lock_tables=list(lock_tables),
+                     lock_SQL=copy.deepcopy(lock_SQL))
         require(not errors and len(results)==1,'worker runtime/precondition error: '+repr(errors))
         require(results[0].get('status')=='created','real worker did not naturally create tuple')
         self.assertLess(time.monotonic()-started,TOTAL_SECONDS)
@@ -716,4 +869,5 @@ class HorseArticlePairReceiptIndexTests(TransactionTestCase):
         emit('two_PG_capture_committed',main_pid=main_pid,worker_pid=pids[0],actual_parent_blockers=blockers,
              result=results[0],natural_commit=True,worker_errors=errors,cleanup_complete=True,
              uncommitted_tuple_invisible=True,scanner_invoked=False,lock_tables=lock_tables,
+             lock_SQL=lock_SQL,final_event_reached=True,milestones=milestones,
              actual_link=snapshot(self.d.link),actual_log=snapshot(self.d.log),actual_index=snapshot(self._archives().get()))
