@@ -1425,6 +1425,9 @@
     ],
     "server/stable/services/horse_article_strong_backfill.py": [
       "content_contracts"
+    ],
+    "server/stable/services/horse_article_binding_diagnostics.py": [
+      "content_contracts"
     ]
   },
   "symbols": {
