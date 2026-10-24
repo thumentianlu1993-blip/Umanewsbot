@@ -253,12 +253,13 @@ def _receipt(rows, key, bundle, payload_sha, provider):
 
 
 def _result(status, link=None, receipt=None):
+    """link_id always identifies the current row; history has its own field."""
     result = {"status": status}
     if link is not None:
         result["link_id"] = link.pk
     if receipt is not None:
         row, value = receipt
-        result.update(link_id=value["link_id"], receipt_id=row.pk)
+        result.update(original_link_id=value["link_id"], receipt_id=row.pk)
     return result
 
 
@@ -270,7 +271,7 @@ def _classify(link, receipt, matches):
         if link is None:
             return _result("historical_applied_missing", receipt=receipt)
         same = link.pk == old["link_id"] and _snapshot(link) == old["after"]
-        return _result("replayed" if same and matches else "historical_applied_drifted", receipt=receipt)
+        return _result("replayed" if same and matches else "historical_applied_drifted", link, receipt)
     if link is not None:
         return _result("existing_pair_conflict", link)
     if not matches:
@@ -327,11 +328,11 @@ def commit_strong_horse_binding(handle_id, actor):
         try:
             decision, proposal = _decision(bundle, provider)
         except _PARSE_ERRORS:
-            return _result("historical_applied_drifted", receipt=receipt) if receipt else _result("blocked_decision")
+            return _result("historical_applied_drifted", link, receipt) if receipt else _result("blocked_decision")
         decision_sha = _sha(_raw(decision))
         if receipt is not None:
             if receipt[1]["decision_sha256"] != decision_sha:
-                return _result("historical_applied_drifted", receipt=receipt)
+                return _result("historical_applied_drifted", link, receipt)
             return state
         metadata = dict(schema_version="l01.horse-link-metadata.v1", request_key=key, payload_sha256=payload_sha,
             decision_sha256=decision_sha, provider_ref=provider, occurrence=proposal["occurrence"], evidence=proposal["evidence"])

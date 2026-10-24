@@ -153,15 +153,45 @@ class HorseArticleBindingPersistenceTests(TransactionTestCase):
         old_pk = link.pk
         link.delete()
         result = self.assert_no_write("historical_applied_missing")
-        self.assertEqual(result["link_id"], old_pk)
+        self.assertEqual(result["original_link_id"], old_pk)
+        self.assertNotIn("link_id", result)
 
     def test_historical_replacement_and_metadata_drift_never_repaired(self):
         link = self.created()
         ArticleHorseLink.objects.filter(pk=link.pk).update(metadata={"changed": True})
-        self.assert_no_write("historical_applied_drifted")
+        result = self.assert_no_write("historical_applied_drifted")
+        self.assertEqual(result["link_id"], link.pk)
+        self.assertEqual(result["original_link_id"], link.pk)
+        original_pk = link.pk
         link.delete()
-        ArticleHorseLink.objects.create(article=self.article, horse_profile=self.horse, status="auto")
-        self.assert_no_write("historical_applied_drifted")
+        replacement = ArticleHorseLink.objects.create(article=self.article, horse_profile=self.horse, status="auto")
+        result = self.assert_no_write("historical_applied_drifted")
+        self.assertEqual(result["link_id"], replacement.pk)
+        self.assertEqual(result["original_link_id"], original_pk)
+
+    def test_receipt_protected_replacement_returns_current_and_historical_IDs(self):
+        original = self.created()
+        original_pk = original.pk
+        receipt = self.logs()[0]
+        original.delete()
+        for status in ["manual", "removed"]:
+            with self.subTest(status=status):
+                replacement = ArticleHorseLink.objects.create(article=self.article, horse_profile=self.horse,
+                    status=status, source="manual", confidence=71, matched_text="keep replacement",
+                    match_reason="independent replacement", metadata={"keep": [status]},
+                    confirmed_by=self.actor, confirmed_at=timezone.now(),
+                    removed_by=self.other, removed_at=timezone.now())
+                self.assertNotEqual(replacement.pk, original_pk)
+                before_row = snapshot(replacement)
+                before_logs = list(OperationLog.objects.order_by("pk").values())
+                result = self.assert_no_write("protected_current")
+                self.assertEqual(result, {"status": "protected_current", "link_id": replacement.pk,
+                                         "original_link_id": original_pk, "receipt_id": receipt.pk})
+                replacement.refresh_from_db()
+                self.assertEqual(snapshot(replacement), before_row)
+                self.assertEqual(list(OperationLog.objects.order_by("pk").values()), before_logs)
+                self.assertEqual(len(self.logs()), 1)
+                replacement.delete()
 
     def test_manual_removed_full_row_protection_before_and_after_receipt(self):
         link = ArticleHorseLink.objects.create(article=self.article, horse_profile=self.horse, status="removed", metadata={"keep": [1]})
