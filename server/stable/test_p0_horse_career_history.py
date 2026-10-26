@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import date, datetime, timedelta
 
 from django.db import connection
@@ -30,6 +31,7 @@ from stable.models import (
     TermEntry,
     TermType,
 )
+from stable.services import horse_race_records
 from stable.services.horse_race_records import (
     refresh_career_history_completeness,
     upsert_race_record,
@@ -567,6 +569,268 @@ class P0HorseCareerHistoryTests(TestCase):
         self.profile.refresh_from_db()
         self.assertEqual(self.profile.linked_race_event_count, 1)
         self.assertEqual(self.profile.unlinked_race_record_count, 0)
+
+    def _h03_event_and_result(self, slug):
+        event = RaceEvent.objects.create(
+            year=2024,
+            slug=slug,
+            original_name="Race 1",
+            chinese_name="生涯测试赛",
+            country_region=RacingRegion.UNITED_KINGDOM,
+            racecourse="Ascot",
+            grade_text="",
+            surface="turf",
+            local_date=date(2024, 1, 1),
+            visibility_status=RaceEventVisibility.PUBLISHED,
+        )
+        result = RaceEventResult.objects.create(
+            event=event,
+            finish_position=5,
+            horse_name=self.profile.original_name,
+        )
+        return event, result
+
+    def test_null_event_with_valid_result_links_existing_record_without_duplicate(self):
+        original = upsert_race_record(self.profile, self._payload()).record
+        self.assertIsNone(original.event_id)
+        self.assertIsNone(original.result_id)
+        event, result = self._h03_event_and_result("h03-null-event-result")
+        result.refresh_from_db()
+        self.assertEqual(result.event_id, event.pk)
+        self.assertEqual(result.horse_name, self.profile.original_name)
+        payload = self._payload(
+            event_id=None,
+            result_id=result.pk,
+            source_name="second_source",
+            source_url="https://example.com/second/1",
+        )
+        self.assertIn("event_id", payload)
+        self.assertIsNone(payload["event_id"])
+        self.assertEqual(payload["result_id"], result.pk)
+
+        linked = upsert_race_record(self.profile, payload).record
+        linked.refresh_from_db()
+        self.assertEqual(linked.pk, original.pk)
+        self.assertEqual(linked.result_id, result.pk)
+        self.assertEqual(
+            HorseRaceRecord.objects.filter(horse_profile=self.profile).count(), 1,
+        )
+        self.assertEqual(linked.event_id, event.pk)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.linked_race_event_count, 1)
+        self.assertEqual(self.profile.unlinked_race_record_count, 0)
+
+        replayed = upsert_race_record(self.profile, payload).record
+        self.assertEqual((replayed.pk, replayed.event_id, replayed.result_id),
+                         (original.pk, event.pk, result.pk))
+        self.assertEqual(
+            HorseRaceRecord.objects.filter(horse_profile=self.profile).count(), 1,
+        )
+
+    def test_valid_result_with_conflicting_event_rejects_without_writes(self):
+        upsert_race_record(self.profile, self._payload())
+        event, result = self._h03_event_and_result("h03-result-owner")
+        other_event, _other_result = self._h03_event_and_result("h03-wrong-event")
+        self.assertNotEqual(event.pk, other_event.pk)
+        self.assertEqual(result.event_id, event.pk)
+
+        def snapshot():
+            return {
+                "records": list(HorseRaceRecord.objects.order_by("pk").values()),
+                "profiles": list(HorseProfile.objects.order_by("pk").values()),
+                "events": list(RaceEvent.objects.order_by("pk").values()),
+                "results": list(RaceEventResult.objects.order_by("pk").values()),
+            }
+
+        before = snapshot()
+        with self.assertRaisesMessage(ValueError, "result does not belong to event"):
+            upsert_race_record(
+                self.profile,
+                self._payload(event_id=other_event.pk, result_id=result.pk),
+            )
+        self.assertEqual(snapshot(), before)
+
+    def test_explicit_null_event_and_result_keep_independent_history(self):
+        payload = self._payload(event_id=None, result_id=None)
+        first = upsert_race_record(self.profile, payload).record
+        replayed = upsert_race_record(self.profile, payload).record
+        replayed.refresh_from_db()
+        self.assertEqual(replayed.pk, first.pk)
+        self.assertIsNone(replayed.event_id)
+        self.assertIsNone(replayed.result_id)
+        self.assertEqual(
+            HorseRaceRecord.objects.filter(horse_profile=self.profile).count(), 1,
+        )
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.linked_race_event_count, 0)
+        self.assertEqual(self.profile.unlinked_race_record_count, 1)
+
+    def _h03_dual_id_record(self, **overrides):
+        payload = self._payload(external_result_id="result-A", external_race_id="42")
+        payload.update(overrides)
+        record = upsert_race_record(self.profile, payload).record
+        record.refresh_from_db()
+        self.assertEqual(record.race_date, date(2024, 1, 1))
+        self.assertEqual(record.race_number, "1")
+        self.assertEqual(record.start_status, HorseRaceStartStatus.STARTED)
+        self.assertEqual(record.raw_payload["source_name"], "official")
+        self.assertEqual(record.raw_payload["external_result_id"], "result-A")
+        self.assertEqual(record.raw_payload["external_race_id"], "42")
+        sources = record.source_refs["sources"]
+        self.assertTrue(any(
+            item.get("source_name") == "official"
+            and item.get("external_result_id") == "result-A"
+            and item.get("external_race_id") == "42"
+            for item in sources
+        ))
+        expected_key = hashlib.sha256(
+            f"{self.profile.pk}|external|official|result-A".encode("utf-8")
+        ).hexdigest()
+        self.assertEqual(record.idempotency_key, expected_key)
+        return record, payload
+
+    def test_cross_field_dual_id_collision_keeps_distinct_independent_starts(self):
+        first, first_payload = self._h03_dual_id_record()
+        before = HorseRaceRecord.objects.filter(pk=first.pk).values().get()
+        second_payload = self._payload(
+            day=2, external_result_id="42", external_race_id="99",
+        )
+        self.assertNotEqual(first_payload["external_result_id"], second_payload["external_result_id"])
+        self.assertNotEqual(first_payload["external_race_id"], second_payload["external_race_id"])
+        self.assertEqual(first_payload["external_race_id"], second_payload["external_result_id"])
+        for field in ("race_date", "race_number", "source_url"):
+            self.assertNotEqual(first_payload[field], second_payload[field])
+        self.assertEqual(first_payload["source_name"], second_payload["source_name"])
+        self.assertNotIn("event_id", second_payload)
+        self.assertNotIn("result_id", second_payload)
+        # Fixed existing key encodings exclude alternate resolver matches.
+        second_key = hashlib.sha256(
+            f"{self.profile.pk}|external|official|42".encode("utf-8")
+        ).hexdigest()
+        second_canonical = hashlib.sha256(
+            f"{self.profile.pk}|venue-slot|2024-01-02|ascot|2".encode("utf-8")
+        ).hexdigest()
+        self.assertNotEqual(first.idempotency_key, second_key)
+        self.assertNotEqual(first.canonical_race_key, second_canonical)
+        self.assertFalse(self.profile.race_records.filter(idempotency_key=second_key).exists())
+        self.assertFalse(self.profile.race_records.filter(canonical_race_key=second_canonical).exists())
+
+        second = upsert_race_record(self.profile, second_payload).record
+        self.assertNotEqual(second.pk, first.pk)
+        self.assertEqual(self.profile.race_records.count(), 2)
+        self.assertEqual(HorseRaceRecord.objects.filter(pk=first.pk).values().get(), before)
+        for record, pair in ((first, ("result-A", "42")), (second, ("42", "99"))):
+            record.refresh_from_db()
+            self.assertIsNone(record.event_id)
+            self.assertIsNone(record.result_id)
+            self.assertEqual(
+                (record.raw_payload["external_result_id"], record.raw_payload["external_race_id"]),
+                pair,
+            )
+            self.assertTrue(any(
+                item.get("source_name") == "official"
+                and (item.get("external_result_id"), item.get("external_race_id")) == pair
+                for item in record.source_refs["sources"]
+            ))
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.collected_start_count, 2)
+        replayed = upsert_race_record(self.profile, second_payload).record
+        self.assertEqual(replayed.pk, second.pk)
+        self.assertEqual(self.profile.race_records.count(), 2)
+        self.assertEqual(HorseRaceRecord.objects.filter(pk=first.pk).values().get(), before)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.collected_start_count, 2)
+
+    def test_dual_id_same_field_or_explicit_idempotency_alias_stays_supported(self):
+        record, _payload = self._h03_dual_id_record(idempotency_key="shared-alias")
+        self.assertEqual(record.raw_payload["idempotency_key"], "shared-alias")
+        expected_pks = [record.pk]
+        cases = (
+            ("same_result", {"external_result_id": "result-A", "external_race_id": "99"}),
+            ("same_race", {"external_result_id": "new-result", "external_race_id": "42"}),
+            ("same_explicit_alias", {
+                "external_result_id": "42", "external_race_id": "99",
+                "idempotency_key": "shared-alias",
+            }),
+        )
+        for name, ids in cases:
+            with self.subTest(case=name):
+                incoming = self._payload(day=2, **ids)
+                if name != "same_explicit_alias":
+                    self.assertNotIn("idempotency_key", incoming)
+                # Actual helper reads real ORM evidence; expected PK is fixture-owned.
+                actual = horse_race_records._source_evidence_identity_matches(self.profile, incoming)
+                self.assertEqual([item.pk for item in actual], expected_pks)
+
+    def test_single_id_and_split_evidence_keep_legacy_compatibility(self):
+        dual, _payload = self._h03_dual_id_record()
+        race_only = upsert_race_record(
+            self.profile, self._payload(day=3, external_race_id="77"),
+        ).record
+        result_only = upsert_race_record(
+            self.profile, self._payload(day=4, external_result_id="88"),
+        ).record
+        split = upsert_race_record(self.profile, self._payload(
+            day=5, external_race_id="split-race",
+            source_refs={"source_name": "official", "external_result_id": "split-result"},
+        )).record
+        for item in (race_only, result_only, split):
+            item.refresh_from_db()
+        self.assertNotIn("external_result_id", race_only.raw_payload)
+        self.assertNotIn("external_race_id", result_only.raw_payload)
+        self.assertNotIn("external_result_id", split.raw_payload)
+        self.assertNotIn("external_race_id", split.source_refs)
+        self.assertEqual(split.source_refs["external_result_id"], "split-result")
+        self.assertEqual(split.raw_payload["external_race_id"], "split-race")
+        self.assertEqual(self.profile.race_records.count(), 4)
+        cases = (
+            ("incoming_race_missing", {"external_result_id": "42"}, dual.pk),
+            ("incoming_result_missing", {"external_race_id": "result-A"}, dual.pk),
+            ("stored_result_missing", {"external_result_id": "77", "external_race_id": "new-race"}, race_only.pk),
+            ("stored_race_missing", {"external_result_id": "new-result", "external_race_id": "88"}, result_only.pk),
+            ("split_evidence_not_combined", {
+                "external_result_id": "split-race", "external_race_id": "new-race",
+            }, split.pk),
+        )
+        for name, ids, expected_pk in cases:
+            with self.subTest(case=name):
+                incoming = self._payload(day=2, **ids)
+                actual = horse_race_records._source_evidence_identity_matches(self.profile, incoming)
+                self.assertEqual([item.pk for item in actual], [expected_pk])
+
+    def test_conflicting_evidence_does_not_hide_other_supported_aliases(self):
+        record, original_payload = self._h03_dual_id_record(
+            source_refs={"source_name": "official", "idempotency_key": "root-alias"},
+        )
+        alias_payload = self._payload(
+            external_result_id="42", source_url="https://example.com/official/alias-42",
+        )
+        observed = upsert_race_record(self.profile, alias_payload).record
+        self.assertEqual(observed.pk, record.pk)
+        restored = upsert_race_record(self.profile, original_payload).record
+        self.assertEqual(restored.pk, record.pk)
+        restored.refresh_from_db()
+        self.assertEqual(restored.raw_payload["external_result_id"], "result-A")
+        self.assertEqual(restored.raw_payload["external_race_id"], "42")
+        self.assertEqual(restored.source_refs["idempotency_key"], "root-alias")
+        alias_items = [item for item in restored.source_refs["sources"]
+                       if item.get("source_url") == alias_payload["source_url"]]
+        self.assertEqual(len(alias_items), 1)
+        self.assertEqual(alias_items[0]["external_result_id"], "42")
+        self.assertNotIn("external_race_id", alias_items[0])
+        self.assertEqual(self.profile.race_records.count(), 1)
+        cases = (
+            ("later_sources_alias", {"external_result_id": "42", "external_race_id": "99"}),
+            ("root_alias", {
+                "external_result_id": "new-result", "external_race_id": "new-race",
+                "idempotency_key": "root-alias",
+            }),
+        )
+        for name, ids in cases:
+            with self.subTest(case=name):
+                incoming = self._payload(day=2, **ids)
+                actual = horse_race_records._source_evidence_identity_matches(self.profile, incoming)
+                self.assertEqual([item.pk for item in actual], [record.pk])
 
     def test_full_profile_requires_independent_complete_career_status(self):
         for field_name, value in {

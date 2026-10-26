@@ -326,3 +326,98 @@ def _bundle(fd, inputs, capture, *, packet_raw=None):
     source = json.loads(cache)
     return {"packet": packet, "cache": cache, "candidate": candidate, "target": target,
             "after": payload["basic_profile"], "source_time": source["source"]["fetched_at"]}
+
+
+BASIC_MODULE_PACKET_FIELDS = {
+    'schema_version', 'producer_version', 'source_file', 'source_ref', 'expected_source_sha256',
+    'permission_file', 'permission_ref', 'expected_permission_sha256', 'snapshot',
+    'entity_versions', 'as_of', 'max_age_seconds', 'profile_baseline',
+}
+
+
+def _strict_basic_module_packet(raw):
+    """独立模块packet；不重解释旧packet或赋予permission引用权威。"""
+    from .horse_source_cache_reuse_adapter import BASIC_MODULE_PRODUCER_VERSION
+    from .horse_target_inventory import _key
+
+    if type(raw) is not bytes or len(raw) > MAX_BYTES:
+        _reject('module_packet_bytes')
+    packet = _strict_json(raw)
+    if type(packet) is not dict or set(packet) != BASIC_MODULE_PACKET_FIELDS:
+        _reject('module_packet_schema')
+    if (packet['schema_version'] != 'h03-basic-module-input.v1'
+            or packet['producer_version'] != BASIC_MODULE_PRODUCER_VERSION
+            or type(packet['snapshot']) is not dict or type(packet['entity_versions']) is not dict
+            or len(packet['entity_versions']) != 1
+            or type(packet['max_age_seconds']) is not int
+            or not 0 <= packet['max_age_seconds'] <= 10**12):
+        _reject('module_packet_schema')
+    for field in ('source_file', 'permission_file'):
+        _parts(packet[field], 'module_packet_path')
+    try:
+        for field in ('source_ref', 'permission_ref'):
+            _key(packet[field])
+        for key, version in packet['entity_versions'].items():
+            _key(key)
+            _key(version)
+            if (not re.fullmatch(r'profile:[1-9][0-9]*', key)
+                    or int(key.split(':', 1)[1]) > 10**12
+                    or not version.startswith('h03-basic-v1:')
+                    or not version.removeprefix('h03-basic-v1:')):
+                _reject('module_entity_version')
+    except (ValueError, TypeError):
+        _reject('module_entity_version')
+    for field in ('expected_source_sha256', 'expected_permission_sha256'):
+        value = packet[field]
+        if type(value) is not str or not re.fullmatch(r'[0-9a-f]{64}', value):
+            _reject('module_packet_digest')
+    _utc(packet['as_of'], 'module_packet_time')
+    _utc(packet['profile_baseline'], 'module_profile_baseline')
+    return packet
+
+
+def _prepare_basic_module(packet, raw, source_sha, *, permission_raw):
+    """原件→实际producer/bridge/H02；只准备，许可权威仍不可用。"""
+    from . import horse_cache_reuse, horse_source_cache_reuse_adapter as producer
+    from .horse_target_inventory import _plain
+
+    try:
+        _plain(packet)
+        packet = _strict_basic_module_packet(_canonical(packet).encode('utf-8'))
+    except (ValueError, TypeError, UnicodeError, RecursionError):
+        _reject('module_packet_schema')
+    if (type(raw) is not bytes or len(raw) > MAX_BYTES
+            or type(permission_raw) is not bytes or len(permission_raw) > MAX_BYTES):
+        _reject('module_input_bytes')
+    _equal(source_sha, packet['expected_source_sha256'], 'module_source_digest_mismatch')
+    _bound(raw, source_sha, 'module_source_digest', 'module_source_hash_mismatch')
+    _bound(permission_raw, packet['expected_permission_sha256'],
+           'module_permission_digest', 'module_permission_hash_mismatch')
+    binding = dict(reference=packet['permission_ref'], sha256=packet['expected_permission_sha256'])
+    try:
+        module = producer.produce_hkjc_basic_module(
+            raw, expected_sha256=source_sha, source_ref=packet['source_ref'], permission_binding=binding)
+        record = producer.basic_module_to_h02_record(
+            module, raw_bytes=raw, expected_sha256=source_sha,
+            source_ref=packet['source_ref'], permission_binding=binding)
+    except producer.CacheReuseAdapterError as exc:
+        _reject(exc.code)
+    try:
+        plan = horse_cache_reuse.plan_cache_reuse(
+            packet['snapshot'], [record], packet['entity_versions'],
+            as_of=packet['as_of'], max_age_seconds=packet['max_age_seconds'])
+    except (ValueError, TypeError, OverflowError):
+        _reject('module_cache_not_reusable')
+    if len(plan['decisions']) != 1 or len(plan['candidates']) != 1:
+        _reject('module_cache_not_reusable')
+    decision, candidate = plan['decisions'][0], plan['candidates'][0]
+    key = candidate['entity_key']
+    if (decision['status'] != 'reusable' or candidate['action'] != 'reusable'
+            or not re.fullmatch(r'profile:[1-9][0-9]*', key)
+            or set(packet['entity_versions']) != {key}
+            or candidate['entity_version'] != packet['entity_versions'][key]
+            or decision['profile_exists'] is not True or decision['public_state'] != 'unpublished'
+            or candidate['cache_refs'] != [record['ref']]
+            or candidate['content'] != record['content']):
+        _reject('module_cache_not_reusable')
+    return module, plan, candidate
