@@ -1,0 +1,9 @@
+# Preserve reviewed capture bytes; only HTML/CFM are opaque diffs.
+primary3/** -text
+primary3/**/*.html -diff
+primary3/**/*.cfm -diff
+secondary2/** -text
+secondary2/**/*.html -diff
+remaining3/** -text
+remaining3/**/*.html -diff
+remaining3/**/*.cfm -diff

@@ -1,0 +1,16 @@
+{
+  "files": {
+    "7a0d5ab380f77dd8c9420aa85e4be398b6d4a72cbcef7d99fab2a0b2c8643db2.cfm": {
+      "cached_at": "2026-07-15T19:25:35.926059+00:00",
+      "path": "7a0d5ab380f77dd8c9420aa85e4be398b6d4a72cbcef7d99fab2a0b2c8643db2.cfm",
+      "protected_by": [],
+      "sha256": "52f7e3de1570f9b5d28376f07c054e639a4778998684871b5fdfa939d80ada8c",
+      "size": 117375,
+      "source_url": "https://www.equibase.com/yearbook/Result.cfm?cy=USA&de=D&rd=2018-09-29&rn=8&tk=CD"
+    }
+  },
+  "root": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6/smoke/run/smoke-united_states-70844/source-cache",
+  "schema_version": "1.0",
+  "total_bytes": 117375,
+  "updated_at": "2026-07-15T19:25:35.926066+00:00"
+}

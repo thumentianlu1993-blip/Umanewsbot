@@ -17,6 +17,9 @@
             {% if profile.trainer_name %}<span>练马师：{{ profile.trainer_name }}</span>{% endif %}
             {% if major_wins %}<span>主胜鞍：{% for record in major_wins|slice:":3" %}{% race_field record "name" record.display_race_name %}{% if not forloop.last %} / {% endif %}{% endfor %}</span>{% endif %}
           </div>
+          {% if not is_following %}
+            <p class="muted">此关注仅作站内新闻聚合：可在“我的关注”浏览这匹马及两代内后代已收录的公开新闻。</p>
+          {% endif %}
         </div>
         <form method="post" action="{% url 'public-horse-follow' profile.id %}">
           {% csrf_token %}<input type="hidden" name="next" value="{{ public_detail_current_url }}">

@@ -1,0 +1,47 @@
+{
+  "artifact_kind": "historical_race_detail_source_fragment",
+  "plan_id": "detail-crawl-1998-2026-v6-smoke",
+  "region": "hong_kong",
+  "requests": [
+    {
+      "evidence_source_url": "https://racing.hkjc.com/zh-hk/local/information/localresults?Racecourse=ST&racedate=2026%2F01%2F04&RaceNo=8",
+      "fixture_identity": {
+        "path": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6/smoke/fixtures/hong_kong-49451.html",
+        "sha256": "1c56bbfe3393204f2d0d06f8bab4a4555c1fee6a6ef7899233eddd4c7d643cb7",
+        "size": 211229
+      },
+      "local_date": "2026-01-04",
+      "recovery_evidence": [
+        {
+          "kind": "validated_candidate_jsonl",
+          "path": "/Users/mentianlu/Code/umanews/runtime/race_event_detail_imports/2026/hong-kong-hkjc-details-20260706/hkjc_detail_candidates_2026.jsonl",
+          "sha256": "e6c9b261063c96c968e92b7ce971ccae868cc390e4054fd332da3b17ea558cac",
+          "size": 275872
+        },
+        {
+          "kind": "human_review_csv",
+          "path": "/Users/mentianlu/Code/umanews/runtime/race_event_detail_imports/2026/hong-kong-hkjc-details-20260706/hkjc_detail_review_2026.csv",
+          "sha256": "5316a8ac4d5de262d70072006b3624a7b65d308b1d6ae82e090fdb95fda69a8f",
+          "size": 5282
+        },
+        {
+          "kind": "verified_source_capture",
+          "path": "/Users/mentianlu/Code/umanews/runtime/race_event_detail_imports/2026/hong-kong-hkjc-details-20260706/sources/source_hkjc_localresults_2026-01-04_ST_8.html",
+          "sha256": "a2cfddbfb2a20f8fff05fbed78d3c53b7a9591915ed40319c5d1757ae540fade",
+          "size": 210908
+        }
+      ],
+      "region": "hong_kong",
+      "slug": "hong_kong-hong-kong-bauhinia-sprint-trophy-2026",
+      "source_name": "hkjc_results_all_zh_hk",
+      "source_provider": "hkjc",
+      "source_url": "https://racing.hkjc.com/zh-hk/local/information/localresults?Racecourse=ST&racedate=2026%2F01%2F04&RaceNo=8",
+      "target_id": "49451",
+      "target_sha256": "c125663073e3056b1724f8a7a95c752a2c3ca42cb8f081c30012034bdb69a489",
+      "year": 2026
+    }
+  ],
+  "schema_version": "2.0",
+  "shard_id": "smoke-hong_kong-49451",
+  "target_count": 1
+}

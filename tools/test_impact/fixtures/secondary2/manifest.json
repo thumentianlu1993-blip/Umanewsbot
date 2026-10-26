@@ -1,0 +1,92 @@
+{
+  "schema": 1,
+  "id": "b243-secondary2-v1",
+  "native_ids": [
+    "stable.test_historical_race_detail_runner_v2_package_identity.HistoricalRaceDetailRunnerV2PackageIdentityRealSmokeTests.test_nonempty_event_and_parsed_distance_conflict_becomes_validation_gap",
+    "stable.test_historical_race_detail_runner_v2_package_identity.HistoricalRaceDetailRunnerV2PackageIdentityRealSmokeTests.test_hk_package_rejects_raw_candidate_without_validation_evidence"
+  ],
+  "origin_index_sha256": "7c0f5501fd6c1123db5ef701839d53e72bca1e7d99b878345abbd86c5ec39e06",
+  "review_index_sha256": "939dae92f2595f1b7841c573d205ca657fea99403f9b8807d59019fc6d7de0a2",
+  "files": {
+    "originals/descriptors/smoke-japan-50556.json": {
+      "bytes": 5115,
+      "sha256": "a236f053bfce1808f114b0ca90b7fbbd971506704c1f28298223cdacacd981bf"
+    },
+    "smoke/descriptors/smoke-japan-50556.json": {
+      "bytes": 5031,
+      "sha256": "b39030df59d10feb0a9e08e87c5314cfe21ebd439491da350e135c0bf51e275f"
+    },
+    "smoke/events/smoke-japan-50556.csv": {
+      "bytes": 869,
+      "sha256": "25a0d8b06dd0388bb3b933be95261e8e5fb14acf717070c0e37979b7c64020a4"
+    },
+    "smoke/source_fragments/smoke-japan-50556.json": {
+      "bytes": 1691,
+      "sha256": "029a26bfdf04501649f57a23291725961e3f84b3c284af05cb95d841839784ca"
+    },
+    "smoke/run/smoke-japan-50556/source-cache/source_cache_manifest.json": {
+      "bytes": 705,
+      "sha256": "75dac303fedf1607428c5812d69afcfc7561b51d6144d137e3d6730f196e728d"
+    },
+    "smoke/run/smoke-japan-50556/source-cache/ad7ba45bc97fd0070b65d40f624b6ec1faf950701bec20c5914e4b9486020e74.html": {
+      "bytes": 79845,
+      "sha256": "2dbe222766b6ed2e9a5c3c60c348ec98896e55acbbefbfdb8d5b3c0e2177bf4a"
+    },
+    "originals/descriptors/smoke-hong_kong-49451.json": {
+      "bytes": 5487,
+      "sha256": "a33405e5dc7f6898f1e18787ccafa28a4dbc8a16187dd8c65375e30b7c42eaf1"
+    },
+    "smoke/descriptors/smoke-hong_kong-49451.json": {
+      "bytes": 5403,
+      "sha256": "a4522451d08c0d9aa485dc69a650d649e9644f129f42bad7026e0702efd258e5"
+    },
+    "smoke/events/smoke-hong_kong-49451.csv": {
+      "bytes": 838,
+      "sha256": "3e5ca56e5fe3c62a3d7f47640ce892982000fb28ee0d4166381dd4f234ee6bbd"
+    },
+    "smoke/source_fragments/smoke-hong_kong-49451.json": {
+      "bytes": 2212,
+      "sha256": "acd4b3793302b2df7c4f74710ec3105541885112ab0688a649db10cbf8b563e3"
+    },
+    "smoke/run/smoke-hong_kong-49451/validated-candidates.jsonl": {
+      "bytes": 31404,
+      "sha256": "c154dc9d60a5a4e94063db1316b585321e3cfd683bee976dd29e013f4e7fd230"
+    },
+    "originals/plan_identity.json": {
+      "bytes": 2774,
+      "sha256": "fde87c93e08e050cba0188689a4d2c99004aa6e86cffa85c8fb0f4f8a9a11403"
+    }
+  },
+  "view_file_count": 9,
+  "provenance_file_count": 3,
+  "descriptors": [
+    {
+      "original": "originals/descriptors/smoke-japan-50556.json",
+      "view": "smoke/descriptors/smoke-japan-50556.json",
+      "original_raw_sha256": "a236f053bfce1808f114b0ca90b7fbbd971506704c1f28298223cdacacd981bf",
+      "original_canonical_sha256": "df990054e2b9fd5c49e5cec12cb88f1ddd80f475f9ab597edd03a9def38b05fc",
+      "reviewed_b243_view_raw_sha256": "71276993a3224e0d3c9a518bb8f21fd341748fd873b07d10089eb479ca159586",
+      "reviewed_b243_view_canonical_sha256": "74eaccaf1b807dfbe3d02baf4755d3770e473b796f4600454ef1dc51436832eb",
+      "git_view_raw_sha256": "b39030df59d10feb0a9e08e87c5314cfe21ebd439491da350e135c0bf51e275f",
+      "git_view_canonical_sha256": "6e765db3cddd5a52a0b2af215b552533ec920fa03626f408659118edd61deab5",
+      "native_id": "stable.test_historical_race_detail_runner_v2_package_identity.HistoricalRaceDetailRunnerV2PackageIdentityRealSmokeTests.test_nonempty_event_and_parsed_distance_conflict_becomes_validation_gap"
+    },
+    {
+      "original": "originals/descriptors/smoke-hong_kong-49451.json",
+      "view": "smoke/descriptors/smoke-hong_kong-49451.json",
+      "original_raw_sha256": "a33405e5dc7f6898f1e18787ccafa28a4dbc8a16187dd8c65375e30b7c42eaf1",
+      "original_canonical_sha256": "f3eb3d65b56568f8593bc5ccaf2268800ed9c4e99d7ca62e1e85ec4a11a6b6fe",
+      "reviewed_b243_view_raw_sha256": "238906c178928a8070488c3324f7597491f684157c4b0278c03a4f99d46f37d1",
+      "reviewed_b243_view_canonical_sha256": "4679680471871bb954c94498436eab5191fbaa19052568895773fca8e54d5860",
+      "git_view_raw_sha256": "a4522451d08c0d9aa485dc69a650d649e9644f129f42bad7026e0702efd258e5",
+      "git_view_canonical_sha256": "4774ce7e0d713f16856ce9e35e81544766d0ffa7102214205385eff9e36232b8",
+      "native_id": "stable.test_historical_race_detail_runner_v2_package_identity.HistoricalRaceDetailRunnerV2PackageIdentityRealSmokeTests.test_hk_package_rejects_raw_candidate_without_validation_evidence"
+    }
+  ],
+  "plan": "originals/plan_identity.json",
+  "readonly_root": "/source/tools/test_impact/fixtures/secondary2",
+  "environment": {
+    "HISTORICAL_DETAIL_DISTANCE_CACHE_RUN_ROOT": "smoke/run"
+  },
+  "hk_cached_html_dependency": false
+}

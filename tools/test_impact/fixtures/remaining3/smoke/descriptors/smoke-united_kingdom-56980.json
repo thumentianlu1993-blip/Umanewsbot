@@ -1,0 +1,136 @@
+{
+  "adapter_inputs": {
+    "events_csv": "/source/tools/test_impact/fixtures/remaining3/smoke/events/smoke-united_kingdom-56980.csv",
+    "source_fragment": "/source/tools/test_impact/fixtures/remaining3/smoke/source_fragments/smoke-united_kingdom-56980.json"
+  },
+  "artifact_kind": "historical_race_detail_shard_descriptor",
+  "identities": [
+    {
+      "path": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6/plan_identity.json",
+      "role": "plan",
+      "sha256": "fde87c93e08e050cba0188689a4d2c99004aa6e86cffa85c8fb0f4f8a9a11403",
+      "size": 2774
+    },
+    {
+      "path": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6/smoke/events/smoke-united_kingdom-56980.csv",
+      "role": "events_csv",
+      "sha256": "45a63470bd48662673ea454c2f74e7954e3c7463d57eb43391d3dd9c361d19aa",
+      "size": 763
+    },
+    {
+      "path": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6/smoke/source_fragments/smoke-united_kingdom-56980.json",
+      "role": "source_fragment",
+      "sha256": "ea68a3860380f77bd8ea1e86fd91a98b1bace37a12004a1f7999e31459a6d80a",
+      "size": 2806
+    },
+    {
+      "path": "/Users/mentianlu/Code/umanews/runtime/race_event_crawl_runs/dev-worktrees/historical-progress-guard/runtime/tools/historical_race_detail_runner_v2.py",
+      "role": "tool",
+      "sha256": "be86b15f971efab232dffeefe6eb577e6e01f26bc7ee261a73327e9125a4d406",
+      "size": 71997
+    },
+    {
+      "path": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6/recipes.json",
+      "role": "recipe",
+      "sha256": "5f5b1cf9378ff537914869771f8de0a90c16ed3e0dd6294316f70aee1d195eee",
+      "size": 2150
+    }
+  ],
+  "image": {
+    "architecture": "arm64",
+    "digest": "sha256:af28703508bdd86930f1e4ccd7d54ebc52d0a6da30f055bcf91d0ae0643f9bf9",
+    "image_id": "sha256:af28703508bdd86930f1e4ccd7d54ebc52d0a6da30f055bcf91d0ae0643f9bf9",
+    "os": "linux",
+    "platform": "linux/arm64",
+    "revision": "d6d6f58b2b5b90301d8fa633a650df28379c09e7",
+    "tag": "umanews-historical-detail-v6:local"
+  },
+  "mounts": [
+    {
+      "mode": "ro",
+      "path": "/Users/mentianlu/Code/umanews/runtime/race_event_crawl_runs/dev-worktrees/historical-progress-guard",
+      "role": "repo"
+    },
+    {
+      "mode": "ro",
+      "path": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6",
+      "role": "plan"
+    },
+    {
+      "mode": "rw",
+      "path": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6/smoke/run/smoke-united_kingdom-56980",
+      "role": "run"
+    },
+    {
+      "mode": "rw",
+      "path": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6/smoke/host-locks",
+      "role": "host_lock"
+    }
+  ],
+  "outputs": {
+    "cache_root": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6/smoke/run/smoke-united_kingdom-56980/cache",
+    "checkpoint": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6/smoke/run/smoke-united_kingdom-56980/checkpoint.json",
+    "host_append_log": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6/smoke/host-locks/www.sportinglife.com.requests.jsonl",
+    "host_last_start": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6/smoke/host-locks/www.sportinglife.com.last-start.json",
+    "package_root": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6/smoke/run/smoke-united_kingdom-56980/package",
+    "parse_root": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6/smoke/run/smoke-united_kingdom-56980/parse",
+    "request_log": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6/smoke/run/smoke-united_kingdom-56980/request-log.jsonl"
+  },
+  "permissions": {
+    "apply": false,
+    "database": false,
+    "network_stages": [
+      "discover",
+      "cache"
+    ],
+    "shell": false
+  },
+  "plan_id": "detail-crawl-1998-2026-v6-smoke",
+  "recipe": {
+    "discovery_required": false,
+    "fallback_sources": [
+      "sporting_life",
+      "irishracing"
+    ],
+    "id": "united-kingdom-v6",
+    "region": "united_kingdom",
+    "source_chain": [
+      "racing_post",
+      "sporting_life",
+      "irishracing"
+    ]
+  },
+  "region": "united_kingdom",
+  "request_policy": {
+    "allowed_hosts": [
+      "www.sportinglife.com"
+    ],
+    "max_requests": 2,
+    "max_requests_per_host": 2,
+    "minimum_interval_seconds": 1.0,
+    "redirect_hosts": [
+      "www.sportinglife.com"
+    ],
+    "url_patterns": {
+      "www.sportinglife.com": [
+        "^/racing/results/2013\\-06\\-20/ascot/118984/gold\\-cup\\-british\\-champions\\-series\\-group\\-1$"
+      ]
+    }
+  },
+  "schema_version": "2.0",
+  "shard_id": "smoke-united_kingdom-56980",
+  "stages": [
+    "discover",
+    "cache",
+    "parse",
+    "validate",
+    "package"
+  ],
+  "targets": [
+    {
+      "slug": "united_kingdom-GBR_ASCOT_GOLD_CUP-2013",
+      "target_id": "56980",
+      "target_sha256": "e184450d57c5f8f8e9946943682c9c2c783e3e6806ab3bebc535334c0ece9374"
+    }
+  ]
+}

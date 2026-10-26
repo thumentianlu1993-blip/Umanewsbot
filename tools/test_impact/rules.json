@@ -985,6 +985,9 @@
     "server/stable/migrations/0081_managed_readonly_steps.py"
   ],
   "paths": {
+    "server/stable/services/numeric_surface_audit.py": [
+      "numeric_surface_audit"
+    ],
     "docs/changes/next-version-capabilities/lanes/C/U01-offline-cases.json": [
       "module:stable.test_race_information_display_pages",
       "module:stable.test_race_information_display",
@@ -1297,6 +1300,27 @@
     "server/stable/fixtures/public_probe_template_v6/golden.schema.json": [
       "public_probe_template_adapter"
     ],
+    "server/stable/fixtures/public_probe_template_v7/contract.json": [
+      "public_probe_template_adapter"
+    ],
+    "server/stable/fixtures/public_probe_template_v7/derivation.json": [
+      "public_probe_template_adapter"
+    ],
+    "server/stable/fixtures/public_probe_template_v7/descriptor.json": [
+      "public_probe_template_adapter"
+    ],
+    "server/stable/fixtures/public_probe_template_v7/envelope.json": [
+      "public_probe_template_adapter"
+    ],
+    "server/stable/fixtures/public_probe_template_v7/evidence-contract.json": [
+      "public_probe_template_adapter"
+    ],
+    "server/stable/fixtures/public_probe_template_v7/golden-derived.json": [
+      "public_probe_template_adapter"
+    ],
+    "server/stable/fixtures/public_probe_template_v7/golden.schema.json": [
+      "public_probe_template_adapter"
+    ],
     "server/stable/services/public_probe_render.py": [
       "public_probe_render"
     ],
@@ -1416,6 +1440,47 @@
     ],
     "server/stable/test_managed_readonly_translation.py": [
       "news_translation"
+    ],
+    "server/stable/services/article_term_receipt.py": [
+      "news_translation"
+    ],
+    "server/stable/services/term_capture_budget.py": [
+      "news_translation"
+    ],
+    "server/stable/services/content_review_decisions.py": [
+      "news_translation"
+    ],
+    "server/stable/services/content_review_shadow.py": [
+      "news_translation"
+    ],
+    "server/stable/services/race_source_arbitration.py": [
+      "r04_arbitration",
+      "race_results"
+    ],
+    "server/stable/services/race_result_arbitration_shadow.py": [
+      "r04_arbitration",
+      "race_results"
+    ],
+    "server/stable/services/race_result_roster_orm.py": [
+      "race_result_roster_orm"
+    ],
+    "server/stable/services/race_result_roster_reconciliation.py": [
+      "race_result_roster_reconciliation"
+    ],
+    "server/stable/test_calendar_empty_filter_recovery.py": [
+      "module:stable.test_calendar_empty_filter_recovery"
+    ],
+    "server/stable/templates/stable/public/race_calendar.html": [
+      "module:stable.test_calendar_empty_filter_recovery"
+    ],
+    "server/stable/services/race_calendar.py": [
+      "module:stable.test_calendar_empty_filter_recovery"
+    ],
+    "server/stable/services/race_public_time.py": [
+      "module:stable.test_calendar_empty_filter_recovery"
+    ],
+    "server/stable/services/article_entity_binding.py": [
+      "content_contracts"
     ]
   },
   "symbols": {
@@ -1454,7 +1519,8 @@
         "module:stable.test_race_calendar_responsive_ui",
         "module:stable.test_race_public_time",
         "module:stable.test_public_new_regions",
-        "module:stable.test_race_news_exposure"
+        "module:stable.test_race_news_exposure",
+        "module:stable.test_calendar_empty_filter_recovery"
       ],
       "_public_weekly_focus_events": [
         "module:stable.test_race_information_display_pages",
@@ -1499,12 +1565,14 @@
       "_public_read_nav": [
         "module:stable.tests_legacy",
         "horse_page",
-        "module:stable.test_race_calendar_default_date_window"
+        "module:stable.test_race_calendar_default_date_window",
+        "module:stable.test_calendar_empty_filter_recovery"
       ],
       "_public_nav_token": [
         "module:stable.tests_legacy",
         "horse_page",
-        "module:stable.test_race_calendar_default_date_window"
+        "module:stable.test_race_calendar_default_date_window",
+        "module:stable.test_calendar_empty_filter_recovery"
       ],
       "_public_href": [
         "module:stable.tests_legacy",
@@ -1519,7 +1587,8 @@
       "_public_apply_list_nav": [
         "module:stable.tests_legacy",
         "horse_page",
-        "module:stable.test_race_calendar_default_date_window"
+        "module:stable.test_race_calendar_default_date_window",
+        "module:stable.test_calendar_empty_filter_recovery"
       ],
       "_public_attach_nav": [
         "module:stable.tests_legacy",
@@ -1565,7 +1634,8 @@
         "module:stable.test_race_information_display_pages",
         "module:stable.test_historical_race_calendar_integrity",
         "module:stable.test_race_public_time",
-        "module:stable.test_race_news_exposure"
+        "module:stable.test_race_news_exposure",
+        "module:stable.test_calendar_empty_filter_recovery"
       ],
       "public_race_detail": [
         "module:stable.tests_legacy",

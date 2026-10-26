@@ -1,0 +1,134 @@
+{
+  "adapter_inputs": {
+    "events_csv": "/source/tools/test_impact/fixtures/remaining3/smoke/events/smoke-japan-50556.csv",
+    "source_fragment": "/source/tools/test_impact/fixtures/remaining3/smoke/source_fragments/smoke-japan-50556.json"
+  },
+  "artifact_kind": "historical_race_detail_shard_descriptor",
+  "identities": [
+    {
+      "path": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6/plan_identity.json",
+      "role": "plan",
+      "sha256": "fde87c93e08e050cba0188689a4d2c99004aa6e86cffa85c8fb0f4f8a9a11403",
+      "size": 2774
+    },
+    {
+      "path": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6/smoke/events/smoke-japan-50556.csv",
+      "role": "events_csv",
+      "sha256": "25a0d8b06dd0388bb3b933be95261e8e5fb14acf717070c0e37979b7c64020a4",
+      "size": 869
+    },
+    {
+      "path": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6/smoke/source_fragments/smoke-japan-50556.json",
+      "role": "source_fragment",
+      "sha256": "029a26bfdf04501649f57a23291725961e3f84b3c284af05cb95d841839784ca",
+      "size": 1691
+    },
+    {
+      "path": "/Users/mentianlu/Code/umanews/runtime/race_event_crawl_runs/dev-worktrees/historical-progress-guard/runtime/tools/historical_race_detail_runner_v2.py",
+      "role": "tool",
+      "sha256": "be86b15f971efab232dffeefe6eb577e6e01f26bc7ee261a73327e9125a4d406",
+      "size": 71997
+    },
+    {
+      "path": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6/recipes.json",
+      "role": "recipe",
+      "sha256": "5f5b1cf9378ff537914869771f8de0a90c16ed3e0dd6294316f70aee1d195eee",
+      "size": 2150
+    }
+  ],
+  "image": {
+    "architecture": "arm64",
+    "digest": "sha256:af28703508bdd86930f1e4ccd7d54ebc52d0a6da30f055bcf91d0ae0643f9bf9",
+    "image_id": "sha256:af28703508bdd86930f1e4ccd7d54ebc52d0a6da30f055bcf91d0ae0643f9bf9",
+    "os": "linux",
+    "platform": "linux/arm64",
+    "revision": "d6d6f58b2b5b90301d8fa633a650df28379c09e7",
+    "tag": "umanews-historical-detail-v6:local"
+  },
+  "mounts": [
+    {
+      "mode": "ro",
+      "path": "/Users/mentianlu/Code/umanews/runtime/race_event_crawl_runs/dev-worktrees/historical-progress-guard",
+      "role": "repo"
+    },
+    {
+      "mode": "ro",
+      "path": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6",
+      "role": "plan"
+    },
+    {
+      "mode": "rw",
+      "path": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6/smoke/run/smoke-japan-50556",
+      "role": "run"
+    },
+    {
+      "mode": "rw",
+      "path": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6/smoke/host-locks",
+      "role": "host_lock"
+    }
+  ],
+  "outputs": {
+    "cache_root": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6/smoke/run/smoke-japan-50556/cache",
+    "checkpoint": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6/smoke/run/smoke-japan-50556/checkpoint.json",
+    "host_append_log": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6/smoke/host-locks/www.jra.go.jp.requests.jsonl",
+    "host_last_start": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6/smoke/host-locks/www.jra.go.jp.last-start.json",
+    "package_root": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6/smoke/run/smoke-japan-50556/package",
+    "parse_root": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6/smoke/run/smoke-japan-50556/parse",
+    "request_log": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6/smoke/run/smoke-japan-50556/request-log.jsonl"
+  },
+  "permissions": {
+    "apply": false,
+    "database": false,
+    "network_stages": [
+      "discover",
+      "cache"
+    ],
+    "shell": false
+  },
+  "plan_id": "detail-crawl-1998-2026-v6-smoke",
+  "recipe": {
+    "discovery_required": false,
+    "fallback_sources": [
+      "netkeiba"
+    ],
+    "id": "japan-v6",
+    "region": "japan",
+    "source_chain": [
+      "jra",
+      "netkeiba"
+    ]
+  },
+  "region": "japan",
+  "request_policy": {
+    "allowed_hosts": [
+      "www.jra.go.jp"
+    ],
+    "max_requests": 2,
+    "max_requests_per_host": 2,
+    "minimum_interval_seconds": 1.0,
+    "redirect_hosts": [
+      "www.jra.go.jp"
+    ],
+    "url_patterns": {
+      "www.jra.go.jp": [
+        "^/datafile/seiseki/replay/2005/99\\.html$"
+      ]
+    }
+  },
+  "schema_version": "2.0",
+  "shard_id": "smoke-japan-50556",
+  "stages": [
+    "discover",
+    "cache",
+    "parse",
+    "validate",
+    "package"
+  ],
+  "targets": [
+    {
+      "slug": "japan-daily-hai-nisai-2005",
+      "target_id": "50556",
+      "target_sha256": "cd03d88f02caabb59f24afc341d48a2f5f5e1e74c6ea3ef2d9fd7b6926c07bae"
+    }
+  ]
+}

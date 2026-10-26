@@ -214,22 +214,38 @@ class FrozenWorkerBindingTests(unittest.TestCase):
             'stable.test_managed_readonly_steps.ManagedReadonlyStepTests.test_publication_v1_default_has_original_exact_fields_and_no_upgrade',
             'stable.test_managed_readonly_steps.ManagedReadonlyStepTests.test_publication_v2_unknown_and_existing_source_permission_time_fences',
         }
+        # 已批准的原B107/B108五个v3合同和B120三个专门v3方法；原29+8不删减。
+        v3_ids = {
+            'stable.test_managed_readonly_steps.ManagedReadonlyStepTests.' + name
+            for name in (
+                'test_article_term_receipt_v2_real_orm_missing_candidate_material',
+                'test_article_term_receipt_v3_limit_preserves_slot_and_unknown_replay',
+                'test_article_term_receipt_v3_cached_source_permission_deadline_and_version_fences',
+                'test_article_term_receipt_v3_v1_v2_exact_keys_and_no_root_upgrade',
+                'test_article_term_receipt_v3_read_finish_source_grant_and_timeout_fences',
+                'test_v3_two_read_consumers_have_one_capture_and_immutable_receipt',
+                'test_v3_independent_source_and_grant_writer_during_capture_refuses_receipt',
+                'test_v3_real_lock_wait_crossing_effective_deadline_refuses_new_and_cached_read',
+            )
+        }
+        self.assertEqual(len(v3_ids),8)
+        self.assertTrue(v3_ids.isdisjoint(baseline_ids | publication_ids))
         self.assertEqual(len(baseline_ids),29)
         self.assertEqual(len(publication_ids),8)
         self.assertTrue(baseline_ids.isdisjoint(publication_ids))
         self.assertTrue(baseline_ids.issubset(ids))
         self.assertTrue(publication_ids.issubset(ids))
-        self.assertEqual(set(ids),baseline_ids | publication_ids)
+        self.assertEqual(set(ids),baseline_ids | publication_ids | v3_ids)
         self.assertEqual(len(ids),len(set(ids)))
         def case(ident):
             return SimpleNamespace(id=lambda:ident,_testMethodName='test_case',test_case=lambda:None)
         collect=self.worker_function('collect',load=lambda labels:[case(i) for i in ids if i.startswith(labels[0]+'.')],shard_tests=shard_tests)
         actual=collect({'labels':labels,'mode':'full'},catalog)
-        self.assertEqual(actual['count'],len(baseline_ids | publication_ids))
+        self.assertEqual(actual['count'],len(baseline_ids | publication_ids | v3_ids))
         self.assertEqual({i for b in actual['batches'] for i in b['ids']},set(ids))
         self.assertEqual({b['profile'] for b in actual['batches']},{'django'})
         self.assertEqual({i:b['profile'] for b in actual['batches'] for i in b['ids']},
-                         {i:'django' for i in baseline_ids | publication_ids})
+                         {i:'django' for i in baseline_ids | publication_ids | v3_ids})
         self.assertEqual(actual['collection_skips'],[])
         for label in labels:
             bad={**catalog,'profiles':{k:v for k,v in catalog['profiles'].items() if k!=label}}
@@ -423,3 +439,31 @@ class HistoricalMigrationFixtureCompatibilityTests(unittest.TestCase):
             contract,_=self.contract(generation,root/('server/stable/services/release_'+generation+'_recovery.py'))
             with self.subTest(generation=generation),self.assertRaisesRegex(ValueError,generation+' migration file/content contract drift'):
                 contract()
+
+
+class PGLifecycleTrustedClosureTests(unittest.TestCase):
+    def test_shell_launched_pg_module_is_required_in_trusted_bundle(self):
+        import tempfile
+        import hashlib
+        from scripts.verify_delivery_test_evidence import extract_trusted_bundle
+        root=Path(__file__).resolve().parents[2]
+        paths=['tools/test_impact/core.py','tools/test_impact/git_input.py','tools/test_impact/source_binding.py',
+               'tools/test_impact/serial_ci.py','tools/test_impact/pg_lifecycle.py','scripts/plan_affected_tests.py',
+               'scripts/run_test_plan.py','scripts/test_plan_worker.py','scripts/run_bounded_stable_tests.py',
+               'deploy/test-impact/entrypoint.sh','tools/test_impact/fixture_inputs.py',
+               'tools/test_impact/fixture_inputs_secondary.py','tools/test_impact/fixture_inputs_remaining.py']
+        blobs={p:(root/p).read_bytes() for p in paths}
+        oid=lambda data:hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
+        controls={p:oid(data) for p,data in blobs.items()}
+        def git(command, ref):
+            p=ref.split(':',1)[1]
+            if p not in blobs: raise AssertionError('undeclared dependency '+p)
+            return blobs[p] if command=='show' else oid(blobs[p]).encode()
+        with tempfile.TemporaryDirectory() as d:
+            bundle=Path(d)
+            proof=extract_trusted_bundle(git,'a'*40,bundle,controls)
+            self.assertIn('tools/test_impact/pg_lifecycle.py',proof['files'])
+            self.assertEqual((bundle/'tools/test_impact/pg_lifecycle.py').read_bytes(),blobs['tools/test_impact/pg_lifecycle.py'])
+        controls.pop('tools/test_impact/pg_lifecycle.py')
+        with tempfile.TemporaryDirectory() as d,self.assertRaisesRegex(ValueError,'trusted dependency/protocol mismatch'):
+            extract_trusted_bundle(git,'a'*40,Path(d),controls)

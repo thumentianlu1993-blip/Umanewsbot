@@ -1785,7 +1785,7 @@ def claim_due_enrollments(
                     authority_version=1,
                     state="enrolled",
                     event__live_tracking__next_poll_at__lte=now,
-                ).exists()
+                ).exclude(event__status=models.RaceEventStatus.CANCELLED).exists()
                 else min(20, max(0, (batch_size + (now.minute % 2)) // 2))
             ),
             ttl_seconds=ttl_seconds,
@@ -1819,6 +1819,7 @@ def claim_due_enrollments(
                 race_data_sync_enrollment__source_identity__source_key__in=providers,
                 race_data_sync_enrollment__source_identity__region_code__in=regions,
             )
+            .exclude(status=models.RaceEventStatus.CANCELLED)
             .filter(
                 Q(live_tracking__active_attempt_token="")
                 | Q(live_tracking__claim_expires_at__lte=now)
@@ -2103,7 +2104,19 @@ def fail_race_data_sync_claim(
             checkpoint.last_attempt_at = now
             checkpoint.consecutive_failures += 1
             checkpoint.circuit_reason = reason_code
-            checkpoint.next_poll_at = retry_at
+            checkpoint.next_poll_at = (
+                None
+                if event.status == models.RaceEventStatus.CANCELLED
+                or (
+                    event.status == models.RaceEventStatus.POSTPONED
+                    and checkpoint.data_kind == models.RaceDataSyncDataKind.RESULT
+                )
+                or (
+                    event.status == models.RaceEventStatus.FINISHED
+                    and checkpoint.data_kind != models.RaceDataSyncDataKind.RESULT
+                )
+                else retry_at
+            )
             checkpoint.lock_version += 1
             checkpoint.save(
                 update_fields=(

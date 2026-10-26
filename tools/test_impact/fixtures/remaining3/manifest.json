@@ -1,0 +1,224 @@
+{
+  "schema": 1,
+  "id": "b243-remaining3-fixture-bound-v1",
+  "native_ids": [
+    "stable.test_historical_race_detail_distance_metadata.HistoricalRaceDetailDistanceMetadataRealCacheTests.test_sporting_life_race_118984_preserves_distance_units",
+    "stable.test_historical_race_detail_runner_v2_package_identity.HistoricalRaceDetailRunnerV2PackageIdentityRealSmokeTests.test_empty_event_distance_uses_real_parsed_metadata_with_original_units",
+    "stable.test_historical_race_detail_runner_v2_package_identity.HistoricalRaceDetailRunnerV2PackageIdentityRealSmokeTests.test_hk_real_validated_candidate_packages_with_plan_inventory_identity"
+  ],
+  "origin_index_sha256": "7c0f5501fd6c1123db5ef701839d53e72bca1e7d99b878345abbd86c5ec39e06",
+  "files": {
+    "originals/descriptors/smoke-hong_kong-49451.json": {
+      "bytes": 5487,
+      "sha256": "a33405e5dc7f6898f1e18787ccafa28a4dbc8a16187dd8c65375e30b7c42eaf1"
+    },
+    "smoke/descriptors/smoke-hong_kong-49451.json": {
+      "bytes": 5403,
+      "sha256": "d6b3a5cf495a18a6d78d472ab437659a05a002d1d617a98f85a8780840ea9b60"
+    },
+    "originals/descriptors/smoke-japan-50556.json": {
+      "bytes": 5115,
+      "sha256": "a236f053bfce1808f114b0ca90b7fbbd971506704c1f28298223cdacacd981bf"
+    },
+    "smoke/descriptors/smoke-japan-50556.json": {
+      "bytes": 5031,
+      "sha256": "36dc6717ec32746325d797a062c0346a57de5a1aa49b87799c18a8744bbbb7a4"
+    },
+    "originals/descriptors/smoke-united_kingdom-56980.json": {
+      "bytes": 5406,
+      "sha256": "312c4c006af5e3837260e87663ab945e6d3c15f09ae1c46cca914dfb3e834fe8"
+    },
+    "smoke/descriptors/smoke-united_kingdom-56980.json": {
+      "bytes": 5322,
+      "sha256": "504b733f55f521bc85f514b1f51df4911bd14afdd224c53606e7190697086cbe"
+    },
+    "originals/descriptors/smoke-united_states-70844.json": {
+      "bytes": 5700,
+      "sha256": "02b9994f79a271db8c8710c074fb754504a7fcfa69a4ae6eb430e8f7924d8167"
+    },
+    "smoke/descriptors/smoke-united_states-70844.json": {
+      "bytes": 5616,
+      "sha256": "d76dac7d0c016313960f4fe239e1f516991472a01d70a5f9c89eb182fb4f5cd3"
+    },
+    "smoke/events/smoke-hong_kong-49451.csv": {
+      "bytes": 838,
+      "sha256": "3e5ca56e5fe3c62a3d7f47640ce892982000fb28ee0d4166381dd4f234ee6bbd"
+    },
+    "smoke/events/smoke-japan-50556.csv": {
+      "bytes": 869,
+      "sha256": "25a0d8b06dd0388bb3b933be95261e8e5fb14acf717070c0e37979b7c64020a4"
+    },
+    "smoke/events/smoke-united_kingdom-56980.csv": {
+      "bytes": 763,
+      "sha256": "45a63470bd48662673ea454c2f74e7954e3c7463d57eb43391d3dd9c361d19aa"
+    },
+    "smoke/events/smoke-united_states-70844.csv": {
+      "bytes": 988,
+      "sha256": "f57b275d874fab5c6994ebd2fc56c30adecf0aa560fad384e0dbdbb77165704e"
+    },
+    "smoke/run/smoke-hong_kong-49451/source-cache/c973922de919d472df520deb93e5743945a8c1dd357fecf731f23ac91f72db85.html": {
+      "bytes": 211229,
+      "sha256": "1c56bbfe3393204f2d0d06f8bab4a4555c1fee6a6ef7899233eddd4c7d643cb7"
+    },
+    "smoke/run/smoke-hong_kong-49451/source-cache/source_cache_manifest.json": {
+      "bytes": 760,
+      "sha256": "cf299689e2f28b3c4ed9b70542d8f6005b027599ef6952f80141f1806a463908"
+    },
+    "smoke/run/smoke-hong_kong-49451/validated-candidates.jsonl": {
+      "bytes": 31404,
+      "sha256": "c154dc9d60a5a4e94063db1316b585321e3cfd683bee976dd29e013f4e7fd230"
+    },
+    "smoke/run/smoke-japan-50556/source-cache/ad7ba45bc97fd0070b65d40f624b6ec1faf950701bec20c5914e4b9486020e74.html": {
+      "bytes": 79845,
+      "sha256": "2dbe222766b6ed2e9a5c3c60c348ec98896e55acbbefbfdb8d5b3c0e2177bf4a"
+    },
+    "smoke/run/smoke-japan-50556/source-cache/source_cache_manifest.json": {
+      "bytes": 705,
+      "sha256": "75dac303fedf1607428c5812d69afcfc7561b51d6144d137e3d6730f196e728d"
+    },
+    "smoke/run/smoke-united_kingdom-56980/source-cache/a1fedb79cba27440012e10a08a766fc82435abaf34ae54b369de9f4ed3bd48d8.html": {
+      "bytes": 297391,
+      "sha256": "20004c114cf3e0a750300568a560958df76a73a185cc1f2b1eb5ae425279ed17"
+    },
+    "smoke/run/smoke-united_kingdom-56980/source-cache/source_cache_manifest.json": {
+      "bytes": 767,
+      "sha256": "c220c56d2c72c466c6e338e7f9232e3712f7ae6976e6957bc2a53c8c546d56ba"
+    },
+    "smoke/run/smoke-united_states-70844/source-cache/7a0d5ab380f77dd8c9420aa85e4be398b6d4a72cbcef7d99fab2a0b2c8643db2.cfm": {
+      "bytes": 117375,
+      "sha256": "52f7e3de1570f9b5d28376f07c054e639a4778998684871b5fdfa939d80ada8c"
+    },
+    "smoke/run/smoke-united_states-70844/source-cache/source_cache_manifest.json": {
+      "bytes": 736,
+      "sha256": "a3009ad63fd7ab31daaacd6a5d260665ceda8679be7336c38c951fa3d29b9b50"
+    },
+    "smoke/source_fragments/smoke-hong_kong-49451.json": {
+      "bytes": 2212,
+      "sha256": "acd4b3793302b2df7c4f74710ec3105541885112ab0688a649db10cbf8b563e3"
+    },
+    "smoke/source_fragments/smoke-japan-50556.json": {
+      "bytes": 1691,
+      "sha256": "029a26bfdf04501649f57a23291725961e3f84b3c284af05cb95d841839784ca"
+    },
+    "smoke/source_fragments/smoke-united_kingdom-56980.json": {
+      "bytes": 2806,
+      "sha256": "ea68a3860380f77bd8ea1e86fd91a98b1bace37a12004a1f7999e31459a6d80a"
+    },
+    "smoke/source_fragments/smoke-united_states-70844.json": {
+      "bytes": 1860,
+      "sha256": "5d8a86da495c58bec6e0217bf06ce7a2e7a08a17bfb4101a949beb773dae0dc7"
+    },
+    "originals/plan_identity.json": {
+      "bytes": 2774,
+      "sha256": "fde87c93e08e050cba0188689a4d2c99004aa6e86cffa85c8fb0f4f8a9a11403"
+    }
+  },
+  "view_file_count": 21,
+  "provenance_file_count": 5,
+  "descriptors": [
+    {
+      "original": "originals/descriptors/smoke-hong_kong-49451.json",
+      "view": "smoke/descriptors/smoke-hong_kong-49451.json",
+      "original_raw_sha256": "a33405e5dc7f6898f1e18787ccafa28a4dbc8a16187dd8c65375e30b7c42eaf1",
+      "original_canonical_sha256": "f3eb3d65b56568f8593bc5ccaf2268800ed9c4e99d7ca62e1e85ec4a11a6b6fe",
+      "reviewed_b243_view_raw_sha256": "238906c178928a8070488c3324f7597491f684157c4b0278c03a4f99d46f37d1",
+      "reviewed_b243_view_canonical_sha256": "4679680471871bb954c94498436eab5191fbaa19052568895773fca8e54d5860",
+      "git_view_raw_sha256": "d6b3a5cf495a18a6d78d472ab437659a05a002d1d617a98f85a8780840ea9b60",
+      "git_view_canonical_sha256": "0358447d6c1d01abaa635a454760c92b51b0268b03cf0bfd358f2462910f757e"
+    },
+    {
+      "original": "originals/descriptors/smoke-japan-50556.json",
+      "view": "smoke/descriptors/smoke-japan-50556.json",
+      "original_raw_sha256": "a236f053bfce1808f114b0ca90b7fbbd971506704c1f28298223cdacacd981bf",
+      "original_canonical_sha256": "df990054e2b9fd5c49e5cec12cb88f1ddd80f475f9ab597edd03a9def38b05fc",
+      "reviewed_b243_view_raw_sha256": "71276993a3224e0d3c9a518bb8f21fd341748fd873b07d10089eb479ca159586",
+      "reviewed_b243_view_canonical_sha256": "74eaccaf1b807dfbe3d02baf4755d3770e473b796f4600454ef1dc51436832eb",
+      "git_view_raw_sha256": "36dc6717ec32746325d797a062c0346a57de5a1aa49b87799c18a8744bbbb7a4",
+      "git_view_canonical_sha256": "fe859af3d8cc70b92a194ab1e0ad91a73c6144d5df14c76ee2c0232d09d232cc"
+    },
+    {
+      "original": "originals/descriptors/smoke-united_kingdom-56980.json",
+      "view": "smoke/descriptors/smoke-united_kingdom-56980.json",
+      "original_raw_sha256": "312c4c006af5e3837260e87663ab945e6d3c15f09ae1c46cca914dfb3e834fe8",
+      "original_canonical_sha256": "47ae75ed5663e4ced663c21421158cfee61b91e13d41726679066676af2c08eb",
+      "reviewed_b243_view_raw_sha256": "cf2c5b3a9bcf1a80148afb0215810335c89c135c5b9c29a0f5cce1515cefc5d9",
+      "reviewed_b243_view_canonical_sha256": "2310f6bab5275264ce167f8ae46140cc3f77dc88bde957a75abf9b50da8dd99a",
+      "git_view_raw_sha256": "504b733f55f521bc85f514b1f51df4911bd14afdd224c53606e7190697086cbe",
+      "git_view_canonical_sha256": "b7382601b27c284776d07efc0570b1a683d6050bcb7484614de1670f067405af"
+    },
+    {
+      "original": "originals/descriptors/smoke-united_states-70844.json",
+      "view": "smoke/descriptors/smoke-united_states-70844.json",
+      "original_raw_sha256": "02b9994f79a271db8c8710c074fb754504a7fcfa69a4ae6eb430e8f7924d8167",
+      "original_canonical_sha256": "289cd1dc6bb5b5653c8147c2e37ddfa9de1b00f9f31465dc74253895f77f192b",
+      "reviewed_b243_view_raw_sha256": "ed2287af1083eea67233a04fbec50024dab0e22608f9aa8057ee326fba0638a2",
+      "reviewed_b243_view_canonical_sha256": "7a0181a7fda38fcda15a751d8d48523c32351a3bc34f7d6947c07525ce664cfd",
+      "git_view_raw_sha256": "d76dac7d0c016313960f4fe239e1f516991472a01d70a5f9c89eb182fb4f5cd3",
+      "git_view_canonical_sha256": "ede13d6e7a7d9b6a3da4b1413a5754b437cb0459399482791374763e0e889293"
+    }
+  ],
+  "plan": "originals/plan_identity.json",
+  "readonly_root": "/source/tools/test_impact/fixtures/remaining3",
+  "source_bindings": {
+    "smoke-hong_kong-49451": {
+      "discovery_schema": "calendar_only",
+      "detail_provider": "hkjc",
+      "detail_url": "https://racing.hkjc.com/zh-hk/local/information/localresults?Racecourse=ST&racedate=2026%2F01%2F04&RaceNo=8",
+      "calendar_provider": "hkjc",
+      "calendar_url": "https://racing.hkjc.com/racing/english/international-racing/pdf/2025-2026-Hong-Kong-Pattern-Book.pdf",
+      "calendar_authority": "official",
+      "local_date": "2026-01-04",
+      "year": 2026,
+      "target_id": "49451",
+      "target_sha256": "c125663073e3056b1724f8a7a95c752a2c3ca42cb8f081c30012034bdb69a489",
+      "provenance_kind": "existing_fixture_bound_local_input",
+      "earlier_fixture_formation": "UNKNOWN"
+    },
+    "smoke-japan-50556": {
+      "discovery_schema": "detail_and_calendar",
+      "detail_provider": "jra",
+      "detail_url": "https://www.jra.go.jp/datafile/seiseki/replay/2005/99.html",
+      "calendar_provider": "jra",
+      "calendar_url": "https://www.jra.go.jp/datafile/seiseki/replay/2005/99.html",
+      "calendar_authority": "official",
+      "local_date": "2005-10-15",
+      "year": 2005,
+      "target_id": "50556",
+      "target_sha256": "cd03d88f02caabb59f24afc341d48a2f5f5e1e74c6ea3ef2d9fd7b6926c07bae",
+      "provenance_kind": "existing_fixture_bound_local_input",
+      "earlier_fixture_formation": "Not re-certified by this source card"
+    },
+    "smoke-united_kingdom-56980": {
+      "discovery_schema": "calendar_only",
+      "detail_provider": "sporting_life",
+      "detail_url": "https://www.sportinglife.com/racing/results/2013-06-20/ascot/118984/gold-cup-british-champions-series-group-1",
+      "calendar_provider": "uk_bha",
+      "calendar_url": "https://www.britishhorseracing.com/wp-content/uploads/2017/03/FlatPattern2013-1.pdf",
+      "calendar_authority": "official",
+      "local_date": "2013-06-20",
+      "year": 2013,
+      "target_id": "56980",
+      "target_sha256": "e184450d57c5f8f8e9946943682c9c2c783e3e6806ab3bebc535334c0ece9374",
+      "provenance_kind": "existing_fixture_bound_local_input",
+      "earlier_fixture_formation": "UNKNOWN"
+    },
+    "smoke-united_states-70844": {
+      "discovery_schema": "detail_and_calendar",
+      "detail_provider": "equibase",
+      "detail_url": "https://www.equibase.com/yearbook/Result.cfm?cy=USA&de=D&rd=2018-09-29&rn=8&tk=CD",
+      "calendar_provider": "equibase",
+      "calendar_url": "https://www.equibase.com/yearbook/Result.cfm?cy=USA&de=D&rd=2018-09-29&rn=8&tk=CD",
+      "calendar_authority": "third_party",
+      "local_date": "2018-09-29",
+      "year": 2018,
+      "target_id": "70844",
+      "target_sha256": "cbcd96ad5c913147ae9724295486e97c552f1a632ddee30a6919d3e4bea3354f",
+      "provenance_kind": "existing_fixture_bound_local_input",
+      "earlier_fixture_formation": "Not re-certified by this source card"
+    }
+  },
+  "environment": {
+    "HISTORICAL_DETAIL_DISTANCE_CACHE_RUN_ROOT": "smoke/run"
+  },
+  "evidence_boundary": "Offline fixture-bound mechanism only. UK/HK earlier formation remains UNKNOWN; no independent HTTP or production acceptance claim."
+}
