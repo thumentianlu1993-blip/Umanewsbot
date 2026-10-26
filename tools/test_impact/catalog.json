@@ -827,7 +827,15 @@
       "stable.test_u04_horse_follow_copy",
       "stable.test_article_horse_link_reconcile_protection",
       "stable.test_u04_article_body_empty_copy",
-      "stable.test_article_horse_link_withdrawal"
+      "stable.test_article_horse_link_withdrawal",
+      "stable.test_followed_article_limit",
+      "stable.test_article_horse_link_profile_scan_protection",
+      "stable.test_horse_article_binding_persistence",
+      "stable.test_profile_strong_backfill_trigger",
+      "stable.test_horse_article_strong_evidence_protection",
+      "stable.test_horse_article_binding_diagnostics",
+      "stable.test_horse_article_pair_receipt_index",
+      "stable.test_horse_article_pair_index_scanner_protection"
     ],
     "module:scripts.tests.test_f02_readonly_export": [
       "scripts.tests.test_f02_readonly_export"
@@ -2992,6 +3000,54 @@
       "domains": [
         "horse_career_review_consumer"
       ]
+    },
+    "server/stable/test_followed_article_limit.py": {
+      "label": "stable.test_followed_article_limit",
+      "domains": [
+        "content_contracts"
+      ]
+    },
+    "server/stable/test_article_horse_link_profile_scan_protection.py": {
+      "label": "stable.test_article_horse_link_profile_scan_protection",
+      "domains": [
+        "content_contracts"
+      ]
+    },
+    "server/stable/test_horse_article_binding_persistence.py": {
+      "label": "stable.test_horse_article_binding_persistence",
+      "domains": [
+        "content_contracts"
+      ]
+    },
+    "server/stable/test_profile_strong_backfill_trigger.py": {
+      "label": "stable.test_profile_strong_backfill_trigger",
+      "domains": [
+        "content_contracts"
+      ]
+    },
+    "server/stable/test_horse_article_strong_evidence_protection.py": {
+      "label": "stable.test_horse_article_strong_evidence_protection",
+      "domains": [
+        "content_contracts"
+      ]
+    },
+    "server/stable/test_horse_article_binding_diagnostics.py": {
+      "label": "stable.test_horse_article_binding_diagnostics",
+      "domains": [
+        "content_contracts"
+      ]
+    },
+    "server/stable/test_horse_article_pair_receipt_index.py": {
+      "label": "stable.test_horse_article_pair_receipt_index",
+      "domains": [
+        "content_contracts"
+      ]
+    },
+    "server/stable/test_horse_article_pair_index_scanner_protection.py": {
+      "label": "stable.test_horse_article_pair_index_scanner_protection",
+      "domains": [
+        "content_contracts"
+      ]
     }
   },
   "profiles": {
@@ -3328,7 +3384,15 @@
     "stable.test_h03_basic_module_input": "django",
     "stable.test_h03_private_basic_module_transaction": "django",
     "stable.test_h03_private_independent_career_row_consumption": "django",
-    "stable.test_h03_independent_career_row_prepare": "django"
+    "stable.test_h03_independent_career_row_prepare": "django",
+    "stable.test_followed_article_limit": "django",
+    "stable.test_article_horse_link_profile_scan_protection": "django",
+    "stable.test_horse_article_binding_persistence": "django",
+    "stable.test_profile_strong_backfill_trigger": "django",
+    "stable.test_horse_article_strong_evidence_protection": "django",
+    "stable.test_horse_article_binding_diagnostics": "django",
+    "stable.test_horse_article_pair_receipt_index": "django",
+    "stable.test_horse_article_pair_index_scanner_protection": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {

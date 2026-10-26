@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import hashlib
+import re
 import secrets
+import time
 from dataclasses import dataclass
 from typing import Any, Iterable
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core import signing
-from django.db import transaction
-from django.db.models import Q, QuerySet
+from django.db import connection, connections, transaction
+from django.db.models import OuterRef, Q, QuerySet, Subquery
 from django.utils import timezone
 
 from stable.models import (
@@ -259,26 +261,53 @@ def transition_review_status(
     user: User | None = None,
     note: str = "",
 ) -> HorseProfile:
-    now = timezone.now()
-    profile.review_status = status
-    profile.review_notes = note or profile.review_notes
-    update_fields = ["review_status", "review_notes", "updated_at"]
-    if status == HorseProfileStatus.PUBLISHED:
-        profile.published_at = now
-        profile.published_by = user
-        update_fields.extend(["published_at", "published_by"])
-    if status == HorseProfileStatus.HIDDEN:
-        profile.hidden_at = now
-        profile.hidden_by = user
-        update_fields.extend(["hidden_at", "hidden_by"])
-    profile.save(update_fields=update_fields)
-    log_operation(
-        action_type="horse_profile_status_changed",
-        target_type="horse_profile",
-        target_id=profile.pk,
-        detail=f"马匹资料状态改为 {status}；备注：{note}",
-        admin=user,
-    )
+    def after_commit(profile_id, actor_id):
+        # Even direct/eager fallback runs only after the outer Profile lock
+        # has been released; the writer may then lock Article -> Profile.
+        import logging
+
+        logger = logging.getLogger(__name__)
+        try:
+            from stable.services.horse_article_strong_backfill import enqueue_profile_strong_backfill
+
+            enqueue_profile_strong_backfill(profile_id, actor_id)
+        except Exception as error:
+            logger.exception("strong backfill dispatch failed profile=%s actor=%s", profile_id, actor_id)
+            try:
+                TaskExecutionLog.objects.create(task_name="horse_strong_backfill_dispatch", status=TaskStatus.FAILED,
+                    payload={"profile_id": profile_id, "actor_id": actor_id},
+                    detail="dispatch_or_direct_execution_failed:"+type(error).__name__, finished_at=timezone.now())
+            except Exception:
+                logger.exception("strong backfill dispatch failure audit unavailable profile=%s", profile_id)
+
+    with transaction.atomic():
+        current = HorseProfile.objects.select_for_update().only("review_status", "published_at").get(pk=profile.pk)
+        first_publication = (status == HorseProfileStatus.PUBLISHED
+                             and current.review_status != HorseProfileStatus.PUBLISHED and current.published_at is None)
+        now = timezone.now()
+        profile.review_status = status
+        profile.review_notes = note or profile.review_notes
+        update_fields = ["review_status", "review_notes", "updated_at"]
+        if status == HorseProfileStatus.PUBLISHED:
+            profile.published_at = now
+            profile.published_by = user
+            update_fields.extend(["published_at", "published_by"])
+        if status == HorseProfileStatus.HIDDEN:
+            profile.hidden_at = now
+            profile.hidden_by = user
+            update_fields.extend(["hidden_at", "hidden_by"])
+        profile.save(update_fields=update_fields)
+        log_operation(
+            action_type="horse_profile_status_changed",
+            target_type="horse_profile",
+            target_id=profile.pk,
+            detail=f"马匹资料状态改为 {status}；备注：{note}",
+            admin=user,
+        )
+        actor_id = getattr(user, "pk", None)
+        if first_publication and type(actor_id) is int and actor_id > 0:
+            profile_id = profile.pk
+            transaction.on_commit(lambda: after_commit(profile_id, actor_id), robust=True)
     return profile
 
 
@@ -372,12 +401,163 @@ def _match_article(article: NewsArticle, profile: HorseProfile, terms: list[tupl
     return None
 
 
+def _article_horse_link_protection(link):
+    if link.status in {ArticleHorseLinkStatus.MANUAL, ArticleHorseLinkStatus.REMOVED}:
+        return {"link_id": link.id, "status": link.status}
+    from stable.services.horse_article_binding_persistence import classify_existing_strong_evidence
+
+    reason = classify_existing_strong_evidence(link)
+    if reason is not None:
+        return {"link_id": link.id, "status": link.status, "reason": reason}
+    return None
+
+
+class PairHistoryTransactionError(ValueError):
+    """不能确认同一实际 RC 写事务时，拒绝新增弱关系动作。"""
+
+
+class PairHistoryContractError(ValueError):
+    """历史 reader 的私有 DTO 不符合冻结合同。"""
+
+
+_PAIR_HISTORY_MAX_PAIRS = 16
+_PAIR_HISTORY_MAX_SELECTS = 32
+_PAIR_HISTORY_MAX_RAW_BYTES = 64 * 1024 * 1024
+_PAIR_HISTORY_SECONDS = 5
+_PAIR_HISTORY_TIMEOUT_MS = 2000
+_PAIR_HISTORY_REFERENCES = frozenset((
+    "index_id", "request_key", "operation_log_id", "original_link_id", "original_actor_id",
+    "receipt_detail_sha256", "after_sha256",
+))
+_PAIR_HISTORY_BOUNDARIES = {
+    "schema_version": "l02.pair-receipt-history.v1",
+    "historical_coverage": "indexed_receipt_only",
+    "historical_request_uniqueness": "not_proved",
+    "current_write_authority": "not_evaluated",
+    "source_license": "not_evaluated",
+    "automatic_action": "none",
+}
+
+
+def _pair_history_alias(article_locks, link_locks, *instances):
+    # The frozen reader uses connection.alias. Bind both writes and locks to
+    # that same alias; do not let routers give a different backend its SHOW.
+    using = article_locks.db
+    if (using != connection.alias or link_locks.db != using
+            or any(item._state.db != using for item in instances)):
+        raise PairHistoryTransactionError("pair_history_requires_read_committed")
+    return using
+
+
+def _pair_history_elapsed(started):
+    if time.monotonic() - started >= _PAIR_HISTORY_SECONDS:
+        raise ValueError("pair_history_elapsed_budget_exceeded")
+
+
+def _pair_history_reason(value, article_id, profile_id):
+    """NO_INDEX 只表示未命中新增保护，不授予弱写许可。"""
+    keys = set(_PAIR_HISTORY_BOUNDARIES) | _PAIR_HISTORY_REFERENCES | {
+        "state", "article_id", "profile_id", "weak_mutation_allowed",
+    }
+    valid = (type(value) is dict and set(value) == keys
+             and all(value[k] == expected for k, expected in _PAIR_HISTORY_BOUNDARIES.items())
+             and value["weak_mutation_allowed"] is False
+             and type(value["article_id"]) is int and value["article_id"] == article_id
+             and type(value["profile_id"]) is int and value["profile_id"] == profile_id)
+    if not valid:
+        raise PairHistoryContractError("invalid_pair_history_result")
+    state = value["state"]
+    if state == "INDEXED_HISTORY":
+        valid = all(type(value[k]) is int and 0 < value[k] <= 9_223_372_036_854_775_807
+                    for k in ("index_id", "operation_log_id", "original_link_id", "original_actor_id"))
+        valid = valid and all(type(value[k]) is str and re.fullmatch(r"[0-9a-f]{64}", value[k])
+                              for k in ("request_key", "receipt_detail_sha256", "after_sha256"))
+        reason = "indexed_pair_history"
+    elif state in ("UNKNOWN_NO_INDEX", "UNKNOWN_CORRUPT_OR_UNSUPPORTED", "UNKNOWN_CONFLICT"):
+        valid = all(value[k] is None for k in _PAIR_HISTORY_REFERENCES)
+        reason = None if state == "UNKNOWN_NO_INDEX" else "pair_history_unknown"
+    else:
+        valid = False
+        reason = None
+    if not valid:
+        raise PairHistoryContractError("invalid_pair_history_result")
+    return reason
+
+
+def _pair_history_timeout(value):
+    # PostgreSQL normalizes these millisecond GUCs to integral display units.
+    match = re.fullmatch(r"([0-9]+)(ms|s|min|h|d)?", value) if type(value) is str else None
+    if match is None:
+        raise PairHistoryContractError("invalid_pair_history_timeout")
+    current = int(match[1]) * {None: 1, "ms": 1, "s": 1000, "min": 60000,
+                               "h": 3600000, "d": 86400000}[match[2]]
+    return f"{min(current or _PAIR_HISTORY_TIMEOUT_MS, _PAIR_HISTORY_TIMEOUT_MS)}ms"
+
+
+def _observe_pair_histories(article_id, profile_ids, *, using, writable):
+    """同一原事务内逐 pair 读一次，只保留小的保护原因映射。
+
+    固定 reader 每 pair 至多两条 data SELECT、单条原始 UTF8 至多4MiB；
+    预留最坏原始输入量，不冒充 Python 堆硬上限。DB/driver 错误原样抛出，
+    异常时由调用方 atomic/savepoint 回滚 GUC，绝不在坏事务 finally 发 SQL。
+    """
+    pairs = sorted(set(profile_ids))
+    if not pairs:
+        return {}, None
+    started = time.monotonic()
+    from stable.services.horse_article_pair_receipt_index import MAX_BYTES, classify_pair_receipt_history
+
+    db = connections[using]
+    if (using != connection.alias or db.vendor != "postgresql"
+            or not db.in_atomic_block or db.get_autocommit()):
+        raise PairHistoryTransactionError("pair_history_requires_read_committed")
+    with db.cursor() as cursor:
+        if writable:
+            cursor.execute("SHOW transaction_isolation")
+            actual = cursor.fetchone()
+            if actual != ("read committed",):
+                raise PairHistoryTransactionError("pair_history_requires_read_committed")
+        if (len(pairs) > _PAIR_HISTORY_MAX_PAIRS or 2 * len(pairs) > _PAIR_HISTORY_MAX_SELECTS
+                or len(pairs) * MAX_BYTES > _PAIR_HISTORY_MAX_RAW_BYTES):
+            raise ValueError("pair_history_pair_budget_exceeded")
+        cursor.execute("SHOW statement_timeout")
+        statement = cursor.fetchone()[0]
+        cursor.execute("SHOW lock_timeout")
+        lock = cursor.fetchone()[0]
+        cursor.execute("SELECT set_config('statement_timeout', %s, true), set_config('lock_timeout', %s, true)",
+                       (_pair_history_timeout(statement), _pair_history_timeout(lock)))
+        blocked = {}
+        for profile_id in pairs:
+            _pair_history_elapsed(started)
+            reason = _pair_history_reason(classify_pair_receipt_history(article_id, profile_id), article_id, profile_id)
+            _pair_history_elapsed(started)
+            if reason is not None:
+                blocked[profile_id] = reason
+        cursor.execute("SELECT set_config('statement_timeout', %s, true), set_config('lock_timeout', %s, true)",
+                       (statement, lock))
+    _pair_history_elapsed(started)
+    return blocked, started
+
+
+def _add_pair_history_protection(protected, current_by_profile, blocked):
+    protected_ids = {item["link_id"] for item in protected}
+    for profile_id, reason in blocked.items():
+        current = current_by_profile.get(profile_id)
+        if current is not None and current.id not in protected_ids:
+            protected.append({"link_id": current.id, "status": current.status, "reason": reason})
+            protected_ids.add(current.id)
+    return protected_ids
+
+
 def reconcile_article_horse_links(
     article: NewsArticle,
     resolution: ArticleEntityResolution,
     *,
     commit: bool = True,
 ) -> dict[str, list]:
+    article_locks = NewsArticle.objects.select_for_update()
+    link_locks = ArticleHorseLink.objects.select_for_update()
+    using = _pair_history_alias(article_locks, link_locks, article)
     horse_entities = [item for item in resolution.entities if item.entity_type in {"horse", "unknown_horse"}]
     term_ids = {item.term_id for item in horse_entities if item.term_id}
     candidate_names = {
@@ -399,6 +579,8 @@ def reconcile_article_horse_links(
         .select_related("primary_term")
         .order_by("id")
     ) if term_ids or candidate_names else []
+    if any(profile._state.db != using for profile in profiles):
+        raise PairHistoryTransactionError("pair_history_requires_read_committed")
     desired: dict[int, dict] = {}
     for profile in profiles:
         matches = [
@@ -428,9 +610,8 @@ def reconcile_article_horse_links(
             "metadata": {"entity": match.as_dict()},
         }
 
-    existing = list(ArticleHorseLink.objects.filter(article=article).order_by("id"))
+    existing = list(ArticleHorseLink.objects.using(using).filter(article=article).order_by("id"))
     existing_by_profile = {item.horse_profile_id: item for item in existing}
-    protected = [item for item in existing if item.status in {ArticleHorseLinkStatus.MANUAL, ArticleHorseLinkStatus.REMOVED}]
     delete_links = [
         item
         for item in existing
@@ -448,63 +629,102 @@ def reconcile_article_horse_links(
         if profile_id in existing_by_profile
         and existing_by_profile[profile_id].status not in {ArticleHorseLinkStatus.MANUAL, ArticleHorseLinkStatus.REMOVED}
     ]
-    result = {
-        "create": create_payloads,
-        "update": update_payloads,
-        "delete_ids": [item.id for item in delete_links],
-        "protected_ids": [item.id for item in protected],
-        "protected": [{"link_id": item.id, "status": item.status} for item in protected],
-    }
     if not commit:
-        return result
-    with transaction.atomic():
-        current_article = NewsArticle.objects.select_for_update().get(pk=article.pk)
+        protected = [value for item in existing if (value := _article_horse_link_protection(item)) is not None]
+        protected_ids = {item["link_id"] for item in protected}
+        action_profiles = (
+            {item["horse_profile_id"] for item in create_payloads}
+            | {item["horse_profile_id"] for item in update_payloads if item["link_id"] not in protected_ids}
+            | {item.horse_profile_id for item in delete_links if item.id not in protected_ids}
+        )
+        with transaction.atomic(using=using):
+            blocked, _ = _observe_pair_histories(article.pk, action_profiles, using=using, writable=False)
+        _add_pair_history_protection(protected, existing_by_profile, blocked)
+        return {
+            "create": [item for item in create_payloads if item["horse_profile_id"] not in blocked],
+            "update": [item for item in update_payloads if item["link_id"] not in protected_ids
+                       and item["horse_profile_id"] not in blocked],
+            "delete_ids": [item.id for item in delete_links if item.id not in protected_ids
+                           and item.horse_profile_id not in blocked],
+            "protected_ids": [item["link_id"] for item in protected],
+            "protected": protected,
+        }
+    with transaction.atomic(using=using):
+        current_article = article_locks.using(using).get(pk=article.pk)
         locked_links = list(
-            ArticleHorseLink.objects.select_for_update()
-            .filter(pk__in=[item.id for item in existing])
+            link_locks.using(using)
+            .filter(article_id=current_article.pk)
             .order_by("id")
         )
         original_profiles = {item.id: item.horse_profile_id for item in existing}
         current_links = {
             item.id: item
             for item in locked_links
-            if item.article_id == article.pk
+            if item.id in original_profiles and item.article_id == article.pk
             and item.horse_profile_id == original_profiles[item.id]
         }
+        current_by_profile = {item.horse_profile_id: item for item in locked_links}
         mutable_statuses = {ArticleHorseLinkStatus.AUTO, ArticleHorseLinkStatus.CANDIDATE}
         protected = [
-            item for item in current_links.values()
-            if item.status in {ArticleHorseLinkStatus.MANUAL, ArticleHorseLinkStatus.REMOVED}
+            value for item in locked_links
+            if (value := _article_horse_link_protection(item)) is not None
         ]
+        protected_ids = {item["link_id"] for item in protected}
         result = {
             "create": [],
             "update": [],
             "delete_ids": [],
-            "protected_ids": [item.id for item in protected],
-            "protected": [{"link_id": item.id, "status": item.status} for item in protected],
+            "protected_ids": [item["link_id"] for item in protected],
+            "protected": protected,
         }
         if current_article.workflow_status == WorkflowStatus.WITHDRAWN:
             return result
         delete_ids = [
             item.id for item in delete_links
             if item.id in current_links and current_links[item.id].status in mutable_statuses
+            and item.id not in protected_ids
         ]
+        # 全部实际可执行动作先分类，再开始任何关系 DML；保留原 PK/profile
+        # CAS 和 mutable_statuses，不把锁后新出现的行当成旧计划可改目标。
+        action_profiles = (
+            {current_links[link_id].horse_profile_id for link_id in delete_ids}
+            | {item["horse_profile_id"] for item in create_payloads
+               if current_by_profile.get(item["horse_profile_id"]) is None
+               or current_by_profile[item["horse_profile_id"]].id not in protected_ids}
+            | {current_links[item["link_id"]].horse_profile_id for item in update_payloads
+               if item["link_id"] in current_links
+               and current_links[item["link_id"]].status in mutable_statuses
+               and item["link_id"] not in protected_ids}
+        )
+        blocked, history_started = _observe_pair_histories(
+            current_article.pk, action_profiles, using=using, writable=True)
+        protected_ids = _add_pair_history_protection(protected, current_by_profile, blocked)
+        result["protected_ids"] = [item["link_id"] for item in protected]
+        delete_ids = [link_id for link_id in delete_ids if current_links[link_id].horse_profile_id not in blocked]
         if delete_ids:
-            ArticleHorseLink.objects.filter(pk__in=delete_ids).delete()
+            _pair_history_elapsed(history_started)
+            ArticleHorseLink.objects.using(using).filter(pk__in=delete_ids).delete()
             result["delete_ids"] = delete_ids
         for payload in create_payloads:
             profile_id = payload["horse_profile_id"]
+            if profile_id in blocked:
+                continue
+            current = current_by_profile.get(profile_id)
+            if current is not None and current.id in protected_ids:
+                continue
             defaults = {key: value for key, value in payload.items() if key != "horse_profile_id"}
-            ArticleHorseLink.objects.create(article=article, horse_profile_id=profile_id, **defaults)
+            _pair_history_elapsed(history_started)
+            ArticleHorseLink.objects.using(using).create(article=current_article, horse_profile_id=profile_id, **defaults)
             result["create"].append(payload)
         for payload in update_payloads:
             link_id = payload["link_id"]
             link = current_links.get(link_id)
-            if link is None or link.status not in mutable_statuses:
+            if link is None or link.status not in mutable_statuses or link_id in protected_ids:
                 continue
             defaults = {key: value for key, value in payload.items() if key not in {"link_id", "horse_profile_id"}}
             defaults["updated_at"] = timezone.now()
-            if ArticleHorseLink.objects.filter(pk=link_id).update(**defaults):
+            _pair_history_elapsed(history_started)
+            if ArticleHorseLink.objects.using(using).filter(pk=link_id).update(**defaults):
                 result["update"].append(payload)
     return result
 
@@ -551,7 +771,11 @@ def scan_article_horse_links(
                 continue
             if match.status == ArticleHorseLinkStatus.CANDIDATE:
                 candidate += 1
-            existing = ArticleHorseLink.objects.filter(horse_profile=profile_item, article=article_item).first()
+            article_locks = NewsArticle.objects.select_for_update()
+            link_locks = ArticleHorseLink.objects.select_for_update()
+            using = _pair_history_alias(article_locks, link_locks, article_item, profile_item)
+            existing = ArticleHorseLink.objects.using(using).filter(
+                horse_profile=profile_item, article=article_item).order_by("id").first()
             if existing and existing.status == ArticleHorseLinkStatus.REMOVED:
                 skipped_removed += 1
                 continue
@@ -559,19 +783,55 @@ def scan_article_horse_links(
                 skipped_manual += 1
                 continue
             if not commit:
+                if existing is None or _article_horse_link_protection(existing) is None:
+                    with transaction.atomic(using=using):
+                        _observe_pair_histories(article_item.pk, (profile_item.pk,), using=using, writable=False)
                 continue
-            _, was_created = ArticleHorseLink.objects.update_or_create(
-                horse_profile=profile_item,
-                article=article_item,
-                defaults={
-                    "status": match.status,
-                    "source": "auto_match",
-                    "confidence": match.confidence,
-                    "matched_text": match.matched_text[:255],
-                    "match_reason": match.reason,
-                    "metadata": {},
-                },
-            )
+            defaults = {
+                "status": match.status,
+                "source": "auto_match",
+                "confidence": match.confidence,
+                "matched_text": match.matched_text[:255],
+                "match_reason": match.reason,
+                "metadata": {},
+            }
+            # 初读不持锁；实际写入逐对采用既有的父文章→关系锁序。
+            with transaction.atomic(using=using):
+                current_article = article_locks.using(using).get(pk=article_item.pk)
+                current = link_locks.using(using).filter(
+                    article_id=current_article.pk, horse_profile_id=profile_item.pk).order_by("id").first()
+                if current is not None:
+                    if current.status == ArticleHorseLinkStatus.REMOVED:
+                        skipped_removed += 1
+                        continue
+                    if current.status == ArticleHorseLinkStatus.MANUAL:
+                        skipped_manual += 1
+                        continue
+                    if _article_horse_link_protection(current) is not None:
+                        continue
+                blocked, history_started = _observe_pair_histories(
+                    current_article.pk, (profile_item.pk,), using=using, writable=True)
+                if profile_item.pk in blocked:
+                    continue
+                _pair_history_elapsed(history_started)
+                link, was_created = link_locks.using(using).get_or_create(
+                    horse_profile=profile_item,
+                    article=current_article,
+                    defaults=defaults,
+                )
+                if not was_created:
+                    if link.status == ArticleHorseLinkStatus.REMOVED:
+                        skipped_removed += 1
+                        continue
+                    if link.status == ArticleHorseLinkStatus.MANUAL:
+                        skipped_manual += 1
+                        continue
+                    if _article_horse_link_protection(link) is not None:
+                        continue
+                    for field, value in defaults.items():
+                        setattr(link, field, value)
+                    _pair_history_elapsed(history_started)
+                    link.save(using=using, update_fields=[*defaults, "updated_at"])
             created += int(was_created)
             updated += int(not was_created)
     result = {
@@ -716,27 +976,34 @@ def followed_horse_ids(token_hash: str, *, include_descendants: bool = True) -> 
 
 def followed_articles(token_hash: str, *, limit: int = 20) -> list[dict[str, Any]]:
     horse_ids = followed_horse_ids(token_hash, include_descendants=True)
-    if not horse_ids:
+    if not horse_ids or limit == 0:
         return []
-    links = (
-        ArticleHorseLink.objects.filter(
-            horse_profile_id__in=horse_ids,
-            horse_profile__review_status=HorseProfileStatus.PUBLISHED,
-            status__in=[ArticleHorseLinkStatus.AUTO, ArticleHorseLinkStatus.MANUAL],
-            article__workflow_status=WorkflowStatus.PUBLISHED,
-            article__published_to_web_at__isnull=False,
-        )
-        .select_related("article", "horse_profile")
-        .order_by("-article__published_to_web_at", "-article_id")[:limit]
+    eligible_links = ArticleHorseLink.objects.filter(
+        horse_profile_id__in=horse_ids,
+        horse_profile__review_status=HorseProfileStatus.PUBLISHED,
+        status__in=[ArticleHorseLinkStatus.AUTO, ArticleHorseLinkStatus.MANUAL],
+        article__workflow_status=WorkflowStatus.PUBLISHED,
+        article__published_to_web_at__isnull=False,
     )
-    seen_articles: set[int] = set()
-    entries: list[dict[str, Any]] = []
-    for link in links:
-        if link.article_id in seen_articles:
-            continue
-        seen_articles.add(link.article_id)
-        entries.append({"article": link.article, "horse_profile": link.horse_profile, "link": link})
-    return entries
+    # 先按唯一文章限额；所有中间结果留在数据库，不把重复关系载入 Python。
+    articles = (
+        NewsArticle.objects.filter(
+            pk__in=Subquery(eligible_links.order_by().values("article_id"))
+        )
+        .order_by("-published_to_web_at", "-pk")[:limit]
+    )
+    # 同文任取一个合格代表，不新增关系优先级；标量子查询只返回一行。
+    representative_ids = articles.annotate(
+        followed_link_id=Subquery(
+            eligible_links.filter(article_id=OuterRef("pk")).order_by().values("pk")[:1]
+        )
+    ).values("followed_link_id")
+    links = (
+        eligible_links.filter(pk__in=Subquery(representative_ids))
+        .select_related("article", "horse_profile")
+        .order_by("-article__published_to_web_at", "-article_id")
+    )
+    return [{"article": link.article, "horse_profile": link.horse_profile, "link": link} for link in links]
 
 
 def classify_completion_payload(payload: dict) -> str:

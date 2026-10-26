@@ -9,6 +9,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
 from django.db import models, transaction
+from django.db.models.lookups import GreaterThan, LessThanOrEqual
 from django.utils import timezone
 from django.utils.text import slugify
 
@@ -4213,6 +4214,41 @@ class ArticleHorseLink(TimestampedModel):
     @property
     def is_public(self) -> bool:
         return self.status in {ArticleHorseLinkStatus.AUTO, ArticleHorseLinkStatus.MANUAL}
+
+
+class HorseArticlePairReceiptIndex(models.Model):
+    """私有首次强写档案；无 live FK/TTL，不代表生产永久留存授权。"""
+
+    id = models.BigAutoField(primary_key=True)
+    article_id_snapshot = models.BigIntegerField()
+    profile_id_snapshot = models.BigIntegerField()
+    producer_namespace = models.CharField(max_length=255)
+    request_id = models.CharField(max_length=255)
+    request_key = models.CharField(max_length=64)
+    operation_log_id_snapshot = models.BigIntegerField()
+    original_link_id = models.BigIntegerField()
+    original_actor_id = models.BigIntegerField()
+    receipt_detail = models.TextField()
+    receipt_detail_sha256 = models.CharField(max_length=64)
+    protocol_version = models.CharField(max_length=64)
+    recorded_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=("article_id_snapshot", "profile_id_snapshot"),
+                                    name="uq_horse_pair_receipt_pair"),
+            models.UniqueConstraint(fields=("request_key",), name="uq_horse_pair_receipt_key"),
+            models.UniqueConstraint(fields=("operation_log_id_snapshot",), name="uq_horse_pair_receipt_log"),
+            models.CheckConstraint(condition=models.Q(article_id_snapshot__gt=0, profile_id_snapshot__gt=0,
+                operation_log_id_snapshot__gt=0, original_link_id__gt=0, original_actor_id__gt=0),
+                name="ck_hpair_index_ids"),
+            models.CheckConstraint(condition=models.Q(request_key__regex=r"^[0-9a-f]{64}$",
+                receipt_detail_sha256__regex=r"^[0-9a-f]{64}$"), name="ck_hpair_index_hashes"),
+            models.CheckConstraint(condition=(
+                GreaterThan(models.Func(models.F("receipt_detail"), function="OCTET_LENGTH", output_field=models.BigIntegerField()), 0)
+                & LessThanOrEqual(models.Func(models.F("receipt_detail"), function="OCTET_LENGTH", output_field=models.BigIntegerField()), 4_194_304)),
+                name="ck_hpair_index_bytes"),
+        ]
 
 
 class HorseFollow(TimestampedModel):
