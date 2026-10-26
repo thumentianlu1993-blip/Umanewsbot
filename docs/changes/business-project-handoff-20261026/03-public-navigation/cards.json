@@ -1,0 +1,1083 @@
+[
+  {
+    "id": "F05",
+    "project": "P03",
+    "requirement_id": "BR-F05",
+    "original_plan": {
+      "id": "F05",
+      "lane": "C",
+      "role": "application",
+      "it": 1,
+      "start": "2026-10-04",
+      "due": "2026-10-05",
+      "h": 3,
+      "deps": [],
+      "gaps": [
+        "UG-01",
+        "UG-02",
+        "UG-03"
+      ],
+      "area": "public",
+      "title": "复验域名与公开缺陷并固定回归样例",
+      "change": "复验域名、凯旋门重复、德国 G1 筛选、兰秀赛果、女皇杯缺行、三个马匹统计例；为每例保留 URL、对象 ID、时间和实际结果。",
+      "test": "重测美艺力量 45 条分页、已消失的新闻污染和前导零，防止将已关闭问题重新计入。",
+      "done": "每项标明复现/未复现/待证；域名目标从现有部署配置核实，未知时给出待决项而非自行改站点。",
+      "deadline": "2026-10-05 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-05T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/templates/stable/public/race_detail.html",
+        "server/stable/templates/stable/public/horse_detail.html",
+        "server/stable/templates/stable/public/detail.html"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "F05",
+      "title": "复验域名与公开缺陷并固定回归样例",
+      "lane": "C",
+      "completion_percent": 100,
+      "status": "已完成本卡",
+      "basis_and_gap": "只读复验基线及分类报告已审；完成的是本卡复验，不是缺陷修复",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "F05"
+      ],
+      "previous_percent": 100,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "C",
+      "title": "复验域名与公开缺陷并固定回归样例",
+      "deps": [],
+      "deadline_at": "2026-10-05T18:00:00+08:00",
+      "status": "开发完成",
+      "phase": "只读基线交付",
+      "commit": "6fd64c87155be14f382c6ab09b8f4b5c94284dd4",
+      "pr": null,
+      "review": "APPROVED@6fd64c87，F05-M-01 CLOSED；不代表缺陷修复或生产验收",
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "dispatch_id": "C-001",
+      "owner_thread_id": "01a0fdc7-5154-7e51-aafa-f1b34d8f46f9",
+      "review_commit": "503a52ee7929bbcb3623229e95016e51716b5ddc"
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 100,
+    "business_delivery_complete": true,
+    "priority_within_project": 1
+  },
+  {
+    "id": "U01",
+    "project": "P03",
+    "requirement_id": "BR-U01",
+    "original_plan": {
+      "id": "U01",
+      "lane": "C",
+      "role": "application",
+      "it": 1,
+      "start": "2026-10-07",
+      "due": "2026-10-08",
+      "h": 3,
+      "deps": [
+        "F05"
+      ],
+      "gaps": [
+        "UG-02"
+      ],
+      "area": "public",
+      "title": "统一赛事等级筛选与卡片标签",
+      "change": "统一规范等级解析、数据库查询和标签投影，处理空值/别名；为存量差异生成候选修复清单。",
+      "test": "德国 2025 G1 案例及 G2/G3/Jpn1/Local G1 边界回放；禁止为修一个 URL 改写所有等级。",
+      "done": "列表与筛选集合一致；需要数据修复的内容交 H09/O06，不夹带生产写入。",
+      "deadline": "2026-10-08 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-08T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/templates/stable/public/race_detail.html",
+        "server/stable/templates/stable/public/horse_detail.html",
+        "server/stable/templates/stable/public/detail.html"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "U01",
+      "title": "统一赛事等级筛选与卡片标签",
+      "lane": "C",
+      "completion_percent": 80,
+      "status": "部分完成",
+      "basis_and_gap": "等级筛选/标签代码与组合正式CI已审合入；生产公开复验未完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "U01"
+      ],
+      "previous_percent": 80,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "C",
+      "title": "统一赛事等级筛选与卡片标签",
+      "deps": [
+        "F05"
+      ],
+      "deadline_at": "2026-10-08T18:00:00+08:00",
+      "status": "提测",
+      "phase": "代码/独立review与综合PR236正式交付已核，已随PR237合并；未发布",
+      "commit": "03e5afbbfd2f31cef19285de3f0758a8d6134602",
+      "pr": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/237",
+      "review": "原R代码/映射APPROVED，已纳PR236正常正式full及delivery verified",
+      "evidence": [
+        "/Users/mentianlu/.codex/worktrees/bc9b/umanews/docs/changes/next-version-capabilities/lanes/C/U01-implementation-review.md"
+      ],
+      "merged": true,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "dispatch_id": "C-003",
+      "owner_thread_id": "01a0fdc7-5154-7e51-aafa-f1b34d8f46f9",
+      "approved_plan_sha": "2919dd3558950466e18a8886ec8bc7f85a119f5a",
+      "red_commit": "5c66088d821c249e41141dd5f8ba062c3edaf210",
+      "development_validation": {
+        "head": "4c11df4ba9899efb64d544e14246eabd13dfb1c8",
+        "tests": 39,
+        "cases": 198,
+        "failures": 0,
+        "errors": 0,
+        "skips": 0,
+        "postgres": "16.15 Ubuntu aarch64",
+        "python": "3.12.3",
+        "django": "5.2.1",
+        "capabilities": "UTF8/normalize/und-x-icu实际assertTrue",
+        "receipt": "/Users/mentianlu/.codex/runtime/c003-impact-evidence/green-4c11/batch-000.json",
+        "receipt_sha256": "8db64b35964cdd8fa15d90ebb42ef11b6b29e3db3b50c23a412527f5ec0e7834",
+        "formal_delivery_receipt": false,
+        "production_capabilities_verified": false
+      },
+      "repair_commit": "f910d671b275c616ea628975b13fd2a919eecc0c",
+      "formal_delivery_receipt": "/Users/mentianlu/.codex/runtime/first-integration-evidence/delivery-39f0bb96.json",
+      "formal_validation": "PR236 fixed06b CI37137528485：6378项/46批、0fail/error、10既定skip、全部native lifecyclecomplete；候选外main907 delivery verified；未合并发布",
+      "merged_delivery_slices": [
+        {
+          "pr": 237,
+          "merge_commit": "22e130adf4464fd3c5dd63ccd3f508c4a853d464",
+          "head": "3a55a9891e3e557027876b18403ef7b5fb39401a",
+          "scope": "仅third-integration-delivery.md列明固定受审切片；不含后续未交付实现",
+          "deployed": false
+        }
+      ],
+      "merge_commit": "22e130adf4464fd3c5dd63ccd3f508c4a853d464",
+      "local_demo_current_preflight": {
+        "dispatch_id": "B156-U01-U02-LOCAL-DEMO-CURRENT-READONLY-PREFLIGHT-001",
+        "status": "ACTIVE_READ_ONLY_EXISTING_ENTRY_CHECK",
+        "candidate": "23eae7f53360c986303bc46685f191764c70af1b",
+        "synthetic_data": "must remain explicitly labeled; not real business acceptance",
+        "production_or_service_start_authorized": false
+      }
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 80,
+    "business_delivery_complete": false,
+    "priority_within_project": 2
+  },
+  {
+    "id": "U02",
+    "project": "P03",
+    "requirement_id": "BR-U02",
+    "original_plan": {
+      "id": "U02",
+      "lane": "C",
+      "role": "application",
+      "it": 1,
+      "start": "2026-10-08",
+      "due": "2026-10-09",
+      "h": 3,
+      "deps": [
+        "F05"
+      ],
+      "gaps": [
+        "UG-03"
+      ],
+      "area": "public",
+      "title": "补齐近期赛事首页与详情旧交互要求",
+      "change": "首页改为今天起七天、最多四场、缺时刻留空；移除指定详情届次控件，保留日历年份筛选；列表返回保留条件。",
+      "test": "跨月跨年、无赛日、只有当地日期和四场以上排序；不把远期重点赛事塞回近期范围。",
+      "done": "历史待办对应条目逐项复验，标题与实际范围一致。",
+      "deadline": "2026-10-09 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-09T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/templates/stable/public/race_detail.html",
+        "server/stable/templates/stable/public/horse_detail.html",
+        "server/stable/templates/stable/public/detail.html"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "U02",
+      "title": "补齐近期赛事首页与详情旧交互要求",
+      "lane": "C",
+      "completion_percent": 75,
+      "status": "部分完成",
+      "basis_and_gap": "交互代码/PG/HTTP旅程及组合CI通过；视觉与生产复验未完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "U02"
+      ],
+      "previous_percent": 75,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "C",
+      "title": "补齐近期赛事首页与详情旧交互要求",
+      "deps": [
+        "F05"
+      ],
+      "deadline_at": "2026-10-09T18:00:00+08:00",
+      "status": "提测",
+      "phase": "代码、实际PG126原失败唯一补验、HTTP20/8journey及PR236正式full/delivery均通过；视觉/生产仍待",
+      "commit": "06b01aea9041eacb3deae9f46968eb06fd459cb6",
+      "pr": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/237",
+      "review": "fixedfe53代码91001/唯一fixture73ec/HTTP58eb与正式交付原R345b通过，视觉与生产未验",
+      "evidence": [],
+      "merged": true,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "dispatch_id": "C-009",
+      "owner_thread_id": "01a0fdc7-5154-7e51-aafa-f1b34d8f46f9",
+      "plan_decisions": "D0..D6/4场；public_date→public_start_time NULLS LAST→id；date-only保留当地日期提示且无推导时刻；三列表参数白名单安全返回；canonical不变",
+      "plan_commit": "b899421995d39341572791d2c3e2a2053b7d980b",
+      "plan_review_commit": "b590f274",
+      "plan_revision": "7cb9c137da9204ec60501642ba3665ee0216c217",
+      "http_capability_receipt": "/Users/mentianlu/.codex/runtime/u02-http-contract/receipt.json",
+      "http_capability_receipt_sha256": "79d14357046a252dddc1b8322e15f6456e1d34ca8e8626cf661d4bf4459cfec3",
+      "navigation_revision_decision": "独立salt签名压缩导航token，无新增存储/部署配置；保留可承载q>200，最终href含path/HTTP开销受4094请求行约束；先验签再解压/有界解压和结构白名单，真正超预算安全默认",
+      "navigation_decision": {
+        "recorded_at": "2026-10-03T20:21:05.793395+08:00",
+        "mode": "双向同一独立盐签名压缩token，列表仅当前请求展开QueryDict；不重定向长URL，不新增存储",
+        "constraints": "token-only，混用/重复/错kind/坏签名/过期/超预算安全默认；先验签后16KiB有界解压；最终requestline<=3800 bytes；正常query兼容，q>200可容纳即保留",
+        "status": "原R正式APPROVED并已解锁TDD；编码probe不是应用GREEN",
+        "plan_head": "909ad54be3871cb3a9de93c7cf9406a4ab07f573",
+        "review_commit": "469335586ac3ced391097c0822517a4a8e85af5f"
+      },
+      "implementation_commit": "fe53b27d4f35b37a9bd85b3f933344be79f8fefa",
+      "review_packet_commit": "6954b1e360d8369d29403afb4dd7b27462f3ebf2",
+      "red_commit": "a4a90e560ee40849e02abc16c4c9c402931934bf",
+      "implementation_evidence": {
+        "path": "/Users/mentianlu/.codex/runtime/u02-implementation/evidence.json",
+        "sha256": "f0463fdd750ba85ec957df40170a4663a4cfbfcdad0e44cc27de118fa9df195e",
+        "new_tests": 21,
+        "final_batch": 61,
+        "earlier_unaffected_batch": 65,
+        "unique_count": 126,
+        "same_final_batch_126": false,
+        "PostgreSQL_verified": false
+      },
+      "review_commit": "91001a39ff63acbc1a9a360253a43c1e8bfd4f77",
+      "integration_review_commit": "b0019f25",
+      "fixture_repair": {
+        "source_commit": "34cfcfdec64570a83ca7d37e5f029f722947f284",
+        "doc_commit": "3dd1f639",
+        "evidence_sha256": "eb5eee7a5019d5a602417f548533e5c6f428e5bcb0766ae3ef588e8a675b443b",
+        "HTTP_delta_sha256": "555288579302e329d532e768dafc3bb5890dc2053c869cc3ae21f83b91c51727",
+        "status": "APPROVED73ec；PG1和HTTP实际补证经R58eb批准"
+      },
+      "formal_validation": "PR236 fixed06b CI37137528485：6378项/46批、0fail/error、10既定skip、全部native lifecyclecomplete；候选外main907 delivery verified；未合并发布",
+      "merged_delivery_slices": [
+        {
+          "pr": 237,
+          "merge_commit": "22e130adf4464fd3c5dd63ccd3f508c4a853d464",
+          "head": "3a55a9891e3e557027876b18403ef7b5fb39401a",
+          "scope": "仅third-integration-delivery.md列明固定受审切片；不含后续未交付实现",
+          "deployed": false
+        }
+      ],
+      "merge_commit": "22e130adf4464fd3c5dd63ccd3f508c4a853d464",
+      "local_demo_current_preflight": {
+        "dispatch_id": "B156-U01-U02-LOCAL-DEMO-CURRENT-READONLY-PREFLIGHT-001",
+        "status": "ACTIVE_READ_ONLY_EXISTING_ENTRY_CHECK",
+        "candidate": "23eae7f53360c986303bc46685f191764c70af1b",
+        "synthetic_data": "must remain explicitly labeled; not real business acceptance",
+        "production_or_service_start_authorized": false
+      }
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 75,
+    "business_delivery_complete": false,
+    "priority_within_project": 3
+  },
+  {
+    "id": "L01",
+    "project": "P03",
+    "requirement_id": "BR-L01",
+    "original_plan": {
+      "id": "L01",
+      "lane": "C",
+      "role": "application",
+      "it": 2,
+      "start": "2026-10-12",
+      "due": "2026-10-13",
+      "h": 4,
+      "deps": [
+        "N03",
+        "F01"
+      ],
+      "gaps": [
+        "LG-01",
+        "AG-03"
+      ],
+      "area": "links",
+      "title": "实现共享实体及赛事届次解析",
+      "change": "消费 N03 实体结果，用强身份/届次绑定新闻和马匹，区分本届、历史背景和赛事系列；歧义只保留候选。",
+      "test": "同名异马、跨年同赛事、无中文名、只提父母/后代、正文多个赛事；名称相似不自动写关联。",
+      "done": "TC-L01 通过；不用另起一套模型识别重复调用。",
+      "deadline": "2026-10-13 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-13T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/article_entity_reprocessing.py",
+        "server/stable/services/race_news_exposure.py",
+        "server/stable/views.py",
+        "server/stable/test_backfill_article_race_links.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "L01",
+      "title": "实现共享实体及赛事届次解析",
+      "lane": "C",
+      "completion_percent": 60,
+      "status": "部分完成",
+      "basis_and_gap": "结构绑定核心与真实caller四场景GREEN；完整实体/届次覆盖与来源依赖未闭合",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "L01"
+      ],
+      "previous_percent": 60,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "C",
+      "title": "实现共享实体及赛事届次解析",
+      "deps": [
+        "N03",
+        "F01"
+      ],
+      "deadline_at": "2026-10-13T18:00:00+08:00",
+      "status": "结构绑定核心35目标首次实际通过；真实caller接入规划中，整卡未验收",
+      "phase": "C187原R_C零finding批准35目标directGREEN与6898/49批原始执行层；正式full因10expiredskip失败，C188核真实N03/F01输入与实际caller下一接入，来源真实性/权限/完整依赖未关闭",
+      "commit": "1e9723d27956c3df3441c507c5600feb381c8be7",
+      "pr": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/260",
+      "review": "R_C approved target35 firstdirectGREEN only; formal full failed expired skip",
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 60,
+    "business_delivery_complete": false,
+    "priority_within_project": 4
+  },
+  {
+    "id": "L02",
+    "project": "P03",
+    "requirement_id": "BR-L02",
+    "original_plan": {
+      "id": "L02",
+      "lane": "C",
+      "role": "application",
+      "it": 2,
+      "start": "2026-10-13",
+      "due": "2026-10-14",
+      "h": 4,
+      "deps": [
+        "L01"
+      ],
+      "gaps": [
+        "LG-02"
+      ],
+      "area": "links",
+      "title": "建立双向关系更新与更正传播",
+      "change": "发布、编辑、撤回、名称/身份更正和目标后来建档都触发幂等关系重算；人工否决关系保留，双向计数统一过滤。",
+      "test": "乱序事件、失败补投、重复重跑和撤回后旧任务到达；不得把被删除的错误关系复活。",
+      "done": "TC-L02 通过；写关系与下游重算可在事务提交后重试。",
+      "deadline": "2026-10-14 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-14T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/article_entity_reprocessing.py",
+        "server/stable/services/race_news_exposure.py",
+        "server/stable/views.py",
+        "server/stable/test_backfill_article_race_links.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "L02",
+      "title": "建立双向关系更新与更正传播",
+      "lane": "C",
+      "completion_percent": 65,
+      "status": "部分完成",
+      "basis_and_gap": "新增强关系writer后续触发、当前marked双scanner人工保护15方法及只读receipt诊断20方法实际通过并获审；缺失/擦除marker的权威索引仅源码获审，C257双PG失败，C259复验进行中；完整双向传播/历史覆盖仍未验收。",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "C243_strong_trigger_normal_validation",
+        "C248_current_marked_scanner_normal_validation",
+        "C253_selected_receipt_diagnostic_normal_first_validation",
+        "C257_pair_receipt_index_first_normal_ci_validation",
+        "C259_pair_receipt_index_narrow_repair_normal_ci"
+      ],
+      "previous_percent": 60,
+      "change_since_previous": "新增强关系writer后续触发、当前marked双scanner人工保护15方法及只读receipt诊断20方法实际通过并获审；缺失/擦除marker的权威索引仅源码获审，C257双PG失败，C259复验进行中；完整双向传播/历史覆盖仍未验收。",
+      "delta_percentage_points": 5
+    },
+    "execution_ledger": {
+      "lane": "C",
+      "title": "建立双向关系更新与更正传播",
+      "deps": [
+        "L01"
+      ],
+      "deadline_at": "2026-10-14T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "后续C259 pair receipt index 27项窄GREEN获审；C264真实scanner24=2P22F（20业务RED，2driver控制未达）；C265最小guard源码d8f8e9e已原R_C通过。C266 run40108906491/1因用户暂停仅取消请求已受理，远端最终状态/外部CID UNKNOWN，实现后GREEN未验证。65%原估计保留，不改成已完成。",
+    "progress_percent_preserved": 65,
+    "business_delivery_complete": false,
+    "priority_within_project": 5
+  },
+  {
+    "id": "L03",
+    "project": "P03",
+    "requirement_id": "BR-L03",
+    "original_plan": {
+      "id": "L03",
+      "lane": "C",
+      "role": "application",
+      "it": 2,
+      "start": "2026-10-15",
+      "due": "2026-10-16",
+      "h": 3,
+      "deps": [
+        "L02",
+        "H06"
+      ],
+      "gaps": [
+        "LG-03",
+        "LG-05"
+      ],
+      "area": "public",
+      "title": "增加新闻标签及赛事马匹跳转",
+      "change": "新闻实体标签链接到正确届次和马匹；名单、赛果、冠军区域以身份提供跳转；无档案记录进入补齐队列。",
+      "test": "移动端点击、重复标签、退赛马、改名、目标撤回或缺失；不生成空赛事页凑链接。",
+      "done": "TC-L03 通过；匿名用户完整走通新闻到赛事到马匹。",
+      "deadline": "2026-10-16 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-16T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/templates/stable/public/race_detail.html",
+        "server/stable/templates/stable/public/horse_detail.html",
+        "server/stable/templates/stable/public/detail.html"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "L03",
+      "title": "增加新闻标签及赛事马匹跳转",
+      "lane": "C",
+      "completion_percent": 60,
+      "status": "部分完成",
+      "basis_and_gap": "文章至赛事回程等导航切片GREEN；全部新闻/赛事/马匹匿名旅程未完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "L03"
+      ],
+      "previous_percent": 60,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "C",
+      "title": "增加新闻标签及赛事马匹跳转",
+      "deps": [
+        "L02",
+        "H06"
+      ],
+      "deadline_at": "2026-10-16T18:00:00+08:00",
+      "status": "导航切片源码/实际GREEN独立通过；交付技术检查阻塞",
+      "phase": "PR253固定0897最小文章到赛事回程修复，6871/49及8目标实际结果获R_C批准；C180缺候选外独立镜像collection/持久原件与CID收尾，未合并/部署/整卡验收",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 60,
+    "business_delivery_complete": false,
+    "priority_within_project": 6
+  },
+  {
+    "id": "L04",
+    "project": "P03",
+    "requirement_id": "BR-L04",
+    "original_plan": {
+      "id": "L04",
+      "lane": "C",
+      "role": "application",
+      "it": 3,
+      "start": "2026-10-17",
+      "due": "2026-10-18",
+      "h": 4,
+      "deps": [
+        "V02",
+        "L02"
+      ],
+      "gaps": [
+        "LG-04"
+      ],
+      "area": "public",
+      "title": "实现赛事相关新闻统计与重点排序",
+      "change": "按本届赛事及公开关系聚合，赛果报告、重要更正/取消优先，分页和总数同一过滤口径。",
+      "test": "兰秀赛前稿误放赛后、同名跨届、撤回后计数、并列优先级和无相关新闻。",
+      "done": "TC-L03 通过；重点稿排序原因可解释，新闻点击到对应公开页。",
+      "deadline": "2026-10-18 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-18T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/templates/stable/public/race_detail.html",
+        "server/stable/templates/stable/public/horse_detail.html",
+        "server/stable/templates/stable/public/detail.html"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "L04",
+      "title": "实现赛事相关新闻统计与重点排序",
+      "lane": "C",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "L04"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "C",
+      "title": "实现赛事相关新闻统计与重点排序",
+      "deps": [
+        "V02",
+        "L02"
+      ],
+      "deadline_at": "2026-10-18T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 7
+  },
+  {
+    "id": "L05",
+    "project": "P03",
+    "requirement_id": "BR-L05",
+    "original_plan": {
+      "id": "L05",
+      "lane": "C",
+      "role": "application",
+      "it": 3,
+      "start": "2026-10-18",
+      "due": "2026-10-19",
+      "h": 4,
+      "deps": [
+        "L04",
+        "H03"
+      ],
+      "gaps": [
+        "LG-06",
+        "LG-07"
+      ],
+      "area": "public",
+      "title": "完善马匹全生涯与近期新闻导航",
+      "change": "履历展示出道/OP/Listed，存在 event 才给内部链接；近期新闻区分本马与亲属背景，取消错误强关联。",
+      "test": "无赛事页记录、后续补链不重复、分页返回、改名和撤回；统计不得只算日历比赛。",
+      "done": "TC-L03/H03 通过；新闻—赛事—马匹—履历/新闻往返可用。",
+      "deadline": "2026-10-19 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-19T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/templates/stable/public/race_detail.html",
+        "server/stable/templates/stable/public/horse_detail.html",
+        "server/stable/templates/stable/public/detail.html"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "L05",
+      "title": "完善马匹全生涯与近期新闻导航",
+      "lane": "C",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "L05"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "C",
+      "title": "完善马匹全生涯与近期新闻导航",
+      "deps": [
+        "L04",
+        "H03"
+      ],
+      "deadline_at": "2026-10-19T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 8
+  },
+  {
+    "id": "U03",
+    "project": "P03",
+    "requirement_id": "BR-U03",
+    "original_plan": {
+      "id": "U03",
+      "lane": "C",
+      "role": "application",
+      "it": 2,
+      "start": "2026-10-14",
+      "due": "2026-10-15",
+      "h": 4,
+      "deps": [
+        "F05",
+        "L02"
+      ],
+      "gaps": [
+        "UG-02"
+      ],
+      "area": "links",
+      "title": "修复重复赛事身份和旧链接去向",
+      "change": "对固定复现的重复实例建立受审映射和 dry-run 合并工具；重指向名单、新闻和履历，保留旧地址跳转及审计。",
+      "test": "不同届次、同日同场不同比赛不可合并；唯一约束冲突可中止；重复执行无额外关系和赛绩。",
+      "done": "TC-U01 通过；产出明确对象清单供发布包使用，不直接扫描全库自动合并。",
+      "deadline": "2026-10-15 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-15T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/article_entity_reprocessing.py",
+        "server/stable/services/race_news_exposure.py",
+        "server/stable/views.py",
+        "server/stable/test_backfill_article_race_links.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "U03",
+      "title": "修复重复赛事身份和旧链接去向",
+      "lane": "C",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "U03"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "C",
+      "title": "修复重复赛事身份和旧链接去向",
+      "deps": [
+        "F05",
+        "L02"
+      ],
+      "deadline_at": "2026-10-15T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 9
+  },
+  {
+    "id": "U04",
+    "project": "P03",
+    "requirement_id": "BR-U04",
+    "original_plan": {
+      "id": "U04",
+      "lane": "C",
+      "role": "application",
+      "it": 3,
+      "start": "2026-10-22",
+      "due": "2026-10-22",
+      "h": 2,
+      "deps": [
+        "H07",
+        "L05",
+        "R03"
+      ],
+      "gaps": [
+        "UG-04",
+        "UG-05"
+      ],
+      "area": "public",
+      "title": "统一缺失失败新鲜度及订阅文案",
+      "change": "区分无匹配、尚无资料、读取失败；展示合适的暂定/确定及更新时间；跟随/聚合文案与实际能力一致。",
+      "test": "只有当地赛日不能伪造北京时间；QQ 下线后无暗示主动推送的入口；失败可重试。",
+      "done": "TC-U02 通过；读者可理解缺了什么和当前资料阶段，不暴露内部故障码。",
+      "deadline": "2026-10-22 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/templates/stable/public/race_detail.html",
+        "server/stable/templates/stable/public/horse_detail.html",
+        "server/stable/templates/stable/public/detail.html"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "U04",
+      "title": "统一缺失失败新鲜度及订阅文案",
+      "lane": "C",
+      "completion_percent": 55,
+      "status": "部分完成",
+      "basis_and_gap": "新增关注说明、基础资料全空提示与日文原名fallback等切片的真实RED/GREEN及原审（D051后续、D076、D081）；完整读失败/新鲜度/安全重试语义未覆盖，新增小片仍不足上调整卡5%刻度。",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "U04"
+      ],
+      "previous_percent": 55,
+      "change_since_previous": "新增关注说明、基础资料全空提示与日文原名fallback等切片的真实RED/GREEN及原审（D051后续、D076、D081）；完整读失败/新鲜度/安全重试语义未覆盖，新增小片仍不足上调整卡5%刻度。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "C",
+      "title": "统一缺失失败新鲜度及订阅文案",
+      "deps": [
+        "H07",
+        "L05",
+        "R03"
+      ],
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "status": "D线独立公开体验切片方案已送审",
+      "phase": "D001仅赛事日历受限空态重置入口，cabdc28方案交R_D；原H07/L05/R03上游与整卡新鲜度/资料状态义务保留，不改QQ下线范围",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "calendar_empty_recovery_slice": {
+        "head": "4c6fcc7f4ea333e328c836a08e56df27153dbeed",
+        "PR": 257,
+        "actual_target_methods": 19,
+        "actual_datewindow_methods": 41,
+        "independent_review": "APPROVED_ACTUAL_EXECUTION_ONLY",
+        "full_GREEN": false,
+        "formal_delivery": "BLOCKED_EXPIRED_SKIP_AND_INDEPENDENT_DELIVERY_GAPS",
+        "full_U04_U05_accepted": false
+      }
+    },
+    "after_snapshot_note": "D081日文fallback四项窄GREEN已获审；读失败/新鲜度/安全重试整卡仍未覆盖。",
+    "progress_percent_preserved": 55,
+    "business_delivery_complete": false,
+    "priority_within_project": 10
+  },
+  {
+    "id": "L06",
+    "project": "P03",
+    "requirement_id": "BR-L06",
+    "original_plan": {
+      "id": "L06",
+      "lane": "C",
+      "role": "application",
+      "it": 4,
+      "start": "2026-10-24",
+      "due": "2026-10-25",
+      "h": 4,
+      "deps": [
+        "O06",
+        "L05",
+        "H09"
+      ],
+      "gaps": [
+        "LG-02",
+        "LG-07"
+      ],
+      "area": "links",
+      "title": "补齐存量关系并验收跨页导航",
+      "change": "在 F06 冻结的近期/重点存量新闻范围重建关系；检查新建档目标补链、撤回同步和人工否决保护。",
+      "test": "按新闻→赛事→马匹→生涯/新闻完整点击，含无赛事页履历和手机端；总数、分页、目标版本一致。",
+      "done": "TC-L01–03 通过；历史范围和实际完成量公开，不把标签生成当链接验收。",
+      "deadline": "2026-10-25 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-25T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/article_entity_reprocessing.py",
+        "server/stable/services/race_news_exposure.py",
+        "server/stable/views.py",
+        "server/stable/test_backfill_article_race_links.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "L06",
+      "title": "补齐存量关系并验收跨页导航",
+      "lane": "C",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "L06"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "C",
+      "title": "补齐存量关系并验收跨页导航",
+      "deps": [
+        "O06",
+        "L05",
+        "H09"
+      ],
+      "deadline_at": "2026-10-25T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 11
+  },
+  {
+    "id": "U05",
+    "project": "P03",
+    "requirement_id": "BR-U05",
+    "original_plan": {
+      "id": "U05",
+      "lane": "C",
+      "role": "application",
+      "it": 4,
+      "start": "2026-10-26",
+      "due": "2026-10-27",
+      "h": 4,
+      "deps": [
+        "L06",
+        "E06",
+        "U04"
+      ],
+      "gaps": [
+        "UG-01",
+        "UG-05"
+      ],
+      "area": "public",
+      "title": "完成域名手机空态与性能复验",
+      "change": "对正式域名/别名、新闻/赛事/马匹路径、长表、分页返回和失败重试统一验收；修复明确的 N+1 查询或阻断布局。",
+      "test": "固定数据量下比较旧新 p95 和查询数；浏览器实际点击，不能仅靠模板测试；未知来源时间保持真实表达。",
+      "done": "TC-U01/02 通过；无断链/横向遮挡关键操作；非功能提升数字必须有测量。",
+      "deadline": "2026-10-27 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-27T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/templates/stable/public/race_detail.html",
+        "server/stable/templates/stable/public/horse_detail.html",
+        "server/stable/templates/stable/public/detail.html"
+      ],
+      "status": "未开始",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
+    },
+    "progress_snapshot": {
+      "id": "U05",
+      "title": "完成域名手机空态与性能复验",
+      "lane": "C",
+      "completion_percent": 20,
+      "status": "部分完成",
+      "basis_and_gap": "浏览器测量脚本及有限纯测试有进展，但D070资格差分出现新的sandbox拒绝后STOP；真实手机/域名/布局/p95未测，比例不变。",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "U05"
+      ],
+      "previous_percent": 20,
+      "change_since_previous": "浏览器测量脚本及有限纯测试有进展，但D070资格差分出现新的sandbox拒绝后STOP；真实手机/域名/布局/p95未测，比例不变。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "C",
+      "title": "完成域名手机空态与性能复验",
+      "deps": [
+        "L06",
+        "E06",
+        "U04"
+      ],
+      "deadline_at": "2026-10-27T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。",
+      "follow_cancel_accessible_name_slice": {
+        "head": "4d1e5d235ce0a47a119945073a888224354ca989",
+        "PR": 263,
+        "actual_target_methods": 12,
+        "independent_review": "APPROVED_TARGET12_GREEN_ONLY",
+        "full_GREEN": false,
+        "formal_delivery": "BLOCKED_EXPIRED_SKIP_AND_INDEPENDENT_DELIVERY_GAPS",
+        "full_U04_U05_accepted": false
+      }
+    },
+    "after_snapshot_note": "真实域名/手机长表/浏览器资格和p95仍未测，D070历史sandbox拒绝与清理UNKNOWN保留。",
+    "progress_percent_preserved": 20,
+    "business_delivery_complete": false,
+    "priority_within_project": 12
+  },
+  {
+    "id": "Q03",
+    "project": "P03",
+    "requirement_id": "BR-Q03",
+    "original_plan": {
+      "id": "Q03",
+      "lane": "C",
+      "role": "application",
+      "it": 2,
+      "start": "2026-10-16",
+      "due": "2026-10-16",
+      "h": 2,
+      "deps": [
+        "F01",
+        "L02"
+      ],
+      "gaps": [
+        "QG-03"
+      ],
+      "area": "contract",
+      "title": "形成长期只读内容 API 合同",
+      "change": "写明未来新闻/赛事/马匹读取范围、稳定 ID、版本/更正、分页、鉴权/限流候选和内容稳定前置条件；不复用 staff 管理接口直接公开。",
+      "test": "以一个消费者读取并追踪更正的样例核对合同；标记授权与商业条件待后续确定。",
+      "done": "交付设计文档及本版可复用字段清单；公开 API 服务按用户长期方向保留，不算 10/30 已上线功能。",
+      "deadline": "2026-10-16 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-16T18:00:00+08:00",
+      "read_paths": [
+        "docs/changes/next-version-capabilities/design.md",
+        "docs/changes/race-event-unified-decision/spec.md",
+        "server/stable/models.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "Q03",
+      "title": "形成长期只读内容 API 合同",
+      "lane": "C",
+      "completion_percent": 75,
+      "status": "部分完成",
+      "basis_and_gap": "API合同、投影及多项提交可靠性切片已审；完整合同一致性与交付闭环未完；本卡不要求外部API上线",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "Q03"
+      ],
+      "previous_percent": 75,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "C",
+      "title": "形成长期只读内容 API 合同",
+      "deps": [
+        "F01",
+        "L02"
+      ],
+      "deadline_at": "2026-10-16T18:00:00+08:00",
+      "status": "局部实现中",
+      "phase": "公开投影/查询与部分PG提交原语实际GREEN获有限批准；S1异常/清理及RR基线回归仍未闭合，C168/B157固定fixture和映射仅静态获审未执行；外部API整卡未验收",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "dispatch_id": "C143-Q03-READONLY-API-CONTRACT-FIRST-SLICE-001",
+      "owner_thread_id": "01a0fdc7-5154-7e51-aafa-f1b34d8f46f9"
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 75,
+    "business_delivery_complete": false,
+    "priority_within_project": 13
+  }
+]

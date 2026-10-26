@@ -1,0 +1,923 @@
+[
+  {
+    "id": "M01",
+    "project": "P05",
+    "requirement_id": "BR-M01",
+    "original_plan": {
+      "id": "M01",
+      "lane": "B",
+      "role": "integration",
+      "it": 1,
+      "start": "2026-10-05",
+      "due": "2026-10-06",
+      "h": 5,
+      "deps": [
+        "F01",
+        "F02"
+      ],
+      "gaps": [
+        "AG-01"
+      ],
+      "area": "ai",
+      "title": "增加 GPT-6 Responses 适配及结构输出",
+      "change": "在现有 provider 旁新增可配置 Responses 适配，定义实体/事实/证据/缺口输出 schema；保留现有翻译对照路径并记录模型与提示词版本。",
+      "test": "用 mock 响应覆盖合法结构、拒答、字段缺失、截断、429 和超时；自动测试不使用真实 API。",
+      "done": "业务层不依赖具体模型 SDK 响应形状；账号实测作为有边界的运行验证，不当作单元测试。",
+      "deadline": "2026-10-06 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-06T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/translation.py",
+        "server/stable/services/rewriting.py",
+        "server/stable/services/translation_recovery.py",
+        "server/app/settings.py",
+        "server/stable/tasks.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "M01",
+      "title": "增加 GPT-6 Responses 适配及结构输出",
+      "lane": "B",
+      "completion_percent": 45,
+      "status": "部分完成",
+      "basis_and_gap": "Responses与结构化mock适配局部获审；完整调用链/质量依赖未闭合",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "M01"
+      ],
+      "previous_percent": 45,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "B",
+      "title": "增加 GPT-6 Responses 适配及结构输出",
+      "deps": [
+        "F01",
+        "F02"
+      ],
+      "deadline_at": "2026-10-06T18:00:00+08:00",
+      "status": "局部开发完成/正式交付待",
+      "phase": "原R6ba6cb关闭唯一finding；Responses/mock代码局部完成，shared mapping/正式CI待，最终M01质量账号与F02依赖未完成",
+      "commit": "386d89af07d4b552003ff9283f96694872095915",
+      "pr": null,
+      "review": "6ba6cbc42c09beb5dcd1dcd92323f652cd459329",
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "dispatch_id": "B020-M01-RESPONSES-MOCK-IMPLEMENT-001",
+      "owner_thread_id": "01a0fdc6-e1a2-7ae1-9749-6889626d9bf4",
+      "plan_commit": "9edcf8f509a39a29ce96e4e50971bb6fb163c136",
+      "plan_review": "ca1f045466253222db69f4c1350dc2c2d8900020",
+      "merged_slices": [
+        {
+          "name": "默认关闭 Responses mock适配器",
+          "pr": 239,
+          "merge": "6e6aded22764ebee3d6a97f2834f47d4b4baa7bb",
+          "deployed": false,
+          "enabled": false,
+          "whole_task_accepted": false
+        }
+      ]
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 45,
+    "business_delivery_complete": false,
+    "priority_within_project": 1
+  },
+  {
+    "id": "M02",
+    "project": "P05",
+    "requirement_id": "BR-M02",
+    "original_plan": {
+      "id": "M02",
+      "lane": "B",
+      "role": "integration",
+      "it": 1,
+      "start": "2026-10-06",
+      "due": "2026-10-07",
+      "h": 5,
+      "deps": [
+        "M01"
+      ],
+      "gaps": [
+        "AG-08"
+      ],
+      "area": "ai",
+      "title": "实现有界多轮任务执行与恢复",
+      "change": "在 Celery 上持久化步骤、预算、截止时间和幂等键；限制工具轮次/token/请求；进程中断可续跑，重复任务复用同版本结果。",
+      "test": "模拟 worker 崩溃、工具超时、预算耗尽、重投和旧版本迟到；网络读取不得在数据库事务或业务锁内进行。",
+      "done": "退出原因明确；无重复发布/扣账；模型不可用不阻断可靠结构化更新。",
+      "deadline": "2026-10-07 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-07T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/translation.py",
+        "server/stable/services/rewriting.py",
+        "server/stable/services/translation_recovery.py",
+        "server/app/settings.py",
+        "server/stable/tasks.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "M02",
+      "title": "实现有界多轮任务执行与恢复",
+      "lane": "B",
+      "completion_percent": 50,
+      "status": "部分完成",
+      "basis_and_gap": "恢复重投及token停止线等已合并；完整多轮/预算/业务恢复仍缺",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "M02"
+      ],
+      "previous_percent": 50,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "B",
+      "title": "实现有界多轮任务执行与恢复",
+      "deps": [
+        "M01"
+      ],
+      "deadline_at": "2026-10-07T18:00:00+08:00",
+      "status": "部分开发与技术交付完成；完整能力尚缺",
+      "phase": "PR246恢复/重投与PR247已报告token停止线已合并；完整M02义务仍开放，B097定位下一个可离线实现切片；未部署启用",
+      "commit": "1b3d0fab49c112fc6e3c86eab7cdf6e11cde79b2",
+      "pr": 246,
+      "review": "dbd4dfe1ec0a124fcd3713f58cb515974a35bfb0",
+      "evidence": [
+        "docs/changes/next-version-capabilities/twelfth-integration-delivery.md",
+        "docs/changes/next-version-capabilities/thirteenth-integration-delivery.md"
+      ],
+      "merged": true,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "dispatch_id": "B050-M02-END-TO-END-GAP-PLAN-001",
+      "merged_commit": "582846d4b525378e8b44d03674be1d47b71e7a65"
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 50,
+    "business_delivery_complete": false,
+    "priority_within_project": 2
+  },
+  {
+    "id": "M03",
+    "project": "P05",
+    "requirement_id": "BR-M03",
+    "original_plan": {
+      "id": "M03",
+      "lane": "B",
+      "role": "integration",
+      "it": 1,
+      "start": "2026-10-07",
+      "due": "2026-10-08",
+      "h": 4,
+      "deps": [
+        "M02",
+        "F03"
+      ],
+      "gaps": [
+        "AG-02"
+      ],
+      "area": "ai",
+      "title": "封装内部查询与证据读取工具",
+      "change": "提供当前名单、马匹身份/译名、已收录新闻和来源证据读取；工具参数绑定目标和来源，输出真实 evidence ID、内容时间与读取时间。",
+      "test": "拒绝伪造实体/证据、越界 URL 和页面夹带指令；不暴露任意 SQL、直接发布或修改权限工具。",
+      "done": "多轮查询能回到真实证据；同一证据可被翻译、关联、前瞻复用。",
+      "deadline": "2026-10-08 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-08T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/translation.py",
+        "server/stable/services/rewriting.py",
+        "server/stable/services/translation_recovery.py",
+        "server/app/settings.py",
+        "server/stable/tasks.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "M03",
+      "title": "封装内部查询与证据读取工具",
+      "lane": "B",
+      "completion_percent": 55,
+      "status": "部分完成",
+      "basis_and_gap": "来源摘录/内部读取子片有真实PG回归与PR249；完整查询复用面未闭合",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "M03"
+      ],
+      "previous_percent": 55,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "B",
+      "title": "封装内部查询与证据读取工具",
+      "deps": [
+        "M02",
+        "F03"
+      ],
+      "deadline_at": "2026-10-08T18:00:00+08:00",
+      "status": "部分范围开始开发",
+      "phase": "B098来源摘录证据收据切片RED/实现；完整查询工具面仍开放",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "dispatch_id": "B098-M03-SOURCE-EVIDENCE-RECEIPT-001"
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 55,
+    "business_delivery_complete": false,
+    "priority_within_project": 3
+  },
+  {
+    "id": "M04",
+    "project": "P05",
+    "requirement_id": "BR-M04",
+    "original_plan": {
+      "id": "M04",
+      "lane": "B",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-15",
+      "due": "2026-10-16",
+      "h": 5,
+      "deps": [
+        "M03",
+        "R04"
+      ],
+      "gaps": [
+        "AG-04"
+      ],
+      "area": "ai",
+      "title": "实现多源研究与冲突候选输出",
+      "change": "按赛事资料缺口选择下一工具，区分旧消息/预想/确定/更正；输出逐字段候选、支持与冲突证据、退出原因，交统一赛事决策验证。",
+      "test": "一个已验证可信终态源、两个镜像、过期消息、缺马、来源断网；结构化完整结果不等待研究。",
+      "done": "TC-A02 通过；研究结果可以安全自动采纳或退回补证，不能直接写任意数据库字段。",
+      "deadline": "2026-10-16 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-16T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/translation.py",
+        "server/stable/services/rewriting.py",
+        "server/stable/services/translation_recovery.py",
+        "server/app/settings.py",
+        "server/stable/tasks.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "M04",
+      "title": "实现多源研究与冲突候选输出",
+      "lane": "B",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "M04"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "B",
+      "title": "实现多源研究与冲突候选输出",
+      "deps": [
+        "M03",
+        "R04"
+      ],
+      "deadline_at": "2026-10-16T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 4
+  },
+  {
+    "id": "M05",
+    "project": "P05",
+    "requirement_id": "BR-M05",
+    "original_plan": {
+      "id": "M05",
+      "lane": "B",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-19",
+      "due": "2026-10-20",
+      "h": 4,
+      "deps": [
+        "M04",
+        "N06",
+        "H05"
+      ],
+      "gaps": [
+        "AG-05"
+      ],
+      "area": "ai",
+      "title": "建立全参赛者前瞻资料表",
+      "change": "以具体赛事与名单版本逐匹生成资料项：身份、现成名、近绩、距离场地经验、可靠训练采访和缺口；只补过期资料。",
+      "test": "全部冷门马、无中文名、同名异马、查询失败和无近况；必须每匹有结果而非只写热门。",
+      "done": "TC-A03 通过；名单覆盖 100%，无额外马匹；资料缺口不被编造填满。",
+      "deadline": "2026-10-20 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-20T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/translation.py",
+        "server/stable/services/rewriting.py",
+        "server/stable/services/translation_recovery.py",
+        "server/app/settings.py",
+        "server/stable/tasks.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "M05",
+      "title": "建立全参赛者前瞻资料表",
+      "lane": "B",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "M05"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "B",
+      "title": "建立全参赛者前瞻资料表",
+      "deps": [
+        "M04",
+        "N06",
+        "H05"
+      ],
+      "deadline_at": "2026-10-20T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 5
+  },
+  {
+    "id": "M06",
+    "project": "P05",
+    "requirement_id": "BR-M06",
+    "original_plan": {
+      "id": "M06",
+      "lane": "B",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-20",
+      "due": "2026-10-21",
+      "h": 5,
+      "deps": [
+        "M05"
+      ],
+      "gaps": [
+        "AG-05"
+      ],
+      "area": "ai",
+      "title": "生成带事实出处的重点赛事前瞻",
+      "change": "按基本信息/看点/逐马情况/有依据对比/不确定性生成主稿；逐段关键事实映射证据，事实与分析分开，关联赛事和马匹。",
+      "test": "无训练伤情采访证据、跨语言误引、资料互相矛盾；对照用户认可样稿，尚未取得时用已冻结格式不假称已读。",
+      "done": "TC-A03/04 通过；首批仅重点赛事，预算用量和单篇成本可见。",
+      "deadline": "2026-10-21 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-21T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/translation.py",
+        "server/stable/services/rewriting.py",
+        "server/stable/services/translation_recovery.py",
+        "server/app/settings.py",
+        "server/stable/tasks.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "M06",
+      "title": "生成带事实出处的重点赛事前瞻",
+      "lane": "B",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "M06"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "B",
+      "title": "生成带事实出处的重点赛事前瞻",
+      "deps": [
+        "M05"
+      ],
+      "deadline_at": "2026-10-21T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 6
+  },
+  {
+    "id": "M07",
+    "project": "P05",
+    "requirement_id": "BR-M07",
+    "original_plan": {
+      "id": "M07",
+      "lane": "B",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-21",
+      "due": "2026-10-22",
+      "h": 4,
+      "deps": [
+        "M06",
+        "R06",
+        "L02"
+      ],
+      "gaps": [
+        "AG-05",
+        "AG-08"
+      ],
+      "area": "ai",
+      "title": "实现前瞻发布前复验与增量更正",
+      "change": "发布前读取最新名单/时间/状态；退赛及延期触发更新同一主稿；取消/开赛拒绝旧前瞻，版本锁防旧任务覆盖。",
+      "test": "研究期间退赛、同场两个生成任务、已开赛才返回、重试重复发布、名单预想转确定。",
+      "done": "TC-A05 通过；显示稿件版本和更新时间；不让前瞻队列阻断 5/10 分钟资料更新。",
+      "deadline": "2026-10-22 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/translation.py",
+        "server/stable/services/rewriting.py",
+        "server/stable/services/translation_recovery.py",
+        "server/app/settings.py",
+        "server/stable/tasks.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "M07",
+      "title": "实现前瞻发布前复验与增量更正",
+      "lane": "B",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "M07"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "B",
+      "title": "实现前瞻发布前复验与增量更正",
+      "deps": [
+        "M06",
+        "R06",
+        "L02"
+      ],
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 7
+  },
+  {
+    "id": "M08",
+    "project": "P05",
+    "requirement_id": "BR-M08",
+    "original_plan": {
+      "id": "M08",
+      "lane": "B",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-22",
+      "due": "2026-10-22",
+      "h": 4,
+      "deps": [
+        "M06",
+        "R08"
+      ],
+      "gaps": [
+        "AG-06"
+      ],
+      "area": "ai",
+      "title": "实现赛后综合报道",
+      "change": "读取完整赛果、可靠赛程报道与采访，生成独立赛后稿；复用证据与关联但保留赛前稿历史。",
+      "test": "只有结果表、并列/非完赛、赛后更正、采访缺失；不能虚构比赛走势或引语。",
+      "done": "TC-A04 通过；关键名次与赛事公开版本一致，综合稿类型可被赛事页优先展示。",
+      "deadline": "2026-10-22 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/translation.py",
+        "server/stable/services/rewriting.py",
+        "server/stable/services/translation_recovery.py",
+        "server/app/settings.py",
+        "server/stable/tasks.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "M08",
+      "title": "实现赛后综合报道",
+      "lane": "B",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "M08"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "B",
+      "title": "实现赛后综合报道",
+      "deps": [
+        "M06",
+        "R08"
+      ],
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 8
+  },
+  {
+    "id": "M09",
+    "project": "P05",
+    "requirement_id": "BR-M09",
+    "original_plan": {
+      "id": "M09",
+      "lane": "B",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-17",
+      "due": "2026-10-19",
+      "h": 4,
+      "deps": [
+        "M04",
+        "R08",
+        "L01"
+      ],
+      "gaps": [
+        "AG-06"
+      ],
+      "area": "ai",
+      "title": "将新闻事实转为资料变更候选",
+      "change": "提取计划参赛、确定退赛、取消、更正等时间语义，附 evidence ID 和目标版本，调用统一资料候选入口。",
+      "test": "传闻、否定、旧报道、同名赛、计划变确定和重复转载；新闻实体关系不能直接成为事实更新授权。",
+      "done": "TC-A02 通过；合格候选按现有规则自动落地，冲突返回例外。",
+      "deadline": "2026-10-19 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-19T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/translation.py",
+        "server/stable/services/rewriting.py",
+        "server/stable/services/translation_recovery.py",
+        "server/app/settings.py",
+        "server/stable/tasks.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "M09",
+      "title": "将新闻事实转为资料变更候选",
+      "lane": "B",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "M09"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "B",
+      "title": "将新闻事实转为资料变更候选",
+      "deps": [
+        "M04",
+        "R08",
+        "L01"
+      ],
+      "deadline_at": "2026-10-19T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 9
+  },
+  {
+    "id": "M10",
+    "project": "P05",
+    "requirement_id": "BR-M10",
+    "original_plan": {
+      "id": "M10",
+      "lane": "B",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-19",
+      "due": "2026-10-22",
+      "h": 4,
+      "deps": [
+        "M04",
+        "E02"
+      ],
+      "gaps": [
+        "AG-04",
+        "EG-02"
+      ],
+      "area": "ai",
+      "title": "提供异常证据归因与恢复建议",
+      "change": "从已有日志/证据读取模板变化、身份歧义和来源停更线索，产出支持证据与建议动作；只调用已有适用恢复动作。",
+      "test": "日志夹带指令、证据不足、错误归因和重复异常；模型不可修改策略、额度或凭据。",
+      "done": "TC-E01 通过；后台说明可读，未经证实原因用可能性表达，正常路径无需模型批准。",
+      "deadline": "2026-10-22 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/translation.py",
+        "server/stable/services/rewriting.py",
+        "server/stable/services/translation_recovery.py",
+        "server/app/settings.py",
+        "server/stable/tasks.py"
+      ],
+      "status": "未开始",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
+    },
+    "progress_snapshot": {
+      "id": "M10",
+      "title": "提供异常证据归因与恢复建议",
+      "lane": "B",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "M10"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "B",
+      "title": "提供异常证据归因与恢复建议",
+      "deps": [
+        "M04",
+        "E02"
+      ],
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 10
+  },
+  {
+    "id": "M11",
+    "project": "P05",
+    "requirement_id": "BR-M11",
+    "original_plan": {
+      "id": "M11",
+      "lane": "B",
+      "role": "integration",
+      "it": 4,
+      "start": "2026-10-24",
+      "due": "2026-10-26",
+      "h": 6,
+      "deps": [
+        "O06",
+        "F02",
+        "M08",
+        "M10"
+      ],
+      "gaps": [
+        "AG-07",
+        "AG-08"
+      ],
+      "area": "ai",
+      "title": "完成模型质量时延成本对照与参数收敛",
+      "change": "比较规则/现有模型/增强链，按每篇合格产出、每场研究计算成本和 p50/p95 时延；限制无收益重复查询，固定最终配置。",
+      "test": "使用未参与调参的保留集及真实灰度输出，覆盖拒答、模型不可用、证据不支持与冷门马资料缺失。",
+      "done": "TC-A01–05 达标；成本在 F06 锁定预算内，模型自信评分不作为验收。",
+      "deadline": "2026-10-26 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-26T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/translation.py",
+        "server/stable/services/rewriting.py",
+        "server/stable/services/translation_recovery.py",
+        "server/app/settings.py",
+        "server/stable/tasks.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "M11",
+      "title": "完成模型质量时延成本对照与参数收敛",
+      "lane": "B",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "M11"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "B",
+      "title": "完成模型质量时延成本对照与参数收敛",
+      "deps": [
+        "O06",
+        "F02",
+        "M08",
+        "M10"
+      ],
+      "deadline_at": "2026-10-26T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 11
+  },
+  {
+    "id": "M12",
+    "project": "P05",
+    "requirement_id": "BR-M12",
+    "original_plan": {
+      "id": "M12",
+      "lane": "B",
+      "role": "integration",
+      "it": 4,
+      "start": "2026-10-27",
+      "due": "2026-10-28",
+      "h": 3,
+      "deps": [
+        "M11",
+        "N09"
+      ],
+      "gaps": [
+        "AG-08"
+      ],
+      "area": "ai",
+      "title": "验证模型降级与最终发布配置",
+      "change": "演练 API 不可用、预算耗尽和超时，确认已验证结构化更新继续，依赖语义判定的任务有界等待并呈现缺口。",
+      "test": "不能静默切弱模型后保留原准确率声明；前瞻过期禁止补发；恢复后不重发同篇稿。",
+      "done": "10/28 12:00 前复验已冻结配置和回退清单；若需变更配置或代码，必须补 V05 对应复审后再交 O08，不以本卡测试代替审核；关键任务无依赖模型的单点卡死。",
+      "deadline": "2026-10-28 12:00 Asia/Shanghai",
+      "deadline_at": "2026-10-28T12:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/translation.py",
+        "server/stable/services/rewriting.py",
+        "server/stable/services/translation_recovery.py",
+        "server/app/settings.py",
+        "server/stable/tasks.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "M12",
+      "title": "验证模型降级与最终发布配置",
+      "lane": "B",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "M12"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "B",
+      "title": "验证模型降级与最终发布配置",
+      "deps": [
+        "M11",
+        "N09"
+      ],
+      "deadline_at": "2026-10-28T12:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 12
+  }
+]

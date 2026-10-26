@@ -1,0 +1,1728 @@
+[
+  {
+    "requirement": "BR-F02",
+    "card": "F02",
+    "project": "P01",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-004",
+      "USR-005"
+    ],
+    "card_original_change": "只读统计五地区抓取、清洗、翻译、选择、公开和曝光；按失败原因拆解 JRA 倾斜。保存脱敏的原文/正确实体/重要事件标注，固定训练样例与保留验收集。",
+    "original_deps": [],
+    "new_execution_order_rank": 1
+  },
+  {
+    "requirement": "BR-N01",
+    "card": "N01",
+    "project": "P01",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-004",
+      "USR-005"
+    ],
+    "card_original_change": "为来源适配器输出稳定区块 ID、原文与保留/删除原因，修正宽容器回退；保存必要正文证据供模型检查。",
+    "original_deps": [
+      "F02"
+    ],
+    "new_execution_order_rank": 2
+  },
+  {
+    "requirement": "BR-N02",
+    "card": "N02",
+    "project": "P01",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-004",
+      "USR-005"
+    ],
+    "card_original_change": "模型只返回区块保留/删除及依据，程序实施清洗；对异常短文/噪声比例/模板变化记录质量原因及有界重试。",
+    "original_deps": [
+      "N01",
+      "M03"
+    ],
+    "new_execution_order_rank": 3
+  },
+  {
+    "requirement": "BR-N03",
+    "card": "N03",
+    "project": "P01",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-004",
+      "USR-005"
+    ],
+    "card_original_change": "结合词库与强模型发现实体 occurrence，核验字符区间和稳定身份后生成保护占位；未知马名保留原名。",
+    "original_deps": [
+      "N02",
+      "M03"
+    ],
+    "new_execution_order_rank": 4
+  },
+  {
+    "requirement": "BR-N04",
+    "card": "N04",
+    "project": "P01",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-004",
+      "USR-005"
+    ],
+    "card_original_change": "先核对姓名/数字/日期/名次，再审否定/计划/引语归属；记录具体差异，限定自动重译次数，重要失败优先待办。",
+    "original_deps": [
+      "N03"
+    ],
+    "new_execution_order_rank": 5
+  },
+  {
+    "requirement": "BR-N05",
+    "card": "N05",
+    "project": "P01",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-004",
+      "USR-005"
+    ],
+    "card_original_change": "合并跨来源同事件候选，模型识别重要性和新事实；取消为凑量降低门槛的自动兜底，重大更新可突破常规上限。",
+    "original_deps": [
+      "V02"
+    ],
+    "new_execution_order_rank": 6
+  },
+  {
+    "requirement": "BR-N06",
+    "card": "N06",
+    "project": "P01",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-004",
+      "USR-005"
+    ],
+    "card_original_change": "移除不合理的固定来源偏置，按周合格事件覆盖/曝光调节；零产出拆成来源不足、抓取失败、翻译阻断和未选中。",
+    "original_deps": [
+      "N05",
+      "F02"
+    ],
+    "new_execution_order_rank": 7
+  },
+  {
+    "requirement": "BR-N07",
+    "card": "N07",
+    "project": "P01",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-004",
+      "USR-005"
+    ],
+    "card_original_change": "扫描 F02 确认影响的来源/时间切片，生成旧正文、清洗差异、保护实体、译文和关联变化的固定清单。",
+    "original_deps": [
+      "N02",
+      "N04"
+    ],
+    "new_execution_order_rank": 8
+  },
+  {
+    "requirement": "BR-N08",
+    "card": "N08",
+    "project": "P01",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-004",
+      "USR-005"
+    ],
+    "card_original_change": "按固定清单执行修复并保护人工稿，重算关联/曝光；逐篇保存前后内容与恢复点。",
+    "original_deps": [
+      "O06",
+      "N07"
+    ],
+    "new_execution_order_rank": 9
+  },
+  {
+    "requirement": "BR-N09",
+    "card": "N09",
+    "project": "P01",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-004",
+      "USR-005"
+    ],
+    "card_original_change": "使用 O05 固定的五地区新闻政策与范围，按真实起点累计至少 168 小时；计划 10/20 12:00 至 10/27 12:00，冻结候选/发布/曝光及重大事件分母后抽检拒稿和漏报。",
+    "original_deps": [
+      "N08",
+      "N06",
+      "O05"
+    ],
+    "new_execution_order_rank": 10
+  },
+  {
+    "requirement": "BR-F03",
+    "card": "F03",
+    "project": "P02",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-006",
+      "USR-007",
+      "USR-008"
+    ],
+    "card_original_change": "按地区×赛程/名单/退赛/结果/更正记录可用端点、稳定身份、更新时刻、最终状态语义、速率和现有权限；每格给主源、备源或缺口，输出固定回放证据。",
+    "original_deps": [
+      "F01"
+    ],
+    "new_execution_order_rank": 1
+  },
+  {
+    "requirement": "BR-R01",
+    "card": "R01",
+    "project": "P02",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-006",
+      "USR-007",
+      "USR-008"
+    ],
+    "card_original_change": "记录应跟踪目标、阶段截止、来源首次可得区间、发现/排队/验证/公开时间；实现按场次错误和卡顿的查询与地区切片。",
+    "original_deps": [
+      "F01",
+      "F03"
+    ],
+    "new_execution_order_rank": 2
+  },
+  {
+    "requirement": "BR-R02",
+    "card": "R02",
+    "project": "P02",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-006",
+      "USR-007",
+      "USR-008"
+    ],
+    "card_original_change": "复用既有统一决策方案，输入事实/时钟/成熟度/执行健康，输出唯一下一动作和原因；旧执行路径继续使用原有 owner/lease。",
+    "original_deps": [
+      "R01"
+    ],
+    "new_execution_order_rank": 3
+  },
+  {
+    "requirement": "BR-R03",
+    "card": "R03",
+    "project": "P02",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-006",
+      "USR-007",
+      "USR-008"
+    ],
+    "card_original_change": "提供预想/确定名单、待确认/已确认结果与真实赛事进程的组合投影；冠军卡、名单和结果表使用同一公开 revision。",
+    "original_deps": [
+      "R02"
+    ],
+    "new_execution_order_rank": 4
+  },
+  {
+    "requirement": "BR-R04",
+    "card": "R04",
+    "project": "P02",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-006",
+      "USR-007",
+      "USR-008"
+    ],
+    "card_original_change": "替换固定来源等级先拒绝的逻辑，按能力/身份/成熟度/新鲜度/健康选择；高等级旧值失效时允许合格备源接管，保存原因。",
+    "original_deps": [
+      "V01"
+    ],
+    "new_execution_order_rank": 5
+  },
+  {
+    "requirement": "BR-R05",
+    "card": "R05",
+    "project": "P02",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-006",
+      "USR-007",
+      "USR-008"
+    ],
+    "card_original_change": "在确定资料开放和赛前赛后窗口缩短轮询，按 5/10 分钟倒扣排队/解析/备用时间；加入阶段超时和下一动作。",
+    "original_deps": [
+      "R04",
+      "R01"
+    ],
+    "new_execution_order_rank": 6
+  },
+  {
+    "requirement": "BR-R06",
+    "card": "R06",
+    "project": "P02",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-006",
+      "USR-007",
+      "USR-008"
+    ],
+    "card_original_change": "将来源变化归一化为证据事件，更新 schedule generation、未来截止与页面；取消结束无意义轮询但保留合法更正入口。",
+    "original_deps": [
+      "R05"
+    ],
+    "new_execution_order_rank": 7
+  },
+  {
+    "requirement": "BR-R07",
+    "card": "R07",
+    "project": "P02",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-006",
+      "USR-007",
+      "USR-008"
+    ],
+    "card_original_change": "分别表示未出赛、非完赛、失格、未知缺行；用稳定身份对账预定/实际出赛/结果，保留原始和派生依据。",
+    "original_deps": [
+      "R04",
+      "R03"
+    ],
+    "new_execution_order_rank": 8
+  },
+  {
+    "requirement": "BR-R08",
+    "card": "R08",
+    "project": "P02",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-006",
+      "USR-007",
+      "USR-008"
+    ],
+    "card_original_change": "以公开 revision 一次更新冠军/名单/赛果投影；延迟任务拒绝覆盖新版本，更新后触发缓存和下游变更事件。",
+    "original_deps": [
+      "R06",
+      "R07"
+    ],
+    "new_execution_order_rank": 9
+  },
+  {
+    "requirement": "BR-R09",
+    "card": "R09",
+    "project": "P02",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-006",
+      "USR-007",
+      "USR-008"
+    ],
+    "card_original_change": "重新读取此前 11 场受阻清单，逐场核实当前状态与历史 publication 证据，修复有合法依据的旧读路径；缺证明确挂账。",
+    "original_deps": [
+      "R08"
+    ],
+    "new_execution_order_rank": 10
+  },
+  {
+    "requirement": "BR-R11-JP",
+    "card": "R11-JP",
+    "project": "P02",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-006",
+      "USR-007",
+      "USR-008"
+    ],
+    "card_original_change": "只处理 F03 矩阵中日本已明确的适配缺口：身份、赛程、名单/退赛、结果/更正。沿既有 adapter 修最小差异，保留主备来源证据与能力标记；已满足的格只补验证，不重写。",
+    "original_deps": [
+      "R04",
+      "F03"
+    ],
+    "new_execution_order_rank": 11
+  },
+  {
+    "requirement": "BR-R11-HK",
+    "card": "R11-HK",
+    "project": "P02",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-006",
+      "USR-007",
+      "USR-008"
+    ],
+    "card_original_change": "只处理 F03 矩阵中中国香港已明确的适配缺口：身份、赛程、名单/退赛、结果/更正。沿既有 adapter 修最小差异，保留主备来源证据与能力标记；已满足的格只补验证，不重写。",
+    "original_deps": [
+      "R04",
+      "F03"
+    ],
+    "new_execution_order_rank": 12
+  },
+  {
+    "requirement": "BR-R11-GB",
+    "card": "R11-GB",
+    "project": "P02",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-006",
+      "USR-007",
+      "USR-008"
+    ],
+    "card_original_change": "只处理 F03 矩阵中英国已明确的适配缺口：身份、赛程、名单/退赛、结果/更正。沿既有 adapter 修最小差异，保留主备来源证据与能力标记；已满足的格只补验证，不重写。",
+    "original_deps": [
+      "R07",
+      "F03"
+    ],
+    "new_execution_order_rank": 13
+  },
+  {
+    "requirement": "BR-R11-IE",
+    "card": "R11-IE",
+    "project": "P02",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-006",
+      "USR-007",
+      "USR-008"
+    ],
+    "card_original_change": "只处理 F03 矩阵中爱尔兰已明确的适配缺口：身份、赛程、名单/退赛、结果/更正。沿既有 adapter 修最小差异，保留主备来源证据与能力标记；已满足的格只补验证，不重写。",
+    "original_deps": [
+      "R07",
+      "F03"
+    ],
+    "new_execution_order_rank": 14
+  },
+  {
+    "requirement": "BR-R11-FR",
+    "card": "R11-FR",
+    "project": "P02",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-006",
+      "USR-007",
+      "USR-008"
+    ],
+    "card_original_change": "只处理 F03 矩阵中法国已明确的适配缺口：身份、赛程、名单/退赛、结果/更正。沿既有 adapter 修最小差异，保留主备来源证据与能力标记；已满足的格只补验证，不重写。",
+    "original_deps": [
+      "R07",
+      "F03"
+    ],
+    "new_execution_order_rank": 15
+  },
+  {
+    "requirement": "BR-R10",
+    "card": "R10",
+    "project": "P02",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-006",
+      "USR-007",
+      "USR-008"
+    ],
+    "card_original_change": "按统一决策处理过期/变更策略和 owner 冲突，恢复合法登记的下一动作；历史公开依据保持独立。",
+    "original_deps": [
+      "V02"
+    ],
+    "new_execution_order_rank": 16
+  },
+  {
+    "requirement": "BR-R11-US",
+    "card": "R11-US",
+    "project": "P02",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-006",
+      "USR-007",
+      "USR-008"
+    ],
+    "card_original_change": "只处理 F03 矩阵中美国已明确的适配缺口：身份、赛程、名单/退赛、结果/更正。沿既有 adapter 修最小差异，保留主备来源证据与能力标记；已满足的格只补验证，不重写。",
+    "original_deps": [
+      "V02",
+      "F03"
+    ],
+    "new_execution_order_rank": 17
+  },
+  {
+    "requirement": "BR-R11-AU",
+    "card": "R11-AU",
+    "project": "P02",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-006",
+      "USR-007",
+      "USR-008"
+    ],
+    "card_original_change": "只处理 F03 矩阵中澳大利亚已明确的适配缺口：身份、赛程、名单/退赛、结果/更正。沿既有 adapter 修最小差异，保留主备来源证据与能力标记；已满足的格只补验证，不重写。",
+    "original_deps": [
+      "V02",
+      "F03"
+    ],
+    "new_execution_order_rank": 18
+  },
+  {
+    "requirement": "BR-R11-DE",
+    "card": "R11-DE",
+    "project": "P02",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-006",
+      "USR-007",
+      "USR-008"
+    ],
+    "card_original_change": "只处理 F03 矩阵中德国已明确的适配缺口：身份、赛程、名单/退赛、结果/更正。沿既有 adapter 修最小差异，保留主备来源证据与能力标记；已满足的格只补验证，不重写。",
+    "original_deps": [
+      "V02",
+      "F03"
+    ],
+    "new_execution_order_rank": 19
+  },
+  {
+    "requirement": "BR-R11-ME",
+    "card": "R11-ME",
+    "project": "P02",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-006",
+      "USR-007",
+      "USR-008"
+    ],
+    "card_original_change": "只处理 F03 矩阵中中东已明确的适配缺口：身份、赛程、名单/退赛、结果/更正。沿既有 adapter 修最小差异，保留主备来源证据与能力标记；已满足的格只补验证，不重写。",
+    "original_deps": [
+      "V02",
+      "F03"
+    ],
+    "new_execution_order_rank": 20
+  },
+  {
+    "requirement": "BR-R11",
+    "card": "R11",
+    "project": "P02",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-006",
+      "USR-007",
+      "USR-008"
+    ],
+    "card_original_change": "汇总九张地区切片的解析结果和证据，核对 F03 每格状态、主备切换和统一决策的消费方式；适配修复在地区卡计工时，不重复实现。",
+    "original_deps": [
+      "R10",
+      "F03",
+      "R11-JP",
+      "R11-HK",
+      "R11-GB",
+      "R11-IE",
+      "R11-FR",
+      "R11-US",
+      "R11-AU",
+      "R11-DE",
+      "R11-ME"
+    ],
+    "new_execution_order_rank": 21
+  },
+  {
+    "requirement": "BR-R12",
+    "card": "R12",
+    "project": "P02",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-006",
+      "USR-007",
+      "USR-008"
+    ],
+    "card_original_change": "固化至少 300 场保留验收样例，九地区各至少 20 场，其余补异常；覆盖名单成熟、延期取消、退赛、并列、超时和更正。",
+    "original_deps": [
+      "R11",
+      "H08"
+    ],
+    "new_execution_order_rank": 22
+  },
+  {
+    "requirement": "BR-R13",
+    "card": "R13",
+    "project": "P02",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-006",
+      "USR-007",
+      "USR-008"
+    ],
+    "card_original_change": "生产候选探针记录外部发布/首次可见区间与页面 revision；按日和滚动 28 天展示错误、卡顿、缺失和各阶段时延。",
+    "original_deps": [
+      "R12",
+      "O03"
+    ],
+    "new_execution_order_rank": 23
+  },
+  {
+    "requirement": "BR-R14",
+    "card": "R14",
+    "project": "P02",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-006",
+      "USR-007",
+      "USR-008"
+    ],
+    "card_original_change": "按实际超时对象复盘发现、队列、验证和公开耗时，只修具体根因；保留原始失败和修复后的新窗口统计。",
+    "original_deps": [
+      "O06",
+      "R13"
+    ],
+    "new_execution_order_rank": 24
+  },
+  {
+    "requirement": "BR-R15",
+    "card": "R15",
+    "project": "P02",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-006",
+      "USR-007",
+      "USR-008"
+    ],
+    "card_original_change": "在隔离环境重放真实目标的主源断开、备用接管、worker 中断及迟到更正；对照生产只读探针的实际配置。",
+    "original_deps": [
+      "R14",
+      "H11"
+    ],
+    "new_execution_order_rank": 25
+  },
+  {
+    "requirement": "BR-R16",
+    "card": "R16",
+    "project": "P02",
+    "priority": "P0",
+    "user_message_ids": [
+      "USR-006",
+      "USR-007",
+      "USR-008"
+    ],
+    "card_original_change": "从全量运行账本逐场核对关键资料和卡顿分母，检查九地区与历史数据修复清单；跟踪到 10/30。",
+    "original_deps": [
+      "O08",
+      "R15"
+    ],
+    "new_execution_order_rank": 26
+  },
+  {
+    "requirement": "BR-F05",
+    "card": "F05",
+    "project": "P03",
+    "priority": "P1",
+    "user_message_ids": [
+      "USR-013",
+      "USR-014",
+      "USR-020"
+    ],
+    "card_original_change": "复验域名、凯旋门重复、德国 G1 筛选、兰秀赛果、女皇杯缺行、三个马匹统计例；为每例保留 URL、对象 ID、时间和实际结果。",
+    "original_deps": [],
+    "new_execution_order_rank": 1
+  },
+  {
+    "requirement": "BR-U01",
+    "card": "U01",
+    "project": "P03",
+    "priority": "P1",
+    "user_message_ids": [
+      "USR-013",
+      "USR-014",
+      "USR-020"
+    ],
+    "card_original_change": "统一规范等级解析、数据库查询和标签投影，处理空值/别名；为存量差异生成候选修复清单。",
+    "original_deps": [
+      "F05"
+    ],
+    "new_execution_order_rank": 2
+  },
+  {
+    "requirement": "BR-U02",
+    "card": "U02",
+    "project": "P03",
+    "priority": "P1",
+    "user_message_ids": [
+      "USR-013",
+      "USR-014",
+      "USR-020"
+    ],
+    "card_original_change": "首页改为今天起七天、最多四场、缺时刻留空；移除指定详情届次控件，保留日历年份筛选；列表返回保留条件。",
+    "original_deps": [
+      "F05"
+    ],
+    "new_execution_order_rank": 3
+  },
+  {
+    "requirement": "BR-L01",
+    "card": "L01",
+    "project": "P03",
+    "priority": "P1",
+    "user_message_ids": [
+      "USR-013",
+      "USR-014",
+      "USR-020"
+    ],
+    "card_original_change": "消费 N03 实体结果，用强身份/届次绑定新闻和马匹，区分本届、历史背景和赛事系列；歧义只保留候选。",
+    "original_deps": [
+      "N03",
+      "F01"
+    ],
+    "new_execution_order_rank": 4
+  },
+  {
+    "requirement": "BR-L02",
+    "card": "L02",
+    "project": "P03",
+    "priority": "P1",
+    "user_message_ids": [
+      "USR-013",
+      "USR-014",
+      "USR-020"
+    ],
+    "card_original_change": "发布、编辑、撤回、名称/身份更正和目标后来建档都触发幂等关系重算；人工否决关系保留，双向计数统一过滤。",
+    "original_deps": [
+      "L01"
+    ],
+    "new_execution_order_rank": 5
+  },
+  {
+    "requirement": "BR-L03",
+    "card": "L03",
+    "project": "P03",
+    "priority": "P1",
+    "user_message_ids": [
+      "USR-013",
+      "USR-014",
+      "USR-020"
+    ],
+    "card_original_change": "新闻实体标签链接到正确届次和马匹；名单、赛果、冠军区域以身份提供跳转；无档案记录进入补齐队列。",
+    "original_deps": [
+      "L02",
+      "H06"
+    ],
+    "new_execution_order_rank": 6
+  },
+  {
+    "requirement": "BR-L04",
+    "card": "L04",
+    "project": "P03",
+    "priority": "P1",
+    "user_message_ids": [
+      "USR-013",
+      "USR-014",
+      "USR-020"
+    ],
+    "card_original_change": "按本届赛事及公开关系聚合，赛果报告、重要更正/取消优先，分页和总数同一过滤口径。",
+    "original_deps": [
+      "V02",
+      "L02"
+    ],
+    "new_execution_order_rank": 7
+  },
+  {
+    "requirement": "BR-L05",
+    "card": "L05",
+    "project": "P03",
+    "priority": "P1",
+    "user_message_ids": [
+      "USR-013",
+      "USR-014",
+      "USR-020"
+    ],
+    "card_original_change": "履历展示出道/OP/Listed，存在 event 才给内部链接；近期新闻区分本马与亲属背景，取消错误强关联。",
+    "original_deps": [
+      "L04",
+      "H03"
+    ],
+    "new_execution_order_rank": 8
+  },
+  {
+    "requirement": "BR-U03",
+    "card": "U03",
+    "project": "P03",
+    "priority": "P1",
+    "user_message_ids": [
+      "USR-013",
+      "USR-014",
+      "USR-020"
+    ],
+    "card_original_change": "对固定复现的重复实例建立受审映射和 dry-run 合并工具；重指向名单、新闻和履历，保留旧地址跳转及审计。",
+    "original_deps": [
+      "F05",
+      "L02"
+    ],
+    "new_execution_order_rank": 9
+  },
+  {
+    "requirement": "BR-U04",
+    "card": "U04",
+    "project": "P03",
+    "priority": "P1",
+    "user_message_ids": [
+      "USR-013",
+      "USR-014",
+      "USR-020"
+    ],
+    "card_original_change": "区分无匹配、尚无资料、读取失败；展示合适的暂定/确定及更新时间；跟随/聚合文案与实际能力一致。",
+    "original_deps": [
+      "H07",
+      "L05",
+      "R03"
+    ],
+    "new_execution_order_rank": 10
+  },
+  {
+    "requirement": "BR-L06",
+    "card": "L06",
+    "project": "P03",
+    "priority": "P1",
+    "user_message_ids": [
+      "USR-013",
+      "USR-014",
+      "USR-020"
+    ],
+    "card_original_change": "在 F06 冻结的近期/重点存量新闻范围重建关系；检查新建档目标补链、撤回同步和人工否决保护。",
+    "original_deps": [
+      "O06",
+      "L05",
+      "H09"
+    ],
+    "new_execution_order_rank": 11
+  },
+  {
+    "requirement": "BR-U05",
+    "card": "U05",
+    "project": "P03",
+    "priority": "P1",
+    "user_message_ids": [
+      "USR-013",
+      "USR-014",
+      "USR-020"
+    ],
+    "card_original_change": "对正式域名/别名、新闻/赛事/马匹路径、长表、分页返回和失败重试统一验收；修复明确的 N+1 查询或阻断布局。",
+    "original_deps": [
+      "L06",
+      "E06",
+      "U04"
+    ],
+    "new_execution_order_rank": 12
+  },
+  {
+    "requirement": "BR-Q03",
+    "card": "Q03",
+    "project": "P03",
+    "priority": "P1",
+    "user_message_ids": [
+      "USR-013",
+      "USR-014",
+      "USR-020"
+    ],
+    "card_original_change": "写明未来新闻/赛事/马匹读取范围、稳定 ID、版本/更正、分页、鉴权/限流候选和内容稳定前置条件；不复用 staff 管理接口直接公开。",
+    "original_deps": [
+      "F01",
+      "L02"
+    ],
+    "new_execution_order_rank": 13
+  },
+  {
+    "requirement": "BR-H01",
+    "card": "H01",
+    "project": "P04",
+    "priority": "P1",
+    "user_message_ids": [
+      "USR-009",
+      "USR-010",
+      "USR-011"
+    ],
+    "card_original_change": "去重生成近三年参赛集合、当前赛季/未来 30 天/近期新闻优先队列、2020 年以来 G1 全参赛马名称集合；纳入未建档对象、Jpn1 与香港本土 G1，列出地区和缺口。",
+    "original_deps": [
+      "F01"
+    ],
+    "new_execution_order_rank": 1
+  },
+  {
+    "requirement": "BR-H02",
+    "card": "H02",
+    "project": "P04",
+    "priority": "P1",
+    "user_message_ids": [
+      "USR-009",
+      "USR-010",
+      "USR-011"
+    ],
+    "card_original_change": "检查既有批次/缓存哈希、来源时间和外部稳定 ID，输出可复用/需刷新/冲突清单；建立按实体与版本去重的输入包。",
+    "original_deps": [
+      "H01",
+      "F03"
+    ],
+    "new_execution_order_rank": 2
+  },
+  {
+    "requirement": "BR-H03",
+    "card": "H03",
+    "project": "P04",
+    "priority": "P1",
+    "user_message_ids": [
+      "USR-009",
+      "USR-010",
+      "USR-011"
+    ],
+    "card_original_change": "将可核验候选从缓存/staging 经身份绑定发布到档案；履历允许 event 为空，保留出道、OP、Listed 和跨地区记录。",
+    "original_deps": [
+      "H02"
+    ],
+    "new_execution_order_rank": 3
+  },
+  {
+    "requirement": "BR-H04",
+    "card": "H04",
+    "project": "P04",
+    "priority": "P1",
+    "user_message_ids": [
+      "USR-009",
+      "USR-010",
+      "USR-011"
+    ],
+    "card_original_change": "按稳定 ID/受审身份映射提取现成繁体名，沿既有规则规范简体并保留别名、来源位置和时间；同步词库与档案候选。",
+    "original_deps": [
+      "N03",
+      "H02"
+    ],
+    "new_execution_order_rank": 4
+  },
+  {
+    "requirement": "BR-H05",
+    "card": "H05",
+    "project": "P04",
+    "priority": "P1",
+    "user_message_ids": [
+      "USR-009",
+      "USR-010",
+      "USR-011"
+    ],
+    "card_original_change": "实现来源名单配置和现成名提取，视频材料保存作品链接与时间点/字幕证据；单个认可来源且同马身份清楚可采纳，冲突进入复核。",
+    "original_deps": [
+      "H04",
+      "M03"
+    ],
+    "new_execution_order_rank": 5
+  },
+  {
+    "requirement": "BR-H06",
+    "card": "H06",
+    "project": "P04",
+    "priority": "P1",
+    "user_message_ids": [
+      "USR-009",
+      "USR-010",
+      "USR-011"
+    ],
+    "card_original_change": "封装公开名称选择器，支持原文、中文和别名搜索；采用原名回退、译名来源状态和更名历史，预留 H04/H05 采纳事件。",
+    "original_deps": [
+      "F01",
+      "H02"
+    ],
+    "new_execution_order_rank": 6
+  },
+  {
+    "requirement": "BR-H07",
+    "card": "H07",
+    "project": "P04",
+    "priority": "P1",
+    "user_message_ids": [
+      "USR-009",
+      "USR-010",
+      "USR-011"
+    ],
+    "card_original_change": "区分基础档案/近期成绩/完整生涯/名称可用性，未知不显示 0；按实际等级计算主胜鞍；完整档案优先排序需使用可信完整度。",
+    "original_deps": [
+      "H03",
+      "H06"
+    ],
+    "new_execution_order_rank": 7
+  },
+  {
+    "requirement": "BR-H08",
+    "card": "H08",
+    "project": "P04",
+    "priority": "P1",
+    "user_message_ids": [
+      "USR-009",
+      "USR-010",
+      "USR-011"
+    ],
+    "card_original_change": "订阅已公开赛事版本，幂等更新马匹履历、出赛/名次汇总与主胜鞍；原值、覆盖和缺失区别保存。",
+    "original_deps": [
+      "R08",
+      "H03",
+      "V02"
+    ],
+    "new_execution_order_rank": 8
+  },
+  {
+    "requirement": "BR-H09",
+    "card": "H09",
+    "project": "P04",
+    "priority": "P1",
+    "user_message_ids": [
+      "USR-009",
+      "USR-010",
+      "USR-011"
+    ],
+    "card_original_change": "按 F06 数量和优先级生成固定输入包：近期档案、历史译名、已知赛果与重复赛事；每类独立 dry-run、备份影响表和回滚映射。正文污染另由 N07 在 10/22 形成独立包。",
+    "original_deps": [
+      "H08",
+      "H05",
+      "U03",
+      "R09"
+    ],
+    "new_execution_order_rank": 9
+  },
+  {
+    "requirement": "BR-H10",
+    "card": "H10",
+    "project": "P04",
+    "priority": "P1",
+    "user_message_ids": [
+      "USR-009",
+      "USR-010",
+      "USR-011"
+    ],
+    "card_original_change": "执行冻结近期目标的可得基础资料/近期履历及名称批次，按优先级持续补入新参赛和新闻对象；每批验证公开页和关联。",
+    "original_deps": [
+      "O06",
+      "H09"
+    ],
+    "new_execution_order_rank": 10
+  },
+  {
+    "requirement": "BR-H11",
+    "card": "H11",
+    "project": "P04",
+    "priority": "P1",
+    "user_message_ids": [
+      "USR-009",
+      "USR-010",
+      "USR-011"
+    ],
+    "card_original_change": "对冻结的 2020 年以来 G1 全参赛马逐一走 HKJC/认可社区名称检索，采纳可验证现名，关联别名并核对页面。",
+    "original_deps": [
+      "H10",
+      "H05"
+    ],
+    "new_execution_order_rank": 11
+  },
+  {
+    "requirement": "BR-M01",
+    "card": "M01",
+    "project": "P05",
+    "priority": "P2",
+    "user_message_ids": [
+      "USR-014",
+      "USR-015"
+    ],
+    "card_original_change": "在现有 provider 旁新增可配置 Responses 适配，定义实体/事实/证据/缺口输出 schema；保留现有翻译对照路径并记录模型与提示词版本。",
+    "original_deps": [
+      "F01",
+      "F02"
+    ],
+    "new_execution_order_rank": 1
+  },
+  {
+    "requirement": "BR-M02",
+    "card": "M02",
+    "project": "P05",
+    "priority": "P2",
+    "user_message_ids": [
+      "USR-014",
+      "USR-015"
+    ],
+    "card_original_change": "在 Celery 上持久化步骤、预算、截止时间和幂等键；限制工具轮次/token/请求；进程中断可续跑，重复任务复用同版本结果。",
+    "original_deps": [
+      "M01"
+    ],
+    "new_execution_order_rank": 2
+  },
+  {
+    "requirement": "BR-M03",
+    "card": "M03",
+    "project": "P05",
+    "priority": "P2",
+    "user_message_ids": [
+      "USR-014",
+      "USR-015"
+    ],
+    "card_original_change": "提供当前名单、马匹身份/译名、已收录新闻和来源证据读取；工具参数绑定目标和来源，输出真实 evidence ID、内容时间与读取时间。",
+    "original_deps": [
+      "M02",
+      "F03"
+    ],
+    "new_execution_order_rank": 3
+  },
+  {
+    "requirement": "BR-M04",
+    "card": "M04",
+    "project": "P05",
+    "priority": "P2",
+    "user_message_ids": [
+      "USR-014",
+      "USR-015"
+    ],
+    "card_original_change": "按赛事资料缺口选择下一工具，区分旧消息/预想/确定/更正；输出逐字段候选、支持与冲突证据、退出原因，交统一赛事决策验证。",
+    "original_deps": [
+      "M03",
+      "R04"
+    ],
+    "new_execution_order_rank": 4
+  },
+  {
+    "requirement": "BR-M05",
+    "card": "M05",
+    "project": "P05",
+    "priority": "P2",
+    "user_message_ids": [
+      "USR-014",
+      "USR-015"
+    ],
+    "card_original_change": "以具体赛事与名单版本逐匹生成资料项：身份、现成名、近绩、距离场地经验、可靠训练采访和缺口；只补过期资料。",
+    "original_deps": [
+      "M04",
+      "N06",
+      "H05"
+    ],
+    "new_execution_order_rank": 5
+  },
+  {
+    "requirement": "BR-M06",
+    "card": "M06",
+    "project": "P05",
+    "priority": "P2",
+    "user_message_ids": [
+      "USR-014",
+      "USR-015"
+    ],
+    "card_original_change": "按基本信息/看点/逐马情况/有依据对比/不确定性生成主稿；逐段关键事实映射证据，事实与分析分开，关联赛事和马匹。",
+    "original_deps": [
+      "M05"
+    ],
+    "new_execution_order_rank": 6
+  },
+  {
+    "requirement": "BR-M07",
+    "card": "M07",
+    "project": "P05",
+    "priority": "P2",
+    "user_message_ids": [
+      "USR-014",
+      "USR-015"
+    ],
+    "card_original_change": "发布前读取最新名单/时间/状态；退赛及延期触发更新同一主稿；取消/开赛拒绝旧前瞻，版本锁防旧任务覆盖。",
+    "original_deps": [
+      "M06",
+      "R06",
+      "L02"
+    ],
+    "new_execution_order_rank": 7
+  },
+  {
+    "requirement": "BR-M08",
+    "card": "M08",
+    "project": "P05",
+    "priority": "P2",
+    "user_message_ids": [
+      "USR-014",
+      "USR-015"
+    ],
+    "card_original_change": "读取完整赛果、可靠赛程报道与采访，生成独立赛后稿；复用证据与关联但保留赛前稿历史。",
+    "original_deps": [
+      "M06",
+      "R08"
+    ],
+    "new_execution_order_rank": 8
+  },
+  {
+    "requirement": "BR-M09",
+    "card": "M09",
+    "project": "P05",
+    "priority": "P2",
+    "user_message_ids": [
+      "USR-014",
+      "USR-015"
+    ],
+    "card_original_change": "提取计划参赛、确定退赛、取消、更正等时间语义，附 evidence ID 和目标版本，调用统一资料候选入口。",
+    "original_deps": [
+      "M04",
+      "R08",
+      "L01"
+    ],
+    "new_execution_order_rank": 9
+  },
+  {
+    "requirement": "BR-M10",
+    "card": "M10",
+    "project": "P05",
+    "priority": "P2",
+    "user_message_ids": [
+      "USR-014",
+      "USR-015"
+    ],
+    "card_original_change": "从已有日志/证据读取模板变化、身份歧义和来源停更线索，产出支持证据与建议动作；只调用已有适用恢复动作。",
+    "original_deps": [
+      "M04",
+      "E02"
+    ],
+    "new_execution_order_rank": 10
+  },
+  {
+    "requirement": "BR-M11",
+    "card": "M11",
+    "project": "P05",
+    "priority": "P2",
+    "user_message_ids": [
+      "USR-014",
+      "USR-015"
+    ],
+    "card_original_change": "比较规则/现有模型/增强链，按每篇合格产出、每场研究计算成本和 p50/p95 时延；限制无收益重复查询，固定最终配置。",
+    "original_deps": [
+      "O06",
+      "F02",
+      "M08",
+      "M10"
+    ],
+    "new_execution_order_rank": 11
+  },
+  {
+    "requirement": "BR-M12",
+    "card": "M12",
+    "project": "P05",
+    "priority": "P2",
+    "user_message_ids": [
+      "USR-014",
+      "USR-015"
+    ],
+    "card_original_change": "演练 API 不可用、预算耗尽和超时，确认已验证结构化更新继续，依赖语义判定的任务有界等待并呈现缺口。",
+    "original_deps": [
+      "M11",
+      "N09"
+    ],
+    "new_execution_order_rank": 12
+  },
+  {
+    "requirement": "BR-F01",
+    "card": "F01",
+    "project": "P06",
+    "priority": "P0支持 / 全量交付P2",
+    "user_message_ids": [
+      "USR-016",
+      "USR-018",
+      "USR-019",
+      "USR-023"
+    ],
+    "card_original_change": "将身份、资料成熟度、来源证据、input_version、下一动作、异常原因、手动保护字段写为共享类型；补迁移/索引草图。采用总规划的默认参数，逐项标注已确认与建议；10/04 锁定首批重点赛事选择规则、社区来源清单和预算配置入口。",
+    "original_deps": [],
+    "new_execution_order_rank": 1
+  },
+  {
+    "requirement": "BR-F06",
+    "card": "F06",
+    "project": "P06",
+    "priority": "P0支持 / 全量交付P2",
+    "user_message_ids": [
+      "USR-016",
+      "USR-018",
+      "USR-019",
+      "USR-023"
+    ],
+    "card_original_change": "汇总目标马匹数量、可复用缓存、需新增请求数、来源额度、模型账号能力及三线剩余小时；用小样或既有日志估计吞吐和单位成本，记录高低区间。",
+    "original_deps": [
+      "F01",
+      "F02",
+      "F03",
+      "H01"
+    ],
+    "new_execution_order_rank": 2
+  },
+  {
+    "requirement": "BR-O01",
+    "card": "O01",
+    "project": "P06",
+    "priority": "P0支持 / 全量交付P2",
+    "user_message_ids": [
+      "USR-016",
+      "USR-018",
+      "USR-019",
+      "USR-023"
+    ],
+    "card_original_change": "记录三线 worktree、共享文件负责人、schema 变更顺序、发布协调人、环境及现有锁；安排 10/20 12:00、10/23 16:00、10/28 16:00 窗口和前后备份。",
+    "original_deps": [
+      "F01"
+    ],
+    "new_execution_order_rank": 3
+  },
+  {
+    "requirement": "BR-E01",
+    "card": "E01",
+    "project": "P06",
+    "priority": "P0支持 / 全量交付P2",
+    "user_message_ids": [
+      "USR-016",
+      "USR-018",
+      "USR-019",
+      "USR-023"
+    ],
+    "card_original_change": "定义 exception 的对象、原因、证据、影响、截止、自动恢复动作和关联运行；技术瞬态先自动重试，语义冲突才转人工。",
+    "original_deps": [
+      "F04",
+      "R02"
+    ],
+    "new_execution_order_rank": 4
+  },
+  {
+    "requirement": "BR-E04",
+    "card": "E04",
+    "project": "P06",
+    "priority": "P0支持 / 全量交付P2",
+    "user_message_ids": [
+      "USR-016",
+      "USR-018",
+      "USR-019",
+      "USR-023"
+    ],
+    "card_original_change": "保存时校验对象版本，记录人工修改字段保护及审计；修复成功只重跑受影响阶段，下游关联自动更新。",
+    "original_deps": [
+      "E03",
+      "L02"
+    ],
+    "new_execution_order_rank": 5
+  },
+  {
+    "requirement": "BR-E05",
+    "card": "E05",
+    "project": "P06",
+    "priority": "P0支持 / 全量交付P2",
+    "user_message_ids": [
+      "USR-016",
+      "USR-018",
+      "USR-019",
+      "USR-023"
+    ],
+    "card_original_change": "把新闻/赛事/马匹正常完成、自动重试、待人工三类结果统一统计；根因恢复后批量关闭派生待办。",
+    "original_deps": [
+      "E04",
+      "R10",
+      "N06"
+    ],
+    "new_execution_order_rank": 6
+  },
+  {
+    "requirement": "BR-O02",
+    "card": "O02",
+    "project": "P06",
+    "priority": "P0支持 / 全量交付P2",
+    "user_message_ids": [
+      "USR-016",
+      "USR-018",
+      "USR-019",
+      "USR-023"
+    ],
+    "card_original_change": "在隔离 PostgreSQL 复现新闻/术语唯一约束恢复问题，定位导出或恢复顺序并做最小修复；不得直接批量清洗生产数据。",
+    "original_deps": [
+      "O01"
+    ],
+    "new_execution_order_rank": 7
+  },
+  {
+    "requirement": "BR-O03",
+    "card": "O03",
+    "project": "P06",
+    "priority": "P0支持 / 全量交付P2",
+    "user_message_ids": [
+      "USR-016",
+      "USR-018",
+      "USR-019",
+      "USR-023"
+    ],
+    "card_original_change": "检查来源变化到公开版本、下一动作真实入队、worker/beat 心跳和内容过期；使用独立于被检查执行器的运行位置。",
+    "original_deps": [
+      "R01",
+      "O01"
+    ],
+    "new_execution_order_rank": 8
+  },
+  {
+    "requirement": "BR-O04",
+    "card": "O04",
+    "project": "P06",
+    "priority": "P0支持 / 全量交付P2",
+    "user_message_ids": [
+      "USR-016",
+      "USR-018",
+      "USR-019",
+      "USR-023"
+    ],
+    "card_original_change": "在隔离副本恢复代表数据，压测赛事控制、模型长任务和普通新闻并行；核算内存、并发、队列及请求预算。",
+    "original_deps": [
+      "O02",
+      "R05",
+      "M02"
+    ],
+    "new_execution_order_rank": 9
+  },
+  {
+    "requirement": "BR-V01",
+    "card": "V01",
+    "project": "P06",
+    "priority": "P0支持 / 全量交付P2",
+    "user_message_ids": [
+      "USR-016",
+      "USR-018",
+      "USR-019",
+      "USR-023"
+    ],
+    "card_original_change": "审核字段合同、来源矩阵、目标数量、主干兼容和可独立上线修复；冻结下一轮接口版本。",
+    "original_deps": [
+      "F06",
+      "H02",
+      "R03",
+      "M03",
+      "N01",
+      "Q02",
+      "U01",
+      "U02",
+      "O02"
+    ],
+    "new_execution_order_rank": 10
+  },
+  {
+    "requirement": "BR-V02",
+    "card": "V02",
+    "project": "P06",
+    "priority": "P0支持 / 全量交付P2",
+    "user_message_ids": [
+      "USR-016",
+      "USR-018",
+      "USR-019",
+      "USR-023"
+    ],
+    "card_original_change": "在隔离环境连接抓取证据、翻译、状态更新、档案和双向关系；审核 schema/数据变更与首批运行范围。",
+    "original_deps": [
+      "R09",
+      "H03",
+      "H05",
+      "M04",
+      "L03",
+      "Q03",
+      "E02",
+      "O04",
+      "R11-JP",
+      "R11-HK",
+      "R11-GB",
+      "R11-IE",
+      "R11-FR"
+    ],
+    "new_execution_order_rank": 11
+  },
+  {
+    "requirement": "BR-V03",
+    "card": "V03",
+    "project": "P06",
+    "priority": "P0支持 / 全量交付P2",
+    "user_message_ids": [
+      "USR-016",
+      "USR-018",
+      "USR-019",
+      "USR-023"
+    ],
+    "card_original_change": "10/22 完成开发，10/23 对固定候选做影响回归、schema/并发/幂等/权限审查；比对新旧 CI 失败集合。",
+    "original_deps": [
+      "R13",
+      "M07",
+      "M08",
+      "M09",
+      "M10",
+      "N07",
+      "H09",
+      "L05",
+      "H07",
+      "E05",
+      "U04"
+    ],
+    "new_execution_order_rank": 12
+  },
+  {
+    "requirement": "BR-O05",
+    "card": "O05",
+    "project": "P06",
+    "priority": "P0支持 / 全量交付P2",
+    "user_message_ids": [
+      "USR-016",
+      "USR-018",
+      "USR-019",
+      "USR-023"
+    ],
+    "card_original_change": "针对 I2 及已审核增量准备精确发布包，按根 AGENTS.md 执行；五地区新闻均启用本次 N06 政策并固定候选/发布/曝光分母，赛事与名称仍按明确的有限灰度对象运行。",
+    "original_deps": [
+      "V02",
+      "R11",
+      "H05",
+      "N06",
+      "L05",
+      "O03",
+      "O04"
+    ],
+    "new_execution_order_rank": 13
+  },
+  {
+    "requirement": "BR-O06",
+    "card": "O06",
+    "project": "P06",
+    "priority": "P0支持 / 全量交付P2",
+    "user_message_ids": [
+      "USR-016",
+      "USR-018",
+      "USR-019",
+      "USR-023"
+    ],
+    "card_original_change": "发布全部能力的候选版本，QQ 停用、已核验数据修复和重点赛事前瞻按发布包逐项启用；逐地区/来源保留可定位的开关及回滚点。",
+    "original_deps": [
+      "V03",
+      "O05",
+      "Q02",
+      "H09"
+    ],
+    "new_execution_order_rank": 14
+  },
+  {
+    "requirement": "BR-V04",
+    "card": "V04",
+    "project": "P06",
+    "priority": "P0支持 / 全量交付P2",
+    "user_message_ids": [
+      "USR-016",
+      "USR-018",
+      "USR-019",
+      "USR-023"
+    ],
+    "card_original_change": "独立核查新闻阅读/筛选→赛事资料→马匹履历及后台异常修复，覆盖五地区新闻、九地区赛事和不同资料成熟度。",
+    "original_deps": [
+      "O06"
+    ],
+    "new_execution_order_rank": 15
+  },
+  {
+    "requirement": "BR-O07",
+    "card": "O07",
+    "project": "P06",
+    "priority": "P0支持 / 全量交付P2",
+    "user_message_ids": [
+      "USR-016",
+      "USR-018",
+      "USR-019",
+      "USR-023"
+    ],
+    "card_original_change": "以固定候选在隔离副本演练停新任务、回退读路径/代码、保留新 schema/已发布证据、恢复人工字段；核验数据批次快照。",
+    "original_deps": [
+      "O06",
+      "O04"
+    ],
+    "new_execution_order_rank": 16
+  },
+  {
+    "requirement": "BR-V05",
+    "card": "V05",
+    "project": "P06",
+    "priority": "P0支持 / 全量交付P2",
+    "user_message_ids": [
+      "USR-016",
+      "USR-018",
+      "USR-019",
+      "USR-023"
+    ],
+    "card_original_change": "对最终 SHA、迁移、配置、来源/模型/数据范围和失败集合重新核对；风险修改补影响回归；检查 51 个 Gap 去向。",
+    "original_deps": [
+      "H11",
+      "R15",
+      "N09",
+      "M11",
+      "L06",
+      "E06",
+      "U05",
+      "O07",
+      "V04"
+    ],
+    "new_execution_order_rank": 17
+  },
+  {
+    "requirement": "BR-O08",
+    "card": "O08",
+    "project": "P06",
+    "priority": "P0支持 / 全量交付P2",
+    "user_message_ids": [
+      "USR-016",
+      "USR-018",
+      "USR-019",
+      "USR-023"
+    ],
+    "card_original_change": "依据根 AGENTS.md 对固定发布包交付，覆盖所有本版目标地区/对象/功能；仅按包内范围应用配置和数据，保留精确回滚。",
+    "original_deps": [
+      "V05",
+      "M12",
+      "E07"
+    ],
+    "new_execution_order_rank": 18
+  },
+  {
+    "requirement": "BR-V06",
+    "card": "V06",
+    "project": "P06",
+    "priority": "P0支持 / 全量交付P2",
+    "user_message_ids": [
+      "USR-016",
+      "USR-018",
+      "USR-019",
+      "USR-023"
+    ],
+    "card_original_change": "持续检查自然资料变化、五地区新闻、重点前瞻、名称/履历更新、无人值守异常恢复和 QQ 零发送。",
+    "original_deps": [
+      "O08",
+      "R16"
+    ],
+    "new_execution_order_rank": 19
+  },
+  {
+    "requirement": "BR-V07",
+    "card": "V07",
+    "project": "P06",
+    "priority": "P0支持 / 全量交付P2",
+    "user_message_ids": [
+      "USR-016",
+      "USR-018",
+      "USR-019",
+      "USR-023"
+    ],
+    "card_original_change": "将每张任务卡关联 commit/PR、部署版本、范围、开关、测试和公开验收；列清代码完成/部署/启用/验证四种状态。",
+    "original_deps": [
+      "V06",
+      "R16"
+    ],
+    "new_execution_order_rank": 20
+  },
+  {
+    "requirement": "BR-O09",
+    "card": "O09",
+    "project": "P06",
+    "priority": "P0支持 / 全量交付P2",
+    "user_message_ids": [
+      "USR-016",
+      "USR-018",
+      "USR-019",
+      "USR-023"
+    ],
+    "card_original_change": "更新 current_state、project_status、decisions 及实际受影响运维文档，交接来源续期、预算、异常处理和长期 API 合同。",
+    "original_deps": [
+      "V07"
+    ],
+    "new_execution_order_rank": 21
+  },
+  {
+    "requirement": "BR-F04",
+    "card": "F04",
+    "project": "P07",
+    "priority": "暂停 / 不排实施",
+    "user_message_ids": [
+      "USR-013",
+      "USR-019"
+    ],
+    "card_original_change": "记录找待办、核对差异、改正文、改名称、处理赛事冲突、修复后续跑六条现有路径的步骤/耗时；画出待处理、内容、资料、自动化四入口及手机原型。",
+    "original_deps": [],
+    "new_execution_order_rank": 1
+  },
+  {
+    "requirement": "BR-E02",
+    "card": "E02",
+    "project": "P07",
+    "priority": "暂停 / 不排实施",
+    "user_message_ids": [
+      "USR-013",
+      "USR-019"
+    ],
+    "card_original_change": "建设待处理入口、影响优先级、地区/类型筛选、证据详情和分页；原后台入口渐进跳转，不删除底层能力。",
+    "original_deps": [
+      "E01"
+    ],
+    "new_execution_order_rank": 2
+  },
+  {
+    "requirement": "BR-E03",
+    "card": "E03",
+    "project": "P07",
+    "priority": "暂停 / 不排实施",
+    "user_message_ids": [
+      "USR-013",
+      "USR-019"
+    ],
+    "card_original_change": "正文清洗差异、术语身份冲突、赛事资料版本在一个任务详情中核验；复用自动保存/发布动作，减少跨页和重复输入，适配手机。",
+    "original_deps": [
+      "E02",
+      "N04",
+      "H05",
+      "R03"
+    ],
+    "new_execution_order_rank": 3
+  },
+  {
+    "requirement": "BR-E06",
+    "card": "E06",
+    "project": "P07",
+    "priority": "暂停 / 不排实施",
+    "user_message_ids": [
+      "USR-013",
+      "USR-019"
+    ],
+    "card_original_change": "使用 F04 相同任务复测桌面与手机的步骤、耗时和失败恢复；只修影响完成任务的具体问题。",
+    "original_deps": [
+      "O06",
+      "E05"
+    ],
+    "new_execution_order_rank": 4
+  },
+  {
+    "requirement": "BR-E07",
+    "card": "E07",
+    "project": "P07",
+    "priority": "暂停 / 不排实施",
+    "user_message_ids": [
+      "USR-013",
+      "USR-019"
+    ],
+    "card_original_change": "统计正常自动完成、自动恢复、人工介入和待办年龄，与 F04 基线及前台质量联查；补操作说明。",
+    "original_deps": [
+      "E06",
+      "U05",
+      "R15"
+    ],
+    "new_execution_order_rank": 5
+  },
+  {
+    "requirement": "BR-Q01",
+    "card": "Q01",
+    "project": "P07",
+    "priority": "暂停 / 不排实施",
+    "user_message_ids": [
+      "USR-013",
+      "USR-019"
+    ],
+    "card_original_change": "统一禁止自动、手动、重试与遗留定时发送；网站发布成功不依赖 OneBot；保留配置与历史记录便于诊断。",
+    "original_deps": [
+      "F01"
+    ],
+    "new_execution_order_rank": 6
+  },
+  {
+    "requirement": "BR-Q02",
+    "card": "Q02",
+    "project": "P07",
+    "priority": "暂停 / 不排实施",
+    "user_message_ids": [
+      "USR-013",
+      "USR-019"
+    ],
+    "card_original_change": "隐藏推送按钮/状态误导，标记旧任务终止原因；盘点仅 QQ 使用的服务、健康告警和依赖，生成停用差异。",
+    "original_deps": [
+      "Q01"
+    ],
+    "new_execution_order_rank": 7
+  }
+]

@@ -1,0 +1,130 @@
+{
+  "status": "SOURCE_PREPARATION_NOT_EXECUTED",
+  "head": "ab651cecd940850a62afe04bfd74551cf9ad3887",
+  "tree": "377424d1d2aa02dc54b56077c8c8b2f13c5cb481",
+  "parent_head": "bb871949877979226292033f0ab14f8d949cc6b7",
+  "tracked_files": 2182,
+  "actual_git_closure": {
+    "tools/test_impact/pg_lifecycle.py": {
+      "mode": "100644",
+      "blob": "8658c760b7ea99ae370d67e0b76b01e6102942fa",
+      "size": 33259,
+      "sha256": "debc453294a084df2f9e1bae8c92c9bf63176e6b371de69ef1997cbfee55c538"
+    },
+    "tools/test_impact/test_pg_lifecycle.py": {
+      "mode": "100644",
+      "blob": "95f7a940a453bdca9bc89d580fde4ed93a822cb8",
+      "size": 20469,
+      "sha256": "ff8babd5df7cdd7998a63c2e1d4c5a27e894322609ef493159eb00e3a2808636"
+    },
+    "tools/test_impact/core.py": {
+      "mode": "100644",
+      "blob": "96ecdf11298720693f6ba92abb768ec8c970d759",
+      "size": 8328,
+      "sha256": "e0ea67adb83a2ef09ab63d3b7bd01465dac15720894819c64d115e6659748cab"
+    },
+    "tools/test_impact/source_binding.py": {
+      "mode": "100644",
+      "blob": "2d3a53c701f9735764fda5992f778d37a9a10b22",
+      "size": 4028,
+      "sha256": "02db7474f27dcccde0192a0835f05825ab5184cb5bc257cc2a42b181ca733115"
+    }
+  },
+  "commit_raw_sha256": "ab056c19c62c129974081d9cf8860ae9bd8b94e2f7e88789fc68c696cd176048",
+  "full_tree_reconstructed": true,
+  "host_runner_gate_byte_identical_B284": true,
+  "resources": {
+    "memory": "2g",
+    "cpus": "2",
+    "pids": 256,
+    "tmpfs": "/tmp:rw,exec,size=1g,uid=10001,gid=10001,mode=0700"
+  },
+  "max_attempts": {
+    "suite": 1,
+    "initdb": 5,
+    "postmaster": 4,
+    "worker_probe": 2,
+    "pg_ctl_stop": 3,
+    "concurrent_sessions": 1,
+    "readiness": "only original bounded loop; no extra readiness-fault attempt"
+  },
+  "budgets": {
+    "original_request_invoke": 600,
+    "original_session_inner": 570,
+    "original_cleanup": 30,
+    "startup_shared": 60,
+    "worker_each": 5,
+    "pg_ctl_internal": 8,
+    "pg_ctl_wait_cap": 10,
+    "postmaster_wait_then_kill_wait_each": 3,
+    "suite_static_path_upper_estimate": 475,
+    "outer_total": 600,
+    "foreground_run_cap": 540,
+    "outer_cleanup": 40,
+    "evidence_reserve": 20,
+    "estimate_limit": "Conservative 5*(startup60+worker5+cleanup30)=475; not measured latency or syscall-bound guarantee. Foreground hard cap540, outer600; original min(deadline,now+30) cleanup is not extended."
+  },
+  "ids": [
+    "tools.test_impact.test_pg_lifecycle.RealPGTests.test_real_foreground_pid_and_separate_stop_wait",
+    "tools.test_impact.test_pg_lifecycle.RealPGTests.test_real_worker7_does_not_hide_stop_wait0",
+    "tools.test_impact.test_pg_lifecycle.RealPGTests.test_real_sigstop_forces_real_stop_timeout_not_success",
+    "tools.test_impact.test_pg_lifecycle.RealPGTests.test_real_initdb_failure_has_no_fake_postmaster_zero",
+    "tools.test_impact.test_pg_lifecycle.RealPGTests.test_real_early_postmaster_exit_is_reaped"
+  ],
+  "plan_run_id": "B286-P5-SYNC-PREPARE-b51eebf7f1bd4e389c3fa21acb9abbf0",
+  "request_nonce": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "owner_nonce": "b51eebf7f1bd4e389c3fa21acb9abbf0",
+  "plan_canonical_digest": "94e690d944a052e8d42b7a0a7079a111c60869d0c35c0b4182899336391cfc17",
+  "whole_request_status": "Statically rebound from accepted15-field prototype; helper/validation NOT_RUN",
+  "new_output": "/Users/mentianlu/.codex/runtime/realpg5-v2-p5sync-execution-b51eebf7f1bd4e389c3fa21acb9abbf0",
+  "new_output_exists": false,
+  "compiled_only": [
+    {
+      "path": "control/component_evidence_gate.py",
+      "sha256": "57b6c3444d557ae6ca11fccf2d81ab1270594d5b665f08f43db2641fa8cf8630"
+    },
+    {
+      "path": "control/run_realpg5.py",
+      "sha256": "890962062031a96558b4025daa822fdf3a1d381f7d59efed607d9138f4294540"
+    },
+    {
+      "path": "host_run_once.py",
+      "sha256": "188baedbb399862cc4efcf14ce208828b5ae9df6b05a46029f55aafafa3fbcae"
+    },
+    {
+      "path": "source/tools/test_impact/core.py",
+      "sha256": "e0ea67adb83a2ef09ab63d3b7bd01465dac15720894819c64d115e6659748cab"
+    },
+    {
+      "path": "source/tools/test_impact/pg_lifecycle.py",
+      "sha256": "debc453294a084df2f9e1bae8c92c9bf63176e6b371de69ef1997cbfee55c538"
+    },
+    {
+      "path": "source/tools/test_impact/source_binding.py",
+      "sha256": "02db7474f27dcccde0192a0835f05825ab5184cb5bc257cc2a42b181ca733115"
+    },
+    {
+      "path": "source/tools/test_impact/test_pg_lifecycle.py",
+      "sha256": "ff8babd5df7cdd7998a63c2e1d4c5a27e894322609ef493159eb00e3a2808636"
+    }
+  ],
+  "local_commit": {
+    "argv": [
+      "git",
+      "-c",
+      "core.hooksPath=/dev/null",
+      "-c",
+      "commit.gpgsign=false",
+      "commit",
+      "-m",
+      "Synchronize P5 killed-postmaster precondition before cleanup",
+      "--only",
+      "--",
+      "tools/test_impact/test_pg_lifecycle.py"
+    ],
+    "reason": "Explicit B286 local commit; hooks/signing disabled to avoid unauthorized executable hooks/network/tests; no push"
+  },
+  "runtime_source_mapping": "No code changes to runner/host/gate: runner still loads original five IDs from RealPGTests; extra pure boundary class not selected.",
+  "static_check_sha256": "248d94a3d2aa5692ad98780b5ff94d05ba797eac8cf3ede4703350904c6ae929",
+  "erratum_sha256": "ec919d06b517c256df9d19e8f68c24429cdbb03782013e1720bebc5866fcb65c"
+}

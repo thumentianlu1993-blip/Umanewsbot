@@ -1,0 +1,1540 @@
+{
+  "as_of": "2026-10-24T21:19:36+08:00",
+  "kind": "ROOT conservative full-card scope estimate, not measured effort or business acceptance",
+  "summary": {
+    "total": 100,
+    "complete": 1,
+    "partial": 40,
+    "zero": 59,
+    "deferred": 7,
+    "equal_card_average": 18.65,
+    "retained_equal_card_average": 17.96,
+    "changed_percent_cards": 2
+  },
+  "original_index_count": 100,
+  "excluded_ledger_extra": [
+    "A091 (执行子任务，不是原100卡)"
+  ],
+  "rows": [
+    {
+      "id": "E01",
+      "title": "统一自动处理恢复与人工例外分类",
+      "lane": "C",
+      "completion_percent": 0,
+      "status": "共用核心保留",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成；只保留其他业务所需核心，后台交互部分暂缓",
+      "scope_disposition": "retain_shared_core_defer_admin_integration",
+      "evidence_keys": [
+        "E01"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "E02",
+      "title": "实现统一待办列表与原因详情",
+      "lane": "C",
+      "completion_percent": 0,
+      "status": "用户暂缓",
+      "basis_and_gap": "用户暂缓；暂无已核本卡实现交付",
+      "scope_disposition": "deferred_by_user_20261006",
+      "evidence_keys": [
+        "E02"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "E03",
+      "title": "完成原位编辑证据差异与预览",
+      "lane": "C",
+      "completion_percent": 0,
+      "status": "用户暂缓",
+      "basis_and_gap": "用户暂缓；暂无已核本卡实现交付",
+      "scope_disposition": "deferred_by_user_20261006",
+      "evidence_keys": [
+        "E03"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "E04",
+      "title": "实现人工修复后自动续跑与字段保护",
+      "lane": "C",
+      "completion_percent": 0,
+      "status": "共用核心保留",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成；只保留其他业务所需核心，后台交互部分暂缓",
+      "scope_disposition": "retain_shared_core_defer_admin_integration",
+      "evidence_keys": [
+        "E04"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "E05",
+      "title": "打通自动完成与技术恢复的后台闭环",
+      "lane": "C",
+      "completion_percent": 0,
+      "status": "共用核心保留",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成；只保留其他业务所需核心，后台交互部分暂缓",
+      "scope_disposition": "retain_shared_core_defer_admin_integration",
+      "evidence_keys": [
+        "E05"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "E06",
+      "title": "验证后台六条高频路径并修复交互阻碍",
+      "lane": "C",
+      "completion_percent": 0,
+      "status": "用户暂缓",
+      "basis_and_gap": "用户暂缓；暂无已核本卡实现交付",
+      "scope_disposition": "deferred_by_user_20261006",
+      "evidence_keys": [
+        "E06"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "E07",
+      "title": "验收自动完成率与人工干预收益",
+      "lane": "C",
+      "completion_percent": 0,
+      "status": "用户暂缓",
+      "basis_and_gap": "用户暂缓；暂无已核本卡实现交付",
+      "scope_disposition": "deferred_by_user_20261006",
+      "evidence_keys": [
+        "E07"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "F01",
+      "title": "冻结跨模块字段及首版产品参数",
+      "lane": "A",
+      "completion_percent": 85,
+      "status": "部分完成",
+      "basis_and_gap": "共享合同已独立审核并合并；完整参数、外部约束收敛仍需闭合",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "F01"
+      ],
+      "previous_percent": 85,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "F02",
+      "title": "建立新闻漏斗与模型黄金样例",
+      "lane": "B",
+      "completion_percent": 25,
+      "status": "部分完成",
+      "basis_and_gap": "导出/采集工具及隔离测试已有；五地区真实黄金样例和保留集仍为0",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "F02"
+      ],
+      "previous_percent": 25,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "F03",
+      "title": "盘点九地区主备来源与现有 TRA 套餐",
+      "lane": "A",
+      "completion_percent": 25,
+      "status": "部分完成",
+      "basis_and_gap": "九地区矩阵及来源研究已审；6项有限支持、39项未知，实际能力0/45闭合",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "F03"
+      ],
+      "previous_percent": 25,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "F04",
+      "title": "冻结编辑后台关键任务与交互原型",
+      "lane": "C",
+      "completion_percent": 35,
+      "status": "用户暂缓",
+      "basis_and_gap": "方案/原型和合成材料已审；真人效率基线未取得，用户暂缓",
+      "scope_disposition": "deferred_by_user_20261006",
+      "evidence_keys": [
+        "F04"
+      ],
+      "previous_percent": 35,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "F05",
+      "title": "复验域名与公开缺陷并固定回归样例",
+      "lane": "C",
+      "completion_percent": 100,
+      "status": "已完成本卡",
+      "basis_and_gap": "只读复验基线及分类报告已审；完成的是本卡复验，不是缺陷修复",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "F05"
+      ],
+      "previous_percent": 100,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "F06",
+      "title": "核定数据量、预算和迭代可行性",
+      "lane": "R",
+      "completion_percent": 20,
+      "status": "部分完成",
+      "basis_and_gap": "政策/资源有只读材料；真实分母、来源额度、吞吐和成本未闭合",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "F06"
+      ],
+      "previous_percent": 20,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "H01",
+      "title": "生成近三年与历史 G1 全参赛马目标集",
+      "lane": "A",
+      "completion_percent": 30,
+      "status": "部分完成",
+      "basis_and_gap": "目标集reader/helper及合成PG已审；真实目标分母未冻结",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "H01"
+      ],
+      "previous_percent": 30,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "H02",
+      "title": "复用缓存与强身份建立补全输入包",
+      "lane": "A",
+      "completion_percent": 30,
+      "status": "部分完成",
+      "basis_and_gap": "缓存输入合同与离线测试切片已审；真实缓存/强身份输入未验收",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "H02"
+      ],
+      "previous_percent": 30,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "H03",
+      "title": "打通基础档案及可独立存在的生涯记录",
+      "lane": "A",
+      "completion_percent": 35,
+      "status": "部分完成",
+      "basis_and_gap": "新增私有模块输入、事务创建、独立生涯行prepare与consumer实际隔离PG/CI及独立审核（A150/A154/A160/A164/A170）；真实来源用途/能力/许可权威仍缺，公开入口继续拒绝，未形成整卡公开验收。",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "A150_module_input_normal_first_validation",
+        "A154_observer_normal_first_validation",
+        "A160_career_row_new_sha_normal_validation",
+        "A170_http_budget_loader_normal_ci_validation"
+      ],
+      "previous_percent": 25,
+      "change_since_previous": "新增私有模块输入、事务创建、独立生涯行prepare与consumer实际隔离PG/CI及独立审核（A150/A154/A160/A164/A170）；真实来源用途/能力/许可权威仍缺，公开入口继续拒绝，未形成整卡公开验收。",
+      "delta_percentage_points": 10
+    },
+    {
+      "id": "H04",
+      "title": "补齐 HKJC 现成译名和名称证据",
+      "lane": "B",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "H04"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "H05",
+      "title": "接入认可社区名称提取与冲突处理",
+      "lane": "B",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "H05"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "H06",
+      "title": "统一名称展示搜索与更名追踪",
+      "lane": "C",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "H06"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "H07",
+      "title": "修正完整度主胜鞍与统计展示",
+      "lane": "C",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "H07"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "H08",
+      "title": "将新赛果和更正持续同步到履历统计",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "H08"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "H09",
+      "title": "准备可恢复的数据修复与补齐批次",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "H09"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "H10",
+      "title": "完成近期优先目标的正式公开批次",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "H10"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "H11",
+      "title": "完成历史 G1 全参赛马名称检索与采纳批次",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "H11"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "L01",
+      "title": "实现共享实体及赛事届次解析",
+      "lane": "C",
+      "completion_percent": 60,
+      "status": "部分完成",
+      "basis_and_gap": "结构绑定核心与真实caller四场景GREEN；完整实体/届次覆盖与来源依赖未闭合",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "L01"
+      ],
+      "previous_percent": 60,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "L02",
+      "title": "建立双向关系更新与更正传播",
+      "lane": "C",
+      "completion_percent": 65,
+      "status": "部分完成",
+      "basis_and_gap": "新增强关系writer后续触发、当前marked双scanner人工保护15方法及只读receipt诊断20方法实际通过并获审；缺失/擦除marker的权威索引仅源码获审，C257双PG失败，C259复验进行中；完整双向传播/历史覆盖仍未验收。",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "C243_strong_trigger_normal_validation",
+        "C248_current_marked_scanner_normal_validation",
+        "C253_selected_receipt_diagnostic_normal_first_validation",
+        "C257_pair_receipt_index_first_normal_ci_validation",
+        "C259_pair_receipt_index_narrow_repair_normal_ci"
+      ],
+      "previous_percent": 60,
+      "change_since_previous": "新增强关系writer后续触发、当前marked双scanner人工保护15方法及只读receipt诊断20方法实际通过并获审；缺失/擦除marker的权威索引仅源码获审，C257双PG失败，C259复验进行中；完整双向传播/历史覆盖仍未验收。",
+      "delta_percentage_points": 5
+    },
+    {
+      "id": "L03",
+      "title": "增加新闻标签及赛事马匹跳转",
+      "lane": "C",
+      "completion_percent": 60,
+      "status": "部分完成",
+      "basis_and_gap": "文章至赛事回程等导航切片GREEN；全部新闻/赛事/马匹匿名旅程未完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "L03"
+      ],
+      "previous_percent": 60,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "L04",
+      "title": "实现赛事相关新闻统计与重点排序",
+      "lane": "C",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "L04"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "L05",
+      "title": "完善马匹全生涯与近期新闻导航",
+      "lane": "C",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "L05"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "L06",
+      "title": "补齐存量关系并验收跨页导航",
+      "lane": "C",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "L06"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "M01",
+      "title": "增加 GPT-6 Responses 适配及结构输出",
+      "lane": "B",
+      "completion_percent": 45,
+      "status": "部分完成",
+      "basis_and_gap": "Responses与结构化mock适配局部获审；完整调用链/质量依赖未闭合",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "M01"
+      ],
+      "previous_percent": 45,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "M02",
+      "title": "实现有界多轮任务执行与恢复",
+      "lane": "B",
+      "completion_percent": 50,
+      "status": "部分完成",
+      "basis_and_gap": "恢复重投及token停止线等已合并；完整多轮/预算/业务恢复仍缺",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "M02"
+      ],
+      "previous_percent": 50,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "M03",
+      "title": "封装内部查询与证据读取工具",
+      "lane": "B",
+      "completion_percent": 55,
+      "status": "部分完成",
+      "basis_and_gap": "来源摘录/内部读取子片有真实PG回归与PR249；完整查询复用面未闭合",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "M03"
+      ],
+      "previous_percent": 55,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "M04",
+      "title": "实现多源研究与冲突候选输出",
+      "lane": "B",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "M04"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "M05",
+      "title": "建立全参赛者前瞻资料表",
+      "lane": "B",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "M05"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "M06",
+      "title": "生成带事实出处的重点赛事前瞻",
+      "lane": "B",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "M06"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "M07",
+      "title": "实现前瞻发布前复验与增量更正",
+      "lane": "B",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "M07"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "M08",
+      "title": "实现赛后综合报道",
+      "lane": "B",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "M08"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "M09",
+      "title": "将新闻事实转为资料变更候选",
+      "lane": "B",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "M09"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "M10",
+      "title": "提供异常证据归因与恢复建议",
+      "lane": "B",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "M10"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "M11",
+      "title": "完成模型质量时延成本对照与参数收敛",
+      "lane": "B",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "M11"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "M12",
+      "title": "验证模型降级与最终发布配置",
+      "lane": "B",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "M12"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "N01",
+      "title": "保存正文区块与清洗差异",
+      "lane": "B",
+      "completion_percent": 40,
+      "status": "部分完成",
+      "basis_and_gap": "正文区块与ROOT噪声修复局部获审；五地区真实模板覆盖未验收",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "N01"
+      ],
+      "previous_percent": 40,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "N02",
+      "title": "接入正文污染审查与模板变化检测",
+      "lane": "B",
+      "completion_percent": 55,
+      "status": "部分完成",
+      "basis_and_gap": "污染审查核心与shadow/正式原生组合已有；真实样本与完整技术交付未闭合",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "N02"
+      ],
+      "previous_percent": 55,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "N03",
+      "title": "接入上下文实体识别和专名保护",
+      "lane": "B",
+      "completion_percent": 55,
+      "status": "部分完成",
+      "basis_and_gap": "实体/专名保护若干切片及实际组合结果获审；完整真实实体质量未验收",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "N03"
+      ],
+      "previous_percent": 55,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "N04",
+      "title": "加入译后事实审校与有界修复",
+      "lane": "B",
+      "completion_percent": 45,
+      "status": "部分完成",
+      "basis_and_gap": "数字事实核对及caller诊断真实GREEN；真实gold和完整有界修复未闭合",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "N04"
+      ],
+      "previous_percent": 45,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "N05",
+      "title": "按事件重要性和新增事实选择新闻",
+      "lane": "B",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "N05"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "N06",
+      "title": "实施五地区周覆盖与来源健康调节",
+      "lane": "B",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "N06"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "N07",
+      "title": "生成历史污染与误译重处理候选",
+      "lane": "B",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "N07"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "N08",
+      "title": "完成污染和误译清单的受控重处理",
+      "lane": "B",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "N08"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "N09",
+      "title": "验收五地区周覆盖与重要事件保留",
+      "lane": "B",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "N09"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "O01",
+      "title": "冻结集成与发布资源安排",
+      "lane": "R",
+      "completion_percent": 50,
+      "status": "部分完成",
+      "basis_and_gap": "B线完成原8个缓存组件的分次有限验证及纯组合/生命周期合同测试；B268真实PG5在P3失败、后2未达，B272旧基线失败待原审，未形成同SHA全组合/镜像内容/独立collect与CID完整资格，比例不变。",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "O01"
+      ],
+      "previous_percent": 50,
+      "change_since_previous": "B线完成原8个缓存组件的分次有限验证及纯组合/生命周期合同测试；B268真实PG5在P3失败、后2未达，B272旧基线失败待原审，未形成同SHA全组合/镜像内容/独立collect与CID完整资格，比例不变。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "O02",
+      "title": "修复已知备份恢复约束问题",
+      "lane": "C",
+      "completion_percent": 30,
+      "status": "部分完成",
+      "basis_and_gap": "恢复约束窄修及测试源已有审核；所需真实恢复域/完整运行仍未验证",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "O02"
+      ],
+      "previous_percent": 30,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "O03",
+      "title": "建设队列外公开结果与执行健康探针",
+      "lane": "C",
+      "completion_percent": 35,
+      "status": "部分完成",
+      "basis_and_gap": "离线HTML探针切片已审；真实loader/权限/队列外失活探测未闭合",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "O03"
+      ],
+      "previous_percent": 35,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "O04",
+      "title": "验证备份恢复与队列容量边界",
+      "lane": "R",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "O04"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "O05",
+      "title": "首批核心链路生产灰度及自然观察",
+      "lane": "R",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "O05"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "O06",
+      "title": "发布完整候选并开始七天验收窗口",
+      "lane": "R",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "10/23完整候选和七天观察未启动；本卡仍0%，不得压缩观察窗或以旧结果填充。",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "O06"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "10/23完整候选和七天观察未启动；本卡仍0%，不得压缩观察窗或以旧结果填充。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "O07",
+      "title": "验证完整候选回滚与恢复交接",
+      "lane": "R",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "O07"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "O08",
+      "title": "执行全量上线与公开范围核验",
+      "lane": "R",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "O08"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "O09",
+      "title": "完成维护交接与长期事项归档",
+      "lane": "R",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "O09"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "Q01",
+      "title": "关闭 QQ 全发送路径并解耦网页发布",
+      "lane": "C",
+      "completion_percent": 80,
+      "status": "用户暂缓",
+      "basis_and_gap": "代码、独立审、组合CI并合入；用户暂缓，未执行生产QQ停用",
+      "scope_disposition": "deferred_by_user_20261006",
+      "evidence_keys": [
+        "Q01"
+      ],
+      "previous_percent": 80,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "Q02",
+      "title": "移除 QQ 使用入口及专属运行依赖",
+      "lane": "C",
+      "completion_percent": 80,
+      "status": "用户暂缓",
+      "basis_and_gap": "入口/Beat/Compose切片已审合入；用户暂缓，生产依赖退出未执行",
+      "scope_disposition": "deferred_by_user_20261006",
+      "evidence_keys": [
+        "Q02"
+      ],
+      "previous_percent": 80,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "Q03",
+      "title": "形成长期只读内容 API 合同",
+      "lane": "C",
+      "completion_percent": 75,
+      "status": "部分完成",
+      "basis_and_gap": "API合同、投影及多项提交可靠性切片已审；完整合同一致性与交付闭环未完；本卡不要求外部API上线",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "Q03"
+      ],
+      "previous_percent": 75,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "R01",
+      "title": "实现阶段与端到端时效账本",
+      "lane": "A",
+      "completion_percent": 35,
+      "status": "部分完成",
+      "basis_and_gap": "纯时效账本核心已合并；真实持久hook与公开端到端计时未接齐",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R01"
+      ],
+      "previous_percent": 35,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "R02",
+      "title": "提取统一纯决策并接入影子比较",
+      "lane": "A",
+      "completion_percent": 35,
+      "status": "部分完成",
+      "basis_and_gap": "纯决策核心与独立反例回归已审；真实影子比较接入未完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R02"
+      ],
+      "previous_percent": 35,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "R03",
+      "title": "实现赛前赛后成熟度统一读模型",
+      "lane": "A",
+      "completion_percent": 40,
+      "status": "部分完成",
+      "basis_and_gap": "成熟度纯读模型多片独立测试通过；真实loader/来源权威链未闭合",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R03"
+      ],
+      "previous_percent": 40,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "R04",
+      "title": "按成熟度与新鲜度实现主备源仲裁",
+      "lane": "A",
+      "completion_percent": 40,
+      "status": "部分完成",
+      "basis_and_gap": "主备仲裁纯核心/坏例及合法控制已审；真实producer/hook未接齐",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R04"
+      ],
+      "previous_percent": 40,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "R05",
+      "title": "调度明确资料替换期限与容量预留",
+      "lane": "A",
+      "completion_percent": 35,
+      "status": "部分完成",
+      "basis_and_gap": "期限/容量核心与映射候选获审；完整压力/容量/自然公开时效未验收",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R05"
+      ],
+      "previous_percent": 35,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "R06",
+      "title": "贯通延迟改期取消及旧任务失效",
+      "lane": "A",
+      "completion_percent": 65,
+      "status": "部分完成",
+      "basis_and_gap": "取消/延期/失败重试/结束与午夜切片实际GREEN并组合；完整自然公开链未验收",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R06"
+      ],
+      "previous_percent": 65,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "R07",
+      "title": "统一退赛非完赛并列与完整名单核验",
+      "lane": "A",
+      "completion_percent": 55,
+      "status": "部分完成",
+      "basis_and_gap": "名单对账核心及caller子片GREEN；完整退赛/非完赛/并列自然验收未闭合",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R07"
+      ],
+      "previous_percent": 55,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "R08",
+      "title": "原子发布资料更正与统一缓存失效",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R08"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "R09",
+      "title": "审计历史结果公开依据与兼容修复",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R09"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "R10",
+      "title": "完成策略换代与持续跟踪恢复",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R10"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "R11",
+      "title": "汇总九地区适配与能力验收矩阵",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R11"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "R11-AU",
+      "title": "澳大利亚来源合同与解析缺口切片",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R11-AU"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "R11-DE",
+      "title": "德国来源合同与解析缺口切片",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R11-DE"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "R11-FR",
+      "title": "法国来源合同与解析缺口切片",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R11-FR"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "R11-GB",
+      "title": "英国来源合同与解析缺口切片",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R11-GB"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "R11-HK",
+      "title": "中国香港来源合同与解析缺口切片",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R11-HK"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "R11-IE",
+      "title": "爱尔兰来源合同与解析缺口切片",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R11-IE"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "R11-JP",
+      "title": "日本来源合同与解析缺口切片",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R11-JP"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "R11-ME",
+      "title": "中东来源合同与解析缺口切片",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R11-ME"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "R11-US",
+      "title": "美国来源合同与解析缺口切片",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R11-US"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "R12",
+      "title": "完成跨来源与异常回放验收集",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R12"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "R13",
+      "title": "接通真实公开时延与阶段质量面板",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R13"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "R14",
+      "title": "修复自然观察暴露的资料时效问题",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R14"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "R15",
+      "title": "执行断源与积压恢复演练",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R15"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "R16",
+      "title": "复核全量赛事质量与剩余数据缺口",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R16"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "U01",
+      "title": "统一赛事等级筛选与卡片标签",
+      "lane": "C",
+      "completion_percent": 80,
+      "status": "部分完成",
+      "basis_and_gap": "等级筛选/标签代码与组合正式CI已审合入；生产公开复验未完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "U01"
+      ],
+      "previous_percent": 80,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "U02",
+      "title": "补齐近期赛事首页与详情旧交互要求",
+      "lane": "C",
+      "completion_percent": 75,
+      "status": "部分完成",
+      "basis_and_gap": "交互代码/PG/HTTP旅程及组合CI通过；视觉与生产复验未完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "U02"
+      ],
+      "previous_percent": 75,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "U03",
+      "title": "修复重复赛事身份和旧链接去向",
+      "lane": "C",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "U03"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "U04",
+      "title": "统一缺失失败新鲜度及订阅文案",
+      "lane": "C",
+      "completion_percent": 55,
+      "status": "部分完成",
+      "basis_and_gap": "新增关注说明、基础资料全空提示与日文原名fallback等切片的真实RED/GREEN及原审（D051后续、D076、D081）；完整读失败/新鲜度/安全重试语义未覆盖，新增小片仍不足上调整卡5%刻度。",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "U04"
+      ],
+      "previous_percent": 55,
+      "change_since_previous": "新增关注说明、基础资料全空提示与日文原名fallback等切片的真实RED/GREEN及原审（D051后续、D076、D081）；完整读失败/新鲜度/安全重试语义未覆盖，新增小片仍不足上调整卡5%刻度。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "U05",
+      "title": "完成域名手机空态与性能复验",
+      "lane": "C",
+      "completion_percent": 20,
+      "status": "部分完成",
+      "basis_and_gap": "浏览器测量脚本及有限纯测试有进展，但D070资格差分出现新的sandbox拒绝后STOP；真实手机/域名/布局/p95未测，比例不变。",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "U05"
+      ],
+      "previous_percent": 20,
+      "change_since_previous": "浏览器测量脚本及有限纯测试有进展，但D070资格差分出现新的sandbox拒绝后STOP；真实手机/域名/布局/p95未测，比例不变。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "V01",
+      "title": "迭代一接口与失败路径验收",
+      "lane": "R",
+      "completion_percent": 10,
+      "status": "部分完成",
+      "basis_and_gap": "接口/失败路径已有分散子片证据；迭代一整体验收表未闭合",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "V01"
+      ],
+      "previous_percent": 10,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "V02",
+      "title": "迭代二端到端候选验收",
+      "lane": "R",
+      "completion_percent": 15,
+      "status": "部分完成",
+      "basis_and_gap": "部分端到端子片和固定19组合原生结果可用；迭代二真实整体验收未过",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "V02"
+      ],
+      "previous_percent": 15,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "V03",
+      "title": "功能冻结与独立集成审核",
+      "lane": "R",
+      "completion_percent": 25,
+      "status": "部分完成",
+      "basis_and_gap": "A170/D081/C248/C253等窄片新增独立审核；全量冻结/集成及正式过期skip gate仍失败，比例不变。",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "V03"
+      ],
+      "previous_percent": 25,
+      "change_since_previous": "A170/D081/C248/C253等窄片新增独立审核；全量冻结/集成及正式过期skip gate仍失败，比例不变。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "V04",
+      "title": "执行真实用户旅程和保留样例验收",
+      "lane": "R",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "V04"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "V05",
+      "title": "固定全量发布候选并独立复审",
+      "lane": "R",
+      "completion_percent": 10,
+      "status": "部分完成",
+      "basis_and_gap": "新增候选切片证据而非全量发布候选；C259运行中、B真实PG资格未通过，比例不变。",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "V05"
+      ],
+      "previous_percent": 10,
+      "change_since_previous": "新增候选切片证据而非全量发布候选；C259运行中、B真实PG资格未通过，比例不变。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "V06",
+      "title": "完成全量运行的 48 小时观察",
+      "lane": "R",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "V06"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    {
+      "id": "V07",
+      "title": "汇总最终验收及逐任务完成证据",
+      "lane": "R",
+      "completion_percent": 5,
+      "status": "部分完成",
+      "basis_and_gap": "存在协调/证据台账；逐卡最终验收和运行观察输入均不齐",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "V07"
+      ],
+      "previous_percent": 5,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    }
+  ],
+  "comparison_baseline": {
+    "path": "task-progress-2026-10-24.json",
+    "as_of": "2026-10-24T08:38:35+08:00"
+  },
+  "delivery_status": {
+    "full_formal_gate": "NOT_READY/FAIL",
+    "merged_since_baseline": false,
+    "deployed_since_baseline": false,
+    "enabled_since_baseline": false,
+    "public_acceptance_since_baseline": false,
+    "C259": "active same normal CI; no accepted final packet at export cutoff",
+    "B272": "ROOT verified fixed17; original reviewer in progress, not accepted result yet"
+  }
+}

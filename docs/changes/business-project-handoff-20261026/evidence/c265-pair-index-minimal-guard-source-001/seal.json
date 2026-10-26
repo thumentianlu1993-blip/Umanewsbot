@@ -1,0 +1,87 @@
+{
+  "task": "C265",
+  "member_count": 16,
+  "total_bytes": 168453,
+  "members": [
+    {
+      "path": "R-C264-index.json",
+      "bytes": 1815,
+      "sha256": "adb4bced69f4a82474759cd74871510eb32fdc70e98d250624794ee345bc23e0"
+    },
+    {
+      "path": "R-C264-report.md",
+      "bytes": 8869,
+      "sha256": "b601767c6a152abbed27fd027f43704a3a4c367fa16d243c202c0248daf6ce3c"
+    },
+    {
+      "path": "api-and-budget-contract.json",
+      "bytes": 2598,
+      "sha256": "173634994181953d6cf5332c8abfe790e8ddd1f5abc0bdcc3ef84fa77e47886b"
+    },
+    {
+      "path": "commit-validation.json",
+      "bytes": 562,
+      "sha256": "e7d75550fc5f5bf836c2958866268745ca3caf2782e0335c10ac51e520ddd970"
+    },
+    {
+      "path": "committed.diff",
+      "bytes": 17564,
+      "sha256": "036a09beb64c724eab74c245a25d26e6a7c91f08acb0a5cbbf7ac06516b406c6"
+    },
+    {
+      "path": "delivery.json",
+      "bytes": 893,
+      "sha256": "3edc31842ef0489c9ee514973f0dafff9f7d217df60ab45af5af05130c5fa9c1"
+    },
+    {
+      "path": "frozen-horse_profiles.py",
+      "bytes": 44287,
+      "sha256": "4b0868d7e9893501644cb76575a3f49cfe6ad76c1407996a27d5966e27b315f8"
+    },
+    {
+      "path": "implementation-plan.md",
+      "bytes": 409,
+      "sha256": "a265ff7b488b0d68cf0ab8df3fa67abddc2749d67dc88e536f9ba8373e72b74a"
+    },
+    {
+      "path": "index.json",
+      "bytes": 1252,
+      "sha256": "acae86c146acb4b63d2c9cbdb468a7995311b389bc1753eab04ed58f723c6fac"
+    },
+    {
+      "path": "oracle-source-map.json",
+      "bytes": 21615,
+      "sha256": "d26048f48844d30e5dc67a5f7e5abe1ed32ad02cd4eb9bf6afd3bb38dcaf4944"
+    },
+    {
+      "path": "parent-horse_profiles.py",
+      "bytes": 33658,
+      "sha256": "18545b3e4e7858790635e3846a7f5c0477726f630d4894709c763eff519df011"
+    },
+    {
+      "path": "prior-preservation.json",
+      "bytes": 18818,
+      "sha256": "81c10bf9d6f4e8cdc6a508996d2da91d4553312ba3afa054b186071deca02220"
+    },
+    {
+      "path": "protected-pins-validation.json",
+      "bytes": 9847,
+      "sha256": "fbb55b9ee6385f9e52b0611396718663a4564dfdf836b44b3d194f3d97bb450e"
+    },
+    {
+      "path": "report.md",
+      "bytes": 4620,
+      "sha256": "50b8f202cf188b30ccfdb083ffcaabedf829c05e8883e4ccde94cf74293c872b"
+    },
+    {
+      "path": "source-symbols.json",
+      "bytes": 739,
+      "sha256": "b6282e5af4056badd62933f3e719db1f3f5ff4cfa5d418387df419723dc3a011"
+    },
+    {
+      "path": "static-validation.json",
+      "bytes": 907,
+      "sha256": "ece626d0cb5f2326db276920c3b8c55b091cab7ef13fcd1d4bab21e8c9fec1d0"
+    }
+  ]
+}

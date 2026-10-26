@@ -1,0 +1,65 @@
+{
+  "status": "P5_PRECONDITION_SOURCE_REPAIR_LOCAL_COMMIT_STATIC_ONLY_NOT_RUN",
+  "head": "ab651cecd940850a62afe04bfd74551cf9ad3887",
+  "tree": "377424d1d2aa02dc54b56077c8c8b2f13c5cb481",
+  "parent_head": "bb871949877979226292033f0ab14f8d949cc6b7",
+  "changed_project_files": [
+    "tools/test_impact/test_pg_lifecycle.py"
+  ],
+  "test_source_sha256": "ff8babd5df7cdd7998a63c2e1d4c5a27e894322609ef493159eb00e3a2808636",
+  "erratum_sha256": "ec919d06b517c256df9d19e8f68c24429cdbb03782013e1720bebc5866fcb65c",
+  "source_diff_sha256": "5dd5247cb8b706d9489c2b40bb59c931955e7253bc850f69b8bbde6d3f0508a3",
+  "source_static_checks_sha256": "248d94a3d2aa5692ad98780b5ff94d05ba797eac8cf3ede4703350904c6ae929",
+  "new_source_binding_checks_sha256": "5894bf0109947a1bb38dd601f6c7269eaa3bd4b87741cc0cb7cfb0ecdabfca7f",
+  "manifest_sha256": "7990b7e727c2a79c534f8e8576bfebc9aa0b1f279515d83d49d33e98e6ddaa57",
+  "control_payload_sha256": {
+    "closure-binding.json": "daf327bb824fc9e153542eb2d38cd4dec72485276cbb9b58b9f7606b8e5bd74d",
+    "component_evidence_gate.py": "57b6c3444d557ae6ca11fccf2d81ab1270594d5b665f08f43db2641fa8cf8630",
+    "plan.json": "d7be7232e5b2290d07342da2cfc44c43fd1182ae583bd01db3ba4a81a2fe5519",
+    "qualification-request.json": "d3cb5a0ddf8de4dae373a1faac1431fb7afaf9f400e3e6060f53934a702d795d",
+    "run_realpg5.py": "890962062031a96558b4025daa822fdf3a1d381f7d59efed607d9138f4294540",
+    "test-commit.raw": "ab056c19c62c129974081d9cf8860ae9bd8b94e2f7e88789fc68c696cd176048"
+  },
+  "host_sha256": "188baedbb399862cc4efcf14ce208828b5ae9df6b05a46029f55aafafa3fbcae",
+  "proposed_command_sha256": "d71d1a227e52a3c43a4d12544f6f1ec581ae640aba86dd9ed28e48d07f9da233",
+  "planned_output": "/Users/mentianlu/.codex/runtime/realpg5-v2-p5sync-execution-b51eebf7f1bd4e389c3fa21acb9abbf0",
+  "planned_output_exists": false,
+  "resources": {
+    "memory": "2g",
+    "cpus": "2",
+    "pids": 256,
+    "tmpfs": "/tmp:rw,exec,size=1g,uid=10001,gid=10001,mode=0700"
+  },
+  "pg_stop_cap": 3,
+  "gate_oracle_unchanged": true,
+  "host_runner_gate_unchanged": true,
+  "boundary_tests": "4_SOURCE_ONLY_NOT_EXECUTED",
+  "verification": "AST/compile code object without exec, JSON/hash/Git/diff-check only",
+  "protected": [
+    {
+      "path": "/Users/mentianlu/.codex/runtime/b284-realpg5-2g-1g-resource-variant-prepare-001",
+      "index_sha256": "0b40bcddbe9d525729341f6be0ac13e32a51330cc76ff71f2fc0e1e21a62a188",
+      "members_verified": 41
+    },
+    {
+      "path": "/Users/mentianlu/.codex/runtime/b285-realpg5-2g1g-once-result-001",
+      "index_sha256": "a9d31f51364022936ab65f002dfb7289a065cde5eec402cab53af5fd772073e3",
+      "members_verified": 77
+    },
+    {
+      "path": "/Users/mentianlu/.codex/runtime/r-b285-first-p5-rejection-result-review-001",
+      "index_sha256": "5d1aeefb7958b2ab02ba6ca6259e7ca2663a6e3afd16208dba491abf0e08c50d",
+      "members_verified": 2
+    }
+  ],
+  "weekly_usage": {
+    "used_percent": 51,
+    "ordinaryUsageAllowed": true
+  },
+  "no_helpers_tests_PG_Docker_CI_push_network_executed": true,
+  "PG5": "NOT_QUALIFIED_STOPPED",
+  "historical_false_UNKNOWN": "PRESERVED",
+  "formal_full_independent_delivery": "NOT_READY",
+  "root_image": "NOT_CLOSED",
+  "handoff": "ROOT -> same original R narrow source/precondition/cap review; future execution needs separate ROOT card"
+}

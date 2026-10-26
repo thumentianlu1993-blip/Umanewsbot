@@ -1,0 +1,49 @@
+# R_C265：horse_profiles最小pair-index guard产品源码复核
+
+结论：**APPROVED — SOURCE_ONLY / READY_FOR_SEPARATE_FIXED_SHA_GREEN_CARD**。未发现阻断finding；固定单文件实现与C260/C261、C263冻结oracle及C264真实RED的最小修复范围相符。源码准入不代表24项或资源/SQLSTATE/PG窗口已GREEN，实际实现后执行全部NOT_RUN。
+
+按派单先核周窗：当前读数used51%、remaining49%，ordinaryUsageAllowed=true；未reset、兑换或变更模型/额度。其后只读源码/AST/diff/Git/封包，不执行candidate/helper、测试、SQL、PG/CI、迁移或网络下载，不写作者树/旧包。
+
+## 固定对象与独立核验
+
+作者包 `/Users/mentianlu/.codex/runtime/c265-pair-index-minimal-guard-source-001`。seal `50e35a402ba41ec4d564684d0cc2f610d7397fddbf02834c06819c06fbf54477` 的16成员168453字节逐项核验；report `50b8f202cf188b30ccfdb083ffcaabedf829c05e8883e4ccde94cf74293c872b` / index `acae86c146acb4b63d2c9cbdb468a7995311b389bc1753eab04ed58f723c6fac` 与派单相符。
+
+HEAD `d8f8e9e6757b997e6545b917d5db6d4268ce7c5a` / tree `d8c36586d87bf19aaf9b437884de2fbc2c513b9e` / parent `69e9856282a41048ac9434fc1928c0d9fc53359f`。仅horse_profiles.py变更，216增16删、1015行44287字节，SHA `4b0868d7e9893501644cb76575a3f49cfe6ad76c1407996a27d5966e27b315f8`，与包内frozen原件一致。tracked无改动，原b547设计唯一untracked未变。
+
+独立AST核对原函数仅reconcile/scan改变；原_article_horse_link_protection及其他旧函数AST不变，新增2内部异常类和6辅助均同文件。26 pins中唯一授权horse_profiles更新，其他25项保持；固定24 test SHA `502c5625c865df81f5c56685c9f4c18a593b191abe67d466134687788a051557`、catalog、reader/model/0082/strong writer未改。74旧包seal及5907成员逐项保存，包含C264两个版本和原RED。
+
+## 两个真实写入口
+
+reconcile保留原plan、旧PK/profile CAS/current_links与mutable_statuses。原Article→当前Link锁后仍先WITHDRAWN/人工/marked保护；只从实际可执行delete/create/update取profile IDs去重并排序，全部history观察完成后才开始任意关系DML。helper将命中/坏候选映射到精确pair，过滤三个动作集合；当前有行只加实际current.id，无行只排除create，不将原receipt PK伪装protected_id。result.protected仍引用同一扩展列表，protected_ids重新反映真实行；无实际动作时不会因None计时进入写操作。
+
+profile/global改为Article锁→精确pair Link锁读并显式PK排序→旧manual/removed/marked→新history观察→原get_or_create/save。已没有先INSERT缺行再保护的漏洞；新增索引保护跳过该pair，普通NO_INDEX仍交既有matcher/状态规则。candidate、manual/removed计数和每pair独立atomic保持，不全局冻结普通pair，不增加公开blocked字段。原strong writer父锁顺序与Index只读性不改。
+
+preview在私有atomic内观察历史，writable=false不要求RC；article过滤实际计划并使用真实current PK，profile只观察不改旧统计shape。它不建档/写DML，不返回可复用许可；commit独立重锁重读，未跨调用缓存NO_INDEX或命中结论。preview没有新增与commit等价的快照/锁承诺。
+
+## 实际事务准入与using边界
+
+_pair_history_alias第442行绑定原for-update QuerySet的写alias、Link锁alias及传入已存实例_state.db到冻结reader使用的default connection.alias；actual atomic、锁、delete/create/get_or_create/save显式using相同。不同alias/无法确认时报稳定PairHistoryTransactionError，未增加多库支持、默认连接SHOW代另一写连接背书或回退新连接。这个约束是确认既有单连接责任域，不改变RC普通pair匹配/授权规则。
+
+_observe_pair_histories第497行只在有待history动作时检查PG/实际atomic/非autocommit，并在任何history读取或NO_INDEX交回旧policy前执行真实SHOW transaction_isolation，只接受tuple read committed。RR/SERIALIZABLE/未知形状稳定pair_history_requires_read_committed；SHOW自己的driver错误不被转换。原reprocess外层atomic中的savepoint仍使用同连接/事务，不SET隔离级别、重开/重启或重试。旧零DML保护分支无需新增准入。
+
+源码依靠原atomic、显式using及冻结reader的同alias绑定；没有额外PID/xid探针，也不将静态结构称实际同backend/xid已验。C263测试会逐事务记录SHOW、reader与DML的真实alias/pid/raw_connection/xid，必须在后续运行中对证。
+
+## DTO、有限预算与GUC/首因
+
+_pair_history_reason检查固定17键、schema/pair精确类型值、恒边界及weak_mutation_allowed严格false；INDEXED引用正整数与64位小写SHA，UNKNOWN引用全None，四状态以外/畸形报PairHistoryContractError。不把坏候选降成普通pair，不把NO_INDEX解释为never-strong或grant。内部校验不调用writer/_admit，不修receipt/marker或生成索引。
+
+动作pair去重后先核16上限，预留2*pair≤32数据SELECT及pair*MAX_BYTES≤64MiB，再逐pair一次调用冻结reader。该上界确由未改reader每pair最多两个SELECT、最多一个≤4MiB raw原件支撑；old marked检查或固定GUC语句不计为新增reader数据SELECT。不同时存原detail，只保留reason map。**这不是动态SQL计数/满额输入验收，也不是JSON堆或总canonical复制硬上界**。17pair在history/DML前报稳定预算错误，不截断后放未观察动作。
+
+timeout读取原SHOW值，PG标准整单位解析覆盖ms/s/min/h/d；0作为无限制收紧到2000ms，非零取更严值，不放宽caller。设置均transaction-local，仅history阶段生效；正常返回恢复原SHOW字符串。异常没有finally恢复SQL，沿原caller atomic/savepoint退出回滚GUC，避免坏事务额外SQL掩盖22012/42P01/57014；异常集合没有吞driver或改成NO_INDEX。
+
+软elapsed从观察阶段开始，在每读前后、正常恢复后及每次实际弱DML前核5秒；不是Python解析硬抢占，也不追溯原父/Link等待、resolver/translation或整个global总工作。超限可使当前单位整体回滚；不会把此前global独立pair已提交工作冒整体零写。空动作返回空map/None且后续实际DML路径相应为空/被旧保护跳过，不误用空计时；同pair重复动作只查一次，当前PK与CAS约束保留。
+
+## C264对应修复及尚未到达的验证
+
+该接缝直接覆盖C264已采的marker擦除/缺行/replacement弱改删/重建、无history观察、RR未拒绝、preview未过滤及动作预算要求；既有2PASS优先保护/只读RR合同保持。没有为测试凑P修改24 oracle。新guard不写audit，正常task成功扫描日志仍由原路径产生；reprocess成功可保存tags/metadata及旧成功日志，技术/合同错误沿原外层atomic回滚，public wrapper失败审计独立保留。
+
+下一固定新SHA正常GREEN必须实际走完原24完整方法，尤其C264未到达的6项SQLSTATE注入及public失败审计、一次5.1秒真实读后延迟/稳定elapsed拒绝、GUC更严最小值/正常与异常恢复、16/17动作/32SELECT边界、逐事务SHOW/xid、普通NO_INDEX后续strong conflict、preview后commit、12真实PG窗口的零弱DML/K2 history_conflict/RR稳定拒绝与独立RC末态。源码正确方向不等于这些已实测；若出现driver/fixture/observer问题按新原件分列，不能将旧短路算已闭合或缩oracle。
+
+可以交ROOT另卡唯一新SHA正常CI；本审没有执行或授权自己push/rerun。C264 scanner真实RED保留，C259 capture机制历史pre-RED NOT_RUN不倒写。无新增migration/backfill/全局enforce、来源grant、D模板或生产cutover；全L02、durable、生产role/保留/公开验收未闭合。
+
+正式门禁边界仍按各run实况：C264当前首因execute FAIL且verifier SKIPPED，C259历史实际expired-skip FAIL；未发生C265正式门禁运行，不能称full gate通过。summary/独立collect/image及外部CID UNKNOWN缺口保持。

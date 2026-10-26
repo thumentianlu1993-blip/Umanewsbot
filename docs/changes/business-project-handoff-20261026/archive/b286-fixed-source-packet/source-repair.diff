@@ -1,0 +1,129 @@
+diff --git a/tools/test_impact/test_pg_lifecycle.py b/tools/test_impact/test_pg_lifecycle.py
+index fa5b888d3..95f7a940a 100644
+--- a/tools/test_impact/test_pg_lifecycle.py
++++ b/tools/test_impact/test_pg_lifecycle.py
+@@ -192,6 +192,103 @@ class PGProtocolTests(unittest.TestCase):
+         with self.assertRaises(pg.ReceiptError):pg.receipt_filename('run','../batch-000')
+ 
+ 
++def _p5_postmaster_reaped(session, process):
++    record=session.records.get('postmaster',{})
++    return (process is not None and session.processes.get('postmaster') is process
++            and record is session.receipt['postmaster'] and record.get('started') is True
++            and record.get('reaped') is True and type(record.get('returncode')) is int
++            and record['returncode']==-signal.SIGKILL and type(process.returncode) is int
++            and process.returncode==-signal.SIGKILL)
++
++
++def _confirm_p5_postmaster_exit(session, process):
++    """仅测试故障前件：用原数字wait，最多3秒且不越过原业务/内deadline。"""
++    if session.processes.get('postmaster') is not process:
++        raise AssertionError('P5_SAVED_POSTMASTER_MISMATCH')
++    deadline=min(session.business_deadline,session.deadline,pg.time.monotonic()+3)
++    code=session._wait('postmaster',deadline,False)
++    if type(code) is not int or code!=-signal.SIGKILL or not _p5_postmaster_reaped(session,process):
++        raise AssertionError('P5_EXIT_PRECONDITION_UNKNOWN')
++
++
++def _cleanup_p5_after_confirmed_exit(session):
++    """P5任何失败路径都不许fallback启动第四次pg_stop；未证实就留UNKNOWN。"""
++    if not _p5_postmaster_reaped(session,session.processes.get('postmaster')):
++        session.error('P5_EXIT_PRECONDITION_UNKNOWN');session.persist_partial()
++        raise AssertionError('P5_EXIT_PRECONDITION_UNKNOWN')
++    session.stop_and_wait()
++
++
++class P5ExitPreconditionTests(unittest.TestCase):
++    """纯边界源码：模拟Popen依赖，不是PG资格；本卡冻结但不执行。"""
++    def setUp(self):
++        import shutil
++        from unittest import mock
++        self.mock=mock
++        self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
++        plan=plan_fixture();request=pg.make_request(plan,'run','batch-000','django','a'*32)
++        self.session=pg.Session(request,plan,Path(self.tmp.name),root=Path(self.tmp.name))
++        self.addCleanup(shutil.rmtree,self.session.log_dir,ignore_errors=True)
++        self.session.business_deadline=102.;self.session.deadline=132.
++        self.process=mock.Mock(pid=900,returncode=None)
++        self.process.poll.side_effect=lambda:self.process.returncode
++        record=pg.step_record();record.update(pid=900,ppid=1,started=True,status='RUNNING',argv=['synthetic-p5-postmaster'])
++        self.session.processes['postmaster']=self.process
++        self.session.records['postmaster']=record;self.session.receipt['postmaster']=record
++        self.session._spawn=mock.Mock(side_effect=AssertionError('pure boundary must not spawn'))
++
++    def test_unobserved_kill_requires_numeric_wait_before_cleanup(self):
++        import subprocess
++        outcomes=iter([subprocess.TimeoutExpired('synthetic-p5',.1),-9])
++        def wait(timeout=None):
++            outcome=next(outcomes)
++            if isinstance(outcome,BaseException):raise outcome
++            self.process.returncode=outcome;return outcome
++        self.process.wait.side_effect=wait
++        with self.mock.patch.object(pg.time,'monotonic',return_value=100.):
++            _confirm_p5_postmaster_exit(self.session,self.process)
++        self.assertEqual(self.process.wait.call_count,2)
++        self.process.poll.assert_not_called()
++        self.assertEqual(self.session.receipt['postmaster']['returncode'],-9)
++        self.assertTrue(self.session.receipt['postmaster']['reaped'])
++        self.session._spawn.assert_not_called()
++
++    def test_precondition_timeout_blocks_registered_cleanup_stop(self):
++        self.session.business_deadline=100.5
++        with self.mock.patch.object(pg.time,'monotonic',side_effect=[100.,101.]):
++            with self.assertRaises(TimeoutError):
++                _confirm_p5_postmaster_exit(self.session,self.process)
++        with self.assertRaisesRegex(AssertionError,'P5_EXIT_PRECONDITION_UNKNOWN'):
++            _cleanup_p5_after_confirmed_exit(self.session)
++        self.assertTrue(self.session.receipt['postmaster']['timed_out'])
++        self.assertFalse(self.session.receipt['postmaster']['reaped'])
++        self.assertFalse(self.session.closed)
++        self.assertFalse(self.session.receipt['pg_stop']['started'])
++        self.assertEqual(self.session.receipt['primary_error'],'P5_EXIT_PRECONDITION_UNKNOWN')
++        self.session._spawn.assert_not_called()
++
++    def test_confirmed_exit_enters_original_cleanup_without_stop_spawn(self):
++        def wait(timeout=None):self.process.returncode=-9;return -9
++        self.process.wait.side_effect=wait
++        with self.mock.patch.object(pg.time,'monotonic',return_value=100.):
++            _confirm_p5_postmaster_exit(self.session,self.process)
++            with self.mock.patch.object(pg.os,'waitpid',side_effect=ChildProcessError(10,'synthetic ECHILD')):
++                _cleanup_p5_after_confirmed_exit(self.session)
++        self.assertTrue(self.session.closed)
++        self.assertFalse(self.session.receipt['pg_stop']['started'])
++        self.assertEqual(self.session.receipt['primary_error'],'PG_EXIT_BEFORE_STOP')
++        self.assertEqual(self.session.receipt['secondary_errors'],['PG_POSTMASTER_EXIT:-9'])
++        self.session._spawn.assert_not_called()
++
++    def test_startup_failure_cannot_fall_through_to_fourth_stop(self):
++        with self.assertRaisesRegex(AssertionError,'P5_EXIT_PRECONDITION_UNKNOWN'):
++            _cleanup_p5_after_confirmed_exit(self.session)
++        self.assertFalse(self.session.closed)
++        self.assertFalse(self.session.receipt['pg_stop']['started'])
++        self.process.poll.assert_not_called()
++        self.session._spawn.assert_not_called()
++
++
+ @unittest.skipUnless(os.environ.get('UMANEWS_REAL_PG_QUALIFICATION')=='1',
+                      'requires separate exact real-PG qualification card/container')
+ class RealPGTests(unittest.TestCase):
+@@ -204,7 +301,10 @@ class RealPGTests(unittest.TestCase):
+         self.root=Path(self.tmp.name)
+         request=pg.make_request(plan,'run',batch['key'],batch['profile'],'a'*32)
+         self.session=pg.Session(request,plan,self.root,root=self.root,data_dir=self.root/'pgdata')
+-        self.addCleanup(self.session.stop_and_wait)
++        if self._testMethodName=='test_real_early_postmaster_exit_is_reaped':
++            self.addCleanup(_cleanup_p5_after_confirmed_exit,self.session)
++        else:
++            self.addCleanup(self.session.stop_and_wait)
+ 
+     def start(self):
+         self.session.prepare_pg();self.session.start_postgres();self.session.wait_ready()
+@@ -241,6 +341,7 @@ class RealPGTests(unittest.TestCase):
+ 
+     def test_real_early_postmaster_exit_is_reaped(self):
+         self.start();process=self.session.processes['postmaster'];os.kill(process.pid,signal.SIGKILL)
+-        self.session.stop_and_wait()
++        _confirm_p5_postmaster_exit(self.session,process)
++        _cleanup_p5_after_confirmed_exit(self.session)
+         self.assertEqual(self.session.receipt['postmaster']['returncode'],-signal.SIGKILL)
+         self.assertTrue(self.session.receipt['postmaster']['reaped'])

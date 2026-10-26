@@ -1,0 +1,17 @@
+{
+  "schema_version": "pg-lifecycle-v2",
+  "nonce": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "mode": "run",
+  "key": "batch-000",
+  "profile": "django",
+  "test_sha": "ab651cecd940850a62afe04bfd74551cf9ad3887",
+  "test_tree": "377424d1d2aa02dc54b56077c8c8b2f13c5cb481",
+  "run_id": "B286-P5-SYNC-PREPARE-b51eebf7f1bd4e389c3fa21acb9abbf0",
+  "run_attempt": "1",
+  "image_id": "sha256:3dfe2d0415bf03584bab2436ff1b8f40ac7591cf3834d66e6263b018febf2f98",
+  "parent_full_digest": null,
+  "input_plan_digest": "94e690d944a052e8d42b7a0a7079a111c60869d0c35c0b4182899336391cfc17",
+  "invoke_seconds": 600,
+  "inner_seconds": 570,
+  "cleanup_seconds": 30
+}

@@ -1,0 +1,29 @@
+{
+  "card": "C265",
+  "status": "PRODUCT_SOURCE_ONLY_FROZEN_REVIEW_PENDING",
+  "commit": {
+    "HEAD": "d8f8e9e6757b997e6545b917d5db6d4268ce7c5a",
+    "TREE": "d8c36586d87bf19aaf9b437884de2fbc2c513b9e",
+    "parent": "69e9856282a41048ac9434fc1928c0d9fc53359f",
+    "checkout": "/Users/mentianlu/.codex/worktrees/c191-l01-diagnostics-tests/umanews",
+    "changed_file": "server/stable/services/horse_profiles.py",
+    "source_sha256": "4b0868d7e9893501644cb76575a3f49cfe6ad76c1407996a27d5966e27b315f8",
+    "source_bytes": 44287,
+    "source_lines": 1015,
+    "status": "?? docs/changes/next-version-capabilities/lanes/C/C260-pair-index-scanner-integration-design.md"
+  },
+  "changed_existing_functions": [
+    "reconcile_article_horse_links",
+    "scan_article_horse_links"
+  ],
+  "fixed_tests": 24,
+  "test_source_sha256": "502c5625c865df81f5c56685c9f4c18a593b191abe67d466134687788a051557",
+  "catalog_sha256": "8da0453cf2dfc3fc104e6907fc8054011d99cd787f992b6c98d731a0b98cb231",
+  "protected_pins_unchanged": 25,
+  "prior_packages": 74,
+  "prior_members": 5907,
+  "GREEN": "NOT_RUN",
+  "source_review": "PENDING",
+  "push_tests_collect_DB_CI_network": "NOT_RUN",
+  "report_sha256": "50b8f202cf188b30ccfdb083ffcaabedf829c05e8883e4ccde94cf74293c872b"
+}

@@ -1,0 +1,51 @@
+{
+  "card": "C264",
+  "status": "FIXED_FIRST_NORMAL_RED_RESULT_REVIEW_PENDING",
+  "run": 40104839417,
+  "attempt": 1,
+  "event": "pull_request",
+  "head": "69e9856282a41048ac9434fc1928c0d9fc53359f",
+  "tree": "2536f738d6be9083441481ae0347199a1524e57d",
+  "test_merge": "c42fd9b4fa070ce3497c74214b3d53fc4bc80ddf",
+  "new_native": {
+    "total": 24,
+    "pass": 2,
+    "fail": 22,
+    "error": 0,
+    "skip": 0,
+    "failure_entries": 72
+  },
+  "semantic_controls_not_reached": 2,
+  "business_or_requirement_failure_methods": 20,
+  "full_native": {
+    "total": 7091,
+    "pass": 7059,
+    "fail": 22,
+    "error": 0,
+    "skip": 10
+  },
+  "legacy_pass_counts": [
+    27,
+    20,
+    15,
+    17,
+    13
+  ],
+  "batches": 50,
+  "complete_batches": 50,
+  "exit0_batches": 49,
+  "exit1_batches": 1,
+  "registration_exact": 7091,
+  "C262_raw_events": 651,
+  "actual_blocking_windows": 12,
+  "RR_independent_RC_final_states": 6,
+  "first_failed_stage": "execute-isolated-plan",
+  "formal_verifier": "SKIPPED",
+  "independent_collect": "SKIPPED",
+  "image_artifact": "SKIPPED_NOT_DOWNLOADED",
+  "external_CID_cleanup": "UNKNOWN",
+  "own_watcher": "EXITED",
+  "prior_packages": 72,
+  "prior_members": 5587,
+  "report_sha256": "b34fbf111492db62b88d7c8cebe8256814e00a5b656c3e567b766e2956c384d0"
+}

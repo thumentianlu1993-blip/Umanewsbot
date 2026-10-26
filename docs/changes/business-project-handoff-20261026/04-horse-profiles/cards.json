@@ -1,0 +1,920 @@
+[
+  {
+    "id": "H01",
+    "project": "P04",
+    "requirement_id": "BR-H01",
+    "original_plan": {
+      "id": "H01",
+      "lane": "A",
+      "role": "integration",
+      "it": 1,
+      "start": "2026-10-04",
+      "due": "2026-10-06",
+      "h": 5,
+      "deps": [
+        "F01"
+      ],
+      "gaps": [
+        "HG-01",
+        "HG-07"
+      ],
+      "area": "horse",
+      "title": "生成近三年与历史 G1 全参赛马目标集",
+      "change": "去重生成近三年参赛集合、当前赛季/未来 30 天/近期新闻优先队列、2020 年以来 G1 全参赛马名称集合；纳入未建档对象、Jpn1 与香港本土 G1，列出地区和缺口。",
+      "test": "按最近参赛时间而非马龄排序；同马跨地区只算一次；历史集合不能缩成胜马；窗口边界及并发新增目标可重复计算。",
+      "done": "目标数量和优先级账本可复算；未知身份与缺来源保留在分母；缓存、staging、正式公开分别计数。",
+      "deadline": "2026-10-06 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-06T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/p0_horse_profiles.py",
+        "server/stable/services/horse_profile_completion.py",
+        "server/stable/services/horse_profile_publish.py",
+        "server/stable/services/horse_race_records.py",
+        "server/stable/test_horse_profile_publish.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "H01",
+      "title": "生成近三年与历史 G1 全参赛马目标集",
+      "lane": "A",
+      "completion_percent": 30,
+      "status": "部分完成",
+      "basis_and_gap": "目标集reader/helper及合成PG已审；真实目标分母未冻结",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "H01"
+      ],
+      "previous_percent": 30,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "生成近三年与历史 G1 全参赛马目标集",
+      "deps": [
+        "F01"
+      ],
+      "deadline_at": "2026-10-06T18:00:00+08:00",
+      "status": "提测",
+      "phase": "原reader已纳PR236正式交付；新helper5cca及A0107d4实际六项合成PG已独立验收；A011准备未绑定预检包，真实生产分母未取",
+      "commit": "f21058c112d7d7ddd5040571081c13cda4cfd91b",
+      "pr": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/236",
+      "review": "原reader PG5原Rd4ebb批准；新helper代码7c37批准；GUC/parser/supervisor finding全闭，新固定六项实际原R36b5批准",
+      "evidence": [
+        "/Users/mentianlu/.codex/worktrees/5482/umanews/docs/changes/next-version-capabilities/lanes/A/A-006-report.md",
+        "/Users/mentianlu/.codex/runtime/a006-h01-linux-3780b662/result.json"
+      ],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "dispatch_id": "A010-H01-CAPACITY-PG-PREPARE-001",
+      "owner_thread_id": "01a0fdc6-8c4e-7ff1-af4b-9db4baff8fb1",
+      "dependency_input_sha": "815b3181fa61e7fbbff714c7d7326e5598dc71a6",
+      "implementation_commit": "3780b662b19327ea2c40419f900053d6213ad0a7",
+      "review_commit": "0c307354e683909cfab1827e368f408662d1a13a",
+      "repair_commit": "4e86466fff0e607d00c4cb8e63cb30c93d1b697b",
+      "pg_plan_commit": "272a0446bc865d13dd214a64542644ffc2b6b7f0",
+      "pg_plan_revision": "a2c6005c52f25b4dfe03bf1b7c51a46fec6f16ec",
+      "pg_plan_review": "8b50d4cdb5650c7157f78b7e19a413627b7992ce",
+      "pg_harness_candidate": "1da007005f48c8c8ce53824d7123e6cc3bc1b917",
+      "pg_harness_review": "f246fd0f",
+      "driver_repair_commit": "b2f585d54af13d347a2c31f49ce73adc8a220809",
+      "driver_repair_evidence": {
+        "path": "/Users/mentianlu/.codex/runtime/a007-psycopg3-repair/evidence.json",
+        "sha256": "c83b5454bc23ca2bd6f9a20b3ca5503a7deeb3e824441c780fd2a343da4189a6",
+        "new_red_green": 2,
+        "reader_regression_passed": 13,
+        "harness_offline_checks_passed": 3,
+        "PG5": "not executed"
+      },
+      "driver_repair_review_commit": "c5494ebf",
+      "pg_actual_6c_failed_receipt": {
+        "status": "FAIL",
+        "stage": "collect_import",
+        "reason": "psycopg2 unavailable; project requirement psycopg[binary]==3.2.6",
+        "path": "/Users/mentianlu/.codex/runtime/a007-sixc-execution-preparation/execution-6cdb1a7fd2fb/supervisor-result.json",
+        "sha256": "a234d548d3d88ca669dc0b3a84b2c30b876ff5175d665329d5d2c912ac49368f",
+        "elapsed_seconds": 2.6521535419888096,
+        "executed_test_cases": 0,
+        "PG_started_by_native_collect": true,
+        "PG_stopped": true,
+        "owned_container_removed": true
+      },
+      "pg_actual_receipt": {
+        "lane": "A",
+        "task": "A007",
+        "head": "2e1a7220719ae902239c0d96d60f92d401c27f46",
+        "runtime": "/Users/mentianlu/.codex/runtime/a007-twoe-execution-preparation",
+        "manifest_sha256": "e4c1a7a3b70b19e6d2293e763372314061854d5714cd87b0b991053f55e80b01",
+        "started_at": "2026-10-03T21:12:31.961592+08:00",
+        "budget_seconds": 900,
+        "cleanup_reserved_seconds": 20,
+        "cpu": 2,
+        "memory_gib": 2,
+        "network": "none",
+        "owner_thread_id": "01a0fdc6-8c4e-7ff1-af4b-9db4baff8fb1",
+        "status": "PASS diagnostic5 only",
+        "executed": 5,
+        "skips": 0,
+        "failures": 0,
+        "errors": 0,
+        "elapsed_seconds": 17.262666208000155,
+        "cleanup": "complete/root actual ps-a codex.task empty",
+        "receipt": "/Users/mentianlu/.codex/runtime/a007-twoe-execution-preparation/execution-fe26ce00d128/supervisor-result.json",
+        "receipt_sha256": "0f20a5e3a80bd6a48b72f550567b4a99d5d5296b09dd007382ef7019dee13434",
+        "review_commit": "d4ebb72ed572389cd393e9e8831803d50e5dfed0"
+      },
+      "capacity_plan_review": {
+        "commit": "fe86f9d2",
+        "status": "APPROVED，两P2 CLOSED，已派A009隔离实现",
+        "findings": [
+          "R-A008-PLAN-001-P2-01",
+          "R-A008-PLAN-001-P2-02"
+        ],
+        "repair_commit": "f05f3c0f0acf19e1aaee7b7062ae1beb399893ed",
+        "rereview_commit": "6de7aea66ef703acebdca9f5f77664370eda7d5d"
+      },
+      "formal_validation": "PR236 fixed06b CI37137528485：6378项/46批、0fail/error、10既定skip、全部native lifecyclecomplete；候选外main907 delivery verified；未合并发布",
+      "capacity_implementation_commit": "5e738e47b004a73c23819b9446a4d53d3ce8aa42",
+      "capacity_pg_actual_review_commit": "36b5ca8716ae48d12db4ec502352cd6cffb9eeba",
+      "merged_delivery_slices": [
+        {
+          "pr": 237,
+          "merge_commit": "22e130adf4464fd3c5dd63ccd3f508c4a853d464",
+          "head": "3a55a9891e3e557027876b18403ef7b5fb39401a",
+          "scope": "仅third-integration-delivery.md列明固定受审切片；不含后续未交付实现",
+          "deployed": false
+        }
+      ],
+      "partial_merged": true
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 30,
+    "business_delivery_complete": false,
+    "priority_within_project": 1
+  },
+  {
+    "id": "H02",
+    "project": "P04",
+    "requirement_id": "BR-H02",
+    "original_plan": {
+      "id": "H02",
+      "lane": "A",
+      "role": "integration",
+      "it": 1,
+      "start": "2026-10-06",
+      "due": "2026-10-09",
+      "h": 4,
+      "deps": [
+        "H01",
+        "F03"
+      ],
+      "gaps": [
+        "HG-02",
+        "HG-05"
+      ],
+      "area": "horse",
+      "title": "复用缓存与强身份建立补全输入包",
+      "change": "检查既有批次/缓存哈希、来源时间和外部稳定 ID，输出可复用/需刷新/冲突清单；建立按实体与版本去重的输入包。",
+      "test": "同名异马、失效缓存、只在 staging 的马匹不能误报公开；处理重跑不恢复已暂停的旧采集任务。",
+      "done": "近期目标的候选输入可直接交给 H03；无需重抓全部历史；无身份候选有可操作原因。",
+      "deadline": "2026-10-09 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-09T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/p0_horse_profiles.py",
+        "server/stable/services/horse_profile_completion.py",
+        "server/stable/services/horse_profile_publish.py",
+        "server/stable/services/horse_race_records.py",
+        "server/stable/test_horse_profile_publish.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "H02",
+      "title": "复用缓存与强身份建立补全输入包",
+      "lane": "A",
+      "completion_percent": 30,
+      "status": "部分完成",
+      "basis_and_gap": "缓存输入合同与离线测试切片已审；真实缓存/强身份输入未验收",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "H02"
+      ],
+      "previous_percent": 30,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "复用缓存与强身份建立补全输入包",
+      "deps": [
+        "H01",
+        "F03"
+      ],
+      "deadline_at": "2026-10-09T18:00:00+08:00",
+      "status": "进行中",
+      "phase": "A071确认既有离线核心；用户明确选择调用方显式max_age_seconds；A092仅合同/测试候选经原R批准并由ROOT核报告/7项封存，离线切片完成。真实缓存、H01强身份输入/来源绑定和整卡业务验收仍缺",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "dispatch_id": "A028-H02-CACHE-REUSE-FIRST-SLICE-001",
+      "owner_thread_id": "01a0fdc6-8c4e-7ff1-af4b-9db4baff8fb1"
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 30,
+    "business_delivery_complete": false,
+    "priority_within_project": 2
+  },
+  {
+    "id": "H03",
+    "project": "P04",
+    "requirement_id": "BR-H03",
+    "original_plan": {
+      "id": "H03",
+      "lane": "A",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-15",
+      "due": "2026-10-16",
+      "h": 5,
+      "deps": [
+        "H02"
+      ],
+      "gaps": [
+        "HG-02",
+        "LG-06"
+      ],
+      "area": "horse",
+      "title": "打通基础档案及可独立存在的生涯记录",
+      "change": "将可核验候选从缓存/staging 经身份绑定发布到档案；履历允许 event 为空，保留出道、OP、Listed 和跨地区记录。",
+      "test": "无中文名可用原名；同场不同来源去重；后续绑定赛事页不新增一场；未出赛不计入出赛次数。",
+      "done": "TC-H01/03 通过；公开档案可显示近期资料与覆盖范围，不等待所有早年履历补齐。",
+      "deadline": "2026-10-16 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-16T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/p0_horse_profiles.py",
+        "server/stable/services/horse_profile_completion.py",
+        "server/stable/services/horse_profile_publish.py",
+        "server/stable/services/horse_race_records.py",
+        "server/stable/test_horse_profile_publish.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "H03",
+      "title": "打通基础档案及可独立存在的生涯记录",
+      "lane": "A",
+      "completion_percent": 35,
+      "status": "部分完成",
+      "basis_and_gap": "新增私有模块输入、事务创建、独立生涯行prepare与consumer实际隔离PG/CI及独立审核（A150/A154/A160/A164/A170）；真实来源用途/能力/许可权威仍缺，公开入口继续拒绝，未形成整卡公开验收。",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "A150_module_input_normal_first_validation",
+        "A154_observer_normal_first_validation",
+        "A160_career_row_new_sha_normal_validation",
+        "A170_http_budget_loader_normal_ci_validation"
+      ],
+      "previous_percent": 25,
+      "change_since_previous": "新增私有模块输入、事务创建、独立生涯行prepare与consumer实际隔离PG/CI及独立审核（A150/A154/A160/A164/A170）；真实来源用途/能力/许可权威仍缺，公开入口继续拒绝，未形成整卡公开验收。",
+      "delta_percentage_points": 10
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "打通基础档案及可独立存在的生涯记录",
+      "deps": [
+        "H02"
+      ],
+      "deadline_at": "2026-10-16T18:00:00+08:00",
+      "status": "已有细分实现，整卡未验收",
+      "phase": "固定1dd5e0a源码已有基础档案/独立生涯消费/后补赛事入口；A096及R_A仅静态评估确认，当前输入/权限/审阅/资源及整卡验收未绑定",
+      "commit": null,
+      "pr": null,
+      "review": "R_A APPROVE_ASSESSMENT_ONLY; not code/runtime/full-card acceptance",
+      "evidence": [
+        "/Users/mentianlu/.codex/runtime/a096-h03-independent-next-slice-assessment-001/README.md",
+        "/Users/mentianlu/.codex/worktrees/review-a-20261030/umanews/docs/changes/next-version-capabilities/reviews/R-A096-H03-existing-slice-assessment-review-001.md"
+      ],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "source_base_sha": "1dd5e0a508957672bcddd1c33e454fbbef1b75c1"
+    },
+    "after_snapshot_note": "A164私有生涯消费者22项PG、A170导入窄修已有有限接受；真实用途/来源权威与公开许可未证；当前无合格公开批次。",
+    "progress_percent_preserved": 35,
+    "business_delivery_complete": false,
+    "priority_within_project": 3
+  },
+  {
+    "id": "H04",
+    "project": "P04",
+    "requirement_id": "BR-H04",
+    "original_plan": {
+      "id": "H04",
+      "lane": "B",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-13",
+      "due": "2026-10-14",
+      "h": 4,
+      "deps": [
+        "N03",
+        "H02"
+      ],
+      "gaps": [
+        "HG-03",
+        "HG-05"
+      ],
+      "area": "names",
+      "title": "补齐 HKJC 现成译名和名称证据",
+      "change": "按稳定 ID/受审身份映射提取现成繁体名，沿既有规则规范简体并保留别名、来源位置和时间；同步词库与档案候选。",
+      "test": "同名不同年出生、繁简冲突、已有人工保护名和 HKJC 没有名称；无来源不填入候选。",
+      "done": "TC-H02 通过；名称被采纳后可供翻译和所有公开入口复用。",
+      "deadline": "2026-10-14 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-14T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/terms.py",
+        "server/stable/services/term_discovery.py",
+        "server/stable/services/termbase_seed.py",
+        "server/stable/services/term_consistency.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "H04",
+      "title": "补齐 HKJC 现成译名和名称证据",
+      "lane": "B",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "H04"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "B",
+      "title": "补齐 HKJC 现成译名和名称证据",
+      "deps": [
+        "N03",
+        "H02"
+      ],
+      "deadline_at": "2026-10-14T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 4
+  },
+  {
+    "id": "H05",
+    "project": "P04",
+    "requirement_id": "BR-H05",
+    "original_plan": {
+      "id": "H05",
+      "lane": "B",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-14",
+      "due": "2026-10-15",
+      "h": 5,
+      "deps": [
+        "H04",
+        "M03"
+      ],
+      "gaps": [
+        "HG-04",
+        "HG-05",
+        "AG-03"
+      ],
+      "area": "names",
+      "title": "接入认可社区名称提取与冲突处理",
+      "change": "实现来源名单配置和现成名提取，视频材料保存作品链接与时间点/字幕证据；单个认可来源且同马身份清楚可采纳，冲突进入复核。",
+      "test": "只有昵称、引用他人译名、来源失效、错马和模型自造名；无可读字幕时不得假称看过视频。",
+      "done": "TC-H02 通过；不强制两源一致，不用模型翻译补足；审核界面能定位原始使用位置。",
+      "deadline": "2026-10-15 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-15T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/terms.py",
+        "server/stable/services/term_discovery.py",
+        "server/stable/services/termbase_seed.py",
+        "server/stable/services/term_consistency.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "H05",
+      "title": "接入认可社区名称提取与冲突处理",
+      "lane": "B",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "H05"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "B",
+      "title": "接入认可社区名称提取与冲突处理",
+      "deps": [
+        "H04",
+        "M03"
+      ],
+      "deadline_at": "2026-10-15T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 5
+  },
+  {
+    "id": "H06",
+    "project": "P04",
+    "requirement_id": "BR-H06",
+    "original_plan": {
+      "id": "H06",
+      "lane": "C",
+      "role": "application",
+      "it": 2,
+      "start": "2026-10-10",
+      "due": "2026-10-11",
+      "h": 4,
+      "deps": [
+        "F01",
+        "H02"
+      ],
+      "gaps": [
+        "HG-05",
+        "UG-04"
+      ],
+      "area": "public",
+      "title": "统一名称展示搜索与更名追踪",
+      "change": "封装公开名称选择器，支持原文、中文和别名搜索；采用原名回退、译名来源状态和更名历史，预留 H04/H05 采纳事件。",
+      "test": "改名不改变 URL/实体 ID；无中文名不显示空标题；新闻、赛事、档案统一显示已采纳名。",
+      "done": "TC-H02 通过；接口 mock 与名称输入合同一致，后续名称批次无需改前端。",
+      "deadline": "2026-10-11 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-11T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/templates/stable/public/race_detail.html",
+        "server/stable/templates/stable/public/horse_detail.html",
+        "server/stable/templates/stable/public/detail.html"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "H06",
+      "title": "统一名称展示搜索与更名追踪",
+      "lane": "C",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "H06"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "C",
+      "title": "统一名称展示搜索与更名追踪",
+      "deps": [
+        "F01",
+        "H02"
+      ],
+      "deadline_at": "2026-10-11T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 6
+  },
+  {
+    "id": "H07",
+    "project": "P04",
+    "requirement_id": "BR-H07",
+    "original_plan": {
+      "id": "H07",
+      "lane": "C",
+      "role": "application",
+      "it": 3,
+      "start": "2026-10-19",
+      "due": "2026-10-20",
+      "h": 4,
+      "deps": [
+        "H03",
+        "H06"
+      ],
+      "gaps": [
+        "HG-06",
+        "UG-03",
+        "UG-04"
+      ],
+      "area": "public",
+      "title": "修正完整度主胜鞍与统计展示",
+      "change": "区分基础档案/近期成绩/完整生涯/名称可用性，未知不显示 0；按实际等级计算主胜鞍；完整档案优先排序需使用可信完整度。",
+      "test": "DINOZZO 占位、A Wave Of The Sea 汇总、Art Power 主胜鞍和 45 条分页；缺中文名不阻止原名档案。",
+      "done": "TC-H04 通过；列表、详情、卡片统计一致，内部占位文字不公开。",
+      "deadline": "2026-10-20 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-20T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/templates/stable/public/race_detail.html",
+        "server/stable/templates/stable/public/horse_detail.html",
+        "server/stable/templates/stable/public/detail.html"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "H07",
+      "title": "修正完整度主胜鞍与统计展示",
+      "lane": "C",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "H07"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "C",
+      "title": "修正完整度主胜鞍与统计展示",
+      "deps": [
+        "H03",
+        "H06"
+      ],
+      "deadline_at": "2026-10-20T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 7
+  },
+  {
+    "id": "H08",
+    "project": "P04",
+    "requirement_id": "BR-H08",
+    "original_plan": {
+      "id": "H08",
+      "lane": "A",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-19",
+      "due": "2026-10-20",
+      "h": 5,
+      "deps": [
+        "R08",
+        "H03",
+        "V02"
+      ],
+      "gaps": [
+        "HG-06"
+      ],
+      "area": "horse",
+      "title": "将新赛果和更正持续同步到履历统计",
+      "change": "订阅已公开赛事版本，幂等更新马匹履历、出赛/名次汇总与主胜鞍；原值、覆盖和缺失区别保存。",
+      "test": "相同赛果重发、更正取消资格、退赛、旧版本迟到及缺部分生涯；无完整覆盖时不展示虚假的生涯总数。",
+      "done": "TC-H03/04 通过；A Wave Of The Sea、拯救者和主胜鞍案例数据一致。",
+      "deadline": "2026-10-20 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-20T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/p0_horse_profiles.py",
+        "server/stable/services/horse_profile_completion.py",
+        "server/stable/services/horse_profile_publish.py",
+        "server/stable/services/horse_race_records.py",
+        "server/stable/test_horse_profile_publish.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "H08",
+      "title": "将新赛果和更正持续同步到履历统计",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "H08"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "将新赛果和更正持续同步到履历统计",
+      "deps": [
+        "R08",
+        "H03",
+        "V02"
+      ],
+      "deadline_at": "2026-10-20T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 8
+  },
+  {
+    "id": "H09",
+    "project": "P04",
+    "requirement_id": "BR-H09",
+    "original_plan": {
+      "id": "H09",
+      "lane": "A",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-20",
+      "due": "2026-10-21",
+      "h": 4,
+      "deps": [
+        "H08",
+        "H05",
+        "U03",
+        "R09"
+      ],
+      "gaps": [
+        "HG-01",
+        "HG-02",
+        "HG-07"
+      ],
+      "area": "horse",
+      "title": "准备可恢复的数据修复与补齐批次",
+      "change": "按 F06 数量和优先级生成固定输入包：近期档案、历史译名、已知赛果与重复赛事；每类独立 dry-run、备份影响表和回滚映射。正文污染另由 N07 在 10/22 形成独立包。",
+      "test": "事务边界、重复 apply、部分失败重跑、并发在线更新、恢复后关系守恒；既有暂停批次不被隐式恢复。",
+      "done": "包内对象和变更量可审核，公开完成/暂存/冲突分开；后续批次使用相同验证合同。",
+      "deadline": "2026-10-21 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-21T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/p0_horse_profiles.py",
+        "server/stable/services/horse_profile_completion.py",
+        "server/stable/services/horse_profile_publish.py",
+        "server/stable/services/horse_race_records.py",
+        "server/stable/test_horse_profile_publish.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "H09",
+      "title": "准备可恢复的数据修复与补齐批次",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "H09"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "准备可恢复的数据修复与补齐批次",
+      "deps": [
+        "H08",
+        "H05",
+        "U03",
+        "R09"
+      ],
+      "deadline_at": "2026-10-21T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 9
+  },
+  {
+    "id": "H10",
+    "project": "P04",
+    "requirement_id": "BR-H10",
+    "original_plan": {
+      "id": "H10",
+      "lane": "A",
+      "role": "integration",
+      "it": 4,
+      "start": "2026-10-24",
+      "due": "2026-10-25",
+      "h": 5,
+      "deps": [
+        "O06",
+        "H09"
+      ],
+      "gaps": [
+        "HG-01",
+        "HG-02",
+        "HG-07"
+      ],
+      "area": "horse",
+      "title": "完成近期优先目标的正式公开批次",
+      "change": "执行冻结近期目标的可得基础资料/近期履历及名称批次，按优先级持续补入新参赛和新闻对象；每批验证公开页和关联。",
+      "test": "核对处理数=公开成功+无可信数据+身份冲突+运行失败，逐项保留证据；统计采集成功不替代公开成功。",
+      "done": "首版目标中可取得且身份明确的资料全部公开；剩余项逐马列原因和下一动作，不虚报全世界所有马已补齐。",
+      "deadline": "2026-10-25 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-25T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/p0_horse_profiles.py",
+        "server/stable/services/horse_profile_completion.py",
+        "server/stable/services/horse_profile_publish.py",
+        "server/stable/services/horse_race_records.py",
+        "server/stable/test_horse_profile_publish.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "H10",
+      "title": "完成近期优先目标的正式公开批次",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "H10"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "完成近期优先目标的正式公开批次",
+      "deps": [
+        "O06",
+        "H09"
+      ],
+      "deadline_at": "2026-10-25T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 10
+  },
+  {
+    "id": "H11",
+    "project": "P04",
+    "requirement_id": "BR-H11",
+    "original_plan": {
+      "id": "H11",
+      "lane": "A",
+      "role": "integration",
+      "it": 4,
+      "start": "2026-10-25",
+      "due": "2026-10-26",
+      "h": 5,
+      "deps": [
+        "H10",
+        "H05"
+      ],
+      "gaps": [
+        "HG-03",
+        "HG-04",
+        "HG-07"
+      ],
+      "area": "names",
+      "title": "完成历史 G1 全参赛马名称检索与采纳批次",
+      "change": "对冻结的 2020 年以来 G1 全参赛马逐一走 HKJC/认可社区名称检索，采纳可验证现名，关联别名并核对页面。",
+      "test": "所有参赛者均有处理结果；不是胜马名单；缺可用名称、冲突和不可访问来源分别计数；无出处不能自造。",
+      "done": "冻结名单检索覆盖 100%，已发现且身份明确的现名采纳完成；无可信译名明确保留原名，不把检索完成写成中文覆盖 100%。",
+      "deadline": "2026-10-26 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-26T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/terms.py",
+        "server/stable/services/term_discovery.py",
+        "server/stable/services/termbase_seed.py",
+        "server/stable/services/term_consistency.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "H11",
+      "title": "完成历史 G1 全参赛马名称检索与采纳批次",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "H11"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "完成历史 G1 全参赛马名称检索与采纳批次",
+      "deps": [
+        "H10",
+        "H05"
+      ],
+      "deadline_at": "2026-10-26T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 11
+  }
+]

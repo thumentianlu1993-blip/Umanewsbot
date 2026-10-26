@@ -1,0 +1,1602 @@
+[
+  {
+    "card": "F01",
+    "project": "P06",
+    "original_deps": [],
+    "concrete_contract_candidates": [],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "F04",
+    "project": "P07",
+    "original_deps": [],
+    "concrete_contract_candidates": [],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "F03",
+    "project": "P02",
+    "original_deps": [
+      "F01"
+    ],
+    "concrete_contract_candidates": [
+      "F01"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "F02",
+    "project": "P01",
+    "original_deps": [],
+    "concrete_contract_candidates": [],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "F05",
+    "project": "P03",
+    "original_deps": [],
+    "concrete_contract_candidates": [],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "H01",
+    "project": "P04",
+    "original_deps": [
+      "F01"
+    ],
+    "concrete_contract_candidates": [
+      "F01"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "M01",
+    "project": "P05",
+    "original_deps": [
+      "F01",
+      "F02"
+    ],
+    "concrete_contract_candidates": [
+      "F01",
+      "F02"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "Q01",
+    "project": "P07",
+    "original_deps": [
+      "F01"
+    ],
+    "concrete_contract_candidates": [
+      "F01"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "F06",
+    "project": "P06",
+    "original_deps": [
+      "F01",
+      "F02",
+      "F03",
+      "H01"
+    ],
+    "concrete_contract_candidates": [
+      "F01",
+      "F02",
+      "F03",
+      "H01"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "O01",
+    "project": "P06",
+    "original_deps": [
+      "F01"
+    ],
+    "concrete_contract_candidates": [
+      "F01"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "R01",
+    "project": "P02",
+    "original_deps": [
+      "F01",
+      "F03"
+    ],
+    "concrete_contract_candidates": [
+      "F01",
+      "F03"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "M02",
+    "project": "P05",
+    "original_deps": [
+      "M01"
+    ],
+    "concrete_contract_candidates": [
+      "M01"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "Q02",
+    "project": "P07",
+    "original_deps": [
+      "Q01"
+    ],
+    "concrete_contract_candidates": [],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [
+      "Q01"
+    ],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "R02",
+    "project": "P02",
+    "original_deps": [
+      "R01"
+    ],
+    "concrete_contract_candidates": [
+      "R01"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "M03",
+    "project": "P05",
+    "original_deps": [
+      "M02",
+      "F03"
+    ],
+    "concrete_contract_candidates": [
+      "M02",
+      "F03"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "U01",
+    "project": "P03",
+    "original_deps": [
+      "F05"
+    ],
+    "concrete_contract_candidates": [
+      "F05"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "H02",
+    "project": "P04",
+    "original_deps": [
+      "H01",
+      "F03"
+    ],
+    "concrete_contract_candidates": [
+      "H01",
+      "F03"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "R03",
+    "project": "P02",
+    "original_deps": [
+      "R02"
+    ],
+    "concrete_contract_candidates": [
+      "R02"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "N01",
+    "project": "P01",
+    "original_deps": [
+      "F02"
+    ],
+    "concrete_contract_candidates": [
+      "F02"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "O02",
+    "project": "P06",
+    "original_deps": [
+      "O01"
+    ],
+    "concrete_contract_candidates": [
+      "O01"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "U02",
+    "project": "P03",
+    "original_deps": [
+      "F05"
+    ],
+    "concrete_contract_candidates": [
+      "F05"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "V01",
+    "project": "P06",
+    "original_deps": [
+      "F06",
+      "H02",
+      "R03",
+      "M03",
+      "N01",
+      "Q02",
+      "U01",
+      "U02",
+      "O02"
+    ],
+    "concrete_contract_candidates": [
+      "F06",
+      "H02",
+      "R03",
+      "M03",
+      "N01",
+      "U01",
+      "U02",
+      "O02"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [
+      "Q02"
+    ],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "R04",
+    "project": "P02",
+    "original_deps": [
+      "V01"
+    ],
+    "concrete_contract_candidates": [],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [
+      "V01"
+    ],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "N02",
+    "project": "P01",
+    "original_deps": [
+      "N01",
+      "M03"
+    ],
+    "concrete_contract_candidates": [
+      "N01",
+      "M03"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "E01",
+    "project": "P06",
+    "original_deps": [
+      "F04",
+      "R02"
+    ],
+    "concrete_contract_candidates": [
+      "R02"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [
+      "F04"
+    ],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "H06",
+    "project": "P04",
+    "original_deps": [
+      "F01",
+      "H02"
+    ],
+    "concrete_contract_candidates": [
+      "F01",
+      "H02"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "R05",
+    "project": "P02",
+    "original_deps": [
+      "R04",
+      "R01"
+    ],
+    "concrete_contract_candidates": [
+      "R04",
+      "R01"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "R11-HK",
+    "project": "P02",
+    "original_deps": [
+      "R04",
+      "F03"
+    ],
+    "concrete_contract_candidates": [
+      "R04",
+      "F03"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "R11-JP",
+    "project": "P02",
+    "original_deps": [
+      "R04",
+      "F03"
+    ],
+    "concrete_contract_candidates": [
+      "R04",
+      "F03"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "N03",
+    "project": "P01",
+    "original_deps": [
+      "N02",
+      "M03"
+    ],
+    "concrete_contract_candidates": [
+      "N02",
+      "M03"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "E02",
+    "project": "P07",
+    "original_deps": [
+      "E01"
+    ],
+    "concrete_contract_candidates": [
+      "E01"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "O03",
+    "project": "P06",
+    "original_deps": [
+      "R01",
+      "O01"
+    ],
+    "concrete_contract_candidates": [
+      "R01",
+      "O01"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "R06",
+    "project": "P02",
+    "original_deps": [
+      "R05"
+    ],
+    "concrete_contract_candidates": [
+      "R05"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "N04",
+    "project": "P01",
+    "original_deps": [
+      "N03"
+    ],
+    "concrete_contract_candidates": [
+      "N03"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "L01",
+    "project": "P03",
+    "original_deps": [
+      "N03",
+      "F01"
+    ],
+    "concrete_contract_candidates": [
+      "N03",
+      "F01"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "R07",
+    "project": "P02",
+    "original_deps": [
+      "R04",
+      "R03"
+    ],
+    "concrete_contract_candidates": [
+      "R04",
+      "R03"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "H04",
+    "project": "P04",
+    "original_deps": [
+      "N03",
+      "H02"
+    ],
+    "concrete_contract_candidates": [
+      "N03",
+      "H02"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "L02",
+    "project": "P03",
+    "original_deps": [
+      "L01"
+    ],
+    "concrete_contract_candidates": [
+      "L01"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "R08",
+    "project": "P02",
+    "original_deps": [
+      "R06",
+      "R07"
+    ],
+    "concrete_contract_candidates": [
+      "R06",
+      "R07"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "R11-GB",
+    "project": "P02",
+    "original_deps": [
+      "R07",
+      "F03"
+    ],
+    "concrete_contract_candidates": [
+      "R07",
+      "F03"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "R11-IE",
+    "project": "P02",
+    "original_deps": [
+      "R07",
+      "F03"
+    ],
+    "concrete_contract_candidates": [
+      "R07",
+      "F03"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "H05",
+    "project": "P04",
+    "original_deps": [
+      "H04",
+      "M03"
+    ],
+    "concrete_contract_candidates": [
+      "H04",
+      "M03"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "U03",
+    "project": "P03",
+    "original_deps": [
+      "F05",
+      "L02"
+    ],
+    "concrete_contract_candidates": [
+      "F05",
+      "L02"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "O04",
+    "project": "P06",
+    "original_deps": [
+      "O02",
+      "R05",
+      "M02"
+    ],
+    "concrete_contract_candidates": [
+      "O02",
+      "R05",
+      "M02"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "H03",
+    "project": "P04",
+    "original_deps": [
+      "H02"
+    ],
+    "concrete_contract_candidates": [
+      "H02"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "R09",
+    "project": "P02",
+    "original_deps": [
+      "R08"
+    ],
+    "concrete_contract_candidates": [
+      "R08"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "R11-FR",
+    "project": "P02",
+    "original_deps": [
+      "R07",
+      "F03"
+    ],
+    "concrete_contract_candidates": [
+      "R07",
+      "F03"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "M04",
+    "project": "P05",
+    "original_deps": [
+      "M03",
+      "R04"
+    ],
+    "concrete_contract_candidates": [
+      "M03",
+      "R04"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "L03",
+    "project": "P03",
+    "original_deps": [
+      "L02",
+      "H06"
+    ],
+    "concrete_contract_candidates": [
+      "L02",
+      "H06"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "Q03",
+    "project": "P03",
+    "original_deps": [
+      "F01",
+      "L02"
+    ],
+    "concrete_contract_candidates": [
+      "F01",
+      "L02"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "V02",
+    "project": "P06",
+    "original_deps": [
+      "R09",
+      "H03",
+      "H05",
+      "M04",
+      "L03",
+      "Q03",
+      "E02",
+      "O04",
+      "R11-JP",
+      "R11-HK",
+      "R11-GB",
+      "R11-IE",
+      "R11-FR"
+    ],
+    "concrete_contract_candidates": [
+      "R09",
+      "H03",
+      "H05",
+      "M04",
+      "L03",
+      "Q03",
+      "O04",
+      "R11-JP",
+      "R11-HK",
+      "R11-GB",
+      "R11-IE",
+      "R11-FR"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [
+      "E02"
+    ],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "R10",
+    "project": "P02",
+    "original_deps": [
+      "V02"
+    ],
+    "concrete_contract_candidates": [],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [
+      "V02"
+    ],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "N05",
+    "project": "P01",
+    "original_deps": [
+      "V02"
+    ],
+    "concrete_contract_candidates": [],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [
+      "V02"
+    ],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "L04",
+    "project": "P03",
+    "original_deps": [
+      "V02",
+      "L02"
+    ],
+    "concrete_contract_candidates": [
+      "L02"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [
+      "V02"
+    ],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "R11",
+    "project": "P02",
+    "original_deps": [
+      "R10",
+      "F03",
+      "R11-JP",
+      "R11-HK",
+      "R11-GB",
+      "R11-IE",
+      "R11-FR",
+      "R11-US",
+      "R11-AU",
+      "R11-DE",
+      "R11-ME"
+    ],
+    "concrete_contract_candidates": [
+      "R10",
+      "F03",
+      "R11-JP",
+      "R11-HK",
+      "R11-GB",
+      "R11-IE",
+      "R11-FR",
+      "R11-US",
+      "R11-AU",
+      "R11-DE",
+      "R11-ME"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "R11-AU",
+    "project": "P02",
+    "original_deps": [
+      "V02",
+      "F03"
+    ],
+    "concrete_contract_candidates": [
+      "F03"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [
+      "V02"
+    ],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "R11-DE",
+    "project": "P02",
+    "original_deps": [
+      "V02",
+      "F03"
+    ],
+    "concrete_contract_candidates": [
+      "F03"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [
+      "V02"
+    ],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "R11-ME",
+    "project": "P02",
+    "original_deps": [
+      "V02",
+      "F03"
+    ],
+    "concrete_contract_candidates": [
+      "F03"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [
+      "V02"
+    ],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "R11-US",
+    "project": "P02",
+    "original_deps": [
+      "V02",
+      "F03"
+    ],
+    "concrete_contract_candidates": [
+      "F03"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [
+      "V02"
+    ],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "M09",
+    "project": "P05",
+    "original_deps": [
+      "M04",
+      "R08",
+      "L01"
+    ],
+    "concrete_contract_candidates": [
+      "M04",
+      "R08",
+      "L01"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "N06",
+    "project": "P01",
+    "original_deps": [
+      "N05",
+      "F02"
+    ],
+    "concrete_contract_candidates": [
+      "N05",
+      "F02"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "L05",
+    "project": "P03",
+    "original_deps": [
+      "L04",
+      "H03"
+    ],
+    "concrete_contract_candidates": [
+      "L04",
+      "H03"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "H08",
+    "project": "P04",
+    "original_deps": [
+      "R08",
+      "H03",
+      "V02"
+    ],
+    "concrete_contract_candidates": [
+      "R08",
+      "H03"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [
+      "V02"
+    ],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "M05",
+    "project": "P05",
+    "original_deps": [
+      "M04",
+      "N06",
+      "H05"
+    ],
+    "concrete_contract_candidates": [
+      "M04",
+      "N06",
+      "H05"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "H07",
+    "project": "P04",
+    "original_deps": [
+      "H03",
+      "H06"
+    ],
+    "concrete_contract_candidates": [
+      "H03",
+      "H06"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "H09",
+    "project": "P04",
+    "original_deps": [
+      "H08",
+      "H05",
+      "U03",
+      "R09"
+    ],
+    "concrete_contract_candidates": [
+      "H08",
+      "H05",
+      "U03",
+      "R09"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "M06",
+    "project": "P05",
+    "original_deps": [
+      "M05"
+    ],
+    "concrete_contract_candidates": [
+      "M05"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "E03",
+    "project": "P07",
+    "original_deps": [
+      "E02",
+      "N04",
+      "H05",
+      "R03"
+    ],
+    "concrete_contract_candidates": [
+      "N04",
+      "H05",
+      "R03"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [
+      "E02"
+    ],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "O05",
+    "project": "P06",
+    "original_deps": [
+      "V02",
+      "R11",
+      "H05",
+      "N06",
+      "L05",
+      "O03",
+      "O04"
+    ],
+    "concrete_contract_candidates": [
+      "R11",
+      "H05",
+      "N06",
+      "L05",
+      "O03",
+      "O04"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [
+      "V02"
+    ],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "R12",
+    "project": "P02",
+    "original_deps": [
+      "R11",
+      "H08"
+    ],
+    "concrete_contract_candidates": [
+      "R11",
+      "H08"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "R13",
+    "project": "P02",
+    "original_deps": [
+      "R12",
+      "O03"
+    ],
+    "concrete_contract_candidates": [
+      "R12",
+      "O03"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "M07",
+    "project": "P05",
+    "original_deps": [
+      "M06",
+      "R06",
+      "L02"
+    ],
+    "concrete_contract_candidates": [
+      "M06",
+      "R06",
+      "L02"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "M08",
+    "project": "P05",
+    "original_deps": [
+      "M06",
+      "R08"
+    ],
+    "concrete_contract_candidates": [
+      "M06",
+      "R08"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "M10",
+    "project": "P05",
+    "original_deps": [
+      "M04",
+      "E02"
+    ],
+    "concrete_contract_candidates": [
+      "M04"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [
+      "E02"
+    ],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "N07",
+    "project": "P01",
+    "original_deps": [
+      "N02",
+      "N04"
+    ],
+    "concrete_contract_candidates": [
+      "N02",
+      "N04"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "E04",
+    "project": "P06",
+    "original_deps": [
+      "E03",
+      "L02"
+    ],
+    "concrete_contract_candidates": [
+      "L02"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [
+      "E03"
+    ],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "E05",
+    "project": "P06",
+    "original_deps": [
+      "E04",
+      "R10",
+      "N06"
+    ],
+    "concrete_contract_candidates": [
+      "E04",
+      "R10",
+      "N06"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "U04",
+    "project": "P03",
+    "original_deps": [
+      "H07",
+      "L05",
+      "R03"
+    ],
+    "concrete_contract_candidates": [
+      "H07",
+      "L05",
+      "R03"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "O06",
+    "project": "P06",
+    "original_deps": [
+      "V03",
+      "O05",
+      "Q02",
+      "H09"
+    ],
+    "concrete_contract_candidates": [
+      "H09"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [
+      "V03",
+      "O05"
+    ],
+    "user_deferred_edges": [
+      "Q02"
+    ],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "V03",
+    "project": "P06",
+    "original_deps": [
+      "R13",
+      "M07",
+      "M08",
+      "M09",
+      "M10",
+      "N07",
+      "H09",
+      "L05",
+      "H07",
+      "E05",
+      "U04"
+    ],
+    "concrete_contract_candidates": [
+      "R13",
+      "M07",
+      "M08",
+      "M09",
+      "M10",
+      "N07",
+      "H09",
+      "L05",
+      "H07",
+      "E05",
+      "U04"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "H10",
+    "project": "P04",
+    "original_deps": [
+      "O06",
+      "H09"
+    ],
+    "concrete_contract_candidates": [
+      "H09"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [
+      "O06"
+    ],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "R14",
+    "project": "P02",
+    "original_deps": [
+      "O06",
+      "R13"
+    ],
+    "concrete_contract_candidates": [
+      "R13"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [
+      "O06"
+    ],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "E06",
+    "project": "P07",
+    "original_deps": [
+      "O06",
+      "E05"
+    ],
+    "concrete_contract_candidates": [
+      "E05"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [
+      "O06"
+    ],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "L06",
+    "project": "P03",
+    "original_deps": [
+      "O06",
+      "L05",
+      "H09"
+    ],
+    "concrete_contract_candidates": [
+      "L05",
+      "H09"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [
+      "O06"
+    ],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "O07",
+    "project": "P06",
+    "original_deps": [
+      "O06",
+      "O04"
+    ],
+    "concrete_contract_candidates": [
+      "O04"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [
+      "O06"
+    ],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "H11",
+    "project": "P04",
+    "original_deps": [
+      "H10",
+      "H05"
+    ],
+    "concrete_contract_candidates": [
+      "H10",
+      "H05"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "M11",
+    "project": "P05",
+    "original_deps": [
+      "O06",
+      "F02",
+      "M08",
+      "M10"
+    ],
+    "concrete_contract_candidates": [
+      "F02",
+      "M08",
+      "M10"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [
+      "O06"
+    ],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "N08",
+    "project": "P01",
+    "original_deps": [
+      "O06",
+      "N07"
+    ],
+    "concrete_contract_candidates": [
+      "N07"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [
+      "O06"
+    ],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "V04",
+    "project": "P06",
+    "original_deps": [
+      "O06"
+    ],
+    "concrete_contract_candidates": [],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [
+      "O06"
+    ],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "R15",
+    "project": "P02",
+    "original_deps": [
+      "R14",
+      "H11"
+    ],
+    "concrete_contract_candidates": [
+      "R14",
+      "H11"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "N09",
+    "project": "P01",
+    "original_deps": [
+      "N08",
+      "N06",
+      "O05"
+    ],
+    "concrete_contract_candidates": [
+      "N08",
+      "N06"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [
+      "O05"
+    ],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "U05",
+    "project": "P03",
+    "original_deps": [
+      "L06",
+      "E06",
+      "U04"
+    ],
+    "concrete_contract_candidates": [
+      "L06",
+      "U04"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [
+      "E06"
+    ],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "V05",
+    "project": "P06",
+    "original_deps": [
+      "H11",
+      "R15",
+      "N09",
+      "M11",
+      "L06",
+      "E06",
+      "U05",
+      "O07",
+      "V04"
+    ],
+    "concrete_contract_candidates": [
+      "H11",
+      "R15",
+      "N09",
+      "M11",
+      "L06",
+      "U05",
+      "O07"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [
+      "V04"
+    ],
+    "user_deferred_edges": [
+      "E06"
+    ],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "M12",
+    "project": "P05",
+    "original_deps": [
+      "M11",
+      "N09"
+    ],
+    "concrete_contract_candidates": [
+      "M11",
+      "N09"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "E07",
+    "project": "P07",
+    "original_deps": [
+      "E06",
+      "U05",
+      "R15"
+    ],
+    "concrete_contract_candidates": [
+      "U05",
+      "R15"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [],
+    "user_deferred_edges": [
+      "E06"
+    ],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "O08",
+    "project": "P06",
+    "original_deps": [
+      "V05",
+      "M12",
+      "E07"
+    ],
+    "concrete_contract_candidates": [
+      "M12"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [
+      "V05"
+    ],
+    "user_deferred_edges": [
+      "E07"
+    ],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "R16",
+    "project": "P02",
+    "original_deps": [
+      "O08",
+      "R15"
+    ],
+    "concrete_contract_candidates": [
+      "R15"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [
+      "O08"
+    ],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "O09",
+    "project": "P06",
+    "original_deps": [
+      "V07"
+    ],
+    "concrete_contract_candidates": [],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [
+      "V07"
+    ],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "V06",
+    "project": "P06",
+    "original_deps": [
+      "O08",
+      "R16"
+    ],
+    "concrete_contract_candidates": [
+      "R16"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [
+      "O08"
+    ],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  },
+  {
+    "card": "V07",
+    "project": "P06",
+    "original_deps": [
+      "V06",
+      "R16"
+    ],
+    "concrete_contract_candidates": [
+      "R16"
+    ],
+    "aggregate_acceptance_conditions_not_blanket_implementation_blocker": [
+      "V06"
+    ],
+    "user_deferred_edges": [],
+    "rule": "保留原边；执行按本卡实际使用的接口/数据和风险判断，不自动删除直接安全或许可条件"
+  }
+]

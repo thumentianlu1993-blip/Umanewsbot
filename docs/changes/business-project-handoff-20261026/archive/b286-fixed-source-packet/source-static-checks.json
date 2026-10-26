@@ -1,0 +1,38 @@
+{
+  "status": "SOURCE_ONLY_STATIC_CHECKS_NOT_TESTED",
+  "baseline_head": "bb871949877979226292033f0ab14f8d949cc6b7",
+  "baseline_tree": "c034f4d1188cd6815b60ec40a98de9c4c00a06f9",
+  "only_changed_file": "tools/test_impact/test_pg_lifecycle.py",
+  "before_sha256": "8100a59d14672451aa006a93b8c256330b9242dd7a6c28cdaa42d51b9262361c",
+  "after_sha256": "ff8babd5df7cdd7998a63c2e1d4c5a27e894322609ef493159eb00e3a2808636",
+  "unchanged_RealPG_methods_AST": [
+    "start",
+    "test_real_foreground_pid_and_separate_stop_wait",
+    "test_real_worker7_does_not_hide_stop_wait0",
+    "test_real_sigstop_forces_real_stop_timeout_not_success",
+    "test_real_initdb_failure_has_no_fake_postmaster_zero"
+  ],
+  "unchanged_P5_final_assertions": true,
+  "RealPG_test_ids": [
+    "test_real_foreground_pid_and_separate_stop_wait",
+    "test_real_worker7_does_not_hide_stop_wait0",
+    "test_real_sigstop_forces_real_stop_timeout_not_success",
+    "test_real_initdb_failure_has_no_fake_postmaster_zero",
+    "test_real_early_postmaster_exit_is_reaped"
+  ],
+  "pure_boundary_tests": [
+    "test_unobserved_kill_requires_numeric_wait_before_cleanup",
+    "test_precondition_timeout_blocks_registered_cleanup_stop",
+    "test_confirmed_exit_enters_original_cleanup_without_stop_spawn",
+    "test_startup_failure_cannot_fall_through_to_fourth_stop"
+  ],
+  "pure_boundary_status": "4_SOURCE_ONLY_NOT_RUN",
+  "wait_bound": "min(original business_deadline, original deadline, monotonic+3); real existing Session._wait, honour_cancel=False; no reset",
+  "cleanup_guard": "Both direct and registered P5 cleanup use saved-Popen/reaped/-SIGKILL check before original stop_and_wait; on missing/unconfirmed state persist P5_EXIT_PRECONDITION_UNKNOWN and raise, leaving closed false. No fallback PG stop.",
+  "stop_cap_before_spawn_reason": "P5 cannot reach original cleanup unless saved real Popen has cached numeric -9 and matching Session record already reaped by _wait. Popen.poll then returns cached -9, so original pg_stop spawn branch is unreachable. Failure/startup path never calls original cleanup. P1/P2/P3 each at most one stop, P6a no PG; total<=3 without raising cap.",
+  "budget": "P5 startup<=60 + bounded confirmation<=3 + original cleanup<=30 =93<=original per-method conservative95; entire original475 estimate/600/540/40/20 and Session570/540/30 unchanged, no latency guarantee",
+  "unconfirmed_failure_limit": "P5 failure before confirmed exit intentionally leaves Session unclosed/partial UNKNOWN and no test-level PG stop; later exact isolated host teardown must handle only owned container. No fabricated wait/ECHILD/log completion.",
+  "runtime_mapping": "No runner/gate/host source change needed: runner selects unchanged RealPGTests exact5; new pure boundary class is not selected. New commit/tree and controls must be rebound.",
+  "parse_compile_no_exec": true,
+  "helper_test_PG_Docker_CI_push_network_execution": 0
+}

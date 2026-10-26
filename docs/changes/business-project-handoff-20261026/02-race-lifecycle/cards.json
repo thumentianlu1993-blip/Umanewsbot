@@ -1,0 +1,2463 @@
+[
+  {
+    "id": "F03",
+    "project": "P02",
+    "requirement_id": "BR-F03",
+    "original_plan": {
+      "id": "F03",
+      "lane": "A",
+      "role": "integration",
+      "it": 1,
+      "start": "2026-10-04",
+      "due": "2026-10-05",
+      "h": 5,
+      "deps": [
+        "F01"
+      ],
+      "gaps": [
+        "RG-02"
+      ],
+      "area": "source",
+      "title": "盘点九地区主备来源与现有 TRA 套餐",
+      "change": "按地区×赛程/名单/退赛/结果/更正记录可用端点、稳定身份、更新时刻、最终状态语义、速率和现有权限；每格给主源、备源或缺口，输出固定回放证据。",
+      "test": "验证一个合格第三方即可给出确定资料；空响应、只给前三名和镜像转载不能冒充完整独立来源。",
+      "done": "九地区矩阵无空白格；缺能力项有修复归属和最迟 10/06 可行性结论；不得以付费事实推断端点覆盖。",
+      "deadline": "2026-10-05 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-05T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_data_sync_providers.py",
+        "server/stable/services/race_source_identity.py",
+        "server/stable/services/race_data_sync_enrollment.py",
+        "server/stable/test_race_multisource_identity.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "F03",
+      "title": "盘点九地区主备来源与现有 TRA 套餐",
+      "lane": "A",
+      "completion_percent": 25,
+      "status": "部分完成",
+      "basis_and_gap": "九地区矩阵及来源研究已审；6项有限支持、39项未知，实际能力0/45闭合",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "F03"
+      ],
+      "previous_percent": 25,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "盘点九地区主备来源与现有 TRA 套餐",
+      "deps": [
+        "F01"
+      ],
+      "deadline_at": "2026-10-05T18:00:00+08:00",
+      "status": "部分完成",
+      "phase": "A091固定候选经原R批准为有限文档状态整理（6 SUPPORTED、39 UNKNOWN），ROOT核seal；功能验收仍0/45、真实来源样本新增0、旧1/300未复核；A089/A090主备与价格研究边界不变，真实采集/账号/付费未授权",
+      "commit": null,
+      "pr": null,
+      "review": "A003方案与A004 v4/v5证据APPROVED@36ae2318；真实留存1/目标300、完整0/45，整体仍部分完成",
+      "evidence": [
+        "/Users/mentianlu/.codex/runtime/a004-f03-v4/A-004-report.md",
+        "/Users/mentianlu/.codex/runtime/a004-f03-v5-policy-supplement/policy-supplement.md"
+      ],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "dispatch_id": "A022-F03-PROOF-GAP-PREPARE-001",
+      "owner_thread_id": "01a0fdc6-8c4e-7ff1-af4b-9db4baff8fb1",
+      "dependency_input_sha": "0e05029c1ed00713a6f66e461e6753c1e4dadb27",
+      "dependency_limit": "F01已随PR237仅合并main22e130ad；A022仅本地旧证据/静态候选准备，无新增真实网络/付费/生产DB",
+      "plan_artifact": "/Users/mentianlu/.codex/runtime/a003-f03-815b3181/",
+      "plan_digest": "cfbec6d7658a5fdca98d4c192148ef633684ea9d20f780d7e0f7886454c1147f",
+      "review_package_sha256": "38d5dacc12f4c7ad126b388853c75b18fcc24fde94612424bc2a2b7c55cb7772",
+      "pending_supplement": {
+        "path": "/Users/mentianlu/.codex/runtime/a004-f03-v6-attribution/",
+        "manifest_sha256": "72463aecf6d566c80d53172f6351bf96d5cf31d6d3e8bfbe39250cb3619af64e",
+        "status": "原R静态事实APPROVED，无新增回放/真实来源",
+        "counts_unchanged": "55 files /20直接测试 /17赛事候选 /300目标 /0of45完整格",
+        "review_commit": "eeb9b8fc525e08edf982e9f890bbf38e3e38bc91"
+      },
+      "source_attribution_note": "A022 found v4 hash-bound file-origins already synthetic for rp494/495 while v6 described prior correction; preserve provenance and do not double-subtract",
+      "prepare_candidate": {
+        "head": "48cd301bb1dcefc75014299e39f867233ba152fd",
+        "report_sha256": "290b1b115a44cfb38d96c6b779b0fad03d05af4836a33db75764b09fcfed93dd",
+        "runtime": "/Users/mentianlu/.codex/runtime/a022-f03-proof-gap",
+        "index_sha256": "4b4da76ae4bd587d4d83694741c0b15aa42bad829787ad4c26235a6da281771d",
+        "root_verified_artifacts": 23,
+        "root_verified_fixture_git_bytes": 55,
+        "root_verified_code_bindings": 5,
+        "cells": 45,
+        "real_retained": 1,
+        "target": 300,
+        "complete": 0,
+        "review": "APPROVED_AT_d37b_STATIC_PREPARE_ONLY",
+        "review_commit": "e27eacd03b2f56cfdb4c6ea85ba5f7d306e9f154",
+        "review_evidence_sha256": "75e7e55883bddc1fc40d9ceaeb75017635ca2f7def3a3437687b2d079e043e59",
+        "correct_TRA_threshold": "2026-10-28T01:15:00+08:00",
+        "stale_comparison": "strictly greater than threshold",
+        "network_candidate": "NET-GB-CARD-01 prepare only, capture executor missing",
+        "execution_authorized": false
+      },
+      "A022_date_repair": {
+        "head": "d37b40ff974294a27fbf575f2049ee7726896bd0",
+        "parent": "48cd301bb1dcefc75014299e39f867233ba152fd",
+        "runtime": "/Users/mentianlu/.codex/runtime/a022-f03-proof-gap-policy-date",
+        "index_sha256": "2395d7e1064eb697c6273abf9e577fa01f972fcb52d9eda59737f3888691f309",
+        "receipt_sha256": "f9744a60980abbcd3d26e1dcef2ad41ba5dbdaf069ab47507b879cb125629ba5",
+        "root_verified_new_artifacts": 31,
+        "root_verified_preserved_original_artifacts": 23,
+        "status": "APPROVED_STATIC_PREPARE_R01_CLOSED",
+        "review_commit": "5df16a6fc95bc1488aab93be15ba3be09459cd65",
+        "review_report_sha256": "1d8b0a3761a4de9e84381ce331256ceffbbba082c70bc61812e0e9720223ae63",
+        "review_evidence_sha256": "174c4fc191da91715fd51098105e9e75f1dc9955b0f7ad4c0d54bee7cc24315e",
+        "root_review_hashes_verified": true,
+        "execution_authorized": false
+      },
+      "next_capture_executor_plan": "A023-CAPTURE-EXECUTOR-PREPARE-001",
+      "A023_capture_executor_plan": {
+        "head": "11936e76741ab35d31668fc92f3f66711f9b4acd",
+        "parent": "d37b40ff974294a27fbf575f2049ee7726896bd0",
+        "runtime": "/Users/mentianlu/.codex/runtime/a023-capture-executor-plan",
+        "report_sha256": "9aad97367ce684bd7a09a0f53e0cc90e5cac680f2d081567ee01476e8d245f98",
+        "index_sha256": "273faf462dd2ccfeb8c7e6b4b9bd971735a7f9ac2e5830c4f8fd3d4231f5fa08",
+        "receipt_sha256": "c47aff580f8551a1277f3c710d31eb759ca60f89c21420d36c48d1710354fad3",
+        "root_verified_artifacts": 15,
+        "root_verified_fixed_source_comparisons": 3,
+        "root_example_raw_hash_verified": true,
+        "planned_cases": 32,
+        "actual_business_tests": 0,
+        "transport_implemented": false,
+        "capture_authorized": false,
+        "review": "PENDING_STATIC_PLAN",
+        "independent_review": {
+          "status": "REVISE",
+          "commit": "b73c96f8f12b3f8b67dd2c07c8ffd194b9510528",
+          "report_sha256": "3bbf368d995c614b0dafd3813c669570340300f0dc165f04354422f5e8e82d0c",
+          "evidence_sha256": "2c00ba62a37f4e33515188041fc8b9c8b2ca2344553fcf8ef1e31a98779c5158",
+          "root_report_evidence_verified": true,
+          "findings": [
+            "R01_closed_contract",
+            "R02_json_predecode_budget"
+          ],
+          "implementation_approved": false,
+          "capture_authorized": false
+        }
+      },
+      "offline_executor_slice": {
+        "head": "6cacaddc5210d4b21bef9e81090446c863c59755",
+        "review_commit": "515a55ccf339ba10156d81c920b181884e8eb33b",
+        "development_complete": true,
+        "fake_only": true,
+        "real_backend": false,
+        "capture": false
+      },
+      "deadline_checkpoint_20261005": {
+        "due": "2026-10-05T18:00:00+08:00",
+        "result": "NOT_MET",
+        "complete_cells": 0,
+        "denominator": 45,
+        "next": "A G1 pending; source/account/coverage evidence and capacity decision still missing"
+      }
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 25,
+    "business_delivery_complete": false,
+    "priority_within_project": 1
+  },
+  {
+    "id": "R01",
+    "project": "P02",
+    "requirement_id": "BR-R01",
+    "original_plan": {
+      "id": "R01",
+      "lane": "A",
+      "role": "integration",
+      "it": 1,
+      "start": "2026-10-06",
+      "due": "2026-10-07",
+      "h": 4,
+      "deps": [
+        "F01",
+        "F03"
+      ],
+      "gaps": [
+        "RG-01",
+        "RG-07"
+      ],
+      "area": "race",
+      "title": "实现阶段与端到端时效账本",
+      "change": "记录应跟踪目标、阶段截止、来源首次可得区间、发现/排队/验证/公开时间；实现按场次错误和卡顿的查询与地区切片。",
+      "test": "未登记、无来源、任务从未执行及缺资料均不能从应推进分母消失；修复后的短暂错误仍保留历史。",
+      "done": "TC-R01/02 通过；能生成总量、缺失量、超时原因和 5/10 分钟替换时延，未知来源发布时间不冒充精确 SLA。",
+      "deadline": "2026-10-07 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-07T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_event_lifecycle.py",
+        "server/stable/services/race_data_sync_policy.py",
+        "server/stable/services/race_public_coverage.py",
+        "server/stable/test_race_data_sync_policy_v2.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "R01",
+      "title": "实现阶段与端到端时效账本",
+      "lane": "A",
+      "completion_percent": 35,
+      "status": "部分完成",
+      "basis_and_gap": "纯时效账本核心已合并；真实持久hook与公开端到端计时未接齐",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R01"
+      ],
+      "previous_percent": 35,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "实现阶段与端到端时效账本",
+      "deps": [
+        "F01",
+        "F03"
+      ],
+      "deadline_at": "2026-10-07T18:00:00+08:00",
+      "status": "部分完成",
+      "phase": "A013时效账本纯核心已随PR237合并；真实持久账本/hook/自然公开链仍待",
+      "commit": "2a7ccbfe159a1878e3d9ee03258110757bdc259b",
+      "pr": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/237",
+      "review": "A012设计9b5d及A013修订f8b1 APPROVED，仅纯core",
+      "evidence": [
+        {
+          "type": "plan_preparation",
+          "commit": "9d6b5e7ab90074aaad61312c711ad62ca34bcfe3",
+          "root_status": "read; corrections requested; not reviewed"
+        }
+      ],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "dispatch_id": "A013-R01-PURE-CORE-001",
+      "dependency_input_sha": "06b01aea9041eacb3deae9f46968eb06fd459cb6",
+      "owner_thread_id": "01a0fdc6-8c4e-7ff1-af4b-9db4baff8fb1",
+      "pure_core_delivery": {
+        "head": "2336ddb53eda432b31c3dbf563aa513b57dc4430",
+        "manifest_sha256": "3b2b05dd3ab0454f3cb296045bdaffbee04e3b06b39c0414ff15363729ff251c",
+        "root_hashes_verified": 40,
+        "tests": 47,
+        "new_core_tests": 30,
+        "F01_minimal_tests": 17,
+        "failures": 0,
+        "errors": 0,
+        "skips": 0,
+        "database": false,
+        "network": false,
+        "shared_mapping_registered": false,
+        "original_R_review": "REVISE 6f339; original47 passed and independent47 passed but two counterexamples fail"
+      },
+      "repair_validation": {
+        "head": "2a7ccbfe159a1878e3d9ee03258110757bdc259b",
+        "manifest_sha256": "18802826907f57cda705a03d35202729dd5cb22b28a24deae2038b193c91cd4f",
+        "root_verified_files": 16,
+        "tests": 61,
+        "core_tests": 44,
+        "F01_minimal_tests": 17,
+        "failures": 0,
+        "errors": 0,
+        "skips": 0,
+        "original_two_repros_RED": {
+          "failures": 2,
+          "errors": 0
+        },
+        "database": false,
+        "network": false,
+        "original_R_review": "APPROVED both findings CLOSED",
+        "review_commit": "f8b1f33fc3132dce3baac6ab57eacfcd7c4ee0a5",
+        "independent_tests": 61,
+        "independent_failures": 0,
+        "independent_errors": 0,
+        "independent_skips": 0,
+        "local_integration_sha": "ae9ae0bb8b05f7c746a5789c41148419f3b93665",
+        "shared_mapping_registered_locally": true
+      },
+      "review_commit": "f8b1f33fc3132dce3baac6ab57eacfcd7c4ee0a5",
+      "merged_delivery_slices": [
+        {
+          "pr": 237,
+          "merge_commit": "22e130adf4464fd3c5dd63ccd3f508c4a853d464",
+          "head": "3a55a9891e3e557027876b18403ef7b5fb39401a",
+          "scope": "仅third-integration-delivery.md列明固定受审切片；不含后续未交付实现",
+          "deployed": false
+        }
+      ],
+      "partial_merged": true
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 35,
+    "business_delivery_complete": false,
+    "priority_within_project": 2
+  },
+  {
+    "id": "R02",
+    "project": "P02",
+    "requirement_id": "BR-R02",
+    "original_plan": {
+      "id": "R02",
+      "lane": "A",
+      "role": "integration",
+      "it": 1,
+      "start": "2026-10-07",
+      "due": "2026-10-08",
+      "h": 4,
+      "deps": [
+        "R01"
+      ],
+      "gaps": [
+        "RG-04",
+        "EG-02"
+      ],
+      "area": "race",
+      "title": "提取统一纯决策并接入影子比较",
+      "change": "复用既有统一决策方案，输入事实/时钟/成熟度/执行健康，输出唯一下一动作和原因；旧执行路径继续使用原有 owner/lease。",
+      "test": "相同输入与 now 输出一致；影子比较无网络、业务写入和通知；时间到达不能单独确认发车或完赛。",
+      "done": "历史和新输入可比较，差异可解释；新增决策服务标为新文件，旧调用路径仍兼容。",
+      "deadline": "2026-10-08 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-08T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_event_lifecycle.py",
+        "server/stable/services/race_data_sync_policy.py",
+        "server/stable/services/race_public_coverage.py",
+        "server/stable/test_race_data_sync_policy_v2.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "R02",
+      "title": "提取统一纯决策并接入影子比较",
+      "lane": "A",
+      "completion_percent": 35,
+      "status": "部分完成",
+      "basis_and_gap": "纯决策核心与独立反例回归已审；真实影子比较接入未完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R02"
+      ],
+      "previous_percent": 35,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "提取统一纯决策并接入影子比较",
+      "deps": [
+        "R01"
+      ],
+      "deadline_at": "2026-10-08T18:00:00+08:00",
+      "status": "部分完成",
+      "phase": "A015纯core76d1经原R6d2f批准三P2 CLOSED/独立117+3PASS；共享映射待root组合，真实链未接",
+      "commit": "76d19af3515041391e6fe7effc7d9833371842a9",
+      "pr": null,
+      "review": "APPROVED pure repaired subset only",
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "dispatch_id": "A015-R02-PURE-CORE-001",
+      "owner_thread_id": "01a0fdc6-8c4e-7ff1-af4b-9db4baff8fb1",
+      "dependency_input_sha": "84e4ffd055c1d9efe5c5e642c5d8470672061011",
+      "review_commit": "6d2f4016f23597371312f758c0a1c77a90a3a37c",
+      "zone_input_clarification": {
+        "status": "technical implementation refinement within approved pure scope",
+        "offset_zero_valid": true,
+        "nullable_unknown": true,
+        "exact_as_of_bound": true,
+        "context_digest_covers_all_zone_fields": true,
+        "implicit_tzdb_io_allowed": false,
+        "real_iana_validation": "future loader only; no synthetic evidence substitution",
+        "review": "original R approved technical zone input contract; unrelated three findings remain"
+      },
+      "pure_core_delivery": {
+        "head": "d66d1bafd39ac43b3120ea26bb080081d4b74b9d",
+        "runtime": "/Users/mentianlu/.codex/runtime/a015-r02-pure-core",
+        "manifest_sha256": "19d87fb5f132154239da1d4cc5b0215b97e6c45d2d6946a8f374a4bd9b0c73c6",
+        "root_runtime_files_verified": 117,
+        "root_git_artifacts_verified": 3,
+        "fixed_dependencies_verified": 5,
+        "tests": 103,
+        "new_tests": 42,
+        "f01_tests": 17,
+        "a013_tests": 44,
+        "failures": 0,
+        "errors": 0,
+        "skips": 0,
+        "source_sha256": "8ef0546212dc6b1d3ab249d2a3becf33157f86f37b550e48e84e63c42c2c2951",
+        "test_sha256": "fa82203fc414d1219ce494b80588b64531e0955a17fbba2060f2b2cc311a02a6",
+        "real_IO": false,
+        "shared_mapping": "proposal only; not registered",
+        "original_R_review": "REVISE three P2",
+        "independent_tests": 103,
+        "independent_counterexamples": {
+          "total": 4,
+          "assertion_failures": 3,
+          "passes": 1,
+          "errors": 0
+        }
+      },
+      "pure_core_repair": {
+        "head": "76d19af3515041391e6fe7effc7d9833371842a9",
+        "manifest": "/Users/mentianlu/.codex/runtime/a015-r02-p2-repair/manifest.json",
+        "manifest_sha256": "7b91a01c889982045dba48fbc0d7078c4bd33d115a6edb786c47d8605df89b61",
+        "root_runtime_hashes_verified": 35,
+        "root_git_artifacts_verified": 3,
+        "root_fixed_dependency_hashes_verified": 5,
+        "red_snapshots_verified": 3,
+        "tests": 117,
+        "repository_tests": 113,
+        "original_R_counterexamples": 4,
+        "failures": 0,
+        "errors": 0,
+        "skips": 0,
+        "review": "APPROVED all three CLOSED",
+        "review_commit": "6d2f4016f23597371312f758c0a1c77a90a3a37c",
+        "independent_tests": 117,
+        "independent_extra_tests": 3
+      }
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 35,
+    "business_delivery_complete": false,
+    "priority_within_project": 3
+  },
+  {
+    "id": "R03",
+    "project": "P02",
+    "requirement_id": "BR-R03",
+    "original_plan": {
+      "id": "R03",
+      "lane": "A",
+      "role": "integration",
+      "it": 1,
+      "start": "2026-10-08",
+      "due": "2026-10-09",
+      "h": 5,
+      "deps": [
+        "R02"
+      ],
+      "gaps": [
+        "RG-03",
+        "UG-04"
+      ],
+      "area": "result",
+      "title": "实现赛前赛后成熟度统一读模型",
+      "change": "提供预想/确定名单、待确认/已确认结果与真实赛事进程的组合投影；冠军卡、名单和结果表使用同一公开 revision。",
+      "test": "预测更新不能覆盖已确认结果；只有部分名次不得标完整；第三方终态可通过能力校验确认。",
+      "done": "TC-R03/06 通过；旧页面字段兼容，来源身份和资料成熟度分别保存。",
+      "deadline": "2026-10-09 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-09T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_data_sync_results.py",
+        "server/stable/services/race_information_display.py",
+        "server/stable/services/race_pre_race.py",
+        "server/stable/test_race_data_sync_results.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "R03",
+      "title": "实现赛前赛后成熟度统一读模型",
+      "lane": "A",
+      "completion_percent": 40,
+      "status": "部分完成",
+      "basis_and_gap": "成熟度纯读模型多片独立测试通过；真实loader/来源权威链未闭合",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R03"
+      ],
+      "previous_percent": 40,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "实现赛前赛后成熟度统一读模型",
+      "deps": [
+        "R02"
+      ],
+      "deadline_at": "2026-10-09T18:00:00+08:00",
+      "status": "部分完成",
+      "phase": "A021 f9ef纯叶片开发完成：原R e78a关闭scope P2，独立280/0skip已核；真实loader/authority及Linux整合与上线仍待",
+      "commit": "7148ee66a398759190e9ad15e26a0f94ebf7a944",
+      "pr": null,
+      "review": "APPROVED result+roster/composite pure subsets only",
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "dispatch_id": "A017-R03-RESULT-PURE-CORE-001",
+      "owner_thread_id": "01a0fdc6-8c4e-7ff1-af4b-9db4baff8fb1",
+      "dependency_input_sha": "76d19af3515041391e6fe7effc7d9833371842a9",
+      "plan_delivery": {
+        "index_sha256": "b75373345513aa7d5b262b84e25c99aea45a17fd5b75fd8edc2c8ae91c0893f2",
+        "document_sha256": "c0f06ae24928ad43a86e0d0a535169ec87a71cb0259b074da5a65c06088fd808",
+        "root_fixed_sources_verified": 16,
+        "root_full_read": true,
+        "tests": 0,
+        "implemented": false
+      },
+      "review_commit": "e78aeb4728c750bad8097cb5e602a7321a86b2d2",
+      "plan_repair": {
+        "document_sha256": "5012d948d3a667540343a6c8f1db779aa74739d36173f670898fa6c8d796b886",
+        "index_sha256": "3c1639e8698656fe13734585dc448c9d712e57d9aea811938aba77e24228fca0",
+        "root_fixed_sources_verified": 16,
+        "root_full_read": true,
+        "implemented": false,
+        "review": "APPROVED three CLOSED",
+        "review_commit": "f855737fbc873e0864ca5416577569af45ebf3a8",
+        "independent_static_sha256": "265afffae50613e5ea2d620c47e8fea6840025a791829087e6817e826bbf2fcd"
+      },
+      "pure_projection": {
+        "status": "APPROVED pure result slice",
+        "dispatch_id": "A017-R03-RESULT-PURE-CORE-001",
+        "implemented": true,
+        "real_IO": false,
+        "head": "3046caed5734a4e8850467d2b308aa4dbb72782a",
+        "evidence_index": "/Users/mentianlu/.codex/runtime/a017-r03-result-pure-core/evidence-index.json",
+        "evidence_index_sha256": "0062a2835faf95185d00d37457c7a39be76178e202044d1c8ae5659bdfe0ade6",
+        "delivery_receipt_sha256": "15d0d7ae69d3def20b0f40066f485c984cac058aab437724abe34cb071af7919",
+        "root_artifacts_verified": 164,
+        "root_Git_files_verified": 3,
+        "root_final_fixed_dependencies_verified": 7,
+        "tests": 154,
+        "new_tests": 41,
+        "F01_tests": 17,
+        "A013_tests": 44,
+        "A015_tests": 52,
+        "failures": 0,
+        "errors": 0,
+        "skips": 0,
+        "actual_calls": 813,
+        "mutations": 287,
+        "source_sha256": "ce7be161345bceaceac7508fc7bb38d72bb4a85ced07105225788585ec80f247",
+        "tests_sha256": "eaf0bf9d8e81004debe90e3b0506760ae832726640968fbd1f5e0b73a713e2ac",
+        "RED_errors": "8/29/24 target NotImplemented;1 KeyError missing participant guard, not assertion counts",
+        "real_public_read_verified": false,
+        "review_commit": "fb5a1e4d9df5876d37370552d5a02357404aad17",
+        "findings": [
+          "A017-R01"
+        ],
+        "independent_tests": 154,
+        "independent_counterexamples": {
+          "total": 4,
+          "assertion_failures": 3,
+          "errors": 0,
+          "passes": 1
+        },
+        "review_evidence_sha256": "6933dca37aceaa77f10ee0dea6b0cb34094b72edeb68ee294cd0a0eef2d93bc6",
+        "root_review_artifact_hashes_verified": 7,
+        "typed_repair": {
+          "head": "29f7793a48e5b93a54fbc53fe8cfd8db397bbb44",
+          "base": "3046caed5734a4e8850467d2b308aa4dbb72782a",
+          "runtime": "/Users/mentianlu/.codex/runtime/a017-d-typed-p2-repair",
+          "evidence_index_sha256": "9dc02d4c2ae7970a68cb9968d76e8281f5c4f93c62081b096eaf9e6278aff691",
+          "receipt_sha256": "ac2672128712eb45fdeb0e93a0bedf908d7be5f85cd54c76699ad1aa30edf29c",
+          "root_artifact_hashes_verified": 97,
+          "root_Git_files_verified": 3,
+          "root_stages_pre_post_full_files_verified": 6,
+          "root_original_RED_and_final_Git_verified": true,
+          "root_original_R_counterexamples_unchanged": true,
+          "original_counterexamples_RED_assertions": 3,
+          "original_counterexamples_GREEN": 4,
+          "new_methods": 7,
+          "new_RED_assertions": 12,
+          "initial_harness_errors_excluded": true,
+          "final_methods": 161,
+          "failures": 0,
+          "errors": 0,
+          "skips": 0,
+          "independent_review": "APPROVED A017-R01 CLOSED",
+          "real_IO": false,
+          "review_commit": "fb5a1e4d9df5876d37370552d5a02357404aad17",
+          "independent_methods": 161,
+          "independent_original_counterexamples": 4,
+          "independent_review_evidence_sha256": "fd925ea304f9928689b5da5a6e4057cba3166d51f46715b1e311f2c837498dca"
+        }
+      },
+      "roster_preview_plan": {
+        "dispatch_id": "A018-R03-ROSTER-PREVIEW-PLAN-001",
+        "status": "APPROVED fixed6eea via original Rcfb; implemented byA019",
+        "tests": 0,
+        "implementation": false,
+        "head": "6eea9a7a9ef8d1d3f5c59f16aa39f624e3a3b07d",
+        "review_commit": "cfb585221d13b624d39c5624f6fdff7a516ca0cf"
+      },
+      "roster_composite_implementation": {
+        "head": "7148ee66a398759190e9ad15e26a0f94ebf7a944",
+        "base": "6eea9a7a9ef8d1d3f5c59f16aa39f624e3a3b07d",
+        "status": "APPROVED developer pure slice complete",
+        "new_methods": 43,
+        "final_unique_methods": 204,
+        "failures": 0,
+        "errors": 0,
+        "skips": 0,
+        "evidence_index_sha256": "d94a83331dd28245d766826632949b6888571e692a7bb55f04ef7168c8b01c63",
+        "commit_receipt_sha256": "dbcd8200027d94914d80f74e749a7ac0b0a3cfb7d5fc48be2f2a88c7f0a32936",
+        "root_verified_stages": 19,
+        "root_source_files_verified": 247,
+        "root_fixed_dependency_sources": 9,
+        "root_verification_sha256": "e362df5803d9ad817186f8c9430c3f6f165ced6e1a3eede0bd56bda7e9d4b8c6",
+        "formatting_only_repair_verified": true,
+        "valid_red_pairs": 5,
+        "trusted_loader_implemented": false,
+        "actual_IO": false,
+        "merged": false,
+        "deployed": false,
+        "public_verified": false,
+        "review_commit": "2f588965ba9119215ee64114963c45ccc97894e3",
+        "independent_methods": 204,
+        "independent_extra_methods": 6,
+        "review_evidence_sha256": "19ea4283fa7efdd4c922ddde984df5574198bba6c8f195985f7ca621cb8ea564",
+        "root_review_sources_verified": 15,
+        "root_actual_unique_ids_verified": true
+      },
+      "full_page_compat_plan": {
+        "dispatch_id": "A020-R03-FULL-PAGE-COMPAT-PLAN-001",
+        "status": "APPROVED final static contract; A021 pure implementation dispatched",
+        "implementation": false,
+        "real_IO": false,
+        "head": "421db83792b9180d3167937e1ff93ef55012babe",
+        "base": "7148ee66a398759190e9ad15e26a0f94ebf7a944",
+        "document_sha256": "f0416ce5768815b1fa0052a75fe820dd2e0da385aaf2f32470b8529a9d2caa8f",
+        "source_index_sha256": "39ae0c84468706d581443d6c1510da9b0c3bc4e4125701dccf153d286291da5d",
+        "receipt_sha256": "9e9fb6b916bd63a8fbe81dafe67f5e10bab33dc001ae895a99795c6afe5f2841",
+        "root_fixed_sources_verified": 24,
+        "root_full_read": true,
+        "tag_interface": "future C only; prefer real tag on frozen raw DTO + independent tag_outputs, no tag patch",
+        "status_interface": "future C only views now=read_now; current status vs retained result separate bound domains, no implementation yet",
+        "review_commit": "4357415ddc2ec085e4042be14cb38043fbb58e87",
+        "review_evidence_sha256": "81a9fabc0b808a152d68319936fc5ce7b932f63c044b87a1f6441cbc7db358b9",
+        "root_report_full_read_and_fixed_source_set_verified": true,
+        "repair_dispatch_id": "A020-EVIDENCE-OBJECTS-P2-REPAIR-001",
+        "repair_choice": "keep synthetic bound scope with explicit typed evidence sidecar; no F03 authenticity claim",
+        "evidence_repair": {
+          "head": "b3835db09c69bc63ecfffc0a5c2aa79a09f8cc5a",
+          "base": "421db83792b9180d3167937e1ff93ef55012babe",
+          "status": "REVISE only detail unit-to-original relation remains; carrier/permission main contract accepted",
+          "document_sha256": "61418bddd2eac981e3faf920e2533f5ef796138eb40c3ddcd47861721673a437",
+          "source_index_sha256": "8d3c285c8d4857f1bb8ff4c70958f202c0bd1b99839cacf61bc2b085a6c35490",
+          "receipt_sha256": "9230230944be1f419e15656de828642e6613a1bea9063788fb9a963ae81f502d",
+          "root_fixed_sources_verified": 26,
+          "old24_index_unchanged": true,
+          "implementation": false,
+          "business_tests": 0,
+          "review_commit": "6d02856e05a0cc369cd50dab11c7b62285f14bc8",
+          "review_evidence_sha256": "2873511901bca3fef0a6546368da9d9a03c3651326b582baded33db9ecc4cafb",
+          "root_full_review_read": true,
+          "unit_repair": {
+            "dispatch_id": "A020-DETAIL-UNIT-P2-REPAIR-001",
+            "base": "b3835db09c69bc63ecfffc0a5c2aa79a09f8cc5a",
+            "scope": "original detail weight_unit/odds_format equality; exact applicable rawrefs and DF source unit; no behavior change",
+            "status": "APPROVED R01 CLOSED; static only",
+            "head": "4982b4a2935f0680b5b1456998e81d2707578ffe",
+            "document_sha256": "48305f8978c9a668b791b0bc40399d64e034f3f5c032e1fb47a011705d4b7708",
+            "source_index_sha256": "e471b5ce85723b59b6360f55e7521dc8e95b45ce52165430ab4abe54a99a7b01",
+            "receipt_sha256": "fa51df0a890c4ccaf8413886aa53c9baca680b5732205e2647cbfd8a75f9ec44",
+            "root_fixed_sources_verified": 28,
+            "old26_index_unchanged": true,
+            "review_commit": "24d4c524c2171d78c8d333cdc2a382a86bf65424",
+            "review_evidence_sha256": "da5b51a9de4a6864ed56640e677334a20de516f390b94a5b973a95b05c404d5c",
+            "review_report_sha256": "ed34fe65f3d7d9de4e88818dcf34e564e771eb3859e41a242f20e57a859dde90",
+            "business_tests": 0,
+            "root_review_sources_verified": 28
+          }
+        },
+        "approved_head": "4982b4a2935f0680b5b1456998e81d2707578ffe",
+        "final_review_commit": "24d4c524c2171d78c8d333cdc2a382a86bf65424"
+      },
+      "full_page_compat_implementation": {
+        "dispatch_id": "A021-R03-FULL-PAGE-COMPAT-PURE-001",
+        "base": "4982b4a2935f0680b5b1456998e81d2707578ffe",
+        "status": "sent; active pure TDD",
+        "review_commit": "24d4c524c2171d78c8d333cdc2a382a86bf65424",
+        "scope": "new race_page_compat.py, test_race_page_compat.py and A021 report only",
+        "fixed_old_methods": 204,
+        "max_batch_methods": 200,
+        "actual_tests_verified": 0,
+        "real_IO": false,
+        "production_wiring": false,
+        "last_author_progress": {
+          "at": "2026-10-04T11:18:07.395270+08:00",
+          "status": "active, no fixed final delivery yet",
+          "reported": "strict/lb/完整同着/current g8-retained g7合成用例通过；现有结果字段extension绕过和跨域/遗漏gen关系负例已补",
+          "remaining": [
+            "budgets",
+            "hidden empty result",
+            "complete legacy slicing",
+            "original204 methods"
+          ],
+          "root_verified": false
+        }
+      },
+      "page_compat_candidate": {
+        "head": "898cfe0244abed9b07ff481159dc37c6fd9f96cc",
+        "parent": "4982b4a2935f0680b5b1456998e81d2707578ffe",
+        "status": "REVISE P2 R01; original A repair active",
+        "methods": 273,
+        "original_methods": 204,
+        "new_methods": 69,
+        "batches": [
+          160,
+          113
+        ],
+        "failures": 0,
+        "errors": 0,
+        "skips": 0,
+        "indexed_files_verified": 808,
+        "source_manifest_entries": 444,
+        "fixed_git_dependencies": 11,
+        "red_green_same_test_pairs": 10,
+        "evidence_index_sha256": "e8c17b4e6b127f0b070f8647907ac4e5eeaf95f239ca12e049752b5658cffc5d",
+        "receipt_sha256": "8df1f7a10ec2e498df1a656343d2ed2c1edbe351d1bc3ea54dd71dfe12a102ed",
+        "root_verification": "/private/tmp/umanews-root-a021-verification-898c/verification.json",
+        "root_verification_sha256": "8936f19d7c71f70509b53a77ca56380913e21822a90514d9d6f643cc50806fa1",
+        "handoff": "docs/changes/next-version-capabilities/A021-review-handoff.md",
+        "merged": false,
+        "deployed": false,
+        "enabled": false,
+        "public_verified": false,
+        "independent_review": {
+          "status": "REVISE",
+          "head": "898cfe0244abed9b07ff481159dc37c6fd9f96cc",
+          "review_commit": "7f898fb836a2578b931b7df04895aec006310a58",
+          "finding_id": "R01",
+          "priority": "P2",
+          "finding": "Event/Status/Gate/Protection/PagePermission missing original scope surface_ref equality; five independently resealed counterexamples incorrectly bound",
+          "independent_methods": 273,
+          "batches": [
+            160,
+            113
+          ],
+          "parameter_cases": 938,
+          "failures": 0,
+          "errors": 0,
+          "skips": 0,
+          "counterexamples": 5,
+          "evidence_sha256": "ba280c7a96946a0244503ce4e0068efb5f1787abb16c4926f18ad3f3d79fccb6",
+          "root_verified_artifact_hashes": 11,
+          "root_verified_fixed_git_and_actual_sources": 13,
+          "root_verified_unique_ids": 273,
+          "root_verified_successful_parameter_records": 938,
+          "source_layout": "12 files in runtime/tree; F01 JSON in runtime/docs; original root lookup assumption corrected",
+          "production_impact": "unmerged pure candidate only; not in PR237"
+        },
+        "repair": {
+          "head": "f9ef5fdea599463c81ca25ba80811e81cf9617cd",
+          "parent": "898cfe0244abed9b07ff481159dc37c6fd9f96cc",
+          "status": "APPROVED original R01 CLOSED; fixed pure leaf development complete",
+          "index_sha256": "dd4fafbd46b40e17cce435220f084b41e9b09acdef086c52496e9d05c23a98c5",
+          "audit_sha256": "103f5b32c948dfd4fe39c66faa35e044d1580272c82b03a833ab6b4b92329837",
+          "receipt_sha256": "9335aca4f785416558e4f75989da4b3d25a1761379c469feb4ac7cb8d0b8f311",
+          "indexed_files_verified": 95,
+          "source_manifest_entries_verified": 52,
+          "fixed_git_blobs_verified": 14,
+          "same_test_RED_methods": 7,
+          "same_test_RED_assertion_failures": 10,
+          "GREEN_methods": 280,
+          "batches": [
+            167,
+            113
+          ],
+          "prior_methods_preserved": 273,
+          "subtests": 943,
+          "failures": 0,
+          "errors": 0,
+          "skips": 0,
+          "old_tests_complete_prefix_preserved": true,
+          "runtime": "/Users/mentianlu/.codex/runtime/a021-scope-p2",
+          "independent_approval": true,
+          "independent_review": {
+            "status": "APPROVED_R01_CLOSED",
+            "head": "f9ef5fdea599463c81ca25ba80811e81cf9617cd",
+            "review_commit": "e78aeb4728c750bad8097cb5e602a7321a86b2d2",
+            "report_sha256": "c93f785e7080f6bfe7ae8bbf570250b99478e98e76c7c86e977376f3e1730341",
+            "evidence_sha256": "30e69999dd8c83168c2f89d6d109394f5ca45bc034c58c59f04232ba31c587a4",
+            "root_verified_artifacts": 14,
+            "root_verified_fixed_git_and_snapshot_sources": 13,
+            "independent_unique_methods": 280,
+            "batches": [
+              167,
+              113
+            ],
+            "prior_preserved": 273,
+            "parameter_cases": 943,
+            "failures": 0,
+            "errors": 0,
+            "skips": 0,
+            "reviewer_counterexamples_rejected": 10,
+            "reviewer_positives_bound": 2,
+            "pure_leaf_development_complete": true,
+            "merged": false,
+            "deployed": false,
+            "enabled": false,
+            "public_verified": false
+          }
+        }
+      }
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 40,
+    "business_delivery_complete": false,
+    "priority_within_project": 4
+  },
+  {
+    "id": "R04",
+    "project": "P02",
+    "requirement_id": "BR-R04",
+    "original_plan": {
+      "id": "R04",
+      "lane": "A",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-10",
+      "due": "2026-10-11",
+      "h": 5,
+      "deps": [
+        "V01"
+      ],
+      "gaps": [
+        "RG-02",
+        "RG-04"
+      ],
+      "area": "source",
+      "title": "按成熟度与新鲜度实现主备源仲裁",
+      "change": "替换固定来源等级先拒绝的逻辑，按能力/身份/成熟度/新鲜度/健康选择；高等级旧值失效时允许合格备源接管，保存原因。",
+      "test": "官方晚于第三方、同源转载、旧确定与新预测、两源冲突；不足证据返回补查，不变成最后写入覆盖。",
+      "done": "TC-R04 通过；单写入者不变，切源只改变有证据的字段。",
+      "deadline": "2026-10-11 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-11T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_data_sync_providers.py",
+        "server/stable/services/race_source_identity.py",
+        "server/stable/services/race_data_sync_enrollment.py",
+        "server/stable/test_race_multisource_identity.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "R04",
+      "title": "按成熟度与新鲜度实现主备源仲裁",
+      "lane": "A",
+      "completion_percent": 40,
+      "status": "部分完成",
+      "basis_and_gap": "主备仲裁纯核心/坏例及合法控制已审；真实producer/hook未接齐",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R04"
+      ],
+      "previous_percent": 40,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "按成熟度与新鲜度实现主备源仲裁",
+      "deps": [
+        "V01"
+      ],
+      "deadline_at": "2026-10-11T18:00:00+08:00",
+      "status": "局部实现中",
+      "phase": "原R49回归/6坏例+2合法控制通过，排名P2关闭；A076已审纯片正式集成登记候选已派，真实hook/producer未接",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "dispatch_id": "A072-R04-SOURCE-ARBITRATION-FIRST-SLICE-PLAN-001"
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 40,
+    "business_delivery_complete": false,
+    "priority_within_project": 5
+  },
+  {
+    "id": "R05",
+    "project": "P02",
+    "requirement_id": "BR-R05",
+    "original_plan": {
+      "id": "R05",
+      "lane": "A",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-11",
+      "due": "2026-10-12",
+      "h": 5,
+      "deps": [
+        "R04",
+        "R01"
+      ],
+      "gaps": [
+        "RG-04"
+      ],
+      "area": "race",
+      "title": "调度明确资料替换期限与容量预留",
+      "change": "在确定资料开放和赛前赛后窗口缩短轮询，按 5/10 分钟倒扣排队/解析/备用时间；加入阶段超时和下一动作。",
+      "test": "模拟队列积压、低额度、首次发现时间区间和来源迟延；重试不能无限延后业务截止。",
+      "done": "压力回放符合 TC-R02；轮询频率与 F03 额度计算一致，不靠等待后台人工点击推进。",
+      "deadline": "2026-10-12 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-12T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_event_lifecycle.py",
+        "server/stable/services/race_data_sync_policy.py",
+        "server/stable/services/race_public_coverage.py",
+        "server/stable/test_race_data_sync_policy_v2.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "R05",
+      "title": "调度明确资料替换期限与容量预留",
+      "lane": "A",
+      "completion_percent": 35,
+      "status": "部分完成",
+      "basis_and_gap": "期限/容量核心与映射候选获审；完整压力/容量/自然公开时效未验收",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R05"
+      ],
+      "previous_percent": 35,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "调度明确资料替换期限与容量预留",
+      "deps": [
+        "R04",
+        "R01"
+      ],
+      "deadline_at": "2026-10-12T18:00:00+08:00",
+      "status": "局部实现中",
+      "phase": "A088固定48b31f24核心/映射候选获审；A094受运行域不可用阻断、实际验证未执行，不得沿旧派单措辞称验证进行中；真实容量预留/来源/SLA整卡未验收",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "dispatch_id": "A083-R05-DEADLINE-CAPACITY-INDEPENDENT-SLICE-PLAN-001"
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 35,
+    "business_delivery_complete": false,
+    "priority_within_project": 6
+  },
+  {
+    "id": "R06",
+    "project": "P02",
+    "requirement_id": "BR-R06",
+    "original_plan": {
+      "id": "R06",
+      "lane": "A",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-12",
+      "due": "2026-10-13",
+      "h": 4,
+      "deps": [
+        "R05"
+      ],
+      "gaps": [
+        "RG-05"
+      ],
+      "area": "race",
+      "title": "贯通延迟改期取消及旧任务失效",
+      "change": "将来源变化归一化为证据事件，更新 schedule generation、未来截止与页面；取消结束无意义轮询但保留合法更正入口。",
+      "test": "先取消后旧任务到达、改期跨日、只知日期、来源暂时无响应；任务失败不自动当延期。",
+      "done": "TC-R05 通过；旧时钟不能把已取消赛事重新推进为进行中。",
+      "deadline": "2026-10-13 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-13T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_event_lifecycle.py",
+        "server/stable/services/race_data_sync_policy.py",
+        "server/stable/services/race_public_coverage.py",
+        "server/stable/test_race_data_sync_policy_v2.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "R06",
+      "title": "贯通延迟改期取消及旧任务失效",
+      "lane": "A",
+      "completion_percent": 65,
+      "status": "部分完成",
+      "basis_and_gap": "取消/延期/失败重试/结束与午夜切片实际GREEN并组合；完整自然公开链未验收",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R06"
+      ],
+      "previous_percent": 65,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "贯通延迟改期取消及旧任务失效",
+      "deps": [
+        "R05"
+      ],
+      "deadline_at": "2026-10-13T18:00:00+08:00",
+      "status": "局部修复获审；第二切片全量结果待复核",
+      "phase": "PR254取消领取与PR256延期失败重试两个切片实际全量结果独立获审；后者限历史精确GREEN，10skip当前到期/候选外独立collection/CID及整卡公开验收缺口保留，未合并部署",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 65,
+    "business_delivery_complete": false,
+    "priority_within_project": 7
+  },
+  {
+    "id": "R07",
+    "project": "P02",
+    "requirement_id": "BR-R07",
+    "original_plan": {
+      "id": "R07",
+      "lane": "A",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-13",
+      "due": "2026-10-14",
+      "h": 4,
+      "deps": [
+        "R04",
+        "R03"
+      ],
+      "gaps": [
+        "RG-05",
+        "RG-06"
+      ],
+      "area": "result",
+      "title": "统一退赛非完赛并列与完整名单核验",
+      "change": "分别表示未出赛、非完赛、失格、未知缺行；用稳定身份对账预定/实际出赛/结果，保留原始和派生依据。",
+      "test": "女皇杯缺行、并列名次、全部取消、退赛未出现在结果 API、仅前三名摘要；不得给缺行补造名次。",
+      "done": "TC-R06 通过；完整性不依赖 HTML 表闭合或简单结果条数等于报名数。",
+      "deadline": "2026-10-14 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-14T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_data_sync_results.py",
+        "server/stable/services/race_information_display.py",
+        "server/stable/services/race_pre_race.py",
+        "server/stable/test_race_data_sync_results.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "R07",
+      "title": "统一退赛非完赛并列与完整名单核验",
+      "lane": "A",
+      "completion_percent": 55,
+      "status": "部分完成",
+      "basis_and_gap": "名单对账核心及caller子片GREEN；完整退赛/非完赛/并列自然验收未闭合",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R07"
+      ],
+      "previous_percent": 55,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "统一退赛非完赛并列与完整名单核验",
+      "deps": [
+        "R04",
+        "R03"
+      ],
+      "deadline_at": "2026-10-14T18:00:00+08:00",
+      "status": "独立对账核心实际14目标通过；真实caller接入规划中，整卡未验收",
+      "phase": "A112 PR258首次directGREEN及原full执行已获原R_A0finding结果审；正常CI因10过期skip最终失败，A113核持久caller下一接入切片，R03/R04完整依赖仍未关闭",
+      "commit": "f0c074e5d4a6135ba63bf938f64c77267fecb0cb",
+      "pr": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/258",
+      "review": "R_A APPROVE_TARGET_DIRECT_GREEN_AND_RAW_EXECUTION_EVIDENCE_ONLY; full verification failed expired skip",
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 55,
+    "business_delivery_complete": false,
+    "priority_within_project": 8
+  },
+  {
+    "id": "R08",
+    "project": "P02",
+    "requirement_id": "BR-R08",
+    "original_plan": {
+      "id": "R08",
+      "lane": "A",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-14",
+      "due": "2026-10-15",
+      "h": 5,
+      "deps": [
+        "R06",
+        "R07"
+      ],
+      "gaps": [
+        "RG-03",
+        "RG-06"
+      ],
+      "area": "result",
+      "title": "原子发布资料更正与统一缓存失效",
+      "change": "以公开 revision 一次更新冠军/名单/赛果投影；延迟任务拒绝覆盖新版本，更新后触发缓存和下游变更事件。",
+      "test": "并发更正、发布中断、重复重放、旧缓存读和人工保护字段；分别验证数据库和公开页面。",
+      "done": "TC-R07 通过；卡片与详情无跨版本组合；下游事件可补投且幂等。",
+      "deadline": "2026-10-15 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-15T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_data_sync_results.py",
+        "server/stable/services/race_information_display.py",
+        "server/stable/services/race_pre_race.py",
+        "server/stable/test_race_data_sync_results.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "R08",
+      "title": "原子发布资料更正与统一缓存失效",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R08"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "原子发布资料更正与统一缓存失效",
+      "deps": [
+        "R06",
+        "R07"
+      ],
+      "deadline_at": "2026-10-15T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 9
+  },
+  {
+    "id": "R09",
+    "project": "P02",
+    "requirement_id": "BR-R09",
+    "original_plan": {
+      "id": "R09",
+      "lane": "A",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-15",
+      "due": "2026-10-16",
+      "h": 4,
+      "deps": [
+        "R08"
+      ],
+      "gaps": [
+        "RG-06",
+        "UG-04"
+      ],
+      "area": "result",
+      "title": "审计历史结果公开依据与兼容修复",
+      "change": "重新读取此前 11 场受阻清单，逐场核实当前状态与历史 publication 证据，修复有合法依据的旧读路径；缺证明确挂账。",
+      "test": "当前采集权限到期与历史公开依据分离；显式撤销/身份错误必须仍可停止公开，不能补造 proof。",
+      "done": "产出固定对象修复候选与前后判定；不以全部显示作为放松规则的标准。",
+      "deadline": "2026-10-16 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-16T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_data_sync_results.py",
+        "server/stable/services/race_information_display.py",
+        "server/stable/services/race_pre_race.py",
+        "server/stable/test_race_data_sync_results.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "R09",
+      "title": "审计历史结果公开依据与兼容修复",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R09"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "审计历史结果公开依据与兼容修复",
+      "deps": [
+        "R08"
+      ],
+      "deadline_at": "2026-10-16T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 10
+  },
+  {
+    "id": "R11-JP",
+    "project": "P02",
+    "requirement_id": "BR-R11-JP",
+    "original_plan": {
+      "id": "R11-JP",
+      "lane": "A",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-10",
+      "due": "2026-10-12",
+      "h": 2,
+      "deps": [
+        "R04",
+        "F03"
+      ],
+      "gaps": [
+        "RG-02",
+        "RG-05",
+        "RG-07"
+      ],
+      "area": "source",
+      "title": "日本来源合同与解析缺口切片",
+      "change": "只处理 F03 矩阵中日本已明确的适配缺口：身份、赛程、名单/退赛、结果/更正。沿既有 adapter 修最小差异，保留主备来源证据与能力标记；已满足的格只补验证，不重写。",
+      "test": "至少覆盖 JRA 与 Jpn1 范围、日文身份和明确赛果入口；对照固定 raw 响应验证规范输出，正常/部分/冲突/过期各一组。真实请求与离线测试分离。",
+      "done": "交付该地区能力矩阵及 fixture/最小补丁；自然实测与回放分别标记；新增站点或超出 2 小时的实质解析工作必须在 F06 时拆增量卡并使用预留容量，不在最后隐性延期。",
+      "deadline": "2026-10-12 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-12T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_data_sync_providers.py",
+        "server/stable/services/race_source_identity.py",
+        "server/stable/services/race_data_sync_enrollment.py",
+        "server/stable/test_race_multisource_identity.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "R11-JP",
+      "title": "日本来源合同与解析缺口切片",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R11-JP"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "日本来源合同与解析缺口切片",
+      "deps": [
+        "R04",
+        "F03"
+      ],
+      "deadline_at": "2026-10-12T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 11
+  },
+  {
+    "id": "R11-HK",
+    "project": "P02",
+    "requirement_id": "BR-R11-HK",
+    "original_plan": {
+      "id": "R11-HK",
+      "lane": "A",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-10",
+      "due": "2026-10-12",
+      "h": 2,
+      "deps": [
+        "R04",
+        "F03"
+      ],
+      "gaps": [
+        "RG-02",
+        "RG-05",
+        "RG-07"
+      ],
+      "area": "source",
+      "title": "中国香港来源合同与解析缺口切片",
+      "change": "只处理 F03 矩阵中中国香港已明确的适配缺口：身份、赛程、名单/退赛、结果/更正。沿既有 adapter 修最小差异，保留主备来源证据与能力标记；已满足的格只补验证，不重写。",
+      "test": "至少覆盖 跨年赛季、繁简马名、退赛和名次状态；对照固定 raw 响应验证规范输出，正常/部分/冲突/过期各一组。真实请求与离线测试分离。",
+      "done": "交付该地区能力矩阵及 fixture/最小补丁；自然实测与回放分别标记；新增站点或超出 2 小时的实质解析工作必须在 F06 时拆增量卡并使用预留容量，不在最后隐性延期。",
+      "deadline": "2026-10-12 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-12T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_data_sync_providers.py",
+        "server/stable/services/race_source_identity.py",
+        "server/stable/services/race_data_sync_enrollment.py",
+        "server/stable/test_race_multisource_identity.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "R11-HK",
+      "title": "中国香港来源合同与解析缺口切片",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R11-HK"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "中国香港来源合同与解析缺口切片",
+      "deps": [
+        "R04",
+        "F03"
+      ],
+      "deadline_at": "2026-10-12T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 12
+  },
+  {
+    "id": "R11-GB",
+    "project": "P02",
+    "requirement_id": "BR-R11-GB",
+    "original_plan": {
+      "id": "R11-GB",
+      "lane": "A",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-13",
+      "due": "2026-10-15",
+      "h": 2,
+      "deps": [
+        "R07",
+        "F03"
+      ],
+      "gaps": [
+        "RG-02",
+        "RG-05",
+        "RG-07"
+      ],
+      "area": "source",
+      "title": "英国来源合同与解析缺口切片",
+      "change": "只处理 F03 矩阵中英国已明确的适配缺口：身份、赛程、名单/退赛、结果/更正。沿既有 adapter 修最小差异，保留主备来源证据与能力标记；已满足的格只补验证，不重写。",
+      "test": "至少覆盖 TRA 与可信第三方的赛卡/结果成熟度及缺行；对照固定 raw 响应验证规范输出，正常/部分/冲突/过期各一组。真实请求与离线测试分离。",
+      "done": "交付该地区能力矩阵及 fixture/最小补丁；自然实测与回放分别标记；新增站点或超出 2 小时的实质解析工作必须在 F06 时拆增量卡并使用预留容量，不在最后隐性延期。",
+      "deadline": "2026-10-15 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-15T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_data_sync_providers.py",
+        "server/stable/services/race_source_identity.py",
+        "server/stable/services/race_data_sync_enrollment.py",
+        "server/stable/test_race_multisource_identity.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "R11-GB",
+      "title": "英国来源合同与解析缺口切片",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R11-GB"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "英国来源合同与解析缺口切片",
+      "deps": [
+        "R07",
+        "F03"
+      ],
+      "deadline_at": "2026-10-15T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 13
+  },
+  {
+    "id": "R11-IE",
+    "project": "P02",
+    "requirement_id": "BR-R11-IE",
+    "original_plan": {
+      "id": "R11-IE",
+      "lane": "A",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-13",
+      "due": "2026-10-15",
+      "h": 2,
+      "deps": [
+        "R07",
+        "F03"
+      ],
+      "gaps": [
+        "RG-02",
+        "RG-05",
+        "RG-07"
+      ],
+      "area": "source",
+      "title": "爱尔兰来源合同与解析缺口切片",
+      "change": "只处理 F03 矩阵中爱尔兰已明确的适配缺口：身份、赛程、名单/退赛、结果/更正。沿既有 adapter 修最小差异，保留主备来源证据与能力标记；已满足的格只补验证，不重写。",
+      "test": "至少覆盖 地区旧桶兼容、原始非完赛标记和实际出赛数量；对照固定 raw 响应验证规范输出，正常/部分/冲突/过期各一组。真实请求与离线测试分离。",
+      "done": "交付该地区能力矩阵及 fixture/最小补丁；自然实测与回放分别标记；新增站点或超出 2 小时的实质解析工作必须在 F06 时拆增量卡并使用预留容量，不在最后隐性延期。",
+      "deadline": "2026-10-15 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-15T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_data_sync_providers.py",
+        "server/stable/services/race_source_identity.py",
+        "server/stable/services/race_data_sync_enrollment.py",
+        "server/stable/test_race_multisource_identity.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "R11-IE",
+      "title": "爱尔兰来源合同与解析缺口切片",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R11-IE"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "爱尔兰来源合同与解析缺口切片",
+      "deps": [
+        "R07",
+        "F03"
+      ],
+      "deadline_at": "2026-10-15T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 14
+  },
+  {
+    "id": "R11-FR",
+    "project": "P02",
+    "requirement_id": "BR-R11-FR",
+    "original_plan": {
+      "id": "R11-FR",
+      "lane": "A",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-15",
+      "due": "2026-10-16",
+      "h": 2,
+      "deps": [
+        "R07",
+        "F03"
+      ],
+      "gaps": [
+        "RG-02",
+        "RG-05",
+        "RG-07"
+      ],
+      "area": "source",
+      "title": "法国来源合同与解析缺口切片",
+      "change": "只处理 F03 矩阵中法国已明确的适配缺口：身份、赛程、名单/退赛、结果/更正。沿既有 adapter 修最小差异，保留主备来源证据与能力标记；已满足的格只补验证，不重写。",
+      "test": "至少覆盖 冠名变体、法文非完赛、当地时间与赛果更正；对照固定 raw 响应验证规范输出，正常/部分/冲突/过期各一组。真实请求与离线测试分离。",
+      "done": "交付该地区能力矩阵及 fixture/最小补丁；自然实测与回放分别标记；新增站点或超出 2 小时的实质解析工作必须在 F06 时拆增量卡并使用预留容量，不在最后隐性延期。",
+      "deadline": "2026-10-16 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-16T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_data_sync_providers.py",
+        "server/stable/services/race_source_identity.py",
+        "server/stable/services/race_data_sync_enrollment.py",
+        "server/stable/test_race_multisource_identity.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "R11-FR",
+      "title": "法国来源合同与解析缺口切片",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R11-FR"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "法国来源合同与解析缺口切片",
+      "deps": [
+        "R07",
+        "F03"
+      ],
+      "deadline_at": "2026-10-16T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 15
+  },
+  {
+    "id": "R10",
+    "project": "P02",
+    "requirement_id": "BR-R10",
+    "original_plan": {
+      "id": "R10",
+      "lane": "A",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-17",
+      "due": "2026-10-18",
+      "h": 4,
+      "deps": [
+        "V02"
+      ],
+      "gaps": [
+        "RG-04"
+      ],
+      "area": "race",
+      "title": "完成策略换代与持续跟踪恢复",
+      "change": "按统一决策处理过期/变更策略和 owner 冲突，恢复合法登记的下一动作；历史公开依据保持独立。",
+      "test": "旧 generation/lease 到达、政策到期与续期、历史已发布对象、无来源身份；不得自动延长未知权限。",
+      "done": "TC-R08 通过；阻断都有负责人和下次检查，恢复后不双写。",
+      "deadline": "2026-10-18 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-18T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_event_lifecycle.py",
+        "server/stable/services/race_data_sync_policy.py",
+        "server/stable/services/race_public_coverage.py",
+        "server/stable/test_race_data_sync_policy_v2.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "R10",
+      "title": "完成策略换代与持续跟踪恢复",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R10"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "完成策略换代与持续跟踪恢复",
+      "deps": [
+        "V02"
+      ],
+      "deadline_at": "2026-10-18T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 16
+  },
+  {
+    "id": "R11-US",
+    "project": "P02",
+    "requirement_id": "BR-R11-US",
+    "original_plan": {
+      "id": "R11-US",
+      "lane": "A",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-17",
+      "due": "2026-10-19",
+      "h": 2,
+      "deps": [
+        "V02",
+        "F03"
+      ],
+      "gaps": [
+        "RG-02",
+        "RG-05",
+        "RG-07"
+      ],
+      "area": "source",
+      "title": "美国来源合同与解析缺口切片",
+      "change": "只处理 F03 矩阵中美国已明确的适配缺口：身份、赛程、名单/退赛、结果/更正。沿既有 adapter 修最小差异，保留主备来源证据与能力标记；已满足的格只补验证，不重写。",
+      "test": "至少覆盖 多时区、主赛与分组身份、非出赛/取消资格；对照固定 raw 响应验证规范输出，正常/部分/冲突/过期各一组。真实请求与离线测试分离。",
+      "done": "交付该地区能力矩阵及 fixture/最小补丁；自然实测与回放分别标记；新增站点或超出 2 小时的实质解析工作必须在 F06 时拆增量卡并使用预留容量，不在最后隐性延期。",
+      "deadline": "2026-10-19 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-19T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_data_sync_providers.py",
+        "server/stable/services/race_source_identity.py",
+        "server/stable/services/race_data_sync_enrollment.py",
+        "server/stable/test_race_multisource_identity.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "R11-US",
+      "title": "美国来源合同与解析缺口切片",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R11-US"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "美国来源合同与解析缺口切片",
+      "deps": [
+        "V02",
+        "F03"
+      ],
+      "deadline_at": "2026-10-19T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 17
+  },
+  {
+    "id": "R11-AU",
+    "project": "P02",
+    "requirement_id": "BR-R11-AU",
+    "original_plan": {
+      "id": "R11-AU",
+      "lane": "A",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-17",
+      "due": "2026-10-19",
+      "h": 2,
+      "deps": [
+        "V02",
+        "F03"
+      ],
+      "gaps": [
+        "RG-02",
+        "RG-05",
+        "RG-07"
+      ],
+      "area": "source",
+      "title": "澳大利亚来源合同与解析缺口切片",
+      "change": "只处理 F03 矩阵中澳大利亚已明确的适配缺口：身份、赛程、名单/退赛、结果/更正。沿既有 adapter 修最小差异，保留主备来源证据与能力标记；已满足的格只补验证，不重写。",
+      "test": "至少覆盖 跨年赛季、SCR/SB 等标记及摘要前几名不完整；对照固定 raw 响应验证规范输出，正常/部分/冲突/过期各一组。真实请求与离线测试分离。",
+      "done": "交付该地区能力矩阵及 fixture/最小补丁；自然实测与回放分别标记；新增站点或超出 2 小时的实质解析工作必须在 F06 时拆增量卡并使用预留容量，不在最后隐性延期。",
+      "deadline": "2026-10-19 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-19T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_data_sync_providers.py",
+        "server/stable/services/race_source_identity.py",
+        "server/stable/services/race_data_sync_enrollment.py",
+        "server/stable/test_race_multisource_identity.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "R11-AU",
+      "title": "澳大利亚来源合同与解析缺口切片",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R11-AU"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "澳大利亚来源合同与解析缺口切片",
+      "deps": [
+        "V02",
+        "F03"
+      ],
+      "deadline_at": "2026-10-19T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 18
+  },
+  {
+    "id": "R11-DE",
+    "project": "P02",
+    "requirement_id": "BR-R11-DE",
+    "original_plan": {
+      "id": "R11-DE",
+      "lane": "A",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-17",
+      "due": "2026-10-19",
+      "h": 2,
+      "deps": [
+        "V02",
+        "F03"
+      ],
+      "gaps": [
+        "RG-02",
+        "RG-05",
+        "RG-07"
+      ],
+      "area": "source",
+      "title": "德国来源合同与解析缺口切片",
+      "change": "只处理 F03 矩阵中德国已明确的适配缺口：身份、赛程、名单/退赛、结果/更正。沿既有 adapter 修最小差异，保留主备来源证据与能力标记；已满足的格只补验证，不重写。",
+      "test": "至少覆盖 等级规范、来源稳定身份、取消或延期与全名单；对照固定 raw 响应验证规范输出，正常/部分/冲突/过期各一组。真实请求与离线测试分离。",
+      "done": "交付该地区能力矩阵及 fixture/最小补丁；自然实测与回放分别标记；新增站点或超出 2 小时的实质解析工作必须在 F06 时拆增量卡并使用预留容量，不在最后隐性延期。",
+      "deadline": "2026-10-19 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-19T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_data_sync_providers.py",
+        "server/stable/services/race_source_identity.py",
+        "server/stable/services/race_data_sync_enrollment.py",
+        "server/stable/test_race_multisource_identity.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "R11-DE",
+      "title": "德国来源合同与解析缺口切片",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R11-DE"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "德国来源合同与解析缺口切片",
+      "deps": [
+        "V02",
+        "F03"
+      ],
+      "deadline_at": "2026-10-19T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 19
+  },
+  {
+    "id": "R11-ME",
+    "project": "P02",
+    "requirement_id": "BR-R11-ME",
+    "original_plan": {
+      "id": "R11-ME",
+      "lane": "A",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-17",
+      "due": "2026-10-19",
+      "h": 2,
+      "deps": [
+        "V02",
+        "F03"
+      ],
+      "gaps": [
+        "RG-02",
+        "RG-05",
+        "RG-07"
+      ],
+      "area": "source",
+      "title": "中东来源合同与解析缺口切片",
+      "change": "只处理 F03 矩阵中中东已明确的适配缺口：身份、赛程、名单/退赛、结果/更正。沿既有 adapter 修最小差异，保留主备来源证据与能力标记；已满足的格只补验证，不重写。",
+      "test": "至少覆盖 不同主办地区的来源能力、当地日期、非完赛与改期；对照固定 raw 响应验证规范输出，正常/部分/冲突/过期各一组。真实请求与离线测试分离。",
+      "done": "交付该地区能力矩阵及 fixture/最小补丁；自然实测与回放分别标记；新增站点或超出 2 小时的实质解析工作必须在 F06 时拆增量卡并使用预留容量，不在最后隐性延期。",
+      "deadline": "2026-10-19 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-19T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_data_sync_providers.py",
+        "server/stable/services/race_source_identity.py",
+        "server/stable/services/race_data_sync_enrollment.py",
+        "server/stable/test_race_multisource_identity.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "R11-ME",
+      "title": "中东来源合同与解析缺口切片",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R11-ME"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "中东来源合同与解析缺口切片",
+      "deps": [
+        "V02",
+        "F03"
+      ],
+      "deadline_at": "2026-10-19T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 20
+  },
+  {
+    "id": "R11",
+    "project": "P02",
+    "requirement_id": "BR-R11",
+    "original_plan": {
+      "id": "R11",
+      "lane": "A",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-18",
+      "due": "2026-10-19",
+      "h": 2,
+      "deps": [
+        "R10",
+        "F03",
+        "R11-JP",
+        "R11-HK",
+        "R11-GB",
+        "R11-IE",
+        "R11-FR",
+        "R11-US",
+        "R11-AU",
+        "R11-DE",
+        "R11-ME"
+      ],
+      "gaps": [
+        "RG-02",
+        "RG-05"
+      ],
+      "area": "source",
+      "title": "汇总九地区适配与能力验收矩阵",
+      "change": "汇总九张地区切片的解析结果和证据，核对 F03 每格状态、主备切换和统一决策的消费方式；适配修复在地区卡计工时，不重复实现。",
+      "test": "时区、日期赛、跨语言、延迟取消、非完赛和来源更正；九地区均有覆盖，不以日本样本代替。",
+      "done": "TC-R04/05/06 的地区矩阵闭合；若新增适配超出 4 小时切片，10/06 风险表已拆子任务和重排，不临近上线再发现。",
+      "deadline": "2026-10-19 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-19T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_data_sync_providers.py",
+        "server/stable/services/race_source_identity.py",
+        "server/stable/services/race_data_sync_enrollment.py",
+        "server/stable/test_race_multisource_identity.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "R11",
+      "title": "汇总九地区适配与能力验收矩阵",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R11"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "汇总九地区适配与能力验收矩阵",
+      "deps": [
+        "R10",
+        "F03",
+        "R11-JP",
+        "R11-HK",
+        "R11-GB",
+        "R11-IE",
+        "R11-FR",
+        "R11-US",
+        "R11-AU",
+        "R11-DE",
+        "R11-ME"
+      ],
+      "deadline_at": "2026-10-19T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 21
+  },
+  {
+    "id": "R12",
+    "project": "P02",
+    "requirement_id": "BR-R12",
+    "original_plan": {
+      "id": "R12",
+      "lane": "A",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-21",
+      "due": "2026-10-22",
+      "h": 4,
+      "deps": [
+        "R11",
+        "H08"
+      ],
+      "gaps": [
+        "RG-07"
+      ],
+      "area": "race",
+      "title": "完成跨来源与异常回放验收集",
+      "change": "固化至少 300 场保留验收样例，九地区各至少 20 场，其余补异常；覆盖名单成熟、延期取消、退赛、并列、超时和更正。",
+      "test": "冻结样例后运行候选版本与旧版对照，错误按场、卡顿按应推进场次；不能用调参样例充当独立验收。",
+      "done": "TC-R09 通过，关键身份错配/伪造确定为零；输出分地区 N、分子和失败对象。",
+      "deadline": "2026-10-22 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_event_lifecycle.py",
+        "server/stable/services/race_data_sync_policy.py",
+        "server/stable/services/race_public_coverage.py",
+        "server/stable/test_race_data_sync_policy_v2.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "R12",
+      "title": "完成跨来源与异常回放验收集",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R12"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "完成跨来源与异常回放验收集",
+      "deps": [
+        "R11",
+        "H08"
+      ],
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 22
+  },
+  {
+    "id": "R13",
+    "project": "P02",
+    "requirement_id": "BR-R13",
+    "original_plan": {
+      "id": "R13",
+      "lane": "A",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-22",
+      "due": "2026-10-22",
+      "h": 4,
+      "deps": [
+        "R12",
+        "O03"
+      ],
+      "gaps": [
+        "RG-01",
+        "RG-07"
+      ],
+      "area": "race",
+      "title": "接通真实公开时延与阶段质量面板",
+      "change": "生产候选探针记录外部发布/首次可见区间与页面 revision；按日和滚动 28 天展示错误、卡顿、缺失和各阶段时延。",
+      "test": "来源无精确时间、事件跨窗口仍超时、未登记赛事；页面更新成功但统计滞后要暴露。",
+      "done": "指标可追到证据对象；不足 28 天明确观察时长，不能展示长期达标徽章。",
+      "deadline": "2026-10-22 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_event_lifecycle.py",
+        "server/stable/services/race_data_sync_policy.py",
+        "server/stable/services/race_public_coverage.py",
+        "server/stable/test_race_data_sync_policy_v2.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "R13",
+      "title": "接通真实公开时延与阶段质量面板",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R13"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "接通真实公开时延与阶段质量面板",
+      "deps": [
+        "R12",
+        "O03"
+      ],
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 23
+  },
+  {
+    "id": "R14",
+    "project": "P02",
+    "requirement_id": "BR-R14",
+    "original_plan": {
+      "id": "R14",
+      "lane": "A",
+      "role": "integration",
+      "it": 4,
+      "start": "2026-10-24",
+      "due": "2026-10-25",
+      "h": 4,
+      "deps": [
+        "O06",
+        "R13"
+      ],
+      "gaps": [
+        "RG-04",
+        "RG-07"
+      ],
+      "area": "race",
+      "title": "修复自然观察暴露的资料时效问题",
+      "change": "按实际超时对象复盘发现、队列、验证和公开耗时，只修具体根因；保留原始失败和修复后的新窗口统计。",
+      "test": "重放对应真实事件并加入回归；任何身份、成熟度或来源边界变化重走相关验收。",
+      "done": "已观察关键错误和可复现卡点闭合；无问题时输出观察证据，不为填任务制造代码改动。",
+      "deadline": "2026-10-25 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-25T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_event_lifecycle.py",
+        "server/stable/services/race_data_sync_policy.py",
+        "server/stable/services/race_public_coverage.py",
+        "server/stable/test_race_data_sync_policy_v2.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "R14",
+      "title": "修复自然观察暴露的资料时效问题",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R14"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "修复自然观察暴露的资料时效问题",
+      "deps": [
+        "O06",
+        "R13"
+      ],
+      "deadline_at": "2026-10-25T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 24
+  },
+  {
+    "id": "R15",
+    "project": "P02",
+    "requirement_id": "BR-R15",
+    "original_plan": {
+      "id": "R15",
+      "lane": "A",
+      "role": "integration",
+      "it": 4,
+      "start": "2026-10-26",
+      "due": "2026-10-27",
+      "h": 4,
+      "deps": [
+        "R14",
+        "H11"
+      ],
+      "gaps": [
+        "RG-05",
+        "RG-07"
+      ],
+      "area": "race",
+      "title": "执行断源与积压恢复演练",
+      "change": "在隔离环境重放真实目标的主源断开、备用接管、worker 中断及迟到更正；对照生产只读探针的实际配置。",
+      "test": "主源失效后可在期限内切换；剩余预算不足时如实标记超时，不无限重试；恢复不重复写入。",
+      "done": "TC-R04/08 与 TC-O03 通过，回滚和恢复步骤可由发布协调人执行。",
+      "deadline": "2026-10-27 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-27T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_event_lifecycle.py",
+        "server/stable/services/race_data_sync_policy.py",
+        "server/stable/services/race_public_coverage.py",
+        "server/stable/test_race_data_sync_policy_v2.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "R15",
+      "title": "执行断源与积压恢复演练",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R15"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "执行断源与积压恢复演练",
+      "deps": [
+        "R14",
+        "H11"
+      ],
+      "deadline_at": "2026-10-27T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 25
+  },
+  {
+    "id": "R16",
+    "project": "P02",
+    "requirement_id": "BR-R16",
+    "original_plan": {
+      "id": "R16",
+      "lane": "A",
+      "role": "integration",
+      "it": 4,
+      "start": "2026-10-28",
+      "due": "2026-10-30",
+      "h": 4,
+      "deps": [
+        "O08",
+        "R15"
+      ],
+      "gaps": [
+        "RG-01",
+        "RG-07"
+      ],
+      "area": "race",
+      "title": "复核全量赛事质量与剩余数据缺口",
+      "change": "从全量运行账本逐场核对关键资料和卡顿分母，检查九地区与历史数据修复清单；跟踪到 10/30。",
+      "test": "原始错误不因修好而删除；公开空缺、source 时间不确定和样本不足单列；全量范围不能只统计健康路由。",
+      "done": "10/30 12:00 交预报，16:00 观察冻结后于 16:30 前提交包含最后 4 小时全部应推进场次、错误、缺失和时延的最终证据，绑定与 V06 相同的窗口和版本；若门槛未过明确未完成，不提交虚假通过。",
+      "deadline": "2026-10-30 16:30 Asia/Shanghai",
+      "deadline_at": "2026-10-30T16:30:00+08:00",
+      "read_paths": [
+        "server/stable/services/race_event_lifecycle.py",
+        "server/stable/services/race_data_sync_policy.py",
+        "server/stable/services/race_public_coverage.py",
+        "server/stable/test_race_data_sync_policy_v2.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "R16",
+      "title": "复核全量赛事质量与剩余数据缺口",
+      "lane": "A",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "R16"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "复核全量赛事质量与剩余数据缺口",
+      "deps": [
+        "O08",
+        "R15"
+      ],
+      "deadline_at": "2026-10-30T16:30:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 26
+  }
+]

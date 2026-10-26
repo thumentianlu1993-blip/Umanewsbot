@@ -1,0 +1,2 @@
+# NOT RUN. Requires original R source review and ROOT subsequent exact card.
+/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/bin/python3.14 -I -S -B /Users/mentianlu/.codex/runtime/b286-p5-exit-precondition-source-repair-001/host_run_once.py 7990b7e727c2a79c534f8e8576bfebc9aa0b1f279515d83d49d33e98e6ddaa57 /Users/mentianlu/.codex/runtime/realpg5-v2-p5sync-execution-b51eebf7f1bd4e389c3fa21acb9abbf0

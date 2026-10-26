@@ -1,0 +1,440 @@
+[
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/2026-10-05-1800-checkpoint.md",
+    "path": "docs/changes/next-version-capabilities/2026-10-05-1800-checkpoint.md",
+    "bytes": 2845,
+    "sha256": "12e25d8bc356694cc2de463eed9a0c3c6933d1b7729147e29cdda750f903d940"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/A021-review-handoff.md",
+    "path": "docs/changes/next-version-capabilities/A021-review-handoff.md",
+    "bytes": 4380,
+    "sha256": "e5a52cd6874881102b68b8def5a902c1c8167f82f5ee89dd1427a226e2c611a2"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/A026-local-build-isolation-scope-choice.md",
+    "path": "docs/changes/next-version-capabilities/A026-local-build-isolation-scope-choice.md",
+    "bytes": 4511,
+    "sha256": "a600f406360729a148cff226081f00985cd2ba3728a446a20f2e5d89391109cf"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/A026-staged-bootstrap-direction.md",
+    "path": "docs/changes/next-version-capabilities/A026-staged-bootstrap-direction.md",
+    "bytes": 5288,
+    "sha256": "cb745f667d83f7fa76194ba8bddb4302b6b963761ff5b4275e9dbeeae22ad163"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/B006-synthetic-transfer-receipt-20261003.md",
+    "path": "docs/changes/next-version-capabilities/B006-synthetic-transfer-receipt-20261003.md",
+    "bytes": 3017,
+    "sha256": "ed235731552846d671fd9b3ea1e14bebb29e0084d31d2679663da55a7c5e759a"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/B016-actor-clock-direction.md",
+    "path": "docs/changes/next-version-capabilities/B016-actor-clock-direction.md",
+    "bytes": 4910,
+    "sha256": "60fb7e34f335bae8a043519f14a2316bb5730fc990220acea5ad34c13822728b"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/B016-bounded-wire-v3-plan-direction.md",
+    "path": "docs/changes/next-version-capabilities/B016-bounded-wire-v3-plan-direction.md",
+    "bytes": 5891,
+    "sha256": "be8487a4046e9404ed3f85ed08bb779d96c14717658cdc36065620a54e8bffe8"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/B016-foundation-scope-direction.md",
+    "path": "docs/changes/next-version-capabilities/B016-foundation-scope-direction.md",
+    "bytes": 7403,
+    "sha256": "298091b450cc03513a37149d3486a2c6f9a9c0592d3a15e56a4119b2331ded52"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/B016-full-wire-budget-direction.md",
+    "path": "docs/changes/next-version-capabilities/B016-full-wire-budget-direction.md",
+    "bytes": 4125,
+    "sha256": "cef8e1f81abf8ae9a3f0c4af2843db023a4777ede069024dbad3a8d2fcb86f09"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/B016-identity-domain-clarification.md",
+    "path": "docs/changes/next-version-capabilities/B016-identity-domain-clarification.md",
+    "bytes": 4533,
+    "sha256": "1ea17098bd9210c3e1e8db401bf698ba4f2081e31f8bbf3e371e2285955d5b3e"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/B016-initial-producer-direction.md",
+    "path": "docs/changes/next-version-capabilities/B016-initial-producer-direction.md",
+    "bytes": 3122,
+    "sha256": "3efa617c24f09f61830f7b9cb46144e423509279cd583d6922ad57629780fc42"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/B016-wire-path-and-return-constraints.md",
+    "path": "docs/changes/next-version-capabilities/B016-wire-path-and-return-constraints.md",
+    "bytes": 4991,
+    "sha256": "948dd2adbcc69047e2203985478d1970bf8f478af9988aa46196711511d2484a"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/B016-wire-size-direction.md",
+    "path": "docs/changes/next-version-capabilities/B016-wire-size-direction.md",
+    "bytes": 5518,
+    "sha256": "29be218b27fd1f1a9b7e517cb9e6f2e1dc83e83d56e5f046224044b33505b86f"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/B028-004-first001-execution-20261006.md",
+    "path": "docs/changes/next-version-capabilities/B028-004-first001-execution-20261006.md",
+    "bytes": 5157,
+    "sha256": "be5636fc9437c6d580f0d9efe4c041e984ad9b8af53860c4d83fcfd24386a0a9"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/B028-006-first001-execution-20261006.md",
+    "path": "docs/changes/next-version-capabilities/B028-006-first001-execution-20261006.md",
+    "bytes": 5603,
+    "sha256": "a86ef7cbe73d7e268cbe503d807d3e9f9201236c64ddcfa9030d69d1d5ea5bb3"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/B028-first-sample-delivery-003.md",
+    "path": "docs/changes/next-version-capabilities/B028-first-sample-delivery-003.md",
+    "bytes": 9258,
+    "sha256": "4b03203c695522fe5737ea19c0d6da278f75db33ec63fa835d26418811ad3c2c"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/B028-first-sample-delivery-004.md",
+    "path": "docs/changes/next-version-capabilities/B028-first-sample-delivery-004.md",
+    "bytes": 5740,
+    "sha256": "1ad36a43adb69eae3613dbf86b5e630f96221f5ac3f08113ad5079e5a12e779c"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/B028-first-sample-delivery-006.md",
+    "path": "docs/changes/next-version-capabilities/B028-first-sample-delivery-006.md",
+    "bytes": 7776,
+    "sha256": "df6f48573969ee1c0d0923980e0c56007740ef9fa89208d3ef081e64bf5ede22"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/B028-first001-execution-20261006.md",
+    "path": "docs/changes/next-version-capabilities/B028-first001-execution-20261006.md",
+    "bytes": 5722,
+    "sha256": "c57b4c95cbd94df2a6d43e276572ea522735dc7681daaaa7563162485cd68f5a"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/B034-count-delivery-001.md",
+    "path": "docs/changes/next-version-capabilities/B034-count-delivery-001.md",
+    "bytes": 7589,
+    "sha256": "6e959709c0088fcbb49b5f44dfe096f78a546da7f2693f8ea8b9d4d5b019b87c"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/B100-count-delivery-001.md",
+    "path": "docs/changes/next-version-capabilities/B100-count-delivery-001.md",
+    "bytes": 8415,
+    "sha256": "d64de0df7c9f366d87cc03c69a1258ab3859b48c2b846574c1bcd2627d2d9063"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/B100-post-count-recovery-001.md",
+    "path": "docs/changes/next-version-capabilities/B100-post-count-recovery-001.md",
+    "bytes": 3252,
+    "sha256": "a4e88cdb51edb2bd14d3b9c79033c58901b89f23688f8283897f45f0b95b31fa"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/B100-post-count-recovery-002.md",
+    "path": "docs/changes/next-version-capabilities/B100-post-count-recovery-002.md",
+    "bytes": 3398,
+    "sha256": "f8b83c27283198283c3d421d7ef1a4defec46cdc82351c23629448543563916f"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/B100-post-count-recovery-003.md",
+    "path": "docs/changes/next-version-capabilities/B100-post-count-recovery-003.md",
+    "bytes": 3305,
+    "sha256": "21b1ce7ea7ecb7c2750c2bb9f97984691a5b4136c7e62c1c3c975600a6356ffc"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/B100-post-count-recovery-004.md",
+    "path": "docs/changes/next-version-capabilities/B100-post-count-recovery-004.md",
+    "bytes": 3502,
+    "sha256": "1571553046f10ae7414955df99f80fd9174e20ae790db049244e0ac826c8800a"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/B100-post-count-recovery-005.md",
+    "path": "docs/changes/next-version-capabilities/B100-post-count-recovery-005.md",
+    "bytes": 3287,
+    "sha256": "282d617b267ed978dfdb34ce61a4568e92c952808a40a948d8a47b5557799242"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/C021-baseline-repair-direction.md",
+    "path": "docs/changes/next-version-capabilities/C021-baseline-repair-direction.md",
+    "bytes": 4357,
+    "sha256": "d361b0d3ccad58872378c066bd618a177e7acb063df83d26bde9c41197e4fcdb"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/C021-five-baseline-direction.md",
+    "path": "docs/changes/next-version-capabilities/C021-five-baseline-direction.md",
+    "bytes": 7049,
+    "sha256": "eb07376a36b414bd0e25e7e9cbcf6f17a3d5f826a92336bfe61db253af6b9b16"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/C021-review-handoff.md",
+    "path": "docs/changes/next-version-capabilities/C021-review-handoff.md",
+    "bytes": 6401,
+    "sha256": "afb61c49036a5a8d5635afe513fdb7634d32aa480e6a523795675e780e0a99f7"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/C021-stable-parameter-identity-direction.md",
+    "path": "docs/changes/next-version-capabilities/C021-stable-parameter-identity-direction.md",
+    "bytes": 4705,
+    "sha256": "a788496332d55008b0a6464335bf39ea7214f8c21ee4d1575473dc32d89418fb"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/C021-target-metadata-observation-direction.md",
+    "path": "docs/changes/next-version-capabilities/C021-target-metadata-observation-direction.md",
+    "bytes": 3695,
+    "sha256": "6792a7b96ad5186bc7f15e118ab66eeb64d91237359584888ce130814839cc55"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/C021-target312-identity-compatibility-direction.md",
+    "path": "docs/changes/next-version-capabilities/C021-target312-identity-compatibility-direction.md",
+    "bytes": 4196,
+    "sha256": "f79882ce6615ddce68fce459796fab8826da181d10801ee57636776607081826"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/F06-policy-capacity-readonly-20261003.md",
+    "path": "docs/changes/next-version-capabilities/F06-policy-capacity-readonly-20261003.md",
+    "bytes": 4018,
+    "sha256": "c884a1fbac6fa369dd63d23cbd9d398cccba2a0454e8718bf3b2d17dbc549ffa"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/O01-integration-release-resources.md",
+    "path": "docs/changes/next-version-capabilities/O01-integration-release-resources.md",
+    "bytes": 6334,
+    "sha256": "74883b73093b8a4b53ca538bc4cffd61c20f771baf6036bb190c0257cbd20f3f"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/O01-runtime-readonly-20261003.md",
+    "path": "docs/changes/next-version-capabilities/O01-runtime-readonly-20261003.md",
+    "bytes": 6152,
+    "sha256": "df02ef2e1791abab6db40359c2cfc74345972aeb7377d9448b577cf94ea8cb99"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/O02-readonly-findings-20261003.md",
+    "path": "docs/changes/next-version-capabilities/O02-readonly-findings-20261003.md",
+    "bytes": 10688,
+    "sha256": "44a5d736006f31fcc0b7507e1b57070203d7c8cd2f6e03c61e5c66e0467a1bbd"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/Q02-operations-implementation.md",
+    "path": "docs/changes/next-version-capabilities/Q02-operations-implementation.md",
+    "bytes": 3675,
+    "sha256": "3868acbb8392e3b6b15c951a825e41f1c1207ab258fef85b6c419257047e4ff1"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/coordination-recovery-20261005.md",
+    "path": "docs/changes/next-version-capabilities/coordination-recovery-20261005.md",
+    "bytes": 5787,
+    "sha256": "a25cca25d202ee4af1867bcf2c1fb15436e46c529dd99f7046c208a8e7d89b4b"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/coordination.md",
+    "path": "docs/changes/next-version-capabilities/coordination.md",
+    "bytes": 543533,
+    "sha256": "8fa8722fcb60b25704630f9fd6ca63c37955957348e6423bc110a58cc2daf2e0"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/design.md",
+    "path": "docs/changes/next-version-capabilities/design.md",
+    "bytes": 118375,
+    "sha256": "b2396d209db87abd067349f1a65efff38c98d963ddfef0a502906b5363b86e4b"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/dispatch_state.json",
+    "path": "docs/changes/next-version-capabilities/dispatch_state.json",
+    "bytes": 2600392,
+    "sha256": "298ee7d4c8ade5465213baab38d890d05d7efe346cd534b7e87af611dd814fef"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/eighth-integration-delivery.md",
+    "path": "docs/changes/next-version-capabilities/eighth-integration-delivery.md",
+    "bytes": 3805,
+    "sha256": "89d961cffa5458d48bc1e1513969d10f8b133155ba3dee4d82d89f05d1e7ad5b"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/eleventh-integration-delivery.md",
+    "path": "docs/changes/next-version-capabilities/eleventh-integration-delivery.md",
+    "bytes": 11652,
+    "sha256": "82e37be6c7d1640c9f614399b9d5407f6087c26773a260ab1018bee960fcc943"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/fifth-integration-delivery.md",
+    "path": "docs/changes/next-version-capabilities/fifth-integration-delivery.md",
+    "bytes": 5424,
+    "sha256": "302443603baf87862b60860faa164b6e9ed55645915b84fd5888462ac0aef6b4"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/first-integration-delivery.md",
+    "path": "docs/changes/next-version-capabilities/first-integration-delivery.md",
+    "bytes": 3102,
+    "sha256": "08e9c21d790fd744e6da757dc1c37d2b00dfc73b66e69946e9412e7276eaf72e"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/fourteenth-integration-delivery.md",
+    "path": "docs/changes/next-version-capabilities/fourteenth-integration-delivery.md",
+    "bytes": 4163,
+    "sha256": "a60174d3a0758ab69985f560eaefa0c0dfaf9c79fb3cd73da8638ff45c8bee4f"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/fourth-integration-delivery.md",
+    "path": "docs/changes/next-version-capabilities/fourth-integration-delivery.md",
+    "bytes": 5192,
+    "sha256": "c770612f1b01ad8a623da07e2c438387bb5c170c67c172961cf17e0e8eb42629"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/impact-mapping-repair.md",
+    "path": "docs/changes/next-version-capabilities/impact-mapping-repair.md",
+    "bytes": 2751,
+    "sha256": "1e0a6487c6b0ca5e2e0cac8e67202e24a9382e28ca4236cecdda56918cbebc39"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/inheritance.json",
+    "path": "docs/changes/next-version-capabilities/inheritance.json",
+    "bytes": 3341,
+    "sha256": "a8c60048cbad16f6ce0a1acf53f9cbeb4f063ac34837c8eecc46bcf48f95c2a4"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/lanes/B/B-016-wire-v3-digest-fd-plan-repair.md",
+    "path": "docs/changes/next-version-capabilities/lanes/B/B-016-wire-v3-digest-fd-plan-repair.md",
+    "bytes": 16462,
+    "sha256": "b6428bca40ce4b849796e0228676a8791a47711c7adddde66e84e6ef273a1451"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/ninth-integration-delivery.md",
+    "path": "docs/changes/next-version-capabilities/ninth-integration-delivery.md",
+    "bytes": 3835,
+    "sha256": "71b3baee12f46e5a10a901a3d4760682b9d316a06b604abd2fd94d25c2a3e548"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/rollout.md",
+    "path": "docs/changes/next-version-capabilities/rollout.md",
+    "bytes": 8920,
+    "sha256": "6070b81fcbd4e55a32c2736b37254cc759df8072d0d2838b0d5c1d4a354966c1"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/second-integration-delivery.md",
+    "path": "docs/changes/next-version-capabilities/second-integration-delivery.md",
+    "bytes": 4048,
+    "sha256": "3c7d334f79e598f259fbf9cc1a08584daf8c124b1b02ec93f4ea7a143363139b"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/second-integration-status.md",
+    "path": "docs/changes/next-version-capabilities/second-integration-status.md",
+    "bytes": 4299,
+    "sha256": "4fb5cf7f61bd389c2095754ce0d054a65742b088ca637b28927dc1576f47f9da"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/sixth-integration-delivery.md",
+    "path": "docs/changes/next-version-capabilities/sixth-integration-delivery.md",
+    "bytes": 2829,
+    "sha256": "717c6a46996ef3ad465cb2f8b1d572eb9c9682b61b6fe6a1b457d64211fb5549"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/spec.md",
+    "path": "docs/changes/next-version-capabilities/spec.md",
+    "bytes": 23000,
+    "sha256": "c81904cdb5739aad45147f0952f16d1f72ef83430b97aada43a219399ed8e9c6"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/task-progress-2026-10-24-2119.json",
+    "path": "docs/changes/next-version-capabilities/task-progress-2026-10-24-2119.json",
+    "bytes": 57073,
+    "sha256": "4b040fff4bfb663ee2759808a9089248ffeb6229d7ffca2d940f3a311e9d57ea"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/task-progress-2026-10-24-2119.md",
+    "path": "docs/changes/next-version-capabilities/task-progress-2026-10-24-2119.md",
+    "bytes": 24356,
+    "sha256": "8700f291bb9b2768593f0a2499ef2d72045c34d4b2543ec1047e8b22eedcf5c1"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/task-progress-2026-10-24.json",
+    "path": "docs/changes/next-version-capabilities/task-progress-2026-10-24.json",
+    "bytes": 39101,
+    "sha256": "aa1a43d29f2f03e42a4dacad4318539e958acb7b8109048ec768fa24af514841"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/task-progress-2026-10-24.md",
+    "path": "docs/changes/next-version-capabilities/task-progress-2026-10-24.md",
+    "bytes": 21001,
+    "sha256": "d46c701f54164ddfd97e74760b188736f1a670292a5aa1631ab5e5c64197227b"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/task_index.json",
+    "path": "docs/changes/next-version-capabilities/task_index.json",
+    "bytes": 129818,
+    "sha256": "0520ff68ef80e40c6e479b2ae45d17cb19b6061ad306e56e6764fd87b99fa5ac"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/tasks.md",
+    "path": "docs/changes/next-version-capabilities/tasks.md",
+    "bytes": 190410,
+    "sha256": "a06c1ff6035a1a0dd5291d1c2755ebbdd521c6a0f0aa3a7845dd21ac91d15695"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/tenth-integration-delivery.md",
+    "path": "docs/changes/next-version-capabilities/tenth-integration-delivery.md",
+    "bytes": 4890,
+    "sha256": "c856235274a05f6ec03e53e6e93e1b9259ec8001024d997f99e19c82e2056572"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/test_cases.md",
+    "path": "docs/changes/next-version-capabilities/test_cases.md",
+    "bytes": 14162,
+    "sha256": "df7d38e09acfbfa3166c7af1404bf9a927afd2c044a74ab2a008a1ab3ef674a9"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/third-integration-delivery.md",
+    "path": "docs/changes/next-version-capabilities/third-integration-delivery.md",
+    "bytes": 6622,
+    "sha256": "35c88e136defe7263dad875a0b7cf1959db22a7b3865000bf49d59024409c4c3"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/thirteenth-integration-delivery.md",
+    "path": "docs/changes/next-version-capabilities/thirteenth-integration-delivery.md",
+    "bytes": 5271,
+    "sha256": "56b89e3b111b2f995af92a7efcfeb4d27af0ecd6185952290d5ae0c169bfa8ef"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/twelfth-integration-delivery.md",
+    "path": "docs/changes/next-version-capabilities/twelfth-integration-delivery.md",
+    "bytes": 6873,
+    "sha256": "ed9144e58abb83670607c6e469dea5d81ce956ed84af232cee7bf4bb238f19c2"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/current_state.md",
+    "path": "docs/changes/business-project-handoff-20261026/original/docs/current_state.md",
+    "bytes": 1467363,
+    "sha256": "9dc46f2b832807e9236f2fd21ab2ad18890c5a08ad31188fecfe5619cdf0adfe"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/decisions.md",
+    "path": "docs/changes/business-project-handoff-20261026/original/docs/decisions.md",
+    "bytes": 393598,
+    "sha256": "128c91ad075c3a52075d1fd6d760d367a0371075ef6326ad623016639e2a8771"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/future_work_roadmap.md",
+    "path": "docs/changes/business-project-handoff-20261026/original/docs/future_work_roadmap.md",
+    "bytes": 35404,
+    "sha256": "a974d987b47db81e8159d530a8350cb5ccec6e869d1097c1130688f957933428"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/project_overview.md",
+    "path": "docs/changes/business-project-handoff-20261026/original/docs/project_overview.md",
+    "bytes": 58577,
+    "sha256": "57e482976830d011c82ec5b19e79cef3ad0d858372d3e1bb0f3ff291ed136b16"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/project_status.md",
+    "path": "docs/changes/business-project-handoff-20261026/original/docs/project_status.md",
+    "bytes": 375941,
+    "sha256": "2298e9de764f2aa2591029bfaaf27035ea8d40d70b8256b43b874437551d21ee"
+  },
+  {
+    "source": "/Users/mentianlu/.codex/worktrees/c191-l01-diagnostics-tests/umanews/docs/changes/next-version-capabilities/lanes/C/C260-pair-index-scanner-integration-design.md",
+    "path": "docs/changes/next-version-capabilities/lanes/C/C260-pair-index-scanner-integration-design.md",
+    "bytes": 23502,
+    "sha256": "b54784a6cb032b364384ec3a8b359457eb49c94c381bd59199c9b85dbd1a86cb"
+  }
+]

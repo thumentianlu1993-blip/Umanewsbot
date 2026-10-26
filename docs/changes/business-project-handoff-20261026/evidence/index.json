@@ -1,0 +1,152 @@
+[
+  {
+    "original": "/Users/mentianlu/.codex/runtime/a170-http-budget-loader-normal-ci-validation-001/report.md",
+    "copy": "docs/changes/business-project-handoff-20261026/evidence/a170-http-budget-loader-normal-ci-validation-001/report.md",
+    "sha256": "5596cb4c31ba7754c04ebcfe52ca4d4ca84f7a4a65d9bd37fa8f256c1bd83275",
+    "bytes": 6893
+  },
+  {
+    "original": "/Users/mentianlu/.codex/runtime/a170-http-budget-loader-normal-ci-validation-001/index.json",
+    "copy": "docs/changes/business-project-handoff-20261026/evidence/a170-http-budget-loader-normal-ci-validation-001/index.json",
+    "sha256": "189288addffb76d63fef7949a8874074bba4126db3471499918d4824ba4bdfdf",
+    "bytes": 35908
+  },
+  {
+    "original": "/Users/mentianlu/.codex/runtime/a171-rh-next-ready-business-slice-once-001/report.md",
+    "copy": "docs/changes/business-project-handoff-20261026/evidence/a171-rh-next-ready-business-slice-once-001/report.md",
+    "sha256": "59d959197628e8e9d49e5859588bfeeff5f6334c09032183526c86d417ab5be2",
+    "bytes": 5389
+  },
+  {
+    "original": "/Users/mentianlu/.codex/runtime/a171-rh-next-ready-business-slice-once-001/index.json",
+    "copy": "docs/changes/business-project-handoff-20261026/evidence/a171-rh-next-ready-business-slice-once-001/index.json",
+    "sha256": "4805f96a01721cad68ef5146626b00097e639d7a4faea160f4e516636ef64cd8",
+    "bytes": 2135
+  },
+  {
+    "original": "/Users/mentianlu/.codex/runtime/b285-realpg5-2g1g-once-result-001/report.md",
+    "copy": "docs/changes/business-project-handoff-20261026/evidence/b285-realpg5-2g1g-once-result-001/report.md",
+    "sha256": "f11afda441c11178e340ffb669c0ab6501526a022408dec42795ed6530580437",
+    "bytes": 6848
+  },
+  {
+    "original": "/Users/mentianlu/.codex/runtime/b285-realpg5-2g1g-once-result-001/index.json",
+    "copy": "docs/changes/business-project-handoff-20261026/evidence/b285-realpg5-2g1g-once-result-001/index.json",
+    "sha256": "a9d31f51364022936ab65f002dfb7289a065cde5eec402cab53af5fd772073e3",
+    "bytes": 12728
+  },
+  {
+    "original": "/Users/mentianlu/.codex/runtime/r-b285-first-p5-rejection-result-review-001/report.md",
+    "copy": "docs/changes/business-project-handoff-20261026/evidence/r-b285-first-p5-rejection-result-review-001/report.md",
+    "sha256": "dbd8da078ba8ef6999c1a0229691509247860a00aab4f1636425fd4842e231b1",
+    "bytes": 9422
+  },
+  {
+    "original": "/Users/mentianlu/.codex/runtime/r-b285-first-p5-rejection-result-review-001/index.json",
+    "copy": "docs/changes/business-project-handoff-20261026/evidence/r-b285-first-p5-rejection-result-review-001/index.json",
+    "sha256": "5d1aeefb7958b2ab02ba6ca6259e7ca2663a6e3afd16208dba491abf0e08c50d",
+    "bytes": 446
+  },
+  {
+    "original": "/Users/mentianlu/.codex/runtime/b286-p5-exit-precondition-source-repair-001/report.md",
+    "copy": "docs/changes/business-project-handoff-20261026/evidence/b286-p5-exit-precondition-source-repair-001/report.md",
+    "sha256": "7098170ef04f173403628ce7fa3fdecee88e322a9d9954647903d8491a36d163",
+    "bytes": 6923
+  },
+  {
+    "original": "/Users/mentianlu/.codex/runtime/b286-p5-exit-precondition-source-repair-001/b285-stop-cap-erratum.json",
+    "copy": "docs/changes/business-project-handoff-20261026/evidence/b286-p5-exit-precondition-source-repair-001/b285-stop-cap-erratum.json",
+    "sha256": "ec919d06b517c256df9d19e8f68c24429cdbb03782013e1720bebc5866fcb65c",
+    "bytes": 1518
+  },
+  {
+    "original": "/Users/mentianlu/.codex/runtime/b286-p5-exit-precondition-source-repair-001/index.json",
+    "copy": "docs/changes/business-project-handoff-20261026/evidence/b286-p5-exit-precondition-source-repair-001/index.json",
+    "sha256": "910107752b9a10b7d6c155778b81a49b2a39ff0d3b4ecd29cddc082095b682d0",
+    "bytes": 3334
+  },
+  {
+    "original": "/Users/mentianlu/.codex/runtime/r-b286-paused-checkpoint-001/checkpoint.json",
+    "copy": "docs/changes/business-project-handoff-20261026/evidence/r-b286-paused-checkpoint-001/checkpoint.json",
+    "sha256": "1cdd7c3e6e236bd443da8fc67ec4c19d88ee58aff72ea964db2111fe2e883c9f",
+    "bytes": 837
+  },
+  {
+    "original": "/Users/mentianlu/.codex/runtime/c264-scanner-fixed-first-normal-red-002/seal.json",
+    "copy": "docs/changes/business-project-handoff-20261026/evidence/c264-scanner-fixed-first-normal-red-002/seal.json",
+    "sha256": "c5234ac6beee86b6c9b35884650a495f76cd56e7b3fdcb88fd989edb156f8329",
+    "bytes": 26824
+  },
+  {
+    "original": "/Users/mentianlu/.codex/runtime/c264-scanner-fixed-first-normal-red-002/report.md",
+    "copy": "docs/changes/business-project-handoff-20261026/evidence/c264-scanner-fixed-first-normal-red-002/report.md",
+    "sha256": "b34fbf111492db62b88d7c8cebe8256814e00a5b656c3e567b766e2956c384d0",
+    "bytes": 7523
+  },
+  {
+    "original": "/Users/mentianlu/.codex/runtime/c264-scanner-fixed-first-normal-red-002/index.json",
+    "copy": "docs/changes/business-project-handoff-20261026/evidence/c264-scanner-fixed-first-normal-red-002/index.json",
+    "sha256": "936aacf9761d880205d9857da95317eefb33d120d4f3360229d2601f9ef506fc",
+    "bytes": 1286
+  },
+  {
+    "original": "/Users/mentianlu/.codex/runtime/r-c264-scanner-fixed-first-normal-red-result-review-001/report.md",
+    "copy": "docs/changes/business-project-handoff-20261026/evidence/r-c264-scanner-fixed-first-normal-red-result-review-001/report.md",
+    "sha256": "b601767c6a152abbed27fd027f43704a3a4c367fa16d243c202c0248daf6ce3c",
+    "bytes": 8869
+  },
+  {
+    "original": "/Users/mentianlu/.codex/runtime/r-c264-scanner-fixed-first-normal-red-result-review-001/index.json",
+    "copy": "docs/changes/business-project-handoff-20261026/evidence/r-c264-scanner-fixed-first-normal-red-result-review-001/index.json",
+    "sha256": "adb4bced69f4a82474759cd74871510eb32fdc70e98d250624794ee345bc23e0",
+    "bytes": 1815
+  },
+  {
+    "original": "/Users/mentianlu/.codex/runtime/c265-pair-index-minimal-guard-source-001/seal.json",
+    "copy": "docs/changes/business-project-handoff-20261026/evidence/c265-pair-index-minimal-guard-source-001/seal.json",
+    "sha256": "50e35a402ba41ec4d564684d0cc2f610d7397fddbf02834c06819c06fbf54477",
+    "bytes": 2562
+  },
+  {
+    "original": "/Users/mentianlu/.codex/runtime/c265-pair-index-minimal-guard-source-001/report.md",
+    "copy": "docs/changes/business-project-handoff-20261026/evidence/c265-pair-index-minimal-guard-source-001/report.md",
+    "sha256": "50b8f202cf188b30ccfdb083ffcaabedf829c05e8883e4ccde94cf74293c872b",
+    "bytes": 4620
+  },
+  {
+    "original": "/Users/mentianlu/.codex/runtime/c265-pair-index-minimal-guard-source-001/index.json",
+    "copy": "docs/changes/business-project-handoff-20261026/evidence/c265-pair-index-minimal-guard-source-001/index.json",
+    "sha256": "acae86c146acb4b63d2c9cbdb468a7995311b389bc1753eab04ed58f723c6fac",
+    "bytes": 1252
+  },
+  {
+    "original": "/Users/mentianlu/.codex/runtime/r-c265-pair-index-minimal-guard-source-review-001/report.md",
+    "copy": "docs/changes/business-project-handoff-20261026/evidence/r-c265-pair-index-minimal-guard-source-review-001/report.md",
+    "sha256": "6b91cd7f656f2268d08fadb31d6ffbbfadecdd59a8a4c314fa3ec9c3f6d8d184",
+    "bytes": 8029
+  },
+  {
+    "original": "/Users/mentianlu/.codex/runtime/r-c265-pair-index-minimal-guard-source-review-001/index.json",
+    "copy": "docs/changes/business-project-handoff-20261026/evidence/r-c265-pair-index-minimal-guard-source-review-001/index.json",
+    "sha256": "28bedeac7312b213f221fe3f5d312089141b99e363fd6902a44282b27f2214ed",
+    "bytes": 1349
+  },
+  {
+    "original": "/Users/mentianlu/.codex/runtime/c266-fixed-guard-normal-green-validation-001/PAUSED.json",
+    "copy": "docs/changes/business-project-handoff-20261026/evidence/c266-fixed-guard-normal-green-validation-001/PAUSED.json",
+    "sha256": "ed4cb8c55b4920239c8742f93fe5fd3d1c6141c0451dd9473e66c116361f9058",
+    "bytes": 1091
+  },
+  {
+    "original": "/Users/mentianlu/.codex/runtime/d082-u04-u05-remaining-slice-bounded-selection-001/report.md",
+    "copy": "docs/changes/business-project-handoff-20261026/evidence/d082-u04-u05-remaining-slice-bounded-selection-001/report.md",
+    "sha256": "ee3e427489d485ce974ab0dda7c3c2eae679b9ea8a0d507a3c9fa919f5ead9bb",
+    "bytes": 3144
+  },
+  {
+    "original": "/Users/mentianlu/.codex/runtime/d082-u04-u05-remaining-slice-bounded-selection-001/index.json",
+    "copy": "docs/changes/business-project-handoff-20261026/evidence/d082-u04-u05-remaining-slice-bounded-selection-001/index.json",
+    "sha256": "b78b16939cdc85b1711d3d446a6319765dc2678111d8a439df7a287c490cda93",
+    "bytes": 478
+  }
+]

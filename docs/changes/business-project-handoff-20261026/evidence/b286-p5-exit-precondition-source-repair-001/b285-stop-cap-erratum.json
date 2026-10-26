@@ -1,0 +1,36 @@
+{
+  "status": "APPEND_ONLY_ERRATUM_OLD_REPORT_RAW_UNCHANGED",
+  "manifest_stop_cap": 3,
+  "actual_stop_count": 4,
+  "actual_stops": [
+    {
+      "id": "tools.test_impact.test_pg_lifecycle.RealPGTests.test_real_foreground_pid_and_separate_stop_wait",
+      "pid": 31,
+      "returncode": 0
+    },
+    {
+      "id": "tools.test_impact.test_pg_lifecycle.RealPGTests.test_real_worker7_does_not_hide_stop_wait0",
+      "pid": 56,
+      "returncode": 0
+    },
+    {
+      "id": "tools.test_impact.test_pg_lifecycle.RealPGTests.test_real_sigstop_forces_real_stop_timeout_not_success",
+      "pid": 80,
+      "returncode": 1
+    },
+    {
+      "id": "tools.test_impact.test_pg_lifecycle.RealPGTests.test_real_early_postmaster_exit_is_reaped",
+      "pid": 107,
+      "returncode": 1
+    }
+  ],
+  "retry": false,
+  "correction": "B285 five-method attempt caps did not all hold: pg_stop4>3. Prior report budget/caps statement is invalid as an observed result; P5 stop107 and gate rejection remain.",
+  "source_methods_sha256": "95fe09fbda2d6ebf00d745f2ab0813a93a0e126a5cf981e40f9428594893229f",
+  "b285_report_sha256": "f11afda441c11178e340ffb669c0ab6501526a022408dec42795ed6530580437",
+  "b285_index_sha256": "a9d31f51364022936ab65f002dfb7289a065cde5eec402cab53af5fd772073e3",
+  "r_b285_report_sha256": "dbd8da078ba8ef6999c1a0229691509247860a00aab4f1636425fd4842e231b1",
+  "r_b285_index_sha256": "5d1aeefb7958b2ab02ba6ca6259e7ca2663a6e3afd16208dba491abf0e08c50d",
+  "weekly_used_percent": 51,
+  "ordinaryUsageAllowed": true
+}

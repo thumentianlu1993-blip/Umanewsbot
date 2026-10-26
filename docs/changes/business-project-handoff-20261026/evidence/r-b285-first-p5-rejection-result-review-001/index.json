@@ -1,0 +1,18 @@
+{
+  "schema": "r-b285-readonly-p5-result-review-v1",
+  "self_excluded": "index.json",
+  "members": [
+    {
+      "path": "checks.json",
+      "size": 8720,
+      "sha256": "24ec92244775c98b2a4dffdfdcd190dba8e32a04d8f8c2c8a2e4419ae38b8176"
+    },
+    {
+      "path": "report.md",
+      "size": 9422,
+      "sha256": "dbd8da078ba8ef6999c1a0229691509247860a00aab4f1636425fd4842e231b1"
+    }
+  ],
+  "member_count": 2,
+  "total_member_bytes": 18142
+}

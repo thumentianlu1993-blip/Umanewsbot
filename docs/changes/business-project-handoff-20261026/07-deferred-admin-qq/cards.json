@@ -1,0 +1,629 @@
+[
+  {
+    "id": "F04",
+    "project": "P07",
+    "requirement_id": "BR-F04",
+    "original_plan": {
+      "id": "F04",
+      "lane": "C",
+      "role": "application",
+      "it": 1,
+      "start": "2026-10-03",
+      "due": "2026-10-04",
+      "h": 4,
+      "deps": [],
+      "gaps": [
+        "EG-01",
+        "UG-05"
+      ],
+      "area": "console",
+      "title": "冻结编辑后台关键任务与交互原型",
+      "change": "记录找待办、核对差异、改正文、改名称、处理赛事冲突、修复后续跑六条现有路径的步骤/耗时；画出待处理、内容、资料、自动化四入口及手机原型。",
+      "test": "使用相同样例操作旧流程，区分已有保存发布合一与真正冗余；无登录证据时标记待实测，不伪造耗时。",
+      "done": "形成前后操作对照和组件清单；关键动作不依赖桌面宽表或多次跳页。",
+      "deadline": "2026-10-04 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-04T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/admin.py",
+        "server/stable/templates/stable/console/dashboard.html",
+        "server/stable/templates/stable/console/article_editor.html"
+      ],
+      "status": "用户暂缓",
+      "scope_disposition": "deferred_by_user_20261006",
+      "scope_note": "用户2026-10-06：暂缓运营后台改造及QQ通知下线，其余保留；用户随后已恢复其余开发，本卡仍暂缓。 保留已有代码和历史交付，不回滚、不部署。",
+      "status_before_deferral": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "F04",
+      "title": "冻结编辑后台关键任务与交互原型",
+      "lane": "C",
+      "completion_percent": 35,
+      "status": "用户暂缓",
+      "basis_and_gap": "方案/原型和合成材料已审；真人效率基线未取得，用户暂缓",
+      "scope_disposition": "deferred_by_user_20261006",
+      "evidence_keys": [
+        "F04"
+      ],
+      "previous_percent": 35,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "C",
+      "title": "冻结编辑后台关键任务与交互原型",
+      "deps": [],
+      "deadline_at": "2026-10-04T18:00:00+08:00",
+      "status": "用户暂缓",
+      "phase": "原方案/原型/合成事实已审；新人工桌面18run材料7605经原Rb85批准，实际人选时段未答/未采数",
+      "commit": "5d2ce4e4e05774a54cf4fc511f491ccdcd137be8",
+      "pr": null,
+      "review": "固定事实及9哈希APPROVED@88d40234；限定3文档+9runtime同范围指纹一致，整树并发dirty如实留痕；整卡部分完成",
+      "evidence": [
+        "/Users/mentianlu/.codex/worktrees/bc9b/umanews/docs/changes/next-version-capabilities/lanes/C/C-001-handoff.md",
+        "/Users/mentianlu/.codex/worktrees/bc9b/umanews/docs/changes/next-version-capabilities/lanes/C/F04-baseline-measurement.md",
+        "/Users/mentianlu/.codex/worktrees/3ab1/umanews/docs/changes/next-version-capabilities/lanes/R/R-F04-milestone-gap-review.md"
+      ],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "dispatch_id": "C-001",
+      "owner_thread_id": "01a0fdc7-5154-7e51-aafa-f1b34d8f46f9",
+      "review_commit": "88d4023474b8363049b27a21f31a0d3d6013dc1e",
+      "milestone_review_commit": "b9d587a01b10509dd18cdeab2bde60acd4d2c413",
+      "later_evidence": "E03/E06新旧效率和真实手机、E04/E05 worker终点按原后续节点，不能用模拟代替，也不全部前置今日",
+      "active_preparation": "C-F04-HUMAN-KIT-001",
+      "human_kit_review": "b85dc70d17bf7b481ddcb082a6d1a8988c1756e9",
+      "scope_disposition": "deferred_by_user_20261006",
+      "scope_note": "用户2026-10-06：暂缓运营后台改造及QQ通知下线，其余保留；用户随后已恢复其余开发，本卡仍暂缓。 保留已有代码和历史交付，不回滚、不部署。",
+      "status_before_deferral": "部分完成"
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 35,
+    "business_delivery_complete": false,
+    "priority_within_project": 1
+  },
+  {
+    "id": "E02",
+    "project": "P07",
+    "requirement_id": "BR-E02",
+    "original_plan": {
+      "id": "E02",
+      "lane": "C",
+      "role": "application",
+      "it": 2,
+      "start": "2026-10-11",
+      "due": "2026-10-12",
+      "h": 4,
+      "deps": [
+        "E01"
+      ],
+      "gaps": [
+        "EG-03"
+      ],
+      "area": "console",
+      "title": "实现统一待办列表与原因详情",
+      "change": "建设待处理入口、影响优先级、地区/类型筛选、证据详情和分页；原后台入口渐进跳转，不删除底层能力。",
+      "test": "权限隔离、重复原因聚合、过期与已恢复状态、分页总数；隐藏对象不泄露到非 staff 用户。",
+      "done": "六条 F04 任务可从同一入口找到，展示下一动作而非只有失败代码。",
+      "deadline": "2026-10-12 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-12T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/admin.py",
+        "server/stable/templates/stable/console/dashboard.html",
+        "server/stable/templates/stable/console/article_editor.html"
+      ],
+      "status": "用户暂缓",
+      "scope_disposition": "deferred_by_user_20261006",
+      "scope_note": "用户2026-10-06：暂缓运营后台改造及QQ通知下线，其余保留；用户随后已恢复其余开发，本卡仍暂缓。 保留已有代码和历史交付，不回滚、不部署。",
+      "status_before_deferral": "未开始",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
+    },
+    "progress_snapshot": {
+      "id": "E02",
+      "title": "实现统一待办列表与原因详情",
+      "lane": "C",
+      "completion_percent": 0,
+      "status": "用户暂缓",
+      "basis_and_gap": "用户暂缓；暂无已核本卡实现交付",
+      "scope_disposition": "deferred_by_user_20261006",
+      "evidence_keys": [
+        "E02"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "C",
+      "title": "实现统一待办列表与原因详情",
+      "deps": [
+        "E01"
+      ],
+      "deadline_at": "2026-10-12T18:00:00+08:00",
+      "status": "用户暂缓",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "scope_disposition": "deferred_by_user_20261006",
+      "scope_note": "用户2026-10-06：暂缓运营后台改造及QQ通知下线，其余保留；用户随后已恢复其余开发，本卡仍暂缓。 保留已有代码和历史交付，不回滚、不部署。",
+      "status_before_deferral": "未开始",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 2
+  },
+  {
+    "id": "E03",
+    "project": "P07",
+    "requirement_id": "BR-E03",
+    "original_plan": {
+      "id": "E03",
+      "lane": "C",
+      "role": "application",
+      "it": 3,
+      "start": "2026-10-20",
+      "due": "2026-10-21",
+      "h": 5,
+      "deps": [
+        "E02",
+        "N04",
+        "H05",
+        "R03"
+      ],
+      "gaps": [
+        "EG-04",
+        "NG-07"
+      ],
+      "area": "console",
+      "title": "完成原位编辑证据差异与预览",
+      "change": "正文清洗差异、术语身份冲突、赛事资料版本在一个任务详情中核验；复用自动保存/发布动作，减少跨页和重复输入，适配手机。",
+      "test": "保存失败、草稿恢复、无权限、窄屏长内容和预览不同版本；已存在合一动作不重复建设。",
+      "done": "TC-E02 通过；六条高频任务按 F04 原型完成，错误提示指向可修复字段。",
+      "deadline": "2026-10-21 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-21T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/admin.py",
+        "server/stable/templates/stable/console/dashboard.html",
+        "server/stable/templates/stable/console/article_editor.html"
+      ],
+      "status": "用户暂缓",
+      "scope_disposition": "deferred_by_user_20261006",
+      "scope_note": "用户2026-10-06：暂缓运营后台改造及QQ通知下线，其余保留；用户随后已恢复其余开发，本卡仍暂缓。 保留已有代码和历史交付，不回滚、不部署。",
+      "status_before_deferral": "未开始",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
+    },
+    "progress_snapshot": {
+      "id": "E03",
+      "title": "完成原位编辑证据差异与预览",
+      "lane": "C",
+      "completion_percent": 0,
+      "status": "用户暂缓",
+      "basis_and_gap": "用户暂缓；暂无已核本卡实现交付",
+      "scope_disposition": "deferred_by_user_20261006",
+      "evidence_keys": [
+        "E03"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "C",
+      "title": "完成原位编辑证据差异与预览",
+      "deps": [
+        "E02",
+        "N04",
+        "H05",
+        "R03"
+      ],
+      "deadline_at": "2026-10-21T18:00:00+08:00",
+      "status": "用户暂缓",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "scope_disposition": "deferred_by_user_20261006",
+      "scope_note": "用户2026-10-06：暂缓运营后台改造及QQ通知下线，其余保留；用户随后已恢复其余开发，本卡仍暂缓。 保留已有代码和历史交付，不回滚、不部署。",
+      "status_before_deferral": "未开始",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 3
+  },
+  {
+    "id": "E06",
+    "project": "P07",
+    "requirement_id": "BR-E06",
+    "original_plan": {
+      "id": "E06",
+      "lane": "C",
+      "role": "application",
+      "it": 4,
+      "start": "2026-10-24",
+      "due": "2026-10-25",
+      "h": 4,
+      "deps": [
+        "O06",
+        "E05"
+      ],
+      "gaps": [
+        "EG-04",
+        "EG-06",
+        "UG-05"
+      ],
+      "area": "console",
+      "title": "验证后台六条高频路径并修复交互阻碍",
+      "change": "使用 F04 相同任务复测桌面与手机的步骤、耗时和失败恢复；只修影响完成任务的具体问题。",
+      "test": "编辑中刷新、窄屏、长证据、多候选冲突和并发保存；校验用户权限及人工保护字段。",
+      "done": "TC-E02/03 达标；记录前后中位耗时与点击次数，不用页面数量下降代替可用性。",
+      "deadline": "2026-10-25 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-25T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/admin.py",
+        "server/stable/templates/stable/console/dashboard.html",
+        "server/stable/templates/stable/console/article_editor.html"
+      ],
+      "status": "用户暂缓",
+      "scope_disposition": "deferred_by_user_20261006",
+      "scope_note": "用户2026-10-06：暂缓运营后台改造及QQ通知下线，其余保留；用户随后已恢复其余开发，本卡仍暂缓。 保留已有代码和历史交付，不回滚、不部署。",
+      "status_before_deferral": "未开始",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
+    },
+    "progress_snapshot": {
+      "id": "E06",
+      "title": "验证后台六条高频路径并修复交互阻碍",
+      "lane": "C",
+      "completion_percent": 0,
+      "status": "用户暂缓",
+      "basis_and_gap": "用户暂缓；暂无已核本卡实现交付",
+      "scope_disposition": "deferred_by_user_20261006",
+      "evidence_keys": [
+        "E06"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "C",
+      "title": "验证后台六条高频路径并修复交互阻碍",
+      "deps": [
+        "O06",
+        "E05"
+      ],
+      "deadline_at": "2026-10-25T18:00:00+08:00",
+      "status": "用户暂缓",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "scope_disposition": "deferred_by_user_20261006",
+      "scope_note": "用户2026-10-06：暂缓运营后台改造及QQ通知下线，其余保留；用户随后已恢复其余开发，本卡仍暂缓。 保留已有代码和历史交付，不回滚、不部署。",
+      "status_before_deferral": "未开始",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 4
+  },
+  {
+    "id": "E07",
+    "project": "P07",
+    "requirement_id": "BR-E07",
+    "original_plan": {
+      "id": "E07",
+      "lane": "C",
+      "role": "application",
+      "it": 4,
+      "start": "2026-10-27",
+      "due": "2026-10-28",
+      "h": 3,
+      "deps": [
+        "E06",
+        "U05",
+        "R15"
+      ],
+      "gaps": [
+        "EG-06"
+      ],
+      "area": "console",
+      "title": "验收自动完成率与人工干预收益",
+      "change": "统计正常自动完成、自动恢复、人工介入和待办年龄，与 F04 基线及前台质量联查；补操作说明。",
+      "test": "减少人工不能以漏发/错误/长期停留交换；失败任务、未知来源和新对象均在分母。",
+      "done": "10/28 12:00 前交效率与质量对照；未达到建议收益时报告实际差距，但关键质量门槛不可降低。",
+      "deadline": "2026-10-28 12:00 Asia/Shanghai",
+      "deadline_at": "2026-10-28T12:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/admin.py",
+        "server/stable/templates/stable/console/dashboard.html",
+        "server/stable/templates/stable/console/article_editor.html"
+      ],
+      "status": "用户暂缓",
+      "scope_disposition": "deferred_by_user_20261006",
+      "scope_note": "用户2026-10-06：暂缓运营后台改造及QQ通知下线，其余保留；用户随后已恢复其余开发，本卡仍暂缓。 保留已有代码和历史交付，不回滚、不部署。",
+      "status_before_deferral": "未开始",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
+    },
+    "progress_snapshot": {
+      "id": "E07",
+      "title": "验收自动完成率与人工干预收益",
+      "lane": "C",
+      "completion_percent": 0,
+      "status": "用户暂缓",
+      "basis_and_gap": "用户暂缓；暂无已核本卡实现交付",
+      "scope_disposition": "deferred_by_user_20261006",
+      "evidence_keys": [
+        "E07"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "C",
+      "title": "验收自动完成率与人工干预收益",
+      "deps": [
+        "E06",
+        "U05",
+        "R15"
+      ],
+      "deadline_at": "2026-10-28T12:00:00+08:00",
+      "status": "用户暂缓",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "scope_disposition": "deferred_by_user_20261006",
+      "scope_note": "用户2026-10-06：暂缓运营后台改造及QQ通知下线，其余保留；用户随后已恢复其余开发，本卡仍暂缓。 保留已有代码和历史交付，不回滚、不部署。",
+      "status_before_deferral": "未开始",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 5
+  },
+  {
+    "id": "Q01",
+    "project": "P07",
+    "requirement_id": "BR-Q01",
+    "original_plan": {
+      "id": "Q01",
+      "lane": "C",
+      "role": "integration",
+      "it": 1,
+      "start": "2026-10-05",
+      "due": "2026-10-06",
+      "h": 3,
+      "deps": [
+        "F01"
+      ],
+      "gaps": [
+        "QG-01"
+      ],
+      "area": "qq",
+      "title": "关闭 QQ 全发送路径并解耦网页发布",
+      "change": "统一禁止自动、手动、重试与遗留定时发送；网站发布成功不依赖 OneBot；保留配置与历史记录便于诊断。",
+      "test": "mock OneBot，测试迟到 Celery 消息与手动接口均不发送；新闻照常发布，其他非 QQ 通知不受影响。",
+      "done": "TC-Q01 通过；列出生产停用所需配置和可恢复范围，当前开发任务不实际对外发送。",
+      "deadline": "2026-10-06 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-06T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/onebot.py",
+        "server/stable/services/notifications.py",
+        "server/stable/tasks.py",
+        "server/stable/admin.py",
+        "server/app/settings.py"
+      ],
+      "status": "用户暂缓",
+      "scope_disposition": "deferred_by_user_20261006",
+      "scope_note": "用户2026-10-06：暂缓运营后台改造及QQ通知下线，其余保留；用户随后已恢复其余开发，本卡仍暂缓。 保留已有代码和历史交付，不回滚、不部署。",
+      "status_before_deferral": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "Q01",
+      "title": "关闭 QQ 全发送路径并解耦网页发布",
+      "lane": "C",
+      "completion_percent": 80,
+      "status": "用户暂缓",
+      "basis_and_gap": "代码、独立审、组合CI并合入；用户暂缓，未执行生产QQ停用",
+      "scope_disposition": "deferred_by_user_20261006",
+      "evidence_keys": [
+        "Q01"
+      ],
+      "previous_percent": 80,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "C",
+      "title": "关闭 QQ 全发送路径并解耦网页发布",
+      "deps": [
+        "F01"
+      ],
+      "deadline_at": "2026-10-06T18:00:00+08:00",
+      "status": "用户暂缓",
+      "phase": "代码/76PG/原R复审及组合映射/PR236正式full与delivery均通过，已随PR237合并；未发布",
+      "commit": "924a2a37edda1695a45a9c6275d24403d23bc702",
+      "pr": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/237",
+      "review": "APPROVED@924a；C005-P2-01/02 CLOSED@e95fbac3；76PG收据独立核验，非正式交付",
+      "evidence": [],
+      "merged": true,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "dispatch_id": "C-005",
+      "owner_thread_id": "01a0fdc7-5154-7e51-aafa-f1b34d8f46f9",
+      "dependency_input_sha": "0e05029c1ed00713a6f66e461e6753c1e4dadb27",
+      "development_validation": {
+        "behavior_head": "f606ef7d1c83854ef484cc3ed3fc82a87e107799",
+        "postgres_tests": 76,
+        "failures": 0,
+        "errors": 0,
+        "skips": 0,
+        "additional_host_tests": 0,
+        "formal_delivery_receipt": false,
+        "receipt_sha256": "6601313227b89bd0abf3e65f29b7efd6c160fb87a90ba16398e0e747822cb252"
+      },
+      "formal_validation": "PR236 fixed06b CI37137528485：6378项/46批、0fail/error、10既定skip、全部native lifecyclecomplete；候选外main907 delivery verified；未合并发布",
+      "merged_delivery_slices": [
+        {
+          "pr": 237,
+          "merge_commit": "22e130adf4464fd3c5dd63ccd3f508c4a853d464",
+          "head": "3a55a9891e3e557027876b18403ef7b5fb39401a",
+          "scope": "仅third-integration-delivery.md列明固定受审切片；不含后续未交付实现",
+          "deployed": false
+        }
+      ],
+      "merge_commit": "22e130adf4464fd3c5dd63ccd3f508c4a853d464",
+      "scope_disposition": "deferred_by_user_20261006",
+      "scope_note": "用户2026-10-06：暂缓运营后台改造及QQ通知下线，其余保留；用户随后已恢复其余开发，本卡仍暂缓。 保留已有代码和历史交付，不回滚、不部署。",
+      "status_before_deferral": "进行中"
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 80,
+    "business_delivery_complete": false,
+    "priority_within_project": 6
+  },
+  {
+    "id": "Q02",
+    "project": "P07",
+    "requirement_id": "BR-Q02",
+    "original_plan": {
+      "id": "Q02",
+      "lane": "C",
+      "role": "application",
+      "it": 1,
+      "start": "2026-10-06",
+      "due": "2026-10-07",
+      "h": 2,
+      "deps": [
+        "Q01"
+      ],
+      "gaps": [
+        "QG-02"
+      ],
+      "area": "qq",
+      "title": "移除 QQ 使用入口及专属运行依赖",
+      "change": "隐藏推送按钮/状态误导，标记旧任务终止原因；盘点仅 QQ 使用的服务、健康告警和依赖，生成停用差异。",
+      "test": "后台和前台不再诱导进入无服务流程；共享消息/日志组件不得随 QQ 一并删除。",
+      "done": "停用清单可供 O06 发布；数据保留，专属依赖退出不会破坏 Web/worker。",
+      "deadline": "2026-10-07 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-07T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/onebot.py",
+        "server/stable/services/notifications.py",
+        "server/stable/tasks.py",
+        "server/stable/admin.py",
+        "server/app/settings.py"
+      ],
+      "status": "用户暂缓",
+      "scope_disposition": "deferred_by_user_20261006",
+      "scope_note": "用户2026-10-06：暂缓运营后台改造及QQ通知下线，其余保留；用户随后已恢复其余开发，本卡仍暂缓。 保留已有代码和历史交付，不回滚、不部署。",
+      "status_before_deferral": "未开始",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
+    },
+    "progress_snapshot": {
+      "id": "Q02",
+      "title": "移除 QQ 使用入口及专属运行依赖",
+      "lane": "C",
+      "completion_percent": 80,
+      "status": "用户暂缓",
+      "basis_and_gap": "入口/Beat/Compose切片已审合入；用户暂缓，生产依赖退出未执行",
+      "scope_disposition": "deferred_by_user_20261006",
+      "evidence_keys": [
+        "Q02"
+      ],
+      "previous_percent": 80,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "C",
+      "title": "移除 QQ 使用入口及专属运行依赖",
+      "deps": [
+        "Q01"
+      ],
+      "deadline_at": "2026-10-07T18:00:00+08:00",
+      "status": "用户暂缓",
+      "phase": "UI及专属Beat/Compose切片独立review与PR236正式full/delivery均通过；生产未停用",
+      "commit": "c02dd9fb4cde31034a9e37ba957de8f394a05854",
+      "pr": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/237",
+      "review": "C008@017f6e9c/operations@47f74934均APPROVED，仅local代码；O06未执行",
+      "evidence": [],
+      "merged": true,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "dispatch_id": "C-008",
+      "owner_thread_id": "01a0fdc7-5154-7e51-aafa-f1b34d8f46f9",
+      "dependency_input_sha": "924a2a37edda1695a45a9c6275d24403d23bc702",
+      "plan_review_commit": "e97406d7a0392dd0efd6e8793725798d42078a05",
+      "operations_commit": "6b87f22c963108ae97678586bc629c5c747efdba",
+      "operations_status": "APPROVED@47f74934，原R固定Git独立3项PASS；综合PR236正式full/delivery已通过，生产停用待G2/O06",
+      "ui_review_commit": "017f6e9c0d618fd989d000ee2ae91f50c3566f58",
+      "operations_review_commit": "47f7493486c2f47eb4b6ee4b5fa279c189726030",
+      "formal_validation": "PR236 fixed06b CI37137528485：6378项/46批、0fail/error、10既定skip、全部native lifecyclecomplete；候选外main907 delivery verified；未合并发布",
+      "merged_delivery_slices": [
+        {
+          "pr": 237,
+          "merge_commit": "22e130adf4464fd3c5dd63ccd3f508c4a853d464",
+          "head": "3a55a9891e3e557027876b18403ef7b5fb39401a",
+          "scope": "仅third-integration-delivery.md列明固定受审切片；不含后续未交付实现",
+          "deployed": false
+        }
+      ],
+      "merge_commit": "22e130adf4464fd3c5dd63ccd3f508c4a853d464",
+      "scope_disposition": "deferred_by_user_20261006",
+      "scope_note": "用户2026-10-06：暂缓运营后台改造及QQ通知下线，其余保留；用户随后已恢复其余开发，本卡仍暂缓。 保留已有代码和历史交付，不回滚、不部署。",
+      "status_before_deferral": "进行中",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 80,
+    "business_delivery_complete": false,
+    "priority_within_project": 7
+  }
+]

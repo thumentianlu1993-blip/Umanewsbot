@@ -1,0 +1,31 @@
+{
+  "source": "git",
+  "test_sha": "ab651cecd940850a62afe04bfd74551cf9ad3887",
+  "test_tree": "377424d1d2aa02dc54b56077c8c8b2f13c5cb481",
+  "run_id": "B286-P5-SYNC-PREPARE-b51eebf7f1bd4e389c3fa21acb9abbf0",
+  "run_attempt": "1",
+  "image_id": "sha256:3dfe2d0415bf03584bab2436ff1b8f40ac7591cf3834d66e6263b018febf2f98",
+  "mode": "targeted",
+  "labels": [
+    "tools.test_impact.test_pg_lifecycle.RealPGTests.test_real_foreground_pid_and_separate_stop_wait",
+    "tools.test_impact.test_pg_lifecycle.RealPGTests.test_real_worker7_does_not_hide_stop_wait0",
+    "tools.test_impact.test_pg_lifecycle.RealPGTests.test_real_sigstop_forces_real_stop_timeout_not_success",
+    "tools.test_impact.test_pg_lifecycle.RealPGTests.test_real_initdb_failure_has_no_fake_postmaster_zero",
+    "tools.test_impact.test_pg_lifecycle.RealPGTests.test_real_early_postmaster_exit_is_reaped"
+  ],
+  "batches": [
+    {
+      "key": "batch-000",
+      "profile": "django",
+      "ids": [
+        "tools.test_impact.test_pg_lifecycle.RealPGTests.test_real_foreground_pid_and_separate_stop_wait",
+        "tools.test_impact.test_pg_lifecycle.RealPGTests.test_real_worker7_does_not_hide_stop_wait0",
+        "tools.test_impact.test_pg_lifecycle.RealPGTests.test_real_sigstop_forces_real_stop_timeout_not_success",
+        "tools.test_impact.test_pg_lifecycle.RealPGTests.test_real_initdb_failure_has_no_fake_postmaster_zero",
+        "tools.test_impact.test_pg_lifecycle.RealPGTests.test_real_early_postmaster_exit_is_reaped"
+      ]
+    }
+  ],
+  "count": 5,
+  "qualification_scope": "real-PG component only, five original methods, not native/full"
+}

@@ -1,0 +1,4 @@
+# 原始文档和旧补丁逐字归档，保留历史空白；新spec仍执行正常空白检查。
+original/docs/*.md -whitespace
+archive/*.patch -whitespace
+archive/**/*.diff -whitespace

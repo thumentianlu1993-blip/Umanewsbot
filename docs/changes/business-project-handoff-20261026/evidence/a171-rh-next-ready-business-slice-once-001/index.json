@@ -1,0 +1,67 @@
+{
+  "task": "A171-RH-NEXT-READY-BUSINESS-SLICE-ONCE-001",
+  "head": "12d54be46de8b8bf20490e3a738f141e187b402d",
+  "tree": "4a057f7ba1c0b7147e880d41f5f9ebef4060eac0",
+  "selected": null,
+  "red_oracle": null,
+  "conclusion": "ONE_BOUNDED_AUDIT_COMPLETE_NO_DEPENDENCY_READY_SLICE_STOP_WAIT",
+  "source_changed": false,
+  "execution": false,
+  "working_tree_clean": true,
+  "formal_expired_skip_fail_preserved": true,
+  "source_permission": "NOT_ESTABLISHED",
+  "public_consumer_authorized": false,
+  "repeat_audit_authorized": false,
+  "members": [
+    {
+      "path": "A135-prior-selection-summary.json",
+      "bytes": 352,
+      "sha256": "8b3b057e7cc0324ef5dd3dd44e8580fb7d7f25f576231187695596fe314cc01f"
+    },
+    {
+      "path": "A145-prior-selection-summary.json",
+      "bytes": 821,
+      "sha256": "4c50977b090e6c0758223ee3ea23df15f366105aa5c05329cb649e5b36169b68"
+    },
+    {
+      "path": "accepted-r-a170-index.json",
+      "bytes": 1379,
+      "sha256": "a2573042668efe659306a747e6ddcb92ec1de1dce724b94e489172c1f43b7cd9"
+    },
+    {
+      "path": "accepted-r-a170-report.md",
+      "bytes": 7669,
+      "sha256": "44c4923c213bb88d209445e06cce98c8a99da6f43abcf586497ade9bb651ea7f"
+    },
+    {
+      "path": "existing-mechanisms-evidence.json",
+      "bytes": 62925,
+      "sha256": "7da42afd197e9e3aa16933aa1da214ed662a4c30f9b29b1c9a07fedb2e7f0a01"
+    },
+    {
+      "path": "original-rh-scope.json",
+      "bytes": 4723,
+      "sha256": "825352d79edbe56ef49bc15192bb42b4dc5ad0912a04debce97f69625cd2753f"
+    },
+    {
+      "path": "report.md",
+      "bytes": 5389,
+      "sha256": "59d959197628e8e9d49e5859588bfeeff5f6334c09032183526c86d417ab5be2"
+    },
+    {
+      "path": "selection.json",
+      "bytes": 2907,
+      "sha256": "fc409a7dc558c5726a4907bb3c42db8d94b297f7a62fbce2d04f9b632555a46a"
+    },
+    {
+      "path": "source-excerpts.txt",
+      "bytes": 8395,
+      "sha256": "c2791b0524062f60c95f755f48c726d96f010cbe0aefb5aeb4fb7c8aba05ba04"
+    },
+    {
+      "path": "source-manifest.json",
+      "bytes": 2099,
+      "sha256": "7c3bf27fb50837686903d142274cb0b39c92adfc1f16bfd0edd43bd97bb71926"
+    }
+  ]
+}

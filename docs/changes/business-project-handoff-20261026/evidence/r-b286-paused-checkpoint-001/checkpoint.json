@@ -1,0 +1,15 @@
+{
+  "status": "PAUSED_BY_EXPLICIT_USER_INSTRUCTION",
+  "saved_utc": "2026-10-24T16:01:07.705662+00:00",
+  "task": "B286 narrow source and packet review",
+  "progress": "Read-only source inspection incomplete; no verdict or completed review report issued",
+  "repo": "/Users/mentianlu/.codex/worktrees/b195-reviewed-feature-integration/umanews",
+  "head": "ab651cecd940850a62afe04bfd74551cf9ad3887",
+  "dirty_porcelain": "",
+  "own_model_cli_subagents_watchers_supervisors_started": [],
+  "own_running_tool_sessions": [],
+  "other_process_CI_state": "NOT_QUERIED_NOT_OWNED_BY_THIS_REVIEW",
+  "candidate_helper_test_PG_Docker_execution_by_reviewer": 0,
+  "last_completed_review": "/Users/mentianlu/.codex/runtime/r-b285-first-p5-rejection-result-review-001",
+  "resume_condition": "Only an explicit later manual user resume instruction"
+}

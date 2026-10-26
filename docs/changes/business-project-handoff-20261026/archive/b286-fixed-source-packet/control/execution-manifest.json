@@ -1,0 +1,123 @@
+{
+  "schema": "realpg5-prepared-execution-manifest-v2",
+  "lifecycle_schema": "pg-lifecycle-v2",
+  "status": "P5_PRECONDITION_SOURCE_REPAIRED_NOT_EXECUTED_PENDING_SAME_R_AND_ROOT",
+  "context": "colima-umanews-impact-ci",
+  "image_id": "sha256:3dfe2d0415bf03584bab2436ff1b8f40ac7591cf3834d66e6263b018febf2f98",
+  "platform": "linux/amd64",
+  "uid": 10001,
+  "gid": 10001,
+  "head": "ab651cecd940850a62afe04bfd74551cf9ad3887",
+  "tree": "377424d1d2aa02dc54b56077c8c8b2f13c5cb481",
+  "run_nonce": "b51eebf7f1bd4e389c3fa21acb9abbf0",
+  "container_name": "impact-realpg5-v2-p5sync-b51eebf7f1bd4e389c3fa21acb9abbf0",
+  "expected_ids": [
+    "tools.test_impact.test_pg_lifecycle.RealPGTests.test_real_foreground_pid_and_separate_stop_wait",
+    "tools.test_impact.test_pg_lifecycle.RealPGTests.test_real_worker7_does_not_hide_stop_wait0",
+    "tools.test_impact.test_pg_lifecycle.RealPGTests.test_real_sigstop_forces_real_stop_timeout_not_success",
+    "tools.test_impact.test_pg_lifecycle.RealPGTests.test_real_initdb_failure_has_no_fake_postmaster_zero",
+    "tools.test_impact.test_pg_lifecycle.RealPGTests.test_real_early_postmaster_exit_is_reaped"
+  ],
+  "source_closure": {
+    "tools/test_impact/pg_lifecycle.py": {
+      "mode": "100644",
+      "blob": "8658c760b7ea99ae370d67e0b76b01e6102942fa",
+      "size": 33259,
+      "sha256": "debc453294a084df2f9e1bae8c92c9bf63176e6b371de69ef1997cbfee55c538"
+    },
+    "tools/test_impact/test_pg_lifecycle.py": {
+      "mode": "100644",
+      "blob": "95f7a940a453bdca9bc89d580fde4ed93a822cb8",
+      "size": 20469,
+      "sha256": "ff8babd5df7cdd7998a63c2e1d4c5a27e894322609ef493159eb00e3a2808636"
+    },
+    "tools/test_impact/core.py": {
+      "mode": "100644",
+      "blob": "96ecdf11298720693f6ba92abb768ec8c970d759",
+      "size": 8328,
+      "sha256": "e0ea67adb83a2ef09ab63d3b7bd01465dac15720894819c64d115e6659748cab"
+    },
+    "tools/test_impact/source_binding.py": {
+      "mode": "100644",
+      "blob": "2d3a53c701f9735764fda5992f778d37a9a10b22",
+      "size": 4028,
+      "sha256": "02db7474f27dcccde0192a0835f05825ab5184cb5bc257cc2a42b181ca733115"
+    }
+  },
+  "container_environment": {
+    "PATH": "/venv/bin:/usr/lib/postgresql/16/bin:/usr/bin:/bin",
+    "HOME": "/tmp/home",
+    "TMPDIR": "/tmp",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "PYTHONUNBUFFERED": "1",
+    "PYTHONNOUSERSITE": "1",
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC",
+    "UMANEWS_REAL_PG_QUALIFICATION": "1",
+    "UMANEWS_PG_QUALIFICATION_PLAN": "/control/plan.json"
+  },
+  "budgets": {
+    "original_request_invoke": 600,
+    "original_session_inner": 570,
+    "original_cleanup": 30,
+    "startup_shared": 60,
+    "worker_each": 5,
+    "pg_ctl_internal": 8,
+    "pg_ctl_wait_cap": 10,
+    "postmaster_wait_then_kill_wait_each": 3,
+    "suite_static_path_upper_estimate": 475,
+    "outer_total": 600,
+    "foreground_run_cap": 540,
+    "outer_cleanup": 40,
+    "evidence_reserve": 20,
+    "estimate_limit": "Conservative 5*(startup60+worker5+cleanup30)=475; not measured latency or syscall-bound guarantee. Foreground hard cap540, outer600; original min(deadline,now+30) cleanup is not extended."
+  },
+  "resources": {
+    "memory": "2g",
+    "cpus": "2",
+    "pids": 256,
+    "tmpfs": "/tmp:rw,exec,size=1g,uid=10001,gid=10001,mode=0700"
+  },
+  "planned_output_dir": "/Users/mentianlu/.codex/runtime/realpg5-v2-p5sync-execution-b51eebf7f1bd4e389c3fa21acb9abbf0",
+  "control_payload_sha256": {
+    "closure-binding.json": "daf327bb824fc9e153542eb2d38cd4dec72485276cbb9b58b9f7606b8e5bd74d",
+    "component_evidence_gate.py": "57b6c3444d557ae6ca11fccf2d81ab1270594d5b665f08f43db2641fa8cf8630",
+    "plan.json": "d7be7232e5b2290d07342da2cfc44c43fd1182ae583bd01db3ba4a81a2fe5519",
+    "qualification-request.json": "d3cb5a0ddf8de4dae373a1faac1431fb7afaf9f400e3e6060f53934a702d795d",
+    "run_realpg5.py": "890962062031a96558b4025daa822fdf3a1d381f7d59efed607d9138f4294540",
+    "test-commit.raw": "ab056c19c62c129974081d9cf8860ae9bd8b94e2f7e88789fc68c696cd176048"
+  },
+  "host_launcher_sha256": "188baedbb399862cc4efcf14ce208828b5ae9df6b05a46029f55aafafa3fbcae",
+  "max_attempts": {
+    "suite": 1,
+    "initdb": 5,
+    "postmaster": 4,
+    "worker_probe": 2,
+    "pg_ctl_stop": 3,
+    "concurrent_sessions": 1,
+    "readiness": "only original bounded loop; no extra readiness-fault attempt"
+  },
+  "failure_policy": "First failure/UNKNOWN STOP_RETAIN all raw/new output and result index; retry0. Only independently owned CID may be removed by frozen cleanup contract; no artifact deletion or B268 rewrite.",
+  "receipt_contract": "Numeric PID/direct Popen wait+reap; adopted raw waitpid events/rawstatus->exit and actual ECHILD, primary/secondary errors, stdout/stderr/log hashes; CID absence never replaces waits.",
+  "owned_contract": "CID exact image/name/owner label; raw inspect/isolation/wait/container exit/CLI numeric join; owned rm then strict raw absence predicate; no name-only deletion.",
+  "metadata_limits": [
+    "B286 SOURCE_ONLY; no new candidate/helper/test/PG/Docker or metadata execution. B284 resource metadata and B285 actual experiment are historical, not current capacity guarantee.",
+    "P5 precondition and cleanup guard source are untested; real saved-Popen -9/reaped plus original gate branch and stop<=3 must be verified by separately authorized runs.",
+    "B285 actually spawned4 pg_stop versus cap3; append-only erratum included, original report/raw/index/P5 rejection unchanged.",
+    "Unconfirmed P5 cannot enter original Session cleanup: explicit UNKNOWN/failure, closedFalse, no fake reap/ECHILD; owned container teardown only under future exact host card.",
+    "Original2g/1g caps are not reserved/sufficient capacity guarantee; OOM/peak/competition/full/root-image remain unqualified."
+  ],
+  "oracle_result": "NOT_RUN; success zero is an expectation; real nonzero/UNKNOWN is not relaxed",
+  "scope": "Original five RealPG component methods; no standard complete/native/full/CI/delivery claim",
+  "forbidden": [
+    "candidate/host/runner/helper/test/PG/Docker/CI/push/network execution under B286",
+    "production Session change",
+    "gate/oracle relaxation",
+    "stop cap increase or retry",
+    "signal interception/fake poll",
+    "budget reset/extension",
+    "rewrite old reports/raw/false/UNKNOWN",
+    "backend switch/resource expansion/new resources"
+  ]
+}

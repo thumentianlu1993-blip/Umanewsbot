@@ -1,0 +1,106 @@
+{
+  "schema": "b286-p5-precondition-source-preparation-index-v1",
+  "self_excluded": "index.json",
+  "members": [
+    {
+      "path": "b285-stop-cap-erratum.json",
+      "size": 1518,
+      "sha256": "ec919d06b517c256df9d19e8f68c24429cdbb03782013e1720bebc5866fcb65c"
+    },
+    {
+      "path": "control/closure-binding.json",
+      "size": 346891,
+      "sha256": "daf327bb824fc9e153542eb2d38cd4dec72485276cbb9b58b9f7606b8e5bd74d"
+    },
+    {
+      "path": "control/component_evidence_gate.py",
+      "size": 12473,
+      "sha256": "57b6c3444d557ae6ca11fccf2d81ab1270594d5b665f08f43db2641fa8cf8630"
+    },
+    {
+      "path": "control/execution-manifest.json",
+      "size": 6347,
+      "sha256": "7990b7e727c2a79c534f8e8576bfebc9aa0b1f279515d83d49d33e98e6ddaa57"
+    },
+    {
+      "path": "control/plan.json",
+      "size": 1623,
+      "sha256": "d7be7232e5b2290d07342da2cfc44c43fd1182ae583bd01db3ba4a81a2fe5519"
+    },
+    {
+      "path": "control/qualification-request.json",
+      "size": 643,
+      "sha256": "d3cb5a0ddf8de4dae373a1faac1431fb7afaf9f400e3e6060f53934a702d795d"
+    },
+    {
+      "path": "control/run_realpg5.py",
+      "size": 11580,
+      "sha256": "890962062031a96558b4025daa822fdf3a1d381f7d59efed607d9138f4294540"
+    },
+    {
+      "path": "control/test-commit.raw",
+      "size": 269,
+      "sha256": "ab056c19c62c129974081d9cf8860ae9bd8b94e2f7e88789fc68c696cd176048"
+    },
+    {
+      "path": "final-binding.json",
+      "size": 3314,
+      "sha256": "1a310c5bdd34e135534a4bd5b9005b35659e2c1910eaff4992b07cd080cfe08b"
+    },
+    {
+      "path": "host_run_once.py",
+      "size": 12964,
+      "sha256": "188baedbb399862cc4efcf14ce208828b5ae9df6b05a46029f55aafafa3fbcae"
+    },
+    {
+      "path": "new-source-binding-checks.json",
+      "size": 5300,
+      "sha256": "5894bf0109947a1bb38dd601f6c7269eaa3bd4b87741cc0cb7cfb0ecdabfca7f"
+    },
+    {
+      "path": "proposed-command.json",
+      "size": 2966,
+      "sha256": "d71d1a227e52a3c43a4d12544f6f1ec581ae640aba86dd9ed28e48d07f9da233"
+    },
+    {
+      "path": "proposed-command.txt",
+      "size": 434,
+      "sha256": "9548b15212272dff8eaa0c4b2f6fa78860b5ba7b7023530e54aee3f37a4ec793"
+    },
+    {
+      "path": "report.md",
+      "size": 6923,
+      "sha256": "7098170ef04f173403628ce7fa3fdecee88e322a9d9954647903d8491a36d163"
+    },
+    {
+      "path": "source/tools/test_impact/core.py",
+      "size": 8328,
+      "sha256": "e0ea67adb83a2ef09ab63d3b7bd01465dac15720894819c64d115e6659748cab"
+    },
+    {
+      "path": "source/tools/test_impact/pg_lifecycle.py",
+      "size": 33259,
+      "sha256": "debc453294a084df2f9e1bae8c92c9bf63176e6b371de69ef1997cbfee55c538"
+    },
+    {
+      "path": "source/tools/test_impact/source_binding.py",
+      "size": 4028,
+      "sha256": "02db7474f27dcccde0192a0835f05825ab5184cb5bc257cc2a42b181ca733115"
+    },
+    {
+      "path": "source/tools/test_impact/test_pg_lifecycle.py",
+      "size": 20469,
+      "sha256": "ff8babd5df7cdd7998a63c2e1d4c5a27e894322609ef493159eb00e3a2808636"
+    },
+    {
+      "path": "source-repair.diff",
+      "size": 7491,
+      "sha256": "5dd5247cb8b706d9489c2b40bb59c931955e7253bc850f69b8bbde6d3f0508a3"
+    },
+    {
+      "path": "source-static-checks.json",
+      "size": 2918,
+      "sha256": "248d94a3d2aa5692ad98780b5ff94d05ba797eac8cf3ede4703350904c6ae929"
+    }
+  ]
+}

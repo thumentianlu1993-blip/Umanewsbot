@@ -1,0 +1,6 @@
+tree 377424d1d2aa02dc54b56077c8c8b2f13c5cb481
+parent bb871949877979226292033f0ab14f8d949cc6b7
+author mentianlu <dev@thetahealth.ai> 1792857343 +0800
+committer mentianlu <dev@thetahealth.ai> 1792857343 +0800
+
+Synchronize P5 killed-postmaster precondition before cleanup

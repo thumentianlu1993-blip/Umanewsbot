@@ -1,0 +1,2591 @@
+[
+  {
+    "id": "F01",
+    "project": "P06",
+    "requirement_id": "BR-F01",
+    "original_plan": {
+      "id": "F01",
+      "lane": "A",
+      "role": "integration",
+      "it": 1,
+      "start": "2026-10-03",
+      "due": "2026-10-04",
+      "h": 4,
+      "deps": [],
+      "gaps": [
+        "RG-01",
+        "RG-03",
+        "HG-05",
+        "AG-01",
+        "EG-02"
+      ],
+      "area": "contract",
+      "title": "冻结跨模块字段及首版产品参数",
+      "change": "将身份、资料成熟度、来源证据、input_version、下一动作、异常原因、手动保护字段写为共享类型；补迁移/索引草图。采用总规划的默认参数，逐项标注已确认与建议；10/04 锁定首批重点赛事选择规则、社区来源清单和预算配置入口。",
+      "test": "用普通词马名、同名异马、确定名单与预想名单冲突、未知值四组输入验证类型能表达；不把提供方与成熟度合并为一个 official 布尔值。",
+      "done": "输出接口样例和兼容策略；A/B/C 均可据此独立实现；仍未知的外部额度有负责人及 10/06 处理结论。",
+      "deadline": "2026-10-04 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-04T18:00:00+08:00",
+      "read_paths": [
+        "docs/changes/next-version-capabilities/design.md",
+        "docs/changes/race-event-unified-decision/spec.md",
+        "server/stable/models.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "F01",
+      "title": "冻结跨模块字段及首版产品参数",
+      "lane": "A",
+      "completion_percent": 85,
+      "status": "部分完成",
+      "basis_and_gap": "共享合同已独立审核并合并；完整参数、外部约束收敛仍需闭合",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "F01"
+      ],
+      "previous_percent": 85,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "A",
+      "title": "冻结跨模块字段及首版产品参数",
+      "deps": [],
+      "deadline_at": "2026-10-04T18:00:00+08:00",
+      "status": "进行中",
+      "phase": "固定共享合同代码、独立审核与PR237正式交付均核，已仅合并main22e130ad；未部署/启用/公开验收",
+      "commit": "815b3181fa61e7fbbff714c7d7326e5598dc71a6",
+      "pr": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/237",
+      "review": "代码与映射原R通过；PR235正式6236项/10原许可skip及候选外delivery verified，未合并发布",
+      "evidence": [
+        "/Users/mentianlu/.codex/worktrees/5482/umanews/docs/changes/next-version-capabilities/lanes/A/A-001-report.md"
+      ],
+      "merged": true,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "dispatch_id": "A-002",
+      "owner_thread_id": "01a0fdc6-8c4e-7ff1-af4b-9db4baff8fb1",
+      "approved_plan_sha": "7c78f67d04cc156520d21916f3eb0a3ef066305e",
+      "review_commit": "6acff163a1cfcae17d30774c264cbbbbb2a1dc18",
+      "development_validation": {
+        "head": "0e05029c1ed00713a6f66e461e6753c1e4dadb27",
+        "base": "7c78f67d04cc156520d21916f3eb0a3ef066305e",
+        "status": "passed",
+        "executed": 6182,
+        "batches": 41,
+        "failures": 0,
+        "errors": 0,
+        "allowed_skips": 10,
+        "all_lifecycle_complete": true,
+        "trusted_verifier_source": "907f8de699b31a6fcc80acc78e9ba070aadc4f28",
+        "summary": "/tmp/umanews-a002-evidence/linux-full-0e05029c/summary.json",
+        "plan_digest": "d1dd7ec5c6c62cce97eb101327fc3d3199f2ba68600c656295b3177d505668b3",
+        "test_tree": "be3cee831b2359ecec7b4e946a0a3a16753d826e",
+        "formal_delivery_receipt": false
+      },
+      "formal_delivery_receipt": "/Users/mentianlu/.codex/runtime/first-integration-evidence/delivery-39f0bb96.json",
+      "formal_validation": "PR236 fixed06b CI37137528485：6378项/46批、0fail/error、10既定skip、全部native lifecyclecomplete；候选外main907 delivery verified；未合并发布",
+      "merged_delivery_slices": [
+        {
+          "pr": 237,
+          "merge_commit": "22e130adf4464fd3c5dd63ccd3f508c4a853d464",
+          "head": "3a55a9891e3e557027876b18403ef7b5fb39401a",
+          "scope": "仅third-integration-delivery.md列明固定受审切片；不含后续未交付实现",
+          "deployed": false
+        }
+      ],
+      "merge_commit": "22e130adf4464fd3c5dd63ccd3f508c4a853d464"
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 85,
+    "business_delivery_complete": false,
+    "priority_within_project": 1
+  },
+  {
+    "id": "F06",
+    "project": "P06",
+    "requirement_id": "BR-F06",
+    "original_plan": {
+      "id": "F06",
+      "lane": "R",
+      "role": "operations",
+      "it": 1,
+      "start": "2026-10-03",
+      "due": "2026-10-06",
+      "h": 4,
+      "deps": [
+        "F01",
+        "F02",
+        "F03",
+        "H01"
+      ],
+      "gaps": [
+        "HG-01",
+        "RG-02",
+        "AG-08"
+      ],
+      "area": "qa",
+      "title": "核定数据量、预算和迭代可行性",
+      "change": "汇总目标马匹数量、可复用缓存、需新增请求数、来源额度、模型账号能力及三线剩余小时；用小样或既有日志估计吞吐和单位成本，记录高低区间。",
+      "test": "用剩余数量/保守吞吐计算完成日期；将超配额、低可用地区、需人工消歧和无法获取的名称单列；未授权付费调用只做配置/历史证据核验。",
+      "done": "10/06 产出容量风险表；有不足必须提出增加容量/减少非核心修饰等具体调整，不暗改用户质量阈值或把 10/30 改成代码完成。",
+      "deadline": "2026-10-06 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-06T18:00:00+08:00",
+      "read_paths": [
+        "docs/reports/2026-10-02-current-capabilities.md",
+        "docs/reports/2026-10-02-backlog-evidence-reconciliation.md",
+        "docs/changes/next-version-capabilities/test_cases.md"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "F06",
+      "title": "核定数据量、预算和迭代可行性",
+      "lane": "R",
+      "completion_percent": 20,
+      "status": "部分完成",
+      "basis_and_gap": "政策/资源有只读材料；真实分母、来源额度、吞吐和成本未闭合",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "F06"
+      ],
+      "previous_percent": 20,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "R",
+      "title": "核定数据量、预算和迭代可行性",
+      "deps": [
+        "F01",
+        "F02",
+        "F03",
+        "H01"
+      ],
+      "deadline_at": "2026-10-06T18:00:00+08:00",
+      "status": "进行中",
+      "phase": "生产政策摘要与资源已只读核对；套餐/分母/吞吐/预算待证",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [
+        "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/F06-policy-capacity-readonly-20261003.md"
+      ],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "owner": "coordinator"
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 20,
+    "business_delivery_complete": false,
+    "priority_within_project": 2
+  },
+  {
+    "id": "O01",
+    "project": "P06",
+    "requirement_id": "BR-O01",
+    "original_plan": {
+      "id": "O01",
+      "lane": "R",
+      "role": "operations",
+      "it": 1,
+      "start": "2026-10-03",
+      "due": "2026-10-06",
+      "h": 3,
+      "deps": [
+        "F01"
+      ],
+      "gaps": [
+        "UG-06"
+      ],
+      "area": "ops",
+      "title": "冻结集成与发布资源安排",
+      "change": "记录三线 worktree、共享文件负责人、schema 变更顺序、发布协调人、环境及现有锁；安排 10/20 12:00、10/23 16:00、10/28 16:00 窗口和前后备份。",
+      "test": "与现有长任务/暂停批次核对；不消费冻结旧队列，不假设其他线程已停止。",
+      "done": "形成按根 AGENTS.md 执行的发布日程和资源表；不另设人工确认规则。",
+      "deadline": "2026-10-06 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-06T18:00:00+08:00",
+      "read_paths": [
+        "deploy/deploy.sh",
+        "deploy/backup_db.sh",
+        "deploy/restore_db.sh",
+        "deploy/rollback.sh",
+        "docker-compose.prod.yml",
+        "docker-compose.prod.lowcost.yml"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "O01",
+      "title": "冻结集成与发布资源安排",
+      "lane": "R",
+      "completion_percent": 50,
+      "status": "部分完成",
+      "basis_and_gap": "B线完成原8个缓存组件的分次有限验证及纯组合/生命周期合同测试；B268真实PG5在P3失败、后2未达，B272旧基线失败待原审，未形成同SHA全组合/镜像内容/独立collect与CID完整资格，比例不变。",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "O01"
+      ],
+      "previous_percent": 50,
+      "change_since_previous": "B线完成原8个缓存组件的分次有限验证及纯组合/生命周期合同测试；B268真实PG5在P3失败、后2未达，B272旧基线失败待原审，未形成同SHA全组合/镜像内容/独立collect与CID完整资格，比例不变。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "R",
+      "title": "冻结集成与发布资源安排",
+      "deps": [
+        "F01"
+      ],
+      "deadline_at": "2026-10-06T18:00:00+08:00",
+      "status": "进行中",
+      "phase": "负责人/共享文件/测试资源与日程已登记并补时点只读证据；生命周期锁完整绑定及O02副本预算仍待",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [
+        "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/O01-runtime-readonly-20261003.md",
+        "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/F06-policy-capacity-readonly-20261003.md",
+        "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/O01-integration-release-resources.md"
+      ],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "owner": "coordinator"
+    },
+    "after_snapshot_note": "B285一次2g/1g隔离PG：native5ok但P5 gate拒绝，实际stop4>cap3。B286测试前件修订ab651cec源码未执行，原审被人工暂停，无最终批准。测试环境资格/标准complete/full交付仍未闭合。",
+    "progress_percent_preserved": 50,
+    "business_delivery_complete": false,
+    "priority_within_project": 3
+  },
+  {
+    "id": "E01",
+    "project": "P06",
+    "requirement_id": "BR-E01",
+    "original_plan": {
+      "id": "E01",
+      "lane": "C",
+      "role": "application",
+      "it": 2,
+      "start": "2026-10-10",
+      "due": "2026-10-11",
+      "h": 4,
+      "deps": [
+        "F04",
+        "R02"
+      ],
+      "gaps": [
+        "EG-02"
+      ],
+      "area": "console",
+      "title": "统一自动处理恢复与人工例外分类",
+      "change": "定义 exception 的对象、原因、证据、影响、截止、自动恢复动作和关联运行；技术瞬态先自动重试，语义冲突才转人工。",
+      "test": "网络抖动不能产生成百上千审批；同一根因聚合，临近比赛优先；正常任务无人工必经节点。",
+      "done": "TC-E01 通过；新闻/赛事/马匹均有可映射的异常契约。",
+      "deadline": "2026-10-11 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-11T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/admin.py",
+        "server/stable/templates/stable/console/dashboard.html",
+        "server/stable/templates/stable/console/article_editor.html"
+      ],
+      "status": "未开始",
+      "scope_disposition": "retain_shared_core_defer_admin_integration",
+      "scope_note": "保留其余业务必需的异常分类、幂等、字段保护及恢复核心；暂缓新版后台入口/人工操作流程改造与效率验收，实施前按现有业务入口拆分。",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
+    },
+    "progress_snapshot": {
+      "id": "E01",
+      "title": "统一自动处理恢复与人工例外分类",
+      "lane": "C",
+      "completion_percent": 0,
+      "status": "共用核心保留",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成；只保留其他业务所需核心，后台交互部分暂缓",
+      "scope_disposition": "retain_shared_core_defer_admin_integration",
+      "evidence_keys": [
+        "E01"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "C",
+      "title": "统一自动处理恢复与人工例外分类",
+      "deps": [
+        "F04",
+        "R02"
+      ],
+      "deadline_at": "2026-10-11T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "scope_disposition": "retain_shared_core_defer_admin_integration",
+      "scope_note": "保留其余业务必需的异常分类、幂等、字段保护及恢复核心；暂缓新版后台入口/人工操作流程改造与效率验收，实施前按现有业务入口拆分。",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 4
+  },
+  {
+    "id": "E04",
+    "project": "P06",
+    "requirement_id": "BR-E04",
+    "original_plan": {
+      "id": "E04",
+      "lane": "C",
+      "role": "application",
+      "it": 3,
+      "start": "2026-10-21",
+      "due": "2026-10-22",
+      "h": 4,
+      "deps": [
+        "E03",
+        "L02"
+      ],
+      "gaps": [
+        "EG-05"
+      ],
+      "area": "console",
+      "title": "实现人工修复后自动续跑与字段保护",
+      "change": "保存时校验对象版本，记录人工修改字段保护及审计；修复成功只重跑受影响阶段，下游关联自动更新。",
+      "test": "两人并发编辑、自动任务迟到、重复点继续、人工否决关系和失败回滚；不得用旧数据覆盖人工确定结果。",
+      "done": "TC-E03 通过；一次解决例外后不需要人工逐步推进后续正常任务。",
+      "deadline": "2026-10-22 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/admin.py",
+        "server/stable/templates/stable/console/dashboard.html",
+        "server/stable/templates/stable/console/article_editor.html"
+      ],
+      "status": "未开始",
+      "scope_disposition": "retain_shared_core_defer_admin_integration",
+      "scope_note": "保留其余业务必需的异常分类、幂等、字段保护及恢复核心；暂缓新版后台入口/人工操作流程改造与效率验收，实施前按现有业务入口拆分。",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
+    },
+    "progress_snapshot": {
+      "id": "E04",
+      "title": "实现人工修复后自动续跑与字段保护",
+      "lane": "C",
+      "completion_percent": 0,
+      "status": "共用核心保留",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成；只保留其他业务所需核心，后台交互部分暂缓",
+      "scope_disposition": "retain_shared_core_defer_admin_integration",
+      "evidence_keys": [
+        "E04"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "C",
+      "title": "实现人工修复后自动续跑与字段保护",
+      "deps": [
+        "E03",
+        "L02"
+      ],
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "scope_disposition": "retain_shared_core_defer_admin_integration",
+      "scope_note": "保留其余业务必需的异常分类、幂等、字段保护及恢复核心；暂缓新版后台入口/人工操作流程改造与效率验收，实施前按现有业务入口拆分。",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 5
+  },
+  {
+    "id": "E05",
+    "project": "P06",
+    "requirement_id": "BR-E05",
+    "original_plan": {
+      "id": "E05",
+      "lane": "C",
+      "role": "application",
+      "it": 3,
+      "start": "2026-10-22",
+      "due": "2026-10-22",
+      "h": 4,
+      "deps": [
+        "E04",
+        "R10",
+        "N06"
+      ],
+      "gaps": [
+        "EG-02",
+        "EG-06"
+      ],
+      "area": "console",
+      "title": "打通自动完成与技术恢复的后台闭环",
+      "change": "把新闻/赛事/马匹正常完成、自动重试、待人工三类结果统一统计；根因恢复后批量关闭派生待办。",
+      "test": "无人打开后台仍持续更新；临时网络失败不积累永久待审；失败记录与公开结果可互相定位。",
+      "done": "TC-E01/03 通过；后台角色由推进每条内容转为处理必要例外。",
+      "deadline": "2026-10-22 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/views.py",
+        "server/stable/admin.py",
+        "server/stable/templates/stable/console/dashboard.html",
+        "server/stable/templates/stable/console/article_editor.html"
+      ],
+      "status": "未开始",
+      "scope_disposition": "retain_shared_core_defer_admin_integration",
+      "scope_note": "保留其余业务必需的异常分类、幂等、字段保护及恢复核心；暂缓新版后台入口/人工操作流程改造与效率验收，实施前按现有业务入口拆分。",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
+    },
+    "progress_snapshot": {
+      "id": "E05",
+      "title": "打通自动完成与技术恢复的后台闭环",
+      "lane": "C",
+      "completion_percent": 0,
+      "status": "共用核心保留",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成；只保留其他业务所需核心，后台交互部分暂缓",
+      "scope_disposition": "retain_shared_core_defer_admin_integration",
+      "evidence_keys": [
+        "E05"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "C",
+      "title": "打通自动完成与技术恢复的后台闭环",
+      "deps": [
+        "E04",
+        "R10",
+        "N06"
+      ],
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "scope_disposition": "retain_shared_core_defer_admin_integration",
+      "scope_note": "保留其余业务必需的异常分类、幂等、字段保护及恢复核心；暂缓新版后台入口/人工操作流程改造与效率验收，实施前按现有业务入口拆分。",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 6
+  },
+  {
+    "id": "O02",
+    "project": "P06",
+    "requirement_id": "BR-O02",
+    "original_plan": {
+      "id": "O02",
+      "lane": "C",
+      "role": "operations",
+      "it": 1,
+      "start": "2026-10-07",
+      "due": "2026-10-09",
+      "h": 5,
+      "deps": [
+        "O01"
+      ],
+      "gaps": [
+        "UG-06"
+      ],
+      "area": "ops",
+      "title": "修复已知备份恢复约束问题",
+      "change": "在隔离 PostgreSQL 复现新闻/术语唯一约束恢复问题，定位导出或恢复顺序并做最小修复；不得直接批量清洗生产数据。",
+      "test": "恢复副本能重建约束、行数和关键关系；二次恢复行为明确；检查历史版本与新 schema 兼容。",
+      "done": "附恢复日志、校验查询和恢复时长；发现超出原缺陷的新数据问题单独记录，不伪报灾备通过。",
+      "deadline": "2026-10-09 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-09T18:00:00+08:00",
+      "read_paths": [
+        "deploy/deploy.sh",
+        "deploy/backup_db.sh",
+        "deploy/restore_db.sh",
+        "deploy/rollback.sh",
+        "docker-compose.prod.yml",
+        "docker-compose.prod.lowcost.yml"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "O02",
+      "title": "修复已知备份恢复约束问题",
+      "lane": "C",
+      "completion_percent": 30,
+      "status": "部分完成",
+      "basis_and_gap": "恢复约束窄修及测试源已有审核；所需真实恢复域/完整运行仍未验证",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "O02"
+      ],
+      "previous_percent": 30,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "C",
+      "title": "修复已知备份恢复约束问题",
+      "deps": [
+        "O01"
+      ],
+      "deadline_at": "2026-10-09T18:00:00+08:00",
+      "status": "进行中",
+      "phase": "C167方案获批，C170固定测试源码候选获原R批准；C171 ROOT核既有Linux/Python3.12 noDB域M1-M4阻断；实际运行/测试/restore/信号/容器/DB/CI仍NOT_RUN，整体NOT_PASSED；用户2026-10-15明确无现成域、O02运行验证后补，不作为无关后续能力全局阻断；直接依赖卡仍保留安全验收要求",
+      "commit": null,
+      "pr": null,
+      "review": "tail三批原R fb8a1807 APPROVED；完整恢复未完成",
+      "evidence": [
+        "/Users/mentianlu/.codex/worktrees/516a/umanews/docs/changes/next-version-capabilities/O02-readonly-findings-20261003.md"
+      ],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "dispatch_id": "C167-O02-RESTORE-FAILURE-CLEANUP-NON-GZIP-SLICE-PLAN-001",
+      "owner_thread_id": "01a0fdc7-5154-7e51-aafa-f1b34d8f46f9",
+      "plan_commit": "c191b0795c158eec409edf4076eb47a9897d79e8",
+      "reference_design_commit": "a53e99bd85000e075dab4fb98fc4089c59c46589",
+      "pilot_receipt": {
+        "observed_at": "2026-10-03T20:14:06.909521+08:00",
+        "manifest_sha256": "413c0681980ecc24773c04870340a3f91af09b27b8c3f93562ba7414ad7dda73",
+        "summary_path": "/Users/mentianlu/.codex/runtime/c010-o02-pilot/pilot-summary.json",
+        "summary_sha256": "72a9361aeadd2e610709b4d3fb02e82ee56fcb1152474db8b9888d608f6674f5",
+        "private_sha256": "509033d22c6fec32faec63005bb9232f4650c1d6e40dca8e841e33376eb7e949",
+        "status": "completed",
+        "news_groups": 8,
+        "news_rows": 47,
+        "term_groups_selected": 20,
+        "term_rows_selected": 40,
+        "term_complete": false,
+        "rollback_close_complete": true,
+        "container_private_cleanup": true,
+        "production_database_writes": false
+      },
+      "followup_receipt": {
+        "path": "/Users/mentianlu/.codex/runtime/c010-o02-pilot-followup/followup-index.json",
+        "sha256": "c9dfc48b72380773daa020095cd7626dc0630014ae88b82a9be54fc54181cf87",
+        "manifest_sha256": "ecee18ee55b2b73044dc2849a7ac046de358a0ff2dcc4f937b1807469b61a0d9",
+        "status": "partial_18_of_21_FK_plus_semantics28groups",
+        "failed": "FK10 stable_newssnapshot QueryCanceled57014 at3000ms",
+        "not_executed": [
+          "FK11",
+          "FK12"
+        ],
+        "rollback_close_container_cleanup_all": true,
+        "new_term_groups": 0,
+        "database_writes": false,
+        "news_content_diff_groups": 6,
+        "news_identity_diff_groups": 5,
+        "news_public_basis_diff_groups": 8,
+        "term_evidence_reference_rows": 1088,
+        "term_review_diff_groups": 1,
+        "snapshot_consistency": "independent_batches_not_single_graph_snapshot"
+      },
+      "tail_packet": {
+        "path": "/Users/mentianlu/.codex/runtime/c010-o02-tail-prepare/package-manifest.json",
+        "sha256": "e627b6ef77f715206ce14403a800469da7ec555b4d7dee4c1f42a3ecfe145b55",
+        "doc_commit": "d15d0309",
+        "status": "实际三batch全部completed；原R实际收据review pending"
+      },
+      "tail_actual_receipts": {
+        "metadata": {
+          "path": "/Users/mentianlu/.codex/runtime/c010-o02-tail-prepare/metadata-summary.json",
+          "sha256": "dbd51f4dc6520de90569192506d6f4413467f6897e8cee8fbc66d1dd2bd9e2a4",
+          "private_sha256": "7322b1167c50f5f726b6c274849296da9bdb3c94f56ca4aaa730b4f0d39b9a7a",
+          "select_count": 1,
+          "seconds": 0.0383,
+          "status": "completed",
+          "observed_at": "2026-10-03T14:36:04.018077+00:00",
+          "rollback_close_cleanup": true
+        },
+        "references-tail": {
+          "path": "/Users/mentianlu/.codex/runtime/c010-o02-tail-prepare/references-tail-summary.json",
+          "sha256": "8be1a18f88252c0395b06e80ff4dfcb3c5816b4496ae1f0f950bff3dac636cc9",
+          "private_sha256": "3ca250751a373d80fc8be8f0d42069117506b86e5c819686f4b84d7676c8cd73",
+          "select_count": 4,
+          "seconds": 0.0396,
+          "status": "completed",
+          "observed_at": "2026-10-03T14:36:48.024495+00:00",
+          "rollback_close_cleanup": true
+        },
+        "key-class": {
+          "path": "/Users/mentianlu/.codex/runtime/c010-o02-tail-prepare/key-class-summary.json",
+          "sha256": "267c81b769ec20d6f5280b27a63df309ab33218fe6fe17e5e3ba247217c82e79",
+          "private_sha256": "e501323cf26a079407ea063e518b141601fdcd295c28ead54af81cee5f6b44f3",
+          "select_count": 2,
+          "seconds": 0.1008,
+          "status": "completed",
+          "observed_at": "2026-10-03T14:37:05.802336+00:00",
+          "rollback_close_cleanup": true
+        }
+      },
+      "tail_final_verification": {
+        "path": "/Users/mentianlu/.codex/runtime/c010-o02-tail-prepare/root-final-verification.json",
+        "sha256": "833d0c6c46f740f97f62ee5572d12b0191ff767a58b988e88c454779a9c1542a",
+        "remaining_tail_backends": 0,
+        "observer_closed": true,
+        "snapshot_consistency": "independent batches not full graph",
+        "FK_completed": 20,
+        "FK_total": 21,
+        "unknown": [
+          "FK10 newssnapshot"
+        ],
+        "production_database_writes": false,
+        "review_commit": "fb8a1807"
+      },
+      "synthetic_packet": {
+        "task": "C011-O02-SNAPSHOT-SYNTHETIC-IMPLEMENT-001",
+        "doc_commit": "639a138405b2f2dbab44b1d736396186c9d22cb3",
+        "manifest": "/Users/mentianlu/.codex/runtime/c011-o02-synthetic-v2/manifest.json",
+        "manifest_sha256": "06b95d4b3139efbeb116056c6623fb6baa968f9f769f9941b5621fb9bed0e2da",
+        "offline_receipt_sha256": "cb31d163b01145ea77a5a3a544b84a8f3ebd5bcca6d51cb3833ed8cfc4f18f86",
+        "root_verified_files": 26,
+        "root_AST": "PASS",
+        "reported_fake_tests": {
+          "lifecycle_driver": 17,
+          "host": 13,
+          "guest": 5
+        },
+        "actual_pg_executed": false,
+        "execution_window_granted": false,
+        "review_status": "REVISE",
+        "review_dispatch_id": "R-C011-SYNTHETIC-CODE-001",
+        "review_commit": "989ee5a4f05e476c1522e3afee3a366ab5983d52",
+        "findings": [
+          "R-C011-SYNTHETIC-CODE-001-P2-01",
+          "R-C011-SYNTHETIC-CODE-001-P2-02",
+          "R-C011-SYNTHETIC-CODE-001-P2-03"
+        ]
+      },
+      "synthetic_positive_actual_review_commit": "7fc2cf294ca582d758dff0392e20fb80c7b0c9bb",
+      "synthetic_N1_N4_review_commit": "66b0313ed175baf4d2c1696038be3bcec3e2f1a4",
+      "synthetic_N5_N8_review_commit": "b5789e4a29fe577669729df9306d8795da1d9e93"
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 30,
+    "business_delivery_complete": false,
+    "priority_within_project": 7
+  },
+  {
+    "id": "O03",
+    "project": "P06",
+    "requirement_id": "BR-O03",
+    "original_plan": {
+      "id": "O03",
+      "lane": "C",
+      "role": "operations",
+      "it": 2,
+      "start": "2026-10-10",
+      "due": "2026-10-12",
+      "h": 4,
+      "deps": [
+        "R01",
+        "O01"
+      ],
+      "gaps": [
+        "UG-06"
+      ],
+      "area": "ops",
+      "title": "建设队列外公开结果与执行健康探针",
+      "change": "检查来源变化到公开版本、下一动作真实入队、worker/beat 心跳和内容过期；使用独立于被检查执行器的运行位置。",
+      "test": "HTTP 200 但资料没变、队列停摆、heartbeat 自身失效；通知使用已有渠道和批准收件范围。",
+      "done": "TC-O01 通过；系统失活可发现，探针不是每轮无变化都发消息。",
+      "deadline": "2026-10-12 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-12T18:00:00+08:00",
+      "read_paths": [
+        "deploy/deploy.sh",
+        "deploy/backup_db.sh",
+        "deploy/restore_db.sh",
+        "deploy/rollback.sh",
+        "docker-compose.prod.yml",
+        "docker-compose.prod.lowcost.yml"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "O03",
+      "title": "建设队列外公开结果与执行健康探针",
+      "lane": "C",
+      "completion_percent": 35,
+      "status": "部分完成",
+      "basis_and_gap": "离线HTML探针切片已审；真实loader/权限/队列外失活探测未闭合",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "O03"
+      ],
+      "previous_percent": 35,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "C",
+      "title": "建设队列外公开结果与执行健康探针",
+      "deps": [
+        "R01",
+        "O01"
+      ],
+      "deadline_at": "2026-10-12T18:00:00+08:00",
+      "status": "部分完成",
+      "phase": "固定离线HTML开发子片实际114/625及原18判据经原R0b6c通过，两HTML P2关闭；formal交付检查、真实loader/匿名views/ORM权限、CSS/SLA/队列外探针和失活验证仍缺",
+      "commit": "baa6345e87203e35fde6cb2c7e913fae28826ecd",
+      "pr": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/237",
+      "review": null,
+      "evidence": [
+        "C018 cdeb757f fixed read repair APPROVED a790ed4c; independent121 PASS/0skip; author and R resources cleaned; no formal integration/public verification"
+      ],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "dispatch_id": "C013-O03-PURE-CORE-001",
+      "owner_thread_id": "01a0fdc7-5154-7e51-aafa-f1b34d8f46f9",
+      "dependency_input_sha": "06b01aea9041eacb3deae9f46968eb06fd459cb6",
+      "plan_commit": "0bde91b1cf98ee14d9ee7ce2cac1bf9c34b95012",
+      "plan_review_commit": "10fa4d99a9dc0f24793d86cf46cabf478ba301b0",
+      "pure_core_delivery": {
+        "head": "baa6345e87203e35fde6cb2c7e913fae28826ecd",
+        "receipt_sha256": "c48035d5e8ad6535a025c6ea1806e54139665730c825a5f828d7042c31d06322",
+        "runtime": "/Users/mentianlu/.codex/runtime/c013-o03-pure-core-001",
+        "root_artifact_hashes_verified": 21,
+        "root_git_hashes_verified": 3,
+        "tests": 49,
+        "new_core_tests": 32,
+        "F01_minimal_tests": 17,
+        "failures": 0,
+        "errors": 0,
+        "skips": 0,
+        "database": false,
+        "network": false,
+        "shared_mapping_registered": false,
+        "original_R_review": "APPROVED",
+        "review_commit": "c924ec6d84b6b99f3f461e274328d60cd2c968a5",
+        "independent_tests": 49,
+        "local_integration_sha": "4e8993c818de459df3fe89f80f6f386badf47e13",
+        "shared_mapping_registered_locally": true
+      },
+      "review_commit": "c924ec6d84b6b99f3f461e274328d60cd2c968a5",
+      "render_plan": {
+        "head": "99539f3fd8ec2c3467b19de66ec55d219b26332d",
+        "document_sha256": "34753c49256a9deb0942a113772b7a00e94349c6d6a51fad77ea76c1bf2a91fa",
+        "root_read": true,
+        "static_index_sha256": "e78bb4e5658b18d2196cd40b8f61b119480a68120e167d7f59021f664b72a3d8",
+        "static_receipt_sha256": "753157882cef62a98260c609e202c6488ab8130cd3146a1b19dad704876ec85e",
+        "fixed_blobs_verified": 24,
+        "recorded_ast_locations_verified": 663,
+        "review": "APPROVED source-independent direction only",
+        "implementation": false,
+        "tests": 0,
+        "real_io": false,
+        "scope_gaps": [
+          "history eligibility and canonical tip target visibility require isolated diagnosis before any behavior change",
+          "HTTP200 capability absence remains diagnostic/unverified under current C013",
+          "real origin permission scope and bounded resource package still missing"
+        ],
+        "review_commit": "b58fc7ea3067b6b4a2eb14ecffe838e21654944e"
+      },
+      "render_leaf": {
+        "dispatch_id": "C015-O03-RENDER-LEAF-001",
+        "status": "APPROVED at da0a; further fivefixture repair82c APPROVED",
+        "basis": "99539f3fd8ec2c3467b19de66ec55d219b26332d",
+        "review": "candidate SHA domain and single-script negative classification",
+        "implementation": false,
+        "head": "098f61d9d19982e2ed54c69fef44c5446f8fe035",
+        "document_sha256": "418ef173add640b9e19013cf3a2672a64d5e168fad354445bd3d0be800fc2c41",
+        "fixture_sha256": "7e1d429d34025d53dacbe0471b4629c217f885ed615d6bdd23ef2f10e2dcc0cd",
+        "receipt_sha256": "841ed4f03c91e395347ff36b4a27e063ce9eaa30986032b177371453e4d34f60",
+        "runtime": "/Users/mentianlu/.codex/runtime/c015-o03-render-leaf-001",
+        "root_full_doc_read": true,
+        "root_fixed_git_files_verified": 2,
+        "root_runtime_hashes_verified": 3,
+        "synthetic_expected_cases": 53,
+        "expected_positive": 8,
+        "expected_negative": 45,
+        "actual_tests": 0,
+        "real_IO": false,
+        "review_commit": "b967ef40ea93d94a6eefd6c301f93806ede4cc68",
+        "independent_F01_inputs_accepted": 3,
+        "independent_C013_calls_rejected": 6,
+        "rejection_reason": "sha256_value; candidate40Git != strict64SHA256",
+        "parser_implemented": false,
+        "p2_repair": {
+          "head": "da0a1629b24e8639a73be4bc40875e8e9b9d742b",
+          "runtime": "/Users/mentianlu/.codex/runtime/c015-leaf-p2-repair-001",
+          "receipt_sha256": "67f02c9e6507ab750def9f6cfd6c700ae82406a0d596897a64120fe298bba96f",
+          "fixture_sha256": "5b1eab2a08b1283ba56ddf6ab172480d8f2057490f75126b4d0cf7a6a73242cb",
+          "root_fixed_Git_verified": 2,
+          "root_runtime_hashes_verified": 12,
+          "root_descriptor_Git_inputs_verified": 4,
+          "candidate_content_sha256": "9b3ee2c0bc5755c2ffb00b59df74910b55e761671842bf1e1a0b656e793c332d",
+          "actual_F01_inputs_accepted": 3,
+          "actual_C013_wires_accepted": 6,
+          "SLA": "unverified",
+          "synthetic_expected_cases": 54,
+          "positive_expectations": 8,
+          "negative_expectations": 46,
+          "leaf_tests": 0,
+          "implementation": false,
+          "review": "APPROVED two findings CLOSED",
+          "review_commit": "9c3ae97308bb893948b6ea2a4664876704420bd6",
+          "independent_pure_API_calls": 18,
+          "independent_fixture_inverse_normalization": true
+        }
+      },
+      "pure_parser": {
+        "dispatch_id": "C016-O03-PURE-PARSER-001",
+        "status": "APPROVED synthetic pure parser slice only",
+        "basis": "82c0f8f603d91a7fa33ce21ec10496bce3909cda",
+        "synthetic_expected_cases": 54,
+        "actual_passed": 82,
+        "real_IO": false,
+        "application_implemented": false,
+        "fixture_issue": {
+          "cases": [
+            "N18-generic-403",
+            "N18-generic-404",
+            "N19-200-results-absent"
+          ],
+          "cause": "synthetic h1/p outside frozen allowed tags, invalid_structure precedes expected absence diagnosis",
+          "decision": "minimal threeHTML and twoexpectedreason repair APPROVED; no parser weakening",
+          "scope_preserved": 54
+        },
+        "fixture_repair": {
+          "head": "82c0f8f603d91a7fa33ce21ec10496bce3909cda",
+          "intermediate": "5d8841483f1e2bb8293099457dc40910fe70b90f",
+          "fixture_sha256": "590751082dc941127ba053958aed24f2d265649726b2fc8eb5219dc469150218",
+          "root_exact_3html_2reason_only_verified": true,
+          "all_cases_preserved": 54,
+          "root_git_artifacts_verified": 4,
+          "root_runtime_hashes_verified": 6,
+          "review": "APPROVED fixed fivechanges only",
+          "formal_parser_dependency": "82c0f8f603d91a7fa33ce21ec10496bce3909cda",
+          "review_commit": "f17aba52cc77a53e1522152ec866fbfb1cb8d157",
+          "independent_static_sha256": "4d03dca56e56ff37d1c65b850e371bb7868bdbc705309c4cd5b1e8d9d1834984"
+        },
+        "head": "8d012700f95370e13034f6eee8b1e1f298ecf8fe",
+        "tests_count_unit": "unittest methods; 4 methods contain54case subtests, not additive",
+        "methods": 82,
+        "new_methods": 33,
+        "extra_boundary_methods": 29,
+        "fixture_subtests": 54,
+        "fixture_positive": 8,
+        "fixture_rejected": 14,
+        "fixture_unverified": 32,
+        "failures": 0,
+        "errors": 0,
+        "skips": 0,
+        "root_full_doc_read": true,
+        "root_git_artifacts_verified": 3,
+        "root_stages_verified": 19,
+        "root_stage_full_file_hashes_verified": 176,
+        "root_final_fixed_dependencies_verified": 6,
+        "receipt": "/Users/mentianlu/.codex/runtime/c016-o03-pure-parser-001/final-receipt.json",
+        "receipt_sha256": "af3ef8c7367bd21dd7e3bcfb898d2c16923bbe7cc59dacafcebac0713d28e73f",
+        "final_stage_receipt_sha256": "25cc9b803f48231f6b6a102bfd1c83618a70ff604ea8dc2f5409ed00973d556c",
+        "final_stage_log_sha256": "148c6fff4ba27fef7f90798e27ee82ac345c5d91c4e9eb01c82cfb4becaf4fac",
+        "actual_cases_sha256": "4fe62a4a2fe822f63b300e01a57327dd07fd066c93ce4bfe0e124e41c904e42a",
+        "source_sha256": "9e4e7d9e93c37de81a5da36013d037e9e4e6399e47cab871423bda8aad0cce44",
+        "tests_sha256": "e634fc63e2b8906eae5fc7bdbe34285921ec75e0a9e6e8dc76999a67e0f968f3",
+        "synthetic_only": true,
+        "SLA": "unverified",
+        "independent_review": "APPROVED both P2 CLOSED",
+        "first_RED": "54 assertions; five later fixture contradictions excluded from target product RED",
+        "handoff_old_final02_sha": "superseded only as final03 reference; original historical final02 retained",
+        "root_actual_case_summary_verified": true,
+        "review_commit": "a0b275a10a11e47d33cce35d02d3f0c2b41de8ed",
+        "independent_methods": 82,
+        "independent_counterexamples": {
+          "total": 4,
+          "assertion_failures": 4,
+          "errors": 0
+        },
+        "findings": [
+          "C016-R-01",
+          "C016-R-02"
+        ],
+        "review_evidence_sha256": "bbc8ce25686b6aa8cbae53c6d0f16d549b1dd2b40eb28b424f2df14e602d8d39",
+        "counterexamples_sha256": "5e7fa336347069bc7f328ad520595859d31660f92cb26ef4e197c6fe68ddd337",
+        "p2_repair": {
+          "head": "8d012700f95370e13034f6eee8b1e1f298ecf8fe",
+          "runtime": "/Users/mentianlu/.codex/runtime/c016-visible-content-p2-repair-001",
+          "receipt_sha256": "4bd33318c97c28e8b31f418d51e05a617ee7a0f6ac9008307d02a7054e959bc2",
+          "root_Git_files_verified": 3,
+          "root_stages_verified": 5,
+          "root_full_file_hashes_verified": 59,
+          "root_old_RED_sources_equal_fixed_Git": true,
+          "root_original_counterexamples_unchanged": true,
+          "original_counterexamples_RED_assertions": 4,
+          "original_counterexamples_GREEN": 4,
+          "new_methods": 12,
+          "additional_RED_assertions": 16,
+          "final_methods": 94,
+          "failures": 0,
+          "errors": 0,
+          "skips": 0,
+          "fixture_cases": 54,
+          "fixture_outputs_unchanged": true,
+          "review": "APPROVED original two P2 CLOSED",
+          "real_IO": false,
+          "SLA": "unverified",
+          "final_stage_receipt_sha256": "fa7290014ee6c121f24a395ae0189a6e5e8f812ee5d813de5fab74baa302c35a",
+          "final_log_sha256": "654bbc6a3f784f9227608626e7752217bc891cee619208360408ca8658b8ee27",
+          "review_commit": "a0b275a10a11e47d33cce35d02d3f0c2b41de8ed",
+          "independent_methods": 94,
+          "independent_original_counterexamples": 4,
+          "independent_actual54_unchanged": true,
+          "independent_review_evidence_sha256": "ae86a420b00a3462959dbace7699fa8f82a73a70c30fc52b20f3903309d0f5c7"
+        }
+      },
+      "public_linked_read_plan": {
+        "dispatch_id": "C017-PUBLIC-LINKED-READ-PLAN-001",
+        "head": "7f9d70bab742b8897526ac1fc4befa1a43d461b5",
+        "status": "historical approved plan; implementation subsequently completed in C018, see public_linked_read_implementation",
+        "document_sha256": "4cdf7a81dbb39ff4a339851eee6d81367d796c992199993b6d30668759d76b90",
+        "index_sha256": "48ffef36f2959d2df1151957c50d480c13b2b21b0181dbb48a26aeb75c67170b",
+        "receipt_sha256": "f9488317126dee9097888325c4bb28af1063902d5fb745f2999eaf74e47e75b6",
+        "root_full_read": true,
+        "root_fixed_sources_verified": 15,
+        "implemented": false,
+        "tests": 0,
+        "actual_IO": false,
+        "query_budget": "static estimated 2+12ceil(U/100), unverified; full history denominator preserved",
+        "scope": "H2 modern primary permissions, K2/K3 published canonical target, shared loaded validator preserving single semantics; H1/H4/H5 preserved",
+        "review_commit": "46504ee326e3631162c83ccfce9e491c6ec404a9",
+        "independent_review_evidence_sha256": "d4bfd69d9687116a05288c3e30143802c365c78ed4ae7761d6ac5e1c37de41df"
+      },
+      "public_linked_read_implementation": {
+        "dispatch_id": "C018-PUBLIC-LINKED-READ-IMPL-001",
+        "status": "developer slice complete; original R APPROVED with independent121 PASS; formal integration and public verification pending",
+        "implementation_verified": true,
+        "public_verified": false,
+        "shared_mapping": "proposal only",
+        "initial_page_methods": 8,
+        "initial_RED_assertions": 4,
+        "initial_GREEN": 8,
+        "initial_errors": 0,
+        "initial_skips": 0,
+        "head": "cdeb757f9c8e70938ac8ea40a64096f8a0ffa2cd",
+        "review_commit": "a790ed4c1f38b4b45152b633a70c58035301c212",
+        "author_methods": 121,
+        "new_methods": 25,
+        "independent_methods": 121,
+        "failures": 0,
+        "errors": 0,
+        "skips": 0,
+        "root_author_artifacts_verified": 159,
+        "root_author_stages_verified": 15,
+        "root_R_fixed_source_files_verified": 1882,
+        "independent_receipt_sha256": "b02a52246cacbec84bf8f6e3a977a4e7390803975eb7ebbf0f2894eca6b3a2be",
+        "resources_released": true,
+        "merged": false,
+        "deployed": false,
+        "enabled": false
+      },
+      "template_adapter_plan": {
+        "dispatch_id": "C019-O03-TEMPLATE-ADAPTER-PLAN-001",
+        "head": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+        "parent": "cdeb757f9c8e70938ac8ea40a64096f8a0ffa2cd",
+        "status": "APPROVED only static fixture/closed contract preparation",
+        "document_sha256": "eeb8d6235e4d2c77ce477d16e147d0e0b63ae5b4c2cf24432270e090ba0d09dd",
+        "source_index_sha256": "a90fab31d03fb283f151b8a3c1bfd5cbe3e273fedae14ef1519f6b6754b3b408",
+        "root_full_read": true,
+        "root_fixed_sources_verified": 87,
+        "root_exact_missing_paths_verified": 23,
+        "root_static_anchors_verified": {
+          "exact": 310,
+          "prefix_excerpts": 165
+        },
+        "implemented": false,
+        "tests": 0,
+        "rendered": false,
+        "actual_IO": false,
+        "F01_dependency_assembly": "must use fixed06b content_contracts; currentcdeb blob missing",
+        "real_origin_permission_loader": "MISSING",
+        "review_commit": "725515cb0060a0826a1f83de2fb7297cb9a10db5",
+        "review_evidence_sha256": "3a03d0d6aeff3c6ceeec348fee5512a749578da5558e541b591cc256f02ce9d2",
+        "implementation_authorized": false
+      },
+      "template_contract_fixture": {
+        "dispatch_id": "C020-O03-TEMPLATE-CONTRACT-FIXTURE-001",
+        "head": "2a9468659a85fe3ffaa99d85d69daccea7a0c12e",
+        "base": "02e7f7b0687ca902d4dbe30e7cf20d2da0b83bc9",
+        "status": "APPROVED static contract and synthetic fixture premises only; original C020-R01 CLOSED",
+        "source_index_sha256": "d0a99b36c8b58f533e7560254c0ac49a06367c5b5e9b65ebed4d737ed4c4c129",
+        "static_validation_sha256": "e73aac531520448dfe0aeaa892b6b8dd19707bb7f8bf7d8b920be3fa7641cd00",
+        "receipt_sha256": "9a9d46fb6b428cce5fd06c4cf6248b7686db9e6ec4279d11077937ec01a0f137",
+        "root_Git_files_verified": 8,
+        "root_fixed_sources_verified": 117,
+        "repository_AST_modules": 107,
+        "candidate_canonical_sha256": "23b94f4ee64e0b1d4bb5a7b92a8ad886eefc6ca2249dc5a73b719559b4995793",
+        "inputs": 25,
+        "future_positive_expectations": 24,
+        "future_missing_required_expectations": 1,
+        "future_negative_behavior_specs": 72,
+        "future_meta_specs": 3,
+        "business_tests": 0,
+        "renders": 0,
+        "adapter_implemented": false,
+        "trusted_loader_implemented": false,
+        "real_IO": false,
+        "review_commit": "da3f29962b6f31622e706bc4015f6f62356a053a",
+        "review_evidence_sha256": "bfcaf0e6daaaefbc74a587e6705644ae960834d9eacbbb0be94470c1d4175014",
+        "root_report_and_exact_token_counterexample_verified": true,
+        "independent_static_source_files": 117,
+        "independent_static_fixture_files": 6,
+        "independent_template_reassemblies": 4,
+        "independent_case_hashes": 25,
+        "findings": [
+          "C020-R01"
+        ],
+        "static_repair_dispatch_id": "C020-N01-PRIORITY-P2-REPAIR-001",
+        "priority_repair": {
+          "head": "0ebb7d7a0a5be4d0f88088cba708ea63d8dde09d",
+          "base": "2a9468659a85fe3ffaa99d85d69daccea7a0c12e",
+          "status": "APPROVED original R01 CLOSED; root reviewed full report and evidence",
+          "source_index_sha256": "0cffed5eb655468572b709129708e657fd33bc1cdc894e83fed2f4afb604c433",
+          "static_validation_sha256": "119ee23796b436e5ed03dad9e0a45786fbbcf38b7a44a62553b8cbd597023d80",
+          "receipt_sha256": "9257ad608a50cb8ef442ed2317f5cb78819db1b83996175ec69423d439c1448b",
+          "priority_proof_sha256": "85fcfe607490d6e81452e129162e3f035386708363e03e5dde0423e17e6f7122",
+          "root_Git_files_verified": 2,
+          "source_117_index_exact_unchanged": true,
+          "other_five_contract_blobs_exact_unchanged": true,
+          "golden_deep_unchanged_except_N01_three_fields_and_new_N75": true,
+          "candidate_unchanged": true,
+          "future_behavior_specs": 72,
+          "future_meta_specs": 3,
+          "business_tests": 0,
+          "renders": 0,
+          "review_commit": "d158e5281bed62693dba28ed1fc78c52dd39cec9",
+          "review_report_sha256": "a1d9e22969ec50b56ecd13dac29135025a3263a797f213939df958cbf422c352",
+          "review_evidence_sha256": "25f7e2ce7649ad750b01e3140354e6ef19a10b80c8fa7080da40d534ff893faa",
+          "root_review_receipts_verified": true
+        },
+        "approved_head": "0ebb7d7a0a5be4d0f88088cba708ea63d8dde09d",
+        "final_review_commit": "d158e5281bed62693dba28ed1fc78c52dd39cec9"
+      },
+      "template_adapter_implementation": {
+        "dispatch_id": "C021-O03-TEMPLATE-ADAPTER-IMPL-001",
+        "base": "0ebb7d7a0a5be4d0f88088cba708ea63d8dde09d",
+        "review_commit": "d158e5281bed62693dba28ed1fc78c52dd39cec9",
+        "status": "target assertion RED verified; pure implementation and next immutable packet active",
+        "code_implemented": false,
+        "actual_renders": 25,
+        "business_tests": 96,
+        "resource_execution_allocated": false,
+        "production_views_wired": false,
+        "trusted_loader_implemented": false,
+        "scope": "real full detail/calendar templates, actual tags, new pure adapter, independent frozen fixtures; no DB/network",
+        "api_clarification": {
+          "explicit_keyword_only_contracts": [
+            "envelope_contract",
+            "schema_contract"
+          ],
+          "input": "bounded original UTF8 JSON bytes with exact descriptor bytes hash checks",
+          "private_input_schema_changed": false,
+          "program": "finite reviewed operations only, no eval/exec/import/callable",
+          "support_files": [
+            "server/stable/tests/public_probe_template_support.py",
+            "server/stable/tests/public_probe_template_settings.py",
+            "server/stable/tests/public_probe_template_urls.py"
+          ],
+          "no_DB_wrapper": "required; existing django test_plan_worker probes PG and cannot substantiate zeroDB",
+          "evidence_documents": {
+            "type": "bounded original UTF8 JSON bytes",
+            "root_keys": [
+              "origins",
+              "permissions",
+              "f01_documents",
+              "display_mappings"
+            ],
+            "wire_bytes": 262144,
+            "depth": 64,
+            "nodes": 12000,
+            "max_each_index_members": 8,
+            "coverage": "whole private scope ref inventories, not observed marker subset",
+            "identity": "derived candidate binds evidence schema/source bytes only; case original values remain tuple/ref-bound",
+            "missing": "unverified, conflicts still reject",
+            "contract_review": "in same C021 fixed preparation package before execution"
+          },
+          "support_module_loading": "independent test support search path avoids stable.tests legacy re-exports; actual StableConfig.ready/tags preserved with pre-setup IO guards",
+          "schema_contract_source": "actual C020 contract.json raw UTF8, SHA5fc516d81b17a82c95151c10ed76872b3d4518b91b22ed505efedd6ba4f9304c; all refs local #/"
+        },
+        "preparation": {
+          "head": "6483e2484abd8f341a449587c8f4cb4f4839f785",
+          "parent": "31bd585b1cc94a36cb1f968631a5712f5a62491c",
+          "runtime": "/Users/mentianlu/.codex/runtime/c021-o03-template-adapter-impl-001-v2",
+          "manifest_sha256": "063b95d1f96339776315c06289d2e2e4b7c3d1f3cfe2dab719a4a16f687b181d",
+          "source_hashes_sha256": "b8f144a4512c005ff7140003c33b1cdb55fa24b88a192ba781c85d05fbd2bd2f",
+          "worker_sha256": "3411358fec070fbe75b8e148c0523ad61d6e427393f91973dc37158b9c90d165",
+          "runner_sha256": "6accbd8e58bccf868eaa6ed40072352a7a730612693adb1998643f58ea4c74a4",
+          "root_full_report_worker_runner_read": true,
+          "root_snapshot_files_verified": 1899,
+          "root_fixed_Git_sources_verified": 114,
+          "root_overlay_verified": 5,
+          "old_package_files_unchanged": 3801,
+          "AST_methods": 96,
+          "old_methods": 94,
+          "old_cases": 54,
+          "new_render_subtests_planned": 25,
+          "actual_tests": 0,
+          "container_executions": 0,
+          "initial_root_findings": [
+            "PEP508 psycopg[binary] metadata",
+            "socket class/ssl compatibility",
+            "schema_contract exact contract.json bytes"
+          ],
+          "initial_findings_status": "fixed v2; runtime not verified",
+          "root_checker_KeyError": "last 2 F01 fixed entries no git_blob; corrected checker and full hash/size/Git equality PASS; not product RED",
+          "resource_review_dispatch": "R-C021-RESOURCE-V2-REVIEW-001",
+          "image_readonly_observed": "exact ab8494 linuxamd64 User10001:10001; dedicated ps-q empty, no runtime deps verified",
+          "resource_execution_allocated": false,
+          "resource_review": {
+            "status": "APPROVED initial fixed RED only",
+            "commit": "d56da5305e7f869c6b374724bd47891cc774b28e",
+            "report_sha256": "c8b6c9e64ab58860d2c81a92ce09211d9abebc8bbb7d12270e9572b44792bd65",
+            "evidence_sha256": "3a2830641bc597e74b024948517e55a0895d14c5a5e7960af5b34738aca78a44",
+            "root_full_read_and_hash_verified": true
+          }
+        },
+        "initial_RED": {
+          "status": "actual target assertion RED verified",
+          "runtime": "/Users/mentianlu/.codex/runtime/c021-o03-template-adapter-impl-001-v2/run-2b41573816564f93bb3a297470fd3f44",
+          "receipt_sha256": "fbfd66687f385ec95245a0b539d1d71a34957787f17c5e1ac60351abb39dcfa0",
+          "report_sha256": "dc777278fdcf21f635ce00a29cd1be0edf19f8926ccce259fb35fc52a14b53b3",
+          "log_sha256": "b2fb44a1a9b4721ec0562c41ea2010cc4f6cc44a64820bcb9a495c8a0f2987aa",
+          "methods": 96,
+          "old_methods_passed": 94,
+          "new_methods_passed": 1,
+          "new_target_assertion_failures": 1,
+          "failed_method": "stable.test_public_probe_template_adapter.TemplateAdapterFirstRed.test_first_positive_independent_expected",
+          "failure_line": 24,
+          "failure": "unverified != template_fixture_verified",
+          "body_receipt_assertions_reached": false,
+          "new_actual_render_subtests_passed": 25,
+          "old_case_outputs": 54,
+          "errors": 0,
+          "skips": 0,
+          "sql_attempts": 0,
+          "network_attempts": 0,
+          "Python": "3.12.3",
+          "Django": "5.2.1",
+          "requirements_pins": 18,
+          "psycopg_binary_extra": "3.2.6 exact metadata relationship",
+          "loaded_repository_modules": 24,
+          "root_snapshot_files_verified": 1899,
+          "root_actual_IDs_equal_AST": true,
+          "root_control_bytes_equal": true,
+          "source_unchanged": true,
+          "cleanup": "zero",
+          "root_live_dedicated_running_containers": 0,
+          "root_live_nonce_remaining": 0,
+          "root_live_runner_attach_processes": 0,
+          "elapsed_seconds": 2.098309333989164,
+          "cid": "b25cd859da961ec2a9e290b2def918f2d2ef580d881442af8bdd9a1342c84231",
+          "verified_at": "2026-10-04T11:02:20.830179+08:00",
+          "full_25_72_3_matrix_executed": false,
+          "adapter_GREEN": false,
+          "root_verification_sha256": "9351bb0e263cb31629e77db9a816e85c0ff5b0a2c9e852f394ceea0ef336752d",
+          "root_verification_path": "/Users/mentianlu/.codex/runtime/root-c021-initial-red-v2-verification/verification.json",
+          "author_report_commit": "b940c10589083b463bd77a089d8a71ff97076dd0"
+        },
+        "serialization_clarification": {
+          "at": "2026-10-04T11:04:39.433015+08:00",
+          "status": "root technical choices sent; derived contract and code await R",
+          "marker_transport": "fixed ordered seven string slots with Django5.2.1 escapejs; no new context scalar/business tag",
+          "raw_vs_canonical": "script-safe transport JSON bytes differ from F01 canonical bytes; strict decoded seven-key object equal, F01 hash retains original canonical object",
+          "unchanged_schema": true,
+          "old_C020_six_files_readonly": true,
+          "derived_envelope_and_source_hash_required": true,
+          "unknown_filter_or_nonmarker_escapejs_rejected": true,
+          "new_tests_required": [
+            "legal subject ampersand JSON roundtrip/hash equivalence",
+            "invalid type/duplicate keys/extra script",
+            "encoder dangerous chars separate while Marker schema still rejects"
+          ],
+          "token_lookup": "finite fixed-site nested for/parentloop counter matching; original declared arrays, bounded total operations, no DOM-derived cardinality",
+          "calendar_target": "public_path equals marker subject + complete; full independent scope/unique target/private proof still mandatory",
+          "actual_new_execution_allocated": false,
+          "author_choice_received": true
+        },
+        "last_author_progress": {
+          "at": "2026-10-04T11:18:07.395270+08:00",
+          "reported": "按root选择加入条件注释/escapejs marker，新observer有限展开/证据/字段校验继续实现",
+          "new_code_executed": false,
+          "new_GREEN_claimed": false,
+          "root_verified": false
+        },
+        "N09_priority_clarification": {
+          "at": "2026-10-04T11:23:21.958276+08:00",
+          "status": "APPROVED exact static correction; decision sent to C, derived artifact/actual tests pending",
+          "source_head": "0ebb7d7a0a5be4d0f88088cba708ea63d8dde09d",
+          "contract_sha256": "5fc516d81b17a82c95151c10ed76872b3d4518b91b22ed505efedd6ba4f9304c",
+          "golden_sha256": "996bf69c2fb16c55edbc5f2db0cdff0ab338cfc48b57e8eeedfe7ed665f53cfa",
+          "case_id": "N09-duplicate-field",
+          "mutation": "section#results td:nth-child(4) field=horse_name replaces jockey_name; missing plus duplicate",
+          "original_expected": "duplicate_field rank6",
+          "contract_priority": "missing_field before duplicate_field in rank6",
+          "root_proposed_resolution": "preserve original operands/ID/denominator, derived exact missing_field only; no global precedence change",
+          "R_dispatch_id": "R-C021-N09-PRIORITY-TECHNICAL-001",
+          "additional_duplicate_only_case": "no proven reachable isolated mutation under fixed9slots; no N76, do not weaken structure",
+          "original_C020_six_files_unchanged": true,
+          "actual_new_execution": false,
+          "independent_work_continues": true,
+          "review_commit": "403c3b657d5f0be9050a33140cc1ee6e78c1e79c",
+          "review_report_sha256": "193e466d3496755f219a2ae517dbab2bb53f783aa1ba566407d5c94ef6fde0d8",
+          "review_evidence_sha256": "84ca28610914af150b49bf5fc048f569221bc6c2ba751755c668c553ad45aec0",
+          "root_full_report_read": true,
+          "root_fixed_Git_sources_verified": 3,
+          "final_reason": "missing_field",
+          "final_rank": 6,
+          "original_other_fields_preserved": true,
+          "decision_sent_at": "2026-10-04T11:27:30.332545+08:00"
+        }
+      },
+      "first_green_package": {
+        "head": "3732fd2fa5ef7f15f75649407bd13d840404de2d",
+        "source_commit": "bb8f400c9f9f62529291aec8e19af56e56696155",
+        "runtime": "/Users/mentianlu/.codex/runtime/c021-o03-template-adapter-green-001",
+        "manifest_sha256": "e1a8a6f886e71558b65fce83865f802dd15cff8c5abacfcf320dd051349837c6",
+        "source_index_sha256": "c283280a72c7b055a7e82aed9d6b15dc47324ae4e3a9276c245cc95389247117",
+        "candidate_sha256": "d76f1f7b9b89cf6857fe99ede2528ced9f452cee56a84f34f8099da2f403b49f",
+        "source_verification": "/private/tmp/umanews-root-c021-green-pack-verification-3732/source-verification.json",
+        "source_verification_sha256": "2c09d059755be99995132a509568be187d1a4a5d67094354e2700cc88397303a",
+        "planned_methods": 105,
+        "old_methods": 94,
+        "new_methods": 11,
+        "positive_inputs": 25,
+        "behavior": 72,
+        "meta": 3,
+        "executed": false,
+        "review_requested": true,
+        "resource_allocated": false,
+        "remaining": [
+          "original C targeted actual-HTML tests and fixed RED package",
+          "original R static package review then root fresh exact resource allocation",
+          "actual target RED before minimal implementation fix and new GREEN package",
+          "same original R review and accepted actual execution receipts"
+        ],
+        "derived_verification": "/private/tmp/umanews-root-c021-green-pack-verification-3732/derived-verification.json",
+        "derived_verification_sha256": "836e088b2b13dafa98e5e990d8ad59220bc4d8fc5a50cf7b9454c8f7478128cf",
+        "root_derived_deep_check": {
+          "whole_golden_exact_independent_reconstruction": true,
+          "all_25_visible_template_contexts_exact": true,
+          "identity_members": 130,
+          "tuple_cases": 24,
+          "row_token_bindings": 108,
+          "expected_body_anchor_cases": 24,
+          "candidate_imports": 0,
+          "renders": 0,
+          "adapter_calls": 0
+        },
+        "handoff": "docs/changes/next-version-capabilities/C021-review-handoff.md",
+        "review_dispatched_at": "2026-10-05T02:25:06.201038+08:00",
+        "independent_review": {
+          "status": "REVISE",
+          "head": "3732fd2fa5ef7f15f75649407bd13d840404de2d",
+          "review_commit": "fb3b7f8b2b6f79ddb67aafa97ad19a68fb05f895",
+          "report_sha256": "5c9090b603eaf8750d73a4c528001ae3a7c7e3835d8aa504730321dc5a44a377",
+          "evidence_sha256": "5077a21091f803abee2f9a5ac579a3097d711788cfb4f44b87eb721cee5c7bab",
+          "findings": [
+            "R01 hero scalar nested element can hide same text via site-nav CSS",
+            "R02 result row medal CSS not bound to original DTO display_finish_position"
+          ],
+          "static_only": true,
+          "actual_methods_executed": 0,
+          "calendar_whole_card_suspicion_excluded": true,
+          "GREEN_window_approved": false
+        }
+      },
+      "merged_delivery_slices": [
+        {
+          "pr": 237,
+          "merge_commit": "22e130adf4464fd3c5dd63ccd3f508c4a853d464",
+          "head": "3a55a9891e3e557027876b18403ef7b5fb39401a",
+          "scope": "仅third-integration-delivery.md列明固定受审切片；不含后续未交付实现",
+          "deployed": false
+        }
+      ],
+      "partial_merged": true,
+      "targeted_RED_package": {
+        "head": "600e0903ffd83094d5eca50db78c4cf8c4592cb8",
+        "source_commit": "6aaeb444d639ea956466c42b05b9617714ecb395",
+        "runtime": "/Users/mentianlu/.codex/runtime/c021-leaf-style-p2-red-001",
+        "manifest_sha256": "9c9d33e110c335e4de4aabb3130deae59ac4fa52f871a064f5ce7c4b85d4b3bc",
+        "index_sha256": "03ecd17f25247f29b45e7453013c566806d21bb33d618d38024cc794e32d6e9a",
+        "candidate_sha256": "bbf409c0a672720ef68bf9f74db897f3ec4f214f9291caabc6bf7be8dab32c19",
+        "review_plan_sha256": "0056e4bbbdbf357f4e0fca69972c168f51fefdb0a4ce02444624a0455676f192",
+        "static_verification_sha256": "649c93fdcdb44b63395de491e2942b46a77f5857de710a1c12e3fb3d04dc30ef",
+        "snapshot_files": 1913,
+        "fixed_sources": 114,
+        "overlays": 14,
+        "archive_untouched_files": 1787,
+        "descriptor_sources": 122,
+        "old_v1_v2_json_unchanged": 13,
+        "adapter_templates_unchanged": true,
+        "methods_AST": 108,
+        "old_methods": 105,
+        "new_methods": 3,
+        "new_HTML_mutations": 114,
+        "new_target_mutations": 102,
+        "existing_controls": 12,
+        "baseline_cases": 13,
+        "visible_inputs": 25,
+        "schema_static_nodes": 144578,
+        "static_review": {
+          "status": "APPROVED_STATIC_RED_PACKAGE_ONLY",
+          "commit": "3c646282c7970981e577ac5501e7bdd7ebf5c33a",
+          "report_sha256": "95cf4cafdfb889736127944cf615064eeef84f66dd01318d7b3abab500f1495c",
+          "evidence_sha256": "1ac32ba83532d43b7d3e8f72051d7d1f1fcfc2f09ad9593eabc86ced585269af",
+          "actual_executions": 0,
+          "findings_closed": false,
+          "independent_identity_mappings": 195
+        },
+        "resource_allocated": false,
+        "actual_execution": true,
+        "tests_passed": null,
+        "result": {
+          "status": "EXECUTED_BLOCKED_NOT_P2_RED",
+          "report_commit": "32414f96fe19858fde0e14650d4d07768c2dc3ea",
+          "runtime_run": "/Users/mentianlu/.codex/runtime/c021-leaf-style-p2-red-001/run-cd82ba275c2b4d98b8bbcf26b93e3531",
+          "nonce": "cd82ba275c2b4d98b8bbcf26b93e3531",
+          "cid": "4affe99d3454b43f853da8dfb0cf81bbccb2b0ff1778fc7f7462e46f43b319b8",
+          "receipt_sha256": "2e3baf49ae5e729f1f91e56c24aaf9b697b2369dc5bb64e40c9823e2ac6b3644",
+          "report_sha256": "36e320fff205e356f77e4d9c10f837ccab77adfd9d437a604ce1f85cadd811da",
+          "console_sha256": "914f886c50a31b9a611c0bf2a03cbafe8e5f36d2a9a8cac0be37a0104e260b7d",
+          "classification_sha256": "75a6f3ea4b024b8e9d145c3dbb6109dd176753ec9fdf0e7bb0b6981bf80a15e8",
+          "elapsed_seconds": 7.164898666989757,
+          "exit_code": 1,
+          "unique_methods_executed": 108,
+          "old94_failure_or_error_records": 0,
+          "old_C015_outputs": 54,
+          "failure_records": 20,
+          "error_records": 80,
+          "skips": 0,
+          "guard_counts": {
+            "network_attempts": 0,
+            "sql_attempts": 0
+          },
+          "positive_matched": 7,
+          "positive_not_matched": 18,
+          "review_baselines_observed": 1,
+          "review_mutations_observed": 0,
+          "target_P2_RED": false,
+          "root_source_files_unchanged": 1913,
+          "cleanup": "zero",
+          "root_exact_CID_absent": true,
+          "root_nonce_query_empty": true,
+          "root_dedicated_running": 0
+        }
+      },
+      "baseline_repair_direction": {
+        "dispatch_id": "C021-BASELINE-CONTRACT-PREPARE-002",
+        "document": "docs/changes/next-version-capabilities/C021-baseline-repair-direction.md",
+        "locale_receipt": "/Users/mentianlu/.codex/runtime/c021-root-django-locale-static-001/receipt.json",
+        "locale_receipt_sha256": "14ffc3320030db15b0c85332c1e817e39a9d5b542113ab69b4dba9c5a0a413d7",
+        "private_sizes_sha256": "8ac77ea773d150d3d1ae040659d82e075d4d4d07821b3addadae663acb1ee3a4",
+        "private_max_observed_nodes": 14760,
+        "private_max_observed_canonical_bytes": 204386,
+        "proposed_private_nodes": 16384,
+        "proposed_private_bytes": 262144,
+        "proposed_private_depth": 64,
+        "budget_implementation_approved": false,
+        "original_HTML_limits_unchanged": true,
+        "new_execution_allocated": false
+      },
+      "baseline_budget_draft": {
+        "head": "b078f7f471a44d33f5596bd111e8ee190f2f3399",
+        "source_commit": "276b25d6dcc129c401c3a84d1e0ef582ea03d585",
+        "runtime": "/Users/mentianlu/.codex/runtime/c021-baseline-contract-prepare-002",
+        "review_index_sha256": "08aba8f8a7a9f019fa24143f7fd69dbe95468e00d79b1b272fc70638dda708f2",
+        "source_index_sha256": "f1226ac2555e7995ba2bc133145584ea4fea87ddd7a6c8f813ca758159048c93",
+        "candidate_sha256": "ed7eb5c37ca40c1097d9a0f63ab3c02a627099e69c40a7b784490f57688f9184",
+        "metadata_hashes_verified": 7,
+        "source_files_verified": 1921,
+        "fixed_Git_sources_verified": 114,
+        "overlays_verified": 14,
+        "descriptor_sources_verified": 122,
+        "old_v1_v2_v3_files_unchanged": 20,
+        "prior_test_functions_AST_unchanged": 24,
+        "planned_methods": 110,
+        "old_methods": 108,
+        "new_budget_methods": 2,
+        "visible_cases_unchanged": 25,
+        "behavior_and_meta_unchanged": true,
+        "adapter_changed_only": "date_format",
+        "private_budget_implemented": false,
+        "P2_implemented": false,
+        "execution_manifest": null,
+        "root_business_imports": 0,
+        "review_status": "PENDING",
+        "independent_review": {
+          "status": "REVISE_P2_R01_INTEGER_BOUND",
+          "commit": "7a24e9c14ab90f105e47863fc62d52b1bc13b1ed",
+          "report_sha256": "058aa440a15262f64869628308bc0d1151fb440f475f0267d9cc2ec4217b334b",
+          "evidence_sha256": "c1bfcc7640978a92651683564f8072dac3fb0b5795114b9018ea2902200f827c",
+          "root_verified_metadata_hashes": 8,
+          "root_verified_review_script_hashes": 2,
+          "independent_whole_golden_reconstruction": true,
+          "identity_mapping_count": 195,
+          "root_numeric_punctuation_correction": "compact JSON object with numeric x token has 6 punctuation bytes; prior report8 is string-case confusion",
+          "corrected_report_pending": false,
+          "implementation_approved": false,
+          "corrected_report_commit": "0d1b67a68c1e10ae0dc1b4e3b3c0d88335528120",
+          "corrected_report_sha256": "0809b4e335da55299f5116a0eae50484d1f7cf6a85aba171143f29aba5d1c8be",
+          "correction_sha256": "a0cbd3a86e2ed00f20e4acbe7eb42ece97614331cee98fef51ac9abc9ec5f9c5",
+          "root_correction_verified": true
+        }
+      },
+      "latest_offline_slice": {
+        "result_commit": "4f425aec986e3aab19f75d12d6c5edcb0a97bed4",
+        "review_commit": "0b6c48ec82656692e1d390f3f081b87bf394b188",
+        "development_complete": true,
+        "merged": false,
+        "deployed": false,
+        "public_verified": false
+      },
+      "next_orm_slice": {
+        "dispatch_id": "C026-O03-ORM-LOADER-DETAIL-IMPLEMENT-001",
+        "status": "implementation_and_local_pg15_complete_pending_review",
+        "plan_commit": "aa1b0bd060d71463cfc0f94d452ef53b1f0aad18",
+        "plan_review": "f3199e5fa049768ea6505caf6c2a5c3d01426e63",
+        "public_verified": false,
+        "head": "3e54461be83ee1397ac62d684b9be386d5ec8079",
+        "tested_source": "e7e67d47e858a762f40170d8f575666333423eda",
+        "tests": 15
+      },
+      "merged_slices": [
+        {
+          "name": "公开结果只读ORM快照加载器",
+          "pr": 239,
+          "merge": "6e6aded22764ebee3d6a97f2834f47d4b4baa7bb",
+          "deployed": false,
+          "enabled": false,
+          "whole_task_accepted": false
+        }
+      ]
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 35,
+    "business_delivery_complete": false,
+    "priority_within_project": 8
+  },
+  {
+    "id": "O04",
+    "project": "P06",
+    "requirement_id": "BR-O04",
+    "original_plan": {
+      "id": "O04",
+      "lane": "R",
+      "role": "operations",
+      "it": 2,
+      "start": "2026-10-14",
+      "due": "2026-10-15",
+      "h": 4,
+      "deps": [
+        "O02",
+        "R05",
+        "M02"
+      ],
+      "gaps": [
+        "UG-06",
+        "AG-08"
+      ],
+      "area": "ops",
+      "title": "验证备份恢复与队列容量边界",
+      "change": "在隔离副本恢复代表数据，压测赛事控制、模型长任务和普通新闻并行；核算内存、并发、队列及请求预算。",
+      "test": "慢模型不得占满赛事执行容量；恢复后约束、关系和新旧程序读路径正确；禁止测试连接生产服务。",
+      "done": "TC-O02/03 通过；实际容量偏差回写排期风险及配置建议。",
+      "deadline": "2026-10-15 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-15T18:00:00+08:00",
+      "read_paths": [
+        "deploy/deploy.sh",
+        "deploy/backup_db.sh",
+        "deploy/restore_db.sh",
+        "deploy/rollback.sh",
+        "docker-compose.prod.yml",
+        "docker-compose.prod.lowcost.yml"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "O04",
+      "title": "验证备份恢复与队列容量边界",
+      "lane": "R",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "O04"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "R",
+      "title": "验证备份恢复与队列容量边界",
+      "deps": [
+        "O02",
+        "R05",
+        "M02"
+      ],
+      "deadline_at": "2026-10-15T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 9
+  },
+  {
+    "id": "V01",
+    "project": "P06",
+    "requirement_id": "BR-V01",
+    "original_plan": {
+      "id": "V01",
+      "lane": "R",
+      "role": "operations",
+      "it": 1,
+      "start": "2026-10-09",
+      "due": "2026-10-09",
+      "h": 4,
+      "deps": [
+        "F06",
+        "H02",
+        "R03",
+        "M03",
+        "N01",
+        "Q02",
+        "U01",
+        "U02",
+        "O02"
+      ],
+      "gaps": [
+        "RG-07",
+        "NG-07",
+        "UG-06"
+      ],
+      "area": "qa",
+      "title": "迭代一接口与失败路径验收",
+      "change": "审核字段合同、来源矩阵、目标数量、主干兼容和可独立上线修复；冻结下一轮接口版本。",
+      "test": "运行对应离线合同测试及隔离恢复；检查依赖、工时和外部缺口均已归属。",
+      "done": "提交 I1 验收表和修正清单；未解决高影响问题不得仅改状态为完成。",
+      "deadline": "2026-10-09 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-09T18:00:00+08:00",
+      "read_paths": [
+        "docs/reports/2026-10-02-current-capabilities.md",
+        "docs/reports/2026-10-02-backlog-evidence-reconciliation.md",
+        "docs/changes/next-version-capabilities/test_cases.md"
+      ],
+      "status": "未开始",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
+    },
+    "progress_snapshot": {
+      "id": "V01",
+      "title": "迭代一接口与失败路径验收",
+      "lane": "R",
+      "completion_percent": 10,
+      "status": "部分完成",
+      "basis_and_gap": "接口/失败路径已有分散子片证据；迭代一整体验收表未闭合",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "V01"
+      ],
+      "previous_percent": 10,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "R",
+      "title": "迭代一接口与失败路径验收",
+      "deps": [
+        "F06",
+        "H02",
+        "R03",
+        "M03",
+        "N01",
+        "Q02",
+        "U01",
+        "U02",
+        "O02"
+      ],
+      "deadline_at": "2026-10-09T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 10,
+    "business_delivery_complete": false,
+    "priority_within_project": 10
+  },
+  {
+    "id": "V02",
+    "project": "P06",
+    "requirement_id": "BR-V02",
+    "original_plan": {
+      "id": "V02",
+      "lane": "R",
+      "role": "operations",
+      "it": 2,
+      "start": "2026-10-16",
+      "due": "2026-10-16",
+      "h": 4,
+      "deps": [
+        "R09",
+        "H03",
+        "H05",
+        "M04",
+        "L03",
+        "Q03",
+        "E02",
+        "O04",
+        "R11-JP",
+        "R11-HK",
+        "R11-GB",
+        "R11-IE",
+        "R11-FR"
+      ],
+      "gaps": [
+        "RG-07",
+        "HG-07",
+        "NG-07"
+      ],
+      "area": "qa",
+      "title": "迭代二端到端候选验收",
+      "change": "在隔离环境连接抓取证据、翻译、状态更新、档案和双向关系；审核 schema/数据变更与首批运行范围。",
+      "test": "完整跑一场赛前到赛后及一篇新闻到公开关联；回放延期/退赛/更正；未解决的九地区缺口不能隐藏。",
+      "done": "I2 验收通过才切入首批生产准备；输出可复用的固定输入和预期公开结果。",
+      "deadline": "2026-10-16 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-16T18:00:00+08:00",
+      "read_paths": [
+        "docs/reports/2026-10-02-current-capabilities.md",
+        "docs/reports/2026-10-02-backlog-evidence-reconciliation.md",
+        "docs/changes/next-version-capabilities/test_cases.md"
+      ],
+      "status": "未开始",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
+    },
+    "progress_snapshot": {
+      "id": "V02",
+      "title": "迭代二端到端候选验收",
+      "lane": "R",
+      "completion_percent": 15,
+      "status": "部分完成",
+      "basis_and_gap": "部分端到端子片和固定19组合原生结果可用；迭代二真实整体验收未过",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "V02"
+      ],
+      "previous_percent": 15,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "R",
+      "title": "迭代二端到端候选验收",
+      "deps": [
+        "R09",
+        "H03",
+        "H05",
+        "M04",
+        "L03",
+        "Q03",
+        "E02",
+        "O04",
+        "R11-JP",
+        "R11-HK",
+        "R11-GB",
+        "R11-IE",
+        "R11-FR"
+      ],
+      "deadline_at": "2026-10-16T18:00:00+08:00",
+      "status": "计划节点逾期，未完成端到端验收",
+      "phase": "原10/16 18:00 I2未通过，已有单片/CI不能代替主链；真实来源/模型保留集/身份输入、关系与API/恢复及隔离集成证据仍需补齐，后台暂缓范围不重加",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 15,
+    "business_delivery_complete": false,
+    "priority_within_project": 11
+  },
+  {
+    "id": "V03",
+    "project": "P06",
+    "requirement_id": "BR-V03",
+    "original_plan": {
+      "id": "V03",
+      "lane": "R",
+      "role": "operations",
+      "it": 3,
+      "start": "2026-10-22",
+      "due": "2026-10-23",
+      "h": 6,
+      "deps": [
+        "R13",
+        "M07",
+        "M08",
+        "M09",
+        "M10",
+        "N07",
+        "H09",
+        "L05",
+        "H07",
+        "E05",
+        "U04"
+      ],
+      "gaps": [
+        "AG-07",
+        "RG-07",
+        "UG-06"
+      ],
+      "area": "qa",
+      "title": "功能冻结与独立集成审核",
+      "change": "10/22 完成开发，10/23 对固定候选做影响回归、schema/并发/幂等/权限审查；比对新旧 CI 失败集合。",
+      "test": "TC 全矩阵，逐项核实 51 个 Gap 映射；已知基线失败须确认不覆盖本次路径，不能以存量名义跳过。",
+      "done": "10/23 12:00 前给出审核结论及固定 SHA；没有阻断项才交 O06；后续仅缺陷修复和验收。",
+      "deadline": "2026-10-23 12:00 Asia/Shanghai",
+      "deadline_at": "2026-10-23T12:00:00+08:00",
+      "read_paths": [
+        "docs/reports/2026-10-02-current-capabilities.md",
+        "docs/reports/2026-10-02-backlog-evidence-reconciliation.md",
+        "docs/changes/next-version-capabilities/test_cases.md"
+      ],
+      "status": "未开始",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
+    },
+    "progress_snapshot": {
+      "id": "V03",
+      "title": "功能冻结与独立集成审核",
+      "lane": "R",
+      "completion_percent": 25,
+      "status": "部分完成",
+      "basis_and_gap": "A170/D081/C248/C253等窄片新增独立审核；全量冻结/集成及正式过期skip gate仍失败，比例不变。",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "V03"
+      ],
+      "previous_percent": 25,
+      "change_since_previous": "A170/D081/C248/C253等窄片新增独立审核；全量冻结/集成及正式过期skip gate仍失败，比例不变。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "R",
+      "title": "功能冻结与独立集成审核",
+      "deps": [
+        "R13",
+        "M07",
+        "M08",
+        "M09",
+        "M10",
+        "N07",
+        "H09",
+        "L05",
+        "H07",
+        "E05",
+        "U04"
+      ],
+      "deadline_at": "2026-10-23T12:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
+    },
+    "after_snapshot_note": "C265新增独立源码审通过；四线整合后未进行新独立审或CI，原单线测试不能背书新组合。",
+    "progress_percent_preserved": 25,
+    "business_delivery_complete": false,
+    "priority_within_project": 12
+  },
+  {
+    "id": "O05",
+    "project": "P06",
+    "requirement_id": "BR-O05",
+    "original_plan": {
+      "id": "O05",
+      "lane": "R",
+      "role": "operations",
+      "it": 3,
+      "start": "2026-10-20",
+      "due": "2026-10-20",
+      "h": 4,
+      "deps": [
+        "V02",
+        "R11",
+        "H05",
+        "N06",
+        "L05",
+        "O03",
+        "O04"
+      ],
+      "gaps": [
+        "UG-06",
+        "RG-07"
+      ],
+      "area": "ops",
+      "title": "首批核心链路生产灰度及自然观察",
+      "change": "针对 I2 及已审核增量准备精确发布包，按根 AGENTS.md 执行；五地区新闻均启用本次 N06 政策并固定候选/发布/曝光分母，赛事与名称仍按明确的有限灰度对象运行。",
+      "test": "验证原始证据、数据、revision、关系及公开页面，记录自然时延；已批准包以外的模型/来源/数据动作不混入。",
+      "done": "10/20 12:00 前启动五地区新闻有效观察并记录政策版本、来源范围及真实开始时间；10/27 12:00 才可冻结完整 168 小时证据。地区无合格事件仍保留分母与原因，不能以删地区达标；缺少实赛的地区回放与自然证据分开。",
+      "deadline": "2026-10-20 12:00 Asia/Shanghai",
+      "deadline_at": "2026-10-20T12:00:00+08:00",
+      "read_paths": [
+        "deploy/deploy.sh",
+        "deploy/backup_db.sh",
+        "deploy/restore_db.sh",
+        "deploy/rollback.sh",
+        "docker-compose.prod.yml",
+        "docker-compose.prod.lowcost.yml"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "O05",
+      "title": "首批核心链路生产灰度及自然观察",
+      "lane": "R",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "O05"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "R",
+      "title": "首批核心链路生产灰度及自然观察",
+      "deps": [
+        "V02",
+        "R11",
+        "H05",
+        "N06",
+        "L05",
+        "O03",
+        "O04"
+      ],
+      "deadline_at": "2026-10-20T12:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 13
+  },
+  {
+    "id": "O06",
+    "project": "P06",
+    "requirement_id": "BR-O06",
+    "original_plan": {
+      "id": "O06",
+      "lane": "R",
+      "role": "operations",
+      "it": 3,
+      "start": "2026-10-23",
+      "due": "2026-10-23",
+      "h": 4,
+      "deps": [
+        "V03",
+        "O05",
+        "Q02",
+        "H09"
+      ],
+      "gaps": [
+        "QG-01",
+        "QG-02",
+        "AG-05",
+        "UG-06"
+      ],
+      "area": "ops",
+      "title": "发布完整候选并开始七天验收窗口",
+      "change": "发布全部能力的候选版本，QQ 停用、已核验数据修复和重点赛事前瞻按发布包逐项启用；逐地区/来源保留可定位的开关及回滚点。",
+      "test": "校验 schema、新旧版本兼容、任务积压、实际请求边界、前台版本及资源；首批前瞻关键事实抽检。",
+      "done": "10/23 16:00 前所有本版能力已部署并按灰度范围运行；固定候选/配置和实际观察起点，到 10/30 16:00 满 168 小时。中途关键变更须重算相关有效窗口，仍不宣称已经全量验收。",
+      "deadline": "2026-10-23 16:00 Asia/Shanghai",
+      "deadline_at": "2026-10-23T16:00:00+08:00",
+      "read_paths": [
+        "deploy/deploy.sh",
+        "deploy/backup_db.sh",
+        "deploy/restore_db.sh",
+        "deploy/rollback.sh",
+        "docker-compose.prod.yml",
+        "docker-compose.prod.lowcost.yml"
+      ],
+      "status": "未开始",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
+    },
+    "progress_snapshot": {
+      "id": "O06",
+      "title": "发布完整候选并开始七天验收窗口",
+      "lane": "R",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "10/23完整候选和七天观察未启动；本卡仍0%，不得压缩观察窗或以旧结果填充。",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "O06"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "10/23完整候选和七天观察未启动；本卡仍0%，不得压缩观察窗或以旧结果填充。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "R",
+      "title": "发布完整候选并开始七天验收窗口",
+      "deps": [
+        "V03",
+        "O05",
+        "Q02",
+        "H09"
+      ],
+      "deadline_at": "2026-10-23T16:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 14
+  },
+  {
+    "id": "V04",
+    "project": "P06",
+    "requirement_id": "BR-V04",
+    "original_plan": {
+      "id": "V04",
+      "lane": "R",
+      "role": "operations",
+      "it": 4,
+      "start": "2026-10-24",
+      "due": "2026-10-26",
+      "h": 4,
+      "deps": [
+        "O06"
+      ],
+      "gaps": [
+        "HG-07",
+        "LG-07",
+        "NG-07",
+        "UG-05"
+      ],
+      "area": "qa",
+      "title": "执行真实用户旅程和保留样例验收",
+      "change": "独立核查新闻阅读/筛选→赛事资料→马匹履历及后台异常修复，覆盖五地区新闻、九地区赛事和不同资料成熟度。",
+      "test": "将代码测试、隔离数据库、生产只读、受控数据动作证据分开；逐条记录实际结果与截图/日志时间。",
+      "done": "所有发布阻断问题进入本轮修复；不以一张截图替代完整路径。",
+      "deadline": "2026-10-26 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-26T18:00:00+08:00",
+      "read_paths": [
+        "docs/reports/2026-10-02-current-capabilities.md",
+        "docs/reports/2026-10-02-backlog-evidence-reconciliation.md",
+        "docs/changes/next-version-capabilities/test_cases.md"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "V04",
+      "title": "执行真实用户旅程和保留样例验收",
+      "lane": "R",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "V04"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "R",
+      "title": "执行真实用户旅程和保留样例验收",
+      "deps": [
+        "O06"
+      ],
+      "deadline_at": "2026-10-26T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 15
+  },
+  {
+    "id": "O07",
+    "project": "P06",
+    "requirement_id": "BR-O07",
+    "original_plan": {
+      "id": "O07",
+      "lane": "R",
+      "role": "operations",
+      "it": 4,
+      "start": "2026-10-24",
+      "due": "2026-10-25",
+      "h": 4,
+      "deps": [
+        "O06",
+        "O04"
+      ],
+      "gaps": [
+        "UG-06"
+      ],
+      "area": "ops",
+      "title": "验证完整候选回滚与恢复交接",
+      "change": "以固定候选在隔离副本演练停新任务、回退读路径/代码、保留新 schema/已发布证据、恢复人工字段；核验数据批次快照。",
+      "test": "候选文章已发布、名称已更新和新 revision 存在时回滚不丢审计；兼容代码无法读新数据时必须有恢复策略。",
+      "done": "TC-O02 通过；精确 RTO/RPO 实测值与缺口可见，旧队列和无关服务保持原边界。",
+      "deadline": "2026-10-25 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-25T18:00:00+08:00",
+      "read_paths": [
+        "deploy/deploy.sh",
+        "deploy/backup_db.sh",
+        "deploy/restore_db.sh",
+        "deploy/rollback.sh",
+        "docker-compose.prod.yml",
+        "docker-compose.prod.lowcost.yml"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "O07",
+      "title": "验证完整候选回滚与恢复交接",
+      "lane": "R",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "O07"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "R",
+      "title": "验证完整候选回滚与恢复交接",
+      "deps": [
+        "O06",
+        "O04"
+      ],
+      "deadline_at": "2026-10-25T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 16
+  },
+  {
+    "id": "V05",
+    "project": "P06",
+    "requirement_id": "BR-V05",
+    "original_plan": {
+      "id": "V05",
+      "lane": "R",
+      "role": "operations",
+      "it": 4,
+      "start": "2026-10-27",
+      "due": "2026-10-27",
+      "h": 4,
+      "deps": [
+        "H11",
+        "R15",
+        "N09",
+        "M11",
+        "L06",
+        "E06",
+        "U05",
+        "O07",
+        "V04"
+      ],
+      "gaps": [
+        "RG-07",
+        "HG-07",
+        "AG-07",
+        "UG-06"
+      ],
+      "area": "qa",
+      "title": "固定全量发布候选并独立复审",
+      "change": "对最终 SHA、迁移、配置、来源/模型/数据范围和失败集合重新核对；风险修改补影响回归；检查 51 个 Gap 去向。",
+      "test": "RC 对照回归、全部关键合同和恢复证据；观察窗口中出现错误必须保留并给修复结果。",
+      "done": "10/27 18:00 前具备可审核的全量包；M12/E07 的 10/28 上午运行验收作为 O08 必要输入。",
+      "deadline": "2026-10-27 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-27T18:00:00+08:00",
+      "read_paths": [
+        "docs/reports/2026-10-02-current-capabilities.md",
+        "docs/reports/2026-10-02-backlog-evidence-reconciliation.md",
+        "docs/changes/next-version-capabilities/test_cases.md"
+      ],
+      "status": "未开始",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
+    },
+    "progress_snapshot": {
+      "id": "V05",
+      "title": "固定全量发布候选并独立复审",
+      "lane": "R",
+      "completion_percent": 10,
+      "status": "部分完成",
+      "basis_and_gap": "新增候选切片证据而非全量发布候选；C259运行中、B真实PG资格未通过，比例不变。",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "V05"
+      ],
+      "previous_percent": 10,
+      "change_since_previous": "新增候选切片证据而非全量发布候选；C259运行中、B真实PG资格未通过，比例不变。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "R",
+      "title": "固定全量发布候选并独立复审",
+      "deps": [
+        "H11",
+        "R15",
+        "N09",
+        "M11",
+        "L06",
+        "E06",
+        "U05",
+        "O07",
+        "V04"
+      ],
+      "deadline_at": "2026-10-27T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
+    },
+    "after_snapshot_note": "没有全量发布候选。C266取消后GREEN未知，B286源码仍待审，正式verifier/独立collect/image交付证据仍有缺口。",
+    "progress_percent_preserved": 10,
+    "business_delivery_complete": false,
+    "priority_within_project": 17
+  },
+  {
+    "id": "O08",
+    "project": "P06",
+    "requirement_id": "BR-O08",
+    "original_plan": {
+      "id": "O08",
+      "lane": "R",
+      "role": "operations",
+      "it": 4,
+      "start": "2026-10-28",
+      "due": "2026-10-28",
+      "h": 4,
+      "deps": [
+        "V05",
+        "M12",
+        "E07"
+      ],
+      "gaps": [
+        "UG-06"
+      ],
+      "area": "ops",
+      "title": "执行全量上线与公开范围核验",
+      "change": "依据根 AGENTS.md 对固定发布包交付，覆盖所有本版目标地区/对象/功能；仅按包内范围应用配置和数据，保留精确回滚。",
+      "test": "逐模块检查已开启范围、实际公开内容、真实定时运行、历史入口与性能；不能把全量部署但开关仍灰度算完成。",
+      "done": "10/28 16:00 前完成全部目标范围切换并记录真实启用时间；10/30 16:00 才满 48 小时。未达标则停止扩大并如实报告；延迟启用不得沿用计划开始时刻。",
+      "deadline": "2026-10-28 16:00 Asia/Shanghai",
+      "deadline_at": "2026-10-28T16:00:00+08:00",
+      "read_paths": [
+        "deploy/deploy.sh",
+        "deploy/backup_db.sh",
+        "deploy/restore_db.sh",
+        "deploy/rollback.sh",
+        "docker-compose.prod.yml",
+        "docker-compose.prod.lowcost.yml"
+      ],
+      "status": "未开始",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
+    },
+    "progress_snapshot": {
+      "id": "O08",
+      "title": "执行全量上线与公开范围核验",
+      "lane": "R",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "O08"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "R",
+      "title": "执行全量上线与公开范围核验",
+      "deps": [
+        "V05",
+        "M12",
+        "E07"
+      ],
+      "deadline_at": "2026-10-28T16:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 18
+  },
+  {
+    "id": "V06",
+    "project": "P06",
+    "requirement_id": "BR-V06",
+    "original_plan": {
+      "id": "V06",
+      "lane": "R",
+      "role": "operations",
+      "it": 4,
+      "start": "2026-10-28",
+      "due": "2026-10-30",
+      "h": 6,
+      "deps": [
+        "O08",
+        "R16"
+      ],
+      "gaps": [
+        "RG-07",
+        "NG-07",
+        "HG-07",
+        "EG-06",
+        "AG-07"
+      ],
+      "area": "qa",
+      "title": "完成全量运行的 48 小时观察",
+      "change": "持续检查自然资料变化、五地区新闻、重点前瞻、名称/履历更新、无人值守异常恢复和 QQ 零发送。",
+      "test": "指标与用户路径双核验；期间修复要重测影响路径，并记录剩余观察时长；关键回退后不能沿用旧稳定窗口。",
+      "done": "10/30 16:00 冻结满 48 小时全量及 168 小时完整候选的有效窗口，纳入 R16 最终证据；17:00 前形成报告供 V07 验收。真实启用较晚或关键回退导致窗口不足时，明确原 DDL 风险，不使用预报代替最终分母。",
+      "deadline": "2026-10-30 17:00 Asia/Shanghai",
+      "deadline_at": "2026-10-30T17:00:00+08:00",
+      "read_paths": [
+        "docs/reports/2026-10-02-current-capabilities.md",
+        "docs/reports/2026-10-02-backlog-evidence-reconciliation.md",
+        "docs/changes/next-version-capabilities/test_cases.md"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "V06",
+      "title": "完成全量运行的 48 小时观察",
+      "lane": "R",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "V06"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "R",
+      "title": "完成全量运行的 48 小时观察",
+      "deps": [
+        "O08",
+        "R16"
+      ],
+      "deadline_at": "2026-10-30T17:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 19
+  },
+  {
+    "id": "V07",
+    "project": "P06",
+    "requirement_id": "BR-V07",
+    "original_plan": {
+      "id": "V07",
+      "lane": "R",
+      "role": "operations",
+      "it": 4,
+      "start": "2026-10-30",
+      "due": "2026-10-30",
+      "h": 3,
+      "deps": [
+        "V06",
+        "R16"
+      ],
+      "gaps": [
+        "RG-07",
+        "HG-07",
+        "UG-06"
+      ],
+      "area": "qa",
+      "title": "汇总最终验收及逐任务完成证据",
+      "change": "将每张任务卡关联 commit/PR、部署版本、范围、开关、测试和公开验收；列清代码完成/部署/启用/验证四种状态。",
+      "test": "核对错误率 <1%、卡顿率 <3%、5/10 分钟时限和数据覆盖；28 天尚未满不能声明长期达标。",
+      "done": "提前整理逐任务材料；10/30 17:00 接收 V06 和 R16 最终证据后，18:00 前完成最终核对并提交报告；任一核心能力未过时标为部分上线而非完全上线。",
+      "deadline": "2026-10-30 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-30T18:00:00+08:00",
+      "read_paths": [
+        "docs/reports/2026-10-02-current-capabilities.md",
+        "docs/reports/2026-10-02-backlog-evidence-reconciliation.md",
+        "docs/changes/next-version-capabilities/test_cases.md"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "V07",
+      "title": "汇总最终验收及逐任务完成证据",
+      "lane": "R",
+      "completion_percent": 5,
+      "status": "部分完成",
+      "basis_and_gap": "存在协调/证据台账；逐卡最终验收和运行观察输入均不齐",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "V07"
+      ],
+      "previous_percent": 5,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "R",
+      "title": "汇总最终验收及逐任务完成证据",
+      "deps": [
+        "V06",
+        "R16"
+      ],
+      "deadline_at": "2026-10-30T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 5,
+    "business_delivery_complete": false,
+    "priority_within_project": 20
+  },
+  {
+    "id": "O09",
+    "project": "P06",
+    "requirement_id": "BR-O09",
+    "original_plan": {
+      "id": "O09",
+      "lane": "R",
+      "role": "operations",
+      "it": 4,
+      "start": "2026-10-30",
+      "due": "2026-10-30",
+      "h": 2,
+      "deps": [
+        "V07"
+      ],
+      "gaps": [
+        "UG-06",
+        "QG-03"
+      ],
+      "area": "ops",
+      "title": "完成维护交接与长期事项归档",
+      "change": "更新 current_state、project_status、decisions 及实际受影响运维文档，交接来源续期、预算、异常处理和长期 API 合同。",
+      "test": "交接链接、任务归属、恢复入口和剩余数据缺口逐项可读；不将长期 API 或不可得中文名标为本版已实现。",
+      "done": "10/30 20:00 前交接完毕；用户可从统一入口找到上线版本和后续真实剩余项。",
+      "deadline": "2026-10-30 20:00 Asia/Shanghai",
+      "deadline_at": "2026-10-30T20:00:00+08:00",
+      "read_paths": [
+        "deploy/deploy.sh",
+        "deploy/backup_db.sh",
+        "deploy/restore_db.sh",
+        "deploy/rollback.sh",
+        "docker-compose.prod.yml",
+        "docker-compose.prod.lowcost.yml"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "O09",
+      "title": "完成维护交接与长期事项归档",
+      "lane": "R",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "O09"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "R",
+      "title": "完成维护交接与长期事项归档",
+      "deps": [
+        "V07"
+      ],
+      "deadline_at": "2026-10-30T20:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 21
+  }
+]

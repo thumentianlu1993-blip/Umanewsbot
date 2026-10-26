@@ -60,7 +60,10 @@
         "server/stable/templates/stable/console/dashboard.html",
         "server/stable/templates/stable/console/article_editor.html"
       ],
-      "status": "未开始"
+      "status": "用户暂缓",
+      "scope_disposition": "deferred_by_user_20261006",
+      "scope_note": "用户2026-10-06：暂缓运营后台改造及QQ通知下线，其余保留；用户随后已恢复其余开发，本卡仍暂缓。 保留已有代码和历史交付，不回滚、不部署。",
+      "status_before_deferral": "未开始"
     },
     {
       "id": "F03",
@@ -240,7 +243,10 @@
         "server/stable/admin.py",
         "server/app/settings.py"
       ],
-      "status": "未开始"
+      "status": "用户暂缓",
+      "scope_disposition": "deferred_by_user_20261006",
+      "scope_note": "用户2026-10-06：暂缓运营后台改造及QQ通知下线，其余保留；用户随后已恢复其余开发，本卡仍暂缓。 保留已有代码和历史交付，不回滚、不部署。",
+      "status_before_deferral": "未开始"
     },
     {
       "id": "F06",
@@ -395,7 +401,12 @@
         "server/stable/admin.py",
         "server/app/settings.py"
       ],
-      "status": "未开始"
+      "status": "用户暂缓",
+      "scope_disposition": "deferred_by_user_20261006",
+      "scope_note": "用户2026-10-06：暂缓运营后台改造及QQ通知下线，其余保留；用户随后已恢复其余开发，本卡仍暂缓。 保留已有代码和历史交付，不回滚、不部署。",
+      "status_before_deferral": "未开始",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
     },
     {
       "id": "R02",
@@ -675,7 +686,9 @@
         "docs/reports/2026-10-02-backlog-evidence-reconciliation.md",
         "docs/changes/next-version-capabilities/test_cases.md"
       ],
-      "status": "未开始"
+      "status": "未开始",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
     },
     {
       "id": "R04",
@@ -767,7 +780,11 @@
         "server/stable/templates/stable/console/dashboard.html",
         "server/stable/templates/stable/console/article_editor.html"
       ],
-      "status": "未开始"
+      "status": "未开始",
+      "scope_disposition": "retain_shared_core_defer_admin_integration",
+      "scope_note": "保留其余业务必需的异常分类、幂等、字段保护及恢复核心；暂缓新版后台入口/人工操作流程改造与效率验收，实施前按现有业务入口拆分。",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
     },
     {
       "id": "H06",
@@ -952,7 +969,12 @@
         "server/stable/templates/stable/console/dashboard.html",
         "server/stable/templates/stable/console/article_editor.html"
       ],
-      "status": "未开始"
+      "status": "用户暂缓",
+      "scope_disposition": "deferred_by_user_20261006",
+      "scope_note": "用户2026-10-06：暂缓运营后台改造及QQ通知下线，其余保留；用户随后已恢复其余开发，本卡仍暂缓。 保留已有代码和历史交付，不回滚、不部署。",
+      "status_before_deferral": "未开始",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
     },
     {
       "id": "O03",
@@ -1583,7 +1605,9 @@
         "docs/reports/2026-10-02-backlog-evidence-reconciliation.md",
         "docs/changes/next-version-capabilities/test_cases.md"
       ],
-      "status": "未开始"
+      "status": "未开始",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
     },
     {
       "id": "R10",
@@ -2129,7 +2153,12 @@
         "server/stable/templates/stable/console/dashboard.html",
         "server/stable/templates/stable/console/article_editor.html"
       ],
-      "status": "未开始"
+      "status": "用户暂缓",
+      "scope_disposition": "deferred_by_user_20261006",
+      "scope_note": "用户2026-10-06：暂缓运营后台改造及QQ通知下线，其余保留；用户随后已恢复其余开发，本卡仍暂缓。 保留已有代码和历史交付，不回滚、不部署。",
+      "status_before_deferral": "未开始",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
     },
     {
       "id": "O05",
@@ -2324,7 +2353,9 @@
         "server/app/settings.py",
         "server/stable/tasks.py"
       ],
-      "status": "未开始"
+      "status": "未开始",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
     },
     {
       "id": "N07",
@@ -2386,7 +2417,11 @@
         "server/stable/templates/stable/console/dashboard.html",
         "server/stable/templates/stable/console/article_editor.html"
       ],
-      "status": "未开始"
+      "status": "未开始",
+      "scope_disposition": "retain_shared_core_defer_admin_integration",
+      "scope_note": "保留其余业务必需的异常分类、幂等、字段保护及恢复核心；暂缓新版后台入口/人工操作流程改造与效率验收，实施前按现有业务入口拆分。",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
     },
     {
       "id": "E05",
@@ -2418,7 +2453,11 @@
         "server/stable/templates/stable/console/dashboard.html",
         "server/stable/templates/stable/console/article_editor.html"
       ],
-      "status": "未开始"
+      "status": "未开始",
+      "scope_disposition": "retain_shared_core_defer_admin_integration",
+      "scope_note": "保留其余业务必需的异常分类、幂等、字段保护及恢复核心；暂缓新版后台入口/人工操作流程改造与效率验收，实施前按现有业务入口拆分。",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
     },
     {
       "id": "U04",
@@ -2487,7 +2526,9 @@
         "docker-compose.prod.yml",
         "docker-compose.prod.lowcost.yml"
       ],
-      "status": "未开始"
+      "status": "未开始",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
     },
     {
       "id": "V03",
@@ -2527,7 +2568,9 @@
         "docs/reports/2026-10-02-backlog-evidence-reconciliation.md",
         "docs/changes/next-version-capabilities/test_cases.md"
       ],
-      "status": "未开始"
+      "status": "未开始",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
     },
     {
       "id": "H10",
@@ -2623,7 +2666,12 @@
         "server/stable/templates/stable/console/dashboard.html",
         "server/stable/templates/stable/console/article_editor.html"
       ],
-      "status": "未开始"
+      "status": "用户暂缓",
+      "scope_disposition": "deferred_by_user_20261006",
+      "scope_note": "用户2026-10-06：暂缓运营后台改造及QQ通知下线，其余保留；用户随后已恢复其余开发，本卡仍暂缓。 保留已有代码和历史交付，不回滚、不部署。",
+      "status_before_deferral": "未开始",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
     },
     {
       "id": "L06",
@@ -2913,7 +2961,9 @@
         "server/stable/templates/stable/public/horse_detail.html",
         "server/stable/templates/stable/public/detail.html"
       ],
-      "status": "未开始"
+      "status": "未开始",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
     },
     {
       "id": "V05",
@@ -2952,7 +3002,9 @@
         "docs/reports/2026-10-02-backlog-evidence-reconciliation.md",
         "docs/changes/next-version-capabilities/test_cases.md"
       ],
-      "status": "未开始"
+      "status": "未开始",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
     },
     {
       "id": "M12",
@@ -3014,7 +3066,12 @@
         "server/stable/templates/stable/console/dashboard.html",
         "server/stable/templates/stable/console/article_editor.html"
       ],
-      "status": "未开始"
+      "status": "用户暂缓",
+      "scope_disposition": "deferred_by_user_20261006",
+      "scope_note": "用户2026-10-06：暂缓运营后台改造及QQ通知下线，其余保留；用户随后已恢复其余开发，本卡仍暂缓。 保留已有代码和历史交付，不回滚、不部署。",
+      "status_before_deferral": "未开始",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
     },
     {
       "id": "O08",
@@ -3047,7 +3104,9 @@
         "docker-compose.prod.yml",
         "docker-compose.prod.lowcost.yml"
       ],
-      "status": "未开始"
+      "status": "未开始",
+      "dependency_replan_required": true,
+      "dependency_note": "原deps保留作历史；暂缓后台/QQ部分不再作为保留范围的阻断，跨模块共用核心依赖仍有效；恢复实施前按范围拆分依赖和验收，不能直接将整卡跳过为完成。"
     },
     {
       "id": "R16",

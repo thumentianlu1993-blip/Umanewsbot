@@ -1,0 +1,36 @@
+{
+  "task": "R-C265-PAIR-INDEX-MINIMAL-GUARD-SOURCE-REVIEW-001",
+  "verdict": "APPROVED",
+  "scope": "SOURCE_ONLY_READY_FOR_SEPARATE_FIXED_SHA_GREEN_CARD",
+  "blocking_findings": [],
+  "head": "d8f8e9e6757b997e6545b917d5db6d4268ce7c5a",
+  "tree": "d8c36586d87bf19aaf9b437884de2fbc2c513b9e",
+  "parent": "69e9856282a41048ac9434fc1928c0d9fc53359f",
+  "horse_profiles_sha256": "4b0868d7e9893501644cb76575a3f49cfe6ad76c1407996a27d5966e27b315f8",
+  "frozen_test_methods": 24,
+  "runtime_GREEN": "NOT_RUN",
+  "budget_source_contract": {
+    "pairs": 16,
+    "reader_data_SELECTs": 32,
+    "raw_UTF8_MiB": 64,
+    "local_timeout_max_ms": 2000,
+    "elapsed_soft_seconds": 5,
+    "heap_hard_limit_proved": false
+  },
+  "weekly_usage_observation": {
+    "used_percent": 51,
+    "remaining_percent": 49,
+    "ordinary_usage_allowed": true,
+    "reset_used": false
+  },
+  "verified_package_members": 16,
+  "verified_package_bytes": 168453,
+  "verified_other_protected_pins": 25,
+  "verified_prior_packages": 74,
+  "verified_prior_members": 5907,
+  "author_seal_sha256": "50e35a402ba41ec4d564684d0cc2f610d7397fddbf02834c06819c06fbf54477",
+  "report_sha256": "6b91cd7f656f2268d08fadb31d6ffbbfadecdd59a8a4c314fa3ec9c3f6d8d184",
+  "candidate_helper_tests_SQL_or_DB_execution": false,
+  "author_tree_modified": false,
+  "production_or_full_L02_acceptance": false
+}

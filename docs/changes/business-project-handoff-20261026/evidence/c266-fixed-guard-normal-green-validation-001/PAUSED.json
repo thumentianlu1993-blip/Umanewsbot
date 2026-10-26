@@ -1,0 +1,29 @@
+{
+  "paused_at": "2026-10-24T16:00:42.011544+00:00",
+  "reason": "Explicit human pause, all C266 work stops",
+  "task": "C266",
+  "HEAD": "d8f8e9e6757b997e6545b917d5db6d4268ce7c5a",
+  "dirty": "?? docs/changes/next-version-capabilities/lanes/C/C260-pair-index-scanner-integration-design.md",
+  "CI_run": 40108906491,
+  "watcher_pid": 76400,
+  "watcher_command": "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python -u -",
+  "watcher_owned_confirmed": true,
+  "watcher_stop": "EXITED: ps reports PID absent",
+  "CI_cancel": {
+    "attempts": 1,
+    "exit_code": 0,
+    "request": "accepted",
+    "final_remote_status": "UNKNOWN; no further poll"
+  },
+  "further_poll_download_analysis": "STOPPED",
+  "CI_status_before_cancel": {
+    "id": 40108906491,
+    "status": "in_progress",
+    "conclusion": null,
+    "head_sha": "d8f8e9e6757b997e6545b917d5db6d4268ce7c5a",
+    "run_attempt": 1
+  },
+  "watcher_exit_ps": "",
+  "external_CID_cleanup": "UNKNOWN",
+  "resume_condition": "Only explicit later manual human resume"
+}

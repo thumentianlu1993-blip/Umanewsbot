@@ -1,0 +1,918 @@
+[
+  {
+    "id": "F02",
+    "project": "P01",
+    "requirement_id": "BR-F02",
+    "original_plan": {
+      "id": "F02",
+      "lane": "B",
+      "role": "integration",
+      "it": 1,
+      "start": "2026-10-03",
+      "due": "2026-10-05",
+      "h": 5,
+      "deps": [],
+      "gaps": [
+        "NG-01",
+        "NG-07",
+        "AG-07"
+      ],
+      "area": "news",
+      "title": "建立新闻漏斗与模型黄金样例",
+      "change": "只读统计五地区抓取、清洗、翻译、选择、公开和曝光；按失败原因拆解 JRA 倾斜。保存脱敏的原文/正确实体/重要事件标注，固定训练样例与保留验收集。",
+      "test": "每地区至少 20 篇，共至少 100 篇；包含广告、误删、普通词、重复报道和重大消息。检查分母同时覆盖未发布和失败文章。",
+      "done": "交付基线表、固定 fixture 与标注指南；明确实际生产配置与代码默认值的差异。",
+      "deadline": "2026-10-05 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-05T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/article_content.py",
+        "server/stable/adapters/international.py",
+        "server/stable/services/automation.py",
+        "server/stable/services/publishing_windows.py",
+        "server/stable/test_news_content_boundaries.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "F02",
+      "title": "建立新闻漏斗与模型黄金样例",
+      "lane": "B",
+      "completion_percent": 25,
+      "status": "部分完成",
+      "basis_and_gap": "导出/采集工具及隔离测试已有；五地区真实黄金样例和保留集仍为0",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "F02"
+      ],
+      "previous_percent": 25,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "B",
+      "title": "建立新闻漏斗与模型黄金样例",
+      "deps": [],
+      "deadline_at": "2026-10-05T18:00:00+08:00",
+      "status": "进行中",
+      "phase": "B027固定8d0715完整本地采集/交付31唯一隔离测试、原R00654492通过；B028精确现场包准备，fresh/人工gold/holdout仍0",
+      "commit": "4eafb17fe572967e90bf2ee19d6f65168b6d9413",
+      "pr": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/235",
+      "review": "组合正式delivery/full6378和exact31PG已验；T01真实原R收包已审；D01/D02实际负例原R81bb通过；真实F02样本0",
+      "evidence": [
+        "/Users/mentianlu/.codex/worktrees/a14d/umanews/docs/changes/next-version-capabilities/lanes/B/B-001-status.md"
+      ],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "dispatch_id": "B-006",
+      "owner_thread_id": "01a0fdc6-e1a2-7ae1-9749-6889626d9bf4",
+      "plan_commit": "1e36c9af7b34c4a22db795e7108923c0e14f76d1",
+      "adapter_commit": "d092773a2357edfcf9e62ca458d84df56fca6e65",
+      "review_commit": "848955d9c384809a272e858f0409e15e01b38279",
+      "formal_ci_blocker": null,
+      "ci_connection_plan": {
+        "path": "/Users/mentianlu/.codex/runtime/b005-pg-window-v1/ci-connection-proposal-v2.md",
+        "sha256": "3994cb9ad03d9d28c519c2fff1025ef849528d2f67e584cd77c60f8f033aea6b",
+        "status": "APPROVED@aebe8e2a，实现42a已审，实际PG待"
+      },
+      "ci_binding_candidate": {
+        "sha": "64c647149f1c210e8241cf66d345fbb8635646e8",
+        "status": "64c修复已纳入PR236 fixed06b，正式CI exact31PG全部执行通过；生产/真实样本未验",
+        "execution_plan": "/Users/mentianlu/.codex/runtime/b005-pg-window-v3/execution-plan.json",
+        "execution_plan_sha256": "a15196bdc795cef75ddcaa99a546523d0e264b9279948886bab2a329a45f0f42",
+        "review_commit": "85082da7",
+        "prior_source_sha": "42a92650b812c3f8fbe8fe83919109f85fdf44e9"
+      },
+      "pg_v3_receipt": {
+        "path": "/Users/mentianlu/.codex/runtime/b005-pg-window-v3/receipt.json",
+        "sha256": "da0c9c273ec3eb65d06523e68201cfcd523ce78bfb006532cf139c54e2ca2431",
+        "executed": 31,
+        "passed": 30,
+        "errors": 1,
+        "skips": 0,
+        "cleanup": "complete"
+      },
+      "pg_v4_receipt": {
+        "lane": "B",
+        "task": "B005",
+        "source_sha": "64c647149f1c210e8241cf66d345fbb8635646e8",
+        "plan_sha256": "41329b28facac7a1d77699d5c85e32ad31114e60e2eb416419597329d950d686",
+        "status": "passed_partial_P08_only",
+        "collection_count": 31,
+        "executed": 1,
+        "passed": 1,
+        "skips": 0,
+        "receipt": "/Users/mentianlu/.codex/runtime/b005-pg-window-v4/receipt.json",
+        "receipt_sha256": "fb3f1c150a6b4b5af77505606142cf18124ba4f7ec97642caa930ef0f2403dcc",
+        "cleanup": "complete",
+        "elapsed_seconds": 3.378,
+        "review_commit": "66772aa9"
+      },
+      "docker_smoke_plan": {
+        "commit": "d8ab39deb8b6376e88a6eeac53b171763d1e2603",
+        "path": "/Users/mentianlu/.codex/runtime/b006-transfer-v2/execution-plan.json",
+        "sha256": "df0f0aa62713db66aff968316f59ecb3c97cfbeff8e2e186c3b8042743d81cb5",
+        "status": "v2真实T01失败且cp返回不足，root已准仅诊断runtime v3准备；无重跑授权",
+        "finding": "R-B006-SMOKE-001-P2-01",
+        "review_commit": "bf85758005c0e318d771e2fa6b3d48b62c70b018"
+      },
+      "docker_smoke_actual": {
+        "path": "/Users/mentianlu/.codex/runtime/b006-transfer-v2/receipt.json",
+        "sha256": "4b20bf1a39602dff8a27b5638e1a09296683a9f7c43b9cbdfd7a3c44a5d7d501",
+        "status": "failed",
+        "failure_stage": "happy_actual_exec_cp_host_persistence",
+        "error_type": "AssertionError",
+        "passed_cases": [
+          "unknown_helper_running",
+          "unknown_helper_resume_and_discovery"
+        ],
+        "container_removed": true,
+        "host_process_reaped": true,
+        "helper_cleanup": "stopped_pid_start_verified",
+        "elapsed_seconds": 1.458,
+        "delivered_to_R": false,
+        "root_live_absence_verified": true
+      },
+      "docker_smoke_diagnostic": {
+        "runtime": "/Users/mentianlu/.codex/runtime/b006-transfer-v3",
+        "plan_sha256": "3bcd625f84ecf51a4cd5fbac4dbbc2db1b1e7411cd510e3447df782f9baccefd",
+        "status": "v4实际T01失败：容器源目录不存在，cp return1；B离线定位fixture与路径绑定",
+        "actual_receipt": {
+          "path": "/Users/mentianlu/.codex/runtime/b006-transfer-v3/receipt.json",
+          "sha256": "d47ce4209796eaae43a965c7c572da11980db9c391b2876fc3801d728351a364",
+          "status": "failed",
+          "stage": "tool_package_verification",
+          "error_type": "CalledProcessError",
+          "elapsed_seconds": 0.058,
+          "container_created": false,
+          "PG_started": false,
+          "T01_executed": false
+        },
+        "root_cause_v3": "复制执行后v2 prepared携入4个cpython314 pyc，精确工具名单拒绝；工具源码SHA正确，尚非cp根因",
+        "v4_plan_sha256": "61f78217388f92815a677ef984b1f10b85584089534a90f5886ea1df530efde7",
+        "v4_actual_receipt": {
+          "path": "/Users/mentianlu/.codex/runtime/b006-transfer-v4/receipt.json",
+          "sha256": "e6c2389f2c81eef7ce58fc3647c8f086de8d1f0e8e2a86e398834784bad44e99",
+          "status": "failed",
+          "stage": "happy_actual_exec_cp_host_persistence",
+          "elapsed_seconds": 0.5,
+          "exec_commands": 1,
+          "copy_commands": 1,
+          "copy_returncode": 1,
+          "copy_stderr_sha256": "049e46461f2377fceaa65a4769188dd3052617b2c978146cd4ecdd12385389a5",
+          "observed_error": "daemon could not find fixed synthetic source directory",
+          "root_cause": "pending offline fixture/path binding diagnosis",
+          "container_removed": true,
+          "host_process_reaped": true,
+          "root_live_absence_verified": true,
+          "PG_started": false,
+          "delivered_to_R": false
+        }
+      },
+      "docker_smoke_current": {
+        "runtime": "/Users/mentianlu/.codex/runtime/b006-transfer-v9",
+        "status": "synthetic T01 actual PASS; original R independent receipt and trusted API bridge delivered_to_R",
+        "receipt_sha256": "2b903eda1f33a15d1e38589f70852a2a78465fb2292dcf4aef8710b6049d68d2",
+        "next": "B008 首批真实host只读preflight包仅本地准备",
+        "receipt_report": "docs/changes/next-version-capabilities/B006-synthetic-transfer-receipt-20261003.md"
+      },
+      "formal_ci_actual": {
+        "pr": 236,
+        "head": "06b01aea9041eacb3deae9f46968eb06fd459cb6",
+        "run_id": 37137528485,
+        "test_tree": "d23998ef537cf4ff7098a4aae0d9efa7987d115d",
+        "exact_f02_pg_executed": 31,
+        "skips": 0,
+        "errors": 0,
+        "failures": 0,
+        "batches": [
+          "batch-000.json",
+          "batch-001.json",
+          "batch-002.json",
+          "batch-003.json"
+        ],
+        "formal_delivery_verified": true
+      },
+      "native_partial_checkpoint": {
+        "head": "57fb5a318fbce7d1ddb2edc72a6c55f04a736241",
+        "parent": "3def650263fc4eb59b761780540331db9e5641a8",
+        "status": "partial_not_review_ready_not_complete",
+        "document_sha256": "6099255f9079b771d69fdc2de41d75f8324502e1920bfc8011cec940aad1cfa2",
+        "checkpoint_sha256": "1e8e805cfb12b89fabb1db4d2dab32c896177fb7f9fd30875412e08538d0867b",
+        "runtime": "/Users/mentianlu/.codex/runtime/b016-native-pure-contract-v1/partial-checkpoint-20261005",
+        "module_sha256": "cf4708f20a089e3917bc8be26354472d7ae8a94e597e65d2f75e0b53ad950b79",
+        "tests_sha256": "4e6dec08035cc2a592e0f57af39ef4c22ed9a6fe35bf8633ccfc96ac9e274790",
+        "actual_methods": 43,
+        "green_stage": "receipt-shape-positive-green2",
+        "actual_exit": 0,
+        "failures": 0,
+        "errors": 0,
+        "root_verified_actual_log_method_ids_source_snapshots_and_6_baselines": true,
+        "component_only": true,
+        "code_untracked_preserved": true,
+        "native": false,
+        "full_bundle_complete": false,
+        "author_background_runner": false
+      },
+      "merged_delivery_slices": [
+        {
+          "pr": 237,
+          "merge_commit": "22e130adf4464fd3c5dd63ccd3f508c4a853d464",
+          "head": "3a55a9891e3e557027876b18403ef7b5fb39401a",
+          "scope": "仅third-integration-delivery.md列明固定受审切片；不含后续未交付实现",
+          "deployed": false
+        }
+      ],
+      "partial_merged": true,
+      "tooling_merged_pr": 237,
+      "historical_development_approved_samples": 1,
+      "fresh_acceptance_count": 0,
+      "deadline_checkpoint_20261005": {
+        "due": "2026-10-05T18:00:00+08:00",
+        "result": "NOT_MET",
+        "real_recent_samples": 0,
+        "first_sample_blocker": "passive exporter path unavailable; full bounded supervised export and private receive not yet bound",
+        "next": "B027 local complete capture/delivery integration; original R review, then concrete approved production packet and actual R fresh receive; no mechanical cp retry"
+      }
+    },
+    "after_snapshot_note": "采样、黄金集和holdout真实输入仍不齐；B100005获精确授权只执行一次，cleanup_wait不是存活或清理证明，不得在新会话复用作再次生产授权。",
+    "progress_percent_preserved": 25,
+    "business_delivery_complete": false,
+    "priority_within_project": 1
+  },
+  {
+    "id": "N01",
+    "project": "P01",
+    "requirement_id": "BR-N01",
+    "original_plan": {
+      "id": "N01",
+      "lane": "B",
+      "role": "integration",
+      "it": 1,
+      "start": "2026-10-08",
+      "due": "2026-10-09",
+      "h": 4,
+      "deps": [
+        "F02"
+      ],
+      "gaps": [
+        "NG-02"
+      ],
+      "area": "news",
+      "title": "保存正文区块与清洗差异",
+      "change": "为来源适配器输出稳定区块 ID、原文与保留/删除原因，修正宽容器回退；保存必要正文证据供模型检查。",
+      "test": "固定广告、导航、引语、表格和图片说明案例；非空正文仍可能是错误容器，重要段落误删必须失败。",
+      "done": "TC-N01 通过；至少覆盖五地区现有启用来源模板，不将完整网页框架作为正文后备。",
+      "deadline": "2026-10-09 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-09T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/article_content.py",
+        "server/stable/adapters/international.py",
+        "server/stable/services/automation.py",
+        "server/stable/services/publishing_windows.py",
+        "server/stable/test_news_content_boundaries.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "N01",
+      "title": "保存正文区块与清洗差异",
+      "lane": "B",
+      "completion_percent": 40,
+      "status": "部分完成",
+      "basis_and_gap": "正文区块与ROOT噪声修复局部获审；五地区真实模板覆盖未验收",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "N01"
+      ],
+      "previous_percent": 40,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "B",
+      "title": "保存正文区块与清洗差异",
+      "deps": [
+        "F02"
+      ],
+      "deadline_at": "2026-10-09T18:00:00+08:00",
+      "status": "进行中",
+      "phase": "B159候选891fae2b已获原R APPROVED_LOCAL_CODE；只限本地合成输入ROOT噪声修复与13方法窄回归；真实来源演示/五地区整体验收仍缺，未授权PR/合并/发布",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [
+        "/Users/mentianlu/.codex/runtime/b158-n01-fixture-independent-red-design-001/plan.md"
+      ],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "dispatch_id": "B159-N01-ROOT-NOISE-FIX-RED-GREEN-001",
+      "owner_thread_id": "01a0fdc6-e1a2-7ae1-9749-6889626d9bf4"
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 40,
+    "business_delivery_complete": false,
+    "priority_within_project": 2
+  },
+  {
+    "id": "N02",
+    "project": "P01",
+    "requirement_id": "BR-N02",
+    "original_plan": {
+      "id": "N02",
+      "lane": "B",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-10",
+      "due": "2026-10-11",
+      "h": 4,
+      "deps": [
+        "N01",
+        "M03"
+      ],
+      "gaps": [
+        "NG-02",
+        "AG-03"
+      ],
+      "area": "news",
+      "title": "接入正文污染审查与模板变化检测",
+      "change": "模型只返回区块保留/删除及依据，程序实施清洗；对异常短文/噪声比例/模板变化记录质量原因及有界重试。",
+      "test": "广告与正文用词相似、引语含推广词、重要段落误删、模型不可用；回放 F02 保留集。",
+      "done": "TC-N01 达标，清洗前后差异可供后台查看；失败不得静默发布网页框架。",
+      "deadline": "2026-10-11 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-11T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/article_content.py",
+        "server/stable/adapters/international.py",
+        "server/stable/services/automation.py",
+        "server/stable/services/publishing_windows.py",
+        "server/stable/test_news_content_boundaries.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "N02",
+      "title": "接入正文污染审查与模板变化检测",
+      "lane": "B",
+      "completion_percent": 55,
+      "status": "部分完成",
+      "basis_and_gap": "污染审查核心与shadow/正式原生组合已有；真实样本与完整技术交付未闭合",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "N02"
+      ],
+      "previous_percent": 55,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "B",
+      "title": "接入正文污染审查与模板变化检测",
+      "deps": [
+        "N01",
+        "M03"
+      ],
+      "deadline_at": "2026-10-11T18:00:00+08:00",
+      "status": "正式PR CI通过，待ROOT/原R分层交付复审",
+      "phase": "PR250当前a3a140294a56c30585e1e31d794f019cc802a4cf，B161精确类型修复/代码、原生CI JSON与小工件有限接受；镜像体/候选外trusted collection/owned cleanup及N02/F02/I2整体验收未闭合",
+      "commit": "afed9bbe0e91ae9c93f318af8c2ae9e2715dfdc9",
+      "pr": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/250",
+      "review": "Original R exact-head read-only evidence review dispatched; pending.",
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false,
+      "dispatch_id": "B134-N02-CONTENT-REVIEW-FIRST-SLICE-PLAN-001"
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 55,
+    "business_delivery_complete": false,
+    "priority_within_project": 3
+  },
+  {
+    "id": "N03",
+    "project": "P01",
+    "requirement_id": "BR-N03",
+    "original_plan": {
+      "id": "N03",
+      "lane": "B",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-11",
+      "due": "2026-10-12",
+      "h": 5,
+      "deps": [
+        "N02",
+        "M03"
+      ],
+      "gaps": [
+        "NG-03",
+        "AG-03"
+      ],
+      "area": "names",
+      "title": "接入上下文实体识别和专名保护",
+      "change": "结合词库与强模型发现实体 occurrence，核验字符区间和稳定身份后生成保护占位；未知马名保留原名。",
+      "test": "普通词马名、同名异马、重复词、日英文混合、无中文名、错误区间与漏识别；占位恢复必须逐一一致。",
+      "done": "TC-N02 达标；不通过模型自造名消除缺口；实体结果可被 L01 复用。",
+      "deadline": "2026-10-12 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-12T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/terms.py",
+        "server/stable/services/term_discovery.py",
+        "server/stable/services/termbase_seed.py",
+        "server/stable/services/term_consistency.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "N03",
+      "title": "接入上下文实体识别和专名保护",
+      "lane": "B",
+      "completion_percent": 55,
+      "status": "部分完成",
+      "basis_and_gap": "实体/专名保护若干切片及实际组合结果获审；完整真实实体质量未验收",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "N03"
+      ],
+      "previous_percent": 55,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "B",
+      "title": "接入上下文实体识别和专名保护",
+      "deps": [
+        "N02",
+        "M03"
+      ],
+      "deadline_at": "2026-10-12T18:00:00+08:00",
+      "status": "局部修复已通过独立审核；后续切片测试候选审核中",
+      "phase": "PR255固定321a全量6868/49实际结果独立通过，10skip/独立collection/CID缺口保留；B172新固定9fcebff6在同R源码审，未真实RED/实现；整卡未验收",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 55,
+    "business_delivery_complete": false,
+    "priority_within_project": 4
+  },
+  {
+    "id": "N04",
+    "project": "P01",
+    "requirement_id": "BR-N04",
+    "original_plan": {
+      "id": "N04",
+      "lane": "B",
+      "role": "integration",
+      "it": 2,
+      "start": "2026-10-12",
+      "due": "2026-10-13",
+      "h": 4,
+      "deps": [
+        "N03"
+      ],
+      "gaps": [
+        "NG-04",
+        "AG-03"
+      ],
+      "area": "ai",
+      "title": "加入译后事实审校与有界修复",
+      "change": "先核对姓名/数字/日期/名次，再审否定/计划/引语归属；记录具体差异，限定自动重译次数，重要失败优先待办。",
+      "test": "漏否定、未来计划误译已发生、单位变更和模型结构正确但事实错误；重试不丢原文和已核验术语。",
+      "done": "TC-N03 达标；现有正常翻译继续，失败只阻断受影响文章。",
+      "deadline": "2026-10-13 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-13T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/translation.py",
+        "server/stable/services/rewriting.py",
+        "server/stable/services/translation_recovery.py",
+        "server/app/settings.py",
+        "server/stable/tasks.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "N04",
+      "title": "加入译后事实审校与有界修复",
+      "lane": "B",
+      "completion_percent": 45,
+      "status": "部分完成",
+      "basis_and_gap": "数字事实核对及caller诊断真实GREEN；真实gold和完整有界修复未闭合",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "N04"
+      ],
+      "previous_percent": 45,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "B",
+      "title": "加入译后事实审校与有界修复",
+      "deps": [
+        "N03"
+      ],
+      "deadline_at": "2026-10-13T18:00:00+08:00",
+      "status": "数字表面核对核心25目标实际通过；caller诊断接入规划，整卡未验收",
+      "phase": "B178原R零finding批准首次directGREEN及原始全执行层；正式full因10expiredskip失败，B179核实际诊断caller最小接入，N03/真实gold/有界修复等完整依赖仍未关闭",
+      "commit": "a0ec316e4417f399ae0b0002fedb886b497dbd1c",
+      "pr": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/259",
+      "review": "R APPROVE_TARGET_FIRST_DIRECT_GREEN_AND_NATIVE_EXECUTION_FACTS_ONLY; full failed expired skip",
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 45,
+    "business_delivery_complete": false,
+    "priority_within_project": 5
+  },
+  {
+    "id": "N05",
+    "project": "P01",
+    "requirement_id": "BR-N05",
+    "original_plan": {
+      "id": "N05",
+      "lane": "B",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-17",
+      "due": "2026-10-18",
+      "h": 4,
+      "deps": [
+        "V02"
+      ],
+      "gaps": [
+        "NG-05",
+        "AG-03"
+      ],
+      "area": "news",
+      "title": "按事件重要性和新增事实选择新闻",
+      "change": "合并跨来源同事件候选，模型识别重要性和新事实；取消为凑量降低门槛的自动兜底，重大更新可突破常规上限。",
+      "test": "不同赛事同名、重大退赛、政策新闻、旧稿新标题和同事件实质更新；重要消息不得因去重被吞掉。",
+      "done": "TC-N04 通过；每次选/不选有可解释原因和事件关联。",
+      "deadline": "2026-10-18 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-18T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/article_content.py",
+        "server/stable/adapters/international.py",
+        "server/stable/services/automation.py",
+        "server/stable/services/publishing_windows.py",
+        "server/stable/test_news_content_boundaries.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "N05",
+      "title": "按事件重要性和新增事实选择新闻",
+      "lane": "B",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "N05"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "B",
+      "title": "按事件重要性和新增事实选择新闻",
+      "deps": [
+        "V02"
+      ],
+      "deadline_at": "2026-10-18T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 6
+  },
+  {
+    "id": "N06",
+    "project": "P01",
+    "requirement_id": "BR-N06",
+    "original_plan": {
+      "id": "N06",
+      "lane": "B",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-18",
+      "due": "2026-10-19",
+      "h": 4,
+      "deps": [
+        "N05",
+        "F02"
+      ],
+      "gaps": [
+        "NG-06"
+      ],
+      "area": "news",
+      "title": "实施五地区周覆盖与来源健康调节",
+      "change": "移除不合理的固定来源偏置，按周合格事件覆盖/曝光调节；零产出拆成来源不足、抓取失败、翻译阻断和未选中。",
+      "test": "某地区无合格新闻时不凑数；重大事件允许倾斜但保留其他地区发现；跨地区稿只按约定计主归属。",
+      "done": "TC-N05 通过；五地区有稳定来源和不足原因，报告候选/合格/公开/曝光四组数量。",
+      "deadline": "2026-10-19 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-19T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/article_content.py",
+        "server/stable/adapters/international.py",
+        "server/stable/services/automation.py",
+        "server/stable/services/publishing_windows.py",
+        "server/stable/test_news_content_boundaries.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "N06",
+      "title": "实施五地区周覆盖与来源健康调节",
+      "lane": "B",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "N06"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "B",
+      "title": "实施五地区周覆盖与来源健康调节",
+      "deps": [
+        "N05",
+        "F02"
+      ],
+      "deadline_at": "2026-10-19T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 7
+  },
+  {
+    "id": "N07",
+    "project": "P01",
+    "requirement_id": "BR-N07",
+    "original_plan": {
+      "id": "N07",
+      "lane": "B",
+      "role": "integration",
+      "it": 3,
+      "start": "2026-10-22",
+      "due": "2026-10-22",
+      "h": 2,
+      "deps": [
+        "N02",
+        "N04"
+      ],
+      "gaps": [
+        "NG-02",
+        "NG-04"
+      ],
+      "area": "news",
+      "title": "生成历史污染与误译重处理候选",
+      "change": "扫描 F02 确认影响的来源/时间切片，生成旧正文、清洗差异、保护实体、译文和关联变化的固定清单。",
+      "test": "已有人工改稿保护、重复重跑、没有原文证据的文章；未复现旧样例不强行改写。",
+      "done": "dry-run 数量及快照齐全，交 N08 执行；不将本轮范围扩大为全历史重译。",
+      "deadline": "2026-10-22 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/article_content.py",
+        "server/stable/adapters/international.py",
+        "server/stable/services/automation.py",
+        "server/stable/services/publishing_windows.py",
+        "server/stable/test_news_content_boundaries.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "N07",
+      "title": "生成历史污染与误译重处理候选",
+      "lane": "B",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "N07"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "B",
+      "title": "生成历史污染与误译重处理候选",
+      "deps": [
+        "N02",
+        "N04"
+      ],
+      "deadline_at": "2026-10-22T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 8
+  },
+  {
+    "id": "N08",
+    "project": "P01",
+    "requirement_id": "BR-N08",
+    "original_plan": {
+      "id": "N08",
+      "lane": "B",
+      "role": "integration",
+      "it": 4,
+      "start": "2026-10-24",
+      "due": "2026-10-26",
+      "h": 6,
+      "deps": [
+        "O06",
+        "N07"
+      ],
+      "gaps": [
+        "NG-02",
+        "NG-04"
+      ],
+      "area": "news",
+      "title": "完成污染和误译清单的受控重处理",
+      "change": "按固定清单执行修复并保护人工稿，重算关联/曝光；逐篇保存前后内容与恢复点。",
+      "test": "同一包重跑幂等、正文误删、已撤回文章和人工改动；公开抽样与快照差异一致。",
+      "done": "本轮受影响清单完成或有逐条真实阻断，不能用全量重译替代局部修复。",
+      "deadline": "2026-10-26 18:00 Asia/Shanghai",
+      "deadline_at": "2026-10-26T18:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/article_content.py",
+        "server/stable/adapters/international.py",
+        "server/stable/services/automation.py",
+        "server/stable/services/publishing_windows.py",
+        "server/stable/test_news_content_boundaries.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "N08",
+      "title": "完成污染和误译清单的受控重处理",
+      "lane": "B",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "N08"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "B",
+      "title": "完成污染和误译清单的受控重处理",
+      "deps": [
+        "O06",
+        "N07"
+      ],
+      "deadline_at": "2026-10-26T18:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 9
+  },
+  {
+    "id": "N09",
+    "project": "P01",
+    "requirement_id": "BR-N09",
+    "original_plan": {
+      "id": "N09",
+      "lane": "B",
+      "role": "integration",
+      "it": 4,
+      "start": "2026-10-26",
+      "due": "2026-10-27",
+      "h": 4,
+      "deps": [
+        "N08",
+        "N06",
+        "O05"
+      ],
+      "gaps": [
+        "NG-05",
+        "NG-06",
+        "NG-07"
+      ],
+      "area": "news",
+      "title": "验收五地区周覆盖与重要事件保留",
+      "change": "使用 O05 固定的五地区新闻政策与范围，按真实起点累计至少 168 小时；计划 10/20 12:00 至 10/27 12:00，冻结候选/发布/曝光及重大事件分母后抽检拒稿和漏报。",
+      "test": "地区供给不足与选择偏置分别计算；调整参数要在固定保留集复测，不用低质补量达数。",
+      "done": "TC-N04/05 通过；10/27 14:00 前交付完整周报告、每地区合格覆盖和漏报原因，预设重大事件无漏发；为 V05 18:00 的独立候选审核留出 4 小时。少于 168 小时或政策/分母不可比较时不得报周验收通过。",
+      "deadline": "2026-10-27 14:00 Asia/Shanghai",
+      "deadline_at": "2026-10-27T14:00:00+08:00",
+      "read_paths": [
+        "server/stable/services/article_content.py",
+        "server/stable/adapters/international.py",
+        "server/stable/services/automation.py",
+        "server/stable/services/publishing_windows.py",
+        "server/stable/test_news_content_boundaries.py"
+      ],
+      "status": "未开始"
+    },
+    "progress_snapshot": {
+      "id": "N09",
+      "title": "验收五地区周覆盖与重要事件保留",
+      "lane": "B",
+      "completion_percent": 0,
+      "status": "未开始/未证",
+      "basis_and_gap": "暂无本卡新增交付或整卡执行证据；前置能力/既有旧功能不折算本卡完成",
+      "scope_disposition": "retained",
+      "evidence_keys": [
+        "N09"
+      ],
+      "previous_percent": 0,
+      "change_since_previous": "无新增足以上调整卡比例的已核交付。",
+      "delta_percentage_points": 0
+    },
+    "execution_ledger": {
+      "lane": "B",
+      "title": "验收五地区周覆盖与重要事件保留",
+      "deps": [
+        "N08",
+        "N06",
+        "O05"
+      ],
+      "deadline_at": "2026-10-27T14:00:00+08:00",
+      "status": "未开始",
+      "phase": "待派发",
+      "commit": null,
+      "pr": null,
+      "review": null,
+      "evidence": [],
+      "merged": false,
+      "deployed": false,
+      "enabled": false,
+      "public_verified": false
+    },
+    "after_snapshot_note": "",
+    "progress_percent_preserved": 0,
+    "business_delivery_complete": false,
+    "priority_within_project": 10
+  }
+]
