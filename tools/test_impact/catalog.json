@@ -835,7 +835,10 @@
       "stable.test_horse_article_strong_evidence_protection",
       "stable.test_horse_article_binding_diagnostics",
       "stable.test_horse_article_pair_receipt_index",
-      "stable.test_horse_article_pair_index_scanner_protection"
+      "stable.test_horse_article_pair_index_scanner_protection",
+      "stable.test_u04_horse_basic_profile_empty_copy",
+      "stable.test_u04_horse_index_japanese_fallback",
+      "stable.test_u04_result_publication_time"
     ],
     "module:scripts.tests.test_f02_readonly_export": [
       "scripts.tests.test_f02_readonly_export"
@@ -873,7 +876,8 @@
     ],
     "public_probe_template_adapter": [
       "stable.test_public_probe_template_adapter",
-      "stable.test_public_probe_template_glue"
+      "stable.test_public_probe_template_glue",
+      "stable.test_u04_publication_probe_rejection"
     ],
     "responses_analysis": [
       "stable.test_responses_analysis"
@@ -3048,6 +3052,30 @@
       "domains": [
         "content_contracts"
       ]
+    },
+    "server/stable/test_u04_horse_basic_profile_empty_copy.py": {
+      "label": "stable.test_u04_horse_basic_profile_empty_copy",
+      "domains": [
+        "content_contracts"
+      ]
+    },
+    "server/stable/test_u04_horse_index_japanese_fallback.py": {
+      "label": "stable.test_u04_horse_index_japanese_fallback",
+      "domains": [
+        "content_contracts"
+      ]
+    },
+    "server/stable/test_u04_result_publication_time.py": {
+      "label": "stable.test_u04_result_publication_time",
+      "domains": [
+        "content_contracts"
+      ]
+    },
+    "server/stable/test_u04_publication_probe_rejection.py": {
+      "label": "stable.test_u04_publication_probe_rejection",
+      "domains": [
+        "public_probe_template_adapter"
+      ]
     }
   },
   "profiles": {
@@ -3392,7 +3420,11 @@
     "stable.test_horse_article_strong_evidence_protection": "django",
     "stable.test_horse_article_binding_diagnostics": "django",
     "stable.test_horse_article_pair_receipt_index": "django",
-    "stable.test_horse_article_pair_index_scanner_protection": "django"
+    "stable.test_horse_article_pair_index_scanner_protection": "django",
+    "stable.test_u04_horse_basic_profile_empty_copy": "django",
+    "stable.test_u04_horse_index_japanese_fallback": "django",
+    "stable.test_u04_result_publication_time": "django",
+    "stable.test_u04_publication_probe_rejection": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {

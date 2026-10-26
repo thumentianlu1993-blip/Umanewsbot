@@ -290,3 +290,171 @@ class U04HorseFollowCopyTests(TestCase):
         for _profile, article, _status in negatives:
             with self.subTest(excluded=article.title_zh):
                 self.assertTrue(article.title_zh not in html, "第三代/hidden/candidate/未公开独立标记不得泄漏")
+
+
+SIDEBAR_FOLLOW_COPY = "关注仅作站内新闻聚合，可在“我的关注”浏览已收录的公开新闻。"
+
+
+@override_settings(ALLOWED_HOSTS=["testserver"])
+class U04SidebarFollowCopyTests(TestCase):
+    """D050：只走真实首页，复用本模块 DOM 解析器，不继承既有测试类。
+
+    无关注和历史关注空流两态预期在旧侧栏缺新文案处 RED；非空态保护原卡片。
+    合成记录仅由未来获准的隔离测试数据库创建，不调用抓取、发布或通知服务。
+    """
+
+    def _sidebar_profile(self, label):
+        term = TermEntry.objects.create(
+            term_type=TermType.HORSE,
+            source_language=SourceLanguage.JAPANESE,
+            source_ja=f"D050-SIDEBAR-HORSE-{label}",
+            target_zh=f"D050合成马{label}",
+            racing_region=RacingRegion.JAPAN,
+            is_active=True,
+        )
+        return HorseProfile.objects.create(
+            primary_term=term,
+            display_name_zh=term.target_zh,
+            original_name=term.source_ja,
+            racing_region=RacingRegion.JAPAN,
+            review_status=HorseProfileStatus.PUBLISHED,
+        )
+
+    def _sidebar_article(self, label):
+        now = timezone.now()
+        return NewsArticle.objects.create(
+            source_site=SourceSite.NETKEIBA,
+            source_mode=SourceMode.LATEST,
+            source_language=SourceLanguage.JAPANESE,
+            racing_region=RacingRegion.JAPAN,
+            source_article_id=f"d050-sidebar-{label}",
+            source_url=f"https://example.invalid/d050/{label}",
+            title_ja=f"D050原始标题{label}",
+            title_zh=f"D050公开新闻{label}",
+            body_ja_raw="D050 synthetic sidebar source body.",
+            body_ja_normalized="D050 synthetic sidebar source body.",
+            body_zh="D050独立合成正文。",
+            summary_zh="D050独立合成摘要。",
+            workflow_status=WorkflowStatus.PUBLISHED,
+            published_at=now,
+            published_to_web_at=now,
+        )
+
+    def _sidebar_follow(self, profile, *, include_descendants=False, depth=1):
+        token = signed_follow_token()
+        self.client.cookies[FOLLOW_COOKIE_NAME] = token
+        return HorseFollow.objects.create(
+            token_hash=token_hash_from_cookie(token),
+            horse_profile=profile,
+            include_descendants=include_descendants,
+            descendant_depth=depth,
+        )
+
+    def _homepage_sidebar_without_mutation(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        before_follows = list(HorseFollow.objects.order_by("pk").values())
+        before_articles = list(NewsArticle.objects.order_by("pk").values())
+        cookie = self.client.cookies.get(FOLLOW_COOKIE_NAME)
+        cookie_before = cookie.value if cookie is not None else None
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.get(reverse("public-news-feed"))
+        self.assertEqual(response.status_code, 200, "前件：真实首页 GET 必须成功")
+        self.assertEqual(response.resolver_match.url_name, "public-news-feed")
+        self.assertTemplateUsed(response, "stable/public/feed.html")
+        self.assertTemplateUsed(response, "stable/public/_hot_list.html")
+        # 只输出命令类型，不在失败信息中暴露 Cookie、token hash 或完整 SQL。
+        write_verbs = []
+        for query in queries.captured_queries:
+            sql = query["sql"].lstrip()
+            verb = sql.split(None, 1)[0].upper() if sql else ""
+            if verb in {"INSERT", "UPDATE", "DELETE", "REPLACE", "MERGE", "TRUNCATE", "ALTER", "CREATE", "DROP"}:
+                write_verbs.append(verb)
+        self.assertEqual(write_verbs, [], "首页 GET 不应发出数据库写语句")
+        self.assertTrue(before_follows == list(HorseFollow.objects.order_by("pk").values()), "GET 改变了关注完整字段或行集合")
+        self.assertTrue(before_articles == list(NewsArticle.objects.order_by("pk").values()), "GET 改变了新闻完整字段或行集合")
+        self.assertTrue(FOLLOW_COOKIE_NAME not in response.cookies, "GET 不应创建或旋转关注 Cookie；正常 CSRF Cookie 允许")
+        cookie = self.client.cookies.get(FOLLOW_COOKIE_NAME)
+        cookie_after = cookie.value if cookie is not None else None
+        self.assertTrue(cookie_before == cookie_after, "GET 改变了客户端关注 Cookie")
+        document = _Document(response.content.decode(response.charset))
+        panels = [node for node in document.nodes if node.tag == "section" and node.has_class("rail-card") and node.attrs.get("aria-label") == "我的关注"]
+        self.assertEqual(len(panels), 1, "前件：唯一真实我的关注侧栏")
+        panel = panels[0]
+        manage_links = [node for node in document.nodes if node.tag == "a" and node.has_class("rail-more") and node.inside(panel)]
+        self.assertEqual(len(manage_links), 1)
+        self.assertEqual(manage_links[0].attrs.get("href"), reverse("public-horse-follows"))
+        self.assertEqual(manage_links[0].text().strip(), "管理 →")
+        return response, document, panel
+
+    def _empty_sidebar_paragraph(self, document, panel):
+        paragraphs = [node for node in document.nodes if node.tag == "p" and node.has_class("follow-empty") and node.inside(panel)]
+        self.assertEqual(len(paragraphs), 1, "前件：原空流段落恰一次")
+        paragraph = paragraphs[0]
+        self.assertEqual(paragraph.attrs, {"class": "follow-empty"})
+        self.assertFalse(any(node.has_class("follow-item") and node.inside(panel) for node in document.nodes))
+        links = [node for node in document.nodes if node.tag == "a" and node.inside(paragraph)]
+        self.assertEqual(len(links), 1)
+        self.assertEqual(links[0].attrs, {"href": reverse("public-horse-index")})
+        self.assertEqual(links[0].text().strip(), "去马匹档案看看 →")
+        return paragraph
+
+    def _assert_sidebar_copy(self, response, paragraph):
+        # 仅在真实首页/context/原侧栏及原 href 前件成立后接受此处缺文案 RED。
+        self.assertEqual(paragraph.text().count(SIDEBAR_FOLLOW_COPY), 1, "U04：侧栏站内聚合说明必须恰好一次")
+        self.assertEqual("".join(part for part in paragraph.parts if isinstance(part, str)).strip(), SIDEBAR_FOLLOW_COPY)
+        children = [part for part in paragraph.parts if not isinstance(part, str)]
+        self.assertEqual(len(children), 1, "仅保留原档案链接，不新增推送或重试控件")
+        self.assertEqual(children[0].tag, "a")
+        self.assertEqual(response.content.decode(response.charset).count(SIDEBAR_FOLLOW_COPY), 1)
+
+    def test_no_follows_empty_homepage_sidebar_explains_station_aggregation(self):
+        self._sidebar_article("UNLINKED")
+        self.assertEqual(HorseFollow.objects.count(), 0)
+        self.assertTrue(FOLLOW_COOKIE_NAME not in self.client.cookies)
+        response, document, panel = self._homepage_sidebar_without_mutation()
+        self.assertEqual(response.context["followed_entries"], [])
+        paragraph = self._empty_sidebar_paragraph(document, panel)
+        self._assert_sidebar_copy(response, paragraph)
+
+    def test_historical_false_depth_one_empty_sidebar_uses_same_general_copy(self):
+        profile = self._sidebar_profile("HISTORICAL")
+        follow = self._sidebar_follow(profile, include_descendants=False, depth=1)
+        self._sidebar_article("UNLINKED-HISTORY")
+        self.assertEqual(HorseFollow.objects.count(), 1)
+        response, document, panel = self._homepage_sidebar_without_mutation()
+        self.assertEqual(response.context["followed_entries"], [])
+        after = HorseFollow.objects.get(pk=follow.pk)
+        self.assertFalse(after.include_descendants)
+        self.assertEqual(after.descendant_depth, 1)
+        paragraph = self._empty_sidebar_paragraph(document, panel)
+        self._assert_sidebar_copy(response, paragraph)
+
+    def test_public_follow_entry_keeps_real_sidebar_card_href_and_no_empty_copy(self):
+        from urllib.parse import urlsplit
+
+        profile = self._sidebar_profile("VISIBLE")
+        self._sidebar_follow(profile)
+        article = self._sidebar_article("VISIBLE")
+        self.assertLess(len(article.effective_title), 18, "前件：标题短于原侧栏截断上限")
+        ArticleHorseLink.objects.create(horse_profile=profile, article=article, status=ArticleHorseLinkStatus.MANUAL)
+        response, document, panel = self._homepage_sidebar_without_mutation()
+        entries = response.context["followed_entries"]
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]["article"].pk, article.pk)
+        self.assertEqual(entries[0]["article"].workflow_status, WorkflowStatus.PUBLISHED)
+        self.assertIsNotNone(entries[0]["article"].published_to_web_at)
+        self.assertEqual(entries[0]["horse_profile"].pk, profile.pk)
+        self.assertEqual(entries[0]["horse_profile"].review_status, HorseProfileStatus.PUBLISHED)
+        items = [node for node in document.nodes if node.tag == "div" and node.has_class("follow-item") and node.inside(panel)]
+        self.assertEqual(len(items), 1)
+        links = [node for node in document.nodes if node.tag == "a" and node.inside(items[0])]
+        self.assertEqual(len(links), 1)
+        self.assertEqual(links[0].text().strip(), article.effective_title)
+        self.assertEqual(links[0].attrs.get("href"), entries[0]["article"].public_list_detail_url)
+        self.assertEqual(urlsplit(links[0].attrs["href"]).path, reverse("public-article-detail", args=[article.pk]))
+        names = [node.text().strip() for node in document.nodes if node.has_class("follow-meta") and node.inside(items[0])]
+        self.assertEqual(names, [profile.display_name])
+        self.assertFalse(any(node.has_class("follow-empty") and node.inside(panel) for node in document.nodes))
+        self.assertNotIn(SIDEBAR_FOLLOW_COPY, panel.text())
