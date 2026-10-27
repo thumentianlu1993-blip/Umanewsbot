@@ -3110,7 +3110,8 @@ def publish_article(article: NewsArticle, user) -> None:
     article.published_to_web_at = timezone.now()
     article.published_by = user
     article.published_by_mode = PublishedByMode.MANUAL
-    article.save(update_fields=["workflow_status", "published_to_web_at", "published_by", "published_by_mode", "updated_at"])
+    from stable.services.news_feed import save_legacy_publication
+    save_legacy_publication(article, update_fields=["workflow_status", "published_to_web_at", "published_by", "published_by_mode", "updated_at"])
     from stable.services.qq_auto_push import enqueue_qq_auto_push_for_article
 
     enqueue_qq_auto_push_for_article(article.id)

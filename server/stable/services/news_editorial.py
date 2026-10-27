@@ -5,12 +5,12 @@ import re
 import unicodedata
 from datetime import date
 from stable.services.news_pipeline import digest, REGIONS
-from stable.services.news_content import ContentBlocked, bounded_json, block_map
+from stable.services.news_content import ContentBlocked, bounded_json, block_map, model_schema
 
 RESPONSE_SCHEMA = {
     "priority": "major|regional|reject|uncertain", "primary_region": list(REGIONS),
     "reason": "基于事件价值的理由，不按来源或榜单加分",
-    "identity": {"kind": "race|retirement|injury|policy|appointment", "fields": "按类型提供完整规范元组",
+    "identity": {"kind": "race|retirement|injury|policy|appointment", "fields": "仅返回identity_contract对应kind的一组完整字段，值均为字符串，不返回说明字段",
         "evidence": "每个 fields 键映射为 {block_id,start,end} 原文证据"},
     "facts": [{"subject_ref": "已核主体或原文主体", "predicate": "事实谓词", "object": "原文事实值",
         "effective_time": "明确事实时间或空字符串", "modality": "happened|planned|possible|negated",
@@ -20,6 +20,44 @@ RESPONSE_SCHEMA = {
         "correction": "仅 correction 必填 {receipt_id,old_body_span:{start,end},old_text}，精确引用旧稿"}],
     "comparison": {"event_id": "候选事件UUID或null", "version": 0},
 }
+
+
+# 输入说明不属于返回对象；首次无候选也必须能构造程序接受的完整身份。
+IDENTITY_CONTRACT = {
+    "allowed_field_sets": {
+        "race": [["canonical_race_id"], ["source_race_id"], ["organizer", "venue", "local_date", "race_number"]],
+        "retirement": [["subject_ref", "episode_ref"]],
+        "injury": [["subject_ref", "episode_ref"]],
+        "policy": [["organization", "jurisdiction", "document_id"], ["organization", "jurisdiction", "effective_date", "scope"]],
+        "appointment": [["organization", "jurisdiction", "document_id"], ["organization", "jurisdiction", "effective_date", "scope"]],
+    },
+    "rules": [
+        "仅选择kind的一组字段，不增删字段；identity.evidence必须有同样的键，每项{block_id,start,end}为原文精确字符跨度。",
+        "canonical_race_id仅可使用提供的identity_aliases中mention:<原文片段> -> race:<ID>映射，fields只填ID字符串。不得猜ID。",
+        "source_race_id填原文来源赛事ID；没有ID时使用organizer/venue/local_date/race_number，日期YYYY-MM-DD，场次1..99且无前导零。",
+        "subject_ref填horse:<source_scope>:<原文主体>，或给定identity_aliases中该键/mention:<原文主体>对应的已核horse引用。不得创造跨源ID。",
+        "episode_ref在原文有明确YYYY-MM-DD时填date:<YYYY-MM-DD>:<injury或retirement>；否则必须引用原文公告编号，填announcement:<source_scope>:<公告编号>。缺证据返回uncertain。",
+        "policy/appointment必须有organization和jurisdiction，并使用document_id或effective_date+scope；日期YYYY-MM-DD；非引用字段必须与对应原文跨度一致。",
+        "无法获得完整身份时priority=uncertain，不用模糊标题或相似词猜测事件。identity_contract和identity_aliases只是输入说明，不得作为输出字段。",
+    ],
+    "synthetic_examples": [
+        {"source_scope": "jra", "kind": "injury", "fields": {"subject_ref": "horse:jra:Example Horse", "episode_ref": "date:2026-10-27:injury"},
+         "evidence_rule": "subject_ref跨度选Example Horse；episode_ref跨度只选2026-10-27。"},
+        {"source_scope": "tdn", "kind": "retirement", "fields": {"subject_ref": "horse:tdn:Example Horse", "episode_ref": "announcement:tdn:A42"},
+         "evidence_rule": "episode_ref跨度选公告号A42；这是格式示例而非真实新闻。"},
+    ],
+}
+
+
+def correction_identity(fact):
+    return digest({"receipt_id": str(fact["correction"]["receipt_id"]),
+        "prior_fact_ids": sorted(set(fact["prior_fact_ids"])), "correct_fact_id": fact["id"]})
+
+
+def unpublished_corrections(event, facts):
+    # 规范键单列于不可变receipt，不把可变化的引用范围当新事实，也不依赖会覆盖同ID的事件摘要。
+    return [fact for fact in facts if fact["relation"] == "correction" and fact["importance"] == "major"
+        and not event.receipts.filter(evidence__correction_keys__contains=[correction_identity(fact)]).exists()]
 
 
 def norm(value):
@@ -35,6 +73,7 @@ def iso_date(value):
         raise ContentBlocked("identity_date_invalid") from None
 
 
+@model_schema
 def identity_key(kind, fields, *, source_scope="", aliases=None):
     aliases = aliases or {}
     if type(fields) is not dict:
@@ -79,6 +118,7 @@ def identity_key(kind, fields, *, source_scope="", aliases=None):
     return "news-event-v1:" + kind + ":" + digest(parts)
 
 
+@model_schema
 def span_text(clean, span):
     texts = block_map(clean)
     if type(span) is not dict or set(span) != {"block_id", "start", "end"}:
@@ -93,6 +133,7 @@ def fact_key(fact):
     return digest({key: norm(fact[key]) if fact[key] else "" for key in ("subject_ref", "predicate", "object", "effective_time", "modality")})
 
 
+@model_schema
 def validate_editorial(clean, response, *, source_scope, candidates=(), aliases=None, binding=None):
     if len(candidates) > 20:
         raise ContentBlocked("recall_overflow")
@@ -201,6 +242,7 @@ def correction_targets(editorial):
     return [fact["correction"] for fact in editorial.get("facts", []) if fact["relation"] == "correction"]
 
 
+@model_schema
 def audit_corrections(editorial, response):
     """旧文定位由程序核验，是否有实质错误及新稿是否有证据由强审校确认。"""
     targets = correction_targets(editorial)

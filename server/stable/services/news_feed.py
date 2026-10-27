@@ -173,6 +173,25 @@ def index_legacy_article(article):
         sort_time=article.published_to_web_at, primary_region=article.racing_region, priority="regional")
 
 
+@transaction.atomic
+def save_legacy_publication(article, **save_options):
+    """仅供三个旧网页发布入口；普通采集/编辑save不获取发布锁或隐式回填。"""
+    from stable.models import NewsArticle
+    enabled = getattr(settings, "NEWS_QUALITY_INDEX_ENABLED", False) or getattr(settings, "NEWS_QUALITY_FEED_ENABLED", False)
+    if enabled:
+        publication_lock()
+    current = NewsArticle.objects.select_for_update().get(pk=article.pk)
+    if current.active_news_run_id:
+        raise ValueError("pipeline_owner_requires_receipt_writer")
+    if article.workflow_status != "published" or not article.published_to_web_at:
+        raise ValueError("legacy_publication_state_required")
+    article.save(**save_options)
+    if enabled:
+        index_legacy_article(NewsArticle.objects.get(pk=article.pk))
+        transaction.on_commit(request_snapshot_refresh)
+    return article
+
+
 def request_snapshot_refresh():
     """只投递后台刷新；已提交公开稿不会因 broker 错误回滚或同步付费。"""
     if not getattr(settings, "NEWS_QUALITY_FEED_ENABLED", False) or not getattr(settings, "NEWS_QUALITY_DISPATCH_ENABLED", False):

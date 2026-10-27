@@ -132,7 +132,8 @@ def _reserve_quota(run, now):
     ledger = QuotaLedger.objects.select_for_update().get(pk=ledger.pk)
     if ledger.used >= min(cap, ledger.limit):
         return False
-    limits = getattr(settings, "MULTIREGION_AUTO_PUBLISH_REGION_DAILY_LIMITS", {})
+    from stable.services.multiregion import _setting_int_map
+    limits = _setting_int_map("MULTIREGION_AUTO_PUBLISH_REGION_DAILY_LIMITS")
     if run.primary_region in limits:
         start = now.astimezone(ZoneInfo("Asia/Shanghai")).replace(hour=0, minute=0, second=0, microsecond=0)
         count = NewsPublicationReceipt.objects.filter(published_at__gte=start, run__primary_region=run.primary_region).count()
@@ -207,7 +208,8 @@ def publish(run_id):
     facts = run.editorial_snapshot["facts"]
     delta = [fact for fact in facts if fact["relation"] == "new" and fact["id"] not in old_ids
              and (event.version == 0 or fact["importance"] == "major")]
-    corrections = [fact for fact in facts if fact["relation"] == "correction" and fact["importance"] == "major"]
+    from stable.services.news_editorial import unpublished_corrections, correction_identity
+    corrections = unpublished_corrections(event, facts)
     previous = article.news_receipts.order_by("-published_at", "-id").first() or event.receipts.order_by("-published_at", "-id").first()
     if not delta and not corrections:
         run.state, run.reason = "duplicate", "no_material_new_fact"
@@ -226,7 +228,7 @@ def publish(run_id):
         run.save(update_fields=["state", "reason"])
         return None
     key = digest({"kind": kind, "new_facts": sorted(fact["id"] for fact in delta),
-        "corrections": sorted((str(previous.pk), tuple(sorted(fact["prior_fact_ids"])), fact["id"], digest(fact["correction"])) for fact in corrections)})
+        "corrections": sorted(correction_identity(fact) for fact in corrections)})
     if event.receipts.filter(publication_key=key).exists():
         run.state, run.reason = "duplicate", "publication_already_recorded"
         run.save(update_fields=["state", "reason"])
@@ -259,7 +261,7 @@ def publish(run_id):
         source_revision_sha=run.input_sha, target_revision_sha=run.quality_snapshot["target_sha"], delta_sha=digest(delta + corrections),
         content=content, source_snapshot=deepcopy(run.source_snapshot),
         evidence={"quality": run.quality_snapshot, "editorial": run.editorial_snapshot, "policy_sha": run.policy_sha,
-                  "editor": run.editor_provenance},
+                  "editor": run.editor_provenance, "correction_keys": sorted(correction_identity(fact) for fact in corrections)},
         verified_occurrences=run.entity_snapshot["occurrences"], verified_relations=relations,
         previous_receipt=previous, kind=kind, publication_key=key, published_at=now)
     append_public_entry(article=article, receipt=receipt, now=now, priority=run.priority, region=run.primary_region)

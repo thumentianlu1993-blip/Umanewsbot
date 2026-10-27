@@ -30,6 +30,20 @@ class ContentBlocked(ValueError):
     pass
 
 
+def model_schema(function):
+    """合法JSON的错误字段类型也属于内容拒绝，不能逃逸成调度器异常。"""
+    from functools import wraps
+    @wraps(function)
+    def checked(*args, **kwargs):
+        try:
+            return function(*args, **kwargs)
+        except ContentBlocked:
+            raise
+        except (TypeError, ValueError, KeyError, IndexError, AttributeError) as error:
+            raise ContentBlocked("model_schema_invalid:" + type(error).__name__) from error
+    return checked
+
+
 def bounded_json(value, depth=0, count=None):
     count = count if count is not None else [0]
     count[0] += 1
@@ -124,6 +138,7 @@ def block_map(clean):
     return {"title": clean["title"], **{row["id"]: row["text"] for row in clean["blocks"]}}
 
 
+@model_schema
 def validate_entities(clean, response):
     bounded_json(response)
     if type(response) is not dict or set(response) != {"coverage", "entities"} or response["coverage"] != "complete":
@@ -139,10 +154,10 @@ def validate_entities(clean, response):
         if type(item) is not dict or set(item) != required:
             raise ContentBlocked("entity_schema")
         block, start, end = item["block_id"], item["start"], item["end"]
-        if (block not in texts or type(start) is not int or type(end) is not int
+        if (type(block) is not str or block not in texts or type(start) is not int or type(end) is not int
                 or not 0 <= start < end <= len(texts[block]) or texts[block][start:end] != item["text"]):
             raise ContentBlocked("entity_span_invalid")
-        if item["type"] not in {"horse", "person", "race", "organization", "place", "common_word"}:
+        if type(item["type"]) is not str or item["type"] not in {"horse", "person", "race", "organization", "place", "common_word"}:
             raise ContentBlocked("entity_type_invalid")
         if any(start < other_end and end > other_start for other_start, other_end in spans.get(block, [])):
             raise ContentBlocked("entity_span_overlap")
@@ -163,6 +178,7 @@ def protect_source(clean, entities):
     return {"title": texts["title"], "blocks": [{"id": row["id"], "text": texts[row["id"]]} for row in clean["blocks"]]}
 
 
+@model_schema
 def restore_translation(clean, entities, response):
     bounded_json(response)
     if type(response) is not dict or set(response) != {"title", "summary", "blocks"}:
@@ -204,6 +220,7 @@ def numeric_surface(text):
     return re.sub(r"(?<=\d),(?=\d{3}(?:\D|$))", "", text)
 
 
+@model_schema
 def validate_audit(clean, target, response):
     bounded_json(response)
     failed = {"passed": False, "reason": "audit_schema_or_unknown", "source_sha": clean["source_sha"], "target_sha": digest(target)}
@@ -270,6 +287,7 @@ def manual_translation(target):
     return {**target, "blocks": [{"id": "body", "text": target["body"]}], "manual": True}
 
 
+@model_schema
 def validate_body_review(clean, response):
     bounded_json(response)
     expected = set(clean.get("suspicious_block_ids", []))

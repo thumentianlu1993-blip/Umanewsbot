@@ -3,7 +3,7 @@ from django.db import transaction
 from django.utils import timezone
 from stable.models import NewsArticle, NewsProcessingRun, NewsPublicationReceipt, NewsEditorialEvent
 from stable.services.news_feed import publication_lock
-from stable.services.news_pipeline import _current_run, start_revision, enqueue_news_run, source_eligible
+from stable.services.news_pipeline import _current_run, start_revision, enqueue_news_run, source_eligible, article_revision
 from stable.services.operations import log_operation
 
 
@@ -65,8 +65,11 @@ def review_action(run_id, *, action, user, reason, event_id=None, receipt_id=Non
     elif action in {"hold", "reject"}:
         if run.state in {"published", "duplicate", "stale"}:
             raise ReviewConflict("已结束稿件不可再次接管；撤回请选具体公开稿。")
-        run.state, run.reason, run.lease_until = ("review" if action == "hold" else "rejected"), reason, None
-        run.save(update_fields=["state", "reason", "lease_until"])
+        article.news_generation += 1
+        article.save(update_fields=["news_generation"])
+        run.generation, run.expected_article_sha = article.news_generation, article_revision(article)
+        run.state, run.reason, run.lease_until = ("review" if action == "hold" else "rejected"), reason[:255], None
+        run.save(update_fields=["state", "reason", "lease_until", "generation", "expected_article_sha"])
     elif action == "retry":
         if run.state != "review" or not _current_run(article, run) or not source_eligible(run):
             raise ReviewConflict("当前版本或来源不可重跑，请先核对配置及待审内容。")

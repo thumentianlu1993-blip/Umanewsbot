@@ -17,9 +17,9 @@ class StageClaimTests(TestCase):
         self.run.save(update_fields=["stage"])
 
     def test_only_one_live_claim_and_generation_advances(self):
-        attempt = claim_stage(self.run.pk, {"text": "fixture"})
+        attempt = claim_stage(self.run.pk, {"text": "fixture"}, expected_stage=self.run.stage, expected_generation=self.run.generation)
         self.assertIsNotNone(attempt, "待处理阶段应获得持久化认领")
-        self.assertIsNone(claim_stage(self.run.pk, {"text": "fixture"}))
+        self.assertIsNone(claim_stage(self.run.pk, {"text": "fixture"}, expected_stage=self.run.stage, expected_generation=self.run.generation))
         self.article.refresh_from_db()
         self.run.refresh_from_db()
         self.assertEqual(attempt.generation, self.article.news_generation)
@@ -30,12 +30,12 @@ class StageClaimTests(TestCase):
 
     @override_settings(NEWS_QUALITY_MODE="off")
     def test_off_never_claims_or_unbinds(self):
-        self.assertIsNone(claim_stage(self.run.pk, {}))
+        self.assertIsNone(claim_stage(self.run.pk, {}, expected_stage=self.run.stage, expected_generation=self.run.generation))
         self.article.refresh_from_db()
         self.assertEqual(self.article.active_news_run_id, self.run.pk)
 
     def test_worker_result_after_manual_change_never_commits(self):
-        attempt = claim_stage(self.run.pk, {"text": "fixture"})
+        attempt = claim_stage(self.run.pk, {"text": "fixture"}, expected_stage=self.run.stage, expected_generation=self.run.generation)
         self.assertIsNotNone(attempt)
         NewsArticle.objects.filter(pk=self.article.pk).update(editor_notes="new note", body_zh="人工稿")
         NewsStageAttempt.objects.filter(pk=attempt.pk).update(state="completed", result={"entities": []}, output_sha=digest({"entities": []}))
@@ -47,7 +47,7 @@ class StageClaimTests(TestCase):
         self.assertEqual(self.run.entity_snapshot, {})
 
     def test_superseded_revision_never_applies_old_result(self):
-        attempt = claim_stage(self.run.pk, {"text": "fixture"})
+        attempt = claim_stage(self.run.pk, {"text": "fixture"}, expected_stage=self.run.stage, expected_generation=self.run.generation)
         self.assertIsNotNone(attempt)
         newer = start_revision(self.article, snapshot={**self.run.source_snapshot, "body": "new body"})
         NewsStageAttempt.objects.filter(pk=attempt.pk).update(state="completed", result={"entities": []}, output_sha=digest({"entities": []}))

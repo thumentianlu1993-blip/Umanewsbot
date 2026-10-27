@@ -899,7 +899,8 @@ def publish_article_automatically(article: NewsArticle) -> None:
     article.published_by_mode = PublishedByMode.AUTO
     article.auto_publish_at = timezone.now()
     article.published_to_web_at = article.published_to_web_at or article.auto_publish_at
-    article.save(
+    from stable.services.news_feed import save_legacy_publication
+    save_legacy_publication(article,
         update_fields=[
             "workflow_status",
             "automation_status",

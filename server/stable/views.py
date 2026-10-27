@@ -2360,7 +2360,11 @@ def article_editor(request: HttpRequest, article_id: int):
             else:
                 if article.workflow_status in {WorkflowStatus.PENDING_TRANSLATION, WorkflowStatus.TRANSLATION_FAILED}:
                     article.workflow_status = WorkflowStatus.PENDING_EDIT
-            article.save()
+            if intent == "publish":
+                from stable.services.news_feed import save_legacy_publication
+                save_legacy_publication(article)
+            else:
+                article.save()
             form.save_related_regions(article)
             if intent == "publish":
                 from stable.services.qq_auto_push import enqueue_qq_auto_push_for_article

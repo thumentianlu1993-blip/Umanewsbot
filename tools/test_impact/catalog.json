@@ -941,7 +941,8 @@
       "stable.test_p01_news_relations",
       "stable.test_p01_news_report",
       "stable.test_p01_news_source_evidence",
-      "stable.test_p01_news_workflow"
+      "stable.test_p01_news_workflow",
+      "stable.test_p01_news_review_regressions"
     ]
   },
   "dependencies": {
@@ -3212,6 +3213,12 @@
     },
     "server/stable/test_p01_news_workflow.py": {
       "label": "stable.test_p01_news_workflow",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_review_regressions.py": {
+      "label": "stable.test_p01_news_review_regressions",
       "domains": [
         "news_quality"
       ]

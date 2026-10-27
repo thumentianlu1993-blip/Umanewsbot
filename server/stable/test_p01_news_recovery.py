@@ -14,7 +14,7 @@ class RecoveryTests(WorkflowFixture, TransactionTestCase):
         news_pipeline.process_news_run(self.run.pk)
         self.run.refresh_from_db()
         payload = news_pipeline.stage_payload(self.run)
-        return news_pipeline.claim_stage(self.run.pk, payload), payload
+        return news_pipeline.claim_stage(self.run.pk, payload, expected_stage=self.run.stage, expected_generation=self.run.generation), payload
 
     def expire(self):
         type(self.run).objects.filter(pk=self.run.pk).update(lease_until=timezone.now()-timedelta(seconds=1))

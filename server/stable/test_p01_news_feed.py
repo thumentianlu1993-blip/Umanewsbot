@@ -71,11 +71,11 @@ class FeedTests(TransactionTestCase):
             with self.assertRaises(RuntimeError), transaction.atomic():
                 article.workflow_status = "published"
                 article.published_to_web_at = self.now
-                article.save(update_fields=["workflow_status", "published_to_web_at"])
+                news_feed.save_legacy_publication(article, update_fields=["workflow_status", "published_to_web_at"])
                 self.assertTrue(NewsPublicEntry.objects.filter(article=article).exists())
                 raise RuntimeError("模拟提交前崩溃")
             self.assertFalse(NewsPublicEntry.objects.filter(article=article).exists())
-            article.save(update_fields=["workflow_status", "published_to_web_at"])
+            news_feed.save_legacy_publication(article, update_fields=["workflow_status", "published_to_web_at"])
             entry = NewsPublicEntry.objects.get(article=article)
             article.title_zh = "修复标题"
             article.save(update_fields=["title_zh"])
