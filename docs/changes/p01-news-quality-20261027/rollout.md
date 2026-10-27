@@ -1,12 +1,12 @@
 # P01 上线、回滚与交接
 
-本轮：设计文档与独立方案评审。实现、真实调用、部署和生产验收均NOT_RUN。人工确认唯一依据为[根 AGENTS.md](../../../AGENTS.md)，本文件只描述技术检查与交付内容。
+本轮已进入实现和隔离验证。真实调用、部署和生产验收均NOT_RUN。人工确认唯一依据为[根 AGENTS.md](../../../AGENTS.md)，本文件只描述技术检查与交付内容。
 
 ## 1 工作树与恢复交接
 
 - 本线程：`/Users/mentianlu/.codex/worktrees/9c8c/umanews`，`codex/p01-news-quality-design-20261027`。
 - 固定代码基线：`e4df6bdaf85318eb9588489807e4b9a40bb01665`，原业务交接worktree/分支保留且不修改。
-- 当前只改 `docs/changes/p01-news-quality-20261027/`、current_state、decisions及必要入口。源码、原卡及原百分比不修改。
+- 实现范围覆盖 `server/stable/` 新闻服务/页面/测试、settings、迁移0083–0085、独立worker Compose和Nginx曝光日志。原卡及原百分比保持不变。
 - 原8线、定时调度、生产采集仍暂停；新方案不恢复旧任务。P02/P03/P04其他工作树若后续并行，只通过固定提交和schema合同集成，不竞争生产发布面。
 - 已知B285/B286：原direct-PG停止上限与修复资格未关闭；后续执行真实PG测试前只读审查该修复及停止/清理证明，使用新隔离环境。不能用本次文档检查当其复验，也不能让该执行环境缺口阻止纯设计。
 
@@ -69,10 +69,32 @@
 - 用户追加决定：“单独发一篇新稿件，不修改旧文章”。据此所有日常重大更新/需公开的实质更正都独立receipt+entry+URL，新稿引用旧稿，旧稿内容与原公开时间不变；取消current_receipt原位替换和旧稿URL切换。存储仍保留来源唯一锚点，不要求用户选择数据库模型。
 - 追加修正：source重抓在upsert前转discovery/run，prompt消费新快照；按独立稿件撤回；重复实质更正幂等。同步T27/T28/T35和任务。第三轮原reviewer认为独立稿件/重抓/撤回/分页合同已闭合，但发现新稿继承anchor旧关联的直接high问题（指纹 `3c79412d8bee9841357f48895fd9136ee80e83ce1b5711ad3eb0eb398d8cc68d`）。已补每份receipt独立occurrence/关系证据、当前可见性与T36，第四轮定向复审已关闭该high，最终VERDICT: APPROVED，无新增actionable finding。
 
-### 最终结论（2026-10-27）
+### 方案阶段结论（2026-10-27）
 
 原reviewer共4轮：首轮7项（5 high/2 medium）经第二轮关闭；用户追加“独立新稿，不修改旧文章”后，第三轮发现1项直接关联high，经第四轮关闭。当前没有未关闭finding或待用户决定的产品/架构问题。独立稿件使用完整不可变公开记录，旧稿不原位替换，关联证据也按稿件隔离。
 
 第四轮前后只读指纹一致 `27eceec5d49a276afa39e5d6be3e587d51afb92dff010f3d21b189fff72e6b13`（写入最终状态前的方案版本）；最终状态回写只登记结论，不改变被审技术合同。
 
 最终文档检查：workflow contract PASS、4项契约测试PASS、五文档链接/格式与T01–T36映射PASS、git diff --check通过。36组是实施阶段待执行的测试设计；应用测试、CI、真实模型/生产/168小时观察仍NOT_RUN。下一阶段为依本方案进行测试与实现，当前请求到设计和独立方案评审为止。
+
+## 8 实现候选与本地验证（2026-10-27）
+
+实现基线为方案提交 `c71d99ce4788c151d66f4770208b2b02c71fcc89`。19个专项模块在固定源码、Linux离线容器、独立PG16上执行，不连接生产DB/Redis/供应商。各轮RED/GREEN原始日志保存在本线程runtime的完整SHA目录。`7d0e0e8b` 的3项RED在 `e9afdbbc` 的21项测试中全部转GREEN；`a3f4556b` 证明不相关race span会进入旧关联查询，随后收紧为精确block/start/end交集，组合复验中。
+
+目前能力包括：冻结输入与policy/人工目标、5阶段固定模型任务、日/月预约和unknown对账、原文清洗/全文/占位专名/事实审校、证据事件身份和新增事实判断、只发布独立不可变稿件、各公开入口的精确关系、5区快照/签名水位分页、匿名实际响应曝光、后台人工恢复、只读质量报告、固定旧索引和历史修复工具。所有生产开关默认关闭。
+
+本地已盘点7份DOM fixture，`local-input-inventory.json` 明确真实来源样本为0；20篇真实评估、100/25 gold/holdout、可用模型与费率、来源许可/真实频率及完整168小时验收仍缺证据。默认policy样例不包含模型、来源和预算，不能用于启用。新增命令只生成离线评估包，不执行付费请求。
+
+完整回归、独立代码review与最终SHA结果将在本节补齐。当前不声明PR已可合并或生产可启用。
+
+## 9 配置与停止操作说明
+
+- 使用 `docker-compose.news-quality.yml` 叠加现有生产Compose；新worker仅在 `news-quality` profile启用，固定候选镜像通过 `UMANEWS_NEWS_QUALITY_IMAGE` 传入；队列为 `news_quality`，并发2。
+- `NEWS_QUALITY_POLICY_DIR` 是宿主只读目录，容器中以 `/run/news-quality` 挂载。全部web/worker/Beat使用相同 `NEWS_QUALITY_POLICY_FILE` 和 `NEWS_QUALITY_POLICY_FILE_SHA256`；文件超限、SHA不符或非对象导致启动失败。API凭据只注入环境，不进入policy/仓库。
+- `NEWS_QUALITY_MODE=off` 阻断新认领/公开；`NEWS_QUALITY_DISPATCH_ENABLED=false` 停止扫描投递。旧writer对已绑定P01稿仍拦截。`NEWS_QUALITY_FEED_ENABLED` 可保持true以继续显示已公开回执并每5分钟刷新快照，不能用关闭feed代替逐稿撤回。
+- 索引切换分离：先 `NEWS_QUALITY_INDEX_ENABLED=true` 保证旧writer维护条目，feed仍false。`backfill_news_public_index --max-id N --after-id M --limit 100 --output manifest.json` 只准备固定页；apply带manifest及原文件SHA。每页最多500篇，整页锁定并核原文/公开版本，漂移整页拒绝；重复应用不重复建索引。首次全量集合核对后再开feed。本轮未对生产运行该命令。
+- `prepare_news_evaluation` 固定本地manifest/根目录/SHA，校验真实来源与人工标注；输出始终NOT_RUN。缺模型/费率或真实样本时package_ready=false。
+- `report_news_quality` 输入事件JSON、应用曝光JSONL、访问对账JSON、窗口证据JSON分别绑定SHA，最多32MiB；窗口至多31天。缺独立清单/窗口/访问证据时保持unknown或未通过，管理页7日即时统计不等于自然周验收。
+- 应用在 `LOG_DIR/news-exposure.jsonl` 写响应ID、generation和实际条目；Nginx在 `news-exposure-access.jsonl` 写匿名响应ID/状态/时间，保留原combined access log。发布包必须含两端日志持久化、轮转和至少覆盖观察窗口的保留期，核实际磁盘边界。应用handler支持外部轮转；Nginx轮转须重新打开日志。
+- 访问对账输入不是原始Nginx JSONL：需从固定完整窗口文件筛选成功200响应，提取唯一response_ids，记录start/end/provenance及complete。先证明日志无丢失/轮转缺口再设complete；重复响应ID、集合不一致均失败。不能仅凭程序生成日志而声称浏览器已收到，也不把snapshot席位当曝光。应另保留原始日志SHA及汇总过程。
+- 迁移0083建表/字段，0084保护公开回执及已发表锚点，0085保护已结算任务/已发表run。仅PG具有DB级保护；生产不可替换为SQLite。停用后保留表和receipt，不降迁移、不回滚不理解P01的旧writer镜像。
