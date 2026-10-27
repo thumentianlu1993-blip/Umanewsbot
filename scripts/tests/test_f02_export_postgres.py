@@ -353,12 +353,16 @@ class PostgreSQLContracts(unittest.TestCase):
             table=export.TABLES[key]
             with self.admin.cursor() as c:
                 c.execute('TRUNCATE public.'+table)
-                columns={'cohort':"id,racing_region",'windows':"id,kind",'decisions':"id,window_id",'homepage_exposures':"id,article_id,channel"}.get(key,'id')
-                values={'cohort':"n,'japan'",'windows':"n,'publish'",'decisions':"n,1",'homepage_exposures':"n,1,'homepage'"}.get(key,'n')
+                # Count budgets independently of the strict observation-time cutoff.
+                # Fresh CURRENT_TIMESTAMP rows can land on/after that cutoff when
+                # the isolated VM clock is corrected during this test.
+                columns={'cohort':"id,racing_region,first_seen_at",'crawl_jobs':"id,started_at",'windows':"id,kind,window_start",'decisions':"id,window_id",'homepage_exposures':"id,article_id,channel"}.get(key,'id')
+                values={'cohort':"n,'japan',now()-interval '1 day'",'crawl_jobs':"n,now()-interval '1 day'",'windows':"n,'publish',now()-interval '1 day'",'decisions':"n,1",'homepage_exposures':"n,1,'homepage'"}.get(key,'n')
                 c.execute('INSERT INTO public.'+table+'('+columns+') SELECT '+values+' FROM generate_series(1,%s) AS q(n)',(limit,))
             snapshot=self.metadata();self.assertEqual(snapshot['counts'][key],limit)
             with self.admin.cursor() as c:c.execute('INSERT INTO public.'+table+'('+columns+') SELECT '+values+' FROM generate_series(%s::bigint,%s::bigint) AS q(n)',(limit+1,limit+1))
-            with self.assertRaisesRegex(export.ExportError,'detail_budget_exceeded'):self.metadata()
+            with self.subTest(dataset=key):
+                with self.assertRaisesRegex(export.ExportError,'detail_budget_exceeded'):self.metadata()
             # Reset full fixture after each case so unrelated over-budget tables cannot mask this one.
             if key!=list(export.LIMITS)[-1]:self.setUp()
 
