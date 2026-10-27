@@ -131,7 +131,7 @@ class SourceRevisionFenceTests(TestCase):
         from stable.models import ReviewMode
         self.article.review_mode = ReviewMode.AUTO
         self.article.save(update_fields=["review_mode"])
-        with patch("stable.tasks.rewrite_article") as rewrite, patch("stable.tasks.score_article_for_automation") as score, patch("stable.tasks.validate_rewrite", return_value=SimpleNamespace(passed=True, reason="")) as validate, patch("stable.tasks.apply_validation_outcome"), patch("stable.tasks.apply_score_decision"), patch("stable.tasks.send_notification_task") as notice, patch("stable.tasks.send_high_value_warning_notification"):
+        with patch("stable.tasks.rewrite_article") as rewrite, patch("stable.tasks.score_article_for_automation", return_value=SimpleNamespace(decision_summary="旧流程", score_total=50, review_mode="auto", automation_status="rewrite_ready")) as score, patch("stable.tasks.validate_rewrite", return_value=SimpleNamespace(passed=True, reason="")) as validate, patch("stable.tasks.apply_validation_outcome"), patch("stable.tasks.apply_score_decision"), patch("stable.tasks.send_notification_task") as notice, patch("stable.tasks.send_high_value_warning_notification"):
             for task in (tasks.score_article_task, tasks.rewrite_article_task, tasks.validate_rewrite_task, tasks.process_article_automation_task):
                 result = task.run(self.article.pk)
                 self.assertEqual(result.get("reason"), "p01_owned", task.name)
