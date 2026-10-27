@@ -31,3 +31,5 @@ PROMPTS = {
     ),
     "event_classify": BASE + "基于完整可信正文判断事件、重要性和相对已知事实的重大增量；不按来源或榜单加分。按输入 response_schema 返回。",
 }
+
+PROMPTS["fact_audit"] += " 若 editorial 中有 correction 事实，逐项验证旧稿 old_text 确有实质事实错误且新稿完整纠正并有来源支持；额外返回 corrections 数组，每项仅含 receipt_id、old_body_span、substantive(bool)、supported(bool)，与事实顺序一致。没有更正时省略该字段；纯措辞变更不能通过 substantive。"

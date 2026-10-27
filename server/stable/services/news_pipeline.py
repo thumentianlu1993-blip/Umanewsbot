@@ -174,16 +174,31 @@ def claim_stage(run_id, payload):
 
 
 def _event_candidates(run):
+    import re
+    from django.db.models import Q
     from stable.models import NewsEditorialEvent
-    event_id = run.event_id
-    if not event_id and run.parent_run_id:
-        event_id = run.parent_run.event_id
-    if not event_id:
-        return []
-    event = NewsEditorialEvent.objects.get(pk=event_id)
-    return [{"id": str(event.pk), "identity_key": event.identity_key, "version": event.version,
-             "kind": event.event_kind, "identity": event.identity_evidence,
-             "primary_region": event.primary_region, "facts": event.published_facts}]
+    from stable.services.news_content import ContentBlocked
+    event_id = run.event_id or (run.parent_run.event_id if run.parent_run_id else None)
+    # 仅以来源中确实出现的公告/赛事编号与已知同源前版作有界召回。
+    text = run.clean_snapshot.get("title", "") + " " + " ".join(row["text"] for row in run.clean_snapshot.get("blocks", []))
+    tokens = set(re.findall(r"[\w./-]{2,128}", text))
+    query = Q(pk=event_id) if event_id else Q(pk__in=[])
+    for field in ("document_id", "source_race_id", "organization", "organizer", "venue"):
+        query |= Q(**{f"identity_evidence__fields__{field}__in": list(tokens)})
+    events = list(NewsEditorialEvent.objects.filter(query).order_by("id")[:21])
+    if len(events) > 20:
+        raise ContentBlocked("recall_overflow")
+    result = []
+    for event in events:
+        receipts = list(event.receipts.order_by("-published_at", "-id")[:21])
+        if len(receipts) > 20:
+            raise ContentBlocked("receipt_recall_overflow")
+        result.append({"id": str(event.pk), "identity_key": event.identity_key, "version": event.version,
+            "kind": event.event_kind, "identity": event.identity_evidence,
+            "primary_region": event.primary_region, "facts": event.published_facts,
+            "receipts": [{"id": str(row.pk), "body": row.content["body"],
+                          "fact_ids": [fact["id"] for fact in row.evidence.get("editorial", {}).get("facts", [])]} for row in receipts]})
+    return result
 
 
 def stage_payload(run):
@@ -192,7 +207,8 @@ def stage_payload(run):
     source = deepcopy(run.clean_snapshot)
     if run.stage == "event_classify":
         return {"source": source, "candidates": _event_candidates(run),
-                "response_schema": RESPONSE_SCHEMA, "source_scope": run.source_snapshot["source_site"]}
+                "response_schema": RESPONSE_SCHEMA, "source_scope": run.source_snapshot["source_site"],
+                "manual_target": run.manual_target}
     if run.stage == "body_review":
         return {"source": source, "suspicious_block_ids": source.get("suspicious_block_ids", [])}
     if run.stage == "entity_check":
@@ -202,7 +218,7 @@ def stage_payload(run):
                 "repair": run.quality_snapshot if run.repair_count else {}}
     if run.stage == "fact_audit":
         return {"source": source, "target": run.translation_snapshot,
-                "entities": run.entity_snapshot["occurrences"]}
+                "entities": run.entity_snapshot["occurrences"], "editorial": run.editorial_snapshot}
     raise ValueError("stage_not_registered")
 
 
@@ -259,7 +275,9 @@ def _stage_projection(run, attempt):
         target = restore_translation(run.clean_snapshot, run.entity_snapshot["occurrences"], attempt.result)
         return {**update, "translation_snapshot": target, "stage": "fact_audit"}
     if attempt.stage == "fact_audit":
-        quality = validate_audit(run.clean_snapshot, run.translation_snapshot, attempt.result)
+        from stable.services.news_editorial import audit_corrections
+        response = audit_corrections(run.editorial_snapshot, attempt.result)
+        quality = validate_audit(run.clean_snapshot, run.translation_snapshot, response)
         quality.update(strong_attempt_id=attempt.pk, input_sha=attempt.input_sha, policy_sha=run.policy_sha)
         update["quality_snapshot"] = quality
         if quality["passed"]:

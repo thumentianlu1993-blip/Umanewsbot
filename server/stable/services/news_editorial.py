@@ -16,7 +16,8 @@ RESPONSE_SCHEMA = {
         "effective_time": "明确事实时间或空字符串", "modality": "happened|planned|possible|negated",
         "source_span": {"block_id": "ID", "start": 0, "end": 1},
         "importance": "major|minor", "relation": "new|repeated|correction",
-        "prior_fact_ids": ["只引用提供的候选事实ID"]}],
+        "prior_fact_ids": ["只引用提供的候选事实ID"],
+        "correction": "仅 correction 必填 {receipt_id,old_body_span:{start,end},old_text}，精确引用旧稿"}],
     "comparison": {"event_id": "候选事件UUID或null", "version": 0},
 }
 
@@ -147,6 +148,8 @@ def validate_editorial(clean, response, *, source_scope, candidates=(), aliases=
     facts, seen = [], set()
     for fact in response["facts"]:
         keys = {"subject_ref", "predicate", "object", "effective_time", "modality", "source_span", "importance", "relation", "prior_fact_ids"}
+        if isinstance(fact, dict) and fact.get("relation") == "correction":
+            keys.add("correction")
         if type(fact) is not dict or set(fact) != keys:
             raise ContentBlocked("fact_schema")
         original = span_text(clean, fact["source_span"])
@@ -163,9 +166,43 @@ def validate_editorial(clean, response, *, source_scope, candidates=(), aliases=
             raise ContentBlocked("prior_fact_unknown")
         if fact["relation"] in {"repeated", "correction"} and not ids:
             raise ContentBlocked("prior_fact_evidence_missing")
+        if fact["relation"] == "correction":
+            validate_correction(fact, chosen)
         fid = fact_key(fact)
         if fid in seen:
             raise ContentBlocked("duplicate_fact")
         seen.add(fid)
         facts.append({**fact, "id": fid})
     return {**response, "identity_key": key, "facts": facts}
+
+
+def validate_correction(fact, candidate):
+    correction = fact.get("correction")
+    if type(correction) is not dict or set(correction) != {"receipt_id", "old_body_span", "old_text"}:
+        raise ContentBlocked("correction_target_missing")
+    receipt = next((row for row in (candidate or {}).get("receipts", []) if row["id"] == correction["receipt_id"]), None)
+    if not receipt or not set(fact["prior_fact_ids"]).issubset(receipt["fact_ids"]):
+        raise ContentBlocked("correction_target_fact_mismatch")
+    span = correction["old_body_span"]
+    if type(span) is not dict or set(span) != {"start", "end"}:
+        raise ContentBlocked("correction_span_invalid")
+    start, end = span["start"], span["end"]
+    if type(start) is not int or type(end) is not int or not 0 <= start < end <= len(receipt["body"]):
+        raise ContentBlocked("correction_span_invalid")
+    if correction["old_text"] != receipt["body"][start:end]:
+        raise ContentBlocked("correction_old_text_mismatch")
+
+
+def correction_targets(editorial):
+    return [fact["correction"] for fact in editorial.get("facts", []) if fact["relation"] == "correction"]
+
+
+def audit_corrections(editorial, response):
+    """旧文定位由程序核验，是否有实质错误及新稿是否有证据由强审校确认。"""
+    targets = correction_targets(editorial)
+    checked = response.get("corrections", [])
+    expected = [{"receipt_id": row["receipt_id"], "old_body_span": row["old_body_span"],
+                 "substantive": True, "supported": True} for row in targets]
+    if checked != expected:
+        raise ContentBlocked("correction_not_substantively_verified")
+    return {key: value for key, value in response.items() if key != "corrections"}

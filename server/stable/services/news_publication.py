@@ -18,7 +18,7 @@ from stable.models import (
 )
 from stable.services.news_pipeline import digest, policy_sha, _current_run, article_revision, source_eligible
 from stable.services.news_content import ContentBlocked, validate_audit, validate_entities
-from stable.services.news_editorial import validate_editorial
+from stable.services.news_editorial import validate_editorial, audit_corrections
 from stable.services.news_feed import publication_lock, append_public_entry
 
 
@@ -71,7 +71,9 @@ def check_publication_evidence(run):
     audit = _validated_attempt(run, run.quality_snapshot.get("strong_attempt_id"), "fact_audit")
     if audit.usage["input"].get("source") != clean or audit.usage["input"].get("target") != run.translation_snapshot:
         raise ContentBlocked("audit_input_changed")
-    quality = validate_audit(clean, run.translation_snapshot, audit.result)
+    if audit.usage["input"].get("editorial") != run.editorial_snapshot:
+        raise ContentBlocked("audit_editorial_changed")
+    quality = validate_audit(clean, run.translation_snapshot, audit_corrections(run.editorial_snapshot, audit.result))
     if not quality["passed"] or run.quality_snapshot.get("target_sha") != quality["target_sha"] or run.quality_snapshot.get("policy_sha") != run.policy_sha:
         raise ContentBlocked("target_not_audited")
     if run.manual_target and (digest(run.manual_target) != run.target_revision_sha
@@ -193,7 +195,8 @@ def publish(run_id):
         return None
     if event.version == 0 and _primary_candidate(event, run) != run.pk:
         run.reason = "await_primary_or_selection_overflow"
-        run.save(update_fields=["reason"])
+        run.next_attempt_at = timezone.now() + timedelta(minutes=1)
+        run.save(update_fields=["reason", "next_attempt_at"])
         return None
     old_ids = {fact["id"] for fact in event.published_facts}
     facts = run.editorial_snapshot["facts"]
@@ -206,12 +209,19 @@ def publish(run_id):
         run.save(update_fields=["state", "reason"])
         return None
     kind = "correction_story" if corrections else "new_story"
+    if corrections:
+        target_ids = {fact["correction"]["receipt_id"] for fact in corrections}
+        if len(target_ids) != 1:
+            run.state, run.reason = "review", "correction_multiple_targets"
+            run.save(update_fields=["state", "reason"])
+            return None
+        previous = event.receipts.filter(pk=next(iter(target_ids))).first()
     if corrections and not previous:
         run.state, run.reason = "review", "correction_target_missing"
         run.save(update_fields=["state", "reason"])
         return None
     key = digest({"kind": kind, "new_facts": sorted(fact["id"] for fact in delta),
-        "corrections": sorted((str(previous.pk), tuple(sorted(fact["prior_fact_ids"])), fact["id"]) for fact in corrections)})
+        "corrections": sorted((str(previous.pk), tuple(sorted(fact["prior_fact_ids"])), fact["id"], digest(fact["correction"])) for fact in corrections)})
     if event.receipts.filter(publication_key=key).exists():
         run.state, run.reason = "duplicate", "publication_already_recorded"
         run.save(update_fields=["state", "reason"])
@@ -248,6 +258,10 @@ def publish(run_id):
         verified_occurrences=run.entity_snapshot["occurrences"], verified_relations=relations,
         previous_receipt=previous, kind=kind, publication_key=key, published_at=now)
     append_public_entry(article=article, receipt=receipt, now=now, priority=run.priority, region=run.primary_region)
+    if corrections:
+        # 旧稿仍可在详情/档案访问；新首页不再把被更正稿作为优先候选。
+        from stable.models import NewsPublicEntry
+        NewsPublicEntry.objects.filter(receipt=previous, superseded_at__isnull=True).update(superseded_at=now)
     by_id = {fact["id"]: fact for fact in event.published_facts}
     for fact in delta + corrections:
         by_id[fact["id"]] = fact
