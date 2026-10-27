@@ -31,3 +31,7 @@ entrypoint、request、batch、worker隔离检查及receipt核验均拒绝root p
 21d7f17b 的独立审核提出 C1–C7，均属执行器技术合同：贯通 serial CI/候选外验证的原始镜像proof及collection输入摘要；PID文件检查由有界10001子进程执行；源码复制不保留宿主所有权；准备进程接入OwnedObserver预算与reader精确CID登记；普通collect-only无镜像动作，初次CI显式使用prepare-images；恢复旧exact3 API并验证三份资源；兼容旧server-only入口。受限root能力仍为0xe0，不增加DAC/CHOWN能力。
 
 镜像构建增加随机操作所有权label，避免并发相同构建误删他人镜像；只删除本操作新建的精确image ID。reader失败和清理失败均保留主异常，仍尝试镜像清理；不以缓存、模拟receipt或collection代替原native执行。
+
+## 最终清理合同返修
+
+C8只兼容实际Docker精确返回的 `no such object` 小写文案，完整目标ID、退出码1和空stdout约束保留；额外错误、错误ID、权限或daemon错误均不能当作已清理。C9让无OwnedObserver的准备入口也使用共同的精确容器名称清理函数和既有deadline；不追加重试时间或清理无关资源。

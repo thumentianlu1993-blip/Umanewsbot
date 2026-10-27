@@ -11,3 +11,6 @@
 - V08：旧exact3/exact2/remaining3 API实际读取冻结资源；旧server-only入口收集原迁移类；Linux源码uid10001、复制目标uid0时保留字节/执行位且无需CHOWN。
 - V09：serial collection及候选外PG校验程序重建相同proof绑定输入；缺失/篡改proof拒绝；普通collect-only无构建，prepare-images明确准备。
 - V10：准备进程走OwnedObserver预算；reader timeout后精确CID清理，清理异常保留主异常且继续回收本操作image；root回执UID/GID拒绝bool伪装。
+
+- V11：Docker小写精确缺失文案仅在完整目标ID、退出码1、空stdout同时符合时认作不存在；错误ID、权限、daemon和附加错误必须拒绝。
+- V12：无OwnedObserver的镜像reader失败后，按精确名称和同一deadline清理；保留原异常并继续回收本操作image，不延长预算或删除其他资源。
