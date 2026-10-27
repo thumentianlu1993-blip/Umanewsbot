@@ -154,7 +154,7 @@ def snapshot_page(generation, *, cursor=None, size=12, now=None):
 @transaction.atomic
 def index_legacy_article(article):
     """与旧发布 writer 同事务调用。旧数据仅由显式回填命令建立索引。"""
-    if article.active_news_run_id or not getattr(settings, "NEWS_QUALITY_FEED_ENABLED", False):
+    if article.active_news_run_id or not (getattr(settings, "NEWS_QUALITY_INDEX_ENABLED", False) or getattr(settings, "NEWS_QUALITY_FEED_ENABLED", False)):
         return None
     publication_lock()
     if article.workflow_status != "published" or not article.published_to_web_at:

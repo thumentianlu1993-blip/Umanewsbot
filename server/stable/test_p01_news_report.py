@@ -46,10 +46,10 @@ class ReportTests(WorkflowFixture, TransactionTestCase):
 
     def test_duplicate_discoveries_do_not_hide_three_failed_details(self):
         for _ in range(2):
-            job = CrawlJob.objects.create(source=self.source, source_site=self.source.source_site, source_mode=self.source.source_mode)
+            job = CrawlJob.objects.create(source=self.source)
             for index in range(3):
                 NewsDiscoveryObservation.objects.create(crawl_job=job, source=self.source, kind="stub", item_key=f"candidate-{index}",
-                    primary_region="france", stage="detail", outcome="failed", reason="fixture_template_changed")
+                    primary_region="france", stage="detail", outcome="failed", reason="fixture_template_changed", observed_at=timezone.now())
         report = self.report()
         self.assertEqual(report["discovery"]["candidates"], 3)
         self.assertEqual(report["discovery"]["failed"], 3)

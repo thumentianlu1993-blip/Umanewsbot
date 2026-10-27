@@ -140,7 +140,7 @@ class FeedTests(TransactionTestCase):
                 return news_feed.create_snapshot(now=self.now)
             finally:
                 close_old_connections()
-        with ThreadPoolExecutor(max_workers=2) as pool:
+        with self.settings(NEWS_QUALITY_INDEX_ENABLED=True), ThreadPoolExecutor(max_workers=2) as pool:
             publishing = pool.submit(publisher)
             self.assertTrue(entered.wait(2))
             building = pool.submit(snapshot)
