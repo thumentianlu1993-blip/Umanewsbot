@@ -1110,7 +1110,7 @@ class ManagedReadonlySchemaTests(TransactionTestCase):
             self.assertNotIn(("stable", "0081_managed_readonly_steps"), MigrationRecorder(connection).applied_migrations())
         finally:
             MigrationExecutor(connection).migrate(entry_leaves)
-        self.assertEqual(MigrationRecorder(connection).applied_migrations(), entry_applied)
+        self.assertEqual(set(MigrationRecorder(connection).applied_migrations()), set(entry_applied))
         self.assertEqual(TranslationRetryBudget.objects.values().get(pk=self.parent.pk), before)
         self.assertEqual(ManagedReadonlyTaskBudget.objects.count(), 0)
         self.assertEqual(ManagedReadonlyStep.objects.count(), 0)

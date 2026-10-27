@@ -3589,7 +3589,8 @@
     "stable.test_p01_news_relations": "django",
     "stable.test_p01_news_report": "django",
     "stable.test_p01_news_source_evidence": "django",
-    "stable.test_p01_news_workflow": "django"
+    "stable.test_p01_news_workflow": "django",
+    "stable.test_p01_news_review_regressions": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
