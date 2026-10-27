@@ -305,8 +305,10 @@ class FrozenWorkerBindingTests(unittest.TestCase):
         django=types.ModuleType('django');django.setup=Mock()
         conf=types.ModuleType('django.conf');conf.settings=SimpleNamespace()
         dotenv=types.ModuleType('dotenv');dotenv.load_dotenv=Mock()
+        from tools.test_impact.fixture_inputs import ENVIRONMENT, fixture_environment
         setup=self.worker_function('setup',ROOT=self.source,os=os,sys=sys,
-                                   isolated_environment=isolated_environment,verify_source_binding=verify_source_binding)
+                                   isolated_environment=isolated_environment,verify_source_binding=verify_source_binding,
+                                   ENVIRONMENT=ENVIRONMENT,fixture_environment=fixture_environment)
         with patch.dict(sys.modules,{'django':django,'django.conf':conf,'dotenv':dotenv}),patch.dict(os.environ,{'PATH':os.environ['PATH'],'A045_TEST_CODE_SHA':'0'*40,'HOST_SENTINEL':'discard'}),patch.object(sys,'argv',[]):
             setup('django',self.plan,self.binding)
             self.assertEqual(os.environ['A045_TEST_CODE_SHA'],self.plan['test_sha'])
@@ -332,7 +334,7 @@ class FrozenWorkerBindingTests(unittest.TestCase):
                                   setup=setup,collect=Mock(side_effect=stop))
         with patch.object(sys,'argv',['worker','collect']),self.assertRaisesRegex(RuntimeError,'synthetic collection boundary'):
             main()
-        setup.assert_called_once_with('django',self.plan,self.binding)
+        setup.assert_called_once_with('django',self.plan,self.binding,collecting=True)
 
     def test_formal_executor_rejects_unresolved_commit_and_tree_before_docker(self):
         import argparse

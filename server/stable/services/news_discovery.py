@@ -11,7 +11,7 @@ def enabled(source):
 
 
 def item_key(item):
-    return digest({"item": item.source_article_id or item.source_url})
+    return digest({"item": getattr(item, "source_article_id", "") or item.source_url})
 
 
 def discover_listing(adapter, source, job, mode, window):
