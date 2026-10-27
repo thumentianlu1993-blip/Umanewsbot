@@ -1,0 +1,572 @@
+{
+  "code_sha": "741334cc1dadad510aae8cce20373d871f150a3a",
+  "original_export_sha256": "c103a28d20b7e512cfc6160f4e81714bb3afe280255980b2db1d5460077e2686",
+  "unique_cached_articles": 30,
+  "international_body_and_time_pass": 22,
+  "old_japanese_missing_html": 8,
+  "fresh_japanese_replay_pages": 2,
+  "fresh_japanese_are_existing_article_rechecks": true,
+  "sporting_listing_candidates": 14,
+  "gold_samples": 0,
+  "model_calls": 0,
+  "production_writes": 0,
+  "files": {
+    "/Users/mentianlu/.codex/runtime/p01-source-fixes-20261027/replay.py": "4b43f5b49409b7747a33d47dd38430ba20dfd82e10d4eb4da70b5a38cbdd9c8e",
+    "/Users/mentianlu/.codex/runtime/p01-source-fixes-20261027/replay-reviewed.json": "38fe393b6866c45a8a237cfa011d08f8a85585cf4e28f640dcc443b612abfbdd",
+    "/Users/mentianlu/.codex/runtime/p01-source-fixes-20261027/sporting-list.html": "14a52b856e35d13da5d1dd9af8862ead4cc456eb5a654c51f7bd49cde7eaebff",
+    "/Users/mentianlu/.codex/runtime/p01-source-fixes-20261027/listing-fetch.json": "6f5fb1cf35136745232b2aea1e65f82da5346e307a2388f6b9ef5d3a64d49f54",
+    "/Users/mentianlu/.codex/runtime/p01-source-verification-20261027/netkeiba-fresh.html": "2d9dea1fd51a19a697ad710c3489e56311d928083988a675637273f6eb4231fd",
+    "/Users/mentianlu/.codex/runtime/p01-source-verification-20261027/jra-fresh.html": "3b577e84335167ace96341f48017e76d16cfc4df3d731a5398fd642587e93c10",
+    "/Users/mentianlu/.codex/runtime/p01-source-fixes-20261027/japan-replay-reviewed.json": "d432c496b7a626c65da68612f501e66f403dac2341f8c5b76380f4d9cf97258b",
+    "/Users/mentianlu/.codex/runtime/p01-source-fixes-20261027/full-741334cc/official-summary.json": "fd6b22bb5597aceed3f3bc3c3a1e7bf3f152033220af8ff5edd6e950b4afaa85",
+    "/Users/mentianlu/.codex/runtime/p01-source-fixes-20261027/full-741334cc/final-audit.json": "6b417c47ad1dcff01d13c3ed331cbe0018b670c952e04feb146706a7749f0fda",
+    "/Users/mentianlu/.codex/runtime/p01-source-fixes-20261027/full-741334cc/id-delta.json": "9c4e91193183c50498f236bfcca4662916128fdf36b423fc7fe71008f5f73928"
+  },
+  "review": {
+    "status": "approved",
+    "rounds": 3,
+    "closed_findings": [
+      "R1",
+      "R2",
+      "R3"
+    ],
+    "code_sha": "741334cc1dadad510aae8cce20373d871f150a3a",
+    "final_fingerprint": "3ff5c30bfba224cf7da70234950664dee8a54686735e365f0d63a67b45bdfe70",
+    "scope": "code and cached-source evidence; no production acceptance"
+  },
+  "selected_results": {
+    "source_tests": 17,
+    "latest_adapter_regression_tests": 62,
+    "all_latest_adapter_regression_pass": true
+  },
+  "international_results": [
+    {
+      "article_id": 22700,
+      "site": "hkjc_news",
+      "html_sha256": "fb6e1cfda82cd0aa4f745c14ae92f1776e5675946b768bdfffde5f3c71519ec2",
+      "body": {
+        "status": "structure_pass",
+        "blocks": 24,
+        "chars": 3881,
+        "sha256": "b6e559e22e43b636331a1b5b926fbf66b9041bcd8b983abf0154e51e0bc7f2fc"
+      },
+      "parsed_publication_time": "2026-10-27 06:49:00+00:00",
+      "publication_evidence": {
+        "source": "detail",
+        "raw": "27/10/2026 14:49",
+        "selector": ".content-news-list :scope > .horses-racing-news-title-header > .horses-racing-news-author",
+        "timezone": "Asia/Hong_Kong",
+        "precision": "minute",
+        "verified": true,
+        "reason": "published_time"
+      },
+      "candidate_region": "hong_kong",
+      "region_status": null
+    },
+    {
+      "article_id": 22608,
+      "site": "hkjc_news",
+      "html_sha256": "bcf8dfb8432959844506380be70fcf9552183de084dc78f8e3b92b518a10bc7d",
+      "body": {
+        "status": "structure_pass",
+        "blocks": 12,
+        "chars": 3174,
+        "sha256": "1a091a9f2a9ef04d3ae0170dd3130c6bdd3f55274c6724a469e24fda29126a1c"
+      },
+      "parsed_publication_time": "2026-10-26 04:34:00+00:00",
+      "publication_evidence": {
+        "source": "detail",
+        "raw": "26/10/2026 12:34",
+        "selector": ".content-news-list :scope > .horses-racing-news-title-header > .horses-racing-news-author",
+        "timezone": "Asia/Hong_Kong",
+        "precision": "minute",
+        "verified": true,
+        "reason": "published_time"
+      },
+      "candidate_region": "hong_kong",
+      "region_status": null
+    },
+    {
+      "article_id": 22715,
+      "site": "scmp_racing",
+      "html_sha256": "d9078e5b98c0aaccae1293f12b75654e31e7b24d0de29b0a88123ab4aed52b6e",
+      "body": {
+        "status": "structure_pass",
+        "blocks": 15,
+        "chars": 2134,
+        "sha256": "9d520f007efe89a9dee523a883f42742e63d458cac6efe940a9465446d3031a9"
+      },
+      "parsed_publication_time": "2026-10-27 11:35:21+00:00",
+      "publication_evidence": {
+        "source": "detail",
+        "raw": "2026-10-27T19:35:21+08:00",
+        "selector": "jsonld:datePublished",
+        "timezone": "Asia/Hong_Kong",
+        "precision": "minute",
+        "verified": true,
+        "reason": "published_time"
+      },
+      "candidate_region": "hong_kong",
+      "region_status": null
+    },
+    {
+      "article_id": 22624,
+      "site": "scmp_racing",
+      "html_sha256": "b1f2957bb03ab30a7d7f14378f8e4a2e2b63ff10f45a5543506d144eb0ba9368",
+      "body": {
+        "status": "structure_pass",
+        "blocks": 19,
+        "chars": 3878,
+        "sha256": "7dcdbaef344f1fa6dd040a7b7be1bf8af75de7fef135096de615978ea20b5ae2"
+      },
+      "parsed_publication_time": "2026-10-26 10:00:10+00:00",
+      "publication_evidence": {
+        "source": "detail",
+        "raw": "2026-10-26T18:00:10+08:00",
+        "selector": "head:published_time",
+        "timezone": "Asia/Hong_Kong",
+        "precision": "minute",
+        "verified": true,
+        "reason": "published_time"
+      },
+      "candidate_region": "hong_kong",
+      "region_status": null
+    },
+    {
+      "article_id": 20780,
+      "site": "sporting_life",
+      "html_sha256": "74a43768f78bed327169fd65ccecb5b1f356f05455b4748da40d533fd7cd6827",
+      "body": {
+        "status": "structure_pass",
+        "blocks": 19,
+        "chars": 2687,
+        "sha256": "1e96348d6514daaf6d2ce46a2e3465c4f81ef4402aec5535f57d99693e66a201"
+      },
+      "parsed_publication_time": "2026-10-12 11:06:34.535000+00:00",
+      "publication_evidence": {
+        "source": "detail",
+        "raw": "2026-10-12T11:06:34.535Z",
+        "selector": "jsonld:datePublished",
+        "timezone": "Europe/London",
+        "precision": "minute",
+        "verified": true,
+        "reason": "published_time"
+      },
+      "candidate_region": "united_kingdom",
+      "region_status": null
+    },
+    {
+      "article_id": 20777,
+      "site": "sporting_life",
+      "html_sha256": "3e7728365cc97e9b614019e6650d21af75f93ac690d73782b880d6ab41422192",
+      "body": {
+        "status": "structure_pass",
+        "blocks": 17,
+        "chars": 3370,
+        "sha256": "d575d8626e1d022d218485d9f84858b6f4509943dceb083ee28f987fcc82ee92"
+      },
+      "parsed_publication_time": "2026-10-12 11:51:55.814000+00:00",
+      "publication_evidence": {
+        "source": "detail",
+        "raw": "2026-10-12T11:51:55.814Z",
+        "selector": "jsonld:datePublished",
+        "timezone": "Europe/London",
+        "precision": "minute",
+        "verified": true,
+        "reason": "published_time"
+      },
+      "candidate_region": "united_kingdom",
+      "region_status": null
+    },
+    {
+      "article_id": 17850,
+      "site": "sky_sports_racing",
+      "html_sha256": "6972f8dc76cbb6d0d0fffd53a4b26cb94b60fa3655c06970b6340b19478b8836",
+      "body": {
+        "status": "structure_pass",
+        "blocks": 23,
+        "chars": 3382,
+        "sha256": "80b06328bfd3387625de55b5fd9b98bfc25632f3b52eb74deeb61777ca3efddd"
+      },
+      "parsed_publication_time": "2026-09-14 07:00:00+00:00",
+      "publication_evidence": {
+        "source": "detail",
+        "raw": "2026-09-14T07:00:00+0000",
+        "selector": "jsonld:datePublished",
+        "timezone": "Europe/London",
+        "precision": "minute",
+        "verified": true,
+        "reason": "published_time"
+      },
+      "candidate_region": "united_kingdom",
+      "region_status": null
+    },
+    {
+      "article_id": 17849,
+      "site": "sky_sports_racing",
+      "html_sha256": "d1cc318c446ff60a4ff49cb32630c0fcc3f923411bbf39585cd83be3090dd891",
+      "body": {
+        "status": "structure_pass",
+        "blocks": 21,
+        "chars": 3027,
+        "sha256": "3a64c42c2a119f7dd263efd30e53af8b274c130a640ac566bbc19e2f999de7c8"
+      },
+      "parsed_publication_time": "2026-09-15 06:10:00+00:00",
+      "publication_evidence": {
+        "source": "detail",
+        "raw": "2026-09-15T06:10:00+0000",
+        "selector": "jsonld:datePublished",
+        "timezone": "Europe/London",
+        "precision": "minute",
+        "verified": true,
+        "reason": "published_time"
+      },
+      "candidate_region": "united_kingdom",
+      "region_status": null
+    },
+    {
+      "article_id": 22537,
+      "site": "sky_sports_racing",
+      "html_sha256": "5464c33ae30e7a22d949f86b2d9ac1dc287303953f42db042c66403488542663",
+      "body": {
+        "status": "structure_pass",
+        "blocks": 16,
+        "chars": 3238,
+        "sha256": "cc6a09034bf5d8073125901b2ef482d8f299840719bbcec88e21e8fc0fb9eb3c"
+      },
+      "parsed_publication_time": "2026-10-25 15:48:00+00:00",
+      "publication_evidence": {
+        "source": "detail",
+        "raw": "2026-10-25T15:48:00+0000",
+        "selector": "jsonld:datePublished",
+        "timezone": "Europe/London",
+        "precision": "minute",
+        "verified": true,
+        "reason": "published_time"
+      },
+      "candidate_region": "united_kingdom",
+      "region_status": null
+    },
+    {
+      "article_id": 22338,
+      "site": "sky_sports_racing",
+      "html_sha256": "95f8db58e1c1a99a926c1acecbfc5e9055833d572e3ea0df6218d13e1fd2453e",
+      "body": {
+        "status": "structure_pass",
+        "blocks": 36,
+        "chars": 4885,
+        "sha256": "d5f7894d8e543dd8cbf7f76c640709818792384053652274de4d7d0378d282ef"
+      },
+      "parsed_publication_time": "2026-10-24 17:20:00+00:00",
+      "publication_evidence": {
+        "source": "detail",
+        "raw": "2026-10-24T17:20:00+0000",
+        "selector": "jsonld:datePublished",
+        "timezone": "Europe/London",
+        "precision": "minute",
+        "verified": true,
+        "reason": "published_time"
+      },
+      "candidate_region": "united_kingdom",
+      "region_status": null
+    },
+    {
+      "article_id": 22154,
+      "site": "france_galop_news",
+      "html_sha256": "395ceb1c80416255d681df7ea32749cc2bd2e5ecde7f751659379ed64021ade7",
+      "body": {
+        "status": "structure_pass",
+        "blocks": 4,
+        "chars": 1484,
+        "sha256": "276fc686d3dedbeac8d8afaf4a5fb7ff8bdacad3c7f41d395507b5f05c05ea3d"
+      },
+      "parsed_publication_time": "2026-10-23 11:59:00+00:00",
+      "publication_evidence": {
+        "source": "detail",
+        "raw": "Friday, October 23, 2026 - 13:59",
+        "selector": "article.full :scope > header .authored .date, :scope > header time[datetime]",
+        "timezone": "Europe/Paris",
+        "precision": "minute",
+        "verified": true,
+        "reason": "published_time"
+      },
+      "candidate_region": "france",
+      "region_status": null
+    },
+    {
+      "article_id": 22044,
+      "site": "france_galop_news",
+      "html_sha256": "87b52f8c655e613a034bdecea4190851a944558dafd67f34efbbe607e7bdcb19",
+      "body": {
+        "status": "structure_pass",
+        "blocks": 6,
+        "chars": 546,
+        "sha256": "291ba0f3c069d9b980eeb38bbda2cd12fa7d94f4faba8bbe15f3fe39132f6fd6"
+      },
+      "parsed_publication_time": "2026-10-22 14:06:00+00:00",
+      "publication_evidence": {
+        "source": "detail",
+        "raw": "Thursday, October 22, 2026 - 16:06",
+        "selector": "article.full :scope > header .authored .date, :scope > header time[datetime]",
+        "timezone": "Europe/Paris",
+        "precision": "minute",
+        "verified": true,
+        "reason": "published_time"
+      },
+      "candidate_region": "france",
+      "region_status": null
+    },
+    {
+      "article_id": 7611,
+      "site": "tdn",
+      "html_sha256": "dfe928664e9faf66c97476879287d3e5e1669534f681b0d436dafcd31115e917",
+      "body": {
+        "status": "structure_pass",
+        "blocks": 5,
+        "chars": 902,
+        "sha256": "428ccd8b6a9e8254628e10aef42e11cf93e14908d1a6a2e31124a71c0a03fe95"
+      },
+      "parsed_publication_time": "2026-07-09 20:18:53+00:00",
+      "publication_evidence": {
+        "source": "detail",
+        "raw": "2026-07-09T20:18:53+00:00",
+        "selector": "jsonld:datePublished",
+        "timezone": "America/New_York",
+        "precision": "minute",
+        "verified": true,
+        "reason": "published_time"
+      },
+      "candidate_region": "france",
+      "region_status": "supported"
+    },
+    {
+      "article_id": 5700,
+      "site": "tdn",
+      "html_sha256": "721ec9b954f8567c2ae4357546c94de70ce3cfe27cd3a9e1e2ed8006d6b6fbf0",
+      "body": {
+        "status": "structure_pass",
+        "blocks": 5,
+        "chars": 1166,
+        "sha256": "9f8e9a8b0f558610cbf28fa0492ddf72b3890e4ff9ad49638eb314bb281f8514"
+      },
+      "parsed_publication_time": "2024-01-24 17:59:55+00:00",
+      "publication_evidence": {
+        "source": "detail",
+        "raw": "2024-01-24T17:59:55+00:00",
+        "selector": "jsonld:datePublished",
+        "timezone": "America/New_York",
+        "precision": "minute",
+        "verified": true,
+        "reason": "published_time"
+      },
+      "candidate_region": "france",
+      "region_status": "supported"
+    },
+    {
+      "article_id": 22733,
+      "site": "tdn",
+      "html_sha256": "e62d1703b3597e0235ff829e0f2d10e7977148d94aaf4319d4b6c2315fa6c3b7",
+      "body": {
+        "status": "structure_pass",
+        "blocks": 7,
+        "chars": 1235,
+        "sha256": "ec87892e2883c8037cb3efa55b205a8a251930bdb368752d208b196e7d65d986"
+      },
+      "parsed_publication_time": "2026-10-27 14:59:45+00:00",
+      "publication_evidence": {
+        "source": "detail",
+        "raw": "2026-10-27T14:59:45+00:00",
+        "selector": "jsonld:datePublished",
+        "timezone": "America/New_York",
+        "precision": "minute",
+        "verified": true,
+        "reason": "published_time"
+      },
+      "candidate_region": "other",
+      "region_status": "needs_review"
+    },
+    {
+      "article_id": 22732,
+      "site": "tdn",
+      "html_sha256": "194ab15f4cfa484aec639a7fa5b2ff10223f55375790a0f54fb2e2dae5493eea",
+      "body": {
+        "status": "structure_pass",
+        "blocks": 5,
+        "chars": 739,
+        "sha256": "3a6c714f344bc299ca8bc3542fa3b76896b53d853879291ca7b2f85ab9f961c1"
+      },
+      "parsed_publication_time": "2026-10-27 15:11:07+00:00",
+      "publication_evidence": {
+        "source": "detail",
+        "raw": "2026-10-27T15:11:07+00:00",
+        "selector": "jsonld:datePublished",
+        "timezone": "America/New_York",
+        "precision": "minute",
+        "verified": true,
+        "reason": "published_time"
+      },
+      "candidate_region": "other",
+      "region_status": "needs_review"
+    },
+    {
+      "article_id": 18345,
+      "site": "horse_racing_nation",
+      "html_sha256": "d0335b67605860f8d9b8e92c5c25e4acbd6d069493010143282857d4f70a9fd8",
+      "body": {
+        "status": "structure_pass",
+        "blocks": 2,
+        "chars": 1150,
+        "sha256": "ce04134181d15a954a9fc291022cc77b5396fc7e8e26695f92a3d26705033985"
+      },
+      "parsed_publication_time": "2026-09-25 12:50:00+00:00",
+      "publication_evidence": {
+        "source": "detail",
+        "raw": "2026-09-25T12:50:00Z",
+        "selector": "jsonld:datePublished",
+        "timezone": "America/New_York",
+        "precision": "minute",
+        "verified": true,
+        "reason": "published_time"
+      },
+      "candidate_region": "united_states",
+      "region_status": null
+    },
+    {
+      "article_id": 16379,
+      "site": "horse_racing_nation",
+      "html_sha256": "7ae73ff8258729a8131a327781ddb8a95074ecf0d325a86b6e736ea2de2b71d3",
+      "body": {
+        "status": "structure_pass",
+        "blocks": 15,
+        "chars": 4848,
+        "sha256": "40257dcb4d1fd02c228d3cafe03157098dfcd897532c2c2a3ae6ad89bb5e75d6"
+      },
+      "parsed_publication_time": "2026-09-09 20:40:00+00:00",
+      "publication_evidence": {
+        "source": "detail",
+        "raw": "2026-09-09T20:40:00Z",
+        "selector": "jsonld:datePublished",
+        "timezone": "America/New_York",
+        "precision": "minute",
+        "verified": true,
+        "reason": "published_time"
+      },
+      "candidate_region": "united_states",
+      "region_status": null
+    },
+    {
+      "article_id": 22731,
+      "site": "horse_racing_nation",
+      "html_sha256": "9a5b9aef329f47c03805b3d32615c5f0f3105a5b108beb6714f49fc0d5f4397b",
+      "body": {
+        "status": "structure_pass",
+        "blocks": 10,
+        "chars": 4096,
+        "sha256": "22cc94fc4f6c6e0a99ce52e06b6cc2c7c4f29c89c7e13a2a6dd2eb43af86880e"
+      },
+      "parsed_publication_time": "2026-10-27 14:04:00+00:00",
+      "publication_evidence": {
+        "source": "detail",
+        "raw": "2026-10-27T14:04:00Z",
+        "selector": "jsonld:datePublished",
+        "timezone": "America/New_York",
+        "precision": "minute",
+        "verified": true,
+        "reason": "published_time"
+      },
+      "candidate_region": "united_states",
+      "region_status": null
+    },
+    {
+      "article_id": 22730,
+      "site": "horse_racing_nation",
+      "html_sha256": "269cdb5bc90cc464e70d3774012dca81a34453de2308591be1cfcf96487536ee",
+      "body": {
+        "status": "structure_pass",
+        "blocks": 7,
+        "chars": 1955,
+        "sha256": "154679ac4326d5bf389320d72590286e87f6d50c352164f3b7a2eb71e7caeb86"
+      },
+      "parsed_publication_time": "2026-10-27 13:42:00+00:00",
+      "publication_evidence": {
+        "source": "detail",
+        "raw": "2026-10-27T13:42:00Z",
+        "selector": "jsonld:datePublished",
+        "timezone": "America/New_York",
+        "precision": "minute",
+        "verified": true,
+        "reason": "published_time"
+      },
+      "candidate_region": "united_states",
+      "region_status": null
+    },
+    {
+      "article_id": 22684,
+      "site": "tdn",
+      "html_sha256": "4c131151a0125abe5f20b9619c3820358926180302d47afe59bd557e56365c0d",
+      "body": {
+        "status": "structure_pass",
+        "blocks": 39,
+        "chars": 13166,
+        "sha256": "d2c13959d27440e45de25e8e4dfdc9e9671e836756828ebc51ab072a1ceaf12b"
+      },
+      "parsed_publication_time": "2026-10-26 22:56:15+00:00",
+      "publication_evidence": {
+        "source": "detail",
+        "raw": "2026-10-26T22:56:15+00:00",
+        "selector": "jsonld:datePublished",
+        "timezone": "America/New_York",
+        "precision": "minute",
+        "verified": true,
+        "reason": "published_time"
+      },
+      "candidate_region": "united_states",
+      "region_status": "supported"
+    },
+    {
+      "article_id": 22644,
+      "site": "tdn",
+      "html_sha256": "a6529a1f65874c31b7802cc9b5ceee1b37f518e176b8f421f9669ca3b08bffc7",
+      "body": {
+        "status": "structure_pass",
+        "blocks": 5,
+        "chars": 919,
+        "sha256": "28607cbb33922ed9737471f188d4c82882b17580433465a8fc1a2bec92a32a6a"
+      },
+      "parsed_publication_time": "2026-10-26 16:15:45+00:00",
+      "publication_evidence": {
+        "source": "detail",
+        "raw": "2026-10-26T16:15:45+00:00",
+        "selector": "jsonld:datePublished",
+        "timezone": "America/New_York",
+        "precision": "minute",
+        "verified": true,
+        "reason": "published_time"
+      },
+      "candidate_region": "france",
+      "region_status": "supported"
+    }
+  ],
+  "full_suite": {
+    "code_sha": "741334cc1dadad510aae8cce20373d871f150a3a",
+    "test_tree": "42678461d4376d6e2a39601e775df44e5a69df69",
+    "batches": 57,
+    "tests": 7696,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "owned_lifecycles_verified": 58,
+    "owned_containers_confirmed_absent": 59,
+    "owned_image_confirmed_absent": "sha256:4028b9678430bd9a8bbaa4deda33eeaa80d16a6ce49066c6c90d37bd85be65ff",
+    "image_id": "sha256:5fa59696f087c4ba2fdc0fde4e6c95d484e660334332a0256ba739a911766d42",
+    "local_offline_only": true,
+    "status": "passed",
+    "skipped_count": 0,
+    "mode": "full",
+    "count": 7696,
+    "plan_digest": "13db3adbb387baa49eeea136e8b09014e9011dad9ad7fac071a9d6d8d634f2cd",
+    "run_id": "p01-source-fixes-741334cc",
+    "run_attempt": "1",
+    "seconds": 1507.3493701659972
+  }
+}
