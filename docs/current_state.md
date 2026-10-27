@@ -1,10 +1,12 @@
-# 当前工作状态：2026-10-27 P02 核心开发与独立评审
+# 当前工作状态：2026-10-28 P02 免费地区接入
 
 P02 已从方案进入授权开发。独立分支 `codex/p02-race-lifecycle-design-20261027`、worktree `/Users/mentianlu/.codex/worktrees/p02-race-lifecycle-design-20261027/umanews`；用户明确要求先不合并、不部署。核心 epoch 发布、名单/赛果成熟度、期限与冲突读闸、容量调度、持久补偿和计量报告已实现，并以隔离 PostgreSQL 测试先行验证。详见 [实施记录](changes/p02-race-lifecycle-20261027/implementation.md)、[验证证据](changes/p02-race-lifecycle-20261027/validation.json)和[免费来源盘点](changes/p02-race-lifecycle-20261027/source-inventory.md)。
 
 子 Agent 独立实现评审的首轮 11 项、第二轮 5 项问题均已修复；完整原生审核和后续修复复审均已完成，全部 actionable findings 已关闭，491 项不同测试通过，详见 [实现评审](changes/p02-race-lifecycle-20261027/implementation-review.md)。原 [方案评审](changes/p02-race-lifecycle-20261027/review.md)的 APPROVED 仅指方案，不替代实现评审。
 
-新开关默认关闭；真实容量/首发时钟/生产探针/自然赛日/七天观察均未验收。JRA 是首区离线候选，其他地区尤其 AU/DE/AE/SA 的常驻适配与五类能力仍有缺口；不能宣称九地区接通或 SLA 达标。未改原卡百分比，未恢复旧多线调度。人工确认仅引用根 AGENTS.md。
+本轮免费地区接入已通过 318 项不同隔离测试；独立静态评审的两项完整性问题已关闭；完整原生审核新增两项 P2 已修复并通过原 reviewer 聚焦复审，剩余 actionable findings 为 0，见[地区评审](changes/p02-race-lifecycle-20261027/regional-review.md)。
+
+新开关默认关闭；真实容量/首发时钟/生产探针/自然赛日/七天观察均未验收。JRA 是首区离线候选；本轮新增 NAR/HK/GB/IE/FR/US/AU/DE/AE/SA 免费地区适配、同场名单核验及隔离发布回放，详见[地区实施记录](changes/p02-race-lifecycle-20261027/regional-implementation.md)。法国/德国确定名单成熟度、各区明确更正和实际全量覆盖/容量仍有缺口；不能宣称九地区生产验收或 SLA 达标。未改原卡百分比，未恢复旧多线调度。人工确认仅引用根 AGENTS.md。
 
 ## 2026-10-26 业务项目交接（保留历史）
 

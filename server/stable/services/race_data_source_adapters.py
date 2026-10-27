@@ -11,6 +11,7 @@ import re
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 from django.conf import settings
+from .race_regional_sources import parse_regional_observation
 
 KINDS = ("race_time", "racecard", "result")
 REGIONS = (
@@ -431,7 +432,11 @@ def parse_jra_observation(page, *, url, route, now):
         ):
             raise ValueError("jra_result_incomplete")
     page_title = " ".join(n.get_text(" ", strip=True) for n in soup.select("h1"))
-    declaration = "confirmed" if not is_result and "出馬表" in page_title and "特別登録" not in page_title else "unknown"
+    declaration = (
+        "confirmed"
+        if not is_result and "出馬表" in page_title and "特別登録" not in page_title
+        else "unknown"
+    )
     value.update(
         roster=rows,
         result_phase="official" if is_result else "",
@@ -569,6 +574,13 @@ def fetch_bound_observation(*, event, route, now, fetcher=None, kind="result"):
             url = discover_source_url(
                 event=event, route=route, now=now, fetcher=fetcher
             )
+        if route.provider == "jcsa" and kind == "racecard":
+            # 公共页面 data-race-status 与 JS 明确使用同一公开 endpoint 合同。
+            url = url.replace("/Results/True", "/Declared/True")
+        if route.provider == "racing_australia" and kind == "racecard":
+            url = url.replace("/Results.aspx", "/Acceptances.aspx")
+        if route.provider == "jcsa" and kind == "result":
+            url = url.replace("/Declared/True", "/Results/True")
         if not route.permits_url(url):
             raise ValueError("source_url_rejected")
         page = fetcher(url, route=route, now=now)
@@ -601,13 +613,177 @@ def fetch_bound_observation(*, event, route, now, fetcher=None, kind="result"):
                 if kind == "result"
                 else ""
             )
+            card = (
+                parse_nar_observation(page, url=url, route=route, now=now)
+                if linked
+                else None
+            )
             if linked:
                 url = linked
                 chain.append(url)
                 page = fetcher(url, route=route, now=now)
             value = parse_nar_observation(page, url=url, route=route, now=now)
+            if card:
+                from .race_regional_sources import merge_numbered_rosters
+
+                value = merge_numbered_rosters(value, card)
         elif route.provider == "hkjc":
-            value = parse_hkjc_observation(page, url=url, route=route, now=now)
+            if (
+                kind == "result"
+                and urlsplit(url).path == "/en-us/local/information/racecard"
+            ):
+                from bs4 import BeautifulSoup
+                from .race_regional_sources import merge_numbered_rosters
+
+                soup = BeautifulSoup(str(page), "html.parser")
+                unavailable = soup.select_one("#errorContainer")
+                missing_card = (
+                    unavailable is not None
+                    and unavailable.get_text(" ", strip=True) == "No information."
+                    and soup.select_one("table.starter") is None
+                )
+                # 历史卡明确下线时仍读同场结果；完整性由下方既有受审名单校验。
+                # 其他缺页、身份或日期错误不降级，避免静默丢弃冲突证据。
+                card = (
+                    None
+                    if missing_card
+                    else parse_hkjc_observation(page, url=url, route=route, now=now)
+                )
+                result_url = url.replace(
+                    "/information/racecard", "/information/localresults"
+                )
+                if not route.permits_url(result_url):
+                    raise ValueError("source_url_rejected")
+                result_page = fetcher(result_url, route=route, now=now)
+                chain.append(result_url)
+                result = parse_hkjc_observation(
+                    result_page, url=result_url, route=route, now=now
+                )
+                value = merge_numbered_rosters(result, card) if card else result
+            else:
+                value = parse_hkjc_observation(page, url=url, route=route, now=now)
+        elif route.provider == "era" and urlsplit(url).path.startswith("/racecard/"):
+            from .race_regional_sources import (
+                era_ajax_url,
+                parse_era_joined_page,
+                merge_numbered_rosters,
+            )
+
+            target_kind = "results" if kind == "result" else "declarations"
+            rows_url = era_ajax_url(page, url=url, route=route, kind=target_kind)
+            rows_page = fetcher(rows_url, route=route, now=now)
+            chain.append(rows_url)
+            value = parse_era_joined_page(
+                page, rows_page, url=url, rows_url=rows_url, route=route, now=now
+            )
+            if kind == "result":
+                card_url = era_ajax_url(page, url=url, route=route, kind="declarations")
+                card_page = fetcher(card_url, route=route, now=now)
+                chain.append(card_url)
+                card = parse_era_joined_page(
+                    page, card_page, url=url, rows_url=card_url, route=route, now=now
+                )
+                if card.get("declaration_status") != "confirmed":
+                    raise ValueError("era_card_not_official")
+                value = merge_numbered_rosters(value, card)
+        elif route.provider in ("racing_australia", "era", "jcsa", "galopp_statistik"):
+            context = (
+                dict(source.identity_fields.get("multisource_v2", {})) if source else {}
+            )
+            # 单场 ajax 缺失的赛事标题/马场仅允许引用同源已核验身份。
+            if context.get("venue_key") in route.venue_aliases:
+                context["racecourse"] = route.venue_aliases[context["venue_key"]][0]
+            value = parse_regional_observation(
+                page, url=url, route=route, now=now, context=context
+            )
+            if route.provider == "racing_australia" and kind == "result":
+                from .race_regional_sources import merge_numbered_rosters
+
+                card_first = urlsplit(url).path.endswith("/Acceptances.aspx")
+                pair_url = (
+                    url.replace("/Acceptances.aspx", "/Results.aspx")
+                    if card_first
+                    else url.replace("/Results.aspx", "/Acceptances.aspx")
+                )
+                if pair_url == url or not route.permits_url(pair_url):
+                    raise ValueError("au_pair_url_invalid")
+                pair_page = fetcher(pair_url, route=route, now=now)
+                chain.append(pair_url)
+                pair = parse_regional_observation(
+                    pair_page, url=pair_url, route=route, now=now, context=context
+                )
+                result, card = (pair, value) if card_first else (value, pair)
+                if card.get("declaration_status") != "confirmed":
+                    raise ValueError("au_card_not_final")
+                value = merge_numbered_rosters(result, card)
+            if route.provider == "galopp_statistik" and kind == "result":
+                from .race_regional_sources import (
+                    galopp_result_link,
+                    merge_numbered_rosters,
+                )
+
+                if urlsplit(url).path == "/RennenDetails.php":
+                    card = value
+                    result_url = galopp_result_link(page, url=url, route=route)
+                    result_page = fetcher(result_url, route=route, now=now)
+                    chain.append(result_url)
+                    result = parse_regional_observation(
+                        result_page,
+                        url=result_url,
+                        route=route,
+                        now=now,
+                        context=context,
+                    )
+                    value = merge_numbered_rosters(result, card)
+                elif context.get("roster_evidence"):
+                    card_url = context["roster_evidence"].get("source_url", "")
+                    if (
+                        not route.permits_url(card_url)
+                        or urlsplit(card_url).path != "/RennenDetails.php"
+                    ):
+                        raise ValueError("source_url_rejected")
+                    card_page = fetcher(card_url, route=route, now=now)
+                    card = parse_regional_observation(
+                        card_page, url=card_url, route=route, now=now, context=context
+                    )
+                    value = merge_numbered_rosters(value, card)
+            if (
+                route.provider == "jcsa"
+                and kind == "racecard"
+                and "race_time" in route.capabilities
+            ):
+                from .race_regional_sources import enrich_jcsa_metadata
+
+                part = re.fullmatch(
+                    r"/api/meeting-info/en/(\d{8})/(\d+)/(?:Results|Declared)/True",
+                    urlsplit(url).path,
+                )
+                if not part:
+                    raise ValueError("jcsa_url_invalid")
+                header_url = f"https://{urlsplit(url).netloc}/en/races/{part[1]}/{part[2]}/results"
+                if not route.permits_url(header_url):
+                    raise ValueError("source_url_rejected")
+                header_page = fetcher(header_url, route=route, now=now)
+                chain.append(header_url)
+                value = enrich_jcsa_metadata(
+                    value, header_page, url=header_url, route=route
+                )
+            if route.provider == "jcsa" and kind == "result":
+                from .race_regional_sources import merge_jcsa_rosters
+
+                if not re.fullmatch(
+                    r"/api/meeting-info/en/\d{8}/\d+/Results/True", urlsplit(url).path
+                ):
+                    raise ValueError("jcsa_result_endpoint_required")
+                card_url = url.replace("/Results/True", "/Declared/True")
+                if not route.permits_url(card_url):
+                    raise ValueError("source_url_rejected")
+                card_page = fetcher(card_url, route=route, now=now)
+                chain.append(card_url)
+                card = parse_regional_observation(
+                    card_page, url=card_url, route=route, now=now, context=context
+                )
+                value = merge_jcsa_rosters(value, card)
         else:
             linked = (
                 linked_result_url(page, url=url, route=route)
@@ -635,14 +811,24 @@ def fetch_bound_observation(*, event, route, now, fetcher=None, kind="result"):
             (r["number"], normalize_name(r["horse_name"]))
             for r in value.get("roster", [])
         ]
+        independent = (
+            route.provider
+            in ("jcsa", "galopp_statistik", "era", "nar", "racing_australia", "hkjc")
+            and bool(value.get("roster_evidence"))
+            and value.get("roster_complete") is True
+        )
         value["roster_complete"] = bool(
-            expected
-            and (
-                sorted(expected) == sorted(actual)
-                or (
-                    source is not None
-                    and event.runners.exists()
-                    and sorted(n for n, _ in expected) == sorted(n for n, _ in actual)
+            (not expected and independent)
+            or (
+                expected
+                and (
+                    sorted(expected) == sorted(actual)
+                    or (
+                        source is not None
+                        and event.runners.exists()
+                        and sorted(n for n, _ in expected)
+                        == sorted(n for n, _ in actual)
+                    )
                 )
             )
         )
@@ -728,8 +914,8 @@ def parse_reference_observation(page, *, url, route, now, event=None):
     venues = [
         key
         for key, names in route.venue_aliases.items()
-        if normalize_name(race["source_racecourse"])
-        in {normalize_name(n) for n in names}
+        if normalize_name(race["source_racecourse"]).replace("-", " ")
+        in {normalize_name(n).replace("-", " ") for n in names}
     ]
     if len(venues) != 1:
         raise ValueError("venue_unreviewed")
@@ -769,6 +955,7 @@ def parse_reference_observation(page, *, url, route, now, event=None):
         if positions.get(row["reported_finish_position"], 0) > 1:
             row["status"] = "dead_heat"
     # Complete ordering alone is not an official source phase: require explicit source marker.
+    sporting_instant = None
     if route.provider == "sporting_life":
         summary = (
             parser._next_data(str(page))
@@ -777,6 +964,19 @@ def parse_reference_observation(page, *, url, route, now, event=None):
             .get("race", {})
             .get("race_summary", {})
         )
+        summary_date = summary.get("date")
+        raw_clock = str(summary.get("time", ""))
+        if summary_date and re.fullmatch(r"\d{2}:\d{2}", raw_clock):
+            sporting_instant = datetime.fromisoformat(
+                summary_date + "T" + raw_clock + ":00+00:00"
+            )
+            page_day = (
+                sporting_instant.astimezone(ZoneInfo(route.timezone)).date().isoformat()
+            )
+        else:
+            page_day = summary_date
+        if page_day and page_day != match["date"]:
+            raise ValueError("sporting_date_mismatch")
         if str(summary.get("race_stage", "")).lower() not in (
             "result",
             "results",
@@ -788,7 +988,7 @@ def parse_reference_observation(page, *, url, route, now, event=None):
         phase = ""  # 现有 payout+also-rans 合同明确 partial，不冒充完整名次。
     elif not re.search(r"arriv[eé]e\s+(?:officielle|d[eé]finitive)", str(page), re.I):
         phase = ""
-    return dict(
+    value = dict(
         provider=route.provider,
         region=route.region,
         identity_namespace=route.identity_namespace,
@@ -810,6 +1010,34 @@ def parse_reference_observation(page, *, url, route, now, event=None):
         result_phase=phase,
         roster_complete=semantic["completeness"]["runners"] == "complete",
     )
+
+    for row in rows:
+        row["field_provenance"] = {"source_url": url, "raw_sha256": value["raw_sha256"]}
+    if route.provider == "sporting_life":
+        # Public NEXT_DATA stores the scheduled clock in UTC (not displayed UK/local time).
+        if sporting_instant:
+            value["off_time"] = sporting_instant.isoformat()
+        count = summary.get("ride_count")
+        active = sum(r["status"] not in ("withdrawn", "scratched") for r in rows)
+        if count not in (len(rows), active):
+            value["result_phase"] = ""
+            value["roster_complete"] = False
+    if route.provider == "zeturf":
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(str(page), "html.parser")
+        stamps = soup.select(".heure-course [data-timestamp]")
+        if len(stamps) == 1 and str(stamps[0]["data-timestamp"]).isdigit():
+            instant = datetime.fromtimestamp(
+                int(stamps[0]["data-timestamp"]), tz=ZoneInfo("UTC")
+            )
+            if (
+                instant.astimezone(ZoneInfo(route.timezone)).date().isoformat()
+                != value["local_date"]
+            ):
+                raise ValueError("zeturf_schedule_date_mismatch")
+            value["off_time"] = instant.isoformat()
+    return value
 
 
 def run_multisource_claim(*, claim, now, fetcher=None):
@@ -870,7 +1098,12 @@ def run_multisource_claim(*, claim, now, fetcher=None):
             ),
         )
         from stable.services.race_lifecycle_projection import writable
-        acquisition_key = canonical_sha([claim.attempt_token, binding.pk]) if writable(claim.event_id) else ""
+
+        acquisition_key = (
+            canonical_sha([claim.attempt_token, binding.pk])
+            if writable(claim.event_id)
+            else ""
+        )
         if "result" in claim.data_kinds:
             for row in value["roster"]:
                 row["field_provenance"] = {
@@ -889,7 +1122,9 @@ def run_multisource_claim(*, claim, now, fetcher=None):
                 region=route.region,
                 course=value["venue_key"],
                 race_name=value["raw_names"][0],
-                race_status="pending" if value["result_phase"] == "provisional" else "complete",
+                race_status=(
+                    "pending" if value["result_phase"] == "provisional" else "complete"
+                ),
                 participants=value["roster"],
             )
             recorded = record_race_result_observation(
@@ -1020,7 +1255,9 @@ def run_multisource_claim(*, claim, now, fetcher=None):
             )
             if result.status not in ("applied", "replayed"):
                 raise ValueError(result.reason or "racecard_not_applied")
-            accepted_kinds = result.applied_kinds if result.applied_kinds is not None else remaining
+            accepted_kinds = (
+                result.applied_kinds if result.applied_kinds is not None else remaining
+            )
             for kind in accepted_kinds:
                 applied.append(kind)
                 hashes[kind] = value["raw_sha256"]
@@ -1098,7 +1335,7 @@ def parse_nar_observation(page, *, url, route, now):
     # Course-code crosswalk is explicit in policy key; do not infer JRA/NAR from names.
     if venues[0] != f"nar:{baba}":
         raise ValueError("nar_course_code_mismatch")
-    title = soup.select_one(".raceName, .race_name, h2")
+    title = soup.select_one("section.raceTitle h3, .raceName, .race_name, h2")
     if title is None:
         raise ValueError("nar_name_missing")
     is_result = urlsplit(url).path.endswith("RaceMarkTable")
@@ -1151,7 +1388,7 @@ def parse_nar_observation(page, *, url, route, now):
             SimpleNamespace(
                 local_date=day,
                 timezone_name=route.timezone,
-                racecourse=header[4].replace(" ", ""),
+                racecourse=re.sub(r"\s", "", header[4]),
             ),
             url,
         )
@@ -1215,6 +1452,13 @@ def parse_nar_observation(page, *, url, route, now):
         result_phase="official" if is_result else "",
         roster_complete=True,
     )
+    value["declaration_status"] = (
+        "confirmed"
+        if not is_result and urlsplit(url).path.endswith("DebaTable")
+        else "unknown"
+    )
+    for row in rows:
+        row["field_provenance"] = {"source_url": url, "raw_sha256": value["raw_sha256"]}
     start = re.search(r"(\d{1,2}):(\d{2})\s*発走", text)
     if start:
         value["off_time"] = datetime(
@@ -1229,6 +1473,8 @@ def parse_nar_observation(page, *, url, route, now):
 
 
 def parse_hkjc_observation(page, *, url, route, now):
+    if urlsplit(url).path.lower().endswith(("/racecard", "/racecard.aspx")):
+        return parse_regional_observation(page, url=url, route=route, now=now)
     from urllib.parse import parse_qs
     from bs4 import BeautifulSoup
     from stable.services.external_hkjc_data import HKJCHTMLParser
@@ -1252,6 +1498,15 @@ def parse_hkjc_observation(page, *, url, route, now):
         for v in (day.strftime("%d/%m/%Y"), day.strftime("%Y/%m/%d"), day.isoformat())
     ):
         raise ValueError("hkjc_page_identity_missing")
+    meeting = re.search(
+        r"Race Meeting:\s*(\d{2}/\d{2}/\d{4})\s+(Sha Tin|Happy Valley)", text
+    )
+    if urlsplit(url).path.startswith("/en-us/") and (
+        not meeting
+        or datetime.strptime(meeting[1], "%d/%m/%Y").date() != day
+        or {"Sha Tin": "ST", "Happy Valley": "HV"}[meeting[2]] != course
+    ):
+        raise ValueError("hkjc_meeting_header_mismatch")
     parsed = HKJCHTMLParser().parse_race_result(
         str(page),
         race_date=day.isoformat(),
@@ -1270,7 +1525,10 @@ def parse_hkjc_observation(page, *, url, route, now):
     tables = [
         t
         for t in soup.select("table")
-        if "Pla." in t.get_text() and "Horse No." in t.get_text()
+        if all(
+            label in t.get_text()
+            for label in ("Pla.", "Horse No.", "Finish Time", "Jockey", "Trainer")
+        )
     ]
     if len(tables) != 1 or len(tables[0].select("tr")) - 1 != len(parsed["results"]):
         raise ValueError("hkjc_result_partial")
@@ -1320,7 +1578,7 @@ def parse_hkjc_observation(page, *, url, route, now):
             > 1
         ):
             row["status"] = "dead_heat"
-    return dict(
+    value = dict(
         provider=route.provider,
         region=route.region,
         identity_namespace=route.identity_namespace,
@@ -1342,6 +1600,9 @@ def parse_hkjc_observation(page, *, url, route, now):
         result_phase="official",
         roster_complete=True,
     )
+    for row in rows:
+        row["field_provenance"] = {"source_url": url, "raw_sha256": value["raw_sha256"]}
+    return value
 
 
 def parse_sporting_card_observation(page, *, url, route, now, event):
@@ -1417,7 +1678,20 @@ def parse_sporting_card_observation(page, *, url, route, now, event):
         result_phase="",
         roster_complete=True,
     )
-    # Only explicit ISO instant with zone can populate off_time; date/clock strings alone cannot.
+    value["declaration_status"] = (
+        "confirmed"
+        if summary.get("race_stage") == "DECLARED"
+        else "predicted" if summary.get("race_stage") == "DORMANT" else "unknown"
+    )
+    for row in roster:
+        row["field_provenance"] = {"source_url": url, "raw_sha256": value["raw_sha256"]}
+    # Sporting Life's structured scheduled date/clock is UTC, including overseas cards.
+    clock = str(summary.get("time", ""))
+    if re.fullmatch(r"\d{2}:\d{2}", clock):
+        value["off_time"] = datetime.fromisoformat(
+            summary["date"] + "T" + clock + ":00+00:00"
+        ).isoformat()
+    # A separately zoned source instant takes precedence when present.
     raw = summary.get("start_time") or summary.get("off_time")
     try:
         instant = aware(raw)

@@ -429,7 +429,8 @@ def _fetch_bounded_html(url, *, now, provider, region, validator, enabled):
                 encodings = {'utf-8':'utf-8', 'utf8':'utf-8', 'shift_jis':'cp932',
                              'shift-jis':'cp932', 'sjis':'cp932', 'cp932':'cp932'}
                 if encoding not in encodings: raise JraFetchError('jra_encoding_rejected')
-                html = raw.decode(encodings[encoding])
+                from .race_regional_sources import decode_public_html
+                html = decode_public_html(raw, encoding=encodings[encoding], provider=provider)
                 success = True
                 return {'html': html, 'raw_sha256':hashlib.sha256(raw).hexdigest(), 'observed_at':timezone.now().isoformat()}, 1, 1
         except (requests.RequestException, UnicodeError) as exc:
