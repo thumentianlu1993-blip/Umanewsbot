@@ -62,3 +62,24 @@ class ReceiptViewTests(WorkflowFixture, TransactionTestCase):
         selection.refresh_from_db()
         self.assertIsNone(selection.article_id)
         self.assertIsNone(selection.receipt_id)
+
+    def test_recommendation_uses_current_receipt_instead_of_original_anchor(self):
+        from django.contrib.auth import get_user_model
+        from stable.models import HomepageHeadlineRecommendation
+        from stable.services.news_feed import create_snapshot
+        from stable.services.editorial_headlines import generate_headline_recommendation, accept_headline_recommendation
+        user = get_user_model().objects.create_superuser("recommend-editor", "fixture@example.invalid", "fixture")
+        create_snapshot(with_features=True)
+        result = generate_headline_recommendation(user=user)
+        self.assertIsNotNone(result)
+        recommendation = HomepageHeadlineRecommendation.objects.get(pk=result["id"])
+        self.assertEqual(recommendation.receipt_id, self.second.pk)
+
+    def test_legacy_detail_links_to_independent_new_stories(self):
+        from stable.models import NewsArticle, NewsPublicEntry
+        from django.utils import timezone
+        legacy = NewsArticle.objects.create(source_site="jra", source_mode="official", source_article_id="old-detail",
+            title_ja="旧新闻", title_zh="旧新闻", summary_zh="旧新闻摘要", body_zh="旧新闻正文", published_at=timezone.now(),
+            source_url="https://fixture.invalid/legacy", workflow_status="published", published_to_web_at=timezone.now(), racing_region="france")
+        response = self.client.get(legacy.public_path)
+        self.assertContains(response, self.second.public_path)
