@@ -120,3 +120,12 @@ def submit_manual_target(article, fields, *, editor):
     if any(not isinstance(value, str) for value in target.values()) or not target["title"].strip() or not target["body"].strip():
         raise ValueError("manual_target_invalid")
     return start_revision(article, snapshot=active.source_snapshot, manual_target=target, editor=editor)
+
+
+def claim_stage(run_id, payload):
+    """默认停用阶段认领；启用路径逐项验证后接入。"""
+    return None
+
+
+def commit_stage(attempt_id, generation):
+    return False
