@@ -1,6 +1,6 @@
 # P01 测试与验收计划
 
-本文件是待执行测试设计，所有业务结果初始为 NOT_RUN。产品要求见[spec](spec.md)，工程合同见[design](design.md)。自动测试隔离生产DB/Redis/队列/第三方，模型和来源均fixture/mock；真实模型评估与自然周观察单独记账。
+本文件保留测试设计，实际运行证据见 [rollout 第8节](rollout.md#8-实现候选与本地验证2026-10-27)。离线合成测试通过不代表真实样本或上线验收通过。产品要求见[spec](spec.md)，工程合同见[design](design.md)。自动测试隔离生产DB/Redis/队列/第三方，模型和来源均fixture/mock；真实模型评估与自然周观察单独记账。
 
 ## 1 样例与标注
 
@@ -66,3 +66,17 @@ F02固定至少100篇、每区20篇；按独立事件分组后75篇调试、25�
 - 上线后168小时：固定来源/policy/预算版本，公开探针核网页与缓存，独立事件分母核漏报，五地区及重大事件拆报时效/质量/曝光/费用。参数变化注明不可比区间，相关指标重新起算完整窗口。
 
 发现新增技术缺陷修复并跑受影响回归；无修改和失败后停止扩大测试。空样本、未知状态、环境错误不能算业务RED或通过。
+
+
+## 5 已实现的离线测试入口
+
+| 合同范围 | `server/stable/` 中的测试模块 |
+|---|---|
+| 冻结输入、阶段、claim、单写入和人工接管 | `test_p01_news_workflow.py`、`test_p01_news_claims.py`、`test_p01_news_pipeline.py`、`test_p01_news_recovery.py`、`test_p01_news_review_regressions.py` |
+| 日/月预约、未知费用和迟到核账 | `test_p01_news_budget.py` |
+| 清洗、实体/数值、源证据和样本清单 | `test_p01_news_content.py`、`test_p01_news_source_evidence.py`、`test_p01_news_evaluation.py` |
+| 事件、更正、发布、公开不可变及独立关联 | `test_p01_news_editorial.py`、`test_p01_news_corrections.py`、`test_p01_news_publication.py`、`test_p01_news_immutability.py`、`test_p01_news_relations.py` |
+| 五区feed、详情/档案和后台 | `test_p01_news_feed.py`、`test_p01_news_public_views.py`、`test_p01_news_console.py` |
+| 发现分母、窗口报告和定向历史工具 | `test_p01_news_discovery.py`、`test_p01_news_report.py`、`test_p01_news_history.py` |
+
+共20个专项模块；表格表示已实现的离线断言入口，不将T01–T36中要求真实来源、真实模型、生产形状容量、部署恢复或168小时观察的部分自动标成通过。真实输入仍缺，保留其 NOT_RUN 状态。

@@ -158,3 +158,12 @@ snapshot记录席位/地区/事件/policy与有效时长，仅表示展示供给
 最小后续模块：`news_pipeline.py`（run与状态）、`news_model_gateway.py`（有界调用）、`news_editorial.py`（事件/选稿）、`news_feed.py`（快照/分页）、`news_quality_report.py`（只读报告）；现有modules只做必要接入。
 
 P03/P04消费只读结果：article ID、input/quality SHA、verified occurrences、可选canonical ID、provenance；不会为了本项目自动创建全站实体。锁定输入/输出schema_v1。更新current_state、decisions，实施后按实际影响补deploy_runbook；不机械重写全部历史状态。
+
+
+## 实现收尾约束（2026-10-27）
+
+- 人工搁置或驳回会推进文章/run generation；只有当前 generation 的自动处理状态允许阶段推进。迟到调用仍结算实际费用，但不能恢复人工终态。
+- 旧公开索引写入集中在三个真实 legacy 发布入口的短事务内，锁顺序为公开索引锁→article；普通 `NewsArticle.save()` 不取全站锁，网络抓取/翻译不持有该锁。
+- 模型返回类型错误统一转可解释待审；恢复扫描逐条隔离坏记录。认领同时绑定预期 stage 和 generation，禁止用旧阶段的 payload 执行新阶段。
+- 更正幂等键由前稿 receipt、排序后的旧事实 ID、正确事实 ID 组成；引用位置仅作证据。已公开更正先从候选材料排除，避免换引文位置或混合旧/新更正重复公开。
+- 事件身份请求包含五类身份的字段组合、来源作用域及示例；空启用时间和 off 策略不进入纳入判断。地区额度复用既有配置解析器。

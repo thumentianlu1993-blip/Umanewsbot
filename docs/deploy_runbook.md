@@ -9828,3 +9828,10 @@ RACE_DATA_RAW_ARTIFACT_ROOTS=/run/race-data-sync
 候选外核验器需要本地 Linux Docker、Git 对象、GitHub只读权限和该run的镜像artifact。
 镜像在依赖准备完成后固定ID，实际测试及交付时重新收集均使用 network none、非root、无宿主凭据的容器。
 准备阶段可以下载依赖，测试阶段不可出站；交付重收集只列名称，不重新执行全部测试。
+
+
+## P01 新闻质量候选的运维入口（2026-10-27，未部署）
+
+候选新增 `docker-compose.news-quality.yml`、专用 `news_quality` worker、0083–0085 schema/保护迁移和匿名曝光日志；默认 off、来源为空、预算为0。本轮只做本地隔离验证，没有读取或更改生产运行态。
+
+操作参数、旧公开索引固定 manifest 回填、日志保留/对账、停止认领及保留已公开稿件的步骤见 [P01 rollout 第9节](changes/p01-news-quality-20261027/rollout.md#9-配置与停止操作说明)。部署前须填实同文档第3节的精确发布包，并依根 `AGENTS.md` 办理；不能直接回滚到不理解 `active_news_run` 的旧 writer，也不通过降迁移删除公开证据。
