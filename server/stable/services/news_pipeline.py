@@ -78,6 +78,7 @@ def target_revision_digest(target, binding=None):
 
 @transaction.atomic
 def start_revision(article, *, snapshot=None, manual_target=None, editor=None, event_binding=None, reason=""):
+    from django.utils import timezone
     article = NewsArticle.objects.select_for_update().get(pk=article.pk)
     snapshot = deepcopy(snapshot if snapshot is not None else source_snapshot(article))
     target = deepcopy(manual_target or {})
@@ -85,7 +86,7 @@ def start_revision(article, *, snapshot=None, manual_target=None, editor=None, e
     target_sha = target_revision_digest(target, binding)
     run, created = NewsProcessingRun.objects.get_or_create(
         article=article, input_sha=digest(snapshot), policy_sha=policy_sha(), target_revision_sha=target_sha,
-        defaults={"generation": article.news_generation + 1, "source_snapshot": snapshot, "manual_target": target,
+        defaults={"generation": article.news_generation + 1, "next_attempt_at": timezone.now(), "source_snapshot": snapshot, "manual_target": target,
                   "editor_provenance": {"user_id": editor.pk, "event_binding": binding, "reason": reason} if editor else {},
                   "primary_region": snapshot["region"], "parent_run_id": article.active_news_run_id},
     )
@@ -421,7 +422,16 @@ def process_news_run(run_id):
                             _transition(run.pk, {"state": "review", "reason": result.error or "provider_failed"}, generation=attempt.generation)
         except (ContentBlocked, RequestDenied) as error:
             current = NewsProcessingRun.objects.get(pk=run.pk)
-            _transition(run.pk, {"state": "review", "reason": str(error)[:255], "lease_until": None}, generation=current.generation)
+            from stable.models import NewsStageAttempt
+            NewsStageAttempt.objects.filter(run=current, generation=current.generation, state="reserved", provider="").update(state="failed", error="never_dispatched")
+            if str(error).startswith("budget_exhausted_"):
+                from zoneinfo import ZoneInfo
+                tomorrow = timezone.now().astimezone(ZoneInfo("Asia/Shanghai")).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+                if str(error) == "budget_exhausted_month":
+                    tomorrow = (tomorrow.replace(day=1) + timedelta(days=32)).replace(day=1)
+                _transition(run.pk, {"state": "pending", "reason": str(error), "lease_until": None, "next_attempt_at": tomorrow}, generation=current.generation)
+            else:
+                _transition(run.pk, {"state": "review", "reason": str(error)[:255], "lease_until": None}, generation=current.generation)
     run.refresh_from_db()
     return {"run_id": run.pk, "state": run.state, "stage": run.stage, "reason": run.reason}
 

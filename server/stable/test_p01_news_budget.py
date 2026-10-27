@@ -130,7 +130,7 @@ class BudgetConcurrencyTests(TransactionTestCase):
                 close_old_connections()
         with ThreadPoolExecutor(max_workers=2) as pool:
             result = sorted(pool.map(worker, attempts))
-        self.assertEqual(result, ["budget_exhausted", "reserved"])
+        self.assertEqual(result, ["budget_exhausted_day", "reserved"])
         for budget in NewsModelBudget.objects.all():
             self.assertGreater(budget.reserved, 0)
             self.assertLessEqual(budget.reserved + budget.spent, budget.cap)
@@ -138,7 +138,17 @@ class BudgetConcurrencyTests(TransactionTestCase):
 
 @override_settings(NEWS_QUALITY_MODE="shadow", NEWS_QUALITY_POLICY=POLICY)
 class SingleDispatchTests(TransactionTestCase):
-    setUp = ModelBudgetTests.setUp
+    def setUp(self):
+        from copy import deepcopy
+        from stable.models import NewsSource
+        source = NewsSource.objects.create(name="Dispatch fixture", source_site="france_galop_news", source_mode="official",
+            adapter_key="france_galop_news", racing_region="france", source_language="en", enabled=True, production_approved=True)
+        policy = deepcopy(POLICY)
+        policy.update(source_ids=[source.pk], activated_at=(timezone.now()-timedelta(hours=1)).isoformat())
+        override = self.settings(NEWS_QUALITY_POLICY=policy)
+        override.enable()
+        self.addCleanup(override.disable)
+        ModelBudgetTests.setUp(self)
 
     def test_duplicate_dispatch_reuses_response_without_second_charge(self):
         from types import SimpleNamespace

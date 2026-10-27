@@ -105,7 +105,7 @@ def reserve_request(attempt_id, payload):
             if budget.policy_sha != policy_sha() or budget.cap != caps[budget.period_kind]:
                 raise RequestDenied("budget_policy_changed")
             if budget.state != "open" or budget.spent + budget.reserved + amount > budget.cap:
-                raise RequestDenied("budget_exhausted")
+                raise RequestDenied("budget_exhausted_" + budget.period_kind)
         for budget in budgets:
             budget.reserved += amount
             budget.save(update_fields=["reserved"])
@@ -227,11 +227,17 @@ def execute_request(attempt_id, payload):
             run.article = article
             attempt.run = run
             validate_attempt(attempt, payload)
+            from stable.services.news_pipeline import source_eligible, _current_run
+            if not source_eligible(run) or not _current_run(article, run):
+                raise RequestDenied("source_or_revision_changed")
             attempt.state = "inflight"
             attempt.save(update_fields=["state"])
-    except RequestDenied:
+    except RequestDenied as error:
         # 尚未发出的请求可明确结算零费用；发送后的异常走 unknown。
-        return settle_request(attempt_id, actual_cost=0)
+        settled = settle_request(attempt_id, actual_cost=0)
+        NewsStageAttempt.objects.filter(pk=attempt_id).update(error=str(error)[:255])
+        settled.refresh_from_db()
+        return settled
     try:
         response = _single_request(attempt, payload)
     except KnownRequestRejected as error:

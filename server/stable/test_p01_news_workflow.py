@@ -38,6 +38,12 @@ def workflow_draft(value="27"):
 
 class WorkflowFixture:
     def setUp(self):
+        # 模型 fixture 使用单调合成时钟，隔离模拟器宿主时钟的短时回拨。
+        from itertools import count
+        base, ticks = timezone.now(), count()
+        clock = patch("django.utils.timezone.now", side_effect=lambda: base + timedelta(milliseconds=next(ticks)))
+        clock.start()
+        self.addCleanup(clock.stop)
         self.source = NewsSource.objects.create(name="P01 fixture", source_site="france_galop_news", source_mode="official", adapter_key="france_galop_news", racing_region="france", source_language="en", production_approved=True, enabled=True)
         self.override = self.settings(NEWS_QUALITY_MODE="shadow", NEWS_QUALITY_POLICY=workflow_policy(self.source.pk))
         self.override.enable()
