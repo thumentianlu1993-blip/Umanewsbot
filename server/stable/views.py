@@ -2297,6 +2297,16 @@ def article_editor(request: HttpRequest, article_id: int):
     if request.method == "POST":
         form = ArticleEditorForm(request.POST, instance=article)
         if form.is_valid():
+            from stable.services.news_pipeline import is_pipeline_article, submit_manual_target
+            if is_pipeline_article(article):
+                intent = request.POST.get("intent", "save")
+                if intent in {"save", "autosave", "submit_review", "publish"}:
+                    run = submit_manual_target(article, form.cleaned_data, editor=request.user)
+                    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                        return JsonResponse({"saved": True, "run_id": run.pk, "workflow_status": "pending_review"})
+                    messages.success(request, "修订已保存为待审稿；通过审校与事实增量检查后独立发布。")
+                    return redirect("console-article-editor", article_id=article.pk)
+                return JsonResponse({"detail": "请从具体稿件的审核记录执行此操作"}, status=400)
             article = form.save(commit=False)
             article.mark_manual_edits(["title_zh", "summary_zh", "body_zh", "source_note", "editor_notes", "tags_json"])
             intent = request.POST.get("intent", "save")
