@@ -134,3 +134,34 @@ class BudgetConcurrencyTests(TransactionTestCase):
         for budget in NewsModelBudget.objects.all():
             self.assertGreater(budget.reserved, 0)
             self.assertLessEqual(budget.reserved + budget.spent, budget.cap)
+
+
+@override_settings(NEWS_QUALITY_MODE="shadow", NEWS_QUALITY_POLICY=POLICY)
+class SingleDispatchTests(TransactionTestCase):
+    setUp = ModelBudgetTests.setUp
+
+    def test_duplicate_dispatch_reuses_response_without_second_charge(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from stable.services.news_model_gateway import execute_request
+        response = SimpleNamespace(id="fixture-request", choices=[SimpleNamespace(message=SimpleNamespace(content='{"coverage":"complete","entities":[]}', tool_calls=None))], usage=SimpleNamespace(prompt_tokens=50, completion_tokens=20))
+        with patch("stable.services.news_model_gateway._single_request", return_value=response) as provider:
+            first = execute_request(self.attempt.pk, {"text": "test"})
+            second = execute_request(self.attempt.pk, {"text": "test"})
+        self.assertEqual(first.state, "completed")
+        self.assertEqual(second.result, {"coverage": "complete", "entities": []})
+        self.assertEqual(provider.call_count, 1)
+        for budget in NewsModelBudget.objects.all():
+            self.assertEqual(budget.reserved, 0)
+            self.assertEqual(budget.spent, Decimal("0.00009"))
+
+    def test_timeout_is_unknown_and_never_automatically_resends(self):
+        from unittest.mock import patch
+        from stable.services.news_model_gateway import execute_request
+        with patch("stable.services.news_model_gateway._single_request", side_effect=TimeoutError("fixture")) as provider:
+            first = execute_request(self.attempt.pk, {"text": "test"})
+            second = execute_request(self.attempt.pk, {"text": "test"})
+        self.assertEqual(first.state, "unknown")
+        self.assertEqual(second.state, "unknown")
+        self.assertEqual(provider.call_count, 1)
+        self.assertTrue(all(b.reserved > 0 and b.spent == 0 for b in NewsModelBudget.objects.all()))

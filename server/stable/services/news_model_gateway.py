@@ -179,3 +179,11 @@ def mark_unknown(attempt_id, reason):
             budget.state = "blocked_unknown"
             budget.save(update_fields=["state"])
     return attempt
+
+
+def _single_request(attempt, payload):
+    raise RequestDenied("provider_not_configured")
+
+
+def execute_request(attempt_id, payload):
+    return NewsStageAttempt.objects.get(pk=attempt_id)
