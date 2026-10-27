@@ -120,9 +120,62 @@ def reserve_request(attempt_id, payload):
         return attempt
 
 
+def _locked_finance(attempt_id):
+    reference = NewsStageAttempt.objects.get(pk=attempt_id)
+    if not reference.month_budget_id or not reference.day_budget_id:
+        raise RequestDenied("reservation_missing")
+    month = NewsModelBudget.objects.select_for_update().get(pk=reference.month_budget_id)
+    day = NewsModelBudget.objects.select_for_update().get(pk=reference.day_budget_id)
+    return NewsStageAttempt.objects.select_for_update().get(pk=attempt_id), (month, day)
+
+
+@transaction.atomic
 def settle_request(attempt_id, *, actual_cost, result=None, version=1, usage=None):
-    return NewsStageAttempt.objects.get(pk=attempt_id)
+    cost = money(actual_cost)
+    if type(version) is not int or version < 1:
+        raise RequestDenied("settlement_version_invalid")
+    attempt, budgets = _locked_finance(attempt_id)
+    if version <= attempt.settlement_version:
+        if version == attempt.settlement_version and cost != attempt.actual_cost:
+            raise RequestDenied("settlement_revision_conflict")
+        return attempt
+    released = attempt.reservation if attempt.settlement_version == 0 else Decimal(0)
+    delta = cost - attempt.actual_cost
+    if not attempt.settlement_version:
+        attempt.state = "completed" if result is not None else "failed"
+        attempt.result = result if result is not None else {}
+        attempt.output_sha = digest(result) if result is not None else ""
+        attempt.completed_at = timezone.now()
+    attempt.actual_cost = cost
+    attempt.settlement_version = version
+    attempt.usage = {**attempt.usage, "reported": usage or {}}
+    attempt.save(update_fields=["state", "result", "output_sha", "completed_at", "actual_cost", "settlement_version", "usage"])
+    for budget in budgets:
+        if budget.reserved < released or budget.spent + delta < 0:
+            raise RequestDenied("ledger_mismatch")
+        budget.reserved -= released
+        budget.spent += delta
+        budget.overage = max(Decimal(0), budget.spent - budget.cap)
+        if cost > attempt.reservation or budget.spent + budget.reserved > budget.cap:
+            budget.state = "blocked_overage"
+        elif budget.state == "blocked_unknown":
+            relation = "month_budget_id" if budget.period_kind == "month" else "day_budget_id"
+            if not NewsStageAttempt.objects.filter(**{relation: budget.pk}, state="unknown").exists():
+                budget.state = "open"
+        budget.save(update_fields=["reserved", "spent", "overage", "state"])
+    return attempt
 
 
+@transaction.atomic
 def mark_unknown(attempt_id, reason):
-    return NewsStageAttempt.objects.get(pk=attempt_id)
+    attempt, budgets = _locked_finance(attempt_id)
+    if attempt.settlement_version:
+        return attempt
+    attempt.state = "unknown"
+    attempt.error = reason[:255]
+    attempt.save(update_fields=["state", "error"])
+    for budget in budgets:
+        if budget.state == "open":
+            budget.state = "blocked_unknown"
+            budget.save(update_fields=["state"])
+    return attempt
