@@ -53,3 +53,11 @@ class ReceiptRelationTests(WorkflowFixture, TransactionTestCase):
             NewsPublicationReceipt.objects.filter(pk=second.pk).update(visibility="withdrawn")
             self.assertEqual(related_horse_entries([self.b.pk]), [])
             self.assertEqual([row["article"].pk for row in related_horse_entries([self.a.pk])], [first.pk])
+
+    def test_race_relation_requires_occurrence_at_identity_evidence_span(self):
+        self.run.entity_snapshot = {"occurrences": [{"type": "race", "block_id": "b1", "start": 0, "end": 7, "text": "Other R"}]}
+        self.run.editorial_snapshot = {"identity": {"fields": {"canonical_race_id": "99"},
+            "evidence": {"canonical_race_id": {"block_id": "b0", "start": 0, "end": 7}}}}
+        with patch("stable.services.news_publication.ArticleRaceLink.objects.filter", return_value=[]) as query:
+            self.assertEqual(verified_relations(self.run)["race_ids"], [])
+        query.assert_not_called()
