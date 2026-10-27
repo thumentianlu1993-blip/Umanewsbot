@@ -1426,6 +1426,7 @@ def _ranked_revival_after_source_elevation(article: NewsArticle, *, source_eleva
 
 
 def _crawl_netkeiba_mode(mode: str, pages: int, source: NewsSource | None = None) -> dict:
+    from stable.services.news_discovery import discover_listing, fetch_discovered_detail, record_failure
     adapter = NetkeibaAdapter()
     job = _start_crawl_job(source)
     new_count = 0
@@ -1433,11 +1434,11 @@ def _crawl_netkeiba_mode(mode: str, pages: int, source: NewsSource | None = None
     ranked_revival_results: list[dict] = []
     try:
         for page in range(1, pages + 1):
-            stubs = adapter.fetch_listing(mode, page)
+            stubs = discover_listing(adapter, source, job, mode, page)
             if not stubs:
                 break
             for stub in stubs:
-                detail = adapter.fetch_detail(stub.source_article_id)
+                detail = fetch_discovered_detail(adapter, job, stub, stub.source_article_id)
                 draft = adapter.normalize_source_payload(stub, detail)
                 upsert_result = upsert_article_from_draft(draft, crawl_job=job)
                 article, created = upsert_result
@@ -1479,6 +1480,7 @@ def _crawl_netkeiba_mode(mode: str, pages: int, source: NewsSource | None = None
 
 
 def _crawl_jra_source(source: NewsSource | None = None) -> dict:
+    from stable.services.news_discovery import discover_listing, fetch_discovered_detail, record_failure
     adapter = JRAAdapter()
     job = _start_crawl_job(source)
     months = {
@@ -1490,9 +1492,9 @@ def _crawl_jra_source(source: NewsSource | None = None) -> dict:
     skipped_errors: list[str] = []
     try:
         for month in sorted(months):
-            for stub in adapter.fetch_listing(SourceMode.OFFICIAL, month):
+            for stub in discover_listing(adapter, source, job, SourceMode.OFFICIAL, month):
                 try:
-                    detail = adapter.fetch_detail(stub.source_url)
+                    detail = fetch_discovered_detail(adapter, job, stub, stub.source_url)
                 except JRA_SKIPPABLE_DETAIL_ERRORS as exc:
                     skipped_errors.append(f"{stub.source_url}: {exc}")
                     continue
@@ -1528,6 +1530,7 @@ def _crawl_jra_source(source: NewsSource | None = None) -> dict:
 
 
 def _crawl_international_source(source: NewsSource) -> dict:
+    from stable.services.news_discovery import discover_listing, fetch_discovered_detail, record_failure
     adapter_class = INTERNATIONAL_ADAPTERS.get(source.adapter_key)
     if adapter_class is None:
         raise NotImplementedError(f"未支持的国际新闻适配器：{source.adapter_key}")
@@ -1539,9 +1542,9 @@ def _crawl_international_source(source: NewsSource) -> dict:
     ranked_revival_results: list[dict] = []
     unverified_time_count = 0
     try:
-        for stub in adapter.fetch_listing(source.source_mode, 1):
+        for stub in discover_listing(adapter, source, job, source.source_mode, 1):
             try:
-                detail = adapter.fetch_detail(stub.source_url)
+                detail = fetch_discovered_detail(adapter, job, stub, stub.source_url)
                 draft = adapter.normalize_source_payload(stub, detail)
                 draft_metadata = getattr(draft, "metadata", {}) or {}
                 body_parse_status = draft_metadata.get("body_parse_status")
@@ -1556,6 +1559,7 @@ def _crawl_international_source(source: NewsSource) -> dict:
                 if draft_metadata.get("published_at_verified") is False:
                     unverified_time_count += 1
             except Exception as exc:
+                record_failure(job, stub, exc)
                 detail_errors.append(f"{stub.source_url}: {exc}")
                 continue
             upsert_result = upsert_article_from_draft(draft, crawl_job=job)

@@ -152,6 +152,8 @@ def upsert_article_from_draft(draft, crawl_job: CrawlJob | None = None) -> Artic
             if is_pipeline_article(article):
                 start_revision(article, snapshot=source_snapshot(article, draft))
                 article.refresh_from_db()
+                from stable.services.news_discovery import record_ingested
+                record_ingested(crawl_job, draft, article)
                 return ArticleUpsertResult(article=article, created=False)
             source_elevated = _should_elevate_ranked_source(article, draft)
             if _should_update_primary_source(article, draft, source_elevated=source_elevated):
@@ -217,4 +219,6 @@ def upsert_article_from_draft(draft, crawl_job: CrawlJob | None = None) -> Artic
         if created and can_enroll(article):
             start_revision(article)
             article.refresh_from_db()
+        from stable.services.news_discovery import record_ingested
+        record_ingested(crawl_job, draft, article)
     return ArticleUpsertResult(article=article, created=created, source_elevated=source_elevated)
