@@ -331,7 +331,8 @@ def source_eligible(run):
 
 
 def publish_news_web(run_id):
-    return None
+    from stable.services.news_publication import publish
+    return publish(run_id)
 
 
 def process_news_run(run_id):

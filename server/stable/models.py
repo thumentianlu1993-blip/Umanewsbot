@@ -7145,6 +7145,10 @@ class NewsStageAttempt(models.Model):
 
 
 class NewsPublicationReceipt(models.Model):
+    @property
+    def public_path(self):
+        return f"/news/stories/{self.pk}/"
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     run = models.OneToOneField(NewsProcessingRun, on_delete=models.PROTECT, related_name="receipt")
     article = models.ForeignKey(NewsArticle, on_delete=models.PROTECT, related_name="news_receipts")
