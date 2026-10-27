@@ -150,3 +150,49 @@ class InternationalSourceRepairTests(SimpleTestCase):
                     self.assertEqual(draft.racing_region, region)
                     self.assertTrue(draft.metadata['region_evidence']['reason'])
                     self.assertNotEqual(draft.metadata['region_evidence']['reason'], 'source_region')
+
+
+from django.test import TestCase, override_settings
+
+
+@override_settings(NEWS_QUALITY_MODE='off', MULTIREGION_ATTRIBUTION_MODE='enforce', MULTIREGION_ATTRIBUTION_ROLLOUT_STAGE='new_articles')
+class InternationalSourceIngestionTests(TestCase):
+    def test_tdn_unknown_region_stays_reviewable_and_manual_lock_survives_refetch(self):
+        from stable.adapters.international import TDNAdapter
+        from stable.models import NewsSource, AttributionStatus
+        from stable.services.ingestion import upsert_article_from_draft
+        from django.utils import timezone
+        source = NewsSource.objects.create(name='TEST source', source_site='tdn', source_mode='latest', racing_region='united_states', adapter_key='tdn')
+        adapter = TDNAdapter()
+        stub = SourceArticleStub('tdn', 'latest', 'TEST-unknown', 'https://www.thoroughbreddailynews.com/unknown/', 'A new appointment', timezone.now())
+        detail = adapter.parse_detail_html('<h1>A new appointment</h1><div class="entry-content"><p>Details are pending.</p></div>', url=stub.source_url)
+        draft = adapter.normalize_source_payload(stub, detail)
+        with patch('stable.services.ingestion.find_builtin_source', return_value=source):
+            article = upsert_article_from_draft(draft).article
+            article.refresh_from_db()
+            self.assertEqual(article.racing_region, 'other')
+            self.assertEqual(article.attribution_status, AttributionStatus.NEEDS_REVIEW)
+            self.assertIn('region_evidence', article.translation_metadata)
+            article.attribution_locked = True
+            article.racing_region = 'france'
+            article.save()
+            article = upsert_article_from_draft(draft).article
+            self.assertEqual(article.racing_region, 'france')
+
+    def test_verified_detail_time_and_body_survive_ingestion_and_snapshot(self):
+        from stable.adapters.international import SCMPRacingAdapter
+        from stable.services.ingestion import upsert_article_from_draft
+        from stable.services.news_pipeline import source_snapshot
+        from django.utils import timezone
+        adapter = SCMPRacingAdapter()
+        url = 'https://www.scmp.com/sport/racing/article/1/sample'
+        stub = SourceArticleStub('scmp_racing', 'latest', 'TEST-1', url, 'Title', timezone.now())
+        html = '<h1>Title</h1><script type="application/ld+json">{"@type":"NewsArticle","url":"' + url + '","datePublished":"2026-10-27T19:35:21+08:00"}</script><article><p>Wrong</p></article><div class="article-body"><p>Correct body.</p></div>'
+        detail = adapter.parse_detail_html(html, url=url)
+        with patch('stable.services.ingestion.find_builtin_source', return_value=None):
+            article = upsert_article_from_draft(adapter.normalize_source_payload(stub, detail)).article
+        snapshot = source_snapshot(article)
+        self.assertEqual(snapshot['body'], 'Correct body.')
+        self.assertEqual(snapshot['source_time'], '2026-10-27T11:35:21+00:00')
+        self.assertTrue(snapshot['time_verified'])
+        self.assertEqual(snapshot['time_evidence']['selector'], 'jsonld:datePublished')
