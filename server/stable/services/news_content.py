@@ -1,31 +1,216 @@
-"""新闻正文、实体位置与全文审校的确定性边界。"""
-from bs4 import BeautifulSoup
-from stable.services.article_content import clean_international_article_body
+"""全文边界、实体 occurrence、占位恢复与语义审校；模型输出只作为数据。"""
+from __future__ import annotations
+
+import re
+from copy import deepcopy
+
+from bs4 import BeautifulSoup, NavigableString, Tag, Comment
+from stable.services.article_content import _STRUCTURED_NOISE_SELECTORS
 from stable.services.numeric_surface_audit import audit_numeric_surfaces
+from stable.services.news_pipeline import digest
+
+BODY_SELECTORS = {
+    "netkeiba": [".News_Txt"], "jra": [".news_body"],
+    "sponichi": ["[data-component='article-body']"],
+    "hkjc_news": [".horses-racing-news-content"],
+    "sporting_life": ["[class*='Article__ArticleBody']", "article .article-body"],
+    "bha": [".article-body"], "sky_sports_racing": [".sdc-article-body"],
+    "france_galop_news": [".field--name-body", ".field-name-body"],
+    "tdn": ["span[itemprop='articleBody']", ".entry-content"],
+    "tdn_france": ["span[itemprop='articleBody']", ".entry-content"],
+    "horse_racing_nation": [".article-body"],
+}
+AUDIT_CHECKS = frozenset({"names", "numbers_units", "dates", "placings", "negation", "modality", "attribution", "completeness", "unsupported_claims"})
+TOKEN_RE = re.compile(r"__P01_ENTITY_\d{3}__")
+BLOCK_TAGS = frozenset({"p", "blockquote", "table", "ul", "ol", "h2", "h3", "h4", "h5", "figcaption", "pre"})
 
 
 class ContentBlocked(ValueError):
     pass
 
 
+def bounded_json(value, depth=0, count=None):
+    count = count if count is not None else [0]
+    count[0] += 1
+    if depth > 12 or count[0] > 10000:
+        raise ContentBlocked("response_structure_limit")
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if type(key) is not str:
+                raise ContentBlocked("invalid_key")
+            bounded_json(item, depth + 1, count)
+    elif isinstance(value, list):
+        for item in value:
+            bounded_json(item, depth + 1, count)
+    elif value is not None and type(value) not in (str, bool, int, float):
+        raise ContentBlocked("invalid_json")
+    elif isinstance(value, str) and len(value.encode()) > 1000000:
+        raise ContentBlocked("response_text_limit")
+
+
+def _text(node):
+    return " ".join(node.get_text(" ", strip=True).split())
+
+
 def clean_source(snapshot, selectors=None):
-    soup = BeautifulSoup(snapshot.get("html", ""), "lxml")
-    clean = clean_international_article_body(soup, source_site=snapshot["source_site"])
-    return {"title": snapshot["title"], "blocks": [{"id": "b0", "text": clean.text}]}
+    html = snapshot.get("html", "")
+    if not isinstance(html, str) or not html.strip() or len(html.encode()) > 2000000:
+        raise ContentBlocked("body_boundary_missing_or_oversized")
+    soup = BeautifulSoup(html, "lxml")
+    root, matched = None, ""
+    for selector in selectors or BODY_SELECTORS.get(snapshot["source_site"], []):
+        if selector.strip() in {"html", "body", "main", "article", ".content", ".region-content", "*"}:
+            raise ContentBlocked("body_boundary_too_broad")
+        nodes = soup.select(selector)
+        if len(nodes) > 1:
+            raise ContentBlocked("body_boundary_ambiguous")
+        if nodes:
+            root, matched = nodes[0], selector
+            break
+    if root is None or root.name in {"html", "body", "main"}:
+        raise ContentBlocked("body_boundary_not_found")
+    removed = []
+    for selector in _STRUCTURED_NOISE_SELECTORS:
+        for node in list(root.select(selector)):
+            if node.parent is None:
+                continue
+            removed.append({"selector": selector, "html_sha": digest(str(node)), "reason": "structured_noise"})
+            node.decompose()
+    blocks = []
+    def append(text, tag):
+        text = text.strip()
+        if text:
+            blocks.append({"id": f"b{len(blocks)}", "text": text, "tag": tag})
+    def walk(node):
+        inline = []
+        def flush():
+            append(" ".join(" ".join(inline).split()), "text")
+            inline.clear()
+        for child in node.children:
+            if isinstance(child, Comment):
+                continue
+            if isinstance(child, NavigableString):
+                inline.append(str(child))
+            elif isinstance(child, Tag) and child.name in BLOCK_TAGS:
+                flush()
+                if child.name == "table":
+                    text = "\n".join(" | ".join(_text(cell) for cell in row.find_all(["th", "td"], recursive=False)) for row in child.find_all("tr"))
+                elif child.name in {"ul", "ol"}:
+                    text = "\n".join("- " + _text(item) for item in child.find_all("li", recursive=False))
+                else:
+                    text = _text(child)
+                append(text, child.name)
+            elif isinstance(child, Tag) and child.find(list(BLOCK_TAGS)):
+                flush()
+                walk(child)
+            elif isinstance(child, Tag):
+                inline.append(_text(child))
+        flush()
+    walk(root)
+    if not blocks or len(blocks) > 1000 or not snapshot.get("title", "").strip():
+        raise ContentBlocked("body_empty_or_unbounded")
+    if any(TOKEN_RE.search(row["text"]) for row in blocks) or TOKEN_RE.search(snapshot["title"]):
+        raise ContentBlocked("reserved_token_in_source")
+    value = {"title": snapshot["title"], "blocks": blocks, "source_sha": digest(snapshot), "selector": matched, "removed": removed}
+    value["clean_sha"] = digest({"title": value["title"], "blocks": blocks})
+    return value
+
+
+def block_map(clean):
+    return {"title": clean["title"], **{row["id"]: row["text"] for row in clean["blocks"]}}
 
 
 def validate_entities(clean, response):
-    return response.get("entities", [])
+    bounded_json(response)
+    if type(response) is not dict or set(response) != {"coverage", "entities"} or response["coverage"] != "complete":
+        raise ContentBlocked("entity_schema_or_coverage")
+    rows = response["entities"]
+    if type(rows) is not list or len(rows) > 128:
+        raise ContentBlocked("entity_count_limit")
+    texts = block_map(clean)
+    validated = []
+    spans = {}
+    for item in rows:
+        required = {"block_id", "start", "end", "text", "type"}
+        if type(item) is not dict or set(item) != required:
+            raise ContentBlocked("entity_schema")
+        block, start, end = item["block_id"], item["start"], item["end"]
+        if (block not in texts or type(start) is not int or type(end) is not int
+                or not 0 <= start < end <= len(texts[block]) or texts[block][start:end] != item["text"]):
+            raise ContentBlocked("entity_span_invalid")
+        if item["type"] not in {"horse", "person", "race", "organization", "place", "common_word"}:
+            raise ContentBlocked("entity_type_invalid")
+        if any(start < other_end and end > other_start for other_start, other_end in spans.get(block, [])):
+            raise ContentBlocked("entity_span_overlap")
+        spans.setdefault(block, []).append((start, end))
+        if item["type"] == "common_word":
+            continue
+        validated.append({**item, "replacement": item["text"], "provenance": "original_name", "source_sha": clean["source_sha"]})
+    for index, item in enumerate(sorted(validated, key=lambda row: (row["block_id"], row["start"]))):
+        item["token"] = f"__P01_ENTITY_{index:03}__"
+    return validated
 
 
 def protect_source(clean, entities):
-    return clean
+    texts = block_map(clean)
+    for item in sorted(entities, key=lambda row: (row["block_id"], -row["start"])):
+        block = item["block_id"]
+        texts[block] = texts[block][:item["start"]] + item["token"] + texts[block][item["end"]:]
+    return {"title": texts["title"], "blocks": [{"id": row["id"], "text": texts[row["id"]]} for row in clean["blocks"]]}
 
 
 def restore_translation(clean, entities, response):
-    return {"title": response["title"], "summary": response["summary"], "body": "\n\n".join(row["text"] for row in response["blocks"]), "blocks": response["blocks"]}
+    bounded_json(response)
+    if type(response) is not dict or set(response) != {"title", "summary", "blocks"}:
+        raise ContentBlocked("translation_schema")
+    rows = response["blocks"]
+    if type(rows) is not list or any(type(row) is not dict or set(row) != {"id", "text"} for row in rows):
+        raise ContentBlocked("translation_blocks_schema")
+    if [row["id"] for row in rows] != [row["id"] for row in clean["blocks"]]:
+        raise ContentBlocked("translation_block_coverage")
+    texts = {"title": response["title"], "summary": response["summary"], **{row["id"]: row["text"] for row in rows}}
+    if any(type(text) is not str or not text.strip() for text in texts.values()):
+        raise ContentBlocked("translation_empty")
+    known = {item["token"] for item in entities}
+    for block, text in texts.items():
+        found = TOKEN_RE.findall(text)
+        expected = {item["token"] for item in entities if item["block_id"] == block}
+        if block == "summary":
+            if set(found) - known:
+                raise ContentBlocked("unknown_placeholder")
+        elif set(found) != expected or len(found) != len(expected):
+            raise ContentBlocked("placeholder_coverage")
+        for item in entities:
+            text = text.replace(item["token"], item["replacement"])
+        if "__P01_ENTITY" in text:
+            raise ContentBlocked("placeholder_residue")
+        texts[block] = text
+    blocks = [{"id": row["id"], "text": texts[row["id"]]} for row in rows]
+    return {"title": texts["title"], "summary": texts["summary"], "body": "\n\n".join(row["text"] for row in blocks), "blocks": blocks}
 
 
 def validate_audit(clean, target, response):
-    audit = audit_numeric_surfaces("\n".join(row["text"] for row in clean["blocks"]), target["body"])
-    return {"passed": audit["status"] != "surface_difference"}
+    bounded_json(response)
+    failed = {"passed": False, "reason": "audit_schema_or_unknown", "source_sha": clean["source_sha"], "target_sha": digest(target)}
+    if (type(response) is not dict or set(response) != {"verdict", "checks", "issues"}
+            or response.get("verdict") not in {"pass", "fail", "uncertain"}
+            or type(response.get("checks")) is not dict or set(response["checks"]) != AUDIT_CHECKS
+            or any(type(value) is not bool for value in response["checks"].values())
+            or type(response.get("issues")) is not list or len(response["issues"]) > 128):
+        return failed
+    sources = block_map(clean)
+    targets = {"title": target["title"], **{row["id"]: row["text"] for row in target["blocks"]}}
+    diagnostics = {key: audit_numeric_surfaces(text, targets.get(key, "")) for key, text in sources.items()}
+    for issue in response["issues"]:
+        if type(issue) is not dict or set(issue) != {"kind", "block_id", "source_span", "target_span"}:
+            return failed
+        block = issue["block_id"]
+        if block not in sources or block not in targets or issue["kind"] not in AUDIT_CHECKS:
+            return failed
+        for field, texts in (("source_span", sources), ("target_span", targets)):
+            span = issue[field]
+            if type(span) is not list or len(span) != 2 or any(type(i) is not int for i in span) or not 0 <= span[0] <= span[1] <= len(texts[block]):
+                return failed
+    numeric_ok = all(row["status"] != "surface_difference" for row in diagnostics.values())
+    passed = response["verdict"] == "pass" and all(response["checks"].values()) and not response["issues"] and numeric_ok
+    return {"passed": passed, "reason": "passed" if passed else "facts_or_numeric_difference", "source_sha": clean["source_sha"], "clean_sha": clean["clean_sha"], "target_sha": digest(target), "model": deepcopy(response), "numeric": diagnostics}
