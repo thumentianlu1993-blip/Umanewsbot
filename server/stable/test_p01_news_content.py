@@ -59,3 +59,15 @@ class NewsContentTests(SimpleTestCase):
         self.assertFalse(validate_audit(CLEAN, target, {"verdict": "pass"})["passed"])
         with self.assertRaises(ContentBlocked):
             validate_entities(CLEAN, {"coverage": "complete", "entities": [], "tools": [{"url": "https://secret.invalid/"}]})
+
+    def test_complete_semantic_review_accepts_equivalent_month_format(self):
+        from stable.services.news_content import AUDIT_CHECKS
+        target = {"title": "官方更新", "summary": "计划参赛", "body": "Unknown Horse计划于10月27日参赛。\n\n练马师表示这是一项计划。", "blocks": [{"id": "b0", "text": "Unknown Horse计划于10月27日参赛。"}, {"id": "b1", "text": "练马师表示这是一项计划。"}]}
+        result = validate_audit(CLEAN, target, {"verdict": "pass", "checks": {key: True for key in AUDIT_CHECKS}, "issues": []})
+        self.assertTrue(result["passed"])
+
+    def test_summary_cannot_add_a_number_absent_from_full_source(self):
+        from stable.services.news_content import AUDIT_CHECKS
+        target = {"title": "官方更新", "summary": "以99马位获胜", "body": "Unknown Horse will race on 27 October.\n\nThe trainer said this is a plan.", "blocks": CLEAN["blocks"]}
+        result = validate_audit(CLEAN, target, {"verdict": "pass", "checks": {key: True for key in AUDIT_CHECKS}, "issues": []})
+        self.assertFalse(result["passed"])
