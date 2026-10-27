@@ -52,6 +52,7 @@ def source_snapshot(article, draft=None):
             "attribution_locked": article.attribution_locked,
             "source_time": article.published_at.isoformat(), "time_verified": article.published_at_verified,
             "time_evidence": article.published_at_evidence,
+            "region_evidence": article.translation_metadata.get("region_evidence", {}),
         }
     from stable.services.sources import find_builtin_source
     source = find_builtin_source(draft.source_site, draft.source_mode)
@@ -67,6 +68,7 @@ def source_snapshot(article, draft=None):
         "source_time": draft.published_at.isoformat() if draft.published_at else None,
         "time_verified": draft.metadata.get("published_at_verified"),
         "time_evidence": draft.metadata.get("published_at_evidence", {}),
+        "region_evidence": draft.metadata.get("region_evidence", {}),
     }
 
 

@@ -44,14 +44,14 @@ _STRUCTURED_NOISE_SELECTORS = (
     "script",
     "style",
     "noscript",
-    ".article-body-comment",
-    ".scmp_button_comment",
-    ".advert_wrapper",
-    ".article-blocks",
     "[class*='ShareBlock']",
     "[class*='ArticleShare']",
     "[class*='ArticleSocialMediaButtons__StyledInnerContainer']",
     "[class*='SocialShare']",
+)
+
+_SCMP_STRUCTURED_NOISE_SELECTORS = (
+    ".article-body-comment", ".scmp_button_comment", ".advert_wrapper", ".article-blocks",
 )
 
 _SPONICHI_STRUCTURED_NOISE_SELECTORS = (
@@ -181,9 +181,10 @@ def _remove_structured_noise(node: Tag, removed: Counter[str], audit: _CleaningA
 
 def _remove_source_structured_noise(node: Tag, source: str, removed: Counter[str], audit: _CleaningAudit) -> None:
     selectors = _HRN_STRUCTURED_NOISE_SELECTORS if source == SourceSite.HORSE_RACING_NATION else (
-        _SPONICHI_STRUCTURED_NOISE_SELECTORS if source == SourceSite.SPONICHI else ()
+        _SPONICHI_STRUCTURED_NOISE_SELECTORS if source == SourceSite.SPONICHI else
+        _SCMP_STRUCTURED_NOISE_SELECTORS if source == SourceSite.SCMP_RACING else ()
     )
-    reason = "hrn_structured_noise" if source == SourceSite.HORSE_RACING_NATION else "sponichi_structured_noise"
+    reason = {SourceSite.HORSE_RACING_NATION: "hrn_structured_noise", SourceSite.SCMP_RACING: "scmp_structured_noise"}.get(source, "sponichi_structured_noise")
     for selector in selectors:
         matches = list(node.select(selector))
         audit.remove(matches, reason)

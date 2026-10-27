@@ -214,7 +214,19 @@ def upsert_article_from_draft(draft, crawl_job: CrawlJob | None = None) -> Artic
                 except Exception:
                     image.local_path = ""
             image.save()
-        apply_article_attribution(article, source_config=article.source_config, is_new_article=created)
+        region_evidence = draft_metadata.get("region_evidence") or {}
+        if (article_source_site == SourceSite.TDN and region_evidence.get("source_region_used") is False
+                and not article.attribution_locked):
+            from .news_attribution import set_article_regions, classify_news_content
+            from stable.models import AttributionStatus
+            supported = region_evidence.get("status") == "supported"
+            set_article_regions(article, primary_region=draft.racing_region, attribution_source="source_text",
+                reason=region_evidence["reason"], evidence=region_evidence,
+                content_category=classify_news_content(article),
+                status=AttributionStatus.APPLIED if supported else AttributionStatus.NEEDS_REVIEW,
+                confidence=80 if supported else 0, rule_version=region_evidence["rule_version"])
+        else:
+            apply_article_attribution(article, source_config=article.source_config, is_new_article=created)
         from stable.services.news_pipeline import can_enroll, start_revision
         if created and can_enroll(article):
             start_revision(article)

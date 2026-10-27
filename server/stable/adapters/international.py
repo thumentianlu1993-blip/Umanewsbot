@@ -296,21 +296,6 @@ class SimpleInternationalNewsAdapter(SourceAdapter):
                 return node, selector
         return None, ""
 
-    def _parse_published_at(self, date_node) -> datetime | None:
-        if date_node is None:
-            return None
-        raw = (date_node.get("datetime") or date_node.get_text(" ", strip=True) or "").strip()
-        parsed = dateparse.parse_datetime(raw)
-        if parsed is None:
-            parsed_date = dateparse.parse_date(raw)
-            if parsed_date is not None:
-                parsed = datetime.combine(parsed_date, datetime.min.time())
-        if parsed is None:
-            return None
-        if timezone.is_naive(parsed):
-            parsed = timezone.make_aware(parsed)
-        return parsed
-
     def _article_id(self, url: str) -> str:
         digest = hashlib.sha1(url.encode("utf-8")).hexdigest()[:16]
         slug = urlsplit(url).path.rstrip("/").split("/")[-1].strip()
@@ -571,7 +556,7 @@ class TDNAdapter(SimpleInternationalNewsAdapter):
         from stable.services.news_attribution import infer_global_source_region
         draft = super().normalize_source_payload(stub, detail)
         draft.racing_region, evidence = infer_global_source_region(draft.title_ja, draft.body_ja_normalized)
-        draft.metadata["region_evidence"] = evidence
+        draft.metadata.update(region_evidence=evidence, region=draft.racing_region, source_region=self.racing_region)
         return draft
 
     def listing_url(self, page_or_month: str | int, mode: SourceMode | str | None = None) -> str:

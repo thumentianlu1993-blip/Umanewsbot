@@ -6,7 +6,7 @@ from copy import deepcopy
 import unicodedata
 
 from bs4 import BeautifulSoup, NavigableString, Tag, Comment
-from stable.services.article_content import _STRUCTURED_NOISE_SELECTORS
+from stable.services.article_content import _STRUCTURED_NOISE_SELECTORS, _SCMP_STRUCTURED_NOISE_SELECTORS
 from stable.services.numeric_surface_audit import audit_numeric_surfaces
 from stable.services.news_pipeline import digest
 
@@ -88,7 +88,8 @@ def clean_source(snapshot, selectors=None):
     if snapshot["source_site"] == "scmp_racing" and root.select_one(".paywall, [data-paywall], .subscription-required"):
         raise ContentBlocked("body_access_restricted")
     removed = []
-    for selector in _STRUCTURED_NOISE_SELECTORS:
+    noise_selectors = _STRUCTURED_NOISE_SELECTORS + (_SCMP_STRUCTURED_NOISE_SELECTORS if snapshot["source_site"] == "scmp_racing" else ())
+    for selector in noise_selectors:
         for node in list(root.select(selector)):
             if node.parent is None:
                 continue
