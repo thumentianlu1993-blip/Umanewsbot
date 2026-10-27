@@ -93,3 +93,44 @@ class ModelBudgetTests(TestCase):
             settle_request(attempt.pk, actual_cost="0.001", result={"ok": True})
         self.assertEqual(set(NewsModelBudget.objects.values_list("id", flat=True)), original_ids)
         self.assertTrue(all(b.spent == Decimal("0.001") for b in NewsModelBudget.objects.all()))
+
+
+from concurrent.futures import ThreadPoolExecutor
+from django.db import close_old_connections
+from django.test import TransactionTestCase
+from threading import Barrier
+from copy import deepcopy
+
+CONCURRENT_POLICY = deepcopy(POLICY)
+CONCURRENT_POLICY.update(day_cap="5", month_cap="5")
+CONCURRENT_POLICY["models"]["entity_check"].update(input_per_million="1000", output_per_million="2000")
+
+
+@override_settings(NEWS_QUALITY_MODE="shadow", NEWS_QUALITY_POLICY=CONCURRENT_POLICY)
+class BudgetConcurrencyTests(TransactionTestCase):
+    def test_two_workers_cannot_reserve_the_same_remaining_money(self):
+        attempts = []
+        for index in range(2):
+            run = start_revision(upsert_article_from_draft(draft_for(source_article_id=f"concurrent-{index}")).article)
+            run.state = "running"
+            run.lease_until = timezone.now() + timedelta(seconds=180)
+            run.save(update_fields=["state", "lease_until"])
+            attempts.append(NewsStageAttempt.objects.create(run=run, stage="entity_check", seq=1,
+                generation=run.generation, input_sha=digest({"text": "test"})).pk)
+        barrier = Barrier(2)
+        def worker(attempt_id):
+            close_old_connections()
+            try:
+                barrier.wait(timeout=10)
+                reserve_request(attempt_id, {"text": "test"})
+                return "reserved"
+            except RequestDenied as exc:
+                return str(exc)
+            finally:
+                close_old_connections()
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            result = sorted(pool.map(worker, attempts))
+        self.assertEqual(result, ["budget_exhausted", "reserved"])
+        for budget in NewsModelBudget.objects.all():
+            self.assertGreater(budget.reserved, 0)
+            self.assertLessEqual(budget.reserved + budget.spent, budget.cap)
