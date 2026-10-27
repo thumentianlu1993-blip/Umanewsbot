@@ -122,3 +122,33 @@ class SourceRevisionFenceTests(TestCase):
         self.article.refresh_from_db()
         self.assertEqual(self.article.body_zh, "旧稿全文")
         self.assertEqual(self.article.active_news_run.manual_target["body"], "修订全文")
+
+    @override_settings(AUTOMATION_ENABLED=True)
+    def test_old_tasks_return_before_provider_and_notifications(self):
+        from types import SimpleNamespace
+        from stable import tasks
+        from stable.models import ReviewMode
+        self.article.review_mode = ReviewMode.AUTO
+        self.article.save(update_fields=["review_mode"])
+        with patch("stable.tasks.rewrite_article") as rewrite, patch("stable.tasks.score_article_for_automation") as score, patch("stable.tasks.validate_rewrite", return_value=SimpleNamespace(passed=True, reason="")) as validate, patch("stable.tasks.apply_validation_outcome"), patch("stable.tasks.apply_score_decision"), patch("stable.tasks.send_notification_task") as notice, patch("stable.tasks.send_high_value_warning_notification"):
+            for task in (tasks.score_article_task, tasks.rewrite_article_task, tasks.validate_rewrite_task, tasks.process_article_automation_task):
+                result = task.run(self.article.pk)
+                self.assertEqual(result.get("reason"), "p01_owned", task.name)
+            rewrite.assert_not_called()
+            score.assert_not_called()
+            validate.assert_not_called()
+            notice.run.assert_not_called()
+
+    def test_editor_form_saves_target_without_mutating_published_content(self):
+        from django.contrib.auth import get_user_model
+        from django.urls import reverse
+        editor = get_user_model().objects.create_user("p01-form-editor", is_staff=True)
+        self.client.force_login(editor)
+        response = self.client.post(reverse("console-article-editor", args=[self.article.pk]), {
+            "title_zh": "表单修订", "body_zh": "表单修订全文", "summary_zh": "表单摘要",
+            "intent": "save", "source_note": "来源", "tags_json": "[]",
+        })
+        self.assertEqual(response.status_code, 302)
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.body_zh, "旧稿全文")
+        self.assertEqual(self.article.active_news_run.manual_target["body"], "表单修订全文")
