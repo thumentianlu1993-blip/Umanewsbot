@@ -1,3 +1,9 @@
+# 2026-10-27 P01 新闻方案设计与独立评审
+
+用户已完成10题产品澄清，并明确授权本线程设计开发方案和派出子Agent评审。当前只进行文档设计与评审，不恢复旧8线或生产任务，不代表开始实现。
+
+方案分支 `codex/p01-news-quality-design-20261027`，基于交接 `e4df6bda`，见[产品规格](changes/p01-news-quality-20261027/spec.md)、[设计](changes/p01-news-quality-20261027/design.md)、[测试](changes/p01-news-quality-20261027/test_cases.md)、[任务](changes/p01-news-quality-20261027/tasks.md)、[交付与评审状态](changes/p01-news-quality-20261027/rollout.md)。原卡百分比保持不变；独立reviewer两轮评审关闭7项问题，推荐方案技术APPROVED；“公开版本+条目索引”架构选择已提交用户、待回答。业务测试、CI、真实模型评估和生产操作均未执行。G1范围来自当前指令；后续交付依根AGENTS处理。
+
 # 当前工作状态：2026-10-26 业务项目交接
 
 用户已停止旧多线协调，要求把全部任务、进度和源码整合后交其重新规划。本次仅做本地源码保存、需求映射、优先级建议和完整spec交接；未恢复开发、定时任务、生产采集或通知。
