@@ -187,3 +187,8 @@ def commit_stage(attempt_id, generation):
         return False
     # 只有接入对应阶段的确定性校验器后才允许推进；原始模型输出不作已审结果。
     return False
+
+
+def process_news_run(run_id):
+    run = NewsProcessingRun.objects.get(pk=run_id)
+    return {"run_id": run.pk, "state": run.state}
