@@ -91,6 +91,17 @@
 
 测试环境为本地 Colima 中原生 ARM64 Linux 镜像 `sha256:5fa59696f087c4ba2fdc0fde4e6c95d484e660334332a0256ba739a911766d42`，测试容器 network none、独立PG16。初次 AMD64 模拟镜像不能满足PG进程身份核验，已停止该诊断运行并保留原始结果，不记为通过；未修改安全核验来适配模拟进程。Compose离线解析证明四类进程默认off、共享policy只读挂载。全量测试在固定 `3f21f41f` 上执行，结果在下文登记；不声明PR已可合并或生产可启用。
 
+
+### 实施收尾与全量核验结果
+
+- 后续只读复审：`3f21f41f`→`152bd19a`（F02 fixture和5份文档）APPROVED，指纹 `04de2fdd156c3bc45dfadc58c62957d3989316915e1b81e677e14192acc78741`；`152bd19a`→`69bfc4e1f3996c5996879610e663978529ab966d`（采集兼容和测试夹具）APPROVED，指纹 `1bdaa3e9aff21522b8ec6bd51a534f1fbee0915d41c45c03ca7bc7be06687318`。前后均clean，无新增可操作finding。
+- 全量固定 `3f21f41f`：53批，7,662个唯一ID，无重复或遗漏执行。原生结果7,644成功、5失败、3错误、10跳过。52批具有完成报告；batch-012的198项原生断言通过，但PG日志超过既有512KiB总限额，收尾失败，只有部分证据。主执行器中断后，仅继续原计划中从未运行的批次，没有重写既有报告。
+- 8个失败/错误用例：F02新插入行落在观察截止附近；旧采集URL-only stub的错误被来源ID缺失覆盖；工具链AST fixture缺新依赖/参数、可信依赖闭包遗漏。分别修正测试时间、URL回退和测试夹具；组合测试又暴露失效SHA案例污染进程环境，已加测试环境恢复。没有修改导出上限、生产执行器、PG身份/收尾约束或安全门禁。
+- 修复后独立证据：`6e540964` 的原F02 batch-003共12项PASS；`0602f1787e2faa9e1f68a34be76b697c8f9b82dd` 的全部20个P01模块124项+旧采集13项，共137项PG PASS；`69bfc4e1` 的两工具链模块31项PASS。`0602f178` 的 `makemigrations --check --dry-run --noinput` 返回 No changes detected；全量最后49项发布恢复合同PASS。
+- 正式 `verify_test_plan.py` 退出1：`missing/duplicate/unexpected batch`（batch-012缺完成回执）。10项真实缓存/root/镜像用例仍跳过，catalog的2026-10-16复核期限已过。后续定向通过不能替换原全量回执，故正式状态仍 **BLOCKED**。未提高日志限额、缩减断言、自动延期skip或把合成样本替作真实缓存。
+- 原始日志及机器摘要位于本机 `/Users/mentianlu/.codex/runtime/p01-news-quality/`，摘要为 `final-evidence-summary.json`；各原生/定向结果分别保留固定SHA和镜像身份。P01测试容器已全部退出，其他线程容器未操作。工作流契约及其4项测试、相对链接和 `git diff --check` 通过。
+- 本轮源码和代码复审完成，完整交付验证尚未通过；仓库级证据管线/真实样本补证是否扩围已询问用户，未获得选择前保持现有边界。未push共享主线、未合并/部署、未调用真实模型、未生产回填/启用或外发消息。
+
 ## 9 配置与停止操作说明
 
 - 使用 `docker-compose.news-quality.yml` 叠加现有生产Compose；新worker仅在 `news-quality` profile启用，固定候选镜像通过 `UMANEWS_NEWS_QUALITY_IMAGE` 传入；队列为 `news_quality`，并发2。
