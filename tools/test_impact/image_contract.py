@@ -342,10 +342,8 @@ def prepare_image_proof(repository, plan, output, observer=None):
                     if observer is not None:
                         observer.cleanup(container_name, cidfile)
                     else:
-                        cleanup_container = subprocess.run(['docker','rm','-f',container_name], capture_output=True, text=True, timeout=20)
-                        absent = subprocess.run(['docker','container','inspect',container_name], capture_output=True, text=True, timeout=5)
-                        if (cleanup_container.returncode != 0 or absent.returncode != 1 or absent.stdout.strip()
-                                or absent.stderr.strip() not in ('Error: No such container: '+container_name, 'Error: No such object: '+container_name)):
+                        from tools.test_impact.serial_ci import remove_owned
+                        if not remove_owned(container_name, deadline=cleanup_end)['clean']:
                             raise ValueError('image reader container cleanup unconfirmed')
             except BaseException as exc:
                 cleanup_errors.append(exc)

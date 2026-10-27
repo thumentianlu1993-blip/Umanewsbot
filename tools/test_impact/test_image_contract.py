@@ -15,6 +15,42 @@ from tools.test_impact import image_contract as contract
 
 
 class ImageProofTests(unittest.TestCase):
+    def test_non_owned_preparation_uses_verified_exact_cleanup_protocol(self):
+        proof, plan = self.fixture()
+        image_id = proof['image_id']
+        cleanup_calls = []
+        def fake_command(command, **kwargs):
+            if command[1:3] == ['image','ls']:
+                return subprocess.CompletedProcess(command,0,'','')
+            if command[1] == 'build':
+                Path(command[command.index('--iidfile')+1]).write_text(image_id)
+                proof['inspect']['Config']['Labels']['org.umanews.test-preparation'] = command[command.index('--label')+1].split('=',1)[1]
+                return subprocess.CompletedProcess(command,0,'built','')
+            if command[1:3] == ['image','inspect']:
+                return subprocess.CompletedProcess(command,0,json.dumps([proof['inspect']]),'')
+            if command[1] == 'run':
+                return subprocess.CompletedProcess(command,0,json.dumps(proof['runtime']),'')
+            self.fail('unexpected preparation command')
+        def cleanup(command, **kwargs):
+            cleanup_calls.append(command)
+            if command[1] == 'rm' or command[1:3] == ['image','rm']:
+                return subprocess.CompletedProcess(command,0,'removed\n','')
+            if command[1:3] == ['container','inspect']:
+                return subprocess.CompletedProcess(command,1,'[]\n','Error response from daemon: No such container: '+command[-1]+'\n')
+            self.assertEqual(command[1:4],['inspect','--format','{{.Id}}'])
+            return subprocess.CompletedProcess(command,1,'\n','error: no such object: '+command[-1]+'\n')
+        with tempfile.TemporaryDirectory() as directory, \
+                patch.object(contract,'_migration_image_source',return_value=contract._MIGRATION_IMAGE_SOURCE), \
+                patch.object(contract,'_migration_image_archive_context'), \
+                patch.object(contract,'_assert_migration_image_context'), \
+                patch.object(contract.subprocess,'check_output',return_value=b'fixed archive'), \
+                patch.object(contract,'preparation_command',side_effect=fake_command), \
+                patch.object(contract.subprocess,'run',side_effect=cleanup):
+            raw, descriptor = contract.prepare_image_proof(Path(directory),plan,Path(directory))
+            self.assertEqual(contract.validate_proof(raw,{**plan,'migration_image_proof':descriptor})['cleanup'],
+                             {'created_image':True,'removed':True})
+            self.assertEqual(cleanup_calls[0][-1],cleanup_calls[1][-1])
+
     def test_current_docker_absence_dialect_requires_exact_cid_and_no_other_error(self):
         from tools.test_impact.serial_ci import absent
         cid = 'c'*64
