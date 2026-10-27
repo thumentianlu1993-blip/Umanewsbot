@@ -71,7 +71,7 @@ class InternationalSourceRepairTests(SimpleTestCase):
         from stable.adapters.international import HKJCRacingNewsAdapter
         from datetime import datetime, timezone
         adapter = HKJCRacingNewsAdapter()
-        detail = self.detail(adapter, '<h1>Title</h1><div class="dropdown-news-date">28/10/2026</div><p class="horses-racing-news-author">By Author<br>27/10/2026 14:49</p><div class="horses-racing-news-content"><p>Body</p></div>')
+        detail = self.detail(adapter, '<h1>Title</h1><div class="dropdown-news-date">28/10/2026</div><div class="content-news-list"><div class="horses-racing-news-title-header"><p class="horses-racing-news-author">By Author<br>27/10/2026 14:49</p></div><div class="horses-racing-news-content"><p>Body</p></div></div>')
         self.assertEqual(detail.published_at, datetime(2026, 10, 27, 6, 49, tzinfo=timezone.utc))
         self.assertTrue(self.draft(adapter, detail).metadata['published_at_verified'])
         self.assertEqual(detail.metadata['published_at_evidence']['timezone'], 'Asia/Hong_Kong')

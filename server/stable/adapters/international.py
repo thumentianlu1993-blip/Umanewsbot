@@ -123,29 +123,32 @@ def _publication_time(soup, *, source_site, url, title):
         "head meta[property='article:published_time'], head meta[itemprop='datePublished']")])
     if result:
         return result
-    if str(source_site) == "hkjc_news":
-        rows = []
-        for node in soup.select(".horses-racing-news-author"):
-            match = re.search(r"\b\d{2}/\d{2}/\d{4}\s+\d{2}:\d{2}\b", node.get_text(" ", strip=True))
-            if match:
-                rows.append((match[0], ".horses-racing-news-author"))
-    else:
-        selector = {
-            "france_galop_news": ".date, time[datetime]",
-            "horse_racing_nation": ".publish-date time[datetime]",
-        }.get(str(source_site), "time[itemprop='datePublished'], .published time[datetime]")
-        def current_publication(node):
-            for parent in (node, *node.parents):
-                if parent.name in {"aside", "nav", "footer"}:
-                    return False
-                if "dateModified" in str(parent.get("itemprop", "")):
-                    return False
-                tokens = " ".join(parent.get("class", [])) + " " + str(parent.get("id", ""))
-                if re.search(r"related|recommend|dropdown|news-card|story-card|listing", tokens, re.I):
-                    return False
-            return True
-        rows = [(node.get("datetime") or node.get_text(" ", strip=True), selector)
-                for node in soup.select(selector) if current_publication(node)]
+    # 仅已核实的文章容器及其头部可提供 DOM 首发时间；语义相同的推荐卡片不属于该稿。
+    scopes = {
+        "hkjc_news": (".content-news-list", ".horses-racing-news-content", ":scope > .horses-racing-news-title-header > .horses-racing-news-author"),
+        "france_galop_news": ("article.full", ".field--name-body, .field-name-body", ":scope > header .authored .date, :scope > header time[datetime]"),
+        "horse_racing_nation": ("main > .p-md-2", ".article-body", ":scope > .row.align-items-center .publish-date > time[datetime]"),
+    }
+    rows = []
+    if str(source_site) in scopes:
+        scope_selector, body_selector, date_selector = scopes[str(source_site)]
+        roots = [node for node in soup.select(scope_selector) if len(node.select(body_selector)) == 1]
+        if len(roots) == 1:
+            root = roots[0]
+            for node in root.select(date_selector):
+                owners = []
+                for parent in (node, *node.parents):
+                    if parent is root:
+                        break
+                    owners.append(parent)
+                if any(parent.name in {"article", "aside", "nav", "footer"}
+                       or "dateModified" in str(parent.get("itemprop", "")) for parent in owners):
+                    continue
+                raw = node.get("datetime") or node.get_text(" ", strip=True)
+                if str(source_site) == "hkjc_news":
+                    match = re.search(r"\b\d{2}/\d{2}/\d{4}\s+\d{2}:\d{2}\b", raw)
+                    raw = match[0] if match else ""
+                rows.append((raw, scope_selector + " " + date_selector))
     result = resolve(rows)
     return result or (None, {"source": "fallback", "raw": "", "timezone": zone, "precision": "unknown", "verified": False,
                             "reason": "publication_time_missing"})
