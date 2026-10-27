@@ -315,7 +315,7 @@ class FrozenWorkerBindingTests(unittest.TestCase):
             self.assertNotIn('HOST_SENTINEL',os.environ)
             django.setup.assert_called_once_with()
         django.setup.reset_mock()
-        with patch.dict(sys.modules,{'django':django,'django.conf':conf,'dotenv':dotenv}),self.assertRaises(ValueError):
+        with patch.dict(sys.modules,{'django':django,'django.conf':conf,'dotenv':dotenv}),patch.dict(os.environ,dict(os.environ)),self.assertRaises(ValueError):
             setup('django',{**self.plan,'test_sha':None},self.binding)
         django.setup.assert_not_called()
 
