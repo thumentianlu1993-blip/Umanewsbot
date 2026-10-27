@@ -94,6 +94,7 @@ def start_revision(article, *, snapshot=None, manual_target=None, editor=None):
     run.generation = article.news_generation
     run.expected_article_sha = article_revision(article)
     run.save(update_fields=["generation", "expected_article_sha"])
+    transaction.on_commit(lambda: enqueue_news_run(run.pk))
     return run
 
 
@@ -386,8 +387,95 @@ def process_news_run(run_id):
 
 
 def recover_expired_run(run_id):
-    return False
+    """先冻结过期认领，再独立核账；绝不在业务锁内调用供应商或取得预算锁。"""
+    from datetime import timedelta
+    from django.utils import timezone
+    from stable.models import NewsStageAttempt
+    from stable.services.news_model_gateway import settle_request, mark_unknown
+    reference = NewsProcessingRun.objects.get(pk=run_id)
+    now = timezone.now()
+    attempt = None
+    with transaction.atomic():
+        article = NewsArticle.objects.select_for_update().get(pk=reference.article_id)
+        run = NewsProcessingRun.objects.select_for_update().get(pk=run_id)
+        if run.state != "running" or not run.lease_until or run.lease_until > now:
+            return False
+        attempt = run.attempts.select_for_update().filter(generation=run.generation).order_by("-pk").first()
+        if attempt and attempt.state == "completed" and _current_run(article, run):
+            # 只延长这次已完成回执的提交窗口，不分配新请求。
+            run.lease_until = now + timedelta(seconds=30)
+            run.save(update_fields=["lease_until"])
+        elif attempt and attempt.state == "reserved":
+            attempt.state, attempt.error = "failed", "never_dispatched"
+            attempt.save(update_fields=["state", "error"])
+        elif attempt is None:
+            run.state, run.reason, run.lease_until = "pending", "claim_without_attempt", None
+            run.save(update_fields=["state", "reason", "lease_until"])
+            return True
+    if attempt.state == "completed":
+        return commit_stage(attempt.pk, attempt.generation)
+    if attempt.state in {"inflight", "unknown"}:
+        attempt = mark_unknown(attempt.pk, "expired_provider_claim")
+        if attempt.state == "completed":
+            # worker 恰好落了完整回执；下次扫描提交，不重发。
+            return recover_expired_run(run_id)
+        return _transition(run_id, {"state": "review", "reason": "provider_unknown", "lease_until": None}, generation=attempt.generation)
+    if attempt.error == "never_dispatched":
+        if attempt.month_budget_id:
+            settle_request(attempt.pk, actual_cost=0)
+        return _transition(run_id, {"state": "pending", "reason": "recovered_before_dispatch", "lease_until": None,
+            "next_attempt_at": now}, generation=attempt.generation)
+    return _transition(run_id, {"state": "review", "reason": "expired_failed_attempt", "lease_until": None}, generation=attempt.generation)
 
 
 def enqueue_news_run(run_id):
-    return True
+    """broker 失败不在 web/抓取进程里降级执行付费模型；扫描器重投。"""
+    import logging
+    if not getattr(settings, "NEWS_QUALITY_DISPATCH_ENABLED", False) or getattr(settings, "NEWS_QUALITY_MODE", "off") not in {"shadow", "enforce"}:
+        return False
+    try:
+        from stable.tasks import process_news_quality_run_task
+        process_news_quality_run_task.apply_async(args=[run_id], retry=False)
+        return True
+    except Exception as error:
+        logging.getLogger(__name__).warning("P01 broker dispatch failed run=%s type=%s", run_id, type(error).__name__)
+        return False
+
+
+def scan_news_runs(*, now=None, limit=100):
+    from datetime import timedelta
+    from django.utils import timezone
+    from stable.models import NewsStageAttempt
+    from stable.services.news_model_gateway import mark_unknown, settle_request
+    from stable.services.news_feed import regional_slot_seconds
+    now = now or timezone.now()
+    if not getattr(settings, "NEWS_QUALITY_DISPATCH_ENABLED", False) or getattr(settings, "NEWS_QUALITY_MODE", "off") not in {"shadow", "enforce"}:
+        return {"dispatched": 0, "recovered": 0, "enabled": False}
+    limit = max(1, min(100, limit))
+    recovered = 0
+    for pk in NewsProcessingRun.objects.filter(state="running", lease_until__lte=now).values_list("pk", flat=True)[:limit]:
+        recovered += int(bool(recover_expired_run(pk)))
+    # 已被新版本取代的旧 worker 也必须核账，不能遗留可被遗忘的 reservation。
+    orphaned = NewsStageAttempt.objects.filter(state__in=["reserved", "inflight"], reserved_at__lt=now-timedelta(seconds=180)).exclude(run__state="running")
+    for reference in list(orphaned[:limit]):
+        with transaction.atomic():
+            attempt = NewsStageAttempt.objects.select_for_update().get(pk=reference.pk)
+            if attempt.state == "reserved":
+                attempt.state, attempt.error = "failed", "never_dispatched"
+                attempt.save(update_fields=["state", "error"])
+        if attempt.state == "inflight":
+            mark_unknown(attempt.pk, "orphaned_provider_claim")
+        elif attempt.error == "never_dispatched" and attempt.month_budget_id and not attempt.settlement_version:
+            settle_request(attempt.pk, actual_cost=0)
+    due = NewsProcessingRun.objects.filter(state__in=["pending", "ready", "shadow"], next_attempt_at__lte=now, policy_sha=policy_sha())
+    if getattr(settings, "NEWS_QUALITY_MODE", "off") == "shadow":
+        due = due.exclude(state="shadow")
+    selected = list(due.filter(priority="major").order_by("article__published_at", "pk").values_list("pk", flat=True)[:limit])
+    slots = regional_slot_seconds(now)
+    regions = sorted(REGIONS, key=lambda region: (slots.get(region, 0), REGIONS.index(region)))
+    queues = {region: list(due.exclude(priority="major").filter(primary_region=region).order_by("created_at", "pk").values_list("pk", flat=True)[:limit]) for region in regions}
+    while len(selected) < limit and any(queues.values()):
+        for region in regions:
+            if queues[region] and len(selected) < limit:
+                selected.append(queues[region].pop(0))
+    return {"enabled": True, "dispatched": sum(enqueue_news_run(pk) for pk in selected), "recovered": recovered}

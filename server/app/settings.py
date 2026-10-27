@@ -1190,3 +1190,35 @@ if RACE_DATA_COVERAGE_ALERTS_ENABLED:
     }
 RACE_DATA_MULTISOURCE_POLICY_FILE = env("RACE_DATA_MULTISOURCE_POLICY_FILE", "")
 RACE_DATA_MULTISOURCE_POLICY_SHA256 = env("RACE_DATA_MULTISOURCE_POLICY_SHA256", "")
+
+
+# P01 默认停用。模型、费率、来源和激活时点必须来自绑定摘要的本地策略文件。
+NEWS_QUALITY_MODE = env("NEWS_QUALITY_MODE", "off")
+NEWS_QUALITY_FEED_ENABLED = env_bool("NEWS_QUALITY_FEED_ENABLED", False)
+NEWS_QUALITY_DISPATCH_ENABLED = env_bool("NEWS_QUALITY_DISPATCH_ENABLED", False)
+NEWS_QUALITY_API_KEY = env("NEWS_QUALITY_API_KEY", "")
+NEWS_QUALITY_BASE_URL = env("NEWS_QUALITY_BASE_URL", "")
+NEWS_QUALITY_POLICY = {}
+NEWS_QUALITY_POLICY_FILE = env("NEWS_QUALITY_POLICY_FILE", "")
+NEWS_QUALITY_POLICY_FILE_SHA256 = env("NEWS_QUALITY_POLICY_FILE_SHA256", "")
+if NEWS_QUALITY_MODE not in {"off", "shadow", "enforce"}:
+    raise ValueError("NEWS_QUALITY_MODE invalid")
+if NEWS_QUALITY_POLICY_FILE:
+    import hashlib as _news_hashlib
+    import json as _news_json
+    _news_policy_bytes = Path(NEWS_QUALITY_POLICY_FILE).read_bytes()
+    if len(_news_policy_bytes) > 262144 or _news_hashlib.sha256(_news_policy_bytes).hexdigest() != NEWS_QUALITY_POLICY_FILE_SHA256:
+        raise ValueError("NEWS_QUALITY_POLICY_FILE digest invalid")
+    NEWS_QUALITY_POLICY = _news_json.loads(_news_policy_bytes)
+    if not isinstance(NEWS_QUALITY_POLICY, dict):
+        raise ValueError("NEWS_QUALITY_POLICY must be an object")
+    del _news_policy_bytes
+CELERY_TASK_ROUTES.update({
+    "stable.tasks.process_news_quality_run_task": {"queue": "celery"},
+    "stable.tasks.scan_news_quality_runs_task": {"queue": "celery"},
+    "stable.tasks.build_news_quality_feed_task": {"queue": "celery"},
+})
+if NEWS_QUALITY_DISPATCH_ENABLED:
+    CELERY_BEAT_SCHEDULE["scan-news-quality-runs"] = {"task": "stable.tasks.scan_news_quality_runs_task", "schedule": 60.0}
+if NEWS_QUALITY_FEED_ENABLED:
+    CELERY_BEAT_SCHEDULE["build-news-quality-feed"] = {"task": "stable.tasks.build_news_quality_feed_task", "schedule": 300.0}

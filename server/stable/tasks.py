@@ -3424,6 +3424,27 @@ def advance_race_event_lifecycle_task(
     }
 
 
-@shared_task
+@shared_task(soft_time_limit=100, time_limit=120)
 def process_news_quality_run_task(run_id):
-    return {"run_id": run_id, "state": "pending"}
+    from stable.services.news_pipeline import process_news_run, enqueue_news_run
+    from stable.models import NewsProcessingRun
+    outcome = process_news_run(run_id)
+    run = NewsProcessingRun.objects.get(pk=run_id)
+    if run.state in {"pending", "ready"} and run.next_attempt_at <= timezone.now():
+        enqueue_news_run(run_id)
+    return outcome
+
+
+@shared_task
+def scan_news_quality_runs_task():
+    from stable.services.news_pipeline import scan_news_runs
+    return scan_news_runs()
+
+
+@shared_task
+def build_news_quality_feed_task():
+    if not getattr(settings, "NEWS_QUALITY_FEED_ENABLED", False):
+        return {"enabled": False}
+    from stable.services.news_feed import create_snapshot
+    snapshot = create_snapshot(with_features=True)
+    return {"generation": str(snapshot.generation), "watermark": snapshot.catalog_watermark}
