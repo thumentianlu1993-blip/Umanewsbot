@@ -89,17 +89,21 @@ def create_snapshot(*, now=None, per_region=100, with_features=False):
                 ordered.append(queues[region].popleft())
     headline = None
     hot = []
-    if with_features and ordered:
+    if with_features:
         selection = HomepageHeadlineSelection.objects.filter(slot="homepage_primary").first()
         if selection and selection.article_id:
-            manual = visible_entries().filter(feed_seq__lte=watermark, sort_time__lte=now)
+            manual = homepage_entries().filter(feed_seq__lte=watermark, sort_time__lte=now)
             manual = manual.filter(receipt_id=selection.receipt_id) if selection.receipt_id else manual.filter(article_id=selection.article_id, kind="legacy")
             headline = manual.order_by("-sort_time", "-feed_seq").first()
+            if headline:
+                values = headline.receipt.content if headline.kind == "p01" else {"title": headline.article.effective_title, "body": headline.article.effective_body, "summary": headline.article.effective_summary}
+                if not all(values.get(key, "").strip() for key in ("title", "body", "summary")):
+                    headline = None
             if headline and headline.pk not in {row.pk for row in ordered}:
                 ordered = [headline, *ordered[:499]]
-        headline = headline or ordered[0]
+        headline = headline or (ordered[0] if ordered else None)
         # 热门区只取已进入同一首页资格池的稿件，不创建旁路。
-        hot = [row for row in active_major if row.pk != headline.pk][:3]
+        hot = [row for row in active_major if not headline or row.pk != headline.pk][:3]
     featured = {row.pk for row in ([headline] if headline else []) + hot}
     return NewsFeedSnapshot.objects.create(policy_sha=policy_sha(), catalog_watermark=watermark, cutoff_at=now,
         ordered_entry_ids=[row.pk for row in ordered if row.pk not in featured],
@@ -167,3 +171,54 @@ def index_legacy_article(article):
     seq = (NewsPublicEntry.objects.aggregate(value=Max("feed_seq"))["value"] or 0)+1
     return NewsPublicEntry.objects.create(feed_seq=seq, kind="legacy", article=article, public_revision=revision,
         sort_time=article.published_to_web_at, primary_region=article.racing_region, priority="regional")
+
+
+def request_snapshot_refresh():
+    """只投递后台刷新；已提交公开稿不会因 broker 错误回滚或同步付费。"""
+    if not getattr(settings, "NEWS_QUALITY_FEED_ENABLED", False) or not getattr(settings, "NEWS_QUALITY_DISPATCH_ENABLED", False):
+        return False
+    try:
+        from stable.tasks import build_news_quality_feed_task
+        build_news_quality_feed_task.apply_async(retry=False)
+        return True
+    except Exception as error:
+        import logging
+        logging.getLogger(__name__).warning("feed refresh dispatch failed type=%s", type(error).__name__)
+        return False
+
+
+def archive_page(*, query="", region="", cursor=None, size=24):
+    """档案及搜索使用同一提交水位的签名 keyset，不使用 OFFSET。"""
+    from stable.services.news_pipeline import digest
+    filters = digest({"q": query, "region": region})
+    if cursor:
+        try:
+            state = signing.loads(cursor, salt="p01-news-archive-v1", max_age=86400)
+            when = datetime.fromisoformat(state["time"])
+            if state["filters"] != filters or type(state["watermark"]) is not int or type(state["seq"]) is not int or when.tzinfo is None:
+                raise ValueError("archive_cursor_invalid")
+        except (signing.BadSignature, KeyError, TypeError, ValueError) as error:
+            raise ValueError("archive_cursor_invalid") from error
+    else:
+        with transaction.atomic():
+            publication_lock()
+            watermark = NewsPublicEntry.objects.aggregate(value=Max("feed_seq"))["value"] or 0
+        state = {"watermark": watermark, "filters": filters}
+    rows = visible_entries().filter(feed_seq__lte=state["watermark"])
+    if query:
+        rows = rows.filter(Q(kind="p01", receipt__content__title__icontains=query) |
+            Q(kind="p01", receipt__content__body__icontains=query) |
+            Q(kind="legacy", article__title_zh__icontains=query) | Q(kind="legacy", article__body_zh__icontains=query))
+    if region:
+        rows = rows.filter(primary_region=region)
+    if cursor:
+        rows = rows.filter(Q(sort_time__lt=when) | Q(sort_time=when, feed_seq__lt=state["seq"]))
+    size = max(1, min(50, size))
+    entries = list(rows.order_by("-sort_time", "-feed_seq")[:size+1])
+    more = len(entries) > size
+    entries = entries[:size]
+    token = None
+    if more:
+        last = entries[-1]
+        token = signing.dumps({**state, "time": last.sort_time.isoformat(), "seq": last.feed_seq}, salt="p01-news-archive-v1", compress=True)
+    return {"entries": entries, "next_cursor": token, "watermark": state["watermark"]}

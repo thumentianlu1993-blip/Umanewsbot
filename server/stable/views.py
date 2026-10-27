@@ -2433,6 +2433,11 @@ def headline_control(request: HttpRequest):
             if len(eligible_articles) >= 48:
                 break
 
+    if getattr(settings, "NEWS_QUALITY_FEED_ENABLED", False):
+        from stable.services.editorial_headlines import headline_entry_candidates
+        from stable.services.news_public_read import display_article
+        entries, _ = headline_entry_candidates()
+        eligible_articles = [display_article(row) for row in entries]
     active_rec = state.get("active_recommendation")
     recommendation = None
     if active_rec:
@@ -4255,6 +4260,12 @@ def public_article_detail(request: HttpRequest, article_id: int):
     if first_receipt:
         from stable.news_public_views import receipt_detail
         return receipt_detail(request, first_receipt.pk)
+    if getattr(settings, "NEWS_QUALITY_FEED_ENABLED", False):
+        from stable.services.news_feed import visible_entries
+        from stable.news_public_views import entry_detail
+        entry = visible_entries().filter(article_id=article_id, kind="legacy").order_by("-feed_seq").first()
+        if entry:
+            return entry_detail(request, entry)
     article = get_object_or_404(
         NewsArticle.objects.prefetch_related(
             "race_links__event",

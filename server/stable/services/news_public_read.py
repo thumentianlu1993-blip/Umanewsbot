@@ -11,13 +11,14 @@ def display_article(entry):
         article.public_horse_links = list(article.horse_links.filter(status__in=["auto", "manual"], horse_profile__review_status="published").select_related("horse_profile"))
         article.public_race_links = list(article.race_links.filter(status__in=["auto", "manual"], event__visibility_status="published").select_related("event"))
         article.public_entry_id = entry.pk
+        article.headline_article_id = entry.article_id
         return article
     receipt = entry.receipt
     relations = receipt.verified_relations
     horses = HorseProfile.objects.filter(pk__in=relations.get("horse_ids", []), review_status="published")
     races = RaceEvent.objects.filter(pk__in=relations.get("race_ids", []), visibility_status="published")
     return SimpleNamespace(
-        pk=receipt.pk, id=receipt.pk, source_article_id=entry.article_id, public_entry_id=entry.pk,
+        pk=receipt.pk, id=receipt.pk, source_article_id=entry.article_id, public_entry_id=entry.pk, headline_article_id=entry.article_id,
         receipt=receipt, public_path=receipt.public_path, public_list_detail_url=receipt.public_path,
         effective_title=receipt.content["title"], effective_body=receipt.content["body"], effective_summary=receipt.content["summary"],
         published_to_web_at=receipt.published_at, published_at=receipt.published_at, racing_region=entry.primary_region,

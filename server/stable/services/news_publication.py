@@ -271,5 +271,6 @@ def publish(run_id):
     run.state, run.reason, run.lease_until = "published", "", None
     run.expected_article_sha = article_revision(article)
     run.save(update_fields=["state", "reason", "lease_until", "expected_article_sha"])
-    transaction.on_commit(lambda: cache.delete("p01:latest-feed"))
+    from stable.services.news_feed import request_snapshot_refresh
+    transaction.on_commit(request_snapshot_refresh)
     return receipt

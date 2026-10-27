@@ -29,6 +29,8 @@ def withdraw_receipt(receipt_id, *, user, reason):
     receipt.save(update_fields=["visibility", "visibility_evidence"])
     log_operation(action_type="news_receipt_withdrawn", target_type="news_receipt", target_id=receipt.pk,
         detail=reason, admin=user)
+    from stable.services.news_feed import request_snapshot_refresh
+    transaction.on_commit(request_snapshot_refresh)
     return receipt
 
 

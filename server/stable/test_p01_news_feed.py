@@ -17,7 +17,7 @@ class FeedTests(TransactionTestCase):
         self.seq += 1
         when = self.now - timedelta(hours=age)
         article = NewsArticle.objects.create(source_site="jra", source_mode="official", source_article_id=str(self.seq),
-            title_ja="原文", title_zh=f"稿件{self.seq}", published_at=when, source_url="https://fixture.invalid/", racing_region=region,
+            title_ja="原文", title_zh=f"稿件{self.seq}", body_zh="合格全文", summary_zh="列表摘要", published_at=when, source_url="https://fixture.invalid/", racing_region=region,
             workflow_status="published", published_to_web_at=when)
         return NewsPublicEntry.objects.create(feed_seq=self.seq, kind="legacy", article=article, public_revision=str(self.seq),
             sort_time=when, primary_region=region, priority=priority, major_until=when+timedelta(hours=24) if priority=="major" else None)

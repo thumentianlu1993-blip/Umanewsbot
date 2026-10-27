@@ -24,9 +24,16 @@ def _no_cache(response):
 @require_GET
 @never_cache
 def receipt_detail(request, receipt_id):
-    from stable import views
     receipt = get_object_or_404(NewsPublicationReceipt, pk=receipt_id, visibility="public")
     entry = get_object_or_404(visible_entries(), receipt=receipt)
+    return entry_detail(request, entry)
+
+
+@require_GET
+@never_cache
+def entry_detail(request, entry):
+    from stable import views
+    receipt = entry.receipt if entry.kind == "p01" else None
     article = display_article(entry)
     nav = views._public_detail_nav(request, allowed={"news"}, default="news")
     for link in article.public_race_links:
@@ -34,13 +41,13 @@ def receipt_detail(request, receipt_id):
     previous = visible_entries().filter(Q(sort_time__lt=entry.sort_time) | Q(sort_time=entry.sort_time, feed_seq__lt=entry.feed_seq)).order_by("-sort_time", "-feed_seq").first()
     following = visible_entries().filter(Q(sort_time__gt=entry.sort_time) | Q(sort_time=entry.sort_time, feed_seq__gt=entry.feed_seq)).order_by("sort_time", "feed_seq").first()
     related = visible_entries().filter(primary_region=entry.primary_region).exclude(pk=entry.pk).order_by("-sort_time", "-feed_seq")[:4]
-    original = NewsPublicationReceipt.objects.filter(pk=receipt.previous_receipt_id, visibility="public").first()
+    original = NewsPublicationReceipt.objects.filter(pk=receipt.previous_receipt_id, visibility="public").first() if receipt else None
     return _no_cache(views._render_race_information(request, "stable/public/detail.html", {
         "article": article, **nav, "horse_links": article.public_horse_links, "race_links": article.public_race_links,
         "prev_article": display_article(previous) if previous else None,
         "next_article": display_article(following) if following else None,
         "related_articles": [display_article(row) for row in related], "original_receipt": original,
-        "is_correction_story": receipt.kind == "correction_story",
+        "is_correction_story": bool(receipt and receipt.kind == "correction_story"),
     }))
 
 
@@ -97,14 +104,11 @@ def feed(request):
 def archive(request):
     query = request.GET.get("q", "").strip()[:200]
     region = request.GET.get("region", "").strip()
-    rows = visible_entries()
-    if query:
-        rows = rows.filter(Q(kind="p01", receipt__content__title__icontains=query) |
-            Q(kind="p01", receipt__content__body__icontains=query) |
-            Q(kind="legacy", article__title_zh__icontains=query) | Q(kind="legacy", article__body_zh__icontains=query))
-    if region:
-        rows = rows.filter(primary_region=region)
-    page = Paginator(rows.order_by("-sort_time", "-feed_seq"), 24).get_page(request.GET.get("page"))
-    page.object_list = [display_article(row) for row in page.object_list]
-    return _no_cache(render(request, "stable/public/news_archive.html", {"page_obj": page, "query": query,
-        "pagination_querystring": urlencode({"q": query, "region": region})}))
+    from stable.services.news_feed import archive_page
+    try:
+        page = archive_page(query=query, region=region, cursor=request.GET.get("cursor"))
+    except ValueError:
+        return _no_cache(HttpResponse("档案分页链接失效，请重新检索。", status=410))
+    return _no_cache(render(request, "stable/public/news_archive.html", {
+        "articles": [display_article(row) for row in page["entries"]], "query": query, "region": region,
+        "next_cursor": page["next_cursor"], "next_url": "?"+urlencode({"q": query, "region": region, "cursor": page["next_cursor"]}) if page["next_cursor"] else ""}))
