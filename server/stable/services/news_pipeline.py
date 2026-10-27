@@ -383,3 +383,11 @@ def process_news_run(run_id):
             _transition(run.pk, {"state": "review", "reason": str(error)[:255], "lease_until": None}, generation=current.generation)
     run.refresh_from_db()
     return {"run_id": run.pk, "state": run.state, "stage": run.stage, "reason": run.reason}
+
+
+def recover_expired_run(run_id):
+    return False
+
+
+def enqueue_news_run(run_id):
+    return True

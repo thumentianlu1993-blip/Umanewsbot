@@ -3422,3 +3422,8 @@ def advance_race_event_lifecycle_task(
         "error": result.error,
         "transition_id": result.transition_id,
     }
+
+
+@shared_task
+def process_news_quality_run_task(run_id):
+    return {"run_id": run_id, "state": "pending"}
