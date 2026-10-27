@@ -82,3 +82,43 @@ class SourceRevisionFenceTests(TestCase):
         self.article.refresh_from_db()
         self.assertEqual(self.article.published_to_web_at, old_time)
         qq.assert_not_called()
+
+    def test_old_rewrite_result_cannot_change_effective_body(self):
+        from stable.services.rewriting import RewriteResult, apply_rewrite_result
+        apply_rewrite_result(self.article, RewriteResult("旁路标题", "旁路摘要", "旁路正文", 99, {}))
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.effective_body, "旧稿全文")
+
+    def test_old_translation_result_cannot_change_effective_body(self):
+        from stable.services.translation import TranslationResult
+        self.article.apply_translation_result(TranslationResult("旁路标题", "旁路正文", "旁路摘要", {}), force=True)
+        self.article.save()
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.effective_body, "旧稿全文")
+
+    def test_old_ready_transition_cannot_requalify_pipeline_article(self):
+        from stable.services.automation import mark_publish_ready, is_ready_for_auto_publish
+        mark_publish_ready(self.article)
+        self.article.refresh_from_db()
+        self.assertNotEqual(self.article.automation_status, "publish_ready")
+        self.assertFalse(is_ready_for_auto_publish(self.article))
+
+    def test_stale_orm_instance_cannot_bypass_persisted_owner(self):
+        self.article.active_news_run_id = None
+        with patch("stable.services.automation.log_automation"), patch("stable.services.qq_auto_push.enqueue_qq_auto_push_for_article") as qq:
+            publish_article_automatically(self.article)
+        qq.assert_not_called()
+
+    @override_settings(NEWS_QUALITY_MODE="off")
+    def test_edit_api_creates_review_target_and_leaves_public_body_unchanged(self):
+        from django.contrib.auth import get_user_model
+        from django.test import RequestFactory
+        from stable.views import article_update_api
+        editor = get_user_model().objects.create_user("p01-editor", is_staff=True)
+        request = RequestFactory().post("/", data='{"title_zh":"修订标题","body_zh":"修订全文","summary_zh":"修订摘要"}', content_type="application/json")
+        request.user = editor
+        response = article_update_api(request, self.article.pk)
+        self.assertEqual(response.status_code, 200)
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.body_zh, "旧稿全文")
+        self.assertEqual(self.article.active_news_run.manual_target["body"], "修订全文")
