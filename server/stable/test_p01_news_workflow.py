@@ -36,7 +36,7 @@ def workflow_draft(value="27"):
         metadata={"published_at_verified": True, "published_at_evidence": {"source": "fixture"}})
 
 
-class WorkflowTests(TransactionTestCase):
+class WorkflowFixture:
     def setUp(self):
         self.source = NewsSource.objects.create(name="P01 fixture", source_site="france_galop_news", source_mode="official", adapter_key="france_galop_news", racing_region="france", source_language="en", production_approved=True, enabled=True)
         self.override = self.settings(NEWS_QUALITY_MODE="shadow", NEWS_QUALITY_POLICY=workflow_policy(self.source.pk))
@@ -87,6 +87,9 @@ class WorkflowTests(TransactionTestCase):
                 break
         return run
 
+
+
+class WorkflowTests(WorkflowFixture, TransactionTestCase):
     def test_complete_shadow_pipeline_has_strong_receipts_and_full_text(self):
         run = self.finish()
         self.assertEqual(run.state, "shadow", run.reason)
