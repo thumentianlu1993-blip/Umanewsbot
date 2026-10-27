@@ -96,7 +96,8 @@ class JRAAdapter(SourceAdapter):
             body_ja_normalized=body_normalized,
             published_at=published_at,
             images=images,
-            metadata={"publisher": "JRA"},
+            original_content_html=html,
+            metadata={"publisher": "JRA", "published_at_verified": False, "published_at_evidence": {"raw": published_text, "selector": ".news_title .date", "precision": "date", "timezone": "Asia/Tokyo", "url": url}},
         )
 
     def normalize_source_payload(self, stub: SourceArticleStub, detail: SourceArticleDetail) -> CanonicalNewsDraft:
@@ -110,6 +111,7 @@ class JRAAdapter(SourceAdapter):
             body_ja_normalized=detail.body_ja_normalized,
             published_at=detail.published_at or stub.published_at,
             images=detail.images,
+            original_content_html=detail.original_content_html,
             metadata={**stub.metadata, **detail.metadata},
         )
 

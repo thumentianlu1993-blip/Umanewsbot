@@ -113,6 +113,9 @@ def clean_source(snapshot, selectors=None):
     if any(TOKEN_RE.search(row["text"]) for row in blocks) or TOKEN_RE.search(snapshot["title"]):
         raise ContentBlocked("reserved_token_in_source")
     value = {"title": snapshot["title"], "blocks": blocks, "source_sha": digest(snapshot), "selector": matched, "removed": removed}
+    value["suspicious_block_ids"] = [row["id"] for row in blocks
+        if row["tag"] not in {"blockquote", "table", "figcaption"} and len(row["text"]) < 500
+        and re.search(r"subscribe|sign up|register now|広告|有料会員|無料登録|点击.*下载|立即投注", row["text"], re.I)]
     value["clean_sha"] = digest({"title": value["title"], "blocks": blocks})
     return value
 
@@ -265,3 +268,26 @@ def resolve_known_entities(clean, occurrences, *, language):
 
 def manual_translation(target):
     return {**target, "blocks": [{"id": "body", "text": target["body"]}], "manual": True}
+
+
+def validate_body_review(clean, response):
+    bounded_json(response)
+    expected = set(clean.get("suspicious_block_ids", []))
+    if type(response) is not dict or set(response) != {"decisions"} or type(response["decisions"]) is not list or len(response["decisions"]) != len(expected):
+        raise ContentBlocked("body_review_schema")
+    seen, removed = set(), set()
+    for row in response["decisions"]:
+        if (type(row) is not dict or set(row) != {"id", "decision", "reason"} or row["id"] not in expected
+                or row["id"] in seen or row["decision"] not in {"keep", "remove"}
+                or type(row["reason"]) is not str or not 0 < len(row["reason"]) <= 1000):
+            raise ContentBlocked("body_review_uncertain_or_invalid")
+        seen.add(row["id"])
+        if row["decision"] == "remove":
+            removed.add(row["id"])
+    value = deepcopy(clean)
+    value["blocks"] = [row for row in clean["blocks"] if row["id"] not in removed]
+    if not value["blocks"]:
+        raise ContentBlocked("body_review_empty")
+    value["body_review"] = deepcopy(response)
+    value["clean_sha"] = digest({"title": value["title"], "blocks": value["blocks"]})
+    return value

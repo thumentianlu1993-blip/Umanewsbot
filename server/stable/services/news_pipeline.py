@@ -193,6 +193,8 @@ def stage_payload(run):
     if run.stage == "event_classify":
         return {"source": source, "candidates": _event_candidates(run),
                 "response_schema": RESPONSE_SCHEMA, "source_scope": run.source_snapshot["source_site"]}
+    if run.stage == "body_review":
+        return {"source": source, "suspicious_block_ids": source.get("suspicious_block_ids", [])}
     if run.stage == "entity_check":
         return {"source": source}
     if run.stage == "translate_full":
@@ -238,6 +240,11 @@ def _stage_projection(run, attempt):
         if event.version and not material:
             return {**update, "state": "duplicate", "reason": "no_material_new_fact"}
         return {**update, "stage": "entity_check"}
+    if attempt.stage == "body_review":
+        from stable.services.news_content import validate_body_review
+        reviewed = validate_body_review(run.clean_snapshot, attempt.result)
+        reviewed["body_review_attempt_id"] = attempt.pk
+        return {**update, "clean_snapshot": reviewed, "stage": "event_classify"}
     if attempt.stage == "entity_check":
         rows = validate_entities(run.clean_snapshot, attempt.result)
         rows = resolve_known_entities(run.clean_snapshot, rows, language=run.source_snapshot["language"])
@@ -357,7 +364,7 @@ def process_news_run(run_id):
             if run.stage == "clean":
                 selectors = getattr(settings, "NEWS_QUALITY_POLICY", {}).get("body_selectors", {}).get(run.source_snapshot["source_site"])
                 clean = clean_source(run.source_snapshot, selectors=selectors)
-                _transition(run.pk, {"clean_snapshot": clean, "stage": "event_classify"}, generation=run.generation)
+                _transition(run.pk, {"clean_snapshot": clean, "stage": "body_review" if clean.get("suspicious_block_ids") else "event_classify"}, generation=run.generation)
             else:
                 payload = stage_payload(run)
                 attempt = claim_stage(run.pk, payload)

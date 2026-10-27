@@ -38,6 +38,17 @@ def check_publication_evidence(run):
     if run.policy_sha != policy_sha() or digest(run.source_snapshot) != run.input_sha or not source_eligible(run):
         raise ContentBlocked("source_or_policy_changed")
     clean = run.clean_snapshot
+    from stable.services.news_content import clean_source, validate_body_review
+    selectors = getattr(settings, "NEWS_QUALITY_POLICY", {}).get("body_selectors", {}).get(run.source_snapshot["source_site"])
+    expected_clean = clean_source(run.source_snapshot, selectors=selectors)
+    if expected_clean.get("suspicious_block_ids"):
+        body_review = _validated_attempt(run, clean.get("body_review_attempt_id"), "body_review")
+        if body_review.usage["input"].get("source") != expected_clean:
+            raise ContentBlocked("body_review_input_changed")
+        expected_clean = validate_body_review(expected_clean, body_review.result)
+        expected_clean["body_review_attempt_id"] = body_review.pk
+    if clean != expected_clean:
+        raise ContentBlocked("clean_source_evidence_changed")
     if clean.get("source_sha") != run.input_sha or clean.get("clean_sha") != digest({"title": clean.get("title"), "blocks": clean.get("blocks")}):
         raise ContentBlocked("clean_snapshot_changed")
     if run.priority not in {"major", "regional"} or run.primary_region != run.editorial_snapshot.get("primary_region"):
