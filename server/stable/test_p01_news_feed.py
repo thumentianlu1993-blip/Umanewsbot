@@ -5,7 +5,7 @@ from django.utils import timezone
 from stable.models import NewsArticle, NewsPublicEntry, NewsFeedSnapshot
 from stable.services import news_feed
 
-REGIONS = ("japan", "hong_kong", "uk", "france", "usa")
+REGIONS = ("japan", "hong_kong", "united_kingdom", "france", "united_states")
 
 
 class FeedTests(TransactionTestCase):
@@ -26,7 +26,7 @@ class FeedTests(TransactionTestCase):
         old = self.entry("japan", "major", 25)
         for region in REGIONS:
             self.entry(region)
-        major = self.entry("usa", "major")
+        major = self.entry("united_states", "major")
         snap = news_feed.create_snapshot(now=self.now)
         self.assertEqual(snap.ordered_entry_ids[0], major.pk)
         rows = list(NewsPublicEntry.objects.filter(pk__in=snap.ordered_entry_ids))

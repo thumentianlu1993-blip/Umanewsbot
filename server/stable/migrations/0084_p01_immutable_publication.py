@@ -50,7 +50,7 @@ DROP FUNCTION IF EXISTS p01_immutable_guard();
 
 def apply(apps, schema_editor):
     if schema_editor.connection.vendor == "postgresql":
-        schema_editor.execute(SQL)
+        schema_editor.execute(SQL, params=None)
 
 
 def reverse(apps, schema_editor):
