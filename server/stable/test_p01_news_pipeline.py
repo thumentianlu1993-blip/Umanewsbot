@@ -42,6 +42,7 @@ from django.test import TestCase
 from django.utils import timezone
 from stable.models import NewsProcessingRun
 from stable.services.ingestion import upsert_article_from_draft
+from stable.services.news_pipeline import source_snapshot
 from stable.test_france_news_freshness_change import draft_for
 
 
@@ -51,7 +52,7 @@ class SourceRevisionFenceTests(TestCase):
         self.run = NewsProcessingRun.objects.create(
             article=self.article, input_sha="a" * 64, policy_sha="b" * 64,
             expected_article_sha="c" * 64, primary_region="france",
-            source_snapshot={"title": self.article.title_ja, "body": self.article.body_ja_raw},
+            source_snapshot=source_snapshot(self.article),
         )
         self.article.active_news_run = self.run
         self.article.workflow_status = WorkflowStatus.PUBLISHED
