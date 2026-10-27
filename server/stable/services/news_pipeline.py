@@ -534,15 +534,20 @@ def scan_news_runs(*, now=None, limit=100):
     # 已被新版本取代的旧 worker 也必须核账，不能遗留可被遗忘的 reservation。
     orphaned = NewsStageAttempt.objects.filter(state__in=["reserved", "inflight"], reserved_at__lt=now-timedelta(seconds=180)).exclude(run__state="running")
     for reference in list(orphaned[:limit]):
-        with transaction.atomic():
-            attempt = NewsStageAttempt.objects.select_for_update().get(pk=reference.pk)
-            if attempt.state == "reserved":
-                attempt.state, attempt.error = "failed", "never_dispatched"
-                attempt.save(update_fields=["state", "error"])
-        if attempt.state == "inflight":
-            mark_unknown(attempt.pk, "orphaned_provider_claim")
-        elif attempt.error == "never_dispatched" and attempt.month_budget_id and not attempt.settlement_version:
-            settle_request(attempt.pk, actual_cost=0)
+        try:
+            with transaction.atomic():
+                attempt = NewsStageAttempt.objects.select_for_update().get(pk=reference.pk)
+                if attempt.state == "reserved":
+                    attempt.state, attempt.error = "failed", "never_dispatched"
+                    attempt.save(update_fields=["state", "error"])
+            if attempt.state == "inflight":
+                mark_unknown(attempt.pk, "orphaned_provider_claim")
+            elif attempt.error == "never_dispatched" and attempt.month_budget_id and not attempt.settlement_version:
+                settle_request(attempt.pk, actual_cost=0)
+        except Exception as error:
+            import logging
+            recovery_errors += 1
+            logging.getLogger(__name__).error("P01 orphan reconciliation failed attempt=%s type=%s", reference.pk, type(error).__name__)
     due = NewsProcessingRun.objects.filter(state__in=["pending", "ready", "shadow"], next_attempt_at__lte=now, policy_sha=policy_sha())
     if getattr(settings, "NEWS_QUALITY_MODE", "off") == "shadow":
         due = due.exclude(state="shadow")

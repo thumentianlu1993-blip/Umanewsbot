@@ -112,3 +112,14 @@ class CorrectionTests(WorkflowFixture, TransactionTestCase):
         self.correction.update(old_body_span={"start": start, "end": start + 2}, old_text="27")
         self.assertEqual(self.story("31").state, "duplicate")
         self.assertEqual(NewsPublicationReceipt.objects.filter(kind="correction_story").count(), 1)
+
+    def test_mixed_old_and_new_corrections_only_admit_new_fact(self):
+        from stable.services.news_editorial import unpublished_corrections, fact_key
+        first = NewsPublicationReceipt.objects.get(run=self.story("27"))
+        self.target(first)
+        run = self.story("31")
+        prior = NewsPublicationReceipt.objects.get(run=run).evidence["editorial"]["facts"][0]
+        newer = deepcopy(prior)
+        newer["object"] = "32"
+        newer["id"] = fact_key(newer)
+        self.assertEqual(unpublished_corrections(run.event, [prior, newer]), [newer])

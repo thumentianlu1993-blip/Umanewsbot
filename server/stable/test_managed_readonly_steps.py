@@ -1099,13 +1099,18 @@ class ManagedReadonlySchemaTests(TransactionTestCase):
         from django.db.migrations.executor import MigrationExecutor
         from django.db.migrations.recorder import MigrationRecorder
         before = TranslationRetryBudget.objects.values().get(pk=self.parent.pk)
+        executor = MigrationExecutor(connection)
+        entry_applied = MigrationRecorder(connection).applied_migrations()
+        entry_leaves = [node for node in executor.loader.graph.leaf_nodes("stable") if node in entry_applied]
+        self.assertEqual(len(entry_leaves), 1, "必须恢复测试入口完整schema，不能把0081留给后续测试")
         try:
             MigrationExecutor(connection).migrate([("stable", "0080_translation_retry_budget")])
             self.assertTrue(NewsArticle.objects.filter(pk=self.article.pk).exists())
             self.assertEqual(TranslationRetryBudget.objects.values().get(pk=self.parent.pk), before)
             self.assertNotIn(("stable", "0081_managed_readonly_steps"), MigrationRecorder(connection).applied_migrations())
         finally:
-            MigrationExecutor(connection).migrate([("stable", "0081_managed_readonly_steps")])
+            MigrationExecutor(connection).migrate(entry_leaves)
+        self.assertEqual(MigrationRecorder(connection).applied_migrations(), entry_applied)
         self.assertEqual(TranslationRetryBudget.objects.values().get(pk=self.parent.pk), before)
         self.assertEqual(ManagedReadonlyTaskBudget.objects.count(), 0)
         self.assertEqual(ManagedReadonlyStep.objects.count(), 0)

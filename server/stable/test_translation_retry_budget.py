@@ -708,7 +708,8 @@ class TranslationBudgetMigrationBoundaryTests(TransactionTestCase):
                         if node in entry_applied]
         self.assertEqual(len(entry_leaves), 1, "入口必须有唯一已应用的当前 stable leaf")
         entry_leaf = entry_leaves[0]
-        self.assertEqual(entry_leaf, ("stable", "0081_managed_readonly_steps"))
+        self.assertIn(("stable", "0081_managed_readonly_steps"),
+                      MigrationExecutor(connection).loader.graph.forwards_plan(entry_leaf))
         readonly_tables = {ManagedReadonlyTaskBudget._meta.db_table, ManagedReadonlyStep._meta.db_table}
         self.assertTrue(readonly_tables <= set(connection.introspection.table_names()),
                         "入口当前 leaf 的 readonly 两表必须存在")
