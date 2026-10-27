@@ -45,3 +45,20 @@ class ReceiptViewTests(WorkflowFixture, TransactionTestCase):
     def test_no_ready_snapshot_is_explicitly_unavailable(self):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 503)
+
+    def test_manual_headline_binds_exact_receipt_and_preserves_cancel_version(self):
+        from django.contrib.auth import get_user_model
+        from stable.models import HomepageHeadlineSelection
+        from stable.services.editorial_headlines import set_manual_headline, cancel_manual_headline
+        user = get_user_model().objects.create_superuser("headline-editor", "fixture@example.invalid", "fixture")
+        first = set_manual_headline(self.article.pk, user=user, expected_version=0)
+        selection = HomepageHeadlineSelection.objects.get(slot="homepage_primary")
+        self.assertEqual(selection.receipt_id, self.first.pk)
+        second = set_manual_headline(self.article.pk, receipt_id=self.second.pk, user=user, expected_version=first["version"])
+        selection.refresh_from_db()
+        self.assertEqual(selection.receipt_id, self.second.pk)
+        self.assertGreater(second["version"], first["version"])
+        cancel_manual_headline(user=user, expected_version=second["version"])
+        selection.refresh_from_db()
+        self.assertIsNone(selection.article_id)
+        self.assertIsNone(selection.receipt_id)

@@ -81,3 +81,12 @@ class FeedTests(TransactionTestCase):
             article.save(update_fields=["title_zh"])
             self.assertEqual(NewsPublicEntry.objects.filter(article=article).count(), 1)
             self.assertEqual(entry.sort_time, self.now)
+
+    def test_manual_headline_outside_30_day_pool_has_no_implicit_expiry(self):
+        from stable.models import HomepageHeadlineSelection
+        old = self.entry("france", age=1000)
+        self.entry()
+        HomepageHeadlineSelection.objects.create(slot="homepage_primary", article=old.article, selected_at=self.now)
+        snapshot = news_feed.create_snapshot(now=self.now, with_features=True)
+        self.assertEqual(snapshot.headline_entry_id, old.pk)
+        self.assertNotIn(old.pk, snapshot.ordered_entry_ids)
