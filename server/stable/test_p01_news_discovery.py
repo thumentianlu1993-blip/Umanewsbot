@@ -14,6 +14,7 @@ class DiscoveryDenominatorTests(TestCase):
 
     def test_three_detail_failures_remain_three_candidates_without_articles(self):
         adapter = Mock()
+        adapter.skipped_items = []
         adapter.fetch_listing.return_value = self.stubs
         adapter.fetch_detail.side_effect = ValueError("template changed")
         with override_settings(NEWS_QUALITY_MODE="shadow", NEWS_QUALITY_POLICY={"source_ids": [self.source.pk]}), patch.dict("stable.tasks.INTERNATIONAL_ADAPTERS", {"tdn": lambda: adapter}):
@@ -26,6 +27,7 @@ class DiscoveryDenominatorTests(TestCase):
 
     def test_listing_failure_retains_source_window_gap(self):
         adapter = Mock()
+        adapter.skipped_items = []
         adapter.fetch_listing.side_effect = RuntimeError("listing unavailable")
         with override_settings(NEWS_QUALITY_MODE="shadow", NEWS_QUALITY_POLICY={"source_ids": [self.source.pk]}), patch.dict("stable.tasks.INTERNATIONAL_ADAPTERS", {"tdn": lambda: adapter}):
             with self.assertRaises(RuntimeError):
