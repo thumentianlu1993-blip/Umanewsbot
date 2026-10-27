@@ -118,3 +118,11 @@ def reserve_request(attempt_id, payload):
         attempt.usage = {"price": spec, "currency": currency}
         attempt.save(update_fields=["month_budget", "day_budget", "reservation", "provider", "model", "prompt_version", "reserved_at", "usage"])
         return attempt
+
+
+def settle_request(attempt_id, *, actual_cost, result=None, version=1, usage=None):
+    return NewsStageAttempt.objects.get(pk=attempt_id)
+
+
+def mark_unknown(attempt_id, reason):
+    return NewsStageAttempt.objects.get(pk=attempt_id)
