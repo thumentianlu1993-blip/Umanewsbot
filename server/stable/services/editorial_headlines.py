@@ -951,15 +951,17 @@ def invalidate_headline_state_for_article(
 
         # --- Selection ---
         if selection and selection.article_id == article_id:
-            eligible = article is not None and is_headline_eligible(article)
+            eligible = article is not None and (_headline_receipt(article, selection.receipt_id) is not None if selection.receipt_id or article.active_news_run_id else is_headline_eligible(article))
             if not eligible:
                 selection.article = None
+                selection.receipt = None
                 selection.selected_by = None
                 selection.selected_at = None
                 selection.version += 1
                 selection.save(
                     update_fields=[
                         "article",
+                        "receipt",
                         "selected_by",
                         "selected_at",
                         "version",
@@ -984,7 +986,7 @@ def invalidate_headline_state_for_article(
 
         # --- Recommendation ---
         if active_rec and active_rec.article_id == article_id:
-            eligible = article is not None and is_headline_eligible(article)
+            eligible = article is not None and (_headline_receipt(article, active_rec.receipt_id) is not None if active_rec.receipt_id or article.active_news_run_id else is_headline_eligible(article))
             if not eligible:
                 active_rec.status = HomepageHeadlineRecommendation.Status.INVALIDATED
                 active_rec.save(update_fields=["status", "updated_at"])

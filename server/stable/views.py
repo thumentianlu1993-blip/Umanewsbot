@@ -1974,6 +1974,8 @@ def candidate_detail(request: HttpRequest, article_id: int):
         ),
         pk=article_id,
     )
+    if article.active_news_run_id:
+        return redirect("console-news-quality-detail", run_id=article.active_news_run_id)
     return render(
         request,
         "stable/console/candidate_detail.html",

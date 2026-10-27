@@ -173,3 +173,33 @@ class FeedTests(TransactionTestCase):
         HomepageHeadlineSelection.objects.create(slot="homepage_primary", article=old.article, selected_at=self.now)
         snapshot = news_feed.create_snapshot(now=self.now, with_features=True)
         self.assertEqual(snapshot.headline_entry_id, old.pk)
+
+    def test_backfill_manifest_detects_drift_and_is_idempotent(self):
+        import hashlib
+        import json
+        from io import StringIO
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from django.core.management import call_command
+        from django.core.management.base import CommandError
+        article = NewsArticle.objects.create(source_site="jra", source_mode="official", source_article_id="backfill",
+            title_ja="原文", title_zh="旧公开稿", body_zh="正文", summary_zh="摘要", published_at=self.now,
+            workflow_status="published", published_to_web_at=self.now, source_url="https://fixture.invalid/")
+        output = StringIO()
+        call_command("backfill_news_public_index", max_id=article.pk, stdout=output)
+        raw = output.getvalue().encode()
+        self.assertFalse(NewsPublicEntry.objects.filter(article=article).exists())
+        with TemporaryDirectory() as folder, self.settings(NEWS_QUALITY_INDEX_ENABLED=True):
+            path = Path(folder, "manifest.json")
+            path.write_bytes(raw)
+            options = dict(manifest=str(path), manifest_sha256=hashlib.sha256(raw).hexdigest(), apply=True, stdout=StringIO())
+            with self.assertRaises(CommandError):
+                call_command("backfill_news_public_index", **{**options, "manifest_sha256": "0"*64})
+            NewsArticle.objects.filter(pk=article.pk).update(title_zh="漂移标题")
+            with self.assertRaises(CommandError):
+                call_command("backfill_news_public_index", **options)
+            self.assertFalse(NewsPublicEntry.objects.filter(article=article).exists())
+            NewsArticle.objects.filter(pk=article.pk).update(title_zh="旧公开稿")
+            call_command("backfill_news_public_index", **options)
+            call_command("backfill_news_public_index", **options)
+            self.assertEqual(NewsPublicEntry.objects.filter(article=article).count(), 1)

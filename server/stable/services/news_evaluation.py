@@ -29,6 +29,8 @@ def validate_gold(rows, *, root):
     if len(rows) != 100:
         errors.append("requires_100_samples")
     regions, holdout, splits, ids, event_splits = Counter(), Counter(), Counter(), set(), {}
+    source_shas = set()
+    source_urls = set()
     for index, row in enumerate(rows):
         sid = row.get("id")
         if not sid or sid in ids:
@@ -51,6 +53,10 @@ def validate_gold(rows, *, root):
             errors.append(f"sample_{index}:real_input_or_human_annotation_missing")
         try:
             actual = inventory_files(root, [{"path": row["path"], "region": region}])["files"][0]["sha256"]
+            if actual in source_shas or row.get("source_url") in source_urls:
+                errors.append(f"sample_{index}:duplicate_source")
+            source_shas.add(actual)
+            source_urls.add(row.get("source_url"))
             if actual != row.get("sha256"):
                 errors.append(f"sample_{index}:source_sha_mismatch")
         except (KeyError, OSError, ValueError):
@@ -74,6 +80,8 @@ def evaluation_package(samples, model_candidates):
         errors.append("requires_one_or_two_model_candidates")
     if any(not row.get("eligible_for_gold") or not row.get("sha256") for row in samples):
         errors.append("real_cached_provenance_missing")
+    if len({row.get("sha256") for row in samples}) != len(samples) or len({row.get("source_url") for row in samples}) != len(samples):
+        errors.append("duplicate_sample_sources")
     candidates = []
     for candidate in model_candidates:
         roles = candidate.get("models", {})

@@ -921,6 +921,27 @@
     ],
     "module:stable.test_calendar_empty_filter_recovery": [
       "stable.test_calendar_empty_filter_recovery"
+    ],
+    "news_quality": [
+      "stable.test_p01_news_budget",
+      "stable.test_p01_news_claims",
+      "stable.test_p01_news_console",
+      "stable.test_p01_news_content",
+      "stable.test_p01_news_corrections",
+      "stable.test_p01_news_discovery",
+      "stable.test_p01_news_editorial",
+      "stable.test_p01_news_evaluation",
+      "stable.test_p01_news_feed",
+      "stable.test_p01_news_history",
+      "stable.test_p01_news_immutability",
+      "stable.test_p01_news_pipeline",
+      "stable.test_p01_news_public_views",
+      "stable.test_p01_news_publication",
+      "stable.test_p01_news_recovery",
+      "stable.test_p01_news_relations",
+      "stable.test_p01_news_report",
+      "stable.test_p01_news_source_evidence",
+      "stable.test_p01_news_workflow"
     ]
   },
   "dependencies": {
@@ -985,6 +1006,10 @@
     ],
     "race_results": [
       "r04_arbitration"
+    ],
+    "news_quality": [
+      "news_translation",
+      "horse_page"
     ]
   },
   "tests": {
@@ -3076,6 +3101,120 @@
       "domains": [
         "public_probe_template_adapter"
       ]
+    },
+    "server/stable/test_p01_news_budget.py": {
+      "label": "stable.test_p01_news_budget",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_claims.py": {
+      "label": "stable.test_p01_news_claims",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_console.py": {
+      "label": "stable.test_p01_news_console",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_content.py": {
+      "label": "stable.test_p01_news_content",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_corrections.py": {
+      "label": "stable.test_p01_news_corrections",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_discovery.py": {
+      "label": "stable.test_p01_news_discovery",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_editorial.py": {
+      "label": "stable.test_p01_news_editorial",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_evaluation.py": {
+      "label": "stable.test_p01_news_evaluation",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_feed.py": {
+      "label": "stable.test_p01_news_feed",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_history.py": {
+      "label": "stable.test_p01_news_history",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_immutability.py": {
+      "label": "stable.test_p01_news_immutability",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_pipeline.py": {
+      "label": "stable.test_p01_news_pipeline",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_public_views.py": {
+      "label": "stable.test_p01_news_public_views",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_publication.py": {
+      "label": "stable.test_p01_news_publication",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_recovery.py": {
+      "label": "stable.test_p01_news_recovery",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_relations.py": {
+      "label": "stable.test_p01_news_relations",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_report.py": {
+      "label": "stable.test_p01_news_report",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_source_evidence.py": {
+      "label": "stable.test_p01_news_source_evidence",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_workflow.py": {
+      "label": "stable.test_p01_news_workflow",
+      "domains": [
+        "news_quality"
+      ]
     }
   },
   "profiles": {
@@ -3424,7 +3563,26 @@
     "stable.test_u04_horse_basic_profile_empty_copy": "django",
     "stable.test_u04_horse_index_japanese_fallback": "django",
     "stable.test_u04_result_publication_time": "django",
-    "stable.test_u04_publication_probe_rejection": "django"
+    "stable.test_u04_publication_probe_rejection": "django",
+    "stable.test_p01_news_budget": "django",
+    "stable.test_p01_news_claims": "django",
+    "stable.test_p01_news_console": "django",
+    "stable.test_p01_news_content": "django",
+    "stable.test_p01_news_corrections": "django",
+    "stable.test_p01_news_discovery": "django",
+    "stable.test_p01_news_editorial": "django",
+    "stable.test_p01_news_evaluation": "django",
+    "stable.test_p01_news_feed": "django",
+    "stable.test_p01_news_history": "django",
+    "stable.test_p01_news_immutability": "django",
+    "stable.test_p01_news_pipeline": "django",
+    "stable.test_p01_news_public_views": "django",
+    "stable.test_p01_news_publication": "django",
+    "stable.test_p01_news_recovery": "django",
+    "stable.test_p01_news_relations": "django",
+    "stable.test_p01_news_report": "django",
+    "stable.test_p01_news_source_evidence": "django",
+    "stable.test_p01_news_workflow": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
@@ -3508,7 +3666,8 @@
     "horse_career_link_cache": "integration: H03 单条既有赛绩离线补连、强身份/binding 与事务重放边界",
     "horse_basic_profile_prepare_command": "integration: H03缓存prepare-only命令与私有待审产物合同",
     "horse_basic_profile_review_input": "integration: H03独立已审输入与原消费者事务/重放合同",
-    "r04_arbitration": "integration: A reviewed R04 pure selection and caller-shaped shadow diagnostics; no writer/hook/source"
+    "r04_arbitration": "integration: A reviewed R04 pure selection and caller-shaped shadow diagnostics; no writer/hook/source",
+    "news_quality": "application/integration: P01 全文审校、精确稿件、预算、审核队列与五地区观测"
   },
   "dedicated_batch_modules": [
     "stable.test_migration_history_repair_postgres",

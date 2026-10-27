@@ -25,7 +25,8 @@
     "docs/changes/next-version-capabilities/lanes/C/U02-offline-inventory.json",
     "docs/changes/next-version-capabilities/lanes/B/B053-m02-read-translation-consumer/obligations.json",
     "docs/changes/next-version-capabilities/lanes/B/B055-completed-redelivery-receipt-fix/obligations.json",
-    "docs/changes/next-version-capabilities/lanes/B/B057-remaining7-end-to-end-test-prep/obligations.json"
+    "docs/changes/next-version-capabilities/lanes/B/B057-remaining7-end-to-end-test-prep/obligations.json",
+    "docs/changes/p01-news-quality-20261027/local-input-inventory.json"
   ],
   "high_risk": [
     ".codex/agents/application.toml",
@@ -982,7 +983,20 @@
     "server/stable/services/translation_retry_budget.py",
     "server/stable/management/commands/horse_basic_profile_from_review.py",
     "server/stable/services/horse_basic_profile_prepare_input.py",
-    "server/stable/migrations/0081_managed_readonly_steps.py"
+    "server/stable/migrations/0081_managed_readonly_steps.py",
+    "deploy/docker/start-news-quality-worker.sh",
+    "docker-compose.news-quality.yml",
+    "server/stable/management/commands/backfill_news_public_index.py",
+    "server/stable/management/commands/prepare_news_evaluation.py",
+    "server/stable/management/commands/report_news_quality.py",
+    "server/stable/migrations/0083_p01_news_quality.py",
+    "server/stable/migrations/0084_p01_immutable_publication.py",
+    "server/stable/migrations/0085_p01_sealed_evidence.py",
+    "server/stable/templates/stable/console/news_quality_detail.html",
+    "server/stable/templates/stable/console/news_quality_editor.html",
+    "server/stable/templates/stable/console/news_quality_queue.html",
+    "server/stable/templates/stable/console/news_quality_report.html",
+    "server/stable/templates/stable/public/news_archive.html"
   ],
   "paths": {
     "server/stable/services/numeric_surface_audit.py": [
@@ -1499,6 +1513,48 @@
     ],
     "server/stable/services/horse_article_pair_receipt_index.py": [
       "content_contracts"
+    ],
+    "server/stable/news_public_views.py": [
+      "news_quality"
+    ],
+    "server/stable/news_quality_views.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_content.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_discovery.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_editorial.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_evaluation.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_feed.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_model_gateway.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_pipeline.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_prompts.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_public_read.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_publication.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_quality_report.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_review.py": [
+      "news_quality"
     ]
   },
   "symbols": {
