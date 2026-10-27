@@ -1223,3 +1223,12 @@ if NEWS_QUALITY_DISPATCH_ENABLED:
     CELERY_BEAT_SCHEDULE["scan-news-quality-runs"] = {"task": "stable.tasks.scan_news_quality_runs_task", "schedule": 60.0}
 if NEWS_QUALITY_FEED_ENABLED:
     CELERY_BEAT_SCHEDULE["build-news-quality-feed"] = {"task": "stable.tasks.build_news_quality_feed_task", "schedule": 300.0}
+
+# 仅记录匿名响应编号、generation 和实际展示条目；不含 IP、Cookie 或用户标识。
+if LOG_DIR:
+    LOGGING["formatters"]["news_json"] = {"format": "%(message)s"}
+    LOGGING["handlers"]["news_exposure_file"] = {
+        "class": "logging.handlers.WatchedFileHandler", "filename": str(Path(LOG_DIR)/"news-exposure.jsonl"),
+        "formatter": "news_json",
+    }
+    LOGGING["loggers"]["stable.news_exposure"] = {"handlers": ["news_exposure_file"], "level": "INFO", "propagate": False}

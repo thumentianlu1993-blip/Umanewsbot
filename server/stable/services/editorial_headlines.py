@@ -424,8 +424,8 @@ def set_manual_headline(
                 update_fields=["article", "receipt", "selected_by", "selected_at", "version", "updated_at"]
             )
             selection.refresh_from_db()
-        from stable.services.news_feed import request_snapshot_refresh
-        transaction.on_commit(request_snapshot_refresh)
+            from stable.services.news_feed import request_snapshot_refresh
+            transaction.on_commit(request_snapshot_refresh)
 
             # Audit — include old article ID so the full transition is reconstructable.
             detail_parts = [
