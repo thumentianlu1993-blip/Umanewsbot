@@ -1367,3 +1367,11 @@ def translate_article(article: NewsArticle, *, managed_run: TranslationRun | Non
         run.error_message = str(exc)
         run.save(update_fields=["status", "raw_response", "error_message", "updated_at"])
         raise
+
+
+def request_json_translation_once(client, *, model, messages, max_tokens):
+    """普通 provider 的单次 JSON 请求；调用方持有自己的预算/重试合同。"""
+    return client.chat.completions.create(
+        model=model, messages=messages, max_tokens=max_tokens,
+        response_format={"type": "json_object"},
+    )

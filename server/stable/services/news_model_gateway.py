@@ -181,9 +181,80 @@ def mark_unknown(attempt_id, reason):
     return attempt
 
 
+class KnownRequestRejected(Exception):
+    """供应商明确在处理请求前拒绝；与发送后结果未知区分。"""
+
+
 def _single_request(attempt, payload):
-    raise RequestDenied("provider_not_configured")
+    from openai import OpenAI, RateLimitError
+    from stable.services.news_prompts import PROMPTS
+    from stable.services.translation import request_json_translation_once
+    api_key = getattr(settings, "NEWS_QUALITY_API_KEY", "")
+    if not api_key:
+        raise KnownRequestRejected("credentials_missing")
+    client = OpenAI(api_key=api_key, base_url=getattr(settings, "NEWS_QUALITY_BASE_URL", None) or None,
+                    max_retries=0, timeout=60)
+    try:
+        return request_json_translation_once(
+            client, model=attempt.model,
+            messages=[{"role": "system", "content": PROMPTS[attempt.stage]},
+                      {"role": "user", "content": json.dumps(payload, ensure_ascii=False, sort_keys=True)}],
+            max_tokens=attempt.usage["price"]["max_output_tokens"],
+        )
+    except RateLimitError:
+        raise KnownRequestRejected("rate_limited") from None
+    finally:
+        client.close()
 
 
 def execute_request(attempt_id, payload):
-    return NewsStageAttempt.objects.get(pk=attempt_id)
+    from django.db import connection
+    from stable.services.news_content import bounded_json, ContentBlocked
+    if connection.in_atomic_block:
+        raise RequestDenied("network_inside_transaction")
+    existing = NewsStageAttempt.objects.get(pk=attempt_id)
+    if existing.state != "reserved":
+        return existing
+    attempt = reserve_request(attempt_id, payload)
+    # 先写 inflight 再调用；即使进程在两者之间退出也按未知核账，不猜测免费重发。
+    with transaction.atomic():
+        attempt = NewsStageAttempt.objects.select_for_update().select_related("run__article").get(pk=attempt_id)
+        if attempt.state != "reserved":
+            return attempt
+        validate_attempt(attempt, payload)
+        attempt.state = "inflight"
+        attempt.save(update_fields=["state"])
+    try:
+        response = _single_request(attempt, payload)
+    except KnownRequestRejected as error:
+        settled = settle_request(attempt_id, actual_cost=0)
+        NewsStageAttempt.objects.filter(pk=attempt_id).update(error=str(error)[:255])
+        settled.refresh_from_db()
+        return settled
+    except Exception as error:
+        return mark_unknown(attempt_id, type(error).__name__)
+    usage = getattr(response, "usage", None)
+    tokens_in, tokens_out = getattr(usage, "prompt_tokens", None), getattr(usage, "completion_tokens", None)
+    if type(tokens_in) is not int or type(tokens_out) is not int or tokens_in < 0 or tokens_out < 0:
+        return mark_unknown(attempt_id, "usage_unknown")
+    spec = attempt.usage["price"]
+    cost = money((Decimal(tokens_in) * money(spec["input_per_million"]) + Decimal(tokens_out) * money(spec["output_per_million"])) / Decimal(1000000))
+    result, error = None, ""
+    try:
+        if len(response.choices) != 1 or getattr(response.choices[0].message, "tool_calls", None):
+            raise ContentBlocked("unexpected_model_action")
+        content = response.choices[0].message.content
+        if type(content) is not str or len(content.encode()) > 1000000:
+            raise ContentBlocked("invalid_model_response")
+        result = json.loads(content)
+        bounded_json(result)
+        if type(result) is not dict:
+            raise ContentBlocked("model_response_not_object")
+    except (AttributeError, TypeError, ValueError, IndexError, ContentBlocked):
+        result, error = None, "invalid_model_response"
+    settled = settle_request(attempt_id, actual_cost=cost, result=result,
+        usage={"input_tokens": tokens_in, "output_tokens": tokens_out, "request_id": str(getattr(response, "id", ""))[:128]})
+    if error:
+        NewsStageAttempt.objects.filter(pk=attempt_id).update(error=error)
+        settled.refresh_from_db()
+    return settled
