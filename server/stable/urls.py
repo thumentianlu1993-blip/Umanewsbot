@@ -1,8 +1,12 @@
 from django.urls import path
 
-from . import views
+from . import views, news_quality_views
 
 urlpatterns = [
+    path("news-quality/", news_quality_views.queue, name="console-news-quality-queue"),
+    path("news-quality/runs/<int:run_id>/", news_quality_views.detail, name="console-news-quality-detail"),
+    path("news-quality/runs/<int:run_id>/action/", news_quality_views.action, name="console-news-quality-action"),
+    path("news-quality/receipts/<uuid:receipt_id>/withdraw/", news_quality_views.withdraw, name="console-news-quality-withdraw"),
     path("login/", views.BackendLoginView.as_view(), name="backend-login"),
     path("logout/", views.BackendLogoutView.as_view(), name="backend-logout"),
     path("", views.console_dashboard, name="console-dashboard"),

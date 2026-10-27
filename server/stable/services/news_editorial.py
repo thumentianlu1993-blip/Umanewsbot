@@ -93,7 +93,7 @@ def fact_key(fact):
     return digest({key: norm(fact[key]) if fact[key] else "" for key in ("subject_ref", "predicate", "object", "effective_time", "modality")})
 
 
-def validate_editorial(clean, response, *, source_scope, candidates=(), aliases=None):
+def validate_editorial(clean, response, *, source_scope, candidates=(), aliases=None, binding=None):
     if len(candidates) > 20:
         raise ContentBlocked("recall_overflow")
     bounded_json(response)
@@ -138,6 +138,10 @@ def validate_editorial(clean, response, *, source_scope, candidates=(), aliases=
     chosen = next((row for row in candidates if str(row["id"]) == comparison["event_id"]), None)
     if comparison["event_id"] is not None and chosen is None:
         raise ContentBlocked("comparison_event_unknown")
+    if binding:
+        if not chosen or binding["event_id"] != str(chosen["id"]):
+            raise ContentBlocked("manual_event_binding_mismatch")
+        key = chosen["identity_key"]
     if chosen and (chosen["identity_key"] != key or chosen["version"] != comparison["version"]):
         raise ContentBlocked("comparison_identity_or_version")
     if not chosen and comparison["version"] != 0:

@@ -70,16 +70,23 @@ def source_snapshot(article, draft=None):
     }
 
 
+def target_revision_digest(target, binding=None):
+    if binding:
+        return digest({"target": target, "event_binding": binding})
+    return digest(target) if target else "machine"
+
+
 @transaction.atomic
-def start_revision(article, *, snapshot=None, manual_target=None, editor=None):
+def start_revision(article, *, snapshot=None, manual_target=None, editor=None, event_binding=None, reason=""):
     article = NewsArticle.objects.select_for_update().get(pk=article.pk)
     snapshot = deepcopy(snapshot if snapshot is not None else source_snapshot(article))
     target = deepcopy(manual_target or {})
-    target_sha = digest(target) if target else "machine"
+    binding = deepcopy(event_binding or {})
+    target_sha = target_revision_digest(target, binding)
     run, created = NewsProcessingRun.objects.get_or_create(
         article=article, input_sha=digest(snapshot), policy_sha=policy_sha(), target_revision_sha=target_sha,
         defaults={"generation": article.news_generation + 1, "source_snapshot": snapshot, "manual_target": target,
-                  "editor_provenance": {"user_id": editor.pk} if editor else {},
+                  "editor_provenance": {"user_id": editor.pk, "event_binding": binding, "reason": reason} if editor else {},
                   "primary_region": snapshot["region"], "parent_run_id": article.active_news_run_id},
     )
     if not created:
@@ -124,7 +131,8 @@ def submit_manual_target(article, fields, *, editor):
     target = {key: fields.get(key + "_zh", previous.get(key, "")) for key in ("title", "body", "summary")}
     if any(not isinstance(value, str) for value in target.values()) or not target["title"].strip() or not target["body"].strip():
         raise ValueError("manual_target_invalid")
-    return start_revision(article, snapshot=active.source_snapshot, manual_target=target, editor=editor)
+    return start_revision(article, snapshot=active.source_snapshot, manual_target=target, editor=editor,
+        event_binding=active.editor_provenance.get("event_binding"))
 
 
 def _current_run(article, run):
@@ -185,12 +193,18 @@ def _event_candidates(run):
     query = Q(pk=event_id) if event_id else Q(pk__in=[])
     for field in ("document_id", "source_race_id", "organization", "organizer", "venue"):
         query |= Q(**{f"identity_evidence__fields__{field}__in": list(tokens)})
+    binding = run.editor_provenance.get("event_binding", {})
+    if binding:
+        query = Q(pk=binding["event_id"])
     events = list(NewsEditorialEvent.objects.filter(query).order_by("id")[:21])
     if len(events) > 20:
         raise ContentBlocked("recall_overflow")
     result = []
     for event in events:
-        receipts = list(event.receipts.order_by("-published_at", "-id")[:21])
+        receipt_query = event.receipts.all()
+        if binding.get("receipt_id"):
+            receipt_query = receipt_query.filter(pk=binding["receipt_id"])
+        receipts = list(receipt_query.order_by("-published_at", "-id")[:21])
         if len(receipts) > 20:
             raise ContentBlocked("receipt_recall_overflow")
         result.append({"id": str(event.pk), "identity_key": event.identity_key, "version": event.version,
@@ -208,7 +222,7 @@ def stage_payload(run):
     if run.stage == "event_classify":
         return {"source": source, "candidates": _event_candidates(run),
                 "response_schema": RESPONSE_SCHEMA, "source_scope": run.source_snapshot["source_site"],
-                "manual_target": run.manual_target}
+                "manual_target": run.manual_target, "event_binding": run.editor_provenance.get("event_binding", {})}
     if run.stage == "body_review":
         return {"source": source, "suspicious_block_ids": source.get("suspicious_block_ids", [])}
     if run.stage == "entity_check":
@@ -237,7 +251,8 @@ def _stage_projection(run, attempt):
     if attempt.stage == "event_classify":
         value = validate_editorial(run.clean_snapshot, attempt.result,
             source_scope=run.source_snapshot["source_site"], candidates=payload["candidates"],
-            aliases=getattr(settings, "NEWS_QUALITY_POLICY", {}).get("identity_aliases", {}))
+            aliases=getattr(settings, "NEWS_QUALITY_POLICY", {}).get("identity_aliases", {}),
+            binding=run.editor_provenance.get("event_binding"))
         update.update(editorial_snapshot=value, priority=value["priority"], primary_region=value["primary_region"])
         if value["priority"] in {"reject", "uncertain"}:
             return {**update, "state": "rejected" if value["priority"] == "reject" else "review", "reason": value["reason"]}
@@ -498,7 +513,7 @@ def scan_news_runs(*, now=None, limit=100):
     selected = list(due.filter(priority="major").order_by("article__published_at", "pk").values_list("pk", flat=True)[:limit])
     slots = regional_slot_seconds(now)
     regions = sorted(REGIONS, key=lambda region: (slots.get(region, 0), REGIONS.index(region)))
-    queues = {region: list(due.exclude(priority="major").filter(primary_region=region).order_by("created_at", "pk").values_list("pk", flat=True)[:limit]) for region in regions}
+    queues = {region: list(due.exclude(priority="major").filter(primary_region=region).order_by("created_at", "pk").values_list("pk", flat=True)[:min(20, limit)]) for region in regions}
     while len(selected) < limit and any(queues.values()):
         for region in regions:
             if queues[region] and len(selected) < limit:

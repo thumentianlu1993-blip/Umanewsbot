@@ -2220,6 +2220,13 @@ def candidate_ignore(request: HttpRequest, article_id: int):
     if denied:
         return denied
     article = get_object_or_404(NewsArticle, pk=article_id)
+    if article.active_news_run_id:
+        from stable.services.news_review import review_action, ReviewConflict
+        try:
+            run = review_action(article.active_news_run_id, action="reject", user=request.user, reason="管理员reject当前候选")
+        except ReviewConflict as error:
+            return HttpResponse(str(error), status=409)
+        return redirect("console-news-quality-detail", run_id=run.pk)
     article.workflow_status = WorkflowStatus.IGNORED
     article.review_mode = ReviewMode.IGNORED
     article.automation_status = AutomationStatus.IGNORED
@@ -2243,6 +2250,13 @@ def candidate_mark_manual(request: HttpRequest, article_id: int):
     if denied:
         return denied
     article = get_object_or_404(NewsArticle, pk=article_id)
+    if article.active_news_run_id:
+        from stable.services.news_review import review_action, ReviewConflict
+        try:
+            run = review_action(article.active_news_run_id, action="hold", user=request.user, reason="管理员hold当前候选")
+        except ReviewConflict as error:
+            return HttpResponse(str(error), status=409)
+        return redirect("console-news-quality-detail", run_id=run.pk)
     article.review_mode = ReviewMode.MANUAL
     article.automation_status = AutomationStatus.MANUAL_REVIEW_REQUIRED
     article.workflow_status = WorkflowStatus.PENDING_REVIEW
@@ -2293,6 +2307,9 @@ def article_editor(request: HttpRequest, article_id: int):
         slot="homepage_primary", status="active"
     ).first()
     can_manage_headline = request.user.has_perm("stable.change_homepageheadlineselection")
+    if article.active_news_run_id:
+        from stable.news_quality_views import edit_revision
+        return edit_revision(request, article)
     article.ensure_editable_fields()
     if request.method == "POST":
         form = ArticleEditorForm(request.POST, instance=article)

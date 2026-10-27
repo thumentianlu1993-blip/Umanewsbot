@@ -16,7 +16,7 @@ from stable.models import (
     NewsArticle, NewsProcessingRun, NewsStageAttempt, NewsPublicationReceipt,
     NewsEditorialEvent, ArticleHorseLink, ArticleRaceLink, TermEntry, QuotaLedger,
 )
-from stable.services.news_pipeline import digest, policy_sha, _current_run, article_revision, source_eligible
+from stable.services.news_pipeline import digest, policy_sha, _current_run, article_revision, source_eligible, target_revision_digest
 from stable.services.news_content import ContentBlocked, validate_audit, validate_entities
 from stable.services.news_editorial import validate_editorial, audit_corrections
 from stable.services.news_feed import publication_lock, append_public_entry
@@ -76,7 +76,7 @@ def check_publication_evidence(run):
     quality = validate_audit(clean, run.translation_snapshot, audit_corrections(run.editorial_snapshot, audit.result))
     if not quality["passed"] or run.quality_snapshot.get("target_sha") != quality["target_sha"] or run.quality_snapshot.get("policy_sha") != run.policy_sha:
         raise ContentBlocked("target_not_audited")
-    if run.manual_target and (digest(run.manual_target) != run.target_revision_sha
+    if run.manual_target and (target_revision_digest(run.manual_target, run.editor_provenance.get("event_binding")) != run.target_revision_sha
             or any(run.manual_target[key] != run.translation_snapshot[key] for key in ("title", "body", "summary"))):
         raise ContentBlocked("manual_target_changed")
     editorial = run.attempts.filter(stage="event_classify", state="completed").order_by("-seq").first()
@@ -85,7 +85,8 @@ def check_publication_evidence(run):
     editorial = _validated_attempt(run, editorial.pk, "event_classify")
     value = validate_editorial(clean, editorial.result, source_scope=run.source_snapshot["source_site"],
         candidates=editorial.usage["input"].get("candidates", []),
-        aliases=getattr(settings, "NEWS_QUALITY_POLICY", {}).get("identity_aliases", {}))
+        aliases=getattr(settings, "NEWS_QUALITY_POLICY", {}).get("identity_aliases", {}),
+        binding=run.editor_provenance.get("event_binding"))
     if value != run.editorial_snapshot or value["identity_key"] != run.event.identity_key:
         raise ContentBlocked("editorial_evidence_changed")
     if run.attempts.filter(state__in=["reserved", "inflight", "unknown"]).exists():
