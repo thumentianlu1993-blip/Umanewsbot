@@ -1720,6 +1720,46 @@
         "module:stable.test_race_public_time",
         "module:stable.test_race_news_exposure",
         "public_probe_orm_loader"
+      ],
+      "article_editor": [
+        "news_quality",
+        "news_translation",
+        "module:stable.test_editorial_headlines"
+      ],
+      "article_update_api": [
+        "news_quality",
+        "news_translation",
+        "module:stable.test_editorial_headlines"
+      ],
+      "candidate_detail": [
+        "news_quality",
+        "news_translation",
+        "module:stable.test_editorial_headlines"
+      ],
+      "candidate_ignore": [
+        "news_quality",
+        "news_translation",
+        "module:stable.test_editorial_headlines"
+      ],
+      "candidate_mark_manual": [
+        "news_quality",
+        "news_translation",
+        "module:stable.test_editorial_headlines"
+      ],
+      "headline_control": [
+        "news_quality",
+        "news_translation",
+        "module:stable.test_editorial_headlines"
+      ],
+      "headline_select": [
+        "news_quality",
+        "news_translation",
+        "module:stable.test_editorial_headlines"
+      ],
+      "legacy_public_article_detail": [
+        "news_quality",
+        "news_translation",
+        "module:stable.test_editorial_headlines"
       ]
     }
   },

@@ -110,12 +110,16 @@ def verified_relations(run):
             "link_version": link.updated_at.isoformat(), "source_sha": run.input_sha,
             "occurrence": {key: occurrence[key] for key in ("block_id", "start", "end", "text", "term_id")}})
     canonical_race = run.editorial_snapshot.get("identity", {}).get("fields", {}).get("canonical_race_id")
-    if canonical_race and any(row["type"] == "race" for row in occurrences):
+    race_span = run.editorial_snapshot.get("identity", {}).get("evidence", {}).get("canonical_race_id", {})
+    race_occurrence = next((row for row in occurrences if row["type"] == "race" and
+        row.get("block_id") == race_span.get("block_id") and row.get("start") == race_span.get("start") and
+        row.get("end") == race_span.get("end")), None)
+    if canonical_race and race_occurrence:
         for link in ArticleRaceLink.objects.filter(article=run.article, event_id=canonical_race, status__in=["auto", "manual"]):
             result["race_ids"].append(link.event_id)
             result["evidence"].append({"kind": "race", "id": link.event_id, "link_id": link.pk,
                 "link_version": link.updated_at.isoformat(), "source_sha": run.input_sha,
-                "identity": run.editorial_snapshot["identity"]})
+                "identity": run.editorial_snapshot["identity"], "occurrence": race_occurrence})
     if len(result["evidence"]) > 128:
         return {"horse_ids": [], "race_ids": [], "evidence": [], "gaps": ["relation_limit"]}
     return result
