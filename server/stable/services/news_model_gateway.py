@@ -10,7 +10,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from stable.models import NewsModelBudget, NewsStageAttempt
+from stable.models import NewsModelBudget, NewsStageAttempt, NewsArticle, NewsProcessingRun
 from stable.services.news_pipeline import digest, policy_sha
 
 STAGES = frozenset({"event_classify", "entity_check", "translate_full", "fact_audit", "body_review"})
@@ -217,13 +217,21 @@ def execute_request(attempt_id, payload):
         return existing
     attempt = reserve_request(attempt_id, payload)
     # 先写 inflight 再调用；即使进程在两者之间退出也按未知核账，不猜测免费重发。
-    with transaction.atomic():
-        attempt = NewsStageAttempt.objects.select_for_update().select_related("run__article").get(pk=attempt_id)
-        if attempt.state != "reserved":
-            return attempt
-        validate_attempt(attempt, payload)
-        attempt.state = "inflight"
-        attempt.save(update_fields=["state"])
+    try:
+        with transaction.atomic():
+            article = NewsArticle.objects.select_for_update().get(pk=attempt.run.article_id)
+            run = NewsProcessingRun.objects.select_for_update().get(pk=attempt.run_id)
+            attempt = NewsStageAttempt.objects.select_for_update().get(pk=attempt_id)
+            if attempt.state != "reserved":
+                return attempt
+            run.article = article
+            attempt.run = run
+            validate_attempt(attempt, payload)
+            attempt.state = "inflight"
+            attempt.save(update_fields=["state"])
+    except RequestDenied:
+        # 尚未发出的请求可明确结算零费用；发送后的异常走 unknown。
+        return settle_request(attempt_id, actual_cost=0)
     try:
         response = _single_request(attempt, payload)
     except KnownRequestRejected as error:
