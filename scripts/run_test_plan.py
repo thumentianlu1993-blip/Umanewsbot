@@ -18,6 +18,7 @@ from tools.test_impact.git_input import git, commit
 from tools.test_impact.core import digest
 from tools.test_impact.serial_ci import OwnedObserver
 from tools.test_impact.source_binding import validate_source_plan, verify_source_binding
+import tools.test_impact.image_contract as image_contract
 
 
 OBSERVER=None
@@ -134,6 +135,25 @@ def main():
             with args.export_image.open('wb') as image_file:
                 docker('save',image_id,stdout=image_file)
         plan['image_id']=image_id
+        prepared = temp/'prepared'
+        prepared.mkdir()
+        if image_contract.selected(plan):
+            STAGE='migration-image-preparation'
+            if args.batch:
+                proof_path = args.plan.resolve().parent/'migration-image-proof.json'
+                from tools.test_impact.pg_lifecycle import read_regular
+                if proof_path.lstat().st_size > 65536:
+                    raise ValueError('oversize image proof')
+                raw_proof = read_regular(proof_path)
+                image_contract.validate_proof(raw_proof, plan)
+            else:
+                raw_proof, descriptor = image_contract.prepare_image_proof(root, plan, output)
+                plan['migration_image_proof'] = descriptor
+            (prepared/'migration-image-proof.json').write_bytes(raw_proof)
+            (prepared/'migration-image-proof.json').chmod(0o444)
+            if not args.batch or output != args.plan.resolve().parent:
+                with (output/'migration-image-proof.json').open('xb') as proof_file:
+                    proof_file.write(raw_proof)
         frozen_plan_bytes=json.dumps(plan).encode()
         frozen_binding_bytes=json.dumps(binding).encode()
         def invoke(mode,key='',profile=''):
@@ -155,7 +175,10 @@ def main():
                      '--pids-limit','256','--memory','4g','--cpus','2','--read-only','--tmpfs','/tmp:rw,exec,size=3g',
                      '--mount',f'type=bind,src={source},dst=/source,readonly',
                      '--mount',f'type=bind,src={control},dst=/control,readonly',
+                     '--mount',f'type=bind,src={prepared},dst=/prepared,readonly',
                      '--mount',f'type=bind,src={out},dst=/output',image_id,mode,key,profile]
+            if mode == 'run' and profile == 'django-root-artifact':
+                command[1:1] = ['--user','0:0','--cap-add','SETUID','--cap-add','SETGID','--cap-add','KILL']
             cidfile=None
             expected=lifecycle.native_filename(mode,key);life=lifecycle.receipt_filename(mode,key)
             primary=None;completed=None;cleanup=None

@@ -151,6 +151,8 @@ class FrozenWorkerBindingTests(unittest.TestCase):
         import ast
         t=ast.parse((self.root/'scripts/test_plan_worker.py').read_text())
         fn=next(n for n in t.body if isinstance(n,ast.FunctionDef) and n.name==name)
+        from tools.test_impact.execution_profiles import resolve_profile
+        namespace.setdefault('resolve_profile', resolve_profile)
         exec(compile(ast.Module(body=[fn],type_ignores=[]),'real-worker-'+name,'exec'),namespace)
         return namespace[name]
 
@@ -334,7 +336,7 @@ class FrozenWorkerBindingTests(unittest.TestCase):
                                   setup=setup,collect=Mock(side_effect=stop))
         with patch.object(sys,'argv',['worker','collect']),self.assertRaisesRegex(RuntimeError,'synthetic collection boundary'):
             main()
-        setup.assert_called_once_with('django',self.plan,self.binding,collecting=True)
+        setup.assert_called_once_with('django',self.plan,self.binding,collecting=True,batch=None)
 
     def test_formal_executor_rejects_unresolved_commit_and_tree_before_docker(self):
         import argparse
@@ -453,7 +455,7 @@ class PGLifecycleTrustedClosureTests(unittest.TestCase):
                'tools/test_impact/serial_ci.py','tools/test_impact/pg_lifecycle.py','scripts/plan_affected_tests.py',
                'scripts/run_test_plan.py','scripts/test_plan_worker.py','scripts/run_bounded_stable_tests.py',
                'deploy/test-impact/entrypoint.sh','tools/test_impact/fixture_inputs.py',
-               'tools/test_impact/fixture_inputs_secondary.py','tools/test_impact/fixture_inputs_remaining.py']
+               'tools/test_impact/fixture_inputs_secondary.py','tools/test_impact/fixture_inputs_remaining.py','tools/test_impact/execution_profiles.py','tools/test_impact/image_contract.py']
         blobs={p:(root/p).read_bytes() for p in paths}
         oid=lambda data:hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
         controls={p:oid(data) for p,data in blobs.items()}

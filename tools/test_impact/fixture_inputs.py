@@ -130,6 +130,11 @@ def fixture_environment(plan, binding, code_sha, profile, *, collecting=False,
     if plan['fixture_inputs']['id'] == REMAINING_RESOURCE_ID:
         from tools.test_impact.fixture_inputs_remaining import resource_environment
         return resource_environment(source_root)
+    return resource_environment(source_root)
+
+
+def resource_environment(source_root):
+    source_root = Path(source_root)
     root = _regular(source_root, str(RESOURCE_PATH/'manifest.json')).parent
     raw = (root/'manifest.json').read_bytes()
     _require(len(raw) <= 32768 and hashlib.sha256(raw).hexdigest() == MANIFEST_SHA256,

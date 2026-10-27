@@ -15,12 +15,13 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT), str(ROOT/'server'), str(ROOT/'.codex/scripts'), str(ROOT/'scripts'), str(ROOT/'runtime/research')]
 from tools.test_impact.core import digest, shard_tests
+from tools.test_impact.execution_profiles import resolve_profile, validate_batch, cache_environment, ROOT_PROFILE, validate_privilege, current_capabilities
 from tools.test_impact.source_binding import verify_source_binding
 from tools.test_impact.fixture_inputs import ENVIRONMENT, fixture_environment, validate_selection
 from run_bounded_stable_tests import isolated_environment, flatten
 
 
-def setup(profile, plan, binding, *, collecting=False):
+def setup(profile, plan, binding, *, collecting=False, batch=None):
     inherited_fixture_keys = set(os.environ).intersection(ENVIRONMENT)
     source = {'PATH':os.environ['PATH'], 'HOME':'/home/tester','POSTGRES_PORT':'5432',
               'POSTGRES_DB':'release_0078_ci' if profile=='release-postgres' else 'bounded_ci',
@@ -30,6 +31,8 @@ def setup(profile, plan, binding, *, collecting=False):
     fixtures = fixture_environment(plan, binding, code_sha, profile, collecting=collecting,
                                    inherited_keys=inherited_fixture_keys)
     os.environ.update(isolated_environment(source))
+    if batch is not None:
+        fixtures.update(cache_environment(batch, plan, binding, code_sha))
     os.environ.update(fixtures)
     os.environ.update(DOTENV_DISABLED='1', RELEASE_0078_TEST_POSTGRES='1', RUN_HISTORICAL_PIPELINE_PERF='1',
                       A045_TEST_CODE_SHA=code_sha)
@@ -44,7 +47,8 @@ def setup(profile, plan, binding, *, collecting=False):
 
 
 def isolation_probe(profile):
-    if os.getuid() == 0 or Path('/var/run/docker.sock').exists():
+    validate_privilege(profile, os.getuid(), os.getgid(), current_capabilities())
+    if os.getuid() != (0 if profile == ROOT_PROFILE else 10001) or os.getgid() != os.getuid() or Path('/var/run/docker.sock').exists():
         raise ValueError('unsafe container privilege')
     interfaces = set(os.listdir('/sys/class/net'))
     if interfaces != {'lo'}:
@@ -84,7 +88,9 @@ def collect(plan, catalog):
                 reason=getattr(case.__class__,'__unittest_skip_why__','') or getattr(method,'__unittest_skip_why__','')
                 entry={'id':ident,'reason':reason}
                 if entry not in declared_skips: declared_skips.append(entry)
-            profile = next((p for m,p in catalog['profiles'].items() if ident.startswith(m+'.')), None)
+            profile = resolve_profile(ident, catalog['profiles'])
+            if 'fixture_inputs' in plan and profile and profile.startswith('django-cache-'):
+                profile = 'django'
             if profile is None:
                 raise ValueError('unowned test: '+ident)
             if ident in cases:
@@ -134,7 +140,7 @@ def execute(plan, batch):
         if len(actual)!=len(set(actual)) or set(actual)!=set(batch['ids']) or not 0<len(actual)<=200:
             raise ValueError('batch selection mismatch')
         result_holder=[]
-        if batch['profile']=='django':
+        if batch['profile'].startswith('django'):
             from django.test.runner import DiscoverRunner
             class Runner(DiscoverRunner):
                 def get_resultclass(self): return Result
@@ -162,7 +168,12 @@ def main():
     plan=json.loads(Path('/control/plan.json').read_text())
     profile='django' if mode=='collect' else args[2]
     binding=json.loads(Path('/control/source-binding.json').read_text())
-    setup(profile, plan, binding, collecting=mode=='collect')
+    batch = None if mode=='collect' else next(b for b in plan['batches'] if b['key']==args[1])
+    if batch is not None:
+        validate_batch(batch)
+        if batch['profile'] != profile:
+            raise ValueError('profile mismatch')
+    setup(profile, plan, binding, collecting=mode=='collect', batch=batch)
     if mode=='collect':
         plan=collect(plan,json.loads((ROOT/'tools/test_impact/catalog.json').read_text()))
         validate_selection(plan)

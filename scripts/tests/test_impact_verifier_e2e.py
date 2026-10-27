@@ -23,7 +23,7 @@ class OutsideVerifierTests(unittest.TestCase):
                'scripts/test_plan_worker.py','scripts/run_bounded_stable_tests.py','deploy/test-impact/entrypoint.sh',
                'tools/test_impact/serial_ci.py','tools/test_impact/pg_lifecycle.py',
                'tools/test_impact/fixture_inputs.py','tools/test_impact/fixture_inputs_secondary.py',
-               'tools/test_impact/fixture_inputs_remaining.py']
+               'tools/test_impact/fixture_inputs_remaining.py','tools/test_impact/execution_profiles.py','tools/test_impact/image_contract.py']
         for name in ['scripts/verify_delivery_test_evidence.py',*self.trusted_dependencies]:
             p=self.repo/name;p.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(ROOT/name,p)
         self.rules={'schema_version':1,'docs':['docs/*.md'],'high_risk':['tools/test_impact/**','.github/**'],

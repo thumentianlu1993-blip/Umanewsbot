@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
-[[ "$(id -u)" != 0 ]]
+if [[ "${1:-}" == run && "${3:-}" == django-root-artifact ]]; then
+    [[ "$(id -u):$(id -g)" == 0:0 ]]
+else
+    [[ "$(id -u):$(id -g)" == 10001:10001 ]]
+fi
 [[ ! -S /var/run/docker.sock ]]
 # 只复制由宿主 git archive 固定的输入，不挂载宿主工作区或凭据。
 mkdir -p /tmp/work

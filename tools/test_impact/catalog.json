@@ -104,7 +104,9 @@
       "scripts.tests.test_impact_git",
       "scripts.tests.test_impact_delivery",
       "scripts.tests.test_impact_evolution",
-      "scripts.tests.test_impact_verifier_e2e"
+      "scripts.tests.test_impact_verifier_e2e",
+      "tools.test_impact.test_execution_profiles",
+      "tools.test_impact.test_image_contract"
     ],
     "module:runtime.research.test_audit_france_galop_bulletin_occurrences": [
       "runtime.research.test_audit_france_galop_bulletin_occurrences"
@@ -3222,6 +3224,18 @@
       "domains": [
         "news_quality"
       ]
+    },
+    "tools/test_impact/test_execution_profiles.py": {
+      "label": "tools.test_impact.test_execution_profiles",
+      "domains": [
+        "infrastructure"
+      ]
+    },
+    "tools/test_impact/test_image_contract.py": {
+      "label": "tools.test_impact.test_image_contract",
+      "domains": [
+        "infrastructure"
+      ]
     }
   },
   "profiles": {
@@ -3590,7 +3604,18 @@
     "stable.test_p01_news_report": "django",
     "stable.test_p01_news_source_evidence": "django",
     "stable.test_p01_news_workflow": "django",
-    "stable.test_p01_news_review_regressions": "django"
+    "stable.test_p01_news_review_regressions": "django",
+    "stable.test_race_live_gate_remediation.RollbackGateBehaviorRemediationTests.test_root_artifact_is_exact_0700_0600_secret_free_and_no_replace": "django-root-artifact",
+    "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": "django-cache-primary",
+    "stable.test_historical_race_detail_distance_metadata.HistoricalRaceDetailDistanceMetadataRealCacheTests.test_jra_2005_legacy_page_preserves_distance_unit": "django-cache-primary",
+    "stable.test_historical_race_detail_distance_metadata.HistoricalRaceDetailDistanceMetadataRealCacheTests.test_equibase_yearbook_result_preserves_distance_unit": "django-cache-primary",
+    "stable.test_historical_race_detail_runner_v2_package_identity.HistoricalRaceDetailRunnerV2PackageIdentityRealSmokeTests.test_nonempty_event_and_parsed_distance_conflict_becomes_validation_gap": "django-cache-secondary",
+    "stable.test_historical_race_detail_runner_v2_package_identity.HistoricalRaceDetailRunnerV2PackageIdentityRealSmokeTests.test_hk_package_rejects_raw_candidate_without_validation_evidence": "django-cache-secondary",
+    "stable.test_historical_race_detail_distance_metadata.HistoricalRaceDetailDistanceMetadataRealCacheTests.test_sporting_life_race_118984_preserves_distance_units": "django-cache-remaining",
+    "stable.test_historical_race_detail_runner_v2_package_identity.HistoricalRaceDetailRunnerV2PackageIdentityRealSmokeTests.test_empty_event_distance_uses_real_parsed_metadata_with_original_units": "django-cache-remaining",
+    "stable.test_historical_race_detail_runner_v2_package_identity.HistoricalRaceDetailRunnerV2PackageIdentityRealSmokeTests.test_hk_real_validated_candidate_packages_with_plan_inventory_identity": "django-cache-remaining",
+    "tools.test_impact.test_execution_profiles": "python",
+    "tools.test_impact.test_image_contract": "python"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {

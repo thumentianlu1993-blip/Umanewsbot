@@ -26,6 +26,8 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib import admin
 from django.db import DatabaseError, IntegrityError, connection, connections, transaction
+from django.db.models import Value
+from django.db.models.functions import Repeat
 from django.test import Client, TransactionTestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -484,7 +486,7 @@ class HorseArticlePairReceiptIndexTests(TransactionTestCase):
                     operation_log_id_snapshot=archive.operation_log_id_snapshot+10000,request_key='0'*64)
         for constraint,change in (('ck_hpair_index_ids',{'article_id_snapshot':0}),
                                   ('ck_hpair_index_hashes',{'receipt_detail_sha256':'G'*64}),
-                                  ('ck_hpair_index_bytes',{'receipt_detail':'x'*(MAX_BYTES+1)})):
+                                  ('ck_hpair_index_bytes',{'receipt_detail':Repeat(Value('x'),MAX_BYTES+1)})):
             before=self._state()
             with self.subTest(constraint=constraint),self.assertRaises(IntegrityError) as caught:
                 with transaction.atomic():self.Index.objects.create(**{**base,**change})

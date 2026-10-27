@@ -121,13 +121,15 @@ def host_filename(mode, key):
 
 
 def make_request(plan, mode, key, profile, nonce):
+    from tools.test_impact.execution_profiles import PROFILES, validate_batch
     validate_source_plan(plan)
     _stem(mode,key)
     profile = 'django' if mode == 'collect' else profile
-    require(profile in ('python','django','release-postgres'), 'REQUEST_SCHEMA', 'profile')
+    require(profile in PROFILES, 'REQUEST_SCHEMA', 'profile')
     if mode == 'run':
         matches = [b for b in plan.get('batches', []) if b['key'] == key]
         require(len(matches) == 1 and matches[0]['profile'] == profile, 'REQUEST_IDENTITY_MISMATCH', 'batch/profile')
+        validate_batch(matches[0])
     require(type(nonce) is str and re.fullmatch('[0-9a-f]{32}',nonce), 'REQUEST_SCHEMA', 'nonce')
     require(type(plan.get('image_id')) is str and re.fullmatch('sha256:[0-9a-f]{64}',plan['image_id']), 'REQUEST_SCHEMA', 'image')
     require(all(k in plan and type(plan[k]) in (str,int) and bool(plan[k]) for k in ('run_id','run_attempt')), 'REQUEST_SCHEMA', 'run identity')
@@ -253,7 +255,8 @@ def validate_receipt(receipt, request, native_bytes):
     require(canonical({k:receipt[k] for k in REQUEST_FIELDS}) == canonical(request), 'RECEIPT_IDENTITY_MISMATCH')
     required = request['mode'] == 'collect' or request['profile'] != 'python'
     require(receipt['pg_required'] is required and receipt['complete'] is True and receipt['secondary_errors'] == []
-            and receipt['signal_events'] == [] and receipt['uid'] == 10001 and receipt['gid'] == 10001,
+            and receipt['signal_events'] == [] and receipt['uid'] == (0 if request['profile']=='django-root-artifact' else 10001)
+            and receipt['gid'] == receipt['uid'],
             'PG_NUMERIC_INCOMPLETE')
     parent = receipt['supervisor_pid']
     require(type(parent) is int and parent > 0 and _numeric(receipt['worker'],parent), 'WORKER_WAIT_INCOMPLETE')
@@ -349,7 +352,8 @@ class Session:
             process=subprocess.Popen(argv,cwd=self.root,start_new_session=True)
         else:
             with (self.log_dir/(name+'.stdout')).open('wb') as out,(self.log_dir/(name+'.stderr')).open('wb') as err:
-                process=subprocess.Popen(argv,cwd=self.root,stdout=out,stderr=err,start_new_session=True)
+                credentials = dict(user=10001, group=10001, extra_groups=[]) if self.request['profile']=='django-root-artifact' else {}
+                process=subprocess.Popen(argv,cwd=self.root,stdout=out,stderr=err,start_new_session=True,**credentials)
         record.update(pid=process.pid,ppid=os.getpid(),started=True,status='RUNNING');self.processes[name]=process
         return process
 
@@ -570,9 +574,12 @@ class Session:
 def main():
     args=sys.argv[1:]
     require(len(args)==3,'REQUEST_SCHEMA','three original worker arguments required')
-    require(os.getuid()==10001 and os.getgid()==10001 and not Path('/var/run/docker.sock').exists(),'UNSAFE_PRIVILEGE')
     plan=read_json('/control/plan.json');request=read_json('/control/pg-lifecycle-request.json')
     validate_request(request,plan,args[0],args[1],args[2])
+    from tools.test_impact.execution_profiles import validate_privilege, current_capabilities
+    validate_privilege(request['profile'], os.getuid(), os.getgid(), current_capabilities())
+    expected_uid = 0 if request['profile']=='django-root-artifact' else 10001
+    require(os.getuid()==expected_uid and os.getgid()==expected_uid and not Path('/var/run/docker.sock').exists(),'UNSAFE_PRIVILEGE')
     verify_source_binding(plan,read_json('/control/source-binding.json'),Path.cwd(),require_git_head=True)
     return Session(request,plan,'/output').execute(args)
 
