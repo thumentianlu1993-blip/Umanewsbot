@@ -54,6 +54,12 @@ _SCMP_STRUCTURED_NOISE_SELECTORS = (
     ".article-body-comment", ".scmp_button_comment", ".advert_wrapper", ".article-blocks",
 )
 
+def scmp_body_access_restricted(node: Tag) -> bool:
+    classes = set(node.get("class", []))
+    return bool(node.has_attr("data-paywall") or classes & {"paywall", "subscription-required"}
+                or node.select_one(".paywall, [data-paywall], .subscription-required"))
+
+
 _SPONICHI_STRUCTURED_NOISE_SELECTORS = (
     "figure",
     "#article_more_area",

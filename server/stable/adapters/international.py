@@ -14,7 +14,7 @@ from django.conf import settings
 from django.utils import dateparse, timezone
 
 from stable.models import RacingRegion, SourceKind, SourceLanguage, SourceMode, SourceSite
-from stable.services.article_content import ArticleContentCleanResult, clean_international_article_body
+from stable.services.article_content import ArticleContentCleanResult, clean_international_article_body, scmp_body_access_restricted
 from stable.services.http import DEFAULT_HEADERS, get_bytes
 from stable.services.text import normalize_whitespace
 
@@ -130,9 +130,22 @@ def _publication_time(soup, *, source_site, url, title):
             if match:
                 rows.append((match[0], ".horses-racing-news-author"))
     else:
-        rows = [(node.get("datetime") or node.get_text(" ", strip=True), "time[datetime]" if node.has_attr("datetime") else "time/.date")
-                for node in soup.select("time[datetime], time, .date, .published, .timestamp")
-                if not node.find_parent(["aside", "nav", "footer"])]
+        selector = {
+            "france_galop_news": ".date, time[datetime]",
+            "horse_racing_nation": ".publish-date time[datetime]",
+        }.get(str(source_site), "time[itemprop='datePublished'], .published time[datetime]")
+        def current_publication(node):
+            for parent in (node, *node.parents):
+                if parent.name in {"aside", "nav", "footer"}:
+                    return False
+                if "dateModified" in str(parent.get("itemprop", "")):
+                    return False
+                tokens = " ".join(parent.get("class", [])) + " " + str(parent.get("id", ""))
+                if re.search(r"related|recommend|dropdown|news-card|story-card|listing", tokens, re.I):
+                    return False
+            return True
+        rows = [(node.get("datetime") or node.get_text(" ", strip=True), selector)
+                for node in soup.select(selector) if current_publication(node)]
     result = resolve(rows)
     return result or (None, {"source": "fallback", "raw": "", "timezone": zone, "precision": "unknown", "verified": False,
                             "reason": "publication_time_missing"})
@@ -261,7 +274,7 @@ class SimpleInternationalNewsAdapter(SourceAdapter):
         published_at, time_evidence = _publication_time(soup, source_site=self.source_site, url=url, title=title)
         if body_node is None:
             clean_result = ArticleContentCleanResult(text="", status="selector_not_found", removed_rules={})
-        elif self.source_site == SourceSite.SCMP_RACING and body_node.select_one(".paywall, [data-paywall], .subscription-required"):
+        elif self.source_site == SourceSite.SCMP_RACING and scmp_body_access_restricted(body_node):
             clean_result = ArticleContentCleanResult(text="", status="body_access_restricted", removed_rules={})
         else:
             clean_result = clean_international_article_body(body_node, source_site=self.source_site)

@@ -676,6 +676,14 @@ def infer_article_attribution(
     *,
     batch_context: AttributionBatchContext | None = None,
 ) -> AttributionResult:
+    source_evidence = (article.translation_metadata or {}).get("region_evidence") or {}
+    if article.source_site in GLOBAL_SOURCE_SITES and source_evidence.get("source_region_used") is False:
+        # 证据只选择推断路径，结论重新从当前正文计算；应用仍由原开关/锁/rollout策略负责。
+        region, evidence = infer_global_source_region(article.title_ja, article.body_ja_normalized or article.body_ja_raw)
+        supported = evidence["status"] == "supported"
+        return AttributionResult(primary_region=region, content_category=classify_news_content(article),
+            reason=evidence["reason"], evidence=evidence, confidence=80 if supported else 0,
+            status=AttributionStatus.APPLIED if supported else AttributionStatus.NEEDS_REVIEW)
     resolved_source_config = source_config
     if resolved_source_config is None and batch_context is not None and article.source_config_id:
         resolved_source_config = batch_context.source_configs_by_id.get(article.source_config_id)

@@ -160,7 +160,8 @@ def upsert_article_from_draft(draft, crawl_job: CrawlJob | None = None) -> Artic
                 article.source_mode = draft.source_mode
                 article.source_config = source_config or article.source_config
                 article.crawl_job = crawl_job or article.crawl_job
-                if not article.attribution_locked:
+                # 逐稿地区候选交给既有 off/shadow/enforce 与历史稿策略；重抓不能先写入绕过它。
+                if not article.attribution_locked and not draft_metadata.get("region_evidence"):
                     article.racing_region = source_metadata["racing_region"]
                 article.source_language = source_metadata["source_language"]
                 if source_config:
@@ -214,19 +215,7 @@ def upsert_article_from_draft(draft, crawl_job: CrawlJob | None = None) -> Artic
                 except Exception:
                     image.local_path = ""
             image.save()
-        region_evidence = draft_metadata.get("region_evidence") or {}
-        if (article_source_site == SourceSite.TDN and region_evidence.get("source_region_used") is False
-                and not article.attribution_locked):
-            from .news_attribution import set_article_regions, classify_news_content
-            from stable.models import AttributionStatus
-            supported = region_evidence.get("status") == "supported"
-            set_article_regions(article, primary_region=draft.racing_region, attribution_source="source_text",
-                reason=region_evidence["reason"], evidence=region_evidence,
-                content_category=classify_news_content(article),
-                status=AttributionStatus.APPLIED if supported else AttributionStatus.NEEDS_REVIEW,
-                confidence=80 if supported else 0, rule_version=region_evidence["rule_version"])
-        else:
-            apply_article_attribution(article, source_config=article.source_config, is_new_article=created)
+        apply_article_attribution(article, source_config=article.source_config, is_new_article=created)
         from stable.services.news_pipeline import can_enroll, start_revision
         if created and can_enroll(article):
             start_revision(article)

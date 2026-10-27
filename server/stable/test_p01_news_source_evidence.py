@@ -104,12 +104,12 @@ class InternationalSourceRepairTests(SimpleTestCase):
         from stable.adapters.international import FranceGalopEnglishNewsAdapter, SportingLifeAdapter
         for adapter in (FranceGalopEnglishNewsAdapter(), SportingLifeAdapter()):
             with self.subTest(source=adapter.source_site):
-                detail = self.detail(adapter, '<h1>Title</h1><time datetime="2026-07-12">12 July</time>')
+                detail = self.detail(adapter, '<h1>Title</h1><script type="application/ld+json">{"@type":"Article","headline":"Title","datePublished":"2026-07-12"}</script>')
                 self.assertIsNotNone(detail.published_at)
                 self.assertFalse(self.draft(adapter, detail).metadata['published_at_verified'])
                 self.assertEqual(detail.metadata['published_at_evidence']['precision'], 'date')
         adapter = SportingLifeAdapter()
-        detail = self.detail(adapter, '<h1>Title</h1><time datetime="2026-07-12T15:30:00">Date</time>')
+        detail = self.detail(adapter, '<h1>Title</h1><script type="application/ld+json">{"@type":"Article","headline":"Title","datePublished":"2026-07-12T15:30:00"}</script>')
         self.assertEqual(detail.published_at, datetime(2026, 7, 12, 14, 30, tzinfo=timezone.utc))
 
     def test_conflicting_current_article_dates_are_not_verified(self):
