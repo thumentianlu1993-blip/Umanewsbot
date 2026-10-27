@@ -207,7 +207,8 @@ class SourceReviewBoundaryTests(SimpleTestCase):
         stub = SourceArticleStub('sporting_life', 'latest', '123', url, 'Title', datetime(2026, 10, 27, tzinfo=timezone.utc))
         for markup in ('<time itemprop="dateModified" datetime="2026-10-27T10:00:00Z">Updated</time>',
                        '<div class="related-articles"><time datetime="2026-10-27T10:00:00Z">Other story</time></div>',
-                       '<time datetime="2026-10-27T10:00:00Z">Unknown semantic</time>'):
+                       '<time datetime="2026-10-27T10:00:00Z">Unknown semantic</time>',
+                       '<article class="article-card"><h2>Other story</h2><time itemprop="datePublished" datetime="2026-10-27T10:00:00Z">Other</time></article>'):
             with self.subTest(markup=markup):
                 detail = adapter.parse_detail_html('<h1>Title</h1>' + markup, url=url)
                 draft = adapter.normalize_source_payload(stub, detail)
