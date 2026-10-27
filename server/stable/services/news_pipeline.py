@@ -428,7 +428,7 @@ def process_news_run(run_id):
                 from zoneinfo import ZoneInfo
                 tomorrow = timezone.now().astimezone(ZoneInfo("Asia/Shanghai")).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
                 if str(error) == "budget_exhausted_month":
-                    tomorrow = (tomorrow.replace(day=1) + timedelta(days=32)).replace(day=1)
+                    tomorrow = (timezone.now().astimezone(ZoneInfo("Asia/Shanghai")).replace(day=1, hour=0, minute=0, second=0, microsecond=0) + timedelta(days=32)).replace(day=1)
                 _transition(run.pk, {"state": "pending", "reason": str(error), "lease_until": None, "next_attempt_at": tomorrow}, generation=current.generation)
             else:
                 _transition(run.pk, {"state": "review", "reason": str(error)[:255], "lease_until": None}, generation=current.generation)

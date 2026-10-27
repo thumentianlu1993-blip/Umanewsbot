@@ -4452,7 +4452,7 @@ class NewsArticle(TimestampedModel):
 
     def save(self, *args, **kwargs):
         # P01 自己的提交在专用 writer；既有稿发布与索引共享同一个事务水位。
-        if getattr(settings, "NEWS_QUALITY_FEED_ENABLED", False) and not self.active_news_run_id:
+        if (getattr(settings, "NEWS_QUALITY_INDEX_ENABLED", False) or getattr(settings, "NEWS_QUALITY_FEED_ENABLED", False)) and not self.active_news_run_id:
             from stable.services.news_feed import publication_lock, index_legacy_article
             with transaction.atomic():
                 publication_lock()

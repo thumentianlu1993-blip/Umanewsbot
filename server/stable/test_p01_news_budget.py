@@ -130,7 +130,7 @@ class BudgetConcurrencyTests(TransactionTestCase):
                 close_old_connections()
         with ThreadPoolExecutor(max_workers=2) as pool:
             result = sorted(pool.map(worker, attempts))
-        self.assertEqual(result, ["budget_exhausted_day", "reserved"])
+        self.assertEqual(result, ["budget_exhausted_month", "reserved"])
         for budget in NewsModelBudget.objects.all():
             self.assertGreater(budget.reserved, 0)
             self.assertLessEqual(budget.reserved + budget.spent, budget.cap)

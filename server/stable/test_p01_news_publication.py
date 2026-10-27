@@ -70,3 +70,25 @@ class PublicationTests(WorkflowFixture, TransactionTestCase):
         self.finish()
         publish_news_web(self.run.pk)
         self.assertFalse(NewsPublicationReceipt.objects.exists())
+
+    def test_two_ready_sources_publish_only_one_primary_under_concurrency(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from django.db import close_old_connections
+        first = self.finish()
+        draft = workflow_draft()
+        draft.source_article_id = "other-primary"
+        other = self.finish(upsert_article_from_draft(draft).article.active_news_run)
+        self.assertEqual(other.state, "shadow", other.reason)
+        def publish_one(pk):
+            close_old_connections()
+            try:
+                return publish_news_web(pk)
+            finally:
+                close_old_connections()
+        with self.settings(NEWS_QUALITY_MODE="enforce", NEWS_QUALITY_FEED_ENABLED=True):
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                list(pool.map(publish_one, [first.pk, other.pk]))
+            self.finish(first)
+            self.finish(other)
+        self.assertEqual(NewsPublicationReceipt.objects.count(), 1)
+        self.assertEqual(NewsPublicEntry.objects.count(), 1)

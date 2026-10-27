@@ -90,3 +90,64 @@ class FeedTests(TransactionTestCase):
         snapshot = news_feed.create_snapshot(now=self.now, with_features=True)
         self.assertEqual(snapshot.headline_entry_id, old.pk)
         self.assertNotIn(old.pk, snapshot.ordered_entry_ids)
+
+    def test_large_japan_supply_cannot_hide_other_regions_or_tail(self):
+        articles = []
+        for index in range(520):
+            articles.append(NewsArticle(source_site="jra", source_mode="official", source_article_id=f"bulk-{index}",
+                title_ja="原文", title_zh="合格稿", published_at=self.now, source_url="https://fixture.invalid/",
+                racing_region="japan", workflow_status="published", published_to_web_at=self.now))
+        NewsArticle.objects.bulk_create(articles)
+        NewsPublicEntry.objects.bulk_create([NewsPublicEntry(feed_seq=i+1, kind="legacy", article=row, public_revision=f"bulk-{i}",
+            sort_time=self.now, primary_region="japan", priority="regional") for i, row in enumerate(articles)])
+        self.seq = 520
+        others = [self.entry(region) for region in REGIONS[1:]]
+        snapshot = news_feed.create_snapshot(now=self.now)
+        self.assertEqual(len(snapshot.ordered_entry_ids), 104)
+        self.assertTrue({row.pk for row in others}.issubset(snapshot.ordered_entry_ids[:5]))
+        seen, cursor = [], None
+        for _ in range(12):
+            page = news_feed.snapshot_page(snapshot.generation, cursor=cursor, size=50, now=self.now)
+            seen.extend(row.pk for row in page["entries"])
+            cursor = page["next_cursor"]
+            if not cursor:
+                break
+        self.assertEqual(len(seen), 524)
+        self.assertEqual(len(set(seen)), 524)
+
+    def test_snapshot_waits_for_publisher_commit_before_capturing_watermark(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Event
+        from django.db import close_old_connections, transaction
+        entered, release = Event(), Event()
+        article = NewsArticle.objects.create(source_site="jra", source_mode="official", source_article_id="late-commit",
+            title_ja="原文", published_at=self.now, source_url="https://fixture.invalid/", workflow_status="published", published_to_web_at=self.now)
+        def publisher():
+            close_old_connections()
+            try:
+                with transaction.atomic():
+                    news_feed.publication_lock()
+                    entry = news_feed.index_legacy_article(article)
+                    entered.set()
+                    if not release.wait(2):
+                        raise AssertionError("test publisher release timeout")
+                    return entry.pk
+            finally:
+                close_old_connections()
+        def snapshot():
+            close_old_connections()
+            try:
+                return news_feed.create_snapshot(now=self.now)
+            finally:
+                close_old_connections()
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            publishing = pool.submit(publisher)
+            self.assertTrue(entered.wait(2))
+            building = pool.submit(snapshot)
+            try:
+                self.assertFalse(building.done())
+            finally:
+                release.set()
+            entry_id, snap = publishing.result(timeout=5), building.result(timeout=5)
+        self.assertEqual(snap.catalog_watermark, 1)
+        self.assertIn(entry_id, snap.ordered_entry_ids)

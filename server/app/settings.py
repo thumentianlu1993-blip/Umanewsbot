@@ -1194,6 +1194,7 @@ RACE_DATA_MULTISOURCE_POLICY_SHA256 = env("RACE_DATA_MULTISOURCE_POLICY_SHA256",
 
 # P01 默认停用。模型、费率、来源和激活时点必须来自绑定摘要的本地策略文件。
 NEWS_QUALITY_MODE = env("NEWS_QUALITY_MODE", "off")
+NEWS_QUALITY_INDEX_ENABLED = env_bool("NEWS_QUALITY_INDEX_ENABLED", False)
 NEWS_QUALITY_FEED_ENABLED = env_bool("NEWS_QUALITY_FEED_ENABLED", False)
 NEWS_QUALITY_DISPATCH_ENABLED = env_bool("NEWS_QUALITY_DISPATCH_ENABLED", False)
 NEWS_QUALITY_API_KEY = env("NEWS_QUALITY_API_KEY", "")
@@ -1214,9 +1215,9 @@ if NEWS_QUALITY_POLICY_FILE:
         raise ValueError("NEWS_QUALITY_POLICY must be an object")
     del _news_policy_bytes
 CELERY_TASK_ROUTES.update({
-    "stable.tasks.process_news_quality_run_task": {"queue": "celery"},
-    "stable.tasks.scan_news_quality_runs_task": {"queue": "celery"},
-    "stable.tasks.build_news_quality_feed_task": {"queue": "celery"},
+    "stable.tasks.process_news_quality_run_task": {"queue": "news_quality"},
+    "stable.tasks.scan_news_quality_runs_task": {"queue": "news_quality"},
+    "stable.tasks.build_news_quality_feed_task": {"queue": "news_quality"},
 })
 if NEWS_QUALITY_DISPATCH_ENABLED:
     CELERY_BEAT_SCHEDULE["scan-news-quality-runs"] = {"task": "stable.tasks.scan_news_quality_runs_task", "schedule": 60.0}

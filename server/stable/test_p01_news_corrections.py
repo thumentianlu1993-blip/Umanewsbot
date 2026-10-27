@@ -78,3 +78,24 @@ class CorrectionTests(WorkflowFixture, TransactionTestCase):
         self.assertEqual(run.state, "published", run.reason)
         payload = run.attempts.filter(stage="event_classify").first().usage["input"]
         self.assertIn(str(first.event_id), [row["id"] for row in payload["candidates"]])
+
+    def test_same_correction_after_later_story_is_not_published_twice(self):
+        first = NewsPublicationReceipt.objects.get(run=self.story("27"))
+        self.target(first)
+        self.assertEqual(self.story("31").state, "published")
+        self.correction = None
+        self.assertEqual(self.story("50").state, "published")
+        self.target(first)
+        repeat = self.story("31")
+        self.assertEqual(repeat.state, "duplicate", repeat.reason)
+        self.assertEqual(NewsPublicationReceipt.objects.filter(kind="correction_story").count(), 1)
+
+    def test_correction_removes_old_priority_without_hiding_original(self):
+        from stable.services.news_feed import create_snapshot, visible_entries
+        first = NewsPublicationReceipt.objects.get(run=self.story("27"))
+        self.target(first)
+        run = self.story("31")
+        self.assertEqual(run.state, "published", run.reason)
+        snap = create_snapshot()
+        self.assertNotIn(first.public_entry.pk, snap.ordered_entry_ids)
+        self.assertTrue(visible_entries().filter(receipt=first).exists())
