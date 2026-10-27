@@ -36,3 +36,49 @@ class PipelineSchemaTests(SimpleTestCase):
     def test_article_has_durable_owner_even_when_feature_is_off(self):
         fields = {field.name for field in NewsArticle._meta.fields}
         self.assertTrue({"active_news_run", "news_generation"} <= fields)
+
+
+from django.test import TestCase
+from django.utils import timezone
+from stable.models import NewsProcessingRun
+from stable.services.ingestion import upsert_article_from_draft
+from stable.test_france_news_freshness_change import draft_for
+
+
+class SourceRevisionFenceTests(TestCase):
+    def setUp(self):
+        self.article = upsert_article_from_draft(draft_for()).article
+        self.run = NewsProcessingRun.objects.create(
+            article=self.article, input_sha="a" * 64, policy_sha="b" * 64,
+            expected_article_sha="c" * 64, primary_region="france",
+            source_snapshot={"title": self.article.title_ja, "body": self.article.body_ja_raw},
+        )
+        self.article.active_news_run = self.run
+        self.article.workflow_status = WorkflowStatus.PUBLISHED
+        self.article.title_zh = "旧稿标题"
+        self.article.body_zh = "旧稿全文"
+        self.article.published_to_web_at = timezone.now()
+        self.article.save()
+
+    @override_settings(NEWS_QUALITY_MODE="off")
+    def test_recrawl_preserves_published_source_and_creates_independent_revision(self):
+        before = NewsArticle.objects.values().get(pk=self.article.pk)
+        draft = draft_for()
+        draft.title_ja = "Corrected official news"
+        draft.body_ja_raw = draft.body_ja_normalized = "A new material correction about a different horse."
+        upsert_article_from_draft(draft)
+        after = NewsArticle.objects.values().get(pk=self.article.pk)
+        for field in ("title_ja", "body_ja_raw", "body_ja_normalized", "title_zh", "body_zh", "published_at", "published_to_web_at", "source_url"):
+            self.assertEqual(before[field], after[field], field)
+        latest = self.article.news_runs.order_by("-id").first()
+        self.assertNotEqual(latest.pk, self.run.pk)
+        self.assertEqual(latest.source_snapshot["body"], draft.body_ja_raw)
+
+    def test_manual_legacy_publish_does_not_republish_or_notify(self):
+        from stable.tasks import publish_article
+        with patch("stable.services.qq_auto_push.enqueue_qq_auto_push_for_article") as qq, patch("stable.tasks.dispatch_task"), patch("stable.tasks.log_operation"):
+            old_time = self.article.published_to_web_at
+            publish_article(self.article, None)
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.published_to_web_at, old_time)
+        qq.assert_not_called()
