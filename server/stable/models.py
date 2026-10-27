@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import uuid
 from typing import Iterable
 
 from django.conf import settings
@@ -4297,6 +4298,8 @@ class CrawlJob(TimestampedModel):
 
 
 class NewsArticle(TimestampedModel):
+    active_news_run = models.ForeignKey("NewsProcessingRun", null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    news_generation = models.PositiveBigIntegerField(default=0)
     source_config = models.ForeignKey(
         NewsSource,
         on_delete=models.SET_NULL,
@@ -5920,6 +5923,7 @@ class MultiregionAttributionLock(TimestampedModel):
 
 
 class HomepageHeadlineSelection(models.Model):
+    receipt = models.ForeignKey("NewsPublicationReceipt", null=True, blank=True, on_delete=models.PROTECT, related_name="+")
     SLOT_HOMEPAGE_PRIMARY = "homepage_primary"
 
     slot = models.CharField(max_length=32, unique=True, default=SLOT_HOMEPAGE_PRIMARY)
@@ -5947,6 +5951,7 @@ class HomepageHeadlineSelection(models.Model):
 
 
 class HomepageHeadlineRecommendation(models.Model):
+    receipt = models.ForeignKey("NewsPublicationReceipt", null=True, blank=True, on_delete=models.PROTECT, related_name="+")
     class Status(models.TextChoices):
         ACTIVE = "active", "活跃"
         ACCEPTED = "accepted", "已接受"
@@ -7024,3 +7029,199 @@ class ManagedReadonlyStep(models.Model):
 
     def delete(self, *args, **kwargs):
         raise ValidationError("只读step禁止删除。")
+
+
+class NewsEditorialEvent(TimestampedModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    event_kind = models.CharField(max_length=32)
+    identity_key = models.CharField(max_length=160, unique=True)
+    primary_region = models.CharField(max_length=32)
+    version = models.PositiveBigIntegerField(default=0)
+    published_facts = models.JSONField(default=list)
+    identity_evidence = models.JSONField(default=dict)
+
+
+class NewsProcessingRun(TimestampedModel):
+    class State(models.TextChoices):
+        PENDING = "pending", "待处理"
+        RUNNING = "running", "处理中"
+        READY = "ready", "待发布"
+        REVIEW = "review", "待人工处理"
+        STALE = "stale", "已失效"
+        REJECTED = "rejected", "未入选"
+        DUPLICATE = "duplicate", "无新事实"
+        PUBLISHED = "published", "已发布"
+        SHADOW = "shadow", "影子完成"
+
+    article = models.ForeignKey(NewsArticle, on_delete=models.PROTECT, related_name="news_runs")
+    input_sha = models.CharField(max_length=64)
+    policy_sha = models.CharField(max_length=64)
+    target_revision_sha = models.CharField(max_length=64, default="machine")
+    expected_article_sha = models.CharField(max_length=64)
+    state = models.CharField(max_length=16, choices=State.choices, default=State.PENDING)
+    stage = models.CharField(max_length=32, default="clean")
+    generation = models.PositiveBigIntegerField(default=0)
+    lease_until = models.DateTimeField(null=True)
+    next_attempt_at = models.DateTimeField(default=timezone.now)
+    event = models.ForeignKey(NewsEditorialEvent, null=True, on_delete=models.PROTECT, related_name="runs")
+    event_version = models.PositiveBigIntegerField(default=0)
+    priority = models.CharField(max_length=16, default="uncertain")
+    primary_region = models.CharField(max_length=32)
+    source_snapshot = models.JSONField(default=dict)
+    clean_snapshot = models.JSONField(default=dict)
+    editorial_snapshot = models.JSONField(default=dict)
+    entity_snapshot = models.JSONField(default=dict)
+    translation_snapshot = models.JSONField(default=dict)
+    quality_snapshot = models.JSONField(default=dict)
+    manual_target = models.JSONField(default=dict)
+    editor_provenance = models.JSONField(default=dict)
+    parent_run = models.ForeignKey("self", null=True, on_delete=models.PROTECT)
+    reason = models.CharField(max_length=255, blank=True)
+    repair_count = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=("article", "input_sha", "policy_sha", "target_revision_sha"), name="news_run_revision_unique"),
+            models.CheckConstraint(condition=models.Q(state__in=["pending", "running", "ready", "review", "stale", "rejected", "duplicate", "published", "shadow"]), name="news_run_state_check"),
+            models.CheckConstraint(condition=models.Q(repair_count__lte=1), name="news_run_repair_bound"),
+        ]
+        indexes = [models.Index(fields=("state", "next_attempt_at", "priority")), models.Index(fields=("article", "-created_at"))]
+
+
+class NewsModelBudget(models.Model):
+    period_kind = models.CharField(max_length=8, choices=[("day", "日"), ("month", "月")])
+    period_start = models.DateField()
+    currency = models.CharField(max_length=8)
+    cap = models.DecimalField(max_digits=18, decimal_places=8, default=0)
+    reserved = models.DecimalField(max_digits=18, decimal_places=8, default=0)
+    spent = models.DecimalField(max_digits=18, decimal_places=8, default=0)
+    overage = models.DecimalField(max_digits=18, decimal_places=8, default=0)
+    policy_sha = models.CharField(max_length=64)
+    state = models.CharField(max_length=24, default="open", choices=[(s, s) for s in ("open", "blocked_overage", "blocked_unknown", "closed")])
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=("period_kind", "period_start", "currency"), name="news_budget_period_unique"),
+            models.CheckConstraint(condition=models.Q(cap__gte=0, reserved__gte=0, spent__gte=0, overage__gte=0), name="news_budget_nonnegative"),
+            models.CheckConstraint(condition=models.Q(period_kind__in=["day", "month"]), name="news_budget_period_check"),
+            models.CheckConstraint(condition=models.Q(state__in=["open", "blocked_overage", "blocked_unknown", "closed"]), name="news_budget_state_check"),
+        ]
+
+
+class NewsStageAttempt(models.Model):
+    run = models.ForeignKey(NewsProcessingRun, on_delete=models.PROTECT, related_name="attempts")
+    stage = models.CharField(max_length=32)
+    seq = models.PositiveSmallIntegerField()
+    claim_uuid = models.UUIDField(default=uuid.uuid4, unique=True)
+    generation = models.PositiveBigIntegerField()
+    input_sha = models.CharField(max_length=64)
+    output_sha = models.CharField(max_length=64, blank=True)
+    provider = models.CharField(max_length=64, blank=True)
+    model = models.CharField(max_length=128, blank=True)
+    prompt_version = models.CharField(max_length=64, blank=True)
+    state = models.CharField(max_length=16, default="reserved", choices=[(s, s) for s in ("reserved", "inflight", "completed", "failed", "unknown")])
+    reservation = models.DecimalField(max_digits=18, decimal_places=8, default=0)
+    actual_cost = models.DecimalField(max_digits=18, decimal_places=8, default=0)
+    settlement_version = models.PositiveIntegerField(default=0)
+    day_budget = models.ForeignKey(NewsModelBudget, null=True, on_delete=models.PROTECT, related_name="day_attempts")
+    month_budget = models.ForeignKey(NewsModelBudget, null=True, on_delete=models.PROTECT, related_name="month_attempts")
+    usage = models.JSONField(default=dict)
+    result = models.JSONField(default=dict)
+    error = models.CharField(max_length=255, blank=True)
+    reserved_at = models.DateTimeField(default=timezone.now)
+    completed_at = models.DateTimeField(null=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=("run", "stage", "seq"), name="news_stage_attempt_unique"),
+            models.CheckConstraint(condition=models.Q(state__in=["reserved", "inflight", "completed", "failed", "unknown"]), name="news_attempt_state_check"),
+            models.CheckConstraint(condition=~models.Q(state="completed") | ~models.Q(output_sha=""), name="news_attempt_output_check"),
+            models.CheckConstraint(condition=models.Q(reservation__gte=0, actual_cost__gte=0), name="news_attempt_cost_check"),
+        ]
+        indexes = [models.Index(fields=("state", "reserved_at"))]
+
+
+class NewsPublicationReceipt(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    run = models.OneToOneField(NewsProcessingRun, on_delete=models.PROTECT, related_name="receipt")
+    article = models.ForeignKey(NewsArticle, on_delete=models.PROTECT, related_name="news_receipts")
+    event = models.ForeignKey(NewsEditorialEvent, on_delete=models.PROTECT, related_name="receipts")
+    source_revision_sha = models.CharField(max_length=64)
+    target_revision_sha = models.CharField(max_length=64)
+    delta_sha = models.CharField(max_length=64)
+    content = models.JSONField()
+    source_snapshot = models.JSONField()
+    evidence = models.JSONField(default=dict)
+    verified_occurrences = models.JSONField(default=list)
+    verified_relations = models.JSONField(default=dict)
+    previous_receipt = models.ForeignKey("self", null=True, on_delete=models.PROTECT)
+    kind = models.CharField(max_length=24, choices=[("new_story", "新稿"), ("correction_story", "更正稿")])
+    publication_key = models.CharField(max_length=64)
+    published_at = models.DateTimeField(default=timezone.now)
+    visibility = models.CharField(max_length=16, default="public", choices=[("public", "公开"), ("withdrawn", "撤回")])
+    visibility_evidence = models.JSONField(default=list)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=("event", "publication_key"), name="news_publication_event_unique"),
+            models.CheckConstraint(condition=models.Q(kind__in=["new_story", "correction_story"]), name="news_receipt_kind_check"),
+            models.CheckConstraint(condition=models.Q(visibility__in=["public", "withdrawn"]), name="news_receipt_visibility_check"),
+        ]
+        indexes = [models.Index(fields=("event", "published_at"))]
+
+
+class NewsPublicEntry(models.Model):
+    feed_seq = models.PositiveBigIntegerField(unique=True)
+    kind = models.CharField(max_length=8, choices=[("legacy", "既有"), ("p01", "P01")])
+    article = models.ForeignKey(NewsArticle, on_delete=models.PROTECT, related_name="public_entries")
+    receipt = models.OneToOneField(NewsPublicationReceipt, null=True, on_delete=models.PROTECT, related_name="public_entry")
+    public_revision = models.CharField(max_length=64)
+    sort_time = models.DateTimeField()
+    primary_region = models.CharField(max_length=32)
+    priority = models.CharField(max_length=16)
+    major_until = models.DateTimeField(null=True)
+    superseded_at = models.DateTimeField(null=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=("kind", "article", "public_revision"), name="news_entry_revision_unique"),
+            models.CheckConstraint(condition=models.Q(kind="p01", receipt__isnull=False) | models.Q(kind="legacy", receipt__isnull=True), name="news_entry_kind_check"),
+        ]
+        indexes = [models.Index(fields=("primary_region", "-sort_time", "-feed_seq"))]
+
+
+class NewsFeedSnapshot(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    generation = models.UUIDField(default=uuid.uuid4, unique=True)
+    policy_sha = models.CharField(max_length=64)
+    catalog_watermark = models.PositiveBigIntegerField(default=0)
+    cutoff_at = models.DateTimeField(default=timezone.now)
+    ordered_entry_ids = models.JSONField(default=list)
+    headline_entry_id = models.PositiveBigIntegerField(null=True)
+    hot_entry_ids = models.JSONField(default=list)
+    slots_metadata = models.JSONField(default=dict)
+    expires_at = models.DateTimeField(db_index=True)
+
+
+class NewsDiscoveryObservation(models.Model):
+    kind = models.CharField(max_length=16, choices=[("stub", "候选"), ("source_window", "来源窗口")])
+    source = models.ForeignKey(NewsSource, null=True, on_delete=models.PROTECT)
+    crawl_job = models.ForeignKey(CrawlJob, on_delete=models.PROTECT, related_name="news_observations")
+    item_key = models.CharField(max_length=1000)
+    observed_at = models.DateTimeField(default=timezone.now)
+    source_time_evidence = models.JSONField(default=dict)
+    primary_region = models.CharField(max_length=32, default="unknown")
+    related_regions = models.JSONField(default=list)
+    stage = models.CharField(max_length=32, default="discovered")
+    outcome = models.CharField(max_length=32, default="pending")
+    reason = models.CharField(max_length=255, blank=True)
+    source_snapshot = models.JSONField(default=dict)
+    article = models.ForeignKey(NewsArticle, null=True, on_delete=models.PROTECT)
+    run = models.ForeignKey(NewsProcessingRun, null=True, on_delete=models.PROTECT)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=("crawl_job", "kind", "item_key"), name="news_discovery_item_unique"),
+            models.CheckConstraint(condition=models.Q(kind__in=["stub", "source_window"]), name="news_discovery_kind_check"),
+        ]
+        indexes = [models.Index(fields=("source", "item_key", "observed_at"))]
