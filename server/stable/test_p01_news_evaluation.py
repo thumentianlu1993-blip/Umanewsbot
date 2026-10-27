@@ -22,3 +22,19 @@ class EvaluationManifestTests(SimpleTestCase):
         package = evaluation_package([], [])
         self.assertEqual(package["status"], "NOT_RUN")
         self.assertEqual(package["external_calls_executed"], 0)
+
+    def test_same_cached_content_cannot_fill_gold_with_different_ids(self):
+        import hashlib
+        from stable.services.news_pipeline import REGIONS
+        with TemporaryDirectory() as root:
+            raw = b"one real cached source"
+            Path(root, "source.html").write_bytes(raw)
+            rows = [{"id": str(i), "path": "source.html", "sha256": hashlib.sha256(raw).hexdigest(),
+                "region": region, "split": "holdout" if j < 5 else "development", "event_key": str(i),
+                "origin": "cached_real", "provenance": "cached source", "source_url": "https://example.invalid/story",
+                "annotation_origin": "human", "annotator": "reviewer", "annotations": {
+                    "body_blocks": ["body"], "entities": [], "facts": [], "editorial": {"priority": "regional"}}}
+                for i, (region, j) in enumerate((r, j) for r in REGIONS for j in range(20))]
+            result = validate_gold(rows, root=root)
+        self.assertFalse(result["valid"])
+        self.assertTrue(any("duplicate_source" in error for error in result["errors"]))

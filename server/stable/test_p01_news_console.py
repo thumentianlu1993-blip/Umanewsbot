@@ -80,3 +80,20 @@ class QualityConsoleTests(WorkflowFixture, TransactionTestCase):
         new = article.active_news_run
         self.assertEqual(new.editor_provenance["event_binding"]["event_id"], str(first.event_id))
         self.assertEqual(new.editor_provenance["user_id"], self.user.pk)
+
+    def test_candidate_entry_routes_to_current_quality_run(self):
+        response = self.client.get(reverse("console-candidate-detail", args=[self.article.pk]))
+        self.assertRedirects(response, reverse("console-news-quality-detail", args=[self.run.pk]))
+
+    def test_headline_invalidation_uses_selected_receipt_and_clears_binding(self):
+        from stable.models import HomepageHeadlineSelection
+        from stable.services.editorial_headlines import invalidate_headline_state_for_article
+        first, second = self.publish_pair()
+        selection = HomepageHeadlineSelection.objects.create(slot=HomepageHeadlineSelection.SLOT_HOMEPAGE_PRIMARY,
+            article=self.article, receipt=second, selected_by=self.user)
+        self.assertEqual(invalidate_headline_state_for_article(self.article.pk), 0)
+        NewsPublicationReceipt.objects.filter(pk=second.pk).update(visibility="withdrawn")
+        self.assertEqual(invalidate_headline_state_for_article(self.article.pk), 1)
+        selection.refresh_from_db()
+        self.assertIsNone(selection.article_id)
+        self.assertIsNone(selection.receipt_id)
