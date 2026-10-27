@@ -1,7 +1,7 @@
 """公开快照与已发布来源不可被绕过 service 的 ORM 写覆盖。"""
 from django.db import DatabaseError, transaction
 from django.test import TransactionTestCase
-from stable.models import NewsArticle, NewsPublicationReceipt, NewsPublicEntry, NewsProcessingRun
+from stable.models import NewsArticle, NewsPublicationReceipt, NewsPublicEntry, NewsProcessingRun, NewsStageAttempt
 from stable.test_p01_news_workflow import WorkflowFixture
 
 
@@ -16,6 +16,8 @@ class ImmutablePublicationTests(WorkflowFixture, TransactionTestCase):
             (NewsArticle.objects.filter(pk=self.article.pk), {"body_ja_raw": "重抓覆盖"}),
             (NewsPublicEntry.objects.filter(receipt=receipt), {"sort_time": receipt.published_at.replace(year=2020)}),
             (NewsProcessingRun.objects.filter(pk=self.run.pk), {"source_snapshot": {"title": "替换"}}),
+            (NewsProcessingRun.objects.filter(pk=self.run.pk), {"quality_snapshot": {"passed": True}}),
+            (NewsStageAttempt.objects.filter(pk=self.run.quality_snapshot["strong_attempt_id"]), {"result": {"verdict": "pass"}}),
         ]
         for queryset, fields in mutations:
             with self.subTest(model=queryset.model.__name__), self.assertRaises(DatabaseError), transaction.atomic():
