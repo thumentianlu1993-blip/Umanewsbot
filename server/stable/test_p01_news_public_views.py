@@ -34,8 +34,14 @@ class ReceiptViewTests(WorkflowFixture, TransactionTestCase):
         self.assertEqual(self.client.get(self.second.public_path).status_code, 200)
 
     def test_feed_uses_both_receipts_and_returns_generation(self):
+        from stable.services.news_feed import create_snapshot
+        create_snapshot(with_features=True)
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
         self.assertIn("X-News-Generation", response)
         self.assertContains(response, self.first.public_path)
         self.assertContains(response, self.second.public_path)
+
+    def test_no_ready_snapshot_is_explicitly_unavailable(self):
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 503)

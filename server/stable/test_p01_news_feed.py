@@ -62,3 +62,22 @@ class FeedTests(TransactionTestCase):
             news_feed.snapshot_page(snap.generation, now=self.now+timedelta(hours=25))
         with self.assertRaises(ValueError):
             news_feed.snapshot_page(snap.generation, cursor="tampered", now=self.now)
+
+    def test_legacy_publication_indexes_atomically_and_rollback_leaves_no_entry(self):
+        from django.db import transaction
+        article = NewsArticle.objects.create(source_site="jra", source_mode="official", source_article_id="legacy-new",
+            title_ja="原文", published_at=self.now, source_url="https://fixture.invalid/")
+        with self.settings(NEWS_QUALITY_FEED_ENABLED=True):
+            with self.assertRaises(RuntimeError), transaction.atomic():
+                article.workflow_status = "published"
+                article.published_to_web_at = self.now
+                article.save(update_fields=["workflow_status", "published_to_web_at"])
+                self.assertTrue(NewsPublicEntry.objects.filter(article=article).exists())
+                raise RuntimeError("模拟提交前崩溃")
+            self.assertFalse(NewsPublicEntry.objects.filter(article=article).exists())
+            article.save(update_fields=["workflow_status", "published_to_web_at"])
+            entry = NewsPublicEntry.objects.get(article=article)
+            article.title_zh = "修复标题"
+            article.save(update_fields=["title_zh"])
+            self.assertEqual(NewsPublicEntry.objects.filter(article=article).count(), 1)
+            self.assertEqual(entry.sort_time, self.now)
