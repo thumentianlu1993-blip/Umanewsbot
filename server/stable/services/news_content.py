@@ -14,6 +14,7 @@ BODY_SELECTORS = {
     "netkeiba": [".News_Txt"], "jra": [".news_body"],
     "sponichi": ["[data-component='article-body']"],
     "hkjc_news": [".horses-racing-news-content"],
+    "scmp_racing": [".article-body"],
     "sporting_life": ["[class*='Article__ArticleBody']", "article .article-body"],
     "bha": [".article-body"], "sky_sports_racing": [".sdc-article-body"],
     "france_galop_news": [".field--name-body", ".field-name-body"],
@@ -84,6 +85,8 @@ def clean_source(snapshot, selectors=None):
             break
     if root is None or root.name in {"html", "body", "main"}:
         raise ContentBlocked("body_boundary_not_found")
+    if snapshot["source_site"] == "scmp_racing" and root.select_one(".paywall, [data-paywall], .subscription-required"):
+        raise ContentBlocked("body_access_restricted")
     removed = []
     for selector in _STRUCTURED_NOISE_SELECTORS:
         for node in list(root.select(selector)):

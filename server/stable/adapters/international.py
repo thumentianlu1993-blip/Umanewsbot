@@ -24,6 +24,120 @@ from .base import CanonicalNewsDraft, SourceAdapter, SourceArticleDetail, Source
 RANKED_SOURCE_MODES = {SourceMode.ACCESS, SourceMode.ATTENTION}
 
 
+# 站点墙钟必须使用来源时区；仅日期不构成小时级时效证据。
+_SOURCE_TIMEZONES = {
+    "sponichi": "Asia/Tokyo", "hkjc_news": "Asia/Hong_Kong", "scmp_racing": "Asia/Hong_Kong",
+    "sporting_life": "Europe/London", "sky_sports_racing": "Europe/London", "bha": "Europe/London",
+    "france_galop_news": "Europe/Paris", "tdn": "America/New_York", "tdn_france": "America/New_York",
+    "horse_racing_nation": "America/New_York", "at_the_races": "Europe/London",
+    "bloodhorse": "America/New_York", "paulick_report": "America/New_York",
+}
+
+
+def _source_datetime(raw, zone):
+    raw = str(raw).strip()
+    precision = "minute" if re.search(r"\d{1,2}:\d{2}", raw) else "date"
+    try:
+        parsed = dateparse.parse_datetime(raw)
+        if parsed is None:
+            value = dateparse.parse_date(raw)
+            parsed = datetime.combine(value, datetime.min.time()) if value else None
+    except (ValueError, TypeError):
+        parsed = None
+    if parsed is None:
+        for pattern in ("%d/%m/%Y %H:%M", "%A, %B %d, %Y - %H:%M", "%A, %B %d, %Y",
+                        "%a, %B %d, %Y - %H:%M", "%a, %B %d, %Y", "%d %B %Y - %H:%M",
+                        "%d %B %Y", "%B %d, %Y - %H:%M", "%B %d, %Y"):
+            try:
+                parsed = datetime.strptime(raw, pattern)
+                break
+            except ValueError:
+                pass
+    if parsed is None:
+        return None, precision
+    if timezone.is_naive(parsed):
+        local = parsed.replace(tzinfo=ZoneInfo(zone))
+        # DST 的重复/不存在墙钟没有足够证据选择一个 UTC 时刻。
+        if local.utcoffset() != local.replace(fold=1).utcoffset():
+            return None, precision
+        parsed = local
+    return parsed.astimezone(dt_timezone.utc), precision
+
+
+def _publication_time(soup, *, source_site, url, title):
+    zone = _SOURCE_TIMEZONES.get(str(source_site), "UTC")
+    def resolve(rows):
+        valid = []
+        for raw, selector in rows:
+            parsed, precision = _source_datetime(raw, zone)
+            if parsed:
+                valid.append((parsed, raw, selector, precision))
+        if not valid:
+            return None
+        if len({row[0] for row in valid}) > 1:
+            return None, {"source": "detail", "verified": False, "timezone": zone,
+                          "precision": "unknown", "reason": "conflicting_publication_dates"}
+        parsed, raw, selector, precision = valid[0]
+        verified = precision == "minute" and parsed <= timezone.now() + timedelta(minutes=5)
+        return parsed, {"source": "detail", "raw": raw, "selector": selector, "timezone": zone,
+                        "precision": precision, "verified": verified,
+                        "reason": "published_time" if verified else "date_only_or_future"}
+    def identity(value):
+        if isinstance(value, dict):
+            value = value.get("@id") or value.get("url")
+        if not isinstance(value, str) or not value:
+            return None
+        parts = urlsplit(urljoin(url, value))
+        return parts.hostname, parts.path.rstrip("/")
+    articles = []
+    for script in soup.select('script[type="application/ld+json"]'):
+        try:
+            payload = json.loads(script.string or script.get_text())
+        except (ValueError, TypeError):
+            continue
+        # 只遍历顶层和 @graph；嵌套推荐/hasPart不是当前文章。
+        stack = [payload]
+        while stack:
+            node = stack.pop()
+            if isinstance(node, list):
+                stack.extend(node)
+            elif isinstance(node, dict):
+                if isinstance(node.get("@graph"), list):
+                    stack.extend(node["@graph"])
+                types = node.get("@type", [])
+                types = [types] if isinstance(types, str) else types
+                if not isinstance(types, list) or not set(x for x in types if isinstance(x, str)) & {"Article", "NewsArticle", "ReportageNewsArticle"}:
+                    continue
+                refs = [identity(node.get(key)) for key in ("mainEntityOfPage", "url", "@id") if node.get(key)]
+                refs = [ref for ref in refs if ref]
+                if refs and any(ref != identity(url) for ref in refs):
+                    continue
+                if not refs and normalize_whitespace(html_lib.unescape(str(node.get("headline") or node.get("alternativeHeadline") or ""))) != title:
+                    continue
+                if isinstance(node.get("datePublished"), str):
+                    articles.append((node["datePublished"], "jsonld:datePublished"))
+    result = resolve(articles)
+    if result:
+        return result
+    result = resolve([(node.get("content", ""), "head:published_time") for node in soup.select(
+        "head meta[property='article:published_time'], head meta[itemprop='datePublished']")])
+    if result:
+        return result
+    if str(source_site) == "hkjc_news":
+        rows = []
+        for node in soup.select(".horses-racing-news-author"):
+            match = re.search(r"\b\d{2}/\d{2}/\d{4}\s+\d{2}:\d{2}\b", node.get_text(" ", strip=True))
+            if match:
+                rows.append((match[0], ".horses-racing-news-author"))
+    else:
+        rows = [(node.get("datetime") or node.get_text(" ", strip=True), "time[datetime]" if node.has_attr("datetime") else "time/.date")
+                for node in soup.select("time[datetime], time, .date, .published, .timestamp")
+                if not node.find_parent(["aside", "nav", "footer"])]
+    result = resolve(rows)
+    return result or (None, {"source": "fallback", "raw": "", "timezone": zone, "precision": "unknown", "verified": False,
+                            "reason": "publication_time_missing"})
+
+
 class SimpleInternationalNewsAdapter(SourceAdapter):
     source_site: SourceSite
     canonical_source_site: SourceSite | None = None
@@ -73,6 +187,13 @@ class SimpleInternationalNewsAdapter(SourceAdapter):
         return self.parse_detail_html(html, url=url)
 
     def normalize_source_payload(self, stub: SourceArticleStub, detail: SourceArticleDetail) -> CanonicalNewsDraft:
+        metadata = {**stub.metadata, **detail.metadata,
+                    "source_language": self.source_language, "discovered_source_site": self.source_site}
+        if detail.published_at is None and detail.metadata.get("published_at_evidence", {}).get("reason") != "conflicting_publication_dates":
+            evidence = dict(stub.metadata.get("published_at_evidence") or {
+                "source": "listing", "raw": stub.published_at.isoformat() if stub.published_at else "",
+                "timezone": "UTC", "precision": "unknown", "verified": False, "reason": "discovery_time_fallback"})
+            metadata.update(published_at_verified=evidence.get("verified") is True, published_at_evidence=evidence)
         return CanonicalNewsDraft(
             source_site=self.source_site,
             source_mode=stub.source_mode,
@@ -91,12 +212,7 @@ class SimpleInternationalNewsAdapter(SourceAdapter):
             attention_count=stub.attention_count,
             rank=stub.rank,
             canonical_source_site=self.canonical_source_site,
-            metadata={
-                **stub.metadata,
-                **detail.metadata,
-                "source_language": self.source_language,
-                "discovered_source_site": self.source_site,
-            },
+            metadata=metadata,
         )
 
     def listing_url(self, page_or_month: str | int, mode: SourceMode | str | None = None) -> str:
@@ -138,18 +254,19 @@ class SimpleInternationalNewsAdapter(SourceAdapter):
         title_meta = soup.select_one("meta[property='og:title'], meta[name='twitter:title']")
         title_node = soup.select_one(self.title_selector) or soup.select_one("title")
         body_node, matched_body_selector = self._select_body_node(soup)
-        date_node = soup.select_one(self.date_selector)
         author_node = soup.select_one(self.author_selector)
         meta_title = title_meta.get("content", "").strip() if title_meta and title_meta.get("content") else ""
         node_title = title_node.get_text(" ", strip=True) if title_node else ""
         title = normalize_whitespace(meta_title if self.prefer_meta_title and meta_title else node_title or meta_title)
+        published_at, time_evidence = _publication_time(soup, source_site=self.source_site, url=url, title=title)
         if body_node is None:
             clean_result = ArticleContentCleanResult(text="", status="selector_not_found", removed_rules={})
+        elif self.source_site == SourceSite.SCMP_RACING and body_node.select_one(".paywall, [data-paywall], .subscription-required"):
+            clean_result = ArticleContentCleanResult(text="", status="body_access_restricted", removed_rules={})
         else:
             clean_result = clean_international_article_body(body_node, source_site=self.source_site)
         body_raw = clean_result.text
         body_normalized = normalize_whitespace(body_raw)
-        published_at = self._parse_published_at(date_node)
         return SourceArticleDetail(
             title_ja=title,
             body_ja_raw=body_raw,
@@ -164,6 +281,8 @@ class SimpleInternationalNewsAdapter(SourceAdapter):
                 "body_parse_status": clean_result.status,
                 "body_selector": matched_body_selector,
                 "body_cleaning": clean_result.metadata(),
+                "published_at_verified": time_evidence["verified"],
+                "published_at_evidence": time_evidence,
             },
             original_content_html=html,
         )
@@ -319,6 +438,11 @@ class SCMPRacingAdapter(SimpleInternationalNewsAdapter):
     racing_region = RacingRegion.HONG_KONG
     source_language = SourceLanguage.ENGLISH
     link_path_keywords = ("/sport/racing",)
+    body_selector = ".article-body"
+
+    def _select_body_node(self, soup):
+        nodes = soup.select(self.body_selector)
+        return (nodes[0], self.body_selector) if len(nodes) == 1 else (None, "")
 
 
 class SportingLifeAdapter(SimpleInternationalNewsAdapter):
@@ -329,6 +453,25 @@ class SportingLifeAdapter(SimpleInternationalNewsAdapter):
     source_language = SourceLanguage.ENGLISH
     link_path_keywords = ("/racing/news",)
     body_selector = "[class*='Article__ArticleBody'], article .article-body"
+
+    article_selector = "a[href*='/racing/news/']"
+
+    def _topic_allowed(self, title, url):
+        return bool(super()._topic_allowed(title, url) and re.fullmatch(r"/racing/news/[^/]+/\d+/?", urlsplit(url).path))
+
+    def parse_listing_html(self, html, *, url, mode=None):
+        soup = BeautifulSoup(html, "lxml")
+        for anchor in soup.select(self.article_selector):
+            heading = anchor.select_one("h2, h3, [class*='Headline']")
+            if heading:
+                anchor["title"] = heading.get_text(" ", strip=True)
+        stubs = super().parse_listing_html(str(soup), url=url, mode=mode)
+        if not stubs:
+            raise ValueError("listing_no_candidates:sporting_life")
+        for stub in stubs:
+            stub.metadata.update(published_at_verified=False, published_at_evidence={
+                "source": "listing", "verified": False, "precision": "unknown", "reason": "discovery_time_fallback"})
+        return stubs
 
 
 class BHAAdapter(SimpleInternationalNewsAdapter):
@@ -409,67 +552,6 @@ class FranceGalopEnglishNewsAdapter(SimpleInternationalNewsAdapter):
     title_selector = "h1, article h1"
     body_selector = "article, .region-content, main"
 
-    def _parse_published_at(self, date_node) -> datetime | None:
-        if date_node is None:
-            return None
-        raw = (date_node.get("datetime") or date_node.get_text(" ", strip=True) or "").strip()
-        parsed = dateparse.parse_datetime(raw)
-        if parsed is None:
-            for pattern in (
-                "%A, %B %d, %Y - %H:%M",
-                "%A, %B %d, %Y",
-                "%a, %B %d, %Y - %H:%M",
-                "%a, %B %d, %Y",
-                "%d %B %Y - %H:%M",
-                "%d %B %Y",
-                "%B %d, %Y - %H:%M",
-                "%B %d, %Y",
-            ):
-                try:
-                    parsed = datetime.strptime(raw, pattern)
-                    break
-                except ValueError:
-                    continue
-        if parsed is None:
-            return None
-        if timezone.is_naive(parsed):
-            parsed = parsed.replace(tzinfo=ZoneInfo("Europe/Paris"))
-        return parsed.astimezone(dt_timezone.utc)
-
-    def parse_detail_html(self, html: str, *, url: str) -> SourceArticleDetail:
-        detail = super().parse_detail_html(html, url=url)
-        soup = BeautifulSoup(html, "lxml")
-        date_node = soup.select_one(self.date_selector)
-        raw = (
-            (date_node.get("datetime") or date_node.get_text(" ", strip=True) or "").strip()
-            if date_node is not None
-            else ""
-        )
-        detail.metadata["published_at_evidence"] = {
-            "source": "detail" if detail.published_at else "fallback",
-            "raw": raw,
-            "timezone": "Europe/Paris",
-            "verified": bool(detail.published_at),
-        }
-        detail.metadata["published_at_verified"] = bool(detail.published_at)
-        return detail
-
-    def normalize_source_payload(self, stub: SourceArticleStub, detail: SourceArticleDetail) -> CanonicalNewsDraft:
-        draft = super().normalize_source_payload(stub, detail)
-        if detail.published_at:
-            evidence = detail.metadata.get("published_at_evidence") or {}
-            draft.metadata["published_at_verified"] = True
-            draft.metadata["published_at_evidence"] = evidence
-        else:
-            evidence = stub.metadata.get("published_at_evidence") or {
-                "source": "listing",
-                "raw": stub.published_at.isoformat() if stub.published_at else "",
-                "timezone": "UTC",
-                "verified": False,
-            }
-            draft.metadata["published_at_verified"] = False
-            draft.metadata["published_at_evidence"] = evidence
-        return draft
 
 
 class TDNAdapter(SimpleInternationalNewsAdapter):
@@ -484,6 +566,13 @@ class TDNAdapter(SimpleInternationalNewsAdapter):
     api_url = "https://www.thoroughbreddailynews.com/wp-json/wp/v2/posts?per_page=20"
     resolve_missing_api_dates = False
     max_api_article_age: timedelta | None = None
+
+    def normalize_source_payload(self, stub, detail):
+        from stable.services.news_attribution import infer_global_source_region
+        draft = super().normalize_source_payload(stub, detail)
+        draft.racing_region, evidence = infer_global_source_region(draft.title_ja, draft.body_ja_normalized)
+        draft.metadata["region_evidence"] = evidence
+        return draft
 
     def listing_url(self, page_or_month: str | int, mode: SourceMode | str | None = None) -> str:
         return self.api_url
