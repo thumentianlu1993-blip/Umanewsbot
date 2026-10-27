@@ -3,6 +3,7 @@ from django.urls import path
 from . import views, news_quality_views
 
 urlpatterns = [
+    path("news-quality/report/", news_quality_views.report, name="console-news-quality-report"),
     path("news-quality/", news_quality_views.queue, name="console-news-quality-queue"),
     path("news-quality/runs/<int:run_id>/", news_quality_views.detail, name="console-news-quality-detail"),
     path("news-quality/runs/<int:run_id>/action/", news_quality_views.action, name="console-news-quality-action"),

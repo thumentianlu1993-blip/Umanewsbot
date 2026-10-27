@@ -113,3 +113,18 @@ def edit_revision(request, article):
             messages.success(request, "修订已保存；审校及事实增量检查通过后独立发布。")
             return redirect("console-article-editor", article_id=article.pk)
     return render(request, "stable/console/news_quality_editor.html", _context(request, article=article, run=run, form=form))
+
+
+@login_required
+@require_GET
+@never_cache
+def report(request):
+    from datetime import timedelta
+    from django.utils import timezone
+    from stable.services.news_quality_report import build_report
+    if (denied := _staff(request)) is not None:
+        return denied
+    end = timezone.now()
+    result = build_report(start=end-timedelta(days=7), end=end)
+    return render(request, "stable/console/news_quality_report.html", _context(request,
+        report=result, regions=result["regions"].items(), details=json.dumps(result, ensure_ascii=False, indent=2, default=str)))
