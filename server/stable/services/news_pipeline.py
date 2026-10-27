@@ -78,7 +78,7 @@ def start_revision(article, *, snapshot=None, manual_target=None, editor=None):
     target_sha = digest(target) if target else "machine"
     run, created = NewsProcessingRun.objects.get_or_create(
         article=article, input_sha=digest(snapshot), policy_sha=policy_sha(), target_revision_sha=target_sha,
-        defaults={"source_snapshot": snapshot, "manual_target": target,
+        defaults={"generation": article.news_generation + 1, "source_snapshot": snapshot, "manual_target": target,
                   "editor_provenance": {"user_id": editor.pk} if editor else {},
                   "primary_region": snapshot["region"], "parent_run_id": article.active_news_run_id},
     )
