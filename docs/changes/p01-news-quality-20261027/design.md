@@ -1,6 +1,6 @@
 # P01 开发设计
 
-状态：原 reviewer 第二轮技术评审 APPROVED，7项问题已关闭；公开版本+条目索引架构选择待用户决定。基线及产品决策见 [spec](spec.md)，授权统一引用[根 AGENTS.md](../../../AGENTS.md)。以下新接口/模型均是拟议实现，不是当前已具备能力。
+状态：用户已明确独立新稿、旧文章不修改；原 reviewer 第四轮最终 APPROVED，全部已发现方案问题关闭。基线及产品决策见 [spec](spec.md)，授权统一引用[根 AGENTS.md](../../../AGENTS.md)。以下新接口/模型均是拟议实现，不是当前已具备能力。
 
 ## 1 实际代码基线与复用边界
 
@@ -49,16 +49,16 @@
 | `NewsStageAttempt` | run FK、stage、seq、claim_uuid、generation、input/output SHA、provider/model/prompt版本、state、reservation金额、实际usage、两类budget FK、timestamps；unique(run,stage,seq)，claim_uuid唯一 | 每次外部请求、未知费用和响应归属；禁止覆盖已完成证据 |
 | `NewsModelBudget` | period_kind(day/month)、period_start、currency、cap、reserved、spent、policy_sha；unique(period_kind,period_start,currency)；金额非负；state(open/blocked_overage/blocked_unknown/closed)，overage金额；准入在锁内检查spent+reserved+新预约≤cap，事实账允许spent超cap | P01专用金额额度，不扩张只读工具预算表 |
 | `NewsEditorialEvent` | UUID、event_kind、identity_key（可空）、primary_region、version、published_facts JSON；已确认identity_key非空时唯一 | 非赛事新闻也有事件；归并不修改 RaceEvent/HorseProfile |
-| `NewsPublicationReceipt` | UUID、run OneToOne、article FK、event FK、source_revision_sha、target_revision_sha、delta_sha、不可变全文/标题/摘要/原文及证据快照、previous_receipt FK、story_receipt FK、kind(new_story/correction)、published_at、visibility状态；new_story条件unique(event,delta_sha)，correction条件unique(story_receipt,target_revision_sha) | 发布幂等与增量历史，引用已提交版本 |
+| `NewsPublicationReceipt` | UUID、run OneToOne、article FK、event FK、source_revision_sha、target_revision_sha、delta_sha、不可变全文/标题/摘要/原文及证据快照、verified_occurrences/verified_relations快照、previous_receipt FK、kind(new_story/correction_story)、publication_key、published_at、visibility状态；unique(event,publication_key) | 发布幂等与增量历史，引用已提交版本 |
 | `NewsFeedSnapshot` | UUID、generation唯一、policy_sha、catalog_watermark、cutoff_at、ordered public_entry IDs、headline/hot entry IDs、slots metadata、expires_at | 可重放排序与分页，同一版本无重复漏页 |
 | `NewsDiscoveryObservation` | kind(stub/source_window)、source FK、crawl_job FK、source item ID或规范URL、observed_at、source time证据、primary/related地区及unknown、stage/outcome/reason、article/run nullable FK；unique(crawl_job,kind,item_key) | 解析前候选与来源窗口失败，重复轮询按来源项目归并统计首次发现 |
-| `NewsPublicEntry` | feed_seq唯一、kind(legacy/p01)、article FK、story_receipt nullable OneToOne、current_receipt nullable FK、public_revision、不可变sort_time/主地区/priority/major_until、superseded_at nullable；unique(kind,article,public_revision)，current_receipt必须属于同story | 最小公开条目索引，统一版本稿和旧文章的稳定分页身份，不复制正文 |
+| `NewsPublicEntry` | feed_seq唯一、kind(legacy/p01)、article FK、receipt nullable OneToOne、public_revision、不可变sort_time/主地区/priority/major_until、superseded_at nullable；unique(kind,article,public_revision)，每个P01公开新稿receipt唯一对应一个entry | 最小公开条目索引，统一版本稿和旧文章的稳定分页身份，不复制正文 |
 
 `NewsArticle` 增加 nullable `active_news_run` FK 与 `news_generation`（默认0）用于强制路由和旧任务拦截。新表状态限定 choices + CheckConstraint；完成阶段要求输出 SHA，published run 要有回执（服务事务检查并以回执 OneToOne约束防重）。FK 对证据用 PROTECT，禁止删除绕过去重。索引：run(state,next_attempt_at,priority)、run(article,-created_at)、event(identity_key)、receipt(event,published_at)、attempt(state,reserved_at)、snapshot(expires_at)、discovery(source,item_key,observed_at)、public_entry(primary_region,-sort_time,-feed_seq)。实际 migration 编号由实施时迁移图决定，不预占共享编号。
 
 `input_sha` 覆盖来源 ID/URL、标题、原始正文/HTML、语言、主地区/人工归属锁及源时间证据；`expected_article_sha` 另外覆盖所有最终展示字段、manual flags、workflow/withdrawn、active run/generation。术语/来源/模型/prompt/质量/编辑策略版本纳入 policy_sha。人工更新、原文变化或策略变化都不得让旧结果继续覆盖。
 
-锁顺序固定：budget（月→日）只用于预约/结算短事务；涉及公开/事件归并的业务提交先取publication advisory lock，再按event ID升序 → article → run → attempt；不公开的阶段结果提交只锁article→run→attempt，不同时持 budget 与业务锁。外部请求不持数据库锁。claim 用 select_for_update(skip_locked)，generation递增；结果提交 CAS 重验 generation、lease、版本及未撤回状态。新原文重抓时保留旧公开receipt，在 article锁下切 active run，旧 run=stale，旧 generation的结果只留证不写公开字段。
+锁顺序固定：budget（月→日）只用于预约/结算短事务；涉及公开/事件归并的业务提交先取publication advisory lock，再按event ID升序 → article → run → attempt；不公开的阶段结果提交只锁article→run→attempt，不同时持 budget 与业务锁。外部请求不持数据库锁。claim 用 select_for_update(skip_locked)，generation递增；结果提交 CAS 重验 generation、lease、版本及未撤回状态。新原文重抓时先落discovery源文证据及新run快照，旧已发布NewsArticle的源文与公开字段均不覆盖；仅在article锁下切内部active run，旧 run=stale，旧 generation的结果只留证不写公开字段。
 
 Celery投递使用 `transaction.on_commit`，再由每分钟扫描未完成 run补偿 DB提交后broker失败；不要求 exactly-once网络。成功 checkpoint可重用；发送后超时/worker失联视为 unknown，先按供应商request ID核对，不能查清则保留费用占用并待处理，禁止自动重发同一次不确定调用。
 
@@ -106,13 +106,17 @@ P01选稿明确停用JRA固定加分、榜单抬到自动阈值、soft_fill及�
 
 人工修正通过既有编辑页面的P01分支保存到run.manual_target，不直接写已公开内容；记录编辑者/操作日志/expected_article_sha，保留人工原文。重新审校恰好这份人工目标，不自动再翻译覆盖；审校失败仍可产生下一manual_target版本。成功后人工标志并非永久阻断：若目标SHA、编辑版本、原文和policy仍完全一致，则提交已核验的人工稿；发生新编辑则旧结果stale。
 
-第一篇通过时写不可变receipt并将已审字段投影到NewsArticle供旧接口兼容，清空非人工rewrite_*且验证effective hash。后续同URL重大事实更新生成新的run和receipt，保留首篇公开快照，不覆盖首篇正文/发布时间；不能通过伪造source_article_id复制NewsArticle。对已发布版本的纯纠错形成新的审定版本并保留前版，若无重大新增事实则创建kind=correction的receipt并更新原entry.current_receipt，不新增首页条目；重大更正创建kind=new_story的receipt与新entry并互链。纯纠错只校验同story目标版本唯一，不误用new_story的事件增量唯一约束。
+第一篇通过时写不可变receipt并将已审字段投影到尚未公开的NewsArticle供旧接口兼容，清空非人工rewrite_*且验证effective hash。一旦公开，日常P01流程不再修改其标题、正文、摘要、原文快照和发布时间。后续同URL重大事实更新，或需要公开的实质译文/事实更正，都生成新的run、独立receipt和新public entry；不存在current_receipt替换路径，不把旧稿路由指向新内容。仅措辞/排版差异不形成新稿，也不自动修改旧稿。
 
-发布事务重验当前目标、质量、人工指纹、事件版本和来源资格。既有人工发布/改稿入口对P01稿调用相同writer；后续重抓仅更新源证据/待审run，不改变公开快照。第一篇已发布也不阻止后续重大增量run发布。尚未审核的人工改稿不能通过旧有效字段即时出现在公开页。
+NewsArticle在存储上仅作来源唯一锚点；每个独立公开稿件以receipt承载完整不可变内容及自己的公开时间。用户确认的是独立稿件行为，不要求复制来源ID或改现有来源唯一约束。新稿使用独立公共稿件URL，页面标明所针对的前稿并链接原稿，旧稿页面和旧正文保持原样。
+
+publication_key由程序规范生成：new_story使用已核重大事实增量的规范键；correction_story使用被纠正receipt ID+原错事实ID+正确事实/原文证据的规范键。事件锁下检查该修正是否已在其他新稿覆盖，只有未覆盖的实质修正可新发，重复人工提交、换模型或换措辞不能多发。所有公开稿统一按(event,publication_key)去重，correction_story不以“原文没有新事实”为由被过滤。
+
+发布事务重验当前目标、质量、人工指纹、事件版本和来源资格。既有人工发布/改稿入口对P01稿调用相同writer；后续重抓在进入upsert前识别已公开P01锚点，源证据只写discovery及待审run，不覆盖旧NewsArticle正文。翻译prompt从run.source_snapshot构造不可变TranslationInput，复用普通provider单次请求能力，不依赖临时改写ORM文章来复用旧translate(article)。第一篇已发布也不阻止后续重大增量run发布。尚未审核的人工改稿不能通过旧有效字段即时出现在公开页。
 
 ### 6.2 新旧曝光和稳定分页
 
-P01有receipt的文章由事件增量决定资格，不再受 `RaceNewsExposure` 旧赛事两槽限制；无receipt旧文章继续原过滤。所有公开读取统一消费 `NewsPublicEntry` 引用，详见6.3。撤回/权限/可见性检查在所有查询路径共同执行。原稿与更正稿可同存，但首页优先最新更正，详情互链。
+P01有receipt的文章由事件增量决定资格，不再受 `RaceNewsExposure` 旧赛事两槽限制；无receipt旧文章继续原过滤。所有公开读取统一消费 `NewsPublicEntry` 引用，详见6.3。撤回/权限/可见性检查在所有查询路径共同执行。原稿与更正稿均独立保留，新稿链接原稿；首页可优先最新实质更正，但不改变旧稿内容和详情。
 
 每5分钟（或重大稿新公开时）生成feed snapshot。取池先按五地区分别取30天内最多100个可见public entry，先活跃major、再按不可变sort_time/feed_seq降序，总首部上限500；不能先全站截500再分区。超量地区记录overflow数，未进首部的已公开稿仍进入档案尾部，不能从公开/漏报分母消失。
 
@@ -122,28 +126,30 @@ P01有receipt的文章由事件增量决定资格，不再受 `RaceNewsExposure`
 
 ### 6.3 公开版本消费合同
 
-- `/news/<article_id>/` 对P01指向首篇的当前已审公开版本；更新稿使用 `/news/<article_id>/updates/<receipt_uuid>/`，与原稿互链。旧slug重定向保留；无receipt的旧文章保持原地址和现有字段读取。
-- feed/headline/hot、新闻搜索/档案、详情前后篇、赛事/马匹相关新闻及关注区统一用 `NewsPublicEntry` 的版本引用生成标题/正文/摘要/时间/链接；关联仍从anchor article读取且继续验证关系权限。不得一个地方读receipt、另一个地方直接取anchor的最新源文或effective字段。
+- `/news/<article_id>/` 对P01始终读取首稿的固定receipt；新稿统一使用 `/news/stories/<receipt_uuid>/` 独立详情路由，新稿链接前稿。旧slug保留原目标，不自动重定向新稿；无receipt的旧文章保持现有字段读取。
+- feed/headline/hot、新闻搜索/档案、详情前后篇、赛事/马匹相关新闻及关注区统一用 `NewsPublicEntry` 的版本引用生成标题/正文/摘要/时间/链接；P01关联必须从该receipt自身的verified_relations读取，并复验目标当前可见性，不能直接继承anchor article的关系。不得一个地方读receipt、另一个地方直接取anchor的最新源文或effective字段。
+- 每份receipt冻结本稿verified_occurrences与verified_relations，包含本稿source_sha/occurrence span、实体ID、既有关系证据及版本。首版仅采纳“该稿经核验身份/occurrence”与已有已确认anchor关系的交集，不新增模糊绑定；因此新稿纠正为B而anchor只确认A时，先不展示任何马匹关联，绝不挂到A。旧稿receipt和旧关系不修改；后续P03可按其范围补合法关系。无需全站实体ID的原名仍可正常翻译发布。
+- 相关新闻/关注查询必须按receipt关系证据筛选，然后检查对应马匹/赛事的当前公开状态；不能先用anchor关系召回后将全部receipt展开。receipt中的confirmed horse/race ID数组可用JSONB GIN索引，单稿最多128个关系条目，超限记关联缺口而不截断正文；无证据只影响关系展示，不阻止已合格全文发布。旧文章无receipt时继续原关联路径。
 - `HomepageHeadlineSelection`和`HomepageHeadlineRecommendation`各增加nullable receipt FK，选定P01稿时绑定精确receipt；旧article-only记录仍按旧语义。保留现有人工选择/取消/有效性检查，不虚称已有TTL或自动改变人工头条。推荐evidence带public_entry和质量SHA，接受时再次验可见性。
-- 首篇公开时间与每个新稿时间分别保存，不更新anchor的初次published_to_web_at来给旧稿“翻新”。纯排版/事实纠错替代同条目显示时不改变entry排序时间；重大更正是新条目。
-- article级撤回隐藏该anchor全部版本；单版本撤回只影响该receipt并在原链接返回不可用，不重定向到未审草稿。重新发布仍需审校和版本记录。receipt内容不可变，仅可见性/当前纠错版本引用通过审计writer更新。
+- 首篇与每个新稿公开时间分别保存；任何日常更新不刷新anchor初次published_to_web_at。需公开的实质更正也是独立条目，使用自己的公开时间；不能用更正名义将旧内容原位替换。
+- 每篇独立稿件按receipt单独撤回，前稿撤回不会自动撤回其他合格新稿；无receipt旧文仍按原article级撤回。明确的整来源撤回操作才隐藏该anchor所有稿件，并列出精确影响清单；新稿发布本身不触发旧稿撤回。receipt内容不可变，仅可见性可经审计writer更新；撤回的链接不指向未审草稿。
 - 发布/更正/撤回在事务提交后失效该anchor所有详情别名、相关列表与当前feed缓存；所有读取再次校验可见性，缺失回执不降级输出源文。缓存验证包含Nginx/应用层，不能只清Django缓存。
 
 ### 6.4 稳定分页、旧档案与曝光
 
-`NewsPublicEntry`仅作公开索引：P01每个new_story receipt建entry，correction仅更新该entry.current_receipt；legacy每次真实首次发布/明确重新发布建publication_generation，旧entry标superseded，原URL行为不变。排序键在entry建立后不可修改；纯历史修复不新建entry。模型迁移不自动回填，单独分页backfill已有公开旧文章（按article+既有公开版本幂等，沿用旧发布时间），上线切读前检查索引集合与当前公开文章/receipt一致。
+`NewsPublicEntry`仅作公开索引：P01每个new_story/correction_story receipt各建独立entry；legacy每次真实首次发布/明确重新发布建publication_generation，旧entry标superseded，原URL行为不变。排序键在entry建立后不可修改；纯历史修复不新建entry。模型迁移不自动回填，单独分页backfill已有公开旧文章（按article+既有公开版本幂等，沿用旧发布时间），上线切读前检查索引集合与当前公开文章/receipt一致。
 
 所有新旧公开提交与entry写入在同一短事务中完成，通过数据库事务级publication advisory lock串行分配feed_seq并持锁到提交；快照构建先取得同一锁，读取已提交最大feed_seq为catalog_watermark再释放。这样没有先分配ID后迟提交的条目穿过水位线。锁只覆盖数据库提交，不跨模型调用。发稿批量逐篇短事务，不持锁做全表扫描；锁等待超时进入重试不静默忽略entry。
 
-snapshot首部H冻结所有已占用的头条/热门/混排entry IDs（去重），档案尾部T定义为该水位线内全部公开entry减H，按不可变(sort_time DESC,feed_seq DESC) keyset分页；尾部不从“混排最后一项时间”开始。读取始终过滤现在已撤回/已替代版本，可产生空位但不补新ID。水位线之后的新稿/回填只出现在新generation；纯纠错不改变排序键。仍可见集合完整遍历应无重复无遗漏，明确撤回/替代导致的排除单列。
+snapshot首部H冻结所有已占用的头条/热门/混排entry IDs（去重），档案尾部T定义为该水位线内全部公开entry减H，按不可变(sort_time DESC,feed_seq DESC) keyset分页；尾部不从“混排最后一项时间”开始。读取始终过滤现在已撤回/已替代版本，可产生空位但不补新ID。水位线之后的新稿/回填只出现在新generation；实质更正新entry只进入新的generation，旧entry排序键不变。仍可见集合完整遍历应无重复无遗漏，明确撤回/替代导致的排除单列。
 
 无generation的首次请求绑定最新ready snapshot并在响应头/分页链接输出generation；无snapshot时显示可解释暂不可用，不能生成未计量的随机混排。generation有效24小时，过期链接提示刷新，不暗换顺序。服务端校验签名cursor的generation、水位和最后sort key；深页访问也不全表OFFSET。
 
 snapshot记录席位/地区/事件/policy与有效时长，仅表示展示供给。成功响应日志聚合generation+page/cursor摘要，含代理缓存命中；只记匿名聚合，不新增cookie或持久化IP。没有generation的首请求须在响应日志捕获实际选择的generation；曝光只计该响应实际保留的entry（撤回过滤后），不能直接用旧快照ID全量计。日志缺失时仅报席位而不宣称真实曝光完成。热门区不得绕过同事件控制；人工头条例外单列。
 
-## 7 历史修复与验证
+## 7 独立的历史修复交付与验证
 
-新增链完整交付后执行 N07/N08。复用news_body_history的冻结清单、每批≤10、前后fingerprint、幂等及回滚；先扩展五地区adapter合同与可写字段依赖测试，移除HRN硬编码必须限于manifest明确来源。没有原始证据或人工变化的条目保持blocked。
+本节仅承接用户先前确认的定向历史污染/误译清单修复，不能作为日常更新修改旧稿的旁路。新增链完整交付后单独处理 N07/N08。复用news_body_history的冻结清单、每批≤10、前后fingerprint、幂等及回滚；先扩展五地区adapter合同与可写字段依赖测试，移除HRN硬编码必须限于manifest明确来源。没有原始证据或人工变化的条目保持blocked。
 
 历史动作保留原 URL、published_to_web_at、人工字段、撤回状态；不当新稿排到首页，不发QQ/邮件。更新正文关联和曝光时在同一版本上校验；本轮只调整已存在且有确定证据的关系，不借机补采马匹。恢复必须after_sha匹配，发现修复后人工修改则停止该条回滚，不能覆盖。
 
