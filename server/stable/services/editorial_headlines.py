@@ -225,9 +225,13 @@ def get_headline_state(*, now=None) -> dict:
         }
 
     article = selection.article
-    is_manual_active = (
-        article is not None and is_headline_eligible(article, now=now)
-    )
+    is_manual_active = article is not None and is_headline_eligible(article, now=now)
+    if article and (selection.receipt_id or article.active_news_run_id):
+        receipt = _headline_receipt(article, selection.receipt_id)
+        is_manual_active = receipt is not None
+        if receipt:
+            from stable.services.news_public_read import display_article
+            article = display_article(receipt.public_entry)
 
     try:
         active_rec = HomepageHeadlineRecommendation.objects.select_related("article").get(
@@ -354,7 +358,7 @@ def resolve_homepage_headline(public_queryset, *, now=None) -> NewsArticle | Non
 
 
 def set_manual_headline(
-    article_id, *, user, expected_version
+    article_id, *, user, expected_version, receipt_id=None
 ) -> dict:
     """Atomically set (or replace) the homepage headline to *article_id*.
 
@@ -399,14 +403,12 @@ def set_manual_headline(
         except NewsArticle.DoesNotExist:
             return {"success": False, "reason": f"Article {article_id} does not exist"}
 
-        if not is_headline_eligible(article):
-            return {
-                "success": False,
-                "reason": f"Article {article_id} is not eligible as headline",
-            }
+        receipt = _headline_receipt(article, receipt_id)
+        if (receipt is None and (receipt_id or article.active_news_run_id)) or (receipt is None and not is_headline_eligible(article)):
+            return {"success": False, "reason": "目标稿件不可作为头条"}
 
         # Determine action
-        already_selected = selection.article_id == article_id
+        already_selected = selection.article_id == article_id and selection.receipt_id == (receipt.pk if receipt else None)
         old_article_id = selection.article_id
         had_previous = old_article_id is not None
         action = "replaced" if had_previous else "set"
@@ -414,11 +416,12 @@ def set_manual_headline(
         if not already_selected:
             # Update selection
             selection.article = article
+            selection.receipt = receipt
             selection.selected_by = user
             selection.selected_at = timezone.now()
             selection.version += 1
             selection.save(
-                update_fields=["article", "selected_by", "selected_at", "version", "updated_at"]
+                update_fields=["article", "receipt", "selected_by", "selected_at", "version", "updated_at"]
             )
             selection.refresh_from_db()
 
@@ -450,7 +453,7 @@ def set_manual_headline(
         # this article (idempotent re-set): the exposure state may have
         # degraded to waiting/suppressed since the headline was first set,
         # and a headline without an ACTIVE exposure is invisible.
-        if getattr(settings, "RACE_NEWS_EXPOSURE_ENABLED", False):
+        if receipt is None and getattr(settings, "RACE_NEWS_EXPOSURE_ENABLED", False):
             from stable.services.race_news_exposure import (
                 classify_angle,
                 force_activate_exposure,
@@ -575,11 +578,12 @@ def cancel_manual_headline(*, user, expected_version) -> dict:
 
         old_article_id = selection.article_id
         selection.article = None
+        selection.receipt = None
         selection.selected_by = None
         selection.selected_at = None
         selection.version += 1
         selection.save(
-            update_fields=["article", "selected_by", "selected_at", "version", "updated_at"]
+            update_fields=["article", "receipt", "selected_by", "selected_at", "version", "updated_at"]
         )
         selection.refresh_from_db()
 
@@ -729,9 +733,14 @@ def generate_headline_recommendation(*, user, now=None) -> dict | None:
             "manual_selection_article_id": selection.article_id,
         }
 
+        receipt = _headline_receipt(locked_article)
+        if locked_article.active_news_run_id and receipt is None:
+            return None
+        if receipt:
+            evidence.update(public_entry_id=receipt.public_entry.pk, quality_sha=receipt.target_revision_sha)
         rec = HomepageHeadlineRecommendation.objects.create(
             slot=HomepageHeadlineRecommendation.SLOT_HOMEPAGE_PRIMARY,
-            article=locked_article,
+            article=locked_article, receipt=receipt,
             status=HomepageHeadlineRecommendation.Status.ACTIVE,
             reason=reason,
             evidence=evidence,
@@ -828,20 +837,20 @@ def accept_headline_recommendation(
                 f"Recommended article {rec.article_id} does not exist"
             )
 
-        if not is_headline_eligible(article):
-            raise ValueError(
-                f"Recommended article {rec.article_id} is no longer eligible"
-            )
+        receipt = _headline_receipt(article, rec.receipt_id)
+        if (receipt is None and (rec.receipt_id or article.active_news_run_id)) or (receipt is None and not is_headline_eligible(article)):
+            raise ValueError("推荐稿件已不可用")
 
         had_previous = selection.article_id is not None
         action = "replaced" if had_previous else "set"
 
         selection.article = article
+        selection.receipt = receipt
         selection.selected_by = user
         selection.selected_at = timezone.now()
         selection.version += 1
         selection.save(
-            update_fields=["article", "selected_by", "selected_at", "version", "updated_at"]
+            update_fields=["article", "receipt", "selected_by", "selected_at", "version", "updated_at"]
         )
 
         rec.status = HomepageHeadlineRecommendation.Status.ACCEPTED
@@ -985,3 +994,16 @@ def invalidate_headline_state_for_article(
                 )
 
     return changes
+
+
+def _headline_receipt(article, receipt_id=None):
+    if not article.active_news_run_id and not receipt_id:
+        return None
+    from stable.models import NewsPublicationReceipt
+    query = NewsPublicationReceipt.objects.filter(article=article)
+    receipt = query.filter(pk=receipt_id).first() if receipt_id else query.order_by("published_at", "id").first()
+    if not receipt or receipt.visibility != "public" or receipt.published_at > timezone.now():
+        return None
+    if not all(receipt.content.get(key, "").strip() for key in ("title", "body", "summary")):
+        return None
+    return receipt

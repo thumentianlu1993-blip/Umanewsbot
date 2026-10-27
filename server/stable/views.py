@@ -2467,7 +2467,7 @@ def headline_select(request: HttpRequest):
     article_id = form.cleaned_data["article_id"]
     expected_version = form.cleaned_data["expected_version"]
     try:
-        result = set_manual_headline(article_id, user=request.user, expected_version=expected_version)
+        result = set_manual_headline(article_id, user=request.user, expected_version=expected_version, receipt_id=request.POST.get("receipt_id") or None)
         if result.get("success"):
             messages.success(request, "已设置首页头条。")
         else:

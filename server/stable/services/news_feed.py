@@ -92,8 +92,11 @@ def create_snapshot(*, now=None, per_region=100, with_features=False):
     if with_features and ordered:
         selection = HomepageHeadlineSelection.objects.filter(slot="homepage_primary").first()
         if selection and selection.article_id:
-            headline = next((row for row in ordered if (row.receipt_id == selection.receipt_id if selection.receipt_id
-                else row.article_id == selection.article_id and row.kind == "legacy")), None)
+            manual = visible_entries().filter(feed_seq__lte=watermark, sort_time__lte=now)
+            manual = manual.filter(receipt_id=selection.receipt_id) if selection.receipt_id else manual.filter(article_id=selection.article_id, kind="legacy")
+            headline = manual.order_by("-sort_time", "-feed_seq").first()
+            if headline and headline.pk not in {row.pk for row in ordered}:
+                ordered = [headline, *ordered[:499]]
         headline = headline or ordered[0]
         # 热门区只取已进入同一首页资格池的稿件，不创建旁路。
         hot = [row for row in active_major if row.pk != headline.pk][:3]
