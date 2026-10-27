@@ -196,3 +196,60 @@ class InternationalSourceIngestionTests(TestCase):
         self.assertEqual(snapshot['source_time'], '2026-10-27T11:35:21+00:00')
         self.assertTrue(snapshot['time_verified'])
         self.assertEqual(snapshot['time_evidence']['selector'], 'jsonld:datePublished')
+
+
+class SourceReviewBoundaryTests(SimpleTestCase):
+    def test_modified_recommended_or_unscoped_time_is_not_verified(self):
+        from stable.adapters.international import SportingLifeAdapter
+        from datetime import datetime, timezone
+        adapter = SportingLifeAdapter()
+        url = 'https://www.sportinglife.com/racing/news/sample/123'
+        stub = SourceArticleStub('sporting_life', 'latest', '123', url, 'Title', datetime(2026, 10, 27, tzinfo=timezone.utc))
+        for markup in ('<time itemprop="dateModified" datetime="2026-10-27T10:00:00Z">Updated</time>',
+                       '<div class="related-articles"><time datetime="2026-10-27T10:00:00Z">Other story</time></div>',
+                       '<time datetime="2026-10-27T10:00:00Z">Unknown semantic</time>'):
+            with self.subTest(markup=markup):
+                detail = adapter.parse_detail_html('<h1>Title</h1>' + markup, url=url)
+                draft = adapter.normalize_source_payload(stub, detail)
+                self.assertFalse(draft.metadata['published_at_verified'])
+                self.assertIsNone(detail.published_at)
+
+    def test_scmp_root_access_markers_block_both_paths(self):
+        from stable.adapters.international import SCMPRacingAdapter
+        from stable.services.news_content import ContentBlocked
+        for attrs in ('class="article-body" data-paywall="true"', 'class="article-body paywall"', 'class="article-body subscription-required"'):
+            with self.subTest(attrs=attrs):
+                html = '<h1>Title</h1><div ' + attrs + '><p>Preview</p></div>'
+                detail = SCMPRacingAdapter().parse_detail_html(html, url='https://www.scmp.com/sport/racing/article/1/test')
+                self.assertEqual(detail.metadata['body_parse_status'], 'body_access_restricted')
+                self.assertFalse(detail.body_ja_raw)
+                with self.assertRaisesRegex(ContentBlocked, 'body_access_restricted'):
+                    clean_source({'source_site': 'scmp_racing', 'title': 'Title', 'html': html})
+
+
+class SourceRegionRolloutProtectionTests(TestCase):
+    @override_settings(NEWS_QUALITY_MODE='off')
+    def test_existing_region_and_applied_links_survive_off_shadow_and_new_only(self):
+        from stable.adapters.international import TDNAdapter
+        from stable.models import NewsSource, NewsArticle, NewsArticleRelatedRegion
+        from stable.services.ingestion import upsert_article_from_draft
+        from django.utils import timezone
+        source = NewsSource.objects.create(name='TEST source', source_site='tdn', source_mode='latest', racing_region='united_states', adapter_key='tdn')
+        adapter = TDNAdapter()
+        for mode in ('off', 'shadow', 'enforce'):
+            with self.subTest(mode=mode), override_settings(MULTIREGION_ATTRIBUTION_MODE=mode, MULTIREGION_ATTRIBUTION_ROLLOUT_STAGE='new_articles'):
+                url = 'https://www.thoroughbreddailynews.com/test-' + mode + '/'
+                applied = {'primary_region': 'united_states', 'reason': 'prior_approved', 'related_regions': ['japan']}
+                article = NewsArticle.objects.create(source_site='tdn', source_mode='latest', source_article_id='TEST-' + mode,
+                    source_config=source, source_url=url, title_ja='Old title', body_ja_raw='Old body', body_ja_normalized='Old body',
+                    racing_region='united_states', source_language='en', published_at=timezone.now(), attribution_summary={'applied': applied}, attribution_status='applied')
+                NewsArticleRelatedRegion.objects.create(article=article, region='japan', source='manual', is_manual=True)
+                stub = SourceArticleStub('tdn', 'latest', article.source_article_id, url, 'France Galop update', timezone.now())
+                detail = adapter.parse_detail_html('<h1>France Galop update</h1><div class="entry-content"><p>New programme in France.</p></div>', url=url)
+                draft = adapter.normalize_source_payload(stub, detail)
+                with patch('stable.services.ingestion.find_builtin_source', return_value=source):
+                    upsert_article_from_draft(draft)
+                article.refresh_from_db()
+                self.assertEqual(article.racing_region, 'united_states')
+                self.assertEqual(article.attribution_summary['applied'], applied)
+                self.assertEqual(list(article.related_region_links.values_list('region', flat=True)), ['japan'])
