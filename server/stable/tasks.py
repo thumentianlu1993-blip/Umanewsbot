@@ -3072,6 +3072,9 @@ def qq_push_delivery_task(self, delivery_id: int) -> dict:
 
 
 def publish_article(article: NewsArticle, user) -> None:
+    from stable.services.news_pipeline import is_pipeline_article
+    if is_pipeline_article(article):
+        return
     article.workflow_status = WorkflowStatus.PUBLISHED
     article.published_to_web_at = timezone.now()
     article.published_by = user
