@@ -2,6 +2,7 @@
 from unittest.mock import Mock, patch
 
 from django.test import SimpleTestCase, override_settings
+from django.apps import apps
 
 from stable.models import NewsArticle, WorkflowStatus
 from stable.services.automation import publish_article_automatically
@@ -20,3 +21,18 @@ class LegacyWriterFenceTests(SimpleTestCase):
         self.assertEqual(article.workflow_status, WorkflowStatus.PENDING_TRANSLATION)
         article.save.assert_not_called()
         qq.assert_not_called()
+
+
+class PipelineSchemaTests(SimpleTestCase):
+    def test_independent_versions_and_persistent_discovery_are_registered(self):
+        names = {model.__name__ for model in apps.get_app_config("stable").get_models()}
+        expected = {
+            "NewsProcessingRun", "NewsStageAttempt", "NewsModelBudget",
+            "NewsEditorialEvent", "NewsPublicationReceipt", "NewsFeedSnapshot",
+            "NewsDiscoveryObservation", "NewsPublicEntry",
+        }
+        self.assertFalse(expected - names, f"缺少持久化合同: {sorted(expected - names)}")
+
+    def test_article_has_durable_owner_even_when_feature_is_off(self):
+        fields = {field.name for field in NewsArticle._meta.fields}
+        self.assertTrue({"active_news_run", "news_generation"} <= fields)
