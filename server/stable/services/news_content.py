@@ -212,7 +212,11 @@ def validate_audit(clean, target, response):
         return failed
     sources = block_map(clean)
     targets = {"title": target["title"], **{row["id"]: row["text"] for row in target["blocks"]}}
-    diagnostics = {key: audit_numeric_surfaces(numeric_surface(text), numeric_surface(targets.get(key, ""))) for key, text in sources.items()}
+    if target.get("manual"):
+        pairs = {"title": (clean["title"], target["title"]), "body": ("\n\n".join(row["text"] for row in clean["blocks"]), target["body"])}
+    else:
+        pairs = {key: (text, targets.get(key, "")) for key, text in sources.items()}
+    diagnostics = {key: audit_numeric_surfaces(numeric_surface(original), numeric_surface(translated)) for key, (original, translated) in pairs.items()}
     for row in diagnostics.values():
         row["comparison_scope"] = "normalized_numeric_lexemes"
         row["normalization"] = "nfkc-thousands-explicit-month-v1"
@@ -220,11 +224,12 @@ def validate_audit(clean, target, response):
         if type(issue) is not dict or set(issue) != {"kind", "block_id", "source_span", "target_span"}:
             return failed
         block = issue["block_id"]
-        if block not in sources or block not in targets or issue["kind"] not in AUDIT_CHECKS:
+        target_block = "body" if target.get("manual") and block != "title" else block
+        if block not in sources or target_block not in targets or issue["kind"] not in AUDIT_CHECKS:
             return failed
         for field, texts in (("source_span", sources), ("target_span", targets)):
             span = issue[field]
-            if type(span) is not list or len(span) != 2 or any(type(i) is not int for i in span) or not 0 <= span[0] <= span[1] <= len(texts[block]):
+            if type(span) is not list or len(span) != 2 or any(type(i) is not int for i in span) or not 0 <= span[0] <= span[1] <= len(texts[target_block if field == "target_span" else block]):
                 return failed
     numeric_ok = all(row["status"] != "surface_difference" for row in diagnostics.values())
     source_numbers = set(re.findall(r"\d+(?:\.\d+)?", numeric_surface("\n".join(sources.values()))))
@@ -232,3 +237,31 @@ def validate_audit(clean, target, response):
     numeric_ok = numeric_ok and not (summary_numbers - source_numbers)
     passed = response["verdict"] == "pass" and all(response["checks"].values()) and not response["issues"] and numeric_ok
     return {"passed": passed, "reason": "passed" if passed else "facts_or_numeric_difference", "source_sha": clean["source_sha"], "clean_sha": clean["clean_sha"], "target_sha": digest(target), "model": deepcopy(response), "numeric": diagnostics}
+
+
+def resolve_known_entities(clean, occurrences, *, language):
+    """只采纳现有确定性 resolver 已确认的同一 occurrence；不新增实体或译名。"""
+    from stable.services.terms import resolve_article_entities
+    texts = block_map(clean)
+    resolutions = {}
+    result = deepcopy(occurrences)
+    for item in result:
+        block = item["block_id"]
+        if block not in resolutions:
+            resolutions[block] = resolve_article_entities("", texts[block], source_language=language)
+        resolution = resolutions[block]
+        matches = [candidate for candidate in resolution.entities
+            if candidate.start == item["start"] and candidate.end == item["end"]
+            and candidate.matched_text == item["text"] and not candidate.conflict_flags
+            and candidate.term_id in resolution.accepted_term_ids and candidate.confidence >= 90
+            and candidate.target_zh and not candidate.needs_preserve
+            and (candidate.entity_type == item["type"] or (item["type"] == "person" and candidate.entity_type in {"jockey", "trainer", "owner", "person"}))]
+        if len(matches) == 1:
+            candidate = matches[0]
+            item.update(replacement=candidate.target_zh, term_id=candidate.term_id,
+                        provenance="confirmed_term_occurrence", identity_evidence=candidate.evidence)
+    return result
+
+
+def manual_translation(target):
+    return {**target, "blocks": [{"id": "body", "text": target["body"]}], "manual": True}

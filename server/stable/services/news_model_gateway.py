@@ -115,7 +115,7 @@ def reserve_request(attempt_id, payload):
         attempt.model = spec["model"]
         attempt.prompt_version = spec["prompt_version"]
         attempt.reserved_at = now
-        attempt.usage = {"price": spec, "currency": currency}
+        attempt.usage = {**attempt.usage, "price": spec, "currency": currency}
         attempt.save(update_fields=["month_budget", "day_budget", "reservation", "provider", "model", "prompt_version", "reserved_at", "usage"])
         return attempt
 

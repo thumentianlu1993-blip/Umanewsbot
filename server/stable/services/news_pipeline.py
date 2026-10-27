@@ -43,6 +43,7 @@ def article_revision(article):
 def source_snapshot(article, draft=None):
     if draft is None:
         return {
+            "source_config_id": article.source_config_id,
             "source_site": article.source_site, "source_mode": article.source_mode,
             "source_id": article.source_article_id, "url": article.source_url,
             "title": article.title_ja, "body": article.body_ja_raw,
@@ -52,7 +53,10 @@ def source_snapshot(article, draft=None):
             "source_time": article.published_at.isoformat(), "time_verified": article.published_at_verified,
             "time_evidence": article.published_at_evidence,
         }
+    from stable.services.sources import find_builtin_source
+    source = find_builtin_source(draft.source_site, draft.source_mode)
     return {
+        "source_config_id": source.pk if source else None,
         "source_site": str(draft.source_site), "source_mode": str(draft.source_mode),
         "source_id": draft.source_article_id, "url": draft.source_url,
         "title": draft.title_ja, "body": draft.body_ja_raw,
@@ -165,30 +169,216 @@ def claim_stage(run_id, payload):
     run.state, run.lease_until = "running", now + timedelta(seconds=180)
     run.save(update_fields=["generation", "expected_article_sha", "state", "lease_until"])
     return NewsStageAttempt.objects.create(run=run, stage=run.stage, seq=seq,
-        generation=run.generation, input_sha=digest(payload))
+        generation=run.generation, input_sha=digest(payload), usage={"input": deepcopy(payload)})
+
+
+def _event_candidates(run):
+    from stable.models import NewsEditorialEvent
+    event_id = run.event_id
+    if not event_id and run.parent_run_id:
+        event_id = run.parent_run.event_id
+    if not event_id:
+        return []
+    event = NewsEditorialEvent.objects.get(pk=event_id)
+    return [{"id": str(event.pk), "identity_key": event.identity_key, "version": event.version,
+             "kind": event.event_kind, "identity": event.identity_evidence,
+             "primary_region": event.primary_region, "facts": event.published_facts}]
+
+
+def stage_payload(run):
+    from stable.services.news_content import protect_source
+    from stable.services.news_editorial import RESPONSE_SCHEMA
+    source = deepcopy(run.clean_snapshot)
+    if run.stage == "event_classify":
+        return {"source": source, "candidates": _event_candidates(run),
+                "response_schema": RESPONSE_SCHEMA, "source_scope": run.source_snapshot["source_site"]}
+    if run.stage == "entity_check":
+        return {"source": source}
+    if run.stage == "translate_full":
+        return {"source": protect_source(source, run.entity_snapshot["occurrences"]),
+                "repair": run.quality_snapshot if run.repair_count else {}}
+    if run.stage == "fact_audit":
+        return {"source": source, "target": run.translation_snapshot,
+                "entities": run.entity_snapshot["occurrences"]}
+    raise ValueError("stage_not_registered")
+
+
+def _stage_projection(run, attempt):
+    from stable.models import NewsEditorialEvent
+    from stable.services.news_content import (ContentBlocked, validate_entities, resolve_known_entities,
+        restore_translation, validate_audit, manual_translation)
+    from stable.services.news_editorial import validate_editorial
+    from stable.services.news_model_gateway import request_spec
+    payload = attempt.usage.get("input")
+    if payload is None or digest(payload) != attempt.input_sha:
+        raise ContentBlocked("attempt_input_missing")
+    if attempt.stage in {"entity_check", "fact_audit"} and request_spec(attempt.stage).get("quality_tier") != "strong":
+        raise ContentBlocked("strong_model_not_configured")
+    update = {"state": "pending", "reason": "", "lease_until": None}
+    if attempt.stage == "event_classify":
+        value = validate_editorial(run.clean_snapshot, attempt.result,
+            source_scope=run.source_snapshot["source_site"], candidates=payload["candidates"],
+            aliases=getattr(settings, "NEWS_QUALITY_POLICY", {}).get("identity_aliases", {}))
+        update.update(editorial_snapshot=value, priority=value["priority"], primary_region=value["primary_region"])
+        if value["priority"] in {"reject", "uncertain"}:
+            return {**update, "state": "rejected" if value["priority"] == "reject" else "review", "reason": value["reason"]}
+        if run.source_snapshot["attribution_locked"] and value["primary_region"] != run.source_snapshot["region"]:
+            raise ContentBlocked("primary_region_locked")
+        event, _ = NewsEditorialEvent.objects.get_or_create(identity_key=value["identity_key"], defaults={
+            "event_kind": value["identity"]["kind"], "primary_region": value["primary_region"],
+            "identity_evidence": value["identity"],
+        })
+        update.update(event_id=event.pk, event_version=event.version, primary_region=event.primary_region)
+        if value["comparison"]["version"] != event.version or (event.version and value["comparison"]["event_id"] != str(event.pk)):
+            return {**update, "stage": "event_classify", "reason": "event_recompare"}
+        old_ids = {fact["id"] for fact in event.published_facts}
+        material = [fact for fact in value["facts"] if fact["importance"] == "major"
+                    and (fact["relation"] == "correction" or (fact["relation"] == "new" and fact["id"] not in old_ids))]
+        if event.version and not material:
+            return {**update, "state": "duplicate", "reason": "no_material_new_fact"}
+        return {**update, "stage": "entity_check"}
+    if attempt.stage == "entity_check":
+        rows = validate_entities(run.clean_snapshot, attempt.result)
+        rows = resolve_known_entities(run.clean_snapshot, rows, language=run.source_snapshot["language"])
+        update["entity_snapshot"] = {"occurrences": rows, "strong_attempt_id": attempt.pk,
+            "input_sha": attempt.input_sha, "clean_sha": run.clean_snapshot["clean_sha"]}
+        if run.manual_target:
+            update.update(translation_snapshot=manual_translation(run.manual_target), stage="fact_audit")
+        else:
+            update["stage"] = "translate_full"
+        return update
+    if attempt.stage == "translate_full":
+        target = restore_translation(run.clean_snapshot, run.entity_snapshot["occurrences"], attempt.result)
+        return {**update, "translation_snapshot": target, "stage": "fact_audit"}
+    if attempt.stage == "fact_audit":
+        quality = validate_audit(run.clean_snapshot, run.translation_snapshot, attempt.result)
+        quality.update(strong_attempt_id=attempt.pk, input_sha=attempt.input_sha, policy_sha=run.policy_sha)
+        update["quality_snapshot"] = quality
+        if quality["passed"]:
+            return {**update, "state": "ready", "stage": "publish"}
+        if run.repair_count == 0 and not run.manual_target:
+            return {**update, "stage": "translate_full", "repair_count": 1, "reason": "one_bounded_repair"}
+        return {**update, "state": "review", "reason": "quality_failed"}
+    raise ContentBlocked("stage_not_registered")
 
 
 @transaction.atomic
-def commit_stage(attempt_id, generation):
-    from django.utils import timezone
-    from stable.models import NewsStageAttempt
-    reference = NewsStageAttempt.objects.select_related("run").get(pk=attempt_id)
-    article = NewsArticle.objects.select_for_update().get(pk=reference.run.article_id)
-    run = NewsProcessingRun.objects.select_for_update().get(pk=reference.run_id)
-    attempt = NewsStageAttempt.objects.select_for_update().get(pk=attempt_id)
+def _transition(run_id, update, *, generation=None):
+    reference = NewsProcessingRun.objects.get(pk=run_id)
+    article = NewsArticle.objects.select_for_update().get(pk=reference.article_id)
+    run = NewsProcessingRun.objects.select_for_update().get(pk=run_id)
+    if generation is not None and run.generation != generation:
+        return False
     if not _current_run(article, run):
-        if run.state not in {"published", "duplicate", "rejected"}:
+        if run.state not in {"published", "rejected", "duplicate"}:
             run.state, run.reason = "stale", "revision_changed"
             run.save(update_fields=["state", "reason"])
         return False
-    if (run.state != "running" or attempt.generation != generation or run.generation != generation
-            or not run.lease_until or timezone.now() >= run.lease_until
-            or attempt.state != "completed" or attempt.output_sha != digest(attempt.result)):
+    for key, value in update.items():
+        setattr(run, key, value)
+    run.save(update_fields=list(update))
+    return True
+
+
+def commit_stage(attempt_id, generation):
+    from django.utils import timezone
+    from stable.models import NewsStageAttempt, NewsEditorialEvent
+    from stable.services.news_content import ContentBlocked
+    reference = NewsStageAttempt.objects.select_related("run__article").get(pk=attempt_id)
+    if not _current_run(reference.run.article, reference.run):
+        _transition(reference.run_id, {}, generation=generation)
         return False
-    # 只有接入对应阶段的确定性校验器后才允许推进；原始模型输出不作已审结果。
-    return False
+    if (reference.state != "completed" or reference.output_sha != digest(reference.result)
+            or reference.generation != generation):
+        return False
+    try:
+        projection = _stage_projection(reference.run, reference)
+    except ContentBlocked as error:
+        return _transition(reference.run_id, {"state": "review", "reason": str(error), "lease_until": None}, generation=generation)
+    with transaction.atomic():
+        # 若涉及事件，先锁事件，再锁 article→run→attempt；不持预算锁。
+        if projection.get("event_id"):
+            event = NewsEditorialEvent.objects.select_for_update().get(pk=projection["event_id"])
+            if event.version != projection["event_version"]:
+                projection.update(stage="event_classify", state="pending", reason="event_recompare")
+        article = NewsArticle.objects.select_for_update().get(pk=reference.run.article_id)
+        run = NewsProcessingRun.objects.select_for_update().get(pk=reference.run_id)
+        attempt = NewsStageAttempt.objects.select_for_update().get(pk=attempt_id)
+        if not _current_run(article, run):
+            if run.state not in {"published", "duplicate", "rejected"}:
+                run.state, run.reason = "stale", "revision_changed"
+                run.save(update_fields=["state", "reason"])
+            return False
+        if (run.state != "running" or attempt.generation != generation or run.generation != generation
+                or not run.lease_until or timezone.now() >= run.lease_until
+                or attempt.state != "completed" or attempt.output_sha != reference.output_sha):
+            return False
+        for key, value in projection.items():
+            setattr(run, key, value)
+        run.save(update_fields=list(projection))
+        return True
+
+
+def source_eligible(run):
+    from stable.models import NewsSource
+    from django.utils.dateparse import parse_datetime
+    policy = getattr(settings, "NEWS_QUALITY_POLICY", {})
+    source_id = run.source_snapshot.get("source_config_id")
+    boundary = parse_datetime(policy.get("activated_at", ""))
+    return bool(source_id in policy.get("source_ids", []) and boundary and boundary.tzinfo
+        and run.article.first_seen_at >= boundary
+        and NewsSource.objects.filter(pk=source_id, enabled=True, production_approved=True, deleted_at__isnull=True).exists())
+
+
+def publish_news_web(run_id):
+    return None
 
 
 def process_news_run(run_id):
-    run = NewsProcessingRun.objects.get(pk=run_id)
-    return {"run_id": run.pk, "state": run.state}
+    from datetime import timedelta
+    from django.utils import timezone
+    from stable.services.news_content import ContentBlocked, clean_source
+    from stable.services.news_model_gateway import execute_request, RequestDenied
+    run = NewsProcessingRun.objects.select_related("article").get(pk=run_id)
+    mode = getattr(settings, "NEWS_QUALITY_MODE", "off")
+    if mode not in {"shadow", "enforce"} or run.state in {"published", "rejected", "duplicate", "review", "stale"}:
+        return {"run_id": run.pk, "state": run.state}
+    if not source_eligible(run):
+        _transition(run.pk, {"state": "review", "reason": "source_not_eligible"}, generation=run.generation)
+    elif run.state in {"ready", "shadow"}:
+        if mode == "enforce":
+            publish_news_web(run.pk)
+        elif run.state == "ready":
+            _transition(run.pk, {"state": "shadow"}, generation=run.generation)
+    elif run.state == "pending":
+        try:
+            if run.stage == "clean":
+                selectors = getattr(settings, "NEWS_QUALITY_POLICY", {}).get("body_selectors", {}).get(run.source_snapshot["source_site"])
+                clean = clean_source(run.source_snapshot, selectors=selectors)
+                _transition(run.pk, {"clean_snapshot": clean, "stage": "event_classify"}, generation=run.generation)
+            else:
+                payload = stage_payload(run)
+                attempt = claim_stage(run.pk, payload)
+                if attempt:
+                    result = execute_request(attempt.pk, payload)
+                    if result.state == "completed":
+                        budgets = (result.month_budget, result.day_budget)
+                        if any(budget and budget.state != "open" for budget in budgets):
+                            _transition(run.pk, {"state": "review", "reason": "budget_unreconciled"}, generation=attempt.generation)
+                        else:
+                            commit_stage(attempt.pk, attempt.generation)
+                    elif result.state == "unknown":
+                        _transition(run.pk, {"state": "review", "reason": "provider_unknown"}, generation=attempt.generation)
+                    elif result.state == "failed":
+                        retries = run.attempts.filter(stage=attempt.stage, state="failed").exclude(provider="").count()
+                        if result.error == "rate_limited" and retries <= 2:
+                            _transition(run.pk, {"state": "pending", "lease_until": None,
+                                "next_attempt_at": timezone.now() + timedelta(minutes=(1, 5)[retries - 1]),
+                                "reason": "known_retry"}, generation=attempt.generation)
+                        else:
+                            _transition(run.pk, {"state": "review", "reason": result.error or "provider_failed"}, generation=attempt.generation)
+        except (ContentBlocked, RequestDenied) as error:
+            current = NewsProcessingRun.objects.get(pk=run.pk)
+            _transition(run.pk, {"state": "review", "reason": str(error)[:255], "lease_until": None}, generation=current.generation)
+    run.refresh_from_db()
+    return {"run_id": run.pk, "state": run.state, "stage": run.stage, "reason": run.reason}
