@@ -50,9 +50,10 @@ class ModelBudgetTests(TestCase):
 
     def test_actual_overage_is_recorded_and_settlement_is_idempotent(self):
         from stable.services.news_model_gateway import settle_request
-        attempt = reserve_request(self.attempt.pk, {"text": "test"})
-        NewsModelBudget.objects.all().update(cap=10, spent=8, reserved=2)
-        NewsStageAttempt.objects.filter(pk=attempt.pk).update(reservation=2)
+        from unittest.mock import patch
+        with patch("stable.services.news_model_gateway.reservation_amount", return_value=Decimal(2)):
+            attempt = reserve_request(self.attempt.pk, {"text": "test"})
+        NewsModelBudget.objects.all().update(cap=10, spent=8)
         settle_request(attempt.pk, actual_cost="3", result={"ok": True})
         settle_request(attempt.pk, actual_cost="3", result={"ok": True})
         for budget in NewsModelBudget.objects.all():

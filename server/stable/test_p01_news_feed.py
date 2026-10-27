@@ -151,3 +151,25 @@ class FeedTests(TransactionTestCase):
             entry_id, snap = publishing.result(timeout=5), building.result(timeout=5)
         self.assertEqual(snap.catalog_watermark, 1)
         self.assertIn(entry_id, snap.ordered_entry_ids)
+
+    def test_archive_cursor_keeps_watermark_after_new_publication(self):
+        for _ in range(30):
+            self.entry()
+        response = self.client.get("/news/archive/")
+        self.assertEqual(response.status_code, 200)
+        cursor = response.context.get("next_cursor")
+        self.assertTrue(cursor, "档案必须返回签名水位 cursor")
+        first_ids = {row.public_entry_id for row in response.context["articles"]}
+        newcomer = self.entry()
+        page = self.client.get("/news/archive/", {"cursor": cursor})
+        other_ids = {row.public_entry_id for row in page.context["articles"]}
+        self.assertEqual(len(first_ids | other_ids), 30)
+        self.assertFalse(first_ids & other_ids)
+        self.assertNotIn(newcomer.pk, other_ids)
+
+    def test_manual_headline_can_be_only_eligible_item_outside_recent_pool(self):
+        from stable.models import HomepageHeadlineSelection
+        old = self.entry("france", age=1000)
+        HomepageHeadlineSelection.objects.create(slot="homepage_primary", article=old.article, selected_at=self.now)
+        snapshot = news_feed.create_snapshot(now=self.now, with_features=True)
+        self.assertEqual(snapshot.headline_entry_id, old.pk)
