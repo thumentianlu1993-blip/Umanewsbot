@@ -302,6 +302,9 @@ def get_rewrite_provider() -> RewriteProvider:
 
 
 def rewrite_article(article: NewsArticle) -> RewriteResult:
+    from stable.services.news_pipeline import is_pipeline_article
+    if is_pipeline_article(article):
+        raise ValueError("p01_owned")
     provider = get_rewrite_provider()
     resolution = resolve_article_entities_for_article(article)
     if "entity_resolution" in inspect.signature(provider.rewrite).parameters:

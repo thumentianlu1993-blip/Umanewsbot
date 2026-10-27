@@ -1313,6 +1313,9 @@ def get_translation_provider(*, article=None, managed_run=None) -> TranslationPr
 
 
 def translate_article(article: NewsArticle, *, managed_run: TranslationRun | None = None) -> TranslationResult:
+    from stable.services.news_pipeline import is_pipeline_article
+    if is_pipeline_article(article):
+        raise ValueError("p01_owned")
     # 持久登记目标在缺scope时也必须传给guard，先拒绝再构造provider。
     provider = get_translation_provider(article=article, managed_run=managed_run)
     source_text = article.body_ja_normalized or article.body_ja_raw

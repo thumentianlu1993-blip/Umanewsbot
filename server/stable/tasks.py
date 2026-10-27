@@ -1365,6 +1365,9 @@ def _can_coalesce_old_window(window: ProductionWindow, *, now: datetime) -> bool
 
 
 def _auto_translate_article_after_ingest(article: NewsArticle) -> dict | None:
+    from stable.services.news_pipeline import is_pipeline_article
+    if is_pipeline_article(article):
+        return {"article_id": article.id, "skipped": True, "reason": "p01_owned"}
     if not getattr(settings, "AUTO_TRANSLATE_ON_INGEST", True):
         return None
     try:
@@ -1376,6 +1379,9 @@ def _auto_translate_article_after_ingest(article: NewsArticle) -> dict | None:
 
 
 def _discover_terms_after_ingest(article: NewsArticle) -> dict | None:
+    from stable.services.news_pipeline import is_pipeline_article
+    if is_pipeline_article(article):
+        return {"article_id": article.id, "skipped": True, "reason": "p01_owned"}
     if not getattr(settings, "TERM_DISCOVERY_ENABLED", False):
         return None
     try:
@@ -1385,6 +1391,9 @@ def _discover_terms_after_ingest(article: NewsArticle) -> dict | None:
 
 
 def _qq_push_after_source_elevation(article: NewsArticle, *, source_elevated: bool) -> dict | None:
+    from stable.services.news_pipeline import is_pipeline_article
+    if is_pipeline_article(article):
+        return {"article_id": article.id, "skipped": True, "reason": "p01_owned"}
     if not source_elevated or not qq_channel_enabled() or not getattr(settings, "QQ_PUSH_ENABLED", False) or not is_article_public(article):
         return None
     try:
@@ -1394,6 +1403,9 @@ def _qq_push_after_source_elevation(article: NewsArticle, *, source_elevated: bo
 
 
 def _ranked_revival_after_source_elevation(article: NewsArticle, *, source_elevated: bool) -> dict | None:
+    from stable.services.news_pipeline import is_pipeline_article
+    if is_pipeline_article(article):
+        return {"article_id": article.id, "skipped": True, "reason": "p01_owned"}
     if not source_elevated or is_article_public(article):
         return None
     try:
@@ -1893,6 +1905,8 @@ def discover_term_candidates_task(article_id: int) -> dict:
 
 
 def _translate_managed_claim_task(article_id, run_id, claimed_at, *, suppress_automation, log):
+    if NewsArticle.objects.filter(pk=article_id, active_news_run__isnull=False).exists():
+        return {"article_id": article_id, "skipped": True, "reason": "p01_owned"}
     from django.db import connection, transaction
     from stable.services.translation_recovery import (
         CLAIM_KEY, TranslationCheckpointError, build_translation_checkpoint, finalize_translation_claim,
@@ -1982,6 +1996,8 @@ def translate_article_task(
     claim_started_at: str = "",
     readonly_job_uuid: str = "",
 ) -> dict:
+    if NewsArticle.objects.filter(pk=article_id, active_news_run__isnull=False).exists():
+        return {"article_id": article_id, "skipped": True, "reason": "p01_owned"}
     from stable.services.translation_recovery import _current_offline_budget_binding
     log = _log_start(
         "translate_article",
@@ -2127,6 +2143,8 @@ def recover_stale_translations_task() -> dict:
 
 @shared_task
 def process_article_automation_task(article_id: int) -> dict:
+    if NewsArticle.objects.filter(pk=article_id, active_news_run__isnull=False).exists():
+        return {"article_id": article_id, "skipped": True, "reason": "p01_owned"}
     log = _log_start("process_article_automation", {"article_id": article_id})
     if not getattr(settings, "AUTOMATION_ENABLED", False):
         _log_success(log, "automation disabled")
@@ -2168,6 +2186,8 @@ def process_article_automation_task(article_id: int) -> dict:
 
 @shared_task
 def score_article_task(article_id: int) -> dict:
+    if NewsArticle.objects.filter(pk=article_id, active_news_run__isnull=False).exists():
+        return {"article_id": article_id, "skipped": True, "reason": "p01_owned"}
     log = _log_start("score_article", {"article_id": article_id})
     article = NewsArticle.objects.get(pk=article_id)
     try:
@@ -2196,6 +2216,8 @@ def score_article_task(article_id: int) -> dict:
 
 @shared_task
 def rewrite_article_task(article_id: int) -> dict:
+    if NewsArticle.objects.filter(pk=article_id, active_news_run__isnull=False).exists():
+        return {"article_id": article_id, "skipped": True, "reason": "p01_owned"}
     log = _log_start("rewrite_article", {"article_id": article_id})
     article = NewsArticle.objects.get(pk=article_id)
     if article.review_mode != ReviewMode.AUTO:
@@ -2218,6 +2240,8 @@ def rewrite_article_task(article_id: int) -> dict:
 
 @shared_task
 def validate_rewrite_task(article_id: int) -> dict:
+    if NewsArticle.objects.filter(pk=article_id, active_news_run__isnull=False).exists():
+        return {"article_id": article_id, "skipped": True, "reason": "p01_owned"}
     log = _log_start("validate_rewrite", {"article_id": article_id})
     article = NewsArticle.objects.get(pk=article_id)
     try:
