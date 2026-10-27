@@ -122,10 +122,68 @@ def submit_manual_target(article, fields, *, editor):
     return start_revision(article, snapshot=active.source_snapshot, manual_target=target, editor=editor)
 
 
+def _current_run(article, run):
+    return (
+        article.active_news_run_id == run.pk and article.news_generation == run.generation
+        and run.policy_sha == policy_sha() and not article.withdrawn_at
+        and article_revision(article) == run.expected_article_sha
+    )
+
+
+@transaction.atomic
 def claim_stage(run_id, payload):
-    """默认停用阶段认领；启用路径逐项验证后接入。"""
-    return None
+    from datetime import timedelta
+    from django.db.models import Max
+    from django.utils import timezone
+    from stable.models import NewsStageAttempt
+    if getattr(settings, "NEWS_QUALITY_MODE", "off") not in {"shadow", "enforce"}:
+        return None
+    reference = NewsProcessingRun.objects.get(pk=run_id)
+    article = NewsArticle.objects.select_for_update(skip_locked=True).filter(pk=reference.article_id).first()
+    if article is None:
+        return None
+    run = NewsProcessingRun.objects.select_for_update(skip_locked=True).filter(pk=run_id).first()
+    if run is None or run.state not in {"pending", "running"}:
+        return None
+    now = timezone.now()
+    if not _current_run(article, run):
+        run.state, run.reason = "stale", "revision_changed"
+        run.save(update_fields=["state", "reason"])
+        return None
+    if run.state == "running" or run.next_attempt_at > now:
+        return None  # 到期由专门恢复器核对外部请求；不能当成免费重试。
+    requests = run.attempts.exclude(provider="")
+    if requests.count() >= 10 or requests.filter(stage=run.stage, state="failed").count() >= 3:
+        run.state, run.reason = "review", "request_limit"
+        run.save(update_fields=["state", "reason"])
+        return None
+    seq = (run.attempts.filter(stage=run.stage).aggregate(n=Max("seq"))["n"] or 0) + 1
+    article.news_generation += 1
+    article.save(update_fields=["news_generation"])
+    run.generation = article.news_generation
+    run.expected_article_sha = article_revision(article)
+    run.state, run.lease_until = "running", now + timedelta(seconds=180)
+    run.save(update_fields=["generation", "expected_article_sha", "state", "lease_until"])
+    return NewsStageAttempt.objects.create(run=run, stage=run.stage, seq=seq,
+        generation=run.generation, input_sha=digest(payload))
 
 
+@transaction.atomic
 def commit_stage(attempt_id, generation):
+    from django.utils import timezone
+    from stable.models import NewsStageAttempt
+    reference = NewsStageAttempt.objects.select_related("run").get(pk=attempt_id)
+    article = NewsArticle.objects.select_for_update().get(pk=reference.run.article_id)
+    run = NewsProcessingRun.objects.select_for_update().get(pk=reference.run_id)
+    attempt = NewsStageAttempt.objects.select_for_update().get(pk=attempt_id)
+    if not _current_run(article, run):
+        if run.state not in {"published", "duplicate", "rejected"}:
+            run.state, run.reason = "stale", "revision_changed"
+            run.save(update_fields=["state", "reason"])
+        return False
+    if (run.state != "running" or attempt.generation != generation or run.generation != generation
+            or not run.lease_until or timezone.now() >= run.lease_until
+            or attempt.state != "completed" or attempt.output_sha != digest(attempt.result)):
+        return False
+    # 只有接入对应阶段的确定性校验器后才允许推进；原始模型输出不作已审结果。
     return False
