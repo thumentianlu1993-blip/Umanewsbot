@@ -99,3 +99,16 @@ class CorrectionTests(WorkflowFixture, TransactionTestCase):
         snap = create_snapshot()
         self.assertNotIn(first.public_entry.pk, snap.ordered_entry_ids)
         self.assertTrue(visible_entries().filter(receipt=first).exists())
+
+    def test_same_correction_with_different_valid_quote_is_duplicate(self):
+        first = NewsPublicationReceipt.objects.get(run=self.story("27"))
+        self.target(first)
+        self.assertEqual(self.story("31").state, "published")
+        self.correction = None
+        self.assertEqual(self.story("50").state, "published")
+        self.target(first)
+        old = first.content["body"]
+        start = old.index("27")
+        self.correction.update(old_body_span={"start": start, "end": start + 2}, old_text="27")
+        self.assertEqual(self.story("31").state, "duplicate")
+        self.assertEqual(NewsPublicationReceipt.objects.filter(kind="correction_story").count(), 1)
