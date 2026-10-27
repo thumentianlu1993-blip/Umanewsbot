@@ -9,6 +9,7 @@ import os
 import shutil
 import subprocess
 import stat
+import sys
 from io import BytesIO, StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -1261,6 +1262,9 @@ class MigrationHistoryRepairArtifactRedTests(SimpleTestCase):
         self.assertFalse(any(" migrate " in f" {call} " for call in calls), calls)
 
 
+# 旧bounded/manage.py入口只加载server；共享合同来自同一固定仓库。
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 from tools.test_impact.image_contract import (
     _MIGRATION_IMAGE_SOURCE, _migration_image_source, _assert_migration_image_context,
     _migration_image_archive_context, _migration_image_id, _migration_image_values,
@@ -1269,6 +1273,19 @@ from tools.test_impact.image_contract import (
 
 
 class MigrationImageRevisionPureTests(unittest.TestCase):
+    def test_legacy_server_only_entrypoint_collects_original_leafset_class(self):
+        code = (
+            "import sys,unittest; sys.path.insert(0,sys.argv[1]); "
+            "import django; django.setup(); "
+            "suite=unittest.TestLoader().loadTestsFromName("
+            "'stable.test_migration_history_repair.MigrationHistoryRepairLeafSetRedTests'); "
+            "assert suite.countTestCases()>0; "
+            "assert all(not isinstance(t,unittest.loader._FailedTest) for t in suite)"
+        )
+        result = subprocess.run([sys.executable,'-I','-c',code,str(ROOT/'server')],
+                                capture_output=True,text=True,timeout=30)
+        self.assertEqual(result.returncode,0,result.stderr)
+
     def setUp(self):
         self.temp = TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

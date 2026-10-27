@@ -8,8 +8,9 @@ import re
 import stat
 import subprocess
 import tarfile
+import time
 import uuid
-from tempfile import TemporaryDirectory
+from tempfile import TemporaryDirectory, TemporaryFile
 from tools.test_impact.fixture_inputs import _json
 
 NATIVE_ID = 'stable.test_migration_history_repair.MigrationHistoryRepairDockerImageContractTests.test_candidate_image_contains_only_the_exact_reviewed_audit_file'
@@ -19,6 +20,53 @@ DATABASE_IDENTITY = 'a986cc11149981c54e9d4915ad35e7c46e9382584d6670c8f950eceda26
 
 def selected(plan):
     return any(NATIVE_ID == label or NATIVE_ID.startswith(label + '.') for label in plan['labels'])
+
+
+def needs_preparation(plan, *, collect_only, prepare_images, batch):
+    return selected(plan) and not batch and (not collect_only or prepare_images)
+
+
+def read_proof(path):
+    path = Path(path)
+    try:
+        if not stat.S_ISREG(path.lstat().st_mode):
+            raise ValueError('image proof must be a regular file')
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        with os.fdopen(fd, 'rb') as stream:
+            if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+                raise ValueError('image proof must be regular')
+            data = stream.read(65537)
+        if len(data) > 65536:
+            raise ValueError('oversize image proof')
+        return data
+    except OSError as exc:
+        raise ValueError('image proof unavailable') from exc
+
+
+def collection_input(selection, collected, proof_root):
+    """CI和候选外验证器统一重建实际collection请求，先核原始proof字节。"""
+    result = {**selection, 'image_id': collected['image_id']}
+    if selected(selection):
+        validate_proof(read_proof(Path(proof_root)/'migration-image-proof.json'), collected)
+        result['migration_image_proof'] = collected['migration_image_proof']
+    elif 'migration_image_proof' in collected:
+        raise ValueError('unselected image proof')
+    return result
+
+
+def preparation_command(command, *, observer=None, timeout=60, cwd=None):
+    """文件承接输出，避免OwnedObserver.wait与PIPE互锁；同享总截止和清理预留。"""
+    with TemporaryFile() as out, TemporaryFile() as err:
+        kwargs = dict(stdout=out, stderr=err, timeout=timeout, cwd=cwd)
+        if observer is None:
+            result = subprocess.run(command, **kwargs)
+        else:
+            result = observer.run(command, 'migration-image-preparation', **kwargs)
+        out.seek(0); err.seek(0)
+        stdout, stderr = out.read(16*1024*1024+1), err.read(16*1024*1024+1)
+        if max(len(stdout), len(stderr)) > 16*1024*1024:
+            raise ValueError('oversize image preparation output')
+        return subprocess.CompletedProcess(command, result.returncode, stdout.decode(), stderr.decode())
 
 
 def validate_proof(raw, plan):
@@ -38,6 +86,9 @@ def validate_proof(raw, plan):
                 or proof[key] == '0'*40 or proof[key] != plan.get(key)):
             raise ValueError('image proof test source mismatch')
     _migration_image_values(proof['image_id'], proof['inspect'], proof['runtime'], proof['source']['sha'])
+    owner = proof['inspect']['Config']['Labels'].get('org.umanews.test-preparation')
+    if type(owner) is not str or re.fullmatch('[0-9a-f]{32}', owner) is None:
+        raise ValueError('missing unique image preparation owner')
     runtime = proof['runtime']
     if (set(runtime) != {'release_commit','marker_hex','audit_files','audit_sha256','database_identity_sha256'}
             or runtime['audit_files'] != [AUDIT_RELATIVE]
@@ -202,7 +253,11 @@ def _equal(actual, expected, message='image contract mismatch'):
         raise ValueError(message)
 
 
-def prepare_image_proof(repository, plan, output):
+def prepare_image_proof(repository, plan, output, observer=None):
+    if observer is not None:
+        observer.admission(600)
+    def run(command, *, timeout=60, cwd=None):
+        return preparation_command(command, observer=observer, timeout=timeout, cwd=cwd)
     source = _migration_image_source(repository, _MIGRATION_IMAGE_SOURCE["sha"], _MIGRATION_IMAGE_SOURCE)
     image_id = None
     created_image = False
@@ -213,32 +268,38 @@ def prepare_image_proof(repository, plan, output):
         _migration_image_archive_context(archive, source, context)
         iidfile = private / "image-id"
         _assert_migration_image_context(context, source)
-        before = subprocess.run(
+        before = run(
             ["docker", "image", "ls", "--no-trunc", "--quiet"],
-            text=True, capture_output=True, timeout=60, check=False,
+            timeout=60,
         )
         _equal(before.returncode, 0, before.stderr)
         existing_ids = {_migration_image_id(value) for value in before.stdout.splitlines()}
-        container_name = 'migration-image-contract-'+uuid.uuid4().hex
+        owner = uuid.uuid4().hex
+        container_name = 'migration-image-contract-'+owner
+        reader_started = False
+        cidfile = Path(output)/'owned-cids'/(container_name+'.cid')
+        primary = None
         try:
-            build = subprocess.run(
-                ["docker", "build", "--iidfile", str(iidfile), "--build-arg",
+            build = run(
+                ["docker", "build", "--iidfile", str(iidfile), "--label",
+                 "org.umanews.test-preparation="+owner, "--build-arg",
                  "UMANEWS_RELEASE_COMMIT=" + source["sha"], "."],
-                cwd=context, text=True, capture_output=True, timeout=600, check=False,
+                cwd=context, timeout=600,
             )
             (Path(output)/'migration-image-build.log').write_text(build.stdout+build.stderr)
             _equal(build.returncode, 0, "historical image build failed; see migration-image-build.log")
             image_id = _migration_image_id(iidfile.read_text())
             created_image = image_id not in existing_ids
             _assert_migration_image_context(context, source)
-            inspect = subprocess.run(
+            inspect = run(
                 ["docker", "image", "inspect", image_id],
-                text=True, capture_output=True, timeout=60, check=False,
+                timeout=60,
             )
             _equal(inspect.returncode, 0, inspect.stderr)
             inspected = json.loads(inspect.stdout)
             _equal(type(inspected), list)
             _equal(len(inspected), 1)
+            _equal(inspected[0]["Config"]["Labels"].get("org.umanews.test-preparation"), owner)
             code = (
                 "from pathlib import Path; import django; django.setup(); "
                 "from stable.services.historical_calendar_release_b_schema import "
@@ -257,26 +318,53 @@ def prepare_image_proof(repository, plan, output):
                 "'audit_files':files,'audit_sha256':hashlib.sha256(expected.read_bytes()).hexdigest(),"
                 "'database_identity_sha256':load_reviewed_production_audit()['database_identity_sha256']}))"
             )
-            read = subprocess.run(
-                ["docker", "run", "--name", container_name, "--rm", "--network", "none", "--cap-drop", "ALL",
-                 "--security-opt", "no-new-privileges", "--read-only", "--tmpfs", "/tmp:rw,size=128m", "--pids-limit", "128", "--memory", "1g", "--cpus", "1", "-e",
-                 "DJANGO_SETTINGS_MODULE=app.settings", "--entrypoint", "python", image_id, "-c", code],
-                text=True, capture_output=True, timeout=60, check=False,
-            )
+            reader = ["docker", "run", "--name", container_name, "--network", "none", "--cap-drop", "ALL",
+                      "--security-opt", "no-new-privileges", "--read-only", "--tmpfs", "/tmp:rw,size=128m",
+                      "--pids-limit", "128", "--memory", "1g", "--cpus", "1", "-e",
+                      "DJANGO_SETTINGS_MODULE=app.settings", "--entrypoint", "python", image_id, "-c", code]
+            if observer is not None:
+                cidfile.parent.mkdir(exist_ok=True)
+                reader[2:2] = ['--cidfile', str(cidfile)]
+                observer.start(container_name, cidfile, 'migration-image', 'migration-image-preparation', image_id=image_id)
+            reader_started = True
+            read = run(reader, timeout=60)
             _equal(read.returncode, 0, read.stderr)
             _migration_image_values(image_id, inspected[0], json.loads(read.stdout), source["sha"])
             _assert_migration_image_context(context, source)
+        except BaseException as exc:
+            primary = exc
+            raise
         finally:
-            cleanup_container = subprocess.run(['docker','rm','-f',container_name], capture_output=True, text=True, timeout=30)
-            absent = subprocess.run(['docker','container','inspect',container_name], capture_output=True, text=True, timeout=30)
-            if absent.returncode != 1 or 'No such container' not in absent.stderr:
-                raise ValueError('image reader container cleanup unconfirmed')
-            if image_id is not None and created_image:
-                cleanup = subprocess.run(
-                    ["docker", "image", "rm", image_id],
-                    text=True, capture_output=True, timeout=60, check=False,
-                )
-                _equal(cleanup.returncode, 0, cleanup.stderr)
+            cleanup_errors = []
+            cleanup_end = min(time.monotonic()+40, observer.deadline) if observer is not None else time.monotonic()+40
+            try:
+                if reader_started:
+                    if observer is not None:
+                        observer.cleanup(container_name, cidfile)
+                    else:
+                        cleanup_container = subprocess.run(['docker','rm','-f',container_name], capture_output=True, text=True, timeout=20)
+                        absent = subprocess.run(['docker','container','inspect',container_name], capture_output=True, text=True, timeout=5)
+                        if (cleanup_container.returncode != 0 or absent.returncode != 1 or absent.stdout.strip()
+                                or absent.stderr.strip() not in ('Error: No such container: '+container_name, 'Error: No such object: '+container_name)):
+                            raise ValueError('image reader container cleanup unconfirmed')
+            except BaseException as exc:
+                cleanup_errors.append(exc)
+            try:
+                if image_id is not None and created_image:
+                    remaining = cleanup_end-time.monotonic()
+                    if remaining <= 0:
+                        raise TimeoutError('image cleanup budget exhausted: '+image_id)
+                    cleanup = subprocess.run(['docker', 'image', 'rm', image_id],
+                                             text=True, capture_output=True, timeout=min(remaining,30))
+                    _equal(cleanup.returncode, 0, cleanup.stderr)
+            except BaseException as exc:
+                cleanup_errors.append(exc)
+            if cleanup_errors:
+                if primary is not None:
+                    for error in cleanup_errors:
+                        primary.add_note('image preparation cleanup: '+repr(error))
+                else:
+                    raise cleanup_errors[0]
     proof = dict(version=1, test_sha=plan['test_sha'], test_tree=plan['test_tree'],
                  source=_MIGRATION_IMAGE_SOURCE, image_id=image_id, inspect=inspected[0],
                  runtime=json.loads(read.stdout),

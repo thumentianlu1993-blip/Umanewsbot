@@ -162,6 +162,8 @@ def main():
                 require(type(batch['key']) is str and re.fullmatch(r'batch-[0-9]{3,}',batch['key']),'unsafe lifecycle batch key')
                 stems.append(batch['key'])
             required={'execution-plan.json'}
+            if 'migration_image_proof' in plan:
+                required.add('migration-image-proof.json')
             for stem in stems:
                 required.update({'lifecycle-'+stem+'.json','lifecycle-request-'+stem+'.json','lifecycle-host-'+stem+'.json'})
                 if stem!='collection':required.add(stem+'.json')
@@ -211,8 +213,10 @@ for field in ('domains','labels','hashes','changed_paths','content_digest','allo
 if sys.argv[3]=='selection': print(json.dumps(e))
 elif sys.argv[3]=='pg':
  from tools.test_impact.pg_lifecycle import SCHEMA,verify_saved_lifecycle
+ from tools.test_impact.image_contract import collection_input
  if SCHEMA!='pg-lifecycle-v2': raise ValueError('LIFECYCLE_VERSION_MISMATCH')
  selection={**e,'run_id':p['run_id'],'run_attempt':p['run_attempt'],'control_blobs':p['control_blobs'],'image_id':p['image_id']}
+ selection=collection_input(selection,p,Path(x['artifact_pg']))
  verify_saved_lifecycle(Path(x['artifact_pg']),selection,'collect','','django')
  for b in p['batches']: verify_saved_lifecycle(Path(x['artifact_pg']),p,'run',b['key'],b['profile'])
  independent_input={**p,'mode':e['mode']}

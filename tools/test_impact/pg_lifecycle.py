@@ -255,7 +255,8 @@ def validate_receipt(receipt, request, native_bytes):
     require(canonical({k:receipt[k] for k in REQUEST_FIELDS}) == canonical(request), 'RECEIPT_IDENTITY_MISMATCH')
     required = request['mode'] == 'collect' or request['profile'] != 'python'
     require(receipt['pg_required'] is required and receipt['complete'] is True and receipt['secondary_errors'] == []
-            and receipt['signal_events'] == [] and receipt['uid'] == (0 if request['profile']=='django-root-artifact' else 10001)
+            and receipt['signal_events'] == [] and type(receipt['uid']) is int and type(receipt['gid']) is int
+            and receipt['uid'] == (0 if request['profile']=='django-root-artifact' else 10001)
             and receipt['gid'] == receipt['uid'],
             'PG_NUMERIC_INCOMPLETE')
     parent = receipt['supervisor_pid']
@@ -431,6 +432,21 @@ class Session:
         return self.command('worker',[sys.executable,'scripts/test_plan_worker.py',*args],
                             max(0,self.business_deadline-time.monotonic()))
 
+    def verify_pidfile(self, process, deadline):
+        pidfile = self.data_dir/'postmaster.pid'
+        if self.request['profile'] != 'django-root-artifact':
+            require(read_regular(pidfile).splitlines()[0].decode()==str(process.pid),'PG_PIDFILE_MISMATCH')
+            return
+        # PGDATA 保留10001的0700；不扩大root能力，也不读取其他PID。
+        code = ('import sys; from tools.test_impact.pg_lifecycle import read_regular; '
+                'sys.exit(0 if read_regular(sys.argv[1]).splitlines()[0].decode()==sys.argv[2] else 1)')
+        self._spawn('pidfile-check', [sys.executable, '-c', code, str(pidfile), str(process.pid)])
+        try:
+            status = self._wait('pidfile-check', min(deadline, time.monotonic()+3), False)
+            require(status == 0, 'PG_PIDFILE_MISMATCH')
+        finally:
+            self._terminate('pidfile-check', deadline)
+
     def stop_and_wait(self):
         if self.closed:return
         # 所有阶段共享原内deadline；不足就记录UNKNOWN，不追加超时。
@@ -444,8 +460,7 @@ class Session:
             try:
                 if process.poll() is None:
                     if time.monotonic() >= cleanup_end:raise TimeoutError('no PG stop budget before spawn')
-                    pidfile=self.data_dir/'postmaster.pid'
-                    require(read_regular(pidfile).splitlines()[0].decode()==str(process.pid),'PG_PIDFILE_MISMATCH')
+                    self.verify_pidfile(process, cleanup_end)
                     self._spawn('pg_stop',['pg_ctl','-D',str(self.data_dir),'-m','immediate','-t','8','-w','stop'])
                     try:
                         stop=self._wait('pg_stop',min(cleanup_end,time.monotonic()+10),False)

@@ -8,7 +8,7 @@ fi
 [[ ! -S /var/run/docker.sock ]]
 # 只复制由宿主 git archive 固定的输入，不挂载宿主工作区或凭据。
 mkdir -p /tmp/work
-cp -a /source/. /tmp/work/
+cp -a --no-preserve=ownership /source/. /tmp/work/
 cd /tmp/work
 git init -q
 git add -Af .

@@ -12,6 +12,7 @@ import uuid
 import sys
 import time
 from tools.test_impact.core import digest
+from tools.test_impact.image_contract import collection_input
 from tools.test_impact.pg_lifecycle import verify_saved_lifecycle, receipt_filename, read_regular
 
 SOFT = 6600
@@ -444,7 +445,7 @@ class Serial:
         self.persist()
         primary=None
         try:
-            result = self.call(self.native(selection, collect_only=True, build=True, export_image=image), 'collection')
+            result = self.call(self.native(selection, collect_only=True, prepare_images=True, build=True, export_image=image), 'collection')
             if result['exit'] != 0 or self.status['fatal']:
                 raise RuntimeError('collection failed/cleanup uncertain')
         except BaseException as exc:
@@ -476,7 +477,7 @@ class Serial:
             raise ValueError('duplicate native IDs')
         if plan['mode'] != 'docs-only':
             try:
-                pg=verify_saved_lifecycle(self.output,{**selected,'image_id':plan['image_id']},'collect','','django')
+                pg=verify_saved_lifecycle(self.output,collection_input(selected,plan,self.output),'collect','','django')
                 self.status['collection_pg_lifecycle']={k:pg[k] for k in ('schema_version','nonce','input_plan_digest','native_raw_sha256')}
                 self.status['collection_pg_lifecycle'].update(pg_stop_wait=pg['pg_stop']['returncode'],postmaster_wait=pg['postmaster']['returncode'])
             except BaseException as exc:

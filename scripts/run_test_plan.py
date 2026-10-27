@@ -71,12 +71,15 @@ def main():
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--collect-only',action='store_true')
     parser.add_argument('--batch')
+    parser.add_argument('--prepare-images',action='store_true',help='初次CI收集的显式镜像准备阶段；独立重收集不得使用')
     parser.add_argument('--image',default='umanews-test-impact:local')
     parser.add_argument('--build',action='store_true')
     parser.add_argument('--resource-ledger',type=Path)
     parser.add_argument('--invoke-deadline-monotonic',type=float)
     parser.add_argument('--final-reserve-seconds',type=float,default=600)
     args=parser.parse_args()
+    if args.prepare_images and (not args.collect_only or args.batch):
+        raise ValueError("prepare-images requires initial collect-only")
     if args.resource_ledger:
         if args.invoke_deadline_monotonic is None: raise ValueError('owned observation requires deadline')
         OBSERVER=OwnedObserver(args.resource_ledger,args.invoke_deadline_monotonic,args.final_reserve_seconds)
@@ -137,17 +140,15 @@ def main():
         plan['image_id']=image_id
         prepared = temp/'prepared'
         prepared.mkdir()
-        if image_contract.selected(plan):
+        if image_contract.selected(plan) and (args.batch or image_contract.needs_preparation(
+                plan, collect_only=args.collect_only, prepare_images=args.prepare_images, batch=args.batch)):
             STAGE='migration-image-preparation'
             if args.batch:
                 proof_path = args.plan.resolve().parent/'migration-image-proof.json'
-                from tools.test_impact.pg_lifecycle import read_regular
-                if proof_path.lstat().st_size > 65536:
-                    raise ValueError('oversize image proof')
-                raw_proof = read_regular(proof_path)
+                raw_proof = image_contract.read_proof(proof_path)
                 image_contract.validate_proof(raw_proof, plan)
             else:
-                raw_proof, descriptor = image_contract.prepare_image_proof(root, plan, output)
+                raw_proof, descriptor = image_contract.prepare_image_proof(root, plan, output, observer=OBSERVER)
                 plan['migration_image_proof'] = descriptor
             (prepared/'migration-image-proof.json').write_bytes(raw_proof)
             (prepared/'migration-image-proof.json').chmod(0o444)

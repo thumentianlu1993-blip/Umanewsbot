@@ -125,11 +125,11 @@ def fixture_environment(plan, binding, code_sha, profile, *, collecting=False,
     _require(source_root.is_absolute() and stat.S_ISDIR(source_root.lstat().st_mode),
              'regular absolute source directory required')
     if plan['fixture_inputs']['id'] == SECONDARY_RESOURCE_ID:
-        from tools.test_impact.fixture_inputs_secondary import resource_environment
-        return resource_environment(source_root)
+        from tools.test_impact.fixture_inputs_secondary import resource_environment as secondary_environment
+        return secondary_environment(source_root)
     if plan['fixture_inputs']['id'] == REMAINING_RESOURCE_ID:
-        from tools.test_impact.fixture_inputs_remaining import resource_environment
-        return resource_environment(source_root)
+        from tools.test_impact.fixture_inputs_remaining import resource_environment as remaining_environment
+        return remaining_environment(source_root)
     return resource_environment(source_root)
 
 

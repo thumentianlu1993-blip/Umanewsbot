@@ -4,6 +4,7 @@
 旧入口/外层SIGKILL/原runner收据资格仍须原12oracle的独立精确运行卡。
 """
 import copy
+import errno
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
@@ -35,6 +36,8 @@ def synthetic_receipt(request, native, worker_exit=0):
                  last_phase='complete', complete=True, supervisor_exit=worker_exit,
                  native_raw_sha256=hashlib.sha256(native).hexdigest(),
                  output_plan_digest=digest(json.loads(native)) if request['mode']=='collect' else request['input_plan_digest'])
+    value['adopted_wait'] = dict(status='ECHILD',deadline_monotonic=1,echild=True,error=None,
+                                 events=[dict(kind='ECHILD',errno=errno.ECHILD)])
     for name, pid in [('worker', 102), ('postmaster', 101), ('pg_stop', 103)]:
         if name != 'worker' and not value['pg_required']:
             continue
@@ -62,6 +65,8 @@ def save_synthetic_lifecycle(output, input_plan, mode, key='', profile='', worke
 def native_fixture_inputs(namespace):
     """旧invoke AST单元的最小合法只读输入，非真实source binding。"""
     namespace['image_id']=IMAGE
+    namespace['prepared']=Path(namespace['temp'])/'prepared'
+    namespace['prepared'].mkdir(exist_ok=True)
     plan=plan_fixture()
     return dict(frozen_plan_bytes=json.dumps(plan).encode(), frozen_binding_bytes=b'{}', raw_commit=b'synthetic-only')
 

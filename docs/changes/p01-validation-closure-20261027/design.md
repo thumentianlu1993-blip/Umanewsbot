@@ -25,3 +25,9 @@ entrypoint、request、batch、worker隔离检查及receipt核验均拒绝root p
 准备阶段只操作本地daemon及自己创建的镜像，构建依赖下载属于准备，实际镜像读取network none。输出有界JSON证据绑定当前test_sha/tree、合同版本/固定原始源码、image ID、inspect和镜像内读取值。文件hash进入计划，证据以只读专用挂载进入普通非root测试容器；worker先核字节hash与来源绑定，原native测试验证完整真实镜像结果，缺失/伪造/漂移失败。普通测试始终无daemon。批次重入只读已绑定证据，不重复构建；独立重收集不把材料当执行结果。
 
 正式收据仍逐批绑定当前执行计划和SHA，不拼接旧通过结果。最终移除已闭合10项skip豁免，执行全量并核验；如新执行条件存在问题，保留失败记录后修复。
+
+## 首轮代码审核返修
+
+21d7f17b 的独立审核提出 C1–C7，均属执行器技术合同：贯通 serial CI/候选外验证的原始镜像proof及collection输入摘要；PID文件检查由有界10001子进程执行；源码复制不保留宿主所有权；准备进程接入OwnedObserver预算与reader精确CID登记；普通collect-only无镜像动作，初次CI显式使用prepare-images；恢复旧exact3 API并验证三份资源；兼容旧server-only入口。受限root能力仍为0xe0，不增加DAC/CHOWN能力。
+
+镜像构建增加随机操作所有权label，避免并发相同构建误删他人镜像；只删除本操作新建的精确image ID。reader失败和清理失败均保留主异常，仍尝试镜像清理；不以缓存、模拟receipt或collection代替原native执行。

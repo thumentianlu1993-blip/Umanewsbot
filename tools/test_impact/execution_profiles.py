@@ -20,7 +20,8 @@ def validate_privilege(profile, uid, gid, cap_eff):
     expected_uid = 0 if profile == ROOT_PROFILE else 10001
     # Linux CAP_KILL(5), CAP_SETGID(6), CAP_SETUID(7) only.
     expected_caps = 0xe0 if profile == ROOT_PROFILE else 0
-    if profile not in PROFILES or uid != expected_uid or gid != expected_uid or cap_eff != expected_caps:
+    if (profile not in PROFILES or any(type(value) is not int for value in (uid,gid,cap_eff))
+            or uid != expected_uid or gid != expected_uid or cap_eff != expected_caps):
         raise ValueError('execution profile privilege mismatch')
 
 

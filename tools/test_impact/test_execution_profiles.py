@@ -1,12 +1,42 @@
 """专用环境的精确准入；不以模拟证据替代真实 native 执行。"""
 import copy
+import json
 import unittest
+from pathlib import Path
 from tools.test_impact import execution_profiles as profiles
 from tools.test_impact import pg_lifecycle as pg
 from tools.test_impact.test_pg_lifecycle import plan_fixture
 
 
 class ExecutionProfileTests(unittest.TestCase):
+    def test_root_receipt_requires_numeric_root_uid_and_gid(self):
+        from tools.test_impact.test_pg_lifecycle import synthetic_receipt
+        plan = plan_fixture()
+        plan['batches'][0].update(profile=profiles.ROOT_PROFILE,ids=[profiles.ROOT_ID])
+        request = pg.make_request(plan,'run','batch-000',profiles.ROOT_PROFILE,'a'*32)
+        raw = json.dumps({'exit_code':0}).encode()
+        receipt = synthetic_receipt(request,raw)
+        receipt.update(uid=0,gid=0)
+        pg.validate_receipt(receipt,request,raw)
+        for uid,gid in ((False,False),(0,False),(10001,10001)):
+            bad = {**receipt,'uid':uid,'gid':gid}
+            with self.subTest(uid=uid,gid=gid), self.assertRaises(ValueError):
+                pg.validate_receipt(bad,request,raw)
+
+    def test_all_original_exact_resource_apis_remain_callable(self):
+        from tools.test_impact.fixture_inputs import fixture_environment
+        source = Path(__file__).resolve().parents[2]
+        for module in profiles.CACHE_PROFILES.values():
+            ids = list(module.NATIVE_IDS)
+            plan = dict(source='git', mode='targeted', test_sha='a'*40, test_tree='b'*40,
+                        labels=ids, count=len(ids), batches=[dict(key='batch-000', profile='django', ids=ids)],
+                        fixture_inputs=dict(id=module.RESOURCE_ID, manifest_sha256=module.MANIFEST_SHA256,
+                                            source_sha='a'*40, source_tree='b'*40))
+            with self.subTest(resource=module.RESOURCE_ID):
+                env = fixture_environment(plan, plan, 'a'*40, 'django', source_root=source)
+                self.assertTrue(env)
+                self.assertTrue(all(Path(value).is_dir() for value in env.values()))
+
     def test_privilege_boundary_rejects_normal_root_extra_and_missing_caps(self):
         profiles.validate_privilege('django', 10001, 10001, 0)
         profiles.validate_privilege(profiles.ROOT_PROFILE, 0, 0, 0xe0)
