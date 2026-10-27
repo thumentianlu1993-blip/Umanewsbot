@@ -28,7 +28,7 @@ from datetime import datetime, timedelta
 from django.conf import settings
 from django.core import signing
 from django.db import transaction
-from django.db.models import Q, Exists, OuterRef
+from django.db.models import Q, Exists, OuterRef, Case, When, Value, IntegerField
 from django.utils import timezone
 from stable.models import NewsFeedSnapshot, HomepageHeadlineSelection, RacingRegion
 
@@ -76,7 +76,7 @@ def create_snapshot(*, now=None, per_region=100, with_features=False):
     candidates = homepage_entries().filter(feed_seq__lte=watermark, sort_time__gte=now-timedelta(days=30), sort_time__lte=now)
     rows = []
     for region in REGIONS:
-        rows.extend(candidates.filter(primary_region=region).order_by("-sort_time", "-feed_seq")[:min(100, per_region)])
+        rows.extend(candidates.filter(primary_region=region).annotate(active_major=Case(When(major_until__gt=now, then=Value(1)), default=Value(0), output_field=IntegerField())).order_by("-active_major", "-sort_time", "-feed_seq")[:min(100, per_region)])
     active_major = sorted((row for row in rows if row.major_until and row.major_until > now), key=lambda row: (row.sort_time, row.feed_seq), reverse=True)
     major_ids = {row.pk for row in active_major}
     queues = {region: deque(row for row in rows if row.primary_region == region and row.pk not in major_ids) for region in REGIONS}
@@ -101,7 +101,8 @@ def create_snapshot(*, now=None, per_region=100, with_features=False):
     return NewsFeedSnapshot.objects.create(policy_sha=policy_sha(), catalog_watermark=watermark, cutoff_at=now,
         ordered_entry_ids=[row.pk for row in ordered if row.pk not in featured],
         headline_entry_id=headline.pk if headline else None, hot_entry_ids=[row.pk for row in hot],
-        slots_metadata={"region_slots": dict(Counter(row.primary_region for row in ordered)), "region_order": region_order},
+        slots_metadata={"region_slots": dict(Counter(row.primary_region for row in ordered if row.pk not in major_ids)),
+                        "all_region_slots": dict(Counter(row.primary_region for row in ordered)), "region_order": region_order},
         expires_at=now+timedelta(hours=24))
 
 

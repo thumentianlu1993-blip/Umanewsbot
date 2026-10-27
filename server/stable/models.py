@@ -4451,6 +4451,18 @@ class NewsArticle(TimestampedModel):
         return self.effective_title
 
     def save(self, *args, **kwargs):
+        # P01 自己的提交在专用 writer；既有稿发布与索引共享同一个事务水位。
+        if getattr(settings, "NEWS_QUALITY_FEED_ENABLED", False) and not self.active_news_run_id:
+            from stable.services.news_feed import publication_lock, index_legacy_article
+            with transaction.atomic():
+                publication_lock()
+                result = self._save_public_projection(*args, **kwargs)
+                persisted = type(self).objects.get(pk=self.pk)
+                index_legacy_article(persisted)
+                return result
+        return self._save_public_projection(*args, **kwargs)
+
+    def _save_public_projection(self, *args, **kwargs):
         if not self.public_slug and (self.title_zh or self.title_ja):
             base = slugify(self.title_zh or self.title_ja, allow_unicode=True)[:80] or f"article-{self.pk or 'draft'}"
             self.public_slug = base

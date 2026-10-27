@@ -54,7 +54,10 @@ def feed(request):
     if not generation:
         if request.GET.get("cursor"):
             return _no_cache(HttpResponse("分页链接已失效，请返回首页。", status=400))
-        snapshot = create_snapshot(now=now, with_features=True)
+        from stable.services.news_pipeline import policy_sha
+        snapshot = NewsFeedSnapshot.objects.filter(expires_at__gt=now, policy_sha=policy_sha()).order_by("-cutoff_at", "-id").first()
+        if snapshot is None:
+            return _no_cache(HttpResponse("新闻列表正在准备，请稍后刷新。", status=503, headers={"Retry-After": "60"}))
         generation = snapshot.generation
     try:
         generation = uuid.UUID(str(generation))
