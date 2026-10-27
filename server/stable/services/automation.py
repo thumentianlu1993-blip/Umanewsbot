@@ -881,6 +881,10 @@ def is_ready_for_auto_publish(article: NewsArticle) -> bool:
 
 
 def publish_article_automatically(article: NewsArticle) -> None:
+    from stable.services.news_pipeline import is_pipeline_article
+
+    if is_pipeline_article(article):
+        return
     article.workflow_status = WorkflowStatus.PUBLISHED
     article.automation_status = AutomationStatus.AUTO_PUBLISHED
     article.published_by_mode = PublishedByMode.AUTO
