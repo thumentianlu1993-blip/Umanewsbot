@@ -40,6 +40,7 @@ class CorrectionTests(WorkflowFixture, TransactionTestCase):
 
     def test_correction_targets_original_even_after_intervening_story(self):
         first_run = self.story("27")
+        self.assertEqual(first_run.state, "published", first_run.reason)
         first = NewsPublicationReceipt.objects.get(run=first_run)
         self.assertEqual(self.story("30").state, "published")
         self.target(first)
