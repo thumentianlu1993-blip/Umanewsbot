@@ -13,6 +13,7 @@
       <div class="article-meta">
         <span class="tabular">{{ article.published_to_web_at|date:"Y-m-d H:i" }} 发布</span>
       </div>
+      {% if original_receipt %}<p class="muted">{% if is_correction_story %}本文为更正稿。{% else %}本文包含新的进展。{% endif %}<a href="{{ original_receipt.public_path }}">查看此前稿件</a></p>{% endif %}
       <hr class="article-rule">
 
       {% if horse_links or race_links %}

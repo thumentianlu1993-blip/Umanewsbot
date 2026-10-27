@@ -978,6 +978,9 @@ def followed_articles(token_hash: str, *, limit: int = 20) -> list[dict[str, Any
     horse_ids = followed_horse_ids(token_hash, include_descendants=True)
     if not horse_ids or limit == 0:
         return []
+    if getattr(settings, "NEWS_QUALITY_FEED_ENABLED", False):
+        from stable.services.news_public_read import related_horse_entries
+        return related_horse_entries(horse_ids, limit=limit)
     eligible_links = ArticleHorseLink.objects.filter(
         horse_profile_id__in=horse_ids,
         horse_profile__review_status=HorseProfileStatus.PUBLISHED,

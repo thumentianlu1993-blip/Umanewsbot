@@ -1,0 +1,10 @@
+{% extends "stable/public/base.html" %}
+{% block title %}新闻档案 · UmaFans{% endblock %}
+{% block content %}
+<main class="wrap">
+  <h1>新闻档案</h1>
+  <form method="get"><label>搜索新闻 <input name="q" value="{{ query }}" maxlength="200"></label><button type="submit">搜索</button></form>
+  {% for article in page_obj %}{% include "stable/public/_article_card.html" %}{% empty %}<p>暂无符合条件的新闻。</p>{% endfor %}
+  {% include "stable/public/_pagination.html" %}
+</main>
+{% endblock %}

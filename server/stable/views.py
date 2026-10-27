@@ -2864,6 +2864,9 @@ def _horse_record_position(record: HorseRaceRecord) -> str:
 def _public_horse_article_entries(profile: HorseProfile, *, limit: int = 12) -> list[dict]:
     descendant_ids = get_descendant_horse_ids(profile, depth=2, public_only=True)
     horse_ids = {profile.pk, *descendant_ids}
+    if getattr(settings, "NEWS_QUALITY_FEED_ENABLED", False):
+        from stable.services.news_public_read import related_horse_entries
+        return related_horse_entries(horse_ids, primary_id=profile.pk, limit=limit)
     links = list(
         ArticleHorseLink.objects.filter(
             horse_profile_id__in=horse_ids,
@@ -4052,6 +4055,9 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
             ArticleRaceLinkType.RELATED,
         )
     }
+    if getattr(settings, "NEWS_QUALITY_FEED_ENABLED", False):
+        from stable.services.news_public_read import related_race_articles
+        news_groups = related_race_articles(event.pk)
     from .services.race_pre_race import public_jra_preview, public_reviewed_preview
     from .services.race_pre_race_refresh import public_refresh_preview
     preview = public_refresh_preview(event, now=read_now) or public_jra_preview(event, now=read_now) or public_reviewed_preview(event, now=read_now)
@@ -4156,6 +4162,9 @@ def public_race_sitemap_shard(request: HttpRequest, shard: int):
 
 
 def public_news_feed(request: HttpRequest):
+    if getattr(settings, "NEWS_QUALITY_FEED_ENABLED", False):
+        from stable.news_public_views import feed
+        return feed(request)
     _public_apply_list_nav(request, "news")
     redirect_response = _redirect_legacy_region(request)
     if redirect_response:
@@ -4224,6 +4233,11 @@ def public_news_feed(request: HttpRequest):
 
 
 def public_article_detail(request: HttpRequest, article_id: int):
+    from stable.models import NewsPublicationReceipt
+    first_receipt = NewsPublicationReceipt.objects.filter(article_id=article_id).order_by("published_at", "id").first()
+    if first_receipt:
+        from stable.news_public_views import receipt_detail
+        return receipt_detail(request, first_receipt.pk)
     article = get_object_or_404(
         NewsArticle.objects.prefetch_related(
             "race_links__event",
@@ -4538,22 +4552,33 @@ def public_horse_follows(request: HttpRequest):
         )
         entries = followed_articles(token_hash, limit=40)
         direct_ids = {follow.horse_profile_id for follow in follows}
-        article_ids = [entry["article"].pk for entry in entries]
-        public_articles = {article.pk: article for article in _public_published_articles().filter(pk__in=article_ids)}
-        entries = [
-            {
-                **entry,
-                "article": public_articles[entry["article"].pk],
-                "source_horse_profile": entry["horse_profile"],
-                "is_descendant": entry["horse_profile"].pk not in direct_ids,
-            }
-            for entry in entries
-            if entry["article"].pk in public_articles
-        ]
+        if getattr(settings, "NEWS_QUALITY_FEED_ENABLED", False):
+            entries = [{**entry, "source_horse_profile": entry["horse_profile"],
+                        "is_descendant": entry["horse_profile"].pk not in direct_ids} for entry in entries]
+        else:
+            article_ids = [entry["article"].pk for entry in entries]
+            public_articles = {article.pk: article for article in _public_published_articles().filter(pk__in=article_ids)}
+            entries = [
+                {
+                    **entry,
+                    "article": public_articles[entry["article"].pk],
+                    "source_horse_profile": entry["horse_profile"],
+                    "is_descendant": entry["horse_profile"].pk not in direct_ids,
+                }
+                for entry in entries
+                if entry["article"].pk in public_articles
+            ]
     return render(request, "stable/public/horse_follows.html", {"follows": follows, "followed_entries": entries})
 
 
 def legacy_public_article_detail(request: HttpRequest, slug: str):
+    from stable.models import NewsPublicationReceipt
+    anchor = NewsArticle.objects.filter(public_slug=slug).first()
+    if anchor and NewsPublicationReceipt.objects.filter(article=anchor).exists():
+        first = NewsPublicationReceipt.objects.filter(article=anchor).order_by("published_at", "id").first()
+        if first.visibility != "public":
+            return HttpResponse(status=404, headers={"Cache-Control": "private, no-store"})
+        return redirect(anchor.public_path)
     article = get_object_or_404(
         NewsArticle,
         workflow_status=WorkflowStatus.PUBLISHED,
