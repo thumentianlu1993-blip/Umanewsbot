@@ -1,0 +1,3274 @@
+{
+  "schema_version": 1,
+  "as_of": "2026-10-27T15:28:51.401784+00:00",
+  "window_start": "2026-10-20T15:28:51.401784+00:00",
+  "production_release_commit": "ad50abdb74b89669ab8ada2958b040877c1a1849",
+  "reviewed_code_sha": "85397345e7814c6c418078ee8e8d00ec888e5d1c",
+  "database_read_only": true,
+  "query_statement_timeout_seconds": 15,
+  "configuration_count": 21,
+  "enabled_approved_count": 15,
+  "source_publisher_count": 9,
+  "offline_sample_count": 30,
+  "structure_passed_count": 20,
+  "gold_sample_count": 0,
+  "sources": [
+    {
+      "id": 1,
+      "name": "netkeiba 新着顺",
+      "homepage_url": "https://news.netkeiba.com/",
+      "feed_url": "https://news.netkeiba.com/?pid=news_backnumber&page=1",
+      "racing_region": "japan",
+      "source_language": "ja",
+      "source_kind": "news",
+      "adapter_key": "netkeiba",
+      "source_site": "netkeiba",
+      "source_mode": "latest",
+      "enabled": true,
+      "production_approved": true,
+      "crawl_interval_minutes": 60,
+      "effective_crawl_interval_minutes": 60,
+      "backoff_until": "2026-10-21 15:00:02.875691+00:00",
+      "failure_streak": 3,
+      "success_streak": 0,
+      "last_error_category": "server_error",
+      "last_crawl_at": "2026-10-27 15:01:02.122442+00:00",
+      "last_crawl_status": "success",
+      "jobs_7d": [
+        {
+          "status": "failed",
+          "n": 11,
+          "first": "2026-10-20 20:40:11.188265+00:00",
+          "last": "2026-10-25 15:00:00.384856+00:00"
+        },
+        {
+          "status": "success",
+          "n": 226,
+          "first": "2026-10-20 15:40:04.712076+00:00",
+          "last": "2026-10-27 15:00:04.903372+00:00"
+        }
+      ],
+      "jobs_sample_limit": 400,
+      "articles_7d": {
+        "count": 543,
+        "first": "2026-10-20 20:20:08.374020+00:00",
+        "last": "2026-10-27 13:03:55.193849+00:00"
+      },
+      "interval_sample": {
+        "jobs": 237,
+        "limited": false,
+        "first": "2026-10-20T15:40:04.712076+00:00",
+        "last": "2026-10-27T15:00:04.903372+00:00",
+        "gap_median_minutes": 59.72,
+        "gap_p95_minutes": 60.46,
+        "gap_max_minutes": 61.2,
+        "new_count_sum": 684,
+        "zero_new_count_jobs": 105,
+        "legacy_fail_count_sum": 27491
+      },
+      "sample_ids": [
+        22726,
+        22725
+      ]
+    },
+    {
+      "id": 2,
+      "name": "netkeiba 访问量榜",
+      "homepage_url": "https://news.netkeiba.com/",
+      "feed_url": "https://news.netkeiba.com/?pid=news_backnumber&rf=access",
+      "racing_region": "japan",
+      "source_language": "ja",
+      "source_kind": "news",
+      "adapter_key": "netkeiba",
+      "source_site": "netkeiba",
+      "source_mode": "access",
+      "enabled": true,
+      "production_approved": true,
+      "crawl_interval_minutes": 60,
+      "effective_crawl_interval_minutes": 15,
+      "backoff_until": null,
+      "failure_streak": 0,
+      "success_streak": 324,
+      "last_error_category": "",
+      "last_crawl_at": "2026-10-27 15:19:26.765335+00:00",
+      "last_crawl_status": "success",
+      "jobs_7d": [
+        {
+          "status": "failed",
+          "n": 8,
+          "first": "2026-10-21 13:19:17.080390+00:00",
+          "last": "2026-10-21 17:16:41.350656+00:00"
+        },
+        {
+          "status": "success",
+          "n": 553,
+          "first": "2026-10-20 15:35:00.362527+00:00",
+          "last": "2026-10-27 15:19:11.134159+00:00"
+        }
+      ],
+      "jobs_sample_limit": 400,
+      "articles_7d": {
+        "count": 141,
+        "first": "2026-10-20 21:00:04.478939+00:00",
+        "last": "2026-10-27 12:02:54.283166+00:00"
+      },
+      "interval_sample": {
+        "jobs": 400,
+        "limited": true,
+        "first": "2026-10-23T07:16:12.546086+00:00",
+        "last": "2026-10-27T15:19:11.134159+00:00",
+        "gap_median_minutes": 18.54,
+        "gap_p95_minutes": 21.76,
+        "gap_max_minutes": 41.32,
+        "new_count_sum": 0,
+        "zero_new_count_jobs": 400,
+        "legacy_fail_count_sum": 16000
+      },
+      "sample_ids": [
+        22720,
+        22706
+      ]
+    },
+    {
+      "id": 3,
+      "name": "netkeiba 注目数榜",
+      "homepage_url": "https://news.netkeiba.com/",
+      "feed_url": "https://news.netkeiba.com/?pid=news_backnumber&rf=attention",
+      "racing_region": "japan",
+      "source_language": "ja",
+      "source_kind": "news",
+      "adapter_key": "netkeiba",
+      "source_site": "netkeiba",
+      "source_mode": "attention",
+      "enabled": true,
+      "production_approved": true,
+      "crawl_interval_minutes": 60,
+      "effective_crawl_interval_minutes": 15,
+      "backoff_until": null,
+      "failure_streak": 0,
+      "success_streak": 181,
+      "last_error_category": "",
+      "last_crawl_at": "2026-10-27 15:26:51.375342+00:00",
+      "last_crawl_status": "success",
+      "jobs_7d": [
+        {
+          "status": "failed",
+          "n": 8,
+          "first": "2026-10-21 13:26:42.224166+00:00",
+          "last": "2026-10-21 17:26:56.290029+00:00"
+        },
+        {
+          "status": "success",
+          "n": 408,
+          "first": "2026-10-20 15:45:02.995031+00:00",
+          "last": "2026-10-27 15:26:35.543412+00:00"
+        }
+      ],
+      "jobs_sample_limit": 400,
+      "articles_7d": {
+        "count": 0,
+        "first": null,
+        "last": null
+      },
+      "interval_sample": {
+        "jobs": 400,
+        "limited": true,
+        "first": "2026-10-20T19:46:26.241448+00:00",
+        "last": "2026-10-27T15:26:35.543412+00:00",
+        "gap_median_minutes": 19.31,
+        "gap_p95_minutes": 60.09,
+        "gap_max_minutes": 65.35,
+        "new_count_sum": 0,
+        "zero_new_count_jobs": 400,
+        "legacy_fail_count_sum": 15680
+      },
+      "sample_ids": [
+        19619,
+        10570
+      ]
+    },
+    {
+      "id": 4,
+      "name": "JRA 官方新闻",
+      "homepage_url": "https://www.jra.go.jp/news/",
+      "feed_url": "https://www.jra.go.jp/news/",
+      "racing_region": "japan",
+      "source_language": "ja",
+      "source_kind": "official",
+      "adapter_key": "jra",
+      "source_site": "jra",
+      "source_mode": "official",
+      "enabled": true,
+      "production_approved": true,
+      "crawl_interval_minutes": 720,
+      "effective_crawl_interval_minutes": 60,
+      "backoff_until": "2026-10-27 12:32:18.971943+00:00",
+      "failure_streak": 1,
+      "success_streak": 0,
+      "last_error_category": "timeout",
+      "last_crawl_at": "2026-10-27 14:46:25.820038+00:00",
+      "last_crawl_status": "failed",
+      "jobs_7d": [
+        {
+          "status": "failed",
+          "n": 55,
+          "first": "2026-10-20 17:10:14.092560+00:00",
+          "last": "2026-10-27 14:45:03.973030+00:00"
+        },
+        {
+          "status": "success",
+          "n": 414,
+          "first": "2026-10-20 15:41:09.064170+00:00",
+          "last": "2026-10-27 13:40:01.264814+00:00"
+        }
+      ],
+      "jobs_sample_limit": 400,
+      "articles_7d": {
+        "count": 32,
+        "first": "2026-10-21 02:02:03.676599+00:00",
+        "last": "2026-10-27 08:15:57.964678+00:00"
+      },
+      "interval_sample": {
+        "jobs": 400,
+        "limited": true,
+        "first": "2026-10-21T14:05:10.037818+00:00",
+        "last": "2026-10-27T14:45:03.973030+00:00",
+        "gap_median_minutes": 20.01,
+        "gap_p95_minutes": 36.37,
+        "gap_max_minutes": 66.57,
+        "new_count_sum": 29,
+        "zero_new_count_jobs": 380,
+        "legacy_fail_count_sum": 72470
+      },
+      "sample_ids": [
+        22701,
+        22687
+      ]
+    },
+    {
+      "id": 5,
+      "name": "Sponichi 赛马新闻",
+      "homepage_url": "https://www.sponichi.co.jp/gamble/",
+      "feed_url": "https://www.sponichi.co.jp/gamble/",
+      "racing_region": "japan",
+      "source_language": "ja",
+      "source_kind": "news",
+      "adapter_key": "sponichi",
+      "source_site": "sponichi",
+      "source_mode": "latest",
+      "enabled": false,
+      "production_approved": false,
+      "crawl_interval_minutes": 180,
+      "effective_crawl_interval_minutes": 15,
+      "backoff_until": null,
+      "failure_streak": 0,
+      "success_streak": 172,
+      "last_error_category": "",
+      "last_crawl_at": "2026-07-30 19:45:09.630084+00:00",
+      "last_crawl_status": "success",
+      "jobs_7d": [],
+      "jobs_sample_limit": 400,
+      "articles_7d": {
+        "count": 0,
+        "first": null,
+        "last": null
+      },
+      "interval_sample": {
+        "jobs": 0,
+        "limited": false,
+        "first": null,
+        "last": null,
+        "gap_median_minutes": null,
+        "gap_p95_minutes": null,
+        "gap_max_minutes": null,
+        "new_count_sum": 0,
+        "zero_new_count_jobs": 0,
+        "legacy_fail_count_sum": 0
+      },
+      "sample_ids": []
+    },
+    {
+      "id": 6,
+      "name": "Sponichi 新闻ランキング",
+      "homepage_url": "https://www.sponichi.co.jp/gamble/",
+      "feed_url": "https://www.sponichi.co.jp/gamble/ranking/",
+      "racing_region": "japan",
+      "source_language": "ja",
+      "source_kind": "news",
+      "adapter_key": "sponichi",
+      "source_site": "sponichi",
+      "source_mode": "access",
+      "enabled": false,
+      "production_approved": false,
+      "crawl_interval_minutes": 180,
+      "effective_crawl_interval_minutes": 15,
+      "backoff_until": null,
+      "failure_streak": 0,
+      "success_streak": 173,
+      "last_error_category": "",
+      "last_crawl_at": "2026-07-30 19:45:17.092577+00:00",
+      "last_crawl_status": "success",
+      "jobs_7d": [],
+      "jobs_sample_limit": 400,
+      "articles_7d": {
+        "count": 0,
+        "first": null,
+        "last": null
+      },
+      "interval_sample": {
+        "jobs": 0,
+        "limited": false,
+        "first": null,
+        "last": null,
+        "gap_median_minutes": null,
+        "gap_p95_minutes": null,
+        "gap_max_minutes": null,
+        "new_count_sum": 0,
+        "zero_new_count_jobs": 0,
+        "legacy_fail_count_sum": 0
+      },
+      "sample_ids": []
+    },
+    {
+      "id": 7,
+      "name": "HKJC Racing News",
+      "homepage_url": "https://racingnews.hkjc.com/english/",
+      "feed_url": "https://racingnews.hkjc.com/english/",
+      "racing_region": "hong_kong",
+      "source_language": "en",
+      "source_kind": "news",
+      "adapter_key": "hkjc_news",
+      "source_site": "hkjc_news",
+      "source_mode": "latest",
+      "enabled": true,
+      "production_approved": true,
+      "crawl_interval_minutes": 240,
+      "effective_crawl_interval_minutes": 15,
+      "backoff_until": null,
+      "failure_streak": 0,
+      "success_streak": 291,
+      "last_error_category": "",
+      "last_crawl_at": "2026-10-27 15:15:12.891300+00:00",
+      "last_crawl_status": "success",
+      "jobs_7d": [
+        {
+          "status": "failed",
+          "n": 24,
+          "first": "2026-10-22 10:36:36.651821+00:00",
+          "last": "2026-10-23 10:09:27.378458+00:00"
+        },
+        {
+          "status": "success",
+          "n": 419,
+          "first": "2026-10-20 15:42:17.315817+00:00",
+          "last": "2026-10-27 15:15:10.848681+00:00"
+        }
+      ],
+      "jobs_sample_limit": 400,
+      "articles_7d": {
+        "count": 6,
+        "first": "2026-10-21 17:40:06.582376+00:00",
+        "last": "2026-10-27 07:37:03.847029+00:00"
+      },
+      "interval_sample": {
+        "jobs": 400,
+        "limited": true,
+        "first": "2026-10-21T06:02:12.572531+00:00",
+        "last": "2026-10-27T15:15:10.848681+00:00",
+        "gap_median_minutes": 20.01,
+        "gap_p95_minutes": 63.3,
+        "gap_max_minutes": 80.68,
+        "new_count_sum": 6,
+        "zero_new_count_jobs": 394,
+        "legacy_fail_count_sum": 1833
+      },
+      "sample_ids": [
+        22700,
+        22608
+      ]
+    },
+    {
+      "id": 8,
+      "name": "SCMP Racing",
+      "homepage_url": "https://www.scmp.com/sport/racing",
+      "feed_url": "https://www.scmp.com/sport/racing",
+      "racing_region": "hong_kong",
+      "source_language": "en",
+      "source_kind": "news",
+      "adapter_key": "scmp_racing",
+      "source_site": "scmp_racing",
+      "source_mode": "latest",
+      "enabled": true,
+      "production_approved": true,
+      "crawl_interval_minutes": 240,
+      "effective_crawl_interval_minutes": 15,
+      "backoff_until": null,
+      "failure_streak": 0,
+      "success_streak": 438,
+      "last_error_category": "",
+      "last_crawl_at": "2026-10-27 15:15:15.178599+00:00",
+      "last_crawl_status": "success",
+      "jobs_7d": [
+        {
+          "status": "failed",
+          "n": 1,
+          "first": "2026-10-21 11:27:00.162400+00:00",
+          "last": "2026-10-21 11:27:00.162400+00:00"
+        },
+        {
+          "status": "success",
+          "n": 497,
+          "first": "2026-10-20 15:42:18.865557+00:00",
+          "last": "2026-10-27 15:15:14.246849+00:00"
+        }
+      ],
+      "jobs_sample_limit": 400,
+      "articles_7d": {
+        "count": 10,
+        "first": "2026-10-21 16:06:22.083483+00:00",
+        "last": "2026-10-27 11:55:44.373554+00:00"
+      },
+      "interval_sample": {
+        "jobs": 400,
+        "limited": true,
+        "first": "2026-10-22T00:36:31.382994+00:00",
+        "last": "2026-10-27T15:15:14.246849+00:00",
+        "gap_median_minutes": 19.94,
+        "gap_p95_minutes": 23.95,
+        "gap_max_minutes": 43.26,
+        "new_count_sum": 9,
+        "zero_new_count_jobs": 391,
+        "legacy_fail_count_sum": 1591
+      },
+      "sample_ids": [
+        22715,
+        22624
+      ]
+    },
+    {
+      "id": 9,
+      "name": "Sporting Life Racing",
+      "homepage_url": "https://www.sportinglife.com/racing",
+      "feed_url": "https://www.sportinglife.com/racing/news",
+      "racing_region": "united_kingdom",
+      "source_language": "en",
+      "source_kind": "news",
+      "adapter_key": "sporting_life",
+      "source_site": "sporting_life",
+      "source_mode": "latest",
+      "enabled": true,
+      "production_approved": true,
+      "crawl_interval_minutes": 240,
+      "effective_crawl_interval_minutes": 15,
+      "backoff_until": null,
+      "failure_streak": 0,
+      "success_streak": 1200,
+      "last_error_category": "",
+      "last_crawl_at": "2026-10-27 15:16:00.830101+00:00",
+      "last_crawl_status": "success",
+      "jobs_7d": [
+        {
+          "status": "success",
+          "n": 494,
+          "first": "2026-10-20 15:42:41.834108+00:00",
+          "last": "2026-10-27 15:15:59.973038+00:00"
+        }
+      ],
+      "jobs_sample_limit": 400,
+      "articles_7d": {
+        "count": 0,
+        "first": null,
+        "last": null
+      },
+      "interval_sample": {
+        "jobs": 400,
+        "limited": true,
+        "first": "2026-10-21T23:16:53.873247+00:00",
+        "last": "2026-10-27T15:15:59.973038+00:00",
+        "gap_median_minutes": 20.0,
+        "gap_p95_minutes": 24.03,
+        "gap_max_minutes": 43.2,
+        "new_count_sum": 0,
+        "zero_new_count_jobs": 400,
+        "legacy_fail_count_sum": 0
+      },
+      "sample_ids": [
+        20780,
+        20777
+      ]
+    },
+    {
+      "id": 10,
+      "name": "Sky Sports Racing 新闻",
+      "homepage_url": "https://www.skysports.com/racing",
+      "feed_url": "https://www.skysports.com/racing/news",
+      "racing_region": "united_kingdom",
+      "source_language": "en",
+      "source_kind": "news",
+      "adapter_key": "sky_sports_racing",
+      "source_site": "sky_sports_racing",
+      "source_mode": "latest",
+      "enabled": true,
+      "production_approved": true,
+      "crawl_interval_minutes": 240,
+      "effective_crawl_interval_minutes": 15,
+      "backoff_until": null,
+      "failure_streak": 0,
+      "success_streak": 1705,
+      "last_error_category": "",
+      "last_crawl_at": "2026-10-27 15:16:03.291509+00:00",
+      "last_crawl_status": "success",
+      "jobs_7d": [
+        {
+          "status": "success",
+          "n": 494,
+          "first": "2026-10-20 15:42:42.699985+00:00",
+          "last": "2026-10-27 15:16:00.869930+00:00"
+        }
+      ],
+      "jobs_sample_limit": 400,
+      "articles_7d": {
+        "count": 0,
+        "first": null,
+        "last": null
+      },
+      "interval_sample": {
+        "jobs": 400,
+        "limited": true,
+        "first": "2026-10-21T23:16:54.773141+00:00",
+        "last": "2026-10-27T15:16:00.869930+00:00",
+        "gap_median_minutes": 20.0,
+        "gap_p95_minutes": 24.03,
+        "gap_max_minutes": 43.2,
+        "new_count_sum": 0,
+        "zero_new_count_jobs": 400,
+        "legacy_fail_count_sum": 3402
+      },
+      "sample_ids": [
+        17850,
+        17849
+      ]
+    },
+    {
+      "id": 11,
+      "name": "Sky Sports Racing Top Stories",
+      "homepage_url": "https://www.skysports.com/racing",
+      "feed_url": "https://www.skysports.com/racing",
+      "racing_region": "united_kingdom",
+      "source_language": "en",
+      "source_kind": "news",
+      "adapter_key": "sky_sports_racing",
+      "source_site": "sky_sports_racing",
+      "source_mode": "access",
+      "enabled": true,
+      "production_approved": true,
+      "crawl_interval_minutes": 240,
+      "effective_crawl_interval_minutes": 15,
+      "backoff_until": null,
+      "failure_streak": 0,
+      "success_streak": 27,
+      "last_error_category": "",
+      "last_crawl_at": "2026-10-27 15:15:39.459456+00:00",
+      "last_crawl_status": "success",
+      "jobs_7d": [
+        {
+          "status": "failed",
+          "n": 7,
+          "first": "2026-10-20 16:41:22.595342+00:00",
+          "last": "2026-10-27 04:15:07.846896+00:00"
+        },
+        {
+          "status": "success",
+          "n": 481,
+          "first": "2026-10-20 15:42:20.310650+00:00",
+          "last": "2026-10-27 15:15:16.280932+00:00"
+        }
+      ],
+      "jobs_sample_limit": 400,
+      "articles_7d": {
+        "count": 7,
+        "first": "2026-10-20 16:21:31.411714+00:00",
+        "last": "2026-10-25 17:05:51.679588+00:00"
+      },
+      "interval_sample": {
+        "jobs": 400,
+        "limited": true,
+        "first": "2026-10-21T21:14:38.252145+00:00",
+        "last": "2026-10-27T15:15:16.280932+00:00",
+        "gap_median_minutes": 19.99,
+        "gap_p95_minutes": 25.84,
+        "gap_max_minutes": 67.02,
+        "new_count_sum": 5,
+        "zero_new_count_jobs": 395,
+        "legacy_fail_count_sum": 7947
+      },
+      "sample_ids": [
+        22537,
+        22338
+      ]
+    },
+    {
+      "id": 12,
+      "name": "BHA 新闻",
+      "homepage_url": "https://www.britishhorseracing.com/",
+      "feed_url": "https://www.britishhorseracing.com/press-releases/",
+      "racing_region": "united_kingdom",
+      "source_language": "en",
+      "source_kind": "official",
+      "adapter_key": "bha",
+      "source_site": "bha",
+      "source_mode": "official",
+      "enabled": false,
+      "production_approved": false,
+      "crawl_interval_minutes": 360,
+      "effective_crawl_interval_minutes": null,
+      "backoff_until": null,
+      "failure_streak": 0,
+      "success_streak": 0,
+      "last_error_category": "",
+      "last_crawl_at": null,
+      "last_crawl_status": "",
+      "jobs_7d": [],
+      "jobs_sample_limit": 400,
+      "articles_7d": {
+        "count": 0,
+        "first": null,
+        "last": null
+      },
+      "interval_sample": {
+        "jobs": 0,
+        "limited": false,
+        "first": null,
+        "last": null,
+        "gap_median_minutes": null,
+        "gap_p95_minutes": null,
+        "gap_max_minutes": null,
+        "new_count_sum": 0,
+        "zero_new_count_jobs": 0,
+        "legacy_fail_count_sum": 0
+      },
+      "sample_ids": []
+    },
+    {
+      "id": 13,
+      "name": "France Galop 英文新闻",
+      "homepage_url": "https://www.france-galop.com/en/news",
+      "feed_url": "https://www.france-galop.com/en/news",
+      "racing_region": "france",
+      "source_language": "en",
+      "source_kind": "official",
+      "adapter_key": "france_galop_news",
+      "source_site": "france_galop_news",
+      "source_mode": "official",
+      "enabled": true,
+      "production_approved": true,
+      "crawl_interval_minutes": 360,
+      "effective_crawl_interval_minutes": 15,
+      "backoff_until": null,
+      "failure_streak": 0,
+      "success_streak": 481,
+      "last_error_category": "",
+      "last_crawl_at": "2026-10-27 15:16:29.772770+00:00",
+      "last_crawl_status": "success",
+      "jobs_7d": [
+        {
+          "status": "failed",
+          "n": 1,
+          "first": "2026-10-20 19:03:24.419668+00:00",
+          "last": "2026-10-20 19:03:24.419668+00:00"
+        },
+        {
+          "status": "success",
+          "n": 491,
+          "first": "2026-10-20 15:45:32.085949+00:00",
+          "last": "2026-10-27 15:16:03.336858+00:00"
+        }
+      ],
+      "jobs_sample_limit": 400,
+      "articles_7d": {
+        "count": 2,
+        "first": "2026-10-22 14:15:51.051427+00:00",
+        "last": "2026-10-23 12:11:58.783363+00:00"
+      },
+      "interval_sample": {
+        "jobs": 400,
+        "limited": true,
+        "first": "2026-10-21T23:03:40.654963+00:00",
+        "last": "2026-10-27T15:16:03.336858+00:00",
+        "gap_median_minutes": 20.01,
+        "gap_p95_minutes": 24.1,
+        "gap_max_minutes": 43.21,
+        "new_count_sum": 2,
+        "zero_new_count_jobs": 398,
+        "legacy_fail_count_sum": 7998
+      },
+      "sample_ids": [
+        22154,
+        22044
+      ]
+    },
+    {
+      "id": 14,
+      "name": "TDN France Galop 关键词英文新闻",
+      "homepage_url": "https://www.thoroughbreddailynews.com/",
+      "feed_url": "https://www.thoroughbreddailynews.com/wp-json/wp/v2/search?search=France%20Galop&per_page=20",
+      "racing_region": "france",
+      "source_language": "en",
+      "source_kind": "news",
+      "adapter_key": "tdn_france",
+      "source_site": "tdn_france",
+      "source_mode": "latest",
+      "enabled": true,
+      "production_approved": true,
+      "crawl_interval_minutes": 360,
+      "effective_crawl_interval_minutes": 15,
+      "backoff_until": null,
+      "failure_streak": 0,
+      "success_streak": 1679,
+      "last_error_category": "",
+      "last_crawl_at": "2026-10-27 15:16:30.936460+00:00",
+      "last_crawl_status": "success",
+      "jobs_7d": [
+        {
+          "status": "success",
+          "n": 492,
+          "first": "2026-10-20 15:45:53.784938+00:00",
+          "last": "2026-10-27 15:16:29.812166+00:00"
+        }
+      ],
+      "jobs_sample_limit": 400,
+      "articles_7d": {
+        "count": 0,
+        "first": null,
+        "last": null
+      },
+      "interval_sample": {
+        "jobs": 400,
+        "limited": true,
+        "first": "2026-10-21T23:04:03.604354+00:00",
+        "last": "2026-10-27T15:16:29.812166+00:00",
+        "gap_median_minutes": 20.01,
+        "gap_p95_minutes": 24.12,
+        "gap_max_minutes": 43.22,
+        "new_count_sum": 1,
+        "zero_new_count_jobs": 399,
+        "legacy_fail_count_sum": 417
+      },
+      "sample_ids": [
+        7611,
+        5700
+      ]
+    },
+    {
+      "id": 15,
+      "name": "At The Races 法国相关英文新闻",
+      "homepage_url": "https://www.attheraces.com/",
+      "feed_url": "https://www.attheraces.com/news",
+      "racing_region": "france",
+      "source_language": "en",
+      "source_kind": "news",
+      "adapter_key": "at_the_races_france",
+      "source_site": "at_the_races",
+      "source_mode": "latest",
+      "enabled": false,
+      "production_approved": false,
+      "crawl_interval_minutes": 360,
+      "effective_crawl_interval_minutes": null,
+      "backoff_until": null,
+      "failure_streak": 0,
+      "success_streak": 0,
+      "last_error_category": "",
+      "last_crawl_at": null,
+      "last_crawl_status": "",
+      "jobs_7d": [],
+      "jobs_sample_limit": 400,
+      "articles_7d": {
+        "count": 0,
+        "first": null,
+        "last": null
+      },
+      "interval_sample": {
+        "jobs": 0,
+        "limited": false,
+        "first": null,
+        "last": null,
+        "gap_median_minutes": null,
+        "gap_p95_minutes": null,
+        "gap_max_minutes": null,
+        "new_count_sum": 0,
+        "zero_new_count_jobs": 0,
+        "legacy_fail_count_sum": 0
+      },
+      "sample_ids": []
+    },
+    {
+      "id": 16,
+      "name": "TDN 美国新闻",
+      "homepage_url": "https://www.thoroughbreddailynews.com/",
+      "feed_url": "https://www.thoroughbreddailynews.com/wp-json/wp/v2/posts?per_page=20",
+      "racing_region": "united_states",
+      "source_language": "en",
+      "source_kind": "news",
+      "adapter_key": "tdn",
+      "source_site": "tdn",
+      "source_mode": "latest",
+      "enabled": true,
+      "production_approved": true,
+      "crawl_interval_minutes": 240,
+      "effective_crawl_interval_minutes": 15,
+      "backoff_until": null,
+      "failure_streak": 0,
+      "success_streak": 1678,
+      "last_error_category": "",
+      "last_crawl_at": "2026-10-27 15:18:02.454443+00:00",
+      "last_crawl_status": "success",
+      "jobs_7d": [
+        {
+          "status": "success",
+          "n": 492,
+          "first": "2026-10-20 15:45:54.357571+00:00",
+          "last": "2026-10-27 15:16:30.978375+00:00"
+        }
+      ],
+      "jobs_sample_limit": 400,
+      "articles_7d": {
+        "count": 127,
+        "first": "2026-10-20 16:25:08.329020+00:00",
+        "last": "2026-10-27 15:16:46.873391+00:00"
+      },
+      "interval_sample": {
+        "jobs": 400,
+        "limited": true,
+        "first": "2026-10-21T23:04:04.771680+00:00",
+        "last": "2026-10-27T15:16:30.978375+00:00",
+        "gap_median_minutes": 20.0,
+        "gap_p95_minutes": 24.79,
+        "gap_max_minutes": 40.26,
+        "new_count_sum": 106,
+        "zero_new_count_jobs": 315,
+        "legacy_fail_count_sum": 7894
+      },
+      "sample_ids": [
+        22733,
+        22732
+      ]
+    },
+    {
+      "id": 17,
+      "name": "Horse Racing Nation 新闻",
+      "homepage_url": "https://www.horseracingnation.com/news",
+      "feed_url": "https://www.horseracingnation.com/news",
+      "racing_region": "united_states",
+      "source_language": "en",
+      "source_kind": "news",
+      "adapter_key": "horse_racing_nation",
+      "source_site": "horse_racing_nation",
+      "source_mode": "latest",
+      "enabled": true,
+      "production_approved": true,
+      "crawl_interval_minutes": 240,
+      "effective_crawl_interval_minutes": 15,
+      "backoff_until": null,
+      "failure_streak": 0,
+      "success_streak": 1143,
+      "last_error_category": "",
+      "last_crawl_at": "2026-10-27 15:21:37.075839+00:00",
+      "last_crawl_status": "success",
+      "jobs_7d": [
+        {
+          "status": "success",
+          "n": 491,
+          "first": "2026-10-20 15:30:06.640112+00:00",
+          "last": "2026-10-27 15:21:13.525598+00:00"
+        }
+      ],
+      "jobs_sample_limit": 400,
+      "articles_7d": {
+        "count": 0,
+        "first": null,
+        "last": null
+      },
+      "interval_sample": {
+        "jobs": 400,
+        "limited": true,
+        "first": "2026-10-21T22:23:52.221009+00:00",
+        "last": "2026-10-27T15:21:13.525598+00:00",
+        "gap_median_minutes": 20.04,
+        "gap_p95_minutes": 23.96,
+        "gap_max_minutes": 45.59,
+        "new_count_sum": 6,
+        "zero_new_count_jobs": 394,
+        "legacy_fail_count_sum": 5755
+      },
+      "sample_ids": [
+        18345,
+        16379
+      ]
+    },
+    {
+      "id": 18,
+      "name": "Horse Racing Nation Trending",
+      "homepage_url": "https://www.horseracingnation.com/news",
+      "feed_url": "https://www.horseracingnation.com/news",
+      "racing_region": "united_states",
+      "source_language": "en",
+      "source_kind": "news",
+      "adapter_key": "horse_racing_nation",
+      "source_site": "horse_racing_nation",
+      "source_mode": "access",
+      "enabled": true,
+      "production_approved": true,
+      "crawl_interval_minutes": 240,
+      "effective_crawl_interval_minutes": 15,
+      "backoff_until": null,
+      "failure_streak": 0,
+      "success_streak": 1144,
+      "last_error_category": "",
+      "last_crawl_at": "2026-10-27 15:18:34.194931+00:00",
+      "last_crawl_status": "success",
+      "jobs_7d": [
+        {
+          "status": "success",
+          "n": 491,
+          "first": "2026-10-20 15:46:36.809743+00:00",
+          "last": "2026-10-27 15:18:12.535530+00:00"
+        }
+      ],
+      "jobs_sample_limit": 400,
+      "articles_7d": {
+        "count": 76,
+        "first": "2026-10-20 16:47:08.342028+00:00",
+        "last": "2026-10-27 14:17:38.173346+00:00"
+      },
+      "interval_sample": {
+        "jobs": 400,
+        "limited": true,
+        "first": "2026-10-21T22:41:18.193955+00:00",
+        "last": "2026-10-27T15:18:12.535530+00:00",
+        "gap_median_minutes": 20.02,
+        "gap_p95_minutes": 24.25,
+        "gap_max_minutes": 40.27,
+        "new_count_sum": 52,
+        "zero_new_count_jobs": 356,
+        "legacy_fail_count_sum": 5711
+      },
+      "sample_ids": [
+        22731,
+        22730
+      ]
+    },
+    {
+      "id": 19,
+      "name": "BloodHorse",
+      "homepage_url": "https://www.bloodhorse.com/horse-racing",
+      "feed_url": "https://www.bloodhorse.com/horse-racing/articles",
+      "racing_region": "united_states",
+      "source_language": "en",
+      "source_kind": "news",
+      "adapter_key": "bloodhorse",
+      "source_site": "bloodhorse",
+      "source_mode": "latest",
+      "enabled": false,
+      "production_approved": false,
+      "crawl_interval_minutes": 240,
+      "effective_crawl_interval_minutes": null,
+      "backoff_until": null,
+      "failure_streak": 0,
+      "success_streak": 0,
+      "last_error_category": "",
+      "last_crawl_at": null,
+      "last_crawl_status": "",
+      "jobs_7d": [],
+      "jobs_sample_limit": 400,
+      "articles_7d": {
+        "count": 0,
+        "first": null,
+        "last": null
+      },
+      "interval_sample": {
+        "jobs": 0,
+        "limited": false,
+        "first": null,
+        "last": null,
+        "gap_median_minutes": null,
+        "gap_p95_minutes": null,
+        "gap_max_minutes": null,
+        "new_count_sum": 0,
+        "zero_new_count_jobs": 0,
+        "legacy_fail_count_sum": 0
+      },
+      "sample_ids": []
+    },
+    {
+      "id": 20,
+      "name": "Paulick Report",
+      "homepage_url": "https://paulickreport.com/",
+      "feed_url": "https://paulickreport.com/news/",
+      "racing_region": "united_states",
+      "source_language": "en",
+      "source_kind": "news",
+      "adapter_key": "paulick_report",
+      "source_site": "paulick_report",
+      "source_mode": "latest",
+      "enabled": false,
+      "production_approved": false,
+      "crawl_interval_minutes": 240,
+      "effective_crawl_interval_minutes": null,
+      "backoff_until": null,
+      "failure_streak": 0,
+      "success_streak": 0,
+      "last_error_category": "",
+      "last_crawl_at": null,
+      "last_crawl_status": "",
+      "jobs_7d": [],
+      "jobs_sample_limit": 400,
+      "articles_7d": {
+        "count": 0,
+        "first": null,
+        "last": null
+      },
+      "interval_sample": {
+        "jobs": 0,
+        "limited": false,
+        "first": null,
+        "last": null,
+        "gap_median_minutes": null,
+        "gap_p95_minutes": null,
+        "gap_max_minutes": null,
+        "new_count_sum": 0,
+        "zero_new_count_jobs": 0,
+        "legacy_fail_count_sum": 0
+      },
+      "sample_ids": []
+    },
+    {
+      "id": 21,
+      "name": "TDN 法国宽关键词英文新闻",
+      "homepage_url": "https://www.thoroughbreddailynews.com/",
+      "feed_url": "https://www.thoroughbreddailynews.com/wp-json/wp/v2/search?search=French%20racing&per_page=20",
+      "racing_region": "france",
+      "source_language": "en",
+      "source_kind": "news",
+      "adapter_key": "tdn_france_broad",
+      "source_site": "tdn_france",
+      "source_mode": "access",
+      "enabled": true,
+      "production_approved": true,
+      "crawl_interval_minutes": 360,
+      "effective_crawl_interval_minutes": 15,
+      "backoff_until": null,
+      "failure_streak": 0,
+      "success_streak": 1693,
+      "last_error_category": "",
+      "last_crawl_at": "2026-10-27 15:18:12.498645+00:00",
+      "last_crawl_status": "success",
+      "jobs_7d": [
+        {
+          "status": "success",
+          "n": 491,
+          "first": "2026-10-20 15:46:21.942574+00:00",
+          "last": "2026-10-27 15:18:02.518540+00:00"
+        }
+      ],
+      "jobs_sample_limit": 400,
+      "articles_7d": {
+        "count": 15,
+        "first": "2026-10-20 18:23:38.395139+00:00",
+        "last": "2026-10-26 23:06:20.527963+00:00"
+      },
+      "interval_sample": {
+        "jobs": 400,
+        "limited": true,
+        "first": "2026-10-21T22:41:06.505164+00:00",
+        "last": "2026-10-27T15:18:02.518540+00:00",
+        "gap_median_minutes": 20.01,
+        "gap_p95_minutes": 24.91,
+        "gap_max_minutes": 43.2,
+        "new_count_sum": 0,
+        "zero_new_count_jobs": 400,
+        "legacy_fail_count_sum": 2578
+      },
+      "sample_ids": [
+        22684,
+        22644
+      ]
+    }
+  ],
+  "samples": [
+    {
+      "id": 22726,
+      "source_config_id": 1,
+      "adapter_key": "netkeiba",
+      "source_site": "netkeiba",
+      "url": "https://news.netkeiba.com/?pid=news_view&no=346910",
+      "html_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "html_bytes": 0,
+      "stored_region": "japan",
+      "source_region": "japan",
+      "stored_body_chars": 361,
+      "stored_time_verified": null,
+      "stored_time_evidence": {},
+      "date_candidates": [],
+      "p01_clean": {
+        "status": "blocked",
+        "reason": "body_boundary_missing_or_oversized",
+        "configured_selectors": [
+          ".News_Txt"
+        ]
+      },
+      "candidate_body_nodes": []
+    },
+    {
+      "id": 22725,
+      "source_config_id": 1,
+      "adapter_key": "netkeiba",
+      "source_site": "netkeiba",
+      "url": "https://news.netkeiba.com/?pid=news_view&no=346911",
+      "html_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "html_bytes": 0,
+      "stored_region": "japan",
+      "source_region": "japan",
+      "stored_body_chars": 856,
+      "stored_time_verified": null,
+      "stored_time_evidence": {},
+      "date_candidates": [],
+      "p01_clean": {
+        "status": "blocked",
+        "reason": "body_boundary_missing_or_oversized",
+        "configured_selectors": [
+          ".News_Txt"
+        ]
+      },
+      "candidate_body_nodes": []
+    },
+    {
+      "id": 22720,
+      "source_config_id": 2,
+      "adapter_key": "netkeiba",
+      "source_site": "netkeiba",
+      "url": "https://news.netkeiba.com/?pid=news_view&no=346207",
+      "html_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "html_bytes": 0,
+      "stored_region": "japan",
+      "source_region": "japan",
+      "stored_body_chars": 590,
+      "stored_time_verified": null,
+      "stored_time_evidence": {},
+      "date_candidates": [],
+      "p01_clean": {
+        "status": "blocked",
+        "reason": "body_boundary_missing_or_oversized",
+        "configured_selectors": [
+          ".News_Txt"
+        ]
+      },
+      "candidate_body_nodes": []
+    },
+    {
+      "id": 22706,
+      "source_config_id": 2,
+      "adapter_key": "netkeiba",
+      "source_site": "netkeiba",
+      "url": "https://news.netkeiba.com/?pid=news_view&no=346898",
+      "html_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "html_bytes": 0,
+      "stored_region": "japan",
+      "source_region": "japan",
+      "stored_body_chars": 466,
+      "stored_time_verified": null,
+      "stored_time_evidence": {},
+      "date_candidates": [],
+      "p01_clean": {
+        "status": "blocked",
+        "reason": "body_boundary_missing_or_oversized",
+        "configured_selectors": [
+          ".News_Txt"
+        ]
+      },
+      "candidate_body_nodes": []
+    },
+    {
+      "id": 19619,
+      "source_config_id": 3,
+      "adapter_key": "netkeiba",
+      "source_site": "netkeiba",
+      "url": "https://news.netkeiba.com/?pid=news_view&no=344602",
+      "html_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "html_bytes": 0,
+      "stored_region": "japan",
+      "source_region": "japan",
+      "stored_body_chars": 435,
+      "stored_time_verified": null,
+      "stored_time_evidence": {},
+      "date_candidates": [],
+      "p01_clean": {
+        "status": "blocked",
+        "reason": "body_boundary_missing_or_oversized",
+        "configured_selectors": [
+          ".News_Txt"
+        ]
+      },
+      "candidate_body_nodes": []
+    },
+    {
+      "id": 10570,
+      "source_config_id": 3,
+      "adapter_key": "netkeiba",
+      "source_site": "netkeiba",
+      "url": "https://news.netkeiba.com/?pid=news_view&no=338222",
+      "html_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "html_bytes": 0,
+      "stored_region": "japan",
+      "source_region": "japan",
+      "stored_body_chars": 239,
+      "stored_time_verified": null,
+      "stored_time_evidence": {},
+      "date_candidates": [],
+      "p01_clean": {
+        "status": "blocked",
+        "reason": "body_boundary_missing_or_oversized",
+        "configured_selectors": [
+          ".News_Txt"
+        ]
+      },
+      "candidate_body_nodes": []
+    },
+    {
+      "id": 22701,
+      "source_config_id": 4,
+      "adapter_key": "jra",
+      "source_site": "jra",
+      "url": "https://www.jra.go.jp/news/202610/102703.html",
+      "html_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "html_bytes": 0,
+      "stored_region": "japan",
+      "source_region": "japan",
+      "stored_body_chars": 1386,
+      "stored_time_verified": null,
+      "stored_time_evidence": {},
+      "date_candidates": [],
+      "p01_clean": {
+        "status": "blocked",
+        "reason": "body_boundary_missing_or_oversized",
+        "configured_selectors": [
+          ".news_body"
+        ]
+      },
+      "candidate_body_nodes": []
+    },
+    {
+      "id": 22687,
+      "source_config_id": 4,
+      "adapter_key": "jra",
+      "source_site": "jra",
+      "url": "https://www.jra.go.jp/news/202610/102702.html",
+      "html_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "html_bytes": 0,
+      "stored_region": "japan",
+      "source_region": "japan",
+      "stored_body_chars": 1124,
+      "stored_time_verified": null,
+      "stored_time_evidence": {},
+      "date_candidates": [],
+      "p01_clean": {
+        "status": "blocked",
+        "reason": "body_boundary_missing_or_oversized",
+        "configured_selectors": [
+          ".news_body"
+        ]
+      },
+      "candidate_body_nodes": []
+    },
+    {
+      "id": 22700,
+      "source_config_id": 7,
+      "adapter_key": "hkjc_news",
+      "source_site": "hkjc_news",
+      "url": "https://racingnews.hkjc.com/english/2026/10/27/orman-confident-top-dragon-can-handle-dirt-debut-at-sha-tin/",
+      "html_sha256": "fb6e1cfda82cd0aa4f745c14ae92f1776e5675946b768bdfffde5f3c71519ec2",
+      "html_bytes": 65942,
+      "stored_region": "hong_kong",
+      "source_region": "hong_kong",
+      "stored_body_chars": 3927,
+      "stored_time_verified": null,
+      "stored_time_evidence": {},
+      "date_candidates": [],
+      "p01_clean": {
+        "status": "passed_structure",
+        "selector": ".horses-racing-news-content",
+        "blocks": 24,
+        "text_chars": 3904,
+        "text_sha256": "bc7288b34e3862d4090230d352ce4d0052c16cea329a25f539156d38299b6740",
+        "suspicious_block_count": 0
+      },
+      "adapter_reparse": {
+        "body_chars": 3927,
+        "published_at": "None",
+        "metadata": {
+          "body_parse_status": "ok",
+          "body_selector": ".horses-racing-news-content"
+        }
+      },
+      "candidate_body_nodes": [
+        {
+          "tag": "div",
+          "id": null,
+          "class": [
+            "racing-news-content-container"
+          ],
+          "chars": 0
+        },
+        {
+          "tag": "div",
+          "id": "horses-racing-news-content-id",
+          "class": [
+            "horses-racing-news-content"
+          ],
+          "chars": 3904
+        }
+      ]
+    },
+    {
+      "id": 22608,
+      "source_config_id": 7,
+      "adapter_key": "hkjc_news",
+      "source_site": "hkjc_news",
+      "url": "https://racingnews.hkjc.com/english/2026/10/26/classic-history-maker-osborne-sets-sights-on-hong-kong/",
+      "html_sha256": "bcf8dfb8432959844506380be70fcf9552183de084dc78f8e3b92b518a10bc7d",
+      "html_bytes": 63594,
+      "stored_region": "hong_kong",
+      "source_region": "hong_kong",
+      "stored_body_chars": 3196,
+      "stored_time_verified": null,
+      "stored_time_evidence": {},
+      "date_candidates": [],
+      "p01_clean": {
+        "status": "passed_structure",
+        "selector": ".horses-racing-news-content",
+        "blocks": 12,
+        "text_chars": 3185,
+        "text_sha256": "c625e0872ca8d4755dbf202182d4b75207e48ba373f201c60fb5b3b5977db185",
+        "suspicious_block_count": 0
+      },
+      "adapter_reparse": {
+        "body_chars": 3196,
+        "published_at": "None",
+        "metadata": {
+          "body_parse_status": "ok",
+          "body_selector": ".horses-racing-news-content"
+        }
+      },
+      "candidate_body_nodes": [
+        {
+          "tag": "div",
+          "id": null,
+          "class": [
+            "racing-news-content-container"
+          ],
+          "chars": 0
+        },
+        {
+          "tag": "div",
+          "id": "horses-racing-news-content-id",
+          "class": [
+            "horses-racing-news-content"
+          ],
+          "chars": 3185
+        }
+      ]
+    },
+    {
+      "id": 22715,
+      "source_config_id": 8,
+      "adapter_key": "scmp_racing",
+      "source_site": "scmp_racing",
+      "url": "https://www.scmp.com/sport/racing/article/3372320/caspar-fownes-has-sky-high-hopes-class-three-duo-sha-tins-all-weather-meeting",
+      "html_sha256": "d9078e5b98c0aaccae1293f12b75654e31e7b24d0de29b0a88123ab4aed52b6e",
+      "html_bytes": 150736,
+      "stored_region": "hong_kong",
+      "source_region": "hong_kong",
+      "stored_body_chars": 94,
+      "stored_time_verified": null,
+      "stored_time_evidence": {},
+      "date_candidates": [
+        {
+          "tag": "meta",
+          "attrs": {
+            "itemprop": "dateCreated",
+            "content": "2026-10-27T19:35:18+08:00"
+          },
+          "text": ""
+        },
+        {
+          "tag": "meta",
+          "attrs": {
+            "itemprop": "dateModified",
+            "content": "2026-10-27T19:35:21+08:00"
+          },
+          "text": ""
+        },
+        {
+          "tag": "meta",
+          "attrs": {
+            "itemprop": "datePublished",
+            "content": "2026-10-27T19:35:21+08:00"
+          },
+          "text": ""
+        },
+        {
+          "tag": "time",
+          "attrs": {
+            "datetime": "2026-10-27T19:35:21+08:00"
+          },
+          "text": "on Tuesday, October 27, 2026 7:35 PM"
+        },
+        {
+          "tag": "div",
+          "attrs": {
+            "class": [
+              "date"
+            ]
+          },
+          "text": "Wednesday 28 Oct, 2026"
+        },
+        {
+          "tag": "meta",
+          "attrs": {
+            "itemprop": "dateModified",
+            "content": "2025-11-27T18:32:03+08:00"
+          },
+          "text": ""
+        },
+        {
+          "tag": "meta",
+          "attrs": {
+            "itemprop": "datePublished",
+            "content": "2025-11-27T18:20:33+08:00"
+          },
+          "text": ""
+        },
+        {
+          "tag": "meta",
+          "attrs": {
+            "itemprop": "dateModified",
+            "content": "2026-10-26T18:00:10+08:00"
+          },
+          "text": ""
+        },
+        {
+          "tag": "meta",
+          "attrs": {
+            "itemprop": "datePublished",
+            "content": "2026-10-26T18:00:10+08:00"
+          },
+          "text": ""
+        },
+        {
+          "tag": "meta",
+          "attrs": {
+            "itemprop": "dateModified",
+            "content": "2026-10-26T13:15:44+08:00"
+          },
+          "text": ""
+        },
+        {
+          "tag": "meta",
+          "attrs": {
+            "itemprop": "datePublished",
+            "content": "2026-10-26T13:15:44+08:00"
+          },
+          "text": ""
+        },
+        {
+          "tag": "meta",
+          "attrs": {
+            "itemprop": "dateModified",
+            "content": "2026-10-25T20:40:33+08:00"
+          },
+          "text": ""
+        },
+        {
+          "@type": "NewsArticle",
+          "datePublished": "2026-10-27T19:35:21+08:00",
+          "dateModified": "2026-10-27T19:35:21+08:00"
+        }
+      ],
+      "p01_clean": {
+        "status": "blocked",
+        "reason": "body_boundary_not_found",
+        "configured_selectors": []
+      },
+      "adapter_reparse": {
+        "body_chars": 94,
+        "published_at": "2026-10-27 19:35:21+08:00",
+        "metadata": {
+          "body_parse_status": "ok",
+          "body_selector": "article"
+        }
+      },
+      "candidate_body_nodes": [
+        {
+          "tag": "div",
+          "id": null,
+          "class": [
+            "article-body",
+            "clearfix"
+          ],
+          "chars": 2168
+        },
+        {
+          "tag": "div",
+          "id": null,
+          "class": [
+            "article-body-comment",
+            "scmp_button_comment"
+          ],
+          "chars": 19
+        }
+      ]
+    },
+    {
+      "id": 22624,
+      "source_config_id": 8,
+      "adapter_key": "scmp_racing",
+      "source_site": "scmp_racing",
+      "url": "https://www.scmp.com/sport/racing/article/3372149/total-turnover-rise-pleases-jockey-club-host-australian-gallopers-eye-hkir",
+      "html_sha256": "b1f2957bb03ab30a7d7f14378f8e4a2e2b63ff10f45a5543506d144eb0ba9368",
+      "html_bytes": 146677,
+      "stored_region": "hong_kong",
+      "source_region": "hong_kong",
+      "stored_body_chars": 75,
+      "stored_time_verified": null,
+      "stored_time_evidence": {},
+      "date_candidates": [
+        {
+          "tag": "meta",
+          "attrs": {
+            "itemprop": "dateCreated",
+            "content": "2026-10-26T15:51:29+08:00"
+          },
+          "text": ""
+        },
+        {
+          "tag": "meta",
+          "attrs": {
+            "itemprop": "dateModified",
+            "content": "2026-10-26T18:00:10+08:00"
+          },
+          "text": ""
+        },
+        {
+          "tag": "meta",
+          "attrs": {
+            "itemprop": "datePublished",
+            "content": "2026-10-26T18:00:10+08:00"
+          },
+          "text": ""
+        },
+        {
+          "tag": "time",
+          "attrs": {
+            "datetime": "2026-10-26T18:00:10+08:00"
+          },
+          "text": "on Monday, October 26, 2026 6:00 PM"
+        },
+        {
+          "tag": "meta",
+          "attrs": {
+            "itemprop": "dateModified",
+            "content": "2026-10-26T13:15:44+08:00"
+          },
+          "text": ""
+        },
+        {
+          "tag": "meta",
+          "attrs": {
+            "itemprop": "datePublished",
+            "content": "2026-10-26T13:15:44+08:00"
+          },
+          "text": ""
+        },
+        {
+          "tag": "meta",
+          "attrs": {
+            "itemprop": "dateModified",
+            "content": "2026-10-25T20:40:33+08:00"
+          },
+          "text": ""
+        },
+        {
+          "tag": "meta",
+          "attrs": {
+            "itemprop": "datePublished",
+            "content": "2026-10-25T20:40:33+08:00"
+          },
+          "text": ""
+        },
+        {
+          "tag": "meta",
+          "attrs": {
+            "itemprop": "dateModified",
+            "content": "2026-10-25T20:16:02+08:00"
+          },
+          "text": ""
+        },
+        {
+          "tag": "meta",
+          "attrs": {
+            "itemprop": "datePublished",
+            "content": "2026-10-25T20:16:02+08:00"
+          },
+          "text": ""
+        },
+        {
+          "tag": "meta",
+          "attrs": {
+            "itemprop": "dateModified",
+            "content": "2026-10-24T17:00:11+08:00"
+          },
+          "text": ""
+        },
+        {
+          "tag": "meta",
+          "attrs": {
+            "itemprop": "datePublished",
+            "content": "2026-10-24T17:00:11+08:00"
+          },
+          "text": ""
+        },
+        {
+          "@type": "NewsArticle",
+          "datePublished": "2026-10-26T18:00:10+08:00",
+          "dateModified": "2026-10-26T18:00:10+08:00"
+        }
+      ],
+      "p01_clean": {
+        "status": "blocked",
+        "reason": "body_boundary_not_found",
+        "configured_selectors": []
+      },
+      "adapter_reparse": {
+        "body_chars": 75,
+        "published_at": "2026-10-26 18:00:10+08:00",
+        "metadata": {
+          "body_parse_status": "ok",
+          "body_selector": "article"
+        }
+      },
+      "candidate_body_nodes": [
+        {
+          "tag": "div",
+          "id": null,
+          "class": [
+            "article-body",
+            "clearfix"
+          ],
+          "chars": 3896
+        }
+      ]
+    },
+    {
+      "id": 20780,
+      "source_config_id": 9,
+      "adapter_key": "sporting_life",
+      "source_site": "sporting_life",
+      "url": "https://www.sportinglife.com/racing/news/qatar-champions-day-wathnans-big-race-plans/234781",
+      "html_sha256": "74a43768f78bed327169fd65ccecb5b1f356f05455b4748da40d533fd7cd6827",
+      "html_bytes": 157993,
+      "stored_region": "united_kingdom",
+      "source_region": "united_kingdom",
+      "stored_body_chars": 2065,
+      "stored_time_verified": null,
+      "stored_time_evidence": {},
+      "date_candidates": [
+        {
+          "@type": "Article",
+          "datePublished": "2026-10-12T11:06:34.535Z",
+          "dateModified": "2026-10-12T16:10:31.695Z"
+        }
+      ],
+      "p01_clean": {
+        "status": "passed_structure",
+        "selector": "[class*='Article__ArticleBody']",
+        "blocks": 19,
+        "text_chars": 2705,
+        "text_sha256": "28e53cd161531819c8264739c5372ffac00677bdc24eb15450fb20e2c5315b9e",
+        "suspicious_block_count": 0
+      },
+      "adapter_reparse": {
+        "body_chars": 2065,
+        "published_at": "None",
+        "metadata": {
+          "body_parse_status": "ok",
+          "body_selector": "[class*='Article__ArticleBody']"
+        }
+      },
+      "candidate_body_nodes": [
+        {
+          "tag": "div",
+          "id": null,
+          "class": [
+            "Article__ArticleBody-sc-c607b264-5",
+            "jALLYd"
+          ],
+          "chars": 2731
+        }
+      ]
+    },
+    {
+      "id": 20777,
+      "source_config_id": 9,
+      "adapter_key": "sporting_life",
+      "source_site": "sporting_life",
+      "url": "https://www.sportinglife.com/racing/news/qatar-racing-champion-stakes-preview-calandagan-team-happy-to-have-christophe-soumillon/234784",
+      "html_sha256": "3e7728365cc97e9b614019e6650d21af75f93ac690d73782b880d6ab41422192",
+      "html_bytes": 158745,
+      "stored_region": "united_kingdom",
+      "source_region": "united_kingdom",
+      "stored_body_chars": 2748,
+      "stored_time_verified": null,
+      "stored_time_evidence": {},
+      "date_candidates": [
+        {
+          "@type": "Article",
+          "datePublished": "2026-10-12T11:51:55.814Z",
+          "dateModified": "2026-10-12T16:02:09.608Z"
+        }
+      ],
+      "p01_clean": {
+        "status": "passed_structure",
+        "selector": "[class*='Article__ArticleBody']",
+        "blocks": 17,
+        "text_chars": 3386,
+        "text_sha256": "204bb15c805b41ddddfcf1cff4b001b0eae3cd41bf7bf4f1183bd8cdbaa365a7",
+        "suspicious_block_count": 0
+      },
+      "adapter_reparse": {
+        "body_chars": 2748,
+        "published_at": "None",
+        "metadata": {
+          "body_parse_status": "ok",
+          "body_selector": "[class*='Article__ArticleBody']"
+        }
+      },
+      "candidate_body_nodes": [
+        {
+          "tag": "div",
+          "id": null,
+          "class": [
+            "Article__ArticleBody-sc-c607b264-5",
+            "jALLYd"
+          ],
+          "chars": 3413
+        }
+      ]
+    },
+    {
+      "id": 17850,
+      "source_config_id": 10,
+      "adapter_key": "sky_sports_racing",
+      "source_site": "sky_sports_racing",
+      "url": "https://www.skysports.com/racing/news/13585370/today-on-sky-sports-racing-windsor-s-flat-season-finale-headlines-monday-s-action",
+      "html_sha256": "6972f8dc76cbb6d0d0fffd53a4b26cb94b60fa3655c06970b6340b19478b8836",
+      "html_bytes": 230012,
+      "stored_region": "united_kingdom",
+      "source_region": "united_kingdom",
+      "stored_body_chars": 3990,
+      "stored_time_verified": null,
+      "stored_time_evidence": {},
+      "date_candidates": [
+        {
+          "@type": "NewsArticle",
+          "datePublished": "2026-09-14T07:00:00+0000",
+          "dateModified": "2026-09-14T06:48:46+0000"
+        }
+      ],
+      "p01_clean": {
+        "status": "passed_structure",
+        "selector": ".sdc-article-body",
+        "blocks": 23,
+        "text_chars": 3404,
+        "text_sha256": "daef89eaa332d166733990933628c56460ad958fcc69552443a50faa51922e7b",
+        "suspicious_block_count": 0
+      },
+      "adapter_reparse": {
+        "body_chars": 3990,
+        "published_at": "None",
+        "metadata": {
+          "body_parse_status": "ok",
+          "body_selector": "main"
+        }
+      },
+      "candidate_body_nodes": [
+        {
+          "tag": "div",
+          "id": null,
+          "class": [
+            "site-share-wrapper",
+            "site-component-vertical-margin",
+            "site-wrap-padding",
+            "sdc-article-body-width-limiter"
+          ],
+          "chars": 0
+        },
+        {
+          "tag": "div",
+          "id": null,
+          "class": [
+            "sdc-article-body",
+            "sdc-article-body--lead"
+          ],
+          "chars": 3392
+        }
+      ]
+    },
+    {
+      "id": 17849,
+      "source_config_id": 10,
+      "adapter_key": "sky_sports_racing",
+      "source_site": "sky_sports_racing",
+      "url": "https://www.skysports.com/racing/news/13585885/today-on-sky-sports-racing-yarmouth-s-eastern-festival-kicks-off-with-exciting-novice-action",
+      "html_sha256": "d1cc318c446ff60a4ff49cb32630c0fcc3f923411bbf39585cd83be3090dd891",
+      "html_bytes": 221759,
+      "stored_region": "united_kingdom",
+      "source_region": "united_kingdom",
+      "stored_body_chars": 3642,
+      "stored_time_verified": null,
+      "stored_time_evidence": {},
+      "date_candidates": [
+        {
+          "@type": "NewsArticle",
+          "datePublished": "2026-09-15T06:10:00+0000",
+          "dateModified": "2026-09-14T17:31:14+0000"
+        }
+      ],
+      "p01_clean": {
+        "status": "passed_structure",
+        "selector": ".sdc-article-body",
+        "blocks": 21,
+        "text_chars": 3047,
+        "text_sha256": "c17ed8d4d8ca94f2888e0ab4c3d3631773236518f1192a2fa70acc6458e06707",
+        "suspicious_block_count": 0
+      },
+      "adapter_reparse": {
+        "body_chars": 3642,
+        "published_at": "None",
+        "metadata": {
+          "body_parse_status": "ok",
+          "body_selector": "main"
+        }
+      },
+      "candidate_body_nodes": [
+        {
+          "tag": "div",
+          "id": null,
+          "class": [
+            "site-share-wrapper",
+            "site-component-vertical-margin",
+            "site-wrap-padding",
+            "sdc-article-body-width-limiter"
+          ],
+          "chars": 0
+        },
+        {
+          "tag": "div",
+          "id": null,
+          "class": [
+            "sdc-article-body",
+            "sdc-article-body--lead"
+          ],
+          "chars": 3035
+        }
+      ]
+    },
+    {
+      "id": 22537,
+      "source_config_id": 11,
+      "adapter_key": "sky_sports_racing",
+      "source_site": "sky_sports_racing",
+      "url": "https://www.skysports.com/racing/news/13603620/drumbeat-wins-criterium-de-saint-cloud-to-add-to-aidan-obriens-two-year-old-roll-of-honour",
+      "html_sha256": "5464c33ae30e7a22d949f86b2d9ac1dc287303953f42db042c66403488542663",
+      "html_bytes": 219776,
+      "stored_region": "united_kingdom",
+      "source_region": "united_kingdom",
+      "stored_body_chars": 3786,
+      "stored_time_verified": null,
+      "stored_time_evidence": {},
+      "date_candidates": [
+        {
+          "@type": "NewsArticle",
+          "datePublished": "2026-10-25T15:48:00+0000",
+          "dateModified": "2026-10-25T16:49:02+0000"
+        }
+      ],
+      "p01_clean": {
+        "status": "passed_structure",
+        "selector": ".sdc-article-body",
+        "blocks": 16,
+        "text_chars": 3253,
+        "text_sha256": "6e23d7bbc2ae52c4230a02471dd0d370464a05b2f15160fa28e1359165b839b9",
+        "suspicious_block_count": 0
+      },
+      "adapter_reparse": {
+        "body_chars": 3786,
+        "published_at": "None",
+        "metadata": {
+          "body_parse_status": "ok",
+          "body_selector": "main"
+        }
+      },
+      "candidate_body_nodes": [
+        {
+          "tag": "div",
+          "id": null,
+          "class": [
+            "site-share-wrapper",
+            "site-component-vertical-margin",
+            "site-wrap-padding",
+            "sdc-article-body-width-limiter"
+          ],
+          "chars": 0
+        },
+        {
+          "tag": "div",
+          "id": null,
+          "class": [
+            "sdc-article-body",
+            "sdc-article-body--lead"
+          ],
+          "chars": 3377
+        }
+      ]
+    },
+    {
+      "id": 22338,
+      "source_config_id": 11,
+      "adapter_key": "sky_sports_racing",
+      "source_site": "sky_sports_racing",
+      "url": "https://www.skysports.com/racing/news/13603250/giant-sequoia-powers-to-impressive-futurity-trophy-success",
+      "html_sha256": "95f8db58e1c1a99a926c1acecbfc5e9055833d572e3ea0df6218d13e1fd2453e",
+      "html_bytes": 222225,
+      "stored_region": "united_kingdom",
+      "source_region": "united_kingdom",
+      "stored_body_chars": 5522,
+      "stored_time_verified": null,
+      "stored_time_evidence": {},
+      "date_candidates": [
+        {
+          "@type": "NewsArticle",
+          "datePublished": "2026-10-24T17:20:00+0000",
+          "dateModified": "2026-10-24T17:33:28+0000"
+        }
+      ],
+      "p01_clean": {
+        "status": "passed_structure",
+        "selector": ".sdc-article-body",
+        "blocks": 36,
+        "text_chars": 4920,
+        "text_sha256": "cf01d3304c0bc18fc638945dbc8b5b7f7fc739d4b4c6b1d97c70864e6b9067f0",
+        "suspicious_block_count": 0
+      },
+      "adapter_reparse": {
+        "body_chars": 5522,
+        "published_at": "None",
+        "metadata": {
+          "body_parse_status": "ok",
+          "body_selector": "main"
+        }
+      },
+      "candidate_body_nodes": [
+        {
+          "tag": "div",
+          "id": null,
+          "class": [
+            "site-share-wrapper",
+            "site-component-vertical-margin",
+            "site-wrap-padding",
+            "sdc-article-body-width-limiter"
+          ],
+          "chars": 0
+        },
+        {
+          "tag": "div",
+          "id": null,
+          "class": [
+            "sdc-article-body",
+            "sdc-article-body--lead"
+          ],
+          "chars": 4916
+        }
+      ]
+    },
+    {
+      "id": 22154,
+      "source_config_id": 13,
+      "adapter_key": "france_galop_news",
+      "source_site": "france_galop_news",
+      "url": "https://www.france-galop.com/en/content/saint-cloud-hosts-final-three-group-1-races-season",
+      "html_sha256": "395ceb1c80416255d681df7ea32749cc2bd2e5ecde7f751659379ed64021ade7",
+      "html_bytes": 37124,
+      "stored_region": "france",
+      "source_region": "france",
+      "stored_body_chars": 1607,
+      "stored_time_verified": true,
+      "stored_time_evidence": {
+        "raw": "Friday, October 23, 2026 - 13:59",
+        "source": "detail",
+        "timezone": "Europe/Paris",
+        "verified": true
+      },
+      "date_candidates": [
+        {
+          "tag": "p",
+          "attrs": {
+            "class": [
+              "date"
+            ]
+          },
+          "text": "Friday, October 23, 2026 - 13:59"
+        },
+        {
+          "tag": "p",
+          "attrs": {
+            "class": [
+              "date"
+            ]
+          },
+          "text": "16 October 2026"
+        },
+        {
+          "tag": "p",
+          "attrs": {
+            "class": [
+              "date"
+            ]
+          },
+          "text": "8 October 2026"
+        },
+        {
+          "tag": "p",
+          "attrs": {
+            "class": [
+              "date"
+            ]
+          },
+          "text": "4 October 2026"
+        },
+        {
+          "tag": "p",
+          "attrs": {
+            "class": [
+              "date"
+            ]
+          },
+          "text": "4 October 2026"
+        },
+        {
+          "tag": "p",
+          "attrs": {
+            "class": [
+              "date"
+            ]
+          },
+          "text": "4 October 2026"
+        },
+        {
+          "tag": "span",
+          "attrs": {
+            "class": [
+              "date"
+            ]
+          },
+          "text": ""
+        }
+      ],
+      "p01_clean": {
+        "status": "passed_structure",
+        "selector": ".field--name-body",
+        "blocks": 4,
+        "text_chars": 1487,
+        "text_sha256": "620d820d2bcccac70bb478c8755a2a8d6c504d2b7da4d8ee30237920ce28efa6",
+        "suspicious_block_count": 0
+      },
+      "adapter_reparse": {
+        "body_chars": 1607,
+        "published_at": "2026-10-23 11:59:00+00:00",
+        "metadata": {
+          "body_parse_status": "ok",
+          "body_selector": "article",
+          "published_at_evidence": {
+            "source": "detail",
+            "raw": "Friday, October 23, 2026 - 13:59",
+            "timezone": "Europe/Paris",
+            "verified": true
+          },
+          "published_at_verified": true
+        }
+      },
+      "candidate_body_nodes": [
+        {
+          "tag": "div",
+          "id": null,
+          "class": [
+            "field",
+            "field--name-body",
+            "field--type-text-with-summary",
+            "field--label-hidden",
+            "field--item"
+          ],
+          "chars": 1487
+        }
+      ]
+    },
+    {
+      "id": 22044,
+      "source_config_id": 13,
+      "adapter_key": "france_galop_news",
+      "source_site": "france_galop_news",
+      "url": "https://www.france-galop.com/en/content/equipment-permitted-racecourses-race-days",
+      "html_sha256": "87b52f8c655e613a034bdecea4190851a944558dafd67f34efbbe607e7bdcb19",
+      "html_bytes": 36441,
+      "stored_region": "france",
+      "source_region": "france",
+      "stored_body_chars": 668,
+      "stored_time_verified": true,
+      "stored_time_evidence": {
+        "raw": "Thursday, October 22, 2026 - 16:06",
+        "source": "detail",
+        "timezone": "Europe/Paris",
+        "verified": true
+      },
+      "date_candidates": [
+        {
+          "tag": "p",
+          "attrs": {
+            "class": [
+              "date"
+            ]
+          },
+          "text": "Thursday, October 22, 2026 - 16:06"
+        },
+        {
+          "tag": "p",
+          "attrs": {
+            "class": [
+              "date"
+            ]
+          },
+          "text": "28 May 2026"
+        },
+        {
+          "tag": "p",
+          "attrs": {
+            "class": [
+              "date"
+            ]
+          },
+          "text": "10 March 2026"
+        },
+        {
+          "tag": "p",
+          "attrs": {
+            "class": [
+              "date"
+            ]
+          },
+          "text": "9 May 2025"
+        },
+        {
+          "tag": "p",
+          "attrs": {
+            "class": [
+              "date"
+            ]
+          },
+          "text": "30 April 2025"
+        },
+        {
+          "tag": "p",
+          "attrs": {
+            "class": [
+              "date"
+            ]
+          },
+          "text": "11 April 2025"
+        },
+        {
+          "tag": "span",
+          "attrs": {
+            "class": [
+              "date"
+            ]
+          },
+          "text": ""
+        }
+      ],
+      "p01_clean": {
+        "status": "passed_structure",
+        "selector": ".field--name-body",
+        "blocks": 6,
+        "text_chars": 551,
+        "text_sha256": "1728ad55250308e627c7cf349734dfa29e21aa5d7db3354eab47caf8c10a2fe2",
+        "suspicious_block_count": 0
+      },
+      "adapter_reparse": {
+        "body_chars": 668,
+        "published_at": "2026-10-22 14:06:00+00:00",
+        "metadata": {
+          "body_parse_status": "ok",
+          "body_selector": "article",
+          "published_at_evidence": {
+            "source": "detail",
+            "raw": "Thursday, October 22, 2026 - 16:06",
+            "timezone": "Europe/Paris",
+            "verified": true
+          },
+          "published_at_verified": true
+        }
+      },
+      "candidate_body_nodes": [
+        {
+          "tag": "div",
+          "id": null,
+          "class": [
+            "field",
+            "field--name-body",
+            "field--type-text-with-summary",
+            "field--label-hidden",
+            "field--item"
+          ],
+          "chars": 551
+        }
+      ]
+    },
+    {
+      "id": 7611,
+      "source_config_id": 14,
+      "adapter_key": "tdn_france",
+      "source_site": "tdn",
+      "url": "https://www.thoroughbreddailynews.com/france-galop-to-present-2026-budget-on-july-16/",
+      "html_sha256": "dfe928664e9faf66c97476879287d3e5e1669534f681b0d436dafcd31115e917",
+      "html_bytes": 97161,
+      "stored_region": "france",
+      "source_region": "france",
+      "stored_body_chars": 910,
+      "stored_time_verified": null,
+      "stored_time_evidence": {},
+      "date_candidates": [
+        {
+          "tag": "meta",
+          "attrs": {
+            "property": "article:published_time",
+            "content": "2026-07-09T20:18:53+00:00"
+          },
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "attrs": {
+            "class": [
+              "article-date"
+            ]
+          },
+          "text": "Thursday, July 9, 2026 at 4:18 pm | Back to: Europe , Industry News Europe"
+        },
+        {
+          "@type": "WebPage",
+          "datePublished": "2026-07-09T20:18:53+00:00",
+          "dateModified": null
+        },
+        {
+          "@type": "Article",
+          "datePublished": "2026-07-09T20:18:53+00:00",
+          "dateModified": null
+        }
+      ],
+      "p01_clean": {
+        "status": "passed_structure",
+        "selector": "span[itemprop='articleBody']",
+        "blocks": 5,
+        "text_chars": 906,
+        "text_sha256": "a759212934f6f3aed64e33153db26f9a119a169692da3ed07c56f311459d41c2",
+        "suspicious_block_count": 0
+      },
+      "adapter_reparse": {
+        "body_chars": 890,
+        "published_at": "None",
+        "metadata": {
+          "body_parse_status": "ok",
+          "body_selector": "span[itemprop='articleBody']"
+        }
+      },
+      "candidate_body_nodes": [
+        {
+          "tag": "span",
+          "id": null,
+          "class": null,
+          "chars": 906
+        }
+      ]
+    },
+    {
+      "id": 5700,
+      "source_config_id": 14,
+      "adapter_key": "tdn_france",
+      "source_site": "tdn",
+      "url": "https://www.thoroughbreddailynews.com/elie-hennau-is-new-head-of-france-galop/",
+      "html_sha256": "721ec9b954f8567c2ae4357546c94de70ce3cfe27cd3a9e1e2ed8006d6b6fbf0",
+      "html_bytes": 97539,
+      "stored_region": "france",
+      "source_region": "france",
+      "stored_body_chars": 1178,
+      "stored_time_verified": null,
+      "stored_time_evidence": {},
+      "date_candidates": [
+        {
+          "tag": "meta",
+          "attrs": {
+            "property": "article:published_time",
+            "content": "2024-01-24T17:59:55+00:00"
+          },
+          "text": ""
+        },
+        {
+          "tag": "meta",
+          "attrs": {
+            "property": "article:modified_time",
+            "content": "2024-01-24T18:03:34+00:00"
+          },
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "attrs": {
+            "class": [
+              "article-date"
+            ]
+          },
+          "text": "Wednesday, January 24, 2024 at 12:59 pm | Back to: Europe , Shared News Europe Updated: January 24, 2024 at 1:03 pm"
+        },
+        {
+          "@type": "WebPage",
+          "datePublished": "2024-01-24T17:59:55+00:00",
+          "dateModified": "2024-01-24T18:03:34+00:00"
+        },
+        {
+          "@type": "Article",
+          "datePublished": "2024-01-24T17:59:55+00:00",
+          "dateModified": "2024-01-24T18:03:34+00:00"
+        }
+      ],
+      "p01_clean": {
+        "status": "passed_structure",
+        "selector": "span[itemprop='articleBody']",
+        "blocks": 5,
+        "text_chars": 1170,
+        "text_sha256": "052da741ee458aeec229e58606b4bd2d7e8c497bd9e360941aaf53985abe62da",
+        "suspicious_block_count": 0
+      },
+      "adapter_reparse": {
+        "body_chars": 1154,
+        "published_at": "None",
+        "metadata": {
+          "body_parse_status": "ok",
+          "body_selector": "span[itemprop='articleBody']"
+        }
+      },
+      "candidate_body_nodes": [
+        {
+          "tag": "span",
+          "id": null,
+          "class": null,
+          "chars": 1170
+        }
+      ]
+    },
+    {
+      "id": 22733,
+      "source_config_id": 16,
+      "adapter_key": "tdn",
+      "source_site": "tdn",
+      "url": "https://www.thoroughbreddailynews.com/middle-park-hero-wise-approachs-full-sister-slightly-set-for-dundalk-debut/",
+      "html_sha256": "e62d1703b3597e0235ff829e0f2d10e7977148d94aaf4319d4b6c2315fa6c3b7",
+      "html_bytes": 101269,
+      "stored_region": "united_states",
+      "source_region": "united_states",
+      "stored_body_chars": 1220,
+      "stored_time_verified": null,
+      "stored_time_evidence": {},
+      "date_candidates": [
+        {
+          "tag": "meta",
+          "attrs": {
+            "property": "article:published_time",
+            "content": "2026-10-27T14:59:45+00:00"
+          },
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "attrs": {
+            "class": [
+              "article-date"
+            ]
+          },
+          "text": "Tuesday, October 27, 2026 at 10:59 am | Back to: Europe , Shared News Europe"
+        },
+        {
+          "@type": "WebPage",
+          "datePublished": "2026-10-27T14:59:45+00:00",
+          "dateModified": null
+        },
+        {
+          "@type": "Article",
+          "datePublished": "2026-10-27T14:59:45+00:00",
+          "dateModified": null
+        }
+      ],
+      "p01_clean": {
+        "status": "passed_structure",
+        "selector": "span[itemprop='articleBody']",
+        "blocks": 7,
+        "text_chars": 1241,
+        "text_sha256": "57ed956b935d471a44bc0117bd7937065b6147c128240bc8bd0c6cecd4569c64",
+        "suspicious_block_count": 0
+      },
+      "adapter_reparse": {
+        "body_chars": 1220,
+        "published_at": "None",
+        "metadata": {
+          "body_parse_status": "ok",
+          "body_selector": "span[itemprop='articleBody']"
+        }
+      },
+      "candidate_body_nodes": [
+        {
+          "tag": "span",
+          "id": null,
+          "class": null,
+          "chars": 1241
+        }
+      ]
+    },
+    {
+      "id": 22732,
+      "source_config_id": 16,
+      "adapter_key": "tdn",
+      "source_site": "tdn",
+      "url": "https://www.thoroughbreddailynews.com/maroney-and-snellings-added-to-trfs-board-of-directors/",
+      "html_sha256": "194ab15f4cfa484aec639a7fa5b2ff10223f55375790a0f54fb2e2dae5493eea",
+      "html_bytes": 100255,
+      "stored_region": "united_states",
+      "source_region": "united_states",
+      "stored_body_chars": 727,
+      "stored_time_verified": null,
+      "stored_time_evidence": {},
+      "date_candidates": [
+        {
+          "tag": "meta",
+          "attrs": {
+            "property": "article:published_time",
+            "content": "2026-10-27T15:11:07+00:00"
+          },
+          "text": ""
+        },
+        {
+          "tag": "meta",
+          "attrs": {
+            "property": "article:modified_time",
+            "content": "2026-10-27T15:11:45+00:00"
+          },
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "attrs": {
+            "class": [
+              "article-date"
+            ]
+          },
+          "text": "Tuesday, October 27, 2026 at 11:11 am | Back to: Top News Updated: October 27, 2026 at 11:11 am"
+        },
+        {
+          "@type": "WebPage",
+          "datePublished": "2026-10-27T15:11:07+00:00",
+          "dateModified": "2026-10-27T15:11:45+00:00"
+        },
+        {
+          "@type": "Article",
+          "datePublished": "2026-10-27T15:11:07+00:00",
+          "dateModified": "2026-10-27T15:11:45+00:00"
+        }
+      ],
+      "p01_clean": {
+        "status": "passed_structure",
+        "selector": "span[itemprop='articleBody']",
+        "blocks": 5,
+        "text_chars": 743,
+        "text_sha256": "3d0212d05268362f28dc69635c2c779b902566572a65018a2ecd81b0ec7e47a9",
+        "suspicious_block_count": 0
+      },
+      "adapter_reparse": {
+        "body_chars": 727,
+        "published_at": "None",
+        "metadata": {
+          "body_parse_status": "ok",
+          "body_selector": "span[itemprop='articleBody']"
+        }
+      },
+      "candidate_body_nodes": [
+        {
+          "tag": "span",
+          "id": null,
+          "class": null,
+          "chars": 743
+        }
+      ]
+    },
+    {
+      "id": 18345,
+      "source_config_id": 17,
+      "adapter_key": "horse_racing_nation",
+      "source_site": "horse_racing_nation",
+      "url": "https://www.horseracingnation.com/news/Flatter_Pod_Exclusive_interview_with_Churchill_CEO_Carstanjen_123",
+      "html_sha256": "d0335b67605860f8d9b8e92c5c25e4acbd6d069493010143282857d4f70a9fd8",
+      "html_bytes": 103308,
+      "stored_region": "united_states",
+      "source_region": "united_states",
+      "stored_body_chars": 1155,
+      "stored_time_verified": null,
+      "stored_time_evidence": {},
+      "date_candidates": [
+        {
+          "tag": "meta",
+          "attrs": {
+            "property": "og:article:published_time",
+            "content": "2026-09-25T12:50:00Z"
+          },
+          "text": ""
+        },
+        {
+          "tag": "meta",
+          "attrs": {
+            "property": "og:article:modified_time",
+            "content": "2024-09-14T12:30:32Z"
+          },
+          "text": ""
+        },
+        {
+          "tag": "time",
+          "attrs": {
+            "datetime": "2026-09-25T12:50:00Z"
+          },
+          "text": "September 25, 2026 12:50pm"
+        },
+        {
+          "@type": "NewsArticle",
+          "datePublished": "2026-09-25T12:50:00Z",
+          "dateModified": "2024-09-14T12:30:32Z"
+        }
+      ],
+      "p01_clean": {
+        "status": "passed_structure",
+        "selector": ".article-body",
+        "blocks": 2,
+        "text_chars": 1151,
+        "text_sha256": "00aff52873c4853c74631030345b7076a495d2c612a14836de98b6839a7f7d16",
+        "suspicious_block_count": 0
+      },
+      "adapter_reparse": {
+        "body_chars": 1155,
+        "published_at": "2026-09-25 12:50:00+00:00",
+        "metadata": {
+          "body_parse_status": "ok",
+          "body_selector": ".article-body"
+        }
+      },
+      "candidate_body_nodes": [
+        {
+          "tag": "div",
+          "id": null,
+          "class": [
+            "article-body",
+            "mt-2"
+          ],
+          "chars": 1151
+        }
+      ]
+    },
+    {
+      "id": 16379,
+      "source_config_id": 17,
+      "adapter_key": "horse_racing_nation",
+      "source_site": "horse_racing_nation",
+      "url": "https://www.horseracingnation.com/news/Woodbine_Motion_s_Induction_makes_stakes_debut_Summer_123",
+      "html_sha256": "7ae73ff8258729a8131a327781ddb8a95074ecf0d325a86b6e736ea2de2b71d3",
+      "html_bytes": 123617,
+      "stored_region": "united_states",
+      "source_region": "united_states",
+      "stored_body_chars": 4780,
+      "stored_time_verified": null,
+      "stored_time_evidence": {},
+      "date_candidates": [
+        {
+          "tag": "meta",
+          "attrs": {
+            "property": "og:article:published_time",
+            "content": "2026-09-09T20:40:00Z"
+          },
+          "text": ""
+        },
+        {
+          "tag": "meta",
+          "attrs": {
+            "property": "og:article:modified_time",
+            "content": "2026-09-09T20:36:39Z"
+          },
+          "text": ""
+        },
+        {
+          "tag": "time",
+          "attrs": {
+            "datetime": "2026-09-09T20:40:00Z"
+          },
+          "text": "September 9, 2026 8:40pm"
+        },
+        {
+          "@type": "NewsArticle",
+          "datePublished": "2026-09-09T20:40:00Z",
+          "dateModified": "2026-09-09T20:36:39Z"
+        }
+      ],
+      "p01_clean": {
+        "status": "passed_structure",
+        "selector": ".article-body",
+        "blocks": 15,
+        "text_chars": 4862,
+        "text_sha256": "1314f95255f6e8a44cb9515174e3c5c9769a6ca5d4be68ebc0cf5e57dd5639f8",
+        "suspicious_block_count": 0
+      },
+      "adapter_reparse": {
+        "body_chars": 4780,
+        "published_at": "2026-09-09 20:40:00+00:00",
+        "metadata": {
+          "body_parse_status": "ok",
+          "body_selector": ".article-body"
+        }
+      },
+      "candidate_body_nodes": [
+        {
+          "tag": "div",
+          "id": null,
+          "class": [
+            "article-body",
+            "mt-2"
+          ],
+          "chars": 4670
+        }
+      ]
+    },
+    {
+      "id": 22731,
+      "source_config_id": 18,
+      "adapter_key": "horse_racing_nation",
+      "source_site": "horse_racing_nation",
+      "url": "https://www.horseracingnation.com/news/Santa_Anita_American_Oaks_winner_Ambaya_returns_in_Goldikova_123",
+      "html_sha256": "9a5b9aef329f47c03805b3d32615c5f0f3105a5b108beb6714f49fc0d5f4397b",
+      "html_bytes": 119644,
+      "stored_region": "united_states",
+      "source_region": "united_states",
+      "stored_body_chars": 4020,
+      "stored_time_verified": null,
+      "stored_time_evidence": {},
+      "date_candidates": [
+        {
+          "tag": "meta",
+          "attrs": {
+            "property": "og:article:published_time",
+            "content": "2026-10-27T14:04:00Z"
+          },
+          "text": ""
+        },
+        {
+          "tag": "meta",
+          "attrs": {
+            "property": "og:article:modified_time",
+            "content": "2026-10-27T14:02:33Z"
+          },
+          "text": ""
+        },
+        {
+          "tag": "time",
+          "attrs": {
+            "datetime": "2026-10-27T14:04:00Z"
+          },
+          "text": "October 27, 2026 2:04pm"
+        },
+        {
+          "@type": "NewsArticle",
+          "datePublished": "2026-10-27T14:04:00Z",
+          "dateModified": "2026-10-27T14:02:33Z"
+        }
+      ],
+      "p01_clean": {
+        "status": "passed_structure",
+        "selector": ".article-body",
+        "blocks": 10,
+        "text_chars": 4105,
+        "text_sha256": "8a630f6654e06db1b71fbdc94a6684c23136ae83f024d5fbe98133ae25578877",
+        "suspicious_block_count": 0
+      },
+      "adapter_reparse": {
+        "body_chars": 4020,
+        "published_at": "2026-10-27 14:04:00+00:00",
+        "metadata": {
+          "body_parse_status": "ok",
+          "body_selector": ".article-body"
+        }
+      },
+      "candidate_body_nodes": [
+        {
+          "tag": "div",
+          "id": null,
+          "class": [
+            "article-body",
+            "mt-2"
+          ],
+          "chars": 3928
+        }
+      ]
+    },
+    {
+      "id": 22730,
+      "source_config_id": 18,
+      "adapter_key": "horse_racing_nation",
+      "source_site": "horse_racing_nation",
+      "url": "https://www.horseracingnation.com/news/Speed_figures_These_are_last_week_s_fastest_stakes_winners_2026_10_27_123",
+      "html_sha256": "269cdb5bc90cc464e70d3774012dca81a34453de2308591be1cfcf96487536ee",
+      "html_bytes": 110675,
+      "stored_region": "united_states",
+      "source_region": "united_states",
+      "stored_body_chars": 1899,
+      "stored_time_verified": null,
+      "stored_time_evidence": {},
+      "date_candidates": [
+        {
+          "tag": "meta",
+          "attrs": {
+            "property": "og:article:published_time",
+            "content": "2026-10-27T13:42:00Z"
+          },
+          "text": ""
+        },
+        {
+          "tag": "meta",
+          "attrs": {
+            "property": "og:article:modified_time",
+            "content": "2026-10-26T18:15:04Z"
+          },
+          "text": ""
+        },
+        {
+          "tag": "time",
+          "attrs": {
+            "datetime": "2026-10-27T13:42:00Z"
+          },
+          "text": "October 27, 2026 1:42pm"
+        },
+        {
+          "@type": "NewsArticle",
+          "datePublished": "2026-10-27T13:42:00Z",
+          "dateModified": "2026-10-26T18:15:04Z"
+        }
+      ],
+      "p01_clean": {
+        "status": "passed_structure",
+        "selector": ".article-body",
+        "blocks": 7,
+        "text_chars": 1961,
+        "text_sha256": "456a48692983113f2a744bd82c55f7fa2500f1b78922c75f25855e660c21edc9",
+        "suspicious_block_count": 0
+      },
+      "adapter_reparse": {
+        "body_chars": 1899,
+        "published_at": "2026-10-27 13:42:00+00:00",
+        "metadata": {
+          "body_parse_status": "ok",
+          "body_selector": ".article-body"
+        }
+      },
+      "candidate_body_nodes": [
+        {
+          "tag": "div",
+          "id": null,
+          "class": [
+            "article-body",
+            "mt-2"
+          ],
+          "chars": 1801
+        }
+      ]
+    },
+    {
+      "id": 22684,
+      "source_config_id": 21,
+      "adapter_key": "tdn_france_broad",
+      "source_site": "tdn",
+      "url": "https://www.thoroughbreddailynews.com/five-for-forever-young-as-favorite-in-breeders-cup-classic/",
+      "html_sha256": "4c131151a0125abe5f20b9619c3820358926180302d47afe59bd557e56365c0d",
+      "html_bytes": 130638,
+      "stored_region": "france",
+      "source_region": "france",
+      "stored_body_chars": 13161,
+      "stored_time_verified": true,
+      "stored_time_evidence": {
+        "raw": "2026-10-26T22:56:15",
+        "source": "api",
+        "timezone": "UTC",
+        "verified": true
+      },
+      "date_candidates": [
+        {
+          "tag": "meta",
+          "attrs": {
+            "property": "article:published_time",
+            "content": "2026-10-26T22:56:15+00:00"
+          },
+          "text": ""
+        },
+        {
+          "tag": "meta",
+          "attrs": {
+            "property": "article:modified_time",
+            "content": "2026-10-27T11:56:52+00:00"
+          },
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "attrs": {
+            "class": [
+              "article-date"
+            ]
+          },
+          "text": "Monday, October 26, 2026 at 6:56 pm | Back to: Top News Updated: October 27, 2026 at 7:56 am"
+        },
+        {
+          "@type": "WebPage",
+          "datePublished": "2026-10-26T22:56:15+00:00",
+          "dateModified": "2026-10-27T11:56:52+00:00"
+        },
+        {
+          "@type": "Article",
+          "datePublished": "2026-10-26T22:56:15+00:00",
+          "dateModified": "2026-10-27T11:56:52+00:00"
+        }
+      ],
+      "p01_clean": {
+        "status": "passed_structure",
+        "selector": "span[itemprop='articleBody']",
+        "blocks": 39,
+        "text_chars": 13204,
+        "text_sha256": "125757e3dd7d6831dffe234fec49d50c65c7e988e3e1d7c9a71c7e188ee5ff18",
+        "suspicious_block_count": 0
+      },
+      "adapter_reparse": {
+        "body_chars": 13161,
+        "published_at": "None",
+        "metadata": {
+          "body_parse_status": "ok",
+          "body_selector": "span[itemprop='articleBody']"
+        }
+      },
+      "candidate_body_nodes": [
+        {
+          "tag": "span",
+          "id": null,
+          "class": null,
+          "chars": 13204
+        }
+      ]
+    },
+    {
+      "id": 22644,
+      "source_config_id": 21,
+      "adapter_key": "tdn_france_broad",
+      "source_site": "tdn",
+      "url": "https://www.thoroughbreddailynews.com/stallion-shares-and-breeding-rights-on-offer-in-arqana-online-november-sale/",
+      "html_sha256": "a6529a1f65874c31b7802cc9b5ceee1b37f518e176b8f421f9669ca3b08bffc7",
+      "html_bytes": 101335,
+      "stored_region": "france",
+      "source_region": "france",
+      "stored_body_chars": 900,
+      "stored_time_verified": true,
+      "stored_time_evidence": {
+        "raw": "2026-10-26T16:15:45",
+        "source": "api",
+        "timezone": "UTC",
+        "verified": true
+      },
+      "date_candidates": [
+        {
+          "tag": "meta",
+          "attrs": {
+            "property": "article:published_time",
+            "content": "2026-10-26T16:15:45+00:00"
+          },
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "attrs": {
+            "class": [
+              "article-date"
+            ]
+          },
+          "text": "Monday, October 26, 2026 at 12:15 pm | Back to: Europe , Top News Europe"
+        },
+        {
+          "@type": "WebPage",
+          "datePublished": "2026-10-26T16:15:45+00:00",
+          "dateModified": null
+        },
+        {
+          "@type": "Article",
+          "datePublished": "2026-10-26T16:15:45+00:00",
+          "dateModified": null
+        }
+      ],
+      "p01_clean": {
+        "status": "passed_structure",
+        "selector": "span[itemprop='articleBody']",
+        "blocks": 5,
+        "text_chars": 923,
+        "text_sha256": "35cb245697c0c16da8b3a1d1da4786c708e32a181dfaac0740bbbaf09f1c27b0",
+        "suspicious_block_count": 0
+      },
+      "adapter_reparse": {
+        "body_chars": 900,
+        "published_at": "None",
+        "metadata": {
+          "body_parse_status": "ok",
+          "body_selector": "span[itemprop='articleBody']"
+        }
+      },
+      "candidate_body_nodes": [
+        {
+          "tag": "span",
+          "id": null,
+          "class": null,
+          "chars": 923
+        }
+      ]
+    }
+  ],
+  "news_schedule": {
+    "crawl-netkeiba-latest-hourly": {
+      "task": "stable.tasks.crawl_netkeiba_latest",
+      "schedule": "<crontab: 0 * * * * (m/h/dM/MY/d)>"
+    },
+    "crawl-netkeiba-latest-sunday-rush": {
+      "task": "stable.tasks.crawl_netkeiba_latest",
+      "schedule": "<crontab: 30,35,40,45,50,55 14 * * sun (m/h/dM/MY/d)>"
+    },
+    "crawl-netkeiba-latest-sunday-rush-end": {
+      "task": "stable.tasks.crawl_netkeiba_latest",
+      "schedule": "<crontab: 0,5,10,15,20,25,30 15 * * sun (m/h/dM/MY/d)>"
+    },
+    "crawl-netkeiba-access": {
+      "task": "stable.tasks.crawl_netkeiba_access",
+      "schedule": "<crontab: 16 * * * * (m/h/dM/MY/d)>"
+    },
+    "crawl-netkeiba-attention": {
+      "task": "stable.tasks.crawl_netkeiba_attention",
+      "schedule": "<crontab: 26 * * * * (m/h/dM/MY/d)>"
+    },
+    "crawl-jra": {
+      "task": "stable.tasks.crawl_jra_news",
+      "schedule": "<crontab: 10 0,12 * * * (m/h/dM/MY/d)>"
+    },
+    "crawl-enabled-news-sources": {
+      "task": "stable.tasks.crawl_enabled_news_sources_task",
+      "schedule": "<crontab: */30 * * * * (m/h/dM/MY/d)>"
+    },
+    "crawl-production-sources-window": {
+      "task": "stable.tasks.crawl_production_sources_window_task",
+      "schedule": "<crontab: */5 * * * * (m/h/dM/MY/d)>"
+    }
+  },
+  "evidence_files": {
+    "production-evidence.json": {
+      "sha256": "c103a28d20b7e512cfc6160f4e81714bb3afe280255980b2db1d5460077e2686",
+      "bytes": 5183079
+    },
+    "cached-check.json": {
+      "sha256": "e6ca3f255cf053f8efb1bf639e16cd5cd8f9ed167b4cb832faa623c0855851d2",
+      "bytes": 583716
+    },
+    "read-production.py": {
+      "sha256": "c184c4900f3c4552d3993485a47df38e64bca93c37e93085374001160a983e07",
+      "bytes": 3115
+    },
+    "check-cached-samples.py": {
+      "sha256": "a79a8b6c0466474a22dd6fdeebe76c5ff0af19876e9ce40bffbed71f9dca26a9",
+      "bytes": 3527
+    },
+    "fresh-fetch.json": {
+      "sha256": "47e09ef9411221fc2e2e7d8d6148221736651e376c357c6126823b03d5ba8639",
+      "bytes": 1288
+    },
+    "fresh-replay.json": {
+      "sha256": "82834f6487f1ab3f88f477590ec3cc9001c8724108ea94f971d892f6bf02faf5",
+      "bytes": 1403
+    },
+    "fetch-two-japanese-samples.py": {
+      "sha256": "9e36eed204cded7d5ddb5f660724e6cd39adacca9e0609327a5acac7ae7c1234",
+      "bytes": 1710
+    },
+    "check-fresh-japanese.py": {
+      "sha256": "e230c34561211ffb3cdc3ac6dc0380e1dc8aa757cf9fc19745f575aea17a805f",
+      "bytes": 2649
+    },
+    "netkeiba-fresh.html": {
+      "sha256": "2d9dea1fd51a19a697ad710c3489e56311d928083988a675637273f6eb4231fd",
+      "bytes": 76878
+    },
+    "jra-fresh.html": {
+      "sha256": "3b577e84335167ace96341f48017e76d16cfc4df3d731a5398fd642587e93c10",
+      "bytes": 64369
+    }
+  },
+  "boundaries": [
+    "生产只读事务；未调用任何采集任务、模型或写操作。",
+    "source_config来源分配并非独立新闻总量；旧流程会合并或更换归属。",
+    "间隔分布只取每配置最近400条，7日任务计数为完整聚合。",
+    "CrawlJob.fail_count在旧流程中经常记录重复数，不能当作失败数；失败任务取status=failed。",
+    "用户确认已有所有来源授权，本轮据此记录可用；未审阅文件。production_approved仍只是内部准入字段。",
+    "20项结构通过不等于全文人工校验、模型评估或gold。",
+    "公开网页工具的403/robots拒绝仅证明该工具路径受限，不推断所有生产访问失败。"
+  ],
+  "public_policy_observation": {
+    "date": "2026-10-27",
+    "project_written_permissions": "user_confirmed_all_sources_authorized",
+    "numeric_allowed_request_rate": "未从本次公开证据核实任何数值许可；数据库15/60分钟为内部运行配置",
+    "publishers": [
+      {
+        "publisher": "netkeiba",
+        "url": "https://www.netkeiba.com/info/kiyaku.html?rf=footer",
+        "observed_via": "官方条款搜索索引，当日抓取",
+        "finding": "第14/15条限制超出私人使用的复制、出版和商业用途；项目授权按用户本轮确认为准。",
+        "robots_url": "https://news.netkeiba.com/robots.txt",
+        "robots_result": "网页工具不可访问，未核实",
+        "public_terms_status": "requires_separate_permission",
+        "project_use_status": "user_confirmed_authorized_documents_not_inspected"
+      },
+      {
+        "publisher": "JRA",
+        "url": "https://www.jra.go.jp/use/",
+        "observed_via": "官方使用说明搜索索引，当日抓取",
+        "finding": "说明文章等内容归JRA或第三方；页面的视频申请流程不能直接当作文章全文翻译许可。",
+        "robots_url": "https://www.jra.go.jp/robots.txt",
+        "robots_result": "User-agent:*的Disallow为空；不是全文转载授权",
+        "public_terms_status": "copyright_notice_no_full_translation_grant_verified",
+        "project_use_status": "user_confirmed_authorized_documents_not_inspected"
+      },
+      {
+        "publisher": "HKJC",
+        "url": "https://www.hkjc.com/en-us/disclaimer",
+        "observed_via": "新闻页页脚链接，网页工具读取正文",
+        "finding": "声明涵盖资料和文章、强调准确性及及时性不作保证；项目授权按用户本轮确认为准。新闻页保留所有权利。",
+        "robots_url": "https://racingnews.hkjc.com/robots.txt",
+        "robots_result": "网页工具不可访问，未核实",
+        "public_terms_status": "no_full_translation_grant_verified",
+        "project_use_status": "user_confirmed_authorized_documents_not_inspected"
+      },
+      {
+        "publisher": "SCMP",
+        "url": "https://www.scmp.com/terms-conditions",
+        "observed_via": "官方条款搜索索引昨日抓取；直接打开403",
+        "finding": "3.2条对复制、翻译、改编及多类AI/机器处理用途列出限制；项目授权按用户本轮确认为准。索引内容不冒称本次直连200。",
+        "robots_url": "https://www.scmp.com/robots.txt",
+        "robots_result": "网页工具403",
+        "public_terms_status": "indexed_explicit_restrictions_needs_permission",
+        "project_use_status": "user_confirmed_authorized_documents_not_inspected"
+      },
+      {
+        "publisher": "Sporting Life",
+        "url": "https://www.sportinglife.com/terms-and-conditions",
+        "observed_via": "官方条款搜索结果返回正文，当日抓取",
+        "finding": "Fair Use禁止包括screen scraping的数据捕获；内容为个人使用，复制或分发需明确许可。",
+        "robots_url": "https://www.sportinglife.com/robots.txt",
+        "robots_result": "本次只见Host和Sitemap；不能覆盖条款限制",
+        "public_terms_status": "explicit_scraping_and_reuse_restrictions",
+        "project_use_status": "user_confirmed_authorized_documents_not_inspected"
+      },
+      {
+        "publisher": "Sky Sports",
+        "url": "https://www.sky.com/help/articles/skycom-terms-and-conditions",
+        "observed_via": "新闻HTML页脚链接，网页工具仅返回条款页标题",
+        "finding": "条款正文未取得，项目授权以用户确认为准。",
+        "robots_url": "https://www.skysports.com/robots.txt",
+        "robots_result": "按路径和UA区分，包含GPTBot等限制；新闻URL未列入通用Disallow不等于用途许可",
+        "public_terms_status": "terms_body_not_verified",
+        "project_use_status": "user_confirmed_authorized_documents_not_inspected"
+      },
+      {
+        "publisher": "France Galop",
+        "url": "https://www.france-galop.com/en/terms-and-conditions-use-france-galop-website",
+        "observed_via": "官方条款搜索结果返回第3/5条，索引上月抓取",
+        "finding": "第5条限制未经授权的软件复制、修改及衍生作品；短引述条款不等于全文翻译许可。",
+        "robots_url": "https://www.france-galop.com/robots.txt",
+        "robots_result": "网页工具不可访问，未核实",
+        "public_terms_status": "requires_permission_for_copying_and_derivatives",
+        "project_use_status": "user_confirmed_authorized_documents_not_inspected"
+      },
+      {
+        "publisher": "TDN",
+        "url": "https://www.thoroughbreddailynews.com/tdn-user-agreement/",
+        "observed_via": "官方用户协议搜索索引四周前抓取；直接打开403",
+        "finding": "索引中的用户协议要求复制取得书面许可；公开WordPress API本身不证明全文再发布授权。",
+        "robots_url": "https://www.thoroughbreddailynews.com/robots.txt",
+        "robots_result": "网页工具不可访问，未核实",
+        "public_terms_status": "indexed_written_permission_required",
+        "project_use_status": "user_confirmed_authorized_documents_not_inspected"
+      },
+      {
+        "publisher": "Horse Racing Nation",
+        "url": "https://www.horseracingnation.com/content/terms",
+        "observed_via": "库内新闻HTML页脚链接，网页工具robots拒绝",
+        "finding": "未取得适用于新闻主站的条款正文；没有把Picks付费数字商品条款套到新闻内容上。",
+        "robots_url": "https://www.horseracingnation.com/robots.txt",
+        "robots_result": "网页工具不可访问，未核实",
+        "public_terms_status": "terms_not_retrieved",
+        "project_use_status": "user_confirmed_authorized_documents_not_inspected"
+      }
+    ],
+    "user_statement": "已有所有来源授权",
+    "document_review_performed": false,
+    "authorization_is_current_blocker": false
+  },
+  "public_listing_checks": [
+    {
+      "url": "https://www.sportinglife.com/racing/news",
+      "result": "网页工具返回当日/一日前新闻，与来源9近7日零新增形成发现链缺口信号"
+    },
+    {
+      "url": "https://www.skysports.com/racing/news",
+      "result": "网页工具返回列表，工具标注抓取于上周；不作为当日完整列表证据"
+    },
+    {
+      "url": "https://www.france-galop.com/en/news",
+      "result": "网页工具当前列表最新两篇为10月23/22，与库内抽样一致"
+    },
+    {
+      "url": "https://racingnews.hkjc.com/english/",
+      "result": "网页工具当前列表包括10月27/26；包含库内抽样URL"
+    },
+    {
+      "url": "https://www.jra.go.jp/news/",
+      "result": "网页工具可读取列表；指定文章URL未被工具取得"
+    },
+    {
+      "url": "https://news.netkeiba.com/?pid=news_view&no=346910",
+      "result": "网页工具不可访问，未绕过访问限制"
+    }
+  ],
+  "offline_execution": {
+    "image_id": "sha256:5fa59696f087c4ba2fdc0fde4e6c95d484e660334332a0256ba739a911766d42",
+    "network": "none",
+    "uid_gid": "10001:10001",
+    "source_readonly": true,
+    "evidence_readonly": true,
+    "database": "仅内存SQLite配置，未读写生产",
+    "exit_code": 0,
+    "owned_container_absent": true,
+    "source_hashes": {
+      "server/stable/services/news_content.py": "a758fc15eb883ca2ef5ac09e59cf313fdec796e7d019892008f0b4a83a2b7fac",
+      "server/stable/adapters/international.py": "d97c2ddb82c7f69735097706efe6618e38718990f299ffa9f2276a59b235962d",
+      "server/stable/services/sources.py": "5ecd9256d0d4d1d76cabae37d41fc95f965b831bcf0449ff82b8ac9065a8dfb8",
+      "server/stable/tasks.py": "8475b96f953391fcb7f77981b3e0bf859430635b794a7eed5d2e79778bf7d4b7"
+    }
+  },
+  "fresh_japanese_supplement": {
+    "fetch": {
+      "rows": [
+        {
+          "source_site": "netkeiba",
+          "request_url": "https://news.sp.netkeiba.com/?pid=news_view&no=346910",
+          "encoding": "utf-8",
+          "requested_at": "2026-10-27T15:42:21.993154+00:00",
+          "request_limit": "one GET, up to two redirects, no retries",
+          "purpose": "user-authorized source diagnostic; not an automated regression test",
+          "status": 200,
+          "final_url": "https://news.sp.netkeiba.com/?pid=news_view&no=346910",
+          "content_type": "text/html; charset=UTF-8",
+          "bytes": 76878,
+          "sha256": "2d9dea1fd51a19a697ad710c3489e56311d928083988a675637273f6eb4231fd",
+          "file": "netkeiba-fresh.html"
+        },
+        {
+          "source_site": "jra",
+          "request_url": "https://www.jra.go.jp/news/202610/102703.html",
+          "encoding": "shift_jis",
+          "requested_at": "2026-10-27T15:42:21.993519+00:00",
+          "request_limit": "one GET, up to two redirects, no retries",
+          "purpose": "user-authorized source diagnostic; not an automated regression test",
+          "status": 200,
+          "final_url": "https://www.jra.go.jp/news/202610/102703.html",
+          "content_type": "text/html",
+          "bytes": 64369,
+          "sha256": "3b577e84335167ace96341f48017e76d16cfc4df3d731a5398fd642587e93c10",
+          "file": "jra-fresh.html"
+        }
+      ]
+    },
+    "offline_replay": {
+      "rows": [
+        {
+          "source_site": "netkeiba",
+          "request_url": "https://news.sp.netkeiba.com/?pid=news_view&no=346910",
+          "raw_sha256": "2d9dea1fd51a19a697ad710c3489e56311d928083988a675637273f6eb4231fd",
+          "network": "none",
+          "result": "passed_structure_and_adapter_propagation",
+          "html_chars": 70828,
+          "body_chars": 361,
+          "selector": ".News_Txt",
+          "blocks": 1,
+          "published_at": "2026-10-27 06:50:00-05:00",
+          "published_at_verified": true,
+          "time_evidence": {
+            "raw": "2026年10月27日(火) 20:50",
+            "selector": ".News_Data_Time",
+            "precision": "minute",
+            "timezone": "Asia/Tokyo"
+          },
+          "published_at_utc": "2026-10-27T11:50:00+00:00"
+        },
+        {
+          "source_site": "jra",
+          "request_url": "https://www.jra.go.jp/news/202610/102703.html",
+          "raw_sha256": "3b577e84335167ace96341f48017e76d16cfc4df3d731a5398fd642587e93c10",
+          "network": "none",
+          "result": "passed_structure_and_adapter_propagation",
+          "html_chars": 60773,
+          "body_chars": 1386,
+          "selector": ".news_body",
+          "blocks": 23,
+          "published_at": "2026-10-26 10:00:00-05:00",
+          "published_at_verified": false,
+          "time_evidence": {
+            "raw": "2026年10月27日",
+            "selector": ".news_title .date",
+            "precision": "date",
+            "timezone": "Asia/Tokyo",
+            "url": "https://www.jra.go.jp/news/202610/102703.html"
+          },
+          "published_at_utc": "2026-10-26T15:00:00+00:00"
+        }
+      ]
+    },
+    "owned_container_absent": true,
+    "database_sample_count_unchanged": 30,
+    "explanation": "候选已接通HTML与时间证据；两次指定页面GET补充验证，离线重放无网络，不改变原30份生产快照结果。"
+  }
+}
