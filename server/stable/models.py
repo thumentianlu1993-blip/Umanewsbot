@@ -4630,6 +4630,9 @@ class NewsArticle(TimestampedModel):
         return self.translation_runs.order_by("-created_at", "-id").first()
 
     def apply_translation_result(self, result: object, *, force: bool = False) -> None:
+        from stable.services.news_pipeline import is_pipeline_article
+        if is_pipeline_article(self):
+            return
         manual_fields = set(self.manually_edited_fields or [])
         title_zh = (getattr(result, "title_zh", "") or "").strip()
         body_zh = (getattr(result, "body_zh", "") or "").strip()

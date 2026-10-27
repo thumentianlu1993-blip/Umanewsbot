@@ -105,3 +105,18 @@ def can_enroll(article):
         and source.pk in policy.get("source_ids", []) and article.racing_region in REGIONS
         and not article.published_to_web_at and not article.withdrawn_at
     )
+
+
+@transaction.atomic
+def submit_manual_target(article, fields, *, editor):
+    article = NewsArticle.objects.select_for_update().get(pk=article.pk)
+    active = article.active_news_run
+    if active is None:
+        raise ValueError("pipeline_owner_required")
+    previous = active.manual_target or active.translation_snapshot or {
+        "title": article.effective_title, "body": article.effective_body, "summary": article.effective_summary,
+    }
+    target = {key: fields.get(key + "_zh", previous.get(key, "")) for key in ("title", "body", "summary")}
+    if any(not isinstance(value, str) for value in target.values()) or not target["title"].strip() or not target["body"].strip():
+        raise ValueError("manual_target_invalid")
+    return start_revision(article, snapshot=active.source_snapshot, manual_target=target, editor=editor)

@@ -4694,6 +4694,12 @@ def article_update_api(request: HttpRequest, article_id: int) -> JsonResponse:
         return JsonResponse({"detail": "forbidden"}, status=403)
     article = get_object_or_404(NewsArticle, pk=article_id)
     payload = json.loads(request.body.decode("utf-8"))
+    from stable.services.news_pipeline import is_pipeline_article, submit_manual_target
+    if is_pipeline_article(article):
+        if set(payload) - {"title_zh", "body_zh", "summary_zh"}:
+            return JsonResponse({"detail": "P01 请使用稿件审核或撤回入口"}, status=400)
+        run = submit_manual_target(article, payload, editor=request.user)
+        return JsonResponse({"updated": True, "run_id": run.pk, "state": run.state, "fields": list(payload)})
     changed_fields: list[str] = []
     for field in ("title_zh", "summary_zh", "body_zh", "push_summary_zh", "editor_notes", "workflow_status", "status"):
         if field in payload:
