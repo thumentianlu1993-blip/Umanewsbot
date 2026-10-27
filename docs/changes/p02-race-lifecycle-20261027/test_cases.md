@@ -31,3 +31,11 @@
 阈值严格按 < 比较：100 场 1 错不通过，100 场 3 卡不通过；小样本也报 N/E/U/D/L、时延区间和 coverage。独立验收回放必须零身份错配/零伪造确定、全部必要断言通过。自然样本不足或审核缺失时不作长期达标结论。
 
 性能接受条件：清单/页面批处理 100，查询数不得随赛事数线性增长；重点和常规公开时效分别不超过 300/600 秒，含发现、队列、fallback、缓存和探针。记录队列 p95/p99、最高请求量、超时分子，而不是只报均值。没有真实速率证据不能只凭合成压测宣称容量可用。
+
+## 本轮实际自动化映射
+
+`server/stable/test_race_lifecycle_{storage,publication,multisource,schedule,delivery,metrics,capacity,sources}.py` 为本轮新增回归，使用真实隔离 PostgreSQL。覆盖 T01–T16 的核心负例：缺来源/未知时钟不算成功、完整性/成熟度、精确截止、冲突与明确更正、A→B→A、改期/取消恢复、重复投递/崩溃/双 worker、预算到期、新义务不能借旧 probe、人工字段锁、全站结果表面、DOM可见内容。
+
+这些不是各地区自然赛日或正式生产SLA测试；逐区真实数据与完整覆盖仍按 [implementation.md](implementation.md) 的边界记录。独立 review 发现的11项问题对应本轮测试名和最终结果保存在 [validation.json](validation.json)。
+
+第二轮 review 回归另覆盖：旧 corrected 重放、晚于旧发布但早于冲突的纠错、纠错关闭时的相同事实/成熟度变更、确定→临时倒退、乱序旧冲突及冲突时间倒退、较新明确纠错正向恢复；历史无 display_name 的原版本在新观测授权后继续可见；未知/临时资料义务由确定后继履约，跨 generation 或明确 B 对旧 A 仍拒绝。均使用隔离 PostgreSQL 与本地网页探针替身。

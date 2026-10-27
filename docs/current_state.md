@@ -1,8 +1,10 @@
-# 当前工作状态：2026-10-27 P02 方案设计
+# 当前工作状态：2026-10-27 P02 核心开发与独立评审
 
-用户已选定 P02 赛事生命周期，完成 10 问产品访谈，并要求编写开发方案与子 Agent 独立评审。当前产物为 [P02 实施规格](changes/p02-race-lifecycle-20261027/spec.md)、[开发设计](changes/p02-race-lifecycle-20261027/design.md)、[测试用例](changes/p02-race-lifecycle-20261027/test_cases.md)、[任务估算](changes/p02-race-lifecycle-20261027/tasks.md)、[交付与恢复方案](changes/p02-race-lifecycle-20261027/rollout.md)。
+P02 已从方案进入授权开发。独立分支 `codex/p02-race-lifecycle-design-20261027`、worktree `/Users/mentianlu/.codex/worktrees/p02-race-lifecycle-design-20261027/umanews`；用户明确要求先不合并、不部署。核心 epoch 发布、名单/赛果成熟度、期限与冲突读闸、容量调度、持久补偿和计量报告已实现，并以隔离 PostgreSQL 测试先行验证。详见 [实施记录](changes/p02-race-lifecycle-20261027/implementation.md)、[验证证据](changes/p02-race-lifecycle-20261027/validation.json)和[免费来源盘点](changes/p02-race-lifecycle-20261027/source-inventory.md)。
 
-方案分支 `codex/p02-race-lifecycle-design-20261027`，独立 worktree `/Users/mentianlu/.codex/worktrees/p02-race-lifecycle-design-20261027/umanews`，起点 `e4df6bdaf85318eb9588489807e4b9a40bb01665`。本轮仅文档与方案评审；业务实现、DB/业务测试、CI、真实采集及生产验证均未执行，不提高原卡进度，不恢复旧调度。[独立评审](changes/p02-race-lifecycle-20261027/review.md)经同一 reviewer 复审为 APPROVED，4 项问题全部关闭。人工确认只引用根 AGENTS.md。
+子 Agent 独立实现评审的首轮 11 项、第二轮 5 项问题均已修复；最终聚焦复审通过，480 项测试通过。完整原生 CLI 审核仍为中断/BLOCKED，详见 [实现评审](changes/p02-race-lifecycle-20261027/implementation-review.md)。原 [方案评审](changes/p02-race-lifecycle-20261027/review.md)的 APPROVED 仅指方案，不替代实现评审。
+
+新开关默认关闭；真实容量/首发时钟/生产探针/自然赛日/七天观察均未验收。JRA 是首区离线候选，其他地区尤其 AU/DE/AE/SA 的常驻适配与五类能力仍有缺口；不能宣称九地区接通或 SLA 达标。未改原卡百分比，未恢复旧多线调度。人工确认仅引用根 AGENTS.md。
 
 ## 2026-10-26 业务项目交接（保留历史）
 

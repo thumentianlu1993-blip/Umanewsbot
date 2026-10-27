@@ -1,0 +1,45 @@
+{
+  "racing_australia": {
+    "runners": 11,
+    "results": 7,
+    "metadata": {
+      "racecourse": "Kembla Grange",
+      "local_date": "2026-07-25",
+      "race_number": "1",
+      "race_title": "MORETTI CONSTRUCTIONS SUPER 3YO MAIDEN PLATE",
+      "distance_text": "1400",
+      "race_time": "1:24.57",
+      "page_title": "Race 1 - 12:14PM MORETTI CONSTRUCTIONS SUPER 3YO MAIDEN PLATE (1400 METRES)",
+      "available_race_numbers": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8"
+      ],
+      "source_kind": "racing_australia_results",
+      "row_count": 11,
+      "result_count": 7
+    }
+  },
+  "jcsa": {
+    "runners": 14,
+    "results": 13,
+    "metadata": {
+      "local_date": "2026-02-14",
+      "race_number": "9",
+      "racecourse": "King Abdulaziz Racetrack",
+      "race_title": "",
+      "winning_time": "1:51.027",
+      "row_count": 14,
+      "result_count": 13
+    }
+  },
+  "ae": {
+    "tables": 1,
+    "rows": 12
+  }
+}

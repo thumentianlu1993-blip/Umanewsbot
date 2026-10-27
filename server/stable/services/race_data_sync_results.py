@@ -526,7 +526,10 @@ def apply_data_sync_result_observation(
         participants_by_external_id: dict[
             str, models.RaceEventParticipant | None
         ] = {}
-        if terminal_phase:
+        from stable.services.race_lifecycle_projection import writable
+        epoch_enabled = writable(event.pk)
+        provisional_public = epoch_enabled and observation.result_phase == "provisional"
+        if terminal_phase or provisional_public:
             roster_mapping = _result_roster_mapping(
                 event=event,
                 source=source,
@@ -664,6 +667,15 @@ def apply_data_sync_result_observation(
             if current is not None and current.primary_observation_id
             else None
         )
+        from stable.services.race_lifecycle_projection import writable
+        epoch_enabled = writable(event.pk)
+        current_state = None
+        if epoch_enabled:
+            current_state = models.RaceLifecyclePublicState.objects.filter(event=event).first()
+            if current_state and current_state.result_revision_id == (current.pk if current else None):
+                current_observation = models.RaceResultObservation.objects.select_related("source_identity").filter(
+                    pk=current_state.result_evidence.get("observation_id"),
+                    source_identity__event_id=event.pk).first()
         candidate_watermark = observation.source_updated_at or observation.observed_at
         current_watermark = None
         current_source_key = ""
@@ -678,6 +690,35 @@ def apply_data_sync_result_observation(
                     current_observation.source_updated_at
                     or current_observation.observed_at
                 )
+        correction_marked = bool(
+            observation.result_phase == models.RaceResultPhase.CORRECTED
+            and provenance.get("correction_marker") is True
+        )
+        recovery_watermark = current_watermark
+        if epoch_enabled and current_state and current_state.result_visibility == "verifying":
+            conflict = models.RaceResultObservation.objects.filter(
+                pk=current_state.result_evidence.get("conflict_observation_id"),
+                source_identity__event_id=event.pk).first()
+            if conflict:
+                conflict_time = conflict.source_updated_at or conflict.observed_at
+                recovery_watermark = max(filter(None, (current_watermark, conflict_time)))
+        explicit_recovery = bool(
+            correction_marked and correction_apply_enabled
+            and not any(manual_locks.get(key) for key in ("results", "result", "status"))
+            and (recovery_watermark is None or candidate_watermark > recovery_watermark)
+        )
+        if epoch_enabled and current is not None:
+            # 在相同事实、摘要复用和冲突分支之前统一阻止倒序与成熟度回退。
+            # 原始 observation 已独立留存，但这些输入不得改变当前公开状态。
+            if recovery_watermark and candidate_watermark < recovery_watermark:
+                return DataSyncResultApplyDecision("replayed", "stale_result_evidence", current.pk, True)
+            if current.phase in ("official", "corrected") and observation.result_phase == "provisional":
+                return DataSyncResultApplyDecision("replayed", "result_maturity_regression", current.pk, True)
+            if correction_marked and not correction_apply_enabled:
+                return DataSyncResultApplyDecision("rejected", "correction_apply_disabled", current.pk, True)
+            if (current_state and current_state.result_visibility == "verifying"
+                    and correction_marked and not explicit_recovery):
+                return DataSyncResultApplyDecision("rejected", "result_conflict_unresolved", current.pk, True)
         if is_multisource and current_observation is not None:
             # 已验证跨来源 runner 映射允许姓名使用不同语种；普通佐证不能
             # 把翻译差异当更正。同源或明确更正仍比较全部公开姓名字段。
@@ -709,16 +750,24 @@ def apply_data_sync_result_observation(
                 )
             except (ValueError, TypeError):
                 same_facts = False
-            if same_facts:
+            if same_facts and (not epoch_enabled or current.phase == observation.result_phase):
                 models.RaceEventRevisionEvidence.objects.get_or_create(
                     revision=current,
                     observation=observation,
                     defaults={"role": "supporting"},
                 )
+                if epoch_enabled and project_current and lifecycle_trusted:
+                    from stable.services.race_lifecycle_projection import refresh_result_authority
+                    refresh_result_authority(event=event, control=control, lifecycle=lifecycle,
+                        revision=current, observation=observation, now=now,
+                        explicit=explicit_recovery)
                 return DataSyncResultApplyDecision(
                     "replayed", "same_event_result_evidence", current.pk, True
                 )
-        content_sha256 = _canonical_sha256(observation.normalized_payload)
+        from stable.services.race_lifecycle_projection import writable
+        epoch_enabled = writable(event.pk)
+        # 内容版本不包含抓取/来源修订元数据；当次观测和权限绑定在新 epoch。
+        content_sha256 = _canonical_sha256([{k:v for k,v in row.items() if k != "field_provenance"} for row in ordered_rows] if epoch_enabled else observation.normalized_payload)
         arbitration = arbitrate_source_value(
             current_source_key=current_source_key,
             current_source_class=current_source_class,
@@ -734,21 +783,28 @@ def apply_data_sync_result_observation(
                 or manual_locks.get("status")
             ),
         )
-        if current is not None and current_hash == content_sha256:
+        maturity_upgrade = bool(epoch_enabled and current and current.phase == "provisional" and terminal_phase)
+        if current is not None and current_hash == content_sha256 and not maturity_upgrade:
+            if epoch_enabled and project_current and lifecycle_trusted:
+                from stable.services.race_lifecycle_projection import refresh_result_authority
+                refresh_result_authority(event=event, control=control, lifecycle=lifecycle,
+                    revision=current, observation=observation, now=now, explicit=explicit_recovery)
             return DataSyncResultApplyDecision(
                 "replayed", arbitration.reason_code, current.pk, True
             )
-        correction_marked = bool(
-            observation.result_phase == models.RaceResultPhase.CORRECTED
-            and provenance.get("correction_marker") is True
-        )
+        if epoch_enabled and explicit_recovery:
+            from stable.services.race_data_sync_policy import SourceArbitrationDecision
+            arbitration = SourceArbitrationDecision(True, "qualified_correction", 0, 0)
         priority_replacement = bool(
             current is not None
             and arbitration.apply
             and arbitration.reason_code == "higher_priority_source"
             and not is_multisource
         )
-        authorized_replacement = correction_marked or priority_replacement
+        if maturity_upgrade and candidate_watermark >= current_watermark:
+            from stable.services.race_data_sync_policy import SourceArbitrationDecision
+            arbitration = SourceArbitrationDecision(True, "maturity_upgrade", 0, 0)
+        authorized_replacement = correction_marked or priority_replacement or maturity_upgrade
         if (
             current is not None
             and authorized_replacement
@@ -767,6 +823,10 @@ def apply_data_sync_result_observation(
         correction_conflict = bool(
             current is not None and not authorized_replacement
         )
+        if correction_conflict and terminal_phase and project_current and lifecycle_trusted:
+            from stable.services.race_lifecycle_projection import hide_conflict
+            hide_conflict(event=event, control=control, lifecycle=lifecycle,
+                          observation=observation, now=now)
         granted_identity_id = models.RaceDataSyncEnrollment.objects.filter(
             event_id=expected_event_id,
             state=models.RaceDataSyncEnrollmentState.ENROLLED,
@@ -779,7 +839,7 @@ def apply_data_sync_result_observation(
             and not is_multisource
         )
         may_project = bool(
-            terminal_phase
+            (terminal_phase or provisional_public)
             and project_current
             and arbitration.apply
             and lifecycle_trusted
@@ -790,7 +850,13 @@ def apply_data_sync_result_observation(
             event=event,
             kind=models.RaceEventRevisionKind.RESULT,
             content_sha256=content_sha256,
+            **({"phase": phase} if epoch_enabled else {}),
         ).first()
+        republish_existing = bool(
+            epoch_enabled and existing is not None and may_project
+            and existing.published_at is not None and existing.phase == phase
+            and existing.items.count() == len(rows)
+        )
         promote_existing = bool(
             existing is not None
             and may_project
@@ -800,7 +866,7 @@ def apply_data_sync_result_observation(
             and existing.source_authority == candidate_source_class
             and existing.items.count() == len(rows)
         )
-        if existing is not None and not promote_existing:
+        if existing is not None and not promote_existing and not republish_existing:
             return DataSyncResultApplyDecision(
                 "replayed",
                 "revision_exists",
@@ -822,7 +888,7 @@ def apply_data_sync_result_observation(
                     runner.save()
                 else:
                     runner.save(update_fields=("source_refs", "updated_at"))
-        if promote_existing:
+        if promote_existing or republish_existing:
             assert existing is not None
             revision = existing
         else:
@@ -856,7 +922,7 @@ def apply_data_sync_result_observation(
                     else models.RaceEventRevisionConflictStatus.NONE
                 ),
             )
-        if may_project:
+        if may_project and not republish_existing:
             models.RaceEventRevisionPublication.objects.create(
                 revision=revision,
                 published_at=now,
@@ -882,7 +948,7 @@ def apply_data_sync_result_observation(
                 # every other revision identity field remains immutable.
                 revision.published_at = now
                 revision.save(update_fields=("published_at", "updated_at"))
-        if not promote_existing:
+        if not promote_existing and not republish_existing:
             control.next_result_revision_no += 1
             for internal_order, row in enumerate(ordered_rows, start=1):
                 stable_key = (
@@ -926,7 +992,7 @@ def apply_data_sync_result_observation(
                     jockey_name=row["jockey_name"],
                     trainer_name=row["trainer_name"],
                     carried_weight=row["carried_weight"],
-                    field_provenance=row["field_provenance"],
+                    field_provenance={**row["field_provenance"], "display_name": row["horse_name"]},
                 )
             models.RaceEventRevisionEvidence.objects.create(
                 revision=revision,
@@ -956,7 +1022,7 @@ def apply_data_sync_result_observation(
                         barrier=item.barrier,
                         carried_weight=item.carried_weight,
                         running_status=item.status,
-                        is_confirmed=True,
+                        is_confirmed=terminal_phase,
                         source_refs={
                             "source_key": source.source_key,
                             "external_runner_id": row["external_runner_id"],
@@ -970,51 +1036,52 @@ def apply_data_sync_result_observation(
                 )
             models.RaceEventResult.objects.bulk_create(legacy_results)
             control.current_result_revision = revision
-            control.last_known_good_result_revision = revision
-            control.last_provisional_result_revision = None
-            event_before_status = event.status
-            event.status = models.RaceEventStatus.FINISHED
-            event.result_confirmed_at = now
-            event.save(
-                update_fields=("status", "result_confirmed_at", "updated_at")
-            )
-            models.RaceEventLiveTracking.objects.filter(event=event).update(
-                state=(
-                    models.RaceEventLiveState.CORRECTED_RESULT
-                    if phase == models.RaceResultPhase.CORRECTED
-                    else models.RaceEventLiveState.OFFICIAL_RESULT
-                ),
-                official_published_at=now,
-                corrected_at=(
-                    now if phase == models.RaceResultPhase.CORRECTED else None
-                ),
-                updated_at=now,
-            )
-            if event_before_status != models.RaceEventStatus.FINISHED:
-                models.RaceEventLifecycleTransition.objects.get_or_create(
-                    dedupe_key=f"data-sync-result:{event.pk}:{revision.pk}:finished",
-                    defaults={
-                        "event": event,
-                        "from_status": event_before_status,
-                        "to_status": models.RaceEventStatus.FINISHED,
-                        "reason_code": "data_sync_complete_result",
-                        "effective_at": now,
-                        "source_authority": candidate_source_class,
-                        "source_key": source.source_key,
-                        "source_url": source.canonical_url,
-                        "trigger_task": "sync_race_event_provider_task",
-                        "schedule_generation": (
-                            lifecycle.schedule_generation if lifecycle else 0
-                        ),
-                        "record_kind": (
-                            models.RaceEventLifecycleTransitionKind.APPLIED
-                        ),
-                        "metadata": {
-                            "observation_id": observation.pk,
-                            "revision_id": revision.pk,
-                        },
-                    },
+            if terminal_phase:
+                control.last_known_good_result_revision = revision
+                control.last_provisional_result_revision = None
+                event_before_status = event.status
+                event.status = models.RaceEventStatus.FINISHED
+                event.result_confirmed_at = now
+                event.save(
+                    update_fields=("status", "result_confirmed_at", "updated_at")
                 )
+                models.RaceEventLiveTracking.objects.filter(event=event).update(
+                    state=(
+                        models.RaceEventLiveState.CORRECTED_RESULT
+                        if phase == models.RaceResultPhase.CORRECTED
+                        else models.RaceEventLiveState.OFFICIAL_RESULT
+                    ),
+                    official_published_at=now,
+                    corrected_at=(
+                        now if phase == models.RaceResultPhase.CORRECTED else None
+                    ),
+                    updated_at=now,
+                )
+                if event_before_status != models.RaceEventStatus.FINISHED:
+                    models.RaceEventLifecycleTransition.objects.get_or_create(
+                        dedupe_key=f"data-sync-result:{event.pk}:{revision.pk}:finished",
+                        defaults={
+                            "event": event,
+                            "from_status": event_before_status,
+                            "to_status": models.RaceEventStatus.FINISHED,
+                            "reason_code": "data_sync_complete_result",
+                            "effective_at": now,
+                            "source_authority": candidate_source_class,
+                            "source_key": source.source_key,
+                            "source_url": source.canonical_url,
+                            "trigger_task": "sync_race_event_provider_task",
+                            "schedule_generation": (
+                                lifecycle.schedule_generation if lifecycle else 0
+                            ),
+                            "record_kind": (
+                                models.RaceEventLifecycleTransitionKind.APPLIED
+                            ),
+                            "metadata": {
+                                "observation_id": observation.pk,
+                                "revision_id": revision.pk,
+                            },
+                        },
+                    )
             transaction.on_commit(invalidate_public_race_cache)
         if phase == models.RaceResultPhase.PROVISIONAL:
             control.last_provisional_result_revision = revision
@@ -1027,6 +1094,10 @@ def apply_data_sync_result_observation(
                 "updated_at",
             )
         )
+        if projected:
+            from stable.services.race_lifecycle_projection import capture_result
+            capture_result(event=event, control=control, lifecycle=lifecycle,
+                           revision=revision, observation=observation, now=now)
         return DataSyncResultApplyDecision(
             "applied" if projected else "recorded",
             (

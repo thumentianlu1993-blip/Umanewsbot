@@ -21,6 +21,10 @@ REGIONS = (
     "ireland",
     "france",
     "united_states",
+    "australia",
+    "germany",
+    "united_arab_emirates",
+    "saudi_arabia",
 )
 
 
@@ -426,9 +430,12 @@ def parse_jra_observation(page, *, url, route, now):
             r["reported_finish_position"] == 1 for r in rows
         ):
             raise ValueError("jra_result_incomplete")
+    page_title = " ".join(n.get_text(" ", strip=True) for n in soup.select("h1"))
+    declaration = "confirmed" if not is_result and "出馬表" in page_title and "特別登録" not in page_title else "unknown"
     value.update(
         roster=rows,
         result_phase="official" if is_result else "",
+        declaration_status=declaration,
         roster_complete=not is_result,
     )
     return value
@@ -854,12 +861,16 @@ def run_multisource_claim(*, claim, now, fetcher=None):
             contract_digest=route.contract_digest,
             automation_allowed=True,
             roster_complete=value.get("roster_complete") is True,
+            schedule_correction_marker=value.get("schedule_correction_marker") is True,
+            card_correction_marker=value.get("card_correction_marker") is True,
             # corrected 只由受审 parser 的明确 amended/corrected/revised 标记产生。
             correction_marker=value.get("result_phase") == "corrected",
             multisource_authority=publication_authority(
                 binding=binding, enrollment=locked.enrollment
             ),
         )
+        from stable.services.race_lifecycle_projection import writable
+        acquisition_key = canonical_sha([claim.attempt_token, binding.pk]) if writable(claim.event_id) else ""
         if "result" in claim.data_kinds:
             for row in value["roster"]:
                 row["field_provenance"] = {
@@ -869,6 +880,7 @@ def run_multisource_claim(*, claim, now, fetcher=None):
             if value.get("result_phase") not in (
                 "official",
                 "corrected",
+                "provisional",
             ) or not value.get("roster_complete"):
                 raise ValueError("not_published")
             payload = dict(
@@ -877,7 +889,7 @@ def run_multisource_claim(*, claim, now, fetcher=None):
                 region=route.region,
                 course=value["venue_key"],
                 race_name=value["raw_names"][0],
-                race_status="complete",
+                race_status="pending" if value["result_phase"] == "provisional" else "complete",
                 participants=value["roster"],
             )
             recorded = record_race_result_observation(
@@ -891,6 +903,7 @@ def run_multisource_claim(*, claim, now, fetcher=None):
                 field_provenance=provenance,
                 parse_warnings=[],
                 permission_classification="multisource_approved",
+                acquisition_key=acquisition_key,
             )
             if recorded.observation is None:
                 raise ValueError("observation_rejected")
@@ -921,12 +934,13 @@ def run_multisource_claim(*, claim, now, fetcher=None):
             card = dict(
                 multisource_source_set_digest=locked.enrollment.source_set_digest,
                 schema_version=1,
+                declaration_status=value.get("declaration_status", "unknown"),
                 external_race_id=value["external_race_id"],
                 off_time=value.get("off_time", ""),
                 region=route.region,
                 course=value["venue_key"],
                 race_name=value["raw_names"][0],
-                race_status=locked.event.status,
+                race_status=value.get("race_status", locked.event.status),
                 participants=[
                     dict(
                         external_runner_id=r["external_runner_id"],
@@ -991,6 +1005,7 @@ def run_multisource_claim(*, claim, now, fetcher=None):
                 },
                 parse_warnings=[],
                 permission_classification="multisource_approved",
+                acquisition_key=acquisition_key,
             )
             result = reconcile_racecard_observation(
                 observation_id=recorded.observation.pk,
@@ -1615,6 +1630,8 @@ def fetch_tra_observation(*, event, route, now, kind, fetcher=None):
             phase = "official"
         elif marker in ("amended", "corrected", "revised"):
             phase = "corrected"
+        elif marker in ("provisional", "unofficial"):
+            phase = "provisional"
         rows = _result_payload(
             normalized_race=race,
             region=route.region,

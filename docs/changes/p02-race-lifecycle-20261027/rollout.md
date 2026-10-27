@@ -48,3 +48,17 @@
 每次交接保存：worktree/branch/commit、未提交文件清单、task ID/实际测试、review findings、schema/backfill cursor、cohort SHA/策略、writer owner、claim/队列存活信息、已执行步骤和公开探针证据、回退点、下一动作。执行结果未知时先读权威 DB/任务/公开状态，不重复 apply；恢复不能凭聊天“应该成功”。
 
 历史 R09 审计只从交接的既有目标清单出发，实际更新单列 manifest；未知旧资料仍按 spec 的兼容规则处理。无关 worktree、旧调度、新闻/QQ 和其他项目不受本发布包影响。
+
+## 2026-10-27 实现接口补充（本轮未执行发布）
+
+运行参数：`RACE_LIFECYCLE_V2_WRITE_ENABLED=false`、`RACE_LIFECYCLE_DELIVERY_ENABLED=false`、`RACE_LIFECYCLE_V2_EVENT_IDS` 空列表，公开 `RACE_LIFECYCLE_PUBLIC_ORIGIN` 与 `RACE_LIFECYCLE_CAPACITY_FILE/SHA256` 默认空。既有 multisource、provider/region/field、host budget 开关仍须同时成立；新开关不取代它们。
+
+- `report_race_lifecycle_capacity --manifest <文件> --sha256 <原始文件SHA>`：离线能力/全库存容量报告，零网络零写库。运行容量文件额外含 `valid_from/valid_until`，覆盖所有 cohort canonical ID。
+- `backfill_race_lifecycle --event-id <ID> [--after-id <游标>]`：默认只读，每页最多100，输出 manifest 及 canonical 内容 SHA。回填使用 `--apply-manifest <纯manifest文件> --sha256 <canonical内容SHA>`；不能传整个带包装的报告，也不能拿原始字节 SHA 替代内容 SHA。
+- `manage_race_lifecycle_report --input <文件> --sha256 <原始文件SHA>`：输入 `{document, anchors}` 导入严格 R01；输入 `{scope, window, as_of}` 从账本组装并保存。`--register-scope` 输入 `{scope,window,obligations}` 保存冻结分母及明确期限；义务绑定其 target 的 current_input_version。`--receipt <key>` 回读。
+- 延迟输入 `{event_id,epoch,module,candidate_sha256,as_of}` 经同一报告命令输出版本绑定的 R01 latency input/result。来源或探针时钟没有可信证据时返回 UNKNOWN，不能把入库时刻当来源首发。真实时钟证据和独立覆盖审计尚未配置。
+- outbox 周期任务 `stable.tasks.deliver_race_lifecycle_outbox_task` 在配置启用时每30秒进入 `race_sync_v2`；运行失败保留持久投递并重试。探针需要HTTPS真实公开 origin；测试替身不计生产验收。
+
+迁移为0083、0084、0085。0085扩展 observation 去重键，旧 writer 空 acquisition_key 的行为不变。**产生新领取观测后，不逆迁移0085回旧唯一约束**：同内容多次观测是合法新证据，反向DDL可能唯一冲突，也不能为回滚删除证据。出现问题优先关闭新写入/网络发现，保留新 reader、证据表与迁移，按逐事件当前授权保持 fail closed；未经核验直接切回不认识 epoch 的旧代码可能重新公开争议内容。schema回退需要独立恢复设计，不能当机械代码回退。
+
+地区可行性与未完成项见[来源盘点](source-inventory.md)；本记录没有发出任何发布或外部请求授权。人工确认只按根 AGENTS.md。
