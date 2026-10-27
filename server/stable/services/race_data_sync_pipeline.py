@@ -108,6 +108,7 @@ class RacecardReconciliationDecision:
     event_id: int | None = None
     observation_id: int | None = None
     claim_invalidated: bool = False
+    applied_kinds: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -1311,6 +1312,7 @@ def _reconcile_racecard_observation_atomic(
     claim_guard: RaceDataSyncClaim | None = None,
 ) -> RacecardReconciliationDecision:
     """Apply admitted racecard and schedule fields under source arbitration."""
+    from stable.services.race_lifecycle_projection import writable
     with transaction.atomic():
         lifecycle = (
             models.RaceEventLifecycleControl.objects.select_for_update()
@@ -2352,6 +2354,9 @@ def _reconcile_racecard_observation_atomic(
             event.pk,
             observation.pk,
             claim_invalidated=bool(schedule_changed and claim_guard is not None),
+            applied_kinds=tuple(kind for kind, allowed in (
+                ('race_time', allow_schedule_apply), ('racecard', allow_racecard_apply)) if allowed)
+                if writable(event.pk) else None,
         )
 
 
@@ -2365,6 +2370,19 @@ def reconcile_racecard_observation(
     run_id: str,
     claim_guard: RaceDataSyncClaim | None = None,
 ) -> RacecardReconciliationDecision:
+    from stable.services.race_lifecycle_projection import writable
+    if allow_schedule_apply and allow_racecard_apply and writable(expected_event_id):
+        # 名单完整性与赛程事实各自裁决；取消/延期不能被一张不完整名单挡住。
+        common = dict(observation_id=observation_id, expected_event_id=expected_event_id,
+                      task_id=task_id, run_id=run_id, claim_guard=claim_guard)
+        schedule = reconcile_racecard_observation(**common, allow_schedule_apply=True, allow_racecard_apply=False)
+        if schedule.status not in ('applied', 'replayed') or schedule.claim_invalidated:
+            return schedule
+        card = reconcile_racecard_observation(**common, allow_schedule_apply=False, allow_racecard_apply=True)
+        if card.status not in ('applied', 'replayed'):
+            return schedule if schedule.status == 'applied' else card
+        from dataclasses import replace
+        return replace(card, applied_kinds=('race_time', 'racecard'))
     try:
         return _reconcile_racecard_observation_atomic(
             observation_id=observation_id,

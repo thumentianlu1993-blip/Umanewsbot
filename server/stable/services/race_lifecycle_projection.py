@@ -226,6 +226,9 @@ def card_preflight(*, event, control, lifecycle, observation, now):
     if not previous:
         return "epoch_card_evidence_missing"
     current_time = previous.source_updated_at or previous.observed_at
+    if state.racecard_latest_observation_id:
+        latest = state.racecard_latest_observation
+        current_time = max(current_time, latest.source_updated_at or latest.observed_at)
     incoming_time = observation.source_updated_at or observation.observed_at
     if incoming_time < current_time:
         return "epoch_card_stale"
@@ -237,15 +240,40 @@ def card_preflight(*, event, control, lifecycle, observation, now):
         if not (observation.field_provenance.get('card_correction_marker') is True
                 and incoming_time > max(current_time, conflict_time)):
             return 'epoch_card_conflict_unresolved'
+    cross_source = previous.source_identity_id != observation.source_identity_id
+    if cross_source:
+        from stable.services.race_data_sync_pipeline import _resolve_namespaced_runner
+        from stable.services.race_data_sync_results import runner_slot_identity_matches
+        matched = set()
+        for row in observation.normalized_payload.get('participants', []):
+            runner, conflict = _resolve_namespaced_runner(event=event, source=observation.source_identity,
+                external_runner_id=row.get('external_runner_id', ''))
+            if (not runner or conflict or runner.pk in matched
+                    or not runner_slot_identity_matches(event=event, source=observation.source_identity,
+                        runner=runner, external_runner_id=row.get('external_runner_id', ''), horse_name=row.get('horse_name', ''))):
+                return 'epoch_card_identity_unverified'
+            matched.add(runner.pk)
+        if len(matched) != state.racecard_revision.items.count():
+            return 'epoch_card_identity_unverified'
     def facts(obs):
+        keys = ("number", "draw", "carried_weight", "status") if cross_source else (
+            "number", "horse_name", "draw", "jockey_name", "trainer_name", "carried_weight", "status")
         return sorted(tuple(str(row.get(key, "")) for key in
-            ("number", "horse_name", "draw", "jockey_name", "trainer_name", "carried_weight", "status"))
+            keys)
             for row in obs.normalized_payload.get("participants", []))
-    if (previous.source_identity_id != observation.source_identity_id and facts(previous) != facts(observation)
+    if (cross_source and facts(previous) != facts(observation)
             and observation.field_provenance.get("card_correction_marker") is not True):
         hide_conflict(event=event, control=control, lifecycle=lifecycle, observation=observation, now=now, kind="racecard")
         return "epoch_card_conflict"
     return ""
+
+
+def _advance_observation(state, kind, observation):
+    """只推进已验证的同内容佐证，不制造新 epoch 或覆盖不可变发布证据。"""
+    previous = getattr(state, f'{kind}_latest_observation')
+    if previous is None or (observation.source_updated_at or observation.observed_at) > (previous.source_updated_at or previous.observed_at):
+        setattr(state, f'{kind}_latest_observation', observation)
+        state.save(update_fields=(f'{kind}_latest_observation', 'updated_at'))
 
 
 def capture_card(*, event, control, lifecycle, observation, now):
@@ -266,6 +294,7 @@ def capture_card(*, event, control, lifecycle, observation, now):
         publication = models.RaceLifecycleEpochPublication.objects.filter(event=event,epoch=state.epoch).first()
         if (publication and previous and publication.authorization.get('manifest') == control.owner_manifest_sha256
                 and publication.writer_generation == control.owner_generation and _card_authority(event,control,previous,now)):
+            _advance_observation(state, 'racecard', observation)
             return publication
     state.schedule_generation = lifecycle.schedule_generation
     state.policy_digest = policy_digest
@@ -277,6 +306,7 @@ def capture_card(*, event, control, lifecycle, observation, now):
     state.racecard_evidence = dict(observation_id=observation.pk,
                                   normalized_sha256=observation.normalized_sha256,
                                   source_id=observation.source_identity_id)
+    state.racecard_latest_observation = observation
     return _commit_state(state=state, control=control, now=now, reason="racecard")
 
 
@@ -299,6 +329,7 @@ def capture_result(*, event, control, lifecycle, revision, observation, now):
     state.result_evidence = {
         "observation_id": observation.pk, "normalized_sha256": observation.normalized_sha256,
         "source_id": observation.source_identity_id}
+    state.result_latest_observation = observation
     publication = _commit_state(state=state, control=control, now=now, reason="result")
     if not provisional and lifecycle.first_result_confirmed_at is None:
         lifecycle.first_result_confirmed_at = now
@@ -328,6 +359,8 @@ def refresh_result_authority(*, event, control, lifecycle, revision, observation
             needs = True
     if needs:
         return capture_result(event=event,control=control,lifecycle=lifecycle,revision=revision,observation=observation,now=now)
+    if _result_authority(event, control, revision, observation, now, now):
+        _advance_observation(state, 'result', observation)
     return None
 
 

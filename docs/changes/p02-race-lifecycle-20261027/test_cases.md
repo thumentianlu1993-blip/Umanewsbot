@@ -39,3 +39,7 @@
 这些不是各地区自然赛日或正式生产SLA测试；逐区真实数据与完整覆盖仍按 [implementation.md](implementation.md) 的边界记录。独立 review 发现的11项问题对应本轮测试名和最终结果保存在 [validation.json](validation.json)。
 
 第二轮 review 回归另覆盖：旧 corrected 重放、晚于旧发布但早于冲突的纠错、纠错关闭时的相同事实/成熟度变更、确定→临时倒退、乱序旧冲突及冲突时间倒退、较新明确纠错正向恢复；历史无 display_name 的原版本在新观测授权后继续可见；未知/临时资料义务由确定后继履约，跨 generation 或明确 B 对旧 A 仍拒绝。均使用隔离 PostgreSQL 与本地网页探针替身。
+
+完整原生审核回归另覆盖：关闭纠错仍允许 provisional 首次转 official；相同结果/名单重采保持 epoch 幂等并防止乱序覆盖；组合 race_time+racecard claim 的取消在名单不完整时仍落地，applied_kinds 不虚报名单成功；已核验跨语言映射不产生假冲突，未核验映射拒绝、真实负磅变化保留冲突隐藏。
+
+最后的马号更正回归覆盖实际跨来源 producer、已核验 participant 映射及公开不可变 revision：明确更正更新马号，无标记仍冲突，人工锁优先。

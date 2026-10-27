@@ -690,6 +690,10 @@ def apply_data_sync_result_observation(
                     current_observation.source_updated_at
                     or current_observation.observed_at
                 )
+        if epoch_enabled and current_state and current_state.result_latest_observation_id:
+            latest = current_state.result_latest_observation
+            current_watermark = max(filter(None, (
+                current_watermark, latest.source_updated_at or latest.observed_at)))
         correction_marked = bool(
             observation.result_phase == models.RaceResultPhase.CORRECTED
             and provenance.get("correction_marker") is True
@@ -714,7 +718,7 @@ def apply_data_sync_result_observation(
                 return DataSyncResultApplyDecision("replayed", "stale_result_evidence", current.pk, True)
             if current.phase in ("official", "corrected") and observation.result_phase == "provisional":
                 return DataSyncResultApplyDecision("replayed", "result_maturity_regression", current.pk, True)
-            if correction_marked and not correction_apply_enabled:
+            if correction_marked and not correction_apply_enabled and current.phase != "provisional":
                 return DataSyncResultApplyDecision("rejected", "correction_apply_disabled", current.pk, True)
             if (current_state and current_state.result_visibility == "verifying"
                     and correction_marked and not explicit_recovery):
@@ -810,6 +814,7 @@ def apply_data_sync_result_observation(
             and authorized_replacement
             and not correction_apply_enabled
             and arbitration.apply
+            and not maturity_upgrade
         ):
             return DataSyncResultApplyDecision(
                 "rejected", "correction_apply_disabled", current.pk, True

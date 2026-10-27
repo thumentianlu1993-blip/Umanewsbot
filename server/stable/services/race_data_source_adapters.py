@@ -1020,7 +1020,8 @@ def run_multisource_claim(*, claim, now, fetcher=None):
             )
             if result.status not in ("applied", "replayed"):
                 raise ValueError(result.reason or "racecard_not_applied")
-            for kind in remaining:
+            accepted_kinds = result.applied_kinds if result.applied_kinds is not None else remaining
+            for kind in accepted_kinds:
                 applied.append(kind)
                 hashes[kind] = value["raw_sha256"]
             if result.claim_invalidated:
@@ -1029,6 +1030,9 @@ def run_multisource_claim(*, claim, now, fetcher=None):
                     "reason": "schedule_claim_invalidated",
                     "applied_kinds": applied,
                 }
+            if set(accepted_kinds) != set(remaining):
+                # 合法赛程已持久化；未接受的名单不能被登记为成功或粘滞换源。
+                raise ValueError("racecard_not_applied")
         decision = finish_multisource_claim(
             claim=claim, now=timezone.now(), success=True, observation_hashes=hashes
         )

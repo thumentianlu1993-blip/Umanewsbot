@@ -59,6 +59,6 @@
 - 延迟输入 `{event_id,epoch,module,candidate_sha256,as_of}` 经同一报告命令输出版本绑定的 R01 latency input/result。来源或探针时钟没有可信证据时返回 UNKNOWN，不能把入库时刻当来源首发。真实时钟证据和独立覆盖审计尚未配置。
 - outbox 周期任务 `stable.tasks.deliver_race_lifecycle_outbox_task` 在配置启用时每30秒进入 `race_sync_v2`；运行失败保留持久投递并重试。探针需要HTTPS真实公开 origin；测试替身不计生产验收。
 
-迁移为0083、0084、0085。0085扩展 observation 去重键，旧 writer 空 acquisition_key 的行为不变。**产生新领取观测后，不逆迁移0085回旧唯一约束**：同内容多次观测是合法新证据，反向DDL可能唯一冲突，也不能为回滚删除证据。出现问题优先关闭新写入/网络发现，保留新 reader、证据表与迁移，按逐事件当前授权保持 fail closed；未经核验直接切回不认识 epoch 的旧代码可能重新公开争议内容。schema回退需要独立恢复设计，不能当机械代码回退。
+迁移为0083、0084、0085、0086。0086仅新增最近获准佐证的可空引用，历史行为空时回落到发布观测；部署时与新 writer 同步，保留该列可向前兼容。0085扩展 observation 去重键，旧 writer 空 acquisition_key 的行为不变。**产生新领取观测后，不逆迁移0085回旧唯一约束**：同内容多次观测是合法新证据，反向DDL可能唯一冲突，也不能为回滚删除证据。出现问题优先关闭新写入/网络发现，保留新 reader、证据表与迁移，按逐事件当前授权保持 fail closed；未经核验直接切回不认识 epoch 的旧代码可能重新公开争议内容。schema回退需要独立恢复设计，不能当机械代码回退。
 
 地区可行性与未完成项见[来源盘点](source-inventory.md)；本记录没有发出任何发布或外部请求授权。人工确认只按根 AGENTS.md。

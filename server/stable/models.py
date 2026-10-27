@@ -7047,6 +7047,9 @@ class RaceLifecyclePublicState(TimestampedModel):
     result_deadline_at = models.DateTimeField(null=True)
     racecard_evidence = models.JSONField(default=dict)
     result_evidence = models.JSONField(default=dict)
+    # 当前内容的最近获准佐证；不是公开版本，不参与 epoch 内容摘要。
+    racecard_latest_observation = models.ForeignKey(RaceResultObservation, null=True, on_delete=models.PROTECT, related_name="+")
+    result_latest_observation = models.ForeignKey(RaceResultObservation, null=True, on_delete=models.PROTECT, related_name="+")
     policy_digest = models.CharField(max_length=64)
 
     class Meta:

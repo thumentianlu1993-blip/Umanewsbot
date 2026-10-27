@@ -228,3 +228,113 @@ class LifecycleSourceEvidenceTests(TestCase):
         self._apply_candidate(candidate,enabled=False)
         state=models.RaceLifecyclePublicState.objects.get(event=self.event)
         self.assertEqual((state.epoch,state.result_maturity),(epoch,'confirmed'))
+
+
+@override_settings(**fixtures.JraColdStartTests._overridden_settings)
+@override_settings(RACE_LIFECYCLE_V2_WRITE_ENABLED=True,RACE_DATA_SYNC_RACECARD_APPLY_ENABLED=True,
+                   RACE_DATA_SYNC_ENABLED_PROVIDERS=('jra','alternate'),RACE_DATA_SYNC_ENABLED_DATA_KINDS=('racecard',))
+class LifecycleCrossLanguageCardTests(TestCase):
+    setUp=fixtures.JraColdStartTests.setUp
+    fetch=fixtures.JraColdStartTests.fetch
+    capacity=LifecycleSourceEvidenceTests.capacity
+
+    def _check_translated_card(self, *, verified=True, changed=False, renumber=False, marker=False, locked=False):
+        from datetime import timedelta
+        from stable.services.race_data_source_adapters import parse_multisource_policy,fetch_bound_observation
+        from stable.services.race_data_sync_enrollment import attach_multisource_observation
+        from stable.services.race_data_sync_pipeline import _ROSTER_ALLOWED_FIELDS
+        from stable.services.race_data_sync_control import finish_multisource_claim
+        payload=fixtures.policy_payload(kinds=('racecard',))
+        payload['routes']+=fixtures.policy_payload('alternate',kinds=('racecard',))['routes']
+        self.policy=parse_multisource_policy(payload,now=fixtures.NOW)
+        with override_settings(RACE_LIFECYCLE_V2_EVENT_IDS=(self.event.pk,),RACE_DATA_SYNC_ENABLED_FIELDS=tuple(_ROSTER_ALLOWED_FIELDS),
+                RACE_DATA_SYNC_ENABLED_DATA_KINDS=('racecard',),RACE_DATA_SYNC_ENABLED_PROVIDERS=('jra','alternate')),patch(
+                'stable.services.race_data_source_adapters.load_multisource_policy',return_value=self.policy),patch(
+                'stable.services.race_lifecycle_projection.capacity_manifest',return_value=self.capacity()):
+            value=fetch_bound_observation(event=self.event,route=self.policy.routes[0],now=fixtures.NOW,fetcher=self.fetch,kind='racecard')
+            self.assertEqual(attach_multisource_observation(value,policy=self.policy,now=fixtures.NOW).action,'acquired')
+            def claim(at):
+                return claim_due_enrollments(now=at,batch_size=20,ttl_seconds=240,enabled_providers=('jra','alternate'),
+                    enabled_regions=('japan_jra',),enabled_data_kinds=('racecard',))[0]
+            self.assertTrue(run_multisource_claim(claim=claim(fixtures.NOW),now=fixtures.NOW,fetcher=self.fetch)['processed'])
+            state=models.RaceLifecyclePublicState.objects.get(event=self.event)
+            value.update(provider='alternate',identity_namespace='alternate-race-v1')
+            for row in value['roster']:
+                row.update(external_runner_id='alt:'+row['number'],horse_name='English Horse '+row['number'],
+                           jockey_name='English Rider '+row['number'],trainer_name='English Trainer '+row['number'])
+            self.assertEqual(attach_multisource_observation(value,policy=self.policy,now=fixtures.NOW).action,'attached')
+            source=models.RaceResultSourceIdentity.objects.get(event=self.event,source_key='alternate')
+            if verified:
+                for item in state.racecard_revision.items.all():
+                    models.RaceEventParticipantSourceIdentity.objects.create(source_identity=source,
+                        external_runner_id='alt:'+item.horse_number,participant=item.participant)
+            original_number=value['roster'][0]['number']
+            if changed:
+                value['roster'][0]['carried_weight']='99'
+            if renumber:
+                value['roster'][0]['number']='99'
+            if marker:
+                value['card_correction_marker']=True
+            if locked:
+                runner=models.RaceEventRunner.objects.get(event=self.event,horse_number=original_number)
+                runner.manual_lock_flags={'horse_number':True};runner.save()
+            later=fixtures.NOW+timedelta(hours=6,minutes=1)
+            value['fetched_at']=later.isoformat()
+            with patch('django.utils.timezone.now',return_value=later):
+                first=claim(later);self.assertEqual(first.checkpoint_plan[0]['source_key'],'jra')
+                finish_multisource_claim(claim=first,now=later,success=False,reason_code='http_403')
+                alternate=claim(later);self.assertEqual(alternate.checkpoint_plan[0]['source_key'],'alternate')
+                with patch('stable.services.race_data_source_adapters.fetch_bound_observation',return_value=value):
+                    outcome=run_multisource_claim(claim=alternate,now=later,fetcher=self.fetch)
+            state.refresh_from_db()
+            conflict=(changed or renumber) and verified and not marker
+            self.assertEqual(state.racecard_visibility,'verifying' if conflict else 'visible',outcome)
+            self.assertEqual(outcome['processed'],verified and not conflict,outcome)
+            from stable.services.race_lifecycle_projection import public_modules
+            modules=public_modules(self.event.pk,now=later)
+            self.assertEqual(modules['visibility']['racecard'],'verifying' if conflict else 'visible')
+            if renumber and marker and verified:
+                numbers=[row.horse_number for row in modules['racecard']]
+                self.assertIn(original_number if locked else '99',numbers)
+                self.assertNotIn('99' if locked else original_number,numbers)
+
+    def test_reviewed_translated_card_is_not_a_source_conflict(self):
+        self._check_translated_card()
+
+    def test_reviewed_card_still_hides_real_weight_conflict(self):
+        self._check_translated_card(changed=True)
+
+    def test_unverified_translated_card_is_rejected_without_hiding_approved_card(self):
+        self._check_translated_card(verified=False)
+
+    def test_explicit_cross_source_number_correction_reaches_public_revision(self):
+        self._check_translated_card(renumber=True,marker=True)
+
+    def test_unmarked_cross_source_number_change_is_still_a_conflict(self):
+        self._check_translated_card(renumber=True)
+
+    def test_explicit_cross_source_number_correction_preserves_manual_lock(self):
+        self._check_translated_card(renumber=True,marker=True,locked=True)
+
+    def test_combined_claim_applies_cancellation_without_claiming_card_success(self):
+        from stable.services.race_data_source_adapters import parse_multisource_policy,fetch_bound_observation
+        from stable.services.race_data_sync_enrollment import attach_multisource_observation
+        from stable.services.race_data_sync_pipeline import _ROSTER_ALLOWED_FIELDS
+        self.policy=parse_multisource_policy(fixtures.policy_payload(kinds=('racecard','race_time')),now=fixtures.NOW)
+        with override_settings(RACE_LIFECYCLE_V2_EVENT_IDS=(self.event.pk,),RACE_DATA_SYNC_ENABLED_FIELDS=tuple(_ROSTER_ALLOWED_FIELDS),
+                RACE_DATA_SYNC_ENABLED_DATA_KINDS=('racecard','race_time'),RACE_DATA_SYNC_ENABLED_PROVIDERS=('jra',),
+                RACE_DATA_SYNC_SCHEDULE_APPLY_ENABLED=True),patch(
+                'stable.services.race_data_source_adapters.load_multisource_policy',return_value=self.policy),patch(
+                'stable.services.race_lifecycle_projection.capacity_manifest',return_value=self.capacity()):
+            value=fetch_bound_observation(event=self.event,route=self.policy.routes[0],now=fixtures.NOW,fetcher=self.fetch,kind='racecard')
+            self.assertEqual(attach_multisource_observation(value,policy=self.policy,now=fixtures.NOW).action,'acquired')
+            claim=claim_due_enrollments(now=fixtures.NOW,batch_size=20,ttl_seconds=240,enabled_providers=('jra',),
+                enabled_regions=('japan_jra',),enabled_data_kinds=('racecard','race_time'))[0]
+            self.assertEqual(set(claim.data_kinds),{'racecard','race_time'})
+            value.update(race_status='cancelled',roster_complete=False)
+            with patch('stable.services.race_data_source_adapters.fetch_bound_observation',return_value=value):
+                outcome=run_multisource_claim(claim=claim,now=fixtures.NOW,fetcher=self.fetch)
+            self.event.refresh_from_db();self.assertEqual(self.event.status,'cancelled',outcome)
+            self.assertTrue(outcome['processed'],outcome)
+            self.assertEqual(outcome['applied_kinds'],['race_time'])
+            self.assertFalse(models.RaceLifecyclePublicState.objects.filter(event=self.event).exists())

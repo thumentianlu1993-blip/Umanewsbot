@@ -390,7 +390,7 @@ class LifecyclePublicationTests(TestCase):
                 observation=self._observation(self.source, 'licensed_api', self._rows()), now=NOW)
         self.assertEqual(_series_history_winners(other), [])
 
-    def _card(self, *, name='Alpha', at=NOW, correction=False, status='scheduled', schedule_correction=False):
+    def _card(self, *, name='Alpha', at=NOW, correction=False, status='scheduled', schedule_correction=False, complete=True):
         from stable.services.race_data_sync_pipeline import _ROSTER_ALLOWED_FIELDS
         payload=dict(schema_version=1,external_race_id=self.source.external_race_id,
             off_time=self.event.race_datetime.isoformat(),region='japan_jra',course='Tokyo',
@@ -403,7 +403,7 @@ class LifecyclePublicationTests(TestCase):
             normalized_payload=payload,field_provenance=dict(provider=self.source.source_key,region='japan_jra',
                 source_class='licensed_api',registry_digest=self.roster.registry_digest,contract_version=entry.contract_version,
                 contract_digest=entry.contract_digest,automation_allowed=True,allowed_fields=list(_ROSTER_ALLOWED_FIELDS),
-                roster_complete=True,card_correction_marker=correction,schedule_correction_marker=schedule_correction),parse_warnings=[],permission_classification='synthetic',
+                roster_complete=complete,card_correction_marker=correction,schedule_correction_marker=schedule_correction),parse_warnings=[],permission_classification='synthetic',
             acquisition_key=fixtures._sha([at.isoformat(),correction])).observation
 
     @override_settings(RACE_DATA_SYNC_ENABLED_DATA_KINDS=('result','racecard'))
@@ -536,3 +536,54 @@ class LifecyclePublicationTests(TestCase):
 
     def test_frozen_missing_result_cannot_be_fulfilled_across_generation(self):
         self._check_frozen_result_successor(wrong_generation=True)
+
+    def test_first_result_confirmation_does_not_require_correction_switch(self):
+        self.apply(self._observation(self.source,'licensed_api',self._rows(),result_phase='provisional',race_status='pending'))
+        official=self._observation(self.source,'licensed_api',self._rows(),observed_at=NOW+timedelta(minutes=1))
+        outcome=apply_data_sync_result_observation(observation_id=official.pk,expected_event_id=self.event.pk,
+            now=NOW+timedelta(minutes=1),project_current=True,correction_apply_enabled=False)
+        self.assertTrue(outcome.projected,outcome)
+        state=models.RaceLifecyclePublicState.objects.get(event=self.event)
+        self.assertEqual((state.result_maturity,state.result_visibility),('confirmed','visible'))
+
+    def test_same_facts_reobservation_advances_freshness_without_new_epoch(self):
+        self.apply(self._observation(self.source,'licensed_api',self._rows()))
+        newer=self._observation(self.source,'licensed_api',self._rows(),observed_at=NOW+timedelta(minutes=4),
+            provenance_overrides={'acquisition_key':'8'*64})
+        self.apply(newer,NOW+timedelta(minutes=4))
+        self.assertEqual(models.RaceLifecycleEpochPublication.objects.count(),1)
+        changed=self._rows();changed[0]['reported_finish_position'],changed[1]['reported_finish_position']=2,1
+        old=self._observation(self.source,'licensed_api',changed,observed_at=NOW+timedelta(minutes=1))
+        self.apply(old,NOW+timedelta(minutes=5))
+        state=models.RaceLifecyclePublicState.objects.get(event=self.event)
+        self.assertEqual((state.epoch,state.result_visibility),(1,'visible'))
+
+    @override_settings(RACE_DATA_SYNC_ENABLED_DATA_KINDS=('result','racecard','race_time'))
+    def test_incomplete_combined_card_cannot_block_explicit_cancellation(self):
+        from stable.services.race_data_sync_pipeline import reconcile_racecard_observation
+        def apply(obs):
+            return reconcile_racecard_observation(observation_id=obs.pk,expected_event_id=self.event.pk,
+                allow_schedule_apply=True,allow_racecard_apply=True,task_id='combined',run_id='combined')
+        apply(self._card())
+        state=models.RaceLifecyclePublicState.objects.get(event=self.event);revision=state.racecard_revision_id
+        outcome=apply(self._card(status='cancelled',complete=False,at=NOW+timedelta(seconds=1)))
+        self.event.refresh_from_db()
+        self.assertEqual(self.event.status,'cancelled',outcome)
+        state.refresh_from_db();self.assertEqual(state.racecard_revision_id,revision)
+        from stable.services.race_lifecycle_projection import public_modules
+        self.assertEqual(public_modules(self.event.pk,now=NOW+timedelta(seconds=1))['visibility']['racecard'],'updating')
+
+    @override_settings(RACE_DATA_SYNC_ENABLED_DATA_KINDS=('result','racecard'))
+    def test_same_card_reobservation_prevents_older_card_replacement(self):
+        from stable.services.race_data_sync_pipeline import reconcile_racecard_observation
+        def apply(obs):
+            return reconcile_racecard_observation(observation_id=obs.pk,expected_event_id=self.event.pk,
+                allow_schedule_apply=False,allow_racecard_apply=True,task_id='fresh-card',run_id='fresh-card')
+        apply(self._card())
+        apply(self._card(at=NOW+timedelta(minutes=4)))
+        self.assertEqual(models.RaceLifecycleEpochPublication.objects.count(),1)
+        apply(self._card(name='Older Replacement',at=NOW+timedelta(minutes=1)))
+        state=models.RaceLifecyclePublicState.objects.get(event=self.event)
+        self.assertEqual(state.epoch,1)
+        from stable.services.race_lifecycle_projection import public_modules
+        self.assertEqual(public_modules(self.event.pk,now=NOW+timedelta(minutes=5))['racecard'][0].horse_name,'Alpha')
