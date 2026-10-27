@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 from copy import deepcopy
+import unicodedata
 
 from bs4 import BeautifulSoup, NavigableString, Tag, Comment
 from stable.services.article_content import _STRUCTURED_NOISE_SELECTORS
@@ -189,6 +190,17 @@ def restore_translation(clean, entities, response):
     return {"title": texts["title"], "summary": texts["summary"], "body": "\n\n".join(row["text"] for row in blocks), "blocks": blocks}
 
 
+def numeric_surface(text):
+    text = unicodedata.normalize("NFKC", text)
+    months = "January February March April May June July August September October November December".split()
+    for number, month in enumerate(months, 1):
+        # 只规范带日期/介词上下文的月份，避免把马名 May 或普通助动词当数字。
+        text = re.sub(r"(\b\d{1,2}(?:st|nd|rd|th)?\s+)" + month + r"\b", lambda match: match[1] + str(number), text, flags=re.I)
+        text = re.sub(r"\b" + month + r"(?=\s+\d{1,2}\b)", str(number), text, flags=re.I)
+        text = re.sub(r"(\b(?:in|during|on)\s+)" + month + r"\b", lambda match: match[1] + str(number), text, flags=re.I)
+    return re.sub(r"(?<=\d),(?=\d{3}(?:\D|$))", "", text)
+
+
 def validate_audit(clean, target, response):
     bounded_json(response)
     failed = {"passed": False, "reason": "audit_schema_or_unknown", "source_sha": clean["source_sha"], "target_sha": digest(target)}
@@ -200,7 +212,10 @@ def validate_audit(clean, target, response):
         return failed
     sources = block_map(clean)
     targets = {"title": target["title"], **{row["id"]: row["text"] for row in target["blocks"]}}
-    diagnostics = {key: audit_numeric_surfaces(text, targets.get(key, "")) for key, text in sources.items()}
+    diagnostics = {key: audit_numeric_surfaces(numeric_surface(text), numeric_surface(targets.get(key, ""))) for key, text in sources.items()}
+    for row in diagnostics.values():
+        row["comparison_scope"] = "normalized_numeric_lexemes"
+        row["normalization"] = "nfkc-thousands-explicit-month-v1"
     for issue in response["issues"]:
         if type(issue) is not dict or set(issue) != {"kind", "block_id", "source_span", "target_span"}:
             return failed
@@ -212,5 +227,8 @@ def validate_audit(clean, target, response):
             if type(span) is not list or len(span) != 2 or any(type(i) is not int for i in span) or not 0 <= span[0] <= span[1] <= len(texts[block]):
                 return failed
     numeric_ok = all(row["status"] != "surface_difference" for row in diagnostics.values())
+    source_numbers = set(re.findall(r"\d+(?:\.\d+)?", numeric_surface("\n".join(sources.values()))))
+    summary_numbers = set(re.findall(r"\d+(?:\.\d+)?", numeric_surface(target["summary"])))
+    numeric_ok = numeric_ok and not (summary_numbers - source_numbers)
     passed = response["verdict"] == "pass" and all(response["checks"].values()) and not response["issues"] and numeric_ok
     return {"passed": passed, "reason": "passed" if passed else "facts_or_numeric_difference", "source_sha": clean["source_sha"], "clean_sha": clean["clean_sha"], "target_sha": digest(target), "model": deepcopy(response), "numeric": diagnostics}
