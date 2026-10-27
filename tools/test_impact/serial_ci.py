@@ -47,7 +47,8 @@ def absent(result, name):
     # Daemon errors and permission errors are never proof of absence.
     return (result.returncode == 1 and result.stdout.strip() == '' and
             result.stderr.strip() in ('Error: No such object: ' + name,
-                                     'Error: No such container: ' + name))
+                                     'Error: No such container: ' + name,
+                                     'error: no such object: ' + name))
 
 
 def remove_owned(name, run=None, deadline=None):

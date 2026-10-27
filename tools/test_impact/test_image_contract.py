@@ -15,6 +15,19 @@ from tools.test_impact import image_contract as contract
 
 
 class ImageProofTests(unittest.TestCase):
+    def test_current_docker_absence_dialect_requires_exact_cid_and_no_other_error(self):
+        from tools.test_impact.serial_ci import absent
+        cid = 'c'*64
+        def result(code=1, stdout='\n', stderr=None):
+            return subprocess.CompletedProcess([],code,stdout,stderr or 'error: no such object: '+cid+'\n')
+        self.assertTrue(absent(result(),cid))
+        for value in (result(code=0), result(stdout='unexpected'),
+                      result(stderr='error: no such object: '+'d'*64),
+                      result(stderr='permission denied'), result(stderr='Cannot connect to the Docker daemon'),
+                      result(stderr='error: no such object: '+cid+'\npermission denied')):
+            with self.subTest(result=value):
+                self.assertFalse(absent(value,cid))
+
     def test_outside_verifier_pg_program_preserves_image_descriptor(self):
         from tools.test_impact.core import digest
         from tools.test_impact.test_pg_lifecycle import save_synthetic_lifecycle

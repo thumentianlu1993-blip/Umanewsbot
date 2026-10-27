@@ -12,7 +12,7 @@
    首个引导版本的 base 尚无规则时才用 `--bootstrap`，交付仍需独立审核绑定。
 3. `python scripts/run_test_plan.py --plan <计划> --output <目录> --build`
    仅支持已核验的本地 Docker socket；无 daemon 时明确失败，不回退到宿主 Django。
-   `--collect-only` 只列用例和分片，不执行测试。
+   `--collect-only` 只列用例和分片，不执行测试或镜像合同。首次CI准备镜像证据须显式使用 `--collect-only --prepare-images`；普通执行自动准备，分片只读同一证明。
 4. `python scripts/verify_test_plan.py --plan <execution-plan.json> --reports <目录> --output <summary.json>`
    检查完整集合、身份、skip 政策及收尾。它不替代候选外的交付核验器。
 
@@ -32,8 +32,7 @@
 最多4个独立容器同时运行。收集失败、超时、缺片、意外 skip、退出/收尾失败都阻断。
 容器无外网，PG16在同一容器的loopback内且使用UTF-8；Docker CLI只用于离线Compose配置，真实daemon不可访问。
 
-10项真实缓存/root/真实镜像合同目前存在明确覆盖缺口。catalog逐项列ID、原始skip原因和2026-10-16复核期限；
-不自动延期，不扩展到其他skip，也不能宣称它们通过。普通核心/工具链验证不依赖这些豁免。
+原10项真实缓存/root/镜像用例已提供对应执行条件，旧skip豁免已移除：8项缓存按精确ID分为三组只读profile；root仅一个精确native ID，worker为0:0、能力仅SETUID/SETGID/KILL，PG及PID检查为10001；历史固定镜像由宿主准备、原native验证有界只读proof，普通worker无daemon。普通profile仍10001且cap-drop ALL。所有测试必须实际执行；是否全量通过，以该固定SHA的新收据为准。
 
 ## 交付与回退
 
