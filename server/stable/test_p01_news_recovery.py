@@ -60,3 +60,34 @@ class RecoveryTests(WorkflowFixture, TransactionTestCase):
             self.assertFalse(news_pipeline.enqueue_news_run(self.run.pk))
         self.run.refresh_from_db()
         self.assertEqual(self.run.state, "pending")
+
+    def test_daily_capacity_waits_until_next_beijing_day_without_provider_call(self):
+        from stable.models import NewsModelBudget
+        from zoneinfo import ZoneInfo
+        news_pipeline.process_news_run(self.run.pk)
+        news_pipeline.process_news_run(self.run.pk)
+        before = len(self.calls)
+        day = NewsModelBudget.objects.get(period_kind="day")
+        day.spent = day.cap
+        day.save(update_fields=["spent"])
+        news_pipeline.process_news_run(self.run.pk)
+        self.run.refresh_from_db()
+        self.assertEqual(self.run.state, "pending", self.run.reason)
+        self.assertEqual(self.run.next_attempt_at.astimezone(ZoneInfo("Asia/Shanghai")).hour, 0)
+        self.assertGreater(self.run.next_attempt_at, timezone.now())
+        self.assertEqual(len(self.calls), before)
+        self.assertFalse(self.run.attempts.filter(state="reserved").exists())
+
+    def test_source_revoked_after_reservation_never_reaches_provider(self):
+        attempt, payload = self.claim_editorial()
+        def reserve_then_revoke(*args, **kwargs):
+            result = reserve_request(*args, **kwargs)
+            self.source.enabled = False
+            self.source.save(update_fields=["enabled"])
+            return result
+        with patch("stable.services.news_model_gateway.reserve_request", side_effect=reserve_then_revoke):
+            result = execute_request(attempt.pk, payload)
+        self.assertEqual(self.calls, [])
+        self.assertEqual(result.state, "failed")
+        self.assertEqual(result.actual_cost, 0)
+        self.assertEqual(result.month_budget.reserved, 0)
