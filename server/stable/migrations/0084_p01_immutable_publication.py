@@ -14,7 +14,7 @@ BEGIN
   ELSIF TG_TABLE_NAME = 'stable_newspublicentry' THEN
     old_j := to_jsonb(OLD) - 'superseded_at'; new_j := to_jsonb(NEW) - 'superseded_at';
   ELSIF TG_TABLE_NAME = 'stable_newsprocessingrun' THEN
-    keys := ARRAY['article_id','input_sha','policy_sha','target_revision_sha','source_snapshot','manual_target','editor_provenance','parent_run_id','generation'];
+    keys := ARRAY['article_id','input_sha','policy_sha','target_revision_sha','source_snapshot','manual_target','editor_provenance','parent_run_id'];
     SELECT jsonb_object_agg(key, value) INTO old_j FROM jsonb_each(to_jsonb(OLD)) WHERE key = ANY(keys);
     SELECT jsonb_object_agg(key, value) INTO new_j FROM jsonb_each(to_jsonb(NEW)) WHERE key = ANY(keys);
   ELSIF TG_TABLE_NAME = 'stable_newsarticle' THEN
