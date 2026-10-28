@@ -8,7 +8,7 @@ from stable.services.news_pipeline import digest, REGIONS
 from stable.services.news_content import ContentBlocked, bounded_json, block_map, model_schema
 
 RESPONSE_SCHEMA = {
-    "priority": "major|regional|reject|uncertain", "primary_region": list(REGIONS),
+    "priority": "major|regional|reject|uncertain", "primary_region": "|".join(REGIONS),
     "reason": "基于事件价值的理由，不按来源或榜单加分",
     "identity": {"kind": "race|retirement|injury|policy|appointment", "fields": "仅返回identity_contract对应kind的一组完整字段，值均为字符串，不返回说明字段",
         "evidence": "每个 fields 键映射为 {block_id,start,end} 原文证据"},
