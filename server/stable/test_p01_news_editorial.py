@@ -5,6 +5,20 @@ from stable.services.news_editorial import identity_key, validate_editorial
 
 
 class EditorialIdentityTests(SimpleTestCase):
+    def test_response_region_example_is_scalar_and_matches_allowed_regions(self):
+        from stable.services.news_editorial import RESPONSE_SCHEMA
+        from stable.services.news_pipeline import REGIONS
+        region = RESPONSE_SCHEMA["primary_region"]
+        self.assertIsInstance(region, str)
+        self.assertEqual(set(region.split("|")), set(REGIONS))
+        for value in region.split("|"):
+            response = {"priority": "uncertain", "primary_region": value,
+                "reason": "缺少身份依据", "identity": {}, "facts": [],
+                "comparison": {"event_id": None, "version": 0}}
+            self.assertEqual(validate_editorial({}, response, source_scope="jra")["primary_region"], value)
+            with self.assertRaises(ContentBlocked):
+                validate_editorial({}, {**response, "primary_region": [value]}, source_scope="jra")
+
     def test_verified_cross_source_aliases_share_one_event(self):
         aliases = {"race:jra:2026102701": "race:123", "race:netkeiba:2026102701": "race:123"}
         first = identity_key("race", {"source_race_id": "2026102701"}, source_scope="jra", aliases=aliases)

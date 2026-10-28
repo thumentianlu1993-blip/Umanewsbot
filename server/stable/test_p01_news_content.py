@@ -11,6 +11,28 @@ ENTITY = {"block_id": "b0", "start": 0, "end": 13, "text": "Unknown Horse", "typ
 
 
 class NewsContentTests(SimpleTestCase):
+    def test_entity_prompt_example_round_trips_unicode_and_repeated_occurrences(self):
+        from stable.services import news_prompts
+        from stable.services.news_pipeline import digest
+        import json
+        example = getattr(news_prompts, "ENTITY_CONTRACT_EXAMPLE", None)
+        self.assertIsInstance(example, dict)
+        self.assertIn(json.dumps(example, ensure_ascii=False), news_prompts.PROMPTS["entity_check"])
+        source = {**example["source"], "source_sha": digest(example["source"]),
+            "clean_sha": digest(example["source"])}
+        entities = validate_entities(source, example["response"])
+        self.assertEqual(len(entities), 3)
+        self.assertEqual([(e["block_id"], e["start"], e["end"]) for e in entities],
+            [("title", 2, 12), ("b0", 0, 10), ("b0", 13, 23)])
+        protected = protect_source(source, entities)
+        restored = restore_translation(source, entities, {**protected, "summary": "测试摘要"})
+        self.assertEqual(restored["title"], source["title"])
+        self.assertEqual(restored["blocks"], source["blocks"])
+        wrong = {**example["response"], "entities": [
+            {**example["response"]["entities"][0], "start": 3, "end": 13}]}
+        with self.assertRaisesRegex(ContentBlocked, "entity_span_invalid"):
+            validate_entities(source, wrong)
+
     def test_broad_nonempty_container_is_not_proof_of_complete_body(self):
         with self.assertRaisesRegex(ContentBlocked, "body_boundary"):
             clean_source({"source_site": "tdn", "title": "Title", "html": "<main><p>Story plus navigation</p></main>"})
