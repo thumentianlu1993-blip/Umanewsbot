@@ -1,0 +1,76 @@
+{
+  "code_sha": "3dd2ddc9a733f1ae59cd8c82131ca916d8cab32f",
+  "verified": {
+    "status": "passed",
+    "skipped_count": 0,
+    "mode": "expanded",
+    "count": 942,
+    "plan_digest": "ae7fef97499d09220ea61e126ba2c7894c2ca9e21804f8f5e2115c8baacd6a9e",
+    "run_id": "p01-prompt-contract-3dd2ddc9",
+    "run_attempt": "1",
+    "test_tree": "e05f18907bf0bc0ca1fce9d52a9158512001cc0e"
+  },
+  "containers": [
+    {
+      "id": "dde160c5f657fa90231180ce7d9537ecaa05e343c4ca526347c2aab1bb66b46a",
+      "exit_code": 0,
+      "absent": true
+    },
+    {
+      "id": "781d9e5fc1fd9b3319127b11a8364ab48d6a30cc1e85d2f14f4009f06a5192ce",
+      "exit_code": 0,
+      "absent": true
+    },
+    {
+      "id": "1e32177c5e1d86c73d69d1f4ec1bc79bea164ed5aa2057c39dffe8f0145ed3fd",
+      "exit_code": 0,
+      "absent": true
+    },
+    {
+      "id": "f231f09847c48221b264b3f6bb5eb76d63dd999c0b6c6611f09e106751fee5d5",
+      "exit_code": 0,
+      "absent": true
+    },
+    {
+      "id": "867a6ec488ba26aa1d6ce6059d37ec1d991e11d11c678f9548135dff877cdbf1",
+      "exit_code": 0,
+      "absent": true
+    },
+    {
+      "id": "c40c19e815c4b1fe015e807cfcd5f742285f373a124c489f8df74c22a97aa335",
+      "exit_code": 0,
+      "absent": true
+    }
+  ],
+  "prompt_utf8_bytes": {
+    "entity_check": 1715,
+    "translate_full": 900,
+    "fact_audit": 1398,
+    "body_review": 659,
+    "event_classify": 1556
+  },
+  "prompt_sha256": {
+    "entity_check": "f364ec3b81fd2304b66bd0db39537e8b42dde890dc2c7a5240b31c022ae03f8d",
+    "translate_full": "8b2bc1244efdb87c670ad7a12361969506b58ab9e075908cd998dcc9733da77e",
+    "fact_audit": "85a32abacead82aa9d1dde798a0df063329086828bfe3ed7f62a53a517f48352",
+    "body_review": "c365c9215a17d1bc6590a2851f3e524c01b5ee495dd1aba29f8b6120e3db58e4",
+    "event_classify": "054a393927b7b82e421e986aee1dd45e2be6120094fb78a61606dbff5fca44c8"
+  },
+  "real_model_calls_this_change": 0,
+  "review": {
+    "verdict": "APPROVED",
+    "closed_finding": "P2 system prompt UTF-8 boundary",
+    "fingerprint": "98981265b09eda6a434697e396fa5f81bb7b83a69d761020d805ade1d4478093",
+    "scope": "d9bb7b24..3dd2ddc9"
+  },
+  "runtime_sha256": {
+    "red.log": "472cfeedddcf8c763db636fb0f58ff319ddbfaa34e3e9f78c413f8f7ac560b9a",
+    "green.log": "af1d5d254f874ea46fd75c637624ef56c5aae690aaf2e16fecda4f1c4a3a0cd0",
+    "limit-red.log": "c497e6809e92660269132aada5b7194383fec3dff96a840357172856cf2a353b",
+    "final-audit.json": "9bd391dd84e82be4eb8f2299696960e76932bab17a4b2dcba6a7eafacbf71d5e",
+    "plan-3dd2ddc9.json": "08344f5b268fff9bdeec7619fb1cdfafd79668a087f86860c05be57082384792",
+    "affected-3dd2ddc9/execution-plan.json": "3fc3f347788d3c7d72dabf5234d21524863fd241c2e711c72eff65393315509d",
+    "affected-3dd2ddc9/verified.json": "b66de3e3c74728d770e1c82a7ac47a9025d44184298781d2b55dc2d4ddd7f13c",
+    "affected-3dd2ddc9/owned-events.jsonl": "17e389d247a6e251964ad357dc8bbdd2dda0fd9ce29df0cf20d9af730fc148d2"
+  }
+}
