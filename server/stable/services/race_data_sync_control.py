@@ -2748,7 +2748,18 @@ def _claim_multisource_due(
         .values_list("event_id", flat=True)[:batch_size]
     )
     claims = []
+    from stable.services.race_lifecycle_projection import writable, capacity_manifest, capacity_allows_source
+    capacity = None
+    if any(writable(event_id) for event_id in ids):
+        try:
+            capacity = capacity_manifest(now=now)
+        except (ValueError, TypeError, KeyError, OSError):
+            capacity = None
     for event_id in ids:
+        if writable(event_id) and capacity is None:
+            models.RaceEventLiveTracking.objects.filter(event_id=event_id).update(
+                circuit_reason="lifecycle_capacity_gap", next_poll_at=now + timedelta(minutes=5))
+            continue
         try:
             with transaction.atomic():
                 event, _ = _lock_multisource_event(event_id)
@@ -2816,6 +2827,8 @@ def _claim_multisource_due(
                     ):
                         continue
                     if binding is not None and binding.pk != b.pk:
+                        continue
+                    if writable(event_id) and not capacity_allows_source(capacity, event=event, source=b.source_identity):
                         continue
                     admission = validate_multisource_admission(
                         event_id=event_id,
@@ -2999,6 +3012,14 @@ def _validate_multisource_claim(*, claim, now, required_data_kinds=()):
         )
         if not admission.admitted:
             return deny(admission.reason_code)
+    from stable.services.race_lifecycle_projection import writable, capacity_manifest, capacity_allows_source
+    if writable(event.pk):
+        try:
+            capacity = capacity_manifest(now=now)
+            if not capacity_allows_source(capacity, event=event, source=binding.source_identity):
+                return deny("lifecycle_capacity_source_gap")
+        except (OSError, ValueError, TypeError, KeyError):
+            return deny("lifecycle_capacity_gap")
     return ControlDecision(
         "valid", "", event.pk, tracking.claim_generation
     ), LockedRaceDataSyncClaim(event, control, tracking, enrollment, checkpoints)
@@ -3165,6 +3186,22 @@ def multisource_initial_poll_at(*, event, kind, now):
 
 def calculate_multisource_next_poll(*, event, kind, now):
     from zoneinfo import ZoneInfo
+    from stable.services.race_lifecycle_projection import writable
+
+    if writable(event.pk):
+        if timezone.is_naive(now):
+            raise ValueError("aware_timestamp_required")
+        if event.status == "cancelled":
+            return now + timedelta(days=1) if kind == "race_time" else None
+        lifecycle = models.RaceEventLifecycleControl.objects.filter(event=event).first()
+        if lifecycle and lifecycle.first_result_confirmed_at:
+            until = lifecycle.correction_until or (lifecycle.first_result_confirmed_at + timedelta(days=7))
+            if now >= until:
+                return None
+        key = str(event.normalized_grade or "").upper().replace("-", "")
+        manual = (event.source_refs or {}).get("lifecycle_priority") == "key"
+        interval = 60 if key in ("G1", "GI", "JPN1", "JPNI", "JG1") or manual else 120
+        return now + timedelta(seconds=interval)
 
     if event.status in ("cancelled", "postponed"):
         return None

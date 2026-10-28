@@ -57,3 +57,7 @@ active intent期间拒绝新deploy/manual与普通stopped-service resume。没�
 3. 前台可打开至少 3 篇文章
 4. `worker`/`beat` 正常
 5. 抓取、翻译、推送日志恢复写入
+
+## P02 epoch 生命周期（未发布实现）
+
+产生 epoch 后保留新 reader 与不可变证据，优先关闭新 writer/发现；不要仅切旧代码而绕过争议/到期读闸。0085 的 acquisition_key 允许同内容多个真实观测，已有新数据时不得机械逆迁移到旧唯一约束或删除证据来迎合约束。具体接口与恢复面见 [P02 rollout](changes/p02-race-lifecycle-20261027/rollout.md)，人工确认仅按根 AGENTS.md。

@@ -9828,3 +9828,7 @@ RACE_DATA_RAW_ARTIFACT_ROOTS=/run/race-data-sync
 候选外核验器需要本地 Linux Docker、Git 对象、GitHub只读权限和该run的镜像artifact。
 镜像在依赖准备完成后固定ID，实际测试及交付时重新收集均使用 network none、非root、无宿主凭据的容器。
 准备阶段可以下载依赖，测试阶段不可出站；交付重收集只列名称，不重新执行全部测试。
+
+## P02 epoch 生命周期运维接口（2026-10-27，尚未发布）
+
+新增状态/不可变凭据/持久投递与观测 acquisition_key，开关默认关闭。容量审计、历史兼容审计/限定回填、冻结 scope 与 R01 报告命令及配置见 [P02 rollout 实现接口](changes/p02-race-lifecycle-20261027/rollout.md)。没有真实容量 manifest 不领取高频请求；数据库提交不代表外部公开。真实运行状态不能从离线回归或免费页面 HTTP200推定。人工确认仅按根 AGENTS.md。
