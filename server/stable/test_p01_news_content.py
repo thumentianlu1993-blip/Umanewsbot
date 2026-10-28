@@ -11,6 +11,14 @@ ENTITY = {"block_id": "b0", "start": 0, "end": 13, "text": "Unknown Horse", "typ
 
 
 class NewsContentTests(SimpleTestCase):
+    def test_fixed_prompts_fit_existing_request_envelope_allowance(self):
+        from stable.services.news_prompts import PROMPTS
+        # UTF-8字节是保守token上界，2048预留中留256给固定chat封装。
+        # 同时满足既有实测runner的系统提示小于2048字节前置条件。
+        for stage, prompt in PROMPTS.items():
+            with self.subTest(stage=stage):
+                self.assertLessEqual(len(prompt.encode("utf-8")), 2048 - 256)
+
     def test_entity_prompt_example_round_trips_unicode_and_repeated_occurrences(self):
         from stable.services import news_prompts
         from stable.services.news_pipeline import digest
