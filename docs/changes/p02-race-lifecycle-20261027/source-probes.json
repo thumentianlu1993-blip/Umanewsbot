@@ -1,0 +1,92 @@
+{
+  "de_index": {
+    "url": "https://www.deutscher-galopp.de/gr/renntage/ergebnisse/",
+    "status": 403,
+    "fetched_at": "2026-10-27T09:41:39.461713+00:00",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "size": 0,
+    "content_type": "text/html; charset=UTF-8",
+    "location": null
+  },
+  "ae_index": {
+    "url": "https://emiratesracing.com/",
+    "status": 200,
+    "fetched_at": "2026-10-27T09:41:39.356421+00:00",
+    "sha256": "3b7413fb83d22b7d57026a4ea13d1755731e6a0af0c957bfb7db02639a0e1b34",
+    "size": 295740,
+    "content_type": "text/html; charset=utf-8",
+    "location": null
+  },
+  "sa_index": {
+    "url": "https://www.jcsa.sa/ar/racing/",
+    "status": 200,
+    "fetched_at": "2026-10-27T09:41:41.249821+00:00",
+    "sha256": "9db03eea77a89c79186b5d55f784f24db4f16b69417f45879d89c0d41e56c762",
+    "size": 92016,
+    "content_type": "text/html; charset=utf-8",
+    "location": null
+  },
+  "au_result": {
+    "url": "https://www.racingaustralia.horse/FreeFields/Results.aspx?Key=2026Jul25,NSW,Kembla+Grange",
+    "status": 200,
+    "fetched_at": "2026-10-27T09:41:40.718556+00:00",
+    "sha256": "06a2e08637facc014d344b63bacff2a60e7ffedd8b2415f243237f8686811a09",
+    "size": 157131,
+    "content_type": "text/html; charset=utf-8",
+    "location": null
+  },
+  "ae_card": {
+    "url": "https://emiratesracing.com/racecard/2026-10-29/1/declarations",
+    "status": 200,
+    "fetched_at": "2026-10-27T09:42:36.751936+00:00",
+    "sha256": "f89c960f91bde3621233529e62647b127c25d626c5cbf9e401c8cab55089a4d1",
+    "size": 68919,
+    "content_type": "text/html; charset=utf-8",
+    "location": null
+  },
+  "ae_calendar": {
+    "url": "https://emiratesracing.com/season-calendar/current-season?fixture=2026-10-25",
+    "status": 200,
+    "fetched_at": "2026-10-27T09:42:37.215224+00:00",
+    "sha256": "3904fbf7042811c35235106fd410cbd84c177495c522080ed6f72023a6c985a9",
+    "size": 1221217,
+    "content_type": "text/html; charset=utf-8",
+    "location": null
+  },
+  "sa_card": {
+    "url": "https://www.jcsa.sa/ar/racing/RRS_Racecards/?fr=sMmFjZTkzMzE4NTQ",
+    "status": 200,
+    "fetched_at": "2026-10-27T09:42:37.441638+00:00",
+    "sha256": "6f35fcf6c44f1f8d4f2fe7e695f28b51c637aa5862abcdb6642e211b3f2e3b72",
+    "size": 81511,
+    "content_type": "text/html; charset=utf-8",
+    "location": null
+  },
+  "de_alternative": {
+    "url": "https://galopponline.de/statistiken-ergebnisse/",
+    "status": 200,
+    "fetched_at": "2026-10-27T09:42:40.885134+00:00",
+    "sha256": "1675d58386bd40bf5b9ba92bf495656624daab15961d2c864c404ada5bee5a2f",
+    "size": 279309,
+    "content_type": "text/html; charset=UTF-8",
+    "location": null
+  },
+  "ae_card_rows": {
+    "url": "https://emiratesracing.com/ajax/racecard-declarations?date=2026-10-29&race=1",
+    "status": 200,
+    "fetched_at": "2026-10-27T09:44:56.511110+00:00",
+    "sha256": "466283b3c2f429cf959c981131f13abc570dcc2fcce66a7d09b1f3ef66086bfa",
+    "size": 152467,
+    "content_type": "text/html; charset=utf-8",
+    "location": null
+  },
+  "sa_saved_endpoint": {
+    "url": "https://jcsa.sa/api/meeting-info/en/20260214/9/Results/True",
+    "status": 200,
+    "fetched_at": "2026-10-27T09:44:58.528226+00:00",
+    "sha256": "f2ec6ede22d521493293d3e71913f6597774754b5eb570e6be3c5ca336e50c94",
+    "size": 98754,
+    "content_type": "text/html; charset=utf-8",
+    "location": null
+  }
+}

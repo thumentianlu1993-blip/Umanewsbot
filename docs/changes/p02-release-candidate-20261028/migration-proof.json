@@ -1,0 +1,37 @@
+{
+  "source_stable": "0079_multisource_race_enrollment",
+  "plan": [
+    "0080_translation_retry_budget",
+    "0081_managed_readonly_steps",
+    "0083_race_lifecycle_publication",
+    "0084_race_lifecycle_evidence_guards",
+    "0085_race_observation_acquisition",
+    "0086_race_lifecycle_observation_watermarks"
+  ],
+  "seconds_synthetic_empty": 0.3891336670058081,
+  "target": [
+    [
+      "admin",
+      "0003_logentry_add_action_flag_choices"
+    ],
+    [
+      "auth",
+      "0012_alter_user_first_name_max_length"
+    ],
+    [
+      "contenttypes",
+      "0002_remove_content_type_name"
+    ],
+    [
+      "sessions",
+      "0001_initial"
+    ],
+    [
+      "stable",
+      "0086_race_lifecycle_observation_watermarks"
+    ]
+  ],
+  "remaining_plan": [],
+  "database": "local synthetic UTF8 p02_upgrade_verified_ci",
+  "production_shape": false
+}

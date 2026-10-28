@@ -1,3 +1,7 @@
+# 2026-10-28 P02 主线发布候选准备
+
+已在独立 codex/p02-release-candidate-20261028 分支从 main 提取 P02，移除跨项目0082迁移依赖。候选、升级与恢复流程见[第1项](changes/p02-release-candidate-20261028/spec.md)。新生产执行器尚未实现，CI/镜像演练/生产验收未完成；没有合并或部署。历史源候选证据不替代当前候选测试。
+
 ## 2026-10-03 下一版本进入开发调度
 
 用户已要求由协调会话承担架构与产品协调，创建三条开发线及独立审核支持，目标仍为 10/30 完全上线。已在独立工作树继承原规划并保留来源哈希；模型固定 gpt-6.1-sol / medium。实际派单与会话状态见 [开发调度](changes/next-version-capabilities/coordination.md) 和 [执行台账](changes/next-version-capabilities/dispatch_state.json)。本条不表示任何功能已实现、合并或发布。

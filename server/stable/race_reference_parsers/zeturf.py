@@ -9,7 +9,6 @@ from bs4 import BeautifulSoup
 
 from . import decode_html, legacy_hash, reference_runners, text
 
-
 PARSER_NAME = "zeturf"
 PARSER_VERSION = "reference-v1"
 
@@ -69,7 +68,9 @@ def _title_parts(html: str) -> dict[str, str]:
     }
 
 
-def parse_legacy_page(html: str, *, source_url: str) -> tuple[list[dict], list[dict], dict]:
+def parse_legacy_page(
+    html: str, *, source_url: str
+) -> tuple[list[dict], list[dict], dict]:
     soup = BeautifulSoup(html, "lxml")
     runners: list[dict] = []
     runner_by_number: dict[str, dict] = {}
@@ -187,8 +188,7 @@ def parse_reference_page(raw_bytes, source_url, parser_context):
         if canonical_parts.netloc and (
             canonical_parts.scheme.casefold() != "https"
             or not (
-                canonical_host == "zeturf.fr"
-                or canonical_host.endswith(".zeturf.fr")
+                canonical_host == "zeturf.fr" or canonical_host.endswith(".zeturf.fr")
             )
         ):
             raise RuntimeError("ZEturf canonical URL host is outside source contract")
@@ -216,6 +216,13 @@ def parse_reference_page(raw_bytes, source_url, parser_context):
                     int(marker_match.group("meeting")),
                     int(marker_match.group("race")),
                 )
+            )
+    # 免费新版页面的固定赛事页头，不能采集菜单/相关推荐里的 R/C。
+    for marker in soup.select(".mobile-sticky-title strong"):
+        match = re.fullmatch(r"R([1-9]\d*)C([1-9]\d*)", text(marker.get_text()), re.I)
+        if match:
+            page_identities.add(
+                (_title_parts(html)["date"], int(match[1]), int(match[2]))
             )
     expected_identity = (
         expected["local_date"],
@@ -249,7 +256,9 @@ def parse_reference_page(raw_bytes, source_url, parser_context):
         },
         "runners": semantic_runners,
         "completeness": {
-            "race_identity": "complete" if metadata["race_name"] and metadata["venue"] else "partial",
+            "race_identity": (
+                "complete" if metadata["race_name"] and metadata["venue"] else "partial"
+            ),
             "runners": "complete" if semantic_runners else "unknown",
             "results": "complete" if results_complete else "partial",
             "gap_codes": gaps,
