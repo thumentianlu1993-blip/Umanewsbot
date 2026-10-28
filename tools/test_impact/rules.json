@@ -25,7 +25,18 @@
     "docs/changes/next-version-capabilities/lanes/C/U02-offline-inventory.json",
     "docs/changes/next-version-capabilities/lanes/B/B053-m02-read-translation-consumer/obligations.json",
     "docs/changes/next-version-capabilities/lanes/B/B055-completed-redelivery-receipt-fix/obligations.json",
-    "docs/changes/next-version-capabilities/lanes/B/B057-remaining7-end-to-end-test-prep/obligations.json"
+    "docs/changes/next-version-capabilities/lanes/B/B057-remaining7-end-to-end-test-prep/obligations.json",
+    "docs/changes/p02-race-lifecycle-20261027/production-readonly-20261028.json",
+    "docs/changes/p02-race-lifecycle-20261027/regional-fixtures.json",
+    "docs/changes/p02-race-lifecycle-20261027/regional-source-probes.json",
+    "docs/changes/p02-race-lifecycle-20261027/regional-validation.json",
+    "docs/changes/p02-race-lifecycle-20261027/source-parse-report.json",
+    "docs/changes/p02-race-lifecycle-20261027/source-probes.json",
+    "docs/changes/p02-race-lifecycle-20261027/validation.json",
+    "docs/changes/p02-release-candidate-20261028/dependency-manifest.json",
+    "docs/changes/p02-release-candidate-20261028/fixture-manifest.json",
+    "docs/changes/p02-release-candidate-20261028/migration-proof.json",
+    "docs/changes/p02-release-candidate-20261028/validation.json"
   ],
   "high_risk": [
     ".codex/agents/application.toml",
@@ -982,7 +993,13 @@
     "server/stable/services/translation_retry_budget.py",
     "server/stable/management/commands/horse_basic_profile_from_review.py",
     "server/stable/services/horse_basic_profile_prepare_input.py",
-    "server/stable/migrations/0081_managed_readonly_steps.py"
+    "server/stable/migrations/0081_managed_readonly_steps.py",
+    "server/stable/management/commands/backfill_race_lifecycle.py",
+    "server/stable/management/commands/manage_race_lifecycle_report.py",
+    "server/stable/management/commands/report_race_lifecycle_capacity.py",
+    "server/stable/services/race_lifecycle_metrics.py",
+    "server/stable/services/race_lifecycle_projection.py",
+    "server/stable/services/race_regional_sources.py"
   ],
   "paths": {
     "docs/changes/next-version-capabilities/lanes/C/U01-offline-cases.json": [
@@ -1416,6 +1433,10 @@
     ],
     "server/stable/test_managed_readonly_translation.py": [
       "news_translation"
+    ],
+    "server/stable/tests/fixtures/regional_lifecycle/*.html": [
+      "race_parser",
+      "race_results"
     ]
   },
   "symbols": {
@@ -1576,6 +1597,31 @@
         "module:stable.test_race_public_time",
         "module:stable.test_race_news_exposure",
         "public_probe_orm_loader"
+      ],
+      "_finished_race_queryset": [
+        "race_results",
+        "module:stable.test_race_information_display_pages",
+        "module:stable.test_race_public_time",
+        "horse_page",
+        "module:stable.test_race_section_gaps"
+      ],
+      "_group_race_events_by_date": [
+        "race_results",
+        "module:stable.test_race_information_display_pages",
+        "module:stable.test_race_public_time",
+        "horse_page"
+      ],
+      "_render_race_information": [
+        "race_results",
+        "module:stable.test_race_information_display_pages",
+        "module:stable.test_race_public_time",
+        "horse_page"
+      ],
+      "_series_history_winners": [
+        "race_results",
+        "module:stable.test_race_information_display_pages",
+        "module:stable.test_race_public_time",
+        "horse_page"
       ]
     }
   },

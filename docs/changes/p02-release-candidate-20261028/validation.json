@@ -570,8 +570,21 @@
     "fingerprint": "e7b219f34430152e449df482434132e95c781ab2e61ba2f8d497390ec4a341ba",
     "report": "review.md"
   },
-  "CI": "not run",
+  "CI": "initial run 40662454763 failed at catalog drift; mapping repaired/re-reviewed; full rerun pending",
   "migration_rehearsal": "migration-proof.json",
   "code_manifest": "dependency-manifest.json",
-  "fixture_manifest": "fixture-manifest.json"
+  "fixture_manifest": "fixture-manifest.json",
+  "mapping": {
+    "tests_passed": 39,
+    "collected_new_tests": 115,
+    "collection_profiles": [
+      "django"
+    ],
+    "review": "PASS",
+    "fingerprint": "081f336dbc01edbd08ac632250a7d4dc8a1cd9ed9dec451cd45fd9b3d3266c78",
+    "files": {
+      "tools/test_impact/catalog.json": "e64c71c3b7bb0d5287986dfca8786e2db63b44caded579d789fa70bed6b58d00",
+      "tools/test_impact/rules.json": "58a5c32ac41ba0e63dd2fb7720a5ae0e85596360912bffaf94e4ca60361741c3"
+    }
+  }
 }

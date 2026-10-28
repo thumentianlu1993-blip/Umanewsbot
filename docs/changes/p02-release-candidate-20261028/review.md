@@ -9,3 +9,7 @@
 原生限定审核正常结束 exit 0，无actionable finding。日志 `/tmp/p02-candidate-focused-review.ip5P4i`，SHA256 `b99a5e89e17430152cdaa62bf7bd20d928a3c294853c4910530b870b9430a1f0`。中途变更的旧指纹不作为PASS；最后唯一链接修正独立补审，最终同scope前后指纹一致：`e7b219f34430152e449df482434132e95c781ab2e61ba2f8d497390ec4a341ba`。
 
 审核结束后只回写review/tasks/validation状态，不再修改业务代码或升级方案。本结论仅覆盖候选拆分和流程方案，生产执行器、CI、镜像演练、来源能力与生产验收未完成；不能称为可部署，也不是发布授权。
+
+## CI映射修复复审
+
+首次远端CI在generate-plan阶段报新增模块catalog drift，未执行业务测试。已补10模块领域与django profile、6个新生产文件high_risk、19样本路径、4个views函数及精确文档JSON映射。原生映射审核正常exit0，发现profile缺项和section_gaps直接回归遗漏，两项修复后由同一reviewer聚焦复审PASS。旧规则只增不减，full和unmapped拒绝保持；最终前后指纹`081f336dbc01edbd08ac632250a7d4dc8a1cd9ed9dec451cd45fd9b3d3266c78`。39项工具测试通过；实际collect先RED后GREEN，115个用例均归属django（收集不另算测试通过数量）。远端完整CI待重跑。

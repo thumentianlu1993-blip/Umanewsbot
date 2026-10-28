@@ -53,7 +53,17 @@
       "stable.test_race_data_sync_chain_e2e",
       "stable.test_race_data_sync_repair",
       "stable.test_race_data_sync_r0_postgres",
-      "stable.test_race_multisource_jra"
+      "stable.test_race_multisource_jra",
+      "stable.test_race_lifecycle_capacity",
+      "stable.test_race_lifecycle_delivery",
+      "stable.test_race_lifecycle_metrics",
+      "stable.test_race_lifecycle_multisource",
+      "stable.test_race_lifecycle_publication",
+      "stable.test_race_lifecycle_schedule",
+      "stable.test_race_lifecycle_sources",
+      "stable.test_race_lifecycle_storage",
+      "stable.test_race_regional_lifecycle",
+      "stable.test_race_regional_pipeline"
     ],
     "historical_batch": [
       "stable.test_historical_batch_pipeline",
@@ -2818,6 +2828,66 @@
       "domains": [
         "news_translation"
       ]
+    },
+    "server/stable/test_race_lifecycle_capacity.py": {
+      "label": "stable.test_race_lifecycle_capacity",
+      "domains": [
+        "race_results"
+      ]
+    },
+    "server/stable/test_race_lifecycle_delivery.py": {
+      "label": "stable.test_race_lifecycle_delivery",
+      "domains": [
+        "race_results"
+      ]
+    },
+    "server/stable/test_race_lifecycle_metrics.py": {
+      "label": "stable.test_race_lifecycle_metrics",
+      "domains": [
+        "race_results"
+      ]
+    },
+    "server/stable/test_race_lifecycle_multisource.py": {
+      "label": "stable.test_race_lifecycle_multisource",
+      "domains": [
+        "race_results"
+      ]
+    },
+    "server/stable/test_race_lifecycle_publication.py": {
+      "label": "stable.test_race_lifecycle_publication",
+      "domains": [
+        "race_results"
+      ]
+    },
+    "server/stable/test_race_lifecycle_schedule.py": {
+      "label": "stable.test_race_lifecycle_schedule",
+      "domains": [
+        "race_results"
+      ]
+    },
+    "server/stable/test_race_lifecycle_sources.py": {
+      "label": "stable.test_race_lifecycle_sources",
+      "domains": [
+        "race_results"
+      ]
+    },
+    "server/stable/test_race_lifecycle_storage.py": {
+      "label": "stable.test_race_lifecycle_storage",
+      "domains": [
+        "race_results"
+      ]
+    },
+    "server/stable/test_race_regional_lifecycle.py": {
+      "label": "stable.test_race_regional_lifecycle",
+      "domains": [
+        "race_results"
+      ]
+    },
+    "server/stable/test_race_regional_pipeline.py": {
+      "label": "stable.test_race_regional_pipeline",
+      "domains": [
+        "race_results"
+      ]
     }
   },
   "profiles": {
@@ -3131,7 +3201,17 @@
     "stable.test_horse_career_record_from_review": "django",
     "stable.test_managed_readonly_steps": "django",
     "stable.test_managed_readonly_translation": "django",
-    "stable.test_translation_reported_token_stop": "django"
+    "stable.test_translation_reported_token_stop": "django",
+    "stable.test_race_lifecycle_capacity": "django",
+    "stable.test_race_lifecycle_delivery": "django",
+    "stable.test_race_lifecycle_metrics": "django",
+    "stable.test_race_lifecycle_multisource": "django",
+    "stable.test_race_lifecycle_publication": "django",
+    "stable.test_race_lifecycle_schedule": "django",
+    "stable.test_race_lifecycle_sources": "django",
+    "stable.test_race_lifecycle_storage": "django",
+    "stable.test_race_regional_lifecycle": "django",
+    "stable.test_race_regional_pipeline": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
