@@ -51,10 +51,7 @@
     </section>
 
     <nav class="race-subnav" aria-label="赛事详情模块">
-      <a href="#overview" class="active">概览</a>
-      {% if lifecycle_marker %}{{ lifecycle_marker|json_script:"race-lifecycle-marker" }}{% endif %}
-      {% if lifecycle_card_notice %}<p class="race-data-notice">名单：{{ lifecycle_card_notice }}</p>{% endif %}
-      {% if lifecycle_result_notice %}<p class="race-data-notice">赛果：{{ lifecycle_result_notice }}</p>{% endif %}
+      <a href="#overview" class="active">概览</a>{% if lifecycle_marker %}{{ lifecycle_marker|json_script:"race-lifecycle-marker" }}{% endif %}{% if lifecycle_card_notice %}<p class="race-data-notice">名单：{{ lifecycle_card_notice }}</p>{% endif %}{% if lifecycle_result_notice %}<p class="race-data-notice">赛果：{{ lifecycle_result_notice }}</p>{% endif %}
       {% if runners %}<a href="#runners">{{ runner_section_label }}</a>{% endif %}
       {% if results %}<a href="#results"{% if public_probe_projection.complete %} data-o03-role="detail.result.nav" data-o03-field="text"{% endif %}>赛果</a>{% endif %}
       {% if history_winners %}<a href="#history">历年冠军</a>{% endif %}

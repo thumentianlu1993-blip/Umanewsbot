@@ -13,3 +13,7 @@
 ## CI映射修复复审
 
 首次远端CI在generate-plan阶段报新增模块catalog drift，未执行业务测试。已补10模块领域与django profile、6个新生产文件high_risk、19样本路径、4个views函数及精确文档JSON映射。原生映射审核正常exit0，发现profile缺项和section_gaps直接回归遗漏，两项修复后由同一reviewer聚焦复审PASS。旧规则只增不减，full和unmapped拒绝保持；最终前后指纹`081f336dbc01edbd08ac632250a7d4dc8a1cd9ed9dec451cd45fd9b3d3266c78`。39项工具测试通过；实际collect先RED后GREEN，115个用例均归属django（收集不另算测试通过数量）。远端完整CI待重跑。
+
+## 全量CI直接集成修复
+
+四处修复及五份证据文档经同一reviewer限定复审PASS，无actionable finding；原生审核正常exit0，日志`/tmp/p02-ci-integration-review.OideHw`，SHA`2f64787d22225d53ad1ddc49f46f7d774f66f44bfb374aac01597b34005a8435`。审前、审后及补核指纹一致：`6373aea9e37c9accfee3584a30142c4f5aea2fdb5c5414718fe84fc2abe3a60f`。七组531次执行通过（有重叠），10项主线既有过期skip仍阻塞完整CI；未延期。审后仅回写本审核状态，代码保持冻结。
