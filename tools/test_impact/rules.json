@@ -1524,6 +1524,9 @@
     "server/stable/services/news_content.py": [
       "news_quality"
     ],
+    "server/stable/services/news_numeric_equivalence.py": [
+      "news_quality"
+    ],
     "server/stable/services/news_discovery.py": [
       "news_quality"
     ],

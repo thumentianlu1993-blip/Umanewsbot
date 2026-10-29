@@ -1,7 +1,10 @@
 """T01–T07/T25：全文、引语表格、严格实体跨度与事实审校。"""
+from copy import deepcopy
+
 from django.test import SimpleTestCase
+from stable.services.news_editorial import validate_editorial
 from stable.services.news_content import (
-    ContentBlocked, clean_source, validate_entities, protect_source,
+    AUDIT_CHECKS, ContentBlocked, clean_source, validate_entities, protect_source,
     restore_translation, validate_audit,
 )
 
@@ -101,3 +104,160 @@ class NewsContentTests(SimpleTestCase):
         target = {"title": "官方更新", "summary": "以99马位获胜", "body": "Unknown Horse will race on 27 October.\n\nThe trainer said this is a plan.", "blocks": CLEAN["blocks"]}
         result = validate_audit(CLEAN, target, {"verdict": "pass", "checks": {key: True for key in AUDIT_CHECKS}, "issues": []})
         self.assertFalse(result["passed"])
+
+
+def audit_pair(source, translated, summary="摘要"):
+    clean = {"title": "News", "source_sha": "a" * 64, "clean_sha": "b" * 64,
+             "blocks": [{"id": "b0", "text": source}]}
+    target = {"title": "新闻", "summary": summary, "body": translated,
+              "blocks": [{"id": "b0", "text": translated}]}
+    response = {"verdict": "pass", "checks": {key: True for key in AUDIT_CHECKS}, "issues": []}
+    return validate_audit(clean, target, response)
+
+
+class NumericEquivalenceTests(SimpleTestCase):
+    def test_real_currency_magnitude_conversions(self):
+        for source, target in [
+            ("€725 million; €802 million in 2025", "7.25亿欧元；2025年8.02亿欧元"),
+            ("€26.2 million and €16.5 million", "2620万欧元和1650万欧元"),
+            ("EUR 1,250,000", "125万欧元"),
+        ]:
+            with self.subTest(source=source):
+                self.assertTrue(audit_pair(source, target)["passed"])
+
+    def test_currency_change_amount_change_or_dropped_unit_still_blocks(self):
+        for target in ["7.25万美元", "7.25亿美元", "7.26亿欧元", "725欧元", "725000000"]:
+            with self.subTest(target=target):
+                self.assertFalse(audit_pair("€725 million", target)["passed"])
+
+    def test_real_month_and_chinese_number_conversions(self):
+        for source, target in [
+            ("at the end of August", "8月底"), ("until April", "直到4月"),
+            ("in May", "在五月"), ("gate six", "第6档"),
+            ("Class 2", "第二班"), ("Group 1", "一级赛"), ("G1", "一级赛"),
+            ("6、7割; 10割; 1本", "六、七成；十成；一趟"),
+        ]:
+            with self.subTest(source=source):
+                self.assertTrue(audit_pair(source, target)["passed"])
+
+    def test_ambiguous_may_is_not_invented_as_a_month(self):
+        self.assertFalse(audit_pair("May could win.", "5月可能获胜。")["passed"])
+        self.assertTrue(audit_pair("May could win.", "May可能获胜。")["passed"])
+
+    def test_wrong_month_grade_gate_and_ratio_still_block(self):
+        for source, target in [("in May", "在六月"), ("G1", "二级赛"),
+                               ("Class 2", "第三班"), ("gate six", "第7档"),
+                               ("6割", "七成")]:
+            with self.subTest(source=source):
+                self.assertFalse(audit_pair(source, target)["passed"])
+
+    def test_time_formats_preserve_hour_and_meridiem(self):
+        for source, target in [("6.45pm", "下午6时45分"), ("6:45pm", "18:45"),
+                               ("12.05am", "凌晨0时05分"), ("12.05am", "凌晨12时05分"), ("12.05pm", "中午12时05分")]:
+            with self.subTest(source=source):
+                self.assertTrue(audit_pair(source, target)["passed"])
+
+    def test_changed_time_and_meridiem_still_block(self):
+        for target in ["上午6时45分", "下午6时46分", "下午7时45分", "6.45"]:
+            with self.subTest(target=target):
+                self.assertFalse(audit_pair("6.45pm", target)["passed"])
+
+    def test_equivalent_summary_amount_allowed_but_new_amount_rejected(self):
+        self.assertTrue(audit_pair("€725 million", "7.25亿欧元", "预算7.25亿欧元")["passed"])
+        self.assertFalse(audit_pair("€725 million", "7.25亿欧元", "预算7.26亿欧元")["passed"])
+
+    def test_equivalence_does_not_erase_occurrence_counts(self):
+        self.assertFalse(audit_pair("€725 million; €725 million", "7.25亿欧元")["passed"])
+
+    def test_indefinite_articles_do_not_become_new_numeric_facts(self):
+        self.assertTrue(audit_pair("It was a good year.", "这是很好的一年。")["passed"])
+        self.assertTrue(audit_pair("She won a race.", "她赢了一场比赛。", "一次胜利")["passed"])
+
+    def test_spelled_numbers_can_align_with_explicit_digits(self):
+        self.assertTrue(audit_pair("six runners and a dual winner", "6匹参赛马和2胜马")["passed"])
+        self.assertFalse(audit_pair("six runners", "7匹参赛马")["passed"])
+        self.assertFalse(audit_pair("6 runners and 6 runners", "六匹参赛马")["passed"])
+
+    def test_dollar_odds_are_not_invented_as_a_known_currency(self):
+        self.assertTrue(audit_pair("a $1.4 chance", "赔率1.4")["passed"])
+
+    def test_semantic_audit_failure_cannot_be_overridden(self):
+        clean = {"title": "News", "source_sha": "a" * 64, "clean_sha": "b" * 64,
+                 "blocks": [{"id": "b0", "text": "€725 million"}]}
+        target = {"title": "新闻", "summary": "摘要", "body": "7.25亿欧元",
+                  "blocks": [{"id": "b0", "text": "7.25亿欧元"}]}
+        response = {"verdict": "fail", "checks": {key: True for key in AUDIT_CHECKS}, "issues": []}
+        self.assertFalse(validate_audit(clean, target, response)["passed"])
+
+    def test_mixed_arabic_chinese_money_scales(self):
+        for source, target in [("€10 million", "1千万欧元"), ("€2 million", "2百万欧元")]:
+            with self.subTest(source=source):
+                self.assertTrue(audit_pair(source, target)["passed"])
+        for source, target in [("€110 million", "1千万欧元"), ("€21 million", "2百万欧元")]:
+            with self.subTest(source=source):
+                self.assertFalse(audit_pair(source, target)["passed"])
+
+    def test_unsupported_compound_words_do_not_supply_partial_numbers(self):
+        for source, target in [("twenty-six runners", "6匹参赛马"), ("one hundred runners", "1匹参赛马"),
+                               ("gate twenty-one", "第20档"), ("one hundred and six", "6匹"), ("thirty-six runners", "6匹参赛马"),
+                               ("forty-one runners", "1匹参赛马"), ("twenty–six runners", "6匹参赛马"),
+                               ("thirty six runners", "6匹参赛马"), ("twenty‑six runners", "6匹参赛马"),
+                               ("one and a half lengths", "1马位"), ("two and a quarter lengths", "2马位"),
+                               ("two thirds", "2"), ("one point five", "1"), ("six dozen", "6"),
+                               ("negative six", "6")]:
+            with self.subTest(source=source):
+                self.assertFalse(audit_pair(source, target)["passed"])
+
+    def test_clock_chinese_adjacency_and_race_duration(self):
+        for source, target in [("The race starts at 18:45.", "比赛在18:45开始。"),
+                               ("He won in 1:34.56.", "他以1分34.56秒获胜。")]:
+            with self.subTest(source=source):
+                self.assertTrue(audit_pair(source, target)["passed"])
+        self.assertFalse(audit_pair("He won in 1:34.56.", "他以1分34.57秒获胜。")["passed"])
+
+    def test_explicit_currency_aliases(self):
+        for source, target in [("HK$100", "100港币"), ("US$100", "100美金")]:
+            with self.subTest(source=source):
+                self.assertTrue(audit_pair(source, target)["passed"])
+        self.assertFalse(audit_pair("HK$100", "100美金")["passed"])
+
+
+def policy_response(date_text, canonical="2026-10-22"):
+    text = "Authority France equipment " + date_text
+    values = {"organization": "Authority", "jurisdiction": "France", "scope": "equipment",
+              "effective_date": canonical}
+    originals = {**values, "effective_date": date_text}
+    evidence = {key: {"block_id": "b0", "start": text.index(value),
+                      "end": text.index(value) + len(value)} for key, value in originals.items()}
+    clean = {"title": "Policy", "blocks": [{"id": "b0", "text": text}]}
+    response = {"primary_region": "france", "priority": "regional", "reason": "规则变更",
+                "identity": {"kind": "policy", "fields": values, "evidence": evidence},
+                "comparison": {"event_id": None, "version": 0},
+                "facts": [{"subject_ref": "Authority", "predicate": "approved", "object": "equipment",
+                           "effective_time": canonical, "modality": "happened", "importance": "minor",
+                           "relation": "new", "prior_fact_ids": [],
+                           "source_span": {"block_id": "b0", "start": 17, "end": 26}}]}
+    return clean, response
+
+
+class EditorialDateEquivalenceTests(SimpleTestCase):
+    def test_full_dates_can_match_iso_identity(self):
+        for text in ["October 22, 2026", "22 October 2026", "2026年10月22日", "2026-10-22"]:
+            with self.subTest(text=text):
+                clean, response = policy_response(text)
+                self.assertTrue(validate_editorial(clean, response, source_scope="france_galop_news")["identity_key"])
+
+    def test_different_partial_invalid_or_ambiguous_dates_do_not_match(self):
+        for text in ["October 23, 2026", "October 22", "22/10/2026", "2026-02-30",
+                     "October 22, 2026 planned", "October 22, 2025"]:
+            with self.subTest(text=text):
+                clean, response = policy_response(text)
+                with self.assertRaises(ContentBlocked):
+                    validate_editorial(clean, response, source_scope="france_galop_news")
+
+    def test_date_equivalence_does_not_repair_other_bad_evidence_spans(self):
+        clean, response = policy_response("October 22, 2026")
+        response = deepcopy(response)
+        response["identity"]["evidence"]["scope"]["end"] -= 1
+        with self.assertRaisesRegex(ContentBlocked, "identity_evidence_mismatch"):
+            validate_editorial(clean, response, source_scope="france_galop_news")

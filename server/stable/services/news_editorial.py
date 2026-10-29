@@ -170,6 +170,10 @@ def validate_editorial(clean, response, *, source_scope, candidates=(), aliases=
             expected = f"date:{original}:{identity['kind']}" if re.fullmatch(r"\d{4}-\d{2}-\d{2}", original) else f"announcement:{source_scope}:{original}"
             if value != expected and aliases.get(expected) != value:
                 raise ContentBlocked("episode_identity_unverified")
+        elif key == "effective_date":
+            from stable.services.news_numeric_equivalence import same_explicit_date
+            if not same_explicit_date(value, original):
+                raise ContentBlocked("identity_evidence_mismatch")
         elif norm(value) != norm(original):
             raise ContentBlocked("identity_evidence_mismatch")
     key = identity_key(identity["kind"], fields, source_scope=source_scope, aliases=aliases)
