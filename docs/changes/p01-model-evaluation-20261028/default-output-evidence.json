@@ -1,0 +1,41 @@
+{
+  "status": "SINGLE_ENTITY_PROBE_PASSED",
+  "sample_id": 22726,
+  "calls": 1,
+  "finish_reason": "stop",
+  "usage": {
+    "prompt_tokens": 1038,
+    "completion_tokens": 12549,
+    "total_tokens": 13587,
+    "prompt_tokens_details": {
+      "cached_tokens": 1024
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 12225
+    },
+    "prompt_cache_hit_tokens": 1024,
+    "prompt_cache_miss_tokens": 14
+  },
+  "usage_cost_usd": "0.049757576",
+  "peak_cost_upper_usd": "0.0510642",
+  "aggregate_upper_usd": "1.16650380",
+  "elapsed_seconds": 137.20854955725372,
+  "validated_entity_count": 12,
+  "new_unknown": 0,
+  "old_unknown_reserve_usd": "0.03872088",
+  "remote_receipt_verified": true,
+  "validator_container_absent": true,
+  "max_tokens_omitted": true,
+  "provider_default_tokens": 65536,
+  "package_sha256": "c4aa88d131e2daeac0d5dc5ba44bc623542c0e536348bb78a8bde67c10edc1aa",
+  "artifact_sha256": {
+    "package.json": "c4aa88d131e2daeac0d5dc5ba44bc623542c0e536348bb78a8bde67c10edc1aa",
+    "approval.json": "22634509add64f05422f4aa207269c2aef3c34e3102af23a6d8ec6799e4c464d",
+    "results/4848679b1da1343cbdd0ba9540e3d6e0f6d0e76fa4a1bccca055ae6b78fd03b7-receipt.json": "5d9f2a82e65aaa05dcce7af9bcba6a9f36c88ee1bd681e14ed1f978c8c747574",
+    "results/4848679b1da1343cbdd0ba9540e3d6e0f6d0e76fa4a1bccca055ae6b78fd03b7-request.json": "b104e7db576b5084370c0e92c31046ad768249514486b430aab64e4dc4b4c90c",
+    "results/4848679b1da1343cbdd0ba9540e3d6e0f6d0e76fa4a1bccca055ae6b78fd03b7-transport.json": "7360349271ebf1e1e28906b56fe6aef84dea6791cc2fab8a915f3991059e66d4",
+    "results/article-22726.json": "cd44e222fea3326a27558d25e3f652ff5a974a3f7cb53ddf9a29b811c14688ff",
+    "results/ledger.json": "50d7d70e07aefb9ec124d1a247307fa304f6179f82a5fedd3aa8216b6a45c7c5",
+    "results/summary.json": "449e4a1083bab30058a0a71612515e23f7ac8ed45ffdca5dfe53d8f53265f9e8"
+  }
+}

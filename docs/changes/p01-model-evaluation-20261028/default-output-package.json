@@ -1,0 +1,80 @@
+{
+  "schema": "p01-pro-default-output-probe-v1",
+  "status": "AUTHORIZED",
+  "source_commit": "0cd55393755b7285163a4638f8a814817d7f5041",
+  "date": "2026-10-29",
+  "samples": [
+    {
+      "id": 22726,
+      "source_url": "https://news.sp.netkeiba.com/?pid=news_view&no=346910",
+      "source_site": "netkeiba",
+      "title": "【天皇賞・秋】ラストランのセイウンハーデスは上昇気配　橋口調教師「馬体の張りも上昇」",
+      "region": "japan",
+      "raw_sha256": "2d9dea1fd51a19a697ad710c3489e56311d928083988a675637273f6eb4231fd",
+      "clean_sha": "4eb5db98be1a1dda15d52483c060232f9c5d6d71e9e122f1ab787809cea17640"
+    }
+  ],
+  "prompt_sha256": {
+    "entity_check": "f364ec3b81fd2304b66bd0db39537e8b42dde890dc2c7a5240b31c022ae03f8d",
+    "event_classify": "054a393927b7b82e421e986aee1dd45e2be6120094fb78a61606dbff5fca44c8"
+  },
+  "provider": "DeepSeek",
+  "endpoint": "https://api.deepseek.com/chat/completions",
+  "model": "deepseek-v4-pro",
+  "thinking": "enabled",
+  "stages": [
+    "entity_check"
+  ],
+  "max_calls": 1,
+  "max_entity_attempts_per_article": 1,
+  "max_event_attempts_per_article": 0,
+  "max_input_bytes": 50000,
+  "max_system_prompt_bytes": 1792,
+  "reserved_envelope_tokens": 2048,
+  "max_output_tokens": null,
+  "http_timeout_seconds": 1200,
+  "transport_timeout_seconds": 1230,
+  "concurrency": 1,
+  "price_basis": "peak USD per million; no cache discounts assumed",
+  "input_price": "1.32",
+  "output_price": "3.96",
+  "price_source": "https://api-docs.deepseek.com/quick_start/pricing/",
+  "price_verified_date": "2026-10-29",
+  "maximum_calculated_usd": "1.62579264",
+  "hard_budget_usd": "20.00",
+  "aggregate_old_upper_plus_new_hard_cap_usd": null,
+  "old_unknown": {
+    "seq": 56,
+    "id": 22730,
+    "reservation_usd": "0.03872088",
+    "state": "unknown",
+    "proposed_policy": "retain full maximum charge in aggregate budget; do not retry or mark reconciled; permit independent 3-article smoke only after explicit approval"
+  },
+  "new_unknown_policy": "stop, retain reservation, read existing remote receipt only; no resend",
+  "remote_receipt_directory": "/tmp/umanews-p01-eval-20261029",
+  "tools": false,
+  "production_db_writes": false,
+  "configuration_changes": false,
+  "publish": false,
+  "auto_expand_to_20": false,
+  "runtime_sha256": {
+    "config.json": "f4ff8a65fcdd1abc2217450221b91f0abfdd927e6d07520d65e7a59b602fabc7",
+    "inputs.json": "f3283756602f5252b756fa5bfdba326757ab1a9537339eb5676656af0c8f0b78",
+    "journal_proxy.py": "6f40f4873c9c96defba026603bc020e0ed0ecb97cbb3896a34c40aa778258bbd",
+    "validate.py": "d5f69356707a70a8c8d18cc8326d47370e34a4ba94dd7e0fdee06cbcda8a2a45",
+    "run-smoke.py": "dcd2458a824775f4c3fa746588e45d5c9a9f4852fcbf84aed6ae462df2b7b26a",
+    "test_proxy.py": "a903412281d1fb3c0d0c6dd156d2e1871b879c5423f9c82e92bf3edbecb53a66"
+  },
+  "offline_proxy_tests": {
+    "run": 5,
+    "passed": 5
+  },
+  "model_calls_executed": 0,
+  "reasoning_effort": "provider_default_high",
+  "baseline_package_sha256": "0dedc3a1b26e7d81e080bc0035dc307674192fff7de256b9e031c2f481c791fc",
+  "provider_default_output_tokens": 65536,
+  "reservation_output_tokens": 393216,
+  "budget_scope": "aggregate_all_evaluation_runs",
+  "prior_aggregate_upper_usd": "1.11543960",
+  "authorization": "用户：OK，在本次测试中，取消单次token上限；先验证一篇，累计20美元"
+}
