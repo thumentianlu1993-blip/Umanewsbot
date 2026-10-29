@@ -23,3 +23,11 @@
 - [x] (operations) 提交633fecc5完整CI 40813370000通过6990项/51批，failure/error/skip=0；候选目录外交付核验verified。新提交另看当前检查。
 
 - [x] (application) 修复全量CI发现的改期测试日期碰撞；新增日期不变量回归，26项PG测试及原reviewer审核通过，未改生产代码。
+
+## 第3项目标与容量冻结准备（2026-10-29）
+
+- [x] (operations) 只读事务盘点完整未来canonical清单及历史空确认、七天候选库存，保存固定摘要；未改生产。
+- [x] (integration) 固定79场/25已知重点/25重点未知/29已知非重点基线与逐host预算台账，全部未知来源/额度保留阻断；见[报告](../p02-target-capacity-20261029/report.md)。
+- [ ] (integration) 完整独立地区分母、逐场身份、历史义务归属、来源许可/额度及请求链成本闭合。
+- [ ] (application) 容量准入合同补齐未确认首日6次复查与实际全库存/多链成本并完成拒绝测试。
+- [x] (operations) 独立评审冻结准备包并复验，P2修正后原reviewer及原生复审PASS；第3项生产冻结仍未完成，见[评审](../p02-target-capacity-20261029/review.md)。
