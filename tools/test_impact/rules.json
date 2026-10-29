@@ -36,7 +36,10 @@
     "docs/changes/p02-release-candidate-20261028/dependency-manifest.json",
     "docs/changes/p02-release-candidate-20261028/fixture-manifest.json",
     "docs/changes/p02-release-candidate-20261028/migration-proof.json",
-    "docs/changes/p02-release-candidate-20261028/validation.json"
+    "docs/changes/p02-release-candidate-20261028/validation.json",
+    "docs/changes/p02-source-capabilities-20261029/evidence.json",
+    "docs/changes/p02-source-capabilities-20261029/matrix.json",
+    "docs/changes/p02-source-capabilities-20261029/validation.json"
   ],
   "high_risk": [
     ".codex/agents/application.toml",
