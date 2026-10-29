@@ -1,0 +1,221 @@
+{
+  "calls": 9,
+  "settled": 9,
+  "new_unknown": 0,
+  "usage_cost_usd": "0.236053752",
+  "peak_no_cache_upper_usd": "0.24438348",
+  "aggregate_upper_including_old_unknown_usd": "1.11543960",
+  "old_unknown_reserve_usd": ".03872088",
+  "articles": [
+    {
+      "id": 22700,
+      "event": {
+        "valid": false,
+        "error": "ContentBlocked:editorial_schema"
+      },
+      "entity_attempts": [
+        {
+          "valid": false,
+          "error": "ContentBlocked:entity_schema_or_coverage"
+        },
+        {
+          "valid": false,
+          "error": "ContentBlocked:entity_schema_or_coverage"
+        }
+      ]
+    },
+    {
+      "id": 22715,
+      "event": {
+        "valid": true,
+        "result": {
+          "comparison": {
+            "event_id": null,
+            "version": 0
+          },
+          "facts": [],
+          "identity": {},
+          "primary_region": "hong_kong",
+          "priority": "reject",
+          "reason": "Routine race preview with trainer quotes about upcoming Class Three races at Sha Tin; no significant event development, no complete identity fields such as race date or source race ID, and no incremental hard news beyond stable expectations.",
+          "identity_key": null
+        }
+      },
+      "entity_attempts": [
+        {
+          "valid": false,
+          "error": "ContentBlocked:entity_schema_or_coverage"
+        },
+        {
+          "valid": false,
+          "error": "ContentBlocked:entity_schema_or_coverage"
+        }
+      ]
+    },
+    {
+      "id": 22726,
+      "event": {
+        "valid": true,
+        "result": {
+          "comparison": {
+            "event_id": null,
+            "version": 0
+          },
+          "facts": [],
+          "identity": {},
+          "primary_region": "japan",
+          "priority": "uncertain",
+          "reason": "文章报道セイウンハーデス将在天皇赏秋后退役，但未提供明确退役日期或公告编号，无法构建完整identity，故priority为uncertain。",
+          "identity_key": null
+        }
+      },
+      "entity_attempts": [
+        {
+          "valid": false,
+          "error": "ContentBlocked:entity_schema_or_coverage"
+        },
+        {
+          "valid": false,
+          "error": "ContentBlocked:entity_schema_or_coverage"
+        }
+      ]
+    }
+  ],
+  "call_details": [
+    {
+      "id": 22726,
+      "stage": "event_classify",
+      "attempt": 0,
+      "finish_reason": "stop",
+      "reasoning_tokens": 1181,
+      "completion_tokens": 1278,
+      "elapsed_seconds": 22.774137096479535,
+      "usage_cost_usd": "0.00746592"
+    },
+    {
+      "id": 22726,
+      "stage": "entity_check",
+      "attempt": 0,
+      "finish_reason": "length",
+      "reasoning_tokens": 8192,
+      "completion_tokens": 8192,
+      "elapsed_seconds": 107.79866164550185,
+      "usage_cost_usd": "0.03381048"
+    },
+    {
+      "id": 22726,
+      "stage": "entity_check",
+      "attempt": 1,
+      "finish_reason": "length",
+      "reasoning_tokens": 8192,
+      "completion_tokens": 8192,
+      "elapsed_seconds": 101.28797802980989,
+      "usage_cost_usd": "0.032503856"
+    },
+    {
+      "id": 22715,
+      "stage": "event_classify",
+      "attempt": 0,
+      "finish_reason": "stop",
+      "reasoning_tokens": 1676,
+      "completion_tokens": 1778,
+      "elapsed_seconds": 33.1897319983691,
+      "usage_cost_usd": "0.01031976"
+    },
+    {
+      "id": 22715,
+      "stage": "entity_check",
+      "attempt": 0,
+      "finish_reason": "length",
+      "reasoning_tokens": 8192,
+      "completion_tokens": 8192,
+      "elapsed_seconds": 94.71726863458753,
+      "usage_cost_usd": "0.034683"
+    },
+    {
+      "id": 22715,
+      "stage": "entity_check",
+      "attempt": 1,
+      "finish_reason": "length",
+      "reasoning_tokens": 8192,
+      "completion_tokens": 8192,
+      "elapsed_seconds": 104.94743631221354,
+      "usage_cost_usd": "0.032559736"
+    },
+    {
+      "id": 22700,
+      "stage": "event_classify",
+      "attempt": 0,
+      "finish_reason": "stop",
+      "reasoning_tokens": 1939,
+      "completion_tokens": 3832,
+      "elapsed_seconds": 50.6377176521346,
+      "usage_cost_usd": "0.01741828"
+    },
+    {
+      "id": 22700,
+      "stage": "entity_check",
+      "attempt": 0,
+      "finish_reason": "length",
+      "reasoning_tokens": 8192,
+      "completion_tokens": 8192,
+      "elapsed_seconds": 90.67061739601195,
+      "usage_cost_usd": "0.034626328"
+    },
+    {
+      "id": 22700,
+      "stage": "entity_check",
+      "attempt": 1,
+      "finish_reason": "length",
+      "reasoning_tokens": 8192,
+      "completion_tokens": 8192,
+      "elapsed_seconds": 94.32603359408677,
+      "usage_cost_usd": "0.032666392"
+    }
+  ],
+  "remote_receipts_verified": 9,
+  "latency_p50": 94.32603359408677,
+  "latency_max": 107.79866164550185,
+  "package_sha256": "557ceae50795e67dac53763c25d70332d2e627f55be9f421a5a83884cde8ad18",
+  "artifact_sha256": {
+    "approval.json": "af4e5eeda67727836989c34568355dc172da2acb8673a0aa3afb48da88329992",
+    "package.json": "557ceae50795e67dac53763c25d70332d2e627f55be9f421a5a83884cde8ad18",
+    "results/1fbf383347981934fbd183749dcae3a5c80e20ba6447ea9816bdd3df2bd4bf31-receipt.json": "b560c55c89bbde175ed320f775bf41bc7893b7cb4596e5d409737be1f874e7fb",
+    "results/1fbf383347981934fbd183749dcae3a5c80e20ba6447ea9816bdd3df2bd4bf31-request.json": "dd37f13218ed09f503e2e20495cb7a14209488632954070f382d8cc49a10a025",
+    "results/1fbf383347981934fbd183749dcae3a5c80e20ba6447ea9816bdd3df2bd4bf31-transport.json": "7360349271ebf1e1e28906b56fe6aef84dea6791cc2fab8a915f3991059e66d4",
+    "results/2d78f32a68d80d5536d6cfc916936e59795e5b6240fba7a1eb6620af740a65e7-receipt.json": "a13ee0aca9ea422fedd553e46b313abf8523ff8bdf28a4a6bd606745c4b3d850",
+    "results/2d78f32a68d80d5536d6cfc916936e59795e5b6240fba7a1eb6620af740a65e7-request.json": "74d552d14f55bc4e7208cde8bf09cfc1185f748645c0c8fe332858c90da21f8d",
+    "results/2d78f32a68d80d5536d6cfc916936e59795e5b6240fba7a1eb6620af740a65e7-transport.json": "7360349271ebf1e1e28906b56fe6aef84dea6791cc2fab8a915f3991059e66d4",
+    "results/4182f770367bbe7eb00dab0765bc717187684bdf1dae4820b45a38ab1e7a9645-receipt.json": "a9080671c547020875e26a366a4a8481fcb132f2638a5996a1880d6aeb1f49b5",
+    "results/4182f770367bbe7eb00dab0765bc717187684bdf1dae4820b45a38ab1e7a9645-request.json": "5a8aa46666e2bd82975761d6c7e243b746650b9afed8d05f54e1ddfd744c2e01",
+    "results/4182f770367bbe7eb00dab0765bc717187684bdf1dae4820b45a38ab1e7a9645-transport.json": "7360349271ebf1e1e28906b56fe6aef84dea6791cc2fab8a915f3991059e66d4",
+    "results/527d971e77b89c0f540c8b05a87095891a1311f21c235ae2bd461e41d6012681-receipt.json": "d84a4f830feb543ccb91526527a9c935f88022b473ac4bf360b96eb2b4fcf185",
+    "results/527d971e77b89c0f540c8b05a87095891a1311f21c235ae2bd461e41d6012681-request.json": "0c9404295406c97edd08c1e2074f378e0a41e1420341ca9a7203f6629f241762",
+    "results/527d971e77b89c0f540c8b05a87095891a1311f21c235ae2bd461e41d6012681-transport.json": "7360349271ebf1e1e28906b56fe6aef84dea6791cc2fab8a915f3991059e66d4",
+    "results/7f0c93dacddcd9caafbbbf439508360b531e7a73a62de3f69e5f5f407ef8c44e-receipt.json": "576202dbf91bb6bb4114d732a4b62a78e35989e9b52e5f627a05a49c624d1ded",
+    "results/7f0c93dacddcd9caafbbbf439508360b531e7a73a62de3f69e5f5f407ef8c44e-request.json": "ddbb15acdfb0739fe720f8618d9e2d280e4b2cb221b79cfe58e437c177d77c5f",
+    "results/7f0c93dacddcd9caafbbbf439508360b531e7a73a62de3f69e5f5f407ef8c44e-transport.json": "7360349271ebf1e1e28906b56fe6aef84dea6791cc2fab8a915f3991059e66d4",
+    "results/93e3d5f910ebbde77e8c49ef47538111dbe5239ca17c671815eab5b32abd30ca-receipt.json": "f6d97b61b4758c91a6e1fd59864268a4edc488f632106d643e3c7a8811726a34",
+    "results/93e3d5f910ebbde77e8c49ef47538111dbe5239ca17c671815eab5b32abd30ca-request.json": "a2c1f8d4acbf3c12705d0170e4b495423b00501dbc7c1996c112ec4eec1a1d79",
+    "results/93e3d5f910ebbde77e8c49ef47538111dbe5239ca17c671815eab5b32abd30ca-transport.json": "7360349271ebf1e1e28906b56fe6aef84dea6791cc2fab8a915f3991059e66d4",
+    "results/9ada604b91fdf39f6742dad4c3c0734774db1b2808794d87f0d81cda59a1b135-receipt.json": "e48e842748691e801c8f6887e43810d6eebae151dbf34e84c56b9bed915f7adc",
+    "results/9ada604b91fdf39f6742dad4c3c0734774db1b2808794d87f0d81cda59a1b135-request.json": "ae98cf3e342071971a1ef7e14fae361fc3334a5d33748ce1b0a3eb09a1d50138",
+    "results/9ada604b91fdf39f6742dad4c3c0734774db1b2808794d87f0d81cda59a1b135-transport.json": "7360349271ebf1e1e28906b56fe6aef84dea6791cc2fab8a915f3991059e66d4",
+    "results/article-22700.json": "5e1132d4f9fe063a1e02cbfc7dff723168ac237c85b4ccd3da7a509e316857b8",
+    "results/article-22715.json": "0864b62008b334cf0e144fd27c895fac7c2385b05f45eeb53241e01697515ab7",
+    "results/article-22726.json": "8ed492089c9e22d4123ec84e73d7becaf10f098470c8bcb69643b6b8cc348de9",
+    "results/c6bf780d87fb3b2ee3f6fcfdde82096b67de3472fc042a781261974ae8d24a66-receipt.json": "9ea15456c59c28d61c71e87986e76ee51ba03326276ebfb99513241238be81c2",
+    "results/c6bf780d87fb3b2ee3f6fcfdde82096b67de3472fc042a781261974ae8d24a66-request.json": "10783cdeec9a206d2bf0c5cbe3942f04b7d22b3628377d67307647f2925f89a6",
+    "results/c6bf780d87fb3b2ee3f6fcfdde82096b67de3472fc042a781261974ae8d24a66-transport.json": "7360349271ebf1e1e28906b56fe6aef84dea6791cc2fab8a915f3991059e66d4",
+    "results/f40fa61966bfa7b980cded4ad83b23579bd80e68f1ab8b7ec437251c10e6df3f-receipt.json": "3f5a8df942953d28808282970b976d4f4ddca4394a0fbbe923a9f56b3be017ab",
+    "results/f40fa61966bfa7b980cded4ad83b23579bd80e68f1ab8b7ec437251c10e6df3f-request.json": "cdf561b5b34e8c3740e0ecdd391d7fbd0d370598b1aa44090d75027ba040edf0",
+    "results/f40fa61966bfa7b980cded4ad83b23579bd80e68f1ab8b7ec437251c10e6df3f-transport.json": "7360349271ebf1e1e28906b56fe6aef84dea6791cc2fab8a915f3991059e66d4",
+    "results/ledger.json": "86441b9a0f53f6204ef3ccef76ba8b28a3ef6f2a9c423661a156b42b4327f079",
+    "results/summary.json": "e37275162876234047a339df711c42d6a5bffae20c5fa38e1cdb64052da4a6ff"
+  },
+  "validator_container_absent": true,
+  "status": "COMPLETED_SMOKE_NOT_PASSED",
+  "production_writes": 0,
+  "full_20_retest_started": false,
+  "approval": "用户：可以，用pro吧；沿用同3篇和提示词，Pro开启思考，独立1美元上限计入原21美元预算；旧unknown最高预约保留"
+}

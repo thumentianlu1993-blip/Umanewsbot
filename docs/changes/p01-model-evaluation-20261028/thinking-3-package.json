@@ -1,0 +1,94 @@
+{
+  "schema": "p01-pro-thinking-smoke-v1",
+  "status": "AUTHORIZED",
+  "source_commit": "0cd55393755b7285163a4638f8a814817d7f5041",
+  "date": "2026-10-29",
+  "samples": [
+    {
+      "id": 22726,
+      "source_url": "https://news.sp.netkeiba.com/?pid=news_view&no=346910",
+      "source_site": "netkeiba",
+      "title": "【天皇賞・秋】ラストランのセイウンハーデスは上昇気配　橋口調教師「馬体の張りも上昇」",
+      "region": "japan",
+      "raw_sha256": "2d9dea1fd51a19a697ad710c3489e56311d928083988a675637273f6eb4231fd",
+      "clean_sha": "4eb5db98be1a1dda15d52483c060232f9c5d6d71e9e122f1ab787809cea17640"
+    },
+    {
+      "id": 22715,
+      "source_url": "https://www.scmp.com/sport/racing/article/3372320/caspar-fownes-has-sky-high-hopes-class-three-duo-sha-tins-all-weather-meeting",
+      "source_site": "scmp_racing",
+      "title": "Fownes has Sky-high hopes for Class Three duo at dirt meeting",
+      "region": "hong_kong",
+      "raw_sha256": "d9078e5b98c0aaccae1293f12b75654e31e7b24d0de29b0a88123ab4aed52b6e",
+      "clean_sha": "9d520f007efe89a9dee523a883f42742e63d458cac6efe940a9465446d3031a9"
+    },
+    {
+      "id": 22700,
+      "source_url": "https://racingnews.hkjc.com/english/2026/10/27/orman-confident-top-dragon-can-handle-dirt-debut-at-sha-tin/",
+      "source_site": "hkjc_news",
+      "title": "Orman confident Top Dragon can handle dirt debut at Sha Tin",
+      "region": "hong_kong",
+      "raw_sha256": "fb6e1cfda82cd0aa4f745c14ae92f1776e5675946b768bdfffde5f3c71519ec2",
+      "clean_sha": "b6e559e22e43b636331a1b5b926fbf66b9041bcd8b983abf0154e51e0bc7f2fc"
+    }
+  ],
+  "prompt_sha256": {
+    "entity_check": "f364ec3b81fd2304b66bd0db39537e8b42dde890dc2c7a5240b31c022ae03f8d",
+    "event_classify": "054a393927b7b82e421e986aee1dd45e2be6120094fb78a61606dbff5fca44c8"
+  },
+  "provider": "DeepSeek",
+  "endpoint": "https://api.deepseek.com/chat/completions",
+  "model": "deepseek-v4-pro",
+  "thinking": "enabled",
+  "stages": [
+    "event_classify",
+    "entity_check"
+  ],
+  "max_calls": 9,
+  "max_entity_attempts_per_article": 2,
+  "max_event_attempts_per_article": 1,
+  "max_input_bytes": 50000,
+  "max_system_prompt_bytes": 1792,
+  "reserved_envelope_tokens": 2048,
+  "max_output_tokens": 8192,
+  "http_timeout_seconds": 180,
+  "transport_timeout_seconds": 210,
+  "concurrency": 1,
+  "price_basis": "peak USD per million; no cache discounts assumed",
+  "input_price": "1.32",
+  "output_price": "3.96",
+  "price_source": "https://api-docs.deepseek.com/quick_start/pricing/",
+  "price_verified_date": "2026-10-29",
+  "maximum_calculated_usd": "0.91029312",
+  "hard_budget_usd": "1.00",
+  "aggregate_old_upper_plus_new_hard_cap_usd": "1.87105612",
+  "old_unknown": {
+    "seq": 56,
+    "id": 22730,
+    "reservation_usd": "0.03872088",
+    "state": "unknown",
+    "proposed_policy": "retain full maximum charge in aggregate budget; do not retry or mark reconciled; permit independent 3-article smoke only after explicit approval"
+  },
+  "new_unknown_policy": "stop, retain reservation, read existing remote receipt only; no resend",
+  "remote_receipt_directory": "/tmp/umanews-p01-eval-20261029",
+  "tools": false,
+  "production_db_writes": false,
+  "configuration_changes": false,
+  "publish": false,
+  "auto_expand_to_20": false,
+  "runtime_sha256": {
+    "config.json": "f4ff8a65fcdd1abc2217450221b91f0abfdd927e6d07520d65e7a59b602fabc7",
+    "inputs.json": "2c2ec1d0bc80dca0e82998e812a31e8ce03e0b4eed0be1d02d32d51f06672d09",
+    "journal_proxy.py": "28bedc0a9e984cd44842224b79f2af00ce875754758e02a1c3c8121440a42bf3",
+    "validate.py": "d5f69356707a70a8c8d18cc8326d47370e34a4ba94dd7e0fdee06cbcda8a2a45",
+    "run-smoke.py": "89e3be8801830b11d8f68507f3add7a54c31bb41ae3bb77314b9a7a22e31f216",
+    "test_proxy.py": "6fdc0b1b23879872c45cf05f19ecd45fd71f3be3d89e8aa7d364dc0d63c740ae"
+  },
+  "offline_proxy_tests": {
+    "run": 5,
+    "passed": 5
+  },
+  "model_calls_executed": 0,
+  "reasoning_effort": "provider_default_high",
+  "baseline_package_sha256": "0dedc3a1b26e7d81e080bc0035dc307674192fff7de256b9e031c2f481c791fc"
+}
