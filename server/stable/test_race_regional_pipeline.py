@@ -3,6 +3,7 @@
 身份审核、历史正式名单及容量是明确的合成前置；HTML 是裁剪公开样本。
 此文件证明接线，不把合成前置转换为生产权限或真实时效结论。
 """
+from stable.test_race_lifecycle_capacity import synthetic_capacity
 
 from datetime import datetime, timedelta
 from types import SimpleNamespace
@@ -242,7 +243,7 @@ class RegionalPipelineTests(TestCase):
                 )
             decision = attach_multisource_observation(value, policy=policy, now=now)
             self.assertEqual(decision.action, "acquired", decision)
-            capacity = dict(
+            capacity = synthetic_capacity(
                 targets=[
                     dict(key=f"canonical:{event.pk}", region=r.region, key_race=True)
                 ],

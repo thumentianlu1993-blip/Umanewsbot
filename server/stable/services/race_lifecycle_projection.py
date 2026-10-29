@@ -733,48 +733,96 @@ def execute_delivery(row, *, now, fetcher=None):
         record_probe_repairs(receipt, publication=publication, now=observed)
 
 
-def source_capacity_report(*, targets, proofs, budgets):
+def _capacity_refs(value):
+    return isinstance(value, list) and bool(value) and all(isinstance(v, str) and v.strip() for v in value)
+
+
+def _capacity_keys(value):
+    return _capacity_refs(value) and len(set(value)) == len(value)
+
+
+def _capacity_proof_covers(proof, target):
+    return (isinstance(proof, dict) and proof.get('region') == target['region']
+        and _capacity_keys(proof.get('target_keys')) and target['key'] in proof['target_keys']
+        and all(proof.get(k) is True for k in (
+            'identity', 'schedule', 'confirmed_card', 'withdrawal', 'complete_result',
+            'correction', 'automated_use_permitted', 'request_costs_verified', 'quota_verified'))
+        and all(_capacity_refs(proof.get(k)) for k in (
+            'evidence_refs', 'cost_evidence_refs', 'use_evidence_refs', 'quota_evidence_refs'))
+        and proof.get('discovery') == 'full'
+        and 'extra_requests_per_hour' in proof)
+
+
+def source_capacity_report(*, targets, proofs, budgets, inventory=None):
     """只计算全库存所需额度；来源 proof 由固定 manifest 提供，不自行推断授权。"""
-    import math
     from stable.services.race_data_source_adapters import REGIONS
-    if not isinstance(targets, list) or len(targets) > 1000 or len({t['key'] for t in targets}) != len(targets):
+    from urllib.parse import urlsplit
+    if (not isinstance(targets, list) or len(targets) > 1000
+            or any(not isinstance(t, dict) or not isinstance(t.get('key'), str) or not t['key'].strip() for t in targets)
+            or len({t['key'] for t in targets}) != len(targets)):
         raise ValueError("capacity_targets_invalid")
+    if not isinstance(proofs, list) or not isinstance(budgets, dict):
+        raise ValueError('capacity_inputs_invalid')
+    inventory = inventory if isinstance(inventory, dict) else {}
+    inventory_ok = (inventory.get('verified') is True and _capacity_refs(inventory.get('evidence_refs'))
+        and _capacity_keys(inventory.get('target_keys'))
+        and set(inventory['target_keys']) == {t['key'] for t in targets})
+    other_loads = inventory.get('other_requests_per_hour', {})
+    if not isinstance(other_loads, dict):
+        raise ValueError('capacity_other_loads_invalid')
     hosts, gaps, selected = {}, {}, {}
     for target in targets:
         key = target['key']
         if target.get('region') not in REGIONS or type(target.get('key_race')) is not bool:
             raise ValueError("capacity_target_region_or_priority")
-        candidates = [p for p in proofs if p.get('region') == target['region']
-            and all(p.get(k) is True for k in ('identity', 'confirmed_card', 'complete_result', 'correction'))
-            and p.get('evidence_refs') and p.get('discovery') == 'full']
+        candidates = [p for p in proofs if _capacity_proof_covers(p, target)]
         if not candidates:
             gaps[key] = ['source_capabilities_missing']
             continue
         verified = [p for p in candidates if p.get('runtime_verified') is True]
-        candidates = verified or candidates
+        # 未核验备源也保留在成本与缺口中，不能借主源通过将其隐藏。
         selected[key] = candidates
         for proof in candidates:
             requests = proof.get('requests_per_fetch')
             if type(requests) is not int or not 1 <= requests <= 10:
                 raise ValueError("capacity_request_cost")
-            host = proof['host']
+            extra = proof['extra_requests_per_hour']
+            if type(extra) is not int or extra < 0:
+                raise ValueError('capacity_extra_request_cost')
+            host = proof.get('host')
+            if (not isinstance(host, str) or not host or urlsplit('https://' + host).hostname != host
+                    or any(c in host for c in '/:@?#')):
+                raise ValueError('capacity_host_invalid')
+            if not isinstance(proof.get('provider'), str) or not proof['provider'].strip():
+                raise ValueError('capacity_provider_invalid')
             bucket = hosts.setdefault(host, {'base_per_hour': 0, 'required_per_hour': 0, 'capacity_ok': False})
             # 每个可切换来源都覆盖全部追踪库存，不能借用另一 host 的空闲额度。
-            bucket['base_per_hour'] += requests * (3600 / (60 if target['key_race'] else 120) + 4)
-        if not verified:
+            # 6涵盖未确认首日复查峰值；requests含同host全部有效模块/配对页，extra显式计重试和寻址。
+            bucket['base_per_hour'] += requests * ((60 if target['key_race'] else 30) + 6) + extra
+        if len(verified) != len(candidates):
             gaps[key] = ['source_runtime_unverified']
     for host, bucket in hosts.items():
         limit = budgets.get(host)
         if limit is not None and (type(limit) is not int or limit < 0):
             raise ValueError("capacity_budget_invalid")
-        bucket['required_per_hour'] = math.ceil(bucket['base_per_hour'] / 0.7)
+        other = other_loads.get(host)
+        if other is not None and (type(other) is not int or other < 0):
+            raise ValueError('capacity_other_request_cost')
+        if other is not None:
+            bucket['base_per_hour'] += other
+        bucket['other_requests_per_hour'] = other
+        bucket['required_per_hour'] = (bucket['base_per_hour'] * 10 + 6) // 7
         bucket['approved_per_hour'] = limit
-        bucket['capacity_ok'] = limit is not None and limit >= bucket['required_per_hour']
+        bucket['capacity_ok'] = other is not None and limit is not None and limit >= bucket['required_per_hour']
     for key, proofs_for_target in selected.items():
         if any(not hosts[proof['host']]['capacity_ok'] for proof in proofs_for_target):
             gaps.setdefault(key, []).append('request_capacity_gap')
+    if not inventory_ok:
+        for target in targets:
+            gaps.setdefault(target['key'], []).append('inventory_unverified')
     return dict(targets=len(targets), ready=len(targets)-len(gaps), gaps=gaps, hosts=hosts,
-                strategy='full_fetch', reserve=0.3, manifest_sha256=canonical_sha(dict(targets=targets, proofs=proofs, budgets=budgets)))
+                strategy='full_fetch', reserve=0.3, rechecks_per_hour=6,
+                manifest_sha256=canonical_sha(dict(targets=targets, proofs=proofs, budgets=budgets, inventory=inventory)))
 
 
 def capacity_manifest(*, now):
@@ -793,7 +841,7 @@ def capacity_manifest(*, now):
     from stable.services.race_data_source_adapters import aware
     if not aware(value['valid_from']) <= now < aware(value['valid_until']):
         raise ValueError('capacity_manifest_expired')
-    report = source_capacity_report(targets=value['targets'], proofs=value['proofs'], budgets=value['budgets'])
+    report = source_capacity_report(targets=value['targets'], proofs=value['proofs'], budgets=value['budgets'], inventory=value.get('inventory'))
     if report['ready'] != report['targets'] or not report['targets']:
         raise ValueError('capacity_not_ready')
     keys = {t['key'] for t in value['targets']}
@@ -918,10 +966,12 @@ def capacity_allows_source(manifest, *, event, source):
     from urllib.parse import urlsplit
     target = next((t for t in manifest.get('targets', []) if t['key'] == f'canonical:{event.pk}'), None)
     grade = str(event.normalized_grade or '').upper().replace('-', '')
-    key = grade in ('G1', 'GI', 'JPN1', 'JPNI', 'JG1') or (event.source_refs or {}).get('lifecycle_priority') == 'key'
-    report = source_capacity_report(targets=manifest['targets'], proofs=manifest['proofs'], budgets=manifest['budgets'])
+    # 缺规范等级不能凭缺值套用120秒常规预算；显式重点预算只是保守成本，不补造等级。
+    key = not grade or grade in ('G1', 'GI', 'JPN1', 'JPNI', 'JG1') or (event.source_refs or {}).get('lifecycle_priority') == 'key'
+    report = source_capacity_report(targets=manifest['targets'], proofs=manifest['proofs'], budgets=manifest['budgets'], inventory=manifest.get('inventory'))
     host = urlsplit(source.canonical_url).hostname
-    return bool(report['hosts'].get(host, {}).get('capacity_ok') and target and target['region'] == source.region_code and (not key or target['key_race'])
-        and any(p.get('runtime_verified') is True and p.get('region') == source.region_code
+    return bool(report['ready'] == report['targets'] and report['targets']
+        and report['hosts'].get(host, {}).get('capacity_ok') and target and target['region'] == source.region_code and (not key or target['key_race'])
+        and any(_capacity_proof_covers(p, target) and p.get('runtime_verified') is True
             and p.get('provider') == source.source_key and p.get('host') == urlsplit(source.canonical_url).hostname
             for p in manifest.get('proofs', [])))

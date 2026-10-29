@@ -19,7 +19,7 @@ class Command(BaseCommand):
             raise CommandError('capacity_manifest_digest')
         try:
             value = json.loads(raw)
-            report = source_capacity_report(targets=value['targets'], proofs=value['proofs'], budgets=value['budgets'])
+            report = source_capacity_report(targets=value['targets'], proofs=value['proofs'], budgets=value['budgets'], inventory=value.get('inventory'))
         except (ValueError, KeyError, TypeError) as exc:
             raise CommandError('capacity_manifest_invalid') from exc
         self.stdout.write(json.dumps(report, ensure_ascii=False, sort_keys=True))

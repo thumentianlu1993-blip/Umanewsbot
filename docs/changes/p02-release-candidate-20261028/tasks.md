@@ -31,3 +31,13 @@
 - [ ] (integration) 完整独立地区分母、逐场身份、历史义务归属、来源许可/额度及请求链成本闭合。
 - [ ] (application) 容量准入合同补齐未确认首日6次复查与实际全库存/多链成本并完成拒绝测试。
 - [x] (operations) 独立评审冻结准备包并复验，P2修正后原reviewer及原生复审PASS；第3项生产冻结仍未完成，见[评审](../p02-target-capacity-20261029/review.md)。
+
+## 第3项继续收口（2026-10-29）
+
+- [x] (operations) 只读交叉分类10,134场历史空确认，保存19场在管未完成与1场临时发布不一致；2场观察起点有official修订/publication证据。
+- [x] (integration) 补两个未匹配英国目标、25场原等级依据与119/199来源身份候选；仍无生产绑定/自动用途和额度证明，见[覆盖表](../p02-target-capacity-20261029/identity-coverage.md)。
+- [x] (application) 取得+4低估、缺库存仍放行、跨proof借用、未知等级低预算的RED，补+6及完整库存/成本/权限/逐目标绑定，78项隔离PG回归通过。
+- [x] (operations) 真实阻断候选103条运行离线容量诊断，ready=0，未知未转成合成授权。
+- [x] (operations) 本轮原生和子Agent独立review均PASS，无finding，审前后指纹一致。
+- [ ] (operations) 固定提交完整CI与候选目录外交付核验；状态以PR当前提交检查及交付收据为准。
+- [ ] (integration) 完整第3项生产冻结：真实用途/额度、全覆盖、所有绑定、legacy义务及成本/时钟实测。不能由本轮技术收口替代。

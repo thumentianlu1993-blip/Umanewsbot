@@ -22,3 +22,13 @@
 原生日志`/tmp/p02-capacity-native-rereview.log`，SHA256：`8b3e3f0396868412f74de7dec248cc5de96fc6cb4ca3a4ad5bd9e010093a7aa5`。审核后仅回写本记录和tasks评审勾选，不改变清单/预算结论。
 
 完整目标目录、用途许可/额度、存量义务分类、容量合同尚未闭合；UNKNOWN没有被改为通过。未合并、未部署。
+
+## 第二轮：历史义务、覆盖与容量代码收口
+
+基线db8a584a后的全部未提交代码及文档经独立子Agent与原生只读审核PASS，无actionable finding。原生review退出0，独立执行14项容量测试（未执行文件往返与PG用例）及diff检查通过；主线程78项隔离PG回归另列，不重复相加。
+
+reviewer逐项核对了283/282额度边界、跨proof拒绝、历史分类守恒，以及25条官方缓存的日期/名称/场地/等级与原文SHA。103已知候选与10,114条legacy义务UNKNOWN边界核验通过。审前后指纹一致：`5e3934a71cdace4a5006e2c2f84a343ab7974362a493b85dfc3157a884325c9d`。
+
+日志`/tmp/p02-capacity-closeout-native-review.log`，SHA256 `d167763c825a52f5b47d4cedde6fcd62e2328ddbe193c96c1e436d2604749d7d`。审核后仅回写review/tasks/current_state的评审结果；代码和业务证据不变。最终固定提交CI以[PR #270当前检查](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/270/checks)为准，本记录不提前宣称CI通过。
+
+完整生产冻结仍BLOCKED。未合并、未部署、未改生产数据或启动自动网络采集。

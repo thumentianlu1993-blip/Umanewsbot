@@ -1,4 +1,5 @@
 """地区接入回归；真实裁剪样本与合成异常严格区分，测试无网络。"""
+from stable.test_race_lifecycle_capacity import synthetic_capacity
 
 from datetime import timedelta
 from pathlib import Path
@@ -604,7 +605,7 @@ class SaudiPipelineTests(TestCase):
         config = override_settings(RACE_LIFECYCLE_V2_EVENT_IDS=(self.event.pk,))
         config.enable()
         self.addCleanup(config.disable)
-        capacity = dict(
+        capacity = synthetic_capacity(
             targets=[
                 dict(
                     key=f"canonical:{self.event.pk}",

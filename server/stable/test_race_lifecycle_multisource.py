@@ -1,4 +1,5 @@
 """本地 JRA 原始样本走生产 writer；网络与容量证据均为隔离测试替身。"""
+from stable.test_race_lifecycle_capacity import synthetic_capacity
 from unittest.mock import patch
 from django.test import TestCase, override_settings
 from stable import models, test_race_multisource_jra as fixtures
@@ -28,7 +29,7 @@ class LifecycleMultisourceTests(TestCase):
         self.assertFalse(models.RaceLifecyclePublicState.objects.exists())
 
     def test_saved_jra_result_reaches_epoch_reader_and_delivery(self):
-        with patch('stable.services.race_lifecycle_projection.capacity_manifest', return_value=dict(targets=[dict(key=f'canonical:{self.event.pk}', region='japan_jra', key_race=True)], proofs=[dict(region='japan_jra', provider='jra', host='www.jra.go.jp', runtime_verified=True, identity=True, confirmed_card=True, complete_result=True, correction=True, evidence_refs=['synthetic'], discovery='full', requests_per_fetch=2)], budgets={'www.jra.go.jp': 1000})):
+        with patch('stable.services.race_lifecycle_projection.capacity_manifest', return_value=synthetic_capacity(targets=[dict(key=f'canonical:{self.event.pk}', region='japan_jra', key_race=True)], proofs=[dict(region='japan_jra', provider='jra', host='www.jra.go.jp', runtime_verified=True, identity=True, confirmed_card=True, complete_result=True, correction=True, evidence_refs=['synthetic'], discovery='full', requests_per_fetch=2)], budgets={'www.jra.go.jp': 1000})):
             outcome = run_multisource_claim(claim=self.claim(), now=fixtures.NOW, fetcher=self.fetch)
         self.assertTrue(outcome['processed'], outcome)
         state = models.RaceLifecyclePublicState.objects.get(event=self.event)
@@ -39,7 +40,7 @@ class LifecycleMultisourceTests(TestCase):
         self.assertEqual(len(public_modules(self.event.pk, now=fixtures.NOW)['result']), 13)
 
     def test_expired_capacity_between_claim_and_fetch_blocks_network(self):
-        manifest = dict(targets=[dict(key=f'canonical:{self.event.pk}', region='japan_jra', key_race=True)],
+        manifest = synthetic_capacity(targets=[dict(key=f'canonical:{self.event.pk}', region='japan_jra', key_race=True)],
             proofs=[dict(region='japan_jra', provider='jra', host='www.jra.go.jp', runtime_verified=True, identity=True,
                 confirmed_card=True, complete_result=True, correction=True, evidence_refs=['synthetic'], discovery='full', requests_per_fetch=2)],
             budgets={'www.jra.go.jp':1000})
@@ -74,7 +75,7 @@ class LifecycleJraCardTests(TestCase):
             from stable.services.race_data_sync_admission import validate_multisource_admission
             admission = validate_multisource_admission(event_id=self.event.pk, now=fixtures.NOW, capability='racecard', policy=policy)
             self.assertTrue(admission.admitted, admission.reason_code)
-            with patch('stable.services.race_lifecycle_projection.capacity_manifest', return_value=dict(targets=[dict(key=f'canonical:{self.event.pk}', region='japan_jra', key_race=True)], proofs=[dict(region='japan_jra', provider='jra', host='www.jra.go.jp', runtime_verified=True, identity=True, confirmed_card=True, complete_result=True, correction=True, evidence_refs=['synthetic'], discovery='full', requests_per_fetch=2)], budgets={'www.jra.go.jp': 1000})):
+            with patch('stable.services.race_lifecycle_projection.capacity_manifest', return_value=synthetic_capacity(targets=[dict(key=f'canonical:{self.event.pk}', region='japan_jra', key_race=True)], proofs=[dict(region='japan_jra', provider='jra', host='www.jra.go.jp', runtime_verified=True, identity=True, confirmed_card=True, complete_result=True, correction=True, evidence_refs=['synthetic'], discovery='full', requests_per_fetch=2)], budgets={'www.jra.go.jp': 1000})):
                 claims = claim_due_enrollments(now=fixtures.NOW, batch_size=20, ttl_seconds=240,
                     enabled_providers=('jra',), enabled_regions=('japan_jra',), enabled_data_kinds=('racecard',))
                 self.assertTrue(claims, list(models.RaceEventLiveProviderCheckpoint.objects.values('next_poll_at', 'data_kind', 'circuit_reason')))
@@ -96,7 +97,7 @@ class LifecycleSourceEvidenceTests(TestCase):
     claim=fixtures.JraColdStartTests.claim
 
     def capacity(self):
-        return dict(targets=[dict(key=f'canonical:{self.event.pk}',region='japan_jra',key_race=True)],
+        return synthetic_capacity(targets=[dict(key=f'canonical:{self.event.pk}',region='japan_jra',key_race=True)],
             proofs=[dict(region='japan_jra',provider=p,host='www.jra.go.jp',runtime_verified=True,identity=True,
                 confirmed_card=True,complete_result=True,correction=True,evidence_refs=['synthetic'],discovery='full',requests_per_fetch=2)
                 for p in ('jra','alternate')],budgets={'www.jra.go.jp':1000})
