@@ -51,6 +51,9 @@ class RefreshFixtures:
         self.future = self.today + timedelta(days=60)
         # far_future 与 future 同年（改期）；next_year 跨年（拒绝改期）
         self.far_future = date(self.future.year, 12, 28)
+        # 10月29日 + 60天恰为12月28日；改期夹具必须保持不同日期。
+        if self.far_future == self.future:
+            self.far_future += timedelta(days=1)
         self.next_year_date = date(self.future.year + 1, 1, 15)
         self.past = self.today - timedelta(days=60)
 
