@@ -1,3 +1,9 @@
+# 2026-10-29 P02 来源能力证据补充
+
+[第2项盘点](changes/p02-source-capabilities-20261029/report.md)新增11个地区/子区官方明确更正案例、法国最终名单证据和德国节目册/报名负例。新样本不等于现有producer已接入：德国最终名单PARTIAL；JRA/GB/IE/US名单与多区退赛证据仍UNKNOWN，所有地区runtime_verified未证明。下一项为目标覆盖和容量预算；未合并、未部署。
+
+第1项代码提交633fecc5的完整CI 40813370000已通过6990项/51批，failure/error/skip=0，候选目录外交付核验verified。下方“CI未完成”是此前记录；不包含生产发布执行器和恢复演练。
+
 # 2026-10-29 P02 主线发布候选与CI补齐
 
 已在独立 codex/p02-release-candidate-20261028 分支从 main 提取 P02，移除跨项目0082迁移依赖。候选、升级与恢复流程见[第1项](changes/p02-release-candidate-20261028/spec.md)。新生产执行器尚未实现，CI/镜像演练/生产验收未完成；没有合并或部署。历史源候选证据不替代当前候选测试。

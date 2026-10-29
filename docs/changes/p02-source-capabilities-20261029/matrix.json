@@ -1,0 +1,625 @@
+{
+  "schema_version": 1,
+  "dimensions": [
+    "schedule",
+    "final_roster",
+    "withdrawal",
+    "full_result",
+    "correction"
+  ],
+  "regions": [
+    {
+      "region": "JRA",
+      "capabilities": {
+        "schedule": {
+          "state": "UNKNOWN",
+          "evidence": [],
+          "limitation": "本轮所引用真实样本不足：JRA缺逐项直接引用；GB/IE为WEIGHEDIN结果而非DECLARED名单；NAR/GB/IE/FR/AE没有本场真实退赛。合成状态变体和过往履历不能作为真实能力证据。"
+        },
+        "final_roster": {
+          "state": "UNKNOWN",
+          "evidence": [],
+          "limitation": "本轮所引用真实样本不足：JRA缺逐项直接引用；GB/IE为WEIGHEDIN结果而非DECLARED名单；NAR/GB/IE/FR/AE没有本场真实退赛。合成状态变体和过往履历不能作为真实能力证据。"
+        },
+        "withdrawal": {
+          "state": "UNKNOWN",
+          "evidence": [],
+          "limitation": "本轮所引用真实样本不足：JRA缺逐项直接引用；GB/IE为WEIGHEDIN结果而非DECLARED名单；NAR/GB/IE/FR/AE没有本场真实退赛。合成状态变体和过往履历不能作为真实能力证据。"
+        },
+        "full_result": {
+          "state": "UNKNOWN",
+          "evidence": [],
+          "limitation": "本轮所引用真实样本不足：JRA缺逐项直接引用；GB/IE为WEIGHEDIN结果而非DECLARED名单；NAR/GB/IE/FR/AE没有本场真实退赛。合成状态变体和过往履历不能作为真实能力证据。"
+        },
+        "correction": {
+          "state": "SOURCE_SAMPLE_ONLY",
+          "evidence": [
+            "jra-corrected-result"
+          ],
+          "limitation": "官方历史明确更正案例；未接入自动更正，未闭合原始全场名单/改后全量配对及及时发现。"
+        }
+      },
+      "runtime_verified": false,
+      "automated_use_permission": "UNKNOWN",
+      "host_quota": "UNKNOWN",
+      "first_publication_clock": "UNKNOWN",
+      "coverage": "UNKNOWN"
+    },
+    {
+      "region": "NAR",
+      "capabilities": {
+        "schedule": {
+          "state": "HISTORICAL_SAMPLE",
+          "evidence": [
+            "../p02-release-candidate-20261028/fixture-manifest.json",
+            "../p02-race-lifecycle-20261027/regional-implementation.md",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/nar-card.html"
+          ],
+          "limitation": "单场日期/时间样本，不证明完整赛程发现或改期发现；全目标集合仍UNKNOWN。 具体本场样本见所列fixture；仅对应该页赛事。"
+        },
+        "final_roster": {
+          "state": "HISTORICAL_SAMPLE",
+          "evidence": [
+            "../p02-release-candidate-20261028/fixture-manifest.json",
+            "../p02-race-lifecycle-20261027/regional-implementation.md",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/nar-card.html"
+          ],
+          "limitation": "既有样本/离线回放记录；本轮仅复核fixture摘要，未重新执行解析。非全覆盖或运行许可。 具体本场样本见所列fixture；仅对应该页赛事。"
+        },
+        "withdrawal": {
+          "state": "UNKNOWN",
+          "evidence": [],
+          "limitation": "本轮所引用真实样本不足：JRA缺逐项直接引用；GB/IE为WEIGHEDIN结果而非DECLARED名单；NAR/GB/IE/FR/AE没有本场真实退赛。合成状态变体和过往履历不能作为真实能力证据。"
+        },
+        "full_result": {
+          "state": "HISTORICAL_SAMPLE",
+          "evidence": [
+            "../p02-release-candidate-20261028/fixture-manifest.json",
+            "../p02-race-lifecycle-20261027/regional-implementation.md",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/nar-card.html",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/nar-result.html"
+          ],
+          "limitation": "既有样本/离线回放记录；本轮仅复核fixture摘要，未重新执行解析。非全覆盖或运行许可。 具体本场样本见所列fixture；仅对应该页赛事。"
+        },
+        "correction": {
+          "state": "SOURCE_SAMPLE_ONLY",
+          "evidence": [
+            "nar-correction"
+          ],
+          "limitation": "官方历史明确更正案例；未接入自动更正，未闭合原始全场名单/改后全量配对及及时发现。"
+        }
+      },
+      "runtime_verified": false,
+      "automated_use_permission": "UNKNOWN",
+      "host_quota": "UNKNOWN",
+      "first_publication_clock": "UNKNOWN",
+      "coverage": "UNKNOWN"
+    },
+    {
+      "region": "HK",
+      "capabilities": {
+        "schedule": {
+          "state": "HISTORICAL_SAMPLE",
+          "evidence": [
+            "../p02-release-candidate-20261028/fixture-manifest.json",
+            "../p02-race-lifecycle-20261027/regional-implementation.md",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/hk-card.html"
+          ],
+          "limitation": "单场日期/时间样本，不证明完整赛程发现或改期发现；全目标集合仍UNKNOWN。 具体本场样本见所列fixture；仅对应该页赛事。"
+        },
+        "final_roster": {
+          "state": "HISTORICAL_SAMPLE",
+          "evidence": [
+            "../p02-release-candidate-20261028/fixture-manifest.json",
+            "../p02-race-lifecycle-20261027/regional-implementation.md",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/hk-card.html"
+          ],
+          "limitation": "既有样本/离线回放记录；本轮仅复核fixture摘要，未重新执行解析。非全覆盖或运行许可。 具体本场样本见所列fixture；仅对应该页赛事。"
+        },
+        "withdrawal": {
+          "state": "UNKNOWN",
+          "evidence": [],
+          "limitation": "旧实施叙述缺本轮可逐项绑定的真实样本，保守UNKNOWN。"
+        },
+        "full_result": {
+          "state": "HISTORICAL_SAMPLE",
+          "evidence": [
+            "../p02-release-candidate-20261028/fixture-manifest.json",
+            "../p02-race-lifecycle-20261027/regional-implementation.md",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/hk-result.html"
+          ],
+          "limitation": "既有样本/离线回放记录；本轮仅复核fixture摘要，未重新执行解析。非全覆盖或运行许可。 具体本场样本见所列fixture；仅对应该页赛事。"
+        },
+        "correction": {
+          "state": "SOURCE_SAMPLE_ONLY",
+          "evidence": [
+            "hk-correction"
+          ],
+          "limitation": "官方历史明确更正案例；未接入自动更正，未闭合原始全场名单/改后全量配对及及时发现。"
+        }
+      },
+      "runtime_verified": false,
+      "automated_use_permission": "UNKNOWN",
+      "host_quota": "UNKNOWN",
+      "first_publication_clock": "UNKNOWN",
+      "coverage": "UNKNOWN"
+    },
+    {
+      "region": "GB",
+      "capabilities": {
+        "schedule": {
+          "state": "HISTORICAL_SAMPLE",
+          "evidence": [
+            "../p02-release-candidate-20261028/fixture-manifest.json",
+            "../p02-race-lifecycle-20261027/regional-implementation.md",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/sl-gb.html"
+          ],
+          "limitation": "单场日期/时间样本，不证明完整赛程发现或改期发现；全目标集合仍UNKNOWN。 具体本场样本见所列fixture；仅对应该页赛事。"
+        },
+        "final_roster": {
+          "state": "UNKNOWN",
+          "evidence": [],
+          "limitation": "本轮所引用真实样本不足：JRA缺逐项直接引用；GB/IE为WEIGHEDIN结果而非DECLARED名单；NAR/GB/IE/FR/AE没有本场真实退赛。合成状态变体和过往履历不能作为真实能力证据。"
+        },
+        "withdrawal": {
+          "state": "UNKNOWN",
+          "evidence": [],
+          "limitation": "本轮所引用真实样本不足：JRA缺逐项直接引用；GB/IE为WEIGHEDIN结果而非DECLARED名单；NAR/GB/IE/FR/AE没有本场真实退赛。合成状态变体和过往履历不能作为真实能力证据。"
+        },
+        "full_result": {
+          "state": "HISTORICAL_SAMPLE",
+          "evidence": [
+            "../p02-release-candidate-20261028/fixture-manifest.json",
+            "../p02-race-lifecycle-20261027/regional-implementation.md",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/sl-gb.html"
+          ],
+          "limitation": "既有样本/离线回放记录；本轮仅复核fixture摘要，未重新执行解析。非全覆盖或运行许可。 具体本场样本见所列fixture；仅对应该页赛事。"
+        },
+        "correction": {
+          "state": "SOURCE_SAMPLE_ONLY",
+          "evidence": [
+            "gb-correction"
+          ],
+          "limitation": "官方历史明确更正案例；未接入自动更正，未闭合原始全场名单/改后全量配对及及时发现。"
+        }
+      },
+      "runtime_verified": false,
+      "automated_use_permission": "UNKNOWN",
+      "host_quota": "UNKNOWN",
+      "first_publication_clock": "UNKNOWN",
+      "coverage": "UNKNOWN"
+    },
+    {
+      "region": "IE",
+      "capabilities": {
+        "schedule": {
+          "state": "HISTORICAL_SAMPLE",
+          "evidence": [
+            "../p02-release-candidate-20261028/fixture-manifest.json",
+            "../p02-race-lifecycle-20261027/regional-implementation.md",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/sl-ie.html"
+          ],
+          "limitation": "单场日期/时间样本，不证明完整赛程发现或改期发现；全目标集合仍UNKNOWN。 具体本场样本见所列fixture；仅对应该页赛事。"
+        },
+        "final_roster": {
+          "state": "UNKNOWN",
+          "evidence": [],
+          "limitation": "本轮所引用真实样本不足：JRA缺逐项直接引用；GB/IE为WEIGHEDIN结果而非DECLARED名单；NAR/GB/IE/FR/AE没有本场真实退赛。合成状态变体和过往履历不能作为真实能力证据。"
+        },
+        "withdrawal": {
+          "state": "UNKNOWN",
+          "evidence": [],
+          "limitation": "本轮所引用真实样本不足：JRA缺逐项直接引用；GB/IE为WEIGHEDIN结果而非DECLARED名单；NAR/GB/IE/FR/AE没有本场真实退赛。合成状态变体和过往履历不能作为真实能力证据。"
+        },
+        "full_result": {
+          "state": "HISTORICAL_SAMPLE",
+          "evidence": [
+            "../p02-release-candidate-20261028/fixture-manifest.json",
+            "../p02-race-lifecycle-20261027/regional-implementation.md",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/sl-ie.html"
+          ],
+          "limitation": "既有样本/离线回放记录；本轮仅复核fixture摘要，未重新执行解析。非全覆盖或运行许可。 具体本场样本见所列fixture；仅对应该页赛事。"
+        },
+        "correction": {
+          "state": "SOURCE_SAMPLE_ONLY",
+          "evidence": [
+            "ie-correction"
+          ],
+          "limitation": "官方历史明确更正案例；未接入自动更正，未闭合原始全场名单/改后全量配对及及时发现。"
+        }
+      },
+      "runtime_verified": false,
+      "automated_use_permission": "UNKNOWN",
+      "host_quota": "UNKNOWN",
+      "first_publication_clock": "UNKNOWN",
+      "coverage": "UNKNOWN"
+    },
+    {
+      "region": "FR",
+      "capabilities": {
+        "schedule": {
+          "state": "HISTORICAL_SAMPLE",
+          "evidence": [
+            "../p02-release-candidate-20261028/fixture-manifest.json",
+            "../p02-race-lifecycle-20261027/regional-implementation.md",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/zt-fr.html"
+          ],
+          "limitation": "单场日期/时间样本，不证明完整赛程发现或改期发现；全目标集合仍UNKNOWN。 具体本场样本见所列fixture；仅对应该页赛事。"
+        },
+        "final_roster": {
+          "state": "SOURCE_SAMPLE_ONLY",
+          "evidence": [
+            "fr-final"
+          ],
+          "limitation": "France Galop单场明确最终名单；ZEturf及生产接入仍UNKNOWN。"
+        },
+        "withdrawal": {
+          "state": "UNKNOWN",
+          "evidence": [],
+          "limitation": "本轮所引用真实样本不足：JRA缺逐项直接引用；GB/IE为WEIGHEDIN结果而非DECLARED名单；NAR/GB/IE/FR/AE没有本场真实退赛。合成状态变体和过往履历不能作为真实能力证据。"
+        },
+        "full_result": {
+          "state": "HISTORICAL_SAMPLE",
+          "evidence": [
+            "../p02-release-candidate-20261028/fixture-manifest.json",
+            "../p02-race-lifecycle-20261027/regional-implementation.md",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/zt-fr.html"
+          ],
+          "limitation": "既有样本/离线回放记录；本轮仅复核fixture摘要，未重新执行解析。非全覆盖或运行许可。 具体本场样本见所列fixture；仅对应该页赛事。"
+        },
+        "correction": {
+          "state": "SOURCE_SAMPLE_ONLY",
+          "evidence": [
+            "fr-correction"
+          ],
+          "limitation": "官方历史明确更正案例；未接入自动更正，未闭合原始全场名单/改后全量配对及及时发现。"
+        }
+      },
+      "runtime_verified": false,
+      "automated_use_permission": "UNKNOWN",
+      "host_quota": "UNKNOWN",
+      "first_publication_clock": "UNKNOWN",
+      "coverage": "UNKNOWN"
+    },
+    {
+      "region": "US",
+      "capabilities": {
+        "schedule": {
+          "state": "HISTORICAL_SAMPLE",
+          "evidence": [
+            "../p02-release-candidate-20261028/fixture-manifest.json",
+            "../p02-race-lifecycle-20261027/regional-implementation.md",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/sl-us.html"
+          ],
+          "limitation": "单场日期/时间样本，不证明完整赛程发现或改期发现；全目标集合仍UNKNOWN。 具体本场样本见所列fixture；仅对应该页赛事。"
+        },
+        "final_roster": {
+          "state": "UNKNOWN",
+          "evidence": [
+            "../p02-release-candidate-20261028/fixture-manifest.json",
+            "../p02-race-lifecycle-20261027/regional-implementation.md"
+          ],
+          "limitation": "现有适配源最终申报成熟度尚未闭合。"
+        },
+        "withdrawal": {
+          "state": "HISTORICAL_SAMPLE",
+          "evidence": [
+            "../p02-release-candidate-20261028/fixture-manifest.json",
+            "../p02-race-lifecycle-20261027/regional-implementation.md",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/sl-us.html"
+          ],
+          "limitation": "既有样本/离线回放记录；本轮仅复核fixture摘要，未重新执行解析。非全覆盖或运行许可。 具体本场样本见所列fixture；仅对应该页赛事。"
+        },
+        "full_result": {
+          "state": "HISTORICAL_SAMPLE",
+          "evidence": [
+            "../p02-release-candidate-20261028/fixture-manifest.json",
+            "../p02-race-lifecycle-20261027/regional-implementation.md",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/sl-us.html"
+          ],
+          "limitation": "既有样本/离线回放记录；本轮仅复核fixture摘要，未重新执行解析。非全覆盖或运行许可。 具体本场样本见所列fixture；仅对应该页赛事。"
+        },
+        "correction": {
+          "state": "SOURCE_SAMPLE_ONLY",
+          "evidence": [
+            "us-correction"
+          ],
+          "limitation": "官方历史明确更正案例；未接入自动更正，未闭合原始全场名单/改后全量配对及及时发现。"
+        }
+      },
+      "runtime_verified": false,
+      "automated_use_permission": "UNKNOWN",
+      "host_quota": "UNKNOWN",
+      "first_publication_clock": "UNKNOWN",
+      "coverage": "UNKNOWN"
+    },
+    {
+      "region": "AU",
+      "capabilities": {
+        "schedule": {
+          "state": "HISTORICAL_SAMPLE",
+          "evidence": [
+            "../p02-release-candidate-20261028/fixture-manifest.json",
+            "../p02-race-lifecycle-20261027/regional-implementation.md",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/au-card.html"
+          ],
+          "limitation": "单场日期/时间样本，不证明完整赛程发现或改期发现；全目标集合仍UNKNOWN。 具体本场样本见所列fixture；仅对应该页赛事。"
+        },
+        "final_roster": {
+          "state": "HISTORICAL_SAMPLE",
+          "evidence": [
+            "../p02-release-candidate-20261028/fixture-manifest.json",
+            "../p02-race-lifecycle-20261027/regional-implementation.md",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/au-card.html"
+          ],
+          "limitation": "既有样本/离线回放记录；本轮仅复核fixture摘要，未重新执行解析。非全覆盖或运行许可。 具体本场样本见所列fixture；仅对应该页赛事。"
+        },
+        "withdrawal": {
+          "state": "HISTORICAL_SAMPLE",
+          "evidence": [
+            "../p02-release-candidate-20261028/fixture-manifest.json",
+            "../p02-race-lifecycle-20261027/regional-implementation.md",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/au-card.html",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/au-result.html"
+          ],
+          "limitation": "既有样本/离线回放记录；本轮仅复核fixture摘要，未重新执行解析。非全覆盖或运行许可。 具体本场样本见所列fixture；仅对应该页赛事。"
+        },
+        "full_result": {
+          "state": "HISTORICAL_SAMPLE",
+          "evidence": [
+            "../p02-release-candidate-20261028/fixture-manifest.json",
+            "../p02-race-lifecycle-20261027/regional-implementation.md",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/au-card.html",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/au-result.html"
+          ],
+          "limitation": "既有样本/离线回放记录；本轮仅复核fixture摘要，未重新执行解析。非全覆盖或运行许可。 具体本场样本见所列fixture；仅对应该页赛事。"
+        },
+        "correction": {
+          "state": "SOURCE_SAMPLE_ONLY",
+          "evidence": [
+            "au-correction"
+          ],
+          "limitation": "官方历史明确更正案例；未接入自动更正，未闭合原始全场名单/改后全量配对及及时发现。"
+        }
+      },
+      "runtime_verified": false,
+      "automated_use_permission": "UNKNOWN",
+      "host_quota": "UNKNOWN",
+      "first_publication_clock": "UNKNOWN",
+      "coverage": "UNKNOWN"
+    },
+    {
+      "region": "DE",
+      "capabilities": {
+        "schedule": {
+          "state": "HISTORICAL_SAMPLE",
+          "evidence": [
+            "../p02-release-candidate-20261028/fixture-manifest.json",
+            "../p02-race-lifecycle-20261027/regional-implementation.md",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/de-card.html"
+          ],
+          "limitation": "单场日期/时间样本，不证明完整赛程发现或改期发现；全目标集合仍UNKNOWN。 具体本场样本见所列fixture；仅对应该页赛事。"
+        },
+        "final_roster": {
+          "state": "PARTIAL",
+          "evidence": [
+            "de-program-complete",
+            "de-trial-result",
+            "de-future-nominations",
+            "de-program-origin"
+          ],
+          "limitation": "8匹正式节目册与赛后页；缺最终申报标志和赛前获取证据。旧Startfeld不升级。"
+        },
+        "withdrawal": {
+          "state": "HISTORICAL_SAMPLE",
+          "evidence": [
+            "../p02-release-candidate-20261028/fixture-manifest.json",
+            "../p02-race-lifecycle-20261027/regional-implementation.md",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/de-card.html",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/de-paired-result.html"
+          ],
+          "limitation": "既有样本/离线回放记录；本轮仅复核fixture摘要，未重新执行解析。非全覆盖或运行许可。 具体本场样本见所列fixture；仅对应该页赛事。"
+        },
+        "full_result": {
+          "state": "HISTORICAL_SAMPLE",
+          "evidence": [
+            "../p02-release-candidate-20261028/fixture-manifest.json",
+            "../p02-race-lifecycle-20261027/regional-implementation.md",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/de-card.html",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/de-paired-result.html"
+          ],
+          "limitation": "既有样本/离线回放记录；本轮仅复核fixture摘要，未重新执行解析。非全覆盖或运行许可。 具体本场样本见所列fixture；仅对应该页赛事。"
+        },
+        "correction": {
+          "state": "SOURCE_SAMPLE_ONLY",
+          "evidence": [
+            "de-correction"
+          ],
+          "limitation": "官方历史明确更正案例；未接入自动更正，未闭合原始全场名单/改后全量配对及及时发现。"
+        }
+      },
+      "runtime_verified": false,
+      "automated_use_permission": "UNKNOWN",
+      "host_quota": "UNKNOWN",
+      "first_publication_clock": "UNKNOWN",
+      "coverage": "UNKNOWN"
+    },
+    {
+      "region": "AE",
+      "capabilities": {
+        "schedule": {
+          "state": "HISTORICAL_SAMPLE",
+          "evidence": [
+            "../p02-release-candidate-20261028/fixture-manifest.json",
+            "../p02-race-lifecycle-20261027/regional-implementation.md",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/ae-page.html"
+          ],
+          "limitation": "单场日期/时间样本，不证明完整赛程发现或改期发现；全目标集合仍UNKNOWN。 具体本场样本见所列fixture；仅对应该页赛事。"
+        },
+        "final_roster": {
+          "state": "HISTORICAL_SAMPLE",
+          "evidence": [
+            "../p02-release-candidate-20261028/fixture-manifest.json",
+            "../p02-race-lifecycle-20261027/regional-implementation.md",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/ae-card.html"
+          ],
+          "limitation": "既有样本/离线回放记录；本轮仅复核fixture摘要，未重新执行解析。非全覆盖或运行许可。 具体本场样本见所列fixture；仅对应该页赛事。"
+        },
+        "withdrawal": {
+          "state": "UNKNOWN",
+          "evidence": [],
+          "limitation": "本轮所引用真实样本不足：JRA缺逐项直接引用；GB/IE为WEIGHEDIN结果而非DECLARED名单；NAR/GB/IE/FR/AE没有本场真实退赛。合成状态变体和过往履历不能作为真实能力证据。"
+        },
+        "full_result": {
+          "state": "HISTORICAL_SAMPLE",
+          "evidence": [
+            "../p02-release-candidate-20261028/fixture-manifest.json",
+            "../p02-race-lifecycle-20261027/regional-implementation.md",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/ae-card.html",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/ae-result.html"
+          ],
+          "limitation": "既有样本/离线回放记录；本轮仅复核fixture摘要，未重新执行解析。非全覆盖或运行许可。 具体本场样本见所列fixture；仅对应该页赛事。"
+        },
+        "correction": {
+          "state": "SOURCE_SAMPLE_ONLY",
+          "evidence": [
+            "ae-correction"
+          ],
+          "limitation": "官方历史明确更正案例；未接入自动更正，未闭合原始全场名单/改后全量配对及及时发现。"
+        }
+      },
+      "runtime_verified": false,
+      "automated_use_permission": "UNKNOWN",
+      "host_quota": "UNKNOWN",
+      "first_publication_clock": "UNKNOWN",
+      "coverage": "UNKNOWN"
+    },
+    {
+      "region": "SA",
+      "capabilities": {
+        "schedule": {
+          "state": "HISTORICAL_SAMPLE",
+          "evidence": [
+            "../p02-release-candidate-20261028/fixture-manifest.json",
+            "../p02-race-lifecycle-20261027/regional-implementation.md",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/sa-race-page.html"
+          ],
+          "limitation": "单场日期/时间样本，不证明完整赛程发现或改期发现；全目标集合仍UNKNOWN。 具体本场样本见所列fixture；仅对应该页赛事。"
+        },
+        "final_roster": {
+          "state": "HISTORICAL_SAMPLE",
+          "evidence": [
+            "../p02-release-candidate-20261028/fixture-manifest.json",
+            "../p02-race-lifecycle-20261027/regional-implementation.md",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/sa-declared.html"
+          ],
+          "limitation": "既有样本/离线回放记录；本轮仅复核fixture摘要，未重新执行解析。非全覆盖或运行许可。 具体本场样本见所列fixture；仅对应该页赛事。"
+        },
+        "withdrawal": {
+          "state": "HISTORICAL_SAMPLE",
+          "evidence": [
+            "../p02-release-candidate-20261028/fixture-manifest.json",
+            "../p02-race-lifecycle-20261027/regional-implementation.md",
+            "../../../server/stable/tests/fixtures/regional_lifecycle/sa-declared.html"
+          ],
+          "limitation": "既有样本/离线回放记录；本轮仅复核fixture摘要，未重新执行解析。非全覆盖或运行许可。 具体本场样本见所列fixture；仅对应该页赛事。"
+        },
+        "full_result": {
+          "state": "UNKNOWN",
+          "evidence": [],
+          "limitation": "旧实施叙述缺本轮可逐项绑定的真实样本，保守UNKNOWN。"
+        },
+        "correction": {
+          "state": "SOURCE_SAMPLE_ONLY",
+          "evidence": [
+            "sa-correction"
+          ],
+          "limitation": "官方历史明确更正案例；未接入自动更正，未闭合原始全场名单/改后全量配对及及时发现。"
+        }
+      },
+      "runtime_verified": false,
+      "automated_use_permission": "UNKNOWN",
+      "host_quota": "UNKNOWN",
+      "first_publication_clock": "UNKNOWN",
+      "coverage": "UNKNOWN"
+    }
+  ],
+  "historical_fixture_hash_check": [
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/ae-card.html",
+      "sha256": "87f7ebff48127a6f88d81e382572f6f89350f36a9b6a0f91626e3e0cfdb43c4d"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/ae-page.html",
+      "sha256": "fba1e179b5ab52afbe6eeb3723c5db008c0ec00f4f7ee139097442c1bf9132f4"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/ae-result.html",
+      "sha256": "01ff2cc627f8fc9cfea311b1d581e2d8b39412803ef12a0868ca73d2cb103c9b"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/au-card.html",
+      "sha256": "9fb2e38cca3c1ad1c07fdca2a37f059873f64fd9fa6f6135813de91e216bd4e3"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/au-result.html",
+      "sha256": "35adec7025b700ba59967bd7d42bc5c3fbba5b7c98023f7438fd3ea2ddb10957"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/de-card.html",
+      "sha256": "20dba820a09e204f543595c59e194ca83224507b701afd259d8c8e3e4056d6c7"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/de-paired-result.html",
+      "sha256": "a3ae2b97a95f769ed5a56ed830ac79c394e42938a6596bbfccbbf18238299c3f"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/galopp-de.html",
+      "sha256": "5cab29bf213614387317bb42a3b01938964f96c9291b932c2fc7742dad906a9d"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/hk-card.html",
+      "sha256": "d08961428ff0143ae431d5a77d841ec9743b5bfe9a6dc98479146221840811b7"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/hk-result.html",
+      "sha256": "2a88241e43e63eed899b2f13feca79d7eb1eb0e3e7ca78fa1dff0d906ecb8024"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/nar-card.html",
+      "sha256": "2d6fefaf00368f10b374a53e8edbef7fc38208053eb9d06f216867793504fb3b"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/nar-result.html",
+      "sha256": "20566c7a26a4e7077f977b997f872c4901ba329db318aa4cdbff7eb069f0299e"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/sa-declared.html",
+      "sha256": "2a71efdd8cd45fe1cd7e5e7cd7b1d9d94d8e8cb453ca93b2e2d416a37f3647f7"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/sa-race-page.html",
+      "sha256": "1fa3186b15733c770a8fc1058a802ad39e1e3b418f7f5f03795c42df7595d707"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/sl-gb.html",
+      "sha256": "2f41cb9162522b722e73e2bed80e2036aee8122689c65154d583dc223c78aea9"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/sl-ie.html",
+      "sha256": "fe4ad440eb1503189847c6ef41911304ecd3ea72b175b8976002a05494f21fd4"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/sl-us.html",
+      "sha256": "afa61f780bc053f34ac5ca94f17640876ad3c580e9b04285f227e393a7b7c587"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/zt-fr.html",
+      "sha256": "17270a0965f448ddf7d5c176f8d9a83f3e09d5f84696302cec0fd11198fa37f4"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/hk-card-unavailable.html",
+      "sha256": "d894e8388ab1c02cf764270c28e67b55479326c6e3ea86fc2696b0e73eada64e"
+    }
+  ]
+}
