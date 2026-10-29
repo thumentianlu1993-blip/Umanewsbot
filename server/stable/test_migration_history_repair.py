@@ -1258,12 +1258,24 @@ class MigrationHistoryRepairArtifactRedTests(SimpleTestCase):
 
 
 @skipUnless(
-    os.environ.get("RUN_MIGRATION_REPAIR_DOCKER_CONTRACT") == "true"
-    and shutil.which("docker"),
+    os.environ.get("IMPACT_APPLICATION_IMAGE_CONTRACT") == "true"
+    or (os.environ.get("RUN_MIGRATION_REPAIR_DOCKER_CONTRACT") == "true"
+        and shutil.which("docker")),
     "set RUN_MIGRATION_REPAIR_DOCKER_CONTRACT=true for the real image contract",
 )
 class MigrationHistoryRepairDockerImageContractTests(SimpleTestCase):
     def test_candidate_image_contains_only_the_exact_reviewed_audit_file(self):
+        if os.environ.get("IMPACT_APPLICATION_IMAGE_CONTRACT") == "true":
+            from stable.services.historical_calendar_release_b_schema import (
+                AUDIT_PATH as actual_audit, load_reviewed_production_audit,
+            )
+            self.assertEqual(ROOT, Path('/app'))
+            self.assertEqual(actual_audit, Path('/app/docs/changes/repair-production-migration-history/production_audit.json'))
+            files = sorted(str(p.relative_to('/app/docs')) for p in Path('/app/docs').rglob('*') if p.is_file())
+            self.assertEqual(files, ['changes/repair-production-migration-history/production_audit.json'])
+            self.assertEqual(load_reviewed_production_audit()['database_identity_sha256'],
+                             'a986cc11149981c54e9d4915ad35e7c46e9382584d6670c8f950eceda26e471c')
+            return
         tag = "umanews-migration-repair-audit-contract:local"
         build = subprocess.run(
             [

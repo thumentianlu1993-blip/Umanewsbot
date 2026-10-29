@@ -1,0 +1,23 @@
+{
+  "artifact_kind": "historical_race_detail_master_plan_identity",
+  "image": {
+    "digest": "sha256:2a83b35fa43646d6e0844846dbbabdae88861f6f8ea0b155f65de25388ee781b",
+    "revision": "d6d6f58b2b5b90301d8fa633a650df28379c09e7"
+  },
+  "plan_id": "detail-crawl-1998-2026-v3",
+  "recovery_input": {
+    "artifact_kind": "v2_source_recovery_ledger",
+    "sha256": "07ff2ba27520c6525fd5d0e221ec921b564cf5880464e0901f0a7e6653929319",
+    "size": 10278201
+  },
+  "repo_root": "@REPOSITORY_ROOT@",
+  "schema_version": "2.0",
+  "scope_count": 8032,
+  "source_manifest_sha256": "22e010305f5c597d4c3ab44f903323d1507f2680b8d8ec3212c99e813c732b2a",
+  "source_plan_id": "detail-crawl-1998-2026-v2",
+  "tool_identity": {
+    "path": "@REPOSITORY_ROOT@/runtime/tools/historical_race_detail_runner_v2.py",
+    "sha256": "de39a4c4c5f412832944f242aa63422bf7a895ace778a2d5b2c839bf30072c6b",
+    "size": 67747
+  }
+}

@@ -9,10 +9,11 @@ from pathlib import Path
 from unittest import skipUnless
 
 from django.test import SimpleTestCase
+from stable.real_cache_test_fixture import verify_real_cache_fixtures
 
 
 TOOLS = Path(__file__).resolve().parents[2] / "runtime" / "tools"
-CACHE_RUN_ROOT_VALUE = os.environ.get("HISTORICAL_DETAIL_DISTANCE_CACHE_RUN_ROOT", "")
+CACHE_RUN_ROOT_VALUE = os.environ.get("HISTORICAL_DETAIL_DISTANCE_CACHE_RUN_ROOT", str(verify_real_cache_fixtures() / "historical/smoke/run"))
 CACHE_RUN_ROOT = Path(CACHE_RUN_ROOT_VALUE) if CACHE_RUN_ROOT_VALUE else None
 
 

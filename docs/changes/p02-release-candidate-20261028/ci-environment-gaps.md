@@ -27,3 +27,26 @@
 这会从P02业务移植扩展到仓库通用测试环境与执行身份设计，应在继续该新增范围前按根 [AGENTS.md](../../../AGENTS.md) 判断G1。此文件只是具体方案，不授权改变CI运行身份、开放网络或新增生产权限。
 
 在环境缺口解决前，保持Draft，不合并、不部署，也不将本地定向测试或CI执行完成等同于完整验收通过。
+
+## 2026-10-29 已确认的实施范围
+
+用户明确同意将上述10项纳入第1项。最新旧候选CI `40677898864` 已完成6978项/49片，failure/error均为0，仍有10项过期skip，最终验证失败。此处不宣称完整CI通过。
+
+- 缓存：从本地已保存的v3 smoke及Sporting Life v8原始缓存提取7份页面及必要的4场描述/事件/已验证候选；保持页面原始字节，登记URL、原始与打包哈希。仅重定位本地路径，离线运行原8项断言。无新抓取。
+- 身份：收集器为两个精确测试ID分配专用profile，禁止模块/类通配扩大特权。其他ID仍走原有非root环境；验证器继续检查执行集合、完整生命周期和零skip。
+- root合同：专用容器仍禁网、只读根、临时数据目录、无socket；PostgreSQL以tester身份初始化，测试本身uid/gid=0。初始化所需SETUID/SETGID/CHOWN/SETPCAP在运行测试前全部丢弃，测试进程核验CapBnd/CapPrm/CapEff/CapInh/CapAmb全零及NoNewPrivs=1。只允许指定root测试ID。
+- 镜像合同：宿主编排器只负责从固定git archive构建候选应用镜像并取得不可变image ID；测试在该应用镜像内以10001身份、禁网、只读根执行，不提供嵌套Docker。原有精确audit路径/唯一文件/审核内容断言移入可在镜像内运行的分支；候选revision、冻结源码和实际image ID写入证据。镜像不得用测试依赖镜像代替。
+- 回归：先取得缺缓存/错误身份/错误镜像或遗漏profile的RED；补齐后跑10项、调度/隔离/验证器工具测试，再固定提交运行完整CI。删除10项过期skip豁免，不延期。
+- 交付：延用同一只读reviewer复审；不修改生产、发布合同或开启业务开关。失败时保持Draft。若基础镜像构建需要包下载，仅属于现有CI构建依赖，不允许测试外网。
+
+应用镜像worker从`/source`验证固定Git树，测试及业务代码从实际`/app/server`导入；逐文件核对镜像server内容、revision和固定源码，并将实际image ID绑定plan/report。不依赖应用镜像内git或Docker。
+
+双镜像协议：`plan.image_id`保留依赖测试镜像；`plan.application_image_id`只绑定真实应用镜像。收集后逐batch写入`image_id`（application-image使用后者，其余使用前者）；宿主按该不可变ID启动并记录`actual_image_id`，worker报告带`image_id`，最终验证要求三者与plan匹配。任一缺失/格式错误/串用均失败。单片重跑必须已有同一应用镜像且revision=test_sha，禁止重建替换；完整导出tar同时包含两镜像。独立交付核验加载同run的tar，检查两个ID均存在、应用revision及所有batch映射，再用受信控制重新收集比较。仅收集无需构建镜像。覆盖缺失、替换、串用、残余capability的拒绝测试。
+
+### 当前实现与阶段证据
+
+- 已保存的7份原始页面和必要元数据共28文件（约1.87MB），见`server/stable/fixtures/ci_real_cache/manifest.json`。页面字节不变；本地路径转为明确占位符，原始/打包摘要分别保留。`.gitattributes`只对该目录的上游HTML/CFM关闭空白格式检查，页面内容仍由摘要验证。
+- 精确ID分配、两种专用profile、双镜像tar和候选外核验已实现；49项工具测试及36项核心/专用身份测试通过（批次有重叠）。
+- 原8项缓存断言及邻近回归共47项通过。真实应用镜像内1项合同已通过；专用root 1项已通过最终验证器，UID/GID=0、五类capability全零、NoNewPrivs=1、外网/socket不可用。
+- root容器初始化复制代码时不保留宿主owner，避免引入FOWNER；保留原始文件模式和字节，并验证Git树。
+- 最终同快照10项批次、镜像篡改拒绝、独立实现复审及完整CI仍待完成。阶段产物位于`/tmp/p02-ci-gaps-20261029/`，不能据此宣称最终CI通过。

@@ -17,3 +17,13 @@
 ## 全量CI直接集成修复
 
 四处修复及五份证据文档经同一reviewer限定复审PASS，无actionable finding；原生审核正常exit0，日志`/tmp/p02-ci-integration-review.OideHw`，SHA`2f64787d22225d53ad1ddc49f46f7d774f66f44bfb374aac01597b34005a8435`。审前、审后及补核指纹一致：`6373aea9e37c9accfee3584a30142c4f5aea2fdb5c5414718fe84fc2abe3a60f`。七组531次执行通过（有重叠），10项主线既有过期skip仍阻塞完整CI；未延期。审后仅回写本审核状态，代码保持冻结。
+
+## 2026-10-29 CI环境扩展方案审核
+
+原方案reviewer只读审核，指出C1降权需要SETPCAP与全部capability归零检查，C2应用镜像身份需纳入batch/报告/最终核验及单片复跑协议。两项已回写具体方案，同一reviewer聚焦复审APPROVED，审核文件SHA256为`a9782b65475443037f94be013e2c566a98ba267c810d6e7949e639d7bdc36f93`。这仅是方案通过，实际权限/镜像/零skip验证及实现评审仍待完成。
+
+## CI补齐实现审核与返修
+
+完整原生审核正常退出，发现P1选测未覆盖`.gitattributes`、P2缺计划镜像字段可跳过校验、P2导出tar缺应用镜像可由本机缓存补足。原生日志`/tmp/p02-ci-gaps-native-review.log`，SHA256 `32986b8ad067e4b69dc955ca5ba1e9c2cd031fb6161aa650957f10e2c55cf9dd`，审前后指纹`960cb975882c7c83e0ef719f1fe2bb75cbd0209faafbe89b071d386d89d4bdc7`。三项已取得RED并修复，39项直接回归和52项工具回归通过（有重叠），实际全部改动规划为full/339 labels。修复后的验证器重新接受原10项零skip证据，并验证真实双镜像tar精确包含两份config摘要；等待原reviewer聚焦复审。
+
+原reviewer聚焦复审PASS，3项finding全部关闭，剩余actionable finding为0；独立69项相关工具测试通过。审前后指纹一致：`6968ef2bd153a8e05eba580121fa27c3ece096c5aaa9926b760086039be6b5a3`。本轮是首次全范围原生审核后的聚焦复审，没有重跑完整原生命令。审后仅回写本审核/验证/任务/状态证据，源码与测试保持不变；最终固定提交完整CI结果以PR当前提交检查为准。

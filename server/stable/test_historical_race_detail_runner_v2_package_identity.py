@@ -11,11 +11,12 @@ from tempfile import TemporaryDirectory
 from unittest import skipUnless
 
 from django.test import SimpleTestCase
+from stable.real_cache_test_fixture import verify_real_cache_fixtures, fixture_descriptor
 
 
 ROOT = Path(__file__).resolve().parents[2]
 TOOLS = ROOT / "runtime" / "tools"
-CACHE_RUN_ROOT_VALUE = os.environ.get("HISTORICAL_DETAIL_DISTANCE_CACHE_RUN_ROOT", "")
+CACHE_RUN_ROOT_VALUE = os.environ.get("HISTORICAL_DETAIL_DISTANCE_CACHE_RUN_ROOT", str(verify_real_cache_fixtures() / "historical/smoke/run"))
 CACHE_RUN_ROOT = Path(CACHE_RUN_ROOT_VALUE) if CACHE_RUN_ROOT_VALUE else None
 SMOKE_ROOT = CACHE_RUN_ROOT.parent if CACHE_RUN_ROOT is not None else None
 
@@ -35,9 +36,7 @@ def _load(name: str):
 
 def _descriptor(smoke_name: str) -> dict:
     assert SMOKE_ROOT is not None
-    return json.loads(
-        (SMOKE_ROOT / "descriptors" / f"{smoke_name}.json").read_text(encoding="utf-8")
-    )
+    return fixture_descriptor(SMOKE_ROOT / "descriptors" / f"{smoke_name}.json")
 
 
 def _cache_manifest(smoke_name: str) -> Path:

@@ -20,7 +20,7 @@ class OutsideVerifierTests(unittest.TestCase):
         self.git('init','-q');self.git('config','user.email','ci@example.invalid');self.git('config','user.name','ci')
         self.trusted_dependencies=['tools/test_impact/core.py','tools/test_impact/git_input.py',
                'scripts/plan_affected_tests.py','scripts/run_test_plan.py','tools/test_impact/source_binding.py',
-               'scripts/test_plan_worker.py','scripts/run_bounded_stable_tests.py','deploy/test-impact/entrypoint.sh']
+               'scripts/test_plan_worker.py','scripts/application_image_test_worker.py','scripts/run_bounded_stable_tests.py','deploy/test-impact/entrypoint.sh','deploy/test-impact/root-entrypoint.sh','tools/test_impact/special_profiles.py']
         for name in ['scripts/verify_delivery_test_evidence.py',*self.trusted_dependencies]:
             p=self.repo/name;p.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(ROOT/name,p)
         self.rules={'schema_version':1,'docs':['docs/*.md'],'high_risk':['tools/test_impact/**','.github/**'],
@@ -41,7 +41,7 @@ class OutsideVerifierTests(unittest.TestCase):
         merge=self.git('commit-tree',head+'^{tree}','-p',self.base,'-p',head,'-m','synthetic merge')
         plan=create_plan(self.repo,self.base,head,merge);plan.update(mode='docs-only',batches=[],count=0,run_id='11',run_attempt='1')
         plan['control_blobs']={p:oid for p,oid in files(self.repo,merge).items() if p.startswith(('tools/test_impact/','deploy/test-impact/','.github/workflows/')) or p in (
-            'requirements.txt','scripts/plan_affected_tests.py','scripts/run_test_plan.py','scripts/test_plan_worker.py',
+            'requirements.txt','scripts/plan_affected_tests.py','scripts/run_test_plan.py','scripts/test_plan_worker.py','scripts/application_image_test_worker.py',
             'scripts/verify_test_plan.py','scripts/impact_ci.py','scripts/run_bounded_stable_tests.py')}
         archive=self.work/'artifact.zip'
         with zipfile.ZipFile(archive,'w') as z:z.writestr('execution-plan.json',json.dumps(plan))

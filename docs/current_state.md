@@ -1,6 +1,8 @@
-# 2026-10-28 P02 主线发布候选准备
+# 2026-10-29 P02 主线发布候选与CI补齐
 
 已在独立 codex/p02-release-candidate-20261028 分支从 main 提取 P02，移除跨项目0082迁移依赖。候选、升级与恢复流程见[第1项](changes/p02-release-candidate-20261028/spec.md)。新生产执行器尚未实现，CI/镜像演练/生产验收未完成；没有合并或部署。历史源候选证据不替代当前候选测试。
+
+用户已同意补齐通用CI的10项既有环境缺口。原全量6978项已无failure/error，10项过期skip仍阻断；现10项在隔离容器实际运行并由验证器确认全部通过、零skip，真实镜像变异也被拒绝。独立审核3项问题已修复并聚焦复审通过，剩余actionable finding为0。最终完整CI状态以[PR #270当前提交检查](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/270/checks)为准，本记录写入在该次CI之前。详见[CI补齐](changes/p02-release-candidate-20261028/ci-environment-gaps.md)。
 
 ## 2026-10-03 下一版本进入开发调度
 
