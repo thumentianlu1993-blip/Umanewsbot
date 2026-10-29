@@ -1,0 +1,470 @@
+{
+  "status": "COMPLETED_SMOKE_NOT_PASSED",
+  "calls": 9,
+  "settled": 9,
+  "new_unknown": 0,
+  "cost_from_usage_usd": "0.067229976",
+  "peak_no_cache_upper_usd": "0.07506972",
+  "old_unknown_reserve_usd": "0.03872088",
+  "articles": [
+    {
+      "id": 22726,
+      "old_event": {
+        "valid": false,
+        "error": "ContentBlocked:editorial_priority_or_region"
+      },
+      "new_event": {
+        "valid": false,
+        "error": "ContentBlocked:subject_identity_unverified"
+      },
+      "old_entity_attempts": [
+        {
+          "valid": false,
+          "error": "ContentBlocked:entity_span_invalid"
+        },
+        {
+          "valid": false,
+          "error": "ContentBlocked:entity_count_limit"
+        }
+      ],
+      "new_entity_attempts": [
+        {
+          "valid": false,
+          "error": "ContentBlocked:entity_span_invalid"
+        },
+        {
+          "valid": false,
+          "error": "ContentBlocked:entity_span_invalid"
+        }
+      ]
+    },
+    {
+      "id": 22715,
+      "old_event": {
+        "valid": false,
+        "error": "ContentBlocked:editorial_schema"
+      },
+      "new_event": {
+        "valid": true,
+        "result": {
+          "identity": {},
+          "facts": [],
+          "priority": "reject",
+          "primary_region": "hong_kong",
+          "reason": "文章为练马师对几匹赛驹的赛前展望和参赛计划，无重大赛果、政策或身份事件，不值得选稿。",
+          "comparison": {
+            "event_id": null,
+            "version": 0
+          },
+          "identity_key": null
+        }
+      },
+      "old_entity_attempts": [
+        {
+          "valid": false,
+          "error": "ContentBlocked:entity_span_invalid"
+        },
+        {
+          "valid": false,
+          "error": "ContentBlocked:entity_count_limit"
+        }
+      ],
+      "new_entity_attempts": [
+        {
+          "valid": false,
+          "error": "ContentBlocked:entity_span_invalid"
+        },
+        {
+          "valid": false,
+          "error": "ContentBlocked:entity_span_invalid"
+        }
+      ]
+    },
+    {
+      "id": 22700,
+      "old_event": {
+        "valid": false,
+        "error": "ContentBlocked:editorial_priority_or_region"
+      },
+      "new_event": {
+        "valid": true,
+        "result": {
+          "primary_region": "hong_kong",
+          "priority": "uncertain",
+          "reason": "该文章为赛前预览，报道骑师对个别马匹参赛前景的看法，不包含比赛结果或重大事件，仅含观点和已发生的普通赛果，身份依据不足，不值得作为新闻事件选稿。",
+          "identity": {},
+          "facts": [],
+          "comparison": {
+            "event_id": null,
+            "version": 0
+          },
+          "identity_key": null
+        }
+      },
+      "old_entity_attempts": [
+        {
+          "valid": false,
+          "error": "ContentBlocked:entity_span_invalid"
+        },
+        {
+          "valid": false,
+          "error": "ContentBlocked:entity_span_invalid"
+        }
+      ],
+      "new_entity_attempts": [
+        {
+          "valid": false,
+          "error": "ContentBlocked:entity_span_invalid"
+        },
+        {
+          "valid": false,
+          "error": "ContentBlocked:entity_span_invalid"
+        }
+      ]
+    }
+  ],
+  "span_diagnostics": [
+    {
+      "id": 22726,
+      "attempt": 0,
+      "entity_count": 25,
+      "span_error_count": 25,
+      "first_errors": [
+        {
+          "block_id": "title",
+          "text": "天皇賞",
+          "returned_span": [
+            1,
+            6
+          ],
+          "actual_slice": "天皇賞・秋",
+          "first_exact_match_span": [
+            1,
+            4
+          ]
+        },
+        {
+          "block_id": "title",
+          "text": "秋",
+          "returned_span": [
+            8,
+            9
+          ],
+          "actual_slice": "ス",
+          "first_exact_match_span": [
+            5,
+            6
+          ]
+        }
+      ]
+    },
+    {
+      "id": 22726,
+      "attempt": 1,
+      "entity_count": 47,
+      "span_error_count": 44,
+      "first_errors": [
+        {
+          "block_id": "title",
+          "text": "ラストラン",
+          "returned_span": [
+            7,
+            16
+          ],
+          "actual_slice": "ラストランのセイウ",
+          "first_exact_match_span": [
+            7,
+            12
+          ]
+        },
+        {
+          "block_id": "title",
+          "text": "セイウンハーデス",
+          "returned_span": [
+            17,
+            27
+          ],
+          "actual_slice": "ハーデスは上昇気配　",
+          "first_exact_match_span": [
+            13,
+            21
+          ]
+        }
+      ]
+    },
+    {
+      "id": 22715,
+      "attempt": 0,
+      "entity_count": 65,
+      "span_error_count": 58,
+      "first_errors": [
+        {
+          "block_id": "title",
+          "text": "Sky-high",
+          "returned_span": [
+            11,
+            20
+          ],
+          "actual_slice": "Sky-high ",
+          "first_exact_match_span": [
+            11,
+            19
+          ]
+        },
+        {
+          "block_id": "title",
+          "text": "Class Three",
+          "returned_span": [
+            30,
+            40
+          ],
+          "actual_slice": "Class Thre",
+          "first_exact_match_span": [
+            30,
+            41
+          ]
+        }
+      ]
+    },
+    {
+      "id": 22715,
+      "attempt": 1,
+      "entity_count": 49,
+      "span_error_count": 39,
+      "first_errors": [
+        {
+          "block_id": "title",
+          "text": "Class Three",
+          "returned_span": [
+            29,
+            39
+          ],
+          "actual_slice": " Class Thr",
+          "first_exact_match_span": [
+            30,
+            41
+          ]
+        },
+        {
+          "block_id": "b0",
+          "text": "Class Three",
+          "returned_span": [
+            67,
+            79
+          ],
+          "actual_slice": " their respe",
+          "first_exact_match_span": [
+            85,
+            96
+          ]
+        }
+      ]
+    },
+    {
+      "id": 22700,
+      "attempt": 0,
+      "entity_count": 61,
+      "span_error_count": 50,
+      "first_errors": [
+        {
+          "block_id": "title",
+          "text": "Sha Tin",
+          "returned_span": [
+            42,
+            50
+          ],
+          "actual_slice": " debut a",
+          "first_exact_match_span": [
+            52,
+            59
+          ]
+        },
+        {
+          "block_id": "b1",
+          "text": "James Orman",
+          "returned_span": [
+            21,
+            32
+          ],
+          "actual_slice": "s never lac",
+          "first_exact_match_span": [
+            49,
+            60
+          ]
+        }
+      ]
+    },
+    {
+      "id": 22700,
+      "attempt": 1,
+      "entity_count": 57,
+      "span_error_count": 48,
+      "first_errors": [
+        {
+          "block_id": "title",
+          "text": "Top Dragon",
+          "returned_span": [
+            15,
+            25
+          ],
+          "actual_slice": " Top Drago",
+          "first_exact_match_span": [
+            16,
+            26
+          ]
+        },
+        {
+          "block_id": "title",
+          "text": "Sha Tin",
+          "returned_span": [
+            39,
+            47
+          ],
+          "actual_slice": "irt debu",
+          "first_exact_match_span": [
+            52,
+            59
+          ]
+        }
+      ]
+    }
+  ],
+  "cost_detail": [
+    {
+      "operation": "108f09f922af884ef1875f3117c00055f2ac3c309b90ce91b5c6626c2467f0df",
+      "rate_period": "peak",
+      "started_at": "2026-10-29T03:00:12.074444+00:00",
+      "usage_cost_usd": "0.005148",
+      "finish_reason": "stop"
+    },
+    {
+      "operation": "accbc96a3386a96cb517e2bc460646474f44c94b5f266098984d58d6200a1c76",
+      "rate_period": "peak",
+      "started_at": "2026-10-29T03:00:22.987306+00:00",
+      "usage_cost_usd": "0.00486156",
+      "finish_reason": "stop"
+    },
+    {
+      "operation": "d3716864c4cf2d08591cdecc675e4acf4b4817507cdecc4c0efb139849a5724f",
+      "rate_period": "peak",
+      "started_at": "2026-10-29T03:00:34.145833+00:00",
+      "usage_cost_usd": "0.008248504",
+      "finish_reason": "stop"
+    },
+    {
+      "operation": "01da7a6b9d46e602a10d3232428572ad2a869c97e46029d89cecb8278c452ca4",
+      "rate_period": "peak",
+      "started_at": "2026-10-29T03:00:53.366476+00:00",
+      "usage_cost_usd": "0.00353496",
+      "finish_reason": "stop"
+    },
+    {
+      "operation": "7428557a4d9e2e82b19413d9e6f29d1e0ee3e58442ee4bca11550fe4e8383bff",
+      "rate_period": "peak",
+      "started_at": "2026-10-29T03:00:58.097912+00:00",
+      "usage_cost_usd": "0.01328184",
+      "finish_reason": "stop"
+    },
+    {
+      "operation": "c967382fe827ae6a1367f3807ad7b6d472ff9390a552fae33c9918d4861681d3",
+      "rate_period": "peak",
+      "started_at": "2026-10-29T03:01:24.800395+00:00",
+      "usage_cost_usd": "0.006977784",
+      "finish_reason": "stop"
+    },
+    {
+      "operation": "9f58bce094dafc3544bdf7fb3ac01d794e8a3f755a7b77d9cedb188fd6d5f9f1",
+      "rate_period": "peak",
+      "started_at": "2026-10-29T03:01:40.679385+00:00",
+      "usage_cost_usd": "0.00255904",
+      "finish_reason": "stop"
+    },
+    {
+      "operation": "0b905a5ad9f5fa7d958729afd5d5a6b6954a2804f689272a65a0062d90c5b056",
+      "rate_period": "peak",
+      "started_at": "2026-10-29T03:01:45.363261+00:00",
+      "usage_cost_usd": "0.012667776",
+      "finish_reason": "stop"
+    },
+    {
+      "operation": "637fd8014645f49726a323652c75674bf1e60944ec6a808145a70791c9919c69",
+      "rate_period": "peak",
+      "started_at": "2026-10-29T03:02:08.384922+00:00",
+      "usage_cost_usd": "0.009950512",
+      "finish_reason": "stop"
+    }
+  ],
+  "latency_seconds": {
+    "p50": 13.914990367367864,
+    "p95_nearest_rank": 24.241370198316872
+  },
+  "production_writes": 0,
+  "full_20_retest_started": false,
+  "receipt_audit": {
+    "package_sha256": "0dedc3a1b26e7d81e080bc0035dc307674192fff7de256b9e031c2f481c791fc",
+    "status": "PASS",
+    "model_requests": 9,
+    "local_receipts_verified": 9,
+    "remote_durable_receipts_verified": 9,
+    "remote_receipt_sha256": {
+      "108f09f922af884ef1875f3117c00055f2ac3c309b90ce91b5c6626c2467f0df": "b8b273fe3c8c75f5569a99d4e8617181abc12abe7e03086546a3e2316be4ce38",
+      "accbc96a3386a96cb517e2bc460646474f44c94b5f266098984d58d6200a1c76": "0bd9087606fbb6f615ed54ee46b5ee26cd232bba496a4a6c55ba6d94d5be5d98",
+      "d3716864c4cf2d08591cdecc675e4acf4b4817507cdecc4c0efb139849a5724f": "bcd71580008a658392b46fc4cd7af3c15eab3e68a1dd38588cf78a38cd63fc02",
+      "01da7a6b9d46e602a10d3232428572ad2a869c97e46029d89cecb8278c452ca4": "5c06e29de0cbd49dcea8cd9ace2337684b9e512a72bc122379eacd6415d477f8",
+      "7428557a4d9e2e82b19413d9e6f29d1e0ee3e58442ee4bca11550fe4e8383bff": "bd96cac223998902c346360923165146f8cae53d72a51a8a011d17764ae2e9e9",
+      "c967382fe827ae6a1367f3807ad7b6d472ff9390a552fae33c9918d4861681d3": "c09322693f10043d4fec9cf14706369e00c697efb265c2661c174e3a89366354",
+      "9f58bce094dafc3544bdf7fb3ac01d794e8a3f755a7b77d9cedb188fd6d5f9f1": "0f7790e5a8763acd809e25f9914177630fc15a85970d020d7f008c44128bc546",
+      "0b905a5ad9f5fa7d958729afd5d5a6b6954a2804f689272a65a0062d90c5b056": "b88c5f2de4bcd7bcc1cda14937216099be2ac973a658d704964e66a251e34ea9",
+      "637fd8014645f49726a323652c75674bf1e60944ec6a808145a70791c9919c69": "b87b570729ab7bd4c0b195e45341e3381f8844c1028e613f3a52485cbb1730a1"
+    },
+    "new_unknown": 0,
+    "validator_container_absent": true,
+    "old_unknown_preserved": true
+  },
+  "approved_package_sha256": "0dedc3a1b26e7d81e080bc0035dc307674192fff7de256b9e031c2f481c791fc",
+  "approval": "用户：同意，开始吧；同意旧unknown最高预约继续占用预算，不重试旧请求，独立3篇小测上限1美元",
+  "source_commit": "0cd55393755b7285163a4638f8a814817d7f5041",
+  "runtime_file_sha256": {
+    "approval.json": "8396dd3b3c7b64cd7852540c598ce02a2574226949fddb1fcfb3f1f0c8508a2d",
+    "package.json": "0dedc3a1b26e7d81e080bc0035dc307674192fff7de256b9e031c2f481c791fc",
+    "config.json": "f4ff8a65fcdd1abc2217450221b91f0abfdd927e6d07520d65e7a59b602fabc7",
+    "inputs.json": "2c2ec1d0bc80dca0e82998e812a31e8ce03e0b4eed0be1d02d32d51f06672d09",
+    "run-smoke.py": "ac154720978b984444f35e2f30750f9652b99d462777f3df4bb18c8fc453918f",
+    "journal_proxy.py": "fe13feb78453050eb69f9ca390a8b0cc910b0f64a1f66093d92177a75dd944b3",
+    "test_proxy.py": "e27edbf27681f15d1f38f5386221f41da60a9e849bf952eeda28a15065d9dcd7",
+    "final-summary.json": "69fdb938717734076f5359a759cb1f2f2c82075362f00ef9f3aaa5c454253eaf",
+    "receipt-audit.json": "bbda7cd58ee3a2a038beea26553b1813adfd572e0b734547c9a0e70fd2216211",
+    "results/01da7a6b9d46e602a10d3232428572ad2a869c97e46029d89cecb8278c452ca4-receipt.json": "c311844218da257530f99d3c8b1eaa2a7a4b83d419a2155b861a4efc1ccebf15",
+    "results/01da7a6b9d46e602a10d3232428572ad2a869c97e46029d89cecb8278c452ca4-request.json": "59a764dbba99e87a0fde9ce723c403d743877a42e6ceb0f7507ca0a0d03d1c1f",
+    "results/01da7a6b9d46e602a10d3232428572ad2a869c97e46029d89cecb8278c452ca4-transport.json": "7360349271ebf1e1e28906b56fe6aef84dea6791cc2fab8a915f3991059e66d4",
+    "results/0b905a5ad9f5fa7d958729afd5d5a6b6954a2804f689272a65a0062d90c5b056-receipt.json": "79ab136f9bfdf4d24544c4936df300f361683bb66f5bc4522796f87732f37d6f",
+    "results/0b905a5ad9f5fa7d958729afd5d5a6b6954a2804f689272a65a0062d90c5b056-request.json": "f241d9b0dcb96cc6cd2f40203ac33fb0ba38a39ae59a2af7bedd8a6226dbdbd4",
+    "results/0b905a5ad9f5fa7d958729afd5d5a6b6954a2804f689272a65a0062d90c5b056-transport.json": "7360349271ebf1e1e28906b56fe6aef84dea6791cc2fab8a915f3991059e66d4",
+    "results/108f09f922af884ef1875f3117c00055f2ac3c309b90ce91b5c6626c2467f0df-receipt.json": "de25cef92f3e3d2ca87a89e98cf56c26a7d56fdc4a5eea5ba6ecaa49980da8c9",
+    "results/108f09f922af884ef1875f3117c00055f2ac3c309b90ce91b5c6626c2467f0df-request.json": "c634c935f20e3a92cb02bc9c51c2507d589db674e9e60f485aea0a7713679729",
+    "results/108f09f922af884ef1875f3117c00055f2ac3c309b90ce91b5c6626c2467f0df-transport.json": "7360349271ebf1e1e28906b56fe6aef84dea6791cc2fab8a915f3991059e66d4",
+    "results/637fd8014645f49726a323652c75674bf1e60944ec6a808145a70791c9919c69-receipt.json": "5b4bf8c8a3a746c98f4c68157abf0c5e8e710601f040e084fea2401dde7ad884",
+    "results/637fd8014645f49726a323652c75674bf1e60944ec6a808145a70791c9919c69-request.json": "7e4580a81c5b8085d34eb42b41f0f37532ee43ee7ad2a2dc70cbb1b598a9b9aa",
+    "results/637fd8014645f49726a323652c75674bf1e60944ec6a808145a70791c9919c69-transport.json": "7360349271ebf1e1e28906b56fe6aef84dea6791cc2fab8a915f3991059e66d4",
+    "results/7428557a4d9e2e82b19413d9e6f29d1e0ee3e58442ee4bca11550fe4e8383bff-receipt.json": "5bd62ddc453b505bd73bba7697a121faaf2ebf47031b29027b915555f3b1313c",
+    "results/7428557a4d9e2e82b19413d9e6f29d1e0ee3e58442ee4bca11550fe4e8383bff-request.json": "ec6c099df9fbcd4f3f04bbcf612739c414d039066c5b89254de42b3aa74debcf",
+    "results/7428557a4d9e2e82b19413d9e6f29d1e0ee3e58442ee4bca11550fe4e8383bff-transport.json": "7360349271ebf1e1e28906b56fe6aef84dea6791cc2fab8a915f3991059e66d4",
+    "results/9f58bce094dafc3544bdf7fb3ac01d794e8a3f755a7b77d9cedb188fd6d5f9f1-receipt.json": "e67730824278f46d46f1520efae292a5a6df783462d9683926a3df26cb5264db",
+    "results/9f58bce094dafc3544bdf7fb3ac01d794e8a3f755a7b77d9cedb188fd6d5f9f1-request.json": "569d4b050cf0495b8037180598943a18f7384f343ada3f00484a66d2abfa3eef",
+    "results/9f58bce094dafc3544bdf7fb3ac01d794e8a3f755a7b77d9cedb188fd6d5f9f1-transport.json": "7360349271ebf1e1e28906b56fe6aef84dea6791cc2fab8a915f3991059e66d4",
+    "results/accbc96a3386a96cb517e2bc460646474f44c94b5f266098984d58d6200a1c76-receipt.json": "2de3e6ec5cccb161407bfb085bd6a17020d50f0c24baddfe057fc14a2d55b2f2",
+    "results/accbc96a3386a96cb517e2bc460646474f44c94b5f266098984d58d6200a1c76-request.json": "2856c7484df15e2d7e6bee7e85ba9b9c4eec0171ad9ca8ff48cd1f97d27d7f20",
+    "results/accbc96a3386a96cb517e2bc460646474f44c94b5f266098984d58d6200a1c76-transport.json": "7360349271ebf1e1e28906b56fe6aef84dea6791cc2fab8a915f3991059e66d4",
+    "results/article-22700.json": "1a5f390f5e24bc2b2d91262285b3baaa39a8f3d65e6fa23e03bc28d261d0e947",
+    "results/article-22715.json": "66a0c508fa71cf0ddcb7f68413cd841da675ea17f73fc232709e3091174acc27",
+    "results/article-22726.json": "ae43dbd4cecf6fa52dc9393608b32cbc89d2e39626851c02baea993b21286ccf",
+    "results/c967382fe827ae6a1367f3807ad7b6d472ff9390a552fae33c9918d4861681d3-receipt.json": "d0c0ae38a45cea6dbb65fc475f518b566b681a5d05dfe6964aa07902bd31cb94",
+    "results/c967382fe827ae6a1367f3807ad7b6d472ff9390a552fae33c9918d4861681d3-request.json": "1fc6277696591ca4aab26aacceb8e4ee0fcd00d5e75c3b08ae44c3d2ceee78a9",
+    "results/c967382fe827ae6a1367f3807ad7b6d472ff9390a552fae33c9918d4861681d3-transport.json": "7360349271ebf1e1e28906b56fe6aef84dea6791cc2fab8a915f3991059e66d4",
+    "results/d3716864c4cf2d08591cdecc675e4acf4b4817507cdecc4c0efb139849a5724f-receipt.json": "43d171da18efb4bcad7d21c8e1ed21898a0dfe0fd2e52349c6c84ca5e2220ee5",
+    "results/d3716864c4cf2d08591cdecc675e4acf4b4817507cdecc4c0efb139849a5724f-request.json": "ba29600a4875c28ca1d9f005a22fc9fcb02f6860b7504da3d63d762dda555876",
+    "results/d3716864c4cf2d08591cdecc675e4acf4b4817507cdecc4c0efb139849a5724f-transport.json": "7360349271ebf1e1e28906b56fe6aef84dea6791cc2fab8a915f3991059e66d4",
+    "results/ledger.json": "2e74193fe56d9b7e9f87a84fb20407c199ba2d81f77e246a4dc425655ef0f96c",
+    "results/summary.json": "4cede4c5bb5149bdfd2c05e913115bc5f16dd541503d6c22ef7f1912061931b9"
+  }
+}
