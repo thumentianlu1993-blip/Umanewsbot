@@ -4,6 +4,8 @@
 
 用户已同意补齐通用CI的10项既有环境缺口。原全量6978项已无failure/error，10项过期skip仍阻断；现10项在隔离容器实际运行并由验证器确认全部通过、零skip，真实镜像变异也被拒绝。独立审核3项问题已修复并聚焦复审通过，剩余actionable finding为0。最终完整CI状态以[PR #270当前提交检查](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/270/checks)为准，本记录写入在该次CI之前。详见[CI补齐](changes/p02-release-candidate-20261028/ci-environment-gaps.md)。
 
+2026-10-29 全量CI `40810137042`已执行6989项、skip=0；4项日历刷新测试因动态日期与固定12月28日碰撞未通过。该测试夹具已修复，26项PG回归及原reviewer单文件原生审核通过。最终完整CI依然以PR当前提交检查为准。
+
 ## 2026-10-03 下一版本进入开发调度
 
 用户已要求由协调会话承担架构与产品协调，创建三条开发线及独立审核支持，目标仍为 10/30 完全上线。已在独立工作树继承原规划并保留来源哈希；模型固定 gpt-6.1-sol / medium。实际派单与会话状态见 [开发调度](changes/next-version-capabilities/coordination.md) 和 [执行台账](changes/next-version-capabilities/dispatch_state.json)。本条不表示任何功能已实现、合并或发布。

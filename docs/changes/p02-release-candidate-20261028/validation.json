@@ -1278,5 +1278,29 @@
       "tools/test_impact/rules.json": "c5a2dfcdc7f2d6411ddd036bfe7d6874cba2739bfe39f0196b824c42be547e1b",
       "tools/test_impact/special_profiles.py": "83cefc4cfd19855642a8ee0e7a730beba817f2d1ac9bcf77ed48ce6f4f4b909c"
     }
+  },
+  "calendar_fixture_date_fix": {
+    "trigger": "2026-10-29 + 60 days equals fixed December 28; reschedule fixture became noop",
+    "full_ci_before_fix": {
+      "run": 40810137042,
+      "executed": 6989,
+      "batches": 51,
+      "failures": 2,
+      "errors": 2,
+      "skips": 0
+    },
+    "red_artifact": "/tmp/p02-ci-gaps-20261029/calendar-date-red.log",
+    "red_sha256": "f80bc14ca13b9b2e0cb2fd5b38e9ac198da94d392291308a0257a25dade80c8a",
+    "green_artifact": "/tmp/p02-ci-gaps-20261029/calendar-date-green.json",
+    "green_sha256": "bb87721abffe56c43441b711877ae3fdaaa60ddff906dcc2bec27f6b9a5377ec",
+    "green_postgres_tests": 26,
+    "review": "PASS",
+    "remaining_findings": 0,
+    "review_fingerprint": "a926b5aca2343981c67c398bc1f6bc98c5b6263f47e22770b0f6a03009c80036",
+    "review_log_sha256": "275b94b5ceb4f051217012a5bc2191e1dcef1f7021b1342e572575106f24d8bd",
+    "independent_calendar_days_checked": 1461,
+    "source_sha256": "761fce55454473e5dfd5fd5f7fc531c9868f90b23e1570ebad176b257f47d433",
+    "production_code_changed": false,
+    "final_ci_authority": "https://github.com/thumentianlu1993-blip/Umanewsbot/pull/270/checks"
   }
 }
