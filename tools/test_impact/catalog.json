@@ -97,7 +97,13 @@
       "stable.test_release_0078_recovery",
       "stable.test_release_0078_entrypoints",
       "stable.test_release_0078_recovery_postgres",
-      "stable.test_release_0079"
+      "stable.test_release_0079",
+      "stable.test_release_p02",
+      "stable.test_release_p02_coordinator",
+      "stable.test_release_p02_lock",
+      "stable.test_release_p02_postgres",
+      "stable.test_release_p02_readonly",
+      "stable.test_release_p02_runtime"
     ],
     "infrastructure": [
       "scripts.tests.test_bounded_stable_tests",
@@ -2895,6 +2901,42 @@
       "domains": [
         "infrastructure"
       ]
+    },
+    "server/stable/test_release_p02.py": {
+      "label": "stable.test_release_p02",
+      "domains": [
+        "release"
+      ]
+    },
+    "server/stable/test_release_p02_coordinator.py": {
+      "label": "stable.test_release_p02_coordinator",
+      "domains": [
+        "release"
+      ]
+    },
+    "server/stable/test_release_p02_lock.py": {
+      "label": "stable.test_release_p02_lock",
+      "domains": [
+        "release"
+      ]
+    },
+    "server/stable/test_release_p02_postgres.py": {
+      "label": "stable.test_release_p02_postgres",
+      "domains": [
+        "release"
+      ]
+    },
+    "server/stable/test_release_p02_readonly.py": {
+      "label": "stable.test_release_p02_readonly",
+      "domains": [
+        "release"
+      ]
+    },
+    "server/stable/test_release_p02_runtime.py": {
+      "label": "stable.test_release_p02_runtime",
+      "domains": [
+        "release"
+      ]
     }
   },
   "profiles": {
@@ -3219,7 +3261,13 @@
     "stable.test_race_lifecycle_storage": "django",
     "stable.test_race_regional_lifecycle": "django",
     "stable.test_race_regional_pipeline": "django",
-    "scripts.tests.test_impact_special_profiles": "python"
+    "scripts.tests.test_impact_special_profiles": "python",
+    "stable.test_release_p02": "python",
+    "stable.test_release_p02_coordinator": "python",
+    "stable.test_release_p02_lock": "python",
+    "stable.test_release_p02_postgres": "django",
+    "stable.test_release_p02_readonly": "django",
+    "stable.test_release_p02_runtime": "python"
   },
   "allowed_skips": {},
   "owners": {
@@ -3245,6 +3293,7 @@
   "dedicated_batch_modules": [
     "stable.test_migration_history_repair_postgres",
     "stable.test_migration_database_isolation",
-    "scripts.tests.test_f02_export_postgres"
+    "scripts.tests.test_f02_export_postgres",
+    "stable.test_release_p02_postgres"
   ]
 }

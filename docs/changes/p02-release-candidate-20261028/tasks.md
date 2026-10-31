@@ -49,3 +49,11 @@
 - [x] (operations) 刷新固定历史集合及19场追踪/合同状态，形成逐场处置候选；重现registry证据陈旧，未续签或调用TRA。
 - [x] (operations) 独立子Agent/原生只读评审与文档检查均PASS，无finding；来源准入仍阻断，新head CI另验。
 - [ ] (integration) 取得符合免费约束的来源用途/额度证明，再推进适配和绑定；本轮未完成来源准入或生产冻结。
+
+
+## 第4项执行器实现（2026-10-31）
+
+- [x] (operations) 独立P02执行器与精确catalog实现；身份、并发、writer、漂移、故障恢复和收尾失败测试先行。
+- [x] (operations) 合成PG16双集群真实备份/恢复、六步DDL及故障续跑验证；见[验证边界](executor-validation.md)。
+- [ ] (operations) 固定候选完整Compose与生产形状隔离副本演练，实测资源、停写时限和RTO；合成测试不能勾选本项。
+- [ ] (operations) 当前head独立review与所需CI全部通过，形成可交付发布包。
