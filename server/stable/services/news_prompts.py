@@ -71,12 +71,18 @@ CONTEXT_BASE = (
 )
 CONTEXT_PROMPTS = {
     'entity_check': CONTEXT_BASE + (
-        '识别source.title及source.blocks中全部专名，每次出现分别给出逐字原文上下文context。'
-        'context非空且含text，须在该块中唯一定位本次text；重复名须各用可区分的上下文。'
-        '不输出字符跨度，不改写空白/大小写，不猜译名或身份。返回'
-        '{"coverage":"complete或uncertain","entities":[{"block_id":"title或块ID","text":"原名",'
-        '"type":"horse/person/race/organization/place/common_word中一个","context":"原文逐字片段"}]}。'
-        'common_word只标易混淆赛马词。最多128条；缺失或歧义则uncertain，不截取后称完整；无专名用空数组。'),
+        '逐个处理units含标题，识别全部专名每次提及。仅返回'
+        '{"units":[{"unit_id":"输入ID","coverage":"complete或uncertain","entities":[{"text":"原名",'
+        '"type":"horse/person/race/organization/place/common_word中一个","context":"原文片段"}]}]}。'
+        '每个输入单元须有回执，无专名用空数组。只抽起点在核心text内的提及，window供语境及跨边界引用；context_units仅为只读语境，不抽其中提及。'
+        'context逐字取自window且唯一定位text；不报跨度、不改空白、不猜译名或身份。'
+        'repair仅返回请求单元的修正/补充行，accepted已冻结，不重复、不删除。仍无法确定用uncertain。'
+        '总计最多128行，不截取后称完整；common_word只标易混淆赛马词。不得加note或解释。'
+        '以下为合成语义对照：标题及正文都有Alpha须各抽一次；“Alpha won. Alpha returns.”分别引用各句。'
+        '“今回がラストランとなる”中ラストラン指最后一战，不截ラストラ作马名，网站链接不作依据；'
+        '“ラストランという名の競走馬”明确命名，ラストラン是马名。不可把普通词永久拉黑。'
+        '“骑师林某策骑晨光”中林某是人、晨光是马；仅“晨光归来”须结合正文，否则uncertain。'
+        '原文秋の天皇賞不改写成天皇賞・秋。'),
     'translate_full': CONTEXT_BASE + (
         '忠实完整翻译标题、正文和引语为中文，不省略、总结或新增。保留数字单位、否定、计划语气。'
         '__P01_ENTITY_NNN__占位符必须在原块恰好一次且不翻译；摘要可引用已知占位符。'

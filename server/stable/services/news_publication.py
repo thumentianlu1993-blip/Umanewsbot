@@ -64,13 +64,23 @@ def check_publication_evidence(run):
     if run.priority not in {"major", "regional"} or run.primary_region != run.editorial_snapshot.get("primary_region"):
         raise ContentBlocked("editorial_selection_missing")
     entity = _validated_attempt(run, run.entity_snapshot.get("strong_attempt_id"), "entity_check")
-    if entity.usage["input"].get("source") != (stable_source(clean) if v2 else clean):
-        raise ContentBlocked("entity_input_changed")
-    raw_entities = validate_entities(clean, entity.result, contract_version=version)
+    if v2:
+        from stable.services.news_entity_units import replay, occurrences, VERSION
+        state = replay(run, entity, _validated_attempt)
+        if (run.entity_snapshot.get("unit_state") != state
+                or run.entity_snapshot.get("contract_version") != VERSION
+                or run.entity_snapshot.get("input_sha") != entity.input_sha
+                or run.entity_snapshot.get("clean_sha") != clean["clean_sha"]):
+            raise ContentBlocked("entity_unit_snapshot_changed")
+        raw_entities = occurrences(clean, state)
+    else:
+        if entity.usage["input"].get("source") != clean:
+            raise ContentBlocked("entity_input_changed")
+        raw_entities = validate_entities(clean, entity.result, contract_version=version)
     frozen = run.entity_snapshot.get("occurrences", [])
     keys = ("block_id", "start", "end", "text", "type", "token", "source_sha")
     if v2:
-        keys += ("context", "contract_version")
+        keys += ("context", "contract_version", "unit_id")
     if [{key: row[key] for key in keys} for row in raw_entities] != [{key: row.get(key) for key in keys} for row in frozen]:
         raise ContentBlocked("entity_snapshot_changed")
     for row in frozen:

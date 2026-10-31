@@ -290,7 +290,9 @@ def _stage_projection(run, attempt):
             if fact["importance"] == "major" and fact["relation"] == "new" and fact["id"] not in old_ids]
         if event.version and not material:
             return {**update, "state": "duplicate", "reason": "no_material_new_fact"}
-        return {**update, "stage": "entity_check"}
+        # 事件重判通过后开始新实体轮次；旧attempt及费用账证仍保留。
+        # 不能将上轮已完成的initial_attempt_id误当成待修复任务。
+        return {**update, "stage": "entity_check", **({"entity_snapshot": {}} if context_enabled() else {})}
     if attempt.stage == "body_review":
         from stable.services.news_content import validate_body_review
         reviewed = validate_body_review(run.clean_snapshot, attempt.result)
@@ -619,7 +621,20 @@ def context_payload(run):
         return {"source": body_context_source(source), "suspicious_block_ids": source.get("suspicious_block_ids", []),
                 "language": run.source_snapshot["language"]}
     if run.stage == "entity_check":
-        return {"source": source, "language": run.source_snapshot["language"]}
+        from stable.services.news_entity_units import initial_payload, repair_payload, evaluate
+        from stable.services.news_publication import _validated_attempt
+        first_id = run.entity_snapshot.get("initial_attempt_id")
+        if first_id:
+            first = _validated_attempt(run, first_id, "entity_check")
+            if first.usage["input"] != initial_payload(run.clean_snapshot, run.source_snapshot["language"]):
+                from stable.services.news_content import ContentBlocked
+                raise ContentBlocked("entity_repair_base_invalid")
+            state = evaluate(run.clean_snapshot, first.usage["input"], first.result)
+            if state["complete"]:
+                from stable.services.news_content import ContentBlocked
+                raise ContentBlocked("entity_repair_not_needed")
+            return repair_payload(run.clean_snapshot, run.source_snapshot["language"], state, first.pk)
+        return initial_payload(run.clean_snapshot, run.source_snapshot["language"])
     if run.stage == "fact_audit":
         return {"source": source, "target": run.translation_snapshot,
                 "entities": run.entity_snapshot["occurrences"], "editorial": run.editorial_snapshot}
@@ -661,10 +676,21 @@ def context_projection(run, attempt):
     update = {"state": "pending", "reason": "", "lease_until": None}
     quality = deepcopy(run.quality_snapshot)
     if attempt.stage == "entity_check":
-        rows = validate_entities(run.clean_snapshot, attempt.result, contract_version="context-v2")
+        from stable.services.news_entity_units import replay, occurrences, VERSION
+        from stable.services.news_publication import _validated_attempt
+        state = replay(run, attempt, _validated_attempt)
+        first_id = run.entity_snapshot.get("initial_attempt_id") or attempt.pk
+        snapshot = {"contract_version": VERSION, "initial_attempt_id": first_id,
+                    "unit_state": state, "clean_sha": run.clean_snapshot["clean_sha"]}
+        if not state["complete"]:
+            repairing = attempt.usage["input"].get("mode") == "repair"
+            return {**update, "stage": "entity_check", "entity_snapshot": snapshot,
+                    "state": "review" if repairing else "pending",
+                    "reason": "entity_repair_failed" if repairing else "one_entity_repair"}
+        rows = occurrences(run.clean_snapshot, state)
         rows = resolve_known_entities(run.clean_snapshot, rows, language=run.source_snapshot["language"])
-        update["entity_snapshot"] = {"occurrences": rows, "strong_attempt_id": attempt.pk,
-            "input_sha": attempt.input_sha, "clean_sha": run.clean_snapshot["clean_sha"]}
+        update["entity_snapshot"] = {**snapshot, "occurrences": rows, "strong_attempt_id": attempt.pk,
+                                    "input_sha": attempt.input_sha}
         if run.manual_target:
             target = manual_translation(run.manual_target)
             hard = hard_translation_checks(run.clean_snapshot, target)

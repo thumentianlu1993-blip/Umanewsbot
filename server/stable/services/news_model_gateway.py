@@ -398,7 +398,11 @@ def reuse_completed(attempt, payload):
             # completed 仅代表供应商账证完成；缓存还须重放阶段内容校验。
             from stable.services.news_content import validate_entities, validate_body_review
             if origin.stage == "entity_check":
-                validate_entities(origin.run.clean_snapshot, origin.result, contract_version="context-v2")
+                from stable.services.news_entity_units import evaluate, occurrences, initial_payload
+                # 修复输入绑定本run首轮回执，不跨run复用补丁。
+                if payload != initial_payload(origin.run.clean_snapshot, origin.run.source_snapshot['language']):
+                    continue
+                occurrences(origin.run.clean_snapshot, evaluate(origin.run.clean_snapshot, payload, origin.result))
             else:
                 validate_body_review(origin.run.clean_snapshot, origin.result)
         except (ContentBlocked, RequestDenied):

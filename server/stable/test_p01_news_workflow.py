@@ -125,7 +125,7 @@ class WorkflowTests(WorkflowFixture, TransactionTestCase):
         self.assertEqual(run.translation_snapshot["body"], manual["body_zh"])
 
 
-class ContextWorkflowTests(WorkflowFixture, TransactionTestCase):
+class ContextWorkflowFixture(WorkflowFixture):
     def setUp(self):
         super().setUp()
         from stable.test_p01_news_budget import context_policy
@@ -145,6 +145,14 @@ class ContextWorkflowTests(WorkflowFixture, TransactionTestCase):
         self.profiles = []
 
     def fake_response(self, attempt, payload):
+        if attempt.stage == 'entity_check':
+            self.calls.append(attempt.stage)
+            data = {'units': [{'unit_id': unit['unit_id'], 'coverage': 'complete', 'entities': [
+                {'text': 'Authority', 'type': 'organization', 'context': 'Authority jurisdiction ZZ'}
+            ] if unit['block_id'] == 'b0' else []} for unit in payload['units']]}
+            return SimpleNamespace(id='unit-fixture', choices=[SimpleNamespace(
+                finish_reason='stop', message=SimpleNamespace(content=json.dumps(data), tool_calls=None))],
+                usage=SimpleNamespace(prompt_tokens=50, completion_tokens=20))
         response = super().fake_response(attempt, payload) if payload.get('mode') != 'repair_blocks' else None
         if response is None:
             self.calls.append(attempt.stage)
@@ -152,8 +160,6 @@ class ContextWorkflowTests(WorkflowFixture, TransactionTestCase):
             response = SimpleNamespace(id='patch', choices=[SimpleNamespace(message=SimpleNamespace(content='', tool_calls=None))], usage=SimpleNamespace(prompt_tokens=50, completion_tokens=20))
         else:
             data = json.loads(response.choices[0].message.content)
-        if attempt.stage == 'entity_check':
-            data['entities'] = [{'block_id': 'b0', 'text': 'Authority', 'type': 'organization', 'context': 'Authority jurisdiction ZZ'}]
         if attempt.stage == 'translate_full':
             self.translation_count += 1
             if self.first_bad_number and self.translation_count == 1:
@@ -169,6 +175,8 @@ class ContextWorkflowTests(WorkflowFixture, TransactionTestCase):
         response.choices[0].finish_reason = 'stop'
         return response
 
+
+class ContextWorkflowTests(ContextWorkflowFixture, TransactionTestCase):
     def test_v2_complete_and_publication_revalidates_context(self):
         from stable.services.news_publication import check_publication_evidence
         run = self.finish()
@@ -340,7 +348,7 @@ class ContextWorkflowTests(WorkflowFixture, TransactionTestCase):
             response = original(attempt, payload)
             if attempt.stage == 'entity_check':
                 data = json.loads(response.choices[0].message.content)
-                data['coverage'] = 'uncertain'
+                data['units'][0]['coverage'] = 'uncertain'
                 response.choices[0].message.content = json.dumps(data)
             return response
         self.provider.stop()
@@ -366,3 +374,98 @@ class ContextWorkflowTests(WorkflowFixture, TransactionTestCase):
                     editorial_snapshot={}, quality_snapshot={})
                 self.assertIn(reason, risk_reasons(run))
                 self.assertEqual(required_profile(run), 'deep')
+
+
+class EntityRepairWorkflowFixture(ContextWorkflowFixture):
+    """沿用带真实预算、回执和发布重验的隔离fixture。"""
+    def setUp(self):
+        super().setUp()
+        self.entity_repair_bad = False
+        self.entity_patch_inputs = []
+
+    def fake_response(self, attempt, payload):
+        result = super().fake_response(attempt, payload)
+        if attempt.stage != 'entity_check': return result
+        data = json.loads(result.choices[0].message.content)
+        if payload['mode'] == 'initial':
+            # 保留b0有效机构；标题回执缺失，必须单独补齐。
+            data['units'] = [u for u in data['units'] if u['unit_id'] != 'title']
+        else:
+            self.entity_patch_inputs.append(deepcopy(payload))
+            if self.entity_repair_bad: data['units'][0]['coverage'] = 'uncertain'
+        result.choices[0].message.content = json.dumps(data)
+        return result
+
+
+class EntityRepairWorkflowTests(EntityRepairWorkflowFixture, TransactionTestCase):
+    def test_entity_patch_only_title_preserves_rows_and_publication_replays_both(self):
+        from stable.services.news_publication import check_publication_evidence
+        from stable.services.news_pipeline import digest
+        run = self.finish()
+        self.assertEqual(run.state, 'shadow', run.reason)
+        self.assertEqual(self.calls.count('entity_check'), 2)
+        self.assertEqual(run.repair_count, 0)
+        patch_input = self.entity_patch_inputs[0]
+        self.assertEqual([u['unit_id'] for u in patch_input['units']], ['title'])
+        self.assertEqual(patch_input['accepted'][0]['text'], 'Authority')
+        check_publication_evidence(run)
+        first = run.attempts.get(pk=run.entity_snapshot['initial_attempt_id'])
+        first.result['units'][0]['entities'][0]['context'] = 'invented'
+        first.output_sha = digest(first.result)
+        from stable.services.news_entity_units import replay
+        final = run.attempts.get(pk=run.entity_snapshot['strong_attempt_id'])
+        with self.assertRaises(ValueError):
+            replay(run, final, lambda *args: first)
+
+    def test_second_incomplete_response_stops_before_translation(self):
+        self.entity_repair_bad = True
+        run = self.finish()
+        self.assertEqual((run.state, run.reason), ('review', 'entity_repair_failed'))
+        self.assertEqual(self.calls.count('entity_check'), 2)
+        self.assertEqual(self.calls.count('translate_full'), 0)
+        self.assertEqual(run.repair_count, 0)
+        self.assertEqual(run.entity_snapshot['unit_state']['accepted'][0]['text'], 'Authority')
+
+    def test_tampered_unit_state_or_initial_binding_never_publishes(self):
+        from stable.services.news_publication import check_publication_evidence
+        run = self.finish(); self.assertEqual(run.state, 'shadow', run.reason)
+        original = deepcopy(run.entity_snapshot)
+        run.entity_snapshot['unit_state']['accepted'] = []
+        with self.assertRaises(ValueError): check_publication_evidence(run)
+        run.entity_snapshot = original
+        run.entity_snapshot['initial_attempt_id'] = run.entity_snapshot['strong_attempt_id']
+        with self.assertRaises(ValueError): check_publication_evidence(run)
+
+
+class EntityRecompareWorkflowTests(ContextWorkflowFixture, TransactionTestCase):
+    def test_new_material_after_event_version_change_starts_fresh_entity_round(self):
+        from stable.services.news_publication import publish, check_publication_evidence
+        run = self.finish()
+        self.assertEqual(run.state, 'shadow', run.reason)
+        old_id = run.entity_snapshot['initial_attempt_id']
+        old_attempt = run.attempts.get(pk=old_id)
+        old_cost = old_attempt.actual_cost
+        event = run.event
+        event.version += 1
+        event.save(update_fields=['version'])
+        with self.settings(NEWS_QUALITY_MODE='enforce', NEWS_QUALITY_FEED_ENABLED=True):
+            self.assertIsNone(publish(run.pk))
+        run.refresh_from_db()
+        self.assertEqual((run.state, run.stage), ('pending', 'event_classify'))
+        # 此fixture仍有major/new事实，不会走duplicate结束。
+        run = self.finish(run)
+        self.assertEqual(run.state, 'shadow', run.reason)
+        self.assertNotEqual(run.entity_snapshot['initial_attempt_id'], old_id)
+        self.assertEqual(self.calls.count('entity_check'), 4 if hasattr(self, 'entity_patch_inputs') else 2)
+        old_attempt.refresh_from_db()
+        self.assertEqual(old_attempt.actual_cost, old_cost)
+        self.assertEqual(old_attempt.state, 'completed')
+        check_publication_evidence(run)
+
+
+class RepairedEntityRecompareWorkflowTests(EntityRepairWorkflowFixture, TransactionTestCase):
+    def test_previously_repaired_entities_start_new_round_after_event_recompare(self):
+        EntityRecompareWorkflowTests.test_new_material_after_event_version_change_starts_fresh_entity_round(self)
+        self.assertEqual(len(self.entity_patch_inputs), 2)
+        self.assertNotEqual(self.entity_patch_inputs[0]['base_attempt_id'],
+                            self.entity_patch_inputs[1]['base_attempt_id'])
