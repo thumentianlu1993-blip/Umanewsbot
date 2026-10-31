@@ -354,3 +354,15 @@ class ContextWorkflowTests(WorkflowFixture, TransactionTestCase):
             self.finish(revised)
         self.assertEqual(self.calls.count('entity_check'), before + 1)
         self.assertEqual(revised.attempts.get(stage='entity_check').provider, 'openai')
+
+    def test_japanese_last_run_and_tendon_injury_require_deep_audit(self):
+        from stable.services.news_pipeline import required_profile, risk_reasons
+        for text, reason in [('ラストランのセイウンハーデス', 'retirement'),
+                             ('今回はラストラ ンとなる。', 'retirement'),
+                             ('屈腱炎により約1年5か月の休養もあった現役生活。', 'injury'),
+                             ('あんなにひどいけがを乗り越えてくれて。', 'injury')]:
+            with self.subTest(text=text):
+                run = SimpleNamespace(stage='fact_audit', clean_snapshot={'title': text, 'blocks': []},
+                    editorial_snapshot={}, quality_snapshot={})
+                self.assertIn(reason, risk_reasons(run))
+                self.assertEqual(required_profile(run), 'deep')

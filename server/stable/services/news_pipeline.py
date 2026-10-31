@@ -575,8 +575,8 @@ def context_enabled():
 def risk_reasons(run):
     import re
     text = run.clean_snapshot.get("title", "") + " " + " ".join(row["text"] for row in run.clean_snapshot.get("blocks", []))
-    rules = {"retirement": r"\bretir(?:e|es|ed|ement|ing)\b|退役|引退",
-             "injury": r"\binjur(?:y|ies|ed)\b|骨折|重傷|重伤",
+    rules = {"retirement": r"\bretir(?:e|es|ed|ement|ing)\b|退役|引退|ラスト\s*ラ\s*ン",
+             "injury": r"\binjur(?:y|ies|ed)\b|骨折|重傷|重伤|屈腱炎|けが|怪我",
              "suspension": r"\bsuspen(?:sion|ded)\b|禁赛|禁賽|騎乗停止",
              "result_correction": r"\bdisqualif|result.{0,20}correct|赛果更正|賽果更正"}
     reasons = [name for name, pattern in rules.items() if re.search(pattern, text, re.I)]
