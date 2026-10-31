@@ -1,0 +1,286 @@
+{
+  "completed_cases": 10,
+  "planned_cases": 10,
+  "calls": [
+    {
+      "case": "entity-22726-base",
+      "profile": "base",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 693,
+        "completion_tokens": 675,
+        "total_tokens": 1368,
+        "prompt_tokens_details": {
+          "cached_tokens": 256
+        },
+        "prompt_cache_hit_tokens": 256,
+        "prompt_cache_miss_tokens": 437
+      },
+      "elapsed_seconds": 4.919358394108713,
+      "peak_cost_upper_usd": "0.00358776"
+    },
+    {
+      "case": "entity-22726-deep",
+      "profile": "deep",
+      "finish_reason": "length",
+      "usage": {
+        "prompt_tokens": 772,
+        "completion_tokens": 8192,
+        "total_tokens": 8964,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 8192
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 772
+      },
+      "elapsed_seconds": 78.01748214941472,
+      "peak_cost_upper_usd": "0.03345936"
+    },
+    {
+      "case": "entity-22725-base",
+      "profile": "base",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 1095,
+        "completion_tokens": 2748,
+        "total_tokens": 3843,
+        "prompt_tokens_details": {
+          "cached_tokens": 256
+        },
+        "prompt_cache_hit_tokens": 256,
+        "prompt_cache_miss_tokens": 839
+      },
+      "elapsed_seconds": 16.580717318691313,
+      "peak_cost_upper_usd": "0.01232748"
+    },
+    {
+      "case": "entity-22725-deep",
+      "profile": "deep",
+      "finish_reason": "length",
+      "usage": {
+        "prompt_tokens": 1174,
+        "completion_tokens": 8192,
+        "total_tokens": 9366,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 8192
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 1174
+      },
+      "elapsed_seconds": 70.94953360129148,
+      "peak_cost_upper_usd": "0.03399"
+    },
+    {
+      "case": "entity-7611-base",
+      "profile": "base",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 797,
+        "completion_tokens": 545,
+        "total_tokens": 1342,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 797
+      },
+      "elapsed_seconds": 4.788644102402031,
+      "peak_cost_upper_usd": "0.00321024"
+    },
+    {
+      "case": "entity-7611-deep",
+      "profile": "deep",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 876,
+        "completion_tokens": 4431,
+        "total_tokens": 5307,
+        "prompt_tokens_details": {
+          "cached_tokens": 256
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 4065
+        },
+        "prompt_cache_hit_tokens": 256,
+        "prompt_cache_miss_tokens": 620
+      },
+      "elapsed_seconds": 40.63533197809011,
+      "peak_cost_upper_usd": "0.01870308"
+    },
+    {
+      "case": "audit-22726-bad-base",
+      "profile": "base",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 2526,
+        "completion_tokens": 306,
+        "total_tokens": 2832,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 2526
+      },
+      "elapsed_seconds": 3.2775196377187967,
+      "peak_cost_upper_usd": "0.00454608"
+    },
+    {
+      "case": "audit-22726-bad-deep",
+      "profile": "deep",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 2605,
+        "completion_tokens": 5467,
+        "total_tokens": 8072,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 5303
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 2605
+      },
+      "elapsed_seconds": 52.12063053995371,
+      "peak_cost_upper_usd": "0.02508792"
+    },
+    {
+      "case": "audit-22726-good-base",
+      "profile": "base",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 2522,
+        "completion_tokens": 87,
+        "total_tokens": 2609,
+        "prompt_tokens_details": {
+          "cached_tokens": 256
+        },
+        "prompt_cache_hit_tokens": 256,
+        "prompt_cache_miss_tokens": 2266
+      },
+      "elapsed_seconds": 3.446189183741808,
+      "peak_cost_upper_usd": "0.00367356"
+    },
+    {
+      "case": "audit-22726-good-deep",
+      "profile": "deep",
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 2601,
+        "completion_tokens": 2317,
+        "total_tokens": 4918,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 2256
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 2601
+      },
+      "elapsed_seconds": 20.98910744395107,
+      "peak_cost_upper_usd": "0.01260864"
+    }
+  ],
+  "incremental_peak_upper_usd": "0.15119412",
+  "historical_peak_upper_usd": "5.42317758",
+  "new_unknown": 0,
+  "production_writes": 0,
+  "human_gold": false,
+  "usage_price_estimate_usd": "0.074943748",
+  "usage_price_basis": "2026-10-31 Saturday offpeak; estimate not invoice",
+  "ledger_receipts_verified": true,
+  "length_responses": 2,
+  "provider_elapsed_seconds": 295.72451434936374,
+  "frozen_entity_passes": 0,
+  "frozen_audit_passes": 3,
+  "entity_7611_deep_adjudication": "frozen score remains false; France Galop Committee is an acceptable larger mention span, not an actual omission at that occurrence; no full gold claim",
+  "cases": [
+    {
+      "case": "entity-22726-base",
+      "frozen_success": false,
+      "valid": true,
+      "error": null,
+      "missing_count": 1,
+      "forbidden_count": 0
+    },
+    {
+      "case": "entity-22726-deep",
+      "frozen_success": false,
+      "valid": false,
+      "error": "output_not_complete",
+      "missing_count": 0,
+      "forbidden_count": 0
+    },
+    {
+      "case": "entity-22725-base",
+      "frozen_success": false,
+      "valid": false,
+      "error": "ContentBlocked:entity_context_schema",
+      "missing_count": 0,
+      "forbidden_count": 0
+    },
+    {
+      "case": "entity-22725-deep",
+      "frozen_success": false,
+      "valid": false,
+      "error": "output_not_complete",
+      "missing_count": 0,
+      "forbidden_count": 0
+    },
+    {
+      "case": "entity-7611-base",
+      "frozen_success": false,
+      "valid": false,
+      "error": "ContentBlocked:context_not_unique",
+      "missing_count": 0,
+      "forbidden_count": 0
+    },
+    {
+      "case": "entity-7611-deep",
+      "frozen_success": false,
+      "valid": true,
+      "error": null,
+      "missing_count": 1,
+      "forbidden_count": 0
+    },
+    {
+      "case": "audit-22726-bad-base",
+      "frozen_success": false,
+      "valid": false,
+      "error": null,
+      "missing_count": 0,
+      "forbidden_count": 0
+    },
+    {
+      "case": "audit-22726-bad-deep",
+      "frozen_success": true,
+      "valid": true,
+      "error": null,
+      "missing_count": 0,
+      "forbidden_count": 0
+    },
+    {
+      "case": "audit-22726-good-base",
+      "frozen_success": true,
+      "valid": true,
+      "error": null,
+      "missing_count": 0,
+      "forbidden_count": 0
+    },
+    {
+      "case": "audit-22726-good-deep",
+      "frozen_success": true,
+      "valid": true,
+      "error": null,
+      "missing_count": 0,
+      "forbidden_count": 0
+    }
+  ]
+}
