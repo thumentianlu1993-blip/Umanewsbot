@@ -1,0 +1,74 @@
+{
+  "articles": 3,
+  "calls": 4,
+  "incremental_peak_upper_usd": "0.02716692",
+  "historical_peak_upper_usd": "5.48637918",
+  "new_unknown": 0,
+  "business_writes": 0,
+  "human_gold": false,
+  "code_sha": "0c6ff935d0e26166a1428231a6eb549ee77148a0",
+  "package_sha256": "669790ae8a4ed82eef66eff65a9e619784976eb7b1d6de953cb17e35e773b583",
+  "translation_calls": 0,
+  "audit_calls": 0,
+  "provider_elapsed_seconds": 29.904968539252877,
+  "usage": {
+    "prompt_tokens": 6421,
+    "completion_tokens": 4720,
+    "prompt_cache_hit_tokens": 768,
+    "prompt_cache_miss_tokens": 5653
+  },
+  "article_results": [
+    {
+      "article_id": 22726,
+      "state": "review",
+      "reason": "ContentBlocked:entity_units_schema",
+      "stage": "entity_check",
+      "calls": 1,
+      "peak_cost_upper_usd": "0.00621192",
+      "entity_reference_check": null
+    },
+    {
+      "article_id": 22725,
+      "state": "review",
+      "reason": "ContentBlocked:entity_units_schema",
+      "stage": "entity_check",
+      "calls": 1,
+      "peak_cost_upper_usd": "0.01395108",
+      "entity_reference_check": null
+    },
+    {
+      "article_id": 7611,
+      "state": "review",
+      "reason": "entity_repair_failed",
+      "stage": "entity_check",
+      "calls": 2,
+      "peak_cost_upper_usd": "0.00700392",
+      "entity_reference_check": null
+    }
+  ],
+  "evidence_sha256": {
+    "package.json": "669790ae8a4ed82eef66eff65a9e619784976eb7b1d6de953cb17e35e773b583",
+    "run.py": "59e3331de5fe05fa7e28fcc705d7c82ff4069080daaacedb6f8ab49d53b0340c",
+    "evaluate.py": "a2e696b91ecc27db1c41f44946c3133da8884b03fa1ce8cb146acb097530fa74",
+    "journal_proxy.py": "03d32ed9cacfaf9374734cd4fe250e6c67cf7f4778d5027d1f814194abe9f379",
+    "inputs.json": "bbe193cca4cf2aeff19eb2dfead629c04c08594bf7304f4430a2ffd6188bd73e",
+    "policy.json": "a3d21a6bc69e13c10e9753762dce26223e91858a6b048ca2f09d8667075acdfa",
+    "run.log": "a1dac292139d503f8aba219794c1751b25ef75d52edaeb070664519b5c919064",
+    "results/ledger.json": "16345b15dae501dd2145f6a4aaf1ad85e65324a6c1f534264d01bcebe5b14915",
+    "results/completed.json": "3a65a76a44535e5a83343e72a4848888216c720a48ae9bd2be25b7e7a6de2193",
+    "results/summary.json": "d467ceec48826baaa22a2a24b470d375793289576804fe5acb57e74d379c1a41",
+    "results/800f9828cbdecee9d15650413d45f027e714c3c9575648cf1c29fa573d289c27-initial-receipt.json": "ab949f62128ce29e00085564f606070f1106e4a21e154842e1cba6ee7105acdc",
+    "results/d394915f7e3b697b943ed784642f105ec30ce447456e0ce7aa1de717cab0767b-initial-receipt.json": "9260f3af444210130b219459710277a5492524949de402d7c925a7c76036f455",
+    "results/800f9828cbdecee9d15650413d45f027e714c3c9575648cf1c29fa573d289c27-receipt.json": "ab949f62128ce29e00085564f606070f1106e4a21e154842e1cba6ee7105acdc",
+    "results/31b943cfeca40ade1af12a9fbab1050f1e59aa703998a4e8a0ccd0bf441224fa-initial-receipt.json": "0e849b250638c50c99d40c865a3994faefae28decde87e0b72fe6b18d415445b",
+    "results/d394915f7e3b697b943ed784642f105ec30ce447456e0ce7aa1de717cab0767b-receipt.json": "9260f3af444210130b219459710277a5492524949de402d7c925a7c76036f455",
+    "results/31b943cfeca40ade1af12a9fbab1050f1e59aa703998a4e8a0ccd0bf441224fa-receipt.json": "0e849b250638c50c99d40c865a3994faefae28decde87e0b72fe6b18d415445b",
+    "results/df5ad5ce2a66ee970fb28070d96bba0b4c75057201c6e46b17d4abb5493501be-initial-receipt.json": "dc519d1a96f370df98faad3c24d151cf325b3c7228075a7bbc02f1b682cb037e",
+    "results/df5ad5ce2a66ee970fb28070d96bba0b4c75057201c6e46b17d4abb5493501be-receipt.json": "dc519d1a96f370df98faad3c24d151cf325b3c7228075a7bbc02f1b682cb037e",
+    "results/22725-state.json": "3a62e10506d906c048b54f1c0c6ad102be476ce188b2a639007fafde08708b23",
+    "results/22726-state.json": "ea3c51ee5a73bdffff3ecf57c4121ef8cdf151650582115ce5aa3a338092a164",
+    "results/7611-state.json": "5a66a4ca682bab5702dfb6205f59abcfec73e1447ee2c94c707f8f9d254e5800"
+  },
+  "entity_passed_article_count": 0,
+  "independent_result_review": "APPROVED: remote receipts, costs, source hashes and report interpretation verified; not quality approval"
+}
