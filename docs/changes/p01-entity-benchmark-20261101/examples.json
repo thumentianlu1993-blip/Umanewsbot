@@ -1,0 +1,268 @@
+{
+  "schema": "entity-annotation-examples-v0.1",
+  "note": "合成格式示例，非真实gold，不能计入100/100或代表模型测量结果",
+  "cases": [
+    {
+      "sample_id": "repeated",
+      "origin": "synthetic",
+      "annotation_origin": "agent_draft",
+      "status": "example_only_not_human_gold",
+      "clean": {
+        "title": "",
+        "blocks": [
+          {
+            "id": "b0",
+            "text": "赛马晨光领先，晨光获胜。"
+          }
+        ]
+      },
+      "gold": {
+        "mentions": [
+          {
+            "mention_id": "repeated-m0",
+            "block_id": "b0",
+            "start": 2,
+            "end": 4,
+            "text": "晨光",
+            "context_start": 0,
+            "context_end": 12,
+            "context": "赛马晨光领先，晨光获胜。",
+            "type": "horse",
+            "acceptable_variants": [],
+            "boundary_reason": "完整原文名称"
+          },
+          {
+            "mention_id": "repeated-m1",
+            "block_id": "b0",
+            "start": 7,
+            "end": 9,
+            "text": "晨光",
+            "context_start": 0,
+            "context_end": 12,
+            "context": "赛马晨光领先，晨光获胜。",
+            "type": "horse",
+            "acceptable_variants": [],
+            "boundary_reason": "完整原文名称"
+          }
+        ],
+        "hard_negatives": [],
+        "ambiguous_spans": [],
+        "expected_action": "extract"
+      }
+    },
+    {
+      "sample_id": "ordinary",
+      "origin": "synthetic",
+      "annotation_origin": "agent_draft",
+      "status": "example_only_not_human_gold",
+      "clean": {
+        "title": "",
+        "blocks": [
+          {
+            "id": "b0",
+            "text": "今回がラストランとなる。"
+          }
+        ]
+      },
+      "gold": {
+        "mentions": [],
+        "hard_negatives": [
+          {
+            "block_id": "b0",
+            "start": 3,
+            "end": 8,
+            "text": "ラストラン",
+            "context_start": 0,
+            "context_end": 12,
+            "context": "今回がラストランとなる。",
+            "reason": "最后一战是普通描述"
+          }
+        ],
+        "ambiguous_spans": [],
+        "expected_action": "extract"
+      }
+    },
+    {
+      "sample_id": "named",
+      "origin": "synthetic",
+      "annotation_origin": "agent_draft",
+      "status": "example_only_not_human_gold",
+      "clean": {
+        "title": "",
+        "blocks": [
+          {
+            "id": "b0",
+            "text": "ラストランという名の競走馬が出走する。"
+          }
+        ]
+      },
+      "gold": {
+        "mentions": [
+          {
+            "mention_id": "named-m0",
+            "block_id": "b0",
+            "start": 0,
+            "end": 5,
+            "text": "ラストラン",
+            "context_start": 0,
+            "context_end": 19,
+            "context": "ラストランという名の競走馬が出走する。",
+            "type": "horse",
+            "acceptable_variants": [],
+            "boundary_reason": "完整原文名称"
+          }
+        ],
+        "hard_negatives": [],
+        "ambiguous_spans": [],
+        "expected_action": "extract"
+      }
+    },
+    {
+      "sample_id": "uncertain",
+      "origin": "synthetic",
+      "annotation_origin": "agent_draft",
+      "status": "example_only_not_human_gold",
+      "clean": {
+        "title": "",
+        "blocks": [
+          {
+            "id": "b0",
+            "text": "晨光归来"
+          }
+        ]
+      },
+      "gold": {
+        "mentions": [],
+        "hard_negatives": [],
+        "ambiguous_spans": [
+          {
+            "block_id": "b0",
+            "start": 0,
+            "end": 2,
+            "text": "晨光",
+            "context_start": 0,
+            "context_end": 4,
+            "context": "晨光归来",
+            "reason": "无类别证据",
+            "allowed_action": "review"
+          }
+        ],
+        "expected_action": "review"
+      }
+    },
+    {
+      "sample_id": "organization",
+      "origin": "synthetic",
+      "annotation_origin": "agent_draft",
+      "status": "example_only_not_human_gold",
+      "clean": {
+        "title": "",
+        "blocks": [
+          {
+            "id": "b0",
+            "text": "晨光牧场宣布扩建。"
+          }
+        ]
+      },
+      "gold": {
+        "mentions": [
+          {
+            "mention_id": "organization-m0",
+            "block_id": "b0",
+            "start": 0,
+            "end": 4,
+            "text": "晨光牧场",
+            "context_start": 0,
+            "context_end": 9,
+            "context": "晨光牧场宣布扩建。",
+            "type": "organization",
+            "acceptable_variants": [],
+            "boundary_reason": "完整原文名称"
+          }
+        ],
+        "hard_negatives": [],
+        "ambiguous_spans": [],
+        "expected_action": "extract"
+      }
+    },
+    {
+      "sample_id": "unicode",
+      "origin": "synthetic",
+      "annotation_origin": "agent_draft",
+      "status": "example_only_not_human_gold",
+      "clean": {
+        "title": "",
+        "blocks": [
+          {
+            "id": "b0",
+            "text": "🐎晨光这匹马获胜。"
+          }
+        ]
+      },
+      "gold": {
+        "mentions": [
+          {
+            "mention_id": "unicode-m0",
+            "block_id": "b0",
+            "start": 1,
+            "end": 3,
+            "text": "晨光",
+            "context_start": 0,
+            "context_end": 9,
+            "context": "🐎晨光这匹马获胜。",
+            "type": "horse",
+            "acceptable_variants": [],
+            "boundary_reason": "完整原文名称"
+          }
+        ],
+        "hard_negatives": [],
+        "ambiguous_spans": [],
+        "expected_action": "extract"
+      }
+    },
+    {
+      "sample_id": "boundary",
+      "origin": "synthetic",
+      "annotation_origin": "agent_draft",
+      "status": "example_only_not_human_gold",
+      "clean": {
+        "title": "",
+        "blocks": [
+          {
+            "id": "b0",
+            "text": "橋口調教師が語った。"
+          }
+        ]
+      },
+      "gold": {
+        "mentions": [
+          {
+            "mention_id": "boundary-m0",
+            "block_id": "b0",
+            "start": 0,
+            "end": 2,
+            "text": "橋口",
+            "context_start": 0,
+            "context_end": 10,
+            "context": "橋口調教師が語った。",
+            "type": "person",
+            "acceptable_variants": [
+              {
+                "block_id": "b0",
+                "start": 0,
+                "end": 5,
+                "text": "橋口調教師",
+                "type": "person",
+                "reason": "姓名和紧邻职称的预声明完整指称变体"
+              }
+            ],
+            "boundary_reason": "完整原文名称"
+          }
+        ],
+        "hard_negatives": [],
+        "ambiguous_spans": [],
+        "expected_action": "extract"
+      }
+    }
+  ]
+}
