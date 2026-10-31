@@ -1,0 +1,64 @@
+{
+  "summary": [
+    {
+      "id": 22726,
+      "status": "translation_checks_passed",
+      "editorial_valid": false,
+      "error": null,
+      "peak_cost_upper_usd": "0.01935780"
+    },
+    {
+      "id": 22725,
+      "status": "validation_blocked",
+      "editorial_valid": false,
+      "error": "ContentBlocked:context_not_unique",
+      "peak_cost_upper_usd": "0.01241064"
+    },
+    {
+      "id": 7611,
+      "status": "validation_blocked",
+      "editorial_valid": false,
+      "error": "ContentBlocked:context_not_unique",
+      "peak_cost_upper_usd": "0.00502788"
+    }
+  ],
+  "cost": {
+    "articles": 3,
+    "calls": 8,
+    "incremental_peak_upper_usd": "0.03679632",
+    "historical_peak_upper_usd": "5.27198346",
+    "production_writes": 0,
+    "human_gold": false
+  },
+  "usage_price_estimate_usd": "0.015703248",
+  "usage_price_basis": "Saturday offpeak USD/M hit .022 miss .66 output 1.98; estimate not invoice",
+  "calls": 8,
+  "all_finish_stop": true,
+  "all_receipts_verified": true,
+  "new_unknown": 0,
+  "latency_seconds": {
+    "sum": 38.92242622189224,
+    "median": 3.660837719216943,
+    "max": 12.274179537780583
+  },
+  "invalid_entity_contexts": [
+    {
+      "article_id": 22725,
+      "text": "天皇賞・秋",
+      "context": "秋の天皇賞が2000メートル戦になって以降",
+      "context_matches": 1,
+      "name_matches_in_context": 0,
+      "candidate_spans": 0
+    },
+    {
+      "article_id": 7611,
+      "text": "France Galop",
+      "context": "France Galop will present the 2026 budget to the France Galop Committee",
+      "context_matches": 1,
+      "name_matches_in_context": 2,
+      "candidate_spans": 2
+    }
+  ],
+  "human_gold": false,
+  "reviewed_quality_issue": "22726 entity ラストラ mislabeled as horse; protected in output as ラストラ 战; model audit false pass; Japanese risk route missing on sampled candidate"
+}

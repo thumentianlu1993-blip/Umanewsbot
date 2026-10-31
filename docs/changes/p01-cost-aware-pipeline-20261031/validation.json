@@ -1,0 +1,38 @@
+{
+  "code_sha": "bc28043e224d0ad6ef3e8e78aa4e84f59d914345",
+  "test_scope": [
+    "stable.test_p01_news_workflow",
+    "stable.test_p01_news_budget",
+    "stable.test_p01_news_content",
+    "stable.test_p01_news_publication",
+    "stable.test_p01_news_recovery",
+    "stable.test_p01_news_report"
+  ],
+  "tests": 89,
+  "failures": 0,
+  "errors": 0,
+  "skips": 0,
+  "environment": "fixed source archive; nonroot read-only Docker; network none; isolated PostgreSQL",
+  "full_suite_run": false,
+  "user_requested_no_full_ci": true,
+  "plan_review": "01a19078-b420-72c3-a49a-e96624d8647b",
+  "code_review": "01a19089-b411-7480-b18b-04883dabc9ff",
+  "review_verdict": "APPROVED",
+  "package_sha256": "4b76d641d6abdc98ff7a8285e3b3b7295dcdcc9dd292f415b9f6b8c31c6845fe",
+  "evidence_sha256": {
+    "plan-review-r2.log": "f54dd0442fdd231b70193f206e8cfb50cf1cd08a4dfb5609f4cf6df27dbdd96c",
+    "review-red.log": "b9be55390bc53c2a35ce26d51bad593996cc3fa726dee19b93a729287079fab0",
+    "fixed-sha-green.log": "9235c19c107c78dcc88d794549ff055606485161a2dd0bad691eef08a1ed91cc",
+    "code-review-r1.log": "c090fd7ca1e19f46d252c126305e651b4a64ef1fdf20c4e602181005b4166d48",
+    "code-review-r2.log": "4bcc936a00a7f6febdd5be9fce1471066414c2e319d75f9d440f8f44c9ae43cf",
+    "code-review-r3.log": "1a32803363bb82d761931912366bd858deb6886b13f6912c42bb695d702a54d3",
+    "code-review-r4.log": "19eea1952575af65a44e95c0d3ffb03955b2a754d5af98ae9bc22269c09e5dc7",
+    "package-review.log": "87404257c8047403782e477f3723dc519e43df48325a5687e9190584743b5016",
+    "japanese-risk-red.log": "65c6bb0bd4810a4281cff1af041ae00e2f1e8a5c7b95c0db402849a1d380b23e",
+    "japanese-risk-green.log": "c49f5caff7a979179f6a16bfa574ff498c5e172459f7bf98d9b2ead81ac9a2aa",
+    "japanese-risk-review.log": "9f540dce6d2ddb5966c5163f5c0a2d8b64c2f2002decb5805514cce5cf0069e1",
+    "final-fixed-sha-green.log": "b958be4dacbebbe5356779d5cedb18f3621ce2c5aece1be3963d030c5f9b519c"
+  },
+  "live_test_code_sha": "4c21910f4e58aa22b753284ef6ebe9cd755870e2",
+  "live_test_on_final_code": false
+}
