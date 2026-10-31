@@ -259,7 +259,7 @@ class ReleaseP02PostgresTests(unittest.TestCase):
             role_state = schema.security_state()
             self.assertIn(role, [r["rolname"] for r in role_state["roles"]])
             self.assertIn("pg_read_all_stats", [r["rolname"] for r in role_state["roles"]])
-            self.assertEqual([r["grantor"] for r in role_state["membership"] if r["role"] == role], [self.params["user"]])
+            self.assertEqual([r["grantor"] for r in role_state["membership"] if r["role"] == role], [schema.bootstrap_role()])
             before = schema.security_snapshot()
             self.admin.execute(sql.SQL("GRANT {} TO {} WITH INHERIT FALSE, SET TRUE").format(sql.Identifier(role), sql.Identifier(member)))
             after_inherit = schema.security_snapshot()
