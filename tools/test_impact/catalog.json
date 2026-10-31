@@ -3281,7 +3281,9 @@
     "stable.test_release_p02_lock": "python",
     "stable.test_release_p02_postgres": "django",
     "stable.test_release_p02_readonly": "django",
-    "stable.test_release_p02_runtime": "python"
+    "stable.test_release_p02_runtime": "python",
+    "stable.test_duplicate_repair_rehearsal": "python",
+    "stable.test_duplicate_repair_runtime": "python"
   },
   "allowed_skips": {},
   "owners": {
