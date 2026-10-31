@@ -261,3 +261,71 @@ class EditorialDateEquivalenceTests(SimpleTestCase):
         response["identity"]["evidence"]["scope"]["end"] -= 1
         with self.assertRaisesRegex(ContentBlocked, "identity_evidence_mismatch"):
             validate_editorial(clean, response, source_scope="france_galop_news")
+
+
+class ContextContractTests(SimpleTestCase):
+    def test_context_entities_roundtrip_unicode_and_repeated_names(self):
+        clean = {**CLEAN, 'title': '😀Alpha', 'blocks': [{'id': 'b0', 'text': 'Alpha wins; Alpha retires.'}]}
+        response = {'coverage': 'complete', 'entities': [
+            {'block_id': 'title', 'text': 'Alpha', 'type': 'horse', 'context': '😀Alpha'},
+            {'block_id': 'b0', 'text': 'Alpha', 'type': 'horse', 'context': 'Alpha wins'},
+            {'block_id': 'b0', 'text': 'Alpha', 'type': 'horse', 'context': '; Alpha retires.'}]}
+        rows = validate_entities(clean, response, contract_version='context-v2')
+        self.assertEqual([(r['start'], r['end']) for r in rows], [(1, 6), (0, 5), (12, 17)])
+        self.assertTrue(all(r['context'] for r in rows))
+        raw = {**protect_source(clean, rows), 'summary': '摘要'}
+        self.assertEqual(restore_translation(clean, rows, raw)['blocks'], clean['blocks'])
+
+    def test_missing_ambiguous_invented_context_or_legacy_spans_fail_closed(self):
+        clean = {**CLEAN, 'blocks': [{'id': 'b0', 'text': 'Alpha / Alpha'}]}
+        row = {'block_id': 'b0', 'text': 'Alpha', 'type': 'horse', 'context': 'Alpha'}
+        for value in [row, {**row, 'context': ''}, {**row, 'context': 'Alpha / Alpha'},
+                      {**row, 'context': 'alpha / '}, {**row, 'start': 0, 'end': 5},
+                      {k: v for k, v in row.items() if k != 'context'}]:
+            with self.subTest(value=value), self.assertRaises(ContentBlocked):
+                validate_entities(clean, {'coverage': 'complete', 'entities': [value]}, contract_version='context-v2')
+
+    def test_summary_and_cross_block_audit_issues_use_independent_anchors(self):
+        target = {'title': '官方更新', 'summary': '10月28日参赛。', 'blocks': [
+            {'id': 'b0', 'text': 'Unknown Horse计划于10月27日参赛。'},
+            {'id': 'b1', 'text': '骑师说这是一项计划。'}], 'body': 'unused'}
+        response = {'verdict': 'fail', 'checks': {k: False for k in AUDIT_CHECKS}, 'issues': [
+            {'kind': 'dates', 'source': {'block_id': 'b0', 'quote': '27 October', 'context': 'race on 27 October.'},
+             'target': {'block_id': 'summary', 'quote': '28', 'context': '10月28日参赛。'}, 'missing': False},
+            {'kind': 'attribution', 'source': {'block_id': 'b1', 'quote': 'trainer', 'context': 'The trainer said'},
+             'target': {'block_id': 'b1', 'quote': '骑师', 'context': '骑师说'}, 'missing': False}]}
+        quality = validate_audit(CLEAN, target, response, contract_version='context-v2')
+        self.assertFalse(quality['passed'])
+        self.assertTrue(quality['evidence_valid'])
+        self.assertEqual(quality['repair_block_ids'], ['b1', 'summary'])
+        response['issues'][0]['target']['context'] = 'invented'
+        self.assertFalse(validate_audit(CLEAN, target, response, contract_version='context-v2')['evidence_valid'])
+
+    def test_patch_bound_to_raw_baseline_and_exact_target_set(self):
+        from stable.services import news_content as content
+        base = {'title': '标题', 'summary': '摘要', 'blocks': [{'id': 'b0', 'text': '旧译'}, {'id': 'b1', 'text': '不变'}]}
+        patch = {'base_raw_sha': content.digest(base), 'replacements': [{'id': 'b0', 'text': '新译'}]}
+        merged = content.merge_translation_patch(base, patch, ['b0'])
+        self.assertEqual(merged['blocks'][1], base['blocks'][1])
+        self.assertEqual(merged['blocks'][0]['text'], '新译')
+        self.assertEqual(base['blocks'][0]['text'], '旧译')
+        for bad in [{**patch, 'base_raw_sha': 'wrong'}, {**patch, 'replacements': patch['replacements'] * 2},
+                    {**patch, 'replacements': [{'id': 'b1', 'text': '越界'}]}]:
+            with self.assertRaises(ContentBlocked):
+                content.merge_translation_patch(base, bad, ['b0'])
+
+    def test_stable_projection_preserves_content_but_excludes_receipt_id(self):
+        from stable.services import news_content as content
+        a = {**CLEAN, 'body_review_attempt_id': 1}
+        b = {**CLEAN, 'body_review_attempt_id': 2}
+        self.assertEqual(content.stable_source(a), content.stable_source(b))
+        self.assertNotEqual(content.stable_source(a), content.stable_source({**b, 'title': 'changed'}))
+
+    def test_hard_checks_identify_numeric_block_before_model_audit(self):
+        from stable.services import news_content as content
+        target = {'title': 'Official update', 'summary': 'A plan', 'blocks': [
+            {'id': 'b0', 'text': 'Unknown Horse will race on 28 October.'},
+            {'id': 'b1', 'text': CLEAN['blocks'][1]['text']}], 'body': ''}
+        value = content.hard_translation_checks(CLEAN, target)
+        self.assertEqual(value['repair_block_ids'], ['b0'])
+        self.assertFalse(value['passed'])

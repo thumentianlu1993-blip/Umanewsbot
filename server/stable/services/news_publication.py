@@ -26,24 +26,34 @@ def _validated_attempt(run, attempt_id, stage):
     attempt = NewsStageAttempt.objects.filter(pk=attempt_id, run=run, stage=stage, state="completed").first()
     if not attempt or attempt.output_sha != digest(attempt.result) or attempt.input_sha != digest(attempt.usage.get("input")):
         raise ContentBlocked("stage_receipt_invalid")
-    spec = getattr(settings, "NEWS_QUALITY_POLICY", {}).get("models", {}).get(stage, {})
+    from stable.services.news_pipeline import context_enabled
+    from stable.services.news_model_gateway import request_spec
+    spec = (request_spec(stage, profile=attempt.usage.get("price", {}).get("profile", "base"), payload=attempt.usage.get("input"))
+            if context_enabled() else getattr(settings, "NEWS_QUALITY_POLICY", {}).get("models", {}).get(stage, {}))
     if attempt.model != spec.get("model") or attempt.prompt_version != spec.get("prompt_version") or attempt.usage.get("price") != spec:
         raise ContentBlocked("model_policy_changed")
     if stage in {"entity_check", "fact_audit"} and spec.get("quality_tier") != "strong":
         raise ContentBlocked("strong_model_receipt_missing")
+    if context_enabled():
+        from stable.services.news_model_gateway import validate_paid_or_cache
+        validate_paid_or_cache(attempt)
     return attempt
 
 
 def check_publication_evidence(run):
     if run.policy_sha != policy_sha() or digest(run.source_snapshot) != run.input_sha or not source_eligible(run):
         raise ContentBlocked("source_or_policy_changed")
+    from stable.services.news_pipeline import context_enabled, body_context_source
+    from stable.services.news_content import stable_source
+    v2 = context_enabled()
+    version = "context-v2" if v2 else "legacy"
     clean = run.clean_snapshot
     from stable.services.news_content import clean_source, validate_body_review
     selectors = getattr(settings, "NEWS_QUALITY_POLICY", {}).get("body_selectors", {}).get(run.source_snapshot["source_site"])
     expected_clean = clean_source(run.source_snapshot, selectors=selectors)
     if expected_clean.get("suspicious_block_ids"):
         body_review = _validated_attempt(run, clean.get("body_review_attempt_id"), "body_review")
-        if body_review.usage["input"].get("source") != expected_clean:
+        if body_review.usage["input"].get("source") != (body_context_source(expected_clean) if v2 else expected_clean):
             raise ContentBlocked("body_review_input_changed")
         expected_clean = validate_body_review(expected_clean, body_review.result)
         expected_clean["body_review_attempt_id"] = body_review.pk
@@ -54,11 +64,13 @@ def check_publication_evidence(run):
     if run.priority not in {"major", "regional"} or run.primary_region != run.editorial_snapshot.get("primary_region"):
         raise ContentBlocked("editorial_selection_missing")
     entity = _validated_attempt(run, run.entity_snapshot.get("strong_attempt_id"), "entity_check")
-    if entity.usage["input"].get("source") != clean:
+    if entity.usage["input"].get("source") != (stable_source(clean) if v2 else clean):
         raise ContentBlocked("entity_input_changed")
-    raw_entities = validate_entities(clean, entity.result)
+    raw_entities = validate_entities(clean, entity.result, contract_version=version)
     frozen = run.entity_snapshot.get("occurrences", [])
     keys = ("block_id", "start", "end", "text", "type", "token", "source_sha")
+    if v2:
+        keys += ("context", "contract_version")
     if [{key: row[key] for key in keys} for row in raw_entities] != [{key: row.get(key) for key in keys} for row in frozen]:
         raise ContentBlocked("entity_snapshot_changed")
     for row in frozen:
@@ -69,13 +81,15 @@ def check_publication_evidence(run):
         elif row["replacement"] != row["text"]:
             raise ContentBlocked("invented_entity_translation")
     audit = _validated_attempt(run, run.quality_snapshot.get("strong_attempt_id"), "fact_audit")
-    if audit.usage["input"].get("source") != clean or audit.usage["input"].get("target") != run.translation_snapshot:
+    if audit.usage["input"].get("source") != (stable_source(clean) if v2 else clean) or audit.usage["input"].get("target") != run.translation_snapshot:
         raise ContentBlocked("audit_input_changed")
     if audit.usage["input"].get("editorial") != run.editorial_snapshot:
         raise ContentBlocked("audit_editorial_changed")
-    quality = validate_audit(clean, run.translation_snapshot, audit_corrections(run.editorial_snapshot, audit.result))
+    quality = validate_audit(clean, run.translation_snapshot, audit_corrections(run.editorial_snapshot, audit.result), contract_version=version)
     if not quality["passed"] or run.quality_snapshot.get("target_sha") != quality["target_sha"] or run.quality_snapshot.get("policy_sha") != run.policy_sha:
         raise ContentBlocked("target_not_audited")
+    if v2:
+        validate_context_chain(run, audit)
     if run.manual_target and (target_revision_digest(run.manual_target, run.editor_provenance.get("event_binding")) != run.target_revision_sha
             or any(run.manual_target[key] != run.translation_snapshot[key] for key in ("title", "body", "summary"))):
         raise ContentBlocked("manual_target_changed")
@@ -91,7 +105,7 @@ def check_publication_evidence(run):
         raise ContentBlocked("editorial_evidence_changed")
     if run.attempts.filter(state__in=["reserved", "inflight", "unknown"]).exists():
         raise ContentBlocked("request_unresolved")
-    if run.attempts.exclude(provider="").filter(~Q(month_budget__state="open") | ~Q(day_budget__state="open")).exists():
+    if run.attempts.exclude(provider__in=["", "cache"]).filter(~Q(month_budget__state="open") | ~Q(day_budget__state="open")).exists():
         raise ContentBlocked("budget_unreconciled")
     if urlsplit(run.source_snapshot.get("url", "")).scheme not in {"http", "https"}:
         raise ContentBlocked("source_url_invalid")
@@ -280,3 +294,70 @@ def publish(run_id):
     from stable.services.news_feed import request_snapshot_refresh
     transaction.on_commit(request_snapshot_refresh)
     return receipt
+
+
+
+def validate_context_chain(run, audit):
+    from stable.services.news_pipeline import risk_reasons
+    from stable.services.news_content import (restore_translation, merge_translation_patch, hard_translation_checks,
+        stable_source, protect_source, translation_repair_ids)
+    from stable.models import NewsModelBudget
+    currency = getattr(settings, "NEWS_QUALITY_POLICY", {}).get("currency")
+    if NewsModelBudget.objects.filter(currency=currency, state__in=["blocked_unknown", "blocked_overage"]).exists():
+        raise ContentBlocked("budget_unreconciled")
+    deep_required = bool(risk_reasons(run))
+    # 路由证据从原始已核回执重建；不能只信quality里的deep标记。
+    for previous in run.attempts.filter(stage="fact_audit", state="completed").exclude(pk=audit.pk):
+        previous = _validated_attempt(run, previous.pk, "fact_audit")
+        if previous.usage["price"]["profile"] == "deep":
+            deep_required = True
+        response = audit_corrections(run.editorial_snapshot, previous.result)
+        value = validate_audit(run.clean_snapshot, previous.usage["input"]["target"], response, contract_version="context-v2")
+        if value.get("evidence_valid") and value.get("verdict") == "uncertain":
+            deep_required = True
+    if deep_required and audit.usage["price"]["profile"] != "deep":
+        raise ContentBlocked("deep_audit_missing")
+    if run.manual_target:
+        return
+    base = run.quality_snapshot.get("repair_base", {})
+    original = _validated_attempt(run, base.get("attempt_id"), "translate_full")
+    raw = original.result
+    if base.get("raw") != raw or base.get("raw_sha") != digest(raw):
+        raise ContentBlocked("repair_base_changed")
+    if original.usage["input"].get("source") != protect_source(run.clean_snapshot, run.entity_snapshot["occurrences"]):
+        raise ContentBlocked("translation_source_changed")
+    if run.repair_count:
+        repaired = _validated_attempt(run, run.quality_snapshot.get("repair_attempt_id"), "translate_full")
+        task = run.quality_snapshot.get("repair_task", {})
+        ids = task.get("required_block_ids")
+        # 重新计算原始硬错误或原审校证据，不能扩大补丁范围。
+        try:
+            old_target = restore_translation(run.clean_snapshot, run.entity_snapshot["occurrences"], raw)
+        except ContentBlocked:
+            expected_ids = translation_repair_ids(run.clean_snapshot, run.entity_snapshot["occurrences"], raw)
+        else:
+            hard = hard_translation_checks(run.clean_snapshot, old_target)
+            expected_ids = hard["repair_block_ids"]
+            if not expected_ids:
+                before = run.attempts.filter(stage="fact_audit", state="completed", pk__lt=repaired.pk).order_by("-seq").first()
+                if not before:
+                    raise ContentBlocked("repair_cause_missing")
+                before = _validated_attempt(run, before.pk, "fact_audit")
+                if before.usage["input"].get("target") != old_target:
+                    raise ContentBlocked("repair_cause_changed")
+                value = validate_audit(run.clean_snapshot, old_target, audit_corrections(run.editorial_snapshot, before.result), contract_version="context-v2")
+                if not value.get("evidence_valid") or value.get("verdict") != "fail":
+                    raise ContentBlocked("repair_cause_invalid")
+                expected_ids = value["repair_block_ids"]
+        if task.get("mode") == "repair_blocks":
+            if ids != expected_ids or repaired.usage["input"].get("required_block_ids") != ids:
+                raise ContentBlocked("repair_scope_changed")
+            raw = merge_translation_patch(raw, repaired.result, ids)
+        elif task.get("mode") == "full" and not expected_ids and task.get("reason"):
+            raw = repaired.result
+        else:
+            raise ContentBlocked("repair_scope_changed")
+    if restore_translation(run.clean_snapshot, run.entity_snapshot["occurrences"], raw) != run.translation_snapshot:
+        raise ContentBlocked("translation_chain_changed")
+    if not hard_translation_checks(run.clean_snapshot, run.translation_snapshot)["passed"]:
+        raise ContentBlocked("hard_translation_failed")

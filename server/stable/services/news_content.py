@@ -142,7 +142,9 @@ def block_map(clean):
 
 
 @model_schema
-def validate_entities(clean, response):
+def validate_entities(clean, response, *, contract_version="legacy"):
+    if contract_version == "context-v2":
+        return context_entities(clean, response)
     bounded_json(response)
     if type(response) is not dict or set(response) != {"coverage", "entities"} or response["coverage"] != "complete":
         raise ContentBlocked("entity_schema_or_coverage")
@@ -213,7 +215,9 @@ def restore_translation(clean, entities, response):
 
 
 @model_schema
-def validate_audit(clean, target, response):
+def validate_audit(clean, target, response, *, contract_version="legacy"):
+    if contract_version == "context-v2":
+        return context_audit(clean, target, response)
     bounded_json(response)
     failed = {"passed": False, "reason": "audit_schema_or_unknown", "source_sha": clean["source_sha"], "target_sha": digest(target)}
     if (type(response) is not dict or set(response) != {"verdict", "checks", "issues"}
@@ -298,3 +302,165 @@ def validate_body_review(clean, response):
     value["body_review"] = deepcopy(response)
     value["clean_sha"] = digest({"title": value["title"], "blocks": value["blocks"]})
     return value
+
+
+# context-v2：模型给语义及原文引用，字符定位由确定性代码完成。
+def stable_source(clean):
+    return deepcopy({key: value for key, value in clean.items() if key != "body_review_attempt_id"})
+
+
+def exact_span(text, quote, context):
+    if any(type(value) is not str or not value for value in (text, quote, context)):
+        raise ContentBlocked("context_required")
+    def positions(haystack, needle):
+        start = 0
+        while True:
+            found = haystack.find(needle, start)
+            if found < 0:
+                return
+            yield found
+            start = found + 1
+    offsets = positions(context, quote)
+    offset = next(offsets, None)
+    if offset is None or next(offsets, None) is not None:
+        raise ContentBlocked("context_not_unique")
+    starts = positions(text, context)
+    start = next(starts, None)
+    if start is None or next(starts, None) is not None:
+        raise ContentBlocked("context_not_unique")
+    return start + offset, start + offset + len(quote)
+
+
+def context_entities(clean, response):
+    bounded_json(response)
+    if (type(response) is not dict or set(response) != {"coverage", "entities"}
+            or response["coverage"] != "complete" or type(response["entities"]) is not list
+            or len(response["entities"]) > 128):
+        raise ContentBlocked("entity_schema_or_coverage")
+    texts, translated, contexts = block_map(clean), [], {}
+    for row in response["entities"]:
+        if type(row) is not dict or set(row) != {"block_id", "text", "type", "context"}:
+            raise ContentBlocked("entity_context_schema")
+        block = row["block_id"]
+        if type(block) is not str or block not in texts:
+            raise ContentBlocked("entity_block_invalid")
+        start, end = exact_span(texts[block], row["text"], row["context"])
+        translated.append({key: value for key, value in row.items() if key != "context"} | {"start": start, "end": end})
+        contexts[(block, start, end)] = row["context"]
+    rows = validate_entities(clean, {"coverage": "complete", "entities": translated})
+    return [row | {"context": contexts[(row["block_id"], row["start"], row["end"])],
+                   "contract_version": "context-v2"} for row in rows]
+
+
+def hard_translation_checks(clean, target):
+    sources = block_map(clean)
+    targets = {"title": target["title"], **{row["id"]: row["text"] for row in target["blocks"]}}
+    if target.get("manual"):
+        pairs = {"title": (clean["title"], target["title"]),
+                 "body": ("\n\n".join(row["text"] for row in clean["blocks"]), target["body"])}
+    else:
+        if [row["id"] for row in target["blocks"]] != [row["id"] for row in clean["blocks"]]:
+            raise ContentBlocked("translation_block_coverage")
+        pairs = {key: (value, targets[key]) for key, value in sources.items()}
+    numeric = {key: audit_equivalent_numbers(*pair) for key, pair in pairs.items()}
+    bad = [key for key, value in numeric.items() if value["status"] == "surface_difference"]
+    summary_extra = set(numeric_tokens(target["summary"], include_optional=False)) - set(numeric_tokens("\n".join(sources.values())))
+    if summary_extra:
+        bad.append("summary")
+    return {"passed": not bad, "numeric": numeric, "repair_block_ids": sorted(set(bad)),
+            "summary_difference": sorted(summary_extra), "target_sha": digest(target)}
+
+
+def context_audit(clean, target, response):
+    bounded_json(response)
+    failed = {"passed": False, "evidence_valid": False, "reason": "audit_schema_or_unknown",
+              "source_sha": clean["source_sha"], "target_sha": digest(target), "repair_block_ids": []}
+    if (type(response) is not dict or set(response) != {"verdict", "checks", "issues"}
+            or response.get("verdict") not in {"pass", "fail", "uncertain"}
+            or type(response.get("checks")) is not dict or set(response["checks"]) != AUDIT_CHECKS
+            or any(type(v) is not bool for v in response["checks"].values())
+            or type(response.get("issues")) is not list or len(response["issues"]) > 128):
+        return failed
+    sources = block_map(clean)
+    targets = {"title": target["title"], "summary": target["summary"],
+               **{row["id"]: row["text"] for row in target["blocks"]}}
+    normalized, repair = [], set()
+    try:
+        for issue in response["issues"]:
+            if (type(issue) is not dict or set(issue) != {"kind", "source", "target", "missing"}
+                    or issue["kind"] not in AUDIT_CHECKS or type(issue["missing"]) is not bool):
+                return failed
+            spans = {}
+            for side, texts in (("source", sources), ("target", targets)):
+                ref = issue[side]
+                if type(ref) is not dict or set(ref) != {"block_id", "quote", "context"} or ref["block_id"] not in texts:
+                    return failed
+                if side == "target" and issue["missing"]:
+                    if ref["quote"] != "":
+                        return failed
+                    exact_span(texts[ref["block_id"]], ref["context"], ref["context"])
+                    spans[side] = None
+                else:
+                    spans[side] = list(exact_span(texts[ref["block_id"]], ref["quote"], ref["context"]))
+            repair.add(issue["target"]["block_id"])
+            normalized.append({**issue, "located": spans})
+    except (ContentBlocked, TypeError, KeyError):
+        return failed
+    if (response["verdict"] == "pass" and (response["issues"] or not all(response["checks"].values()))
+            or response["verdict"] != "pass" and not response["issues"]):
+        return failed
+    hard = hard_translation_checks(clean, target)
+    passed = response["verdict"] == "pass" and hard["passed"]
+    return {**failed, "passed": passed, "evidence_valid": True, "verdict": response["verdict"],
+            "reason": "passed" if passed else "facts_or_numeric_difference", "clean_sha": clean["clean_sha"],
+            "model": deepcopy(response), "located_issues": normalized, "numeric": hard["numeric"],
+            "repair_block_ids": sorted(repair | set(hard["repair_block_ids"]))}
+
+
+def protected_translation_map(raw):
+    if (type(raw) is not dict or set(raw) != {"title", "summary", "blocks"} or type(raw["blocks"]) is not list
+            or any(type(row) is not dict or set(row) != {"id", "text"} for row in raw["blocks"])):
+        raise ContentBlocked("repair_structure")
+    ids = [row["id"] for row in raw["blocks"]]
+    if any(type(key) is not str or key in {"title", "summary"} for key in ids) or len(set(ids)) != len(ids):
+        raise ContentBlocked("repair_structure")
+    texts = {"title": raw["title"], "summary": raw["summary"], **{row["id"]: row["text"] for row in raw["blocks"]}}
+    if any(type(value) is not str for value in texts.values()):
+        raise ContentBlocked("repair_structure")
+    return texts
+
+
+@model_schema
+def merge_translation_patch(base, patch, required):
+    bounded_json(patch)
+    texts = protected_translation_map(base)
+    if (not required or len(set(required)) != len(required) or not set(required) <= set(texts)
+            or type(patch) is not dict or set(patch) != {"base_raw_sha", "replacements"}
+            or patch["base_raw_sha"] != digest(base) or type(patch["replacements"]) is not list):
+        raise ContentBlocked("repair_patch_schema")
+    rows = patch["replacements"]
+    if (any(type(row) is not dict or set(row) != {"id", "text"} or type(row["text"]) is not str or not row["text"].strip() for row in rows)
+            or len(rows) != len(required) or {row["id"] for row in rows} != set(required)):
+        raise ContentBlocked("repair_patch_coverage")
+    texts.update({row["id"]: row["text"] for row in rows})
+    return {"title": texts["title"], "summary": texts["summary"],
+            "blocks": [{"id": row["id"], "text": texts[row["id"]]} for row in base["blocks"]]}
+
+
+def translation_repair_ids(clean, entities, raw):
+    """仅结构安全时定位空块/占位错误；否则使用明确的全文修复。"""
+    try:
+        texts = protected_translation_map(raw)
+        if [row["id"] for row in raw["blocks"]] != [row["id"] for row in clean["blocks"]]:
+            return None
+    except ContentBlocked:
+        return None
+    known, bad = {row["token"] for row in entities}, []
+    for block, text in texts.items():
+        found = TOKEN_RE.findall(text)
+        expected = {row["token"] for row in entities if row["block_id"] == block}
+        wrong = (set(found) - known) if block == "summary" else (set(found) != expected or len(found) != len(expected))
+        residue = TOKEN_RE.sub("", text)
+        if not text.strip() or wrong or "__P01_ENTITY" in residue:
+            bad.append(block)
+    return sorted(bad) or None

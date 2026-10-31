@@ -176,3 +176,117 @@ class SingleDispatchTests(TransactionTestCase):
         self.assertEqual(second.state, "unknown")
         self.assertEqual(provider.call_count, 1)
         self.assertTrue(all(b.reserved > 0 and b.spent == 0 for b in NewsModelBudget.objects.all()))
+
+
+def context_policy():
+    value = deepcopy(POLICY)
+    spec = {**value['models']['entity_check'], 'quality_tier': 'strong', 'thinking': 'disabled',
+            'http_timeout_seconds': 120, 'prompt_version': 'context-v2'}
+    value.update(contract_version='context-v2', article_cap='0.02',
+        models={stage: {**spec, 'deep': {**spec, 'thinking': 'enabled'}} for stage in
+                ('body_review', 'event_classify', 'entity_check', 'translate_full', 'fact_audit')})
+    return value
+
+
+from django.test import SimpleTestCase
+
+
+@override_settings(NEWS_QUALITY_POLICY=context_policy())
+class ContextRequestTests(SimpleTestCase):
+    def test_explicit_profiles_and_translation_budget_are_bounded(self):
+        from stable.services.news_model_gateway import request_spec
+        base = request_spec('fact_audit', profile='base', payload={})
+        deep = request_spec('fact_audit', profile='deep', payload={})
+        self.assertEqual((base['thinking'], deep['thinking']), ('disabled', 'enabled'))
+        self.assertEqual(deep['contract_version'], 'context-v2')
+        with self.assertRaises(RequestDenied):
+            request_spec('fact_audit', profile='unknown', payload={})
+
+    def test_weak_or_wrong_mode_cannot_be_configured_as_strong_audit(self):
+        from stable.services.news_model_gateway import request_spec
+        for changes in ({'quality_tier': 'cheap'}, {'thinking': 'enabled'}, {'http_timeout_seconds': 121}):
+            value = context_policy()
+            value['models']['fact_audit'].update(changes)
+            with self.settings(NEWS_QUALITY_POLICY=value), self.assertRaises(RequestDenied):
+                request_spec('fact_audit', profile='base', payload={})
+
+    def test_v2_prompt_envelope_and_context_contract(self):
+        from stable.services.news_prompts import prompt_for
+        for stage in context_policy()['models']:
+            self.assertLessEqual(len(prompt_for(stage, 'context-v2').encode()), 1792)
+        self.assertIn('context', prompt_for('entity_check', 'context-v2'))
+
+    def test_provider_request_sends_mode_and_never_retries(self):
+        from stable.services.news_model_gateway import _single_request, request_spec
+        from types import SimpleNamespace
+        from unittest.mock import patch, Mock
+        spec = request_spec('entity_check', profile='base', payload={})
+        attempt = SimpleNamespace(stage='entity_check', model=spec['model'], usage={'price': spec})
+        client = Mock()
+        with self.settings(NEWS_QUALITY_API_KEY='synthetic'), patch('openai.OpenAI', return_value=client) as factory:
+            _single_request(attempt, {})
+        self.assertEqual(factory.call_args.kwargs['max_retries'], 0)
+        self.assertEqual(factory.call_args.kwargs['timeout'], 120)
+        self.assertEqual(client.chat.completions.create.call_args.kwargs['extra_body']['thinking'], {'type': 'disabled'})
+
+
+@override_settings(NEWS_QUALITY_MODE='shadow', NEWS_QUALITY_POLICY=context_policy())
+class ContextBudgetTests(TransactionTestCase):
+    def setUp(self):
+        ModelBudgetTests.setUp(self)
+
+    def other_attempt(self, run=None):
+        run = run or self.run
+        return NewsStageAttempt.objects.create(run=run, stage='entity_check', seq=2,
+            generation=run.generation, input_sha=digest({'text': 'test'}))
+
+    def test_same_article_concurrent_requests_share_one_cap(self):
+        from unittest.mock import patch
+        other = self.other_attempt()
+        barrier = Barrier(2)
+        def worker(pk):
+            close_old_connections()
+            try:
+                barrier.wait(timeout=10)
+                reserve_request(pk, {'text': 'test'})
+                return 'reserved'
+            except RequestDenied as exc:
+                return str(exc)
+            finally:
+                close_old_connections()
+        with patch('stable.services.news_model_gateway.reservation_amount', return_value=Decimal('0.015')):
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                results = sorted(pool.map(worker, [self.attempt.pk, other.pk]))
+        self.assertEqual(results, ['article_budget_exhausted', 'reserved'])
+        self.assertTrue(all(row.reserved == Decimal('0.015') for row in NewsModelBudget.objects.all()))
+
+    def test_policy_change_preserves_history_and_late_settlement(self):
+        from stable.services.news_model_gateway import settle_request, article_cost
+        first = reserve_request(self.attempt.pk, {'text': 'test'})
+        value = context_policy()
+        value['models']['entity_check']['prompt_version'] = 'context-v2-next'
+        with self.settings(NEWS_QUALITY_POLICY=value):
+            run = start_revision(self.run.article)
+            run.state, run.lease_until = 'running', timezone.now() + timedelta(seconds=180)
+            run.save(update_fields=['state', 'lease_until'])
+            other = self.other_attempt(run)
+            reserve_request(other.pk, {'text': 'test'})
+            settle_request(first.pk, actual_cost='0.001', result={'valid': True})
+            totals = article_cost(self.run.article_id, currency='USD')
+        self.assertEqual(totals['spent'], Decimal('0.001'))
+        self.assertGreater(totals['reserved'], 0)
+        self.assertEqual(NewsModelBudget.objects.count(), 2)
+        with self.assertRaisesRegex(RequestDenied, 'article_currency_changed'):
+            article_cost(self.run.article_id, currency='CNY')
+
+    def test_new_revision_cannot_reset_single_article_expense(self):
+        from stable.services.news_model_gateway import settle_request
+        from unittest.mock import patch
+        with patch('stable.services.news_model_gateway.reservation_amount', return_value=Decimal('0.015')):
+            reserve_request(self.attempt.pk, {'text': 'test'})
+            settle_request(self.attempt.pk, actual_cost='0.015', result={'valid': True})
+            run = start_revision(self.run.article, manual_target={'title': '修订', 'body': '稿件', 'summary': '摘要'})
+            run.state, run.lease_until = 'running', timezone.now() + timedelta(seconds=180)
+            run.save(update_fields=['state', 'lease_until'])
+            with self.assertRaisesRegex(RequestDenied, 'article_budget_exhausted'):
+                reserve_request(self.other_attempt(run).pk, {'text': 'test'})

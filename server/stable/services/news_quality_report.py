@@ -185,11 +185,24 @@ def build_report(*, start, end, independent_events=(), exposure_records=None, ex
         for region, slots in snap.slots_metadata.get("all_region_slots", {}).items():
             seconds[region] += duration*slots
     exposure = exposure_report(exposure_records, exposure_access, start=start, end=end)
-    attempts = _bounded(NewsStageAttempt.objects.filter(reserved_at__gte=start, reserved_at__lte=end).exclude(provider=""))
-    cost = {"requests": len(attempts), "actual": str(sum((row.actual_cost for row in attempts), Decimal(0))),
+    attempts = _bounded(NewsStageAttempt.objects.select_related("run").filter(reserved_at__gte=start, reserved_at__lte=end).exclude(provider=""))
+    cost = {"requests": sum(row.provider != "cache" for row in attempts),
+        "cache_hits": sum(row.provider == "cache" for row in attempts),
+        "unknown_reserved": str(sum((row.reservation for row in attempts if row.state == "unknown" and not row.settlement_version), Decimal(0))), "actual": str(sum((row.actual_cost for row in attempts), Decimal(0))),
         "unknown_requests": sum(row.state == "unknown" for row in attempts),
         "reserved": str(sum((row.reservation for row in attempts if not row.settlement_version), Decimal(0))),
         "blocked_budgets": list(NewsModelBudget.objects.exclude(state__in=["open", "closed"]).values("id", "period_kind", "period_start", "currency", "state", "spent", "reserved", "overage"))}
+    # 单篇以全历史run聚合，报表时间窗不重置文章额度；币种分开显示。
+    from django.db.models import Sum, Case, When, F, Value, DecimalField
+    article_ids = {row.run.article_id for row in attempts}
+    cost["articles"] = list(NewsStageAttempt.objects.filter(run__article_id__in=article_ids,
+        month_budget__isnull=False).values("run__article_id", "month_budget__currency").annotate(
+            spent=Sum("actual_cost"), reserved=Sum(Case(When(settlement_version=0, then=F("reservation")),
+                default=Value(0), output_field=DecimalField())),
+            unknown=Sum(Case(When(state="unknown", settlement_version=0, then=F("reservation")),
+                default=Value(0), output_field=DecimalField()))).order_by("run__article_id", "month_budget__currency"))
+    cost["periods"] = list(NewsModelBudget.objects.filter(period_start__gte=start.date().replace(day=1),
+        period_start__lte=end.date()).values("period_kind", "period_start", "currency", "spent", "reserved", "cap", "state"))
     invalid_quality = []
     for receipt in receipts:
         run = receipt.run

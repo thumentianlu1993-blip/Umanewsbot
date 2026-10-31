@@ -178,7 +178,7 @@ def claim_stage(run_id, payload, *, expected_stage, expected_generation):
         return None
     if run.state == "running" or run.next_attempt_at > now:
         return None  # 到期由专门恢复器核对外部请求；不能当成免费重试。
-    requests = run.attempts.exclude(provider="")
+    requests = run.attempts.exclude(provider__in=["", "cache"])
     if requests.count() >= 10 or requests.filter(stage=run.stage, state="failed").count() >= 3:
         run.state, run.reason = "review", "request_limit"
         run.save(update_fields=["state", "reason"])
@@ -232,6 +232,8 @@ def stage_payload(run):
     from stable.services.news_content import protect_source
     from stable.services.news_editorial import RESPONSE_SCHEMA, IDENTITY_CONTRACT
     source = deepcopy(run.clean_snapshot)
+    if context_enabled():
+        return context_payload(run)
     if run.stage == "event_classify":
         return {"source": source, "candidates": _event_candidates(run),
                 "response_schema": RESPONSE_SCHEMA, "identity_contract": IDENTITY_CONTRACT,
@@ -260,6 +262,8 @@ def _stage_projection(run, attempt):
     payload = attempt.usage.get("input")
     if payload is None or digest(payload) != attempt.input_sha:
         raise ContentBlocked("attempt_input_missing")
+    if context_enabled() and attempt.stage in {"entity_check", "translate_full", "fact_audit"}:
+        return context_projection(run, attempt)
     if attempt.stage in {"entity_check", "fact_audit"} and request_spec(attempt.stage).get("quality_tier") != "strong":
         raise ContentBlocked("strong_model_not_configured")
     update = {"state": "pending", "reason": "", "lease_until": None}
@@ -562,3 +566,148 @@ def scan_news_runs(*, now=None, limit=100):
             if queues[region] and len(selected) < limit:
                 selected.append(queues[region].pop(0))
     return {"enabled": True, "dispatched": sum(enqueue_news_run(pk) for pk in selected), "recovered": recovered, "recovery_errors": recovery_errors}
+
+
+def context_enabled():
+    return getattr(settings, "NEWS_QUALITY_POLICY", {}).get("contract_version") == "context-v2"
+
+
+def risk_reasons(run):
+    import re
+    text = run.clean_snapshot.get("title", "") + " " + " ".join(row["text"] for row in run.clean_snapshot.get("blocks", []))
+    rules = {"retirement": r"\bretir(?:e|es|ed|ement|ing)\b|退役|引退",
+             "injury": r"\binjur(?:y|ies|ed)\b|骨折|重傷|重伤",
+             "suspension": r"\bsuspen(?:sion|ded)\b|禁赛|禁賽|騎乗停止",
+             "result_correction": r"\bdisqualif|result.{0,20}correct|赛果更正|賽果更正"}
+    reasons = [name for name, pattern in rules.items() if re.search(pattern, text, re.I)]
+    kind = run.editorial_snapshot.get("identity", {}).get("kind")
+    if kind in {"injury", "retirement"} and kind not in reasons:
+        reasons.append(kind)
+    if any(row.get("relation") == "correction" for row in run.editorial_snapshot.get("facts", [])):
+        reasons.append("correction")
+    return reasons
+
+
+def required_profile(run):
+    if not context_enabled() or run.stage != "fact_audit":
+        return "base"
+    return "deep" if risk_reasons(run) or run.quality_snapshot.get("deep_required") else "base"
+
+
+def body_context_source(clean):
+    from stable.services.news_content import stable_source
+    source = stable_source(clean)
+    suspicious = set(source.get("suspicious_block_ids", []))
+    keep = {j for i, row in enumerate(source["blocks"]) if row["id"] in suspicious
+            for j in (i - 1, i, i + 1) if 0 <= j < len(source["blocks"])}
+    source["block_fingerprints"] = {row["id"]: digest(row) for row in source["blocks"]}
+    source["blocks"] = [row for i, row in enumerate(source["blocks"]) if i in keep]
+    return source
+
+
+def context_payload(run):
+    from stable.services.news_content import stable_source, protect_source, protected_translation_map
+    from stable.services.news_editorial import RESPONSE_SCHEMA, IDENTITY_CONTRACT
+    source = stable_source(run.clean_snapshot)
+    if run.stage == "event_classify":
+        return {"source": source, "candidates": _event_candidates(run), "response_schema": RESPONSE_SCHEMA,
+                "identity_contract": IDENTITY_CONTRACT,
+                "identity_aliases": getattr(settings, "NEWS_QUALITY_POLICY", {}).get("identity_aliases", {}),
+                "source_scope": run.source_snapshot["source_site"], "manual_target": run.manual_target,
+                "event_binding": run.editor_provenance.get("event_binding", {})}
+    if run.stage == "body_review":
+        return {"source": body_context_source(source), "suspicious_block_ids": source.get("suspicious_block_ids", []),
+                "language": run.source_snapshot["language"]}
+    if run.stage == "entity_check":
+        return {"source": source, "language": run.source_snapshot["language"]}
+    if run.stage == "fact_audit":
+        return {"source": source, "target": run.translation_snapshot,
+                "entities": run.entity_snapshot["occurrences"], "editorial": run.editorial_snapshot}
+    if run.stage == "translate_full":
+        protected = protect_source(source, run.entity_snapshot["occurrences"])
+        task = run.quality_snapshot.get("repair_task", {}) if run.repair_count else {}
+        if task.get("mode") == "repair_blocks":
+            ids = task["required_block_ids"]
+            base = run.quality_snapshot["repair_base"]["raw"]
+            texts = protected_translation_map(base)
+            blocks = protected["blocks"]
+            adjacent = {j for i, row in enumerate(blocks) if row["id"] in ids
+                        for j in (i - 1, i + 1) if 0 <= j < len(blocks)}
+            return {"mode": "repair_blocks", "base_raw_sha": digest(base), "required_block_ids": ids,
+                    "source": {"title": protected["title"] if "title" in ids or "summary" in ids else "",
+                               "blocks": [row for row in blocks if row["id"] in ids or "summary" in ids]},
+                    "context": [row for i, row in enumerate(blocks) if i in adjacent],
+                    "previous": {key: texts[key] for key in ids}, "repair": task["evidence"],
+                    "entities": run.entity_snapshot["occurrences"]}
+        return {"mode": "full", "source": protected, "repair": task}
+    raise ValueError("stage_not_registered")
+
+
+def repair_projection(run, quality, ids, reason):
+    if run.repair_count or run.manual_target:
+        return {"state": "review", "reason": reason, "lease_until": None, "quality_snapshot": quality}
+    quality["repair_task"] = {"mode": "repair_blocks" if ids else "full", "required_block_ids": ids or [],
+                              "reason": reason, "evidence": {key: quality[key] for key in
+                                  ("numeric", "located_issues", "repair_block_ids") if key in quality}}
+    return {"state": "pending", "stage": "translate_full", "repair_count": 1, "reason": "one_bounded_repair",
+            "lease_until": None, "quality_snapshot": quality}
+
+
+def context_projection(run, attempt):
+    from stable.services.news_content import (validate_entities, resolve_known_entities, manual_translation,
+        restore_translation, hard_translation_checks, validate_audit, merge_translation_patch,
+        translation_repair_ids, ContentBlocked)
+    from stable.services.news_editorial import audit_corrections
+    update = {"state": "pending", "reason": "", "lease_until": None}
+    quality = deepcopy(run.quality_snapshot)
+    if attempt.stage == "entity_check":
+        rows = validate_entities(run.clean_snapshot, attempt.result, contract_version="context-v2")
+        rows = resolve_known_entities(run.clean_snapshot, rows, language=run.source_snapshot["language"])
+        update["entity_snapshot"] = {"occurrences": rows, "strong_attempt_id": attempt.pk,
+            "input_sha": attempt.input_sha, "clean_sha": run.clean_snapshot["clean_sha"]}
+        if run.manual_target:
+            target = manual_translation(run.manual_target)
+            hard = hard_translation_checks(run.clean_snapshot, target)
+            return {**update, "translation_snapshot": target, "stage": "fact_audit",
+                    **({"state": "review", "reason": "manual_hard_check_failed"} if not hard["passed"] else {})}
+        return {**update, "stage": "translate_full"}
+    if attempt.stage == "translate_full":
+        raw = deepcopy(attempt.result)
+        payload = attempt.usage["input"]
+        if run.repair_count:
+            if payload.get("mode") == "repair_blocks":
+                raw = merge_translation_patch(quality["repair_base"]["raw"], raw, payload["required_block_ids"])
+            quality["repair_attempt_id"] = attempt.pk
+        else:
+            quality["repair_base"] = {"raw": raw, "raw_sha": digest(raw), "attempt_id": attempt.pk}
+        try:
+            target = restore_translation(run.clean_snapshot, run.entity_snapshot["occurrences"], raw)
+        except ContentBlocked as error:
+            ids = translation_repair_ids(run.clean_snapshot, run.entity_snapshot["occurrences"], raw)
+            return repair_projection(run, quality, ids, str(error))
+        hard = hard_translation_checks(run.clean_snapshot, target)
+        quality.update(target_sha=digest(target))
+        if not hard["passed"]:
+            quality.update(numeric=hard["numeric"], repair_block_ids=hard["repair_block_ids"])
+            return {**repair_projection(run, quality, hard["repair_block_ids"], "hard_translation_failed"),
+                    "translation_snapshot": target}
+        return {**update, "translation_snapshot": target, "quality_snapshot": quality, "stage": "fact_audit"}
+    if attempt.stage == "fact_audit":
+        response = audit_corrections(run.editorial_snapshot, attempt.result)
+        result = validate_audit(run.clean_snapshot, run.translation_snapshot, response, contract_version="context-v2")
+        preserved = {key: value for key, value in quality.items() if key in
+                     {"repair_base", "repair_task", "repair_attempt_id", "deep_required", "upgrade_attempt_id"}}
+        quality = {**preserved, **result, "strong_attempt_id": attempt.pk, "input_sha": attempt.input_sha, "policy_sha": run.policy_sha}
+        if result["passed"]:
+            return {**update, "quality_snapshot": quality, "state": "ready", "stage": "publish"}
+        if not result["evidence_valid"]:
+            return {**update, "quality_snapshot": quality, "state": "review", "reason": "audit_evidence_invalid"}
+        if result["verdict"] == "uncertain":
+            if attempt.usage["price"]["profile"] == "base" and not quality.get("deep_required"):
+                quality.update(deep_required=True, upgrade_attempt_id=attempt.pk)
+                return {**update, "quality_snapshot": quality, "stage": "fact_audit", "reason": "one_deep_audit"}
+            return {**update, "quality_snapshot": quality, "state": "review", "reason": "deep_uncertain"}
+        if attempt.usage["price"]["profile"] == "deep":
+            quality["deep_required"] = True
+        return repair_projection(run, quality, result["repair_block_ids"], "quality_failed")
+    raise ContentBlocked("stage_not_registered")
