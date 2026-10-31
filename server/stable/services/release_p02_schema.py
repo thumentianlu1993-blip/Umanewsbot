@@ -205,14 +205,16 @@ def counts():
         cursor.execute("SELECT sequencename FROM pg_sequences WHERE schemaname='public' ORDER BY sequencename")
         sequences = [r[0] for r in cursor.fetchall()]
         for name in tables:
-            cursor.execute(f"SELECT row_to_json(t)::text FROM public.{connection.ops.quote_name(name)} t ORDER BY row_to_json(t)::text COLLATE \"C\"")
             digest, count = hashlib.sha256(), 0
-            while batch := cursor.fetchmany(500):
-                for row in batch:
-                    data = row[0].encode()
-                    digest.update(len(data).to_bytes(8, "big"))
-                    digest.update(data)
-                    count += 1
+            # 普通cursor即使fetchmany也已在客户端缓冲整表；服务器游标保持恢复核验内存有界。
+            with connection.chunked_cursor() as stream:
+                stream.execute(f"SELECT row_to_json(t)::text FROM public.{connection.ops.quote_name(name)} t ORDER BY row_to_json(t)::text COLLATE \"C\"")
+                while batch := stream.fetchmany(50):
+                    for row in batch:
+                        data = row[0].encode()
+                        digest.update(len(data).to_bytes(8, "big"))
+                        digest.update(data)
+                        count += 1
             result["tables"][name] = {"count": count, "sha256": digest.hexdigest()}
         for name in sequences:
             if name == "django_migrations_id_seq":

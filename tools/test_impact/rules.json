@@ -1016,7 +1016,9 @@
     "server/stable/urls.py",
     "server/templates/404.html",
     "server/templates/500.html",
-    "tools/test_impact/**"
+    "tools/test_impact/**",
+    "deploy/rehearse_duplicate_repair.py",
+    "server/stable/services/duplicate_repair_rehearsal.py"
   ],
   "paths": {
     "docs/changes/next-version-capabilities/lanes/C/U01-offline-cases.json": [

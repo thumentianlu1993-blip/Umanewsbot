@@ -103,7 +103,9 @@
       "stable.test_release_p02_lock",
       "stable.test_release_p02_postgres",
       "stable.test_release_p02_readonly",
-      "stable.test_release_p02_runtime"
+      "stable.test_release_p02_runtime",
+      "stable.test_duplicate_repair_rehearsal",
+      "stable.test_duplicate_repair_runtime"
     ],
     "infrastructure": [
       "scripts.tests.test_bounded_stable_tests",
@@ -2934,6 +2936,18 @@
     },
     "server/stable/test_release_p02_runtime.py": {
       "label": "stable.test_release_p02_runtime",
+      "domains": [
+        "release"
+      ]
+    },
+    "server/stable/test_duplicate_repair_rehearsal.py": {
+      "label": "stable.test_duplicate_repair_rehearsal",
+      "domains": [
+        "release"
+      ]
+    },
+    "server/stable/test_duplicate_repair_runtime.py": {
+      "label": "stable.test_duplicate_repair_runtime",
       "domains": [
         "release"
       ]
