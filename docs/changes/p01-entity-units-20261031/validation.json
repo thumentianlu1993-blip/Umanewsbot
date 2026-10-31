@@ -1,0 +1,68 @@
+{
+  "targeted_tests": 121,
+  "failures": 0,
+  "errors": 0,
+  "skips": 0,
+  "full_ci_run": false,
+  "live_model_calls": 0,
+  "migrations": false,
+  "runtime": "/Users/mentianlu/.codex/runtime/p01-entity-units-20261031",
+  "source_files": 974,
+  "environment": "network none; nonroot read-only container; fixed source manifest; isolated UTF8 PostgreSQL over local Unix socket",
+  "evidence_sha256": {
+    "red.log": "a262447728b549782c6ef46c448facb2ea20cf145004b562eb012806a4bb43fb",
+    "review-red.log": "44e999802d3f49da104fd89014491a615001e3c507eb4e3e16ae26eb27a4516a",
+    "review-green.log": "5a7c3cfa92a977813734e6797c7f089c883f342f4b9208dd48f3f5b55049bc37",
+    "recompare-red.log": "df34cb1621d6b7df41a5fd2079f69306d597ac1d98d3739072e69278e3cc1cc4",
+    "recompare-repaired-red.log": "a97d2a614cc580fcec5d836972376798c92d3b511046d2f316ae3ddf764d33d0",
+    "recompare-green.log": "a8b33922f98490064aa486cc2ebb7dce703403a888063f8edf6bd7a1f2dfc49a",
+    "targeted-final.log": "dae1405e6832bec8a0702a0a26323e15604563c938dc106afeea4414d6e1309b",
+    "source-manifest-final.json": "88f9cba7b2207afc4f488fbf87c350e33065a18ca324bfaedd7a62623619d605",
+    "offline-map-final.json": "bd1c8e76ddaee74298f13adf93359be0915f6f8a8558a5f0fb44c2201baa9d23",
+    "test-pg.sh": "a6bbee9416eb15b975c8cbeba79091e9ac55888fa2188c6c4ca7087a90fa4f08"
+  },
+  "cached_article_mapping": [
+    {
+      "article_id": 22726,
+      "clean_sha": "57384b9cbbee6adb812ba802301059e02a427f4168106f9b1d0018e85d56b1ef",
+      "unit_count": 2,
+      "max_core_chars": 358,
+      "conserved": true
+    },
+    {
+      "article_id": 22725,
+      "clean_sha": "addadb7fcb137df8f13900939a8875df06ef143e3909a6bfd5e0ee0f10bd1f35",
+      "unit_count": 3,
+      "max_core_chars": 669,
+      "conserved": true
+    },
+    {
+      "article_id": 7611,
+      "clean_sha": "428ccd8b6a9e8254628e10aef42e11cf93e14908d1a6a2e31124a71c0a03fe95",
+      "unit_count": 6,
+      "max_core_chars": 353,
+      "conserved": true
+    }
+  ],
+  "code_sha": "a886517c9e388a112bcf8e74d1fd24da5f0a48ec",
+  "review_verdict": "APPROVED",
+  "reviewer": "p01_code_reviewer",
+  "review_findings_closed": [
+    "R1",
+    "R2",
+    "R3",
+    "R4"
+  ],
+  "review_fingerprint": "74c23d7ab5a0b708b8cf771292d46f2afd8baee8f4ffa118ee5187c7e1393fb4",
+  "review_content_manifest": "5036b72b0916ba286be534f74f9ad4ed39221e634781fc7c317e85df22ac7957",
+  "targeted_modules": [
+    "entity_units",
+    "news_content",
+    "news_pipeline",
+    "news_publication",
+    "news_budget",
+    "news_recovery",
+    "news_workflow",
+    "news_immutability"
+  ]
+}
