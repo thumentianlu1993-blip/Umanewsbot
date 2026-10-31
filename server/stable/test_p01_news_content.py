@@ -329,3 +329,56 @@ class ContextContractTests(SimpleTestCase):
         value = content.hard_translation_checks(CLEAN, target)
         self.assertEqual(value['repair_block_ids'], ['b0'])
         self.assertFalse(value['passed'])
+
+
+class InlineTextExtractionTests(SimpleTestCase):
+    def clean(self, html):
+        return clean_source({'source_site': 'netkeiba', 'title': 'Title',
+                             'html': '<div class="News_Txt">' + html + '</div>'})['blocks']
+
+    def test_inline_horse_autolink_does_not_split_an_ordinary_word(self):
+        for fragment in ['今回が<a href="/horse/example">ラストラ</a>ンとなる。',
+                         '<p>今回が<a href="/horse/example">ラストラ</a>ンとなる。</p>',
+                         '今回が<span><a>ラストラ</a></span>ンとなる。']:
+            with self.subTest(fragment=fragment):
+                self.assertEqual([b['text'] for b in self.clean(fragment)], ['今回がラストランとなる。'])
+
+    def test_english_inline_spaces_and_word_parts_follow_source_nodes(self):
+        for fragment, expected in [
+            ('The <a>France <em>Galop</em></a> Committee.', 'The France Galop Committee.'),
+            ('<p>The<a> France Galop </a>Committee.</p>', 'The France Galop Committee.'),
+            ('<p>un<strong>beaten</strong> horse</p>', 'unbeaten horse'),
+            ('A<span> </span><b>B</b>', 'A B'),
+        ]:
+            with self.subTest(fragment=fragment):
+                self.assertEqual([b['text'] for b in self.clean(fragment)], [expected])
+
+    def test_br_and_adjacent_structural_containers_remain_separated(self):
+        for fragment, expected in [
+            ('A<br>B', ['A B']), ('<p>A<br>B</p><p>C</p>', ['A B', 'C']),
+            ('<div>A</div><div>B</div>', ['A B']),
+            ('<div><p>A</p></div><div><p>B</p></div>', ['A', 'B']),
+            ('A<section>B</section>C', ['A B C']),
+        ]:
+            with self.subTest(fragment=fragment):
+                blocks = self.clean(fragment)
+                self.assertEqual([b['text'] for b in blocks], expected)
+                self.assertEqual([b['id'] for b in blocks], ['b'+str(i) for i in range(len(blocks))])
+
+    def test_table_and_list_keep_cell_and_item_boundaries(self):
+        blocks = self.clean('<table><tr><td>un<b>beaten</b></td><td>2</td></tr></table>'
+                            '<ul><li>ラスト<a>ラン</a></li><li>A<br>B</li></ul>')
+        self.assertEqual([b['text'] for b in blocks], ['unbeaten | 2', '- ラストラン\n- A B'])
+
+    def test_comments_and_noncontent_elements_do_not_enter_inline_text(self):
+        self.assertEqual([b['text'] for b in self.clean('<p>A<!--not text--><span>B</span>'
+                         '<script>bad()</script><style>.bad{}</style>C</p>')], ['ABC'])
+
+    def test_hidden_templates_and_ruby_annotations_stay_out_of_body(self):
+        for fragment, expected in [
+            ('<p>Winner A.<template>Winner B.</template></p>', 'Winner A.'),
+            ('Winner A.<template>Winner B.</template>', 'Winner A.'),
+            ('<p><ruby>東京<rp>(</rp><rt>とうきょう</rt><rp>)</rp></ruby>競馬場</p>', '東京競馬場'),
+        ]:
+            with self.subTest(fragment=fragment):
+                self.assertEqual([b['text'] for b in self.clean(fragment)], [expected])

@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 from copy import deepcopy
 
-from bs4 import BeautifulSoup, NavigableString, Tag, Comment
+from bs4 import BeautifulSoup, NavigableString, Tag, Comment, CData
 from stable.services.article_content import _STRUCTURED_NOISE_SELECTORS, _SCMP_STRUCTURED_NOISE_SELECTORS, scmp_body_access_restricted
 from stable.services.news_numeric_equivalence import audit_equivalent_numbers, numeric_surface, numeric_tokens
 from stable.services.news_pipeline import digest
@@ -63,8 +63,32 @@ def bounded_json(value, depth=0, count=None):
         raise ContentBlocked("response_text_limit")
 
 
+# 行内标签不产生空格；仅 HTML 结构边界提供分隔，不把自动链接当作分词。
+_TEXT_BOUNDARIES = frozenset({
+    "br", "hr", "div", "p", "section", "article", "header", "footer", "aside", "nav", "main",
+    "address", "figure", "figcaption", "blockquote", "ul", "ol", "li", "table", "tr", "td", "th",
+    "dl", "dt", "dd", "h1", "h2", "h3", "h4", "h5", "h6", "pre",
+})
+
+
+def _text_parts(node):
+    if isinstance(node, Comment):
+        return
+    if isinstance(node, NavigableString):
+        if type(node) in (NavigableString, CData):
+            yield str(node)
+    elif isinstance(node, Tag) and node.name not in {"script", "style"}:
+        boundary = node.name in _TEXT_BOUNDARIES
+        if boundary:
+            yield " "
+        for child in node.children:
+            yield from _text_parts(child)
+        if boundary:
+            yield " "
+
+
 def _text(node):
-    return " ".join(node.get_text(" ", strip=True).split())
+    return " ".join("".join(_text_parts(node)).split())
 
 
 def clean_source(snapshot, selectors=None):
@@ -102,13 +126,14 @@ def clean_source(snapshot, selectors=None):
     def walk(node):
         inline = []
         def flush():
-            append(" ".join(" ".join(inline).split()), "text")
+            append(" ".join("".join(inline).split()), "text")
             inline.clear()
         for child in node.children:
             if isinstance(child, Comment):
                 continue
             if isinstance(child, NavigableString):
-                inline.append(str(child))
+                if type(child) in (NavigableString, CData):
+                    inline.append(str(child))
             elif isinstance(child, Tag) and child.name in BLOCK_TAGS:
                 flush()
                 if child.name == "table":
@@ -122,7 +147,7 @@ def clean_source(snapshot, selectors=None):
                 flush()
                 walk(child)
             elif isinstance(child, Tag):
-                inline.append(_text(child))
+                inline.append("".join(_text_parts(child)))
         flush()
     walk(root)
     if not blocks or len(blocks) > 1000 or not snapshot.get("title", "").strip():
