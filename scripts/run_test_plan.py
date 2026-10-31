@@ -16,6 +16,7 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from tools.test_impact.git_input import git, commit
 from tools.test_impact.core import digest
+from tools.test_impact.special_profiles import expected_image, validate_special_batch
 from tools.test_impact.source_binding import validate_source_plan, verify_source_binding
 
 
@@ -88,9 +89,6 @@ def main():
             with (output/'image-build.log').open('w') as log:
                 docker('build','-t',args.image,str(context),stdout=log,stderr=subprocess.STDOUT)
         image_id=subprocess.check_output(['docker','image','inspect','--format','{{.Id}}',args.image],text=True).strip()
-        if args.export_image:
-            with args.export_image.open('wb') as image_file:
-                docker('save',image_id,stdout=image_file)
         plan['image_id']=image_id
         control=temp/'control'; control.mkdir()
         (control/'test-commit.raw').write_bytes(raw_commit)
@@ -99,11 +97,21 @@ def main():
         def invoke(mode,key='',profile=''):
             out=temp/(key or 'collection'); out.mkdir(); out.chmod(0o777)
             container_name='impact-'+uuid.uuid4().hex
+            batch = next((b for b in plan.get('batches', []) if b['key'] == key), None) if mode == 'run' else None
+            if batch: validate_special_batch(batch)
+            selected_image = expected_image(plan, batch) if batch else image_id
             command=['run','--name',container_name,'--rm','--network','none','--cap-drop','ALL','--security-opt','no-new-privileges',
                      '--pids-limit','256','--memory','4g','--cpus','2','--read-only','--tmpfs','/tmp:rw,exec,size=3g',
                      '--mount',f'type=bind,src={source},dst=/source,readonly',
                      '--mount',f'type=bind,src={control},dst=/control,readonly',
-                     '--mount',f'type=bind,src={out},dst=/output',image_id,mode,key,profile]
+                     '--mount',f'type=bind,src={out},dst=/output']
+            if profile == 'root-django':
+                command += ['--user','0:0','--cap-add','SETUID','--cap-add','SETGID','--cap-add','CHOWN','--cap-add','SETPCAP',
+                            '--entrypoint','/bin/bash',selected_image,'/source/deploy/test-impact/root-entrypoint.sh',mode,key,profile]
+            elif profile == 'application-image':
+                command += ['--user','10001:10001','--entrypoint','python',selected_image,'/source/scripts/application_image_test_worker.py',key]
+            else:
+                command += [selected_image,mode,key,profile]
             with (output/((key or 'collection')+'.log')).open('w') as log:
                 try:
                     completed=subprocess.run(['docker',*command],stdout=log,stderr=subprocess.STDOUT,timeout=2100 if profile=='release-postgres' else 600)
@@ -113,6 +121,10 @@ def main():
             returned=[file.name for file in out.iterdir()]
             if returned != [expected]: raise ValueError('unexpected/missing container output: '+str(returned))
             shutil.copy(out/expected,output/expected)
+            if mode == 'run':
+                report=json.loads((output/expected).read_text())
+                report['actual_image_id']=selected_image
+                (output/expected).write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
             return completed.returncode
         if not args.batch:
             if invoke('collect'):
@@ -124,7 +136,28 @@ def main():
             if original['image_id']!=image_id:
                 raise ValueError('collection/execution image mismatch')
             plan=original
+        needs_application = any(b['profile'] == 'application-image' for b in plan['batches'])
+        if needs_application and not args.collect_only:
+            if args.batch:
+                application_id = plan.get('application_image_id')
+                if not application_id: raise ValueError('frozen application image required for batch replay')
+            else:
+                tag='umanews-impact-app:'+test_sha
+                with (output/'application-image-build.log').open('w') as log:
+                    docker('build','--build-arg','UMANEWS_RELEASE_COMMIT='+test_sha,'-t',tag,str(source),stdout=log,stderr=subprocess.STDOUT)
+                application_id=subprocess.check_output(['docker','image','inspect','--format','{{.Id}}',tag],text=True).strip()
+                plan['application_image_id']=application_id
+            revision=subprocess.check_output(['docker','image','inspect','--format','{{index .Config.Labels "org.opencontainers.image.revision"}}',application_id],text=True).strip()
+            if revision != test_sha: raise ValueError('application image revision mismatch')
+        for batch in plan['batches']:
+            if batch['profile'] != 'application-image' or plan.get('application_image_id'):
+                batch['image_id'] = expected_image(plan, batch)
+        (output/'execution-plan.json').write_text(json.dumps(plan,ensure_ascii=False,indent=2)+'\n')
         (control/'plan.json').write_text(json.dumps(plan))
+        if args.export_image:
+            images=[image_id] + ([plan['application_image_id']] if needs_application and plan.get('application_image_id') else [])
+            with args.export_image.open('wb') as image_file:
+                docker('save',*images,stdout=image_file)
         if args.collect_only:
             print(json.dumps({'mode':plan['mode'],'count':plan['count'],'batches':len(plan['batches']),'image_id':image_id})); return
         batches=[b for b in plan['batches'] if not args.batch or b['key']==args.batch]

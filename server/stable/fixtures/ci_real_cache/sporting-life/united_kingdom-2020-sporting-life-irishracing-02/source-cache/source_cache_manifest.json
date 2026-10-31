@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "root": "@FIXTURE_ROOT@/sporting-life/united_kingdom-2020-sporting-life-irishracing-02/source-cache",
+  "files": {
+    "c41ae87f71d8042b9cd02e3cd34d9e6fa0497e155b6366f746479b7e268771a9.html": {
+      "cached_at": "2026-07-16T07:40:11.631874+00:00",
+      "path": "c41ae87f71d8042b9cd02e3cd34d9e6fa0497e155b6366f746479b7e268771a9.html",
+      "protected_by": [],
+      "sha256": "12b583d052bcf3c0da572d98c41c072f46657ab973b2f222de99603b3b605cdc",
+      "size": 378716,
+      "source_url": "https://www.sportinglife.com/racing/results/2020-03-13/cheltenham/559948/jcb-triumph-hurdle-grade-1"
+    }
+  },
+  "total_bytes": 378716
+}

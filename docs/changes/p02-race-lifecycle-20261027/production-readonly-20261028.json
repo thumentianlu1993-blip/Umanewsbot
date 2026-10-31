@@ -1,0 +1,709 @@
+{
+  "observed_at": "2026-10-28T08:39:49.723966+00:00",
+  "release_commit": "ad50abdb74b89669ab8ada2958b040877c1a1849",
+  "stable_applied_latest": [
+    "0079_multisource_race_enrollment",
+    "0078_externalhorse_profile_snapshot",
+    "0077_racing_api_horse_identity_staging",
+    "0076_alter_externaldataimporterror_racing_region_and_more",
+    "0075_race_data_source_priority_and_reported_position",
+    "0074_race_data_sync_r0_control_plane",
+    "0073_lifecycle_enforce_registry",
+    "0072_add_extended_racing_regions"
+  ],
+  "flags": {
+    "RACE_LIFECYCLE_V2_WRITE_ENABLED": null,
+    "RACE_LIFECYCLE_DELIVERY_ENABLED": null,
+    "RACE_DATA_MULTISOURCE_APPLY_ENABLED": true,
+    "RACE_DATA_MULTISOURCE_DISCOVERY_ENABLED": true,
+    "RACE_DATA_SYNC_ENABLED": true,
+    "RACE_DATA_SYNC_ALLOW_NETWORK": true,
+    "RACE_DATA_SYNC_RESULT_PUBLIC_ENABLED": true,
+    "RACE_DATA_SYNC_PRE_RACE_REFRESH_ENABLED": true,
+    "RACE_DATA_SYNC_JRA_PRE_RACE_ENABLED": true
+  },
+  "future_window": {
+    "start": "2026-10-28",
+    "end_exclusive": "2026-11-25"
+  },
+  "future_public_count": 78,
+  "future_counts": [
+    {
+      "country_region": "france",
+      "count": 11
+    },
+    {
+      "country_region": "germany",
+      "count": 3
+    },
+    {
+      "country_region": "hong_kong",
+      "count": 4
+    },
+    {
+      "country_region": "ireland",
+      "count": 22
+    },
+    {
+      "country_region": "japan",
+      "count": 17
+    },
+    {
+      "country_region": "united_states",
+      "count": 21
+    }
+  ],
+  "future_events": [
+    {
+      "id": 199,
+      "country_region": "japan",
+      "local_date": "2026-10-29",
+      "original_name": "エーデルワイス賞",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 549,
+      "country_region": "united_states",
+      "local_date": "2026-10-30",
+      "original_name": "BREEDERS' CUP JUVENILE",
+      "status": "scheduled",
+      "priority": "P0"
+    },
+    {
+      "id": 550,
+      "country_region": "united_states",
+      "local_date": "2026-10-30",
+      "original_name": "BREEDERS' CUP JUVENILE FILLIES",
+      "status": "scheduled",
+      "priority": "P0"
+    },
+    {
+      "id": 551,
+      "country_region": "united_states",
+      "local_date": "2026-10-30",
+      "original_name": "BREEDERS' CUP JUVENILE FILLIES TURF",
+      "status": "scheduled",
+      "priority": "P0"
+    },
+    {
+      "id": 552,
+      "country_region": "united_states",
+      "local_date": "2026-10-30",
+      "original_name": "BREEDERS' CUP JUVENILE TURF",
+      "status": "scheduled",
+      "priority": "P0"
+    },
+    {
+      "id": 553,
+      "country_region": "united_states",
+      "local_date": "2026-10-30",
+      "original_name": "BREEDERS' CUP JUVENILE TURF SPRINT",
+      "status": "scheduled",
+      "priority": "P0"
+    },
+    {
+      "id": 20565,
+      "country_region": "ireland",
+      "local_date": "2026-10-30",
+      "original_name": "Feathard Lady Mares Novice Hurdle",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 20614,
+      "country_region": "ireland",
+      "local_date": "2026-10-30",
+      "original_name": "Jezki Hurdle",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 118,
+      "country_region": "japan",
+      "local_date": "2026-10-31",
+      "original_name": "ファンタジーS",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 554,
+      "country_region": "united_states",
+      "local_date": "2026-10-31",
+      "original_name": "LONGINES BREEDERS' CUP DISTAFF",
+      "status": "scheduled",
+      "priority": "P0"
+    },
+    {
+      "id": 555,
+      "country_region": "united_states",
+      "local_date": "2026-10-31",
+      "original_name": "MAKER'S MARK BREEDERS' CUP FILLY & MARE TURF",
+      "status": "scheduled",
+      "priority": "P0"
+    },
+    {
+      "id": 556,
+      "country_region": "united_states",
+      "local_date": "2026-10-31",
+      "original_name": "PNC BANK BREEDERS' CUP FILLY & MARE SPRINT",
+      "status": "scheduled",
+      "priority": "P0"
+    },
+    {
+      "id": 557,
+      "country_region": "united_states",
+      "local_date": "2026-10-31",
+      "original_name": "LONGINES BREEDERS' CUP CLASSIC",
+      "status": "scheduled",
+      "priority": "P0"
+    },
+    {
+      "id": 558,
+      "country_region": "united_states",
+      "local_date": "2026-10-31",
+      "original_name": "BREEDERS' CUP DIRT MILE",
+      "status": "scheduled",
+      "priority": "P0"
+    },
+    {
+      "id": 559,
+      "country_region": "united_states",
+      "local_date": "2026-10-31",
+      "original_name": "LONGINES BREEDERS' CUP TURF",
+      "status": "scheduled",
+      "priority": "P0"
+    },
+    {
+      "id": 560,
+      "country_region": "united_states",
+      "local_date": "2026-10-31",
+      "original_name": "FANDUEL BREEDERS' CUP MILE",
+      "status": "scheduled",
+      "priority": "P0"
+    },
+    {
+      "id": 561,
+      "country_region": "united_states",
+      "local_date": "2026-10-31",
+      "original_name": "CYGAMES BREEDERS' CUP SPRINT",
+      "status": "scheduled",
+      "priority": "P0"
+    },
+    {
+      "id": 562,
+      "country_region": "united_states",
+      "local_date": "2026-10-31",
+      "original_name": "PREVAGEN BREEDERS' CUP TURF SPRINT",
+      "status": "scheduled",
+      "priority": "P0"
+    },
+    {
+      "id": 563,
+      "country_region": "united_states",
+      "local_date": "2026-10-31",
+      "original_name": "GOLDIKOVA S.",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 20250,
+      "country_region": "germany",
+      "local_date": "2026-10-31",
+      "original_name": "Silbernes Pferd",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 20619,
+      "country_region": "ireland",
+      "local_date": "2026-10-31",
+      "original_name": "Kauto Star Steeplechase",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 20711,
+      "country_region": "ireland",
+      "local_date": "2026-10-31",
+      "original_name": "Skymas Steeplechase",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 119,
+      "country_region": "japan",
+      "local_date": "2026-11-01",
+      "original_name": "天皇賞（秋）",
+      "status": "scheduled",
+      "priority": "P0"
+    },
+    {
+      "id": 564,
+      "country_region": "united_states",
+      "local_date": "2026-11-01",
+      "original_name": "FORTY NINER S.",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 565,
+      "country_region": "united_states",
+      "local_date": "2026-11-01",
+      "original_name": "BOLD RULER S.",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 566,
+      "country_region": "united_states",
+      "local_date": "2026-11-01",
+      "original_name": "TWILIGHT DERBY",
+      "status": "scheduled",
+      "priority": "P1"
+    },
+    {
+      "id": 20623,
+      "country_region": "ireland",
+      "local_date": "2026-11-01",
+      "original_name": "Kildorrery Novice Steeplechase",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 20646,
+      "country_region": "ireland",
+      "local_date": "2026-11-01",
+      "original_name": "Loughbrown Stakes",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 20740,
+      "country_region": "ireland",
+      "local_date": "2026-11-01",
+      "original_name": "Youghal Novice Hurdle",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 200,
+      "country_region": "japan",
+      "local_date": "2026-11-03",
+      "original_name": "JBC2歳優駿",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 201,
+      "country_region": "japan",
+      "local_date": "2026-11-03",
+      "original_name": "JBCクラシック",
+      "status": "scheduled",
+      "priority": "P0"
+    },
+    {
+      "id": 202,
+      "country_region": "japan",
+      "local_date": "2026-11-03",
+      "original_name": "JBCスプリント",
+      "status": "scheduled",
+      "priority": "P0"
+    },
+    {
+      "id": 203,
+      "country_region": "japan",
+      "local_date": "2026-11-03",
+      "original_name": "JBCレディスクラシック",
+      "status": "scheduled",
+      "priority": "P0"
+    },
+    {
+      "id": 20539,
+      "country_region": "ireland",
+      "local_date": "2026-11-05",
+      "original_name": "Clonmel Steeplechase",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 20719,
+      "country_region": "ireland",
+      "local_date": "2026-11-05",
+      "original_name": "T.A. Morris Memorial Mares Steeplechase",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 120,
+      "country_region": "japan",
+      "local_date": "2026-11-07",
+      "original_name": "京王杯2歳S",
+      "status": "scheduled",
+      "priority": "P1"
+    },
+    {
+      "id": 121,
+      "country_region": "japan",
+      "local_date": "2026-11-07",
+      "original_name": "京都ジャンプS",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 567,
+      "country_region": "united_states",
+      "local_date": "2026-11-07",
+      "original_name": "MOTHER GOOSE S.",
+      "status": "scheduled",
+      "priority": "P1"
+    },
+    {
+      "id": 20233,
+      "country_region": "germany",
+      "local_date": "2026-11-07",
+      "original_name": "Grosser Allianz Preis von Bayern",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 122,
+      "country_region": "japan",
+      "local_date": "2026-11-08",
+      "original_name": "アルゼンチン共和国杯",
+      "status": "scheduled",
+      "priority": "P1"
+    },
+    {
+      "id": 123,
+      "country_region": "japan",
+      "local_date": "2026-11-08",
+      "original_name": "みやこS",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 19608,
+      "country_region": "hong_kong",
+      "local_date": "2026-11-08",
+      "original_name": "Sa Sa Ladies' Purse (H)",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 20527,
+      "country_region": "ireland",
+      "local_date": "2026-11-08",
+      "original_name": "Brown Lad Handicap Hurdle",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 20681,
+      "country_region": "ireland",
+      "local_date": "2026-11-08",
+      "original_name": "Poplar Square Steeplechase",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 795,
+      "country_region": "france",
+      "local_date": "2026-11-11",
+      "original_name": "PRIX FILLE DE L ’AIR",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 124,
+      "country_region": "japan",
+      "local_date": "2026-11-14",
+      "original_name": "武蔵野S",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 125,
+      "country_region": "japan",
+      "local_date": "2026-11-14",
+      "original_name": "デイリー杯2歳S",
+      "status": "scheduled",
+      "priority": "P1"
+    },
+    {
+      "id": 843,
+      "country_region": "france",
+      "local_date": "2026-11-14",
+      "original_name": "PRIX MAGALEN BRYANT",
+      "status": "scheduled",
+      "priority": "P1"
+    },
+    {
+      "id": 844,
+      "country_region": "france",
+      "local_date": "2026-11-14",
+      "original_name": "PRIX SERGE LANDON - GRAND PRIX D’AUTOMNE",
+      "status": "scheduled",
+      "priority": "P0"
+    },
+    {
+      "id": 845,
+      "country_region": "france",
+      "local_date": "2026-11-14",
+      "original_name": "PRIX CONGRESS",
+      "status": "scheduled",
+      "priority": "P1"
+    },
+    {
+      "id": 20240,
+      "country_region": "germany",
+      "local_date": "2026-11-14",
+      "original_name": "Herzog von Ratibor-Rennen",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 20570,
+      "country_region": "ireland",
+      "local_date": "2026-11-14",
+      "original_name": "For Auction Novice Hurdle",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 20571,
+      "country_region": "ireland",
+      "local_date": "2026-11-14",
+      "original_name": "Fortria Steeplechase",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 20643,
+      "country_region": "ireland",
+      "local_date": "2026-11-14",
+      "original_name": "Lismullen Hurdle",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 126,
+      "country_region": "japan",
+      "local_date": "2026-11-15",
+      "original_name": "エリザベス女王杯",
+      "status": "scheduled",
+      "priority": "P0"
+    },
+    {
+      "id": 846,
+      "country_region": "france",
+      "local_date": "2026-11-15",
+      "original_name": "PRIX CAMBACERES - GRANDE COURSE DE HAIES DES 3 ANS",
+      "status": "scheduled",
+      "priority": "P0"
+    },
+    {
+      "id": 847,
+      "country_region": "france",
+      "local_date": "2026-11-15",
+      "original_name": "PRIX RENAUD DU VIVIER - GRANDE COURSE DE HAIES DES 4 ANS",
+      "status": "scheduled",
+      "priority": "P0"
+    },
+    {
+      "id": 848,
+      "country_region": "france",
+      "local_date": "2026-11-15",
+      "original_name": "PRIX MAURICE GILLOIS - GRAND STEEPLE-CHASE DES 4 ANS",
+      "status": "scheduled",
+      "priority": "P0"
+    },
+    {
+      "id": 849,
+      "country_region": "france",
+      "local_date": "2026-11-15",
+      "original_name": "PRIX FONDEUR",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 850,
+      "country_region": "france",
+      "local_date": "2026-11-15",
+      "original_name": "PRIX LA HAYE JOUSSELIN",
+      "status": "scheduled",
+      "priority": "P0"
+    },
+    {
+      "id": 20505,
+      "country_region": "ireland",
+      "local_date": "2026-11-15",
+      "original_name": "Aries Girl Mares I.N.H. Flat Race",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 20658,
+      "country_region": "ireland",
+      "local_date": "2026-11-15",
+      "original_name": "Monksfield Novice Hurdle",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 20730,
+      "country_region": "ireland",
+      "local_date": "2026-11-15",
+      "original_name": "Troytown Handicap Steeplechase",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 796,
+      "country_region": "france",
+      "local_date": "2026-11-20",
+      "original_name": "PRIX THOMAS BRYON",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 797,
+      "country_region": "france",
+      "local_date": "2026-11-20",
+      "original_name": "PRIX MIESQUE",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 127,
+      "country_region": "japan",
+      "local_date": "2026-11-21",
+      "original_name": "福島記念",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 568,
+      "country_region": "united_states",
+      "local_date": "2026-11-21",
+      "original_name": "PEBBLES S.",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 20567,
+      "country_region": "ireland",
+      "local_date": "2026-11-21",
+      "original_name": "Florida Pearl Novice Steeplechase",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 20660,
+      "country_region": "ireland",
+      "local_date": "2026-11-21",
+      "original_name": "Morgiana Hurdle",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 128,
+      "country_region": "japan",
+      "local_date": "2026-11-22",
+      "original_name": "マイルチャンピオンシップ",
+      "status": "scheduled",
+      "priority": "P0"
+    },
+    {
+      "id": 569,
+      "country_region": "united_states",
+      "local_date": "2026-11-22",
+      "original_name": "MANILA S.",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 19609,
+      "country_region": "hong_kong",
+      "local_date": "2026-11-22",
+      "original_name": "BOCHK Jockey Club Cup",
+      "status": "scheduled",
+      "priority": "P1"
+    },
+    {
+      "id": 19610,
+      "country_region": "hong_kong",
+      "local_date": "2026-11-22",
+      "original_name": "BOCHK Private Wealth Jockey Club Mile",
+      "status": "scheduled",
+      "priority": "P1"
+    },
+    {
+      "id": 19611,
+      "country_region": "hong_kong",
+      "local_date": "2026-11-22",
+      "original_name": "BOCHK Private Banking Jockey Club Sprint",
+      "status": "scheduled",
+      "priority": "P1"
+    },
+    {
+      "id": 20545,
+      "country_region": "ireland",
+      "local_date": "2026-11-22",
+      "original_name": "Craddockstown Novice Steeplechase",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 20589,
+      "country_region": "ireland",
+      "local_date": "2026-11-22",
+      "original_name": "Grabel Mares Hurdle",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 20689,
+      "country_region": "ireland",
+      "local_date": "2026-11-22",
+      "original_name": "Punchestown Steeplechase",
+      "status": "scheduled",
+      "priority": "P2"
+    },
+    {
+      "id": 129,
+      "country_region": "japan",
+      "local_date": "2026-11-23",
+      "original_name": "東スポ杯2歳S",
+      "status": "scheduled",
+      "priority": "P1"
+    }
+  ],
+  "truncated": false,
+  "limitation": "Current canonical calendar only; not an independent all-target coverage proof or approved production cohort",
+  "raw_snapshot_sha256": "b93a22ecd32e18e9544db67402050204fdb23286e05b6fbeb6ae3f29912de855",
+  "public_health": {
+    "observed_at": "2026-10-28T08:40:12.053578+00:00",
+    "checks": [
+      {
+        "url": "https://umafans.run/healthz/",
+        "status": 200,
+        "final_url": "https://umafans.run/healthz/",
+        "bytes": 16
+      },
+      {
+        "url": "https://www.umafans.run/healthz/",
+        "status": 200,
+        "final_url": "https://www.umafans.run/healthz/",
+        "bytes": 16
+      }
+    ]
+  },
+  "read_boundary": {
+    "production_database_transaction": "READ ONLY",
+    "statement_timeout_ms": 8000,
+    "production_writes": false,
+    "external_source_fetches": false,
+    "services_changed": false
+  }
+}

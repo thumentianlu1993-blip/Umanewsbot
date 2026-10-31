@@ -1,0 +1,1153 @@
+{
+  "migration_contract_sha256": "9a86bb646f0437834e7df22b44d878dbf0df008d0aaa604d103d356d94f08c3b",
+  "source_recorder": [
+    [
+      "admin",
+      "0001_initial"
+    ],
+    [
+      "admin",
+      "0002_logentry_remove_auto_add"
+    ],
+    [
+      "admin",
+      "0003_logentry_add_action_flag_choices"
+    ],
+    [
+      "auth",
+      "0001_initial"
+    ],
+    [
+      "auth",
+      "0002_alter_permission_name_max_length"
+    ],
+    [
+      "auth",
+      "0003_alter_user_email_max_length"
+    ],
+    [
+      "auth",
+      "0004_alter_user_username_opts"
+    ],
+    [
+      "auth",
+      "0005_alter_user_last_login_null"
+    ],
+    [
+      "auth",
+      "0006_require_contenttypes_0002"
+    ],
+    [
+      "auth",
+      "0007_alter_validators_add_error_messages"
+    ],
+    [
+      "auth",
+      "0008_alter_user_username_max_length"
+    ],
+    [
+      "auth",
+      "0009_alter_user_last_name_max_length"
+    ],
+    [
+      "auth",
+      "0010_alter_group_name_max_length"
+    ],
+    [
+      "auth",
+      "0011_update_proxy_permissions"
+    ],
+    [
+      "auth",
+      "0012_alter_user_first_name_max_length"
+    ],
+    [
+      "contenttypes",
+      "0001_initial"
+    ],
+    [
+      "contenttypes",
+      "0002_remove_content_type_name"
+    ],
+    [
+      "sessions",
+      "0001_initial"
+    ],
+    [
+      "stable",
+      "0001_initial"
+    ],
+    [
+      "stable",
+      "0002_crawljob_newsarticle_crawl_status_and_more"
+    ],
+    [
+      "stable",
+      "0003_seed_sources_and_backfill_articles"
+    ],
+    [
+      "stable",
+      "0004_newsarticle_translated_at_and_more"
+    ],
+    [
+      "stable",
+      "0005_automation_mvp"
+    ],
+    [
+      "stable",
+      "0006_termcandidate_termcandidateevidence_and_more"
+    ],
+    [
+      "stable",
+      "0007_termcandidate_aliases_ja_termcandidate_aliases_zh_and_more"
+    ],
+    [
+      "stable",
+      "0008_externaldataimportrun_externaldataimportlock_and_more"
+    ],
+    [
+      "stable",
+      "0009_automation_publish_gates"
+    ],
+    [
+      "stable",
+      "0010_qqpushdelivery"
+    ],
+    [
+      "stable",
+      "0011_remove_termcandidate_uq_term_candidate_type_normalized_and_more"
+    ],
+    [
+      "stable",
+      "0012_termalias"
+    ],
+    [
+      "stable",
+      "0013_alter_newsarticle_source_site_and_more"
+    ],
+    [
+      "stable",
+      "0014_multiregion_news_indexes"
+    ],
+    [
+      "stable",
+      "0015_termentry_racing_region"
+    ],
+    [
+      "stable",
+      "0016_alter_externaldataimporterror_source_and_more"
+    ],
+    [
+      "stable",
+      "0017_majorraceevent_productionwindow_quotaledger_and_more"
+    ],
+    [
+      "stable",
+      "0018_alter_notificationlog_type"
+    ],
+    [
+      "stable",
+      "0019_newsarticle_ranked_revived_at"
+    ],
+    [
+      "stable",
+      "0020_raceevent_articleracelink_raceeventalias_and_more"
+    ],
+    [
+      "stable",
+      "0021_alter_raceevent_surface"
+    ],
+    [
+      "stable",
+      "0022_horseprofile_horsefollow_articlehorselink_and_more"
+    ],
+    [
+      "stable",
+      "0023_multiregion_news_attribution"
+    ],
+    [
+      "stable",
+      "0024_historical_race_inventory"
+    ],
+    [
+      "stable",
+      "0026_historical_race_query_indexes"
+    ],
+    [
+      "stable",
+      "0027_p0_horse_profile_completion"
+    ],
+    [
+      "stable",
+      "0028_term_gate_reprocess_runs"
+    ],
+    [
+      "stable",
+      "0029_france_freshness_translation_attribution"
+    ],
+    [
+      "stable",
+      "0030_japanese_racing_translation_terms"
+    ],
+    [
+      "stable",
+      "0031_historical_batch_runner"
+    ],
+    [
+      "stable",
+      "0032_historical_race_detail_import_receipt"
+    ],
+    [
+      "stable",
+      "0033_raceeventprojectioncontrol"
+    ],
+    [
+      "stable",
+      "0034_raceeventlivetracking"
+    ],
+    [
+      "stable",
+      "0035_raceliveidentitymodels"
+    ],
+    [
+      "stable",
+      "0036_raceliverevisionmodels"
+    ],
+    [
+      "stable",
+      "0037_projectionrevisionpointers"
+    ],
+    [
+      "stable",
+      "0038_racelivehostbudget"
+    ],
+    [
+      "stable",
+      "0039_raceliverevisionlinkguards"
+    ],
+    [
+      "stable",
+      "0040_raceresultauthority_revisionpublication"
+    ],
+    [
+      "stable",
+      "0041_extend_race_runner_status_choices"
+    ],
+    [
+      "stable",
+      "0042_raceresultsourceidentity_tra_supplemental"
+    ],
+    [
+      "stable",
+      "0043_racelivepublicationcontrols"
+    ],
+    [
+      "stable",
+      "0044_raceeventrevisionpublication_policy_snapshot"
+    ],
+    [
+      "stable",
+      "0045_raceliveofficialverificationmodels"
+    ],
+    [
+      "stable",
+      "0046_race_live_manual_verification_contract"
+    ],
+    [
+      "stable",
+      "0047_race_live_public_beta_controls"
+    ],
+    [
+      "stable",
+      "0048_raceeventrunner_external_runner_identity"
+    ],
+    [
+      "stable",
+      "0049_horse_career_history"
+    ],
+    [
+      "stable",
+      "0050_backfill_horse_career_history"
+    ],
+    [
+      "stable",
+      "0051_horse_career_history_indexes"
+    ],
+    [
+      "stable",
+      "0052_horse_career_source_authority"
+    ],
+    [
+      "stable",
+      "0053_newsarticle_publish_ready_at"
+    ],
+    [
+      "stable",
+      "0054_homepage_headline_control"
+    ],
+    [
+      "stable",
+      "0054_race_field_normalization_schema"
+    ],
+    [
+      "stable",
+      "0055_race_field_normalization_indexes"
+    ],
+    [
+      "stable",
+      "0056_race_field_normalization_brought_down"
+    ],
+    [
+      "stable",
+      "0057_merge_20260725_0448"
+    ],
+    [
+      "stable",
+      "0058_add_race_event_lifecycle"
+    ],
+    [
+      "stable",
+      "0059_add_lifecycle_manifest_data"
+    ],
+    [
+      "stable",
+      "0060_raceeventproductcanonicallink"
+    ],
+    [
+      "stable",
+      "0061_add_race_reference_observations"
+    ],
+    [
+      "stable",
+      "0062_add_scheduled_race_result_review"
+    ],
+    [
+      "stable",
+      "0063_add_term_mapping_evidence"
+    ],
+    [
+      "stable",
+      "0064_add_race_news_exposure"
+    ],
+    [
+      "stable",
+      "0065_add_exposure_constraints"
+    ],
+    [
+      "stable",
+      "0066_add_term_consistency_manifest"
+    ],
+    [
+      "stable",
+      "0067_historical_calendar_release_a"
+    ],
+    [
+      "stable",
+      "0068_race_data_sync_pipeline_a_field_audit"
+    ],
+    [
+      "stable",
+      "0069_race_data_sync_pipeline_a_ledger_guards"
+    ],
+    [
+      "stable",
+      "0070_horse_identity_evidence_commit_receipt"
+    ],
+    [
+      "stable",
+      "0071_historical_calendar_release_b"
+    ],
+    [
+      "stable",
+      "0072_add_extended_racing_regions"
+    ],
+    [
+      "stable",
+      "0073_lifecycle_enforce_registry"
+    ],
+    [
+      "stable",
+      "0074_race_data_sync_r0_control_plane"
+    ],
+    [
+      "stable",
+      "0075_race_data_source_priority_and_reported_position"
+    ],
+    [
+      "stable",
+      "0076_alter_externaldataimporterror_racing_region_and_more"
+    ],
+    [
+      "stable",
+      "0077_racing_api_horse_identity_staging"
+    ],
+    [
+      "stable",
+      "0078_externalhorse_profile_snapshot"
+    ],
+    [
+      "stable",
+      "0079_multisource_race_enrollment"
+    ]
+  ],
+  "states": [
+    {
+      "prefix": 0,
+      "canonical_catalog_sha256": "bda65ea389001e1a5c4f3cc2536627feb2e92a9fdc76bb8624e0b18ee46c98a9",
+      "accepted_catalog_sha256": [
+        "bab852832545e249d0f4952cc36743a2c6b6223f3c12262fe02c15f2bc2578ea",
+        "bda65ea389001e1a5c4f3cc2536627feb2e92a9fdc76bb8624e0b18ee46c98a9"
+      ]
+    },
+    {
+      "prefix": 1,
+      "canonical_catalog_sha256": "a7c2130ebaa63722a0cac572cb9d6615f63261f1a982d66311fbf2e402983194",
+      "accepted_catalog_sha256": [
+        "a7c2130ebaa63722a0cac572cb9d6615f63261f1a982d66311fbf2e402983194",
+        "e05d8f0164713e758ecfffcb613f97df45dddefc0682398b7a4712e91b617dcb"
+      ]
+    },
+    {
+      "prefix": 2,
+      "canonical_catalog_sha256": "2192e56d646dfc3841e69d617a85150af92b767ab94784cfba638aacb8a2b1c0",
+      "accepted_catalog_sha256": [
+        "2192e56d646dfc3841e69d617a85150af92b767ab94784cfba638aacb8a2b1c0",
+        "e22fa8e021efc2cf93e16ea9eb52bc82f216e99ae85708366504a1116a2b1b50"
+      ]
+    },
+    {
+      "prefix": 3,
+      "canonical_catalog_sha256": "bab8a96178e7332359fa227c64e9d6599918bce749d770dbfae4049cb31a0f0b",
+      "accepted_catalog_sha256": [
+        "bab8a96178e7332359fa227c64e9d6599918bce749d770dbfae4049cb31a0f0b",
+        "f4a33be6fd407807d8939afd7f261b21dd2b30c1ccbd1a1cd16fdbacf2596654"
+      ]
+    },
+    {
+      "prefix": 4,
+      "canonical_catalog_sha256": "5ad90f1228c7376e7f67a3a7ab824c15a516b7dad242b093853d6e8cee937fbc",
+      "accepted_catalog_sha256": [
+        "5ad90f1228c7376e7f67a3a7ab824c15a516b7dad242b093853d6e8cee937fbc",
+        "c9d15e3cd418726b700f418b0abc6cccb69b1f9967a362f3dd90370fa50bd794"
+      ]
+    },
+    {
+      "prefix": 5,
+      "canonical_catalog_sha256": "92688c097e01c7ade98002bc8890078447d815800c049f66de97bf93e956a505",
+      "accepted_catalog_sha256": [
+        "6662ce9bc559d38abbc87614c9f226f3bbb25c80806bc9fd75b43d9d950d93a2",
+        "92688c097e01c7ade98002bc8890078447d815800c049f66de97bf93e956a505"
+      ]
+    },
+    {
+      "prefix": 6,
+      "canonical_catalog_sha256": "f458c525a609d69ef2f3d36f763027813c01d395cc8c88c7518dd320d49e6c56",
+      "accepted_catalog_sha256": [
+        "2b2e992e99f4b025ebb8988b14cd23a343df61e93296a74212efa37590b1dbc7",
+        "f458c525a609d69ef2f3d36f763027813c01d395cc8c88c7518dd320d49e6c56"
+      ]
+    }
+  ],
+  "constraint_normalizations": [
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (layer::text = ANY (ARRAY['historical_through_2024'::character varying, 'current_year_due'::character varying]::text[]))",
+        "name": "hist_rcpt_layer_valid",
+        "table_name": "stable_historicalracedetailimportreceipt",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (layer::text = ANY (ARRAY['historical_through_2024'::character varying::text, 'current_year_due'::character varying::text]))",
+        "name": "hist_rcpt_layer_valid",
+        "table_name": "stable_historicalracedetailimportreceipt",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (state::text = ANY (ARRAY['claimed'::character varying, 'complete'::character varying, 'failed'::character varying]::text[]))",
+        "name": "race_data_snapshot_state_valid",
+        "table_name": "stable_racedatasnapshotlease",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (state::text = ANY (ARRAY['claimed'::character varying::text, 'complete'::character varying::text, 'failed'::character varying::text]))",
+        "name": "race_data_snapshot_state_valid",
+        "table_name": "stable_racedatasnapshotlease",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (state::text = ANY (ARRAY['proposed'::character varying, 'enrolled'::character varying, 'paused'::character varying, 'retired'::character varying]::text[]))",
+        "name": "race_data_enroll_state_valid",
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (state::text = ANY (ARRAY['proposed'::character varying::text, 'enrolled'::character varying::text, 'paused'::character varying::text, 'retired'::character varying::text]))",
+        "name": "race_data_enroll_state_valid",
+        "table_name": "stable_racedatasyncenrollment",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (state::text = ANY (ARRAY['active'::character varying, 'quarantined'::character varying, 'retired'::character varying]::text[]))",
+        "name": "race_sync_binding_state",
+        "table_name": "stable_racedatasyncsourcebinding",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (state::text = ANY (ARRAY['active'::character varying::text, 'quarantined'::character varying::text, 'retired'::character varying::text]))",
+        "name": "race_sync_binding_state",
+        "table_name": "stable_racedatasyncsourcebinding",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (decision::text = ''::text OR (decision::text = ANY (ARRAY['applied'::character varying, 'replayed'::character varying, 'needs_review'::character varying, 'rejected'::character varying]::text[])))",
+        "name": "race_field_change_decision_valid",
+        "table_name": "stable_raceeventfieldchange",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (decision::text = ''::text OR (decision::text = ANY (ARRAY['applied'::character varying::text, 'replayed'::character varying::text, 'needs_review'::character varying::text, 'rejected'::character varying::text])))",
+        "name": "race_field_change_decision_valid",
+        "table_name": "stable_raceeventfieldchange",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (data_kind::text = ANY (ARRAY['race_time'::character varying, 'racecard'::character varying, 'result'::character varying]::text[]))",
+        "name": "race_data_ckpt_kind_valid",
+        "table_name": "stable_raceeventliveprovidercheckpoint",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (data_kind::text = ANY (ARRAY['race_time'::character varying::text, 'racecard'::character varying::text, 'result'::character varying::text]))",
+        "name": "race_data_ckpt_kind_valid",
+        "table_name": "stable_raceeventliveprovidercheckpoint",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (state::text = ANY (ARRAY['scheduled'::character varying, 'racecard_ready'::character varying, 'awaiting_result'::character varying, 'provisional_result'::character varying, 'official_result'::character varying, 'corrected_result'::character varying]::text[]))",
+        "name": "race_live_tracking_state_valid",
+        "table_name": "stable_raceeventlivetracking",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (state::text = ANY (ARRAY['scheduled'::character varying::text, 'racecard_ready'::character varying::text, 'awaiting_result'::character varying::text, 'provisional_result'::character varying::text, 'official_result'::character varying::text, 'corrected_result'::character varying::text]))",
+        "name": "race_live_tracking_state_valid",
+        "table_name": "stable_raceeventlivetracking",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (review_status::text = ANY (ARRAY['pending'::character varying, 'approved'::character varying, 'rejected'::character varying, 'conflict'::character varying]::text[]))",
+        "name": "race_part_review_valid",
+        "table_name": "stable_raceeventparticipant",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (review_status::text = ANY (ARRAY['pending'::character varying::text, 'approved'::character varying::text, 'rejected'::character varying::text, 'conflict'::character varying::text]))",
+        "name": "race_part_review_valid",
+        "table_name": "stable_raceeventparticipant",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (write_owner::text = ANY (ARRAY['unmanaged'::character varying, 'historical'::character varying, 'live'::character varying, 'data_sync'::character varying, 'manual_paused'::character varying]::text[]))",
+        "name": "race_projection_owner_valid",
+        "table_name": "stable_raceeventprojectioncontrol",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (write_owner::text = ANY (ARRAY['unmanaged'::character varying::text, 'historical'::character varying::text, 'live'::character varying::text, 'data_sync'::character varying::text, 'manual_paused'::character varying::text]))",
+        "name": "race_projection_owner_valid",
+        "table_name": "stable_raceeventprojectioncontrol",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (conflict_status::text = ANY (ARRAY['none'::character varying, 'pending'::character varying, 'resolved'::character varying]::text[]))",
+        "name": "race_rev_conflict_valid",
+        "table_name": "stable_raceeventrevision",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (conflict_status::text = ANY (ARRAY['none'::character varying::text, 'pending'::character varying::text, 'resolved'::character varying::text]))",
+        "name": "race_rev_conflict_valid",
+        "table_name": "stable_raceeventrevision",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (kind::text = ANY (ARRAY['racecard'::character varying, 'result'::character varying]::text[]))",
+        "name": "race_rev_kind_valid",
+        "table_name": "stable_raceeventrevision",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (kind::text = ANY (ARRAY['racecard'::character varying::text, 'result'::character varying::text]))",
+        "name": "race_rev_kind_valid",
+        "table_name": "stable_raceeventrevision",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (phase::text = ANY (ARRAY['racecard'::character varying, 'provisional'::character varying, 'official'::character varying, 'corrected'::character varying, 'unknown'::character varying]::text[]))",
+        "name": "race_rev_phase_valid",
+        "table_name": "stable_raceeventrevision",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (phase::text = ANY (ARRAY['racecard'::character varying::text, 'provisional'::character varying::text, 'official'::character varying::text, 'corrected'::character varying::text, 'unknown'::character varying::text]))",
+        "name": "race_rev_phase_valid",
+        "table_name": "stable_raceeventrevision",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (status::text = ANY (ARRAY['declared'::character varying, 'running'::character varying, 'scratched'::character varying, 'withdrawn'::character varying, 'reinstated'::character varying, 'non_runner'::character varying, 'unknown'::character varying, 'finished'::character varying, 'dead_heat'::character varying, 'disqualified'::character varying, 'did_not_finish'::character varying, 'pulled_up'::character varying, 'unseated_rider'::character varying, 'fell'::character varying, 'refused'::character varying]::text[]))",
+        "name": "race_revitem_status_valid",
+        "table_name": "stable_raceeventrevisionitem",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (status::text = ANY (ARRAY['declared'::character varying::text, 'running'::character varying::text, 'scratched'::character varying::text, 'withdrawn'::character varying::text, 'reinstated'::character varying::text, 'non_runner'::character varying::text, 'unknown'::character varying::text, 'finished'::character varying::text, 'dead_heat'::character varying::text, 'disqualified'::character varying::text, 'did_not_finish'::character varying::text, 'pulled_up'::character varying::text, 'unseated_rider'::character varying::text, 'fell'::character varying::text, 'refused'::character varying::text]))",
+        "name": "race_revitem_status_valid",
+        "table_name": "stable_raceeventrevisionitem",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (authorization_kind::text = ANY (ARRAY['provisional_policy'::character varying, 'official_route'::character varying]::text[]))",
+        "name": "race_pub_auth_kind_valid",
+        "table_name": "stable_raceeventrevisionpublication",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (authorization_kind::text = ANY (ARRAY['provisional_policy'::character varying::text, 'official_route'::character varying::text]))",
+        "name": "race_pub_auth_kind_valid",
+        "table_name": "stable_raceeventrevisionpublication",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (status::text = ANY (ARRAY['open'::character varying, 'sending'::character varying, 'sent'::character varying, 'failed'::character varying, 'resolved'::character varying]::text[]))",
+        "name": "race_alert_status_valid",
+        "table_name": "stable_racelivealertincident",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (status::text = ANY (ARRAY['open'::character varying::text, 'sending'::character varying::text, 'sent'::character varying::text, 'failed'::character varying::text, 'resolved'::character varying::text]))",
+        "name": "race_alert_status_valid",
+        "table_name": "stable_racelivealertincident",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (alert_type::text = ANY (ARRAY['provisional_overdue'::character varying, 'official_overdue'::character varying, 'source_failures'::character varying, 'pagination_overflow'::character varying, 'host_circuit'::character varying, 'queue_age'::character varying]::text[]))",
+        "name": "race_alert_type_valid",
+        "table_name": "stable_racelivealertincident",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (alert_type::text = ANY (ARRAY['provisional_overdue'::character varying::text, 'official_overdue'::character varying::text, 'source_failures'::character varying::text, 'pagination_overflow'::character varying::text, 'host_circuit'::character varying::text, 'queue_age'::character varying::text]))",
+        "name": "race_alert_type_valid",
+        "table_name": "stable_racelivealertincident",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (max_mode::text = ANY (ARRAY['off'::character varying, 'shadow'::character varying, 'provisional_public'::character varying, 'official_public'::character varying]::text[]))",
+        "name": "race_live_allow_mode_valid",
+        "table_name": "stable_raceliveeventpublicationallowlist",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (max_mode::text = ANY (ARRAY['off'::character varying::text, 'shadow'::character varying::text, 'provisional_public'::character varying::text, 'official_public'::character varying::text]))",
+        "name": "race_live_allow_mode_valid",
+        "table_name": "stable_raceliveeventpublicationallowlist",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (review_status::text = ANY (ARRAY['pending'::character varying, 'approved'::character varying, 'rejected'::character varying, 'conflict'::character varying]::text[]))",
+        "name": "race_marker_contract_review_valid",
+        "table_name": "stable_raceliveofficialmarkercontract",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (review_status::text = ANY (ARRAY['pending'::character varying::text, 'approved'::character varying::text, 'rejected'::character varying::text, 'conflict'::character varying::text]))",
+        "name": "race_marker_contract_review_valid",
+        "table_name": "stable_raceliveofficialmarkercontract",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (max_phase::text = ANY (ARRAY['official'::character varying, 'corrected'::character varying]::text[]))",
+        "name": "race_official_auth_phase_valid",
+        "table_name": "stable_raceliveofficialpublicationauthorization",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (max_phase::text = ANY (ARRAY['official'::character varying::text, 'corrected'::character varying::text]))",
+        "name": "race_official_auth_phase_valid",
+        "table_name": "stable_raceliveofficialpublicationauthorization",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (status::text = ANY (ARRAY['open'::character varying, 'resolved'::character varying, 'escalated'::character varying]::text[]))",
+        "name": "race_official_incident_status_valid",
+        "table_name": "stable_raceliveofficialverificationincident",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (status::text = ANY (ARRAY['open'::character varying::text, 'resolved'::character varying::text, 'escalated'::character varying::text]))",
+        "name": "race_official_incident_status_valid",
+        "table_name": "stable_raceliveofficialverificationincident",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (mode::text = ANY (ARRAY['off'::character varying, 'shadow'::character varying, 'provisional_public'::character varying, 'official_public'::character varying]::text[]))",
+        "name": "race_live_pub_mode_valid",
+        "table_name": "stable_racelivepublicationpolicy",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (mode::text = ANY (ARRAY['off'::character varying::text, 'shadow'::character varying::text, 'provisional_public'::character varying::text, 'official_public'::character varying::text]))",
+        "name": "race_live_pub_mode_valid",
+        "table_name": "stable_racelivepublicationpolicy",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (scope_type::text = ANY (ARRAY['global'::character varying, 'region'::character varying, 'source'::character varying, 'event'::character varying]::text[]))",
+        "name": "race_live_pub_scope_valid",
+        "table_name": "stable_racelivepublicationpolicy",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (scope_type::text = ANY (ARRAY['global'::character varying::text, 'region'::character varying::text, 'source'::character varying::text, 'event'::character varying::text]))",
+        "name": "race_live_pub_scope_valid",
+        "table_name": "stable_racelivepublicationpolicy",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (source_key::text = ANY (ARRAY['reference_sporting_life'::character varying, 'reference_zeturf'::character varying, 'reference_horse_racing_nation'::character varying]::text[]))",
+        "name": "race_ref_payload_source_ck",
+        "table_name": "stable_racereferencepayload",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (source_key::text = ANY (ARRAY['reference_sporting_life'::character varying::text, 'reference_zeturf'::character varying::text, 'reference_horse_racing_nation'::character varying::text]))",
+        "name": "race_ref_payload_source_ck",
+        "table_name": "stable_racereferencepayload",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (result_phase::text = ANY (ARRAY['racecard'::character varying, 'provisional'::character varying, 'official'::character varying, 'corrected'::character varying, 'unknown'::character varying]::text[]))",
+        "name": "race_obs_phase_valid",
+        "table_name": "stable_raceresultobservation",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (result_phase::text = ANY (ARRAY['racecard'::character varying::text, 'provisional'::character varying::text, 'official'::character varying::text, 'corrected'::character varying::text, 'unknown'::character varying::text]))",
+        "name": "race_obs_phase_valid",
+        "table_name": "stable_raceresultobservation",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (result_authority::text = ANY (ARRAY['supplemental'::character varying, 'official'::character varying]::text[]))",
+        "name": "race_srcid_authority_valid",
+        "table_name": "stable_raceresultsourceidentity",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (result_authority::text = ANY (ARRAY['supplemental'::character varying::text, 'official'::character varying::text]))",
+        "name": "race_srcid_authority_valid",
+        "table_name": "stable_raceresultsourceidentity",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (review_status::text = ANY (ARRAY['pending'::character varying, 'approved'::character varying, 'rejected'::character varying, 'conflict'::character varying]::text[]))",
+        "name": "race_srcid_review_valid",
+        "table_name": "stable_raceresultsourceidentity",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (review_status::text = ANY (ARRAY['pending'::character varying::text, 'approved'::character varying::text, 'rejected'::character varying::text, 'conflict'::character varying::text]))",
+        "name": "race_srcid_review_valid",
+        "table_name": "stable_raceresultsourceidentity",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (terms_status::text = ANY (ARRAY['unknown'::character varying, 'approved'::character varying, 'manual'::character varying, 'blocked'::character varying]::text[]))",
+        "name": "race_srcid_terms_valid",
+        "table_name": "stable_raceresultsourceidentity",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (terms_status::text = ANY (ARRAY['unknown'::character varying::text, 'approved'::character varying::text, 'manual'::character varying::text, 'blocked'::character varying::text]))",
+        "name": "race_srcid_terms_valid",
+        "table_name": "stable_raceresultsourceidentity",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (state::text = ANY (ARRAY['inflight'::character varying, 'completed'::character varying, 'unknown'::character varying, 'failed'::character varying, 'expired'::character varying, 'denied'::character varying]::text[]))",
+        "name": "ck_ro_step_state",
+        "table_name": "stable_managedreadonlystep",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (state::text = ANY (ARRAY['inflight'::character varying::text, 'completed'::character varying::text, 'unknown'::character varying::text, 'failed'::character varying::text, 'expired'::character varying::text, 'denied'::character varying::text]))",
+        "name": "ck_ro_step_state",
+        "table_name": "stable_managedreadonlystep",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (state::text = ANY (ARRAY['open'::character varying, 'revoked'::character varying, 'blocked_unknown'::character varying, 'expired'::character varying]::text[]))",
+        "name": "ck_ro_root_state",
+        "table_name": "stable_managedreadonlytaskbudget",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (state::text = ANY (ARRAY['open'::character varying::text, 'revoked'::character varying::text, 'blocked_unknown'::character varying::text, 'expired'::character varying::text]))",
+        "name": "ck_ro_root_state",
+        "table_name": "stable_managedreadonlytaskbudget",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (status::text = ANY (ARRAY['pending'::character varying, 'running'::character varying, 'done'::character varying]::text[]))",
+        "name": "lifecycle_delivery_status",
+        "table_name": "stable_racelifecycledelivery",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (status::text = ANY (ARRAY['pending'::character varying::text, 'running'::character varying::text, 'done'::character varying::text]))",
+        "name": "lifecycle_delivery_status",
+        "table_name": "stable_racelifecycledelivery",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (racecard_maturity::text = ANY (ARRAY['unknown'::character varying, 'predicted'::character varying, 'confirmed'::character varying]::text[]))",
+        "name": "lifecycle_card_maturity",
+        "table_name": "stable_racelifecyclepublicstate",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (racecard_maturity::text = ANY (ARRAY['unknown'::character varying::text, 'predicted'::character varying::text, 'confirmed'::character varying::text]))",
+        "name": "lifecycle_card_maturity",
+        "table_name": "stable_racelifecyclepublicstate",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (racecard_visibility::text = ANY (ARRAY['visible'::character varying, 'updating'::character varying, 'verifying'::character varying]::text[]))",
+        "name": "lifecycle_card_visibility",
+        "table_name": "stable_racelifecyclepublicstate",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (racecard_visibility::text = ANY (ARRAY['visible'::character varying::text, 'updating'::character varying::text, 'verifying'::character varying::text]))",
+        "name": "lifecycle_card_visibility",
+        "table_name": "stable_racelifecyclepublicstate",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (NOT (result_maturity::text = ANY (ARRAY['confirmed'::character varying, 'corrected'::character varying]::text[])) OR result_deadline_at IS NULL)",
+        "name": "lifecycle_confirmed_result_time",
+        "table_name": "stable_racelifecyclepublicstate",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (NOT (result_maturity::text = ANY (ARRAY['confirmed'::character varying::text, 'corrected'::character varying::text])) OR result_deadline_at IS NULL)",
+        "name": "lifecycle_confirmed_result_time",
+        "table_name": "stable_racelifecyclepublicstate",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (result_maturity::text = ANY (ARRAY['unknown'::character varying, 'provisional'::character varying, 'confirmed'::character varying, 'corrected'::character varying]::text[]))",
+        "name": "lifecycle_result_maturity",
+        "table_name": "stable_racelifecyclepublicstate",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (result_maturity::text = ANY (ARRAY['unknown'::character varying::text, 'provisional'::character varying::text, 'confirmed'::character varying::text, 'corrected'::character varying::text]))",
+        "name": "lifecycle_result_maturity",
+        "table_name": "stable_racelifecyclepublicstate",
+        "type": "c",
+        "validated": true
+      }
+    },
+    {
+      "original": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (result_visibility::text = ANY (ARRAY['visible'::character varying, 'updating'::character varying, 'verifying'::character varying]::text[]))",
+        "name": "lifecycle_result_visibility",
+        "table_name": "stable_racelifecyclepublicstate",
+        "type": "c",
+        "validated": true
+      },
+      "restored": {
+        "deferrable": false,
+        "deferred": false,
+        "definition": "CHECK (result_visibility::text = ANY (ARRAY['visible'::character varying::text, 'updating'::character varying::text, 'verifying'::character varying::text]))",
+        "name": "lifecycle_result_visibility",
+        "table_name": "stable_racelifecyclepublicstate",
+        "type": "c",
+        "validated": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,140 @@
+{
+  "adapter_inputs": {
+    "events_csv": "@FIXTURE_ROOT@/historical/smoke/events/smoke-hong_kong-49451.csv",
+    "source_fragment": "@FIXTURE_ROOT@/historical/smoke/source_fragments/smoke-hong_kong-49451.json"
+  },
+  "artifact_kind": "historical_race_detail_shard_descriptor",
+  "identities": [
+    {
+      "path": "@FIXTURE_ROOT@/historical/plan_identity.json",
+      "role": "plan",
+      "sha256": "44923d7762da9c4d989ba385e91a8e38ff65c60b5cfd6305f9c9ab6a42306322",
+      "size": 1061
+    },
+    {
+      "path": "@FIXTURE_ROOT@/historical/smoke/events/smoke-hong_kong-49451.csv",
+      "role": "events_csv",
+      "sha256": "3e5ca56e5fe3c62a3d7f47640ce892982000fb28ee0d4166381dd4f234ee6bbd",
+      "size": 838
+    },
+    {
+      "path": "@FIXTURE_ROOT@/historical/smoke/source_fragments/smoke-hong_kong-49451.json",
+      "role": "source_fragment",
+      "sha256": "8e649f8aede5f8972ec117be3e987975660fb7d9e6b04c8d749cde1621d9dc76",
+      "size": 2212
+    },
+    {
+      "path": "@REPOSITORY_ROOT@/runtime/tools/historical_race_detail_runner_v2.py",
+      "role": "tool",
+      "sha256": "de39a4c4c5f412832944f242aa63422bf7a895ace778a2d5b2c839bf30072c6b",
+      "size": 67747
+    },
+    {
+      "path": "@FIXTURE_ROOT@/historical/recipes.json",
+      "role": "recipe",
+      "sha256": "0854afc4178ed0d10916f87b83ccc437d185b7b6cd3adb7b75bcf6a59e8406fa",
+      "size": 2150
+    }
+  ],
+  "image": {
+    "digest": "sha256:2a83b35fa43646d6e0844846dbbabdae88861f6f8ea0b155f65de25388ee781b",
+    "revision": "d6d6f58b2b5b90301d8fa633a650df28379c09e7"
+  },
+  "mounts": [
+    {
+      "mode": "ro",
+      "path": "@REPOSITORY_ROOT@",
+      "role": "repo"
+    },
+    {
+      "mode": "ro",
+      "path": "@FIXTURE_ROOT@/historical",
+      "role": "plan"
+    },
+    {
+      "mode": "rw",
+      "path": "@FIXTURE_ROOT@/historical/smoke/run/smoke-hong_kong-49451",
+      "role": "run"
+    },
+    {
+      "mode": "rw",
+      "path": "@FIXTURE_ROOT@/historical/smoke/host-locks",
+      "role": "host_lock"
+    }
+  ],
+  "outputs": {
+    "cache_root": "@FIXTURE_ROOT@/historical/smoke/run/smoke-hong_kong-49451/cache",
+    "checkpoint": "@FIXTURE_ROOT@/historical/smoke/run/smoke-hong_kong-49451/checkpoint.json",
+    "host_append_log": "@FIXTURE_ROOT@/historical/smoke/host-locks/racing.hkjc.com.requests.jsonl",
+    "host_last_start": "@FIXTURE_ROOT@/historical/smoke/host-locks/racing.hkjc.com.last-start.json",
+    "package_root": "@FIXTURE_ROOT@/historical/smoke/run/smoke-hong_kong-49451/package",
+    "parse_root": "@FIXTURE_ROOT@/historical/smoke/run/smoke-hong_kong-49451/parse",
+    "request_log": "@FIXTURE_ROOT@/historical/smoke/run/smoke-hong_kong-49451/request-log.jsonl"
+  },
+  "permissions": {
+    "apply": false,
+    "database": false,
+    "network_stages": [
+      "discover",
+      "cache"
+    ],
+    "shell": false
+  },
+  "plan_id": "detail-crawl-1998-2026-v3-smoke",
+  "recipe": {
+    "discovery_required": true,
+    "fallback_sources": [],
+    "id": "hong-kong-v3",
+    "region": "hong_kong",
+    "source_chain": [
+      "hkjc"
+    ]
+  },
+  "region": "hong_kong",
+  "request_policy": {
+    "allowed_hosts": [
+      "racing.hkjc.com"
+    ],
+    "max_requests": 2,
+    "max_requests_per_host": 2,
+    "minimum_interval_seconds": 1.0,
+    "query_patterns": {
+      "racing.hkjc.com": {
+        "parameters": {
+          "RaceNo": "[1-9]|1[0-2]",
+          "Racecourse": "ST|HV",
+          "racedate": "20[0-9]{2}/[0-9]{2}/[0-9]{2}"
+        },
+        "required_keys": [
+          "Racecourse",
+          "racedate",
+          "RaceNo"
+        ]
+      }
+    },
+    "redirect_hosts": [
+      "racing.hkjc.com"
+    ],
+    "url_patterns": {
+      "racing.hkjc.com": [
+        "^/zh\\-hk/local/information/localresults$"
+      ]
+    }
+  },
+  "schema_version": "2.0",
+  "shard_id": "smoke-hong_kong-49451",
+  "stages": [
+    "discover",
+    "cache",
+    "parse",
+    "validate",
+    "package"
+  ],
+  "targets": [
+    {
+      "slug": "hong_kong-hong-kong-bauhinia-sprint-trophy-2026",
+      "target_id": "49451",
+      "target_sha256": "c125663073e3056b1724f8a7a95c752a2c3ca42cb8f081c30012034bdb69a489"
+    }
+  ]
+}

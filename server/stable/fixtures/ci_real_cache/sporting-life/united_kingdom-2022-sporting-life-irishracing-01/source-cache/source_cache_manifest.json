@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "root": "@FIXTURE_ROOT@/sporting-life/united_kingdom-2022-sporting-life-irishracing-01/source-cache",
+  "files": {
+    "bd3b263718aae7cd25155f4038ec493e40b1fb22ca0d754d6f441a7d3b50d69e.html": {
+      "cached_at": "2026-07-16T07:40:12.392838+00:00",
+      "path": "bd3b263718aae7cd25155f4038ec493e40b1fb22ca0d754d6f441a7d3b50d69e.html",
+      "protected_by": [],
+      "sha256": "98fd4c13d20c7b6da6849c7f24f8dcdca93512f515877bb0b971657c658f73b8",
+      "size": 360772,
+      "source_url": "https://www.sportinglife.com/racing/results/2022-12-26/kempton/715575/ladbrokes-christmas-hurdle-grade-1-gbb-race"
+    }
+  },
+  "total_bytes": 360772
+}

@@ -1,0 +1,149 @@
+{
+  "adapter_inputs": {
+    "events_csv": "@FIXTURE_ROOT@/historical/smoke/events/smoke-united_states-70844.csv",
+    "source_fragment": "@FIXTURE_ROOT@/historical/smoke/source_fragments/smoke-united_states-70844.json"
+  },
+  "artifact_kind": "historical_race_detail_shard_descriptor",
+  "identities": [
+    {
+      "path": "@FIXTURE_ROOT@/historical/plan_identity.json",
+      "role": "plan",
+      "sha256": "44923d7762da9c4d989ba385e91a8e38ff65c60b5cfd6305f9c9ab6a42306322",
+      "size": 1061
+    },
+    {
+      "path": "@FIXTURE_ROOT@/historical/smoke/events/smoke-united_states-70844.csv",
+      "role": "events_csv",
+      "sha256": "f57b275d874fab5c6994ebd2fc56c30adecf0aa560fad384e0dbdbb77165704e",
+      "size": 988
+    },
+    {
+      "path": "@FIXTURE_ROOT@/historical/smoke/source_fragments/smoke-united_states-70844.json",
+      "role": "source_fragment",
+      "sha256": "c70146d192a5495565054ecf7c389c61bb48c5c70af4af2fdd7d564b669abae6",
+      "size": 1860
+    },
+    {
+      "path": "@REPOSITORY_ROOT@/runtime/tools/historical_race_detail_runner_v2.py",
+      "role": "tool",
+      "sha256": "de39a4c4c5f412832944f242aa63422bf7a895ace778a2d5b2c839bf30072c6b",
+      "size": 67747
+    },
+    {
+      "path": "@FIXTURE_ROOT@/historical/recipes.json",
+      "role": "recipe",
+      "sha256": "0854afc4178ed0d10916f87b83ccc437d185b7b6cd3adb7b75bcf6a59e8406fa",
+      "size": 2150
+    }
+  ],
+  "image": {
+    "digest": "sha256:2a83b35fa43646d6e0844846dbbabdae88861f6f8ea0b155f65de25388ee781b",
+    "revision": "d6d6f58b2b5b90301d8fa633a650df28379c09e7"
+  },
+  "mounts": [
+    {
+      "mode": "ro",
+      "path": "@REPOSITORY_ROOT@",
+      "role": "repo"
+    },
+    {
+      "mode": "ro",
+      "path": "@FIXTURE_ROOT@/historical",
+      "role": "plan"
+    },
+    {
+      "mode": "rw",
+      "path": "@FIXTURE_ROOT@/historical/smoke/run/smoke-united_states-70844",
+      "role": "run"
+    },
+    {
+      "mode": "rw",
+      "path": "@FIXTURE_ROOT@/historical/smoke/host-locks",
+      "role": "host_lock"
+    }
+  ],
+  "outputs": {
+    "cache_root": "@FIXTURE_ROOT@/historical/smoke/run/smoke-united_states-70844/cache",
+    "checkpoint": "@FIXTURE_ROOT@/historical/smoke/run/smoke-united_states-70844/checkpoint.json",
+    "host_append_log": "@FIXTURE_ROOT@/historical/smoke/host-locks/www.equibase.com.requests.jsonl",
+    "host_last_start": "@FIXTURE_ROOT@/historical/smoke/host-locks/www.equibase.com.last-start.json",
+    "package_root": "@FIXTURE_ROOT@/historical/smoke/run/smoke-united_states-70844/package",
+    "parse_root": "@FIXTURE_ROOT@/historical/smoke/run/smoke-united_states-70844/parse",
+    "request_log": "@FIXTURE_ROOT@/historical/smoke/run/smoke-united_states-70844/request-log.jsonl"
+  },
+  "permissions": {
+    "apply": false,
+    "database": false,
+    "network_stages": [
+      "discover",
+      "cache"
+    ],
+    "shell": false
+  },
+  "plan_id": "detail-crawl-1998-2026-v3-smoke",
+  "recipe": {
+    "discovery_required": false,
+    "fallback_sources": [
+      "horse_racing_nation"
+    ],
+    "id": "united-states-v3",
+    "region": "united_states",
+    "source_chain": [
+      "equibase",
+      "equibase_chart",
+      "equibase_archive",
+      "horse_racing_nation"
+    ]
+  },
+  "region": "united_states",
+  "request_policy": {
+    "allowed_hosts": [
+      "www.equibase.com"
+    ],
+    "max_requests": 2,
+    "max_requests_per_host": 2,
+    "minimum_interval_seconds": 1.0,
+    "query_patterns": {
+      "www.equibase.com": {
+        "parameters": {
+          "cy": "USA",
+          "de": "D",
+          "rd": "20[0-9]{2}-[0-9]{2}-[0-9]{2}",
+          "rn": "[1-9]|1[0-9]",
+          "tk": "[A-Z]{2,4}"
+        },
+        "required_keys": [
+          "cy",
+          "de",
+          "rd",
+          "rn",
+          "tk"
+        ]
+      }
+    },
+    "redirect_hosts": [
+      "www.equibase.com"
+    ],
+    "url_patterns": {
+      "www.equibase.com": [
+        "^/yearbook/Result\\.cfm$"
+      ]
+    }
+  },
+  "schema_version": "2.0",
+  "shard_id": "smoke-united_states-70844",
+  "stages": [
+    "discover",
+    "cache",
+    "parse",
+    "validate",
+    "package"
+  ],
+  "targets": [
+    {
+      "slug": "united_states-USA_CHURCHILL_DOWNS_ACK_ACK_STAKES-2018",
+      "target_id": "70844",
+      "target_sha256": "cbcd96ad5c913147ae9724295486e97c552f1a632ddee30a6919d3e4bea3354f"
+    }
+  ]
+}

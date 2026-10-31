@@ -703,6 +703,9 @@ class TranslationBudgetMigrationBoundaryTests(TransactionTestCase):
         self.assertEqual(TranslationRetryBudget.objects.count(), 0, "逆迁移仅针对空账表")
         article = article_for_retry(source_article_id="migration-original-kept")
         tables = {TranslationRetryBudget._meta.db_table, TranslationRequestAttempt._meta.db_table}
+        # Restore the complete candidate graph, not just the historical boundary.
+        # Otherwise later TransactionTestCases see current models against old DDL.
+        restore_targets = MigrationExecutor(connection).loader.graph.leaf_nodes()
         try:
             MigrationExecutor(connection).migrate([("stable", "0079_multisource_race_enrollment")])
             self.assertFalse(tables & set(connection.introspection.table_names()))
@@ -710,12 +713,13 @@ class TranslationBudgetMigrationBoundaryTests(TransactionTestCase):
                              MigrationRecorder(connection).applied_migrations())
             self.assertTrue(NewsArticle.objects.filter(pk=article.pk).exists())
         finally:
-            MigrationExecutor(connection).migrate([("stable", "0080_translation_retry_budget")])
+            MigrationExecutor(connection).migrate(restore_targets)
+        self.assertFalse(MigrationExecutor(connection).migration_plan(restore_targets))
         self.assertTrue(tables <= set(connection.introspection.table_names()))
         self.assertTrue(NewsArticle.objects.filter(pk=article.pk).exists())
         self.assertEqual(TranslationRetryBudget.objects.count(), 0)
         self.assertIn(("stable", "0080_translation_retry_budget"),
                       MigrationRecorder(connection).applied_migrations())
         print("B041_EMPTY_LEDGER_MIGRATION_BOUNDARY", {
-            "reverse": "0079", "forward_restored": "0080", "tables": sorted(tables),
+            "reverse": "0079", "forward_restored": restore_targets, "tables": sorted(tables),
             "original_article_kept": True, "empty_budget_tables_only": True}, flush=True)

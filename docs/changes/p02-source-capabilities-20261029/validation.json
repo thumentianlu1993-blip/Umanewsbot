@@ -1,0 +1,12 @@
+{
+  "scope": "文档与证据，不执行生产或重新运行业务解析器",
+  "raw_hashes_verified": 16,
+  "historical_fixture_hashes_verified": 19,
+  "matrix_cells_checked": 55,
+  "local_references": "PASS",
+  "workflow_contract": "PASS",
+  "workflow_contract_tests": 4,
+  "diff_check": "PASS",
+  "runtime_verified": false,
+  "review": "见review.md"
+}

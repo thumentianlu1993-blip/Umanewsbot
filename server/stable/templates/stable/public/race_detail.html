@@ -51,7 +51,7 @@
     </section>
 
     <nav class="race-subnav" aria-label="赛事详情模块">
-      <a href="#overview" class="active">概览</a>
+      <a href="#overview" class="active">概览</a>{% if lifecycle_marker %}{{ lifecycle_marker|json_script:"race-lifecycle-marker" }}{% endif %}{% if lifecycle_card_notice %}<p class="race-data-notice">名单：{{ lifecycle_card_notice }}</p>{% endif %}{% if lifecycle_result_notice %}<p class="race-data-notice">赛果：{{ lifecycle_result_notice }}</p>{% endif %}
       {% if runners %}<a href="#runners">{{ runner_section_label }}</a>{% endif %}
       {% if results %}<a href="#results"{% if public_probe_projection.complete %} data-o03-role="detail.result.nav" data-o03-field="text"{% endif %}>赛果</a>{% endif %}
       {% if history_winners %}<a href="#history">历年冠军</a>{% endif %}
@@ -85,7 +85,7 @@
             <thead><tr><th>闸位</th><th>马号</th><th>马名</th><th>骑师</th><th>练马师</th><th>{% if race_information_enabled %}负重{% else %}负磅{% endif %}</th><th>{% if race_information_enabled %}赔率 / 热门排名{% else %}赔率 / 热门{% endif %}</th><th>状态</th></tr></thead>
             <tbody>
               {% for runner in runners %}
-                <tr>
+                <tr{% if runner.lifecycle_row_token %} data-lifecycle-row="{{ runner.lifecycle_row_token }}"{% endif %}>
                   <td><span class="barrier-chip">{% if runner.barrier and runner.barrier != "0" %}{% race_field runner "barrier" runner.barrier %}{% else %}—{% endif %}</span></td>
                   <td class="num">{% race_field runner "horse_number" runner.horse_number|default:"-" %}</td>
                   <td><strong>{% race_field runner "horse_name" runner.display_horse_name %}</strong></td>
@@ -112,7 +112,7 @@
             <thead><tr><th>名次</th><th>马号</th><th>马名</th><th>骑师</th><th>练马师</th><th>时间</th><th>差距</th><th>{% if race_information_enabled %}赔率 / 热门排名{% else %}赔率 / 人气{% endif %}</th></tr></thead>
             <tbody>
               {% for result in results %}
-                <tr class="{% if result.display_finish_position == 1 %}medal-1{% elif result.display_finish_position == 2 %}medal-2{% elif result.display_finish_position == 3 %}medal-3{% endif %}"{% if public_probe_projection.complete %} data-o03-row="{% for token in public_probe_projection.table_row_tokens %}{% if forloop.counter0 == forloop.parentloop.counter0 %}{{ token }}{% endif %}{% endfor %}"{% endif %}>
+                <tr{% if result.lifecycle_row_token %} data-lifecycle-row="{{ result.lifecycle_row_token }}"{% endif %} class="{% if result.display_finish_position == 1 %}medal-1{% elif result.display_finish_position == 2 %}medal-2{% elif result.display_finish_position == 3 %}medal-3{% endif %}"{% if public_probe_projection.complete %} data-o03-row="{% for token in public_probe_projection.table_row_tokens %}{% if forloop.counter0 == forloop.parentloop.counter0 %}{{ token }}{% endif %}{% endfor %}"{% endif %}>
                   <td{% if public_probe_projection.complete %} data-o03-field="position"{% endif %}>{% race_field result "position" result.display_finish_position %}</td>
                   <td class="num"{% if public_probe_projection.complete %} data-o03-field="horse_number"{% endif %}>{% race_field result "horse_number" result.horse_number|default:"-" %}</td>
                   <td><strong{% if public_probe_projection.complete %} data-o03-field="horse_name"{% endif %}>{% race_field result "horse_name" result.display_horse_name %}</strong></td>
