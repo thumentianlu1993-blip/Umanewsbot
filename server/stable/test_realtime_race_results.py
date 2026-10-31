@@ -4517,9 +4517,13 @@ class RaceLivePublicStatusTests(TestCase):
         # date-only 回退扩展后（九地区）：date-only 赛事按当地赛日进入日期窗口，
         # 窗口内容查询从空结果短路变为真实执行，常数 +1（80 场实测仍为 15 条，非线性）。
         term_budget = 10 if settings.RACE_INFORMATION_NORMALIZED_DISPLAY_ENABLED else 0
+        # P02 adds three page-wide reads: the epoch batch in the legacy read gate,
+        # the epoch batch used to render rows, and the persisted-epoch cache guard.
+        # The guard must remain active with the writer flag off. This is a fixed
+        # page cost, not permission to issue a query for each event.
         self.assertLessEqual(
             len(captured),
-            15 + term_budget,
+            18 + term_budget,
             f"赛事日历 live read gate 查询数不应随 40 场赛事线性增长，实际 {len(captured)}",
         )
 

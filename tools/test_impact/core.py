@@ -158,6 +158,14 @@ def verify_results(plan, reports):
         raise ValueError('missing/duplicate/unexpected batch')
     for report in reports:
         batch = expected[report['key']]
+        from .special_profiles import expected_image, verify_special_report
+        # 执行证据的必需身份，不得通过删字段降级到旧协议。
+        if not isinstance(plan.get('image_id'), str):
+            raise ValueError('missing dependency image identity')
+        image = expected_image(plan, batch)
+        if batch.get('image_id') != image or report.get('image_id') != image or report.get('actual_image_id') != image:
+            raise ValueError('batch/worker/actual image identity mismatch')
+        verify_special_report(plan, batch, report)
         if report['plan_digest'] != digest(plan) or report['profile'] != batch['profile']:
             raise ValueError('plan/profile mismatch')
         for field in ('run_id', 'run_attempt', 'test_tree'):

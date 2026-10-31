@@ -11,7 +11,34 @@ import re
 import subprocess
 import sys
 import tempfile
+import tarfile
 import zipfile
+
+
+def verify_image_archive(path, expected_ids):
+    """加载前证明本次归档包含全部期望镜像，不允许本机缓存补足遗漏。"""
+    expected = set(expected_ids)
+    if not expected or any(not isinstance(i, str) or not re.fullmatch(r'sha256:[0-9a-f]{64}', i) for i in expected):
+        raise ValueError('invalid expected archive images')
+    with tarfile.open(path) as archive:
+        members = archive.getmembers()
+        names = [m.name for m in members]
+        if len(names) != len(set(names)):
+            raise ValueError('duplicate image archive member')
+        def read(name, limit):
+            if not isinstance(name, str) or name.startswith('/') or '..' in name.split('/'):
+                raise ValueError('unsafe image archive reference')
+            member = archive.getmember(name)
+            if not member.isfile() or member.size > limit:
+                raise ValueError('invalid image archive member')
+            return archive.extractfile(member).read()
+        manifest = json.loads(read('manifest.json', 4_000_000))
+        if not isinstance(manifest, list) or len(manifest) != len(expected):
+            raise ValueError('image archive does not contain exact expected images')
+        actual = ['sha256:'+hashlib.sha256(read(item['Config'], 10_000_000)).hexdigest() for item in manifest]
+        if len(actual) != len(set(actual)) or set(actual) != expected:
+            raise ValueError('image archive config identities mismatch')
+    return actual
 
 
 def checked(command, cwd=None):
@@ -67,8 +94,9 @@ def extract_trusted_bundle(git, trusted_sha, bundle, controls):
     require(re.fullmatch('[0-9a-f]{40}', trusted_sha), 'exact trusted bundle SHA required')
     pending = ['tools/test_impact/core.py', 'tools/test_impact/git_input.py',
                'scripts/plan_affected_tests.py', 'scripts/run_test_plan.py',
-               'tools/test_impact/source_binding.py', 'scripts/test_plan_worker.py',
-               'scripts/run_bounded_stable_tests.py', 'deploy/test-impact/entrypoint.sh']
+               'tools/test_impact/source_binding.py', 'scripts/test_plan_worker.py','scripts/application_image_test_worker.py',
+               'scripts/run_bounded_stable_tests.py', 'deploy/test-impact/entrypoint.sh',
+               'deploy/test-impact/root-entrypoint.sh', 'scripts/application_image_test_worker.py']
     files = {}
     while pending:
         path = pending.pop(0)
@@ -160,7 +188,7 @@ def main():
     require(plan['run_id']==str(a.run) and plan['run_attempt']==str(attempt),'artifact run mismatch')
     entries={record.split(b'\t',1)[1].decode():record.split(b'\t',1)[0].decode().split()[2] for record in git('ls-tree','-rz',test).split(b'\0') if record}
     controls={path:oid for path,oid in entries.items() if path.startswith(('tools/test_impact/','deploy/test-impact/','.github/workflows/')) or path in (
-        'requirements.txt','scripts/plan_affected_tests.py','scripts/run_test_plan.py','scripts/test_plan_worker.py',
+        '.gitattributes','requirements.txt','scripts/plan_affected_tests.py','scripts/run_test_plan.py','scripts/test_plan_worker.py','scripts/application_image_test_worker.py',
         'scripts/verify_test_plan.py','scripts/impact_ci.py','scripts/run_bounded_stable_tests.py',
         '.github/workflows/affected_tests.yml','.github/workflows/full_regression.yml')}
     require(plan['control_blobs']==controls,'missing or unexpected control identities')
@@ -210,11 +238,20 @@ else: print(json.dumps(verify_results(p,x['reports'])))
             # 校验本地Docker上下文，不允许生产/远程daemon；加载后按digest运行。
             endpoint=checked(['docker','context','inspect','--format','{{.Endpoints.docker.Host}}']).decode().strip()
             require(not os.environ.get('DOCKER_HOST') and not os.environ.get('DOCKER_CONTEXT') and endpoint.startswith('unix://'),'local Docker required')
+            expected_images={plan['image_id']}
+            if any(b['profile']=='application-image' for b in plan['batches']):
+                expected_images.add(plan.get('application_image_id'))
+            verify_image_archive(image_path, expected_images)
             checked(['docker','load','-i',str(image_path)])
             require(re.fullmatch('sha256:[0-9a-f]{64}',plan['image_id']),'invalid image ID')
+            checked(['docker','image','inspect',plan['image_id']])
+            if any(b['profile']=='application-image' for b in plan['batches']):
+                require(re.fullmatch('sha256:[0-9a-f]{64}',plan.get('application_image_id','')),'invalid application image ID')
+                revision=checked(['docker','image','inspect','--format','{{index .Config.Labels "org.opencontainers.image.revision"}}',plan['application_image_id']]).decode().strip()
+                require(revision==plan['test_sha'],'application image revision mismatch')
             source_plan=bundle/'selection.json';source_plan.write_text(json.dumps({**plan,'mode':expected['mode']}))
             trusted_controls=bundle/'execution-controls'
-            for path in ('scripts/test_plan_worker.py','scripts/run_bounded_stable_tests.py','deploy/test-impact/entrypoint.sh','tools/test_impact/core.py','tools/test_impact/source_binding.py'):
+            for path in ('scripts/test_plan_worker.py','scripts/application_image_test_worker.py','scripts/run_bounded_stable_tests.py','deploy/test-impact/entrypoint.sh','tools/test_impact/core.py','tools/test_impact/source_binding.py'):
                 control=trusted_controls/path;control.parent.mkdir(parents=True,exist_ok=True)
                 control.write_bytes((bundle/path).read_bytes())
             collection_dir=bundle/'collection'

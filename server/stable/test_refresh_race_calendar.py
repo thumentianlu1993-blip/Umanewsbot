@@ -12,6 +12,7 @@ from datetime import date, timedelta
 from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.management import CommandError, call_command
@@ -50,7 +51,9 @@ class RefreshFixtures:
         self.today = timezone.localdate()
         self.future = self.today + timedelta(days=60)
         # far_future 与 future 同年（改期）；next_year 跨年（拒绝改期）
-        self.far_future = date(self.future.year, 12, 28)
+        self.far_future = self.future + timedelta(days=1)
+        if self.far_future.year != self.future.year:
+            self.far_future = self.future - timedelta(days=1)
         self.next_year_date = date(self.future.year + 1, 1, 15)
         self.past = self.today - timedelta(days=60)
 
@@ -948,3 +951,19 @@ class RaceCalendarRefreshTaskTests(SimpleTestCase):
             result = race_calendar_refresh_dry_run_task()
         self.assertEqual(result["status"], "skipped")
         self.assertEqual(result["reason"], "missing_inputs")
+
+
+class RefreshFixtureDateTests(SimpleTestCase):
+    def test_reschedule_fixture_is_distinct_future_date_in_same_year(self):
+        class Fixture(RefreshFixtures, SimpleTestCase):
+            pass
+        for today in (date(2026, 10, 29), date(2026, 11, 1), date(2026, 12, 31), date(2028, 2, 29)):
+            with self.subTest(today=today), patch(
+                "stable.test_refresh_race_calendar.get_user_model"
+            ), patch("stable.test_refresh_race_calendar.timezone.localdate", return_value=today):
+                fixture = Fixture()
+                fixture.setUp()
+                self.assertNotEqual(fixture.future, fixture.far_future)
+                self.assertEqual(fixture.future.year, fixture.far_future.year)
+                self.assertGreater(fixture.future, today)
+                self.assertGreater(fixture.far_future, today)

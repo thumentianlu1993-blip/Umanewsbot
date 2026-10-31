@@ -13,10 +13,11 @@ from unittest import skipUnless
 from unittest.mock import patch
 
 from django.test import SimpleTestCase
+from stable.real_cache_test_fixture import verify_real_cache_fixtures
 
 
 TOOLS = Path(__file__).resolve().parents[2] / "runtime" / "tools"
-SPORTING_LIFE_REAL_CACHE_RUN_ROOT_VALUE = os.environ.get("SPORTING_LIFE_REAL_CACHE_RUN_ROOT", "")
+SPORTING_LIFE_REAL_CACHE_RUN_ROOT_VALUE = os.environ.get("SPORTING_LIFE_REAL_CACHE_RUN_ROOT", str(verify_real_cache_fixtures() / "sporting-life"))
 SPORTING_LIFE_REAL_CACHE_RUN_ROOT = (
     Path(SPORTING_LIFE_REAL_CACHE_RUN_ROOT_VALUE) if SPORTING_LIFE_REAL_CACHE_RUN_ROOT_VALUE else None
 )
