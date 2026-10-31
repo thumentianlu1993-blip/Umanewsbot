@@ -1,0 +1,16 @@
+{
+  "status": "frozen_before_live_retest",
+  "origin": "synthetic_agent_reference_not_human_gold",
+  "purpose": "普通用法、明确命名和不确定的语义对照；不是代码黑名单或实体身份事实",
+  "cases": [
+    {"id":"last_run_ordinary","text":"今回がラストランとなる。","focus":"ラストラン","expect":"common_word_or_omit","reason":"描述本次出赛是最后一战，不指称具体命名对象"},
+    {"id":"last_run_named","text":"ラストランという名の競走馬が出走する。","focus":"ラストラン","expect":"horse","reason":"明确的赛马命名关系"},
+    {"id":"grade_ordinary","text":"このレースはG1に格付けされている。","focus":"G1","expect":"common_word_or_omit","reason":"等级类别，非具体赛事名称"},
+    {"id":"grade_named","text":"G1という名前の競走馬を紹介する。","focus":"G1","expect":"horse","reason":"合成命名关系；不能把字符串永远列为非专名"},
+    {"id":"role_ordinary","text":"指揮官は馬の状態を説明した。","focus":"指揮官","expect":"common_word_or_omit","reason":"未命名角色称谓，不是姓名"},
+    {"id":"role_named","text":"指揮官という名の競走馬が出走する。","focus":"指揮官","expect":"horse","reason":"合成命名关系"},
+    {"id":"ambiguous_title","text":"晨光归来","focus":"晨光","expect":"uncertain","reason":"孤立标题缺少对象类别，不猜马名"},
+    {"id":"explicit_riding","text":"骑师林某策骑晨光获胜。","focus":"晨光","expect":"horse","reason":"骑乘关系明确区分骑师与马"},
+    {"id":"same_name_different_object","text":"晨光牧场宣布扩建。","focus":"晨光牧场","expect":"organization","reason":"机构名称，不从中截出马名晨光"}
+  ]
+}

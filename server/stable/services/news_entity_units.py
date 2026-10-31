@@ -3,8 +3,9 @@ from copy import deepcopy
 import re
 
 from stable.services.news_content import ContentBlocked, block_map, bounded_json, validate_entities
+from stable.services.news_pipeline import digest
 
-VERSION = 'entity-units-v1'
+VERSION = 'entity-units-v2'
 ROW_KEYS = {'text', 'type', 'context'}
 TYPES = {'horse', 'person', 'race', 'organization', 'place', 'common_word'}
 
@@ -66,17 +67,60 @@ def locate(unit, row):
     if any(type(row[k]) is not str or not row[k] for k in ROW_KEYS) or row['type'] not in TYPES:
         return None, {'code': 'invalid_entity_value'}
     window, quote, context = unit['window'], row['text'], row['context']
-    candidates = sorted({unit['window_start'] + c + q
-                         for c in _positions(window, context) for q in _positions(context, quote)
-                         if unit['start'] <= unit['window_start'] + c + q < unit['end']})
+    core, neighbors = set(), set()
+    for c in _positions(window, context):
+        for q in _positions(context, quote):
+            position = unit['window_start'] + c + q
+            if unit['start'] <= position < unit['end']:
+                core.add(position)
+                if len(core) > 128:
+                    raise ContentBlocked('entity_candidate_limit')
+            elif len(neighbors) <= 128:
+                neighbors.add(position)
+    if not core and len(neighbors) > 128:
+        raise ContentBlocked('entity_candidate_limit')
+    candidates = sorted(core or neighbors)
     if len(candidates) != 1:
         return None, {'code': 'ambiguous_occurrence' if candidates else 'quote_not_found',
                       'candidates': [{'start': s, 'end': s + len(quote),
                          'context': window[max(0, s-unit['window_start']-40):s-unit['window_start']+len(quote)+40]}
-                         for s in candidates[:128]]}
+                         for s in candidates]}
     start = candidates[0]
     return {**row, 'unit_id': unit['unit_id'], 'block_id': unit['block_id'],
             'start': start, 'end': start + len(quote)}, None
+
+
+def _same(a, b):
+    return all(a[k] == b[k] for k in ('block_id', 'start', 'end', 'text', 'type'))
+
+
+def _overlaps(a, b):
+    return a['block_id'] == b['block_id'] and a['start'] < b['end'] and a['end'] > b['start']
+
+
+def _owner(all_units, row):
+    return next(u['unit_id'] for u in all_units if u['block_id'] == row['block_id']
+                and u['start'] <= row['start'] < u['end'])
+
+
+def _issues_with_candidates(clean, all_units, issues, accepted):
+    result = []
+    for issue in issues:
+        item = deepcopy(issue)
+        item['issue_id'] = digest({'clean_sha': clean['clean_sha'], 'issue': issue})[:24]
+        if issue.get('candidates'):
+            raw = issue['row']
+            block = next(u['block_id'] for u in all_units if u['unit_id'] == issue['unit_id'])
+            for candidate in item['candidates']:
+                candidate.update(block_id=block, text=raw['text'], type=raw['type'])
+                candidate['unit_id'] = _owner(all_units, candidate)
+                candidate['candidate_id'] = digest({'clean_sha': clean['clean_sha'],
+                    **{k: candidate[k] for k in ('block_id', 'start', 'end', 'text')}})[:24]
+                candidate['status'] = ('already_frozen' if any(_same(candidate, r) for r in accepted) else
+                    'overlap_conflict' if any(_overlaps(candidate, r) for r in accepted) else 'available')
+        if not any(r['issue_id'] == item['issue_id'] for r in result):
+            result.append(item)
+    return result
 
 
 def evaluate(clean, payload, response, *, previous=None):
@@ -84,13 +128,25 @@ def evaluate(clean, payload, response, *, previous=None):
     expected = (initial_payload(clean, payload.get('language')) if previous is None else
                 repair_payload(clean, payload.get('language'), previous, payload.get('base_attempt_id')))
     if payload != expected: raise ContentBlocked('entity_unit_input_changed')
-    if type(response) is not dict or set(response) != {'units'} or type(response['units']) is not list:
+    keys = {'units', 'decisions'} if previous is not None else {'units'}
+    if type(response) is not dict or set(response) != keys or type(response['units']) is not list:
         raise ContentBlocked('entity_units_schema')
+    all_units = build_units(clean)
     requested = {u['unit_id']: u for u in payload['units']}
     if len(response['units']) > len(requested): raise ContentBlocked('entity_units_schema')
     accepted = deepcopy(previous['accepted']) if previous else []
     issues, pending, seen, proposed = [], set(), set(), []
     total = len(accepted)
+
+    def propose(uid, row, raw):
+        row['unit_id'] = _owner(all_units, row)
+        if row['unit_id'] not in requested and not any(_same(row, r) for r in accepted):
+            pending.add(uid)
+            issues.append({'unit_id': uid, 'row': deepcopy(raw), 'code': 'outside_requested_core',
+                           'owner_unit_id': row['unit_id']})
+        else:
+            proposed.append((uid, row, raw))
+
     for receipt in response['units']:
         if (type(receipt) is not dict or set(receipt) != {'unit_id', 'coverage', 'entities'}
                 or type(receipt['unit_id']) is not str or receipt['unit_id'] not in requested
@@ -106,24 +162,61 @@ def evaluate(clean, payload, response, *, previous=None):
             if error:
                 pending.add(uid); issues.append({'unit_id': uid, 'row': deepcopy(raw), **error})
             else:
-                proposed.append((row, raw))
-    # 同批相互冲突的行整体待修，不能让模型返回顺序决定哪行成为不可替换的证据。
-    def overlaps(a, b):
-        return a['block_id'] == b['block_id'] and a['start'] < b['end'] and a['end'] > b['start']
+                propose(uid, row, raw)
+
+    if previous is not None:
+        offered = {i['issue_id']: i for i in payload['issues'] if i.get('code') == 'ambiguous_occurrence'}
+        decisions = response['decisions']; decided = set()
+        if type(decisions) is not list or len(decisions) > len(offered):
+            raise ContentBlocked('entity_decisions_schema')
+        for decision in decisions:
+            if (type(decision) is not dict or set(decision) != {'issue_id', 'picks'}
+                    or type(decision['issue_id']) is not str or decision['issue_id'] not in offered
+                    or decision['issue_id'] in decided or type(decision['picks']) is not list):
+                raise ContentBlocked('entity_decision_invalid')
+            issue = offered[decision['issue_id']]; decided.add(decision['issue_id'])
+            candidates = {c['candidate_id']: c for c in issue['candidates']}; picked = set()
+            total += len(decision['picks'])
+            if total > 128: raise ContentBlocked('entity_count_limit')
+            for pick in decision['picks']:
+                if (type(pick) is not dict or set(pick) != {'candidate_id', 'type'}
+                        or type(pick['candidate_id']) is not str or pick['candidate_id'] not in candidates
+                        or pick['candidate_id'] in picked or type(pick['type']) is not str or pick['type'] not in TYPES):
+                    raise ContentBlocked('entity_candidate_invalid')
+                picked.add(pick['candidate_id']); candidate = candidates[pick['candidate_id']]
+                row = {k: candidate[k] for k in ('block_id', 'start', 'end', 'text', 'context', 'unit_id')}
+                row['type'] = pick['type']
+                propose(issue['unit_id'], row, pick)
+        for issue_id, issue in offered.items():
+            if issue_id not in decided:
+                pending.add(issue['unit_id'])
+                issues.append({'unit_id': issue['unit_id'], 'code': 'candidate_decision_missing', 'for_issue_id': issue_id})
+
+    # 完全相同提及幂等合并；同名不同位置/类型和重叠边界不能合并。
     frozen = list(accepted)
-    for i, (row, raw) in enumerate(proposed):
-        if (any(overlaps(row, r) for r in frozen)
-                or any(i != j and overlaps(row, other) for j, (other, _) in enumerate(proposed))):
-            pending.add(row['unit_id'])
-            issues.append({'unit_id': row['unit_id'], 'row': deepcopy(raw),
-                           'code': 'entity_overlap_or_frozen_duplicate'})
-        else:
+    for i, (uid, row, raw) in enumerate(proposed):
+        if (any(_overlaps(row, r) and not _same(row, r) for r in frozen)
+                or any(i != j and _overlaps(row, other) and not _same(row, other)
+                       for j, (_, other, _) in enumerate(proposed))):
+            pending.add(uid)
+            issues.append({'unit_id': uid, 'row': deepcopy(raw), 'code': 'entity_overlap_or_type_conflict',
+                           'owner_unit_id': row['unit_id']})
+        elif not any(_same(row, r) for r in accepted):
             accepted.append(row)
     for uid in requested:
         if uid not in seen:
             pending.add(uid); issues.append({'unit_id': uid, 'code': 'unit_unprocessed'})
-    return {'accepted': accepted, 'pending': [u for u in requested if u in pending],
-            'issues': issues, 'complete': not pending, 'unit_ids': [u['unit_id'] for u in build_units(clean)]}
+    enriched = _issues_with_candidates(clean, all_units, issues, accepted)
+    # 已观察到的未决位置属于原始全文范围，将其实际owner显式纳入待修请求。
+    # 未观察到问题的普通只读邻居仍不能新增实体。
+    for issue in enriched:
+        if issue['code'] == 'ambiguous_occurrence':
+            pending.update(c['unit_id'] for c in issue['candidates'])
+        if issue['code'] == 'entity_overlap_or_type_conflict':
+            pending.add(issue['owner_unit_id'])
+    return {'accepted': accepted, 'pending': [u['unit_id'] for u in all_units if u['unit_id'] in pending],
+            'issues': enriched,
+            'complete': not pending, 'unit_ids': [u['unit_id'] for u in all_units]}
 
 
 def occurrences(clean, state):

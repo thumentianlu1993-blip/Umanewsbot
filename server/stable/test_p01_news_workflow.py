@@ -150,6 +150,7 @@ class ContextWorkflowFixture(WorkflowFixture):
             data = {'units': [{'unit_id': unit['unit_id'], 'coverage': 'complete', 'entities': [
                 {'text': 'Authority', 'type': 'organization', 'context': 'Authority jurisdiction ZZ'}
             ] if unit['block_id'] == 'b0' else []} for unit in payload['units']]}
+            if payload['mode'] == 'repair': data['decisions'] = []
             return SimpleNamespace(id='unit-fixture', choices=[SimpleNamespace(
                 finish_reason='stop', message=SimpleNamespace(content=json.dumps(data), tool_calls=None))],
                 usage=SimpleNamespace(prompt_tokens=50, completion_tokens=20))
@@ -469,3 +470,34 @@ class RepairedEntityRecompareWorkflowTests(EntityRepairWorkflowFixture, Transact
         self.assertEqual(len(self.entity_patch_inputs), 2)
         self.assertNotEqual(self.entity_patch_inputs[0]['base_attempt_id'],
                             self.entity_patch_inputs[1]['base_attempt_id'])
+
+
+class CandidateSelectionWorkflowTests(ContextWorkflowFixture, TransactionTestCase):
+    def fake_response(self, attempt, payload):
+        result = super().fake_response(attempt, payload)
+        if attempt.stage != 'entity_check': return result
+        data = json.loads(result.choices[0].message.content)
+        if payload['mode'] == 'initial':
+            unit = next(u for u in payload['units'] if u['block_id'] == 'b0')
+            receipt = next(r for r in data['units'] if r['unit_id'] == unit['unit_id'])
+            # 合成歧义引用；选择common_word仅验证候选回执路径，不当作真实分类案例。
+            receipt['entities'].append({'text': 'i', 'type': 'common_word', 'context': unit['text']})
+        else:
+            issue = next(i for i in payload['issues'] if i['code'] == 'ambiguous_occurrence')
+            candidate = next(c for c in issue['candidates'] if c['status'] == 'available')
+            data['decisions'] = [{'issue_id': issue['issue_id'], 'picks': [
+                {'candidate_id': candidate['candidate_id'], 'type': 'common_word'}]}]
+        result.choices[0].message.content = json.dumps(data)
+        return result
+
+    def test_candidate_receipt_replays_through_publication_and_rejects_tampering(self):
+        from stable.services.news_publication import check_publication_evidence
+        from stable.services.news_entity_units import replay
+        run = self.finish()
+        self.assertEqual(run.state, 'shadow', run.reason)
+        self.assertEqual(self.calls.count('entity_check'), 2)
+        check_publication_evidence(run)
+        first = run.attempts.get(pk=run.entity_snapshot['initial_attempt_id'])
+        final = run.attempts.get(pk=run.entity_snapshot['strong_attempt_id'])
+        final.result['decisions'][0]['picks'][0]['candidate_id'] = 'invented'
+        with self.assertRaises(ValueError): replay(run, final, lambda *args: first)
