@@ -15,7 +15,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt /app/requirements.txt
-RUN pip install -r /app/requirements.txt
+RUN pip install -r /app/requirements.txt \
+    && python -c 'from kombu.transport.redis import Channel; channel = object.__new__(Channel); channel.global_keyprefix = ""; channel._get_client()'
 
 COPY server /app/server
 COPY runtime/tools /app/runtime/tools

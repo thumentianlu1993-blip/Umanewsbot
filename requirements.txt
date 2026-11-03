@@ -1,5 +1,9 @@
 beautifulsoup4==4.12.3
 celery==5.4.0
+# 保持原生产已验证的 Celery 依赖组合，避免 Redis transport 版本漂移。
+kombu==5.6.2
+billiard==4.3.0
+amqp==5.4.0
 django==5.2.1
 django-filter==25.1
 gunicorn==22.0.0
