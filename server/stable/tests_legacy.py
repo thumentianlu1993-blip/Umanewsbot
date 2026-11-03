@@ -19200,6 +19200,33 @@ class QQShutdownTests(TestCase):
         self.assertEqual(delivery.request_payload, {"historical": True})
         self.assertEqual(delivery.response_payload, {"receipt": "retained"})
 
+    def test_stale_enabled_worker_cannot_claim_a_retired_delivery(self):
+        from stable.services.qq_auto_push import process_qq_push_delivery
+        delivery = QQPushDelivery.objects.create(
+            article=self.article, target=self.target, attempt_count=0,
+            request_payload={"historical": True},
+        )
+
+        def retire_after_enabled_worker_read():
+            QQPushDelivery.objects.filter(pk=delivery.pk).update(
+                status=QQPushDeliveryStatus.SKIPPED, last_error="qq_channel_disabled",
+            )
+            return True, None
+
+        with override_settings(QQ_CHANNEL_ENABLED=True, QQ_PUSH_SCOPE="all_public"), \
+             patch("stable.services.qq_auto_push.BotPusher.is_online", side_effect=retire_after_enabled_worker_read), \
+             patch("stable.services.qq_auto_push.is_public_url_accessible", return_value=(True, None)) as probe, \
+             patch("stable.services.qq_auto_push.BotPusher.send_group_message", return_value={"message_id": "synthetic"}) as send:
+            result = process_qq_push_delivery(delivery)
+        self.assertEqual(result.status, QQPushDeliveryStatus.SKIPPED)
+        probe.assert_not_called()
+        send.assert_not_called()
+        delivery.refresh_from_db()
+        self.assertEqual(delivery.attempt_count, 0)
+        self.assertIsNone(delivery.last_attempt_at)
+        self.assertEqual(delivery.last_error, "qq_channel_disabled")
+        self.assertEqual(delivery.request_payload, {"historical": True})
+
     def test_online_probe_does_not_contact_disabled_gateway(self):
         from stable.services.onebot import BotPusher
         self.assertEqual(BotPusher().is_online(), (False, 'qq_channel_disabled'))
