@@ -1,3 +1,7 @@
+# 2026-11-03 QQ完整下线候选准备
+
+用户明确不再需要QQ链路。已从实际生产ad50abdb形成QQ窄回移候选68063962，包含自动/手动/旧消息终止、界面/调度/专属依赖退出；另修复旧worker原子领取已停用记录的并发绕过。固定源PG16回归120项通过，生产未变，主线PR及精确发布包仍待交付核验和G2。见[QQ下线包](changes/qq-retirement-20261103/rollout.md)。不把整个main或P02迁移带入这次生产包。
+
 ## 2026-10-03 下一版本进入开发调度
 
 用户已要求由协调会话承担架构与产品协调，创建三条开发线及独立审核支持，目标仍为 10/30 完全上线。已在独立工作树继承原规划并保留来源哈希；模型固定 gpt-6.1-sol / medium。实际派单与会话状态见 [开发调度](changes/next-version-capabilities/coordination.md) 和 [执行台账](changes/next-version-capabilities/dispatch_state.json)。本条不表示任何功能已实现、合并或发布。
