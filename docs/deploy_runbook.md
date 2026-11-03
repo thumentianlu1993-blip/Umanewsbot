@@ -1,3 +1,9 @@
+## 2026-11-03 QQ兼容性恢复发布并验收
+
+当前固定生产候选`9def4a7b`，目录`/opt/umanews-release-9def4a7b-qq-compat-20261103/umanewsbot`，镜像`3724748524a1`，schema0079；QQ三个开关false、OneBot停止/restart=no。原0079同schema发布已完成，再以独立锁内精确激活恢复原本应运行的两个worker及beat，21:17:49—21:28:39 CST完成650秒观察，四应用零重启，QQ无新增发送/重试/投递记录，历史发送记录与OneBot挂载保留，网页及broker正常。备份及intent/complete身份见[恢复记录](changes/qq-retirement-20261103/rollout.md)。
+
+本次激活必须继承原生发布的`UMANEWS_RELEASE_COMMIT=9def4a7be906a5e91d47ab5dd7ba888496f62b00`；该变量影响Compose构建参数及有效配置摘要，遗漏时应拒绝，不能修改摘要或.env绕过。新intent保留后台false的历史事实，额外激活由独立绑定收据记录；不能直接使用旧intent假设运行态。普通旧镜像回滚仍禁止，失败按同intent受保护恢复或重新绑定前向修复处理。人工门禁仅引用根AGENTS.md。
+
 ## 2026-11-03 QQ下线发布的依赖兼容故障
 
 68063962同schema发布及OneBot停止已执行，但Celery最终验收发现新解析的Kombu 5.7.0不支持固定redis 5.2.1。三个失败后台服务已停止，web健康，QQ保持关闭，队列保留。恢复须使用经过兼容验证的前向候选与精确包，不回滚旧镜像，不改写已有intent或完成收据。详见[执行记录](changes/qq-retirement-20261103/rollout.md)。构建成功、容器Running及发布入口退出0不能替代真实worker/broker就绪证明。
