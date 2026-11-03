@@ -19369,6 +19369,28 @@ class QQShutdownTests(TestCase):
         self.get.assert_not_called()
         self.post.assert_not_called()
 
+    def test_zero_attempt_offline_delivery_stops_retries_and_preserves_history(self):
+        delivery = QQPushDelivery.objects.create(
+            article=self.article, target=self.target,
+            status=QQPushDeliveryStatus.RETRYING, attempt_count=0, max_attempts=3,
+            last_error_type="send_failed", last_error="synthetic connection refused",
+            request_payload={"historical": True}, response_payload={"receipt": "retained"},
+        )
+        self.get.side_effect = requests.ConnectionError("synthetic connection refused")
+        with patch("stable.tasks.qq_push_delivery_task.apply_async") as retry:
+            for _ in range(2):
+                result = qq_push_delivery_task.run(delivery.pk)
+                self.assertEqual(result["status"], QQPushDeliveryStatus.SKIPPED)
+        retry.assert_not_called()
+        self.get.assert_not_called()
+        self.post.assert_not_called()
+        delivery.refresh_from_db()
+        self.assertEqual(delivery.attempt_count, 0)
+        self.assertIsNone(delivery.last_attempt_at)
+        self.assertEqual(delivery.last_error, "qq_channel_disabled")
+        self.assertEqual(delivery.request_payload, {"historical": True})
+        self.assertEqual(delivery.response_payload, {"receipt": "retained"})
+
     def test_online_probe_does_not_contact_disabled_gateway(self):
         from stable.services.onebot import BotPusher
         self.assertEqual(BotPusher().is_online(), (False, 'qq_channel_disabled'))
