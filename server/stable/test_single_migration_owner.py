@@ -3345,6 +3345,15 @@ class DeploymentLockCoverageTests(SimpleTestCase):
 
 
 class ShellAndComposeStaticValidationTests(SimpleTestCase):
+    def test_redis_transport_accepts_installed_client(self):
+        """真实 transport 校验必须成功，不能只依赖 pip 的元数据兼容判断。"""
+        import redis
+        from kombu.transport.redis import Channel
+
+        channel = object.__new__(Channel)
+        channel.global_keyprefix = ""
+        self.assertIs(channel._get_client(), redis.Redis)
+
     """T16: sh -n over deploy scripts and real compose config validation."""
 
     def test_t16_r0_host_entry_and_direct_helper_graph_is_executable(self):

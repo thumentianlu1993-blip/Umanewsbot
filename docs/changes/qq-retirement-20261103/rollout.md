@@ -28,3 +28,14 @@
 ## 证据及剩余条件
 
 私有目录`/Users/mentianlu/.codex/runtime/qq-retirement-20261103/`保存生产身份、配置摘要、RED/GREEN、固定源PG收据与原reviewer复审。发布方案审核及主线PR检查收口后才能提交G2选择；当前不得称生产已下线。
+
+
+## 2026-11-03 已执行及最终验收失败
+
+用户确认操作2后，PR271合并为adfa98827d80af5847cdf6e4e999d9cd8e436656。资源连续三次达标后，原0079入口完成候选68063962的同schema发布；镜像为eed3bf6b70136631c8fc322bae542cb7d84be923612b0125f550cfbdb33cb202。本次新备份917915919字节，通过摘要及TOC校验；不宣称完整恢复通过。旧worker自然排空，计划的cancel_consumer因发布已完成而在状态校验前退出，未执行。OneBot在独立锁内停止，restart=no，挂载保留。
+
+最终Celery验收发现Kombu 5.7.0与redis 5.2.1不兼容。新版本的web健康，但三个后台服务重启循环；已在锁内停止worker、race_sync_v2_worker、beat，保留web、DB、Redis及全部队列，QQ保持关闭。受保护入口退出0及complete收据不等于后台业务验收通过。私有证据位于本机qq-retirement-20261103及生产/opt/umanews-qq-retirement-20261103。
+
+### 前向修复（待新的精确G2绑定）
+
+候选9def4a7be906a5e91d47ab5dd7ba888496f62b00仅固定原生产Celery依赖组合，并增加构建期Redis transport检查和回归。无迁移、无QQ开关变化，不重新启动OneBot。先完成隔离回归与独立review，再通过0079同schema入口发布；当前已停止的后台服务会被新发布意图保留为停止态。后续恢复必须在独立发布锁内同时核验原68063962的恢复意图、新候选的完成收据、实际schema/image/config，再仅恢复原意图中应运行的worker、race_sync_v2_worker及beat。不得改写旧/新intent或用无校验的Compose启动替代受保护发布；新恢复动作须纳入精确包后确认。

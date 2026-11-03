@@ -1,3 +1,7 @@
+## 2026-11-03 QQ下线发布的依赖兼容故障
+
+68063962同schema发布及OneBot停止已执行，但Celery最终验收发现新解析的Kombu 5.7.0不支持固定redis 5.2.1。三个失败后台服务已停止，web健康，QQ保持关闭，队列保留。恢复须使用经过兼容验证的前向候选与精确包，不回滚旧镜像，不改写已有intent或完成收据。详见[执行记录](changes/qq-retirement-20261103/rollout.md)。构建成功、容器Running及发布入口退出0不能替代真实worker/broker就绪证明。
+
 ## 2026-10-03 Q02 调度与 Compose 声明退出（仓库候选，未部署）
 
 下一版本候选移除了 QQ 专属 Beat 周期和两份 production Compose 中可选 OneBot 占位服务；网页、worker、Beat、Redis、Nginx 及其它周期保持。旧 QQ task 名和安全 guard 保留用于消费迟到任务。此变更不停止已有容器、不删除登录卷、不清理共享队列，也不能证明生产零发送。
