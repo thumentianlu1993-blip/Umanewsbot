@@ -3137,62 +3137,62 @@
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
       "profile": "django",
       "reason": "Sporting Life real cache root not configured",
-      "review_by": "2026-10-16",
-      "follow_up": "补受审专用环境或冻结真实缓存夹具；当前full结论必须单列该覆盖缺口，不可自动延期"
+      "review_by": "2026-11-03",
+      "follow_up": "2026-11-03用户明确本次QQ下线无需回归此项；PR271仅当日接受既有环境skip，单列10项覆盖缺口，不引入P02设施，不得自动续期"
     },
     "stable.test_historical_race_detail_distance_metadata.HistoricalRaceDetailDistanceMetadataRealCacheTests.test_jra_2005_legacy_page_preserves_distance_unit": {
       "profile": "django",
       "reason": "real cache root not configured",
-      "review_by": "2026-10-16",
-      "follow_up": "补受审专用环境或冻结真实缓存夹具；当前full结论必须单列该覆盖缺口，不可自动延期"
+      "review_by": "2026-11-03",
+      "follow_up": "2026-11-03用户明确本次QQ下线无需回归此项；PR271仅当日接受既有环境skip，单列10项覆盖缺口，不引入P02设施，不得自动续期"
     },
     "stable.test_historical_race_detail_distance_metadata.HistoricalRaceDetailDistanceMetadataRealCacheTests.test_sporting_life_race_118984_preserves_distance_units": {
       "profile": "django",
       "reason": "real cache root not configured",
-      "review_by": "2026-10-16",
-      "follow_up": "补受审专用环境或冻结真实缓存夹具；当前full结论必须单列该覆盖缺口，不可自动延期"
+      "review_by": "2026-11-03",
+      "follow_up": "2026-11-03用户明确本次QQ下线无需回归此项；PR271仅当日接受既有环境skip，单列10项覆盖缺口，不引入P02设施，不得自动续期"
     },
     "stable.test_historical_race_detail_distance_metadata.HistoricalRaceDetailDistanceMetadataRealCacheTests.test_equibase_yearbook_result_preserves_distance_unit": {
       "profile": "django",
       "reason": "real cache root not configured",
-      "review_by": "2026-10-16",
-      "follow_up": "补受审专用环境或冻结真实缓存夹具；当前full结论必须单列该覆盖缺口，不可自动延期"
+      "review_by": "2026-11-03",
+      "follow_up": "2026-11-03用户明确本次QQ下线无需回归此项；PR271仅当日接受既有环境skip，单列10项覆盖缺口，不引入P02设施，不得自动续期"
     },
     "stable.test_historical_race_detail_runner_v2_package_identity.HistoricalRaceDetailRunnerV2PackageIdentityRealSmokeTests.test_empty_event_distance_uses_real_parsed_metadata_with_original_units": {
       "profile": "django",
       "reason": "real cache root not configured",
-      "review_by": "2026-10-16",
-      "follow_up": "补受审专用环境或冻结真实缓存夹具；当前full结论必须单列该覆盖缺口，不可自动延期"
+      "review_by": "2026-11-03",
+      "follow_up": "2026-11-03用户明确本次QQ下线无需回归此项；PR271仅当日接受既有环境skip，单列10项覆盖缺口，不引入P02设施，不得自动续期"
     },
     "stable.test_historical_race_detail_runner_v2_package_identity.HistoricalRaceDetailRunnerV2PackageIdentityRealSmokeTests.test_nonempty_event_and_parsed_distance_conflict_becomes_validation_gap": {
       "profile": "django",
       "reason": "real cache root not configured",
-      "review_by": "2026-10-16",
-      "follow_up": "补受审专用环境或冻结真实缓存夹具；当前full结论必须单列该覆盖缺口，不可自动延期"
+      "review_by": "2026-11-03",
+      "follow_up": "2026-11-03用户明确本次QQ下线无需回归此项；PR271仅当日接受既有环境skip，单列10项覆盖缺口，不引入P02设施，不得自动续期"
     },
     "stable.test_historical_race_detail_runner_v2_package_identity.HistoricalRaceDetailRunnerV2PackageIdentityRealSmokeTests.test_hk_real_validated_candidate_packages_with_plan_inventory_identity": {
       "profile": "django",
       "reason": "real cache root not configured",
-      "review_by": "2026-10-16",
-      "follow_up": "补受审专用环境或冻结真实缓存夹具；当前full结论必须单列该覆盖缺口，不可自动延期"
+      "review_by": "2026-11-03",
+      "follow_up": "2026-11-03用户明确本次QQ下线无需回归此项；PR271仅当日接受既有环境skip，单列10项覆盖缺口，不引入P02设施，不得自动续期"
     },
     "stable.test_historical_race_detail_runner_v2_package_identity.HistoricalRaceDetailRunnerV2PackageIdentityRealSmokeTests.test_hk_package_rejects_raw_candidate_without_validation_evidence": {
       "profile": "django",
       "reason": "real cache root not configured",
-      "review_by": "2026-10-16",
-      "follow_up": "补受审专用环境或冻结真实缓存夹具；当前full结论必须单列该覆盖缺口，不可自动延期"
+      "review_by": "2026-11-03",
+      "follow_up": "2026-11-03用户明确本次QQ下线无需回归此项；PR271仅当日接受既有环境skip，单列10项覆盖缺口，不引入P02设施，不得自动续期"
     },
     "stable.test_migration_history_repair.MigrationHistoryRepairDockerImageContractTests.test_candidate_image_contains_only_the_exact_reviewed_audit_file": {
       "profile": "django",
       "reason": "set RUN_MIGRATION_REPAIR_DOCKER_CONTRACT=true for the real image contract",
-      "review_by": "2026-10-16",
-      "follow_up": "补受审专用环境或冻结真实缓存夹具；当前full结论必须单列该覆盖缺口，不可自动延期"
+      "review_by": "2026-11-03",
+      "follow_up": "2026-11-03用户明确本次QQ下线无需回归此项；PR271仅当日接受既有环境skip，单列10项覆盖缺口，不引入P02设施，不得自动续期"
     },
     "stable.test_race_live_gate_remediation.RollbackGateBehaviorRemediationTests.test_root_artifact_is_exact_0700_0600_secret_free_and_no_replace": {
       "profile": "django",
       "reason": "root-owned artifact contract requires root EUID",
-      "review_by": "2026-10-16",
-      "follow_up": "补受审专用环境或冻结真实缓存夹具；当前full结论必须单列该覆盖缺口，不可自动延期"
+      "review_by": "2026-11-03",
+      "follow_up": "2026-11-03用户明确本次QQ下线无需回归此项；PR271仅当日接受既有环境skip，单列10项覆盖缺口，不引入P02设施，不得自动续期"
     }
   },
   "owners": {
