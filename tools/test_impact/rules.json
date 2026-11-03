@@ -982,7 +982,8 @@
     "server/stable/services/translation_retry_budget.py",
     "server/stable/management/commands/horse_basic_profile_from_review.py",
     "server/stable/services/horse_basic_profile_prepare_input.py",
-    "server/stable/migrations/0081_managed_readonly_steps.py"
+    "server/stable/migrations/0081_managed_readonly_steps.py",
+    "docs/changes/qq-retirement-20261103/release-manifest.json"
   ],
   "paths": {
     "docs/changes/next-version-capabilities/lanes/C/U01-offline-cases.json": [

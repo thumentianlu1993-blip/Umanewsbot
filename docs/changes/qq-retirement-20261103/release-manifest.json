@@ -1,0 +1,52 @@
+{
+  "schema": "umanews.qq-retirement.release/v1",
+  "candidate_commit": "680639625dee9d6ab70ae31f7e095cd5f0c85155",
+  "candidate_tree": "d3c043ba7f8dacc2541239d004454ec43e368cc3",
+  "production_baseline_commit": "ad50abdb74b89669ab8ada2958b040877c1a1849",
+  "expected_application_image": "sha256:73ee1dcf7edb5b7c7bda49f5d6baedffe030d639fcc5bf191b831ece6e9f5930",
+  "expected_config_sha256": "3ed8596fee3558fb1efe9a6adc22c40cc08a4d320cc9043bbd04808784e2f789",
+  "compose_project": "umanewsbot",
+  "schema_leaf": "stable.0079_multisource_race_enrollment",
+  "new_migrations": [],
+  "config_changes": {
+    "QQ_CHANNEL_ENABLED": false,
+    "QQ_PUSH_ENABLED": false,
+    "MULTIREGION_PRODUCTION_WINDOWS_QQ_ENABLED": false
+  },
+  "application_services": [
+    "web",
+    "worker",
+    "beat",
+    "race_sync_v2_worker"
+  ],
+  "onebot": {
+    "container_id": "9f77b49ec509a223cf30a9360350dfc6b358a193126afb1ba278b61f2cc2c98c",
+    "image_id": "sha256:9254ec12af101576c5eeb4910847abd1d219297bc6d9a35c52511e12500f0f45",
+    "restart_policy_after": "no",
+    "running_after": false,
+    "delete_container": false,
+    "delete_mounts": false
+  },
+  "production_data_actions": [
+    "consume existing QQ messages through disabled guards; mark eligible non-sent deliveries skipped/qq_channel_disabled",
+    "preserve sent facts, message receipts and historical request/response payloads"
+  ],
+  "prohibited_actions": [
+    "purge shared queues",
+    "delete historical QQ records or OneBot volumes",
+    "send any verification QQ message",
+    "enable new race/news automation",
+    "deploy the whole origin/main tree"
+  ],
+  "release_entrypoint": "deploy/deploy_0079.sh",
+  "recovery": "same-intent resume or forward fix with QQ kept disabled; no ordinary rollback or QQ reactivation",
+  "preconditions": [
+    "original application image/config/service identity still matches",
+    "no competing release/collection lock",
+    "three bounded resource samples admit source backup and image build",
+    "candidate 0079 schema identical and empty migration plan",
+    "release-specific backup passes existing integrity checks; no claim of full restore from TOC",
+    "source-specific tests and independent review pass",
+    "user G2 approval binds this manifest and candidate"
+  ]
+}

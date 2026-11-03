@@ -12,6 +12,7 @@ from datetime import date, timedelta
 from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.management import CommandError, call_command
@@ -42,10 +43,13 @@ def _sha256(path: Path) -> str:
 
 
 class RefreshFixtures:
-    """共享 fixture：动态日期避免依赖真实日历日。"""
+    """共享 fixture：固定业务日期，与清单中的 2026 年保持一致。"""
 
     def setUp(self):
         super().setUp()
+        clock = patch("django.utils.timezone.localdate", return_value=date(2026, 6, 1))
+        clock.start()
+        self.addCleanup(clock.stop)
         self.operator = get_user_model().objects.create_user(username="operator", password="unused")
         self.today = timezone.localdate()
         self.future = self.today + timedelta(days=60)

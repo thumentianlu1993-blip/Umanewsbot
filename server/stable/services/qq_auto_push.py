@@ -364,6 +364,9 @@ def _claim_delivery_attempt(delivery: QQPushDelivery, *, message: str, public_ur
             Q(pk=delivery.pk),
             claimable_status | stale_sending,
             attempt_count__lt=F("max_attempts"),
+        ).exclude(
+            status=QQPushDeliveryStatus.SKIPPED,
+            last_error=QQ_CHANNEL_DISABLED,
         ).update(
             status=QQPushDeliveryStatus.SENDING,
             attempt_count=F("attempt_count") + 1,
