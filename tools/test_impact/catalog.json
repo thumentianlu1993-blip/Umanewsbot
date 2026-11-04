@@ -1,6 +1,10 @@
 {
   "schema_version": 1,
   "domains": {
+    "numeric_surface_audit": [
+      "stable.test_numeric_surface_audit",
+      "stable.test_numeric_surface_validation_diagnostics"
+    ],
     "core": [
       "stable.test_release_commit",
       "stable.test_race_live_target_eligibility",
@@ -18,7 +22,9 @@
       "stable.test_public_navigation_and_attribution",
       "stable.tests_legacy.P0HorseProfileDataCompletionTests",
       "stable.tests.test_page_regression",
-      "stable.tests.test_term_display"
+      "stable.tests.test_term_display",
+      "stable.test_article_race_navigation",
+      "stable.test_follow_management_button_names"
     ],
     "news_translation": [
       "stable.tests_legacy.TranslationWorkflowTests",
@@ -36,7 +42,10 @@
       "stable.test_managed_translation_dispatch_fence",
       "stable.test_managed_readonly_steps",
       "stable.test_managed_readonly_translation",
-      "stable.test_translation_reported_token_stop"
+      "stable.test_translation_reported_token_stop",
+      "stable.test_article_term_receipt",
+      "stable.test_content_review_decisions",
+      "stable.test_content_review_shadow"
     ],
     "race_parser": [
       "stable.test_race_reference_sources",
@@ -811,7 +820,14 @@
       "stable.tests.test_race_event_lifecycle_enrollment.LifecycleEnrollmentCommandTests.test_prepare_command_does_not_resolve_away_temporary_alias"
     ],
     "content_contracts": [
-      "stable.test_content_contracts"
+      "stable.test_content_contracts",
+      "stable.test_article_entity_binding",
+      "stable.test_article_entity_binding_diagnostics",
+      "stable.test_article_entity_resolution_binding",
+      "stable.test_u04_horse_follow_copy",
+      "stable.test_article_horse_link_reconcile_protection",
+      "stable.test_u04_article_body_empty_copy",
+      "stable.test_article_horse_link_withdrawal"
     ],
     "module:scripts.tests.test_f02_readonly_export": [
       "scripts.tests.test_f02_readonly_export"
@@ -876,6 +892,19 @@
     ],
     "horse_career_review_consumer": [
       "stable.test_horse_career_record_from_review"
+    ],
+    "r04_arbitration": [
+      "stable.test_race_source_arbitration",
+      "stable.test_race_result_arbitration_shadow"
+    ],
+    "race_result_roster_orm": [
+      "stable.test_race_result_roster_orm"
+    ],
+    "race_result_roster_reconciliation": [
+      "stable.test_race_result_roster_reconciliation"
+    ],
+    "module:stable.test_calendar_empty_filter_recovery": [
+      "stable.test_calendar_empty_filter_recovery"
     ]
   },
   "dependencies": {
@@ -937,9 +966,24 @@
       "horse_career_link_cache",
       "horse_basic_profile_review_input",
       "horse_target_inventory"
+    ],
+    "race_results": [
+      "r04_arbitration"
     ]
   },
   "tests": {
+    "server/stable/test_numeric_surface_validation_diagnostics.py": {
+      "label": "stable.test_numeric_surface_validation_diagnostics",
+      "domains": [
+        "numeric_surface_audit"
+      ]
+    },
+    "server/stable/test_numeric_surface_audit.py": {
+      "label": "stable.test_numeric_surface_audit",
+      "domains": [
+        "numeric_surface_audit"
+      ]
+    },
     ".codex/scripts/test_graded_race_participants_workflow.py": {
       "label": "test_graded_race_participants_workflow",
       "domains": [
@@ -2818,9 +2862,113 @@
       "domains": [
         "news_translation"
       ]
+    },
+    "server/stable/test_article_term_receipt.py": {
+      "label": "stable.test_article_term_receipt",
+      "domains": [
+        "news_translation"
+      ]
+    },
+    "server/stable/test_content_review_decisions.py": {
+      "label": "stable.test_content_review_decisions",
+      "domains": [
+        "news_translation"
+      ]
+    },
+    "server/stable/test_content_review_shadow.py": {
+      "label": "stable.test_content_review_shadow",
+      "domains": [
+        "news_translation"
+      ]
+    },
+    "server/stable/test_race_source_arbitration.py": {
+      "label": "stable.test_race_source_arbitration",
+      "domains": [
+        "r04_arbitration"
+      ]
+    },
+    "server/stable/test_race_result_arbitration_shadow.py": {
+      "label": "stable.test_race_result_arbitration_shadow",
+      "domains": [
+        "r04_arbitration"
+      ]
+    },
+    "server/stable/test_race_result_roster_orm.py": {
+      "label": "stable.test_race_result_roster_orm",
+      "domains": [
+        "race_result_roster_orm"
+      ]
+    },
+    "server/stable/test_race_result_roster_reconciliation.py": {
+      "label": "stable.test_race_result_roster_reconciliation",
+      "domains": [
+        "race_result_roster_reconciliation"
+      ]
+    },
+    "server/stable/test_article_race_navigation.py": {
+      "label": "stable.test_article_race_navigation",
+      "domains": [
+        "horse_page"
+      ]
+    },
+    "server/stable/test_calendar_empty_filter_recovery.py": {
+      "label": "stable.test_calendar_empty_filter_recovery",
+      "domains": [
+        "module:stable.test_calendar_empty_filter_recovery"
+      ]
+    },
+    "server/stable/test_follow_management_button_names.py": {
+      "label": "stable.test_follow_management_button_names",
+      "domains": [
+        "horse_page"
+      ]
+    },
+    "server/stable/test_article_entity_binding.py": {
+      "label": "stable.test_article_entity_binding",
+      "domains": [
+        "content_contracts"
+      ]
+    },
+    "server/stable/test_article_entity_binding_diagnostics.py": {
+      "label": "stable.test_article_entity_binding_diagnostics",
+      "domains": [
+        "content_contracts"
+      ]
+    },
+    "server/stable/test_article_entity_resolution_binding.py": {
+      "label": "stable.test_article_entity_resolution_binding",
+      "domains": [
+        "content_contracts"
+      ]
+    },
+    "server/stable/test_u04_horse_follow_copy.py": {
+      "label": "stable.test_u04_horse_follow_copy",
+      "domains": [
+        "content_contracts"
+      ]
+    },
+    "server/stable/test_article_horse_link_reconcile_protection.py": {
+      "label": "stable.test_article_horse_link_reconcile_protection",
+      "domains": [
+        "content_contracts"
+      ]
+    },
+    "server/stable/test_u04_article_body_empty_copy.py": {
+      "label": "stable.test_u04_article_body_empty_copy",
+      "domains": [
+        "content_contracts"
+      ]
+    },
+    "server/stable/test_article_horse_link_withdrawal.py": {
+      "label": "stable.test_article_horse_link_withdrawal",
+      "domains": [
+        "content_contracts"
+      ]
     }
   },
   "profiles": {
+    "stable.test_numeric_surface_validation_diagnostics": "django",
+    "stable.test_numeric_surface_audit": "python",
     "test_graded_race_participants_workflow": "python",
     "test_workflow_contract": "python",
     "runtime.research.test_audit_france_galop_bulletin_occurrences": "python",
@@ -3131,7 +3279,24 @@
     "stable.test_horse_career_record_from_review": "django",
     "stable.test_managed_readonly_steps": "django",
     "stable.test_managed_readonly_translation": "django",
-    "stable.test_translation_reported_token_stop": "django"
+    "stable.test_translation_reported_token_stop": "django",
+    "stable.test_article_term_receipt": "django",
+    "stable.test_content_review_decisions": "django",
+    "stable.test_content_review_shadow": "django",
+    "stable.test_race_source_arbitration": "python",
+    "stable.test_race_result_arbitration_shadow": "python",
+    "stable.test_race_result_roster_orm": "django",
+    "stable.test_race_result_roster_reconciliation": "python",
+    "stable.test_article_race_navigation": "django",
+    "stable.test_calendar_empty_filter_recovery": "django",
+    "stable.test_follow_management_button_names": "django",
+    "stable.test_article_entity_binding": "python",
+    "stable.test_article_entity_binding_diagnostics": "django",
+    "stable.test_article_entity_resolution_binding": "django",
+    "stable.test_u04_horse_follow_copy": "django",
+    "stable.test_article_horse_link_reconcile_protection": "django",
+    "stable.test_u04_article_body_empty_copy": "django",
+    "stable.test_article_horse_link_withdrawal": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
@@ -3196,6 +3361,7 @@
     }
   },
   "owners": {
+    "numeric_surface_audit": "integration: B线 N04离线数字表面差异核心",
     "horse_page": "application: 马匹公开页面与发布边界",
     "news_translation": "integration: 翻译与内容公开边界",
     "race_parser": "integration: 来源解析到结果规范化",
@@ -3213,7 +3379,8 @@
     "horse_basic_profile_cache": "integration: H03绑定缓存的私有基础资料事务与PG并发合同",
     "horse_career_link_cache": "integration: H03 单条既有赛绩离线补连、强身份/binding 与事务重放边界",
     "horse_basic_profile_prepare_command": "integration: H03缓存prepare-only命令与私有待审产物合同",
-    "horse_basic_profile_review_input": "integration: H03独立已审输入与原消费者事务/重放合同"
+    "horse_basic_profile_review_input": "integration: H03独立已审输入与原消费者事务/重放合同",
+    "r04_arbitration": "integration: A reviewed R04 pure selection and caller-shaped shadow diagnostics; no writer/hook/source"
   },
   "dedicated_batch_modules": [
     "stable.test_migration_history_repair_postgres",

@@ -4230,6 +4230,13 @@ def public_article_detail(request: HttpRequest, article_id: int):
         if link.status in {ArticleRaceLinkStatus.AUTO, ArticleRaceLinkStatus.MANUAL}
         and link.event.visibility_status == RaceEventVisibility.PUBLISHED
     ]
+    navigation = _public_detail_nav(request, allowed={"news"}, default="news")
+    for link in race_links:
+        event = link.event
+        event.public_list_detail_url = (
+            _public_href(event.public_path, {"return_nav": navigation["public_nav_token"]})
+            if navigation["public_nav_token"] else ""
+        ) or event.public_path
     horse_links = [
         link
         for link in article.horse_links.all()
@@ -4273,7 +4280,7 @@ def public_article_detail(request: HttpRequest, article_id: int):
         "stable/public/detail.html",
         {
             "article": article,
-            **_public_detail_nav(request, allowed={"news"}, default="news"),
+            **navigation,
             "race_links": race_links,
             "horse_links": horse_links,
             "prev_article": prev_article,

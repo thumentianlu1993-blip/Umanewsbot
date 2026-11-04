@@ -150,6 +150,28 @@ class RealMappingTests(unittest.TestCase):
         catalog=json.loads((ROOT/'tools/test_impact/catalog.json').read_text())
         return core.select_changes([change(path)],rules,catalog)
 
+    def test_article_receipt_and_capture_budget_select_translation_consumers(self):
+        for path in ('server/stable/services/article_term_receipt.py',
+                     'server/stable/services/term_capture_budget.py'):
+            with self.subTest(path=path):
+                plan = self.select_path(path)
+                self.assertEqual(plan['mode'], 'targeted')
+                self.assertIn('news_translation', plan['domains'])
+                for label in ('stable.test_article_term_receipt',
+                              'stable.test_managed_readonly_steps',
+                              'stable.test_managed_readonly_translation',
+                              'stable.test_managed_translation_budget_consumer'):
+                    self.assertIn(label, plan['labels'])
+
+    def test_unknown_receipt_neighbor_remains_unmapped_with_high_risk(self):
+        import json
+        rules = json.loads((ROOT/'tools/test_impact/rules.json').read_text())
+        catalog = json.loads((ROOT/'tools/test_impact/catalog.json').read_text())
+        with self.assertRaisesRegex(ValueError, 'unmapped: server/stable/services/article_term_receipt_unknown.py'):
+            core.select_changes([change('tools/test_impact/rules.json'),
+                                 change('server/stable/services/article_term_receipt_unknown.py')],
+                                rules, catalog)
+
     def test_result_write_selects_public_read_and_repair_contracts(self):
         labels=self.select_path('server/stable/services/race_data_sync_results.py')['labels']
         self.assertIn('stable.test_race_data_sync_chain_e2e',labels)

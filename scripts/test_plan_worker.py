@@ -109,7 +109,8 @@ def execute(plan, batch):
             'python':platform.python_version(),'os':platform.platform()}
     class Result(unittest.TextTestResult):
         def startTest(self,test):
-            print('RUN '+test.id(), flush=True)
+            sys.stdout.write('RUN '+test.id()+'\n')
+            sys.stdout.flush()
             report['executed'].append(test.id()); super().startTest(test)
         def addSkip(self,test,reason):
             report['skips'].append({'id':test.id(),'reason':reason}); super().addSkip(test,reason)

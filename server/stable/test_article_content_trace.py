@@ -179,3 +179,179 @@ class ArticleContentTraceTests(SimpleTestCase):
         self.assertNotIn('STYLE_SENTINEL', json.dumps(evidence))
         removed = [b for b in evidence['blocks'] if b['decision'] == 'removed']
         self.assertEqual([b['original_text'] for b in removed], ['Menu'])
+
+    def test_selected_structural_noise_root_is_removed_and_audited_without_fallback(self):
+        import hashlib
+        import json
+
+        from bs4 import BeautifulSoup
+
+        # Synthetic parser inputs, not captured source pages (captured_at=null).
+        adapter = SportingLifeAdapter()
+        for tag in ('nav', 'footer', 'aside', 'form', 'noscript', 'script', 'style'):
+            with self.subTest(tag=tag):
+                payload = {
+                    'script': 'ROOT_SCRIPT_SENTINEL',
+                    'style': 'ROOT_STYLE_SENTINEL',
+                }.get(tag, 'MENU_ROOT_SENTINEL')
+                html = f'<{tag} class="Article__ArticleBody">{payload}</{tag}>'
+                node = BeautifulSoup(html, 'lxml').select_one('[class*="Article__ArticleBody"]')
+                node_html_sha256 = hashlib.sha256(str(node).encode()).hexdigest()
+                detail = adapter.parse_detail_html(html, url='https://fixture.invalid/root-structural-noise')
+                self.assertEqual(detail.body_ja_raw, '')
+                self.assertEqual(detail.body_ja_normalized, '')
+                self.assertEqual(detail.metadata['body_parse_status'], 'empty_after_cleaning')
+                self.assertEqual(detail.metadata['body_selector'], "[class*='Article__ArticleBody']")
+                evidence = detail.metadata['body_cleaning']
+                self.assertEqual(evidence['after_text'], '')
+                self.assertEqual(evidence['removed_rules'], {'structured_noise': 1})
+                self.assertEqual(evidence['removed_count'], 1)
+                self.assertEqual(len(evidence['blocks']), 1)
+                block = evidence['blocks'][0]
+                self.assertEqual(block['locator'], 'container')
+                self.assertEqual(block['decision'], 'removed')
+                self.assertEqual(block['text'], '')
+                self.assertEqual(block['reasons'], ['structured_noise'])
+                self.assertTrue(block['block_id'])
+                if tag in ('script', 'style'):
+                    self.assertEqual(evidence['before_text'], '')
+                    self.assertEqual(block['original_text'], '')
+                    self.assertEqual(block['original_html_sha256'], node_html_sha256)
+                    self.assertNotIn(payload, json.dumps(evidence))
+                else:
+                    self.assertEqual(evidence['before_text'], payload)
+                    self.assertEqual(block['original_text'], payload)
+                self.assertEqual(evidence['body_html_sha256'], node_html_sha256)
+                self.assertEqual(detail.original_content_html, html)
+                replay = adapter.parse_detail_html(html, url='https://fixture.invalid/root-structural-noise')
+                self.assertEqual(replay.metadata['body_cleaning'], evidence)
+
+        html = ('<div class="Article__ArticleBody"><nav>MENU_ROOT_SENTINEL</nav>'
+                '<p>MENU_ROOT_SENTINEL</p><p>Last fact.</p></div>')
+        detail = adapter.parse_detail_html(html, url='https://fixture.invalid/root-noise-control')
+        self.assertEqual(detail.body_ja_raw, 'MENU_ROOT_SENTINEL\n\nLast fact.')
+        self.assertEqual(detail.metadata['body_parse_status'], 'ok')
+        evidence = detail.metadata['body_cleaning']
+        self.assertEqual(evidence['removed_rules'], {'structured_noise': 1})
+        removed = [b for b in evidence['blocks'] if b['decision'] == 'removed']
+        kept = [b for b in evidence['blocks'] if b['decision'] == 'kept']
+        self.assertEqual([b['original_text'] for b in removed], ['MENU_ROOT_SENTINEL'])
+        self.assertEqual([b['text'] for b in kept], ['MENU_ROOT_SENTINEL', 'Last fact.'])
+        self.assertEqual(len({b['block_id'] for b in evidence['blocks']}), 3)
+        self.assertEqual('\n\n'.join(b['text'] for b in kept), detail.body_ja_raw)
+
+
+class SelectedClassNoiseRootTests(SimpleTestCase):
+    """Synthetic parser inputs only; captured_at=null, no real-source claim."""
+
+    def setUp(self):
+        guard = patch('socket.socket.connect', side_effect=AssertionError('offline parser test'))
+        guard.start()
+        self.addCleanup(guard.stop)
+
+    def _assert_removed_root(self, root_html, expected_original):
+        import hashlib
+        import json
+
+        from bs4 import BeautifulSoup
+
+        html = ('<html><body><main><p>OUTER_FRAME_SENTINEL</p>' + root_html +
+                '<article><div class="article-body">FALLBACK_BODY_SENTINEL</div></article>'
+                '</main></body></html>')
+        selected = BeautifulSoup(html, 'lxml').select_one('[class*="Article__ArticleBody"]')
+        self.assertIsNotNone(selected)
+        self.assertEqual(selected.name, 'div')
+        self.assertEqual(selected.get_text(' ', strip=True), expected_original)
+        selected_hash = hashlib.sha256(str(selected).encode()).hexdigest()
+        adapter = SportingLifeAdapter()
+        detail = adapter.parse_detail_html(html, url='https://fixture.invalid/class-noise-root')
+        self.assertEqual(detail.metadata['body_selector'], "[class*='Article__ArticleBody']")
+        self.assertEqual(detail.body_ja_raw, '')
+        self.assertEqual(detail.body_ja_normalized, '')
+        self.assertEqual(detail.metadata['body_parse_status'], 'empty_after_cleaning')
+        self.assertEqual(detail.original_content_html, html)
+        evidence = detail.metadata['body_cleaning']
+        self.assertEqual(evidence['before_text'], expected_original)
+        self.assertEqual(evidence['after_text'], '')
+        self.assertEqual(evidence['body_html_sha256'], selected_hash)
+        self.assertEqual(evidence['removed_count'], 1)
+        self.assertEqual(evidence['removed_rules'], {'structured_noise': 1})
+        self.assertEqual(len(evidence['blocks']), 1)
+        block = evidence['blocks'][0]
+        self.assertEqual(block['locator'], 'container')
+        self.assertEqual(block['original_text'], expected_original)
+        self.assertEqual(block['text'], '')
+        self.assertEqual(block['decision'], 'removed')
+        self.assertEqual(block['reasons'], ['structured_noise'])
+        identity = json.dumps(
+            ['sporting_life', selected_hash, 'container', expected_original],
+            ensure_ascii=False, separators=(',', ':'),
+        )
+        expected_id = 'body-' + hashlib.sha256(identity.encode()).hexdigest()[:20]
+        self.assertEqual(block['block_id'], expected_id)
+        replay = adapter.parse_detail_html(html, url='https://fixture.invalid/class-noise-root')
+        self.assertEqual(replay.metadata['body_cleaning'], evidence)
+        self.assertEqual(replay.original_content_html, html)
+
+    def test_existing_class_noise_selected_roots_are_removed_and_audited(self):
+        for noise_class in (
+            'InlineShareBlockWrapper',
+            'InlineArticleShareWrapper',
+            'ArticleSocialMediaButtons__StyledInnerContainer',
+            'InlineSocialShareWrapper',
+        ):
+            with self.subTest(noise_class=noise_class):
+                root = ('<div class="Article__ArticleBody ' + noise_class +
+                        '"><p>CLASS_ROOT_SENTINEL</p></div>')
+                self._assert_removed_root(root, 'CLASS_ROOT_SENTINEL')
+
+    def test_multiple_root_noise_classes_with_nested_noise_are_removed_once(self):
+        root = ('<div class="Article__ArticleBody ShareBlock ArticleShare '
+                'ArticleSocialMediaButtons__StyledInnerContainer SocialShare">'
+                '<p>ROOT_SHARE_SENTINEL '
+                '<span class="ShareBlock">NESTED_SHARE_SENTINEL</span></p></div>')
+        self._assert_removed_root(root, 'ROOT_SHARE_SENTINEL NESTED_SHARE_SENTINEL')
+
+    def test_legal_body_preserves_same_words_and_case_distinct_classes(self):
+        html = ('<div class="Article__ArticleBody shareblock socialshare">'
+                '<p>First fact.</p>'
+                '<p>ShareBlock ArticleShare ArticleSocialMediaButtons__StyledInnerContainer SocialShare.</p>'
+                '<p>The trainer said: "ShareBlock is the quoted label."</p>'
+                '<p>Final fact.</p></div>')
+        expected = ('First fact.\n\n'
+                    'ShareBlock ArticleShare ArticleSocialMediaButtons__StyledInnerContainer SocialShare.\n\n'
+                    'The trainer said: "ShareBlock is the quoted label."\n\nFinal fact.')
+        detail = SportingLifeAdapter().parse_detail_html(html, url='https://fixture.invalid/class-words')
+        self.assertEqual(detail.body_ja_raw, expected)
+        self.assertEqual(detail.body_ja_normalized, expected)
+        self.assertEqual(detail.metadata['body_parse_status'], 'ok')
+        self.assertEqual(detail.metadata['body_selector'], "[class*='Article__ArticleBody']")
+        self.assertEqual(detail.original_content_html, html)
+        evidence = detail.metadata['body_cleaning']
+        self.assertEqual(evidence['removed_count'], 0)
+        self.assertEqual(evidence['removed_rules'], {})
+        self.assertEqual([b['text'] for b in evidence['blocks']], expected.split('\n\n'))
+        self.assertTrue(all(b['decision'] == 'kept' for b in evidence['blocks']))
+
+    def test_nested_class_noise_keeps_existing_cleanup_and_surrounding_facts(self):
+        html = ('<div class="Article__ArticleBody"><p>First fact.</p>'
+                '<div class="ShareBlock">SHARE_WIDGET</div>'
+                '<div class="ArticleShare">SHARE_WIDGET</div>'
+                '<div class="ArticleSocialMediaButtons__StyledInnerContainer">SHARE_WIDGET</div>'
+                '<div class="SocialShare">SHARE_WIDGET</div>'
+                '<p>Final fact.</p></div>')
+        detail = SportingLifeAdapter().parse_detail_html(html, url='https://fixture.invalid/nested-class-noise')
+        self.assertEqual(detail.body_ja_raw, 'First fact.\n\nFinal fact.')
+        self.assertEqual(detail.body_ja_normalized, detail.body_ja_raw)
+        self.assertEqual(detail.metadata['body_parse_status'], 'ok')
+        self.assertEqual(detail.original_content_html, html)
+        evidence = detail.metadata['body_cleaning']
+        self.assertEqual(evidence['removed_count'], 4)
+        self.assertEqual(evidence['removed_rules'], {'structured_noise': 4})
+        removed = [b for b in evidence['blocks'] if b['decision'] == 'removed']
+        kept = [b for b in evidence['blocks'] if b['decision'] == 'kept']
+        self.assertEqual(len(removed), 4)
+        self.assertEqual([b['original_text'] for b in removed], ['SHARE_WIDGET'] * 4)
+        self.assertTrue(all(b['text'] == '' and b['reasons'] == ['structured_noise'] for b in removed))
+        self.assertEqual([b['text'] for b in kept], ['First fact.', 'Final fact.'])
+        self.assertEqual(len({b['block_id'] for b in evidence['blocks']}), 6)

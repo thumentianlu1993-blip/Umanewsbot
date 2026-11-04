@@ -133,7 +133,17 @@
           </div>
         </section>
       {% empty %}
-        <p class="empty-state">暂无符合条件的赛事。</p>
+        {% if filters.region or filters.grade or filters.when or filters.year or filters.q or filters.cursor or filters.direction or filters.tab == 'key' %}
+          <p class="empty-state">
+            当前列表暂无可展示的已发布赛事。
+            <br>
+            <a href="{% url 'public-race-calendar' %}?tab=all">重置筛选，返回默认赛事列表</a>
+            <br>
+            <span>重置后按赛事日历的默认规则显示。</span>
+          </p>
+        {% else %}
+          <p class="empty-state">暂无符合条件的赛事。</p>
+        {% endif %}
       {% endfor %}
     </section>
   </main>

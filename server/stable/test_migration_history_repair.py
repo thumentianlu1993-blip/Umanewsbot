@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import json
+import re
+import tarfile
+import hashlib
+import unittest
 import os
 import shutil
 import subprocess
 import stat
-from io import StringIO
+from io import BytesIO, StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import skipUnless
@@ -1257,6 +1261,429 @@ class MigrationHistoryRepairArtifactRedTests(SimpleTestCase):
         self.assertFalse(any(" migrate " in f" {call} " for call in calls), calls)
 
 
+# Reviewed image source is independent of this test-fix commit.
+_MIGRATION_IMAGE_SOURCE = {
+    "sha": "1dd5e0a508957672bcddd1c33e454fbbef1b75c1",
+    "tree": "67e755d385725fa7404cba822bf65d74f50403cf",
+    "pins": {
+        "Dockerfile": "57bfb54b98425911b0a58d08c7634f654253a1374d8b5e3c2f221bf637b3177d",
+        ".dockerignore": "ce8e0d28818b57e42592d09d2de35ced17af0a0d5cb86aabd993523f80605790",
+        "requirements.txt": "f3fd408c04cae78ed13d5175fe8cc04674fcde4efab9d9f18d569652eddf3f59",
+        "docs/changes/repair-production-migration-history/production_audit.json": "2d3fba0d7d97ff9d706b22ef8a8ae1f7719aa1db4772176b95cc8954e2f6105c",
+        "server/stable/services/historical_calendar_release_b_schema.py": "05eeaa404dc8bca309ed18a7ffd19bb2febcf1b2a43fd26034ba11f0bcb6aae0",
+    },
+}
+
+
+def _migration_image_source(repository, source_sha, reviewed):
+    if (not isinstance(source_sha, str) or re.fullmatch(r"[0-9a-f]{40}", source_sha) is None
+            or source_sha == "0" * 40 or source_sha != reviewed["sha"]):
+        raise ValueError("explicit nonzero reviewed source SHA required")
+    def git(*args):
+        try:
+            return subprocess.check_output(["git", "-C", str(repository), *args], stderr=subprocess.PIPE)
+        except subprocess.CalledProcessError as exc:
+            raise ValueError("reviewed Git object unavailable") from exc
+    if git("cat-file", "-t", source_sha).strip() != b"commit":
+        raise ValueError("reviewed source must be a commit")
+    tree = git("rev-parse", source_sha + "^{tree}").decode().strip()
+    if tree != reviewed["tree"]:
+        raise ValueError("reviewed source tree mismatch")
+    files = {}
+    for record in git("ls-tree", "-rz", "--full-tree", source_sha).split(b"\0"):
+        if not record:
+            continue
+        meta, path = record.split(b"\t", 1)
+        mode, kind, oid = meta.decode().split()
+        name = path.decode()
+        if kind != "blob" or mode not in ("100644", "100755"):
+            raise ValueError("nonregular source member")
+        files[name] = {"mode": mode, "blob": oid}
+    for path, expected in reviewed["pins"].items():
+        if path not in files or hashlib.sha256(git("cat-file", "blob", files[path]["blob"])).hexdigest() != expected:
+            raise ValueError("reviewed input byte pin mismatch")
+    return {"sha": source_sha, "tree": tree, "files": files, "pins": dict(reviewed["pins"])}
+
+
+def _assert_migration_image_context(context, source):
+    context = Path(context)
+    if context.is_symlink() or not context.is_dir() or stat.S_IMODE(context.stat().st_mode) != 0o700:
+        raise ValueError("private source context required")
+    expected = source["files"]
+    directories = {str(parent) for name in expected for parent in Path(name).parents if str(parent) != "."}
+    seen = set()
+    for path in context.rglob("*"):
+        name = path.relative_to(context).as_posix()
+        current = path.lstat()
+        if stat.S_ISDIR(current.st_mode):
+            if name not in directories:
+                raise ValueError("unexpected context directory")
+            continue
+        if not stat.S_ISREG(current.st_mode) or name not in expected:
+            raise ValueError("unexpected or unsafe context member")
+        identity = expected[name]
+        if stat.S_IMODE(current.st_mode) != (0o755 if identity["mode"] == "100755" else 0o644):
+            raise ValueError("context file mode drift")
+        body = path.read_bytes()
+        oid = hashlib.sha1(b"blob " + str(len(body)).encode() + b"\0" + body).hexdigest()
+        if oid != identity["blob"] or (name in source["pins"] and hashlib.sha256(body).hexdigest() != source["pins"][name]):
+            raise ValueError("context byte identity drift")
+        seen.add(name)
+    if seen != set(expected):
+        raise ValueError("context member missing")
+
+
+def _migration_image_archive_context(archive, source, context):
+    context = Path(context)
+    if context.exists() or context.is_symlink():
+        raise ValueError("fresh context required")
+    expected = source["files"]
+    directories = {str(parent) for name in expected for parent in Path(name).parents if str(parent) != "."}
+    contents, seen = {}, set()
+    try:
+        with tarfile.open(fileobj=BytesIO(archive), mode="r:") as tar:
+            for member in tar:
+                name = member.name.rstrip("/") if member.isdir() else member.name
+                path = Path(name)
+                if (not name or path.is_absolute() or ".." in path.parts or path.as_posix() != name or name in seen):
+                    raise ValueError("unsafe or duplicate archive member")
+                seen.add(name)
+                if member.isdir():
+                    if name not in directories:
+                        raise ValueError("unexpected archive directory")
+                    continue
+                if not member.isfile() or name not in expected or member.mode & 0o7000:
+                    raise ValueError("nonregular or unexpected archive member")
+                identity = expected[name]
+                if bool(member.mode & 0o111) != (identity["mode"] == "100755"):
+                    raise ValueError("archive executable mode drift")
+                handle = tar.extractfile(member)
+                if handle is None:
+                    raise ValueError("missing archive bytes")
+                body = handle.read()
+                oid = hashlib.sha1(b"blob " + str(len(body)).encode() + b"\0" + body).hexdigest()
+                if oid != identity["blob"]:
+                    raise ValueError("archive blob identity drift")
+                contents[name] = body
+    except (tarfile.TarError, EOFError) as exc:
+        raise ValueError("invalid Git archive") from exc
+    if set(contents) != set(expected):
+        raise ValueError("archive member missing")
+    # No archive paths are materialized until the entire exact member set passes.
+    context.mkdir(mode=0o700)
+    for name, body in contents.items():
+        path = context / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("xb") as handle:
+            handle.write(body)
+        path.chmod(0o755 if expected[name]["mode"] == "100755" else 0o644)
+    _assert_migration_image_context(context, source)
+
+
+def _migration_image_id(raw):
+    if not isinstance(raw, str) or re.fullmatch(r"sha256:[0-9a-f]{64}\n?", raw) is None:
+        raise ValueError("one immutable image ID required")
+    return raw.removesuffix("\n")
+
+
+def _migration_image_values(image_id, inspected, runtime, expected_sha):
+    if (not isinstance(expected_sha, str) or re.fullmatch(r"[0-9a-f]{40}", expected_sha) is None
+            or expected_sha == "0" * 40):
+        raise ValueError("explicit expected source revision required")
+    if _migration_image_id(image_id) != image_id or not isinstance(inspected, dict) or inspected.get("Id") != image_id:
+        raise ValueError("inspect object must be the same immutable image ID")
+    config = inspected.get("Config")
+    if not isinstance(config, dict) or not isinstance(config.get("Labels"), dict) or not isinstance(config.get("Env"), list):
+        raise ValueError("missing image revision metadata")
+    environment = config["Env"]
+    if any(not isinstance(value, str) or "=" not in value for value in environment):
+        raise ValueError("malformed image environment")
+    releases = [value for value in environment if value.split("=", 1)[0] == "UMANEWS_RELEASE_COMMIT"]
+    if (config["Labels"].get("org.opencontainers.image.revision") != expected_sha
+            or releases != ["UMANEWS_RELEASE_COMMIT=" + expected_sha]
+            or not isinstance(runtime, dict)
+            or runtime.get("release_commit") != expected_sha
+            or runtime.get("marker_hex") != (expected_sha + "\n").encode().hex()):
+        raise ValueError("each image revision value must equal expected SHA")
+
+
+class MigrationImageRevisionPureTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.repo = Path(self.temp.name) / "repo"
+        self.repo.mkdir()
+        self.git("init", "-q")
+        for name, body in {"Dockerfile": b"FROM scratch\n", "requirements.txt": b"# controlled source\n", "audit.json": b'{"reviewed":true}\n', "server/data.py": b"value = 1\n"}.items():
+            path = self.repo / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(body)
+        self.git("add", ".")
+        self.git("-c", "user.name=Pure Fixture", "-c", "user.email=pure@example.invalid", "commit", "-qm", "controlled input")
+        self.sha = self.git("rev-parse", "HEAD").decode().strip()
+        self.reviewed = {"sha": self.sha, "tree": self.git("rev-parse", "HEAD^{tree}").decode().strip(), "pins": {name: hashlib.sha256((self.repo / name).read_bytes()).hexdigest() for name in ("Dockerfile", "requirements.txt", "audit.json")}}
+
+    def git(self, *args):
+        return subprocess.check_output(["git", "-C", str(self.repo), "-c", "core.hooksPath=/dev/null", *args], stderr=subprocess.PIPE)
+
+    def test_reviewed_source_normal_control_is_callable_and_accepted(self):
+        self.assertTrue(callable(_migration_image_source))
+        self.assertEqual(_migration_image_source(self.repo, self.sha, self.reviewed)["sha"], self.sha)
+
+    def test_other_valid_commit_is_rejected_against_reviewed_sha(self):
+        (self.repo / "server/data.py").write_text("value = 2\n")
+        self.git("add", ".")
+        self.git("-c", "user.name=Pure Fixture", "-c", "user.email=pure@example.invalid", "commit", "-qm", "wrong source")
+        wrong = self.git("rev-parse", "HEAD").decode().strip()
+        self.assertNotEqual(wrong, self.sha)
+        with self.assertRaises(ValueError):
+            _migration_image_source(self.repo, wrong, self.reviewed)
+
+    def image_values(self, revision=None):
+        revision = revision or self.sha
+        image_id = "sha256:" + "a" * 64
+        inspected = {"Id": image_id, "Config": {"Labels": {"org.opencontainers.image.revision": revision}, "Env": ["UMANEWS_RELEASE_COMMIT=" + revision]}}
+        runtime = {"release_commit": revision, "marker_hex": (revision + "\n").encode().hex()}
+        return image_id, inspected, runtime
+
+    def test_image_metadata_normal_control_is_callable_and_accepted(self):
+        self.assertTrue(callable(_migration_image_values))
+        self.assertIsNone(_migration_image_values(*self.image_values(), self.sha))
+
+    def test_all_image_revision_values_agree_on_wrong_sha_rejected(self):
+        wrong = "f" * 40 if self.sha != "f" * 40 else "e" * 40
+        with self.assertRaises(ValueError):
+            _migration_image_values(*self.image_values(wrong), self.sha)
+
+    def test_noncanonical_or_placeholder_source_rejected_before_git(self):
+        for value in (None, "", "unknown", "0" * 40, "A" * 40, self.sha + " ", self.sha[:8], "g" * 40, 1):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                _migration_image_source(self.repo, value, {**self.reviewed, "sha": value})
+
+    def test_missing_or_noncommit_source_object_rejected(self):
+        missing = "f" * 40
+        with self.assertRaises(ValueError):
+            _migration_image_source(self.repo, missing, {**self.reviewed, "sha": missing})
+        self.git("-c", "user.name=Pure Fixture", "-c", "user.email=pure@example.invalid", "tag", "-am", "not commit", "review-tag")
+        tag = self.git("rev-parse", "review-tag").decode().strip()
+        with self.assertRaises(ValueError):
+            _migration_image_source(self.repo, tag, {**self.reviewed, "sha": tag})
+
+    def test_declared_tree_and_each_input_pin_drift_rejected(self):
+        with self.assertRaises(ValueError):
+            _migration_image_source(self.repo, self.sha, {**self.reviewed, "tree": "0" * 40})
+        for name in self.reviewed["pins"]:
+            pins = {**self.reviewed["pins"], name: "0" * 64}
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                _migration_image_source(self.repo, self.sha, {**self.reviewed, "pins": pins})
+
+    def fixture_context(self):
+        temp = TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        context = Path(temp.name)
+        source = _migration_image_source(self.repo, self.sha, self.reviewed)
+        for name, identity in source["files"].items():
+            path = context / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(self.git("cat-file", "blob", identity["blob"]))
+            path.chmod(0o755 if identity["mode"] == "100755" else 0o644)
+        return context, source
+
+    def test_exact_context_normal_control_accepted(self):
+        context, source = self.fixture_context()
+        self.assertTrue(callable(_assert_migration_image_context))
+        self.assertIsNone(_assert_migration_image_context(context, source))
+
+    def test_correct_sha_does_not_allow_dirty_wrong_context(self):
+        context, source = self.fixture_context()
+        (context / "server/data.py").write_text("wrong tree despite correct arg\n")
+        with self.assertRaises(ValueError):
+            _assert_migration_image_context(context, source)
+
+    def test_context_extra_missing_mode_and_symlink_rejected(self):
+        for mutation in ("extra", "missing", "mode", "symlink"):
+            context, source = self.fixture_context()
+            path = context / "server/data.py"
+            if mutation == "extra":
+                (context / "iidfile").write_text("output must stay outside context\n")
+            elif mutation == "missing":
+                path.unlink()
+            elif mutation == "mode":
+                path.chmod(0o755)
+            else:
+                path.unlink()
+                path.symlink_to(self.repo / "server/data.py")
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                _assert_migration_image_context(context, source)
+
+    def test_fresh_reviewed_archive_populates_exact_members_despite_dirty_checkout(self):
+        source = _migration_image_source(self.repo, self.sha, self.reviewed)
+        (self.repo / "server/data.py").write_text("dirty source ignored\n")
+        (self.repo / "untracked.secret").write_text("excluded by Git object\n")
+        archive = self.git("archive", self.sha)
+        with TemporaryDirectory() as directory:
+            context = Path(directory) / "source"
+            self.assertTrue(callable(_migration_image_archive_context))
+            _migration_image_archive_context(archive, source, context)
+            self.assertEqual({p.relative_to(context).as_posix() for p in context.rglob("*") if p.is_file()}, set(source["files"]))
+            _assert_migration_image_context(context, source)
+            self.assertEqual((context / "server/data.py").read_bytes(), b"value = 1\n")
+
+    def archive_mutation(self, name, kind=None, duplicate=False, body=b"unexpected"):
+        output = BytesIO()
+        with tarfile.open(fileobj=output, mode="w") as tar:
+            member = tarfile.TarInfo(name)
+            member.mode = 0o644
+            member.size = len(body)
+            if kind is not None:
+                member.type = kind
+                member.linkname = "../outside"
+                member.size = 0
+            tar.addfile(member, BytesIO(body) if member.isfile() else None)
+            if duplicate:
+                tar.addfile(member, BytesIO(body))
+        return output.getvalue()
+
+    def test_archive_escape_symlink_duplicate_and_wrong_blob_rejected_without_writes(self):
+        source = _migration_image_source(self.repo, self.sha, self.reviewed)
+        cases = (("../outside", None, False), ("/absolute", None, False), ("server/data.py", tarfile.SYMTYPE, False), ("server/data.py", None, True), ("server/data.py", None, False))
+        for name, kind, duplicate in cases:
+            with self.subTest(name=name, kind=kind, duplicate=duplicate), TemporaryDirectory() as directory:
+                context = Path(directory) / "source"
+                with self.assertRaises(ValueError):
+                    _migration_image_archive_context(self.archive_mutation(name, kind, duplicate), source, context)
+                self.assertFalse(context.exists())
+                self.assertFalse((Path(directory) / "outside").exists())
+
+    def values_rejected(self, image_id, inspected, runtime):
+        try:
+            _migration_image_values(image_id, inspected, runtime, self.sha)
+        except ValueError:
+            return True
+        except Exception:
+            return False
+        return False
+
+    def test_immutable_image_id_malformed_missing_multiple_and_drift_rejected(self):
+        for value in (None, "", "tag:latest", "sha256:" + "a" * 63, "sha256:" + "g" * 64, "sha256:" + "a" * 64 + "\n\n"):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                _migration_image_id(value)
+        image_id, inspected, runtime = self.image_values()
+        inspected["Id"] = "sha256:" + "b" * 64
+        self.assertTrue(self.values_rejected(image_id, inspected, runtime))
+
+    def test_unrelated_config_env_allowed_and_duplicate_release_env_rejected(self):
+        image_id, inspected, runtime = self.image_values()
+        inspected["Config"]["Env"].append("PATH=/usr/bin")
+        accepted = True
+        try:
+            _migration_image_values(image_id, inspected, runtime, self.sha)
+        except ValueError:
+            accepted = False
+        self.assertTrue(accepted, "valid image Env may contain unrelated entries")
+        inspected["Config"]["Env"].append("UMANEWS_RELEASE_COMMIT=" + self.sha)
+        self.assertTrue(self.values_rejected(image_id, inspected, runtime))
+
+    def test_missing_or_malformed_inspect_payload_uses_contract_rejection(self):
+        image_id, inspected, runtime = self.image_values()
+        for bad in ({}, {"Id": image_id}, {"Id": image_id, "Config": None}, {"Id": image_id, "Config": {"Labels": {}, "Env": [1]}}):
+            with self.subTest(bad=bad):
+                self.assertTrue(self.values_rejected(image_id, bad, runtime))
+
+    def test_each_revision_value_independently_checked_and_marker_exact_bytes(self):
+        for field in ("label", "config_env", "runtime_env", "marker"):
+            for wrong in (None, "unknown", "0" * 40, "f" * 40):
+                image_id, inspected, runtime = self.image_values()
+                if field == "label":
+                    inspected["Config"]["Labels"]["org.opencontainers.image.revision"] = wrong
+                elif field == "config_env":
+                    inspected["Config"]["Env"] = [] if wrong is None else ["UMANEWS_RELEASE_COMMIT=" + wrong]
+                elif field == "runtime_env":
+                    runtime["release_commit"] = wrong
+                else:
+                    runtime["marker_hex"] = None if wrong is None else (wrong + "\n").encode().hex()
+                with self.subTest(field=field, wrong=wrong):
+                    self.assertTrue(self.values_rejected(image_id, inspected, runtime))
+        for marker in (self.sha, self.sha + "\n\n", " " + self.sha + "\n", self.sha + "\nother\n"):
+            image_id, inspected, runtime = self.image_values()
+            runtime["marker_hex"] = marker.encode().hex()
+            self.assertTrue(self.values_rejected(image_id, inspected, runtime))
+        image_id, inspected, runtime = self.image_values()
+        self.assertEqual(_migration_image_id(image_id + "\n"), image_id)
+        for invalid_expected in (None, "unknown", "0" * 40):
+            with self.assertRaises(ValueError):
+                _migration_image_values(image_id, inspected, runtime, invalid_expected)
+
+    def test_nonregular_git_member_and_nonprivate_context_rejected(self):
+        (self.repo / "link").symlink_to("server/data.py")
+        self.git("add", ".")
+        self.git("-c", "user.name=Pure Fixture", "-c", "user.email=pure@example.invalid", "commit", "-qm", "unsupported member")
+        sha = self.git("rev-parse", "HEAD").decode().strip()
+        reviewed = {**self.reviewed, "sha": sha, "tree": self.git("rev-parse", "HEAD^{tree}").decode().strip()}
+        with self.assertRaises(ValueError):
+            _migration_image_source(self.repo, sha, reviewed)
+        context, source = self.fixture_context()
+        context.chmod(0o755)
+        with self.assertRaises(ValueError):
+            _assert_migration_image_context(context, source)
+
+    def test_archive_late_unsafe_member_rejected_before_any_member_written(self):
+        source = _migration_image_source(self.repo, self.sha, self.reviewed)
+        output = BytesIO()
+        with tarfile.open(fileobj=output, mode="w") as tar:
+            for name, identity in source["files"].items():
+                body = self.git("cat-file", "blob", identity["blob"])
+                member = tarfile.TarInfo(name)
+                member.mode = 0o644
+                member.size = len(body)
+                tar.addfile(member, BytesIO(body))
+            unsafe = tarfile.TarInfo("../late-escape")
+            unsafe.size = 1
+            tar.addfile(unsafe, BytesIO(b"x"))
+        with TemporaryDirectory() as directory:
+            context = Path(directory) / "source"
+            with self.assertRaises(ValueError):
+                _migration_image_archive_context(output.getvalue(), source, context)
+            self.assertEqual(list(Path(directory).iterdir()), [])
+
+    def test_full_archive_one_blob_or_mode_drift_rejected_before_writes(self):
+        source = _migration_image_source(self.repo, self.sha, self.reviewed)
+        for mutation in ("bytes", "mode"):
+            output = BytesIO()
+            with tarfile.open(fileobj=output, mode="w") as tar:
+                for name, identity in source["files"].items():
+                    body = self.git("cat-file", "blob", identity["blob"])
+                    member = tarfile.TarInfo(name)
+                    member.mode = 0o644
+                    if name == "server/data.py":
+                        if mutation == "bytes":
+                            body = b"value = 999\n"
+                        else:
+                            member.mode = 0o755
+                    member.size = len(body)
+                    tar.addfile(member, BytesIO(body))
+            with TemporaryDirectory() as directory:
+                context = Path(directory) / "source"
+                with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                    _migration_image_archive_context(output.getvalue(), source, context)
+                self.assertFalse(context.exists())
+
+    def test_reviewed_executable_mode_preserved_in_fresh_archive(self):
+        script = self.repo / "run.sh"
+        script.write_bytes(b"#!/bin/sh\nexit 0\n")
+        script.chmod(0o755)
+        self.git("add", ".")
+        self.git("-c", "user.name=Pure Fixture", "-c", "user.email=pure@example.invalid", "commit", "-qm", "executable source")
+        sha = self.git("rev-parse", "HEAD").decode().strip()
+        reviewed = {**self.reviewed, "sha": sha, "tree": self.git("rev-parse", "HEAD^{tree}").decode().strip()}
+        source = _migration_image_source(self.repo, sha, reviewed)
+        with TemporaryDirectory() as directory:
+            context = Path(directory) / "source"
+            _migration_image_archive_context(self.git("archive", sha), source, context)
+            self.assertEqual(stat.S_IMODE((context / "run.sh").stat().st_mode), 0o755)
+            _assert_migration_image_context(context, source)
+
+
 @skipUnless(
     os.environ.get("RUN_MIGRATION_REPAIR_DOCKER_CONTRACT") == "true"
     and shutil.which("docker"),
@@ -1264,55 +1691,78 @@ class MigrationHistoryRepairArtifactRedTests(SimpleTestCase):
 )
 class MigrationHistoryRepairDockerImageContractTests(SimpleTestCase):
     def test_candidate_image_contains_only_the_exact_reviewed_audit_file(self):
-        tag = "umanews-migration-repair-audit-contract:local"
-        build = subprocess.run(
-            [
-                "docker",
-                "build",
-                "-t",
-                tag,
-                "--build-arg",
-                "UMANEWS_RELEASE_COMMIT=" + "0" * 40,
-                ".",
-            ],
-            cwd=ROOT,
-            text=True,
-            capture_output=True,
-            timeout=600,
-            check=False,
-        )
-        self.assertEqual(build.returncode, 0, build.stderr[-4000:])
-        code = (
-            "from pathlib import Path; import django; django.setup(); "
-            "from stable.services.historical_calendar_release_b_schema import "
-            "AUDIT_PATH, load_reviewed_production_audit; "
-            "expected=Path('/app/docs/changes/repair-production-migration-history/production_audit.json'); "
-            "assert AUDIT_PATH == expected; "
-            "files=sorted(str(p.relative_to('/app/docs')) for p in Path('/app/docs').rglob('*') if p.is_file()); "
-            "assert files == ['changes/repair-production-migration-history/production_audit.json'], files; "
-            "assert load_reviewed_production_audit()['database_identity_sha256'] == "
-            "'a986cc11149981c54e9d4915ad35e7c46e9382584d6670c8f950eceda26e471c'"
-        )
-        read = subprocess.run(
-            [
-                "docker",
-                "run",
-                "--rm",
-                "-e",
-                "DJANGO_SETTINGS_MODULE=app.settings",
-                "--entrypoint",
-                "python",
-                tag,
-                "-c",
-                code,
-            ],
-            cwd=ROOT,
-            text=True,
-            capture_output=True,
-            timeout=60,
-            check=False,
-        )
-        self.assertEqual(read.returncode, 0, read.stderr)
+        source = _migration_image_source(ROOT, _MIGRATION_IMAGE_SOURCE["sha"], _MIGRATION_IMAGE_SOURCE)
+        image_id = None
+        created_image = False
+        with TemporaryDirectory(prefix="migration-image-contract-") as directory:
+            private = Path(directory)
+            context = private / "source"
+            archive = subprocess.check_output(["git", "-C", str(ROOT), "archive", source["sha"]])
+            _migration_image_archive_context(archive, source, context)
+            iidfile = private / "image-id"
+            _assert_migration_image_context(context, source)
+            before = subprocess.run(
+                ["docker", "image", "ls", "--no-trunc", "--quiet"],
+                text=True, capture_output=True, timeout=60, check=False,
+            )
+            self.assertEqual(before.returncode, 0, before.stderr)
+            existing_ids = {_migration_image_id(value) for value in before.stdout.splitlines()}
+            try:
+                build = subprocess.run(
+                    ["docker", "build", "--iidfile", str(iidfile), "--build-arg",
+                     "UMANEWS_RELEASE_COMMIT=" + source["sha"], "."],
+                    cwd=context, text=True, capture_output=True, timeout=600, check=False,
+                )
+                self.assertEqual(build.returncode, 0, build.stderr[-4000:])
+                image_id = _migration_image_id(iidfile.read_text())
+                created_image = image_id not in existing_ids
+                _assert_migration_image_context(context, source)
+                inspect = subprocess.run(
+                    ["docker", "image", "inspect", image_id],
+                    text=True, capture_output=True, timeout=60, check=False,
+                )
+                self.assertEqual(inspect.returncode, 0, inspect.stderr)
+                inspected = json.loads(inspect.stdout)
+                self.assertIsInstance(inspected, list)
+                self.assertEqual(len(inspected), 1)
+                code = (
+                    "from pathlib import Path; import django; django.setup(); "
+                    "from stable.services.historical_calendar_release_b_schema import "
+                    "AUDIT_PATH, load_reviewed_production_audit; "
+                    "expected=Path('/app/docs/changes/repair-production-migration-history/production_audit.json'); "
+                    "assert AUDIT_PATH == expected; "
+                    "files=sorted(str(p.relative_to('/app/docs')) for p in Path('/app/docs').rglob('*') if p.is_file()); "
+                    "assert files == ['changes/repair-production-migration-history/production_audit.json'], files; "
+                    "assert load_reviewed_production_audit()['database_identity_sha256'] == "
+                    "'a986cc11149981c54e9d4915ad35e7c46e9382584d6670c8f950eceda26e471c'; "
+                    "import os,json,hashlib; "
+                    "assert hashlib.sha256(expected.read_bytes()).hexdigest() == "
+                    + repr(source["pins"]["docs/changes/repair-production-migration-history/production_audit.json"])
+                    + "; print(json.dumps({'release_commit':os.environ.get('UMANEWS_RELEASE_COMMIT'),"
+                    "'marker_hex':Path('/app/.umanews-release-commit').read_bytes().hex()}))"
+                )
+                read = subprocess.run(
+                    ["docker", "run", "--rm", "--network", "none", "-e",
+                     "DJANGO_SETTINGS_MODULE=app.settings", "--entrypoint", "python", image_id, "-c", code],
+                    text=True, capture_output=True, timeout=60, check=False,
+                )
+                self.assertEqual(read.returncode, 0, read.stderr)
+                _migration_image_values(image_id, inspected[0], json.loads(read.stdout), source["sha"])
+                _assert_migration_image_context(context, source)
+            finally:
+                if image_id is not None and created_image:
+                    cleanup = subprocess.run(
+                        ["docker", "image", "rm", image_id],
+                        text=True, capture_output=True, timeout=60, check=False,
+                    )
+                    self.assertEqual(cleanup.returncode, 0, cleanup.stderr)
+            print(json.dumps({
+                "reviewed_source_sha": source["sha"], "reviewed_source_tree": source["tree"],
+                "image_id": image_id, "oci_revision": inspected[0]["Config"]["Labels"]["org.opencontainers.image.revision"],
+                "runtime_revision": json.loads(read.stdout)["release_commit"],
+                "audit_sha256": source["pins"]["docs/changes/repair-production-migration-history/production_audit.json"],
+                "created_image_removed": created_image,
+            }, sort_keys=True))
 
 
 class MigrationHistoryRepairRestrictedRecoveryRedTests(SimpleTestCase):

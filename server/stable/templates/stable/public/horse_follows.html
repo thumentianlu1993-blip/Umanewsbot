@@ -7,7 +7,7 @@
     <section class="horse-search-hero"><span class="section-kicker">Following</span><h1>我的关注</h1></section>
     {% if follows %}
       <div class="followed-horses-row" aria-label="已关注马匹">
-        {% for follow in follows %}<span class="followed-horse-chip"><span class="star">★</span><a href="{{ follow.horse_profile.public_path }}">{{ follow.horse_profile.display_name }}</a><form method="post" action="{% url 'public-horse-follow' follow.horse_profile.id %}">{% csrf_token %}<input type="hidden" name="intent" value="unfollow"><input type="hidden" name="next" value="{% url 'public-horse-follows' %}"><button class="unfollow" type="submit">取消</button></form></span>{% endfor %}
+        {% for follow in follows %}<span class="followed-horse-chip"><span class="star">★</span><a href="{{ follow.horse_profile.public_path }}">{{ follow.horse_profile.display_name }}</a><form method="post" action="{% url 'public-horse-follow' follow.horse_profile.id %}">{% csrf_token %}<input type="hidden" name="intent" value="unfollow"><input type="hidden" name="next" value="{% url 'public-horse-follows' %}"><button class="unfollow" type="submit" aria-label="取消关注 {{ follow.horse_profile.display_name }}">取消</button></form></span>{% endfor %}
       </div>
       <section class="follow-feed" aria-label="关注新闻流">
         {% for entry in followed_entries %}{% include "stable/public/_article_card.html" with article=entry.article follow_entry=entry %}{% empty %}<p class="empty-state">已关注马匹暂时没有公开新闻。</p>{% endfor %}

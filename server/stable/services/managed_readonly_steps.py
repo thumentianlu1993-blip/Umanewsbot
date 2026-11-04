@@ -21,6 +21,8 @@ from django.utils import timezone
 from stable.models import ManagedReadonlyTaskBudget, ManagedReadonlyStep, NewsArticle
 from . import translation_recovery as recovery, translation_retry_budget as core
 from . import source_publication_receipt as publication
+from . import article_term_receipt as term_receipt
+from .term_capture_budget import TermCaptureRefusal
 
 WORKFLOW_VERSION = "managed-source-excerpt-v1"
 QUERY_VERSION = "source_excerpt_v1"
@@ -28,13 +30,14 @@ RESULT_VERSION = "readonly-result-v1"
 RECEIPT_VERSIONS = {
     1: (WORKFLOW_VERSION, QUERY_VERSION, RESULT_VERSION),
     2: ("managed-source-excerpt-v2", "source_excerpt_v2", "readonly-result-v2"),
+    3: ("managed-source-terms-v3", "source_terms_v3", "readonly-result-v3"),
 }
 
 
 def registered_versions(versions):
     if versions == RECEIPT_VERSIONS[1]:
         return versions == (WORKFLOW_VERSION, QUERY_VERSION, RESULT_VERSION)
-    return versions == RECEIPT_VERSIONS[2]
+    return versions in (RECEIPT_VERSIONS[2], RECEIPT_VERSIONS[3])
 
 
 LOGICAL_STEP = "source_excerpt:1"
@@ -141,6 +144,8 @@ def initialize_read_budget(*, tool_read_limit, baseline, now, receipt_version=1)
     if type(receipt_version) is not int or receipt_version not in RECEIPT_VERSIONS:
         raise ReadonlyRefusal("step_version_changed")
     versions = RECEIPT_VERSIONS[receipt_version]
+    if receipt_version == 3 and tool_read_limit != 1:
+        raise ReadonlyRefusal("readonly_baseline_unknown")
     if (type(tool_read_limit) is not int or tool_read_limit not in (0, 1, 2)
             or type(baseline) is not dict or baseline != {
                 "kind": "synthetic_no_prior_tool_reads", "operation_uuid": str(binding.identity.operation_uuid)}):
@@ -203,7 +208,7 @@ def _locked_context(binding, scope, envelope, now):
         raise ReadonlyRefusal("read_identity_changed")
     article, run, reason = recovery._locked_translation_claim(envelope.article_id, envelope.run_id,
         envelope.claimed_at, phase="executing", now=now,
-        defer_publication_evidence=(scope.result_version == RECEIPT_VERSIONS[2][2]))
+        defer_publication_evidence=(scope.result_version in (RECEIPT_VERSIONS[2][2], RECEIPT_VERSIONS[3][2])))
     if reason:
         raise ReadonlyRefusal(reason)
     claim = run.raw_response[recovery.CLAIM_KEY]
@@ -237,7 +242,7 @@ def _locked_context(binding, scope, envelope, now):
         "source_site": article.source_site, "source_article_id": article.source_article_id,
         "input_sha256": root.source_sha256, "deadline_at": deadline.isoformat(),
         "workflow_version": scope.workflow_version, "query_version": scope.query_version,
-        "result_version": scope.result_version, "permission_epoch": scope.permission_epoch}
+        "result_version": scope.result_version, "permission_epoch": scope.permission_epoch}, article
 
 
 def revoke_read_grant(root_pk):
@@ -252,13 +257,14 @@ def revoke_read_grant(root_pk):
 
 
 def _read_source_excerpt_once(envelope, params, expected):
+    started_at = timezone.now().isoformat()
     # 同一条有限SELECT返回用于digest的真实源字段和摘录材料，不能把另外一次hash贴给旧摘录。
     raw_body = models.Q(body_ja_normalized="") | models.Q(body_ja_normalized__isnull=True)
     body = models.Case(models.When(raw_body, then=models.F("body_ja_raw")), default=models.F("body_ja_normalized"))
     field = models.Case(models.When(raw_body, then=models.Value("body_ja_raw")), default=models.Value("body_ja_normalized"))
     annotations = {"_ro_title": Substr("title_ja", 1, 65537), "_ro_body": Substr(body, 1, 65537), "_ro_field": field}
     fields = ["pk", "source_site", "source_article_id", "source_language", "_ro_title", "_ro_body", "_ro_field"]
-    with_publication = expected["result_version"] == RECEIPT_VERSIONS[2][2]
+    with_publication = expected["result_version"] in (RECEIPT_VERSIONS[2][2], RECEIPT_VERSIONS[3][2])
     if with_publication:
         annotations["_ro_publication_evidence"] = Substr(
             Cast("published_at_evidence", output_field=models.TextField()), 1, publication.EVIDENCE_MAX_BYTES + 1)
@@ -266,7 +272,7 @@ def _read_source_excerpt_once(envelope, params, expected):
     row = NewsArticle.objects.filter(pk=envelope.article_id).annotate(**annotations).values(*fields).first()
     if row is None or len(row["_ro_title"]) > 65536 or len(row["_ro_body"]) > 65536:
         raise ReadonlyRefusal("read_source_missing_or_oversized")
-    snapshot = SimpleNamespace(source_site=row["source_site"], source_language=row["source_language"],
+    snapshot = SimpleNamespace(source_site=row["source_site"], source_article_id=row["source_article_id"], source_language=row["source_language"],
         title_ja=row["_ro_title"], body_ja_normalized=row["_ro_body"] if row["_ro_field"] == "body_ja_normalized" else "",
         body_ja_raw=row["_ro_body"])
     actual_sha = recovery.translation_input_sha256(snapshot)
@@ -283,8 +289,10 @@ def _read_source_excerpt_once(envelope, params, expected):
             result["publication"] = publication.from_projection(row["published_at"], row["published_at_verified"], row["_ro_publication_evidence"])
         except publication.PublicationReceiptInvalid as exc:
             raise ReadonlyRefusal(str(exc)) from exc
+    if expected["result_version"] == RECEIPT_VERSIONS[3][2]:
+        result["term_snapshot"] = term_receipt.capture(snapshot, envelope.article_id, actual_sha, started_at)
     if len(json.dumps(result, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()) > RESULT_MAX_BYTES:
-        raise ReadonlyRefusal("read_result_oversized")
+        raise ReadonlyRefusal("read_terms_limit" if expected["result_version"] == RECEIPT_VERSIONS[3][2] else "read_result_oversized")
     return result
 
 
@@ -402,12 +410,14 @@ def _step_identity(step, expected, params):
         raise ReadonlyRefusal("step_identity_changed")
 
 
-def _validated_result(step, expected, params):
+def _validated_result(step, expected, params, *, article=None):
     result = step.result
     fields = {"query_version", "result_version", "article_id", "run_id", "source_site", "source_article_id",
               "input_sha256", "title", "body_excerpt", "body_chars", "read_at", "step_uuid", "idempotency_sha256"}
-    if expected["result_version"] == RECEIPT_VERSIONS[2][2]:
+    if expected["result_version"] in (RECEIPT_VERSIONS[2][2], RECEIPT_VERSIONS[3][2]):
         fields.add("publication")
+    if expected["result_version"] == RECEIPT_VERSIONS[3][2]:
+        fields.add("term_snapshot")
     if type(result) is not dict or set(result) != fields:
         raise ReadonlyRefusal("step_result_invalid")
     if "publication" in fields:
@@ -425,6 +435,16 @@ def _validated_result(step, expected, params):
             or type(result["body_excerpt"]) is not str or len(result["body_excerpt"]) > params["body_chars"]
             or type(result["read_at"]) is not str or step.read_at is None or step.completed_at is None):
         raise ReadonlyRefusal("step_result_invalid")
+    if expected["result_version"] == RECEIPT_VERSIONS[3][2]:
+        try:
+            view = term_receipt.source_view(article, expected)
+            term_receipt.decode(result["term_snapshot"], view, expected["article_id"], expected["input_sha256"])
+            started = datetime.fromisoformat(result["term_snapshot"]["read_started_at"])
+            finished = datetime.fromisoformat(result["term_snapshot"]["read_finished_at"])
+            if not step.reserved_at <= started <= finished <= step.completed_at:
+                raise TermCaptureRefusal("read_terms_invalid")
+        except (TermCaptureRefusal, TypeError, ValueError, UnicodeError) as exc:
+            raise ReadonlyRefusal("step_result_invalid") from exc
     try:
         read_at = datetime.fromisoformat(result["read_at"])
         deadline = datetime.fromisoformat(expected["deadline_at"])
@@ -445,13 +465,15 @@ def _admit_step(envelope, params, now):
     binding, scope = _current_scope(now)
     _envelope_valid(envelope)
     with transaction.atomic():
-        root, expected = _locked_context(binding, scope, envelope, now)
+        root, expected, article = _locked_context(binding, scope, envelope, now)
+        if scope.result_version == RECEIPT_VERSIONS[3][2] and params != {"body_chars":256}:
+            raise ReadonlyRefusal("readonly_params_invalid")
         step = ManagedReadonlyStep.objects.select_for_update().filter(
             read_budget=root, logical_step_name=LOGICAL_STEP).first()
         if step is not None:
             _step_identity(step, expected, params)
             if step.state == "completed":
-                return ReadDecision(True, "step_cached", _validated_result(step, expected, params), True, step.step_uuid)
+                return ReadDecision(True, "step_cached", _validated_result(step, expected, params, article=article), True, step.step_uuid)
             # No timeout/exit can prove no read happened. Existing token is never transferred.
             return ReadDecision(False, "step_result_unknown", step_uuid=step.step_uuid)
         if root.tool_reads_reserved >= root.tool_read_limit:
@@ -484,7 +506,7 @@ def _read_permit_guard(envelope, params, expected, reservation):
             or reservation.root_pk != scope.root_pk or _identity_bytes(expected) != reservation.identity_json):
         raise ReadonlyRefusal("readonly_scope_mismatch")
     with transaction.atomic():
-        root, current = _locked_context(binding, scope, envelope, now)
+        root, current, article = _locked_context(binding, scope, envelope, now)
         step = ManagedReadonlyStep.objects.select_for_update().filter(
             pk=reservation.step_pk, read_budget=root, logical_step_name=LOGICAL_STEP).first()
         if (step is None or step.state != "inflight" or root.tool_reads_reserved < 1
@@ -504,7 +526,7 @@ def _finish_step(envelope, params, reservation, result, now):
             or reservation.root_pk != scope.root_pk):
         raise ReadonlyRefusal("readonly_scope_mismatch")
     with transaction.atomic():
-        root, expected = _locked_context(binding, scope, envelope, now)
+        root, expected, article = _locked_context(binding, scope, envelope, now)
         step = ManagedReadonlyStep.objects.select_for_update().filter(
             pk=reservation.step_pk, read_budget=root, logical_step_name=LOGICAL_STEP).first()
         if step is None:
@@ -523,8 +545,10 @@ def _finish_step(envelope, params, reservation, result, now):
             raise ReadonlyRefusal("step_result_invalid") from exc
         step.completed_at = core._actual_now(now)
         step.result = stored
+        if expected["result_version"] == RECEIPT_VERSIONS[3][2] and len(_json_bytes(stored)) > RESULT_MAX_BYTES:
+            raise ReadonlyRefusal("read_terms_limit")
         step.result_sha256 = _sha(stored)
-        validated = _validated_result(step, expected, params)
+        validated = _validated_result(step, expected, params, article=article)
         changed = models.QuerySet.update(ManagedReadonlyStep.objects.filter(pk=step.pk, state="inflight",
             reservation_token=reservation.token), state="completed", read_at=step.read_at,
             completed_at=step.completed_at, result=stored, result_sha256=step.result_sha256)
@@ -558,7 +582,7 @@ def execute_step(envelope, params, *, now):
         if reader.fault == "exit_after_commit":
             raise ReadFixtureExit("read exited after committed step result")
         return decision
-    except ReadonlyRefusal as exc:
+    except (ReadonlyRefusal, TermCaptureRefusal) as exc:
         return ReadDecision(False, str(exc))
     except TimeoutError:
         return ReadDecision(False, "step_result_unknown")
