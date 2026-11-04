@@ -1,0 +1,21 @@
+{
+  "source_commit": "835d4f644c5a5e8489433f2b6b33614af6fb842f",
+  "source_archive_sha256": "577e7cb5c6c4ec57dfcf417b2e7303c2340be24142388a1d3cfeef53b42c79f0",
+  "image": "sha256:66bbd4bd9fb88ccaeab4e7b55d0c869977e4225fe91918f595047e69a0f3a624",
+  "user": "10001:10001",
+  "network": "none",
+  "exit_code": 0,
+  "oom_killed": false,
+  "evidence_sha256": {
+    "pg.log": "36bba05754168c2d8bf0dac4029fc183c81bbbdc67b5ea9fd5a9b35456ddd7bf",
+    "pg-before.json": "8c51e0e85f1fbb5ca8491d2c19f60d9278c674f78407202b196316a1e75c289b",
+    "pg-after.json": "b9217f88cb91f06d9f974a71812d46a562867989d1e70e9d3abd2943335acb51",
+    "regression.json": "c30933756081f0ae1955b46bb736d16ba17a2f546e3edd672be71b0419a905db",
+    "benchmark.json": "f406f7420ef86b775672ccbb41bb68edffccb493a760ead0c6e7530ae35c0e79"
+  },
+  "controls_sha256": {
+    "benchmark.py": "b3a44ec4420bf6b1e43b347efc91e2ebe836cfa1d01bcf9207fec7afd1775eb7",
+    "run.sh": "c4bff2647683ad808bef190986b82d6acd24812a436ea85ec9fe0c34f92aa749",
+    "run-pg.py": "f95eadb4a9ec6c215cb5a1ddca8f069e70ffc1376b2c111d49b59411f60cbbc4"
+  }
+}

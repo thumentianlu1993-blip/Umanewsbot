@@ -1,8 +1,8 @@
 # 执行记录
 
-- [x] (operations) 核对当前生产开关、术语规模、索引及只读执行计划；无生产写入。
-- [x] (application) 新增200名称的紧凑无排序查询合同，旧实现真实RED。
-- [ ] (application) 补充匹配语义回归，实现数据库Upper批量IN查询。
-- [ ] (integration) 隔离PostgreSQL回归与旧/新SQL结果、计划、耗时对照。
-- [ ] (operations) 完成必要独立review、固定提交CI及目录外交付核验。
-- [ ] (operations) 形成精确交付包，按根AGENTS交付；尚未合并或发布。
+- [x] (operations) 核对生产只读计划和身份；无生产写入。
+- [x] (application) 查询合同真实RED；实现数据库Upper批量IN及语义回归。
+- [x] (integration) 主线固定源码隔离PostgreSQL 111项通过；旧新SQL结果等价与性能对照完成。
+- [ ] (integration) 窄生产候选专项回归及来源等价核验。
+- [ ] (operations) 最终固定提交独立review、完整CI及目录外交付核验；结果以PR交付收据为准。
+- [x] (operations) 固定候选与精确发布包已形成，尚未合并或发布。

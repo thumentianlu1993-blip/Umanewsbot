@@ -1,0 +1,28 @@
+{
+  "schema": "umanews.term-display-sql.release/v1",
+  "candidate_commit": "cf8f5cf3451fb55f39969b80596b0088fc7fbe33",
+  "candidate_tree": "b556cff12f42702b3a34ab5c878c4e24e8928bff",
+  "production_baseline_commit": "9def4a7be906a5e91d47ab5dd7ba888496f62b00",
+  "expected_application_image": "sha256:3724748524a1f03e2061c6f9fcffc467b9986582f8e72354877b5d62c466068e",
+  "expected_config_sha256": "c2815ad4f419e362caca584d97019c24faabdb0a05b1e77463974823b846472e",
+  "compose_project": "umanewsbot",
+  "schema_leaf": "stable.0079_multisource_race_enrollment",
+  "new_migrations": [],
+  "config_changes": {},
+  "production_data_actions": [],
+  "application_services": [
+    "web",
+    "worker",
+    "beat",
+    "race_sync_v2_worker"
+  ],
+  "release_entrypoint": "deploy/deploy_0079.sh",
+  "recovery": "same-intent resume; forward fix if completed; no ordinary rollback",
+  "prohibited_actions": [
+    "deploy whole main",
+    "change QQ flags or start OneBot",
+    "purge queues",
+    "enable automation",
+    "bulk data writes"
+  ]
+}
