@@ -17,6 +17,9 @@
             {% if profile.trainer_name %}<span>练马师：{{ profile.trainer_name }}</span>{% endif %}
             {% if major_wins %}<span>主胜鞍：{% for record in major_wins|slice:":3" %}{% race_field record "name" record.display_race_name %}{% if not forloop.last %} / {% endif %}{% endfor %}</span>{% endif %}
           </div>
+          {% if not is_following %}
+            <p class="muted">此关注仅作站内新闻聚合：可在“我的关注”浏览这匹马及两代内后代已收录的公开新闻。</p>
+          {% endif %}
         </div>
         <form method="post" action="{% url 'public-horse-follow' profile.id %}">
           {% csrf_token %}<input type="hidden" name="next" value="{{ public_detail_current_url }}">
@@ -32,6 +35,8 @@
       <section class="panel"><h2>基础资料</h2><div class="race-meta-grid">
         {% if profile.country %}<div><span>国家/地区</span><b>{{ profile.country }}</b></div>{% endif %}{% if profile.owner_name %}<div><span>马主</span><b>{{ profile.owner_name }}</b></div>{% endif %}{% if profile.trainer_name %}<div><span>练马师</span><b>{{ profile.trainer_name }}</b></div>{% endif %}{% if profile.breeder_name %}<div><span>生产牧场</span><b>{{ profile.breeder_name }}</b></div>{% endif %}
       </div>{% if profile.intro %}<p class="horse-intro">{{ profile.intro }}</p>{% endif %}</section>
+    {% else %}
+      <section class="panel"><h2>基础资料</h2><p class="muted">本栏暂无国家/地区、马主、练马师、生产牧场及简介资料。</p></section>
     {% endif %}
 
     {% if profile.sire_text or profile.dam_text or profile.sire_sire_text or profile.sire_dam_text or profile.dam_sire_text or profile.dam_dam_text %}

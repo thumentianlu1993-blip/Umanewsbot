@@ -32,13 +32,50 @@ class TemplateGlueIsolationTests(SimpleTestCase):
 
         loaded = list(cases(suite))
         self.assertTrue(loaded)
-        self.assertTrue(all(isinstance(case, adapter_tests.TemplateAdapterFirstRed)
-                            for case in loaded))
+        expected_classes = {
+            adapter_tests.TemplateAdapterFirstRed: 20,
+            adapter_tests.PublicProbeNavEnvelopeContractTests: 4,
+            adapter_tests.PublicProbeNavThreeStateCausalTests: 1,
+        }
+        self.assertEqual({type(case) for case in loaded}, set(expected_classes))
+        self.assertEqual(len(loaded), 25)
+        for case_type, count in expected_classes.items():
+            self.assertEqual(sum(type(case) is case_type for case in loaded), count)
+        for case in loaded:
+            self.assertEqual(type(case).__module__, 'stable.test_public_probe_template_adapter')
+            self.assertEqual(case.id().rsplit('.', 2)[-2], type(case).__name__)
         identifiers = [case.id() for case in loaded]
         self.assertEqual(len(identifiers), len(set(identifiers)))
-        self.assertTrue(all(ident.startswith(
-            'stable.test_public_probe_template_adapter.TemplateAdapterFirstRed.')
-            for ident in identifiers))
+        # 独立冻结的完整收集合同；不从 loaded 或模块发现结果构造 expected。
+        expected_ids = {
+            'stable.test_public_probe_template_adapter.TemplateAdapterFirstRed.test_behavioral_negative_matrix',
+            'stable.test_public_probe_template_adapter.TemplateAdapterFirstRed.test_first_positive_independent_expected',
+            'stable.test_public_probe_template_adapter.TemplateAdapterFirstRed.test_full_original_bytes_without_projection',
+            'stable.test_public_probe_template_adapter.TemplateAdapterFirstRed.test_full_template_legacy_without_projection',
+            'stable.test_public_probe_template_adapter.TemplateAdapterFirstRed.test_marker_close_and_script_injection_rejected',
+            'stable.test_public_probe_template_adapter.TemplateAdapterFirstRed.test_marker_duplicate_key_and_invalid_type',
+            'stable.test_public_probe_template_adapter.TemplateAdapterFirstRed.test_marker_script_safe_transport_equivalence',
+            'stable.test_public_probe_template_adapter.TemplateAdapterFirstRed.test_meta_all_seven_resource_boundaries',
+            'stable.test_public_probe_template_adapter.TemplateAdapterFirstRed.test_meta_expected_feedback_is_detected',
+            'stable.test_public_probe_template_adapter.TemplateAdapterFirstRed.test_meta_missing_fourth_row_is_detected',
+            'stable.test_public_probe_template_adapter.TemplateAdapterFirstRed.test_positive_and_missing_contract_matrix',
+            'stable.test_public_probe_template_adapter.TemplateAdapterFirstRed.test_private_budget_preserves_existing_DTO_guards',
+            'stable.test_public_probe_template_adapter.TemplateAdapterFirstRed.test_private_incremental_canonical_and_first_failure',
+            'stable.test_public_probe_template_adapter.TemplateAdapterFirstRed.test_private_input_fixed_resource_boundaries',
+            'stable.test_public_probe_template_adapter.TemplateAdapterFirstRed.test_private_power10_independent_oracle',
+            'stable.test_public_probe_template_adapter.TemplateAdapterFirstRed.test_private_square_independent_oracle',
+            'stable.test_public_probe_template_adapter.TemplateAdapterFirstRed.test_review_R01_scalar_nested_nodes_rejected',
+            'stable.test_public_probe_template_adapter.TemplateAdapterFirstRed.test_review_R01_scalar_outer_class_and_wrapper_controls',
+            'stable.test_public_probe_template_adapter.TemplateAdapterFirstRed.test_review_R02_medal_classes_bound_to_independent_DTO',
+            'stable.test_public_probe_template_adapter.TemplateAdapterFirstRed.test_supplementary_baseline_reason_isolation',
+            'stable.test_public_probe_template_adapter.PublicProbeNavEnvelopeContractTests.test_current_location_on_nonactive_link_is_rejected',
+            'stable.test_public_probe_template_adapter.PublicProbeNavEnvelopeContractTests.test_missing_current_location_is_rejected',
+            'stable.test_public_probe_template_adapter.PublicProbeNavEnvelopeContractTests.test_new_nav_current_location_is_verified',
+            'stable.test_public_probe_template_adapter.PublicProbeNavEnvelopeContractTests.test_wrong_current_location_value_is_rejected',
+            'stable.test_public_probe_template_adapter.PublicProbeNavThreeStateCausalTests.test_old_v6_new_v6_new_v7_causal_control',
+        }
+        self.assertEqual(len(expected_ids), 25)
+        self.assertEqual(set(identifiers), expected_ids)
         self.assertIn('stable.test_public_probe_template_adapter.'
                       'TemplateAdapterFirstRed.test_full_original_bytes_without_projection',
                       identifiers)

@@ -29,7 +29,7 @@ def fixture_bytes(name):
 def approved_cases():
     # Original C020 bytes remain pinned; derived bytes are fixed by the execution manifest.
     fixture_bytes('golden.json')
-    return json.loads((FIXTURES.parent / 'public_probe_template_v6/golden-derived.json').read_bytes())
+    return json.loads((FIXTURES.parent / 'public_probe_template_v7/golden-derived.json').read_bytes())
 
 
 def typed_context(value, key=None):
@@ -95,8 +95,8 @@ def adapter_inputs(document, case):
         'expected': deepcopy(case['expected']),
         'anchor': deepcopy(case['anchor']),
         'now': '2026-10-04T00:02:02Z',
-        'envelope_contract': (FIXTURES.parent / 'public_probe_template_v6/envelope.json').read_bytes(),
-        'schema_contract': (FIXTURES.parent / 'public_probe_template_v6/contract.json').read_bytes(),
+        'envelope_contract': (FIXTURES.parent / 'public_probe_template_v7/envelope.json').read_bytes(),
+        'schema_contract': (FIXTURES.parent / 'public_probe_template_v7/contract.json').read_bytes(),
         'evidence_documents': json.dumps(evidence, ensure_ascii=False, sort_keys=True,
                                           separators=(',', ':'), allow_nan=False).encode('utf-8'),
     }
