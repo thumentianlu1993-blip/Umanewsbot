@@ -10,6 +10,119 @@ from stable.services.race_information_display import prepare_context, row_fields
 from stable.services.race_term_display import RaceTermResolver
 
 
+class StrictTermQueryCostTests(TestCase):
+    """批量专名解析的查询形状和身份语义必须同时保持。"""
+
+    def test_two_compact_unsorted_queries_for_200_distinct_names(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        resolver = RaceTermResolver(mode='strict_display_v1').strict
+        for i in range(200):
+            resolver.add(f'Lookup Horse {i}', 'horse', 'japan', 'en')
+        with CaptureQueriesContext(connection) as queries:
+            resolver.resolve()
+
+        self.assertEqual(len(queries), 2)
+        for query in queries:
+            sql = query['sql'].upper()
+            self.assertNotIn(' OR ', sql)
+            self.assertNotIn(' ORDER BY ', sql)
+        self.assertEqual(resolver.field('Lookup Horse 199', 'horse', 'japan', 'en').text,
+                         'Lookup Horse 199')
+
+    def test_conflicts_scope_and_untranslated_local_terms_keep_their_meaning(self):
+        def entry(name, target, **kwargs):
+            return TermEntry.objects.create(
+                source_ja=name, target_zh=target,
+                **{'term_type': 'horse', 'source_language': 'en',
+                   'racing_region': 'japan', **kwargs})
+
+        entry('Shared', '全局译名', racing_region='', priority=100)
+        entry('SHARED', '本地译名', priority=-100)
+        entry('Conflict', '甲')
+        other = entry('Other', '乙', priority=200)
+        TermAlias.objects.create(term=other, text='CONFLICT', source_language='en')
+        same = entry('Alias Horse', '同一匹马')
+        TermAlias.objects.create(term=same, text='ALIAS HORSE', source_language='en')
+        TermAlias.objects.create(term=same, text='Nickname', source_language='ja')
+        entry('Blank', '全局有译名', racing_region='')
+        entry('BLANK', '')
+        inactive = entry('Inactive', '不应显示', is_active=False)
+        TermAlias.objects.create(term=inactive, text='Inactive Alias', source_language='en')
+        TermAlias.objects.create(term=same, text='Disabled Alias', source_language='en', is_active=False)
+        cases = [
+            (('Shared', 'horse', 'japan', 'en'), '本地译名', 'formal_term'),
+            (('Shared', 'horse', 'france', 'en'), '全局译名', 'formal_term'),
+            (('Shared', 'horse', 'japan', 'ja'), 'Shared', 'term_missing'),
+            (('Conflict', 'horse', 'japan', 'en'), 'Conflict', 'term_conflict'),
+            (('Alias Horse', 'horse', 'japan', 'en'), '同一匹马', 'formal_term'),
+            (('Nickname', 'horse', 'japan', 'ja'), '同一匹马', 'formal_term'),
+            (('Nickname', 'horse', 'japan', 'en'), 'Nickname', 'term_missing'),
+            (('Nickname', 'race', 'japan', 'ja'), 'Nickname', 'term_missing'),
+            (('Blank', 'horse', 'japan', 'en'), 'Blank', 'untranslated_term'),
+            (('Inactive', 'horse', 'japan', 'en'), 'Inactive', 'term_missing'),
+            (('Inactive Alias', 'horse', 'japan', 'en'), 'Inactive Alias', 'term_missing'),
+            (('Disabled Alias', 'horse', 'japan', 'en'), 'Disabled Alias', 'term_missing'),
+        ]
+        resolver = RaceTermResolver(mode='strict_display_v1').strict
+        for args, _, _ in cases:
+            resolver.add(*args)
+        with self.assertNumQueries(4):
+            resolver.resolve()
+        for args, text, reason in cases:
+            with self.subTest(args=args):
+                field = resolver.field(*args)
+                self.assertEqual((field.text, field.reason_code), (text, reason))
+
+    def test_existing_normalization_recall_is_not_expanded_or_reduced(self):
+        for name, target in [('Full Width', '全角输入'), ('Space Horse', '空白输入'),
+                             ('Ｗｉｄｅ Only', '不应扩大召回'), ('Double  Space', '不应压缩存储值')]:
+            TermEntry.objects.create(term_type='horse', source_ja=name, target_zh=target,
+                                     racing_region='japan', source_language='en')
+        cases = [('Ｆｕｌｌ　Ｗｉｄｔｈ', '全角输入'), ('  Space  Horse \t', '空白输入'),
+                 ('Wide Only', 'Wide Only'), ('Double Space', 'Double Space')]
+        resolver = RaceTermResolver(mode='strict_display_v1').strict
+        for name, _ in cases:
+            resolver.add(name, 'horse', 'japan', 'en')
+        resolver.resolve()
+        for name, expected in cases:
+            self.assertEqual(resolver.field(name, 'horse', 'japan', 'en').text, expected)
+
+    def test_unicode_and_literal_characters_match_database_iexact_contract(self):
+        import unicodedata
+        from django.db.models import Q
+        from stable.services.race_term_display import display_identity
+
+        pairs = [('Straße', 'straße'), ('Straße', 'STRASSE'), ('İzmir', 'izmir'),
+                 ('Istanbul', 'ıstanbul'), ('Σίγμα', 'σίγμα'), ('CAFÉ', 'café'),
+                 ('Kelvin', 'Kelvin'), ("O'BRIEN_%\\", "o'brien_%\\")]
+        for alias in (False, True):
+            for i, (stored, requested) in enumerate(pairs):
+                prefix = f'Case {alias} {i} '
+                name, query_name = prefix + stored, prefix + requested
+                target = f'译名{i}'
+                term = TermEntry.objects.create(
+                    term_type='horse', source_ja=prefix + 'Unused' if alias else name,
+                    target_zh=target, source_language='en', racing_region='japan')
+                if alias:
+                    TermAlias.objects.create(term=term, text=name, source_language='en')
+                # 用旧数据库iexact语义作参考，避免Python大小写规则替代数据库规则。
+                variants = {query_name.strip(), ' '.join(unicodedata.normalize('NFKC', query_name).split())}
+                old_query = Q(pk__in=[])
+                field_name = 'text' if alias else 'source_ja'
+                for variant in variants:
+                    old_query |= Q(**{field_name + '__iexact': variant})
+                model = TermAlias if alias else TermEntry
+                matched = model.objects.filter(old_query).exists()
+                expected = target if matched and display_identity(name) == display_identity(query_name) else query_name
+                resolver = RaceTermResolver(mode='strict_display_v1').strict
+                resolver.add(query_name, 'horse', 'japan', 'en')
+                resolver.resolve()
+                with self.subTest(alias=alias, requested=query_name):
+                    self.assertEqual(resolver.field(query_name, 'horse', 'japan', 'en').text, expected)
+
+
 @override_settings(RACE_INFORMATION_NORMALIZED_DISPLAY_ENABLED=True)
 class DisplayPageTests(TestCase):
     def setUp(self):
