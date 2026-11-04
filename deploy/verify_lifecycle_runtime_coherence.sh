@@ -3,6 +3,8 @@
 # requires both legacy and registry trust roots to be empty in every resident.
 set -eu
 
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd -P)"
+
 fail() {
   echo "lifecycle runtime coherence: $*" >&2
   exit 1
@@ -85,7 +87,8 @@ snapshot="$(mktemp "${TMPDIR:-/tmp}/umanews-lifecycle-census.XXXXXX")" || fail "
 trap 'rm -f "$snapshot"' EXIT HUP INT TERM
 
 # Format labels in the host-wide running set.  Do not scope this to a Compose
-# project: an old checkout is precisely what this check must detect.
+# project: an old checkout is precisely what this check must detect. Foreign
+# residents are excluded only after read-only ownership/isolation proof.
 docker ps --filter label=com.docker.compose.service \
   --format '{{.ID}}|{{.Label "com.docker.compose.service"}}|{{.Label "com.docker.compose.project"}}|{{.Label "com.docker.compose.oneoff"}}|{{.Label "com.docker.compose.project.working_dir"}}' \
   > "$snapshot" || fail "docker ps census failed"
@@ -100,6 +103,15 @@ check_service() {
     [ -n "$cid" ] || fail "$service census returned an empty container ID"
     case "$cid" in -*|*[!A-Za-z0-9_.-]*) fail "$service census returned an invalid container ID" ;; esac
     case "$row_oneoff" in True|true) fail "running $service one-off exists ($cid)" ;; False|false) ;; *) fail "$service has an invalid one-off label" ;; esac
+    if [ "$row_project" != "$EXPECTED_COMPOSE_PROJECT" ]; then
+      python3 "$SCRIPT_DIR/verify_unrelated_lifecycle_service.py" \
+        --snapshot "$snapshot" --container-id "$cid" \
+        --expected-project "$EXPECTED_COMPOSE_PROJECT" \
+        --expected-release-dir "$EXPECTED_RELEASE_DIR" \
+        --expected-image-id "$EXPECTED_IMAGE_ID" >/dev/null \
+        || fail "$service belongs to an unproven foreign Compose project"
+      continue
+    fi
     count=$((count + 1))
     selected="$cid"
     [ "$row_project" = "$EXPECTED_COMPOSE_PROJECT" ] || fail "$service belongs to an unexpected Compose project"
@@ -107,7 +119,7 @@ check_service() {
   done < "$snapshot"
 
   if [ "$expected" = "absent" ]; then
-    [ "$count" -eq 0 ] || fail "Beat must be stopped host-wide"
+    [ "$count" -eq 0 ] || fail "Umanews Beat must be stopped host-wide"
     return 0
   fi
   [ "$count" -eq 1 ] || fail "$service must have exactly one running resident container"
