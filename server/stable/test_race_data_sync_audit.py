@@ -109,7 +109,7 @@ class RaceDataSyncAuditCommandTests(TestCase):
                 "result",
             ),
             RACE_LIVE_TRA_REGISTRY_SHA256=(
-                "0e1cdff89052b7b5f482b4761f1e39e3f38eefdf30405ae6a5d45b64e737b322"
+                "53962c4220c35523ea77ca27e674970bfb555e48e7b6bf86b0472e05cfed1735"
             ),
             RACE_DATA_SYNC_REFERENCE_REGISTRY_SHA256=(
                 "740a93774927765f9c848cc97e4b87b78ab36d473c4c3e2e644d56a6f856cff2"
@@ -119,7 +119,7 @@ class RaceDataSyncAuditCommandTests(TestCase):
             ),
             RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256=(
                 # 阶段 3c：ireland 一等化新增 1 条 TRA 路线（13->14），digest 轮换属发布包钉扎事项
-                "e73a4e3b556cf1670caed6ca0cae46e5c01dbe711c74712a8fbe9c3fc527d679"
+                "4d00fdef5b515b5777f1a5d306c86911ffa2afe15a6ba1eafebcd25180ea04ab"
             ),
             RACE_DATA_RAW_MAX_COMPRESSED_BYTES=2 * 1024 * 1024,
             RACE_DATA_RAW_MAX_UNCOMPRESSED_BYTES=8 * 1024 * 1024,

@@ -2896,6 +2896,30 @@ class RaceLiveTheRacingApiFreeRunnerTests(TestCase):
         )
         return hashlib.sha256(self.registry_path.read_bytes()).hexdigest()
 
+    def _write_registry_v3(self):
+        RaceLiveTheRacingApiFreeRunnerTests._write_registry_v2(self)
+        payload = json.loads(self.registry_path.read_text())
+        payload["schema_version"] = 3
+        payload["evidence"].update(
+            verified_at=(self.NOW-timedelta(days=40)).isoformat(),
+            permission_valid_until=payload["valid_until"],
+            authorization_reference="confirmed-scope-renewal-test",
+        )
+        self.registry_path.write_text(json.dumps(payload))
+        return hashlib.sha256(self.registry_path.read_bytes()).hexdigest()
+
+    def test_v3_results_finds_target_beyond_first_page_after_31_days(self):
+        pages = self._full_results_page
+        with patch.object(self, "_write_registry_v2", self._write_registry_v3), patch.object(
+            self, "_full_results_page",
+            side_effect=lambda skip, count, include_target: pages(skip=skip, count=count, include_target=skip==50),
+        ):
+            self.test_v2_results_runner_fetches_all_pages_and_uses_region_route()
+
+    def test_v3_pre_off_refresh_retains_region_snapshot_after_31_days(self):
+        with patch.object(self, "_write_registry_v2", self._write_registry_v3):
+            self.test_v2_pre_off_runner_refreshes_racecard_through_region_snapshot()
+
     def _response_payload(self, *, race_id="race-live-1"):
         return {
             "results": [

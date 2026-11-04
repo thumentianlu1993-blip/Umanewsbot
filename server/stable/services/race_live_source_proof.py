@@ -170,9 +170,9 @@ def _read_registry_contract(
         schema_version == 1
         and set(registry) != required_v1
     ) or (
-        schema_version == 2
+        schema_version in {2, 3}
         and set(registry) != required_v2
-    ) or schema_version not in {1, 2}:
+    ) or schema_version not in {1, 2, 3} or type(schema_version) is not int:
         raise ValueError("source registry keys do not match the proof contract")
     if registry["source_key"] != "the_racing_api" or registry["host"] != _HOST:
         raise PermissionError("source registry identity is not approved")
@@ -197,6 +197,8 @@ def _read_registry_contract(
         "verified_at",
         "authorization_basis",
     }
+    if schema_version == 3:
+        expected_evidence_keys |= {"permission_valid_until", "authorization_reference"}
     if not isinstance(evidence, dict) or set(evidence) != expected_evidence_keys:
         raise ValueError("source registry evidence does not match the proof contract")
     if (
@@ -219,7 +221,21 @@ def _read_registry_contract(
         raise ValueError("source registry evidence timestamp must be timezone-aware")
     if evidence_verified_at > now:
         raise PermissionError("source registry evidence timestamp is in the future")
-    if now - evidence_verified_at > timedelta(days=31):
+    if schema_version == 3:
+        if evidence["authorization_basis"] != "user_confirmed_automation_permission":
+            raise PermissionError("explicit permission requires user confirmation")
+        reference = evidence["authorization_reference"]
+        if not isinstance(reference, str) or not reference.strip() or len(reference) > 500:
+            raise ValueError("authorization reference is required and bounded")
+        try:
+            permission_until = datetime.fromisoformat(evidence["permission_valid_until"])
+        except (TypeError, ValueError) as exc:
+            raise ValueError("permission expiry is invalid") from exc
+        if permission_until.tzinfo is None:
+            raise ValueError("permission expiry must be timezone-aware")
+        if permission_until <= evidence_verified_at or valid_until > permission_until or now >= permission_until:
+            raise PermissionError("explicit permission has expired or registry exceeds permission")
+    elif now - evidence_verified_at > timedelta(days=31):
         raise PermissionError("source registry evidence is stale")
     registry_budget = registry["max_requests"]
     if (
@@ -262,7 +278,7 @@ def build_the_racing_api_route_url(
     """Build one canonical URL from the reviewed registry v2 contract."""
     if (
         not isinstance(registry, dict)
-        or registry.get("schema_version") != 2
+        or registry.get("schema_version") not in {2, 3}
         or registry.get("source_key") != "the_racing_api"
         or registry.get("host") != _HOST
         or registry.get("allowed_region_codes") != _REGION_CODES
