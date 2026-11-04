@@ -162,6 +162,19 @@ probe_worker_node() {
   printf '%s\n' "$node"
 }
 
+probe_initial_beat_running() {
+  beat_cid="$(compose_mutation ps -a -q beat)" || return 1
+  if [ -z "$beat_cid" ]; then printf 'false\n'; return 0; fi
+  case "$beat_cid" in *[!A-Za-z0-9_.-]*) return 1 ;; esac
+  beat_state="$(docker inspect --format '{{.State.Running}} {{.State.Restarting}}' "$beat_cid")" || return 1
+  case "$beat_state" in
+    'true false') printf 'true\n' ;;
+    'false false') printf 'false\n' ;;
+    *) return 1 ;;
+  esac
+}
+
+initial_beat_running=unknown
 lock_held=0
 completed=0
 quiesced=0
@@ -202,9 +215,18 @@ on_exit() {
   if [ "$status" -ne 0 ] && [ "$lock_held" -eq 1 ] && [ "$recovery_required" -eq 1 ]; then
     recover_off || status=1
   elif [ "$status" -ne 0 ] && [ "$lock_held" -eq 1 ] && [ "$quiesced" -eq 1 ]; then
-    # No backup-protected database/env mutation has begun. Restore the
-    # previously running scheduler/consumer without touching lifecycle roots.
-    if ! compose_mutation up -d --no-deps worker beat >/dev/null 2>&1; then
+    # Preserve the admitted scheduler state before any backup-protected write.
+    # A stopped scheduler must not be started by an unsuccessful promotion.
+    restore_rc=0
+    case "$initial_beat_running" in
+      true) compose_mutation up -d --no-deps worker beat >/dev/null 2>&1 || restore_rc=1 ;;
+      false)
+        compose_mutation up -d --no-deps worker >/dev/null 2>&1 || restore_rc=1
+        if [ "$restore_rc" -eq 0 ]; then verify_off || restore_rc=1; fi
+        ;;
+      *) restore_rc=1 ;;
+    esac
+    if [ "$restore_rc" -ne 0 ]; then
       status=1
       keep_lock=1
       compose_mutation stop beat worker >/dev/null 2>&1 || true
@@ -235,6 +257,7 @@ trap 'exit 143' TERM
 # Quiesce the only lifecycle scheduler/consumer before taking the rollback
 # snapshot.  A successful backup must therefore remain stable until promotion.
 worker_node="$(probe_worker_node)" || fail "worker admission probe failed"
+initial_beat_running="$(probe_initial_beat_running)" || fail "Beat admission probe failed"
 quiesced=1
 compose_mutation stop beat
 COMPOSE_FILE="$COMPOSE_FILE" EXPECTED_CELERY_WORKERS="$worker_node" \
