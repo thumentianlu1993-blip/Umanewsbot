@@ -160,7 +160,10 @@ class LifecycleCensusOwnershipTests(SimpleTestCase):
                 self.assert_safe_output(result,h)
 
     def test_docker_socket_parent_and_symlink_alias_fail_closed(self):
-        for source in ('/var/run','/run','/var','/'):
+        # Linux /var/run resolves to /run; /var is not its socket ancestor.
+        # Exercise the actual grandparent on both Linux and macOS.
+        grandparent = str(Path('/var/run/docker.sock').resolve().parent.parent)
+        for source in sorted({'/var/run', '/run', grandparent, '/'}):
             with self.subTest(source=source),TemporaryDirectory() as tmp:
                 h=OwnershipHarness(Path(tmp));h.foreign['Mounts'][0]['Source']=source
                 h.add_foreign();result=h.run()
