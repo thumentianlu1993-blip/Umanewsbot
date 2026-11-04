@@ -117,6 +117,7 @@
     "deploy/verify_persistent_release_mounts.sh",
     "deploy/verify_rollback_control_state.py",
     "deploy/verify_rollback_target_migration.py",
+    "deploy/verify_unrelated_lifecycle_service.py",
     "deploy/wait_for_celery_drain.sh",
     "deploy/wait_for_compose_service_healthy.sh",
     "deploy_lowcost.sh",

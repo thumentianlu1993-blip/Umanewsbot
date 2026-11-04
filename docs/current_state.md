@@ -1,3 +1,7 @@
+## 2026-11-04 PR275 应用已发布，生命周期续期遇到跨项目 census 阻断
+
+PR275 已合并4f63ef3e，固定窄候选ab5775f6已上线；四服务的TRA v3及两项摘要已核验，schema仍0079。授权promotion在写registry前因wechat-summary同名worker误阻断，保护机制将lifecycle保持false/off并停止普通worker/Beat；网页正常，generation3未创建。用户已批准按应用所有权证明排除无关项目，修复在独立分支准备；未对微信摘要服务作任何操作。见[修复范围](changes/lifecycle-census-ownership-20261104/spec.md)与[恢复包准备](changes/lifecycle-census-ownership-20261104/rollout.md)。
+
 ## 2026-11-04 生命周期与TRA授权续期候选（未发布）
 
 用户确认现有范围持续有效至北京时间2027/12/31。候选实现显式到期合同，生命周期仍仅956；TRA保持原地区/接口/预算。已完成真实RED、候选150项回归、82项隔离PG及独立review返修复审；主线CI/交付与生产状态分别核验，不以候选通过代替上线。见[发布包](changes/authorization-renewal-20261104/rollout.md)、[验证](changes/authorization-renewal-20261104/validation.md)。
