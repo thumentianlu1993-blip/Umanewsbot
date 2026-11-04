@@ -60,6 +60,9 @@ class OwnershipHarness(CoherenceHarness):
         _write_executable(self.bin/'docker',JSON_DOCKER)
         for service,cid in self.services.items():
             self.write_container(metadata(cid,service))
+        (self.state/'image-sha256:good').write_text(json.dumps([{
+            'Id': 'sha256:good', 'Config': {'Labels': {
+                'org.opencontainers.image.revision': 'a'*40}, 'Env': []}}]))
         self.foreign=metadata('cid-foreign','worker',foreign=True)
         self.foreign_image={
             'Id':'sha256:foreign','RepoTags':['foreign-app:latest'],
@@ -92,6 +95,87 @@ class LifecycleCensusOwnershipTests(SimpleTestCase):
                 self.assertEqual(result.returncode,0,result.stderr)
                 self.assert_safe_output(result,h)
 
+    def test_isolated_foreign_oci_revision_is_not_an_application_identity(self):
+        for service in ('web', 'worker', 'beat'):
+            with self.subTest(service=service), TemporaryDirectory() as tmp:
+                h = OwnershipHarness(Path(tmp))
+                for config in (h.foreign['Config'], h.foreign_image['Config']):
+                    config['Labels']['org.opencontainers.image.revision'] = 'b' * 40
+                h.add_foreign(service=service)
+                result = h.run()
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assert_safe_output(result, h)
+
+    def test_foreign_revision_drift_or_malformed_metadata_fails_closed(self):
+        for container_revision, image_revision in [('b'*40, 'c'*40), ('b'*40, ''),
+                ('', 'b'*40), (None, None), (123, 123), ('bad\nrevision', 'bad\nrevision')]:
+            with self.subTest(container_revision=container_revision), TemporaryDirectory() as tmp:
+                h = OwnershipHarness(Path(tmp))
+                h.foreign['Config']['Labels']['org.opencontainers.image.revision'] = container_revision
+                h.foreign_image['Config']['Labels']['org.opencontainers.image.revision'] = image_revision
+                h.add_foreign(); result = h.run()
+                self.assertNotEqual(result.returncode, 0)
+                self.assert_safe_output(result, h)
+
+    def test_revision_of_stopped_application_service_is_not_foreign(self):
+        with TemporaryDirectory() as tmp:
+            h = OwnershipHarness(Path(tmp))
+            # 停止的旧 Beat 仍属于本项目的受保护身份集合。
+            dep = metadata('cid-old', 'race_live_worker')
+            dep['State']['Running'] = False
+            dep['Config']['Labels']['org.opencontainers.image.revision'] = 'c'*40
+            h.write_container(dep)
+            (h.state/'resource-ps').write_text((h.state/'ps').read_text() +
+                'cid-old|race_live_worker|umanews|False|/srv/release\n')
+            for config in (h.foreign['Config'], h.foreign_image['Config']):
+                config['Labels']['org.opencontainers.image.revision'] = 'c'*40
+            h.add_foreign(); result = h.run()
+            self.assertNotEqual(result.returncode, 0)
+            self.assert_safe_output(result, h)
+
+    def test_stopped_application_image_revision_survives_container_label_override(self):
+        with TemporaryDirectory() as tmp:
+            h = OwnershipHarness(Path(tmp))
+            dep = metadata('cid-old', 'race_live_worker')
+            dep['State']['Running'] = False
+            dep['Image'] = 'sha256:old'
+            dep['Config']['Labels'].pop('org.opencontainers.image.revision')
+            h.write_container(dep)
+            (h.state/'resource-ps').write_text((h.state/'ps').read_text() +
+                'cid-old|race_live_worker|umanews|False|/srv/release\n')
+            (h.state/'image-sha256:old').write_text(json.dumps([{
+                'Id': 'sha256:old', 'Config': {'Labels': {
+                    'org.opencontainers.image.revision': 'c'*40}, 'Env': []}}]))
+            for config in (h.foreign['Config'], h.foreign_image['Config']):
+                config['Labels']['org.opencontainers.image.revision'] = 'c'*40
+            h.add_foreign(); result = h.run()
+            self.assertNotEqual(result.returncode, 0)
+            self.assert_safe_output(result, h)
+
+    def test_application_image_inspection_is_required_bound_and_cached(self):
+        for mutation in ('missing', 'identity', 'config', 'revision', 'none'):
+            with self.subTest(mutation=mutation), TemporaryDirectory() as tmp:
+                h = OwnershipHarness(Path(tmp)); image = h.state/'image-sha256:good'
+                data = json.loads(image.read_text())
+                if mutation == 'missing':
+                    image.unlink()
+                elif mutation == 'identity':
+                    data[0]['Id'] = 'sha256:other'
+                elif mutation == 'config':
+                    del data[0]['Config']['Env']
+                elif mutation == 'revision':
+                    data[0]['Config']['Labels']['org.opencontainers.image.revision'] = 123
+                if mutation != 'missing':
+                    image.write_text(json.dumps(data))
+                h.add_foreign(); result = h.run()
+                if mutation == 'none':
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(h.log.read_text().splitlines().count(
+                        'image inspect sha256:good'), 1)  # 三个容器共享镜像，仅检查一次。
+                else:
+                    self.assertNotEqual(result.returncode, 0)
+                self.assert_safe_output(result, h)
+
     def test_docker_image_without_labels_has_no_revision_marker(self):
         for label_shape in (None, 'absent'):
             with self.subTest(label_shape=label_shape),TemporaryDirectory() as tmp:
@@ -113,8 +197,8 @@ class LifecycleCensusOwnershipTests(SimpleTestCase):
             self.assert_safe_output(result,h)
 
     def test_application_markers_or_shared_resources_fail_closed(self):
-        def set_revision(h):h.foreign_image['Config']['Labels']['org.opencontainers.image.revision']='b'*40
-        def set_container_revision(h):h.foreign['Config']['Labels']['org.opencontainers.image.revision']='b'*40
+        def set_revision(h):h.foreign_image['Config']['Labels']['org.opencontainers.image.revision']='a'*40
+        def set_container_revision(h):h.foreign['Config']['Labels']['org.opencontainers.image.revision']='a'*40
         def set_env(h):h.foreign['Config']['Env'].append('UMANEWS_RELEASE_COMMIT='+'b'*40)
         def set_flag(h):h.foreign['Config']['Env'].append('RACE_EVENT_LIFECYCLE_ENABLED=false')
         def set_image_env(h):h.foreign_image['Config']['Env'].append('RACE_LIVE_ENABLED=false')
@@ -137,7 +221,10 @@ class LifecycleCensusOwnershipTests(SimpleTestCase):
                parent_bind,child_bind,socket_bind,privileged,host_pid,volumes_from,workdir]
         for mutate in cases:
             with self.subTest(case=mutate.__name__),TemporaryDirectory() as tmp:
-                h=OwnershipHarness(Path(tmp));mutate(h);h.add_foreign();result=h.run()
+                h=OwnershipHarness(Path(tmp))
+                for config in (h.foreign['Config'], h.foreign_image['Config']):
+                    config['Labels']['org.opencontainers.image.revision'] = 'b' * 40
+                mutate(h);h.add_foreign();result=h.run()
                 self.assertNotEqual(result.returncode,0)
                 self.assert_safe_output(result,h)
 
@@ -155,7 +242,10 @@ class LifecycleCensusOwnershipTests(SimpleTestCase):
         for mutate in [missing_network,missing_mounts,missing_state,stopped,bad_image,empty_tags,
                        bad_labels,missing_env,missing_network_id,bad_mount]:
             with self.subTest(case=mutate.__name__),TemporaryDirectory() as tmp:
-                h=OwnershipHarness(Path(tmp));mutate(h);h.add_foreign();result=h.run()
+                h=OwnershipHarness(Path(tmp))
+                for config in (h.foreign['Config'], h.foreign_image['Config']):
+                    config['Labels']['org.opencontainers.image.revision'] = 'b' * 40
+                mutate(h);h.add_foreign();result=h.run()
                 self.assertNotEqual(result.returncode,0)
                 self.assert_safe_output(result,h)
 
