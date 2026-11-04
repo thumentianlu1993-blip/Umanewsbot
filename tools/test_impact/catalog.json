@@ -862,7 +862,9 @@
       "stable.test_horse_source_cache_reuse_adapter"
     ],
     "horse_basic_profile_cache": [
-      "stable.test_horse_basic_profile_from_cache"
+      "stable.test_horse_basic_profile_from_cache",
+      "stable.test_h03_basic_module_input",
+      "stable.test_h03_private_basic_module_transaction"
     ],
     "horse_career_link_cache": [
       "stable.test_horse_career_record_link_from_cache"
@@ -875,7 +877,9 @@
       "stable.test_horse_basic_profile_from_review_command"
     ],
     "horse_career_review_consumer": [
-      "stable.test_horse_career_record_from_review"
+      "stable.test_horse_career_record_from_review",
+      "stable.test_h03_independent_career_row_prepare",
+      "stable.test_h03_private_independent_career_row_consumption"
     ]
   },
   "dependencies": {
@@ -2735,6 +2739,12 @@
         "news_translation"
       ]
     },
+    "server/stable/test_h03_basic_module_input.py": {
+      "label": "stable.test_h03_basic_module_input",
+      "domains": [
+        "horse_basic_profile_cache"
+      ]
+    },
     "server/stable/test_horse_basic_profile_from_cache.py": {
       "label": "stable.test_horse_basic_profile_from_cache",
       "domains": [
@@ -2817,6 +2827,24 @@
       "label": "stable.test_translation_reported_token_stop",
       "domains": [
         "news_translation"
+      ]
+    },
+    "server/stable/test_h03_private_basic_module_transaction.py": {
+      "label": "stable.test_h03_private_basic_module_transaction",
+      "domains": [
+        "horse_basic_profile_cache"
+      ]
+    },
+    "server/stable/test_h03_private_independent_career_row_consumption.py": {
+      "label": "stable.test_h03_private_independent_career_row_consumption",
+      "domains": [
+        "horse_career_review_consumer"
+      ]
+    },
+    "server/stable/test_h03_independent_career_row_prepare.py": {
+      "label": "stable.test_h03_independent_career_row_prepare",
+      "domains": [
+        "horse_career_review_consumer"
       ]
     }
   },
@@ -3118,6 +3146,7 @@
     "stable.test_horse_source_cache_reuse_adapter": "django",
     "stable.test_c027_public_time_sqlite": "python",
     "stable.test_article_content_trace": "django",
+    "stable.test_h03_basic_module_input": "django",
     "stable.test_horse_basic_profile_from_cache": "django",
     "stable.test_translation_claim_fence": "django",
     "stable.test_horse_career_record_link_from_cache": "django",
@@ -3131,7 +3160,10 @@
     "stable.test_horse_career_record_from_review": "django",
     "stable.test_managed_readonly_steps": "django",
     "stable.test_managed_readonly_translation": "django",
-    "stable.test_translation_reported_token_stop": "django"
+    "stable.test_translation_reported_token_stop": "django",
+    "stable.test_h03_private_basic_module_transaction": "django",
+    "stable.test_h03_private_independent_career_row_consumption": "django",
+    "stable.test_h03_independent_career_row_prepare": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {

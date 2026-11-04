@@ -705,6 +705,15 @@ def _bump_next_refresh_forward(
         if step > cap:
             step = cap
         control.next_refresh_at = now + step
+        if (
+            event.race_datetime is None
+            and event.local_date is not None
+            and control.last_result_code == "before_local_midnight"
+        ):
+            control.next_refresh_at = min(
+                control.next_refresh_at,
+                _local_next_midnight(event.local_date, event.timezone_name),
+            )
 
     control.save(update_fields=("next_refresh_at", "updated_at"))
 
