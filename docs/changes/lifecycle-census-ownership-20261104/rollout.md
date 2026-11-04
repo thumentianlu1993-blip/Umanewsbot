@@ -3,8 +3,8 @@
 ## 固定对象和已完成部分
 
 - 当前生产：`ab5775f62619ec196aed7bd7f87f65236b53dfa8`，镜像 `sha256:ef9a690471051f4bfb7095b10fc5b2e93d47cf7d6a3ad37972076b56f315df27`，schema0079。
-- 新固定候选：`8fe6483cbc6a8512dd16566e0d0f552dfd92ec29`，基于当前生产，仅修改两个 deploy 校验文件。不发布含额外迁移的完整主线。
-- 新授权 artifact SHA：`31837d09c2cee563b45184ffffe2b8f56a39676b9e938de9292e097a6f3af669`，批准提交为上述候选；生成时间 `2026-11-04T15:34:57.191598Z`，须在24小时有效期内应用。
+- 新固定候选：`661a0859242f001853957365fcb8dd7c5ad0ddab`，基于当前生产，仅修改两份校验文件及promotion失败恢复。不发布含额外迁移的完整主线。
+- 新授权 artifact SHA：`00a4e93ca22e4189d9b026359a9111898a745a2751b37ec78d43fdea7aa33b86`，批准提交为上述候选；生成时间 `2026-11-04T15:43:50.598118+00:00`，须在24小时有效期内应用。
 - 原 active root：`28c327c0897f3c1559dfa99fc9fed76532dc1b1bee6f2ed994db4e680e5bb1a9`；新 generation3、成员仅956、membership SHA `f500e2fac984d03df92cc7fa83762425fb2b6bf70a4e540a168bae0ac2ce4a90`。
 - 新期限 `2027-12-31T16:00:00Z`，覆盖北京时间2027/12/31全天。TRA已经续期，本包不再变更TRA摘要、地区、接口、配额或standing policy期限。
 
@@ -24,12 +24,14 @@
 2. 准备独立新release目录和共享持久化挂载，镜像绑定新候选SHA；不清理旧checkout。按上述恢复接管规则归档遗留锁。
 3. 使用新候选`deploy/deploy_0079.sh deploy`执行同schema发布。执行原归档备份、SHA/TOC、迁移空计划、static及完成凭据检查。**无新增迁移，无反向迁移，无全库恢复。**失败只允许原intent/镜像的受保护resume；不得把旧complete当新收据。
 4. 0079按进入时服务清单恢复web与race_sync_v2_worker；普通worker、Beat仍停止。核验完成凭据后，在同一coordinator、共享部署锁下以新候选及false/off配置重建并启动普通worker，保持Beat停止。四个应用服务都必须为新候选镜像（Beat随后重建）；该worker恢复明确属于本包。对web IP变化执行`nginx -t`及平滑reload，不重建Nginx。
-5. 以固定新artifact运行原`deploy/promote_lifecycle_enforce_registry.sh`：先排空并停止普通worker，备份验证后更新配置，重建web/worker为false/off，用修复后的宿主归属检查器核验，再创建generation3与单成员。须验证旧root/identity/CAS和956行不变；不得修改赛事事实、扩大成员或人工触发抓取。
+5. 以固定新artifact运行修复后的受保护`deploy/promote_lifecycle_enforce_registry.sh`：先排空并停止普通worker，备份验证后更新配置，重建web/worker为false/off，用修复后的宿主归属检查器核验，再创建generation3与单成员。须验证旧root/identity/CAS和956行不变；不得修改赛事事实、扩大成员或人工触发抓取。
 6. 运行原`deploy/switch_lifecycle_mode.sh`，新root/membership/count与artifact完全匹配；先激活数据库，再写true/enforce并重建web/worker，最后重建启动Beat。只恢复原956授权范围。nginx如因web重建变化再次平滑reload。
 7. 核对四应用镜像/commit、配置和QQ关闭态，TRA合同不变；新registry active、旧registry退休、成员与control一致，956仍finished。核对schema0079、迁移空计划、队列/锁、worker和Beat健康，双域名首页/healthz/956页面。至少10分钟连续观察，无新OOM/restart、资源越线、健康错误或授权漂移。自然计划任务随原Beat恢复，禁止额外人工抓取或对外发信。
 8. 归档新intent/manifest/complete、备份SHA/TOC、artifact及验收记录，确认共享锁释放；最后释放coordinator。dump目录验证不冒充整库恢复验收。
 
 ## 失败与回滚边界
+
+promotion在排空前记录Beat实际状态；若进入时Beat停止，排空/备份/验证失败只恢复worker，并核验false/off及Beat停止后才释放锁。无法恢复或证明时停止worker/Beat、保留锁。进入时Beat运行的既有失败恢复行为不变。
 
 本包采用受保护续跑或关闭态前向修复，不回退旧镜像或数据库。promotion/activation失败沿原脚本恢复false/off；证明失败时停Beat/普通worker并保留锁及证据。web尽量保持健康，race_sync_v2_worker不被归属修复扩大操作范围。不会为恢复而停止外项目worker、替换docker输出、改签旧checkout或跳过census。任何需要改变新候选、artifact、成员或安全边界的后续动作均依根AGENTS.md处理。
 

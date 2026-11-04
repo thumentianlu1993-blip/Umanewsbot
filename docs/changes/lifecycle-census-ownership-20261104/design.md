@@ -12,3 +12,5 @@
 新增只读 helper 由原 shell checker 调用。只在外项目分支运行，原本项目镜像、commit、环境键计数与 trust-root 校验不变。只允许 docker ps/inspect/image inspect，不执行 stop/up/exec。错误输出使用固定分类，不回显环境或 Docker 原始输出。
 
 生产修复不得改写旧签名 checkout 或替换 Docker 输出。必须准备新固定候选和新 approved_commit 的续期 artifact，再经过更新后的精确发布包交付。新包需处理原失败留下的关闭态与恢复锁，不能直接重跑已有 deploy intent。
+
+恢复包入口在锁内、排空前只读记录Beat是否运行。原本停止时，备份前失败禁止启动Beat，仅恢复worker后核验关闭态；失败保留锁/证据并停止消费者。原本运行时保留既有备份前恢复行为，不引入新配置开关。

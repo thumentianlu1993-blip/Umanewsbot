@@ -12,3 +12,5 @@
 - 额外权限RED：宿主proc/sys/dev挂载、CapAdd、Devices、DeviceRequests不能被判为独立应用。
 
 - 第二轮review反例真实RED共6项：非默认/rootless socket改名及父目录；两次census间db消失或归属标签变化。
+
+- 恢复包review发现原promotion备份前失败提前启动Beat：4项断言真实RED；补充drain/backup/backup_validation、关闭态证明失败、worker恢复失败及Beat admission异常/多ID用例。21项直接相关测试通过。

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -239,3 +240,72 @@ class LifecycleCensusOwnershipTests(SimpleTestCase):
                 (h.state/'resource-ps').write_text(initial)
                 h.add_foreign();result=h.run()
                 self.assertNotEqual(result.returncode,0);self.assert_safe_output(result,h)
+
+
+class PromotionStoppedBeatRecoveryTests(SimpleTestCase):
+    def run_failure(self, *, initial='false', verify=0, restore=0, stage='backup'):
+        root=Path(__file__).resolve().parents[2]
+        source=(root/'deploy/promote_lifecycle_enforce_registry.sh').read_text()
+        handler=source[source.index('on_exit() {'):source.index('export DEPLOYMENT_LOCK_ACTION=')]
+        script=f"""
+exec 3>&1
+compose_mutation() {{ echo "compose $*" >&3; case "$*" in 'up '* ) return {restore};; esac; }}
+verify_off() {{ echo verify_off >&2; return {verify}; }}
+lock() {{ echo "lock $*"; }}
+rm() {{ echo cleanup; }}
+LOCK=lock
+lock_held=1
+quiesced=1
+recovery_required=0
+keep_lock=0
+completed=0
+legacy_snapshot=
+registry_snapshot=artifact
+initial_beat_running={initial}
+{handler}
+echo failed_{stage} >&2
+false
+on_exit
+"""
+        return subprocess.run(['/bin/sh'],input=script,text=True,capture_output=True)
+
+    def test_drain_and_backup_failure_preserve_stopped_beat_and_verify_off(self):
+        for stage in ('drain','backup','backup_validation'):
+            with self.subTest(stage=stage):
+                r=self.run_failure(stage=stage)
+                self.assertNotEqual(r.returncode,0)
+                self.assertIn('verify_off',r.stderr)
+                self.assertIn('compose up -d --no-deps worker',r.stdout)
+                self.assertNotIn('worker beat',r.stdout+r.stderr)
+                self.assertIn('lock release',r.stdout)
+
+    def test_unverified_off_or_worker_restore_failure_retains_lock(self):
+        for verify,restore in ((1,0),(0,1)):
+            with self.subTest(verify=verify,restore=restore):
+                r=self.run_failure(verify=verify,restore=restore)
+                self.assertNotEqual(r.returncode,0)
+                self.assertNotIn('lock release',r.stdout)
+                self.assertNotIn('cleanup',r.stdout)
+                self.assertIn('retained evidence',r.stderr)
+
+    def test_previously_running_beat_keeps_existing_failure_restore(self):
+        r=self.run_failure(initial='true')
+        self.assertNotEqual(r.returncode,0)
+        self.assertIn('lock release',r.stdout)
+        self.assertNotIn('verify_off',r.stderr)
+        self.assertIn('compose up -d --no-deps worker beat',r.stdout)
+
+    def test_beat_admission_rejects_unknown_duplicate_or_restarting_state(self):
+        root=Path(__file__).resolve().parents[2]
+        source=(root/'deploy/promote_lifecycle_enforce_registry.sh').read_text()
+        probe=source[source.index('probe_initial_beat_running() {'):source.index('initial_beat_running=unknown')]
+        for cid,state,expected in [('cid-beat','true false','true'),('cid-beat','false false','false'),
+                                   ('','','false'),('cid-beat','true true',None),
+                                   ('cid-beat','unknown',None),('cid-one\ncid-two','false false',None)]:
+            with self.subTest(cid=cid,state=state):
+                import shlex
+                script='compose_mutation() { printf %s '+shlex.quote(cid)+'; }\n'
+                script+='docker() { printf %s '+shlex.quote(state)+'; }\n'+probe+'\nprobe_initial_beat_running\n'
+                r=subprocess.run(['/bin/sh'],input=script,text=True,capture_output=True)
+                if expected is None:self.assertNotEqual(r.returncode,0)
+                else:self.assertEqual((r.returncode,r.stdout.strip()),(0,expected))
