@@ -25,14 +25,14 @@ TRA_REGISTRY = (
 SHA_A = "a" * 64
 
 
-class TheRacingApiRegistryV2ContractTests(SimpleTestCase):
+class TheRacingApiRegistryContractTests(SimpleTestCase):
     def _payload(self):
         return json.loads(TRA_REGISTRY.read_text(encoding="utf-8"))
 
-    def test_registry_v2_has_reviewed_region_codes_and_route_contracts(self):
+    def test_registry_has_reviewed_region_codes_and_route_contracts(self):
         payload = self._payload()
 
-        self.assertEqual(payload.get("schema_version"), 2)
+        self.assertEqual(payload.get("schema_version"), 3)
         self.assertEqual(
             payload.get("allowed_region_codes"),
             {
@@ -754,7 +754,7 @@ class RaceLiveRegistryImageContractTests(SimpleTestCase):
         ).hexdigest()
         self.assertEqual(
             registry_sha,
-            "0e1cdff89052b7b5f482b4761f1e39e3f38eefdf30405ae6a5d45b64e737b322",
+            "53962c4220c35523ea77ca27e674970bfb555e48e7b6bf86b0472e05cfed1735",
         )
         for relative_path in (
             ".env.example",
