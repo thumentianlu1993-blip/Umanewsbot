@@ -1176,6 +1176,35 @@ def deliver_race_live_alert_task(incident_id: int) -> dict:
     }
 
 
+@shared_task(bind=True, max_retries=2)
+def backfill_profile_strong_article_links_task(self, profile_id: int, actor_id: int) -> dict:
+    """C-line registered task; direct fallback is not durable queued retry."""
+    from django.db import InterfaceError, OperationalError, connection
+    from stable.services.horse_article_strong_backfill import backfill_profile_strong_bindings
+
+    try:
+        return backfill_profile_strong_bindings(profile_id, actor_id)
+    except (OperationalError, InterfaceError) as error:
+        cause = error.__cause__
+        # Single allowlisted server diagnostic, not an exception-class policy.
+        # A statement timeout aborts its statement/transaction. Completed writes
+        # remain receipt-bound; retry re-reads authority/CAS. Same-code user cancel,
+        # all InterfaceError, auth/connection codes and unknown/localized primary
+        # diagnostics fail unchanged. Exact equality only; no substring matching.
+        transient = False
+        if isinstance(error, OperationalError) and connection.vendor == "postgresql":
+            driver_errors = getattr(getattr(connection, "Database", None), "errors", None)
+            query_canceled = getattr(driver_errors, "QueryCanceled", None)
+            if isinstance(query_canceled, type) and isinstance(cause, query_canceled):
+                sqlstate = getattr(cause, "sqlstate", None) or getattr(cause, "pgcode", None)
+                primary = getattr(getattr(cause, "diag", None), "message_primary", None)
+                transient = (sqlstate, primary) == ("57014", "canceling statement due to statement timeout")
+        if (transient and not self.request.called_directly and not getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False)
+                and self.request.retries < 2):
+            raise self.retry(exc=error, countdown=(2, 5)[self.request.retries], max_retries=2)
+        raise
+
+
 @shared_task
 def scan_article_horse_links_task(article_id: int | None = None, profile_id: int | None = None, limit: int = 500, commit: bool = True) -> dict:
     from stable.services.horse_profiles import scan_article_horse_links
