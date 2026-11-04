@@ -240,7 +240,8 @@ class RaceTermResolver:
 # 新模式先合并主名和别名，再按实体去重；legacy路径保持原样。
 import unicodedata
 from dataclasses import replace
-from django.db.models import Q
+from django.db.models import Value
+from django.db.models.functions import Upper
 from stable.services.race_field_normalization import display_field
 
 
@@ -261,22 +262,24 @@ class StrictRaceTermResolver:
             requests = [r for r in self.requests if r[1] == term_type and r[0].strip()]
             if not requests:
                 continue
-            primary_query, alias_query = Q(pk__in=[]), Q(pk__in=[])
-            # bounded by rendered page inputs; no full-table Python scan.
-            for name in {r[0] for r in requests}:
-                for variant in {name.strip(), ' '.join(unicodedata.normalize('NFKC', name).split())}:
-                    primary_query |= Q(source_ja__iexact=variant)
-                    alias_query |= Q(text__iexact=variant)
+            variants = sorted({variant for name in {r[0] for r in requests}
+                               for variant in (name.strip(), ' '.join(unicodedata.normalize('NFKC', name).split()))})
+            # 两端沿用数据库大小写规则；IN避免每行重复计算数百个iexact分支。
+            # 输入仍只来自本页，不能把右值改成Python upper/casefold。
+            folded_names = [Upper(Value(name)) for name in variants]
             regions = {r[2] for r in requests} | {''}
             candidates = []
-            entries = TermEntry.objects.filter(primary_query, term_type=term_type, is_active=True,
-                                                racing_region__in=regions).values(
+            entries = TermEntry.objects.alias(_display_name_upper=Upper('source_ja')).filter(
+                _display_name_upper__in=folded_names, term_type=term_type, is_active=True,
+                racing_region__in=regions).order_by().values(
                 'id', 'source_ja', 'target_zh', 'racing_region', 'source_language')
             for entry in entries:
                 candidates.append((entry['id'], display_identity(entry['source_ja']), entry['target_zh'],
                                    entry['racing_region'], entry['source_language']))
-            aliases = TermAlias.objects.filter(alias_query, term__term_type=term_type, is_active=True,
-                                                term__is_active=True, term__racing_region__in=regions).values(
+            # 以下选择按实体去重，不依赖模型默认排序或priority。
+            aliases = TermAlias.objects.alias(_display_name_upper=Upper('text')).filter(
+                _display_name_upper__in=folded_names, term__term_type=term_type, is_active=True,
+                term__is_active=True, term__racing_region__in=regions).order_by().values(
                 'term_id', 'text', 'term__target_zh', 'term__racing_region', 'source_language')
             for alias in aliases:
                 candidates.append((alias['term_id'], display_identity(alias['text']), alias['term__target_zh'],

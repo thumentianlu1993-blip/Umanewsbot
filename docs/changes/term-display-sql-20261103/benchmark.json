@@ -1,0 +1,281 @@
+{
+  "synthetic_only": true,
+  "production_queries_executed": false,
+  "postgresql": "16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+  "lc_ctype": "C.UTF-8",
+  "tables": [
+    [
+      "stable_termalias",
+      39926,
+      454
+    ],
+    [
+      "stable_termentry",
+      58211,
+      2904
+    ]
+  ],
+  "parallel_workers_per_gather": 0,
+  "rounds": "one warmup + three alternating measured rounds",
+  "results": [
+    {
+      "table": "stable_termentry",
+      "input_names": 1,
+      "matched_rows": 1,
+      "same_results_sha256": "aff12c8fb06bd0cb2101cdfde0ed36065dfe8fe9e2248019e6b82101ef2f6b0e",
+      "modes": {
+        "old": {
+          "execution_ms": [
+            2.007,
+            2.117,
+            1.915
+          ],
+          "median_execution_ms": 2.007,
+          "median_planning_ms": 0.022,
+          "plan_nodes": [
+            "Sort",
+            "Bitmap Heap Scan",
+            "Bitmap Index Scan"
+          ],
+          "sql_chars": 511,
+          "shared_hit_blocks": 558,
+          "shared_read_blocks": 0
+        },
+        "new": {
+          "execution_ms": [
+            2.126,
+            2.145,
+            2.001
+          ],
+          "median_execution_ms": 2.126,
+          "median_planning_ms": 0.026,
+          "plan_nodes": [
+            "Bitmap Heap Scan",
+            "Bitmap Index Scan"
+          ],
+          "sql_chars": 457,
+          "shared_hit_blocks": 558,
+          "shared_read_blocks": 0
+        }
+      }
+    },
+    {
+      "table": "stable_termalias",
+      "input_names": 1,
+      "matched_rows": 0,
+      "same_results_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "modes": {
+        "old": {
+          "execution_ms": [
+            6.123,
+            6.193,
+            6.189
+          ],
+          "median_execution_ms": 6.189,
+          "median_planning_ms": 0.078,
+          "plan_nodes": [
+            "Sort",
+            "Nested Loop",
+            "Seq Scan",
+            "Index Scan"
+          ],
+          "sql_chars": 651,
+          "shared_hit_blocks": 454,
+          "shared_read_blocks": 0
+        },
+        "new": {
+          "execution_ms": [
+            6.26,
+            6.174,
+            6.302
+          ],
+          "median_execution_ms": 6.26,
+          "median_planning_ms": 0.1,
+          "plan_nodes": [
+            "Nested Loop",
+            "Seq Scan",
+            "Index Scan"
+          ],
+          "sql_chars": 589,
+          "shared_hit_blocks": 454,
+          "shared_read_blocks": 0
+        }
+      }
+    },
+    {
+      "table": "stable_termentry",
+      "input_names": 20,
+      "matched_rows": 10,
+      "same_results_sha256": "a50dd87a77db3c4b0abea0aa756748344a346241bb9ba850a36e8b388c113f9c",
+      "modes": {
+        "old": {
+          "execution_ms": [
+            26.823,
+            27.006,
+            27.132
+          ],
+          "median_execution_ms": 27.006,
+          "median_planning_ms": 0.062,
+          "plan_nodes": [
+            "Sort",
+            "Bitmap Heap Scan",
+            "Bitmap Index Scan"
+          ],
+          "sql_chars": 1634,
+          "shared_hit_blocks": 558,
+          "shared_read_blocks": 0
+        },
+        "new": {
+          "execution_ms": [
+            2.23,
+            2.449,
+            2.51
+          ],
+          "median_execution_ms": 2.449,
+          "median_planning_ms": 0.033,
+          "plan_nodes": [
+            "Bitmap Heap Scan",
+            "Bitmap Index Scan"
+          ],
+          "sql_chars": 666,
+          "shared_hit_blocks": 558,
+          "shared_read_blocks": 0
+        }
+      }
+    },
+    {
+      "table": "stable_termalias",
+      "input_names": 20,
+      "matched_rows": 3,
+      "same_results_sha256": "c24694d171b9a6e14d4eec124650464718a456d104ed4cec5ccd324cefc086fe",
+      "modes": {
+        "old": {
+          "execution_ms": [
+            96.577,
+            97.115,
+            97.158
+          ],
+          "median_execution_ms": 97.115,
+          "median_planning_ms": 0.105,
+          "plan_nodes": [
+            "Sort",
+            "Hash Join",
+            "Seq Scan",
+            "Hash",
+            "Bitmap Heap Scan",
+            "Bitmap Index Scan"
+          ],
+          "sql_chars": 1679,
+          "shared_hit_blocks": 1012,
+          "shared_read_blocks": 0
+        },
+        "new": {
+          "execution_ms": [
+            8.481,
+            8.432,
+            8.699
+          ],
+          "median_execution_ms": 8.481,
+          "median_planning_ms": 0.099,
+          "plan_nodes": [
+            "Hash Join",
+            "Bitmap Heap Scan",
+            "Bitmap Index Scan",
+            "Hash",
+            "Seq Scan"
+          ],
+          "sql_chars": 798,
+          "shared_hit_blocks": 1012,
+          "shared_read_blocks": 0
+        }
+      }
+    },
+    {
+      "table": "stable_termentry",
+      "input_names": 200,
+      "matched_rows": 100,
+      "same_results_sha256": "f7f98f1e97b597c1aca2e58a0f088d12469fb4243f80fe184ac422a7f281eac8",
+      "modes": {
+        "old": {
+          "execution_ms": [
+            265.645,
+            263.407,
+            264.959
+          ],
+          "median_execution_ms": 264.959,
+          "median_planning_ms": 0.202,
+          "plan_nodes": [
+            "Sort",
+            "Bitmap Heap Scan",
+            "Bitmap Index Scan"
+          ],
+          "sql_chars": 12254,
+          "shared_hit_blocks": 558,
+          "shared_read_blocks": 0
+        },
+        "new": {
+          "execution_ms": [
+            2.645,
+            2.685,
+            2.532
+          ],
+          "median_execution_ms": 2.645,
+          "median_planning_ms": 0.115,
+          "plan_nodes": [
+            "Bitmap Heap Scan",
+            "Bitmap Index Scan"
+          ],
+          "sql_chars": 2646,
+          "shared_hit_blocks": 558,
+          "shared_read_blocks": 0
+        }
+      }
+    },
+    {
+      "table": "stable_termalias",
+      "input_names": 200,
+      "matched_rows": 33,
+      "same_results_sha256": "2d86cb680b7c71521adeb6f279aaec0d42cc515fb21d561a3f2e72526a8a1dff",
+      "modes": {
+        "old": {
+          "execution_ms": [
+            263.969,
+            274.368,
+            268.273
+          ],
+          "median_execution_ms": 268.273,
+          "median_planning_ms": 0.282,
+          "plan_nodes": [
+            "Sort",
+            "Nested Loop",
+            "Bitmap Heap Scan",
+            "Bitmap Index Scan",
+            "Index Scan"
+          ],
+          "sql_chars": 11399,
+          "shared_hit_blocks": 33717,
+          "shared_read_blocks": 0
+        },
+        "new": {
+          "execution_ms": [
+            9.287,
+            9.961,
+            9.989
+          ],
+          "median_execution_ms": 9.961,
+          "median_planning_ms": 0.185,
+          "plan_nodes": [
+            "Hash Join",
+            "Seq Scan",
+            "Hash",
+            "Bitmap Heap Scan",
+            "Bitmap Index Scan"
+          ],
+          "sql_chars": 2778,
+          "shared_hit_blocks": 1012,
+          "shared_read_blocks": 0
+        }
+      }
+    }
+  ]
+}
