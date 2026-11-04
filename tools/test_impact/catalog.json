@@ -876,6 +876,11 @@
     ],
     "horse_career_review_consumer": [
       "stable.test_horse_career_record_from_review"
+    ],
+    "lifecycle_authorization_renewal": [
+      "stable.tests.test_lifecycle_enforce_full_cohort",
+      "stable.tests.test_lifecycle_enforce_full_cohort_operations",
+      "stable.test_race_live_source_proof"
     ]
   },
   "dependencies": {
@@ -3213,7 +3218,8 @@
     "horse_basic_profile_cache": "integration: H03绑定缓存的私有基础资料事务与PG并发合同",
     "horse_career_link_cache": "integration: H03 单条既有赛绩离线补连、强身份/binding 与事务重放边界",
     "horse_basic_profile_prepare_command": "integration: H03缓存prepare-only命令与私有待审产物合同",
-    "horse_basic_profile_review_input": "integration: H03独立已审输入与原消费者事务/重放合同"
+    "horse_basic_profile_review_input": "integration: H03独立已审输入与原消费者事务/重放合同",
+    "lifecycle_authorization_renewal": "integration: 生命周期原范围续期与 TRA 显式许可截止日期"
   },
   "dedicated_batch_modules": [
     "stable.test_migration_history_repair_postgres",

@@ -1,3 +1,9 @@
+## 2026-11-04 生命周期与TRA授权续期候选（未发布）
+
+用户确认现有范围持续有效至北京时间2027/12/31。候选实现显式到期合同，生命周期仍仅956；TRA保持原地区/接口/预算。已完成真实RED、候选150项回归、82项隔离PG及独立review返修复审；主线CI/交付与生产状态分别核验，不以候选通过代替上线。见[发布包](changes/authorization-renewal-20261104/rollout.md)、[验证](changes/authorization-renewal-20261104/validation.md)。
+
+普通worker约18分钟采样未复现95%持续CPU；第二轮峰值25.33%对应JRA等重复新闻抓取，另有web来源数据库负载。见[诊断](changes/authorization-renewal-20261104/worker-diagnosis.md)。
+
 # 2026-11-03 QQ发布后依赖兼容故障，后台恢复中
 
 PR271已合并，固定候选68063962已通过0079同schema发布，三个QQ开关false，独立OneBot停止且restart=no；历史记录和挂载保留。但最终验收发现新构建的Kombu 5.7.0要求redis-py>=6.1，与项目redis 5.2.1不兼容，worker、race_sync_v2_worker、beat重启循环。已在发布锁内停止三个失败服务，web及公网healthz仍200，队列未清理。不能宣称完整下线验收通过或非QQ后台已恢复。

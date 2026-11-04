@@ -20,6 +20,57 @@ class TheRacingApiFreeSourceProofTests(SimpleTestCase):
     USERNAME = "proof-user"
     PASSWORD = "proof-password#42"
 
+    def test_explicit_permission_survives_monthly_evidence_window(self):
+        service = self._service()
+        payload = json.loads((Path(__file__).resolve().parents[2] / "runtime/policies/race_live/source_registry_the_racing_api_free.json").read_text())
+        payload["schema_version"] = 3
+        payload["valid_until"] = "2028-01-01T00:00:00+08:00"
+        payload["evidence"]["authorization_basis"] = "user_confirmed_automation_permission"
+        payload["evidence"]["permission_valid_until"] = payload["valid_until"]
+        payload["evidence"]["authorization_reference"] = "user-confirmation-20261104"
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "registry.json"
+            path.write_text(json.dumps(payload))
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            result, _ = service._read_registry_contract(path, expected_sha256=digest, now=datetime(2027, 12, 31, 15, 59, 59, tzinfo=dt_timezone.utc))
+            self.assertEqual(result["schema_version"], 3)
+            with self.assertRaises(PermissionError):
+                service._read_registry_contract(path, expected_sha256=digest, now=datetime(2027, 12, 31, 16, tzinfo=dt_timezone.utc))
+
+    def test_explicit_permission_rejects_invalid_evidence_and_scope(self):
+        service = self._service()
+        original = json.loads((Path(__file__).resolve().parents[2] / "runtime/policies/race_live/source_registry_the_racing_api_free.json").read_text())
+        original["schema_version"] = 3
+        original["valid_until"] = "2028-01-01T00:00:00+08:00"
+        original["evidence"].update(authorization_basis="user_confirmed_automation_permission", permission_valid_until=original["valid_until"], authorization_reference="user-confirmation-20261104")
+        mutations = {
+            "missing_reference": lambda p: p["evidence"].pop("authorization_reference"),
+            "blank_reference": lambda p: p["evidence"].update(authorization_reference=" "),
+            "unconfirmed": lambda p: p["evidence"].update(authorization_basis="provider_terms_for_application_use_and_user_requested_automation"),
+            "future_confirmation": lambda p: p["evidence"].update(verified_at="2028-01-01T00:00:00+00:00"),
+            "naive_permission": lambda p: p["evidence"].update(permission_valid_until="2028-01-01T00:00:00"),
+            "exceeds_permission": lambda p: p["evidence"].update(permission_valid_until="2027-01-01T00:00:00+00:00"),
+            "revoked": lambda p: p.update(terms_status="revoked"),
+            "host": lambda p: p.update(host="example.com"),
+            "region": lambda p: p["allowed_region_codes"].update(australia="aus"),
+            "route": lambda p: p["route_contracts"]["result_by_id"].update(path="/v1/new"),
+            "budget": lambda p: p.update(max_requests=4),
+        }
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "registry.json"
+            for name, mutate in mutations.items():
+                with self.subTest(name=name):
+                    payload = json.loads(json.dumps(original))
+                    mutate(payload)
+                    path.write_text(json.dumps(payload))
+                    with self.assertRaises((ValueError, PermissionError)):
+                        service._read_registry_contract(path, expected_sha256=hashlib.sha256(path.read_bytes()).hexdigest(), now=datetime(2027, 6, 1, tzinfo=dt_timezone.utc))
+            path.write_text(json.dumps(original))
+            with self.assertRaises(PermissionError):
+                service._read_registry_contract(path, expected_sha256="0" * 64, now=datetime(2027, 6, 1, tzinfo=dt_timezone.utc))
+            url = service.build_the_racing_api_route_url(registry=original, route_name="result_by_id", region="united_kingdom", limit=0, skip=0, race_id="race_123")
+            self.assertTrue(url.endswith("/v1/results/race_123"))
+
     def _service(self):
         try:
             return importlib.import_module("stable.services.race_live_source_proof")

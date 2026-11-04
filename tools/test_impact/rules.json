@@ -609,6 +609,7 @@
     "server/stable/management/commands/prepare_race_event_lifecycle_enforce_canary.py",
     "server/stable/management/commands/prepare_race_event_lifecycle_enforce_registry.py",
     "server/stable/management/commands/prepare_race_event_lifecycle_enrollment.py",
+    "server/stable/management/commands/prepare_race_event_lifecycle_renewal.py",
     "server/stable/management/commands/prepare_race_live_manual_official_evidence.py",
     "server/stable/management/commands/prepare_race_live_publication_transition.py",
     "server/stable/management/commands/prepare_race_live_racecards.py",

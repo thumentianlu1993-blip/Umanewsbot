@@ -35,6 +35,7 @@ class Command(BaseCommand):
         parser.add_argument("--approved-commit", required=True)
         parser.add_argument("--generation", required=True, type=int)
         parser.add_argument("--predecessor-root-sha256", default="")
+        parser.add_argument("--runtime-valid-until", help="显式授权到期时间（含时区）；省略时保持35天合同")
         parser.add_argument("--output", required=True)
         parser.add_argument("--census-output")
         parser.add_argument("--enrollment-plan-output")
@@ -241,6 +242,7 @@ class Command(BaseCommand):
                 predecessor_root_sha256=predecessor_root,
                 selector_scope=scope,
                 now=generated_at,
+                runtime_valid_until=(datetime.fromisoformat(options["runtime_valid_until"]) if options.get("runtime_valid_until") else None),
             )
             output.write_bytes(raw)
             self.stdout.write(

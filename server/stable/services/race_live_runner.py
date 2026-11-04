@@ -1696,7 +1696,7 @@ def run_race_live_the_racing_api_free(
             now=now,
         )
 
-    if registry.get("schema_version") == 2:
+    if registry.get("schema_version") in {2, 3}:
         if pre_off_refresh:
             return _run_v2_region_racecard_refresh(
                 event=event,

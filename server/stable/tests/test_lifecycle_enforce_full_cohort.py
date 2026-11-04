@@ -149,6 +149,28 @@ class FullCohortArtifactAndSelectorContracts(TestCase):
         event.refresh_from_db()
         return event
 
+    def test_explicit_runtime_expiry_survives_35_days(self):
+        service = self.svc()
+        event = self._eligible(slug="long-authorization", at=self.cutoff + timedelta(hours=1))
+        scope = service.build_registry_selector_scope(kind="datetime_7d_canary", cutoff=self.cutoff, window_end=self.cutoff + timedelta(days=7), limit=20, predecessor_carry_forward=True)
+        deadline = datetime(2027, 12, 31, 16, tzinfo=timezone.utc)
+        raw = service.build_registry_artifact(event_ids=[event.id], enrollment_sha_by_event={event.id: ENROLLMENT_A}, approved_commit=OID, generation=1, selector_scope=scope, now=self.cutoff, runtime_valid_until=deadline)
+        args = dict(expected_raw_sha256=hashlib.sha256(raw).hexdigest(), expected_commit=OID)
+        manifest = service.load_registry_manifest_bytes(raw, now=deadline-timedelta(seconds=1), **args)
+        self.assertEqual(manifest.data["schema_version"], 2)
+        with self.assertRaises(service.RegistryError):
+            service.load_registry_manifest_bytes(raw, now=deadline, **args)
+        with self.assertRaises(service.RegistryError):
+            service.load_registry_manifest_bytes(raw, now=self.cutoff+timedelta(days=2), require_apply_fresh=True, **args)
+
+    def test_explicit_runtime_expiry_rejects_naive_and_past(self):
+        service = self.svc()
+        event = self._eligible(slug="bad-authorization-time", at=self.cutoff + timedelta(hours=1))
+        scope = service.build_registry_selector_scope(kind="datetime_7d_canary", cutoff=self.cutoff, window_end=self.cutoff + timedelta(days=7), limit=20, predecessor_carry_forward=True)
+        for deadline in (self.cutoff, self.cutoff-timedelta(seconds=1), datetime(2027, 12, 31)):
+            with self.subTest(deadline=deadline), self.assertRaises(service.RegistryError):
+                service.build_registry_artifact(event_ids=[event.id], enrollment_sha_by_event={event.id: ENROLLMENT_A}, approved_commit=OID, generation=1, selector_scope=scope, now=self.cutoff, runtime_valid_until=deadline)
+
     def test_registry_accepts_three_members_and_multiple_enrollment_roots(self):
         service = self.svc()
         events = [
@@ -706,6 +728,52 @@ class FullCohortArtifactAndSelectorContracts(TestCase):
             self.assertEqual(registry.read_bytes(), b"do-not-overwrite")
             self.assertFalse(census.exists())
             self.assertFalse(plan.exists())
+
+    @override_settings(RACE_EVENT_LIFECYCLE_ENABLED=False, RACE_EVENT_LIFECYCLE_MODE="off")
+    def test_terminal_member_renewal_preserves_identity_and_status(self):
+        service = self.svc()
+        event = self._eligible(slug="terminal-renewal", at=self.cutoff + timedelta(hours=1))
+        scope = service.build_registry_selector_scope(kind="datetime_7d_canary", cutoff=self.cutoff, window_end=self.cutoff+timedelta(days=7), limit=20, predecessor_carry_forward=True)
+        def load(raw):
+            return service.load_registry_manifest_bytes(raw, expected_raw_sha256=hashlib.sha256(raw).hexdigest(), expected_commit=OID, now=self.cutoff)
+        old = load(service.build_registry_artifact(event_ids=[event.id], enrollment_sha_by_event={event.id:ENROLLMENT_A}, approved_commit=OID, generation=1, selector_scope=scope, now=self.cutoff))
+        service.promote_registry(old, apply=True)
+        service.activate_registry(old, activation_id="8"*64)
+        type(event).objects.filter(pk=event.pk).update(status="finished")
+        raw = service.build_registry_renewal_artifact(expected_root_sha256=old.raw_sha256, approved_commit=OID, runtime_valid_until=datetime(2027,12,31,16,tzinfo=timezone.utc), now=self.cutoff)
+        renewed = load(raw)
+        with self.assertRaises(service.RegistryError):
+            service.build_registry_renewal_artifact(expected_root_sha256="0"*64, approved_commit=OID, runtime_valid_until=datetime(2027,12,31,16,tzinfo=timezone.utc), now=self.cutoff)
+        newcomer = self._eligible(slug="renewal-outside-scope", at=self.cutoff+timedelta(hours=2))
+        for ids, enrollment in (([event.id, newcomer.id], {event.id:ENROLLMENT_A, newcomer.id:ENROLLMENT_A}), ([event.id], {event.id:ENROLLMENT_B})):
+            invalid = load(service.build_registry_artifact(event_ids=ids, enrollment_sha_by_event=enrollment, approved_commit=OID, generation=2, selector_scope=scope, predecessor_root_sha256=old.raw_sha256, now=self.cutoff, runtime_valid_until=datetime(2027,12,31,16,tzinfo=timezone.utc)))
+            with self.assertRaises(service.RegistryError):
+                service.promote_registry(invalid, apply=False)
+        RaceEventLifecycleControl.objects.filter(event=event).update(manual_pause_reason="manual-pause")
+        with self.assertRaises(service.RegistryError):
+            service.promote_registry(renewed, apply=False)
+        RaceEventLifecycleControl.objects.filter(event=event).update(manual_pause_reason="")
+        Registry, Membership = _models(self)
+        Membership.objects.filter(registry__root_sha256=old.raw_sha256).update(state="revoked")
+        with self.assertRaises(service.RegistryError):
+            service.promote_registry(renewed, apply=False)
+        Membership.objects.filter(registry__root_sha256=old.raw_sha256).update(state="active")
+        with TemporaryDirectory() as directory, patch("stable.services.race_event_lifecycle_enforce.django_timezone.now", return_value=self.cutoff):
+            output = Path(directory)/"renewal.json"
+            args = dict(expected_root_sha256=old.raw_sha256, approved_commit=OID, runtime_valid_until="2028-01-01T00:00:00+08:00", output=str(output), stdout=StringIO())
+            call_command("prepare_race_event_lifecycle_renewal", **args)
+            self.assertEqual(output.read_bytes(),raw)
+            with self.assertRaises(CommandError):
+                call_command("prepare_race_event_lifecycle_renewal", **args)
+        self.assertEqual(service.promote_registry(renewed, apply=False).outcome, "would_apply")
+        self.assertEqual(service.promote_registry(renewed, apply=True).outcome, "applied")
+        service.verify_registry_state(renewed, expected_state="inactive")
+        service.activate_registry(renewed, activation_id="9"*64)
+        service.verify_registry_state(renewed, expected_state="active")
+        self.assertEqual(service.activate_registry(renewed, activation_id="9"*64).outcome,"replay")
+        event.refresh_from_db()
+        self.assertEqual(event.status,"finished")
+        self.assertEqual(renewed.event_ids,(event.id,))
 
     @override_settings(
         RACE_EVENT_LIFECYCLE_ENABLED=False,

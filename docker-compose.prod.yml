@@ -23,7 +23,7 @@ services:
       RACE_LIVE_MONITOR_ENABLED: ${RACE_LIVE_MONITOR_ENABLED:-false}
       RACE_LIVE_ENABLED_REGIONS: ${RACE_LIVE_ENABLED_REGIONS:-}
       RACE_LIVE_TRA_REGISTRY_FILE: ${RACE_LIVE_TRA_REGISTRY_FILE:-/app/runtime/policies/race_live/source_registry_the_racing_api_free.json}
-      RACE_LIVE_TRA_REGISTRY_SHA256: ${RACE_LIVE_TRA_REGISTRY_SHA256:-0e1cdff89052b7b5f482b4761f1e39e3f38eefdf30405ae6a5d45b64e737b322}
+      RACE_LIVE_TRA_REGISTRY_SHA256: ${RACE_LIVE_TRA_REGISTRY_SHA256:-53962c4220c35523ea77ca27e674970bfb555e48e7b6bf86b0472e05cfed1735}
     volumes:
       - ${UMANEWS_PERSISTENT_RUNTIME_ROOT:-./runtime}/race_data_sync:/run/race-data-sync:ro
       - static_data:/app/server/staticfiles

@@ -400,6 +400,7 @@ def build_registry_artifact(
     selector_scope: dict[str, Any],
     now: datetime | None = None,
     predecessor_root_sha256: str = "",
+    runtime_valid_until: datetime | None = None,
 ) -> bytes:
     _validate_selector_scope(selector_scope)
     validate_registry_artifact_identity(
@@ -415,6 +416,9 @@ def build_registry_artifact(
     ):
         raise RegistryError("每场必须绑定合法 enrollment SHA")
     generated = (now or django_timezone.now()).astimezone(timezone.utc)
+    deadline = runtime_valid_until or generated + timedelta(days=35)
+    if deadline.tzinfo is None or deadline <= generated:
+        raise RegistryError("runtime_valid_until 必须为晚于生成时间的 aware 时间")
     events = list(RaceEvent.objects.filter(id__in=ids).order_by("id"))
     controls = {
         row.event_id: row
@@ -431,10 +435,10 @@ def build_registry_artifact(
         entry_shas.append(entry_sha)
     membership_sha = hashlib.sha256(_canonical_bytes({"entry_sha256s": entry_shas})).hexdigest()
     payload: dict[str, Any] = {
-        "schema_version": SCHEMA_VERSION,
+        "schema_version": 2 if runtime_valid_until is not None else SCHEMA_VERSION,
         "generated_at": _utc_iso(generated),
         "apply_expires_at": _utc_iso(generated + timedelta(hours=24)),
-        "runtime_valid_until": _utc_iso(generated + timedelta(days=35)),
+        "runtime_valid_until": _utc_iso(deadline),
         "approved_commit": approved_commit,
         "generation": generation,
         "predecessor_root_sha256": predecessor_root_sha256,
@@ -475,7 +479,11 @@ def load_registry_manifest_bytes(
         "approved_commit", "generation", "predecessor_root_sha256", "selector_scope",
         "scope_sha256", "member_count", "membership_sha256", "events", "content_sha256",
     }
-    if set(data) != required or data.get("schema_version") != SCHEMA_VERSION:
+    if (
+        set(data) != required
+        or type(data.get("schema_version")) is not int
+        or data.get("schema_version") not in {1, 2}
+    ):
         raise RegistryError("registry artifact schema 不匹配")
     if data["approved_commit"] != expected_commit:
         raise RegistryError("approved_commit 不匹配")
@@ -483,8 +491,14 @@ def load_registry_manifest_bytes(
     expires = _parse_dt(data["apply_expires_at"], "apply_expires_at")
     runtime_until = _parse_dt(data["runtime_valid_until"], "runtime_valid_until")
     current = now or django_timezone.now()
-    if expires != generated + timedelta(hours=24) or runtime_until != generated + timedelta(days=35):
+    if (
+        expires != generated + timedelta(hours=24)
+        or runtime_until <= generated
+        or (data["schema_version"] == 1 and runtime_until != generated + timedelta(days=35))
+    ):
         raise RegistryError("registry 有效期合同不匹配")
+    if generated > current:
+        raise RegistryError("registry generated_at 不得在未来")
     if current >= runtime_until or (require_apply_fresh and current >= expires):
         raise RegistryError("registry artifact 已过期")
     if scope_sha256(data["selector_scope"]) != data["scope_sha256"]:
@@ -532,6 +546,79 @@ def load_registry_manifest_bytes(
     return LoadedRegistryManifest(data, raw, actual, content, ids, enrollment, predecessor)
 
 
+def _is_same_scope_renewal(manifest: LoadedRegistryManifest) -> bool:
+    """显式期限 successor 只能续期现有成员，不能借续期重选范围或身份。"""
+    if manifest.data["schema_version"] != 2 or not manifest.predecessor_root_sha256:
+        return False
+    predecessor = RaceEventLifecycleEnforceRegistry.objects.filter(
+        root_sha256=manifest.predecessor_root_sha256
+    ).first()
+    if predecessor is None:
+        raise RegistryError("续期 predecessor 不存在")
+    replay = RaceEventLifecycleEnforceRegistry.objects.filter(
+        root_sha256=manifest.raw_sha256, is_active=True, state="active",
+        predecessor=predecessor,
+    ).exists()
+    if not replay and (not predecessor.is_active or predecessor.state != "active"):
+        raise RegistryError("续期 predecessor 已撤销或非当前 active root")
+    rows = list(predecessor.memberships.order_by("event_id"))
+    if (tuple(row.event_id for row in rows) != manifest.event_ids
+            or predecessor.member_count != len(rows)
+            or predecessor.selector_scope != manifest.data["selector_scope"]
+            or manifest.data["generation"] != predecessor.generation + 1):
+        raise RegistryError("续期不得改变成员、selector scope 或 generation 链")
+    for row in rows:
+        entry = manifest.data["events"][str(row.event_id)]
+        if (not replay and row.state != "active") or any(
+            entry.get(key) != value for key, value in {
+                "schedule_generation": row.schedule_generation,
+                "schedule_hash": row.schedule_hash,
+                "source_enrollment_sha256": row.source_enrollment_sha256,
+                "region": row.country_region,
+                "timezone_name": row.timezone_name,
+                "allowed_us_zones": row.frozen_snapshot.get("allowed_us_zones", []),
+            }.items()
+        ):
+            raise RegistryError(f"event {row.event_id} 续期身份漂移或已撤销")
+    return True
+
+
+def build_registry_renewal_artifact(
+    *, expected_root_sha256: str, approved_commit: str,
+    runtime_valid_until: datetime, now: datetime | None = None,
+) -> bytes:
+    """只读准备当前 cohort 的续期；生产 apply 仍走原 promotion/activation。"""
+    predecessor = RaceEventLifecycleEnforceRegistry.objects.filter(
+        root_sha256=expected_root_sha256, is_active=True, state="active"
+    ).first()
+    if predecessor is None:
+        raise RegistryError("续期 root 与当前 active registry 不一致")
+    rows = list(predecessor.memberships.order_by("event_id"))
+    raw = build_registry_artifact(
+        event_ids=[row.event_id for row in rows],
+        enrollment_sha_by_event={row.event_id: row.source_enrollment_sha256 for row in rows},
+        approved_commit=approved_commit, generation=predecessor.generation+1,
+        selector_scope=predecessor.selector_scope,
+        predecessor_root_sha256=expected_root_sha256,
+        runtime_valid_until=runtime_valid_until, now=now,
+    )
+    manifest = load_registry_manifest_bytes(
+        raw, expected_raw_sha256=hashlib.sha256(raw).hexdigest(),
+        expected_commit=approved_commit, now=now,
+    )
+    _is_same_scope_renewal(manifest)
+    controls = {row.event_id: row for row in RaceEventLifecycleControl.objects.filter(
+        event_id__in=manifest.event_ids
+    )}
+    for event in RaceEvent.objects.filter(id__in=manifest.event_ids):
+        control = controls[event.id]
+        if (_active_member_safety_reason(event, control)
+                or control.mode != RaceEventLifecycleMode.ENFORCE
+                or control.manifest_data.get("enforce_registry", {}).get("root_sha256") != expected_root_sha256):
+            raise RegistryError(f"event {event.id} 当前授权状态不允许续期")
+    return raw
+
+
 def _assert_closed() -> None:
     if getattr(settings, "RACE_EVENT_LIFECYCLE_ENABLED", False) or getattr(
         settings, "RACE_EVENT_LIFECYCLE_MODE", "off"
@@ -571,6 +658,9 @@ def _assert_manifest_matches_db(
     allow_lifecycle_progress: bool = False,
     allow_running_event_ids: frozenset[int] = frozenset(),
 ) -> tuple[list[RaceEvent], list[RaceEventLifecycleControl]]:
+    renewal = _is_same_scope_renewal(manifest)
+    if renewal:
+        allow_lifecycle_progress = True
     expected_ids = event_ids or manifest.event_ids
     events = list(RaceEvent.objects.select_for_update().filter(id__in=expected_ids).order_by("id"))
     controls = list(RaceEventLifecycleControl.objects.select_for_update().filter(event_id__in=expected_ids).order_by("event_id"))
@@ -578,6 +668,8 @@ def _assert_manifest_matches_db(
         raise RegistryError("registry cohort 数据库行不完整")
     for event, control in zip(events, controls, strict=True):
         entry = manifest.data["events"][str(event.id)]
+        if renewal and control.mode != RaceEventLifecycleMode.ENFORCE:
+            raise RegistryError(f"event {event.id} 续期 control 已退出 enforce")
         if _schedule_hash(event) != entry["schedule_hash"] or control.schedule_generation != entry["schedule_generation"]:
             raise RegistryError(f"event {event.id} schedule/generation 漂移")
         if event.country_region != entry["region"] or event.timezone_name != entry["timezone_name"]:
@@ -942,15 +1034,16 @@ def activate_registry(
                     raise RegistryError(
                         f"event {control.event_id} control promotion evidence 不完整"
                     )
-            census = select_registry_candidates(
-                scope=manifest.data["selector_scope"],
-                predecessor_event_ids=(
-                    list(target.predecessor.memberships.values_list("event_id", flat=True))
-                    if target.predecessor_id else []
-                ),
-            )
-            if census.included_event_ids != manifest.event_ids:
-                raise RegistryError("activation cutoff census 与 artifact 不一致")
+            if not _is_same_scope_renewal(manifest):
+                census = select_registry_candidates(
+                    scope=manifest.data["selector_scope"],
+                    predecessor_event_ids=(
+                        list(target.predecessor.memberships.values_list("event_id", flat=True))
+                        if target.predecessor_id else []
+                    ),
+                )
+                if census.included_event_ids != manifest.event_ids:
+                    raise RegistryError("activation cutoff census 与 artifact 不一致")
             if not apply:
                 return RegistryResult("would_activate", manifest.event_ids)
             now = django_timezone.now()
