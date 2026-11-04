@@ -25,7 +25,9 @@
     "docs/changes/next-version-capabilities/lanes/C/U02-offline-inventory.json",
     "docs/changes/next-version-capabilities/lanes/B/B053-m02-read-translation-consumer/obligations.json",
     "docs/changes/next-version-capabilities/lanes/B/B055-completed-redelivery-receipt-fix/obligations.json",
-    "docs/changes/next-version-capabilities/lanes/B/B057-remaining7-end-to-end-test-prep/obligations.json"
+    "docs/changes/next-version-capabilities/lanes/B/B057-remaining7-end-to-end-test-prep/obligations.json",
+    "docs/changes/term-display-sql-20261103/benchmark.json",
+    "docs/changes/term-display-sql-20261103/pg-receipt.json"
   ],
   "high_risk": [
     ".codex/agents/application.toml",
@@ -983,7 +985,8 @@
     "server/stable/management/commands/horse_basic_profile_from_review.py",
     "server/stable/services/horse_basic_profile_prepare_input.py",
     "server/stable/migrations/0081_managed_readonly_steps.py",
-    "docs/changes/qq-retirement-20261103/release-manifest.json"
+    "docs/changes/qq-retirement-20261103/release-manifest.json",
+    "docs/changes/term-display-sql-20261103/release-manifest.json"
   ],
   "paths": {
     "docs/changes/next-version-capabilities/lanes/C/U01-offline-cases.json": [
