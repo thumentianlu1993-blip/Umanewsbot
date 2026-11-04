@@ -1,3 +1,9 @@
+## 2026-11-05 OCI归属修正恢复完成
+
+当前固定生产候选df2f376a、镜像3fcf9090，四应用与0079空迁移计划一致。原受保护promotion/activation已完成，
+Beat最后启动，Nginx平滑reload；644.6秒观察和锁释放审计通过。恢复点与凭据使用[本次记录](changes/lifecycle-oci-revision-20261105/production-result.md)，
+不要复用旧661a失败包或把完整main作为生产候选。QQ保持关闭，外项目未操作。通用人工确认仍仅见根AGENTS.md。
+
 ## 2026-11-03 QQ下线发布的依赖兼容故障
 
 68063962同schema发布及OneBot停止已执行，但Celery最终验收发现新解析的Kombu 5.7.0不支持固定redis 5.2.1。三个失败后台服务已停止，web健康，QQ保持关闭，队列保留。恢复须使用经过兼容验证的前向候选与精确包，不回滚旧镜像，不改写已有intent或完成收据。详见[执行记录](changes/qq-retirement-20261103/rollout.md)。构建成功、容器Running及发布入口退出0不能替代真实worker/broker就绪证明。
