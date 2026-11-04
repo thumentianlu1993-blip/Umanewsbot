@@ -99,9 +99,18 @@ def config(data, *, image=False):
     return value
 
 
-def reject_application_markers(value):
-    require(not value['Labels'].get('org.opencontainers.image.revision'),
-            'application revision marker exists')
+def revision(value):
+    marker = value['Labels'].get('org.opencontainers.image.revision', '')
+    require(isinstance(marker, str) and len(marker) <= 256 and
+            not any(char.isspace() for char in marker), 'revision metadata is invalid')
+    return marker
+
+
+def reject_application_markers(value, owned_revisions):
+    # OCI revision 是通用元数据；只有命中本项目身份时才能作为归属证据。
+    marker = revision(value)
+    require(not marker or marker not in owned_revisions,
+            'application revision identity exists')
     prefixes = ('UMANEWS_', 'RACE_EVENT_LIFECYCLE_', 'RACE_LIVE_', 'RACE_DATA_SYNC_')
     require(not any(item.split('=', 1)[0].upper().startswith(prefixes)
                     for item in value['Env']), 'application environment marker exists')
@@ -185,12 +194,16 @@ def prove_unrelated(snapshot, cid, project, release_dir, image):
             any(item[1] == 'web' for item in anchors), 'application census anchors are ambiguous')
     owned_paths = {host_path(release_dir)}
     owned_names, owned_network_ids, owned_repositories = set(), set(), set()
+    owned_revisions = set()
+    owned_images = {}
     for anchor in anchors:
         require(anchor[3] in ('False', 'false') and anchor[4] == release_dir,
                 'application anchor labels mismatch')
         data = inspect('container', anchor[0]); value = verify_row(anchor, data)
         require(data.get('Image') == image, 'application anchor image mismatch')
         owned_repositories.add(repository(value.get('Image')))
+        if revision(value):
+            owned_revisions.add(revision(value))
         names, ids = networks(data); owned_names.update(names); owned_network_ids.update(ids)
         owned_paths.update(mounts(data))
     # 镜像身份锚点与资源归属分开：包括 db/redis/nginx 等本项目依赖，亦含停止容器。
@@ -200,16 +213,29 @@ def prove_unrelated(snapshot, cid, project, release_dir, image):
             'application resource disappeared or changed since census')
     for resource in resources:
         data = inspect('container', resource[0])
-        verify_row(resource, data, running_required=False)
+        resource_config = verify_row(resource, data, running_required=False)
+        image_id = data.get('Image', '')
+        if image_id not in owned_images:
+            owned_image = inspect('image', image_id)
+            require(owned_image.get('Id') == image_id, 'application image identity mismatch')
+            owned_images[image_id] = config(owned_image, image=True)
+        image_revision = revision(owned_images[image_id])
+        if image_revision:
+            owned_revisions.add(image_revision)
+        if revision(resource_config):
+            owned_revisions.add(revision(resource_config))
         names, ids = networks(data, stopped=not data['State']['Running'])
         owned_names.update(names); owned_network_ids.update(ids)
         owned_paths.add(host_path(resource[4])); owned_paths.update(mounts(data))
     data = inspect('container', cid); value = verify_row(row, data)
-    require(data.get('Image') != image, 'candidate application image in foreign project')
-    reject_application_markers(value)
+    require(data.get('Image') not in owned_images, 'application image in foreign project')
+    reject_application_markers(value, owned_revisions)
     image_data = inspect('image', data.get('Image', ''))
     require(image_data.get('Id') == data['Image'], 'image inspect identity mismatch')
-    reject_application_markers(config(image_data, image=True))
+    image_config = config(image_data, image=True)
+    reject_application_markers(image_config, owned_revisions)
+    require(revision(value) == revision(image_config),
+            'container and image revision metadata differ')
     tags = image_data.get('RepoTags')
     require(isinstance(tags, list) and tags, 'foreign image has no repository provenance')
     refs = {repository(value.get('Image')), *(repository(tag) for tag in tags)}

@@ -1,3 +1,11 @@
+## 2026-11-05 PR276已合并，恢复再次被外项目OCI revision阻断
+
+固定候选661a0859已完成0079同schema应用发布与专属备份；promotion在generation3写入前被同机外项目新revision标签阻断。
+Web健康、race_sync_v2_worker运行，普通worker/Beat按保护逻辑暂停、lifecycle false/off。
+TRA续期已完成，生命周期续期与恢复后10分钟验收未完成；956事实行保持。
+修复通用标签误判及本项目镜像身份保护，准备新候选df2f376a与artifact8fb7b644…；测试/独立复审/CI完成后再交付。
+具体已执行证据和下一恢复包见[记录](changes/lifecycle-oci-revision-20261105/rollout.md)。
+
 ## 2026-11-04 PR275 应用已发布，生命周期续期遇到跨项目 census 阻断
 
 PR275 已合并4f63ef3e，固定窄候选ab5775f6已上线；四服务的TRA v3及两项摘要已核验，schema仍0079。授权promotion在写registry前因wechat-summary同名worker误阻断，保护机制将lifecycle保持false/off并停止普通worker/Beat；网页正常，generation3未创建。用户已批准按应用所有权证明排除无关项目，修复在独立分支准备；未对微信摘要服务作任何操作。见[修复范围](changes/lifecycle-census-ownership-20261104/spec.md)与[恢复包准备](changes/lifecycle-census-ownership-20261104/rollout.md)。

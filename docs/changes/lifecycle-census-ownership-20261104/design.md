@@ -4,7 +4,7 @@
 
 - census 与重新 inspect 的容器 ID、service/project/working directory/one-off 标签、运行状态一致。
 - 本项目必须有可核对的 web 锚点，最多三个不同服务；锚点镜像和发布目录完全符合预期。不能以缺失或重复的本项目容器建立归属依据。
-- 外部容器镜像不是候选镜像；容器和镜像都没有 OCI revision、UMANEWS、lifecycle、race-live、race-sync 环境标记；镜像仓库不与本项目重合。
+- 外部容器镜像不是候选镜像；容器和镜像都没有 UMANEWS、lifecycle、race-live、race-sync 环境标记；通用 OCI revision 不单独证明应用归属，但必须在镜像与容器间一致、格式有界，且不得命中本项目全部容器及其固定 Image ID 镜像的 revision（含停止容器）。镜像 inspect ID 不符、缺失或畸形均拒绝，同一 Image ID 在一次证明中只读一次；镜像仓库不与本项目重合。
 - 以本项目全部 Compose 容器（含停止容器、db/redis/nginx等依赖）建立受保护网络及挂载清单，与应用镜像锚点分开。两次 census 之间首次出现的全部本项目容器必须保持 ID 和归属标签一致，否则拒绝本次证明。停止容器保留声明网络名；外部网络名称和 NetworkID 均不得重合。拒绝 host/container/service 网络命名空间、宿主 PID/IPC、特权、额外capability/设备和 volumes-from。
 - 外部发布目录及 bind/volume 来源与本项目发布目录、挂载来源没有相等或祖先/后代关系；解析宿主路径别名，拒绝 Docker socket及其父目录、proc/sys/dev宿主伪文件系统及/run/user运行时目录；非默认路径的docker.sock来源即使改名挂载也拒绝。只读时区文件允许共用。
 - 缺失、畸形、漂移或无法检查的必要元数据均拒绝。Docker 镜像省略或 null Labels 表示无标签；容器身份标签仍不可省略。
