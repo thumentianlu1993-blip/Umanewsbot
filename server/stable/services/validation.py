@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import hashlib
+import json
+import math
 import re
 import unicodedata
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone as datetime_timezone
 from typing import Callable
 
 from django.conf import settings
@@ -29,6 +31,7 @@ from stable.models import (
 from stable.services.terms import (
     ArticleEntityResolution,
     ENGLISH_COMMON_WORD_TERM_SEEDS,
+    clean_visible_source_text,
     _recognize_non_japanese_external_aliases,
     english_horse_name_has_confirmed_occurrence,
     _find_source_term_match,
@@ -44,6 +47,7 @@ from stable.services.terms import (
 from stable.services.news_attribution import article_region_set
 from stable.services.publish_readiness import transition_to_publish_ready
 from stable.services.term_consistency import apply_consistency_gate
+from stable.services.numeric_surface_audit import audit_numeric_surfaces
 
 
 _NUMBER_RE = re.compile(r"\d+(?:\.\d+)?")
@@ -215,6 +219,245 @@ def _summarize_issues(issues: list[GateIssue]) -> str:
     if warnings:
         return "warning：" + "；".join(warnings[:4])
     return "info：" + "；".join(infos[:4])
+
+
+_NUMERIC_DIAGNOSTIC_FIELD_BYTES = 16 * 1024
+_NUMERIC_DIAGNOSTIC_TOTAL_BYTES = 32 * 1024
+_NUMERIC_DIAGNOSTIC_OCCURRENCES = 512
+_NUMERIC_DIAGNOSTIC_OLD_JSON_BYTES = 128 * 1024
+_NUMERIC_DIAGNOSTIC_JSON_BYTES = 576 * 1024
+_NUMERIC_DIAGNOSTIC_LOG_BYTES = 768 * 1024
+_NUMERIC_DIAGNOSTIC_MEMORY_BYTES = 16 * 1024 * 1024
+
+
+class _NumericDiagnosticResourceRefusal(Exception):
+    def __init__(self, limit: str):
+        self.limit = limit
+        super().__init__(limit)
+
+
+def _numeric_diagnostic_unavailable(reason: str, resource_limit: str | None = None) -> dict:
+    result = {
+        "status": "diagnostic_unavailable",
+        "reason": reason,
+        "comparison_scope": "raw_numeric_lexemes",
+        "fact_verdict": "not_assessed",
+    }
+    if resource_limit is not None:
+        result["resource_limit"] = resource_limit
+    return result
+
+
+def _numeric_diagnostic_payload_upper(value: dict) -> int:
+    """有界读取既有JSON值，不编码、复制或强转未知对象。"""
+    active = set()
+    nodes = 0
+    size = 0
+
+    def add(amount):
+        nonlocal size
+        size += amount
+        if size > _NUMERIC_DIAGNOSTIC_OLD_JSON_BYTES:
+            raise _NumericDiagnosticResourceRefusal("existing_payload_json_upper_bytes")
+
+    def visit(item, depth):
+        nonlocal nodes
+        nodes += 1
+        if nodes > 4096:
+            raise _NumericDiagnosticResourceRefusal("existing_payload_scan_max_nodes")
+        if depth > 16:
+            raise _NumericDiagnosticResourceRefusal("existing_payload_scan_max_depth")
+        kind = type(item)
+        if item is None:
+            add(4)
+        elif kind is bool:
+            add(5)
+        elif kind is str:
+            # 包括普通JSONField的ASCII/控制字符转义和引号。
+            add(12 * len(item) + 2)
+        elif kind is int:
+            if item.bit_length() > 64:
+                raise _NumericDiagnosticResourceRefusal("existing_payload_type")
+            add(66)
+        elif kind is float:
+            if not math.isfinite(item):
+                raise _NumericDiagnosticResourceRefusal("existing_payload_type")
+            add(32)
+        elif kind in (dict, list, tuple):
+            identity = id(item)
+            if identity in active:
+                raise _NumericDiagnosticResourceRefusal("existing_payload_cycle")
+            add(2 + (4 if kind is dict else 2) * len(item))
+            active.add(identity)
+            try:
+                if kind is dict:
+                    for key, child in item.items():
+                        if type(key) is not str:
+                            raise _NumericDiagnosticResourceRefusal("existing_payload_type")
+                        visit(key, depth + 1)
+                        visit(child, depth + 1)
+                else:
+                    for child in item:
+                        visit(child, depth + 1)
+            finally:
+                active.remove(identity)
+        else:
+            raise _NumericDiagnosticResourceRefusal("existing_payload_type")
+
+    if type(value) is not dict:
+        raise _NumericDiagnosticResourceRefusal("existing_payload_type")
+    visit(value, 0)
+    return size
+
+
+def _numeric_diagnostic_text_bounds(texts: tuple[str, ...], stage: str) -> tuple[int, int]:
+    """流式计UTF8与出现数；不创建编码副本、token字符串或跨度清单。"""
+    total_bytes = 0
+    for text in texts:
+        if type(text) is not str:
+            raise TypeError("diagnostic inputs must be strings")
+        field_bytes = 0
+        for character in text:
+            point = ord(character)
+            if 0xD800 <= point <= 0xDFFF:
+                raise UnicodeError("diagnostic input contains a surrogate")
+            field_bytes += 1 if point <= 0x7F else 2 if point <= 0x7FF else 3 if point <= 0xFFFF else 4
+            if field_bytes > _NUMERIC_DIAGNOSTIC_FIELD_BYTES:
+                raise _NumericDiagnosticResourceRefusal(stage + "_field_utf8_bytes")
+        total_bytes += field_bytes
+        if total_bytes > _NUMERIC_DIAGNOSTIC_TOTAL_BYTES:
+            raise _NumericDiagnosticResourceRefusal(stage + "_total_utf8_bytes")
+    occurrences = 0
+    for text in texts:
+        for _ in _NUMBER_RE.finditer(text):
+            occurrences += 1
+            if occurrences > _NUMERIC_DIAGNOSTIC_OCCURRENCES:
+                raise _NumericDiagnosticResourceRefusal(stage + "_occurrences")
+    return total_bytes, occurrences
+
+
+def _numeric_diagnostic_timestamp(loaded: dict) -> tuple[str | None, str]:
+    if "updated_at" not in loaded:
+        return None, "field_not_loaded"
+    value = loaded["updated_at"]
+    if value is None:
+        return None, "loaded_null"
+    if type(value) is not datetime:
+        return None, "unsupported_timestamp_value"
+    try:
+        if value.tzinfo is None or value.utcoffset() is None:
+            return None, "naive_timestamp"
+        return value.astimezone(datetime_timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z"), "loaded"
+    except Exception:
+        return None, "unsupported_timestamp_value"
+
+
+def _numeric_surface_diagnostics(
+    *, article, content_source, legacy_title, legacy_body, publish_title,
+    publish_body, existing_details, source_fields, target_selectors,
+) -> dict:
+    """仅为当前校验输入追加完整诊断，失败不改变既有gate计算。
+
+    预算只约束新增计算和接受时的JSON；不是旧日志/OOM的普遍隔离。
+    后续article.save和AutomationLog编码/写入仍由原调用链处理。
+    """
+    try:
+        loaded = article.__dict__
+        article_id = loaded.get("id")
+        if type(article_id) is not int or not 0 < article_id <= 2**63 - 1:
+            return _numeric_diagnostic_unavailable("missing_article_identity")
+        observed_time, time_reason = _numeric_diagnostic_timestamp(loaded)
+        if (
+            type(content_source) is not str
+            or content_source not in ("base_translation", "rewrite")
+            or type(source_fields) is not dict or len(source_fields) != 2
+            or type(target_selectors) is not dict or len(target_selectors) != 2
+            or type(source_fields.get("title")) is not str
+            or source_fields["title"] != "title_ja"
+            or type(source_fields.get("body")) is not str
+            or source_fields["body"] not in ("body_ja_normalized", "body_ja_raw")
+            or type(target_selectors.get("title")) is not str
+            or target_selectors["title"] != "_publish_title"
+            or type(target_selectors.get("body")) is not str
+            or target_selectors["body"] != "_publish_body"
+        ):
+            raise TypeError("invalid diagnostic selection metadata")
+        raw = (legacy_title, legacy_body, publish_title, publish_body)
+        if any(type(text) is not str for text in raw):
+            raise TypeError("diagnostic inputs must be strings")
+        if any(len(text) > _NUMERIC_DIAGNOSTIC_FIELD_BYTES for text in raw):
+            raise _NumericDiagnosticResourceRefusal("raw_field_codepoints")
+        if sum(len(text) for text in raw) > _NUMERIC_DIAGNOSTIC_TOTAL_BYTES:
+            raise _NumericDiagnosticResourceRefusal("raw_total_codepoints")
+        # 留出原apply路径的issue_counts；不复制或改写原details。
+        old_upper = _numeric_diagnostic_payload_upper(existing_details) + 512
+        if old_upper > _NUMERIC_DIAGNOSTIC_OLD_JSON_BYTES:
+            raise _NumericDiagnosticResourceRefusal("existing_payload_json_upper_bytes")
+        maximum_json = 4096 + 12 * _NUMERIC_DIAGNOSTIC_TOTAL_BYTES + 288 * _NUMERIC_DIAGNOSTIC_OCCURRENCES
+        # 工程预收费，仍需固定运行时峰值测量，不是OS分配器硬限。
+        memory_charge = (
+            1048576 + 32 * (2 * _NUMERIC_DIAGNOSTIC_TOTAL_BYTES)
+            + 4096 * _NUMERIC_DIAGNOSTIC_OCCURRENCES
+            + 8 * maximum_json + 4 * _NUMERIC_DIAGNOSTIC_OLD_JSON_BYTES
+        )
+        if memory_charge > _NUMERIC_DIAGNOSTIC_MEMORY_BYTES:
+            raise _NumericDiagnosticResourceRefusal("builder_incremental_memory_budget_bytes")
+        _numeric_diagnostic_text_bounds(raw, "raw")
+        cleaned = tuple(clean_visible_source_text(text) for text in raw)
+        clean_bytes, clean_occurrences = _numeric_diagnostic_text_bounds(cleaned, "clean")
+        diagnostic_upper = 4096 + 12 * clean_bytes + 288 * clean_occurrences
+        if diagnostic_upper > _NUMERIC_DIAGNOSTIC_JSON_BYTES:
+            raise _NumericDiagnosticResourceRefusal("diagnostic_json_bytes_cap")
+        if old_upper + diagnostic_upper + 512 > _NUMERIC_DIAGNOSTIC_LOG_BYTES:
+            raise _NumericDiagnosticResourceRefusal("augmented_current_log_json_bytes_cap")
+
+        fields = {}
+        for name, source_index, target_index in (("title", 0, 2), ("body", 1, 3)):
+            source, translated = cleaned[source_index], cleaned[target_index]
+            fields[name] = {
+                "source_text": source,
+                "translated_text": translated,
+                "source_sha256": hashlib.sha256(source.encode("utf-8")).hexdigest(),
+                "translated_sha256": hashlib.sha256(translated.encode("utf-8")).hexdigest(),
+                "raw_source_sha256": hashlib.sha256(raw[source_index].encode("utf-8")).hexdigest(),
+                "raw_translated_sha256": hashlib.sha256(raw[target_index].encode("utf-8")).hexdigest(),
+                "audit": audit_numeric_surfaces(source, translated),
+                "source_field": source_fields[name],
+                "target_selector": target_selectors[name],
+            }
+        snapshot = {
+            "status": "available",
+            "comparison_scope": "raw_numeric_lexemes",
+            "fact_verdict": "not_assessed",
+            "binding_scope": "current_validation_snapshot",
+            "coordinate_space": "diagnostic_input_string",
+            "article_id": article_id,
+            "article_updated_at": observed_time,
+            "updated_at_observation": time_reason,
+            "content_source": content_source,
+            "transform": "terms.clean_visible_source_text",
+            "fields": fields,
+        }
+        canonical = json.dumps(snapshot, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode("utf-8")
+        snapshot["snapshot_sha256"] = hashlib.sha256(canonical).hexdigest()
+        del canonical
+        # 预准入之后的防御复核，不能替代前面的构造预算。
+        encoded_size = len(json.dumps(snapshot, allow_nan=False).encode("utf-8"))
+        if encoded_size > _NUMERIC_DIAGNOSTIC_JSON_BYTES:
+            raise _NumericDiagnosticResourceRefusal("diagnostic_json_bytes_cap")
+        if old_upper + encoded_size + 512 > _NUMERIC_DIAGNOSTIC_LOG_BYTES:
+            raise _NumericDiagnosticResourceRefusal("augmented_current_log_json_bytes_cap")
+        return snapshot
+    except _NumericDiagnosticResourceRefusal as exc:
+        return _numeric_diagnostic_unavailable("resource_refusal", exc.limit)
+    except (TypeError, UnicodeError):
+        return _numeric_diagnostic_unavailable("invalid_input")
+    except Exception as exc:
+        result = _numeric_diagnostic_unavailable("numeric_diagnostic_error")
+        name = type(exc).__name__
+        if len(name) <= 48 and name.isascii():
+            result["exception_type"] = name
+        return result
 
 
 def _important_numbers(text: str) -> list[str]:
@@ -816,7 +1059,12 @@ def validate_rewrite(
         context_mode = "off"
     visible_title, visible_body = _visible_source_parts(article)
     legacy_title = article.title_ja or ""
-    legacy_body = article.body_ja_normalized or article.body_ja_raw or ""
+    legacy_body = article.body_ja_normalized
+    if legacy_body:
+        source_body_field = "body_ja_normalized"
+    else:
+        legacy_body = article.body_ja_raw or ""
+        source_body_field = "body_ja_raw"
     title = visible_title if context_mode == "enforce" else legacy_title
     gate_body = visible_body if context_mode == "enforce" else legacy_body
     source = "\n".join([title, gate_body]).strip()
@@ -840,7 +1088,8 @@ def validate_rewrite(
         "article_entities": [],
     }
 
-    if not _publish_title(article, content_source):
+    publish_title = _publish_title(article, content_source)
+    if not publish_title:
         issues.append(_issue("missing_title", SEVERITY_BLOCKER, "发布稿缺少标题", route=ROUTE_MANUAL))
     if not publish_body:
         issues.append(_issue("missing_body", SEVERITY_BLOCKER, "发布稿缺少正文", route=ROUTE_MANUAL))
@@ -1595,6 +1844,17 @@ def validate_rewrite(
     issue_dicts = [issue.as_dict() for issue in issues]
     details["issues"] = issue_dicts
     passed = not any(issue.severity == SEVERITY_BLOCKER for issue in issues)
+    details["numeric_surface_audit"] = _numeric_surface_diagnostics(
+        article=article,
+        content_source=content_source,
+        legacy_title=legacy_title,
+        legacy_body=legacy_body,
+        publish_title=publish_title,
+        publish_body=publish_body,
+        existing_details=details,
+        source_fields={"title": "title_ja", "body": source_body_field},
+        target_selectors={"title": "_publish_title", "body": "_publish_body"},
+    )
     return ValidationOutcome(passed, _summarize_issues(issues), details, issue_dicts)
 
 

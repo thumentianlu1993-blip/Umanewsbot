@@ -991,6 +991,9 @@
     "docs/changes/term-display-sql-20261103/release-manifest.json"
   ],
   "paths": {
+    "server/stable/services/numeric_surface_audit.py": [
+      "numeric_surface_audit"
+    ],
     "docs/changes/next-version-capabilities/lanes/C/U01-offline-cases.json": [
       "module:stable.test_race_information_display_pages",
       "module:stable.test_race_information_display",
