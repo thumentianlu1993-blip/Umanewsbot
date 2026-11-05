@@ -48,6 +48,9 @@ def decide_data_sync_lifecycle(
         )
     if timezone.is_naive(event.race_datetime):
         raise ValueError("race_datetime must be timezone-aware")
+    from stable.services.race_lifecycle_projection import governed
+    if governed(event.pk):
+        return DataSyncLifecycleDecision(reason_code="source_fact_required", next_refresh_at=now + timedelta(minutes=2))
     finish_at = event.race_datetime + timedelta(minutes=30)
     if now >= finish_at:
         return DataSyncLifecycleDecision(

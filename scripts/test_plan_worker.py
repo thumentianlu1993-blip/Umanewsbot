@@ -15,6 +15,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT), str(ROOT/'server'), str(ROOT/'.codex/scripts'), str(ROOT/'scripts'), str(ROOT/'runtime/research')]
 from tools.test_impact.core import digest, shard_tests
+from tools.test_impact.special_profiles import profile_for, validate_special_batch, validate_root_status, expected_image
 from tools.test_impact.source_binding import verify_source_binding
 from run_bounded_stable_tests import isolated_environment, flatten
 
@@ -39,8 +40,11 @@ def setup(profile, plan, binding):
 
 
 def isolation_probe(profile):
-    if os.getuid() == 0 or Path('/var/run/docker.sock').exists():
+    if (os.getuid() == 0) != (profile == 'root-django') or Path('/var/run/docker.sock').exists():
         raise ValueError('unsafe container privilege')
+    if profile == 'root-django':
+        status = dict(line.split(':', 1) for line in Path('/proc/self/status').read_text().splitlines() if ':' in line)
+        validate_root_status(status, os.getuid(), os.getgid())
     interfaces = set(os.listdir('/sys/class/net'))
     if interfaces != {'lo'}:
         raise ValueError('network namespace has non-loopback interfaces')
@@ -53,7 +57,10 @@ def isolation_probe(profile):
             raise ValueError('subprocess network isolation failed')
     if subprocess.run(['docker','run','--pull=never','--rm','hello-world'],capture_output=True,timeout=5).returncode == 0:
         raise ValueError('nested Docker unexpectedly available')
-    return {'interfaces':sorted(interfaces),'external_python':'blocked','curl':'blocked','nested_docker':'daemon-blocked'}
+    evidence = {'interfaces':sorted(interfaces),'external_python':'blocked','curl':'blocked','nested_docker':'daemon-blocked', 'uid':os.getuid(), 'gid':os.getgid()}
+    if profile == 'root-django':
+        evidence['capabilities'] = {key: status[key].strip() for key in ('CapBnd', 'CapPrm', 'CapEff', 'CapInh', 'CapAmb', 'NoNewPrivs')}
+    return evidence
 
 
 def load(labels):
@@ -82,13 +89,14 @@ def collect(plan, catalog):
             profile = next((p for m,p in catalog['profiles'].items() if ident.startswith(m+'.')), None)
             if profile is None:
                 raise ValueError('unowned test: '+ident)
+            profile = profile_for(ident, profile)
             if ident in cases:
                 aliases.append({'id':ident,'label':label})
                 if cases[ident]['profile'] != profile:
                     raise ValueError('profile ownership conflict')
             else:
                 cases[ident] = {'id':ident,'profile':profile,
-                                'dedicated_batch':any(ident.startswith(module+'.') for module in catalog.get('dedicated_batch_modules',[]))}
+                                'dedicated_batch':profile in ('root-django', 'application-image') or any(ident.startswith(module+'.') for module in catalog.get('dedicated_batch_modules',[]))}
     if plan['labels'] and not cases:
         raise ValueError('empty test collection')
     plan['aliases'] = aliases
@@ -101,8 +109,10 @@ def collect(plan, catalog):
 
 
 def execute(plan, batch):
+    validate_special_batch(batch)
     started=time.monotonic()
     report={'key':batch['key'],'profile':batch['profile'],'plan_digest':digest(plan),
+            'image_id': expected_image(plan, batch),
             **{k:plan[k] for k in ('run_id','run_attempt','test_tree')},
             'executed':[], 'failures':[], 'errors':[], 'skips':[], 'expected_failures':[],
             'unexpected_successes':[], 'lifecycle':'incomplete','exit_code':1,
@@ -128,7 +138,7 @@ def execute(plan, batch):
         if len(actual)!=len(set(actual)) or set(actual)!=set(batch['ids']) or not 0<len(actual)<=200:
             raise ValueError('batch selection mismatch')
         result_holder=[]
-        if batch['profile']=='django':
+        if batch['profile'] in ('django', 'root-django'):
             from django.test.runner import DiscoverRunner
             class Runner(DiscoverRunner):
                 def get_resultclass(self): return Result

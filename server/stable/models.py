@@ -2340,6 +2340,7 @@ class RaceResultObservation(TimestampedModel):
     parser_version = models.CharField(max_length=64)
     raw_sha256 = models.CharField(max_length=64)
     normalized_sha256 = models.CharField(max_length=64)
+    acquisition_key = models.CharField(max_length=64, blank=True, default="")
     result_phase = models.CharField(max_length=16, choices=RaceResultPhase.choices)
     normalized_payload = models.JSONField(default=dict, blank=True)
     field_provenance = models.JSONField(default=dict, blank=True)
@@ -2355,7 +2356,7 @@ class RaceResultObservation(TimestampedModel):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=("source_identity", "normalized_sha256", "result_phase"),
+                fields=("source_identity", "normalized_sha256", "result_phase", "acquisition_key"),
                 name="uq_race_obs_source_hash_phase",
             ),
             models.CheckConstraint(
@@ -6065,6 +6066,9 @@ class RaceEventLifecycleControl(TimestampedModel):
     manual_pause_reason = models.TextField(blank=True)
     enrollment_manifest_sha256 = models.CharField(max_length=64, blank=True)
     manifest_data = models.JSONField(default=dict, blank=True)
+    first_result_confirmed_at = models.DateTimeField(null=True, blank=True)
+    correction_until = models.DateTimeField(null=True, blank=True)
+    next_correction_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         indexes = [
@@ -6988,3 +6992,123 @@ class ManagedReadonlyStep(models.Model):
 
     def delete(self, *args, **kwargs):
         raise ValidationError("只读step禁止删除。")
+
+
+class RaceLifecyclePublicState(TimestampedModel):
+    """当前公开投影；证据保存在不可变的 epoch publication。"""
+    event = models.OneToOneField(RaceEvent, on_delete=models.PROTECT, related_name="lifecycle_public_state")
+    epoch = models.PositiveBigIntegerField()
+    schedule_generation = models.PositiveBigIntegerField()
+    racecard_revision = models.ForeignKey(RaceEventRevision, null=True, on_delete=models.PROTECT, related_name="+")
+    result_revision = models.ForeignKey(RaceEventRevision, null=True, on_delete=models.PROTECT, related_name="+")
+    racecard_maturity = models.CharField(max_length=16, default="unknown")
+    result_maturity = models.CharField(max_length=16, default="unknown")
+    racecard_visibility = models.CharField(max_length=16, default="updating")
+    result_visibility = models.CharField(max_length=16, default="updating")
+    racecard_reason = models.CharField(max_length=64, default="missing")
+    result_reason = models.CharField(max_length=64, default="missing")
+    racecard_deadline_at = models.DateTimeField(null=True)
+    result_deadline_at = models.DateTimeField(null=True)
+    racecard_evidence = models.JSONField(default=dict)
+    result_evidence = models.JSONField(default=dict)
+    # 当前内容的最近获准佐证；不是公开版本，不参与 epoch 内容摘要。
+    racecard_latest_observation = models.ForeignKey(RaceResultObservation, null=True, on_delete=models.PROTECT, related_name="+")
+    result_latest_observation = models.ForeignKey(RaceResultObservation, null=True, on_delete=models.PROTECT, related_name="+")
+    policy_digest = models.CharField(max_length=64)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=models.Q(epoch__gt=0), name="lifecycle_state_epoch_positive"),
+            models.CheckConstraint(condition=models.Q(racecard_maturity__in=["unknown", "predicted", "confirmed"]), name="lifecycle_card_maturity"),
+            models.CheckConstraint(condition=models.Q(result_maturity__in=["unknown", "provisional", "confirmed", "corrected"]), name="lifecycle_result_maturity"),
+            models.CheckConstraint(condition=models.Q(racecard_visibility__in=["visible", "updating", "verifying"]), name="lifecycle_card_visibility"),
+            models.CheckConstraint(condition=models.Q(result_visibility__in=["visible", "updating", "verifying"]), name="lifecycle_result_visibility"),
+            models.CheckConstraint(condition=~models.Q(racecard_visibility="visible") | models.Q(racecard_revision__isnull=False), name="lifecycle_visible_card_ref"),
+            models.CheckConstraint(condition=~models.Q(result_visibility="visible") | models.Q(result_revision__isnull=False), name="lifecycle_visible_result_ref"),
+            models.CheckConstraint(condition=~models.Q(racecard_maturity="confirmed") | models.Q(racecard_deadline_at__isnull=True), name="lifecycle_confirmed_card_time"),
+            models.CheckConstraint(condition=~models.Q(result_maturity__in=["confirmed", "corrected"]) | models.Q(result_deadline_at__isnull=True), name="lifecycle_confirmed_result_time"),
+        ]
+
+
+class RaceLifecycleImmutable(TimestampedModel):
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("赛事生命周期证据不可修改。")
+        kwargs["force_insert"] = True
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("赛事生命周期证据不可删除。")
+
+
+class RaceLifecycleEpochPublication(RaceLifecycleImmutable):
+    event = models.ForeignKey(RaceEvent, on_delete=models.PROTECT, related_name="lifecycle_publications")
+    epoch = models.PositiveBigIntegerField()
+    previous_epoch = models.PositiveBigIntegerField(default=0)
+    schedule_generation = models.PositiveBigIntegerField()
+    idempotency_key = models.CharField(max_length=64)
+    racecard_revision = models.ForeignKey(RaceEventRevision, null=True, on_delete=models.PROTECT, related_name="+")
+    result_revision = models.ForeignKey(RaceEventRevision, null=True, on_delete=models.PROTECT, related_name="+")
+    writer_owner = models.CharField(max_length=16)
+    writer_generation = models.PositiveBigIntegerField()
+    snapshot = models.JSONField()
+    snapshot_sha256 = models.CharField(max_length=64)
+    authorization = models.JSONField()
+    admitted_at = models.DateTimeField()
+    published_at = models.DateTimeField()
+    reason = models.CharField(max_length=64)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=("event", "epoch"), name="uq_lifecycle_event_epoch"),
+            models.UniqueConstraint(fields=("event", "idempotency_key"), name="uq_lifecycle_epoch_operation"),
+            models.CheckConstraint(condition=models.Q(epoch__gt=0), name="lifecycle_publication_epoch"),
+            models.CheckConstraint(condition=models.Q(previous_epoch__lt=models.F("epoch")), name="lifecycle_epoch_predecessor"),
+        ]
+
+
+class RaceLifecycleReceipt(RaceLifecycleImmutable):
+    idempotency_key = models.CharField(max_length=64, unique=True)
+    target_key = models.CharField(max_length=255)
+    event = models.ForeignKey(RaceEvent, null=True, on_delete=models.PROTECT, related_name="lifecycle_receipts")
+    kind = models.CharField(max_length=32)
+    schedule_generation = models.PositiveBigIntegerField(default=0)
+    epoch = models.PositiveBigIntegerField(null=True)
+    occurred_at = models.DateTimeField(null=True)
+    recorded_at = models.DateTimeField()
+    deadline_at = models.DateTimeField(null=True)
+    payload = models.JSONField(default=dict)
+    evidence_refs = models.JSONField(default=list)
+    rule_version = models.CharField(max_length=32, default="p02.v1")
+
+    class Meta:
+        indexes = [
+            models.Index(fields=("target_key", "recorded_at"), name="lc_receipt_target_time"),
+            models.Index(fields=("kind", "deadline_at"), name="lc_receipt_kind_deadline"),
+        ]
+
+
+class RaceLifecycleDelivery(TimestampedModel):
+    event = models.ForeignKey(RaceEvent, on_delete=models.PROTECT, related_name="lifecycle_deliveries")
+    epoch = models.PositiveBigIntegerField()
+    consumer = models.CharField(max_length=32)
+    status = models.CharField(max_length=16, default="pending")
+    next_attempt_at = models.DateTimeField()
+    attempts = models.PositiveIntegerField(default=0)
+    lease_token = models.CharField(max_length=64, blank=True, default="")
+    lease_expires_at = models.DateTimeField(null=True)
+    payload_sha256 = models.CharField(max_length=64)
+    last_error = models.CharField(max_length=64, blank=True, default="")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=("event", "epoch", "consumer"), name="uq_lifecycle_delivery"),
+            models.CheckConstraint(condition=models.Q(status__in=["pending", "running", "done"]), name="lifecycle_delivery_status"),
+        ]
+        indexes = [
+            models.Index(fields=("status", "next_attempt_at"), name="lc_delivery_due"),
+            models.Index(fields=("status", "lease_expires_at"), name="lc_delivery_expiry"),
+        ]

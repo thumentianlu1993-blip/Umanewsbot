@@ -3362,3 +3362,24 @@ def advance_race_event_lifecycle_task(
         "error": result.error,
         "transition_id": result.transition_id,
     }
+
+
+@shared_task
+def deliver_race_lifecycle_outbox_task() -> dict:
+    """每次领取一个，避免批量租约在串行网络探针执行期间到期。"""
+    from stable.services.race_lifecycle_projection import claim_deliveries, execute_delivery, finish_delivery, record_due_deadlines
+    record_due_deadlines(now=timezone.now())
+    counts = {"done": 0, "failed": 0}
+    for _ in range(100):
+        rows = claim_deliveries(now=timezone.now(), limit=1)
+        if not rows:
+            break
+        row = rows[0]
+        error = ""
+        try:
+            execute_delivery(row, now=timezone.now())
+        except Exception:
+            error = "delivery_failed"
+        acknowledged = finish_delivery(row, now=timezone.now(), error=error)
+        counts["done" if acknowledged and not error else "failed"] += 1
+    return counts

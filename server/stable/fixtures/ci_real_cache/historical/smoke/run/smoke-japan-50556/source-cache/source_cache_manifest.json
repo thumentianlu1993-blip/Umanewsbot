@@ -1,0 +1,16 @@
+{
+  "files": {
+    "ad7ba45bc97fd0070b65d40f624b6ec1faf950701bec20c5914e4b9486020e74.html": {
+      "cached_at": "2026-07-15T16:52:55.695815+00:00",
+      "path": "ad7ba45bc97fd0070b65d40f624b6ec1faf950701bec20c5914e4b9486020e74.html",
+      "protected_by": [],
+      "sha256": "2dbe222766b6ed2e9a5c3c60c348ec98896e55acbbefbfdb8d5b3c0e2177bf4a",
+      "size": 79845,
+      "source_url": "https://www.jra.go.jp/datafile/seiseki/replay/2005/99.html"
+    }
+  },
+  "root": "@FIXTURE_ROOT@/historical/smoke/run/smoke-japan-50556/source-cache",
+  "schema_version": "1.0",
+  "total_bytes": 79845,
+  "updated_at": "2026-07-15T16:52:55.695819+00:00"
+}

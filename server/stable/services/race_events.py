@@ -3296,6 +3296,9 @@ def _resolve_data_sync_publication_from_loaded_rows(
     standing_policy_digest: str | None,
     now: datetime,
     standing_policy: dict | None = None,
+    loaded_admission: dict | None = None,
+    binding_retired=None,
+    allow_provisional=False,
 ) -> RaceLivePublicReadDecision:
     """Authorize a data-sync result without borrowing legacy race-live policy."""
 
@@ -3310,17 +3313,18 @@ def _resolve_data_sync_publication_from_loaded_rows(
 
     if control.write_owner != RaceEventProjectionWriteOwner.DATA_SYNC:
         return reject("writer_owner_mismatch")
-    if revision.phase not in {RaceResultPhase.OFFICIAL, RaceResultPhase.CORRECTED}:
+    provisional = allow_provisional and revision.phase == RaceResultPhase.PROVISIONAL
+    if not provisional and revision.phase not in {RaceResultPhase.OFFICIAL, RaceResultPhase.CORRECTED}:
         return reject("phase_not_public")
-    if event.status != RaceEventStatus.FINISHED or not isinstance(
+    if not provisional and (event.status != RaceEventStatus.FINISHED or not isinstance(
         event.result_confirmed_at, datetime
-    ) or timezone.is_naive(event.result_confirmed_at):
+    ) or timezone.is_naive(event.result_confirmed_at)):
         return reject("event_not_confirmed")
 
     if enrollment is not None and enrollment.authority_version==2:
         from stable.services.race_data_sync_admission import validate_multisource_publication
         reason=validate_multisource_publication(event=event,control=control,revision=revision,
-            publication=publication,observation=observation,source=source,enrollment=enrollment)
+            publication=publication,observation=observation,source=source,enrollment=enrollment,binding_retired=binding_retired)
         if reason:return reject(reason)
         return RaceLivePublicReadDecision(visible=True,reason="data_sync_public_read_allowed",
             revision_id=revision.pk,phase=revision.phase,effective_mode=RaceLivePublicationMode.OFFICIAL_PUBLIC)
@@ -3352,6 +3356,7 @@ def _resolve_data_sync_publication_from_loaded_rows(
             event_id=event.pk,
             now=now,
             standing_policy=standing_policy,
+            loaded=loaded_admission,
         )
         if not admission.admitted:
             return reject(admission.reason_code)
@@ -3560,6 +3565,10 @@ def resolve_race_live_public_read(
         return reject("invalid_event_id")
     if not isinstance(now, datetime) or timezone.is_naive(now):
         return reject("invalid_now")
+    from stable.services.race_lifecycle_projection import result_read
+    epoch_read = result_read(event_id, now)
+    if epoch_read is not None:
+        return epoch_read
     if not RaceEvent.objects.filter(pk=event_id).exists():
         return reject("event_missing")
 
@@ -4191,6 +4200,13 @@ def resolve_race_live_public_reads(
     if not valid_ids:
         return decisions
 
+    from stable.services.race_lifecycle_projection import result_reads
+    epoch_decisions = result_reads(valid_ids, now)
+    decisions.update(epoch_decisions)
+    valid_ids = [event_id for event_id in valid_ids if event_id not in epoch_decisions]
+    if not valid_ids:
+        return decisions
+
     event_by_id = {
         event.pk: event for event in RaceEvent.objects.filter(pk__in=valid_ids)
     }
@@ -4785,6 +4801,7 @@ def record_race_result_observation(
     field_provenance: dict,
     parse_warnings: list,
     permission_classification: str,
+    acquisition_key: str = "",
 ) -> RaceResultObservationRecordDecision:
     """Append one normalized source observation without rewriting prior evidence."""
     if (
@@ -4842,7 +4859,10 @@ def record_race_result_observation(
     ):
         return RaceResultObservationRecordDecision(False, "invalid_permission")
 
+    if acquisition_key and (not isinstance(acquisition_key, str) or not RACE_PROJECTION_MANIFEST_SHA256_RE.fullmatch(acquisition_key)):
+        return RaceResultObservationRecordDecision(False, "invalid_acquisition_key")
     lookup = {
+        "acquisition_key": acquisition_key,
         "source_identity_id": source_identity_id,
         "normalized_sha256": normalized_sha256,
         "result_phase": result_phase,

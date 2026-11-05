@@ -44,6 +44,7 @@ _REQUIRED_TOP_LEVEL_KEYS = {
     "participants",
 }
 _OPTIONAL_TOP_LEVEL_KEYS = {
+    "declaration_status",
     "local_start_time",
     "timezone_name",
     "multisource_source_set_digest",
@@ -107,6 +108,7 @@ class RacecardReconciliationDecision:
     event_id: int | None = None
     observation_id: int | None = None
     claim_invalidated: bool = False
+    applied_kinds: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -634,6 +636,10 @@ _EVENT_REGION_BY_CONTRACT_REGION = {
     "france": models.RacingRegion.FRANCE,
     "united_states": models.RacingRegion.UNITED_STATES,
     "ireland": models.RacingRegion.IRELAND,
+    "australia": models.RacingRegion.AUSTRALIA,
+    "germany": models.RacingRegion.GERMANY,
+    "united_arab_emirates": models.RacingRegion.MIDDLE_EAST,
+    "saudi_arabia": models.RacingRegion.MIDDLE_EAST,
 }
 # 存量兼容：ireland 合同赛事在一等化前归入 other 桶，生产仍存在该形态的赛事与登记；
 # 归 region 判定必须同时接受一等地区与存量桶。
@@ -974,6 +980,8 @@ def normalize_racecard_observation(
         )
     ):
         raise ValueError("racecard payload does not match the strict schema")
+    if payload.get("declaration_status", "unknown") not in ("unknown", "predicted", "confirmed"):
+        raise ValueError("declaration_status_invalid")
     if "multisource_source_set_digest" in payload and not re.fullmatch(
         "[0-9a-f]{64}", str(payload["multisource_source_set_digest"])
     ):
@@ -1304,6 +1312,7 @@ def _reconcile_racecard_observation_atomic(
     claim_guard: RaceDataSyncClaim | None = None,
 ) -> RacecardReconciliationDecision:
     """Apply admitted racecard and schedule fields under source arbitration."""
+    from stable.services.race_lifecycle_projection import writable
     with transaction.atomic():
         lifecycle = (
             models.RaceEventLifecycleControl.objects.select_for_update()
@@ -1662,6 +1671,13 @@ def _reconcile_racecard_observation_atomic(
                 )
             validated_participants.append((external_runner_id, horse_name, row))
 
+        if allow_racecard_apply:
+            from stable.services.race_lifecycle_projection import card_preflight
+            reason = card_preflight(event=event, control=control, lifecycle=lifecycle,
+                                    observation=observation, now=timezone.now())
+            if reason:
+                return RacecardReconciliationDecision("rejected", reason, event.pk, observation.pk)
+
         for order, (external_runner_id, horse_name, row) in enumerate(
             validated_participants, start=1
         ):
@@ -1859,6 +1875,9 @@ def _reconcile_racecard_observation_atomic(
                     ).strip()
                 if not external_runner_id:
                     continue
+                from stable.services.race_lifecycle_projection import writable
+                if writable(event.pk) and external_runner_id not in seen:
+                    continue
                 stable_key = (
                     f"{source.source_key}:"
                     f"{hashlib.sha256(external_runner_id.encode()).hexdigest()[:48]}"
@@ -1900,6 +1919,8 @@ def _reconcile_racecard_observation_atomic(
                         "jockey_name": runner.jockey_name,
                         "trainer_name": runner.trainer_name,
                         "carried_weight": runner.carried_weight,
+                        "odds_value": runner.odds_value,
+                        "popularity": runner.popularity,
                         "status": runner.running_status,
                     }
                 )
@@ -1944,6 +1965,9 @@ def _reconcile_racecard_observation_atomic(
                             carried_weight=runner.carried_weight,
                             field_provenance={
                                 "source_key": source.source_key,
+                                "display_name": runner.horse_name,
+                                "odds_value": runner.odds_value,
+                                "popularity": runner.popularity,
                                 "external_runner_id": canonical_participants[index - 1][
                                     "external_runner_id"
                                 ],
@@ -2094,6 +2118,13 @@ def _reconcile_racecard_observation_atomic(
                 "status": "status",
             }[field_name]
             field_admitted = contract_field_name in admitted_fields
+            from stable.services.race_lifecycle_projection import writable
+            explicit_recovery = bool(writable(event.pk) and field_name == 'status'
+                and old_value == models.RaceEventStatus.CANCELLED
+                and candidate_value in ('scheduled','postponed','running')
+                and provenance.get('schedule_correction_marker') is True
+                and authority.observed_at is not None and candidate_watermark > authority.observed_at
+                and not locks.get(field_name) and not authority.manual_lock)
             terminal_status_regression = bool(
                 field_name == "status"
                 and old_value
@@ -2102,11 +2133,12 @@ def _reconcile_racecard_observation_atomic(
                     models.RaceEventStatus.FINISHED,
                 }
                 and candidate_value != old_value
+                and not explicit_recovery
             )
             applied = bool(
                 allow_schedule_apply
                 and field_admitted
-                and arbitration.apply
+                and (arbitration.apply or explicit_recovery)
                 and not terminal_status_regression
             )
             decision = (
@@ -2222,6 +2254,10 @@ def _reconcile_racecard_observation_atomic(
                             )
                         ),
                     )
+                    from stable.services.race_lifecycle_projection import writable
+                    if writable(event.pk):
+                        from stable.services.race_data_sync_control import calculate_multisource_next_poll
+                        checkpoint.next_poll_at = calculate_multisource_next_poll(event=event, kind=checkpoint.data_kind, now=checkpoint_now)
                     checkpoint.lock_version += 1
                     checkpoint.save(
                         update_fields=("next_poll_at", "lock_version", "updated_at")
@@ -2304,14 +2340,23 @@ def _reconcile_racecard_observation_atomic(
                         state=tracking_state,
                         updated_at=timezone.now(),
                     )
+            from stable.services.race_lifecycle_projection import capture_schedule
+            capture_schedule(event=event, control=control, lifecycle=lifecycle, now=timezone.now())
             transaction.on_commit(invalidate_public_race_cache)
             aggregate = "applied"
+        if allow_racecard_apply and control.current_racecard_revision_id:
+            from stable.services.race_lifecycle_projection import capture_card
+            capture_card(event=event, control=control, lifecycle=lifecycle,
+                         observation=observation, now=timezone.now())
         return RacecardReconciliationDecision(
             aggregate,
             f"racecard_{aggregate}",
             event.pk,
             observation.pk,
             claim_invalidated=bool(schedule_changed and claim_guard is not None),
+            applied_kinds=tuple(kind for kind, allowed in (
+                ('race_time', allow_schedule_apply), ('racecard', allow_racecard_apply)) if allowed)
+                if writable(event.pk) else None,
         )
 
 
@@ -2325,6 +2370,19 @@ def reconcile_racecard_observation(
     run_id: str,
     claim_guard: RaceDataSyncClaim | None = None,
 ) -> RacecardReconciliationDecision:
+    from stable.services.race_lifecycle_projection import writable
+    if allow_schedule_apply and allow_racecard_apply and writable(expected_event_id):
+        # 名单完整性与赛程事实各自裁决；取消/延期不能被一张不完整名单挡住。
+        common = dict(observation_id=observation_id, expected_event_id=expected_event_id,
+                      task_id=task_id, run_id=run_id, claim_guard=claim_guard)
+        schedule = reconcile_racecard_observation(**common, allow_schedule_apply=True, allow_racecard_apply=False)
+        if schedule.status not in ('applied', 'replayed') or schedule.claim_invalidated:
+            return schedule
+        card = reconcile_racecard_observation(**common, allow_schedule_apply=False, allow_racecard_apply=True)
+        if card.status not in ('applied', 'replayed'):
+            return schedule if schedule.status == 'applied' else card
+        from dataclasses import replace
+        return replace(card, applied_kinds=('race_time', 'racecard'))
     try:
         return _reconcile_racecard_observation_atomic(
             observation_id=observation_id,

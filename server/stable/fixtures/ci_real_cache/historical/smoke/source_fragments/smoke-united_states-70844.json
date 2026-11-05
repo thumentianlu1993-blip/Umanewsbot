@@ -1,0 +1,41 @@
+{
+  "artifact_kind": "historical_race_detail_source_fragment",
+  "plan_id": "detail-crawl-1998-2026-v3-smoke",
+  "region": "united_states",
+  "requests": [
+    {
+      "evidence_source_url": "https://www.equibase.com/yearbook/Result.cfm?cy=USA&de=D&rd=2018-09-29&rn=8&tk=CD",
+      "fixture_identity": {
+        "path": "@FIXTURE_ROOT@/historical/smoke/fixtures/united_states-70844.cfm",
+        "sha256": "52f7e3de1570f9b5d28376f07c054e639a4778998684871b5fdfa939d80ada8c",
+        "size": 117375
+      },
+      "local_date": "2018-09-29",
+      "recovery_evidence": [
+        {
+          "kind": "v1_source_fragment",
+          "path": "@ARCHIVE_REPOSITORY@/runtime/historical_plan_exports/detail-crawl-1998-2026-v1/source_fragments/united_states-2018-hrn-equibase-archive-chart-01.json",
+          "sha256": "e771b4271ac60582c1e1228003be68d9dfca767ea77c6085d4669ff1bdd7482e",
+          "size": 180999
+        },
+        {
+          "kind": "v1_events_csv",
+          "path": "@ARCHIVE_REPOSITORY@/runtime/historical_plan_exports/detail-crawl-1998-2026-v1/events/united_states-2018-hrn-equibase-archive-chart-01.csv",
+          "sha256": "dc58b7d0daafe5c15be91cf982fea8f59d6556e56a91c9fc651aea22925d3dcc",
+          "size": 196333
+        }
+      ],
+      "region": "united_states",
+      "slug": "united_states-USA_CHURCHILL_DOWNS_ACK_ACK_STAKES-2018",
+      "source_name": "equibase_yearbook",
+      "source_provider": "equibase",
+      "source_url": "https://www.equibase.com/yearbook/Result.cfm?cy=USA&de=D&rd=2018-09-29&rn=8&tk=CD",
+      "target_id": "70844",
+      "target_sha256": "cbcd96ad5c913147ae9724295486e97c552f1a632ddee30a6919d3e4bea3354f",
+      "year": 2018
+    }
+  ],
+  "schema_version": "2.0",
+  "shard_id": "smoke-united_states-70844",
+  "target_count": 1
+}
