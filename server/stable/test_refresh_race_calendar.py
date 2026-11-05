@@ -45,9 +45,11 @@ def _sha256(path: Path) -> str:
 class RefreshFixtures:
     """共享 fixture：固定业务日期，与清单中的 2026 年保持一致。"""
 
+    fixture_today = date(2026, 6, 1)
+
     def setUp(self):
         super().setUp()
-        clock = patch("django.utils.timezone.localdate", return_value=date(2026, 6, 1))
+        clock = patch("django.utils.timezone.localdate", return_value=self.fixture_today)
         clock.start()
         self.addCleanup(clock.stop)
         self.operator = get_user_model().objects.create_user(username="operator", password="unused")
@@ -963,10 +965,15 @@ class RefreshFixtureDateTests(SimpleTestCase):
         for today in (date(2026, 10, 29), date(2026, 11, 1), date(2026, 12, 31), date(2028, 2, 29)):
             with self.subTest(today=today), patch(
                 "stable.test_refresh_race_calendar.get_user_model"
-            ), patch("stable.test_refresh_race_calendar.timezone.localdate", return_value=today):
+            ):
                 fixture = Fixture()
-                fixture.setUp()
-                self.assertNotEqual(fixture.future, fixture.far_future)
-                self.assertEqual(fixture.future.year, fixture.far_future.year)
-                self.assertGreater(fixture.future, today)
-                self.assertGreater(fixture.far_future, today)
+                fixture.fixture_today = today
+                try:
+                    fixture.setUp()
+                    self.assertEqual(fixture.today, today)
+                    self.assertNotEqual(fixture.future, fixture.far_future)
+                    self.assertEqual(fixture.future.year, fixture.far_future.year)
+                    self.assertGreater(fixture.future, today)
+                    self.assertGreater(fixture.far_future, today)
+                finally:
+                    fixture.doCleanups()
