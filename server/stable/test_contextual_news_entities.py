@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from django.core.management import call_command
 from django.db import connection
-from django.test import TestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
@@ -32,6 +32,10 @@ from stable.models import (
     TermEntry,
     TermType,
     WorkflowStatus,
+)
+from stable.services.terms import (
+    ArticleEntity, ArticleEntityResolution,
+    apply_contextual_horse_placeholders, clean_visible_source_text,
 )
 from stable.services.translation import OpenAICompatibleTranslationProvider, TranslationResponseError, translate_article
 from stable.services.rewriting import FallbackRewriteProvider, OpenAICompatibleRewriteProvider
@@ -1333,3 +1337,95 @@ class ReprocessArticleEntitiesCommandTests(TestCase):
         article.refresh_from_db()
         self.assertEqual(payload["articles"][0]["status"], "committed")
         self.assertEqual(article.tags_json, [])
+
+
+class VisibleOccurrenceMarkerCollisionTests(SimpleTestCase):
+    @staticmethod
+    def resolution(starts):
+        # Synthetic existing-resolver output; no identity/discovery claim.
+        return ArticleEntityResolution(
+            source_language=SourceLanguage.ENGLISH,
+            entities=[ArticleEntity(
+                entity_type='unknown_horse', matched_text='Aurora', canonical_text='Aurora',
+                target_zh='', field_name='body', start=start, end=start + 6,
+                confidence=100, evidence=[], conflict_flags=[], needs_preserve=True,
+                classification='confirmed_horse',
+            ) for start in starts],
+            suppressed_candidates=[], accepted_terms=[], machine_horse_tags=[],
+        )
+
+    def assert_visible_spans(self, raw, resolution, expected_visible):
+        visible = clean_visible_source_text(raw)
+        self.assertEqual(visible, expected_visible)
+        for entity in resolution.entities:
+            self.assertEqual(visible[entity.start:entity.end], entity.matched_text)
+
+    def test_literal_marker_cannot_make_hidden_horse_occurrence_visible(self):
+        marker = '__UMA_VISIBLE_OCCURRENCE_MARKER__'
+        for tag in ('script', 'style', 'nav', 'aside'):
+            with self.subTest(tag=tag):
+                raw = f'<{tag}>Aurora</{tag}><p>Aurora won.</p><p>{marker}</p>'
+                resolution = self.resolution([0])
+                self.assert_visible_spans(raw, resolution, 'Aurora won.' + marker)
+                placeholders = {'__UMA_HORSE_0__': 'Aurora'}
+                protected = apply_contextual_horse_placeholders(
+                    raw, resolution, placeholders, field_name='body')
+                expected = f'<{tag}>Aurora</{tag}><p>__UMA_HORSE_0__ won.</p><p>{marker}</p>'
+                self.assertEqual(protected, expected)
+                self.assertEqual(protected.replace('__UMA_HORSE_0__', 'Aurora'), raw)
+                self.assertEqual(placeholders, {'__UMA_HORSE_0__': 'Aurora'})
+
+    def test_inline_tags_cannot_create_a_visible_marker_collision(self):
+        split_marker = '__UMA_VISIBLE_<b>OCCURRENCE</b>_MARKER__'
+        marker = '__UMA_VISIBLE_OCCURRENCE_MARKER__'
+        raw = f'<script>Aurora</script><p>Aurora won.</p><p>{split_marker}</p>'
+        self.assertNotIn(marker, raw)
+        resolution = self.resolution([0])
+        self.assert_visible_spans(raw, resolution, 'Aurora won.' + marker)
+        placeholders = {'__UMA_HORSE_0__': 'Aurora'}
+        protected = apply_contextual_horse_placeholders(
+            raw, resolution, placeholders, field_name='body')
+        self.assertEqual(protected, f'<script>Aurora</script><p>__UMA_HORSE_0__ won.</p><p>{split_marker}</p>')
+        self.assertEqual(protected.replace('__UMA_HORSE_0__', 'Aurora'), raw)
+        self.assertEqual(placeholders, {'__UMA_HORSE_0__': 'Aurora'})
+
+    def test_each_suffix_candidate_avoids_raw_and_cleaned_text(self):
+        base = '__UMA_VISIBLE_OCCURRENCE_MARKER__'
+        suffix1 = '__UMA_VISIBLE_OCCURRENCE_MARKER_1__'
+        suffix2 = '__UMA_VISIBLE_OCCURRENCE_MARKER_2__'
+        suffix3 = '__UMA_VISIBLE_OCCURRENCE_MARKER_3__'
+        tail = (base + ' __UMA_VISIBLE_OCCURRENCE_MARKER_<b>1</b>__ '
+                + suffix2 + ' __UMA_VISIBLE_OCCURRENCE_MARKER_<b>3</b>__')
+        raw = f'<script>Aurora</script><p>Aurora won.</p><p>{tail}</p>'
+        self.assertNotIn(suffix1, raw)
+        self.assertNotIn(suffix3, raw)
+        resolution = self.resolution([0])
+        self.assert_visible_spans(raw, resolution, 'Aurora won.' + ' '.join((base, suffix1, suffix2, suffix3)))
+        placeholders = {'__UMA_HORSE_0__': 'Aurora'}
+        protected = apply_contextual_horse_placeholders(
+            raw, resolution, placeholders, field_name='body')
+        self.assertEqual(protected, f'<script>Aurora</script><p>__UMA_HORSE_0__ won.</p><p>{tail}</p>')
+        self.assertEqual(protected.replace('__UMA_HORSE_0__', 'Aurora'), raw)
+        self.assertEqual(placeholders, {'__UMA_HORSE_0__': 'Aurora'})
+
+    def test_no_collision_keeps_existing_visible_occurrence_protection(self):
+        raw = '<script>Aurora</script><p>Aurora won.</p>'
+        resolution = self.resolution([0])
+        self.assert_visible_spans(raw, resolution, 'Aurora won.')
+        placeholders = {'__UMA_HORSE_0__': 'Aurora'}
+        protected = apply_contextual_horse_placeholders(
+            raw, resolution, placeholders, field_name='body')
+        self.assertEqual(protected, '<script>Aurora</script><p>__UMA_HORSE_0__ won.</p>')
+        self.assertEqual(protected.replace('__UMA_HORSE_0__', 'Aurora'), raw)
+
+    def test_collision_keeps_both_repeated_visible_occurrences_in_order(self):
+        marker = '__UMA_VISIBLE_OCCURRENCE_MARKER__'
+        raw = f'<script>Aurora</script><p>Aurora won.</p><p>Aurora placed second.</p><p>{marker}</p>'
+        resolution = self.resolution([0, 11])
+        self.assert_visible_spans(raw, resolution, 'Aurora won.Aurora placed second.' + marker)
+        placeholders = {'__UMA_HORSE_0__': 'Aurora'}
+        protected = apply_contextual_horse_placeholders(
+            raw, resolution, placeholders, field_name='body')
+        expected = f'<script>Aurora</script><p>__UMA_HORSE_0__ won.</p><p>__UMA_HORSE_0__ placed second.</p><p>{marker}</p>'
+        self.assertEqual(protected, expected)
+        self.assertEqual(protected.replace('__UMA_HORSE_0__', 'Aurora'), raw)
