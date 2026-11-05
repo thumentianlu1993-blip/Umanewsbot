@@ -284,7 +284,7 @@ class DockerRuntime:
             self._private_json(staging / "paths.json", {"paths": paths})
             if before != self.configuration_inventory():
                 raise ValueError("P02 configuration changed during backup")
-            archive_directories({"config": staging}, directory / "config.tar")
+            archive_directories({"config": staging}, directory / "config.tar", allow_directory_links=True)
         finally:
             shutil.rmtree(staging)
         asset_command = ["run", "--rm", "--no-deps", "--entrypoint", "python", "-v", f"{directory}:{directory}:rw",
