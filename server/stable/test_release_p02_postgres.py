@@ -234,6 +234,51 @@ class ReleaseP02PostgresTests(unittest.TestCase):
             self.apply()
         self.assertFalse((self.directory / "step-1.json").exists())
 
+    def test_wide_row_fingerprint_fits_small_temp_budget(self):
+        # 整行排序会超过1MiB，固定32字节行摘要应在该预算下完成。
+        with connection.cursor() as q:
+            q.execute("CREATE TABLE public.p02_fingerprint_probe(payload text)")
+            q.execute("INSERT INTO public.p02_fingerprint_probe SELECT repeat(md5(g::text),256) FROM generate_series(1,1000) g")
+            q.execute("SET work_mem='64kB'; SET temp_file_limit='1MB'; SET max_parallel_workers_per_gather=0")
+        try:
+            result = schema.counts()
+            self.assertEqual(result['algorithm'], 'sorted-sha256-row-json-v2')
+            self.assertEqual(result['tables']['p02_fingerprint_probe']['count'], 1000)
+        finally:
+            with connection.cursor() as q:
+                q.execute('RESET work_mem; RESET temp_file_limit; RESET max_parallel_workers_per_gather')
+
+    def test_row_fingerprint_preserves_multiset_and_detects_mutation(self):
+        with connection.cursor() as q:
+            q.execute("CREATE TABLE public.p02_fingerprint_probe(payload text)")
+            q.execute("INSERT INTO public.p02_fingerprint_probe VALUES (NULL),(''),('赛马'),('same'),('same')")
+        first = schema.counts()
+        self.assertEqual(first['algorithm'], 'sorted-sha256-row-json-v2')
+        with connection.cursor() as q:
+            q.execute("TRUNCATE public.p02_fingerprint_probe")
+            q.execute("INSERT INTO public.p02_fingerprint_probe VALUES ('same'),('赛马'),(''),('same'),(NULL)")
+        self.assertEqual(schema.counts(), first)
+        with connection.cursor() as q:
+            q.execute("UPDATE public.p02_fingerprint_probe SET payload='changed' WHERE payload='赛马'")
+        self.assertNotEqual(schema.counts()['tables']['p02_fingerprint_probe']['sha256'], first['tables']['p02_fingerprint_probe']['sha256'])
+        with connection.cursor() as q:
+            q.execute("UPDATE public.p02_fingerprint_probe SET payload='赛马' WHERE payload='changed'")
+            q.execute("INSERT INTO public.p02_fingerprint_probe VALUES ('same')")
+        duplicate = schema.counts()['tables']['p02_fingerprint_probe']
+        self.assertEqual(duplicate['count'], 6)
+        self.assertNotEqual(duplicate['sha256'], first['tables']['p02_fingerprint_probe']['sha256'])
+
+    def test_unversioned_restore_fingerprint_is_rejected_before_ddl(self):
+        old_format = schema.counts()
+        old_format.pop('algorithm')
+        self.directory = self.directory / 'legacy-proof'
+        self.directory.mkdir(mode=0o700)
+        with patch.object(schema, 'counts', return_value=old_format):
+            self.prepare_test_receipts()
+        with self.assertRaisesRegex(ValueError, 'source changed'):
+            self.apply()
+        self.assertFalse((self.directory / 'step-1.json').exists())
+
     def test_recorder_sequence_cannot_reissue_existing_id(self):
         with connection.cursor() as q:
             q.execute("SELECT setval('django_migrations_id_seq', (SELECT max(id) FROM django_migrations), false)")

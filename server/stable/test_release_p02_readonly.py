@@ -38,10 +38,10 @@ class ReadonlyProbeTests(SimpleTestCase):
 
 
 class StreamingRecoveryCountsTests(SimpleTestCase):
-    def test_large_table_rows_use_server_cursor_and_keep_digest(self):
+    def test_large_table_hashes_use_server_cursor_and_version_digest(self):
         import hashlib
         from stable.services import release_p02_schema as schema
-        batch = [('first',), ('second',)]
+        batch = [(value,) for value in sorted(hashlib.sha256(v).digest() for v in (b'first', b'second'))]
         with patch.object(schema, 'connection') as db:
             metadata = db.cursor.return_value.__enter__.return_value
             metadata.fetchall.side_effect = [[('large_table',)], []]
@@ -50,12 +50,12 @@ class StreamingRecoveryCountsTests(SimpleTestCase):
             stream.fetchmany.side_effect = [batch, []]
             # A normal cursor's execute buffers its full result, even with later fetchmany().
             def reject_buffered_rows(query, *args):
-                if query.startswith('SELECT row_to_json'):
+                if 'AS row_hash FROM' in query:
                     raise AssertionError('large table was buffered on the client')
             metadata.execute.side_effect = reject_buffered_rows
             actual = schema.counts()
         h = hashlib.sha256()
         for row in batch:
-            value = row[0].encode(); h.update(len(value).to_bytes(8, 'big')); h.update(value)
-        self.assertEqual(actual, {'tables': {'large_table': {'count': 2, 'sha256': h.hexdigest()}}, 'sequences': {}})
+            h.update(row[0])
+        self.assertEqual(actual, {'algorithm': 'sorted-sha256-row-json-v2', 'tables': {'large_table': {'count': 2, 'sha256': h.hexdigest()}}, 'sequences': {}})
         db.chunked_cursor.assert_called_once()

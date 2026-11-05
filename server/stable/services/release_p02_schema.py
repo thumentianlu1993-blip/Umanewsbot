@@ -11,6 +11,8 @@ from django.db.migrations.recorder import MigrationRecorder
 
 from stable.services import release_p02_recovery as c
 
+FINGERPRINT_ALGORITHM = "sorted-sha256-row-json-v2"
+
 CATALOG_FILE = Path(__file__).resolve().parent.parent / "fixtures/release_p02_catalog.json"
 CATALOG_SHA256 = "47d7605f29bd347ebf28b901304942b0c75bb55e9ef2c24fc92965830f5342c8"
 
@@ -197,8 +199,8 @@ def state():
 
 
 def counts():
-    """恢复核对每表排序行内容与业务序列；recorder序列允许事务回滚留下空号。"""
-    result = {"tables": {}, "sequences": {}}
+    """对完整行的固定长度摘要排序，保留多重集与序列，避免宽JSON外排。"""
+    result = {"algorithm": FINGERPRINT_ALGORITHM, "tables": {}, "sequences": {}}
     with connection.cursor() as cursor:
         cursor.execute("SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename")
         tables = [r[0] for r in cursor.fetchall()]
@@ -208,11 +210,12 @@ def counts():
             digest, count = hashlib.sha256(), 0
             # 普通cursor即使fetchmany也已在客户端缓冲整表；服务器游标保持恢复核验内存有界。
             with connection.chunked_cursor() as stream:
-                stream.execute(f"SELECT row_to_json(t)::text FROM public.{connection.ops.quote_name(name)} t ORDER BY row_to_json(t)::text COLLATE \"C\"")
-                while batch := stream.fetchmany(50):
+                stream.execute(f"SELECT sha256(convert_to(row_to_json(t)::text, 'UTF8')) AS row_hash FROM public.{connection.ops.quote_name(name)} t ORDER BY row_hash")
+                while batch := stream.fetchmany(2000):
                     for row in batch:
-                        data = row[0].encode()
-                        digest.update(len(data).to_bytes(8, "big"))
+                        data = bytes(row[0])
+                        if len(data) != 32:
+                            raise ValueError("P02 invalid row fingerprint")
                         digest.update(data)
                         count += 1
             result["tables"][name] = {"count": count, "sha256": digest.hexdigest()}
