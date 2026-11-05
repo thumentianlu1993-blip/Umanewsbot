@@ -497,6 +497,139 @@ class RaceDataSyncEnrollmentControlTests(TestCase):
             now=NOW,
         )
 
+    def _a100_claim_state(self, event):
+        """Read full persisted rows; cancellation must not mutate claim state."""
+        return {
+            "event": list(models.RaceEvent.objects.filter(pk=event.pk).values()),
+            "source": list(models.RaceResultSourceIdentity.objects.filter(event=event).order_by("pk").values()),
+            "control": list(models.RaceEventProjectionControl.objects.filter(event=event).values()),
+            "enrollment": list(models.RaceDataSyncEnrollment.objects.filter(event=event).values()),
+            "tracking": list(models.RaceEventLiveTracking.objects.filter(event=event).values()),
+            "checkpoints": list(models.RaceEventLiveProviderCheckpoint.objects.filter(tracking__event=event).order_by("pk").values()),
+            "lifecycle": list(models.RaceEventLifecycleControl.objects.filter(event=event).values()),
+        }
+
+    def test_cancelled_v1_event_is_not_claimed_and_state_is_unchanged(self):
+        self.assertEqual(self._acquire().action, "acquired")
+        # Prove this exact admitted fixture can claim before cancellation.
+        # Roll back only the positive probe, retaining the enrolled fixture.
+        with transaction.atomic():
+            scheduled = race_data_sync_control.claim_due_enrollments(
+                now=NOW, batch_size=10, ttl_seconds=60,
+                enabled_providers=("jra",), enabled_regions=("japan",),
+                enabled_data_kinds=("race_time", "racecard", "result"),
+            )
+            self.assertEqual(tuple(claim.event_id for claim in scheduled), (self.event.pk,))
+            transaction.set_rollback(True)
+
+        self.event.status = models.RaceEventStatus.CANCELLED
+        self.event.save(update_fields=("status", "updated_at"))
+        before = self._a100_claim_state(self.event)
+        self.assertTrue(before["tracking"][0]["tracking_enabled"])
+        self.assertEqual(before["enrollment"][0]["authority_version"], 1)
+        self.assertTrue(all(row["next_poll_at"] <= NOW for row in before["checkpoints"]))
+
+        claims = race_data_sync_control.claim_due_enrollments(
+            now=NOW, batch_size=10, ttl_seconds=60,
+            enabled_providers=("jra",), enabled_regions=("japan",),
+            enabled_data_kinds=("race_time", "racecard", "result"),
+        )
+        with self.subTest("cancelled_returns_no_claim"):
+            self.assertEqual(claims, ())
+        with self.subTest("cancelled_persisted_state_unchanged"):
+            self.assertEqual(self._a100_claim_state(self.event), before)
+
+    def test_cancelled_v1_event_does_not_take_single_batch_slot(self):
+        self.assertEqual(self._acquire().action, "acquired")
+        self.event.status = models.RaceEventStatus.CANCELLED
+        self.event.save(update_fields=("status", "updated_at"))
+        earlier = NOW - timedelta(seconds=1)
+        models.RaceEventLiveTracking.objects.filter(event=self.event).update(next_poll_at=earlier)
+        models.RaceEventLiveProviderCheckpoint.objects.filter(tracking__event=self.event).update(next_poll_at=earlier)
+
+        scheduled = create_event(slug="a100-scheduled-after-cancelled")
+        models.RaceEventProjectionControl.objects.create(
+            event=scheduled,
+            write_owner=models.RaceEventProjectionWriteOwner.UNMANAGED,
+        )
+        source = models.RaceResultSourceIdentity.objects.create(
+            event=scheduled, source_key="jra", region_code="japan",
+            identity_namespace="jra-race-v1", external_race_id="20260821-tokyo-12",
+            review_status=models.RaceLiveReviewStatus.APPROVED,
+            terms_status=models.RaceSourceTermsStatus.APPROVED,
+            automation_allowed=True, proof_network_allowed=True,
+            evidence_url="https://jra.example.test/reviewed-proof",
+            evidence_sha256=SHA_A, valid_until=NOW + timedelta(days=30),
+            registry_digest=self.route.registry_digest,
+        )
+        acquired = race_data_sync_control.acquire_enrollment(
+            event_id=scheduled.pk, source_identity_id=source.pk,
+            standing_policy_digest=SHA_A, route_digest=self.route.route_digest,
+            event_snapshot_sha256=SHA_C, manifest_sha256=SHA_D, entry_sha256=SHA_B,
+            expected_owner=models.RaceEventProjectionWriteOwner.UNMANAGED,
+            expected_owner_generation=0,
+            data_kinds=("race_time", "racecard", "result"), now=NOW,
+        )
+        self.assertEqual(acquired.action, "acquired")
+        self.assertLess(earlier, models.RaceEventLiveTracking.objects.get(event=scheduled).next_poll_at)
+        before = self._a100_claim_state(self.event)
+
+        claims = race_data_sync_control.claim_due_enrollments(
+            now=NOW, batch_size=1, ttl_seconds=60,
+            enabled_providers=("jra",), enabled_regions=("japan",),
+            enabled_data_kinds=("race_time", "racecard", "result"),
+        )
+        with self.subTest("scheduled_gets_single_slot"):
+            self.assertEqual(tuple(claim.event_id for claim in claims), (scheduled.pk,))
+        with self.subTest("cancelled_state_unchanged"):
+            self.assertEqual(self._a100_claim_state(self.event), before)
+
+    def test_finished_v1_result_poll_remains_claimable(self):
+        self.assertEqual(self._acquire().action, "acquired")
+        self.event.status = models.RaceEventStatus.FINISHED
+        self.event.save(update_fields=("status", "updated_at"))
+        models.RaceEventLiveProviderCheckpoint.objects.filter(
+            tracking__event=self.event, data_kind=models.RaceDataSyncDataKind.RESULT,
+        ).update(next_poll_at=NOW)
+
+        claims = race_data_sync_control.claim_due_enrollments(
+            now=NOW, batch_size=10, ttl_seconds=60,
+            enabled_providers=("jra",), enabled_regions=("japan",),
+            enabled_data_kinds=("result",),
+        )
+        self.assertEqual(tuple(claim.event_id for claim in claims), (self.event.pk,))
+        self.assertEqual(claims[0].data_kinds, ("result",))
+        self.event.refresh_from_db()
+        self.assertEqual(self.event.status, models.RaceEventStatus.FINISHED)
+        self.assertEqual(models.RaceDataSyncEnrollment.objects.get(event=self.event).state,
+                         models.RaceDataSyncEnrollmentState.ENROLLED)
+
+    def test_cancelled_only_v1_due_does_not_reserve_multisource_batch_share(self):
+        self.assertEqual(NOW.minute, 0)
+        self.assertEqual(self._acquire().action, "acquired")
+        self.event.status = models.RaceEventStatus.CANCELLED
+        self.event.save(update_fields=("status", "updated_at"))
+        before = self._a100_claim_state(self.event)
+
+        # Only observe the existing boundary's budget argument. No v2 claims,
+        # ORM, admission or subject-under-test behavior is supplied by this spy.
+        with patch("stable.services.race_data_sync_control._claim_multisource_due", return_value=()) as boundary:
+            claims = race_data_sync_control.claim_due_enrollments(
+                now=NOW, batch_size=10, ttl_seconds=60,
+                enabled_providers=("jra",), enabled_regions=("japan",),
+                enabled_data_kinds=("race_time", "racecard", "result"),
+            )
+        with self.subTest("cancelled_does_not_reserve_v1_share"):
+            boundary.assert_called_once_with(
+                now=NOW, batch_size=10, ttl_seconds=60,
+                providers=("jra",), regions=("japan",),
+                data_kinds=("race_time", "racecard", "result"),
+            )
+        with self.subTest("cancelled_returns_no_claim"):
+            self.assertEqual(claims, ())
+        with self.subTest("cancelled_state_unchanged"):
+            self.assertEqual(self._a100_claim_state(self.event), before)
+
     def test_acquire_replay_and_disenroll_owner_cas(self):
         acquired = self._acquire()
         self.assertEqual(acquired.action, "acquired")
