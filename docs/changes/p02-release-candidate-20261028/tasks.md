@@ -141,3 +141,13 @@
 - [x] (operations) 新候选迁移故障续跑、七服务/Redis/Web恢复、129表全量守恒通过；隔离七服务已停止，卷保留。
 - [x] (operations) 生产既有RDB只读复制及禁网恢复，9728键、race_live=7543；只是既有快照恢复，不是共同切点。
 - [ ] (operations) 更新容量预算、同切点/媒体/Redis/生产形状与RTO验证，完成可审核发布包。
+
+
+## 剩余材料与同切点采集包
+
+- [x] (operations) 固定清单9323媒体版本/966,371,153字节全部恢复，原引用路径和逐文件字节核验通过。
+- [x] (operations) 完整Redis AOF集合稳定复制、严格禁网恢复及队列保留证明；非共同数据库切点。
+- [x] (operations) 精确采集维护包及失联/迟到stop/磁盘写失败/配置混代回归；原review上下文PASS。
+- [ ] (operations) 按根AGENTS取得精确采集窗口授权后，生成共同rehearsal cut并恢复原服务。
+- [ ] (operations) 新切点隔离恢复、生产形状峰值/RTO及第5步精确包。
+- [ ] (operations) 第5步正式控制面纳入已审ReleaseLock心跳写失败持锁修复；739候选本身尚无该补丁。
