@@ -148,6 +148,9 @@
 - [x] (operations) 固定清单9323媒体版本/966,371,153字节全部恢复，原引用路径和逐文件字节核验通过。
 - [x] (operations) 完整Redis AOF集合稳定复制、严格禁网恢复及队列保留证明；非共同数据库切点。
 - [x] (operations) 精确采集维护包及失联/迟到stop/磁盘写失败/配置混代回归；原review上下文PASS。
-- [ ] (operations) 按根AGENTS取得精确采集窗口授权后，生成共同rehearsal cut并恢复原服务。
-- [ ] (operations) 新切点隔离恢复、生产形状峰值/RTO及第5步精确包。
+- [x] (operations) 已获准v3精确采集窗口，生成共同rehearsal cut并恢复原服务。
+- [x] (operations) 新共同切点全材料恢复、独立修复/故障/幂等/第三空库严格往返、同切点升级与七服务故障/129表守恒及停止。
+- [ ] (operations) 生产形状峰值/RTO及第5步精确包。
 - [ ] (operations) 第5步正式控制面纳入已审ReleaseLock心跳写失败持锁修复；739候选本身尚无该补丁。
+
+本轮最新验收与剩余边界见[2026-11-06共同切点结果](closed-cut-verification-20261106.md)，历史候选与阶段条目不替代该记录。
