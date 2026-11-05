@@ -140,6 +140,7 @@ def decide_race_lifecycle(
     local_date: date | None = None,
     region: str = "",
     allowed_us_zones: frozenset[str] | None = None,
+    source_facts_only: bool = False,
 ) -> LifecycleDecision:
     """Pure decision: given current state and *now*, return the next action.
 
@@ -158,6 +159,9 @@ def decide_race_lifecycle(
 
     if not isinstance(now, datetime) or django_timezone.is_naive(now):
         return LifecycleDecision(action="error", error_message="now must be aware datetime")
+
+    if source_facts_only:
+        return LifecycleDecision(action="noop", reason_code="source_fact_required")
 
     if race_datetime is not None:
         if not isinstance(race_datetime, datetime) or django_timezone.is_naive(race_datetime):
@@ -366,7 +370,9 @@ def apply_race_lifecycle_decision(
     elif effective == "enforce" and registry_authorized:
         canary_transition_metadata = dict(registry_transition_metadata or {})
 
+    from stable.services.race_lifecycle_projection import governed
     decision = decide_race_lifecycle(
+        source_facts_only=governed(event.pk),
         race_datetime=event.race_datetime,
         timezone_name=event.timezone_name,
         status=event.status,
@@ -469,7 +475,9 @@ def _apply_dry(
     except RaceEvent.DoesNotExist:
         return ApplyResult(action="error", error="event not found")
 
+    from stable.services.race_lifecycle_projection import governed
     decision = decide_race_lifecycle(
+        source_facts_only=governed(event.pk),
         race_datetime=event.race_datetime,
         timezone_name=event.timezone_name,
         status=event.status,
@@ -845,7 +853,9 @@ def reconcile_lifecycle_controls(
                 stats["ineligible"] += 1
                 continue
             # Dry-run: compute lifecycle decision for diagnostics
+            from stable.services.race_lifecycle_projection import governed
             decision = decide_race_lifecycle(
+                source_facts_only=governed(event.pk),
                 race_datetime=event.race_datetime,
                 timezone_name=event.timezone_name,
                 status=event.status,

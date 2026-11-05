@@ -93,9 +93,10 @@ class SelectionTests(unittest.TestCase):
 
 class EvidenceTests(unittest.TestCase):
     def fixture(self):
-        plan={'mode':'targeted','batches':[{'key':'batch-000','profile':'django','ids':['m.C.test_x']}],
+        image='sha256:'+'a'*64
+        plan={'mode':'targeted','image_id':image,'batches':[{'key':'batch-000','profile':'django','ids':['m.C.test_x'],'image_id':image}],
               'run_id':'100','run_attempt':'1','test_tree':'tree','allowed_skips':{}}
-        report={'key':'batch-000','profile':'django','executed':['m.C.test_x'],'plan_digest':core.digest(plan),
+        report={'image_id':image,'actual_image_id':image,'key':'batch-000','profile':'django','executed':['m.C.test_x'],'plan_digest':core.digest(plan),
                 'run_id':'100','run_attempt':'1','test_tree':'tree','exit_code':0,'lifecycle':'complete',
                 'failures':[],'errors':[],'skips':[],'unexpected_successes':[],'expected_failures':[]}
         return plan,report

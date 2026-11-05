@@ -1,0 +1,16 @@
+{
+  "files": {
+    "a1fedb79cba27440012e10a08a766fc82435abaf34ae54b369de9f4ed3bd48d8.html": {
+      "cached_at": "2026-07-15T16:52:56.178396+00:00",
+      "path": "a1fedb79cba27440012e10a08a766fc82435abaf34ae54b369de9f4ed3bd48d8.html",
+      "protected_by": [],
+      "sha256": "20004c114cf3e0a750300568a560958df76a73a185cc1f2b1eb5ae425279ed17",
+      "size": 297391,
+      "source_url": "https://www.sportinglife.com/racing/results/2013-06-20/ascot/118984/gold-cup-british-champions-series-group-1"
+    }
+  },
+  "root": "@FIXTURE_ROOT@/historical/smoke/run/smoke-united_kingdom-56980/source-cache",
+  "schema_version": "1.0",
+  "total_bytes": 297391,
+  "updated_at": "2026-07-15T16:52:56.178399+00:00"
+}
