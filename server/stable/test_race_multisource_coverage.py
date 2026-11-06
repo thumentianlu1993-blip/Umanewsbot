@@ -40,6 +40,19 @@ class CoverageTests(TestCase):
             self.assertEqual(build_multisource_coverage(
                 now=fixtures.NOW, policy=self.policy)["total"], 0)
 
+    def test_p02_result_timestamp_does_not_hide_missing_racecard_enrollment(self):
+        self.event.result_confirmed_at = fixtures.NOW
+        self.event.save(update_fields=("result_confirmed_at",))
+        self.assertFalse(self.event.runners.exists())
+        with override_settings(RACE_LIFECYCLE_V2_WRITE_ENABLED=True,
+                               RACE_LIFECYCLE_V2_EVENT_IDS=(self.event.pk,)):
+            self.assertEqual(build_multisource_coverage(
+                now=fixtures.NOW, policy=self.policy)["counts"], {"enrollment_missing": 1})
+        with override_settings(RACE_LIFECYCLE_V2_WRITE_ENABLED=False,
+                               RACE_LIFECYCLE_V2_EVENT_IDS=(self.event.pk,)):
+            self.assertEqual(build_multisource_coverage(
+                now=fixtures.NOW, policy=self.policy)["counts"], {"confirmed": 1})
+
     def test_unenrolled_overdue_alert_dedup_and_outside_window_persistence(self):
         self.event.race_datetime = fixtures.NOW - timedelta(hours=1)
         self.event.save()
