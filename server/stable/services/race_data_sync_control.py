@@ -2815,7 +2815,7 @@ def _claim_multisource_due(
                         continue
                     if binding is not None and binding.pk != b.pk:
                         continue
-                    if writable(event_id) and not capacity_allows_source(capacity, event=event, source=b.source_identity):
+                    if writable(event_id) and not capacity_allows_source(capacity, event=event, source=b.source_identity, data_kind=row.data_kind):
                         continue
                     admission = validate_multisource_admission(
                         event_id=event_id,
@@ -3003,7 +3003,7 @@ def _validate_multisource_claim(*, claim, now, required_data_kinds=()):
     if writable(event.pk):
         try:
             capacity = capacity_manifest(now=now)
-            if not capacity_allows_source(capacity, event=event, source=binding.source_identity):
+            if not capacity_allows_source(capacity, event=event, source=binding.source_identity, data_kind=kind):
                 return deny("lifecycle_capacity_source_gap")
         except (OSError, ValueError, TypeError, KeyError):
             return deny("lifecycle_capacity_gap")

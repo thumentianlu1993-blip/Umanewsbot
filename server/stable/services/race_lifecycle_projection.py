@@ -825,6 +825,41 @@ def source_capacity_report(*, targets, proofs, budgets, inventory=None):
                 manifest_sha256=canonical_sha(dict(targets=targets, proofs=proofs, budgets=budgets, inventory=inventory)))
 
 
+def _bounded_manifest_valid(value):
+    """用途范围和请求上限；不把能力验收缺口填写为已验证。"""
+    from stable.services.race_data_source_adapters import REGIONS
+    from urllib.parse import urlsplit
+    targets, routes, budgets = value.get('targets'), value.get('runtime_routes'), value.get('budgets')
+    daily = value.get('daily_provider_region_requests')
+    if (not isinstance(targets, list) or not 1 <= len(targets) <= 1000
+            or not isinstance(routes, list) or not 1 <= len(routes) <= 64
+            or not isinstance(budgets, dict) or type(daily) is not int or daily <= 0):
+        return False
+    if any(not isinstance(t, dict) or not isinstance(t.get('key'), str) or not t['key']
+           or t.get('region') not in REGIONS or type(t.get('key_race')) is not bool for t in targets):
+        return False
+    keys = {t['key'] for t in targets}
+    if len(keys) != len(targets):
+        return False
+    for route in routes:
+        if not isinstance(route, dict):
+            return False
+        host = route.get('host')
+        if (not isinstance(host, str) or not host or any(c in host for c in '/:@?#')
+                or urlsplit('https://' + host).hostname != host
+                or not isinstance(route.get('provider'), str) or not route['provider']
+                or route.get('region') not in REGIONS
+                or route.get('automated_use_permitted') is not True
+                or not _capacity_refs(route.get('use_evidence_refs'))
+                or not _capacity_keys(route.get('target_keys'))
+                or not set(route['target_keys']) <= keys
+                or not isinstance(route.get('capabilities'), list) or not route['capabilities']
+                or any(k not in ('race_time', 'racecard', 'result') for k in route['capabilities'])
+                or type(budgets.get(host)) is not int or not 1 <= budgets[host] <= 3600000):
+            return False
+    return True
+
+
 def capacity_manifest(*, now):
     """无已核验容量证据时拒绝提高真实轮询频率。"""
     import hashlib
@@ -841,9 +876,15 @@ def capacity_manifest(*, now):
     from stable.services.race_data_source_adapters import aware
     if not aware(value['valid_from']) <= now < aware(value['valid_until']):
         raise ValueError('capacity_manifest_expired')
-    report = source_capacity_report(targets=value['targets'], proofs=value['proofs'], budgets=value['budgets'], inventory=value.get('inventory'))
-    if report['ready'] != report['targets'] or not report['targets']:
-        raise ValueError('capacity_not_ready')
+    if value.get('runtime_mode') == 'bounded-v1':
+        if not _bounded_manifest_valid(value):
+            raise ValueError('bounded_capacity_invalid')
+    elif value.get('runtime_mode') is None:
+        report = source_capacity_report(targets=value['targets'], proofs=value['proofs'], budgets=value['budgets'], inventory=value.get('inventory'))
+        if report['ready'] != report['targets'] or not report['targets']:
+            raise ValueError('capacity_not_ready')
+    else:
+        raise ValueError('capacity_runtime_mode')
     keys = {t['key'] for t in value['targets']}
     if not {f'canonical:{pk}' for pk in getattr(settings, 'RACE_LIFECYCLE_V2_EVENT_IDS', ())} <= keys:
         raise ValueError('capacity_cohort_incomplete')
@@ -962,8 +1003,28 @@ def record_due_deadlines(*, now, limit=100):
     from stable.services.race_lifecycle_metrics import record_scope_deadlines
     return count + record_scope_deadlines(now=now, limit=limit)
 
-def capacity_allows_source(manifest, *, event, source):
+def capacity_allows_source(manifest, *, event, source, data_kind=None):
     from urllib.parse import urlsplit
+    if manifest.get('runtime_mode') == 'bounded-v1':
+        if not _bounded_manifest_valid(manifest):
+            return False
+        target = next((t for t in manifest['targets'] if t['key'] == f'canonical:{event.pk}'), None)
+        host = urlsplit(source.canonical_url).hostname
+        daily = getattr(settings, 'RACE_DATA_RAW_DAILY_PROVIDER_REGION_REQUESTS', 0)
+        if (not target or target['region'] != source.region_code or type(daily) is not int
+                or not 0 < daily <= manifest['daily_provider_region_requests']):
+            return False
+        routes = [r for r in manifest['runtime_routes'] if r['provider'] == source.source_key
+                  and r['region'] == source.region_code and r['host'] == host
+                  and target['key'] in r['target_keys'] and data_kind in r['capabilities']]
+        if not routes:
+            return False
+        # 此处只验实际配置；host预约/熔断与日账本仍在每次HTTP前原子执行。
+        limit = manifest['budgets'][host]
+        minimum_ms = (3600000 + limit - 1) // limit
+        return models.RaceLiveHostBudget.objects.filter(host=host, min_interval_ms__gte=minimum_ms).exists()
+    if manifest.get('runtime_mode') is not None:
+        return False
     target = next((t for t in manifest.get('targets', []) if t['key'] == f'canonical:{event.pk}'), None)
     grade = str(event.normalized_grade or '').upper().replace('-', '')
     # 缺规范等级不能凭缺值套用120秒常规预算；显式重点预算只是保守成本，不补造等级。

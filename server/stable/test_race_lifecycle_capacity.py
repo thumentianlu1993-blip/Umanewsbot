@@ -189,3 +189,65 @@ class LifecycleCapacityTests(SimpleTestCase):
                 output=StringIO()
                 call_command('report_race_lifecycle_capacity',manifest=str(p),sha256=hashlib.sha256(raw).hexdigest(),stdout=output)
                 self.assertEqual(json.loads(output.getvalue())['ready'],int(complete))
+
+
+from django.test import TestCase, override_settings
+from types import SimpleNamespace
+from stable.models import RaceLiveHostBudget
+
+
+@override_settings(RACE_DATA_RAW_DAILY_PROVIDER_REGION_REQUESTS=100)
+class BoundedLifecycleAdmissionTests(TestCase):
+    def setUp(self):
+        self.manifest = dict(runtime_mode='bounded-v1', targets=[dict(key='canonical:1',region='japan_jra',key_race=True)],
+            proofs=[], budgets={'www.jra.go.jp':60}, daily_provider_region_requests=100,
+            runtime_routes=[dict(provider='jra',region='japan_jra',host='www.jra.go.jp',
+                target_keys=['canonical:1'],capabilities=['race_time','racecard','result'],
+                automated_use_permitted=True,use_evidence_refs=['synthetic:approved-package'])])
+        self.event = SimpleNamespace(pk=1, normalized_grade='G1', source_refs={})
+        self.source = SimpleNamespace(source_key='jra',region_code='japan_jra',canonical_url='https://www.jra.go.jp/example')
+        RaceLiveHostBudget.objects.create(host='www.jra.go.jp',min_interval_ms=60000)
+
+    def allowed(self, kind='result'):
+        return service.capacity_allows_source(self.manifest,event=self.event,source=self.source,data_kind=kind)
+
+    def test_runtime_allowed_without_falsifying_full_readiness(self):
+        self.assertTrue(self.allowed())
+        report=service.source_capacity_report(targets=self.manifest['targets'],proofs=[],budgets=self.manifest['budgets'])
+        self.assertEqual(report['ready'],0)
+
+    def test_source_capability_target_and_permission_boundaries(self):
+        from copy import deepcopy
+        original=deepcopy(self.manifest)
+        for field,value in [('provider','other'),('region','ireland'),('host','other.invalid'),
+                            ('target_keys',['canonical:2']),('capabilities',['racecard']),
+                            ('automated_use_permitted',False),('use_evidence_refs',[])]:
+            self.manifest=deepcopy(original);self.manifest['runtime_routes'][0][field]=value
+            with self.subTest(field=field):
+                self.assertFalse(self.allowed())
+
+    def test_manifest_accepts_pending_evidence_but_rejects_wrong_cohort(self):
+        import json, hashlib, tempfile
+        from pathlib import Path
+        from django.utils import timezone
+        value={**self.manifest,'valid_from':'2026-01-01T00:00:00Z','valid_until':'2027-01-01T00:00:00Z'}
+        raw=json.dumps(value).encode()
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'capacity.json';path.write_bytes(raw)
+            with override_settings(RACE_LIFECYCLE_CAPACITY_FILE=str(path),
+                    RACE_LIFECYCLE_CAPACITY_SHA256=hashlib.sha256(raw).hexdigest(),
+                    RACE_LIFECYCLE_V2_EVENT_IDS=(1,)):
+                now=timezone.datetime(2026,11,6,tzinfo=timezone.get_default_timezone())
+                self.assertEqual(service.capacity_manifest(now=now)['proofs'],[])
+                with override_settings(RACE_LIFECYCLE_V2_EVENT_IDS=(1,2)):
+                    with self.assertRaisesMessage(ValueError,'capacity_cohort_incomplete'):
+                        service.capacity_manifest(now=now)
+
+    def test_budget_must_be_enforced_not_just_reported(self):
+        RaceLiveHostBudget.objects.filter(host='www.jra.go.jp').update(min_interval_ms=2000)
+        self.assertFalse(self.allowed())
+        RaceLiveHostBudget.objects.filter(host='www.jra.go.jp').update(min_interval_ms=60000)
+        with override_settings(RACE_DATA_RAW_DAILY_PROVIDER_REGION_REQUESTS=101):
+            self.assertFalse(self.allowed())
+        self.manifest['budgets']['www.jra.go.jp']=0
+        self.assertFalse(self.allowed())
