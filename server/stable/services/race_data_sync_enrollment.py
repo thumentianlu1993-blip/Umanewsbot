@@ -1916,6 +1916,10 @@ def build_multisource_coverage(*, now, policy):
                 reason = "manual_pause"
             elif control and control.write_owner not in ("unmanaged", "data_sync"):
                 reason = "owner_conflict"
+            elif event.pk in p02_ids and race_data_sync_control.lifecycle_correction_window_closed(
+                lifecycle=lifecycle, now=now
+            ):
+                reason = "confirmed"
             # 旧赛果时间戳不能证明P02名单等模块已齐备；显式批次按登记状态继续发现。
             elif event.result_confirmed_at and event.pk not in p02_ids:
                 reason = "confirmed"

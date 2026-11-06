@@ -3171,6 +3171,14 @@ def multisource_initial_poll_at(*, event, kind, now):
     return now
 
 
+def lifecycle_correction_window_closed(*, lifecycle, now):
+    """发现与模块调度共用新生命周期时钟，不用旧赛果时间戳替代。"""
+    if not lifecycle or not lifecycle.first_result_confirmed_at:
+        return False
+    until = lifecycle.correction_until or (lifecycle.first_result_confirmed_at + timedelta(days=7))
+    return now >= until
+
+
 def calculate_multisource_next_poll(*, event, kind, now):
     from zoneinfo import ZoneInfo
     from stable.services.race_lifecycle_projection import writable
@@ -3181,10 +3189,8 @@ def calculate_multisource_next_poll(*, event, kind, now):
         if event.status == "cancelled":
             return now + timedelta(days=1) if kind == "race_time" else None
         lifecycle = models.RaceEventLifecycleControl.objects.filter(event=event).first()
-        if lifecycle and lifecycle.first_result_confirmed_at:
-            until = lifecycle.correction_until or (lifecycle.first_result_confirmed_at + timedelta(days=7))
-            if now >= until:
-                return None
+        if lifecycle_correction_window_closed(lifecycle=lifecycle, now=now):
+            return None
         key = str(event.normalized_grade or "").upper().replace("-", "")
         manual = (event.source_refs or {}).get("lifecycle_priority") == "key"
         interval = 60 if key in ("G1", "GI", "JPN1", "JPNI", "JG1") or manual else 120
