@@ -855,7 +855,7 @@ def _bounded_manifest_valid(value):
                 or not set(route['target_keys']) <= keys
                 or not isinstance(route.get('capabilities'), list) or not route['capabilities']
                 or any(k not in ('race_time', 'racecard', 'result') for k in route['capabilities'])
-                or type(budgets.get(host)) is not int or not 1 <= budgets[host] <= 3600000):
+                or type(budgets.get(host)) is not int or not 1200 <= budgets[host] <= 3600000):
             return False
     return True
 
@@ -1022,7 +1022,9 @@ def capacity_allows_source(manifest, *, event, source, data_kind=None):
         # 此处只验实际配置；host预约/熔断与日账本仍在每次HTTP前原子执行。
         limit = manifest['budgets'][host]
         minimum_ms = (3600000 + limit - 1) // limit
-        return models.RaceLiveHostBudget.objects.filter(host=host, min_interval_ms__gte=minimum_ms).exists()
+        # 当前双页适配器最多等待3秒；不接受会导致第二页永久饥饿的慢间隔。
+        return models.RaceLiveHostBudget.objects.filter(
+            host=host, min_interval_ms__gte=minimum_ms, min_interval_ms__lte=3000).exists()
     if manifest.get('runtime_mode') is not None:
         return False
     target = next((t for t in manifest.get('targets', []) if t['key'] == f'canonical:{event.pk}'), None)

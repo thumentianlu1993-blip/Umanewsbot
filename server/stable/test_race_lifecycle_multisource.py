@@ -102,6 +102,35 @@ class LifecycleSourceEvidenceTests(TestCase):
                 confirmed_card=True,complete_result=True,correction=True,evidence_refs=['synthetic'],discovery='full',requests_per_fetch=2)
                 for p in ('jra','alternate')],budgets={'www.jra.go.jp':1000})
 
+    def test_multikind_claim_rechecks_each_capability_before_fetch(self):
+        from stable.services.race_data_source_adapters import parse_multisource_policy
+        policy=parse_multisource_policy(fixtures.policy_payload(kinds=('race_time','racecard','result')),now=fixtures.NOW)
+        self.policy=policy
+        with override_settings(RACE_LIFECYCLE_V2_EVENT_IDS=(self.event.pk,),
+                RACE_DATA_SYNC_ENABLED_DATA_KINDS=('race_time','racecard','result'),RACE_DATA_SYNC_SCHEDULE_APPLY_ENABLED=True,RACE_DATA_SYNC_RACECARD_APPLY_ENABLED=True), patch(
+                'stable.services.race_data_source_adapters.load_multisource_policy',return_value=policy), patch(
+                'stable.services.race_lifecycle_projection.capacity_manifest',return_value=self.capacity()):
+            self.enroll()
+            checkpoint=models.RaceEventLiveProviderCheckpoint.objects.filter(tracking__event=self.event,data_kind='result').values().get()
+            for key in ('id','created_at','updated_at'): checkpoint.pop(key,None)
+            for kind in ('race_time','racecard'):
+                values={**checkpoint,'next_poll_at':fixtures.NOW}
+                models.RaceEventLiveProviderCheckpoint.objects.update_or_create(
+                    tracking_id=values.pop('tracking_id'),source_key=values.pop('source_key'),
+                    data_kind=kind,defaults={k:v for k,v in values.items() if k!='data_kind'})
+            claims=claim_due_enrollments(now=fixtures.NOW,batch_size=20,ttl_seconds=240,
+                enabled_providers=('jra',),enabled_regions=('japan_jra',),enabled_data_kinds=('race_time','racecard'))
+            self.assertTrue(claims)
+            claim=claims[0];kinds={row['data_kind'] for row in claim.checkpoint_plan}
+            self.assertEqual(kinds,{'race_time','racecard'})
+            allowed_last=list(kinds)[-1]
+            with patch('stable.services.race_lifecycle_projection.capacity_allows_source',
+                    side_effect=lambda *a, data_kind=None, **kw:data_kind==allowed_last), patch(
+                    'stable.services.race_data_source_adapters.fetch_bound_observation') as fetch:
+                outcome=run_multisource_claim(claim=claim,now=fixtures.NOW,fetcher=self.fetch)
+            fetch.assert_not_called()
+            self.assertFalse(outcome['processed'])
+
     def test_identical_cross_language_result_remains_visible(self):
         with override_settings(RACE_LIFECYCLE_V2_EVENT_IDS=(self.event.pk,)), patch(
                 'stable.services.race_lifecycle_projection.capacity_manifest',return_value=self.capacity()):

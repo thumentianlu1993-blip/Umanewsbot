@@ -3003,7 +3003,8 @@ def _validate_multisource_claim(*, claim, now, required_data_kinds=()):
     if writable(event.pk):
         try:
             capacity = capacity_manifest(now=now)
-            if not capacity_allows_source(capacity, event=event, source=binding.source_identity, data_kind=kind):
+            if not all(capacity_allows_source(capacity, event=event, source=binding.source_identity, data_kind=kind)
+                       for kind in kinds):
                 return deny("lifecycle_capacity_source_gap")
         except (OSError, ValueError, TypeError, KeyError):
             return deny("lifecycle_capacity_gap")

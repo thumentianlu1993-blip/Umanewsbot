@@ -200,13 +200,13 @@ from stable.models import RaceLiveHostBudget
 class BoundedLifecycleAdmissionTests(TestCase):
     def setUp(self):
         self.manifest = dict(runtime_mode='bounded-v1', targets=[dict(key='canonical:1',region='japan_jra',key_race=True)],
-            proofs=[], budgets={'www.jra.go.jp':60}, daily_provider_region_requests=100,
+            proofs=[], budgets={'www.jra.go.jp':1200}, daily_provider_region_requests=100,
             runtime_routes=[dict(provider='jra',region='japan_jra',host='www.jra.go.jp',
                 target_keys=['canonical:1'],capabilities=['race_time','racecard','result'],
                 automated_use_permitted=True,use_evidence_refs=['synthetic:approved-package'])])
         self.event = SimpleNamespace(pk=1, normalized_grade='G1', source_refs={})
         self.source = SimpleNamespace(source_key='jra',region_code='japan_jra',canonical_url='https://www.jra.go.jp/example')
-        RaceLiveHostBudget.objects.create(host='www.jra.go.jp',min_interval_ms=60000)
+        RaceLiveHostBudget.objects.create(host='www.jra.go.jp',min_interval_ms=3000)
 
     def allowed(self, kind='result'):
         return service.capacity_allows_source(self.manifest,event=self.event,source=self.source,data_kind=kind)
@@ -243,10 +243,15 @@ class BoundedLifecycleAdmissionTests(TestCase):
                     with self.assertRaisesMessage(ValueError,'capacity_cohort_incomplete'):
                         service.capacity_manifest(now=now)
 
+    def test_slow_host_budget_cannot_starve_paired_page_fetch(self):
+        self.manifest['budgets']['www.jra.go.jp']=60
+        RaceLiveHostBudget.objects.filter(host='www.jra.go.jp').update(min_interval_ms=60000)
+        self.assertFalse(self.allowed())
+
     def test_budget_must_be_enforced_not_just_reported(self):
         RaceLiveHostBudget.objects.filter(host='www.jra.go.jp').update(min_interval_ms=2000)
         self.assertFalse(self.allowed())
-        RaceLiveHostBudget.objects.filter(host='www.jra.go.jp').update(min_interval_ms=60000)
+        RaceLiveHostBudget.objects.filter(host='www.jra.go.jp').update(min_interval_ms=3000)
         with override_settings(RACE_DATA_RAW_DAILY_PROVIDER_REGION_REQUESTS=101):
             self.assertFalse(self.allowed())
         self.manifest['budgets']['www.jra.go.jp']=0
