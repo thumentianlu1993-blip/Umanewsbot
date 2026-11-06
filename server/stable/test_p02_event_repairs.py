@@ -106,3 +106,49 @@ class EventRepairTests(TestCase):
         event.country_region='france';event.slug='changed-identity'
         event.save(update_fields={'country_region','slug'})
         with self.assertRaises(CommandError):self.run_manifest(actions,apply=True)
+
+    def publish_manifest(self, actions, apply=False, alter=None):
+        repair_raw=json.dumps({'schema':'p02-data-actions-v1','actions':actions}).encode()
+        target=HistoricalRaceEventTarget.objects.get()
+        payload={'schema':'p02-publish-created-calendars-v1',
+            'repair_manifest_sha256':hashlib.sha256(repair_raw).hexdigest(),
+            'targets':[{'target_id':target.pk,'materialization_snapshot_sha256':digest(materialization_snapshot(target))}]}
+        if alter:alter(payload)
+        with TemporaryDirectory() as tmp:
+            p=Path(tmp)/'publish.json';p.write_text(json.dumps(payload));out=StringIO()
+            with patch('django.utils.timezone.localdate',return_value=date(2026,11,6)):
+                call_command('publish_p02_created_calendars',manifest=str(p),expected_sha256=hashlib.sha256(p.read_bytes()).hexdigest(),apply=apply,stdout=out)
+            return json.loads(out.getvalue())
+
+    def test_publication_requires_repair_receipt_then_dry_run_and_idempotent_apply(self):
+        actions=self.actions()
+        with self.assertRaises(CommandError):self.publish_manifest(actions,apply=True)
+        self.run_manifest(actions,apply=True)
+        self.publish_manifest(actions)
+        self.assertEqual(HistoricalRaceEventTarget.objects.get().event.visibility_status,'draft')
+        self.publish_manifest(actions,apply=True);self.publish_manifest(actions,apply=True)
+        self.assertEqual(HistoricalRaceEventTarget.objects.get().event.visibility_status,'published')
+
+    def test_publication_rejects_changed_created_fields(self):
+        actions=self.actions();self.run_manifest(actions,apply=True)
+        event=HistoricalRaceEventTarget.objects.get().event
+        event.distance_text='changed';event.save(update_fields={'distance_text'})
+        with self.assertRaises(CommandError):self.publish_manifest(actions,apply=True)
+        event.refresh_from_db();self.assertEqual(event.visibility_status,'draft')
+
+    def test_publication_rejects_foreign_receipt(self):
+        actions=self.actions();self.run_manifest(actions,apply=True)
+        with self.assertRaises(CommandError):
+            self.publish_manifest(actions,apply=True,alter=lambda p:p.update(repair_manifest_sha256='f'*64))
+        self.assertEqual(HistoricalRaceEventTarget.objects.get().event.visibility_status,'draft')
+
+    def test_publication_refuses_existing_runner_or_result_rows(self):
+        from stable.models import RaceEventRunner, RaceEventResult
+        actions=self.actions();self.run_manifest(actions,apply=True)
+        event=HistoricalRaceEventTarget.objects.get().event
+        for model,fields in ((RaceEventRunner,{}),(RaceEventResult,{'finish_position':1})):
+            with self.subTest(model=model.__name__):
+                row=model.objects.create(event=event,horse_name='Unexpected Horse',**fields)
+                with self.assertRaises(CommandError):self.publish_manifest(actions,apply=True)
+                event.refresh_from_db();self.assertEqual(event.visibility_status,'draft')
+                row.delete()
