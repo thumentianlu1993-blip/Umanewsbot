@@ -1758,9 +1758,31 @@ def discover_source_url(*, event, route, now, fetcher):
     candidates = set()
     for url in dict.fromkeys(indexes):
         page = fetcher(url, route=route, now=now)
-        for link in BeautifulSoup(str(page), 'html.parser').select('a[href]'):
+        soup = BeautifulSoup(str(page), 'html.parser')
+        # 历史结果页的链接文字可能仅含时刻；用已有 NEXT_DATA 结构精确选名，
+        # 再以 race id 对上页面实际链接，不构造/猜测详情 URL。
+        result_ids = set()
+        if route.provider == 'sporting_life':
+            node = soup.select_one('script#__NEXT_DATA__')
+            if node is not None:
+                data = json.loads(node.get_text())
+                for meeting in data.get('props', {}).get('pageProps', {}).get('meetings', []):
+                    for race in meeting.get('races') or []:
+                        if normalize_name(race.get('name') or '') in names:
+                            race_id = (race.get('race_summary_reference') or {}).get('id')
+                            if race_id is not None:
+                                result_ids.add(str(race_id))
+        for link in soup.select('a[href]'):
             target = urljoin(url, link.get('href', ''))
             label = link.get_text(' ', strip=True)
+            result_match = re.fullmatch(
+                r'/racing/results/(\d{4}-\d{2}-\d{2})/[^/]+/(\d+)/[^/]+/?',
+                urlsplit(target).path,
+            )
+            if (route.provider == 'sporting_life' and result_match
+                    and event.local_date and result_match.group(1) == event.local_date.isoformat()
+                    and result_match.group(2) in result_ids and route.permits_url(target)):
+                candidates.add(target)
             # 只提取真实列表的赛名字段；时间/名单等装饰文字不属于名称。
             # 仍精确匹配，且此处仅发现URL，不写入来源身份。
             if route.provider == 'sporting_life' and re.search(r'/racecard/\d+/', urlsplit(target).path):

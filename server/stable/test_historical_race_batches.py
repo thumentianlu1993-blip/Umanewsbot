@@ -32,6 +32,7 @@ from stable.models import (
 from stable.services.historical_race_batches import (
     _locked_historical_target,
     materialize_historical_event,
+    materialize_scheduled_historical_event,
     read_immutable_selection_snapshot,
     select_historical_band_batch_targets,
     select_first_acceptance_targets,
@@ -228,6 +229,61 @@ class HistoricalRaceBatchTests(TestCase):
 
         self.assertEqual(materialize_historical_event(target).pk, event.pk)
         self.assertEqual(RaceEvent.objects.count(), 1)
+
+    def test_not_due_future_schedule_materializes_without_claiming_results_ready(self):
+        from datetime import date
+        target = self._target(
+            self._series(RacingRegion.UNITED_KINGDOM, "future-schedule"), 2026,
+            expectation=HistoricalRaceExpectationStatus.NOT_DUE,
+            resolution=HistoricalRaceResolutionStatus.SOURCE_UNAVAILABLE, with_event=False,
+        )
+        target.local_date = date(2026, 11, 15)
+        target.save(update_fields={"local_date"})
+        with patch("stable.services.historical_race_batches.dj_timezone.localdate", return_value=date(2026, 11, 6)):
+            event = materialize_scheduled_historical_event(target)
+            self.assertIsNotNone(event)
+            target.refresh_from_db()
+            self.assertEqual(materialize_scheduled_historical_event(target).pk, event.pk)
+        self.assertEqual(event.status, RaceEventStatus.SCHEDULED)
+        self.assertEqual(event.visibility_status, RaceEventVisibility.DRAFT)
+        self.assertEqual(target.expectation_status, HistoricalRaceExpectationStatus.NOT_DUE)
+        self.assertEqual(target.resolution_status, HistoricalRaceResolutionStatus.SOURCE_UNAVAILABLE)
+        self.assertEqual(RaceEvent.objects.count(), 1)
+
+    def test_not_due_schedule_rejects_due_dates_and_missing_identity(self):
+        from datetime import date
+        target = self._target(
+            self._series(RacingRegion.UNITED_KINGDOM, "invalid-schedule"), 2026,
+            expectation=HistoricalRaceExpectationStatus.NOT_DUE,
+            resolution=HistoricalRaceResolutionStatus.SOURCE_UNAVAILABLE, with_event=False,
+        )
+        with patch("stable.services.historical_race_batches.dj_timezone.localdate", return_value=date(2026, 11, 6)):
+            for value in (None, date(2026, 11, 5), date(2026, 11, 6)):
+                target.local_date = value
+                target.save(update_fields={"local_date"})
+                with self.assertRaises(InventoryValidationError):
+                    materialize_scheduled_historical_event(target)
+            target.local_date = date(2026, 11, 15)
+            target.source_refs = {}
+            target.save(update_fields={"local_date", "source_refs"})
+            with self.assertRaises(InventoryValidationError):
+                materialize_scheduled_historical_event(target)
+        self.assertFalse(RaceEvent.objects.exists())
+
+    def test_not_due_schedule_rejects_finished_existing_event(self):
+        from datetime import date
+        target = self._target(
+            self._series(RacingRegion.UNITED_KINGDOM, "finished-schedule"), 2026,
+            expectation=HistoricalRaceExpectationStatus.NOT_DUE,
+            resolution=HistoricalRaceResolutionStatus.SOURCE_UNAVAILABLE,
+        )
+        target.local_date = date(2026, 11, 15)
+        target.save(update_fields={"local_date"})
+        with patch("stable.services.historical_race_batches.dj_timezone.localdate", return_value=date(2026, 11, 6)):
+            with self.assertRaises(InventoryValidationError):
+                materialize_scheduled_historical_event(target)
+        target.event.refresh_from_db()
+        self.assertEqual(target.event.status, RaceEventStatus.FINISHED)
 
     def test_first_acceptance_selects_five_regions_three_series_and_three_eras(self):
         selected_series: dict[str, list[str]] = {}

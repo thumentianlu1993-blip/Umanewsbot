@@ -260,6 +260,24 @@ class RegionAdapterTests(TestCase):
                     discover_source_url(event=event,route=route,now=NOW,fetcher=lambda *a,**k:page)
         self.assertFalse(models.RaceResultSourceIdentity.objects.exists())
 
+    def test_sporting_life_result_discovery_uses_exact_structured_name_and_actual_link(self):
+        import json
+        route=route_for('sporting_life','united_kingdom','united_kingdom','Europe/London',
+                        'venue',['Venue'],'www.sportinglife.com','/racing/')
+        route.payload['discovery_urls_by_date']={'2026-09-20':['https://www.sportinglife.com/racing/results/2026-09-20']}
+        event=SimpleNamespace(original_name='Exact Race',chinese_name='',source_refs={},local_date=date(2026,9,20))
+        detail='https://www.sportinglife.com/racing/results/2026-09-20/venue/123/exact-race'
+        data={'props':{'pageProps':{'meetings':[{'races':[{'name':'Exact Race','race_summary_reference':{'id':123}}]}]}}}
+        page='<script id="__NEXT_DATA__" type="application/json">'+json.dumps(data)+'</script><a href="'+detail+'">Results 12:40</a>'
+        self.assertEqual(discover_source_url(event=event,route=route,now=NOW,fetcher=lambda *a,**k:page),detail)
+        for bad in (page.replace('Exact Race','Exact Race Extra'),page.replace('/123/', '/124/')):
+            with self.assertRaisesRegex(ValueError,'source_not_found'):
+                discover_source_url(event=event,route=route,now=NOW,fetcher=lambda *a,**k:bad)
+        duplicate=page+'<a href="'+detail.replace('exact-race','other')+'">Results</a>'
+        with self.assertRaisesRegex(ValueError,'source_discovery_ambiguous'):
+            discover_source_url(event=event,route=route,now=NOW,fetcher=lambda *a,**k:duplicate)
+        self.assertFalse(models.RaceResultSourceIdentity.objects.exists())
+
     def test_discovery_names_only_select_request_never_identity(self):
 
         payload = policy_payload()

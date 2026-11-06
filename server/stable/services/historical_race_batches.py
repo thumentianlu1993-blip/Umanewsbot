@@ -216,7 +216,10 @@ def _materialize_historical_event(
         if target.event_id:
             raise InventoryValidationError("not-held target must not have a RaceEvent")
         return None
-    if target.expectation_status == HistoricalRaceExpectationStatus.NOT_DUE:
+    if target.expectation_status == HistoricalRaceExpectationStatus.NOT_DUE and not (
+        scheduled
+        and target.resolution_status == HistoricalRaceResolutionStatus.SOURCE_UNAVAILABLE
+    ):
         if not target.event_id:
             return None
         event = RaceEvent.objects.select_related("race_series").get(pk=target.event_id)
@@ -246,7 +249,13 @@ def _materialize_historical_event(
             raise InventoryValidationError("scheduled historical event requires a future local_date")
     if target.race_series.review_status != RaceSeriesReviewStatus.APPROVED:
         raise InventoryValidationError("target series is not approved")
-    if target.resolution_status not in {
+    # 未到期的排期记录允许资料源尚未发布；不改变其覆盖状态或声称结果齐全。
+    pending_schedule = (
+        scheduled
+        and target.expectation_status == HistoricalRaceExpectationStatus.NOT_DUE
+        and target.resolution_status == HistoricalRaceResolutionStatus.SOURCE_UNAVAILABLE
+    )
+    if not pending_schedule and target.resolution_status not in {
         HistoricalRaceResolutionStatus.READY,
         HistoricalRaceResolutionStatus.IMPORTED,
     }:
@@ -273,6 +282,11 @@ def _materialize_historical_event(
         raise InventoryValidationError(f"historical slug conflict: {public_year}/{slug}")
     with transaction.atomic():
         locked = _locked_historical_target(target.pk).get()
+        if any(getattr(locked, field) != getattr(target, field) for field in (
+            "expectation_status", "resolution_status", "race_series_id", "local_date",
+            "original_name", "racecourse", "source_refs", "artifact_sha256",
+        )) or locked.race_series.review_status != RaceSeriesReviewStatus.APPROVED:
+            raise InventoryValidationError("target changed before materialization")
         try:
             locked_identity = historical_event_identity(locked, locked.local_date)
         except ValidationError as exc:
@@ -328,6 +342,11 @@ def _materialize_historical_event(
                 source_refs=source_refs,
             )
         else:
+            if scheduled and locked.expectation_status == HistoricalRaceExpectationStatus.NOT_DUE and (
+                event.status not in {RaceEventStatus.SCHEDULED, RaceEventStatus.POSTPONED}
+                or event.local_date != locked.local_date
+            ):
+                raise InventoryValidationError("not-due target existing RaceEvent identity/status mismatch")
             try:
                 validate_event_years(
                     event.year,
