@@ -68,6 +68,13 @@ class ProductionNginxContractTests(SimpleTestCase):
             2,
         )
 
+    def test_amazon_calendar_cursor_block_is_narrow(self):
+        self.assertIn("map $http_user_agent $is_amazon_calendar_crawler", self.source)
+        self.assertIn("~*Amazonbot 1;", self.source)
+        self.assertIn('map "$is_amazon_calendar_crawler:$uri:$arg_cursor" $block_amazon_calendar_cursor', self.source)
+        self.assertIn("~^1:/races/:.+ 1;", self.source)
+        self.assertEqual(self.source.count("if ($block_amazon_calendar_cursor) {\n        return 429;\n    }"), 2)
+
     def test_retired_hipilot_host_remains_gone(self):
         self.assertIn("server_name hipilot.umafans.run", self.source)
         block = self.source[self.source.index("server_name hipilot.umafans.run") :]
