@@ -105,7 +105,8 @@
       "stable.test_release_p02_readonly",
       "stable.test_release_p02_runtime",
       "stable.test_duplicate_repair_rehearsal",
-      "stable.test_duplicate_repair_runtime"
+      "stable.test_duplicate_repair_runtime",
+      "stable.test_p02_b_repair_plan"
     ],
     "infrastructure": [
       "scripts.tests.test_bounded_stable_tests",
@@ -2965,6 +2966,12 @@
       "domains": [
         "release"
       ]
+    },
+    "server/stable/test_p02_b_repair_plan.py": {
+      "label": "stable.test_p02_b_repair_plan",
+      "domains": [
+        "release"
+      ]
     }
   },
   "profiles": {
@@ -3298,7 +3305,8 @@
     "stable.test_release_p02_readonly": "django",
     "stable.test_release_p02_runtime": "python",
     "stable.test_duplicate_repair_rehearsal": "python",
-    "stable.test_duplicate_repair_runtime": "python"
+    "stable.test_duplicate_repair_runtime": "python",
+    "stable.test_p02_b_repair_plan": "python"
   },
   "allowed_skips": {},
   "owners": {
