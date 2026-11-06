@@ -1029,7 +1029,9 @@
     "deploy/p02_inplace_migrate.py",
     "server/stable/management/commands/register_p02_canonical_names.py",
     "server/stable/management/commands/apply_p02_event_repairs.py",
-    "server/stable/management/commands/publish_p02_created_calendars.py"
+    "server/stable/management/commands/publish_p02_created_calendars.py",
+    "server/stable/services/race_data_historical_request.py",
+    "server/stable/management/commands/backfill_historical_tra_result.py"
   ],
   "paths": {
     "docs/changes/next-version-capabilities/lanes/C/U01-offline-cases.json": [

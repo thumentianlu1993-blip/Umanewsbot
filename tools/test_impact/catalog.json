@@ -910,6 +910,12 @@
     ],
     "module:stable.test_p02_event_repairs": [
       "stable.test_p02_event_repairs"
+    ],
+    "module:stable.test_race_data_historical_request": [
+      "stable.test_race_data_historical_request"
+    ],
+    "module:stable.test_race_data_historical_provider": [
+      "stable.test_race_data_historical_provider"
     ]
   },
   "dependencies": {
@@ -2990,6 +2996,18 @@
       "domains": [
         "module:stable.test_p02_event_repairs"
       ]
+    },
+    "server/stable/test_race_data_historical_request.py": {
+      "label": "stable.test_race_data_historical_request",
+      "domains": [
+        "module:stable.test_race_data_historical_request"
+      ]
+    },
+    "server/stable/test_race_data_historical_provider.py": {
+      "label": "stable.test_race_data_historical_provider",
+      "domains": [
+        "module:stable.test_race_data_historical_provider"
+      ]
     }
   },
   "profiles": {
@@ -3326,7 +3344,9 @@
     "stable.test_duplicate_repair_runtime": "python",
     "stable.test_p02_b_repair_plan": "python",
     "stable.test_p02_canonical_name_registration": "django",
-    "stable.test_p02_event_repairs": "django"
+    "stable.test_p02_event_repairs": "django",
+    "stable.test_race_data_historical_request": "django",
+    "stable.test_race_data_historical_provider": "django"
   },
   "allowed_skips": {},
   "owners": {
