@@ -93,6 +93,33 @@ class ReleaseP02PostgresTests(unittest.TestCase):
         self.admin.execute(sql.SQL("DROP DATABASE {} WITH (FORCE)").format(sql.Identifier(self.name)))
         self.temp.cleanup()
 
+    def inplace_apply(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("p02_inplace", Path(__file__).resolve().parents[2] / "deploy/p02_inplace_migrate.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module.apply(database_identity=self.initial["database_identity_sha256"],
+                            source_catalog=self.initial["catalog_sha256"],
+                            migration_contract=c.migration_contract())
+
+    def test_inplace_six_migrations_preserve_existing_observation(self):
+        from stable.models import RaceResultObservation
+        before = list(RaceResultObservation.objects.values_list("id", "normalized_sha256"))
+        result = self.inplace_apply()
+        self.assertEqual(result["status"], "schema_complete_only")
+        self.assertEqual(schema.state()["prefix"], 6)
+        self.assertEqual(list(RaceResultObservation.objects.values_list("id", "normalized_sha256")), before)
+
+    def test_inplace_failure_after_ddl_rolls_back_all_six(self):
+        original = MigrationExecutor.migrate
+        def crash(executor, *args, **kwargs):
+            original(executor, *args, **kwargs)
+            raise InjectedCrash("after all DDL, before outer commit")
+        with patch.object(MigrationExecutor, "migrate", crash):
+            with self.assertRaises(InjectedCrash):
+                self.inplace_apply()
+        self.assertEqual(schema.state(), self.initial)
+
     def prepare_test_receipts(self):
         # 明确合成：真实pg_dump/restore由独立恢复测试覆盖，不伪装成生产证明。
         backup_dir = c.private_directory(self.directory / "backup")
