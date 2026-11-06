@@ -1861,6 +1861,10 @@ def build_multisource_coverage(*, now, policy):
     from stable.services.race_source_identity import normalize_name
 
     entries = []
+    # 显式开启的P02批次可能包含历史与远期赛事，不能被旧滚动窗口剪掉。
+    p02_ids = set(getattr(settings, "RACE_LIFECYCLE_V2_EVENT_IDS", ())) if (
+        getattr(settings, "RACE_LIFECYCLE_V2_WRITE_ENABLED", False) is True
+    ) else set()
     duplicates = models.RaceEventProductCanonicalLink.objects.filter(
         is_active=True
     ).values_list("duplicate_event_id", flat=True)
@@ -1868,7 +1872,8 @@ def build_multisource_coverage(*, now, policy):
         models.RaceEvent.objects.filter(visibility_status="published")
         .exclude(pk__in=duplicates)
         .filter(
-            Q(local_date__isnull=True)
+            Q(pk__in=p02_ids)
+            | Q(local_date__isnull=True)
             | Q(
                 local_date__range=(
                     now.date() - timedelta(days=9),
@@ -1899,7 +1904,7 @@ def build_multisource_coverage(*, now, policy):
             except (ValueError, KeyError):
                 reason = "missing_timezone"
             else:
-                if age < -30 or age > 7:
+                if event.pk not in p02_ids and (age < -30 or age > 7):
                     continue
         enrollment = models.RaceDataSyncEnrollment.objects.filter(event=event).first()
         lifecycle = models.RaceEventLifecycleControl.objects.filter(event=event).first()

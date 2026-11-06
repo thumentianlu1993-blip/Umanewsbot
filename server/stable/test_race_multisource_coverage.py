@@ -11,6 +11,35 @@ class CoverageTests(TestCase):
     def setUp(self):
         fixtures.IdentityTests.setUp(self)
 
+    def test_explicit_enabled_p02_cohort_keeps_distant_dates_in_coverage(self):
+        for day in (fixtures.NOW.date() - timedelta(days=19),
+                    fixtures.NOW.date() + timedelta(days=90)):
+            with self.subTest(day=day):
+                self.event.local_date = day
+                self.event.save(update_fields=("local_date",))
+                with override_settings(RACE_LIFECYCLE_V2_WRITE_ENABLED=True,
+                                       RACE_LIFECYCLE_V2_EVENT_IDS=(self.event.pk,)):
+                    report = build_multisource_coverage(now=fixtures.NOW, policy=self.policy)
+                    self.assertEqual(report["counts"], {"enrollment_missing": 1})
+                for enabled, ids in ((False, (self.event.pk,)), (True, ())):
+                    with override_settings(RACE_LIFECYCLE_V2_WRITE_ENABLED=enabled,
+                                           RACE_LIFECYCLE_V2_EVENT_IDS=ids):
+                        self.assertEqual(build_multisource_coverage(
+                            now=fixtures.NOW, policy=self.policy)["total"], 0)
+
+    def test_distant_p02_cohort_preserves_pause_and_visibility_checks(self):
+        self.event.local_date = fixtures.NOW.date() + timedelta(days=90)
+        self.event.manual_lock_flags = {"runners": True}
+        self.event.save()
+        with override_settings(RACE_LIFECYCLE_V2_WRITE_ENABLED=True,
+                               RACE_LIFECYCLE_V2_EVENT_IDS=(self.event.pk,)):
+            self.assertEqual(build_multisource_coverage(
+                now=fixtures.NOW, policy=self.policy)["counts"], {"manual_pause": 1})
+            self.event.visibility_status = "draft"
+            self.event.save(update_fields=("visibility_status",))
+            self.assertEqual(build_multisource_coverage(
+                now=fixtures.NOW, policy=self.policy)["total"], 0)
+
     def test_unenrolled_overdue_alert_dedup_and_outside_window_persistence(self):
         self.event.race_datetime = fixtures.NOW - timedelta(hours=1)
         self.event.save()
