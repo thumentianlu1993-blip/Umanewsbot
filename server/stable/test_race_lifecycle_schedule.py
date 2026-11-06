@@ -41,6 +41,22 @@ class LifecycleScheduleTests(TestCase):
             self.assertIsNone(calculate_multisource_next_poll(
                 event=self.event, kind=kind, now=self.control.correction_until))
 
+    def test_legacy_confirmed_history_can_bootstrap_all_p02_modules(self):
+        # 升级前的赛果时间戳不是新生命周期的首次确认，0083新增时钟为空。
+        self.event.race_datetime = NOW - timedelta(days=60)
+        self.event.local_date = self.event.race_datetime.date()
+        self.event.result_confirmed_at = NOW - timedelta(days=59)
+        self.control.first_result_confirmed_at = None
+        self.control.correction_until = None
+        self.control.save()
+        from stable.services.race_data_sync_control import multisource_initial_poll_at
+        for kind in ("race_time", "racecard", "result"):
+            with self.subTest(kind=kind):
+                self.assertEqual(multisource_initial_poll_at(
+                    event=self.event, kind=kind, now=NOW), NOW)
+                self.assertEqual(calculate_multisource_next_poll(
+                    event=self.event, kind=kind, now=NOW), NOW + timedelta(seconds=60))
+
     def test_clock_alone_never_finishes_or_starts_cohort_event(self):
         from stable.services.race_data_sync_lifecycle import decide_data_sync_lifecycle
         for status in ('scheduled', 'running'):
