@@ -318,6 +318,9 @@ class RegionAdapterTests(TestCase):
              '/RennenDetails.php', '/RennenDetails.php?Datum=2026-09-20&Ort=Bad&Nummer=6',
              '<div class="nr-des-rennens">6</div><div class="titel-des-rennens">Exact Race</div><div>15:55 55000 EUR</div>'),
         ]
+        cases.append(('galopp_statistik', 'germany', 'Europe/Berlin', 'www.galopp-statistik.de',
+                      '/DisplayErgebnis.php', '/DisplayErgebnis.php?id=14631',
+                      '<div class="nr-des-rennens">5</div><div class="titel-des-rennens">Exact Race</div><div>15:45 55000 EUR</div>'))
         for provider, region, zone, host, prefix, detail, markup in cases:
             with self.subTest(provider=provider):
                 route=route_for(provider,region,region,zone,'venue',['Venue'],host,prefix)

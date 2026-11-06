@@ -1956,7 +1956,7 @@ def discover_source_url(*, event, route, now, fetcher):
                 if title is not None:
                     label = ' '.join(str(t) for t in title.find_all(string=True, recursive=False)
                                      if not isinstance(t, Comment))
-            elif route.provider == 'galopp_statistik' and urlsplit(target).path == '/RennenDetails.php':
+            elif route.provider == 'galopp_statistik' and urlsplit(target).path in ('/RennenDetails.php', '/DisplayErgebnis.php'):
                 title = link.select_one('.titel-des-rennens')
                 if title is not None:
                     label = title.get_text(' ', strip=True)
