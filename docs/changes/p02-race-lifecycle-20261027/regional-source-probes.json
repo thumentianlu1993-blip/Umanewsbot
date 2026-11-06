@@ -1,0 +1,218 @@
+{
+  "ae-result": {
+    "url": "https://emiratesracing.com/ajax/racecard-results?date=2026-03-28&race=9",
+    "status": 200,
+    "fetched_at": "2026-10-27T15:56:52.425093+00:00",
+    "sha256": "d0a7b3a3b8528fd80cb93a51ba402fe6ba125a17736cc0fd61aeb3d5d131bdd6",
+    "size": 426427,
+    "location": null
+  },
+  "ae-tb-card": {
+    "url": "https://emiratesracing.com/ajax/racecard-declarations?date=2026-03-28&race=9",
+    "status": 200,
+    "fetched_at": "2026-10-27T15:51:36.749064+00:00",
+    "sha256": "86f81e21510acee3686bb5f00930f81d7b41663b32426419326286469bdfcca9",
+    "size": 114827,
+    "location": null
+  },
+  "ae-tb-page": {
+    "url": "https://emiratesracing.com/racecard/2026-03-28/9/declarations",
+    "status": 200,
+    "fetched_at": "2026-10-27T15:53:11.770395+00:00",
+    "sha256": "fd748bbc9f8341347d407788ec95889548e6fc0058fd19fc9872a1861f066028",
+    "size": 71981,
+    "location": null
+  },
+  "au-acceptances": {
+    "url": "https://www.racingaustralia.horse/FreeFields/Acceptances.aspx?Key=2026Jul25%2CNSW%2CKembla%20Grange",
+    "status": 200,
+    "fetched_at": "2026-10-27T15:51:34.024403+00:00",
+    "sha256": "a8aa19f5edcdf4fc1cc9df513aae29018a458574d556668cf8a1236bbba275c5",
+    "size": 129207,
+    "location": null
+  },
+  "de-card": {
+    "url": "https://www.galopp-statistik.de/RennenDetails.php?Datum=2026-10-18&Nummer=4&Ort=Bad",
+    "status": 200,
+    "sha256": "eb3426fb3dc8d1fc0bd5c4705740677814dd1bcc1c2476bd319b12cd2799b74b",
+    "bytes": 238786,
+    "fetched_at": "2026-10-27T15:34:23.019001+00:00"
+  },
+  "de-paired-result": {
+    "url": "https://www.galopp-statistik.de/DisplayErgebnis.php?id=14726&Pferd1=Africa&Pferd2=Dacant&Pferd3=Dalmera&Pferd4=Erophila+%28IRE%29&Pferd5=Flaming+Rose+%28FR%29&Pferd6=Mahasti&Pferd7=Sanaz+%28FR%29&Pferd8=Sexxy+%28FR%29&Pferd9=Sweet+Rose+%28FR%29&Pferd10=Sylvie+%28IRE%29&Pferd11=Wakira+%28FR%29&Pferd12=Westana&Pferd13=Zawadis+Pride",
+    "status": 200,
+    "fetched_at": "2026-10-27T15:48:53.851197+00:00",
+    "sha256": "e505bdd17fcf4a958537e9c88a2c553ef6ceba4d1a5dcea0236cdaad97edd98d",
+    "size": 50130,
+    "location": null
+  },
+  "galopp-de": {
+    "url": "https://www.galopp-statistik.de/DisplayErgebnis.php?id=14273",
+    "status": 200,
+    "sha256": "e55b72e245460a346a5de6b774b1347c86cea23bef2183a6452b83fbb71ef2ae",
+    "bytes": 36310,
+    "fetched_at": "2026-10-27T15:30:49.665352+00:00"
+  },
+  "hk-card-check": {
+    "url": "https://racing.hkjc.com/racing/information/English/Racing/RaceCard.aspx?RaceDate=2026/10/25&Racecourse=ST&RaceNo=1",
+    "status": 302,
+    "fetched_at": "2026-10-27T15:48:20.336983+00:00",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "size": 0,
+    "location": "https://racing.hkjc.com/en-us/local/information/racecard?RaceDate=2026/10/25&Racecourse=ST&RaceNo=1"
+  },
+  "hk-card-current": {
+    "url": "https://racing.hkjc.com/en-us/local/information/racecard?RaceDate=2026/10/25&Racecourse=ST&RaceNo=1",
+    "status": 200,
+    "fetched_at": "2026-10-27T15:48:55.296854+00:00",
+    "sha256": "a803c7a930b03859b17c79774fdb50f7fa3fec58699f96e390bdcbcc2be671d2",
+    "size": 120461,
+    "location": null
+  },
+  "hk-card-dated": {
+    "url": "https://racing.hkjc.com/en-us/local/information/racecard?racedate=2026/10/28&Racecourse=ST&RaceNo=1",
+    "status": 200,
+    "fetched_at": "2026-10-27T15:51:24.442969+00:00",
+    "sha256": "74f3fe5309144b593a95043c32920c25e396fb7fe1b69e3d6a8b649f53a365bb",
+    "size": 195132,
+    "location": null
+  },
+  "hk-card-default": {
+    "url": "https://racing.hkjc.com/en-us/local/information/racecard",
+    "status": 200,
+    "fetched_at": "2026-10-27T15:50:28.150011+00:00",
+    "sha256": "c349c6a4362f0431bd0a2680afe67df83c9e182c908df98e509422851a09dd06",
+    "size": 195081,
+    "location": null
+  },
+  "hk-card": {
+    "url": "https://racing.hkjc.com/racing/information/English/Racing/RaceCard.aspx?RaceDate=2026/10/25&Racecourse=ST&RaceNo=1",
+    "status": 302,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0,
+    "fetched_at": "2026-10-27T15:34:23.798602+00:00"
+  },
+  "hk-result": {
+    "url": "https://racing.hkjc.com/en-us/local/information/localresults?racedate=2026/10/25&Racecourse=ST&RaceNo=1",
+    "status": 200,
+    "fetched_at": "2026-10-27T15:56:54.266055+00:00",
+    "sha256": "c3303efab812cdc6954d00628a21b5f36ef71fd37c63ce3528a1637cd0b7da30",
+    "size": 211760,
+    "location": null
+  },
+  "jra-sa-card-news": {
+    "url": "https://www.jra.go.jp/news/202602/021203.html",
+    "status": 200,
+    "sha256": "0598fd069b149b06a55e4b6ceb27c28bc66758d6e3d0cde6c49817ba01b770d2",
+    "bytes": 62177,
+    "fetched_at": "2026-10-27T15:38:43.941562+00:00"
+  },
+  "jra-sa-kaiko": {
+    "url": "https://www.jra.go.jp/keiba/overseas/race/2026saudi/kaiko.html",
+    "status": 200,
+    "sha256": "7d8a5b560bb6b256b921bb69c62b81ae28e168842958002fdf362f908d54a5ee",
+    "bytes": 86064,
+    "fetched_at": "2026-10-27T15:38:41.988619+00:00"
+  },
+  "jra-sa-result": {
+    "url": "https://www.jra.go.jp/news/202602/021503.html",
+    "status": 200,
+    "sha256": "bbaa8d10cd2631395b3cffd1e74812db55a2156519d7530b6e4e16978f9edbf0",
+    "bytes": 62296,
+    "fetched_at": "2026-10-27T15:38:13.165288+00:00"
+  },
+  "jra-sa-syutsuba": {
+    "url": "https://www.jra.go.jp/keiba/overseas/race/2026saudi/syutsuba.html",
+    "status": 200,
+    "sha256": "b72b1d950fe5e4b90e9c53db893038fa7779925172001e6883d94c2554373a3d",
+    "bytes": 204560,
+    "fetched_at": "2026-10-27T15:39:11.201612+00:00"
+  },
+  "nar-card": {
+    "url": "https://www.keiba.go.jp/KeibaWeb/TodayRaceInfo/DebaTable?k_babaCode=22&k_raceDate=2026%2F09%2F22&k_raceNo=11",
+    "status": 200,
+    "fetched_at": "2026-10-27T15:53:09.715341+00:00",
+    "sha256": "f2a2b2aff17f9558971590a532e92610293d11f1a7d484a5e1fe7ee2eddaefba",
+    "size": 275698,
+    "location": null
+  },
+  "nar-result": {
+    "url": "https://www.keiba.go.jp/KeibaWeb/TodayRaceInfo/RaceMarkTable?k_raceDate=2026%2F09%2F22&k_raceNo=11&k_babaCode=22",
+    "status": 200,
+    "fetched_at": "2026-10-27T15:56:49.792515+00:00",
+    "sha256": "70ada4d0af51d95e901aabbd77fe0f5a90236cf65338b6d4871d2aa47deb0681",
+    "size": 114124,
+    "location": null
+  },
+  "rp-de": {
+    "url": "https://www.racingpost.com/results/207/baden-baden/2026-09-06/928068/",
+    "status": 406,
+    "sha256": "b208c223fd119d8adcaad239aca0ed9fc0e194ad05095dd13051b240f0911ead",
+    "bytes": 5315,
+    "fetched_at": "2026-10-27T15:30:46.659804+00:00"
+  },
+  "sa-declared": {
+    "url": "https://jcsa.sa/api/meeting-info/en/20260214/9/Declared/True",
+    "status": 200,
+    "sha256": "7e69da0dd38095887dc52a55e3ca08674d484a6970c8c2b199f6932203a2e24f",
+    "bytes": 91182,
+    "fetched_at": "2026-10-27T15:39:09.417653+00:00"
+  },
+  "sa-fullpage": {
+    "url": "https://jcsa.sa/en/races/20260214/9/results",
+    "status": 200,
+    "sha256": "55818c2cd4a10c282d7acae990bf5d0f0c27580b9804dd05df24d190c46138a9",
+    "bytes": 83638,
+    "fetched_at": "2026-10-27T15:38:11.517444+00:00"
+  },
+  "sa-js": {
+    "url": "https://jcsa.sa/js/scripts.min.js",
+    "status": 200,
+    "sha256": "9f03921c666f77fe38eb9e018ee490f9d2a95bda6741239a09ce02ca0d5480e3",
+    "bytes": 2460327,
+    "fetched_at": "2026-10-27T15:38:40.470596+00:00"
+  },
+  "sa-meeting": {
+    "url": "https://jcsa.sa/en/races/20260214",
+    "status": 200,
+    "sha256": "80abd76a1457f7ecfd87cb22c9e26fd78738a8db8d6c000e3de72cb418f85293",
+    "bytes": 68886,
+    "fetched_at": "2026-10-27T15:40:15.699299+00:00"
+  },
+  "sa-stewards": {
+    "url": "https://www.jcsa.sa/pdfs/44a07e9435bb4ce8bab1159bf8ce7527.pdf",
+    "status": 200,
+    "sha256": "d7cb8664d6f534e74b1cb6f207269b9fd43163461baf6ca059c3e5bf6ff9f89e",
+    "bytes": 130439,
+    "fetched_at": "2026-10-27T15:38:17.876170+00:00"
+  },
+  "sl-gb": {
+    "url": "https://www.sportinglife.com/racing/results/2026-10-08/southwell/942396/get-raceday-ready-handicap",
+    "status": 200,
+    "sha256": "3ecc2495119be60ec33b1d67f8011aefd0b788f60f98040f482bb1a1ae2076d9",
+    "bytes": 387450,
+    "fetched_at": "2026-10-27T15:30:52.366639+00:00"
+  },
+  "sl-ie": {
+    "url": "https://www.sportinglife.com/racing/results/2026-10-08/thurles/942856/irish-stallion-farms-ebf-fillies-maiden",
+    "status": 200,
+    "sha256": "f1f1269cd8e10e5c90d1946f0bc0bdf10fcc8bba05921f1d1493c5e5c63cb733",
+    "bytes": 353388,
+    "fetched_at": "2026-10-27T15:31:58.844297+00:00"
+  },
+  "sl-us": {
+    "url": "https://www.sportinglife.com/racing/results/2026-09-18/belmont-park/939662/race-5-jockey-club-gold-cup-stakes-grade-1",
+    "status": 200,
+    "fetched_at": "2026-10-27T15:48:19.406841+00:00",
+    "sha256": "ff4ecd7537ca1d9ed991d322cd37b0e0c5951498509d765525991aff77e63597",
+    "size": 319081,
+    "location": null
+  },
+  "zt-fr": {
+    "url": "https://www.zeturf.fr/fr/course-du-jour/2026-09-19/R1C3-chantilly-prix-eclipse-tattersalls-fonds-europeen-de-l-elevage",
+    "status": 200,
+    "sha256": "6c7c5c61ea0d7219d59bfb16bbc369aa435ff108460e83063dc88177164d0576",
+    "bytes": 203986,
+    "fetched_at": "2026-10-27T15:32:01.101770+00:00"
+  }
+}

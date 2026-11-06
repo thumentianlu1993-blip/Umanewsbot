@@ -1799,14 +1799,15 @@ def rebind_multisource_enrollment(*, event_id, policy, now, expected_route_diges
                     "updated_at",
                 )
             )
+            # 新policy已核验；同事务先续期再校验，其余权限/撤销拒绝会整体回滚。
+            if source.valid_until is None or source.valid_until < aware(route.valid_until):
+                source.valid_until = aware(route.valid_until)
+                source.save(update_fields=("valid_until", "updated_at"))
             reason = binding_admission_reason(
                 binding=binding, route=route, now=now, check_runtime=False
             )
             if reason:
                 raise ValueError("rebind_contract_drift:" + reason)
-            if source.valid_until is None or source.valid_until < aware(route.valid_until):
-                source.valid_until = aware(route.valid_until)
-                source.save(update_fields=("valid_until", "updated_at"))
         enrollment.standing_policy_digest = policy.digest
         enrollment.route_digest = new_route_digest
         enrollment.save(
@@ -1861,6 +1862,10 @@ def build_multisource_coverage(*, now, policy):
     from stable.services.race_source_identity import normalize_name
 
     entries = []
+    # 显式开启的P02批次可能包含历史与远期赛事，不能被旧滚动窗口剪掉。
+    p02_ids = set(getattr(settings, "RACE_LIFECYCLE_V2_EVENT_IDS", ())) if (
+        getattr(settings, "RACE_LIFECYCLE_V2_WRITE_ENABLED", False) is True
+    ) else set()
     duplicates = models.RaceEventProductCanonicalLink.objects.filter(
         is_active=True
     ).values_list("duplicate_event_id", flat=True)
@@ -1868,7 +1873,8 @@ def build_multisource_coverage(*, now, policy):
         models.RaceEvent.objects.filter(visibility_status="published")
         .exclude(pk__in=duplicates)
         .filter(
-            Q(local_date__isnull=True)
+            Q(pk__in=p02_ids)
+            | Q(local_date__isnull=True)
             | Q(
                 local_date__range=(
                     now.date() - timedelta(days=9),
@@ -1899,7 +1905,7 @@ def build_multisource_coverage(*, now, policy):
             except (ValueError, KeyError):
                 reason = "missing_timezone"
             else:
-                if age < -30 or age > 7:
+                if event.pk not in p02_ids and (age < -30 or age > 7):
                     continue
         enrollment = models.RaceDataSyncEnrollment.objects.filter(event=event).first()
         lifecycle = models.RaceEventLifecycleControl.objects.filter(event=event).first()
@@ -1911,7 +1917,12 @@ def build_multisource_coverage(*, now, policy):
                 reason = "manual_pause"
             elif control and control.write_owner not in ("unmanaged", "data_sync"):
                 reason = "owner_conflict"
-            elif event.result_confirmed_at:
+            elif event.pk in p02_ids and race_data_sync_control.lifecycle_correction_window_closed(
+                lifecycle=lifecycle, now=now
+            ):
+                reason = "confirmed"
+            # 旧赛果时间戳不能证明P02名单等模块已齐备；显式批次按登记状态继续发现。
+            elif event.result_confirmed_at and event.pk not in p02_ids:
                 reason = "confirmed"
             elif event.status in ("cancelled", "postponed"):
                 reason = event.status

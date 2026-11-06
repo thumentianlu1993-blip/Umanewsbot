@@ -27,7 +27,21 @@
     "docs/changes/next-version-capabilities/lanes/B/B055-completed-redelivery-receipt-fix/obligations.json",
     "docs/changes/next-version-capabilities/lanes/B/B057-remaining7-end-to-end-test-prep/obligations.json",
     "docs/changes/term-display-sql-20261103/benchmark.json",
-    "docs/changes/term-display-sql-20261103/pg-receipt.json"
+    "docs/changes/term-display-sql-20261103/pg-receipt.json",
+    "docs/changes/p02-race-lifecycle-20261027/production-readonly-20261028.json",
+    "docs/changes/p02-race-lifecycle-20261027/regional-fixtures.json",
+    "docs/changes/p02-race-lifecycle-20261027/regional-source-probes.json",
+    "docs/changes/p02-race-lifecycle-20261027/regional-validation.json",
+    "docs/changes/p02-race-lifecycle-20261027/source-parse-report.json",
+    "docs/changes/p02-race-lifecycle-20261027/source-probes.json",
+    "docs/changes/p02-race-lifecycle-20261027/validation.json",
+    "docs/changes/p02-release-candidate-20261028/dependency-manifest.json",
+    "docs/changes/p02-release-candidate-20261028/fixture-manifest.json",
+    "docs/changes/p02-release-candidate-20261028/migration-proof.json",
+    "docs/changes/p02-release-candidate-20261028/validation.json",
+    "docs/changes/p02-source-capabilities-20261029/evidence.json",
+    "docs/changes/p02-source-capabilities-20261029/matrix.json",
+    "docs/changes/p02-source-capabilities-20261029/validation.json"
   ],
   "high_risk": [
     ".codex/agents/application.toml",
@@ -988,7 +1002,36 @@
     "server/stable/services/horse_basic_profile_prepare_input.py",
     "server/stable/migrations/0081_managed_readonly_steps.py",
     "docs/changes/qq-retirement-20261103/release-manifest.json",
-    "docs/changes/term-display-sql-20261103/release-manifest.json"
+    "docs/changes/term-display-sql-20261103/release-manifest.json",
+    ".gitattributes",
+    "deploy/p02_release_assets.py",
+    "deploy/p02_release_lock.py",
+    "deploy/p02_release_runtime.py",
+    "deploy/release_p02.py",
+    "scripts/application_image_test_worker.py",
+    "scripts/build_p02_catalog.py",
+    "server/app/p02_readonly_settings.py",
+    "server/app/p02_readonly_wsgi.py",
+    "server/stable/fixtures/release_p02_catalog.json",
+    "server/stable/management/commands/backfill_race_lifecycle.py",
+    "server/stable/management/commands/manage_race_lifecycle_report.py",
+    "server/stable/management/commands/release_p02.py",
+    "server/stable/management/commands/report_race_lifecycle_capacity.py",
+    "server/stable/services/race_lifecycle_metrics.py",
+    "server/stable/services/race_lifecycle_projection.py",
+    "server/stable/services/race_regional_sources.py",
+    "server/stable/services/release_p02_executor.py",
+    "server/stable/services/release_p02_recovery.py",
+    "server/stable/services/release_p02_schema.py",
+    "deploy/rehearse_duplicate_repair.py",
+    "server/stable/services/duplicate_repair_rehearsal.py",
+    "server/stable/services/p02_b_repair_plan.py",
+    "deploy/p02_inplace_migrate.py",
+    "server/stable/management/commands/register_p02_canonical_names.py",
+    "server/stable/management/commands/apply_p02_event_repairs.py",
+    "server/stable/management/commands/publish_p02_created_calendars.py",
+    "server/stable/services/race_data_historical_request.py",
+    "server/stable/management/commands/backfill_historical_tra_result.py"
   ],
   "paths": {
     "docs/changes/next-version-capabilities/lanes/C/U01-offline-cases.json": [
@@ -1422,6 +1465,20 @@
     ],
     "server/stable/test_managed_readonly_translation.py": [
       "news_translation"
+    ],
+    "server/stable/tests/fixtures/regional_lifecycle/*.html": [
+      "race_parser",
+      "race_results"
+    ],
+    "server/stable/real_cache_test_fixture.py": [
+      "module:stable.test_historical_race_detail_direct_urls",
+      "module:stable.test_historical_race_detail_distance_metadata",
+      "module:stable.test_historical_race_detail_runner_v2_package_identity"
+    ],
+    "server/stable/fixtures/ci_real_cache/**": [
+      "module:stable.test_historical_race_detail_direct_urls",
+      "module:stable.test_historical_race_detail_distance_metadata",
+      "module:stable.test_historical_race_detail_runner_v2_package_identity"
     ]
   },
   "symbols": {
@@ -1582,6 +1639,31 @@
         "module:stable.test_race_public_time",
         "module:stable.test_race_news_exposure",
         "public_probe_orm_loader"
+      ],
+      "_finished_race_queryset": [
+        "race_results",
+        "module:stable.test_race_information_display_pages",
+        "module:stable.test_race_public_time",
+        "horse_page",
+        "module:stable.test_race_section_gaps"
+      ],
+      "_group_race_events_by_date": [
+        "race_results",
+        "module:stable.test_race_information_display_pages",
+        "module:stable.test_race_public_time",
+        "horse_page"
+      ],
+      "_render_race_information": [
+        "race_results",
+        "module:stable.test_race_information_display_pages",
+        "module:stable.test_race_public_time",
+        "horse_page"
+      ],
+      "_series_history_winners": [
+        "race_results",
+        "module:stable.test_race_information_display_pages",
+        "module:stable.test_race_public_time",
+        "horse_page"
       ]
     }
   },

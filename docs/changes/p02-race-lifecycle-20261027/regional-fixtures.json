@@ -1,0 +1,196 @@
+{
+  "schema_version": 1,
+  "fixtures": [
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/ae-card.html",
+      "source_url": "https://emiratesracing.com/ajax/racecard-declarations?date=2026-03-28&race=9",
+      "source_raw_sha256": "86f81e21510acee3686bb5f00930f81d7b41663b32426419326286469bdfcca9",
+      "fetched_at": "2026-10-27T15:51:36.749064+00:00",
+      "fixture_sha256": "482df553ff6c432db151d6121c364939636fdf8d1ab25ff38136cd44964cacdc",
+      "bytes": 46192,
+      "kind": "trimmed_public_sample",
+      "transform": "保留身份、表头、行和必要链接；移除无关脚本/样式/图片及签名媒体 URL。德国无效字节只在 HTML 注释内删除后严格解码。"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/ae-page.html",
+      "source_url": "https://emiratesracing.com/racecard/2026-03-28/9/declarations",
+      "source_raw_sha256": "fd748bbc9f8341347d407788ec95889548e6fc0058fd19fc9872a1861f066028",
+      "fetched_at": "2026-10-27T15:53:11.770395+00:00",
+      "fixture_sha256": "847891d2efbb86a0575365eb485ff810eb5b3dde303a164817ed9b80914d4a38",
+      "bytes": 11321,
+      "kind": "trimmed_public_sample",
+      "transform": "保留身份、表头、行和必要链接；移除无关脚本/样式/图片及签名媒体 URL。德国无效字节只在 HTML 注释内删除后严格解码。"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/ae-result.html",
+      "source_url": "https://emiratesracing.com/ajax/racecard-results?date=2026-03-28&race=9",
+      "source_raw_sha256": "d0a7b3a3b8528fd80cb93a51ba402fe6ba125a17736cc0fd61aeb3d5d131bdd6",
+      "fetched_at": "2026-10-27T15:56:52.425093+00:00",
+      "fixture_sha256": "21fc3ba95fdad4fcd6d1c19fe10a8140aec3e78e9f3d84602839c46effcf357b",
+      "bytes": 68167,
+      "kind": "trimmed_public_sample",
+      "transform": "保留身份、表头、行和必要链接；移除无关脚本/样式/图片及签名媒体 URL。德国无效字节只在 HTML 注释内删除后严格解码。"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/au-card.html",
+      "source_url": "https://www.racingaustralia.horse/FreeFields/Acceptances.aspx?Key=2026Jul25%2CNSW%2CKembla%20Grange",
+      "source_raw_sha256": "a8aa19f5edcdf4fc1cc9df513aae29018a458574d556668cf8a1236bbba275c5",
+      "fetched_at": "2026-10-27T15:51:34.024403+00:00",
+      "fixture_sha256": "b3b98f6ee1a906bcc93175f34172d11d0a331c02330cf8d25aa4551b55db975d",
+      "bytes": 12404,
+      "kind": "trimmed_public_sample",
+      "transform": "保留身份、表头、行和必要链接；移除无关脚本/样式/图片及签名媒体 URL。德国无效字节只在 HTML 注释内删除后严格解码。"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/au-result.html",
+      "source_url": "https://www.racingaustralia.horse/FreeFields/Results.aspx?Key=2026Jul25,NSW,Kembla+Grange",
+      "source_raw_sha256": "06a2e08637facc014d344b63bacff2a60e7ffedd8b2415f243237f8686811a09",
+      "fetched_at": "2026-10-27T09:41:40.718556+00:00",
+      "fixture_sha256": "52236f82f66d05e58b8ff3619d2e6205deafe9434d253b9fe4052a9a54c5344b",
+      "bytes": 15304,
+      "kind": "trimmed_public_sample",
+      "transform": "保留身份、表头、行和必要链接；移除无关脚本/样式/图片及签名媒体 URL。德国无效字节只在 HTML 注释内删除后严格解码。"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/de-card.html",
+      "source_url": "https://www.galopp-statistik.de/RennenDetails.php?Datum=2026-10-18&Nummer=4&Ort=Bad",
+      "source_raw_sha256": "eb3426fb3dc8d1fc0bd5c4705740677814dd1bcc1c2476bd319b12cd2799b74b",
+      "fetched_at": "2026-10-27T15:34:23.019001+00:00",
+      "fixture_sha256": "5a1eff51a6898aafd734b601b121efac1403e9b8bb106508d4dfe78ecec134f7",
+      "bytes": 14374,
+      "kind": "trimmed_public_sample",
+      "transform": "保留身份、表头、行和必要链接；移除无关脚本/样式/图片及签名媒体 URL。德国无效字节只在 HTML 注释内删除后严格解码。"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/de-paired-result.html",
+      "source_url": "https://www.galopp-statistik.de/DisplayErgebnis.php?id=14726&Pferd1=Africa&Pferd2=Dacant&Pferd3=Dalmera&Pferd4=Erophila+%28IRE%29&Pferd5=Flaming+Rose+%28FR%29&Pferd6=Mahasti&Pferd7=Sanaz+%28FR%29&Pferd8=Sexxy+%28FR%29&Pferd9=Sweet+Rose+%28FR%29&Pferd10=Sylvie+%28IRE%29&Pferd11=Wakira+%28FR%29&Pferd12=Westana&Pferd13=Zawadis+Pride",
+      "source_raw_sha256": "e505bdd17fcf4a958537e9c88a2c553ef6ceba4d1a5dcea0236cdaad97edd98d",
+      "fetched_at": "2026-10-27T15:48:53.851197+00:00",
+      "fixture_sha256": "7b37f56ea4a61144b474e892cf86221de0aa87c0978d9521c4e51ae6bdd470e2",
+      "bytes": 26316,
+      "kind": "trimmed_public_sample",
+      "transform": "保留身份、表头、行和必要链接；移除无关脚本/样式/图片及签名媒体 URL。德国无效字节只在 HTML 注释内删除后严格解码。"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/galopp-de.html",
+      "source_url": "https://www.galopp-statistik.de/DisplayErgebnis.php?id=14273",
+      "source_raw_sha256": "e55b72e245460a346a5de6b774b1347c86cea23bef2183a6452b83fbb71ef2ae",
+      "fetched_at": "2026-10-27T15:30:49.665352+00:00",
+      "fixture_sha256": "5ef65df7ebb2d3fb74857d68f06aafe7d9df8a5a0b1683d7629e143894d1d7e4",
+      "bytes": 17010,
+      "kind": "trimmed_public_sample",
+      "transform": "保留身份、表头、行和必要链接；移除无关脚本/样式/图片及签名媒体 URL。德国无效字节只在 HTML 注释内删除后严格解码。"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/hk-card.html",
+      "source_url": "https://racing.hkjc.com/en-us/local/information/racecard?racedate=2026/10/28&Racecourse=ST&RaceNo=1",
+      "source_raw_sha256": "74f3fe5309144b593a95043c32920c25e396fb7fe1b69e3d6a8b649f53a365bb",
+      "fetched_at": "2026-10-27T15:51:24.442969+00:00",
+      "fixture_sha256": "5bc195d81292e68bb9b2e55bb6b2a62ca5b83276f454834b91a453dd769abb2b",
+      "bytes": 25536,
+      "kind": "trimmed_public_sample",
+      "transform": "保留身份、表头、行和必要链接；移除无关脚本/样式/图片及签名媒体 URL。德国无效字节只在 HTML 注释内删除后严格解码。"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/hk-result.html",
+      "source_url": "https://racing.hkjc.com/en-us/local/information/localresults?racedate=2026/10/25&Racecourse=ST&RaceNo=1",
+      "source_raw_sha256": "c3303efab812cdc6954d00628a21b5f36ef71fd37c63ce3528a1637cd0b7da30",
+      "fetched_at": "2026-10-27T15:56:54.266055+00:00",
+      "fixture_sha256": "e6de59a0499dfebc792fe789525933e3093c77c84d20ee7b940c2deabaf02246",
+      "bytes": 38380,
+      "kind": "trimmed_public_sample",
+      "transform": "保留身份、表头、行和必要链接；移除无关脚本/样式/图片及签名媒体 URL。德国无效字节只在 HTML 注释内删除后严格解码。"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/nar-card.html",
+      "source_url": "https://www.keiba.go.jp/KeibaWeb/TodayRaceInfo/DebaTable?k_babaCode=22&k_raceDate=2026%2F09%2F22&k_raceNo=11",
+      "source_raw_sha256": "f2a2b2aff17f9558971590a532e92610293d11f1a7d484a5e1fe7ee2eddaefba",
+      "fetched_at": "2026-10-27T15:53:09.715341+00:00",
+      "fixture_sha256": "80671ae85fa9a1e20dfe696d84329e5b87af6a5ccd21f6bd384825ee9c3f728f",
+      "bytes": 134361,
+      "kind": "trimmed_public_sample",
+      "transform": "保留身份、表头、行和必要链接；移除无关脚本/样式/图片及签名媒体 URL。德国无效字节只在 HTML 注释内删除后严格解码。"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/nar-result.html",
+      "source_url": "https://www.keiba.go.jp/KeibaWeb/TodayRaceInfo/RaceMarkTable?k_raceDate=2026%2F09%2F22&k_raceNo=11&k_babaCode=22",
+      "source_raw_sha256": "70ada4d0af51d95e901aabbd77fe0f5a90236cf65338b6d4871d2aa47deb0681",
+      "fetched_at": "2026-10-27T15:56:49.792515+00:00",
+      "fixture_sha256": "d9bbc17d22fa0f5307096dd33735622cb84732d55ef41fdf1e5a5afc6d226895",
+      "bytes": 18985,
+      "kind": "trimmed_public_sample",
+      "transform": "保留身份、表头、行和必要链接；移除无关脚本/样式/图片及签名媒体 URL。德国无效字节只在 HTML 注释内删除后严格解码。"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/sa-declared.html",
+      "source_url": "https://jcsa.sa/api/meeting-info/en/20260214/9/Declared/True",
+      "source_raw_sha256": "7e69da0dd38095887dc52a55e3ca08674d484a6970c8c2b199f6932203a2e24f",
+      "fetched_at": "2026-10-27T15:39:09.417653+00:00",
+      "fixture_sha256": "d0189e2d759d224b2b0e9840ec5c5a8c7dbaa97e1118957d01b0d74ebf80e417",
+      "bytes": 22122,
+      "kind": "trimmed_public_sample",
+      "transform": "保留身份、表头、行和必要链接；移除无关脚本/样式/图片及签名媒体 URL。德国无效字节只在 HTML 注释内删除后严格解码。"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/sa-race-page.html",
+      "source_url": "https://jcsa.sa/en/races/20260214/9/results",
+      "source_raw_sha256": "55818c2cd4a10c282d7acae990bf5d0f0c27580b9804dd05df24d190c46138a9",
+      "fetched_at": "2026-10-27T15:38:11.517444+00:00",
+      "fixture_sha256": "7b2e12c3cdb60dc47dcd267952f6f4af9925fd6bbf61cc6f5032f38594fb72d4",
+      "bytes": 1109,
+      "kind": "trimmed_public_sample",
+      "transform": "保留身份、表头、行和必要链接；移除无关脚本/样式/图片及签名媒体 URL。德国无效字节只在 HTML 注释内删除后严格解码。"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/sl-gb.html",
+      "source_url": "https://www.sportinglife.com/racing/results/2026-10-08/southwell/942396/get-raceday-ready-handicap",
+      "source_raw_sha256": "3ecc2495119be60ec33b1d67f8011aefd0b788f60f98040f482bb1a1ae2076d9",
+      "fetched_at": "2026-10-27T15:30:52.366639+00:00",
+      "fixture_sha256": "854971af903749d64098c9a6bd2b3ac335fae8ec0556e71c9f61d96da7a7eb70",
+      "bytes": 9885,
+      "kind": "trimmed_public_sample",
+      "transform": "保留身份、表头、行和必要链接；移除无关脚本/样式/图片及签名媒体 URL。德国无效字节只在 HTML 注释内删除后严格解码。"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/sl-ie.html",
+      "source_url": "https://www.sportinglife.com/racing/results/2026-10-08/thurles/942856/irish-stallion-farms-ebf-fillies-maiden",
+      "source_raw_sha256": "f1f1269cd8e10e5c90d1946f0bc0bdf10fcc8bba05921f1d1493c5e5c63cb733",
+      "fetched_at": "2026-10-27T15:31:58.844297+00:00",
+      "fixture_sha256": "61f1df0e14f6a792b3f672f180a3a3f009c3da1d4544ebe47bbc602d21003759",
+      "bytes": 9252,
+      "kind": "trimmed_public_sample",
+      "transform": "保留身份、表头、行和必要链接；移除无关脚本/样式/图片及签名媒体 URL。德国无效字节只在 HTML 注释内删除后严格解码。"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/sl-us.html",
+      "source_url": "https://www.sportinglife.com/racing/results/2026-09-18/belmont-park/939662/race-5-jockey-club-gold-cup-stakes-grade-1",
+      "source_raw_sha256": "ff4ecd7537ca1d9ed991d322cd37b0e0c5951498509d765525991aff77e63597",
+      "fetched_at": "2026-10-27T15:48:19.406841+00:00",
+      "fixture_sha256": "d484eb79929146b667ca25db00f3f784c1508e95f272264e80d2b5e2b4d1800c",
+      "bytes": 4049,
+      "kind": "trimmed_public_sample",
+      "transform": "保留身份、表头、行和必要链接；移除无关脚本/样式/图片及签名媒体 URL。德国无效字节只在 HTML 注释内删除后严格解码。"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/zt-fr.html",
+      "source_url": "https://www.zeturf.fr/fr/course-du-jour/2026-09-19/R1C3-chantilly-prix-eclipse-tattersalls-fonds-europeen-de-l-elevage",
+      "source_raw_sha256": "6c7c5c61ea0d7219d59bfb16bbc369aa435ff108460e83063dc88177164d0576",
+      "fetched_at": "2026-10-27T15:32:01.101770+00:00",
+      "fixture_sha256": "eeedb2d02adffde94440aeaeedf0e2d16567604a8b855a73badb475d5714d18d",
+      "bytes": 21263,
+      "kind": "trimmed_public_sample",
+      "transform": "保留身份、表头、行和必要链接；移除无关脚本/样式/图片及签名媒体 URL。德国无效字节只在 HTML 注释内删除后严格解码。"
+    },
+    {
+      "path": "server/stable/tests/fixtures/regional_lifecycle/hk-card-unavailable.html",
+      "source_url": "https://racing.hkjc.com/en-us/local/information/racecard?RaceDate=2026/10/25&Racecourse=ST&RaceNo=1",
+      "source_raw_sha256": "a803c7a930b03859b17c79774fdb50f7fa3fec58699f96e390bdcbcc2be671d2",
+      "fetched_at": "2026-10-27T15:48:55.296854+00:00",
+      "fixture_sha256": "d894e8388ab1c02cf764270c28e67b55479326c6e3ea86fc2696b0e73eada64e",
+      "bytes": 183,
+      "kind": "trimmed_public_sample",
+      "transform": "仅保留历史出马表明确 No information 的 errorContainer；无合成赛事身份或名单。"
+    }
+  ],
+  "synthetic_tests_note": "异常、过期、删行、成熟度变体在测试中显式修改；数据库身份/历史名单/容量是合成前置，不是源站取样。"
+}

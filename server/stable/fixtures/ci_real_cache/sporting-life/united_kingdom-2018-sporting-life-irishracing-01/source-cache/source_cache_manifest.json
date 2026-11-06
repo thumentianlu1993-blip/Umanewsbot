@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "root": "@FIXTURE_ROOT@/sporting-life/united_kingdom-2018-sporting-life-irishracing-01/source-cache",
+  "files": {
+    "ea466a540417e785e831ecbac9a01781d3964b86af732dd1523d73da27a6401b.html": {
+      "cached_at": "2026-07-16T07:40:07.654629+00:00",
+      "path": "ea466a540417e785e831ecbac9a01781d3964b86af732dd1523d73da27a6401b.html",
+      "protected_by": [],
+      "sha256": "f0c05c607b26527747f4ee0bc507c575a5e7b887f92ce532998c6ef3b40ebb4c",
+      "size": 360262,
+      "source_url": "https://www.sportinglife.com/racing/results/2018-03-13/cheltenham/460687/unibet-champion-hurdle-challenge-trophy-grade-1"
+    }
+  },
+  "total_bytes": 360262
+}

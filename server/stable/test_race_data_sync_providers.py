@@ -1,4 +1,5 @@
 from __future__ import annotations
+from zoneinfo import ZoneInfo
 
 from datetime import date, datetime, timedelta, timezone as dt_timezone
 import json
@@ -579,6 +580,128 @@ class TheRacingApiDataSyncAdapterTests(TestCase):
         revision = models.RaceEventRevision.objects.get()
         self.assertEqual(revision.phase, models.RaceResultPhase.CORRECTED)
         self.assertIsNotNone(revision.published_at)
+
+    def test_historical_snapshot_reads_live_identity_and_owner(self):
+        from types import SimpleNamespace
+        from stable.services.race_data_historical_request import read_live_entry, read_locked_live_entry
+        enrollment = models.RaceDataSyncEnrollment.objects.get(event=self.event)
+        decision = SimpleNamespace(admitted=True, event=self.event, source=self.source,
+                                   enrollment=enrollment, control=SimpleNamespace(manual_pause_reason=""))
+        with (
+            patch("stable.services.race_data_sync_admission.validate_data_sync_lifecycle_admission", return_value=decision),
+            patch("stable.services.race_data_sync_control.resolve_source_route_admission", return_value=("", self.route)),
+        ):
+            current, route = read_live_entry(event_id=self.event.pk, now=NOW)
+            self.assertEqual(current["entry"]["source_id"], self.source.pk)
+            self.assertEqual(current["entry"]["external_race_id"], self.source.external_race_id)
+            self.assertEqual(current["entry"]["owner_generation"], self.control.owner_generation)
+            self.assertEqual(current["entry"]["enrollment_generation"], enrollment.enrollment_generation)
+            self.assertEqual(current["entry"]["local_date"], self.event.local_date.isoformat())
+            self.assertEqual(current["write_owner"], "data_sync")
+            self.assertIs(route, self.route)
+            self.assertEqual(read_locked_live_entry(event_id=self.event.pk, now=NOW), (current, route))
+            self.control.owner_generation += 1
+            self.control.save(update_fields=("owner_generation",))
+            with self.assertRaisesMessage(ValueError, "historical_live_owner_drift"):
+                read_locked_live_entry(event_id=self.event.pk, now=NOW)
+
+    def test_historical_response_standard_writer_and_rollback(self):
+        from types import SimpleNamespace
+        from django.db import transaction
+        from stable.services.race_data_historical_request import apply_response, read_live_entry
+        from stable.test_race_data_historical_request import manifest, encode, CODE
+        self.event.local_date = date(2026, 8, 27)
+        self.event.race_datetime = NOW - timedelta(days=1, minutes=10)
+        self.event.save(update_fields=("local_date", "race_datetime"))
+        membership = models.RaceEventLifecycleEnforceMembership.objects.get(event=self.event)
+        membership.schedule_hash = _schedule_hash(self.event)
+        membership.save(update_fields=("schedule_hash",))
+        for runner_id, name, number in (("horse-1", "Alpha", "1"), ("horse-2", "Beta", "2")):
+            models.RaceEventRunner.objects.create(event=self.event, external_runner_id=runner_id,
+                horse_name=name, horse_number=number, source_refs={self.source.source_key: runner_id})
+        enrollment = models.RaceDataSyncEnrollment.objects.get(event=self.event)
+        admission = SimpleNamespace(admitted=True, event=self.event, source=self.source,
+            enrollment=enrollment, control=SimpleNamespace(manual_pause_reason=""))
+        with patch("stable.services.race_data_sync_admission.validate_data_sync_lifecycle_admission", return_value=admission), patch("stable.services.race_data_sync_control.resolve_source_route_admission", return_value=("", self.route)):
+            current, _ = read_live_entry(event_id=self.event.pk, now=NOW)
+        response = json.loads(self._transport(endpoint_name="results").body)["results"][0]
+        response["off_dt"] = self.event.race_datetime.isoformat()
+        response["race_status"] = "official"
+        with tempfile.TemporaryDirectory() as root:
+            value = manifest(Path(root))
+            value.update(issued_at=(NOW-timedelta(minutes=1)).isoformat(),
+                         expires_at=(NOW+timedelta(minutes=20)).isoformat(), entries=[current["entry"]])
+            raw, sha = encode(value)
+            args = dict(raw=raw, expected_sha256=sha, expected_code_sha=CODE,
+                receipt_directory=Path(root), event_id=self.event.pk, now=NOW,
+                raw_sha256="b"*64, result_url="https://api.theracingapi.com/v1/results/jp-api-11")
+            with patch("stable.services.race_data_historical_request.read_locked_live_entry", return_value=(current, self.route)), patch("stable.services.race_data_historical_request.read_live_entry", return_value=(current, self.route)):
+                self.assertEqual(apply_response(**args, response={"_not_found": True}), "provider_not_found")
+                for marker, complete in (("official", True), ("running", False)):
+                    with self.subTest(marker=marker), transaction.atomic():
+                        response["race_status"] = marker
+                        if complete:
+                            # 此旧provider fixture无standing policy；真实public检查必须挡住并回滚。
+                            with self.assertRaisesMessage(ValueError, "historical_public_verification_public_read_data_sync_standing_policy_unavailable"):
+                                apply_response(**args, response=response)
+                            self.assertFalse(models.RaceEventRevisionPublication.objects.exists())
+                            self.assertFalse(self.event.results.exists())
+                        else:
+                            with self.assertRaises(ValueError):
+                                apply_response(**args, response=response)
+                            self.assertFalse(models.RaceResultObservation.objects.exists())
+                        transaction.set_rollback(True)
+                current["entry"]["owner_generation"] += 1
+                with self.assertRaisesMessage(ValueError, "historical_live_identity_drift"):
+                    apply_response(**args, response=response)
+                self.assertFalse(models.RaceResultObservation.objects.exists())
+
+    def test_historical_active_claim_defers_without_changing_claim(self):
+        from stable.services.race_data_historical_request import read_locked_live_entry
+        tracking = models.RaceEventLiveTracking.objects.get(event=self.event)
+        tracking.active_attempt_token = "f" * 64
+        for expiry in (NOW + timedelta(minutes=5), None):
+            tracking.claim_expires_at = expiry
+            tracking.save(update_fields=("active_attempt_token", "claim_expires_at"))
+            with self.assertRaisesMessage(ValueError, "historical_target_claim_active"):
+                read_locked_live_entry(event_id=self.event.pk, now=NOW)
+            tracking.refresh_from_db()
+            self.assertEqual(tracking.active_attempt_token, "f" * 64)
+            self.assertEqual(tracking.claim_expires_at, expiry)
+
+    def test_historical_snapshot_denied_admission_stops_before_route(self):
+        from types import SimpleNamespace
+        from stable.services.race_data_historical_request import read_live_entry
+        with (
+            patch("stable.services.race_data_sync_admission.validate_data_sync_lifecycle_admission", return_value=SimpleNamespace(admitted=False)),
+            patch("stable.services.race_data_sync_control.resolve_source_route_admission") as resolve,
+        ):
+            with self.assertRaisesMessage(ValueError, "historical_live_admission_rejected"):
+                read_live_entry(event_id=self.event.pk, now=NOW)
+            resolve.assert_not_called()
+
+    def test_result_by_id_keeps_seven_day_boundary(self):
+        from unittest.mock import Mock
+        for days, expected_calls in ((1, 1), (7, 1), (8, 0), (30, 0)):
+            with self.subTest(days=days):
+                self.event.local_date = NOW.astimezone(ZoneInfo(self.event.timezone_name)).date() - timedelta(days=days)
+                self.event.save(update_fields=("local_date",))
+                transport = Mock(side_effect=AssertionError("unexpected network"))
+                with (
+                    patch("stable.services.race_data_sync_providers.read_the_racing_api_automation_registry", return_value=(self.registry, SHA)),
+                    patch("stable.services.race_data_sync_providers._read_secret", return_value=("user", "secret")),
+                    patch("stable.services.race_data_sync_providers._fetch_the_racing_api_result_by_id", return_value=("https://api.theracingapi.com/v1/results/jp-api-11", {"_not_found": True}, "a" * 64)) as fetch,
+                ):
+                    outcome = run_the_racing_api_data_sync(
+                        event_id=self.event.pk, data_kinds=("result",), route=self.route,
+                        now=NOW, task_id="boundary", run_id="boundary", transport=transport,
+                        clock=lambda: NOW, sleeper=lambda _: None,
+                    )
+                self.assertTrue(outcome.success, outcome.reason_code)
+                self.assertEqual(fetch.call_count, expected_calls)
+                transport.assert_not_called()
+                self.assertEqual(outcome.not_found_kinds, ("result",))
+                self.assertFalse(models.RaceResultObservation.objects.exists())
 
     def test_out_of_window_racecard_is_successful_not_found_and_stays_due(self):
         self.event.local_date = date(2026, 9, 15)

@@ -1,8 +1,9 @@
 from datetime import timedelta
+from unittest.mock import patch
 from django.test import TestCase, override_settings
 from stable import models
 from stable import test_race_multisource_identity as fixtures
-from stable.services.race_data_sync_enrollment import build_multisource_coverage
+from stable.services.race_data_sync_enrollment import build_multisource_coverage, discover_multisource_events
 from stable.services.race_data_sync_alerts import stage_multisource_coverage_incidents
 
 
@@ -10,6 +11,78 @@ from stable.services.race_data_sync_alerts import stage_multisource_coverage_inc
 class CoverageTests(TestCase):
     def setUp(self):
         fixtures.IdentityTests.setUp(self)
+
+    def test_explicit_enabled_p02_cohort_keeps_distant_dates_in_coverage(self):
+        for day in (fixtures.NOW.date() - timedelta(days=19),
+                    fixtures.NOW.date() + timedelta(days=90)):
+            with self.subTest(day=day):
+                self.event.local_date = day
+                self.event.save(update_fields=("local_date",))
+                with override_settings(RACE_LIFECYCLE_V2_WRITE_ENABLED=True,
+                                       RACE_LIFECYCLE_V2_EVENT_IDS=(self.event.pk,)):
+                    report = build_multisource_coverage(now=fixtures.NOW, policy=self.policy)
+                    self.assertEqual(report["counts"], {"enrollment_missing": 1})
+                for enabled, ids in ((False, (self.event.pk,)), (True, ())):
+                    with override_settings(RACE_LIFECYCLE_V2_WRITE_ENABLED=enabled,
+                                           RACE_LIFECYCLE_V2_EVENT_IDS=ids):
+                        self.assertEqual(build_multisource_coverage(
+                            now=fixtures.NOW, policy=self.policy)["total"], 0)
+
+    def test_distant_p02_cohort_preserves_pause_and_visibility_checks(self):
+        self.event.local_date = fixtures.NOW.date() + timedelta(days=90)
+        self.event.manual_lock_flags = {"runners": True}
+        self.event.save()
+        with override_settings(RACE_LIFECYCLE_V2_WRITE_ENABLED=True,
+                               RACE_LIFECYCLE_V2_EVENT_IDS=(self.event.pk,)):
+            self.assertEqual(build_multisource_coverage(
+                now=fixtures.NOW, policy=self.policy)["counts"], {"manual_pause": 1})
+            self.event.visibility_status = "draft"
+            self.event.save(update_fields=("visibility_status",))
+            self.assertEqual(build_multisource_coverage(
+                now=fixtures.NOW, policy=self.policy)["total"], 0)
+
+    def test_p02_result_timestamp_does_not_hide_missing_racecard_enrollment(self):
+        self.event.result_confirmed_at = fixtures.NOW
+        self.event.save(update_fields=("result_confirmed_at",))
+        self.assertFalse(self.event.runners.exists())
+        with override_settings(RACE_LIFECYCLE_V2_WRITE_ENABLED=True,
+                               RACE_LIFECYCLE_V2_EVENT_IDS=(self.event.pk,)):
+            self.assertEqual(build_multisource_coverage(
+                now=fixtures.NOW, policy=self.policy)["counts"], {"enrollment_missing": 1})
+        with override_settings(RACE_LIFECYCLE_V2_WRITE_ENABLED=False,
+                               RACE_LIFECYCLE_V2_EVENT_IDS=(self.event.pk,)):
+            self.assertEqual(build_multisource_coverage(
+                now=fixtures.NOW, policy=self.policy)["counts"], {"confirmed": 1})
+
+    def test_p02_correction_deadline_stops_discovery_without_dropping_coverage(self):
+        self.event.local_date = fixtures.NOW.date() - timedelta(days=19)
+        self.event.result_confirmed_at = fixtures.NOW - timedelta(days=8)
+        self.event.save()
+        control = models.RaceEventLifecycleControl.objects.create(
+            event=self.event, first_result_confirmed_at=fixtures.NOW - timedelta(days=7))
+        with override_settings(RACE_LIFECYCLE_V2_WRITE_ENABLED=True,
+                               RACE_LIFECYCLE_V2_EVENT_IDS=(self.event.pk,),
+                               RACE_DATA_MULTISOURCE_DISCOVERY_ENABLED=True,
+                               RACE_DATA_SYNC_ENABLED=True,
+                               RACE_DATA_SYNC_ALLOW_NETWORK=True,
+                               RACE_DATA_SYNC_ENABLED_PROVIDERS=("jra",),
+                               RACE_DATA_SYNC_ENABLED_REGIONS=("japan_jra",)):
+            for deadline in (None, fixtures.NOW, fixtures.NOW - timedelta(seconds=1)):
+                with self.subTest(deadline=deadline):
+                    self.event.source_refs = {}
+                    self.event.save(update_fields=("source_refs",))
+                    control.correction_until = deadline
+                    control.save()
+                    with patch("stable.services.race_data_source_adapters.fetch_bound_observation",
+                               side_effect=RuntimeError("offline_probe")) as fetch:
+                        result = discover_multisource_events(now=fixtures.NOW, policy=self.policy)
+                    fetch.assert_not_called()
+                    self.assertEqual(result["attempted"], 0)
+                    self.assertEqual(result["coverage"]["counts"], {"confirmed": 1})
+            control.correction_until = fixtures.NOW + timedelta(microseconds=1)
+            control.save()
+            self.assertEqual(build_multisource_coverage(
+                now=fixtures.NOW, policy=self.policy)["counts"], {"enrollment_missing": 1})
 
     def test_unenrolled_overdue_alert_dedup_and_outside_window_persistence(self):
         self.event.race_datetime = fixtures.NOW - timedelta(hours=1)

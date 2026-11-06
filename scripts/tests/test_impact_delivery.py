@@ -223,7 +223,8 @@ class FrozenWorkerBindingTests(unittest.TestCase):
         self.assertEqual(len(ids),len(set(ids)))
         def case(ident):
             return SimpleNamespace(id=lambda:ident,_testMethodName='test_case',test_case=lambda:None)
-        collect=self.worker_function('collect',load=lambda labels:[case(i) for i in ids if i.startswith(labels[0]+'.')],shard_tests=shard_tests)
+        from tools.test_impact.special_profiles import profile_for
+        collect=self.worker_function('collect',profile_for=profile_for,load=lambda labels:[case(i) for i in ids if i.startswith(labels[0]+'.')],shard_tests=shard_tests)
         actual=collect({'labels':labels,'mode':'full'},catalog)
         self.assertEqual(actual['count'],len(baseline_ids | publication_ids))
         self.assertEqual({i for b in actual['batches'] for i in b['ids']},set(ids))

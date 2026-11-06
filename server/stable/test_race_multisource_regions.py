@@ -1,6 +1,6 @@
 """多地区离线合同；标注为 synthetic 的变体不作为生产抓取/条款 proof。"""
 
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -43,6 +43,76 @@ def route_for(provider, region, country, zone, venue, names, host, prefix, kinds
 
 
 class RegionAdapterTests(TestCase):
+    def zeturf_directory_case(self):
+        route = route_for('zeturf', 'france', 'france', 'Europe/Paris',
+                          'paris-longchamp', ['ParisLongchamp', 'Paris-Longchamp'],
+                          'www.zeturf.fr', '/fr/')
+        index = 'https://www.zeturf.fr/fr/resultats-et-rapports-du-jour/2026-09-20'
+        meeting = 'https://www.zeturf.fr/fr/reunion-du-jour/2026-09-20/R1-paris-longchamp'
+        detail = 'https://www.zeturf.fr/fr/course-du-jour/2026-09-20/R1C5-exact-race'
+        route.payload['discovery_urls_by_date'] = {'2026-09-20': [index]}
+        event = SimpleNamespace(original_name='Exact Race', chinese_name='', source_refs={},
+                                local_date=date(2026, 9, 20), racecourse='ParisLongchamp')
+        return route, event, index, meeting, detail
+
+    def test_zeturf_directory_uses_same_day_venue_and_exact_race(self):
+        route, event, index, meeting, detail = self.zeturf_directory_case()
+        pages = {index: f'<a href="{meeting}#races">R1</a><a href="{meeting}#results">Results</a>'
+                 f'<a href="{meeting.replace("2026-09-20", "2026-09-21")}">Today</a>',
+                 meeting: f'<a href="{detail}">Exact Race</a>'
+                 f'<a href="{detail.replace("R1C5", "R2C5")}">Exact Race</a>'
+                 f'<a href="{detail.replace("2026-09-20", "2026-09-21")}">Exact Race</a>'}
+        calls = []
+        def fetch(url, **kwargs):
+            calls.append(url)
+            return pages[url]
+        self.assertEqual(discover_source_url(event=event, route=route, now=NOW, fetcher=fetch), detail)
+        self.assertEqual(calls, [index, meeting])
+        self.assertFalse(models.RaceResultSourceIdentity.objects.exists())
+
+    def test_zeturf_programme_and_result_switch_at_local_midnight(self):
+        route, event, historical, meeting, detail = self.zeturf_directory_case()
+        programme = 'https://www.zeturf.fr/fr/programmes-et-pronostics-du-jour'
+        route.payload['discovery_urls_by_date'] = {'2026-09-20': [historical, programme]}
+        for now, selected in ((datetime(2026,9,19,20,tzinfo=timezone.utc), programme),
+                              (datetime(2026,9,20,20,tzinfo=timezone.utc), programme),
+                              (datetime(2026,9,20,22,tzinfo=timezone.utc), historical)):
+            with self.subTest(now=now):
+                calls = []
+                pages = {selected: f'<a href="{meeting}">Meeting</a>',
+                         meeting: f'<a href="{detail}">Exact Race</a>'}
+                def fetch(url, **kwargs):
+                    calls.append(url)
+                    return pages[url]
+                self.assertEqual(discover_source_url(event=event, route=route, now=now, fetcher=fetch), detail)
+                self.assertEqual(calls, [selected, meeting])
+
+    def test_zeturf_directory_rejects_unmatched_or_ambiguous_meetings_before_fetch(self):
+        route, event, index, meeting, detail = self.zeturf_directory_case()
+        for target in (meeting.replace('2026-09-20', '2026-09-19'),
+                       meeting.replace('paris-longchamp', 'strasbourg'),
+                       meeting.replace('www.zeturf.fr', 'foreign.invalid'), meeting+'?other=1'):
+            calls = []
+            def fetch(url, **kwargs):
+                calls.append(url)
+                return f'<a href="{target}">R1</a>'
+            with self.subTest(target=target), self.assertRaisesRegex(ValueError, 'source_not_found'):
+                discover_source_url(event=event, route=route, now=NOW, fetcher=fetch)
+            self.assertEqual(calls, [index])
+        with self.assertRaisesRegex(ValueError, 'source_discovery_ambiguous'):
+            discover_source_url(event=event, route=route, now=NOW, fetcher=lambda *a, **k:
+                f'<a href="{meeting}">R1</a><a href="{meeting.replace("R1-", "R2-")}#results">R2</a>')
+
+    def test_zeturf_directory_keeps_name_and_detail_permission_checks(self):
+        route, event, index, meeting, detail = self.zeturf_directory_case()
+        for markup in (f'<a href="{detail}">Sponsored Exact Race</a>',
+                       f'<a href="{detail.replace("www.zeturf.fr", "foreign.invalid")}">Exact Race</a>',
+                       f'<a href="{detail}?x=1">Exact Race</a>',
+                       f'<a href="{detail}">Exact Race</a><a href="{detail.replace("C5-", "C6-")}">Exact Race</a>'):
+            with self.subTest(markup=markup), self.assertRaises(ValueError):
+                discover_source_url(event=event, route=route, now=NOW, fetcher=lambda url, **k:
+                    f'<a href="{meeting}">R1</a>' if url == index else markup)
+
     def test_real_sporting_cards_uk_us_and_synthetic_ireland_independent_route(self):
         from stable.race_reference_parsers.sporting_life import _next_data
         import json
@@ -190,6 +260,281 @@ class RegionAdapterTests(TestCase):
         self.assertEqual(value["external_race_id"], "HK20260621HV01")
         self.assertEqual(value["race_number"], "1")
         self.assertTrue(value["roster"])
+
+    def test_explicit_discovery_date_selects_historical_page(self):
+        payload=policy_payload()
+        payload['routes'][0]['discovery_urls_by_date']={
+            '2026-09-01':['https://www.jra.go.jp/JRADB/day1.html'],
+            '2026-09-20':['https://www.jra.go.jp/JRADB/day20.html']}
+        route=parse_multisource_policy(payload,now=NOW).routes[0]
+        event=SimpleNamespace(original_name='オールカマー',chinese_name='',source_refs={},local_date=date(2026,9,1))
+        calls=[]
+        def fetch(url, **kwargs):
+            calls.append(url)
+            return '<a href="/JRADB/detail.html">オールカマー</a>'
+        self.assertEqual(discover_source_url(event=event,route=route,now=NOW,fetcher=fetch),
+                         'https://www.jra.go.jp/JRADB/detail.html')
+        self.assertEqual(calls,['https://www.jra.go.jp/JRADB/day1.html'])
+        self.assertFalse(models.RaceResultSourceIdentity.objects.exists())
+
+    def test_missing_explicit_date_does_not_fetch_generic_fallback(self):
+        payload=policy_payload()
+        payload['routes'][0].update(discovery_urls=['https://www.jra.go.jp/JRADB/generic.html'],
+            discovery_urls_by_date={'2026-09-01':['https://www.jra.go.jp/JRADB/day1.html']})
+        route=parse_multisource_policy(payload,now=NOW).routes[0]
+        event=SimpleNamespace(original_name='x',chinese_name='',source_refs={},local_date=date(2026,9,2))
+        from unittest.mock import Mock
+        fetch=Mock()
+        with self.assertRaisesRegex(ValueError,'source_discovery_date_missing'):
+            discover_source_url(event=event,route=route,now=NOW,fetcher=fetch)
+        fetch.assert_not_called()
+
+    def test_date_pages_must_resolve_one_detail_across_all_pages(self):
+        payload=policy_payload()
+        payload['routes'][0]['discovery_urls_by_date']={'2026-09-01':[
+            'https://www.jra.go.jp/JRADB/one.html','https://www.jra.go.jp/JRADB/two.html']}
+        route=parse_multisource_policy(payload,now=NOW).routes[0]
+        event=SimpleNamespace(original_name='same',chinese_name='',source_refs={},local_date=date(2026,9,1))
+        calls=[]
+        def fetch(url, **kwargs):
+            calls.append(url)
+            return '<a href="'+url.replace('.html','-detail.html')+'">same</a>'
+        with self.assertRaisesRegex(ValueError,'source_discovery_ambiguous'):
+            discover_source_url(event=event,route=route,now=NOW,fetcher=fetch)
+        self.assertEqual(len(calls),2)
+
+    def test_date_discovery_rejects_invalid_date_and_foreign_host(self):
+        for dates in ({'2026-02-30':['https://www.jra.go.jp/JRADB/day.html']},
+                      {'2026-09-01':['https://foreign.invalid/JRADB/day.html']}):
+            payload=policy_payload();payload['routes'][0]['discovery_urls_by_date']=dates
+            with self.assertRaises(ValueError):parse_multisource_policy(payload,now=NOW)
+
+    def test_discovery_uses_provider_race_title_not_link_metadata(self):
+        cases = [
+            ('sporting_life', 'united_kingdom', 'Europe/London', 'www.sportinglife.com',
+             '/racing/', '/racing/racecards/2026-09-20/venue/racecard/123/race',
+             '<span>12:40</span><span data-testid="racecard-meeting-race-name">Exact Race<span>4 Runners, Class 3</span></span>'),
+            ('galopp_statistik', 'germany', 'Europe/Berlin', 'www.galopp-statistik.de',
+             '/RennenDetails.php', '/RennenDetails.php?Datum=2026-09-20&Ort=Bad&Nummer=6',
+             '<div class="nr-des-rennens">6</div><div class="titel-des-rennens">Exact Race</div><div>15:55 55000 EUR</div>'),
+        ]
+        cases.append(('galopp_statistik', 'germany', 'Europe/Berlin', 'www.galopp-statistik.de',
+                      '/DisplayErgebnis.php', '/DisplayErgebnis.php?id=14631',
+                      '<div class="nr-des-rennens">5</div><div class="titel-des-rennens">Exact Race</div><div>15:45 55000 EUR</div>'))
+        for provider, region, zone, host, prefix, detail, markup in cases:
+            with self.subTest(provider=provider):
+                route=route_for(provider,region,region,zone,'venue',['Venue'],host,prefix)
+                route.payload['discovery_urls']=['https://'+host+prefix+'index']
+                event=SimpleNamespace(original_name='Exact Race',chinese_name='',source_refs={},local_date=date(2026,9,20))
+                page='<a href="'+detail+'">'+markup+'</a>'
+                self.assertEqual(discover_source_url(event=event,route=route,now=NOW,fetcher=lambda *a,**k:page),'https://'+host+detail)
+                event.original_name='Exact'
+                with self.assertRaisesRegex(ValueError,'source_not_found'):
+                    discover_source_url(event=event,route=route,now=NOW,fetcher=lambda *a,**k:page)
+        self.assertFalse(models.RaceResultSourceIdentity.objects.exists())
+
+    def test_hkjc_declared_pair_switches_at_hong_kong_midnight(self):
+        from datetime import datetime, timezone
+        card = 'https://racing.hkjc.com/en-us/local/information/racecard?racedate=2026/10/28&Racecourse=ST&RaceNo=1'
+        result = card.replace('/racecard?', '/localresults?')
+        route = route_for('hkjc','hong_kong','hong_kong','Asia/Hong_Kong',
+                          'hkjc:ST',['Sha Tin'],'racing.hkjc.com','/en-us/local/information/')
+        route.payload['discovery_urls_by_date'] = {'2026-10-28':[card,result]}
+        event = SimpleNamespace(original_name='Target', chinese_name='', source_refs={},
+                                local_date=date(2026,10,28), racecourse='Sha Tin')
+        for hour, expected in [(15,card),(16,result)]:
+            calls = []
+            with patch('stable.services.race_data_source_adapters.discover_hkjc_meeting',
+                       return_value={expected}):
+                discover_source_url(event=event,route=route,
+                    now=datetime(2026,10,28,hour,tzinfo=timezone.utc),
+                    fetcher=lambda url,**kw: calls.append(url) or '')
+            self.assertEqual(calls,[expected])
+        route.payload['discovery_urls_by_date'] = {'2026-10-28':[card]}
+        calls.clear()
+        with patch('stable.services.race_data_source_adapters.discover_hkjc_meeting',return_value={card}):
+            discover_source_url(event=event,route=route,
+                now=datetime(2026,10,29,tzinfo=timezone.utc),
+                fetcher=lambda url,**kw: calls.append(url) or '')
+        self.assertEqual(calls,[card])
+
+    def test_hkjc_image_navigation_uses_same_meeting_pages_with_bounded_requests(self):
+        from datetime import datetime, timezone
+        base = 'https://racing.hkjc.com/en-us/local/information/racecard'
+        index = base+'?racedate=2026/10/28&Racecourse=ST&RaceNo=1'
+        detail = base+'?racedate=2026/10/28&Racecourse=ST&RaceNo=2'
+        route = route_for('hkjc','hong_kong','hong_kong','Asia/Hong_Kong',
+                          'hkjc:ST',['Sha Tin'],'racing.hkjc.com','/en-us/local/information/')
+        route.payload['valid_until'] = '2026-11-30T00:00:00+00:00'
+        route.payload['discovery_urls_by_date'] = {'2026-10-28':[index]}
+        event = SimpleNamespace(original_name='Target Race', chinese_name='', source_refs={},
+            local_date=date(2026,10,28), racecourse='Sha Tin')
+        page = (ROOT/'tests/fixtures/regional_lifecycle/hk-card.html').read_text()
+        target = page.replace('Race 1 - WA MEI SHAN HANDICAP','Race 2 - Target Race')
+        links = '<a href="'+detail+'"><img src="race2.gif"></a>'
+        for rejected in [detail.replace('ST','HV'),detail.replace('10/28','10/29'),
+                         detail.replace('racing.hkjc.com','unapproved.test')]:
+            links += '<a href="'+rejected+'"><img></a>'
+        calls = []
+        def fetch(url, **kwargs):
+            calls.append(url)
+            return page+links if url == index else target
+        now = datetime(2026,10,28,tzinfo=timezone.utc)
+        self.assertEqual(discover_source_url(event=event,route=route,now=now,fetcher=fetch), detail)
+        self.assertEqual(calls,[index,detail])
+        excessive = ''.join('<a href="'+base+'?racedate=2026/10/28&Racecourse=ST&RaceNo='+str(n)+'"><img></a>' for n in range(2,13))
+        calls.clear()
+        with self.assertRaisesRegex(ValueError,'hkjc_discovery_page_limit'):
+            discover_source_url(event=event,route=route,now=now,
+                fetcher=lambda url,**kw: calls.append(url) or page+excessive)
+        self.assertEqual(calls,[index])
+
+    def test_sporting_discovery_rolls_declared_pair_by_route_local_date(self):
+        from datetime import datetime, timezone
+        card_index = 'https://www.sportinglife.com/racing/racecards'
+        result_index = 'https://www.sportinglife.com/racing/results/2026-09-20'
+        event = SimpleNamespace(original_name='Exact Race', chinese_name='',
+                                source_refs={}, local_date=date(2026, 9, 20))
+        now = datetime(2026, 9, 21, 1, tzinfo=timezone.utc)
+        for zone, selected in [('Europe/London', result_index),
+                               ('America/Los_Angeles', card_index)]:
+            with self.subTest(zone=zone):
+                route = route_for('sporting_life', 'united_states', 'united_states',
+                                  zone, 'venue', ['Venue'], 'www.sportinglife.com', '/racing/')
+                route.payload['discovery_urls_by_date'] = {
+                    '2026-09-20': [card_index, result_index]}
+                calls = []
+                def fetch(url, **kwargs):
+                    calls.append(url)
+                    return '<a href="/racing/results/2026-09-20/venue/123/exact">Exact Race</a>'
+                discover_source_url(event=event, route=route, now=now, fetcher=fetch)
+                self.assertEqual(calls, [selected])
+        # A legacy single-entry policy cannot authorize a synthesized result URL.
+        route.payload['discovery_urls_by_date'] = {'2026-09-20': [card_index]}
+        calls.clear()
+        discover_source_url(event=event, route=route, now=now, fetcher=fetch)
+        self.assertEqual(calls, [card_index])
+
+    def test_sporting_rollover_ignores_old_card_hints_and_bindings(self):
+        from datetime import datetime, timezone
+        from unittest.mock import Mock
+        from stable.services.race_data_source_adapters import fetch_bound_observation
+        card = 'https://www.sportinglife.com/racing/racecards/2026-09-20/venue/racecard/123/exact'
+        index = 'https://www.sportinglife.com/racing/results/2026-09-20'
+        detail = 'https://www.sportinglife.com/racing/results/2026-09-20/venue/123/exact'
+        route = route_for('sporting_life', 'united_kingdom', 'united_kingdom',
+                          'Europe/London', 'venue', ['Venue'], 'www.sportinglife.com', '/racing/')
+        route.payload['discovery_urls_by_date'] = {'2026-09-20': [
+            'https://www.sportinglife.com/racing/racecards', index]}
+        now = datetime(2026, 9, 21, 1, tzinfo=timezone.utc)
+        for binding in ['source', 'seed', 'primary']:
+            with self.subTest(binding=binding):
+                sources = Mock()
+                sources.filter.return_value.first.return_value = (
+                    SimpleNamespace(canonical_url=card) if binding == 'source' else None)
+                event = SimpleNamespace(original_name='Exact Race', chinese_name='',
+                    source_refs={'primary': card} if binding == 'primary' else {},
+                    local_date=date(2026, 9, 20), source_identities=sources)
+                calls = []
+                def fetch(url, **kwargs):
+                    calls.append(url)
+                    return '<a href="'+detail+'">Exact Race</a>'
+                with patch('stable.services.race_source_identity.seed_evidence',
+                           return_value={'canonical_url':card} if binding == 'seed' else None), \
+                     patch('stable.services.race_data_source_adapters.parse_reference_observation',
+                           side_effect=RuntimeError('parser_reached')):
+                    with self.assertRaisesRegex(RuntimeError, 'parser_reached'):
+                        fetch_bound_observation(event=event, route=route, now=now, fetcher=fetch)
+                self.assertEqual(calls, [index, detail])
+
+    def test_sporting_rollover_preserves_verified_seed_identity_receipt(self):
+        from datetime import datetime, timezone
+        from stable.services.race_data_source_adapters import fetch_bound_observation
+        from stable.services.race_source_identity import event_snapshot, resolve_observation
+        from stable.test_race_multisource_identity import observation
+        now = datetime(2026, 9, 21, 1, tzinfo=timezone.utc)
+        card = 'https://www.sportinglife.com/racing/racecards/2026-09-20/venue/racecard/123/exact'
+        index = 'https://www.sportinglife.com/racing/results/2026-09-20'
+        detail = 'https://www.sportinglife.com/racing/results/2026-09-20/venue/123/exact'
+        route = route_for('sporting_life', 'united_kingdom', 'united_kingdom',
+                          'Europe/London', 'venue', ['Venue'], 'www.sportinglife.com', '/racing/')
+        route.payload['discovery_urls_by_date'] = {'2026-09-20': [
+            'https://www.sportinglife.com/racing/racecards', index]}
+        event = models.RaceEvent.objects.create(year=2026, slug='sl-seed',
+            original_name='Exact Race', country_region='united_kingdom', racecourse='Venue',
+            local_date=date(2026, 9, 20), timezone_name='Europe/London', status='scheduled')
+        previous = dict(candidate_id=1, event_snapshot_sha256=event_snapshot(event),
+                        raw_sha256='e'*64, canonical_url=card, roster=[('1', 'horse')])
+        value = observation('sporting_life', region=route.region, operator=route.operator,
+            canonical_url=detail, external_race_id='123', venue_key='venue',
+            timezone=route.timezone, fetched_at=now.isoformat(), raw_names=['Exact Race'],
+            roster=[{'number':'1', 'horse_name':'Horse'}], result_phase='official')
+        def fetch(url, **kwargs):
+            return '<a href="'+detail+'">Exact Race</a>' if url == index else ''
+        with patch('stable.services.race_source_identity.seed_evidence', return_value=previous), \
+             patch('stable.services.race_data_source_adapters.parse_reference_observation',
+                   side_effect=lambda *a, **k: dict(value)):
+            result = fetch_bound_observation(event=event, route=route, now=now, fetcher=fetch)
+            self.assertEqual(result['identity_seed_receipt']['link_chain'], [card, detail])
+            self.assertEqual(resolve_observation(result, route=route, now=now).event_id, event.pk)
+            for bad in [card.replace('/123/', '/999/'), card.replace('/venue/', '/other/')]:
+                previous['canonical_url'] = bad
+                with self.assertRaisesRegex(ValueError, 'linked_result_identity_mismatch'):
+                    fetch_bound_observation(event=event, route=route, now=now, fetcher=fetch)
+
+    def test_sporting_life_result_discovery_uses_exact_structured_name_and_actual_link(self):
+        import json
+        route=route_for('sporting_life','united_kingdom','united_kingdom','Europe/London',
+                        'venue',['Venue'],'www.sportinglife.com','/racing/')
+        route.payload['discovery_urls_by_date']={'2026-09-20':['https://www.sportinglife.com/racing/results/2026-09-20']}
+        event=SimpleNamespace(original_name='Exact Race',chinese_name='',source_refs={},local_date=date(2026,9,20))
+        detail='https://www.sportinglife.com/racing/results/2026-09-20/venue/123/exact-race'
+        data={'props':{'pageProps':{'meetings':[{'races':[{'name':'Exact Race','race_summary_reference':{'id':123}}]}]}}}
+        page='<script id="__NEXT_DATA__" type="application/json">'+json.dumps(data)+'</script><a href="'+detail+'">Results 12:40</a>'
+        self.assertEqual(discover_source_url(event=event,route=route,now=NOW,fetcher=lambda *a,**k:page),detail)
+        for bad in (page.replace('Exact Race','Exact Race Extra'),page.replace('/123/', '/124/')):
+            with self.assertRaisesRegex(ValueError,'source_not_found'):
+                discover_source_url(event=event,route=route,now=NOW,fetcher=lambda *a,**k:bad)
+        duplicate=page+'<a href="'+detail.replace('exact-race','other')+'">Results</a>'
+        with self.assertRaisesRegex(ValueError,'source_discovery_ambiguous'):
+            discover_source_url(event=event,route=route,now=NOW,fetcher=lambda *a,**k:duplicate)
+        self.assertFalse(models.RaceResultSourceIdentity.objects.exists())
+
+    def test_declared_discovery_index_hint_is_not_returned_as_race_detail(self):
+        route=route_for('jra','japan_jra','japan','Asia/Tokyo','nakayama',['中山'],
+                        'www.jra.go.jp','/JRADB/')
+        index='https://www.jra.go.jp/datafile/seiseki/replay/2026/jyusyo.html'
+        route.payload['allowed_path_prefixes']=['/datafile/seiseki/replay/', '/JRADB/']
+        route.payload['discovery_urls_by_date']={'2026-09-20':[index]}
+        event=SimpleNamespace(original_name='Exact Race',chinese_name='',source_refs={'primary':index},local_date=date(2026,9,20))
+        detail='https://www.jra.go.jp/JRADB/detail.html'
+        self.assertEqual(discover_source_url(event=event,route=route,now=NOW,
+            fetcher=lambda *a,**k:'<a href="'+detail+'">Exact Race</a>'),detail)
+
+    def test_discovery_uses_only_current_evidenced_approved_series_aliases(self):
+        series=models.RaceSeries.objects.create(key='test-source-alias',country_region='france',
+            canonical_name_original='Canonical Race',review_status='approved')
+        alias=models.RaceSeriesName.objects.create(series=series,text='Sponsored Exact Race',
+            valid_from_year=2026,valid_to_year=2026,source_refs={'official':'https://source.example/evidence'})
+        route=route_for('zeturf','france','france','Europe/Paris','chantilly',['Chantilly'],
+                        'www.zeturf.fr','/fr/')
+        route.payload['discovery_urls']=['https://www.zeturf.fr/fr/index']
+        event=SimpleNamespace(original_name='Canonical Race',chinese_name='',source_refs={},
+            local_date=date(2026,9,19),edition_year=2026,race_series_id=series.pk)
+        detail='https://www.zeturf.fr/fr/course-du-jour/exact'
+        fetch=lambda *a,**k:'<a href="'+detail+'">Sponsored Exact Race</a>'
+        self.assertEqual(discover_source_url(event=event,route=route,now=NOW,fetcher=fetch),detail)
+        for changes in ({'is_active':False},{'source_refs':{}},{'valid_from_year':2024,'valid_to_year':2025},{'valid_from_year':2027,'valid_to_year':2028}):
+            for field,value in changes.items():setattr(alias,field,value)
+            alias.save()
+            with self.assertRaisesRegex(ValueError,'source_not_found'):
+                discover_source_url(event=event,route=route,now=NOW,fetcher=fetch)
+            alias.is_active=True;alias.source_refs={'official':'https://source.example/evidence'}
+            alias.valid_from_year=2026;alias.valid_to_year=2026;alias.save()
+        series.review_status='pending';series.save()
+        with self.assertRaisesRegex(ValueError,'source_not_found'):
+            discover_source_url(event=event,route=route,now=NOW,fetcher=fetch)
+        self.assertFalse(models.RaceResultSourceIdentity.objects.exists())
 
     def test_discovery_names_only_select_request_never_identity(self):
 

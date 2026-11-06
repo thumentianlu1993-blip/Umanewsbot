@@ -900,6 +900,48 @@ class MultisourceRebindTests(JraColdStartTests):
         self.assertEqual(models.OperationLog.objects.filter(
             action_type="multisource_rebind").count(), 1)
 
+    def test_rebind_renews_expired_source_and_binding_atomically(self):
+        from stable.services.race_data_sync_enrollment import rebind_multisource_enrollment
+        from stable.services.race_data_sync_admission import binding_admission_reason
+        self.enroll()
+        binding = self.binding()
+        source = binding.source_identity
+        expired = NOW - timedelta(days=1)
+        source.valid_until = expired
+        source.save(update_fields=("valid_until",))
+        binding.valid_until = expired
+        binding.save(update_fields=("valid_until",))
+        policy = self.policy_v2()
+        old_digest = binding.route_digest
+        result = rebind_multisource_enrollment(event_id=self.event.pk, policy=policy,
+            now=NOW, expected_route_digest=old_digest, apply=True)
+        self.assertEqual(result["action"], "rebound")
+        renewed = self.binding()
+        self.assertGreater(renewed.source_identity.valid_until, NOW)
+        self.assertEqual(binding_admission_reason(binding=renewed, route=policy.routes[0],
+            now=NOW, check_runtime=False), "")
+
+    def test_expired_rebind_preserves_revocation_and_rolls_back_renewal(self):
+        from stable.services.race_data_sync_enrollment import rebind_multisource_enrollment
+        self.enroll()
+        binding = self.binding()
+        source = binding.source_identity
+        expired = NOW - timedelta(days=1)
+        source.valid_until = expired
+        source.identity_fields = {**source.identity_fields, "publication_revoked": True}
+        source.save(update_fields=("valid_until", "identity_fields"))
+        binding.valid_until = expired
+        binding.save(update_fields=("valid_until",))
+        old_digest = binding.route_digest
+        with self.assertRaisesMessage(ValueError, "rebind_contract_drift"):
+            rebind_multisource_enrollment(event_id=self.event.pk, policy=self.policy_v2(),
+                now=NOW, expected_route_digest=old_digest, apply=True)
+        source.refresh_from_db();binding.refresh_from_db()
+        self.assertEqual(source.valid_until, expired)
+        self.assertEqual(binding.valid_until, expired)
+        self.assertEqual(binding.route_digest, old_digest)
+        self.assertTrue(source.identity_fields["publication_revoked"])
+
     def test_rebind_rejects_baseline_drift_without_writes(self):
         from stable.services.race_data_sync_enrollment import rebind_multisource_enrollment
         self.enroll()

@@ -3193,11 +3193,11 @@ def _finished_race_queryset(queryset, now):
     queryset = queryset.filter(status=RaceEventStatus.FINISHED).annotate(
         _has_confirmed=Exists(results.filter(is_confirmed=True)),
         _has_unconfirmed=Exists(results.filter(is_confirmed=False)),
-    ).filter(_has_confirmed=True, _has_unconfirmed=False)
+    ).filter(Q(lifecycle_public_state__isnull=False) | Q(_has_confirmed=True, _has_unconfirmed=False))
     ids = list(queryset.filter(
-        Q(projection_control__current_result_revision__isnull=False) |
+        Q(lifecycle_public_state__isnull=False) | Q(projection_control__current_result_revision__isnull=False) |
         Q(projection_control__write_owner__in=("data_sync", "live"))
-    ).exclude(projection_control__write_owner="historical").values_list("pk", flat=True))
+    ).exclude(Q(projection_control__write_owner="historical") & Q(lifecycle_public_state__isnull=True)).values_list("pk", flat=True))
     hidden = []
     for offset in range(0,len(ids),100):
         decisions = resolve_race_live_public_reads(event_ids=ids[offset:offset+100], now=now)
@@ -3279,6 +3279,11 @@ def _public_today_races() -> tuple[list[dict], bool]:
             winner = _confirmed_race_winner(candidates)
             if winner is not None:
                 winners[event_id] = winner.horse_name
+    from stable.services.race_lifecycle_projection import load_public_batch, public_modules
+    epoch_batch = load_public_batch([event.pk for event in events])
+    for event_id, loaded in epoch_batch.items():
+        winner = _confirmed_race_winner(public_modules(event_id, now=now, loaded=loaded)['result'])
+        winners[event_id] = winner.horse_name if winner else ''
     entries = [
         {
             "event": event,
@@ -3544,12 +3549,17 @@ def _group_race_events_by_date(events, *, today, anchor_date=None):
         if live_revision_event_ids
         else {}
     )
+    from stable.services.race_lifecycle_projection import public_modules, load_public_batch
+    epoch_batch = load_public_batch([e.pk for e in events])
+    epoch_ids = set(epoch_batch)
     for event in events:
+        if event.pk in epoch_ids:
+            modules = public_modules(event.pk, now=read_now, loaded=epoch_batch[event.pk])
+            event.top_results = modules["result"][:5] if modules else []
         live_public_read = live_public_reads.get(event.pk)
-        if (
-            live_public_read is not None
-            and not live_public_read.visible
-        ):
+        if event.pk in epoch_ids:
+            pass
+        elif live_public_read is not None and not live_public_read.visible:
             event.top_results = []
         else:
             event.top_results = list(event.results.all()[:5])
@@ -3873,8 +3883,12 @@ def _series_history_winners(
     *,
     exclude_result_event_id: int | None = None,
 ):
+    from stable.services.race_lifecycle_projection import load_public_batch, public_modules
     if not event.race_series_id:
+        if load_public_batch([event.pk]):
+            return []
         return list(event.history_winners.all())
+    epoch_batch = load_public_batch(list(RaceEvent.objects.filter(race_series_id=event.race_series_id).values_list('pk', flat=True)))
     result_winner_queryset = (
         RaceEventResult.objects.select_related("event")
         .filter(
@@ -3902,7 +3916,13 @@ def _series_history_winners(
     result_winners = list(
         result_winner_queryset.order_by("-event__year", "finish_position", "id")
     )
-    covered_years = set()
+    result_winners = [r for r in result_winners if r.event_id not in epoch_batch]
+    for event_id, loaded in epoch_batch.items():
+        if event_id == exclude_result_event_id:
+            continue
+        result_winners.extend(r for r in public_modules(event_id, now=timezone.now(), loaded=loaded)['result']
+                              if r.is_confirmed and (r.reported_finish_position or r.official_finish_position) == 1)
+    covered_years = {loaded['event'].year for loaded in epoch_batch.values()}
     for winner in result_winners:
         winner.winner_year = winner.event.year
         covered_years.add(winner.event.year)
@@ -3921,7 +3941,7 @@ def _series_history_winners(
     )
     return sorted(
         [*result_winners, *fallback_winners],
-        key=lambda winner: (-winner.winner_year, winner.horse_name, winner.pk),
+        key=lambda winner: (-winner.winner_year, winner.horse_name, winner.pk or 0),
     )
 
 
@@ -4868,4 +4888,15 @@ def term_toggle_active_api(request: HttpRequest, term_id: int) -> JsonResponse:
 
 def _render_race_information(request, template_name, context):
     from .services.race_information_display import prepare_context
-    return render(request, template_name, prepare_context(context))
+    from .services.race_lifecycle_projection import decorate_context
+    epoch_page = decorate_context(context, now=timezone.now())
+    if epoch_page:
+        _attach_result_display_positions(context["results"])
+        _attach_race_term_display_names([
+            (context["event"], context["runners"]), (context["event"], context["results"])])
+    response = render(request, template_name, prepare_context(context))
+    from stable.models import RaceLifecyclePublicState
+    related_page = "race" in template_name or any(key in context for key in ("today_races", "history_winners"))
+    if epoch_page or (related_page and (getattr(settings, "RACE_LIFECYCLE_V2_EVENT_IDS", ()) or RaceLifecyclePublicState.objects.exists())):
+        response["Cache-Control"] = "no-store, max-age=0"
+    return response

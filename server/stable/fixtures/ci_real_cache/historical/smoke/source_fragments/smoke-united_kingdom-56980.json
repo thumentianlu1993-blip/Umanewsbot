@@ -1,0 +1,53 @@
+{
+  "artifact_kind": "historical_race_detail_source_fragment",
+  "plan_id": "detail-crawl-1998-2026-v3-smoke",
+  "region": "united_kingdom",
+  "requests": [
+    {
+      "evidence_source_url": "https://www.sportinglife.com/racing/results/2013-06-20/ascot/118984/gold-cup-british-champions-series-group-1",
+      "fixture_identity": {
+        "path": "@FIXTURE_ROOT@/historical/smoke/fixtures/united_kingdom-56980.html",
+        "sha256": "20004c114cf3e0a750300568a560958df76a73a185cc1f2b1eb5ae425279ed17",
+        "size": 297391
+      },
+      "local_date": "2013-06-20",
+      "recovery_evidence": [
+        {
+          "kind": "validated_candidate_jsonl",
+          "path": "@ARCHIVE_REPOSITORY@/runtime/historical_detail_crawl_runs/detail-crawl-1998-2026-v1/shards/united_kingdom-2013-sporting-life-irishracing-01/sporting_life/uk_sportinglife_detail_candidates_2026.jsonl",
+          "sha256": "a6c87b33ffe5a67577c12c64ea5101ebf3aa6bc84e19ec3304dd7e4cf61c5c14",
+          "size": 2301843
+        },
+        {
+          "kind": "human_review_csv",
+          "path": "@ARCHIVE_REPOSITORY@/runtime/historical_detail_crawl_runs/detail-crawl-1998-2026-v1/shards/united_kingdom-2013-sporting-life-irishracing-01/sporting_life/uk_sportinglife_detail_review_2026.csv",
+          "sha256": "a70f3256329f27827aaee703f0e383dfbdc51304cc47ceb06aca07255dad8487",
+          "size": 46822
+        },
+        {
+          "kind": "source_cache_manifest",
+          "path": "@ARCHIVE_REPOSITORY@/runtime/historical_detail_crawl_runs/detail-crawl-1998-2026-v1/shards/united_kingdom-2013-sporting-life-irishracing-01/sporting_life/source_cache_manifest.json",
+          "sha256": "826a18522ba847edec4964ddfd59aa8fc8a3f43f1c76ab119263d44eda320df2",
+          "size": 103160
+        },
+        {
+          "kind": "verified_source_cache",
+          "path": "@ARCHIVE_REPOSITORY@/runtime/historical_detail_crawl_runs/detail-crawl-1998-2026-v1/shards/united_kingdom-2013-sporting-life-irishracing-01/sporting_life/sources/source_sl_detail_118984.html",
+          "sha256": "7587a3df4923314c562c989474385d0f3dc7d0c0106217325ef8abacbe999dc0",
+          "size": 297414
+        }
+      ],
+      "region": "united_kingdom",
+      "slug": "united_kingdom-GBR_ASCOT_GOLD_CUP-2013",
+      "source_name": "sporting_life",
+      "source_provider": "sporting_life",
+      "source_url": "https://www.sportinglife.com/racing/results/2013-06-20/ascot/118984/gold-cup-british-champions-series-group-1",
+      "target_id": "56980",
+      "target_sha256": "e184450d57c5f8f8e9946943682c9c2c783e3e6806ab3bebc535334c0ece9374",
+      "year": 2013
+    }
+  ],
+  "schema_version": "2.0",
+  "shard_id": "smoke-united_kingdom-56980",
+  "target_count": 1
+}

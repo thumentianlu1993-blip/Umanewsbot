@@ -38,6 +38,7 @@ def validate_data_sync_lifecycle_admission(
     now: datetime,
     lock: bool = False,
     standing_policy: dict[str, Any] | None = None,
+    loaded: dict | None = None,
 ) -> LifecycleAdmissionDecision:
     """Single admission entry for data-sync lifecycle, result and public reads.
 
@@ -47,9 +48,9 @@ def validate_data_sync_lifecycle_admission(
     conflict, not a fallback.
     """
 
-    if models.RaceDataSyncEnrollment.objects.filter(
-        event_id=event_id, authority_version=2
-    ).exists():
+    if ((loaded is not None and loaded.get("enrollment") and loaded["enrollment"].authority_version == 2)
+        or (loaded is None and models.RaceDataSyncEnrollment.objects.filter(
+            event_id=event_id, authority_version=2).exists())):
         return validate_multisource_admission(event_id=event_id, now=now, lock=lock)
     if timezone.is_naive(now):
         raise ValueError("now must be timezone-aware")
@@ -86,8 +87,8 @@ def validate_data_sync_lifecycle_admission(
         control_qs = control_qs.select_for_update()
         event_qs = event_qs.select_for_update()
         enrollment_qs = enrollment_qs.select_for_update()
-    control = control_qs.filter(event_id=event_id).first()
-    event = event_qs.filter(pk=event_id).first()
+    control = loaded.get("lifecycle") if loaded is not None else control_qs.filter(event_id=event_id).first()
+    event = loaded.get("event") if loaded is not None else event_qs.filter(pk=event_id).first()
     if event is None:
         return _deny("event_missing")
     if event.visibility_status != models.RaceEventVisibility.PUBLISHED:
@@ -97,7 +98,7 @@ def validate_data_sync_lifecycle_admission(
     if event.status not in policy.continuation_statuses:
         return _deny("continuation_status_not_allowed")
 
-    legacy_active = models.RaceEventLifecycleEnforceMembership.objects.filter(
+    legacy_active = loaded.get("legacy_active", False) if loaded is not None else models.RaceEventLifecycleEnforceMembership.objects.filter(
         event_id=event_id,
         state="active",
         registry__state="active",
@@ -110,7 +111,7 @@ def validate_data_sync_lifecycle_admission(
     }:
         return _deny("lifecycle_authority_conflict")
 
-    projection = models.RaceEventProjectionControl.objects.filter(
+    projection = loaded.get("projection") if loaded is not None else models.RaceEventProjectionControl.objects.filter(
         event_id=event_id
     ).first()
     if (
@@ -119,7 +120,7 @@ def validate_data_sync_lifecycle_admission(
     ):
         return _deny("writer_owner_conflict")
 
-    enrollment = enrollment_qs.filter(event_id=event_id).first()
+    enrollment = loaded.get("enrollment") if loaded is not None else enrollment_qs.filter(event_id=event_id).first()
     if (
         enrollment is None
         or enrollment.state != models.RaceDataSyncEnrollmentState.ENROLLED
@@ -228,7 +229,9 @@ def validate_multisource_admission(
     if event is None:
         return _deny("event_missing")
     if event.status in ("cancelled", "postponed"):
-        return _deny("event_not_active")
+        from stable.services.race_lifecycle_projection import writable
+        if not (writable(event.pk) and (event.status == "postponed" or capability == "race_time")):
+            return _deny("event_not_active")
     if event.visibility_status != "published" or any(
         (event.manual_lock_flags or {}).values()
     ):
@@ -352,7 +355,7 @@ def validate_multisource_admission(
 
 
 def validate_multisource_publication(
-    *, event, control, revision, publication, observation, source, enrollment
+    *, event, control, revision, publication, observation, source, enrollment, binding_retired=None
 ):
     """只读发布时授权；当前网络/写开关和来源到期不撤销既有正式版本。"""
     from stable.services.race_data_source_adapters import canonical_sha, aware
@@ -372,9 +375,9 @@ def validate_multisource_publication(
         or source.identity_fields.get("publication_revoked")
     ):
         return "identity_revoked"
-    if models.RaceDataSyncSourceBinding.objects.filter(
+    if (binding_retired if binding_retired is not None else models.RaceDataSyncSourceBinding.objects.filter(
         enrollment=enrollment, source_identity=source, state="retired"
-    ).exists():
+    ).exists()):
         return "binding_revoked"
     if (
         enrollment is None

@@ -1,0 +1,216 @@
+{
+  "schema_version": 1,
+  "provenance": "Existing local public racing page caches; no new fetch; raw page bytes unchanged",
+  "files": [
+    {
+      "path": "historical/smoke/descriptors/smoke-japan-50556.json",
+      "original_sha256": "d59b60e6ee477596ed8ee992bcae048579f0a5d9ee9b3c5705b3a03e11c63df9",
+      "sha256": "5f45bd3fee8b57202c62d98c7cf1fdc1f7a5f632c87e5d753316d7855e3c0633",
+      "size": 3740,
+      "transformation": "local_path_tokens"
+    },
+    {
+      "path": "historical/smoke/events/smoke-japan-50556.csv",
+      "original_sha256": "25a0d8b06dd0388bb3b933be95261e8e5fb14acf717070c0e37979b7c64020a4",
+      "sha256": "25a0d8b06dd0388bb3b933be95261e8e5fb14acf717070c0e37979b7c64020a4",
+      "size": 869,
+      "transformation": "local_path_tokens"
+    },
+    {
+      "path": "historical/smoke/source_fragments/smoke-japan-50556.json",
+      "original_sha256": "aec53aabd6ec474d3f72842dc8c91979163ec855037632f777701f44f9740312",
+      "sha256": "a0ba56111afcb764da0b534bc9612965207d48518a2ee181207018e08ea54eb3",
+      "size": 1611,
+      "transformation": "local_path_tokens"
+    },
+    {
+      "path": "historical/smoke/run/smoke-japan-50556/source-cache/source_cache_manifest.json",
+      "original_sha256": "a8054da6cd112fe9c52dbddaed1c80590ab328b955c4cbf1316aa5182d41294e",
+      "sha256": "49914b1f7cd9afaf8371feff59c0b7c99c81aceabcfca74f2d94cc7e350c9517",
+      "size": 643,
+      "transformation": "local_path_tokens"
+    },
+    {
+      "path": "historical/smoke/run/smoke-japan-50556/source-cache/ad7ba45bc97fd0070b65d40f624b6ec1faf950701bec20c5914e4b9486020e74.html",
+      "original_sha256": "2dbe222766b6ed2e9a5c3c60c348ec98896e55acbbefbfdb8d5b3c0e2177bf4a",
+      "sha256": "2dbe222766b6ed2e9a5c3c60c348ec98896e55acbbefbfdb8d5b3c0e2177bf4a",
+      "size": 79845,
+      "transformation": "none",
+      "source_url": "https://www.jra.go.jp/datafile/seiseki/replay/2005/99.html",
+      "cached_at": "2026-07-15T16:52:55.695815+00:00"
+    },
+    {
+      "path": "historical/smoke/descriptors/smoke-united_kingdom-56980.json",
+      "original_sha256": "20e2b18914f3ebf3c81274b12ad229084a7ad3621bff30bf1d925610d47a33c7",
+      "sha256": "bb48df3445b0821a1660eb6ab199d7b97da44fd00c25c6f911177c5e546995d3",
+      "size": 4031,
+      "transformation": "local_path_tokens"
+    },
+    {
+      "path": "historical/smoke/events/smoke-united_kingdom-56980.csv",
+      "original_sha256": "45a63470bd48662673ea454c2f74e7954e3c7463d57eb43391d3dd9c361d19aa",
+      "sha256": "45a63470bd48662673ea454c2f74e7954e3c7463d57eb43391d3dd9c361d19aa",
+      "size": 763,
+      "transformation": "local_path_tokens"
+    },
+    {
+      "path": "historical/smoke/source_fragments/smoke-united_kingdom-56980.json",
+      "original_sha256": "2cb17456814bc4f4541328a7b829903f8d4a72bdaff12dd12a56976e9ab47fbf",
+      "sha256": "3315210c97c25895ac895800588918b36fd509488dbde2ea8fba694dea419163",
+      "size": 2708,
+      "transformation": "local_path_tokens"
+    },
+    {
+      "path": "historical/smoke/run/smoke-united_kingdom-56980/source-cache/source_cache_manifest.json",
+      "original_sha256": "9e763bc82b5b6adfda47965483666b9952c999e36f0f904bc78a8db9153ed411",
+      "sha256": "53c6f4768168ee06b7a2ae661e08a4fa1aca8a474314d5970f259efc1c4c9eec",
+      "size": 705,
+      "transformation": "local_path_tokens"
+    },
+    {
+      "path": "historical/smoke/run/smoke-united_kingdom-56980/source-cache/a1fedb79cba27440012e10a08a766fc82435abaf34ae54b369de9f4ed3bd48d8.html",
+      "original_sha256": "20004c114cf3e0a750300568a560958df76a73a185cc1f2b1eb5ae425279ed17",
+      "sha256": "20004c114cf3e0a750300568a560958df76a73a185cc1f2b1eb5ae425279ed17",
+      "size": 297391,
+      "transformation": "none",
+      "source_url": "https://www.sportinglife.com/racing/results/2013-06-20/ascot/118984/gold-cup-british-champions-series-group-1",
+      "cached_at": "2026-07-15T16:52:56.178396+00:00"
+    },
+    {
+      "path": "historical/smoke/descriptors/smoke-united_states-70844.json",
+      "original_sha256": "900639973614ef78d1473bd76057c588a1b148c6e070c1035e3da50c2bbed5b6",
+      "sha256": "ea3219bf82ab72a1e7a690b242babfe158f2925bf5f72770bdaf66f9dcff5d51",
+      "size": 4325,
+      "transformation": "local_path_tokens"
+    },
+    {
+      "path": "historical/smoke/events/smoke-united_states-70844.csv",
+      "original_sha256": "f57b275d874fab5c6994ebd2fc56c30adecf0aa560fad384e0dbdbb77165704e",
+      "sha256": "f57b275d874fab5c6994ebd2fc56c30adecf0aa560fad384e0dbdbb77165704e",
+      "size": 988,
+      "transformation": "local_path_tokens"
+    },
+    {
+      "path": "historical/smoke/source_fragments/smoke-united_states-70844.json",
+      "original_sha256": "c70146d192a5495565054ecf7c389c61bb48c5c70af4af2fdd7d564b669abae6",
+      "sha256": "cdaada2bd577f3ae9aab2429423b823238a77d9abbaeba0dea8fc3ff081ad27d",
+      "size": 1780,
+      "transformation": "local_path_tokens"
+    },
+    {
+      "path": "historical/smoke/run/smoke-united_states-70844/source-cache/source_cache_manifest.json",
+      "original_sha256": "fd70e207f85b286159151e58587ecb991d50908a77dc1145328f6d9bef7531f6",
+      "sha256": "4550b83e71cd1f66ad533e276d220de1c3fe6327ad326be0808c1494ae448cb9",
+      "size": 674,
+      "transformation": "local_path_tokens"
+    },
+    {
+      "path": "historical/smoke/run/smoke-united_states-70844/source-cache/7a0d5ab380f77dd8c9420aa85e4be398b6d4a72cbcef7d99fab2a0b2c8643db2.cfm",
+      "original_sha256": "52f7e3de1570f9b5d28376f07c054e639a4778998684871b5fdfa939d80ada8c",
+      "sha256": "52f7e3de1570f9b5d28376f07c054e639a4778998684871b5fdfa939d80ada8c",
+      "size": 117375,
+      "transformation": "none",
+      "source_url": "https://www.equibase.com/yearbook/Result.cfm?cy=USA&de=D&rd=2018-09-29&rn=8&tk=CD",
+      "cached_at": "2026-07-15T16:52:56.625562+00:00"
+    },
+    {
+      "path": "historical/smoke/descriptors/smoke-hong_kong-49451.json",
+      "original_sha256": "e1f6862b24769c35702df4588526db86bfcd9fd26d4a9c92cc0e3030bfc1e01a",
+      "sha256": "f7453c8a93b6dd091370b4ac83345d0809f5ae0ab081ad19654337ad9f458833",
+      "size": 4112,
+      "transformation": "local_path_tokens"
+    },
+    {
+      "path": "historical/smoke/events/smoke-hong_kong-49451.csv",
+      "original_sha256": "3e5ca56e5fe3c62a3d7f47640ce892982000fb28ee0d4166381dd4f234ee6bbd",
+      "sha256": "3e5ca56e5fe3c62a3d7f47640ce892982000fb28ee0d4166381dd4f234ee6bbd",
+      "size": 838,
+      "transformation": "local_path_tokens"
+    },
+    {
+      "path": "historical/smoke/source_fragments/smoke-hong_kong-49451.json",
+      "original_sha256": "8e649f8aede5f8972ec117be3e987975660fb7d9e6b04c8d749cde1621d9dc76",
+      "sha256": "73984b6d9ea9bb5d1dc72069dd582d780484df37108ba825c3fb80b473ca0fa7",
+      "size": 2123,
+      "transformation": "local_path_tokens"
+    },
+    {
+      "path": "historical/smoke/run/smoke-hong_kong-49451/source-cache/source_cache_manifest.json",
+      "original_sha256": "05e88a1bd213d6df9cda91a5e8d832d87068347a1ceb7a9d0715f0fb91034647",
+      "sha256": "c098c6b194f56e39b6a4fc8018cc23dc2e4fc3534de0b031421a9d7fb5a12ca0",
+      "size": 698,
+      "transformation": "local_path_tokens"
+    },
+    {
+      "path": "historical/smoke/run/smoke-hong_kong-49451/source-cache/c973922de919d472df520deb93e5743945a8c1dd357fecf731f23ac91f72db85.html",
+      "original_sha256": "1c56bbfe3393204f2d0d06f8bab4a4555c1fee6a6ef7899233eddd4c7d643cb7",
+      "sha256": "1c56bbfe3393204f2d0d06f8bab4a4555c1fee6a6ef7899233eddd4c7d643cb7",
+      "size": 211229,
+      "transformation": "none",
+      "source_url": "https://racing.hkjc.com/zh-hk/local/information/localresults?Racecourse=ST&racedate=2026%2F01%2F04&RaceNo=8",
+      "cached_at": "2026-07-15T16:52:55.239019+00:00"
+    },
+    {
+      "path": "historical/smoke/run/smoke-hong_kong-49451/validated-candidates.jsonl",
+      "original_sha256": "c154dc9d60a5a4e94063db1316b585321e3cfd683bee976dd29e013f4e7fd230",
+      "sha256": "c154dc9d60a5a4e94063db1316b585321e3cfd683bee976dd29e013f4e7fd230",
+      "size": 31404,
+      "transformation": "local_path_tokens"
+    },
+    {
+      "path": "historical/plan_identity.json",
+      "original_sha256": "44923d7762da9c4d989ba385e91a8e38ff65c60b5cfd6305f9c9ab6a42306322",
+      "sha256": "62f83e47c580c8d5c6aa830fe2090c75037e00827e47a2dbec7706df2a3f4411",
+      "size": 897,
+      "transformation": "local_path_tokens"
+    },
+    {
+      "path": "sporting-life/united_kingdom-2018-sporting-life-irishracing-01/source-cache/ea466a540417e785e831ecbac9a01781d3964b86af732dd1523d73da27a6401b.html",
+      "original_sha256": "f0c05c607b26527747f4ee0bc507c575a5e7b887f92ce532998c6ef3b40ebb4c",
+      "sha256": "f0c05c607b26527747f4ee0bc507c575a5e7b887f92ce532998c6ef3b40ebb4c",
+      "size": 360262,
+      "transformation": "none",
+      "source_url": "https://www.sportinglife.com/racing/results/2018-03-13/cheltenham/460687/unibet-champion-hurdle-challenge-trophy-grade-1",
+      "cached_at": "2026-07-16T07:40:07.654629+00:00"
+    },
+    {
+      "path": "sporting-life/united_kingdom-2018-sporting-life-irishracing-01/source-cache/source_cache_manifest.json",
+      "original_sha256": "a42e814bd5ab8b7f1b9b2e945b314046849d6f009c77806ec1a8a5f6eb64c2b3",
+      "sha256": "1c1d1864d48e8a4cec76363dc67c4379a22183fb4d0e96542b1d291641dbdb3b",
+      "size": 679,
+      "transformation": "one_selected_source_and_local_path_token"
+    },
+    {
+      "path": "sporting-life/united_kingdom-2020-sporting-life-irishracing-02/source-cache/c41ae87f71d8042b9cd02e3cd34d9e6fa0497e155b6366f746479b7e268771a9.html",
+      "original_sha256": "12b583d052bcf3c0da572d98c41c072f46657ab973b2f222de99603b3b605cdc",
+      "sha256": "12b583d052bcf3c0da572d98c41c072f46657ab973b2f222de99603b3b605cdc",
+      "size": 378716,
+      "transformation": "none",
+      "source_url": "https://www.sportinglife.com/racing/results/2020-03-13/cheltenham/559948/jcb-triumph-hurdle-grade-1",
+      "cached_at": "2026-07-16T07:40:11.631874+00:00"
+    },
+    {
+      "path": "sporting-life/united_kingdom-2020-sporting-life-irishracing-02/source-cache/source_cache_manifest.json",
+      "original_sha256": "8e79d67198c420525542dfca5af7e2ff41e3e0a5ad402b131b180bb6a8dbcb5f",
+      "sha256": "c2071f03d66f56ea9b192c0bd06b1ae50b9359a1a9e52fdcdd3693ddb6bb889a",
+      "size": 658,
+      "transformation": "one_selected_source_and_local_path_token"
+    },
+    {
+      "path": "sporting-life/united_kingdom-2022-sporting-life-irishracing-01/source-cache/bd3b263718aae7cd25155f4038ec493e40b1fb22ca0d754d6f441a7d3b50d69e.html",
+      "original_sha256": "98fd4c13d20c7b6da6849c7f24f8dcdca93512f515877bb0b971657c658f73b8",
+      "sha256": "98fd4c13d20c7b6da6849c7f24f8dcdca93512f515877bb0b971657c658f73b8",
+      "size": 360772,
+      "transformation": "none",
+      "source_url": "https://www.sportinglife.com/racing/results/2022-12-26/kempton/715575/ladbrokes-christmas-hurdle-grade-1-gbb-race",
+      "cached_at": "2026-07-16T07:40:12.392838+00:00"
+    },
+    {
+      "path": "sporting-life/united_kingdom-2022-sporting-life-irishracing-01/source-cache/source_cache_manifest.json",
+      "original_sha256": "c96593a2e7e4636861824ed88d03e368bde2c3e6f86fcfbcc5ed60fa34ce97b2",
+      "sha256": "32de12197d85d963fd777981efe8f4c3f7557d3743e32762ab657e4e59c236d1",
+      "size": 672,
+      "transformation": "one_selected_source_and_local_path_token"
+    }
+  ]
+}

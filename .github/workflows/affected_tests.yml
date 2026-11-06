@@ -94,6 +94,11 @@ jobs:
           SCOPE: ${{ github.event_name == 'pull_request' && 'affected' || inputs.scope }}
           REASON: ${{ inputs.reason }}
         run: python scripts/impact_ci.py --base "$BASE_SHA" --head "$HEAD_SHA" --test "$TEST_SHA" --scope "$SCOPE" --reason "$REASON" --output evidence/plan.json
+      - name: 拒绝PR自动启动全量测试
+        if: github.event_name == 'pull_request' && steps.plan.outputs.mode == 'full'
+        run: |
+          echo '::error::选测结果需要全量测试；PR事件不自动执行。进入完整上线阶段后，使用显式全量工作流绑定候选SHA运行。当前未执行全量测试，也不构成测试通过。'
+          exit 1
       - name: execute-isolated-plan
         id: execute
         if: github.event_name != 'pull_request' || vars.IMPACT_TEST_POLICY == 'active' || steps.plan.outputs.mode == 'docs-only'
