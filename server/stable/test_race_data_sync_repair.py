@@ -250,6 +250,41 @@ class StalledEventRepairTests(TestCase):
         self.event.refresh_from_db()
         self.assertEqual(self.event.status, models.RaceEventStatus.RUNNING)
 
+    def test_historical_response_projects_with_real_admission_and_public_reader(self):
+        from unittest.mock import patch
+        from stable.services.race_data_historical_request import read_live_entry, apply_response
+        from stable.test_race_data_historical_request import manifest, encode, CODE
+        self.event.local_date = (NOW - timedelta(days=20)).date()
+        self.event.race_datetime = NOW - timedelta(days=20)
+        self.event.save(update_fields=("local_date", "race_datetime"))
+        self.lifecycle.mode = models.RaceEventLifecycleMode.ENFORCE
+        self.lifecycle.manifest_data = {"race_data_sync": {
+            "standing_policy_digest": self.enrollment.standing_policy_digest,
+            "manifest_sha256": self.enrollment.manifest_sha256,
+            "entry_sha256": self.enrollment.entry_sha256,
+            "owner_generation": self.control.owner_generation,
+        }}
+        self.lifecycle.save(update_fields=("mode", "manifest_data"))
+        current, _ = read_live_entry(event_id=self.event.pk, now=NOW)
+        with TemporaryDirectory() as root, patch("django.utils.timezone.now", return_value=NOW):
+            value = manifest(Path(root))
+            value.update(issued_at=(NOW-timedelta(minutes=1)).isoformat(),
+                         expires_at=(NOW+timedelta(minutes=20)).isoformat(), entries=[current["entry"]])
+            raw, sha = encode(value)
+            response = {"race_id": self.source.external_race_id, "race_status": "official",
+                "off_dt": self.event.race_datetime.isoformat(), "region": "jpn", "course": "Tokyo",
+                "race_name": self.event.original_name,
+                "runners": [{"horse_id": "horse-1", "horse": "Alpha", "number": "1", "position": "1"},
+                            {"horse_id": "horse-2", "horse": "Beta", "number": "2", "position": "2"}]}
+            result = apply_response(raw=raw, expected_sha256=sha, expected_code_sha=CODE,
+                receipt_directory=Path(root), event_id=self.event.pk, now=NOW,
+                response=response, raw_sha256="b"*64, result_url=self.source.evidence_url)
+            self.assertEqual(result, "projected")
+            self.event.refresh_from_db()
+            self.assertIsNotNone(self.event.result_confirmed_at)
+            self.assertEqual(self.event.results.count(), 2)
+            self.assertTrue(race_events.resolve_race_live_public_read(event_id=self.event.pk, now=NOW).visible)
+
     def _dry_run(self):
         output = StringIO()
         call_command(

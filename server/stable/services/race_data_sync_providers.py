@@ -1918,6 +1918,126 @@ def _result_payload(
     }
 
 
+def _fetch_the_racing_api_result_by_id(
+    *, registry, source, provider_region, transport, username, password, now, clock, sleeper
+):
+    """复用既有单场结果传输；调用方负责日期范围及独立授权准入。"""
+    capacity = reserve_race_data_transport_capacity(
+        provider=source.source_key,
+        region_code=source.region_code,
+        now=now,
+        proposed_requests=1,
+        max_response_bytes_per_request=_MAX_RESPONSE_BYTES,
+    )
+    if not capacity.allowed:
+        raise _ProviderSyncError(capacity.reason_code)
+    result_url = build_the_racing_api_route_url(
+        registry=registry,
+        route_name="result_by_id",
+        region=provider_region,
+        race_id=source.external_race_id,
+        limit=0,
+        skip=0,
+    )
+    exact_result, raw_sha256 = _fetch_json(
+        transport=transport,
+        endpoint_name="result_by_id",
+        url=result_url,
+        username=username,
+        password=password,
+        now=now,
+        clock=clock,
+        sleeper=sleeper,
+        allow_not_found=True,
+    )
+    return result_url, exact_result, raw_sha256
+
+
+def _record_and_apply_the_racing_api_result(
+    *, normalized_race, normalized_status, event, source, route, raw_sha256,
+    result_url, detail_reason, flags, now, claim_guard=None,
+):
+    """共享TRA归一化观测与标准writer；调用方负责请求及写入时权限。"""
+    correction_marked = (
+        normalized_status in _TRA_CORRECTION_MARKERS
+    )
+    phase = (
+        models.RaceResultPhase.CORRECTED
+        if correction_marked
+        else models.RaceResultPhase.OFFICIAL
+        if normalized_status in route.entry.terminal_markers
+        else models.RaceResultPhase.PROVISIONAL
+    )
+    payload = _result_payload(
+        normalized_race=normalized_race,
+        region=source.region_code,
+        event=event,
+        source_key=source.source_key,
+    )
+    normalized_sha256 = hashlib.sha256(
+        json.dumps(
+            payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    ).hexdigest()
+    observation_decision = record_race_result_observation(
+        source_identity_id=source.pk,
+        observed_at=now,
+        source_updated_at=None,
+        parser_version="the-racing-api-v1",
+        raw_sha256=raw_sha256,
+        result_phase=phase,
+        normalized_payload=payload,
+        field_provenance={
+            "provider": source.source_key,
+            "region": source.region_code,
+            "source_class": route.entry.source_class,
+            "source_url": result_url,
+            "registry_digest": route.registry_digest,
+            "contract_version": route.entry.contract_version,
+            "contract_digest": route.entry.contract_digest,
+            "automation_allowed": True,
+            "normalized_sha256": normalized_sha256,
+            "correction_marker": correction_marked,
+            "confirmation_lookup_reason": detail_reason,
+            "correction_marker_value": (
+                normalized_status if correction_marked else ""
+            ),
+        },
+        parse_warnings=[],
+        permission_classification="licensed_api_automation",
+    )
+    if (
+        not observation_decision.recorded
+        or observation_decision.observation is None
+    ):
+        raise _ProviderSyncError(
+            f"observation_{observation_decision.reason}"
+        )
+    apply_result = apply_data_sync_result_observation(
+        observation_id=observation_decision.observation.pk,
+        expected_event_id=event.pk,
+        now=now,
+        project_current=bool(
+            flags.result_apply_enabled
+            and flags.result_public_enabled
+        ),
+        correction_apply_enabled=flags.correction_apply_enabled,
+        claim_guard=claim_guard,
+    )
+    if apply_result.action not in {
+        "applied",
+        "recorded",
+        "replayed",
+    }:
+        raise _ProviderSyncError(
+            f"result_{apply_result.reason_code}"
+        )
+    return apply_result
+
+
 def run_the_racing_api_data_sync(
     *,
     event_id: int,
@@ -2256,33 +2376,10 @@ def run_the_racing_api_data_sync(
                     fetcher=fetch_result_snapshot,
                 )
             elif day_offset is not None and -7 <= day_offset < 0:
-                capacity = reserve_race_data_transport_capacity(
-                    provider=source.source_key,
-                    region_code=source.region_code,
-                    now=now,
-                    proposed_requests=1,
-                    max_response_bytes_per_request=_MAX_RESPONSE_BYTES,
-                )
-                if not capacity.allowed:
-                    raise _ProviderSyncError(capacity.reason_code)
-                result_url = build_the_racing_api_route_url(
-                    registry=registry,
-                    route_name="result_by_id",
-                    region=provider_region,
-                    race_id=source.external_race_id,
-                    limit=0,
-                    skip=0,
-                )
-                exact_result, raw_sha256 = _fetch_json(
-                    transport=transport,
-                    endpoint_name="result_by_id",
-                    url=result_url,
-                    username=username,
-                    password=password,
-                    now=now,
-                    clock=clock,
-                    sleeper=sleeper,
-                    allow_not_found=True,
+                result_url, exact_result, raw_sha256 = _fetch_the_racing_api_result_by_id(
+                    registry=registry, source=source, provider_region=provider_region,
+                    transport=transport, username=username, password=password,
+                    now=now, clock=clock, sleeper=sleeper,
                 )
                 if exact_result.get("_not_found") is not True:
                     response_payload = {
@@ -2356,83 +2453,12 @@ def run_the_racing_api_data_sync(
                                 detail_reason = getattr(exc, "reason_code", "detail_response_invalid")
                         else:
                             detail_reason = "provider_request_budget_exhausted"
-                    correction_marked = (
-                        normalized_status in _TRA_CORRECTION_MARKERS
+                    _record_and_apply_the_racing_api_result(
+                        normalized_race=normalized_race, normalized_status=normalized_status,
+                        event=event, source=source, route=route, raw_sha256=raw_sha256,
+                        result_url=result_url, detail_reason=detail_reason, flags=flags,
+                        now=now, claim_guard=claim_guard,
                     )
-                    phase = (
-                        models.RaceResultPhase.CORRECTED
-                        if correction_marked
-                        else models.RaceResultPhase.OFFICIAL
-                        if normalized_status in route.entry.terminal_markers
-                        else models.RaceResultPhase.PROVISIONAL
-                    )
-                    payload = _result_payload(
-                        normalized_race=normalized_race,
-                        region=source.region_code,
-                        event=event,
-                        source_key=source.source_key,
-                    )
-                    normalized_sha256 = hashlib.sha256(
-                        json.dumps(
-                            payload,
-                            ensure_ascii=False,
-                            sort_keys=True,
-                            separators=(",", ":"),
-                        ).encode()
-                    ).hexdigest()
-                    observation_decision = record_race_result_observation(
-                        source_identity_id=source.pk,
-                        observed_at=now,
-                        source_updated_at=None,
-                        parser_version="the-racing-api-v1",
-                        raw_sha256=raw_sha256,
-                        result_phase=phase,
-                        normalized_payload=payload,
-                        field_provenance={
-                            "provider": source.source_key,
-                            "region": source.region_code,
-                            "source_class": route.entry.source_class,
-                            "source_url": result_url,
-                            "registry_digest": route.registry_digest,
-                            "contract_version": route.entry.contract_version,
-                            "contract_digest": route.entry.contract_digest,
-                            "automation_allowed": True,
-                            "normalized_sha256": normalized_sha256,
-                            "correction_marker": correction_marked,
-                            "confirmation_lookup_reason": detail_reason,
-                            "correction_marker_value": (
-                                normalized_status if correction_marked else ""
-                            ),
-                        },
-                        parse_warnings=[],
-                        permission_classification="licensed_api_automation",
-                    )
-                    if (
-                        not observation_decision.recorded
-                        or observation_decision.observation is None
-                    ):
-                        raise _ProviderSyncError(
-                            f"observation_{observation_decision.reason}"
-                        )
-                    apply_result = apply_data_sync_result_observation(
-                        observation_id=observation_decision.observation.pk,
-                        expected_event_id=event.pk,
-                        now=now,
-                        project_current=bool(
-                            flags.result_apply_enabled
-                            and flags.result_public_enabled
-                        ),
-                        correction_apply_enabled=flags.correction_apply_enabled,
-                        claim_guard=claim_guard,
-                    )
-                    if apply_result.action not in {
-                        "applied",
-                        "recorded",
-                        "replayed",
-                    }:
-                        raise _ProviderSyncError(
-                            f"result_{apply_result.reason_code}"
-                        )
                     applied.append(models.RaceDataSyncDataKind.RESULT)
     except _ProviderSyncError as exc:
         return ProviderSyncOutcome(
