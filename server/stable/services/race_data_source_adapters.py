@@ -1748,6 +1748,50 @@ def sporting_card_needs_rollover(url, *, event, route, now):
                 and urlsplit(url).path.startswith('/racing/racecards/'))
 
 
+def discover_hkjc_meeting(*, event, route, now, url, page, fetcher, names):
+    """HK图片导航只读取同日同场实际链接，至多11场；复用完整页面身份解析。"""
+    from urllib.parse import parse_qs, urljoin
+    from bs4 import BeautifulSoup
+    from stable.services.race_source_identity import normalize_name
+
+    def meeting_key(candidate):
+        if not route.permits_url(candidate):
+            return None
+        parsed = urlsplit(candidate)
+        if parsed.path != urlsplit(url).path:
+            return None
+        q = {k.lower(): v for k, v in parse_qs(parsed.query).items()}
+        if set(q) != {'racedate', 'racecourse', 'raceno'} or any(len(v) != 1 for v in q.values()):
+            return None
+        if q['racedate'] != [event.local_date.strftime('%Y/%m/%d')]:
+            return None
+        code = q['racecourse'][0]
+        aliases = route.venue_aliases.get('hkjc:' + code, [])
+        if normalize_name(event.racecourse) not in {normalize_name(a) for a in aliases}:
+            return None
+        number = q['raceno'][0]
+        return (code, int(number)) if number.isdigit() and int(number) > 0 else None
+
+    key = meeting_key(url)
+    if key is None:
+        raise ValueError('hkjc_discovery_meeting_mismatch')
+    pages = {key[1]: url}
+    for a in BeautifulSoup(str(page), 'html.parser').select('a[href]'):
+        target = urljoin(url, a['href'])
+        target_key = meeting_key(target)
+        if target_key and target_key[0] == key[0]:
+            pages.setdefault(target_key[1], target)
+    if len(pages) > 11 or any(n > 11 for n in pages):
+        raise ValueError('hkjc_discovery_page_limit')
+    matches = set()
+    for target in pages.values():
+        raw = page if target == url else fetcher(target, route=route, now=now)
+        value = parse_hkjc_observation(raw, url=target, route=route, now=now)
+        if names & {normalize_name(n) for n in value['raw_names']}:
+            matches.add(target)
+    return matches
+
+
 def discover_source_url(*, event, route, now, fetcher):
     """独立来源发现：旧 URL 仅作取数提示，不能据此自动授予赛事身份。
 
@@ -1807,6 +1851,14 @@ def discover_source_url(*, event, route, now, fetcher):
         if not indexes:
             raise ValueError('source_identity_missing')
         indexes = [indexes[event.local_date.toordinal() % len(indexes)]]
+    # HK 仅从同参数的两个已声明入口中选择；单入口策略保持原范围。
+    if route.provider == 'hkjc' and dated is not None and len(indexes) == 2:
+        cards = [u for u in indexes if urlsplit(u).path == '/en-us/local/information/racecard']
+        if len(cards) == 1:
+            result_index = cards[0].replace('/information/racecard?', '/information/localresults?')
+            if result_index != cards[0] and result_index in indexes:
+                today = aware(now).astimezone(ZoneInfo(route.timezone)).date()
+                indexes = [result_index if event.local_date < today else cards[0]]
     selected_index = sporting_discovery_index(event=event, route=route, now=now)
     if selected_index:
         indexes = [selected_index]
@@ -1814,6 +1866,10 @@ def discover_source_url(*, event, route, now, fetcher):
     candidates = set()
     for url in dict.fromkeys(indexes):
         page = fetcher(url, route=route, now=now)
+        if route.provider == 'hkjc':
+            candidates.update(discover_hkjc_meeting(event=event, route=route, now=now,
+                url=url, page=page, fetcher=fetcher, names=names))
+            continue
         soup = BeautifulSoup(str(page), 'html.parser')
         # 历史结果页的链接文字可能仅含时刻；用已有 NEXT_DATA 结构精确选名，
         # 再以 race id 对上页面实际链接，不构造/猜测详情 URL。

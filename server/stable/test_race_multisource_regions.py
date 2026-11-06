@@ -260,6 +260,62 @@ class RegionAdapterTests(TestCase):
                     discover_source_url(event=event,route=route,now=NOW,fetcher=lambda *a,**k:page)
         self.assertFalse(models.RaceResultSourceIdentity.objects.exists())
 
+    def test_hkjc_declared_pair_switches_at_hong_kong_midnight(self):
+        from datetime import datetime, timezone
+        card = 'https://racing.hkjc.com/en-us/local/information/racecard?racedate=2026/10/28&Racecourse=ST&RaceNo=1'
+        result = card.replace('/racecard?', '/localresults?')
+        route = route_for('hkjc','hong_kong','hong_kong','Asia/Hong_Kong',
+                          'hkjc:ST',['Sha Tin'],'racing.hkjc.com','/en-us/local/information/')
+        route.payload['discovery_urls_by_date'] = {'2026-10-28':[card,result]}
+        event = SimpleNamespace(original_name='Target', chinese_name='', source_refs={},
+                                local_date=date(2026,10,28), racecourse='Sha Tin')
+        for hour, expected in [(15,card),(16,result)]:
+            calls = []
+            with patch('stable.services.race_data_source_adapters.discover_hkjc_meeting',
+                       return_value={expected}):
+                discover_source_url(event=event,route=route,
+                    now=datetime(2026,10,28,hour,tzinfo=timezone.utc),
+                    fetcher=lambda url,**kw: calls.append(url) or '')
+            self.assertEqual(calls,[expected])
+        route.payload['discovery_urls_by_date'] = {'2026-10-28':[card]}
+        calls.clear()
+        with patch('stable.services.race_data_source_adapters.discover_hkjc_meeting',return_value={card}):
+            discover_source_url(event=event,route=route,
+                now=datetime(2026,10,29,tzinfo=timezone.utc),
+                fetcher=lambda url,**kw: calls.append(url) or '')
+        self.assertEqual(calls,[card])
+
+    def test_hkjc_image_navigation_uses_same_meeting_pages_with_bounded_requests(self):
+        from datetime import datetime, timezone
+        base = 'https://racing.hkjc.com/en-us/local/information/racecard'
+        index = base+'?racedate=2026/10/28&Racecourse=ST&RaceNo=1'
+        detail = base+'?racedate=2026/10/28&Racecourse=ST&RaceNo=2'
+        route = route_for('hkjc','hong_kong','hong_kong','Asia/Hong_Kong',
+                          'hkjc:ST',['Sha Tin'],'racing.hkjc.com','/en-us/local/information/')
+        route.payload['valid_until'] = '2026-11-30T00:00:00+00:00'
+        route.payload['discovery_urls_by_date'] = {'2026-10-28':[index]}
+        event = SimpleNamespace(original_name='Target Race', chinese_name='', source_refs={},
+            local_date=date(2026,10,28), racecourse='Sha Tin')
+        page = (ROOT/'tests/fixtures/regional_lifecycle/hk-card.html').read_text()
+        target = page.replace('Race 1 - WA MEI SHAN HANDICAP','Race 2 - Target Race')
+        links = '<a href="'+detail+'"><img src="race2.gif"></a>'
+        for rejected in [detail.replace('ST','HV'),detail.replace('10/28','10/29'),
+                         detail.replace('racing.hkjc.com','unapproved.test')]:
+            links += '<a href="'+rejected+'"><img></a>'
+        calls = []
+        def fetch(url, **kwargs):
+            calls.append(url)
+            return page+links if url == index else target
+        now = datetime(2026,10,28,tzinfo=timezone.utc)
+        self.assertEqual(discover_source_url(event=event,route=route,now=now,fetcher=fetch), detail)
+        self.assertEqual(calls,[index,detail])
+        excessive = ''.join('<a href="'+base+'?racedate=2026/10/28&Racecourse=ST&RaceNo='+str(n)+'"><img></a>' for n in range(2,13))
+        calls.clear()
+        with self.assertRaisesRegex(ValueError,'hkjc_discovery_page_limit'):
+            discover_source_url(event=event,route=route,now=now,
+                fetcher=lambda url,**kw: calls.append(url) or page+excessive)
+        self.assertEqual(calls,[index])
+
     def test_sporting_discovery_rolls_declared_pair_by_route_local_date(self):
         from datetime import datetime, timezone
         card_index = 'https://www.sportinglife.com/racing/racecards'
