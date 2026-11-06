@@ -1898,6 +1898,16 @@ def discover_source_url(*, event, route, now, fetcher):
             if result_index != cards[0] and result_index in indexes:
                 today = aware(now).astimezone(ZoneInfo(route.timezone)).date()
                 indexes = [result_index if event.local_date < today else cards[0]]
+    # ZEturf赛前导航覆盖近期待赛，历史归档按日期定位；只选已声明的配对入口。
+    if route.provider == 'zeturf' and dated is not None and len(indexes) == 2:
+        programmes = [u for u in indexes if urlsplit(u).path == '/fr/programmes-et-pronostics-du-jour'
+                      and not urlsplit(u).query]
+        archives = [u for u in indexes if urlsplit(u).path ==
+                    '/fr/resultats-et-rapports-du-jour/' + event.local_date.isoformat()
+                    and not urlsplit(u).query]
+        if len(programmes) == len(archives) == 1:
+            today = aware(now).astimezone(ZoneInfo(route.timezone)).date()
+            indexes = [archives[0] if event.local_date < today else programmes[0]]
     selected_index = sporting_discovery_index(event=event, route=route, now=now)
     if selected_index:
         indexes = [selected_index]
@@ -1905,7 +1915,8 @@ def discover_source_url(*, event, route, now, fetcher):
     candidates = set()
     for url in dict.fromkeys(indexes):
         page = fetcher(url, route=route, now=now)
-        if route.provider == 'zeturf' and urlsplit(url).path.startswith('/fr/resultats-et-rapports-du-jour'):
+        if route.provider == 'zeturf' and (urlsplit(url).path.startswith('/fr/resultats-et-rapports-du-jour')
+                                          or urlsplit(url).path == '/fr/programmes-et-pronostics-du-jour'):
             candidates.update(discover_zeturf_meeting(event=event, route=route, now=now,
                 url=url, page=page, fetcher=fetcher, names=names))
             continue

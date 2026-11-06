@@ -1,6 +1,6 @@
 """多地区离线合同；标注为 synthetic 的变体不作为生产抓取/条款 proof。"""
 
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -69,6 +69,23 @@ class RegionAdapterTests(TestCase):
         self.assertEqual(discover_source_url(event=event, route=route, now=NOW, fetcher=fetch), detail)
         self.assertEqual(calls, [index, meeting])
         self.assertFalse(models.RaceResultSourceIdentity.objects.exists())
+
+    def test_zeturf_programme_and_result_switch_at_local_midnight(self):
+        route, event, historical, meeting, detail = self.zeturf_directory_case()
+        programme = 'https://www.zeturf.fr/fr/programmes-et-pronostics-du-jour'
+        route.payload['discovery_urls_by_date'] = {'2026-09-20': [historical, programme]}
+        for now, selected in ((datetime(2026,9,19,20,tzinfo=timezone.utc), programme),
+                              (datetime(2026,9,20,20,tzinfo=timezone.utc), programme),
+                              (datetime(2026,9,20,22,tzinfo=timezone.utc), historical)):
+            with self.subTest(now=now):
+                calls = []
+                pages = {selected: f'<a href="{meeting}">Meeting</a>',
+                         meeting: f'<a href="{detail}">Exact Race</a>'}
+                def fetch(url, **kwargs):
+                    calls.append(url)
+                    return pages[url]
+                self.assertEqual(discover_source_url(event=event, route=route, now=now, fetcher=fetch), detail)
+                self.assertEqual(calls, [selected, meeting])
 
     def test_zeturf_directory_rejects_unmatched_or_ambiguous_meetings_before_fetch(self):
         route, event, index, meeting, detail = self.zeturf_directory_case()
