@@ -4,7 +4,7 @@
 """
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 import hashlib
 import json
 import re
@@ -165,7 +165,7 @@ def parse_multisource_policy(value, *, now):
         if (
             not isinstance(raw, dict)
             or not required <= set(raw)
-            or set(raw) - required - {"discovery_urls"}
+            or set(raw) - required - {"discovery_urls", "discovery_urls_by_date"}
         ):
             raise ValueError("multisource_route_schema")
         row = json.loads(json.dumps(raw))
@@ -235,6 +235,18 @@ def parse_multisource_policy(value, *, now):
             or any(not route.permits_url(u) for u in urls)
         ):
             raise ValueError("multisource_discovery_urls")
+        if 'discovery_urls_by_date' in row:
+            dates = row['discovery_urls_by_date']
+            if not isinstance(dates, dict) or not 1 <= len(dates) <= 366:
+                raise ValueError('multisource_discovery_dates')
+            for day, day_urls in dates.items():
+                try:
+                    valid_day = isinstance(day, str) and date.fromisoformat(day).isoformat() == day
+                except ValueError:
+                    valid_day = False
+                if (not valid_day or not isinstance(day_urls, list) or not 1 <= len(day_urls) <= 4
+                        or any(not route.permits_url(u) for u in day_urls)):
+                    raise ValueError('multisource_discovery_dates')
         routes.append(route)
     return MultisourcePolicy(
         json.loads(json.dumps(value)), canonical_sha(value), tuple(routes)
@@ -1732,21 +1744,25 @@ def discover_source_url(*, event, route, now, fetcher):
     if len(set(urls)) == 1:
         return urls[0]
     names = {normalize_name(n) for n in (event.original_name, event.chinese_name) if n}
-    indexes = route.payload.get("discovery_urls", [])
-    if not indexes:
-        raise ValueError("source_identity_missing")
-    # Rotate a fixed bounded list with local date; no constructed source endpoints.
-    url = indexes[event.local_date.toordinal() % len(indexes)]
-    page = fetcher(url, route=route, now=now)
+    dated = route.payload.get('discovery_urls_by_date')
+    if dated is not None:
+        indexes = dated.get(event.local_date.isoformat(), []) if event.local_date else []
+        if not indexes:
+            raise ValueError('source_discovery_date_missing')
+    else:
+        indexes = route.payload.get('discovery_urls', [])
+        if not indexes:
+            raise ValueError('source_identity_missing')
+        indexes = [indexes[event.local_date.toordinal() % len(indexes)]]
+    # 仅取策略冻结的精确页面；日期映射最多四页，详情仍需唯一匹配和强身份核验。
     candidates = set()
-    for link in BeautifulSoup(str(page), "html.parser").select("a[href]"):
-        target = urljoin(url, link.get("href", ""))
-        if (
-            normalize_name(link.get_text(" ", strip=True)) in names
-            and route.permits_url(target)
-            and target != url
-        ):
-            candidates.add(target)
+    for url in dict.fromkeys(indexes):
+        page = fetcher(url, route=route, now=now)
+        for link in BeautifulSoup(str(page), 'html.parser').select('a[href]'):
+            target = urljoin(url, link.get('href', ''))
+            if (normalize_name(link.get_text(' ', strip=True)) in names
+                    and route.permits_url(target) and target != url):
+                candidates.add(target)
     if len(candidates) != 1:
         raise ValueError(
             "source_discovery_ambiguous" if candidates else "source_not_found"

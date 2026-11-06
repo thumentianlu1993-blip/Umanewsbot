@@ -191,6 +191,54 @@ class RegionAdapterTests(TestCase):
         self.assertEqual(value["race_number"], "1")
         self.assertTrue(value["roster"])
 
+    def test_explicit_discovery_date_selects_historical_page(self):
+        payload=policy_payload()
+        payload['routes'][0]['discovery_urls_by_date']={
+            '2026-09-01':['https://www.jra.go.jp/JRADB/day1.html'],
+            '2026-09-20':['https://www.jra.go.jp/JRADB/day20.html']}
+        route=parse_multisource_policy(payload,now=NOW).routes[0]
+        event=SimpleNamespace(original_name='オールカマー',chinese_name='',source_refs={},local_date=date(2026,9,1))
+        calls=[]
+        def fetch(url, **kwargs):
+            calls.append(url)
+            return '<a href="/JRADB/detail.html">オールカマー</a>'
+        self.assertEqual(discover_source_url(event=event,route=route,now=NOW,fetcher=fetch),
+                         'https://www.jra.go.jp/JRADB/detail.html')
+        self.assertEqual(calls,['https://www.jra.go.jp/JRADB/day1.html'])
+        self.assertFalse(models.RaceResultSourceIdentity.objects.exists())
+
+    def test_missing_explicit_date_does_not_fetch_generic_fallback(self):
+        payload=policy_payload()
+        payload['routes'][0].update(discovery_urls=['https://www.jra.go.jp/JRADB/generic.html'],
+            discovery_urls_by_date={'2026-09-01':['https://www.jra.go.jp/JRADB/day1.html']})
+        route=parse_multisource_policy(payload,now=NOW).routes[0]
+        event=SimpleNamespace(original_name='x',chinese_name='',source_refs={},local_date=date(2026,9,2))
+        from unittest.mock import Mock
+        fetch=Mock()
+        with self.assertRaisesRegex(ValueError,'source_discovery_date_missing'):
+            discover_source_url(event=event,route=route,now=NOW,fetcher=fetch)
+        fetch.assert_not_called()
+
+    def test_date_pages_must_resolve_one_detail_across_all_pages(self):
+        payload=policy_payload()
+        payload['routes'][0]['discovery_urls_by_date']={'2026-09-01':[
+            'https://www.jra.go.jp/JRADB/one.html','https://www.jra.go.jp/JRADB/two.html']}
+        route=parse_multisource_policy(payload,now=NOW).routes[0]
+        event=SimpleNamespace(original_name='same',chinese_name='',source_refs={},local_date=date(2026,9,1))
+        calls=[]
+        def fetch(url, **kwargs):
+            calls.append(url)
+            return '<a href="'+url.replace('.html','-detail.html')+'">same</a>'
+        with self.assertRaisesRegex(ValueError,'source_discovery_ambiguous'):
+            discover_source_url(event=event,route=route,now=NOW,fetcher=fetch)
+        self.assertEqual(len(calls),2)
+
+    def test_date_discovery_rejects_invalid_date_and_foreign_host(self):
+        for dates in ({'2026-02-30':['https://www.jra.go.jp/JRADB/day.html']},
+                      {'2026-09-01':['https://foreign.invalid/JRADB/day.html']}):
+            payload=policy_payload();payload['routes'][0]['discovery_urls_by_date']=dates
+            with self.assertRaises(ValueError):parse_multisource_policy(payload,now=NOW)
+
     def test_discovery_names_only_select_request_never_identity(self):
 
         payload = policy_payload()
