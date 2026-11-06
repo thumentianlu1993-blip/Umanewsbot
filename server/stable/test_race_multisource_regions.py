@@ -239,6 +239,27 @@ class RegionAdapterTests(TestCase):
             payload=policy_payload();payload['routes'][0]['discovery_urls_by_date']=dates
             with self.assertRaises(ValueError):parse_multisource_policy(payload,now=NOW)
 
+    def test_discovery_uses_provider_race_title_not_link_metadata(self):
+        cases = [
+            ('sporting_life', 'united_kingdom', 'Europe/London', 'www.sportinglife.com',
+             '/racing/', '/racing/racecards/2026-09-20/venue/racecard/123/race',
+             '<span>12:40</span><span data-testid="racecard-meeting-race-name">Exact Race<span>4 Runners, Class 3</span></span>'),
+            ('galopp_statistik', 'germany', 'Europe/Berlin', 'www.galopp-statistik.de',
+             '/RennenDetails.php', '/RennenDetails.php?Datum=2026-09-20&Ort=Bad&Nummer=6',
+             '<div class="nr-des-rennens">6</div><div class="titel-des-rennens">Exact Race</div><div>15:55 55000 EUR</div>'),
+        ]
+        for provider, region, zone, host, prefix, detail, markup in cases:
+            with self.subTest(provider=provider):
+                route=route_for(provider,region,region,zone,'venue',['Venue'],host,prefix)
+                route.payload['discovery_urls']=['https://'+host+prefix+'index']
+                event=SimpleNamespace(original_name='Exact Race',chinese_name='',source_refs={},local_date=date(2026,9,20))
+                page='<a href="'+detail+'">'+markup+'</a>'
+                self.assertEqual(discover_source_url(event=event,route=route,now=NOW,fetcher=lambda *a,**k:page),'https://'+host+detail)
+                event.original_name='Exact'
+                with self.assertRaisesRegex(ValueError,'source_not_found'):
+                    discover_source_url(event=event,route=route,now=NOW,fetcher=lambda *a,**k:page)
+        self.assertFalse(models.RaceResultSourceIdentity.objects.exists())
+
     def test_discovery_names_only_select_request_never_identity(self):
 
         payload = policy_payload()

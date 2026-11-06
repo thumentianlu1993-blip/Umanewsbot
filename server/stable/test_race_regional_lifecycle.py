@@ -821,6 +821,23 @@ class RegionalBoundaryTests(SimpleTestCase):
 
 
 class FurtherRegionTests(SimpleTestCase):
+    def test_hong_kong_repeated_header_is_not_a_runner(self):
+        from copy import deepcopy
+        r=route_for('hkjc','hong_kong','hong_kong','Asia/Hong_Kong','hkjc:ST',
+                    ['Sha Tin'],'racing.hkjc.com','/en-us/local/information/')
+        url='https://racing.hkjc.com/en-us/local/information/racecard?racedate=2026/10/28&Racecourse=ST&RaceNo=1'
+        soup=BeautifulSoup((FIX/'hk-card.html').read_text(),'html.parser')
+        table=soup.select_one('table.starter')
+        header=deepcopy(table.select_one('thead tr'))
+        for cell in header.find_all(['td','th'],recursive=False):cell.name='td'
+        table.select_one('tbody').append(header)
+        value=adapters.parse_hkjc_observation(str(soup),url=url,route=r,now=NOW)
+        self.assertEqual(len(value['roster']),11)
+        # 相似但并不完全等于表头的缺失马匹行仍必须拒绝。
+        header.find_all('td',recursive=False)[0].string='12'
+        with self.assertRaisesRegex(ValueError,'hkjc_card_horse_missing'):
+            adapters.parse_hkjc_observation(str(soup),url=url,route=r,now=NOW)
+
     def test_hong_kong_current_public_card_has_final_maturity_and_local_time(self):
         r = route_for(
             "hkjc",

@@ -1720,7 +1720,7 @@ def discover_source_url(*, event, route, now, fetcher):
     列表只读策略审核过的精确 URL；名称仅选择至多一个详情请求，后续
     resolve_observation 仍须 A/B/C 强证据。无分页完成证明不宣称全站覆盖。
     """
-    from bs4 import BeautifulSoup
+    from bs4 import BeautifulSoup, Comment
     from urllib.parse import urljoin
     from stable.services.race_source_identity import normalize_name
 
@@ -1760,7 +1760,19 @@ def discover_source_url(*, event, route, now, fetcher):
         page = fetcher(url, route=route, now=now)
         for link in BeautifulSoup(str(page), 'html.parser').select('a[href]'):
             target = urljoin(url, link.get('href', ''))
-            if (normalize_name(link.get_text(' ', strip=True)) in names
+            label = link.get_text(' ', strip=True)
+            # 只提取真实列表的赛名字段；时间/名单等装饰文字不属于名称。
+            # 仍精确匹配，且此处仅发现URL，不写入来源身份。
+            if route.provider == 'sporting_life' and re.search(r'/racecard/\d+/', urlsplit(target).path):
+                title = link.select_one('[data-testid="racecard-meeting-race-name"]')
+                if title is not None:
+                    label = ' '.join(str(t) for t in title.find_all(string=True, recursive=False)
+                                     if not isinstance(t, Comment))
+            elif route.provider == 'galopp_statistik' and urlsplit(target).path == '/RennenDetails.php':
+                title = link.select_one('.titel-des-rennens')
+                if title is not None:
+                    label = title.get_text(' ', strip=True)
+            if (normalize_name(label) in names
                     and route.permits_url(target) and target != url):
                 candidates.add(target)
     if len(candidates) != 1:

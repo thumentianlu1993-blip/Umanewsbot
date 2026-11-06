@@ -702,7 +702,11 @@ def _hkjc_card(soup, url, context, route):
         cells = tr.find_all("td", recursive=False)
         if len(cells) != len(headers):
             raise ValueError("hkjc_card_partial")
-        values = dict(zip(headers, map(text, cells)))
+        cell_text = list(map(text, cells))
+        # 真实卡页在tbody末尾重复完整表头；仅完全相同的表头行可忽略。
+        if cell_text == headers:
+            continue
+        values = dict(zip(headers, cell_text))
         horse = cells[headers.index("Horse")].select_one("a[href]")
         if not horse:
             raise ValueError("hkjc_card_horse_missing")
