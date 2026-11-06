@@ -1799,14 +1799,15 @@ def rebind_multisource_enrollment(*, event_id, policy, now, expected_route_diges
                     "updated_at",
                 )
             )
+            # 新policy已核验；同事务先续期再校验，其余权限/撤销拒绝会整体回滚。
+            if source.valid_until is None or source.valid_until < aware(route.valid_until):
+                source.valid_until = aware(route.valid_until)
+                source.save(update_fields=("valid_until", "updated_at"))
             reason = binding_admission_reason(
                 binding=binding, route=route, now=now, check_runtime=False
             )
             if reason:
                 raise ValueError("rebind_contract_drift:" + reason)
-            if source.valid_until is None or source.valid_until < aware(route.valid_until):
-                source.valid_until = aware(route.valid_until)
-                source.save(update_fields=("valid_until", "updated_at"))
         enrollment.standing_policy_digest = policy.digest
         enrollment.route_digest = new_route_digest
         enrollment.save(
