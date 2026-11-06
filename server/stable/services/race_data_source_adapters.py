@@ -1792,6 +1792,45 @@ def discover_hkjc_meeting(*, event, route, now, url, page, fetcher, names):
     return matches
 
 
+def discover_zeturf_meeting(*, event, route, now, url, page, fetcher, names):
+    """仅跟随同日、受审场地唯一会议，再精确选名；不在此授予身份。"""
+    from bs4 import BeautifulSoup
+    from urllib.parse import urljoin
+    from stable.services.race_source_identity import normalize_name
+
+    venue = normalize_name(str(getattr(event, 'racecourse', '') or ''))
+    aliases = set()
+    for key, values in route.venue_aliases.items():
+        group = {normalize_name(str(x)) for x in (key, *values)}
+        if venue and venue in group:
+            aliases.update(group)
+    meetings = set()
+    for link in BeautifulSoup(str(page), 'html.parser').select('a[href]'):
+        target = urljoin(url, link['href'])
+        parsed = urlsplit(target)
+        match = re.fullmatch(r'/fr/reunion-du-jour/(\d{4}-\d{2}-\d{2})/R([1-9]\d*)-(.+)', parsed.path)
+        if (match and event.local_date and match[1] == event.local_date.isoformat()
+                and normalize_name(match[3]) in aliases
+                and route.permits_url(parsed._replace(fragment='').geturl())
+                and not parsed.query):
+            meetings.add(parsed._replace(fragment='').geturl())
+    if len(meetings) != 1:
+        raise ValueError('source_discovery_ambiguous' if meetings else 'source_not_found')
+    meeting = meetings.pop()
+    meeting_match = re.fullmatch(r'/fr/reunion-du-jour/([^/]+)/R([1-9]\d*)-(.+)', urlsplit(meeting).path)
+    detail_page = fetcher(meeting, route=route, now=now)
+    candidates = set()
+    for link in BeautifulSoup(str(detail_page), 'html.parser').select('a[href]'):
+        target = urljoin(meeting, link['href'])
+        parsed = urlsplit(target)
+        match = re.fullmatch(r'/fr/course-du-jour/([^/]+)/R([1-9]\d*)C([1-9]\d*)-.+', parsed.path)
+        if (match and match[1] == meeting_match[1] and match[2] == meeting_match[2]
+                and not parsed.query and not parsed.fragment and route.permits_url(target)
+                and normalize_name(link.get_text(' ', strip=True)) in names):
+            candidates.add(target)
+    return candidates
+
+
 def discover_source_url(*, event, route, now, fetcher):
     """独立来源发现：旧 URL 仅作取数提示，不能据此自动授予赛事身份。
 
@@ -1866,6 +1905,10 @@ def discover_source_url(*, event, route, now, fetcher):
     candidates = set()
     for url in dict.fromkeys(indexes):
         page = fetcher(url, route=route, now=now)
+        if route.provider == 'zeturf' and urlsplit(url).path.startswith('/fr/resultats-et-rapports-du-jour'):
+            candidates.update(discover_zeturf_meeting(event=event, route=route, now=now,
+                url=url, page=page, fetcher=fetcher, names=names))
+            continue
         if route.provider == 'hkjc':
             candidates.update(discover_hkjc_meeting(event=event, route=route, now=now,
                 url=url, page=page, fetcher=fetcher, names=names))

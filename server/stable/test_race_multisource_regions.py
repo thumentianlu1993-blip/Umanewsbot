@@ -43,6 +43,59 @@ def route_for(provider, region, country, zone, venue, names, host, prefix, kinds
 
 
 class RegionAdapterTests(TestCase):
+    def zeturf_directory_case(self):
+        route = route_for('zeturf', 'france', 'france', 'Europe/Paris',
+                          'paris-longchamp', ['ParisLongchamp', 'Paris-Longchamp'],
+                          'www.zeturf.fr', '/fr/')
+        index = 'https://www.zeturf.fr/fr/resultats-et-rapports-du-jour/2026-09-20'
+        meeting = 'https://www.zeturf.fr/fr/reunion-du-jour/2026-09-20/R1-paris-longchamp'
+        detail = 'https://www.zeturf.fr/fr/course-du-jour/2026-09-20/R1C5-exact-race'
+        route.payload['discovery_urls_by_date'] = {'2026-09-20': [index]}
+        event = SimpleNamespace(original_name='Exact Race', chinese_name='', source_refs={},
+                                local_date=date(2026, 9, 20), racecourse='ParisLongchamp')
+        return route, event, index, meeting, detail
+
+    def test_zeturf_directory_uses_same_day_venue_and_exact_race(self):
+        route, event, index, meeting, detail = self.zeturf_directory_case()
+        pages = {index: f'<a href="{meeting}#races">R1</a><a href="{meeting}#results">Results</a>'
+                 f'<a href="{meeting.replace("2026-09-20", "2026-09-21")}">Today</a>',
+                 meeting: f'<a href="{detail}">Exact Race</a>'
+                 f'<a href="{detail.replace("R1C5", "R2C5")}">Exact Race</a>'
+                 f'<a href="{detail.replace("2026-09-20", "2026-09-21")}">Exact Race</a>'}
+        calls = []
+        def fetch(url, **kwargs):
+            calls.append(url)
+            return pages[url]
+        self.assertEqual(discover_source_url(event=event, route=route, now=NOW, fetcher=fetch), detail)
+        self.assertEqual(calls, [index, meeting])
+        self.assertFalse(models.RaceResultSourceIdentity.objects.exists())
+
+    def test_zeturf_directory_rejects_unmatched_or_ambiguous_meetings_before_fetch(self):
+        route, event, index, meeting, detail = self.zeturf_directory_case()
+        for target in (meeting.replace('2026-09-20', '2026-09-19'),
+                       meeting.replace('paris-longchamp', 'strasbourg'),
+                       meeting.replace('www.zeturf.fr', 'foreign.invalid'), meeting+'?other=1'):
+            calls = []
+            def fetch(url, **kwargs):
+                calls.append(url)
+                return f'<a href="{target}">R1</a>'
+            with self.subTest(target=target), self.assertRaisesRegex(ValueError, 'source_not_found'):
+                discover_source_url(event=event, route=route, now=NOW, fetcher=fetch)
+            self.assertEqual(calls, [index])
+        with self.assertRaisesRegex(ValueError, 'source_discovery_ambiguous'):
+            discover_source_url(event=event, route=route, now=NOW, fetcher=lambda *a, **k:
+                f'<a href="{meeting}">R1</a><a href="{meeting.replace("R1-", "R2-")}#results">R2</a>')
+
+    def test_zeturf_directory_keeps_name_and_detail_permission_checks(self):
+        route, event, index, meeting, detail = self.zeturf_directory_case()
+        for markup in (f'<a href="{detail}">Sponsored Exact Race</a>',
+                       f'<a href="{detail.replace("www.zeturf.fr", "foreign.invalid")}">Exact Race</a>',
+                       f'<a href="{detail}?x=1">Exact Race</a>',
+                       f'<a href="{detail}">Exact Race</a><a href="{detail.replace("C5-", "C6-")}">Exact Race</a>'):
+            with self.subTest(markup=markup), self.assertRaises(ValueError):
+                discover_source_url(event=event, route=route, now=NOW, fetcher=lambda url, **k:
+                    f'<a href="{meeting}">R1</a>' if url == index else markup)
+
     def test_real_sporting_cards_uk_us_and_synthetic_ireland_independent_route(self):
         from stable.race_reference_parsers.sporting_life import _next_data
         import json
