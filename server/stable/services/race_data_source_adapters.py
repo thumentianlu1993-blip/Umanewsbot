@@ -582,10 +582,23 @@ def fetch_bound_observation(*, event, route, now, fetcher=None, kind="result"):
             else previous["canonical_url"] if previous else ""
         )
         fetcher = fetcher or fetch_source_page
+        rollover_card = ''
+        if url and sporting_card_needs_rollover(url, event=event, route=route, now=now):
+            rollover_card, url = url, ''
         if not url:
             url = discover_source_url(
                 event=event, route=route, now=now, fetcher=fetcher
             )
+        if rollover_card:
+            from stable.race_reference_parsers.sporting_life import _URL_RE
+            before = re.fullmatch(
+                r'/racing/racecards/(\d{4}-\d{2}-\d{2})/([^/]+)/racecard/(\d+)/[^/]+',
+                urlsplit(rollover_card).path)
+            after = _URL_RE.fullmatch(urlsplit(url).path)
+            if (not route.permits_url(rollover_card) or not before or not after
+                    or urlsplit(rollover_card).netloc != urlsplit(url).netloc
+                    or before.groups() != (after['date'], after['course'], after['race_id'])):
+                raise ValueError('linked_result_identity_mismatch')
         if route.provider == "jcsa" and kind == "racecard":
             # 公共页面 data-race-status 与 JS 明确使用同一公开 endpoint 合同。
             url = url.replace("/Results/True", "/Declared/True")
@@ -596,7 +609,9 @@ def fetch_bound_observation(*, event, route, now, fetcher=None, kind="result"):
         if not route.permits_url(url):
             raise ValueError("source_url_rejected")
         page = fetcher(url, route=route, now=now)
-        chain = [url]
+        # 目录实际链接与旧卡的日期/场地/来源race ID严格相等才保留身份衔接；
+        # 不声称旧卡 HTML 存在该链接，也不以同名目录结果替换不同场次。
+        chain = [rollover_card, url] if rollover_card else [url]
         if route.provider == "jra":
             value = parse_jra_observation(page, url=url, route=route, now=now)
             if kind == "result" and not value.get("result_phase"):
@@ -1714,6 +1729,25 @@ def parse_sporting_card_observation(page, *, url, route, now, event):
     return value
 
 
+def sporting_discovery_index(*, event, route, now):
+    """仅在策略明确冻结卡/结果目录这一对 URL 时启用跨日切换。"""
+    if route.provider != 'sporting_life' or not event.local_date:
+        return ''
+    dated = route.payload.get('discovery_urls_by_date') or {}
+    card = 'https://www.sportinglife.com/racing/racecards'
+    result = 'https://www.sportinglife.com/racing/results/' + event.local_date.isoformat()
+    if set(dated.get(event.local_date.isoformat(), [])) != {card, result}:
+        return ''
+    today = aware(now).astimezone(ZoneInfo(route.timezone)).date()
+    return result if event.local_date < today else card
+
+
+def sporting_card_needs_rollover(url, *, event, route, now):
+    selected = sporting_discovery_index(event=event, route=route, now=now)
+    return bool(selected and '/racing/results/' in selected
+                and urlsplit(url).path.startswith('/racing/racecards/'))
+
+
 def discover_source_url(*, event, route, now, fetcher):
     """独立来源发现：旧 URL 仅作取数提示，不能据此自动授予赛事身份。
 
@@ -1745,6 +1779,8 @@ def discover_source_url(*, event, route, now, fetcher):
     for pages in (route.payload.get("discovery_urls_by_date") or {}).values():
         index_urls.update(pages)
     urls = [u for u in hints if isinstance(u, str) and u not in index_urls and route.permits_url(u)]
+    urls = [u for u in urls if not sporting_card_needs_rollover(
+        u, event=event, route=route, now=now)]
     if len(set(urls)) == 1:
         return urls[0]
     names = {normalize_name(n) for n in (event.original_name, event.chinese_name) if n}
@@ -1771,6 +1807,9 @@ def discover_source_url(*, event, route, now, fetcher):
         if not indexes:
             raise ValueError('source_identity_missing')
         indexes = [indexes[event.local_date.toordinal() % len(indexes)]]
+    selected_index = sporting_discovery_index(event=event, route=route, now=now)
+    if selected_index:
+        indexes = [selected_index]
     # 仅取策略冻结的精确页面；日期映射最多四页，详情仍需唯一匹配和强身份核验。
     candidates = set()
     for url in dict.fromkeys(indexes):

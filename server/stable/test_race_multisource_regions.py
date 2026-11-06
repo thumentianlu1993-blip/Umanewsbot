@@ -260,6 +260,99 @@ class RegionAdapterTests(TestCase):
                     discover_source_url(event=event,route=route,now=NOW,fetcher=lambda *a,**k:page)
         self.assertFalse(models.RaceResultSourceIdentity.objects.exists())
 
+    def test_sporting_discovery_rolls_declared_pair_by_route_local_date(self):
+        from datetime import datetime, timezone
+        card_index = 'https://www.sportinglife.com/racing/racecards'
+        result_index = 'https://www.sportinglife.com/racing/results/2026-09-20'
+        event = SimpleNamespace(original_name='Exact Race', chinese_name='',
+                                source_refs={}, local_date=date(2026, 9, 20))
+        now = datetime(2026, 9, 21, 1, tzinfo=timezone.utc)
+        for zone, selected in [('Europe/London', result_index),
+                               ('America/Los_Angeles', card_index)]:
+            with self.subTest(zone=zone):
+                route = route_for('sporting_life', 'united_states', 'united_states',
+                                  zone, 'venue', ['Venue'], 'www.sportinglife.com', '/racing/')
+                route.payload['discovery_urls_by_date'] = {
+                    '2026-09-20': [card_index, result_index]}
+                calls = []
+                def fetch(url, **kwargs):
+                    calls.append(url)
+                    return '<a href="/racing/results/2026-09-20/venue/123/exact">Exact Race</a>'
+                discover_source_url(event=event, route=route, now=now, fetcher=fetch)
+                self.assertEqual(calls, [selected])
+        # A legacy single-entry policy cannot authorize a synthesized result URL.
+        route.payload['discovery_urls_by_date'] = {'2026-09-20': [card_index]}
+        calls.clear()
+        discover_source_url(event=event, route=route, now=now, fetcher=fetch)
+        self.assertEqual(calls, [card_index])
+
+    def test_sporting_rollover_ignores_old_card_hints_and_bindings(self):
+        from datetime import datetime, timezone
+        from unittest.mock import Mock
+        from stable.services.race_data_source_adapters import fetch_bound_observation
+        card = 'https://www.sportinglife.com/racing/racecards/2026-09-20/venue/racecard/123/exact'
+        index = 'https://www.sportinglife.com/racing/results/2026-09-20'
+        detail = 'https://www.sportinglife.com/racing/results/2026-09-20/venue/123/exact'
+        route = route_for('sporting_life', 'united_kingdom', 'united_kingdom',
+                          'Europe/London', 'venue', ['Venue'], 'www.sportinglife.com', '/racing/')
+        route.payload['discovery_urls_by_date'] = {'2026-09-20': [
+            'https://www.sportinglife.com/racing/racecards', index]}
+        now = datetime(2026, 9, 21, 1, tzinfo=timezone.utc)
+        for binding in ['source', 'seed', 'primary']:
+            with self.subTest(binding=binding):
+                sources = Mock()
+                sources.filter.return_value.first.return_value = (
+                    SimpleNamespace(canonical_url=card) if binding == 'source' else None)
+                event = SimpleNamespace(original_name='Exact Race', chinese_name='',
+                    source_refs={'primary': card} if binding == 'primary' else {},
+                    local_date=date(2026, 9, 20), source_identities=sources)
+                calls = []
+                def fetch(url, **kwargs):
+                    calls.append(url)
+                    return '<a href="'+detail+'">Exact Race</a>'
+                with patch('stable.services.race_source_identity.seed_evidence',
+                           return_value={'canonical_url':card} if binding == 'seed' else None), \
+                     patch('stable.services.race_data_source_adapters.parse_reference_observation',
+                           side_effect=RuntimeError('parser_reached')):
+                    with self.assertRaisesRegex(RuntimeError, 'parser_reached'):
+                        fetch_bound_observation(event=event, route=route, now=now, fetcher=fetch)
+                self.assertEqual(calls, [index, detail])
+
+    def test_sporting_rollover_preserves_verified_seed_identity_receipt(self):
+        from datetime import datetime, timezone
+        from stable.services.race_data_source_adapters import fetch_bound_observation
+        from stable.services.race_source_identity import event_snapshot, resolve_observation
+        from stable.test_race_multisource_identity import observation
+        now = datetime(2026, 9, 21, 1, tzinfo=timezone.utc)
+        card = 'https://www.sportinglife.com/racing/racecards/2026-09-20/venue/racecard/123/exact'
+        index = 'https://www.sportinglife.com/racing/results/2026-09-20'
+        detail = 'https://www.sportinglife.com/racing/results/2026-09-20/venue/123/exact'
+        route = route_for('sporting_life', 'united_kingdom', 'united_kingdom',
+                          'Europe/London', 'venue', ['Venue'], 'www.sportinglife.com', '/racing/')
+        route.payload['discovery_urls_by_date'] = {'2026-09-20': [
+            'https://www.sportinglife.com/racing/racecards', index]}
+        event = models.RaceEvent.objects.create(year=2026, slug='sl-seed',
+            original_name='Exact Race', country_region='united_kingdom', racecourse='Venue',
+            local_date=date(2026, 9, 20), timezone_name='Europe/London', status='scheduled')
+        previous = dict(candidate_id=1, event_snapshot_sha256=event_snapshot(event),
+                        raw_sha256='e'*64, canonical_url=card, roster=[('1', 'horse')])
+        value = observation('sporting_life', region=route.region, operator=route.operator,
+            canonical_url=detail, external_race_id='123', venue_key='venue',
+            timezone=route.timezone, fetched_at=now.isoformat(), raw_names=['Exact Race'],
+            roster=[{'number':'1', 'horse_name':'Horse'}], result_phase='official')
+        def fetch(url, **kwargs):
+            return '<a href="'+detail+'">Exact Race</a>' if url == index else ''
+        with patch('stable.services.race_source_identity.seed_evidence', return_value=previous), \
+             patch('stable.services.race_data_source_adapters.parse_reference_observation',
+                   side_effect=lambda *a, **k: dict(value)):
+            result = fetch_bound_observation(event=event, route=route, now=now, fetcher=fetch)
+            self.assertEqual(result['identity_seed_receipt']['link_chain'], [card, detail])
+            self.assertEqual(resolve_observation(result, route=route, now=now).event_id, event.pk)
+            for bad in [card.replace('/123/', '/999/'), card.replace('/venue/', '/other/')]:
+                previous['canonical_url'] = bad
+                with self.assertRaisesRegex(ValueError, 'linked_result_identity_mismatch'):
+                    fetch_bound_observation(event=event, route=route, now=now, fetcher=fetch)
+
     def test_sporting_life_result_discovery_uses_exact_structured_name_and_actual_link(self):
         import json
         route=route_for('sporting_life','united_kingdom','united_kingdom','Europe/London',
