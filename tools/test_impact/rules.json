@@ -1026,7 +1026,9 @@
     "deploy/rehearse_duplicate_repair.py",
     "server/stable/services/duplicate_repair_rehearsal.py",
     "server/stable/services/p02_b_repair_plan.py",
-    "deploy/p02_inplace_migrate.py"
+    "deploy/p02_inplace_migrate.py",
+    "server/stable/management/commands/register_p02_canonical_names.py",
+    "server/stable/management/commands/apply_p02_event_repairs.py"
   ],
   "paths": {
     "docs/changes/next-version-capabilities/lanes/C/U01-offline-cases.json": [

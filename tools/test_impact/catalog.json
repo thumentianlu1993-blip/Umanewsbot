@@ -904,6 +904,12 @@
     ],
     "module:stable.test_lifecycle_census_ownership": [
       "stable.test_lifecycle_census_ownership"
+    ],
+    "module:stable.test_p02_canonical_name_registration": [
+      "stable.test_p02_canonical_name_registration"
+    ],
+    "module:stable.test_p02_event_repairs": [
+      "stable.test_p02_event_repairs"
     ]
   },
   "dependencies": {
@@ -2972,6 +2978,18 @@
       "domains": [
         "release"
       ]
+    },
+    "server/stable/test_p02_canonical_name_registration.py": {
+      "label": "stable.test_p02_canonical_name_registration",
+      "domains": [
+        "module:stable.test_p02_canonical_name_registration"
+      ]
+    },
+    "server/stable/test_p02_event_repairs.py": {
+      "label": "stable.test_p02_event_repairs",
+      "domains": [
+        "module:stable.test_p02_event_repairs"
+      ]
     }
   },
   "profiles": {
@@ -3306,7 +3324,9 @@
     "stable.test_release_p02_runtime": "python",
     "stable.test_duplicate_repair_rehearsal": "python",
     "stable.test_duplicate_repair_runtime": "python",
-    "stable.test_p02_b_repair_plan": "python"
+    "stable.test_p02_b_repair_plan": "python",
+    "stable.test_p02_canonical_name_registration": "django",
+    "stable.test_p02_event_repairs": "django"
   },
   "allowed_skips": {},
   "owners": {
