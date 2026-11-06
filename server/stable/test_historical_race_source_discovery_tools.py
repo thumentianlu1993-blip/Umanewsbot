@@ -1179,6 +1179,17 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
             ],
         )
 
+    def test_france_galop_index_does_not_include_multiple_sex_codes_in_name(self):
+        # 2026年官方目录实际行：性别列可能包含两个代码。
+        text = """
+        19-09 Chantilly 73 200 2 ans M H DES CHENES Groupe III 1 600
+        4-10 ParisLongchamp 400 000 2 ans M F J-L LAGARDERE Groupe I 1 400
+        4-10 ParisLongchamp 5,0 M 3 & + M F ARC DE TRIOMPHE Groupe I 2 400
+        """
+        rows = self.tool.parse_france_galop_flat_schedule_text(text, year=2026)
+        self.assertEqual([row["race_name"] for row in rows],
+                         ["DES CHENES", "J-L LAGARDERE", "ARC DE TRIOMPHE"])
+
     def test_france_galop_flat_program_extracts_only_aqps_index_rows(self):
         text = """
         Index

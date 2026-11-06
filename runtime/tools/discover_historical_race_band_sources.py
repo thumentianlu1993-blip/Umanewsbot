@@ -1292,7 +1292,7 @@ def parse_france_galop_flat_schedule_text(text: str, *, year: int) -> list[dict]
             continue
         prefix = remainder[: group_match.start()].strip()
         name_match = re.match(
-            r"^.*(?:\b\d+\s+ans\b|\b\d+\s*&\s*\+)\s+(?:[FMH]\s+)?(?P<name>.+)$",
+            r"^.*(?:\b\d+\s+ans\b|\b\d+\s*&\s*\+)\s+(?:[FMH]\s+)*(?P<name>.+)$",
             prefix,
         )
         if name_match is None:
