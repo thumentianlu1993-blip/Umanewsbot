@@ -1740,10 +1740,27 @@ def discover_source_url(*, event, route, now, fetcher):
                 hints.append(binding.get("url", ""))
         else:
             hints.append(refs.get("jra_pre_race_url", ""))
-    urls = [u for u in hints if isinstance(u, str) and route.permits_url(u)]
+    # 策略明确声明的列表页只能用于发现，不能因旧 primary 提示而被当成详情页。
+    index_urls = set(route.payload.get("discovery_urls", []))
+    for pages in (route.payload.get("discovery_urls_by_date") or {}).values():
+        index_urls.update(pages)
+    urls = [u for u in hints if isinstance(u, str) and u not in index_urls and route.permits_url(u)]
     if len(set(urls)) == 1:
         return urls[0]
     names = {normalize_name(n) for n in (event.original_name, event.chinese_name) if n}
+    # 复用身份层已受审、带来源证据且在届次有效期内的系列别名。
+    # 此处仍只选择详情请求，不凭名称直接授予赛事身份。
+    if getattr(event, "race_series_id", None):
+        from stable.models import RaceSeriesName
+        year = getattr(event, "edition_year", None) or (event.local_date.year if event.local_date else None)
+        for alias in RaceSeriesName.objects.filter(
+            series_id=event.race_series_id, series__review_status="approved",
+            series__country_region=route.country_region, is_active=True,
+        ):
+            if (alias.source_refs and year is not None
+                    and (not alias.valid_from_year or alias.valid_from_year <= year)
+                    and (not alias.valid_to_year or alias.valid_to_year >= year)):
+                names.add(normalize_name(alias.text))
     dated = route.payload.get('discovery_urls_by_date')
     if dated is not None:
         indexes = dated.get(event.local_date.isoformat(), []) if event.local_date else []

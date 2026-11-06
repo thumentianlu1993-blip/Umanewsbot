@@ -278,6 +278,42 @@ class RegionAdapterTests(TestCase):
             discover_source_url(event=event,route=route,now=NOW,fetcher=lambda *a,**k:duplicate)
         self.assertFalse(models.RaceResultSourceIdentity.objects.exists())
 
+    def test_declared_discovery_index_hint_is_not_returned_as_race_detail(self):
+        route=route_for('jra','japan_jra','japan','Asia/Tokyo','nakayama',['中山'],
+                        'www.jra.go.jp','/JRADB/')
+        index='https://www.jra.go.jp/datafile/seiseki/replay/2026/jyusyo.html'
+        route.payload['allowed_path_prefixes']=['/datafile/seiseki/replay/', '/JRADB/']
+        route.payload['discovery_urls_by_date']={'2026-09-20':[index]}
+        event=SimpleNamespace(original_name='Exact Race',chinese_name='',source_refs={'primary':index},local_date=date(2026,9,20))
+        detail='https://www.jra.go.jp/JRADB/detail.html'
+        self.assertEqual(discover_source_url(event=event,route=route,now=NOW,
+            fetcher=lambda *a,**k:'<a href="'+detail+'">Exact Race</a>'),detail)
+
+    def test_discovery_uses_only_current_evidenced_approved_series_aliases(self):
+        series=models.RaceSeries.objects.create(key='test-source-alias',country_region='france',
+            canonical_name_original='Canonical Race',review_status='approved')
+        alias=models.RaceSeriesName.objects.create(series=series,text='Sponsored Exact Race',
+            valid_from_year=2026,valid_to_year=2026,source_refs={'official':'https://source.example/evidence'})
+        route=route_for('zeturf','france','france','Europe/Paris','chantilly',['Chantilly'],
+                        'www.zeturf.fr','/fr/')
+        route.payload['discovery_urls']=['https://www.zeturf.fr/fr/index']
+        event=SimpleNamespace(original_name='Canonical Race',chinese_name='',source_refs={},
+            local_date=date(2026,9,19),edition_year=2026,race_series_id=series.pk)
+        detail='https://www.zeturf.fr/fr/course-du-jour/exact'
+        fetch=lambda *a,**k:'<a href="'+detail+'">Sponsored Exact Race</a>'
+        self.assertEqual(discover_source_url(event=event,route=route,now=NOW,fetcher=fetch),detail)
+        for changes in ({'is_active':False},{'source_refs':{}},{'valid_from_year':2024,'valid_to_year':2025},{'valid_from_year':2027,'valid_to_year':2028}):
+            for field,value in changes.items():setattr(alias,field,value)
+            alias.save()
+            with self.assertRaisesRegex(ValueError,'source_not_found'):
+                discover_source_url(event=event,route=route,now=NOW,fetcher=fetch)
+            alias.is_active=True;alias.source_refs={'official':'https://source.example/evidence'}
+            alias.valid_from_year=2026;alias.valid_to_year=2026;alias.save()
+        series.review_status='pending';series.save()
+        with self.assertRaisesRegex(ValueError,'source_not_found'):
+            discover_source_url(event=event,route=route,now=NOW,fetcher=fetch)
+        self.assertFalse(models.RaceResultSourceIdentity.objects.exists())
+
     def test_discovery_names_only_select_request_never_identity(self):
 
         payload = policy_payload()
