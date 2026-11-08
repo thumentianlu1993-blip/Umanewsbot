@@ -3198,7 +3198,8 @@
     "stable.test_lifecycle_census_ownership": "django",
     "stable.test_japan_automation": "django",
     "stable.test_japan_name_registration": "django",
-    "stable.test_japan_public_fields": "django"
+    "stable.test_japan_public_fields": "django",
+    "stable.test_hkjc_automation": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
