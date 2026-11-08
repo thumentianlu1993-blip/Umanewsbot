@@ -1458,6 +1458,15 @@
     ],
     "docs/changes/japan-race-automation/ci-scope.json": [
       "infrastructure"
+    ],
+    "server/stable/services/japan_public_fields.py": [
+      "japan_race_automation"
+    ],
+    "server/stable/management/commands/repair_japan_public_fields.py": [
+      "japan_race_automation"
+    ],
+    "docs/changes/japan-race-public-fields/ci-scope.json": [
+      "infrastructure"
     ]
   },
   "symbols": {
@@ -1625,6 +1634,7 @@
     "server/stable/views.py"
   ],
   "reviewed_change_scopes": [
-    "docs/changes/japan-race-automation/ci-scope.json"
+    "docs/changes/japan-race-automation/ci-scope.json",
+    "docs/changes/japan-race-public-fields/ci-scope.json"
   ]
 }

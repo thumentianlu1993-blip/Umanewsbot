@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "base_sha": "a25e62869cf471f9e25820a8c241e4b035271a36",
+  "reason": "用户要求日本公开字段、退赛状态和时间一起修复发版，明确不跑全量CI；覆盖结果投影、卡表写入、日本来源、显示解析、人工锁、事务补正及CI工具，保留核心与领域依赖。",
+  "domains": [
+    "infrastructure",
+    "japan_race_automation",
+    "race_results",
+    "module:stable.test_race_multisource_conversion",
+    "module:stable.test_race_multisource_enrollment",
+    "module:stable.test_race_multisource_postgres",
+    "module:stable.test_race_data_sync_pipeline_a",
+    "module:stable.test_race_data_sync_pipeline_a_postgres",
+    "module:stable.test_race_information_display",
+    "module:stable.test_race_information_display_pages",
+    "module:stable.test_race_pre_race",
+    "module:stable.test_pre_race_refresh"
+  ],
+  "changes": [
+    {
+      "path": "docs/changes/japan-race-public-fields/rollout.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "fa826ed7d7d89a901c4e954f872f4fb6a19fc5c8307b0af1e18b73a82eb6106f",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/japan-race-public-fields/spec.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "accee3570c1428d68b610991a6d2b96f32d2cadcf2fce59ecfb775f181c0c014",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/current_state.md",
+      "status": "modified",
+      "before_hash": "f7515b8b0e993c8e38821458fc26a492768083aa15f196196382bbbc5e06a48c",
+      "after_hash": "bc947d55406b88ce10bf6a8bc424d959396630e7ea9b70998fae02d457e68f3c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/management/commands/repair_japan_public_fields.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "56db63a5b89d0a14da4b4105b4501c07a0d55cad4180ddb117e5937d3e9dbb5f",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/japan_public_fields.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "d296a8feda793c5b817420a26e63185208022440889ff435ee5bc943f3f3b1a9",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_source_adapters.py",
+      "status": "modified",
+      "before_hash": "78cdb5cf3b0dd84a7ba33d972b2e10e4faef3f19d67c3fb239e303382d487142",
+      "after_hash": "72019707e7a829c17079d22724171d6be1bfaeb5153dbb77d815d0c1f9070e7f",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_pipeline.py",
+      "status": "modified",
+      "before_hash": "4137233a95d4184214f2f9261600514696aef205ecde185e55f811c5358ee6cd",
+      "after_hash": "6e51eec1413d7cd78f5fc3c9fbefbba5898c0b01e706683b71bf83c06b1e6fee",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_results.py",
+      "status": "modified",
+      "before_hash": "a124ef78b03cf677a330e8988cbf176bc3bc12648e24096945af47f2bcd6acc3",
+      "after_hash": "86185d04b584318037d84949ec06409fd0377e51b0868aea82c4c51f08bc829f",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_field_normalization.py",
+      "status": "modified",
+      "before_hash": "8bb0fb2a67502310a20562bfd642ecf1285af83078f24dfca98d123261a97fc2",
+      "after_hash": "d1f450e4afe7bb48ed28bfeebbfcb8c9a064fe2522a7bd0c8036ef2164709b2b",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_pre_race.py",
+      "status": "modified",
+      "before_hash": "202900b86a6a018b0636c992d56ee784b91faa5d606e6069135eecb3302d5bbe",
+      "after_hash": "4384b6bd788f48b8b7c0b309b532920801df7ca7440275113dfdad170d848c9b",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_japan_public_fields.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "821acc6056b2dc4639bfd9e3f62703d17f8c70baaf36ebe0217cd8f3fe24d20f",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/catalog.json",
+      "status": "modified",
+      "before_hash": "ec04d6c8e75e8c179a43472ba546fbf81d158f604c84c3e86af0af94113e1217",
+      "after_hash": "5c198320a2a14cca5aa652380f58edcda61e989011a7f8ab7d7717fb02765074",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "414c2edc3853b5b08f2ca49089e478cb7084e3c95fffdecfca818e939ca275d5",
+      "after_hash": "66da5d0a27edcff235b630be62f9964e9fc2d5e48a9cfd74c9ff75a8824960bc",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}
