@@ -108,7 +108,7 @@
                 <td>{{ candidate.fetched_at|date:"Y-m-d H:i" }}</td>
                 <td><code>{{ candidate.diff_payload|truncatechars:120 }}</code>{% if race_information_enabled and candidate.normalized_preview %}<details><summary>标准展示预览（最多20行）</summary>{% for preview in candidate.normalized_preview %}<p>{% for label, text in preview %}{{ label }}：{{ text }}{% if not forloop.last %} · {% endif %}{% endfor %}</p>{% endfor %}</details>{% endif %}</td>
                 <td>
-                  {% if candidate.source_name == 'jra_pre_race_v1' or candidate.raw_payload.jra_pre_race_v1 %}
+                  {% if candidate.source_name == 'jra_pre_race_v1' or candidate.raw_payload.jra_pre_race_v1 or candidate.source_name == 'nar_pre_race_v1' or candidate.raw_payload.nar_pre_race_v1 %}
                     <span class="muted">赛前专用候选，不支持通用应用</span>
                   {% elif candidate.status == 'pending' %}
                     <form method="post" action="{% url 'console-race-event-apply-candidate' candidate.id %}">

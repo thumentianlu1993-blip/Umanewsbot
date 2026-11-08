@@ -94,7 +94,7 @@ def _nar(soup,event,url):
         odds_cell=first.select_one('td.odds_weight');raw=text(odds_cell)
         cancelled=' '.join([raw,text(first.select_one('td.horseNum')),text(following[-1].select_one('td.info'))])
         next_cells=following[0].find_all('td',recursive=False);third_cells=following[1].find_all('td',recursive=False)
-        weight=re.match(r'(\d+(?:\.\d+)?)',text(next_cells[3])) if len(next_cells)>3 else None
+        weight=re.match(r'[☆★▲△◇◆\s]*(\d+(?:\.\d+)?)',text(next_cells[3])) if len(next_cells)>3 else None
         odds=re.fullmatch(r'(\d+(?:\.\d+)?)\s*(?:\((\d+)\)|（(\d+)）)?',raw)
         rows.append(dict(horse_name=text(horse),horse_number=text(first.select_one('td.horseNum')),barrier=barrier,
             jockey_name=text(first.select_one('a.jockeyName')),trainer_name=text(third_cells[1]) if len(third_cells)>1 else '',
