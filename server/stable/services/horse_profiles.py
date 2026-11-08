@@ -688,7 +688,7 @@ def followed_articles(token_hash: str, *, limit: int = 20) -> list[dict[str, Any
             article__workflow_status=WorkflowStatus.PUBLISHED,
             article__published_to_web_at__isnull=False,
         )
-        .select_related("article", "horse_profile")
+        .select_related("article", "horse_profile", "horse_profile__primary_term")
         .order_by("-article__published_to_web_at", "-article_id")[:limit]
     )
     seen_articles: set[int] = set()
