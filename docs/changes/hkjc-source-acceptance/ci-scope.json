@@ -1,0 +1,251 @@
+{
+  "schema_version": 1,
+  "base_sha": "c7a99a7f8879b1a0072ca1ec73108bb9539ba4d5",
+  "reason": "用户已要求按实际影响范围验收。共享入口只新增默认关闭的 HKJC 分支；覆盖真实解析、候选/租约、强身份、多来源登记转换、公开详情、JRA/NAR回归及选测工具，不扩大到无关业务。",
+  "domains": [
+    "hkjc_source_acceptance",
+    "infrastructure"
+  ],
+  "changes": [
+    {
+      "path": "docs/changes/hkjc-source-acceptance/design.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "474d82bfcd7d4f33b3438727840e682015d854a756ca197609dc247261eb424d",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/hkjc-source-acceptance/rollout.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "1349a5038f2197770df9f0f856fc24551f59fe0d1021535ef8b3a901bef89a2e",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/hkjc-source-acceptance/source_evidence.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "00d79073ec4adde22c2c5525810d686e66e17e452123d3b3e0534bc005cde2f7",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/hkjc-source-acceptance/spec.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "003e013dc8433e5d96a809abb5830708b3189ed845d5997f31f7e78f67b858c3",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/hkjc-source-acceptance/tasks.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "1c1e6125501cef33b63e7a59b8a5fc0a13fefee854e95c14d8a1590b5a3c750b",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/hkjc-source-acceptance/test_cases.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "10124ecf6e46f8665e0f7fdaf680f6728ef19128a04f119e9469764c310cff91",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/current_state.md",
+      "status": "modified",
+      "before_hash": "bc947d55406b88ce10bf6a8bc424d959396630e7ea9b70998fae02d457e68f3c",
+      "after_hash": "02c9bf7e7012f88e46925b6c4f24e4b2230314b90c7c46b7085ee16b3dfd8f06",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/app/settings.py",
+      "status": "modified",
+      "before_hash": "e86afddd770156492d51a31d105af2817cfa68342eed99c0502e7181f3ea8b51",
+      "after_hash": "8554b36587c9fbc454eda1b1de3f68d561c49168b6b621a7ee460e61787ee8bb",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/hkjc_automation/card-expired.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "3aa784c5bfafa6dec396abcc1bb2a051731e5add2a483a170183f0795c699033",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/hkjc_automation/card.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "fec7c5706669384f23bb5ec44057149ce96e157dce7c243c5a7637b6d6386b06",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/hkjc_automation/entries-unpublished.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "f1fbeaaac939afa855e9802c2f966cb599efac2840603fa8ae4c878a6e2a5a2d",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/hkjc_automation/entries.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "409b82651fea0a1864748f30c48b8dac695cbfcb8daa2838cc6a24b7e352949b",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/hkjc_automation/meeting-results.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "ec63a630321e0186a0abc1bddf42139e6a351447dfbbd3284c0e820dea8338fb",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/hkjc_automation/nominations.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "075c1db9d3014f54f93c93d9352b302201b271c5ce255fee99fc859a34f4d918",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/hkjc_automation/result-withdrawn.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "b40ba63272e45bfbfb20189167a1ba2005fb7e3b6bee8be3b8e54c8c541ad773",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/hkjc_automation/result.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "201d8c6a1a044116a828dca393917d6dae3d5f4c276b50bba25798e2418440f6",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/hkjc_automation/sources.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "7b25cc97122a882bf78e6a325faee06aa7f91bdfb3f1cd3516e6a97b281cbea3",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/management/commands/verify_hkjc_sources.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "fdad6f82446720d454c95b97a2b089307639fa3b1bb15aa18c5be202ba3b8c76",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/hkjc_pre_race.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "38404b6843251a5b31ea0e342a3367840c257e8cfa41930497c423b77c90f7f4",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/hkjc_sources.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "5469f9627f54f9284b11e53224404afee39d123bd03bd209db08337199946b62",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_source_adapters.py",
+      "status": "modified",
+      "before_hash": "72019707e7a829c17079d22724171d6be1bfaeb5153dbb77d815d0c1f9070e7f",
+      "after_hash": "7943f59ab10f92b1056911ca93e5e7e5a0829f1140a4cdd74d5ff93a4fee5131",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_events.py",
+      "status": "modified",
+      "before_hash": "10398aded1ec156ba16d41a627172c01002d1a7bebcb558d49b32bed329e135a",
+      "after_hash": "b3d6f6ddac7075ac9e3f7f148aaaff51676edbc8c5096a06eb068d048fa7f621",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_pre_race.py",
+      "status": "modified",
+      "before_hash": "4384b6bd788f48b8b7c0b309b532920801df7ca7440275113dfdad170d848c9b",
+      "after_hash": "26bd9d1e5343548fe52b21bbd3291c8e8ebaad709fe35f4c3b68c5d71304e51f",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_pre_race_refresh.py",
+      "status": "modified",
+      "before_hash": "e2980d2f77bffea5b20af086d107bb93338fb279d94ae6af4440fa3cd5187266",
+      "after_hash": "3c9db5b982d493c9d94709fce19259d1cd3bcea3e390861ca8751d3292b84209",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_source_identity.py",
+      "status": "modified",
+      "before_hash": "3fb24524044826161a001d9149eb2d71a921530e2b43b56000d485dec2f1f96d",
+      "after_hash": "d027011300d3f1afdda84e3147d9d01a9f60787bc5054d6e9dafa9fe612085c2",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/tasks.py",
+      "status": "modified",
+      "before_hash": "ac942222cd6801b03ad1ace18eb1774339d5583da1dcb5b626eafeaaad8a9728",
+      "after_hash": "60f8c6dc1c9fe562b058937269e861acb4464fdb5260eba1bde7ba82a1bfa09b",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_hkjc_automation.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "11b6254bbaecd433a99fb2c225f7903b47538132b84c736b7b762cd26621127d",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/views.py",
+      "status": "modified",
+      "before_hash": "e3fe57ea494fbb1fc472807fc42892b63d145a0815a2e759ce133b9afa56ae38",
+      "after_hash": "8c44dce42c2b2eab708eb389c4f7da0456d0d3c37fae7153be19477a26968fd6",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/catalog.json",
+      "status": "modified",
+      "before_hash": "5c198320a2a14cca5aa652380f58edcda61e989011a7f8ab7d7717fb02765074",
+      "after_hash": "49c9f49c7c40bf4eff4508a8faa9c7844da2de3c3608e2a725897e1ea508d572",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "66da5d0a27edcff235b630be62f9964e9fc2d5e48a9cfd74c9ff75a8824960bc",
+      "after_hash": "35f1bd459b8c2cc9ba425adf3277bfb7d97dc7400c5566b4c788785e11ffc818",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}

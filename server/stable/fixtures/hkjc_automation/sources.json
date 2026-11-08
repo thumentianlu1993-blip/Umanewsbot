@@ -1,0 +1,52 @@
+[
+  {
+    "file": "result-withdrawn.html",
+    "raw_file": "result-20261019-8.html",
+    "raw_sha256": "652cfcd0eb3c6b9469e54f6a1ca08c5302e949874ac42fd8f51c23c053a6d64a",
+    "fixture_sha256": "b40ba63272e45bfbfb20189167a1ba2005fb7e3b6bee8be3b8e54c8c541ad773"
+  },
+  {
+    "file": "result.html",
+    "raw_file": "result-20261108-8.html",
+    "raw_sha256": "d9b0b4988d292b460cece13f885501cdf48527992e7d10b52c52ca3044402d27",
+    "fixture_sha256": "201d8c6a1a044116a828dca393917d6dae3d5f4c276b50bba25798e2418440f6"
+  },
+  {
+    "file": "card.html",
+    "raw_file": "card-20261108-8.html",
+    "raw_sha256": "4a25eb589734dbd715f7db76935052d62af759f25e976ae21776219796b752c9",
+    "fixture_sha256": "fec7c5706669384f23bb5ec44057149ce96e157dce7c243c5a7637b6d6386b06"
+  },
+  {
+    "file": "nominations.html",
+    "raw_file": "hkcup-racing-info.html",
+    "raw_sha256": "1fc0520f3188f31fd1e34f949ffaf22d2510bfc8f41f9ed4c947cab7550035e7",
+    "fixture_sha256": "075c1db9d3014f54f93c93d9352b302201b271c5ce255fee99fc859a34f4d918"
+  },
+  {
+    "file": "meeting-results.html",
+    "raw_file": "all-20261108.html",
+    "raw_sha256": "5f1687adfbd2cffb9894f01f88a48da4b2632bf97f40457a486474570e05b15a",
+    "fixture_sha256": "ec63a630321e0186a0abc1bddf42139e6a351447dfbbd3284c0e820dea8338fb"
+  },
+  {
+    "file": "card-expired.html",
+    "raw_file": "card-20260906-3.html",
+    "raw_sha256": "a803c7a930b03859b17c79774fdb50f7fa3fec58699f96e390bdcbcc2be671d2",
+    "fixture_sha256": "3aa784c5bfafa6dec396abcc1bb2a051731e5add2a483a170183f0795c699033"
+  },
+  {
+    "file": "entries.html",
+    "raw_file": "entries-all.html",
+    "url": "https://racing.hkjc.com/en-us/local/information/entries?racedate=2026/11/11&Racecourse=HV&View=All",
+    "raw_sha256": "034f5be307a4cb5de8d68ea5aab2ea6ebad03128e006c11df89d4dafbd29881e",
+    "fixture_sha256": "409b82651fea0a1864748f30c48b8dac695cbfcb8daa2838cc6a24b7e352949b"
+  },
+  {
+    "file": "entries-unpublished.html",
+    "raw_file": "entries-unpublished.html",
+    "url": "https://racing.hkjc.com/en-us/local/information/entries?racedate=2026/11/22&Racecourse=ST&View=All",
+    "raw_sha256": "523c1551986c0783848fd101d23076bea147944f20bcbf1999ea8e1d68e5c47e",
+    "fixture_sha256": "f1fbeaaac939afa855e9802c2f966cb599efac2840603fa8ae4c878a6e2a5a2d"
+  }
+]

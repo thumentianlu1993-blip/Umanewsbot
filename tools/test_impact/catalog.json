@@ -889,6 +889,20 @@
       "stable.test_japan_automation",
       "stable.test_japan_name_registration",
       "stable.test_japan_public_fields"
+    ],
+    "hkjc_source_acceptance": [
+      "stable.test_hkjc_automation",
+      "stable.test_race_pre_race",
+      "stable.test_pre_race_refresh",
+      "stable.test_pre_race_review_fixes",
+      "stable.test_race_multisource_regions",
+      "stable.test_race_multisource_identity",
+      "stable.test_race_multisource_conversion",
+      "stable.test_race_multisource_enrollment",
+      "stable.test_race_multisource_postgres",
+      "stable.test_japan_automation",
+      "stable.test_japan_public_fields",
+      "stable.tests_legacy.RaceEventPageMVPTests"
     ]
   },
   "dependencies": {
@@ -955,7 +969,8 @@
       "module:stable.test_race_pre_race",
       "module:stable.test_race_multisource_identity",
       "race_parser"
-    ]
+    ],
+    "hkjc_source_acceptance": []
   },
   "tests": {
     ".codex/scripts/test_graded_race_participants_workflow.py": {
@@ -2860,6 +2875,12 @@
       "domains": [
         "japan_race_automation"
       ]
+    },
+    "server/stable/test_hkjc_automation.py": {
+      "label": "stable.test_hkjc_automation",
+      "domains": [
+        "hkjc_source_acceptance"
+      ]
     }
   },
   "profiles": {
@@ -3261,7 +3282,8 @@
     "horse_basic_profile_prepare_command": "integration: H03缓存prepare-only命令与私有待审产物合同",
     "horse_basic_profile_review_input": "integration: H03独立已审输入与原消费者事务/重放合同",
     "lifecycle_authorization_renewal": "integration: 生命周期原范围续期与 TRA 显式许可截止日期",
-    "japan_race_automation": "integration: JRA/NAR通用来源、受控候选与历史回填"
+    "japan_race_automation": "integration: JRA/NAR通用来源、受控候选与历史回填",
+    "hkjc_source_acceptance": "integration: HKJC全季目录、正式赛果、分阶段赛前与候选公开"
   },
   "dedicated_batch_modules": [
     "stable.test_migration_history_repair_postgres",

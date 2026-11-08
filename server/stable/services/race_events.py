@@ -7083,6 +7083,10 @@ def apply_data_candidate(candidate: RaceEventDataCandidate, *, user: User | None
         isinstance(candidate.raw_payload, dict) and "nar_pre_race_v1" in candidate.raw_payload
     ):
         raise ValueError("nar_pre_race_candidate_requires_controlled_path")
+    if candidate.source_name == "hkjc_pre_race_v1" or (
+        isinstance(candidate.raw_payload, dict) and "hkjc_pre_race_v1" in candidate.raw_payload
+    ):
+        raise ValueError("hkjc_pre_race_candidate_requires_controlled_path")
     event = candidate.event
     payload = candidate.candidate_payload or {}
     module = candidate.module

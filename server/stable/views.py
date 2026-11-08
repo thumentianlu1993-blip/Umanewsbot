@@ -4044,8 +4044,9 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
     }
     from .services.race_pre_race import public_jra_preview, public_reviewed_preview
     from .services.nar_pre_race import public_nar_preview
+    from .services.hkjc_pre_race import public_hkjc_preview
     from .services.race_pre_race_refresh import public_refresh_preview
-    preview = public_refresh_preview(event, now=read_now) or public_jra_preview(event, now=read_now) or public_nar_preview(event, now=read_now) or public_reviewed_preview(event, now=read_now)
+    preview = public_refresh_preview(event, now=read_now) or public_jra_preview(event, now=read_now) or public_nar_preview(event, now=read_now) or public_hkjc_preview(event, now=read_now) or public_reviewed_preview(event, now=read_now)
     runners = _sort_runners_for_display(preview["rows"] if preview else list(event.runners.all()), event.country_region)
     has_current_live_revision = bool(projection_control and projection_control.write_owner != "historical" and (
         current_result_revision is not None or projection_control.write_owner in {"data_sync", "live"}))

@@ -161,7 +161,7 @@ def seed_evidence(event, *, candidate_id=None, route=None):
     for candidate in qs.order_by("-fetched_at", "-id")[:10]:
         if route and not route.permits_url(candidate.source_url):
             continue
-        for key in ("jra_pre_race_v1", "nar_pre_race_v1", "reviewed_pre_race_v1", "pre_race_refresh_v1"):
+        for key in ("jra_pre_race_v1", "nar_pre_race_v1", "hkjc_pre_race_v1", "reviewed_pre_race_v1", "pre_race_refresh_v1"):
             meta = (candidate.raw_payload or {}).get(key, {})
             if meta.get("validated") is not True or meta.get("baseline") != baseline(
                 event
@@ -184,6 +184,19 @@ def seed_evidence(event, *, candidate_id=None, route=None):
                     or urlsplit(candidate.source_url).hostname != "www.keiba.go.jp"
                     or urlsplit(candidate.source_url).path != "/KeibaWeb/TodayRaceInfo/DebaTable"):
                     continue
+            if key == "hkjc_pre_race_v1":
+                numbers = [str(r.get("horse_number", "")) for r in items]
+                if (meta.get("stage") != "numbered" or not all(n.isdigit() for n in numbers)
+                    or len(set(numbers)) != len(numbers)
+                    or urlsplit(candidate.source_url).hostname != "racing.hkjc.com"
+                    or urlsplit(candidate.source_url).path != "/en-us/local/information/racecard"):
+                    continue
+                from .hkjc_sources import identity
+                try:
+                    day,course,_=identity(candidate.source_url)
+                except ValueError:
+                    continue
+                if day != event.local_date or event.country_region != 'hong_kong':continue
             if (
                 meta.get("items_sha256")
                 and canonical_sha(items) != meta["items_sha256"]

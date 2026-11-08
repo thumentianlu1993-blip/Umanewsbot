@@ -1,0 +1,286 @@
+{
+  "as_of": "2026-11-08T16:33:20.754165+00:00",
+  "start": "2026-09-01",
+  "end": "2026-12-31",
+  "season_count": 35,
+  "pattern_sha256": "3b7d032b248b7d925ec0327f2c6de952c8618a32fd906a5c8e9438485d1f0c33",
+  "targets": [
+    {
+      "local_date": "2026-09-06",
+      "name": "HKSAR Chief Executive's Cup (H)",
+      "grade": "G3",
+      "prize_hkd": 4200000,
+      "distance_m": 1200,
+      "racecourse": "Sha Tin",
+      "status": "complete_result",
+      "url": "https://racing.hkjc.com/en-us/local/information/localresults?racedate=2026%2F09%2F06&Racecourse=ST&RaceNo=3",
+      "count": 6
+    },
+    {
+      "local_date": "2026-09-27",
+      "name": "Celebration Cup (H)",
+      "grade": "G3",
+      "prize_hkd": 4200000,
+      "distance_m": 1400,
+      "racecourse": "Sha Tin",
+      "status": "complete_result",
+      "url": "https://racing.hkjc.com/en-us/local/information/localresults?racedate=2026%2F09%2F27&Racecourse=ST&RaceNo=8",
+      "count": 9
+    },
+    {
+      "local_date": "2026-10-01",
+      "name": "National Day Cup (H)",
+      "grade": "G3",
+      "prize_hkd": 4200000,
+      "distance_m": 1000,
+      "racecourse": "Sha Tin",
+      "status": "complete_result",
+      "url": "https://racing.hkjc.com/en-us/local/information/localresults?racedate=2026%2F10%2F01&Racecourse=ST&RaceNo=3",
+      "count": 8
+    },
+    {
+      "local_date": "2026-10-19",
+      "name": "Sha Tin Trophy (H)",
+      "grade": "G2",
+      "prize_hkd": 5350000,
+      "distance_m": 1600,
+      "racecourse": "Sha Tin",
+      "status": "complete_result",
+      "url": "https://racing.hkjc.com/en-us/local/information/localresults?racedate=2026%2F10%2F19&Racecourse=ST&RaceNo=8",
+      "count": 12
+    },
+    {
+      "local_date": "2026-10-25",
+      "name": "Lukfook Jewellery Premier Bowl (H)",
+      "grade": "G2",
+      "prize_hkd": 5350000,
+      "distance_m": 1200,
+      "racecourse": "Sha Tin",
+      "status": "complete_result",
+      "url": "https://racing.hkjc.com/en-us/local/information/localresults?racedate=2026%2F10%2F25&Racecourse=ST&RaceNo=7",
+      "count": 9
+    },
+    {
+      "local_date": "2026-11-08",
+      "name": "Sa Sa Ladies’ Purse (H)",
+      "grade": "G3",
+      "prize_hkd": 4200000,
+      "distance_m": 1800,
+      "racecourse": "Sha Tin",
+      "status": "complete_result",
+      "url": "https://racing.hkjc.com/en-us/local/information/localresults?racedate=2026%2F11%2F08&Racecourse=ST&RaceNo=8",
+      "count": 13
+    },
+    {
+      "local_date": "2026-11-22",
+      "name": "BOCHK Jockey Club Cup",
+      "grade": "G2",
+      "prize_hkd": 5350000,
+      "distance_m": 2000,
+      "racecourse": "Sha Tin",
+      "status": "not_published",
+      "url": "https://racing.hkjc.com/en-us/local/information/entries?racedate=2026%2F11%2F22&Racecourse=ST&View=All",
+      "count": 0
+    },
+    {
+      "local_date": "2026-11-22",
+      "name": "BOCHK Private Banking Jockey Club Sprint",
+      "grade": "G2",
+      "prize_hkd": 5350000,
+      "distance_m": 1200,
+      "racecourse": "Sha Tin",
+      "status": "not_published",
+      "url": "https://racing.hkjc.com/en-us/local/information/entries?racedate=2026%2F11%2F22&Racecourse=ST&View=All",
+      "count": 0
+    },
+    {
+      "local_date": "2026-11-22",
+      "name": "BOCHK Private Wealth Jockey Club Mile",
+      "grade": "G2",
+      "prize_hkd": 5350000,
+      "distance_m": 1600,
+      "racecourse": "Sha Tin",
+      "status": "not_published",
+      "url": "https://racing.hkjc.com/en-us/local/information/entries?racedate=2026%2F11%2F22&Racecourse=ST&View=All",
+      "count": 0
+    },
+    {
+      "local_date": "2026-12-13",
+      "name": "LONGINES Hong Kong Cup",
+      "grade": "G1",
+      "prize_hkd": 40000000,
+      "distance_m": 2000,
+      "racecourse": "Sha Tin",
+      "status": "registration",
+      "url": "https://campaigns.hkjc.com/racing-event-hub-hkir/en/hkcup-racing-info?b_cid=CSLDSPA_2627RACEH_HKIR_Home_RaceHL",
+      "count": 72
+    },
+    {
+      "local_date": "2026-12-13",
+      "name": "LONGINES Hong Kong Mile",
+      "grade": "G1",
+      "prize_hkd": 36000000,
+      "distance_m": 1600,
+      "racecourse": "Sha Tin",
+      "status": "registration",
+      "url": "https://campaigns.hkjc.com/racing-event-hub-hkir/en/hkmile-racing-info?b_cid=CSLDSPA_2627RACEH_HKIR_Home_RaceHL",
+      "count": 54
+    },
+    {
+      "local_date": "2026-12-13",
+      "name": "LONGINES Hong Kong Sprint",
+      "grade": "G1",
+      "prize_hkd": 28000000,
+      "distance_m": 1200,
+      "racecourse": "Sha Tin",
+      "status": "registration",
+      "url": "https://campaigns.hkjc.com/racing-event-hub-hkir/en/hksprint-racing-info?b_cid=CSLDSPA_2627RACEH_HKIR_Home_RaceHL",
+      "count": 21
+    },
+    {
+      "local_date": "2026-12-13",
+      "name": "LONGINES Hong Kong Vase",
+      "grade": "G1",
+      "prize_hkd": 26000000,
+      "distance_m": 2400,
+      "racecourse": "Sha Tin",
+      "status": "registration",
+      "url": "https://campaigns.hkjc.com/racing-event-hub-hkir/en/hkvase-racing-info?b_cid=CSLDSPA_2627RACEH_HKIR_Home_RaceHL",
+      "count": 59
+    }
+  ],
+  "receipts": [
+    {
+      "url": "https://racing.hkjc.com/en-us/local/information/resultsall?racedate=2026%2F09%2F06&Racecourse=ST",
+      "sha256": "9d8eb3d6568ba8f6f673d67cf10ed8d0afe9fb94eb62c00c5871562605d2311f",
+      "bytes": 353896,
+      "file": "a7cfcd435a781cbfd6366029c6c2254892c3ccc7b1f10aa9a160ca25685d1c0c.html"
+    },
+    {
+      "url": "https://racing.hkjc.com/en-us/local/information/localresults?racedate=2026%2F09%2F06&Racecourse=ST&RaceNo=3",
+      "sha256": "0d765e9172c056212061b7dc9e3c83e39bc1214b0709def73c5aa1e7fcffe678",
+      "bytes": 199400,
+      "file": "c9a0bb93bbe4b5c1da8a431f29ba22ead955336d33036ac116bff75a7adf3bcc.html"
+    },
+    {
+      "url": "https://racing.hkjc.com/en-us/local/information/resultsall?racedate=2026%2F09%2F27&Racecourse=ST",
+      "sha256": "b8ac6f6e81601f291721956ad585852198b153f5dd1ac744fb9ed481fc8c5cbd",
+      "bytes": 332687,
+      "file": "bafe16b855334a1cb3b3a8808e8a81b1ac2b895a0a25d030a8bf625b679795c2.html"
+    },
+    {
+      "url": "https://racing.hkjc.com/en-us/local/information/localresults?racedate=2026%2F09%2F27&Racecourse=ST&RaceNo=8",
+      "sha256": "dc3a5187c08fc42b06d865847252d002a2b097597a64c99acfbb01082496fa58",
+      "bytes": 209779,
+      "file": "4c109d73cb19559ee52b7721ada0367b881bd2b3d2ab281fee7a60ba6e8f8ab4.html"
+    },
+    {
+      "url": "https://racing.hkjc.com/en-us/local/information/resultsall?racedate=2026%2F10%2F01&Racecourse=ST",
+      "sha256": "445671be17a8e1df048284fe545a3e5f8643be000cda2a3158902dfa1754fa9f",
+      "bytes": 317144,
+      "file": "17ff1f9bb7825e95587c427369dea862107852883f1e059ddbcbdf3c19035360.html"
+    },
+    {
+      "url": "https://racing.hkjc.com/en-us/local/information/localresults?racedate=2026%2F10%2F01&Racecourse=ST&RaceNo=3",
+      "sha256": "1c19249b764263da05cb170c41cba222063f57aee20c3e923eaf58e0295e0362",
+      "bytes": 203137,
+      "file": "ad0f8559a6486d5d80b3232b712d27d465ded98c85e1577597b5781a712bf46e.html"
+    },
+    {
+      "url": "https://racing.hkjc.com/en-us/local/information/resultsall?racedate=2026%2F10%2F19&Racecourse=ST",
+      "sha256": "157273761ac0a8e96cc18df7852ff53ef5e433e5e6e055d14e07a9b9ee0ae269",
+      "bytes": 318047,
+      "file": "9bbdd84c4bae19c3724d1d512fd99aae5682c30744830c84927d686773e16ac3.html"
+    },
+    {
+      "url": "https://racing.hkjc.com/en-us/local/information/localresults?racedate=2026%2F10%2F19&Racecourse=ST&RaceNo=8",
+      "sha256": "41b856f4e9dd6c22e72f38c85ea7f9b85bef4ed404bb84550f9d6142e915bc10",
+      "bytes": 216632,
+      "file": "0897bd17e76c0a6622895648165861da461cb79048d18ac974d65095646495fc.html"
+    },
+    {
+      "url": "https://racing.hkjc.com/en-us/local/information/resultsall?racedate=2026%2F10%2F25&Racecourse=ST",
+      "sha256": "cc7108d201b696111dc376eed93d987a33cd26f88043ec4f4c5e276298d25154",
+      "bytes": 326272,
+      "file": "f26b5d53c2646b593c6f41a803504f8e3361388f9c8aa2aabacb612ad40b20a0.html"
+    },
+    {
+      "url": "https://racing.hkjc.com/en-us/local/information/localresults?racedate=2026%2F10%2F25&Racecourse=ST&RaceNo=7",
+      "sha256": "49cfd29fc4e652fcb2315fccbbd8d6e7404b08b0a63c36dbd123cd242beb066e",
+      "bytes": 206541,
+      "file": "8f2811672dab85845e2629c46ba337334bace124dcde73c6c815e175f7b00aa0.html"
+    },
+    {
+      "url": "https://racing.hkjc.com/en-us/local/information/resultsall?racedate=2026%2F11%2F08&Racecourse=ST",
+      "sha256": "7cb676b88a999ec7a52f36673e3850307336da9457cd874e9db6e67ad196c7c4",
+      "bytes": 300563,
+      "file": "139339c4285c1ffddb8aa39faf574e8d01dc4e1da999fcc85b2479157816944b.html"
+    },
+    {
+      "url": "https://racing.hkjc.com/en-us/local/information/localresults?racedate=2026%2F11%2F08&Racecourse=ST&RaceNo=8",
+      "sha256": "1039c4e9fbd25e1b6740eb25b74502f09d3e362dc2db372e566948c92fec47f2",
+      "bytes": 224763,
+      "file": "2386fe3fc2ece68fd03e0e8a072470884b5f7fc4ef6c93bf576c3932d29b26c5.html"
+    },
+    {
+      "url": "https://racing.hkjc.com/en-us/local/information/racecard?racedate=2026%2F11%2F22&Racecourse=ST",
+      "sha256": "a803c7a930b03859b17c79774fdb50f7fa3fec58699f96e390bdcbcc2be671d2",
+      "bytes": 120461,
+      "file": "b230f12e2ca94d81e5280db0851f45043eb6d4e93eca07f51899dd94a98df97b.html"
+    },
+    {
+      "url": "https://racing.hkjc.com/en-us/local/information/entries?racedate=2026%2F11%2F22&Racecourse=ST&View=All",
+      "sha256": "523c1551986c0783848fd101d23076bea147944f20bcbf1999ea8e1d68e5c47e",
+      "bytes": 121522,
+      "file": "57cd05ccbd32ca632554ccf28eba6356a94eb2bcc51492bbf73b0fcf8ac10f1e.html"
+    },
+    {
+      "url": "https://campaigns.hkjc.com/racing-event-hub-hkir/en/",
+      "sha256": "34a980de48488eecb2a260ced7a3422e0f0beee0acb36ae842f92be197a8b742",
+      "bytes": 306506,
+      "file": "d4098d042a34684bc2c5fe1033fa1278354f41ec726b82ccec8e65bdc9744dec.html"
+    },
+    {
+      "url": "https://campaigns.hkjc.com/racing-event-hub-hkir/en/hkcup-racing-info?b_cid=CSLDSPA_2627RACEH_HKIR_Home_RaceHL",
+      "sha256": "836fa5b4add37117de4811375c88e12cf5bdf95f8a3d43f9a917549fd1795710",
+      "bytes": 144950,
+      "file": "fff3d059ff9bb2815dd12a30555e0d62e815fada73eb290f6460861fd05347c3.html"
+    },
+    {
+      "url": "https://campaigns.hkjc.com/racing-event-hub-hkir/en/hkmile-racing-info?b_cid=CSLDSPA_2627RACEH_HKIR_Home_RaceHL",
+      "sha256": "c4ef2a07442d71d687968e4ab2bd604ac42772fd75da7d0fa3ccb85396ba1cdd",
+      "bytes": 141116,
+      "file": "33e9f0488a1d4c435f50d48ebbcccc417cc0d94ad302b193e9d198a246a2ce42.html"
+    },
+    {
+      "url": "https://campaigns.hkjc.com/racing-event-hub-hkir/en/hksprint-racing-info?b_cid=CSLDSPA_2627RACEH_HKIR_Home_RaceHL",
+      "sha256": "847d2e4b82f5f8ef6fb378091ee3c6fec96900314cd8cfe1fe7fd37585577ec4",
+      "bytes": 134598,
+      "file": "d8e51112b6b4a7ddea8fb04d92f461866dda72a08c6ea6567ae085c487a85b6e.html"
+    },
+    {
+      "url": "https://campaigns.hkjc.com/racing-event-hub-hkir/en/hkvase-racing-info?b_cid=CSLDSPA_2627RACEH_HKIR_Home_RaceHL",
+      "sha256": "0ff595695b7c8514cfea7b8a28c4e4e4fe1d08a125fee8e211b1bee736781fd9",
+      "bytes": 142602,
+      "file": "ae5a0eb888f649969bcb3e6dd5d96208a22bfec5d3cae5940d206fde58be1db6.html"
+    },
+    {
+      "url": "https://racing.hkjc.com/en-us/local/information/racecard?racedate=2026%2F12%2F13&Racecourse=ST",
+      "sha256": "a803c7a930b03859b17c79774fdb50f7fa3fec58699f96e390bdcbcc2be671d2",
+      "bytes": 120461,
+      "file": "8fef9a058bfad5512e6f7244f4362bfb64a59df431bbe0659702e0506c6eefae.html"
+    },
+    {
+      "url": "https://racing.hkjc.com/en-us/local/information/entries?racedate=2026%2F12%2F13&Racecourse=ST&View=All",
+      "sha256": "523c1551986c0783848fd101d23076bea147944f20bcbf1999ea8e1d68e5c47e",
+      "bytes": 121522,
+      "file": "404e281578033d88905fc09e4c773ba8867586aff1e0a9fcc607fd93747ab2cf.html"
+    }
+  ],
+  "notes": [
+    "季目录 35 = 32 分级赛 + 3 LR；窗口验收 13 分级赛。",
+    "11/22 完整名单尚未公布；新闻已证实 Docklands 海外报名马会杯，另外两场无海外报名。",
+    "源页单独未提供热门排名，不按赔率推造。",
+    "生产未修改；自然阶段转换另待发布后实况。"
+  ]
+}

@@ -1467,6 +1467,24 @@
     ],
     "docs/changes/japan-race-public-fields/ci-scope.json": [
       "infrastructure"
+    ],
+    "server/stable/services/hkjc_sources.py": [
+      "hkjc_source_acceptance"
+    ],
+    "server/stable/services/hkjc_pre_race.py": [
+      "hkjc_source_acceptance"
+    ],
+    "server/stable/management/commands/verify_hkjc_sources.py": [
+      "hkjc_source_acceptance"
+    ],
+    "server/stable/fixtures/hkjc_automation/**": [
+      "hkjc_source_acceptance"
+    ],
+    "docs/changes/hkjc-source-acceptance/source_evidence.json": [
+      "hkjc_source_acceptance"
+    ],
+    "docs/changes/hkjc-source-acceptance/ci-scope.json": [
+      "infrastructure"
     ]
   },
   "symbols": {
@@ -1635,6 +1653,7 @@
   ],
   "reviewed_change_scopes": [
     "docs/changes/japan-race-automation/ci-scope.json",
-    "docs/changes/japan-race-public-fields/ci-scope.json"
+    "docs/changes/japan-race-public-fields/ci-scope.json",
+    "docs/changes/hkjc-source-acceptance/ci-scope.json"
   ]
 }
