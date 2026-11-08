@@ -971,7 +971,10 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
                 and item.matched_text
                 and (item.field_name, item.start, item.end) not in consumed_entity_keys
             )
-        )[:unknown_horse_limit]
+        )
+        from stable.services.horse_name_policy import enabled as hkjc_horse_names_enabled
+        if not hkjc_horse_names_enabled():
+            unknown_horse_names = unknown_horse_names[:unknown_horse_limit]
         _, horse_placeholders = self._protect_unknown_horse_names("", unknown_horse_names)
         horse_protected_title = apply_contextual_horse_placeholders(
             seed_term_plan.protected_title,

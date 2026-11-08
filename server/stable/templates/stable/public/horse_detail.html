@@ -1,7 +1,7 @@
 {% extends "stable/public/base.html" %}
 {% load race_information %}
 
-{% block title %}{{ profile.display_name }}{% endblock %}
+{% block title %}{{ profile.public_display_name }}{% endblock %}
 
 {% block content %}
   <main class="horse-page">
@@ -10,9 +10,9 @@
       <div class="horse-hero-top">
         <div class="horse-hero-main">
           <span class="horse-hero-kicker">{{ profile.get_racing_region_display }} · {{ profile.public_completeness_badge }}</span>
-          <h1 class="horse-hero-name">{{ profile.display_name }}</h1>
-          <p class="horse-hero-original">{{ profile.original_name|default:profile.english_name }}{% if profile.birth_date %} · {{ profile.birth_date|date:"Y" }} 年生{% endif %}{% if profile.color %} · {{ profile.color }}{% endif %}{% if profile.sex %} · {{ profile.sex }}{% endif %}</p>
-          {% if not profile.display_name_zh and not profile.primary_term.target_zh %}<p class="muted">中文译名待补</p>{% endif %}
+          <h1 class="horse-hero-name">{{ profile.public_display_name }}</h1>
+          <p class="horse-hero-original">{{ profile.public_original_name }}{% if profile.birth_date %} · {{ profile.birth_date|date:"Y" }} 年生{% endif %}{% if profile.color %} · {{ profile.color }}{% endif %}{% if profile.sex %} · {{ profile.sex }}{% endif %}</p>
+          {% if not profile.public_has_chinese_name %}<p class="muted">中文译名待补</p>{% endif %}
           <div class="horse-hero-meta">
             {% if profile.trainer_name %}<span>练马师：{{ profile.trainer_name }}</span>{% endif %}
             {% if major_wins %}<span>主胜鞍：{% for record in major_wins|slice:":3" %}{% race_field record "name" record.display_race_name %}{% if not forloop.last %} / {% endif %}{% endfor %}</span>{% endif %}
@@ -34,11 +34,11 @@
       </div>{% if profile.intro %}<p class="horse-intro">{{ profile.intro }}</p>{% endif %}</section>
     {% endif %}
 
-    {% if profile.sire_text or profile.dam_text or profile.sire_sire_text or profile.sire_dam_text or profile.dam_sire_text or profile.dam_dam_text %}
+    {% if profile.public_sire_text or profile.public_dam_text or profile.public_sire_sire_text or profile.public_sire_dam_text or profile.public_dam_sire_text or profile.public_dam_dam_text %}
       <section class="panel"><h2>血统</h2><div class="pedigree-grid">
-        {% if profile.sire_text %}<div><span>父</span><strong>{% if profile.sire_horse_profile.is_public %}<a href="{{ profile.sire_horse_profile.public_path }}">{{ profile.sire_text }}</a>{% else %}{{ profile.sire_text }}{% endif %}</strong></div>{% endif %}
-        {% if profile.dam_text %}<div><span>母</span><strong>{% if profile.dam_horse_profile.is_public %}<a href="{{ profile.dam_horse_profile.public_path }}">{{ profile.dam_text }}</a>{% else %}{{ profile.dam_text }}{% endif %}</strong></div>{% endif %}
-        {% if profile.sire_sire_text %}<div><span>父父</span><strong>{{ profile.sire_sire_text }}</strong></div>{% endif %}{% if profile.sire_dam_text %}<div><span>父母</span><strong>{{ profile.sire_dam_text }}</strong></div>{% endif %}{% if profile.dam_sire_text %}<div><span>母父</span><strong>{{ profile.dam_sire_text }}</strong></div>{% endif %}{% if profile.dam_dam_text %}<div><span>母母</span><strong>{{ profile.dam_dam_text }}</strong></div>{% endif %}
+        {% if profile.public_sire_text %}<div><span>父</span><strong>{% if profile.sire_horse_profile.is_public %}<a href="{{ profile.sire_horse_profile.public_path }}">{{ profile.public_sire_text }}</a>{% else %}{{ profile.public_sire_text }}{% endif %}</strong></div>{% endif %}
+        {% if profile.public_dam_text %}<div><span>母</span><strong>{% if profile.dam_horse_profile.is_public %}<a href="{{ profile.dam_horse_profile.public_path }}">{{ profile.public_dam_text }}</a>{% else %}{{ profile.public_dam_text }}{% endif %}</strong></div>{% endif %}
+        {% if profile.public_sire_sire_text %}<div><span>父父</span><strong>{{ profile.public_sire_sire_text }}</strong></div>{% endif %}{% if profile.public_sire_dam_text %}<div><span>父母</span><strong>{{ profile.public_sire_dam_text }}</strong></div>{% endif %}{% if profile.public_dam_sire_text %}<div><span>母父</span><strong>{{ profile.public_dam_sire_text }}</strong></div>{% endif %}{% if profile.public_dam_dam_text %}<div><span>母母</span><strong>{{ profile.public_dam_dam_text }}</strong></div>{% endif %}
       </div></section>
     {% endif %}
 

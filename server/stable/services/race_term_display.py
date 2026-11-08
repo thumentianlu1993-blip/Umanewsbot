@@ -14,6 +14,8 @@ from __future__ import annotations
 from typing import Dict, Optional, Set, Tuple
 
 from stable.models import TermAlias, TermEntry, TermType
+from stable.services.horse_name_policy import effective_target, enabled as hkjc_names_enabled, race_original, safe_original
+from types import SimpleNamespace
 
 
 def _normalize(name: str) -> str:
@@ -240,7 +242,7 @@ class RaceTermResolver:
 # 新模式先合并主名和别名，再按实体去重；legacy路径保持原样。
 import unicodedata
 from dataclasses import replace
-from django.db.models import Value
+from django.db.models import Q, Value
 from django.db.models.functions import Upper
 from stable.services.race_field_normalization import display_field
 
@@ -269,41 +271,51 @@ class StrictRaceTermResolver:
             folded_names = [Upper(Value(name)) for name in variants]
             regions = {r[2] for r in requests} | {''}
             candidates = []
+            horse_policy = term_type == TermType.HORSE and hkjc_names_enabled()
+            chinese_names = {r[0].strip() for r in requests if not safe_original(r[0])} if horse_policy else set()
+            name_filter = Q(_display_name_upper__in=folded_names)
+            if chinese_names:
+                name_filter |= Q(target_zh__in=chinese_names)
             entries = TermEntry.objects.alias(_display_name_upper=Upper('source_ja')).filter(
-                _display_name_upper__in=folded_names, term_type=term_type, is_active=True,
+                name_filter, term_type=term_type, is_active=True,
                 racing_region__in=regions).order_by().values(
-                'id', 'source_ja', 'target_zh', 'racing_region', 'source_language')
+                'id', 'source_ja', 'target_zh', 'racing_region', 'source_language', 'notes', 'translation_status')
             for entry in entries:
-                candidates.append((entry['id'], display_identity(entry['source_ja']), entry['target_zh'],
-                                   entry['racing_region'], entry['source_language']))
+                candidates.append((entry['id'], display_identity(entry['source_ja']), effective_target(SimpleNamespace(**entry, term_type=term_type)),
+                                   entry['racing_region'], entry['source_language'], entry['source_ja']))
+                if entry['target_zh'] in chinese_names:
+                    candidates.append((entry['id'], display_identity(entry['target_zh']),
+                                       effective_target(SimpleNamespace(**entry, term_type=term_type)),
+                                       entry['racing_region'], None, entry['source_ja']))
             # 以下选择按实体去重，不依赖模型默认排序或priority。
             aliases = TermAlias.objects.alias(_display_name_upper=Upper('text')).filter(
                 _display_name_upper__in=folded_names, term__term_type=term_type, is_active=True,
                 term__is_active=True, term__racing_region__in=regions).order_by().values(
-                'term_id', 'text', 'term__target_zh', 'term__racing_region', 'source_language')
+                'term_id', 'text', 'term__target_zh', 'term__racing_region', 'source_language', 'term__notes', 'term__translation_status', 'term__source_ja')
             for alias in aliases:
-                candidates.append((alias['term_id'], display_identity(alias['text']), alias['term__target_zh'],
-                                   alias['term__racing_region'], alias['source_language']))
+                candidates.append((alias['term_id'], display_identity(alias['text']), effective_target(SimpleNamespace(target_zh=alias['term__target_zh'], notes=alias['term__notes'], translation_status=alias['term__translation_status'], term_type=term_type)),
+                                   alias['term__racing_region'], alias['source_language'], alias['term__source_ja']))
             for req in requests:
                 name, _, region, language, year = req
-                found = [c for c in candidates if c[1] == display_identity(name) and (not language or c[4] == language)]
+                found = [c for c in candidates if c[1] == display_identity(name) and (not language or c[4] is None or c[4] == language)]
                 local = [c for c in found if c[3] == region]
                 tier = local if local else [c for c in found if c[3] == '']
                 by_entity = {c[0]: c for c in tier}
                 context = {'type': term_type, 'region': region, 'language': language, 'year': year}
                 if len(by_entity) == 1:
                     candidate = next(iter(by_entity.values()))
-                    self.results[req] = display_field(name, candidate[2] or name, context=context,
+                    self.results[req] = display_field(name, candidate[2] or (race_original(name, candidate[5]) if horse_policy else name), context=context,
                                                       state='normalized' if candidate[2] else 'preserved',
                                                       reason='formal_term' if candidate[2] else 'untranslated_term')
                 else:
                     # 专名冲突保留原名，原因仍记录为 conflict，不选任意实体。
                     self.results[req] = replace(display_field(name, ' '.join(name.split()), state='conflict' if by_entity else 'preserved',
-                                                      reason='term_conflict' if by_entity else 'term_missing', context=context), text=' '.join(name.split()))
+                                                      reason='term_conflict' if by_entity else 'term_missing', context=context), text=race_original(' '.join(name.split())) if horse_policy else ' '.join(name.split()))
         return self
 
     def field(self, value, term_type, region='', language='', year=None):
         key = (str(value or ''), term_type, region or '', language or '', year)
         if not value:
             return display_field(value, state='missing', reason='missing')
-        return self.results.get(key, display_field(value, ' '.join(str(value).split()), state='preserved', reason='term_missing'))
+        fallback = race_original(' '.join(str(value).split())) if term_type == TermType.HORSE else ' '.join(str(value).split())
+        return self.results.get(key, display_field(value, fallback, state='preserved', reason='term_missing'))

@@ -20,15 +20,15 @@
             {% csrf_token %}
             <input type="hidden" name="next" value="{{ request.get_full_path }}">
             {% if profile.is_following %}
-              <button class="follow-btn active" type="submit" name="intent" value="unfollow" aria-label="取消关注 {{ profile.display_name }}">★ 已关注</button>
+              <button class="follow-btn active" type="submit" name="intent" value="unfollow" aria-label="取消关注 {{ profile.public_display_name }}">★ 已关注</button>
             {% else %}
               <input type="hidden" name="include_descendants" value="1">
-              <button class="follow-btn" type="submit" aria-label="关注 {{ profile.display_name }}">☆ 关注</button>
+              <button class="follow-btn" type="submit" aria-label="关注 {{ profile.public_display_name }}">☆ 关注</button>
             {% endif %}
           </form>
           <div class="horse-card-top"><span class="region-mark"></span><span class="region-label">{{ profile.get_racing_region_display }}</span></div>
-          <h2 class="horse-card-name"><a href="{{ profile.public_list_detail_url|default:profile.public_path }}">{{ profile.display_name }}</a></h2>
-          <p class="horse-card-original">{{ profile.original_name|default:profile.english_name|default:"资料整理中" }}</p>
+          <h2 class="horse-card-name"><a href="{{ profile.public_list_detail_url|default:profile.public_path }}">{{ profile.public_display_name }}</a></h2>
+          <p class="horse-card-original">{{ profile.public_original_name|default:"资料整理中" }}</p>
           <p class="muted">{{ profile.public_completeness_badge }}</p>
           <div class="horse-record" aria-label="战绩">
             <span>{{ profile.starts_count }} 战</span><b>{{ profile.wins_count }} 冠</b><span>{{ profile.seconds_count }} 亚</span><span>{{ profile.thirds_count }} 季</span>

@@ -484,8 +484,11 @@ def p0_horse_hits(
         article.body_ja_normalized or article.body_ja_raw,
         source_language=article.source_language or SourceLanguage.JAPANESE,
     )
+    from .horse_name_policy import enabled as hkjc_names_enabled
     for entity in resolution.entities:
-        if entity.entity_type != "horse" or not entity.term_id or not entity.target_zh or entity.term_id in seen:
+        # 名称显示资格不改变既有实体命中及新闻价值信号。
+        had_target = entity.target_zh or (hkjc_names_enabled() and entity.has_stored_target)
+        if entity.entity_type != "horse" or not entity.term_id or not had_target or entity.term_id in seen:
             continue
         seen.add(entity.term_id)
         hits.append(

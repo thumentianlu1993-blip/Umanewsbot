@@ -1,0 +1,53 @@
+{
+  "schema": "hkjc-horse-name-impact.v1",
+  "read_only": true,
+  "observed_at": "2026-11-08T16:41:18.729286+00:00",
+  "migration": "0079_multisource_race_enrollment",
+  "term_counts": {
+    "hidden": 6417,
+    "retained": 15180
+  },
+  "source_counts": [
+    {
+      "source": "JRA",
+      "disposition": "hidden",
+      "count": 1
+    },
+    {
+      "source": "hkjc",
+      "disposition": "hidden",
+      "count": 2410
+    },
+    {
+      "source": "hkjc",
+      "disposition": "retained",
+      "count": 1946
+    },
+    {
+      "source": "hkjc_overseas",
+      "disposition": "hidden",
+      "count": 836
+    },
+    {
+      "source": "hkjc_overseas",
+      "disposition": "retained",
+      "count": 13234
+    },
+    {
+      "source": "unspecified",
+      "disposition": "hidden",
+      "count": 1417
+    },
+    {
+      "source": "wpstud",
+      "disposition": "hidden",
+      "count": 1753
+    }
+  ],
+  "published_articles": 3566,
+  "potential_article_count": 3443,
+  "metadata_supported_article_count": 2701,
+  "collector_sha256": "8d1b20ef280b34f6899dd3dfcb5048169deb9167b95bc3f12a8904d87a2fa691",
+  "report_sha256": "2e54af44db983e12eec1d93cacf19c92d0486b0500912b9ff0e7412703db7e11",
+  "interpretation": "文本命中为待核对候选；translation_metadata_match 表示现存翻译元数据亦包含对应马匹，不代表独立人工确认。"
+}
