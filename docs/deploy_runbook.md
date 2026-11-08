@@ -1,3 +1,10 @@
+## 2026-11-09 HKJC 组合发布及外置脚本恢复
+
+代码 `32cf8e34` / schema0079 已部署。首次激活因外置脚本Python导入路径缺失在写库前失败，自动恢复原配置和四服务；
+修正版仅给dry-run/apply临时进程设置 `PYTHONPATH=/app/server`，独立复审及用户确认后以 `resume-activation` 完成激活。
+续跑复用原备份和已部署镜像，不重跑deploy；43场日本绑定与新policy须保持一致。
+当前验收状态、固定SHA及恢复边界见[组合发布记录](changes/hkjc-source-acceptance/release_evidence.md)。
+
 ## 2026-11-03 QQ下线发布的依赖兼容故障
 
 68063962同schema发布及OneBot停止已执行，但Celery最终验收发现新解析的Kombu 5.7.0不支持固定redis 5.2.1。三个失败后台服务已停止，web健康，QQ保持关闭，队列保留。恢复须使用经过兼容验证的前向候选与精确包，不回滚旧镜像，不改写已有intent或完成收据。详见[执行记录](changes/qq-retirement-20261103/rollout.md)。构建成功、容器Running及发布入口退出0不能替代真实worker/broker就绪证明。
