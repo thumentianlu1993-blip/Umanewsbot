@@ -143,6 +143,25 @@ class JapanRegistrationWorkflowTests(TestCase):
         self.assertEqual(len(view['rows']),20)
         self.assertEqual(calls.count(REGISTRATION),2)
 
+    def test_ambiguous_ordinary_race_never_uses_other_page_failure_as_identity(self):
+        from stable import models
+        from stable.services import race_pre_race as pre
+        from unittest.mock import Mock,patch
+        event=models.RaceEvent.objects.create(year=2026,edition_year=2026,slug='ambiguous-ordinary',
+            original_name='3歳以上1勝クラス',country_region='japan',racecourse='東京',
+            local_date=date(2026,11,8),timezone_name='Asia/Tokyo',visibility_status='published')
+        fetch=Mock(return_value=(ROOT/'jra-meeting-index.html').read_text())
+        # 即使下游一页可解析另一页不可解析，也不能从弱排除得到身份。
+        with patch.object(pre,'parse_jra_card',side_effect=[{},ValueError('not_published')]) as parse:
+            result=pre.discover_jra_pre_race(now=NOW,fetcher=fetch,clock=lambda:NOW)
+            self.assertEqual(result['checked'],0)
+            parse.assert_not_called()
+        self.assertEqual(fetch.call_count,1)
+        event.refresh_from_db()
+        self.assertEqual(pre._state(event,pre.JRA)['reason'],'jra_race_identity_ambiguous')
+        self.assertEqual(event.data_candidates.count(),0)
+        self.assertIsNone(event.race_datetime)
+
     def test_unpublished_registration_is_a_successful_check(self):
         from stable import models
         from stable.services import race_pre_race as pre
@@ -516,6 +535,7 @@ class JraOrdinaryMeetingTests(SimpleTestCase):
             local_date=date(2026,11,8),local_start_time=None,race_datetime=None,
             aliases=SimpleNamespace(values_list=lambda *a,**k:[]))
         page=(ROOT/'jra-meeting-index.html').read_text()
-        self.assertEqual(len(jra_pre_race_links(page,event=event)),2)
+        with self.assertRaisesRegex(ValueError,'jra_race_identity_ambiguous'):
+            jra_pre_race_links(page,event=event)
         event.local_start_time=time(12,50)
         self.assertEqual(jra_pre_race_links(page,event=event),['https://www.jra.go.jp/JRADB/accessD.html?CNAME=pw01dde0105202605020620261108/9C'])

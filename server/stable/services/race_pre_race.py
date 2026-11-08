@@ -264,9 +264,9 @@ def jra_pre_race_links(html, *, event):
             known_time = event.race_datetime.astimezone(ZoneInfo('Asia/Tokyo')).time()
         if known_time is not None:
             matched = [u for u in exact if exact_times.get(u) == known_time]
-            if not matched:
-                raise ValueError('jra_race_identity_ambiguous')
-            return matched
+            if len(matched) == 1:
+                return matched
+        raise ValueError('jra_race_identity_ambiguous')
     return exact or candidates
 
 

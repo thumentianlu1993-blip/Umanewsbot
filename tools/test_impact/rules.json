@@ -1422,6 +1422,39 @@
     ],
     "server/stable/test_managed_readonly_translation.py": [
       "news_translation"
+    ],
+    "server/stable/fixtures/japan_automation/**": [
+      "japan_race_automation"
+    ],
+    "deploy/jra-browser/**": [
+      "japan_race_automation"
+    ],
+    "docker-compose.japan-browser.yml": [
+      "japan_race_automation"
+    ],
+    "server/stable/services/japan_source_discovery.py": [
+      "japan_race_automation"
+    ],
+    "server/stable/services/jra_browser_transport.py": [
+      "japan_race_automation"
+    ],
+    "server/stable/services/nar_pre_race.py": [
+      "japan_race_automation"
+    ],
+    "server/stable/management/commands/backfill_japan_results.py": [
+      "japan_race_automation"
+    ],
+    "server/stable/management/commands/register_japan_series_names.py": [
+      "japan_race_automation"
+    ],
+    "server/stable/management/commands/register_japan_source_names.py": [
+      "japan_race_automation"
+    ],
+    "docs/changes/japan-race-automation/nar_venues_evidence.json": [
+      "japan_race_automation"
+    ],
+    "docs/changes/japan-race-automation/source_policy.json": [
+      "japan_race_automation"
     ]
   },
   "symbols": {

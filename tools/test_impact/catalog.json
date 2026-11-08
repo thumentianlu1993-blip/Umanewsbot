@@ -884,6 +884,10 @@
     ],
     "module:stable.test_lifecycle_census_ownership": [
       "stable.test_lifecycle_census_ownership"
+    ],
+    "japan_race_automation": [
+      "stable.test_japan_automation",
+      "stable.test_japan_name_registration"
     ]
   },
   "dependencies": {
@@ -945,6 +949,11 @@
       "horse_career_link_cache",
       "horse_basic_profile_review_input",
       "horse_target_inventory"
+    ],
+    "japan_race_automation": [
+      "module:stable.test_race_pre_race",
+      "module:stable.test_race_multisource_identity",
+      "race_parser"
     ]
   },
   "tests": {
@@ -2832,6 +2841,18 @@
       "domains": [
         "module:stable.test_lifecycle_census_ownership"
       ]
+    },
+    "server/stable/test_japan_automation.py": {
+      "label": "stable.test_japan_automation",
+      "domains": [
+        "japan_race_automation"
+      ]
+    },
+    "server/stable/test_japan_name_registration.py": {
+      "label": "stable.test_japan_name_registration",
+      "domains": [
+        "japan_race_automation"
+      ]
     }
   },
   "profiles": {
@@ -3146,7 +3167,9 @@
     "stable.test_managed_readonly_steps": "django",
     "stable.test_managed_readonly_translation": "django",
     "stable.test_translation_reported_token_stop": "django",
-    "stable.test_lifecycle_census_ownership": "django"
+    "stable.test_lifecycle_census_ownership": "django",
+    "stable.test_japan_automation": "django",
+    "stable.test_japan_name_registration": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
@@ -3229,7 +3252,8 @@
     "horse_career_link_cache": "integration: H03 单条既有赛绩离线补连、强身份/binding 与事务重放边界",
     "horse_basic_profile_prepare_command": "integration: H03缓存prepare-only命令与私有待审产物合同",
     "horse_basic_profile_review_input": "integration: H03独立已审输入与原消费者事务/重放合同",
-    "lifecycle_authorization_renewal": "integration: 生命周期原范围续期与 TRA 显式许可截止日期"
+    "lifecycle_authorization_renewal": "integration: 生命周期原范围续期与 TRA 显式许可截止日期",
+    "japan_race_automation": "integration: JRA/NAR通用来源、受控候选与历史回填"
   },
   "dedicated_batch_modules": [
     "stable.test_migration_history_repair_postgres",
