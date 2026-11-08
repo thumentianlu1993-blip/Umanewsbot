@@ -1782,6 +1782,7 @@ def rebind_multisource_enrollment(*, event_id, policy, now, expected_route_diges
                 "bindings": [b.pk for b, _, _, _ in changes],
             }
         for binding, source, route, manifest in changes:
+            binding.capabilities = route.capabilities
             binding.route_digest = route.digest
             binding.contract_digest = route.contract_digest
             binding.proof_digest = route.proof_digest
@@ -1790,6 +1791,7 @@ def rebind_multisource_enrollment(*, event_id, policy, now, expected_route_diges
             binding.valid_until = aware(route.valid_until)
             binding.save(
                 update_fields=(
+                    "capabilities",
                     "route_digest",
                     "contract_digest",
                     "proof_digest",
@@ -1799,14 +1801,14 @@ def rebind_multisource_enrollment(*, event_id, policy, now, expected_route_diges
                     "updated_at",
                 )
             )
+            if source.valid_until is None or source.valid_until < aware(route.valid_until):
+                source.valid_until = aware(route.valid_until)
+                source.save(update_fields=("valid_until", "updated_at"))
             reason = binding_admission_reason(
                 binding=binding, route=route, now=now, check_runtime=False
             )
             if reason:
                 raise ValueError("rebind_contract_drift:" + reason)
-            if source.valid_until is None or source.valid_until < aware(route.valid_until):
-                source.valid_until = aware(route.valid_until)
-                source.save(update_fields=("valid_until", "updated_at"))
         enrollment.standing_policy_digest = policy.digest
         enrollment.route_digest = new_route_digest
         enrollment.save(
@@ -1822,6 +1824,16 @@ def rebind_multisource_enrollment(*, event_id, policy, now, expected_route_diges
             checkpoint.save(
                 update_fields=("registry_digest", "contract_digest", "updated_at")
             )
+        for source, route in routes.values():
+            for kind in route.capabilities:
+                models.RaceEventLiveProviderCheckpoint.objects.get_or_create(
+                    tracking=tracking, source_key=source.source_key, data_kind=kind,
+                    defaults={
+                        "next_poll_at": race_data_sync_control.multisource_initial_poll_at(event=event, kind=kind, now=now),
+                        "contract_digest": route.contract_digest,
+                        "registry_digest": route.digest,
+                    },
+                )
         _multisource_manifest(enrollment, projection, policy, now)
         enrollment.refresh_from_db()
         selected = enrollment.source_set_manifest.get("selected", {})

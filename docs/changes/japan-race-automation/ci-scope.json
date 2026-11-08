@@ -1,0 +1,495 @@
+{
+  "schema_version": 1,
+  "base_sha": "c47e03d5c1eba3d03eccf9b30685fcde0d1e2316",
+  "reason": "2026-11-08 用户明确要求本次按实际影响范围跑CI后上线；覆盖日本采集、强身份/多源登记、赛前刷新、结果公开、部署合同和CI工具，保留核心与依赖。",
+  "domains": [
+    "infrastructure",
+    "japan_race_automation",
+    "module:stable.test_pre_race_refresh",
+    "module:stable.test_race_multisource_enrollment",
+    "module:stable.test_race_multisource_postgres",
+    "release"
+  ],
+  "changes": [
+    {
+      "path": "deploy/jra-browser/Dockerfile",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "4574bc6970a706ee8e6d6d89b8dbff614f8f23956d42d41309fc4b29a47d7bc2",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "deploy/jra-browser/collector.cjs",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "d141571fcf7bde86f3a8fcce0a0d11609e944e3cea6f52bfdbeaa8769e06d543",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "deploy/jra-browser/collector.test.cjs",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "8697c2f49cde1d9241111f3f2a9548b30e725c53f509da6aecaaa26a37ac1abe",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "deploy/jra-browser/package-lock.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "edc37aa8b320cfe343a05534be01f33e250661ed335142a83d919388a8c89e3d",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "deploy/jra-browser/package.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "f2022a4c180dcc6ffcdcbefc62b368fcece07a9b744bedaa6866bcd93289226a",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "deploy/jra-browser/seccomp_profile.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "cc3e61cabda6bbc1e53e54d27ba4d55a9d3be829b6dd1a596f4a7b31b1cc7849",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "deploy/jra-browser/server.cjs",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "ff4d88a91ce9818ef5bde449959083adfc58174c794d3db2ec3b6d8abad5881e",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docker-compose.japan-browser.yml",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "14ef08a0a15c009b01bdb44e8581a7598343c0075788b6118387e095f48dc22f",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/japan-race-automation/design.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "16ccce5b42d5a34658fcebfda87b2223d6a00837ec177627eb4b8abd596eb7cd",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/japan-race-automation/nar_venues_evidence.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "fbf31a2780c3d18f19c64b4e1ac9f352e447ee87eaf838547bfc91403a4cc987",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/japan-race-automation/rollout.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "2b43bdf0373fbacb68d4f3ba494a252786cb8d7af4e5d31e646dbe40a46ceb21",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/japan-race-automation/source_policy.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "7ac88a1bedc38da0747b4ca188f509d9c546c033c947124ac9b22a8b875b05c1",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/japan-race-automation/spec.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "248799bdb7a913443fc25c434a060c96ffa73e000dba03bef7306c1667895b35",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/japan-race-automation/tasks.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "ac29f789750c4c9b385b23503987a25d8122dbf5236a51addb5d1f4812f5fb1a",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/japan-race-automation/test_cases.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "8885e9312693ed49129313d35f4035b39cbde244c5cb6e6797c54c5b907b0b2f",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/current_state.md",
+      "status": "modified",
+      "before_hash": "84261d1e137137796ee045f34532568b27e7c49ced7751c4b4084d406c69db12",
+      "after_hash": "f7515b8b0e993c8e38821458fc26a492768083aa15f196196382bbbc5e06a48c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "scripts/plan_affected_tests.py",
+      "status": "modified",
+      "before_hash": "10af1bdc1fe298b719eca3802147930e0cc1f1420bf6174a16daa5d8a3d50cff",
+      "after_hash": "71a8ad33b225882e58c259ec8fb2334ae5ea6992618622aff0a0cf5f244d3ccc",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "scripts/tests/test_impact_evolution.py",
+      "status": "modified",
+      "before_hash": "031359f47efd81c34370b2681f7763768d2db0b9cff827b94d48e8ca62783542",
+      "after_hash": "1ed9e97c195b050241864edb7c34bf786548cc3ee34d2868e46e522e2f7b6a4e",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "scripts/tests/test_impact_verifier_e2e.py",
+      "status": "modified",
+      "before_hash": "fa4f3285b0c1fac4250533aaeb89f16a70e835a4caec3625e9df7fd9c9b46d37",
+      "after_hash": "59937054e2fe84cc5aad42976d5f5aca8cdd048cb4343fc776ddd396ed712e22",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/app/settings.py",
+      "status": "modified",
+      "before_hash": "f1915241aeec170768622d2fec347beacad643cc7d8c1481a80835ccb924b784",
+      "after_hash": "e86afddd770156492d51a31d105af2817cfa68342eed99c0502e7181f3ea8b51",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/japan_automation/README.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "52bfd1500f197d8120fb76bc4463ff1bd580396bfa7513d5b8f2ebd9982ba2c2",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/japan_automation/jra-annual.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "6cae4d19ca8fafcabb2d278825762aad34df92ecfe04da1a9c66aa20cc3e0f40",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/japan_automation/jra-card-index.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "6d2ba275931f30d2b73e22062fb14a10da32709f4c8fd22f188ce4b74e6d467d",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/japan_automation/jra-meeting-index.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "8470e2bf0fddd7078697abd51f5928e13620f03c272567c6b8d30ee9665cdb62",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/japan_automation/jra-mile-registration.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "fd9085ff3608dc6b94c34b0727e637ca758483927d9825247d9575e2ff5735d1",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/japan_automation/jra-registration-index.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "a91c072d6c183f454676393a380d621f26a3c8a8a3f8d6e7e53dbd844bb2db02",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/japan_automation/jra-registration.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "e4da838602dabe560ba0b3fd1702fd290132c5d581c4caf6f254c3c4e8954aae",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/japan_automation/jra-result.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "4c78e43c33b65fc6a579731763a88f2a6ced7b6d11e360f5e462ede337555864",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/japan_automation/nar-banei-card.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "57c1cd26543e8f456013021eab9ed2c72146c77705901265cd1bbd6d87df01c1",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/japan_automation/nar-banei-result.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "57fd3051aaccbc9a4fefe74f08181a4b5d047879db5954ac85b5d69e3382eeb6",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/japan_automation/nar-cancelled.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "795ca75e9c9058473e343096efd0e33fb611ed348d8293008c56cd25a8709832",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/japan_automation/nar-card.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "ddc2f588a84048cf3454f7c0c3cd7a7e2d67cec71420eca1fad04229514bbf9b",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/japan_automation/nar-introduction.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "24ed3ae096dee64e419e013c860caf0eb05786f0663319d3833e246497441590",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/japan_automation/nar-navigation.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "2c9a0acf1344f6becbcae3a8f09f002339e4cbd86b47992b42cc5ea727ff2320",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/japan_automation/nar-racelist.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "24c51081c8ba0611bff2a591d18ae27a46a2533f32431ab2927a699d89d127b5",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/japan_automation/nar-result.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "b74a068325efaa94aab459e325bc75b72f99184da457b6d77d4203629bce55d9",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/japan_automation/nar-topic.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "27461cbca3da8dde7f5914366402eb4ee212f4e079e7e4d403d07350f0284d1b",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/japan_automation/nar-upcoming.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "5de68198acaa1445f67bcaff2cbfd6f0bf182aa30490488f50b045efda9594d2",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/management/commands/backfill_japan_results.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "abd11dcaabed3392fd016ea8482dcb1d6e7f6aa1ac8f6edece9153bca3a61435",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/management/commands/register_japan_series_names.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "3120173dc28ba10ff9bca95557b5d1e55fd59eabb17e00d81275378c897bc5d6",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/management/commands/register_japan_source_names.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "174422729e01de58a3594201edc75e64f461a13a7990c0b213041cfb1fb78172",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/japan_source_discovery.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "21cf8ddf8e9ed6c8f7ce27dbda8c08c5c41aeb90f5cd4285df41e3cc3f258089",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/jra_browser_transport.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "1a185184ffec6b33284574a68998f9d9eec6c79a34ac8310ab7195eee125889d",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/nar_pre_race.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "7db62d84d852c47dda3f3509d0765f211deda2cebbc85e84ebbe8b079f8f9c75",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_source_adapters.py",
+      "status": "modified",
+      "before_hash": "3b3f44b6809709c86ec6618e228796cae42736d24fd439313d8abef2cbf228ca",
+      "after_hash": "78cdb5cf3b0dd84a7ba33d972b2e10e4faef3f19d67c3fb239e303382d487142",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_control.py",
+      "status": "modified",
+      "before_hash": "198eb0c6fcde53a7cc86568fb32f6e965a696327525d02ab4bb0d88e913a93d2",
+      "after_hash": "11b1aa7d03da9cd98063f14320a1095244496a47f3c48b6390e86ddfeb724964",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_enrollment.py",
+      "status": "modified",
+      "before_hash": "1ae6cc90f59cc65dbe5e533f8dd00ac6b9fce31ed3cd712053111cd06447e318",
+      "after_hash": "4722122d7945ea5a8ff91dabc8d5c71edea88c71e985d88ae58964e4d9784f1c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_events.py",
+      "status": "modified",
+      "before_hash": "e7cba24c942bf871f660ed2074935afb1610af0c99fbdd830159db53bfb74381",
+      "after_hash": "10398aded1ec156ba16d41a627172c01002d1a7bebcb558d49b32bed329e135a",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_pre_race.py",
+      "status": "modified",
+      "before_hash": "f9d613d77f9fb8e9bbcbd5e0c4005fa9e7b8eb6c286043232fab7bf092cb5219",
+      "after_hash": "202900b86a6a018b0636c992d56ee784b91faa5d606e6069135eecb3302d5bbe",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_pre_race_sources.py",
+      "status": "modified",
+      "before_hash": "4e33b5546f6d0b565119a0fc8e73bae51c5162d3114a2e019d375a81a887e22a",
+      "after_hash": "150d290409496f1d7846532520e96a61840820d1a3d7b4ea98e64f2a9a05c2f2",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_source_identity.py",
+      "status": "modified",
+      "before_hash": "064fbeb9f042301ca1afd6995b910b83ed3fdab10c13829a060523246f1f81fe",
+      "after_hash": "3fb24524044826161a001d9149eb2d71a921530e2b43b56000d485dec2f1f96d",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/tasks.py",
+      "status": "modified",
+      "before_hash": "d1c2faa2fbca6906c6a9bafcbcdbfddc4caed6e92fac696343b50fa11d4da517",
+      "after_hash": "ac942222cd6801b03ad1ace18eb1774339d5583da1dcb5b626eafeaaad8a9728",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/templates/stable/console/race_event_form.html",
+      "status": "modified",
+      "before_hash": "36cadc2243c4b3836e79ba82d49a7f51f66c7ec0aa133903b1aa8844ac2bc65d",
+      "after_hash": "8f2b0feea9299b084c253fa96d8918ee450e124f91b1f31136145bc1bb7f9724",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_japan_automation.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "e49f675dc8927679b9851f6af9a91ccafccb597f81cf5be46d78776a4c0ce8ca",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_japan_name_registration.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "333762e391aee6f91bf97d11673fe775ce6e7e2aa01bf13f7bfdf1062e6f64d5",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_race_multisource_jra.py",
+      "status": "modified",
+      "before_hash": "d1a5e923d1c54c94c510fcda456ae4c9da2200a5c0277f0b6959a11c458e9b5f",
+      "after_hash": "cd422f03e0083231e50fde995f726b2b656dd00f2e1e84f263008ec6df56dbb5",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/views.py",
+      "status": "modified",
+      "before_hash": "78b583c1f4087930ab2ad91390212baf48732a068d2880129a950671aef7d798",
+      "after_hash": "e3fe57ea494fbb1fc472807fc42892b63d145a0815a2e759ce133b9afa56ae38",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/catalog.json",
+      "status": "modified",
+      "before_hash": "157b1c783e7e253e13056f707ddf6d32bcc61b0c7f0906abd4a87e69e85ff439",
+      "after_hash": "ec04d6c8e75e8c179a43472ba546fbf81d158f604c84c3e86af0af94113e1217",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/reviewed_scope.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "1f76b47670e8c127505e7e138b2c736c2d19e5ebad352db53fabb38f527a0df3",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "94483c608e6a00bc4933b4f4cf2f35ec22a9655c6b78250656af0f581b25b9de",
+      "after_hash": "414c2edc3853b5b08f2ca49089e478cb7084e3c95fffdecfca818e939ca275d5",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}

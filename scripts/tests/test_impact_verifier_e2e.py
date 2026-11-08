@@ -18,7 +18,7 @@ class OutsideVerifierTests(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
         self.work=Path(self.temp.name);self.repo=self.work/'repo';self.repo.mkdir()
         self.git('init','-q');self.git('config','user.email','ci@example.invalid');self.git('config','user.name','ci')
-        self.trusted_dependencies=['tools/test_impact/core.py','tools/test_impact/git_input.py',
+        self.trusted_dependencies=['tools/test_impact/core.py','tools/test_impact/git_input.py','tools/test_impact/reviewed_scope.py',
                'scripts/plan_affected_tests.py','scripts/run_test_plan.py','tools/test_impact/source_binding.py',
                'scripts/test_plan_worker.py','scripts/run_bounded_stable_tests.py','deploy/test-impact/entrypoint.sh']
         for name in ['scripts/verify_delivery_test_evidence.py',*self.trusted_dependencies]:

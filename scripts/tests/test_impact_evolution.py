@@ -79,3 +79,56 @@ class PlanEvolutionTests(unittest.TestCase):
             impact_ci.main()
         plan=json.loads(output.read_text());self.assertEqual(plan['mode'],'validation-only');self.assertEqual(plan['labels'],['stable.test_b'])
         with self.assertRaisesRegex(ValueError,'empty diff'):create_plan(self.root,head,head,head)
+
+class ScopedPlanIntegrationTests(unittest.TestCase):
+    setUp = PlanEvolutionTests.setUp
+    git = PlanEvolutionTests.git
+    write = PlanEvolutionTests.write
+    save = PlanEvolutionTests.save
+    commit = PlanEvolutionTests.commit
+    def test_new_scope_exact_binding_full_override_and_future_default(self):
+        from tools.test_impact.git_input import inputs
+        from tools.test_impact.reviewed_scope import FIELDS
+        path='docs/scoped.json'
+        self.rules['reviewed_change_scopes']=[path]
+        self.rules['paths'][path]=['horse'];self.save()
+        self.write('server/stable/views.py','def old(): return 2\n')
+        head=self.commit();data=inputs(self.root,self.base,head,head)
+        manifest={'schema_version':1,'base_sha':self.base,'reason':'explicit scoped acceptance',
+                  'domains':['horse'],'changes':[{k:r[k] for k in FIELDS} for r in data['changes']]}
+        self.write(path,json.dumps(manifest));head=self.commit()
+        plan=create_plan(self.root,self.base,head,head)
+        self.assertEqual(plan['mode'],'targeted');self.assertIn('reviewed_scope_sha256',plan)
+        full=create_plan(self.root,self.base,head,head,full_reason='explicit full request')
+        self.assertEqual(full['mode'],'full');self.assertNotIn('reviewed_scope_sha256',full)
+        self.write('server/stable/views.py','def old(): return 3\n');changed=self.commit()
+        with self.assertRaisesRegex(ValueError,'scope changed'):
+            create_plan(self.root,self.base,changed,changed)
+        later=create_plan(self.root,head,changed,changed)
+        self.assertNotIn('reviewed_scope_sha256',later)
+
+
+class ReviewedScopeTests(unittest.TestCase):
+    def setUp(self):
+        self.change={'path':'server/x.py','status':'modified','before_hash':'a'*64,'after_hash':'b'*64,'before_mode':'100644','after_mode':'100644'}
+        self.manifest={'schema_version':1,'base_sha':'c'*40,'reason':'用户明确要求本次按实际影响范围验证',
+            'changes':[self.change.copy()],'domains':['race']}
+        self.catalog={'domains':{'core':['core.tests'],'race':['race.tests'],'dependency':['dep.tests'],'other':['other.tests']},'dependencies':{'race':['dependency']}}
+        self.old={'mode':'full','domains':list(self.catalog['domains']),'labels':['old'],'reasons':[]}
+    def apply(self,changes=None,manifest=None,base=None):
+        from tools.test_impact.reviewed_scope import apply_reviewed_scope
+        return apply_reviewed_scope(self.old,changes=changes or [self.change],manifest=manifest or self.manifest,
+            base_sha=base or 'c'*40,catalog=self.catalog)
+    def test_exact_scope_keeps_core_and_dependency_and_records_digest(self):
+        value=self.apply();self.assertEqual(value['mode'],'targeted')
+        self.assertEqual(value['labels'],['core.tests','dep.tests','race.tests'])
+        self.assertEqual(len(value['reviewed_scope_sha256']),64)
+    def test_extra_path_content_mode_base_or_domain_drift_is_rejected(self):
+        for field,value in [('path','server/other.py'),('after_hash','d'*64),('after_mode','100755'),('status','deleted')]:
+            with self.subTest(field=field),self.assertRaises(ValueError):self.apply(changes=[{**self.change,field:value}])
+        with self.assertRaises(ValueError):self.apply(changes=[self.change,{**self.change,'path':'extra'}])
+        with self.assertRaises(ValueError):self.apply(base='e'*40)
+        with self.assertRaises(ValueError):self.apply(manifest={**self.manifest,'domains':['unknown']})
+    def test_empty_reason_or_duplicate_scope_rows_is_rejected(self):
+        with self.assertRaises(ValueError):self.apply(manifest={**self.manifest,'reason':''})
+        with self.assertRaises(ValueError):self.apply(manifest={**self.manifest,'changes':[self.change,self.change]})
