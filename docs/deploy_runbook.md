@@ -1,3 +1,11 @@
+## 2026-11-08 日本赛事窄发布完成
+
+当前生产目录为 `/opt/umanews-release-69947674-japan-20261108/umanewsbot`，固定代码 `69947674`、应用镜像 `1d5c696d2381`、schema0079。
+新增内部 `jra_browser` 使用 `docker-compose.japan-browser.yml` 与基础 lowcost Compose 合并；无宿主端口、非 root、sandbox、只读根目录、768 MiB/1 CPU。
+仅日本配置变更，已存在 providers 集合追加 nar，JRA/NAR 赛前刷新开启且窗口31天，policy/历史名单使用固定持久文件与摘要；其它地区、QQ及外项目配置不变。
+标准0079发布与日本事务回填均完成，70页/571行及自然报名77匹通过。下一次操作须以实际运行目录、原私有配置和这次 intent/complete 为依据；下方其它目录均为历史记录。
+具体备份、双层镜像摘要、原镜像与恢复边界见[发布证据](changes/japan-race-automation/release_evidence.md)。
+
 ## 2026-11-03 QQ下线发布的依赖兼容故障
 
 68063962同schema发布及OneBot停止已执行，但Celery最终验收发现新解析的Kombu 5.7.0不支持固定redis 5.2.1。三个失败后台服务已停止，web健康，QQ保持关闭，队列保留。恢复须使用经过兼容验证的前向候选与精确包，不回滚旧镜像，不改写已有intent或完成收据。详见[执行记录](changes/qq-retirement-20261103/rollout.md)。构建成功、容器Running及发布入口退出0不能替代真实worker/broker就绪证明。
