@@ -1455,6 +1455,9 @@
     ],
     "docs/changes/japan-race-automation/source_policy.json": [
       "japan_race_automation"
+    ],
+    "docs/changes/japan-race-automation/ci-scope.json": [
+      "infrastructure"
     ]
   },
   "symbols": {
@@ -1620,5 +1623,8 @@
   },
   "module_initialization_full": [
     "server/stable/views.py"
+  ],
+  "reviewed_change_scopes": [
+    "docs/changes/japan-race-automation/ci-scope.json"
   ]
 }

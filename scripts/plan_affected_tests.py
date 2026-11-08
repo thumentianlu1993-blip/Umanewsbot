@@ -74,6 +74,20 @@ def create_plan(root, base, head, test, local=False, full_reason=None, bootstrap
         if matches:
             superseded[label] = max(matches, key=len)
     chosen['labels'] = sorted({superseded.get(v,v) for v in chosen['labels']})
+    # 清单必须是本次新增；合并后不自动作用于后续PR。显式full/诊断入口始终保持原范围。
+    if not full_reason:
+        from tools.test_impact.reviewed_scope import apply_reviewed_scope
+        scopes = rules.get('reviewed_change_scopes', [])
+        active = [c for c in data['changes'] if c['path'] in scopes and not c['status'].startswith('index')]
+        if len(active) > 1:
+            raise ValueError('multiple reviewed change scopes')
+        if active:
+            scope = active[0]
+            if scope['status'] != 'added':
+                raise ValueError('reviewed change scope must be newly added')
+            manifest = json.loads(scope['after'])
+            changes = [c for c in data['changes'] if c['path'] != scope['path'] and not c['status'].startswith('index')]
+            chosen = apply_reviewed_scope(chosen, changes=changes, manifest=manifest, base_sha=base, catalog=catalog)
     hashes = {p: digest(json.loads((root / p).read_text()) if local else read_json(root, test, p)) for p in (RULES, CATALOG)}
     return {**{k: v for k, v in data.items() if k not in ('changes', 'paths')}, **chosen,
             'schema_version': 1, 'hashes': hashes, 'bootstrap': bootstrap,
