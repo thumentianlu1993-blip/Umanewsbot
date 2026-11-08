@@ -27,7 +27,8 @@
     "docs/changes/next-version-capabilities/lanes/B/B055-completed-redelivery-receipt-fix/obligations.json",
     "docs/changes/next-version-capabilities/lanes/B/B057-remaining7-end-to-end-test-prep/obligations.json",
     "docs/changes/term-display-sql-20261103/benchmark.json",
-    "docs/changes/term-display-sql-20261103/pg-receipt.json"
+    "docs/changes/term-display-sql-20261103/pg-receipt.json",
+    "docs/changes/hkjc-horse-name-display/impact_summary.json"
   ],
   "high_risk": [
     ".codex/agents/application.toml",
@@ -1467,6 +1468,30 @@
     ],
     "docs/changes/japan-race-public-fields/ci-scope.json": [
       "infrastructure"
+    ],
+    "server/stable/services/horse_name_policy.py": [
+      "module:stable.test_hkjc_horse_name_policy",
+      "horse_page",
+      "news_translation",
+      "module:stable.test_public_term_consistency",
+      "module:stable.test_race_information_display_pages"
+    ],
+    "server/stable/services/horse_name_impact.py": [
+      "module:stable.test_hkjc_horse_name_policy",
+      "horse_page",
+      "news_translation",
+      "module:stable.test_public_term_consistency",
+      "module:stable.test_race_information_display_pages"
+    ],
+    "server/stable/management/commands/report_hkjc_horse_name_impact.py": [
+      "module:stable.test_hkjc_horse_name_policy",
+      "horse_page",
+      "news_translation",
+      "module:stable.test_public_term_consistency",
+      "module:stable.test_race_information_display_pages"
+    ],
+    "docs/changes/hkjc-horse-name-display/ci-scope.json": [
+      "infrastructure"
     ]
   },
   "symbols": {
@@ -1627,6 +1652,17 @@
         "module:stable.test_race_public_time",
         "module:stable.test_race_news_exposure",
         "public_probe_orm_loader"
+      ],
+      "_attach_race_term_display_names": [
+        "horse_page",
+        "module:stable.test_hkjc_horse_name_policy",
+        "module:stable.test_race_information_display_pages",
+        "module:stable.test_race_information_display"
+      ],
+      "_public_published_articles": [
+        "horse_page",
+        "module:stable.tests_legacy",
+        "module:stable.test_public_term_consistency"
       ]
     }
   },
@@ -1635,6 +1671,7 @@
   ],
   "reviewed_change_scopes": [
     "docs/changes/japan-race-automation/ci-scope.json",
-    "docs/changes/japan-race-public-fields/ci-scope.json"
+    "docs/changes/japan-race-public-fields/ci-scope.json",
+    "docs/changes/hkjc-horse-name-display/ci-scope.json"
   ]
 }

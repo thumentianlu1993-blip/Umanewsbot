@@ -1,0 +1,277 @@
+{
+  "schema_version": 1,
+  "base_sha": "c7a99a7f8879b1a0072ca1ec73108bb9539ba4d5",
+  "reason": "用户要求按实际影响范围测试，不机械运行全库；models 仅添加公开展示属性无 schema 改动。完整覆盖新马名证据策略、历史影响清单、公开马匹及赛事消费者、翻译/实体识别/发布一致性/P0评分，以及核心和选测基础设施；清单绑定本次全部变更字节、模式与固定主线基线。",
+  "domains": [
+    "infrastructure",
+    "horse_page",
+    "news_translation",
+    "hkjc_horse_consumers",
+    "module:stable.test_hkjc_horse_name_policy",
+    "module:stable.test_contextual_news_entities",
+    "module:stable.test_english_term_context_gates",
+    "module:stable.test_public_term_consistency",
+    "module:stable.test_hrn_source_term_translation",
+    "module:stable.test_race_information_display",
+    "module:stable.test_race_information_display_pages",
+    "module:stable.test_race_information_preview"
+  ],
+  "changes": [
+    {
+      "path": ".env.example",
+      "status": "modified",
+      "before_hash": "57eb6dc6dd1543f88695891b59deb24498aef5096b46c657b9c67c11baaecaff",
+      "after_hash": "a10d91bf33fa0375aa8659934ab112a8770141d081b9ee13b0b5d17f5358d3fd",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/hkjc-horse-name-display/design.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "f8b1a870d9f3795f2367f8414c8a11dc239aaef4e9efba764f25b32b90744d0e",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/hkjc-horse-name-display/impact_summary.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "c636b9349716fbddbb20fb41d1073a9c7bbefbbaaac8593f5fb0e772f33e81e8",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/hkjc-horse-name-display/rollout.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "ba9f8239a65f4087634bd2de8d0fa370f061249874d6f223471c82a279c98758",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/hkjc-horse-name-display/spec.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "e0cf8e4ca216552e285315e22d51b06cda0b8f342326308bbaaa248f6151e4b6",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/hkjc-horse-name-display/tasks.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "e6e505f4a0ca8bc9e34d884d3e6929e31b45a7f26f4867aed41c3791196ef964",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/hkjc-horse-name-display/test_cases.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "f4300934906ab7b9617a87e5a444390383075ef567ec4bceb7f92a36942fc2dc",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/hkjc-horse-name-display/validation.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "1a8ac2cb39a9609cccc105d5bb06558a28211b463575dce1b8e1793b6396115e",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/current_state.md",
+      "status": "modified",
+      "before_hash": "bc947d55406b88ce10bf6a8bc424d959396630e7ea9b70998fae02d457e68f3c",
+      "after_hash": "82d3137332ae0de334fa21a2ca1c8c82ad136a37642d5e01896ccc8dadbea5c7",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/decisions.md",
+      "status": "modified",
+      "before_hash": "56efcd3e1670992719d66f4def722eed85188758414cfa7cf7e29085c875a8cd",
+      "after_hash": "581127851c8283c9120d20d52dc6c9d8719adbe788044c1ed8e6f00f5885e136",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/app/settings.py",
+      "status": "modified",
+      "before_hash": "e86afddd770156492d51a31d105af2817cfa68342eed99c0502e7181f3ea8b51",
+      "after_hash": "16ac4292b151c4498991af9a47a35ff1da1cc4dd7918409869c58d38b57db947",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/management/commands/report_hkjc_horse_name_impact.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "43b0c6ad27d95c5c69542e51a0446fcd6a53b28d13b672b311b3063c64e66ff1",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/models.py",
+      "status": "modified",
+      "before_hash": "5c11bca5f55dfffab0fa4720a565b0b58fbde688f930a9a4fab2d8aabe942749",
+      "after_hash": "cf5d553f5dee06804eb4f4e5f022a6729050a1fca5752bbac96e33c782b43bb5",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/automation.py",
+      "status": "modified",
+      "before_hash": "fe2c74590582d8918820762bf80753e0994132bad5e02f9249abb8b42b0739f7",
+      "after_hash": "f45fd4c59a46fb8128c01504aa78b7e2efe9402a48f85217f24bd2933e9f3b58",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/horse_name_impact.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "b541d9d19e30de7905660d27ca6ccda90b3e0886e1d1c9893d5c7c201276ea1f",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/horse_name_policy.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "197f54b021693538e9bdbbcc34300ce64e14e18da8177d707f3144076804eb67",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/horse_profiles.py",
+      "status": "modified",
+      "before_hash": "3745999db21305c8e3e463c6b2bca992ec33b5eb34e85b1e43e28584421d8610",
+      "after_hash": "7715d3d1cc1afe2d52943efd1e05b661835e62d50672bf0705a3f2e6615baa81",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_term_display.py",
+      "status": "modified",
+      "before_hash": "eb87ba3f74b7f39d82b261ce742e833a6193c9b41d785832612616e33a072cfe",
+      "after_hash": "68ae6a9339e1d30f2f6a8b1325c07f152db1adaa65f24615386a19f52d118e0c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/term_consistency.py",
+      "status": "modified",
+      "before_hash": "cab611c761ba95a3546f2199ec6c8d72c6030d2522f0a08f584e800a2ad4b0fd",
+      "after_hash": "a10811bb7e17f565102514306f9af57b1ef555ab419f590afc9f8c44f3d2bbb0",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/terms.py",
+      "status": "modified",
+      "before_hash": "c8acd2b57440eb5e1dfc6d67679fcb60221ab3dcd648d40999a46da81810097d",
+      "after_hash": "ebb3bb96bbd9bb0cc482e52ea0dd43a74c2640a727218b886ff88bee60fdeac6",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/translation.py",
+      "status": "modified",
+      "before_hash": "f103cc7c2f492aa53c0dc9eff89c8335152ff9f687cc9578ff4b91e262f7080f",
+      "after_hash": "ead90c7e783211dcb1ce62a27ca3fcb1f42473d0a8803d91667c0c9b9b27c0e1",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/validation.py",
+      "status": "modified",
+      "before_hash": "ea0736376c4ef0b005d3334efdb8a01f3e749e17a0e3fa1f9b5ac9b62ca8f336",
+      "after_hash": "6950880c9638b64326af8e219350b901ec9dbef5780faaf82d3cec8ab12f5524",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/templates/stable/public/_article_card.html",
+      "status": "modified",
+      "before_hash": "4b24630cfc6714e1cb319d93b52f236fe66c7ddb1951379bf172ad801966fc3b",
+      "after_hash": "f22be9bdcfff106ba5c1837e3586674f15e0563cc4bae96c5eba4bed3a0681b9",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/templates/stable/public/_hot_list.html",
+      "status": "modified",
+      "before_hash": "4e09d3732001f46c4d5fe41791f6f0b36a7e219baf6d44d743140659b3a66d53",
+      "after_hash": "0b64e241be21ed52908456ac848bce40447f97eabea6b374a311fe8cc58eeadb",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/templates/stable/public/detail.html",
+      "status": "modified",
+      "before_hash": "e73f4d785bb398471a6bf75f50aa95ca3500d27be04a9e2ebb3e419cba77f998",
+      "after_hash": "f588c7e4ace39c4d767dacb08be1f96400e04c2926b5a589731870b0820b2fc7",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/templates/stable/public/horse_detail.html",
+      "status": "modified",
+      "before_hash": "ecb2294c0e312011f972b7ca61fab4e29c8aa93e6afa457fc4e3f9cf15d95dae",
+      "after_hash": "489ed477828a9e37af09386488035435bcb342675058d9e8d3dd543741cdab78",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/templates/stable/public/horse_follows.html",
+      "status": "modified",
+      "before_hash": "f95cfb627d56f06ffb9f134391a89bb0f0963ddd9549784af81bb69eb6048b43",
+      "after_hash": "8efb11615ea37c760a8ff753f8de70c2285e122e2d99ec42cbb6c1ccf5bbe2f7",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/templates/stable/public/horse_index.html",
+      "status": "modified",
+      "before_hash": "c4f839f4101eb82ada81e191fc0bf0018235f52c705694b8d761a2cbfae55e2f",
+      "after_hash": "f82827984f408ad741945173a4292b4f19813e52ae0154a6da3b54244a0da9aa",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_hkjc_horse_name_policy.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "245ea6a3d2fce4ab91e0e1263a0cdd56d1e10d3a80df867584323497877065c0",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/views.py",
+      "status": "modified",
+      "before_hash": "e3fe57ea494fbb1fc472807fc42892b63d145a0815a2e759ce133b9afa56ae38",
+      "after_hash": "4d09d5c91ec6e7323f627dad9261643986e82925f07865da5137e5b77cb9852c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/catalog.json",
+      "status": "modified",
+      "before_hash": "5c198320a2a14cca5aa652380f58edcda61e989011a7f8ab7d7717fb02765074",
+      "after_hash": "34b21b0e7e192837f53f1b51ee577d5124b6872e1d8688113f59673d4477e2e4",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "66da5d0a27edcff235b630be62f9964e9fc2d5e48a9cfd74c9ff75a8824960bc",
+      "after_hash": "9e0fe93433b7e200bf50d1ce8a660eeef3477246074fe0554788548cd111c56f",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}
