@@ -1510,6 +1510,17 @@
     ],
     "docs/changes/hkjc-source-acceptance/ci-scope.json": [
       "infrastructure"
+    ],
+    "server/stable/services/hkjc_public_fields.py": [
+      "hkjc_source_acceptance",
+      "race_results"
+    ],
+    "server/stable/management/commands/repair_hkjc_race_fields.py": [
+      "hkjc_source_acceptance",
+      "race_results"
+    ],
+    "docs/changes/hkjc-race-fields/ci-scope.json": [
+      "infrastructure"
     ]
   },
   "symbols": {
@@ -1691,6 +1702,7 @@
     "docs/changes/japan-race-automation/ci-scope.json",
     "docs/changes/japan-race-public-fields/ci-scope.json",
     "docs/changes/hkjc-horse-name-display/ci-scope.json",
-    "docs/changes/hkjc-source-acceptance/ci-scope.json"
+    "docs/changes/hkjc-source-acceptance/ci-scope.json",
+    "docs/changes/hkjc-race-fields/ci-scope.json"
   ]
 }
