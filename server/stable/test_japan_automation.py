@@ -460,6 +460,14 @@ class JraBindingPriorityTests(SimpleTestCase):
                 discover_source_url(event=event,route=route,now=NOW,fetcher=fetch)
             fetch.assert_not_called()
             event.source_refs['jra_pre_race_binding']['url']=card
+        conflict='https://www.jra.go.jp/datafile/seiseki/g1/tenno/result/tenno2026.html'
+        route=SourceRoute(dict(provider='jra',allowed_hosts=['www.jra.go.jp'],allowed_path_prefixes=['/JRADB/','/datafile/seiseki/']),'a'*64)
+        for key in ('primary','reference_urls'):
+            event.source_refs={key:[conflict] if key=='reference_urls' else conflict,
+                'jra_pre_race_binding':{'url':card,'baseline':baseline(event)}}
+            with self.assertRaisesRegex(ValueError,'source_discovery_ambiguous'):
+                discover_source_url(event=event,route=route,now=NOW,fetcher=fetch)
+        fetch.assert_not_called()
 
 class NarBaneiGeneralTests(SimpleTestCase):
     def test_banei_card_and_result_preserve_hundreds_of_kg_weight(self):
