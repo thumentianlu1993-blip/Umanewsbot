@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from django.test import TestCase, override_settings
+from django.test import TestCase, TransactionTestCase, override_settings
 
 from stable.models import HorseProfile, SourceLanguage, TermEntry, TermType
 from stable.services.race_term_display import StrictRaceTermResolver
@@ -106,23 +106,6 @@ class HkjcHorseNamePolicyTests(TestCase):
         self.assertIn('アンズアメ', result.title_zh)
         self.assertIn('タガノミスト', result.title_zh)
         self.assertNotIn('__UMA_KEEP_', result.body_zh)
-
-    def test_historical_report_is_read_only_and_limits_published_fields(self):
-        import io, json
-        from django.core.management import call_command
-        from django.utils import timezone
-        from stable.models import NewsArticle, WorkflowStatus
-        self.term(notes='source=manual_review')
-        article = NewsArticle.objects.create(source_article_id='history', title_ja='原文', title_zh='杏饴出赛',
-                                             summary_zh='杏饴', body_zh='正文', published_at=timezone.now(),
-                                             workflow_status=WorkflowStatus.PUBLISHED, published_to_web_at=timezone.now())
-        output = io.StringIO()
-        call_command('report_hkjc_horse_name_impact', stdout=output)
-        report = json.loads(output.getvalue())
-        self.assertEqual(report['potential_article_count'], 1)
-        self.assertEqual({m['field'] for m in report['articles'][0]['matches']}, {'effective_title', 'effective_summary'})
-        article.refresh_from_db()
-        self.assertEqual(article.title_zh, '杏饴出赛')
 
     def test_public_profile_pages_hide_overrides_and_pedigree_names(self):
         term = self.term(notes=OFFICIAL)
@@ -299,3 +282,25 @@ class HkjcHorseNamePolicyTests(TestCase):
         rows = list(historical_horse_name_impact())
         self.assertEqual([row['article_id'] for row in rows], [article.pk])
         self.assertEqual({match['name'] for match in rows[0]['matches']}, {'旧译名'})
+
+
+@override_settings(HORSE_NAMES_REQUIRE_HKJC_ENABLED=True)
+class HkjcHorseNameReportTransactionTests(TransactionTestCase):
+    # 命令自行建立 PostgreSQL 只读快照，不能嵌套在 TestCase 的预先查询事务中。
+    def test_historical_report_is_read_only_and_limits_published_fields(self):
+        import io, json
+        from django.core.management import call_command
+        from django.utils import timezone
+        from stable.models import NewsArticle, WorkflowStatus
+        TermEntry.objects.create(term_type=TermType.HORSE, source_language=SourceLanguage.JAPANESE,
+                                 source_ja='アンズアメ', target_zh='杏饴', notes='source=manual_review')
+        article = NewsArticle.objects.create(source_article_id='history', title_ja='原文', title_zh='杏饴出赛',
+                                             summary_zh='杏饴', body_zh='正文', published_at=timezone.now(),
+                                             workflow_status=WorkflowStatus.PUBLISHED, published_to_web_at=timezone.now())
+        output = io.StringIO()
+        call_command('report_hkjc_horse_name_impact', stdout=output)
+        report = json.loads(output.getvalue())
+        self.assertEqual(report['potential_article_count'], 1)
+        self.assertEqual({m['field'] for m in report['articles'][0]['matches']}, {'effective_title', 'effective_summary'})
+        article.refresh_from_db()
+        self.assertEqual(article.title_zh, '杏饴出赛')

@@ -45,7 +45,7 @@
       "path": "docs/changes/hkjc-horse-name-display/rollout.md",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "ba9f8239a65f4087634bd2de8d0fa370f061249874d6f223471c82a279c98758",
+      "after_hash": "a1289aeead3f2d2720f0a2ffd766d2da7e996e6df0af72bc992f232d540f52ef",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -77,7 +77,7 @@
       "path": "docs/changes/hkjc-horse-name-display/validation.md",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "1a8ac2cb39a9609cccc105d5bb06558a28211b463575dce1b8e1793b6396115e",
+      "after_hash": "3d82e83983950bd34b87ca99440ffc5bcf56871f04aa8ed8aff7bf6c5a60a185",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -245,7 +245,7 @@
       "path": "server/stable/test_hkjc_horse_name_policy.py",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "245ea6a3d2fce4ab91e0e1263a0cdd56d1e10d3a80df867584323497877065c0",
+      "after_hash": "5f610d7d0a60f2518a3fa8868983e55b8cf8dcac721c7a9a1195ede0630ba934",
       "before_mode": null,
       "after_mode": "100644"
     },
