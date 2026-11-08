@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "base_sha": "c7a99a7f8879b1a0072ca1ec73108bb9539ba4d5",
-  "reason": "用户已要求按实际影响范围验收。共享入口只新增默认关闭的 HKJC 分支；覆盖真实解析、候选/租约、强身份、多来源登记转换、公开详情、JRA/NAR回归及选测工具，不扩大到无关业务。",
+  "base_sha": "b1feb895c6f84dd54934488a92fe5a216892a3a9",
+  "reason": "HKJC来源PR在已合并马名策略上交付。保留HKJC全阶段、强身份、多来源登记、预览/JRA/NAR、选测执行器，并追加马名策略24项覆盖组合效果。业务补丁未改变。",
   "domains": [
     "hkjc_source_acceptance",
     "infrastructure"
@@ -58,16 +58,16 @@
     {
       "path": "docs/current_state.md",
       "status": "modified",
-      "before_hash": "bc947d55406b88ce10bf6a8bc424d959396630e7ea9b70998fae02d457e68f3c",
-      "after_hash": "02c9bf7e7012f88e46925b6c4f24e4b2230314b90c7c46b7085ee16b3dfd8f06",
+      "before_hash": "82d3137332ae0de334fa21a2ca1c8c82ad136a37642d5e01896ccc8dadbea5c7",
+      "after_hash": "53f3521be18f09ff1a7a01fc5223ef450aded6f17d47817d692b89440649f16e",
       "before_mode": "100644",
       "after_mode": "100644"
     },
     {
       "path": "server/app/settings.py",
       "status": "modified",
-      "before_hash": "e86afddd770156492d51a31d105af2817cfa68342eed99c0502e7181f3ea8b51",
-      "after_hash": "8554b36587c9fbc454eda1b1de3f68d561c49168b6b621a7ee460e61787ee8bb",
+      "before_hash": "16ac4292b151c4498991af9a47a35ff1da1cc4dd7918409869c58d38b57db947",
+      "after_hash": "37394a8a8f20642e06033ff055bd289dc4ca7d9d1232078fe7b23cd83ace6e77",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -226,24 +226,24 @@
     {
       "path": "server/stable/views.py",
       "status": "modified",
-      "before_hash": "e3fe57ea494fbb1fc472807fc42892b63d145a0815a2e759ce133b9afa56ae38",
-      "after_hash": "8c44dce42c2b2eab708eb389c4f7da0456d0d3c37fae7153be19477a26968fd6",
+      "before_hash": "4d09d5c91ec6e7323f627dad9261643986e82925f07865da5137e5b77cb9852c",
+      "after_hash": "25cb79d775ab499fbb89f85ccc722fb46ec350ffbc6a530eac03dad8575cb759",
       "before_mode": "100644",
       "after_mode": "100644"
     },
     {
       "path": "tools/test_impact/catalog.json",
       "status": "modified",
-      "before_hash": "5c198320a2a14cca5aa652380f58edcda61e989011a7f8ab7d7717fb02765074",
-      "after_hash": "e15ff1d7d9b88a4cc597ddf7a99638a1c5b438635314f0be27dbbc37d3818793",
+      "before_hash": "34b21b0e7e192837f53f1b51ee577d5124b6872e1d8688113f59673d4477e2e4",
+      "after_hash": "05b1963baa79c93858f59790ce2dd5f38da58c54d353424cdeace5a8bec1c2fe",
       "before_mode": "100644",
       "after_mode": "100644"
     },
     {
       "path": "tools/test_impact/rules.json",
       "status": "modified",
-      "before_hash": "66da5d0a27edcff235b630be62f9964e9fc2d5e48a9cfd74c9ff75a8824960bc",
-      "after_hash": "35f1bd459b8c2cc9ba425adf3277bfb7d97dc7400c5566b4c788785e11ffc818",
+      "before_hash": "9e0fe93433b7e200bf50d1ce8a660eeef3477246074fe0554788548cd111c56f",
+      "after_hash": "fec3d838d2bb6eb458eb34ab0a9de6c480b28a2387f18aeefee2cd04a41bec36",
       "before_mode": "100644",
       "after_mode": "100644"
     }

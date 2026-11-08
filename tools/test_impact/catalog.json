@@ -912,7 +912,8 @@
       "stable.test_race_multisource_postgres",
       "stable.test_japan_automation",
       "stable.test_japan_public_fields",
-      "stable.tests_legacy.RaceEventPageMVPTests"
+      "stable.tests_legacy.RaceEventPageMVPTests",
+      "stable.test_hkjc_horse_name_policy"
     ]
   },
   "dependencies": {
