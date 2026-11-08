@@ -120,7 +120,7 @@
         <h2>{{ result_section_label }}</h2>
         <div class="race-table-wrap">
           <table class="data-table">
-            <thead><tr><th>名次</th><th>马号</th><th>马名</th><th>骑师</th><th>练马师</th><th>时间</th><th>差距</th><th>{% if race_information_enabled %}赔率 / 热门排名{% else %}赔率 / 人气{% endif %}</th></tr></thead>
+            <thead><tr><th>名次</th><th>马号</th><th>马名</th><th>骑师</th><th>练马师</th><th>负重</th><th>时间</th><th>{% if results.0.source_refs.margin_basis == "winner" %}差距（距头马）{% else %}差距{% endif %}</th><th>{% if race_information_enabled %}赔率 / 热门排名{% else %}赔率 / 人气{% endif %}</th></tr></thead>
             <tbody>
               {% for result in results %}
                 <tr class="{% if result.display_finish_position == 1 %}medal-1{% elif result.display_finish_position == 2 %}medal-2{% elif result.display_finish_position == 3 %}medal-3{% endif %}">
@@ -129,6 +129,7 @@
                   <td><strong>{% race_field result "horse_name" result.display_horse_name %}</strong></td>
                   <td>{% race_field result "jockey_name" result.display_jockey_name|default:"-" %}</td>
                   <td>{% race_field result "trainer_name" result.trainer_name|default:"-" %}</td>
+                  <td>{% race_field result "weight" result.carried_weight|default:"-" %}</td>
                   <td class="num">{% race_field result "finish_time" result.finish_time|default:"-" %}</td>
                   <td>{% race_field result "margin" result.margin|default:"-" %}</td>
                   <td>{% race_field result "odds" result.odds_value|default:"-" %} / {% race_field result "popularity" result.popularity|default:"-" %}</td>

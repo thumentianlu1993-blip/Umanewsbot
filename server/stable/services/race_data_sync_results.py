@@ -22,6 +22,7 @@ from stable.services.race_data_sync_policy import (
 )
 from stable.services.race_event_public_cache import invalidate_public_race_cache
 from stable.services.japan_public_fields import japan_source, result_popularity, fill_result_time
+from stable.services.hkjc_public_fields import hkjc_source, result_odds, UNITS as HKJC_UNITS
 
 
 _TERMINAL_RESULT_STATUSES = frozenset(
@@ -819,9 +820,29 @@ def apply_data_sync_result_observation(
                     ),
                     source.source_key: row["external_runner_id"],
                 }
-                if japan_source(source):
-                    # 既有卡表负重未在赛果投影中替换，其单位也必须原样保留。
+                if hkjc_source(source):
                     if runner.pk is None:
+                        runner.odds_value = result_odds(row["field_provenance"])
+                        runner.source_refs["field_units"] = dict(HKJC_UNITS)
+                    else:
+                        # 只补与此次官方值一致的既有字段单位，不改变卡表负重或人工锁。
+                        matching = {
+                            'carried_weight': runner.carried_weight in (row['carried_weight'], row['carried_weight'].removesuffix('lb')),
+                            'odds_value': runner.odds_value == result_odds(row['field_provenance']),
+                        }
+                        units = dict(runner.source_refs.get('field_units', {}))
+                        for field, same in matching.items():
+                            if (same and not manual_locks.get('runners')
+                                and not (runner.manual_lock_flags or {}).get(field)
+                                and not event.field_authorities.filter(subject_type='participant',
+                                    subject_key__in=(runner.external_runner_id, row['external_runner_id'],
+                                        source.source_key + ':' + row['external_runner_id']),
+                                    field_name=field, manual_lock=True).exists()):
+                                units[field] = HKJC_UNITS[field]
+                        runner.source_refs['field_units'] = units
+                if japan_source(source) or hkjc_source(source):
+                    # 既有卡表负重未在赛果投影中替换，其单位也必须原样保留。
+                    if runner.pk is None and japan_source(source):
                         runner.source_refs['field_units'] = {
                             **runner.source_refs.get('field_units', {}), 'carried_weight': 'kg'}
                     if (not manual_locks.get('runners')
@@ -971,13 +992,14 @@ def apply_data_sync_result_observation(
                         carried_weight=item.carried_weight,
                         running_status=item.status,
                         popularity=result_popularity(item.field_provenance) if japan_source(source) else "",
+                        odds_value=result_odds(item.field_provenance) if hkjc_source(source) else "",
                         is_confirmed=True,
                         source_refs={
                             "source_key": source.source_key,
                             "external_runner_id": row["external_runner_id"],
                             "revision_id": revision.pk,
                             **({"field_units": {"carried_weight": "kg", "margin": "length"}}
-                               if japan_source(source) else {}),
+                               if japan_source(source) else {"field_units": dict(HKJC_UNITS), "margin_basis": "winner", "primary": source.canonical_url} if hkjc_source(source) else {}),
                         },
                         raw_payload={
                             "raw_status": item.raw_status,
@@ -1031,7 +1053,7 @@ def apply_data_sync_result_observation(
                             "observation_id": observation.pk,
                             "revision_id": revision.pk,
                             **({"field_units": {"carried_weight": "kg", "margin": "length"}}
-                               if japan_source(source) else {}),
+                               if japan_source(source) else {"field_units": dict(HKJC_UNITS), "margin_basis": "winner", "primary": source.canonical_url} if hkjc_source(source) else {}),
                         },
                     },
                 )

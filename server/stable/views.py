@@ -3944,7 +3944,9 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
         {
             "event": event,
             "runners": runners,
-            "runner_section_label": preview["label"] if preview else "出马表",
+            "runner_section_label": preview["label"] if preview else (
+                "参赛记录（赛果来源）" if event.country_region == "hong_kong" and runners
+                and all((r.source_refs or {}).get("bootstrap_kind") == "result" for r in runners) else "出马表"),
             "runner_preview": preview,
             "results": results,
             "history_winners": history_winners,
