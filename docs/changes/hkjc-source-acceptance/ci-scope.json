@@ -75,7 +75,7 @@
       "path": "server/stable/fixtures/hkjc_automation/card-expired.html",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "3aa784c5bfafa6dec396abcc1bb2a051731e5add2a483a170183f0795c699033",
+      "after_hash": "73cf92442bee19a796f3780b349cfd69a6228a353c31379c62d5ef016fe2c8d2",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -83,7 +83,7 @@
       "path": "server/stable/fixtures/hkjc_automation/card.html",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "fec7c5706669384f23bb5ec44057149ce96e157dce7c243c5a7637b6d6386b06",
+      "after_hash": "07bbe6c0a3a56bd3e62600d61a2432901fee0cf8e7ae0d01ece216569ea9eba3",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -91,7 +91,7 @@
       "path": "server/stable/fixtures/hkjc_automation/entries-unpublished.html",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "f1fbeaaac939afa855e9802c2f966cb599efac2840603fa8ae4c878a6e2a5a2d",
+      "after_hash": "55036581debcba81ad4678990a47497c29e2a365110549c48e36f01389d4371e",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -99,7 +99,7 @@
       "path": "server/stable/fixtures/hkjc_automation/entries.html",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "409b82651fea0a1864748f30c48b8dac695cbfcb8daa2838cc6a24b7e352949b",
+      "after_hash": "3e24a0774848f06e623b4e10aeb8031b50814d14a99749c97c145b8c3c38d936",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -107,7 +107,7 @@
       "path": "server/stable/fixtures/hkjc_automation/meeting-results.html",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "ec63a630321e0186a0abc1bddf42139e6a351447dfbbd3284c0e820dea8338fb",
+      "after_hash": "43e2fa32454c3711cdaf7f35c48fdf2bd46dd6391ce69e71e109f4f66ba36de8",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -115,7 +115,7 @@
       "path": "server/stable/fixtures/hkjc_automation/nominations.html",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "075c1db9d3014f54f93c93d9352b302201b271c5ce255fee99fc859a34f4d918",
+      "after_hash": "bfd6444a73be667927eb769b0959e1319e3d2475115978afdec1241a8173379b",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -123,7 +123,7 @@
       "path": "server/stable/fixtures/hkjc_automation/result-withdrawn.html",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "b40ba63272e45bfbfb20189167a1ba2005fb7e3b6bee8be3b8e54c8c541ad773",
+      "after_hash": "9eb31c1baf8f24c14e46ec26c6e79411b46cafbfef5025a50716dd929f7bf99b",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -131,7 +131,7 @@
       "path": "server/stable/fixtures/hkjc_automation/result.html",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "201d8c6a1a044116a828dca393917d6dae3d5f4c276b50bba25798e2418440f6",
+      "after_hash": "b5f2d12071c46b7afc9b130e5c288abe8566f43b62b036cf90a4b78e5e56c8bf",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -139,7 +139,7 @@
       "path": "server/stable/fixtures/hkjc_automation/sources.json",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "7b25cc97122a882bf78e6a325faee06aa7f91bdfb3f1cd3516e6a97b281cbea3",
+      "after_hash": "2c515dc7bd383364cee4c2c9d7b7ac056cd973324f002469ec565b95046c1137",
       "before_mode": null,
       "after_mode": "100644"
     },
