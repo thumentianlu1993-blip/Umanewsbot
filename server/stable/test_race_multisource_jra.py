@@ -977,3 +977,20 @@ class MultisourceRebindTests(JraColdStartTests):
             rebind_multisource_enrollment(
                 event_id=self.event.pk, policy=self.policy_v2(), now=NOW,
                 expected_route_digest=self.binding().route_digest, apply=True)
+
+class JapanExpiredPolicyUpgradeTests(JraColdStartTests):
+    def test_expired_binding_upgrade_refreshes_source_and_adds_checkpoints(self):
+        from stable.services.race_data_sync_enrollment import rebind_multisource_enrollment
+        from stable.services.race_data_sync_admission import binding_admission_reason
+        self.enroll()
+        binding=models.RaceDataSyncSourceBinding.objects.get(enrollment__event=self.event)
+        old=binding.route_digest
+        binding.valid_until=NOW-timedelta(seconds=1);binding.save()
+        source=binding.source_identity;source.valid_until=NOW-timedelta(seconds=1);source.save()
+        payload=policy_payload_v2();payload['routes'][0]['capabilities']=['race_time','racecard','result']
+        policy=parse_multisource_policy(payload,now=NOW)
+        rebind_multisource_enrollment(event_id=self.event.pk,policy=policy,now=NOW,expected_route_digest=old,apply=True)
+        binding.refresh_from_db()
+        self.assertEqual(binding.capabilities,['race_time','racecard','result'])
+        self.assertEqual(binding_admission_reason(binding=binding,route=policy.routes[0],now=NOW,check_runtime=False),'')
+        self.assertEqual(set(models.RaceEventLiveProviderCheckpoint.objects.filter(tracking__event=self.event).values_list('data_kind',flat=True)),{'race_time','racecard','result'})

@@ -2705,8 +2705,9 @@ def reserve_race_data_host_request(
 
 
 def _claim_multisource_due(
-    *, now, batch_size, ttl_seconds, providers, regions, data_kinds
+    *, now, batch_size, ttl_seconds, providers, regions, data_kinds, event_ids=None, historical=False
 ):
+    from zoneinfo import ZoneInfo
     from stable.services.race_data_source_adapters import load_multisource_policy
     from stable.services.race_data_sync_admission import validate_multisource_admission
     from stable.services.race_data_sync_enrollment import (
@@ -2722,10 +2723,11 @@ def _claim_multisource_due(
         return ()
     ids = list(
         models.RaceDataSyncEnrollment.objects.filter(
+            **({"event_id__in": event_ids} if event_ids is not None else {}),
             authority_version=2,
             state="enrolled",
             event__live_tracking__tracking_enabled=True,
-            event__live_tracking__next_poll_at__lte=now,
+            **({} if historical else {"event__live_tracking__next_poll_at__lte": now}),
         )
         .filter(
             Q(event__live_tracking__active_attempt_token="")
@@ -2739,6 +2741,10 @@ def _claim_multisource_due(
         try:
             with transaction.atomic():
                 event, _ = _lock_multisource_event(event_id)
+                if historical and (event.country_region != "japan" or not event.local_date
+                    or event.local_date > now.astimezone(ZoneInfo(event.timezone_name)).date()
+                    or (event.race_datetime is not None and event.race_datetime + timedelta(minutes=3) > now)):
+                    continue
                 control = (
                     models.RaceEventProjectionControl.objects.select_for_update().get(
                         event=event
@@ -2760,7 +2766,7 @@ def _claim_multisource_due(
                     models.RaceEventLiveProviderCheckpoint.objects.select_for_update()
                     .filter(
                         tracking=tracking,
-                        next_poll_at__lte=now,
+                        **({} if historical else {"next_poll_at__lte": now}),
                         source_key__in=providers,
                         data_kind__in=data_kinds,
                     )
@@ -2774,7 +2780,7 @@ def _claim_multisource_due(
                     first_allowed = multisource_initial_poll_at(
                         event=event, kind=row.data_kind, now=now
                     )
-                    if first_allowed is None or first_allowed > now:
+                    if not historical and (first_allowed is None or first_allowed > now):
                         row.next_poll_at = first_allowed
                         row.save(update_fields=("next_poll_at", "updated_at"))
                         continue
@@ -3200,3 +3206,12 @@ def _multisource_tracking_due(enrollment, tracking, selected, alternate):
     return models.RaceEventLiveProviderCheckpoint.objects.filter(
         q, tracking=tracking, next_poll_at__isnull=False
     ).aggregate(v=Min("next_poll_at"))["v"]
+
+
+def claim_multisource_events(*, event_ids, now, ttl_seconds=240, historical=False):
+    """固定清单历史回填使用同一claim协议；不领取清单外赛事。"""
+    if not event_ids or len(event_ids) > 1000 or any(type(i) is not int or i <= 0 for i in event_ids):
+        raise ValueError("multisource_explicit_scope_invalid")
+    _require_aware(now, "now")
+    return _claim_multisource_due(now=now, batch_size=min(20, len(event_ids)), ttl_seconds=ttl_seconds,
+        providers=("jra", "nar"), regions=("japan_jra", "japan_nar"), data_kinds=("result",), event_ids=event_ids, historical=historical)

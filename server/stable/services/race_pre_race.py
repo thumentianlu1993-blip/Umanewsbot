@@ -22,6 +22,8 @@ JRA = 'jra_pre_race_v1'
 TRA = 'tra_identity'
 REFRESH = 'pre_race_refresh_v1'
 INDEX_URL = 'https://www.jra.go.jp/keiba/thisweek/'
+CARD_INDEX_URL = 'https://www.jra.go.jp/JRADB/accessD.html?CNAME=pw01dli00/F3'
+REGISTRATION_INDEX_URL = 'https://www.jra.go.jp/JRADB/accessT.html?CNAME=pw03trl00/29'
 SOURCE_DIGEST = hashlib.sha256(b'jra-pre-race-v1:https://www.jra.go.jp:official-preview-only').hexdigest()
 STAGES = {'registration': 0, 'declared': 1, 'numbered': 2}
 JRA_COURSES = frozenset(('札幌', '函館', '福島', '新潟', '東京', '中山', '中京', '京都', '阪神', '小倉'))
@@ -63,15 +65,21 @@ def in_window(event, now):
         today = now.astimezone(ZoneInfo(event.timezone_name)).date()
     except (ValueError, KeyError):
         return False
-    return (0 <= (event.local_date-today).days <= 4
+    return (0 <= (event.local_date-today).days <= pre_race_days(event)
         and (event.race_datetime is None or now < event.race_datetime+timedelta(minutes=5)))
 
 
 def preview_window(event,now):
     if not getattr(settings,'RACE_DATA_MULTISOURCE_APPLY_ENABLED',False):return in_window(event,now)
     if event.visibility_status!='published' or event.status in ('cancelled','postponed') or not event.local_date:return False
-    try:return (event.local_date-now.astimezone(ZoneInfo(event.timezone_name)).date()).days<=4
+    try:return (event.local_date-now.astimezone(ZoneInfo(event.timezone_name)).date()).days<=pre_race_days(event)
     except (ValueError,KeyError):return False
+
+
+def pre_race_days(event):
+    if event.country_region == 'japan':
+        return max(0, min(31, getattr(settings, 'RACE_DATA_SYNC_JAPAN_PRE_RACE_DAYS', 4)))
+    return 4
 
 
 def _refs(event):
@@ -94,10 +102,13 @@ def _save_state(event, source, state):
 
 
 def claim_pre_race(*, event_id, source, now):
-    if source not in {JRA, TRA, REFRESH} or timezone.is_naive(now):
+    if source not in {JRA, TRA, REFRESH, 'nar_pre_race_v1'} or timezone.is_naive(now):
         raise ValueError('invalid_pre_race_claim')
     if source == JRA and not jra_enabled(network=True):
         return None
+    if source == 'nar_pre_race_v1':
+        from .nar_pre_race import enabled
+        if not enabled(): return None
     if source == REFRESH:
         from .race_pre_race_refresh import refresh_enabled
         if not refresh_enabled(): return None
@@ -106,6 +117,8 @@ def claim_pre_race(*, event_id, source, now):
         if not in_window(event, now) or (source == JRA and (
             event.country_region != 'japan' or event.racecourse not in JRA_COURSES or
             _refs(event).get('pre_race_handoff'))):
+            return None
+        if source == 'nar_pre_race_v1' and (event.country_region != 'japan' or event.racecourse in JRA_COURSES or _refs(event).get('pre_race_handoff') or event.runners.exists()):
             return None
         state = _state(event, source)
         lease = _dt(state.get('lease_until'))
@@ -137,6 +150,9 @@ def _finish_locked(event, claim, now, reason='', retry_after=None, outcome_reaso
     anchor = slot(_dt(state.get('last_attempt_at')) or now)
     due = calculate_next_poll_at(data_kind='racecard', now=anchor, race_datetime=event.race_datetime,
                                 local_date=event.local_date, timezone_name=event.timezone_name)
+    if (pre_race_days(event) > 4 and event.local_date and
+        (event.local_date-now.astimezone(ZoneInfo(event.timezone_name)).date()).days > 4):
+        due = min(due or now+timedelta(hours=3), now+timedelta(hours=3))
     if due is not None and due <= now:
         due = calculate_next_poll_at(data_kind='racecard', now=now,
             race_datetime=event.race_datetime, local_date=event.local_date, timezone_name=event.timezone_name)
@@ -165,11 +181,16 @@ def validate_url(url, *, index=False):
     parsed = urlsplit(url)
     if parsed.scheme != 'https' or parsed.netloc != 'www.jra.go.jp' or parsed.fragment:
         raise ValueError('jra_pre_race_url_rejected')
-    if index and url == INDEX_URL:
+    if index and url in {INDEX_URL, CARD_INDEX_URL, REGISTRATION_INDEX_URL}:
+        return
+    if index and parsed.path == '/JRADB/accessD.html' and re.fullmatch(
+            r'CNAME=pw01drl(?:00|10)\d{18}/[0-9A-F]{2}', parsed.query):
         return
     query = parse_qs(parsed.query)
-    if (parsed.path != '/JRADB/accessD.html' or set(query) != {'CNAME'} or len(query['CNAME']) != 1
-        or not re.fullmatch(r'pw01dde01\d{20}/[0-9A-F]{2}', query['CNAME'][0])):
+    patterns = {'/JRADB/accessD.html': r'pw01dde(?:01|10)\d{20}/[0-9A-F]{2}',
+                '/JRADB/accessT.html': r'pw03tde00\d{16}/[0-9A-F]{2}'}
+    if (parsed.path not in patterns or set(query) != {'CNAME'} or len(query['CNAME']) != 1
+        or not re.fullmatch(patterns[parsed.path], query['CNAME'][0])):
         raise ValueError('jra_pre_race_url_rejected')
 
 
@@ -185,11 +206,68 @@ def normalize_jra_race_name(name):
     """JRA 官方名称的确定性归一：去空白与等级前缀，长后缀ステークス/カップ/トロフィー/フィリーズ转为 S/C/T/F。"""
     value = re.sub(r'\s+', '', name or '')
     value = _JRA_GRADE_PREFIX.sub('', value)
+    value = re.sub(r'[（(\[［](?:混合|国際|指定|特指|牝|見習騎手)[）)\]］]', '', value)
     for long, short in _JRA_LONG_SUFFIXES:
         if value.endswith(long) and len(value) > len(long):
             value = value[:-len(long)] + short
             break
     return value
+
+
+def jra_document_links(html, *, base_url=INDEX_URL):
+    """从href或官网doAction提取真实参数，不生成或猜测校验后缀。"""
+    from urllib.parse import urlencode
+    soup = BeautifulSoup(str(html), 'html.parser')
+    for anchor in soup.select('a'):
+        action = re.search(r"doAction\(\s*['\"](/JRADB/access[DST]\.html)['\"]\s*,\s*['\"]([^'\"]+)['\"]\s*\)",
+                           anchor.get('onclick', ''))
+        if action:
+            target = urljoin(base_url, action[1]) + '?' + urlencode({'CNAME': action[2]}, safe='/')
+        else:
+            target = urljoin(base_url, anchor.get('href', ''))
+        yield anchor, target
+
+
+def jra_pre_race_links(html, *, event):
+    from .race_data_source_adapters import jra_cname_identity, _JRA_VENUE_CODES
+    names = {normalize_jra_race_name(n) for n in (event.original_name, event.chinese_name,
+             *event.aliases.values_list('text', flat=True)) if n}
+    candidates, exact, exact_times = [], [], {}
+    for anchor, url in jra_document_links(html):
+        try:
+            validate_url(url)
+            if urlsplit(url).path.endswith('accessT.html'):
+                match = re.fullmatch(r'pw03tde00(\d{2})\d{6}(\d{8})/[0-9A-F]{2}', parse_qs(urlsplit(url).query)['CNAME'][0])
+                venue, day = _JRA_VENUE_CODES.get(match[1]), match[2]
+            else:
+                match = jra_cname_identity(url)
+                venue, day = _JRA_VENUE_CODES.get(match[2]), match[7]
+        except (ValueError, KeyError, TypeError):
+            continue
+        if venue != event.racecourse or day != event.local_date.strftime('%Y%m%d'):
+            continue
+        if url not in candidates:
+            candidates.append(url)
+        label = ''.join(str(n) for n in anchor.contents if isinstance(n, str)).strip()
+        row = anchor.find_parent('tr')
+        row_name = row.select_one('.race_name .stakes') or row.select_one('.race_name') if row else None
+        if row_name is not None:
+            label = row_name.get_text(' ', strip=True)
+        if normalize_jra_race_name(label) in names and url not in exact:
+            exact.append(url)
+            clock = re.search(r'(\d{1,2})時(\d{1,2})分', _text(row.select_one('.time'))) if row else None
+            if clock:
+                exact_times[url] = time(*map(int, clock.groups()))
+    if len(exact) > 1:
+        known_time = getattr(event, 'local_start_time', None)
+        if known_time is None and getattr(event, 'race_datetime', None):
+            known_time = event.race_datetime.astimezone(ZoneInfo('Asia/Tokyo')).time()
+        if known_time is not None:
+            matched = [u for u in exact if exact_times.get(u) == known_time]
+            if not matched:
+                raise ValueError('jra_race_identity_ambiguous')
+            return matched
+    return exact or candidates
 
 
 def parse_jra_card(html, *, event, url):
@@ -215,6 +293,8 @@ def parse_jra_card(html, *, event, url):
     course = re.search(r'\d+回(.+?)\d+日', day_text)
     if not course or course.group(1).strip() != event.racecourse:
         raise ValueError('jra_pre_race_course_mismatch')
+    if urlsplit(url).path == '/JRADB/accessT.html':
+        return _parse_jra_registration(soup, header=header, event=event, url=url)
     start = re.search(r'(\d{1,2})時(\d{1,2})分', _text(header.select_one('.time')))
     if not start:
         raise ValueError('jra_pre_race_time_missing')
@@ -256,6 +336,39 @@ def parse_jra_card(html, *, event, url):
     else:
         raise ValueError('jra_pre_race_stage_unknown')
     return {'items': rows, 'stage': stage, 'off_time': off_time.isoformat()}
+
+
+def _parse_jra_registration(soup, *, header, event, url):
+    """特别登录是独立页面合同：没有赛时、马号或闸位，不能生成最终出走名单。"""
+    from .race_data_source_adapters import _JRA_VENUE_CODES
+    cname = parse_qs(urlsplit(url).query)['CNAME'][0]
+    identity = re.fullmatch(r'pw03tde00(\d{2})(\d{2})(\d{2})(\d{2})(\d{8})/[0-9A-F]{2}', cname)
+    meeting = re.search(r'(\d+)回(.+?)(\d+)日', _text(header.select_one('.date')))
+    if (not identity or not meeting or identity[5] != event.local_date.strftime('%Y%m%d')
+        or _JRA_VENUE_CODES.get(identity[1]) != event.racecourse
+        or int(identity[2]) != int(meeting[1]) or int(identity[3]) != int(meeting[3])):
+        raise ValueError('jra_pre_race_url_identity_mismatch')
+    entry = soup.select_one('#stakes_race_entry')
+    count = re.search(r'第\d+回特別登録\s*(\d+)頭', _text(entry))
+    if entry is None or not count or not 0 < int(count[1]) <= 60:
+        raise ValueError('jra_registration_count_missing')
+    rows = []
+    registered_count = 0
+    for tr in entry.select('.horse_list_area table tbody > tr'):
+        category = _text(tr.find_parent('table').select_one('caption .main'))
+        if not re.fullmatch(r'(登録馬名|地方馬・外国馬)\d+', category):
+            raise ValueError('jra_registration_category_unknown')
+        if category.startswith('登録馬名'):
+            registered_count += 1
+        name, weight = _text(tr.select_one('td.horse')), _text(tr.select_one('td.weight'))
+        if not name or not re.fullmatch(r'\d{2}(?:\.\d)?', weight):
+            raise ValueError('jra_registration_partial_row')
+        rows.append(dict(horse_name=name, carried_weight=weight, sort_order=len(rows)+1,
+                         horse_number='', barrier='', trainer_name='', jockey_name='',
+                         running_status='declared', source_refs={'registration_category': category, 'primary': url}))
+    if registered_count != int(count[1]) or len({r['horse_name'] for r in rows}) != len(rows):
+        raise ValueError('jra_registration_roster_incomplete')
+    return {'items': rows, 'stage': 'registration', 'off_time': None}
 
 
 def cancel_pre_race_claim(claim):
@@ -314,7 +427,7 @@ def complete_jra(claim, *, html, url, now):
             subject_type='event', field_name__in=fields, manual_lock=True).exists()
         admitted=set(settings.RACE_DATA_SYNC_ENABLED_FIELDS)
         permitted=permitted and {'off_time','local_start_time','timezone_name'}.issubset(admitted)
-        if settings.RACE_DATA_SYNC_SCHEDULE_APPLY_ENABLED and permitted and (
+        if payload.get('off_time') and settings.RACE_DATA_SYNC_SCHEDULE_APPLY_ENABLED and permitted and (
             (event.race_datetime is None and event.local_start_time is None) or (
                 old_time.get('baseline') == baseline(event) and
                 _dt(old_time.get('value')) == event.race_datetime and
@@ -377,6 +490,23 @@ def fetch_jra_html(url, *, now):
         validator=lambda url: validate_url(url, index=True), enabled=lambda: jra_enabled(network=True))
 
 
+def _reserve_pre_race_request(host):
+    """有界等待共享配额；提前唤醒后仍须重新领取，不绕过主机预算。"""
+    import time
+    from .race_events import reserve_race_live_host_request
+    deadline = time.monotonic() + 3
+    for _ in range(8):
+        reservation = reserve_race_live_host_request(host=host, now=timezone.now())
+        if reservation.reserved:
+            return reservation
+        remaining = deadline - time.monotonic()
+        delay = max(0.01, (reservation.next_allowed_at - timezone.now()).total_seconds()) if reservation.next_allowed_at else 0.01
+        if reservation.reason != 'rate_limited' or delay > remaining:
+            break
+        time.sleep(delay)
+    raise JraFetchError('jra_host_' + reservation.reason, reservation.next_allowed_at)
+
+
 def _fetch_bounded_html(url, *, now, provider, region, validator, enabled):
     """Bounded official HTTP, shared snapshot lease and existing host budget."""
     import requests
@@ -389,23 +519,33 @@ def _fetch_bounded_html(url, *, now, provider, region, validator, enabled):
     if not enabled():
         raise JraFetchError('jra_pre_race_disabled')
     failure = None
+    browser = bool(getattr(settings, 'JRA_BROWSER_URL', '') and urlsplit(url).hostname == 'www.jra.go.jp')
+    document_budget = 2 if browser and urlsplit(url).path.startswith('/JRADB/') else 1
 
     def fetch():
         nonlocal failure
         host = urlsplit(url).hostname
         ensure_race_live_host_budget_floor(host=host, minimum_interval_ms=2000)
-        reservation = reserve_race_live_host_request(host=host, now=timezone.now())
-        if not reservation.reserved and reservation.reason == 'rate_limited':
-            delay = max(0, (reservation.next_allowed_at-timezone.now()).total_seconds())
-            if delay <= 3:
-                clock.sleep(delay)
-                reservation = reserve_race_live_host_request(host=host, now=timezone.now())
-        if not reservation.reserved:
-            raise JraFetchError('jra_host_'+reservation.reason, reservation.next_allowed_at)
+        try:
+            for _ in range(document_budget):
+                reservation = _reserve_pre_race_request(host)
+        except JraFetchError as exc:
+            failure = exc
+            raise
         started, success, retry_after = clock.monotonic(), False, None
         try:
             if not enabled():
                 raise JraFetchError('jra_pre_race_disabled')
+            if browser:
+                from .jra_browser_transport import fetch_browser_document
+                try:
+                    payload = fetch_browser_document(url)
+                except ValueError as exc:
+                    raise JraFetchError(str(exc)) from exc
+                if not enabled():
+                    raise JraFetchError('jra_pre_race_disabled')
+                success = True
+                return payload, document_budget, 1
             with requests.get(url, timeout=(5, 15), allow_redirects=False, stream=True) as response:
                 if response.status_code != 200:
                     value = response.headers.get('Retry-After', '')
@@ -452,7 +592,7 @@ def _fetch_bounded_html(url, *, now, provider, region, validator, enabled):
         scope_key = url if len(url) <= 128 else 'html:' + hashlib.sha256(url.encode()).hexdigest()
         payload, _ = _get_or_fetch_shared_snapshot(provider=provider, region=region,
             scope_key=scope_key, data_kind='racecard', registry_digest=hashlib.sha256((provider+url).encode()).hexdigest(),
-            run_id=secrets.token_hex(16), now=now, proposed_requests=1,
+            run_id=secrets.token_hex(16), now=now, proposed_requests=document_budget,
             clock=timezone.now, sleeper=clock.sleep, fetcher=fetch, waiter_max_polls=0)
     except _ProviderSyncError as exc:
         raise failure or JraFetchError(exc.reason_code) from exc
@@ -463,7 +603,8 @@ def discover_jra_pre_race(*, now, fetcher=None, clock=timezone.now):
     if not jra_enabled(network=True): return {'checked':0,'reason':'disabled'}
     fetcher=fetcher or fetch_jra_html
     events=models.RaceEvent.objects.filter(visibility_status='published',status='scheduled',country_region='japan',
-        racecourse__in=JRA_COURSES, local_date__gte=now.date()-timedelta(days=1),local_date__lte=now.date()+timedelta(days=5))
+        racecourse__in=JRA_COURSES, local_date__gte=now.date()-timedelta(days=1),
+        local_date__lte=now.date()+timedelta(days=max(5, min(32, getattr(settings, 'RACE_DATA_SYNC_JAPAN_PRE_RACE_DAYS', 4)+1))))
     events=sorted((e for e in events if in_window(e,now) and not _refs(e).get('pre_race_handoff')),
                   key=lambda e: (_state(e,JRA).get('next_poll_at') or '',e.pk))
     checked=0
@@ -480,7 +621,23 @@ def discover_jra_pre_race(*, now, fetcher=None, clock=timezone.now):
             binding = refs.get('jra_pre_race_binding')
             url = binding.get('url', '') if binding and binding.get('baseline') == baseline(event) else (
                 '' if binding else refs.get('jra_pre_race_url', ''))
-            if url:
+            if getattr(settings, 'JRA_BROWSER_URL', ''):
+                # 每轮优先正式卡，避免绑定报名URL后永远读不到下一阶段。
+                urls = []
+                for index in (CARD_INDEX_URL, REGISTRATION_INDEX_URL):
+                    if index not in cache:
+                        cache[index] = fetcher(index, now=clock())
+                    urls = jra_pre_race_links(cache[index], event=event)
+                    if not urls and index == CARD_INDEX_URL:
+                        for meeting in jra_meeting_links(cache[index], event=event):
+                            if meeting not in cache:
+                                cache[meeting] = fetcher(meeting, now=clock())
+                            urls.extend(jra_pre_race_links(cache[meeting], event=event))
+                    if urls:
+                        break
+                if not urls:
+                    raise ValueError('jra_not_published')
+            elif url:
                 urls=[url]
             else:
                 if INDEX_URL not in cache: cache[INDEX_URL]=fetcher(INDEX_URL,now=clock())
@@ -507,7 +664,10 @@ def discover_jra_pre_race(*, now, fetcher=None, clock=timezone.now):
             if (completed-started).total_seconds() > 90: raise ValueError("jra_work_deadline")
             if complete_jra(claim,html=cache[matches[0]],url=matches[0],now=completed): checked+=1
         except (ValueError, OSError) as exc:
-            finish_pre_race(claim,now=clock(),reason=str(exc)[:64], retry_after=getattr(exc,"retry_after",None))
+            if str(exc) == 'jra_not_published':
+                finish_pre_race(claim,now=clock(),outcome_reason='not_published')
+            else:
+                finish_pre_race(claim,now=clock(),reason=str(exc)[:64], retry_after=getattr(exc,"retry_after",None))
     return {'checked':checked, 'attempted':attempted}
 
 
@@ -569,3 +729,17 @@ def preview_payload(event, candidate, stage, *, now):
     state = _state(event, candidate.source_name)
     return {'rows': rows, 'label': LABELS[stage], 'checked_at': checked,
             'stale': bool(state.get('reason')) or now-checked > refresh_interval(event, now)+timedelta(minutes=10)}
+
+
+def jra_meeting_links(html, *, event):
+    """普通竞走与重赏共用官方会场索引，不限已知重赏列表。"""
+    from .race_data_source_adapters import _JRA_VENUE_CODES
+    links=[]
+    for _, url in jra_document_links(html):
+        values=parse_qs(urlsplit(url).query).get('CNAME',[])
+        match=re.fullmatch(r'pw01drl(?:00|10)(\d{2})\d{8}(\d{8})/[0-9A-F]{2}',values[0]) if len(values)==1 else None
+        if match and _JRA_VENUE_CODES.get(match[1])==event.racecourse and match[2]==event.local_date.strftime('%Y%m%d'):
+            validate_url(url,index=True)
+            if url not in links:links.append(url)
+    if len(links)>1:raise ValueError('jra_meeting_ambiguous')
+    return links

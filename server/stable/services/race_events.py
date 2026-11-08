@@ -7079,6 +7079,10 @@ def apply_data_candidate(candidate: RaceEventDataCandidate, *, user: User | None
         isinstance(candidate.raw_payload, dict) and "jra_pre_race_v1" in candidate.raw_payload
     ):
         raise ValueError("jra_pre_race_candidate_requires_controlled_path")
+    if candidate.source_name == "nar_pre_race_v1" or (
+        isinstance(candidate.raw_payload, dict) and "nar_pre_race_v1" in candidate.raw_payload
+    ):
+        raise ValueError("nar_pre_race_candidate_requires_controlled_path")
     event = candidate.event
     payload = candidate.candidate_payload or {}
     module = candidate.module
