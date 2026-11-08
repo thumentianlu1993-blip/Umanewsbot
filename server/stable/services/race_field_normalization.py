@@ -1533,7 +1533,7 @@ def parse_display_time(raw):
 _DISPLAY_MARGINS = {'nose': '鼻差', 'nse': '鼻差', 'ハナ': '鼻差', '鼻差': '鼻差',
                     'head': '头差', 'hd': '头差', 'アタマ': '头差', '头差': '头差',
                     'neck': '颈差', 'nk': '颈差', 'クビ': '颈差', '颈差': '颈差',
-                    'short head': '短头差', 'shd': '短头差', '同着': '同着', 'dead heat': '同着', 'dh': '同着'}
+                    'short head': '短头差', 'shd': '短头差', '同着': '同着', 'dead heat': '同着', 'dh': '同着', '大差': '大差'}
 
 
 def parse_display_margin(raw, *, unit_hint='', basis=''):
@@ -1546,6 +1546,8 @@ def parse_display_margin(raw, *, unit_hint='', basis=''):
     for symbol, val in [('½', '1/2'), ('¼', '1/4'), ('¾', '3/4')]:
         original = re.sub(rf'(?<=\d){symbol}', ' ' + val, original).replace(symbol, val)
     text = _display_text(original).lower()
+    if unit_hint == 'length':
+        text = re.sub(r'^(\d+)\.(\d+/\d+)$', r'\1 \2', text)
     match = re.fullmatch(rf'({_NUMBER})\s*(lengths?|l|马身)?', text)
     try:
         if match and (match[2] or unit_hint == 'length'):
