@@ -625,7 +625,30 @@ def fetch_bound_observation(*, event, route, now, fetcher=None, kind="result", u
                 page = fetcher(url, route=route, now=now)
             value = parse_nar_observation(page, url=url, route=route, now=now)
         elif route.provider == "hkjc":
-            value = parse_hkjc_observation(page, url=url, route=route, now=now)
+            value = None
+            if kind == 'result' and urlsplit(url).path.endswith('/racecard'):
+                from urllib.parse import urlunsplit
+                from bs4 import BeautifulSoup
+                # 正式卡在赛果公布前仍可用于身份发现；过期历史卡才由同场结果接替。
+                try:
+                    independent_card = parse_hkjc_observation(page,url=url,route=route,now=now)
+                except ValueError:
+                    if 'No information.' not in BeautifulSoup(str(page),'html.parser').get_text(' ',strip=True):
+                        raise
+                if independent_card and now < aware(independent_card['off_time']):
+                    value = independent_card
+                else:
+                    parts=urlsplit(url)
+                    result_url=urlunsplit((parts.scheme,parts.netloc,parts.path[:-len('racecard')]+'localresults',parts.query,''))
+                    if not route.permits_url(result_url):raise ValueError('source_url_rejected')
+                    result_page=fetcher(result_url,route=route,now=now)
+                    if independent_card and 'No information.' in BeautifulSoup(str(result_page),'html.parser').get_text(' ',strip=True):
+                        value=independent_card
+                    else:
+                        url=result_url;page=result_page;chain.append(url)
+            if value is None:
+                value = parse_hkjc_observation(page, url=url, route=route, now=now)
+
         else:
             linked = (
                 linked_result_url(page, url=url, route=route)
@@ -669,8 +692,9 @@ def fetch_bound_observation(*, event, route, now, fetcher=None, kind="result", u
             (r["number"], normalize_name(r["horse_name"]))
             for r in value.get("roster", [])
         ]
+        verified_incidents = (route.provider == "hkjc" and value.get("roster_evidence", {}).get("kind") == "official_racing_incident_roster")
         value["roster_complete"] = bool(
-            expected
+            (verified_incidents and not expected) or expected
             and (
                 sorted(expected) == sorted(actual)
                 or (
@@ -1268,6 +1292,9 @@ def parse_nar_observation(page, *, url, route, now):
 
 
 def parse_hkjc_observation(page, *, url, route, now):
+    if urlsplit(url).path.lower().endswith(('/racecard', '/racecard.aspx')):
+        from .hkjc_sources import parse_card
+        return parse_card(page, url=url, route=route, now=now)
     from urllib.parse import parse_qs
     from bs4 import BeautifulSoup
     from stable.services.external_hkjc_data import HKJCHTMLParser
@@ -1291,6 +1318,11 @@ def parse_hkjc_observation(page, *, url, route, now):
         for v in (day.strftime("%d/%m/%Y"), day.strftime("%Y/%m/%d"), day.isoformat())
     ):
         raise ValueError("hkjc_page_identity_missing")
+    if urlsplit(url).path.startswith('/en-us/'):
+        meeting = re.search(r'Race Meeting:\s*(\d{2}/\d{2}/\d{4})\s+(Sha Tin|Happy Valley)', text)
+        if (not meeting or datetime.strptime(meeting[1], '%d/%m/%Y').date() != day
+            or {'Sha Tin':'ST', 'Happy Valley':'HV'}[meeting[2]] != course):
+            raise ValueError('hkjc_meeting_header_mismatch')
     parsed = HKJCHTMLParser().parse_race_result(
         str(page),
         race_date=day.isoformat(),
@@ -1309,7 +1341,7 @@ def parse_hkjc_observation(page, *, url, route, now):
     tables = [
         t
         for t in soup.select("table")
-        if "Pla." in t.get_text() and "Horse No." in t.get_text()
+        if all(label in t.get_text(' ', strip=True) for label in ('Pla.', 'Horse No.', 'Finish Time', 'Jockey', 'Trainer'))
     ]
     if len(tables) != 1 or len(tables[0].select("tr")) - 1 != len(parsed["results"]):
         raise ValueError("hkjc_result_partial")
@@ -1338,13 +1370,14 @@ def parse_hkjc_observation(page, *, url, route, now):
                 barrier=r["barrier"],
                 jockey_name=r["jockey"],
                 trainer_name=r["trainer"],
-                carried_weight=r["weight"],
+                carried_weight=r["weight"] + 'lb' if r["weight"] and r["weight"] != '---' else '',
                 reported_finish_position=pos,
                 status=status,
                 raw_status=raw,
                 finish_time=r["finish_time"],
                 margin=r["margin"],
-                field_provenance={},
+                odds_value=r['odds'] if r['odds'] != '---' else '',
+                field_provenance={'source_url':url, 'field_units':{'carried_weight':'lb'}, 'win_odds':r['odds']},
             )
         )
     if not rows or len({r["number"] for r in rows}) != len(rows):
@@ -1359,7 +1392,7 @@ def parse_hkjc_observation(page, *, url, route, now):
             > 1
         ):
             row["status"] = "dead_heat"
-    return dict(
+    value = dict(
         provider=route.provider,
         region=route.region,
         identity_namespace=route.identity_namespace,
@@ -1381,6 +1414,11 @@ def parse_hkjc_observation(page, *, url, route, now):
         result_phase="official",
         roster_complete=True,
     )
+    from .hkjc_sources import result_roster_evidence
+    evidence = result_roster_evidence(soup, rows, url=url, raw_sha256=value['raw_sha256'])
+    if evidence:
+        value['roster_evidence'] = evidence
+    return value
 
 
 def parse_sporting_card_observation(page, *, url, route, now, event):
@@ -1499,6 +1537,13 @@ def discover_source_url(*, event, route, now, fetcher):
                     return bound_url
                 if urlsplit(bound_url).path.endswith('/accessT.html') and event.local_date >= now.date():
                     raise ValueError('not_published')
+    if route.provider == 'hkjc' and any(p.startswith('/en-us/local/information/') for p in route.allowed_path_prefixes):
+        from .hkjc_sources import discover_result_url, discover_card
+        if event.local_date < now.astimezone(ZoneInfo(route.timezone)).date():
+            return discover_result_url(event=event,route=route,now=now,fetcher=fetcher)
+        card=discover_card(event=event,route=route,now=now,fetcher=fetcher)
+        if card:return card[0]
+        return discover_result_url(event=event,route=route,now=now,fetcher=fetcher)
     from stable.services.japan_source_discovery import discover_japan_url
     japan_url = discover_japan_url(event=event, route=route, now=now, fetcher=fetcher)
     if japan_url:

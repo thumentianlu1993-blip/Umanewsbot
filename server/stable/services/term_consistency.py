@@ -15,6 +15,9 @@ import re
 import unicodedata
 from dataclasses import dataclass, field
 from typing import Any
+from types import SimpleNamespace
+
+from stable.services.horse_name_policy import effective_target, enabled as hkjc_names_enabled
 
 from django.conf import settings
 from django.db import transaction
@@ -206,11 +209,13 @@ def _build_surface_index() -> dict[str, list[dict]]:
     entry_data = list(
         TermEntry.objects.filter(is_active=True).values(
             "id", "source_ja", "target_zh", "source_language",
-            "term_type", "racing_region", "is_active"
+            "term_type", "racing_region", "is_active", "notes", "translation_status"
         )
     )
 
     # Build entry lookup
+    for entry in entry_data:
+        entry["target_zh"] = effective_target(SimpleNamespace(**entry))
     entries_by_id: dict[int, dict] = {e["id"]: e for e in entry_data}
 
     index: dict[str, list[dict]] = {}
@@ -964,9 +969,12 @@ def _term_snapshot_sha256(version: str | None = None) -> str:
     the manifest.  Datetime fields are excluded (not JSON-stable); every
     text content field is included.
     """
+    term_fields = ['id', 'target_zh', 'source_ja', 'is_active', 'term_type', 'racing_region']
+    if hkjc_names_enabled():
+        term_fields.extend(['notes', 'translation_status'])
     terms = list(
         TermEntry.objects.filter(is_active=True)
-        .values("id", "target_zh", "source_ja", "is_active", "term_type", "racing_region")
+        .values(*term_fields)
         .order_by("id")
     )
     aliases = list(
@@ -989,6 +997,8 @@ def _term_snapshot_sha256(version: str | None = None) -> str:
         "evidence": evidence,
         "version": version or "1.0",
     }
+    if hkjc_names_enabled():
+        snapshot["horse_name_policy"] = "hkjc-only.v1"
     return hashlib.sha256(json.dumps(snapshot, sort_keys=True).encode("utf-8")).hexdigest()
 
 

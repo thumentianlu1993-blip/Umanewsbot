@@ -84,6 +84,7 @@ class ArticleEntity:
     reason: str = ""
     matched_context: str = ""
     entity_evidence: list[str] | None = None
+    has_stored_target: bool = False
 
     def as_dict(self) -> dict:
         payload = asdict(self)
@@ -691,6 +692,10 @@ def _make_entity(
     matched_context: str = "",
     entity_evidence: Iterable[str] = (),
 ) -> ArticleEntity:
+    from .horse_name_policy import enabled as hkjc_names_enabled
+    if term is not None and term.term_type == TermType.HORSE and entity_type == "horse" and hkjc_names_enabled():
+        target_zh = term.effective_target_zh
+        needs_preserve = needs_preserve or not target_zh
     return ArticleEntity(
         entity_type=entity_type,
         matched_text=matched_text,
@@ -711,6 +716,7 @@ def _make_entity(
         reason=reason,
         matched_context=matched_context,
         entity_evidence=list(entity_evidence),
+        has_stored_target=bool(term and term.target_zh),
     )
 
 
@@ -787,7 +793,7 @@ def _resolve_english_entities(
                             match.start(),
                             match.end(),
                             canonical_text=entry.source_ja,
-                            target_zh=entry.target_zh,
+                            target_zh=entry.effective_target_zh,
                             confidence=100,
                             evidence=["formal_person_term"],
                             term=entry,
@@ -829,7 +835,7 @@ def _resolve_english_entities(
                     start,
                     end,
                     canonical_text=term.source_ja if term else matched,
-                    target_zh=term.target_zh if term else "",
+                    target_zh=term.effective_target_zh if term else "",
                     confidence=95,
                     evidence=["person_job_context"],
                     term=term,
@@ -916,7 +922,7 @@ def _resolve_english_entities(
                                 match.start(),
                                 match.end(),
                                 canonical_text=entry.source_ja,
-                                target_zh=entry.target_zh,
+                                target_zh=entry.effective_target_zh,
                                 confidence=0,
                                 evidence=["term_candidate"],
                                 conflict_flags=["inside_person_span"],
@@ -936,11 +942,11 @@ def _resolve_english_entities(
                                 match.start(),
                                 match.end(),
                                 canonical_text=entry.source_ja,
-                                target_zh=entry.target_zh,
+                                target_zh=entry.effective_target_zh,
                                 confidence=decision.confidence,
                                 evidence=list(decision.evidence),
                                 conflict_flags=[] if decision.classification == "confirmed_horse" else ["horse_term_without_strong_context"],
-                                needs_preserve=decision.classification == "confirmed_horse" and not entry.has_translation,
+                                needs_preserve=decision.classification == "confirmed_horse" and not entry.has_public_translation,
                                 term=entry,
                                 classification=decision.classification,
                                 reason=decision.reason,
@@ -957,7 +963,7 @@ def _resolve_english_entities(
                                 match.start(),
                                 match.end(),
                                 canonical_text=entry.source_ja,
-                                target_zh=entry.target_zh,
+                                target_zh=entry.effective_target_zh,
                                 confidence=95,
                                 evidence=["formal_term"],
                                 term=entry,
@@ -1026,9 +1032,12 @@ def _resolve_english_entities(
             ).append(entity)
     ambiguous_members: set[int] = set()
     merged_ambiguous: list[ArticleEntity] = []
+    from .horse_name_policy import enabled as hkjc_names_enabled
+    # 显示策略只控制输出，原有译名冲突仍须参与身份消歧。
+    stored_targets = {entry.pk: (entry.target_zh or '').strip() for entry in entries} if hkjc_names_enabled() else {}
     for group in formal_horses_by_span.values():
         targets = {
-            (entity.target_zh or "").strip()
+            stored_targets.get(entity.term_id, (entity.target_zh or "").strip())
             for entity in group
         }
         if len(group) < 2 or len(targets) < 2:
@@ -1155,7 +1164,7 @@ def _resolve_japanese_entities(
                             match.start() + offset,
                             match.start() + offset + len(candidate),
                             canonical_text=term.source_ja,
-                            target_zh=term.target_zh,
+                            target_zh=term.effective_target_zh,
                             confidence=0,
                             evidence=["term_candidate"],
                             conflict_flags=["inside_person_span"],
@@ -1243,7 +1252,7 @@ def _resolve_japanese_entities(
                             match.start() + offset,
                             match.start() + offset + len(candidate),
                             canonical_text=term.source_ja,
-                            target_zh=term.target_zh,
+                            target_zh=term.effective_target_zh,
                             confidence=0,
                             evidence=["term_candidate"],
                             conflict_flags=["inside_common_word_span"],
@@ -1265,10 +1274,10 @@ def _resolve_japanese_entities(
                     match.start(),
                     match.end(),
                     canonical_text=term.source_ja,
-                    target_zh=term.target_zh,
+                    target_zh=term.effective_target_zh,
                     confidence=100,
                     evidence=["formal_full_horse_term"],
-                    needs_preserve=not term.has_translation,
+                    needs_preserve=not term.has_public_translation,
                     term=term,
                 )
             elif aliases:
@@ -1313,7 +1322,7 @@ def _resolve_japanese_entities(
                         match.start() + offset,
                         match.start() + offset + len(candidate),
                         canonical_text=term.source_ja,
-                        target_zh=term.target_zh,
+                        target_zh=term.effective_target_zh,
                         confidence=0,
                         evidence=["formal_internal_horse_term"],
                         conflict_flags=["inside_longer_entity"],
@@ -1341,7 +1350,7 @@ def _resolve_japanese_entities(
                                     match.start(),
                                     match.end(),
                                     canonical_text=entry.source_ja,
-                                    target_zh=entry.target_zh,
+                                    target_zh=entry.effective_target_zh,
                                     confidence=95,
                                     evidence=["ordinary_japanese_context"],
                                     conflict_flags=["horse_term_without_strong_context"],
@@ -1357,10 +1366,10 @@ def _resolve_japanese_entities(
                             match.start(),
                             match.end(),
                             canonical_text=entry.source_ja,
-                            target_zh=entry.target_zh,
+                            target_zh=entry.effective_target_zh,
                             confidence=100,
                             evidence=["formal_term"],
-                            needs_preserve=entry.term_type == TermType.HORSE and not entry.has_translation,
+                            needs_preserve=entry.term_type == TermType.HORSE and not entry.has_public_translation,
                             term=entry,
                         )
                     )
@@ -1393,10 +1402,10 @@ def _resolve_formal_entities(
                             match.start(),
                             match.end(),
                             canonical_text=entry.source_ja,
-                            target_zh=entry.target_zh,
+                            target_zh=entry.effective_target_zh,
                             confidence=100,
                             evidence=["formal_term"],
-                            needs_preserve=entry.term_type == TermType.HORSE and not entry.has_translation,
+                            needs_preserve=entry.term_type == TermType.HORSE and not entry.has_public_translation,
                             term=entry,
                         )
                     )
@@ -1449,7 +1458,7 @@ def _accepted_terms_from_entities(entities: list[ArticleEntity], entries: list[T
             ResolvedTerm(
                 term_type=entry.term_type,
                 source_ja=entry.source_ja,
-                target_zh=entry.target_zh,
+                target_zh=entry.effective_target_zh,
                 matched_text=entity.matched_text,
                 race_grade=getattr(entry, "race_grade", ""),
                 priority=entry.priority,
@@ -1980,7 +1989,7 @@ def _resolve_terms_from_entries(text: str, entries, *, source_language: str | No
                 ResolvedTerm(
                     term_type=entry.term_type,
                     source_ja=entry.source_ja,
-                    target_zh=entry.target_zh,
+                    target_zh=entry.effective_target_zh,
                     matched_text=matched,
                     race_grade=getattr(entry, "race_grade", ""),
                     priority=entry.priority,
@@ -2028,7 +2037,7 @@ def apply_term_mappings(text: str, source_language: str | None = None) -> str:
     terms_by_entry = source_terms_by_entry(entries, source_language)
     ambiguous_horse_candidates = _ambiguous_horse_candidates(entries, terms_by_entry)
     for entry in entries:
-        if not entry.has_translation:
+        if not entry.has_public_translation:
             continue
         candidates = terms_by_entry.get(entry.pk, [])
         for candidate in sorted(candidates, key=len, reverse=True):
@@ -2041,7 +2050,7 @@ def apply_term_mappings(text: str, source_language: str | None = None) -> str:
 def apply_single_term_mapping(text: str, term: TermEntry, source_language: str | None = None) -> str:
     if not text:
         return text
-    if not term.has_translation:
+    if not term.has_public_translation:
         return text
     mapped = text
     candidates = term.source_terms_for_language(source_language) if source_language else term.all_source_terms()
@@ -2237,7 +2246,7 @@ def _recognize_formal_horse_terms(full_text: str, source_language: str, limit: i
             if key in seen:
                 continue
             seen.add(key)
-            has_translation = entry.has_translation
+            has_translation = entry.has_public_translation
             recognized.append(
                 RecognizedHorseName(
                     name_ja=entry.source_ja,
@@ -2595,7 +2604,7 @@ def recognize_horse_names(
         if source in {"formal_term", "formal_ambiguous_term"}:
             term = meta.get("term")
             is_ambiguous = source == "formal_ambiguous_term"
-            has_translation = bool(term and term.has_translation and not is_ambiguous)
+            has_translation = bool(term and term.has_public_translation and not is_ambiguous)
             recognized.append(
                 RecognizedHorseName(
                     name_ja=name,

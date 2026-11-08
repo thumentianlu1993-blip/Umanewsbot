@@ -19,7 +19,7 @@
         <div class="mention-ribbon" aria-label="关联赛事与马匹">
           <span class="mention-label">本文提及</span>
           {% for link in horse_links %}
-            <a class="entity-chip" href="{{ link.horse_profile.public_path }}">🐎 {{ link.horse_profile.display_name }}</a>
+            <a class="entity-chip" href="{{ link.horse_profile.public_path }}">🐎 {{ link.horse_profile.public_display_name }}</a>
           {% endfor %}
           {% for link in race_links %}
             <a class="entity-chip race" href="{{ link.event.public_path }}">🏆 {% race_field link.event "name" link.event.chinese_name %} {{ link.event.year }}</a>

@@ -2679,7 +2679,7 @@ def _public_published_articles():
             status__in=[ArticleHorseLinkStatus.AUTO, ArticleHorseLinkStatus.MANUAL],
             horse_profile__review_status=HorseProfileStatus.PUBLISHED,
         )
-        .select_related("horse_profile")
+        .select_related("horse_profile", "horse_profile__primary_term")
         .order_by("id")
     )
     queryset = (
@@ -2858,7 +2858,7 @@ def _public_horse_article_entries(profile: HorseProfile, *, limit: int = 12) -> 
             article__workflow_status=WorkflowStatus.PUBLISHED,
             article__published_to_web_at__isnull=False,
         )
-        .select_related("horse_profile")
+        .select_related("horse_profile", "horse_profile__primary_term")
         .order_by("-article__published_to_web_at", "-article_id", "horse_profile_id")
     )
     source_by_article: dict[int, ArticleHorseLink] = {}
@@ -3527,6 +3527,13 @@ def _attach_race_term_display_names(event_records):
     if enabled():
         return event_records
     records = [(event, item) for event, items in event_records for item in items]
+    from .services.horse_name_policy import enabled as hkjc_names_enabled
+    from .services.race_term_display import StrictRaceTermResolver
+    horse_resolver = StrictRaceTermResolver() if hkjc_names_enabled() else None
+    if horse_resolver is not None:
+        for event, item in records:
+            horse_resolver.add(getattr(item, "horse_name", ""), TermType.HORSE, event.country_region)
+        horse_resolver.resolve()
     source_names = {
         str(value).strip()
         for _event, item in records
@@ -3545,6 +3552,8 @@ def _attach_race_term_display_names(event_records):
             if getattr(item, "jockey_name", "")
         },
     }
+    if horse_resolver is not None:
+        names_by_type.pop(TermType.HORSE)
     all_names = set().union(*names_by_type.values())
     query_names = {value.lower() for value in source_names} | all_names
     candidates: dict[tuple[str, str], list[TermEntry]] = {}
@@ -3583,10 +3592,13 @@ def _attach_race_term_display_names(event_records):
                 item.pk,
             ),
         )
-        return term.target_zh or value
+        return term.effective_target_zh or value
 
     for event, item in records:
-        item.display_horse_name = display_name(item.horse_name, TermType.HORSE, event.country_region)
+        item.display_horse_name = (
+            horse_resolver.field(item.horse_name, TermType.HORSE, event.country_region).text
+            if horse_resolver is not None else display_name(item.horse_name, TermType.HORSE, event.country_region)
+        )
         item.display_jockey_name = display_name(item.jockey_name, TermType.JOCKEY, event.country_region)
     return event_records
 
@@ -3889,8 +3901,9 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
     }
     from .services.race_pre_race import public_jra_preview, public_reviewed_preview
     from .services.nar_pre_race import public_nar_preview
+    from .services.hkjc_pre_race import public_hkjc_preview
     from .services.race_pre_race_refresh import public_refresh_preview
-    preview = public_refresh_preview(event, now=read_now) or public_jra_preview(event, now=read_now) or public_nar_preview(event, now=read_now) or public_reviewed_preview(event, now=read_now)
+    preview = public_refresh_preview(event, now=read_now) or public_jra_preview(event, now=read_now) or public_nar_preview(event, now=read_now) or public_hkjc_preview(event, now=read_now) or public_reviewed_preview(event, now=read_now)
     runners = _sort_runners_for_display(preview["rows"] if preview else list(event.runners.all()), event.country_region)
     has_current_live_revision = bool(projection_control and projection_control.write_owner != "historical" and (
         current_result_revision is not None or projection_control.write_owner in {"data_sync", "live"}))
@@ -4167,6 +4180,14 @@ def public_horse_index(request: HttpRequest):
 def public_horse_detail(request: HttpRequest, profile_id: int):
     profile = get_object_or_404(
         _public_horse_queryset(token_hash=_follow_token_hash_from_request(request))
+        .select_related(
+            "sire_term", "sire_horse_profile__primary_term",
+            "dam_term", "dam_horse_profile__primary_term",
+            "sire_sire_term", "sire_sire_horse_profile__primary_term",
+            "sire_dam_term", "sire_dam_horse_profile__primary_term",
+            "dam_sire_term", "dam_sire_horse_profile__primary_term",
+            "dam_dam_term", "dam_dam_horse_profile__primary_term",
+        )
         .prefetch_related(
             "race_links__event",
             "sire_children",
@@ -4289,6 +4310,7 @@ def public_horse_detail(request: HttpRequest, profile_id: int):
     is_following = bool(token_hash and HorseFollow.objects.filter(token_hash=token_hash, horse_profile=profile).exists())
     descendants = (
         HorseProfile.objects.filter(Q(sire_horse_profile=profile) | Q(dam_horse_profile=profile), review_status=HorseProfileStatus.PUBLISHED)
+        .select_related("primary_term")
         .order_by("racing_region", "display_name_zh", "id")[:12]
     )
     return _render_race_information(
@@ -4343,7 +4365,7 @@ def public_horse_follows(request: HttpRequest):
     if token_hash:
         follows = list(
             HorseFollow.objects.filter(token_hash=token_hash, horse_profile__review_status=HorseProfileStatus.PUBLISHED)
-            .select_related("horse_profile")
+            .select_related("horse_profile", "horse_profile__primary_term")
             .order_by("-followed_at", "-id")
         )
         entries = followed_articles(token_hash, limit=40)
