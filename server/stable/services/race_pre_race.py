@@ -79,6 +79,8 @@ def preview_window(event,now):
 def pre_race_days(event):
     if event.country_region == 'japan':
         return max(0, min(31, getattr(settings, 'RACE_DATA_SYNC_JAPAN_PRE_RACE_DAYS', 4)))
+    if event.country_region == 'hong_kong' and getattr(settings, 'RACE_DATA_SYNC_HKJC_PRE_RACE_ENABLED', False):
+        return max(0, min(60, getattr(settings, 'RACE_DATA_SYNC_HKJC_PRE_RACE_DAYS', 45)))
     return 4
 
 
@@ -102,12 +104,15 @@ def _save_state(event, source, state):
 
 
 def claim_pre_race(*, event_id, source, now):
-    if source not in {JRA, TRA, REFRESH, 'nar_pre_race_v1'} or timezone.is_naive(now):
+    if source not in {JRA, TRA, REFRESH, 'nar_pre_race_v1', 'hkjc_pre_race_v1'} or timezone.is_naive(now):
         raise ValueError('invalid_pre_race_claim')
     if source == JRA and not jra_enabled(network=True):
         return None
     if source == 'nar_pre_race_v1':
         from .nar_pre_race import enabled
+        if not enabled(): return None
+    if source == 'hkjc_pre_race_v1':
+        from .hkjc_pre_race import enabled
         if not enabled(): return None
     if source == REFRESH:
         from .race_pre_race_refresh import refresh_enabled
@@ -119,6 +124,8 @@ def claim_pre_race(*, event_id, source, now):
             _refs(event).get('pre_race_handoff'))):
             return None
         if source == 'nar_pre_race_v1' and (event.country_region != 'japan' or event.racecourse in JRA_COURSES or _refs(event).get('pre_race_handoff') or event.runners.exists()):
+            return None
+        if source == 'hkjc_pre_race_v1' and (event.country_region != 'hong_kong' or _refs(event).get('pre_race_handoff') or event.runners.exists()):
             return None
         state = _state(event, source)
         lease = _dt(state.get('lease_until'))
