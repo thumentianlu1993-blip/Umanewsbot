@@ -1487,7 +1487,9 @@ def discover_source_url(*, event, route, now, fetcher):
                         if not isinstance(hint, str) or hint == bound_url or not route.permits_url(hint):
                             continue
                         path = urlsplit(hint).path
-                        if path.endswith(('/accessD.html', '/accessS.html')) or re.search(r'/replay/\d{4}/\d{3}\.html$', path):
+                        if (path.endswith(('/accessD.html', '/accessS.html'))
+                            or re.search(r'/replay/\d{4}/\d{3}\.html$', path)
+                            or re.fullmatch(r'/datafile/seiseki/g1/[^/]+/result/[^/]+\.html', path)):
                             raise ValueError('source_discovery_ambiguous')
                     return bound_url
                 if urlsplit(bound_url).path.endswith('/accessT.html') and event.local_date >= now.date():
