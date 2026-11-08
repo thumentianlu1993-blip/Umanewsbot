@@ -1480,6 +1480,15 @@ def discover_source_url(*, event, route, now, fetcher):
             bound_url = binding.get('url', '')
             if route.permits_url(bound_url):
                 if urlsplit(bound_url).path.endswith('/accessD.html'):
+                    references = refs.get('reference_urls', [])
+                    explicit = [refs.get('primary', '')] + (references if isinstance(references, list) else [])
+                    # 年度/本周目录不是另一场比赛；具体详情提示冲突仍按原合同拒绝。
+                    for hint in explicit:
+                        if not isinstance(hint, str) or hint == bound_url or not route.permits_url(hint):
+                            continue
+                        path = urlsplit(hint).path
+                        if path.endswith(('/accessD.html', '/accessS.html')) or re.search(r'/replay/\d{4}/\d{3}\.html$', path):
+                            raise ValueError('source_discovery_ambiguous')
                     return bound_url
                 if urlsplit(bound_url).path.endswith('/accessT.html') and event.local_date >= now.date():
                     raise ValueError('not_published')

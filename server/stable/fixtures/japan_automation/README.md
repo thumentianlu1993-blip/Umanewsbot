@@ -8,19 +8,19 @@ JRA 动态页面使用官网链接中的 CNAME 经 doAction 提交后取得DOM�
 
 | 文件 | SHA256 |
 |---|---|
-| jra-annual.html | `6218b0c66fc4cffe0e6c022a3e95359c81c62b658c7d9072ba1ea725648492d1` |
-| jra-card-index.html | `79710074dc8bc42d3ca987882f2a193da0bde3c662b758e257a5dd5402e12ea8` |
-| jra-meeting-index.html | `3a40ec9e5ac1d321c300938212333eff14b9b131b892e1671efd5a556a222b7a` |
-| jra-mile-registration.html | `9c374a7e30d2e51903e1625e8c10316ab2304e14cae2171645fddf8060b57573` |
-| jra-registration-index.html | `efaa0328d0a63fca7d2deeda1ad870e2b08dd89d1a8e84fbca305b4ad3f4d208` |
-| jra-registration.html | `c91f36aed3eb56945a242cfc69d4820f614640a2228edf4b073df6108cd54cc3` |
-| jra-result.html | `95cfb29e1c025bd203655a4fdda3598d0d0e1a00db508a47ae72ca5fefc1e803` |
-| nar-cancelled.html | `5c7e99fbf6ae7db7d8f7efa9985b6b32a7a47094a38147104dde403dcc22eed0` |
-| nar-card.html | `bce779ced2cab4f01a51c8c01bcce4e35dd778a49284e984cffda94395a909fa` |
+| jra-annual.html | `6cae4d19ca8fafcabb2d278825762aad34df92ecfe04da1a9c66aa20cc3e0f40` |
+| jra-card-index.html | `6d2ba275931f30d2b73e22062fb14a10da32709f4c8fd22f188ce4b74e6d467d` |
+| jra-meeting-index.html | `8470e2bf0fddd7078697abd51f5928e13620f03c272567c6b8d30ee9665cdb62` |
+| jra-mile-registration.html | `fd9085ff3608dc6b94c34b0727e637ca758483927d9825247d9575e2ff5735d1` |
+| jra-registration-index.html | `a91c072d6c183f454676393a380d621f26a3c8a8a3f8d6e7e53dbd844bb2db02` |
+| jra-registration.html | `e4da838602dabe560ba0b3fd1702fd290132c5d581c4caf6f254c3c4e8954aae` |
+| jra-result.html | `4c78e43c33b65fc6a579731763a88f2a6ced7b6d11e360f5e462ede337555864` |
+| nar-cancelled.html | `795ca75e9c9058473e343096efd0e33fb611ed348d8293008c56cd25a8709832` |
+| nar-card.html | `ddc2f588a84048cf3454f7c0c3cd7a7e2d67cec71420eca1fad04229514bbf9b` |
 | nar-introduction.html | `24ed3ae096dee64e419e013c860caf0eb05786f0663319d3833e246497441590` |
-| nar-navigation.html | `0ba8f3e93666928b0466276b7441cbcc58277e803f8490667e6c33ba347d0d59` |
-| nar-racelist.html | `e549d4130206cfcc6fde3cf2fccc30a58a1e02713e09058f0290e4b6216af0d0` |
-| nar-result.html | `5d42aa0ce41bdfbfc2fb05573dc99a635b0c55923c08d344ca8ffee1f4106de0` |
+| nar-navigation.html | `2c9a0acf1344f6becbcae3a8f09f002339e4cbd86b47992b42cc5ea727ff2320` |
+| nar-racelist.html | `24c51081c8ba0611bff2a591d18ae27a46a2533f32431ab2927a699d89d127b5` |
+| nar-result.html | `b74a068325efaa94aab459e325bc75b72f99184da457b6d77d4203629bce55d9` |
 | nar-topic.html | `27461cbca3da8dde7f5914366402eb4ee212f4e079e7e4d403d07350f0284d1b` |
 | nar-upcoming.html | `5de68198acaa1445f67bcaff2cbfd6f0bf182aa30490488f50b045efda9594d2` |
 
@@ -28,5 +28,7 @@ JRA 动态页面使用官网链接中的 CNAME 经 doAction 提交后取得DOM�
 
 带广ばんえい补充：2026-11-08 沿官方月历实际导航取得 2026-11-01 第1竞走；用于验证减量骑手符号与15列赛果格式。
 
-- `nar-banei-result.html`：https://www.keiba.go.jp/KeibaWeb/TodayRaceInfo/RaceMarkTable?k_raceDate=2026%2F11%2F01&k_raceNo=1&k_babaCode=3；SHA256 `59fdff3ab18dfc59a5216cd2505d9006733b7114e627d5d0c832ba7452028ac7`。
-- `nar-banei-card.html`：https://www.keiba.go.jp/KeibaWeb/TodayRaceInfo/DebaTable?k_raceDate=2026%2F11%2F01&k_raceNo=1&k_babaCode=3；SHA256 `d03556e1f1c2b9e55b1bac356d320c27dc27750d48040cd63e7cd7737069105f`。
+- `nar-banei-result.html`：https://www.keiba.go.jp/KeibaWeb/TodayRaceInfo/RaceMarkTable?k_raceDate=2026%2F11%2F01&k_raceNo=1&k_babaCode=3；SHA256 `57fd3051aaccbc9a4fefe74f08181a4b5d047879db5954ac85b5d69e3382eeb6`。
+- `nar-banei-card.html`：https://www.keiba.go.jp/KeibaWeb/TodayRaceInfo/DebaTable?k_raceDate=2026%2F11%2F01&k_raceNo=1&k_babaCode=3；SHA256 `57c1cd26543e8f456013021eab9ed2c72146c77705901265cd1bbd6d87df01c1`。
+
+仓库HTML回放fixture仅规范化ASCII行尾空白和缩进制表符，以满足仓库静态检查；上表为规范化后的fixture SHA。原始下载字节与原始SHA保存在任务runtime证据包，生产回填仍核验原始页面，不使用规范化fixture替代原始证据。
