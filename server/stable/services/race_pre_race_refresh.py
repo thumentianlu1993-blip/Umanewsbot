@@ -57,9 +57,9 @@ def _valid_odds(value, fmt):
     return bool(value) and parse_display_odds(str(value),odds_format=fmt).state=='normalized'
 
 
-def stamp_dynamic_items(items, previous, *, now, source_url, strict_roster=True, observed_at=None):
+def stamp_dynamic_items(items, previous, *, now, source_url, strict_roster=True, observed_at=None, roster_limit=60):
     """完整身份匹配；仅实际观测到有效字段才推进赔率时间。"""
-    if not isinstance(items,list) or not 0<len(items)<=60 or not all(isinstance(r,dict) and r.get('horse_name') for r in items):
+    if not isinstance(items,list) or not 0<len(items)<=roster_limit or not all(isinstance(r,dict) and r.get('horse_name') for r in items):
         raise ValueError('refresh_invalid_roster')
     keys=[_key(r) for r in items]
     if len(set(keys))!=len(keys): raise ValueError('refresh_duplicate_identity')
