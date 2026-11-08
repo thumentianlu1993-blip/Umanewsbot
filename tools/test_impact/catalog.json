@@ -889,6 +889,16 @@
       "stable.test_japan_automation",
       "stable.test_japan_name_registration",
       "stable.test_japan_public_fields"
+    ],
+    "module:stable.test_hkjc_horse_name_policy": [
+      "stable.test_hkjc_horse_name_policy"
+    ],
+    "hkjc_horse_consumers": [
+      "stable.tests_legacy.TermResolverTests",
+      "stable.tests_legacy.TermAliasConceptMergeTests",
+      "stable.tests_legacy.TermRegionFilterTests",
+      "stable.tests_legacy.ArticleTermBackfillTests",
+      "stable.tests_legacy.AutomationFlowTests"
     ]
   },
   "dependencies": {
@@ -2860,6 +2870,12 @@
       "domains": [
         "japan_race_automation"
       ]
+    },
+    "server/stable/test_hkjc_horse_name_policy.py": {
+      "label": "stable.test_hkjc_horse_name_policy",
+      "domains": [
+        "module:stable.test_hkjc_horse_name_policy"
+      ]
     }
   },
   "profiles": {
@@ -3177,7 +3193,8 @@
     "stable.test_lifecycle_census_ownership": "django",
     "stable.test_japan_automation": "django",
     "stable.test_japan_name_registration": "django",
-    "stable.test_japan_public_fields": "django"
+    "stable.test_japan_public_fields": "django",
+    "stable.test_hkjc_horse_name_policy": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {

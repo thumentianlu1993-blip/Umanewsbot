@@ -268,7 +268,8 @@ def _term_preserved(
     normalized_publish = _normalize_term_text(publish_text)
     if source_terms is None:
         source_terms = entry.source_terms_for_language(source_language) if source_language else entry.all_source_terms()
-    candidates = [*source_terms, entry.target_zh, *(entry.aliases_zh or [])]
+    from .horse_name_policy import translation_candidates
+    candidates = [*source_terms, *translation_candidates(entry)]
     return any(candidate and _normalize_term_text(candidate) in normalized_publish for candidate in candidates)
 
 
@@ -1299,10 +1300,11 @@ def validate_rewrite(
                     publish_text, source_terms
                 )
             )
-            if entry.is_pending_horse_translation:
+            if (entry.term_type == TermType.HORSE and not entry.has_public_translation):
                 preserved = original_preserved_in_horse_context
             else:
-                translated_candidates = [entry.target_zh, *(entry.aliases_zh or [])]
+                from .horse_name_policy import translation_candidates
+                translated_candidates = translation_candidates(entry)
                 preserved = (
                     original_preserved_in_horse_context
                     or english_horse_name_has_confirmed_occurrence(
@@ -1325,7 +1327,7 @@ def validate_rewrite(
         else:
             preserved = (
                 _pending_horse_original_preserved(publish_text, source_terms)
-                if entry.is_pending_horse_translation
+                if (entry.term_type == TermType.HORSE and not entry.has_public_translation)
                 else _term_preserved(
                     entry, publish_text, article_source_language, source_terms
                 )
@@ -1377,7 +1379,7 @@ def validate_rewrite(
                     }
                 )
             is_core = _is_core_term(entry, source, title, first_block, article_source_language, source_terms)
-            if entry.is_pending_horse_translation:
+            if (entry.term_type == TermType.HORSE and not entry.has_public_translation):
                 confirmed_occurrences = [
                     item.as_dict()
                     for item in english_horse_occurrences

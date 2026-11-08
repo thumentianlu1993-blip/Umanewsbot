@@ -3734,6 +3734,54 @@ class HorseProfile(TimestampedModel):
         return self.display_name_zh or self.primary_term.target_zh or self.original_name or self.english_name or self.japanese_name
 
     @property
+    def public_display_name(self) -> str:
+        from .services.horse_name_policy import profile_name
+        return profile_name(self)
+
+    @property
+    def public_original_name(self) -> str:
+        from .services.horse_name_policy import enabled, safe_original
+        if not enabled():
+            return self.original_name or self.english_name
+        return (safe_original(self.original_name) or safe_original(self.english_name)
+                or safe_original(self.japanese_name) or safe_original(self.primary_term.source_ja))
+
+    @property
+    def public_has_chinese_name(self) -> bool:
+        from .services.horse_name_policy import effective_target, enabled
+        return bool(effective_target(self.primary_term)) if enabled() else bool(self.display_name_zh or self.primary_term.target_zh)
+
+    @property
+    def public_sire_text(self) -> str:
+        from .services.horse_name_policy import pedigree_name
+        return pedigree_name(self, "sire")
+
+    @property
+    def public_dam_text(self) -> str:
+        from .services.horse_name_policy import pedigree_name
+        return pedigree_name(self, "dam")
+
+    @property
+    def public_sire_sire_text(self) -> str:
+        from .services.horse_name_policy import pedigree_name
+        return pedigree_name(self, "sire_sire")
+
+    @property
+    def public_sire_dam_text(self) -> str:
+        from .services.horse_name_policy import pedigree_name
+        return pedigree_name(self, "sire_dam")
+
+    @property
+    def public_dam_sire_text(self) -> str:
+        from .services.horse_name_policy import pedigree_name
+        return pedigree_name(self, "dam_sire")
+
+    @property
+    def public_dam_dam_text(self) -> str:
+        from .services.horse_name_policy import pedigree_name
+        return pedigree_name(self, "dam_dam")
+
+    @property
     def is_public(self) -> bool:
         return self.review_status == HorseProfileStatus.PUBLISHED
 
@@ -5237,6 +5285,15 @@ class TermEntry(TimestampedModel):
     @property
     def has_translation(self) -> bool:
         return bool((self.target_zh or "").strip()) and self.translation_status == TermTranslationStatus.TRANSLATED
+
+    @property
+    def effective_target_zh(self) -> str:
+        from .services.horse_name_policy import effective_target
+        return effective_target(self)
+
+    @property
+    def has_public_translation(self) -> bool:
+        return self.has_translation and bool(self.effective_target_zh)
 
     @property
     def is_pending_horse_translation(self) -> bool:

@@ -1,6 +1,6 @@
 <article class="feed-card">
   <div class="feed-card-top">
-    {% if follow_entry %}<span class="follow-source-tag">{% if follow_entry.is_descendant %}子代相关 · {% else %}来自：{% endif %}{{ follow_entry.source_horse_profile.display_name }}</span>{% endif %}
+    {% if follow_entry %}<span class="follow-source-tag">{% if follow_entry.is_descendant %}子代相关 · {% else %}来自：{% endif %}{{ follow_entry.source_horse_profile.public_display_name }}</span>{% endif %}
     <span class="feed-card-time tabular">{{ article.published_to_web_at|date:"m-d H:i" }}</span>
   </div>
   <h3 class="feed-card-title"><a href="{{ article.public_list_detail_url|default:article.public_path }}">{{ article.effective_title }}</a></h3>
@@ -10,7 +10,7 @@
   {% if article.public_horse_links or article.public_race_links %}
     <div class="feed-card-foot">
       {% for link in article.public_horse_links|slice:":2" %}
-        <a class="entity-chip" href="{{ link.horse_profile.public_path }}">🐎 {{ link.horse_profile.display_name }}</a>
+        <a class="entity-chip" href="{{ link.horse_profile.public_path }}">🐎 {{ link.horse_profile.public_display_name }}</a>
       {% endfor %}
       {% for link in article.public_race_links|slice:":2" %}
         <a class="entity-chip race" href="{{ link.event.public_path }}">🏆 {{ link.event.chinese_name }}</a>
