@@ -1742,6 +1742,7 @@ def _reconcile_racecard_observation_atomic(
             locks = runner.manual_lock_flags if isinstance(runner.manual_lock_flags, dict) else {}
             subject_key = runner.external_runner_id or external_runner_id
             runner_field_applied = False
+            weight_applied = False
             for field_name, proposed in candidate_fields.items():
                 old_value = None if created else getattr(runner, field_name)
                 authority, _ = models.RaceEventFieldAuthority.objects.select_for_update().get_or_create(
@@ -1792,6 +1793,7 @@ def _reconcile_racecard_observation_atomic(
                 if applied:
                     setattr(runner, field_name, proposed)
                     runner_field_applied = True
+                    weight_applied |= field_name == "carried_weight"
                     if aggregate != "needs_review":
                         aggregate = "applied"
                 if (
@@ -1839,6 +1841,10 @@ def _reconcile_racecard_observation_atomic(
                 **(runner.source_refs if isinstance(runner.source_refs, dict) else {}),
                 source.source_key: external_runner_id,
             }
+            if (weight_applied and source.source_key in ('jra', 'nar')
+                and source.region_code in ('japan_jra', 'japan_nar')):
+                runner.source_refs['field_units'] = {
+                    **runner.source_refs.get('field_units', {}), 'carried_weight': 'kg'}
             runner.save()
 
         if (

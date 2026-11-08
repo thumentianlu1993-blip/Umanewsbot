@@ -653,6 +653,10 @@ def fetch_bound_observation(*, event, route, now, fetcher=None, kind="result", u
         if independent_card:
             if independent_card["external_race_id"] != value["external_race_id"]:
                 raise ValueError("linked_card_identity_mismatch")
+            if not value.get('off_time') and independent_card.get('off_time'):
+                value['off_time'] = independent_card['off_time']
+                value['time_evidence'] = dict(url=independent_card['canonical_url'],
+                    sha256=independent_card['raw_sha256'])
             expected = [(r["number"], normalize_name(r["horse_name"])) for r in independent_card["roster"]]
             value["roster_evidence"] = dict(url=independent_card["canonical_url"],
                 sha256=independent_card["raw_sha256"], row_count=len(expected))
@@ -893,6 +897,7 @@ def run_multisource_claim(*, claim, now, fetcher=None):
             contract_digest=route.contract_digest,
             automation_allowed=True,
             roster_complete=value.get("roster_complete") is True,
+            time_evidence=value.get("time_evidence", {}),
             # corrected 只由受审 parser 的明确 amended/corrected/revised 标记产生。
             correction_marker=value.get("result_phase") == "corrected",
             multisource_authority=publication_authority(

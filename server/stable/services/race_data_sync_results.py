@@ -21,6 +21,7 @@ from stable.services.race_data_sync_policy import (
     normalize_source_class,
 )
 from stable.services.race_event_public_cache import invalidate_public_race_cache
+from stable.services.japan_public_fields import japan_source, result_popularity, fill_result_time
 
 
 _TERMINAL_RESULT_STATUSES = frozenset(
@@ -818,10 +819,23 @@ def apply_data_sync_result_observation(
                     ),
                     source.source_key: row["external_runner_id"],
                 }
+                if japan_source(source):
+                    # 既有卡表负重未在赛果投影中替换，其单位也必须原样保留。
+                    if runner.pk is None:
+                        runner.source_refs['field_units'] = {
+                            **runner.source_refs.get('field_units', {}), 'carried_weight': 'kg'}
+                    if (not manual_locks.get('runners')
+                        and not (runner.manual_lock_flags or {}).get('running_status')
+                        and not event.field_authorities.filter(
+                            subject_type='participant',
+                            subject_key__in=(runner.external_runner_id, row['external_runner_id'],
+                                source.source_key + ':' + row['external_runner_id']),
+                            field_name='running_status', manual_lock=True).exists()):
+                        runner.running_status = row['status']
                 if runner.pk is None:
                     runner.save()
                 else:
-                    runner.save(update_fields=("source_refs", "updated_at"))
+                    runner.save(update_fields=("source_refs", "running_status", "updated_at"))
         if promote_existing:
             assert existing is not None
             revision = existing
@@ -956,11 +970,14 @@ def apply_data_sync_result_observation(
                         barrier=item.barrier,
                         carried_weight=item.carried_weight,
                         running_status=item.status,
+                        popularity=result_popularity(item.field_provenance) if japan_source(source) else "",
                         is_confirmed=True,
                         source_refs={
                             "source_key": source.source_key,
                             "external_runner_id": row["external_runner_id"],
                             "revision_id": revision.pk,
+                            **({"field_units": {"carried_weight": "kg", "margin": "length"}}
+                               if japan_source(source) else {}),
                         },
                         raw_payload={
                             "raw_status": item.raw_status,
@@ -969,6 +986,7 @@ def apply_data_sync_result_observation(
                     )
                 )
             models.RaceEventResult.objects.bulk_create(legacy_results)
+            fill_result_time(event=event, observation=observation, revision=revision, now=now)
             control.current_result_revision = revision
             control.last_known_good_result_revision = revision
             control.last_provisional_result_revision = None
@@ -1012,6 +1030,8 @@ def apply_data_sync_result_observation(
                         "metadata": {
                             "observation_id": observation.pk,
                             "revision_id": revision.pk,
+                            **({"field_units": {"carried_weight": "kg", "margin": "length"}}
+                               if japan_source(source) else {}),
                         },
                     },
                 )

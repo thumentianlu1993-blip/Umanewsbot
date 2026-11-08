@@ -319,6 +319,7 @@ def parse_jra_card(html, *, event, url):
             'trainer_name': _text(row.select_one('td.horse .trainer')),
             'jockey_name': _text(row.select_one('td.jockey .jockey')),
             'carried_weight': _text(row.select_one('td.jockey .weight')), 'sort_order': len(rows)+1,
+            'source_refs': {'primary': url, 'field_units': {'carried_weight': 'kg'}},
             'running_status': 'scratched' if re.search(r'取消|除外', ' '.join(_text(n) for n in row.select('td.status, td.odds, td.horse .name'))) else 'declared',
             'odds_value': _text(row.select_one('td.odds .odds')),
             'popularity': _text(row.select_one('td.odds .rank')).strip('()（）人気'),
@@ -365,7 +366,7 @@ def _parse_jra_registration(soup, *, header, event, url):
             raise ValueError('jra_registration_partial_row')
         rows.append(dict(horse_name=name, carried_weight=weight, sort_order=len(rows)+1,
                          horse_number='', barrier='', trainer_name='', jockey_name='',
-                         running_status='declared', source_refs={'registration_category': category, 'primary': url}))
+                         running_status='declared', source_refs={'registration_category': category, 'primary': url, 'field_units': {'carried_weight': 'kg'}}))
     if registered_count != int(count[1]) or len({r['horse_name'] for r in rows}) != len(rows):
         raise ValueError('jra_registration_roster_incomplete')
     return {'items': rows, 'stage': 'registration', 'off_time': None}
@@ -725,6 +726,10 @@ def public_reviewed_preview(event, *, now):
 def preview_payload(event, candidate, stage, *, now):
     from .race_pre_race_refresh import dynamic_rows, refresh_interval
     rows = dynamic_rows(event, candidate.candidate_payload.get('items', []), now=now)
+    if candidate.source_name == JRA:
+        for row in rows:
+            row.source_refs = {**row.source_refs, 'field_units': {
+                **row.source_refs.get('field_units', {}), 'carried_weight': 'kg'}}
     checked = _dt(_state(event, candidate.source_name).get('last_checked_at')) or candidate.fetched_at
     state = _state(event, candidate.source_name)
     return {'rows': rows, 'label': LABELS[stage], 'checked_at': checked,
