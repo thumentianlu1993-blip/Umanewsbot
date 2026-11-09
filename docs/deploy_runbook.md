@@ -9842,3 +9842,25 @@ RACE_DATA_RAW_ARTIFACT_ROOTS=/run/race-data-sync
 ## 2026-11-09 法国权限修复后继的实际状态
 
 修正镜像已恢复 Web 与双域健康，France Galop/Geny 生产访问通过；数据 dry-run 受 10 场旧登记归属阻塞而回滚，worker/beat 停止。参见[实际发布证据](changes/france-race-automation/release_evidence.md)。该后继使用独立 `runtime/france-repair-executable/pinned-images.json`，保留原失败 intent/备份，不能将旧 intent 改绑到修正镜像。恢复/续跑使用已绑定包入口，不用无 overlay 的通用 Compose 命令替代。数据控制容器在只读父挂载下使用子挂载时，须提前准备已批准的 persistent 数据目录；只读证据目录 0755、文件 0644，私有会话仍 0600。人工门禁仅引用根 `AGENTS.md`。
+
+
+## 2026-11-10 法国应用恢复后的当前维护入口
+
+代码候选仍为 `0d05fa9b`，仅修正镜像内release文件后的应用OCI为 `sha256:2fa852b01378c076bf1b9c45cf30c8242bebfdcb70ab0ebcd29daca728dd8bc4`。执行包 `9f1c07c116f9` 修正版本身份，后继容量恢复包 `ade45ccee795` 已恢复四应用并通过驻留和双域健康核验；原80场/511行、10场交接与49日港换绑收据及原备份保留，无迁移或数据重导。
+
+固定目录为 `/opt/umanews-release-0d05fa9b-france-handoff-20261110/umanewsbot`。该目录的应用维护必须完整使用以下Compose链，不能使用旧权限恢复包或省略最终覆盖文件：
+
+```sh
+./deploy/docker/compose-wrapper.sh \
+  -f docker-compose.prod.lowcost.yml \
+  -f runtime/france-handoff-0d05fa9b/pinned-images.json \
+  -f docker-compose.france-browser.yml \
+  -f /opt/umanews-external-staging/france-application-identity-0d05fa9b/release-identity.json \
+  -f /opt/umanews-external-staging/france-capacity-0d05fa9b/release-identity.json
+```
+
+实际参数写入 `runtime/france-capacity-0d05fa9b/compose-command.json`。application-identity覆盖固定四应用镜像及版本环境，capacity覆盖只设四应用 `RACE_DATA_RAW_MIN_FREE_DISK_BYTES=4294967296`，原 `.env` 字节未变。512MiB归档根目录高水位和单文件限制保持；本次准入另验证空闲量大于4GiB加完整高水位及单文件预留。配置检查输出可能含私有值，不得公开输出或入库。
+
+本次只清理4份本任务远端重复传输镜像归档，每份本机原副本SHA均核对且保留；未删除数据库备份或已加载镜像。旧包如需从归档冷恢复，先按原SHA重新传输本机副本。清理清单及收据见本机 `historical-handoff/application-identity/capacity-recovery/duplicate-image-archives.json` 与 `archive-cleanup-receipt.json`。
+
+版本核验同时比较镜像revision标签、容器环境和Django实际读取的 `/app/.umanews-release-commit`；只检查其中之一不够。复用基础镜像复制源码后须保留启动权限并更新版本文件。worker用有界重复双pong判断就绪，不能启动后仅等待一次10秒。生产状态、后续自然调度证据及历史失败过程见[法国发布证据](changes/france-race-automation/release_evidence.md)。人工门禁仅引用根 `AGENTS.md`。

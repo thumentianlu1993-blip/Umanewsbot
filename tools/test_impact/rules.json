@@ -1563,6 +1563,9 @@
     ],
     "docs/changes/france-race-automation/handoff-ci-scope.json": [
       "infrastructure"
+    ],
+    "docs/changes/france-race-automation/geny-reload-ci-scope.json": [
+      "infrastructure"
     ]
   },
   "symbols": {
@@ -1747,6 +1750,7 @@
     "docs/changes/hkjc-source-acceptance/ci-scope.json",
     "docs/changes/hkjc-race-fields/ci-scope.json",
     "docs/changes/france-race-automation/ci-scope.json",
-    "docs/changes/france-race-automation/handoff-ci-scope.json"
+    "docs/changes/france-race-automation/handoff-ci-scope.json",
+    "docs/changes/france-race-automation/geny-reload-ci-scope.json"
   ]
 }

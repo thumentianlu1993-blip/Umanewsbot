@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "base_sha": "7ea0e260ebe657ef711f532522d0ba6fc686ae12",
+  "reason": "仅修复既有Geny白名单页面的一次同URL主页面重载；传输合同与共享/host文档请求预算同步为最多2，每文档资源96、两文档192，时限和数据解析/写入规则不变。选测法国完整链、共享pre-race与快照额度PG合同、核心及工具链；真实浏览器实取另留证，禁止用诊断替代自然验收。",
+  "domains": [
+    "module:stable.test_france_automation",
+    "module:stable.test_race_pre_race",
+    "module:stable.test_race_data_sync_pipeline_a",
+    "module:stable.test_race_data_sync_pipeline_a_postgres",
+    "infrastructure"
+  ],
+  "changes": [
+    {
+      "path": "deploy/france-browser/collector.cjs",
+      "status": "modified",
+      "before_hash": "fd010131860840ace98634ad5037a2e4d2790c6db47809a3c74eee3ff12e9fe8",
+      "after_hash": "531795aa0a613c7a26ac79cb401d19d4b974f46099941ecc6928bc55f4f3df94",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "deploy/france-browser/collector.test.cjs",
+      "status": "modified",
+      "before_hash": "b1a699ad9848c8df5589c26a532110168e055b7aa4fdddd78a2337cffe72fe97",
+      "after_hash": "254306155a35d03307e0cd08c93039dc7250532b0c6e58ad9c0bd4df96293adc",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/france-race-automation/design.md",
+      "status": "modified",
+      "before_hash": "5b786ee90f55746ac5d7c94b55345de82cdb31909041956422d4b51dd9c0588d",
+      "after_hash": "9ddfa2dbb13ce69627f44c8ec1dbbca5846f4d44cca8c2f510480ea4a8c8cb09",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/france-race-automation/release_evidence.md",
+      "status": "modified",
+      "before_hash": "f9ae0a13680a5627a4e881fc9b584bb3f0a0ed0aacab32b154754c5fab5d9d33",
+      "after_hash": "0d029f3bae7d2b9b5f2c3b1372b9ab2670ecd37ec72b6b253de14368592e8cc4",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/france-race-automation/rollout.md",
+      "status": "modified",
+      "before_hash": "19e712b1b50be4d76441a8c5a289db6ceccd84e0d745007446218c940f30a3f4",
+      "after_hash": "ea13f0767b4017e0b115df20aa1c70575e9e6b99e27b1ce3184ddb3024924e19",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/france-race-automation/tasks.md",
+      "status": "modified",
+      "before_hash": "21cbe7a460f3329993b54a8ff10ea17cba49d84652227aec887e1fb64b9ec4dd",
+      "after_hash": "ff4c3ae6d921f6f63f9899abe2bb71d722a50b9c03e7f0098e4febc9b580fba9",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/france-race-automation/test_cases.md",
+      "status": "modified",
+      "before_hash": "875ce990ff53dd6d2fa9022266a889bd7a9398196d699188e004a7d706da576d",
+      "after_hash": "9a5cd429272480af77f103a4edbfbd60589e845ba64fa7d74c3f9e2c706d7c83",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/current_state.md",
+      "status": "modified",
+      "before_hash": "77bab75238a6b7df2e91ac054cdeb7fcef9c27dd1c4af4efa3b053ba7f5975aa",
+      "after_hash": "404a6967a52a1485cbc1eb93740c864016ec7949b15ae8a9f507c36657e7241a",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/deploy_runbook.md",
+      "status": "modified",
+      "before_hash": "15e5bcc54fe79d051834fb36bf982c7cdd1a7a2e6b4870741414853cd4b2ed5f",
+      "after_hash": "9c0a4dfddad2afd442447b30d41b216b193cf721c997cf142cee4964271215fa",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/france_browser_transport.py",
+      "status": "modified",
+      "before_hash": "9cb4e957ae3ef115d7b47c7ec33254bdd4566dadcbb1bf4a0116854754816206",
+      "after_hash": "5f01fe1caa109e24adc3c68c187383481537205e34c17b069c6075c92441e968",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_pre_race.py",
+      "status": "modified",
+      "before_hash": "3d87ecb6919ed5df10b32b994c50e5b9a4c8d7858842128b5cfa5fc8965e529e",
+      "after_hash": "66404a403853f4456de4b919a1c347ce8b4e21d5a09fe233c1056c322aeab12c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_france_automation.py",
+      "status": "modified",
+      "before_hash": "338458ad2566578d3b397482c3cb9e53dd3e87d3a2e0f0a60b75df993915e002",
+      "after_hash": "6263a93fc4d1e20a22e30f1f8c22ba8817ba5ce717eea41a13382b9c5887b34a",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/catalog.json",
+      "status": "modified",
+      "before_hash": "ae0ccabe142d59c09e8b0727d794e888275bd91c495f63ee83fa8f631257eacc",
+      "after_hash": "5142608e4ffbf9d096119965e4bd0aebf4395a7b82a273426caed96fa0f23072",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "1c7d80b258b0d6034f972f754eeb0d68510734eea8c6fa4a9b90b63d6dc1cad9",
+      "after_hash": "36d01ee4bde444147ca0e608980920d826c4a8960ccfcb5fd4bd5f3cd52d8a02",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}
