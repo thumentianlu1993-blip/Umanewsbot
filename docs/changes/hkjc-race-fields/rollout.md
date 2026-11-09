@@ -1,7 +1,7 @@
 # 交付状态
 
-当前为修复候选，尚未合并或改变生产。生产仍是32cf8e34/schema0079；本候选无迁移，无配置/开关变化。
-精确发布包待测试、独立review和候选构建完成后固化；人工门禁仅引用根AGENTS.md。
+PR290 已合并并完成生产发布，当前为6ca15928/schema0079，无迁移、配置或开关变化。
+最终发布包与恢复/验收结果见[发布证据](release_evidence.md)。以下为准备阶段动作设计；人工门禁仅引用根AGENTS.md。
 
 拟发布范围：代码修复；六场香港结果共57行及对应状态/来源登记/历史赛时；香港杯日期展示与距离单位。
 新建或重建web、worker、race_sync_v2_worker、beat，校验并reload Nginx；不重建数据库、Redis或JRA浏览器。
@@ -15,7 +15,7 @@
 
 生产候选已从32cf8e34独立提取本次8个server文件增量，固定提交6ca15928；
 共享模板保留生产既有结构，未带入主线O03探针或迁移。窄候选同样完成57行逐字段、13页和206条报名回放。
-数据manifest SHA-256：`9e8417c6e6be6cfc927e3b84a3065192e2828903af197609d3e1f49c889ec7e5`。
+数据manifest SHA-256：`3c15b2bddc0dcf728d808c60e3e5592a894fafe3d45acb28ab53a60633ab2d1a`。
 固定目录内原文及字段变更均绑定SHA；政策摘要82cafe9f不变，基线漂移则整批拒绝。
 发布时先持有现有生产release锁，按deploy_0079执行同schema备份/构建/切换，随后暂停beat、排空任务、停止两个worker，
 执行repair_hkjc_race_fields默认dry-run和同清单apply；依OperationLog及字段快照核验提交，恢复同候选四应用并reload Nginx。
