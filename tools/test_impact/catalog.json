@@ -915,6 +915,9 @@
       "stable.tests_legacy.RaceEventPageMVPTests",
       "stable.test_hkjc_horse_name_policy",
       "stable.test_hkjc_public_fields"
+    ],
+    "france_race_automation": [
+      "stable.test_france_automation"
     ]
   },
   "dependencies": {
@@ -982,7 +985,16 @@
       "module:stable.test_race_multisource_identity",
       "race_parser"
     ],
-    "hkjc_source_acceptance": []
+    "hkjc_source_acceptance": [],
+    "france_race_automation": [
+      "hkjc_source_acceptance",
+      "race_results",
+      "module:stable.test_race_information_display_pages",
+      "module:stable.test_race_public_time",
+      "infrastructure",
+      "module:stable.test_race_data_sync_pipeline_a",
+      "module:stable.test_race_data_sync_pipeline_a_postgres"
+    ]
   },
   "tests": {
     ".codex/scripts/test_graded_race_participants_workflow.py": {
@@ -2905,6 +2917,12 @@
       "domains": [
         "hkjc_source_acceptance"
       ]
+    },
+    "server/stable/test_france_automation.py": {
+      "label": "stable.test_france_automation",
+      "domains": [
+        "france_race_automation"
+      ]
     }
   },
   "profiles": {
@@ -3225,7 +3243,8 @@
     "stable.test_japan_public_fields": "django",
     "stable.test_hkjc_horse_name_policy": "django",
     "stable.test_hkjc_automation": "django",
-    "stable.test_hkjc_public_fields": "django"
+    "stable.test_hkjc_public_fields": "django",
+    "stable.test_france_automation": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
@@ -3310,7 +3329,8 @@
     "horse_basic_profile_review_input": "integration: H03独立已审输入与原消费者事务/重放合同",
     "lifecycle_authorization_renewal": "integration: 生命周期原范围续期与 TRA 显式许可截止日期",
     "japan_race_automation": "integration: JRA/NAR通用来源、受控候选与历史回填",
-    "hkjc_source_acceptance": "integration: HKJC全季目录、正式赛果、分阶段赛前与候选公开"
+    "hkjc_source_acceptance": "integration: HKJC全季目录、正式赛果、分阶段赛前与候选公开",
+    "france_race_automation": "integration: 法国来源阶段、身份、字段和固定范围回放"
   },
   "dedicated_batch_modules": [
     "stable.test_migration_history_repair_postgres",

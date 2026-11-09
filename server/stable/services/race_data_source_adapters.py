@@ -583,6 +583,9 @@ def fetch_bound_observation(*, event, route, now, fetcher=None, kind="result", u
             )
         if not route.permits_url(url):
             raise ValueError("source_url_rejected")
+        if route.provider == 'geny':
+            url = url.rsplit('/', 1)[0] + '/partants-pronostics'
+            if not route.permits_url(url):raise ValueError('source_url_rejected')
         page = fetcher(url, route=route, now=now)
         chain = [url]
         if route.provider == "jra":
@@ -649,6 +652,28 @@ def fetch_bound_observation(*, event, route, now, fetcher=None, kind="result", u
             if value is None:
                 value = parse_hkjc_observation(page, url=url, route=route, now=now)
 
+        elif route.provider == 'geny':
+            from .france_sources import parse_geny_observation
+            card_url = url.rsplit('/', 1)[0] + '/partants-pronostics'
+            if not route.permits_url(card_url):raise ValueError('source_url_rejected')
+            card_page = page if url == card_url else fetcher(card_url, route=route, now=now)
+            independent_card = parse_geny_observation(card_page, url=card_url, route=route, now=now)
+            if (kind == 'result' and event.local_date <= now.astimezone(ZoneInfo('Europe/Paris')).date()
+                and not (independent_card.get('off_time') and now < aware(independent_card['off_time']))):
+                result_url = url.rsplit('/', 1)[0] + '/arrivee-rapports'
+                if not route.permits_url(result_url):raise ValueError('source_url_rejected')
+                if url != result_url:
+                    page = fetcher(result_url, route=route, now=now)
+                    chain.append(result_url)
+                try:
+                    value = parse_geny_observation(page, url=result_url, route=route, now=now, card_page=card_page)
+                except ValueError as exc:
+                    # 身份与页面标题已校验；仅明确尚无正式赛果时保留完整卡。
+                    # result claim 仍由后面的 result_phase 准入拒绝，不伪造赛果。
+                    if str(exc) != 'geny_result_not_final':raise
+                    value = independent_card
+            else:
+                value = independent_card
         else:
             linked = (
                 linked_result_url(page, url=url, route=route)
@@ -1004,6 +1029,7 @@ def run_multisource_claim(*, claim, now, fetcher=None):
                         jockey_name=r["jockey_name"],
                         trainer_name=r["trainer_name"],
                         carried_weight=r["carried_weight"],
+                        **({'odds':r['odds_value']} if route.provider=='geny' and route.region=='france' and r.get('odds_value') else {}),
                         **(
                             {
                                 "status": (
@@ -1020,6 +1046,12 @@ def run_multisource_claim(*, claim, now, fetcher=None):
                     for r in value["roster"]
                 ],
             )
+            france_fields = ({r['external_runner_id']:r.get('field_provenance',{}) for r in value['roster']}
+                if route.provider == 'geny' and route.region == 'france' else {})
+            card_observed_at = aware(value['fetched_at']) if france_fields else now
+            if france_fields:
+                # 报价观测与调整后负重也是快照内容；不能被主字段同值去重丢弃。
+                card['france_public_fields_sha256'] = canonical_sha(france_fields)
             normalized = normalize_racecard_observation(
                 payload=card,
                 contract={
@@ -1034,7 +1066,7 @@ def run_multisource_claim(*, claim, now, fetcher=None):
                     "automation_allowed": True,
                     "allowed_fields": list(_ROSTER_ALLOWED_FIELDS),
                 },
-                observed_at=now,
+                observed_at=card_observed_at,
                 source_updated_at=None,
                 parser_version=route.parser_version,
                 raw_sha256=value["raw_sha256"],
@@ -1044,7 +1076,7 @@ def run_multisource_claim(*, claim, now, fetcher=None):
             )
             recorded = record_race_result_observation(
                 source_identity_id=binding.source_identity_id,
-                observed_at=now,
+                observed_at=card_observed_at,
                 source_updated_at=None,
                 parser_version=route.parser_version,
                 raw_sha256=value["raw_sha256"],
@@ -1056,6 +1088,7 @@ def run_multisource_claim(*, claim, now, fetcher=None):
                         for k, v in normalized.provenance.items()
                     },
                     **provenance,
+                    **({'france_public_fields':france_fields} if france_fields else {}),
                 },
                 parse_warnings=[],
                 permission_classification="multisource_approved",
@@ -1521,6 +1554,10 @@ def discover_source_url(*, event, route, now, fetcher):
     from bs4 import BeautifulSoup
     from urllib.parse import urljoin
     from stable.services.race_source_identity import normalize_name
+
+    if route.provider == 'geny':
+        from .france_sources import discover_geny_url
+        return discover_geny_url(event=event,route=route,now=now,fetcher=fetcher)
 
     refs = event.source_refs if isinstance(event.source_refs, dict) else {}
     if route.provider == 'jra':

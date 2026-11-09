@@ -1,0 +1,3980 @@
+[
+  {
+    "tables": [
+      {
+        "id": "",
+        "rows": [
+          [
+            "N°",
+            "Cheval",
+            "Poids",
+            "Valeur",
+            "Priorité",
+            "Propriétaire",
+            "Entraîneur",
+            "Dép./Pays Ent.",
+            "Gains"
+          ],
+          [
+            "1",
+            "INDALIMOS F.PS. 4 A. ... (SUP.)",
+            "56,5 kg",
+            "46.5",
+            "",
+            "MR YVES BURRUS",
+            "A&L. FABRE (S)",
+            "60",
+            "32.985"
+          ],
+          [
+            "2",
+            "GRECIAN COMET F.PS. 4 a.",
+            "56,5 kg",
+            "43.0",
+            "",
+            "EC.NICOLATO/G.AUGUSTIN-NORMAND",
+            "P. OLAVE VALDIVIELSO",
+            "64",
+            "47.478"
+          ],
+          [
+            "3",
+            "WINDFLOWER F.PS. 4 a.",
+            "56,5 kg",
+            "44.5",
+            "",
+            "ECURIE GRIBOMONT/ECURIE DU SUD",
+            "P. COTTIER",
+            "13",
+            "35.744"
+          ],
+          [
+            "4",
+            "Crystal Flyer Gb F.Ps. 5 A.",
+            "56,5 kg",
+            "45.5",
+            "",
+            "A.LARTIGAU/J.M.MCCULLAGH",
+            "A. LARTIGAU",
+            "64",
+            "30.777"
+          ],
+          [
+            "5",
+            "DARKAVA F.PS. 4 a.",
+            "56,5 kg",
+            "41.0",
+            "",
+            "MR ALVARO ODRIOZOLA ARZALLUS",
+            "R. AVIAL LOPEZ",
+            "ESP",
+            "31.606"
+          ],
+          [
+            "6",
+            "TEMAPICA F.PS. 3 A.",
+            "55 kg",
+            "46.5",
+            "",
+            "AB RACING/EC S.STEMPNIAK",
+            "G. MOSSE (S)",
+            "60",
+            "56.025"
+          ],
+          [
+            "7",
+            "ELLE ECLIPSE IRE F.PS. 3 a. ... (Sup.)",
+            "55 kg",
+            "44.0",
+            "",
+            "GODOLPHIN SNC",
+            "A&L. FABRE (S)",
+            "60",
+            "17.370"
+          ],
+          [
+            "8",
+            "WOODY FRANGIPANI F.PS. 3 A.",
+            "55 kg",
+            "46.0",
+            "",
+            "MR STUART MCPHEE",
+            "FR. MONFORT (S)",
+            "49",
+            "51.730"
+          ],
+          [
+            "9",
+            "ARKANSAS F.PS. 3 A.",
+            "55 kg",
+            "44.5",
+            "",
+            "SCUDERIA SCOLARI",
+            "J. REYNIER (S)",
+            "13",
+            "32.470"
+          ],
+          [
+            "10",
+            "SPIRIT OF ZARAK F.PS. 3 A.",
+            "55 kg",
+            "46.5",
+            "",
+            "MR JEAN-CLAUDE SEROUL",
+            "C&Y. LERNER (S)",
+            "78",
+            "50.894"
+          ],
+          [
+            "11",
+            "OZONE F.PS. 3 A.",
+            "55 kg",
+            "44.0",
+            "",
+            "WERTHEIMER & FRERE",
+            "C. FERLAND (S)",
+            "60",
+            "12.575"
+          ]
+        ]
+      },
+      {
+        "id": "",
+        "rows": [
+          [
+            "ANNULATION PART PROB",
+            "Lundi 9 Novembre 2026",
+            "10h30 PARIS"
+          ],
+          [
+            "MONTE",
+            "Lundi 9 Novembre 2026",
+            "12h30 =="
+          ]
+        ]
+      },
+      {
+        "id": "",
+        "rows": [
+          [
+            "Année",
+            "Gagnant",
+            "Sexe/Âge",
+            "Running time",
+            "Jockey",
+            "Entraîneur",
+            "Propriétaire",
+            "Second",
+            "Troisième",
+            "Replay"
+          ],
+          [
+            "2025",
+            "WELTBESTE GER",
+            "F.04",
+            "02'13\"40",
+            "M. SEIDL",
+            "M. PECHEUR",
+            "ECURIE ROETTGEN",
+            "SALMARAK",
+            "GINALYAH (IRE)",
+            ""
+          ],
+          [
+            "2024",
+            "HIGHER LEAVES IRE",
+            "F.03",
+            "02'11\"60",
+            "A. POUCHIN",
+            "H.DE BROMHEAD",
+            "MR JAMES WIGAN",
+            "EUBOA",
+            "NOIR",
+            ""
+          ],
+          [
+            "2023",
+            "PERAMA",
+            "F.03",
+            "02'16\"10",
+            "T. BACHELOT",
+            "F. ROHAUT (S)",
+            "ECURIE DES CHARMES",
+            "UNE PERLE (IRE)",
+            "HARDPIA",
+            ""
+          ],
+          [
+            "2022",
+            "VIA SISTINA IRE",
+            "F.04",
+            "00'00\"00",
+            "JP. SPENCER",
+            "G. BOUGHEY",
+            "MME REBECCA HILLEN",
+            "WINEMA",
+            "PENNINE HILLS IRE",
+            ""
+          ],
+          [
+            "2021",
+            "AMBITION GB",
+            "F.05",
+            "02'12\"80",
+            "M. BARZALONA",
+            "X. THOMAS-DEMEAULTE (S)",
+            "J. ROWSELL/S. ASHLEY",
+            "ANASIA (GB)",
+            "HARDPIA",
+            ""
+          ],
+          [
+            "2020",
+            "DIRECTA",
+            "F.03",
+            "02'11\"70",
+            "T. BACHELOT",
+            "J. BOISNARD (S)",
+            "MME MARYVONNE BLOT",
+            "ALL RUMOURS",
+            "DARIYZA",
+            ""
+          ],
+          [
+            "2019",
+            "AMBITION GB",
+            "F.03",
+            "02'18\"90",
+            "M. BARZALONA",
+            "X. THOMAS-DEMEAULTE (S)",
+            "J. ROWSELL/S. ASHLEY",
+            "VESPERA (IRE)",
+            "TOSEN GIFT IRE",
+            ""
+          ],
+          [
+            "2018",
+            "GAINING GB",
+            "F.04",
+            "02'16\"00",
+            "V. CHEMINAUD",
+            "HF. DEVIN (S)",
+            "SUC. KHALID ABDULLAH",
+            "SON MACIA GER",
+            "TOSEN GIFT IRE",
+            ""
+          ],
+          [
+            "2017",
+            "HAGGLE GB",
+            "F.04",
+            "02'11\"38",
+            "PC. BOUDOT",
+            "HF. DEVIN (S)",
+            "MME REBECCA HILLEN",
+            "SON MACIA GER",
+            "VIA FIRENZE (IRE)",
+            ""
+          ],
+          [
+            "2016",
+            "POWDER SNOW USA",
+            "F.03",
+            "02'15\"25",
+            "A. LEMAITRE",
+            "HA. PANTALL",
+            "GODOLPHIN SNC",
+            "RESTIANA",
+            "ROSENTAL GB",
+            ""
+          ],
+          [
+            "2015",
+            "TANIYA",
+            "F.03",
+            "02'13\"81",
+            "A. BADEL",
+            "JC. ROUGET (S)",
+            "AGA KHAN STUDS SC",
+            "FIVE FIFTEEN",
+            "LADY OF KYUSHU (USA)",
+            ""
+          ],
+          [
+            "2014",
+            "GAGA A URU",
+            "F.05",
+            "02'13\"70",
+            "A. BADEL",
+            "D. SMAGA",
+            "MR BENJAMIN STEINBRUCH",
+            "PEUT ETRE (IRE)",
+            "HEARTILY IRE",
+            ""
+          ],
+          [
+            "2013",
+            "FRINE IRE",
+            "F.03",
+            "02'19\"49",
+            "J. CROCQUEVIEILLE",
+            "JM. OSORIO BERTRAN DE LIS",
+            "DUC D' ALBURQUERQUE",
+            "GLOWING CLOUD GB",
+            "GAGA A URU",
+            ""
+          ],
+          [
+            "2012",
+            "CASACA GB",
+            "F.06",
+            "02'15\"60",
+            "J. CROCQUEVIEILLE",
+            "JM. OSORIO BERTRAN DE LIS",
+            "MME AFRICA CUADRA-LORES",
+            "BAINO ROCK",
+            "BRASILEIRA (GB)",
+            ""
+          ],
+          [
+            "2011",
+            "SKIA",
+            "F.04",
+            "02'11\"83",
+            "A. CRASTUS",
+            "C. LAFFON-PARIAS",
+            "MR LEONIDAS MARINOPOULOS",
+            "SKALLET",
+            "CASACA GB",
+            ""
+          ]
+        ]
+      }
+    ],
+    "text": "5ème(P/ 4184), — 11/11/2026 16h25, TOULOUSE\n\nPLAT , 2.100 mètres , Corde à DROITE\n73.200 (36.600, 14.640, 10.980, 7.320, 3.660)\n128.100 (64.050, 25.620, 19.215, 12.810, 6.405) - Allocation + Prime Propriétaire (si éligible) pour chevaux de 3 ans\n106.140 (53.070, 21.228, 15.921, 10.614, 5.307) - Allocation + Prime Propriétaire (si éligible) pour chevaux de 4 ans et plus\nAprès Part. probables : 29 Engagés. 2 Non Valables. 14 Forfaits. 2 Supplémentaires. 2 Non-Déclarés-Partants. 11 Partants probables. - Course Premium -\n\n\nGROUPE III\nPour juments de 3 ans et au-dessus, n'ayant pas cette année gagné un Groupe II. Poids : 3 ans, 55 kg ; 4 ans et au-dessus, 56,5 kg. Les juments ayant depuis le 11 juin 2026 inclus gagné un Groupe III porteront 2 kg ; plusieurs Groupes III, 3 kg.\nVersement à la poule des propriétaires : 520 à l'engagement le 7 octobre ou 1.600 à l'engagement le 27 octobre ou 5.760 à l'engagement supplémentaire le 7 novembre.\nUn souvenir sera offert au propriétaire de la jument gagnante.\n\n\nLegal notice\n\nTOULOUSE\n\n1 2 3 4 5 6 7 8\nN°\tCheval\tPoids\tValeur\tPriorité\tPropriétaire\tEntraîneur\tDép./Pays Ent.\tGains\n1\tINDALIMOS F.PS. 4 A. ... (SUP.)\t56,5 kg\t46.5\n\t\tMR YVES BURRUS\tA&L. FABRE (S)\t60\t32.985\n2\tGRECIAN COMET F.PS. 4 a.\t56,5 kg\t43.0\n\t\tEC.NICOLATO/G.AUGUSTIN-NORMAND\tP. OLAVE VALDIVIELSO\t64\t47.478\n3\tWINDFLOWER F.PS. 4 a.\t56,5 kg\t44.5\n\t\tECURIE GRIBOMONT/ECURIE DU SUD\tP. COTTIER\t13\t35.744\n4\tCrystal Flyer Gb F.Ps. 5 A.\t56,5 kg\t45.5\n\t\tA.LARTIGAU/J.M.MCCULLAGH\tA. LARTIGAU\t64\t30.777\n5\tDARKAVA F.PS. 4 a.\t56,5 kg\t41.0\n\t\tMR ALVARO ODRIOZOLA ARZALLUS\tR. AVIAL LOPEZ\tESP\t31.606\n6\tTEMAPICA F.PS. 3 A.\t55 kg\t46.5\n\t\tAB RACING/EC S.STEMPNIAK\tG. MOSSE (S)\t60\t56.025\n7\tELLE ECLIPSE IRE F.PS. 3 a. ... (Sup.)\t55 kg\t44.0\n\t\tGODOLPHIN SNC\tA&L. FABRE (S)\t60\t17.370\n8\tWOODY FRANGIPANI F.PS. 3 A.\t55 kg\t46.0\n\t\tMR STUART MCPHEE\tFR. MONFORT (S)\t49\t51.730\n9\tARKANSAS F.PS. 3 A.\t55 kg\t44.5\n\t\tSCUDERIA SCOLARI\tJ. REYNIER (S)\t13\t32.470\n10\tSPIRIT OF ZARAK F.PS. 3 A.\t55 kg\t46.5\n\t\tMR JEAN-CLAUDE SEROUL\tC&Y. LERNER (S)\t78\t50.894\n11\tOZONE F.PS. 3 A.\t55 kg\t44.0\n\t\tWERTHEIMER & FRERE\tC. FERLAND (S)\t60\t12.575\nClôture\nANNULATION PART PROB\tLundi 9 Novembre 2026\t10h30 PARIS\nMONTE\tLundi 9 Novembre 2026\t12h30 ==\nPalmarès\nAnnée\tGagnant\tSexe/Âge\tRunning time\tJockey\tEntraîneur\tPropriétaire\tSecond\tTroisième\tReplay\n2025\tWELTBESTE GER\tF.04\t02'13\"40\tM. SEIDL\tM. PECHEUR\tECURIE ROETTGEN\tSALMARAK\tGINALYAH (IRE)\t\n2024\tHIGHER LEAVES IRE\tF.03\t02'11\"60\tA. POUCHIN\tH.DE BROMHEAD\tMR JAMES WIGAN\tEUBOA\tNOIR\t\n2023\tPERAMA\tF.03\t02'16\"10\tT. BACHELOT\tF. ROHAUT (S)\tECURIE DES CHARMES\tUNE PERLE (IRE)\tHARDPIA\t\n2022\tVIA SISTINA IRE\tF.04\t00'00\"00\tJP. SPENCER\tG. BOUGHEY\tMME REBECCA HILLEN\tWINEMA\tPENNINE HILLS IRE\t\n2021\tAMBITION GB\tF.05\t02'12\"80\tM. BARZALONA\tX. THOMAS-DEMEAULTE (S)\tJ. ROWSELL/S. ASHLEY\tANASIA (GB)\tHARDPIA\t\n2020\tDIRECTA\tF.03\t02'11\"70\tT. BACHELOT\tJ. BOISNARD (S)\tMME MARYVONNE BLOT\tALL RUMOURS\tDARIYZA\t\n2019\tAMBITION GB\tF.03\t02'18\"90\tM. BARZALONA\tX. THOMAS-DEMEAULTE (S)\tJ. ROWSELL/S. ASHLEY\tVESPERA (IRE)\tTOSEN GIFT IRE\t\n2018\tGAINING GB\tF.04\t02'16\"00\tV. CHEMINAUD\tHF. DEVIN (S)\tSUC. KHALID ABDULLAH\tSON MACIA GER\tTOSEN GIFT IRE\t\n2017\tHAGGLE GB\tF.04\t02'11\"38\tPC. BOUDOT\tHF. DEVIN (S)\tMME REBECCA HILLEN\tSON MACIA GER\tVIA FIRENZE (IRE)\t\n2016\tPOWDER SNOW USA\tF.03\t02'15\"25\tA. LEMAITRE\tHA. PANTALL\tGODOLPHIN SNC\tRESTIANA\tROSENTAL GB\t\n2015\tTANIYA\tF.03\t02'13\"81\tA. BADEL\tJC. ROUGET (S)\tAGA KHAN STUDS SC\tFIVE FIFTEEN\tLADY OF KYUSHU (USA)\t\n2014\tGAGA A URU\tF.05\t02'13\"70\tA. BADEL\tD. SMAGA\tMR BENJAMIN STEINBRUCH\tPEUT ETRE (IRE)\tHEARTILY IRE\t\n2013\tFRINE IRE\tF.03\t02'19\"49\tJ. CROCQUEVIEILLE\tJM. OSORIO BERTRAN DE LIS\tDUC D' ALBURQUERQUE\tGLOWING CLOUD GB\tGAGA A URU\t\n2012\tCASACA GB\tF.06\t02'15\"60\tJ. CROCQUEVIEILLE\tJM. OSORIO BERTRAN DE LIS\tMME AFRICA CUADRA-LORES\tBAINO ROCK\tBRASILEIRA (GB)\t\n2011\tSKIA\tF.04\t02'11\"83\tA. CRASTUS\tC. LAFFON-PARIAS\tMR LEONIDAS MARINOPOULOS\tSKALLET\tCASACA GB\t\nFrance Galop\n\n15 Boulevard de Douaumont\n\n75017 Paris\n\n01 49 10 20 29\n\nRechercher\nL'entreprise\nMission France Galop\nGouvernance\nBaromètre du Galop\nComptes sociaux\nComprendre les courses\nDocuthèque\nMétiers\nOffres d'emploi\nOffres de stage\nAppel d'offres\nPartenaires\nÉthique et déontologie\nNos engagements\nLutte anti-dopage\nBien être equin\nIndex Egalité Femmes-Hommes\nJeu responsable\nEspace Presse\nDossiers et communiqués de presse\nX\nInstagram\nFacebook\nYoutube\nTikTok\nLinkedin\nNous contacter\nMentions légales\nProtection des données personnelles\nCGU\nCookies",
+    "title": "PRIX FILLE DE L'AIR | France Galop",
+    "url": "https://www.france-galop.com/fr/course/detail/2026/P/KzBJdEZJZlVQWC9EbkRVZExvdnRBUT09"
+  },
+  {
+    "tables": [
+      {
+        "id": "",
+        "rows": [
+          [
+            "N°",
+            "Cheval",
+            "Poids",
+            "Valeur",
+            "Priorité",
+            "Propriétaire",
+            "Entraîneur",
+            "Dép./Pays Ent.",
+            "Gains"
+          ],
+          [
+            "1",
+            "LAILISSA (IRE) F.PS. 2 a.",
+            "56 kg",
+            "40.5",
+            "",
+            "AGA KHAN STUDS SCEA",
+            "M. DELZANGLES",
+            "60",
+            "16.810"
+          ],
+          [
+            "2",
+            "TUESDAY'S GONE (IRE) F.PS. 2 a.",
+            "56 kg",
+            "43.5",
+            "",
+            "C.WENTWORTH/G. STAVRAKIS",
+            "G. HERNON (S)",
+            "60",
+            "29.250"
+          ],
+          [
+            "3",
+            "MARTINET IRE F.PS. 2 A.",
+            "56 kg",
+            "***",
+            "",
+            "DENFORD STUD",
+            "SIR M. PRESCOTT",
+            "GBR",
+            "40.019"
+          ],
+          [
+            "4",
+            "MATANA F.PS. 2 a.",
+            "56 kg",
+            "***",
+            "",
+            "ECURIE DAVID R. LAYANI FAMILLE",
+            "G. MOSSE (S)",
+            "60",
+            "1.828"
+          ],
+          [
+            "5",
+            "YOU OR ME (GB) F.PS. 2 a.",
+            "56 kg",
+            "38.5",
+            "",
+            "ECURIE MELANIE",
+            "G. MOSSE (S)",
+            "60",
+            "4.316"
+          ],
+          [
+            "6",
+            "INVADE MY HEART IRE F.PS. 2 a.",
+            "56 kg",
+            "***",
+            "",
+            "FAIR SALINIA LTD",
+            "G. MOSSE (S)",
+            "60",
+            "0"
+          ],
+          [
+            "7",
+            "MONEEFA IRE F.PS. 2 a.",
+            "56 kg",
+            "***",
+            "",
+            "PRCE A. FAISAL",
+            "A&L. FABRE (S)",
+            "60",
+            "38.400"
+          ],
+          [
+            "8",
+            "Askam Chope F.Ps. 2 A.",
+            "56 kg",
+            "41.5",
+            "",
+            "J.GIMENEZ/A.CHOPARD",
+            "K. TAVARES (S)",
+            "33",
+            "25.652"
+          ],
+          [
+            "9",
+            "CELTIC MOON (FR) F.PS. 2 a.",
+            "56 kg",
+            "***",
+            "",
+            "MR DAVID KEVIN KELLY",
+            "A. MURPHY (S)",
+            "60",
+            "23.715"
+          ],
+          [
+            "10",
+            "NARCEA IRE F.PS. 2 a.",
+            "56 kg",
+            "***",
+            "",
+            "MR FERNANDO MARTIN-BARRIOS MADRAZO",
+            "M. ALONSO ROLDAN",
+            "ESP",
+            "52.745"
+          ],
+          [
+            "11",
+            "POPPY FOXY IRE F.PS. 2 a.",
+            "56 kg",
+            "***",
+            "",
+            "N. BRADLEY R. 27/ODDSONSYND.",
+            "C. CLOVER",
+            "GBR",
+            "87.912"
+          ],
+          [
+            "12",
+            "OPEN ARMS F.PS. 2 a.",
+            "56 kg",
+            "***",
+            "",
+            "MR ROBERT NG",
+            "M. DELZANGLES",
+            "60",
+            "6.348"
+          ],
+          [
+            "13",
+            "GOLDY GLORY F.PS. 2 a.",
+            "56 kg",
+            "38.0",
+            "",
+            "HA.PANTALL (S)",
+            "HA. PANTALL (S)",
+            "49",
+            "34.040"
+          ],
+          [
+            "14",
+            "BELISA BAY IRE F.PS. 2 A.",
+            "56 kg",
+            "45.5",
+            "",
+            "MR ARTURO SAN JOSE MAZARIEGOS",
+            "A. SOTO LORING",
+            "ESP",
+            "87.850"
+          ],
+          [
+            "15",
+            "SHIBUYA F.PS. 2 a.",
+            "56 kg",
+            "38.0",
+            "",
+            "SCEA HARAS DES FORETS",
+            "N. CAULLERY",
+            "60",
+            "19.934"
+          ],
+          [
+            "16",
+            "AMETIS CHOPE F.PS. 2 a.",
+            "56 kg",
+            "38.5",
+            "",
+            "MR NICOLAS SOUCHON",
+            "T. SPEICHER",
+            "60",
+            "19.101"
+          ]
+        ]
+      },
+      {
+        "id": "",
+        "rows": [
+          [
+            "SECOND ENGAGEMENT",
+            "Mardi 10 Novembre 2026",
+            "10h30 PARIS"
+          ],
+          [
+            "FORFAIT 1",
+            "Lundi 16 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "PARTANT PROBABLE",
+            "Mardi 17 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ENGAGEMENT SUPPLEMENT.",
+            "Mardi 17 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ANNULATION PART PROB",
+            "Mercredi 18 Novembre 2026",
+            "10h30 =="
+          ],
+          [
+            "MONTE",
+            "Mercredi 18 Novembre 2026",
+            "12h30 =="
+          ]
+        ]
+      }
+    ],
+    "text": "4ème(P/ 582), — 20/11/2026 00h00, CHANTILLY\n\nPLAT , 1.400 mètres , PSF, Corde à DROITE\n73.200 (36.600, 14.640, 10.980, 7.320, 3.660)\n128.100 (64.050, 25.620, 19.215, 12.810, 6.405) - Allocation + Prime Propriétaire (si éligible)\nAprès Engagements : 16 Engagés. 16 Partants. - Course Premium -\n\n\nGROUPE III\nPour pouliches de 2 ans, n'ayant pas gagné un Groupe I. Poids : 56 kg. Les pouliches ayant gagné un Groupe III porteront 1,5 kg ; plusieurs Groupe III ou un Groupe II, 2,5 kg.\nVersement à la poule des propriétaires : 520 à l'engagement le 14 octobre ou 1.600 à l'engagement le 10 novembre ou 5.760 à l'engagement supplémentaire le 17 novembre.\nUn souvenir sera offert au propriétaire de la pouliche gagnante par FRANCE GALOP.\n\n\nLegal notice\n\nCHANTILLY\n\n1 2 3 4 5 6 7 8 9\nN°\tCheval\tPoids\tValeur\tPriorité\tPropriétaire\tEntraîneur\tDép./Pays Ent.\tGains\n1\tLAILISSA (IRE) F.PS. 2 a.\t56 kg\t40.5\n\t\tAGA KHAN STUDS SCEA\tM. DELZANGLES\t60\t16.810\n2\tTUESDAY'S GONE (IRE) F.PS. 2 a.\t56 kg\t43.5\n\t\tC.WENTWORTH/G. STAVRAKIS\tG. HERNON (S)\t60\t29.250\n3\tMARTINET IRE F.PS. 2 A.\t56 kg\t***\t\tDENFORD STUD\tSIR M. PRESCOTT\tGBR\t40.019\n4\tMATANA F.PS. 2 a.\t56 kg\t***\t\tECURIE DAVID R. LAYANI FAMILLE\tG. MOSSE (S)\t60\t1.828\n5\tYOU OR ME (GB) F.PS. 2 a.\t56 kg\t38.5\n\t\tECURIE MELANIE\tG. MOSSE (S)\t60\t4.316\n6\tINVADE MY HEART IRE F.PS. 2 a.\t56 kg\t***\t\tFAIR SALINIA LTD\tG. MOSSE (S)\t60\t0\n7\tMONEEFA IRE F.PS. 2 a.\t56 kg\t***\t\tPRCE A. FAISAL\tA&L. FABRE (S)\t60\t38.400\n8\tAskam Chope F.Ps. 2 A.\t56 kg\t41.5\n\t\tJ.GIMENEZ/A.CHOPARD\tK. TAVARES (S)\t33\t25.652\n9\tCELTIC MOON (FR) F.PS. 2 a.\t56 kg\t***\t\tMR DAVID KEVIN KELLY\tA. MURPHY (S)\t60\t23.715\n10\tNARCEA IRE F.PS. 2 a.\t56 kg\t***\t\tMR FERNANDO MARTIN-BARRIOS MADRAZO\tM. ALONSO ROLDAN\tESP\t52.745\n11\tPOPPY FOXY IRE F.PS. 2 a.\t56 kg\t***\t\tN. BRADLEY R. 27/ODDSONSYND.\tC. CLOVER\tGBR\t87.912\n12\tOPEN ARMS F.PS. 2 a.\t56 kg\t***\t\tMR ROBERT NG\tM. DELZANGLES\t60\t6.348\n13\tGOLDY GLORY F.PS. 2 a.\t56 kg\t38.0\n\t\tHA.PANTALL (S)\tHA. PANTALL (S)\t49\t34.040\n14\tBELISA BAY IRE F.PS. 2 A.\t56 kg\t45.5\n\t\tMR ARTURO SAN JOSE MAZARIEGOS\tA. SOTO LORING\tESP\t87.850\n15\tSHIBUYA F.PS. 2 a.\t56 kg\t38.0\n\t\tSCEA HARAS DES FORETS\tN. CAULLERY\t60\t19.934\n16\tAMETIS CHOPE F.PS. 2 a.\t56 kg\t38.5\n\t\tMR NICOLAS SOUCHON\tT. SPEICHER\t60\t19.101\nClôture\nSECOND ENGAGEMENT\tMardi 10 Novembre 2026\t10h30 PARIS\nFORFAIT 1\tLundi 16 Novembre 2026\t11h30 ==\nPARTANT PROBABLE\tMardi 17 Novembre 2026\t11h30 ==\nENGAGEMENT SUPPLEMENT.\tMardi 17 Novembre 2026\t11h30 ==\nANNULATION PART PROB\tMercredi 18 Novembre 2026\t10h30 ==\nMONTE\tMercredi 18 Novembre 2026\t12h30 ==\n",
+    "title": "PRIX MIESQUE | France Galop",
+    "url": "https://www.france-galop.com/fr/course/detail/2026/P/V3p6QkRwQllwT1AvdkUvZ1pnOHd4dz09"
+  },
+  {
+    "tables": [
+      {
+        "id": "",
+        "rows": [
+          [
+            "N°",
+            "Cheval",
+            "Poids",
+            "Valeur",
+            "Priorité",
+            "Propriétaire",
+            "Entraîneur",
+            "Dép./Pays Ent.",
+            "Gains"
+          ],
+          [
+            "1",
+            "ALLEZ PAPA M.PS. 2 a.",
+            "57 kg",
+            "***",
+            "",
+            "ECURIE SENSASS",
+            "M. BARATTI (S)",
+            "60",
+            "10.394"
+          ],
+          [
+            "2",
+            "Arok Atao M.Ps. 2 A.",
+            "57 kg",
+            "42.0",
+            "",
+            "MR PHILIP MOSBEUX",
+            "C. FERLAND (S)",
+            "60",
+            "38.121"
+          ],
+          [
+            "3",
+            "Wykehurst Park Gb M.Ps. 2 A.",
+            "57 kg",
+            "***",
+            "",
+            "MR MICHAEL BLENCOWE & PARTNER",
+            "A. BALDING",
+            "GBR",
+            "27.175"
+          ],
+          [
+            "4",
+            "VEGAWAN IRE M.PS. 2 a.",
+            "57 kg",
+            "***",
+            "",
+            "PUR SANG INVEST",
+            "G. MOSSE (S)",
+            "60",
+            "6.398"
+          ],
+          [
+            "5",
+            "BYZANTINE IRE M.PS. 2 a.",
+            "57 kg",
+            "***",
+            "",
+            "TEME VALLEY/BABINGTON & PART",
+            "G. BOUGHEY",
+            "GBR",
+            "11.804"
+          ],
+          [
+            "6",
+            "ALIAS H.PS. 2 a.",
+            "57 kg",
+            "***",
+            "",
+            "WERTHEIMER & FRERE",
+            "CHR. HEAD (S)",
+            "60",
+            "24.234"
+          ],
+          [
+            "7",
+            "BARRAMUNDI (IRE) M.PS. 2 a.",
+            "57 kg",
+            "41.0",
+            "",
+            "WERTHEIMER & FRERE",
+            "CHR. HEAD (S)",
+            "60",
+            "20.030"
+          ],
+          [
+            "8",
+            "LOOP (IRE) M.PS. 2 a.",
+            "57 kg",
+            "***",
+            "",
+            "WERTHEIMER & FRERE",
+            "A&L. FABRE (S)",
+            "60",
+            "28.760"
+          ],
+          [
+            "9",
+            "DEESSE D'ARGENT F.PS. 2 a.",
+            "55,5 kg",
+            "33.5",
+            "",
+            "MR GAETAN LABORDE",
+            "B. MONTZEY (S)",
+            "40",
+            "9.780"
+          ],
+          [
+            "10",
+            "ATOSSA F.PS. 2 a.",
+            "55,5 kg",
+            "40.0",
+            "",
+            "WERTHEIMER & FRERE",
+            "Y. BARBEROT (S)",
+            "14",
+            "18.300"
+          ]
+        ]
+      },
+      {
+        "id": "",
+        "rows": [
+          [
+            "SECOND ENGAGEMENT",
+            "Mardi 10 Novembre 2026",
+            "10h30 PARIS"
+          ],
+          [
+            "FORFAIT 1",
+            "Lundi 16 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "PARTANT PROBABLE",
+            "Mardi 17 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ENGAGEMENT SUPPLEMENT.",
+            "Mardi 17 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ANNULATION PART PROB",
+            "Mercredi 18 Novembre 2026",
+            "10h30 =="
+          ],
+          [
+            "MONTE",
+            "Mercredi 18 Novembre 2026",
+            "12h30 =="
+          ]
+        ]
+      }
+    ],
+    "text": "3ème(P/ 583), — 20/11/2026 00h00, CHANTILLY\n\nPLAT , 1.800 mètres , PSF, Corde à DROITE\n73.200 (36.600, 14.640, 10.980, 7.320, 3.660)\n128.100 (64.050, 25.620, 19.215, 12.810, 6.405) - Allocation + Prime Propriétaire (si éligible)\nAprès Engagements : 10 Engagés. 10 Partants. - Course Premium -\n\n\nGROUPE III\nPour poulains entiers, hongres et pouliches de 2 ans, n'ayant pas gagné un Groupe I. Poids : 57 kg. Les chevaux ayant gagné un Groupe III porteront 1,5 kg ; plusieurs Groupe III ou un Groupe II, 2,5 kg.\nVersement à la poule des propriétaires : 520 à l'engagement le 14 octobre ou 1.600 à l'engagement le 10 novembre ou 5.760 à l'engagement supplémentaire le 17 novembre.\nUn souvenir sera offert au propriétaire du cheval gagnant par FRANCE GALOP.\n\n\n\nLegal notice\n\nCHANTILLY\n\n1 2 3 4 5 6 7 8 9\nN°\tCheval\tPoids\tValeur\tPriorité\tPropriétaire\tEntraîneur\tDép./Pays Ent.\tGains\n1\tALLEZ PAPA M.PS. 2 a.\t57 kg\t***\t\tECURIE SENSASS\tM. BARATTI (S)\t60\t10.394\n2\tArok Atao M.Ps. 2 A.\t57 kg\t42.0\n\t\tMR PHILIP MOSBEUX\tC. FERLAND (S)\t60\t38.121\n3\tWykehurst Park Gb M.Ps. 2 A.\t57 kg\t***\t\tMR MICHAEL BLENCOWE & PARTNER\tA. BALDING\tGBR\t27.175\n4\tVEGAWAN IRE M.PS. 2 a.\t57 kg\t***\t\tPUR SANG INVEST\tG. MOSSE (S)\t60\t6.398\n5\tBYZANTINE IRE M.PS. 2 a.\t57 kg\t***\t\tTEME VALLEY/BABINGTON & PART\tG. BOUGHEY\tGBR\t11.804\n6\tALIAS H.PS. 2 a.\t57 kg\t***\t\tWERTHEIMER & FRERE\tCHR. HEAD (S)\t60\t24.234\n7\tBARRAMUNDI (IRE) M.PS. 2 a.\t57 kg\t41.0\n\t\tWERTHEIMER & FRERE\tCHR. HEAD (S)\t60\t20.030\n8\tLOOP (IRE) M.PS. 2 a.\t57 kg\t***\t\tWERTHEIMER & FRERE\tA&L. FABRE (S)\t60\t28.760\n9\tDEESSE D'ARGENT F.PS. 2 a.\t55,5 kg\t33.5\n\t\tMR GAETAN LABORDE\tB. MONTZEY (S)\t40\t9.780\n10\tATOSSA F.PS. 2 a.\t55,5 kg\t40.0\n\t\tWERTHEIMER & FRERE\tY. BARBEROT (S)\t14\t18.300\nClôture\nSECOND ENGAGEMENT\tMardi 10 Novembre 2026\t10h30 PARIS\nFORFAIT 1\tLundi 16 Novembre 2026\t11h30 ==\nPARTANT PROBABLE\tMardi 17 Novembre 2026\t11h30 ==\nENGAGEMENT SUPPLEMENT.\tMardi 17 Novembre 2026\t11h30 ==\nANNULATION PART PROB\tMercredi 18 Novembre 2026\t10h30 ==\nMONTE\tMercredi 18 Novembre 2026\t12h30 ==\n",
+    "title": "PRIX THOMAS BRYON | France Galop",
+    "url": "https://www.france-galop.com/fr/course/detail/2026/P/dnhhTFNvRWpNS0VqSE1CWTVZOVUzZz09"
+  },
+  {
+    "tables": [
+      {
+        "id": "",
+        "rows": [
+          [
+            "N°",
+            "Cheval",
+            "Poids",
+            "Valeur",
+            "Priorité",
+            "Propriétaire",
+            "Entraîneur",
+            "Dép./Pays Ent.",
+            "Gains"
+          ],
+          [
+            "1",
+            "JARDIN PATURLE H.PS. 3 A.",
+            "69 kg",
+            "69.0",
+            "",
+            "C.MILLIERE/H.D'AILLIERES",
+            "M. SEROR (S)",
+            "60",
+            "45.655"
+          ],
+          [
+            "2",
+            "DOUBLE BE IRE F.PS. 3 A.",
+            "67 kg",
+            "***",
+            "",
+            "ECURIE HUGO ET PIERRE PILARSKI",
+            "LAGENESTE & MACAIRE (S)",
+            "17",
+            "48.280"
+          ],
+          [
+            "3",
+            "MOSSDAM H.PS. 3 a.",
+            "66 kg",
+            "***",
+            "",
+            "MR RICHARD CORVELLER",
+            "CHAILLE-CHAILLE & PAMART (S)",
+            "17",
+            "0"
+          ],
+          [
+            "4",
+            "Sommerkonig H.Ps. 3 A.",
+            "66 kg",
+            "***",
+            "",
+            "MR DAVID DAHAN",
+            "N. GEORGE & A. ZETTERHOLM (S)",
+            "60",
+            "34.040"
+          ],
+          [
+            "5",
+            "UPANISHAD GB H.PS. 3 a.",
+            "66 kg",
+            "60.0",
+            "",
+            "DELEYTAR SAS",
+            "D. COTTIN (S)",
+            "60",
+            "14.830"
+          ],
+          [
+            "6",
+            "MAGIC DES CHARMES M.PS. 3 A.",
+            "66 kg",
+            "***",
+            "",
+            "ECURIE DES CHARMES",
+            "N. GEORGE & A. ZETTERHOLM (S)",
+            "60",
+            "0"
+          ],
+          [
+            "7",
+            "Nalko Des Mottes H.Ps. 3 A.",
+            "66 kg",
+            "***",
+            "",
+            "ECURIE DES MOTTES",
+            "F. NICOLLE",
+            "17",
+            "47.840"
+          ],
+          [
+            "8",
+            "VOLT DU BERLAIS H.PS. 3 a.",
+            "66 kg",
+            "***",
+            "",
+            "ECURIE HUGO ET PIERRE PILARSKI",
+            "D. COTTIN (S)",
+            "60",
+            "6.600"
+          ],
+          [
+            "9",
+            "NOVAFIGURA HAS H.AQ. 3 a.",
+            "66 kg",
+            "***",
+            "",
+            "SCEA HAMEL STUD",
+            "D. COTTIN (S)",
+            "60",
+            "3.840"
+          ],
+          [
+            "10",
+            "ANETO H.PS. 3 a.",
+            "66 kg",
+            "***",
+            "",
+            "HARAS D'ETREHAM",
+            "D. COTTIN (S)",
+            "60",
+            "2.595"
+          ],
+          [
+            "11",
+            "MIDLTON DE HOUELLE H.PS. 3 a.",
+            "66 kg",
+            "***",
+            "",
+            "MR KEVIN LEBLANC",
+            "CHAILLE-CHAILLE & PAMART (S)",
+            "17",
+            "3.840"
+          ],
+          [
+            "12",
+            "FLONIS H.PS. 3 a.",
+            "66 kg",
+            "***",
+            "",
+            "MME LYNNE MACLENNAN",
+            "Y. FOUIN (S)",
+            "78",
+            "0"
+          ],
+          [
+            "13",
+            "Naruto Banbou H.Aq. 3 A.",
+            "66 kg",
+            "***",
+            "",
+            "MME PATRICK PAPOT",
+            "D. BRESSOU",
+            "50",
+            "11.440"
+          ],
+          [
+            "14",
+            "SILVER DES CARRES H.PS. 3 a.",
+            "66 kg",
+            "63.0",
+            "",
+            "MME CHRISTINE PRECY-BARONI",
+            "M. SEROR (S)",
+            "60",
+            "37.530"
+          ],
+          [
+            "15",
+            "Dedel F.Ps. 3 A.",
+            "64 kg",
+            "***",
+            "",
+            "ECURIE DE LA VERTE VALLEE",
+            "M. SEROR (S)",
+            "60",
+            "0"
+          ],
+          [
+            "16",
+            "NAUSICAA KARWIN F.PS. 3 a.",
+            "64 kg",
+            "62.0",
+            "",
+            "GEMINI STUD/AGV KARWIN STUD",
+            "D. COTTIN (S)",
+            "60",
+            "23.580"
+          ],
+          [
+            "17",
+            "NEXTOBE HAS F.PS. 3 a.",
+            "64 kg",
+            "***",
+            "",
+            "SCEA HAMEL STUD",
+            "D. COTTIN (S)",
+            "60",
+            "9.660"
+          ],
+          [
+            "18",
+            "PEPS NOLIMIT F.PS. 3 a.",
+            "64 kg",
+            "***",
+            "",
+            "MME LYNNE MACLENNAN",
+            "CHAILLE-CHAILLE & PAMART (S)",
+            "17",
+            "12.650"
+          ],
+          [
+            "19",
+            "QUEEN DE COEUR F.PS. 3 a.",
+            "64 kg",
+            "***",
+            "",
+            "MME GERALDINE REILLE-VILLEDEY",
+            "BUTEL & BEAUNEZ (S)",
+            "78",
+            "17.260"
+          ],
+          [
+            "20",
+            "LA DUCASSE F.PS. 3 a.",
+            "64 kg",
+            "***",
+            "",
+            "MR YONI SEROR",
+            "M. SEROR (S)",
+            "60",
+            "25.300"
+          ]
+        ]
+      },
+      {
+        "id": "",
+        "rows": [
+          [
+            "FORFAIT 1",
+            "Mardi 10 Novembre 2026",
+            "11h30 PARIS"
+          ],
+          [
+            "ENGAGEMENT SUPPLEMENT.",
+            "Mercredi 11 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "PARTANT PROBABLE",
+            "Mercredi 11 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ANNULATION PART PROB",
+            "Jeudi 12 Novembre 2026",
+            "10h30 =="
+          ],
+          [
+            "MONTE",
+            "Jeudi 12 Novembre 2026",
+            "12h30 =="
+          ]
+        ]
+      }
+    ],
+    "text": "5ème(O/ 175), — 14/11/2026 00h00, AUTEUIL\n\nSTEEPLE-CHASE , 3.500 mètres\n210.000 (94.500, 46.200, 27.300, 18.900, 10.500, 7.350, 5.250)\n241.500 (108.675, 53.130, 31.395, 21.735, 12.075, 8.452, 6.037) - Allocation + Prime Propriétaire pour femelles (si éligible)\nAprès Engagements : 20 Engagés. 20 Partants. - Course Premium -\n\n\nGROUPE II\nPour tous poulains et pouliches de 3 ans, ayant reçu une allocation en course à obstacles. Poids : 66 kg. Les poulains et pouliches ayant, en steeple-chase, gagné une Listed porteront 3 kg.\nUn souvenir sera offert au propriétaire, à l'entraîneur, au jockey, à l'éleveur et au cavalier d'entraînement du cheval gagnant par FRANCE GALOP.\n\n\n\nLegal notice\n\nAUTEUIL\n\n1 2 3 4 5 6 7 8\nN°\tCheval\tPoids\tValeur\tPriorité\tPropriétaire\tEntraîneur\tDép./Pays Ent.\tGains\n1\tJARDIN PATURLE H.PS. 3 A.\t69 kg\t69.0\n\t\tC.MILLIERE/H.D'AILLIERES\tM. SEROR (S)\t60\t45.655\n2\tDOUBLE BE IRE F.PS. 3 A.\t67 kg\t***\t\tECURIE HUGO ET PIERRE PILARSKI\tLAGENESTE & MACAIRE (S)\t17\t48.280\n3\tMOSSDAM H.PS. 3 a.\t66 kg\t***\t\tMR RICHARD CORVELLER\tCHAILLE-CHAILLE & PAMART (S)\t17\t0\n4\tSommerkonig H.Ps. 3 A.\t66 kg\t***\t\tMR DAVID DAHAN\tN. GEORGE & A. ZETTERHOLM (S)\t60\t34.040\n5\tUPANISHAD GB H.PS. 3 a.\t66 kg\t60.0\n\t\tDELEYTAR SAS\tD. COTTIN (S)\t60\t14.830\n6\tMAGIC DES CHARMES M.PS. 3 A.\t66 kg\t***\t\tECURIE DES CHARMES\tN. GEORGE & A. ZETTERHOLM (S)\t60\t0\n7\tNalko Des Mottes H.Ps. 3 A.\t66 kg\t***\t\tECURIE DES MOTTES\tF. NICOLLE\t17\t47.840\n8\tVOLT DU BERLAIS H.PS. 3 a.\t66 kg\t***\t\tECURIE HUGO ET PIERRE PILARSKI\tD. COTTIN (S)\t60\t6.600\n9\tNOVAFIGURA HAS H.AQ. 3 a.\t66 kg\t***\t\tSCEA HAMEL STUD\tD. COTTIN (S)\t60\t3.840\n10\tANETO H.PS. 3 a.\t66 kg\t***\t\tHARAS D'ETREHAM\tD. COTTIN (S)\t60\t2.595\n11\tMIDLTON DE HOUELLE H.PS. 3 a.\t66 kg\t***\t\tMR KEVIN LEBLANC\tCHAILLE-CHAILLE & PAMART (S)\t17\t3.840\n12\tFLONIS H.PS. 3 a.\t66 kg\t***\t\tMME LYNNE MACLENNAN\tY. FOUIN (S)\t78\t0\n13\tNaruto Banbou H.Aq. 3 A.\t66 kg\t***\t\tMME PATRICK PAPOT\tD. BRESSOU\t50\t11.440\n14\tSILVER DES CARRES H.PS. 3 a.\t66 kg\t63.0\n\t\tMME CHRISTINE PRECY-BARONI\tM. SEROR (S)\t60\t37.530\n15\tDedel F.Ps. 3 A.\t64 kg\t***\t\tECURIE DE LA VERTE VALLEE\tM. SEROR (S)\t60\t0\n16\tNAUSICAA KARWIN F.PS. 3 a.\t64 kg\t62.0\n\t\tGEMINI STUD/AGV KARWIN STUD\tD. COTTIN (S)\t60\t23.580\n17\tNEXTOBE HAS F.PS. 3 a.\t64 kg\t***\t\tSCEA HAMEL STUD\tD. COTTIN (S)\t60\t9.660\n18\tPEPS NOLIMIT F.PS. 3 a.\t64 kg\t***\t\tMME LYNNE MACLENNAN\tCHAILLE-CHAILLE & PAMART (S)\t17\t12.650\n19\tQUEEN DE COEUR F.PS. 3 a.\t64 kg\t***\t\tMME GERALDINE REILLE-VILLEDEY\tBUTEL & BEAUNEZ (S)\t78\t17.260\n20\tLA DUCASSE F.PS. 3 a.\t64 kg\t***\t\tMR YONI SEROR\tM. SEROR (S)\t60\t25.300\nClôture\nFORFAIT 1\tMardi 10 Novembre 2026\t11h30 PARIS\nENGAGEMENT SUPPLEMENT.\tMercredi 11 Novembre 2026\t11h30 ==\nPARTANT PROBABLE\tMercredi 11 Novembre 2026\t11h30 ==\nANNULATION PART PROB\tJeudi 12 Novembre 2026\t10h30 ==\nMONTE\tJeudi 12 Novembre 2026\t12h30 ==\n",
+    "title": "PRIX CONGRESS | France Galop",
+    "url": "https://www.france-galop.com/fr/course/detail/2026/O/d0tjUGhPRnlLUVdkUmpDZmdsNzJzUT09"
+  },
+  {
+    "tables": [
+      {
+        "id": "",
+        "rows": [
+          [
+            "N°",
+            "Cheval",
+            "Poids",
+            "Valeur",
+            "Priorité",
+            "Propriétaire",
+            "Entraîneur",
+            "Dép./Pays Ent.",
+            "Gains"
+          ],
+          [
+            "1",
+            "ALICE'S SAGA F.PS. 3 A.",
+            "67 kg",
+            "69.5",
+            "",
+            "HARAS DE BEAUVOIR",
+            "D. BRESSOU",
+            "50",
+            "111.450"
+          ],
+          [
+            "2",
+            "FLEUR DE VIE F.PS. 3 A.",
+            "67 kg",
+            "64.0",
+            "",
+            "MBAPPE P. RACING STABLES LTD",
+            "D. SATALIA",
+            "60",
+            "57.695"
+          ],
+          [
+            "3",
+            "IN BETWEEN DAYS GB F.PS. 3 A.",
+            "66 kg",
+            "70.5",
+            "",
+            "MR SIMON COX",
+            "N. GEORGE & A. ZETTERHOLM (S)",
+            "60",
+            "91.900"
+          ],
+          [
+            "4",
+            "LA TURBIE F.PS. 3 A.",
+            "66 kg",
+            "67.0",
+            "",
+            "MME HENRI DEVIN",
+            "HF. DEVIN (S)",
+            "60",
+            "75.205"
+          ],
+          [
+            "5",
+            "MAGIADAME F.PS. 3 a.",
+            "65 kg",
+            "***",
+            "",
+            "MR RICHARD CORVELLER",
+            "CHAILLE-CHAILLE & PAMART (S)",
+            "17",
+            "0"
+          ],
+          [
+            "6",
+            "Dedel F.Ps. 3 A.",
+            "65 kg",
+            "69.0",
+            "",
+            "ECURIE DE LA VERTE VALLEE",
+            "M. SEROR (S)",
+            "60",
+            "94.090"
+          ],
+          [
+            "7",
+            "LISSADELL F.PS. 3 a.",
+            "65 kg",
+            "***",
+            "",
+            "ECURIE HUGO ET PIERRE PILARSKI",
+            "E. ALLAIRE (S)",
+            "14",
+            "46.920"
+          ],
+          [
+            "8",
+            "Niri F.Ps. 3 A.",
+            "65 kg",
+            "64.0",
+            "",
+            "ECURIE MG BOUDOT",
+            "M. SEROR (S)",
+            "60",
+            "39.105"
+          ],
+          [
+            "9",
+            "IRENE HAS F.PS. 3 a.",
+            "65 kg",
+            "***",
+            "",
+            "SCEA HAMEL STUD",
+            "D. COTTIN (S)",
+            "60",
+            "4.590"
+          ],
+          [
+            "10",
+            "Almarita F.Ps. 3 A.",
+            "65 kg",
+            "65.0",
+            "",
+            "HARAS D'ETREHAM",
+            "M. SEROR (S)",
+            "60",
+            "43.415"
+          ],
+          [
+            "11",
+            "RUNNIN'BLUE F.PS. 3 a.",
+            "65 kg",
+            "63.0",
+            "",
+            "MR ALAIN JATHIERE",
+            "F. NICOLLE",
+            "17",
+            "39.570"
+          ],
+          [
+            "12",
+            "VIPERINE BLEUE F.PS. 3 a.",
+            "65 kg",
+            "***",
+            "",
+            "MME PATRICK PAPOT",
+            "E. ALLAIRE (S)",
+            "14",
+            "23.460"
+          ],
+          [
+            "13",
+            "QUEEN DE COEUR F.PS. 3 a.",
+            "65 kg",
+            "56.0",
+            "",
+            "MME GERALDINE REILLE-VILLEDEY",
+            "BUTEL & BEAUNEZ (S)",
+            "78",
+            "16.840"
+          ],
+          [
+            "14",
+            "LA DUCASSE F.PS. 3 a.",
+            "65 kg",
+            "***",
+            "",
+            "MR YONI SEROR",
+            "M. SEROR (S)",
+            "60",
+            "1.530"
+          ],
+          [
+            "15",
+            "THIS STORY F.PS. 3 a.",
+            "65 kg",
+            "62.0",
+            "",
+            "MR THIERRY STORME",
+            "GAB. LEENDERS (S)",
+            "49",
+            "20.970"
+          ]
+        ]
+      },
+      {
+        "id": "",
+        "rows": [
+          [
+            "FORFAIT 1",
+            "Mardi 10 Novembre 2026",
+            "11h30 PARIS"
+          ],
+          [
+            "ENGAGEMENT SUPPLEMENT.",
+            "Mercredi 11 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "PARTANT PROBABLE",
+            "Mercredi 11 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ANNULATION PART PROB",
+            "Jeudi 12 Novembre 2026",
+            "10h30 =="
+          ],
+          [
+            "MONTE",
+            "Jeudi 12 Novembre 2026",
+            "12h30 =="
+          ]
+        ]
+      }
+    ],
+    "text": "\n\nFacebook\nTwitter\nMail\n+\nImprimer\n\n1ère(O/ 173), — 14/11/2026 00h00, AUTEUIL\n\nHAIES , 3.600 mètres\n170.000 (76.500, 37.400, 22.100, 15.300, 8.500, 5.950, 4.250)\n195.500 (87.975, 43.010, 25.415, 17.595, 9.775, 6.842, 4.887) - Allocation + Prime Propriétaire (si éligible)\nAprès Engagements : 15 Engagés. 15 Partants. - Course Premium -\n\n\nGROUPE II\nPour pouliches de 3 ans. Poids : 65 kg. Les pouliches ayant, en course de haies, gagné une Listed (Handicap excepté) porteront 1 kg ; un Groupe III ou un Groupe II, 2 kg ; plusieurs courses de Groupe, 3 kg.\nUn souvenir sera offert au propriétaire, à l'entraîneur, au jockey, à l'éleveur et au cavalier d'entraînement de la pouliche gagnante par FRANCE GALOP.\n\n\n\nLegal notice\n\nAUTEUIL\n\n1 2 3 4 5 6 7 8\nN°\tCheval\tPoids\tValeur\tPriorité\tPropriétaire\tEntraîneur\tDép./Pays Ent.\tGains\n1\tALICE'S SAGA F.PS. 3 A.\t67 kg\t69.5\n\t\tHARAS DE BEAUVOIR\tD. BRESSOU\t50\t111.450\n2\tFLEUR DE VIE F.PS. 3 A.\t67 kg\t64.0\n\t\tMBAPPE P. RACING STABLES LTD\tD. SATALIA\t60\t57.695\n3\tIN BETWEEN DAYS GB F.PS. 3 A.\t66 kg\t70.5\n\t\tMR SIMON COX\tN. GEORGE & A. ZETTERHOLM (S)\t60\t91.900\n4\tLA TURBIE F.PS. 3 A.\t66 kg\t67.0\n\t\tMME HENRI DEVIN\tHF. DEVIN (S)\t60\t75.205\n5\tMAGIADAME F.PS. 3 a.\t65 kg\t***\t\tMR RICHARD CORVELLER\tCHAILLE-CHAILLE & PAMART (S)\t17\t0\n6\tDedel F.Ps. 3 A.\t65 kg\t69.0\t\tECURIE DE LA VERTE VALLEE\tM. SEROR (S)\t60\t94.090\n7\tLISSADELL F.PS. 3 a.\t65 kg\t***\t\tECURIE HUGO ET PIERRE PILARSKI\tE. ALLAIRE (S)\t14\t46.920\n8\tNiri F.Ps. 3 A.\t65 kg\t64.0\n\t\tECURIE MG BOUDOT\tM. SEROR (S)\t60\t39.105\n9\tIRENE HAS F.PS. 3 a.\t65 kg\t***\t\tSCEA HAMEL STUD\tD. COTTIN (S)\t60\t4.590\n10\tAlmarita F.Ps. 3 A.\t65 kg\t65.0\n\t\tHARAS D'ETREHAM\tM. SEROR (S)\t60\t43.415\n11\tRUNNIN'BLUE F.PS. 3 a.\t65 kg\t63.0\n\t\tMR ALAIN JATHIERE\tF. NICOLLE\t17\t39.570\n12\tVIPERINE BLEUE F.PS. 3 a.\t65 kg\t***\t\tMME PATRICK PAPOT\tE. ALLAIRE (S)\t14\t23.460\n13\tQUEEN DE COEUR F.PS. 3 a.\t65 kg\t56.0\n\t\tMME GERALDINE REILLE-VILLEDEY\tBUTEL & BEAUNEZ (S)\t78\t16.840\n14\tLA DUCASSE F.PS. 3 a.\t65 kg\t***\t\tMR YONI SEROR\tM. SEROR (S)\t60\t1.530\n15\tTHIS STORY F.PS. 3 a.\t65 kg\t62.0\n\t\tMR THIERRY STORME\tGAB. LEENDERS (S)\t49\t20.970\nClôture\nFORFAIT 1\tMardi 10 Novembre 2026\t11h30 PARIS\nENGAGEMENT SUPPLEMENT.\tMercredi 11 Novembre 2026\t11h30 ==\nPARTANT PROBABLE\tMercredi 11 Novembre 2026\t11h30 ==\nANNULATION PART PROB\tJeudi 12 Novembre 2026\t10h30 ==\nMONTE\tJeudi 12 Novembre 2026\t12h30 ==\n",
+    "title": "PRIX MAGALEN BRYANT | France Galop",
+    "url": "https://www.france-galop.com/fr/course/detail/2026/O/czRJaXVnRmFLMnlyYStmblBLU2VtZz09"
+  },
+  {
+    "tables": [
+      {
+        "id": "",
+        "rows": [
+          [
+            "N°",
+            "Cheval",
+            "Poids",
+            "Valeur",
+            "Priorité",
+            "Propriétaire",
+            "Entraîneur",
+            "Dép./Pays Ent.",
+            "Gains"
+          ],
+          [
+            "1",
+            "KIRIKOU DES MERS H.AQ. 6 A.",
+            "68 kg",
+            "64.0",
+            "",
+            "MR JOSE LOUIS DA SILVA",
+            "MME G. MENATO",
+            "60",
+            "89.865"
+          ],
+          [
+            "2",
+            "LOQUAS H.PS. 8 A.",
+            "68 kg",
+            "64.5",
+            "",
+            "ECURIE ENZO ET MICHAEL RIZIERI",
+            "Y. FOUIN (S)",
+            "78",
+            "185.890"
+          ],
+          [
+            "3",
+            "Style D'emirs H.Ps. 6 A.",
+            "68 kg",
+            "70.0",
+            "",
+            "ECURIE THOMAS SIVADIER",
+            "Y. FOUIN (S)",
+            "78",
+            "177.740"
+          ],
+          [
+            "4",
+            "AJAS H.PS. 12 A.",
+            "68 kg",
+            "68.0",
+            "",
+            "HVITAS STJERNA AB",
+            "T. HELLGREN",
+            "SWE",
+            "6.250"
+          ],
+          [
+            "5",
+            "Gardien De Musee H.Ps. 6 A.",
+            "68 kg",
+            "73.0",
+            "",
+            "MR ALAIN JATHIERE",
+            "Y. FOUIN (S)",
+            "78",
+            "77.860"
+          ],
+          [
+            "6",
+            "KENTUCKY WOOD H.AQ. 6 A.",
+            "68 kg",
+            "71.0",
+            "",
+            "MR ALAIN JATHIERE",
+            "F. NICOLLE",
+            "17",
+            "72.165"
+          ],
+          [
+            "7",
+            "KYROV H.PS. 8 A.",
+            "68 kg",
+            "69.0",
+            "",
+            "MR ALAIN JATHIERE",
+            "F. NICOLLE",
+            "17",
+            "316.320"
+          ],
+          [
+            "8",
+            "THELEME H.PS. 9 A.",
+            "68 kg",
+            "80.0",
+            "",
+            "JDG BLOODSTOCK SERVICES",
+            "CHAILLE-CHAILLE & PAMART (S)",
+            "17",
+            "152.270"
+          ],
+          [
+            "9",
+            "KINGLAND (IRE) H.AQ. 6 A.",
+            "68 kg",
+            "79.0",
+            "",
+            "MME LYNNE MACLENNAN",
+            "F. NICOLLE",
+            "17",
+            "79.710"
+          ],
+          [
+            "10",
+            "ZARAKHAN H.PS. 7 A.",
+            "68 kg",
+            "68.0",
+            "",
+            "MR JEAN-LOUP DE MIEULLE",
+            "E.D' ANDIGNE",
+            "49",
+            "96.810"
+          ],
+          [
+            "11",
+            "LOSANGE BLEU H.PS. 7 A.",
+            "68 kg",
+            "83.0",
+            "",
+            "MME PATRICK PAPOT",
+            "D. BRESSOU",
+            "50",
+            "742.050"
+          ],
+          [
+            "12",
+            "DIAMOND DICE IRE H.OE. 7 A.",
+            "68 kg",
+            "70.0",
+            "",
+            "PRIVATE HARLEY STREET CLINIC",
+            "N. GEORGE & A. ZETTERHOLM (S)",
+            "60",
+            "87.120"
+          ],
+          [
+            "13",
+            "JET BLUE H.AQ. 7 A.",
+            "68 kg",
+            "76.0",
+            "",
+            "PROF. CAROLINE TISDALL",
+            "M. SEROR (S)",
+            "60",
+            "170.800"
+          ],
+          [
+            "14",
+            "LUD'OR H.PS. 6 A.",
+            "68 kg",
+            "***",
+            "",
+            "THE LUDORUMS",
+            "TR. SYMONDS",
+            "GBR",
+            "81.126"
+          ],
+          [
+            "15",
+            "COEUR D'AMOUR H.PS. 5 A.",
+            "67 kg",
+            "68.0",
+            "",
+            "MME GERARD AOUDAI",
+            "CHAILLE-CHAILLE & PAMART (S)",
+            "17",
+            "53.800"
+          ],
+          [
+            "16",
+            "ILLUSION MACHINE H.PS. 5 A.",
+            "67 kg",
+            "75.0",
+            "",
+            "MME CLAIRE BONNER",
+            "N. GEORGE & A. ZETTERHOLM (S)",
+            "60",
+            "224.100"
+          ],
+          [
+            "17",
+            "LE COLOMBAR H.PS. 5 a.",
+            "67 kg",
+            "56.5",
+            "",
+            "SARL CARION E.M.M.",
+            "M. SEROR (S)",
+            "60",
+            "96.920"
+          ],
+          [
+            "18",
+            "LEADER SPORT H.PS. 5 A.",
+            "67 kg",
+            "72.0",
+            "",
+            "MR WALTER B. CONNORS",
+            "D. MELE (S)",
+            "50",
+            "126.170"
+          ],
+          [
+            "19",
+            "FEU DE DIEU H.PS. 5 A.",
+            "67 kg",
+            "59.5",
+            "",
+            "DREAM WITH ME STABLE INC",
+            "D. COTTIN (S)",
+            "60",
+            "53.990"
+          ],
+          [
+            "20",
+            "Lord Brett H.Aq. 5 A.",
+            "67 kg",
+            "66.0",
+            "",
+            "ECURIE MADAME JACQUES CYPRES",
+            "F. NICOLLE",
+            "17",
+            "69.000"
+          ],
+          [
+            "21",
+            "IT'S WIN O'CLOCK H.PS. 5 A.",
+            "67 kg",
+            "72.0",
+            "",
+            "GL RACING",
+            "N. GEORGE & A. ZETTERHOLM (S)",
+            "60",
+            "246.120"
+          ],
+          [
+            "22",
+            "World Apart H.Ps. 5 A.",
+            "67 kg",
+            "64.0",
+            "",
+            "MR ALAIN JATHIERE",
+            "L. BAUDRON (S)",
+            "61",
+            "43.700"
+          ],
+          [
+            "23",
+            "BANDANAS H.PS. 5 a.",
+            "67 kg",
+            "56.0",
+            "",
+            "MME GIADA MENATO",
+            "MME G. MENATO",
+            "60",
+            "6.435"
+          ],
+          [
+            "24",
+            "GOLIATH D'AUNOU H.PS. 5 A.",
+            "67 kg",
+            "71.0",
+            "",
+            "MR DERMOT O'DONOHOE",
+            "N. GEORGE & A. ZETTERHOLM (S)",
+            "60",
+            "144.415"
+          ],
+          [
+            "25",
+            "LORD RAFFLES H.AQ. 5 a.",
+            "67 kg",
+            "60.5",
+            "",
+            "S.MUNIR/I.SOUEDE",
+            "M. SEROR (S)",
+            "60",
+            "42.980"
+          ],
+          [
+            "26",
+            "KIVALA DU BERLAIS H.PS. 5 A.",
+            "67 kg",
+            "71.0",
+            "",
+            "MR STEPHANE SZWARC",
+            "D. COTTIN (S)",
+            "60",
+            "193.105"
+          ]
+        ]
+      },
+      {
+        "id": "",
+        "rows": [
+          [
+            "FORFAIT 1",
+            "Mardi 10 Novembre 2026",
+            "11h30 PARIS"
+          ],
+          [
+            "PARTANT PROBABLE",
+            "Mercredi 11 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ENGAGEMENT SUPPLEMENT.",
+            "Mercredi 11 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ANNULATION PART PROB",
+            "Jeudi 12 Novembre 2026",
+            "10h30 =="
+          ],
+          [
+            "MONTE",
+            "Jeudi 12 Novembre 2026",
+            "12h30 =="
+          ]
+        ]
+      }
+    ],
+    "text": "4ème(O/ 174), — 14/11/2026 00h00, AUTEUIL\n\nHAIES , 4.800 mètres\n363.000 (163.350, 79.860, 47.190, 32.670, 18.150, 12.705, 9.075)\nAprès Second-Engagements : 26 Engagés. 26 Partants. - Course Premium -\n\n\nGROUPE I\nPour tous chevaux de 5 ans et au-dessus. Poids : 5 ans, 67 kg ; 6 ans et au-dessus, 68 kg.\nVersement à la poule des propriétaires : 726 Euros à l'engagement le mercredi 16 septembre 2026, 3 630 Euros au second engagement le vendredi 6 novembre 2026 ou 16 335 Euros à l'engagement supplémentaire le mercredi 11 novembre 2026.\nUn trophée sera offert au propriétaire, à l'entraîneur, au jockey, à l'éleveur et au cavalier d'entraînement du cheval gagnant par FRANCE GALOP.\n\n\n\nLegal notice\n\nAUTEUIL\n\n1 2 3 4 5 6 7 8\nN°\tCheval\tPoids\tValeur\tPriorité\tPropriétaire\tEntraîneur\tDép./Pays Ent.\tGains\n1\tKIRIKOU DES MERS H.AQ. 6 A.\t68 kg\t64.0\n\t\tMR JOSE LOUIS DA SILVA\tMME G. MENATO\t60\t89.865\n2\tLOQUAS H.PS. 8 A.\t68 kg\t64.5\n\t\tECURIE ENZO ET MICHAEL RIZIERI\tY. FOUIN (S)\t78\t185.890\n3\tStyle D'emirs H.Ps. 6 A.\t68 kg\t70.0\n\t\tECURIE THOMAS SIVADIER\tY. FOUIN (S)\t78\t177.740\n4\tAJAS H.PS. 12 A.\t68 kg\t68.0\t\tHVITAS STJERNA AB\tT. HELLGREN\tSWE\t6.250\n5\tGardien De Musee H.Ps. 6 A.\t68 kg\t73.0\n\t\tMR ALAIN JATHIERE\tY. FOUIN (S)\t78\t77.860\n6\tKENTUCKY WOOD H.AQ. 6 A.\t68 kg\t71.0\t\tMR ALAIN JATHIERE\tF. NICOLLE\t17\t72.165\n7\tKYROV H.PS. 8 A.\t68 kg\t69.0\n\t\tMR ALAIN JATHIERE\tF. NICOLLE\t17\t316.320\n8\tTHELEME H.PS. 9 A.\t68 kg\t80.0\n\t\tJDG BLOODSTOCK SERVICES\tCHAILLE-CHAILLE & PAMART (S)\t17\t152.270\n9\tKINGLAND (IRE) H.AQ. 6 A.\t68 kg\t79.0\n\t\tMME LYNNE MACLENNAN\tF. NICOLLE\t17\t79.710\n10\tZARAKHAN H.PS. 7 A.\t68 kg\t68.0\n\t\tMR JEAN-LOUP DE MIEULLE\tE.D' ANDIGNE\t49\t96.810\n11\tLOSANGE BLEU H.PS. 7 A.\t68 kg\t83.0\n\t\tMME PATRICK PAPOT\tD. BRESSOU\t50\t742.050\n12\tDIAMOND DICE IRE H.OE. 7 A.\t68 kg\t70.0\n\t\tPRIVATE HARLEY STREET CLINIC\tN. GEORGE & A. ZETTERHOLM (S)\t60\t87.120\n13\tJET BLUE H.AQ. 7 A.\t68 kg\t76.0\n\t\tPROF. CAROLINE TISDALL\tM. SEROR (S)\t60\t170.800\n14\tLUD'OR H.PS. 6 A.\t68 kg\t***\t\tTHE LUDORUMS\tTR. SYMONDS\tGBR\t81.126\n15\tCOEUR D'AMOUR H.PS. 5 A.\t67 kg\t68.0\n\t\tMME GERARD AOUDAI\tCHAILLE-CHAILLE & PAMART (S)\t17\t53.800\n16\tILLUSION MACHINE H.PS. 5 A.\t67 kg\t75.0\n\t\tMME CLAIRE BONNER\tN. GEORGE & A. ZETTERHOLM (S)\t60\t224.100\n17\tLE COLOMBAR H.PS. 5 a.\t67 kg\t56.5\n\t\tSARL CARION E.M.M.\tM. SEROR (S)\t60\t96.920\n18\tLEADER SPORT H.PS. 5 A.\t67 kg\t72.0\t\tMR WALTER B. CONNORS\tD. MELE (S)\t50\t126.170\n19\tFEU DE DIEU H.PS. 5 A.\t67 kg\t59.5\n\t\tDREAM WITH ME STABLE INC\tD. COTTIN (S)\t60\t53.990\n20\tLord Brett H.Aq. 5 A.\t67 kg\t66.0\t\tECURIE MADAME JACQUES CYPRES\tF. NICOLLE\t17\t69.000\n21\tIT'S WIN O'CLOCK H.PS. 5 A.\t67 kg\t72.0\n\t\tGL RACING\tN. GEORGE & A. ZETTERHOLM (S)\t60\t246.120\n22\tWorld Apart H.Ps. 5 A.\t67 kg\t64.0\t\tMR ALAIN JATHIERE\tL. BAUDRON (S)\t61\t43.700\n23\tBANDANAS H.PS. 5 a.\t67 kg\t56.0\n\t\tMME GIADA MENATO\tMME G. MENATO\t60\t6.435\n24\tGOLIATH D'AUNOU H.PS. 5 A.\t67 kg\t71.0\n\t\tMR DERMOT O'DONOHOE\tN. GEORGE & A. ZETTERHOLM (S)\t60\t144.415\n25\tLORD RAFFLES H.AQ. 5 a.\t67 kg\t60.5\n\t\tS.MUNIR/I.SOUEDE\tM. SEROR (S)\t60\t42.980\n26\tKIVALA DU BERLAIS H.PS. 5 A.\t67 kg\t71.0\n\t\tMR STEPHANE SZWARC\tD. COTTIN (S)\t60\t193.105\nClôture\nFORFAIT 1\tMardi 10 Novembre 2026\t11h30 PARIS\nPARTANT PROBABLE\tMercredi 11 Novembre 2026\t11h30 ==\nENGAGEMENT SUPPLEMENT.\tMercredi 11 Novembre 2026\t11h30 ==\nANNULATION PART PROB\tJeudi 12 Novembre 2026\t10h30 ==\nMONTE\tJeudi 12 Novembre 2026\t12h30 ==\n",
+    "title": "PRIX SERGE LANDON - GRAND PRIX D'AUTOMNE | France Galop",
+    "url": "https://www.france-galop.com/fr/course/detail/2026/O/VTRzZytHQjFZZmVPYlFLc0ZrRUlrUT09"
+  },
+  {
+    "tables": [
+      {
+        "id": "",
+        "rows": [
+          [
+            "N°",
+            "Cheval",
+            "Poids",
+            "Valeur",
+            "Priorité",
+            "Propriétaire",
+            "Entraîneur",
+            "Dép./Pays Ent.",
+            "Gains"
+          ],
+          [
+            "1",
+            "King Dalee M.Ps. 3 A.",
+            "67 kg",
+            "***",
+            "",
+            "A.JATHIERE/EC.THOMAS SIVADIER",
+            "Y. FOUIN (S)",
+            "78",
+            "20.930"
+          ],
+          [
+            "2",
+            "ART DE RUE GB H.PS. 3 a.",
+            "67 kg",
+            "62.0",
+            "",
+            "AMMOLITES RACING",
+            "N. VERGNE (S)",
+            "78",
+            "29.580"
+          ],
+          [
+            "3",
+            "NAVY DU SEUIL M.PS. 3 A.",
+            "67 kg",
+            "68.5",
+            "",
+            "MME MARC BOUDOT",
+            "M. SEROR (S)",
+            "60",
+            "99.950"
+          ],
+          [
+            "4",
+            "NOUVLATIEP H.AQ. 3 a.",
+            "67 kg",
+            "***",
+            "",
+            "MME ALEXIA BOUTIN",
+            "D. COTTIN (S)",
+            "60",
+            "0"
+          ],
+          [
+            "5",
+            "JARDIN PATURLE H.PS. 3 A.",
+            "67 kg",
+            "70.0",
+            "",
+            "C.MILLIERE/H.D'AILLIERES",
+            "M. SEROR (S)",
+            "60",
+            "60.700"
+          ],
+          [
+            "6",
+            "KENTUCKY D'ALCO H.PS. 3 a.",
+            "67 kg",
+            "***",
+            "",
+            "MR JOHN CAVANAGH",
+            "N. GEORGE & A. ZETTERHOLM (S)",
+            "60",
+            "12.660"
+          ],
+          [
+            "7",
+            "DON'T STOP DE GREZ H.PS. 3 a.",
+            "67 kg",
+            "57.0",
+            "",
+            "CHAILLE-CHAILLE & PAMART (S)",
+            "CHAILLE-CHAILLE & PAMART (S)",
+            "17",
+            "5.080"
+          ],
+          [
+            "8",
+            "NUNCIO D'ELIPE H.PS. 3 a.",
+            "67 kg",
+            "***",
+            "",
+            "MR JEAN-PIERRE-JOSEPH DUBOIS",
+            "D. COTTIN (S)",
+            "49",
+            "16.675"
+          ],
+          [
+            "9",
+            "Purple Power H.Ps. 3 A.",
+            "67 kg",
+            "68.0",
+            "",
+            "EC. T.LEVESQUE/H.ROUSSEAU",
+            "J. BOISNARD (S)",
+            "49",
+            "67.050"
+          ],
+          [
+            "10",
+            "BRIGAND DU BERLAIS H.PS. 3 a.",
+            "67 kg",
+            "***",
+            "",
+            "ECURIE BENAROUSSI SOFIANE",
+            "ROB. COLLET (S)",
+            "60",
+            "0"
+          ],
+          [
+            "11",
+            "SUPREME LIGHT M.PS. 3 a.",
+            "67 kg",
+            "61.0",
+            "",
+            "ECURIE C. MARZOCCO",
+            "MME G. MENATO",
+            "60",
+            "16.595"
+          ],
+          [
+            "12",
+            "TROTINETTE H.PS. 3 a.",
+            "67 kg",
+            "59.5",
+            "",
+            "ECURIE DE LA VERTE VALLEE",
+            "M. SEROR (S)",
+            "60",
+            "14.270"
+          ],
+          [
+            "13",
+            "MAGIC DES CHARMES M.PS. 3 A.",
+            "67 kg",
+            "70.5",
+            "",
+            "ECURIE DES CHARMES",
+            "N. GEORGE & A. ZETTERHOLM (S)",
+            "60",
+            "96.030"
+          ],
+          [
+            "14",
+            "MAGNUM VALLEY H.PS. 3 a.",
+            "67 kg",
+            "***",
+            "",
+            "ECURIE HUB DE MONTMIRAIL",
+            "CHAILLE-CHAILLE & PAMART (S)",
+            "17",
+            "7.540"
+          ],
+          [
+            "15",
+            "BAGHERA DU BERLAIS H.PS. 3 a.",
+            "67 kg",
+            "***",
+            "",
+            "ECURIE HUGO ET PIERRE PILARSKI",
+            "D. COTTIN (S)",
+            "60",
+            "35.880"
+          ],
+          [
+            "16",
+            "VOLT DU BERLAIS H.PS. 3 a.",
+            "67 kg",
+            "***",
+            "",
+            "ECURIE HUGO ET PIERRE PILARSKI",
+            "D. COTTIN (S)",
+            "60",
+            "4.410"
+          ],
+          [
+            "17",
+            "TORINO DES ISLES M.PS. 3 a.",
+            "67 kg",
+            "***",
+            "",
+            "ECURIE THOMAS SIVADIER",
+            "D. COTTIN (S)",
+            "60",
+            "0"
+          ],
+          [
+            "18",
+            "LE SIRE H.PS. 3 a.",
+            "67 kg",
+            "65.0",
+            "",
+            "F&O HINDERZE RACING",
+            "M. SEROR (S)",
+            "60",
+            "45.710"
+          ],
+          [
+            "19",
+            "SOCRATES H.PS. 3 a.",
+            "67 kg",
+            "***",
+            "",
+            "FAMILLE BRYANT",
+            "E. GRALL (S)",
+            "44",
+            "0"
+          ],
+          [
+            "20",
+            "NOVAFIGURA HAS H.AQ. 3 a.",
+            "67 kg",
+            "***",
+            "",
+            "SCEA HAMEL STUD",
+            "D. COTTIN (S)",
+            "60",
+            "11.040"
+          ],
+          [
+            "21",
+            "IRRESITIBLEMENT H.PS. 3 a.",
+            "67 kg",
+            "***",
+            "",
+            "HARAS DE LA HAIE NEUVE",
+            "F. BELLEMERE",
+            "60",
+            "26.680"
+          ],
+          [
+            "22",
+            "NAIN BLEU H.PS. 3 a.",
+            "67 kg",
+            "***",
+            "",
+            "HARAS DE SAINT-VOIR",
+            "H. MERIENNE (S)",
+            "60",
+            "7.135"
+          ],
+          [
+            "23",
+            "APOLLOKA H.PS. 3 a.",
+            "67 kg",
+            "***",
+            "",
+            "J.DETRE/EC.TEAM SPIRIT",
+            "E. GRALL (S)",
+            "44",
+            "0"
+          ],
+          [
+            "24",
+            "FORT KNOXS H.PS. 3 a.",
+            "67 kg",
+            "***",
+            "",
+            "MR ALAIN JATHIERE",
+            "D. COTTIN (S)",
+            "60",
+            "0"
+          ],
+          [
+            "25",
+            "STALKY H.PS. 3 a.",
+            "67 kg",
+            "***",
+            "",
+            "MR ALAIN JATHIERE",
+            "N. GEORGE & A. ZETTERHOLM (S)",
+            "60",
+            "26.680"
+          ],
+          [
+            "26",
+            "Saint Savin M.Ps. 3 A.",
+            "67 kg",
+            "68.5",
+            "",
+            "JC.CAMPOS/N.CAMPOS/TERRAINS AVIL",
+            "ROB. COLLET (S)",
+            "60",
+            "56.570"
+          ],
+          [
+            "27",
+            "FLONIS H.PS. 3 a.",
+            "67 kg",
+            "***",
+            "",
+            "MME LYNNE MACLENNAN",
+            "Y. FOUIN (S)",
+            "78",
+            "23.460"
+          ],
+          [
+            "28",
+            "NAJDAM M.PS. 3 a.",
+            "67 kg",
+            "60.5",
+            "",
+            "MME LYNNE MACLENNAN",
+            "CHAILLE-CHAILLE & PAMART (S)",
+            "17",
+            "13.760"
+          ],
+          [
+            "29",
+            "NOM D'UN CHIEN H.PS. 3 a.",
+            "67 kg",
+            "68.5",
+            "",
+            "MME MACLENNAN/HARAS DE ST-VOIR",
+            "F. NICOLLE",
+            "17",
+            "45.545"
+          ],
+          [
+            "30",
+            "KEEP IT SIMPLE H.PS. 3 a.",
+            "67 kg",
+            "***",
+            "",
+            "MR SEAN MULRYAN",
+            "CHAILLE-CHAILLE & PAMART (S)",
+            "17",
+            "1.740"
+          ],
+          [
+            "31",
+            "HURON BLEU H.PS. 3 A.",
+            "67 kg",
+            "77.0",
+            "",
+            "MME PATRICK PAPOT",
+            "D. BRESSOU",
+            "50",
+            "174.600"
+          ],
+          [
+            "32",
+            "Naruto Banbou H.Aq. 3 A.",
+            "67 kg",
+            "65.5",
+            "",
+            "MME PATRICK PAPOT",
+            "D. BRESSOU",
+            "50",
+            "54.700"
+          ],
+          [
+            "33",
+            "VARSOVIE H.PS. 3 A.",
+            "67 kg",
+            "74.0",
+            "",
+            "MME PATRICK PAPOT",
+            "D. BRESSOU",
+            "50",
+            "97.290"
+          ],
+          [
+            "34",
+            "MILORD DU BERLAIS H.PS. 3 a.",
+            "67 kg",
+            "***",
+            "",
+            "S.MUNIR/I.SOUEDE",
+            "M. SEROR (S)",
+            "60",
+            "7.540"
+          ],
+          [
+            "35",
+            "RAFFLES TEMPO H.PS. 3 a.",
+            "67 kg",
+            "***",
+            "",
+            "S.MUNIR/I.SOUEDE",
+            "M. SEROR (S)",
+            "60",
+            "5.220"
+          ],
+          [
+            "36",
+            "NATURAL CLASS H.AQ. 3 a.",
+            "67 kg",
+            "***",
+            "",
+            "SANGWIN BLOODSTOCK LTD",
+            "H. MERIENNE (S)",
+            "60",
+            "0"
+          ],
+          [
+            "37",
+            "IN BETWEEN DAYS GB F.PS. 3 A.",
+            "65 kg",
+            "70.5",
+            "",
+            "MR SIMON COX",
+            "N. GEORGE & A. ZETTERHOLM (S)",
+            "60",
+            "91.900"
+          ],
+          [
+            "38",
+            "LA TURBIE F.PS. 3 A.",
+            "65 kg",
+            "67.0",
+            "",
+            "MME HENRI DEVIN",
+            "HF. DEVIN (S)",
+            "60",
+            "75.205"
+          ],
+          [
+            "39",
+            "Dedel F.Ps. 3 A.",
+            "65 kg",
+            "69.0",
+            "",
+            "ECURIE DE LA VERTE VALLEE",
+            "M. SEROR (S)",
+            "60",
+            "94.090"
+          ],
+          [
+            "40",
+            "Niri F.Ps. 3 A.",
+            "65 kg",
+            "64.0",
+            "",
+            "ECURIE MG BOUDOT",
+            "M. SEROR (S)",
+            "60",
+            "39.105"
+          ],
+          [
+            "41",
+            "Almarita F.Ps. 3 A.",
+            "65 kg",
+            "65.0",
+            "",
+            "HARAS D'ETREHAM",
+            "M. SEROR (S)",
+            "60",
+            "43.415"
+          ],
+          [
+            "42",
+            "RUNNIN'BLUE F.PS. 3 a.",
+            "65 kg",
+            "63.0",
+            "",
+            "MR ALAIN JATHIERE",
+            "F. NICOLLE",
+            "17",
+            "39.570"
+          ],
+          [
+            "43",
+            "MAHADEVI IRE F.PS. 3 a.",
+            "65 kg",
+            "***",
+            "",
+            "MR MAURICE KIERAN MARIGA",
+            "N. GEORGE & A. ZETTERHOLM (S)",
+            "60",
+            "15.230"
+          ]
+        ]
+      },
+      {
+        "id": "",
+        "rows": [
+          [
+            "FORFAIT 1",
+            "Mercredi 11 Novembre 2026",
+            "11h30 PARIS"
+          ],
+          [
+            "PARTANT PROBABLE",
+            "Jeudi 12 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ENGAGEMENT SUPPLEMENT.",
+            "Jeudi 12 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ANNULATION PART PROB",
+            "Vendredi 13 Novembre 2026",
+            "10h30 =="
+          ],
+          [
+            "MONTE",
+            "Vendredi 13 Novembre 2026",
+            "12h30 =="
+          ]
+        ]
+      }
+    ],
+    "text": "2ème(O/ 177), — 15/11/2026 00h00, AUTEUIL\n\nHAIES , 3.600 mètres\n258.000 (116.100, 56.760, 33.540, 23.220, 12.900, 9.030, 6.450)\nAprès Second-Engagements : 43 Engagés. 43 Partants. - Course Premium -\n\n\nGROUPE I\nPour tous poulains et pouliches de 3 ans. Poids : 67 kg.\nVersement à la poule des propriétaires : 516 Euros à l'engagement le mercredi 16 septembre 2026, 2 580 Euros au second engagement le vendredi 6 novembre 2026 ou 11 610 Euros à l'engagement supplémentaire le jeudi 12 novembre 2026.\nUn trophée sera offert au propriétaire, à l'entraîneur, au jockey, à l'éleveur et au cavalier d'entraînement du cheval gagnant par FRANCE GALOP.\nUne couverture sera remise au poulain ou à la pouliche gagnant après la course.\n\n\nLegal notice\n\nAUTEUIL\n\n1 2 3 4 5 6 7 8\nN°\tCheval\tPoids\tValeur\tPriorité\tPropriétaire\tEntraîneur\tDép./Pays Ent.\tGains\n1\tKing Dalee M.Ps. 3 A.\t67 kg\t***\t\tA.JATHIERE/EC.THOMAS SIVADIER\tY. FOUIN (S)\t78\t20.930\n2\tART DE RUE GB H.PS. 3 a.\t67 kg\t62.0\n\t\tAMMOLITES RACING\tN. VERGNE (S)\t78\t29.580\n3\tNAVY DU SEUIL M.PS. 3 A.\t67 kg\t68.5\n\t\tMME MARC BOUDOT\tM. SEROR (S)\t60\t99.950\n4\tNOUVLATIEP H.AQ. 3 a.\t67 kg\t***\t\tMME ALEXIA BOUTIN\tD. COTTIN (S)\t60\t0\n5\tJARDIN PATURLE H.PS. 3 A.\t67 kg\t70.0\t\tC.MILLIERE/H.D'AILLIERES\tM. SEROR (S)\t60\t60.700\n6\tKENTUCKY D'ALCO H.PS. 3 a.\t67 kg\t***\t\tMR JOHN CAVANAGH\tN. GEORGE & A. ZETTERHOLM (S)\t60\t12.660\n7\tDON'T STOP DE GREZ H.PS. 3 a.\t67 kg\t57.0\n\t\tCHAILLE-CHAILLE & PAMART (S)\tCHAILLE-CHAILLE & PAMART (S)\t17\t5.080\n8\tNUNCIO D'ELIPE H.PS. 3 a.\t67 kg\t***\t\tMR JEAN-PIERRE-JOSEPH DUBOIS\tD. COTTIN (S)\t49\t16.675\n9\tPurple Power H.Ps. 3 A.\t67 kg\t68.0\n\t\tEC. T.LEVESQUE/H.ROUSSEAU\tJ. BOISNARD (S)\t49\t67.050\n10\tBRIGAND DU BERLAIS H.PS. 3 a.\t67 kg\t***\t\tECURIE BENAROUSSI SOFIANE\tROB. COLLET (S)\t60\t0\n11\tSUPREME LIGHT M.PS. 3 a.\t67 kg\t61.0\n\t\tECURIE C. MARZOCCO\tMME G. MENATO\t60\t16.595\n12\tTROTINETTE H.PS. 3 a.\t67 kg\t59.5\n\t\tECURIE DE LA VERTE VALLEE\tM. SEROR (S)\t60\t14.270\n13\tMAGIC DES CHARMES M.PS. 3 A.\t67 kg\t70.5\n\t\tECURIE DES CHARMES\tN. GEORGE & A. ZETTERHOLM (S)\t60\t96.030\n14\tMAGNUM VALLEY H.PS. 3 a.\t67 kg\t***\t\tECURIE HUB DE MONTMIRAIL\tCHAILLE-CHAILLE & PAMART (S)\t17\t7.540\n15\tBAGHERA DU BERLAIS H.PS. 3 a.\t67 kg\t***\t\tECURIE HUGO ET PIERRE PILARSKI\tD. COTTIN (S)\t60\t35.880\n16\tVOLT DU BERLAIS H.PS. 3 a.\t67 kg\t***\t\tECURIE HUGO ET PIERRE PILARSKI\tD. COTTIN (S)\t60\t4.410\n17\tTORINO DES ISLES M.PS. 3 a.\t67 kg\t***\t\tECURIE THOMAS SIVADIER\tD. COTTIN (S)\t60\t0\n18\tLE SIRE H.PS. 3 a.\t67 kg\t65.0\n\t\tF&O HINDERZE RACING\tM. SEROR (S)\t60\t45.710\n19\tSOCRATES H.PS. 3 a.\t67 kg\t***\t\tFAMILLE BRYANT\tE. GRALL (S)\t44\t0\n20\tNOVAFIGURA HAS H.AQ. 3 a.\t67 kg\t***\t\tSCEA HAMEL STUD\tD. COTTIN (S)\t60\t11.040\n21\tIRRESITIBLEMENT H.PS. 3 a.\t67 kg\t***\t\tHARAS DE LA HAIE NEUVE\tF. BELLEMERE\t60\t26.680\n22\tNAIN BLEU H.PS. 3 a.\t67 kg\t***\t\tHARAS DE SAINT-VOIR\tH. MERIENNE (S)\t60\t7.135\n23\tAPOLLOKA H.PS. 3 a.\t67 kg\t***\t\tJ.DETRE/EC.TEAM SPIRIT\tE. GRALL (S)\t44\t0\n24\tFORT KNOXS H.PS. 3 a.\t67 kg\t***\t\tMR ALAIN JATHIERE\tD. COTTIN (S)\t60\t0\n25\tSTALKY H.PS. 3 a.\t67 kg\t***\t\tMR ALAIN JATHIERE\tN. GEORGE & A. ZETTERHOLM (S)\t60\t26.680\n26\tSaint Savin M.Ps. 3 A.\t67 kg\t68.5\n\t\tJC.CAMPOS/N.CAMPOS/TERRAINS AVIL\tROB. COLLET (S)\t60\t56.570\n27\tFLONIS H.PS. 3 a.\t67 kg\t***\t\tMME LYNNE MACLENNAN\tY. FOUIN (S)\t78\t23.460\n28\tNAJDAM M.PS. 3 a.\t67 kg\t60.5\n\t\tMME LYNNE MACLENNAN\tCHAILLE-CHAILLE & PAMART (S)\t17\t13.760\n29\tNOM D'UN CHIEN H.PS. 3 a.\t67 kg\t68.5\n\t\tMME MACLENNAN/HARAS DE ST-VOIR\tF. NICOLLE\t17\t45.545\n30\tKEEP IT SIMPLE H.PS. 3 a.\t67 kg\t***\t\tMR SEAN MULRYAN\tCHAILLE-CHAILLE & PAMART (S)\t17\t1.740\n31\tHURON BLEU H.PS. 3 A.\t67 kg\t77.0\n\t\tMME PATRICK PAPOT\tD. BRESSOU\t50\t174.600\n32\tNaruto Banbou H.Aq. 3 A.\t67 kg\t65.5\n\t\tMME PATRICK PAPOT\tD. BRESSOU\t50\t54.700\n33\tVARSOVIE H.PS. 3 A.\t67 kg\t74.0\n\t\tMME PATRICK PAPOT\tD. BRESSOU\t50\t97.290\n34\tMILORD DU BERLAIS H.PS. 3 a.\t67 kg\t***\t\tS.MUNIR/I.SOUEDE\tM. SEROR (S)\t60\t7.540\n35\tRAFFLES TEMPO H.PS. 3 a.\t67 kg\t***\t\tS.MUNIR/I.SOUEDE\tM. SEROR (S)\t60\t5.220\n36\tNATURAL CLASS H.AQ. 3 a.\t67 kg\t***\t\tSANGWIN BLOODSTOCK LTD\tH. MERIENNE (S)\t60\t0\n37\tIN BETWEEN DAYS GB F.PS. 3 A.\t65 kg\t70.5\n\t\tMR SIMON COX\tN. GEORGE & A. ZETTERHOLM (S)\t60\t91.900\n38\tLA TURBIE F.PS. 3 A.\t65 kg\t67.0\n\t\tMME HENRI DEVIN\tHF. DEVIN (S)\t60\t75.205\n39\tDedel F.Ps. 3 A.\t65 kg\t69.0\t\tECURIE DE LA VERTE VALLEE\tM. SEROR (S)\t60\t94.090\n40\tNiri F.Ps. 3 A.\t65 kg\t64.0\n\t\tECURIE MG BOUDOT\tM. SEROR (S)\t60\t39.105\n41\tAlmarita F.Ps. 3 A.\t65 kg\t65.0\n\t\tHARAS D'ETREHAM\tM. SEROR (S)\t60\t43.415\n42\tRUNNIN'BLUE F.PS. 3 a.\t65 kg\t63.0\n\t\tMR ALAIN JATHIERE\tF. NICOLLE\t17\t39.570\n43\tMAHADEVI IRE F.PS. 3 a.\t65 kg\t***\t\tMR MAURICE KIERAN MARIGA\tN. GEORGE & A. ZETTERHOLM (S)\t60\t15.230\nClôture\nFORFAIT 1\tMercredi 11 Novembre 2026\t11h30 PARIS\nPARTANT PROBABLE\tJeudi 12 Novembre 2026\t11h30 ==\nENGAGEMENT SUPPLEMENT.\tJeudi 12 Novembre 2026\t11h30 ==\nANNULATION PART PROB\tVendredi 13 Novembre 2026\t10h30 ==\nMONTE\tVendredi 13 Novembre 2026\t12h30 ==\n",
+    "title": "PRIX CAMBACERES - GRANDE COURSE DE HAIES DES 3 ANS | France Galop",
+    "url": "https://www.france-galop.com/fr/course/detail/2026/O/MFE5VlBLejJjcmdkUTVlbHpQL2Z6dz09"
+  },
+  {
+    "tables": [
+      {
+        "id": "",
+        "rows": [
+          [
+            "N°",
+            "Cheval",
+            "Poids",
+            "Valeur",
+            "Priorité",
+            "Propriétaire",
+            "Entraîneur",
+            "Dép./Pays Ent.",
+            "Gains"
+          ],
+          [
+            "1",
+            "Mon Petit Prince H.Ps. 5 A.",
+            "66 kg",
+            "56.0",
+            "",
+            "D.JOSSET/G.LASSAUSSAYE/LEENDERS",
+            "GAB. LEENDERS (S)",
+            "49",
+            "13.450"
+          ],
+          [
+            "2",
+            "LUCKY NONANTAIS H.PS. 5 A.",
+            "66 kg",
+            "66.5",
+            "",
+            "MR FREDERIC DUVIVIER",
+            "Y. FOUIN (S)",
+            "78",
+            "88.660"
+          ],
+          [
+            "3",
+            "SHANNON POWER H.PS. 5 a.",
+            "66 kg",
+            "59.0",
+            "",
+            "ECURIE BENAROUSSI SOFIANE",
+            "LAGENESTE & MACAIRE (S)",
+            "17",
+            "23.120"
+          ],
+          [
+            "4",
+            "Lebrio Des Mottes H.Aq. 5 A.",
+            "66 kg",
+            "61.5",
+            "",
+            "ECURIE DES MOTTES",
+            "F. NICOLLE",
+            "17",
+            "115.180"
+          ],
+          [
+            "5",
+            "HACKER DU BERLAIS H.PS. 5 A.",
+            "66 kg",
+            "67.0",
+            "",
+            "ECURIE HUB DE MONTMIRAIL",
+            "CHAILLE-CHAILLE & PAMART (S)",
+            "17",
+            "77.900"
+          ],
+          [
+            "6",
+            "Lord Brett H.Aq. 5 A.",
+            "66 kg",
+            "63.0",
+            "",
+            "ECURIE MADAME JACQUES CYPRES",
+            "F. NICOLLE",
+            "17",
+            "45.560"
+          ],
+          [
+            "7",
+            "Liskaria H.Aq. 5 A.",
+            "66 kg",
+            "68.0",
+            "",
+            "ECURIE SERENITE",
+            "D. MELE (S)",
+            "50",
+            "118.700"
+          ],
+          [
+            "8",
+            "HAPPY PEOPLE H.PS. 5 a.",
+            "66 kg",
+            "53.5",
+            "",
+            "IMPERIUM RACING",
+            "AS. PACAULT (S)",
+            "78",
+            "34.420"
+          ],
+          [
+            "9",
+            "Lagon Bleu H.Ps. 5 A.",
+            "66 kg",
+            "62.0",
+            "",
+            "MME PATRICK PAPOT",
+            "J. BOISNARD (S)",
+            "49",
+            "47.090"
+          ],
+          [
+            "10",
+            "LESTRU H.AQ. 5 a.",
+            "66 kg",
+            "56.0",
+            "",
+            "MR JEAN-CLAUDE SARAIS",
+            "M. SEROR (S)",
+            "60",
+            "30.305"
+          ],
+          [
+            "11",
+            "LOUBA F.AQ. 5 a.",
+            "64 kg",
+            "57.5",
+            "",
+            "MR GILDAS BLAIN",
+            "F. BELLEMERE",
+            "60",
+            "38.680"
+          ],
+          [
+            "12",
+            "Tante Zena F.Ps. 5 A.",
+            "64 kg",
+            "59.5",
+            "",
+            "MME HENRI DEVIN",
+            "M. SEROR (S)",
+            "60",
+            "80.330"
+          ],
+          [
+            "13",
+            "JOCASTA F.PS. 5 a.",
+            "64 kg",
+            "58.5",
+            "",
+            "GOLDEN TEAM",
+            "MME G. MENATO",
+            "60",
+            "66.280"
+          ]
+        ]
+      },
+      {
+        "id": "",
+        "rows": [
+          [
+            "FORFAIT 1",
+            "Mercredi 11 Novembre 2026",
+            "11h30 PARIS"
+          ],
+          [
+            "ENGAGEMENT SUPPLEMENT.",
+            "Jeudi 12 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "PARTANT PROBABLE",
+            "Jeudi 12 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ANNULATION PART PROB",
+            "Vendredi 13 Novembre 2026",
+            "10h30 =="
+          ],
+          [
+            "MONTE",
+            "Vendredi 13 Novembre 2026",
+            "12h30 =="
+          ]
+        ]
+      }
+    ],
+    "text": "7ème(O/ 176), — 15/11/2026 00h00, AUTEUIL\n\nSTEEPLE-CHASE , 4.400 mètres\n130.000 (58.500, 28.600, 16.900, 11.700, 6.500, 4.550, 3.250)\n149.500 (67.275, 32.890, 19.435, 13.455, 7.475, 5.232, 3.737) - Allocation + Prime Propriétaire pour femelles (si éligible)\nAprès Engagements : 13 Engagés. 13 Partants. - Course Premium -\n\n\nGROUPE III\nPour tous chevaux de 5 ans, n'ayant, en steeple-chase, depuis le 1er janvier de l'année dernière inclus, ni été classés dans les deux premiers d'un Groupe I, ni, cette année, été classés dans les trois premiers d'une course de Groupe. Poids : 66 kg. Les chevaux ayant, en steeple-chase, depuis le 1er janvier de l'année dernière inclus, gagné un Groupe III porteront 2 kg ; gagné un Groupe II, 3 kg.\nUn souvenir sera offert au propriétaire, à l'entraîneur, à l'éleveur, au jockey, et au cavalier d'entraînement du cheval gagnant par FRANCE GALOP.\n\n\nLegal notice\n\nAUTEUIL\n\n1 2 3 4 5 6 7 8\nN°\tCheval\tPoids\tValeur\tPriorité\tPropriétaire\tEntraîneur\tDép./Pays Ent.\tGains\n1\tMon Petit Prince H.Ps. 5 A.\t66 kg\t56.0\n\t\tD.JOSSET/G.LASSAUSSAYE/LEENDERS\tGAB. LEENDERS (S)\t49\t13.450\n2\tLUCKY NONANTAIS H.PS. 5 A.\t66 kg\t66.5\n\t\tMR FREDERIC DUVIVIER\tY. FOUIN (S)\t78\t88.660\n3\tSHANNON POWER H.PS. 5 a.\t66 kg\t59.0\n\t\tECURIE BENAROUSSI SOFIANE\tLAGENESTE & MACAIRE (S)\t17\t23.120\n4\tLebrio Des Mottes H.Aq. 5 A.\t66 kg\t61.5\n\t\tECURIE DES MOTTES\tF. NICOLLE\t17\t115.180\n5\tHACKER DU BERLAIS H.PS. 5 A.\t66 kg\t67.0\t\tECURIE HUB DE MONTMIRAIL\tCHAILLE-CHAILLE & PAMART (S)\t17\t77.900\n6\tLord Brett H.Aq. 5 A.\t66 kg\t63.0\n\t\tECURIE MADAME JACQUES CYPRES\tF. NICOLLE\t17\t45.560\n7\tLiskaria H.Aq. 5 A.\t66 kg\t68.0\n\t\tECURIE SERENITE\tD. MELE (S)\t50\t118.700\n8\tHAPPY PEOPLE H.PS. 5 a.\t66 kg\t53.5\n\t\tIMPERIUM RACING\tAS. PACAULT (S)\t78\t34.420\n9\tLagon Bleu H.Ps. 5 A.\t66 kg\t62.0\n\t\tMME PATRICK PAPOT\tJ. BOISNARD (S)\t49\t47.090\n10\tLESTRU H.AQ. 5 a.\t66 kg\t56.0\n\t\tMR JEAN-CLAUDE SARAIS\tM. SEROR (S)\t60\t30.305\n11\tLOUBA F.AQ. 5 a.\t64 kg\t57.5\n\t\tMR GILDAS BLAIN\tF. BELLEMERE\t60\t38.680\n12\tTante Zena F.Ps. 5 A.\t64 kg\t59.5\n\t\tMME HENRI DEVIN\tM. SEROR (S)\t60\t80.330\n13\tJOCASTA F.PS. 5 a.\t64 kg\t58.5\t\tGOLDEN TEAM\tMME G. MENATO\t60\t66.280\nClôture\nFORFAIT 1\tMercredi 11 Novembre 2026\t11h30 PARIS\nENGAGEMENT SUPPLEMENT.\tJeudi 12 Novembre 2026\t11h30 ==\nPARTANT PROBABLE\tJeudi 12 Novembre 2026\t11h30 ==\nANNULATION PART PROB\tVendredi 13 Novembre 2026\t10h30 ==\nMONTE\tVendredi 13 Novembre 2026\t12h30 ==\n",
+    "title": "PRIX FONDEUR | France Galop",
+    "url": "https://www.france-galop.com/fr/course/detail/2026/O/REJBenJSQkttMldKNmEvTlNzRmpkUT09"
+  },
+  {
+    "tables": [
+      {
+        "id": "",
+        "rows": [
+          [
+            "N°",
+            "Cheval",
+            "Poids",
+            "Valeur",
+            "Priorité",
+            "Propriétaire",
+            "Entraîneur",
+            "Dép./Pays Ent.",
+            "Gains"
+          ],
+          [
+            "1",
+            "IN LOVE H.AQ. 8 A.",
+            "68 kg",
+            "72.5",
+            "",
+            "A.PEAKE/S.MACAULEY/BRYANTFAMILY",
+            "H. MERIENNE (S)",
+            "60",
+            "84.314"
+          ],
+          [
+            "2",
+            "GOLD TWEET H.PS. 9 A.",
+            "68 kg",
+            "74.0",
+            "",
+            "AGV KARWIN STUD/M.LASRY/BAUDOUIN",
+            "GAB. LEENDERS (S)",
+            "49",
+            "332.657"
+          ],
+          [
+            "3",
+            "BON GARCON H.PS. 6 A.",
+            "68 kg",
+            "74.5",
+            "",
+            "MME GERARD AOUDAI",
+            "CHAILLE-CHAILLE & PAMART (S)",
+            "17",
+            "377.340"
+          ],
+          [
+            "4",
+            "JAZZ MANOUCHE H.AQ. 7 A.",
+            "68 kg",
+            "68.0",
+            "",
+            "MR JEAN-LOUIS BERGER",
+            "L. PONTOIR (S)",
+            "78",
+            "70.050"
+          ],
+          [
+            "5",
+            "AMY DU KIFF H.PS. 7 A.",
+            "68 kg",
+            "66.0",
+            "",
+            "EC.NOSAT/EC.KERISEL/SARL ARION",
+            "GAB. LEENDERS (S)",
+            "49",
+            "68.580"
+          ],
+          [
+            "6",
+            "TOSCANA DU BERLAIS H.PS. 8 A.",
+            "68 kg",
+            "75.0",
+            "",
+            "ECURIE HUB DE MONTMIRAIL",
+            "CHAILLE-CHAILLE & PAMART (S)",
+            "17",
+            "519.640"
+          ],
+          [
+            "7",
+            "ROYAL SAGA H.PS. 6 A.",
+            "68 kg",
+            "75.0",
+            "",
+            "ECURIE SAGARA",
+            "D. BRESSOU",
+            "50",
+            "92.780"
+          ],
+          [
+            "8",
+            "KAPACA DE THAIX H.AQ. 6 A.",
+            "68 kg",
+            "71.0",
+            "",
+            "ECURIE SERENITE",
+            "D. MELE (S)",
+            "50",
+            "204.815"
+          ],
+          [
+            "9",
+            "JAGUAR DU BERLAIS H.PS. 8 A.",
+            "68 kg",
+            "64.5",
+            "",
+            "FAMILLE BRYANT",
+            "E. GRALL (S)",
+            "44",
+            "112.850"
+          ],
+          [
+            "10",
+            "KALIBRE H.PS. 6 A.",
+            "68 kg",
+            "61.5",
+            "",
+            "H.COZENOT / A.GRONFIER / & Co",
+            "M. SEROR (S)",
+            "60",
+            "155.620"
+          ],
+          [
+            "11",
+            "JOJO LAPIN H.PS. 7 A.",
+            "68 kg",
+            "67.0",
+            "",
+            "HARAS DE SAINT-VOIR",
+            "D. COTTIN (S)",
+            "60",
+            "40.950"
+          ],
+          [
+            "12",
+            "KILOMETRE ILLIMITE H.PS. 6 A.",
+            "68 kg",
+            "76.0",
+            "",
+            "HARAS DE SAINT-VOIR",
+            "CHAILLE-CHAILLE & PAMART (S)",
+            "17",
+            "172.710"
+          ],
+          [
+            "13",
+            "GOLIATH DU RHEU H.PS. 7 A.",
+            "68 kg",
+            "74.0",
+            "",
+            "J.DETRE/EC.TEAM SPIRIT",
+            "F. NICOLLE",
+            "17",
+            "177.930"
+          ],
+          [
+            "14",
+            "JUNTOS GANAMOS H.AQ. 7 A.",
+            "68 kg",
+            "73.5",
+            "",
+            "MR ALAIN JATHIERE",
+            "D. COTTIN (S)",
+            "60",
+            "107.100"
+          ],
+          [
+            "15",
+            "KENTUCKY WOOD H.AQ. 6 A.",
+            "68 kg",
+            "69.5",
+            "",
+            "MR ALAIN JATHIERE",
+            "F. NICOLLE",
+            "17",
+            "165.395"
+          ],
+          [
+            "16",
+            "EXUPERY H.PS. 11 A.",
+            "68 kg",
+            "67.0",
+            "",
+            "MR GEORGES LACOMBE",
+            "F. LAGARDE",
+            "19",
+            "119.710"
+          ],
+          [
+            "17",
+            "KOLOKICO H.AQ. 6 A.",
+            "68 kg",
+            "75.0",
+            "",
+            "LORD DARESBURY/EC MME J CYPRES",
+            "E. CLAYEUX (S)",
+            "03",
+            "305.700"
+          ],
+          [
+            "18",
+            "KINGLAND (IRE) H.AQ. 6 A.",
+            "68 kg",
+            "***",
+            "",
+            "MME LYNNE MACLENNAN",
+            "F. NICOLLE",
+            "17",
+            "0"
+          ],
+          [
+            "19",
+            "IMPRESSIVE H.PS. 8 A.",
+            "68 kg",
+            "67.0",
+            "",
+            "MME P.PAPOT/ECURIE GABEUR",
+            "LAGENESTE & MACAIRE (S)",
+            "17",
+            "75.700"
+          ],
+          [
+            "20",
+            "JOHNNY ROQUE H.PS. 7 A.",
+            "68 kg",
+            "63.5",
+            "",
+            "MME PATRICK PAPOT",
+            "D. MELE (S)",
+            "50",
+            "66.970"
+          ],
+          [
+            "21",
+            "La Marche Bleue H.Ps. 7 A.",
+            "68 kg",
+            "64.0",
+            "",
+            "MME PATRICK PAPOT",
+            "F. NICOLLE",
+            "17",
+            "48.730"
+          ],
+          [
+            "22",
+            "SEL JEM H.PS. 9 A.",
+            "68 kg",
+            "78.5",
+            "",
+            "MME PATRICK PAPOT",
+            "LAGENESTE & MACAIRE (S)",
+            "17",
+            "601.790"
+          ],
+          [
+            "23",
+            "LE PETIT CHEVAL H.PS. 5 A.",
+            "67 kg",
+            "69.0",
+            "",
+            "MR GILDAS BLAIN",
+            "F. BELLEMERE",
+            "60",
+            "107.420"
+          ],
+          [
+            "24",
+            "LEADER SPORT H.PS. 5 A.",
+            "67 kg",
+            "77.0",
+            "",
+            "MR WALTER B. CONNORS",
+            "D. MELE (S)",
+            "50",
+            "224.150"
+          ],
+          [
+            "25",
+            "L'UNION JACK H.PS. 5 A.",
+            "67 kg",
+            "63.5",
+            "",
+            "D.ROMEO/MBAPPE P.RACING STABLES",
+            "D. SATALIA",
+            "60",
+            "62.140"
+          ],
+          [
+            "26",
+            "FEU DE DIEU H.PS. 5 A.",
+            "67 kg",
+            "73.0",
+            "",
+            "DREAM WITH ME STABLE INC",
+            "D. COTTIN (S)",
+            "60",
+            "98.865"
+          ],
+          [
+            "27",
+            "LUCKY NONANTAIS H.PS. 5 A.",
+            "67 kg",
+            "66.5",
+            "",
+            "MR FREDERIC DUVIVIER",
+            "Y. FOUIN (S)",
+            "78",
+            "88.660"
+          ],
+          [
+            "28",
+            "CROWN DU BERLAIS H.PS. 5 A.",
+            "67 kg",
+            "69.5",
+            "",
+            "ECURIE HUGO ET PIERRE PILARSKI",
+            "LAGENESTE & MACAIRE (S)",
+            "17",
+            "168.455"
+          ],
+          [
+            "29",
+            "Lord Brett H.Aq. 5 A.",
+            "67 kg",
+            "63.0",
+            "",
+            "ECURIE MADAME JACQUES CYPRES",
+            "F. NICOLLE",
+            "17",
+            "45.560"
+          ],
+          [
+            "30",
+            "World Apart H.Ps. 5 A.",
+            "67 kg",
+            "66.0",
+            "",
+            "MR ALAIN JATHIERE",
+            "L. BAUDRON (S)",
+            "61",
+            "56.800"
+          ],
+          [
+            "31",
+            "BANDANAS H.PS. 5 a.",
+            "67 kg",
+            "***",
+            "",
+            "MME GIADA MENATO",
+            "MME G. MENATO",
+            "60",
+            "795"
+          ],
+          [
+            "32",
+            "KIVALA DU BERLAIS H.PS. 5 A.",
+            "67 kg",
+            "***",
+            "",
+            "MR STEPHANE SZWARC",
+            "D. COTTIN (S)",
+            "60",
+            "99.000"
+          ],
+          [
+            "33",
+            "NEVERCHANGEDOCTOR H.PS. 5 A.",
+            "67 kg",
+            "***",
+            "",
+            "T.STORME/T.LOHEST RACING",
+            "N. GEORGE & A. ZETTERHOLM (S)",
+            "60",
+            "65.780"
+          ],
+          [
+            "34",
+            "GINJA DES TAILLONS F.PS. 9 A.",
+            "66 kg",
+            "61.5",
+            "",
+            "E.BARICHARD/M.GENDRON/JP.MERCIER",
+            "E.D' ANDIGNE",
+            "49",
+            "25.535"
+          ],
+          [
+            "35",
+            "LACOKOKELDY F.AQ. 5 A.",
+            "65 kg",
+            "69.5",
+            "",
+            "MR RENAUD LAVILLENIE",
+            "F. NICOLLE",
+            "17",
+            "118.390"
+          ]
+        ]
+      },
+      {
+        "id": "",
+        "rows": [
+          [
+            "FORFAIT 1",
+            "Mercredi 11 Novembre 2026",
+            "11h30 PARIS"
+          ],
+          [
+            "PARTANT PROBABLE",
+            "Jeudi 12 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ENGAGEMENT SUPPLEMENT.",
+            "Jeudi 12 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ANNULATION PART PROB",
+            "Vendredi 13 Novembre 2026",
+            "10h30 =="
+          ],
+          [
+            "MONTE",
+            "Vendredi 13 Novembre 2026",
+            "12h30 =="
+          ]
+        ]
+      }
+    ],
+    "text": "8ème(O/ 182), — 15/11/2026 00h00, AUTEUIL\n\nSTEEPLE-CHASE , 5.500 mètres\n540.000 (243.000, 118.800, 70.200, 48.600, 27.000, 18.900, 13.500)\nAprès Second-Engagements : 35 Engagés. 35 Partants. - Pari Complexe -\n\n\nGROUPE I\nPour tous chevaux de 5 ans et au-dessus. Poids : 5 ans, 67 kg ; 6 ans et au-dessus, 68 kg.\nVersement à la poule des propriétaires : 1 080 Euros à l'engagement le mercredi 16 septembre 2026, 5 400 Euros au second engagement le vendredi 6 novembre 2026 ou 24 300 Euros à l'engagement supplémentaire le jeudi 12 novembre 2026.\nUn trophée sera offert au propriétaire, à l'entraîneur, au jockey, à l'éleveur et au cavalier d'entraînement du cheval gagnant par FRANCE GALOP.\nUne couverture sera remise au cheval gagnant après la course.\n\n\nLegal notice\n\nAUTEUIL\n\n1 2 3 4 5 6 7 8\nN°\tCheval\tPoids\tValeur\tPriorité\tPropriétaire\tEntraîneur\tDép./Pays Ent.\tGains\n1\tIN LOVE H.AQ. 8 A.\t68 kg\t72.5\n\t\tA.PEAKE/S.MACAULEY/BRYANTFAMILY\tH. MERIENNE (S)\t60\t84.314\n2\tGOLD TWEET H.PS. 9 A.\t68 kg\t74.0\n\t\tAGV KARWIN STUD/M.LASRY/BAUDOUIN\tGAB. LEENDERS (S)\t49\t332.657\n3\tBON GARCON H.PS. 6 A.\t68 kg\t74.5\n\t\tMME GERARD AOUDAI\tCHAILLE-CHAILLE & PAMART (S)\t17\t377.340\n4\tJAZZ MANOUCHE H.AQ. 7 A.\t68 kg\t68.0\n\t\tMR JEAN-LOUIS BERGER\tL. PONTOIR (S)\t78\t70.050\n5\tAMY DU KIFF H.PS. 7 A.\t68 kg\t66.0\n\t\tEC.NOSAT/EC.KERISEL/SARL ARION\tGAB. LEENDERS (S)\t49\t68.580\n6\tTOSCANA DU BERLAIS H.PS. 8 A.\t68 kg\t75.0\n\t\tECURIE HUB DE MONTMIRAIL\tCHAILLE-CHAILLE & PAMART (S)\t17\t519.640\n7\tROYAL SAGA H.PS. 6 A.\t68 kg\t75.0\n\t\tECURIE SAGARA\tD. BRESSOU\t50\t92.780\n8\tKAPACA DE THAIX H.AQ. 6 A.\t68 kg\t71.0\n\t\tECURIE SERENITE\tD. MELE (S)\t50\t204.815\n9\tJAGUAR DU BERLAIS H.PS. 8 A.\t68 kg\t64.5\n\t\tFAMILLE BRYANT\tE. GRALL (S)\t44\t112.850\n10\tKALIBRE H.PS. 6 A.\t68 kg\t61.5\n\t\tH.COZENOT / A.GRONFIER / & Co\tM. SEROR (S)\t60\t155.620\n11\tJOJO LAPIN H.PS. 7 A.\t68 kg\t67.0\n\t\tHARAS DE SAINT-VOIR\tD. COTTIN (S)\t60\t40.950\n12\tKILOMETRE ILLIMITE H.PS. 6 A.\t68 kg\t76.0\n\t\tHARAS DE SAINT-VOIR\tCHAILLE-CHAILLE & PAMART (S)\t17\t172.710\n13\tGOLIATH DU RHEU H.PS. 7 A.\t68 kg\t74.0\n\t\tJ.DETRE/EC.TEAM SPIRIT\tF. NICOLLE\t17\t177.930\n14\tJUNTOS GANAMOS H.AQ. 7 A.\t68 kg\t73.5\t\tMR ALAIN JATHIERE\tD. COTTIN (S)\t60\t107.100\n15\tKENTUCKY WOOD H.AQ. 6 A.\t68 kg\t69.5\n\t\tMR ALAIN JATHIERE\tF. NICOLLE\t17\t165.395\n16\tEXUPERY H.PS. 11 A.\t68 kg\t67.0\t\tMR GEORGES LACOMBE\tF. LAGARDE\t19\t119.710\n17\tKOLOKICO H.AQ. 6 A.\t68 kg\t75.0\n\t\tLORD DARESBURY/EC MME J CYPRES\tE. CLAYEUX (S)\t03\t305.700\n18\tKINGLAND (IRE) H.AQ. 6 A.\t68 kg\t***\t\tMME LYNNE MACLENNAN\tF. NICOLLE\t17\t0\n19\tIMPRESSIVE H.PS. 8 A.\t68 kg\t67.0\n\t\tMME P.PAPOT/ECURIE GABEUR\tLAGENESTE & MACAIRE (S)\t17\t75.700\n20\tJOHNNY ROQUE H.PS. 7 A.\t68 kg\t63.5\n\t\tMME PATRICK PAPOT\tD. MELE (S)\t50\t66.970\n21\tLa Marche Bleue H.Ps. 7 A.\t68 kg\t64.0\n\t\tMME PATRICK PAPOT\tF. NICOLLE\t17\t48.730\n22\tSEL JEM H.PS. 9 A.\t68 kg\t78.5\n\t\tMME PATRICK PAPOT\tLAGENESTE & MACAIRE (S)\t17\t601.790\n23\tLE PETIT CHEVAL H.PS. 5 A.\t67 kg\t69.0\n\t\tMR GILDAS BLAIN\tF. BELLEMERE\t60\t107.420\n24\tLEADER SPORT H.PS. 5 A.\t67 kg\t77.0\t\tMR WALTER B. CONNORS\tD. MELE (S)\t50\t224.150\n25\tL'UNION JACK H.PS. 5 A.\t67 kg\t63.5\n\t\tD.ROMEO/MBAPPE P.RACING STABLES\tD. SATALIA\t60\t62.140\n26\tFEU DE DIEU H.PS. 5 A.\t67 kg\t73.0\n\t\tDREAM WITH ME STABLE INC\tD. COTTIN (S)\t60\t98.865\n27\tLUCKY NONANTAIS H.PS. 5 A.\t67 kg\t66.5\n\t\tMR FREDERIC DUVIVIER\tY. FOUIN (S)\t78\t88.660\n28\tCROWN DU BERLAIS H.PS. 5 A.\t67 kg\t69.5\t\tECURIE HUGO ET PIERRE PILARSKI\tLAGENESTE & MACAIRE (S)\t17\t168.455\n29\tLord Brett H.Aq. 5 A.\t67 kg\t63.0\n\t\tECURIE MADAME JACQUES CYPRES\tF. NICOLLE\t17\t45.560\n30\tWorld Apart H.Ps. 5 A.\t67 kg\t66.0\n\t\tMR ALAIN JATHIERE\tL. BAUDRON (S)\t61\t56.800\n31\tBANDANAS H.PS. 5 a.\t67 kg\t***\t\tMME GIADA MENATO\tMME G. MENATO\t60\t795\n32\tKIVALA DU BERLAIS H.PS. 5 A.\t67 kg\t***\t\tMR STEPHANE SZWARC\tD. COTTIN (S)\t60\t99.000\n33\tNEVERCHANGEDOCTOR H.PS. 5 A.\t67 kg\t***\t\tT.STORME/T.LOHEST RACING\tN. GEORGE & A. ZETTERHOLM (S)\t60\t65.780\n34\tGINJA DES TAILLONS F.PS. 9 A.\t66 kg\t61.5\n\t\tE.BARICHARD/M.GENDRON/JP.MERCIER\tE.D' ANDIGNE\t49\t25.535\n35\tLACOKOKELDY F.AQ. 5 A.\t65 kg\t69.5\n\t\tMR RENAUD LAVILLENIE\tF. NICOLLE\t17\t118.390\nClôture\nFORFAIT 1\tMercredi 11 Novembre 2026\t11h30 PARIS\nPARTANT PROBABLE\tJeudi 12 Novembre 2026\t11h30 ==\nENGAGEMENT SUPPLEMENT.\tJeudi 12 Novembre 2026\t11h30 ==\nANNULATION PART PROB\tVendredi 13 Novembre 2026\t10h30 ==\nMONTE\tVendredi 13 Novembre 2026\t12h30 ==\n",
+    "title": "PRIX LA HAYE JOUSSELIN | France Galop",
+    "url": "https://www.france-galop.com/fr/course/detail/2026/O/U2ljbXRmK3VsSC9Na2pURXR0ZExCQT09"
+  },
+  {
+    "tables": [
+      {
+        "id": "",
+        "rows": [
+          [
+            "N°",
+            "Cheval",
+            "Poids",
+            "Valeur",
+            "Priorité",
+            "Propriétaire",
+            "Entraîneur",
+            "Dép./Pays Ent.",
+            "Gains"
+          ],
+          [
+            "1",
+            "DUC DE ROCHE H.PS. 4 A.",
+            "68 kg",
+            "70.5",
+            "",
+            "A.JATHIERE/C,GEOFFROY",
+            "F. NICOLLE",
+            "17",
+            "202.280"
+          ],
+          [
+            "2",
+            "MAGICIEN D'OR H.AQ. 4 a.",
+            "68 kg",
+            "55.0",
+            "",
+            "AP GROUP S.R.L.",
+            "MME G. MENATO",
+            "60",
+            "6.600"
+          ],
+          [
+            "3",
+            "Mountain Ridge H.Ps. 4 A.",
+            "68 kg",
+            "***",
+            "",
+            "J.BOISNARD (S)",
+            "J. BOISNARD (S)",
+            "49",
+            "12.265"
+          ],
+          [
+            "4",
+            "MACALO DE GREZ H.AQ. 4 a.",
+            "68 kg",
+            "60.5",
+            "",
+            "CHAILLE-CHAILLE & PAMART (S)",
+            "CHAILLE-CHAILLE & PAMART (S)",
+            "17",
+            "31.320"
+          ],
+          [
+            "5",
+            "Fiumiccino H.Ps. 4 A.",
+            "68 kg",
+            "***",
+            "",
+            "MR JEAN-PIERRE-JOSEPH DUBOIS",
+            "D. COTTIN (S)",
+            "60",
+            "11.040"
+          ],
+          [
+            "6",
+            "FRENCH LOVER H.PS. 4 A.",
+            "68 kg",
+            "68.5",
+            "",
+            "ECURIE GABEUR",
+            "LAGENESTE & MACAIRE (S)",
+            "17",
+            "53.160"
+          ],
+          [
+            "7",
+            "LEOPARD DU BERLAIS H.PS. 4 A.",
+            "68 kg",
+            "***",
+            "",
+            "ECURIE HUGO ET PIERRE PILARSKI",
+            "D. COTTIN (S)",
+            "60",
+            "0"
+          ],
+          [
+            "8",
+            "MACIMO CONTI H.PS. 4 a.",
+            "68 kg",
+            "59.0",
+            "",
+            "ECURIE PATRICK JOUBERT",
+            "E. CLAYEUX (S)",
+            "03",
+            "31.650"
+          ],
+          [
+            "9",
+            "WILD FUN (FR) H.PS. 4 a.",
+            "68 kg",
+            "58.0",
+            "",
+            "ECURIE ZINGARO",
+            "D. COTTIN (S)",
+            "60",
+            "37.970"
+          ],
+          [
+            "10",
+            "TEEN SPIRIT H.PS. 4 A.",
+            "68 kg",
+            "69.5",
+            "",
+            "MR S P FITZGERALD",
+            "N. GEORGE & A. ZETTERHOLM (S)",
+            "60",
+            "80.040"
+          ],
+          [
+            "11",
+            "Santander M.Ps. 4 A.",
+            "68 kg",
+            "61.0",
+            "",
+            "HARAS D'ETREHAM",
+            "M. SEROR (S)",
+            "60",
+            "39.865"
+          ],
+          [
+            "12",
+            "MARIACHI H.AQ. 4 a.",
+            "68 kg",
+            "***",
+            "",
+            "MR ALAIN JATHIERE",
+            "Y. FOUIN (S)",
+            "78",
+            "19.800"
+          ],
+          [
+            "13",
+            "MONTANA DREAM H.AQ. 4 a.",
+            "68 kg",
+            "60.5",
+            "",
+            "LORD DARESBURY/EC.MME J.CYPRES",
+            "E. CLAYEUX (S)",
+            "03",
+            "52.560"
+          ],
+          [
+            "14",
+            "MANGO CAY H.AQ. 4 a.",
+            "68 kg",
+            "58.0",
+            "",
+            "MME LYNNE MACLENNAN",
+            "H. MERIENNE (S)",
+            "60",
+            "2.475"
+          ],
+          [
+            "15",
+            "MON MARCEL H.AQ. 4 a.",
+            "68 kg",
+            "***",
+            "",
+            "MME LYNNE MACLENNAN",
+            "GAB. LEENDERS (S)",
+            "49",
+            "19.340"
+          ],
+          [
+            "16",
+            "MOTU KOTA H.AQ. 4 a.",
+            "68 kg",
+            "55.0",
+            "",
+            "MME LYNNE MACLENNAN",
+            "Y. FOUIN (S)",
+            "78",
+            "14.340"
+          ],
+          [
+            "17",
+            "SANTCOKO H.PS. 4 a.",
+            "68 kg",
+            "62.5",
+            "",
+            "MME LYNNE MACLENNAN",
+            "F. NICOLLE",
+            "17",
+            "45.970"
+          ],
+          [
+            "18",
+            "INLANDSIS H.PS. 4 A.",
+            "68 kg",
+            "67.5",
+            "",
+            "D.MELE (S)",
+            "D. MELE (S)",
+            "50",
+            "105.600"
+          ],
+          [
+            "19",
+            "POPULAS H.PS. 4 a.",
+            "68 kg",
+            "60.5",
+            "",
+            "D.MELE (S)",
+            "D. MELE (S)",
+            "50",
+            "61.065"
+          ],
+          [
+            "20",
+            "THE ROBBERS H.PS. +",
+            "68 kg",
+            "62.0",
+            "",
+            "W.MENUET (S)",
+            "W. MENUET (S)",
+            "53",
+            "57.770"
+          ],
+          [
+            "21",
+            "METRONOMIQUE H.AQ. 4 A.",
+            "68 kg",
+            "78.0",
+            "",
+            "MME SHARON COLLEEN NELSON",
+            "N. GEORGE & A. ZETTERHOLM (S)",
+            "60",
+            "391.880"
+          ],
+          [
+            "22",
+            "KILLING BID H.PS. 4 a.",
+            "68 kg",
+            "***",
+            "",
+            "MME PATRICK PAPOT",
+            "D. BRESSOU",
+            "50",
+            "20.590"
+          ],
+          [
+            "23",
+            "MISTER SUN H.AQ. 4 a.",
+            "68 kg",
+            "***",
+            "",
+            "MME PATRICK PAPOT",
+            "D. MELE (S)",
+            "50",
+            "0"
+          ],
+          [
+            "24",
+            "Kap Of Gold M.Ps. 4 A.",
+            "68 kg",
+            "67.5",
+            "",
+            "MME CHRISTINE PRECY-BARONI",
+            "M. SEROR (S)",
+            "60",
+            "97.695"
+          ],
+          [
+            "25",
+            "MAHARAJA H.PS. 4 A.",
+            "68 kg",
+            "***",
+            "",
+            "S.MUNIR/I.SOUEDE",
+            "M. SEROR (S)",
+            "60",
+            "0"
+          ],
+          [
+            "26",
+            "EDAMURA H.PS. 4 A.",
+            "68 kg",
+            "***",
+            "",
+            "TERRAINS D'AVILLY ST LEONARD",
+            "ROB. COLLET (S)",
+            "60",
+            "19.190"
+          ],
+          [
+            "27",
+            "Victrix Du Mesnil F.Ps. 4 A.",
+            "66 kg",
+            "71.0",
+            "",
+            "MME HENRI DEVIN",
+            "M. SEROR (S)",
+            "60",
+            "118.250"
+          ],
+          [
+            "28",
+            "MELISSE DU MATHAN F.AQ. 4 A.",
+            "66 kg",
+            "69.0",
+            "",
+            "ECURIE DU MATHAN",
+            "CHAILLE-CHAILLE & PAMART (S)",
+            "17",
+            "133.660"
+          ],
+          [
+            "29",
+            "Mamaland F.Aq. 4 A.",
+            "66 kg",
+            "66.5",
+            "",
+            "ECURIE HUB DE MONTMIRAIL",
+            "CHAILLE-CHAILLE & PAMART (S)",
+            "17",
+            "48.690"
+          ],
+          [
+            "30",
+            "MILLARES F.AQ. 4 a.",
+            "66 kg",
+            "***",
+            "",
+            "ECURIE MAGNIEN",
+            "E.D' ANDIGNE",
+            "49",
+            "12.650"
+          ],
+          [
+            "31",
+            "GOOD GIRL DE FAUST F.PS. 4 A.",
+            "66 kg",
+            "64.5",
+            "",
+            "MR MARTIN INGRAM",
+            "M. SEROR (S)",
+            "60",
+            "44.180"
+          ],
+          [
+            "32",
+            "MISS DAPHNE GB F.AQ. 4 a.",
+            "66 kg",
+            "***",
+            "",
+            "MLLE VICTORIA MARKOWIAK",
+            "M. SEROR (S)",
+            "60",
+            "0"
+          ]
+        ]
+      },
+      {
+        "id": "",
+        "rows": [
+          [
+            "FORFAIT 1",
+            "Mercredi 11 Novembre 2026",
+            "11h30 PARIS"
+          ],
+          [
+            "PARTANT PROBABLE",
+            "Jeudi 12 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ENGAGEMENT SUPPLEMENT.",
+            "Jeudi 12 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ANNULATION PART PROB",
+            "Vendredi 13 Novembre 2026",
+            "10h30 =="
+          ],
+          [
+            "MONTE",
+            "Vendredi 13 Novembre 2026",
+            "12h30 =="
+          ]
+        ]
+      }
+    ],
+    "text": "6ème(O/ 181), — 15/11/2026 00h00, AUTEUIL\n\nSTEEPLE-CHASE , 4.400 mètres\n330.000 (148.500, 72.600, 42.900, 29.700, 16.500, 11.550, 8.250)\nAprès Second-Engagements : 32 Engagés. 32 Partants. - Pari Complexe -\n\n\nGROUPE I\nPour tous poulains et pouliches de 4 ans. Poids : 68 kg.\nVersement à la poule des propriétaires : 660 Euros à l'engagement le mercredi 16 septembre 2026, 3 300 Euros au second engagement le vendredi 6 novembre 2026 ou 14 850 Euros à l'engagement supplémentaire le jeudi 12 novembre 2026.\nUn trophée sera offert au propriétaire, à l'entraîneur, au jockey, à l'éleveur et au cavalier d'entraînement du cheval gagnant par FRANCE GALOP.\nUne couverture sera remise au poulain ou à la pouliche gagnant après la course.\n\n\nLegal notice\n\nAUTEUIL\n\n1 2 3 4 5 6 7 8\nN°\tCheval\tPoids\tValeur\tPriorité\tPropriétaire\tEntraîneur\tDép./Pays Ent.\tGains\n1\tDUC DE ROCHE H.PS. 4 A.\t68 kg\t70.5\n\t\tA.JATHIERE/C,GEOFFROY\tF. NICOLLE\t17\t202.280\n2\tMAGICIEN D'OR H.AQ. 4 a.\t68 kg\t55.0\n\t\tAP GROUP S.R.L.\tMME G. MENATO\t60\t6.600\n3\tMountain Ridge H.Ps. 4 A.\t68 kg\t***\t\tJ.BOISNARD (S)\tJ. BOISNARD (S)\t49\t12.265\n4\tMACALO DE GREZ H.AQ. 4 a.\t68 kg\t60.5\n\t\tCHAILLE-CHAILLE & PAMART (S)\tCHAILLE-CHAILLE & PAMART (S)\t17\t31.320\n5\tFiumiccino H.Ps. 4 A.\t68 kg\t***\t\tMR JEAN-PIERRE-JOSEPH DUBOIS\tD. COTTIN (S)\t60\t11.040\n6\tFRENCH LOVER H.PS. 4 A.\t68 kg\t68.5\n\t\tECURIE GABEUR\tLAGENESTE & MACAIRE (S)\t17\t53.160\n7\tLEOPARD DU BERLAIS H.PS. 4 A.\t68 kg\t***\t\tECURIE HUGO ET PIERRE PILARSKI\tD. COTTIN (S)\t60\t0\n8\tMACIMO CONTI H.PS. 4 a.\t68 kg\t59.0\n\t\tECURIE PATRICK JOUBERT\tE. CLAYEUX (S)\t03\t31.650\n9\tWILD FUN (FR) H.PS. 4 a.\t68 kg\t58.0\n\t\tECURIE ZINGARO\tD. COTTIN (S)\t60\t37.970\n10\tTEEN SPIRIT H.PS. 4 A.\t68 kg\t69.5\n\t\tMR S P FITZGERALD\tN. GEORGE & A. ZETTERHOLM (S)\t60\t80.040\n11\tSantander M.Ps. 4 A.\t68 kg\t61.0\n\t\tHARAS D'ETREHAM\tM. SEROR (S)\t60\t39.865\n12\tMARIACHI H.AQ. 4 a.\t68 kg\t***\t\tMR ALAIN JATHIERE\tY. FOUIN (S)\t78\t19.800\n13\tMONTANA DREAM H.AQ. 4 a.\t68 kg\t60.5\n\t\tLORD DARESBURY/EC.MME J.CYPRES\tE. CLAYEUX (S)\t03\t52.560\n14\tMANGO CAY H.AQ. 4 a.\t68 kg\t58.0\n\t\tMME LYNNE MACLENNAN\tH. MERIENNE (S)\t60\t2.475\n15\tMON MARCEL H.AQ. 4 a.\t68 kg\t***\t\tMME LYNNE MACLENNAN\tGAB. LEENDERS (S)\t49\t19.340\n16\tMOTU KOTA H.AQ. 4 a.\t68 kg\t55.0\n\t\tMME LYNNE MACLENNAN\tY. FOUIN (S)\t78\t14.340\n17\tSANTCOKO H.PS. 4 a.\t68 kg\t62.5\n\t\tMME LYNNE MACLENNAN\tF. NICOLLE\t17\t45.970\n18\tINLANDSIS H.PS. 4 A.\t68 kg\t67.5\n\t\tD.MELE (S)\tD. MELE (S)\t50\t105.600\n19\tPOPULAS H.PS. 4 a.\t68 kg\t60.5\n\t\tD.MELE (S)\tD. MELE (S)\t50\t61.065\n20\tTHE ROBBERS H.PS. +\t68 kg\t62.0\n\t\tW.MENUET (S)\tW. MENUET (S)\t53\t57.770\n21\tMETRONOMIQUE H.AQ. 4 A.\t68 kg\t78.0\n\t\tMME SHARON COLLEEN NELSON\tN. GEORGE & A. ZETTERHOLM (S)\t60\t391.880\n22\tKILLING BID H.PS. 4 a.\t68 kg\t***\t\tMME PATRICK PAPOT\tD. BRESSOU\t50\t20.590\n23\tMISTER SUN H.AQ. 4 a.\t68 kg\t***\t\tMME PATRICK PAPOT\tD. MELE (S)\t50\t0\n24\tKap Of Gold M.Ps. 4 A.\t68 kg\t67.5\t\tMME CHRISTINE PRECY-BARONI\tM. SEROR (S)\t60\t97.695\n25\tMAHARAJA H.PS. 4 A.\t68 kg\t***\t\tS.MUNIR/I.SOUEDE\tM. SEROR (S)\t60\t0\n26\tEDAMURA H.PS. 4 A.\t68 kg\t***\t\tTERRAINS D'AVILLY ST LEONARD\tROB. COLLET (S)\t60\t19.190\n27\tVictrix Du Mesnil F.Ps. 4 A.\t66 kg\t71.0\n\t\tMME HENRI DEVIN\tM. SEROR (S)\t60\t118.250\n28\tMELISSE DU MATHAN F.AQ. 4 A.\t66 kg\t69.0\n\t\tECURIE DU MATHAN\tCHAILLE-CHAILLE & PAMART (S)\t17\t133.660\n29\tMamaland F.Aq. 4 A.\t66 kg\t66.5\n\t\tECURIE HUB DE MONTMIRAIL\tCHAILLE-CHAILLE & PAMART (S)\t17\t48.690\n30\tMILLARES F.AQ. 4 a.\t66 kg\t***\t\tECURIE MAGNIEN\tE.D' ANDIGNE\t49\t12.650\n31\tGOOD GIRL DE FAUST F.PS. 4 A.\t66 kg\t64.5\t\tMR MARTIN INGRAM\tM. SEROR (S)\t60\t44.180\n32\tMISS DAPHNE GB F.AQ. 4 a.\t66 kg\t***\t\tMLLE VICTORIA MARKOWIAK\tM. SEROR (S)\t60\t0\nClôture\nFORFAIT 1\tMercredi 11 Novembre 2026\t11h30 PARIS\nPARTANT PROBABLE\tJeudi 12 Novembre 2026\t11h30 ==\nENGAGEMENT SUPPLEMENT.\tJeudi 12 Novembre 2026\t11h30 ==\nANNULATION PART PROB\tVendredi 13 Novembre 2026\t10h30 ==\nMONTE\tVendredi 13 Novembre 2026\t12h30 ==\n",
+    "title": "PRIX MAURICE GILLOIS - GRAND STEEPLE-CHASE DES 4 ANS | France Galop",
+    "url": "https://www.france-galop.com/fr/course/detail/2026/O/Sk54SlYrTllGOWI4T1dRK2QyK2x3dz09"
+  },
+  {
+    "tables": [
+      {
+        "id": "",
+        "rows": [
+          [
+            "N°",
+            "Cheval",
+            "Poids",
+            "Valeur",
+            "Priorité",
+            "Propriétaire",
+            "Entraîneur",
+            "Dép./Pays Ent.",
+            "Gains"
+          ],
+          [
+            "1",
+            "MISTER BANKER H.PS. 4 a.",
+            "67 kg",
+            "***",
+            "",
+            "MR PHILIPPE ALLAIRE",
+            "E. ALLAIRE (S)",
+            "14",
+            "18.450"
+          ],
+          [
+            "2",
+            "MAGICIEN D'OR H.AQ. 4 a.",
+            "67 kg",
+            "***",
+            "",
+            "AP GROUP S.R.L.",
+            "MME G. MENATO",
+            "60",
+            "24.225"
+          ],
+          [
+            "3",
+            "ITS NOW H.PS. 4 A.",
+            "67 kg",
+            "67.0",
+            "",
+            "MME FRANCOIS DE BEAUREGARD",
+            "D. SOURDEAU DE BEAUREGARD (S)",
+            "49",
+            "74.795"
+          ],
+          [
+            "4",
+            "MOISES HAS A BOAT H.PS. 4 a.",
+            "67 kg",
+            "***",
+            "",
+            "MR MICHAEL BLENCOWE",
+            "NJ. HENDERSON",
+            "GBR",
+            "20.700"
+          ],
+          [
+            "5",
+            "Mountain Ridge H.Ps. 4 A.",
+            "67 kg",
+            "69.5",
+            "",
+            "J.BOISNARD (S)",
+            "J. BOISNARD (S)",
+            "49",
+            "126.080"
+          ],
+          [
+            "6",
+            "MILOVENT H.AQ. 4 a.",
+            "67 kg",
+            "65.0",
+            "",
+            "MR BENOIT CHEVALIER",
+            "CHAILLE-CHAILLE & PAMART (S)",
+            "17",
+            "42.180"
+          ],
+          [
+            "7",
+            "Fiumiccino H.Ps. 4 A.",
+            "67 kg",
+            "62.5",
+            "",
+            "MR JEAN-PIERRE-JOSEPH DUBOIS",
+            "D. COTTIN (S)",
+            "60",
+            "49.485"
+          ],
+          [
+            "8",
+            "LEWIS GREY H.PS. 4 a.",
+            "67 kg",
+            "63.0",
+            "",
+            "ECURIE DAVID R. LAYANI FAMILLE",
+            "J. BOISNARD (S)",
+            "49",
+            "62.945"
+          ],
+          [
+            "9",
+            "FALCON JET H.PS. 4 A.",
+            "67 kg",
+            "61.5",
+            "",
+            "ECURIE DES POILUS/JM.CALLIER",
+            "CHAILLE-CHAILLE & PAMART (S)",
+            "17",
+            "86.410"
+          ],
+          [
+            "10",
+            "LEOPARD DU BERLAIS H.PS. 4 A.",
+            "67 kg",
+            "73.5",
+            "",
+            "ECURIE HUGO ET PIERRE PILARSKI",
+            "D. COTTIN (S)",
+            "60",
+            "305.340"
+          ],
+          [
+            "11",
+            "TEEN SPIRIT H.PS. 4 A.",
+            "67 kg",
+            "***",
+            "",
+            "MR S P FITZGERALD",
+            "N. GEORGE & A. ZETTERHOLM (S)",
+            "60",
+            "18.620"
+          ],
+          [
+            "12",
+            "GUADALQUIVIR M.PS. 4 A.",
+            "67 kg",
+            "72.0",
+            "",
+            "HARAS DU SAUBOUAS",
+            "N. GEORGE & A. ZETTERHOLM (S)",
+            "60",
+            "148.125"
+          ],
+          [
+            "13",
+            "TALGAT H.PS. 4 a.",
+            "67 kg",
+            "***",
+            "",
+            "MR BENJAMIN LION",
+            "M. SEROR (S)",
+            "60",
+            "9.660"
+          ],
+          [
+            "14",
+            "MOX H.AQ. 4 a.",
+            "67 kg",
+            "***",
+            "",
+            "LORD DARESBURY/EC.MME J.CYPRES",
+            "N. GEORGE & A. ZETTERHOLM (S)",
+            "60",
+            "35.190"
+          ],
+          [
+            "15",
+            "Pinot Blanc H.Ps. 4 A.",
+            "67 kg",
+            "69.0",
+            "",
+            "MR DAVID LUMET",
+            "E. GRALL (S)",
+            "44",
+            "42.930"
+          ],
+          [
+            "16",
+            "METRONOMIQUE H.AQ. 4 A.",
+            "67 kg",
+            "69.0",
+            "",
+            "MME SHARON COLLEEN NELSON",
+            "N. GEORGE & A. ZETTERHOLM (S)",
+            "60",
+            "34.720"
+          ],
+          [
+            "17",
+            "QUINTA DO LAGO H.PS. 4 a.",
+            "67 kg",
+            "***",
+            "",
+            "QDL PARTNERSHIP",
+            "MME J. HARRINGTON",
+            "IRL",
+            "44.889"
+          ],
+          [
+            "18",
+            "MAHARAJA H.PS. 4 A.",
+            "67 kg",
+            "69.0",
+            "",
+            "S.MUNIR/I.SOUEDE",
+            "M. SEROR (S)",
+            "60",
+            "148.945"
+          ],
+          [
+            "19",
+            "SPANISH PRINCE H.PS. 4 a.",
+            "67 kg",
+            "***",
+            "",
+            "SANGWIN BLOODSTOCK LTD",
+            "N. GEORGE & A. ZETTERHOLM (S)",
+            "60",
+            "24.380"
+          ],
+          [
+            "20",
+            "LOUMINOS H.PS. 4 A.",
+            "67 kg",
+            "60.5",
+            "",
+            "MR REGIS SCHMIDLIN",
+            "R. SCHMIDLIN",
+            "77",
+            "134.680"
+          ],
+          [
+            "21",
+            "INSTANT FRAGILE M.PS. 4 a.",
+            "67 kg",
+            "***",
+            "",
+            "MR JEAN-CLAUDE SEROUL",
+            "D. BRESSOU",
+            "50",
+            "46.920"
+          ],
+          [
+            "22",
+            "SHABRACK H.PS. 4 A.",
+            "67 kg",
+            "72.0",
+            "",
+            "T.STORME/HARAS DES SABLONNETS",
+            "M. ROLLAND (S)",
+            "60",
+            "213.300"
+          ],
+          [
+            "23",
+            "EDAMURA H.PS. 4 A.",
+            "67 kg",
+            "71.5",
+            "",
+            "TERRAINS D'AVILLY ST LEONARD",
+            "ROB. COLLET (S)",
+            "60",
+            "206.400"
+          ],
+          [
+            "24",
+            "ILLYADAME F.PS. 4 a.",
+            "65 kg",
+            "63.5",
+            "",
+            "MR RICHARD CORVELLER",
+            "CHAILLE-CHAILLE & PAMART (S)",
+            "17",
+            "58.785"
+          ],
+          [
+            "25",
+            "MYSOKO STAR F.AQ. 4 A.",
+            "65 kg",
+            "69.5",
+            "",
+            "ECURIE BENAROUSSI SOFIANE",
+            "L. PONTOIR (S)",
+            "78",
+            "112.730"
+          ],
+          [
+            "26",
+            "OLGA DE KIEV F.PS. 4 A.",
+            "65 kg",
+            "70.0",
+            "",
+            "ECURIE LAURENT QUEROU",
+            "M. SEROR (S)",
+            "60",
+            "194.645"
+          ],
+          [
+            "27",
+            "MILLARES F.AQ. 4 a.",
+            "65 kg",
+            "67.5",
+            "",
+            "ECURIE MAGNIEN",
+            "E.D' ANDIGNE",
+            "49",
+            "43.960"
+          ],
+          [
+            "28",
+            "Just Happy F.Ps. 4 A.",
+            "65 kg",
+            "63.5",
+            "",
+            "FAMILLE BRYANT",
+            "E. GRALL (S)",
+            "44",
+            "78.895"
+          ],
+          [
+            "29",
+            "GOOD GIRL DE FAUST F.PS. 4 A.",
+            "65 kg",
+            "65.0",
+            "",
+            "MR MARTIN INGRAM",
+            "M. SEROR (S)",
+            "60",
+            "123.020"
+          ],
+          [
+            "30",
+            "MISS DAPHNE GB F.AQ. 4 a.",
+            "65 kg",
+            "60.5",
+            "",
+            "MLLE VICTORIA MARKOWIAK",
+            "M. SEROR (S)",
+            "60",
+            "16.405"
+          ],
+          [
+            "31",
+            "NOIRE WULF IRE F.PS. 4 A.",
+            "65 kg",
+            "68.5",
+            "",
+            "MR DAMIAN TIERNAN",
+            "N. GEORGE & A. ZETTERHOLM (S)",
+            "60",
+            "194.815"
+          ],
+          [
+            "32",
+            "DELMEGAN F.PS. 4 A.",
+            "65 kg",
+            "74.0",
+            "",
+            "MR CHRISTOPHE TOULORGE",
+            "E. ALLAIRE (S)",
+            "14",
+            "432.810"
+          ]
+        ]
+      },
+      {
+        "id": "",
+        "rows": [
+          [
+            "FORFAIT 1",
+            "Mercredi 11 Novembre 2026",
+            "11h30 PARIS"
+          ],
+          [
+            "PARTANT PROBABLE",
+            "Jeudi 12 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ENGAGEMENT SUPPLEMENT.",
+            "Jeudi 12 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ANNULATION PART PROB",
+            "Vendredi 13 Novembre 2026",
+            "10h30 =="
+          ],
+          [
+            "MONTE",
+            "Vendredi 13 Novembre 2026",
+            "12h30 =="
+          ]
+        ]
+      }
+    ],
+    "text": "3ème(O/ 178), — 15/11/2026 00h00, AUTEUIL\n\nHAIES , 3.900 mètres\n260.000 (117.000, 57.200, 33.800, 23.400, 13.000, 9.100, 6.500)\nAprès Second-Engagements : 32 Engagés. 32 Partants. - Course Premium -\n\n\nGROUPE I\nPour tous poulains et pouliches de 4 ans. Poids : 67 kg.\nVersement à la poule des propriétaires : 520 Euros à l'engagement le mercredi 16 septembre 2026, 2 600 Euros au second engagement le vendredi 6 novembre 2026 ou 11 700 Euros à l'engagement supplémentaire le jeudi 12 novembre 2026.\nUn trophée sera offert au propriétaire, à l'entraîneur, au jockey, à l'éleveur et au cavalier d'entraînement du cheval gagnant par FRANCE GALOP.\nUne couverture sera remise au poulain ou à la pouliche gagnant après la course.\n\n\n\nLegal notice\n\nAUTEUIL\n\n1 2 3 4 5 6 7 8\nN°\tCheval\tPoids\tValeur\tPriorité\tPropriétaire\tEntraîneur\tDép./Pays Ent.\tGains\n1\tMISTER BANKER H.PS. 4 a.\t67 kg\t***\t\tMR PHILIPPE ALLAIRE\tE. ALLAIRE (S)\t14\t18.450\n2\tMAGICIEN D'OR H.AQ. 4 a.\t67 kg\t***\t\tAP GROUP S.R.L.\tMME G. MENATO\t60\t24.225\n3\tITS NOW H.PS. 4 A.\t67 kg\t67.0\n\t\tMME FRANCOIS DE BEAUREGARD\tD. SOURDEAU DE BEAUREGARD (S)\t49\t74.795\n4\tMOISES HAS A BOAT H.PS. 4 a.\t67 kg\t***\t\tMR MICHAEL BLENCOWE\tNJ. HENDERSON\tGBR\t20.700\n5\tMountain Ridge H.Ps. 4 A.\t67 kg\t69.5\t\tJ.BOISNARD (S)\tJ. BOISNARD (S)\t49\t126.080\n6\tMILOVENT H.AQ. 4 a.\t67 kg\t65.0\n\t\tMR BENOIT CHEVALIER\tCHAILLE-CHAILLE & PAMART (S)\t17\t42.180\n7\tFiumiccino H.Ps. 4 A.\t67 kg\t62.5\n\t\tMR JEAN-PIERRE-JOSEPH DUBOIS\tD. COTTIN (S)\t60\t49.485\n8\tLEWIS GREY H.PS. 4 a.\t67 kg\t63.0\n\t\tECURIE DAVID R. LAYANI FAMILLE\tJ. BOISNARD (S)\t49\t62.945\n9\tFALCON JET H.PS. 4 A.\t67 kg\t61.5\n\t\tECURIE DES POILUS/JM.CALLIER\tCHAILLE-CHAILLE & PAMART (S)\t17\t86.410\n10\tLEOPARD DU BERLAIS H.PS. 4 A.\t67 kg\t73.5\n\t\tECURIE HUGO ET PIERRE PILARSKI\tD. COTTIN (S)\t60\t305.340\n11\tTEEN SPIRIT H.PS. 4 A.\t67 kg\t***\t\tMR S P FITZGERALD\tN. GEORGE & A. ZETTERHOLM (S)\t60\t18.620\n12\tGUADALQUIVIR M.PS. 4 A.\t67 kg\t72.0\n\t\tHARAS DU SAUBOUAS\tN. GEORGE & A. ZETTERHOLM (S)\t60\t148.125\n13\tTALGAT H.PS. 4 a.\t67 kg\t***\t\tMR BENJAMIN LION\tM. SEROR (S)\t60\t9.660\n14\tMOX H.AQ. 4 a.\t67 kg\t***\t\tLORD DARESBURY/EC.MME J.CYPRES\tN. GEORGE & A. ZETTERHOLM (S)\t60\t35.190\n15\tPinot Blanc H.Ps. 4 A.\t67 kg\t69.0\n\t\tMR DAVID LUMET\tE. GRALL (S)\t44\t42.930\n16\tMETRONOMIQUE H.AQ. 4 A.\t67 kg\t69.0\t\tMME SHARON COLLEEN NELSON\tN. GEORGE & A. ZETTERHOLM (S)\t60\t34.720\n17\tQUINTA DO LAGO H.PS. 4 a.\t67 kg\t***\t\tQDL PARTNERSHIP\tMME J. HARRINGTON\tIRL\t44.889\n18\tMAHARAJA H.PS. 4 A.\t67 kg\t69.0\n\t\tS.MUNIR/I.SOUEDE\tM. SEROR (S)\t60\t148.945\n19\tSPANISH PRINCE H.PS. 4 a.\t67 kg\t***\t\tSANGWIN BLOODSTOCK LTD\tN. GEORGE & A. ZETTERHOLM (S)\t60\t24.380\n20\tLOUMINOS H.PS. 4 A.\t67 kg\t60.5\n\t\tMR REGIS SCHMIDLIN\tR. SCHMIDLIN\t77\t134.680\n21\tINSTANT FRAGILE M.PS. 4 a.\t67 kg\t***\t\tMR JEAN-CLAUDE SEROUL\tD. BRESSOU\t50\t46.920\n22\tSHABRACK H.PS. 4 A.\t67 kg\t72.0\n\t\tT.STORME/HARAS DES SABLONNETS\tM. ROLLAND (S)\t60\t213.300\n23\tEDAMURA H.PS. 4 A.\t67 kg\t71.5\t\tTERRAINS D'AVILLY ST LEONARD\tROB. COLLET (S)\t60\t206.400\n24\tILLYADAME F.PS. 4 a.\t65 kg\t63.5\n\t\tMR RICHARD CORVELLER\tCHAILLE-CHAILLE & PAMART (S)\t17\t58.785\n25\tMYSOKO STAR F.AQ. 4 A.\t65 kg\t69.5\n\t\tECURIE BENAROUSSI SOFIANE\tL. PONTOIR (S)\t78\t112.730\n26\tOLGA DE KIEV F.PS. 4 A.\t65 kg\t70.0\n\t\tECURIE LAURENT QUEROU\tM. SEROR (S)\t60\t194.645\n27\tMILLARES F.AQ. 4 a.\t65 kg\t67.5\t\tECURIE MAGNIEN\tE.D' ANDIGNE\t49\t43.960\n28\tJust Happy F.Ps. 4 A.\t65 kg\t63.5\n\t\tFAMILLE BRYANT\tE. GRALL (S)\t44\t78.895\n29\tGOOD GIRL DE FAUST F.PS. 4 A.\t65 kg\t65.0\n\t\tMR MARTIN INGRAM\tM. SEROR (S)\t60\t123.020\n30\tMISS DAPHNE GB F.AQ. 4 a.\t65 kg\t60.5\n\t\tMLLE VICTORIA MARKOWIAK\tM. SEROR (S)\t60\t16.405\n31\tNOIRE WULF IRE F.PS. 4 A.\t65 kg\t68.5\n\t\tMR DAMIAN TIERNAN\tN. GEORGE & A. ZETTERHOLM (S)\t60\t194.815\n32\tDELMEGAN F.PS. 4 A.\t65 kg\t74.0\n\t\tMR CHRISTOPHE TOULORGE\tE. ALLAIRE (S)\t14\t432.810\nClôture\nFORFAIT 1\tMercredi 11 Novembre 2026\t11h30 PARIS\nPARTANT PROBABLE\tJeudi 12 Novembre 2026\t11h30 ==\nENGAGEMENT SUPPLEMENT.\tJeudi 12 Novembre 2026\t11h30 ==\nANNULATION PART PROB\tVendredi 13 Novembre 2026\t10h30 ==\nMONTE\tVendredi 13 Novembre 2026\t12h30 ==\n",
+    "title": "PRIX RENAUD DU VIVIER - GRANDE COURSE DE HAIES DES 4 ANS | France Galop",
+    "url": "https://www.france-galop.com/fr/course/detail/2026/O/WksrU1d3MXN1ZjM3dFd1ZnM0NStIZz09"
+  },
+  {
+    "tables": [
+      {
+        "id": "",
+        "rows": [
+          [
+            "ENGAGEMENT",
+            "Jeudi 19 Novembre 2026",
+            "10h30 PARIS"
+          ],
+          [
+            "FORFAIT 1",
+            "Lundi 23 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ENGAGEMENT SUPPLEMENT.",
+            "Mardi 24 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "PARTANT PROBABLE",
+            "Mardi 24 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ANNULATION PART PROB",
+            "Mercredi 25 Novembre 2026",
+            "10h30 =="
+          ],
+          [
+            "MONTE",
+            "Mercredi 25 Novembre 2026",
+            "12h30 =="
+          ]
+        ]
+      }
+    ],
+    "text": "\n\nFacebook\nTwitter\nMail\n+\nImprimer\n\n1ère(O/ 3593), — 27/11/2026 00h00, COMPIEGNE\n\nHAIES , 3.400 mètres\n125.000 (56.250, 27.500, 16.250, 11.250, 6.250, 4.375, 3.125)\n143.750 (64.687, 31.625, 18.687, 12.937, 7.187, 5.031, 3.593) - Allocation + Prime Propriétaire pour femelles (si éligible)\nCloture des engagements à venir : - Course Premium -\n\n\nGROUPE III\nDes primes de 11 000, 5 000, 4 000, seront offertes par le Fonds Européen de l'Elevage respectivement attribuées aux trois premiers qui ne seront versées que si les chevaux sont issus d'étalons inscrits au F.E.E.\nPour tous poulains et pouliches de 3 ans. Poids : 66 kg. Les poulains et pouliches ayant, en course de haies, gagné un Groupe III porteront 2 kg ; un Groupe II, 3 kg ; un Groupe I, 4 kg.\nUn souvenir sera offert au propriétaire du cheval gagnant par FRANCE GALOP.\n\n\n\nLegal notice\n\nCOMPIEGNE\n\n1 2 3 4 5 6 7\n\nAUCUNE LISTE DIFFUSABLE\n\nClôture\nENGAGEMENT\tJeudi 19 Novembre 2026\t10h30 PARIS\nFORFAIT 1\tLundi 23 Novembre 2026\t11h30 ==\nENGAGEMENT SUPPLEMENT.\tMardi 24 Novembre 2026\t11h30 ==\nPARTANT PROBABLE\tMardi 24 Novembre 2026\t11h30 ==\nANNULATION PART PROB\tMercredi 25 Novembre 2026\t10h30 ==\nMONTE\tMercredi 25 Novembre 2026\t12h30 ==\n",
+    "title": "PRIX GENERAL DE SAINT-DIDIER | France Galop",
+    "url": "https://www.france-galop.com/fr/course/detail/2026/O/c29RTGZ4S20vZ3dMNDhEdDdzMWRjZz09"
+  },
+  {
+    "tables": [
+      {
+        "id": "",
+        "rows": [
+          [
+            "ENGAGEMENT",
+            "Jeudi 19 Novembre 2026",
+            "10h30 PARIS"
+          ],
+          [
+            "FORFAIT 1",
+            "Lundi 23 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ENGAGEMENT SUPPLEMENT.",
+            "Mardi 24 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "PARTANT PROBABLE",
+            "Mardi 24 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ANNULATION PART PROB",
+            "Mercredi 25 Novembre 2026",
+            "10h30 =="
+          ],
+          [
+            "MONTE",
+            "Mercredi 25 Novembre 2026",
+            "12h30 =="
+          ]
+        ]
+      }
+    ],
+    "text": "3ème(O/ 3594), — 27/11/2026 00h00, COMPIEGNE\n\nHAIES , 3.600 mètres\n125.000 (56.250, 27.500, 16.250, 11.250, 6.250, 4.375, 3.125)\n143.750 (64.687, 31.625, 18.687, 12.937, 7.187, 5.031, 3.593) - Allocation + Prime Propriétaire pour femelles (si éligible)\nCloture des engagements à venir : - Course Premium -\n\n\nGROUPE III\nDes primes de 11 000, 5 000, 4 000, seront offertes par le Fonds Européen de l'Elevage respectivement attribuées aux trois premiers qui ne seront versées que si les chevaux sont issus d'étalons inscrits au F.E.E.\nPour tous chevaux de 4 ans et au-dessus. Poids : 4 ans, 64 kg ; 5 ans, 66 kg ; 6 ans et au-dessus, 67 kg. Les chevaux ayant, en course de haies, depuis le 1er janvier de l'année dernière inclus, gagné un Groupe III porteront 2 kg ; un Groupe II, 3 kg ; un Groupe I, 4 kg.\nUn souvenir sera offert au propriétaire du cheval gagnant par FRANCE GALOP.\n\n\n\nLegal notice\n\nCOMPIEGNE\n\n1 2 3 4 5 6 7\n\nAUCUNE LISTE DIFFUSABLE\n\nClôture\nENGAGEMENT\tJeudi 19 Novembre 2026\t10h30 PARIS\nFORFAIT 1\tLundi 23 Novembre 2026\t11h30 ==\nENGAGEMENT SUPPLEMENT.\tMardi 24 Novembre 2026\t11h30 ==\nPARTANT PROBABLE\tMardi 24 Novembre 2026\t11h30 ==\nANNULATION PART PROB\tMercredi 25 Novembre 2026\t10h30 ==\nMONTE\tMercredi 25 Novembre 2026\t12h30 ==\n",
+    "title": "PRIX LEOPOLD D'ORSETTI - GRANDE COURSE DE HAIES DE COMPIEGNE | France Galop",
+    "url": "https://www.france-galop.com/fr/course/detail/2026/O/ZDRWcldzSE5nQTFld3VPeW9VekRvQT09"
+  },
+  {
+    "tables": [
+      {
+        "id": "",
+        "rows": [
+          [
+            "ENGAGEMENT",
+            "Vendredi 20 Novembre 2026",
+            "10h30 PARIS"
+          ],
+          [
+            "FORFAIT 1",
+            "Mercredi 25 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ENGAGEMENT SUPPLEMENT.",
+            "Jeudi 26 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "PARTANT PROBABLE",
+            "Jeudi 26 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ANNULATION PART PROB",
+            "Vendredi 27 Novembre 2026",
+            "10h30 =="
+          ],
+          [
+            "MONTE",
+            "Vendredi 27 Novembre 2026",
+            "12h30 =="
+          ]
+        ]
+      }
+    ],
+    "text": "8ème(O/ 184), — 29/11/2026 00h00, AUTEUIL\n\nSTEEPLE-CHASE , 4.400 mètres\n130.000 (58.500, 28.600, 16.900, 11.700, 6.500, 4.550, 3.250)\n149.500 (67.275, 32.890, 19.435, 13.455, 7.475, 5.232, 3.737) - Allocation + Prime Propriétaire (si éligible)\nCloture des engagements à venir : - Pari Complexe -\n\n\nGROUPE III\nPour pouliches et juments de 4 et 5 ans, n'ayant pas, cette année, en steeple-chase, gagné un Groupe I. Poids : 4 ans, 64 kg ; 5 ans, 66 kg. Les pouliches et les juments ayant, depuis le 1er janvier de l'année dernière inclus, en steeple-chase, gagné un Groupe III porteront 2 kg ; un Groupe II, 3 kg, un Groupe I, 4 kg.\nUn souvenir sera offert au propriétaire de la pouliche ou la jument gagnante par FRANCE GALOP.\n\n\n\nLegal notice\n\nAUTEUIL\n\n1 2 3 4 5 6 7 8\n\nAUCUNE LISTE DIFFUSABLE\n\nClôture\nENGAGEMENT\tVendredi 20 Novembre 2026\t10h30 PARIS\nFORFAIT 1\tMercredi 25 Novembre 2026\t11h30 ==\nENGAGEMENT SUPPLEMENT.\tJeudi 26 Novembre 2026\t11h30 ==\nPARTANT PROBABLE\tJeudi 26 Novembre 2026\t11h30 ==\nANNULATION PART PROB\tVendredi 27 Novembre 2026\t10h30 ==\nMONTE\tVendredi 27 Novembre 2026\t12h30 ==\n",
+    "title": "PRIX SYTAJ | France Galop",
+    "url": "https://www.france-galop.com/fr/course/detail/2026/O/TEZCbzBYbmEzR2doQmRlYlNVR2xqQT09"
+  },
+  {
+    "tables": [
+      {
+        "id": "",
+        "rows": [
+          [
+            "ENGAGEMENT",
+            "Vendredi 27 Novembre 2026",
+            "10h30 PARIS"
+          ],
+          [
+            "FORFAIT 1",
+            "Mercredi 2 Décembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ENGAGEMENT SUPPLEMENT.",
+            "Jeudi 3 Décembre 2026",
+            "11h30 =="
+          ],
+          [
+            "PARTANT PROBABLE",
+            "Jeudi 3 Décembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ANNULATION PART PROB",
+            "Vendredi 4 Décembre 2026",
+            "10h30 =="
+          ],
+          [
+            "MONTE",
+            "Vendredi 4 Décembre 2026",
+            "12h30 =="
+          ]
+        ]
+      }
+    ],
+    "text": "4ème(O/ 188), — 06/12/2026 00h00, AUTEUIL\n\nHAIES , 3.600 mètres\n165.000 (74.250, 36.300, 21.450, 14.850, 8.250, 5.775, 4.125)\n189.750 (85.387, 41.745, 24.667, 17.077, 9.487, 6.641, 4.743) - Allocation + Prime Propriétaire (si éligible)\nCloture des engagements à venir : - Course Premium -\n\n\nGROUPE II\nPour pouliches et juments de 4 ans et au-dessus, n'ayant pas, cette année, en course à obstacles, gagné un Groupe I. Poids : 4 ans, 64 kg ; 5 ans et au-dessus, 66 kg. Les pouliches et juments ayant, en course de haies, depuis le 1er janvier de l'année dernière inclus, gagné un Groupe III porteront 2 kg ; un Groupe II, 3 kg ; un Groupe I, 4 kg.\nUn souvenir sera offert au propriétaire de la pouliche ou de la jument gagnante par FRANCE GALOP.\n\n\n\nLegal notice\n\nAUTEUIL\n\n1 2 3 4 5 6 7 8 9\n\nAUCUNE LISTE DIFFUSABLE\n\nClôture\nENGAGEMENT\tVendredi 27 Novembre 2026\t10h30 PARIS\nFORFAIT 1\tMercredi 2 Décembre 2026\t11h30 ==\nENGAGEMENT SUPPLEMENT.\tJeudi 3 Décembre 2026\t11h30 ==\nPARTANT PROBABLE\tJeudi 3 Décembre 2026\t11h30 ==\nANNULATION PART PROB\tVendredi 4 Décembre 2026\t10h30 ==\nMONTE\tVendredi 4 Décembre 2026\t12h30 ==\n",
+    "title": "PRIX ANDRE MICHEL | France Galop",
+    "url": "https://www.france-galop.com/fr/course/detail/2026/O/eUtvd2NOTHNJU1Z6ejBoN3RramZoUT09"
+  },
+  {
+    "tables": [
+      {
+        "id": "",
+        "rows": [
+          [
+            "ENGAGEMENT",
+            "Vendredi 27 Novembre 2026",
+            "10h30 PARIS"
+          ],
+          [
+            "FORFAIT 1",
+            "Mercredi 2 Décembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ENGAGEMENT SUPPLEMENT.",
+            "Jeudi 3 Décembre 2026",
+            "11h30 =="
+          ],
+          [
+            "PARTANT PROBABLE",
+            "Jeudi 3 Décembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ANNULATION PART PROB",
+            "Vendredi 4 Décembre 2026",
+            "10h30 =="
+          ],
+          [
+            "MONTE",
+            "Vendredi 4 Décembre 2026",
+            "12h30 =="
+          ]
+        ]
+      }
+    ],
+    "text": "8ème(O/ 192), — 06/12/2026 00h00, AUTEUIL\n\nSTEEPLE-CHASE , 4.400 mètres\n230.000 (103.500, 50.600, 29.900, 20.700, 11.500, 8.050, 5.750)\n264.500 (119.025, 58.190, 34.385, 23.805, 13.225, 9.257, 6.612) - Allocation + Prime Propriétaire pour femelles (si éligible)\nCloture des engagements à venir : - Pari Complexe -\n\n\nGROUPE II\nPour tous chevaux de 5 ans et au-dessus. Poids : 66 kg. Les chevaux ayant, en steeple-chase, depuis le 1er janvier de l'année dernière inclus, gagné un Groupe III porteront 2 kg ; un Groupe II, 3 kg ; un Groupe I, 4 kg.\nUn souvenir sera offert au propriétaire du cheval gagnant par FRANCE GALOP.\n\n\n\nLegal notice\n\nAUTEUIL\n\n1 2 3 4 5 6 7 8 9\n\nAUCUNE LISTE DIFFUSABLE\n\nClôture\nENGAGEMENT\tVendredi 27 Novembre 2026\t10h30 PARIS\nFORFAIT 1\tMercredi 2 Décembre 2026\t11h30 ==\nENGAGEMENT SUPPLEMENT.\tJeudi 3 Décembre 2026\t11h30 ==\nPARTANT PROBABLE\tJeudi 3 Décembre 2026\t11h30 ==\nANNULATION PART PROB\tVendredi 4 Décembre 2026\t10h30 ==\nMONTE\tVendredi 4 Décembre 2026\t12h30 ==\n",
+    "title": "PRIX GEORGES COURTOIS | France Galop",
+    "url": "https://www.france-galop.com/fr/course/detail/2026/O/bFRPOGpqWEpyVjFhck1COEZTakYxdz09"
+  },
+  {
+    "tables": [
+      {
+        "id": "",
+        "rows": [
+          [
+            "ENGAGEMENT",
+            "Vendredi 27 Novembre 2026",
+            "10h30 PARIS"
+          ],
+          [
+            "FORFAIT 1",
+            "Mercredi 2 Décembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ENGAGEMENT SUPPLEMENT.",
+            "Jeudi 3 Décembre 2026",
+            "11h30 =="
+          ],
+          [
+            "PARTANT PROBABLE",
+            "Jeudi 3 Décembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ANNULATION PART PROB",
+            "Vendredi 4 Décembre 2026",
+            "10h30 =="
+          ],
+          [
+            "MONTE",
+            "Vendredi 4 Décembre 2026",
+            "12h30 =="
+          ]
+        ]
+      }
+    ],
+    "text": "5ème(O/ 189), — 06/12/2026 00h00, AUTEUIL\n\nHAIES , 4.300 mètres\n182.000 (81.900, 40.040, 23.660, 16.380, 9.100, 6.370, 4.550)\n209.300 (94.185, 46.046, 27.209, 18.837, 10.465, 7.325, 5.232) - Allocation + Prime Propriétaire pour femelles (si éligible)\nCloture des engagements à venir : - Course Premium -\n\n\nGROUPE II\nPour tous chevaux de 5 ans et au-dessus. Poids : 66 kg. Surcharges accumulées et limitées à 4 kg pour les 5 ans. Les chevaux ayant, depuis le 1er janvier de l'année dernière inclus, en course de haies, gagné un Groupe III ou un Groupe II porteront 2 kg ; plusieurs courses de Groupe, 4 kg ; un Groupe I, 5 kg.\nUn souvenir sera offert au propriétaire du cheval gagnant par FRANCE GALOP.\n\n\n\nLegal notice\n\nAUTEUIL\n\n1 2 3 4 5 6 7 8 9\n\nAUCUNE LISTE DIFFUSABLE\n\nClôture\nENGAGEMENT\tVendredi 27 Novembre 2026\t10h30 PARIS\nFORFAIT 1\tMercredi 2 Décembre 2026\t11h30 ==\nENGAGEMENT SUPPLEMENT.\tJeudi 3 Décembre 2026\t11h30 ==\nPARTANT PROBABLE\tJeudi 3 Décembre 2026\t11h30 ==\nANNULATION PART PROB\tVendredi 4 Décembre 2026\t10h30 ==\nMONTE\tVendredi 4 Décembre 2026\t12h30 ==\n",
+    "title": "PRIX LEON OLRY ROEDERER | France Galop",
+    "url": "https://www.france-galop.com/fr/course/detail/2026/O/VHFGZTI5RzAzbzlUK0FIRm5JaTJGUT09"
+  },
+  {
+    "tables": [
+      {
+        "id": "",
+        "rows": [
+          [
+            "ENGAGEMENT",
+            "Vendredi 27 Novembre 2026",
+            "10h30 PARIS"
+          ],
+          [
+            "FORFAIT 1",
+            "Mercredi 2 Décembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ENGAGEMENT SUPPLEMENT.",
+            "Jeudi 3 Décembre 2026",
+            "11h30 =="
+          ],
+          [
+            "PARTANT PROBABLE",
+            "Jeudi 3 Décembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ANNULATION PART PROB",
+            "Vendredi 4 Décembre 2026",
+            "10h30 =="
+          ],
+          [
+            "MONTE",
+            "Vendredi 4 Décembre 2026",
+            "12h30 =="
+          ]
+        ]
+      }
+    ],
+    "text": "7ème(O/ 191), — 06/12/2026 00h00, AUTEUIL\n\nSTEEPLE-CHASE , 4.400 mètres\n140.000 (63.000, 30.800, 18.200, 12.600, 7.000, 4.900, 3.500)\n161.000 (72.450, 35.420, 20.930, 14.490, 8.050, 5.635, 4.025) - Allocation + Prime Propriétaire pour femelles (si éligible)\nCloture des engagements à venir : - Course Premium -\n\n\nGROUPE III\nPour tous poulains et pouliches de 4 ans. Poids : 66 kg. Les poulains et pouliches ayant, en steeple-chase, gagné un Groupe III porteront 2 kg ; un Groupe II, 3 kg ; un Groupe I, 4 kg.\nUn souvenir sera offert au propriétaire du cheval gagnant par FRANCE GALOP.\n\n\n\nLegal notice\n\nAUTEUIL\n\n1 2 3 4 5 6 7 8 9\n\nAUCUNE LISTE DIFFUSABLE\n\nClôture\nENGAGEMENT\tVendredi 27 Novembre 2026\t10h30 PARIS\nFORFAIT 1\tMercredi 2 Décembre 2026\t11h30 ==\nENGAGEMENT SUPPLEMENT.\tJeudi 3 Décembre 2026\t11h30 ==\nPARTANT PROBABLE\tJeudi 3 Décembre 2026\t11h30 ==\nANNULATION PART PROB\tVendredi 4 Décembre 2026\t10h30 ==\nMONTE\tVendredi 4 Décembre 2026\t12h30 ==\n",
+    "title": "PRIX MORGEX | France Galop",
+    "url": "https://www.france-galop.com/fr/course/detail/2026/O/ay95ZHpJK1VlelhQdGF5T0ZISUZiUT09"
+  },
+  {
+    "tables": [
+      {
+        "id": "",
+        "rows": [
+          [
+            "ENGAGEMENT",
+            "Vendredi 13 Novembre 2026",
+            "10h30 PARIS"
+          ],
+          [
+            "FORFAIT 1",
+            "Mercredi 18 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ENGAGEMENT SUPPLEMENT.",
+            "Jeudi 19 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "PARTANT PROBABLE",
+            "Jeudi 19 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ANNULATION PART PROB",
+            "Vendredi 20 Novembre 2026",
+            "10h30 =="
+          ],
+          [
+            "MONTE",
+            "Vendredi 20 Novembre 2026",
+            "12h30 =="
+          ]
+        ]
+      }
+    ],
+    "text": "7ème(P/ 6281), — 22/11/2026 00h00, FONTAINEBLEAU\n\nPLAT , 2.600 mètres , Corde à GAUCHE\n70.000 (35.000, 14.000, 10.500, 7.000, 3.500)\nCloture des engagements à venir : - Course Premium -\n\n\nGROUPE I AQPS\nPour poulains entiers, hongres et pouliches de 3 ans inscrits au Stud-Book Autres Que Pur-Sang. Poids : 62 kg.\nLes remises de poids prévues à l'Article 104 du Code des Courses au Galop ne sont pas applicables.\nLa prime propriétaire ne s'applique pas.\nL'Association AQPS remettra un trophée au propriétaire du cheval gagnant.\n\n\nLegal notice\n\nFONTAINEBLEAU\n\n1 2 3 4 5 6 7 8\n\nAUCUNE LISTE DIFFUSABLE\n\nClôture\nENGAGEMENT\tVendredi 13 Novembre 2026\t10h30 PARIS\nFORFAIT 1\tMercredi 18 Novembre 2026\t11h30 ==\nENGAGEMENT SUPPLEMENT.\tJeudi 19 Novembre 2026\t11h30 ==\nPARTANT PROBABLE\tJeudi 19 Novembre 2026\t11h30 ==\nANNULATION PART PROB\tVendredi 20 Novembre 2026\t10h30 ==\nMONTE\tVendredi 20 Novembre 2026\t12h30 ==\n",
+    "title": "PRIX JACQUES DE VIENNE | France Galop",
+    "url": "https://www.france-galop.com/fr/course/detail/2026/P/Wm1LNXNaZGdwcGxwZ0lqdnk0YXR3UT09"
+  },
+  {
+    "tables": [
+      {
+        "id": "",
+        "rows": [
+          [
+            "ENGAGEMENT",
+            "Vendredi 13 Novembre 2026",
+            "10h30 PARIS"
+          ],
+          [
+            "FORFAIT 1",
+            "Mercredi 18 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ENGAGEMENT SUPPLEMENT.",
+            "Jeudi 19 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "PARTANT PROBABLE",
+            "Jeudi 19 Novembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ANNULATION PART PROB",
+            "Vendredi 20 Novembre 2026",
+            "10h30 =="
+          ],
+          [
+            "MONTE",
+            "Vendredi 20 Novembre 2026",
+            "12h30 =="
+          ]
+        ]
+      }
+    ],
+    "text": "8ème(P/ 6282), — 22/11/2026 00h00, FONTAINEBLEAU\n\nPLAT , 2.600 mètres , Corde à GAUCHE\n46.000 (23.000, 9.200, 6.900, 4.600, 2.300)\nCloture des engagements à venir : - Course Premium -\n\n\nGROUPE II AQPS\nPour juments de 4 et 5 ans inscrites au Stud-Book Autres Que Pur-Sang. Poids : 64 kg. Les juments ayant depuis le 1er avril 2026 inclus gagné un Groupe II AQPS porteront 2 kg ; un Groupe I AQPS, 3 kg.\nEn outre, des primes de 5.500, 2.500, 2.000 offertes par le Fonds Européen de l'Elevage seront versées aux propriétaires des trois premières, si les juments sont issues d'étalons inscrits au Fonds Européen de l'Elevage ou inscrites au Fonds Européen de l'Elevage. Les primes aux propriétaires et aux éleveurs ne s'appliquent pas à ces primes Fonds Européen de l'Elevage.\nLes remises de poids prévues à l'Article 104 du Code des Courses au Galop ne sont pas applicables.\nLa prime propriétaire ne s'applique pas.\nL'Association AQPS remettra un trophée au propriétaire de la jument gagnante.\n\n\nLegal notice\n\nFONTAINEBLEAU\n\n1 2 3 4 5 6 7 8\n\nAUCUNE LISTE DIFFUSABLE\n\nClôture\nENGAGEMENT\tVendredi 13 Novembre 2026\t10h30 PARIS\nFORFAIT 1\tMercredi 18 Novembre 2026\t11h30 ==\nENGAGEMENT SUPPLEMENT.\tJeudi 19 Novembre 2026\t11h30 ==\nPARTANT PROBABLE\tJeudi 19 Novembre 2026\t11h30 ==\nANNULATION PART PROB\tVendredi 20 Novembre 2026\t10h30 ==\nMONTE\tVendredi 20 Novembre 2026\t12h30 ==\n",
+    "title": "PRIX CHLORIS | France Galop",
+    "url": "https://www.france-galop.com/fr/course/detail/2026/P/eE4raVpNY0xEczRZV0tjR2FkQjljQT09"
+  },
+  {
+    "tables": [
+      {
+        "id": "",
+        "rows": [
+          [
+            "ENGAGEMENT",
+            "Vendredi 4 Décembre 2026",
+            "10h30 PARIS"
+          ],
+          [
+            "FORFAIT 1",
+            "Mercredi 9 Décembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ENGAGEMENT SUPPLEMENT.",
+            "Jeudi 10 Décembre 2026",
+            "11h30 =="
+          ],
+          [
+            "PARTANT PROBABLE",
+            "Jeudi 10 Décembre 2026",
+            "11h30 =="
+          ],
+          [
+            "ANNULATION PART PROB",
+            "Vendredi 11 Décembre 2026",
+            "10h30 =="
+          ],
+          [
+            "MONTE",
+            "Vendredi 11 Décembre 2026",
+            "12h30 =="
+          ]
+        ]
+      }
+    ],
+    "text": "3ème(P/ 6261), — 13/12/2026 00h00, DURTAL\n\nPLAT , 2.900 mètres , Corde à DROITE\n33.900 (16.950, 6.780, 5.085, 3.390, 1.695)\nCloture des engagements à venir : - PMH -\n\n\nGROUPE III AQPS\nPour pouliches de 3 ans inscrites au Stud-Book Autres Que Pur-Sang n'ayant pas gagné un Groupe I AQPS. Poids : 62 kg. Les pouliches ayant gagné un Groupe III AQPS porteront 2 kg ; un Groupe II AQPS ou plusieurs Groupe III AQPS, 3 kg.\nLes remises de poids prévues à l'Article 104 du Code des Courses au Galop ne sont pas applicables.\nLa prime propriétaire ne s'applique pas.\nL'Association des AQPS remettra un trophée au propriétaire de la pouliche gagnante.\n\n\n\nLegal notice\n\nDURTAL\n\n1 2 3 4 5 6 7\n\nAUCUNE LISTE DIFFUSABLE\n\nClôture\nENGAGEMENT\tVendredi 4 Décembre 2026\t10h30 PARIS\nFORFAIT 1\tMercredi 9 Décembre 2026\t11h30 ==\nENGAGEMENT SUPPLEMENT.\tJeudi 10 Décembre 2026\t11h30 ==\nPARTANT PROBABLE\tJeudi 10 Décembre 2026\t11h30 ==\nANNULATION PART PROB\tVendredi 11 Décembre 2026\t10h30 ==\nMONTE\tVendredi 11 Décembre 2026\t12h30 ==\n",
+    "title": "PRIX DES GUILLEDINES | France Galop",
+    "url": "https://www.france-galop.com/fr/course/detail/2026/P/RzVIWXM4NTE1bVcxeHF6bTRhdTRpdz09"
+  }
+]

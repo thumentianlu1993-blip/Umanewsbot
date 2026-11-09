@@ -1,3 +1,9 @@
+## 2026-11-09 法国赛事接入候选（未发布）
+
+法国80唯一目标来源已核：59历史场511行，21未来目标中11场253条报名/预计记录、10场官方暂无可发布名单。候选已接入France Galop阶段名单、Geny正式卡/赛果、公斤与报价语义，默认法国开关关闭。固定数据包支持10场AQPS补档、凯旋门旧URL4→784和59场结果事务回放；整包离线测试通过。独立Linux浏览器已实取Geny节目/卡/赛果和France Galop已登录详情；PostgreSQL与review返修回归继续验证，实际生产服务尚未配置。未合并、未部署、未写生产，不能称法国自动更新已上线。
+
+详见[设计](changes/france-race-automation/design.md)、[测试](changes/france-race-automation/test_cases.md)与[交付状态](changes/france-race-automation/rollout.md)。
+
 ## 2026-11-09 马匹中文名 HKJC 来源策略候选（未发布）
 
 ## 2026-11-09 香港线上字段回归与修复候选（未发布）

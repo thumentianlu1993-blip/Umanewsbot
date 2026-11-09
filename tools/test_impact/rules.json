@@ -1521,6 +1521,42 @@
     ],
     "docs/changes/hkjc-race-fields/ci-scope.json": [
       "infrastructure"
+    ],
+    "server/stable/services/france_sources.py": [
+      "france_race_automation"
+    ],
+    "server/stable/services/france_pre_race.py": [
+      "france_race_automation"
+    ],
+    "server/stable/services/france_public_fields.py": [
+      "france_race_automation"
+    ],
+    "server/stable/services/france_release.py": [
+      "france_race_automation"
+    ],
+    "server/stable/services/france_archive.py": [
+      "france_race_automation"
+    ],
+    "server/stable/services/france_browser_transport.py": [
+      "france_race_automation"
+    ],
+    "server/stable/management/commands/apply_france_release.py": [
+      "france_race_automation"
+    ],
+    "server/stable/fixtures/france_automation/**": [
+      "france_race_automation"
+    ],
+    "server/stable/templates/stable/public/_race_odds_source.html": [
+      "france_race_automation"
+    ],
+    "deploy/france-browser/**": [
+      "france_race_automation"
+    ],
+    "docker-compose.france-browser.yml": [
+      "france_race_automation"
+    ],
+    "docs/changes/france-race-automation/ci-scope.json": [
+      "infrastructure"
     ]
   },
   "symbols": {
@@ -1703,6 +1739,7 @@
     "docs/changes/japan-race-public-fields/ci-scope.json",
     "docs/changes/hkjc-horse-name-display/ci-scope.json",
     "docs/changes/hkjc-source-acceptance/ci-scope.json",
-    "docs/changes/hkjc-race-fields/ci-scope.json"
+    "docs/changes/hkjc-race-fields/ci-scope.json",
+    "docs/changes/france-race-automation/ci-scope.json"
   ]
 }

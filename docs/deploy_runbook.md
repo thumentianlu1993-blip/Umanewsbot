@@ -9832,3 +9832,8 @@ RACE_DATA_RAW_ARTIFACT_ROOTS=/run/race-data-sync
 候选外核验器需要本地 Linux Docker、Git 对象、GitHub只读权限和该run的镜像artifact。
 镜像在依赖准备完成后固定ID，实际测试及交付时重新收集均使用 network none、非root、无宿主凭据的容器。
 准备阶段可以下载依赖，测试阶段不可出站；交付重收集只列名称，不重新执行全部测试。
+
+
+## 法国浏览器候选（2026-11-09，尚未上线）
+
+法国接入使用独立 `docker-compose.france-browser.yml`，内部只读赛事浏览器，不开放宿主端口、不注入业务数据库凭据。France Galop需要外部独立会话文件；生成方式、验证与恢复见[法国交付说明](changes/france-race-automation/rollout.md)。认证失败保留上次候选，不以用户个人Chrome有效会话作为服务器可用证据。策略增加法国route时需同步精确rebind既有日港登记，回退时还原旧策略及对应登记状态。通用人工门禁引用根AGENTS.md。

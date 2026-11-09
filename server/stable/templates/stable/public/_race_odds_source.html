@@ -1,0 +1,1 @@
+{% load race_information %}{% if row.odds_value and row.source_refs.odds_source %}<small>{{ row.source_refs.odds_source }}{% race_source_time row.source_refs.odds_observed_at as source_time %}{% if source_time %} · <time datetime="{{ row.source_refs.odds_observed_at }}">{{ source_time }}</time> 采集{% endif %}</small>{% endif %}

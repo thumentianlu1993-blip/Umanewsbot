@@ -2050,6 +2050,7 @@ def discover_multisource_events(*, now, policy=None, fetcher=None):
             r
             for r in policy.routes
             if r.digest in row["routes"]
+            and r.capabilities
             and r.valid(now)
             and r.provider in settings.RACE_DATA_SYNC_ENABLED_PROVIDERS
             and r.region in settings.RACE_DATA_SYNC_ENABLED_REGIONS

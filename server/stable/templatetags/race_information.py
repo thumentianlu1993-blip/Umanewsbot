@@ -31,3 +31,16 @@ def race_grade_class(obj):
     from stable.services.race_information_display import event_grade_field
     code = event_grade_field(obj).code
     return 'g' + code[-1] if code in {'G1','G2','G3','JG1','JG2','JG3','JPN1','JPN2','JPN3'} else 'g-other'
+
+
+@register.simple_tag
+def race_source_time(value):
+    """来源报价观测时刻统一显示北京时间；无时区数据不补猜。"""
+    from django.utils.dateparse import parse_datetime
+    from django.utils.timezone import is_aware
+    from zoneinfo import ZoneInfo
+    try:
+        instant = parse_datetime(str(value))
+    except (ValueError, TypeError):
+        return ''
+    return instant.astimezone(ZoneInfo('Asia/Shanghai')).strftime('%m-%d %H:%M（北京时间）') if instant and is_aware(instant) else ''
