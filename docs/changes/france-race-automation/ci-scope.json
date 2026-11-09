@@ -1,0 +1,354 @@
+{
+  "schema_version": 1,
+  "base_sha": "21f83955436edbcd4761582d8f991e036b753a56",
+  "reason": "法国赛事接入的精确字节范围。覆盖法国全部新回归、日港共享来源/候选与登记、完整赛果领域、公开字段和时间、核心及测试基础设施。settings仅新增默认关闭法国配置；tasks只增加隔离法国调用；无模型/迁移、新闻链路或权限改动。浏览器另以Node测试和Linux实取验证；独立review须核对清单。",
+  "domains": [
+    "france_race_automation"
+  ],
+  "changes": [
+    {
+      "path": "deploy/france-browser/Dockerfile",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "4574bc6970a706ee8e6d6d89b8dbff614f8f23956d42d41309fc4b29a47d7bc2",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "deploy/france-browser/collector.cjs",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "fd010131860840ace98634ad5037a2e4d2790c6db47809a3c74eee3ff12e9fe8",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "deploy/france-browser/collector.test.cjs",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "b1a699ad9848c8df5589c26a532110168e055b7aa4fdddd78a2337cffe72fe97",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "deploy/france-browser/login.cjs",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "d11fa2ee338dcdd2a82b63a3670b223e646595c9494eaa4083871f141e70df71",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "deploy/france-browser/package-lock.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "3567d4be74aa7942d5234695236617f5136f83e9da6dad2546870501593311d3",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "deploy/france-browser/package.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "7b180a258412cbfff7a531ad6141adc2b4aeef357f6332732c0bdaf6443729ed",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "deploy/france-browser/server.cjs",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "fed4d96e04ed712aad4c1f7fdcc735183f7de4f33062fcce881c2c3729c4463a",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docker-compose.france-browser.yml",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "b996562fd0472af892bd9a8b98264d0d38c4fd832f4141b4dd67c74593d38746",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/france-race-automation/design.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "b9de57bac45602db0b88901652a462aff4eb733c5df46256a0ddda831f3cf2d2",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/france-race-automation/rollout.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "bb7806a05b5a86320aa8cc07b890913f3e7badbe6816ca2c9f53696d72fabf85",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/france-race-automation/spec.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "c61d3dec140266ac329cce4d9085fca8f75c8d516d7aeb26f0a0e5fd120d8d3e",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/france-race-automation/tasks.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "ce226ca8a5d62519ac8a0076a10557120375f15c2461fae7957c8035b53aa54e",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/france-race-automation/test_cases.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "afac4e53155940ba9aa96c54ac8086af24745db57051e636cd1cca218c2c26c0",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/current_state.md",
+      "status": "modified",
+      "before_hash": "ee3b204f0be3759876e5053980f1946af10c5319f06eb8a6aa09547e3952214e",
+      "after_hash": "44ec5dbf925280fced34504eee8baf7c8fa4fe16f38519963e65091e8942d8b4",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/deploy_runbook.md",
+      "status": "modified",
+      "before_hash": "ef5161272acb0ffe6e6a23761053e088adc9b44a7565d888659ab4c66c29d38a",
+      "after_hash": "fb1f25f02a7bf381ea75ca6e5dc8491d7b9f3176726c74eb950268c36fad3412",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/app/settings.py",
+      "status": "modified",
+      "before_hash": "37394a8a8f20642e06033ff055bd289dc4ca7d9d1232078fe7b23cd83ace6e77",
+      "after_hash": "c256c678a176c1f8b540e36d7adb7989772cfa90c8c8b153b3f95143a60a45ce",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/france_automation/avenir-card.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "81fb8ace42d3323d0381a4a5d9741843b7cbff6a1fc573af39510e8d08beb821",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/france_automation/avenir-result.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "b5348d9250064225af58827bbf5936799e26688a985b5b52c0d8723aed07daa1",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/france_automation/future.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "a362300668d5bde533f91fdf7e35275420d72327ffc056a80addc349223a7d43",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/france_automation/historical.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "b610ee542740d86eb830056970a1531f7abacd7079d4b8698b6a0ace4c1353cd",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/france_automation/release_scope.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "e028b0405c69a0c597b0092ce6a9c76e51a2e512ce277812913e1bb1c407f684",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/management/commands/apply_france_release.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "b3118742ec44fc859dff130a45d275a95f345f954503216b396132d33c7d25b7",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/france_archive.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "f9f528df48dd534130b6598787c7e05517934ca82efd5f635dc8483f02eab35e",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/france_browser_transport.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "9cb4e957ae3ef115d7b47c7ec33254bdd4566dadcbb1bf4a0116854754816206",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/france_pre_race.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "6f9d5a63f91f316b96eaf1662a2dcfb60fe156ef01a082ba677e882e32426c16",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/france_public_fields.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "b703e01237428386f7c8aca891d70b19c79a1ba2bd6d04ebe1f46df3175a932b",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/france_release.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "aa3696dd64a49c11eb9d6e9c3957c4c2c7a430b07d5df4f808a33ab6c6b750bd",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/france_sources.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "dec835cc5c365af43bed0d82946e6663da347824aedacd8b1fad7ea96bc20a5c",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_source_adapters.py",
+      "status": "modified",
+      "before_hash": "b5a2b04ddf9423784b2461f688b45c5eb001ad5a5d3711f267438d4a919c5671",
+      "after_hash": "b251be89251e467620375c27c3a65949413e8deb52fcb2617881975eaefc1ebb",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_control.py",
+      "status": "modified",
+      "before_hash": "c389e3fdce3e7943ac6f592746913cdb43ecf4348ff0ec5df269fb62578ecfc6",
+      "after_hash": "da68ae01e4addd15e0f9edf636dcb4a98c0c5e62f23fd6211d3011e19c2b9bb7",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_enrollment.py",
+      "status": "modified",
+      "before_hash": "4722122d7945ea5a8ff91dabc8d5c71edea88c71e985d88ae58964e4d9784f1c",
+      "after_hash": "e8464d17ff1dd3891068b9f9cdb198877686c79bf3df45179bf24209515de370",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_pipeline.py",
+      "status": "modified",
+      "before_hash": "6e51eec1413d7cd78f5fc3c9fbefbba5898c0b01e706683b71bf83c06b1e6fee",
+      "after_hash": "cf87f34b22d2c0ba325b847d212394b1136f5d050d157a3974c6a80479ba73f4",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_results.py",
+      "status": "modified",
+      "before_hash": "79c8dae66677b494346c1a9510ce4a3d684440a6cdc54e584793f0617c612dff",
+      "after_hash": "338f1d1fd5e7ef8a9f9dad6838f5e9b42022940a6b843aba7a0f200c024b1b36",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_field_normalization.py",
+      "status": "modified",
+      "before_hash": "d1f450e4afe7bb48ed28bfeebbfcb8c9a064fe2522a7bd0c8036ef2164709b2b",
+      "after_hash": "30e115d6b5f550a356f42079dd11a5b8215cff8a61dbe985e21255e62f9d5cd6",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_pre_race.py",
+      "status": "modified",
+      "before_hash": "26bd9d1e5343548fe52b21bbd3291c8e8ebaad709fe35f4c3b68c5d71304e51f",
+      "after_hash": "3d87ecb6919ed5df10b32b994c50e5b9a4c8d7858842128b5cfa5fc8965e529e",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/tasks.py",
+      "status": "modified",
+      "before_hash": "60f8c6dc1c9fe562b058937269e861acb4464fdb5260eba1bde7ba82a1bfa09b",
+      "after_hash": "82f55df098463c27bea6d4045d64cb1a79f265f3eee68161e4dbc3aeeb1604ff",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/templates/stable/public/_race_odds_source.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "c419903f2e333151c6f86f8e90733b262726f31313f79cf45c657011c4f5b139",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/templates/stable/public/race_detail.html",
+      "status": "modified",
+      "before_hash": "74a455b7fb93156598ee46cb4ef9098be9312bf9d3ab30dd0c2388f47e9a7d85",
+      "after_hash": "3587187e4e9d1aae847e468d6c9691db0b21018174eb4869ac822d51cf93f972",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/templatetags/race_information.py",
+      "status": "modified",
+      "before_hash": "698afd2add62a742e2b9bbb6e6a09b265cc51249d83464f1b99c17fc8900e173",
+      "after_hash": "7a637a4a10bc57dfb433bfba6ac9d01ccad1f28f8c3136618d26405ce597faf9",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_france_automation.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "6f19889cf5afdddb8b3a3930b15844ce179d443d41f15bbbdd8c632d9efd11d0",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/views.py",
+      "status": "modified",
+      "before_hash": "af6768b703a29c56be6adb679581b290b7411490ae6b9125ef878b650570cb12",
+      "after_hash": "d5e911727d1c98f098fc837d4c3ce9e08b6c98eca025057f4757278ae33e99f4",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/catalog.json",
+      "status": "modified",
+      "before_hash": "cbba3e5caefcd8156dfd273e2a35cfaaf0fcc0d58bf31c0dd366e85836fd280d",
+      "after_hash": "0458a53f9c919d22465173caba2fbd05da918d57903f87a32ebf3fb1f6afde28",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "4aacb3af85f9ac348e991d806d530ec18d304f4c8c00b64fcdb30293b7669fe4",
+      "after_hash": "4206eafd51ed2489ed0ab807b78b93af736e882234f0dcfc6b0d07f67cf12965",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}
