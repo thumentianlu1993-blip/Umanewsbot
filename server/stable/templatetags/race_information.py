@@ -19,3 +19,16 @@ def race_field(obj, field, legacy=''):
     item = fields.get(field)
     # 新路径漏接入也不得把旧单位／不合规等级直接公开。
     return item.text if item is not None else '待核实'
+
+
+@register.simple_tag
+def race_source_time(value):
+    """来源报价观测时刻统一显示北京时间；无时区数据不补猜。"""
+    from django.utils.dateparse import parse_datetime
+    from django.utils.timezone import is_aware
+    from zoneinfo import ZoneInfo
+    try:
+        instant = parse_datetime(str(value))
+    except (ValueError, TypeError):
+        return ''
+    return instant.astimezone(ZoneInfo('Asia/Shanghai')).strftime('%m-%d %H:%M（北京时间）') if instant and is_aware(instant) else ''

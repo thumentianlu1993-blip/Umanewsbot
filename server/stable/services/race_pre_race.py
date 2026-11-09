@@ -81,6 +81,8 @@ def pre_race_days(event):
         return max(0, min(31, getattr(settings, 'RACE_DATA_SYNC_JAPAN_PRE_RACE_DAYS', 4)))
     if event.country_region == 'hong_kong' and getattr(settings, 'RACE_DATA_SYNC_HKJC_PRE_RACE_ENABLED', False):
         return max(0, min(60, getattr(settings, 'RACE_DATA_SYNC_HKJC_PRE_RACE_DAYS', 45)))
+    if event.country_region == 'france' and getattr(settings, 'RACE_DATA_SYNC_FRANCE_PRE_RACE_ENABLED', False):
+        return max(0, min(60, getattr(settings, 'RACE_DATA_SYNC_FRANCE_PRE_RACE_DAYS', 60)))
     return 4
 
 
@@ -104,7 +106,7 @@ def _save_state(event, source, state):
 
 
 def claim_pre_race(*, event_id, source, now):
-    if source not in {JRA, TRA, REFRESH, 'nar_pre_race_v1', 'hkjc_pre_race_v1'} or timezone.is_naive(now):
+    if source not in {JRA, TRA, REFRESH, 'nar_pre_race_v1', 'hkjc_pre_race_v1', 'france_pre_race_v1'} or timezone.is_naive(now):
         raise ValueError('invalid_pre_race_claim')
     if source == JRA and not jra_enabled(network=True):
         return None
@@ -113,6 +115,9 @@ def claim_pre_race(*, event_id, source, now):
         if not enabled(): return None
     if source == 'hkjc_pre_race_v1':
         from .hkjc_pre_race import enabled
+        if not enabled(): return None
+    if source == 'france_pre_race_v1':
+        from .france_pre_race import enabled
         if not enabled(): return None
     if source == REFRESH:
         from .race_pre_race_refresh import refresh_enabled
@@ -126,6 +131,8 @@ def claim_pre_race(*, event_id, source, now):
         if source == 'nar_pre_race_v1' and (event.country_region != 'japan' or event.racecourse in JRA_COURSES or _refs(event).get('pre_race_handoff') or event.runners.exists()):
             return None
         if source == 'hkjc_pre_race_v1' and (event.country_region != 'hong_kong' or _refs(event).get('pre_race_handoff') or event.runners.exists()):
+            return None
+        if source == 'france_pre_race_v1' and (event.country_region != 'france' or _refs(event).get('pre_race_handoff') or event.runners.exists()):
             return None
         state = _state(event, source)
         lease = _dt(state.get('lease_until'))
@@ -528,6 +535,7 @@ def _fetch_bounded_html(url, *, now, provider, region, validator, enabled):
         raise JraFetchError('jra_pre_race_disabled')
     failure = None
     browser = bool(getattr(settings, 'JRA_BROWSER_URL', '') and urlsplit(url).hostname == 'www.jra.go.jp')
+    france_browser = bool(getattr(settings, 'FRANCE_BROWSER_URL', '') and urlsplit(url).hostname in {'www.geny.com','www.france-galop.com'})
     document_budget = 2 if browser and urlsplit(url).path.startswith('/JRADB/') else 1
 
     def fetch():
@@ -544,8 +552,11 @@ def _fetch_bounded_html(url, *, now, provider, region, validator, enabled):
         try:
             if not enabled():
                 raise JraFetchError('jra_pre_race_disabled')
-            if browser:
-                from .jra_browser_transport import fetch_browser_document
+            if browser or france_browser:
+                if france_browser:
+                    from .france_browser_transport import fetch_browser_document
+                else:
+                    from .jra_browser_transport import fetch_browser_document
                 try:
                     payload = fetch_browser_document(url)
                 except ValueError as exc:

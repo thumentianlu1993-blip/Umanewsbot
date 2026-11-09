@@ -47,6 +47,7 @@ _OPTIONAL_TOP_LEVEL_KEYS = {
     "local_start_time",
     "timezone_name",
     "multisource_source_set_digest",
+    "france_public_fields_sha256",
 }
 _LEGACY_RECONCILE_REQUIRED_KEYS = _REQUIRED_TOP_LEVEL_KEYS - {"off_time"}
 _CONTRACT_KEYS = {
@@ -987,6 +988,10 @@ def normalize_racecard_observation(
     source_class = _require_trimmed_string(
         contract.get("source_class"), "source_class", max_length=32
     )
+    if 'france_public_fields_sha256' in payload:
+        if provider != 'geny' or contract['region'] != 'france':
+            raise ValueError('france_metadata_source')
+        _validate_digest(payload['france_public_fields_sha256'], 'france_public_fields_sha256')
     contract_version = _require_trimmed_string(
         contract.get("contract_version"), "contract_version", max_length=64
     )
@@ -1409,6 +1414,11 @@ def _reconcile_racecard_observation_atomic(
                 "rejected", "source_contract_mismatch", expected_event_id, observation.pk
             )
         contract_region = provenance["region"]
+        if 'france_public_fields_sha256' in payload:
+            from .race_data_source_adapters import canonical_sha
+            if (source.source_key != 'geny' or source.region_code != 'france'
+                or payload['france_public_fields_sha256'] != canonical_sha(provenance.get('france_public_fields', {}))):
+                return RacecardReconciliationDecision('rejected', 'france_metadata_contract', expected_event_id, observation.pk)
         allowed_fields = provenance.get("allowed_fields")
         if (
             not isinstance(allowed_fields, (list, tuple))
@@ -1743,6 +1753,17 @@ def _reconcile_racecard_observation_atomic(
             subject_key = runner.external_runner_id or external_runner_id
             runner_field_applied = False
             weight_applied = False
+            france_metadata = {}
+            france_metadata_fields = set()
+            france_observed = None
+            if source.source_key == 'geny' and source.region_code == 'france':
+                from django.utils.dateparse import parse_datetime
+                from .france_public_fields import public_refs
+                france_metadata = public_refs(provenance.get('france_public_fields', {}).get(external_runner_id, {}))
+                try:
+                    france_observed = parse_datetime(str(france_metadata.get('odds_observed_at', '')))
+                except (TypeError, ValueError):
+                    pass
             for field_name, proposed in candidate_fields.items():
                 old_value = None if created else getattr(runner, field_name)
                 authority, _ = models.RaceEventFieldAuthority.objects.select_for_update().get_or_create(
@@ -1796,6 +1817,11 @@ def _reconcile_racecard_observation_atomic(
                     weight_applied |= field_name == "carried_weight"
                     if aggregate != "needs_review":
                         aggregate = "applied"
+                if (france_observed and timezone.is_aware(france_observed)
+                    and france_observed <= candidate_watermark
+                    and (authority.observed_at is None or france_observed >= authority.observed_at)
+                    and (applied or arbitration.reason_code == 'idempotent_replay')):
+                    france_metadata_fields.add(field_name)
                 if (
                     applied
                     or not authority.source_key
@@ -1845,6 +1871,13 @@ def _reconcile_racecard_observation_atomic(
                 and source.region_code in ('japan_jra', 'japan_nar')):
                 runner.source_refs['field_units'] = {
                     **runner.source_refs.get('field_units', {}), 'carried_weight': 'kg'}
+            if source.source_key == 'geny' and source.region_code == 'france':
+                if 'carried_weight' in france_metadata_fields:
+                    runner.source_refs.update({k:france_metadata[k] for k in ('allocated_weight','adjusted_weight')})
+                    runner.source_refs['field_units'] = {**runner.source_refs.get('field_units', {}), 'carried_weight':'kg'}
+                if 'odds_value' in france_metadata_fields:
+                    runner.source_refs.update({k:france_metadata[k] for k in ('odds_source','odds_observed_at')})
+                    runner.source_refs['field_units'] = {**runner.source_refs.get('field_units', {}), 'odds_value':'decimal'}
             runner.save()
 
         if (

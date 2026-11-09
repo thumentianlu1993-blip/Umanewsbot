@@ -77,6 +77,7 @@
           {% if event.public_display.race_type.state != 'missing' %}<div><span>赛种</span><b>{% race_field event "race_type" %}</b></div>{% endif %}
           {% if event.public_display.race_class.state != 'missing' %}<div><span>类别</span><b>{% race_field event "race_class" %}</b></div>{% endif %}
         {% endif %}
+        {% if event.source_refs.classification == "AQPS" %}<div><span>类别</span><b>AQPS（非纯血马）</b></div>{% endif %}
         <div><span>等级</span><b>{% race_field event "grade" event.grade_text %}</b></div>
         <div><span>日期</span><b>{% race_field event "date" event.local_date|date:"Y-m-d"|default:"待定" %}</b></div>
         <div><span>时间</span><b>{% race_field event "time" event.public_time_label %}</b></div>
@@ -102,8 +103,8 @@
                   <td><strong>{% race_field runner "horse_name" runner.display_horse_name %}</strong></td>
                   <td>{% race_field runner "jockey_name" runner.display_jockey_name|default:"-" %}</td>
                   <td>{% race_field runner "trainer_name" runner.trainer_name|default:"-" %}</td>
-                  <td>{% race_field runner "weight" runner.carried_weight|default:"-" %}</td>
-                  <td>{% race_field runner "odds" runner.odds_value|default:"-" %}{% if runner.odds_kind_label %}（{{ runner.odds_kind_label }}）{% endif %} / {% race_field runner "popularity" runner.popularity|default:"-" %}{% if runner.dynamic_updated_at %}<small>{{ runner.dynamic_updated_at|date:"m-d H:i" }} 更新</small>{% endif %}</td>
+                  <td>{% race_field runner "weight" runner.carried_weight|default:"-" %}{% if runner.source_refs.adjusted_weight %}<small>分配 {{ runner.source_refs.allocated_weight }} · 调整后 {{ runner.source_refs.adjusted_weight }}</small>{% endif %}</td>
+                  <td>{% race_field runner "odds" runner.odds_value|default:"-" %}{% include "stable/public/_race_odds_source.html" with row=runner %}{% if runner.odds_kind_label %}（{{ runner.odds_kind_label }}）{% endif %} / {% race_field runner "popularity" runner.popularity|default:"-" %}{% if runner.dynamic_updated_at %}<small>{{ runner.dynamic_updated_at|date:"m-d H:i" }} 更新</small>{% endif %}</td>
                   <td>{% race_field runner "status" runner.get_running_status_display %}</td>
                 </tr>
               {% endfor %}
@@ -120,7 +121,7 @@
         <h2>{{ result_section_label }}</h2>
         <div class="race-table-wrap">
           <table class="data-table">
-            <thead><tr><th>名次</th><th>马号</th><th>马名</th><th>骑师</th><th>练马师</th><th>负重</th><th>时间</th><th>{% if results.0.source_refs.margin_basis == "winner" %}差距（距头马）{% else %}差距{% endif %}</th><th>{% if race_information_enabled %}赔率 / 热门排名{% else %}赔率 / 人气{% endif %}</th></tr></thead>
+            <thead><tr><th>名次</th><th>马号</th><th>马名</th><th>骑师</th><th>练马师</th><th>负重</th><th>时间</th><th>{% if results.0.source_refs.margin_basis == "winner" %}差距（距头马）{% elif results.0.source_refs.margin_basis == "previous_finisher" %}差距（距前马）{% else %}差距{% endif %}</th><th>{% if race_information_enabled %}赔率 / 热门排名{% else %}赔率 / 人气{% endif %}</th></tr></thead>
             <tbody>
               {% for result in results %}
                 <tr class="{% if result.display_finish_position == 1 %}medal-1{% elif result.display_finish_position == 2 %}medal-2{% elif result.display_finish_position == 3 %}medal-3{% endif %}">
@@ -129,10 +130,10 @@
                   <td><strong>{% race_field result "horse_name" result.display_horse_name %}</strong></td>
                   <td>{% race_field result "jockey_name" result.display_jockey_name|default:"-" %}</td>
                   <td>{% race_field result "trainer_name" result.trainer_name|default:"-" %}</td>
-                  <td>{% race_field result "weight" result.carried_weight|default:"-" %}</td>
+                  <td>{% race_field result "weight" result.carried_weight|default:"-" %}{% if result.source_refs.adjusted_weight %}<small>分配 {{ result.source_refs.allocated_weight }} · 调整后 {{ result.source_refs.adjusted_weight }}</small>{% endif %}</td>
                   <td class="num">{% race_field result "finish_time" result.finish_time|default:"-" %}</td>
                   <td>{% race_field result "margin" result.margin|default:"-" %}</td>
-                  <td>{% race_field result "odds" result.odds_value|default:"-" %} / {% race_field result "popularity" result.popularity|default:"-" %}</td>
+                  <td>{% race_field result "odds" result.odds_value|default:"-" %}{% include "stable/public/_race_odds_source.html" with row=result %} / {% race_field result "popularity" result.popularity|default:"-" %}</td>
                 </tr>
               {% endfor %}
             </tbody>

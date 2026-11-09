@@ -1,0 +1,24 @@
+# 与生产基础 Compose 合并使用；不映射宿主端口，只挂载独立法国会话状态，不注入数据库凭据。
+services:
+  france_browser:
+    image: ${FRANCE_BROWSER_IMAGE:?必须指定受验收的浏览器镜像}
+    environment:
+      FRANCE_GALOP_STORAGE_STATE: /run/secrets/france-galop-session.json
+    volumes:
+      - ${FRANCE_GALOP_SESSION_FILE:?必须指定独立法国会话文件}:/run/secrets/france-galop-session.json:ro
+    init: true
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    shm_size: 128m
+    mem_limit: 768m
+    cpus: 1.0
+    pids_limit: 192
+    security_opt:
+      - seccomp:./deploy/jra-browser/seccomp_profile.json
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 3s
+      retries: 3

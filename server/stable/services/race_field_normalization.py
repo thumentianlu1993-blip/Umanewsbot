@@ -1532,7 +1532,7 @@ def parse_display_time(raw):
 _DISPLAY_MARGINS = {'nose': '鼻差', 'nse': '鼻差', 'ハナ': '鼻差', '鼻差': '鼻差',
                     'head': '头差', 'hd': '头差', 'アタマ': '头差', '头差': '头差',
                     'neck': '颈差', 'nk': '颈差', 'クビ': '颈差', '颈差': '颈差',
-                    'short head': '短头差', 'shd': '短头差', '同着': '同着', 'dead heat': '同着', 'dh': '同着', '大差': '大差'}
+                    'short head': '短头差', 'shd': '短头差', 'short neck': '短颈差', '同着': '同着', 'dead heat': '同着', 'dh': '同着', '大差': '大差'}
 
 
 def parse_display_margin(raw, *, unit_hint='', basis=''):

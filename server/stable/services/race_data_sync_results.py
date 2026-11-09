@@ -25,6 +25,8 @@ from stable.services.japan_public_fields import japan_source, result_popularity,
 from stable.services.hkjc_public_fields import hkjc_source, result_odds, UNITS as HKJC_UNITS
 
 
+from .france_public_fields import france_source, public_refs as france_refs, result_odds as france_odds
+
 _TERMINAL_RESULT_STATUSES = frozenset(
     {
         models.RaceEventRevisionItemStatus.FINISHED,
@@ -820,6 +822,9 @@ def apply_data_sync_result_observation(
                     ),
                     source.source_key: row["external_runner_id"],
                 }
+                if france_source(source) and runner.pk is None:
+                    runner.odds_value = france_odds(row["field_provenance"])
+                    runner.source_refs.update(france_refs(row["field_provenance"]))
                 if hkjc_source(source):
                     if runner.pk is None:
                         runner.odds_value = result_odds(row["field_provenance"])
@@ -840,7 +845,7 @@ def apply_data_sync_result_observation(
                                     field_name=field, manual_lock=True).exists()):
                                 units[field] = HKJC_UNITS[field]
                         runner.source_refs['field_units'] = units
-                if japan_source(source) or hkjc_source(source):
+                if japan_source(source) or hkjc_source(source) or france_source(source):
                     # 既有卡表负重未在赛果投影中替换，其单位也必须原样保留。
                     if runner.pk is None and japan_source(source):
                         runner.source_refs['field_units'] = {
@@ -992,14 +997,14 @@ def apply_data_sync_result_observation(
                         carried_weight=item.carried_weight,
                         running_status=item.status,
                         popularity=result_popularity(item.field_provenance) if japan_source(source) else "",
-                        odds_value=result_odds(item.field_provenance) if hkjc_source(source) else "",
+                        odds_value=result_odds(item.field_provenance) if hkjc_source(source) else france_odds(item.field_provenance) if france_source(source) else "",
                         is_confirmed=True,
                         source_refs={
                             "source_key": source.source_key,
                             "external_runner_id": row["external_runner_id"],
                             "revision_id": revision.pk,
                             **({"field_units": {"carried_weight": "kg", "margin": "length"}}
-                               if japan_source(source) else {"field_units": dict(HKJC_UNITS), "margin_basis": "winner", "primary": source.canonical_url} if hkjc_source(source) else {}),
+                               if japan_source(source) else {"field_units": dict(HKJC_UNITS), "margin_basis": "winner", "primary": source.canonical_url} if hkjc_source(source) else france_refs(item.field_provenance) if france_source(source) else {}),
                         },
                         raw_payload={
                             "raw_status": item.raw_status,
