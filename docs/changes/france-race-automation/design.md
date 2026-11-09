@@ -31,3 +31,9 @@
 France release 在既有单事务中消费显式 handoff；十场交接、法国目录/511行结果及49日港换绑任一失败全部回滚。默认无handoff时仍拒绝旧登记，收据重放不得再次递增代数或改写历史。补含真实旧控制状态的PostgreSQL回归，覆盖dry-run零留存、末项失败、apply/replay、状态/代数漂移和人工锁拒绝。修改源码与精确数据包后重新冻结镜像和包，独立review按根AGENTS.md交付。
 
 交接快照直接嵌入法国数据 manifest 的 `legacy_handoffs`，与目录和赛果共同由 manifest SHA 绑定；外层 activation 再绑定该文件 SHA。无需增加第二个独立授权文件或先行事务。普通 `attach_multisource_observation` 默认参数为空，仅此显式发布路径传入控制快照。
+
+### 既有参赛名单与法语重音
+
+补充实态回放发现旧TRA名单的 `Bon Garcon` / `Leopard Du Berlais` 等写法与Geny法语重音形式不同，现有严格同名校验拒绝赛果。十场交接manifest显式绑定完整80匹事件内runner对应表、Geny赛事ID及原始文档hash；执行时再验同一马号、名称仅Unicode大小写/空格/重音差异、无换马/人工锁/栏位冲突或退赛逆转。对应表装入既有event-local crosswalk，保留原runner/participant及旧来源关联。普通身份匹配规则不变，不按马号单独认同一匹马。缺项、错场、错hash、改马名或已有冲突映射全部回滚。
+
+对应表还保存核验时的旧名称和Geny名称。正式writer消费这类交接对应表时，direct来源ID和event-slot回退两条路径都要求当前runner及新观察名称属于这两个已核验写法，防止交接后的同号换马复用对应表。其他既有人工crosswalk语义保持不变。

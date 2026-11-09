@@ -1545,6 +1545,12 @@ def attach_multisource_observation(observation, *, policy, now, discovery_token=
                     or source.terms_status != "approved"
                 ):
                     raise _MultisourceRejected("source_not_admitted")
+                if legacy_handoff is not None:
+                    from .france_release_handoff import install_runner_crosswalk
+                    try:
+                        install_runner_crosswalk(event, source, observation, legacy_handoff)
+                    except ValueError as exc:
+                        raise _MultisourceRejected(str(exc)) from exc
                 key = identity_key(observation)
                 key_added = False
                 if key:

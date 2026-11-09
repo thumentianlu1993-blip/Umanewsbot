@@ -485,13 +485,15 @@ class FranceWholeScopeTests(TestCase):
         legacy_models=[('sources',models.RaceResultSourceIdentity),('revisions',models.RaceEventRevision),
             ('owner',models.RaceEventProjectionControl),('tracking',models.RaceEventLiveTracking),
             ('enrollment',models.RaceDataSyncEnrollment),('checkpoints',models.RaceEventLiveProviderCheckpoint),
-            ('lifecycle',models.RaceEventLifecycleControl)]
+            ('lifecycle',models.RaceEventLifecycleControl),('participants',models.RaceEventParticipant),
+            ('participant_identities',models.RaceEventParticipantSourceIdentity),('field_authorities',models.RaceEventFieldAuthority),
+            ('runner_data',models.RaceEventRunner),('result_data',models.RaceEventResult)]
         for entry in controls:
             for key,model in legacy_models:
                 rows=entry[key] if isinstance(entry[key],list) else [entry[key]]
                 for row in rows:model.objects.create(**row)
         with connection.cursor() as cursor:
-            for sql in connection.ops.sequence_reset_sql(no_style(),[m for _,m in legacy_models]):cursor.execute(sql)
+            for sql in connection.ops.sequence_reset_sql(no_style(),[models.RaceEvent,models.RaceSeries]+[m for _,m in legacy_models]):cursor.execute(sql)
         old_sources=list(models.RaceResultSourceIdentity.objects.order_by('pk').values())
         old_revisions=list(models.RaceEventRevision.objects.order_by('pk').values())
         handoffs=[control_snapshot(models.RaceEvent.objects.get(pk=e['event_id'])) for e in controls]
@@ -502,7 +504,7 @@ class FranceWholeScopeTests(TestCase):
             if item['event_id']:
                 e=models.RaceEvent.objects.get(pk=item['event_id'])
                 original=next(x for x in scope['events'] if x['id']==e.pk)
-                if original['results']:
+                if original['results'] and not e.results.exists():
                     doc=next(x for x in archive['results'] if x['url']==item['source_url'])
                     # 生产形状：已有确认赛果、没有v2写权；保留相同已公布马匹与名次数。
                     for pos,row in enumerate(doc['rows'][:original['results']],1):
@@ -525,6 +527,17 @@ class FranceWholeScopeTests(TestCase):
             timezone='Europe/Paris',venue_aliases={k:sorted(v) for k,v in venues.items()},
             valid_from=data['valid_from'],valid_until=data['valid_until'])
         policy=parse_multisource_policy(data,now=NOW);manifest['policy_digest']=policy.digest
+        from stable.services.france_archive import replay_page
+        from stable.services.france_sources import parse_geny_observation
+        for entry in handoffs:
+            item=next(i for i in manifest['items'] if i.get('event_id')==entry['event_id'])
+            doc=next(d for d in archive['results'] if d['url']==item['source_url'])
+            card=next(d for d in archive['cards'] if d['url'].rsplit('/',1)[0]==doc['url'].rsplit('/',1)[0])
+            value=parse_geny_observation(replay_page(doc,observed_at=NOW),url=doc['url'],route=policy.routes[0],now=NOW,card_page=replay_page(card,observed_at=NOW))
+            runners={r.horse_number:r.pk for r in models.RaceEventRunner.objects.filter(event_id=entry['event_id'])}
+            entry['runner_crosswalk']=dict(source_external_race_id=value['external_race_id'],source_raw_sha256=value['raw_sha256'],
+                runners={row['external_runner_id']:runners[row['number']] for row in value['roster']})
+
         actor=get_user_model().objects.create_user(username='release-test')
         with tempfile.TemporaryDirectory() as directory,patch('django.utils.timezone.now',return_value=NOW),patch('stable.services.race_data_source_adapters.load_multisource_policy',return_value=policy),patch('stable.services.france_release.load_multisource_policy',return_value=policy):
             root=Path(directory);raw=json.dumps(archive,ensure_ascii=False).encode();(root/'historical.json').write_bytes(raw)
@@ -534,7 +547,7 @@ class FranceWholeScopeTests(TestCase):
             report=execute(root/'manifest.json',sha,now=NOW,approved_by_id=actor.pk)
             self.assertEqual((len(report['events']),report['result_rows']),(80,511))
             self.assertEqual(models.RaceEvent.objects.count(),71)
-            for expected in handoffs:self.assertEqual(control_snapshot(models.RaceEvent.objects.get(pk=expected['event_id'])),expected)
+            for expected in handoffs:self.assertEqual(control_snapshot(models.RaceEvent.objects.get(pk=expected['event_id'])),{k:v for k,v in expected.items() if k!='runner_crosswalk'})
             # 在最后一场完整赛果已投影后失败，必须回滚此前所有交接、目录及赛果。
             from stable.services import france_release
             original=france_release.run_multisource_claim
@@ -550,7 +563,7 @@ class FranceWholeScopeTests(TestCase):
             self.assertEqual(completed,59)
             self.assertEqual(models.RaceEvent.objects.count(),71)
             self.assertFalse(models.OperationLog.objects.filter(action_type='france_legacy_handoff').exists())
-            for expected in handoffs:self.assertEqual(control_snapshot(models.RaceEvent.objects.get(pk=expected['event_id'])),expected)
+            for expected in handoffs:self.assertEqual(control_snapshot(models.RaceEvent.objects.get(pk=expected['event_id'])),{k:v for k,v in expected.items() if k!='runner_crosswalk'})
             report=execute(root/'manifest.json',sha,now=NOW,approved_by_id=actor.pk,apply=True)
             self.assertEqual(models.RaceEvent.objects.count(),81)
             self.assertEqual(models.RaceEventResult.objects.count(),511)

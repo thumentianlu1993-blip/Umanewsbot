@@ -10,7 +10,7 @@
       "path": "docs/changes/france-race-automation/design.md",
       "status": "modified",
       "before_hash": "b9de57bac45602db0b88901652a462aff4eb733c5df46256a0ddda831f3cf2d2",
-      "after_hash": "6a5fbbc6aa85e367a4136dfa7dbbd9987a1827fcba7c853d5f2a2b601c1ee1a3",
+      "after_hash": "5b786ee90f55746ac5d7c94b55345de82cdb31909041956422d4b51dd9c0588d",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -18,7 +18,7 @@
       "path": "docs/changes/france-race-automation/release_evidence.md",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "0096d9e99404ce6cea6b34bcdd65c856ada9b4d8f95b5e05c7ba16728ef23507",
+      "after_hash": "f9ae0a13680a5627a4e881fc9b584bb3f0a0ed0aacab32b154754c5fab5d9d33",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -42,7 +42,7 @@
       "path": "docs/changes/france-race-automation/test_cases.md",
       "status": "modified",
       "before_hash": "afac4e53155940ba9aa96c54ac8086af24745db57051e636cd1cca218c2c26c0",
-      "after_hash": "48d2228b05d9ad0d589f89a318c6523a6f3d34bea88dc080e5d8f891d4a2db17",
+      "after_hash": "875ce990ff53dd6d2fa9022266a889bd7a9398196d699188e004a7d706da576d",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -66,7 +66,7 @@
       "path": "server/stable/fixtures/france_automation/legacy_controls.json",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "efe89eb66f1a8e197f5acf5c8bbfcc3777ed7e00ce462bc7e1522086efe36033",
+      "after_hash": "c44f2b6cbb3b7526ee46f36e2e9cab2cad0ab6de25712fd0e778bb8460380103",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -82,7 +82,7 @@
       "path": "server/stable/services/france_release_handoff.py",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "99c2f18d55e5de140380068de98ef58ca94d634d4ec8fd4e95576bd4fe9e69c5",
+      "after_hash": "1a3ec2cfd1559717c90b10f6c84dd25fcf0272bc649b814e44ee2657c1bf9a8b",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -90,7 +90,15 @@
       "path": "server/stable/services/race_data_sync_enrollment.py",
       "status": "modified",
       "before_hash": "e8464d17ff1dd3891068b9f9cdb198877686c79bf3df45179bf24209515de370",
-      "after_hash": "155a784c1e479ecb5237115f2e5a60e882d53ed2e5e86ffa395a4341402b9391",
+      "after_hash": "19fbf2a16b62a05ed45abe5842fa57580e6098d76b2f340145d25202beb170f9",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_results.py",
+      "status": "modified",
+      "before_hash": "338f1d1fd5e7ef8a9f9dad6838f5e9b42022940a6b843aba7a0f200c024b1b36",
+      "after_hash": "b806eee6d6ddc29b397ff99e0b20c209a3d2206e079ed0cc15d47fc5e19d02ec",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -98,7 +106,7 @@
       "path": "server/stable/test_france_automation.py",
       "status": "modified",
       "before_hash": "6f19889cf5afdddb8b3a3930b15844ce179d443d41f15bbbdd8c632d9efd11d0",
-      "after_hash": "49c256bd2387570cf0fe94ba363d94ddb34e6a4820d0fbf31132ccc5061c7a5f",
+      "after_hash": "338458ad2566578d3b397482c3cb9e53dd3e87d3a2e0f0a60b75df993915e002",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -106,7 +114,7 @@
       "path": "server/stable/test_france_release_handoff.py",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "467f235c90ca99f8c9cb70a0d1cd06eee826b219b3bd5452f05f69efa3440132",
+      "after_hash": "8089ca6ae3b20025cdcde017bd0cc52db02e7b6201ef8e9c94477964d3c08386",
       "before_mode": null,
       "after_mode": "100644"
     },

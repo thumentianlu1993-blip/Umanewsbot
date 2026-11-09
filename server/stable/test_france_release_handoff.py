@@ -158,3 +158,72 @@ class FranceLegacyHandoffTests(TestCase):
         with self.assertRaisesMessage(ValueError, 'handoff_scope'): self.run_release(True)
         self.manifest['legacy_handoffs'] = [self.before]; self.manifest['items'][0]['result_rows'] = 0
         with self.assertRaisesMessage(ValueError, 'handoff_scope'): self.run_release(True)
+
+    def test_crosswalk_cannot_use_number_to_replace_a_different_horse_or_manual_row(self):
+        self.prepare()
+        from stable.services.race_data_source_adapters import fetch_bound_observation
+        value = fetch_bound_observation(event=self.event, route=self.policy.routes[0], now=NOW,
+            fetcher=lambda url, **kw: (ROOT/('avenir-result.html' if url.endswith('arrivee-rapports') else 'avenir-card.html')).read_text())
+        mapping = {}
+        for index, row in enumerate(value['roster'], 1):
+            runner = models.RaceEventRunner.objects.create(event=self.event, sort_order=index,
+                horse_number=row['number'], horse_name=row['horse_name'])
+            mapping[row['external_runner_id']] = runner.pk
+        # 发布器使用的是归档文档hash，完整fixture复用同一内容、不同载体。
+        from stable.services.race_data_source_adapters import canonical_sha
+        document = next(d for d in json.loads(self.path.with_name('archive.json').read_text())['results'])
+        crosswalk = dict(source_external_race_id=value['external_race_id'], source_raw_sha256=canonical_sha(document), runners=mapping)
+        self.manifest['legacy_handoffs'][0]['runner_crosswalk'] = crosswalk
+        first = self.event.runners.first(); name = first.horse_name
+        first.horse_name = 'Unrelated horse'; first.save()
+        self.manifest['items'][0]['event_baseline'] = event_baseline(self.event)
+        with self.assertRaisesMessage(ValueError, 'attach_handoff_runner_identity'): self.run_release(True)
+        self.assertEqual(models.RaceResultSourceIdentity.objects.count(), 1)
+        first.horse_name = name; first.manual_lock_flags = {'horse_name': True}; first.save()
+        self.manifest['items'][0]['event_baseline'] = event_baseline(self.event)
+        with self.assertRaisesMessage(ValueError, 'attach_handoff_runner_identity'): self.run_release(True)
+        self.assertEqual(models.RaceDataSyncEnrollment.objects.get(event=self.event).authority_version, 1)
+
+    def test_successful_handoff_does_not_authorize_later_same_number_horse_change(self):
+        self.prepare()
+        from datetime import timedelta
+        from stable.services.race_data_source_adapters import canonical_sha, fetch_bound_observation, run_multisource_claim
+        from stable.services.race_data_sync_control import claim_multisource_events
+        def original_fetch(url, **kwargs):
+            return (ROOT/('avenir-result.html' if url.endswith('arrivee-rapports') else 'avenir-card.html')).read_text()
+        value = fetch_bound_observation(event=self.event, route=self.policy.routes[0], now=NOW, fetcher=original_fetch)
+        mapping = {}
+        for index, row in enumerate(value['roster'], 1):
+            runner = models.RaceEventRunner.objects.create(event=self.event, sort_order=index,
+                horse_number=row['number'], horse_name=row['horse_name'])
+            mapping[row['external_runner_id']] = runner.pk
+        doc = json.loads(self.path.with_name('archive.json').read_text())['results'][0]
+        self.manifest['legacy_handoffs'][0]['runner_crosswalk'] = dict(
+            source_external_race_id=value['external_race_id'], source_raw_sha256=canonical_sha(doc), runners=mapping)
+        self.manifest['items'][0]['event_baseline'] = event_baseline(self.event)
+        self.assertEqual(self.run_release(True)['action'], 'applied')
+        original = list(self.event.results.order_by('pk').values())
+        horse = value['roster'][0]['horse_name']; later = NOW + timedelta(hours=1)
+        def changed_fetch(url, **kwargs):
+            text = original_fetch(url)
+            self.assertIn(horse, text)
+            return text.replace(horse, 'Unrelated replacement horse')
+        from stable.services.race_data_sync_results import _source_runner_id
+        source = models.RaceDataSyncEnrollment.objects.get(event=self.event).source_identity
+        for direct in (False, True):
+            for external_id, pk in mapping.items():
+                runner = models.RaceEventRunner.objects.get(pk=pk)
+                refs = dict(runner.source_refs); refs.pop('geny', None)
+                if refs.get('source_key') == 'geny':
+                    refs.pop('source_key'); refs.pop('external_runner_id', None)
+                if direct: refs['geny'] = external_id
+                runner.source_refs = refs; runner.save(update_fields=('source_refs',))
+                self.assertEqual(_source_runner_id(runner=runner, source=source), external_id if direct else '')
+            if direct: later += timedelta(hours=1)
+            with patch('django.utils.timezone.now', return_value=later):
+                claims = claim_multisource_events(event_ids=[self.event.pk], now=later, historical=True)
+                self.assertEqual(len(claims), 1)
+                result = run_multisource_claim(claim=claims[0], now=later, fetcher=changed_fetch)
+            self.assertFalse(result['processed'], result)
+            self.assertEqual(result['reason'], 'result_roster_incomplete')
+            self.assertEqual(list(self.event.results.order_by('pk').values()), original)

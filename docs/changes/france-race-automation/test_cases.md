@@ -24,3 +24,5 @@
 - PostgreSQL 80场/511行回放覆盖dry-run零留存、最后第59场完成投影后失败整包回滚、原位登记PK保持、旧来源/修订不变、10份before/after审计及apply/replay。
 - 聚焦回归覆盖默认发现仍拒绝v1、未显式列入的旧owner仍拒绝、控制代数/状态/检查点漂移、人工暂停、跟踪及lifecycle活动claim、重复或未消费的handoff。
 - 旧实现真实RED为owner_conflict；共享登记/转换/恢复/并发及法国测试61项通过。后续固定提交CI与新镜像证据另行记录，不把旧772项结果当作此次修改的验证。
+
+补充实际旧名单后取得result_roster_incomplete RED，原因是TRA与Geny法语重音写法不同。fixture进一步包含80旧runner、80participant及来源关联、字段authority和28条历史赛果；通过固定事件内对应表保留这些实体后，80/511全包回放与相关赛果/准入/登记共80项通过。独立review要求对应表后续消费绑定已核验的两个名称，新增成功交接后同号换马的direct/fallback两路径拒绝用例；原correction_marker_missing的晚期拒绝改为result_roster_incomplete的身份拒绝。整包用例独跑时显式重置RaceEvent/RaceSeries序列，消除测试顺序依赖。
