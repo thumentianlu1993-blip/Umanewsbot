@@ -190,6 +190,66 @@ class FranceSourceTests(SimpleTestCase):
                 ['1','LAILISSA (IRE) F.PS. 2 a.','56 kg','40.5','','AGA KHAN STUDS SCEA','M. DELZANGLES','60','16.810']])])
 
 
+class FranceBrowserBudgetTests(SimpleTestCase):
+    def test_geny_reload_contract_is_limited_to_two_same_url_documents(self):
+        from datetime import datetime, timezone
+        from unittest.mock import MagicMock, patch
+        from django.test import override_settings
+        from stable.services.france_browser_transport import fetch_browser_document
+        now = datetime(2026, 11, 10, tzinfo=timezone.utc)
+        programme = 'https://www.geny.com/programme/2026-11-11'
+        card = 'https://www.geny.com/course/1695527-2026-11-02-nantes-prix-de-l-avenir/partants-pronostics'
+        for url, count, resources, accepted in [(programme, 2, 10, True), (programme, 3, 10, False),
+                (card, 2, 122, True), (card.replace('partants-pronostics', 'arrivee-rapports'), 2, 192, True),
+                (card, 2, 193, False), (card, 1, 97, False),
+                ('https://www.france-galop.com/fr/courses/pattern-listed', 2, 10, False)]:
+            with self.subTest(url=url, count=count):
+                payload = dict(url=url, final_url=url, html='<html><body>Course</body></html>',
+                    observed_at=now.isoformat(), navigation_count=count, resource_requests=resources, elapsed_ms=1000)
+                response = MagicMock(); response.__enter__.return_value = response; response.status_code = 200
+                response.iter_content.return_value = [json.dumps(payload).encode()]
+                with override_settings(FRANCE_BROWSER_URL='http://france_browser:8080'), \
+                        patch('django.utils.timezone.now', return_value=now), patch('requests.post', return_value=response):
+                    if accepted:
+                        result = fetch_browser_document(url)
+                        self.assertEqual(result['browser']['navigation_count'], 2)
+                    else:
+                        with self.assertRaises(ValueError):
+                            fetch_browser_document(url)
+
+    def test_geny_reload_reserves_both_budgets_and_preserves_other_sources(self):
+        from datetime import datetime, timezone
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from django.test import override_settings
+        from stable.services import race_pre_race as pre
+        now = datetime(2026, 11, 10, tzinfo=timezone.utc)
+        payload = dict(html='<html><body>Programme</body></html>', raw_sha256='a'*64, observed_at=now.isoformat())
+        urls = [('https://www.geny.com/programme/2026-11-11', 2),
+            ('https://www.geny.com/course/1695527-2026-11-02-nantes-prix-de-l-avenir/partants-pronostics', 2),
+            ('https://www.geny.com/course/1695527-2026-11-02-nantes-prix-de-l-avenir/arrivee-rapports', 2),
+            ('https://www.france-galop.com/fr/courses/pattern-listed', 1),
+            ('https://www.jra.go.jp/JRADB/accessT.html?CNAME=fixture', 2),
+            ('https://www.jra.go.jp/datafile/seiseki/fixture.html', 1)]
+        for url, budget in urls:
+            with self.subTest(url=url):
+                def snapshot(**kwargs):
+                    self.assertEqual(kwargs['proposed_requests'], budget)
+                    result, actual_requests, request_groups = kwargs['fetcher']()
+                    self.assertEqual((actual_requests, request_groups), (budget, 1))
+                    return result, False
+                with override_settings(FRANCE_BROWSER_URL='http://france_browser:8080', JRA_BROWSER_URL='http://jra_browser:8080'), \
+                        patch('stable.services.race_data_sync_providers._get_or_fetch_shared_snapshot', side_effect=snapshot), \
+                        patch('stable.services.race_events.ensure_race_live_host_budget_floor'), \
+                        patch.object(pre, '_reserve_pre_race_request', return_value=SimpleNamespace(reservation_version=7)) as reserve, \
+                        patch('stable.services.race_events.record_race_live_host_outcome'), \
+                        patch('stable.services.france_browser_transport.fetch_browser_document', return_value=payload), \
+                        patch('stable.services.jra_browser_transport.fetch_browser_document', return_value=payload):
+                    self.assertEqual(str(pre._fetch_bounded_html(url, now=now, provider='geny', region='france',
+                        validator=lambda value: None, enabled=lambda: True)), payload['html'])
+                    self.assertEqual(reserve.call_count, budget)
+
+
 from datetime import date,datetime,timedelta,timezone
 from django.test import TestCase,override_settings
 from stable.test_race_pre_race import FLAGS

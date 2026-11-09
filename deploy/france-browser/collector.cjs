@@ -13,9 +13,11 @@ function validateUrl(value){
 }
 async function collect(url,chromium){
  const target=validateUrl(url),began=Date.now();
+ // Geny白名单页面会在同一主页面执行一次重载；不开放其他URL或子框架导航。
+ const maxDocuments=target.hostname==='www.geny.com'?2:1;
  const browser=await chromium.launch({headless:true,timeout:10000,chromiumSandbox:process.platform==='linux'});
  const deadline=setTimeout(()=>browser.close().catch(()=>{}),Math.max(1,30000-(Date.now()-began)));
- let requests=0,documents=0,denied='';
+ let requests=0,documents=0,documentRequests=0,denied='';
  try{
   const options={serviceWorkers:'block',acceptDownloads:false,timezoneId:'Europe/Paris',locale:'fr-FR',viewport:{width:1440,height:1000}};
   if(target.hostname==='www.france-galop.com'&&process.env.FRANCE_GALOP_STORAGE_STATE)options.storageState=process.env.FRANCE_GALOP_STORAGE_STATE;
@@ -23,8 +25,11 @@ async function collect(url,chromium){
   await context.route('**/*',async route=>{
    const req=route.request();let u;try{u=new URL(req.url());}catch{return route.abort();}
    if(denied||Date.now()-began>30000||u.origin!==target.origin||!['GET','HEAD'].includes(req.method())||!['document','script','xhr','fetch'].includes(req.resourceType()))return route.abort();
-   if(req.resourceType()==='document'&&(u.href!==target.href||++documents>1)){denied='navigation_rejected';return route.abort();}
-   if(++requests>96){denied='request_limit';return route.abort();}
+   if(req.resourceType()==='document'){
+    if(u.href!==target.href||req.frame().parentFrame()||++documents>maxDocuments){denied='navigation_rejected';return route.abort();}
+    documentRequests=0;
+   }
+   if(++requests>96*maxDocuments||++documentRequests>96){denied='request_limit';return route.abort();}
    return route.continue();
   });
   const page=await context.newPage();page.setDefaultTimeout(20000);
@@ -50,6 +55,8 @@ async function collect(url,chromium){
    const meta=document.createElement('meta');meta.name='source-timezone';meta.content='Europe/Paris';clone.querySelector('head').append(meta);
    return '<!DOCTYPE html>'+clone.outerHTML;
   });
+  if(denied)throw Error(denied);
+  if(page.url()!==url)throw Error('navigation_rejected');
   if(Buffer.byteLength(html)>MAX_BYTES||Date.now()-began>30000)throw Error('response_limit');
   return {url,final_url:page.url(),html,navigation_count:documents,resource_requests:requests,
    observed_at:new Date().toISOString(),elapsed_ms:Date.now()-began};
