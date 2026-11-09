@@ -2741,7 +2741,7 @@ def _claim_multisource_due(
         try:
             with transaction.atomic():
                 event, _ = _lock_multisource_event(event_id)
-                if historical and (event.country_region != "japan" or not event.local_date
+                if historical and (event.country_region not in ("japan", "hong_kong") or not event.local_date
                     or event.local_date > now.astimezone(ZoneInfo(event.timezone_name)).date()
                     or (event.race_datetime is not None and event.race_datetime + timedelta(minutes=3) > now)):
                     continue
@@ -3214,4 +3214,4 @@ def claim_multisource_events(*, event_ids, now, ttl_seconds=240, historical=Fals
         raise ValueError("multisource_explicit_scope_invalid")
     _require_aware(now, "now")
     return _claim_multisource_due(now=now, batch_size=min(20, len(event_ids)), ttl_seconds=ttl_seconds,
-        providers=("jra", "nar"), regions=("japan_jra", "japan_nar"), data_kinds=("result",), event_ids=event_ids, historical=historical)
+        providers=("jra", "nar", "hkjc"), regions=("japan_jra", "japan_nar", "hong_kong"), data_kinds=("result",), event_ids=event_ids, historical=historical)

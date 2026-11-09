@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "base_sha": "9482ff86614431ad56a617f1751a4d2bbd982d7c",
+  "reason": "香港字段修复的精确字节范围。覆盖HKJC真实源/历史claim/登记/投影、共享赛果全部领域、日本字段回归、公开详情与时间及选测执行器。views只改既有prefetch行的标签，不改变查询/权限；无模型迁移或任务调度变化。独立review须同时核对该范围。",
+  "domains": [
+    "hkjc_source_acceptance",
+    "race_results",
+    "module:stable.test_race_information_display_pages",
+    "module:stable.test_race_public_time",
+    "infrastructure"
+  ],
+  "changes": [
+    {
+      "path": "docs/changes/hkjc-race-fields/design.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "ee557c873a766c29916eab5b6f80b08d173193fe73bb042caf2e26842dcccb59",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/hkjc-race-fields/rollout.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "48ce0602b4229df06712d7f74ec915bd91068988b72d1a1e9c6d050946f81061",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/hkjc-race-fields/spec.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "679a1785514807ceb057b190e54084c08bd5a42690d72d33a91610248e8db1d9",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/hkjc-race-fields/tasks.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "4476934527551bcd49b2d4a3308ff0f001f3ee4e04b2bf59db6a68f9005a3174",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/hkjc-race-fields/test_cases.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "682d02654c5e394b96e98dcb22a47433df76beadf62c55a1c9663ba12e450a14",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/current_state.md",
+      "status": "modified",
+      "before_hash": "53f3521be18f09ff1a7a01fc5223ef450aded6f17d47817d692b89440649f16e",
+      "after_hash": "ee3b204f0be3759876e5053980f1946af10c5319f06eb8a6aa09547e3952214e",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/management/commands/repair_hkjc_race_fields.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "16fd8b8430cebec05d2071e57a54d97876d6200895109da37924f03278aa5de7",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/hkjc_public_fields.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "b77ce8cf1cf123a444f85f1eb09ae9e636630374553f5e5fd8a152662f2d2285",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_source_adapters.py",
+      "status": "modified",
+      "before_hash": "7943f59ab10f92b1056911ca93e5e7e5a0829f1140a4cdd74d5ff93a4fee5131",
+      "after_hash": "b5a2b04ddf9423784b2461f688b45c5eb001ad5a5d3711f267438d4a919c5671",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_control.py",
+      "status": "modified",
+      "before_hash": "11b1aa7d03da9cd98063f14320a1095244496a47f3c48b6390e86ddfeb724964",
+      "after_hash": "c389e3fdce3e7943ac6f592746913cdb43ecf4348ff0ec5df269fb62578ecfc6",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_results.py",
+      "status": "modified",
+      "before_hash": "86185d04b584318037d84949ec06409fd0377e51b0868aea82c4c51f08bc829f",
+      "after_hash": "79c8dae66677b494346c1a9510ce4a3d684440a6cdc54e584793f0617c612dff",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/templates/stable/public/race_detail.html",
+      "status": "modified",
+      "before_hash": "804a943a42a079f5286df6cd7e69e962d0f458e9bc5a3c4161aeee5fe4be10b7",
+      "after_hash": "74a455b7fb93156598ee46cb4ef9098be9312bf9d3ab30dd0c2388f47e9a7d85",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_hkjc_public_fields.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "ab617680a0204d707df3fbae303dacdafbec4edda921c2906c5ad9b6cdeae0a3",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/views.py",
+      "status": "modified",
+      "before_hash": "25cb79d775ab499fbb89f85ccc722fb46ec350ffbc6a530eac03dad8575cb759",
+      "after_hash": "af6768b703a29c56be6adb679581b290b7411490ae6b9125ef878b650570cb12",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/catalog.json",
+      "status": "modified",
+      "before_hash": "05b1963baa79c93858f59790ce2dd5f38da58c54d353424cdeace5a8bec1c2fe",
+      "after_hash": "cbba3e5caefcd8156dfd273e2a35cfaaf0fcc0d58bf31c0dd366e85836fd280d",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "fec3d838d2bb6eb458eb34ab0a9de6c480b28a2387f18aeefee2cd04a41bec36",
+      "after_hash": "4aacb3af85f9ac348e991d806d530ec18d304f4c8c00b64fcdb30293b7669fe4",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}

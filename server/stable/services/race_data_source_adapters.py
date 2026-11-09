@@ -1298,6 +1298,7 @@ def parse_hkjc_observation(page, *, url, route, now):
     from urllib.parse import parse_qs
     from bs4 import BeautifulSoup
     from stable.services.external_hkjc_data import HKJCHTMLParser
+    from .hkjc_public_fields import UNITS, margin_value
     from stable.services.race_source_identity import normalize_name
 
     if not route.permits_url(url) or route.region != "hong_kong":
@@ -1354,6 +1355,12 @@ def parse_hkjc_observation(page, *, url, route, now):
             if pos
             else {
                 "WV": "withdrawn",
+                "WV-A": "withdrawn",
+                "WR": "withdrawn",
+                "WX": "withdrawn",
+                "WX-A": "withdrawn",
+                "TNP": "non_runner",
+                "FE": "fell",
                 "PU": "pulled_up",
                 "UR": "unseated_rider",
                 "DISQ": "disqualified",
@@ -1367,17 +1374,17 @@ def parse_hkjc_observation(page, *, url, route, now):
                 external_runner_id=r["horse_id"] or "number:" + r["horse_number"],
                 number=r["horse_number"],
                 horse_name=r["horse_name_en"],
-                barrier=r["barrier"],
+                barrier=r["barrier"] if r["barrier"] != "---" else "",
                 jockey_name=r["jockey"],
                 trainer_name=r["trainer"],
                 carried_weight=r["weight"] + 'lb' if r["weight"] and r["weight"] != '---' else '',
                 reported_finish_position=pos,
                 status=status,
                 raw_status=raw,
-                finish_time=r["finish_time"],
-                margin=r["margin"],
+                finish_time=r["finish_time"] if r["finish_time"] != "---" else "",
+                margin=margin_value(r["margin"]),
                 odds_value=r['odds'] if r['odds'] != '---' else '',
-                field_provenance={'source_url':url, 'field_units':{'carried_weight':'lb'}, 'win_odds':r['odds']},
+                field_provenance={'source_url':url, 'field_units':dict(UNITS), 'win_odds':r['odds'], 'raw_margin':r['margin']},
             )
         )
     if not rows or len({r["number"] for r in rows}) != len(rows):
