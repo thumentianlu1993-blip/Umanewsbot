@@ -22,3 +22,12 @@
 独立容器只访问 France Galop/Geny 的赛事路径，固定 Europe/Paris，限时限量，关闭下载；应用仍持有配额与lease。France Galop会话由独立正常登录工具生成外部0600文件，仅保留法国域会话，经只读挂载使用。失效返回错误，不自动读取个人Chrome配置或导出身份提供方Cookie。
 
 `france_archive` 将已采集的可见DOM文档转成解析器输入，SHA绑定原文档。这是可见内容回放而非原网页HTML；未记录时区的历史采集不反推开赛时刻。
+
+
+## 2026-11-10 已确认的旧登记交接修订
+
+用户已确认 772/785/790/791/828/830/833/839/840/841 十场显式交接。固定 manifest 保存 owner、旧登记、跟踪、检查点及 lifecycle 控制快照；只接受当前 `historical + retired` 或 `data_sync + enrolled` 的 v1 组合，无人工暂停、活动 claim 或 v2 binding。已批准范围内允许为新 Geny 来源做强身份匹配和准入后，原位转换 v2、递增 owner/enrollment generation，保留旧登记主键、旧来源、不可变修订及 before/after 审计。普通自动发现入口保持拒绝旧归属，不自动扩大接管。
+
+France release 在既有单事务中消费显式 handoff；十场交接、法国目录/511行结果及49日港换绑任一失败全部回滚。默认无handoff时仍拒绝旧登记，收据重放不得再次递增代数或改写历史。补含真实旧控制状态的PostgreSQL回归，覆盖dry-run零留存、末项失败、apply/replay、状态/代数漂移和人工锁拒绝。修改源码与精确数据包后重新冻结镜像和包，独立review按根AGENTS.md交付。
+
+交接快照直接嵌入法国数据 manifest 的 `legacy_handoffs`，与目录和赛果共同由 manifest SHA 绑定；外层 activation 再绑定该文件 SHA。无需增加第二个独立授权文件或先行事务。普通 `attach_multisource_observation` 默认参数为空，仅此显式发布路径传入控制快照。

@@ -9837,3 +9837,8 @@ RACE_DATA_RAW_ARTIFACT_ROOTS=/run/race-data-sync
 ## 法国浏览器候选（2026-11-09，尚未上线）
 
 法国接入使用独立 `docker-compose.france-browser.yml`，内部只读赛事浏览器，不开放宿主端口、不注入业务数据库凭据。France Galop需要外部独立会话文件；生成方式、验证与恢复见[法国交付说明](changes/france-race-automation/rollout.md)。认证失败保留上次候选，不以用户个人Chrome有效会话作为服务器可用证据。策略增加法国route时需同步精确rebind既有日港登记，回退时还原旧策略及对应登记状态。通用人工门禁引用根AGENTS.md。
+
+
+## 2026-11-09 法国权限修复后继的实际状态
+
+修正镜像已恢复 Web 与双域健康，France Galop/Geny 生产访问通过；数据 dry-run 受 10 场旧登记归属阻塞而回滚，worker/beat 停止。参见[实际发布证据](changes/france-race-automation/release_evidence.md)。该后继使用独立 `runtime/france-repair-executable/pinned-images.json`，保留原失败 intent/备份，不能将旧 intent 改绑到修正镜像。恢复/续跑使用已绑定包入口，不用无 overlay 的通用 Compose 命令替代。数据控制容器在只读父挂载下使用子挂载时，须提前准备已批准的 persistent 数据目录；只读证据目录 0755、文件 0644，私有会话仍 0600。人工门禁仅引用根 `AGENTS.md`。
