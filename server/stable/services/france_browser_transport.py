@@ -1,6 +1,7 @@
 """法国内部浏览器传输合同；配额、lease和写入开关由调用方持有。"""
 import hashlib
 import json
+import re
 from urllib.parse import urlsplit
 
 import requests
@@ -9,6 +10,14 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 MAX_HTML = 2 * 1024 * 1024
+
+
+def browser_document_budget(url):
+    """Geny白名单页面的一次同URL重载须同时计入浏览器合同与请求预算。"""
+    parsed = urlsplit(url)
+    return 2 if (parsed.scheme == 'https' and parsed.netloc == 'www.geny.com'
+        and re.fullmatch(r'/(?:programme/\d{4}-\d{2}-\d{2}|course/\d+-\d{4}-\d{2}-\d{2}-[^/]+/(?:partants-pronostics|arrivee-rapports))', parsed.path)
+        and not parsed.query and not parsed.fragment) else 1
 
 
 def fetch_browser_document(url):
@@ -36,8 +45,8 @@ def fetch_browser_document(url):
         or not isinstance(html, str) or not html.rstrip().lower().endswith('</html>')
         or len(html.encode()) > MAX_HTML or observed is None or timezone.is_naive(observed)
         or not 0 <= (timezone.now() - observed).total_seconds() <= 60
-        or type(value.get('navigation_count')) is not int or not 1 <= value['navigation_count'] <= 1
-        or type(value.get('resource_requests')) is not int or not 1 <= value['resource_requests'] <= 96):
+        or type(value.get('navigation_count')) is not int or not 1 <= value['navigation_count'] <= browser_document_budget(url)
+        or type(value.get('resource_requests')) is not int or not 1 <= value['resource_requests'] <= 96 * value['navigation_count']):
         raise ValueError('france_browser_contract')
     return {'html': html, 'raw_sha256': hashlib.sha256(html.encode()).hexdigest(),
             'observed_at': observed.isoformat(), 'browser': {k: value[k] for k in

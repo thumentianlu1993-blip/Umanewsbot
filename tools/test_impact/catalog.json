@@ -919,6 +919,9 @@
     "france_race_automation": [
       "stable.test_france_automation",
       "stable.test_france_release_handoff"
+    ],
+    "module:stable.test_france_automation": [
+      "stable.test_france_automation"
     ]
   },
   "dependencies": {

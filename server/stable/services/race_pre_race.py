@@ -537,6 +537,9 @@ def _fetch_bounded_html(url, *, now, provider, region, validator, enabled):
     browser = bool(getattr(settings, 'JRA_BROWSER_URL', '') and urlsplit(url).hostname == 'www.jra.go.jp')
     france_browser = bool(getattr(settings, 'FRANCE_BROWSER_URL', '') and urlsplit(url).hostname in {'www.geny.com','www.france-galop.com'})
     document_budget = 2 if browser and urlsplit(url).path.startswith('/JRADB/') else 1
+    if france_browser:
+        from .france_browser_transport import browser_document_budget
+        document_budget = browser_document_budget(url)
 
     def fetch():
         nonlocal failure
