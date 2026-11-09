@@ -917,7 +917,8 @@
       "stable.test_hkjc_public_fields"
     ],
     "france_race_automation": [
-      "stable.test_france_automation"
+      "stable.test_france_automation",
+      "stable.test_france_release_handoff"
     ]
   },
   "dependencies": {
@@ -2923,6 +2924,12 @@
       "domains": [
         "france_race_automation"
       ]
+    },
+    "server/stable/test_france_release_handoff.py": {
+      "label": "stable.test_france_release_handoff",
+      "domains": [
+        "france_race_automation"
+      ]
     }
   },
   "profiles": {
@@ -3244,7 +3251,8 @@
     "stable.test_hkjc_horse_name_policy": "django",
     "stable.test_hkjc_automation": "django",
     "stable.test_hkjc_public_fields": "django",
-    "stable.test_france_automation": "django"
+    "stable.test_france_automation": "django",
+    "stable.test_france_release_handoff": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {

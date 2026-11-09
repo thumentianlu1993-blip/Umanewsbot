@@ -1,0 +1,138 @@
+{
+  "schema_version": 1,
+  "base_sha": "907210eb89374980de2edaf0769c1542127eb649",
+  "reason": "法国原子发布内的10场旧登记显式交接；共享attach默认路径不变但覆盖多源登记/并发/转换与完整赛果领域。真实10场控制fixture纳入80场511行回放及末项失败回滚；覆盖日港共享链路、公开展示和测试基础设施。无schema、配置、抓取来源扩版或新闻功能变更。",
+  "domains": [
+    "france_race_automation"
+  ],
+  "changes": [
+    {
+      "path": "docs/changes/france-race-automation/design.md",
+      "status": "modified",
+      "before_hash": "b9de57bac45602db0b88901652a462aff4eb733c5df46256a0ddda831f3cf2d2",
+      "after_hash": "5b786ee90f55746ac5d7c94b55345de82cdb31909041956422d4b51dd9c0588d",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/france-race-automation/release_evidence.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "f9ae0a13680a5627a4e881fc9b584bb3f0a0ed0aacab32b154754c5fab5d9d33",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/france-race-automation/rollout.md",
+      "status": "modified",
+      "before_hash": "bb7806a05b5a86320aa8cc07b890913f3e7badbe6816ca2c9f53696d72fabf85",
+      "after_hash": "19e712b1b50be4d76441a8c5a289db6ceccd84e0d745007446218c940f30a3f4",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/france-race-automation/tasks.md",
+      "status": "modified",
+      "before_hash": "ce226ca8a5d62519ac8a0076a10557120375f15c2461fae7957c8035b53aa54e",
+      "after_hash": "21cbe7a460f3329993b54a8ff10ea17cba49d84652227aec887e1fb64b9ec4dd",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/france-race-automation/test_cases.md",
+      "status": "modified",
+      "before_hash": "afac4e53155940ba9aa96c54ac8086af24745db57051e636cd1cca218c2c26c0",
+      "after_hash": "875ce990ff53dd6d2fa9022266a889bd7a9398196d699188e004a7d706da576d",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/current_state.md",
+      "status": "modified",
+      "before_hash": "44ec5dbf925280fced34504eee8baf7c8fa4fe16f38519963e65091e8942d8b4",
+      "after_hash": "77bab75238a6b7df2e91ac054cdeb7fcef9c27dd1c4af4efa3b053ba7f5975aa",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/deploy_runbook.md",
+      "status": "modified",
+      "before_hash": "fb1f25f02a7bf381ea75ca6e5dc8491d7b9f3176726c74eb950268c36fad3412",
+      "after_hash": "15e5bcc54fe79d051834fb36bf982c7cdd1a7a2e6b4870741414853cd4b2ed5f",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/france_automation/legacy_controls.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "c44f2b6cbb3b7526ee46f36e2e9cab2cad0ab6de25712fd0e778bb8460380103",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/france_release.py",
+      "status": "modified",
+      "before_hash": "aa3696dd64a49c11eb9d6e9c3957c4c2c7a430b07d5df4f808a33ab6c6b750bd",
+      "after_hash": "26f45fb98a2164345f193c222bab864f059725fd34cf3a5b944f3f5b30d6db07",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/france_release_handoff.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "1a3ec2cfd1559717c90b10f6c84dd25fcf0272bc649b814e44ee2657c1bf9a8b",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_enrollment.py",
+      "status": "modified",
+      "before_hash": "e8464d17ff1dd3891068b9f9cdb198877686c79bf3df45179bf24209515de370",
+      "after_hash": "19fbf2a16b62a05ed45abe5842fa57580e6098d76b2f340145d25202beb170f9",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_results.py",
+      "status": "modified",
+      "before_hash": "338f1d1fd5e7ef8a9f9dad6838f5e9b42022940a6b843aba7a0f200c024b1b36",
+      "after_hash": "b806eee6d6ddc29b397ff99e0b20c209a3d2206e079ed0cc15d47fc5e19d02ec",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_france_automation.py",
+      "status": "modified",
+      "before_hash": "6f19889cf5afdddb8b3a3930b15844ce179d443d41f15bbbdd8c632d9efd11d0",
+      "after_hash": "338458ad2566578d3b397482c3cb9e53dd3e87d3a2e0f0a60b75df993915e002",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_france_release_handoff.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "8089ca6ae3b20025cdcde017bd0cc52db02e7b6201ef8e9c94477964d3c08386",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/catalog.json",
+      "status": "modified",
+      "before_hash": "0458a53f9c919d22465173caba2fbd05da918d57903f87a32ebf3fb1f6afde28",
+      "after_hash": "ae0ccabe142d59c09e8b0727d794e888275bd91c495f63ee83fa8f631257eacc",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "4206eafd51ed2489ed0ab807b78b93af736e882234f0dcfc6b0d07f67cf12965",
+      "after_hash": "1c7d80b258b0d6034f972f754eeb0d68510734eea8c6fa4a9b90b63d6dc1cad9",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}

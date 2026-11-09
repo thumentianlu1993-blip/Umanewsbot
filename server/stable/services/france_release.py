@@ -13,6 +13,7 @@ from .race_data_sync_enrollment import attach_multisource_observation,_lock_mult
 from .race_data_sync_control import claim_multisource_events
 from .race_source_identity import resolve_observation
 from .france_archive import replay_page
+from .france_release_handoff import validate_handoff, record_handoff
 
 EVENT_FIELDS=('id','year','edition_year','slug','original_name','chinese_name','country_region','racecourse',
     'race_series_id','local_date','local_start_time','race_datetime','timezone_name','grade_text','normalized_grade',
@@ -52,6 +53,10 @@ def execute(path,expected_sha256,*,apply=False,now=None,approved_by_id=None):
         or not 1<=len(items)<=1000):raise ValueError('manifest_scope')
     identities=[('id',x['event_id']) if x.get('event_id') else ('slug',x.get('slug')) for x in items]
     if len(set(identities))!=len(items) or any(not x[1] for x in identities):raise ValueError('duplicate_event')
+    handoff_entries=manifest.get('legacy_handoffs',[])
+    handoffs={entry['event_id']:entry for entry in handoff_entries}
+    result_ids={item['event_id'] for item in items if item.get('event_id') and item.get('result_rows')}
+    if len(handoffs)!=len(handoff_entries) or not set(handoffs)<=result_ids:raise ValueError('handoff_scope')
     policy=load_multisource_policy(now=now)
     if not policy.valid(now) or policy.digest!=manifest['policy_digest']:raise ValueError('policy_drift')
     source=read_bound(path.parent,manifest['archive']);pages={}
@@ -73,8 +78,11 @@ def execute(path,expected_sha256,*,apply=False,now=None,approved_by_id=None):
             if event.country_region!='france' or event_baseline(event)!=item['event_baseline']:raise ValueError('event_baseline_drift')
             if (lifecycle and lifecycle.manual_pause_reason) or any((event.manual_lock_flags or {}).values()) or event.field_authorities.filter(manual_lock=True).exists():raise ValueError('manual_lock')
             control=getattr(event,'projection_control',None)
-            if control and control.write_owner not in ('unmanaged','data_sync'):raise ValueError('owner_conflict')
-            if getattr(event,'race_data_sync_enrollment',None):raise ValueError('existing_enrollment_requires_separate_rebind')
+            if event.pk in handoffs:
+                validate_handoff(event,handoffs[event.pk])
+            else:
+                if control and control.write_owner not in ('unmanaged','data_sync'):raise ValueError('owner_conflict')
+                if getattr(event,'race_data_sync_enrollment',None):raise ValueError('existing_enrollment_requires_separate_rebind')
             locked[event.pk]=event
         series={s.pk:s for s in models.RaceSeries.objects.select_for_update().filter(pk__in=[i['series_id'] for i in items]).order_by('pk')}
         report=[]
@@ -124,7 +132,7 @@ def execute(path,expected_sha256,*,apply=False,now=None,approved_by_id=None):
             match=resolve_observation(observation,route=route,now=now)
             if match.status!='exact' or match.event_id!=event.pk:raise ValueError('result_identity')
             if len(observation.get('roster',[]))!=item['result_rows']:raise ValueError('result_count')
-            decision=attach_multisource_observation(observation,policy=policy,now=now)
+            decision=attach_multisource_observation(observation,policy=policy,now=now,legacy_handoff=handoffs.get(event.pk))
             if decision.action not in ('acquired','attached','replay'):raise ValueError('attach_'+decision.reason_code)
             claims=claim_multisource_events(event_ids=[event.pk],now=now,historical=True)
             if len(claims)!=1:raise ValueError('historical_claim_unavailable')
@@ -133,6 +141,7 @@ def execute(path,expected_sha256,*,apply=False,now=None,approved_by_id=None):
             event.refresh_from_db()
             if event.status!='finished' or event.results.count()!=item['result_rows']:raise ValueError('public_projection_incomplete')
             entry['rows']=event.results.count()
+            if event.pk in handoffs:record_handoff(event,before=handoffs[event.pk],manifest_sha256=digest)
         result=dict(manifest_sha256=digest,action='applied' if apply else 'dry_run_rolled_back',events=report,
             result_rows=sum(e['rows'] for e in report))
         if apply:models.OperationLog.objects.create(action_type='france_release_data',target_type='manifest',target_id=digest,detail=json.dumps(result))

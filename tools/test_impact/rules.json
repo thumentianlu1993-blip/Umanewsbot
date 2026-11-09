@@ -1557,6 +1557,12 @@
     ],
     "docs/changes/france-race-automation/ci-scope.json": [
       "infrastructure"
+    ],
+    "server/stable/services/france_release_handoff.py": [
+      "france_race_automation"
+    ],
+    "docs/changes/france-race-automation/handoff-ci-scope.json": [
+      "infrastructure"
     ]
   },
   "symbols": {
@@ -1740,6 +1746,7 @@
     "docs/changes/hkjc-horse-name-display/ci-scope.json",
     "docs/changes/hkjc-source-acceptance/ci-scope.json",
     "docs/changes/hkjc-race-fields/ci-scope.json",
-    "docs/changes/france-race-automation/ci-scope.json"
+    "docs/changes/france-race-automation/ci-scope.json",
+    "docs/changes/france-race-automation/handoff-ci-scope.json"
   ]
 }

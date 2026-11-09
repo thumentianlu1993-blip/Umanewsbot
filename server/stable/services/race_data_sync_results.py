@@ -180,6 +180,20 @@ def _identity_text(value: object) -> str:
     ).casefold()
 
 
+def _crosswalk_names_match(crosswalk, *, runner, external_runner_id, horse_name):
+    # 法国显式交接只确认当时的两种名称写法，不永久授权同号换马。
+    if crosswalk.get("scope") != "france_legacy_handoff":
+        return True
+    verified = crosswalk.get("verified_names")
+    if not isinstance(verified, dict):
+        return False
+    names = verified.get(external_runner_id)
+    if not isinstance(names, list) or len(names) != 2 or not all(isinstance(n, str) and n.strip() for n in names):
+        return False
+    allowed = {_identity_text(name) for name in names}
+    return _identity_text(runner.horse_name) in allowed and _identity_text(horse_name) in allowed
+
+
 def runner_slot_identity_matches(*, event, source, runner, external_runner_id, horse_name):
     """马号只表示槽位；换名必须有该场已核验的 runner 映射。"""
     if not external_runner_id.startswith("number:"):
@@ -194,6 +208,8 @@ def runner_slot_identity_matches(*, event, source, runner, external_runner_id, h
         and re.fullmatch("[0-9a-f]{64}", crosswalk["evidence_sha256"])
         and isinstance(crosswalk.get("runners"), dict)
         and crosswalk["runners"].get(external_runner_id) == runner.pk
+        and _crosswalk_names_match(crosswalk, runner=runner,
+                                  external_runner_id=external_runner_id, horse_name=horse_name)
     )
 
 
@@ -260,6 +276,8 @@ def _result_roster_mapping(
                         and crosswalk_valid
                         and crosswalk["runners"].get(row["external_runner_id"])
                         == candidate.pk
+                        and _crosswalk_names_match(crosswalk, runner=candidate,
+                                                  external_runner_id=row["external_runner_id"], horse_name=row["horse_name"])
                         and not any((candidate.manual_lock_flags or {}).values())
                         and not candidate.raw_payload.get("substitution")
                         and not row["field_provenance"].get("substitution")
