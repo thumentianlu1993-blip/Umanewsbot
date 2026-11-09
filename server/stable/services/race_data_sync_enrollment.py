@@ -1386,7 +1386,7 @@ def _multisource_manifest(
     lifecycle.save(update_fields=("manifest_data", "updated_at"))
 
 
-def attach_multisource_observation(observation, *, policy, now, discovery_token=None):
+def attach_multisource_observation(observation, *, policy, now, discovery_token=None, legacy_handoff=None):
     """唯一赛事原子登记或挂接；失败全回滚，后到来源不重新授予 owner。"""
     from django.db import IntegrityError
     from urllib.parse import urlsplit
@@ -1460,7 +1460,7 @@ def attach_multisource_observation(observation, *, policy, now, discovery_token=
                         pk=projection.pk
                     )
                 )
-                if projection.write_owner not in ("unmanaged", "data_sync"):
+                if legacy_handoff is None and projection.write_owner not in ("unmanaged", "data_sync"):
                     raise _MultisourceRejected("writer_owner_conflict")
                 tracking, _ = models.RaceEventLiveTracking.objects.get_or_create(
                     event=event
@@ -1478,7 +1478,15 @@ def attach_multisource_observation(observation, *, policy, now, discovery_token=
                     .filter(tracking=tracking)
                     .order_by("pk")
                 )
-                if enrollment:
+                if legacy_handoff is not None:
+                    from .france_release_handoff import validate_handoff
+                    if route.provider != "geny" or route.region != "france":
+                        raise _MultisourceRejected("handoff_route_scope")
+                    try:
+                        validate_handoff(event, legacy_handoff)
+                    except ValueError as exc:
+                        raise _MultisourceRejected(str(exc)) from exc
+                elif enrollment:
                     if enrollment.authority_version != 2:
                         raise _MultisourceRejected("legacy_conversion_required")
                     if enrollment.state != "enrolled":
@@ -1537,6 +1545,12 @@ def attach_multisource_observation(observation, *, policy, now, discovery_token=
                     or source.terms_status != "approved"
                 ):
                     raise _MultisourceRejected("source_not_admitted")
+                if legacy_handoff is not None:
+                    from .france_release_handoff import install_runner_crosswalk
+                    try:
+                        install_runner_crosswalk(event, source, observation, legacy_handoff)
+                    except ValueError as exc:
+                        raise _MultisourceRejected(str(exc)) from exc
                 key = identity_key(observation)
                 key_added = False
                 if key:
@@ -1557,7 +1571,7 @@ def attach_multisource_observation(observation, *, policy, now, discovery_token=
                         )
                         key_added = True
                 created = enrollment is None
-                if created:
+                if created or legacy_handoff is not None:
                     evidence = canonical_sha(
                         {
                             "event": event_snapshot(event),
@@ -1570,7 +1584,7 @@ def attach_multisource_observation(observation, *, policy, now, discovery_token=
                     projection.owner_manifest_sha256 = evidence
                     projection.owner_changed_at = now
                     projection.save()
-                    enrollment = models.RaceDataSyncEnrollment.objects.create(
+                    enrollment_values = dict(
                         event=event,
                         source_identity=source,
                         authority_version=2,
@@ -1583,7 +1597,18 @@ def attach_multisource_observation(observation, *, policy, now, discovery_token=
                         manifest_sha256=evidence,
                         entry_sha256=evidence,
                         effective_at=now,
+                        retired_at=None,
+                        reason_code="",
                     )
+                    if created:
+                        enrollment = models.RaceDataSyncEnrollment.objects.create(**enrollment_values)
+                    else:
+                        for field, value in enrollment_values.items():
+                            setattr(enrollment, field, value)
+                        enrollment.save()
+                        tracking.circuit_reason = ""
+                        tracking.consecutive_failures = 0
+                        tracking.stale_at = None
                 binding = models.RaceDataSyncSourceBinding.objects.filter(
                     enrollment=enrollment, source_identity=source
                 ).first()
