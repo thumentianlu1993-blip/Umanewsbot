@@ -255,9 +255,7 @@ def display_fields(event, fields):
         label = {'très souple':'很软', 'souple':'软', 'bon souple':'良好偏软', 'bon':'良好', 'léger':'轻快',
                  'collant':'黏重', 'lourd':'重', 'très lourd':'很重'}.get(str(going['value']).lower())
         if label:
-            pen = going.get('penetrometer', '')
-            suffix = '；Pén ' + pen if re.fullmatch(r'\d+(?:\.\d+)?', pen) else ''
-            fields['going'] = display_field(going['value'], label+'（法国：'+going['value']+suffix+'）')
+            fields['going'] = display_field(going['value'], label)
     eligibility = evidence.get('eligibility', {})
     if eligibility.get('value') == value(event, 'eligibility_text'):
         age = eligibility.get('minimum_age')
@@ -272,5 +270,5 @@ def display_fields(event, fields):
         if eligibility.get('eligibility_constraints', {}).get('horse_category') == 'AQPS':
             label += ' · AQPS（非纯血马）' if label else 'AQPS（非纯血马）'
         if label:
-            fields['eligibility'] = display_field(eligibility['value'], label+'；其他限制见完整条件')
+            fields['eligibility'] = display_field(eligibility['value'], label)
     return fields

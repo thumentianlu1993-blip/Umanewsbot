@@ -80,7 +80,6 @@
         {% race_field event "eligibility" as eligibility %}{% if eligibility %}<div><span>参赛条件</span><b>{{ eligibility }}</b></div>{% endif %}
         <div><span>状态</span><b>{{ status_label }}</b></div>
       </div>
-      {% if event.country_region == 'france' and event.eligibility_text %}<details><summary>完整参赛条件（来源原文）</summary><div>{{ event.eligibility_text|linebreaksbr }}</div></details>{% endif %}
     </section>
 
     <section class="panel" id="runners">
