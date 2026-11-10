@@ -125,8 +125,11 @@ class FranceSourceTests(SimpleTestCase):
             source_refs={'margin_basis':'previous_finisher','allocated_weight':'70 kg','adjusted_weight':'68 kg',
                 'odds_source':'Genybet','odds_observed_at':'2026-11-09T00:00:00+00:00'},odds_value='2.3')
         html=render_to_string('stable/public/race_detail.html',dict(event=SimpleNamespace(pk=1),results=[row],runners=[row]))
-        for text in ('差距（距前马）','分配 70 kg','调整后 68 kg','Genybet','2026-11-09T00:00:00+00:00','11-09 08:00（北京时间）'):
+        for text in ('差距（距前马）','分配 70 kg','调整后 68 kg','Genybet'):
             self.assertIn(text,html)
+        for text in ('2026-11-09T00:00:00+00:00', '11-09 08:00（北京时间）', '采集'):
+            self.assertNotIn(text, html)
+        self.assertEqual(row.source_refs['odds_observed_at'], '2026-11-09T00:00:00+00:00')
 
     def test_all_21_official_future_documents_preserve_253_current_entries(self):
         from stable.services.france_sources import parse_france_galop_document

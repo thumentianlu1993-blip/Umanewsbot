@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "base_sha": "ce1aa916536e3eaf2865231e610f20657d70ed42",
+  "reason": "仅精简法国场况/条件和赔率采集时刻展示，保留数据、赔率平台和其它页面行为。覆盖法国完整模块、共享字段/页面、核心及选测工具链；无模型、迁移、采集或队列实现变化。新增清单和注册规则自身也纳入基础设施测试及独立复审。",
+  "domains": [
+    "module:stable.test_france_automation",
+    "module:stable.test_france_public_fields",
+    "module:stable.test_race_information_display",
+    "module:stable.test_race_information_display_pages",
+    "infrastructure"
+  ],
+  "changes": [
+    {
+      "path": "docs/changes/france-public-field-gaps/release_evidence.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "7f785f3ca0f945ce90ecdd4187b5350fa0b06e211dffebcc14df9781ba18b17a",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/france-public-field-gaps/rollout.md",
+      "status": "modified",
+      "before_hash": "0d68e921150220c36579804f20aa18258585d82ed7c89c252b65d425c9f5f58e",
+      "after_hash": "8683390ab022269cdfcb25c69fa38acd379225354d570bb822afb2c8a1ff68dd",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/france-public-field-gaps/tasks.md",
+      "status": "modified",
+      "before_hash": "bee2f3110c2dcf79c35d492cfdc0c54ad298e3f283eaf90c0d75dcc1f41fdb14",
+      "after_hash": "c61d1ed8194dd6d322f1da97923030f2ac853e453e41d356f91ffe2fd82e8a9c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/current_state.md",
+      "status": "modified",
+      "before_hash": "ab366fd60e7b37575eaedf739acb2b72d9b0af55f759f98244e24f0c83be21d8",
+      "after_hash": "680364e5da2eb85fa0c2ed71650db444d7b93c1687b61e464d84398646231b03",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/decisions.md",
+      "status": "modified",
+      "before_hash": "1821d77bbfc4f8ab447e71b2207a8d7ae3487232c35485bdde842d71baeb22ad",
+      "after_hash": "96c09642caf39c494c88d9367a98e9d6ba71a17b56ae28396dabe175f29c5d09",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/deploy_runbook.md",
+      "status": "modified",
+      "before_hash": "214fb7132d114e6b35509c3db707466f598cd471143f495aee468448d5ebf2b8",
+      "after_hash": "2c5c425dd6608a09b700ccc678523b2815b26f8ac07f4d92473f0d76569f8500",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/future_work_roadmap.md",
+      "status": "modified",
+      "before_hash": "a974d987b47db81e8159d530a8350cb5ccec6e869d1097c1130688f957933428",
+      "after_hash": "b07558f3c7b61ed9c799c7c1a5c87beff678d274aa768fcc1fba5c05e0a783a5",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/france_basic_fields.py",
+      "status": "modified",
+      "before_hash": "294c2c86ebf66457af18ab05d145e6d3820290937682bda9eeb75d5acb173963",
+      "after_hash": "39abf82fde3dc5517d03ece96efe63abebbc09ff2ff948a0979d405c8e0fed38",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/templates/stable/public/_race_odds_source.html",
+      "status": "modified",
+      "before_hash": "c419903f2e333151c6f86f8e90733b262726f31313f79cf45c657011c4f5b139",
+      "after_hash": "8a0b98e2cfa3a0d494808f96121b5c6943c6b75430cff6985a8e07f8da23c850",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/templates/stable/public/race_detail.html",
+      "status": "modified",
+      "before_hash": "5b58f92368319937588b187d1ed91903404c1c865b39cf4d9a715a0a4c3bcd4a",
+      "after_hash": "84a5a1f701c2d9443e72061f7f8075ac234552d7d7b216ee4bd198f389b3c719",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_france_automation.py",
+      "status": "modified",
+      "before_hash": "6263a93fc4d1e20a22e30f1f8c22ba8817ba5ce717eea41a13382b9c5887b34a",
+      "after_hash": "eb48219107f74626017aa865e23e764397be5f958a552fae955af890414b0f7e",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_france_public_fields.py",
+      "status": "modified",
+      "before_hash": "90c5425a7292b1625e9e8fddbfaf199fb7283290ea733f15818fca0c4b974797",
+      "after_hash": "c9cdffba69099d7c12ae9c1b20ad7ff7322999d4e6a27774dc732bbf03ead8c9",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "ce2739b2eed4e948608b2e5338bd41603c0a7ae67dc6e7ea0f7e226a023b4416",
+      "after_hash": "11d656ac1042ffbb158766c77025d6ced0b03297d5f5f97237eca01c9e617411",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}

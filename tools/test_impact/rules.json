@@ -1578,6 +1578,9 @@
     ],
     "docs/changes/france-public-field-gaps/ci-scope.json": [
       "infrastructure"
+    ],
+    "docs/changes/france-display-simplify/ci-scope.json": [
+      "infrastructure"
     ]
   },
   "symbols": {
@@ -1764,6 +1767,7 @@
     "docs/changes/france-race-automation/ci-scope.json",
     "docs/changes/france-race-automation/handoff-ci-scope.json",
     "docs/changes/france-race-automation/geny-reload-ci-scope.json",
-    "docs/changes/france-public-field-gaps/ci-scope.json"
+    "docs/changes/france-public-field-gaps/ci-scope.json",
+    "docs/changes/france-display-simplify/ci-scope.json"
   ]
 }
