@@ -85,6 +85,12 @@ def source_context(obj):
     raw = _distance_syntax_text(unicodedata.normalize('NFKC', str(value(obj, 'distance_text') or '')).strip())
     profile = catalog_profile if re.fullmatch(r'\d+(?:\.\d+)?\s*m', raw, re.I) else ''
     distance_unit = units.get('distance_text', '') if isinstance(units.get('distance_text'), str) else ''
+    france_basic = refs.get('france_basic_v1', {})
+    if value(obj,'country_region')=='france' and isinstance(france_basic,dict) and france_basic.get('version')==1:
+        basic_fields=france_basic.get('fields', {})
+        proof=basic_fields.get('distance', {}) if isinstance(basic_fields,dict) else {}
+        if isinstance(proof,dict) and proof and re.sub(r'\s+','',raw).lower()!=re.sub(r'\s+','',str(proof.get('value',''))).lower():
+            distance_unit=''  # 法国逐值单位证据不能随其它writer的异值更新继续沿用。
     conflict = bool(profile and distance_unit and distance_unit.lower() not in {'m', 'meter', 'metre', 'meters', 'metres', '米'})
     return {
         'provider': value(obj, 'source_name') or refs.get('source_provider', ''),
@@ -228,7 +234,7 @@ def event_fields(obj):
     klass = _DISPLAY_CLASSES.get(class_text, '')
     wins = re.fullmatch(r'([123])勝(?:クラス)?', class_text)
     if wins: klass = wins[1] + '胜级'
-    return {
+    fields = {
         'name': display_field(value(obj, 'chinese_name') or value(obj, 'race_name') or value(obj, 'original_name'),
                               value(obj, 'chinese_name') or value(obj, 'race_name') or value(obj, 'original_name'), state='preserved'),
         'grade': event_grade_field(obj, context=ctx),
@@ -236,9 +242,10 @@ def event_fields(obj):
                      if ctx['distance_unit_conflict'] else
                      parse_display_distance(value(obj, 'distance_text'), unit_hint=ctx['distance_unit'], context=ctx)),
         'surface': parse_display_surface(surface_raw),
-        'race_type': parse_display_race_type(value(obj,'race_type_text') or ('jumps' if surface_raw == 'jumps' else '')),
+        'race_type': parse_display_race_type(value(obj,'race_type_text') or (value(obj,'normalized_race_type') if value(obj,'country_region')=='france' else '') or ('jumps' if surface_raw == 'jumps' else '')),
         'layout': parse_display_layout(value(obj,'course_layout_text')),
-        'prize': parse_display_money(value(obj,'prize_text')),
+        'prize': (parse_display_money(value(obj,'prize_amount'), currency=value(obj,'prize_currency'), kind='total')
+                  if value(obj,'prize_amount', None) is not None else parse_display_money(value(obj,'prize_text'))),
         'weather': display_field('',state='missing',reason='unsupported_missing_source'),
         'going': display_field(value(obj,'going_text'),state='unknown' if value(obj,'going_text') else 'missing',reason='going_profile_required' if value(obj,'going_text') else 'unsupported_missing_source'),
         'race_class': display_field(grade_raw, klass) if klass else display_field('', state='missing', reason='missing'),
@@ -246,6 +253,8 @@ def event_fields(obj):
         'racecourse': display_field(value(obj, 'racecourse'), value(obj, 'racecourse'), state='preserved'),
         'date': date_field, 'time': time_field,
     }
+    from .france_basic_fields import display_fields
+    return display_fields(obj, fields)
 
 
 _STATUS_LABELS = {'did_not_finish': '未完赛', 'dnf': '未完赛', 'pulled_up': '拉停', 'unseated_rider': '骑师落马',
@@ -284,12 +293,25 @@ def _position(row, *, horse_record=False):
     return display_field(position, label, code=str(int(text)))
 
 
+def _result_time(row, raw):
+    from .france_sources import geny_key
+    refs = value(row, 'source_refs', {}) or {}
+    hint = ''
+    if isinstance(refs, dict):
+        try:
+            if geny_key(refs.get('primary', ''))[4] == 'arrivee-rapports':
+                hint = 'geny_minutes_seconds'
+        except (ValueError, TypeError):
+            pass
+    return parse_display_time(raw, format_hint=hint)
+
+
 def row_fields(row, *, horse_record=False):
     ctx = source_context(row)
     status = value(row, 'running_status') or value(row, 'result_status')
     return {
         'weight': parse_display_weight(value(row, 'carried_weight'), unit_hint=ctx['weight_unit']),
-        'finish_time': parse_display_time(value(row, 'public_finish_time') if hasattr(row, 'public_finish_time') or isinstance(row, dict) and 'public_finish_time' in row else value(row, 'finish_time')),
+        'finish_time': _result_time(row, value(row, 'public_finish_time') if hasattr(row, 'public_finish_time') or isinstance(row, dict) and 'public_finish_time' in row else value(row, 'finish_time')),
         'margin': parse_display_margin(value(row, 'margin'), unit_hint=ctx['margin_unit']),
         'horse_number': parse_display_number(value(row, 'horse_number')),
         'barrier': parse_display_number(value(row, 'barrier')),
@@ -312,9 +334,11 @@ def horse_record_fields(record, *, event_source=None):
         if not day and value(record, 'race_year', None):
             fields['date'] = display_field(value(record, 'race_year'), str(value(record, 'race_year')), state='preserved', reason='year_only')
     fields.update(row_fields(record, horse_record=True))
-    if not hasattr(record, 'public_finish_time') and not (isinstance(record, dict) and 'public_finish_time' in record):
-        linked = getattr(getattr(record, '_state', None), 'fields_cache', {}).get('result')
-        fields['finish_time'] = parse_display_time(value(linked, 'finish_time') if linked is not None and value(linked, 'is_confirmed', False) else '')
+    linked = getattr(getattr(record, '_state', None), 'fields_cache', {}).get('result')
+    if linked is not None and value(linked, 'is_confirmed', False):
+        fields['finish_time'] = _result_time(linked, value(record, 'public_finish_time', value(linked, 'finish_time')))
+    elif not hasattr(record, 'public_finish_time') and not (isinstance(record, dict) and 'public_finish_time' in record):
+        fields['finish_time'] = parse_display_time('')
     return fields
 
 

@@ -4828,6 +4828,16 @@ def record_race_result_observation(
         json.dumps(field_provenance, ensure_ascii=False, allow_nan=False)
     except (TypeError, ValueError, OverflowError, RecursionError):
         return RaceResultObservationRecordDecision(False, "invalid_provenance")
+    if 'france_basic_sha256' in normalized_payload or 'france_basic_v1' in field_provenance:
+        from .france_basic_fields import validate_basic
+        source = RaceResultSourceIdentity.objects.filter(pk=source_identity_id).first()
+        try:
+            if source is None:
+                raise ValueError('source_missing')
+            validate_basic(field_provenance.get('france_basic_v1'), sha=normalized_payload.get('france_basic_sha256'),
+                provider=source.source_key, region=source.region_code, external_id=source.external_race_id, event=source.event)
+        except (TypeError, ValueError, KeyError, AttributeError):
+            return RaceResultObservationRecordDecision(False, 'france_basic_contract')
     if not isinstance(parse_warnings, list):
         return RaceResultObservationRecordDecision(False, "invalid_warnings")
     try:

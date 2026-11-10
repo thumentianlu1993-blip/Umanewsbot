@@ -1566,6 +1566,18 @@
     ],
     "docs/changes/france-race-automation/geny-reload-ci-scope.json": [
       "infrastructure"
+    ],
+    "server/stable/services/france_basic_fields.py": [
+      "france_race_automation"
+    ],
+    "server/stable/services/france_field_repair.py": [
+      "france_race_automation"
+    ],
+    "server/stable/services/france_pre_race_authority.py": [
+      "france_race_automation"
+    ],
+    "docs/changes/france-public-field-gaps/ci-scope.json": [
+      "infrastructure"
     ]
   },
   "symbols": {
@@ -1751,6 +1763,7 @@
     "docs/changes/hkjc-race-fields/ci-scope.json",
     "docs/changes/france-race-automation/ci-scope.json",
     "docs/changes/france-race-automation/handoff-ci-scope.json",
-    "docs/changes/france-race-automation/geny-reload-ci-scope.json"
+    "docs/changes/france-race-automation/geny-reload-ci-scope.json",
+    "docs/changes/france-public-field-gaps/ci-scope.json"
   ]
 }

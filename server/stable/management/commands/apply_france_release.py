@@ -11,7 +11,8 @@ class Command(BaseCommand):
         parser.add_argument('--expected-sha256',required=True)
         parser.add_argument('--approved-by-id',type=int)
         parser.add_argument('--apply',action='store_true')
+        parser.add_argument('--restore',action='store_true',help='仅恢复该字段修复包仍匹配after-image的字段；默认dry-run')
     def handle(self,*args,**options):
-        try:result=execute(options['manifest'],options['expected_sha256'],apply=options['apply'],approved_by_id=options['approved_by_id'])
+        try:result=execute(options['manifest'],options['expected_sha256'],apply=options['apply'],restore=options['restore'],approved_by_id=options['approved_by_id'])
         except (ValueError,KeyError,TypeError,OSError) as exc:raise CommandError(str(exc)) from None
         self.stdout.write(json.dumps(result,ensure_ascii=False))

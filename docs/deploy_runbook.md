@@ -9846,7 +9846,7 @@ RACE_DATA_RAW_ARTIFACT_ROOTS=/run/race-data-sync
 
 ## 2026-11-10 法国应用恢复后的当前维护入口
 
-代码候选仍为 `0d05fa9b`，仅修正镜像内release文件后的应用OCI为 `sha256:2fa852b01378c076bf1b9c45cf30c8242bebfdcb70ab0ebcd29daca728dd8bc4`。执行包 `9f1c07c116f9` 修正版本身份，后继容量恢复包 `ade45ccee795` 已恢复四应用并通过驻留和双域健康核验；原80场/511行、10场交接与49日港换绑收据及原备份保留，无迁移或数据重导。
+当前应用代码候选为 `5669283d`，应用OCI `sha256:7fc5473c5d00b2dbfd9980845d947802c78fdde340bf519f7d7858c56d7a84bd`，浏览器OCI `sha256:30d27626f4e7797d6f6ca1faac3967e602f04d0188cb99ffb2e90fa43a69caca`。固定包 `8bd146098913` 已完成Geny重载修复发布及21/21自然调度验收；原80场/511行、10场交接与49日港换绑收据及原备份保留，无迁移或数据重导。宿主目录固定0d05fa9b的部署脚本不变，应用实际源码与版本由新镜像提供。
 
 固定目录为 `/opt/umanews-release-0d05fa9b-france-handoff-20261110/umanewsbot`。该目录的应用维护必须完整使用以下Compose链，不能使用旧权限恢复包或省略最终覆盖文件：
 
@@ -9856,11 +9856,12 @@ RACE_DATA_RAW_ARTIFACT_ROOTS=/run/race-data-sync
   -f runtime/france-handoff-0d05fa9b/pinned-images.json \
   -f docker-compose.france-browser.yml \
   -f /opt/umanews-external-staging/france-application-identity-0d05fa9b/release-identity.json \
-  -f /opt/umanews-external-staging/france-capacity-0d05fa9b/release-identity.json
+  -f /opt/umanews-external-staging/france-capacity-0d05fa9b/release-identity.json \
+  -f /opt/umanews-external-staging/france-geny-reload-5669283d/release-identity.json
 ```
 
-实际参数写入 `runtime/france-capacity-0d05fa9b/compose-command.json`。application-identity覆盖固定四应用镜像及版本环境，capacity覆盖只设四应用 `RACE_DATA_RAW_MIN_FREE_DISK_BYTES=4294967296`，原 `.env` 字节未变。512MiB归档根目录高水位和单文件限制保持；本次准入另验证空闲量大于4GiB加完整高水位及单文件预留。配置检查输出可能含私有值，不得公开输出或入库。
+实际参数写入 `runtime/france-geny-reload-5669283d/compose-command.json`。最终Geny覆盖文件固定四应用与浏览器新镜像，以及四应用release版本。application-identity覆盖固定四应用镜像及版本环境，capacity覆盖只设四应用 `RACE_DATA_RAW_MIN_FREE_DISK_BYTES=4294967296`，原 `.env` 字节未变。512MiB归档根目录高水位和单文件限制保持；本次准入另验证空闲量大于4GiB加完整高水位及单文件预留。配置检查输出可能含私有值，不得公开输出或入库。
 
-本次只清理4份本任务远端重复传输镜像归档，每份本机原副本SHA均核对且保留；未删除数据库备份或已加载镜像。旧包如需从归档冷恢复，先按原SHA重新传输本机副本。清理清单及收据见本机 `historical-handoff/application-identity/capacity-recovery/duplicate-image-archives.json` 与 `archive-cleanup-receipt.json`。
+容量恢复阶段清理4份本任务远端重复传输镜像归档，每份本机原副本SHA均核对且保留；未删除数据库备份或已加载镜像。旧包如需从归档冷恢复，先按原SHA重新传输本机副本。该阶段清理清单及收据见本机 `historical-handoff/application-identity/capacity-recovery/duplicate-image-archives.json` 与 `archive-cleanup-receipt.json`。Geny修复另外上传两份固定镜像归档，在SHA核验和load后删除这两份远端传输副本，本机完整归档保留，见 `geny-programme-reload/image-load-proof.json`。
 
 版本核验同时比较镜像revision标签、容器环境和Django实际读取的 `/app/.umanews-release-commit`；只检查其中之一不够。复用基础镜像复制源码后须保留启动权限并更新版本文件。worker用有界重复双pong判断就绪，不能启动后仅等待一次10秒。生产状态、后续自然调度证据及历史失败过程见[法国发布证据](changes/france-race-automation/release_evidence.md)。人工门禁仅引用根 `AGENTS.md`。
