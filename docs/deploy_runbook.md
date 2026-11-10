@@ -1,3 +1,24 @@
+## 2026-11-11 法国字段补缺已发布：当前维护入口
+
+PR #296 合并 `ce1aa916`；生产应用候选 `d9d97ab6c772e560e90822b896a218420f443387`，OCI `sha256:400d8e716cd10cfbf99c3852626e88d86b9809aaab637befaff7d32bb63c41fb`，真实 schema 为 `stable.0082_france_basic_fields`。宿主 checkout 仍为0d05fa9b，不能以其旧迁移目录推断运行版本。北京时间2026-11-11 01:15:38已完成80场数据写入和线上验收，详见[发布证据](changes/france-public-field-gaps/release_evidence.md)。
+
+在固定目录 `/opt/umanews-release-0d05fa9b-france-handoff-20261110/umanewsbot` 使用完整维护链：
+
+```sh
+./deploy/docker/compose-wrapper.sh \
+  -f docker-compose.prod.lowcost.yml \
+  -f runtime/france-handoff-0d05fa9b/pinned-images.json \
+  -f docker-compose.france-browser.yml \
+  -f /opt/umanews-external-staging/france-application-identity-0d05fa9b/release-identity.json \
+  -f /opt/umanews-external-staging/france-capacity-0d05fa9b/release-identity.json \
+  -f /opt/umanews-external-staging/france-geny-reload-5669283d/release-identity.json \
+  -f /opt/umanews-external-staging/france-fields-d9d97ab6/release-identity.json
+```
+
+新增覆盖只改变四应用 image/release 和七个 `france_basic.*` 字段准入；其余配置及 QQ=false 保持，浏览器未重建。生产 Docker 29 的 image Id/Descriptor 使用 manifest摘要400d8e71，本包config摘要26c89120；校验需核对 manifest→config 绑定，不将两种摘要混为一项。
+
+六表备份位于 `runtime/france-fields-d9d97ab6/backup/`，约17.4MB，文件SHA/TOC与包SHA绑定，原全库备份保留。恢复使用stage内同一manifest的after-image校验与原子字段restore；保留两新增列及text扩容，同候选前向恢复，不执行普通旧镜像回退、逆向缩列或全库覆盖。仅本包传输镜像归档在校验load后删除，本机原件保留。生产收据为 `runtime/france-fields-d9d97ab6/release-complete.json`；人工门禁统一引用根AGENTS.md。
+
 ## 2026-11-03 QQ下线发布的依赖兼容故障
 
 68063962同schema发布及OneBot停止已执行，但Celery最终验收发现新解析的Kombu 5.7.0不支持固定redis 5.2.1。三个失败后台服务已停止，web健康，QQ保持关闭，队列保留。恢复须使用经过兼容验证的前向候选与精确包，不回滚旧镜像，不改写已有intent或完成收据。详见[执行记录](changes/qq-retirement-20261103/rollout.md)。构建成功、容器Running及发布入口退出0不能替代真实worker/broker就绪证明。
