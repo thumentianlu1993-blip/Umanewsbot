@@ -744,6 +744,9 @@ def fetch_bound_observation(*, event, route, now, fetcher=None, kind="result", u
 
 def parse_reference_observation(page, *, url, route, now, event=None):
     """已存在参考解析器的统一身份入口；partial 永远不提升为正式结果。"""
+    if route.provider == 'del_mar':
+        from .us_racing_sources import del_mar_observation
+        return del_mar_observation(page, url=url, route=route, now=now, event=event)
     from stable.race_reference_parsers import sporting_life, zeturf, horse_racing_nation
     from stable.services.race_source_identity import normalize_name
 
@@ -1565,6 +1568,10 @@ def discover_source_url(*, event, route, now, fetcher):
     from bs4 import BeautifulSoup
     from urllib.parse import urljoin
     from stable.services.race_source_identity import normalize_name
+
+    if route.provider == 'del_mar':
+        from .us_racing_sources import discover_del_mar_url
+        return discover_del_mar_url(event=event, route=route, now=now, fetcher=fetcher)
 
     if route.provider == 'geny':
         from .france_sources import discover_geny_url

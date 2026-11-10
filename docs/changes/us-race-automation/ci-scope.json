@@ -1,0 +1,258 @@
+{
+  "schema_version": 1,
+  "base_sha": "3c495d3b4a8c760cb7addc5ce4ea635573db5e9a",
+  "reason": "美国只读采集层；共享adapter仅增加del_mar的两个分派分支，覆盖新模块及日港法/身份直接入口回归、core和测试基础设施；无模型、迁移、任务、配置或公开写入变化。全部字节绑定供独立review核对。",
+  "domains": [
+    "us_source_collection"
+  ],
+  "changes": [
+    {
+      "path": "docs/changes/us-race-automation/design.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "d5099849547a5d8c3644f7203d212fe074613a6e3406e854ac3db570d9eeb9a0",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/us-race-automation/release_evidence.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "dc0684b2b20cab9ed9c9a0994e170322d22d215852174ffae8f98bb6c521758c",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/us-race-automation/rollout.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "c95fe993f8739851dd4f18ce004fe27731af64b2e34075eb62d4d4d9181cefb7",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/us-race-automation/spec.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "b9dd39d1ca00ed03f9c783ed0e48a9b002f6b8290f7745f678cc36a40eae0695",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/us-race-automation/tasks.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "05850aa581727526d51c34bc800ad7e1aefd0ae1df826568470e2c10fdc5e258",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/us-race-automation/test_cases.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "b04b6cf252ac3ae7f3040afcbdda3d799404f790926db14b4cf4e8e552a11559",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/current_state.md",
+      "status": "modified",
+      "before_hash": "680364e5da2eb85fa0c2ed71650db444d7b93c1687b61e464d84398646231b03",
+      "after_hash": "2e08ffadd10e77e667b84d1444ea16fc00c46bad9de26c3b8f5f5a6e283cdf57",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_automation/dmtc-bob-hope-noms.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "28fc59d3d4afeb20b10e6fb297c9a923a8fc9d5fe687ce71971c0feb82b6f7b4",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_automation/dmtc-changes.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "21f4d3ff6a29a378d19a32fbdc5f93ba784b8700888a90c93077dff4a36a4722",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_automation/dmtc-entries-final.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "e7c334b10f6d262c837d3eedfec42eaf65c2b9ad9add8dddcab5373f09ef3a8f",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_automation/dmtc-entries.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "0bc53522b1b2abe3cbeda5cc6749fa06e97681bb560efba2cd041fe045026438",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_automation/dmtc-let-it-ride-noms.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "0b3bbcc016038036a61d231d780d93e3242093d3fc52c84f7a80e07a41b918da",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_automation/dmtc-nominations.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "735128ad429bb0a95d5164f72c00f5233dc56b8ff9aee3eeeeaac29681e93eda",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_automation/dmtc-not-published.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "42a06adc6f5f7278e63fe6e3c19eeacada00ab90c491ef910ff4ad9a86980fae",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_automation/dmtc-september.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "cbf5188ee61b081bdfe905948d38c6208992420e4e61627ca89e42b732ead347",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_automation/nsa-colonial-sep.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "8c9426bec4de521910ea6a8046384e5946d8ae36f41e8cbc1c252e974ab19ae3",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_automation/nsa-fall.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "09711554e98811c5f30f8ecbc8155ffdd4f1b079d77537a58ef115147e4b9540",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_automation/nsa-far-hills.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "d12993844d0b7268dc73d4664dbeea500f5c79783d637e51a695501e2cabbcee",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_automation/nsa-montpelier.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "9c40a6d3fc49ec41b77eeb8e6c5fac58901246b9bcd2d62696c101c1d9b5f437",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_automation/nsa-racing.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "527e7ecaceb655b0a53a18f813c645dcd15fe16a3cf0ac4f65c30bb90f288695",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_automation/nsa-saratoga-sep.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "0e5b9b3fb3236e01c751582187dc6a0ef9953b58e09d519ae06894cd3c31c281",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_automation/provenance.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "27e23658218a247133fb7b849f046742971338aa264ddddd22676f34496fd6e5",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_automation/toba.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "36b2203b6769011032fe73a4389f9975ab47f2fa237fe8e85e93967d972fd59a",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/management/commands/verify_us_sources.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "0cbfae1b648de05ab8e8735085702e9ca025d7aba7f888b4d39c3b42fb241c3a",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_source_adapters.py",
+      "status": "modified",
+      "before_hash": "f6b94cc1c41886b56205fb08706fddca0636e89c2aeba3e7d9d6c8cc5a458f97",
+      "after_hash": "9d7a57452e10dcdf9c50b08efabec9d00ac74f7b69f9d40b43e3eebe0dda7803",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_nsa_sources.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "85d6429840b15118075effb09327c3ba5542ae301bb2bfb320f75868d85bdddb",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_racing_sources.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "da5748cc27b4adbbb1e1e916c9827a6c7facc66912fccde95e8d2b9ad1371e94",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_source_collection.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "5b5d9650d04cd7c5eac12a9274f90cfd5ef8c927805aa8726806594a384b7070",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_us_automation.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "76c905f29c69a182f1c3b018b482aa68c9a48fdfb3301a89ab10896c04b2eeab",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/catalog.json",
+      "status": "modified",
+      "before_hash": "16436b4a7ec10f969a8ddc070cb8ec9e663b7dd94cdbcf9906c215b1bf8bb325",
+      "after_hash": "c21fe10961fa4f2e1f4e7799688a8ce95a8a7f25113bfc855c02ce7d43100756",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "11d656ac1042ffbb158766c77025d6ced0b03297d5f5f97237eca01c9e617411",
+      "after_hash": "46e331ac4db03f4313761112580e5699ad4f18af8101591f3c4158be6bf8bf4d",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}

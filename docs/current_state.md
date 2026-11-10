@@ -7617,3 +7617,10 @@ v3 首次 prepare 在请求预算 `60/60` 时由 HRN 空候选连带阻断 Equib
   `2026-08-30T15:11:01.537509Z`。`empty_field` 是“当前赛果字段为空、候选可记录”的仲裁理由，不代表
   terminal/public 已通过；只有 observation phase 为 official/corrected、完整 roster 投影并公开后才开启
   correction。
+
+## 2026-11-11 美国来源采集层（本地实现，未上线）
+
+- 独立 codex/us-race-automation-20261111 分支设计/TDD实现 TOBA、NSA、Del Mar 解析与只读采集/缓存重放，既有 Del Mar 来源入口仍受原policy和identity控制；没有新增生产开关或任务。
+- 本机26项测试通过；31次有界HTTP原件零网络重放得到151条来源候选，仍有等级/身份/字段缺口，命令明确返回 incomplete。151不是生产分母，旧142平地计数曾覆盖Glen Cove第5/8场同名记录，现保留双方。
+- Bob Hope Listed/G3及Mariann De Tejeda G3/G2冲突未裁决；全窗口完整赛果主源、其他赛场报名、生产接入与自然调度未完成。
+- Linux最终固定树274项、零跳过；独立审核四处缺陷修复并复审通过。采集层进入Draft交付，尚未合并或上线。详见 changes/us-race-automation/release_evidence.md。

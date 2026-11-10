@@ -952,6 +952,14 @@
     ],
     "module:stable.test_hkjc_public_fields": [
       "stable.test_hkjc_public_fields"
+    ],
+    "us_source_collection": [
+      "stable.test_us_automation",
+      "stable.test_race_multisource_regions",
+      "stable.test_race_multisource_identity",
+      "stable.test_japan_automation",
+      "stable.test_hkjc_automation",
+      "stable.test_france_automation"
     ]
   },
   "dependencies": {
@@ -1028,6 +1036,9 @@
       "infrastructure",
       "module:stable.test_race_data_sync_pipeline_a",
       "module:stable.test_race_data_sync_pipeline_a_postgres"
+    ],
+    "us_source_collection": [
+      "infrastructure"
     ]
   },
   "tests": {
@@ -2975,6 +2986,12 @@
       "domains": [
         "module:stable.test_france_field_concurrency"
       ]
+    },
+    "server/stable/test_us_automation.py": {
+      "label": "stable.test_us_automation",
+      "domains": [
+        "us_source_collection"
+      ]
     }
   },
   "profiles": {
@@ -3299,7 +3316,8 @@
     "stable.test_france_automation": "django",
     "stable.test_france_release_handoff": "django",
     "stable.test_france_public_fields": "django",
-    "stable.test_france_field_concurrency": "django"
+    "stable.test_france_field_concurrency": "django",
+    "stable.test_us_automation": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
@@ -3385,7 +3403,8 @@
     "lifecycle_authorization_renewal": "integration: 生命周期原范围续期与 TRA 显式许可截止日期",
     "japan_race_automation": "integration: JRA/NAR通用来源、受控候选与历史回填",
     "hkjc_source_acceptance": "integration: HKJC全季目录、正式赛果、分阶段赛前与候选公开",
-    "france_race_automation": "integration: 法国来源阶段、身份、字段和固定范围回放"
+    "france_race_automation": "integration: 法国来源阶段、身份、字段和固定范围回放",
+    "us_source_collection": "integration: 美国只读来源、阶段语义、缓存回放与来源入口"
   },
   "dedicated_batch_modules": [
     "stable.test_migration_history_repair_postgres",

@@ -1,0 +1,107 @@
+[
+  {
+    "file": "toba.html",
+    "source_url": "https://toba.org/graded-stakes/2026-races/",
+    "original_sha256": "a492972e62e75ac0e71fc7e9c3f8530d60b63c44a1c526f9587ba9517e252382",
+    "fixture_sha256": "36b2203b6769011032fe73a4389f9975ab47f2fa237fe8e85e93967d972fd59a",
+    "fragment": true
+  },
+  {
+    "file": "dmtc-entries.html",
+    "source_url": "https://www.dmtc.com/racing/entries/2026-11-14",
+    "original_sha256": "09ad5aa01f957da776d317a6afb287ca17718b5a1209c4f210f9cda07bbbf1f4",
+    "fixture_sha256": "0bc53522b1b2abe3cbeda5cc6749fa06e97681bb560efba2cd041fe045026438",
+    "fragment": true
+  },
+  {
+    "file": "dmtc-changes.html",
+    "source_url": "https://www.dmtc.com/racing/changes",
+    "original_sha256": "15b50b6cc4d85001d726fa252d014de640bb3c2ec5dbe2b07b1cf98861db0b37",
+    "fixture_sha256": "21f4d3ff6a29a378d19a32fbdc5f93ba784b8700888a90c93077dff4a36a4722",
+    "fragment": true
+  },
+  {
+    "file": "dmtc-nominations.html",
+    "source_url": "https://www.dmtc.com/horsemen/nominations",
+    "original_sha256": "15baa6a0947c9cc7535bd0e869f2fdd2675cef5ff31a051ad81d48f67607c8fb",
+    "fixture_sha256": "735128ad429bb0a95d5164f72c00f5233dc56b8ff9aee3eeeeaac29681e93eda",
+    "fragment": true
+  },
+  {
+    "file": "nsa-racing.html",
+    "source_url": "https://nationalsteeplechase.com/racing/",
+    "original_sha256": "297305e763659e294cd6cbd3084692ea788d734f4c153be7736cc464aca8e17e",
+    "fixture_sha256": "527e7ecaceb655b0a53a18f813c645dcd15fe16a3cf0ac4f65c30bb90f288695",
+    "fragment": true
+  },
+  {
+    "file": "dmtc-bob-hope-noms.pdf",
+    "source_url": "https://www.dmtc.com/data/pdf/horsemen/nominations/F4NOM.pdf",
+    "original_sha256": "28fc59d3d4afeb20b10e6fb297c9a923a8fc9d5fe687ce71971c0feb82b6f7b4",
+    "fixture_sha256": "28fc59d3d4afeb20b10e6fb297c9a923a8fc9d5fe687ce71971c0feb82b6f7b4",
+    "fragment": false
+  },
+  {
+    "file": "nsa-fall.pdf",
+    "source_url": "https://nationalsteeplechase.com/wp-content/uploads/2026/10/NSA-ConditionBook-Fall-2026-1.pdf",
+    "original_sha256": "09711554e98811c5f30f8ecbc8155ffdd4f1b079d77537a58ef115147e4b9540",
+    "fixture_sha256": "09711554e98811c5f30f8ecbc8155ffdd4f1b079d77537a58ef115147e4b9540",
+    "fragment": false
+  },
+  {
+    "file": "nsa-far-hills.pdf",
+    "source_url": "https://nationalsteeplechase.com/wp-content/uploads/2026/10/Far-Hills-Results.pdf",
+    "original_sha256": "d12993844d0b7268dc73d4664dbeea500f5c79783d637e51a695501e2cabbcee",
+    "fixture_sha256": "d12993844d0b7268dc73d4664dbeea500f5c79783d637e51a695501e2cabbcee",
+    "fragment": false
+  },
+  {
+    "file": "nsa-saratoga-sep.pdf",
+    "source_url": "https://nationalsteeplechase.com/wp-content/uploads/2026/09/Saratoga-September-2-Results-.pdf",
+    "original_sha256": "0e5b9b3fb3236e01c751582187dc6a0ef9953b58e09d519ae06894cd3c31c281",
+    "fixture_sha256": "0e5b9b3fb3236e01c751582187dc6a0ef9953b58e09d519ae06894cd3c31c281",
+    "fragment": false
+  },
+  {
+    "file": "nsa-colonial-sep.pdf",
+    "source_url": "https://nationalsteeplechase.com/wp-content/uploads/2026/09/September-3-results-.pdf",
+    "original_sha256": "8c9426bec4de521910ea6a8046384e5946d8ae36f41e8cbc1c252e974ab19ae3",
+    "fixture_sha256": "8c9426bec4de521910ea6a8046384e5946d8ae36f41e8cbc1c252e974ab19ae3",
+    "fragment": false
+  },
+  {
+    "file": "dmtc-entries-final.html",
+    "source_url": "https://www.dmtc.com/racing/entries/2026-11-08",
+    "original_sha256": "527105ae5edabd81fc2b056870cd793e2a6d6b4d53c3457ebd4722fc28ea4c77",
+    "fixture_sha256": "e7c334b10f6d262c837d3eedfec42eaf65c2b9ad9add8dddcab5373f09ef3a8f",
+    "fragment": true
+  },
+  {
+    "file": "nsa-montpelier.pdf",
+    "source_url": "https://nationalsteeplechase.com/wp-content/uploads/2026/11/Montpelier-results-2026.pdf",
+    "original_sha256": "9c40a6d3fc49ec41b77eeb8e6c5fac58901246b9bcd2d62696c101c1d9b5f437",
+    "fixture_sha256": "9c40a6d3fc49ec41b77eeb8e6c5fac58901246b9bcd2d62696c101c1d9b5f437",
+    "fragment": false
+  },
+  {
+    "file": "dmtc-let-it-ride-noms.pdf",
+    "source_url": "https://www.dmtc.com/data/pdf/horsemen/nominations/FON1NOM.pdf",
+    "original_sha256": "0b3bbcc016038036a61d231d780d93e3242093d3fc52c84f7a80e07a41b918da",
+    "fixture_sha256": "0b3bbcc016038036a61d231d780d93e3242093d3fc52c84f7a80e07a41b918da",
+    "fragment": false
+  },
+  {
+    "file": "dmtc-september.html",
+    "source_url": "https://www.dmtc.com/racing/entries/2026-09-05",
+    "original_sha256": "cbf5188ee61b081bdfe905948d38c6208992420e4e61627ca89e42b732ead347",
+    "fixture_sha256": "cbf5188ee61b081bdfe905948d38c6208992420e4e61627ca89e42b732ead347",
+    "fragment": false
+  },
+  {
+    "file": "dmtc-not-published.html",
+    "source_url": "https://www.dmtc.com/racing/entries/2026-11-15",
+    "original_sha256": "42a06adc6f5f7278e63fe6e3c19eeacada00ab90c491ef910ff4ad9a86980fae",
+    "fixture_sha256": "42a06adc6f5f7278e63fe6e3c19eeacada00ab90c491ef910ff4ad9a86980fae",
+    "fragment": false
+  }
+]

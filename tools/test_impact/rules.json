@@ -1581,6 +1581,24 @@
     ],
     "docs/changes/france-display-simplify/ci-scope.json": [
       "infrastructure"
+    ],
+    "server/stable/services/us_racing_sources.py": [
+      "us_source_collection"
+    ],
+    "server/stable/services/us_nsa_sources.py": [
+      "us_source_collection"
+    ],
+    "server/stable/services/us_source_collection.py": [
+      "us_source_collection"
+    ],
+    "server/stable/management/commands/verify_us_sources.py": [
+      "us_source_collection"
+    ],
+    "server/stable/fixtures/us_automation/**": [
+      "us_source_collection"
+    ],
+    "docs/changes/us-race-automation/ci-scope.json": [
+      "infrastructure"
     ]
   },
   "symbols": {
@@ -1768,6 +1786,7 @@
     "docs/changes/france-race-automation/handoff-ci-scope.json",
     "docs/changes/france-race-automation/geny-reload-ci-scope.json",
     "docs/changes/france-public-field-gaps/ci-scope.json",
-    "docs/changes/france-display-simplify/ci-scope.json"
+    "docs/changes/france-display-simplify/ci-scope.json",
+    "docs/changes/us-race-automation/ci-scope.json"
   ]
 }
