@@ -127,8 +127,7 @@ class FranceBasicDisplayTests(SimpleTestCase):
         self.assertEqual(fields['race_type'].text, '平地')
         self.assertEqual(fields['prize'].text, '73200欧元')
         self.assertEqual(fields['layout'].text, '右转')
-        self.assertIn('Très souple', fields['going'].text)
-        self.assertIn('3.8', fields['going'].text)
+        self.assertEqual(fields['going'].text, '很软')
         self.assertNotEqual(fields['going'].state, 'unknown')
 
     def test_other_regions_keep_existing_type_display_contract(self):
@@ -144,18 +143,24 @@ class FranceBasicDisplayTests(SimpleTestCase):
         event['distance_text']='2500m'
         self.assertEqual(event_fields(event)['distance'].text,'待核实')
 
-    def test_page_shows_new_fields_and_full_escaped_conditions(self):
+    def test_page_keeps_short_conditions_without_source_text(self):
         from types import SimpleNamespace
         from django.template.loader import render_to_string
         from stable.services.race_information_display import event_fields
-        event = SimpleNamespace(pk=1, country_region='france', prize_amount='73200.00', prize_currency='EUR', eligibility_text='Pour '+('条件\n'*120)+'<script>bad</script>')
+        raw = 'Pour chevaux entiers et juments de 3 ans et au-dessus. Poids : 59,5 kg.'
+        event = SimpleNamespace(pk=1, country_region='france', prize_amount='73200.00', prize_currency='EUR',
+            eligibility_text=raw, source_refs={'france_basic_v1': {'version': 1, 'fields': {
+                'eligibility': {'value': raw, 'minimum_age': 3, 'age_open_ended': True}}}})
         event.public_display = event_fields(event)
+        self.assertEqual(event.public_display['eligibility'].text, '3岁及以上')
         from django.test import override_settings
         with override_settings(RACE_INFORMATION_NORMALIZED_DISPLAY_ENABLED=True):
             html = render_to_string('stable/public/race_detail.html', dict(event=event, race_information_enabled=True))
-        for label in ['总奖金', '73200欧元', '完整参赛条件', '&lt;script&gt;bad&lt;/script&gt;']:
+        for label in ['总奖金', '73200欧元', '3岁及以上']:
             self.assertIn(label, html)
-        self.assertNotIn('<script>bad</script>', html)
+        for label in ['完整参赛条件', '其他限制', raw]:
+            self.assertNotIn(label, html)
+        self.assertEqual(event.eligibility_text, raw)
 
 
 class FrancePrizeSchemaTests(TestCase):
