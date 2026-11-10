@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "base_sha": "6ec0699f25b8c70e7a6abf13bd354a90e137f319",
-  "reason": "法国字段修复：两个可空奖金字段和条件Text扩容，迁移单独实际PG验证；共享时间内核保持非法国语义，选取法国全链、共享仲裁/预览/结果/修复/PostgreSQL竞争、日港真实fixture、公开展示与核心/测试工具链。无队列/架构/非赛事业务变更。范围为独立review对象，所有路径内容及模式精确绑定，禁止遗漏新增测试或用此清单覆盖后续变更。",
+  "reason": "法国字段修复：两个可空奖金字段和条件Text扩容，迁移单独实际PG验证；共享时间内核保持非法国语义，选取法国全链、共享仲裁/预览/结果/修复/PostgreSQL竞争、日港真实fixture、公开展示与核心/测试工具链；历史迁移夹具显式排除本轮0082/0083，追加release历史合同域验证，不改变生产校验。无队列/架构/非赛事业务变更。范围为独立review对象，所有路径内容及模式精确绑定，禁止遗漏新增测试或用此清单覆盖后续变更。",
   "domains": [
     "module:stable.test_france_automation",
     "module:stable.test_france_release_handoff",
@@ -28,7 +28,8 @@
     "module:stable.test_japan_public_fields",
     "module:stable.test_hkjc_automation",
     "module:stable.test_hkjc_public_fields",
-    "infrastructure"
+    "infrastructure",
+    "release"
   ],
   "changes": [
     {
@@ -156,6 +157,14 @@
       "status": "modified",
       "before_hash": "cf5d553f5dee06804eb4f4e5f022a6729050a1fca5752bbac96e33c782b43bb5",
       "after_hash": "76e3a24ca38f5855d31130d8e9f9c7f70cb5f8fb1e87ed7136e9a3c1d71a5c9e",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/release_0078_test_fixture.py",
+      "status": "modified",
+      "before_hash": "ab0511603ad443725910bb3ec833cb205c7c69e9d2a77cf175cd95b5f6a716e5",
+      "after_hash": "4eb4945837dee524870392fdc55916f679ef1f321c881fcb2e17d15c23cd1387",
       "before_mode": "100644",
       "after_mode": "100644"
     },
