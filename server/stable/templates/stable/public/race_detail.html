@@ -76,6 +76,11 @@
           <div><span>场地</span><b>{% race_field event "surface" %}</b></div>
           {% if event.public_display.race_type.state != 'missing' %}<div><span>赛种</span><b>{% race_field event "race_type" %}</b></div>{% endif %}
           {% if event.public_display.race_class.state != 'missing' %}<div><span>类别</span><b>{% race_field event "race_class" %}</b></div>{% endif %}
+          {% if event.country_region == 'france' %}
+          {% if event.public_display.prize.state != 'missing' %}<div><span>总奖金</span><b>{% race_field event "prize" %}</b></div>{% endif %}
+          {% if event.public_display.layout.state != 'missing' %}<div><span>方向</span><b>{% race_field event "layout" %}</b></div>{% endif %}
+          {% if event.public_display.going.state != 'missing' %}<div><span>场况</span><b>{% race_field event "going" %}</b></div>{% endif %}
+          {% endif %}
         {% endif %}
         {% if event.source_refs.classification == "AQPS" %}<div><span>类别</span><b>AQPS（非纯血马）</b></div>{% endif %}
         <div><span>等级</span><b>{% race_field event "grade" event.grade_text %}</b></div>
@@ -86,6 +91,7 @@
         {% race_field event "eligibility" as eligibility %}{% if eligibility %}<div><span>参赛条件</span><b>{{ eligibility }}</b></div>{% endif %}
         <div><span>状态</span><b>{{ status_label }}</b></div>
       </div>
+      {% if event.country_region == 'france' and event.eligibility_text %}<details><summary>完整参赛条件（来源原文）</summary><div>{{ event.eligibility_text|linebreaksbr }}</div></details>{% endif %}
     </section>
 
     <section class="panel" id="runners">

@@ -11,7 +11,8 @@ def race_field(obj, field, legacy=''):
         return _time_fields(obj)[0 if field == 'date' else 1].text
     if field == 'eligibility':
         from stable.services.race_field_normalization import parse_display_eligibility
-        parsed = parse_display_eligibility(value(obj, 'eligibility_text'))
+        prepared = (value(obj, 'public_display', {}) or {}).get('eligibility') if enabled() else None
+        parsed = prepared if prepared is not None else parse_display_eligibility(value(obj, 'eligibility_text'))
         return parsed.text if parsed.state == 'normalized' else ''
     if not enabled():
         return legacy

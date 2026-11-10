@@ -145,6 +145,12 @@ def parse_geny_result(doc, card):
     if 'ARRIVÉE DÉFINITIVE' not in doc.get('text','').upper():
         raise ValueError('geny_result_not_final')
     value=parse_geny_card(card)
+    from .france_basic_fields import digest
+    for row in value['roster']:
+        row['field_provenance']['card_fields'] = dict(
+            source_url=card['url'],raw_sha256=digest(card),horse_name=row['horse_name'],number=row['number'],
+            trainer_name=row['trainer_name'],carried_weight=row['carried_weight'],odds_value=row['odds_value'],
+            adjusted_weight=row['field_provenance']['adjusted_weight'])
     count=re.search(r'(\d+)\s+partants',doc.get('text',''),re.I)
     if not count or int(count[1])!=len(value['roster']):raise ValueError('geny_roster_count')
     results={}
@@ -209,16 +215,25 @@ def parse_geny_observation(page, *, url, route, now, card_page=None):
     tz=soup.select_one('meta[name="source-timezone"]')
     clock=re.search(r'Départ\s*(\d{1,2})h(\d{2})',doc['text'])
     off=''
-    if clock and tz:
+    if clock and tz and (int(clock[1]),int(clock[2])) != (0,0):
         zone=tz.get('content','')
         if zone not in ('Europe/Paris','Asia/Shanghai'):raise ValueError('geny_time_zone')
         off=datetime(day.year,day.month,day.day,int(clock[1]),int(clock[2]),tzinfo=ZoneInfo(zone)).astimezone(ZoneInfo('Europe/Paris')).isoformat()
     for row in value['roster']:
         row['field_provenance']['odds_observed_at']=(getattr(page,'observed_at',None) or now).isoformat()
+        if 'card_fields' in row['field_provenance']:
+            row['field_provenance']['card_fields']['observed_at']=(getattr(card_page,'observed_at',None) or now).isoformat()
     value.update(provider=route.provider,region=route.region,identity_namespace=route.identity_namespace,
         canonical_url=url,fetched_at=(getattr(page,'observed_at',None) or now).isoformat(),raw_sha256=getattr(page,'raw_sha256',hashlib.sha256(str(page).encode()).hexdigest()),
         parser_version=route.parser_version,operator=route.operator,venue_key=venues[0],timezone='Europe/Paris',
         meeting_session='',race_number='',raw_names=[title[1]],off_time=off)
+    from .france_basic_fields import parse_basic
+    value['france_basic_v1'] = parse_basic(doc, identity=dict(local_date=day.isoformat(),
+        external_race_id=key[1], race_name=title[1], venue=title[2]), raw_sha256=value['raw_sha256'],
+        observed_at=value['fetched_at'], parser_version=route.parser_version)
+    if off:
+        value['time_evidence'] = dict(source_timezone=tz.get('content'),kind='scheduled_start',
+            source_clock=clock[0],source_url=url,raw_sha256=value['raw_sha256'])
     if card_page is not None:
         value['roster_evidence']=dict(kind='independent_card',url=card_url,
             sha256=hashlib.sha256(str(card_page).encode()).hexdigest(),row_count=len(value['roster']))
@@ -236,6 +251,8 @@ def parse_france_galop_document(doc):
     off='' if meta[3]=='00h00' else datetime.strptime(meta[2]+' '+meta[3],'%d/%m/%Y %Hh%M').replace(tzinfo=ZoneInfo('Europe/Paris')).isoformat()
     value=dict(local_date=day.isoformat(),venue=meta[4].strip(),race_number=meta[1],
         race_name=doc['title'].split(' | ')[0],off_time=off,items=[],schedule=[row for table in doc.get('tables',[]) for row in table.get('rows',[]) if len(row)==3 and re.fullmatch(r'\d{2}h\d{2} PARIS',row[-1])])
+    from .france_basic_fields import parse_basic
+    value['france_basic_v1'] = parse_basic(doc, identity={k:value[k] for k in ('local_date','venue','race_name')})
     if 'AUCUNE LISTE DIFFUSABLE' in body:
         return dict(value,stage='not_published',source_stage='not_published')
     phase=re.search(r'Après\s+([^:]+):',body,re.I)

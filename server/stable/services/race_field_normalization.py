@@ -1514,10 +1514,18 @@ def parse_display_weight(raw, *, unit_hint=''):
     return display_field(raw, label, context={'unit': unit_hint})
 
 
-def parse_display_time(raw):
+def parse_display_time(raw, *, format_hint=''):
     text = _display_text(raw)
     if not text:
         return _missing(raw)
+    if format_hint == 'geny_minutes_seconds':
+        french = re.fullmatch(r'(\d{1,3})\x27(\d{2})"(\d{1,6})', text)
+        if french:
+            minutes, seconds, fraction = french.groups()
+            if int(seconds) >= 60 or Decimal(minutes) * 60 + Decimal(seconds + '.' + fraction) <= 0:
+                return _unresolved(raw, 'time_format_unknown')
+            return display_field(raw, (f'{int(minutes)}分' if int(minutes) else '') +
+                                 str(int(seconds)) + '.' + fraction + '秒')
     match = re.fullmatch(r'(?:(\d{1,3})[:分])?(\d{1,2}(?:\.\d{1,6})?)(?:秒)?', text)
     if not match or Decimal(match[2]) >= 60 or Decimal(match[2]) < 0:
         return _unresolved(raw, 'time_format_unknown')

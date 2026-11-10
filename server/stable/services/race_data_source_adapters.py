@@ -953,6 +953,12 @@ def run_multisource_claim(*, claim, now, fetcher=None):
                 binding=binding, enrollment=locked.enrollment
             ),
         )
+        france_basic = value.get('france_basic_v1') if route.provider=='geny' and route.region=='france' else None
+        if france_basic:
+            from .france_basic_fields import basic_sha, validate_basic
+            validate_basic(france_basic, sha=basic_sha(france_basic), provider=route.provider,
+                region=route.region, external_id=value['external_race_id'], event=locked.event)
+            provenance['france_basic_v1'] = france_basic
         if "result" in claim.data_kinds:
             for row in value["roster"]:
                 row["field_provenance"] = {
@@ -973,6 +979,8 @@ def run_multisource_claim(*, claim, now, fetcher=None):
                 race_status="complete",
                 participants=value["roster"],
             )
+            if france_basic:
+                payload['france_basic_sha256'] = basic_sha(france_basic)
             recorded = record_race_result_observation(
                 source_identity_id=binding.source_identity_id,
                 observed_at=now,
@@ -1048,6 +1056,9 @@ def run_multisource_claim(*, claim, now, fetcher=None):
             )
             france_fields = ({r['external_runner_id']:r.get('field_provenance',{}) for r in value['roster']}
                 if route.provider == 'geny' and route.region == 'france' else {})
+            if france_basic:
+                card['france_basic_sha256'] = basic_sha(france_basic)
+                card['timezone_name'] = 'Europe/Paris'
             card_observed_at = aware(value['fetched_at']) if france_fields else now
             if france_fields:
                 # 报价观测与调整后负重也是快照内容；不能被主字段同值去重丢弃。
