@@ -63,6 +63,14 @@
       "after_mode": "100644"
     },
     {
+      "path": "server/stable/fixtures/us_automation/.gitattributes",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "547f59603028195ff9f8a87d04c4651551e8bd0d68f075257dfd549cd846b25b",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
       "path": "server/stable/fixtures/us_automation/dmtc-bob-hope-noms.pdf",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -74,7 +82,7 @@
       "path": "server/stable/fixtures/us_automation/dmtc-changes.html",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "21f4d3ff6a29a378d19a32fbdc5f93ba784b8700888a90c93077dff4a36a4722",
+      "after_hash": "f6eea6efaada8e411092dd7cabf451111462c8159fdad7697d61a4312d350d09",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -82,7 +90,7 @@
       "path": "server/stable/fixtures/us_automation/dmtc-entries-final.html",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "e7c334b10f6d262c837d3eedfec42eaf65c2b9ad9add8dddcab5373f09ef3a8f",
+      "after_hash": "e1fafd0106ebe19573296b767dc28d0aae562bd5f52ec2afae927f06cf6c1e12",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -90,7 +98,7 @@
       "path": "server/stable/fixtures/us_automation/dmtc-entries.html",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "0bc53522b1b2abe3cbeda5cc6749fa06e97681bb560efba2cd041fe045026438",
+      "after_hash": "3eba09bcdd9fde2faef7cd1aa33a29039a09d15153d92005c58cf6ba63c9d033",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -106,7 +114,7 @@
       "path": "server/stable/fixtures/us_automation/dmtc-nominations.html",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "735128ad429bb0a95d5164f72c00f5233dc56b8ff9aee3eeeeaac29681e93eda",
+      "after_hash": "332024fefc10c46aa95b0685f57ce2eea9dce07c891259ec8a276a7b944cf0eb",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -114,7 +122,7 @@
       "path": "server/stable/fixtures/us_automation/dmtc-not-published.html",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "42a06adc6f5f7278e63fe6e3c19eeacada00ab90c491ef910ff4ad9a86980fae",
+      "after_hash": "9dbc58049606a26bc5f5a4523d787df66ce914de6e84930c02632d30c796c0aa",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -122,7 +130,7 @@
       "path": "server/stable/fixtures/us_automation/dmtc-september.html",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "cbf5188ee61b081bdfe905948d38c6208992420e4e61627ca89e42b732ead347",
+      "after_hash": "1d1fc3053d0a36e420965323f9ce6a24a829ae5a34cccdc64a9bef7697665043",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -162,7 +170,7 @@
       "path": "server/stable/fixtures/us_automation/nsa-racing.html",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "527e7ecaceb655b0a53a18f813c645dcd15fe16a3cf0ac4f65c30bb90f288695",
+      "after_hash": "22855929d4b6d5c735d9816353f51aedc92e8f15022cd2f99a57822daeac2489",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -178,7 +186,7 @@
       "path": "server/stable/fixtures/us_automation/provenance.json",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "27e23658218a247133fb7b849f046742971338aa264ddddd22676f34496fd6e5",
+      "after_hash": "2048472b91e5d89c11f59cc2efbb83e0e2734875764613bcf6a52d3316a5d4b9",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -186,7 +194,7 @@
       "path": "server/stable/fixtures/us_automation/toba.html",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "36b2203b6769011032fe73a4389f9975ab47f2fa237fe8e85e93967d972fd59a",
+      "after_hash": "c1a4da6a527ad5ec6ddac675421e01eac9da10d5d002a53491520135018fdb2d",
       "before_mode": null,
       "after_mode": "100644"
     },
