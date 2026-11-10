@@ -307,7 +307,7 @@
       "path": "tools/test_impact/catalog.json",
       "status": "modified",
       "before_hash": "5142608e4ffbf9d096119965e4bd0aebf4395a7b82a273426caed96fa0f23072",
-      "after_hash": "90f16c6d4eb34f696355c3a6011be628521ac0d77c9efbe3d1f9dcb528392de9",
+      "after_hash": "16436b4a7ec10f969a8ddc070cb8ec9e663b7dd94cdbcf9906c215b1bf8bb325",
       "before_mode": "100644",
       "after_mode": "100644"
     },

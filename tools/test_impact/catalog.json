@@ -3297,7 +3297,9 @@
     "stable.test_hkjc_automation": "django",
     "stable.test_hkjc_public_fields": "django",
     "stable.test_france_automation": "django",
-    "stable.test_france_release_handoff": "django"
+    "stable.test_france_release_handoff": "django",
+    "stable.test_france_public_fields": "django",
+    "stable.test_france_field_concurrency": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
