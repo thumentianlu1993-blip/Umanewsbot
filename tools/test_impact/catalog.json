@@ -922,6 +922,36 @@
     ],
     "module:stable.test_france_automation": [
       "stable.test_france_automation"
+    ],
+    "module:stable.test_france_public_fields": [
+      "stable.test_france_public_fields"
+    ],
+    "module:stable.test_france_field_concurrency": [
+      "stable.test_france_field_concurrency"
+    ],
+    "module:stable.test_france_release_handoff": [
+      "stable.test_france_release_handoff"
+    ],
+    "module:stable.test_c027_public_time_sqlite": [
+      "stable.test_c027_public_time_sqlite"
+    ],
+    "module:stable.test_race_data_sync_results": [
+      "stable.test_race_data_sync_results"
+    ],
+    "module:stable.test_race_data_sync_result_admission": [
+      "stable.test_race_data_sync_result_admission"
+    ],
+    "module:stable.test_japan_automation": [
+      "stable.test_japan_automation"
+    ],
+    "module:stable.test_japan_public_fields": [
+      "stable.test_japan_public_fields"
+    ],
+    "module:stable.test_hkjc_automation": [
+      "stable.test_hkjc_automation"
+    ],
+    "module:stable.test_hkjc_public_fields": [
+      "stable.test_hkjc_public_fields"
     ]
   },
   "dependencies": {
@@ -2932,6 +2962,18 @@
       "label": "stable.test_france_release_handoff",
       "domains": [
         "france_race_automation"
+      ]
+    },
+    "server/stable/test_france_public_fields.py": {
+      "label": "stable.test_france_public_fields",
+      "domains": [
+        "module:stable.test_france_public_fields"
+      ]
+    },
+    "server/stable/test_france_field_concurrency.py": {
+      "label": "stable.test_france_field_concurrency",
+      "domains": [
+        "module:stable.test_france_field_concurrency"
       ]
     }
   },

@@ -106,6 +106,16 @@ def _save_state(event, source, state):
 
 
 def claim_pre_race(*, event_id, source, now):
+    from .race_data_sync_enrollment import _LifecycleLockRetry
+    for attempt in range(3):
+        try:
+            return _claim_pre_race_atomic(event_id=event_id, source=source, now=now)
+        except _LifecycleLockRetry:
+            if attempt == 2:
+                raise
+
+
+def _claim_pre_race_atomic(*, event_id, source, now):
     if source not in {JRA, TRA, REFRESH, 'nar_pre_race_v1', 'hkjc_pre_race_v1', 'france_pre_race_v1'} or timezone.is_naive(now):
         raise ValueError('invalid_pre_race_claim')
     if source == JRA and not jra_enabled(network=True):
@@ -123,7 +133,16 @@ def claim_pre_race(*, event_id, source, now):
         from .race_pre_race_refresh import refresh_enabled
         if not refresh_enabled(): return None
     with transaction.atomic():
-        event = models.RaceEvent.objects.select_for_update().get(pk=event_id)
+        france_context = None
+        if source == 'france_pre_race_v1':
+            from .race_data_sync_enrollment import _lock_multisource_event
+            from .france_pre_race_authority import lock_context, write_reason
+            event, lifecycle = _lock_multisource_event(event_id)
+            france_context = lock_context(event, lifecycle)
+            if write_reason(france_context, now=now):
+                return None
+        else:
+            event = models.RaceEvent.objects.select_for_update().get(pk=event_id)
         if not in_window(event, now) or (source == JRA and (
             event.country_region != 'japan' or event.racecourse not in JRA_COURSES or
             _refs(event).get('pre_race_handoff'))):
@@ -144,6 +163,8 @@ def claim_pre_race(*, event_id, source, now):
         token = secrets.token_hex(16)
         state.update(lease_token=token, lease_until=_iso(now+timedelta(seconds=120)),
                      last_attempt_at=_iso(now), baseline=baseline(event))
+        if france_context:
+            state['write_guards'] = france_context.guards
         _save_state(event, source, state)
         return {'event_id': event.pk, 'source': source, 'token': token, 'baseline': baseline(event)}
 
@@ -183,8 +204,22 @@ def _finish_locked(event, claim, now, reason='', retry_after=None, outcome_reaso
 
 
 def finish_pre_race(claim, *, now, reason='', retry_after=None, outcome_reason=''):
+    from .race_data_sync_enrollment import _LifecycleLockRetry
+    for attempt in range(3):
+        try:
+            return _finish_pre_race_atomic(claim, now=now, reason=reason, retry_after=retry_after, outcome_reason=outcome_reason)
+        except _LifecycleLockRetry:
+            if attempt == 2:
+                raise
+
+
+def _finish_pre_race_atomic(claim, *, now, reason='', retry_after=None, outcome_reason=''):
     with transaction.atomic():
-        event = models.RaceEvent.objects.select_for_update().get(pk=claim['event_id'])
+        if claim.get('source') == 'france_pre_race_v1':
+            from .race_data_sync_enrollment import _lock_multisource_event
+            event, _ = _lock_multisource_event(claim['event_id'])
+        else:
+            event = models.RaceEvent.objects.select_for_update().get(pk=claim['event_id'])
         if not _valid_claim(event, claim, now):
             return False
         _finish_locked(event, claim, now, reason, retry_after, outcome_reason)

@@ -1,4 +1,4 @@
-# 修复设计（待用户审阅，未实现）
+# 修复设计（方案复审通过，实施中）
 
 ## 1. 问题分层
 
@@ -25,7 +25,7 @@
 
 ### 开赛时间
 
-2026-11-10 用户明确确定：**抓到开赛时间即可更新，不等待正式出马表接管。**“即可更新”指本轮成功采集处理内，完成必要校验后写入正式赛事时间，事务提交时刷新相关公开缓存；不等待下一次调度、名单齐全或来源阶段晋升。此处是方案修订，尚未实现。
+2026-11-10 用户明确确定：**抓到开赛时间即可更新，不等待正式出马表接管。**“即可更新”指本轮成功采集处理内，完成必要校验后写入正式赛事时间，事务提交时刷新相关公开缓存；不等待下一次调度、名单齐全或来源阶段晋升。该规则已进入实现与隔离验收。
 
 时间更新与名单阶段解耦：报名、预计、正式卡或尚无可发布名单时，只要同场来源已明确给出有效时刻及时区，就可更新。复用当前 pipeline 的 schedule_apply、字段权限仲裁、来源新旧比较、人工锁和 lifecycle generation 处理，将时间应用整理为共用入口，由法国赛前采集和正式卡链路调用；不另建一套直接save逻辑，也不只在模板临时覆盖。
 
@@ -74,10 +74,52 @@
 
 同一解析与应用逻辑同时服务历史修复和之后自然采集。相同内容重放零变化；异常事务回滚；不因未公布/空响应删除旧字段；基础资料更新使公共缓存失效，并让后台候选基线与正式值保持一致。
 
-本轮仅设计，未生成获准生产 manifest、未执行新抓取批次/迁移/写入。发布与回滚见 rollout.md。
+本轮实施中，正在收集既定80场的新增来源证据；尚未形成获准生产manifest，未执行生产迁移或业务写入。发布与回滚见 rollout.md。
 
 ## 5. 验证与仍需明确的事实
 
 当前已证实源码原因：france_archive.py明确不注入未记录的时区；race_data_sync_results.py保留旧runner字段；race_information_display.py的法国距离合同依赖旧primary PDF且赛种读取另一对象字段；race_field_normalization.py不识别法式计时；公开模板缺方向/场况/奖金展示。
 
-实现前固定法国场况中文词表、奖金币种合同与计划/实际发走语义；这些不是要求用户重新说明既定范围，优先用来源和现有规则完成。若确实出现会改变产品口径的分支，再按根AGENTS处理。本方案未经过独立review，不能把作者自查当独立review。
+实现前固定法国场况中文词表、奖金币种合同与计划/实际发走语义；这些不是要求用户重新说明既定范围，优先用来源和现有规则完成。若确实出现会改变产品口径的分支，再按根AGENTS处理。2026-11-10独立方案复审已通过；实现后的代码审核仍待完成。
+
+## 6. 方案复审修订：实现边界
+
+### 两套claim的共用写入入口
+
+不将赛前claim伪装成RaceDataSyncClaim，也不绕过正式入口的multisource_claim_required。抽取共用的时间字段仲裁/审计/调度更新内核，入口分别接受经验证的正式RaceDataSyncClaim上下文与受限的FrancePreRaceWriteClaim上下文；内核不自行接收未经验证的event_id直接写库。
+
+FrancePreRaceWriteClaim沿用赛前token/120秒lease，取得时额外冻结projection的owner/owner_generation/owner_manifest_sha256，以及enrollment的state、authority_version、enrollment_generation、source_set_generation/source_set_digest、policy_digest与绑定release（没有控制行时保存明确的无记录基线）。这些guards存入服务器赛前lease状态，返回claim只携带对应token与摘要。complete在同一外层事务重新读取并逐项复验；缺guard、owner变化、新增控制行、过期lease均拒绝，不把原赛前token单独当正式写授权。
+
+法国claim、complete、finish统一在最外层事务起点使用 `_lock_multisource_event` 的 lifecycle→event顺序，并沿正式控制器既有顺序锁projection/enrollment/tracking/checkpoints；遇生命周期控制行创建竞争，按既有机制回滚重试整个事务。正式来源分支继续调用原claim验证器，不改其它地区claim形状。
+
+未登记赛事仅允许unmanaged的赛前时间写入；已登记赛事须data_sync owner、当前有效策略/来源合同/运行release全部一致，且无另一个未过期正式写入claim。若正式claim正活跃，返回明确可重试竞争原因，不抢占、不清掉他人的token；竞争解除后重新取得赛前claim，不复用过期的guards。合法无竞争路径同轮完成，等待名单或正式接管不能成为阻断理由。legacy、unknown、手动owner一律不自动写。
+
+通过此验证后，共用内核按字段仲裁写时间；调度变化使用同一tracking/checkpoint/lifecycle重排逻辑，更新generation与缓存。赛前任务在该事务内用已持有且已验证的上下文收尾，而不再拿已被本次时间更新改变的旧快照调用通用finish；正式任务保留原claim_invalidated收尾。历史修复走独立manifest事务，只改历史字段，不唤醒终态任务。必须以真实PostgreSQL竞争测试证明此衔接，不以mock代替。
+
+### 基础资料指纹与字段准入
+
+`france_basic_v1`结构固定为版本、赛事绑定、fields、每字段原文/单位/币种/来源URL/原文SHA、observed_at及parser_version。规范内容摘要覆盖字段值和来源证据（包括同值的新增单位证明）；纯重复抓取的observed_at不单独制造内容修订，但新权威确认必须更新对应权威水位。
+
+为法国card/result观测增加仅法国可用的`france_basic_sha256`受限字段，并校验它精确等于provenance内基础合同摘要；观测去重因此包含基础资料。结果严格schema只增加这一已校验元数据键，不将任意provenance写入事件。赛前candidate的content_sha同步包含基础合同与off_time，not_published也保留独立basic候选；旧观测不可改写。
+
+显式准入映射：`france_basic.distance`→distance_text及单位证据；`france_basic.discipline`→normalized_race_type及细分证据；`france_basic.surface`→surface/normalized_surface；`france_basic.layout`→course_layout_text；`france_basic.going`→going_text及测量证据；`france_basic.prize`→prize_amount/prize_currency原子字段组；`france_basic.eligibility`→eligibility_text及年龄/性别/资格原子字段组。时间沿用off_time/local_start_time/timezone_name三项同时准入，不归入宽泛basic开关。每组必须来源合同允许且运行字段白名单启用，缺一拒绝；发布包列出这些新增准入项。
+
+### 完整条件的边界
+
+FG完整条件从GROUPE等级后首个以Pour开头的条件段开始，保留所有后续条件段落，包括普通/第二次/追加报名日期及费用、加磅/胜绩限制及相连说明，直到条件区域结束（Legal notice/后续名单区域）。用原始DOM区域或保留换行的可见文档作边界，不能只匹配第一行Pour。Geny使用比赛头部的条件区域，结束于Terrain/下注入口/结果表；不得连入侧栏、名单、历届冠军或页脚。调查台账中的raw_fields.conditions单行摘要仅用于确认存在，不能作完整性真值；测试直接使用原始future.json多段文档。
+
+### 迁移与当前生产基线
+
+仓库有0080/0081其它已合并的独立功能迁移，法国当前生产窄候选仍以0079为基础。法国字段增量迁移从0079分支；仓库用单独无操作merge migration汇合0081与法国分支，生产窄候选只携带法国分支迁移，不顺带执行其它lane的0080/0081。最终编号、migration graph、模型差异与生产迁移计划要在固定候选上证明；如实际生产已变化则重新核对，不沿用旧schema假设。
+
+## France Galop 奖金币种合同补证（2026-11-10）
+
+已检查官方[平地年度programme](https://www.france-galop.com/sites/default/files/2026-02/groupes_listed_plat_2026_v7.pdf)第120页（印刷118页）和[障碍年度programme](https://www.france-galop.com/sites/default/files/2026-01/groupes_listed_obstacles_2026_v4.pdf)第57页（印刷55页）的真实渲染：Miesque/Thomas Bryon基础73,200欧元与128,100含补贴行分开，Magalen Bryant基础170,000欧元与195,500含补贴行分开。PDF文本抽取把欧元符号误映为c，已用页面图像核实。
+
+详情页采用相同的基础allocation/名次分配与后续Prime Propriétaire结构，但省略货币符号；解析器仅对France Galop官方详情头部启用EUR合同，取没有补贴后缀的第一条分配行，并验证名次分配之和等于总额。实际金额仍以当前详情为准，不用旧PDF覆盖变动后的金额；不将本合同应用于其它来源或其它币种页面。
+
+## 7. 代码复审收敛
+
+字段修复的持久before/after CAS保留业务值、来源、权限、身份、owner/登记/调度版本和相关field change；`tracking.claim_generation`只属于短期采集claim，正常完成的空读可递增该计数，故不写入持久修复摘要。修复每次执行仍按统一锁序持锁并拒绝活跃正式claim，不能借此忽略owner/权限/字段漂移。
+
+同值赛果佐证返回前，法国已存在runner仍按同场身份、准入、仲裁和手工锁执行独立卡表补空；既有赛果行不改，不在该分支创建名单。

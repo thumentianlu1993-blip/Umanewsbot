@@ -1,4 +1,4 @@
-# 验收用例（设计，尚未执行）
+# 验收用例（实施中）
 
 | 编号 | 真实样例/输入 | 应验证行为 |
 |---|---|---|
@@ -23,3 +23,40 @@
 | T16 | 20未来00h00、10无名单、当前无赔率、无热门、非冠军无计时 | 正确空值；不造字段、不将未知作为已补全 |
 
 先从真实fixture取得RED，再实现GREEN。自动化测试仅隔离数据库和保存源文件，不接生产/真实第三方。按变更影响运行测试；最终集成CI遵循项目现行test-plan-gate。公网回归与自然节点验收另列，不用手动任务替代自然调度证据。
+
+## 方案复审补充
+
+- T17（PostgreSQL双事务）：赛前时间写入与正式接管并发；统一lifecycle→event锁序，无死锁/越权；活跃正式claim给出可重试冲突。owner/enrollment/source-set generation变化、策略/release漂移、新建控制行与过期lease使旧赛前claim拒绝；正常新claim同轮更新时间并正确收尾。
+- T18：名单与时间不变，只改奖金、完整条件或场况，必须产生新内容观测并生效；同值新增单位证据须生效；完全相同内容重放零重复业务写；旧观测和原审计保持不变。非法国摘要键和摘要/provenance不一致拒绝。
+- T19：apply提交→restore→再次restore；值、证据和authority一致恢复且幂等。插入后续同值补证/高权威确认、异值更新均拒绝过时恢复；restore末段故障全事务回滚。历史时间恢复不启动终态调度。
+- T20：空中锦标原始future.json的Pour条件、普通/第二次/追加报名日期及费用等多段文本全部保留，超过255字不截断；排除Legal notice、名单与历届冠军。不得使用调查脚本的单行conditions作期望值。
+- T21：生产0079→法国分支迁移；仓库0081→汇合图；两者字段一致，不自动执行其它lane迁移。固定窄候选makemigrations/check与实际迁移计划通过。
+
+## 局部执行记录（2026-11-10）
+
+证据目录：`~/.codex/runtime/france-public-field-gaps-20261110/`（未纳入仓库，未包含生产凭据）。
+
+| 行为 | 真实RED与GREEN | 捕获的变化 |
+|---|---|---|
+| 法式计时/确认履历 | time-display-red.log / time-display-green.log；2个新用例+共享展示17通过 | 去掉来源格式解析或错误小数位解释 |
+| 基础抽取/完整条件 | basic-parser-red.log / basic-parser-green.log；全部59历史头字段覆盖 | 丢弃基础字段、条件只取第一行、AQPS误当场地 |
+| 奖金schema/模板 | schema-display-red.log / schema-display-green.log；23通过 | 缺字段、255字符截断、模板不展示奖金/完整原文 |
+| 同轮开赛时间 | immediate-time-red.log / immediate-time-green.log | not_published提前返回、只按名单去重、owner快照缺失 |
+| 同值时间水位 | time-watermark-red.log / time-watermark-green.log；4通过 | 同值确认不推进权威时刻，旧更正覆盖新确认 |
+| 已登记与正式claim竞争 | pre-time-pg.log；PostgreSQL4通过 | 抢占正式token、锁序相反、release漂移仍写入 |
+| 旧卡字段 | old-card-red.log / old-card-green.log；3通过 | 仅更新runner状态/refs而不补空字段 |
+| 字段包与恢复 | repair-red.log / repair-cas-green-fixed.log | 不支持固定字段包、恢复仅比业务值、尾部故障部分提交 |
+| 00h00 | zero-clock-red.log / zero-clock-green.log；parser4通过 | 将未公布时间当午夜开赛 |
+
+以上为当前工作树的局部隔离证据，不替代最终固定Git树、生产形状回放和生产上线验收。
+
+## 补充回归
+
+- T22：恢复时间在事务提交并从PostgreSQL重读后仍以同一UTC瞬间比较，保留微秒；不得因Paris/UTC表示差异拒绝合法恢复。
+- T23：France Galop完整条件的`de\n4 et 5 ans`等换行形式仍提取年龄；完整原文与换行不丢失。
+- T24：公开新字段行限定法国；日港既有race type/展示语义保持。
+
+截至本次候选冻结前：法国56项通过；生产形状80目标apply/restore/replay通过。最终固定树CI与窄候选PG结果以发布包绑定证据为准。
+
+- T25：固定字段包在一次不改业务值的正式claim结束并递增generation后仍可apply/restore；活跃claim仍拒绝。
+- T26：赛果完全相同而新卡赔率补证时，既有空runner字段补齐，手工锁保持，赛果行完全不变。

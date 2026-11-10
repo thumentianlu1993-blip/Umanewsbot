@@ -45,10 +45,15 @@ def read_bound(root,spec):
     return json.loads(raw)
 
 
-def execute(path,expected_sha256,*,apply=False,now=None,approved_by_id=None):
+def execute(path,expected_sha256,*,apply=False,now=None,approved_by_id=None,restore=False):
     now=now or timezone.now();path=Path(path);raw=path.read_bytes();digest=hashlib.sha256(raw).hexdigest()
     if digest!=expected_sha256:raise ValueError('manifest_digest')
     manifest=json.loads(raw);items=manifest.get('items',[])
+    if manifest.get('action')=='france_field_repair':
+        from .france_field_repair import execute_repair
+        return execute_repair(path.parent,manifest,digest,apply=apply,restore=restore,now=now)
+    if restore:
+        raise ValueError('restore_requires_field_repair')
     if (manifest.get('schema_version')!=1 or manifest.get('action')!='france_release_data'
         or not 1<=len(items)<=1000):raise ValueError('manifest_scope')
     identities=[('id',x['event_id']) if x.get('event_id') else ('slug',x.get('slug')) for x in items]

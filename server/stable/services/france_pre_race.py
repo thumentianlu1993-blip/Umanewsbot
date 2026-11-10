@@ -28,39 +28,72 @@ def _route(event,policy):
 
 
 def complete(claim, *, payload, url, page, route, now):
+    from .race_data_sync_enrollment import _LifecycleLockRetry
+    for attempt in range(3):
+        try:
+            return _complete_atomic(claim, payload=payload, url=url, page=page, route=route, now=now)
+        except _LifecycleLockRetry:
+            if attempt == 2:
+                raise
+
+
+def _complete_atomic(claim, *, payload, url, page, route, now):
+    from time import monotonic
     from .race_pre_race_refresh import stamp_dynamic_items, material_items
+    from .race_data_sync_enrollment import _lock_multisource_event
+    from .france_pre_race_authority import lock_context, apply_time, write_reason
+    started = monotonic()
     with transaction.atomic():
-        event=models.RaceEvent.objects.select_for_update().get(pk=claim['event_id'])
-        if claim.get('source') != FRANCE or not enabled() or not route.valid(now) or not pre._valid_claim(event,claim,now):return False
+        event, lifecycle = _lock_multisource_event(claim['event_id'])
+        context = lock_context(event, lifecycle)
+        validation_now = now + timedelta(seconds=monotonic()-started)
+        if claim.get('source') != FRANCE or not enabled() or not route.valid(validation_now) or not pre._valid_claim(event,claim,validation_now):return False
+        if pre._state(event,FRANCE).get('write_guards') != context.guards:
+            pre._finish_locked(event,claim,now,outcome_reason='pre_race_write_guard_stale');return False
+        reason = write_reason(context, now=validation_now)
+        if reason:
+            pre._finish_locked(event,claim,now,reason=reason);return False
         if (any((event.manual_lock_flags or {}).values()) or event.field_authorities.filter(manual_lock=True).exists()
             or (getattr(event, 'projection_control', None) and event.projection_control.write_owner not in {'unmanaged','data_sync'})):
             pre._finish_locked(event,claim,now,outcome_reason='manual_or_owner_lock');return False
         if pre._refs(event).get('pre_race_handoff') or event.runners.exists():
             pre._finish_locked(event,claim,now,outcome_reason='handed_off')
             return False
-        if payload['stage']=='not_published':
-            state=pre._state(event,FRANCE);state['publication_schedule']=payload['schedule'];pre._save_state(event,FRANCE,state)
-            pre._finish_locked(event,claim,now,outcome_reason='not_published')
-            return True
-        latest=event.data_candidates.filter(source_name=FRANCE,module='runners',status='pending').order_by('-fetched_at','-id').first()
+        module = 'basic' if payload['stage']=='not_published' else 'runners'
+        latest=event.data_candidates.filter(source_name=FRANCE,module=module,status='pending').order_by('-fetched_at','-id').first()
         old=latest.raw_payload.get(FRANCE,{}) if latest else {}
-        if old.get('baseline')==pre.baseline(event) and pre.STAGES.get(old.get('stage'),-1)>pre.STAGES[payload['stage']]:
-            pre._finish_locked(event,claim,now,'older_or_incomplete_source');return False
+        roster_blocked = ''
+        if old.get('baseline')==pre.baseline(event) and pre.STAGES.get(old.get('stage'),-1)>pre.STAGES.get(payload['stage'],-1):
+            roster_blocked = 'older_or_incomplete_source'
         if (old.get('baseline')==pre.baseline(event) and old.get('as_of') and payload.get('as_of')
             and old['as_of'] > payload['as_of'] and old.get('stage')==payload['stage']):
-            pre._finish_locked(event,claim,now,'older_source');return False
+            roster_blocked = 'older_source'
+        if roster_blocked:
+            # 名单阶段只约束名单；时间和基础字段独立按各自水位仲裁。
+            module='basic'
+            latest=event.data_candidates.filter(source_name=FRANCE,module=module,status='pending').order_by('-fetched_at','-id').first()
+            old=latest.raw_payload.get(FRANCE,{}) if latest else {}
         previous=latest.candidate_payload.get('items',[]) if latest and old.get('baseline')==pre.baseline(event) else []
-        items=stamp_dynamic_items(payload['items'],previous,now=now,source_url=url,strict_roster=False,
+        items=(stamp_dynamic_items(payload['items'],previous,now=now,source_url=url,strict_roster=False,
             observed_at=getattr(page,'observed_at',None),roster_limit=500 if payload['stage']=='registration' else 60)
-        content=canonical_sha(dict(stage=payload['stage'],source_stage=payload.get('source_stage'),items=material_items(items)))
-        admitted=settings.RACE_DATA_SYNC_RACECARD_APPLY_ENABLED and 'participants.horse_name' in settings.RACE_DATA_SYNC_ENABLED_FIELDS
+            if module=='runners' else [])
+        from .france_basic_fields import basic_sha
+        content=canonical_sha(dict(stage=payload['stage'],source_stage=payload.get('source_stage'),items=material_items(items),
+            off_time=payload.get('off_time',''),france_basic_sha256=basic_sha(payload.get('france_basic_v1',{}))))
+        admitted=module=='runners' and settings.RACE_DATA_SYNC_RACECARD_APPLY_ENABLED and 'participants.horse_name' in settings.RACE_DATA_SYNC_ENABLED_FIELDS
         if old.get('content_sha256')!=content or old.get('baseline')!=pre.baseline(event) or old.get('validated')!=admitted:
-            models.RaceEventDataCandidate.objects.create(event=event,module='runners',source_name=FRANCE,source_url=url,
+            latest=models.RaceEventDataCandidate.objects.create(event=event,module=module,source_name=FRANCE,source_url=url,
                 candidate_payload={**payload,'items':items},raw_payload={FRANCE:dict(validated=bool(admitted),
                     baseline=pre.baseline(event),stage=payload['stage'],content_sha256=content,
                     raw_sha256=getattr(page,'raw_sha256',hashlib.sha256(str(page).encode()).hexdigest()),
                     route_digest=route.digest,as_of=payload.get('as_of',''))},fetched_at=now)
-        pre._finish_locked(event,claim,now)
+        time_reason = apply_time(context, payload=payload, url=url, page=page, route=route, candidate=latest, now=now)
+        if payload.get('france_basic_v1'):
+            from .france_pre_race_authority import apply_basic
+            apply_basic(context, payload=payload, route=route, candidate=latest, now=now)
+        if payload['stage']=='not_published':
+            state=pre._state(event,FRANCE);state['publication_schedule']=payload.get('schedule',[]);pre._save_state(event,FRANCE,state)
+        pre._finish_locked(event,claim,now,outcome_reason=time_reason or roster_blocked or ('not_published' if payload['stage']=='not_published' else ''))
         return True
 
 
@@ -87,10 +120,14 @@ def fetch_france_pre_race(*,event,route,now,fetcher,policy=None):
                     jockey_name=r['jockey_name'],trainer_name=r['trainer_name'],carried_weight=r['carried_weight'],
                     running_status=r['status'],odds_value=r['odds_value'],odds_kind='current',odds_format='decimal',
                     source_refs=public_refs(r['field_provenance'])) for r in observation['roster']]
-                return url,page,dict(stage='numbered',source_stage='final_card',off_time=observation['off_time'],items=items),geny
+                return url,page,dict(stage='numbered',source_stage='final_card',off_time=observation['off_time'],items=items,
+                    local_date=observation['local_date'],race_name=observation['raw_names'][0],venue=venue,
+                    external_race_id=observation['external_race_id'],france_basic_v1=observation['france_basic_v1']),geny
     url=discover_source_url(event=event,route=route,now=now,fetcher=fetcher)
     page=fetcher(url,route=route,now=now)
     payload=parse_france_galop_document(document_from_html(page,url))
+    payload['france_basic_v1'].update(observed_at=(getattr(page,'observed_at',None) or now).isoformat(),
+        raw_sha256=getattr(page,'raw_sha256',hashlib.sha256(str(page).encode()).hexdigest()),parser_version=route.parser_version)
     validate_event_identity(payload,event,route)
     return url,page,payload,route
 

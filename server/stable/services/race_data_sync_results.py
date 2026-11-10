@@ -58,6 +58,16 @@ class DataSyncResultApplyDecision:
     projected: bool = False
 
 
+def _apply_france_basic(event, source, observation, source_class, now):
+    from .france_basic_fields import apply_basic_locked, ALLOWED_FIELDS
+    from .race_data_sync_pipeline import RaceDataSyncFlags, _audit_defaults
+    flags = RaceDataSyncFlags.from_settings()
+    return apply_basic_locked(event=event, basic=observation.field_provenance['france_basic_v1'], source=source,
+        source_class=source_class, admitted_fields={f for f in ALLOWED_FIELDS
+            if flags.allows(provider=source.source_key,region=source.region_code,field_name=f)},
+        audit=_audit_defaults(observation=observation,task_id='france_result_basic',run_id=''),now=now)
+
+
 def _canonical_sha256(value: Any) -> str:
     return hashlib.sha256(
         json.dumps(
@@ -71,7 +81,7 @@ def _canonical_sha256(value: Any) -> str:
 
 
 def _normalize_result_rows(payload: object) -> tuple[dict[str, Any], ...]:
-    if not isinstance(payload, dict) or set(payload) != {
+    if not isinstance(payload, dict) or set(payload) - {'france_basic_sha256'} != {
         "external_race_id",
         "off_time",
         "region",
@@ -81,6 +91,10 @@ def _normalize_result_rows(payload: object) -> tuple[dict[str, Any], ...]:
         "participants",
     }:
         raise ValueError("result payload schema is invalid")
+    if 'france_basic_sha256' in payload:
+        import re
+        if payload.get('region')!='france' or not re.fullmatch('[a-f0-9]{64}',str(payload['france_basic_sha256'])):
+            raise ValueError('france_basic_contract')
     participants = payload.get("participants")
     if not isinstance(participants, (list, tuple)) or not 1 <= len(participants) <= 100:
         raise ValueError("result participants are invalid")
@@ -511,6 +525,13 @@ def apply_data_sync_result_observation(
         )
         if event is None or control is None:
             return DataSyncResultApplyDecision("rejected", "projection_subject_missing")
+        if 'france_basic_sha256' in observation.normalized_payload or 'france_basic_v1' in provenance:
+            from .france_basic_fields import validate_basic
+            try:
+                validate_basic(provenance.get('france_basic_v1'), sha=observation.normalized_payload.get('france_basic_sha256'),
+                    provider=source.source_key, region=source.region_code, external_id=source.external_race_id, event=event)
+            except (ValueError, TypeError, KeyError, AttributeError):
+                return DataSyncResultApplyDecision('rejected', 'france_basic_contract')
         if control.write_owner != models.RaceEventProjectionWriteOwner.DATA_SYNC:
             return DataSyncResultApplyDecision("rejected", "writer_owner_conflict")
         lifecycle_trusted = False
@@ -732,6 +753,15 @@ def apply_data_sync_result_observation(
             except (ValueError, TypeError):
                 same_facts = False
             if same_facts:
+                if terminal_phase and project_current and lifecycle_trusted:
+                    if provenance.get('france_basic_v1'):
+                        _apply_france_basic(event, source, observation, candidate_source_class, now)
+                    if france_source(source):
+                        from .france_public_fields import fill_card_gaps_locked
+                        for row, runner in roster_mapping:
+                            # 本分支仅补已有卡表；不借同值赛果创建或重发名单。
+                            if runner.pk is not None:
+                                fill_card_gaps_locked(event=event,runner=runner,row=row,source=source,observation=observation,now=now)
                 models.RaceEventRevisionEvidence.objects.get_or_create(
                     revision=current,
                     observation=observation,
@@ -823,6 +853,8 @@ def apply_data_sync_result_observation(
             and existing.items.count() == len(rows)
         )
         if existing is not None and not promote_existing:
+            if may_project and provenance.get('france_basic_v1'):
+                _apply_france_basic(event, source, observation, candidate_source_class, now)
             return DataSyncResultApplyDecision(
                 "replayed",
                 "revision_exists",
@@ -830,6 +862,8 @@ def apply_data_sync_result_observation(
                 control.current_result_revision_id == existing.pk,
             )
         if may_project:
+            if provenance.get('france_basic_v1'):
+                _apply_france_basic(event, source, observation, candidate_source_class, now)
             assert roster_mapping is not None
             for row, runner in roster_mapping:
                 runner.source_refs = {
@@ -843,6 +877,9 @@ def apply_data_sync_result_observation(
                 if france_source(source) and runner.pk is None:
                     runner.odds_value = france_odds(row["field_provenance"])
                     runner.source_refs.update(france_refs(row["field_provenance"]))
+                if france_source(source):
+                    from .france_public_fields import fill_card_gaps_locked
+                    fill_card_gaps_locked(event=event,runner=runner,row=row,source=source,observation=observation,now=now)
                 if hkjc_source(source):
                     if runner.pk is None:
                         runner.odds_value = result_odds(row["field_provenance"])
