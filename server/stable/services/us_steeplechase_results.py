@@ -5,8 +5,9 @@ import re
 import pdfplumber
 
 from .us_flat_results import parse_chart, horse_key
+from .us_basic_fields import nsa_overnight_catalogue
 
-NSA_VENUES = {'FH': {'Far Hills'}, 'FX': {'Foxfield'}, 'MTP': {'Montpelier'},
+NSA_VENUES = {'CAM': {'Camden'}, 'FH': {'Far Hills'}, 'FX': {'Foxfield'}, 'MTP': {'Montpelier'},
     'GRM': {'International Gold Cup'}, 'CNL': {'Colonial Downs'}, 'SAR': {'Saratoga'}}
 
 
@@ -68,11 +69,13 @@ def merge_steeplechase(raw_chart, identity, official, card):
         number_availability='reported' if k in by_entry else 'not_present_in_official_overnight')
         for k,n in scratch_names.items()]
     gaps=['scratch_program_number_missing'] if any(x['program_number'] is None for x in scratches) else []
-    return dict(local_date=day,venue=track,race_number=number,race_name=official['race_name'],
-        grade=official['grade'],runners=rows,scratches=scratches,runner_count=len(rows),
+    return dict(local_date=day,venue=track,race_number=number,book_race_id=official['book_race_id'],race_name=official['race_name'],
+        grade=official['grade'],catalogue=nsa_overnight_catalogue(card),runners=rows,scratches=scratches,runner_count=len(rows),
         declared_count=card['declared_count'],roster_complete=True,winning_time=chart['winning_time'],
+        fractional_times=chart['fractional_times'],going=official.get('going',''),
         official_winning_margin=official['winning_margin_raw'],
-        margin_semantics='behind_previous_physical_finisher',gaps=gaps,fields_complete=not gaps)
+        margin_semantics='behind_previous_physical_finisher',gaps=gaps,fields_complete=not gaps,
+        correction_marker=chart.get('correction_marker',''))
 
 
 def resolve_prior_card_scratches(result, prior_card):

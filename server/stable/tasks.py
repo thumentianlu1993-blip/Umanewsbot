@@ -498,6 +498,12 @@ def select_due_race_data_sync_task() -> dict:
 
 
 @shared_task
+def discover_us_pre_race_task() -> dict:
+    from stable.services.us_pre_race import discover_us_pre_race
+    return discover_us_pre_race(now=timezone.now())
+
+
+@shared_task
 def discover_future_race_data_sync_task() -> dict:
     if not getattr(settings, "RACE_DATA_MULTISOURCE_DISCOVERY_ENABLED", False):
         return _discover_future_race_data_sync_legacy_task()

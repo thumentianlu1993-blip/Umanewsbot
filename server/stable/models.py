@@ -1260,6 +1260,10 @@ class RaceEvent(TimestampedModel):
         blank=True,
         related_name="annual_events",
     )
+    division_parent = models.ForeignKey(
+        "self", on_delete=models.PROTECT, null=True, blank=True,
+        related_name="divisions", verbose_name="同届分场年度入口",
+    )
     external_race = models.ForeignKey(
         "ExternalRace",
         on_delete=models.SET_NULL,
@@ -1333,8 +1337,20 @@ class RaceEvent(TimestampedModel):
     def __str__(self) -> str:
         return f"{self.chinese_name or self.original_name} {self.year}"
 
+    def validate_division(self):
+        if not self.division_parent_id:
+            return
+        parent = self.division_parent
+        if (parent.pk == self.pk or parent.division_parent_id or self.race_series_id
+                or parent.year != self.year or parent.country_region != self.country_region
+                or (parent.edition_year or parent.year) != (self.edition_year or self.year)):
+            raise ValidationError({"division_parent": "分场必须属于同地区同届年度入口，不能嵌套或另占系列。"})
+        if self.pk and self.divisions.exists():
+            raise ValidationError({"division_parent": "年度入口不能再成为分场。"})
+
     def clean(self):
         super().clean()
+        self.validate_division()
         from stable.services.race_event_years import validate_event_years
 
         evidence = (
@@ -1358,6 +1374,7 @@ class RaceEvent(TimestampedModel):
         from stable.services.race_event_years import validate_event_years
 
         assert_historical_calendar_write_admitted()
+        self.validate_division()
         requested_update_fields = kwargs.get("update_fields")
         edition_year_was_filled = False
         if self.edition_year is None and self.year is not None:

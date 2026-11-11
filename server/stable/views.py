@@ -3050,6 +3050,8 @@ def _finished_race_queryset(queryset, now):
 
 def _public_race_status_label(event: RaceEvent, today, winner=None) -> str:
     event.public_time_label = _race_time_label(event)
+    if event.country_region == "united_states" and (event.source_refs or {}).get("us_not_run"):
+        return "本年度未举办"
     if event.status == RaceEventStatus.FINISHED:
         return "已完赛" if winner else "赛果待确认"
     now = timezone.now()
@@ -3088,7 +3090,7 @@ def _public_today_races() -> tuple[list[dict], bool]:
     base = annotate_public_time(RaceEvent.objects.all()).filter(
         visibility_status=RaceEventVisibility.PUBLISHED,
         public_date__isnull=False,
-    ).exclude(canonical_product_links__is_active=True)
+    ).exclude(canonical_product_links__is_active=True).filter(divisions__isnull=True)
     events = list(
         base.filter(public_date__gte=today, public_date__lte=today + timedelta(days=1)).order_by(
             "public_date", "public_start_time", "id"
@@ -3146,7 +3148,7 @@ def _public_next_key_race():
         visibility_status=RaceEventVisibility.PUBLISHED,
         public_date__isnull=False,
         public_date__gte=today,
-    ).exclude(canonical_product_links__is_active=True).filter(
+    ).exclude(canonical_product_links__is_active=True).filter(divisions__isnull=True).filter(
         Q(priority__in=[RaceEventPriority.P0, RaceEventPriority.P1])
         | Q(is_featured=True)
     )
@@ -3162,7 +3164,7 @@ def _public_race_calendar_base_queryset(filters: dict, *, today):
     read-gate 展示 annotation 只在最终赛事对象查询上加。"""
     queryset = annotate_public_time(RaceEvent.objects.all()).filter(
         visibility_status=RaceEventVisibility.PUBLISHED
-    ).exclude(canonical_product_links__is_active=True)
+    ).exclude(canonical_product_links__is_active=True).filter(divisions__isnull=True)
     selected_year = (
         int(filters["year"])
         if filters["year"].isdigit()
@@ -3441,7 +3443,7 @@ def _public_weekly_focus_events(region: str = "", *, events: list[RaceEvent] | N
         public_date__gte=week_start,
         public_date__lte=week_end,
         normalized_grade__in=PUBLIC_RACE_GRADE_FILTERS["g1"],
-    ).exclude(canonical_product_links__is_active=True)
+    ).exclude(canonical_product_links__is_active=True).filter(divisions__isnull=True)
     if region:
         queryset = queryset.filter(country_region=region)
     return list(queryset.order_by("public_date", "public_start_time", "id")[:3])
@@ -3730,12 +3732,14 @@ def _series_history_winners(
     *,
     exclude_result_event_id: int | None = None,
 ):
-    if not event.race_series_id:
+    series_id = event.race_series_id or (event.division_parent.race_series_id if event.division_parent_id else None)
+    if not series_id:
         return list(event.history_winners.all())
+    series_scope = Q(event__race_series_id=series_id) | Q(event__division_parent__race_series_id=series_id)
     result_winner_queryset = (
         RaceEventResult.objects.select_related("event")
         .filter(
-            event__race_series_id=event.race_series_id,
+            series_scope,
             event__visibility_status=RaceEventVisibility.PUBLISHED,
             is_confirmed=True,
         )
@@ -3764,7 +3768,7 @@ def _series_history_winners(
         winner.winner_year = winner.event.year
         covered_years.add(winner.event.year)
     fallback_winner_queryset = RaceEventHistoryWinner.objects.filter(
-        event__race_series_id=event.race_series_id,
+        series_scope,
         event__visibility_status=RaceEventVisibility.PUBLISHED,
     )
     if exclude_result_event_id is not None:
@@ -3833,6 +3837,7 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
         )
         .select_related(
             "race_series",
+            "division_parent__race_series",
             "projection_control__current_result_revision",
             "live_tracking",
         )
@@ -3901,10 +3906,11 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
     }
     from .services.race_pre_race import public_jra_preview, public_reviewed_preview
     from .services.nar_pre_race import public_nar_preview
+    from .services.us_pre_race import public_us_preview
     from .services.france_pre_race import public_france_preview
     from .services.hkjc_pre_race import public_hkjc_preview
     from .services.race_pre_race_refresh import public_refresh_preview
-    preview = public_refresh_preview(event, now=read_now) or public_jra_preview(event, now=read_now) or public_nar_preview(event, now=read_now) or public_hkjc_preview(event, now=read_now) or public_france_preview(event, now=read_now) or public_reviewed_preview(event, now=read_now)
+    preview = public_us_preview(event, now=read_now) or public_refresh_preview(event, now=read_now) or public_jra_preview(event, now=read_now) or public_nar_preview(event, now=read_now) or public_hkjc_preview(event, now=read_now) or public_france_preview(event, now=read_now) or public_reviewed_preview(event, now=read_now)
     runners = _sort_runners_for_display(preview["rows"] if preview else list(event.runners.all()), event.country_region)
     has_current_live_revision = bool(projection_control and projection_control.write_owner != "historical" and (
         current_result_revision is not None or projection_control.write_owner in {"data_sync", "live"}))
@@ -3946,7 +3952,7 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
             "event": event,
             "runners": runners,
             "runner_section_label": preview["label"] if preview else (
-                "参赛记录（赛果来源）" if event.country_region == "hong_kong" and runners
+                "参赛记录（赛果来源）" if event.country_region in {"hong_kong", "united_states"} and runners
                 and all((r.source_refs or {}).get("bootstrap_kind") == "result" for r in runners) else "出马表"),
             "runner_preview": preview,
             "results": results,
@@ -3959,6 +3965,7 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
             "news_groups": news_groups,
             "live_result_status": live_result_status,
             "result_section_label": result_section_label,
+            "division_events": event.divisions.filter(visibility_status=RaceEventVisibility.PUBLISHED).order_by("local_start_time", "id"),
             "canonical_product_event": (
                 canonical_product_link.canonical_event
                 if canonical_product_link
@@ -3976,7 +3983,7 @@ def _race_sitemap_queryset():
             visibility_status=RaceEventVisibility.PUBLISHED,
             data_quality_status=RaceEventDataQuality.COMPLETE,
         )
-        .exclude(canonical_product_links__is_active=True)
+        .exclude(canonical_product_links__is_active=True).filter(divisions__isnull=True)
         .filter(
             Q(historical_target__isnull=True)
             | Q(historical_target__resolution_status=HistoricalRaceResolutionStatus.IMPORTED)

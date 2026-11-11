@@ -88,6 +88,41 @@ class USSteeplechaseTests(TestCase):
         self.assertIsNone(horse['odds_net'])
         self.assertEqual(horse['odds_availability'],'not_applicable_no_pool')
 
+    def test_official_overnight_basic_fields_are_not_dropped(self):
+        for case in self.CASES:
+            result=self.bundle(case)
+            self.assertEqual(result['catalogue']['age_condition'],'4U')
+            self.assertTrue(result['catalogue']['purse_raw'].startswith('$'))
+            self.assertTrue(result['catalogue']['distance_text'].endswith('miles'))
+        self.assertEqual(self.bundle(self.CASES[0])['catalogue']['distance_text'],'2 3/8 miles')
+        self.assertEqual(self.bundle(self.CASES[5])['catalogue']['distance_text'],'about 2 1/8 miles')
+        self.assertEqual(self.bundle(self.CASES[1])['catalogue']['sex_condition'],'F&M')
+
+    def test_camden_contract_reaches_overnight_and_result_merge(self):
+        # 合成Camden页眉 + 既有真实NSA版式；不宣称未来Colonial Cup原件已发布。
+        from copy import deepcopy
+        from types import SimpleNamespace
+        from unittest.mock import patch,MagicMock
+        import pdfplumber
+        from stable.services.us_flat_results import parse_chart
+        from stable.services.us_nsa_sources import parse_results
+        from stable.services.us_steeplechase_results import merge_steeplechase
+        case=self.CASES[4];raw=(FIX/case[1]).read_bytes()
+        with pdfplumber.open(FIX/case[1]) as pdf:
+            lines=[deepcopy(line) for page in pdf.pages for line in page.extract_text_lines(x_tolerance=1.5)]
+        for line in lines:line['text']=line['text'].replace('FAR HILLS','CAMDEN').replace('FARHILLS','CAMDEN')
+        document=MagicMock();document.__enter__.return_value=SimpleNamespace(pages=[SimpleNamespace(extract_text_lines=lambda **kw:lines)])
+        with patch('stable.services.us_prerace_documents.pdfplumber.open',return_value=document):
+            card=docs.parse_overnight(raw,local_date='2026-10-17',venue='CAM',race_number=5,source_url='https://nationalsteeplechase.com/wp-content/uploads/2026/10/camden-synthetic.pdf')
+        identity=dict(track='FH',date='2026-10-17',race_number=5)
+        chart=parse_chart((FIX/case[0]).read_bytes(),identity)
+        official=next(r for r in parse_results((FIX/case[2]).read_bytes(),url='fixture')['items'] if r['race_number']=='5')
+        official['venue']='Camden';identity['track']='CAM'
+        with patch('stable.services.us_steeplechase_results.parse_chart',return_value=chart):
+            value=merge_steeplechase((FIX/case[0]).read_bytes(),identity,official,card)
+        self.assertEqual((value['venue'],value['runner_count']),('CAM',7))
+        self.assertEqual(value['gaps'],[])
+
     def test_grand_national_betting_and_scratches(self):
         result=self.bundle(self.CASES[4])
         horse=next(x for x in result['runners'] if x['horse_name']=='ZANAHIYR (IRE)')
@@ -223,7 +258,7 @@ class USSportingCardTests(TestCase):
         race=next(r for r in rows if r['track']=='RP' and r['race_number']==1)
         self.assertEqual(race['date'],'2026-11-11')
         self.assertIn('/2026-11-11/remington-park/racecard/948649/',race['url'])
-        self.assertEqual({r['track'] for r in rows},{'CD','RP'})
+        self.assertEqual({r['track'] for r in rows},{'CD','RP','PEN','MNR','CT','MVR','IND'})
 
     def test_live_card_fields_and_cross_midnight(self):
         for filename,track,number,count,time in [
@@ -421,3 +456,17 @@ class USPrereleaseRegressionTests(TestCase):
         overnight=next(d['data'] for d in value['documents'] if d['data']['source_stage']=='declared_overnight')
         self.assertFalse(overnight['fields_complete'])
         self.assertTrue(overnight['roster_complete'])
+
+class USNSAPreviewTests(TestCase):
+    def test_discovers_actual_race_number_from_named_overnight(self):
+        from stable.services.us_prerelease_collection import nsa_target_card
+        raw=(FIX/'nsa-entry-Far-Hills-Final-Overnight-2.pdf').read_bytes()
+        target=dict(provider='nsa',venue='FH',local_date='2026-10-17',race_name='American Grand National',
+            source_race_id='104',book_race_id='104')
+        value=nsa_target_card(raw,target)
+        self.assertEqual(value['race_number'],5)
+        self.assertEqual(value['declared_count'],8)
+        self.assertEqual(value['source_stage'],'declared_overnight')
+        self.assertEqual(value['runners'][0]['entry_number'],1)
+        for change in [{'race_name':'Grand National'}, {'local_date':'2026-10-18'}, {'venue':'MTP'}]:
+            with self.assertRaises(ValueError):nsa_target_card(raw,{**target,**change})

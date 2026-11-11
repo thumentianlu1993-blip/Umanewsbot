@@ -4,6 +4,7 @@ from collections import Counter
 import re
 
 from .us_racing_sources import pdf_pages, candidate, evidence, catalogue
+from .us_basic_fields import nsa_overnight_catalogue
 
 VENUES = {
     'FOXFIELD': 'Foxfield',
@@ -11,6 +12,7 @@ VENUES = {
     'INTERNATIONAL GOLD CUP': 'International Gold Cup',
     'MONTPELIER': 'Montpelier',
     'COLONIAL CUP': 'Camden',
+    'CAROLINA CUP': 'Camden',
 }
 STATUSES = {
     'PU': 'pulled_up', 'F': 'fell', 'LR': 'unseated_rider',
@@ -33,9 +35,14 @@ def parse_conditions(raw, *, url):
         for match in re.finditer(r'(?m)^([A-Z /]+) RACE (\d+)\n(?:THE )?([^\n]+?) \((?:Grade|Gr\.) ([123])\)', content):
             if not meeting or not meeting['venue']:
                 raise ValueError('us_nsa_meeting_unrecognized')
+            remainder=content[match.start():]
+            next_race=re.search(r'(?m)^[A-Z /]+ RACE \d+$',content[match.end():])
+            if next_race:remainder=content[match.start():match.end()+next_race.start()]
+            basic=nsa_overnight_catalogue(dict(conditions_raw=' '.join(remainder.split()),**meeting,**evidence(raw,url)))
+            fields={k:basic[k] for k in ('purse_raw','distance_text','age_condition','sex_condition','conditions_raw')}
             rows.append(candidate('nsa', **meeting, race_name=match[3], source_race_id=match[2],
                 grade='G'+match[4], timezone='America/New_York', race_kind='hurdle',
-                source_page=page['number'], **evidence(raw,url)))
+                source_page=page['number'], **fields, **evidence(raw,url)))
     if not rows:
         raise ValueError('us_nsa_graded_calendar_empty')
     return catalogue(rows)

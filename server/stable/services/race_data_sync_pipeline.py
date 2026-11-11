@@ -48,6 +48,7 @@ _OPTIONAL_TOP_LEVEL_KEYS = {
     "timezone_name",
     "multisource_source_set_digest",
     "france_public_fields_sha256",
+    "us_public_fields_sha256",
     "france_basic_sha256",
 }
 _LEGACY_RECONCILE_REQUIRED_KEYS = _REQUIRED_TOP_LEVEL_KEYS - {"off_time"}
@@ -989,6 +990,9 @@ def normalize_racecard_observation(
     source_class = _require_trimmed_string(
         contract.get("source_class"), "source_class", max_length=32
     )
+    if 'us_public_fields_sha256' in payload:
+        if provider!='us_racing' or contract['region']!='united_states':raise ValueError('us_metadata_source')
+        _validate_digest(payload['us_public_fields_sha256'],'us_public_fields_sha256')
     if 'france_public_fields_sha256' in payload or 'france_basic_sha256' in payload:
         if provider != 'geny' or contract['region'] != 'france':
             raise ValueError('france_metadata_source')
@@ -1770,6 +1774,11 @@ def _reconcile_racecard_observation_atomic(
                     provider=source.source_key, region=source.region_code, external_id=source.external_race_id, event=source.event)
             except (ValueError, KeyError, TypeError, AttributeError):
                 return RacecardReconciliationDecision('rejected', 'france_basic_contract', expected_event_id, observation.pk)
+        if 'us_public_fields_sha256' in payload:
+            from .race_data_source_adapters import canonical_sha
+            if (source.source_key!='us_racing' or source.region_code!='united_states'
+                or payload['us_public_fields_sha256']!=canonical_sha(provenance.get('us_public_fields',{}))):
+                return RacecardReconciliationDecision('rejected','us_metadata_contract',expected_event_id,observation.pk)
         if 'france_public_fields_sha256' in payload:
             from .race_data_source_adapters import canonical_sha
             if (source.source_key != 'geny' or source.region_code != 'france'
@@ -2109,6 +2118,8 @@ def _reconcile_racecard_observation_atomic(
             subject_key = runner.external_runner_id or external_runner_id
             runner_field_applied = False
             weight_applied = False
+            us_metadata = provenance.get("us_public_fields",{}).get(external_runner_id,{}) if source.source_key=="us_racing" and source.region_code=="united_states" else {}
+            us_metadata_fields=set()
             france_metadata = {}
             france_metadata_fields = set()
             france_observed = None
@@ -2173,6 +2184,8 @@ def _reconcile_racecard_observation_atomic(
                     weight_applied |= field_name == "carried_weight"
                     if aggregate != "needs_review":
                         aggregate = "applied"
+                if us_metadata and (applied or arbitration.reason_code=="idempotent_replay"):
+                    us_metadata_fields.add(field_name)
                 if (france_observed and timezone.is_aware(france_observed)
                     and france_observed <= candidate_watermark
                     and (authority.observed_at is None or france_observed >= authority.observed_at)
@@ -2227,6 +2240,12 @@ def _reconcile_racecard_observation_atomic(
                 and source.region_code in ('japan_jra', 'japan_nar')):
                 runner.source_refs['field_units'] = {
                     **runner.source_refs.get('field_units', {}), 'carried_weight': 'kg'}
+            if us_metadata:
+                for field in ('carried_weight','odds_value'):
+                    if field in us_metadata_fields and field in us_metadata.get('field_units',{}):
+                        runner.source_refs['field_units']={**runner.source_refs.get('field_units',{}),field:us_metadata['field_units'][field]}
+                if 'odds_value' in us_metadata_fields:
+                    runner.source_refs.update({k:us_metadata.get(k,'') for k in ('odds_source','odds_observed_at')})
             if source.source_key == 'geny' and source.region_code == 'france':
                 if 'carried_weight' in france_metadata_fields:
                     runner.source_refs.update({k:france_metadata[k] for k in ('allocated_weight','adjusted_weight')})

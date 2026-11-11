@@ -1,4 +1,5 @@
 from __future__ import annotations
+from .us_public_fields import blocking_multisource_manual_locks
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -229,9 +230,7 @@ def validate_multisource_admission(
         return _deny("event_missing")
     if event.status in ("cancelled", "postponed"):
         return _deny("event_not_active")
-    if event.visibility_status != "published" or any(
-        (event.manual_lock_flags or {}).values()
-    ):
+    if event.visibility_status != "published" or blocking_multisource_manual_locks(event):
         return _deny("manual_or_visibility_block")
     if (
         lifecycle is None
@@ -360,7 +359,7 @@ def validate_multisource_publication(
     if not getattr(settings, "RACE_DATA_SYNC_RESULT_PUBLIC_ENABLED", False):
         return "public_disabled"
     if (
-        any((event.manual_lock_flags or {}).values())
+        blocking_multisource_manual_locks(event)
         or event.visibility_status != "published"
     ):
         return "public_manual_lock"

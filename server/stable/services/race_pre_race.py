@@ -77,6 +77,8 @@ def preview_window(event,now):
 
 
 def pre_race_days(event):
+    if event.country_region == 'united_states':
+        return 60
     if event.country_region == 'japan':
         return max(0, min(31, getattr(settings, 'RACE_DATA_SYNC_JAPAN_PRE_RACE_DAYS', 4)))
     if event.country_region == 'hong_kong' and getattr(settings, 'RACE_DATA_SYNC_HKJC_PRE_RACE_ENABLED', False):
@@ -116,7 +118,7 @@ def claim_pre_race(*, event_id, source, now):
 
 
 def _claim_pre_race_atomic(*, event_id, source, now):
-    if source not in {JRA, TRA, REFRESH, 'nar_pre_race_v1', 'hkjc_pre_race_v1', 'france_pre_race_v1'} or timezone.is_naive(now):
+    if source not in {JRA, TRA, REFRESH, 'nar_pre_race_v1', 'hkjc_pre_race_v1', 'france_pre_race_v1', 'us_pre_race_v1'} or timezone.is_naive(now):
         raise ValueError('invalid_pre_race_claim')
     if source == JRA and not jra_enabled(network=True):
         return None
@@ -128,6 +130,9 @@ def _claim_pre_race_atomic(*, event_id, source, now):
         if not enabled(): return None
     if source == 'france_pre_race_v1':
         from .france_pre_race import enabled
+        if not enabled(): return None
+    if source == 'us_pre_race_v1':
+        from .us_pre_race import enabled
         if not enabled(): return None
     if source == REFRESH:
         from .race_pre_race_refresh import refresh_enabled
@@ -141,6 +146,10 @@ def _claim_pre_race_atomic(*, event_id, source, now):
             france_context = lock_context(event, lifecycle)
             if write_reason(france_context, now=now):
                 return None
+        elif source == 'us_pre_race_v1':
+            from .race_data_sync_enrollment import _lock_multisource_event
+            event, lifecycle = _lock_multisource_event(event_id)
+            if event.country_region != 'united_states' or event.divisions.exists(): return None
         else:
             event = models.RaceEvent.objects.select_for_update().get(pk=event_id)
         if not in_window(event, now) or (source == JRA and (
@@ -178,21 +187,28 @@ def _valid_claim(event, claim, now):
 
 def _finish_locked(event, claim, now, reason='', retry_after=None, outcome_reason=''):
     state = _state(event, claim['source'])
-    # Existing Beat slots are 7/17/27/37/47/57. Worker or prior-source delay must
-    # not move the next due beyond the following slot.
-    def slot(value):
-        return value.replace(second=0, microsecond=0)-timedelta(minutes=(value.minute-7)%10)
-    anchor = slot(_dt(state.get('last_attempt_at')) or now)
-    due = calculate_next_poll_at(data_kind='racecard', now=anchor, race_datetime=event.race_datetime,
-                                local_date=event.local_date, timezone_name=event.timezone_name)
-    if (pre_race_days(event) > 4 and event.local_date and
-        (event.local_date-now.astimezone(ZoneInfo(event.timezone_name)).date()).days > 4):
-        due = min(due or now+timedelta(hours=3), now+timedelta(hours=3))
-    if due is not None and due <= now:
-        due = calculate_next_poll_at(data_kind='racecard', now=now,
-            race_datetime=event.race_datetime, local_date=event.local_date, timezone_name=event.timezone_name)
-        if due is not None and slot(due)>now:
-            due=slot(due)
+    if claim['source'] == 'us_pre_race_v1':
+        from .us_polling import next_poll
+        started = _dt(state.get('last_attempt_at')) or now
+        due = next_poll(event=event, kind='racecard', now=started)
+        if due is not None and due <= now:
+            due = next_poll(event=event, kind='racecard', now=now)
+    else:
+        # Existing Beat slots are 7/17/27/37/47/57. Worker or prior-source delay must
+        # not move the next due beyond the following slot.
+        def slot(value):
+            return value.replace(second=0, microsecond=0)-timedelta(minutes=(value.minute-7)%10)
+        anchor = slot(_dt(state.get('last_attempt_at')) or now)
+        due = calculate_next_poll_at(data_kind='racecard', now=anchor, race_datetime=event.race_datetime,
+                                    local_date=event.local_date, timezone_name=event.timezone_name)
+        if (pre_race_days(event) > 4 and event.local_date and
+            (event.local_date-now.astimezone(ZoneInfo(event.timezone_name)).date()).days > 4):
+            due = min(due or now+timedelta(hours=3), now+timedelta(hours=3))
+        if due is not None and due <= now:
+            due = calculate_next_poll_at(data_kind='racecard', now=now,
+                race_datetime=event.race_datetime, local_date=event.local_date, timezone_name=event.timezone_name)
+            if due is not None and slot(due)>now:
+                due=slot(due)
     if reason:
         failures = min(int(state.get('failures', 0))+1, 8)
         due = max(now+timedelta(minutes=min(180, 5 * 2**(failures-1))), retry_after or now)
@@ -215,7 +231,7 @@ def finish_pre_race(claim, *, now, reason='', retry_after=None, outcome_reason='
 
 def _finish_pre_race_atomic(claim, *, now, reason='', retry_after=None, outcome_reason=''):
     with transaction.atomic():
-        if claim.get('source') == 'france_pre_race_v1':
+        if claim.get('source') in {'france_pre_race_v1','us_pre_race_v1'}:
             from .race_data_sync_enrollment import _lock_multisource_event
             event, _ = _lock_multisource_event(claim['event_id'])
         else:
@@ -529,6 +545,14 @@ class JraPage(str):
         return page
 
 
+class SourceBytes(bytes):
+    def __new__(cls, raw, observed_at=None):
+        value = super().__new__(cls, raw)
+        value.raw_sha256 = hashlib.sha256(raw).hexdigest()
+        value.observed_at = observed_at
+        return value
+
+
 class JraFetchError(ValueError):
     def __init__(self, reason, retry_after=None):
         super().__init__(reason)
@@ -557,7 +581,7 @@ def _reserve_pre_race_request(host):
     raise JraFetchError('jra_host_' + reservation.reason, reservation.next_allowed_at)
 
 
-def _fetch_bounded_html(url, *, now, provider, region, validator, enabled):
+def _fetch_bounded_html(url, *, now, provider, region, validator, enabled, binary=False):
     """Bounded official HTTP, shared snapshot lease and existing host budget."""
     import requests
     import time as clock
@@ -613,14 +637,20 @@ def _fetch_bounded_html(url, *, now, provider, region, validator, enabled):
                     except (ValueError, TypeError, OverflowError):
                         pass
                     raise JraFetchError('jra_http_'+str(response.status_code), retry_after)
-                if 'text/html' not in response.headers.get('Content-Type', '').lower():
+                content_type = response.headers.get('Content-Type', '').lower().split(';')[0].strip()
+                if content_type not in ({'text/html', 'application/pdf', 'application/json'} if binary else {'text/html'}):
                     raise JraFetchError('jra_content_type_rejected')
                 body = bytearray()
                 for chunk in response.iter_content(16384):
                     body.extend(chunk)
-                    if len(body) > 2*1024*1024 or clock.monotonic()-started > 20:
+                    if len(body) > (8 if binary else 2)*1024*1024 or clock.monotonic()-started > 20:
                         raise JraFetchError('jra_response_limit')
                 raw = bytes(body)
+                if binary:
+                    import base64
+                    success = True
+                    return {'bytes_b64': base64.b64encode(raw).decode('ascii'),
+                            'observed_at': timezone.now().isoformat()}, 1, 1
                 declared = re.search(br'charset\s*=\s*[\"\']?([A-Za-z0-9_-]+)', raw[:2048], re.I)
                 encoding = declared.group(1).decode('ascii').lower() if declared else 'utf-8'
                 encodings = {'utf-8':'utf-8', 'utf8':'utf-8', 'shift_jis':'cp932',
@@ -646,13 +676,17 @@ def _fetch_bounded_html(url, *, now, provider, region, validator, enabled):
                     budget.save(update_fields=['next_allowed_at'])
     try:
         # Snapshot scopes are limited to 128 characters; keep existing short keys stable.
-        scope_key = url if len(url) <= 128 else 'html:' + hashlib.sha256(url.encode()).hexdigest()
+        scope_key = ('bytes:' + hashlib.sha256(url.encode()).hexdigest() if binary else
+                     url if len(url) <= 128 else 'html:' + hashlib.sha256(url.encode()).hexdigest())
         payload, _ = _get_or_fetch_shared_snapshot(provider=provider, region=region,
             scope_key=scope_key, data_kind='racecard', registry_digest=hashlib.sha256((provider+url).encode()).hexdigest(),
             run_id=secrets.token_hex(16), now=now, proposed_requests=document_budget,
             clock=timezone.now, sleeper=clock.sleep, fetcher=fetch, waiter_max_polls=0)
     except _ProviderSyncError as exc:
         raise failure or JraFetchError(exc.reason_code) from exc
+    if binary:
+        import base64
+        return SourceBytes(base64.b64decode(payload['bytes_b64'], validate=True), _dt(payload.get('observed_at')))
     return JraPage(payload['html'], payload['raw_sha256'], _dt(payload.get('observed_at')))
 
 
