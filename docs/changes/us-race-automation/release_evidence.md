@@ -89,3 +89,9 @@ ABR 必需节点缺失逃逸整批。真实反例先得到1失败/3错误，修�
 其后只回写文档与ci-scope清单，业务/测试/控制文件字节与受测快照一致；远端CI仍需绑定最终PR head。
 
 包内没有迁移、数据写入或调度启用。窄候选和回滚范围见rollout；当前只完成本地准备，尚未G2、合并、部署或生产业务验收。
+
+
+首个增量远端run43063842934在static-contracts阶段发现第三方HTML fixture的space-before-tab，尚未运行测试。
+仅在us_prerelease原件目录设置HTML的`whitespace=-space-before-tab`属性；保留原件与provenance全部字节，
+其他空白规则及业务代码检查不变。该Git属性不改变生产代码或测试输入，窄候选镜像继续复用；
+最终源提交相对本地受测树增加的内容仅为文档/scope和上述Git属性，远端仍跑完整影响范围。

@@ -34,7 +34,7 @@
       "path": "docs/changes/us-race-automation/release_evidence.md",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "f42a490eb653e0a8b6cc0df7df3d9879678d537cb6c9044c3ba196e02e7ae70d",
+      "after_hash": "7f8cb915a2b556daa5eef7abcc3b746bb5bc0581b85da2f8ef0ffec4dc10b69c",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -442,7 +442,7 @@
       "path": "server/stable/fixtures/us_prerelease/.gitattributes",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "547f59603028195ff9f8a87d04c4651551e8bd0d68f075257dfd549cd846b25b",
+      "after_hash": "6b16ed6a46942d04806a64e6b97386c1ac1942f9a62defcd9990d81fb0681bd6",
       "before_mode": null,
       "after_mode": "100644"
     },
