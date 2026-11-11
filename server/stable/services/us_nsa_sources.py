@@ -80,8 +80,9 @@ def _race_headers(content, day, venue, raw, url, counts):
     return records
 
 
-def parse_results(raw, *, url):
+def parse_results(raw, *, url, graded_only=False):
     records = {}
+    excluded = []
     last_number = None
     meeting = None
     pages = pdf_pages(raw)
@@ -98,6 +99,10 @@ def parse_results(raw, *, url):
             raise ValueError('us_nsa_result_date_conflict')
         meeting = current_meeting
         page_records = _race_headers(content, day, venue, raw, url, counts)
+        if graded_only:
+            excluded.extend(dict(race_number=r['race_number'], race_name=r['race_name'], local_date=r['local_date'])
+                            for r in page_records.values() if not r['grade'])
+            page_records = {k:r for k,r in page_records.items() if r['grade'] in {'G1','G2','G3'}}
         if records.keys() & page_records.keys():
             raise ValueError('us_nsa_duplicate_race')
         records.update(page_records)
@@ -145,6 +150,9 @@ def parse_results(raw, *, url):
         positions = [r['finish_position'] for r in rows if r['finish_position']]
         if not positions or positions != sorted(positions) or positions[0] != 1:
             raise ValueError('us_nsa_result_order')
-    if not records:
+    if not records and not graded_only:
         raise ValueError('us_nsa_results_empty')
-    return catalogue(list(records.values()))
+    result = catalogue(list(records.values()))
+    if graded_only:
+        result['excluded_non_graded_races'] = excluded
+    return result

@@ -11,6 +11,10 @@ import pdfplumber
 
 # 代码是来源赛场标识，不是生产 RaceEvent 身份。
 VENUES = {
+    'FH': ('Far Hills', 'Far Hills', 'America/New_York'),
+    'FX': ('Foxfield', 'Foxfield', 'America/New_York'),
+    'GRM': ('Great Meadow', 'Great Meadow', 'America/New_York'),
+    'MTP': ('Montpelier', 'Montpelier', 'America/New_York'),
     'BEL': ('Belmont Park', 'Belmont', 'America/New_York'),
     'CD': ('Churchill Downs', 'Churchill', 'America/New_York'),
     'CNL': ('Colonial Downs', 'Colonial', 'America/New_York'),
@@ -39,7 +43,8 @@ NAME_ALIASES = {'primtimemmy': 'primetimeemmy', 'comanchebrve': 'comanchebrave',
     'lerntodiscover': 'learntodiscover', 'takechargestr': 'takechargestar',
     'programtrding': 'programtrading', 'fvoritememory': 'favoritememory',
     'opulentrestrint': 'opulentrestraint', 'victoriousdrem': 'victoriousdream',
-    'dimondnecklce': 'diamondnecklace'}
+    'dimondnecklce': 'diamondnecklace', 'zabeelchmpion': 'zabeelchampion',
+    'scorpionsrevng': 'scorpionsrevenge', 'twopsteight': 'twopasteight'}
 
 
 def key(value):

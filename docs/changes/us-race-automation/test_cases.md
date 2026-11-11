@@ -31,3 +31,11 @@ U13：TOBA原始Listed行与Del Mar报名PDF共同输入，Bob Hope输出双方�
 - U15：截断PDF转us_pdf_invalid，仍生成含TOBA成功证据的报告；捕获文档异常逃逸整批。
 - U16：2027重放2026缓存仍得到相同报名和等级冲突；捕获使用当前年份。
 - U17：Montpelier Noel Laing第五名精确为SCORPION'S REVENGE (IRE)，删除独立(L)；捕获坐标交错字符损坏马名。
+
+
+## 发布前1/2/5新增回归
+
+新增 overnight 独立计数/日期/场次、Del Mar计数与trainer、NYRA B/O标记、Sporting Life赛前与历史阶段、
+US Racing预想名单与明确pending、NSA冲线/裁定/赔率/相邻着差、最终overnight前退赛号码不适用、
+Glen Cove分场对账与别名漂移。六个审核反例覆盖冲突分母、卡片缺字段、当天赛前、无关目录、
+Churchill实际PDF消费及双来源不能掩盖年龄/闸位缺失。全部用原件fixture和mock，不访问生产或真实网络。

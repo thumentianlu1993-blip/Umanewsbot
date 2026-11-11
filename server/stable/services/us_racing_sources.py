@@ -285,9 +285,15 @@ def parse_del_mar_nominations(raw, *, url, event):
             running_status='nominated', source_refs={'primary':url}))
     if len(rows) != int(count[1]) or len({r['horse_name'] for r in rows}) != len(rows):
         raise ValueError('us_nomination_count')
+    from .us_prerace_documents import parse_stakes_nominations
+    structured = parse_stakes_nominations(raw, local_date=day.isoformat(), race_name=first_name)
+    if [r['horse_name'] for r in structured['items']] != [r['horse_name'] for r in rows]:
+        raise ValueError('us_nomination_structured_roster')
+    for old, new in zip(rows, structured['items']):
+        old.update(trainer_name=new['trainer_name'], owner_name=new['owner_name'])
     return dict(stage='registration', source_stage='nominations', local_date=day.isoformat(),
         venue='DMR', race_name=first_name, grade='G'+str(len(grade_match[1])) if grade_match else '',
-        items=rows, production_complete=False, gaps=['structured_trainer'], **evidence(raw,url))
+        items=rows, declared_count=len(rows), roster_complete=True, production_complete=False, gaps=[], **evidence(raw,url))
 
 
 def parse_del_mar_changes(raw, *, url, event):

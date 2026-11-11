@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "base_sha": "3c495d3b4a8c760cb7addc5ce4ea635573db5e9a",
-  "reason": "美国只读采集层及平地全场赛果增量；DRF/补源纯解析、有界缓存回放，SourceStore仅增加URL校验覆写点；覆盖美国和既有日港法/身份入口回归、core及测试基础设施。无生产写入、模型、迁移、任务或开关变化。",
+  "reason": "美国只读采集层：平地与NSA完整结果、赛前资料、只读身份清单；覆盖美国及日港法既有适配器、core和测试基础设施。无模型、迁移、任务、业务写入或开关变化。",
   "domains": [
     "us_source_collection"
   ],
@@ -23,10 +23,18 @@
       "after_mode": "100644"
     },
     {
+      "path": "docs/changes/us-race-automation/pre_release_125.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "fd8d851bf4c1ac4173f83b9c9be1e4b589cc24821415e806b27326628b311121",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
       "path": "docs/changes/us-race-automation/release_evidence.md",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "27b9a41a882187db52559c5d38d0e451647397144022ebe6148a53dd3d87507f",
+      "after_hash": "f42a490eb653e0a8b6cc0df7df3d9879678d537cb6c9044c3ba196e02e7ae70d",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -34,7 +42,7 @@
       "path": "docs/changes/us-race-automation/rollout.md",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "c95fe993f8739851dd4f18ce004fe27731af64b2e34075eb62d4d4d9181cefb7",
+      "after_hash": "d32b967db9508689f0dbd90454c8b15cc89a1c4acfb3541530032dd0788d8265",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -42,7 +50,7 @@
       "path": "docs/changes/us-race-automation/spec.md",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "b9dd39d1ca00ed03f9c783ed0e48a9b002f6b8290f7745f678cc36a40eae0695",
+      "after_hash": "2d1d0f48c182e0e931362660d5e5fde60b3e41996c9815b747e65a56be42d0d8",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -50,7 +58,7 @@
       "path": "docs/changes/us-race-automation/tasks.md",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "05850aa581727526d51c34bc800ad7e1aefd0ae1df826568470e2c10fdc5e258",
+      "after_hash": "c8da8e11052768b84df67d22db73a85ed7327c2e4ef6eedd8262dedc13811fdf",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -58,7 +66,7 @@
       "path": "docs/changes/us-race-automation/test_cases.md",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "b04b6cf252ac3ae7f3040afcbdda3d799404f790926db14b4cf4e8e552a11559",
+      "after_hash": "b97d1fb4d9d6475f099339e6186b84439c505eef27cc68408e3e418ece11c4c5",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -66,7 +74,15 @@
       "path": "docs/current_state.md",
       "status": "modified",
       "before_hash": "680364e5da2eb85fa0c2ed71650db444d7b93c1687b61e464d84398646231b03",
-      "after_hash": "0be66e1b3c5e163bd2baf7c577a1820154db31dd262ffddd4ec8e0e33bb4d05b",
+      "after_hash": "987f30f939cf092b83ecacb55c1924977f841115fbbfc0f2aa4954467e93e5c0",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/decisions.md",
+      "status": "modified",
+      "before_hash": "96c09642caf39c494c88d9367a98e9d6ba71a17b56ae28396dabe175f29c5d09",
+      "after_hash": "4a4febef7a44da91e38f52be58e25ae8b0eccbc046e0f619d4d67b68fd4cb14d",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -423,10 +439,354 @@
       "after_mode": "100644"
     },
     {
+      "path": "server/stable/fixtures/us_prerelease/.gitattributes",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "547f59603028195ff9f8a87d04c4651551e8bd0d68f075257dfd549cd846b25b",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/CNL2026090303.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "8bd818acbd0b328ca9770265dc3ac6743b64a02099bb84d13fbec0995872b00d",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/FH2026101703.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "6d00e7b5926c570de4ce815b27a0968e6062429e67d8cf49244c1bc4b1656048",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/FH2026101705.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "17623d8f81d83712cdb6793955eb904fca7fb2f6371951bd10aa25239d67f613",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/FX2026100406.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "f80b7425986c495e44f4c8c5ee8bab76a905e0687eaec33e977236498858b5ca",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/GRM2026102404.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "ca7ca8aab97669d3edbdd92b12a261b4e3e3b31777a8db12f8df120e7ce63068",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/MTP2026110707.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "ae7a9c4d72409c256929ad484256f9f210facf60b97843c991e929cac1d08cab",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/SAR2026090201.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "a85bac5dbf2f8bbdb7c10df1bd9da05255a0a3362ed3c692831797d1fb689918",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/churchill-1107-overnight.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "c2cc8aa04b75ffd73eeb6c9b5d74d8458ed608f2c792bfb88c9952af8c2aebac",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/dmtc-overnight-20260905.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "f7be2d564809375f76ed3f3dd19dd7f7f8513e049ad62f2c8b117c326425f91e",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/dmtc-overnight-20261108.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "2f64cef905407383d5126e180b35926c1b8107b0029155503b5d905e63e6f3a1",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/drf-all-stakes.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "3cfe0c8c7351439b7cea3c66ba86087718c29dd099e2d956ae67886daafcdfd1",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/keeneland-bryan-noms.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "d01fefe1eda6f0195659154ca33b2e9e1da949872e9a256edd7d743ada5e6042",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/nsa-entry-09.03.26-Overnight.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "e20e626fa932f3ba4121b444d9b4c390108429881aaa848d26f8826a53864f68",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/nsa-entry-Far-Hills-Final-Overnight-2.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "c845a0c910c02cf7d9f241ef4595012cc94e0448b8a8bc3c260bb50834475cc0",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/nsa-entry-Foxfield-Overnight-Tuesday.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "c8ceeec3f09112a7b494bab46f8d57081f6ced6d095040d0a3b36a8390e81e6a",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/nsa-entry-International-Gold-Cup-Overnight.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "024bb3f59c803b1c2fabe2c0c348a8d545bb4cc9511b2d6ace9f53d33fb2d607",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/nsa-entry-Montpelier-Overnight-.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "86beaa1de162acc6c68dfe142e2ff35da0add54e3ea7b461cd9c6bac52895d68",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/nsa-entry-Saratoga-September-2.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "276a7b8b0817f11e8f8df98cede1bc2333dda3965be00e7953921ea60e7d3c79",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/nsa-extra-Revised-Foxfield-Overnight-Monday-.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "ad6b478f1a8ee39eb165a09627ed9fdadff024cf98e64f5f0cd27b0d39dcbcac",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/nsa-result-Far-Hills-Results.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "d12993844d0b7268dc73d4664dbeea500f5c79783d637e51a695501e2cabbcee",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/nsa-result-International-Gold-Cup-results-Updated.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "64a136ec8f145feffdcb6a69455202559d518709770dfe96680a641e301f5c80",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/nsa-result-Montpelier-results-2026.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "9c40a6d3fc49ec41b77eeb8e6c5fac58901246b9bcd2d62696c101c1d9b5f437",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/nsa-result-October-4-results.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "c60e43be974d56b6ff2565da0688ab9600ba4a8592a77ac87148739a20caff93",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/nsa-result-Saratoga-September-2-Results-.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "0e5b9b3fb3236e01c751582187dc6a0ef9953b58e09d519ae06894cd3c31c281",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/nsa-result-September-3-results-.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "8c9426bec4de521910ea6a8046384e5946d8ae36f41e8cbc1c252e974ab19ae3",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/nsa-va-fall.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "7bce55d562f8a42647b0b4d9c28726077d97ce2e8c39dffc7c8291cb9abd3ab4",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/nyra-entries.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "608adb6d08acb67fd5b75fc2adf80c2e6c70e9628d8cfaccc2cbb10d4b14cb60",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/nyra-glen-cove-5.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "af4569dda522fa027d8692eae34c620cc9497051dfb92bcb65f36f2114e0adc6",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/nyra-hopeful.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "f5a423de828ca33da41a0782b10fb6e2d21415342e9da4bf7605d9224060449b",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/nyra-jockey-club-gold-cup.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "7d14488a394a40337232e1cd9685e0760f70afcbc0720a9e1afad92fb407dc91",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/provenance.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "ccf5717d792bd897ecde8efe2125a37e5761e17cf23e5cbc03ea3d1bf33cde14",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/sl-cards-today.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "bcacbdb5f96764195e54ca71ed81d3184abf9996f23f8aed619e669564e0c81a",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/sl-churchill-livecard.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "1f1402c3af5fb297869cb037c4532f077344817fcbe86cf9b91b46767026b2c1",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/sl-remington-livecard.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "d2869ffafb008a646a989345f8ab82ded54f2ad7e95ea7a62aaafe5ef85bc9da",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/sl-river-card.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "ea4aa1881a940ce3ce46b1311960982ddd0c33042f3955b28b2a5c89e703fb0a",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/usracing-commonwealth-turf.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "de714de2d6c3b35ffe8784e571365bfb603ceeb234d83cb76198abb8f8261527",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/usracing-graded-schedule.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "ff22ce1854dcd2a32a4e7ce6fed530a5b35621c9ee908fee3ca0f9f80ed17644",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/usracing-manila.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "26ab36d10d0288beec6ed3d1b683837fd19ac3ab6f254e1450d8c747eb98f655",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/usracing-native-diver.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "8c16d413e8a94bb379734c88cbdfc1118f8e1c2cf3858c7f7117b80e314b176d",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/usracing-pebbles.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "646722793718710bd43bd12ff235a1336f71d711d68d7f2580b479cee2147db1",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/verified-final-roster.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "dddd4526d265ce95ef936fbd48a41b8f4888c91cf90f6b646afa33ae1c1aa860",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
       "path": "server/stable/management/commands/verify_us_flat_results.py",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "after_hash": "5ee77a8d0cd528d2604e307b6912073a67bf1b8e3f0f56f2136ca8dcc4ad1925",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/management/commands/verify_us_prerelease.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "d50b77c5aff0594e878aae5536c28523147f8e97901ceb11122abb66d8d5c2c5",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -458,7 +818,7 @@
       "path": "server/stable/services/us_flat_results.py",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "c5aefc9234f1b4894f7efc712904acd49dd6b4d2dfe630d4059332a52b5814c8",
+      "after_hash": "6029c5420069d281fbca2c8cc68d8be8a9c4f602b19c5e63fe11c8293e4f5192",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -466,7 +826,31 @@
       "path": "server/stable/services/us_nsa_sources.py",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "85d6429840b15118075effb09327c3ba5542ae301bb2bfb320f75868d85bdddb",
+      "after_hash": "fb88b1df9cb4f01b35148506983bb28a55d4b78ae7816bbd4f471273ef387679",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_prerace_documents.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "61a42954dd4d4977b47923f15b9ba028d449566f42ba1f9a2c0d4e220b992d15",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_prerelease_collection.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "c0d62a7aaf115ce643f32ec4566d21b1b5e2ea77b58537bc71f627d622cf14e1",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_race_inventory.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "9d71f6c1257e602a74ceb9ccb69f0f624b234bd782a30c870abfe70a7078b4f8",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -474,7 +858,7 @@
       "path": "server/stable/services/us_racing_sources.py",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "da5748cc27b4adbbb1e1e916c9827a6c7facc66912fccde95e8d2b9ad1371e94",
+      "after_hash": "6165a488e68ae5b4e0b0793923a2867378c281f8f0bcf641db7e6fb8f73f4344",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -483,6 +867,14 @@
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "after_hash": "d454b27e000956fe598e9dbe6519311acd386d7a207f197f935ca2fcdfe1bf84",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_steeplechase_results.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "0dd63679bd3ede6711dd232dbca9b04dc0315f367992db2e9175d0bd80adfd46",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -503,10 +895,18 @@
       "after_mode": "100644"
     },
     {
+      "path": "server/stable/test_us_prerelease.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "9797c0f1ca7044657b4f3726d64f33a6fb05ce3a7fb87c8b621f4b2c2f41dca0",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
       "path": "tools/test_impact/catalog.json",
       "status": "modified",
       "before_hash": "16436b4a7ec10f969a8ddc070cb8ec9e663b7dd94cdbcf9906c215b1bf8bb325",
-      "after_hash": "ddc47307e92ea754e0b123f47595ac66dd859f96bd52e80d3ffae407761cf7b9",
+      "after_hash": "73964394440a97eb07d55566451613a8341bef207cdb3a88f4e50878acacee1a",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -514,7 +914,7 @@
       "path": "tools/test_impact/rules.json",
       "status": "modified",
       "before_hash": "11d656ac1042ffbb158766c77025d6ced0b03297d5f5f97237eca01c9e617411",
-      "after_hash": "4370abf80726d2e4eb928c7d42772cfe1773801a9ea0f40c7bff9f2d9e563d3a",
+      "after_hash": "3ea83b8e4c4a5f53884b3c51cf1ef43bbea44b46005161ddad20fb5e8ba4c905",
       "before_mode": "100644",
       "after_mode": "100644"
     }

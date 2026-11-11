@@ -1611,6 +1611,24 @@
     ],
     "server/stable/fixtures/us_flat_results/**": [
       "us_source_collection"
+    ],
+    "server/stable/services/us_prerace_documents.py": [
+      "us_source_collection"
+    ],
+    "server/stable/services/us_prerelease_collection.py": [
+      "us_source_collection"
+    ],
+    "server/stable/services/us_race_inventory.py": [
+      "us_source_collection"
+    ],
+    "server/stable/services/us_steeplechase_results.py": [
+      "us_source_collection"
+    ],
+    "server/stable/management/commands/verify_us_prerelease.py": [
+      "us_source_collection"
+    ],
+    "server/stable/fixtures/us_prerelease/**": [
+      "us_source_collection"
     ]
   },
   "symbols": {
