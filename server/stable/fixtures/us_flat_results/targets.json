@@ -1,0 +1,767 @@
+[
+  {
+    "candidate_key": "faa7f1810cf08cbc4b5362535c2a2938f27ad1967a1807baa8c8144b93c1fd62",
+    "drf": {
+      "date": "2026-09-05",
+      "name": "Del Mar Debutante S (G1)",
+      "race_number": 10,
+      "track": "DMR",
+      "url": "https://www1.drf.com/displayChart.do?filepath=/download/simulcastweekly/charts/2609/DMR2026090510.pdf"
+    },
+    "toba": {
+      "age_condition": "2",
+      "candidate_key": "faa7f1810cf08cbc4b5362535c2a2938f27ad1967a1807baa8c8144b93c1fd62",
+      "distance_raw": "7",
+      "division_raw": "2YO F D",
+      "field_size_raw": "9",
+      "grade": "G1",
+      "local_date": "2026-09-05",
+      "provider": "toba",
+      "purse_raw": "$302,000",
+      "race_name": "DEL MAR DEBUTANTE S.",
+      "raw_sha256": "c1a4da6a527ad5ec6ddac675421e01eac9da10d5d002a53491520135018fdb2d",
+      "reference_urls": [
+        "http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=10&BorP=P&TID=DMR&CTRY=USA&DT=9/5/2026&DAY=D&STYLE=EQB"
+      ],
+      "sex_condition": "f",
+      "source_race_id": "",
+      "source_url": "https://toba.org/graded-stakes/2026-races/",
+      "surface_raw": "",
+      "venue": "DMR",
+      "winner": "Miss Monica"
+    },
+    "sporting_life": [
+      {
+        "summary": {
+          "meeting_summary_reference": {
+            "id": 121281,
+            "external_reference": []
+          },
+          "race_summary_reference": {
+            "id": 937536,
+            "external_reference": []
+          },
+          "name": "Race 10 - Del Mar Debutante Stakes - Grade 1",
+          "race_slug": null,
+          "course_name": "Del Mar",
+          "course_shortcode": null,
+          "course_surface": {
+            "surface": "DIRT"
+          },
+          "country_short_name": "USA",
+          "age": "2YO only",
+          "race_class": "",
+          "distance": "7f",
+          "date": "2026-09-06",
+          "time": "01:03",
+          "off_time": "01:04:36",
+          "winning_time": "1m 23.54s",
+          "ride_count": 9,
+          "race_stage": "WEIGHEDIN",
+          "has_video": false,
+          "going": "Fast",
+          "going_shortcode": "FST",
+          "has_handicap": false,
+          "verdict": null,
+          "verdict_text": null,
+          "hidden": false,
+          "race_prize": 300000,
+          "top_horses": [
+            {
+              "name": "Miss Monica",
+              "position": 1,
+              "odds": "1/3",
+              "favourite": true
+            },
+            {
+              "name": "Crazy Hot Mess",
+              "position": 2,
+              "odds": "25/1",
+              "favourite": false
+            },
+            {
+              "name": "Holmby",
+              "position": 3,
+              "odds": "8/1",
+              "favourite": false
+            }
+          ],
+          "top_rated_horse": {},
+          "meeting_status": "DORMANT"
+        },
+        "url": "https://www.sportinglife.com/racing/results/2026-09-06/del-mar/937536/race-10-del-mar-debutante-stakes-grade-1",
+        "course": "Del Mar"
+      }
+    ]
+  },
+  {
+    "candidate_key": "e8ac5dd1a32a0e1b66063284f069d4344af0ec3d7302439a7ca2566118de6387",
+    "drf": {
+      "date": "2026-09-07",
+      "name": "Old Dominion Derby(G3)",
+      "race_number": 9,
+      "track": "CNL",
+      "url": "https://www1.drf.com/displayChart.do?filepath=/download/simulcastweekly/charts/2609/CNL2026090709.pdf"
+    },
+    "toba": {
+      "age_condition": "3",
+      "candidate_key": "e8ac5dd1a32a0e1b66063284f069d4344af0ec3d7302439a7ca2566118de6387",
+      "distance_raw": "9",
+      "division_raw": "3YO R T",
+      "field_size_raw": "10",
+      "grade": "G3",
+      "local_date": "2026-09-07",
+      "provider": "toba",
+      "purse_raw": "$506,000",
+      "race_name": "OLD DOMINION DERBY",
+      "raw_sha256": "c1a4da6a527ad5ec6ddac675421e01eac9da10d5d002a53491520135018fdb2d",
+      "reference_urls": [
+        "http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=9&BorP=P&TID=CNL&CTRY=USA&DT=9/7/2026&DAY=D&STYLE=EQB"
+      ],
+      "sex_condition": "",
+      "source_race_id": "",
+      "source_url": "https://toba.org/graded-stakes/2026-races/",
+      "surface_raw": "T",
+      "venue": "CNL",
+      "winner": "Lennox the Grey"
+    },
+    "sporting_life": [
+      {
+        "summary": {
+          "meeting_summary_reference": {
+            "id": 121324,
+            "external_reference": []
+          },
+          "race_summary_reference": {
+            "id": 937920,
+            "external_reference": []
+          },
+          "name": "Race 9 - Old Dominion Derby - Grade 3",
+          "race_slug": null,
+          "course_name": "Colonial Downs",
+          "course_shortcode": null,
+          "course_surface": {
+            "surface": "DIRT"
+          },
+          "country_short_name": "USA",
+          "age": "3YO only",
+          "race_class": "",
+          "distance": "1m 1f",
+          "date": "2026-09-07",
+          "time": "20:18",
+          "off_time": "20:27:18",
+          "winning_time": "1m 49.77s",
+          "ride_count": 10,
+          "race_stage": "WEIGHEDIN",
+          "has_video": false,
+          "going": "Firm",
+          "going_shortcode": "FM",
+          "has_handicap": false,
+          "verdict": null,
+          "verdict_text": null,
+          "hidden": false,
+          "race_prize": 500000,
+          "top_horses": [
+            {
+              "name": "Lennox The Grey",
+              "position": 1,
+              "odds": "9/1",
+              "favourite": false
+            },
+            {
+              "name": "The Big Con",
+              "position": 2,
+              "odds": "3/1",
+              "favourite": false
+            },
+            {
+              "name": "Chambersville",
+              "position": 3,
+              "odds": "10/1",
+              "favourite": false
+            }
+          ],
+          "top_rated_horse": {},
+          "meeting_status": "DORMANT"
+        },
+        "url": "https://www.sportinglife.com/racing/results/2026-09-07/colonial-downs/937920/race-9-old-dominion-derby-grade-3",
+        "course": "Colonial Downs"
+      }
+    ]
+  },
+  {
+    "candidate_key": "949cb87a84892a8bf498132faba18adf635421c3aeb78352d7c5981d47a06837",
+    "drf": {
+      "date": "2026-09-19",
+      "name": "Cotillion S (G1)",
+      "race_number": 13,
+      "track": "PRX",
+      "url": "https://www1.drf.com/displayChart.do?filepath=/download/simulcastweekly/charts/2609/PRX2026091913.pdf"
+    },
+    "toba": {
+      "age_condition": "3",
+      "candidate_key": "949cb87a84892a8bf498132faba18adf635421c3aeb78352d7c5981d47a06837",
+      "distance_raw": "8.5",
+      "division_raw": "3YO F R D",
+      "field_size_raw": "9",
+      "grade": "G1",
+      "local_date": "2026-09-19",
+      "provider": "toba",
+      "purse_raw": "$1,000,000",
+      "race_name": "COTILLION S.",
+      "raw_sha256": "c1a4da6a527ad5ec6ddac675421e01eac9da10d5d002a53491520135018fdb2d",
+      "reference_urls": [
+        "http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=13&BorP=P&TID=PRX&CTRY=USA&DT=9/19/2026&DAY=D&STYLE=EQB"
+      ],
+      "sex_condition": "f",
+      "source_race_id": "",
+      "source_url": "https://toba.org/graded-stakes/2026-races/",
+      "surface_raw": "",
+      "venue": "PRX",
+      "winner": "Bodacious Bay"
+    },
+    "sporting_life": []
+  },
+  {
+    "candidate_key": "c23d3807daa08afdaad5cb8600fc760e898381b69a206842f0b6e68ca16cabe2",
+    "drf": {
+      "date": "2026-09-19",
+      "name": "Pennsylvania Derby(G1)",
+      "race_number": 14,
+      "track": "PRX",
+      "url": "https://www1.drf.com/displayChart.do?filepath=/download/simulcastweekly/charts/2609/PRX2026091914.pdf"
+    },
+    "toba": {
+      "age_condition": "3",
+      "candidate_key": "c23d3807daa08afdaad5cb8600fc760e898381b69a206842f0b6e68ca16cabe2",
+      "distance_raw": "9",
+      "division_raw": "3YO R D",
+      "field_size_raw": "10",
+      "grade": "G1",
+      "local_date": "2026-09-19",
+      "provider": "toba",
+      "purse_raw": "$1,000,000",
+      "race_name": "PENNSYLVANIA DERBY",
+      "raw_sha256": "c1a4da6a527ad5ec6ddac675421e01eac9da10d5d002a53491520135018fdb2d",
+      "reference_urls": [
+        "http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=14&BorP=P&TID=PRX&CTRY=USA&DT=9/19/2026&DAY=D&STYLE=EQB"
+      ],
+      "sex_condition": "",
+      "source_race_id": "",
+      "source_url": "https://toba.org/graded-stakes/2026-races/",
+      "surface_raw": "",
+      "venue": "PRX",
+      "winner": "The Puma"
+    },
+    "sporting_life": []
+  },
+  {
+    "candidate_key": "c2e585bdf4130ff57f32fb4c7b9ceb5f6018171896d796e31401e5696168e5d7",
+    "drf": {
+      "date": "2026-09-19",
+      "name": "Gallant Bob S (G2)",
+      "race_number": 12,
+      "track": "PRX",
+      "url": "https://www1.drf.com/displayChart.do?filepath=/download/simulcastweekly/charts/2609/PRX2026091912.pdf"
+    },
+    "toba": {
+      "age_condition": "3",
+      "candidate_key": "c2e585bdf4130ff57f32fb4c7b9ceb5f6018171896d796e31401e5696168e5d7",
+      "distance_raw": "6",
+      "division_raw": "3YO SPR",
+      "field_size_raw": "9",
+      "grade": "G2",
+      "local_date": "2026-09-19",
+      "provider": "toba",
+      "purse_raw": "$400,000",
+      "race_name": "GALLANT BOB S.",
+      "raw_sha256": "c1a4da6a527ad5ec6ddac675421e01eac9da10d5d002a53491520135018fdb2d",
+      "reference_urls": [
+        "http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=12&BorP=P&TID=PRX&CTRY=USA&DT=9/19/2026&DAY=D&STYLE=EQB"
+      ],
+      "sex_condition": "",
+      "source_race_id": "",
+      "source_url": "https://toba.org/graded-stakes/2026-races/",
+      "surface_raw": "",
+      "venue": "PRX",
+      "winner": "Stradale"
+    },
+    "sporting_life": []
+  },
+  {
+    "candidate_key": "99b564c1aa84773126a075abb2ad0bbae72b1a42591f70ee8aaf93122fec4142",
+    "drf": {
+      "date": "2026-10-03",
+      "name": "Chillingworth S (G3)",
+      "race_number": 2,
+      "track": "SA",
+      "url": "https://www1.drf.com/displayChart.do?filepath=/download/simulcastweekly/charts/2610/SA2026100302.pdf"
+    },
+    "toba": {
+      "age_condition": "3U",
+      "candidate_key": "99b564c1aa84773126a075abb2ad0bbae72b1a42591f70ee8aaf93122fec4142",
+      "distance_raw": "6.5",
+      "division_raw": "3UP F/M SPR",
+      "field_size_raw": "6",
+      "grade": "G3",
+      "local_date": "2026-10-03",
+      "provider": "toba",
+      "purse_raw": "$100,500",
+      "race_name": "CHILLINGWORTH S.",
+      "raw_sha256": "c1a4da6a527ad5ec6ddac675421e01eac9da10d5d002a53491520135018fdb2d",
+      "reference_urls": [
+        "http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=2&BorP=P&TID=SA&CTRY=USA&DT=10/3/2026&DAY=D&STYLE=EQB"
+      ],
+      "sex_condition": "f",
+      "source_race_id": "",
+      "source_url": "https://toba.org/graded-stakes/2026-races/",
+      "surface_raw": "",
+      "venue": "SA",
+      "winner": "Our Moonlight"
+    },
+    "sporting_life": [
+      {
+        "summary": {
+          "meeting_summary_reference": {
+            "id": 121835,
+            "external_reference": []
+          },
+          "race_summary_reference": {
+            "id": 942239,
+            "external_reference": []
+          },
+          "name": "Race 2 - Chillingworth Stakes - Grade 3",
+          "race_slug": null,
+          "course_name": "Santa Anita",
+          "course_shortcode": null,
+          "course_surface": {
+            "surface": "DIRT"
+          },
+          "country_short_name": "USA",
+          "age": "3YO plus",
+          "race_class": "",
+          "distance": "6f 110y",
+          "date": "2026-10-03",
+          "time": "20:29",
+          "off_time": "20:31:37",
+          "winning_time": "1m 16.36s",
+          "ride_count": 6,
+          "race_stage": "WEIGHEDIN",
+          "has_video": false,
+          "going": "Fast",
+          "going_shortcode": "FST",
+          "has_handicap": false,
+          "verdict": null,
+          "verdict_text": null,
+          "hidden": false,
+          "race_prize": 100000,
+          "top_horses": [
+            {
+              "name": "Our Moonlight",
+              "position": 1,
+              "odds": "11/2",
+              "favourite": false
+            },
+            {
+              "name": "Paradise City",
+              "position": 2,
+              "odds": "10/3",
+              "favourite": false
+            }
+          ],
+          "top_rated_horse": {},
+          "meeting_status": "DORMANT"
+        },
+        "url": "https://www.sportinglife.com/racing/results/2026-10-03/santa-anita/942239/race-2-chillingworth-stakes-grade-3",
+        "course": "Santa Anita"
+      }
+    ]
+  },
+  {
+    "candidate_key": "fefa5eaeec9feba9591c2b621e0010943c0c0e12e21bea9d4f2244869a39ef8c",
+    "drf": {
+      "date": "2026-10-25",
+      "name": "Glen Cove S (G3)",
+      "race_number": 8,
+      "track": "BEL",
+      "url": "https://www1.drf.com/displayChart.do?filepath=/download/simulcastweekly/charts/2610/BEL2026102508.pdf"
+    },
+    "toba": {
+      "age_condition": "3",
+      "candidate_key": "fefa5eaeec9feba9591c2b621e0010943c0c0e12e21bea9d4f2244869a39ef8c",
+      "distance_raw": "7",
+      "division_raw": "3YO F SPR",
+      "field_size_raw": "11",
+      "grade": "G3",
+      "local_date": "2026-10-25",
+      "provider": "toba",
+      "purse_raw": "$200,000",
+      "race_name": "GLEN COVE S.",
+      "raw_sha256": "c1a4da6a527ad5ec6ddac675421e01eac9da10d5d002a53491520135018fdb2d",
+      "reference_urls": [
+        "http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=8&BorP=P&TID=BEL&CTRY=USA&DT=10/25/2026&DAY=D&STYLE=EQB"
+      ],
+      "sex_condition": "f",
+      "source_race_id": "8",
+      "source_url": "https://toba.org/graded-stakes/2026-races/",
+      "surface_raw": "T",
+      "venue": "BEL",
+      "winner": "Lion Lake (IRE)"
+    },
+    "sporting_life": [
+      {
+        "summary": {
+          "meeting_summary_reference": {
+            "id": 122276,
+            "external_reference": []
+          },
+          "race_summary_reference": {
+            "id": 946058,
+            "external_reference": []
+          },
+          "name": "Race 8 - Glen Cove Stakes - Grade 3",
+          "race_slug": null,
+          "course_name": "Belmont Park",
+          "course_shortcode": null,
+          "course_surface": {
+            "surface": "TURF"
+          },
+          "country_short_name": "USA",
+          "age": "3YO only",
+          "race_class": "",
+          "distance": "7f",
+          "date": "2026-10-25",
+          "time": "21:05",
+          "off_time": "21:14:30",
+          "winning_time": "1m 20.58s",
+          "ride_count": 11,
+          "race_stage": "WEIGHEDIN",
+          "has_video": false,
+          "going": "Firm",
+          "going_shortcode": "FM",
+          "has_handicap": false,
+          "verdict": null,
+          "verdict_text": null,
+          "hidden": false,
+          "race_prize": 200000,
+          "top_horses": [
+            {
+              "name": "Lion Lake",
+              "position": 1,
+              "odds": "10/11",
+              "favourite": true
+            },
+            {
+              "name": "Life's Dynamic",
+              "position": 2,
+              "odds": "13/2",
+              "favourite": false
+            },
+            {
+              "name": "Hark Theangelssing",
+              "position": 3,
+              "odds": "10/1",
+              "favourite": false
+            }
+          ],
+          "top_rated_horse": {},
+          "meeting_status": "DORMANT"
+        },
+        "url": "https://www.sportinglife.com/racing/results/2026-10-25/belmont-park/946058/race-8-glen-cove-stakes-grade-3",
+        "course": "Belmont Park"
+      }
+    ]
+  },
+  {
+    "candidate_key": "c68b8e2f2a6b2d1fbb7f8f6ea4ec71fe71a0dd1f2781f0439d19258622d0ac03",
+    "drf": {
+      "date": "2026-10-30",
+      "name": "Breeders' Cup Juvenile Turf Sprint(G1)",
+      "race_number": 6,
+      "track": "KEE",
+      "url": "https://www1.drf.com/displayChart.do?filepath=/download/simulcastweekly/charts/2610/KEE2026103006.pdf"
+    },
+    "toba": {
+      "age_condition": "2",
+      "candidate_key": "c68b8e2f2a6b2d1fbb7f8f6ea4ec71fe71a0dd1f2781f0439d19258622d0ac03",
+      "distance_raw": "5.5",
+      "division_raw": "2YO T",
+      "field_size_raw": "12",
+      "grade": "G1",
+      "local_date": "2026-10-30",
+      "provider": "toba",
+      "purse_raw": "$920,000",
+      "race_name": "BREEDERS' CUP JUVENILE TURF SPRINT",
+      "raw_sha256": "c1a4da6a527ad5ec6ddac675421e01eac9da10d5d002a53491520135018fdb2d",
+      "reference_urls": [
+        "http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=6&BorP=P&TID=KEE&CTRY=USA&DT=10/30/2026&DAY=D&STYLE=EQB"
+      ],
+      "sex_condition": "",
+      "source_race_id": "6",
+      "source_url": "https://toba.org/graded-stakes/2026-races/",
+      "surface_raw": "T",
+      "venue": "KEE",
+      "winner": "Libertango (IRE)"
+    },
+    "sporting_life": [
+      {
+        "summary": {
+          "meeting_summary_reference": {
+            "id": 122313,
+            "external_reference": []
+          },
+          "race_summary_reference": {
+            "id": 946393,
+            "external_reference": []
+          },
+          "name": "Race 6 - Breeders' Cup Juvenile Turf Sprint - Grade 1",
+          "race_slug": null,
+          "course_name": "Keeneland",
+          "course_shortcode": null,
+          "course_surface": {
+            "surface": "TURF"
+          },
+          "country_short_name": "USA",
+          "age": "2YO only",
+          "race_class": "",
+          "distance": "5f 110y",
+          "date": "2026-10-30",
+          "time": "18:55",
+          "off_time": "18:57:49",
+          "winning_time": "1m 2.64s",
+          "ride_count": 12,
+          "race_stage": "WEIGHEDIN",
+          "has_video": false,
+          "going": "Firm",
+          "going_shortcode": "FM",
+          "has_handicap": false,
+          "verdict": null,
+          "verdict_text": null,
+          "hidden": false,
+          "race_prize": 1000000,
+          "top_horses": [
+            {
+              "name": "Libertango",
+              "position": 1,
+              "odds": "6/4",
+              "favourite": true
+            },
+            {
+              "name": "Hell Of A Spin",
+              "position": 2,
+              "odds": "33/1",
+              "favourite": false
+            },
+            {
+              "name": "Mussab",
+              "position": 3,
+              "odds": "10/1",
+              "favourite": false
+            }
+          ],
+          "top_rated_horse": {},
+          "meeting_status": "DORMANT"
+        },
+        "url": "https://www.sportinglife.com/racing/results/2026-10-30/keeneland/946393/race-6-breeders-cup-juvenile-turf-sprint-grade-1",
+        "course": "Keeneland"
+      }
+    ]
+  },
+  {
+    "candidate_key": "eb0606673f5b01cf380afc362516916a6b165be786aabf95eb9c06e042fb3703",
+    "drf": {
+      "date": "2026-10-31",
+      "name": "Prevagen Breeders' Cup Turf Sprint(G1)",
+      "race_number": 5,
+      "track": "KEE",
+      "url": "https://www1.drf.com/displayChart.do?filepath=/download/simulcastweekly/charts/2610/KEE2026103105.pdf"
+    },
+    "toba": {
+      "age_condition": "3U",
+      "candidate_key": "eb0606673f5b01cf380afc362516916a6b165be786aabf95eb9c06e042fb3703",
+      "distance_raw": "5.5",
+      "division_raw": "3UP T SPR",
+      "field_size_raw": "14",
+      "grade": "G1",
+      "local_date": "2026-10-31",
+      "provider": "toba",
+      "purse_raw": "$920,000",
+      "race_name": "PREVAGEN BREEDERS' CUP TURF SPRINT",
+      "raw_sha256": "c1a4da6a527ad5ec6ddac675421e01eac9da10d5d002a53491520135018fdb2d",
+      "reference_urls": [
+        "http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=5&BorP=P&TID=KEE&CTRY=USA&DT=10/31/2026&DAY=D&STYLE=EQB"
+      ],
+      "sex_condition": "",
+      "source_race_id": "5",
+      "source_url": "https://toba.org/graded-stakes/2026-races/",
+      "surface_raw": "T",
+      "venue": "KEE",
+      "winner": "Bacio"
+    },
+    "sporting_life": [
+      {
+        "summary": {
+          "meeting_summary_reference": {
+            "id": 122314,
+            "external_reference": []
+          },
+          "race_summary_reference": {
+            "id": 946402,
+            "external_reference": []
+          },
+          "name": "Race 5 - Prevagen Breeders' Cup Turf Sprint - Grade 1",
+          "race_slug": null,
+          "course_name": "Keeneland",
+          "course_shortcode": null,
+          "course_surface": {
+            "surface": "TURF"
+          },
+          "country_short_name": "USA",
+          "age": "3YO plus",
+          "race_class": "",
+          "distance": "5f 110y",
+          "date": "2026-10-31",
+          "time": "17:48",
+          "off_time": "17:54:18",
+          "winning_time": "1m 2.11s",
+          "ride_count": 14,
+          "race_stage": "WEIGHEDIN",
+          "has_video": false,
+          "going": "Firm",
+          "going_shortcode": "FM",
+          "has_handicap": false,
+          "verdict": "<p><b>BACIO</b> made such a big impression racing in Europe earlier in the summer and, thanks to a good draw, can add another top-level success to his name. <b>Comanche Brave</b> has been an improved sprinter this season and can chase the selection home with last year's winner <b>Shisospicy</b> not one to be written off.</p><ol><li><b>BACIO (USA)</b></li><li><b>COMANCHE BRAVE (IRE)</b></li><li><b>SHISOSPICY (USA)</b></li></ol>",
+          "verdict_text": "BACIO made such a big impression racing in Europe earlier in the summer and, thanks to a good draw, can add another top-level success to his name. Comanche Brave has been an improved sprinter this season and can chase the selection home with last year's winner Shisospicy not one to be written off.",
+          "hidden": false,
+          "race_prize": 1000000,
+          "top_horses": [
+            {
+              "name": "Bacio",
+              "position": 1,
+              "odds": "7/4",
+              "favourite": true
+            },
+            {
+              "name": "Cy Fair",
+              "position": 2,
+              "odds": "10/1",
+              "favourite": false
+            },
+            {
+              "name": "Starlust",
+              "position": 3,
+              "odds": "16/1",
+              "favourite": false
+            }
+          ],
+          "top_rated_horse": {
+            "draw_number": 3,
+            "favourite": true,
+            "horse_name": "Bacio",
+            "horse_status": "RUNNER",
+            "horse_reference": {
+              "id": "1195693",
+              "external_reference": []
+            },
+            "odds": "7/4",
+            "saddlecloth_number": "3",
+            "silk_filename": "20261031xke174803.png",
+            "timeform_stars": 5
+          },
+          "meeting_status": "DORMANT"
+        },
+        "url": "https://www.sportinglife.com/racing/results/2026-10-31/keeneland/946402/race-5-prevagen-breeders-cup-turf-sprint-grade-1",
+        "course": "Keeneland"
+      }
+    ]
+  },
+  {
+    "candidate_key": "1f4822f09075ef26144c7003585c1269af57a6d76f5d84313e51ac3d615b3711",
+    "drf": {
+      "date": "2026-11-07",
+      "name": "River City S (G3)",
+      "race_number": 8,
+      "track": "CD",
+      "url": "https://www1.drf.com/displayChart.do?filepath=/download/simulcastweekly/charts/2611/CD2026110708.pdf"
+    },
+    "toba": {
+      "age_condition": "3U",
+      "candidate_key": "1f4822f09075ef26144c7003585c1269af57a6d76f5d84313e51ac3d615b3711",
+      "distance_raw": "9",
+      "division_raw": "3UP R T M",
+      "field_size_raw": "6",
+      "grade": "G3",
+      "local_date": "2026-11-07",
+      "provider": "toba",
+      "purse_raw": "$300,000",
+      "race_name": "RIVER CITY S.",
+      "raw_sha256": "c1a4da6a527ad5ec6ddac675421e01eac9da10d5d002a53491520135018fdb2d",
+      "reference_urls": [
+        "http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=8&BorP=P&TID=CD&CTRY=USA&DT=11/7/2026&DAY=D&STYLE=EQB"
+      ],
+      "sex_condition": "",
+      "source_race_id": "",
+      "source_url": "https://toba.org/graded-stakes/2026-races/",
+      "surface_raw": "T",
+      "venue": "CD",
+      "winner": "Mercante"
+    },
+    "sporting_life": [
+      {
+        "summary": {
+          "meeting_summary_reference": {
+            "id": 122519,
+            "external_reference": []
+          },
+          "race_summary_reference": {
+            "id": 948111,
+            "external_reference": []
+          },
+          "name": "Race 8 - River City Stakes - Grade 3",
+          "race_slug": null,
+          "course_name": "Churchill Downs",
+          "course_shortcode": null,
+          "course_surface": {
+            "surface": "TURF"
+          },
+          "country_short_name": "USA",
+          "age": "4YO plus",
+          "race_class": "",
+          "distance": "1m 1f",
+          "date": "2026-11-07",
+          "time": "21:25",
+          "off_time": "21:26:45",
+          "winning_time": "1m 47.2s",
+          "ride_count": 6,
+          "race_stage": "WEIGHEDIN",
+          "has_video": false,
+          "going": "Firm",
+          "going_shortcode": "FM",
+          "has_handicap": false,
+          "verdict": null,
+          "verdict_text": null,
+          "hidden": false,
+          "race_prize": 300000,
+          "top_horses": [
+            {
+              "name": "Mercante",
+              "position": 1,
+              "odds": "5/1",
+              "favourite": false
+            },
+            {
+              "name": "Kupuna",
+              "position": 2,
+              "odds": "5/2",
+              "favourite": false
+            }
+          ],
+          "top_rated_horse": {},
+          "meeting_status": "DORMANT"
+        },
+        "url": "https://www.sportinglife.com/racing/results/2026-11-07/churchill-downs/948111/race-8-river-city-stakes-grade-3",
+        "course": "Churchill Downs"
+      }
+    ]
+  }
+]

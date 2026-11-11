@@ -1,0 +1,327 @@
+[
+  {
+    "file": "nsa-entry-Montpelier-Overnight-.pdf",
+    "url": "https://nationalsteeplechase.com/wp-content/uploads/2026/11/Montpelier-Overnight-.pdf",
+    "at": "2026-11-11T03:39:05.066790+00:00",
+    "status": 200,
+    "content_type": "application/pdf",
+    "bytes": 543437,
+    "sha256": "86beaa1de162acc6c68dfe142e2ff35da0add54e3ea7b461cd9c6bac52895d68"
+  },
+  {
+    "file": "nsa-entry-09.03.26-Overnight.pdf",
+    "url": "https://nationalsteeplechase.com/wp-content/uploads/2026/08/09.03.26-Overnight.pdf",
+    "at": "2026-11-11T03:38:57.077805+00:00",
+    "status": 200,
+    "content_type": "application/pdf",
+    "bytes": 200207,
+    "sha256": "e20e626fa932f3ba4121b444d9b4c390108429881aaa848d26f8826a53864f68"
+  },
+  {
+    "file": "nsa-entry-Saratoga-September-2.pdf",
+    "url": "https://nationalsteeplechase.com/wp-content/uploads/2026/08/Saratoga-September-2.pdf",
+    "at": "2026-11-11T03:38:54.912672+00:00",
+    "status": 200,
+    "content_type": "application/pdf",
+    "bytes": 1017033,
+    "sha256": "276a7b8b0817f11e8f8df98cede1bc2333dda3965be00e7953921ea60e7d3c79"
+  },
+  {
+    "file": "nsa-entry-Far-Hills-Final-Overnight-2.pdf",
+    "url": "https://nationalsteeplechase.com/wp-content/uploads/2026/10/Far-Hills-Final-Overnight-2.pdf",
+    "at": "2026-11-11T03:39:00.995803+00:00",
+    "status": 200,
+    "content_type": "application/pdf",
+    "bytes": 2074805,
+    "sha256": "c845a0c910c02cf7d9f241ef4595012cc94e0448b8a8bc3c260bb50834475cc0"
+  },
+  {
+    "file": "nsa-entry-Foxfield-Overnight-Tuesday.pdf",
+    "url": "https://nationalsteeplechase.com/wp-content/uploads/2026/09/Foxfield-Overnight-Tuesday.pdf",
+    "at": "2026-11-11T03:38:59.003771+00:00",
+    "status": 200,
+    "content_type": "application/pdf",
+    "bytes": 258353,
+    "sha256": "c8ceeec3f09112a7b494bab46f8d57081f6ced6d095040d0a3b36a8390e81e6a"
+  },
+  {
+    "file": "nsa-entry-International-Gold-Cup-Overnight.pdf",
+    "url": "https://nationalsteeplechase.com/wp-content/uploads/2026/10/International-Gold-Cup-Overnight.pdf",
+    "at": "2026-11-11T03:39:03.258335+00:00",
+    "status": 200,
+    "content_type": "application/pdf",
+    "bytes": 330263,
+    "sha256": "024bb3f59c803b1c2fabe2c0c348a8d545bb4cc9511b2d6ace9f53d33fb2d607"
+  },
+  {
+    "file": "MTP2026110707.pdf",
+    "url": "https://www1.drf.com/displayChart.do?filepath=/download/simulcastweekly/charts/2611/MTP2026110707.pdf",
+    "at": "2026-11-11T03:35:38.045942+00:00",
+    "status": 200,
+    "content_type": "application/pdf",
+    "bytes": 59155,
+    "sha256": "ae7a9c4d72409c256929ad484256f9f210facf60b97843c991e929cac1d08cab"
+  },
+  {
+    "file": "GRM2026102404.pdf",
+    "url": "https://www1.drf.com/displayChart.do?filepath=/download/simulcastweekly/charts/2610/GRM2026102404.pdf",
+    "at": "2026-11-11T03:35:40.721815+00:00",
+    "status": 200,
+    "content_type": "application/pdf",
+    "bytes": 59026,
+    "sha256": "ca7ca8aab97669d3edbdd92b12a261b4e3e3b31777a8db12f8df120e7ce63068"
+  },
+  {
+    "file": "CNL2026090303.pdf",
+    "url": "https://www1.drf.com/displayChart.do?filepath=/download/simulcastweekly/charts/2609/CNL2026090303.pdf",
+    "at": "2026-11-11T03:35:48.236681+00:00",
+    "status": 200,
+    "content_type": "application/pdf",
+    "bytes": 58669,
+    "sha256": "8bd818acbd0b328ca9770265dc3ac6743b64a02099bb84d13fbec0995872b00d"
+  },
+  {
+    "file": "SAR2026090201.pdf",
+    "url": "https://www1.drf.com/displayChart.do?filepath=/download/simulcastweekly/charts/2609/SAR2026090201.pdf",
+    "at": "2026-11-11T03:35:49.859030+00:00",
+    "status": 200,
+    "content_type": "application/pdf",
+    "bytes": 60808,
+    "sha256": "a85bac5dbf2f8bbdb7c10df1bd9da05255a0a3362ed3c692831797d1fb689918"
+  },
+  {
+    "file": "FH2026101705.pdf",
+    "url": "https://www1.drf.com/displayChart.do?filepath=/download/simulcastweekly/charts/2610/FH2026101705.pdf",
+    "at": "2026-11-11T03:35:42.356142+00:00",
+    "status": 200,
+    "content_type": "application/pdf",
+    "bytes": 59611,
+    "sha256": "17623d8f81d83712cdb6793955eb904fca7fb2f6371951bd10aa25239d67f613"
+  },
+  {
+    "file": "FX2026100406.pdf",
+    "url": "https://www1.drf.com/displayChart.do?filepath=/download/simulcastweekly/charts/2610/FX2026100406.pdf",
+    "at": "2026-11-11T03:35:46.604547+00:00",
+    "status": 200,
+    "content_type": "application/pdf",
+    "bytes": 63221,
+    "sha256": "f80b7425986c495e44f4c8c5ee8bab76a905e0687eaec33e977236498858b5ca"
+  },
+  {
+    "file": "FH2026101703.pdf",
+    "url": "https://www1.drf.com/displayChart.do?filepath=/download/simulcastweekly/charts/2610/FH2026101703.pdf",
+    "at": "2026-11-11T03:35:44.010254+00:00",
+    "status": 200,
+    "content_type": "application/pdf",
+    "bytes": 58049,
+    "sha256": "6d00e7b5926c570de4ce815b27a0968e6062429e67d8cf49244c1bc4b1656048"
+  },
+  {
+    "file": "keeneland-bryan-noms.pdf",
+    "url": "https://www.keeneland.com/files/bryan-station-noms-26pdf.pdf",
+    "at": "2026-11-11T03:41:02.053994+00:00",
+    "status": 200,
+    "content_type": "application/pdf",
+    "bytes": 202859,
+    "sha256": "d01fefe1eda6f0195659154ca33b2e9e1da949872e9a256edd7d743ada5e6042"
+  },
+  {
+    "file": "churchill-1107-overnight.pdf",
+    "url": "https://www.kentuckyderby.com/wp-content/uploads/sites/3/2026/11/Overnight-11-7-26.pdf",
+    "at": "2026-11-11T03:40:59.255965+00:00",
+    "status": 200,
+    "content_type": "application/pdf",
+    "bytes": 203032,
+    "sha256": "c2cc8aa04b75ffd73eeb6c9b5d74d8458ed608f2c792bfb88c9952af8c2aebac"
+  },
+  {
+    "file": "nsa-result-Saratoga-September-2-Results-.pdf",
+    "url": "https://nationalsteeplechase.com/wp-content/uploads/2026/09/Saratoga-September-2-Results-.pdf",
+    "sha256": "0e5b9b3fb3236e01c751582187dc6a0ef9953b58e09d519ae06894cd3c31c281",
+    "bytes": 54663,
+    "fetched_at": "2026-11-10T20:15:36.092957+00:00"
+  },
+  {
+    "file": "nsa-result-September-3-results-.pdf",
+    "url": "https://nationalsteeplechase.com/wp-content/uploads/2026/09/September-3-results-.pdf",
+    "sha256": "8c9426bec4de521910ea6a8046384e5946d8ae36f41e8cbc1c252e974ab19ae3",
+    "bytes": 91787,
+    "fetched_at": "2026-11-10T20:15:37.640715+00:00"
+  },
+  {
+    "file": "nsa-result-October-4-results.pdf",
+    "url": "https://nationalsteeplechase.com/wp-content/uploads/2026/10/October-4-results.pdf",
+    "sha256": "c60e43be974d56b6ff2565da0688ab9600ba4a8592a77ac87148739a20caff93",
+    "bytes": 110659,
+    "fetched_at": "2026-11-10T20:15:40.772663+00:00"
+  },
+  {
+    "file": "nsa-result-Far-Hills-Results.pdf",
+    "url": "https://nationalsteeplechase.com/wp-content/uploads/2026/10/Far-Hills-Results.pdf",
+    "sha256": "d12993844d0b7268dc73d4664dbeea500f5c79783d637e51a695501e2cabbcee",
+    "bytes": 85061,
+    "fetched_at": "2026-11-10T20:15:45.111436+00:00"
+  },
+  {
+    "file": "nsa-result-International-Gold-Cup-results-Updated.pdf",
+    "url": "https://nationalsteeplechase.com/wp-content/uploads/2026/10/International-Gold-Cup-results-Updated.pdf",
+    "sha256": "64a136ec8f145feffdcb6a69455202559d518709770dfe96680a641e301f5c80",
+    "bytes": 89313,
+    "fetched_at": "2026-11-10T20:15:46.489654+00:00"
+  },
+  {
+    "file": "nsa-result-Montpelier-results-2026.pdf",
+    "url": "https://nationalsteeplechase.com/wp-content/uploads/2026/11/Montpelier-results-2026.pdf",
+    "sha256": "9c40a6d3fc49ec41b77eeb8e6c5fac58901246b9bcd2d62696c101c1d9b5f437",
+    "bytes": 66032,
+    "fetched_at": "2026-11-10T20:15:50.598030+00:00"
+  },
+  {
+    "file": "dmtc-overnight-20260905.pdf",
+    "url": "https://www.dmtc.com/data/pdf/racing/entries/20260905.pdf",
+    "at": "2026-11-11T03:53:05.582653+00:00",
+    "status": 200,
+    "content_type": "application/pdf",
+    "bytes": 454020,
+    "sha256": "f7be2d564809375f76ed3f3dd19dd7f7f8513e049ad62f2c8b117c326425f91e"
+  },
+  {
+    "file": "dmtc-overnight-20261108.pdf",
+    "url": "https://www.dmtc.com/data/pdf/racing/entries/20261108.pdf",
+    "at": "2026-11-11T03:53:06.948550+00:00",
+    "status": 200,
+    "content_type": "application/pdf",
+    "bytes": 447285,
+    "sha256": "2f64cef905407383d5126e180b35926c1b8107b0029155503b5d905e63e6f3a1"
+  },
+  {
+    "file": "nyra-glen-cove-5.html",
+    "url": "https://www.nyra.com/belmont/racing/entries/?day=2026-10-25&race=5",
+    "at": "2026-11-11T03:51:37.114516+00:00",
+    "status": 200,
+    "content_type": "text/html; charset=utf-8",
+    "bytes": 173021,
+    "sha256": "42745489f425a41437dba8c95a50e33a17667e334919216030d64093a3037030",
+    "normalization": "仅移除行尾空白，sha256绑定原件",
+    "fixture_sha256": "af4569dda522fa027d8692eae34c620cc9497051dfb92bcb65f36f2114e0adc6"
+  },
+  {
+    "file": "nyra-entries.html",
+    "url": "https://www.nyra.com/belmont/racing/entries/?day=2026-11-12",
+    "at": "2026-11-11T03:39:08.218472+00:00",
+    "status": 200,
+    "content_type": "text/html; charset=utf-8",
+    "bytes": 164966,
+    "sha256": "f8e216e5fdcf4fffb77a3f8ebee8ee4b5757de5958fb5eba1c35e80dd81548ee",
+    "normalization": "仅移除行尾空白，sha256绑定原件",
+    "fixture_sha256": "608adb6d08acb67fd5b75fc2adf80c2e6c70e9628d8cfaccc2cbb10d4b14cb60"
+  },
+  {
+    "file": "nsa-extra-Revised-Foxfield-Overnight-Monday-.pdf",
+    "url": "https://nationalsteeplechase.com/wp-content/uploads/2026/09/Revised-Foxfield-Overnight-Monday-.pdf",
+    "at": "2026-11-11T03:59:56.130570+00:00",
+    "status": 200,
+    "content_type": "application/pdf",
+    "bytes": 300530,
+    "sha256": "ad6b478f1a8ee39eb165a09627ed9fdadff024cf98e64f5f0cd27b0d39dcbcac"
+  },
+  {
+    "file": "nsa-va-fall.pdf",
+    "url": "https://nationalsteeplechase.com/wp-content/uploads/2026/10/VA-Fall-2026.pdf",
+    "at": "2026-11-11T04:03:40.125523+00:00",
+    "status": 200,
+    "content_type": "application/pdf",
+    "bytes": 65261,
+    "sha256": "7bce55d562f8a42647b0b4d9c28726077d97ce2e8c39dffc7c8291cb9abd3ab4"
+  },
+  {
+    "file": "drf-all-stakes.html",
+    "url": "https://www1.drf.com/StakesResults/MainMenu.do",
+    "sha256": "bbc35249cb3ce9558c8a2728c782334f6c0a652d4d6c2fb2801f6cb8510e674e",
+    "fixture_sha256": "3cfe0c8c7351439b7cea3c66ba86087718c29dd099e2d956ae67886daafcdfd1",
+    "normalization": "仅移除行尾空白；sha256绑定原件",
+    "source_receipt_directory": "/Users/mentianlu/.codex/runtime/us-flat-results-20261111"
+  },
+  {
+    "file": "sl-river-card.html",
+    "sha256": "ea4aa1881a940ce3ce46b1311960982ddd0c33042f3955b28b2a5c89e703fb0a",
+    "url": "https://www.sportinglife.com/racing/racecards/2026-11-07/churchill-downs/racecard/948111/race-8-river-city-stakes-grade-3"
+  },
+  {
+    "file": "sl-churchill-livecard.html",
+    "sha256": "1f1402c3af5fb297869cb037c4532f077344817fcbe86cf9b91b46767026b2c1",
+    "url": "https://www.sportinglife.com/racing/racecards/2026-11-11/churchill-downs/racecard/948616/race-1-claiming"
+  },
+  {
+    "file": "sl-remington-livecard.html",
+    "sha256": "d2869ffafb008a646a989345f8ab82ded54f2ad7e95ea7a62aaafe5ef85bc9da",
+    "url": "https://www.sportinglife.com/racing/racecards/2026-11-11/remington-park/racecard/948649/race-1-claiming"
+  },
+  {
+    "file": "sl-cards-today.html",
+    "sha256": "bcacbdb5f96764195e54ca71ed81d3184abf9996f23f8aed619e669564e0c81a",
+    "url": "https://www.sportinglife.com/racing/racecards"
+  },
+  {
+    "file": "nyra-hopeful.html",
+    "url": "https://www.nyra.com/saratoga/racing/entries/?day=2026-09-06&race=10",
+    "sha256": "f5a423de828ca33da41a0782b10fb6e2d21415342e9da4bf7605d9224060449b",
+    "source_sha256": "5aaed660399c05c40711a92f166ab02493f7d0fcbc622eba957025c5aafdf4c0",
+    "fetched_at": "2026-11-11T04:19:19.822761+00:00",
+    "normalization": "strip trailing whitespace"
+  },
+  {
+    "file": "nyra-jockey-club-gold-cup.html",
+    "url": "https://www.nyra.com/belmont/racing/entries/?day=2026-09-18&race=5",
+    "sha256": "7d14488a394a40337232e1cd9685e0760f70afcbc0720a9e1afad92fb407dc91",
+    "source_sha256": "049711cbd28e600fdb7944f9fe70d9d2e2c7cce40b4cb0e837a950ea3c119f62",
+    "fetched_at": "2026-11-11T16:06:01.405777+00:00",
+    "normalization": "strip trailing whitespace"
+  },
+  {
+    "file": "verified-final-roster.json",
+    "sha256": "dddd4526d265ce95ef936fbd48a41b8f4888c91cf90f6b646afa33ae1c1aa860",
+    "source_report_sha256": "30dd2c31ce77ae4acfe096251bad1f14da19ed1acfae6b7a2c598a5a0ab95ad0",
+    "normalization": "extract verified Pennsylvania Derby final result; source URL and SHA retained in result"
+  },
+  {
+    "file": "usracing-commonwealth-turf.html",
+    "url": "https://usracing.com/commonwealth-turf-stakes",
+    "fetched_at": "2026-11-11T16:23:02.085673+00:00",
+    "sha256": "de714de2d6c3b35ffe8784e571365bfb603ceeb234d83cb76198abb8f8261527",
+    "source_sha256": "46e02e11b2f177eeed059660849e5cc8fbf4392f4d1270c4f5dea9f2ba57e9f4",
+    "normalization": "strip trailing whitespace"
+  },
+  {
+    "file": "usracing-pebbles.html",
+    "url": "https://usracing.com/pebbles-stakes",
+    "fetched_at": "2026-11-11T16:25:11.839545+00:00",
+    "sha256": "646722793718710bd43bd12ff235a1336f71d711d68d7f2580b479cee2147db1",
+    "source_sha256": "d9766442b5ec682f748adc2679d9dfca321bff4b1c1c341918b5d42dbe84d80c",
+    "normalization": "strip trailing whitespace"
+  },
+  {
+    "file": "usracing-manila.html",
+    "url": "https://usracing.com/manila-stakes",
+    "fetched_at": "2026-11-11T16:25:11.839654+00:00",
+    "sha256": "26ab36d10d0288beec6ed3d1b683837fd19ac3ab6f254e1450d8c747eb98f655",
+    "source_sha256": "40ced40f0eccc30dd6c55cc9dcc03992f90386109847fea7f6c59a18d9b7ac25",
+    "normalization": "strip trailing whitespace"
+  },
+  {
+    "file": "usracing-native-diver.html",
+    "url": "https://usracing.com/native-diver-stakes",
+    "fetched_at": "2026-11-11T16:25:14.331077+00:00",
+    "sha256": "8c16d413e8a94bb379734c88cbdfc1118f8e1c2cf3858c7f7117b80e314b176d",
+    "source_sha256": "7dcc9058e4463934dd667c11d3afd27964704c1e7c6567d145a311cbfb2aa360",
+    "normalization": "strip trailing whitespace"
+  },
+  {
+    "file": "usracing-graded-schedule.html",
+    "url": "https://usracing.com/graded-stakes-schedule",
+    "fetched_at": "2026-11-11T16:25:11.839228+00:00",
+    "sha256": "ff22ce1854dcd2a32a4e7ce6fed530a5b35621c9ee908fee3ca0f9f80ed17644",
+    "source_sha256": "55cd58f44b57986b62e4052d56db83442e75496a498f722308e295754aef2b65",
+    "normalization": "strip trailing whitespace"
+  }
+]
