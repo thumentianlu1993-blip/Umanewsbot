@@ -86,7 +86,8 @@ def observation_context(value, route, now):
 def _event_context(event, value, route):
     aliases = route.venue_aliases[value["venue_key"]]
     return (
-        event.country_region == route.country_region
+        not event.divisions.exists()
+        and event.country_region == route.country_region
         and str(event.local_date) == value["local_date"]
         and event.timezone_name == value["timezone"]
         and normalize_name(event.racecourse) in {normalize_name(v) for v in aliases}
@@ -295,7 +296,7 @@ def resolve_observation(value, *, route, now):
         if not name.source_refs:
             continue
         for event in models.RaceEvent.objects.filter(
-            race_series_id=name.series_id, edition_year=day.year
+            race_series_id=name.series_id, edition_year=day.year, divisions__isnull=True
         ):
             if _event_context(event, value, route):
                 targets.add(event.pk)
@@ -335,7 +336,7 @@ def resolve_observation(value, *, route, now):
         return IdentityMatch("exact", event.pk, evidence=evidence)
     candidates = list(
         models.RaceEvent.objects.filter(
-            country_region=route.country_region,
+            country_region=route.country_region, divisions__isnull=True,
             local_date__range=(day - timedelta(days=1), day + timedelta(days=1)),
         )[:100]
     )

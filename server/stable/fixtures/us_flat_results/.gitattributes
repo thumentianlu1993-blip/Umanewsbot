@@ -1,1 +1,5 @@
 *.pdf binary
+# 保留三份ABR HTTP原件字节及来源SHA，不改写站点缩进/尾空格。
+abr-pennsylvania-cheat.html -whitespace
+abr-pennsylvania-discovery.html -whitespace
+abr-pennsylvania-trifecta.html -whitespace

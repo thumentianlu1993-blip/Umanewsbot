@@ -1,6 +1,7 @@
 """美国赛前 PDF 解析，原件字段与发布阶段分别保留。"""
 from datetime import datetime
 from io import BytesIO
+import hashlib
 import re
 from zoneinfo import ZoneInfo
 
@@ -8,7 +9,7 @@ import pdfplumber
 from pdfplumber.utils import extract_text
 
 # 这些是已经核对过的官方 overnight 版式；坐标仅用于版式识别后的列切分。
-OVERNIGHT_VENUES = {'FH': 'FARHILLS', 'FX': 'FOXFIELD', 'GRM': 'GREATMEADOW',
+OVERNIGHT_VENUES = {'CAM': ('CAMDEN','COLONIALCUP','CAROLINACUP','SPRINGDALERACECOURSE'), 'FH': 'FARHILLS', 'FX': 'FOXFIELD', 'GRM': 'GREATMEADOW',
     'MTP': 'MONTPELIER', 'CNL': 'COLONIALDOWNS', 'CD': 'CHURCHILLDOWNS', 'SAR': 'SARATOGA', 'DMR': 'WWW.DMTC.COM'}
 
 
@@ -105,7 +106,9 @@ def parse_overnight(raw, *, local_date, venue, race_number, source_url=''):
     stamp = day.strftime('%B').upper()+str(day.day)+','+str(day.year)
     if stamp not in compact[:500]:
         raise ValueError('us_overnight_date')
-    if OVERNIGHT_VENUES[venue] not in compact[:500]:
+    venue_headers=OVERNIGHT_VENUES[venue]
+    if isinstance(venue_headers,str):venue_headers=(venue_headers,)
+    if not any(header in compact[:500] for header in venue_headers):
         # NYRA overnight页首没有场地字样，必须有NSA当日目录给出的Saratoga文件身份。
         if not (venue == 'SAR' and re.fullmatch(
                 r'https://nationalsteeplechase\.com/wp-content/uploads/\d{4}/\d{2}/Saratoga-[A-Za-z]+-\d+\.pdf', source_url)
@@ -181,6 +184,7 @@ def parse_overnight(raw, *, local_date, venue, race_number, source_url=''):
     off=datetime.combine(day,datetime.strptime(clock[1].replace(' ',''),'%I:%M%p').time(),ZoneInfo('America/Los_Angeles' if venue=='DMR' else 'America/New_York')) if clock else None
     return dict(local_date=local_date,venue=venue,race_number=race_number,source_stage='declared_overnight',
         declared_count=count,roster_complete=True,runners=rows,conditions_raw=conditions,
+        source_url=source_url,raw_sha256=hashlib.sha256(raw).hexdigest(),
         off_time=off.isoformat() if off else None)
 
 

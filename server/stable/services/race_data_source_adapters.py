@@ -493,6 +493,10 @@ def fetch_source_page(url, *, route, now):
     def validate(value):
         if not route.permits_url(value):
             raise ValueError("source_url_rejected")
+        if route.provider == "us_racing":
+            from .us_prerelease_collection import prerelease_url_allowed
+            if not prerelease_url_allowed(value):
+                raise ValueError("us_source_url_rejected")
 
     return _fetch_bounded_html(
         url,
@@ -501,6 +505,7 @@ def fetch_source_page(url, *, route, now):
         region=route.region,
         validator=validate,
         enabled=enabled,
+        binary=route.provider == "us_racing",
     )
 
 
@@ -565,7 +570,12 @@ def fetch_bound_observation(*, event, route, now, fetcher=None, kind="result", u
     ).first()
     previous = seed_evidence(event, route=route)
     independent_card = None
-    if route.provider == "the_racing_api":
+    if route.provider == 'us_racing':
+        from .us_race_source import fetch_us_observation
+        value = fetch_us_observation(event=event, route=route, now=now,
+            fetcher=fetcher or fetch_source_page, kind=kind)
+        chain = [value['canonical_url']]
+    elif route.provider == "the_racing_api":
         value = fetch_tra_observation(
             event=event, route=route, now=now, kind=kind, fetcher=fetcher
         )
@@ -718,8 +728,12 @@ def fetch_bound_observation(*, event, route, now, fetcher=None, kind="result", u
             for r in value.get("roster", [])
         ]
         verified_incidents = (route.provider == "hkjc" and value.get("roster_evidence", {}).get("kind") == "official_racing_incident_roster")
+        verified_us = False
+        if route.provider == 'us_racing':
+            from .us_race_source import validate_final_roster
+            verified_us = validate_final_roster(value)
         value["roster_complete"] = bool(
-            (verified_incidents and not expected) or expected
+            ((verified_incidents or verified_us) and not expected) or expected
             and (
                 sorted(expected) == sorted(actual)
                 or (
@@ -932,6 +946,7 @@ def run_multisource_claim(*, claim, now, fetcher=None):
         )
         from stable.services.race_source_identity import resolve_observation
 
+        if route.provider=='us_racing':now=timezone.now()
         match = resolve_observation(value, route=route, now=now)
         if match.status != "exact" or match.event_id != claim.event_id:
             raise ValueError("identity_conflict")
@@ -956,6 +971,8 @@ def run_multisource_claim(*, claim, now, fetcher=None):
                 binding=binding, enrollment=locked.enrollment
             ),
         )
+        if route.provider == 'us_racing' and value.get('us_race_metadata'):
+            provenance['us_race_metadata'] = value['us_race_metadata']
         france_basic = value.get('france_basic_v1') if route.provider=='geny' and route.region=='france' else None
         if france_basic:
             from .france_basic_fields import basic_sha, validate_basic
@@ -1040,7 +1057,7 @@ def run_multisource_claim(*, claim, now, fetcher=None):
                         jockey_name=r["jockey_name"],
                         trainer_name=r["trainer_name"],
                         carried_weight=r["carried_weight"],
-                        **({'odds':r['odds_value']} if route.provider=='geny' and route.region=='france' and r.get('odds_value') else {}),
+                        **({'odds':r['odds_value']} if route.provider in {'geny','us_racing'} and r.get('odds_value') else {}),
                         **(
                             {
                                 "status": (
@@ -1057,12 +1074,16 @@ def run_multisource_claim(*, claim, now, fetcher=None):
                     for r in value["roster"]
                 ],
             )
+            us_fields = ({r['external_runner_id']:r.get('field_provenance',{}) for r in value['roster']}
+                if route.provider=='us_racing' and route.region=='united_states' else {})
+            if us_fields:
+                card['us_public_fields_sha256']=canonical_sha(us_fields)
             france_fields = ({r['external_runner_id']:r.get('field_provenance',{}) for r in value['roster']}
                 if route.provider == 'geny' and route.region == 'france' else {})
             if france_basic:
                 card['france_basic_sha256'] = basic_sha(france_basic)
                 card['timezone_name'] = 'Europe/Paris'
-            card_observed_at = aware(value['fetched_at']) if france_fields else now
+            card_observed_at = aware(value['fetched_at']) if france_fields or us_fields else now
             if france_fields:
                 # 报价观测与调整后负重也是快照内容；不能被主字段同值去重丢弃。
                 card['france_public_fields_sha256'] = canonical_sha(france_fields)
@@ -1103,6 +1124,7 @@ def run_multisource_claim(*, claim, now, fetcher=None):
                     },
                     **provenance,
                     **({'france_public_fields':france_fields} if france_fields else {}),
+                    **({'us_public_fields':us_fields} if us_fields else {}),
                 },
                 parse_warnings=[],
                 permission_classification="multisource_approved",

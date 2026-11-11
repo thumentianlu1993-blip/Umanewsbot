@@ -17,6 +17,16 @@
       </aside>
     {% endif %}
 
+    {% if division_events %}
+      <section class="panel" aria-label="同届分场">
+        <h2>同届分场</h2>
+        <p>本届赛事分为以下场次，每场单独展示参赛记录与赛果。</p>
+        <ul>{% for division in division_events %}<li><a href="{{ division.public_path }}">{{ division.chinese_name|default:division.original_name }}</a></li>{% endfor %}</ul>
+      </section>
+    {% elif event.division_parent_id %}
+      <p><a href="{{ event.division_parent.public_path }}">查看本届全部分场</a></p>
+    {% endif %}
+
     <section class="race-hero state-{{ event.status }}">
       <div class="race-hero-top">
         <span class="grade-badge {% race_grade_class event %}">{% race_field event "grade" event.grade_badge_label %}</span>
@@ -65,7 +75,9 @@
           <div><span>场地</span><b>{% race_field event "surface" %}</b></div>
           {% if event.public_display.race_type.state != 'missing' %}<div><span>赛种</span><b>{% race_field event "race_type" %}</b></div>{% endif %}
           {% if event.public_display.race_class.state != 'missing' %}<div><span>类别</span><b>{% race_field event "race_class" %}</b></div>{% endif %}
-          {% if event.country_region == 'france' %}
+          {% if event.country_region == 'france' or event.country_region == 'united_states' %}
+          {% if event.public_display.race_time and event.public_display.race_time.state != 'missing' %}<div><span>比赛用时</span><b>{% race_field event "race_time" %}</b></div>{% endif %}
+          {% if event.public_display.fractional_times and event.public_display.fractional_times.state != 'missing' %}<div><span>分段累计用时（来源顺序）</span><b>{% race_field event "fractional_times" %}</b></div>{% endif %}
           {% if event.public_display.prize.state != 'missing' %}<div><span>总奖金</span><b>{% race_field event "prize" %}</b></div>{% endif %}
           {% if event.public_display.layout.state != 'missing' %}<div><span>方向</span><b>{% race_field event "layout" %}</b></div>{% endif %}
           {% if event.public_display.going.state != 'missing' %}<div><span>场况</span><b>{% race_field event "going" %}</b></div>{% endif %}
@@ -115,7 +127,7 @@
         <h2>{{ result_section_label }}</h2>
         <div class="race-table-wrap">
           <table class="data-table">
-            <thead><tr><th>名次</th><th>马号</th><th>马名</th><th>骑师</th><th>练马师</th><th>负重</th><th>时间</th><th>{% if results.0.source_refs.margin_basis == "winner" %}差距（距头马）{% elif results.0.source_refs.margin_basis == "previous_finisher" %}差距（距前马）{% else %}差距{% endif %}</th><th>{% if race_information_enabled %}赔率 / 热门排名{% else %}赔率 / 人气{% endif %}</th></tr></thead>
+            <thead><tr><th>名次</th><th>马号</th><th>马名</th><th>骑师</th><th>练马师</th><th>负重</th><th>时间</th><th>{% if results.0.source_refs.margin_basis == "winner" %}差距（距头马）{% elif results.0.source_refs.margin_basis == "previous_finisher" %}差距（距前马）{% elif results.0.source_refs.margin_basis == "previous_physical" %}差距（距前一匹冲线马）{% else %}差距{% endif %}</th><th>{% if race_information_enabled %}赔率 / 热门排名{% else %}赔率 / 人气{% endif %}</th></tr></thead>
             <tbody>
               {% for result in results %}
                 <tr class="{% if result.display_finish_position == 1 %}medal-1{% elif result.display_finish_position == 2 %}medal-2{% elif result.display_finish_position == 3 %}medal-3{% endif %}"{% if public_probe_projection.complete %} data-o03-row="{% for token in public_probe_projection.table_row_tokens %}{% if forloop.counter0 == forloop.parentloop.counter0 %}{{ token }}{% endif %}{% endfor %}"{% endif %}>

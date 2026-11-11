@@ -961,7 +961,16 @@
       "stable.test_race_multisource_identity",
       "stable.test_japan_automation",
       "stable.test_hkjc_automation",
-      "stable.test_france_automation"
+      "stable.test_france_automation",
+      "stable.test_us_divisions",
+      "stable.test_us_observation",
+      "stable.test_us_polling",
+      "stable.test_us_pre_race",
+      "stable.test_us_public_fields",
+      "stable.test_us_release",
+      "stable.test_us_transport",
+      "stable.test_us_venues",
+      "stable.test_us_workflow"
     ]
   },
   "dependencies": {
@@ -3006,6 +3015,60 @@
       "domains": [
         "us_source_collection"
       ]
+    },
+    "server/stable/test_us_divisions.py": {
+      "label": "stable.test_us_divisions",
+      "domains": [
+        "us_source_collection"
+      ]
+    },
+    "server/stable/test_us_observation.py": {
+      "label": "stable.test_us_observation",
+      "domains": [
+        "us_source_collection"
+      ]
+    },
+    "server/stable/test_us_polling.py": {
+      "label": "stable.test_us_polling",
+      "domains": [
+        "us_source_collection"
+      ]
+    },
+    "server/stable/test_us_pre_race.py": {
+      "label": "stable.test_us_pre_race",
+      "domains": [
+        "us_source_collection"
+      ]
+    },
+    "server/stable/test_us_public_fields.py": {
+      "label": "stable.test_us_public_fields",
+      "domains": [
+        "us_source_collection"
+      ]
+    },
+    "server/stable/test_us_release.py": {
+      "label": "stable.test_us_release",
+      "domains": [
+        "us_source_collection"
+      ]
+    },
+    "server/stable/test_us_transport.py": {
+      "label": "stable.test_us_transport",
+      "domains": [
+        "us_source_collection"
+      ]
+    },
+    "server/stable/test_us_venues.py": {
+      "label": "stable.test_us_venues",
+      "domains": [
+        "us_source_collection"
+      ]
+    },
+    "server/stable/test_us_workflow.py": {
+      "label": "stable.test_us_workflow",
+      "domains": [
+        "us_source_collection"
+      ]
     }
   },
   "profiles": {
@@ -3333,7 +3396,16 @@
     "stable.test_france_field_concurrency": "django",
     "stable.test_us_automation": "django",
     "stable.test_us_flat_results": "django",
-    "stable.test_us_prerelease": "django"
+    "stable.test_us_prerelease": "django",
+    "stable.test_us_divisions": "django",
+    "stable.test_us_observation": "django",
+    "stable.test_us_polling": "django",
+    "stable.test_us_pre_race": "django",
+    "stable.test_us_public_fields": "django",
+    "stable.test_us_release": "django",
+    "stable.test_us_transport": "django",
+    "stable.test_us_venues": "django",
+    "stable.test_us_workflow": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {

@@ -1,0 +1,516 @@
+{
+  "schema_version": 1,
+  "base_sha": "c4bd1207e610e349e9394149cebe80bb92d48250",
+  "reason": "美国展示与3/4/6接入：覆盖美国全部来源/生命周期/公开写入和原件用例、共享多源准入/领取/字段writer/lease/更正、PostgreSQL锁与事务、日港法兼容、公开字段/日历/系列历史及核心检查。新增nullable分场列不改变新闻/翻译/QQ链路；显式绑定本次全部文件字节，不升级无关全量。",
+  "domains": [
+    "infrastructure",
+    "us_source_collection",
+    "race_results",
+    "module:stable.test_race_multisource_enrollment",
+    "module:stable.test_race_multisource_postgres",
+    "module:stable.test_race_data_sync_admission",
+    "module:stable.test_race_data_sync_lifecycle",
+    "module:stable.test_race_data_sync_lifecycle_advance",
+    "module:stable.test_race_data_sync_pipeline_a",
+    "module:stable.test_race_data_sync_pipeline_a_postgres",
+    "module:stable.test_race_pre_race",
+    "module:stable.test_pre_race_refresh",
+    "module:stable.test_pre_race_review_fixes",
+    "module:stable.test_race_information_display",
+    "module:stable.test_race_information_display_pages",
+    "module:stable.test_race_calendar_default_date_window",
+    "module:stable.test_historical_race_calendar_integrity",
+    "module:stable.test_race_public_time",
+    "module:stable.test_race_calendar_ics_reconciliation"
+  ],
+  "changes": [
+    {
+      "path": "docs/changes/us-race-automation/implementation_346.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "6c996b441fbbe1c44ca591b821fc1b03a089f90d18d272a6105e659420f33d5c",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/us-race-automation/online_regression_346.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "a1a10bbe9cd5bf2620bcc3a40854244e086ce298e69b5f250a252b4e7b968a89",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/us-race-automation/release_346.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "54236536987475cf880e7aec276b46861b5a008f6df86d2a1b8da9cc30bf5465",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/us-race-automation/release_evidence.md",
+      "status": "modified",
+      "before_hash": "7f8cb915a2b556daa5eef7abcc3b746bb5bc0581b85da2f8ef0ffec4dc10b69c",
+      "after_hash": "1dd8d507d4ea132c48a9b738af2d1866977250b3fb830d688349b02a59182dbe",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/us-race-automation/rollout.md",
+      "status": "modified",
+      "before_hash": "d32b967db9508689f0dbd90454c8b15cc89a1c4acfb3541530032dd0788d8265",
+      "after_hash": "a67beb76ec77caa6e19106567f096a174b41b2a6f6d106ef3277c9f0464b6427",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/us-race-automation/tasks.md",
+      "status": "modified",
+      "before_hash": "c8da8e11052768b84df67d22db73a85ed7327c2e4ef6eedd8262dedc13811fdf",
+      "after_hash": "7b3d7411f94e1a80c027380b5037355ef366699e97c7fa28227387162aebc211",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/us-race-automation/test_cases.md",
+      "status": "modified",
+      "before_hash": "b97d1fb4d9d6475f099339e6186b84439c505eef27cc68408e3e418ece11c4c5",
+      "after_hash": "6355fb15ea4a047fd843d0a2cfd498828389c547728edf35c3fee1b136c7a96d",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/current_state.md",
+      "status": "modified",
+      "before_hash": "987f30f939cf092b83ecacb55c1924977f841115fbbfc0f2aa4954467e93e5c0",
+      "after_hash": "f2fd91de4e83d0740516109f05693ff613769ee14db59d12f3e35e4a82d1783a",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/deploy_runbook.md",
+      "status": "modified",
+      "before_hash": "2c5c425dd6608a09b700ccc678523b2815b26f8ac07f4d92473f0d76569f8500",
+      "after_hash": "6ec2b73bcad1c5ff69b5bd13d5967336fac750b25c5fdf28a0e6199977e8a062",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/app/settings.py",
+      "status": "modified",
+      "before_hash": "c256c678a176c1f8b540e36d7adb7989772cfa90c8c8b153b3f95143a60a45ce",
+      "after_hash": "a034bee9368905353aa825a8c8c97bfe4ad591b5f508d8afc7b01ec441545637",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/.gitattributes",
+      "status": "modified",
+      "before_hash": "547f59603028195ff9f8a87d04c4651551e8bd0d68f075257dfd549cd846b25b",
+      "after_hash": "5314060841f6eb690b628945d0b3433f81ff9394ea432a26334900fe0041d72c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/abr-pennsylvania-cheat.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "1c2c344ecf5bf5e83749c9347c4304651b0e76636e7e419b42f20c1b6f62b756",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/abr-pennsylvania-discovery.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "1593e43e07af3dc15fab54a1de35d01e11c7ef5f129c10836f4d4c37a64bf7de",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/abr-pennsylvania-trifecta.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "89b371988b9b6bd68f1c2375823b473c3a2bd8b691729ed686a2b5b32215ed5e",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/provenance.json",
+      "status": "modified",
+      "before_hash": "06aa60f7187f8414d92cf89e9565b51c64b009595c1e2705d88ccb0eca1dee34",
+      "after_hash": "912f2af39b91ed930f1a35beadc330aee678c445f09fa4e86bc52ebee130132e",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/management/commands/run_us_release.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "21d4d33a4079f6adabd1c6e28a5a094e14f8e626470367ce80545479fb8478f3",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/migrations/0084_race_event_division_parent.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "2149ff4ac40744772fe9d43c17e7bb1f72f238ff0997c5900574e01eab7f6a11",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/migrations/0085_merge_us_divisions.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "c9b47056c1b9c0fbda591d1a6e35bd48b4819ed582062e4d0245a7bd3da96b71",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/models.py",
+      "status": "modified",
+      "before_hash": "76e3a24ca38f5855d31130d8e9f9c7f70cb5f8fb1e87ed7136e9a3c1d71a5c9e",
+      "after_hash": "f4521779a21bbf8088ab7e028ac134f362d113a89c644f3060e90d5476f95751",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/release_0078_test_fixture.py",
+      "status": "modified",
+      "before_hash": "4eb4945837dee524870392fdc55916f679ef1f321c881fcb2e17d15c23cd1387",
+      "after_hash": "65dcc6dc2ab6ed498d6d4441667be42cbf9d0c9c77438677083ace28218ac0c2",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_source_adapters.py",
+      "status": "modified",
+      "before_hash": "9d7a57452e10dcdf9c50b08efabec9d00ac74f7b69f9d40b43e3eebe0dda7803",
+      "after_hash": "993607a805054a6b22a5aa4b94ab64a57eb1b53f0d68f3d285f2808726f03130",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_admission.py",
+      "status": "modified",
+      "before_hash": "ac586c31e89ff46d285e43381c41ac1429ce47a4bd1ce1578fd4131c9a675326",
+      "after_hash": "83826145ed56699cb9dc4c2738bffc4068b8dddfb3e418601ba8712255a3330b",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_control.py",
+      "status": "modified",
+      "before_hash": "da68ae01e4addd15e0f9edf636dcb4a98c0c5e62f23fd6211d3011e19c2b9bb7",
+      "after_hash": "90778b53ac8d1882ec5f4fb520467227a8782c453f247e175518041d5ed5943b",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_enrollment.py",
+      "status": "modified",
+      "before_hash": "19fbf2a16b62a05ed45abe5842fa57580e6098d76b2f340145d25202beb170f9",
+      "after_hash": "bac88bd8671d59df8fa96777ffb7ff3c76e43b8d63219dc60226a6a5a2d9bc3c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_pipeline.py",
+      "status": "modified",
+      "before_hash": "57cddeadfbe9db65e55306a53ae1ea53cb039ac7c124cc997e48aa566fcafef9",
+      "after_hash": "1c6084788929aa9e0269ee02cc9d8d3b2dffa7c7581df912a56f27b6e120a751",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_results.py",
+      "status": "modified",
+      "before_hash": "1e666c2d7e551c179311099c9dbd48d7b997156085baf6ebce728265666d2c4b",
+      "after_hash": "0c62e0cdf6e4998afcbda520ab70b588e2f3c8d08118586c668deaa82fd228f3",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_field_normalization.py",
+      "status": "modified",
+      "before_hash": "e2c103206cd15c989daa08369f8f274c8466c5d42aac721282c86bc636034d0c",
+      "after_hash": "afe1c4c7dba95744e5afcba3c4d19b42818eb989b1cffc6bc98b68ea843a7875",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_information_display.py",
+      "status": "modified",
+      "before_hash": "80e7e9b75ba879e96c33ba849b2bcf5b4b1cb0fbe48c836cbde6bc1b4c168f18",
+      "after_hash": "41f05143d9c37cc6db802cda6917628825f86c74b746d554d6d07d99b8996480",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_pre_race.py",
+      "status": "modified",
+      "before_hash": "155eab4b52fd2574841c71c3b633edf0adc08cfe5b89b731e05e951b1f2ae7d5",
+      "after_hash": "ed808cedb2ad0d5e64a03a33f2428477d6d558f4229ca8070351c76486ba789b",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_pre_race_refresh.py",
+      "status": "modified",
+      "before_hash": "3c9db5b982d493c9d94709fce19259d1cd3bcea3e390861ca8751d3292b84209",
+      "after_hash": "90505c1ee00c50a25a89cfd7b3b643cea96f268eefae2deed82066ca54ca8db3",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_source_identity.py",
+      "status": "modified",
+      "before_hash": "d027011300d3f1afdda84e3147d9d01a9f60787bc5054d6e9dafa9fe612085c2",
+      "after_hash": "84ef14f676dc2db7e26e8426f20bbbec933d6040d47b9ddcb6a41c0349762861",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_basic_fields.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "11534d680a3f9ad3ec7b70e43d8f9e88a86b2b41c91433eb248bd5f8e0083ffc",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_flat_collection.py",
+      "status": "modified",
+      "before_hash": "b9bd0bbfb116e049c3309648fc43b793afa6dfafbc94cb2462e1e1a6a44d71bb",
+      "after_hash": "cde0bae875f20ca6771c5c25eb788c42201a92ea24aab1cae25d83e4f17fbb9a",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_flat_results.py",
+      "status": "modified",
+      "before_hash": "6029c5420069d281fbca2c8cc68d8be8a9c4f602b19c5e63fe11c8293e4f5192",
+      "after_hash": "64b5a51d194e3d8d53d94fae5f1a4d2072e662d16a5f70536b11f69624c62c85",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_nsa_sources.py",
+      "status": "modified",
+      "before_hash": "fb88b1df9cb4f01b35148506983bb28a55d4b78ae7816bbd4f471273ef387679",
+      "after_hash": "649bce92e835fcd2cbd3ac4429c43347f4b4915a7a284d8e5f31f040e6eeb6b7",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_polling.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "de08bfb48097ca7d7de6f582e557f60a57b5031e0585c6116a0d17570ad076e4",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_pre_race.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "ddafdaba1b98df585683ccc1d2d9bcbc7a438e192433f9b2858c7d0d2f84ceec",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_prerace_documents.py",
+      "status": "modified",
+      "before_hash": "61a42954dd4d4977b47923f15b9ba028d449566f42ba1f9a2c0d4e220b992d15",
+      "after_hash": "157858c7e0c49e051bfcd5db384ba65e78446e1f3f3df5c79a83bd81dadeb85a",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_prerelease_collection.py",
+      "status": "modified",
+      "before_hash": "c0d62a7aaf115ce643f32ec4566d21b1b5e2ea77b58537bc71f627d622cf14e1",
+      "after_hash": "4cf585a3d9f75a1c70daa4d939ee3ed8b7d7b3f80e98f54bfe6c3a56d240c02e",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_public_fields.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "3714ab7942c4718250cd97993e8ff36f3ddeaa125af91f5d9457f20051807681",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_race_source.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "7711962dd99a73a9208e6632724b62c2881ed6d29450a1d1edd2427280432f03",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_release.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "c35f40285849ad432722db141d16e34a023e41255f2daaf63808b79b6e86153e",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_steeplechase_results.py",
+      "status": "modified",
+      "before_hash": "0dd63679bd3ede6711dd232dbca9b04dc0315f367992db2e9175d0bd80adfd46",
+      "after_hash": "f2741c38460d1e5ad6afffd12917cd95edeeae9f043670f70a43854152fe15a1",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_venues.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "5c3750b2141a3b7e459e0fd2c8ee238efbea210844c49cebf23ccdeb05e2a84f",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/tasks.py",
+      "status": "modified",
+      "before_hash": "82f55df098463c27bea6d4045d64cb1a79f265f3eee68161e4dbc3aeeb1604ff",
+      "after_hash": "d16065dd5a8fc3fc9034dd8319bb7d3e82660fedcd3516aeaf90bca289cc8956",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/templates/stable/public/race_detail.html",
+      "status": "modified",
+      "before_hash": "84a5a1f701c2d9443e72061f7f8075ac234552d7d7b216ee4bd198f389b3c719",
+      "after_hash": "a90c3a3b7409ec2d0b4c12cebcbbb4fdeb8a21e7d14ba43922ee8f084cf6db4a",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_us_automation.py",
+      "status": "modified",
+      "before_hash": "76c905f29c69a182f1c3b018b482aa68c9a48fdfb3301a89ab10896c04b2eeab",
+      "after_hash": "7b208b62e3f1e79c496c21670a157188c3928edc043312b98137b39242a50a14",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_us_divisions.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "c9d41ff56a0fcd363bd3aa315372bf70932e499da9ecfc1b96352c001959b374",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_us_flat_results.py",
+      "status": "modified",
+      "before_hash": "a06e8f292915615a7e44e383ad10fa6d07403cd0cfd988890f2ccdb59b4313f2",
+      "after_hash": "82baa4a1e2eabd6c4bc35823bc777f20de7f7730bae25b180315ff08e9f12dec",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_us_observation.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "0a6b3e4fa5202d8197ca236b53c9ff533f45aea54855b728de1cb979a78e1d1a",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_us_polling.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "b9c1767b304d064a603d1951b3b99fffbd9fa47b10b10aff7dd99197fafede11",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_us_pre_race.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "39151dae3b2be893783d07ecc84466ed4a26c04de5a23c624765be48289afb7c",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_us_prerelease.py",
+      "status": "modified",
+      "before_hash": "9797c0f1ca7044657b4f3726d64f33a6fb05ce3a7fb87c8b621f4b2c2f41dca0",
+      "after_hash": "299580bc1a30bdd10cdfd9ce9fc89bdcfa6af4d246ae88e0149acc65f1bf1dac",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_us_public_fields.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "a033466008a1007a1ed5f0028030cf00689d8039aa4b4bd902d75dbc65dd77d1",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_us_release.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "9c52a87accee5e133173394038e6381a1479258b29a83c6105b8bd6c231ec811",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_us_transport.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "ebe44ab2585801cc3c1b0d3634ea5439c508f8a9b615ec797fe6ab443a3826c2",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_us_venues.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "334d4eef061c02644e7b4dc9ccbcb360c4c2fe71f9bd32e2449802304685a023",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_us_workflow.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "f1c8843d3454bd74a9f8feb0a79134a0b7d7364df7d7ed588740b0274afbff08",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/views.py",
+      "status": "modified",
+      "before_hash": "d5e911727d1c98f098fc837d4c3ce9e08b6c98eca025057f4757278ae33e99f4",
+      "after_hash": "2d8fd6c33ea8732ac8872cfac81c491df210d3634bbd76d28d1029a8f67a1d72",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/catalog.json",
+      "status": "modified",
+      "before_hash": "73964394440a97eb07d55566451613a8341bef207cdb3a88f4e50878acacee1a",
+      "after_hash": "998b5193606bd7e3ea1159a7cef85fa4691588e25ee6a76501efe3608ce3e652",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "3ea83b8e4c4a5f53884b3c51cf1ef43bbea44b46005161ddad20fb5e8ba4c905",
+      "after_hash": "c0b53f51cf19f8248a4df5994fc06a60449e182c0fef37ada55d3464313c453e",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}

@@ -26,6 +26,7 @@ from stable.services.hkjc_public_fields import hkjc_source, result_odds, UNITS a
 
 
 from .france_public_fields import france_source, public_refs as france_refs, result_odds as france_odds
+from .us_public_fields import us_source, public_refs as us_refs, result_odds as us_odds
 
 _TERMINAL_RESULT_STATUSES = frozenset(
     {
@@ -580,10 +581,15 @@ def apply_data_sync_result_observation(
             if roster_mapping is None and is_multisource and not event.runners.exists():
                 if (
                     provenance.get("roster_complete") is True
-                    and len({r["number"] for r in rows}) == len(rows)
+                    and len({r["number"] for r in rows if r["number"]}) == sum(bool(r["number"]) for r in rows)
                     and all(
-                        r["number"] and r["status"] in _TERMINAL_RESULT_STATUSES
-                        for r in rows
+                        r["status"] in _TERMINAL_RESULT_STATUSES and (
+                            bool(r["number"]) or (
+                                source.source_key == "us_racing" and source.region_code == "united_states"
+                                and r["status"] == "scratched" and r["external_runner_id"].startswith("withdrawn:")
+                                and r["field_provenance"].get("number_availability") == "withdrawn_before_final_overnight"
+                            )
+                        ) for r in rows
                     )
                 ):
                     roster_mapping = tuple(
@@ -754,6 +760,9 @@ def apply_data_sync_result_observation(
                 same_facts = False
             if same_facts:
                 if terminal_phase and project_current and lifecycle_trusted:
+                    if us_source(source):
+                        from .us_basic_fields import apply_metadata_locked
+                        apply_metadata_locked(event=event,source=source,observation=observation,now=now,source_class=candidate_source_class)
                     if provenance.get('france_basic_v1'):
                         _apply_france_basic(event, source, observation, candidate_source_class, now)
                     if france_source(source):
@@ -862,6 +871,9 @@ def apply_data_sync_result_observation(
                 control.current_result_revision_id == existing.pk,
             )
         if may_project:
+            if us_source(source):
+                from .us_basic_fields import apply_metadata_locked
+                apply_metadata_locked(event=event,source=source,observation=observation,now=now,source_class=candidate_source_class)
             if provenance.get('france_basic_v1'):
                 _apply_france_basic(event, source, observation, candidate_source_class, now)
             assert roster_mapping is not None
@@ -874,6 +886,10 @@ def apply_data_sync_result_observation(
                     ),
                     source.source_key: row["external_runner_id"],
                 }
+                if us_source(source) and runner.pk is None:
+                    runner.odds_value = us_odds(row['field_provenance'])
+                    runner.source_refs.update(us_refs(row['field_provenance']))
+                    runner.source_refs['bootstrap_kind'] = 'result'
                 if france_source(source) and runner.pk is None:
                     runner.odds_value = france_odds(row["field_provenance"])
                     runner.source_refs.update(france_refs(row["field_provenance"]))
@@ -900,7 +916,7 @@ def apply_data_sync_result_observation(
                                     field_name=field, manual_lock=True).exists()):
                                 units[field] = HKJC_UNITS[field]
                         runner.source_refs['field_units'] = units
-                if japan_source(source) or hkjc_source(source) or france_source(source):
+                if japan_source(source) or hkjc_source(source) or france_source(source) or us_source(source):
                     # 既有卡表负重未在赛果投影中替换，其单位也必须原样保留。
                     if runner.pk is None and japan_source(source):
                         runner.source_refs['field_units'] = {
@@ -1052,14 +1068,14 @@ def apply_data_sync_result_observation(
                         carried_weight=item.carried_weight,
                         running_status=item.status,
                         popularity=result_popularity(item.field_provenance) if japan_source(source) else "",
-                        odds_value=result_odds(item.field_provenance) if hkjc_source(source) else france_odds(item.field_provenance) if france_source(source) else "",
+                        odds_value=result_odds(item.field_provenance) if hkjc_source(source) else france_odds(item.field_provenance) if france_source(source) else us_odds(item.field_provenance) if us_source(source) else "",
                         is_confirmed=True,
                         source_refs={
                             "source_key": source.source_key,
                             "external_runner_id": row["external_runner_id"],
                             "revision_id": revision.pk,
                             **({"field_units": {"carried_weight": "kg", "margin": "length"}}
-                               if japan_source(source) else {"field_units": dict(HKJC_UNITS), "margin_basis": "winner", "primary": source.canonical_url} if hkjc_source(source) else france_refs(item.field_provenance) if france_source(source) else {}),
+                               if japan_source(source) else {"field_units": dict(HKJC_UNITS), "margin_basis": "winner", "primary": source.canonical_url} if hkjc_source(source) else france_refs(item.field_provenance) if france_source(source) else us_refs(item.field_provenance) if us_source(source) else {}),
                         },
                         raw_payload={
                             "raw_status": item.raw_status,
