@@ -73,8 +73,8 @@
 
     <nav class="race-subnav" aria-label="赛事详情模块">
       <a href="#overview" class="active">概览</a>
-      {% if runners %}<a href="#runners">{{ runner_section_label }}</a>{% endif %}
-      {% if results %}<a href="#results">赛果</a>{% endif %}
+      {% if runners and not division_events %}<a href="#runners">{{ runner_section_label }}</a>{% endif %}
+      {% if results and not division_events %}<a href="#results">赛果</a>{% endif %}
       {% if history_winners %}<a href="#history">历年冠军</a>{% endif %}
       {% if has_news %}<a href="#news">相关新闻</a>{% endif %}
     </nav>
@@ -105,6 +105,7 @@
       </div>
     </section>
 
+    {% if not division_events %}
     <section class="panel" id="runners">
       <h2>{{ runner_section_label }}</h2>
       {% if runner_preview %}{% timezone "Asia/Shanghai" %}<p>更新于{{ runner_preview.checked_at|date:"Y-m-d H:i" }}（北京时间）{% if runner_preview.stale %} · 更新延迟{% endif %}</p>{% endtimezone %}{% endif %}
@@ -157,6 +158,8 @@
           </table>
         </div>
       </section>
+    {% endif %}
+
     {% endif %}
 
     {% if history_winners %}

@@ -3945,6 +3945,10 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
         if len(candidates) > 1:
             series_events = candidates
     has_news = any(news_groups.values())
+    division_events = list(event.divisions.filter(visibility_status=RaceEventVisibility.PUBLISHED).order_by("local_start_time", "id"))
+    status_label = _public_race_status_label(event, timezone.localdate(), winner)
+    if division_events:
+        status_label = "分场赛事"
     return _render_race_information(
         request,
         "stable/public/race_detail.html",
@@ -3965,14 +3969,14 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
             "news_groups": news_groups,
             "live_result_status": live_result_status,
             "result_section_label": result_section_label,
-            "division_events": event.divisions.filter(visibility_status=RaceEventVisibility.PUBLISHED).order_by("local_start_time", "id"),
+            "division_events": division_events,
             "canonical_product_event": (
                 canonical_product_link.canonical_event
                 if canonical_product_link
                 else None
             ),
             "has_news": has_news,
-            "status_label": _public_race_status_label(event, timezone.localdate(), winner),
+            "status_label": status_label,
         },
     )
 
