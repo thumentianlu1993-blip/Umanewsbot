@@ -955,6 +955,7 @@
     ],
     "us_source_collection": [
       "stable.test_us_automation",
+      "stable.test_us_flat_results",
       "stable.test_race_multisource_regions",
       "stable.test_race_multisource_identity",
       "stable.test_japan_automation",
@@ -2992,6 +2993,12 @@
       "domains": [
         "us_source_collection"
       ]
+    },
+    "server/stable/test_us_flat_results.py": {
+      "label": "stable.test_us_flat_results",
+      "domains": [
+        "us_source_collection"
+      ]
     }
   },
   "profiles": {
@@ -3317,7 +3324,8 @@
     "stable.test_france_release_handoff": "django",
     "stable.test_france_public_fields": "django",
     "stable.test_france_field_concurrency": "django",
-    "stable.test_us_automation": "django"
+    "stable.test_us_automation": "django",
+    "stable.test_us_flat_results": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {

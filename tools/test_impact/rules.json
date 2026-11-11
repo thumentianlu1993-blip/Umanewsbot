@@ -1599,6 +1599,18 @@
     ],
     "docs/changes/us-race-automation/ci-scope.json": [
       "infrastructure"
+    ],
+    "server/stable/services/us_flat_results.py": [
+      "us_source_collection"
+    ],
+    "server/stable/services/us_flat_collection.py": [
+      "us_source_collection"
+    ],
+    "server/stable/management/commands/verify_us_flat_results.py": [
+      "us_source_collection"
+    ],
+    "server/stable/fixtures/us_flat_results/**": [
+      "us_source_collection"
     ]
   },
   "symbols": {

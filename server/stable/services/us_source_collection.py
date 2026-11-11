@@ -42,6 +42,8 @@ def atomic_json(path, value):
 
 
 class SourceStore:
+    url_allowed = staticmethod(allowed_url)
+
     def __init__(self, root, *, allow_network=False, now=None, max_requests=80, max_bytes=8*1024*1024):
         self.root = Path(root)
         self.allow_network = allow_network
@@ -62,7 +64,7 @@ class SourceStore:
             raise ValueError('us_cache_schema')
 
     def get(self, url):
-        if not allowed_url(url):
+        if not self.url_allowed(url):
             raise ValueError('us_source_url_rejected')
         if url in self.failures:
             raise ValueError(self.failures[url])

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "base_sha": "3c495d3b4a8c760cb7addc5ce4ea635573db5e9a",
-  "reason": "美国只读采集层；共享adapter仅增加del_mar的两个分派分支，覆盖新模块及日港法/身份直接入口回归、core和测试基础设施；无模型、迁移、任务、配置或公开写入变化。全部字节绑定供独立review核对。",
+  "reason": "美国只读采集层及平地全场赛果增量；DRF/补源纯解析、有界缓存回放，SourceStore仅增加URL校验覆写点；覆盖美国和既有日港法/身份入口回归、core及测试基础设施。无生产写入、模型、迁移、任务或开关变化。",
   "domains": [
     "us_source_collection"
   ],
@@ -15,10 +15,18 @@
       "after_mode": "100644"
     },
     {
+      "path": "docs/changes/us-race-automation/flat_results.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "8c880fa7105dbc23c17535eb5d8fb5e1ef14d429408fdb0e4dedc0f4a3f1f91c",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
       "path": "docs/changes/us-race-automation/release_evidence.md",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "dc0684b2b20cab9ed9c9a0994e170322d22d215852174ffae8f98bb6c521758c",
+      "after_hash": "27b9a41a882187db52559c5d38d0e451647397144022ebe6148a53dd3d87507f",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -58,7 +66,7 @@
       "path": "docs/current_state.md",
       "status": "modified",
       "before_hash": "680364e5da2eb85fa0c2ed71650db444d7b93c1687b61e464d84398646231b03",
-      "after_hash": "2e08ffadd10e77e667b84d1444ea16fc00c46bad9de26c3b8f5f5a6e283cdf57",
+      "after_hash": "0be66e1b3c5e163bd2baf7c577a1820154db31dd262ffddd4ec8e0e33bb4d05b",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -199,6 +207,230 @@
       "after_mode": "100644"
     },
     {
+      "path": "server/stable/fixtures/us_flat_results/.gitattributes",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "547f59603028195ff9f8a87d04c4651551e8bd0d68f075257dfd549cd846b25b",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/BEL2026102508.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "0eb4b084b77e56c6ade742c201460cf85bc5bd13859704b29f7145bab52a3208",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/BEL2026102508.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "40608cb2a3694bc0e2d968bac9492132a02b2d4cb9f7f9d469d5c29ce104800c",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/CD2026110708.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "42fde040231bd88a12bd95c43d9f39e614a531e14f056fa8b975aab67a79feeb",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/CD2026110708.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "941fd8472ac9a68aaa8ded94961f079510ce12d90d995bf431cad6f784852438",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/CNL2026090709.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "b87a28fbe905a8067ae177e005157da638d7ea24c77e83f53edad69d66b5dfb4",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/CNL2026090709.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "ebfe1d9416ffa7a3101647268efc0c0ed1a9120a681d657b46f91f46861d1215",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/DMR2026090510.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "aa082ad96468c50cf2571a9869f2a8f29562d56a8db8688dbde65541bc51d761",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/DMR2026090510.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "830f377d25506175fca23e9ae8a7183d6f1e7000d5e5adde666f984122506329",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/KEE2026103006.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "98df61252adfcacb46124cc61939af1a9d844639ce19af2bf2eb3af2b70e3d7c",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/KEE2026103006.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "a0c6bcc9f30d0083a6bbf2d49a17412ed83590f9fb0591515dac9d3b639324d0",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/KEE2026103105.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "08cb8c974ed5dbd503131521d8579e7b5a60ec8681f2a93e4de29273902d0675",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/KEE2026103105.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "889868de197dd9beeaaf006ca15d2cba183703cffa89b824977c989365d7c4d6",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/PRX2026091912.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "6a7c7ac52f1db16bd207405d8de2b3e2ef4d3c118842569cb817948fe3f446aa",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/PRX2026091913.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "98aa7fb76b64fa6eff25ed4adf8c8f370036a6bd0249b2264e54bfbdd638a359",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/PRX2026091914.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "b09936a00183323594cb9c7ed64cc1ef0b576b91229f5d6e32232747609a5fe6",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/SA2026100302.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "e577f47f8bf3ec73263d60d85d9e44fe4f7bba05ae7657de2351194bfc65e8aa",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/SA2026100302.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "0db891c07cbffc65f50944e2541c57657ccbcb86a3a94d028200a61d3e95770c",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/abr-cotillion-s.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "065628850e6dc189b3a4f519c377ac4a6097d78433f217eb6d018f45f1d6f6d1",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/abr-gallant-bob-s.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "3ccf4eb956e45ca62abfd21f0ecaf0e21ed0d9b613d607cc176658f4b1a9c5c2",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/abr-pennsylvania-derby.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "34ea02af5744c4398208695fd5d62a08d67caec5ab76c88f6548e175ab67bad4",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/drf-index.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "90c8c89272776e129eecec5149cf331b321468df5887d620e2a5a73f5f892be0",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/provenance.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "06aa60f7187f8414d92cf89e9565b51c64b009595c1e2705d88ccb0eca1dee34",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/sl-day.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "fa821bbb59b815a9c260c47b98c5df5e9fc9fbda7ae99ebf04e71a4b4599aba2",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/targets.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "73aa07602a8f04108fbcab89f99b8cba1451b87d780ebb656d159a347c1c15d7",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/tn-derby-entries.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "00a9795072b15283b4b0bb1afa12d04b338d8baf2b0a5ce0f6899afea4531e30",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/tn-gallant-entries.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "ffd5256e3f5fda85047f7a2fd292ac32267e6ea7102681331e3e9ed28e2b5db3",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/management/commands/verify_us_flat_results.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "5ee77a8d0cd528d2604e307b6912073a67bf1b8e3f0f56f2136ca8dcc4ad1925",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
       "path": "server/stable/management/commands/verify_us_sources.py",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -212,6 +444,22 @@
       "before_hash": "f6b94cc1c41886b56205fb08706fddca0636e89c2aeba3e7d9d6c8cc5a458f97",
       "after_hash": "9d7a57452e10dcdf9c50b08efabec9d00ac74f7b69f9d40b43e3eebe0dda7803",
       "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_flat_collection.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "b9bd0bbfb116e049c3309648fc43b793afa6dfafbc94cb2462e1e1a6a44d71bb",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_flat_results.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "c5aefc9234f1b4894f7efc712904acd49dd6b4d2dfe630d4059332a52b5814c8",
+      "before_mode": null,
       "after_mode": "100644"
     },
     {
@@ -234,7 +482,7 @@
       "path": "server/stable/services/us_source_collection.py",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "5b5d9650d04cd7c5eac12a9274f90cfd5ef8c927805aa8726806594a384b7070",
+      "after_hash": "d454b27e000956fe598e9dbe6519311acd386d7a207f197f935ca2fcdfe1bf84",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -247,10 +495,18 @@
       "after_mode": "100644"
     },
     {
+      "path": "server/stable/test_us_flat_results.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "a06e8f292915615a7e44e383ad10fa6d07403cd0cfd988890f2ccdb59b4313f2",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
       "path": "tools/test_impact/catalog.json",
       "status": "modified",
       "before_hash": "16436b4a7ec10f969a8ddc070cb8ec9e663b7dd94cdbcf9906c215b1bf8bb325",
-      "after_hash": "c21fe10961fa4f2e1f4e7799688a8ce95a8a7f25113bfc855c02ce7d43100756",
+      "after_hash": "ddc47307e92ea754e0b123f47595ac66dd859f96bd52e80d3ffae407761cf7b9",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -258,7 +514,7 @@
       "path": "tools/test_impact/rules.json",
       "status": "modified",
       "before_hash": "11d656ac1042ffbb158766c77025d6ced0b03297d5f5f97237eca01c9e617411",
-      "after_hash": "46e331ac4db03f4313761112580e5699ad4f18af8101591f3c4158be6bf8bf4d",
+      "after_hash": "4370abf80726d2e4eb928c7d42772cfe1773801a9ea0f40c7bff9f2d9e563d3a",
       "before_mode": "100644",
       "after_mode": "100644"
     }

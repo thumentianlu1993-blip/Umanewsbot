@@ -48,3 +48,26 @@
     DB_ENGINE=sqlite SQLITE_DB_PATH=:memory: python server/manage.py verify_us_sources --start 2026-09-01 --end 2026-12-31 --cache-dir <既有缓存> --output-dir <新报告目录>
 
 离线为默认行为。来源/完整性不满足时命令保存report.json并非零退出，这是验收未通过，不是已上线。真实HTTP需要显式allow-network，并按根AGENTS.md既有授权范围执行。
+
+## 平地完整赛果增量（2026-11-11）
+
+新增纯 chart/补源解析与 `verify_us_flat_results` 只读验收入口。全窗口候选143条，已到日期104场
+全部结果来源重放通过：877匹实际出走、139匹退赛、39场未来待赛、零错误、零网络。
+实现与边界见 [平地赛果记录](flat_results.md)。这是来源层结果，生产身份、调度、写入及公开页
+仍未验收；本批无迁移、配置或生产动作。独立 review 和固定树范围验证已完成，详见下文。
+
+
+首轮独立审核会话 `01a1c876-cac3-7070-ae94-2c4cc18ba389` 提出两项 finding：赛程冲突遗漏分母、
+ABR 必需节点缺失逃逸整批。真实反例先得到1失败/3错误，修复后39项美国模块通过；另补ABR退赛
+名单一致性，缺失名单的真实反例先RED后GREEN。同一reviewer复审APPROVED，review前后指纹一致。
+
+固定快照 `f4be31e641c0f9aa8d8821c14eae942a88815df1`，tree
+`ad846606014c514786727040b105c8038d14ab0d`，在Linux无网络容器和隔离PostgreSQL完成287项、零跳过；
+`verify_test_plan`通过，plan digest `7202b8b52bacfa2587d950c6eca23050105d3eeb23b35b8d6d4c99e43c18bcd3`。
+镜像沿用 `sha256:262b3d18c36e8457263c9a63c6eb74c8f5c2ced725d87510bba08692adb67ca7`。
+首次启动因macOS默认临时目录未向Docker共享而在运行任何测试前失败；将本次临时目录移到runtime后
+完成上述验证，没有更改运行器或扩大网络权限。产物位于本机runtime/us-flat-results-20261111/linux-v2。
+
+此后仅回写文档和ci-scope字节清单，不改变受测业务/测试代码；远端CI仍按PR精确head绑定。
+本批保持Draft交付，无合并或生产上线。全量结果JSON保留各份来源URL/SHA/抓取时刻，CSV导出1016行，
+包括877匹出走和139匹退赛；源文件及报表位于本机runtime/us-flat-results-20261111。

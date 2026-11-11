@@ -7624,3 +7624,10 @@ v3 首次 prepare 在请求预算 `60/60` 时由 HRN 空候选连带阻断 Equib
 - 本机26项测试通过；31次有界HTTP原件零网络重放得到151条来源候选，仍有等级/身份/字段缺口，命令明确返回 incomplete。151不是生产分母，旧142平地计数曾覆盖Glen Cove第5/8场同名记录，现保留双方。
 - Bob Hope Listed/G3及Mariann De Tejeda G3/G2冲突未裁决；全窗口完整赛果主源、其他赛场报名、生产接入与自然调度未完成。
 - Linux最终固定树274项、零跳过；独立审核四处缺陷修复并复审通过。采集层进入Draft交付，尚未合并或上线。详见 changes/us-race-automation/release_evidence.md。
+
+## 2026-11-11 美国平地完整赛果来源增量
+
+在未合并的美国采集层分支补齐 DRF 全场 chart、Sporting Life/ABR 名单与马号核对及只读命令。
+2026年9—12月143条平地候选中，104场已到日期全部来源重放通过（877匹实际出走、139匹退赛），
+39场未来待赛。保留降名次、并列、未完赛及逐字段来源；没有生产写入或启用自动更新。
+独立review复审通过；Linux固定树287项、零跳过。保持Draft，尚未合并上线，见[平地赛果记录](changes/us-race-automation/flat_results.md)。
