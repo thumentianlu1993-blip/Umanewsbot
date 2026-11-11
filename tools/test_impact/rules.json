@@ -1581,6 +1581,54 @@
     ],
     "docs/changes/france-display-simplify/ci-scope.json": [
       "infrastructure"
+    ],
+    "server/stable/services/us_racing_sources.py": [
+      "us_source_collection"
+    ],
+    "server/stable/services/us_nsa_sources.py": [
+      "us_source_collection"
+    ],
+    "server/stable/services/us_source_collection.py": [
+      "us_source_collection"
+    ],
+    "server/stable/management/commands/verify_us_sources.py": [
+      "us_source_collection"
+    ],
+    "server/stable/fixtures/us_automation/**": [
+      "us_source_collection"
+    ],
+    "docs/changes/us-race-automation/ci-scope.json": [
+      "infrastructure"
+    ],
+    "server/stable/services/us_flat_results.py": [
+      "us_source_collection"
+    ],
+    "server/stable/services/us_flat_collection.py": [
+      "us_source_collection"
+    ],
+    "server/stable/management/commands/verify_us_flat_results.py": [
+      "us_source_collection"
+    ],
+    "server/stable/fixtures/us_flat_results/**": [
+      "us_source_collection"
+    ],
+    "server/stable/services/us_prerace_documents.py": [
+      "us_source_collection"
+    ],
+    "server/stable/services/us_prerelease_collection.py": [
+      "us_source_collection"
+    ],
+    "server/stable/services/us_race_inventory.py": [
+      "us_source_collection"
+    ],
+    "server/stable/services/us_steeplechase_results.py": [
+      "us_source_collection"
+    ],
+    "server/stable/management/commands/verify_us_prerelease.py": [
+      "us_source_collection"
+    ],
+    "server/stable/fixtures/us_prerelease/**": [
+      "us_source_collection"
     ]
   },
   "symbols": {
@@ -1768,6 +1816,7 @@
     "docs/changes/france-race-automation/handoff-ci-scope.json",
     "docs/changes/france-race-automation/geny-reload-ci-scope.json",
     "docs/changes/france-public-field-gaps/ci-scope.json",
-    "docs/changes/france-display-simplify/ci-scope.json"
+    "docs/changes/france-display-simplify/ci-scope.json",
+    "docs/changes/us-race-automation/ci-scope.json"
   ]
 }

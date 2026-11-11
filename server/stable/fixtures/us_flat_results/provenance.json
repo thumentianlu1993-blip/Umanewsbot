@@ -1,0 +1,164 @@
+[
+  {
+    "file": "CD2026110708.pdf",
+    "url": "https://www1.drf.com/displayChart.do?filepath=/download/simulcastweekly/charts/2611/CD2026110708.pdf",
+    "sha256": "941fd8472ac9a68aaa8ded94961f079510ce12d90d995bf431cad6f784852438"
+  },
+  {
+    "file": "CD2026110708.html",
+    "url": "https://www.sportinglife.com/racing/results/2026-11-07/churchill-downs/948111/race-8-river-city-stakes-grade-3",
+    "original_sha256": "df2fc596e5dd027a5db889772cca20d899b066ac54ac597e93ef3658b4cae8bc",
+    "sha256": "42fde040231bd88a12bd95c43d9f39e614a531e14f056fa8b975aab67a79feeb",
+    "extraction": "Unchanged pageProps.race from NEXT_DATA; unrelated HTML and meeting omitted",
+    "normalization": "Trailing whitespace removed; source bytes retained in runtime"
+  },
+  {
+    "file": "SA2026100302.pdf",
+    "url": "https://www1.drf.com/displayChart.do?filepath=/download/simulcastweekly/charts/2610/SA2026100302.pdf",
+    "sha256": "0db891c07cbffc65f50944e2541c57657ccbcb86a3a94d028200a61d3e95770c"
+  },
+  {
+    "file": "SA2026100302.html",
+    "url": "https://www.sportinglife.com/racing/results/2026-10-03/santa-anita/942239/race-2-chillingworth-stakes-grade-3",
+    "original_sha256": "25243504acaf4a3d6cb03aaa89d521c97feacd97a95d28a8ef9ae9dd09e6c2ec",
+    "sha256": "e577f47f8bf3ec73263d60d85d9e44fe4f7bba05ae7657de2351194bfc65e8aa",
+    "extraction": "Unchanged pageProps.race from NEXT_DATA; unrelated HTML and meeting omitted",
+    "normalization": "Trailing whitespace removed; source bytes retained in runtime"
+  },
+  {
+    "file": "KEE2026103006.pdf",
+    "url": "https://www1.drf.com/displayChart.do?filepath=/download/simulcastweekly/charts/2610/KEE2026103006.pdf",
+    "sha256": "a0c6bcc9f30d0083a6bbf2d49a17412ed83590f9fb0591515dac9d3b639324d0"
+  },
+  {
+    "file": "KEE2026103006.html",
+    "url": "https://www.sportinglife.com/racing/results/2026-10-30/keeneland/946393/race-6-breeders-cup-juvenile-turf-sprint-grade-1",
+    "original_sha256": "88fa2de0efab5dcfb7ef351339297db3c92bd94c878d286c7de0aece69428cb9",
+    "sha256": "98df61252adfcacb46124cc61939af1a9d844639ce19af2bf2eb3af2b70e3d7c",
+    "extraction": "Unchanged pageProps.race from NEXT_DATA; unrelated HTML and meeting omitted",
+    "normalization": "Trailing whitespace removed; source bytes retained in runtime"
+  },
+  {
+    "file": "KEE2026103105.pdf",
+    "url": "https://www1.drf.com/displayChart.do?filepath=/download/simulcastweekly/charts/2610/KEE2026103105.pdf",
+    "sha256": "889868de197dd9beeaaf006ca15d2cba183703cffa89b824977c989365d7c4d6"
+  },
+  {
+    "file": "KEE2026103105.html",
+    "url": "https://www.sportinglife.com/racing/results/2026-10-31/keeneland/946402/race-5-prevagen-breeders-cup-turf-sprint-grade-1",
+    "original_sha256": "c15e692ce928d2b7124bd597a96c42e6b0bcd5d7eeff26b61c48337663ec579c",
+    "sha256": "08cb8c974ed5dbd503131521d8579e7b5a60ec8681f2a93e4de29273902d0675",
+    "extraction": "Unchanged pageProps.race from NEXT_DATA; unrelated HTML and meeting omitted",
+    "normalization": "Trailing whitespace removed; source bytes retained in runtime"
+  },
+  {
+    "file": "CNL2026090709.pdf",
+    "url": "https://www1.drf.com/displayChart.do?filepath=/download/simulcastweekly/charts/2609/CNL2026090709.pdf",
+    "sha256": "ebfe1d9416ffa7a3101647268efc0c0ed1a9120a681d657b46f91f46861d1215"
+  },
+  {
+    "file": "CNL2026090709.html",
+    "url": "https://www.sportinglife.com/racing/results/2026-09-07/colonial-downs/937920/race-9-old-dominion-derby-grade-3",
+    "original_sha256": "fdbe5f98c4911ec41f7ba865bd245bc7b1782b6b7eb1271aad6c5ad99fd0019a",
+    "sha256": "b87a28fbe905a8067ae177e005157da638d7ea24c77e83f53edad69d66b5dfb4",
+    "extraction": "Unchanged pageProps.race from NEXT_DATA; unrelated HTML and meeting omitted",
+    "normalization": "Trailing whitespace removed; source bytes retained in runtime"
+  },
+  {
+    "file": "BEL2026102508.pdf",
+    "url": "https://www1.drf.com/displayChart.do?filepath=/download/simulcastweekly/charts/2610/BEL2026102508.pdf",
+    "sha256": "40608cb2a3694bc0e2d968bac9492132a02b2d4cb9f7f9d469d5c29ce104800c"
+  },
+  {
+    "file": "BEL2026102508.html",
+    "url": "https://www.sportinglife.com/racing/results/2026-10-25/belmont-park/946058/race-8-glen-cove-stakes-grade-3",
+    "original_sha256": "b6dd0afcd5b6e7eb6d38dcb4a289f40a946dd97de32d183950727d5853a2cbfc",
+    "sha256": "0eb4b084b77e56c6ade742c201460cf85bc5bd13859704b29f7145bab52a3208",
+    "extraction": "Unchanged pageProps.race from NEXT_DATA; unrelated HTML and meeting omitted",
+    "normalization": "Trailing whitespace removed; source bytes retained in runtime"
+  },
+  {
+    "file": "DMR2026090510.pdf",
+    "url": "https://www1.drf.com/displayChart.do?filepath=/download/simulcastweekly/charts/2609/DMR2026090510.pdf",
+    "sha256": "830f377d25506175fca23e9ae8a7183d6f1e7000d5e5adde666f984122506329"
+  },
+  {
+    "file": "DMR2026090510.html",
+    "url": "https://www.sportinglife.com/racing/results/2026-09-06/del-mar/937536/race-10-del-mar-debutante-stakes-grade-1",
+    "original_sha256": "4dda3cba95dd80539d98ef568d6b1481c935136ee5f5e2f78cf9cf87bb6b205c",
+    "sha256": "aa082ad96468c50cf2571a9869f2a8f29562d56a8db8688dbde65541bc51d761",
+    "extraction": "Unchanged pageProps.race from NEXT_DATA; unrelated HTML and meeting omitted",
+    "normalization": "Trailing whitespace removed; source bytes retained in runtime"
+  },
+  {
+    "file": "PRX2026091914.pdf",
+    "url": "https://www1.drf.com/displayChart.do?filepath=/download/simulcastweekly/charts/2609/PRX2026091914.pdf",
+    "sha256": "b09936a00183323594cb9c7ed64cc1ef0b576b91229f5d6e32232747609a5fe6"
+  },
+  {
+    "file": "tn-gallant-entries.html",
+    "url": "https://www.truenicks.com/articles/294552/bravaro-takes-on-sprinters-in-gallant-bob-stakes",
+    "original_sha256": "a44407f9d3ae952974d8852064f51ea50e7c4f8324d744be4e7c7eed3b73dfc4",
+    "sha256": "ffd5256e3f5fda85047f7a2fd292ac32267e6ea7102681331e3e9ed28e2b5db3",
+    "extraction": "Unchanged race-entry-shortcode sections",
+    "normalization": "Trailing whitespace removed; source bytes retained in runtime"
+  },
+  {
+    "file": "tn-derby-entries.html",
+    "url": "https://www.truenicks.com/articles/294568/further-ado-the-puma-headline-pennsylvania-derby",
+    "original_sha256": "1f696f1f3c5d78858d60a57cf722268a4d09dc90bc9822301abf4e34cb911339",
+    "sha256": "00a9795072b15283b4b0bb1afa12d04b338d8baf2b0a5ce0f6899afea4531e30",
+    "extraction": "Unchanged race-entry-shortcode sections",
+    "normalization": "Trailing whitespace removed; source bytes retained in runtime"
+  },
+  {
+    "file": "PRX2026091912.pdf",
+    "url": "https://www1.drf.com/displayChart.do?filepath=/download/simulcastweekly/charts/2609/PRX2026091912.pdf",
+    "sha256": "6a7c7ac52f1db16bd207405d8de2b3e2ef4d3c118842569cb817948fe3f446aa"
+  },
+  {
+    "file": "PRX2026091913.pdf",
+    "url": "https://www1.drf.com/displayChart.do?filepath=/download/simulcastweekly/charts/2609/PRX2026091913.pdf",
+    "sha256": "98aa7fb76b64fa6eff25ed4adf8c8f370036a6bd0249b2264e54bfbdd638a359"
+  },
+  {
+    "file": "abr-pennsylvania-derby.html",
+    "url": "https://www.americasbestracing.net/races/2026-pennsylvania-derby",
+    "original_sha256": "64ebca09ab8003deb203f808d65342a5485e2e86082f047f1f02a487f37332a5",
+    "sha256": "34ea02af5744c4398208695fd5d62a08d67caec5ab76c88f6548e175ab67bad4",
+    "extraction": "Unchanged h1, race-date, race-results and scratches elements",
+    "normalization": "Trailing whitespace removed; source bytes retained in runtime"
+  },
+  {
+    "file": "abr-gallant-bob-s.html",
+    "url": "https://www.americasbestracing.net/races/2026-gallant-bob-s",
+    "original_sha256": "b38a3bc8276beae604a7dec3610f07cea91c3ced0a7adab843d1074fa9418d18",
+    "sha256": "3ccf4eb956e45ca62abfd21f0ecaf0e21ed0d9b613d607cc176658f4b1a9c5c2",
+    "extraction": "Unchanged h1, race-date, race-results and scratches elements",
+    "normalization": "Trailing whitespace removed; source bytes retained in runtime"
+  },
+  {
+    "file": "abr-cotillion-s.html",
+    "url": "https://www.americasbestracing.net/races/2026-cotillion-s",
+    "original_sha256": "0b525a5d5cb36fcc68027b77a45b4ddf673d55008c911100fa3f9681c157c29e",
+    "sha256": "065628850e6dc189b3a4f519c377ac4a6097d78433f217eb6d018f45f1d6f6d1",
+    "extraction": "Unchanged h1, race-date, race-results and scratches elements",
+    "normalization": "Trailing whitespace removed; source bytes retained in runtime"
+  },
+  {
+    "file": "drf-index.html",
+    "url": "https://www1.drf.com/StakesResults/MainMenu.do",
+    "original_sha256": "bbc35249cb3ce9558c8a2728c782334f6c0a652d4d6c2fb2801f6cb8510e674e",
+    "sha256": "90c8c89272776e129eecec5149cf331b321468df5887d620e2a5a73f5f892be0",
+    "extraction": "Selected unchanged DOM elements",
+    "normalization": "Trailing whitespace removed; source bytes retained in runtime"
+  },
+  {
+    "file": "sl-day.html",
+    "url": "https://www.sportinglife.com/racing/results/2026-11-07",
+    "original_sha256": "c81dc2f063f6bd21c6262abc8c4f260a5eedd039ce1e8d5a325eefd56e05150c",
+    "sha256": "fa821bbb59b815a9c260c47b98c5df5e9fc9fbda7ae99ebf04e71a4b4599aba2",
+    "extraction": "Selected unchanged DOM elements",
+    "normalization": "Trailing whitespace removed; source bytes retained in runtime"
+  }
+]

@@ -1,0 +1,3 @@
+*.pdf binary
+# 保留来源HTML的混合缩进原始字节，其他空白规则继续检查。
+*.html whitespace=-space-before-tab
