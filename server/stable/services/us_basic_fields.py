@@ -48,6 +48,7 @@ def apply_metadata_locked(*, event, source, observation, now, source_class):
     require_sha(meta['source_sha256']);observed=aware(meta['observed_at'])
     if observed>now:raise ValueError('us_metadata_future')
     flags=RaceDataSyncFlags.from_settings();changed=set();refs=dict(event.source_refs or {})
+    apply_actual_time_locked(event=event,source=source,observation=observation,meta=meta,now=now,source_class=source_class)
     target=meta.get('catalogue') or {}
     values=catalogue_values(target)
     if target and (target.get('local_date')!=str(event.local_date) or target.get('venue')!=source.external_race_id.split(':')[0]):
@@ -59,12 +60,21 @@ def apply_metadata_locked(*, event, source, observation, now, source_class):
     for group,fields in groups:
         if not flags.allows(provider=source.source_key,region=source.region_code,field_name='us_basic.'+group):continue
         authorities={};deny=False
+        announced=refs.get('us_pre_race_schedule',{})
+        phase_upgrade=(group=='prize' and announced.get('prize_stage')=='announced'
+            and announced.get('local_date')==str(event.local_date)
+            and announced.get('candidate_key')==(refs.get('us_target_v1') or {}).get('candidate_key'))
         for field,candidate in fields.items():
             old=getattr(event,field)
             authority=event.field_authorities.select_for_update().filter(subject_type='event',subject_key=str(event.pk),field_name=field).first()
             authorities[field]=authority
-            decision=arbitrate_source_value(current_source_key=authority.source_key if authority else '',
-                current_source_class=authority.source_class if authority else '',current_observed_at=authority.observed_at if authority else None,
+            render=lambda value:str(value) if isinstance(value,Decimal) else value
+            prior=announced.get(field)
+            if field=='prize_amount' and prior is not None:prior=Decimal(prior)
+            upgrade=(phase_upgrade and authority is not None and authority.source_key=='us_racing_schedule'
+                and old==prior and authority.value_sha256==canonical_sha(render(prior)))
+            decision=arbitrate_source_value(current_source_key=authority.source_key if authority and not upgrade else '',
+                current_source_class=authority.source_class if authority and not upgrade else '',current_observed_at=authority.observed_at if authority and not upgrade else None,
                 candidate_source_key=source.source_key,candidate_source_class=source_class,candidate_observed_at=observed,
                 has_current_value=old not in (None,''),values_equal=old==candidate,
                 manual_locked=bool((event.manual_lock_flags or {}).get('basic') or (event.manual_lock_flags or {}).get(field) or authority and authority.manual_lock))
@@ -72,7 +82,7 @@ def apply_metadata_locked(*, event, source, observation, now, source_class):
         if deny:continue
         for field,candidate in fields.items():
             old=getattr(event,field)
-            if old==candidate:continue
+            if old==candidate and not phase_upgrade:continue
             render=lambda value:str(value) if isinstance(value,Decimal) else value
             models.RaceEventFieldChange.objects.create(event=event,subject_type='event',subject_key=str(event.pk),field_name=field,
                 old_value=render(old),new_value=render(candidate),applied=True,decision='applied',
@@ -83,9 +93,63 @@ def apply_metadata_locked(*, event, source, observation, now, source_class):
             authority.external_id=source.external_race_id;authority.observed_at=observed
             authority.authority_level=source_priority(source_class);authority.value_sha256=canonical_sha(render(candidate));authority.save()
             setattr(event,field,candidate);changed.add(field)
+        if phase_upgrade:
+            refs['us_pre_race_schedule']={**announced,'prize_stage':'superseded_by_result'};changed.add('source_refs')
     if (flags.allows(provider=source.source_key,region=source.region_code,field_name='us_basic.race_metadata')
         and not (event.manual_lock_flags or {}).get('basic') and refs.get('us_race_metadata')!=meta):
         refs['us_race_metadata']=meta;changed.add('source_refs')
     if changed:
         event.source_refs=refs
         event.save(update_fields=changed|{'updated_at'})
+
+
+def apply_actual_time_locked(*, event, source, observation, meta, now, source_class):
+    """已通过赛果发布检查的实际时刻投影；不以计划时间代填。"""
+    from zoneinfo import ZoneInfo
+    from stable import models
+    from .race_data_source_adapters import aware, canonical_sha, require_sha
+    from .race_data_sync_pipeline import RaceDataSyncFlags, _audit_defaults
+    from .race_data_sync_policy import arbitrate_source_value, source_priority
+    from .us_venues import VENUES
+    flags=RaceDataSyncFlags.from_settings()
+    if not flags.schedule_apply_enabled or not all(flags.allows(provider=source.source_key,region=source.region_code,field_name=f)
+        for f in ('off_time','local_start_time','timezone_name')):return False
+    stamp=meta.get('off_time')
+    if not stamp:return False
+    stamp=aware(stamp)
+    if stamp!=aware(observation.normalized_payload.get('off_time')):raise ValueError('us_actual_clock_mismatch')
+    zone=VENUES[source.external_race_id.split(':')[0]][2]
+    local=stamp.astimezone(ZoneInfo(zone))
+    if local.date()!=event.local_date or stamp>now:raise ValueError('us_actual_clock_date')
+    evidence=meta['field_sources']['off_time'];require_sha(evidence['sha256'])
+    proposed=dict(race_datetime=stamp,local_start_time=local.time(),timezone_name=zone)
+    lock_fields=set(proposed)|{'basic','race_time','off_time','local_date'}
+    if any((event.manual_lock_flags or {}).get(f) for f in lock_fields) or event.field_authorities.filter(
+        subject_type='event',field_name__in=lock_fields,manual_lock=True).exists():return False
+    authorities={};observed=aware(meta['observed_at'])
+    render=lambda v:v.isoformat() if hasattr(v,'isoformat') else v
+    for field,candidate in proposed.items():
+        old=getattr(event,field)
+        authority=event.field_authorities.select_for_update().filter(subject_type='event',subject_key=str(event.pk),field_name=field).first()
+        authorities[field]=authority
+        decision=arbitrate_source_value(current_source_key=authority.source_key if authority else '',
+            current_source_class=authority.source_class if authority else '',current_observed_at=authority.observed_at if authority else None,
+            candidate_source_key=source.source_key,candidate_source_class=source_class,candidate_observed_at=observed,
+            has_current_value=old not in (None,''),values_equal=old==candidate,manual_locked=False)
+        if not decision.apply and decision.reason_code!='idempotent_replay':return False
+    audit=_audit_defaults(observation=observation,task_id='us_result_actual_time',run_id='')
+    changed=[]
+    for field,candidate in proposed.items():
+        old=getattr(event,field);authority=authorities[field]
+        if old!=candidate:
+            models.RaceEventFieldChange.objects.create(event=event,subject_type='event',subject_key=str(event.pk),field_name=field,
+                old_value=render(old),new_value=render(candidate),applied=True,decision='applied',
+                **{**audit,'source_key':source.source_key,'source_url':evidence['url'],'source_class':source_class,
+                   'authority_level':source_priority(source_class),'raw_sha256':evidence['sha256'],'operation_mode':'us_actual_time'})
+            setattr(event,field,candidate);changed.append(field)
+        authority=authority or models.RaceEventFieldAuthority(event=event,subject_type='event',subject_key=str(event.pk),field_name=field)
+        authority.source_key=source.source_key;authority.source_class=source_class;authority.source_url=evidence['url']
+        authority.external_id=source.external_race_id;authority.observed_at=observed
+        authority.authority_level=source_priority(source_class);authority.value_sha256=canonical_sha(render(candidate));authority.save()
+    if changed:event.save(update_fields=changed+['updated_at'])
+    return bool(changed)

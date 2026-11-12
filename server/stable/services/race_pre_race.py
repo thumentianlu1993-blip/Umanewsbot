@@ -595,6 +595,8 @@ def _fetch_bounded_html(url, *, now, provider, region, validator, enabled, binar
     failure = None
     browser = bool(getattr(settings, 'JRA_BROWSER_URL', '') and urlsplit(url).hostname == 'www.jra.go.jp')
     france_browser = bool(getattr(settings, 'FRANCE_BROWSER_URL', '') and urlsplit(url).hostname in {'www.geny.com','www.france-galop.com'})
+    from .us_browser_transport import uses_browser
+    us_browser = provider == 'us_racing' and uses_browser(url)
     document_budget = 2 if browser and urlsplit(url).path.startswith('/JRADB/') else 1
     if france_browser:
         from .france_browser_transport import browser_document_budget
@@ -614,8 +616,10 @@ def _fetch_bounded_html(url, *, now, provider, region, validator, enabled, binar
         try:
             if not enabled():
                 raise JraFetchError('jra_pre_race_disabled')
-            if browser or france_browser:
-                if france_browser:
+            if browser or france_browser or us_browser:
+                if us_browser:
+                    from .us_browser_transport import fetch_browser_document
+                elif france_browser:
                     from .france_browser_transport import fetch_browser_document
                 else:
                     from .jra_browser_transport import fetch_browser_document
@@ -686,7 +690,8 @@ def _fetch_bounded_html(url, *, now, provider, region, validator, enabled, binar
         raise failure or JraFetchError(exc.reason_code) from exc
     if binary:
         import base64
-        return SourceBytes(base64.b64decode(payload['bytes_b64'], validate=True), _dt(payload.get('observed_at')))
+        return SourceBytes(payload['html'].encode('utf-8') if us_browser and 'html' in payload else
+                           base64.b64decode(payload['bytes_b64'], validate=True), _dt(payload.get('observed_at')))
     return JraPage(payload['html'], payload['raw_sha256'], _dt(payload.get('observed_at')))
 
 

@@ -242,7 +242,7 @@ def event_fields(obj):
                      if ctx['distance_unit_conflict'] else
                      parse_display_distance(value(obj, 'distance_text'), unit_hint=ctx['distance_unit'], context=ctx)),
         'surface': parse_display_surface(surface_raw),
-        'race_type': parse_display_race_type(value(obj,'race_type_text') or (value(obj,'normalized_race_type') if value(obj,'country_region')=='france' else '') or ('jumps' if surface_raw == 'jumps' else '')),
+        'race_type': parse_display_race_type(value(obj,'race_type_text') or (value(obj,'normalized_race_type') if value(obj,'country_region') in {'france','united_states'} else '') or ('jumps' if surface_raw == 'jumps' else '')),
         'layout': parse_display_layout(value(obj,'course_layout_text')),
         'prize': (parse_display_money(value(obj,'prize_amount'), currency=value(obj,'prize_currency'), kind='total')
                   if value(obj,'prize_amount', None) is not None else parse_display_money(value(obj,'prize_text'))),
@@ -259,19 +259,30 @@ def event_fields(obj):
     metadata = refs.get('us_race_metadata', {}) if isinstance(refs, dict) else {}
     fields['race_time'] = parse_display_time(metadata.get('winning_time', '') if value(obj,'country_region')=='united_states' else '')
     if value(obj,'country_region')=='united_states':
+        if metadata.get('surface') in {'turf','dirt','synthetic'} and not (value(obj,'manual_lock_flags',{}) or {}).get('surface'):
+            fields['surface'] = parse_display_surface(metadata['surface'])
+        race_kind = metadata.get('race_kind') or refs.get('us_target_v1', {}).get('race_kind')
+        if race_kind:
+            fields['race_type'] = parse_display_race_type(race_kind)
         splits=[parse_display_time('0'+v if v.startswith(':') else v) for v in metadata.get('fractional_times',[])]
         fields['fractional_times']=display_field('', ' / '.join(v.text for v in splits)) if splits and all(v.state=='normalized' for v in splits) else display_field('',state='missing')
         going=str(metadata.get('going','')).strip().lower()
         labels={'firm':'快地','good':'好地','soft':'软地','yielding':'软地','heavy':'大烂地','fast':'快地','sloppy':'湿泥地','muddy':'泥泞地'}
-        if going:fields['going']=display_field(going,labels[going]+'（'+going+'）',state='normalized') if going in labels else display_field(going,going,state='preserved')
+        raw_going = str(metadata.get('going_raw') or going)
+        if going:fields['going']=display_field(raw_going,labels[going]+'（'+raw_going+'）',state='normalized') if going in labels else display_field(raw_going,raw_going,state='preserved')
+    if value(obj,'country_region')=='united_states':
+        schedule=(value(obj,'source_refs',{}) or {}).get('us_pre_race_schedule',{})
+        if schedule.get('prize_stage')=='announced' and fields['prize'].state=='normalized':
+            from dataclasses import replace
+            fields['prize']=replace(fields['prize'],text=fields['prize'].text+'（计划）')
     return fields
 
 
-_STATUS_LABELS = {'nominated': '已报名', 'expected': '预想参赛', 'did_not_finish': '未完赛', 'dnf': '未完赛', 'pulled_up': '拉停', 'unseated_rider': '骑师落马',
+_STATUS_LABELS = {'nominated': '已报名', 'expected': '预想参赛', 'prospective': '预想参赛', 'did_not_finish': '未完赛', 'dnf': '未完赛', 'pulled_up': '拉停', 'unseated_rider': '骑师落马',
                   'fell': '跌倒', 'brought_down': '被碰倒', 'disqualified': '取消资格', 'scratched': '退赛',
                   'withdrawn': '取消出走', 'non_runner': '未出赛', 'declared': '已出走登记',
                   'refused': '拒跑', 'reinstated': '恢复出走', 'running': '进行中', 'unknown': '未知', 'finished': '完赛', 'dead_heat': '同着'}
-_NON_FINISH = set(_STATUS_LABELS) - {'declared', 'nominated', 'expected', 'running', 'reinstated', 'unknown', 'finished', 'dead_heat'}
+_NON_FINISH = set(_STATUS_LABELS) - {'declared', 'nominated', 'expected', 'prospective', 'running', 'reinstated', 'unknown', 'finished', 'dead_heat'}
 
 
 def _position(row, *, horse_record=False):

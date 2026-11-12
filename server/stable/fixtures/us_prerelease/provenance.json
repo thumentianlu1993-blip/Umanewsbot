@@ -323,5 +323,45 @@
     "sha256": "ff22ce1854dcd2a32a4e7ce6fed530a5b35621c9ee908fee3ca0f9f80ed17644",
     "source_sha256": "55cd58f44b57986b62e4052d56db83442e75496a498f722308e295754aef2b65",
     "normalization": "strip trailing whitespace"
+  },
+  {
+    "file": "nyra-stakes-schedule.html",
+    "url": "https://www.nyra.com/belmont/racing/stakes-schedule/",
+    "sha256": "bd64916bba5e45ed2a3703df3dd195736b6a41f808924ecab610b7ce4d0ff715",
+    "original_sha256": "1d74c87913092567c27cbbb59f452d6bfb283981b6be8db286849ebdc568eb14",
+    "extraction": "浏览器DOM中的原始标题与完整表格；删除无关导航和样式",
+    "captured_at": "2026-11-12T15:02:34.734Z",
+    "normalization": "仅去除行末空白，原始DOM摘要和提取说明保持"
+  },
+  {
+    "file": "dmtc-stakes-schedule.html",
+    "url": "https://www.dmtc.com/horsemen/nomforms",
+    "sha256": "864db228ed3cc8a04efdae03f94c738969261b8f7380ec1b4c0d26d74690904d",
+    "original_sha256": "70987968771d70c4125bdb8c8285a14aebdec12bb7607a7082c28b9b3360f500",
+    "extraction": "浏览器DOM中的原始标题与完整表格；删除无关导航和样式",
+    "captured_at": "2026-11-12T15:02:36.659Z",
+    "normalization": "仅去除行末空白，原始DOM摘要和提取说明保持"
+  },
+  {
+    "file": "gulfstream-stakes-schedule.html",
+    "url": "https://www.gulfstreampark.com/racing-information/stakes/2025-04-29/",
+    "sha256": "08ae16fd18ad46268217771c4e76ce17eefd0079d5ba8f5aa341d1b0b8ed1843",
+    "original_sha256": "39fee626e2adfff2c29987113c374bbded454d9304b9844317b506e14dfe78ad",
+    "extraction": "保留完整.stakes-box和标题，删除其余无关内容",
+    "captured_at": "2026-11-12T14:55:05.567689+00:00"
+  },
+  {
+    "file": "churchill-stakes-schedule.pdf",
+    "url": "https://www.churchilldowns.com/wp-content/uploads/sites/3/2026/09/Fall-Stakes.pdf",
+    "sha256": "3ff88079462d96f934bae38d87c53374502500ff891a44e8a42ab0637cf583ae",
+    "captured_at": "2026-11-12T14:55:04.028730+00:00"
+  },
+  {
+    "file": "nsa-directory-colonial-pending.html",
+    "url": "https://nationalsteeplechase.com/racing/",
+    "sha256": "42d30af94e814a03d67e4ff8727a7f79ee2353bad4e0635b091e2353fb8cb4d7",
+    "original_sha256": "f26b97bcc4472282cff23ac574434c8dd01acf6fc356e7f79780f8061c528350",
+    "captured_at": "2026-11-12T15:27:30.613Z",
+    "extraction": "保留Linux浏览器DOM内完整目录表格"
   }
 ]

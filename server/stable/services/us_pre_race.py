@@ -64,7 +64,9 @@ def fetch_preview(event, *, route, now, fetcher):
     day=date.fromisoformat(target['local_date'])
     if target.get('provider')=='nsa':
         document=nsa_preview(store,target)
-        return preview_document(document,target=target) if document else dict(stage='not_published',items=[],source={},local_date=target['local_date'])
+        if document['kind']=='not_published':
+            return dict(stage='not_published',items=[],source=document['source'],local_date=target['local_date'])
+        return preview_document(document,target=target)
     report=collect_prerace(store,start=day,end=day,target_keys={target['candidate_key']},
         flat_report=dict(start=day.isoformat(),end=day.isoformat(),results=[],sources=[]))
     target_rows=[r for r in report['targets'] if r['candidate_key']==target['candidate_key']]
@@ -78,9 +80,9 @@ def fetch_preview(event, *, route, now, fetcher):
     if not choices:
         if report['errors'] or target_rows[0]['errors']:raise ValueError('us_preview_source_check_failed')
         stage = 'not_published' if target_rows[0].get('card_status') == 'not_published' else 'coverage_unverified'
-        return dict(stage=stage,items=[],source={},local_date=target['local_date'])
+        return dict(stage=stage,items=[],source={},local_date=target['local_date'],schedule=target_rows[0].get('schedule'),schedule_checks=report.get('schedule_checks',[]))
     choices.sort(key=lambda p:(RANK[p['stage']],p['source']['fetched_at']),reverse=True)
-    return choices[0]
+    return dict(choices[0],schedule=target_rows[0].get('schedule'),schedule_checks=report.get('schedule_checks',[]))
 
 
 def card_observation(payload, *, route):
@@ -112,6 +114,17 @@ def complete(claim, *, payload, route, now):
             or (getattr(event,'projection_control',None) and event.projection_control.write_owner not in {'unmanaged','data_sync'})
             or (lifecycle and lifecycle.mode not in {'off','shadow'})):
             pre._finish_locked(event,claim,now,outcome_reason='manual_or_owner_lock');return False
+        if payload.get('source'):
+            from .race_data_source_adapters import aware,require_sha
+            source=payload['source'];require_sha(source['sha256'])
+            if aware(source['fetched_at'])>now or not route.permits_url(source['url']):raise ValueError('us_preview_source_invalid')
+        if payload.get('source') or payload.get('schedule_checks'):
+            event.source_refs={**(event.source_refs or {}),'us_pre_race_checks':dict(
+                source=payload.get('source',{}),schedule_checks=payload.get('schedule_checks',[]),stage=payload['stage'],checked_at=now.isoformat())}
+            event.save(update_fields=['source_refs','updated_at'])
+        if payload.get('schedule'):
+            from .us_stakes_schedule import apply_schedule_locked
+            apply_schedule_locked(event,payload['schedule'],route=route,now=now)
         if payload['stage'] in {'not_published', 'coverage_unverified'}:
             pre._finish_locked(event,claim,now,outcome_reason=payload['stage']);return True
         latest=event.data_candidates.filter(source_name=US,module='runners',status='pending').order_by('-fetched_at','-id').first()

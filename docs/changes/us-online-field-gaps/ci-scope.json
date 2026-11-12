@@ -1,0 +1,433 @@
+{
+  "schema_version": 1,
+  "base_sha": "a4945de0333555e95cf129cd1b36b9cf4e24dc41",
+  "reason": "美国线上时间与字段、官方目录浏览器、计划奖金及严格字段换绑事务。覆盖美国解析与自动链路、共享赛果展示、控制登记及PostgreSQL恢复，不降低既有测试门禁",
+  "domains": [
+    "infrastructure",
+    "race_results",
+    "us_source_collection",
+    "module:stable.test_race_multisource_enrollment",
+    "module:stable.test_race_multisource_postgres",
+    "module:stable.test_race_multisource_conversion",
+    "module:stable.test_race_data_sync_admission",
+    "module:stable.test_france_release_handoff"
+  ],
+  "changes": [
+    {
+      "path": "deploy/us-browser/Dockerfile",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "4574bc6970a706ee8e6d6d89b8dbff614f8f23956d42d41309fc4b29a47d7bc2",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "deploy/us-browser/collector.cjs",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "464f3e8b6967e401504ac21ea7dda62ed0204b3447e81de24f33ecdfbbe67863",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "deploy/us-browser/collector.test.cjs",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "66ff0be8fbc97d09aa5fe23ac36c7b7e8d81796d49f1e417e68b8a996ed0931a",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "deploy/us-browser/package-lock.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "b43069c1715c3bfafe2625405a35cca3f5248f8498983a9bd95fa62137be15fb",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "deploy/us-browser/package.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "797130f2a8721a536a32502b9ac4863131e940d19043f84bfd4f45c605a7a190",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "deploy/us-browser/server.cjs",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "fed4d96e04ed712aad4c1f7fdcc735183f7de4f33062fcce881c2c3729c4463a",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docker-compose.us-browser.yml",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "fd92b6f79762d9cb706855ebe47b4b9063ccc081c052282d7eb7722a506da754",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/us-online-field-gaps/design.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "6c3c6dd9b81e91915570d140d5ec75d23d9028a37488ba9e22f2a87d6e198a89",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/us-online-field-gaps/rollout.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "caf1c09d645ec8b7103cec4fa25a29328d4d43c04a317e890a5e30a57cb251a3",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/us-online-field-gaps/spec.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "8a145ef8c480e0b76b1c3d8d4168852149d815abbfe943744a229391e3fd52c6",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/us-online-field-gaps/tasks.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "247b647f527e27b0edbf4adc48ff92d08c50012cbc9b0f07448f3596d97dc178",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/us-online-field-gaps/test_cases.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "da581a9fe0de9b7d78d937fe01a31c1b246b0a4e58ccdf5730dc98d88fdbabb5",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/us-race-automation/preview_release_evidence.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "c39403724e84e0b5e1f460444692e10d455849cf1655c18d36af12c3324f48c9",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/current_state.md",
+      "status": "modified",
+      "before_hash": "7f77c6ce712a07ee6c5bd5c6609ffcea56f4de9d7e9df7f678514563d5a4f813",
+      "after_hash": "3130705ae37bd801ee2f658a2389972f2ddb08fb8e9b9a9b65cf0ec16e1fdb17",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/decisions.md",
+      "status": "modified",
+      "before_hash": "4a4febef7a44da91e38f52be58e25ae8b0eccbc046e0f619d4d67b68fd4cb14d",
+      "after_hash": "f7d62de0e225085b1074b6b3cec5ad4e879ac3933703d029b208137bffc3d5ff",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/deploy_runbook.md",
+      "status": "modified",
+      "before_hash": "a50c35846fa008477247dfbd8a879d06fff11d481c197a9f358c01445fd41c85",
+      "after_hash": "f4e944fbb3a33bda978be3ada8f98b929df8bbef18bc7c0cc82f94ff6fb29567",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/app/settings.py",
+      "status": "modified",
+      "before_hash": "e821a60e02ef3f5b86c0c64b6352db9b31ba8b9d80ec15410727977f2ab77aa1",
+      "after_hash": "e0898dbadd36e518df1fac382cfc6731ff71e43df6c5a553c886d9efaefcfdc6",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/DEL2026100310.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "2b928c0d78d1f68d632ba092c7055984c76060710033d24eb54d2783dc479730",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/abr-cotillion-glance.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "83816bcae6d88dd6254270868d804a45fd2ace8f45ef8edca461ac140934cb2e",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_flat_results/provenance.json",
+      "status": "modified",
+      "before_hash": "912f2af39b91ed930f1a35beadc330aee678c445f09fa4e86bc52ebee130132e",
+      "after_hash": "ca02eb1766ce4c71510fc00d7997023aea2665d4c438bf4e2bd98f16871be03a",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/churchill-stakes-schedule.pdf",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "3ff88079462d96f934bae38d87c53374502500ff891a44e8a42ab0637cf583ae",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/dmtc-stakes-schedule.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "864db228ed3cc8a04efdae03f94c738969261b8f7380ec1b4c0d26d74690904d",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/gulfstream-stakes-schedule.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "08ae16fd18ad46268217771c4e76ce17eefd0079d5ba8f5aa341d1b0b8ed1843",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/nsa-directory-colonial-pending.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "42d30af94e814a03d67e4ff8727a7f79ee2353bad4e0635b091e2353fb8cb4d7",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/nyra-stakes-schedule.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "bd64916bba5e45ed2a3703df3dd195736b6a41f808924ecab610b7ce4d0ff715",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_prerelease/provenance.json",
+      "status": "modified",
+      "before_hash": "ccf5717d792bd897ecde8efe2125a37e5761e17cf23e5cbc03ea3d1bf33cde14",
+      "after_hash": "2df76638834ecf2f7ff9a9bf0c556ff05f3bd6e1395bebac2ebf16da2306f3ea",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/management/commands/run_us_release.py",
+      "status": "modified",
+      "before_hash": "e75204dbe05b7fce2c517db3e22f37fcb01a4579a747a860019ccaa966a8bc5d",
+      "after_hash": "6934c610700605d4742635c8c3a32a6d2b7fa7a762103b2ed5626131a17d39d9",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_information_display.py",
+      "status": "modified",
+      "before_hash": "41f05143d9c37cc6db802cda6917628825f86c74b746d554d6d07d99b8996480",
+      "after_hash": "ea42b46bc624cd687e2676715a1aced0d3cd6f7671e32487023166c504455f67",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_pre_race.py",
+      "status": "modified",
+      "before_hash": "ed808cedb2ad0d5e64a03a33f2428477d6d558f4229ca8070351c76486ba789b",
+      "after_hash": "a9d7589f489180e87e6b05c02db6d2b3e47e8e317cc2f19f061ae4db0d9b5097",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_pre_race_refresh.py",
+      "status": "modified",
+      "before_hash": "90505c1ee00c50a25a89cfd7b3b643cea96f268eefae2deed82066ca54ca8db3",
+      "after_hash": "8bf804de1250715dd7ed4d98a7f3aaa53a8a78bf3b2c29fe660c4d86281bf567",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_basic_fields.py",
+      "status": "modified",
+      "before_hash": "11534d680a3f9ad3ec7b70e43d8f9e88a86b2b41c91433eb248bd5f8e0083ffc",
+      "after_hash": "a2ddbca447b38cf30b47759c851140bce43c5170b2fb4b1f0790b359c8cf7882",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_browser_transport.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "11f2d3fcd2b2c2b1664da15dc23e3916e402f2f4c9093e2d0f4c2c0306a6cc1d",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_flat_collection.py",
+      "status": "modified",
+      "before_hash": "49b79f7ca3ce10ca5372d2b2efa358b0931c1a613651f9a5404acb447c728756",
+      "after_hash": "93b98cb6acc7b058379c5529066779495409be7dda5719b2b1840148250c7049",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_flat_results.py",
+      "status": "modified",
+      "before_hash": "6bc19301c4bc25dc74ed8c13956cbe63e1ddb27cfed20ecbd3bc39e25f123d69",
+      "after_hash": "cf9450dbe0586d76fbc007c8d280c6e5264bf32c29a14d8932491531842f5a68",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_nsa_sources.py",
+      "status": "modified",
+      "before_hash": "649bce92e835fcd2cbd3ac4429c43347f4b4915a7a284d8e5f31f040e6eeb6b7",
+      "after_hash": "a839515cc110fb7b5f73915063ff5a4c2e35cc92d69a47bbc79df44d430744a5",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_pre_race.py",
+      "status": "modified",
+      "before_hash": "57bf55b053b4757e80acea762e4cccea943533d1c7ae34c651655a159b7f4233",
+      "after_hash": "71fa984ca94a9d081df0861503920979643dce618da9208e70273ab267c94a66",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_prerace_documents.py",
+      "status": "modified",
+      "before_hash": "8faa1465f0f8ee012fb14272bb0a82e72ea19529c33eaa465c01f536acc6892a",
+      "after_hash": "181b52260aa848525de950b6ff299d29baf5c8884186dbb252069c9e6408ab04",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_prerelease_collection.py",
+      "status": "modified",
+      "before_hash": "ad626135085868c36a00bd838e4ef9349ed603ac122e41fd0e0ce55953073a80",
+      "after_hash": "5b2ab3768161a5ebb49ad8cdceb1989db07a39e4923220cdf89a1718caa2d73e",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_race_inventory.py",
+      "status": "modified",
+      "before_hash": "9d71f6c1257e602a74ceb9ccb69f0f624b234bd782a30c870abfe70a7078b4f8",
+      "after_hash": "b67979a6878cf53434771c39448cbfeb9901c1c8979d1aa9dfee8ca32a31dd49",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_race_source.py",
+      "status": "modified",
+      "before_hash": "3325289bbcda8ecc35bf7a7d8ba479d8ea7054240a0cbb3b28b8f315a29ee569",
+      "after_hash": "906115ca4843555e0475830b108467404bf5ea720d65c311f0f8172e217b0d10",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_release.py",
+      "status": "modified",
+      "before_hash": "fbeeb9ab54b34e3a910c2a3ae06e0e8f94df342054486cc8e2721bfd48bb8e8c",
+      "after_hash": "f023a81d4feb9b4e97f422146562c5f8e4cccb414d2e64578a83a567d65005d0",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_stakes_schedule.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "2fb47b49631391f03b8a44c3631c4b30fed074b2b7c7ea3520ea6c8d2f9da19d",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_steeplechase_results.py",
+      "status": "modified",
+      "before_hash": "f2741c38460d1e5ad6afffd12917cd95edeeae9f043670f70a43854152fe15a1",
+      "after_hash": "436041db18775da0cb70304dc1690383c4e317d365f06e23803a3d2fecb7d482",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_us_flat_results.py",
+      "status": "modified",
+      "before_hash": "39e25e656c0b9301ab4d80854c59cc3835dcf9ad441abb1be3c216f70dd7c57d",
+      "after_hash": "f524ba4482b72fbed17faf2c743abfa2c2b6c01f3c687c7e9b2ea76319d8fcfe",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_us_observation.py",
+      "status": "modified",
+      "before_hash": "0a6b3e4fa5202d8197ca236b53c9ff533f45aea54855b728de1cb979a78e1d1a",
+      "after_hash": "08fc35e7c6669f61c624b7c3c28cad3d79f10a23dec27b1ec0dc7608fd5485dc",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_us_pre_race.py",
+      "status": "modified",
+      "before_hash": "2820851e175098cc5667a9e8ff4a0e2eceb353cd200a2e742c8356977c48bbe7",
+      "after_hash": "6ea902ae0cdc47771d13ba24a06ab186a541cc52d3410bd1e0e40065e9272acb",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_us_prerelease.py",
+      "status": "modified",
+      "before_hash": "de9ad203c087319e8c3c971622b8b4bde1a9de856138a6bc83a3391322af2d10",
+      "after_hash": "353811c9ecef0d89f1a160b1860264f7fea045687c7080a769d859075a3b9351",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_us_public_fields.py",
+      "status": "modified",
+      "before_hash": "a033466008a1007a1ed5f0028030cf00689d8039aa4b4bd902d75dbc65dd77d1",
+      "after_hash": "78161a505ed5656a0f961b40e2da5f9d8b4768a0c83aaf95deffa54b4ddeb988",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_us_release.py",
+      "status": "modified",
+      "before_hash": "67f0bfc3eb9cd9bc44aa32438351267fb10e94b7c0895516ddf92590ffddd9d5",
+      "after_hash": "8e4005d422d94a83ef14e1781aab96b5c9bccbb6357b7ef0ea9ee09b2ebc5d5c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_us_transport.py",
+      "status": "modified",
+      "before_hash": "ebe44ab2585801cc3c1b0d3634ea5439c508f8a9b615ec797fe6ab443a3826c2",
+      "after_hash": "0c10d5d434693de52b8df6650c3574d8f4e9edf4a094a436a91f985375a27c0c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_us_workflow.py",
+      "status": "modified",
+      "before_hash": "0388bb16c26a1d333993ee67034696605ddb5e3cfcf5f6e09345814e4a9fb2c4",
+      "after_hash": "fd1445853b1e9f7b6dc17fe1065ba4a6f895c92cedccb24fd4dcf15f5b24de0f",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "07e3984bce0b1f871eaa6a75def6f8bdba9e08c871efae4d4993f609c0f356d9",
+      "after_hash": "e0d33c3818513f1240bb6f80d952e706ea11497fa061717121616641475b4dc0",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}

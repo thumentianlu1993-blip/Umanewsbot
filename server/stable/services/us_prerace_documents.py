@@ -265,10 +265,10 @@ def confirm_del_mar_roster(card, overnight):
 
 def parse_sporting_card(raw, identity):
     """同时接收当前出马和历史出马原件；历史页面不提供赛前时点证明。"""
-    from .us_flat_results import VENUES, next_data, horse_key
+    from .us_flat_results import VENUES, next_data, horse_key, sporting_schedule
     data=next_data(raw)['race'];summary=data['race_summary']
     zone=ZoneInfo(VENUES[identity['track']][2])
-    off=datetime.fromisoformat(summary['date']+'T'+summary['time']).replace(tzinfo=ZoneInfo('Europe/London')).astimezone(zone)
+    off=sporting_schedule(summary, raw).astimezone(zone)
     stage=summary['race_stage']
     if (off.date().isoformat()!=identity['date'] or summary['course_name']!=VENUES[identity['track']][0]
             or not re.match(r'Race '+str(identity['race_number'])+r'\b',summary['name'])

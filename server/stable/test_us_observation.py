@@ -17,7 +17,7 @@ class USObservationTests(TestCase):
         self.assertEqual(sum(row['status']=='scratched' for row in rows),2)
         self.assertEqual(first['field_provenance']['field_units']['carried_weight'],'lb')
         self.assertEqual(first['field_provenance']['margin_relation'],'previous_physical')
-        self.assertEqual(result['off_time'],'2026-11-07T16:25:00-05:00')
+        self.assertEqual(result['off_time'],'2026-11-07T16:26:45-05:00')
 
     def test_demotion_and_dead_heat_use_reported_placing(self):
         from stable.services.us_public_fields import result_participants
@@ -59,4 +59,11 @@ class USObservationTests(TestCase):
         value=source_observation(result,target=target,sources=sources,route=route,now=now)
         self.assertEqual(value['external_race_id'],'FH:2026-10-17:5')
         self.assertEqual(target['source_race_id'],'104')
+        metadata=value['us_race_metadata']
+        self.assertEqual(metadata['winning_time'],'5:45.40')
+        self.assertEqual(metadata['chart_winning_time'],'5:45.30')
+        self.assertEqual(metadata['surface'],'turf')
+        self.assertEqual(metadata['field_sources']['winning_time'],sources['official_result'])
+        self.assertEqual(metadata['field_sources']['off_time'],sources['chart'])
+        self.assertEqual(metadata['field_sources']['scheduled_off_time'],sources['overnight'])
         with self.assertRaises(ValueError):source_observation(result,target={**target,'book_race_id':'103'},sources=sources,route=route,now=now)

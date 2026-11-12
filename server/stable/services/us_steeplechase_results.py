@@ -1,14 +1,23 @@
 """NSA正式结果、出马表与DRF逐匹字段的交叉核对。"""
 from io import BytesIO
+from decimal import Decimal
 import re
 
 import pdfplumber
 
-from .us_flat_results import parse_chart, horse_key
+from .us_flat_results import parse_chart, horse_key, chart_actual_time
 from .us_basic_fields import nsa_overnight_catalogue
 
 NSA_VENUES = {'CAM': {'Camden'}, 'FH': {'Far Hills'}, 'FX': {'Foxfield'}, 'MTP': {'Montpelier'},
     'GRM': {'International Gold Cup'}, 'CNL': {'Colonial Downs'}, 'SAR': {'Saratoga'}}
+
+
+def official_winning_time(raw):
+    match = re.fullmatch(r'(\d+):([0-5]\d)(?: ([1-4])/5)?', str(raw).strip())
+    if not match:
+        raise ValueError('us_nsa_winning_time')
+    seconds = Decimal(int(match[1])*60 + int(match[2])) + Decimal(int(match[3] or 0))/5
+    return f"{int(seconds//60)}:{seconds%60:05.2f}", seconds
 
 
 def merge_steeplechase(raw_chart, identity, official, card):
@@ -69,9 +78,16 @@ def merge_steeplechase(raw_chart, identity, official, card):
         number_availability='reported' if k in by_entry else 'not_present_in_official_overnight')
         for k,n in scratch_names.items()]
     gaps=['scratch_program_number_missing'] if any(x['program_number'] is None for x in scratches) else []
+    winning, official_seconds = official_winning_time(official['race_time_raw'])
+    minutes, seconds = chart['winning_time'].split(':')
+    delta = official_seconds - (Decimal(minutes)*60 + Decimal(seconds))
+    actual = chart_actual_time(chart.get('off_time_raw', ''), scheduled=card.get('off_time'), identity=identity)
     return dict(local_date=day,venue=track,race_number=number,book_race_id=official['book_race_id'],race_name=official['race_name'],
         grade=official['grade'],catalogue=nsa_overnight_catalogue(card),runners=rows,scratches=scratches,runner_count=len(rows),
-        declared_count=card['declared_count'],roster_complete=True,winning_time=chart['winning_time'],
+        declared_count=card['declared_count'],roster_complete=True,winning_time=winning,winning_time_raw=official['race_time_raw'],
+        chart_winning_time=chart['winning_time'],winning_time_delta_seconds=str(delta),
+        surface=official.get('surface',''),race_kind=official.get('race_kind',''),off_time=actual,scheduled_off_time=card.get('off_time') or '',
+        off_time_basis='drf_actual_anchored_to_official_card' if actual else '',
         fractional_times=chart['fractional_times'],going=official.get('going',''),
         official_winning_margin=official['winning_margin_raw'],
         margin_semantics='behind_previous_physical_finisher',gaps=gaps,fields_complete=not gaps,

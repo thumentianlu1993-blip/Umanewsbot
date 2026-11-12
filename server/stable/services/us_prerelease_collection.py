@@ -41,8 +41,10 @@ def prerelease_url_allowed(url):
     if p.query:
         return False
     patterns={
-        'www.dmtc.com':r'/data/pdf/racing/entries/\d{8}\.pdf',
-        'www.churchilldowns.com':r'/overnights/',
+        'www.dmtc.com':r'(?:/data/pdf/racing/entries/\d{8}\.pdf|/horsemen/nomforms)',
+        'www.nyra.com':r'/belmont/racing/stakes-schedule/',
+        'www.gulfstreampark.com':r'/racing-information/stakes/2025-04-29/',
+        'www.churchilldowns.com':r'(?:/overnights/|/wp-content/uploads/sites/3/\d{4}/\d{2}/[A-Za-z0-9_.-]+\.pdf)',
         'www.kentuckyderby.com':r'/wp-content/uploads/sites/3/\d{4}/\d{2}/[A-Za-z0-9_.-]+\.pdf',
         'www.keeneland.com':r'(?:/racing/horsemen/stakes-schedule|/files/[a-zA-Z0-9_.-]+\.pdf)',
         'www.sportinglife.com':r'/racing/racecards(?:/(?:tomorrow|\d{4}-\d{2}-\d{2}(?:/[a-z0-9-]+/racecard/\d+/[a-z0-9-]+)?))?',
@@ -76,7 +78,7 @@ def usracing_directory(raw, targets):
 
 
 def sporting_card_directory(raw, *, start, end, targets=()):
-    from .us_flat_results import next_data,VENUES
+    from .us_flat_results import next_data,VENUES,sporting_schedule
     rows=[]
     for meeting in next_data(raw)['meetings']:
         course=meeting['meeting_summary']['course']
@@ -89,7 +91,7 @@ def sporting_card_directory(raw, *, start, end, targets=()):
         if len(codes)!=1:continue
         code=codes[0]
         for race in meeting['races']:
-            day=datetime.fromisoformat(race['date']+'T'+race['time']).replace(tzinfo=ZoneInfo('Europe/London')).astimezone(ZoneInfo(VENUES[code][2])).date()
+            day=sporting_schedule(race).astimezone(ZoneInfo(VENUES[code][2])).date()
             if not start<=day<=end:continue
             number=re.match(r'Race (\d+) - (.+)',race['name'])
             if not number:raise ValueError('us_card_directory_number')
@@ -254,7 +256,8 @@ def nsa_preview(store, target):
     if len(meetings)!=1:raise ValueError('us_nsa_meeting_missing_or_ambiguous')
     store.accept(doc)
     url=meetings[0]['links'].get('entries')
-    if not url:return None
+    if not url:return dict(kind='not_published',source=_source(doc),
+        data={'source_stage':'not_published','local_date':target['local_date'],'venue':target['venue']})
     card=store.get(url)
     value=nsa_target_card(card['body'],target,source_url=url)
     store.accept(card)
@@ -308,7 +311,7 @@ def collect_prerace(store, *, start, end, flat_report, target_keys=None):
                 value['directory_source']=_source(index)
                 nominations.append(append(doc,value,'nominations','DMR'))
         except (ValueError,KeyError,TypeError,OSError) as exc:errors.append(dict(source=DEL_MAR_NOMS,reason=str(exc)))
-    usracing='https://usracing.com/graded-stakes-schedule';public_links={}
+    usracing='https://usracing.com/graded-stakes-schedule';public_links={};public_index=None
     if future_targets:
         try:
             index=store.get(usracing);public_links=usracing_directory(index['body'],future_targets)
@@ -444,7 +447,10 @@ def collect_prerace(store, *, start, end, flat_report, target_keys=None):
             observation_status='check_failed' if issues else 'published_preliminary' if 'preliminary_field' in stages
                 else 'published_document' if any(s!='not_published' for s in stages)
                 else 'scheduled_no_admitted_document',errors=issues))
-    return dict(targets=rows,documents=documents,checked_directories=directories,errors=errors,
+    from .us_stakes_schedule import collect_schedules
+    schedules,schedule_checks=collect_schedules(store,future_targets,public_index=public_index) if future_targets else ({},[])
+    for row in rows:row['schedule']=schedules.get(row['candidate_key'])
+    return dict(targets=rows,documents=documents,checked_directories=directories,errors=errors,schedule_checks=schedule_checks,
         source_policy=dict(excluded=['equibase.com','*.equibase.com'],excluded_only_information='unavailable_for_project'),
         counts=dict(targets=len(rows),nominations=sum(r['nomination_status']=='available' for r in rows),cards=sum(r['card_status']=='available' for r in rows),
             final_rosters=sum(r['card_status']=='final_roster_available' for r in rows),

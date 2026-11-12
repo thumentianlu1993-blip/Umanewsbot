@@ -81,7 +81,8 @@ def _race_headers(content, day, venue, raw, url, counts):
             source_race_id=f'{number}:{ordinal}' if counts[number]>1 else number,
             book_race_id=number, grade='G'+grade[2] if grade else '', race_number=ordinal,
             timezone='America/New_York', race_time_raw=end[2], winning_margin_raw=end[1],
-            going=end[3], runners=[], production_complete=False,
+            going=end[3], surface='turf', race_kind='hurdle' if re.search(r'\b(?:Hurdle|National\s+fences)\b', header, re.I) else '',
+            runners=[], production_complete=False,
             gaps=['runner_odds','runner_margins','program_numbers','independent_roster_count'],
             **evidence(raw,url))
     return records
