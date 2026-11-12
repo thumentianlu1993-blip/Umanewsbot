@@ -22,3 +22,30 @@ class USPublicFieldTests(TestCase):
         self.assertEqual(parse_display_odds('4.06', odds_format='us_net').text, '4.06（美国净赔率）')
         self.assertEqual(parse_display_odds('4.06').state, 'unknown')
         self.assertEqual(parse_display_odds('1/3', odds_format='us_net').state, 'unknown')
+
+    def test_surface_and_race_kind_are_independent(self):
+        from types import SimpleNamespace
+        from stable.services.race_information_display import event_fields
+        event = SimpleNamespace(country_region='united_states', surface='jumps', normalized_race_type='hurdle',
+            source_refs={'us_race_metadata': {'surface': 'turf', 'race_kind': 'hurdle', 'going': 'muddy', 'going_raw': 'muddy (Sealed)'}})
+        fields = event_fields(event)
+        self.assertEqual(fields['surface'].text, '草地')
+        self.assertEqual(fields['race_type'].state, 'normalized')
+        event.manual_lock_flags={'surface':True};event.surface='dirt'
+        self.assertEqual(event_fields(event)['surface'].text,'泥地')
+        event.manual_lock_flags={}
+        self.assertIn('Sealed', fields['going'].text)
+        event.surface = 'dirt'; event.normalized_race_type = 'flat'; event.source_refs = {}
+        self.assertEqual(event_fields(event)['race_type'].text, '平地')
+
+    def test_announced_purse_keeps_stage_until_actual_replaces_it(self):
+        from types import SimpleNamespace
+        from decimal import Decimal
+        from stable.services.race_information_display import event_fields
+        event=SimpleNamespace(country_region='united_states',status='scheduled',prize_amount=Decimal('300000'),prize_currency='USD',
+            source_refs={'us_pre_race_schedule':{'prize_stage':'announced','prize_amount':'300000','prize_currency':'USD'}})
+        self.assertIn('计划',event_fields(event)['prize'].text)
+        event.status='finished'
+        self.assertIn('计划',event_fields(event)['prize'].text)
+        event.source_refs['us_pre_race_schedule']['prize_stage']='superseded_by_result'
+        self.assertNotIn('计划',event_fields(event)['prize'].text)

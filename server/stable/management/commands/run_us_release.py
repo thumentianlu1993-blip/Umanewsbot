@@ -36,7 +36,8 @@ class Command(BaseCommand):
                         with connection.cursor() as cursor:
                             cursor.execute('SET TRANSACTION READ ONLY')
                             cursor.execute("SET LOCAL statement_timeout='20s'")
-                    if not baseline_matches(snapshot(ids),before,[r['event_id'] for r in manifest.get('rebind',[])]):raise ValueError('baseline_drift')
+                    pure_rebind={r['event_id'] for r in manifest.get('rebind',[])}-{i['event_id'] for i in manifest['items'] if i.get('event_id')}
+                    if not baseline_matches(snapshot(ids),before,pure_rebind):raise ValueError('baseline_drift')
                 result={'action':'baseline_verified','event_count':len(ids),'manifest_sha256':options['sha256']}
             else:
                 result=execute(path,options['sha256'],apply=options['apply'],restore=options['restore'])

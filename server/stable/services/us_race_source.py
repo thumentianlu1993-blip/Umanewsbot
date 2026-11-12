@@ -30,6 +30,17 @@ def source_observation(result, *, target, sources, route, now):
         sources=sources,roster_sha256=canonical_sha([(r['number'],r['horse_name']) for r in rows]))
     if result.get('runner_count_evidence'):
         evidence['runner_count_evidence'] = result['runner_count_evidence']
+    field_sources = {field: primary for field in ('going', 'winning_time')}
+    if result.get('fractional_times'):field_sources['fractional_times'] = sources['chart']
+    if result.get('surface'):field_sources['surface'] = primary
+    if result.get('race_kind'):field_sources['race_kind'] = primary
+    if result.get('off_time_basis') == 'sporting_life_actual_utc':
+        field_sources.update(off_time=sources['supplement'], scheduled_off_time=sources['supplement'])
+    elif result.get('off_time_basis') == 'drf_actual_anchored_to_official_card':
+        field_sources.update(off_time=sources['chart'], scheduled_off_time=sources['overnight'])
+    if result.get('off_time_basis') == 'drf_actual_anchored_to_programme':
+        field_sources.update(off_time=sources['chart'],scheduled_off_time=sources['schedule'])
+    if result.get('chart_winning_time'):field_sources['chart_winning_time'] = sources['chart']
     return dict(provider=route.provider, region=route.region, identity_namespace=route.identity_namespace,
         operator=route.operator, external_race_id=track+':'+result['local_date']+':'+number,
         canonical_url=primary['url'],fetched_at=observed.isoformat(),
@@ -38,7 +49,12 @@ def source_observation(result, *, target, sources, route, now):
         race_number=number,raw_names=[target['race_name']],off_time=result.get('off_time',''),roster=rows,
         result_phase='corrected' if result.get('correction_marker') else 'official',
         correction_evidence=dict(text=result.get('correction_marker',''),source=sources['chart']),roster_complete=True,roster_evidence=evidence,
-        us_race_metadata=dict(going=result.get('going',''),winning_time=result.get('winning_time',''),fractional_times=result.get('fractional_times',[]),
+        us_race_metadata=dict(going=result.get('going',''),going_raw=result.get('going_raw',result.get('going','')),
+            winning_time=result.get('winning_time',''),winning_time_raw=result.get('winning_time_raw',result.get('winning_time','')),
+            chart_winning_time=result.get('chart_winning_time',''),winning_time_delta_seconds=result.get('winning_time_delta_seconds',''),
+            fractional_times=result.get('fractional_times',[]),surface=result.get('surface',''),race_kind=result.get('race_kind',''),
+            scheduled_off_time=result.get('scheduled_off_time',''),off_time=result.get('off_time',''),
+            off_time_basis=result.get('off_time_basis',''),field_sources=field_sources,
             source_url=primary['url'],source_sha256=primary['sha256'],observed_at=observed.isoformat(),
             external_race_id=track+':'+result['local_date']+':'+number,local_date=result['local_date'],catalogue=result.get('catalogue',{})))
 
@@ -106,7 +122,8 @@ def fetch_us_observation(*, event, route, now, fetcher, kind):
         report=collect_nsa(store,start=day,end=day)
         results=[r for r in report['results'] if r['candidate_key']==binding['candidate_key']]
     else:
-        report=collect_flat_results(store,start=day,end=day,target_keys={binding['candidate_key']})
+        report=collect_flat_results(store,start=day,end=day,target_keys={binding['candidate_key']},
+            programme_sources={binding['candidate_key']:binding['programme_url']} if binding.get('programme_url') else None)
         results=report['results']
     if len(results)!=1:
         reasons=[x.get('reason','') for x in report.get('errors',[])]

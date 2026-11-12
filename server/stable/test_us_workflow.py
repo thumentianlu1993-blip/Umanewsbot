@@ -18,7 +18,7 @@ NOW=datetime(2026,11,11,12,tzinfo=timezone.utc)
 @override_settings(**{**workflow.JraColdStartTests._overridden_settings,
     'RACE_DATA_SYNC_ENABLED_PROVIDERS':('us_racing',), 'RACE_DATA_SYNC_ENABLED_REGIONS':('united_states',),
     'RACE_INFORMATION_NORMALIZED_DISPLAY_ENABLED':True,
-    'RACE_DATA_SYNC_ENABLED_FIELDS':(*settings.RACE_DATA_SYNC_ENABLED_FIELDS,'us_basic.prize','us_basic.distance','us_basic.eligibility','us_basic.race_metadata')})
+    'RACE_DATA_SYNC_ENABLED_FIELDS':(*settings.RACE_DATA_SYNC_ENABLED_FIELDS,'us_basic.prize','us_basic.distance','us_basic.eligibility','us_basic.race_metadata','off_time','local_start_time','timezone_name')})
 class USWorkflowTests(TestCase):
     def setUp(self):
         self.target=next(t for t in TARGETS if t['drf']['url'].endswith('CD2026110708.pdf'))
@@ -86,10 +86,78 @@ class USWorkflowTests(TestCase):
         self.assertEqual(models.RaceEventRevision.objects.filter(event=self.event).count(),revisions)
         self.assertEqual(self.event.results.count(),8)
 
-    def test_manual_surface_lock_survives_result_enrollment_and_public_read(self):
-        self.event.surface='turf';self.event.manual_lock_flags={'surface':True};self.event.save()
+    @override_settings(RACE_DATA_SYNC_SCHEDULE_APPLY_ENABLED=True)
+    def test_result_only_projects_actual_clock_with_authority_and_audit(self):
+        self.event.race_datetime=datetime.fromisoformat(self.value['us_race_metadata']['scheduled_off_time'])
+        self.event.save()
         self.publish();self.event.refresh_from_db()
-        self.assertEqual(self.event.surface,'turf')
+        actual=datetime.fromisoformat(self.value['off_time'])
+        self.assertEqual(self.event.race_datetime,actual)
+        self.assertEqual(self.event.local_start_time,actual.astimezone(__import__('zoneinfo').ZoneInfo('America/New_York')).time())
+        for field in ('race_datetime','local_start_time','timezone_name'):
+            authority=self.event.field_authorities.get(field_name=field)
+            self.assertEqual(authority.source_key,'us_racing')
+        self.assertTrue(self.event.field_changes.filter(field_name='race_datetime',applied=True).exists())
+        from stable.services.race_information_display import event_fields
+        self.assertEqual(event_fields(self.event)['time'].state,'normalized')
+
+    @override_settings(RACE_DATA_SYNC_SCHEDULE_APPLY_ENABLED=True)
+    def test_result_only_fills_missing_clock(self):
+        self.publish();self.event.refresh_from_db()
+        self.assertEqual(self.event.race_datetime,datetime.fromisoformat(self.value['off_time']))
+
+    @override_settings(RACE_DATA_SYNC_SCHEDULE_APPLY_ENABLED=True)
+    def test_actual_clock_keeps_manual_authority(self):
+        planned=datetime.fromisoformat(self.value['us_race_metadata']['scheduled_off_time'])
+        self.event.race_datetime=planned;self.event.save()
+        authority=models.RaceEventFieldAuthority.objects.create(event=self.event,subject_type='event',subject_key=str(self.event.pk),
+            field_name='race_datetime',manual_lock=True,value_sha256='a'*64)
+        self.publish();self.event.refresh_from_db();authority.refresh_from_db()
+        self.assertEqual(self.event.status,'finished')
+        self.assertEqual(self.event.race_datetime,planned)
+        self.assertEqual(authority.value_sha256,'a'*64)
+        self.assertFalse(self.event.field_changes.filter(field_name='race_datetime').exists())
+
+    @override_settings(RACE_DATA_SYNC_SCHEDULE_APPLY_ENABLED=True,RACE_DATA_SYNC_ENABLED_FIELDS=('us_basic.race_metadata',))
+    def test_disabled_time_fields_do_not_project_actual_clock(self):
+        self.publish();self.event.refresh_from_db()
+        self.assertIsNone(self.event.race_datetime)
+
+    @override_settings(RACE_DATA_SYNC_SCHEDULE_APPLY_ENABLED=False)
+    def test_disabled_clock_projection_preserves_missing_value(self):
+        self.publish();self.event.refresh_from_db()
+        self.assertIsNone(self.event.race_datetime)
+
+    @override_settings(RACE_DATA_SYNC_SCHEDULE_APPLY_ENABLED=True)
+    def test_missing_actual_clock_preserves_planned_value(self):
+        from copy import deepcopy
+        value=deepcopy(self.value);value['off_time']='';value['us_race_metadata']['off_time']=''
+        planned=datetime.fromisoformat(value['us_race_metadata']['scheduled_off_time'])
+        self.event.race_datetime=planned;self.event.save()
+        with patch('stable.services.race_data_source_adapters.fetch_bound_observation',return_value=value):self.publish()
+        self.event.refresh_from_db();self.assertEqual(self.event.race_datetime,planned)
+
+    def test_announced_official_prize_yields_to_actual_result(self):
+        from stable.services.us_stakes_schedule import apply_schedule_locked
+        from django.db import transaction
+        from types import SimpleNamespace
+        target=self.event.source_refs['us_target_v1']
+        schedule={**target,'prize_amount':'250000','prize_currency':'USD','prize_stage':'announced',
+            'source_class':'official_operator','source':dict(url='https://www.churchilldowns.com/overnights/',sha256='a'*64,fetched_at=NOW.isoformat())}
+        with transaction.atomic():apply_schedule_locked(self.event,schedule,route=SimpleNamespace(permits_url=lambda u:True),now=NOW)
+        self.assertEqual(str(self.event.prize_amount),'250000')
+        self.publish();self.event.refresh_from_db()
+        self.assertEqual(str(self.event.prize_amount),'300000.00')
+        for name in ['prize_amount','prize_currency']:
+            self.assertEqual(self.event.field_authorities.get(field_name=name).source_key,'us_racing')
+        self.assertEqual(self.event.source_refs['us_pre_race_schedule']['prize_stage'],'superseded_by_result')
+
+    def test_manual_surface_lock_survives_result_enrollment_and_public_read(self):
+        self.event.surface='dirt';self.event.manual_lock_flags={'surface':True};self.event.save()
+        self.publish();self.event.refresh_from_db()
+        self.assertEqual(self.event.surface,'dirt')
+        from stable.services.race_information_display import event_fields
+        self.assertEqual(event_fields(self.event)['surface'].text,'泥地')
         self.assertEqual(self.event.manual_lock_flags,{'surface':True})
         self.assertContains(self.client.get(self.event.public_path),'参赛记录（赛果来源）')
         self.event.manual_lock_flags={'results':True};self.event.save()

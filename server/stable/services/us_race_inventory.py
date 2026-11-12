@@ -84,3 +84,26 @@ def reconcile_inventory(flat_calendar, nsa_rows, events, *, start, end, reviewed
         production_identity_granted=False)
     report['inventory_sha256']=hashlib.sha256(json.dumps(report,sort_keys=True,ensure_ascii=False,separators=(',',':')).encode()).hexdigest()
     return report
+
+
+def annual_not_run_fields(event, calendar, *, has_results):
+    """仅准备精确年度草稿修正；调用方仍须执行完整基线和原子发布合同。"""
+    if (event.get('local_date') or has_results or event.get('status') not in {'scheduled','cancelled'}
+        or event.get('visibility_status')!='draft'):
+        raise ValueError('us_not_run_existing_occurrence')
+    refs=event.get('source_refs') or {}
+    def match(row):
+        return (row.get('provider')=='toba' and row.get('venue')==refs.get('track_code')
+            and name_key(row.get('race_name',''))==name_key(event['original_name'])
+            and row.get('source_url')==f"https://toba.org/graded-stakes/{event['year']}-races/")
+    matches=[r for r in calendar['unresolved'] if match(r)]
+    if len(matches)!=1 or matches[0].get('local_date') or matches[0]['grade']!=event['normalized_grade']:
+        raise ValueError('us_not_run_identity')
+    if (any(match(r) for r in calendar['items'])
+        or any(match(r) for c in calendar.get('conflicts',[]) for r in c['evidence'])):
+        raise ValueError('us_not_run_conflict')
+    row=matches[0]
+    if not re.fullmatch('[0-9a-f]{64}',row.get('raw_sha256','')):raise ValueError('us_not_run_source')
+    return dict(status='cancelled',source_refs={**refs,'us_annual_status':dict(
+        raw_status='not run',reason='source_reports_not_run_without_date_or_cancellation_reason',
+        source_url=row['source_url'],raw_sha256=row['raw_sha256'],candidate_key=row['candidate_key'],year=event['year'])})

@@ -16,6 +16,25 @@ class USFlatResultTests(TestCase):
         supplement = parse_sporting_life((FIXTURES / filename.replace('.pdf', '.html')).read_bytes(), target['drf'])
         return merge_result(chart, supplement, expected_count=int(target['toba']['field_size_raw']))
 
+    def test_actual_utc_off_time_across_dst_and_beijing_day(self):
+        for filename, expected in [('DMR2026090510.pdf', '2026-09-05T18:04:36-07:00'),
+                                   ('CD2026110708.pdf', '2026-11-07T16:26:45-05:00')]:
+            with self.subTest(filename=filename):
+                result = self.result(filename)
+                self.assertEqual(result['off_time'], expected)
+                self.assertNotEqual(result['scheduled_off_time'], result['off_time'])
+                self.assertEqual(result['off_time_basis'], 'sporting_life_actual_utc')
+
+    def test_sealed_and_multiline_going_retained(self):
+        result = self.result('BEL2026102508.pdf')
+        self.assertEqual(result['going'], 'firm')
+        self.assertEqual(result['off_time_raw'], '5:15')
+        chart = parse_chart((FIXTURES/'DEL2026100310.pdf').read_bytes(),
+                            dict(track='DEL', date='2026-10-03', race_number=10))
+        self.assertEqual(chart['going'], 'muddy')
+        self.assertEqual(chart['going_raw'], 'muddy (Sealed)')
+        self.assertEqual(chart['off_time_raw'], '5:48')
+
     def test_river_city_keeps_program_post_and_time_semantics(self):
         result = self.result('CD2026110708.pdf')
         self.assertEqual(result['runner_count'], 6)
@@ -240,3 +259,75 @@ class USArchiveProgramTests(TestCase):
         self.assertEqual(len(entries),12)
         with self.assertRaisesRegex(ValueError,'not_found'):
             archived_program_entries(dict(identity,race_number=99),urls=pages,read=lambda url:dict(url=url,body=pages[url]))
+
+
+class USProgrammeClockTests(TestCase):
+    def test_collection_uses_bound_programme_source_for_all_three_parx_races(self):
+        from datetime import date,datetime,timezone
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from stable.services.us_flat_collection import collect_flat_results,DRF_INDEX,SL_INDEX
+        from stable.services.us_race_source import ObservationStore
+        meta={m['file']:m for m in json.loads((FIXTURES/'provenance.json').read_text())}
+        for pdf,page,programme in [('PRX2026091913.pdf','abr-cotillion-s.html','abr-cotillion-glance.html'),
+                                  ('PRX2026091914.pdf','abr-pennsylvania-derby.html','tn-derby-entries.html'),
+                                  ('PRX2026091912.pdf','abr-gallant-bob-s.html','tn-gallant-entries.html')]:
+            target=next(t for t in TARGETS if t['drf']['url'].endswith(pdf))
+            url=meta[programme]['url'];docs={DRF_INDEX:(FIXTURES/'drf-index.html').read_bytes(),
+                SL_INDEX+'2026-09-19':b'no sporting card',target['drf']['url']:(FIXTURES/pdf).read_bytes(),
+                meta[page]['url']:(FIXTURES/page).read_bytes(),url:(FIXTURES/programme).read_bytes(),
+                'https://toba.org/graded-stakes/2026-races/':b'calendar stub'}
+            store=ObservationStore(route=SimpleNamespace(permits_url=lambda u:True),now=datetime(2026,11,12,tzinfo=timezone.utc),fetcher=lambda u,**kw:docs[u])
+            with self.subTest(pdf=pdf),patch('stable.services.us_flat_collection.parse_toba_calendar',return_value={'items':[target['toba']],'unresolved':[]}),patch('stable.services.us_flat_collection.sl_result_url',return_value=None),patch('stable.services.us_flat_collection.drf_directory',return_value=[target['drf']]):
+                report=collect_flat_results(store,start=date(2026,9,19),end=date(2026,9,19),
+                    program_sources={target['drf']['url']:url},programme_sources={target['toba']['candidate_key']:url})
+                self.assertFalse(report['errors'],report['errors'])
+                self.assertEqual(len(report['results']),1)
+                result=report['results'][0]
+                self.assertTrue(result['off_time'])
+                self.assertEqual(result['off_time_basis'],'drf_actual_anchored_to_programme')
+                self.assertIn('schedule',result['sources'])
+
+    def test_explicit_programme_anchor_resolves_three_parx_actual_clocks(self):
+        from stable.services.us_flat_results import programme_schedule,chart_actual_time
+        cases=[('tn-gallant-entries.html',12,'Gallant Bob S. (G2)','16:03','4:06'),
+               ('tn-derby-entries.html',14,'Pennsylvania Derby (G1)','17:48','5:51'),
+               ('abr-cotillion-glance.html',13,'Cotillion S. (G1)','16:58','5:02')]
+        for file,num,name,scheduled,actual in cases:
+            identity=dict(track='PRX',date='2026-09-19',race_number=num,name=name)
+            raw=(FIXTURES/file).read_bytes()
+            anchor=programme_schedule(raw,identity)
+            self.assertEqual(anchor,'2026-09-19T'+scheduled+':00-04:00')
+            resolved=chart_actual_time(actual,scheduled=anchor,identity=identity)
+            self.assertEqual(resolved,'2026-09-19T'+('16:06' if num==12 else '17:51' if num==14 else '17:02')+':00-04:00')
+            with self.assertRaises(ValueError):programme_schedule(raw,dict(identity,date='2025-09-19'))
+            with self.assertRaises(ValueError):programme_schedule(raw,dict(identity,race_number=15))
+        with self.assertRaises(ValueError):programme_schedule((FIXTURES/'abr-cotillion-glance.html').read_bytes().replace(b'p.m. ET',b'p.m.'),dict(track='PRX',date='2026-09-19',race_number=13,name='Cotillion S. (G1)'))
+
+
+class USClockBoundaryTests(TestCase):
+    def test_jsonld_conflict_and_unzoned_date_are_rejected(self):
+        from stable.services.us_flat_results import sporting_schedule,next_data
+        raw=(FIXTURES/'DMR2026090510.html').read_bytes()
+        summary=next_data(raw)['race']['race_summary']
+        entry={'@type':'SportsEvent','name':summary['name'],'location':{'name':summary['course_name']},
+            'url':'https://www.sportinglife.com/racing/results/x/'+str(summary['race_summary_reference']['id'])+'/race',
+            'startDate':summary['date']+'T'+summary['time']+'Z'}
+        encode=lambda e:'<script type="application/ld+json">'+json.dumps(e)+'</script>'
+        self.assertEqual(sporting_schedule(summary,encode(entry)).utcoffset().total_seconds(),0)
+        for changes in [{'startDate':entry['startDate'][:-1]},{'name':'Other race'},
+                        {'location':{'name':'Other venue'}},{'url':'https://www.sportinglife.com/racing/results/wrong/'}]:
+            with self.subTest(changes=changes),self.assertRaisesRegex(ValueError,'clock_conflict'):
+                sporting_schedule(summary,encode({**entry,**changes}))
+
+    def test_actual_midnight_missing_and_outside_anchor(self):
+        from datetime import datetime,timezone
+        from stable.services.us_flat_results import actual_sporting_time,chart_actual_time
+        identity=dict(track='DMR',date='2026-09-05')
+        scheduled=datetime(2026,9,5,23,58,tzinfo=timezone.utc)
+        self.assertEqual(actual_sporting_time({'off_time':'00:03:00'},scheduled,identity),'2026-09-05T17:03:00-07:00')
+        self.assertEqual(actual_sporting_time({},scheduled,identity),'')
+        with self.assertRaisesRegex(ValueError,'ambiguous'):actual_sporting_time({'off_time':'08:00:00'},scheduled,identity)
+        self.assertEqual(chart_actual_time('5:03',scheduled='',identity=identity),'')
+        with self.assertRaisesRegex(ValueError,'anchor'):chart_actual_time('5:03',scheduled='2026-09-05T17:00:00',identity=identity)
+        with self.assertRaisesRegex(ValueError,'ambiguous'):chart_actual_time('1:00',scheduled='2026-09-05T17:00:00-07:00',identity=identity)

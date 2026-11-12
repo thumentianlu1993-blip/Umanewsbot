@@ -142,10 +142,11 @@ def archived_program_entries(identity, *, urls, read):
     return matches[0]
 
 
-def collect_flat_results(store, *, start, end, program_sources=None, target_keys=None):
+def collect_flat_results(store, *, start, end, program_sources=None, target_keys=None, programme_sources=None):
     if not isinstance(start, date) or not isinstance(end, date) or not start <= end or (end-start).days > 366:
         raise ValueError('us_date_window')
     program_sources = program_sources or {}
+    programme_sources = programme_sources or {}
     sources, errors, results, pending, targets, unresolved = [], [], [], [], [], []
     catalogue_conflicts, blocked_keys = [], set()
     def read_parse(url, parser, *args, accept=True):
@@ -238,7 +239,22 @@ def collect_flat_results(store, *, start, end, program_sources=None, target_keys
                     else:entries,program_doc=discover_program_entries(identity,read=read_program,initial=supplement_doc)
                 result_docs.append(program_doc)
                 result = supplement_programs(result, entries)
+            schedule_doc=None
+            if not result.get('off_time'):
+                from .us_flat_results import programme_schedule,chart_actual_time
+                if programme_sources.get(target['candidate_key']):
+                    anchor,schedule_doc=read_parse(programme_sources[target['candidate_key']],programme_schedule,identity,accept=False)
+                    result_docs.append(schedule_doc)
+                elif program_doc:
+                    try:anchor=programme_schedule(program_doc['body'],identity);schedule_doc=program_doc
+                    except ValueError:anchor=''
+                else:anchor=''
+                if anchor:
+                    result.update(scheduled_off_time=anchor,
+                        off_time=chart_actual_time(chart['off_time_raw'],scheduled=anchor,identity=identity),
+                        off_time_basis='drf_actual_anchored_to_programme')
             provenance = {'chart': chart_doc['sha256'], 'supplement': supplement_doc['sha256']}
+            if schedule_doc:provenance['schedule']=schedule_doc['sha256']
             if program_doc:
                 provenance['program'] = program_doc['sha256']
             result.update(catalogue=target, candidate_key=target['candidate_key'], race_name=target['race_name'], grade=target['grade'],

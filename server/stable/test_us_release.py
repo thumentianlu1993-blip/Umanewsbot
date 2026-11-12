@@ -57,6 +57,53 @@ class USReleaseTests(TestCase):
             self.assertEqual(execute(path,sha,restore=True,apply=True,now=NOW)['action'],'restored')
             self.assertEqual(snapshot([self.event.pk]),before)
 
+    def overlapping_packet(self):
+        path,_=self.rebind_packet();manifest=json.loads(path.read_text())
+        refs={**self.event.source_refs,'us_repair_evidence':{'clock':'actual'}}
+        manifest['items']=[dict(event_id=self.event.pk,fields={'source_refs':refs,'going_text':'firm'},result_rows=0)]
+        raw=json.dumps(manifest).encode();path.write_bytes(raw)
+        return path,hashlib.sha256(raw).hexdigest()
+
+    def test_field_patch_with_rebind_is_atomic_and_preserves_candidates(self):
+        path,sha=self.overlapping_packet();before=snapshot([self.event.pk])
+        candidate=models.RaceEventDataCandidate.objects.create(event=self.event,module='runners',source_name='us_pre_race_v1',candidate_payload={'items':[]},raw_payload={},fetched_at=NOW)
+        with patch('stable.services.us_release.load_multisource_policy',return_value=self.policy), \
+             patch('stable.services.race_data_source_adapters.load_multisource_policy',return_value=self.policy):
+            self.assertEqual(execute(path,sha,now=NOW)['action'],'dry_run_rolled_back')
+            self.assertEqual(snapshot([self.event.pk]),before)
+            execute(path,sha,apply=True,now=NOW)
+            self.event.refresh_from_db();self.assertEqual(self.event.going_text,'firm')
+            self.assertTrue(models.RaceEventDataCandidate.objects.filter(pk=candidate.pk).exists())
+            execute(path,sha,restore=True,apply=True,now=NOW)
+            self.assertEqual(snapshot([self.event.pk]),before)
+            self.assertTrue(models.RaceEventDataCandidate.objects.filter(pk=candidate.pk).exists())
+
+    def test_readonly_baseline_check_keeps_patch_rebind_overlap_strict(self):
+        from django.core.management import call_command
+        from django.core.management.base import CommandError
+        from io import StringIO
+        path,sha=self.overlapping_packet()
+        self.event.source_refs={**self.event.source_refs,'new_poll':True};self.event.save()
+        # TestCase已有写事务；这里只测命令的scope收窄，生产只读事务由既有PG测试覆盖。
+        with patch('stable.management.commands.run_us_release.connection.vendor','sqlite'),self.assertRaisesRegex(CommandError,'baseline_drift'):
+            call_command('run_us_release',manifest=str(path),sha256=sha,check_baseline=True,stdout=StringIO())
+
+    def test_patch_rebind_overlap_keeps_strict_baseline_and_rolls_back_failure(self):
+        path,sha=self.overlapping_packet()
+        self.event.source_refs={**self.event.source_refs,'new_poll':{'verified':True}};self.event.save()
+        changed=snapshot([self.event.pk])
+        with patch('stable.services.us_release.load_multisource_policy',return_value=self.policy),self.assertRaisesRegex(ValueError,'baseline_drift'):
+            execute(path,sha,apply=True,now=NOW)
+        self.assertEqual(snapshot([self.event.pk]),changed)
+        # 精确基线通过后，写字段失败仍必须撤销先前换绑。
+        manifest=json.loads(path.read_text());raw=json.dumps(changed).encode();(path.parent/'baseline.json').write_bytes(raw)
+        manifest['baseline']['sha256']=hashlib.sha256(raw).hexdigest();manifest['items'][0]['fields']['unknown']='x'
+        raw=json.dumps(manifest).encode();path.write_bytes(raw)
+        with patch('stable.services.us_release.load_multisource_policy',return_value=self.policy), \
+             patch('stable.services.race_data_source_adapters.load_multisource_policy',return_value=self.policy),self.assertRaisesRegex(ValueError,'unlisted_field'):
+            execute(path,hashlib.sha256(raw).hexdigest(),apply=True,now=NOW)
+        self.assertEqual(snapshot([self.event.pk]),changed)
+
     def test_empty_and_incomplete_rebind_scopes_rejected(self):
         path,_=self.rebind_packet();manifest=json.loads(path.read_text())
         for items,rebind,error in [([],[],'manifest_scope'),
