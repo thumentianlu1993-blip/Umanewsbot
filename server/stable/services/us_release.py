@@ -11,7 +11,7 @@ from stable import models
 from .race_data_source_adapters import canonical_sha, load_multisource_policy, fetch_bound_observation, run_multisource_claim
 from .race_data_sync_enrollment import _lock_multisource_event, attach_multisource_observation, rebind_multisource_enrollment
 from .race_data_sync_control import claim_multisource_events
-from .race_source_identity import identity_key, resolve_observation
+from .race_source_identity import ArchivedResultReceipt, identity_key, resolve_observation
 from .race_pre_race import SourceBytes
 from .france_release import read_bound
 from .france_field_repair import frozen
@@ -158,7 +158,7 @@ def execute(path,expected_sha256,*,apply=False,restore=False,now=None):
         if needing!=set(rebind_ids):raise ValueError('policy_rebind_incomplete')
         for entry in rebind:
             rebind_multisource_enrollment(event_id=entry['event_id'],policy=policy,now=now,expected_route_digest=entry['old_route_digest'],apply=True)
-        events=[];outcomes=[];expected={}
+        events=[];outcomes=[];expected={};archive_receipts={}
         for item in items:
             event=_create_or_update(item,locked,digest);events.append(event)
             outcomes.append({'event_id':event.pk,'slug':event.slug,'rows':0})
@@ -172,19 +172,24 @@ def execute(path,expected_sha256,*,apply=False,restore=False,now=None):
             current=models.RaceEventIdentityKey.objects.filter(namespace=key['namespace'],key_sha256=key['key_sha256']).first()
             if current and current.event_id!=event.pk:raise ValueError('identity_conflict')
             if not current:models.RaceEventIdentityKey.objects.create(event=event,evidence={'manifest_sha256':digest},**key)
-            match=resolve_observation(value,route=route,now=now)
-            if match.status!='exact' or match.event_id!=event.pk:raise ValueError('result_identity')
+            receipt=ArchivedResultReceipt(manifest_sha256=digest,observation_sha256=canonical_sha(value))
+            match=resolve_observation(value,route=route,now=now,archive_receipt=receipt)
+            if match.status!='exact' or match.event_id!=event.pk:
+                raise ValueError(f'result_identity:{event.pk}:{match.reason or match.status}')
             if len(value['roster'])!=item['result_rows']:raise ValueError('result_count')
-            decision=attach_multisource_observation(value,policy=policy,now=now)
+            decision=attach_multisource_observation(value,policy=policy,now=now,archive_receipt=receipt)
             if decision.action not in {'acquired','attached','replay'}:raise ValueError('attach_'+decision.reason_code)
             expected[event.pk]=item['result_rows']
+            archive_receipts[event.pk]=receipt
+            outcomes[-1]['archive_replay']=receipt.evidence(value)
         # 逐场临执行领取，避免前面解析/写入消耗尚未执行目标的租约；仍逐一核对全清单。
         for event_id in expected:
             now=timezone.now()
             claims=claim_multisource_events(event_ids=[event_id],now=now,historical=True)
             if {c.event_id for c in claims}!={event_id}:raise ValueError('historical_claim_incomplete')
             for claim in claims:
-                result=run_multisource_claim(claim=claim,now=timezone.now(),fetcher=fetch)
+                result=run_multisource_claim(claim=claim,now=timezone.now(),fetcher=fetch,
+                    archive_receipt=archive_receipts[event_id])
                 if not result.get('processed'):raise ValueError('result_'+result.get('reason','unknown'))
                 event=models.RaceEvent.objects.get(pk=claim.event_id)
                 if event.status!='finished' or event.results.count()!=expected[event.pk]:raise ValueError('public_projection_incomplete')

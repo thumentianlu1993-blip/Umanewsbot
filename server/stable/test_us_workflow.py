@@ -105,6 +105,41 @@ class USWorkflowTests(TestCase):
             value=fetch_bound_observation(event=self.event,route=self.route,now=NOW,fetcher=fetch)
         self.assertEqual(value['fetched_at'],fetched.isoformat())
 
+    def test_stale_live_observation_cannot_self_authorize_archive_replay(self):
+        from copy import deepcopy
+        from datetime import timedelta
+        from stable.services.race_source_identity import resolve_observation
+        value=deepcopy(self.value);value['fetched_at']=(NOW-timedelta(hours=48)).isoformat()
+        value['archive_replay']={'manifest_sha256':'a'*64}
+        match=resolve_observation(value,route=self.route,now=NOW)
+        self.assertEqual(match.reason,'observation_stale')
+        decision=attach_multisource_observation(value,policy=self.policy,now=NOW)
+        self.assertEqual(decision.reason_code,'observation_stale')
+        self.assertFalse(models.RaceDataSyncEnrollment.objects.filter(event=self.event).exists())
+
+    def test_archive_receipt_binds_exact_result_and_retains_time_policy_guards(self):
+        from copy import deepcopy
+        from datetime import timedelta
+        from stable.services.race_source_identity import ArchivedResultReceipt,resolve_observation
+        from stable.services.race_data_source_adapters import canonical_sha,SourceRoute
+        value=deepcopy(self.value);value['fetched_at']=(NOW-timedelta(hours=48)).isoformat()
+        receipt=ArchivedResultReceipt('a'*64,canonical_sha(value))
+        match=resolve_observation(value,route=self.route,now=NOW,archive_receipt=receipt)
+        self.assertEqual((match.status,match.event_id),('exact',self.event.pk))
+        self.assertEqual(match.evidence['archive_replay']['source_fetched_at'],value['fetched_at'])
+        altered=deepcopy(value);altered['roster'][0]['horse_name']='Different horse'
+        self.assertEqual(resolve_observation(altered,route=self.route,now=NOW,archive_receipt=receipt).reason,'archive_observation_mismatch')
+        future=deepcopy(value);future['fetched_at']=(NOW+timedelta(hours=1)).isoformat()
+        future_receipt=ArchivedResultReceipt('a'*64,canonical_sha(future))
+        self.assertEqual(resolve_observation(future,route=self.route,now=NOW,archive_receipt=future_receipt).reason,'observation_stale')
+        expired=SourceRoute({**self.route.payload,'valid_until':(NOW-timedelta(days=1)).isoformat()},self.route.digest)
+        self.assertEqual(resolve_observation(value,route=expired,now=NOW,archive_receipt=receipt).reason,'observation_route_invalid')
+        self.assertEqual(resolve_observation(value,route=self.route,now=NOW,archive_receipt={'manifest_sha256':'a'*64}).reason,'archive_receipt_invalid')
+        card=deepcopy(value);card['result_phase']=''
+        self.assertEqual(resolve_observation(card,route=self.route,now=NOW,archive_receipt=ArchivedResultReceipt('a'*64,canonical_sha(card))).reason,'archive_observation_mismatch')
+        # 显式回放结束后，默认实时入口仍拒绝同一陈旧来源。
+        self.assertEqual(resolve_observation(value,route=self.route,now=NOW).reason,'observation_stale')
+
     def check_correction(self, explicit):
         from copy import deepcopy
         from datetime import timedelta

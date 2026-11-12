@@ -57,6 +57,37 @@ class USReleaseTests(TestCase):
         self.assertEqual(self.event.projection_control.write_owner,'unmanaged')
         self.assertTrue(models.RaceEventRevision.objects.filter(event=self.event).exists())
 
+    def test_frozen_result_release_after_48_hours_preserves_source_capture_time(self):
+        from datetime import timedelta
+        path,sha=self.packet();before=snapshot([self.event.pk]);later=NOW+timedelta(hours=48)
+        with patch('django.utils.timezone.now',return_value=later):
+            report=execute(path,sha,apply=True,now=later)
+            self.assertEqual(report['result_rows'],8)
+            source=models.RaceResultSourceIdentity.objects.get(event=self.event,source_key='us_racing')
+            self.assertEqual(source.identity_fields['multisource_v2']['fetched_at'],NOW.isoformat())
+            self.event.refresh_from_db()
+            self.assertEqual(self.event.source_refs['us_race_metadata']['observed_at'],NOW.isoformat())
+            observation=models.RaceResultObservation.objects.get(source_identity=source)
+            receipt=observation.field_provenance['archive_replay']
+            self.assertEqual(receipt['manifest_sha256'],sha)
+            self.assertEqual(receipt['source_fetched_at'],NOW.isoformat())
+            self.assertEqual(report['events'][0]['archive_replay'],receipt)
+            self.assertEqual(execute(path,sha,apply=True,now=later)['action'],'replay')
+            execute(path,sha,restore=True,apply=True,now=later)
+        for name in ['RaceEvent','RaceEventRunner','RaceEventResult']:
+            self.assertEqual(snapshot([self.event.pk])[name],before[name],name)
+
+    def test_archive_second_parse_must_match_bound_observation(self):
+        from stable.services import race_data_source_adapters as adapters
+        path,sha=self.packet();before=snapshot([self.event.pk]);original=adapters.fetch_bound_observation
+        def changed(**kwargs):
+            value=original(**kwargs);value['raw_sha256']='f'*64
+            return value
+        with patch('stable.services.race_data_source_adapters.fetch_bound_observation',side_effect=changed):
+            with self.assertRaisesRegex(ValueError,'result_identity_conflict'):
+                execute(path,sha,apply=True,now=NOW)
+        self.assertEqual(snapshot([self.event.pk]),before)
+
     def test_commit_probe_recovers_when_command_output_was_lost(self):
         from io import StringIO
         from django.core.management import call_command
