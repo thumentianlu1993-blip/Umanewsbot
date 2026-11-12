@@ -84,9 +84,35 @@ class USReleaseTests(TestCase):
             value=original(**kwargs);value['raw_sha256']='f'*64
             return value
         with patch('stable.services.race_data_source_adapters.fetch_bound_observation',side_effect=changed):
-            with self.assertRaisesRegex(ValueError,'result_identity_conflict'):
+            with self.assertRaisesRegex(ValueError,f'result_identity_conflict:{self.event.pk}:archive_observation_mismatch'):
                 execute(path,sha,apply=True,now=NOW)
         self.assertEqual(snapshot([self.event.pk]),before)
+
+    def test_archive_release_with_existing_reviewed_roster_survives_source_attachment(self):
+        from stable.services.race_pre_race import baseline
+        from stable.services.race_data_source_adapters import canonical_sha, fetch_bound_observation
+        items=[{'horse_number':row['number'],'horse_name':row['horse_name']} for row in self.value['roster']]
+        candidate=models.RaceEventDataCandidate.objects.create(
+            event=self.event,module='runners',source_name='reviewed_pre_race_v1',
+            source_url=self.value['canonical_url'],fetched_at=NOW,candidate_payload={'items':items},
+            raw_payload={'reviewed_pre_race_v1':{'validated':True,'baseline':baseline(self.event),
+                'raw_sha256':self.value['raw_sha256'],'row_count':len(items),'items_sha256':canonical_sha(items)}})
+        first=fetch_bound_observation(event=self.event,route=self.route,now=NOW,fetcher=self.fetch)
+        self.assertEqual(first['identity_seed_receipt']['candidate_id'],candidate.pk)
+        path,sha=self.packet();before=snapshot([self.event.pk])
+        report=execute(path,sha,apply=True,now=NOW)
+        self.assertEqual(report['result_rows'],8)
+        source=models.RaceResultSourceIdentity.objects.get(event=self.event,source_key='us_racing')
+        self.assertIn('identity_seed_receipt',source.identity_fields['multisource_v2'])
+        second=fetch_bound_observation(event=self.event,route=self.route,now=NOW,fetcher=self.fetch)
+        self.assertNotIn('identity_seed_receipt',second)
+        self.assertEqual(execute(path,sha,apply=True,now=NOW)['action'],'replay')
+        execute(path,sha,apply=True,restore=True,now=NOW)
+        for name in ['RaceEvent','RaceEventRunner','RaceEventResult']:
+            self.assertEqual(snapshot([self.event.pk])[name],before[name],name)
+        candidate.refresh_from_db()
+        self.assertEqual(candidate.status,'pending')
+        self.assertEqual(candidate.candidate_payload,{'items':items})
 
     def test_commit_probe_recovers_when_command_output_was_lost(self):
         from io import StringIO

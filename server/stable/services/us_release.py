@@ -11,7 +11,7 @@ from stable import models
 from .race_data_source_adapters import canonical_sha, load_multisource_policy, fetch_bound_observation, run_multisource_claim
 from .race_data_sync_enrollment import _lock_multisource_event, attach_multisource_observation, rebind_multisource_enrollment
 from .race_data_sync_control import claim_multisource_events
-from .race_source_identity import ArchivedResultReceipt, identity_key, resolve_observation
+from .race_source_identity import ArchivedResultReceipt, archived_result_observation_sha, identity_key, resolve_observation
 from .race_pre_race import SourceBytes
 from .france_release import read_bound
 from .france_field_repair import frozen
@@ -172,7 +172,7 @@ def execute(path,expected_sha256,*,apply=False,restore=False,now=None):
             current=models.RaceEventIdentityKey.objects.filter(namespace=key['namespace'],key_sha256=key['key_sha256']).first()
             if current and current.event_id!=event.pk:raise ValueError('identity_conflict')
             if not current:models.RaceEventIdentityKey.objects.create(event=event,evidence={'manifest_sha256':digest},**key)
-            receipt=ArchivedResultReceipt(manifest_sha256=digest,observation_sha256=canonical_sha(value))
+            receipt=ArchivedResultReceipt(manifest_sha256=digest,observation_sha256=archived_result_observation_sha(value))
             match=resolve_observation(value,route=route,now=now,archive_receipt=receipt)
             if match.status!='exact' or match.event_id!=event.pk:
                 raise ValueError(f'result_identity:{event.pk}:{match.reason or match.status}')
@@ -190,7 +190,8 @@ def execute(path,expected_sha256,*,apply=False,restore=False,now=None):
             for claim in claims:
                 result=run_multisource_claim(claim=claim,now=timezone.now(),fetcher=fetch,
                     archive_receipt=archive_receipts[event_id])
-                if not result.get('processed'):raise ValueError('result_'+result.get('reason','unknown'))
+                if not result.get('processed'):
+                    raise ValueError(f"result_{result.get('reason','unknown')}:{event_id}:{result.get('identity_reason','')}")
                 event=models.RaceEvent.objects.get(pk=claim.event_id)
                 if event.status!='finished' or event.results.count()!=expected[event.pk]:raise ValueError('public_projection_incomplete')
                 next(o for o in outcomes if o['event_id']==event.pk)['rows']=event.results.count()

@@ -1668,6 +1668,9 @@
     ],
     "docs/changes/us-race-automation/ci-scope-archive.json": [
       "infrastructure"
+    ],
+    "docs/changes/us-race-automation/ci-scope-seed.json": [
+      "infrastructure"
     ]
   },
   "symbols": {
@@ -1873,6 +1876,7 @@
     "docs/changes/us-race-automation/ci-scope.json",
     "docs/changes/us-race-automation/ci-scope-346.json",
     "docs/changes/us-race-automation/ci-scope-rebind.json",
-    "docs/changes/us-race-automation/ci-scope-archive.json"
+    "docs/changes/us-race-automation/ci-scope-archive.json",
+    "docs/changes/us-race-automation/ci-scope-seed.json"
   ]
 }
