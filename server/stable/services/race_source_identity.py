@@ -15,6 +15,26 @@ from stable.services.race_data_source_adapters import canonical_sha, aware, requ
 MATCHER_VERSION = "race-identity-v2"
 
 
+@dataclass(frozen=True)
+class ArchivedResultReceipt:
+    """由精确发布入口校验原件后显式传递；来源 JSON 本身不能授予回放权限。"""
+
+    manifest_sha256: str
+    observation_sha256: str
+
+    def evidence(self, value):
+        require_sha(self.manifest_sha256)
+        require_sha(self.observation_sha256)
+        if (value.get("provider") != "us_racing" or value.get("region") != "united_states"
+                or value.get("result_phase") not in {"official", "corrected"}
+                or value.get("roster_complete") is not True
+                or canonical_sha(value) != self.observation_sha256):
+            raise ValueError("archive_observation_mismatch")
+        return {"manifest_sha256": self.manifest_sha256,
+                "observation_sha256": self.observation_sha256,
+                "source_fetched_at": value["fetched_at"]}
+
+
 def normalize_name(value):
     return re.sub(
         r"\s+", " ", unicodedata.normalize("NFKC", html.unescape(str(value))).casefold()
@@ -51,7 +71,7 @@ def event_snapshot(event):
     )
 
 
-def observation_context(value, route, now):
+def observation_context(value, route, now, *, archive_receipt=None):
     if not isinstance(value, dict):
         raise ValueError("observation_invalid")
     for k in (
@@ -68,7 +88,13 @@ def observation_context(value, route, now):
         raise ValueError("observation_route_invalid")
     require_sha(value.get("raw_sha256"))
     fetched = aware(value.get("fetched_at"))
-    if not now - timedelta(hours=24) <= fetched <= now + timedelta(minutes=1):
+    if archive_receipt is not None:
+        if not isinstance(archive_receipt, ArchivedResultReceipt):
+            raise ValueError("archive_receipt_invalid")
+        archive_receipt.evidence(value)
+    # 冻结赛果只豁免下界；实际采集时间、未来时间和当前策略校验均保留。
+    if (fetched > now + timedelta(minutes=1)
+            or (archive_receipt is None and fetched < now - timedelta(hours=24))):
         raise ValueError("observation_stale")
     if (
         not isinstance(value.get("external_race_id"), str)
@@ -239,9 +265,9 @@ def seed_receipt(event, value, *, route, link_chain, candidate_id=None):
     )
 
 
-def resolve_observation(value, *, route, now):
+def resolve_observation(value, *, route, now, archive_receipt=None):
     try:
-        day = observation_context(value, route, now)
+        day = observation_context(value, route, now, archive_receipt=archive_receipt)
     except (ValueError, KeyError, TypeError) as exc:
         return IdentityMatch("conflict", reason=str(exc))
     targets = set()
@@ -250,6 +276,8 @@ def resolve_observation(value, *, route, now):
         "raw_sha256": value["raw_sha256"],
         "route_digest": route.digest,
     }
+    if archive_receipt is not None:
+        evidence["archive_replay"] = archive_receipt.evidence(value)
     source = models.RaceResultSourceIdentity.objects.filter(
         source_key=value["provider"],
         region_code=value["region"],
