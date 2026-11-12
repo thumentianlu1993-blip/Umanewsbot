@@ -914,7 +914,7 @@ def parse_reference_observation(page, *, url, route, now, event=None):
     )
 
 
-def run_multisource_claim(*, claim, now, fetcher=None):
+def run_multisource_claim(*, claim, now, fetcher=None, archive_receipt=None):
     """共享 Celery 入口；网络外采，末端 writer 锁内重新核验同一 claim。"""
     from django.db import transaction
     from django.utils import timezone
@@ -947,7 +947,7 @@ def run_multisource_claim(*, claim, now, fetcher=None):
         from stable.services.race_source_identity import resolve_observation
 
         if route.provider=='us_racing':now=timezone.now()
-        match = resolve_observation(value, route=route, now=now)
+        match = resolve_observation(value, route=route, now=now, archive_receipt=archive_receipt)
         if match.status != "exact" or match.event_id != claim.event_id:
             raise ValueError("identity_conflict")
         if value["external_race_id"] != binding.source_identity.external_race_id:
@@ -973,6 +973,8 @@ def run_multisource_claim(*, claim, now, fetcher=None):
         )
         if route.provider == 'us_racing' and value.get('us_race_metadata'):
             provenance['us_race_metadata'] = value['us_race_metadata']
+        if archive_receipt is not None:
+            provenance['archive_replay'] = match.evidence['archive_replay']
         france_basic = value.get('france_basic_v1') if route.provider=='geny' and route.region=='france' else None
         if france_basic:
             from .france_basic_fields import basic_sha, validate_basic

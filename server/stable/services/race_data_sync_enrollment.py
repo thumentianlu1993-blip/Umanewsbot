@@ -1387,7 +1387,7 @@ def _multisource_manifest(
     lifecycle.save(update_fields=("manifest_data", "updated_at"))
 
 
-def attach_multisource_observation(observation, *, policy, now, discovery_token=None, legacy_handoff=None):
+def attach_multisource_observation(observation, *, policy, now, discovery_token=None, legacy_handoff=None, archive_receipt=None):
     """唯一赛事原子登记或挂接；失败全回滚，后到来源不重新授予 owner。"""
     from django.db import IntegrityError
     from urllib.parse import urlsplit
@@ -1413,7 +1413,7 @@ def attach_multisource_observation(observation, *, policy, now, discovery_token=
         settings, "RACE_DATA_SYNC_ENABLED_PROVIDERS", ()
     ) or route.region not in getattr(settings, "RACE_DATA_SYNC_ENABLED_REGIONS", ()):
         return Decision("rejected", "binding_runtime_disabled")
-    match = resolve_observation(observation, route=route, now=now)
+    match = resolve_observation(observation, route=route, now=now, archive_receipt=archive_receipt)
     if match.status != "exact":
         return Decision("rejected", match.reason or match.status)
     for attempt in range(3):
@@ -1502,7 +1502,7 @@ def attach_multisource_observation(observation, *, policy, now, discovery_token=
                         raise _MultisourceRejected("owner_cas_stale")
                 elif projection.write_owner != "unmanaged":
                     raise _MultisourceRejected("owner_cas_stale")
-                fresh = resolve_observation(observation, route=route, now=now)
+                fresh = resolve_observation(observation, route=route, now=now, archive_receipt=archive_receipt)
                 if fresh.status != "exact" or fresh.event_id != event.pk:
                     raise _MultisourceRejected("identity_drift")
                 source_lookup = dict(

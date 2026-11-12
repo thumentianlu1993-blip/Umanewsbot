@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "base_sha": "21c7cbce73c6be030721c9838261a6dced15f79a",
+  "reason": "仅修复精确美国历史赛果发布的归档时钟：新增显式凭证参数，绑定manifest和完整观测SHA，保留真实采集时间；所有默认实时调用仍有24小时限制。覆盖共享身份、登记、claim写入、全部多源地区回归、美国整包写入与恢复及基础检查，不扩展未改动新闻/翻译/QQ全量。复用已登记范围文件，不修改测试清单或领域映射",
+  "domains": [
+    "infrastructure",
+    "race_results",
+    "us_source_collection",
+    "module:stable.test_race_multisource_enrollment",
+    "module:stable.test_race_multisource_postgres",
+    "module:stable.test_race_multisource_conversion",
+    "module:stable.test_race_multisource_regions",
+    "module:stable.test_race_data_sync_admission",
+    "module:stable.test_france_release_handoff"
+  ],
+  "changes": [
+    {
+      "path": "docs/changes/us-race-automation/archive_replay_fix.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "f604f21cb622b3d1aaafd43dad050c11f50247781612f9b7ad16d7bf146c7af1",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/us-race-automation/release_archive.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "f77ceaee268e700fceabc4848e487d5caef28d7adc7babaa4e990ee9acc25a0d",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/current_state.md",
+      "status": "modified",
+      "before_hash": "9d177769d23198e8a6de1f9458d320c21ba494e3f6b7a163f79fdb906a5cd8a2",
+      "after_hash": "09604c55de286288a39187b0e7ec15499ee2dd2458e35ea153978384ac2af945",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/deploy_runbook.md",
+      "status": "modified",
+      "before_hash": "16ab637b26d86c3b09d73fb6fab0892937f7e2c37bb3ba2f34b66ae99dbc397c",
+      "after_hash": "cc9c9bb0f273a6f2a7fccdcaeb4320d4fd2245fad958abdbf57ac350e6bfbf04",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_source_adapters.py",
+      "status": "modified",
+      "before_hash": "993607a805054a6b22a5aa4b94ab64a57eb1b53f0d68f3d285f2808726f03130",
+      "after_hash": "928e4203e3a6ff7e3b8d6321902140ccc89b8ad098125df0e1feb128fc21c43e",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_enrollment.py",
+      "status": "modified",
+      "before_hash": "aee382c98a3eedf7030c7761ba7bbfd1e09faf0dcb5083766faf09c3fee9a3f1",
+      "after_hash": "4a29b516dac114d439120a930f09fe885d2cdc0ea29fa4816a4fd802e8768b4a",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_source_identity.py",
+      "status": "modified",
+      "before_hash": "84ef14f676dc2db7e26e8426f20bbbec933d6040d47b9ddcb6a41c0349762861",
+      "after_hash": "6d0c98c08954e7bdd5b0998009e26d0bffaa3211e58ad0302a09548974d182e5",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_release.py",
+      "status": "modified",
+      "before_hash": "d289f8cdfc5025828d076788a4e8ec0fd2806e66f9e212d4fe7d30e4eeaa1c96",
+      "after_hash": "6e34e133c1688915c3d17abc09e83effa88770cc8c3826ea42de6605034bae4c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_us_release.py",
+      "status": "modified",
+      "before_hash": "5a38a3369cbbd657e9b0399bbb883ded37d515f9b82a03cd01a0b759a1d2049b",
+      "after_hash": "f36adeee5dd70d1e65f0d35ed5a962d1dbe4bde7759cda72306535d0a6aff94b",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_us_workflow.py",
+      "status": "modified",
+      "before_hash": "f1c8843d3454bd74a9f8feb0a79134a0b7d7364df7d7ed588740b0274afbff08",
+      "after_hash": "0388bb16c26a1d333993ee67034696605ddb5e3cfcf5f6e09345814e4a9fb2c4",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "c2f68f08ef7ea13e751d12b74c7d89300c8447b92cc837e69a7be7c1003bd3c2",
+      "after_hash": "48f8ea1577018803695d6b92e92d85e7920668b558db17fa9c6dec67f5e9a21e",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}
