@@ -936,6 +936,7 @@ def run_multisource_claim(*, claim, now, fetcher=None, archive_receipt=None):
     if not settings.RACE_DATA_SYNC_ALLOW_NETWORK:
         return {"processed": False, "reason": "network_disabled"}
     binding, route = claim_binding(claim, now=now)
+    identity_reason = ""
     try:
         value = fetch_bound_observation(
             event=locked.event,
@@ -949,6 +950,7 @@ def run_multisource_claim(*, claim, now, fetcher=None, archive_receipt=None):
         if route.provider=='us_racing':now=timezone.now()
         match = resolve_observation(value, route=route, now=now, archive_receipt=archive_receipt)
         if match.status != "exact" or match.event_id != claim.event_id:
+            identity_reason = match.reason or match.status
             raise ValueError("identity_conflict")
         if value["external_race_id"] != binding.source_identity.external_race_id:
             raise ValueError("source_identity_changed")
@@ -1172,7 +1174,8 @@ def run_multisource_claim(*, claim, now, fetcher=None, archive_receipt=None):
             reason_code=reason,
             retry_at=getattr(exc, "retry_after", None),
         )
-        return {"processed": False, "reason": reason, "claim_action": decision.action}
+        return {"processed": False, "reason": reason, "claim_action": decision.action,
+                **({"identity_reason": identity_reason} if identity_reason else {})}
 
 
 def parse_nar_observation(page, *, url, route, now):

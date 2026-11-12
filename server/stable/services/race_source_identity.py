@@ -15,6 +15,11 @@ from stable.services.race_data_source_adapters import canonical_sha, aware, requ
 MATCHER_VERSION = "race-identity-v2"
 
 
+def archived_result_observation_sha(value):
+    """绑定全部解析内容；数据库派生的 seed 收据仍由身份解析器独立校验。"""
+    return canonical_sha({k: v for k, v in value.items() if k != "identity_seed_receipt"})
+
+
 @dataclass(frozen=True)
 class ArchivedResultReceipt:
     """由精确发布入口校验原件后显式传递；来源 JSON 本身不能授予回放权限。"""
@@ -28,7 +33,7 @@ class ArchivedResultReceipt:
         if (value.get("provider") != "us_racing" or value.get("region") != "united_states"
                 or value.get("result_phase") not in {"official", "corrected"}
                 or value.get("roster_complete") is not True
-                or canonical_sha(value) != self.observation_sha256):
+                or archived_result_observation_sha(value) != self.observation_sha256):
             raise ValueError("archive_observation_mismatch")
         return {"manifest_sha256": self.manifest_sha256,
                 "observation_sha256": self.observation_sha256,
