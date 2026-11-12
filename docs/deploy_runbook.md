@@ -9917,3 +9917,6 @@ RACE_DATA_RAW_ARTIFACT_ROOTS=/run/race-data-sync
 容量恢复阶段清理4份本任务远端重复传输镜像归档，每份本机原副本SHA均核对且保留；未删除数据库备份或已加载镜像。旧包如需从归档冷恢复，先按原SHA重新传输本机副本。该阶段清理清单及收据见本机 `historical-handoff/application-identity/capacity-recovery/duplicate-image-archives.json` 与 `archive-cleanup-receipt.json`。Geny修复另外上传两份固定镜像归档，在SHA核验和load后删除这两份远端传输副本，本机完整归档保留，见 `geny-programme-reload/image-load-proof.json`。
 
 版本核验同时比较镜像revision标签、容器环境和Django实际读取的 `/app/.umanews-release-commit`；只检查其中之一不够。复用基础镜像复制源码后须保留启动权限并更新版本文件。worker用有界重复双pong判断就绪，不能启动后仅等待一次10秒。生产状态、后续自然调度证据及历史失败过程见[法国发布证据](changes/france-race-automation/release_evidence.md)。人工门禁仅引用根 `AGENTS.md`。
+## 2026-11-12 美国 PR #301 发布未提交，恢复完成
+
+候选 `c2881c9e` 在原件解析后，因历史名单的派生身份收据与回放摘要冲突而停止。数据库提交探测为 false，恢复退出 0；四应用 `332fc540`、schema0084、251 条基线、健康及两类锁释放已复核。整库备份不阻塞发布的现有用户指令保持。隔离演练应覆盖发布读取依赖的候选记录；本次补充 160 条背景记录，详见[修复说明](changes/us-race-automation/archive_seed_fix.md)。

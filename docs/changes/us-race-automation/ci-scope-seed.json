@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "base_sha": "2e47b49a0c5e824b3e719d5766d7171293a940ae",
+  "reason": "冻结回放摘要仅排除数据库派生seed收据，来源解析字段仍完整绑定；补充既有名单到来源绑定再到最终写入的回归及精确错误原因。覆盖共享身份/claim、美国写入/恢复、多源地区默认行为及基础控制检查；新scope只登记本次范围，不改catalog或已有领域映射",
+  "domains": [
+    "infrastructure",
+    "race_results",
+    "us_source_collection",
+    "module:stable.test_race_multisource_enrollment",
+    "module:stable.test_race_multisource_postgres",
+    "module:stable.test_race_multisource_conversion",
+    "module:stable.test_race_multisource_regions",
+    "module:stable.test_race_data_sync_admission",
+    "module:stable.test_france_release_handoff"
+  ],
+  "changes": [
+    {
+      "path": "docs/changes/us-race-automation/archive_seed_fix.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "8e15abc8fbb05c57d5607c92a4f1bb54efd1f9c63af026359ebf41f02101ad18",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/us-race-automation/release_seed.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "b2e4fe27181af8920cb66ee65cac5947e84c8c92b6920c3356f01c360fb839d0",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/current_state.md",
+      "status": "modified",
+      "before_hash": "09604c55de286288a39187b0e7ec15499ee2dd2458e35ea153978384ac2af945",
+      "after_hash": "c34b6afe8fda8a701aecb94905613ed8e65dee885cf08cd8877c01dc200f78a3",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/deploy_runbook.md",
+      "status": "modified",
+      "before_hash": "cc9c9bb0f273a6f2a7fccdcaeb4320d4fd2245fad958abdbf57ac350e6bfbf04",
+      "after_hash": "98c7df6ccd5803e93fd7a4653da3d0e8b41900ead64eddd837bfce36838c3e3f",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_source_adapters.py",
+      "status": "modified",
+      "before_hash": "928e4203e3a6ff7e3b8d6321902140ccc89b8ad098125df0e1feb128fc21c43e",
+      "after_hash": "e86da649c8067274e60cdb81f3a8c60d8030cd9c93f67e1f20e9e9ef4afbf213",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_source_identity.py",
+      "status": "modified",
+      "before_hash": "6d0c98c08954e7bdd5b0998009e26d0bffaa3211e58ad0302a09548974d182e5",
+      "after_hash": "152d928e07f3526c18d6728f8c20d43b636cc046cff4114af3381e4344c6ced2",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_release.py",
+      "status": "modified",
+      "before_hash": "6e34e133c1688915c3d17abc09e83effa88770cc8c3826ea42de6605034bae4c",
+      "after_hash": "e39c8540b7eb5bae5290c3e5c77be01822840fb404bc344f1c49689c788bd19d",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_us_release.py",
+      "status": "modified",
+      "before_hash": "f36adeee5dd70d1e65f0d35ed5a962d1dbe4bde7759cda72306535d0a6aff94b",
+      "after_hash": "f58b7bcb2bab9c0152e7eb20b051a07cf1c69648ce6aab1f66e929a890b81781",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "48f8ea1577018803695d6b92e92d85e7920668b558db17fa9c6dec67f5e9a21e",
+      "after_hash": "3c4cf37a4471c3d9df92de7bc2264038378a0a40051fb17cc244a79ea4652688",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}
