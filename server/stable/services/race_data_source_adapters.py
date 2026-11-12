@@ -498,6 +498,17 @@ def fetch_source_page(url, *, route, now):
             if not prerelease_url_allowed(value):
                 raise ValueError("us_source_url_rejected")
 
+    if route.provider == "us_racing":
+        from .us_calendar_snapshot import calendar_year, load_snapshot
+        snapshot_file = getattr(settings, "RACE_DATA_SYNC_US_CALENDAR_SNAPSHOT_FILE", "")
+        snapshot_sha = getattr(settings, "RACE_DATA_SYNC_US_CALENDAR_SNAPSHOT_SHA256", "")
+        if calendar_year(url) is not None and (snapshot_file or snapshot_sha):
+            validate(url)
+            if not enabled():
+                from .race_pre_race import JraFetchError
+                raise JraFetchError("jra_pre_race_disabled")
+            return load_snapshot(url, manifest_file=snapshot_file, manifest_sha256=snapshot_sha, now=now)
+
     return _fetch_bounded_html(
         url,
         now=now,

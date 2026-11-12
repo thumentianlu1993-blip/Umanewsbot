@@ -219,9 +219,9 @@ def parse_sporting_life(raw, identity):
             runners.append(row)
         else:
             raise ValueError('us_sl_status_unknown')
-    if len(runners) != summary['ride_count']:
+    if type(summary.get('ride_count')) is not int or summary['ride_count'] <= 0 or len(runners) != summary['ride_count']:
         raise ValueError('us_sl_runner_count')
-    return dict(runners=runners, scratches=scratches, provider='sporting_life',
+    return dict(runners=runners, scratches=scratches, provider='sporting_life', declared_runner_count=summary['ride_count'],
                 off_time=when.astimezone(ZoneInfo(VENUES[identity['track']][2])).isoformat())
 
 

@@ -970,7 +970,8 @@
       "stable.test_us_release",
       "stable.test_us_transport",
       "stable.test_us_venues",
-      "stable.test_us_workflow"
+      "stable.test_us_workflow",
+      "stable.test_us_calendar_snapshot"
     ]
   },
   "dependencies": {
@@ -3069,6 +3070,12 @@
       "domains": [
         "us_source_collection"
       ]
+    },
+    "server/stable/test_us_calendar_snapshot.py": {
+      "label": "stable.test_us_calendar_snapshot",
+      "domains": [
+        "us_source_collection"
+      ]
     }
   },
   "profiles": {
@@ -3405,7 +3412,8 @@
     "stable.test_us_release": "django",
     "stable.test_us_transport": "django",
     "stable.test_us_venues": "django",
-    "stable.test_us_workflow": "django"
+    "stable.test_us_workflow": "django",
+    "stable.test_us_calendar_snapshot": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {

@@ -28,6 +28,8 @@ def source_observation(result, *, target, sources, route, now):
             odds_source='DRF',odds_observed_at=sources['chart']['fetched_at'])
     evidence = dict(kind='us_independent_final_roster',row_count=len(rows),runner_count=result['runner_count'],
         sources=sources,roster_sha256=canonical_sha([(r['number'],r['horse_name']) for r in rows]))
+    if result.get('runner_count_evidence'):
+        evidence['runner_count_evidence'] = result['runner_count_evidence']
     return dict(provider=route.provider, region=route.region, identity_namespace=route.identity_namespace,
         operator=route.operator, external_race_id=track+':'+result['local_date']+':'+number,
         canonical_url=primary['url'],fetched_at=observed.isoformat(),
