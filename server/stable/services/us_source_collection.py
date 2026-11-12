@@ -207,6 +207,9 @@ def del_mar_nominations_directory(raw, *, year, start, end):
         day = datetime.strptime(f'{year} {day_match[1]} {day_match[2]}', '%Y %b %d').date()
         if not start <= day <= end:
             continue
+        # 官方报名文件尚未发布；空白或其他无链接内容仍属于结构错误。
+        if text(cells[3]) == '-' and not cells[3].select('a'):
+            continue
         links = [urljoin(DEL_MAR_NOMS,a['href']) for a in tr.select('a[href]') if text(a)=='Noms']
         if len(links) != 1 or not allowed_url(links[0]):
             raise ValueError('us_nomination_directory_link')

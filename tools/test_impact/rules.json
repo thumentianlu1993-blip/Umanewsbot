@@ -1680,6 +1680,9 @@
     ],
     "docs/changes/us-race-automation/ci-scope-calendar.json": [
       "infrastructure"
+    ],
+    "docs/changes/us-race-automation/ci-scope-preview.json": [
+      "infrastructure"
     ]
   },
   "symbols": {
@@ -1887,6 +1890,7 @@
     "docs/changes/us-race-automation/ci-scope-rebind.json",
     "docs/changes/us-race-automation/ci-scope-archive.json",
     "docs/changes/us-race-automation/ci-scope-seed.json",
-    "docs/changes/us-race-automation/ci-scope-calendar.json"
+    "docs/changes/us-race-automation/ci-scope-calendar.json",
+    "docs/changes/us-race-automation/ci-scope-preview.json"
   ]
 }

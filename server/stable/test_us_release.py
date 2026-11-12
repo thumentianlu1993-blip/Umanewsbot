@@ -21,6 +21,63 @@ class USReleaseTests(TestCase):
         loader.start();self.addCleanup(loader.stop)
     fetch=workflow.USWorkflowTests.fetch
 
+    def rebind_packet(self):
+        from stable.services.race_data_source_adapters import parse_multisource_policy
+        from stable.services.race_data_sync_enrollment import attach_multisource_observation
+        decision=attach_multisource_observation(self.value,policy=self.policy,now=NOW)
+        self.assertEqual(decision.action,'acquired')
+        binding=models.RaceDataSyncSourceBinding.objects.get(enrollment__event=self.event)
+        data=deepcopy(self.policy.payload)
+        data['routes'][0]['allowed_path_prefixes'].append('/pebbles-stakes')
+        self.policy=parse_multisource_policy(data,now=NOW)
+        path,_=self.packet();manifest=json.loads(path.read_text())
+        manifest['items']=[]
+        manifest['rebind']=[dict(event_id=self.event.pk,old_route_digest=binding.route_digest)]
+        archive=json.dumps({'documents':[]}).encode();(path.parent/'archive.json').write_bytes(archive)
+        manifest['archive']['sha256']=hashlib.sha256(archive).hexdigest()
+        raw=json.dumps(manifest).encode();path.write_bytes(raw)
+        return path,hashlib.sha256(raw).hexdigest()
+
+    def test_rebind_only_dry_apply_probe_replay_restore_without_historical_fetch(self):
+        from stable.services.us_release import probe_release_commit
+        path,sha=self.rebind_packet();before=snapshot([self.event.pk])
+        with patch('stable.services.us_release.load_multisource_policy',return_value=self.policy), \
+             patch('stable.services.race_data_source_adapters.load_multisource_policy',return_value=self.policy), \
+             patch('stable.services.us_release.fetch_bound_observation',side_effect=AssertionError('historical fetch forbidden')):
+            self.assertEqual(execute(path,sha,now=NOW)['action'],'dry_run_rolled_back')
+            self.assertEqual(snapshot([self.event.pk]),before)
+            self.assertFalse(probe_release_commit(path,sha)['committed'])
+            applied=execute(path,sha,apply=True,now=NOW)
+            self.assertEqual(applied['events'],[])
+            self.assertEqual(applied['result_rows'],0)
+            self.assertEqual(applied['rebind_ids'],[self.event.pk])
+            self.assertTrue(probe_release_commit(path,sha)['committed'])
+            self.assertEqual(execute(path,sha,apply=True,now=NOW)['action'],'replay')
+            self.assertEqual(snapshot([self.event.pk])['RaceEvent'],before['RaceEvent'])
+            self.assertEqual(execute(path,sha,restore=True,apply=True,now=NOW)['action'],'restored')
+            self.assertEqual(snapshot([self.event.pk]),before)
+
+    def test_empty_and_incomplete_rebind_scopes_rejected(self):
+        path,_=self.rebind_packet();manifest=json.loads(path.read_text())
+        for items,rebind,error in [([],[],'manifest_scope'),
+                                  ([dict(event_id=self.event.pk,fields={},result_rows=0)],[],'policy_rebind_incomplete')]:
+            manifest.update(items=items,rebind=rebind)
+            raw=json.dumps(manifest).encode();path.write_bytes(raw)
+            with patch('stable.services.us_release.load_multisource_policy',return_value=self.policy),self.assertRaisesRegex(ValueError,error):
+                execute(path,hashlib.sha256(raw).hexdigest(),apply=True,now=NOW)
+
+    def test_rebind_restore_refuses_polling_drift_after_schedule_resumes(self):
+        from datetime import timedelta
+        path,sha=self.rebind_packet()
+        with patch('stable.services.us_release.load_multisource_policy',return_value=self.policy), \
+             patch('stable.services.race_data_source_adapters.load_multisource_policy',return_value=self.policy):
+            execute(path,sha,apply=True,now=NOW)
+            models.RaceEventLiveTracking.objects.filter(event=self.event).update(next_poll_at=NOW+timedelta(minutes=30))
+            changed=snapshot([self.event.pk])
+            with self.assertRaisesRegex(ValueError,'restore_after_image_drift'):
+                execute(path,sha,restore=True,apply=True,now=NOW)
+            self.assertEqual(snapshot([self.event.pk]),changed)
+
     def packet(self,events=None):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
         root=Path(self.tmp.name);docs=[]

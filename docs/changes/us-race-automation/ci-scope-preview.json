@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "base_sha": "aa264d3b73f4ff30ace0da47ca44345675e4ab96",
+  "reason": "Del Mar未发布报名行精确识别及纯策略换绑入口。覆盖美国来源解析、完整事务/恢复、共享换绑控制引用及其他地区；规则仅登记本次明确范围，不削弱已有门禁",
+  "domains": [
+    "infrastructure",
+    "race_results",
+    "us_source_collection",
+    "module:stable.test_race_multisource_enrollment",
+    "module:stable.test_race_multisource_postgres",
+    "module:stable.test_race_multisource_conversion",
+    "module:stable.test_race_data_sync_admission",
+    "module:stable.test_france_release_handoff"
+  ],
+  "changes": [
+    {
+      "path": "docs/changes/us-race-automation/calendar_release_evidence.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "90d2d04739a657065f596667ce2e0e1f00987dac6d9381fa1f453844c262f699",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/us-race-automation/preview_source_gaps.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "1d983b6f89af8e629a570ed0650136abfce965bb5668d5b97e1138de7e5f315d",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/current_state.md",
+      "status": "modified",
+      "before_hash": "1192d703348163aa459c1727a9aaacf0e7c41c5916307a18bbb5cd43f683433c",
+      "after_hash": "7f77c6ce712a07ee6c5bd5c6609ffcea56f4de9d7e9df7f678514563d5a4f813",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/deploy_runbook.md",
+      "status": "modified",
+      "before_hash": "d9cf3492ef4e643a4b8e45bb030973657884a2304d9e39bdd46af1d32f6cad67",
+      "after_hash": "a50c35846fa008477247dfbd8a879d06fff11d481c197a9f358c01445fd41c85",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_automation/dmtc-nominations-pending.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "e3054f6f1d4b270f012eecc28d36cd0f1290c0fa0d3ed4dc24a43b3061465478",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/us_automation/provenance.json",
+      "status": "modified",
+      "before_hash": "2048472b91e5d89c11f59cc2efbb83e0e2734875764613bcf6a52d3316a5d4b9",
+      "after_hash": "39ae730265105c40c5b6983805b794d0cd0e19c46daf3125b4fc53060d219c26",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_release.py",
+      "status": "modified",
+      "before_hash": "e39c8540b7eb5bae5290c3e5c77be01822840fb404bc344f1c49689c788bd19d",
+      "after_hash": "fbeeb9ab54b34e3a910c2a3ae06e0e8f94df342054486cc8e2721bfd48bb8e8c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_source_collection.py",
+      "status": "modified",
+      "before_hash": "d454b27e000956fe598e9dbe6519311acd386d7a207f197f935ca2fcdfe1bf84",
+      "after_hash": "414ff129f95f6e30fec7d83433010dd02fb3471a9fc1d840c8be8c4f0b8c0f18",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_us_automation.py",
+      "status": "modified",
+      "before_hash": "7b208b62e3f1e79c496c21670a157188c3928edc043312b98137b39242a50a14",
+      "after_hash": "44c0cb1a6834e4f65ff85b0b6b7cf9563dd35efccaafdb872390b5e9259903f7",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_us_release.py",
+      "status": "modified",
+      "before_hash": "f58b7bcb2bab9c0152e7eb20b051a07cf1c69648ce6aab1f66e929a890b81781",
+      "after_hash": "67f0bfc3eb9cd9bc44aa32438351267fb10e94b7c0895516ddf92590ffddd9d5",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "46ecb0be2b1423528e1f774065259b9ae688bbef157518bfaa4d26e774cf0a00",
+      "after_hash": "07e3984bce0b1f871eaa6a75def6f8bdba9e08c871efae4d4993f609c0f356d9",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}

@@ -111,5 +111,14 @@
     "fixture_sha256": "9dbc58049606a26bc5f5a4523d787df66ce914de6e84930c02632d30c796c0aa",
     "fragment": false,
     "normalization": "移除行尾空白；original_sha256仍绑定原件"
+  },
+  {
+    "file": "dmtc-nominations-pending.html",
+    "source_url": "https://www.dmtc.com/horsemen/nominations",
+    "original_sha256": "dd75474a1837ebbdbed4b7dfaeb24d786a8ddceccc3c33627fb4e046ab4c97cb",
+    "fixture_sha256": "e3054f6f1d4b270f012eecc28d36cd0f1290c0fa0d3ed4dc24a43b3061465478",
+    "fetched_at": "2026-11-12T10:20:03.155727+00:00",
+    "fragment": true,
+    "normalization": "仅保留真实报名目录表格并移除行尾空白；单元格文本与链接不变"
   }
 ]

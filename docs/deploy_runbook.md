@@ -1,3 +1,11 @@
+# 2026-11-12 美国目录快照发布完成后的维护入口
+
+PR #303 merge `aa264d3b`，生产候选 `73f47c292bae3df74e960b397cc30c4e52351a25`，OCI `sha256:4d8e4602b47989236bcd7110a286ec665d3481cbb0d5e1f7db3f8573e16370f3`，schema0084。四应用运行、双worker就绪、Beat恢复、QQ关闭，发布锁释放；无迁移或历史重导。自然采集验收状态见[发布证据](changes/us-race-automation/calendar_release_evidence.md)。
+
+宿主发布根仍为 `/opt/umanews-release-0d05fa9b-france-handoff-20261110/umanewsbot`。维护以运行容器 `com.docker.compose.project.config_files` 的完整链为准：在下文美国来源链之后追加 `/opt/umanews-external-staging/us-346-20261112/release-identity.json` 和 `/opt/umanews-external-staging/us-calendar-73f47c29/release-identity.json`；不要遗漏此前法国覆盖。
+
+快照目录只读挂载至 `/run/race-data-sync/us-calendar`。父挂载源为 `/opt/umanewsbot-persistent/runtime/race_data_sync`，必须先有空的 `us-calendar` 子挂载点；缺失时一次性容器会在启动前报只读文件系统错误，不可通过放开只读权限解决。本次补齐空目录后同包重试成功，旧镜像和配置仍保留作批准包回滚。未来新增嵌套只读挂载时，启动检查必须覆盖真实父挂载形状。
+
 # 2026-11-12 美国修订发布中断后的实际运行态
 
 PR #300已合并为`21c7cbce`。候选`43d54f92`发布因冻结原件超过24小时被身份新鲜度校验拒绝；本包事务未提交，恢复退出0。四应用仍为`332fc540`，schema0084保留，旧配置/QQ关闭、健康和发布锁释放已核实。整库备份按用户指令不阻塞发布，原部分导出不是完整备份；后续使用精确before/after恢复面。详见[冻结回放修复](changes/us-race-automation/archive_replay_fix.md)。以下记录保留当时状态。
