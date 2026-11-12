@@ -5,7 +5,7 @@ import json
 from datetime import date, datetime, time
 from pathlib import Path
 
-from django.db import transaction
+from django.db import connection, transaction
 from django.utils import timezone
 from stable import models
 from .race_data_source_adapters import canonical_sha, load_multisource_policy, fetch_bound_observation, run_multisource_claim
@@ -197,6 +197,38 @@ def execute(path,expected_sha256,*,apply=False,restore=False,now=None):
                 detail=json.dumps({'before':before,'after':after,'event_ids':all_ids,'report':report},ensure_ascii=False))
         else:transaction.set_rollback(True)
         return dict(action='applied' if apply else 'dry_run_rolled_back',manifest_sha256=digest,**report)
+
+
+def probe_release_commit(path, expected_sha256):
+    """等待同包事务结束后查询数据库收据，不依赖命令输出文件。"""
+    raw = Path(path).read_bytes()
+    if hashlib.sha256(raw).hexdigest() != expected_sha256:
+        raise ValueError('manifest_digest')
+    manifest = json.loads(raw)
+    if manifest.get('action') != ACTION or manifest.get('schema_version') != 1:
+        raise ValueError('manifest_scope')
+    ids = {item['event_id'] for item in manifest['items'] if item.get('event_id')}
+    ids.update(item['event_id'] for item in manifest.get('rebind', []))
+    if not ids or len(ids) > 1000 or any(type(pk) is not int or pk <= 0 for pk in ids):
+        raise ValueError('commit_probe_anchor_scope')
+    with transaction.atomic():
+        if connection.vendor == 'postgresql':
+            with connection.cursor() as cursor:
+                cursor.execute("SET LOCAL lock_timeout='20s'")
+                cursor.execute("SET LOCAL statement_timeout='25s'")
+        # apply 先按同样顺序锁住这些既有赛事，再写入事务收据。
+        # 锁未释放时不能把尚不可见的收据误判为未提交。
+        locked = list(models.RaceEvent.objects.select_for_update().filter(pk__in=ids)
+                      .order_by('pk').values_list('pk', flat=True))
+        if set(locked) != ids:
+            raise ValueError('commit_probe_anchor_missing')
+        receipts = list(models.OperationLog.objects.filter(
+            action_type=ACTION, target_type='manifest', target_id=expected_sha256,
+        ).values_list('pk', flat=True)[:2])
+        if len(receipts) > 1:
+            raise ValueError('commit_probe_receipt_ambiguous')
+        return {'action': 'commit_probe', 'manifest_sha256': expected_sha256,
+                'committed': bool(receipts)}
 
 
 def restore_release(digest,*,apply,now):
