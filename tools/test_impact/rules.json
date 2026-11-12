@@ -1683,6 +1683,21 @@
     ],
     "docs/changes/us-race-automation/ci-scope-preview.json": [
       "infrastructure"
+    ],
+    "server/stable/services/us_stakes_schedule.py": [
+      "us_source_collection"
+    ],
+    "server/stable/services/us_browser_transport.py": [
+      "us_source_collection"
+    ],
+    "deploy/us-browser/**": [
+      "us_source_collection"
+    ],
+    "docker-compose.us-browser.yml": [
+      "us_source_collection"
+    ],
+    "docs/changes/us-online-field-gaps/ci-scope.json": [
+      "infrastructure"
     ]
   },
   "symbols": {
@@ -1891,6 +1906,7 @@
     "docs/changes/us-race-automation/ci-scope-archive.json",
     "docs/changes/us-race-automation/ci-scope-seed.json",
     "docs/changes/us-race-automation/ci-scope-calendar.json",
-    "docs/changes/us-race-automation/ci-scope-preview.json"
+    "docs/changes/us-race-automation/ci-scope-preview.json",
+    "docs/changes/us-online-field-gaps/ci-scope.json"
   ]
 }

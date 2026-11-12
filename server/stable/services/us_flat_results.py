@@ -1,5 +1,5 @@
 """美国平地全场赛果；DRF 物理冲线与裁定名次分离，补源必须整场一致。"""
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 import json
 import re
@@ -169,10 +169,14 @@ def _chart_page(page, identity, table_only=False):
         scratches = [n.strip() for n in re.split(r'[|,]', clean) if n.strip()]
         if any(re.search(r'\d{2}[A-Za-z]{3}', n) for n in scratches):
             raise ValueError('us_chart_scratches')
+    footer = text[text.index(stop['text']):].split('TIME', 1)[0]
+    ground = re.search(r'(?:Course|Track)\s+([A-Za-z -]+)(\s*\(Sealed\))?\.', footer, re.I)
+    off = re.search(r'OFF\s*AT\s*(\d{1,2}:\d{2}(?::\d{2})?)(?=\s|Start)', footer)
     return dict(local_date=identity['date'], track=identity['track'], race_number=race_number,
                 winning_time=splits[-1], fractional_times=splits[:-1], runners=rows, scratches=scratches,
-                going=(re.search(r'(?:Course|Track)\s+([A-Za-z -]+)\.',stop['text']).group(1).strip().lower()
-                       if re.search(r'(?:Course|Track)\s+([A-Za-z -]+)\.',stop['text']) else ''),
+                going=ground[1].strip().lower() if ground else '',
+                going_raw=(ground[1] + (ground[2] or '')).strip() if ground else '',
+                off_time_raw=off[1] if off else '',
                 margin_semantics='lengths_ahead_of_next_physical_finisher', demotion_notes=notes,
                 correction_marker=correction_marker(text))
 
@@ -191,9 +195,67 @@ def next_data(raw):
     return p
 
 
+def sporting_schedule(summary, raw=None):
+    """Sporting Life summary 使用 UTC；完整页额外核对同场 JSON-LD。"""
+    when = datetime.fromisoformat(summary['date']+'T'+summary['time'])
+    when = when.replace(tzinfo=timezone.utc) if when.tzinfo is None else when.astimezone(timezone.utc)
+    if raw is not None:
+        soup = BeautifulSoup(raw, 'lxml')
+        for node in soup.select('script[type="application/ld+json"]'):
+            value = json.loads(node.string or '')
+            entries = value if isinstance(value, list) else [value]
+            for entry in entries:
+                if entry.get('@type') != 'SportsEvent':
+                    continue
+                stamp = datetime.fromisoformat(entry['startDate'].replace('Z', '+00:00'))
+                race_id = str(summary['race_summary_reference']['id'])
+                if (stamp.tzinfo is None or stamp != when or entry.get('name') != summary['name']
+                        or entry.get('location', {}).get('name') != summary['course_name']
+                        or not re.search(r'/'+re.escape(race_id)+r'/', entry.get('url', ''))):
+                    raise ValueError('us_sl_clock_conflict')
+    return when
+
+
+def actual_sporting_time(summary, scheduled, identity):
+    raw = summary.get('off_time')
+    if not raw:
+        return ''
+    if not re.fullmatch(r'\d{2}:\d{2}(?::\d{2})?', raw):
+        raise ValueError('us_sl_actual_clock')
+    clock = datetime.strptime(raw, '%H:%M:%S' if raw.count(':') == 2 else '%H:%M').time()
+    zone = ZoneInfo(VENUES[identity['track']][2])
+    options = [datetime.combine(scheduled.date()+timedelta(days=delta), clock, timezone.utc)
+               for delta in (-1, 0, 1)]
+    options = [value for value in options if abs(value-scheduled) <= timedelta(hours=3)
+               and value.astimezone(zone).date().isoformat() == identity['date']]
+    if len(options) != 1:
+        raise ValueError('us_sl_actual_clock_ambiguous')
+    return options[0].astimezone(zone).isoformat()
+
+
+def chart_actual_time(raw, *, scheduled, identity):
+    """官方带时区计划时间锚定 DRF 的12小时钟点；缺证据不猜测。"""
+    if not raw or not scheduled:
+        return ''
+    anchor = datetime.fromisoformat(scheduled)
+    zone = ZoneInfo(VENUES[identity['track']][2])
+    if anchor.tzinfo is None or anchor.astimezone(zone).date().isoformat() != identity['date']:
+        raise ValueError('us_chart_clock_anchor')
+    match = re.fullmatch(r'(0?[1-9]|1[0-2]):([0-5]\d)(?::([0-5]\d))?', raw)
+    if not match:
+        raise ValueError('us_chart_clock_format')
+    hour, minute, second = int(match[1]) % 12, int(match[2]), int(match[3] or 0)
+    day = datetime.fromisoformat(identity['date'])
+    options = [day.replace(hour=hour+half, minute=minute, second=second, tzinfo=zone) for half in (0, 12)]
+    options = [value for value in options if abs(value.astimezone(timezone.utc)-anchor) <= timedelta(hours=3)]
+    if len(options) != 1:
+        raise ValueError('us_chart_clock_ambiguous')
+    return options[0].isoformat()
+
+
 def parse_sporting_life(raw, identity):
     data = next_data(raw)['race']; summary = data['race_summary']
-    when = datetime.fromisoformat(summary['date']+'T'+summary['time']).replace(tzinfo=ZoneInfo('Europe/London'))
+    when = sporting_schedule(summary, raw)
     if (when.astimezone(ZoneInfo(VENUES[identity['track']][2])).date().isoformat() != identity['date']
             or summary['course_name'] != VENUES[identity['track']][0]
             or not re.match(r'Race '+str(identity['race_number'])+r'\b', summary['name'])
@@ -222,7 +284,9 @@ def parse_sporting_life(raw, identity):
     if type(summary.get('ride_count')) is not int or summary['ride_count'] <= 0 or len(runners) != summary['ride_count']:
         raise ValueError('us_sl_runner_count')
     return dict(runners=runners, scratches=scratches, provider='sporting_life', declared_runner_count=summary['ride_count'],
-                off_time=when.astimezone(ZoneInfo(VENUES[identity['track']][2])).isoformat())
+                off_time=actual_sporting_time(summary, when, identity),
+                scheduled_off_time=when.astimezone(ZoneInfo(VENUES[identity['track']][2])).isoformat(),
+                off_time_basis='sporting_life_actual_utc' if summary.get('off_time') else '')
 
 
 def parse_abr(raw, identity):
@@ -281,6 +345,8 @@ def merge_result(chart, supplement, *, expected_count):
         raise ValueError('us_result_scratches_mismatch:' + str(chart['scratches']))
     return dict(chart, runners=rows, scratches=scratches, runner_count=len(rows),
         off_time=supplement.get('off_time',''),
+        scheduled_off_time=supplement.get('scheduled_off_time',''),
+        off_time_basis=supplement.get('off_time_basis',''),
         gaps=['scratch_program_number_missing'] if any(r['program_number'] is None for r in scratches) else [])
 
 
@@ -338,3 +404,32 @@ def parse_abr_program(raw, identity):
         if match:rows.append(dict(horse_name=match[2],program_number=int(match[1])))
     if not rows or len({horse_key(r['horse_name']) for r in rows})!=len(rows):raise ValueError('us_program_roster')
     return rows
+
+
+def programme_schedule(raw, identity):
+    """独立赛前原文的完整身份和明确 AM/PM/时区，仅用于锚定 DRF 钟点。"""
+    soup=BeautifulSoup(raw,'lxml');day=datetime.fromisoformat(identity['date'])
+    suffix=f"/race/USA/{identity['track']}/{day.year}/{day.month}/{day.day}/{identity['race_number']}/"
+    sections=[s for s in soup.select('section.race-entry-shortcode')
+        if any(a.get('href','').startswith('https://www.bloodhorse.com'+suffix) for a in s.select('h3 a'))]
+    if len(sections)==1:
+        clocks=[re.fullmatch(r'(\d{1,2}:\d{2}) (AM|PM) \(local\)',n.get_text(' ',strip=True)) for n in sections[0].select('.properties li')]
+        clocks=[m for m in clocks if m]
+        if len(clocks)!=1:raise ValueError('us_programme_clock')
+        clock=datetime.strptime(clocks[0][1]+' '+clocks[0][2],'%I:%M %p').time()
+    else:
+        body=soup.select_one('.field-name-body');title=soup.select_one('h1')
+        normalize=lambda value:key(re.sub(r'\([^)]*\)|\bStakes\b|\bS\.?(?=\s|$)', '', value,flags=re.I))
+        race=re.sub(r'\s*\(G[123]\)\s*$','',identity['name'])
+        if not title or not body or normalize(title.get_text())!=normalize(str(day.year)+' '+race+' at a Glance'):
+            raise ValueError('us_programme_identity')
+        text=body.get_text(' ',strip=True)
+        date_match=re.search(r'Date: (\w+\.?) (\d{1,2})\b',text)
+        race_match=re.search(r'Race: (\d+)\b',text)
+        clock_match=re.search(r'Post Time: (\d{1,2}:\d{2}) ([ap])\.m\. ET\b',text)
+        if (not date_match or not race_match or not clock_match or int(race_match[1])!=identity['race_number']
+            or VENUES[identity['track']][1] not in text or VENUES[identity['track']][2]!='America/New_York'
+            or datetime.strptime(date_match[1].replace('Sept.','Sep').replace('.','')+' '+date_match[2]+' '+str(day.year),'%b %d %Y').date()!=day.date()):
+            raise ValueError('us_programme_identity')
+        clock=datetime.strptime(clock_match[1]+' '+clock_match[2].upper()+'M','%I:%M %p').time()
+    return datetime.combine(day.date(),clock,tzinfo=ZoneInfo(VENUES[identity['track']][2])).isoformat()

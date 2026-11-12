@@ -181,5 +181,18 @@
     "sha256": "1c2c344ecf5bf5e83749c9347c4304651b0e76636e7e419b42f20c1b6f62b756",
     "retrieved_date": "2026-11-12",
     "purpose": "完整原件用于实际文章链接发现及完整马号核验"
+  },
+  {
+    "file": "DEL2026100310.pdf",
+    "url": "https://www1.drf.com/displayChart.do?filepath=/download/simulcastweekly/charts/2610/DEL2026100310.pdf",
+    "sha256": "2b928c0d78d1f68d632ba092c7055984c76060710033d24eb54d2783dc479730"
+  },
+  {
+    "file": "abr-cotillion-glance.html",
+    "url": "https://www.americasbestracing.net/the-sport/2026-2026-cotillion-stakes-glance",
+    "sha256": "83816bcae6d88dd6254270868d804a45fd2ace8f45ef8edca461ac140934cb2e",
+    "original_sha256": "7acbbc1e170d5aa085ad965d3b61458952721ca2cf476c59356ffa7efa3be4f6",
+    "extraction": "保留h1与完整正文，去掉无关导航资源",
+    "captured_at": "2026-11-12T14:58:33.183580+00:00"
   }
 ]

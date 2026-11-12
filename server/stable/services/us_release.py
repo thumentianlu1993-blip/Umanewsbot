@@ -19,7 +19,7 @@ from .france_field_repair import frozen
 DIRECT=('RaceEvent','RaceEventRunner','RaceEventResult','RaceEventProjectionControl','RaceEventLifecycleControl',
         'RaceEventLiveTracking','RaceDataSyncEnrollment','RaceResultSourceIdentity','RaceEventIdentityKey','RaceEventFieldAuthority')
 PATCH_FIELDS={'local_date','local_start_time','race_datetime','timezone_name','grade_text','normalized_grade',
-    'priority','distance_text','surface','eligibility_text','prize_amount','prize_currency','visibility_status','status','source_refs'}
+    'priority','distance_text','surface','normalized_surface','normalized_race_type','going_text','eligibility_text','prize_amount','prize_currency','visibility_status','status','source_refs'}
 ACTION='us_release_data'
 
 
@@ -139,7 +139,7 @@ def execute(path,expected_sha256,*,apply=False,restore=False,now=None):
     new_slugs=[i['slug'] for i in items if not i.get('event_id')]
     if len(new_slugs)!=len(set(new_slugs)):raise ValueError('duplicate_slug')
     rebind=manifest.get('rebind',[]);rebind_ids=[r['event_id'] for r in rebind]
-    if len(rebind_ids)!=len(set(rebind_ids)) or set(existing)&set(rebind_ids):raise ValueError('rebind_scope')
+    if len(rebind_ids)!=len(set(rebind_ids)):raise ValueError('rebind_scope')
     ids=sorted(set(existing)|set(rebind_ids))
     if any(i.get('division_parent_id') not in existing for i in items if i.get('division_parent_id')):raise ValueError('parent_scope')
     before=read_bound(path.parent,manifest['baseline'])
@@ -153,7 +153,7 @@ def execute(path,expected_sha256,*,apply=False,restore=False,now=None):
         for pk in ids:
             event,lifecycle=_lock_multisource_event(pk);_guard(event,lifecycle,now);locked[pk]=event
         actual_before=snapshot(ids)
-        if not baseline_matches(actual_before,before,rebind_ids):raise ValueError('baseline_drift')
+        if not baseline_matches(actual_before,before,set(rebind_ids)-set(existing)):raise ValueError('baseline_drift')
         before=actual_before
         # 发布前应暂停调度并排空在途；全局policy扩版必须覆盖所有仍在登记的旧策略目标。
         needing=set(models.RaceDataSyncEnrollment.objects.filter(authority_version=2,state='enrolled').exclude(standing_policy_digest=policy.digest).values_list('event_id',flat=True))
@@ -163,6 +163,11 @@ def execute(path,expected_sha256,*,apply=False,restore=False,now=None):
         events=[];outcomes=[];expected={};archive_receipts={}
         for item in items:
             event=_create_or_update(item,locked,digest);events.append(event)
+            if item.get('schedule'):
+                from .us_stakes_schedule import apply_schedule_locked
+                from .us_pre_race import route_for
+                if not apply_schedule_locked(event,item['schedule'],route=route_for(event,policy),now=now):
+                    raise ValueError('schedule_not_applied')
             outcomes.append({'event_id':event.pk,'slug':event.slug,'rows':0})
             if not item.get('result_rows'):continue
             from .us_pre_race import route_for

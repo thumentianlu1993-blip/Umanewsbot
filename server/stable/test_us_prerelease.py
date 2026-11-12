@@ -73,6 +73,17 @@ class USSteeplechaseTests(TestCase):
         entry=docs.parse_overnight((FIX/card).read_bytes(),local_date=identity['date'],venue=identity['track'],race_number=identity['race_number'],source_url=urls[card])
         return merge_steeplechase((FIX/chart).read_bytes(),identity,official,entry)
 
+    def test_official_time_material_and_actual_clock_preserve_sources(self):
+        result = self.bundle(self.CASES[0])
+        self.assertEqual(result['winning_time'], '4:53.80')
+        self.assertEqual(result['winning_time_raw'], '4:53 4/5')
+        self.assertEqual(result['chart_winning_time'], '4:54.93')
+        self.assertEqual(result['winning_time_delta_seconds'], '-1.13')
+        self.assertEqual(result['surface'], 'turf')
+        self.assertEqual(result['race_kind'], 'hurdle')
+        self.assertTrue(result['off_time'].startswith('2026-09-02T'))
+        self.assertEqual(result['off_time_basis'], 'drf_actual_anchored_to_official_card')
+
     def test_all_seven_rosters_and_official_statuses(self):
         for case in self.CASES:
             with self.subTest(chart=case[0]):
@@ -485,3 +496,83 @@ class USNSAPreviewTests(TestCase):
         self.assertEqual(value['runners'][0]['entry_number'],1)
         for change in [{'race_name':'Grand National'}, {'local_date':'2026-10-18'}, {'venue':'MTP'}]:
             with self.assertRaises(ValueError):nsa_target_card(raw,{**target,**change})
+
+
+class USStakesScheduleTests(TestCase):
+    def test_official_schedules_and_secondary_keep_dates_and_purses(self):
+        from stable.services.us_stakes_schedule import parse_schedule,NYRA,DMR,GP,USR
+        cases=[('nyra-stakes-schedule.html',NYRA,'BEL','2026-12-05','Remsen','250000'),
+               ('dmtc-stakes-schedule.html',DMR,'DMR','2026-11-21','NATIVE DIVER STAKES (Gr. III)','100000'),
+               ('gulfstream-stakes-schedule.html',GP,'GP','2026-12-26','Harlan’s Holiday','150000'),
+               ('usracing-graded-schedule.html',USR,'SA','2026-12-26','Malibu Stakes','300000'),
+               ('churchill-stakes-schedule.pdf','https://www.churchilldowns.com/wp-content/uploads/sites/3/2026/09/Fall-Stakes.pdf','CD','2026-11-27','CLARK','700000')]
+        from stable.services.us_stakes_schedule import race_name
+        for filename,url,venue,day,name,purse in cases:
+            with self.subTest(source=url):
+                rows=parse_schedule((FIX/filename).read_bytes(),url=url)
+                matched=[r for r in rows if (r['venue'],r['local_date'],race_name(r['race_name']))==(venue,day,race_name(name))]
+                self.assertEqual(len(matched),1)
+                self.assertEqual(matched[0]['prize_amount'],purse)
+
+    def test_official_duplicate_conflict_blocks_secondary_collection_fallback(self):
+        from stable.services.us_stakes_schedule import collect_schedules,NYRA,USR
+        from unittest.mock import Mock
+        raw=(FIX/'nyra-stakes-schedule.html').read_bytes()
+        from bs4 import BeautifulSoup
+        soup=BeautifulSoup(raw,'lxml')
+        row=next(tr for tr in soup.select('tbody tr') if 'Remsen' in tr.get_text())
+        from copy import deepcopy
+        other=deepcopy(row);other.find_all('td')[3].string='$999,000';row.insert_after(other)
+        def doc(url,body):return dict(url=url,body=body,sha256='a'*64,fetched_at='2026-11-12T00:00:00+00:00')
+        store=Mock();store.get.return_value=doc(NYRA,str(soup).encode())
+        target=dict(venue='BEL',local_date='2026-12-05',race_name='Remsen',grade='G2',candidate_key='remsen')
+        selected,checks=collect_schedules(store,[target],public_index=doc(USR,(FIX/'usracing-graded-schedule.html').read_bytes()))
+        self.assertFalse(selected.get('remsen'))
+        self.assertTrue(any(c['status']=='conflict' for c in checks))
+        from stable.services.us_stakes_schedule import parse_schedule,race_name
+        secondary=next(r for r in parse_schedule((FIX/'usracing-graded-schedule.html').read_bytes(),url=USR) if race_name(r['race_name'])=='cigarmile')
+        target2=dict(venue='BEL',local_date=secondary['local_date'],race_name=secondary['race_name'],grade='G2',candidate_key='cigar')
+        normal=next(tr for tr in soup.select('tbody tr') if 'Cigar' in tr.get_text())
+        normal.find_all('td')[3].string='$501,000'
+        store.get.return_value=doc(NYRA,str(soup).encode())
+        selected,checks=collect_schedules(store,[target,target2],public_index=doc(USR,(FIX/'usracing-graded-schedule.html').read_bytes()))
+        self.assertFalse(selected.get('remsen'))
+        self.assertEqual(selected['cigar']['prize_amount'],'501000')
+        self.assertEqual(selected['cigar']['source_class'],'official_operator')
+
+    def test_identity_conflicts_and_announced_purse_authority(self):
+        from stable.services.us_stakes_schedule import select_schedule
+        target=dict(venue='CD',local_date='2026-11-27',race_name='CLARK S.',grade='G2',candidate_key='clark')
+        row=dict(venue='CD',local_date='2026-11-27',race_name='Clark',grade='G2',prize_amount='700000',prize_currency='USD',source_class='official_operator',source={'url':'official','fetched_at':'2026-11-12T00:00:00+00:00'})
+        other=dict(row,prize_amount='800000',source_class='trusted_publisher')
+        chosen=select_schedule(target,[other,row])
+        self.assertEqual(chosen['prize_amount'],'700000')
+        self.assertEqual(chosen['prize_stage'],'announced')
+        self.assertEqual(len(chosen['comparisons']),1)
+        self.assertIsNone(select_schedule(dict(target,local_date='2025-11-27'),[row]))
+        self.assertIsNone(select_schedule(dict(target,venue='BEL'),[row]))
+        with self.assertRaisesRegex(ValueError,'date_conflict'):
+            select_schedule(target,[other,dict(row,local_date='2026-11-28')])
+        with self.assertRaisesRegex(ValueError,'purse_conflict'):
+            select_schedule(target,[row,dict(other,source_class='official_operator')])
+        with self.assertRaisesRegex(ValueError,'grade_conflict'):
+            select_schedule(dict(target,grade='G1'),[row])
+
+
+class USAnnualNotRunTests(TestCase):
+    def test_only_exact_undated_draft_can_receive_not_run_evidence(self):
+        from stable.services.us_race_inventory import annual_not_run_fields
+        event=dict(year=2026,original_name='MR. PROSPECTOR S.',normalized_grade='G3',local_date=None,status='scheduled',
+            visibility_status='draft',source_refs={'track_code':'GP','kept':{'x':1}})
+        row=dict(provider='toba',venue='GP',local_date=None,race_name='MR. PROSPECTOR S.',grade='G3',candidate_key='a'*64,
+            source_url='https://toba.org/graded-stakes/2026-races/',raw_sha256='b'*64)
+        calendar=dict(unresolved=[row],items=[],conflicts=[])
+        fields=annual_not_run_fields(event,calendar,has_results=False)
+        self.assertEqual(fields['status'],'cancelled')
+        self.assertEqual(fields['source_refs']['kept'],{'x':1})
+        self.assertEqual(fields['source_refs']['us_annual_status']['raw_status'],'not run')
+        self.assertNotIn('local_date',fields)
+        for changes in [{'year':2025},{'local_date':'2026-01-08','status':'finished'},{'visibility_status':'published'},{'normalized_grade':'G2'}]:
+            with self.subTest(changes=changes),self.assertRaises(ValueError):annual_not_run_fields({**event,**changes},calendar,has_results=False)
+        with self.assertRaises(ValueError):annual_not_run_fields(event,calendar,has_results=True)
+        with self.assertRaises(ValueError):annual_not_run_fields(event,{**calendar,'items':[{**row,'local_date':'2026-12-10'}]},has_results=False)
