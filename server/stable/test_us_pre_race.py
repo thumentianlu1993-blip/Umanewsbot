@@ -23,6 +23,14 @@ class USPreRaceTests(TestCase):
             trainer_name='A Trainer',carried_weight='',running_status='nominated')],
             source=dict(url='https://www.dmtc.com/racing/entries/2026-11-07',sha256='b'*64,fetched_at=NOW.isoformat()))
 
+    def test_unverified_coverage_records_reason_without_publishing_candidate(self):
+        claim = pre.claim_pre_race(event_id=self.event.pk, source=US, now=NOW)
+        self.assertTrue(complete(claim, payload=dict(stage='coverage_unverified', items=[], source={}), route=self.route, now=NOW))
+        self.event.refresh_from_db()
+        self.assertEqual(pre._state(self.event, US)['reason'], 'coverage_unverified')
+        self.assertFalse(self.event.data_candidates.exists())
+        self.assertIsNone(public_us_preview(self.event, now=NOW))
+
     def test_lease_candidate_preview_and_next_five_minute_claim(self):
         claim=pre.claim_pre_race(event_id=self.event.pk,source=US,now=NOW)
         self.assertIsNotNone(claim)

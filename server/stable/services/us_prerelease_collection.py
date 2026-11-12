@@ -337,7 +337,7 @@ def collect_prerace(store, *, start, end, flat_report, target_keys=None):
                 except (ValueError,KeyError,TypeError,OSError) as exc:errors.append(dict(source=url,reason=str(exc)))
         except (ValueError,KeyError,TypeError,OSError) as exc:errors.append(dict(source=keeneland,reason=str(exc)))
     live=[]
-    current_url='https://www.sportinglife.com/racing/racecards'+('/'+start.isoformat() if target_keys is not None and start==end else '')
+    current_url='https://www.sportinglife.com/racing/racecards'
     if future_targets:
         try:
             live,live_doc=read(current_url,lambda raw:sporting_card_directory(raw,start=start,end=end,targets=future_targets))

@@ -142,6 +142,35 @@ class USFlatResultTests(TestCase):
             self.assertEqual(report['acceptance'], 'result_source_passed', report['errors'])
             self.assertEqual(report['network_requests'], 0)
             self.assertEqual(report['runner_count'], 6)
+            # 冻结于赛前的年度目录没有赛后人数，必须使用来源明确声明，不能从名单长度推断。
+            for count in ['', '0', 'wrong', '5']:
+                with self.subTest(field=count), patch('stable.services.us_flat_collection.parse_toba_calendar', return_value={
+                    'items':[dict(t['toba'], field_size_raw=count)], 'unresolved':[]}):
+                    replay = collect_flat_results(FlatSourceStore(root, now=now), start=date(2026,9,1), end=date(2026,12,31))
+                if count == '':
+                    self.assertEqual(replay['acceptance'], 'result_source_passed', replay['errors'])
+                    self.assertEqual(replay['results'][0]['runner_count_evidence'],
+                        dict(count=6, basis='sporting_life_declared', source_sha256=docs[t['sporting_life'][0]['url']]['sha256']))
+                    from stable.services.us_prerace_documents import final_result_roster
+                    from copy import deepcopy
+                    target = dict(t['toba'], field_size_raw='')
+                    final = final_result_roster(replay['results'][0], target)
+                    self.assertEqual((final['source_stage'], final['active_count'], final['declared_count']),
+                        ('final_result_roster', 6, 8))
+                    from stable.services.us_prerelease_collection import collect_prerace
+                    with patch('stable.services.us_racing_sources.parse_toba_calendar', return_value={'items':[target], 'unresolved':[]}):
+                        final_report = collect_prerace(FlatSourceStore(root, now=now), start=date(2026,9,1), end=date(2026,12,31), flat_report=replay)
+                    self.assertEqual(final_report['targets'][0]['card_status'], 'final_roster_available', final_report)
+
+                    for evidence in [None, {}, dict(count=5, basis='sporting_life_declared', source_sha256=docs[t['sporting_life'][0]['url']]['sha256']),
+                                     dict(count=6, basis='row_length', source_sha256=docs[t['sporting_life'][0]['url']]['sha256']),
+                                     dict(count=6, basis='sporting_life_declared', source_sha256='0'*64)]:
+                        bad = deepcopy(replay['results'][0]); bad['runner_count_evidence'] = evidence
+                        with self.subTest(evidence=evidence), self.assertRaises(ValueError):
+                            final_result_roster(bad, target)
+
+                else:
+                    self.assertFalse(replay['results'])
             conflict = dict(t['toba'], candidate_key='conflicting-target', race_name='Conflicted Stakes')
             with patch('stable.services.us_flat_collection.parse_toba_calendar', return_value={
                 'items': [t['toba']], 'unresolved': [],

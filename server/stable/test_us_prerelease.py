@@ -390,6 +390,21 @@ class USPrereleaseRegressionTests(TestCase):
         return dict(candidate_key='river',provider='toba',venue=venue,local_date='2026-11-07',
             race_name=name,source_race_id=number,grade='G3')
 
+    def test_single_future_target_reads_current_directory_not_redirecting_date_url(self):
+        from datetime import date
+        from stable.services.us_prerelease_collection import collect_prerace
+        from stable.services.us_racing_sources import catalogue
+        from unittest.mock import patch
+        _, store = self.collect([self.target(venue='PRX')])
+        store.get.reset_mock()
+        with patch('stable.services.us_racing_sources.parse_toba_calendar', return_value=catalogue([self.target(venue='PRX')])), \
+             patch('stable.services.us_prerelease_collection.sporting_card_directory', return_value=[]):
+            report = collect_prerace(store, start=date(2026,11,7), end=date(2026,11,7), target_keys={'river'},
+                flat_report=dict(start='2026-11-07',end='2026-11-07',results=[],sources=[]))
+        urls = [c.args[0] for c in store.get.call_args_list]
+        self.assertIn('https://www.sportinglife.com/racing/racecards', urls)
+        self.assertNotIn('https://www.sportinglife.com/racing/racecards/2026-11-07', urls)
+
     def test_conflicting_calendar_stays_in_denominator_and_blocks(self):
         a=self.target();b=dict(a,grade='G2')
         report,_=self.collect([a,b])

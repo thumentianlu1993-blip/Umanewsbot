@@ -18,11 +18,25 @@ def final_result_roster(result, target):
     from .us_flat_results import horse_key
     identity=result['identity']
     runners=result['runners'];scratches=result['scratches'];all_rows=runners+scratches
+    field_raw = target.get('field_size_raw')
+    if field_raw == '':
+        proof = result.get('runner_count_evidence') or {}
+        expected_count = proof.get('count')
+        digest = proof.get('source_sha256')
+        if (proof.get('basis') != 'sporting_life_declared' or type(expected_count) is not int or expected_count <= 0
+                or not isinstance(digest, str) or not re.fullmatch(r'[0-9a-f]{64}', digest)
+                or digest != result.get('sources', {}).get('supplement')):
+            raise ValueError('us_final_roster_count_evidence')
+    else:
+        if not isinstance(field_raw, str) or not re.fullmatch(r'[1-9][0-9]*', field_raw):
+            raise ValueError('us_final_roster_count_evidence')
+        expected_count = int(field_raw)
+
     if (result['candidate_key']!=target['candidate_key'] or identity['track']!=target['venue']
             or identity['date']!=target['local_date']
             or (target.get('source_race_id') and str(identity['race_number'])!=str(target['source_race_id']))
             or result['gaps'] or not runners or result['runner_count']!=len(runners)
-            or len(runners)!=int(target['field_size_raw'])
+            or len(runners)!=expected_count
             or len({horse_key(r['horse_name']) for r in all_rows})!=len(all_rows)
             or any(not r.get('program_number') for r in all_rows)
             or len({str(r['program_number']) for r in all_rows})!=len(all_rows)):
