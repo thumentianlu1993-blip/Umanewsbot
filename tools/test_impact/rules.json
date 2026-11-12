@@ -1629,6 +1629,33 @@
     ],
     "server/stable/fixtures/us_prerelease/**": [
       "us_source_collection"
+    ],
+    "server/stable/services/us_basic_fields.py": [
+      "us_source_collection"
+    ],
+    "server/stable/services/us_polling.py": [
+      "us_source_collection"
+    ],
+    "server/stable/services/us_pre_race.py": [
+      "us_source_collection"
+    ],
+    "server/stable/services/us_public_fields.py": [
+      "us_source_collection"
+    ],
+    "server/stable/services/us_race_source.py": [
+      "us_source_collection"
+    ],
+    "server/stable/services/us_release.py": [
+      "us_source_collection"
+    ],
+    "server/stable/services/us_venues.py": [
+      "us_source_collection"
+    ],
+    "server/stable/management/commands/run_us_release.py": [
+      "us_source_collection"
+    ],
+    "docs/changes/us-race-automation/ci-scope-346.json": [
+      "infrastructure"
     ]
   },
   "symbols": {
@@ -1800,6 +1827,20 @@
         "horse_page",
         "module:stable.tests_legacy",
         "module:stable.test_public_term_consistency"
+      ],
+      "_public_next_key_race": [
+        "module:stable.tests_legacy",
+        "module:stable.test_race_public_time",
+        "us_source_collection"
+      ],
+      "_race_sitemap_queryset": [
+        "module:stable.tests_legacy",
+        "us_source_collection"
+      ],
+      "_series_history_winners": [
+        "race_results",
+        "module:stable.test_historical_race_calendar_integrity",
+        "us_source_collection"
       ]
     }
   },
@@ -1817,6 +1858,7 @@
     "docs/changes/france-race-automation/geny-reload-ci-scope.json",
     "docs/changes/france-public-field-gaps/ci-scope.json",
     "docs/changes/france-display-simplify/ci-scope.json",
-    "docs/changes/us-race-automation/ci-scope.json"
+    "docs/changes/us-race-automation/ci-scope.json",
+    "docs/changes/us-race-automation/ci-scope-346.json"
   ]
 }

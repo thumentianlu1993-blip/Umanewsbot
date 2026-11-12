@@ -23,6 +23,7 @@ class USFlatResultTests(TestCase):
         horse = next(x for x in result['runners'] if x['horse_name'] == 'Ole Crazy Bone')
         self.assertEqual((horse['program_number'], horse['post_position']), (8, 6))
         self.assertEqual(result['winning_time'], '1:47.20')
+        self.assertEqual(result['going'], 'firm')
         self.assertEqual(result['runners'][0]['odds_net'], '4.06')
         self.assertEqual(result['runners'][0]['margin_to_next'], '1/2')
         self.assertNotIn('race_time', horse)
@@ -172,3 +173,41 @@ class USFlatResultTests(TestCase):
         chart['scratches'] = []
         with self.assertRaises(ValueError):
             merge_result(chart, other, expected_count=10)
+
+class USAutoProgramTests(TestCase):
+    def test_race_link_chain_discovers_complete_program_without_manual_map(self):
+        from stable.services.us_flat_collection import discover_program_entries
+        from stable.services.us_flat_results import supplement_programs
+        root='https://www.americasbestracing.net'
+        pages={root+'/races/2026-pennsylvania-derby':'abr-pennsylvania-discovery.html',
+            root+'/gambling/2026-americas-best-racings-trifecta-picks-the-2026-pennsylvania-derby':'abr-pennsylvania-trifecta.html',
+            root+'/the-sport/2026-2026-pennsylvania-derby-cheat-sheet':'abr-pennsylvania-cheat.html'}
+        requested=[]
+        def read(url):
+            requested.append(url)
+            return {'url':url,'body':(FIXTURES/pages[url]).read_bytes()}
+        identity=dict(track='PRX',date='2026-09-19',race_number=14,name='Pennsylvania Derby (G1)')
+        from stable.services.us_flat_results import parse_abr
+        chart=parse_chart((FIXTURES/'PRX2026091914.pdf').read_bytes(),identity)
+        result=merge_result(chart,parse_abr((FIXTURES/'abr-pennsylvania-derby.html').read_bytes(),identity),expected_count=len(chart['runners']))
+        self.assertTrue(result['gaps'])
+        entries,doc=discover_program_entries(identity,read=read,initial=read(root+'/races/2026-pennsylvania-derby'))
+        merged=supplement_programs(result,entries)
+        self.assertFalse(merged['gaps'])
+        self.assertEqual(merged['scratches'][0]['program_number'],1)
+        self.assertEqual(len(entries),11)
+        self.assertEqual(len(requested),3)
+        self.assertTrue(doc['url'].endswith('cheat-sheet'))
+
+
+class USArchiveProgramTests(TestCase):
+    def test_archive_index_selects_by_full_source_identity_without_url_map(self):
+        from stable.services.us_flat_collection import archived_program_entries
+        identity=next(t['drf'] for t in TARGETS if t['drf']['url'].endswith('PRX2026091912.pdf'))
+        pages={'https://www.truenicks.com/articles/1/derby':(FIXTURES/'tn-derby-entries.html').read_bytes(),
+               'https://www.truenicks.com/articles/2/gallant':(FIXTURES/'tn-gallant-entries.html').read_bytes()}
+        entries,doc=archived_program_entries(identity,urls=pages,read=lambda url:dict(url=url,body=pages[url]))
+        self.assertTrue(doc['url'].endswith('/gallant'))
+        self.assertEqual(len(entries),12)
+        with self.assertRaisesRegex(ValueError,'not_found'):
+            archived_program_entries(dict(identity,race_number=99),urls=pages,read=lambda url:dict(url=url,body=pages[url]))

@@ -28,7 +28,7 @@ def flat_url_allowed(url):
             r'filepath=/download/simulcastweekly/charts/\d{4}/[A-Z]{2,3}\d{10}\.pdf', p.query))
     patterns = {
         'www.sportinglife.com': r'/racing/results/\d{4}-\d{2}-\d{2}(?:/[a-z0-9-]+/\d+/[a-z0-9-]+)?',
-        'www.americasbestracing.net': r'/races/\d{4}-[a-z0-9-]+',
+        'www.americasbestracing.net': r'/(?:races|the-sport|gambling)/\d{4}-[a-z0-9-]+',
         'www.truenicks.com': r'/articles/\d+/[a-z0-9-]+',
     }
     return not p.query and bool(re.fullmatch(patterns.get(p.hostname, r'(?!)'), p.path))
@@ -104,7 +104,45 @@ def sl_result_url(raw, identity):
     return matches[0] if matches else None
 
 
-def collect_flat_results(store, *, start, end, program_sources=None):
+def discover_program_entries(identity, *, read, initial):
+    """从赛页实际文章链接有界发现；最多四页、两跳，不预填某场文章URL。"""
+    from .us_flat_results import parse_abr_program
+    root='https://www.americasbestracing.net'
+    slug=re.sub(r'[^a-z0-9]+','-',re.sub(r'\s*\(G[123]\)\s*$','',identity['name']).lower()).strip('-')
+    queue=[(initial,0)];seen={initial['url']};visited=0
+    while queue and visited<4:
+        item,depth=queue.pop(0)
+        doc=read(item) if isinstance(item,str) else item
+        visited+=1
+        try:return parse_abr_program(doc['body'],identity),doc
+        except ValueError:pass
+        if depth>=2:continue
+        links=sorted({urljoin(doc['url'],a['href']) for a in BeautifulSoup(doc['body'],'lxml').select('a[href]')
+            if slug in urljoin(doc['url'],a['href']) and flat_url_allowed(urljoin(doc['url'],a['href']))})
+        pending=[]
+        for url in links[:8]:
+            if url in seen or not url.startswith(root+('/the-sport/')) and not url.startswith(root+'/gambling/'):continue
+            seen.add(url);pending.append((url,depth+1))
+        queue=pending+queue
+    raise ValueError('us_program_supplement_not_discovered')
+
+
+def archived_program_entries(identity, *, urls, read):
+    """精确冻结包内按原文身份检索补表；仅档案导入使用，不声称当前网络可用。"""
+    urls=sorted(urls)
+    if len(urls)>30:raise ValueError('us_archive_program_limit')
+    matches=[]
+    for url in urls:
+        if not flat_url_allowed(url):raise ValueError('us_archive_program_url')
+        doc=read(url)
+        try:entries=parse_program_entries(doc['body'],identity)
+        except ValueError:continue
+        matches.append((entries,doc))
+    if len(matches)!=1:raise ValueError('us_archive_program_not_found_or_ambiguous')
+    return matches[0]
+
+
+def collect_flat_results(store, *, start, end, program_sources=None, target_keys=None):
     if not isinstance(start, date) or not isinstance(end, date) or not start <= end or (end-start).days > 366:
         raise ValueError('us_date_window')
     program_sources = program_sources or {}
@@ -141,6 +179,8 @@ def collect_flat_results(store, *, start, end, program_sources=None):
                     blocked_keys.add(row['candidate_key'])
                     errors.append(dict(candidate_key=row['candidate_key'], race_name=row['race_name'],
                         local_date=row['local_date'], reason='us_calendar_source_conflict'))
+    if target_keys is not None:
+        targets = [t for t in targets if t['candidate_key'] in target_keys]
     directory, _ = read_parse(DRF_INDEX, drf_directory)
     used = set()
     for target in targets:
@@ -169,14 +209,27 @@ def collect_flat_results(store, *, start, end, program_sources=None):
             result_docs.append(supplement_doc)
             result = merge_result(chart, supplement, expected_count=int(target['field_size_raw']))
             program_doc = None
-            if result['gaps'] and (program_url := program_sources.get(identity['url'])):
-                entries, program_doc = read_parse(program_url, parse_program_entries, identity, accept=False)
+            if result['gaps']:
+                if program_url := program_sources.get(identity['url']):
+                    entries, program_doc = read_parse(program_url, parse_program_entries, identity, accept=False)
+                else:
+                    def read_program(url):
+                        _,doc=read_parse(url,lambda raw:None,accept=False)
+                        result_docs.append(doc)
+                        return doc
+                    archive_urls=getattr(store,'archive_program_urls',())
+                    if archive_urls:
+                        try:entries,program_doc=archived_program_entries(identity,urls=archive_urls,read=read_program)
+                        except ValueError as exc:
+                            if str(exc)!='us_archive_program_not_found_or_ambiguous':raise
+                            entries,program_doc=discover_program_entries(identity,read=read_program,initial=supplement_doc)
+                    else:entries,program_doc=discover_program_entries(identity,read=read_program,initial=supplement_doc)
                 result_docs.append(program_doc)
                 result = supplement_programs(result, entries)
             provenance = {'chart': chart_doc['sha256'], 'supplement': supplement_doc['sha256']}
             if program_doc:
                 provenance['program'] = program_doc['sha256']
-            result.update(candidate_key=target['candidate_key'], race_name=target['race_name'], grade=target['grade'],
+            result.update(catalogue=target, candidate_key=target['candidate_key'], race_name=target['race_name'], grade=target['grade'],
                 identity=identity, sources=provenance,
                 field_sources={'finish_position':'chart','placing':'chart+supplement','status':'chart',
                     'weight_lbs':'chart','post_position':'chart','odds_net':'chart','margin_to_next':'chart',

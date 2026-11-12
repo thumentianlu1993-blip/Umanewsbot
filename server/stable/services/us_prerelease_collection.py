@@ -75,13 +75,17 @@ def usracing_directory(raw, targets):
     return found
 
 
-def sporting_card_directory(raw, *, start, end):
+def sporting_card_directory(raw, *, start, end, targets=()):
     from .us_flat_results import next_data,VENUES
     rows=[]
     for meeting in next_data(raw)['meetings']:
         course=meeting['meeting_summary']['course']
         if course['country']['long_name']!='United States':continue
         codes=[k for k,v in VENUES.items() if v[0]==course['name']]
+        if not codes:continue
+        # BAQ与AQU是同一实体赛场的不同来源meeting代码；由目标目录决定。
+        if len(codes)>1:
+            codes=[c for c in codes if any(t['venue']==c for t in targets)]
         if len(codes)!=1:continue
         code=codes[0]
         for race in meeting['races']:
@@ -219,7 +223,45 @@ def churchill_target_card(raw,target):
     return value
 
 
-def collect_prerace(store, *, start, end, flat_report):
+def nsa_target_card(raw,target,*,source_url=''):
+    """条件册编号只核对C编号；实际场次由同名正式overnight标题取得。"""
+    with pdfplumber.open(BytesIO(raw)) as pdf:
+        lines=[line['text'] for page in pdf.pages for line in page.extract_text_lines(x_tolerance=1.5)]
+    matches=[]
+    for i,line in enumerate(lines[:-1]):
+        match=re.match(r'^(\d+)(?:st|nd|rd|th) Race\. \(C(X?\d+)\)',line,re.I)
+        if not match:continue
+        title=re.sub(r'^Purse \$[\d,]+(?: Guaranteed)?\s*','',lines[i+1],flags=re.I)
+        title=re.split(r'\s*\(Grade |\s+\d+(?:[ /]\d+)* Miles?',title,flags=re.I)[0]
+        if _prerace_name(title)!=_prerace_name(target['race_name']):continue
+        book=str(target.get('book_race_id') or target.get('source_race_id') or '').split(':')[0]
+        if book and book!=match[2]:raise ValueError('us_nsa_book_identity')
+        matches.append(int(match[1]))
+    if len(matches)!=1:raise ValueError('us_nsa_overnight_identity')
+    value=parse_overnight(raw,local_date=target['local_date'],venue=target['venue'],race_number=matches[0],source_url=source_url)
+    value['race_name']=target['race_name']
+    return value
+
+
+def nsa_preview(store, target):
+    day=date.fromisoformat(target['local_date'])
+    doc=store.get(NSA_INDEX);listing=nsa_directory(doc['body'],start=day,end=day)
+    names={'FH':'far hills','FX':'foxfield','MTP':'montpelier','GRM':'international gold cup',
+        'CNL':'colonial downs','SAR':'saratoga','CAM':'colonial cup'}
+    token=names.get(target['venue'])
+    if not token:raise ValueError('us_nsa_venue_unknown')
+    meetings=[m for m in listing['meetings'] if token in m['meeting'].lower()]
+    if len(meetings)!=1:raise ValueError('us_nsa_meeting_missing_or_ambiguous')
+    store.accept(doc)
+    url=meetings[0]['links'].get('entries')
+    if not url:return None
+    card=store.get(url)
+    value=nsa_target_card(card['body'],target,source_url=url)
+    store.accept(card)
+    return dict(kind='card',venue=target['venue'],data=value,source=_source(card),directory_source=_source(doc))
+
+
+def collect_prerace(store, *, start, end, flat_report, target_keys=None):
     """已赛用完整最终名单；待赛保留已发布资料及尚未核实的覆盖缺口。"""
     from .us_flat_collection import SL_INDEX
     from .us_flat_results import VENUES
@@ -242,6 +284,8 @@ def collect_prerace(store, *, start, end, flat_report):
         url=f'https://toba.org/graded-stakes/{year}-races/'
         value,_=read(url,lambda raw:parse_toba_calendar(raw,url=url))
         targets.extend(calendar_window_rows(value,start=start.isoformat(),end=end.isoformat()))
+    if target_keys is not None:
+        targets=[t for t in targets if t['candidate_key'] in target_keys]
     results={x['candidate_key']:x for x in flat_report['results']}
     if len(results)!=len(flat_report['results']):
         raise ValueError('us_prerace_duplicate_result')
@@ -293,10 +337,10 @@ def collect_prerace(store, *, start, end, flat_report):
                 except (ValueError,KeyError,TypeError,OSError) as exc:errors.append(dict(source=url,reason=str(exc)))
         except (ValueError,KeyError,TypeError,OSError) as exc:errors.append(dict(source=keeneland,reason=str(exc)))
     live=[]
-    current_url='https://www.sportinglife.com/racing/racecards'
+    current_url='https://www.sportinglife.com/racing/racecards'+('/'+start.isoformat() if target_keys is not None and start==end else '')
     if future_targets:
         try:
-            live,live_doc=read(current_url,lambda raw:sporting_card_directory(raw,start=start,end=end))
+            live,live_doc=read(current_url,lambda raw:sporting_card_directory(raw,start=start,end=end,targets=future_targets))
             directories.append(_source(live_doc))
         except (ValueError,KeyError,TypeError,OSError) as exc:errors.append(dict(source=current_url,reason=str(exc)))
     churchill={};churchill_index='https://www.churchilldowns.com/overnights/'

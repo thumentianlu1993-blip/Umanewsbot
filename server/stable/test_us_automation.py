@@ -111,6 +111,14 @@ class USDocumentTests(SimpleTestCase):
         self.assertTrue(all(r['local_date'].startswith('2026-') for r in result['items']))
         self.assertNotIn('Cool Jet', str(result['items']))
 
+    def test_future_colonial_cup_retains_published_basic_conditions(self):
+        rows=self.parse('nsa','calendar','nsa-fall.pdf')['items']
+        row=next(r for r in rows if r['race_name']=='COLONIAL CUP')
+        self.assertEqual(row['purse_raw'],'$150,000')
+        self.assertEqual(row['age_condition'],'4U')
+        self.assertEqual(row['distance_text'],'2 5/8 miles')
+        self.assertNotIn('HOBKIRK',row['conditions_raw'])
+
     def test_nsa_result_has_every_runner_and_explicit_gaps(self):
         result = self.parse('nsa', 'result', 'nsa-far-hills.pdf')
         race = next(r for r in result['items'] if 'American Grand National' in r['race_name'])

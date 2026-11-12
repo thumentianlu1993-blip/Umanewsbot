@@ -1285,7 +1285,7 @@ def _display_text(raw):
 def _distance_syntax_text(text):
     """仅分离明确的场地标签和合法千分位；保留其他未消费内容以供拒绝。"""
     prefix = re.match(r'^(ダート|芝|ダ)\s*', text)
-    suffix = re.search(r'\s+(turf|dirt)$', text, re.I)
+    suffix = re.search(r'\s+(turf|dirt|synthetic)$', text, re.I)
     if prefix and suffix:
         surface = 'turf' if prefix[1] == '芝' else 'dirt'
         if surface != suffix[1].lower():
@@ -1519,6 +1519,12 @@ def parse_display_time(raw, *, format_hint=''):
     text = _display_text(raw)
     if not text:
         return _missing(raw)
+    explicit = re.fullmatch(r'(?:(\d{1,3})m\s*)?(\d{1,2}(?:\.\d{1,6})?)s', text)
+    if explicit:
+        minutes, seconds = explicit.groups()
+        if Decimal(seconds) >= 60 or Decimal(minutes or '0') * 60 + Decimal(seconds) <= 0:
+            return _unresolved(raw, 'time_format_unknown')
+        text = (str(int(minutes)) + ':' if minutes else '') + seconds + '秒'
     if format_hint == 'geny_minutes_seconds':
         french = re.fullmatch(r'(\d{1,3})\x27(\d{2})"(\d{1,6})', text)
         if french:
@@ -1586,7 +1592,7 @@ def parse_display_odds(raw, *, odds_format=''):
     text = _display_text(raw)
     if not text:
         return _missing(raw)
-    labels = {'decimal': '十进制', 'fractional': '分数', 'hong_kong': '香港'}
+    labels = {'decimal': '十进制', 'fractional': '分数', 'hong_kong': '香港', 'us_net': '美国净赔率'}
     if odds_format not in labels:
         return _unresolved(raw, 'odds_format_unknown')
     pattern = r'\d+/[1-9]\d*' if odds_format == 'fractional' else r'\d+(?:\.\d+)?'

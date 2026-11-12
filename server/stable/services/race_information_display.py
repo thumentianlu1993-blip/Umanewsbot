@@ -254,14 +254,24 @@ def event_fields(obj):
         'date': date_field, 'time': time_field,
     }
     from .france_basic_fields import display_fields
-    return display_fields(obj, fields)
+    fields = display_fields(obj, fields)
+    refs = value(obj, 'source_refs', {}) or {}
+    metadata = refs.get('us_race_metadata', {}) if isinstance(refs, dict) else {}
+    fields['race_time'] = parse_display_time(metadata.get('winning_time', '') if value(obj,'country_region')=='united_states' else '')
+    if value(obj,'country_region')=='united_states':
+        splits=[parse_display_time('0'+v if v.startswith(':') else v) for v in metadata.get('fractional_times',[])]
+        fields['fractional_times']=display_field('', ' / '.join(v.text for v in splits)) if splits and all(v.state=='normalized' for v in splits) else display_field('',state='missing')
+        going=str(metadata.get('going','')).strip().lower()
+        labels={'firm':'快地','good':'好地','soft':'软地','yielding':'软地','heavy':'大烂地','fast':'快地','sloppy':'湿泥地','muddy':'泥泞地'}
+        if going:fields['going']=display_field(going,labels[going]+'（'+going+'）',state='normalized') if going in labels else display_field(going,going,state='preserved')
+    return fields
 
 
-_STATUS_LABELS = {'did_not_finish': '未完赛', 'dnf': '未完赛', 'pulled_up': '拉停', 'unseated_rider': '骑师落马',
+_STATUS_LABELS = {'nominated': '已报名', 'expected': '预想参赛', 'did_not_finish': '未完赛', 'dnf': '未完赛', 'pulled_up': '拉停', 'unseated_rider': '骑师落马',
                   'fell': '跌倒', 'brought_down': '被碰倒', 'disqualified': '取消资格', 'scratched': '退赛',
                   'withdrawn': '取消出走', 'non_runner': '未出赛', 'declared': '已出走登记',
                   'refused': '拒跑', 'reinstated': '恢复出走', 'running': '进行中', 'unknown': '未知', 'finished': '完赛', 'dead_heat': '同着'}
-_NON_FINISH = set(_STATUS_LABELS) - {'declared', 'running', 'reinstated', 'unknown', 'finished', 'dead_heat'}
+_NON_FINISH = set(_STATUS_LABELS) - {'declared', 'nominated', 'expected', 'running', 'reinstated', 'unknown', 'finished', 'dead_heat'}
 
 
 def _position(row, *, horse_record=False):

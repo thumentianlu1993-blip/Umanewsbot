@@ -6,6 +6,7 @@ runtime, network, apply and public switch is off.
 """
 
 from __future__ import annotations
+from .us_public_fields import blocking_multisource_manual_locks
 
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
@@ -1440,7 +1441,7 @@ def attach_multisource_observation(observation, *, policy, now, discovery_token=
                 if (
                     event.visibility_status != "published"
                     or event.status in ("cancelled", "postponed")
-                    or any((event.manual_lock_flags or {}).values())
+                    or blocking_multisource_manual_locks(event)
                     or (lifecycle and lifecycle.manual_pause_reason)
                 ):
                     raise _MultisourceRejected("manual_or_visibility_block")
@@ -1902,7 +1903,7 @@ def build_multisource_coverage(*, now, policy):
         is_active=True
     ).values_list("duplicate_event_id", flat=True)
     queryset = (
-        models.RaceEvent.objects.filter(visibility_status="published")
+        models.RaceEvent.objects.filter(visibility_status="published", divisions__isnull=True)
         .exclude(pk__in=duplicates)
         .filter(
             Q(local_date__isnull=True)
@@ -1942,7 +1943,7 @@ def build_multisource_coverage(*, now, policy):
         lifecycle = models.RaceEventLifecycleControl.objects.filter(event=event).first()
         control = models.RaceEventProjectionControl.objects.filter(event=event).first()
         if not reason:
-            if any((event.manual_lock_flags or {}).values()) or (
+            if blocking_multisource_manual_locks(event) or (
                 lifecycle and lifecycle.manual_pause_reason
             ):
                 reason = "manual_pause"

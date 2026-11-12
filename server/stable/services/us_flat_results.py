@@ -9,27 +9,8 @@ from zoneinfo import ZoneInfo
 from bs4 import BeautifulSoup
 import pdfplumber
 
-# 代码是来源赛场标识，不是生产 RaceEvent 身份。
-VENUES = {
-    'FH': ('Far Hills', 'Far Hills', 'America/New_York'),
-    'FX': ('Foxfield', 'Foxfield', 'America/New_York'),
-    'GRM': ('Great Meadow', 'Great Meadow', 'America/New_York'),
-    'MTP': ('Montpelier', 'Montpelier', 'America/New_York'),
-    'BEL': ('Belmont Park', 'Belmont', 'America/New_York'),
-    'CD': ('Churchill Downs', 'Churchill', 'America/New_York'),
-    'CNL': ('Colonial Downs', 'Colonial', 'America/New_York'),
-    'DEL': ('Delaware Park', 'Delaware', 'America/New_York'),
-    'DMR': ('Del Mar', 'Del Mar', 'America/Los_Angeles'),
-    'GP': ('Gulfstream', 'Gulfstream', 'America/New_York'),
-    'KD': ('Kentucky Downs', 'Ky Downs', 'America/Chicago'),
-    'LRC': ('Los Alamitos Racecourse', 'Los Alamitos', 'America/Los_Angeles'),
-    'KEE': ('Keeneland', 'Keeneland', 'America/New_York'),
-    'PID': ('Presque Isle Downs', 'Presque Isle', 'America/New_York'),
-    'PRX': ('Philadelphia', 'Parx', 'America/New_York'),
-    'RP': ('Remington Park', 'Remington', 'America/Chicago'),
-    'SA': ('Santa Anita', 'Santa Anita', 'America/Los_Angeles'),
-    'SAR': ('Saratoga', 'Saratoga', 'America/New_York'),
-}
+from .us_venues import VENUES
+
 ORDINALS = ('FIRST SECOND THIRD FOURTH FIFTH SIXTH SEVENTH EIGHTH NINTH TENTH '
             'ELEVENTH TWELFTH THIRTEENTH FOURTEENTH FIFTEENTH SIXTEENTH').split()
 GLYPHS = str.maketrans('¥¦§¨©ª«¬¤®', '0123456789')
@@ -72,6 +53,11 @@ def margin(raw):
     if not re.fullmatch(r'[0-9]+', value):
         raise ValueError('us_chart_margin')
     return value
+
+
+def correction_marker(text):
+    markers=re.findall(r'^\s*((?:CORRECTED|REVISED) CHART)\s*$',text,re.I|re.M)
+    return markers[0] if markers else ''
 
 
 def parse_chart(raw, identity):
@@ -185,7 +171,10 @@ def _chart_page(page, identity, table_only=False):
             raise ValueError('us_chart_scratches')
     return dict(local_date=identity['date'], track=identity['track'], race_number=race_number,
                 winning_time=splits[-1], fractional_times=splits[:-1], runners=rows, scratches=scratches,
-                margin_semantics='lengths_ahead_of_next_physical_finisher', demotion_notes=notes)
+                going=(re.search(r'(?:Course|Track)\s+([A-Za-z -]+)\.',stop['text']).group(1).strip().lower()
+                       if re.search(r'(?:Course|Track)\s+([A-Za-z -]+)\.',stop['text']) else ''),
+                margin_semantics='lengths_ahead_of_next_physical_finisher', demotion_notes=notes,
+                correction_marker=correction_marker(text))
 
 
 def next_data(raw):
@@ -232,7 +221,8 @@ def parse_sporting_life(raw, identity):
             raise ValueError('us_sl_status_unknown')
     if len(runners) != summary['ride_count']:
         raise ValueError('us_sl_runner_count')
-    return dict(runners=runners, scratches=scratches, provider='sporting_life')
+    return dict(runners=runners, scratches=scratches, provider='sporting_life',
+                off_time=when.astimezone(ZoneInfo(VENUES[identity['track']][2])).isoformat())
 
 
 def parse_abr(raw, identity):
@@ -290,6 +280,7 @@ def merge_result(chart, supplement, *, expected_count):
     if len(scratches) != len(chart['scratches']) or {horse_key(r['horse_name']) for r in scratches} != {horse_key(r) for r in chart['scratches']}:
         raise ValueError('us_result_scratches_mismatch:' + str(chart['scratches']))
     return dict(chart, runners=rows, scratches=scratches, runner_count=len(rows),
+        off_time=supplement.get('off_time',''),
         gaps=['scratch_program_number_missing'] if any(r['program_number'] is None for r in scratches) else [])
 
 
@@ -328,3 +319,22 @@ def supplement_programs(result, entries):
         raise ValueError('us_program_number_duplicate')
     result = dict(result, scratches=[dict(r, program_number=by_name[horse_key(r['horse_name'])]['program_number']) for r in result['scratches']], gaps=[])
     return result
+
+
+def parse_abr_program(raw, identity):
+    """ABR逐马完整介绍中的明示马号，仍由整场最终名单核对。"""
+    soup=BeautifulSoup(raw,'lxml');title=soup.select_one('h1');body=soup.select_one('.field-name-body')
+    race=re.sub(r'\s*\(G[123]\)\s*$','',identity['name'])
+    if not title or not body or key(title.get_text())!=key(identity['date'][:4]+' '+race+' Cheat Sheet'):
+        raise ValueError('us_program_identity')
+    text=body.get_text(' ',strip=True);day=datetime.fromisoformat(identity['date'])
+    month=day.strftime('%b')
+    if (not re.search(r'\b'+month+r'(?:t)?\.?\s+'+str(day.day)+r'\b',text[:1400])
+        or VENUES[identity['track']][1].lower() not in text[:1400].lower()):
+        raise ValueError('us_program_identity')
+    rows=[]
+    for heading in body.select('strong'):
+        match=re.fullmatch(r'(\d+)\.\s+(.+?)\s+\([\d/-]+(?: morning-line odds)?\)',heading.get_text(' ',strip=True))
+        if match:rows.append(dict(horse_name=match[2],program_number=int(match[1])))
+    if not rows or len({horse_key(r['horse_name']) for r in rows})!=len(rows):raise ValueError('us_program_roster')
+    return rows

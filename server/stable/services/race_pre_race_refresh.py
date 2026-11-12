@@ -122,7 +122,7 @@ def dynamic_rows(event, items, *, now):
         if not fresh or item.get('running_status') in WITHDRAWN:
             fields.update(odds_value='',popularity='')
         status=fields.get('running_status')
-        label={'declared':'已出走登记','reinstated':'恢复出走','scratched':'退赛','withdrawn':'退赛','non_runner':'退赛'}.get(status,'—')
+        label={'nominated':'已报名','expected':'预计参赛','declared':'已出走登记','reinstated':'恢复出走','scratched':'退赛','withdrawn':'退赛','non_runner':'退赛'}.get(status,'—')
         rows.append(SimpleNamespace(**fields,sort_order=item.get('sort_order',0),pk=item.get('sort_order',0),
             source_refs=item.get('source_refs',{}),odds_kind_label={'current':'即时','morning_line':'晨间','forecast':'预测'}.get(item.get('odds_kind'),'') if fields['odds_value'] else '',
             get_running_status_display=lambda label=label:label))

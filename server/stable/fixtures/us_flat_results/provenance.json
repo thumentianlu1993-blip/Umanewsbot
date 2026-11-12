@@ -160,5 +160,26 @@
     "sha256": "fa821bbb59b815a9c260c47b98c5df5e9fc9fbda7ae99ebf04e71a4b4599aba2",
     "extraction": "Selected unchanged DOM elements",
     "normalization": "Trailing whitespace removed; source bytes retained in runtime"
+  },
+  {
+    "file": "abr-pennsylvania-discovery.html",
+    "url": "https://www.americasbestracing.net/races/2026-pennsylvania-derby",
+    "sha256": "1593e43e07af3dc15fab54a1de35d01e11c7ef5f129c10836f4d4c37a64bf7de",
+    "retrieved_date": "2026-11-12",
+    "purpose": "完整原件用于实际文章链接发现及完整马号核验"
+  },
+  {
+    "file": "abr-pennsylvania-trifecta.html",
+    "url": "https://www.americasbestracing.net/gambling/2026-americas-best-racings-trifecta-picks-the-2026-pennsylvania-derby",
+    "sha256": "89b371988b9b6bd68f1c2375823b473c3a2bd8b691729ed686a2b5b32215ed5e",
+    "retrieved_date": "2026-11-12",
+    "purpose": "完整原件用于实际文章链接发现及完整马号核验"
+  },
+  {
+    "file": "abr-pennsylvania-cheat.html",
+    "url": "https://www.americasbestracing.net/the-sport/2026-2026-pennsylvania-derby-cheat-sheet",
+    "sha256": "1c2c344ecf5bf5e83749c9347c4304651b0e76636e7e419b42f20c1b6f62b756",
+    "retrieved_date": "2026-11-12",
+    "purpose": "完整原件用于实际文章链接发现及完整马号核验"
   }
 ]

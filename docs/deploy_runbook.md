@@ -1,3 +1,24 @@
+## 2026-11-12 美国采集代码发布：当前维护入口
+
+PR #298 merge `c4bd1207`，生产窄候选 `332fc540e1adfd51862f7cf6571d6dca8fdddef0`，镜像 `sha256:d2493078f35fd481b2bfdbbe6b4a0485c6b49a1265a09bca1ebbed8b4d31d6f3`，schema0082。四应用/双worker/健康与既有公共页通过；无业务配置或数据变化，QQ关闭。美国业务全链路尚待3/4/6验收。
+
+宿主checkout和发布目录仍为 `/opt/umanews-release-0d05fa9b-france-handoff-20261110/umanewsbot`；维护时必须保留法国展示及美国代码覆盖的完整Compose链：
+
+```sh
+./deploy/docker/compose-wrapper.sh \
+  -f /opt/umanews-release-0d05fa9b-france-handoff-20261110/umanewsbot/docker-compose.prod.lowcost.yml \
+  -f /opt/umanews-release-0d05fa9b-france-handoff-20261110/umanewsbot/runtime/france-handoff-0d05fa9b/pinned-images.json \
+  -f /opt/umanews-release-0d05fa9b-france-handoff-20261110/umanewsbot/docker-compose.france-browser.yml \
+  -f /opt/umanews-external-staging/france-application-identity-0d05fa9b/release-identity.json \
+  -f /opt/umanews-external-staging/france-capacity-0d05fa9b/release-identity.json \
+  -f /opt/umanews-external-staging/france-geny-reload-5669283d/release-identity.json \
+  -f /opt/umanews-external-staging/france-fields-d9d97ab6/release-identity.json \
+  -f /opt/umanews-external-staging/france-display-1e2ed453/release-identity.json \
+  -f /opt/umanews-external-staging/us-sources-332fc540/release-identity.json
+```
+
+本次回滚只恢复上一生产release `1e2ed453` 的完整链四应用和Nginx，不逆向迁移或恢复数据库。原镜像与包内rollback.sh保留，未实际执行回滚。生产收据 `runtime/us-sources-332fc540/release-complete.json`；[发布证据](changes/us-race-automation/release_evidence.md)记录精确SHA及验收边界。下文旧入口为历史，不应替代上面的当前完整链。
+
 ## 2026-11-11 法国字段补缺已发布：当前维护入口
 
 PR #296 合并 `ce1aa916`；生产应用候选 `d9d97ab6c772e560e90822b896a218420f443387`，OCI `sha256:400d8e716cd10cfbf99c3852626e88d86b9809aaab637befaff7d32bb63c41fb`，真实 schema 为 `stable.0082_france_basic_fields`。宿主 checkout 仍为0d05fa9b，不能以其旧迁移目录推断运行版本。北京时间2026-11-11 01:15:38已完成80场数据写入和线上验收，详见[发布证据](changes/france-public-field-gaps/release_evidence.md)。
