@@ -185,7 +185,7 @@
       "path": "server/stable/fixtures/us_prerelease/dmtc-stakes-schedule.html",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "7ed2a5e702ed924ffa448aaf601723ef7ac5d9569f7887ddc5215248342b9142",
+      "after_hash": "864db228ed3cc8a04efdae03f94c738969261b8f7380ec1b4c0d26d74690904d",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -209,7 +209,7 @@
       "path": "server/stable/fixtures/us_prerelease/nyra-stakes-schedule.html",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "ce15480a8ff34fafcd8c3522c87f4e5f96c96968a1e5838d9bd996407c9fdab2",
+      "after_hash": "bd64916bba5e45ed2a3703df3dd195736b6a41f808924ecab610b7ce4d0ff715",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -217,7 +217,7 @@
       "path": "server/stable/fixtures/us_prerelease/provenance.json",
       "status": "modified",
       "before_hash": "ccf5717d792bd897ecde8efe2125a37e5761e17cf23e5cbc03ea3d1bf33cde14",
-      "after_hash": "1e276ad05bab0e46441e4b6a4fb1050f24397aa581ae58606cd2586b38ce8d87",
+      "after_hash": "2df76638834ecf2f7ff9a9bf0c556ff05f3bd6e1395bebac2ebf16da2306f3ea",
       "before_mode": "100644",
       "after_mode": "100644"
     },

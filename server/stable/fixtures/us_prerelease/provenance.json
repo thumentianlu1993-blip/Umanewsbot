@@ -327,18 +327,20 @@
   {
     "file": "nyra-stakes-schedule.html",
     "url": "https://www.nyra.com/belmont/racing/stakes-schedule/",
-    "sha256": "ce15480a8ff34fafcd8c3522c87f4e5f96c96968a1e5838d9bd996407c9fdab2",
+    "sha256": "bd64916bba5e45ed2a3703df3dd195736b6a41f808924ecab610b7ce4d0ff715",
     "original_sha256": "1d74c87913092567c27cbbb59f452d6bfb283981b6be8db286849ebdc568eb14",
     "extraction": "浏览器DOM中的原始标题与完整表格；删除无关导航和样式",
-    "captured_at": "2026-11-12T15:02:34.734Z"
+    "captured_at": "2026-11-12T15:02:34.734Z",
+    "normalization": "仅去除行末空白，原始DOM摘要和提取说明保持"
   },
   {
     "file": "dmtc-stakes-schedule.html",
     "url": "https://www.dmtc.com/horsemen/nomforms",
-    "sha256": "7ed2a5e702ed924ffa448aaf601723ef7ac5d9569f7887ddc5215248342b9142",
+    "sha256": "864db228ed3cc8a04efdae03f94c738969261b8f7380ec1b4c0d26d74690904d",
     "original_sha256": "70987968771d70c4125bdb8c8285a14aebdec12bb7607a7082c28b9b3360f500",
     "extraction": "浏览器DOM中的原始标题与完整表格；删除无关导航和样式",
-    "captured_at": "2026-11-12T15:02:36.659Z"
+    "captured_at": "2026-11-12T15:02:36.659Z",
+    "normalization": "仅去除行末空白，原始DOM摘要和提取说明保持"
   },
   {
     "file": "gulfstream-stakes-schedule.html",
