@@ -67,6 +67,26 @@ class DelMarAdapterTests(SimpleTestCase):
 
 
 class USDocumentTests(SimpleTestCase):
+    def test_del_mar_directory_retains_published_rows_and_skips_explicit_pending(self):
+        from stable.services.us_source_collection import del_mar_nominations_directory
+        raw=(ROOT/'dmtc-nominations-pending.html').read_bytes()
+        rows=del_mar_nominations_directory(raw,year=2026,start=date(2026,11,1),end=date(2026,11,30))
+        self.assertEqual(len(rows),5)
+        self.assertEqual({r['local_date'].day for r in rows},{6,7,8,14,15})
+        self.assertEqual(del_mar_nominations_directory(raw,year=2026,start=date(2026,11,21),end=date(2026,11,21)),[])
+
+    def test_del_mar_pending_marker_does_not_hide_malformed_links(self):
+        from bs4 import BeautifulSoup
+        from stable.services.us_source_collection import del_mar_nominations_directory
+        for html in ['', 'Noms', '<a href="https://invalid.example/noms.pdf">Noms</a>',
+                     '<a href="https://invalid.example/noms.pdf">-</a>']:
+            soup=BeautifulSoup((ROOT/'dmtc-nominations-pending.html').read_bytes(),'lxml')
+            row=next(t for t in soup.select('tbody tr') if 'native diver' in t.get_text().lower())
+            cell=row.find_all('td',recursive=False)[3];cell.clear()
+            cell.append(BeautifulSoup(html,'html.parser'))
+            with self.subTest(html=html), self.assertRaisesRegex(ValueError,'us_nomination_directory_link'):
+                del_mar_nominations_directory(str(soup),year=2026,start=date(2026,11,21),end=date(2026,11,21))
+
     def parse(self, provider, kind, file, **kwargs):
         from stable.services.us_racing_sources import parse_document
         import json

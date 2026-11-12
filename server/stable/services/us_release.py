@@ -130,7 +130,9 @@ def execute(path,expected_sha256,*,apply=False,restore=False,now=None):
     path=Path(path);raw=path.read_bytes();digest=hashlib.sha256(raw).hexdigest();now=now or timezone.now()
     if digest!=expected_sha256:raise ValueError('manifest_digest')
     manifest=json.loads(raw)
-    if manifest.get('action')!=ACTION or manifest.get('schema_version')!=1 or not 1<=len(manifest.get('items',[]))<=1000:raise ValueError('manifest_scope')
+    if (manifest.get('action')!=ACTION or manifest.get('schema_version')!=1
+            or not 1<=len(manifest.get('items',[]))+len(manifest.get('rebind',[]))<=1000):
+        raise ValueError('manifest_scope')
     if restore:return restore_release(digest,apply=apply,now=now)
     items=manifest['items'];existing=[i['event_id'] for i in items if i.get('event_id')]
     if len(existing)!=len(set(existing)):raise ValueError('duplicate_event')
