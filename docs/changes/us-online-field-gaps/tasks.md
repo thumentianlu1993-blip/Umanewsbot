@@ -8,4 +8,5 @@
 - [x] (operations) 生成精确数据清单，完成隔离演练、恢复与最终候选等价核验。
 - [x] (operations) 固定树范围测试、独立代码 review 与精确数据准备。
 - [x] (operations) 为 Draft PR 生成范围CI计划；运行结果以当前PR检查为准。
-- [ ] (operations) 后续按根AGENTS.md完成最终部署包与生产交付。
+- [x] (operations) 完成最终冻结包独立复审、生产交付、153页验收与到期目标自然检查。
+- [ ] (integration) 后续赛事正式出马表、赛后节点及完整七天自然观察。
