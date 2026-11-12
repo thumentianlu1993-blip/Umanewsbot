@@ -1,9 +1,12 @@
 """发布事务、批次完整性和定向恢复；仅本地合成数据库与冻结原件。"""
 import hashlib,json,tempfile
+import threading,time
 from copy import deepcopy
 from pathlib import Path
+from unittest import skipUnless
 from unittest.mock import patch
-from django.test import TestCase,override_settings
+from django.db import connection,connections,transaction
+from django.test import TestCase,TransactionTestCase,override_settings
 from stable import models
 from stable import test_us_workflow as workflow
 NOW=workflow.NOW
@@ -53,6 +56,31 @@ class USReleaseTests(TestCase):
         self.assertFalse(self.event.live_tracking.tracking_enabled)
         self.assertEqual(self.event.projection_control.write_owner,'unmanaged')
         self.assertTrue(models.RaceEventRevision.objects.filter(event=self.event).exists())
+
+    def test_commit_probe_recovers_when_command_output_was_lost(self):
+        from io import StringIO
+        from django.core.management import call_command
+        path,sha=self.packet()
+        output=StringIO()
+        with patch.object(output,'write',side_effect=BrokenPipeError('lost output')):
+            with self.assertRaises(BrokenPipeError):
+                call_command('run_us_release',manifest=str(path),sha256=sha,apply=True,stdout=output)
+        probe=StringIO()
+        call_command('run_us_release',manifest=str(path),sha256=sha,probe_commit=True,stdout=probe)
+        self.assertTrue(json.loads(probe.getvalue())['committed'])
+        self.assertEqual(self.event.results.count(),8)
+        execute(path,sha,restore=True,apply=True,now=NOW)
+        self.assertFalse(self.event.results.exists())
+
+    def test_commit_probe_distinguishes_rolled_back_dry_run(self):
+        from io import StringIO
+        from django.core.management import call_command,CommandError
+        path,sha=self.packet();execute(path,sha,now=NOW)
+        output=StringIO()
+        call_command('run_us_release',manifest=str(path),sha256=sha,probe_commit=True,stdout=output)
+        self.assertFalse(json.loads(output.getvalue())['committed'])
+        with self.assertRaises(CommandError):
+            call_command('run_us_release',manifest=str(path),sha256='0'*64,probe_commit=True)
 
     def test_changed_before_and_after_images_are_rejected(self):
         path,sha=self.packet()
@@ -159,6 +187,11 @@ class USReleaseTests(TestCase):
         decision=attach_multisource_observation(value,policy=old_policy,now=NOW)
         self.assertEqual(decision.action,'acquired')
         old_binding=models.RaceDataSyncSourceBinding.objects.get(enrollment__event=other)
+        models.RaceResultSourceIdentity.objects.create(
+            event=other,source_key='the_racing_api',external_race_id='old-provider-race',registry_digest='a'*64)
+        models.RaceEventLiveProviderCheckpoint.objects.create(
+            tracking=other.live_tracking,source_key='the_racing_api',data_kind='result',
+            registry_digest='a'*64,contract_digest='b'*64,next_poll_at=NOW)
         old_surface=snapshot([other.pk])
         combined=deepcopy(self.policy.payload);combined['routes']+=old_data['routes']
         self.policy=parse_multisource_policy(combined,now=NOW)
@@ -183,3 +216,46 @@ class USReleaseTests(TestCase):
         self.assertFalse(self.event.results.filter(horse_name='Legacy winner').exists())
         execute(path,sha,restore=True,apply=True,now=NOW)
         self.assertEqual(snapshot([self.event.pk])['RaceEventResult'],before['RaceEventResult'])
+
+
+@skipUnless(connection.vendor=='postgresql','requires PostgreSQL row locks')
+class USReleaseCommitProbePostgresTests(TransactionTestCase):
+    def test_probe_waits_for_inflight_transaction_and_sees_its_commit(self):
+        from stable.services.us_release import probe_release_commit
+        event=models.RaceEvent.objects.create(year=2026,slug='us-commit-probe',
+            original_name='Commit probe',country_region='united_states')
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'manifest.json'
+            raw=json.dumps({'schema_version':1,'action':'us_release_data',
+                'items':[{'event_id':event.pk}],'rebind':[]}).encode()
+            path.write_bytes(raw);sha=hashlib.sha256(raw).hexdigest()
+            ready=threading.Event();state={}
+            def probe():
+                try:
+                    with connections['default'].cursor() as cursor:
+                        cursor.execute('SELECT pg_backend_pid()');state['pid']=cursor.fetchone()[0]
+                    ready.set();state['result']=probe_release_commit(path,sha)
+                except BaseException as exc:state['error']=exc
+                finally:connections.close_all()
+            thread=threading.Thread(target=probe,daemon=True)
+            try:
+                with transaction.atomic():
+                    models.RaceEvent.objects.select_for_update().get(pk=event.pk)
+                    thread.start();self.assertTrue(ready.wait(5))
+                    deadline=time.monotonic()+5;blocked=False
+                    while time.monotonic()<deadline:
+                        with connection.cursor() as cursor:
+                            cursor.execute('SELECT pg_stat_clear_snapshot()')
+                            cursor.execute('SELECT wait_event_type FROM pg_stat_activity WHERE pid=%s',[state['pid']])
+                            row=cursor.fetchone()
+                        if row and row[0]=='Lock':blocked=True;break
+                        if 'error' in state or 'result' in state:break
+                        time.sleep(.01)
+                    self.assertTrue(blocked,state)
+                    models.OperationLog.objects.create(action_type='us_release_data',
+                        target_type='manifest',target_id=sha,detail='{}')
+            finally:
+                if thread.ident is not None:thread.join(10)
+            self.assertFalse(thread.is_alive())
+            if 'error' in state:raise state['error']
+            self.assertTrue(state['result']['committed'])
