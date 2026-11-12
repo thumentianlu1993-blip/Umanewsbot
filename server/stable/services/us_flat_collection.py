@@ -207,7 +207,19 @@ def collect_flat_results(store, *, start, end, program_sources=None, target_keys
                 supplement_url = 'https://www.americasbestracing.net/races/'+identity['date'][:4]+'-'+slug
                 supplement, supplement_doc = read_parse(supplement_url, parse_abr, identity, accept=False)
             result_docs.append(supplement_doc)
-            result = merge_result(chart, supplement, expected_count=int(target['field_size_raw']))
+            field_raw = target.get('field_size_raw')
+            if field_raw == '':
+                expected_count = supplement.get('declared_runner_count')
+                if supplement.get('provider') != 'sporting_life' or type(expected_count) is not int or expected_count <= 0:
+                    raise ValueError('us_independent_runner_count_missing')
+                count_evidence = dict(count=expected_count, basis='sporting_life_declared', source_sha256=supplement_doc['sha256'])
+            else:
+                if not isinstance(field_raw, str) or not re.fullmatch(r'[1-9][0-9]*', field_raw):
+                    raise ValueError('us_calendar_runner_count_invalid')
+                expected_count = int(field_raw)
+                count_evidence = dict(count=expected_count, basis='toba_field', source_sha256=target['raw_sha256'])
+            result = merge_result(chart, supplement, expected_count=expected_count)
+            result['runner_count_evidence'] = count_evidence
             program_doc = None
             if result['gaps']:
                 if program_url := program_sources.get(identity['url']):

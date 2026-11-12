@@ -77,7 +77,8 @@ def fetch_preview(event, *, route, now, fetcher):
         except ValueError:continue
     if not choices:
         if report['errors'] or target_rows[0]['errors']:raise ValueError('us_preview_source_check_failed')
-        return dict(stage='not_published',items=[],source={},local_date=target['local_date'])
+        stage = 'not_published' if target_rows[0].get('card_status') == 'not_published' else 'coverage_unverified'
+        return dict(stage=stage,items=[],source={},local_date=target['local_date'])
     choices.sort(key=lambda p:(RANK[p['stage']],p['source']['fetched_at']),reverse=True)
     return choices[0]
 
@@ -111,8 +112,8 @@ def complete(claim, *, payload, route, now):
             or (getattr(event,'projection_control',None) and event.projection_control.write_owner not in {'unmanaged','data_sync'})
             or (lifecycle and lifecycle.mode not in {'off','shadow'})):
             pre._finish_locked(event,claim,now,outcome_reason='manual_or_owner_lock');return False
-        if payload['stage']=='not_published':
-            pre._finish_locked(event,claim,now,outcome_reason='not_published');return True
+        if payload['stage'] in {'not_published', 'coverage_unverified'}:
+            pre._finish_locked(event,claim,now,outcome_reason=payload['stage']);return True
         latest=event.data_candidates.filter(source_name=US,module='runners',status='pending').order_by('-fetched_at','-id').first()
         old=latest.raw_payload.get(US,{}) if latest else {}
         if old.get('baseline')==pre.baseline(event) and RANK.get(old.get('stage'),-1)>RANK[payload['stage']]:

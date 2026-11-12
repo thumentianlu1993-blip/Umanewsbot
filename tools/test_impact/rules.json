@@ -1671,6 +1671,15 @@
     ],
     "docs/changes/us-race-automation/ci-scope-seed.json": [
       "infrastructure"
+    ],
+    "server/stable/services/us_calendar_snapshot.py": [
+      "us_source_collection"
+    ],
+    "server/stable/management/commands/prepare_us_calendar_snapshot.py": [
+      "us_source_collection"
+    ],
+    "docs/changes/us-race-automation/ci-scope-calendar.json": [
+      "infrastructure"
     ]
   },
   "symbols": {
@@ -1877,6 +1886,7 @@
     "docs/changes/us-race-automation/ci-scope-346.json",
     "docs/changes/us-race-automation/ci-scope-rebind.json",
     "docs/changes/us-race-automation/ci-scope-archive.json",
-    "docs/changes/us-race-automation/ci-scope-seed.json"
+    "docs/changes/us-race-automation/ci-scope-seed.json",
+    "docs/changes/us-race-automation/ci-scope-calendar.json"
   ]
 }

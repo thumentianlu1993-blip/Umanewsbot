@@ -1,0 +1,177 @@
+{
+  "schema_version": 1,
+  "base_sha": "0db22f1e8f475f95f7e4dc53f9640b4a38230552",
+  "reason": "美国TOBA人工年度快照仅接入默认受许可入口，保留其他来源网络预算及显式档案；补齐远期目录未知状态和终态独立人数来源。覆盖美国来源/写入/回放、共享入口和结果路径、设置默认及其他地区；catalog仅登记新增快照测试，规则只新增精确路径及本次范围",
+  "domains": [
+    "infrastructure",
+    "race_results",
+    "us_source_collection",
+    "module:stable.test_race_multisource_enrollment",
+    "module:stable.test_race_multisource_postgres",
+    "module:stable.test_race_multisource_conversion",
+    "module:stable.test_race_data_sync_admission",
+    "module:stable.test_france_release_handoff"
+  ],
+  "changes": [
+    {
+      "path": "docs/changes/us-race-automation/calendar_snapshot.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "2b86ec32378db346283817702b075fb400402d2ffb109d6259aecbe48a1e171d",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/us-race-automation/release_calendar.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "153a16908e19368298cd68d92eef4af32b6308c69623243e6db1914a5534b413",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/current_state.md",
+      "status": "modified",
+      "before_hash": "c34b6afe8fda8a701aecb94905613ed8e65dee885cf08cd8877c01dc200f78a3",
+      "after_hash": "1192d703348163aa459c1727a9aaacf0e7c41c5916307a18bbb5cd43f683433c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/deploy_runbook.md",
+      "status": "modified",
+      "before_hash": "98c7df6ccd5803e93fd7a4653da3d0e8b41900ead64eddd837bfce36838c3e3f",
+      "after_hash": "d9cf3492ef4e643a4b8e45bb030973657884a2304d9e39bdd46af1d32f6cad67",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/app/settings.py",
+      "status": "modified",
+      "before_hash": "a034bee9368905353aa825a8c8c97bfe4ad591b5f508d8afc7b01ec441545637",
+      "after_hash": "e821a60e02ef3f5b86c0c64b6352db9b31ba8b9d80ec15410727977f2ab77aa1",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/management/commands/prepare_us_calendar_snapshot.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "f0a95f814b03579b791b645b3bdafcee7a8c59a7dde593148805c3de69c83db3",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_source_adapters.py",
+      "status": "modified",
+      "before_hash": "e86da649c8067274e60cdb81f3a8c60d8030cd9c93f67e1f20e9e9ef4afbf213",
+      "after_hash": "ed826a7be98d2bc91f51e25d36c896275cafc168091dc5efc894414adeaef9bc",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_calendar_snapshot.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "53d62035761dbc6a8616ca6a41622ab34c553afb3d320690596045b0f8b7accc",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_flat_collection.py",
+      "status": "modified",
+      "before_hash": "cde0bae875f20ca6771c5c25eb788c42201a92ea24aab1cae25d83e4f17fbb9a",
+      "after_hash": "49b79f7ca3ce10ca5372d2b2efa358b0931c1a613651f9a5404acb447c728756",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_flat_results.py",
+      "status": "modified",
+      "before_hash": "64b5a51d194e3d8d53d94fae5f1a4d2072e662d16a5f70536b11f69624c62c85",
+      "after_hash": "6bc19301c4bc25dc74ed8c13956cbe63e1ddb27cfed20ecbd3bc39e25f123d69",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_pre_race.py",
+      "status": "modified",
+      "before_hash": "ddafdaba1b98df585683ccc1d2d9bcbc7a438e192433f9b2858c7d0d2f84ceec",
+      "after_hash": "57bf55b053b4757e80acea762e4cccea943533d1c7ae34c651655a159b7f4233",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_prerace_documents.py",
+      "status": "modified",
+      "before_hash": "157858c7e0c49e051bfcd5db384ba65e78446e1f3f3df5c79a83bd81dadeb85a",
+      "after_hash": "8faa1465f0f8ee012fb14272bb0a82e72ea19529c33eaa465c01f536acc6892a",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_prerelease_collection.py",
+      "status": "modified",
+      "before_hash": "4cf585a3d9f75a1c70daa4d939ee3ed8b7d7b3f80e98f54bfe6c3a56d240c02e",
+      "after_hash": "ad626135085868c36a00bd838e4ef9349ed603ac122e41fd0e0ce55953073a80",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_race_source.py",
+      "status": "modified",
+      "before_hash": "7711962dd99a73a9208e6632724b62c2881ed6d29450a1d1edd2427280432f03",
+      "after_hash": "3325289bbcda8ecc35bf7a7d8ba479d8ea7054240a0cbb3b28b8f315a29ee569",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_us_calendar_snapshot.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "7e04df833dfc58dc0bf7884120f372273ed5d8f9a8e180782d304414920e1776",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_us_flat_results.py",
+      "status": "modified",
+      "before_hash": "82baa4a1e2eabd6c4bc35823bc777f20de7f7730bae25b180315ff08e9f12dec",
+      "after_hash": "39e25e656c0b9301ab4d80854c59cc3835dcf9ad441abb1be3c216f70dd7c57d",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_us_pre_race.py",
+      "status": "modified",
+      "before_hash": "39151dae3b2be893783d07ecc84466ed4a26c04de5a23c624765be48289afb7c",
+      "after_hash": "2820851e175098cc5667a9e8ff4a0e2eceb353cd200a2e742c8356977c48bbe7",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_us_prerelease.py",
+      "status": "modified",
+      "before_hash": "299580bc1a30bdd10cdfd9ce9fc89bdcfa6af4d246ae88e0149acc65f1bf1dac",
+      "after_hash": "de9ad203c087319e8c3c971622b8b4bde1a9de856138a6bc83a3391322af2d10",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/catalog.json",
+      "status": "modified",
+      "before_hash": "998b5193606bd7e3ea1159a7cef85fa4691588e25ee6a76501efe3608ce3e652",
+      "after_hash": "632c07e596b06b15eb9b430b1bc402a008248cb37eafc90bb14b92d26fef13b6",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "3c4cf37a4471c3d9df92de7bc2264038378a0a40051fb17cc244a79ea4652688",
+      "after_hash": "46ecb0be2b1423528e1f774065259b9ae688bbef157518bfaa4d26e774cf0a00",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}
