@@ -1771,6 +1771,18 @@ def rebind_multisource_enrollment(*, event_id, policy, now, expected_route_diges
         if len(new_route_digests) != 1:
             raise ValueError("rebind_route_ambiguous")
         new_route_digest = new_route_digests.pop()
+        route_by_source = {source.source_key: route for source, route in routes.values()}
+        historical_sources = set(
+            models.RaceResultSourceIdentity.objects.filter(event=event)
+            .exclude(source_key__in=route_by_source)
+            .values_list("source_key", "registry_digest")
+        )
+        for checkpoint in checkpoints:
+            if checkpoint.source_key not in route_by_source and (
+                not checkpoint.registry_digest
+                or (checkpoint.source_key, checkpoint.registry_digest) not in historical_sources
+            ):
+                raise ValueError("rebind_checkpoint_orphan")
         if enrollment.standing_policy_digest == policy.digest and all(
             b.route_digest == new_route_digest for b in bindings
         ):
@@ -1840,11 +1852,11 @@ def rebind_multisource_enrollment(*, event_id, policy, now, expected_route_diges
         enrollment.save(
             update_fields=("standing_policy_digest", "route_digest", "updated_at")
         )
-        route_by_source = {source.source_key: route for _, source, route, _ in changes}
         for checkpoint in checkpoints:
             route = route_by_source.get(checkpoint.source_key)
             if route is None:
-                raise ValueError("rebind_checkpoint_orphan")
+                # 旧来源检查点留作历史证据；v2 调度仅领取当前有效绑定。
+                continue
             checkpoint.registry_digest = route.digest
             checkpoint.contract_digest = route.contract_digest
             checkpoint.save(

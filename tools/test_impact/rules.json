@@ -1656,6 +1656,15 @@
     ],
     "docs/changes/us-race-automation/ci-scope-346.json": [
       "infrastructure"
+    ],
+    "docs/changes/us-race-automation/rebind_release_fix.md": [
+      "infrastructure"
+    ],
+    "docs/changes/us-race-automation/release_rebind.md": [
+      "infrastructure"
+    ],
+    "docs/changes/us-race-automation/ci-scope-rebind.json": [
+      "infrastructure"
     ]
   },
   "symbols": {
@@ -1859,6 +1868,7 @@
     "docs/changes/france-public-field-gaps/ci-scope.json",
     "docs/changes/france-display-simplify/ci-scope.json",
     "docs/changes/us-race-automation/ci-scope.json",
-    "docs/changes/us-race-automation/ci-scope-346.json"
+    "docs/changes/us-race-automation/ci-scope-346.json",
+    "docs/changes/us-race-automation/ci-scope-rebind.json"
   ]
 }

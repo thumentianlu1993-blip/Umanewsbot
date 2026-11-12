@@ -3,7 +3,7 @@ import hashlib,json
 from pathlib import Path
 from django.core.management.base import BaseCommand,CommandError
 from django.db import connection,transaction
-from stable.services.us_release import execute,snapshot,baseline_matches
+from stable.services.us_release import execute,snapshot,baseline_matches,probe_release_commit
 from stable.services.france_release import read_bound
 
 
@@ -16,11 +16,16 @@ class Command(BaseCommand):
         parser.add_argument('--apply',action='store_true')
         parser.add_argument('--restore',action='store_true')
         parser.add_argument('--check-baseline',action='store_true')
+        parser.add_argument('--probe-commit',action='store_true')
 
     def handle(self,*args,**options):
         try:
             path=Path(options['manifest'])
-            if options['check_baseline']:
+            if options['probe_commit']:
+                if options['apply'] or options['restore'] or options['check_baseline']:
+                    raise ValueError('commit_probe_is_separate')
+                result=probe_release_commit(path,options['sha256'])
+            elif options['check_baseline']:
                 if options['apply'] or options['restore']:raise ValueError('check_is_read_only')
                 raw=path.read_bytes()
                 if hashlib.sha256(raw).hexdigest()!=options['sha256']:raise ValueError('manifest_digest')

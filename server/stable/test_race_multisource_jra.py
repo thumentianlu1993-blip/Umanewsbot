@@ -900,6 +900,75 @@ class MultisourceRebindTests(JraColdStartTests):
         self.assertEqual(models.OperationLog.objects.filter(
             action_type="multisource_rebind").count(), 1)
 
+    def test_rebind_preserves_traceable_legacy_checkpoint_without_claiming_it(self):
+        from stable.services.race_data_sync_enrollment import rebind_multisource_enrollment
+        self.enroll()
+        models.RaceResultSourceIdentity.objects.create(
+            event=self.event, source_key="the_racing_api", external_race_id="legacy-race",
+            registry_digest="a" * 64,
+        )
+        checkpoint = models.RaceEventLiveProviderCheckpoint.objects.create(
+            tracking=self.event.live_tracking, source_key="the_racing_api", data_kind="result",
+            registry_digest="a" * 64, contract_digest="b" * 64,
+            next_poll_at=NOW - timedelta(days=1),
+        )
+        before = models.RaceEventLiveProviderCheckpoint.objects.filter(pk=checkpoint.pk).values().get()
+        policy = self.policy_v2()
+        with patch("stable.services.race_data_source_adapters.load_multisource_policy", return_value=policy):
+            result = rebind_multisource_enrollment(
+                event_id=self.event.pk, policy=policy, now=NOW,
+                expected_route_digest=self.binding().route_digest, apply=True,
+            )
+            self.assertEqual(result["action"], "rebound")
+            claim_result = run_multisource_claim(claim=self.claim(), now=NOW, fetcher=self.fetch)
+            self.assertTrue(claim_result["processed"], claim_result)
+        self.assertEqual(
+            models.RaceEventLiveProviderCheckpoint.objects.filter(pk=checkpoint.pk).values().get(), before,
+        )
+        self.assertEqual(set(self.calls), {CARD, RESULT})
+
+    def test_rebind_rejects_untraceable_checkpoint_in_dry_run_and_apply(self):
+        from stable.services.race_data_sync_enrollment import rebind_multisource_enrollment
+        self.enroll()
+        models.RaceResultSourceIdentity.objects.create(
+            event=self.event, source_key="the_racing_api", external_race_id="legacy-race",
+            registry_digest="a" * 64,
+        )
+        models.RaceEventLiveProviderCheckpoint.objects.create(
+            tracking=self.event.live_tracking, source_key="the_racing_api", data_kind="result",
+            registry_digest="c" * 64, contract_digest="b" * 64,
+        )
+        old = self.binding().route_digest
+        for apply in (False, True):
+            with self.subTest(apply=apply), self.assertRaisesMessage(ValueError, "rebind_checkpoint_orphan"):
+                rebind_multisource_enrollment(
+                    event_id=self.event.pk, policy=self.policy_v2(), now=NOW,
+                    expected_route_digest=old, apply=apply,
+                )
+            self.assertEqual(self.binding().route_digest, old)
+        self.assertFalse(models.OperationLog.objects.filter(action_type="multisource_rebind").exists())
+
+    def test_rebind_replay_rejects_new_untraceable_checkpoint(self):
+        from stable.services.race_data_sync_enrollment import rebind_multisource_enrollment
+        self.enroll()
+        old = self.binding().route_digest
+        policy = self.policy_v2()
+        rebind_multisource_enrollment(
+            event_id=self.event.pk, policy=policy, now=NOW,
+            expected_route_digest=old, apply=True,
+        )
+        models.RaceEventLiveProviderCheckpoint.objects.create(
+            tracking=self.event.live_tracking, source_key="unknown", data_kind="result",
+            registry_digest="c" * 64, contract_digest="b" * 64,
+        )
+        for apply in (False, True):
+            with self.subTest(apply=apply), self.assertRaisesMessage(ValueError, "rebind_checkpoint_orphan"):
+                rebind_multisource_enrollment(
+                    event_id=self.event.pk, policy=policy, now=NOW,
+                    expected_route_digest=old, apply=apply,
+                )
+        self.assertEqual(models.OperationLog.objects.filter(action_type="multisource_rebind").count(), 1)
+
     def test_rebind_rejects_baseline_drift_without_writes(self):
         from stable.services.race_data_sync_enrollment import rebind_multisource_enrollment
         self.enroll()

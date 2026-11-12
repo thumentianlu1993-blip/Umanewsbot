@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "base_sha": "ec799b3afebbe9af6cec8399bdb9d25cd142a66a",
+  "reason": "仅修复共享v2策略换绑：对有同赛事来源registry证据的非当前来源检查点保持原样，未知检查点dry-run/apply均拒绝。覆盖全部换绑/JRA主链、多源登记与领取、PostgreSQL并发、v1转接、地区与来源准入、法国交接、美国整包写入/恢复和基础工作流检查。不扩大到未改动新闻、翻译和QQ全量回归，共享换绑和美国发布链按现有领域覆盖；仅登记本修复说明与精确范围文件，现有测试标签和映射不删减。",
+  "domains": [
+    "infrastructure",
+    "race_results",
+    "us_source_collection",
+    "module:stable.test_race_multisource_enrollment",
+    "module:stable.test_race_multisource_postgres",
+    "module:stable.test_race_multisource_conversion",
+    "module:stable.test_race_multisource_regions",
+    "module:stable.test_race_data_sync_admission",
+    "module:stable.test_france_release_handoff"
+  ],
+  "changes": [
+    {
+      "path": "docs/changes/us-race-automation/rebind_release_fix.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "9d6ed451f3f60655365b2ec32430b3177c9fbbc5c34e42c2a02f623406439c99",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/us-race-automation/release_346.md",
+      "status": "modified",
+      "before_hash": "e0831ad488cd54cde5ad60638cc8a127027b07e32fc91c76aaea35658be32cd1",
+      "after_hash": "653ac679ffd9d7cfc658db746f89cca5fbc5d01da38c416ef1efba6f956a3ac9",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/us-race-automation/release_rebind.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "4c969e80129d0a46d86a8b00433c309137c16622ab3ef0a9554ff48008a095ba",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/us-race-automation/tasks.md",
+      "status": "modified",
+      "before_hash": "7b3d7411f94e1a80c027380b5037355ef366699e97c7fa28227387162aebc211",
+      "after_hash": "313785571a59f94bf414421d238e51caad47ad08ee7dd17397e3b5a4198cdc94",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/current_state.md",
+      "status": "modified",
+      "before_hash": "f2fd91de4e83d0740516109f05693ff613769ee14db59d12f3e35e4a82d1783a",
+      "after_hash": "9d177769d23198e8a6de1f9458d320c21ba494e3f6b7a163f79fdb906a5cd8a2",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/deploy_runbook.md",
+      "status": "modified",
+      "before_hash": "6ec2b73bcad1c5ff69b5bd13d5967336fac750b25c5fdf28a0e6199977e8a062",
+      "after_hash": "16ab637b26d86c3b09d73fb6fab0892937f7e2c37bb3ba2f34b66ae99dbc397c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/management/commands/run_us_release.py",
+      "status": "modified",
+      "before_hash": "21d4d33a4079f6adabd1c6e28a5a094e14f8e626470367ce80545479fb8478f3",
+      "after_hash": "e75204dbe05b7fce2c517db3e22f37fcb01a4579a747a860019ccaa966a8bc5d",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_enrollment.py",
+      "status": "modified",
+      "before_hash": "bac88bd8671d59df8fa96777ffb7ff3c76e43b8d63219dc60226a6a5a2d9bc3c",
+      "after_hash": "aee382c98a3eedf7030c7761ba7bbfd1e09faf0dcb5083766faf09c3fee9a3f1",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_release.py",
+      "status": "modified",
+      "before_hash": "c35f40285849ad432722db141d16e34a023e41255f2daaf63808b79b6e86153e",
+      "after_hash": "d289f8cdfc5025828d076788a4e8ec0fd2806e66f9e212d4fe7d30e4eeaa1c96",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_race_multisource_jra.py",
+      "status": "modified",
+      "before_hash": "cd422f03e0083231e50fde995f726b2b656dd00f2e1e84f263008ec6df56dbb5",
+      "after_hash": "6f26f0d1b0a453633e697741f083b0b546a2424b678b64638842b2921bcd9e98",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_us_release.py",
+      "status": "modified",
+      "before_hash": "9c52a87accee5e133173394038e6381a1479258b29a83c6105b8bd6c231ec811",
+      "after_hash": "5a38a3369cbbd657e9b0399bbb883ded37d515f9b82a03cd01a0b759a1d2049b",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "c0b53f51cf19f8248a4df5994fc06a60449e182c0fef37ada55d3464313c453e",
+      "after_hash": "c2f68f08ef7ea13e751d12b74c7d89300c8447b92cc837e69a7be7c1003bd3c2",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}
