@@ -1,3 +1,11 @@
+# 2026-11-12 美国赛前来源修正发布完成后的维护入口
+
+PR #304 merge `a4945de0333555e95cf129cd1b36b9cf4e24dc41`，生产候选 `049caf284d1605137688e2a15b286756df0b34b1`，OCI `sha256:8f14c22b23d52b734ace8f2faff1d0f3a98bb18b75ec71abbb86f1c5572cb353`。北京时间19:28:22四应用版本/运行态核验通过，双worker就绪、Beat恢复、QQ关闭，schema0084不变，发布锁释放。
+
+宿主根仍为 `/opt/umanews-release-0d05fa9b-france-handoff-20261110/umanewsbot`；在下文目录快照维护链后追加 `/opt/umanews-external-staging/us-preview-049caf28/release-identity.json`，以运行容器完整Compose标签为准。新增独立只读挂载 `/run/us-preview-gaps` 保存本包策略及控制换绑清单，原年度快照不变。策略摘要 `2940443e714b6438b3bf081a2c8953217fc9ebc506267120d208da80bf7d0caa`，220条控制登记已原子换绑，无历史重导。
+
+本次已恢复自然调度，旧静态after-image不能保证仍可恢复。若后续发生发布故障，使用本包已审查的停Beat并核验流程保留新数据，按真实漂移另行处理；不得直接套用恢复调度前的CAS恢复收据。此次未执行回滚，已知Colonial Cup来源403保持为独立待解决项。收据在 `runtime/us-preview-049caf28/`；详见[发布证据](changes/us-race-automation/preview_release_evidence.md)。
+
 # 2026-11-12 美国目录快照发布完成后的维护入口
 
 PR #303 merge `aa264d3b`，生产候选 `73f47c292bae3df74e960b397cc30c4e52351a25`，OCI `sha256:4d8e4602b47989236bcd7110a286ec665d3481cbb0d5e1f7db3f8573e16370f3`，schema0084。四应用运行、双worker就绪、Beat恢复、QQ关闭，发布锁释放；无迁移或历史重导。自然采集验收状态见[发布证据](changes/us-race-automation/calendar_release_evidence.md)。
