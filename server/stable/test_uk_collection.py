@@ -1,0 +1,89 @@
+"""英国付费采集编排：离线注入原件，不访问真实网络或数据库。"""
+import json
+from datetime import date,datetime,timezone
+from types import SimpleNamespace
+from unittest import TestCase
+from stable.test_uk_sources import card,result
+from stable.services.uk_collection import fetch_payload, api_url
+
+NOW=datetime(2026,10,30,16,tzinfo=timezone.utc)
+class Query:
+    def filter(self,**kwargs):return self
+    def first(self):return None
+
+
+def event():
+    return SimpleNamespace(country_region='united_kingdom',local_date=date(2026,10,30),
+        racecourse='Newmarket',original_name='Example Stakes',source_identities=Query(),
+        source_refs={'uk_target_v1':{'external_race_id':'rac_123','name_keys':['examplestakes']}},
+        runners=Query())
+
+
+def route():
+    from urllib.parse import urlsplit
+    return SimpleNamespace(provider='the_racing_api',region='united_kingdom',parser_version='uk-tra-paid-v1',
+        identity_namespace='tra-race',operator='TRA',source_class='licensed_api',timezone='Europe/London',
+        valid=lambda now:True,permits_url=lambda url:urlsplit(url).hostname in {'api.theracingapi.com','www.sportinglife.com'},
+        venue_aliases={'newmarket':['Newmarket']},digest='a'*64)
+
+
+class UKCollectionTests(TestCase):
+    def test_reads_bound_card_and_result_without_free_paths(self):
+        c=card();c['runners'].pop();r=result();r['non_runners']='';calls=[]
+        def fetch(url,**kwargs):
+            calls.append(url)
+            return json.dumps(r if '/results/' in url else c)
+        value=fetch_payload(event=event(),route=route(),now=NOW,fetcher=fetch)
+        self.assertEqual(len(value['roster']),2)
+        self.assertEqual(value['result_phase'],'official')
+        self.assertEqual(calls,['https://api.theracingapi.com/v1/racecards/rac_123/pro','https://api.theracingapi.com/v1/results/rac_123'])
+        self.assertEqual(len(value['source_documents']),2)
+
+    def test_entry_is_preview_only(self):
+        c=card();c['race_status']='entry';c['field_size']='3'
+        for x in c['runners']:x['number']=''
+        value=fetch_payload(event=event(),route=route(),now=NOW,fetcher=lambda *a,**k:json.dumps(c))
+        self.assertEqual(value['stage'],'nominations')
+        self.assertFalse(value['roster_complete'])
+
+    def test_binding_cannot_cross_date_venue_or_region(self):
+        for key,value in [('date','2026-10-29'),('course','Ascot'),('region','IRE')]:
+            c=card();c[key]=value
+            with self.subTest(key=key),self.assertRaises(ValueError):fetch_payload(event=event(),route=route(),now=NOW,fetcher=lambda *a,**k:json.dumps(c))
+
+    def test_discovery_rejects_ambiguous_candidates(self):
+        e=event();e.source_refs['uk_target_v1'].pop('external_race_id')
+        c=card();c['race_status']='declared';other=dict(c,race_id='rac_124')
+        with self.assertRaisesRegex(ValueError,'ambiguous'):
+            fetch_payload(event=e,route=route(),now=NOW,fetcher=lambda *a,**k:{'racecards':[c,other],'total':2})
+
+    def test_empty_list_is_not_published_and_count_drift_fails(self):
+        e=event();e.source_refs['uk_target_v1'].pop('external_race_id')
+        value=fetch_payload(event=e,route=route(),now=NOW,fetcher=lambda *a,**k:{'racecards':[],'total':0})
+        self.assertEqual(value['stage'],'not_published')
+        with self.assertRaisesRegex(ValueError,'pagination'):
+            fetch_payload(event=e,route=route(),now=NOW,fetcher=lambda *a,**k:{'racecards':[],'total':2})
+
+    def test_near_term_entry_falls_back_to_big_races(self):
+        e=event();e.source_refs['uk_target_v1'].pop('external_race_id')
+        c=card();c.update(race_status='entry',field_size='3')
+        def fetch(url,**kwargs):
+            return {'racecards':[c],'total':1} if '/big-races?' in url else {'racecards':[],'total':0}
+        value=fetch_payload(event=e,route=route(),now=NOW,fetcher=fetch)
+        self.assertEqual(value['stage'],'nominations')
+
+    def test_late_nonrunner_retains_verified_original_card_number(self):
+        from stable.services.uk_sources import parse_card
+        e=event();c=card();c['runners'][2]['number']='3';c.update(race_status='declared',field_size='3')
+        old=parse_card(c)
+        old.update(raw_sha256='c'*64,canonical_url=api_url('card',race_id='rac_123'),fetched_at=NOW.isoformat())
+        e.source_identities=SimpleNamespace(filter=lambda **kwargs:SimpleNamespace(first=lambda:SimpleNamespace(external_race_id='rac_123',identity_fields={'multisource_v2':old})))
+        c['runners'][2]['number']='NR';c['field_size']='2'
+        value=fetch_payload(event=e,route=route(),now=NOW,fetcher=lambda *a,**k:c)
+        self.assertEqual(value['gaps'],[])
+        self.assertEqual(value['roster'][2]['number'],'3')
+        self.assertEqual(value['roster'][2]['status'],'non_runner')
+
+    def test_url_builder_rejects_unbounded_identity(self):
+        for race_id in ['../secret','rac_123?key=bad','https://evil.test','123']:
+            with self.subTest(race_id=race_id),self.assertRaises(ValueError):api_url('card',race_id=race_id)

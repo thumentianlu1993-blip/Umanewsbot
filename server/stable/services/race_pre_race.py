@@ -79,6 +79,8 @@ def preview_window(event,now):
 def pre_race_days(event):
     if event.country_region == 'united_states':
         return 60
+    if event.country_region == 'united_kingdom' and getattr(settings,'RACE_DATA_SYNC_UK_PRE_RACE_ENABLED',False) and (event.source_refs or {}).get('uk_target_v1'):
+        return 60
     if event.country_region == 'japan':
         return max(0, min(31, getattr(settings, 'RACE_DATA_SYNC_JAPAN_PRE_RACE_DAYS', 4)))
     if event.country_region == 'hong_kong' and getattr(settings, 'RACE_DATA_SYNC_HKJC_PRE_RACE_ENABLED', False):
@@ -118,7 +120,7 @@ def claim_pre_race(*, event_id, source, now):
 
 
 def _claim_pre_race_atomic(*, event_id, source, now):
-    if source not in {JRA, TRA, REFRESH, 'nar_pre_race_v1', 'hkjc_pre_race_v1', 'france_pre_race_v1', 'us_pre_race_v1'} or timezone.is_naive(now):
+    if source not in {JRA, TRA, REFRESH, 'nar_pre_race_v1', 'hkjc_pre_race_v1', 'france_pre_race_v1', 'us_pre_race_v1', 'uk_pre_race_v1'} or timezone.is_naive(now):
         raise ValueError('invalid_pre_race_claim')
     if source == JRA and not jra_enabled(network=True):
         return None
@@ -134,6 +136,9 @@ def _claim_pre_race_atomic(*, event_id, source, now):
     if source == 'us_pre_race_v1':
         from .us_pre_race import enabled
         if not enabled(): return None
+    if source == 'uk_pre_race_v1':
+        from .uk_pre_race import enabled
+        if not enabled(): return None
     if source == REFRESH:
         from .race_pre_race_refresh import refresh_enabled
         if not refresh_enabled(): return None
@@ -146,10 +151,10 @@ def _claim_pre_race_atomic(*, event_id, source, now):
             france_context = lock_context(event, lifecycle)
             if write_reason(france_context, now=now):
                 return None
-        elif source == 'us_pre_race_v1':
+        elif source in {'us_pre_race_v1','uk_pre_race_v1'}:
             from .race_data_sync_enrollment import _lock_multisource_event
             event, lifecycle = _lock_multisource_event(event_id)
-            if event.country_region != 'united_states' or event.divisions.exists(): return None
+            if event.country_region != ('united_states' if source=='us_pre_race_v1' else 'united_kingdom') or event.divisions.exists(): return None
         else:
             event = models.RaceEvent.objects.select_for_update().get(pk=event_id)
         if not in_window(event, now) or (source == JRA and (
@@ -187,7 +192,7 @@ def _valid_claim(event, claim, now):
 
 def _finish_locked(event, claim, now, reason='', retry_after=None, outcome_reason=''):
     state = _state(event, claim['source'])
-    if claim['source'] == 'us_pre_race_v1':
+    if claim['source'] in {'us_pre_race_v1','uk_pre_race_v1'}:
         from .us_polling import next_poll
         started = _dt(state.get('last_attempt_at')) or now
         due = next_poll(event=event, kind='racecard', now=started)
@@ -231,7 +236,7 @@ def finish_pre_race(claim, *, now, reason='', retry_after=None, outcome_reason='
 
 def _finish_pre_race_atomic(claim, *, now, reason='', retry_after=None, outcome_reason=''):
     with transaction.atomic():
-        if claim.get('source') in {'france_pre_race_v1','us_pre_race_v1'}:
+        if claim.get('source') in {'france_pre_race_v1','us_pre_race_v1','uk_pre_race_v1'}:
             from .race_data_sync_enrollment import _lock_multisource_event
             event, _ = _lock_multisource_event(claim['event_id'])
         else:

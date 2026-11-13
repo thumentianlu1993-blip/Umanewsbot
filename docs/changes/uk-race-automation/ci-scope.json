@@ -1,0 +1,305 @@
+{
+  "schema_version": 1,
+  "base_sha": "0156a7917a103a005350126a28e683ef5f970d86",
+  "reason": "英国付费源、完整卡表赛果、赛前阶段及原子数据包；覆盖共享控制身份、公开字段、美国恢复器及法国交接，登记新增测试不降低既有门禁",
+  "domains": [
+    "infrastructure",
+    "race_results",
+    "uk_race_automation",
+    "us_source_collection",
+    "race_timeliness_contracts",
+    "module:stable.test_race_multisource_identity",
+    "module:stable.test_race_multisource_enrollment",
+    "module:stable.test_race_multisource_postgres",
+    "module:stable.test_race_multisource_conversion",
+    "module:stable.test_race_data_sync_admission",
+    "module:stable.test_race_data_sync_pipeline_a",
+    "module:stable.test_race_data_sync_pipeline_a_postgres",
+    "module:stable.test_france_release_handoff",
+    "module:stable.test_race_pre_race",
+    "module:stable.test_race_information_display",
+    "module:stable.test_race_information_display_pages"
+  ],
+  "changes": [
+    {
+      "path": "docs/changes/uk-race-automation/catalogue.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "492f88bbe807a3430226f0bec238a424d180d7c7a33628bdbda89f841d227023",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/uk-race-automation/design.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "f92b46b63c800351635b3a0cf6c6520893868d0a8d6828f6f0b4567321962178",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/uk-race-automation/rollout.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "4c90ec24b0fb59fbc0aeb52b5ed3e63e094dec0b1209fb699848a064778eaf81",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/uk-race-automation/spec.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "64d588554bf3ebee488a5ee46abdcb44a92024c3dd888646e52e9f518674bf9a",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/uk-race-automation/tasks.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "99d4efcc338fea2f99f9b8d675bdcabf87bc9e2e91c763d744f71feb17215a37",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/uk-race-automation/test_cases.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "662fc02ecca8e920c9893669b28c1da7f3bdbec0db1236c97570c9494c1755bc",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/current_state.md",
+      "status": "modified",
+      "before_hash": "3130705ae37bd801ee2f658a2389972f2ddb08fb8e9b9a9b65cf0ec16e1fdb17",
+      "after_hash": "7f9b4e727494d4d6ada9da5a736ad21188c96082f0fe8ba26ea0985524738cd6",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/app/settings.py",
+      "status": "modified",
+      "before_hash": "e0898dbadd36e518df1fac382cfc6731ff71e43df6c5a553c886d9efaefcfdc6",
+      "after_hash": "bae91131df922372dcf2f414502c32b5070d539cc2a2f027c8366271ffd47e80",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/management/commands/run_uk_release.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "b85e9205c2bdf3eab61467d0014ab3ac6e6c26ee024294092cb6b7928d076440",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/france_release_handoff.py",
+      "status": "modified",
+      "before_hash": "1a3ec2cfd1559717c90b10f6c84dd25fcf0272bc649b814e44ee2657c1bf9a8b",
+      "after_hash": "fa67985e9b57fd034e149ef75da248b2dd66e366411b32b4eb3b2470624e3ca5",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_source_adapters.py",
+      "status": "modified",
+      "before_hash": "ed826a7be98d2bc91f51e25d36c896275cafc168091dc5efc894414adeaef9bc",
+      "after_hash": "c0a72569ce2c9bd7c4cf6d1d907b9cb5006a9a93af7a49db137b43038f148577",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_control.py",
+      "status": "modified",
+      "before_hash": "90778b53ac8d1882ec5f4fb520467227a8782c453f247e175518041d5ed5943b",
+      "after_hash": "eb0752edbe3c463dfa8577e5232d2debdd47ee6fdf9f583e13d7e48b473ecc6b",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_enrollment.py",
+      "status": "modified",
+      "before_hash": "4a29b516dac114d439120a930f09fe885d2cdc0ea29fa4816a4fd802e8768b4a",
+      "after_hash": "496f638ea6d49c2daf427c2c29b21499ea5d428f6e202a6dfa253d1c8ae3f3ef",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_pipeline.py",
+      "status": "modified",
+      "before_hash": "1c6084788929aa9e0269ee02cc9d8d3b2dffa7c7581df912a56f27b6e120a751",
+      "after_hash": "e9e5fb03545e20ab9db7399f196d3ab832339ea24d92a184a71f4f74ba419388",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_results.py",
+      "status": "modified",
+      "before_hash": "0c62e0cdf6e4998afcbda520ab70b588e2f3c8d08118586c668deaa82fd228f3",
+      "after_hash": "95ae07f1f59fa78d909aef08951d4eccace15d089ec72573f7b73eb23cb7b1ea",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_information_display.py",
+      "status": "modified",
+      "before_hash": "ea42b46bc624cd687e2676715a1aced0d3cd6f7671e32487023166c504455f67",
+      "after_hash": "a3c2d6c417f1e835d368d17e52cb8ab532d34e86d0f17e47b1f8350574fc7506",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_pre_race.py",
+      "status": "modified",
+      "before_hash": "a9d7589f489180e87e6b05c02db6d2b3e47e8e317cc2f19f061ae4db0d9b5097",
+      "after_hash": "797854c45fbe285bfc39c167f0d3b57b2bc62aadacd200b77292d8c6754efd62",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_source_identity.py",
+      "status": "modified",
+      "before_hash": "152d928e07f3526c18d6728f8c20d43b636cc046cff4114af3381e4344c6ced2",
+      "after_hash": "46ada09b977d248328189b60fa9dca3c78f3d1b56da134df4ddca8b6117642b0",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/uk_basic_fields.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "f53245b312dec35fc3d69084c71790dd8fcee166c650f7a45ba0c003d2827b40",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/uk_collection.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "be1cdd915bac19132e1239f9a9a16cbbcf59f36955406d951222e5fd4777e515",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/uk_pre_race.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "f27232459755e71182c8535b59bf69389ef47dbec7a84db1f80916744b832908",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/uk_public_fields.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "ccf174156693c09dd1466b7b01876e08dcee3941544204c15ff47e1b6fb60684",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/uk_race_source.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "bc5d4f8b845c86c8641ba39454c1f969b865a1498160464f12cefac280142b22",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/uk_release.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "f03dafed0aef4ec455889d5d746ddf5c1d73740c3e54b05a452d84842696e397",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/uk_sources.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "074b48946d3dbce55dccd0ab4ea711373a48531fe31c0a5448168e177a757062",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_release.py",
+      "status": "modified",
+      "before_hash": "f023a81d4feb9b4e97f422146562c5f8e4cccb414d2e64578a83a567d65005d0",
+      "after_hash": "fdda86851ca406c1b2bc258366bc1e31ce8f5ad6b5a6e08ef9ef9ae62069d855",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/tasks.py",
+      "status": "modified",
+      "before_hash": "d16065dd5a8fc3fc9034dd8319bb7d3e82660fedcd3516aeaf90bca289cc8956",
+      "after_hash": "1d83da8c1dea2dae3263e4570777b92ddf939df9738221b157cf4a2737255053",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_uk_collection.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "2092c24aa241e4d311cdf63a33899808af6c97812b27c9d67e8d15c114e53072",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_uk_pre_race.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "1747de1e19531d036439d11ca897c85ca7c90b4f2178e7aee79982a7be989c50",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_uk_release.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "9810f9adc11da61bfa84760d3fd468651f41d1741d018868645bfb53f9fbf8c0",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_uk_sources.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "f6a4993da0d50371f24e3d6e04ca75c4499b87372dd2268f549b740476e56422",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_uk_workflow.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "aeeeafb926fc846883a455c314b00c716915a7d4460ac06866da36b8a819694f",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/views.py",
+      "status": "modified",
+      "before_hash": "3cbe3c6fd64fd7c52cf3cee50db194beb5b144704806d909facb5753015b7dea",
+      "after_hash": "432e2461031d6d366f4c2ed632dd35b5c54d02c263ecf62f1889d6a2837d2cd3",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/catalog.json",
+      "status": "modified",
+      "before_hash": "632c07e596b06b15eb9b430b1bc402a008248cb37eafc90bb14b92d26fef13b6",
+      "after_hash": "b74015e4d23941040a503c356a55d309ff6cdb6959237ca4cc8ca0271b58d4d6",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "e0d33c3818513f1240bb6f80d952e706ea11497fa061717121616641475b4dc0",
+      "after_hash": "636720446da8ced416e90b269c1bf0c13b6b65a95bd17b559740938f022d5245",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}

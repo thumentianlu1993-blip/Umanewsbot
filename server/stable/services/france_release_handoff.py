@@ -24,12 +24,13 @@ def control_snapshot(event, *, lock=False):
     return json.loads(json.dumps(value, default=str))
 
 
-def validate_handoff(event, expected):
+def validate_handoff(event, expected, *, region="france"):
+    if region not in {'france','united_kingdom'}:raise ValueError('handoff_region')
     before = control_snapshot(event, lock=True)
     if before != {k:v for k,v in expected.items() if k != 'runner_crosswalk'}:
         raise ValueError('handoff_snapshot_drift')
     projection, enrollment, tracking = (before[k] for k in ('projection', 'enrollment', 'tracking'))
-    if (event.country_region != 'france' or not all((projection, enrollment, tracking))
+    if (event.country_region != region or not all((projection, enrollment, tracking))
         or enrollment['authority_version'] != 1
         or (projection['write_owner'], enrollment['state']) not in (
             ('historical', 'retired'), ('data_sync', 'enrolled'))
