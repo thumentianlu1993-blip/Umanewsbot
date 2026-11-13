@@ -918,6 +918,7 @@ CELERY_TASK_ROUTES = {
     "stable.tasks.monitor_race_live_sla_task": {"queue": "race_live"},
     "stable.tasks.sync_race_event_provider_task": {"queue": "race_sync_v2"},
     "stable.tasks.discover_future_race_data_sync_task": {"queue": "race_sync_v2"},
+    "stable.tasks.discover_uk_pre_race_task": {"queue": "race_sync_v2"},
     "stable.tasks.discover_us_pre_race_task": {"queue": "race_sync_v2"},
     "stable.tasks.advance_race_data_sync_lifecycle_task": {"queue": "celery"},
     "stable.tasks.monitor_race_data_sync_result_slo_task": {"queue": "celery"},
@@ -980,8 +981,15 @@ def build_race_data_sync_beat_schedule(
     future_discovery_enabled: bool = False,
     lifecycle_apply_enabled: bool = False,
     us_pre_race_enabled: bool = False,
+    uk_pre_race_enabled: bool = False,
 ) -> dict:
     schedule = {}
+    if scheduler_enabled and uk_pre_race_enabled:
+        schedule["discover-uk-pre-race"] = {
+            "task": "stable.tasks.discover_uk_pre_race_task",
+            "schedule": crontab(minute="*"),
+            "options": {"queue": "race_sync_v2", "expires": 55},
+        }
     if scheduler_enabled and us_pre_race_enabled:
         schedule["discover-us-pre-race"] = {
             "task": "stable.tasks.discover_us_pre_race_task",
@@ -1124,6 +1132,7 @@ CELERY_BEAT_SCHEDULE.update(
         scheduler_enabled=RACE_DATA_SYNC_SCHEDULER_ENABLED,
         future_discovery_enabled=RACE_DATA_SYNC_FUTURE_DISCOVERY_ENABLED,
         lifecycle_apply_enabled=RACE_DATA_SYNC_LIFECYCLE_APPLY_ENABLED,
+        uk_pre_race_enabled=env_bool("RACE_DATA_SYNC_UK_PRE_RACE_ENABLED", False),
         us_pre_race_enabled=env_bool("RACE_DATA_SYNC_US_PRE_RACE_ENABLED", False),
     )
 )
@@ -1206,6 +1215,7 @@ US_BROWSER_URL = env("US_BROWSER_URL", "")
 RACE_DATA_SYNC_FRANCE_PRE_RACE_ENABLED = os.getenv("RACE_DATA_SYNC_FRANCE_PRE_RACE_ENABLED", "false").lower() == "true"
 RACE_DATA_SYNC_FRANCE_PRE_RACE_DAYS = int(os.getenv("RACE_DATA_SYNC_FRANCE_PRE_RACE_DAYS", "60"))
 
+RACE_DATA_SYNC_UK_PRE_RACE_ENABLED = env_bool("RACE_DATA_SYNC_UK_PRE_RACE_ENABLED", False)
 RACE_DATA_SYNC_US_PRE_RACE_ENABLED = env_bool("RACE_DATA_SYNC_US_PRE_RACE_ENABLED", False)
 RACE_DATA_SYNC_US_CALENDAR_SNAPSHOT_FILE = os.getenv("RACE_DATA_SYNC_US_CALENDAR_SNAPSHOT_FILE", "").strip()
 RACE_DATA_SYNC_US_CALENDAR_SNAPSHOT_SHA256 = os.getenv("RACE_DATA_SYNC_US_CALENDAR_SNAPSHOT_SHA256", "").strip()

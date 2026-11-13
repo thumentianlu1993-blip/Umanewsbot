@@ -30,7 +30,8 @@ class ArchivedResultReceipt:
     def evidence(self, value):
         require_sha(self.manifest_sha256)
         require_sha(self.observation_sha256)
-        if (value.get("provider") != "us_racing" or value.get("region") != "united_states"
+        if (not ((value.get("provider"),value.get("region")) == ("us_racing","united_states")
+                or (value.get("provider"),value.get("region"),value.get("parser_version")) == ("the_racing_api","united_kingdom","uk-tra-paid-v1"))
                 or value.get("result_phase") not in {"official", "corrected"}
                 or value.get("roster_complete") is not True
                 or archived_result_observation_sha(value) != self.observation_sha256):

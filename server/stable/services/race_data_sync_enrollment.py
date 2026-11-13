@@ -1481,10 +1481,10 @@ def attach_multisource_observation(observation, *, policy, now, discovery_token=
                 )
                 if legacy_handoff is not None:
                     from .france_release_handoff import validate_handoff
-                    if route.provider != "geny" or route.region != "france":
+                    if not ((route.provider, route.region)==("geny","france") or (route.provider,route.region,route.parser_version)==("the_racing_api","united_kingdom","uk-tra-paid-v1")):
                         raise _MultisourceRejected("handoff_route_scope")
                     try:
-                        validate_handoff(event, legacy_handoff)
+                        validate_handoff(event, legacy_handoff, region=route.region)
                     except ValueError as exc:
                         raise _MultisourceRejected(str(exc)) from exc
                 elif enrollment:

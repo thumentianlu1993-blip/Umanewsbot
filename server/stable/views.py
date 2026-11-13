@@ -3906,11 +3906,12 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
     }
     from .services.race_pre_race import public_jra_preview, public_reviewed_preview
     from .services.nar_pre_race import public_nar_preview
+    from .services.uk_pre_race import public_uk_preview
     from .services.us_pre_race import public_us_preview
     from .services.france_pre_race import public_france_preview
     from .services.hkjc_pre_race import public_hkjc_preview
     from .services.race_pre_race_refresh import public_refresh_preview
-    preview = public_us_preview(event, now=read_now) or public_refresh_preview(event, now=read_now) or public_jra_preview(event, now=read_now) or public_nar_preview(event, now=read_now) or public_hkjc_preview(event, now=read_now) or public_france_preview(event, now=read_now) or public_reviewed_preview(event, now=read_now)
+    preview = public_uk_preview(event, now=read_now) or public_us_preview(event, now=read_now) or public_refresh_preview(event, now=read_now) or public_jra_preview(event, now=read_now) or public_nar_preview(event, now=read_now) or public_hkjc_preview(event, now=read_now) or public_france_preview(event, now=read_now) or public_reviewed_preview(event, now=read_now)
     runners = _sort_runners_for_display(preview["rows"] if preview else list(event.runners.all()), event.country_region)
     has_current_live_revision = bool(projection_control and projection_control.write_owner != "historical" and (
         current_result_revision is not None or projection_control.write_owner in {"data_sync", "live"}))

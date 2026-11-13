@@ -212,13 +212,13 @@ def execute(path,expected_sha256,*,apply=False,restore=False,now=None):
         return dict(action='applied' if apply else 'dry_run_rolled_back',manifest_sha256=digest,**report)
 
 
-def probe_release_commit(path, expected_sha256):
+def probe_release_commit(path, expected_sha256, *, action=ACTION):
     """等待同包事务结束后查询数据库收据，不依赖命令输出文件。"""
     raw = Path(path).read_bytes()
     if hashlib.sha256(raw).hexdigest() != expected_sha256:
         raise ValueError('manifest_digest')
     manifest = json.loads(raw)
-    if manifest.get('action') != ACTION or manifest.get('schema_version') != 1:
+    if manifest.get('action') != action or manifest.get('schema_version') != 1:
         raise ValueError('manifest_scope')
     ids = {item['event_id'] for item in manifest['items'] if item.get('event_id')}
     ids.update(item['event_id'] for item in manifest.get('rebind', []))
@@ -236,7 +236,7 @@ def probe_release_commit(path, expected_sha256):
         if set(locked) != ids:
             raise ValueError('commit_probe_anchor_missing')
         receipts = list(models.OperationLog.objects.filter(
-            action_type=ACTION, target_type='manifest', target_id=expected_sha256,
+            action_type=action, target_type='manifest', target_id=expected_sha256,
         ).values_list('pk', flat=True)[:2])
         if len(receipts) > 1:
             raise ValueError('commit_probe_receipt_ambiguous')
@@ -244,15 +244,15 @@ def probe_release_commit(path, expected_sha256):
                 'committed': bool(receipts)}
 
 
-def restore_release(digest,*,apply,now):
+def restore_release(digest,*,apply,now,action=ACTION,snapshotter=snapshot):
     """精确after-image CAS；恢复公开数据及旧控制面，新增审计/版本留存但停止发布。"""
     with transaction.atomic():
-        receipt=models.OperationLog.objects.select_for_update().get(action_type=ACTION,target_type='manifest',target_id=digest)
+        receipt=models.OperationLog.objects.select_for_update().get(action_type=action,target_type='manifest',target_id=digest)
         saved=json.loads(receipt.detail);ids=saved['event_ids']
-        if models.OperationLog.objects.filter(action_type='us_release_restore',target_id=digest).exists():return {'action':'restore_replay'}
+        if models.OperationLog.objects.filter(action_type=action.removesuffix('_data')+'_restore',target_id=digest).exists():return {'action':'restore_replay'}
         for pk in ids:
             event,lifecycle=_lock_multisource_event(pk);_guard(event,lifecycle,now)
-        if snapshot(ids)!=saved['after']:raise ValueError('restore_after_image_drift')
+        if snapshotter(ids)!=saved['after']:raise ValueError('restore_after_image_drift')
         before=saved['before']
         # 先移除本包新增投影行，释放(event, position / external id)唯一键，再恢复旧主键。
         for name in ('RaceEventRunner','RaceEventResult','RaceEventFieldAuthority','RaceEventIdentityKey'):
@@ -295,6 +295,6 @@ def restore_release(digest,*,apply,now):
             control.next_racecard_revision_no=max(control.next_racecard_revision_no,row['next_racecard_revision_no'])
             control.next_result_revision_no=max(control.next_result_revision_no,row['next_result_revision_no'])
             control.save(update_fields=['next_racecard_revision_no','next_result_revision_no'])
-        if apply:models.OperationLog.objects.create(action_type='us_release_restore',target_type='manifest',target_id=digest,detail=json.dumps({'event_ids':ids}))
+        if apply:models.OperationLog.objects.create(action_type=action.removesuffix('_data')+'_restore',target_type='manifest',target_id=digest,detail=json.dumps({'event_ids':ids}))
         else:transaction.set_rollback(True)
         return {'action':'restored' if apply else 'restore_dry_run_rolled_back','manifest_sha256':digest,'event_ids':ids}

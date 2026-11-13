@@ -743,8 +743,12 @@ def fetch_bound_observation(*, event, route, now, fetcher=None, kind="result", u
         if route.provider == 'us_racing':
             from .us_race_source import validate_final_roster
             verified_us = validate_final_roster(value)
+        verified_uk = False
+        if route.provider == 'the_racing_api' and route.region == 'united_kingdom' and route.parser_version == 'uk-tra-paid-v1':
+            from .uk_race_source import validate_final_roster
+            verified_uk = validate_final_roster(value)
         value["roster_complete"] = bool(
-            ((verified_incidents or verified_us) and not expected) or expected
+            ((verified_incidents or verified_us or verified_uk) and not expected) or expected
             and (
                 sorted(expected) == sorted(actual)
                 or (
@@ -958,7 +962,7 @@ def run_multisource_claim(*, claim, now, fetcher=None, archive_receipt=None):
         )
         from stable.services.race_source_identity import resolve_observation
 
-        if route.provider=='us_racing':now=timezone.now()
+        if route.provider=='us_racing' or route.parser_version=='uk-tra-paid-v1':now=timezone.now()
         match = resolve_observation(value, route=route, now=now, archive_receipt=archive_receipt)
         if match.status != "exact" or match.event_id != claim.event_id:
             identity_reason = match.reason or match.status
@@ -986,6 +990,8 @@ def run_multisource_claim(*, claim, now, fetcher=None, archive_receipt=None):
         )
         if route.provider == 'us_racing' and value.get('us_race_metadata'):
             provenance['us_race_metadata'] = value['us_race_metadata']
+        if route.provider=='the_racing_api' and route.region=='united_kingdom' and value.get('uk_race_metadata'):
+            provenance['uk_race_metadata']=value['uk_race_metadata']
         if archive_receipt is not None:
             provenance['archive_replay'] = match.evidence['archive_replay']
         france_basic = value.get('france_basic_v1') if route.provider=='geny' and route.region=='france' else None
@@ -1072,7 +1078,7 @@ def run_multisource_claim(*, claim, now, fetcher=None, archive_receipt=None):
                         jockey_name=r["jockey_name"],
                         trainer_name=r["trainer_name"],
                         carried_weight=r["carried_weight"],
-                        **({'odds':r['odds_value']} if route.provider in {'geny','us_racing'} and r.get('odds_value') else {}),
+                        **({'odds':r['odds_value']} if (route.provider in {'geny','us_racing'} or route.parser_version=='uk-tra-paid-v1') and r.get('odds_value') else {}),
                         **(
                             {
                                 "status": (
@@ -1089,6 +1095,12 @@ def run_multisource_claim(*, claim, now, fetcher=None, archive_receipt=None):
                     for r in value["roster"]
                 ],
             )
+            if provenance.get('uk_race_metadata'):
+                from .uk_basic_fields import metadata_sha
+                card['uk_race_metadata_sha256']=metadata_sha(provenance['uk_race_metadata'])
+            uk_fields=({r['external_runner_id']:r.get('field_provenance',{}) for r in value['roster']}
+                if route.parser_version=='uk-tra-paid-v1' else {})
+            if uk_fields:card['uk_public_fields_sha256']=canonical_sha(uk_fields)
             us_fields = ({r['external_runner_id']:r.get('field_provenance',{}) for r in value['roster']}
                 if route.provider=='us_racing' and route.region=='united_states' else {})
             if us_fields:
@@ -1140,6 +1152,7 @@ def run_multisource_claim(*, claim, now, fetcher=None, archive_receipt=None):
                     **provenance,
                     **({'france_public_fields':france_fields} if france_fields else {}),
                     **({'us_public_fields':us_fields} if us_fields else {}),
+                    **({'uk_public_fields':uk_fields} if uk_fields else {}),
                 },
                 parse_warnings=[],
                 permission_classification="multisource_approved",
@@ -1695,6 +1708,10 @@ def discover_source_url(*, event, route, now, fetcher):
 
 def fetch_tra_observation(*, event, route, now, kind, fetcher=None):
     """TRA 与其他来源同等进入身份解析；沿用既有凭据、许可、预算和免费窗口。"""
+    if route.region == 'united_kingdom' and route.parser_version == 'uk-tra-paid-v1':
+        from .uk_race_source import fetch_observation
+        return fetch_observation(event=event,route=route,now=now,fetcher=fetcher)
+
     import time
     from django.utils import timezone
     from stable.services.race_data_sync_providers import (
