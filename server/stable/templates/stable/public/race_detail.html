@@ -23,8 +23,8 @@
         <p>本届赛事分为以下场次，每场单独展示参赛记录与赛果。</p>
         <ul>{% for division in division_events %}<li><a href="{{ division.public_path }}">{{ division.chinese_name|default:division.original_name }}</a></li>{% endfor %}</ul>
       </section>
-    {% elif event.division_parent_id %}
-      <p><a href="{{ event.division_parent.public_path }}">查看本届全部分场</a></p>
+    {% elif public_division_parent %}
+      <p><a href="{{ public_division_parent.public_path }}">查看本届全部分场</a></p>
     {% endif %}
 
     <section class="race-hero state-{{ event.status }}">

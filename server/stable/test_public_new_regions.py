@@ -94,22 +94,22 @@ class PublicNewRegionRenderTests(TestCase):
             visibility_status=visibility,
         )
 
-    def test_race_calendar_lists_new_region_tab_and_filters(self):
+    def test_race_calendar_hides_regions_outside_governed_scope(self):
         ireland_event = self._make_event(slug="ireland-test-stakes-2026", region=RacingRegion.IRELAND)
         japan_event = self._make_event(slug="japan-test-stakes-2026", region=RacingRegion.JAPAN)
         response = self.client.get(reverse("public-race-calendar"), {"tab": "all", "year": "2026"})
         self.assertEqual(response.status_code, 200)
         tab_values = [tab["value"] for tab in response.context["region_tabs"]]
         for region in NEW_REGIONS:
-            self.assertIn(region, tab_values)
+            self.assertNotIn(region, tab_values)
 
         filtered = self.client.get(
             reverse("public-race-calendar"),
             {"tab": "all", "year": "2026", "region": RacingRegion.IRELAND},
         )
         self.assertEqual(filtered.status_code, 200)
-        self.assertContains(filtered, ireland_event.original_name)
-        self.assertNotContains(filtered, japan_event.original_name)
+        self.assertNotContains(filtered, ireland_event.original_name)
+        self.assertContains(filtered, japan_event.original_name)
 
     def test_draft_events_stay_hidden_on_public_calendar(self):
         self._make_event(

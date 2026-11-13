@@ -1,4 +1,5 @@
 from __future__ import annotations
+from .services.race_public_scope import PUBLIC_RACE_REGIONS, public_race_q, is_public_race, public_career_records
 from .services.race_public_time import annotate_public_time, public_time, BEIJING
 
 import json
@@ -2670,6 +2671,7 @@ def _public_published_articles():
         ArticleRaceLink.objects.filter(
             status__in=[ArticleRaceLinkStatus.AUTO, ArticleRaceLinkStatus.MANUAL],
             event__visibility_status=RaceEventVisibility.PUBLISHED,
+            event__country_region__in=PUBLIC_RACE_REGIONS,
         )
         .select_related("event")
         .order_by("id")
@@ -3087,7 +3089,7 @@ def _public_race_status_label(event: RaceEvent, today, winner=None) -> str:
 def _public_today_races() -> tuple[list[dict], bool]:
     """首页"今日赛事"面板：当日与次日公开赛事，空窗时回退到最近的重点赛事。"""
     today = timezone.localdate(timezone=BEIJING)
-    base = annotate_public_time(RaceEvent.objects.all()).filter(
+    base = annotate_public_time(RaceEvent.objects.filter(public_race_q())).filter(
         visibility_status=RaceEventVisibility.PUBLISHED,
         public_date__isnull=False,
     ).exclude(canonical_product_links__is_active=True).filter(divisions__isnull=True)
@@ -3144,7 +3146,7 @@ def _public_today_races() -> tuple[list[dict], bool]:
 def _public_next_key_race():
     """右栏"即将开赛"模块：最近一场公开重点赛事。"""
     today = timezone.localdate(timezone=BEIJING)
-    queryset = annotate_public_time(RaceEvent.objects.all()).filter(
+    queryset = annotate_public_time(RaceEvent.objects.filter(public_race_q())).filter(
         visibility_status=RaceEventVisibility.PUBLISHED,
         public_date__isnull=False,
         public_date__gte=today,
@@ -3162,7 +3164,7 @@ def _public_race_calendar_base_queryset(filters: dict, *, today):
     """赛事日历公开基础 queryset：published、排除 active canonical duplicate、
     tab/region/grade/when。默认日期窗口与赛事列表复用同一基础 queryset；
     read-gate 展示 annotation 只在最终赛事对象查询上加。"""
-    queryset = annotate_public_time(RaceEvent.objects.all()).filter(
+    queryset = annotate_public_time(RaceEvent.objects.filter(public_race_q())).filter(
         visibility_status=RaceEventVisibility.PUBLISHED
     ).exclude(canonical_product_links__is_active=True).filter(divisions__isnull=True)
     selected_year = (
@@ -3204,11 +3206,7 @@ def _race_calendar_queryset(request: HttpRequest, *, today):
     if tab not in {"all", "key"}:
         tab = "key"
     region = request.GET.get("region", "").strip()
-    public_regions = {
-        value
-        for value, _label in RacingRegion.choices
-        if value != RacingRegion.OTHER
-    }
+    public_regions = set(PUBLIC_RACE_REGIONS)
     if region not in public_regions:
         region = ""
     direction = request.GET.get("direction", "").strip()
@@ -3433,12 +3431,12 @@ def _public_weekly_focus_events(region: str = "", *, events: list[RaceEvent] | N
         return [
             event
             for event in events
-            if public_time(event).day
+            if is_public_race(event) and public_time(event).day
             and week_start <= public_time(event).day <= week_end
             and event.normalized_grade in PUBLIC_RACE_GRADE_FILTERS["g1"]
             and (not region or event.country_region == region)
         ][:3]
-    queryset = annotate_public_time(RaceEvent.objects.all()).filter(
+    queryset = annotate_public_time(RaceEvent.objects.filter(public_race_q())).filter(
         visibility_status=RaceEventVisibility.PUBLISHED,
         public_date__gte=week_start,
         public_date__lte=week_end,
@@ -3652,7 +3650,7 @@ def public_race_calendar(request: HttpRequest):
 
     region_tabs = [{"value": "", "label": "全部", "is_active": filters["region"] == "", "url": filter_url(region="")}]
     for value, label in RacingRegion.choices:
-        if value == RacingRegion.OTHER:
+        if value not in PUBLIC_RACE_REGIONS:
             continue
         region_tabs.append(
             {
@@ -3741,6 +3739,7 @@ def _series_history_winners(
         .filter(
             series_scope,
             event__visibility_status=RaceEventVisibility.PUBLISHED,
+            event__country_region__in=PUBLIC_RACE_REGIONS,
             is_confirmed=True,
         )
         .filter(
@@ -3770,6 +3769,7 @@ def _series_history_winners(
     fallback_winner_queryset = RaceEventHistoryWinner.objects.filter(
         series_scope,
         event__visibility_status=RaceEventVisibility.PUBLISHED,
+        event__country_region__in=PUBLIC_RACE_REGIONS,
     )
     if exclude_result_event_id is not None:
         fallback_winner_queryset = fallback_winner_queryset.exclude(
@@ -3801,10 +3801,7 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
             .first()
         )
         if path_row is not None:
-            if (
-                path_row.event.visibility_status
-                != RaceEventVisibility.PUBLISHED
-            ):
+            if not is_public_race(path_row.event):
                 raise Http404
             if path_row.path_kind == "legacy":
                 canonical = (
@@ -3833,6 +3830,7 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
     }
     event_queryset = (
         RaceEvent.objects.filter(
+            public_race_q(),
             visibility_status=RaceEventVisibility.PUBLISHED
         )
         .select_related(
@@ -3940,13 +3938,14 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
         candidates = list(
             RaceEvent.objects.filter(
                 race_series_id=event.race_series_id,
+                country_region__in=PUBLIC_RACE_REGIONS,
                 visibility_status=RaceEventVisibility.PUBLISHED,
             ).order_by("-year", "id")
         )
         if len(candidates) > 1:
             series_events = candidates
     has_news = any(news_groups.values())
-    division_events = list(event.divisions.filter(visibility_status=RaceEventVisibility.PUBLISHED).order_by("local_start_time", "id"))
+    division_events = list(event.divisions.filter(public_race_q()).order_by("local_start_time", "id"))
     status_label = _public_race_status_label(event, timezone.localdate(), winner)
     if division_events:
         status_label = "分场赛事"
@@ -3971,9 +3970,10 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
             "live_result_status": live_result_status,
             "result_section_label": result_section_label,
             "division_events": division_events,
+            "public_division_parent": event.division_parent if is_public_race(event.division_parent) else None,
             "canonical_product_event": (
                 canonical_product_link.canonical_event
-                if canonical_product_link
+                if canonical_product_link and is_public_race(canonical_product_link.canonical_event)
                 else None
             ),
             "has_news": has_news,
@@ -3985,6 +3985,7 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
 def _race_sitemap_queryset():
     return (
         RaceEvent.objects.filter(
+            public_race_q(),
             visibility_status=RaceEventVisibility.PUBLISHED,
             data_quality_status=RaceEventDataQuality.COMPLETE,
         )
@@ -4104,7 +4105,7 @@ def public_article_detail(request: HttpRequest, article_id: int):
         link
         for link in article.race_links.all()
         if link.status in {ArticleRaceLinkStatus.AUTO, ArticleRaceLinkStatus.MANUAL}
-        and link.event.visibility_status == RaceEventVisibility.PUBLISHED
+        and is_public_race(link.event)
     ]
     horse_links = [
         link
@@ -4214,12 +4215,12 @@ def public_horse_detail(request: HttpRequest, profile_id: int):
         link
         for link in profile.race_links.all()
         if link.status in {ArticleHorseLinkStatus.AUTO, ArticleHorseLinkStatus.MANUAL}
-        and link.event.visibility_status == RaceEventVisibility.PUBLISHED
+        and is_public_race(link.event)
     ]
     records_order = request.GET.get("records_order", "desc").strip().lower()
     if records_order not in {"asc", "desc"}:
         records_order = "desc"
-    race_record_queryset = profile.race_records.select_related("event", "result")
+    race_record_queryset = public_career_records(profile.race_records.all()).select_related("event", "result__event")
     if records_order == "asc":
         race_record_queryset = race_record_queryset.order_by(
             F("race_date").asc(nulls_last=True),
@@ -4244,7 +4245,7 @@ def public_horse_detail(request: HttpRequest, profile_id: int):
     # term database.  When disabled, fall back to the original names so the
     # template never encounters a missing attribute.
     display_enabled = getattr(settings, "RACE_FIELD_NORMALIZED_DISPLAY_ENABLED", False) and not getattr(settings, "RACE_INFORMATION_NORMALIZED_DISPLAY_ENABLED", False)
-    major_wins_query = major_win_records(profile)
+    major_wins_query = major_win_records(profile, records=public_career_records(profile.race_records.all()))
     if getattr(settings, 'RACE_INFORMATION_NORMALIZED_DISPLAY_ENABLED', False):
         major_wins_query = major_wins_query.select_related('event', 'result')
     major_wins_list = list(major_wins_query)
@@ -4313,7 +4314,7 @@ def public_horse_detail(request: HttpRequest, profile_id: int):
         record.podium_class = f"p{record.public_position}" if record.public_position in {"1", "2", "3"} else ""
         record.public_event_path = (
             record.event.public_path
-            if record.event and record.event.visibility_status == RaceEventVisibility.PUBLISHED
+            if is_public_race(record.event)
             else ""
         )
         record.public_finish_time = (

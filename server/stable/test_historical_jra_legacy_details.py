@@ -110,6 +110,19 @@ class HistoricalJRALegacyDetailTests(SimpleTestCase):
         self.assertTrue(result_keys.issubset(runner_keys))
         self.assertTrue(any(row["finish_position"] == 1 for row in results))
 
+    def test_colspan_jockey_uses_name_cell_after_allowance_marker(self):
+        # 2018 Sirius S 官方页面：騎手 colspan=2，前列为减量标记。
+        for marker in ("", "☆"):
+            with self.subTest(marker=marker):
+                body = ("<table><tr><th>着順</th><th>馬番</th><th>馬名</th>"
+                        '<th colspan="2">騎手</th><th>調教師</th></tr>'
+                        '<tr><td>1</td><td>3</td><td>オメガパフューム</td>'
+                        f'<td>{marker}</td><td>和田竜二</td><td>安田翔伍</td></tr></table>').encode("cp932")
+                runners, results, _ = self.tool.parse_jra_detail(body, source_url=SOURCE_URL)
+                self.assertEqual(runners[0]["jockey_name"], "和田竜二")
+                self.assertEqual(results[0]["jockey_name"], "和田竜二")
+                self.assertEqual(results[0]["trainer_name"], "安田翔伍")
+
     def test_cached_prepare_never_marks_zero_row_jra_detail_complete(self):
         with TemporaryDirectory() as temporary_dir:
             root = Path(temporary_dir)
