@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import base64
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone as dt_timezone
+from datetime import date, datetime, timedelta, timezone as dt_timezone
 import hashlib
 import hmac
 import http.client
@@ -10,6 +10,7 @@ import ipaddress
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import socket
 import ssl
@@ -17,7 +18,7 @@ import stat
 import tempfile
 import time
 from typing import Any, Callable
-from urllib.parse import quote, unquote, urlsplit
+from urllib.parse import parse_qsl, quote, unquote, urlsplit
 
 
 _HOST = "api.theracingapi.com"
@@ -725,6 +726,31 @@ def _is_allowlisted_result_by_id_request(
     return quote(race_id, safe="._:-") == encoded_race_id
 
 
+def _is_allowlisted_uk_paid_request(*, endpoint_name: str, path: str, query: str) -> bool:
+    """英国已批准付费端点；保留 GB、分页和 60 天发现窗口边界。"""
+    if endpoint_name != "uk_paid":
+        return False
+    if re.fullmatch(r"/v1/(?:results/rac_[0-9]+|racecards/rac_[0-9]+/pro)", path):
+        return not query
+    if path not in {"/v1/racecards/pro", "/v1/racecards/big-races"}:
+        return False
+    try:
+        pairs = parse_qsl(query, keep_blank_values=True, strict_parsing=True)
+        params = dict(pairs)
+        dates = {"date"} if path == "/v1/racecards/pro" else {"start_date", "end_date"}
+        if (len(pairs) != len(params) or set(params) != {"region_codes", "limit", "skip"} | dates
+                or params["region_codes"] != "gb" or params["limit"] != "20"
+                or params["skip"] not in {str(skip) for skip in range(0, 200, 20)}):
+            return False
+        parsed_dates = {key: date.fromisoformat(params[key]) for key in dates}
+        if any(value.isoformat() != params[key] for key, value in parsed_dates.items()):
+            return False
+        return (path == "/v1/racecards/pro"
+                or 0 <= (parsed_dates["end_date"] - parsed_dates["start_date"]).days <= 60)
+    except ValueError:
+        return False
+
+
 def the_racing_api_transport(
     *,
     endpoint_name: str,
@@ -769,10 +795,14 @@ def the_racing_api_transport(
         path=parsed.path,
         query=parsed.query,
     )
+    uk_paid_allowed = _is_allowlisted_uk_paid_request(
+        endpoint_name=endpoint_name, path=parsed.path, query=parsed.query,
+    )
     if (
         (
             (endpoint_name, request_path) not in allowed_requests
             and not result_by_id_allowed
+            and not uk_paid_allowed
         )
         or parsed.scheme != "https"
         or parsed.hostname != _HOST

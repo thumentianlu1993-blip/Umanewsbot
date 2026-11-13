@@ -87,3 +87,81 @@ class UKCollectionTests(TestCase):
     def test_url_builder_rejects_unbounded_identity(self):
         for race_id in ['../secret','rac_123?key=bad','https://evil.test','123']:
             with self.subTest(race_id=race_id),self.assertRaises(ValueError):api_url('card',race_id=race_id)
+
+
+from unittest.mock import patch, MagicMock
+from django.test import SimpleTestCase, override_settings
+
+
+class UKPaidRuntimeTransportTests(SimpleTestCase):
+    """真实运行时发送路径，只替换 DNS/HTTP 与共享预算存储。"""
+
+    def _connection(self):
+        connection = MagicMock()
+        response = connection.getresponse.return_value
+        response.status = 200
+        response.read.return_value = b'{"racecards": [], "total": 0}'
+        response.getheader.side_effect = lambda name, default=None: (
+            'application/json' if name == 'Content-Type' else default
+        )
+        return connection
+
+    def test_paid_urls_reach_pinned_http_transport(self):
+        from stable.services import race_live_source_proof as service
+        urls = [api_url('card', race_id='rac_123'), api_url('result', race_id='rac_123'),
+                api_url('cards', day='2026-11-13'), api_url('cards', day='2026-11-13', skip=180),
+                api_url('big', start='2026-11-13', end='2027-01-12')]
+        for url in urls:
+            with self.subTest(url=url), patch.object(service, '_resolve_public_addresses', return_value=['8.8.8.8']), \
+                    patch.object(service, '_PinnedHTTPSConnection', return_value=self._connection()) as connection:
+                response = service.the_racing_api_transport(endpoint_name='uk_paid', url=url,
+                    username='offline', password='offline', timeout_seconds=15,
+                    max_response_bytes=1024, allow_redirects=False)
+                self.assertEqual(response.status_code, 200)
+                connection.return_value.request.assert_called_once()
+                connection.return_value.close.assert_called_once()
+
+    @override_settings(RACE_DATA_SYNC_ENABLED=True, RACE_DATA_SYNC_ALLOW_NETWORK=True,
+                       RACE_DATA_MULTISOURCE_APPLY_ENABLED=True,
+                       RACE_DATA_SYNC_ENABLED_PROVIDERS=('the_racing_api',),
+                       RACE_DATA_SYNC_ENABLED_REGIONS=('united_kingdom',))
+    def test_runtime_json_keeps_real_response_validation_and_transport(self):
+        from stable.services import race_live_source_proof as service
+        from stable.services import race_data_sync_providers as providers
+        from stable.services.uk_collection import _runtime_json
+        def snapshot(**kwargs):
+            payload, pages, count = kwargs['fetcher']()
+            return payload, 'snapshot'
+        with patch.object(providers, '_get_or_fetch_shared_snapshot', side_effect=snapshot), \
+                patch.object(providers, 'reserve_race_live_host_request', return_value=SimpleNamespace(reserved=True, reservation_version=1)), \
+                patch.object(providers, 'record_race_live_host_outcome', return_value=SimpleNamespace(recorded=True)), \
+                patch('stable.services.race_events.ensure_race_live_host_budget_floor'), \
+                patch.object(service, '_read_secret', return_value=('offline', 'offline')), \
+                patch.object(service, '_resolve_public_addresses', return_value=['8.8.8.8']), \
+                patch.object(service, '_PinnedHTTPSConnection', return_value=self._connection()):
+            value = _runtime_json(api_url('cards', day='2026-11-13'), route=route(), now=NOW)
+        self.assertEqual(value['response'], {'racecards': [], 'total': 0})
+        self.assertEqual(len(value['raw_sha256']), 64)
+
+    def test_paid_route_rejects_outside_scope_before_dns(self):
+        from stable.services import race_live_source_proof as service
+        url = api_url('cards', day='2026-11-13')
+        requests = [('uk_paid', url.replace('region_codes=gb', 'region_codes=ire')),
+                    ('uk_paid', url.replace('limit=20', 'limit=500')),
+                    ('uk_paid', url.replace('skip=0', 'skip=200')),
+                    ('uk_paid', url.replace('skip=0', 'skip=1')),
+                    ('uk_paid', url.replace('2026-11-13', '2026-02-30')),
+                    ('uk_paid', url+'&region_codes=gb'), ('uk_paid', url+'&extra=1'),
+                    ('uk_paid', url.replace('https:', 'http:')),
+                    ('uk_paid', url.replace('api.theracingapi.com', 'example.com')),
+                    ('uk_paid', url+'#fragment'), ('results_today', url),
+                    ('uk_paid', api_url('card', race_id='rac_123')+'?x=1'),
+                    ('uk_paid', api_url('result', race_id='rac_123').replace('rac_123', 'rac_123/extra')),
+                    ('uk_paid', api_url('big', start='2026-11-13', end='2027-01-12').replace('2027-01-12', '2027-01-13'))]
+        with patch.object(service, '_resolve_public_addresses') as resolver:
+            for name, target in requests:
+                with self.subTest(url=target), self.assertRaises((PermissionError, ValueError)):
+                    service.the_racing_api_transport(endpoint_name=name, url=target,
+                        username='offline', password='offline', timeout_seconds=15,
+                        max_response_bytes=1024, allow_redirects=False)
+            resolver.assert_not_called()
