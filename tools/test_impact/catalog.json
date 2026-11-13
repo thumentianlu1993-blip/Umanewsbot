@@ -3453,7 +3453,12 @@
     "stable.test_us_transport": "django",
     "stable.test_us_venues": "django",
     "stable.test_us_workflow": "django",
-    "stable.test_us_calendar_snapshot": "django"
+    "stable.test_us_calendar_snapshot": "django",
+    "stable.test_uk_collection": "django",
+    "stable.test_uk_pre_race": "django",
+    "stable.test_uk_release": "django",
+    "stable.test_uk_sources": "django",
+    "stable.test_uk_workflow": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
