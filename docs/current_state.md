@@ -7716,3 +7716,12 @@ Equibase完全排除，独有信息按项目不可用处理。67项本机回归�
 发布计划SHA256：`f42e621bc3d5a36c7f5de455ae74eebc74ba1832200731ac311be79e97def5c7`。
 生产收据位于发布根目录下 `runtime/us-sources-332fc540/release-complete.json`；
 本地完整产物为 `/Users/mentianlu/.codex/runtime/us-125-20261111/`。
+
+
+# 2026-11-13 英国数据及页面上线，自动更新验收失败后暂停调度
+
+PR #307 已合并为 `9b92fc10826b0c3d5b489ba78e31efbef2a11cd8`。用户批准原包后，预检发现新增日本赛事 126 登记，策略换绑从 225 增至 226；修订 2 再获批准，manifest `4caf81367727d67694ee5435f168fa744fbd941c9cca308d23509b149d28fbc9` 已提交。英国 100 场、512 行、55 已赛／1 取消／44 未来、100 个 HTTP 公开入口及 512 行可见赛果均已核验。其他地区公开业务字段与日本 126 的 18 匹名单保持。schema0084，无迁移，QQ关闭。
+
+生产运行候选 `bda46916b9beb0f0f321b735cc564c04ef94a455`，OCI `sha256:4609a9429dd798695ba5ca0e5f0b993b006b160573f8734b6bebaaee06beda62`。北京时间 15:16:39 恢复调度后，英国请求被底层 Free 传输白名单拒绝，返回 `provider_response_invalid` 并触发主机熔断，后续共享快照进入退避。首轮自然自动更新未通过。
+
+按已批准恢复流程，15:26:38 已停止 Beat 并排空、停止 worker 与 race_sync_v2_worker；web 保持健康。运行后 source_refs 和调度控制字段已变化，after-image CAS 不匹配，因此未恢复旧数据、未覆盖新状态。当前新闻和赛事后台任务均暂停。增量修复候选 `282ae4f9ca1a624fc1e965faf50df8f993cebd07` 只修正已批准 GB Pro 端点的传输白名单；离线真实发送路径回归 32 项通过，生产修复尚未发布。详见 [传输修复](changes/uk-race-automation/transport_fix.md)。

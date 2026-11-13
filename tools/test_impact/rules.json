@@ -1728,6 +1728,9 @@
     ],
     "docs/changes/uk-race-automation/catalogue.json": [
       "uk_race_automation"
+    ],
+    "docs/changes/uk-race-automation/transport-ci-scope.json": [
+      "infrastructure"
     ]
   },
   "symbols": {
@@ -1938,6 +1941,7 @@
     "docs/changes/us-race-automation/ci-scope-calendar.json",
     "docs/changes/us-race-automation/ci-scope-preview.json",
     "docs/changes/us-online-field-gaps/ci-scope.json",
-    "docs/changes/uk-race-automation/ci-scope.json"
+    "docs/changes/uk-race-automation/ci-scope.json",
+    "docs/changes/uk-race-automation/transport-ci-scope.json"
   ]
 }
