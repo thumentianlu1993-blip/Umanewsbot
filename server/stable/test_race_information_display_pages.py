@@ -343,16 +343,16 @@ class PublicGradeFilterParityTests(TestCase):
 
     def test_raw_g1_without_stored_code_remains_in_g1_filter_under_both_flags(self):
         event = RaceEvent.objects.create(
-            year=2025, slug='germany-raw-grade-red', original_name='German grade fixture',
-            chinese_name='德国等级回放', country_region='germany', racecourse='Hamburg',
+            year=2025, slug='france-raw-grade-red', original_name='French grade fixture',
+            chinese_name='法国等级回放', country_region='france', racecourse='ParisLongchamp',
             grade_text='G1', normalized_grade='', local_date=date(2025, 7, 6),
             visibility_status='published', status='finished',
         )
         for flag in (True, False):
             with self.subTest(flag=flag), override_settings(RACE_INFORMATION_NORMALIZED_DISPLAY_ENABLED=flag):
-                params = {'year': '2025', 'region': 'germany', 'tab': 'all'}
+                params = {'year': '2025', 'region': 'france', 'tab': 'all'}
                 baseline = self.client.get('/races/', params)
-                self.assertContains(baseline, '德国等级回放')
+                self.assertContains(baseline, '法国等级回放')
                 filtered = self.client.get('/races/', {**params, 'grade': 'g1'})
                 self.assertIn(event.pk, [item.pk for group in filtered.context['groups'] for item in group['events']])
                 self.assertContains(filtered, 'grade-badge g1')
@@ -372,13 +372,13 @@ class PublicGradeFilterParityTests(TestCase):
                 for text in (prefix + suffix, prefix.lower() + ' ' + suffix.lower(),
                              '重賞\t' + prefix + '\u2003' + suffix,
                              prefix + '・-' + suffix):
-                    inputs.append(dict(country_region='germany', year=2025,
+                    inputs.append(dict(country_region='france', year=2025,
                                        grade_text=text, normalized_grade=''))
         inputs.extend([
-            dict(country_region='germany', year=2025, grade_text='𝔊Ⅰ', normalized_grade=''),
-            dict(country_region='germany', year=2025, grade_text='\x1cG1\x1f', normalized_grade=''),
-            dict(country_region='germany', year=2025, grade_text='G1'+' '*120, normalized_grade=''),
-            dict(country_region='germany', year=2025, grade_text='ﷺ'*40+'G1', normalized_grade=''),
+            dict(country_region='france', year=2025, grade_text='𝔊Ⅰ', normalized_grade=''),
+            dict(country_region='france', year=2025, grade_text='\x1cG1\x1f', normalized_grade=''),
+            dict(country_region='france', year=2025, grade_text='G1'+' '*120, normalized_grade=''),
+            dict(country_region='france', year=2025, grade_text='ﷺ'*40+'G1', normalized_grade=''),
         ])
         refs = {'source_kind':'jra_official_graded_race_list',
                 'primary':'https://www.jra.go.jp/datafile/seiseki/replay/2026/jyusyo.html'}
@@ -439,7 +439,7 @@ class PublicGradeFilterParityTests(TestCase):
         from django.template import Context, Template
         from stable.services.race_information_display import filter_public_grade
         event = RaceEvent.objects.create(year=2025, slug='grade-conflict',
-            original_name='Conflict', chinese_name='等级冲突', country_region='germany',
+            original_name='Conflict', chinese_name='等级冲突', country_region='france',
             grade_text='G2', normalized_grade='G1', local_date=date(2025, 7, 6),
             visibility_status='published')
         for flag in (False, True):
@@ -453,17 +453,17 @@ class PublicGradeFilterParityTests(TestCase):
         from datetime import timedelta
         today = date(2026, 7, 6)
         valid = RaceEvent.objects.create(year=2026, slug='focus-raw', original_name='Focus',
-            chinese_name='焦点原始G1', country_region='germany', grade_text='Group I',
+            chinese_name='焦点原始G1', country_region='france', grade_text='Group I',
             normalized_grade='', local_date=today, visibility_status='published')
         conflict = RaceEvent.objects.create(year=2026, slug='focus-conflict', original_name='Conflict',
-            chinese_name='焦点冲突', country_region='germany', grade_text='G2',
+            chinese_name='焦点冲突', country_region='france', grade_text='G2',
             normalized_grade='G1', local_date=today + timedelta(days=1), visibility_status='published')
         hidden = RaceEvent.objects.create(year=2026, slug='focus-hidden', original_name='Hidden',
-            chinese_name='隐藏等级', country_region='germany', grade_text='G1',
+            chinese_name='隐藏等级', country_region='france', grade_text='G1',
             normalized_grade='', local_date=today, visibility_status='draft')
-        self.assertEqual([e.pk for e in _public_weekly_focus_events('germany', today=today)], [valid.pk])
+        self.assertEqual([e.pk for e in _public_weekly_focus_events('france', today=today)], [valid.pk])
         # 对象分支的输入已由公开query过滤；不绕过可见性边界传入hidden。
-        self.assertEqual([e.pk for e in _public_weekly_focus_events('germany', events=[valid,conflict], today=today)], [valid.pk])
+        self.assertEqual([e.pk for e in _public_weekly_focus_events('france', events=[valid,conflict], today=today)], [valid.pk])
 
     def test_historical_key_applies_credible_grade_before_pagination(self):
         from stable.views import _race_calendar_queryset
@@ -471,17 +471,17 @@ class PublicGradeFilterParityTests(TestCase):
         from stable.services.race_information_display import event_grade_field
         for index in range(5):
             RaceEvent.objects.create(year=2025, slug=f'paging-g2-{index}', original_name='G2 Fixture',
-                chinese_name=f'二级{index}', country_region='germany', grade_text='Group II',
+                chinese_name=f'二级{index}', country_region='france', grade_text='Group II',
                 normalized_grade='', local_date=date(2025, 7, index+1), visibility_status='published')
         targets = []
         for index in range(4):
             targets.append(RaceEvent.objects.create(year=2025, slug=f'paging-g1-{index}', original_name='G1 Fixture',
-                chinese_name=f'一级{index}', country_region='germany', grade_text='Group I',
+                chinese_name=f'一级{index}', country_region='france', grade_text='Group I',
                 normalized_grade='', local_date=date(2025, 8, index+1), visibility_status='published'))
         rf = RequestFactory()
         with patch('stable.views.RACE_CALENDAR_PAGE_SIZE', 2):
             rows, _, _, pagination = _race_calendar_queryset(rf.get('/races/',
-                {'year':'2025','region':'germany','tab':'key','grade':'g1'}), today=date(2026, 7, 6))
+                {'year':'2025','region':'france','tab':'key','grade':'g1'}), today=date(2026, 7, 6))
         self.assertEqual([e.pk for e in rows], [e.pk for e in targets[:2]])
         self.assertTrue(pagination['has_next'])
         self.assertTrue(all(event_grade_field(e).code=='G1' for e in rows))
