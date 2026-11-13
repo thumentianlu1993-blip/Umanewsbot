@@ -27,6 +27,7 @@ from stable.services.hkjc_public_fields import hkjc_source, result_odds, UNITS a
 
 from .france_public_fields import france_source, public_refs as france_refs, result_odds as france_odds
 from .us_public_fields import us_source, public_refs as us_refs, result_odds as us_odds
+from .uk_public_fields import uk_source, public_refs as uk_refs, result_odds as uk_odds
 
 _TERMINAL_RESULT_STATUSES = frozenset(
     {
@@ -763,6 +764,11 @@ def apply_data_sync_result_observation(
                     if us_source(source):
                         from .us_basic_fields import apply_metadata_locked
                         apply_metadata_locked(event=event,source=source,observation=observation,now=now,source_class=candidate_source_class)
+                    if uk_source(source) and provenance.get('uk_race_metadata'):
+                        from .uk_basic_fields import apply_metadata_locked
+                        from .uk_pre_race import route_for
+                        from .race_data_source_adapters import load_multisource_policy
+                        apply_metadata_locked(event=event,metadata=provenance['uk_race_metadata'],route=route_for(event,load_multisource_policy(now=now)),now=now)
                     if provenance.get('france_basic_v1'):
                         _apply_france_basic(event, source, observation, candidate_source_class, now)
                     if france_source(source):
@@ -874,6 +880,11 @@ def apply_data_sync_result_observation(
             if us_source(source):
                 from .us_basic_fields import apply_metadata_locked
                 apply_metadata_locked(event=event,source=source,observation=observation,now=now,source_class=candidate_source_class)
+            if uk_source(source) and provenance.get('uk_race_metadata'):
+                from .uk_basic_fields import apply_metadata_locked
+                from .uk_pre_race import route_for
+                from .race_data_source_adapters import load_multisource_policy
+                apply_metadata_locked(event=event,metadata=provenance['uk_race_metadata'],route=route_for(event,load_multisource_policy(now=now)),now=now)
             if provenance.get('france_basic_v1'):
                 _apply_france_basic(event, source, observation, candidate_source_class, now)
             assert roster_mapping is not None
@@ -886,6 +897,10 @@ def apply_data_sync_result_observation(
                     ),
                     source.source_key: row["external_runner_id"],
                 }
+                if uk_source(source) and runner.pk is None:
+                    runner.odds_value = uk_odds(row['field_provenance'])
+                    runner.source_refs.update(uk_refs(row['field_provenance']))
+                    runner.source_refs['bootstrap_kind'] = 'result'
                 if us_source(source) and runner.pk is None:
                     runner.odds_value = us_odds(row['field_provenance'])
                     runner.source_refs.update(us_refs(row['field_provenance']))
@@ -1068,14 +1083,14 @@ def apply_data_sync_result_observation(
                         carried_weight=item.carried_weight,
                         running_status=item.status,
                         popularity=result_popularity(item.field_provenance) if japan_source(source) else "",
-                        odds_value=result_odds(item.field_provenance) if hkjc_source(source) else france_odds(item.field_provenance) if france_source(source) else us_odds(item.field_provenance) if us_source(source) else "",
+                        odds_value=result_odds(item.field_provenance) if hkjc_source(source) else france_odds(item.field_provenance) if france_source(source) else us_odds(item.field_provenance) if us_source(source) else uk_odds(item.field_provenance) if uk_source(source) else "",
                         is_confirmed=True,
                         source_refs={
                             "source_key": source.source_key,
                             "external_runner_id": row["external_runner_id"],
                             "revision_id": revision.pk,
                             **({"field_units": {"carried_weight": "kg", "margin": "length"}}
-                               if japan_source(source) else {"field_units": dict(HKJC_UNITS), "margin_basis": "winner", "primary": source.canonical_url} if hkjc_source(source) else france_refs(item.field_provenance) if france_source(source) else us_refs(item.field_provenance) if us_source(source) else {}),
+                               if japan_source(source) else {"field_units": dict(HKJC_UNITS), "margin_basis": "winner", "primary": source.canonical_url} if hkjc_source(source) else france_refs(item.field_provenance) if france_source(source) else us_refs(item.field_provenance) if us_source(source) else uk_refs(item.field_provenance) if uk_source(source) else {}),
                         },
                         raw_payload={
                             "raw_status": item.raw_status,

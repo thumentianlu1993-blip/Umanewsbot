@@ -242,7 +242,7 @@ def event_fields(obj):
                      if ctx['distance_unit_conflict'] else
                      parse_display_distance(value(obj, 'distance_text'), unit_hint=ctx['distance_unit'], context=ctx)),
         'surface': parse_display_surface(surface_raw),
-        'race_type': parse_display_race_type(value(obj,'race_type_text') or (value(obj,'normalized_race_type') if value(obj,'country_region') in {'france','united_states'} else '') or ('jumps' if surface_raw == 'jumps' else '')),
+        'race_type': parse_display_race_type(value(obj,'race_type_text') or (value(obj,'normalized_race_type') if value(obj,'country_region') in {'france','united_states','united_kingdom'} else '') or ('jumps' if surface_raw == 'jumps' else '')),
         'layout': parse_display_layout(value(obj,'course_layout_text')),
         'prize': (parse_display_money(value(obj,'prize_amount'), currency=value(obj,'prize_currency'), kind='total')
                   if value(obj,'prize_amount', None) is not None else parse_display_money(value(obj,'prize_text'))),
@@ -270,6 +270,18 @@ def event_fields(obj):
         labels={'firm':'快地','good':'好地','soft':'软地','yielding':'软地','heavy':'大烂地','fast':'快地','sloppy':'湿泥地','muddy':'泥泞地'}
         raw_going = str(metadata.get('going_raw') or going)
         if going:fields['going']=display_field(raw_going,labels[going]+'（'+raw_going+'）',state='normalized') if going in labels else display_field(raw_going,raw_going,state='preserved')
+    if value(obj,'country_region')=='united_kingdom':
+        uk=refs.get('uk_race_metadata',{})
+        going=str(value(obj,'going_text','') or '').strip()
+        if going:fields['going']=display_field(going,going,state='preserved')
+        fields['race_time']=parse_display_time(uk.get('winning_time_detail',''))
+        from dataclasses import replace
+        if refs.get('uk_catalogue_v1',{}).get('prize_stage')=='announced' and fields['prize'].state=='normalized':
+            fields['prize']=replace(fields['prize'],text=fields['prize'].text+'（计划总奖金）')
+        winner=parse_display_money(uk.get('winner_prize_amount',''),currency=uk.get('prize_currency',''),kind='winner')
+        if winner.state=='normalized':
+            label='冠军奖金'+('（公布）' if uk.get('winner_prize_stage')=='announced' else '')
+            fields['prize']=replace(winner,text=(fields['prize'].text+'；' if fields['prize'].state=='normalized' else '')+label+' '+winner.text)
     if value(obj,'country_region')=='united_states':
         schedule=(value(obj,'source_refs',{}) or {}).get('us_pre_race_schedule',{})
         if schedule.get('prize_stage')=='announced' and fields['prize'].state=='normalized':
@@ -330,7 +342,7 @@ def _result_time(row, raw):
 def row_fields(row, *, horse_record=False):
     ctx = source_context(row)
     status = value(row, 'running_status') or value(row, 'result_status')
-    return {
+    fields = {
         'weight': parse_display_weight(value(row, 'carried_weight'), unit_hint=ctx['weight_unit']),
         'finish_time': _result_time(row, value(row, 'public_finish_time') if hasattr(row, 'public_finish_time') or isinstance(row, dict) and 'public_finish_time' in row else value(row, 'finish_time')),
         'margin': parse_display_margin(value(row, 'margin'), unit_hint=ctx['margin_unit']),
@@ -341,6 +353,16 @@ def row_fields(row, *, horse_record=False):
         'position': _position(row, horse_record=horse_record),
         'status': display_field(status, _STATUS_LABELS.get(status, '待核实')) if status else display_field(status, state='missing', reason='missing'),
     }
+
+
+    refs=value(row,'source_refs',{}) or {}
+    if refs.get('uk_paid_v1') and status in {'non_runner','scratched','withdrawn'}:
+        fields['odds']=display_field('',state='missing',reason='withdrawn_quote')
+    if refs.get('uk_paid_v1') and fields['odds'].state=='normalized' and refs.get('odds_source'):
+        from dataclasses import replace
+        source=refs['odds_source'];label='SP' if source=='TRA SP' else source+' 赛前报价'
+        fields['odds']=replace(fields['odds'],text=fields['odds'].text+'（'+label+'）')
+    return fields
 
 
 

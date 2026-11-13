@@ -972,6 +972,13 @@
       "stable.test_us_venues",
       "stable.test_us_workflow",
       "stable.test_us_calendar_snapshot"
+    ],
+    "uk_race_automation": [
+      "stable.test_uk_collection",
+      "stable.test_uk_pre_race",
+      "stable.test_uk_release",
+      "stable.test_uk_sources",
+      "stable.test_uk_workflow"
     ]
   },
   "dependencies": {
@@ -1050,6 +1057,9 @@
       "module:stable.test_race_data_sync_pipeline_a_postgres"
     ],
     "us_source_collection": [
+      "infrastructure"
+    ],
+    "uk_race_automation": [
       "infrastructure"
     ]
   },
@@ -3076,6 +3086,36 @@
       "domains": [
         "us_source_collection"
       ]
+    },
+    "server/stable/test_uk_collection.py": {
+      "label": "stable.test_uk_collection",
+      "domains": [
+        "uk_race_automation"
+      ]
+    },
+    "server/stable/test_uk_pre_race.py": {
+      "label": "stable.test_uk_pre_race",
+      "domains": [
+        "uk_race_automation"
+      ]
+    },
+    "server/stable/test_uk_release.py": {
+      "label": "stable.test_uk_release",
+      "domains": [
+        "uk_race_automation"
+      ]
+    },
+    "server/stable/test_uk_sources.py": {
+      "label": "stable.test_uk_sources",
+      "domains": [
+        "uk_race_automation"
+      ]
+    },
+    "server/stable/test_uk_workflow.py": {
+      "label": "stable.test_uk_workflow",
+      "domains": [
+        "uk_race_automation"
+      ]
     }
   },
   "profiles": {
@@ -3500,7 +3540,8 @@
     "japan_race_automation": "integration: JRA/NAR通用来源、受控候选与历史回填",
     "hkjc_source_acceptance": "integration: HKJC全季目录、正式赛果、分阶段赛前与候选公开",
     "france_race_automation": "integration: 法国来源阶段、身份、字段和固定范围回放",
-    "us_source_collection": "integration: 美国只读来源、阶段语义、缓存回放与来源入口"
+    "us_source_collection": "integration: 美国只读来源、阶段语义、缓存回放与来源入口",
+    "uk_race_automation": "integration: 英国付费采集、赛前阶段、完整赛果及发布恢复"
   },
   "dedicated_batch_modules": [
     "stable.test_migration_history_repair_postgres",

@@ -1698,6 +1698,36 @@
     ],
     "docs/changes/us-online-field-gaps/ci-scope.json": [
       "infrastructure"
+    ],
+    "server/stable/services/uk_sources.py": [
+      "uk_race_automation"
+    ],
+    "server/stable/services/uk_public_fields.py": [
+      "uk_race_automation"
+    ],
+    "server/stable/services/uk_collection.py": [
+      "uk_race_automation"
+    ],
+    "server/stable/services/uk_basic_fields.py": [
+      "uk_race_automation"
+    ],
+    "server/stable/services/uk_release.py": [
+      "uk_race_automation"
+    ],
+    "server/stable/services/uk_pre_race.py": [
+      "uk_race_automation"
+    ],
+    "server/stable/services/uk_race_source.py": [
+      "uk_race_automation"
+    ],
+    "server/stable/management/commands/run_uk_release.py": [
+      "uk_race_automation"
+    ],
+    "docs/changes/uk-race-automation/ci-scope.json": [
+      "infrastructure"
+    ],
+    "docs/changes/uk-race-automation/catalogue.json": [
+      "uk_race_automation"
     ]
   },
   "symbols": {
@@ -1907,6 +1937,7 @@
     "docs/changes/us-race-automation/ci-scope-seed.json",
     "docs/changes/us-race-automation/ci-scope-calendar.json",
     "docs/changes/us-race-automation/ci-scope-preview.json",
-    "docs/changes/us-online-field-gaps/ci-scope.json"
+    "docs/changes/us-online-field-gaps/ci-scope.json",
+    "docs/changes/uk-race-automation/ci-scope.json"
   ]
 }
