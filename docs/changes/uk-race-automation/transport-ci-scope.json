@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "base_sha": "9b92fc10826b0c3d5b489ba78e31efbef2a11cd8",
+  "reason": "仅为既有英国付费采集接入真实固定发送器；覆盖新端点、原Free/精确赛果、共享HTTP预算/准入、多源身份与英国完整链路；不修改解析、数据库、数据包或其他业务模块。规则增量只登记本次内容绑定选测清单。",
+  "domains": [
+    "infrastructure",
+    "uk_race_automation",
+    "module:stable.test_race_live_source_proof",
+    "module:stable.test_race_data_sync_providers",
+    "module:stable.test_race_data_sync_admission",
+    "module:stable.test_race_multisource_identity"
+  ],
+  "changes": [
+    {
+      "path": "docs/changes/uk-race-automation/rollout.md",
+      "status": "modified",
+      "before_hash": "4c90ec24b0fb59fbc0aeb52b5ed3e63e094dec0b1209fb699848a064778eaf81",
+      "after_hash": "73f87aeeae5406a52ca977d9b10119b16fd968c3cde62e91848a8f8669f760f5",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/uk-race-automation/transport_fix.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "b4584f63256d2430d507be00d7a45c285c26a8ecc07f5404113159db03f623e9",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/current_state.md",
+      "status": "modified",
+      "before_hash": "7f9b4e727494d4d6ada9da5a736ad21188c96082f0fe8ba26ea0985524738cd6",
+      "after_hash": "43ef2826a4e379a8d0aef47e51be3a42883528a9b00cc143b9fe062c837403a2",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_live_source_proof.py",
+      "status": "modified",
+      "before_hash": "df09eaa88cb64b192bccdc16332e40b256fb9822d46eb1bd333bf59cbe0ea20f",
+      "after_hash": "5140401d01062aeb692537169812f4f7fc27c96004f2c32d38b8c854dc382565",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_uk_collection.py",
+      "status": "modified",
+      "before_hash": "2092c24aa241e4d311cdf63a33899808af6c97812b27c9d67e8d15c114e53072",
+      "after_hash": "efb2bcfd732f5980d644b1fed608e255e579fccdff22dd2cbec1a939d221ccf0",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "636720446da8ced416e90b269c1bf0c13b6b65a95bd17b559740938f022d5245",
+      "after_hash": "3ec4e15315c0672062f967401f3be38647cbcc12ae26622e5f6f07cb24a96fb8",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}
