@@ -1,3 +1,9 @@
+## 2026-11-14 采集磁盘余量改为 3 GiB，历史备份清理完成
+
+当前四应用候选仍为 `24de56e2` / schema0084，完整 Compose 链新增末尾覆盖 `/opt/umanews-external-staging/disk-capacity-20261114/capacity-override.json`，仅将 `RACE_DATA_RAW_MIN_FREE_DISK_BYTES` 从 4 GiB 改为 3 GiB。后续发布须继承当前容器标签中的完整链，不能漏掉该覆盖而恢复旧阈值。
+
+六份 11 月 4 日旧发布 dump 已先离机验证后清理，共 5.15 GiB；当前目录、数据库、媒体、来源证据和近期备份保留。配置重试完成，服务/worker/Beat/双域五地区 HTTP/自然采集和锁释放均已验证。回滚配置可用原完整链恢复 4 GiB；文件恢复使用同清单离机原件，不导入数据库。首次正常301误判、服务恢复、技术修正、归档恢复面及全部绑定见[容量发布记录](changes/five-region-race-governance/disk_capacity_release.md)。
+
 # 2026-11-12 美国赛前来源修正发布完成后的维护入口
 
 PR #304 merge `a4945de0333555e95cf129cd1b36b9cf4e24dc41`，生产候选 `049caf284d1605137688e2a15b286756df0b34b1`，OCI `sha256:8f14c22b23d52b734ace8f2faff1d0f3a98bb18b75ec71abbb86f1c5572cb353`。北京时间19:28:22四应用版本/运行态核验通过，双worker就绪、Beat恢复、QQ关闭，schema0084不变，发布锁释放。
