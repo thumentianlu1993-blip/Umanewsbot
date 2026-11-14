@@ -299,3 +299,19 @@ class V3Workflow(WorkflowFixture,TransactionTestCase):
         translated=self.run.attempts.get(stage='translate_full')
         self.assertEqual(translated.usage['input']['entity_glossary'][0]['replacement'],'Authority')
         self.assertTrue(NewsPublicationReceipt.objects.filter(run=self.run).exists())
+
+    def test_v3_manual_revision_reuses_paid_entity_receipt(self):
+        from stable.services.news_publication import check_publication_evidence
+        first = self.finish()
+        self.assertEqual(first.state, 'shadow', first.reason)
+        before = self.calls.count('entity_check')
+        target = {key: first.translation_snapshot[key] for key in ('title', 'body', 'summary')}
+        revised = self.finish(start_revision(self.article, snapshot=first.source_snapshot, manual_target=target))
+        self.assertEqual(revised.state, 'shadow', revised.reason)
+        self.assertEqual(self.calls.count('entity_check'), before)
+        cached = revised.attempts.get(stage='entity_check')
+        self.assertEqual(cached.provider, 'cache')
+        self.assertFalse(cached.month_budget_id)
+        self.assertEqual(cached.actual_cost, 0)
+        self.assertEqual(cached.usage['cache_origin'], first.entity_snapshot['strong_attempt_id'])
+        check_publication_evidence(revised)

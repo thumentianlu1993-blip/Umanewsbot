@@ -8,7 +8,7 @@
 
 代码基线 `e4df6bdaf85318eb9588489807e4b9a40bb01665`（业务交接整合）。方案分支 `codex/p01-news-quality-design-20261027`，工作树 `/Users/mentianlu/.codex/worktrees/9c8c/umanews`。原交接工作树不修改。
 
-原[完整规格及原卡](../business-project-handoff-20261026/01-news-quality/spec.md)、[机器卡片](../business-project-handoff-20261026/01-news-quality/cards.json)保留全部内容与百分比。本方案更新执行口径，不把旧单线测试结果当成当前组合通过，不重新承诺 10/30。
+原[完整规格及原卡](https://github.com/thumentianlu1993-blip/Umanewsbot/blob/e4d67caa087ff95b171700daeb63ae0ad1831012/docs/changes/business-project-handoff-20261026/01-news-quality/spec.md)、[机器卡片](https://github.com/thumentianlu1993-blip/Umanewsbot/blob/e4d67caa087ff95b171700daeb63ae0ad1831012/docs/changes/business-project-handoff-20261026/01-news-quality/cards.json)保留全部内容与百分比。本方案更新执行口径，不把旧单线测试结果当成当前组合通过，不重新承诺 10/30。
 
 ## 2 已锁定产品决策
 

@@ -400,7 +400,8 @@ def reuse_completed(attempt, payload):
             if origin.stage == "entity_check":
                 from stable.services.news_entity_units import evaluate, occurrences, initial_payload
                 # 修复输入绑定本run首轮回执，不跨run复用补丁。
-                if payload != initial_payload(origin.run.clean_snapshot, origin.run.source_snapshot['language']):
+                if payload != initial_payload(origin.run.clean_snapshot, origin.run.source_snapshot['language'],
+                        contract_version=spec['contract_version']):
                     continue
                 occurrences(origin.run.clean_snapshot, evaluate(origin.run.clean_snapshot, payload, origin.result))
             else:

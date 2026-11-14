@@ -181,7 +181,7 @@
       "path": "docs/changes/p01-news-quality-20261027/rollout.md",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "2ca154ca01a2abf97e0a3786870a9f704d858ed9f0e3f2ff8ac0fe1aa46c559b",
+      "after_hash": "0e25712bcb6910dbf10ed68c3e0b49410b7e57cbcd7c0245104f2a37c0b6164f",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -189,7 +189,7 @@
       "path": "docs/changes/p01-news-quality-20261027/spec.md",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "e9027c3a807ad3d4802fa4513023af6ba3534b310972b7f6969b642edcfbc650",
+      "after_hash": "72b442febcf654b489464f69b811efd5bfd8c35b1fe71e8e19cb6c545195e089",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -197,7 +197,7 @@
       "path": "docs/changes/p01-news-quality-20261027/tasks.md",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "410cb4ab9c8a3929a1737be94da3d3fbc68e5740efac505f988d2ca4da780684",
+      "after_hash": "547e3827f0b0c13c0b1c242137b5be1f7376efd3ab11b19aafc980be606005f4",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -477,7 +477,7 @@
       "path": "server/stable/services/news_model_gateway.py",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "b2fff85056fa1bd7e1ea6e6a2595b363967e1ddc6c7069858ab007aee93ad564",
+      "after_hash": "1617dad52b2d07ff1305bff14b4b3cf22ef987ffc5abee4e309639493d049e43",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -669,7 +669,7 @@
       "path": "server/stable/test_p01_annotation_translation.py",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "092f5197473898a3bd73e940daa88716a397b5071bb3e5a5975fb5a781c7f804",
+      "after_hash": "888a18ac9858624597cf3af5e27ce2b73e48a43b2ed3a2d6563e3f8a4b29e2e9",
       "before_mode": null,
       "after_mode": "100644"
     },
