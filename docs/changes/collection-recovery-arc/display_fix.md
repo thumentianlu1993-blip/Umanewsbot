@@ -23,4 +23,4 @@
 - 使用现有发布锁，候选启动预检、暂停 Beat、排空 worker、备份配置、切换 Web；公网必须是 68 行且 12 选定/56 候补，JRA 保持 18 行、凯旋门旧入口 404/新入口 200 且 16 匹，之后恢复 worker/Beat 并核对服务。
 - 应用回滚到 `661d45ef`，无数据库回滚，不删除已采集数据；此回滚目标会保留已知的旧标签展示问题。
 
-本包尚未合并或发布。精确产物位于 `/Users/mentianlu/.codex/runtime/collection-recovery-arc-20261114/display-fix/`；交付遵循根 `AGENTS.md`。
+PR #315 已合并为 `15d8b53e`，范围 CI 1146 项、零跳过，独立交付核验通过。19:07 首次发布因公网证书过期中止，19:09 四应用回滚至 `661d45ef`；用户随后确认[证书修复附加包](tls_repair.md)，HTTPS 恢复后以原包续跑。19:31:40 候选 `3f967f64` 发布成功，19:32 公网 68 行、12 选定/56 候补通过，19:33 逐马核对 68 行与来源一致；四匹既有中文名通过当前名称映射匹配，标签预期仍取来源字段。四应用与原回归入口均通过，锁释放，无迁移或业务数据动作。精确产物位于 `/Users/mentianlu/.codex/runtime/collection-recovery-arc-20261114/display-fix/`，最终收据为 `acceptance-summary.json`；交付遵循根 `AGENTS.md`。

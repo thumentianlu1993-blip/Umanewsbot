@@ -66,3 +66,19 @@ SCMP 详情页的源站 HTTP 403 是独立阻断，本包没有绕过或修复�
 ## 证据
 
 本机专用产物目录为 `/Users/mentianlu/.codex/runtime/collection-recovery-arc-20261114/`：`delivery-verified.json`、`merge.json`、`released-evidence/evidence/`、`recovery-*.json`、`public-verification.json`。生产恢复点和完整发布日志位于 `/opt/umanews-external-staging/collection-recovery-41d3f76c/`。私有配置、原始归档不提交仓库。
+
+## #315 发布尝试因 TLS 过期回滚
+
+用户批准 #315 后，精确 head `2066dd42` 的独立交付核验确认 1146 项通过、零跳过；PR 合并为 `15d8b53e`。北京时间 19:07:44 开始切换候选 `3f967f64`，两 worker 排空、Web 健康与数据库只读检查通过，但公网 curl 返回证书过期错误。协调器于 19:09:19 恢复四应用至 `661d45ef`、重载 Nginx 并释放锁，无数据动作，未确认 12/56 标签公网通过。
+
+证书 `umafans.run`（SAN 同时含 `www.umafans.run`）于 2026-11-14 18:23:57 到期。Nginx 挂载持久化证书根；现有续期脚本却仍引用已不存在的 `/opt/umanews-release-a7e3783f-PR100-20260810/umanewsbot/deploy/certs/`，续期日志反复在 stat 步骤失败。现有 Certbot 固定镜像、ACME webroot 和证书账户目录仍在，未尝试关闭 TLS 校验，也未写证书。修复范围见 [证书附加包](tls_repair.md)。
+
+## #315 续跑与最终线上验收通过
+
+用户确认证书附加包后，19:27:41（北京时间）原两个域名续期与 HTTPS 验证通过，详见 [证书执行证据](tls_repair.md)。首次失败收据与私有备份保留在远端 `attempt-1-tls-expired/`。原展示候选 `3f967f64` 未变化，19:31:40 四应用发布成功；启动 schema0084 检查、任务排空、双 worker 就绪、Beat 恢复通过，无迁移、业务数据写入、容量或功能开关变化。
+
+19:32 公网验收：NAR 200，68 行中 12 选定、56 候补；标题仍为“预计参赛名单（骑手为预定）”。19:33 逐马将公开标签与已验证报名来源字段比较，68/68 完全一致。初次验收脚本仅因四匹既有中文名与来源日文名不同而未匹配；补用当前只读名称解析后通过，没有修改生产数据、页面或标签预期。JRA 200 且 18 匹；凯旋门旧入口 404，新入口 200 且 16 匹出马表/赛果；站点地图不含旧路径；美国 Commonwealth Turf 18 匹预想、英国 Coral Gold Cup 37 匹报名保持。
+
+最终只读核对：20 项采集目标失败计数均为零；四应用均为 `3f967f64` 且运行、Web 健康，3 GiB 阈值与 QQ 关闭保持，发布协调锁和部署锁释放。本包未验证或修复美国 13 项覆盖缺口、SCMP 403。证书新有效期至 2027-02-12 18:29:00（北京时间）。应用若需回滚仍到 `661d45ef`，保留新证书和已采集数据，旧应用会恢复已知标签显示问题。
+
+本机验收收据为 `display-fix/acceptance-summary.json`、`public-verification.json`、`recovery-193329.json`、`baseline-after.json`、`released-evidence/evidence/` 选定的非敏感 JSON；未下载远端配置或证书备份。公网 NAR HTML SHA256 为 `2f2f4733e69555732cde6ba5ab5fde2d3ac0830838effe4c913f75fd54dcdf1b`。
