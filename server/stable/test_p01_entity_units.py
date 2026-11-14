@@ -142,6 +142,7 @@ class EntityUnitTests(SimpleTestCase):
 
     def test_missing_unit_feedback_is_stable_across_worker_hash_seeds(self):
         import os, subprocess, sys
+        from pathlib import Path
         script = '''import django; django.setup()
 import json
 from stable.services.news_entity_units import initial_payload,evaluate,repair_payload
@@ -149,7 +150,8 @@ c={'title':'Title','blocks':[{'id':'b'+str(i),'text':'Text.'} for i in range(8)]
 p=initial_payload(c,'en');s=evaluate(c,p,{'units':[]})
 print(json.dumps(repair_payload(c,'en',s,1),sort_keys=True))'''
         outputs = [subprocess.check_output([sys.executable, '-c', script],
-            env={**os.environ, 'PYTHONHASHSEED': seed}, text=True) for seed in ('1', '2', '3')]
+            env={**os.environ, 'PYTHONHASHSEED': seed},
+            cwd=Path(__file__).resolve().parents[1], text=True) for seed in ('1', '2', '3')]
         self.assertEqual(outputs[0], outputs[1]); self.assertEqual(outputs[1], outputs[2])
 
 

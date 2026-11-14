@@ -28,6 +28,23 @@ class StageClaimTests(TestCase):
         self.assertGreater(self.run.lease_until, timezone.now())
         self.assertEqual(NewsStageAttempt.objects.count(), 1)
 
+    def test_request_deadline_leaves_settlement_and_claim_recovery_margin(self):
+        from unittest.mock import patch
+        from stable.tasks import process_news_quality_run_task as task
+        from stable.test_p01_news_budget import context_policy
+        from stable.services.news_model_gateway import request_spec
+        with self.settings(NEWS_QUALITY_POLICY=context_policy()):
+            request = request_spec('entity_check')
+        self.assertGreaterEqual(task.soft_time_limit, request['http_timeout_seconds'] + 30)
+        self.assertGreaterEqual(task.time_limit, task.soft_time_limit + 15)
+        now = timezone.now()
+        with patch('django.utils.timezone.now', return_value=now):
+            attempt = claim_stage(self.run.pk, {'text': 'fixture'}, expected_stage=self.run.stage,
+                                  expected_generation=self.run.generation)
+        self.assertIsNotNone(attempt)
+        self.run.refresh_from_db()
+        self.assertGreaterEqual((self.run.lease_until - now).total_seconds(), task.time_limit + 15)
+
     @override_settings(NEWS_QUALITY_MODE="off")
     def test_off_never_claims_or_unbinds(self):
         self.assertIsNone(claim_stage(self.run.pk, {}, expected_stage=self.run.stage, expected_generation=self.run.generation))

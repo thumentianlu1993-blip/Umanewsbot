@@ -3417,7 +3417,8 @@ def advance_race_event_lifecycle_task(
     }
 
 
-@shared_task(soft_time_limit=100, time_limit=120)
+# HTTP上限120秒；核账预留30秒，硬超时及180秒lease再各留15秒。
+@shared_task(soft_time_limit=150, time_limit=165)
 def process_news_quality_run_task(run_id):
     from stable.services.news_pipeline import process_news_run, enqueue_news_run
     from stable.models import NewsProcessingRun

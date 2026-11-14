@@ -573,7 +573,7 @@
       "path": "server/stable/tasks.py",
       "status": "modified",
       "before_hash": "1d83da8c1dea2dae3263e4570777b92ddf939df9738221b157cf4a2737255053",
-      "after_hash": "16f0ed3ca165beced4ea46931536cb287cf67453087b20b6bb74036a82a27806",
+      "after_hash": "58ca82102359b560fe5255afb45f1d853a6d3052e6f9a0ea951cdcd83ce7b2a8",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -677,7 +677,7 @@
       "path": "server/stable/test_p01_entity_units.py",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "be35b6394f24760f9471b828572893e86cae964cb68f2ebc3b82fbd105fce13f",
+      "after_hash": "0df38fb6a3dc719ddb8f697d472889e202d7a1a7a5a721f35a3aa0606dbca68a",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -701,7 +701,7 @@
       "path": "server/stable/test_p01_news_claims.py",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "e7155ff6f28e2774b16755672d360c145a47c5a3636f7873c4ff80ac4c3611c5",
+      "after_hash": "b9ff88005b63d5c941aba8cd4ea9b2df8d84d389156d2fbb065ac1c671e1dd0c",
       "before_mode": null,
       "after_mode": "100644"
     },
