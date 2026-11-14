@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "base_sha": "9db3f4caa2782285a5749d65b44cfca71e80cfa1",
+  "reason": "仅已验证NAR报名预览的临时选定/候补标签进入统一展示。公开字段其余映射、持久化、模型和依赖不变；覆盖开关组合、正式名单隔离、日本全链、各地区公开字段、英美预览及选测基础设施。规则增量只注册本次一次性精确范围清单，不改通用high-risk规则。",
+  "domains": [
+    "japan_race_automation",
+    "module:stable.test_race_information_display",
+    "module:stable.test_race_information_display_pages",
+    "module:stable.test_race_information_preview",
+    "module:stable.test_pre_race_refresh",
+    "module:stable.test_france_public_fields",
+    "module:stable.test_hkjc_public_fields",
+    "uk_race_automation",
+    "us_source_collection",
+    "infrastructure"
+  ],
+  "changes": [
+    {
+      "path": "docs/changes/collection-recovery-arc/display_fix.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "5a32202b5a129e13959ecf333ca1b1039468b0a8d658426ee17e78cab1d11f81",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/collection-recovery-arc/followup.md",
+      "status": "modified",
+      "before_hash": "d9ee62cbbd38f0e3a9432abd84c6dc5a9f2768f46e07e395413cd8581bd1d68c",
+      "after_hash": "a89b7e580b9fae965289450a1e1bc4d0bca8ea03ae3131a968626f2c7eb5934d",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/collection-recovery-arc/release_evidence.md",
+      "status": "modified",
+      "before_hash": "634e17d0d818647bdf46ca098111a655ea3e3da7d747a7b70a93ad8da8fd5bd2",
+      "after_hash": "a9ce79d347b4e9a51770ca4ef8084a7b20837540c62a499af3d0ec7a63d7fba1",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/collection-recovery-arc/rollout.md",
+      "status": "modified",
+      "before_hash": "49bd09327eb64b0337f47191400a442c24e9e14f32b0ba7be1516c2f4c4204c8",
+      "after_hash": "bc7be9fb39d578c5fbf01e84de64772ae2ed7f01b060537ec1624a5fa55ef5e8",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/collection-recovery-arc/tasks.md",
+      "status": "modified",
+      "before_hash": "39ff005651242afbbf73fc4ac98ff6f603fcab0d2088bce2b675fbf732934237",
+      "after_hash": "c9ad99afc3ca0e6c07b6c7196b646fd0d520e322d7381dd37572b861e50b69b2",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/collection-recovery-arc/test_cases.md",
+      "status": "modified",
+      "before_hash": "c424303ef30559b41ac8a0749ae887d9d2b2b12a4cd50a7e50306d4e8599e4a9",
+      "after_hash": "d8064e1b5566dc9667b7e0bccd9e8e1fd90bd5df455185a0750b7b77dabed5a6",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/current_state.md",
+      "status": "modified",
+      "before_hash": "feb6fbc5cbbeac50126ccac14aeb5b024cc1ec65513cafdbca7d505702a93b8a",
+      "after_hash": "7bbf17b36671c9166197ee2979a2ef588daa7d2b2736040472dbab965b93c1f0",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/deploy_runbook.md",
+      "status": "modified",
+      "before_hash": "3f07bf2855d13e40fc7a52d1be33657be8c277cfefb4534cc4881d5b7761a47b",
+      "after_hash": "e072452ac78d6924ba5a863d2b5584f36de46070e3a0a778854c580652ed1c1e",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/nar_pre_race.py",
+      "status": "modified",
+      "before_hash": "7739118d4484ab3a2500096aa1a9cb6891ad36b1426824125882f6f379b50e82",
+      "after_hash": "99db2cd5c34f596733f311df20b3e4a7c3fcc5fa9d68a3641b70bfa9296e32ff",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_information_display.py",
+      "status": "modified",
+      "before_hash": "a3c2d6c417f1e835d368d17e52cb8ab532d34e86d0f17e47b1f8350574fc7506",
+      "after_hash": "70004ff73ad6839ae71e0d3576b4c38b5a935fbb74e94d815bf897fb58eb52ff",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_japan_automation.py",
+      "status": "modified",
+      "before_hash": "dc3dde47184698e84652c6ee2a2ee8e4b15369c94328cdc334d92b12fbd41682",
+      "after_hash": "f1eecdaa7906ad6380158d1953eac1730947071d6aab3a04e5fe536cad047db0",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "18b4e59526d9ae1785baf78b2b2c2c5d35c618ebfc01284f76724a7e07f56477",
+      "after_hash": "2317ff4715b700ae838c0c5932480d5086c457829e85155cdc41e5e898c6b290",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}
