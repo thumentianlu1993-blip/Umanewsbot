@@ -31,7 +31,8 @@
     "docs/changes/hkjc-horse-name-display/impact_summary.json",
     "docs/changes/p01-news-quality-20261027/*.json",
     "docs/changes/p01-annotation-driven-translation-20261114/*.json",
-    "docs/changes/p01-main-integration-20261114/ci-scope.json"
+    "docs/changes/p01-main-integration-20261114/ci-scope.json",
+    "docs/changes/p01-pilot-fixes-20261114/ci-scope.json"
   ],
   "high_risk": [
     ".codex/agents/application.toml",
@@ -2107,6 +2108,7 @@
     "docs/changes/uk-race-automation/transport-ci-scope.json",
     "docs/changes/five-region-race-governance/ci-scope.json",
     "docs/changes/collection-recovery-arc/display-ci-scope.json",
-    "docs/changes/p01-main-integration-20261114/ci-scope.json"
+    "docs/changes/p01-main-integration-20261114/ci-scope.json",
+    "docs/changes/p01-pilot-fixes-20261114/ci-scope.json"
   ]
 }
