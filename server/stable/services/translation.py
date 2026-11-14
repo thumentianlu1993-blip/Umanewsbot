@@ -1316,6 +1316,9 @@ def get_translation_provider(*, article=None, managed_run=None) -> TranslationPr
 
 
 def translate_article(article: NewsArticle, *, managed_run: TranslationRun | None = None) -> TranslationResult:
+    from stable.services.news_pipeline import is_pipeline_article
+    if is_pipeline_article(article):
+        raise ValueError("p01_owned")
     # 持久登记目标在缺scope时也必须传给guard，先拒绝再构造provider。
     provider = get_translation_provider(article=article, managed_run=managed_run)
     source_text = article.body_ja_normalized or article.body_ja_raw
@@ -1367,3 +1370,11 @@ def translate_article(article: NewsArticle, *, managed_run: TranslationRun | Non
         run.error_message = str(exc)
         run.save(update_fields=["status", "raw_response", "error_message", "updated_at"])
         raise
+
+
+def request_json_translation_once(client, *, model, messages, max_tokens):
+    """普通 provider 的单次 JSON 请求；调用方持有自己的预算/重试合同。"""
+    return client.chat.completions.create(
+        model=model, messages=messages, max_tokens=max_tokens,
+        response_format={"type": "json_object"},
+    )

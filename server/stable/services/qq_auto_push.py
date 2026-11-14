@@ -176,6 +176,9 @@ def should_push_news_to_qq(
     *,
     target: PushTarget | None = None,
 ) -> PushEligibility:
+    from stable.services.news_pipeline import is_pipeline_article
+    if is_pipeline_article(article):
+        return PushEligibility(False, "p01_web_only")
     if not is_article_public(article):
         return PushEligibility(False, "article_not_public")
     if has_publish_blocker(article):
@@ -490,6 +493,8 @@ def process_qq_push_delivery(delivery: QQPushDelivery) -> QQPushDelivery:
 
 
 def enqueue_qq_auto_push_for_article(article_id: int) -> None:
+    if NewsArticle.objects.filter(pk=article_id, active_news_run__isnull=False).exists():
+        return
     if not qq_channel_enabled() or not getattr(settings, "QQ_PUSH_ENABLED", False):
         return
     from stable.tasks import qq_auto_push_article_task

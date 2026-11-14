@@ -6,7 +6,7 @@ from pathlib import Path
 from django.core.management.base import BaseCommand, CommandError
 
 from stable.services.news_body_history import (
-    _COHORT_SOURCE_SITE,
+    _COHORT_SOURCE_SITE, _COHORT_SOURCE_SITES,
     _MAX_INVENTORY_PAGE,
     CohortDriftError,
     generate_inventory,
@@ -15,7 +15,7 @@ from stable.services.news_body_history import (
 
 class Command(BaseCommand):
     help = (
-        "对冻结 HRN cohort 生成只读总账 inventory，"
+        "对冻结指定来源 cohort 生成只读总账 inventory，"
         "不发网络请求、不写数据库。"
         "可选 --expected-count 和 --expected-id-set-sha256 用于 cohort 漂移检测。"
     )
@@ -38,8 +38,8 @@ class Command(BaseCommand):
         expected_count = options.get("expected_count")
         expected_id_set_sha256 = options.get("expected_id_set_sha256")
 
-        if source_site != _COHORT_SOURCE_SITE:
-            raise CommandError(f"只支持 {_COHORT_SOURCE_SITE} 的历史正文盘点")
+        if source_site not in _COHORT_SOURCE_SITES:
+            raise CommandError("来源不在五地区已支持的明确白名单内")
         if max_id < 1:
             raise CommandError("--max-id 必须 >= 1")
         if not (1 <= page_size <= _MAX_INVENTORY_PAGE):

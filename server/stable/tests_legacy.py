@@ -1858,6 +1858,8 @@ class AdapterTests(TestCase):
         for adapter, region, language, title in cases:
             with self.subTest(adapter=adapter.__class__.__name__):
                 listing_href = f"{adapter.link_path_keywords[0].rstrip('/')}/test-article"
+                if isinstance(adapter, SportingLifeAdapter):
+                    listing_href += "/123456"  # 当前站点文章路径包含数字ID；列表首页不算文章。
                 listing = listing_html.replace("/news/test-article", listing_href).replace("France racing at Deauville", title)
                 detail = detail_html.replace("France racing at Deauville", title)
                 stubs = adapter.parse_listing_html(listing, url=adapter.base_url)

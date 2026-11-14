@@ -112,7 +112,8 @@ class NetkeibaAdapter(SourceAdapter):
             body_ja_normalized=body_normalized,
             published_at=published_at,
             images=images,
-            metadata={"publisher": self._extract_publisher(soup)},
+            original_content_html=html,
+            metadata={"publisher": self._extract_publisher(soup), "published_at_verified": bool(re.search(r"\d{4}年\d{2}月\d{2}日.*?\d{2}:\d{2}", published_text)), "published_at_evidence": {"raw": published_text, "selector": ".News_Data_Time", "precision": "minute" if re.search(r"\d{4}年\d{2}月\d{2}日.*?\d{2}:\d{2}", published_text) else "unknown", "timezone": "Asia/Tokyo"}},
         )
 
     def normalize_source_payload(self, stub: SourceArticleStub, detail: SourceArticleDetail) -> CanonicalNewsDraft:
@@ -126,6 +127,7 @@ class NetkeibaAdapter(SourceAdapter):
             body_ja_normalized=detail.body_ja_normalized,
             published_at=detail.published_at or stub.published_at,
             images=detail.images,
+            original_content_html=detail.original_content_html,
             comment_count=stub.comment_count,
             attention_count=stub.attention_count,
             rank=stub.rank,

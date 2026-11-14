@@ -28,7 +28,10 @@
     "docs/changes/next-version-capabilities/lanes/B/B057-remaining7-end-to-end-test-prep/obligations.json",
     "docs/changes/term-display-sql-20261103/benchmark.json",
     "docs/changes/term-display-sql-20261103/pg-receipt.json",
-    "docs/changes/hkjc-horse-name-display/impact_summary.json"
+    "docs/changes/hkjc-horse-name-display/impact_summary.json",
+    "docs/changes/p01-news-quality-20261027/*.json",
+    "docs/changes/p01-annotation-driven-translation-20261114/*.json",
+    "docs/changes/p01-main-integration-20261114/ci-scope.json"
   ],
   "high_risk": [
     ".codex/agents/application.toml",
@@ -989,7 +992,10 @@
     "server/stable/services/horse_basic_profile_prepare_input.py",
     "server/stable/migrations/0081_managed_readonly_steps.py",
     "docs/changes/qq-retirement-20261103/release-manifest.json",
-    "docs/changes/term-display-sql-20261103/release-manifest.json"
+    "docs/changes/term-display-sql-20261103/release-manifest.json",
+    "server/stable/migrations/0086_p01_news_quality.py",
+    "server/stable/migrations/0087_p01_immutable_publication.py",
+    "server/stable/migrations/0088_p01_sealed_evidence.py"
   ],
   "paths": {
     "docs/changes/next-version-capabilities/lanes/C/U01-offline-cases.json": [
@@ -1755,6 +1761,102 @@
     ],
     "docs/changes/collection-recovery-arc/display-ci-scope.json": [
       "infrastructure"
+    ],
+    "server/stable/management/commands/backfill_news_public_index.py": [
+      "news_quality"
+    ],
+    "server/stable/management/commands/evaluate_news_annotations.py": [
+      "news_quality"
+    ],
+    "server/stable/management/commands/inventory_news_body_history.py": [
+      "news_quality"
+    ],
+    "server/stable/management/commands/prepare_news_evaluation.py": [
+      "news_quality"
+    ],
+    "server/stable/management/commands/report_news_quality.py": [
+      "news_quality"
+    ],
+    "server/stable/news_public_views.py": [
+      "news_quality"
+    ],
+    "server/stable/news_quality_views.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_annotation_evaluation.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_attribution.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_body_history.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_content.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_discovery.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_editorial.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_entity_taxonomy.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_entity_units.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_evaluation.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_feed.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_model_gateway.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_numeric_equivalence.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_pipeline.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_prompts.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_public_read.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_publication.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_quality_report.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_review.py": [
+      "news_quality"
+    ],
+    "deploy/docker/start-news-quality-worker.sh": [
+      "news_quality"
+    ],
+    "docker-compose.news-quality.yml": [
+      "news_quality"
+    ],
+    "server/stable/templates/stable/public/news_archive.html": [
+      "news_quality"
+    ],
+    "server/stable/templates/stable/console/news_quality_editor.html": [
+      "news_quality"
+    ],
+    "server/stable/templates/stable/console/news_quality_queue.html": [
+      "news_quality"
+    ],
+    "server/stable/templates/stable/console/news_quality_detail.html": [
+      "news_quality"
+    ],
+    "server/stable/templates/stable/console/news_quality_report.html": [
+      "news_quality"
     ]
   },
   "symbols": {
@@ -1943,6 +2045,30 @@
       ],
       "_race_calendar_queryset": [
         "five_region_race_governance"
+      ],
+      "article_editor": [
+        "news_quality"
+      ],
+      "article_update_api": [
+        "news_quality"
+      ],
+      "candidate_detail": [
+        "news_quality"
+      ],
+      "candidate_ignore": [
+        "news_quality"
+      ],
+      "candidate_mark_manual": [
+        "news_quality"
+      ],
+      "headline_control": [
+        "news_quality"
+      ],
+      "headline_select": [
+        "news_quality"
+      ],
+      "legacy_public_article_detail": [
+        "news_quality"
       ]
     }
   },
@@ -1971,6 +2097,7 @@
     "docs/changes/uk-race-automation/ci-scope.json",
     "docs/changes/uk-race-automation/transport-ci-scope.json",
     "docs/changes/five-region-race-governance/ci-scope.json",
-    "docs/changes/collection-recovery-arc/display-ci-scope.json"
+    "docs/changes/collection-recovery-arc/display-ci-scope.json",
+    "docs/changes/p01-main-integration-20261114/ci-scope.json"
   ]
 }

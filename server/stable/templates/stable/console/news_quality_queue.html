@@ -1,0 +1,13 @@
+{% extends "stable/console/base.html" %}
+{% block title %}新闻质量审核{% endblock %}
+{% block content %}
+<div class="page-header"><div><h2>新闻质量审核</h2><p>查看全文处理、待审原因与独立发布稿。点击来源标题进入审核记录。</p><a href="{% url 'console-news-quality-report' %}">最近七天观测报告</a></div></div>
+<form method="get" class="toolbar">
+  <label>状态 <select name="state"><option value="">全部</option><option value="review">待人工处理</option><option value="pending">排队中</option><option value="running">处理中</option><option value="ready">可发布</option><option value="shadow">观察</option><option value="published">已发布</option><option value="duplicate">重复事件</option><option value="rejected">未入选</option><option value="stale">已被新版本替代</option></select></label>
+  <label>地区 <select name="region"><option value="">全部</option><option value="japan">日本</option><option value="hong_kong">香港</option><option value="united_kingdom">英国</option><option value="france">法国</option><option value="united_states">美国</option></select></label><button>筛选</button>
+</form>
+<table><thead><tr><th>来源标题</th><th>地区</th><th>状态 / 阶段</th><th>原因</th><th>版本时间</th></tr></thead><tbody>
+{% for run in page_obj %}<tr><td><a href="{% url 'console-news-quality-detail' run.pk %}">{{ run.source_snapshot.title }}</a></td><td>{{ run.primary_region }}</td><td>{{ run.state }} / {{ run.stage }}</td><td>{{ run.reason }}</td><td>{{ run.created_at|date:'Y-m-d H:i' }}</td></tr>{% empty %}<tr><td colspan="5">当前筛选下没有稿件。</td></tr>{% endfor %}
+</tbody></table>
+<div class="toolbar">{% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}&state={{ request.GET.state|urlencode }}&region={{ request.GET.region|urlencode }}">上一页</a>{% endif %}<span>{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>{% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}&state={{ request.GET.state|urlencode }}&region={{ request.GET.region|urlencode }}">下一页</a>{% endif %}</div>
+{% endblock %}

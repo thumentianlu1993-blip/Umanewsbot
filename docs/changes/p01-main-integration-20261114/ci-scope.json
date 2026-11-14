@@ -1,0 +1,901 @@
+{
+  "schema_version": 1,
+  "base_sha": "15d8b53ed24d4e06583c9caf9aa2f8b1583f6066",
+  "reason": "从最新main仅集成P01新闻依赖与九类翻译能力；不修改赛事采集/字段/来源权限。新增表、可空引用和兼容默认的迁移由P01主线迁移测试、原预算/只读表完整恢复测试及发布合同覆盖。共享新闻、马匹关注、公开入口、来源正文、模型预算、核心与选测基础设施纳入；所有路径/字节/模式和base精确绑定，不改通用full规则。",
+  "domains": [
+    "news_quality",
+    "news_translation",
+    "horse_page",
+    "content_contracts",
+    "release",
+    "infrastructure",
+    "module:stable.test_editorial_headlines",
+    "module:stable.test_france_news_freshness_change",
+    "module:stable.test_news_body_history",
+    "module:stable.test_news_production_integrity",
+    "module:stable.test_race_news_exposure",
+    "module:stable.test_single_migration_owner"
+  ],
+  "changes": [
+    {
+      "path": ".env.example",
+      "status": "modified",
+      "before_hash": "a10d91bf33fa0375aa8659934ab112a8770141d081b9ee13b0b5d17f5358d3fd",
+      "after_hash": "a128d91b13e7030efc474df24e9dec9e95c41e4e003ab99e5cc9d6089c6cb38c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "deploy/docker/start-news-quality-worker.sh",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "1485caf339d252274349f5c6a6448f37f7e2154090f5e71a15462035bed20e86",
+      "before_mode": null,
+      "after_mode": "100755"
+    },
+    {
+      "path": "deploy/nginx/nginx.conf",
+      "status": "modified",
+      "before_hash": "7bc8fd14bdde507fc26545303952810adc4f4cbb627e4761d806559751092934",
+      "after_hash": "30284469517f7ac0de2d1e415a02ce6c4446fc6dcc729b09ea9940a2aec95440",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docker-compose.news-quality.yml",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "31e5bc7fde7c0aa539f1c7fa43f7ee84ac8c3a9174784ab1b60914e4ea0d3df5",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-annotation-driven-translation-20261114/data-manifest.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "d42a1d7e2aa09fafe4b90c2d30537d5d7ef24a6c2f070daea699c2dc7ee9247e",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-annotation-driven-translation-20261114/design.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "266e52d338ae2784eaf3716d5139f11a3a63f26f62b943c9c83edaf9a0bfe0d3",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-annotation-driven-translation-20261114/evaluation.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "a596928b4f3d4c42848c6e1d34fd9ec454705364f8d406fcf1a1625d2644a808",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-annotation-driven-translation-20261114/fact-manifest.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "adb151633d031e9f2024bdb30dbe9510c61d25b91aeb7b79a238313d41ad4e0e",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-annotation-driven-translation-20261114/rollout.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "21bc43887a8123a24fd2cc768584f2578d755000fc266af5956db7c606673e93",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-annotation-driven-translation-20261114/spec.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "42c0bb9fa58545e9128fe9b2b63436ffcfba89f43f792e68be6e3e6bbd39b0ca",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-annotation-driven-translation-20261114/tasks.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "bf26e7c9101572e1c487788dce3f498f16c8d978c32e5d9fd072d6b92484e902",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-annotation-driven-translation-20261114/test_cases.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "fd9609b596586dbe419bed603c969f133ee2c4f7431f107434ddc1e71f946443",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-main-integration-20261114/design.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "fe540dc086ad8c1a1af2b4acb12ed75e32261a38c462070798f8876e51d13e36",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-main-integration-20261114/rollout.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "72d32c36e12aae4c008d7d6daa5ce0c90271a126adf440952ea233129d0d573d",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-main-integration-20261114/spec.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "2b1ea01affbfba02e7412dd5aafe17b5d3f9a806924274bf27928d4017e10f61",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-main-integration-20261114/tasks.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "cb36515f095d3efa418077b933f1c105fd47f547f0a3e1aced144f70454d4a01",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-main-integration-20261114/test_cases.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "00dca037317cad70907b6f8fc4d93136ca44ca61cc5f20c29a9a30c584506d86",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-news-quality-20261027/design.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "664fa8c39fd1b068f46c2e93c629827ed4839f65fd4f057f5fbc2bff79ccd0a9",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-news-quality-20261027/local-input-inventory.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "0a1573bea78eae2d7bd4f18f757544b4743f16e6bb68636d5d50ef273ba1379b",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-news-quality-20261027/policy.example.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "8282e95eddf190a6fecd31c136694d81eac9f841ce6a51094bd069b5fcfb06ca",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-news-quality-20261027/rollout.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "0e25712bcb6910dbf10ed68c3e0b49410b7e57cbcd7c0245104f2a37c0b6164f",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-news-quality-20261027/spec.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "72b442febcf654b489464f69b811efd5bfd8c35b1fe71e8e19cb6c545195e089",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-news-quality-20261027/tasks.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "547e3827f0b0c13c0b1c242137b5be1f7376efd3ab11b19aafc980be606005f4",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-news-quality-20261027/test_cases.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "e276fd4645eda78dbf1ce49d15937ecaa5d476f45a9c2f294faf5ff23516ceb7",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/app/settings.py",
+      "status": "modified",
+      "before_hash": "bae91131df922372dcf2f414502c32b5070d539cc2a2f027c8366271ffd47e80",
+      "after_hash": "7ce16f5b46988321f0e8694918a748283acf206b6bd7b6058676327402cecf73",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/app/urls.py",
+      "status": "modified",
+      "before_hash": "ef10d8d63dd3f15c7461d75b684fbcfc515f74db436a560f1a1737c9f73e5ef7",
+      "after_hash": "bbf6a09ba4d561f1040d39836c09a99bdcc0925cb20320f61b3d0896247f5d2c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/adapters/international.py",
+      "status": "modified",
+      "before_hash": "d97c2ddb82c7f69735097706efe6618e38718990f299ffa9f2276a59b235962d",
+      "after_hash": "e2fda111753e6bde187d339f41bcc3e7cb53014296190404ecfd9c1d1c70e41e",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/adapters/jra.py",
+      "status": "modified",
+      "before_hash": "9f8c1bac339fdd4ae87c1c11a1b652195b5de40245c21747e4b774f841fc1cad",
+      "after_hash": "b3846c5b77ecf573b51d9742c4c8b7da36c710cb750541c152a2f627b1c7b7da",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/adapters/netkeiba.py",
+      "status": "modified",
+      "before_hash": "713cf433b15c5d86e08f6d5082ca5ca1789069dd2c1191debcc7fbf405794209",
+      "after_hash": "55fa4b5271d90cc46b9c944fe5506d7d102fd073814caf4711425fa6dcca4010",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/admin.py",
+      "status": "modified",
+      "before_hash": "9e44fe151de897af3051977fd460928ab574b5228e20bf21e7b6e88df76df2b8",
+      "after_hash": "ab93f13005b74e2c408e16695697f02ca59c10a0c99e851bfce916ae14f4c7e0",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/management/commands/backfill_news_public_index.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "311b738f1fad12aa73d7bd0d69ae8ddbc0a6ad5d7602064350e6ceada5b6681d",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/management/commands/evaluate_news_annotations.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "c28aa2f6f560625c2ac88a048818bf6ebc315ed5a4732e933aaa8e243afd3c8c",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/management/commands/inventory_news_body_history.py",
+      "status": "modified",
+      "before_hash": "d8f95fd5a8e5b33b255d0be34ae8cfa8a4c3b3333bf5d95287c0764eabba7acc",
+      "after_hash": "e7e8a10b662bf2351ec4f6e870bb05a25dcb30b2e1804d61bff5f77f151f189b",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/management/commands/prepare_news_evaluation.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "9917c91620ac69c8dfed177d7df31a48c396d78880765664b4286fe2115125a8",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/management/commands/report_news_quality.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "5f5bab7f010e0d6efef4099d6a7a4aa0c4706f20c409ff8b295b8bbbbed935f4",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/migrations/0086_p01_news_quality.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "bd10d62ddfd54bbdd71de696d7b355352fa7eab0d1553f85260429be942d2c2a",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/migrations/0087_p01_immutable_publication.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "485e7d57703b180b69617a432592e0a227fe3e4b33d98ba5b31957ed94477567",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/migrations/0088_p01_sealed_evidence.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "acabad81916a5dba0540dd1f66936df8d061052f812eebc90672a3a75e85c51a",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/models.py",
+      "status": "modified",
+      "before_hash": "f4521779a21bbf8088ab7e028ac134f362d113a89c644f3060e90d5476f95751",
+      "after_hash": "7041d4c2533a5248b7ceb277e19ef0ddda6052b3e5fba5427ca5fc5b2dbf644b",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/news_public_views.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "d6719630875bbbf4fba3ef000641f546346d8b48e6c7b262d39c7d723ba2ebbc",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/news_quality_views.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "c5ae77d5b9cbb7106743473ad4a48e98a37782bf11094c547744185a77aef365",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/release_0078_test_fixture.py",
+      "status": "modified",
+      "before_hash": "65dcc6dc2ab6ed498d6d4441667be42cbf9d0c9c77438677083ace28218ac0c2",
+      "after_hash": "3e5e43dac8596257597b0a12d13aeb1ea890a768caa5f96926a9bb829c341ff0",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/article_content.py",
+      "status": "modified",
+      "before_hash": "ef623f9a549ce8ae9b41b3df5f9071cd8e2d44e4b7b684c3930b00470687e922",
+      "after_hash": "d8fc0f03cd89e51c08c7851baa33f992f10727a154eb305bc0415a5e9ec2832c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/automation.py",
+      "status": "modified",
+      "before_hash": "f45fd4c59a46fb8128c01504aa78b7e2efe9402a48f85217f24bd2933e9f3b58",
+      "after_hash": "8f9556810ad7193e9beaa4c20237379b4e3230c1ef6cf4a7895c3d8cc8a2e505",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/editorial_headlines.py",
+      "status": "modified",
+      "before_hash": "0e7f46c2d53dbb7aebe7238c36f534209a006f685aa24251f790325cac88cfc1",
+      "after_hash": "96c262b34fdd95bdc7b7cdc35aee035b8f7954eb0c03815be45c52ded068b66e",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/horse_profiles.py",
+      "status": "modified",
+      "before_hash": "a7a57e0d000c1f7cdbad2665965a879497db2297e9f3247f6e0127d3c3dc54f4",
+      "after_hash": "88f4ecdb005224bb6d11da785921e5aa84d865d394a3b3e8c733533f89a28747",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/ingestion.py",
+      "status": "modified",
+      "before_hash": "f93a632756f693a9e1d4e654a080cab388a3d01d7db5def1c9d8de6dd7c6c868",
+      "after_hash": "3eae96fa2e2407f54145c01bbe0a508956b8971a3794956615cffbdb0cf1b45d",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/news_annotation_evaluation.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "11426806275a3f0c15d7a39ddb7153c89fac9a1a6bc82238c4bfc7d71ec4f7ea",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/news_attribution.py",
+      "status": "modified",
+      "before_hash": "5bfb35ac45d4b7d5d93d529f5e08ad8c49840e8016c6be61062e3d9fe6cbb27e",
+      "after_hash": "a31ffa0770d4cdb21b615a237db9054307291c6b8222be06b6af31a1d7dc2b6c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/news_body_history.py",
+      "status": "modified",
+      "before_hash": "c7fb6d66c8452d32dc245ebe8e00146e632aedab0cfb3d08c766a729e18619af",
+      "after_hash": "89ac545e6ad876f18da45a3f0cdc3b67d21aa4453c2357940b25e223ff7ee3b6",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/news_content.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "fe79f8a61dfef9c726715dc1cebaa6a8d25e32f4b0d68bdb5767e63724128a6f",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/news_discovery.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "83dce9b186476cb98ec24b05fc724573e7a18cb1ca2f6718b75e637e4b99aea8",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/news_editorial.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "45980288dafd4930e9efd78e830468579f49b461f3be345b9a723fe248c8b700",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/news_entity_taxonomy.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "71aeb9315a69933c0fce1d1f29a5c9a2c6f4aea9fe0ba7b2d8ed9cd4b047a501",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/news_entity_units.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "8ef14c61b026815d88194e9b33ca9282b3f50ba1b22562b3178dfae3a4847a72",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/news_evaluation.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "daba8993f11bee77ce03eb95d637f213702e621722d444bf9680074da8fee711",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/news_feed.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "2a1ce26b2e605e27ee8e285ff310023e9cfe5cfa0375070f4cfa011296a55c9b",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/news_model_gateway.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "1617dad52b2d07ff1305bff14b4b3cf22ef987ffc5abee4e309639493d049e43",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/news_numeric_equivalence.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "4d4214aa224bd0d001b6a296d195f159fb13f97166efad3be5ec2e1f2e6b29f7",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/news_pipeline.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "b1aae68b0a912c53daa8e2bae0135b21dbefc35c3e524c6d51da1f8883569357",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/news_prompts.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "baebaabf306ad9a19215803c5985d83851fb8756e37f63a79b18f769d00e9eaf",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/news_public_read.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "ed3bd6042797a72b1d17c48be9a5b61ca77921d1e183a090c61b50d19c5a9c5d",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/news_publication.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "ff46e3b8bc70fcb8f20157dad1cab6706e0a0f0a1529e70cec48f239ad9a164d",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/news_quality_report.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "135f84c948ac5d74f844bfe8ced8aadb16082a5daf39c0608b73f17c808cf4bd",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/news_review.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "328da6a4eb6d8a9e1e90386d6784da27321b6ab8a0948970c017783124ce7f49",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/qq_auto_push.py",
+      "status": "modified",
+      "before_hash": "1c2e47ff5f74264359724a3fc564100913f5ce6ca1186e725fa77560439b21a4",
+      "after_hash": "9547c7d33e241794e24b67881aa2565861129e4f116c84bae591a5c006aa6b9d",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/rewriting.py",
+      "status": "modified",
+      "before_hash": "86ee595be550d4d21062e0402732ab83328536825013aa56b095acf574971df4",
+      "after_hash": "9b30973583541193e6ce3478cb5b6559e4038d9c84da9898da13749e30b1d383",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/translation.py",
+      "status": "modified",
+      "before_hash": "ead90c7e783211dcb1ce62a27ca3fcb1f42473d0a8803d91667c0c9b9b27c0e1",
+      "after_hash": "f4f2055610cece803d920614b6fa6a7c65a17827505cbece2aaaebeaf1747c54",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/translation_recovery.py",
+      "status": "modified",
+      "before_hash": "3342060258f9c1816fd96e30312436859135d4e65b10753a04b9bd8c615f2d20",
+      "after_hash": "efbb574fe7fdd3bb1b7dbeaeef5690be12a8b06c80e4ea094676060f0b268992",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/tasks.py",
+      "status": "modified",
+      "before_hash": "1d83da8c1dea2dae3263e4570777b92ddf939df9738221b157cf4a2737255053",
+      "after_hash": "58ca82102359b560fe5255afb45f1d853a6d3052e6f9a0ea951cdcd83ce7b2a8",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/templates/stable/console/base.html",
+      "status": "modified",
+      "before_hash": "06a7abe5a7d3e15d91d7f35443226852a754f5463ea864f7dfc9166835e0d9c9",
+      "after_hash": "baeb52016917ad7c280583e6d0fe86ee73969743b5dbfb3e99a0432e8cf2a88d",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/templates/stable/console/headline_control.html",
+      "status": "modified",
+      "before_hash": "d14a87bde0529b7287080c66248b6ac4fbd692b3092becf6c8d28d68c1e01801",
+      "after_hash": "13d9d455ae83176d2dfad4ff4575a65caf3e9be248969ca31e71584a1f82f14a",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/templates/stable/console/news_quality_detail.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "f911fe123479dc85c2e45d430fa2293c565d4afecc987965bed595ae595f3ee6",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/templates/stable/console/news_quality_editor.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "f021cf9074d643b1739740490701d65271940506b1b82486fa15f129f2f2a281",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/templates/stable/console/news_quality_queue.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "163eaec89d97c31ca3ab705bfc0408c731c17fd4e670897d63b078d664ba9c9e",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/templates/stable/console/news_quality_report.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "78ff627d0dd7adf4e8f32c4e827faebffbf130f8d9fc4df1dcf2b80ff13d3495",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/templates/stable/public/detail.html",
+      "status": "modified",
+      "before_hash": "f588c7e4ace39c4d767dacb08be1f96400e04c2926b5a589731870b0820b2fc7",
+      "after_hash": "810fd41fae11fafad5070e063bd2fb3c3fa8c108467320902bf27ee5674e7bd3",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/templates/stable/public/feed.html",
+      "status": "modified",
+      "before_hash": "69f8c64ea6101e3ba40e62b4119328a7eb705abbc2e6343d2592ef7808a43d36",
+      "after_hash": "210f95830ed3dae4d56f4029d6d4ab09741f008c8b757e21463652c0a79f60a3",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/templates/stable/public/news_archive.html",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "33fca5a8155790e89c9a7df83cf825017a3bde5d9d1d9f9c201748a398a19850",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_france_news_freshness_change.py",
+      "status": "modified",
+      "before_hash": "1ef7089e4a7f30d1d32cb881f98b6c114f6a393240cb76103b0f4f043a968af9",
+      "after_hash": "b462bc7cb7e017458a9ad4b1926895bbdcb0b1671a5a6ac989c959264d852729",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_managed_readonly_steps.py",
+      "status": "modified",
+      "before_hash": "a786ecbdb213b2bc9b7c08ff9eb616ab2b426aa9a291bd82f12c35177463a21f",
+      "after_hash": "185390e0f4338422540653d0f37898738553611faa0288a7b43423e00e9b1859",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_p01_annotation_translation.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "888a18ac9858624597cf3af5e27ce2b73e48a43b2ed3a2d6563e3f8a4b29e2e9",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_p01_entity_units.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "0df38fb6a3dc719ddb8f697d472889e202d7a1a7a5a721f35a3aa0606dbca68a",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_p01_main_integration.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "2f4b722783e8260227cc9c12dc57623974309f19f95ffc06da183aecca18caa8",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_p01_news_budget.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "513c5900c118ecfbc274b47c9f3cc706a139a9cc06ef915424d87ac08cbb35a7",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_p01_news_claims.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "b9ff88005b63d5c941aba8cd4ea9b2df8d84d389156d2fbb065ac1c671e1dd0c",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_p01_news_console.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "57000a55019addca3ee853246793e8309361eaecf45cc2b867973b1f63d0e146",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_p01_news_content.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "3ce2f4bbf5d5d4e6675adb3fc3c1948469690c3b7e309fb11afd37bf7d46d8bd",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_p01_news_corrections.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "e0bfa00617f4be1a435dd2cf7cfa4dd619b5524c4b7f6e28f6c859804f0340f2",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_p01_news_discovery.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "2cc7e65f5ff0a0e71ebe6b1e1ec3eed49beb5dc7354d61becdc14c1d03cb8d92",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_p01_news_editorial.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "9adf3915ca4d67f90c170a0afd1914725cf36c1a9598899b6239e4e5140e97e3",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_p01_news_evaluation.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "34a97b2c00e1f90ff438d75e369103c44fa807f172a8563670e03fb4f124c4e8",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_p01_news_feed.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "dd89ed6d065666a61425c99e37f3fa380be9b6ef92fb3873ee6cbe651e9c9599",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_p01_news_history.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "4036e2a0ffd7b38192a1b732e55b5039a5640238d94c8be3d3ffc7b2afdeea8e",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_p01_news_immutability.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "f4b6a0de85a610e3a67f5c59898d25b224c4069a8851eb1058ae70e06d6848cd",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_p01_news_pipeline.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "7979e4b0c764af93548095b73aa1080dfbf41fe38efc67d4223d0b45c2b0349f",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_p01_news_public_views.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "13e563de627600d02b283675c612eb8413b2b955aaafd33b794e7e2469f124de",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_p01_news_publication.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "3a140f211b8edf8929ad4367c5613162710c89ff38fc8d52f63955ce3d2f6bf5",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_p01_news_recovery.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "3120ad5458d0b366d2433ea6d117a1f17c68c38035abd5c3a26102425c5782a3",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_p01_news_relations.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "38aa394a2623405b1edd510b94951c662758a4840fc7e56d6dfdc761cecb6669",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_p01_news_report.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "124758b884c14ad5c32a60f672be4d23beef3c455a149283bf021109ea0cbb0d",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_p01_news_review_regressions.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "202119b485f2153d9e7f9f9f84cdb376959b744e78ff7aea76668c2121be7c02",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_p01_news_source_evidence.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "8fd52d9691be3bef295f420787f1bad1b28031de9ddec27841e2086eebe0d701",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_p01_news_workflow.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "5ac37648c2f200523f579b17fca3aab4af5cbd603633af4207f52ff54f83e6e3",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_translation_retry_budget.py",
+      "status": "modified",
+      "before_hash": "afa84ee376aa1a2a8f55c3d87c602049f60bd169b5818c7390ec04aab36b793f",
+      "after_hash": "25fe674eb39e09bdf4a7f8ffa8061d8e770878903c93c48999d02ba83c36e3ea",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/tests_legacy.py",
+      "status": "modified",
+      "before_hash": "b66dc65f59942ae400eda68f2ed1274f079776ce047e6f7a056abc34054a5141",
+      "after_hash": "20d44c0613b585dbe722b456eb2e4d036fdf79690df5f51e4533b3d33241f093",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/urls.py",
+      "status": "modified",
+      "before_hash": "6632aaa84f11d27ebc00381d58e7c3c8a68114fa0a80b200d2dc556fc878c29b",
+      "after_hash": "c547755456adfda72d97757f2dd43caf164ce9c38fc1df8209ae4461aa9dc3a8",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/views.py",
+      "status": "modified",
+      "before_hash": "44b81bca28ba3aa9e7bc1d20536aa65ce6fdf7552f8426477fc6554bf93ec238",
+      "after_hash": "757e3c76eb653ef02c1a376d8c97def150de5b1c4a5dbe016e5999dd2646d2b1",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/catalog.json",
+      "status": "modified",
+      "before_hash": "bab7cba74610bc3b9540663c4836ed2f484d80ca9151419830f0db0854583d75",
+      "after_hash": "5dec96904ecc94b07668b94e815df034ebba217a648dc26ae8ef1e267dc95460",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "2317ff4715b700ae838c0c5932480d5086c457829e85155cdc41e5e898c6b290",
+      "after_hash": "44e9f98e2915e9833fa16b29499a9b15697c86fd7735cbe0eb7839085f380719",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}

@@ -1232,3 +1232,45 @@ RACE_DATA_SYNC_UK_PRE_RACE_ENABLED = env_bool("RACE_DATA_SYNC_UK_PRE_RACE_ENABLE
 RACE_DATA_SYNC_US_PRE_RACE_ENABLED = env_bool("RACE_DATA_SYNC_US_PRE_RACE_ENABLED", False)
 RACE_DATA_SYNC_US_CALENDAR_SNAPSHOT_FILE = os.getenv("RACE_DATA_SYNC_US_CALENDAR_SNAPSHOT_FILE", "").strip()
 RACE_DATA_SYNC_US_CALENDAR_SNAPSHOT_SHA256 = os.getenv("RACE_DATA_SYNC_US_CALENDAR_SNAPSHOT_SHA256", "").strip()
+
+
+# P01 默认停用。模型、费率、来源和激活时点必须来自绑定摘要的本地策略文件。
+NEWS_QUALITY_MODE = env("NEWS_QUALITY_MODE", "off")
+NEWS_QUALITY_INDEX_ENABLED = env_bool("NEWS_QUALITY_INDEX_ENABLED", False)
+NEWS_QUALITY_FEED_ENABLED = env_bool("NEWS_QUALITY_FEED_ENABLED", False)
+NEWS_QUALITY_DISPATCH_ENABLED = env_bool("NEWS_QUALITY_DISPATCH_ENABLED", False)
+NEWS_QUALITY_API_KEY = env("NEWS_QUALITY_API_KEY", "")
+NEWS_QUALITY_BASE_URL = env("NEWS_QUALITY_BASE_URL", "")
+NEWS_QUALITY_POLICY = {}
+NEWS_QUALITY_POLICY_FILE = env("NEWS_QUALITY_POLICY_FILE", "")
+NEWS_QUALITY_POLICY_FILE_SHA256 = env("NEWS_QUALITY_POLICY_FILE_SHA256", "")
+if NEWS_QUALITY_MODE not in {"off", "shadow", "enforce"}:
+    raise ValueError("NEWS_QUALITY_MODE invalid")
+if NEWS_QUALITY_POLICY_FILE:
+    import hashlib as _news_hashlib
+    import json as _news_json
+    _news_policy_bytes = Path(NEWS_QUALITY_POLICY_FILE).read_bytes()
+    if len(_news_policy_bytes) > 262144 or _news_hashlib.sha256(_news_policy_bytes).hexdigest() != NEWS_QUALITY_POLICY_FILE_SHA256:
+        raise ValueError("NEWS_QUALITY_POLICY_FILE digest invalid")
+    NEWS_QUALITY_POLICY = _news_json.loads(_news_policy_bytes)
+    if not isinstance(NEWS_QUALITY_POLICY, dict):
+        raise ValueError("NEWS_QUALITY_POLICY must be an object")
+    del _news_policy_bytes
+CELERY_TASK_ROUTES.update({
+    "stable.tasks.process_news_quality_run_task": {"queue": "news_quality"},
+    "stable.tasks.scan_news_quality_runs_task": {"queue": "news_quality"},
+    "stable.tasks.build_news_quality_feed_task": {"queue": "news_quality"},
+})
+if NEWS_QUALITY_DISPATCH_ENABLED:
+    CELERY_BEAT_SCHEDULE["scan-news-quality-runs"] = {"task": "stable.tasks.scan_news_quality_runs_task", "schedule": 60.0}
+if NEWS_QUALITY_FEED_ENABLED:
+    CELERY_BEAT_SCHEDULE["build-news-quality-feed"] = {"task": "stable.tasks.build_news_quality_feed_task", "schedule": 300.0}
+
+# 仅记录匿名响应编号、generation 和实际展示条目；不含 IP、Cookie 或用户标识。
+if LOG_DIR:
+    LOGGING["formatters"]["news_json"] = {"format": "%(message)s"}
+    LOGGING["handlers"]["news_exposure_file"] = {
+        "class": "logging.handlers.WatchedFileHandler", "filename": str(Path(LOG_DIR)/"news-exposure.jsonl"),
+        "formatter": "news_json",
+    }
+    LOGGING["loggers"]["stable.news_exposure"] = {"handlers": ["news_exposure_file"], "level": "INFO", "propagate": False}
