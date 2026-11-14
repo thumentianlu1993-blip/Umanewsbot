@@ -1,0 +1,109 @@
+{
+  "description": "第三轮真实片段及真实模型审校；expected仅是测试期望，不是模型发现或人工gold。",
+  "cases": [
+    {
+      "sample_id": "D031",
+      "block_id": "b020",
+      "source_url": "https://www.jra.go.jp/news/202610/102803.html",
+      "source": "身元引受調教師",
+      "target": "身元引受调教师",
+      "finding": "普通职位未自然中文化",
+      "observed_model_audit": {
+        "verdict": "pass",
+        "checks": {
+          "names": true,
+          "numbers_units": true,
+          "dates": true,
+          "placings": true,
+          "negation": true,
+          "modality": true,
+          "attribution": true,
+          "completeness": true,
+          "unsupported_claims": true
+        },
+        "issues": []
+      },
+      "expected_issue_kind": "fluency",
+      "expected_issue_is_synthetic": true,
+      "source_state_sha256": "b8e9fb240f422fd2e02f13f8d1255854cbd0c39fb5736f9378fe2b326bf9f5b0"
+    },
+    {
+      "sample_id": "D025",
+      "block_id": "title",
+      "source_url": "https://www.thoroughbreddailynews.com/second-french-jockey-title-for-mickael-barzalona/",
+      "source": "Second French Jockey Title For Mickael Barzalona",
+      "target": "巴米高的Second French Jockey Title",
+      "finding": "普通成绩描述被整体保护",
+      "observed_model_audit": {
+        "verdict": "pass",
+        "checks": {
+          "names": true,
+          "numbers_units": true,
+          "dates": true,
+          "placings": true,
+          "negation": true,
+          "modality": true,
+          "attribution": true,
+          "completeness": true,
+          "unsupported_claims": true
+        },
+        "issues": []
+      },
+      "expected_issue_kind": "fluency",
+      "expected_issue_is_synthetic": true,
+      "source_state_sha256": "8b4920c3af68049ec73dcd42d17e5217bdf7472048ec91219da52e0cf12d96f4"
+    },
+    {
+      "sample_id": "D011",
+      "block_id": "b008",
+      "source_url": "https://www.sportinglife.com/racing/news/tim-easterby-pays-tribute-as-copper-knight-retires/234741",
+      "source": "William Haggas’ charge made a sparkling start to his career when winning on debut at Haydock last month but Our Son Oscar provided a much sterner test of his credentials on Friday.",
+      "target": "William Haggas麾下这匹马上月在上月于Haydock首秀夺冠，职业生涯开局亮眼，但周五在Our Son Oscar对其能力构成了更严峻的考验。",
+      "finding": "重复词语及主体句法不清",
+      "observed_model_audit": {
+        "verdict": "pass",
+        "checks": {
+          "names": true,
+          "numbers_units": true,
+          "dates": true,
+          "placings": true,
+          "negation": true,
+          "modality": true,
+          "attribution": true,
+          "completeness": true,
+          "unsupported_claims": true
+        },
+        "issues": []
+      },
+      "expected_issue_kind": "fluency",
+      "expected_issue_is_synthetic": true,
+      "source_state_sha256": "35de65d1b0aae3d18f4d24b1fc2e1d0c35977917c273e60bca77fe5a53ce0ac1"
+    }
+  ],
+  "prompt_baseline": {
+    "commit": "cd7cfbfc46e14ffb92a731268ef340210e35ea65",
+    "v3_char_limits": {
+      "event_classify": 1502,
+      "entity_check": 1771,
+      "translate_full": 1076,
+      "fact_audit": 1338,
+      "body_review": 287
+    },
+    "legacy_hashes": {
+      "legacy": {
+        "event_classify": "054a393927b7b82e421e986aee1dd45e2be6120094fb78a61606dbff5fca44c8",
+        "entity_check": "f364ec3b81fd2304b66bd0db39537e8b42dde890dc2c7a5240b31c022ae03f8d",
+        "translate_full": "8b2bc1244efdb87c670ad7a12361969506b58ab9e075908cd998dcc9733da77e",
+        "fact_audit": "85a32abacead82aa9d1dde798a0df063329086828bfe3ed7f62a53a517f48352",
+        "body_review": "c365c9215a17d1bc6590a2851f3e524c01b5ee495dd1aba29f8b6120e3db58e4"
+      },
+      "context-v2": {
+        "event_classify": "054a393927b7b82e421e986aee1dd45e2be6120094fb78a61606dbff5fca44c8",
+        "entity_check": "2521bf66326e0e6296932fd1e6112ee236daa72f8d5e0155ffeae8ec046783eb",
+        "translate_full": "dbc62cf78ecab35b96817ebae583f42b5fe35b228a6e6161cde8547b5f9dc382",
+        "fact_audit": "f78bc4bbe8d84152ea055abd79c9705c022347c38d1455c18633a691ad73c48b",
+        "body_review": "c365c9215a17d1bc6590a2851f3e524c01b5ee495dd1aba29f8b6120e3db58e4"
+      }
+    }
+  }
+}

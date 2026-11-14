@@ -26,3 +26,13 @@ RED必须在相应生产函数修改之前运行；导入/评测元数据错误�
 补充请求探针：真实复测runner经假传输抓到与gateway一致的low/16384参数；base带effort、deep超限、
 额外字段、receipt请求SHA漂移被拒，既有同operation不再次发出网络请求。
 补充选稿：实际payload的两份schema与prompt一致；新原文quote转换不能改动correction旧稿证据或放松身份。
+
+## 2026-11-15 三项收敛修复
+
+- Q1 普通描述/职位common_word经过实际unit解析→occurrences→protect→restore不产生占位符；同词明确具名的race/horse/honor仍保留，含重复位置/正式冠名，原文不被删除。测试不伪装为模型语义识别。
+- Q2 v3缺fluency的原九项pass必须失败；完整10项pass通过；v2/legacy原9项仍通过。删除版本键选择或放宽缺项即被捕获。
+- Q3 实际英国病句/法国未译/日本职位的期望审校问题（明确标为测试构造）须定位真实原文/目标；错引文、额外键、pass+issue、false无对应证据、kind与checks矛盾拒绝。删除证据/一致性检查即被捕获。
+- Q4 fluency/attribution问题走现有修复任务，块集合只含目标问题；title和summary独立，其他正文不变。一次修复后pass进入shadow、发布重放通过；再次fail进入review、不无限请求。uncertain既有deep路径继续回归。
+- Q5 发布重放不允许把新fluency删掉或修改历史payload；旧v2协议及人工目标继续受硬检查。无需新迁移/队列/幂等结构；现有PG生命周期/并发测试按影响范围回归。
+- Q6 最终Prompt由固定片段集中组装，四阶段总量及每阶段不超过cd7cfbfc；v2/legacy哈希完全相同。禁止按本批专名/错误句子增加运行时分支；语义正确性不靠字符串断言冒充真实验证。
+- Q7 离线评测入口只使用固定原件与期望响应，不允许网络/生产写入；输出区分原模型pass、期望发现及程序验证。后续真实评测样本/预算单独列明，本轮调用0次。

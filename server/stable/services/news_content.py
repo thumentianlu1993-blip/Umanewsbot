@@ -21,7 +21,9 @@ BODY_SELECTORS = {
     "tdn_france": ["span[itemprop='articleBody']", ".entry-content"],
     "horse_racing_nation": [".article-body"],
 }
-AUDIT_CHECKS = frozenset({"names", "numbers_units", "dates", "placings", "negation", "modality", "attribution", "completeness", "unsupported_claims"})
+from stable.services.news_prompts import audit_check_keys
+
+AUDIT_CHECKS = frozenset(audit_check_keys("legacy"))
 TOKEN_RE = re.compile(r"__P01_ENTITY_\d{3}__")
 BLOCK_TAGS = frozenset({"p", "blockquote", "table", "ul", "ol", "h2", "h3", "h4", "h5", "figcaption", "pre"})
 
@@ -247,7 +249,7 @@ def restore_translation(clean, entities, response):
 @model_schema
 def validate_audit(clean, target, response, *, contract_version="legacy"):
     if contract_version in {"context-v2", "context-v3"}:
-        return context_audit(clean, target, response)
+        return context_audit(clean, target, response, contract_version=contract_version)
     bounded_json(response)
     failed = {"passed": False, "reason": "audit_schema_or_unknown", "source_sha": clean["source_sha"], "target_sha": digest(target)}
     if (type(response) is not dict or set(response) != {"verdict", "checks", "issues"}
@@ -411,13 +413,14 @@ def hard_translation_checks(clean, target, entities=()):
             "summary_difference": sorted(summary_extra), "target_sha": digest(target)}
 
 
-def context_audit(clean, target, response):
+def context_audit(clean, target, response, *, contract_version="context-v2"):
     bounded_json(response)
+    checks = frozenset(audit_check_keys(contract_version))
     failed = {"passed": False, "evidence_valid": False, "reason": "audit_schema_or_unknown",
               "source_sha": clean["source_sha"], "target_sha": digest(target), "repair_block_ids": []}
     if (type(response) is not dict or set(response) != {"verdict", "checks", "issues"}
             or response.get("verdict") not in {"pass", "fail", "uncertain"}
-            or type(response.get("checks")) is not dict or set(response["checks"]) != AUDIT_CHECKS
+            or type(response.get("checks")) is not dict or set(response["checks"]) != checks
             or any(type(v) is not bool for v in response["checks"].values())
             or type(response.get("issues")) is not list or len(response["issues"]) > 128):
         return failed
@@ -428,7 +431,7 @@ def context_audit(clean, target, response):
     try:
         for issue in response["issues"]:
             if (type(issue) is not dict or set(issue) != {"kind", "source", "target", "missing"}
-                    or issue["kind"] not in AUDIT_CHECKS or type(issue["missing"]) is not bool):
+                    or issue["kind"] not in checks or type(issue["missing"]) is not bool):
                 return failed
             spans = {}
             for side, texts in (("source", sources), ("target", targets)):
@@ -449,6 +452,10 @@ def context_audit(clean, target, response):
     if (response["verdict"] == "pass" and (response["issues"] or not all(response["checks"].values()))
             or response["verdict"] != "pass" and not response["issues"]):
         return failed
+    if contract_version == "context-v3":
+        failed_checks = {key for key, value in response["checks"].items() if not value}
+        if failed_checks != {issue["kind"] for issue in response["issues"]}:
+            return failed
     hard = hard_translation_checks(clean, target)
     passed = response["verdict"] == "pass" and hard["passed"]
     return {**failed, "passed": passed, "evidence_valid": True, "verdict": response["verdict"],

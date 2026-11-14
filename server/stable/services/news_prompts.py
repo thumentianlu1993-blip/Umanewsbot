@@ -116,73 +116,85 @@ def prompt_for(stage, contract_version='legacy'):
     return (CONTEXT_PROMPTS if contract_version == 'context-v2' else PROMPTS)[stage]
 
 
-# 新协议仅显式context-v3启用，旧prompt文本/缓存哈希保持不变。
+# v3各阶段在一处组装；旧协议文本保持不变。
 from stable.services.news_entity_taxonomy import ENTITY_RULES, EXCLUSION_RULES
-RACING_PROMPTS = dict(CONTEXT_PROMPTS)
-RACING_PROMPTS['entity_check'] = CONTEXT_BASE + (
-    'entity-units-v3：逐个处理units含标题，只抽核心text每次提及，window/context_units只读。'
-    'mode=initial仅返回{"units":[{"unit_id":"输入ID","coverage":"complete或uncertain",'
-    '"entities":[{"text":"逐字原名","type":"以下枚举单选","context":"逐字定位上下文"}]}]}；'
-    'initial绝不返回decisions，包括空数组。每单元必须回执，无专名entities为空。'
-    'mode=repair必须额外返回decisions数组，每项仅{"issue_id":"输入ID","picks":['
-    '{"candidate_id":"已提供候选ID","type":"以下枚举单选"}]}；无歧义decisions为空。'
-    '每个ambiguous_occurrence必须一个decision，选所有确属实体的候选；仅非实体可picks为空。'
-    '不得选already_frozen/overlap_conflict；不重复accepted，不新增非请求units。'
-    '返回全部九类实体或易混淆common_word，累计含accepted最多256行；缺失/不确定coverage=uncertain，不能截断称complete。'
-    'text/context不得改原文、空格、括号；不返回数字跨度、译名、真实身份ID或额外字段。'
-    '同名每次各标，姓名与马名不能仅凭winner判定。父母马仍horse。'
-    '正式冠名与赛事名相邻时保持完整连续表达，包括内部括号；断成不同块则分别标race片段，'
-    '不跨块拼接，不吞入日期地点，不发明不存在的连续原名。'
-    '普通等级、班次和泛称（独立的G1、Group 3、Class 2、重賞、Thoroughbred racing）不是具名对象，标common_word或不抽；'
-    '但等级连同完整赛事名是同一正式名称时仍保留完整race，不能拆断，未抽普通词正常中文化。'
-    '类别规则：' + json.dumps(ENTITY_RULES, ensure_ascii=False) + EXCLUSION_RULES +
-    '信息库匹配未在本版本启用：不可假装查询赛马信息库，身份不明不得猜。'
-    '开发合成对照：骑师林某策骑晨光，林某person、晨光horse；普通“晨光照亮赛场”不标。'
-    'Spring Festival若明确为赛马节则race_related；Spring Award若为赛马年度奖则racing_honor；'
-    'Autumn Yearling Sale拍卖为auction；ラストラン普通最后一战不标，但原文明示同名马可horse。'
-)
-RACING_PROMPTS['translate_full'] += (
-    ' entity_glossary是同一文章的只读实体清单，用type/text/replacement理解上下文；'
-    '仍必须逐次保留原token，程序统一恢复译名。无确认中文名保留原名，不自行音译或补译。'
-    '未标为实体的品牌、节目、普通词等仍正常翻译，不得删除。原文事实互相冲突时忠实保留，交审校指出，'
-    '不得凭常识静默纠正；人物-马匹-赛事关系、血统关系、引语和计划语气均保持。'
-)
-RACING_PROMPTS['fact_audit'] += (
-    ' 同时检查骑师与马匹角色互换、父母血统关系、系列赛和单场指代、原文已有矛盾。'
-    '存在原文矛盾不能自行猜真值，使用uncertain及相关证据。不得以实体token齐全或数字相同替代事实检查。'
+
+
+AUDIT_FACT_KEYS = ('names', 'numbers_units', 'dates', 'placings', 'negation', 'modality',
+                   'attribution', 'completeness', 'unsupported_claims')
+
+
+def audit_check_keys(contract_version):
+    return AUDIT_FACT_KEYS + (('fluency',) if contract_version == 'context-v3' else ())
+
+
+# 只描述通用关系，不把每次失败的专名或错误句子加入运行时特例。
+_TRANSLATION_PRINCIPLES = (
+    '普通描述、职位职责及未保护的通用词按语境译成自然中文，不能仅转换字形。'
+    '不添加性别称谓、完成状态或原文没有的断言；保留否定、推测和计划语气。'
+    '逐句保持人物、马匹、父母血统、赛事的关系及实际说话者；摘要同样核对主体和事件，不凭简称拆成多人。'
+    '赛马习语按语境表达，数字与马位分数保持等值；不把名称误当血统或把轻负磅理解为零负重。'
 )
 
-RACING_PROMPTS['event_classify'] = RACING_PROMPTS['event_classify'].replace('{block_id,start,end}', '{block_id,quote,context}') + (
-    ' context-v3所有新原文证据用{block_id,quote,context}逐字引文唯一定位，不计算数字偏移；遵守输入response_schema和identity_contract。'
-    '无法提供完整事件身份或事件不属于支持的kind时，返回且仅返回六个顶层键：'
-    '{"priority":"uncertain","primary_region":"对应地区","reason":"具体缺少证据","identity":{},"facts":[],"comparison":{"event_id":null,"version":0}}。'
-    '不能以来源日期推测年份、以标题/URL伪造公告编号，不得新增source等顶层字段。'
-    '更正的correction.old_body_span仍是旧稿start/end，与新原文quote协议不同。'
-)
-_TRANSLATION_RELATIONS = (
-    ' 日语姓名后的氏是中性敬称；原文未明确性别称谓时只译姓名，不能添加先生/女士/夫人。'
-    'name_form_hints仅是本篇全名/简称候选线索，不是已核身份；原文明确同一人时摘要不得把全名与简称并列为两人各取胜。'
-    '英文a five-year-old X gelding等明确血统语法中X为父马，译为父系为X的五岁阉马；'
-    '有named/called或同位语等名称证据时不能误判父子关系。轻负磅语境no weight on his back指负磅轻，不是没有负重。'
-    '退休赛马报道须逐句核对跑比赛的马与受访练马师主语；摘要引语只能归于实际说话者，不把其配偶/雇主加入。'
-    'market leader在赛马投注语境为头号热门；retained rider为签约骑师。未确认专名保留原文，普通地域和赛马术语正常中文化。'
-)
-RACING_PROMPTS['translate_full'] += _TRANSLATION_RELATIONS
-RACING_PROMPTS['fact_audit'] += _TRANSLATION_RELATIONS + (
-    ' compact-audit-v1的target.body由全部target.blocks按顺序以双换行连接；blocks、标题、摘要为完整审校对象，不得漏检。'
-)
-
-RACING_PROMPTS['event_classify'] += (
-    ' 先检查能否由原文独立构造合法身份，再决定major/regional。新闻重要不等于身份字段齐全。'
-    '冠军奖项或赛季成绩报道不等于appointment任命；比赛日综述不等于已知场次的单场race。不能选近似kind凑数。'
-    'organization/jurisdiction/scope等普通字段必须逐字采用对应quote中的原文，不翻译、不补机构或国家；'
-    'document_id必须是原文明示的编号，不能用公告标题或公告类型冒充。只能选择一组allowed_field_sets，不能合并两组。'
-    '日期年份不得来自出生年、历史成绩年、赛季、星期几、当前日期或来源URL；原文只有月日而无该日期的明确年份时，完整日期证据不足。'
-    '任何一个必填字段没有对应原文证据，就直接返回上述六字段uncertain，不输出猜测的identity/facts；uncertain是正确且正常的结果。'
-)
-
-RACING_PROMPTS['translate_full'] += (
-    ' 日语发放执照公告的交付します未明示已经完成，不添加已/已经，保留公告或将发放语气。'
-    '马位差中的two-and-a-quarter是2.25（两个又四分之一），不是两个四分之一；可用明确小数防止分数歧义。'
-)
-RACING_PROMPTS['fact_audit'] += ' 核对日语交付します的非过去公告是否被擅自改成已完成；两个四分之一不能代表2.25。'
+RACING_PROMPTS = {
+    'body_review': CONTEXT_PROMPTS['body_review'],
+    'entity_check': CONTEXT_BASE + (
+        'entity-units-v3：逐个处理units含标题，只抽核心text每次提及，window/context_units只读。'
+        'mode=initial仅返回{"units":[{"unit_id":"输入ID","coverage":"complete或uncertain",'
+        '"entities":[{"text":"逐字原名","type":"以下枚举单选","context":"逐字定位上下文"}]}]}；'
+        'initial绝不返回decisions。每单元必须回执，无专名entities为空。'
+        'mode=repair必须额外返回decisions数组，每项仅{"issue_id":"输入ID","picks":['
+        '{"candidate_id":"已提供候选ID","type":"以下枚举单选"}]}；无歧义decisions为空。'
+        '每个ambiguous_occurrence必须一个decision，选所有确属实体的候选；仅非实体可picks为空。'
+        '不得选already_frozen/overlap_conflict；不重复accepted，不新增非请求units。'
+        '累计含accepted最多256行；缺失/不确定coverage=uncertain，不能截断称complete。'
+        'text/context不得改原文、空格、括号；不返回数字跨度、译名、真实身份ID或额外字段。'
+        '先判断是否指具名对象，再选择类别；与赛马有关、首字母大写或位于标题均不足以证明是专名。'
+        '普通成绩描述、获奖次数、职位职责、等级和班次用common_word或不抽；明确作为对象名称时按语境抽取。'
+        '同名每次各标，姓名简称须有上下文；不能仅凭winner判断人或马，父母马仍horse。'
+        '正式冠名与赛事名相邻时保持完整连续表达及内部括号，不能吞入外围日期、地点或成绩描述；'
+        '跨块分别标race片段，不拼接或发明原名。'
+        '类别规则：' + json.dumps(ENTITY_RULES, ensure_ascii=False) + EXCLUSION_RULES +
+        '信息库匹配未启用：不得假装查询赛马信息库，身份不明不得猜。'
+    ),
+    'translate_full': CONTEXT_PROMPTS['translate_full'] + (
+        'entity_glossary是同篇只读实体清单，用type/text/replacement理解上下文，保留原token由程序恢复；'
+        '无确认中文名的专名保留原名，不音译或猜译。未抽取内容仍须翻译，不删除。'
+        'name_form_hints只是全名/简称候选，不是确认身份，不据同姓合并人物。'
+        '原文矛盾忠实保留并交审校指出，不凭常识纠正。'
+    ) + _TRANSLATION_PRINCIPLES,
+    'event_classify': CONTEXT_BASE + (
+        '根据完整source判断事件、重要性和相对candidates的重大增量，不按来源或榜单加分。'
+        'response_schema和identity_contract是格式约束，不是可复制的实例；仅返回规定的六个顶层字段。'
+        'primary_region、priority、identity.kind及事实枚举字段均为单个允许值，不是数组或竖线串；reason不超过1000字符。'
+        'context-v3新原文证据用{block_id,quote,context}逐字唯一定位，不计算数字偏移。'
+        '先核身份完整性再评重要性；新闻重要不等于支持的事件kind或身份齐全。'
+        '仅选一组allowed_field_sets，字段值逐字来自对应引文；不能补译机构、国家、编号或凑近似kind。'
+        '编号必须原文明示，完整日期年份必须属于该日期，不能从历史数字、当前日期或URL推断。'
+        '缺任何身份依据或不支持kind时返回：'
+        '{"priority":"uncertain","primary_region":"对应地区","reason":"缺少的证据","identity":{},'
+        '"facts":[],"comparison":{"event_id":null,"version":0}}；uncertain是正常结果。'
+        '不值得选稿用reject，同样identity={}、facts=[]。major/regional须有完整identity及1至128条有证据的facts。'
+        'fact.object须在source_span引文中；prior_fact_ids仅引用给定候选，没有则[]。'
+        'comparison总是对象，无候选时event_id为null、version为0，不能把null写成字符串。'
+        '仅relation=correction时返回correction字段；其old_body_span仍为旧稿start/end，不用新原文quote协议。'
+        '不要返回identity_contract、response_schema、identity_aliases或source等输入说明字段。'
+    ),
+    'fact_audit': CONTEXT_BASE + (
+        '全文核对source与target，包括标题、摘要、所有正文块及引语；不能以token齐全或数字相同代替语义核对。'
+        '检查专名、数字单位、日期名次、否定、计划/发生、归属、遗漏、新增事实以及中文可读性。'
+        '返回且仅返回{"verdict":"pass或fail或uncertain","checks":' +
+        json.dumps(dict.fromkeys(audit_check_keys('context-v3'), True), separators=(',', ':')) + ',"issues":[]}。'
+        'fluency检查重复、句法残缺、主体指代不清及普通表达未中文化；明确的风格偏好本身不算错误，未知专名保留原名不判错。'
+        '角色或引语关系错误用attribution，新增断言用unsupported_claims。'
+        '全部检查确实通过且issues空才pass；fail/uncertain必须有证据，对应checks项为false，每个false项都有issue。'
+        '每项issue仅含kind(checks键)、source及target(各为{block_id,quote,context})、missing(bool)。'
+        '两端ID独立，target可指summary或人工body；quote/context逐字引用且context唯一定位quote。'
+        'source为相关核查锚点，新增断言不要求在原文存在；遗漏时missing=true,target.quote为空且context锚定现有目标块。'
+        '其余引用非空，不输出数字跨度，不改写目标。'
+        'target.body由全部blocks按顺序双换行连接，不因省略重复body而漏检。'
+        '原文矛盾不得猜真值，返回uncertain及证据。'
+        '若editorial含correction，另返回corrections数组，每项仅receipt_id、old_body_span、substantive(bool)、'
+        'supported(bool)，与更正顺序一致，确认旧稿实质错误且新稿完整纠正；无更正省略该字段。'
+    ) + _TRANSLATION_PRINCIPLES,
+}

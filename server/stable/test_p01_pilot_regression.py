@@ -174,6 +174,8 @@ class PilotCompactWorkflow(ContextWorkflowFixture, TransactionTestCase):
         change=self.settings(NEWS_QUALITY_POLICY=policy);change.enable();self.addCleanup(change.disable)
         self.run=start_revision(self.article)
         self.fail_first_audit=False
+        self.language_block=None
+        self.repeat_language_failure=False
 
     def fake_response(self, attempt, payload):
         response=super().fake_response(attempt,payload)
@@ -182,6 +184,25 @@ class PilotCompactWorkflow(ContextWorkflowFixture, TransactionTestCase):
             data.update(verdict='fail',issues=[{'kind':'unsupported_claims','source':{'block_id':'b1','quote':'27','context':'The prize is 27.'},
                 'target':{'block_id':'b1','quote':'27','context':'奖金为27。'},'missing':False}])
             data['checks']['unsupported_claims']=False
+            response.choices[0].message.content=json.dumps(data)
+        if self.language_block:
+            data=json.loads(response.choices[0].message.content)
+            block=self.language_block
+            if attempt.stage=='translate_full':
+                if payload.get('mode')=='repair_blocks':
+                    text={'title':'奖金调整公告','summary':'官方调整奖金','b1':'奖金为27。'}[block]
+                    data['replacements']=[{'id':block,'text':text}]
+                elif self.translation_count==1:
+                    text={'title':'奖金调整调整公告','summary':'官方调整调整奖金','b1':'奖金为为27。'}[block]
+                    if block in {'title','summary'}:data[block]=text
+                    else:next(b for b in data['blocks'] if b['id']==block)['text']=text
+            if attempt.stage=='fact_audit' and (self.audit_count==1 or self.repeat_language_failure):
+                target=payload['target'];text=target[block] if block in {'title','summary'} else next(b['text'] for b in target['blocks'] if b['id']==block)
+                source=payload['source'];source_id='title' if block=='title' else 'b1'
+                quote=source['title'] if source_id=='title' else next(b['text'] for b in source['blocks'] if b['id']==source_id)
+                data.update(verdict='fail',issues=[{'kind':'fluency','source':{'block_id':source_id,'quote':quote,'context':quote},
+                    'target':{'block_id':block,'quote':text,'context':text},'missing':False}])
+                data['checks']['fluency']=False
             response.choices[0].message.content=json.dumps(data)
         return response
 
@@ -206,6 +227,43 @@ class PilotCompactWorkflow(ContextWorkflowFixture, TransactionTestCase):
     def test_failed_audit_then_patch_chain(self):
         self.fail_first_audit=True;self.finish();self.assert_replay()
         self.assertEqual(self.run.repair_count,1)
+
+    def test_language_failure_repairs_body_title_and_summary_locally(self):
+        for block in ['b1','title','summary']:
+            with self.subTest(block=block):
+                snapshot=deepcopy(self.run.source_snapshot)
+                snapshot['title']='Notice '+{'b1':'body','title':'headline','summary':'summary'}[block]
+                self.run=start_revision(self.article,snapshot=snapshot)
+                self.language_block=block;self.audit_count=0;self.translation_count=0
+                self.finish();self.assert_replay()
+                self.assertEqual(self.run.repair_count,1)
+                patch_attempt=self.run.attempts.filter(stage='translate_full').last()
+                self.assertEqual(patch_attempt.usage['input']['required_block_ids'],[block])
+                original=self.run.attempts.filter(stage='translate_full').first().result
+                final=self.run.translation_snapshot
+                if block!='title':self.assertEqual(original['title'],final['title'])
+                if block!='summary':self.assertEqual(original['summary'],final['summary'])
+                self.assertEqual(self.audit_count,2)
+
+    def test_language_failure_after_one_patch_stops_for_review(self):
+        self.language_block='b1';self.repeat_language_failure=True
+        self.finish()
+        self.assertEqual(self.run.state,'review',self.run.reason)
+        self.assertEqual(self.run.repair_count,1)
+        self.assertEqual(self.translation_count,2)
+        self.assertEqual(self.audit_count,2)
+
+    def test_publication_rejects_receipt_without_language_check(self):
+        from stable.services.news_publication import check_publication_evidence
+        self.finish();self.assert_replay()
+        from stable.services.news_publication import _validated_attempt
+        def without_language(run, attempt_id, stage):
+            attempt=_validated_attempt(run,attempt_id,stage)
+            if stage=='fact_audit':attempt.result['checks'].pop('fluency')
+            return attempt
+        # 不修改数据库封存证据；直接验证发布层仍拒绝缺少该检查的旧形状。
+        with patch('stable.services.news_publication._validated_attempt',side_effect=without_language):
+            with self.assertRaises(ContentBlocked):check_publication_evidence(self.run)
 
 class PilotEditorialProfileTests(SimpleTestCase):
     def test_v3_editorial_uses_existing_deep_profile_without_changing_v2(self):
@@ -246,3 +304,101 @@ class PilotRepairCapacityTests(SimpleTestCase):
                                     ('短期騎手免許を交付しますので、お知らせします。','已公布将向Alex发放短期骑师执照。',False)]:
             t={'title':'公告','summary':'执照公告','blocks':[{'id':'b0','text':target}]}
             self.assertEqual(bool(translation_issues(clean(original),t,[])),bad)
+
+
+class QualityBoundaryTests(SimpleTestCase):
+    """Q1-Q3：预设响应验证程序边界，不证明模型能自行发现语义错误。"""
+    def cases(self):
+        return json.loads((Path(__file__).parent/'fixtures/p01_quality_boundaries_20261115.json').read_text())['cases']
+
+    def target(self, case):
+        return {'title':case['target'], 'summary':'摘要', 'body':case['target'],
+                'blocks':[{'id':'b0','text':case['target']}]}
+
+    def response(self, source, target, kind='fluency'):
+        from stable.services.news_content import AUDIT_CHECKS
+        return {'verdict':'fail', 'checks':{key:key!=kind for key in AUDIT_CHECKS | {'fluency'}}, 'issues':[
+            {'kind':kind,'source':{'block_id':'b0','quote':source,'context':source},
+             'target':{'block_id':'b0','quote':target,'context':target},'missing':False}]}
+
+    def test_v3_requires_language_check_but_old_contracts_keep_nine(self):
+        from stable.services.news_content import validate_audit, AUDIT_CHECKS
+        source=clean('News');target=self.target({'target':'新闻'})
+        old={'verdict':'pass','checks':{key:True for key in AUDIT_CHECKS},'issues':[]}
+        for version in ['legacy','context-v2']:
+            self.assertTrue(validate_audit(source,target,old,contract_version=version)['passed'])
+        self.assertFalse(validate_audit(source,target,old,contract_version='context-v3')['passed'])
+        new=deepcopy(old);new['checks']['fluency']=True
+        self.assertTrue(validate_audit(source,target,new,contract_version='context-v3')['passed'])
+        self.assertFalse(validate_audit(source,target,new,contract_version='context-v2')['evidence_valid'])
+
+    def test_real_failures_accept_evidenced_language_issues_not_old_pass(self):
+        from stable.services.news_content import validate_audit
+        for case in self.cases():
+            with self.subTest(sample=case['sample_id']):
+                source=clean(case['source']);target=self.target(case)
+                self.assertEqual(case['observed_model_audit']['verdict'],'pass')
+                value=validate_audit(source,target,self.response(case['source'],case['target']),contract_version='context-v3')
+                self.assertTrue(value['evidence_valid'],value)
+                self.assertFalse(value['passed'])
+                self.assertEqual(value['repair_block_ids'],['b0'])
+                self.assertEqual(value['located_issues'][0]['located']['target'],[0,len(case['target'])])
+
+    def test_issue_check_consistency_and_invalid_evidence_fail_closed(self):
+        from stable.services.news_content import validate_audit
+        case=self.cases()[-1];source=clean(case['source']);target=self.target(case)
+        original=self.response(case['source'],case['target'])
+        for mutate in [lambda r:r['checks'].update(fluency=True),
+                       lambda r:r['checks'].update(attribution=False),
+                       lambda r:r.update(verdict='pass'),
+                       lambda r:r['issues'][0]['target'].update(quote='不存在'),
+                       lambda r:r['checks'].update(style=True),
+                       lambda r:r['issues'][0].update(kind='style'),
+                       lambda r:r.update(issues=[])]:
+            value=deepcopy(original);mutate(value)
+            self.assertFalse(validate_audit(source,target,value,contract_version='context-v3')['evidence_valid'])
+        # 新一致性约束也覆盖旧事实维度，而不是只检查fluency。
+        bad=self.response(case['source'],case['target'],'attribution');bad['checks']['attribution']=True
+        self.assertFalse(validate_audit(source,target,bad,contract_version='context-v3')['evidence_valid'])
+
+    def test_plain_descriptions_unprotected_named_homonyms_preserved(self):
+        from stable.services import news_entity_units as units
+        from stable.services.news_content import protect_source
+        for text in ['Second French Jockey Title','身元引受調教師','Spring Award','G1 Example Cup']:
+            for kind in ['common_word','racing_honor','horse','race']:
+                with self.subTest(text=text,kind=kind):
+                    source=clean(text,title=text)
+                    payload=units.initial_payload(source,'en',contract_version='context-v3')
+                    response={'units':[{'unit_id':u['unit_id'],'coverage':'complete','entities':[
+                        {'text':text,'type':kind,'context':text}]} for u in payload['units']]}
+                    state=units.evaluate(source,payload,response)
+                    rows=units.occurrences(source,state)
+                    protected=protect_source(source,rows)
+                    if kind=='common_word':
+                        self.assertEqual(rows,[])
+                        self.assertEqual(protected['title'],text)
+                        self.assertEqual(protected['blocks'][0]['text'],text)
+                    else:
+                        self.assertEqual(len(rows),2)
+                        self.assertNotEqual(protected['title'],text)
+                        raw={'title':protected['title'],'summary':protected['title'],'blocks':protected['blocks']}
+                        restored=restore_translation(source,rows,raw)
+                        self.assertEqual(restored['title'],text)
+                        self.assertEqual(restored['blocks'][0]['text'],text)
+
+    def test_prompt_budget_legacy_identity_and_rendered_schema(self):
+        import hashlib
+        from stable.services.news_prompts import prompt_for
+        baseline=json.loads((Path(__file__).parent/'fixtures/p01_quality_boundaries_20261115.json').read_text())['prompt_baseline']
+        for version,stages in baseline['legacy_hashes'].items():
+            for stage,sha in stages.items():
+                self.assertEqual(hashlib.sha256(prompt_for(stage,version).encode()).hexdigest(),sha)
+        for stage,limit in baseline['v3_char_limits'].items():
+            self.assertLessEqual(len(prompt_for(stage,'context-v3')),limit,stage)
+        audit=prompt_for('fact_audit','context-v3')
+        schema,_=json.JSONDecoder().raw_decode(audit.split('返回且仅返回',1)[1])
+        from stable.services.news_content import AUDIT_CHECKS
+        self.assertEqual(set(schema['checks']),AUDIT_CHECKS | {'fluency'})
+        for case in self.cases():
+            for stage in baseline['v3_char_limits']:
+                self.assertNotIn(case['target'],prompt_for(stage,'context-v3'))
