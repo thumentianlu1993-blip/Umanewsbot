@@ -338,10 +338,21 @@ class NarPreRaceWorkflowTests(TestCase):
         self.assertEqual(len(preview['rows']),68)
         self.assertEqual(sum(row.get_running_status_display()=='选定' for row in preview['rows']),12)
         self.assertEqual(sum(row.get_running_status_display()=='候补' for row in preview['rows']),56)
-        with patch('django.utils.timezone.now',return_value=now):
-            response=self.client.get(reverse('public-race-detail',args=[self.event.year,self.event.slug]))
-        self.assertContains(response,'テスト馬67')
-        self.assertContains(response,'候补',count=56)
+        for normalized_display in (False, True):
+            with self.subTest(normalized_display=normalized_display), override_settings(
+                RACE_INFORMATION_NORMALIZED_DISPLAY_ENABLED=normalized_display
+            ), patch('django.utils.timezone.now',return_value=now):
+                response=self.client.get(reverse('public-race-detail',args=[self.event.year,self.event.slug]))
+            self.assertContains(response,'テスト馬67')
+            self.assertContains(response,'选定',count=12)
+            self.assertContains(response,'候补',count=56)
+            self.assertNotContains(response,'已出走登记')
+
+    def test_persisted_selection_metadata_does_not_override_formal_status(self):
+        from stable.models import RaceEventRunner
+        from stable.services.race_information_display import row_fields
+        row=RaceEventRunner(running_status='declared',source_refs={'selection_status':'補欠馬'})
+        self.assertEqual(row_fields(row)['status'].text,'已出走登记')
 
     def test_backend_cannot_apply_nar_registration_candidate(self):
         from django.contrib.auth import get_user_model

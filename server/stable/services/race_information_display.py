@@ -353,8 +353,10 @@ def row_fields(row, *, horse_record=False):
         'position': _position(row, horse_record=horse_record),
         'status': display_field(status, _STATUS_LABELS.get(status, '待核实')) if status else display_field(status, state='missing', reason='missing'),
     }
-
-
+    # 仅已验证的 NAR 报名预览附加此临时标签，不从正式名单的持久化来源字段推断。
+    selection = value(row, 'public_nar_selection_status')
+    if selection in {'选定', '候补'}:
+        fields['status'] = display_field(selection, selection)
     refs=value(row,'source_refs',{}) or {}
     if refs.get('uk_paid_v1') and status in {'non_runner','scratched','withdrawn'}:
         fields['odds']=display_field('',state='missing',reason='withdrawn_quote')

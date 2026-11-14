@@ -1752,6 +1752,9 @@
     ],
     "docs/changes/five-region-race-governance/ci-scope.json": [
       "infrastructure"
+    ],
+    "docs/changes/collection-recovery-arc/display-ci-scope.json": [
+      "infrastructure"
     ]
   },
   "symbols": {
@@ -1967,6 +1970,7 @@
     "docs/changes/us-online-field-gaps/ci-scope.json",
     "docs/changes/uk-race-automation/ci-scope.json",
     "docs/changes/uk-race-automation/transport-ci-scope.json",
-    "docs/changes/five-region-race-governance/ci-scope.json"
+    "docs/changes/five-region-race-governance/ci-scope.json",
+    "docs/changes/collection-recovery-arc/display-ci-scope.json"
   ]
 }

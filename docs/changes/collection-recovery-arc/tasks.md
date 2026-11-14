@@ -8,4 +8,6 @@
 - [x] (operations) 记录 20 个来源自然重试结果：18 个成功检查，日本两项仍失败。
 - [x] (integration) 补齐 NAR 68 匹名单从采集、存储到公开页面的 RED/GREEN 回归；固定候选 67 项通过。
 - [x] (operations) 准备仅日本 126/204 的提前重试 manifest，独立只读 prepare 及 4 项隔离数据测试通过。
-- [ ] (operations) 按根 AGENTS.md 交付后续包并完成两项日本自然验收。
+- [x] (operations) 交付后续包，日本两项自然采集成功，20 项检查均恢复；公网完整名单通过，NAR 12/56 状态标签展示未通过。
+- [x] (application) 针对线上统一展示开关补充 RED/GREEN，保留报名选定/候补标签及正式名单原状态。
+- [ ] (operations) 交付展示修复包，核验公网 12 选定/56 候补并复查服务。

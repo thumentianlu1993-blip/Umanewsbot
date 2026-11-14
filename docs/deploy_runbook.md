@@ -1,3 +1,7 @@
+## 2026-11-14 日本采集后续包维护入口
+
+PR #313 merge `9db3f4ca`，四应用于北京时间 17:36:15 发布固定候选 `661d45ef`。schema0084，无迁移，3 GiB 磁盘阈值及 QQ 关闭保持。维护 Compose 链在采集恢复包链之后追加 `/opt/umanews-external-staging/japan-recovery-661d45ef/release-identity.json`；以运行容器的完整配置链为准。日本 126/204 仅提前 `next_poll_at`，两项原状态及配置备份保存在该目录的私有 `evidence/`。本包应用回滚目标为 `41d3f76c`，正常采集数据保留；未执行回滚。实际自然验收见 [线上证据](changes/collection-recovery-arc/release_evidence.md)。
+
 ## 2026-11-14 采集验收进程与在线 worker 隔离
 
 完整 Django 只读查询进程也会消耗内存；通过 `docker exec` 放进受限 worker 时，会与 Celery 共用 cgroup 上限。本轮 384 MiB worker 两次 OOM 与此类验收进程重叠。后续数据库验收采用继承现有配置、`run --rm --no-deps` 的独立一次性容器，并使用只读事务、语句超时；不要在在线 worker 内启动完整 Django 验收进程。内存事件通过宿主 cgroup 文件读取。需要验证真实抓取时仍使用已有 host budget / snapshot 路径，且限定请求范围；只读数据库检查不触发采集。详见 [本轮证据](changes/collection-recovery-arc/release_evidence.md)。

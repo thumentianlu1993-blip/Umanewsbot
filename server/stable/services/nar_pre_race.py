@@ -195,5 +195,6 @@ def public_nar_preview(event, *, now):
         result['label']='预计参赛名单（骑手为预定）'
         for row in result['rows']:
             selection=(row.source_refs or {}).get('selection_status','')
-            row.get_running_status_display=lambda selection=selection:'候补' if re.search('補欠|予備',selection) else '选定'
+            row.public_nar_selection_status='候补' if re.search('補欠|予備',selection) else '选定'
+            row.get_running_status_display=lambda label=row.public_nar_selection_status:label
     return result

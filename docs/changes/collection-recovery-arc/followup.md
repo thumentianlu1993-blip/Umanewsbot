@@ -31,4 +31,8 @@ JRA 126 的本轮赛事刷新为 `snapshot_fetch_failed`。随后单页浏览器
 
 应用回滚到 `41d3f76c`，无 schema 回滚；提前重试产生的正常数据保留，不删除、不回滚已成功推进的状态。两项重试前状态保存为私有 `retry-before.json` 并记录 SHA，未推进记录可据备份审计。凯旋门旧记录不恢复。
 
-本包尚未合并或发布。精确产物位于 `/Users/mentianlu/.codex/runtime/collection-recovery-arc-20261114/followup/`。交付按根 `AGENTS.md` 的 G2/G3 执行。
+用户确认“合并并执行后续包，完成后继续线上验收”后，PR #313 合并为 `9db3f4caa2782285a5749d65b44cfca71e80cfa1`。精确 head `cf1eed63` 的范围 CI 与独立交付核验均确认 708 项通过、零跳过；代码及发布协调器独立只读复核通过。
+
+北京时间 2026-11-14 17:36:15，四应用发布固定候选 `661d45ef`，schema0084、3 GiB 阈值、QQ 关闭均保持。两个 worker 排空快照为 active/reserved/active_confirm 全部 0；日本 126/204 两项均提前重试、零跳过。原状态备份 SHA 为 `b625c1e7104c91728b2bf4c82aa66c670ce845defe3e5942839a7e77998905d5`。Web 健康、worker 就绪、Beat 恢复、发布锁释放通过，未执行回滚。自然采集验收见 [线上证据](release_evidence.md)。
+
+精确产物位于 `/Users/mentianlu/.codex/runtime/collection-recovery-arc-20261114/followup/`，生产私有恢复点位于 `/opt/umanews-external-staging/japan-recovery-661d45ef/evidence/`。
