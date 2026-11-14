@@ -595,6 +595,8 @@ def risk_reasons(run):
 
 
 def required_profile(run):
+    if context_contract_version() == "context-v3" and run.stage == "event_classify":
+        return "deep"
     if not context_enabled() or run.stage != "fact_audit":
         return "base"
     return "deep" if risk_reasons(run) or run.quality_snapshot.get("deep_required") else "base"

@@ -206,3 +206,22 @@ class PilotCompactWorkflow(ContextWorkflowFixture, TransactionTestCase):
     def test_failed_audit_then_patch_chain(self):
         self.fail_first_audit=True;self.finish();self.assert_replay()
         self.assertEqual(self.run.repair_count,1)
+
+class PilotEditorialProfileTests(SimpleTestCase):
+    def test_v3_editorial_uses_existing_deep_profile_without_changing_v2(self):
+        from stable.services.news_pipeline import required_profile
+        run=SimpleNamespace(stage='event_classify')
+        with override_settings(NEWS_QUALITY_POLICY={'contract_version':'context-v3'}):
+            self.assertEqual(required_profile(run),'deep')
+        with override_settings(NEWS_QUALITY_POLICY={'contract_version':'context-v2'}):
+            self.assertEqual(required_profile(run),'base')
+
+    @override_settings(NEWS_QUALITY_POLICY={'contract_version':'context-v3'})
+    def test_real_editorial_hallucinations_stay_rejected(self):
+        from stable.services.news_editorial import validate_editorial
+        fixtures=json.loads((Path(__file__).parent/'fixtures/p01_live_pilot_failures_20261114.json').read_text())
+        sources={c['sample_id']:c for c in fixtures['cases']}
+        for row in fixtures['retest_editorial_failures']:
+            c=sources[row['sample_id']]
+            with self.subTest(sample=row['sample_id']), self.assertRaises(ContentBlocked):
+                validate_editorial(c['clean'],row['response'],source_scope=c['source_site'])

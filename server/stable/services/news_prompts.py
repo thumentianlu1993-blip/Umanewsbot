@@ -171,3 +171,12 @@ RACING_PROMPTS['translate_full'] += _TRANSLATION_RELATIONS
 RACING_PROMPTS['fact_audit'] += _TRANSLATION_RELATIONS + (
     ' compact-audit-v1的target.body由全部target.blocks按顺序以双换行连接；blocks、标题、摘要为完整审校对象，不得漏检。'
 )
+
+RACING_PROMPTS['event_classify'] += (
+    ' 先检查能否由原文独立构造合法身份，再决定major/regional。新闻重要不等于身份字段齐全。'
+    '冠军奖项或赛季成绩报道不等于appointment任命；比赛日综述不等于已知场次的单场race。不能选近似kind凑数。'
+    'organization/jurisdiction/scope等普通字段必须逐字采用对应quote中的原文，不翻译、不补机构或国家；'
+    'document_id必须是原文明示的编号，不能用公告标题或公告类型冒充。只能选择一组allowed_field_sets，不能合并两组。'
+    '日期年份不得来自出生年、历史成绩年、赛季、星期几、当前日期或来源URL；原文只有月日而无该日期的明确年份时，完整日期证据不足。'
+    '任何一个必填字段没有对应原文证据，就直接返回上述六字段uncertain，不输出猜测的identity/facts；uncertain是正确且正常的结果。'
+)

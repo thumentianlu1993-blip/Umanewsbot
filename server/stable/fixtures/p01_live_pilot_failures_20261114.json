@@ -4174,5 +4174,583 @@
         }
       }
     }
+  ],
+  "retest_editorial_failures": [
+    {
+      "sample_id": "D031",
+      "response": {
+        "priority": "major",
+        "primary_region": "japan",
+        "reason": "日本中央競馬会（JRA）向两位高知名度外国骑手签发短期骑师执照，直接影响即将举行的国际赛事骑乘配置，具有全国性重要性。",
+        "identity": {
+          "kind": "appointment",
+          "fields": {
+            "organization": "日本中央競馬会",
+            "jurisdiction": "japan",
+            "document_id": "短期騎手免許",
+            "effective_date": "2026-10-31",
+            "scope": "短期騎手免許の交付"
+          },
+          "evidence": {
+            "organization": {
+              "block_id": "b000",
+              "quote": "アレクシ・プーシャン（Alexis Pouchin）騎手およびクリスチャン・デムーロ（Cristian Demuro）騎手に対し、下記のとおり短期騎手免許を交付しますので、お知らせします。",
+              "context": "アレクシ・プーシャン（Alexis Pouchin）騎手およびクリスチャン・デムーロ（Cristian Demuro）騎手に対し、下記のとおり短期騎手免許を交付しますので、お知らせします。"
+            },
+            "jurisdiction": {
+              "block_id": "b000",
+              "quote": "日本中央競馬会",
+              "context": "アレクシ・プーシャン（Alexis Pouchin）騎手およびクリスチャン・デムーロ（Cristian Demuro）騎手に対し、下記のとおり短期騎手免許を交付しますので、お知らせします。"
+            },
+            "document_id": {
+              "block_id": "b000",
+              "quote": "短期騎手免許",
+              "context": "アレクシ・プーシャン（Alexis Pouchin）騎手およびクリスチャン・デムーロ（Cristian Demuro）騎手に対し、下記のとおり短期騎手免許を交付しますので、お知らせします。"
+            },
+            "effective_date": {
+              "block_id": "b003",
+              "quote": "10月31日（土曜）から12月29日（火曜）",
+              "context": "10月31日（土曜）から12月29日（火曜）"
+            },
+            "scope": {
+              "block_id": "b000",
+              "quote": "短期騎手免許を交付します",
+              "context": "アレクシ・プーシャン（Alexis Pouchin）騎手およびクリスチャン・デムーロ（Cristian Demuro）騎手に対し、下記のとおり短期騎手免許を交付しますので、お知らせします。"
+            }
+          }
+        },
+        "facts": [
+          {
+            "relation": "new",
+            "subject_ref": "アレクシ・プーシャン",
+            "predicate": "短期騎手免許を交付",
+            "object": "短期騎手免許",
+            "modality": "happened",
+            "importance": "major",
+            "effective_time": "2026-10-31",
+            "source_span": {
+              "block_id": "b000",
+              "quote": "アレクシ・プーシャン（Alexis Pouchin）騎手およびクリスチャン・デムーロ（Cristian Demuro）騎手に対し、下記のとおり短期騎手免許を交付します",
+              "context": "アレクシ・プーシャン（Alexis Pouchin）騎手およびクリスチャン・デムーロ（Cristian Demuro）騎手に対し、下記のとおり短期騎手免許を交付しますので、お知らせします。"
+            },
+            "prior_fact_ids": []
+          },
+          {
+            "relation": "new",
+            "subject_ref": "クリスチャン・デムーロ",
+            "predicate": "短期騎手免許を交付",
+            "object": "短期騎手免許",
+            "modality": "happened",
+            "importance": "major",
+            "effective_time": "2026-10-31",
+            "source_span": {
+              "block_id": "b000",
+              "quote": "アレクシ・プーシャン（Alexis Pouchin）騎手およびクリスチャン・デムーロ（Cristian Demuro）騎手に対し、下記のとおり短期騎手免許を交付します",
+              "context": "アレクシ・プーシャン（Alexis Pouchin）騎手およびクリスチャン・デムーロ（Cristian Demuro）騎手に対し、下記のとおり短期騎手免許を交付しますので、お知らせします。"
+            },
+            "prior_fact_ids": []
+          },
+          {
+            "relation": "new",
+            "subject_ref": "アレクシ・プーシャン",
+            "predicate": "免許期間",
+            "object": "10月31日（土曜）から12月29日（火曜）",
+            "modality": "happened",
+            "importance": "major",
+            "effective_time": "2026-10-31",
+            "source_span": {
+              "block_id": "b003",
+              "quote": "10月31日（土曜）から12月29日（火曜）",
+              "context": "10月31日（土曜）から12月29日（火曜）"
+            },
+            "prior_fact_ids": []
+          },
+          {
+            "relation": "new",
+            "subject_ref": "クリスチャン・デムーロ",
+            "predicate": "免許期間",
+            "object": "10月31日（土曜）から12月27日（日曜）",
+            "modality": "happened",
+            "importance": "major",
+            "effective_time": "2026-10-31",
+            "source_span": {
+              "block_id": "b026",
+              "quote": "10月31日（土曜）から12月27日（日曜）",
+              "context": "10月31日（土曜）から12月27日（日曜）"
+            },
+            "prior_fact_ids": []
+          },
+          {
+            "relation": "new",
+            "subject_ref": "アレクシ・プーシャン",
+            "predicate": "身元引受調教師",
+            "object": "田中 博康（美浦）",
+            "modality": "happened",
+            "importance": "minor",
+            "effective_time": "",
+            "source_span": {
+              "block_id": "b021",
+              "quote": "田中 博康（美浦）",
+              "context": "田中 博康（美浦）"
+            },
+            "prior_fact_ids": []
+          },
+          {
+            "relation": "new",
+            "subject_ref": "クリスチャン・デムーロ",
+            "predicate": "身元引受調教師",
+            "object": "斉藤 崇史（栗東）",
+            "modality": "happened",
+            "importance": "minor",
+            "effective_time": "",
+            "source_span": {
+              "block_id": "b047",
+              "quote": "斉藤 崇史（栗東）",
+              "context": "斉藤 崇史（栗東）"
+            },
+            "prior_fact_ids": []
+          }
+        ],
+        "comparison": {
+          "event_id": null,
+          "version": 0
+        }
+      }
+    },
+    {
+      "sample_id": "D006",
+      "response": {
+        "priority": "major",
+        "primary_region": "hong_kong",
+        "reason": "The article reports on a full race meeting at Sha Tin with a milestone achievement by Zac Purton reaching 1,100 wins on the turf and 2,035 total wins in Hong Kong, which is a significant career milestone for a leading jockey, making it newsworthy.",
+        "identity": {
+          "kind": "race",
+          "fields": {
+            "organizer": "The Hong Kong Jockey Club",
+            "venue": "Sha Tin",
+            "local_date": "2026-10-04",
+            "race_number": "1"
+          },
+          "evidence": {
+            "organizer": {
+              "block_id": "b000",
+              "quote": "Sha Tin",
+              "context": "Definitive (115lb) left no room for doubt at Sha Tin this afternoon (Sunday, 4 October), pouncing under Karis Teetan to win the HK$3.12 million Class 2 Muk Min Ha Handicap (1650m, dirt) and add further fuel to trainer David Eustace’s form in the new season."
+            },
+            "venue": {
+              "block_id": "b000",
+              "quote": "Sha Tin",
+              "context": "Definitive (115lb) left no room for doubt at Sha Tin this afternoon (Sunday, 4 October), pouncing under Karis Teetan to win the HK$3.12 million Class 2 Muk Min Ha Handicap (1650m, dirt) and add further fuel to trainer David Eustace’s form in the new season."
+            },
+            "local_date": {
+              "block_id": "b000",
+              "quote": "Sunday, 4 October",
+              "context": "Definitive (115lb) left no room for doubt at Sha Tin this afternoon (Sunday, 4 October), pouncing under Karis Teetan to win the HK$3.12 million Class 2 Muk Min Ha Handicap (1650m, dirt) and add further fuel to trainer David Eustace’s form in the new season."
+            },
+            "race_number": {
+              "block_id": "b000",
+              "quote": "Muk Min Ha Handicap",
+              "context": "Definitive (115lb) left no room for doubt at Sha Tin this afternoon (Sunday, 4 October), pouncing under Karis Teetan to win the HK$3.12 million Class 2 Muk Min Ha Handicap (1650m, dirt) and add further fuel to trainer David Eustace’s form in the new season."
+            }
+          }
+        },
+        "facts": [
+          {
+            "relation": "new",
+            "subject_ref": "horse:hkjc_news:Definitive",
+            "predicate": "won",
+            "object": "HK$3.12 million Class 2 Muk Min Ha Handicap (1650m, dirt)",
+            "modality": "happened",
+            "importance": "major",
+            "effective_time": "2026-10-04",
+            "prior_fact_ids": [],
+            "source_span": {
+              "block_id": "b000",
+              "quote": "Definitive (115lb) left no room for doubt at Sha Tin this afternoon (Sunday, 4 October), pouncing under Karis Teetan to win the HK$3.12 million Class 2 Muk Min Ha Handicap (1650m, dirt) and add further fuel to trainer David Eustace’s form in the new season.",
+              "context": "Definitive (115lb) left no room for doubt at Sha Tin this afternoon (Sunday, 4 October), pouncing under Karis Teetan to win the HK$3.12 million Class 2 Muk Min Ha Handicap (1650m, dirt) and add further fuel to trainer David Eustace’s form in the new season."
+            }
+          },
+          {
+            "relation": "new",
+            "subject_ref": "jockey:hkjc_news:Karis Teetan",
+            "predicate": "rode",
+            "object": "Definitive",
+            "modality": "happened",
+            "importance": "minor",
+            "effective_time": "2026-10-04",
+            "prior_fact_ids": [],
+            "source_span": {
+              "block_id": "b000",
+              "quote": "Karis Teetan",
+              "context": "Definitive (115lb) left no room for doubt at Sha Tin this afternoon (Sunday, 4 October), pouncing under Karis Teetan to win the HK$3.12 million Class 2 Muk Min Ha Handicap (1650m, dirt) and add further fuel to trainer David Eustace’s form in the new season."
+            }
+          },
+          {
+            "relation": "new",
+            "subject_ref": "trainer:hkjc_news:David Eustace",
+            "predicate": "trained",
+            "object": "Definitive",
+            "modality": "happened",
+            "importance": "minor",
+            "effective_time": "2026-10-04",
+            "prior_fact_ids": [],
+            "source_span": {
+              "block_id": "b000",
+              "quote": "David Eustace",
+              "context": "Definitive (115lb) left no room for doubt at Sha Tin this afternoon (Sunday, 4 October), pouncing under Karis Teetan to win the HK$3.12 million Class 2 Muk Min Ha Handicap (1650m, dirt) and add further fuel to trainer David Eustace’s form in the new season."
+            }
+          },
+          {
+            "relation": "new",
+            "subject_ref": "horse:hkjc_news:Talents Ambition",
+            "predicate": "finished",
+            "object": "second",
+            "modality": "happened",
+            "importance": "minor",
+            "effective_time": "2026-10-04",
+            "prior_fact_ids": [],
+            "source_span": {
+              "block_id": "b005",
+              "quote": "Talents Ambition (128lb) finished second",
+              "context": "Talents Ambition (128lb) finished second with Sky Vino grabbing third."
+            }
+          },
+          {
+            "relation": "new",
+            "subject_ref": "horse:hkjc_news:Sky Vino",
+            "predicate": "finished",
+            "object": "third",
+            "modality": "happened",
+            "importance": "minor",
+            "effective_time": "2026-10-04",
+            "prior_fact_ids": [],
+            "source_span": {
+              "block_id": "b005",
+              "quote": "Sky Vino grabbing third",
+              "context": "Talents Ambition (128lb) finished second with Sky Vino grabbing third."
+            }
+          },
+          {
+            "relation": "new",
+            "subject_ref": "jockey:hkjc_news:Karis Teetan",
+            "predicate": "won",
+            "object": "double",
+            "modality": "happened",
+            "importance": "minor",
+            "effective_time": "2026-10-04",
+            "prior_fact_ids": [],
+            "source_span": {
+              "block_id": "b008",
+              "quote": "capping a double for Teetan",
+              "context": "Mr Cool (126lb) dashed to victory in the Class 4 Yan Chai Trophy Handicap (1400m), capping a double for Teetan."
+            }
+          },
+          {
+            "relation": "new",
+            "subject_ref": "trainer:hkjc_news:Frankie Lor",
+            "predicate": "trained",
+            "object": "two winners",
+            "modality": "happened",
+            "importance": "minor",
+            "effective_time": "2026-10-04",
+            "prior_fact_ids": [],
+            "source_span": {
+              "block_id": "b009",
+              "quote": "Lor also grabbed two of his own",
+              "context": "Lor also grabbed two of his own when Horsepower (135lb) nicked the Class 3 Shing Mun Handicap (1000m) under Andrea Atzeni."
+            }
+          },
+          {
+            "relation": "new",
+            "subject_ref": "jockey:hkjc_news:Zac Purton",
+            "predicate": "achieved",
+            "object": "1,100 wins on Sha Tin turf",
+            "modality": "happened",
+            "importance": "major",
+            "effective_time": "2026-10-04",
+            "prior_fact_ids": [],
+            "source_span": {
+              "block_id": "b010",
+              "quote": "Zac Purton reached 1,100 wins on the Sha Tin turf",
+              "context": "Zac Purton reached 1,100 wins on the Sha Tin turf as Michael Chang’s Lady’s Love (129lb) claimed the Class 4 Sham Tseng Handicap (1400m)."
+            }
+          },
+          {
+            "relation": "new",
+            "subject_ref": "jockey:hkjc_news:Zac Purton",
+            "predicate": "has",
+            "object": "2,035 wins in Hong Kong since 2007/08",
+            "modality": "happened",
+            "importance": "major",
+            "effective_time": "2026-10-04",
+            "prior_fact_ids": [],
+            "source_span": {
+              "block_id": "b012",
+              "quote": "has notched 2,035 wins in the city since arriving in 2007/08",
+              "context": "Purton, a nine-time Hong Kong Champion Jockey, leads the 2026/27 standings with 14 wins – six clear of his nearest rivals. The winningest rider in Hong Kong racing history, 43-year-old Purton has notched 2,035 wins in the city since arriving in 2007/08."
+            }
+          },
+          {
+            "relation": "new",
+            "subject_ref": "jockey:hkjc_news:Zac Purton",
+            "predicate": "leads",
+            "object": "2026/27 standings with 14 wins",
+            "modality": "happened",
+            "importance": "minor",
+            "effective_time": "2026-10-04",
+            "prior_fact_ids": [],
+            "source_span": {
+              "block_id": "b012",
+              "quote": "leads the 2026/27 standings with 14 wins",
+              "context": "Purton, a nine-time Hong Kong Champion Jockey, leads the 2026/27 standings with 14 wins – six clear of his nearest rivals."
+            }
+          },
+          {
+            "relation": "new",
+            "subject_ref": "horse:hkjc_news:Supreme Agility",
+            "predicate": "declared winner",
+            "object": "Class 4 Sha Tsui Handicap (1650m, dirt)",
+            "modality": "happened",
+            "importance": "minor",
+            "effective_time": "2026-10-04",
+            "prior_fact_ids": [],
+            "source_span": {
+              "block_id": "b016",
+              "quote": "Supreme Agility (131lb) was declared the winner of the Class 4 Sha Tsui Handicap (1650m, dirt)",
+              "context": "After interference from Firefoot (123lb), Supreme Agility (131lb) was declared the winner of the Class 4 Sha Tsui Handicap (1650m, dirt) following an inquiry and objection after initially finishing second with jockey James Orman for trainer Pierre Ng."
+            }
+          }
+        ],
+        "comparison": {
+          "event_id": null,
+          "version": 0
+        }
+      }
+    },
+    {
+      "sample_id": "D025",
+      "response": {
+        "priority": "regional",
+        "primary_region": "france",
+        "reason": "Mickael Barzalona winning his second Cravache d'Or is a notable achievement in French racing, with details on his season's performance and Group 1 wins. While significant, it is a regional jockey championship rather than a major international event.",
+        "identity": {
+          "kind": "appointment",
+          "fields": {
+            "organization": "Cravache d'Or",
+            "jurisdiction": "France",
+            "effective_date": "2026-10-31",
+            "scope": "jockey championship"
+          },
+          "evidence": {
+            "organization": {
+              "block_id": "b000",
+              "quote": "Cravache d'Or",
+              "context": "Mickael Barzalona, retained rider for the Aga Khan Studs, won his second Cravache d'Or on Saturday, October 31."
+            },
+            "jurisdiction": {
+              "block_id": "b000",
+              "quote": "Cravache d'Or",
+              "context": "Mickael Barzalona, retained rider for the Aga Khan Studs, won his second Cravache d'Or on Saturday, October 31."
+            },
+            "effective_date": {
+              "block_id": "b000",
+              "quote": "Saturday, October 31",
+              "context": "Mickael Barzalona, retained rider for the Aga Khan Studs, won his second Cravache d'Or on Saturday, October 31."
+            },
+            "scope": {
+              "block_id": "b000",
+              "quote": "won his second Cravache d'Or",
+              "context": "Mickael Barzalona, retained rider for the Aga Khan Studs, won his second Cravache d'Or on Saturday, October 31."
+            }
+          }
+        },
+        "facts": [
+          {
+            "relation": "new",
+            "subject_ref": "Mickael Barzalona",
+            "predicate": "won",
+            "object": "his second Cravache d'Or",
+            "modality": "happened",
+            "importance": "major",
+            "effective_time": "2026-10-31",
+            "prior_fact_ids": [],
+            "source_span": {
+              "block_id": "b000",
+              "quote": "won his second Cravache d'Or",
+              "context": "Mickael Barzalona, retained rider for the Aga Khan Studs, won his second Cravache d'Or on Saturday, October 31."
+            }
+          },
+          {
+            "relation": "new",
+            "subject_ref": "Mickael Barzalona",
+            "predicate": "first won the title",
+            "object": "in 2021",
+            "modality": "happened",
+            "importance": "minor",
+            "effective_time": "2021",
+            "prior_fact_ids": [],
+            "source_span": {
+              "block_id": "b001",
+              "quote": "He first won the title in 2021.",
+              "context": "He first won the title in 2021. Barzalona won 176 races in 2026 out of 719 rides."
+            }
+          },
+          {
+            "relation": "new",
+            "subject_ref": "Mickael Barzalona",
+            "predicate": "won 176 races",
+            "object": "in 2026 out of 719 rides",
+            "modality": "happened",
+            "importance": "minor",
+            "effective_time": "2026",
+            "prior_fact_ids": [],
+            "source_span": {
+              "block_id": "b001",
+              "quote": "Barzalona won 176 races in 2026 out of 719 rides.",
+              "context": "He first won the title in 2021. Barzalona won 176 races in 2026 out of 719 rides. Nine of those wins were at the highest level including the Prix Ganay, the Prix Jacques le Marois and, most notably, the Prix de l'Arc de Triomphe aboard the Aga Khan Studs' Daryz (Sea The Stars), his second win in the race."
+            }
+          },
+          {
+            "relation": "new",
+            "subject_ref": "Mickael Barzalona",
+            "predicate": "had nine wins at the highest level",
+            "object": "including the Prix Ganay, the Prix Jacques le Marois and the Prix de l'Arc de Triomphe",
+            "modality": "happened",
+            "importance": "major",
+            "effective_time": "2026",
+            "prior_fact_ids": [],
+            "source_span": {
+              "block_id": "b001",
+              "quote": "Nine of those wins were at the highest level including the Prix Ganay, the Prix Jacques le Marois and, most notably, the Prix de l'Arc de Triomphe aboard the Aga Khan Studs' Daryz (Sea The Stars), his second win in the race.",
+              "context": "He first won the title in 2021. Barzalona won 176 races in 2026 out of 719 rides. Nine of those wins were at the highest level including the Prix Ganay, the Prix Jacques le Marois and, most notably, the Prix de l'Arc de Triomphe aboard the Aga Khan Studs' Daryz (Sea The Stars), his second win in the race. Barzalona also was the regular pilot of 2025 G1 Japan Cup hero Calandagan (Gleneagles)."
+            }
+          },
+          {
+            "relation": "new",
+            "subject_ref": "Mickael Barzalona",
+            "predicate": "was the regular pilot of",
+            "object": "2025 G1 Japan Cup hero Calandagan (Gleneagles)",
+            "modality": "happened",
+            "importance": "minor",
+            "effective_time": "2025",
+            "prior_fact_ids": [],
+            "source_span": {
+              "block_id": "b001",
+              "quote": "Barzalona also was the regular pilot of 2025 G1 Japan Cup hero Calandagan (Gleneagles).",
+              "context": "Nine of those wins were at the highest level including the Prix Ganay, the Prix Jacques le Marois and, most notably, the Prix de l'Arc de Triomphe aboard the Aga Khan Studs' Daryz (Sea The Stars), his second win in the race. Barzalona also was the regular pilot of 2025 G1 Japan Cup hero Calandagan (Gleneagles)."
+            }
+          }
+        ],
+        "comparison": {
+          "event_id": null,
+          "version": 0
+        }
+      }
+    },
+    {
+      "sample_id": "D023",
+      "response": {
+        "priority": "regional",
+        "primary_region": "united_states",
+        "reason": "Regional partnership extension between NYRA and Oaklawn Park for television coverage through 2031. Significant for US racing fans but not major news globally.",
+        "identity": {
+          "kind": "policy",
+          "fields": {
+            "organization": "The New York Racing Association",
+            "jurisdiction": "united_states",
+            "effective_date": "2031",
+            "scope": "Television partnership extension with Oaklawn Park"
+          },
+          "evidence": {
+            "organization": {
+              "block_id": "b000",
+              "quote": "The New York Racing Association",
+              "context": "The New York Racing Association has extended its partnership with Oaklawn Park, making America's Day at the Races on FOX Sports the television home of the Hot Springs oval through 2031."
+            },
+            "jurisdiction": {
+              "block_id": "b000",
+              "quote": "Hot Springs oval",
+              "context": "The New York Racing Association has extended its partnership with Oaklawn Park, making America's Day at the Races on FOX Sports the television home of the Hot Springs oval through 2031."
+            },
+            "effective_date": {
+              "block_id": "b000",
+              "quote": "through 2031",
+              "context": "The New York Racing Association has extended its partnership with Oaklawn Park, making America's Day at the Races on FOX Sports the television home of the Hot Springs oval through 2031."
+            },
+            "scope": {
+              "block_id": "b000",
+              "quote": "extended its partnership with Oaklawn Park",
+              "context": "The New York Racing Association has extended its partnership with Oaklawn Park, making America's Day at the Races on FOX Sports the television home of the Hot Springs oval through 2031."
+            }
+          }
+        },
+        "facts": [
+          {
+            "predicate": "extends partnership",
+            "object": "Oaklawn Park",
+            "subject_ref": "The New York Racing Association",
+            "effective_time": "2031",
+            "modality": "happened",
+            "importance": "major",
+            "relation": "new",
+            "prior_fact_ids": [],
+            "source_span": {
+              "block_id": "b000",
+              "quote": "extended its partnership with Oaklawn Park",
+              "context": "The New York Racing Association has extended its partnership with Oaklawn Park, making America's Day at the Races on FOX Sports the television home of the Hot Springs oval through 2031."
+            }
+          },
+          {
+            "predicate": "will provide coverage",
+            "object": "in-depth analysis and daily on-site coverage from Oaklawn",
+            "subject_ref": "America's Day at the Races",
+            "effective_time": "",
+            "modality": "planned",
+            "importance": "minor",
+            "relation": "new",
+            "prior_fact_ids": [],
+            "source_span": {
+              "block_id": "b001",
+              "quote": "Beginning Nov. 27, America's Day at the Races will provide viewers across the country with in-depth analysis and daily on-site coverage from Oaklawn.",
+              "context": "Beginning Nov. 27, America's Day at the Races will provide viewers across the country with in-depth analysis and daily on-site coverage from Oaklawn. The show will expand hours and coverage of the marquee events of the Oaklawn meet, including opening weekend, Smarty Jones day, Southwest and Rebel weekends, Arkansas Derby day, and Apple Blossom and Oaklawn Handicap weekends."
+            }
+          },
+          {
+            "predicate": "will expand coverage",
+            "object": "hours and coverage of the marquee events of the Oaklawn meet",
+            "subject_ref": "The show",
+            "effective_time": "",
+            "modality": "planned",
+            "importance": "minor",
+            "relation": "new",
+            "prior_fact_ids": [],
+            "source_span": {
+              "block_id": "b001",
+              "quote": "The show will expand hours and coverage of the marquee events of the Oaklawn meet, including opening weekend, Smarty Jones day, Southwest and Rebel weekends, Arkansas Derby day, and Apple Blossom and Oaklawn Handicap weekends.",
+              "context": "Beginning Nov. 27, America's Day at the Races will provide viewers across the country with in-depth analysis and daily on-site coverage from Oaklawn. The show will expand hours and coverage of the marquee events of the Oaklawn meet, including opening weekend, Smarty Jones day, Southwest and Rebel weekends, Arkansas Derby day, and Apple Blossom and Oaklawn Handicap weekends."
+            }
+          },
+          {
+            "predicate": "said",
+            "object": "Our presence on FOX Sports and NYRA's America's Day at the Races is an important part of Oaklawn's commitment to growing the sport of Thoroughbred racing and showcasing our racing program to a national audience",
+            "subject_ref": "Oaklawn President Louis A. Cella",
+            "effective_time": "",
+            "modality": "happened",
+            "importance": "minor",
+            "relation": "new",
+            "prior_fact_ids": [],
+            "source_span": {
+              "block_id": "b002",
+              "quote": "Our presence on FOX Sports and NYRA's America's Day at the Races is an important part of Oaklawn's commitment to growing the sport of Thoroughbred racing and showcasing our racing program to a national audience",
+              "context": "“Our presence on FOX Sports and NYRA's America's Day at the Races is an important part of Oaklawn's commitment to growing the sport of Thoroughbred racing and showcasing our racing program to a national audience,” said Oaklawn President Louis A. Cella. “The broadcast provides an outstanding platform to highlight the quality of our racing, the strength of our stakes program, and the excitement that makes Oaklawn such a special destination for racing fans.”"
+            }
+          }
+        ],
+        "comparison": {
+          "event_id": null,
+          "version": 0
+        }
+      }
+    }
   ]
 }

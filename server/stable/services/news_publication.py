@@ -28,8 +28,11 @@ def _validated_attempt(run, attempt_id, stage):
         raise ContentBlocked("stage_receipt_invalid")
     from stable.services.news_pipeline import context_enabled
     from stable.services.news_model_gateway import request_spec
+    from stable.services.news_pipeline import context_contract_version
     spec = (request_spec(stage, profile=attempt.usage.get("price", {}).get("profile", "base"), payload=attempt.usage.get("input"))
             if context_enabled() else getattr(settings, "NEWS_QUALITY_POLICY", {}).get("models", {}).get(stage, {}))
+    if context_contract_version() == "context-v3" and stage == "event_classify" and spec.get("profile") != "deep":
+        raise ContentBlocked("editorial_deep_missing")
     if attempt.model != spec.get("model") or attempt.prompt_version != spec.get("prompt_version") or attempt.usage.get("price") != spec:
         raise ContentBlocked("model_policy_changed")
     if stage in {"entity_check", "fact_audit"} and spec.get("quality_tier") != "strong":
