@@ -49,6 +49,8 @@ def request_spec(stage, *, profile="base", payload=None):
                 or not 1 <= spec["http_timeout_seconds"] <= 120
                 or stage in {"entity_check", "fact_audit"} and spec.get("quality_tier") != "strong"):
             raise RequestDenied("profile_not_qualified")
+        if 'reasoning_effort' in spec and (profile != 'deep' or spec['reasoning_effort'] not in {'low','high','max'}):
+            raise RequestDenied('reasoning_effort_invalid')
         spec.update(contract_version=policy["contract_version"], profile=profile)
         if stage == "translate_full" and payload is not None:
             floor = spec.pop("min_output_tokens", spec.get("max_output_tokens"))
@@ -241,9 +243,7 @@ def _single_request(attempt, payload):
         messages = [{"role": "system", "content": prompt_for(attempt.stage, spec.get("contract_version"))},
                     {"role": "user", "content": json.dumps(payload, ensure_ascii=False, sort_keys=True)}]
         if spec.get("contract_version") in {"context-v2", "context-v3"}:
-            return client.chat.completions.create(model=attempt.model, messages=messages,
-                max_tokens=spec["max_output_tokens"], response_format={"type": "json_object"},
-                extra_body={"thinking": {"type": spec["thinking"]}})
+            return client.chat.completions.create(**chat_request_parameters(attempt.model, messages, spec))
         return request_json_translation_once(client, model=attempt.model, messages=messages,
                                              max_tokens=spec["max_output_tokens"])
     except RateLimitError:
@@ -429,3 +429,14 @@ def reuse_completed(attempt, payload):
             current.save(update_fields=['provider', 'model', 'prompt_version', 'state', 'result', 'output_sha', 'completed_at', 'usage'])
             return current
     return None
+
+
+def chat_request_parameters(model, messages, spec):
+    """业务网关与有界真实复测使用同一实际请求参数。"""
+    kwargs = {'model':model, 'messages':messages, 'max_tokens':spec['max_output_tokens'],
+              'response_format':{'type':'json_object'}, 'extra_body':{'thinking':{'type':spec['thinking']}}}
+    if 'reasoning_effort' in spec:
+        if spec['thinking'] != 'enabled' or spec['reasoning_effort'] not in {'low','high','max'}:
+            raise RequestDenied('reasoning_effort_invalid')
+        kwargs['reasoning_effort'] = spec['reasoning_effort']
+    return kwargs

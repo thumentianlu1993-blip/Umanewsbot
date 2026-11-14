@@ -303,6 +303,10 @@ def resolve_known_entities(clean, occurrences, *, language):
             candidate = matches[0]
             item.update(replacement=candidate.target_zh, term_id=candidate.term_id,
                         provenance="confirmed_term_occurrence", identity_evidence=candidate.evidence)
+    from stable.services.news_pipeline import context_contract_version
+    if context_contract_version() == "context-v3":
+        from stable.services.news_translation_quality import apply_phrases
+        result = apply_phrases(result)
     return result
 
 
@@ -384,7 +388,7 @@ def context_entities(clean, response, *, contract_version="context-v2"):
                    "contract_version": contract_version} for row in rows]
 
 
-def hard_translation_checks(clean, target):
+def hard_translation_checks(clean, target, entities=()):
     sources = block_map(clean)
     targets = {"title": target["title"], **{row["id"]: row["text"] for row in target["blocks"]}}
     if target.get("manual"):
@@ -399,7 +403,11 @@ def hard_translation_checks(clean, target):
     summary_extra = set(numeric_tokens(target["summary"], include_optional=False)) - set(numeric_tokens("\n".join(sources.values())))
     if summary_extra:
         bad.append("summary")
-    return {"passed": not bad, "numeric": numeric, "repair_block_ids": sorted(set(bad)),
+    from stable.services.news_translation_quality import translation_issues
+    from stable.services.news_pipeline import context_contract_version
+    issues = translation_issues(clean, target, entities) if context_contract_version() == "context-v3" else []
+    bad.extend(issue["block_id"] for issue in issues)
+    return {"passed": not bad, "located_issues": issues, "numeric": numeric, "repair_block_ids": sorted(set(bad)),
             "summary_difference": sorted(summary_extra), "target_sha": digest(target)}
 
 
@@ -518,7 +526,10 @@ def translation_glossary(clean, entities):
         replacement = item.get('replacement')
         if not isinstance(replacement, str) or not replacement or '__P01_ENTITY' in replacement:
             raise ContentBlocked('glossary_replacement_invalid')
-        if replacement != item['text'] and (not item.get('term_id') or item.get('provenance') != 'confirmed_term_occurrence'):
+        from stable.services.news_translation_quality import valid_phrase
+        if item.get('provenance') == 'reviewed_phrase_catalog' and not valid_phrase(item):
+            raise ContentBlocked('phrase_catalog_changed')
+        if replacement != item['text'] and not valid_phrase(item) and (not item.get('term_id') or item.get('provenance') != 'confirmed_term_occurrence'):
             raise ContentBlocked('unconfirmed_entity_translation')
         if item.get('term_id'):
             tid = item['term_id']

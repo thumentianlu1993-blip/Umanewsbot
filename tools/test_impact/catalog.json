@@ -1031,7 +1031,8 @@
       "stable.test_p01_news_source_evidence",
       "stable.test_p01_news_workflow",
       "stable.test_p01_main_integration",
-      "stable.tests_legacy.AdapterTests"
+      "stable.tests_legacy.AdapterTests",
+      "stable.test_p01_pilot_regression"
     ]
   },
   "dependencies": {
@@ -3326,6 +3327,12 @@
     },
     "server/stable/test_p01_main_integration.py": {
       "label": "stable.test_p01_main_integration",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_pilot_regression.py": {
+      "label": "stable.test_p01_pilot_regression",
       "domains": [
         "news_quality"
       ]

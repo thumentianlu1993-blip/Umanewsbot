@@ -133,6 +133,8 @@ RACING_PROMPTS['entity_check'] = CONTEXT_BASE + (
     '同名每次各标，姓名与马名不能仅凭winner判定。父母马仍horse。'
     '正式冠名与赛事名相邻时保持完整连续表达，包括内部括号；断成不同块则分别标race片段，'
     '不跨块拼接，不吞入日期地点，不发明不存在的连续原名。'
+    '普通等级、班次和泛称（独立的G1、Group 3、Class 2、重賞、Thoroughbred racing）不是具名对象，标common_word或不抽；'
+    '但等级连同完整赛事名是同一正式名称时仍保留完整race，不能拆断，未抽普通词正常中文化。'
     '类别规则：' + json.dumps(ENTITY_RULES, ensure_ascii=False) + EXCLUSION_RULES +
     '信息库匹配未在本版本启用：不可假装查询赛马信息库，身份不明不得猜。'
     '开发合成对照：骑师林某策骑晨光，林某person、晨光horse；普通“晨光照亮赛场”不标。'
@@ -148,4 +150,24 @@ RACING_PROMPTS['translate_full'] += (
 RACING_PROMPTS['fact_audit'] += (
     ' 同时检查骑师与马匹角色互换、父母血统关系、系列赛和单场指代、原文已有矛盾。'
     '存在原文矛盾不能自行猜真值，使用uncertain及相关证据。不得以实体token齐全或数字相同替代事实检查。'
+)
+
+RACING_PROMPTS['event_classify'] = RACING_PROMPTS['event_classify'].replace('{block_id,start,end}', '{block_id,quote,context}') + (
+    ' context-v3所有新原文证据用{block_id,quote,context}逐字引文唯一定位，不计算数字偏移；遵守输入response_schema和identity_contract。'
+    '无法提供完整事件身份或事件不属于支持的kind时，返回且仅返回六个顶层键：'
+    '{"priority":"uncertain","primary_region":"对应地区","reason":"具体缺少证据","identity":{},"facts":[],"comparison":{"event_id":null,"version":0}}。'
+    '不能以来源日期推测年份、以标题/URL伪造公告编号，不得新增source等顶层字段。'
+    '更正的correction.old_body_span仍是旧稿start/end，与新原文quote协议不同。'
+)
+_TRANSLATION_RELATIONS = (
+    ' 日语姓名后的氏是中性敬称；原文未明确性别称谓时只译姓名，不能添加先生/女士/夫人。'
+    'name_form_hints仅是本篇全名/简称候选线索，不是已核身份；原文明确同一人时摘要不得把全名与简称并列为两人各取胜。'
+    '英文a five-year-old X gelding等明确血统语法中X为父马，译为父系为X的五岁阉马；'
+    '有named/called或同位语等名称证据时不能误判父子关系。轻负磅语境no weight on his back指负磅轻，不是没有负重。'
+    '退休赛马报道须逐句核对跑比赛的马与受访练马师主语；摘要引语只能归于实际说话者，不把其配偶/雇主加入。'
+    'market leader在赛马投注语境为头号热门；retained rider为签约骑师。未确认专名保留原文，普通地域和赛马术语正常中文化。'
+)
+RACING_PROMPTS['translate_full'] += _TRANSLATION_RELATIONS
+RACING_PROMPTS['fact_audit'] += _TRANSLATION_RELATIONS + (
+    ' compact-audit-v1的target.body由全部target.blocks按顺序以双换行连接；blocks、标题、摘要为完整审校对象，不得漏检。'
 )

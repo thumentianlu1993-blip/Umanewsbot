@@ -8,8 +8,10 @@ import unicodedata
 
 MONTHS = "January February March April May June July August September October November December".split()
 MONTH_NUMBER = {name.casefold(): index for index, name in enumerate(MONTHS, 1)}
-MONTH_PATTERN = "(?:" + "|".join(MONTHS) + ")"
-NORMALIZATION = "p01-explicit-numeric-equivalence-v2"
+MONTH_NUMBER.update({name[:3].casefold(): index for index, name in enumerate(MONTHS, 1)})
+MONTH_NUMBER["sept"] = 9
+MONTH_PATTERN = "(?:" + "|".join(sorted(MONTH_NUMBER, key=len, reverse=True)) + r")\.?"
+NORMALIZATION = "p01-explicit-numeric-equivalence-v3"
 
 
 def explicit_date(text):
@@ -25,12 +27,12 @@ def explicit_date(text):
         else:
             match = re.fullmatch(rf"({MONTH_PATTERN})\s+(\d{{1,2}})(?:st|nd|rd|th)?,?\s+(\d{{4}})", text, re.I)
             if match:
-                parts = (int(match[3]), MONTH_NUMBER[match[1].casefold()], int(match[2]))
+                parts = (int(match[3]), MONTH_NUMBER[match[1].rstrip(".").casefold()], int(match[2]))
             else:
                 match = re.fullmatch(rf"(\d{{1,2}})(?:st|nd|rd|th)?\s+({MONTH_PATTERN}),?\s+(\d{{4}})", text, re.I)
                 if not match:
                     return None
-                parts = (int(match[3]), MONTH_NUMBER[match[2].casefold()], int(match[1]))
+                parts = (int(match[3]), MONTH_NUMBER[match[2].rstrip(".").casefold()], int(match[1]))
     try:
         return date(*parts).isoformat()
     except ValueError:
@@ -83,6 +85,13 @@ def numeric_surface(text):
     """返回比较用文本；跨度只指向此规范文本，不冒充原文证据跨度。"""
     text = unicodedata.normalize("NFKC", text)
     text = re.sub(r"(?<=\d),(?=\d{3}(?:\D|$))", "", text)
+    # 仅处理明确的马位差分数，不能从普通专名中的 Half 等词推断数量。
+    text = re.sub(r"\ba[ -]length[ -]and[ -]a[ -]half\b", "1.5 lengths", text, flags=re.I)
+    whole = {"one": 1, "two": 2, "three": 3}
+    text = re.sub(r"\b(one|two|three)[ -]and[ -]a[ -](half|quarter)\s+lengths?\b",
+                  lambda m: str(Decimal(whole[m[1].lower()]) + (Decimal("0.5") if m[2].lower() == "half" else Decimal("0.25"))) + " lengths", text, flags=re.I)
+    text = re.sub(r"([一二两三])个(?:半|又(?:二分之一|四分之一))(?=马位)",
+                  lambda m: str(Decimal(_CN_DIGITS[m[1]]) + (Decimal("0.25") if "四分之一" in m[0] else Decimal("0.5"))) + "个", text)
     # 中文数词只在数值单位/序数语境处理，不替换普通词或任意专名。
     cn = r"[零〇一二两三四五六七八九十百千]+"
     def chinese(match):
@@ -112,6 +121,12 @@ def numeric_surface(text):
             return str(words[word])
         return f"〈word:{words[word]}〉"
     text = re.sub(rf"\b(?:[a-z]+[-‐‑‒–—−])+[a-z]+\b|\b{atom}(?:(?:[\s\-‐‑‒–—−]+)(?:(?:and(?:\s+a)?|point)[\s\-‐‑‒–—−]+)?{atom})*\b", english_number, text, flags=re.I)
+    # 缩写必须紧邻日期中的日数；完整月份名保留既有介词语境。
+    abbreviations = "(?:" + "|".join(sorted({m[:3].lower() for m in MONTHS} | {"sept"}, key=len, reverse=True)) + ")"
+    text = re.sub(rf"\b({abbreviations})\.?(?=\s+\d{{1,2}}\b)",
+                  lambda m: str(MONTH_NUMBER[m[1].casefold()]), text, flags=re.I)
+    text = re.sub(rf"(\b\d{{1,2}}(?:st|nd|rd|th)?\s+)({abbreviations})\b\.?",
+                  lambda m: m[1] + str(MONTH_NUMBER[m[2].casefold()]), text, flags=re.I)
     for number, month in enumerate(MONTHS, 1):
         text = re.sub(r"(\b\d{1,2}(?:st|nd|rd|th)?\s+)" + month + r"\b", lambda m: m[1] + str(number), text, flags=re.I)
         text = re.sub(r"\b" + month + r"(?=\s+\d{1,2}\b)", str(number), text, flags=re.I)

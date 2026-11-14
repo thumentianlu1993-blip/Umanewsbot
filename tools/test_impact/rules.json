@@ -1857,6 +1857,15 @@
     ],
     "server/stable/templates/stable/console/news_quality_report.html": [
       "news_quality"
+    ],
+    "server/stable/services/news_translation_quality.py": [
+      "news_quality"
+    ],
+    "server/stable/test_p01_pilot_regression.py": [
+      "news_quality"
+    ],
+    "server/stable/fixtures/p01_live_pilot_failures_20261114.json": [
+      "news_quality"
     ]
   },
   "symbols": {
