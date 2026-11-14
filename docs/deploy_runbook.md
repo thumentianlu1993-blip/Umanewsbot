@@ -1,3 +1,7 @@
+## 2026-11-14 采集验收进程与在线 worker 隔离
+
+完整 Django 只读查询进程也会消耗内存；通过 `docker exec` 放进受限 worker 时，会与 Celery 共用 cgroup 上限。本轮 384 MiB worker 两次 OOM 与此类验收进程重叠。后续数据库验收采用继承现有配置、`run --rm --no-deps` 的独立一次性容器，并使用只读事务、语句超时；不要在在线 worker 内启动完整 Django 验收进程。内存事件通过宿主 cgroup 文件读取。需要验证真实抓取时仍使用已有 host budget / snapshot 路径，且限定请求范围；只读数据库检查不触发采集。详见 [本轮证据](changes/collection-recovery-arc/release_evidence.md)。
+
 # 2026-11-12 美国赛前来源修正发布完成后的维护入口
 
 PR #304 merge `a4945de0333555e95cf129cd1b36b9cf4e24dc41`，生产候选 `049caf284d1605137688e2a15b286756df0b34b1`，OCI `sha256:8f14c22b23d52b734ace8f2faff1d0f3a98bb18b75ec71abbb86f1c5572cb353`。北京时间19:28:22四应用版本/运行态核验通过，双worker就绪、Beat恢复、QQ关闭，schema0084不变，发布锁释放。

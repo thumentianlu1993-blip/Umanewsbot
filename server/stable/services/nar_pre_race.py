@@ -93,7 +93,8 @@ def complete(claim, *, payload, url, page, route, now):
             pre._finish_locked(event,claim,now,'older_or_incomplete_source');return False
         previous=latest.candidate_payload.get('items',[]) if latest and old.get('baseline')==pre.baseline(event) else []
         items=stamp_dynamic_items(payload['items'],previous,now=now,source_url=url,strict_roster=False,
-            observed_at=getattr(page,'observed_at',None))
+            observed_at=getattr(page,'observed_at',None),
+            roster_limit=len(payload['items']) if payload['stage']=='registration' else 60)
         content=canonical_sha(dict(stage=payload['stage'],items=material_items(items)))
         admitted=settings.RACE_DATA_SYNC_RACECARD_APPLY_ENABLED and 'participants.horse_name' in settings.RACE_DATA_SYNC_ENABLED_FIELDS
         if old.get('content_sha256')!=content or old.get('baseline')!=pre.baseline(event) or old.get('validated')!=admitted:

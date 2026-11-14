@@ -8,7 +8,7 @@ from stable.test_race_pre_race import FLAGS, HTML, URL, NOW, event
 
 class BeijingContractTests(TestCase):
     def make(self, slug='us', **kw):
-        values=dict(year=2026,slug=slug,chinese_name=slug,original_name=slug,visibility_status='published',
+        values=dict(year=2026,slug=slug,chinese_name=slug,original_name=slug,visibility_status='published',country_region='united_states',
             local_date=date(2026,9,18),local_start_time=time(16,14),timezone_name='America/New_York',
             race_datetime=datetime(2026,9,18,20,14,tzinfo=tz.utc),eligibility_text='3U 3UP R D L')
         values.update(kw)
