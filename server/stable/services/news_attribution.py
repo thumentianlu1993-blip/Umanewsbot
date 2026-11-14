@@ -676,6 +676,14 @@ def infer_article_attribution(
     *,
     batch_context: AttributionBatchContext | None = None,
 ) -> AttributionResult:
+    source_evidence = (article.translation_metadata or {}).get("region_evidence") or {}
+    if article.source_site in GLOBAL_SOURCE_SITES and source_evidence.get("source_region_used") is False:
+        # 证据只选择推断路径，结论重新从当前正文计算；应用仍由原开关/锁/rollout策略负责。
+        region, evidence = infer_global_source_region(article.title_ja, article.body_ja_normalized or article.body_ja_raw)
+        supported = evidence["status"] == "supported"
+        return AttributionResult(primary_region=region, content_category=classify_news_content(article),
+            reason=evidence["reason"], evidence=evidence, confidence=80 if supported else 0,
+            status=AttributionStatus.APPLIED if supported else AttributionStatus.NEEDS_REVIEW)
     resolved_source_config = source_config
     if resolved_source_config is None and batch_context is not None and article.source_config_id:
         resolved_source_config = batch_context.source_configs_by_id.get(article.source_config_id)
@@ -1054,3 +1062,26 @@ def apply_article_attribution(
         article.tags_json = [*(article.tags_json or []), "ireland"]
         article.save(update_fields=["tags_json", "updated_at"])
     return result
+
+
+def infer_global_source_region(title: str, body: str) -> tuple[str, dict]:
+    """跨国媒体的采集入口不提供稿件地区；仅复用文本规则，缺证据留待复核。"""
+    article = NewsArticle(title_ja=title, body_ja_raw=body, body_ja_normalized=body,
+                          source_site=SourceSite.TDN, source_language=SourceLanguage.ENGLISH,
+                          racing_region=RacingRegion.OTHER)
+    context = AttributionBatchContext(entries=[], entries_by_id={}, terms_by_language={},
+                                      term_indexes={}, source_configs_by_id={})
+    result = infer_article_attribution(article, batch_context=context)
+    # 五区外的爱尔兰稿件不借用英国或来源地区席位。
+    irish = _keyword_regions(title, {RacingRegion.OTHER: [*IRELAND_KEYWORDS, "dundalk"]})
+    supported_event = _keyword_regions(title, EVENT_REGION_KEYWORDS)
+    known = result.status == AttributionStatus.APPLIED and result.primary_region != RacingRegion.OTHER
+    if irish and not supported_event:
+        region, reason, known = RacingRegion.OTHER, "out_of_scope_irish_event", False
+    elif known:
+        region, reason = result.primary_region, result.reason
+    else:
+        region, reason = RacingRegion.OTHER, "region_evidence_insufficient"
+    return str(region), {"reason": reason, "status": "supported" if known else "needs_review",
+                         "rule_version": result.rule_version, "evidence": result.evidence,
+                         "irish_title_matches": irish, "source_region_used": False}

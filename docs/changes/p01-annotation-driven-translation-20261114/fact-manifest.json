@@ -1,0 +1,252 @@
+[
+  {
+    "sample_id": "D006",
+    "language": "en",
+    "source_sha": "b498c3773dac3ebe83844c09ea4572892542ad5215093ede6067ce488ee8bed3",
+    "reference_sha": "8cbce4dd9ab9b4ff0a2f9272c3d4812922b5930cd51ef3fc21f46724aea6f698",
+    "facts": 4,
+    "categories": [
+      "number_unit",
+      "placing",
+      "quotation",
+      "relationship"
+    ]
+  },
+  {
+    "sample_id": "D011",
+    "language": "en",
+    "source_sha": "156ce74b1b76b1e52225536b41c181c61303b40d2ae2bc7051264bbf049fc0b6",
+    "reference_sha": "bb924177c8a4c07e029a58bfc86185d452dab5890d85707b3bd9e28a33035f9c",
+    "facts": 4,
+    "categories": [
+      "number_unit",
+      "placing",
+      "quotation",
+      "relationship"
+    ]
+  },
+  {
+    "sample_id": "D012",
+    "language": "en",
+    "source_sha": "d596e8b3df5c5b172508319f5533f25ce677de866ffef5eb6ecf7cf6ff9cfbe0",
+    "reference_sha": "312d30aca6e83a75c710d26815ff7cf5616240f9202dc1030ba7156889a78bd9",
+    "facts": 4,
+    "categories": [
+      "negation",
+      "pedigree",
+      "plan"
+    ]
+  },
+  {
+    "sample_id": "D013",
+    "language": "en",
+    "source_sha": "507cd3d8b217b2e2a9fc6901abe74d656c4d2d7cbe6155a51dba6bb99a8696f0",
+    "reference_sha": "3b405734ee6b2ac6edf1c3695211f3a3ebb393194d3cd8ed779f63e049627e65",
+    "facts": 4,
+    "categories": [
+      "date",
+      "placing",
+      "plan",
+      "relationship"
+    ]
+  },
+  {
+    "sample_id": "D016",
+    "language": "en",
+    "source_sha": "b34267f826d15e8b8ff711aede7703f95874e19581e904e0c0f610d223d59e02",
+    "reference_sha": "d528db47e64779f758e5ecacffc7d87d23e3ba270537aa21358a925e66698ee1",
+    "facts": 4,
+    "categories": [
+      "plan",
+      "relationship"
+    ]
+  },
+  {
+    "sample_id": "D017",
+    "language": "en",
+    "source_sha": "019a078446ed274c13c11a3b95581a9e18264982daa3c200b53e3d608a8ec3e7",
+    "reference_sha": "9fd4dcd79d98d93b8409cc8cbdf936b519ae6677756eea6d4fc31ca9c595d73d",
+    "facts": 4,
+    "categories": [
+      "number_unit",
+      "placing",
+      "plan",
+      "quotation"
+    ]
+  },
+  {
+    "sample_id": "D019",
+    "language": "en",
+    "source_sha": "38256833b1e2338c7c03eff2657f2879b05c77ddfbdc51d7b33aec83f7cc4e4c",
+    "reference_sha": "e2037a094b97161d51875f8683909255a8eb7b7d7ec1fc7c12307bc701671f40",
+    "facts": 4,
+    "categories": [
+      "date",
+      "number_unit",
+      "pedigree"
+    ]
+  },
+  {
+    "sample_id": "D022",
+    "language": "en",
+    "source_sha": "9b604247b03f95a45206edf1069c9c1fcd3e5d2004d760000b1e34b0c29434b2",
+    "reference_sha": "c11b91f684fe59e13b3d6a078cc92cc6bfaadca255a77b6ec59fbb8b227ad904",
+    "facts": 4,
+    "categories": [
+      "date",
+      "pedigree",
+      "plan",
+      "relationship"
+    ]
+  },
+  {
+    "sample_id": "D023",
+    "language": "en",
+    "source_sha": "80e96abd07f9f2684f8cb9d15d5cefcac0391007de9c4b4188c480f77382ac83",
+    "reference_sha": "21bc0dfc6ff13a56f2f0ac63d82c33a944d819da35d3b3092a267eeb0a4112f3",
+    "facts": 4,
+    "categories": [
+      "date",
+      "plan",
+      "quotation",
+      "relationship"
+    ]
+  },
+  {
+    "sample_id": "D025",
+    "language": "en",
+    "source_sha": "621d6bea8e57c9dc82c3dcdfe2cecaa0b68cc448c293bab977b14473d01510ed",
+    "reference_sha": "d1f13b84dff2fc43f3f938a8513935d95b4a69c2117c3b1cafb2181005c81adf",
+    "facts": 4,
+    "categories": [
+      "date",
+      "number_unit",
+      "quotation",
+      "relationship"
+    ]
+  },
+  {
+    "sample_id": "D026",
+    "language": "ja",
+    "source_sha": "bd562417976dd3c5d1b583ceeab37146e206a96c1fbe7d9c179e2c4df8d692cc",
+    "reference_sha": "0a03a7cc36941a995efd8ad6ef1203e8f0628a621bbfd4faf3c2712f78fea57b",
+    "facts": 4,
+    "categories": [
+      "date",
+      "negation",
+      "number_unit",
+      "plan"
+    ]
+  },
+  {
+    "sample_id": "D027",
+    "language": "ja",
+    "source_sha": "d8014dc9fe85572f43a2d584e550619f3c3942093a8572ad266ff42dfb83394a",
+    "reference_sha": "35d6a9c29c8a2b387bc2e004b33a33d88c90206f493ba711bd43335b9556125e",
+    "facts": 4,
+    "categories": [
+      "date",
+      "number_unit"
+    ]
+  },
+  {
+    "sample_id": "D028",
+    "language": "ja",
+    "source_sha": "6b80d36ec4ea55431aa78388a8506210fc71cfafe4af53b6c8b17859e513a613",
+    "reference_sha": "8e22fe5fef24fd3bc9fe008286e66234099ac1541255bf2b205c4c7279203d18",
+    "facts": 4,
+    "categories": [
+      "date",
+      "number_unit",
+      "relationship"
+    ]
+  },
+  {
+    "sample_id": "D031",
+    "language": "ja",
+    "source_sha": "49b588cc59eeceb999f2fd1dbb063011d7491a00e551370ca034337679d644e7",
+    "reference_sha": "b0ee92c34466adff25f3464e388618481d94b0a9ca10f30fa02085c5c23e733c",
+    "facts": 4,
+    "categories": [
+      "date",
+      "plan",
+      "relationship"
+    ]
+  },
+  {
+    "sample_id": "D032",
+    "language": "ja",
+    "source_sha": "4d3f880163693246e99b6b1fd8c20ee594721bf87ebedead2c92169941dc03fd",
+    "reference_sha": "fff4e79d4277234044b13196452276773df8cadcbdb6b07a9bb315745b1a892e",
+    "facts": 4,
+    "categories": [
+      "date",
+      "negation"
+    ]
+  },
+  {
+    "sample_id": "D033",
+    "language": "ja",
+    "source_sha": "d47531d89db8567ea4790120b7cc8b4940b8ab45c32241e7205c3e640b8fae92",
+    "reference_sha": "40ba31740a91dfbe364227a57fcff78d5e2723051dbc18369d1e4872c4f11b97",
+    "facts": 4,
+    "categories": [
+      "date",
+      "negation",
+      "plan",
+      "relationship"
+    ]
+  },
+  {
+    "sample_id": "D034",
+    "language": "ja",
+    "source_sha": "324a851d401cfea23678aafda5d4b5bca9359861d3794470760d2107f6f162fa",
+    "reference_sha": "fd9a14b006ea37780453d02f3c1546b54d1d0b3e567fa9153a6119232d7d9669",
+    "facts": 4,
+    "categories": [
+      "date",
+      "placing",
+      "plan",
+      "relationship"
+    ]
+  },
+  {
+    "sample_id": "D038",
+    "language": "ja",
+    "source_sha": "652ca32207e0b705cc7a6f73cdb0b203ad0095e192e24385ee320864d28fecb7",
+    "reference_sha": "d2e79a8f2c096a3cc11880d27d5fc5351c44d3d4ba996c0f93ce46f18fea954d",
+    "facts": 4,
+    "categories": [
+      "number_unit",
+      "pedigree",
+      "placing",
+      "plan"
+    ]
+  },
+  {
+    "sample_id": "D042",
+    "language": "ja",
+    "source_sha": "4ffdb238d814fb1c1562e868b5173be9fce53a58dc08b8d2ecca2abf8af4c1d3",
+    "reference_sha": "e614c7f6f0594f198761e5d19a85e2fc447e76335c5fbf3da20b29626170fe23",
+    "facts": 4,
+    "categories": [
+      "placing",
+      "plan",
+      "quotation",
+      "relationship"
+    ]
+  },
+  {
+    "sample_id": "D050",
+    "language": "ja",
+    "source_sha": "77a6c9820fd3d325123c03f29e4cdd504cee1e5aae2f410406ab6b9957a50a06",
+    "reference_sha": "a38525858b7b6dcab46f267d4d4c68dd2fc9ccd5cda21f0be0c8e93c06f29832",
+    "facts": 4,
+    "categories": [
+      "number_unit",
+      "pedigree",
+      "placing",
+      "plan"
+    ]
+  }
+]

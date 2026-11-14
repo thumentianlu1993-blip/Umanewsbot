@@ -1006,6 +1006,32 @@
       "stable.test_historical_race_cached_details",
       "stable.test_public_new_regions",
       "stable.test_public_navigation_and_attribution"
+    ],
+    "news_quality": [
+      "stable.test_p01_annotation_translation",
+      "stable.test_p01_entity_units",
+      "stable.test_p01_news_budget",
+      "stable.test_p01_news_claims",
+      "stable.test_p01_news_console",
+      "stable.test_p01_news_content",
+      "stable.test_p01_news_corrections",
+      "stable.test_p01_news_discovery",
+      "stable.test_p01_news_editorial",
+      "stable.test_p01_news_evaluation",
+      "stable.test_p01_news_feed",
+      "stable.test_p01_news_history",
+      "stable.test_p01_news_immutability",
+      "stable.test_p01_news_pipeline",
+      "stable.test_p01_news_public_views",
+      "stable.test_p01_news_publication",
+      "stable.test_p01_news_recovery",
+      "stable.test_p01_news_relations",
+      "stable.test_p01_news_report",
+      "stable.test_p01_news_review_regressions",
+      "stable.test_p01_news_source_evidence",
+      "stable.test_p01_news_workflow",
+      "stable.test_p01_main_integration",
+      "stable.tests_legacy.AdapterTests"
     ]
   },
   "dependencies": {
@@ -1088,6 +1114,10 @@
     ],
     "uk_race_automation": [
       "infrastructure"
+    ],
+    "news_quality": [
+      "news_translation",
+      "horse_page"
     ]
   },
   "tests": {
@@ -3161,6 +3191,144 @@
       "domains": [
         "module:stable.test_historical_empty_race_repair"
       ]
+    },
+    "server/stable/test_p01_annotation_translation.py": {
+      "label": "stable.test_p01_annotation_translation",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_entity_units.py": {
+      "label": "stable.test_p01_entity_units",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_budget.py": {
+      "label": "stable.test_p01_news_budget",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_claims.py": {
+      "label": "stable.test_p01_news_claims",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_console.py": {
+      "label": "stable.test_p01_news_console",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_content.py": {
+      "label": "stable.test_p01_news_content",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_corrections.py": {
+      "label": "stable.test_p01_news_corrections",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_discovery.py": {
+      "label": "stable.test_p01_news_discovery",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_editorial.py": {
+      "label": "stable.test_p01_news_editorial",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_evaluation.py": {
+      "label": "stable.test_p01_news_evaluation",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_feed.py": {
+      "label": "stable.test_p01_news_feed",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_history.py": {
+      "label": "stable.test_p01_news_history",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_immutability.py": {
+      "label": "stable.test_p01_news_immutability",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_pipeline.py": {
+      "label": "stable.test_p01_news_pipeline",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_public_views.py": {
+      "label": "stable.test_p01_news_public_views",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_publication.py": {
+      "label": "stable.test_p01_news_publication",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_recovery.py": {
+      "label": "stable.test_p01_news_recovery",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_relations.py": {
+      "label": "stable.test_p01_news_relations",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_report.py": {
+      "label": "stable.test_p01_news_report",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_review_regressions.py": {
+      "label": "stable.test_p01_news_review_regressions",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_source_evidence.py": {
+      "label": "stable.test_p01_news_source_evidence",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_news_workflow.py": {
+      "label": "stable.test_p01_news_workflow",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_main_integration.py": {
+      "label": "stable.test_p01_main_integration",
+      "domains": [
+        "news_quality"
+      ]
     }
   },
   "profiles": {
@@ -3595,7 +3763,8 @@
     "france_race_automation": "integration: 法国来源阶段、身份、字段和固定范围回放",
     "us_source_collection": "integration: 美国只读来源、阶段语义、缓存回放与来源入口",
     "uk_race_automation": "integration: 英国付费采集、赛前阶段、完整赛果及发布恢复",
-    "five_region_race_governance": "application/integration: 五地区公开过滤、历史字段修复与来源边界"
+    "five_region_race_governance": "application/integration: 五地区公开过滤、历史字段修复与来源边界",
+    "news_quality": "application/integration: P01 全文审校、精确稿件、预算、审核队列与五地区观测"
   },
   "dedicated_batch_modules": [
     "stable.test_migration_history_repair_postgres",

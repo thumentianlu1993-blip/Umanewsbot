@@ -17,7 +17,7 @@
       </div>
       <div class="flex items-start justify-between">
         <div>
-          <a href="{% url 'console-article-editor' state.manual_article.pk %}" class="text-blue-600 hover:underline font-medium">
+          <a href="{% url 'console-article-editor' state.article_id %}" class="text-blue-600 hover:underline font-medium">
             #{{ state.manual_article.pk }} {{ state.manual_article.effective_title }}
           </a>
           <p class="text-sm text-gray-400 mt-1">
@@ -47,7 +47,7 @@
       </div>
       <div class="mb-2">
         <a href="{% url 'console-article-editor' recommendation.article.pk %}" class="text-blue-600 hover:underline">
-          #{{ recommendation.article.pk }} {{ recommendation.article.effective_title }}
+          #{{ recommendation.article.pk }} {% if recommendation.receipt %}{{ recommendation.receipt.content.title }}{% else %}{{ recommendation.article.effective_title }}{% endif %}
         </a>
       </div>
       <p class="text-sm text-gray-600 mb-3">{{ recommendation.reason }}</p>
@@ -90,7 +90,7 @@
               <tr class="border-b hover:bg-gray-50 {% if state.manual_article and state.manual_article.pk == article.pk %}bg-green-50{% endif %}">
                 <td class="py-2 px-2">{{ article.pk }}</td>
                 <td class="py-2 px-2">
-                  <a href="{% url 'console-article-editor' article.pk %}" class="text-blue-600 hover:underline">
+                  <a href="{% url 'console-article-editor' article.headline_article_id|default:article.pk %}" class="text-blue-600 hover:underline">
                     {{ article.effective_title }}
                   </a>
                   {% if state.manual_article and state.manual_article.pk == article.pk %}
@@ -101,7 +101,8 @@
                 <td class="py-2 px-2">
                   <form method="post" action="{% url 'console-headline-select' %}">
                     {% csrf_token %}
-                    <input type="hidden" name="article_id" value="{{ article.pk }}">
+                    <input type="hidden" name="article_id" value="{{ article.headline_article_id|default:article.pk }}">
+                    {% if article.receipt %}<input type="hidden" name="receipt_id" value="{{ article.receipt.pk }}">{% endif %}
                     <input type="hidden" name="expected_version" value="{{ state.selection.version|default:0 }}">
                     <button type="submit" class="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100">
                       {% if state.manual_article and state.manual_article.pk == article.pk %}重新设置{% else %}设为头条{% endif %}

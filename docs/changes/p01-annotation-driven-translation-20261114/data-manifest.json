@@ -1,0 +1,21 @@
+{
+  "checksum_manifest_sha": "426bf9b73308216f04b009cd86246855710981e67493fa18000075988aa1dc9b",
+  "articles": 120,
+  "mentions": 4619,
+  "human_decisions": 44,
+  "types": {
+    "place": 858,
+    "person": 1198,
+    "race_related": 100,
+    "organization": 333,
+    "race": 660,
+    "horse": 1375,
+    "racing_honor": 50,
+    "auction": 45
+  },
+  "all_exposed": true,
+  "full_human_gold": false,
+  "source_manifest_sha": "7d7b5bd5f4c682b9abd38dbb9fd1f3d6b7bab1fe9216973686967dfc83dbef18",
+  "new_type_uncovered_candidates": 3,
+  "audit_scope": "known_surface_fulltext_scan_not_exhaustive_semantic_gold"
+}

@@ -225,9 +225,13 @@ def get_headline_state(*, now=None) -> dict:
         }
 
     article = selection.article
-    is_manual_active = (
-        article is not None and is_headline_eligible(article, now=now)
-    )
+    is_manual_active = article is not None and is_headline_eligible(article, now=now)
+    if article and (selection.receipt_id or article.active_news_run_id):
+        receipt = _headline_receipt(article, selection.receipt_id)
+        is_manual_active = receipt is not None
+        if receipt:
+            from stable.services.news_public_read import display_article
+            article = display_article(receipt.public_entry)
 
     try:
         active_rec = HomepageHeadlineRecommendation.objects.select_related("article").get(
@@ -354,7 +358,7 @@ def resolve_homepage_headline(public_queryset, *, now=None) -> NewsArticle | Non
 
 
 def set_manual_headline(
-    article_id, *, user, expected_version
+    article_id, *, user, expected_version, receipt_id=None
 ) -> dict:
     """Atomically set (or replace) the homepage headline to *article_id*.
 
@@ -399,14 +403,12 @@ def set_manual_headline(
         except NewsArticle.DoesNotExist:
             return {"success": False, "reason": f"Article {article_id} does not exist"}
 
-        if not is_headline_eligible(article):
-            return {
-                "success": False,
-                "reason": f"Article {article_id} is not eligible as headline",
-            }
+        receipt = _headline_receipt(article, receipt_id)
+        if (receipt is None and (receipt_id or article.active_news_run_id)) or (receipt is None and not is_headline_eligible(article)):
+            return {"success": False, "reason": "目标稿件不可作为头条"}
 
         # Determine action
-        already_selected = selection.article_id == article_id
+        already_selected = selection.article_id == article_id and selection.receipt_id == (receipt.pk if receipt else None)
         old_article_id = selection.article_id
         had_previous = old_article_id is not None
         action = "replaced" if had_previous else "set"
@@ -414,13 +416,16 @@ def set_manual_headline(
         if not already_selected:
             # Update selection
             selection.article = article
+            selection.receipt = receipt
             selection.selected_by = user
             selection.selected_at = timezone.now()
             selection.version += 1
             selection.save(
-                update_fields=["article", "selected_by", "selected_at", "version", "updated_at"]
+                update_fields=["article", "receipt", "selected_by", "selected_at", "version", "updated_at"]
             )
             selection.refresh_from_db()
+            from stable.services.news_feed import request_snapshot_refresh
+            transaction.on_commit(request_snapshot_refresh)
 
             # Audit — include old article ID so the full transition is reconstructable.
             detail_parts = [
@@ -450,7 +455,7 @@ def set_manual_headline(
         # this article (idempotent re-set): the exposure state may have
         # degraded to waiting/suppressed since the headline was first set,
         # and a headline without an ACTIVE exposure is invisible.
-        if getattr(settings, "RACE_NEWS_EXPOSURE_ENABLED", False):
+        if receipt is None and getattr(settings, "RACE_NEWS_EXPOSURE_ENABLED", False):
             from stable.services.race_news_exposure import (
                 classify_angle,
                 force_activate_exposure,
@@ -575,13 +580,16 @@ def cancel_manual_headline(*, user, expected_version) -> dict:
 
         old_article_id = selection.article_id
         selection.article = None
+        selection.receipt = None
         selection.selected_by = None
         selection.selected_at = None
         selection.version += 1
         selection.save(
-            update_fields=["article", "selected_by", "selected_at", "version", "updated_at"]
+            update_fields=["article", "receipt", "selected_by", "selected_at", "version", "updated_at"]
         )
         selection.refresh_from_db()
+        from stable.services.news_feed import request_snapshot_refresh
+        transaction.on_commit(request_snapshot_refresh)
 
         log_operation(
             action_type="headline_cancelled",
@@ -625,6 +633,8 @@ def generate_headline_recommendation(*, user, now=None) -> dict | None:
     _check_headline_permission(user)
 
     now = now or timezone.now()
+    if getattr(settings, "NEWS_QUALITY_FEED_ENABLED", False):
+        return _generate_p01_recommendation(user=user, now=now)
     queryset = headline_candidate_queryset(now=now)
 
     # Scan windows
@@ -729,9 +739,14 @@ def generate_headline_recommendation(*, user, now=None) -> dict | None:
             "manual_selection_article_id": selection.article_id,
         }
 
+        receipt = _headline_receipt(locked_article)
+        if locked_article.active_news_run_id and receipt is None:
+            return None
+        if receipt:
+            evidence.update(public_entry_id=receipt.public_entry.pk, quality_sha=receipt.target_revision_sha)
         rec = HomepageHeadlineRecommendation.objects.create(
             slot=HomepageHeadlineRecommendation.SLOT_HOMEPAGE_PRIMARY,
-            article=locked_article,
+            article=locked_article, receipt=receipt,
             status=HomepageHeadlineRecommendation.Status.ACTIVE,
             reason=reason,
             evidence=evidence,
@@ -828,22 +843,24 @@ def accept_headline_recommendation(
                 f"Recommended article {rec.article_id} does not exist"
             )
 
-        if not is_headline_eligible(article):
-            raise ValueError(
-                f"Recommended article {rec.article_id} is no longer eligible"
-            )
+        receipt = _headline_receipt(article, rec.receipt_id)
+        if (receipt is None and (rec.receipt_id or article.active_news_run_id)) or (receipt is None and not is_headline_eligible(article)):
+            raise ValueError("推荐稿件已不可用")
 
         had_previous = selection.article_id is not None
         action = "replaced" if had_previous else "set"
 
         selection.article = article
+        selection.receipt = receipt
         selection.selected_by = user
         selection.selected_at = timezone.now()
         selection.version += 1
         selection.save(
-            update_fields=["article", "selected_by", "selected_at", "version", "updated_at"]
+            update_fields=["article", "receipt", "selected_by", "selected_at", "version", "updated_at"]
         )
 
+        from stable.services.news_feed import request_snapshot_refresh
+        transaction.on_commit(request_snapshot_refresh)
         rec.status = HomepageHeadlineRecommendation.Status.ACCEPTED
         rec.accepted_by = user
         rec.accepted_at = timezone.now()
@@ -934,15 +951,17 @@ def invalidate_headline_state_for_article(
 
         # --- Selection ---
         if selection and selection.article_id == article_id:
-            eligible = article is not None and is_headline_eligible(article)
+            eligible = article is not None and (_headline_receipt(article, selection.receipt_id) is not None if selection.receipt_id or article.active_news_run_id else is_headline_eligible(article))
             if not eligible:
                 selection.article = None
+                selection.receipt = None
                 selection.selected_by = None
                 selection.selected_at = None
                 selection.version += 1
                 selection.save(
                     update_fields=[
                         "article",
+                        "receipt",
                         "selected_by",
                         "selected_at",
                         "version",
@@ -967,7 +986,7 @@ def invalidate_headline_state_for_article(
 
         # --- Recommendation ---
         if active_rec and active_rec.article_id == article_id:
-            eligible = article is not None and is_headline_eligible(article)
+            eligible = article is not None and (_headline_receipt(article, active_rec.receipt_id) is not None if active_rec.receipt_id or article.active_news_run_id else is_headline_eligible(article))
             if not eligible:
                 active_rec.status = HomepageHeadlineRecommendation.Status.INVALIDATED
                 active_rec.save(update_fields=["status", "updated_at"])
@@ -985,3 +1004,71 @@ def invalidate_headline_state_for_article(
                 )
 
     return changes
+
+
+def _headline_receipt(article, receipt_id=None):
+    if not article.active_news_run_id and not receipt_id:
+        return None
+    from stable.models import NewsPublicationReceipt
+    query = NewsPublicationReceipt.objects.filter(article=article)
+    receipt = query.filter(pk=receipt_id).first() if receipt_id else query.order_by("published_at", "id").first()
+    if not receipt or receipt.visibility != "public" or receipt.published_at > timezone.now():
+        return None
+    if not hasattr(receipt, "public_entry") or receipt.public_entry.superseded_at:
+        return None
+    if not all(receipt.content.get(key, "").strip() for key in ("title", "body", "summary")):
+        return None
+    return receipt
+
+
+def headline_entry_candidates(*, now=None):
+    """从当前已准备好的首页资格池取精确稿件；不重新按旧分数抬高 P01。"""
+    from stable.models import NewsFeedSnapshot
+    from stable.services.news_feed import homepage_entries
+    from stable.services.news_pipeline import policy_sha
+    now = now or timezone.now()
+    snapshot = NewsFeedSnapshot.objects.filter(policy_sha=policy_sha(), expires_at__gt=now).order_by("-cutoff_at", "-id").first()
+    if not snapshot:
+        return [], None
+    ids = ([snapshot.headline_entry_id] if snapshot.headline_entry_id else []) + snapshot.hot_entry_ids + snapshot.ordered_entry_ids
+    by_id = {row.pk: row for row in homepage_entries().filter(pk__in=ids[:192])}
+    rows = []
+    for pk in ids[:192]:
+        row = by_id.get(pk)
+        if not row:
+            continue
+        content = row.receipt.content if row.kind == "p01" else {"title": row.article.effective_title, "body": row.article.effective_body, "summary": row.article.effective_summary}
+        if not all(content.get(key, "").strip() for key in ("title", "body", "summary")):
+            continue
+        rows.append(row)
+        if len(rows) == 48:
+            break
+    return rows, snapshot
+
+
+@transaction.atomic
+def _generate_p01_recommendation(*, user, now):
+    from stable.services.news_feed import publication_lock
+    publication_lock()
+    rows, snapshot = headline_entry_candidates(now=now)
+    if not rows:
+        return None
+    selection, _ = _ensure_selection()
+    selection = HomepageHeadlineSelection.objects.select_for_update().get(pk=selection.pk)
+    alternatives = [row for row in rows if not (row.receipt_id == selection.receipt_id and row.article_id == selection.article_id)]
+    chosen = (alternatives or rows)[0]
+    old = HomepageHeadlineRecommendation.objects.select_for_update().filter(slot="homepage_primary", status="active").first()
+    if old:
+        old.status = "superseded"
+        old.save(update_fields=["status", "updated_at"])
+    evidence = {"generation": str(snapshot.generation), "policy_sha": snapshot.policy_sha,
+        "public_entry_id": chosen.pk, "candidate_entry_ids": [row.pk for row in rows],
+        "quality_sha": chosen.receipt.target_revision_sha if chosen.receipt_id else None}
+    reason = "来自当前首页资格池，按重大优先与地区轮选顺序推荐"
+    rec = HomepageHeadlineRecommendation.objects.create(slot="homepage_primary", article_id=chosen.article_id,
+        receipt_id=chosen.receipt_id, status="active", reason=reason, evidence=evidence,
+        engine_version="p01-feed-headline.v1", generated_by=user)
+    log_operation(action_type="headline_recommendation_generated", target_type="headline_recommendation",
+        target_id=rec.pk, detail=f"entry={chosen.pk} generation={snapshot.generation}", admin=user)
+    return {"id": rec.pk, "article_id": chosen.article_id, "receipt_id": str(chosen.receipt_id) if chosen.receipt_id else None,
+            "reason": reason, "evidence": evidence, "engine_version": rec.engine_version}
