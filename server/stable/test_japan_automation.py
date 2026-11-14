@@ -238,6 +238,23 @@ class NarPreRaceTests(SimpleTestCase):
         with self.assertRaises(ValueError):parse_nar_nominations(html.replace('2026年','2025年'),event=event,
             url='https://www.keiba.go.jp/dirtgraderace/2026/1125_urawakinen/racecard.html')
 
+    def test_full_nomination_list_accepts_selected_and_many_reserves(self):
+        from stable.services.nar_pre_race import parse_nar_nominations
+        event=SimpleNamespace(original_name='浦和記念',local_date=date(2026,11,25))
+        # 2026-11-14 官网形状：12 匹選定馬、56 匹補欠馬，报名人数不是正式出马人数。
+        def section(label, start, stop):
+            rows=''.join(f'<tr><td>テスト馬{i}</td><td>調教師{i}</td></tr>' for i in range(start,stop))
+            return f'<section class="sec_nominate"><h2>{label}</h2><table><tr><th>馬名</th><th>調教師</th></tr>{rows}</table></section>'
+        html='<title>浦和記念 2026年</title>'+section('選定馬',0,12)+section('補欠馬',12,68)
+        url='https://www.keiba.go.jp/dirtgraderace/2026/1125_urawakinen/racecard.html'
+        value=parse_nar_nominations(html,event=event,url=url)
+        self.assertEqual(value['stage'],'registration')
+        self.assertEqual(len(value['items']),68)
+        self.assertEqual(sum(row['source_refs']['selection_status']=='補欠馬' for row in value['items']),56)
+        self.assertTrue(all(row['horse_number']=='' for row in value['items']))
+        with self.assertRaisesRegex(ValueError,'nar_nomination_roster'):
+            parse_nar_nominations(html+section('補欠馬',0,1),event=event,url=url)
+
     def test_nar_actual_fragment_navigation_to_upcoming_page(self):
         from stable.services.japan_source_discovery import nar_topic_document
         base='https://www.keiba.go.jp/dirtgraderace/2026/1125_urawakinen/'
