@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "base_sha": "efb2a6c7e7b7e554515217fd38fd7c40c674249a",
-  "reason": "本次仅修复已授权的P01五篇试跑问题：数字格式、称谓和通用词、选稿引用、审校载荷及有界请求参数。无迁移/模型表/队列/生产配置变动。catalog/rules只登记新回归与精确范围；纳入news_quality、核心和选测基础设施，不扩大到赛事采集全仓测试。全部路径内容模式和基线精确绑定。",
+  "reason": "P01真实试跑修复及三项收敛增量：数字/称谓/载荷/选稿协议，具名边界Prompt与v3单一fluency审校维度及一次修复。无迁移、数据库模型、队列或生产配置变化。保留news_quality、翻译、核心及选测基础设施领域；精确内容和基线绑定，不扩大到赛事采集全仓。",
   "domains": [
     "news_quality",
     "infrastructure"
@@ -40,6 +40,14 @@
       "after_mode": "100644"
     },
     {
+      "path": "docs/changes/p01-pilot-fixes-20261114/quality_boundaries.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "f85edb3687594c35c326c900fc9e8d5743d209aaac25e5876893d285661ee340",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
       "path": "docs/changes/p01-pilot-fixes-20261114/retest_report.md",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -67,7 +75,7 @@
       "path": "docs/changes/p01-pilot-fixes-20261114/tasks.md",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "5a11198f45b1d17017004a49e9e0a0b0c5ec6436b0d17d863826a78c26e79b30",
+      "after_hash": "de0e904ac71074a1c86eada3177457a47fa09e4ca25e1f0539ff6e89de500d2f",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -75,7 +83,7 @@
       "path": "docs/changes/p01-pilot-fixes-20261114/test_cases.md",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "7ce8109b9dfd2d8b51aeb588af66e4990973e8a4f11d48f7d5646d4c28da7c39",
+      "after_hash": "92d2d30d9585df6498c798c82d7ccc5c06b8715a9baee8a07b6bd8b0c26e415e",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -91,7 +99,15 @@
       "path": "docs/current_state.md",
       "status": "modified",
       "before_hash": "7bbf17b36671c9166197ee2979a2ef588daa7d2b2736040472dbab965b93c1f0",
-      "after_hash": "4131eb3088560b141f6c883397c6b5dd6fbbffd30ac1628d3e38c5bb019b7372",
+      "after_hash": "29f8f7a5fdd932b1979d7aa635527c159d74b0d97de89aa720c2dc714f0fdce2",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/decisions.md",
+      "status": "modified",
+      "before_hash": "e699b100ad2145018a070f6804b3ae9af1447615fc3ce84c9aa333f494bfa116",
+      "after_hash": "7f45106aa6cf1cacf1b75f5a14d27bf9feaa427e829b6efd499be763fcf421b7",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -112,10 +128,18 @@
       "after_mode": "100644"
     },
     {
+      "path": "server/stable/fixtures/p01_quality_boundaries_20261115.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "7ba2117adbbf054c0f38143382364eeb33cf5aea5dcaf787746f5e16c2b9d790",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
       "path": "server/stable/services/news_content.py",
       "status": "modified",
       "before_hash": "fe79f8a61dfef9c726715dc1cebaa6a8d25e32f4b0d68bdb5767e63724128a6f",
-      "after_hash": "cb1449a679e928a8c0e8a0a8e4cafd67c7e2a173a4db0771558635065bd49d5d",
+      "after_hash": "8a3f8a07d13040b62997414bd1fd84b87c98107ca33fe405f112456bdda6ce94",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -124,6 +148,14 @@
       "status": "modified",
       "before_hash": "45980288dafd4930e9efd78e830468579f49b461f3be345b9a723fe248c8b700",
       "after_hash": "57631cf2d0dbc71c09c32a3bcb2881afdbe3bbb5b0f232279ff36be312923fa9",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/news_entity_taxonomy.py",
+      "status": "modified",
+      "before_hash": "71aeb9315a69933c0fce1d1f29a5c9a2c6f4aea9fe0ba7b2d8ed9cd4b047a501",
+      "after_hash": "0c9d7ef08e99049eba1ed203759472912afa7d0393325bcb2bf562f9be1a316c",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -155,7 +187,7 @@
       "path": "server/stable/services/news_prompts.py",
       "status": "modified",
       "before_hash": "baebaabf306ad9a19215803c5985d83851fb8756e37f63a79b18f769d00e9eaf",
-      "after_hash": "c33ad7576305effb482658fa983d4e50c142a93a1ed99ee603b51f7f68ce0818",
+      "after_hash": "7b2dde582e6ed4d3c3b0d66f89f7aedd7547a517079a3700ea202cf12e0b6e37",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -176,10 +208,18 @@
       "after_mode": "100644"
     },
     {
+      "path": "server/stable/test_p01_news_workflow.py",
+      "status": "modified",
+      "before_hash": "5ac37648c2f200523f579b17fca3aab4af5cbd603633af4207f52ff54f83e6e3",
+      "after_hash": "a5db35f6cd8df8da1c28e7f7295de932b7052f41647f62bfbb58aa61c6896423",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
       "path": "server/stable/test_p01_pilot_regression.py",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "1185a408da0505f1c2c4c022ec5d1163460a68599cd11192d06e466c0d68072e",
+      "after_hash": "9618bbade889241c677197b5cf94905bfabba34daca37f69225c08f4dca42e99",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -195,7 +235,7 @@
       "path": "tools/test_impact/rules.json",
       "status": "modified",
       "before_hash": "44e9f98e2915e9833fa16b29499a9b15697c86fd7735cbe0eb7839085f380719",
-      "after_hash": "3a5448ea0c80c1a6f3fc32cc4ccdfd5f891529e3a412e889b3d0a5a9ae67575c",
+      "after_hash": "206cfca3e4e08b222a175ad7e9a067a264912fbe283026d9e3fb20ff36d6bc87",
       "before_mode": "100644",
       "after_mode": "100644"
     }
