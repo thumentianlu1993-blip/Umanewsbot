@@ -1,10 +1,10 @@
 # 待确认发布包
 
-当前仅完成准备，尚未执行生产 apply 或发布 NAR 修复。提交与 PR 在交付前绑定。
+当前仅完成准备，尚未执行生产 apply 或发布 NAR 修复。主线修复为 PR #312；生产候选固定为 `41d3f76cc8dd59bc61b2a0ceb474280db5099f7d`，仅包含 NAR 解析器与对应测试两文件，相对生产 `24de56e2cb321b102390409a6a57fb528b5dc333` 没有其他应用差异。
 
 ## 绑定范围
 
-- NAR 解析器修复，无数据库迁移、配置或功能开关变化。
+- NAR 解析器修复，无数据库迁移、配置或功能开关变化。必须继承当前 compose 文件链中的 `/opt/umanews-external-staging/disk-capacity-20261114/capacity-override.json`，四应用保持 `RACE_DATA_RAW_MIN_FREE_DISK_BYTES=3221225472`（3 GiB），不得回退至旧阈值。
 - 从现有生产 `24de56e2` 构建包含本 PR 的窄候选；web、worker、race_sync_v2_worker、beat 使用同一固定镜像重建/重启。浏览器 sidecar、数据库、Redis 和其他项目服务不重建。
 - 生产数据：旧赛事 4 的 6 对象归档后移除；20 个失败赛前来源只提前 next_poll_at，交回既有调度。已推进、已交接或被租约占用的目标跳过。
 - manifest SHA：`f01c9d6c65bfd2441268d61a4fe03faecf51327963e4d32831caf7424d0e74fb`。
