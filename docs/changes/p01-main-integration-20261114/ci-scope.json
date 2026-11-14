@@ -893,7 +893,7 @@
       "path": "tools/test_impact/rules.json",
       "status": "modified",
       "before_hash": "2317ff4715b700ae838c0c5932480d5086c457829e85155cdc41e5e898c6b290",
-      "after_hash": "488375f967f6567a0955ef31a090b50b90ba1b335b096959af61fb2adf32d64f",
+      "after_hash": "44e9f98e2915e9833fa16b29499a9b15697c86fd7735cbe0eb7839085f380719",
       "before_mode": "100644",
       "after_mode": "100644"
     }

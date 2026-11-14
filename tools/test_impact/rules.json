@@ -30,7 +30,8 @@
     "docs/changes/term-display-sql-20261103/pg-receipt.json",
     "docs/changes/hkjc-horse-name-display/impact_summary.json",
     "docs/changes/p01-news-quality-20261027/*.json",
-    "docs/changes/p01-annotation-driven-translation-20261114/*.json"
+    "docs/changes/p01-annotation-driven-translation-20261114/*.json",
+    "docs/changes/p01-main-integration-20261114/ci-scope.json"
   ],
   "high_risk": [
     ".codex/agents/application.toml",
@@ -1835,6 +1836,27 @@
     ],
     "server/stable/services/news_review.py": [
       "news_quality"
+    ],
+    "deploy/docker/start-news-quality-worker.sh": [
+      "news_quality"
+    ],
+    "docker-compose.news-quality.yml": [
+      "news_quality"
+    ],
+    "server/stable/templates/stable/public/news_archive.html": [
+      "news_quality"
+    ],
+    "server/stable/templates/stable/console/news_quality_editor.html": [
+      "news_quality"
+    ],
+    "server/stable/templates/stable/console/news_quality_queue.html": [
+      "news_quality"
+    ],
+    "server/stable/templates/stable/console/news_quality_detail.html": [
+      "news_quality"
+    ],
+    "server/stable/templates/stable/console/news_quality_report.html": [
+      "news_quality"
     ]
   },
   "symbols": {
@@ -2023,6 +2045,30 @@
       ],
       "_race_calendar_queryset": [
         "five_region_race_governance"
+      ],
+      "article_editor": [
+        "news_quality"
+      ],
+      "article_update_api": [
+        "news_quality"
+      ],
+      "candidate_detail": [
+        "news_quality"
+      ],
+      "candidate_ignore": [
+        "news_quality"
+      ],
+      "candidate_mark_manual": [
+        "news_quality"
+      ],
+      "headline_control": [
+        "news_quality"
+      ],
+      "headline_select": [
+        "news_quality"
+      ],
+      "legacy_public_article_detail": [
+        "news_quality"
       ]
     }
   },
