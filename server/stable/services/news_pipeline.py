@@ -570,8 +570,12 @@ def scan_news_runs(*, now=None, limit=100):
     return {"enabled": True, "dispatched": sum(enqueue_news_run(pk) for pk in selected), "recovered": recovered, "recovery_errors": recovery_errors}
 
 
+def context_contract_version():
+    return getattr(settings, "NEWS_QUALITY_POLICY", {}).get("contract_version", "legacy")
+
+
 def context_enabled():
-    return getattr(settings, "NEWS_QUALITY_POLICY", {}).get("contract_version") == "context-v2"
+    return context_contract_version() in {"context-v2", "context-v3"}
 
 
 def risk_reasons(run):
@@ -608,7 +612,7 @@ def body_context_source(clean):
 
 
 def context_payload(run):
-    from stable.services.news_content import stable_source, protect_source, protected_translation_map
+    from stable.services.news_content import stable_source, protect_source, protected_translation_map, translation_glossary
     from stable.services.news_editorial import RESPONSE_SCHEMA, IDENTITY_CONTRACT
     source = stable_source(run.clean_snapshot)
     if run.stage == "event_classify":
@@ -626,7 +630,7 @@ def context_payload(run):
         first_id = run.entity_snapshot.get("initial_attempt_id")
         if first_id:
             first = _validated_attempt(run, first_id, "entity_check")
-            if first.usage["input"] != initial_payload(run.clean_snapshot, run.source_snapshot["language"]):
+            if first.usage["input"] != initial_payload(run.clean_snapshot, run.source_snapshot["language"], contract_version=context_contract_version()):
                 from stable.services.news_content import ContentBlocked
                 raise ContentBlocked("entity_repair_base_invalid")
             state = evaluate(run.clean_snapshot, first.usage["input"], first.result)
@@ -634,11 +638,13 @@ def context_payload(run):
                 from stable.services.news_content import ContentBlocked
                 raise ContentBlocked("entity_repair_not_needed")
             return repair_payload(run.clean_snapshot, run.source_snapshot["language"], state, first.pk)
-        return initial_payload(run.clean_snapshot, run.source_snapshot["language"])
+        return initial_payload(run.clean_snapshot, run.source_snapshot["language"], contract_version=context_contract_version())
     if run.stage == "fact_audit":
         return {"source": source, "target": run.translation_snapshot,
                 "entities": run.entity_snapshot["occurrences"], "editorial": run.editorial_snapshot}
     if run.stage == "translate_full":
+        glossary = ({"entity_glossary": translation_glossary(source, run.entity_snapshot["occurrences"])}
+                    if context_contract_version() == "context-v3" else {})
         protected = protect_source(source, run.entity_snapshot["occurrences"])
         task = run.quality_snapshot.get("repair_task", {}) if run.repair_count else {}
         if task.get("mode") == "repair_blocks":
@@ -648,13 +654,13 @@ def context_payload(run):
             blocks = protected["blocks"]
             adjacent = {j for i, row in enumerate(blocks) if row["id"] in ids
                         for j in (i - 1, i + 1) if 0 <= j < len(blocks)}
-            return {"mode": "repair_blocks", "base_raw_sha": digest(base), "required_block_ids": ids,
+            return {**glossary, "mode": "repair_blocks", "base_raw_sha": digest(base), "required_block_ids": ids,
                     "source": {"title": protected["title"] if "title" in ids or "summary" in ids else "",
                                "blocks": [row for row in blocks if row["id"] in ids or "summary" in ids]},
                     "context": [row for i, row in enumerate(blocks) if i in adjacent],
                     "previous": {key: texts[key] for key in ids}, "repair": task["evidence"],
                     "entities": run.entity_snapshot["occurrences"]}
-        return {"mode": "full", "source": protected, "repair": task}
+        return {**glossary, "mode": "full", "source": protected, "repair": task}
     raise ValueError("stage_not_registered")
 
 
@@ -678,9 +684,9 @@ def context_projection(run, attempt):
     if attempt.stage == "entity_check":
         from stable.services.news_entity_units import replay, occurrences, VERSION
         from stable.services.news_publication import _validated_attempt
-        state = replay(run, attempt, _validated_attempt)
+        state = replay(run, attempt, _validated_attempt, contract_version=context_contract_version())
         first_id = run.entity_snapshot.get("initial_attempt_id") or attempt.pk
-        snapshot = {"contract_version": VERSION, "initial_attempt_id": first_id,
+        snapshot = {"contract_version": state.get("entity_contract", VERSION), "initial_attempt_id": first_id,
                     "unit_state": state, "clean_sha": run.clean_snapshot["clean_sha"]}
         if not state["complete"]:
             repairing = attempt.usage["input"].get("mode") == "repair"
@@ -720,7 +726,7 @@ def context_projection(run, attempt):
         return {**update, "translation_snapshot": target, "quality_snapshot": quality, "stage": "fact_audit"}
     if attempt.stage == "fact_audit":
         response = audit_corrections(run.editorial_snapshot, attempt.result)
-        result = validate_audit(run.clean_snapshot, run.translation_snapshot, response, contract_version="context-v2")
+        result = validate_audit(run.clean_snapshot, run.translation_snapshot, response, contract_version=context_contract_version())
         preserved = {key: value for key, value in quality.items() if key in
                      {"repair_base", "repair_task", "repair_attempt_id", "deep_required", "upgrade_attempt_id"}}
         quality = {**preserved, **result, "strong_attempt_id": attempt.pk, "input_sha": attempt.input_sha, "policy_sha": run.policy_sha}

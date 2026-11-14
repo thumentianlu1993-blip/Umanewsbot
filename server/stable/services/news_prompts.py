@@ -109,4 +109,43 @@ CONTEXT_PROMPTS = {
 
 
 def prompt_for(stage, contract_version='legacy'):
+    if contract_version == 'context-v3':
+        return RACING_PROMPTS[stage]
+    if contract_version not in {None, 'legacy', 'context-v2'}:
+        raise ValueError('unknown_prompt_contract')
     return (CONTEXT_PROMPTS if contract_version == 'context-v2' else PROMPTS)[stage]
+
+
+# 新协议仅显式context-v3启用，旧prompt文本/缓存哈希保持不变。
+from stable.services.news_entity_taxonomy import ENTITY_RULES, EXCLUSION_RULES
+RACING_PROMPTS = dict(CONTEXT_PROMPTS)
+RACING_PROMPTS['entity_check'] = CONTEXT_BASE + (
+    'entity-units-v3：逐个处理units含标题，只抽核心text每次提及，window/context_units只读。'
+    'mode=initial仅返回{"units":[{"unit_id":"输入ID","coverage":"complete或uncertain",'
+    '"entities":[{"text":"逐字原名","type":"以下枚举单选","context":"逐字定位上下文"}]}]}；'
+    'initial绝不返回decisions，包括空数组。每单元必须回执，无专名entities为空。'
+    'mode=repair必须额外返回decisions数组，每项仅{"issue_id":"输入ID","picks":['
+    '{"candidate_id":"已提供候选ID","type":"以下枚举单选"}]}；无歧义decisions为空。'
+    '每个ambiguous_occurrence必须一个decision，选所有确属实体的候选；仅非实体可picks为空。'
+    '不得选already_frozen/overlap_conflict；不重复accepted，不新增非请求units。'
+    '返回全部九类实体或易混淆common_word，累计含accepted最多256行；缺失/不确定coverage=uncertain，不能截断称complete。'
+    'text/context不得改原文、空格、括号；不返回数字跨度、译名、真实身份ID或额外字段。'
+    '同名每次各标，姓名与马名不能仅凭winner判定。父母马仍horse。'
+    '正式冠名与赛事名相邻时保持完整连续表达，包括内部括号；断成不同块则分别标race片段，'
+    '不跨块拼接，不吞入日期地点，不发明不存在的连续原名。'
+    '类别规则：' + json.dumps(ENTITY_RULES, ensure_ascii=False) + EXCLUSION_RULES +
+    '信息库匹配未在本版本启用：不可假装查询赛马信息库，身份不明不得猜。'
+    '开发合成对照：骑师林某策骑晨光，林某person、晨光horse；普通“晨光照亮赛场”不标。'
+    'Spring Festival若明确为赛马节则race_related；Spring Award若为赛马年度奖则racing_honor；'
+    'Autumn Yearling Sale拍卖为auction；ラストラン普通最后一战不标，但原文明示同名马可horse。'
+)
+RACING_PROMPTS['translate_full'] += (
+    ' entity_glossary是同一文章的只读实体清单，用type/text/replacement理解上下文；'
+    '仍必须逐次保留原token，程序统一恢复译名。无确认中文名保留原名，不自行音译或补译。'
+    '未标为实体的品牌、节目、普通词等仍正常翻译，不得删除。原文事实互相冲突时忠实保留，交审校指出，'
+    '不得凭常识静默纠正；人物-马匹-赛事关系、血统关系、引语和计划语气均保持。'
+)
+RACING_PROMPTS['fact_audit'] += (
+    ' 同时检查骑师与马匹角色互换、父母血统关系、系列赛和单场指代、原文已有矛盾。'
+    '存在原文矛盾不能自行猜真值，使用uncertain及相关证据。不得以实体token齐全或数字相同替代事实检查。'
+)

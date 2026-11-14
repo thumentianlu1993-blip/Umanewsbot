@@ -5,6 +5,8 @@ import re
 from stable.services.news_content import ContentBlocked, block_map, bounded_json, validate_entities
 from stable.services.news_pipeline import digest
 
+from stable.services.news_entity_taxonomy import entity_types, entity_limit, unit_contract, context_from_unit
+
 VERSION = 'entity-units-v2'
 ROW_KEYS = {'text', 'type', 'context'}
 TYPES = {'horse', 'person', 'race', 'organization', 'place', 'common_word'}
@@ -27,8 +29,8 @@ def build_units(clean):
     return result
 
 
-def initial_payload(clean, language):
-    return {'entity_contract': VERSION, 'mode': 'initial', 'clean_sha': clean['clean_sha'],
+def initial_payload(clean, language, *, contract_version='context-v2'):
+    return {'entity_contract': unit_contract(contract_version), 'mode': 'initial', 'clean_sha': clean['clean_sha'],
             'language': language, 'units': build_units(clean)}
 
 
@@ -45,7 +47,7 @@ def repair_payload(clean, language, state, attempt_id):
         text = unit['text'][offset:offset + 640]
         context.append({'unit_id': unit['unit_id'], 'block_id': unit['block_id'],
                         'start': unit['start'] + offset, 'text': text})
-    return {'entity_contract': VERSION, 'mode': 'repair', 'clean_sha': clean['clean_sha'],
+    return {'entity_contract': state.get('entity_contract', VERSION), 'mode': 'repair', 'clean_sha': clean['clean_sha'],
             'language': language, 'base_attempt_id': attempt_id,
             'units': [u for i, u in enumerate(all_units) if i in pending],
             'context_units': context,
@@ -61,10 +63,10 @@ def _positions(text, quote):
         pos += 1
 
 
-def locate(unit, row):
+def locate(unit, row, *, types=TYPES):
     if type(row) is not dict or set(row) != ROW_KEYS:
         return None, {'code': 'extra_or_missing_field'}
-    if any(type(row[k]) is not str or not row[k] for k in ROW_KEYS) or row['type'] not in TYPES:
+    if any(type(row[k]) is not str or not row[k] for k in ROW_KEYS) or row['type'] not in types:
         return None, {'code': 'invalid_entity_value'}
     window, quote, context = unit['window'], row['text'], row['context']
     core, neighbors = set(), set()
@@ -125,7 +127,12 @@ def _issues_with_candidates(clean, all_units, issues, accepted):
 
 def evaluate(clean, payload, response, *, previous=None):
     bounded_json(response)
-    expected = (initial_payload(clean, payload.get('language')) if previous is None else
+    try:
+        contract = context_from_unit(payload.get('entity_contract'))
+    except (ValueError, TypeError) as error:
+        raise ContentBlocked('unknown_entity_contract') from error
+    types = entity_types(contract)
+    expected = (initial_payload(clean, payload.get('language'), contract_version=contract) if previous is None else
                 repair_payload(clean, payload.get('language'), previous, payload.get('base_attempt_id')))
     if payload != expected: raise ContentBlocked('entity_unit_input_changed')
     keys = {'units', 'decisions'} if previous is not None else {'units'}
@@ -154,11 +161,11 @@ def evaluate(clean, payload, response, *, previous=None):
             raise ContentBlocked('entity_unit_receipt_invalid')
         uid = receipt['unit_id']; seen.add(uid)
         total += len(receipt['entities'])
-        if total > 128: raise ContentBlocked('entity_count_limit')
+        if total > entity_limit(contract): raise ContentBlocked('entity_count_limit')
         if receipt['coverage'] != 'complete':
             pending.add(uid); issues.append({'unit_id': uid, 'code': 'unit_uncertain'})
         for raw in receipt['entities']:
-            row, error = locate(requested[uid], raw)
+            row, error = locate(requested[uid], raw, types=types)
             if error:
                 pending.add(uid); issues.append({'unit_id': uid, 'row': deepcopy(raw), **error})
             else:
@@ -177,11 +184,11 @@ def evaluate(clean, payload, response, *, previous=None):
             issue = offered[decision['issue_id']]; decided.add(decision['issue_id'])
             candidates = {c['candidate_id']: c for c in issue['candidates']}; picked = set()
             total += len(decision['picks'])
-            if total > 128: raise ContentBlocked('entity_count_limit')
+            if total > entity_limit(contract): raise ContentBlocked('entity_count_limit')
             for pick in decision['picks']:
                 if (type(pick) is not dict or set(pick) != {'candidate_id', 'type'}
                         or type(pick['candidate_id']) is not str or pick['candidate_id'] not in candidates
-                        or pick['candidate_id'] in picked or type(pick['type']) is not str or pick['type'] not in TYPES):
+                        or pick['candidate_id'] in picked or type(pick['type']) is not str or pick['type'] not in types):
                     raise ContentBlocked('entity_candidate_invalid')
                 picked.add(pick['candidate_id']); candidate = candidates[pick['candidate_id']]
                 row = {k: candidate[k] for k in ('block_id', 'start', 'end', 'text', 'context', 'unit_id')}
@@ -214,7 +221,8 @@ def evaluate(clean, payload, response, *, previous=None):
             pending.update(c['unit_id'] for c in issue['candidates'])
         if issue['code'] == 'entity_overlap_or_type_conflict':
             pending.add(issue['owner_unit_id'])
-    return {'accepted': accepted, 'pending': [u['unit_id'] for u in all_units if u['unit_id'] in pending],
+    return {**({'entity_contract': 'entity-units-v3'} if contract == 'context-v3' else {}),
+            'accepted': accepted, 'pending': [u['unit_id'] for u in all_units if u['unit_id'] in pending],
             'issues': enriched,
             'complete': not pending, 'unit_ids': [u['unit_id'] for u in all_units]}
 
@@ -222,14 +230,15 @@ def evaluate(clean, payload, response, *, previous=None):
 def occurrences(clean, state):
     if not state['complete']: raise ContentBlocked('entity_units_incomplete')
     rows = validate_entities(clean, {'coverage': 'complete', 'entities': [
-        {k: r[k] for k in ('block_id', 'start', 'end', 'text', 'type')} for r in state['accepted']]})
+        {k: r[k] for k in ('block_id', 'start', 'end', 'text', 'type')} for r in state['accepted']]},
+        contract_version='racing-spans-v1' if state.get('entity_contract') == 'entity-units-v3' else 'legacy')
     refs = {(r['block_id'], r['start'], r['end']): r for r in state['accepted']}
     return [r | {'context': refs[(r['block_id'], r['start'], r['end'])]['context'],
                  'unit_id': refs[(r['block_id'], r['start'], r['end'])]['unit_id'],
-                 'contract_version': VERSION} for r in rows]
+                 'contract_version': state.get('entity_contract', VERSION)} for r in rows]
 
 
-def replay(run, attempt, validate_attempt):
+def replay(run, attempt, validate_attempt, *, contract_version='context-v2'):
     """重建首轮/一次修复证据；不信任snapshot中的accepted行。"""
     payload = attempt.usage['input']
     first_id = run.entity_snapshot.get('initial_attempt_id')
@@ -238,7 +247,7 @@ def replay(run, attempt, validate_attempt):
         if not first_id or first_id == attempt.pk or payload.get('base_attempt_id') != first_id:
             raise ContentBlocked('entity_repair_base_invalid')
         first = validate_attempt(run, first_id, 'entity_check')
-        if first.seq >= attempt.seq or first.usage['input'] != initial_payload(run.clean_snapshot, language):
+        if first.seq >= attempt.seq or first.usage['input'] != initial_payload(run.clean_snapshot, language, contract_version=contract_version):
             raise ContentBlocked('entity_repair_base_invalid')
         state = evaluate(run.clean_snapshot, first.usage['input'], first.result)
         if state['complete'] or payload != repair_payload(run.clean_snapshot, language, state, first.pk):
@@ -246,6 +255,6 @@ def replay(run, attempt, validate_attempt):
         return evaluate(run.clean_snapshot, payload, attempt.result, previous=state)
     if first_id and first_id != attempt.pk:
         raise ContentBlocked('entity_initial_binding_changed')
-    if payload != initial_payload(run.clean_snapshot, language):
+    if payload != initial_payload(run.clean_snapshot, language, contract_version=contract_version):
         raise ContentBlocked('entity_unit_input_changed')
     return evaluate(run.clean_snapshot, payload, attempt.result)
