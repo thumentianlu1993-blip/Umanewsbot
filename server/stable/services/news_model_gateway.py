@@ -35,7 +35,7 @@ def request_spec(stage, *, profile="base", payload=None):
     policy = getattr(settings, "NEWS_QUALITY_POLICY", {})
     from copy import deepcopy
     spec = deepcopy(policy.get("models", {}).get(stage, {}))
-    v2 = policy.get("contract_version") == "context-v2"
+    v2 = policy.get("contract_version") in {"context-v2", "context-v3"}
     if v2:
         if profile not in {"base", "deep"}:
             raise RequestDenied("profile_invalid")
@@ -49,7 +49,7 @@ def request_spec(stage, *, profile="base", payload=None):
                 or not 1 <= spec["http_timeout_seconds"] <= 120
                 or stage in {"entity_check", "fact_audit"} and spec.get("quality_tier") != "strong"):
             raise RequestDenied("profile_not_qualified")
-        spec.update(contract_version="context-v2", profile=profile)
+        spec.update(contract_version=policy["contract_version"], profile=profile)
         if stage == "translate_full" and payload is not None:
             floor = spec.pop("min_output_tokens", spec.get("max_output_tokens"))
             factor = spec.pop("output_tokens_per_byte", 1)
@@ -131,13 +131,13 @@ def reserve_request(attempt_id, payload):
             raise RequestDenied("attempt_not_reservable")
         if NewsModelBudget.objects.filter(currency=currency, state__in=["blocked_unknown", "blocked_overage"]).exists():
             raise RequestDenied("unreconciled_bill")
-        if policy.get("contract_version") == "context-v2":
+        if policy.get("contract_version") in {"context-v2", "context-v3"}:
             totals = article_cost(attempt.run.article_id, currency=currency)
             cap = money(policy.get("article_cap", 0))
             if not cap or totals["spent"] + totals["reserved"] + amount > cap:
                 raise RequestDenied("article_budget_exhausted")
         for budget in budgets:
-            if policy.get("contract_version") == "context-v2":
+            if policy.get("contract_version") in {"context-v2", "context-v3"}:
                 budget.cap, budget.policy_sha = caps[budget.period_kind], policy_sha()
                 budget.save(update_fields=["cap", "policy_sha"])
             if budget.policy_sha != policy_sha() or budget.cap != caps[budget.period_kind]:
@@ -155,8 +155,8 @@ def reserve_request(attempt_id, payload):
         attempt.reserved_at = now
         from stable.services.news_prompts import prompt_for
         attempt.usage = {**attempt.usage, "price": spec, "currency": currency}
-        if spec.get("contract_version") == "context-v2":
-            attempt.usage["prompt_sha"] = digest(prompt_for(attempt.stage, "context-v2"))
+        if spec.get("contract_version") in {"context-v2", "context-v3"}:
+            attempt.usage["prompt_sha"] = digest(prompt_for(attempt.stage, spec["contract_version"]))
         attempt.save(update_fields=["month_budget", "day_budget", "reservation", "provider", "model", "prompt_version", "reserved_at", "usage"])
         return attempt
 
@@ -240,7 +240,7 @@ def _single_request(attempt, payload):
         spec = attempt.usage["price"]
         messages = [{"role": "system", "content": prompt_for(attempt.stage, spec.get("contract_version"))},
                     {"role": "user", "content": json.dumps(payload, ensure_ascii=False, sort_keys=True)}]
-        if spec.get("contract_version") == "context-v2":
+        if spec.get("contract_version") in {"context-v2", "context-v3"}:
             return client.chat.completions.create(model=attempt.model, messages=messages,
                 max_tokens=spec["max_output_tokens"], response_format={"type": "json_object"},
                 extra_body={"thinking": {"type": spec["thinking"]}})
@@ -305,7 +305,7 @@ def execute_request(attempt_id, payload):
     try:
         if len(response.choices) != 1 or getattr(response.choices[0].message, "tool_calls", None):
             raise ContentBlocked("unexpected_model_action")
-        if spec.get("contract_version") == "context-v2" and getattr(response.choices[0], "finish_reason", None) != "stop":
+        if spec.get("contract_version") in {"context-v2", "context-v3"} and getattr(response.choices[0], "finish_reason", None) != "stop":
             raise ContentBlocked("response_truncated")
         content = response.choices[0].message.content
         if type(content) is not str or len(content.encode()) > 1000000:
@@ -328,7 +328,7 @@ def execute_request(attempt_id, payload):
 def _article_finance_lock(attempt):
     """金融互斥不锁业务行；旧请求迟到结算也参与同一锁序。"""
     if connection.vendor != "postgresql":
-        if getattr(settings, "NEWS_QUALITY_POLICY", {}).get("contract_version") == "context-v2":
+        if getattr(settings, "NEWS_QUALITY_POLICY", {}).get("contract_version") in {"context-v2", "context-v3"}:
             raise RequestDenied("postgres_required")
         return
     import hashlib

@@ -944,7 +944,9 @@
       "stable.test_p01_news_report",
       "stable.test_p01_news_source_evidence",
       "stable.test_p01_news_workflow",
-      "stable.test_p01_news_review_regressions"
+      "stable.test_p01_news_review_regressions",
+      "stable.test_p01_annotation_translation",
+      "stable.test_p01_entity_units"
     ]
   },
   "dependencies": {
@@ -3235,6 +3237,18 @@
       "label": "tools.test_impact.test_image_contract",
       "domains": [
         "infrastructure"
+      ]
+    },
+    "server/stable/test_p01_annotation_translation.py": {
+      "label": "stable.test_p01_annotation_translation",
+      "domains": [
+        "news_quality"
+      ]
+    },
+    "server/stable/test_p01_entity_units.py": {
+      "label": "stable.test_p01_entity_units",
+      "domains": [
+        "news_quality"
       ]
     }
   },

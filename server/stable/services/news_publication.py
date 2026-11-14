@@ -43,10 +43,10 @@ def _validated_attempt(run, attempt_id, stage):
 def check_publication_evidence(run):
     if run.policy_sha != policy_sha() or digest(run.source_snapshot) != run.input_sha or not source_eligible(run):
         raise ContentBlocked("source_or_policy_changed")
-    from stable.services.news_pipeline import context_enabled, body_context_source
+    from stable.services.news_pipeline import context_enabled, context_contract_version, body_context_source
     from stable.services.news_content import stable_source
     v2 = context_enabled()
-    version = "context-v2" if v2 else "legacy"
+    version = context_contract_version() if v2 else "legacy"
     clean = run.clean_snapshot
     from stable.services.news_content import clean_source, validate_body_review
     selectors = getattr(settings, "NEWS_QUALITY_POLICY", {}).get("body_selectors", {}).get(run.source_snapshot["source_site"])
@@ -66,9 +66,9 @@ def check_publication_evidence(run):
     entity = _validated_attempt(run, run.entity_snapshot.get("strong_attempt_id"), "entity_check")
     if v2:
         from stable.services.news_entity_units import replay, occurrences, VERSION
-        state = replay(run, entity, _validated_attempt)
+        state = replay(run, entity, _validated_attempt, contract_version=version)
         if (run.entity_snapshot.get("unit_state") != state
-                or run.entity_snapshot.get("contract_version") != VERSION
+                or run.entity_snapshot.get("contract_version") != state.get("entity_contract", VERSION)
                 or run.entity_snapshot.get("input_sha") != entity.input_sha
                 or run.entity_snapshot.get("clean_sha") != clean["clean_sha"]):
             raise ContentBlocked("entity_unit_snapshot_changed")
@@ -307,6 +307,15 @@ def publish(run_id):
 
 
 
+def validate_translation_glossary(run, payload):
+    from stable.services.news_pipeline import context_contract_version
+    from stable.services.news_content import translation_glossary
+    if context_contract_version() == "context-v3":
+        expected = translation_glossary(run.clean_snapshot, run.entity_snapshot["occurrences"])
+        if payload.get("entity_glossary") != expected:
+            raise ContentBlocked("translation_glossary_changed")
+
+
 def validate_context_chain(run, audit):
     from stable.services.news_pipeline import risk_reasons
     from stable.services.news_content import (restore_translation, merge_translation_patch, hard_translation_checks,
@@ -331,6 +340,7 @@ def validate_context_chain(run, audit):
         return
     base = run.quality_snapshot.get("repair_base", {})
     original = _validated_attempt(run, base.get("attempt_id"), "translate_full")
+    validate_translation_glossary(run, original.usage["input"])
     raw = original.result
     if base.get("raw") != raw or base.get("raw_sha") != digest(raw):
         raise ContentBlocked("repair_base_changed")
@@ -338,6 +348,7 @@ def validate_context_chain(run, audit):
         raise ContentBlocked("translation_source_changed")
     if run.repair_count:
         repaired = _validated_attempt(run, run.quality_snapshot.get("repair_attempt_id"), "translate_full")
+        validate_translation_glossary(run, repaired.usage["input"])
         task = run.quality_snapshot.get("repair_task", {})
         ids = task.get("required_block_ids")
         # 重新计算原始硬错误或原审校证据，不能扩大补丁范围。

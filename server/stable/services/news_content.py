@@ -168,13 +168,18 @@ def block_map(clean):
 
 @model_schema
 def validate_entities(clean, response, *, contract_version="legacy"):
-    if contract_version == "context-v2":
-        return context_entities(clean, response)
+    from stable.services.news_entity_taxonomy import entity_types, entity_limit
+    try:
+        types = entity_types(contract_version)
+    except ValueError as error:
+        raise ContentBlocked(str(error)) from error
+    if contract_version in {"context-v2", "context-v3"}:
+        return context_entities(clean, response, contract_version=contract_version)
     bounded_json(response)
     if type(response) is not dict or set(response) != {"coverage", "entities"} or response["coverage"] != "complete":
         raise ContentBlocked("entity_schema_or_coverage")
     rows = response["entities"]
-    if type(rows) is not list or len(rows) > 128:
+    if type(rows) is not list or len(rows) > entity_limit(contract_version):
         raise ContentBlocked("entity_count_limit")
     texts = block_map(clean)
     validated = []
@@ -187,7 +192,7 @@ def validate_entities(clean, response, *, contract_version="legacy"):
         if (type(block) is not str or block not in texts or type(start) is not int or type(end) is not int
                 or not 0 <= start < end <= len(texts[block]) or texts[block][start:end] != item["text"]):
             raise ContentBlocked("entity_span_invalid")
-        if type(item["type"]) is not str or item["type"] not in {"horse", "person", "race", "organization", "place", "common_word"}:
+        if type(item["type"]) is not str or item["type"] not in types:
             raise ContentBlocked("entity_type_invalid")
         if any(start < other_end and end > other_start for other_start, other_end in spans.get(block, [])):
             raise ContentBlocked("entity_span_overlap")
@@ -241,7 +246,7 @@ def restore_translation(clean, entities, response):
 
 @model_schema
 def validate_audit(clean, target, response, *, contract_version="legacy"):
-    if contract_version == "context-v2":
+    if contract_version in {"context-v2", "context-v3"}:
         return context_audit(clean, target, response)
     bounded_json(response)
     failed = {"passed": False, "reason": "audit_schema_or_unknown", "source_sha": clean["source_sha"], "target_sha": digest(target)}
@@ -356,11 +361,12 @@ def exact_span(text, quote, context):
     return start + offset, start + offset + len(quote)
 
 
-def context_entities(clean, response):
+def context_entities(clean, response, *, contract_version="context-v2"):
+    from stable.services.news_entity_taxonomy import entity_limit
     bounded_json(response)
     if (type(response) is not dict or set(response) != {"coverage", "entities"}
             or response["coverage"] != "complete" or type(response["entities"]) is not list
-            or len(response["entities"]) > 128):
+            or len(response["entities"]) > entity_limit(contract_version)):
         raise ContentBlocked("entity_schema_or_coverage")
     texts, translated, contexts = block_map(clean), [], {}
     for row in response["entities"]:
@@ -372,9 +378,10 @@ def context_entities(clean, response):
         start, end = exact_span(texts[block], row["text"], row["context"])
         translated.append({key: value for key, value in row.items() if key != "context"} | {"start": start, "end": end})
         contexts[(block, start, end)] = row["context"]
-    rows = validate_entities(clean, {"coverage": "complete", "entities": translated})
+    rows = validate_entities(clean, {"coverage": "complete", "entities": translated},
+                             contract_version="racing-spans-v1" if contract_version == "context-v3" else "legacy")
     return [row | {"context": contexts[(row["block_id"], row["start"], row["end"])],
-                   "contract_version": "context-v2"} for row in rows]
+                   "contract_version": contract_version} for row in rows]
 
 
 def hard_translation_checks(clean, target):
@@ -489,3 +496,34 @@ def translation_repair_ids(clean, entities, raw):
         if not text.strip() or wrong or "__P01_ENTITY" in residue:
             bad.append(block)
     return sorted(bad) or None
+
+
+def translation_glossary(clean, entities):
+    """从冻结文章实体构造译者只读清单，不查询数据库或凭空创建译名。"""
+    texts = block_map(clean)
+    seen, spans, targets = set(), {}, {}
+    result = []
+    for item in entities:
+        block, start, end = item.get('block_id'), item.get('start'), item.get('end')
+        if (block not in texts or type(start) is not int or type(end) is not int
+                or not 0 <= start < end <= len(texts[block]) or texts[block][start:end] != item.get('text')
+                or item.get('source_sha') != clean['source_sha']):
+            raise ContentBlocked('glossary_source_changed')
+        token = item.get('token')
+        if not isinstance(token, str) or TOKEN_RE.fullmatch(token) is None or token in seen:
+            raise ContentBlocked('glossary_token_invalid')
+        if any(start < b and end > a for a, b in spans.get(block, [])):
+            raise ContentBlocked('glossary_span_overlap')
+        seen.add(token); spans.setdefault(block, []).append((start,end))
+        replacement = item.get('replacement')
+        if not isinstance(replacement, str) or not replacement or '__P01_ENTITY' in replacement:
+            raise ContentBlocked('glossary_replacement_invalid')
+        if replacement != item['text'] and (not item.get('term_id') or item.get('provenance') != 'confirmed_term_occurrence'):
+            raise ContentBlocked('unconfirmed_entity_translation')
+        if item.get('term_id'):
+            tid = item['term_id']
+            if tid in targets and targets[tid] != replacement:
+                raise ContentBlocked('term_translation_conflict')
+            targets[tid] = replacement
+        result.append({key: item[key] for key in ('token','block_id','start','end','text','type','replacement')})
+    return result

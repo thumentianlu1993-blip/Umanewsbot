@@ -27,7 +27,8 @@
     "docs/changes/next-version-capabilities/lanes/B/B055-completed-redelivery-receipt-fix/obligations.json",
     "docs/changes/next-version-capabilities/lanes/B/B057-remaining7-end-to-end-test-prep/obligations.json",
     "docs/changes/p01-news-quality-20261027/local-input-inventory.json",
-    "docs/changes/p01-news-quality-20261027/policy.example.json"
+    "docs/changes/p01-news-quality-20261027/policy.example.json",
+    "docs/changes/p01-annotation-driven-translation-20261114/*.json"
   ],
   "high_risk": [
     ".codex/agents/application.toml",
@@ -1558,6 +1559,18 @@
       "news_quality"
     ],
     "server/stable/services/news_review.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_entity_units.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_annotation_evaluation.py": [
+      "news_quality"
+    ],
+    "server/stable/services/news_entity_taxonomy.py": [
+      "news_quality"
+    ],
+    "server/stable/management/commands/evaluate_news_annotations.py": [
       "news_quality"
     ]
   },
