@@ -125,7 +125,7 @@
       "path": "docs/changes/p01-main-integration-20261114/rollout.md",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "25d00ab7bed7ff1a65b2e15d477536f3cf341eecc628d9a76f703b9ad9a11549",
+      "after_hash": "72d32c36e12aae4c008d7d6daa5ce0c90271a126adf440952ea233129d0d573d",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -685,7 +685,7 @@
       "path": "server/stable/test_p01_main_integration.py",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "561e1a860d89b0be731d253b6947e49c05b65d4c8ba329491c930fd809914d73",
+      "after_hash": "2f4b722783e8260227cc9c12dc57623974309f19f95ffc06da183aecca18caa8",
       "before_mode": null,
       "after_mode": "100644"
     },

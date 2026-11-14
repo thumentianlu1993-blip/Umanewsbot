@@ -10,6 +10,13 @@ from stable.models import NewsArticle, NewsProcessingRun
 @override_settings(NEWS_QUALITY_MODE='off', NEWS_QUALITY_FEED_ENABLED=False)
 class P01MainMigrationTests(TransactionTestCase):
     def test_existing_article_survives_main_to_p01_migration(self):
+        self._verify_migration([('stable', '0085_merge_us_divisions')])
+
+    def test_actual_production_branches_upgrade_without_prior_budget_tables(self):
+        self._verify_migration([('stable', '0082_france_basic_fields'),
+                                ('stable', '0084_race_event_division_parent')], missing_budget=True)
+
+    def _verify_migration(self, baseline, missing_budget=False):
         self.assertEqual(connection.vendor, 'postgresql')
         self.assertTrue(connection.settings_dict['NAME'].startswith('test_'))
         executor=MigrationExecutor(connection)
@@ -17,10 +24,16 @@ class P01MainMigrationTests(TransactionTestCase):
         self.assertEqual(leaves,[('stable','0088_p01_sealed_evidence')])
         article=NewsArticle.objects.create(title_ja='原有新闻',body_ja_raw='正文保持',source_article_id='pre-p01',source_url='https://fixture.invalid/prior',published_at=timezone.now())
         try:
-            executor.migrate([('stable','0085_merge_us_divisions')])
-            old=executor.loader.project_state([('stable','0085_merge_us_divisions')]).apps.get_model('stable','NewsArticle')
+            if missing_budget:
+                executor.migrate([('stable', '0079_multisource_race_enrollment')])
+                executor = MigrationExecutor(connection)
+            executor.migrate(baseline)
+            old=executor.loader.project_state(baseline).apps.get_model('stable','NewsArticle')
             self.assertEqual(old.objects.get(pk=article.pk).body_ja_raw,'正文保持')
             self.assertNotIn(NewsProcessingRun._meta.db_table,connection.introspection.table_names())
+            if missing_budget:
+                self.assertNotIn('stable_translationretrybudget', connection.introspection.table_names())
+                self.assertNotIn('stable_managedreadonlystep', connection.introspection.table_names())
         finally:
             MigrationExecutor(connection).migrate(leaves)
         article.refresh_from_db()
