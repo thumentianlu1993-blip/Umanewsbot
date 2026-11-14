@@ -1,6 +1,6 @@
-## 2026-11-14 20 项采集检查恢复，NAR 状态标签仍待修复
+## 2026-11-14 #315 展示修复与证书续期完成线上验收
 
-PR #313 合并为 `9db3f4ca`，17:36 四应用上线 `661d45ef`，schema0084、3 GiB 阈值及 QQ 关闭状态保持。日本 126/204 自然刷新成功，20 项目标均完成恢复后的检查：JRA 公网 18 匹，NAR 完整 68 匹报名且数据保留 12 选定/56 候补。公网验收另发现统一展示层把 NAR 状态列全部显示为“已出走登记”，分组展示尚未通过；最小修复已取得真实开关组合 RED/GREEN，尚未发布。凯旋门旧入口 404、新入口 200 且 16 匹赛果完整，站点地图无旧路径。美国 13 项覆盖仍未核实，SCMP 已知 403 未处理。验收使用独立容器，重建后采集 worker 无新增 OOM。详见 [线上证据](changes/collection-recovery-arc/release_evidence.md)、[已发布日本后续包](changes/collection-recovery-arc/followup.md)和[展示修复包](changes/collection-recovery-arc/display_fix.md)。
+PR #315 merge `15d8b53e`，固定候选 `3f967f64` 于北京时间 19:31:40 发布成功。NAR 浦和记念公网 68 行逐马与报名来源核对通过：12 选定、56 候补，仍为报名预览；JRA 18 匹、凯旋门旧入口 404/新入口 200 且 16 匹出马表与赛果、站点地图均通过。四应用版本一致且运行，Web 健康、双 worker 就绪、Beat 恢复，schema0084、3 GiB 阈值、QQ 关闭保持，无迁移或业务数据写入，发布锁释放。首次发布因证书过期回滚；经用户确认附加包后已修复续期脚本旧目录并续签原两个域名，19:27:41 HTTPS 恢复，证书有效期至 2027-02-12。20 项采集检查保持失败计数为零；美国 13 项覆盖未核实、SCMP 403 仍是独立缺口。详见[线上证据](changes/collection-recovery-arc/release_evidence.md)和[证书修复附加包](changes/collection-recovery-arc/tls_repair.md)。
 
 ## 2026-11-13 英国 100 场目录与完整数据包通过初轮离线演练，未发布
 

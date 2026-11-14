@@ -1,3 +1,11 @@
+## 2026-11-14 #315 展示修复与证书续期维护入口
+
+固定应用候选 `3f967f64` 于 19:31:40 发布成功，维护 Compose 链在现有链末追加 `/opt/umanews-external-staging/nar-display-3f967f64/release-identity.json`，以运行容器完整配置标签为准。NAR 68 行逐马标签验收为 12 选定/56 候补；应用回滚目标 `661d45ef` 会保留旧标签问题，无数据库回滚。
+
+证书续期脚本 `/usr/local/sbin/renew-umanews-cert` 已修复为持久化根 `/opt/umanewsbot-persistent/certs`，仅续签 `umafans.run`（包含 `www.umafans.run`），原 cron 时间与固定 Certbot 镜像保持。新脚本 SHA256 `bf76b2847173ece51292debf3f06ab748444df67678215ca8a8afe1b53f11685`；证书有效期至 2027-02-12 18:29:00（北京时间）。本次手动续期、成功后 Nginx 检查/重载与两域名 HTTPS 通过；尚未观察下一次 cron 自然运行，不能把手动成功称为后续自然续期验收。
+
+私有脚本和证书备份仅在 `/opt/umanews-external-staging/nar-display-tls-repair-20261114/evidence/before/`；首次应用发布失败的记录在 `nar-display-3f967f64/attempt-1-tls-expired/`。应用回滚不得删除已签发的新证书；旧脚本和过期证书不能恢复可用 HTTPS。详见[证书附加包](changes/collection-recovery-arc/tls_repair.md)与[最终验收](changes/collection-recovery-arc/release_evidence.md)。
+
 ## 2026-11-14 日本采集后续包维护入口
 
 PR #313 merge `9db3f4ca`，四应用于北京时间 17:36:15 发布固定候选 `661d45ef`。schema0084，无迁移，3 GiB 磁盘阈值及 QQ 关闭保持。维护 Compose 链在采集恢复包链之后追加 `/opt/umanews-external-staging/japan-recovery-661d45ef/release-identity.json`；以运行容器的完整配置链为准。日本 126/204 仅提前 `next_poll_at`，两项原状态及配置备份保存在该目录的私有 `evidence/`。本包应用回滚目标为 `41d3f76c`，正常采集数据保留；未执行回滚。实际自然验收见 [线上证据](changes/collection-recovery-arc/release_evidence.md)。
