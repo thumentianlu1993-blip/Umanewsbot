@@ -55,6 +55,14 @@ def translation_issues(clean, target, entities):
     texts = {'title': clean['title'], **{b['id']: b['text'] for b in clean['blocks']}}
     targets = {'title': target['title'], 'summary': target['summary'], **{b['id']: b['text'] for b in target['blocks']}}
     issues = []
+    for source_block, original in texts.items():
+        if ('免許' in original and '交付します' in original
+                and not re.search(r'交付しました|交付済|既に|すでに', original)):
+            for block in {'summary', 'body' if target.get('manual') and source_block != 'title' else source_block}:
+                if re.search(r'已(?:经)?(?:向[^。！？]*?)?(?:发放|颁发|授予)', targets.get(block, '')):
+                    issues.append({'kind':'unsupported_completed_state', 'block_id':block,
+                                   'source_block':source_block, 'source_quote':'交付します',
+                                   'instruction':'原文为非过去的发放公告，未明确已完成；保留公告/将发放语气，不添加已或已经。'})
     for row in entities:
         if row['type'] != 'person':
             continue

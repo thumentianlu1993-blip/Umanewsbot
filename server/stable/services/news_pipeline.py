@@ -668,7 +668,7 @@ def context_payload(run):
                                "blocks": [row for row in blocks if row["id"] in ids or "summary" in ids]},
                     "context": [row for i, row in enumerate(blocks) if i in adjacent],
                     "previous": {key: texts[key] for key in ids}, "repair": task["evidence"],
-                    "entities": run.entity_snapshot["occurrences"]}
+                    **({"entities": run.entity_snapshot["occurrences"]} if context_contract_version() != "context-v3" else {})}
         return {**glossary, "mode": "full", "source": protected, "repair": task}
     raise ValueError("stage_not_registered")
 

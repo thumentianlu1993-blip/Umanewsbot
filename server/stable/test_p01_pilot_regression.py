@@ -225,3 +225,24 @@ class PilotEditorialProfileTests(SimpleTestCase):
             c=sources[row['sample_id']]
             with self.subTest(sample=row['sample_id']), self.assertRaises(ContentBlocked):
                 validate_editorial(c['clean'],row['response'],source_scope=c['source_site'])
+
+@override_settings(NEWS_QUALITY_POLICY={'contract_version':'context-v3'})
+class PilotRepairCapacityTests(SimpleTestCase):
+    def test_real_hong_kong_local_repair_stays_within_payload_limit(self):
+        from stable.services.news_model_gateway import reservation_amount
+        f=json.loads((Path(__file__).parent/'fixtures/p01_live_pilot_failures_20261114.json').read_text())
+        c=next(c for c in f['cases'] if c['sample_id']=='D006');repair=f['repair_regression']
+        run=SimpleNamespace(stage='translate_full',clean_snapshot=c['clean'],entity_snapshot={'occurrences':repair['entities']},quality_snapshot=repair['quality'],repair_count=1)
+        payload=context_payload(run)
+        reservation_amount(payload,{'max_input_bytes':50000,'input_per_million':'0.3','output_per_million':'1.2','max_output_tokens':8192})
+        self.assertEqual(payload['required_block_ids'],['b002'])
+        self.assertEqual(len(payload['entity_glossary']),len(repair['entities']))
+
+    def test_japanese_nonpast_announcement_does_not_add_completed_state(self):
+        from stable.services.news_translation_quality import translation_issues
+        for original,target,bad in [('短期騎手免許を交付しますので、お知らせします。','现通知，已向Alex发放短期骑师执照。',True),
+                                    ('短期騎手免許を交付しますので、お知らせします。','现通知，将向Alex发放短期骑师执照。',False),
+                                    ('短期騎手免許を交付しました。','已向Alex发放短期骑师执照。',False),
+                                    ('短期騎手免許を交付しますので、お知らせします。','已公布将向Alex发放短期骑师执照。',False)]:
+            t={'title':'公告','summary':'执照公告','blocks':[{'id':'b0','text':target}]}
+            self.assertEqual(bool(translation_issues(clean(original),t,[])),bad)
