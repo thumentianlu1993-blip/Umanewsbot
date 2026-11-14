@@ -58,7 +58,8 @@ def parse_nar_nominations(page, *, event, url):
                     running_status='declared',source_refs={'primary':url,'selection_status':selection,
                         'jockey_stage':'planned','source_fields':fields}))
     if items:
-        if len(items)>60 or len({r['horse_name'] for r in items})!=len(items):raise ValueError('nar_nomination_roster')
+        # 报名包含补欠马，不适用正式出马表人数上限；完整保留各组选定状态。
+        if len({r['horse_name'] for r in items})!=len(items):raise ValueError('nar_nomination_roster')
         return dict(stage='registration',items=items)
     schedule=' '.join(n.get_text(' ',strip=True) for n in soup.select('.txt_schedule'))
     if schedule and re.search('発表|公開',schedule):
