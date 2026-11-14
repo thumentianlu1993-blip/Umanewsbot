@@ -163,7 +163,7 @@
       "path": "server/stable/services/news_translation_quality.py",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "38cd2e0bef234ffe5369844e84cebd9fd3a05543704bf478eda830e3e15eea3a",
+      "after_hash": "f074fc10b19bb4ac243dae0adf563f1dae168f3da49547e95f2469d73c4f98a1",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -171,7 +171,7 @@
       "path": "server/stable/test_p01_pilot_regression.py",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "71972808cb63f874b9f7c37fe5211d9fe13693fd58bb769173e3c877f764169f",
+      "after_hash": "2f0c791990a1ce27b0191574c354f4f4903dff925f9257e7e2174158932d59a1",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -179,7 +179,7 @@
       "path": "tools/test_impact/catalog.json",
       "status": "modified",
       "before_hash": "5dec96904ecc94b07668b94e815df034ebba217a648dc26ae8ef1e267dc95460",
-      "after_hash": "7de4bd72dd7b5b5ebb2638625b66f07f4b12a4f5fbf30ae371313395d38bc294",
+      "after_hash": "0a34f9e77903a034f1dbdc36b5e6e27d3e08f30023fda6cdc8e1b7f0ae06852f",
       "before_mode": "100644",
       "after_mode": "100644"
     },
