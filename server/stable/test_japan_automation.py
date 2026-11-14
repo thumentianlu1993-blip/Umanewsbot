@@ -314,6 +314,35 @@ class NarPreRaceWorkflowTests(TestCase):
         self.assertIn('预定',preview['label'])
         self.assertEqual(preview['rows'][0].get_running_status_display(),'候补')
 
+    def test_full_nomination_list_survives_storage_and_public_preview(self):
+        from datetime import timedelta
+        from unittest.mock import patch
+        from django.urls import reverse
+        from stable.services.nar_pre_race import discover_nar_pre_race, public_nar_preview, NAR
+        from stable.services import race_pre_race as pre
+
+        def section(label, start, stop):
+            rows=''.join(f'<tr><td>テスト馬{i}</td><td>調教師{i}</td></tr>' for i in range(start,stop))
+            return f'<section class="sec_nominate"><h2>{label}</h2><table><tr><th>馬名</th><th>調教師</th></tr>{rows}</table></section>'
+        self.pages[self.base+'racecard.html']='<title>浦和記念 2026年</title>'+section('選定馬',0,12)+section('補欠馬',12,68)
+        for now in (NOW, NOW+timedelta(hours=4)):
+            result=discover_nar_pre_race(now=now,policy=self.policy,
+                fetcher=lambda u,**kw:self.pages[u],clock=lambda:now)
+            self.assertEqual(result,dict(checked=1,attempted=1))
+        self.event.refresh_from_db()
+        self.assertEqual(pre._state(self.event,NAR)['failures'],0)
+        self.assertEqual(self.event.data_candidates.count(),1)
+        self.assertEqual(len(self.event.data_candidates.get().candidate_payload['items']),68)
+        self.assertEqual(self.event.runners.count(),0)
+        preview=public_nar_preview(self.event,now=now)
+        self.assertEqual(len(preview['rows']),68)
+        self.assertEqual(sum(row.get_running_status_display()=='选定' for row in preview['rows']),12)
+        self.assertEqual(sum(row.get_running_status_display()=='候补' for row in preview['rows']),56)
+        with patch('django.utils.timezone.now',return_value=now):
+            response=self.client.get(reverse('public-race-detail',args=[self.event.year,self.event.slug]))
+        self.assertContains(response,'テスト馬67')
+        self.assertContains(response,'候补',count=56)
+
     def test_backend_cannot_apply_nar_registration_candidate(self):
         from django.contrib.auth import get_user_model
         from django.urls import reverse

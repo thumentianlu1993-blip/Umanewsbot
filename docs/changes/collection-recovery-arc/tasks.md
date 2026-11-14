@@ -4,4 +4,8 @@
 - [x] (integration) 取得 NAR RED 并完成最小修复、33 项回归。
 - [x] (operations) 生成精确数据 manifest、归档/恢复脚本及隔离数据库验证。
 - [x] (integration) 应用改动固定提交范围 CI 679 项通过、零跳过，独立只读 review 通过；最终文档提交按保护门禁核验。
-- [ ] (operations) 按根 AGENTS.md 完成交付确认，执行绑定发布包并验收。
+- [x] (operations) 按根 AGENTS.md 完成交付确认，执行同一绑定发布包并核验应用与凯旋门入口。
+- [x] (operations) 记录 20 个来源自然重试结果：18 个成功检查，日本两项仍失败。
+- [x] (integration) 补齐 NAR 68 匹名单从采集、存储到公开页面的 RED/GREEN 回归；固定候选 67 项通过。
+- [x] (operations) 准备仅日本 126/204 的提前重试 manifest，独立只读 prepare 及 4 项隔离数据测试通过。
+- [ ] (operations) 按根 AGENTS.md 交付后续包并完成两项日本自然验收。
