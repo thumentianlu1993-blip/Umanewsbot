@@ -106,7 +106,7 @@ class PilotEvidenceTests(SimpleTestCase):
     def test_neutral_honorific_exceptions_are_person_bound(self):
         from stable.services.news_translation_quality import translation_issues
         for original, translated, bad in [('Alex氏は来日。','Alex先生来日。',True),('Alex氏は来日。','Alex来日。',False),
-                ('Mr. Alex。Alex氏は来日。','Alex先生来日。',False),('Mr. Bob。Alex氏は来日。','Alex先生来日。',True),
+                ('Mr. Alex。Alex氏は来日。','Alex先生来日。',False),('Mr. Bob。Alex氏は来日。','Alex先生来日。',True),('Mr. Alex-Smith。Alex氏は来日。','Alex先生来日。',True),('Mr. Alex’Lee。Alex氏は来日。','Alex先生来日。',True),
                 ('Alex氏名を記入。','Alex先生来日。',False),('Alex氏は来日。','Alex说老师先生来了。',False)]:
             source=clean(original);start=original.rindex('Alex')
             row={'type':'person','block_id':'b0','start':start,'end':start+4,'text':'Alex','replacement':'Alex'}

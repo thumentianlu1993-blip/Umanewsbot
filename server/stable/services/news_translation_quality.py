@@ -63,7 +63,7 @@ def translation_issues(clean, target, entities):
             continue
         name = row['text']
         # 例外必须绑定该姓名，不能由同文其他人的 Mr. 放行。
-        explicit = re.compile(r'\b(?:Mr|Mrs|Ms|Miss)\.?\s+' + re.escape(name) + r'(?![A-Za-z])|'
+        explicit = re.compile(r'\b(?:Mr|Mrs|Ms|Miss)\.?\s+' + re.escape(name) + r"(?![A-Za-z’'-])|"
                               + re.escape(name) + r'(?:先生|女士|夫人|女史)')
         if any(explicit.search(t) for t in texts.values()):
             continue
