@@ -1,0 +1,235 @@
+{
+  "schema_version": 1,
+  "base_sha": "ca8abc736427a47c450721cc42e0b0b98c6521d8",
+  "reason": "公开赛事读取收敛到五地区；三个冻结历史修复清单仅补空字段、明确非完赛/取消和空表赛果，覆盖前台所有关联路径、旧JRA解析、源身份/CAS/幂等/恢复；无模型迁移或依赖变更。控制文件增量只登记新测试profile/domain及本次精确内容选测。",
+  "domains": [
+    "five_region_race_governance",
+    "infrastructure"
+  ],
+  "changes": [
+    {
+      "path": "docs/changes/five-region-race-governance/audit.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "075f4a04c23fb906580f081f8f7f2b23d03cb0fd3587a55fb37b62b5693e674b",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/five-region-race-governance/design.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "8256ef48a5fa47cf8a3e9757f445a38d8d9659bc94faf7abb2217789d07ea3c5",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/five-region-race-governance/rollout.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "37142d91b97136aacce8af44be4b4e6bd269137f5e98565d97617408f6f08dc4",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/five-region-race-governance/spec.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "5a0eaccedd166da79e9292c8541dc97c2fd1d258c12d8050456f3e5ea707cd8d",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/five-region-race-governance/tasks.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "247949ae7203ae518e08a6029d2670977d05d252354307adb696091b8357213d",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/five-region-race-governance/test_cases.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "735bb1dedbe2a9fcc57fdf2d4c750421fe4768d1e84f472d20221b5ee861300b",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/current_state.md",
+      "status": "modified",
+      "before_hash": "43ef2826a4e379a8d0aef47e51be3a42883528a9b00cc143b9fe062c837403a2",
+      "after_hash": "bef920f00c6bea9b450213ceaa862120c183fe0896247a27a34aea522ca38405",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/decisions.md",
+      "status": "modified",
+      "before_hash": "f7d62de0e225085b1074b6b3cec5ad4e879ac3933703d029b208137bffc3d5ff",
+      "after_hash": "e699b100ad2145018a070f6804b3ae9af1447615fc3ce84c9aa333f494bfa116",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "runtime/tools/jra_legacy_replay_detail_parser.py",
+      "status": "modified",
+      "before_hash": "5217a48fcb39f7aa8c950419a1749366702e83d1b27d47ec92e63f567876d8ea",
+      "after_hash": "3417ca869db583aa2394596891c40d2ac9e4c7b223e81cc309d74c53a12252b0",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/management/commands/repair_historical_empty_races.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "6ba0edb16128a959a5cec02127b80e02d28946e08d623a7d6fb7083c431bc598",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/management/commands/repair_historical_jra_fields.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "525e3a124f2cf9b43a94c78f72f90b67679f6ee31d520305ccbbb13d691fb149",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/management/commands/repair_historical_jra_jockeys.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "2a0cf51145dd48babda3378b588a1cf5d0e361189badd788aa1be631910cc867",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/historical_empty_race_repair.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "ec654af8c9e8060ed1b4477fdf5683d2bab4224f949a4448984befcdc4cac09e",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/historical_jra_jockey_repair.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "e618b74677bad9e6b518727877572148b59d85efd400a0981841995d7444d4c8",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/horse_profiles.py",
+      "status": "modified",
+      "before_hash": "7715d3d1cc1afe2d52943efd1e05b661835e62d50672bf0705a3f2e6615baa81",
+      "after_hash": "a7a57e0d000c1f7cdbad2665965a879497db2297e9f3247f6e0127d3c3dc54f4",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_event_public_cache.py",
+      "status": "modified",
+      "before_hash": "5c6b6c4b28849248b3e8f6d3847956144e08a8bc8bee59f2cf939236f54f5de4",
+      "after_hash": "aa1984833a11ff749c86debe00b1f9e16e974c4d9072d18287d2d2be7590d04b",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_public_scope.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "721862f8681436ff1a6dcaf91169815e30661832a900965fb72804661902c27c",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/templates/stable/public/race_detail.html",
+      "status": "modified",
+      "before_hash": "0aec9b15329887b50a44d5b556c2081e8580bd7c4b30ebb169d49f74eb7758eb",
+      "after_hash": "e7175f229f946e9ed3a39efbfedee6072143227ddd3906f3e80fc2a5116ce3f8",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_five_region_race_governance.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "4dd1f0cf8aff7f73a7bb1173450250671260a31b28cbd079e41790ce47789306",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_historical_empty_race_repair.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "99335b67e0e22684628d524b2c754b0be5a894b641a07dd659d6cbb00b1a4ac3",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_historical_jra_jockey_repair.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "ffc722037d60d4512bf5204c1220a03226bc80a0913e0e3827cd17248ffe2c6e",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_historical_jra_legacy_details.py",
+      "status": "modified",
+      "before_hash": "1440dc4ff809b38cda1c0be1f2f5435255db1055c514d16f4e68daf0cf360d41",
+      "after_hash": "d4c726de4f4cc1c3db62c10cae958d5e0a9ef57a21656390c581bf88ef12684d",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_public_new_regions.py",
+      "status": "modified",
+      "before_hash": "5455e05814fdc1de09fa719b9e25047a9e2bdaa2a787101b62f91ec9637c5688",
+      "after_hash": "9d436035de2961f11e614bd5ec696e8d1dc79b6e5ebfe17116e1a77893fc7cf3",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_race_information_display_pages.py",
+      "status": "modified",
+      "before_hash": "f30b8bd62de1323422cf8c04b7d4b847b8e97e9643c0bb043bf151d7b23c6685",
+      "after_hash": "ef1e3f0a2ffbefc07fce09ca9fdb6bb47d28864177160ced70a14f4400f10918",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/tests/test_page_regression.py",
+      "status": "modified",
+      "before_hash": "05392e859ea50ec4f7d57e8a01afefa8b3f32266adf28c955e39faa5d7be0fd3",
+      "after_hash": "4168aaf079db971639424902273f5a3b6446e53a2f1e06f56240b02ea6370f17",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/views.py",
+      "status": "modified",
+      "before_hash": "432e2461031d6d366f4c2ed632dd35b5c54d02c263ecf62f1889d6a2837d2cd3",
+      "after_hash": "44b81bca28ba3aa9e7bc1d20536aa65ce6fdf7552f8426477fc6554bf93ec238",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/catalog.json",
+      "status": "modified",
+      "before_hash": "b74015e4d23941040a503c356a55d309ff6cdb6959237ca4cc8ca0271b58d4d6",
+      "after_hash": "bab7cba74610bc3b9540663c4836ed2f484d80ca9151419830f0db0854583d75",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "3ec4e15315c0672062f967401f3be38647cbcc12ae26622e5f6f07cb24a96fb8",
+      "after_hash": "18b4e59526d9ae1785baf78b2b2c2c5d35c618ebfc01284f76724a7e07f56477",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}

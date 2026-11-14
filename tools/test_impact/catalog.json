@@ -979,6 +979,33 @@
       "stable.test_uk_release",
       "stable.test_uk_sources",
       "stable.test_uk_workflow"
+    ],
+    "module:stable.test_five_region_race_governance": [
+      "stable.test_five_region_race_governance"
+    ],
+    "module:stable.test_historical_jra_jockey_repair": [
+      "stable.test_historical_jra_jockey_repair"
+    ],
+    "module:stable.test_historical_empty_race_repair": [
+      "stable.test_historical_empty_race_repair"
+    ],
+    "five_region_race_governance": [
+      "stable.test_five_region_race_governance",
+      "stable.test_historical_jra_jockey_repair",
+      "stable.test_historical_empty_race_repair",
+      "stable.test_race_calendar_default_date_window",
+      "stable.test_race_calendar_responsive_ui",
+      "stable.test_race_public_time",
+      "stable.test_race_information_display",
+      "stable.test_race_information_display_pages",
+      "stable.test_race_news_exposure",
+      "stable.tests_legacy.HorseProfilePageMvpTests",
+      "stable.tests.test_page_regression",
+      "stable.tests.test_term_display",
+      "stable.test_historical_jra_legacy_details",
+      "stable.test_historical_race_cached_details",
+      "stable.test_public_new_regions",
+      "stable.test_public_navigation_and_attribution"
     ]
   },
   "dependencies": {
@@ -3116,6 +3143,24 @@
       "domains": [
         "uk_race_automation"
       ]
+    },
+    "server/stable/test_five_region_race_governance.py": {
+      "label": "stable.test_five_region_race_governance",
+      "domains": [
+        "module:stable.test_five_region_race_governance"
+      ]
+    },
+    "server/stable/test_historical_jra_jockey_repair.py": {
+      "label": "stable.test_historical_jra_jockey_repair",
+      "domains": [
+        "module:stable.test_historical_jra_jockey_repair"
+      ]
+    },
+    "server/stable/test_historical_empty_race_repair.py": {
+      "label": "stable.test_historical_empty_race_repair",
+      "domains": [
+        "module:stable.test_historical_empty_race_repair"
+      ]
     }
   },
   "profiles": {
@@ -3458,7 +3503,10 @@
     "stable.test_uk_pre_race": "django",
     "stable.test_uk_release": "django",
     "stable.test_uk_sources": "django",
-    "stable.test_uk_workflow": "django"
+    "stable.test_uk_workflow": "django",
+    "stable.test_five_region_race_governance": "django",
+    "stable.test_historical_jra_jockey_repair": "django",
+    "stable.test_historical_empty_race_repair": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
@@ -3546,7 +3594,8 @@
     "hkjc_source_acceptance": "integration: HKJC全季目录、正式赛果、分阶段赛前与候选公开",
     "france_race_automation": "integration: 法国来源阶段、身份、字段和固定范围回放",
     "us_source_collection": "integration: 美国只读来源、阶段语义、缓存回放与来源入口",
-    "uk_race_automation": "integration: 英国付费采集、赛前阶段、完整赛果及发布恢复"
+    "uk_race_automation": "integration: 英国付费采集、赛前阶段、完整赛果及发布恢复",
+    "five_region_race_governance": "application/integration: 五地区公开过滤、历史字段修复与来源边界"
   },
   "dedicated_batch_modules": [
     "stable.test_migration_history_repair_postgres",

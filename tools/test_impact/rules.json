@@ -1731,6 +1731,27 @@
     ],
     "docs/changes/uk-race-automation/transport-ci-scope.json": [
       "infrastructure"
+    ],
+    "server/stable/services/race_public_scope.py": [
+      "five_region_race_governance"
+    ],
+    "server/stable/services/historical_jra_jockey_repair.py": [
+      "five_region_race_governance"
+    ],
+    "server/stable/services/historical_empty_race_repair.py": [
+      "five_region_race_governance"
+    ],
+    "server/stable/management/commands/repair_historical_jra_jockeys.py": [
+      "five_region_race_governance"
+    ],
+    "server/stable/management/commands/repair_historical_jra_fields.py": [
+      "five_region_race_governance"
+    ],
+    "server/stable/management/commands/repair_historical_empty_races.py": [
+      "five_region_race_governance"
+    ],
+    "docs/changes/five-region-race-governance/ci-scope.json": [
+      "infrastructure"
     ]
   },
   "symbols": {
@@ -1916,6 +1937,9 @@
         "race_results",
         "module:stable.test_historical_race_calendar_integrity",
         "us_source_collection"
+      ],
+      "_race_calendar_queryset": [
+        "five_region_race_governance"
       ]
     }
   },
@@ -1942,6 +1966,7 @@
     "docs/changes/us-race-automation/ci-scope-preview.json",
     "docs/changes/us-online-field-gaps/ci-scope.json",
     "docs/changes/uk-race-automation/ci-scope.json",
-    "docs/changes/uk-race-automation/transport-ci-scope.json"
+    "docs/changes/uk-race-automation/transport-ci-scope.json",
+    "docs/changes/five-region-race-governance/ci-scope.json"
   ]
 }

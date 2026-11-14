@@ -99,7 +99,11 @@ def try_parse_jra_legacy_replay_detail(
     column = {label: headers.index(label) for label in LEGACY_REQUIRED_HEADERS}
     for optional in ("枠", "負担重量", "騎手", "タイム", "着差", "調教師", "単勝人気"):
         if optional in headers:
-            column[optional] = headers.index(optional)
+            # 旧版表头“騎手”跨两列：前列为减量标记，最后一列才是姓名。
+            column[optional] = (
+                len(headers) - 1 - headers[::-1].index(optional)
+                if optional == "騎手" else headers.index(optional)
+            )
 
     rows = []
     for tr in table.find_all("tr")[1:]:

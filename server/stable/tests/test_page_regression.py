@@ -212,6 +212,7 @@ class HorsePageTermDisplayTests(TestCase):
         self.record = HorseRaceRecord.objects.create(
             horse_profile=self.profile,
             race_name="東京優駿",
+            race_region=RacingRegion.JAPAN,
             racecourse="東京",
             finish_position="1",
             result_status=HorseRaceResultStatus.WON,
