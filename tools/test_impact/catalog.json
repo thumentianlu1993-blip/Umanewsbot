@@ -1006,6 +1006,9 @@
       "stable.test_historical_race_cached_details",
       "stable.test_public_new_regions",
       "stable.test_public_navigation_and_attribution"
+    ],
+    "module:stable.test_hkjc_name_catalog": [
+      "stable.test_hkjc_name_catalog"
     ]
   },
   "dependencies": {
@@ -3161,6 +3164,12 @@
       "domains": [
         "module:stable.test_historical_empty_race_repair"
       ]
+    },
+    "server/stable/test_hkjc_name_catalog.py": {
+      "label": "stable.test_hkjc_name_catalog",
+      "domains": [
+        "module:stable.test_hkjc_name_catalog"
+      ]
     }
   },
   "profiles": {
@@ -3506,7 +3515,8 @@
     "stable.test_uk_workflow": "django",
     "stable.test_five_region_race_governance": "django",
     "stable.test_historical_jra_jockey_repair": "django",
-    "stable.test_historical_empty_race_repair": "django"
+    "stable.test_historical_empty_race_repair": "django",
+    "stable.test_hkjc_name_catalog": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {

@@ -1218,6 +1218,9 @@ RACE_DATA_SYNC_JAPAN_HISTORICAL_ROSTER_SHA256 = os.getenv("RACE_DATA_SYNC_JAPAN_
 
 # 马匹中文名仅采用可核验的香港赛马会官方来源；发布包显式启用。
 HORSE_NAMES_REQUIRE_HKJC_ENABLED = os.getenv("HORSE_NAMES_REQUIRE_HKJC_ENABLED", "false").lower() == "true"
+# 只读赛事名称目录：路径和 SHA 同时绑定；空路径保留原展示。无数据库导入。
+RACE_HKJC_NAME_CATALOG_PATH = os.getenv("RACE_HKJC_NAME_CATALOG_PATH", "")
+RACE_HKJC_NAME_CATALOG_SHA256 = os.getenv("RACE_HKJC_NAME_CATALOG_SHA256", "")
 # HKJC 接入默认关闭；观察窗口可覆盖已公开的国际赛报名。
 RACE_DATA_SYNC_HKJC_PRE_RACE_ENABLED = os.getenv("RACE_DATA_SYNC_HKJC_PRE_RACE_ENABLED", "false").lower() == "true"
 RACE_DATA_SYNC_HKJC_PRE_RACE_DAYS = int(os.getenv("RACE_DATA_SYNC_HKJC_PRE_RACE_DAYS", "45"))

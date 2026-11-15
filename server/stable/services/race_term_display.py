@@ -256,14 +256,35 @@ class StrictRaceTermResolver:
         self.requests = set()
         self.results = {}
 
-    def add(self, value, term_type, region='', language='', year=None):
-        self.requests.add((str(value or ''), term_type, region or '', language or '', year))
+    def add(self, value, term_type, region='', language='', year=None, name_context=None):
+        from stable.services.hkjc_name_catalog import context_key
+        self.requests.add((str(value or ''), term_type, region or '', language or '', year, context_key(name_context)))
 
     def resolve(self):
+        from stable.services.hkjc_name_catalog import KINDS, configured_catalog
+        catalog = configured_catalog()
         for term_type in {r[1] for r in self.requests}:
             requests = [r for r in self.requests if r[1] == term_type and r[0].strip()]
             if not requests:
                 continue
+            if catalog is not None and term_type in KINDS:
+                unresolved = []
+                for req in requests:
+                    name, _, region, language, year, identity = req
+                    match = catalog.match(name, term_type, dict(identity))
+                    if match.reason == 'hkjc_name_missing':
+                        unresolved.append(req)
+                        continue
+                    text = match.text
+                    if term_type == TermType.HORSE and match.state != 'normalized':
+                        text = race_original(name)
+                    self.results[req] = replace(display_field(
+                        name, text, state=match.state, reason=match.reason,
+                        context={'type': term_type, 'region': region, 'language': language,
+                                 'year': year, 'evidence_ids': list(match.evidence_ids)}), text=text)
+                requests = unresolved
+                if not requests:
+                    continue
             variants = sorted({variant for name in {r[0] for r in requests}
                                for variant in (name.strip(), ' '.join(unicodedata.normalize('NFKC', name).split()))})
             # 两端沿用数据库大小写规则；IN避免每行重复计算数百个iexact分支。
@@ -296,7 +317,7 @@ class StrictRaceTermResolver:
                 candidates.append((alias['term_id'], display_identity(alias['text']), effective_target(SimpleNamespace(target_zh=alias['term__target_zh'], notes=alias['term__notes'], translation_status=alias['term__translation_status'], term_type=term_type)),
                                    alias['term__racing_region'], alias['source_language'], alias['term__source_ja']))
             for req in requests:
-                name, _, region, language, year = req
+                name, _, region, language, year, identity = req
                 found = [c for c in candidates if c[1] == display_identity(name) and (not language or c[4] is None or c[4] == language)]
                 local = [c for c in found if c[3] == region]
                 tier = local if local else [c for c in found if c[3] == '']
@@ -313,8 +334,9 @@ class StrictRaceTermResolver:
                                                       reason='term_conflict' if by_entity else 'term_missing', context=context), text=race_original(' '.join(name.split())) if horse_policy else ' '.join(name.split()))
         return self
 
-    def field(self, value, term_type, region='', language='', year=None):
-        key = (str(value or ''), term_type, region or '', language or '', year)
+    def field(self, value, term_type, region='', language='', year=None, name_context=None):
+        from stable.services.hkjc_name_catalog import context_key
+        key = (str(value or ''), term_type, region or '', language or '', year, context_key(name_context))
         if not value:
             return display_field(value, state='missing', reason='missing')
         fallback = race_original(' '.join(str(value).split())) if term_type == TermType.HORSE else ' '.join(str(value).split())

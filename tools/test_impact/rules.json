@@ -1755,6 +1755,34 @@
     ],
     "docs/changes/collection-recovery-arc/display-ci-scope.json": [
       "infrastructure"
+    ],
+    "scripts/apply_hkjc_name_reviews.py": [
+      "module:stable.test_hkjc_name_catalog",
+      "module:stable.test_hkjc_horse_name_policy",
+      "module:stable.test_race_information_display",
+      "module:stable.test_race_information_display_pages",
+      "module:stable.test_public_term_consistency"
+    ],
+    "scripts/build_hkjc_name_catalog.py": [
+      "module:stable.test_hkjc_name_catalog",
+      "module:stable.test_hkjc_horse_name_policy",
+      "module:stable.test_race_information_display",
+      "module:stable.test_race_information_display_pages",
+      "module:stable.test_public_term_consistency"
+    ],
+    "server/stable/services/hkjc_name_catalog.py": [
+      "module:stable.test_hkjc_name_catalog",
+      "module:stable.test_hkjc_horse_name_policy",
+      "module:stable.test_race_information_display",
+      "module:stable.test_race_information_display_pages",
+      "module:stable.test_public_term_consistency"
+    ],
+    "docs/changes/p04-1-race-name-matching/reviewed_decisions.json": [
+      "module:stable.test_hkjc_name_catalog",
+      "module:stable.test_hkjc_horse_name_policy",
+      "module:stable.test_race_information_display",
+      "module:stable.test_race_information_display_pages",
+      "module:stable.test_public_term_consistency"
     ]
   },
   "symbols": {

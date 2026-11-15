@@ -393,6 +393,7 @@ def prepare_context(context, *, force=False):
         return context
     context['race_information_enabled'] = True
     events, rows, records, winner_entries = [], [], [], []
+    history_rows = set()
     candidate_previews = []
     for key in ('event', 'next_key_race', 'teaser_event', 'canonical_product_event'):
         if context.get(key) is not None:
@@ -415,6 +416,8 @@ def prepare_context(context, *, force=False):
     event = context.get('event')
     for key in ('runners', 'results', 'history_winners', 'top_results'):
         rows.extend((event, row) for row in context.get(key) or [])
+        if key == 'history_winners':
+            history_rows.update(id(row) for row in context.get(key) or [])
     if context.get('winner') is not None and not isinstance(context['winner'], str):
         rows.append((event, context['winner']))
     # 仅后台context提供候选；临时复制，不更改候选diff、状态或人工锁。
@@ -438,6 +441,8 @@ def prepare_context(context, *, force=False):
                         # 仅后台候选合同：apply将finish_position投影为官方名次。
                         preview['reported_finish_position'] = item.get('official_finish_position') or item.get('finish_position')
                     rows.append((event, preview))
+                    if value(candidate, 'module') == 'history_winners':
+                        history_rows.add(id(preview))
                     candidate_previews.append((candidate, preview))
     events = list({id(e): e for e in events}.values())
     records = list({id(r): r for r in records}.values())
@@ -450,8 +455,8 @@ def prepare_context(context, *, force=False):
     resolver = RaceTermResolver(mode='strict_display_v1').strict
     name_requests = []
 
-    def add_name(obj, key, raw, kind, ctx):
-        args = (str(raw or ''), kind, ctx['region'], ctx['language'], ctx['year'])
+    def add_name(obj, key, raw, kind, ctx, identity=None):
+        args = (str(raw or ''), kind, ctx['region'], ctx['language'], ctx['year'], identity)
         resolver.add(*args)
         name_requests.append((obj, key, args))
 
@@ -477,7 +482,12 @@ def prepare_context(context, *, force=False):
         for key in ('region', 'year'):
             ctx[key] = ctx[key] or event_ctx.get(key)
         for key, kind in (('horse_name', 'horse'), ('jockey_name', 'jockey'), ('trainer_name', 'trainer')):
-            add_name(row, key, value(row, key), kind, ctx)
+            # 历届冠军必须使用冠军年份；无身份字段时保持歧义，不猜 raw_payload。
+            identity = {'race_year': value(row, 'winner_year') if id(row) in history_rows
+                        else value(row, 'winner_year') or ctx['year']}
+            if kind == 'horse':
+                identity.update({field: value(row, field) for field in ('birth_year', 'sire', 'dam', 'age')})
+            add_name(row, key, value(row, key), kind, ctx, identity)
     resolver.resolve()
     for obj, key, args in name_requests:
         value(obj, 'public_display')[key] = resolver.field(*args)
