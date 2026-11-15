@@ -1,0 +1,194 @@
+{
+  "schema_version": 1,
+  "base_sha": "efb2a6c7e7b7e554515217fd38fd7c40c674249a",
+  "reason": "仅增加只读HKJC名称目录、身份上下文解析和既有赛事展示适配；无模型、迁移、采集、队列、发布脚本或新闻行为变化。覆盖完整目录及65组裁决、简体显示、所有直接展示消费者、既有马名保护与核心合同；选测登记和一次性范围绑定由基础设施测试覆盖。保持通用full规则，全部差异字节及模式与固定基线绑定。",
+  "domains": [
+    "module:stable.test_hkjc_name_catalog",
+    "module:stable.test_hkjc_horse_name_policy",
+    "module:stable.test_race_information_display",
+    "module:stable.test_race_information_display_pages",
+    "module:stable.test_public_term_consistency",
+    "module:stable.test_race_information_preview",
+    "module:stable.test_pre_race_refresh",
+    "module:stable.test_public_new_regions",
+    "infrastructure"
+  ],
+  "changes": [
+    {
+      "path": ".env.example",
+      "status": "modified",
+      "before_hash": "a128d91b13e7030efc474df24e9dec9e95c41e4e003ab99e5cc9d6089c6cb38c",
+      "after_hash": "900f8a44dc3634f0d230c00096b26624693ea87442592ade829fd7a31658a837",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p04-1-hkjc-name-collection/report.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "91173ddb2a357e80997907f5dc5f7b7a80e76aea707d7d2867c70294fe69a596",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p04-1-race-name-matching/design.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "cfce1cf3e7dc0fb9f0a7206d01939cbd8aeab8c5cb3ea71ee80ea3078b475dea",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p04-1-race-name-matching/result.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "c1f1727cd991a18bd6bb52e83f7dcd9f4721d95fe5ca657d5178e0762d53ae9e",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p04-1-race-name-matching/reviewed_decisions.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "b7e7f45344a60eccc8fe20bede01c499cf98701d31cd751a003250aa4c4b8602",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p04-1-race-name-matching/reviewed_result.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "1c4625ae5dddd4370eb14f34b816224514919460f2ab281023d1b9faae04f5ba",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p04-1-race-name-matching/rollout.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "7d30217ce2b97129e991fe0935ae3f9f56ed3cac3048107aa06889c4ba60230e",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p04-1-race-name-matching/spec.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "8050ea01440cd6f7f7346d12dba5c7e40b4fe6490d67c19da407052c721d98c1",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p04-1-race-name-matching/tasks.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "50c9cffc34090a92f1198460486efd4b943b9e8c0df8e68e2f2d1eaa4dee5bed",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p04-1-race-name-matching/test_cases.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "cdf541decc6e342e4ae6854ceaebb4fc8eeba7557e6adea57f781b386f5db1cf",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/current_state.md",
+      "status": "modified",
+      "before_hash": "7bbf17b36671c9166197ee2979a2ef588daa7d2b2736040472dbab965b93c1f0",
+      "after_hash": "61dcfbc3d9b579d07199480ff3cb8889902b9adab7f836417e70da32b8cd5ffc",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/decisions.md",
+      "status": "modified",
+      "before_hash": "e699b100ad2145018a070f6804b3ae9af1447615fc3ce84c9aa333f494bfa116",
+      "after_hash": "c19129f582d944df4f7f2b976271a4c5baa27a29a028d9fbb46efba0b0b0b8c5",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "scripts/apply_hkjc_name_reviews.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "7dea4649b7670c6f93377e073a538b345d7ca02520caf1a840aa08132919ebeb",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "scripts/build_hkjc_name_catalog.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "3fbce79c971d9de04a2621d0875612f16bfbf96bb1a403748b4225e53409ea90",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/app/settings.py",
+      "status": "modified",
+      "before_hash": "7ce16f5b46988321f0e8694918a748283acf206b6bd7b6058676327402cecf73",
+      "after_hash": "652a287780d9f784456793b847600cdca98753436e074f918ee55d29d4d0737d",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/data/hkjc_name_catalog_20261115.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "675fa8e79fef4b8cffb495dff1bc4a515732d97fa999aa99eb01db28612f78c5",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/hkjc_name_catalog.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "9f85e58825f84a0e5a75ab6f21feb05ab3fe47baab5db6697073c58adf4da4d1",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_information_display.py",
+      "status": "modified",
+      "before_hash": "70004ff73ad6839ae71e0d3576b4c38b5a935fbb74e94d815bf897fb58eb52ff",
+      "after_hash": "febfcf66b4d261fe73f9f072d58428e2a6836716abaec1e01ed241984cbf34fd",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_term_display.py",
+      "status": "modified",
+      "before_hash": "68ae6a9339e1d30f2f6a8b1325c07f152db1adaa65f24615386a19f52d118e0c",
+      "after_hash": "40da868837b8f766191a7f9f54bc8a357e7afce0a356bcd8ad68d38f68ff536d",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_hkjc_name_catalog.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "022721e65b8d4bdcfed3c4a0cab9536daf8e8b9ed39ccba92c5d133cb86eadcd",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/catalog.json",
+      "status": "modified",
+      "before_hash": "5dec96904ecc94b07668b94e815df034ebba217a648dc26ae8ef1e267dc95460",
+      "after_hash": "4124c1fce9c6a4d7d9c41775de1b437f69d2ab033842e0cbe642e2680f57db23",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "44e9f98e2915e9833fa16b29499a9b15697c86fd7735cbe0eb7839085f380719",
+      "after_hash": "3d743bde8145a4894fb551f5663cd5e1cf55f548642baae84eab65a5d21500f4",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}

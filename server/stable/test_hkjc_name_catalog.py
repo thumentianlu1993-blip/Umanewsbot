@@ -261,6 +261,17 @@ class NameCatalogTests(SimpleTestCase):
                 self.assertEqual(c.match(raw, 'horse').state, 'conflict')
         self.assertEqual(c.match('Gran Dia（ＪＰＮ）', 'horse').text, '佳日')
 
+    def test_chinese_display_glyphs_do_not_change_source_or_other_names(self):
+        c = self.catalog(entry('jockey', ['Yutaka Take', '武豊'], '武豊'),
+                         entry('horse', ['Example'], '全力一撃', 'two'))
+        for name in ['Yutaka Take', '武豊', '武丰']:
+            self.assertEqual(c.match(name, 'jockey').text, '武丰')
+        self.assertEqual(c.match('Example', 'horse').text, '全力一击')
+        self.assertEqual(c.entries[0]['names'], ['Yutaka Take', '武豊'])
+        self.assertEqual(c.entries[0]['target'], '武豊')
+        from stable.services.hkjc_name_catalog import chinese_display_name
+        self.assertEqual(chinese_display_name('齐斋郎研晃乾'), '齐斋郎研晃乾')
+
     def test_history_without_year_does_not_inherit_parent_including_candidates(self):
         from types import SimpleNamespace
         from unittest.mock import patch
@@ -277,3 +288,75 @@ class NameCatalogTests(SimpleTestCase):
         self.assertEqual(row['public_display']['trainer_name'].state, 'conflict')
         self.assertEqual(dict(candidate.normalized_preview[0])['练马师'], 'R Hannon')
         self.assertEqual(candidate.candidate_payload, [original])
+
+
+from pathlib import Path
+from datetime import date, datetime, time, timezone
+from django.test import TestCase, override_settings
+
+BUNDLED_CATALOG = Path(__file__).parent / 'data' / 'hkjc_name_catalog_20261115.json'
+BUNDLED_SHA = '675fa8e79fef4b8cffb495dff1bc4a515732d97fa999aa99eb01db28612f78c5'
+
+
+@override_settings(RACE_INFORMATION_NORMALIZED_DISPLAY_ENABLED=True,
+                   RACE_HKJC_NAME_CATALOG_PATH=str(BUNDLED_CATALOG),
+                   RACE_HKJC_NAME_CATALOG_SHA256=BUNDLED_SHA)
+class HkjcCatalogPublicPageTests(TestCase):
+    def setUp(self):
+        from stable.models import RaceEvent, RaceEventRunner, RaceEventResult, RaceEventHistoryWinner
+        self.event = RaceEvent.objects.create(
+            year=2026, slug='hkjc-names-release', original_name='Catalog Race', chinese_name='名称展示测试赛',
+            country_region='japan', racecourse='Tokyo', grade_text='G1', normalized_grade='G1',
+            surface='turf', distance_text='1600m', local_date=date(2026, 9, 18),
+            local_start_time=time(15, 40), timezone_name='Asia/Tokyo',
+            race_datetime=datetime(2026, 9, 18, 6, 40, tzinfo=timezone.utc), visibility_status='published',
+            status='finished')
+        names = dict(horse_name='Do Deuce', jockey_name='Y Take', trainer_name='Y Tomomichi')
+        self.runner = RaceEventRunner.objects.create(event=self.event, horse_number='1', **names)
+        self.result = RaceEventResult.objects.create(event=self.event, finish_position=1,
+            official_finish_position=1, is_confirmed=True, **names)
+        self.history = RaceEventHistoryWinner.objects.create(event=self.event, winner_year=2012,
+            horse_name='カレンチャン', jockey_name='R Moore', trainer_name='R Hannon')
+
+    def test_bundled_catalog_is_sha_bound_and_has_all_review_decisions(self):
+        from stable.services.hkjc_name_catalog import load_catalog
+        import json
+        catalog = load_catalog(str(BUNDLED_CATALOG), BUNDLED_SHA)
+        self.assertEqual(len(catalog.entries), 20519)
+        self.assertEqual(json.loads(BUNDLED_CATALOG.read_text())['review']['case_numbers'], list(range(1, 66)))
+        self.assertEqual(catalog.match('エーシンフォワード', 'horse').text, '荣进快蹄')
+        self.assertEqual(catalog.match('カレンチャン', 'horse').text, '真机伶')
+        self.assertEqual(catalog.match('捷足先得', 'horse').state, 'preserved')
+        self.assertEqual(catalog.match('真机灵', 'horse').state, 'preserved')
+
+    def test_detail_translates_runners_results_and_history_without_writes(self):
+        response = self.client.get(self.event.public_path)
+        self.assertEqual(response.status_code, 200)
+        for text in ['胜局在望', '武丰', '友道康夫', '真机伶', '莫雅', '向能']:
+            self.assertContains(response, text)
+        self.assertNotContains(response, '向礼伦')
+        for obj in [self.runner, self.result]:
+            obj.refresh_from_db()
+            self.assertEqual((obj.horse_name, obj.jockey_name, obj.trainer_name),
+                             ('Do Deuce', 'Y Take', 'Y Tomomichi'))
+        self.history.refresh_from_db()
+        self.assertEqual((self.history.horse_name, self.history.trainer_name), ('カレンチャン', 'R Hannon'))
+
+    def test_calendar_winner_uses_catalog(self):
+        response = self.client.get('/races/', {'year': '2026', 'tab': 'all', 'when': 'all'})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '胜局在望')
+
+    def test_conflicting_and_unknown_names_preserve_source_and_disable_restores_display(self):
+        from stable.models import RaceEventRunner
+        RaceEventRunner.objects.create(event=self.event, horse_number='2', horse_name='Los Angeles',
+                                       jockey_name='J Doyle', trainer_name='Y Takahashi')
+        RaceEventRunner.objects.create(event=self.event, horse_number='3', horse_name='Unlisted Catalog Horse',
+                                       jockey_name='Unlisted Rider', trainer_name='Unlisted Trainer')
+        response = self.client.get(self.event.public_path)
+        for name in ['Los Angeles', 'J Doyle', 'Y Takahashi', 'Unlisted Catalog Horse', 'Unlisted Rider', 'Unlisted Trainer']:
+            self.assertContains(response, name)
+        with self.settings(RACE_HKJC_NAME_CATALOG_PATH='', RACE_HKJC_NAME_CATALOG_SHA256=''):
+            response = self.client.get(self.event.public_path)
+        self.assertContains(response, 'Do Deuce')
+        self.assertNotContains(response, '胜局在望')

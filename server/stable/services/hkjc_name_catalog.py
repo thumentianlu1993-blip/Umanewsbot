@@ -18,6 +18,13 @@ COUNTRIES = 'JPN|GB|IRE|FR|USA|GER|AUS|NZ|CAN|ARG|BRZ|CHI|SAF|ITY|UAE|HK'
 logger = logging.getLogger(__name__)
 
 
+def chinese_display_name(value):
+    # 已有官方中文栏中的日文字形：只修正本目录实测残留的两个字，
+    # 不对原日文名套用字形转换，也不扩大为人名/译名替换规则。
+    # 对照：OpenCC data/dictionary/JPShinjitaiCharacters.txt（豊→豐、撃→擊）。
+    return value.translate(str.maketrans({'豊': '丰', '撃': '击'}))
+
+
 def country_suffix(value):
     found = re.search(r'\((' + COUNTRIES + r')\)\s*$', unicodedata.normalize('NFKC', value or ''), re.I)
     return found.group(1).upper() if found else ''
@@ -143,6 +150,7 @@ class NameCatalog:
                     for short in keys:
                         self.initials[kind, short].add(index)
             self.full_names[index] = full_names
+            self.exact[kind, name_key(chinese_display_name(row['target']), kind)].add(index)
 
     def match(self, value, kind, context=None):
         key = name_key(value, kind)
@@ -196,7 +204,7 @@ class NameCatalog:
                 indices &= confirmed
         if not indices:
             return self._conflict(value, original_indices)
-        targets = {self.entries[i]['target'] for i in indices}
+        targets = {chinese_display_name(self.entries[i]['target']) for i in indices}
         full_names = {self.entries[i].get('identity_group', name)
                       for i in indices for name in self.full_names[i]
                       if key in initials_keys(name)} if abbreviated else set()

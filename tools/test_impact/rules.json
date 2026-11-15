@@ -1885,6 +1885,12 @@
       "module:stable.test_race_information_display",
       "module:stable.test_race_information_display_pages",
       "module:stable.test_public_term_consistency"
+    ],
+    "server/stable/data/hkjc_name_catalog_20261115.json": [
+      "module:stable.test_hkjc_name_catalog"
+    ],
+    "docs/changes/p04-1-race-name-matching/ci-scope.json": [
+      "infrastructure"
     ]
   },
   "symbols": {
@@ -2126,6 +2132,7 @@
     "docs/changes/uk-race-automation/transport-ci-scope.json",
     "docs/changes/five-region-race-governance/ci-scope.json",
     "docs/changes/collection-recovery-arc/display-ci-scope.json",
-    "docs/changes/p01-main-integration-20261114/ci-scope.json"
+    "docs/changes/p01-main-integration-20261114/ci-scope.json",
+    "docs/changes/p04-1-race-name-matching/ci-scope.json"
   ]
 }
