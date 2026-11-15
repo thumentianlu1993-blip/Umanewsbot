@@ -265,6 +265,27 @@ class PilotCompactWorkflow(ContextWorkflowFixture, TransactionTestCase):
         with patch('stable.services.news_publication._validated_attempt',side_effect=without_language):
             with self.assertRaises(ContentBlocked):check_publication_evidence(self.run)
 
+    def test_configured_deep_audit_replays_and_rejects_downgrade(self):
+        from stable.services.news_publication import validate_context_chain
+        policy=deepcopy(settings.NEWS_QUALITY_POLICY);policy['audit_min_profile']='deep'
+        with self.settings(NEWS_QUALITY_POLICY=policy):
+            self.run=start_revision(self.article)
+            self.finish();self.assert_replay()
+            audit=self.run.attempts.get(stage='fact_audit')
+            self.assertEqual(audit.usage['price']['profile'],'deep')
+            lower=SimpleNamespace(pk=audit.pk,usage={'price':{'profile':'base'}})
+            with self.assertRaisesRegex(ContentBlocked,'deep_audit_missing'):
+                validate_context_chain(self.run,lower)
+
+    def test_configured_deep_uncertain_does_not_add_another_request(self):
+        policy=deepcopy(settings.NEWS_QUALITY_POLICY);policy['audit_min_profile']='deep'
+        with self.settings(NEWS_QUALITY_POLICY=policy):
+            self.first_uncertain=True
+            self.run=start_revision(self.article);self.finish()
+            self.assertEqual(self.run.state,'review')
+            self.assertEqual(self.run.reason,'deep_uncertain')
+            self.assertEqual(self.audit_count,1)
+
 class PilotEditorialProfileTests(SimpleTestCase):
     def test_v3_editorial_uses_existing_deep_profile_without_changing_v2(self):
         from stable.services.news_pipeline import required_profile
@@ -549,3 +570,17 @@ class StageBoundaryTests(SimpleTestCase):
             self.assertEqual(json.loads(messages[1]['content'])['response_fields'],fields)
             self.assertIn('顶层字段严格等于response_fields',messages[0]['content'])
             self.assertNotIn('无歧义decisions为空',messages[0]['content'])
+
+    def test_audit_minimum_profile_is_validated_and_cannot_reduce_risk(self):
+        from stable.services.news_pipeline import required_profile
+        run=SimpleNamespace(stage='fact_audit',clean_snapshot=clean('A report.'),editorial_snapshot={},quality_snapshot={})
+        for minimum,expected in [('base','base'),('deep','deep')]:
+            with override_settings(NEWS_QUALITY_POLICY={'contract_version':'context-v3','audit_min_profile':minimum}):
+                self.assertEqual(required_profile(run),expected)
+        with override_settings(NEWS_QUALITY_POLICY={'contract_version':'context-v3','audit_min_profile':'invalid'}),self.assertRaises(ContentBlocked):
+            required_profile(run)
+        with override_settings(NEWS_QUALITY_POLICY={'contract_version':'context-v2','audit_min_profile':'deep'}):
+            self.assertEqual(required_profile(run),'base')
+        run.clean_snapshot=clean('A horse retired.')
+        with override_settings(NEWS_QUALITY_POLICY={'contract_version':'context-v3','audit_min_profile':'base'}):
+            self.assertEqual(required_profile(run),'deep')

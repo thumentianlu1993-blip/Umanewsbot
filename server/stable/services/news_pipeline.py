@@ -594,12 +594,22 @@ def risk_reasons(run):
     return reasons
 
 
+def minimum_audit_profile():
+    if context_contract_version() != 'context-v3':
+        return 'base'
+    value = getattr(settings, 'NEWS_QUALITY_POLICY', {}).get('audit_min_profile', 'base')
+    if value not in ('base', 'deep'):
+        from stable.services.news_content import ContentBlocked
+        raise ContentBlocked('audit_min_profile_invalid')
+    return value
+
+
 def required_profile(run):
     if context_contract_version() == "context-v3" and run.stage == "event_classify":
         return "deep"
     if not context_enabled() or run.stage != "fact_audit":
         return "base"
-    return "deep" if risk_reasons(run) or run.quality_snapshot.get("deep_required") else "base"
+    return "deep" if minimum_audit_profile() == 'deep' or risk_reasons(run) or run.quality_snapshot.get("deep_required") else "base"
 
 
 def body_context_source(clean):

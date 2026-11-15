@@ -329,7 +329,7 @@ def validate_translation_glossary(run, payload):
 
 
 def validate_context_chain(run, audit):
-    from stable.services.news_pipeline import risk_reasons, context_contract_version
+    from stable.services.news_pipeline import risk_reasons, context_contract_version, minimum_audit_profile
     from stable.services.news_translation_quality import audit_target_from_payload, validate_audit_payload
     from stable.services.news_content import (restore_translation, merge_translation_patch, hard_translation_checks,
         stable_source, protect_source, translation_repair_ids)
@@ -337,7 +337,7 @@ def validate_context_chain(run, audit):
     currency = getattr(settings, "NEWS_QUALITY_POLICY", {}).get("currency")
     if NewsModelBudget.objects.filter(currency=currency, state__in=["blocked_unknown", "blocked_overage"]).exists():
         raise ContentBlocked("budget_unreconciled")
-    deep_required = bool(risk_reasons(run))
+    deep_required = minimum_audit_profile() == 'deep' or bool(risk_reasons(run))
     # 路由证据从原始已核回执重建；不能只信quality里的deep标记。
     for previous in run.attempts.filter(stage="fact_audit", state="completed").exclude(pk=audit.pk):
         previous = _validated_attempt(run, previous.pk, "fact_audit")
