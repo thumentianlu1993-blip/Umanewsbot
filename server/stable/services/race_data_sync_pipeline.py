@@ -360,15 +360,17 @@ def reserve_race_data_transport_capacity(
                 usage_date=now.date(),
             )
         )
+        from .race_priority import priority_transport_active
+        priority = priority_transport_active(provider=provider, region=region_code)
         if (
-            ledger.request_count + proposed_requests
+            not priority and ledger.request_count + proposed_requests
             > limits.provider_region_daily_requests
         ):
             return RaceDataSyncCapacityDecision(
                 False, "artifact_daily_requests_exceeded"
             )
         if (
-            ledger.budgeted_response_bytes + proposed_bytes
+            not priority and ledger.budgeted_response_bytes + proposed_bytes
             > limits.provider_region_daily_bytes
         ):
             return RaceDataSyncCapacityDecision(

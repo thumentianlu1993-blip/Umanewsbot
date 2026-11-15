@@ -31,7 +31,8 @@
     "docs/changes/hkjc-horse-name-display/impact_summary.json",
     "docs/changes/p01-news-quality-20261027/*.json",
     "docs/changes/p01-annotation-driven-translation-20261114/*.json",
-    "docs/changes/p01-main-integration-20261114/ci-scope.json"
+    "docs/changes/p01-main-integration-20261114/ci-scope.json",
+    "docs/changes/race-priority-lifecycle-20261115/ci-scope.json"
   ],
   "high_risk": [
     ".codex/agents/application.toml",
@@ -995,7 +996,8 @@
     "docs/changes/term-display-sql-20261103/release-manifest.json",
     "server/stable/migrations/0086_p01_news_quality.py",
     "server/stable/migrations/0087_p01_immutable_publication.py",
-    "server/stable/migrations/0088_p01_sealed_evidence.py"
+    "server/stable/migrations/0088_p01_sealed_evidence.py",
+    "deploy/docker/start-race-priority-worker.sh"
   ],
   "paths": {
     "docs/changes/next-version-capabilities/lanes/C/U01-offline-cases.json": [
@@ -1891,6 +1893,9 @@
     ],
     "docs/changes/p04-1-race-name-matching/ci-scope.json": [
       "infrastructure"
+    ],
+    "server/stable/services/race_priority.py": [
+      "race_priority_lifecycle"
     ]
   },
   "symbols": {
@@ -2103,6 +2108,9 @@
       ],
       "legacy_public_article_detail": [
         "news_quality"
+      ],
+      "_with_winner_evidence": [
+        "race_priority_lifecycle"
       ]
     }
   },
@@ -2133,6 +2141,7 @@
     "docs/changes/five-region-race-governance/ci-scope.json",
     "docs/changes/collection-recovery-arc/display-ci-scope.json",
     "docs/changes/p01-main-integration-20261114/ci-scope.json",
-    "docs/changes/p04-1-race-name-matching/ci-scope.json"
+    "docs/changes/p04-1-race-name-matching/ci-scope.json",
+    "docs/changes/race-priority-lifecycle-20261115/ci-scope.json"
   ]
 }

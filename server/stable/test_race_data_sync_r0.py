@@ -350,7 +350,7 @@ class RaceDataSyncR0FlagContractTests(SimpleTestCase):
         )
         self.assertEqual(
             schedule["select-due-race-data-sync"]["options"]["queue"],
-            "celery",
+            "race_control",
         )
         self.assertEqual(
             schedule["discover-future-race-data-sync"]["options"]["queue"],
@@ -358,11 +358,11 @@ class RaceDataSyncR0FlagContractTests(SimpleTestCase):
         )
         self.assertEqual(
             schedule["advance-race-data-sync-lifecycle"]["options"]["queue"],
-            "celery",
+            "race_control",
         )
         self.assertEqual(
             schedule["monitor-race-data-sync-result-slo"]["options"]["queue"],
-            "celery",
+            "race_control",
         )
         self.assertEqual(
             schedule["cleanup-race-data-sync-artifacts"]["options"]["queue"],
@@ -2536,7 +2536,7 @@ class RaceDataSyncWorkerReleaseContractTests(SimpleTestCase):
             self.assertIn("RACE_DATA_SYNC_WORKER_CPUS", compose, compose_name)
             self.assertIn("RACE_DATA_SYNC_WORKER_MEMORY_LIMIT", compose, compose_name)
             service = re.search(
-                r"(?ms)^  race_sync_v2_worker:\n(.*?)(?=^  [a-zA-Z0-9_-]+:\n|\Z)",
+                r"(?ms)^  race_sync_v2_worker:(?: &[^\n]+)?\n(.*?)(?=^  [a-zA-Z0-9_-]+:\n|\Z)",
                 compose,
             )
             self.assertIsNotNone(service, compose_name)

@@ -186,7 +186,7 @@ def fetch_payload(*,event,route,now,fetcher=None):
     if raw.get('race_status')=='result':
         body,doc=_request(api_url('result',race_id=raw['race_id']),route=route,now=now,fetcher=fetcher)
         if body.get('_not_found'):raise ValueError('uk_result_not_published')
-        value=parse_result(body,card=raw);documents.append(doc)
+        value=parse_result(body,card=raw,allow_partial=True);documents.append(doc)
         if value['gaps']:
             value,supplement=_sl_numbers(value,route=route,now=now,fetcher=fetcher);documents.extend(supplement)
     if raw.get('race_status')=='declared':value=_retained_numbers(value,event=event,route=route)

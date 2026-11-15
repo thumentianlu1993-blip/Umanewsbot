@@ -1,0 +1,376 @@
+{
+  "schema_version": 1,
+  "base_sha": "633f80ce4ffc4a5ee0361bbef7bf6805f6ab313c",
+  "reason": "本包修改赛事控制/取数队列、内部容量准入、冠军驱动完赛、部分赛果及公开状态、同源用时补齐和发布服务合同。覆盖完整受影响生命周期/多来源/结果/队列、日英法港美源回归、三种部署与恢复、PostgreSQL并发、新闻计划、公开页面和选测基础设施；未改变新闻翻译、马匹履历、研究等无关业务。规则增量只登记新模块及本次精确SHA范围，未削弱通用高风险判定。",
+  "domains": [
+    "race_priority_lifecycle",
+    "japan_race_automation",
+    "france_race_automation",
+    "uk_race_automation",
+    "us_source_collection",
+    "hkjc_source_acceptance",
+    "infrastructure"
+  ],
+  "changes": [
+    {
+      "path": "deploy/docker/start-race-priority-worker.sh",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "98985af364bbfffcddb75a9ad5f8885759f159fd76ce17ede2d33763f73f89f9",
+      "before_mode": null,
+      "after_mode": "100755"
+    },
+    {
+      "path": "deploy/manual_release.sh",
+      "status": "modified",
+      "before_hash": "985d50d03cc81bff62f3110c79939600076ba08ce3018b050350cf1641828ec1",
+      "after_hash": "98e45ea6b0341edc503b4315ee9cc6582cb510dff3fd957417105aa3ae9afc1f",
+      "before_mode": "100755",
+      "after_mode": "100755"
+    },
+    {
+      "path": "deploy/release_0078.py",
+      "status": "modified",
+      "before_hash": "d6fc19799a62959abae72fbcb47ce06d0c92d8b87a5c6c090ca58d1658a22910",
+      "after_hash": "c3d514e6b45e8dc60686139a0b0e826df5d69d071c577660954961c41ebca119",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "deploy/release_0079.py",
+      "status": "modified",
+      "before_hash": "6e27d52bd5e0d3959268e297fc3efa4bf086c2c58749acbc3d3f3fc0430e63ec",
+      "after_hash": "a1e9a565981627a542b0f546a7e7a40010d851f05ecd995cf6861bde2349871a",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "deploy/resume_stopped_release.sh",
+      "status": "modified",
+      "before_hash": "a2140cdefbb36e5cade5797a8b87002f39ca2c513064c4958fb242afd2b71921",
+      "after_hash": "905780600101a63d5a237d4fe8c4d463e70cae790474f492dbb51534ef06f569",
+      "before_mode": "100755",
+      "after_mode": "100755"
+    },
+    {
+      "path": "deploy/run_application_release.sh",
+      "status": "modified",
+      "before_hash": "c21b091d2c521daa83a7b7de3aa554b91b07d1caac1cbc8ef47265af138a2ac2",
+      "after_hash": "1e5cc55b94447dd945dd85d0c3a0d80453e6b839f529c361a778426347f01e3d",
+      "before_mode": "100755",
+      "after_mode": "100755"
+    },
+    {
+      "path": "docker-compose.prod.lowcost.yml",
+      "status": "modified",
+      "before_hash": "0fb387de1c2794d4fbf79727fda26eabf144c3f7a9350dafe801ad3aff7b414b",
+      "after_hash": "3c425d142ce4ba169021c637bda4d7235658f709c05733a5090b3e4cbc8c1ba6",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docker-compose.prod.yml",
+      "status": "modified",
+      "before_hash": "817048f093abc3a80e96b7e88e1d6cbf885bbe9b226983d9bbc35cecb2eed0e5",
+      "after_hash": "f2f28e26dd91b853f57d1f53e712814435f67634b2e52c7257b4520939a73f53",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docker-compose.yml",
+      "status": "modified",
+      "before_hash": "b4276e36444b2d62474fef066d4722774d81cff6481a0d6c000b9d760e327d70",
+      "after_hash": "c4809446b700da0b8144c0cf9aa2b42c50f8d49453d9bb482ddf05fd1fc48591",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/race-priority-lifecycle-20261115/design.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "f22f02265ffec1ced551f995d60b8ac4dde4ff8a7b198dce1cbe32c890b0f378",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/race-priority-lifecycle-20261115/diagnosis.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "f51287c6baeb06e4081cebce75961620df607783c20f722d4ab588ad30138211",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/race-priority-lifecycle-20261115/rollout.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "125acc2be59b5adcb570aaf6ebc56ef748f53ba7d5f0599630e8f33a6238916a",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/race-priority-lifecycle-20261115/spec.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "6988657ddb2ffda61b2012ba483b070b6791d4084722140f837b6bf4c1d0e82c",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/race-priority-lifecycle-20261115/tasks.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "c53511c1cdbba8a8cc509705fa45818b20a7340b423a6e842c30cc2d809c80c9",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/race-priority-lifecycle-20261115/test_cases.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "439b2dbb5c9ffde998061e88aac9099b5597ea5636df6ddf463ed4261b773377",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/app/settings.py",
+      "status": "modified",
+      "before_hash": "652a287780d9f784456793b847600cdca98753436e074f918ee55d29d4d0737d",
+      "after_hash": "3c63515db8d05934ba7d9725d72de99e9a45deebdc2f7813a6fdcda4e2d929ac",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/france_sources.py",
+      "status": "modified",
+      "before_hash": "501bec7ed3067f9c5abe82f4461187b7700141cd226638fc296cac9a79298e7c",
+      "after_hash": "5af1aa35190fbb30da4188cf7e23a5e4d05743d2fb9994517ef27e908c96557b",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_source_adapters.py",
+      "status": "modified",
+      "before_hash": "c0a72569ce2c9bd7c4cf6d1d907b9cb5006a9a93af7a49db137b43038f148577",
+      "after_hash": "8c604f157e75d7c9ee4dc30302eb5e2ded7275ac521663a8436594e80533e5ae",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_control.py",
+      "status": "modified",
+      "before_hash": "eb0752edbe3c463dfa8577e5232d2debdd47ee6fdf9f583e13d7e48b473ecc6b",
+      "after_hash": "c91eaa4ec6aed1f2092a5a87f3babb39b60c457242b74f87d1dcf87d3d9ad7b1",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_lifecycle.py",
+      "status": "modified",
+      "before_hash": "0dcd291e4d4e324f394e76ea250348891247f5506afad1d9158d72dc2d2b9819",
+      "after_hash": "afb245bbbdf17eb37d0c4fd547476f12a7cbea491a280a3e446fc92abc858738",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_pipeline.py",
+      "status": "modified",
+      "before_hash": "e9e5fb03545e20ab9db7399f196d3ab832339ea24d92a184a71f4f74ba419388",
+      "after_hash": "851de7902a974d1938d5a75a6fb66d2bbf3cb996f61739e94843de647082f7fa",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_results.py",
+      "status": "modified",
+      "before_hash": "95ae07f1f59fa78d909aef08951d4eccace15d089ec72573f7b73eb23cb7b1ea",
+      "after_hash": "7f37b7f74cb1e74b541edbdad93ad23ef5563f7784a74b15d0c4f2eb446a3186",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_event_lifecycle.py",
+      "status": "modified",
+      "before_hash": "ddee3abf605641edb51a9924eeeb136e9d38047a9fffb2f3f06adfe931e557ef",
+      "after_hash": "9e3eeb51cac474d0775d9e91091e7e8cf914be40875575fb4b5c82419759c133",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_priority.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "6d9513d3bb75a4e728482ebf29fb8b55af21137cead612a2852b315cafff3dd3",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/release_0078_recovery.py",
+      "status": "modified",
+      "before_hash": "e142ce64b99d320f7992c0c572632a74eaf92df81db99ac84950cce4978f29da",
+      "after_hash": "338ddb9e95986905bca8d4a41a0537e724b1e6a5e9ec7a004574d8ec341ec15c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/release_0079_recovery.py",
+      "status": "modified",
+      "before_hash": "11acc44b154d72741ed2c61cc75d045a19438aa027f78dee8cf172cdfc080b35",
+      "after_hash": "9177ecee489d48a5f87f209aedf8e4a98a6b7fb502e7c02dcd5b6edead99c0ad",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/uk_collection.py",
+      "status": "modified",
+      "before_hash": "be1cdd915bac19132e1239f9a9a16cbbcf59f36955406d951222e5fd4777e515",
+      "after_hash": "f56daafca8d6f236c3ab7dfe60ab9d2317cae595bd6fdd4eeba9f7e50cbdbbf4",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/uk_race_source.py",
+      "status": "modified",
+      "before_hash": "bc5d4f8b845c86c8641ba39454c1f969b865a1498160464f12cefac280142b22",
+      "after_hash": "b9315534751cc9d89a8d5fd3a074fcf088030556135c3ca02a34ad83f7966fb0",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/uk_sources.py",
+      "status": "modified",
+      "before_hash": "074b48946d3dbce55dccd0ab4ea711373a48531fe31c0a5448168e177a757062",
+      "after_hash": "d788175042b69b55acbf73f4f7eedd57ebee13cb44844aca765805b1e29ed45b",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/tasks.py",
+      "status": "modified",
+      "before_hash": "58ca82102359b560fe5255afb45f1d853a6d3052e6f9a0ea951cdcd83ce7b2a8",
+      "after_hash": "00934ce3fedcfa4cd803b38787609d1e7a1d887e02ea0826f4eda49af0ea7af4",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_race_data_sync_lifecycle.py",
+      "status": "modified",
+      "before_hash": "20c57c2fe7c340dff6b304ba7baef3051440d589ff3d44220828975db7790b60",
+      "after_hash": "724560f528de244ff01d29169b6e964c8d433d040486cf124f7c86ce50ca5c96",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_race_data_sync_lifecycle_advance.py",
+      "status": "modified",
+      "before_hash": "28384758d824b7e272d1ed534f2a3ce790f2d894474dab34246b38c5a00b2ac5",
+      "after_hash": "c950878c3a10c3c03c1b5b0caf7819beb9241efbdfcaebabe99497a407c46b7c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_race_data_sync_r0.py",
+      "status": "modified",
+      "before_hash": "e697668eca3fe71f046d35b209b60317ff0cfb71a95200847ca174e0618e2dd5",
+      "after_hash": "3479ff55a6a8d7668e5da61dc863f20b625665c63a94c712321d174b425d7d1a",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_race_data_sync_results.py",
+      "status": "modified",
+      "before_hash": "ae55e14e835f1cd75ee7d78b1936b71fada86f25833414ff307c307dda3f9adb",
+      "after_hash": "aff985f33f27f5eeac3d26e3235c78402f505ef225f56c68bde31757b3d53b35",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_race_event_lifecycle.py",
+      "status": "modified",
+      "before_hash": "8258d0ef7e1987b6c13ec6a865cdb47a71a7d4dea8b51873bc222a559a38f578",
+      "after_hash": "c98b1cef5323c6975f6398472e29095c06e146f371aeccdfb9c7a15cf141174a",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_race_multisource_jra.py",
+      "status": "modified",
+      "before_hash": "6f26f0d1b0a453633e697741f083b0b546a2424b678b64638842b2921bcd9e98",
+      "after_hash": "18c55c8aaef83a44c3e17eb978a5b97ee3a179bb4a860f852ade69c7df6b623a",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_race_priority_lifecycle.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "848507858ace25de3582ea3b58aacfa1bc4807667002842c5a8f4da9023f65ba",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_release_0078_entrypoints.py",
+      "status": "modified",
+      "before_hash": "34a59fa884fb72b811bf7cc2d807cb2cf3f31615ad0507e12285944098fa7bf8",
+      "after_hash": "9566740b8d077560d1ccdfc9db90a172439616972eeeb0c9aa237b953cce66d5",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_release_0078_recovery.py",
+      "status": "modified",
+      "before_hash": "d2d9a7396a6a9834d48c2aa911129e0a9de2611ef2e4da9fa64a33969aa1dc94",
+      "after_hash": "5221532abaa106b44d359c1970bb6704d88bfe0d5009a5e0282911a3229d0169",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_single_migration_owner.py",
+      "status": "modified",
+      "before_hash": "54f5d490d127ae196c7ab4584bba94a39bc964051350a219c73d51b2ce66aec3",
+      "after_hash": "c5a740477aafdf342c0c5a273ed9d51db7ae9e9f9bda142d2685cb9c139f7509",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_uk_sources.py",
+      "status": "modified",
+      "before_hash": "f6a4993da0d50371f24e3d6e04ca75c4499b87372dd2268f549b740476e56422",
+      "after_hash": "9e264a4c24daa084b6b77815e2b8187d829e74fa9ea7e886c6d683325a18ff9c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/tests_legacy.py",
+      "status": "modified",
+      "before_hash": "20d44c0613b585dbe722b456eb2e4d036fdf79690df5f51e4533b3d33241f093",
+      "after_hash": "4f64d4035ec143b750404e97ba002c51a0cb45d40c41a7958d65c86d0a00d17b",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/views.py",
+      "status": "modified",
+      "before_hash": "757e3c76eb653ef02c1a376d8c97def150de5b1c4a5dbe016e5999dd2646d2b1",
+      "after_hash": "0a4cddb7aac6358fff4303bb4f016456a8c38c3e46349b65f532b7fffaea64cd",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/catalog.json",
+      "status": "modified",
+      "before_hash": "4124c1fce9c6a4d7d9c41775de1b437f69d2ab033842e0cbe642e2680f57db23",
+      "after_hash": "c4cdb3c8dc269b7963e89b630551d0e76bc9cb0a88ba17907aaaa0e630ea8712",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "3d743bde8145a4894fb551f5663cd5e1cf55f548642baae84eab65a5d21500f4",
+      "after_hash": "30bc2a73f9d5fe1f2e03480784732e3b15ddf47216d055e059c28a8a33bd1ac1",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}

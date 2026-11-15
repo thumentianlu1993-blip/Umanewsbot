@@ -127,48 +127,21 @@ class RaceDataSyncLifecycleTests(TestCase):
             frozen_snapshot={},
         )
 
-    def test_time_rules_move_scheduled_to_running_then_finished(self):
-        first = advance_due_data_sync_lifecycle(
-            now=NOW + timedelta(minutes=1),
-            batch_size=10,
-        )
+    def test_time_starts_event_but_keeps_polling_until_winner(self):
+        first = advance_due_data_sync_lifecycle(now=NOW + timedelta(minutes=1), batch_size=10)
         self.assertEqual(first["transitioned"], 1)
         self.event.refresh_from_db()
-        self.lifecycle.refresh_from_db()
         self.assertEqual(self.event.status, models.RaceEventStatus.RUNNING)
-        self.assertEqual(
-            self.lifecycle.next_refresh_at,
-            self.event.race_datetime + timedelta(minutes=30),
-        )
-
-        second = advance_due_data_sync_lifecycle(
-            now=NOW + timedelta(minutes=31),
-            batch_size=10,
-        )
-        self.assertEqual(second["transitioned"], 1)
-        self.event.refresh_from_db()
-        self.lifecycle.refresh_from_db()
-        self.assertEqual(self.event.status, models.RaceEventStatus.FINISHED)
-        self.assertIsNone(self.lifecycle.next_refresh_at)
-        tracking = models.RaceEventLiveTracking.objects.get(event=self.event)
-        self.assertEqual(tracking.state, models.RaceEventLiveState.AWAITING_RESULT)
-        self.assertEqual(
-            list(
-                models.RaceEventLifecycleTransition.objects.filter(
-                    event=self.event
-                ).values_list("to_status", flat=True)
-            ),
-            [models.RaceEventStatus.RUNNING, models.RaceEventStatus.FINISHED],
-        )
-
-        last_attempt_at = self.lifecycle.last_attempt_at
-        third = advance_due_data_sync_lifecycle(
-            now=NOW + timedelta(minutes=32),
-            batch_size=10,
-        )
-        self.lifecycle.refresh_from_db()
-        self.assertEqual(third["selected"], 0)
-        self.assertEqual(self.lifecycle.last_attempt_at, last_attempt_at)
+        for minute in (31, 32, 60):
+            at = NOW + timedelta(minutes=minute)
+            again = advance_due_data_sync_lifecycle(now=at, batch_size=10)
+            self.assertEqual(again["transitioned"], 0)
+            self.event.refresh_from_db()
+            self.lifecycle.refresh_from_db()
+            self.assertEqual(self.event.status, models.RaceEventStatus.RUNNING)
+            self.assertGreater(self.lifecycle.next_refresh_at, at)
+        self.assertEqual(list(models.RaceEventLifecycleTransition.objects.filter(
+            event=self.event).values_list("to_status", flat=True)), [models.RaceEventStatus.RUNNING])
 
     def test_dry_run_is_zero_write(self):
         result = advance_due_data_sync_lifecycle(

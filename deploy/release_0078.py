@@ -317,7 +317,7 @@ def finish(env, intent_path, intent, receipt):
     for service, current in current_services.items():
         verify_service_image(service, current, env)
         verify_service_flags(service, current, env, manifest["writer_flags"])
-    for service in ("web", "worker", "race_sync_v2_worker", "race_live_worker", "beat", "nginx"):
+    for service in ("web", "worker", "race_sync_v2_worker", "race_control_worker", "race_realtime_worker", "race_live_worker", "beat", "nginx"):
         current = current_services[service]
         if not restore[service]:
             if current["running"]:
@@ -384,10 +384,10 @@ def release(env, *, resume=False):
         current = {service: probe(service, env) for service in contract.SERVICES}
         if current["beat"]["running"]:
             compose(["stop", "beat"], env)
-        nodes = [current[service]["node"] for service in ("worker", "race_live_worker", "race_sync_v2_worker") if current[service]["running"]]
+        nodes = [current[service]["node"] for service in ("worker", "race_live_worker", "race_sync_v2_worker", "race_control_worker", "race_realtime_worker") if current[service]["running"]]
         if nodes:
             run([ROOT / "deploy/wait_for_celery_drain.sh"], env={**env, "EXPECTED_CELERY_WORKERS": " ".join(nodes)})
-        for service in ("worker", "race_live_worker", "race_sync_v2_worker", "web"):
+        for service in ("worker", "race_live_worker", "race_sync_v2_worker", "race_control_worker", "race_realtime_worker", "web"):
             if probe(service, env)["running"]:
                 compose(["stop", service], env)
         if any(probe(service, env)["running"] for service in contract.SERVICES if service != "nginx"):

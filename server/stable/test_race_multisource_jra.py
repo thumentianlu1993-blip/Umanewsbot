@@ -240,6 +240,23 @@ class JraColdStartTests(TestCase):
         self.assertFalse(result["processed"], result)
         self.assertEqual(self.event.runners.count(), 0)
         self.assertEqual(self.event.results.count(), 0)
+        self.event.refresh_from_db()
+        self.assertEqual(self.event.status, "finished")
+        self.assertIsNone(self.event.result_confirmed_at)
+        self.assertLessEqual(self.event.live_tracking.next_poll_at, NOW + timedelta(minutes=1))
+
+    def test_winner_with_pending_other_positions_advances_state_only(self):
+        from bs4 import BeautifulSoup
+        self.enroll()
+        soup = BeautifulSoup(self.result, "html.parser")
+        soup.select("tbody > tr")[-1].select_one("td.place").string = ""
+        self.result = str(soup)
+        result = run_multisource_claim(claim=self.claim(), now=NOW, fetcher=self.fetch)
+        self.assertFalse(result["processed"])
+        self.event.refresh_from_db()
+        self.assertEqual(self.event.status, "finished")
+        self.assertIsNone(self.event.result_confirmed_at)
+        self.assertEqual(self.event.results.count(), 0)
 
     def test_explicit_source_block_hides_published_result(self):
         from stable.services.race_events import resolve_race_live_public_read

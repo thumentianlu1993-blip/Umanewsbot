@@ -19,7 +19,7 @@ MARKER_SCHEMA = "multisource-release-restricted-recovery/v1"
 MIGRATION_CONTRACT_SHA256 = (
     "ecf3a74cb2706dea1ac059473017debc4cdda8f4b82fcc768182003a81b5870a"
 )
-SERVICES = ("web", "worker", "beat", "race_live_worker", "race_sync_v2_worker", "nginx")
+SERVICES = ("web", "worker", "beat", "race_live_worker", "race_sync_v2_worker", "race_control_worker", "race_realtime_worker", "nginx")
 WRITER_FLAGS = (
     "RACE_LIVE_SCHEDULER_ENABLED",
     "RACE_LIVE_MONITOR_ENABLED",

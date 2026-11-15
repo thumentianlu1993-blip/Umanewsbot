@@ -211,7 +211,7 @@ class RaceDataSyncResultApplicationTests(TestCase):
         payload = {
             "external_race_id": source.external_race_id,
             "off_time": self.event.race_datetime.isoformat(),
-            "region": "japan_jra",
+            "region": source.region_code,
             "course": "Tokyo",
             "race_name": "Data Sync Result",
             "race_status": race_status,
@@ -371,6 +371,95 @@ class RaceDataSyncResultApplicationTests(TestCase):
             },
         ]
 
+    def test_winner_only_finishes_without_publishing_or_confirming_complete_result(self):
+        observation = self._observation(self.source, "licensed_api", self._rows()[:1],
+                                        result_phase=models.RaceResultPhase.PROVISIONAL)
+        apply_data_sync_result_observation(
+            observation_id=observation.pk, expected_event_id=self.event.pk,
+            now=NOW, project_current=True, correction_apply_enabled=True,
+        )
+        self.event.refresh_from_db()
+        self.control.refresh_from_db()
+        self.assertEqual(self.event.status, models.RaceEventStatus.FINISHED)
+        self.assertIsNone(self.event.result_confirmed_at)
+        self.assertIsNone(self.control.current_result_revision_id)
+        self.assertFalse(models.RaceEventResult.objects.exists())
+        self.assertTrue(models.RaceEventLifecycleTransition.objects.filter(
+            event=self.event, reason_code="data_sync_winner_observed").exists())
+        from stable.views import _with_winner_evidence, _public_race_status_label
+        public_event = _with_winner_evidence(models.RaceEvent.objects.filter(pk=self.event.pk)).get()
+        self.assertEqual(_public_race_status_label(public_event, NOW.date(), now=NOW), "已完赛")
+
+    @override_settings(RACE_DATA_RAW_DAILY_PROVIDER_REGION_REQUESTS=1,
+                       RACE_DATA_RAW_DAILY_PROVIDER_REGION_BYTES=1,
+                       RACE_DATA_RAW_MAX_COMPRESSED_BYTES=2*1024**2,
+                       RACE_DATA_RAW_MAX_UNCOMPRESSED_BYTES=8*1024**2,
+                       RACE_DATA_RAW_ROOT_HIGH_WATER_BYTES=1024**3,
+                       RACE_DATA_RAW_ROOT_LOW_WATER_BYTES=512*1024**2,
+                       RACE_DATA_RAW_MIN_FREE_DISK_BYTES=1, RACE_DATA_RAW_CLEANUP_MAX_ROWS=100,
+                       RACE_DATA_RAW_CLEANUP_MAX_BYTES=1024**2,
+                       RACE_DATA_RAW_HOLD_ALERT_BYTES=1024**3)
+    def test_verified_result_claim_bypasses_daily_budget_but_not_disk_protection(self):
+        from stable.services.race_priority import result_transport_scope
+        from stable.services.race_data_sync_pipeline import reserve_race_data_transport_capacity
+        claim = self._claim_guard()
+        models.RaceDataTransportCapacityLedger.objects.create(
+            provider=self.source.source_key, region_code=self.source.region_code,
+            usage_date=NOW.date(), request_count=1, budgeted_response_bytes=1,
+        )
+        def reserve():
+            return reserve_race_data_transport_capacity(
+                provider=self.source.source_key, region_code=self.source.region_code,
+                now=NOW, proposed_requests=1, max_response_bytes_per_request=1024,
+            )
+        with patch("django.utils.timezone.now", return_value=NOW), patch(
+            "stable.services.race_data_sync_pipeline.inspect_race_data_artifact_capacity",
+            return_value=(0, 100 * 1024**3),
+        ) as disk:
+            self.assertFalse(reserve().allowed)
+            with result_transport_scope(claim):
+                self.assertTrue(reserve().allowed)
+                disk.return_value = (0, 0)
+                self.assertEqual(reserve().reason_code, "artifact_min_free_disk")
+            disk.return_value = (0, 100 * 1024**3)
+            self.assertFalse(reserve().allowed)
+
+    def test_transport_metadata_does_not_create_result_correction(self):
+        rows = self._rows()
+        rows[0]["field_provenance"] = {"raw_sha256": "a" * 64, "observed_at": NOW.isoformat()}
+        first = self._observation(self.source, "licensed_api", rows)
+        original = apply_data_sync_result_observation(
+            observation_id=first.pk, expected_event_id=self.event.pk,
+            now=NOW, project_current=True, correction_apply_enabled=True,
+        )
+        rows = self._rows()
+        rows[0]["field_provenance"] = {"raw_sha256": "b" * 64, "observed_at": (NOW + timedelta(minutes=1)).isoformat()}
+        second = self._observation(self.source, "licensed_api", rows, observed_at=NOW + timedelta(minutes=1))
+        replay = apply_data_sync_result_observation(
+            observation_id=second.pk, expected_event_id=self.event.pk,
+            now=NOW + timedelta(minutes=1), project_current=True, correction_apply_enabled=True,
+        )
+        self.assertEqual(replay.action, "replayed")
+        self.assertEqual(replay.revision_id, original.revision_id)
+        self.assertEqual(models.RaceEventRevision.objects.filter(event=self.event, kind="result").count(), 1)
+
+    def test_same_source_can_fill_missing_time_but_cannot_change_existing_time(self):
+        for index, finish_time in enumerate(("", "1:30.1", "1:31.2")):
+            rows = self._rows()
+            rows[0]["finish_time"] = finish_time
+            observation = self._observation(self.source, "licensed_api", rows,
+                                            observed_at=NOW + timedelta(minutes=index))
+            decision = apply_data_sync_result_observation(
+                observation_id=observation.pk, expected_event_id=self.event.pk,
+                now=NOW + timedelta(minutes=index), project_current=True,
+                correction_apply_enabled=False,
+            )
+            if index < 2:
+                self.assertTrue(decision.projected, decision)
+            else:
+                self.assertFalse(decision.projected, decision)
+        self.assertEqual(self.event.results.get(reported_finish_position=1).finish_time, "1:30.1")
+
     def test_complete_result_projects_and_finishes_event_without_human_review(self):
         observation = self._observation(
             self.source, "licensed_api", self._rows()
@@ -398,7 +487,7 @@ class RaceDataSyncResultApplicationTests(TestCase):
         self.assertTrue(all(row.is_confirmed for row in results))
         self.assertEqual(
             models.RaceEventLifecycleTransition.objects.get().reason_code,
-            "data_sync_complete_result",
+            "data_sync_winner_observed",
         )
 
     def test_matching_shadow_revision_is_promoted_when_publication_opens(self):

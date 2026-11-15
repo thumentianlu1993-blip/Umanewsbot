@@ -27,6 +27,14 @@ def result():
 
 
 class UKSourceTests(TestCase):
+    def test_bound_result_can_keep_winner_before_other_finishers_arrive(self):
+        raw = result()
+        raw['runners'] = raw['runners'][:1]
+        parsed = parse_result(raw, card=card(), allow_partial=True)
+        self.assertFalse(parsed['roster_complete'])
+        self.assertEqual(parsed['result_phase'], 'provisional')
+        self.assertEqual(parsed['roster'][0]['reported_finish_position'], 1)
+
     def test_card_quotes_keep_bookmaker_and_do_not_replace_result_sp(self):
         raw=card();raw['runners'][0]['odds']=[{'bookmaker':'Other','decimal':'5.5'},
             {'bookmaker':'Bet365','decimal':'4.25','fractional':'13/4','updated':'2026-10-30 12:00:00'}]

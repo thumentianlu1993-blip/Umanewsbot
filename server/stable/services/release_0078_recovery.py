@@ -21,7 +21,7 @@ MANIFEST_SCHEMA = "release-0078-verified-backup-recovery/v1"
 INTENT_SCHEMA = "release-0078-prepared-intent/v1"
 MARKER_SCHEMA = "migration-history-repair-restricted-recovery/v3"
 MIGRATION_CONTRACT_SHA256 = "50c421f3167a8c2c8f1613a0597ad7ee196c249fc18bf7eed0de7b9cd2f80906"
-SERVICES = ("web", "worker", "beat", "race_live_worker", "race_sync_v2_worker", "nginx")
+SERVICES = ("web", "worker", "beat", "race_live_worker", "race_sync_v2_worker", "race_control_worker", "race_realtime_worker", "nginx")
 WRITER_FLAGS = (
     "RACE_LIVE_SCHEDULER_ENABLED", "RACE_LIVE_MONITOR_ENABLED",
     "RACE_DATA_SYNC_ENABLED", "RACE_DATA_SYNC_SCHEDULER_ENABLED",

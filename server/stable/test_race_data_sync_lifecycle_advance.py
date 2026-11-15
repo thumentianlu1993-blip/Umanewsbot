@@ -168,7 +168,7 @@ class DataSyncLifecycleAdvanceTests(TestCase):
         event.refresh_from_db()
         self.assertEqual(event.status, models.RaceEventStatus.RUNNING)
 
-    def test_advance_finishes_data_sync_event_after_t_plus_30(self):
+    def test_advance_waits_for_winner_after_t_plus_30(self):
         event = self._make_event(
             slug="advance-finish",
             race_datetime=NOW - timedelta(minutes=31),
@@ -179,11 +179,11 @@ class DataSyncLifecycleAdvanceTests(TestCase):
         stats = race_data_sync_lifecycle.advance_due_data_sync_lifecycle(now=NOW)
 
         self.assertEqual(stats["error"], 0, stats)
-        self.assertEqual(stats["transitioned"], 1, stats)
+        self.assertEqual(stats["transitioned"], 0, stats)
         event.refresh_from_db()
-        self.assertEqual(event.status, models.RaceEventStatus.FINISHED)
+        self.assertEqual(event.status, models.RaceEventStatus.RUNNING)
 
-    def test_advance_late_admission_finishes_scheduled_event_without_fake_running(self):
+    def test_advance_late_admission_starts_scheduled_event_only(self):
         event = self._make_event(
             slug="advance-late",
             race_datetime=NOW - timedelta(minutes=45),
@@ -195,16 +195,16 @@ class DataSyncLifecycleAdvanceTests(TestCase):
         self.assertEqual(stats["error"], 0, stats)
         self.assertEqual(stats["transitioned"], 1, stats)
         event.refresh_from_db()
-        self.assertEqual(event.status, models.RaceEventStatus.FINISHED)
+        self.assertEqual(event.status, models.RaceEventStatus.RUNNING)
         transitions = models.RaceEventLifecycleTransition.objects.filter(
             event=event
         )
         self.assertEqual(transitions.count(), 1)
-        self.assertNotEqual(
+        self.assertEqual(
             transitions.first().to_status, models.RaceEventStatus.RUNNING
         )
         self.assertEqual(
-            transitions.first().reason_code, "data_sync_late_admission_finish"
+            transitions.first().reason_code, "time_reached_race_datetime"
         )
 
     def test_advance_respects_manual_pause(self):

@@ -109,24 +109,26 @@ class RaceEventLifecycleDecisionTests(SimpleTestCase):
         self.assertEqual(decision.action, "transition")
         self.assertEqual(decision.to_status, "running")
 
-    def test_a03_t_plus_30_no_result_finishes(self):
+    def test_a03_t_plus_30_no_result_waits(self):
         race_dt = datetime(2026, 7, 1, 14, 30, 0, tzinfo=dt_timezone.utc)
         now = race_dt + timedelta(minutes=30)
         decision = race_event_lifecycle.decide_race_lifecycle(
             race_datetime=race_dt, timezone_name="Asia/Tokyo",
             status="running", now=now, region="japan",
         )
-        self.assertEqual(decision.action, "transition")
-        self.assertEqual(decision.to_status, "finished")
+        self.assertEqual(decision.action, "noop")
+        self.assertEqual(decision.to_status, "")
 
-    def test_a03_scheduled_past_t30_also_finishes(self):
+
+    def test_a03_scheduled_past_t30_starts_only(self):
         race_dt = datetime(2026, 7, 1, 14, 0, 0, tzinfo=dt_timezone.utc)
         now = race_dt + timedelta(minutes=30)
         decision = race_event_lifecycle.decide_race_lifecycle(
             race_datetime=race_dt, timezone_name="Asia/Tokyo",
             status="scheduled", now=now, region="japan",
         )
-        self.assertEqual(decision.to_status, "finished")
+        self.assertEqual(decision.to_status, "running")
+
 
     def test_a04_source_failure_does_not_block_time_transition(self):
         race_dt = datetime(2026, 7, 1, 14, 30, 0, tzinfo=dt_timezone.utc)
@@ -135,8 +137,9 @@ class RaceEventLifecycleDecisionTests(SimpleTestCase):
             race_datetime=race_dt, timezone_name="Asia/Tokyo",
             status="running", now=now, region="japan",
         )
-        self.assertEqual(decision.to_status, "finished")
+        self.assertEqual(decision.to_status, "")
         self.assertNotEqual(decision.action, "error")
+
 
     def test_a05_no_time_before_local_midnight_does_not_advance(self):
         now = datetime(2026, 7, 1, 14, 59, 0, tzinfo=dt_timezone.utc)
@@ -146,14 +149,15 @@ class RaceEventLifecycleDecisionTests(SimpleTestCase):
         )
         self.assertEqual(decision.action, "noop")
 
-    def test_a06_no_time_local_next_day_midnight_finishes(self):
+    def test_a06_no_time_local_next_day_midnight_waits(self):
         now = datetime(2026, 7, 1, 15, 0, 0, tzinfo=dt_timezone.utc)
         decision = race_event_lifecycle.decide_race_lifecycle(
             race_datetime=None, timezone_name="Asia/Tokyo",
             local_date=date(2026, 7, 1), status="scheduled", now=now, region="japan",
         )
-        self.assertEqual(decision.action, "transition")
-        self.assertEqual(decision.to_status, "finished")
+        self.assertEqual(decision.action, "noop")
+        self.assertEqual(decision.to_status, "")
+
 
     def test_a07_london_dst(self):
         race_dt = datetime(2026, 3, 28, 14, 0, 0, tzinfo=dt_timezone.utc)
@@ -162,7 +166,8 @@ class RaceEventLifecycleDecisionTests(SimpleTestCase):
             race_datetime=race_dt, timezone_name="Europe/London",
             status="running", now=now, region="united_kingdom",
         )
-        self.assertEqual(d.to_status, "finished")
+        self.assertEqual(d.to_status, "")
+
 
     def test_a08_paris_dst(self):
         race_dt = datetime(2026, 3, 28, 14, 0, 0, tzinfo=dt_timezone.utc)
@@ -171,7 +176,8 @@ class RaceEventLifecycleDecisionTests(SimpleTestCase):
             race_datetime=race_dt, timezone_name="Europe/Paris",
             status="running", now=now, region="france",
         )
-        self.assertEqual(d.to_status, "finished")
+        self.assertEqual(d.to_status, "")
+
 
     def test_a09_new_york_dst(self):
         race_dt = datetime(2026, 11, 1, 5, 30, 0, tzinfo=dt_timezone.utc)
@@ -180,7 +186,8 @@ class RaceEventLifecycleDecisionTests(SimpleTestCase):
             race_datetime=race_dt, timezone_name="America/New_York",
             status="running", now=now, region="united_states",
         )
-        self.assertEqual(d.to_status, "finished")
+        self.assertEqual(d.to_status, "")
+
 
     def test_a10_la_and_ny_same_instant(self):
         race_dt = datetime(2026, 7, 1, 22, 0, 0, tzinfo=dt_timezone.utc)
@@ -193,8 +200,9 @@ class RaceEventLifecycleDecisionTests(SimpleTestCase):
             race_datetime=race_dt, timezone_name="America/New_York",
             status="running", now=now, region="united_states",
         )
-        self.assertEqual(d_la.to_status, "finished")
-        self.assertEqual(d_ny.to_status, "finished")
+        self.assertEqual(d_la.to_status, "")
+        self.assertEqual(d_ny.to_status, "")
+
 
     def test_a11_japan_hk_no_dst(self):
         race_dt = datetime(2026, 7, 1, 6, 0, 0, tzinfo=dt_timezone.utc)
@@ -207,8 +215,9 @@ class RaceEventLifecycleDecisionTests(SimpleTestCase):
             race_datetime=race_dt, timezone_name="Asia/Hong_Kong",
             status="running", now=now, region="hong_kong",
         )
-        self.assertEqual(d_jp.to_status, "finished")
-        self.assertEqual(d_hk.to_status, "finished")
+        self.assertEqual(d_jp.to_status, "")
+        self.assertEqual(d_hk.to_status, "")
+
 
     def test_a12_invalid_timezone_errors(self):
         race_dt = datetime(2026, 7, 1, 6, 0, 0, tzinfo=dt_timezone.utc)
@@ -450,12 +459,13 @@ class RaceEventLifecycleModeTests(TestCase):
         result = _apply(event, now=now)
         self.assertIsNone(result.error)
         event.refresh_from_db()
-        self.assertEqual(event.status, "finished")
+        self.assertEqual(event.status, "running")
         self.assertTrue(
             stable_models.RaceEventLifecycleTransition.objects.filter(
                 event=event, record_kind="applied"
             ).exists()
         )
+
 
     def test_a22_transaction_integrity(self):
         event = _make_event(
@@ -469,13 +479,14 @@ class RaceEventLifecycleModeTests(TestCase):
         self.assertIsNone(result.error)
         self.assertEqual(result.action, "applied")
         event.refresh_from_db()
-        self.assertEqual(event.status, "finished")
+        self.assertEqual(event.status, "running")
         self.assertEqual(
             stable_models.RaceEventLifecycleTransition.objects.filter(
                 event=event, record_kind="applied"
             ).count(),
             1,
         )
+
 
     def test_global_shadow_caps_enforce_control(self):
         """P0 #3: global mode=shadow must cap control.mode=enforce to shadow."""
@@ -532,7 +543,8 @@ class RaceEventLifecycleModeTests(TestCase):
         self.assertIsNone(result.error, f"apply failed: {result.error}")
         self.assertEqual(result.action, "applied")
         event.refresh_from_db()
-        self.assertEqual(event.status, "finished")
+        self.assertEqual(event.status, "running")
+
 
 
 # ── A23-A24: result-phase coexistence ────────────────────────────────
@@ -549,7 +561,7 @@ class RaceEventLifecycleResultPhaseTests(TestCase):
         result = _apply(event, now=now)
         self.assertIn(result.action, ("noop", "already_finished"))
 
-    def test_a24_provisional_and_finished_coexist(self):
+    def test_a24_no_winner_stays_running(self):
         event = _make_event(
             slug="provisional", status="running",
             race_datetime=datetime(2026, 6, 1, 6, 0, 0, tzinfo=dt_timezone.utc),
@@ -559,8 +571,9 @@ class RaceEventLifecycleResultPhaseTests(TestCase):
         result = _apply(event, now=now)
         self.assertIsNone(result.error)
         event.refresh_from_db()
-        self.assertEqual(event.status, "finished")
+        self.assertEqual(event.status, "running")
         self.assertIsNone(event.result_confirmed_at)
+
 
 
 # ── A25-A28: enrollment manifest ─────────────────────────────────────
@@ -636,11 +649,12 @@ class RaceEventLifecycleShadowEnforceTests(TestCase):
 
         _apply(event, now=now, mode="enforce")
         event.refresh_from_db()
-        self.assertEqual(event.status, "finished")
+        self.assertEqual(event.status, "running")
         applied = stable_models.RaceEventLifecycleTransition.objects.filter(
             event=event, record_kind="applied"
         ).count()
         self.assertEqual(applied, 1)
+
 
     def test_a30_enforce_replay_no_duplicate_applied(self):
         event = _make_event(
@@ -703,7 +717,8 @@ class RaceEventLifecycleTimezoneContractTests(SimpleTestCase):
             status="running", now=now, region="united_states",
             allowed_us_zones=None,
         )
-        self.assertEqual(decision.to_status, "finished")
+        self.assertEqual(decision.to_status, "")
+
 
 
 # ── cache invalidation ───────────────────────────────────────────────
@@ -721,9 +736,10 @@ class RaceEventLifecycleCacheTests(TestCase):
         self.assertIsNone(result.error)
         self.assertEqual(result.action, "applied")
         event.refresh_from_db()
-        self.assertEqual(event.status, "finished")
+        self.assertEqual(event.status, "running")
         from stable.services.race_event_public_cache import invalidate_public_race_cache
         self.assertTrue(callable(invalidate_public_race_cache))
+
 
 
 # ── query-count bound ────────────────────────────────────────────────
@@ -775,7 +791,9 @@ class RaceEventLifecycleTaskRouteContractTests(SimpleTestCase):
         ]["queue"]
 
         self.assertEqual(worker_default_queue, "celery")
-        self.assertEqual(lifecycle_route, worker_default_queue)
+        self.assertEqual(lifecycle_route, "race_control")
+        self.assertNotEqual(lifecycle_route, worker_default_queue)
+
 
     def test_race_live_routes_remain_isolated(self):
         self.assertEqual(
@@ -1155,24 +1173,20 @@ class RaceEventLifecycleBackoffTests(TestCase):
         # Set next_refresh exactly at 'now' — the <= fix should still bump it
         ctrl = _make_control(event, mode="shadow", next_refresh_at=now)
 
-        # First shadow: creates proposal, recomputes next_refresh → None (finished)
+        # 首次 shadow 仅提出开赛建议，继续等待结果。
         _apply(event, now=now, mode="shadow")
         ctrl.refresh_from_db()
-        self.assertIsNone(ctrl.next_refresh_at,
-                          "finished→next_refresh_at should be None")
+        self.assertGreater(ctrl.next_refresh_at, now)
 
         # Re-set to exactly 'now' to simulate re-claim after operator re-enables
         ctrl.next_refresh_at = now
         ctrl.claim_token = ""
         ctrl.save()
 
-        # Second shadow: duplicate of running→finished → should set None (terminal)
+        # 重复开赛建议保持未来检查点。
         _apply(event, now=now, mode="shadow")
         ctrl.refresh_from_db()
-        self.assertIsNone(
-            ctrl.next_refresh_at,
-            "duplicate running→finished proposal should set next_refresh_at=None"
-        )
+        self.assertGreater(ctrl.next_refresh_at, now)
 
 # ── reconcile command integration tests ─────────────────────────────
 

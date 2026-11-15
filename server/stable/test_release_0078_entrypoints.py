@@ -27,7 +27,7 @@ TARGET = "stable.0078_externalhorse_profile_snapshot"
 COMMIT = "b" * 40
 IMAGE = "sha256:" + "c" * 64
 DB = "d" * 64
-SERVICES = ("web", "worker", "beat", "race_live_worker", "race_sync_v2_worker", "nginx")
+SERVICES = ("web", "worker", "beat", "race_live_worker", "race_sync_v2_worker", "race_control_worker", "race_realtime_worker", "nginx")
 WRITER_FLAGS = (
     "RACE_LIVE_SCHEDULER_ENABLED", "RACE_LIVE_MONITOR_ENABLED", "RACE_DATA_SYNC_ENABLED",
     "RACE_DATA_SYNC_SCHEDULER_ENABLED", "RACE_DATA_SYNC_ALLOW_NETWORK", "RACE_DATA_SYNC_FUTURE_DISCOVERY_ENABLED",
