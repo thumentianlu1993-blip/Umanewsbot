@@ -390,10 +390,6 @@ class FranceResultWorkflowTests(TestCase):
         self.assertEqual(resolve_race_live_public_reads(event_ids=[self.event.pk], now=NOW)[self.event.pk], decision)
         checkpoint = models.RaceEventLiveProviderCheckpoint.objects.get(tracking__event=self.event, data_kind='result')
         self.assertIsNotNone(checkpoint.next_poll_at)
-        from django.template.loader import render_to_string
-        html = render_to_string('stable/public/race_detail.html', dict(event=self.event,
-            results=list(self.event.results.all()),live_result_status={'phase':'provisional'}))
-        self.assertIn('暂定赛果，仍在补齐', html)
 
         # 第二次快照新增名次但缺少已公开赔率：保留上一版并继续补采。
         from datetime import timedelta

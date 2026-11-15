@@ -389,6 +389,11 @@ class RaceDataSyncResultApplicationTests(TestCase):
         public = race_events.resolve_race_live_public_read(event_id=self.event.pk, now=NOW)
         self.assertTrue(public.visible, public)
         self.assertEqual(public.phase, "provisional")
+        with patch("django.utils.timezone.now", return_value=NOW):
+            response = self.client.get(self.event.get_absolute_url())
+        self.assertContains(response, "暂定赛果，仍在补齐")
+        self.assertEqual(len(response.context["results"]), 1)
+        self.assertFalse(response.context["results"][0].is_confirmed)
         self.assertEqual(race_events.resolve_race_live_public_reads(event_ids=[self.event.pk], now=NOW)[self.event.pk], public)
         official = self._observation(self.source, "licensed_api", self._rows(), observed_at=NOW + timedelta(minutes=1))
         decision = apply_data_sync_result_observation(
@@ -397,6 +402,11 @@ class RaceDataSyncResultApplicationTests(TestCase):
         self.assertTrue(decision.projected, decision)
         self.assertEqual(self.event.results.filter(is_confirmed=True).count(), 2)
         self.assertEqual(self.event.results.count(), 2)
+        with patch("django.utils.timezone.now", return_value=NOW + timedelta(minutes=1)):
+            response = self.client.get(self.event.get_absolute_url())
+        self.assertNotContains(response, "暂定赛果，仍在补齐")
+        self.assertEqual(response.context["result_section_label"], "赛果")
+        self.assertEqual(len(response.context["results"]), 2)
         delayed = self._observation(self.source, "licensed_api", self._rows()[:1],
                                     result_phase=models.RaceResultPhase.PROVISIONAL,
                                     observed_at=NOW + timedelta(minutes=2))
