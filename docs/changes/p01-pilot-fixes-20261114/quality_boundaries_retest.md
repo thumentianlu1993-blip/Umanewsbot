@@ -36,3 +36,5 @@ R006/R008/R014未启动，没有继续改Prompt或追加请求。
 未合并、部署、修改生产业务数据或开启自动化。PR318保留Draft。
 
 原始收据、绑定复核、指标与逐段新旧对照保存在本机runtime目录p01-quality-boundaries-20261115/live；历史结果未覆盖。
+
+补充根因定位：D006的picks字段本身符合候选协议；实际输入只有quote_not_found且candidates为空，模型却编造候选ID并返回decisions。程序拒绝正确，问题在于修复请求仍暴露了本次不适用的候选操作。

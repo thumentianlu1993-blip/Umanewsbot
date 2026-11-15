@@ -402,3 +402,150 @@ class QualityBoundaryTests(SimpleTestCase):
         for case in self.cases():
             for stage in baseline['v3_char_limits']:
                 self.assertNotIn(case['target'],prompt_for(stage,'context-v3'))
+
+
+@override_settings(NEWS_QUALITY_POLICY={'contract_version': 'context-v3'})
+class StageBoundaryTests(SimpleTestCase):
+    def cases(self):
+        return json.loads((Path(__file__).parent/'fixtures/p01_stage_boundary_failures_20261115.json').read_text())
+
+    def test_actual_quote_repair_has_no_candidate_operation(self):
+        from stable.services import news_entity_units as units
+        case = self.cases()['entity']; source = case['clean']
+        first = units.evaluate(source, units.initial_payload(source, 'en', contract_version='context-v3'), case['initial_response'])
+        payload = units.repair_payload(source, 'en', first, 2)
+        self.assertEqual(payload['response_fields'], ['units'])
+        self.assertEqual([i['code'] for i in payload['issues']], ['quote_not_found'])
+        with self.assertRaises(ContentBlocked):
+            units.evaluate(source, payload, case['observed_repair_response'], previous=first)
+        corrected = {'units': deepcopy(case['observed_repair_response']['units'])}
+        corrected['units'][0]['entities'] = [r for r in corrected['units'][0]['entities'] if r['text'] == 'Happy Valley']
+        result = units.evaluate(source, payload, corrected, previous=first)
+        self.assertTrue(result['complete'])
+        self.assertEqual(len([r for r in result['accepted'] if r['text'] == 'Happy Valley']), 3)
+
+    def test_actual_equivalent_mixed_fraction_is_not_a_translation_failure(self):
+        from stable.services.news_content import hard_translation_checks
+        c = self.cases()['numeric']
+        self.assertEqual(hard_translation_checks(c['clean'], c['target'])['numeric']['b010']['status'], 'surface_match')
+        self.assertTrue(hard_translation_checks(c['clean'], c['target'])['passed'])
+
+    def test_generic_mixed_fractions_preserve_exact_value(self):
+        from fractions import Fraction
+        for whole, numerator, denominator in [(1,1,2), (2,3,4), (7,5,8), (0,7,10), (12,3,16)]:
+            value = str(float(Fraction(whole) + Fraction(numerator, denominator)))
+            for separator in ['又', ' ']:
+                with self.subTest(whole=whole,numerator=numerator,denominator=denominator,separator=separator):
+                    target = f'{whole}{separator}{numerator}/{denominator}马位'
+                    self.assertEqual(audit_equivalent_numbers(value+' lengths', target)['status'], 'surface_match')
+                    self.assertEqual(audit_equivalent_numbers(str(whole+2)+' lengths', target)['status'], 'surface_difference')
+        self.assertEqual(audit_equivalent_numbers('1又1/3马位', '1又2/6马位')['status'], 'surface_match')
+        self.assertEqual(audit_equivalent_numbers('1又1/3马位', '1.333333马位')['status'], 'surface_difference')
+        for text in ['4/9 favourite', '2026/11/15', '1/2月']:
+            self.assertEqual(audit_equivalent_numbers(text,text)['status'], 'surface_match')
+
+    def test_unsupported_numeric_form_is_review_not_false_error_or_retry(self):
+        from stable.services.news_content import hard_translation_checks, validate_audit
+        from stable.services.news_prompts import audit_check_keys
+        source = clean('Won by 1.5 lengths.', title='News')
+        raw = {'title':'消息','summary':'获胜。','blocks':[{'id':'b0','text':'领先1又1/0马位获胜。'}]}
+        target = {**raw, 'body': raw['blocks'][0]['text']}
+        hard = hard_translation_checks(source, target)
+        self.assertFalse(hard['passed'])
+        self.assertEqual(hard['numeric']['b0']['status'], 'not_comparable')
+        run = SimpleNamespace(clean_snapshot=source, entity_snapshot={'occurrences':[]}, quality_snapshot={}, repair_count=0, manual_target={})
+        result = context_projection(run, SimpleNamespace(stage='translate_full',result=raw,pk=1,usage={'input':{'mode':'full'}}))
+        self.assertEqual(result['state'], 'review')
+        self.assertEqual(result['reason'], 'numeric_not_comparable')
+        self.assertNotIn('repair_count', result)
+        response = {'verdict':'pass','checks':dict.fromkeys(audit_check_keys('context-v3'),True),'issues':[]}
+        self.assertFalse(validate_audit(source,target,response,contract_version='context-v3')['passed'])
+
+    def test_audit_request_is_evidence_first_without_prefilled_success(self):
+        from stable.services.news_prompts import prompt_for
+        prompt = prompt_for('fact_audit','context-v3')
+        schema,_ = json.JSONDecoder().raw_decode(prompt.split('返回且仅返回',1)[1])
+        self.assertEqual(next(iter(schema)), 'issues')
+        self.assertNotIn(True, schema['checks'].values())
+
+    def test_v3_candidate_operations_and_v2_contract_remain_bound(self):
+        from stable.services import news_entity_units as units
+        source = clean('Alpha and Alpha.')
+        for contract in ['context-v3','context-v2']:
+            p = units.initial_payload(source,'en',contract_version=contract)
+            response = {'units':[{'unit_id':u['unit_id'],'coverage':'complete','entities':[]}
+                                 for u in p['units']]}
+            response['units'][1]['entities'] = [{'text':'Alpha','type':'horse','context':'Alpha'}]
+            first = units.evaluate(source,p,response)
+            repair = units.repair_payload(source,'en',first,1)
+            if contract == 'context-v3':
+                self.assertEqual(p['response_fields'],['units'])
+                self.assertEqual(repair['response_fields'],['units','decisions'])
+                tampered = deepcopy(repair);tampered['response_fields']=['units']
+                with self.assertRaisesRegex(ContentBlocked,'entity_unit_input_changed'):
+                    units.evaluate(source,tampered,{'units':[]},previous=first)
+            else:
+                self.assertNotIn('response_fields',p)
+                self.assertNotIn('response_fields',repair)
+            issue = repair['issues'][0]
+            corrected = {'units':[{'unit_id':u['unit_id'],'coverage':'complete','entities':[]} for u in repair['units']],
+                'decisions':[{'issue_id':issue['issue_id'],'picks':[{'candidate_id':c['candidate_id'],'type':'horse'} for c in issue['candidates']]}]}
+            final = units.evaluate(source,repair,corrected,previous=first)
+            self.assertTrue(final['complete'])
+            self.assertEqual([r['start'] for r in final['accepted']],[0,10])
+            bad = deepcopy(corrected);bad['decisions'][0]['picks'][0]['candidate_id']='invented'
+            with self.assertRaisesRegex(ContentBlocked,'entity_candidate_invalid'):
+                units.evaluate(source,repair,bad,previous=first)
+
+    def test_unknown_numeric_all_fields_manual_and_audit_cannot_bypass(self):
+        from stable.services.news_content import hard_translation_checks, validate_audit, manual_translation
+        from stable.services.news_prompts import audit_check_keys
+        for location in ['title','body','summary','source']:
+            for manual in [False,True]:
+                with self.subTest(location=location,manual=manual):
+                    source = clean('Won by 1.5 lengths.',title='News')
+                    raw = {'title':'消息','summary':'获胜。','blocks':[{'id':'b0','text':'领先1.5马位获胜。'}]}
+                    unknown = '领先1又1/0马位。'
+                    if location == 'source':source['blocks'][0]['text']=unknown
+                    elif location == 'body':raw['blocks'][0]['text']=unknown
+                    else:raw[location]=unknown
+                    target = {**raw,'body':raw['blocks'][0]['text']}
+                    if manual:target = manual_translation({k:target[k] for k in ['title','summary','body']})
+                    hard = hard_translation_checks(source,target)
+                    self.assertFalse(hard['passed'])
+                    self.assertTrue(hard['numeric_not_comparable'])
+                    response = {'verdict':'pass','checks':dict.fromkeys(audit_check_keys('context-v3'),True),'issues':[]}
+                    result = validate_audit(source,target,response,contract_version='context-v3')
+                    self.assertFalse(result['passed'])
+                    self.assertEqual(result['reason'],'numeric_not_comparable')
+                    run = SimpleNamespace(clean_snapshot=source,translation_snapshot=target,editorial_snapshot={},
+                        quality_snapshot={},policy_sha='test',manual_target=target if manual else {},repair_count=0)
+                    projection = context_projection(run, SimpleNamespace(stage='fact_audit',result=response,pk=4,input_sha='test',usage={'price':{'profile':'base'}}))
+                    self.assertEqual(projection['state'],'review')
+                    self.assertEqual(projection['reason'],'numeric_not_comparable')
+                    self.assertNotIn('repair_count',projection)
+                    self.assertNotIn('deep_required',projection['quality_snapshot'])
+        # 相同未知表达也不能相互抵消；负带分数不冒充普通无符号数字。
+        for text in ['1又1/0马位','-1又1/2马位','1又1/马位','1又1/-2马位','1又1/2/3马位','1又1/2.5马位']:
+            self.assertEqual(audit_equivalent_numbers(text,text)['status'],'not_comparable')
+        self.assertEqual(audit_equivalent_numbers('2026 11/15','2026年11月15日')['status'],'surface_match')
+
+    def test_actual_sdk_messages_use_the_same_entity_response_fields(self):
+        from stable.services import news_entity_units as units
+        from stable.services.news_model_gateway import _single_request
+        spec = {'contract_version':'context-v3','thinking':'disabled','max_output_tokens':8192}
+        source = clean('Alpha and Alpha.')
+        initial = units.initial_payload(source,'en',contract_version='context-v3')
+        payloads = [initial]
+        for text,context in [('absent','absent'),('Alpha','Alpha')]:
+            response = {'units':[{'unit_id':u['unit_id'],'coverage':'complete','entities':[]} for u in initial['units']]}
+            response['units'][1]['entities'] = [{'text':text,'context':context,'type':'horse'}]
+            state = units.evaluate(source,initial,response)
+            payloads.append(units.repair_payload(source,'en',state,1))
+        for payload,fields in zip(payloads,[['units'],['units'],['units','decisions']]):
+            with override_settings(NEWS_QUALITY_API_KEY='fixture'),patch('openai.OpenAI') as client:
+                _single_request(SimpleNamespace(stage='entity_check',model='fixture',usage={'price':spec}),payload)
+                messages = client.return_value.chat.completions.create.call_args.kwargs['messages']
+            self.assertEqual(json.loads(messages[1]['content'])['response_fields'],fields)
+            self.assertIn('顶层字段严格等于response_fields',messages[0]['content'])
+            self.assertNotIn('无歧义decisions为空',messages[0]['content'])

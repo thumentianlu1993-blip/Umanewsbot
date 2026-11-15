@@ -44,7 +44,7 @@ class RacingTaxonomyContractTests(SimpleTestCase):
         repair = units.repair_payload(source, 'en', first, 9)
         final = units.evaluate(source, repair, {'units': [{'unit_id': repair['units'][0]['unit_id'],
             'coverage': 'complete', 'entities': [{'text': 'Silver Award', 'type': 'racing_honor',
-            'context': source['blocks'][0]['text']}]}], 'decisions': []}, previous=first)
+            'context': source['blocks'][0]['text']}]}]}, previous=first)
         self.assertEqual([r['type'] for r in units.occurrences(source, final)], ['race_related', 'racing_honor'])
         self.assertEqual(repair['entity_contract'], 'entity-units-v3')
         tampered = deepcopy(repair); tampered['entity_contract'] = 'entity-units-v2'

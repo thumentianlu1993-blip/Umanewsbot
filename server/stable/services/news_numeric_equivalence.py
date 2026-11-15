@@ -2,6 +2,7 @@
 from collections import defaultdict
 from datetime import date
 from decimal import Decimal
+from fractions import Fraction
 import re
 import unicodedata
 
@@ -11,7 +12,7 @@ MONTH_NUMBER = {name.casefold(): index for index, name in enumerate(MONTHS, 1)}
 MONTH_NUMBER.update({name[:3].casefold(): index for index, name in enumerate(MONTHS, 1)})
 MONTH_NUMBER["sept"] = 9
 MONTH_PATTERN = "(?:" + "|".join(sorted(MONTH_NUMBER, key=len, reverse=True)) + r")\.?"
-NORMALIZATION = "p01-explicit-numeric-equivalence-v3"
+NORMALIZATION = "p01-explicit-numeric-equivalence-v4"
 
 
 def explicit_date(text):
@@ -80,11 +81,38 @@ _SCALES = {"": 1, "thousand": 1000, "million": 1000000, "billion": 1000000000,
 _SCALE_PATTERN = r"(?:thousand\b|million\b|billion\b|千万|百万|千|万|亿)"
 _AMOUNT = r"[+-]?\d+(?:\.\d+)?"
 
+# 带分数有明确的整数部分；不把日期或赔率的单个 a/b 猜成数量。
+_MIXED_FRACTION = re.compile(
+    r"(?<![\dA-Za-z./])(?P<whole>[+-]?\d[\d.]*)(?P<separator>又|[ \t]+)"
+    r"(?P<fraction>[+\-\d. \t]*/[+\-\d./ \t]*)(?![\d/])")
+
+
+def _mixed_fraction(match):
+    # 空格可能是年月日分隔；仅在明确马位单位前按带分数读取。
+    if match['separator'] != '又' and not re.match(r'\s*(?:个)?(?:马位|lengths?\b)', match.string[match.end():], re.I):
+        return match[0]
+    try:
+        if match['whole'].startswith('-'):
+            raise ValueError('signed_mixed_number_not_supported')
+        fraction = re.fullmatch(r'(\d+)\s*/\s*(\d+)', match['fraction'].strip())
+        if fraction is None:
+            raise ValueError('invalid_mixed_fraction')
+        whole = int(match['whole'])
+        value = whole + Fraction(int(fraction[1]), int(fraction[2]))
+        return f"〈number:{value}〉"
+    except (ValueError, ZeroDivisionError):
+        return f"〈unparsed:{match[0]}〉"
+
+
+def unparsed_numbers(text):
+    return re.findall(r"〈unparsed:([^〉]+)〉", numeric_surface(text))
+
 
 def numeric_surface(text):
     """返回比较用文本；跨度只指向此规范文本，不冒充原文证据跨度。"""
     text = unicodedata.normalize("NFKC", text)
     text = re.sub(r"(?<=\d),(?=\d{3}(?:\D|$))", "", text)
+    text = _MIXED_FRACTION.sub(_mixed_fraction, text)
     # 仅处理明确的马位差分数，不能从普通专名中的 Half 等词推断数量。
     text = re.sub(r"\ba[ -]length[ -]and[ -]a[ -]half\b", "1.5 lengths", text, flags=re.I)
     whole = {"one": 1, "two": 2, "three": 3}
@@ -168,15 +196,20 @@ def numeric_surface(text):
     return text
 
 
-_TOKEN = re.compile(r"〈(?:money|time|word):[^〉]+〉|\d+(?:\.\d+)?")
+_TOKEN = re.compile(r"〈(?:money|time|word|number|unparsed):[^〉]+〉|\d+(?:\.\d+)?")
 
 
 def _token_evidence(text):
     normalized = numeric_surface(text)
     spans, required = defaultdict(list), defaultdict(list)
     for match in _TOKEN.finditer(normalized):
+        if match[0].startswith('〈unparsed:'):
+            continue
         optional = match[0].startswith('〈word:')
-        value = _decimal(match[0][6:-1]) if optional else match[0] if match[0].startswith('〈') else _decimal(match[0])
+        if optional or match[0].startswith('〈number:'):
+            value = str(Fraction(match[0].split(':', 1)[1][:-1]))
+        else:
+            value = match[0] if match[0].startswith('〈') else str(Fraction(match[0]))
         spans[value].append([match.start(), match.end()])
         if not optional:
             required[value].append([match.start(), match.end()])
@@ -200,8 +233,11 @@ def audit_equivalent_numbers(source, target):
                                 "source_count": len(left), "translated_count": len(right),
                                 "source_required_count": source_count, "translated_required_count": target_count,
                                 "source_spans": left, "translated_spans": right})
+    unparsed = {side: values for side, text in [('source', source), ('target', target)]
+                if (values := unparsed_numbers(text))}
     return {"comparison_scope": "normalized_numeric_lexemes", "normalization": NORMALIZATION,
             "span_scope": "normalized_comparison_text", "fact_verdict": "not_assessed",
-            "status": "surface_difference" if differences else "surface_match" if original else "no_numeric_lexemes",
+            "status": "not_comparable" if unparsed else "surface_difference" if differences else "surface_match" if original else "no_numeric_lexemes",
+            "unparsed": unparsed,
             "source_token_count": sum(map(len, original.values())),
             "translated_token_count": sum(map(len, translated.values())), "differences": differences}

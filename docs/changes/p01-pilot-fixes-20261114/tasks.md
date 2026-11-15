@@ -12,3 +12,10 @@
 - [x] (integration) 测试与实现：Q4–Q5局部修复/重审/发布证据/旧协议回归。
 - [x] (integration) 验证：Q6–Q7离线报告及复杂度预算，准备样本与真实复测预算。
 - [ ] (operations) 验证：原reviewer只读复审、最终范围CI，保持Draft与P01关闭。
+
+## 分阶段修复与验证
+- [x] (application) 测试：实体操作边界、通用带分数和未知数字阻断真实RED。
+- [x] (application) 实现：共享实体响应字段、精确带分数比较、证据优先审校Prompt及同例GREEN。
+- [x] (integration) 验证：相关离线回归与原review上下文复审，固定审校正反样本。
+- [ ] (integration) 验证：有界真实审校配置比较；仅阶段通过后整链路原五篇/预留三篇。
+- [ ] (operations) 验证：最终范围CI、回执与报告，Draft/P01关闭。

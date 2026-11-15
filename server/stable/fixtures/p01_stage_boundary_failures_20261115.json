@@ -1,0 +1,855 @@
+{
+  "provenance": {
+    "source_commit": "295f3aab9907dbe1bce9e497b1cc33b4b6689937",
+    "kind": "observed_real_responses",
+    "note": "本次失败原件节选；corrected响应只在测试构造，不是模型实测或人工gold。"
+  },
+  "entity": {
+    "clean": {
+      "title": "Definitive dominates in Class 2 as Purton reaches milestone at Sha Tin",
+      "blocks": [
+        {
+          "id": "b000",
+          "text": "Definitive (115lb) left no room for doubt at Sha Tin this afternoon (Sunday, 4 October), pouncing under Karis Teetan to win the HK$3.12 million Class 2 Muk Min Ha Handicap (1650m, dirt) and add further fuel to trainer David Eustace’s form in the new season."
+        },
+        {
+          "id": "b001",
+          "text": "Eustace celebrated a second Group 3 win in Hong Kong last Thursday (1 October) with Colourful King before Definitive secured the third-season handler’s fifth win this term as the recipient of a cracking ride from Teetan aboard the five-year-old War Decree gelding."
+        },
+        {
+          "id": "b002",
+          "text": "Stepping from barrier seven, Definitive positioned behind leader Sing Dragon (127lb), while Sky Vino (115lb) held third on the rail. Turning for home, Teetan pressured the leader before taking over at the 400m, scoring by two-and-a-quarter lengths in 1m 38s."
+        },
+        {
+          "id": "b003",
+          "text": "Teetan said: “He went down to the gates feeling good and when he came out so well, I thought, that’s halfway home already. He was able to control the race and he picked it up nicely. He had no weight on his back and he was in the perfect spot."
+        },
+        {
+          "id": "b004",
+          "text": "“I always knew he had ability, and sometimes it’s just about him bringing his ‘A game’ to the races, too. I must say, well done to David and his team – they had the horse spot on.”"
+        },
+        {
+          "id": "b005",
+          "text": "Talents Ambition (128lb) finished second with Sky Vino grabbing third. Eustace expects Definitive will seek a fourth Happy Valley win after today’s breakthrough in Class 2."
+        },
+        {
+          "id": "b006",
+          "text": "Definitive defeats Talents Ambition and Sky Vino at Sha Tin."
+        },
+        {
+          "id": "b007",
+          "text": "“He got a beautiful ride and the setup of the race worked out well for him. He’s got to take his medicine from the handicapper, and there are not too many options for him on the dirt, but he’s got a very effective record at Happy Valley,” Eustace said."
+        },
+        {
+          "id": "b008",
+          "text": "Racing in the same silks as triple Group 1 winner Mr Stunning for owner Maurice Koo and trainer Frankie Lor, Mr Cool (126lb) dashed to victory in the Class 4 Yan Chai Trophy Handicap (1400m), capping a double for Teetan."
+        },
+        {
+          "id": "b009",
+          "text": "Lor also grabbed two of his own when Horsepower (135lb) nicked the Class 3 Shing Mun Handicap (1000m) under Andrea Atzeni. The Harry Angel gelding is owned by Michael Lee, former Chairman of The Hong Kong Jockey Club, and his family."
+        },
+        {
+          "id": "b010",
+          "text": "Zac Purton reached 1,100 wins on the Sha Tin turf as Michael Chang’s Lady’s Love (129lb) claimed the Class 4 Sham Tseng Handicap (1400m). Purton kicked off his double aboard KOL (122lb) in the Class 4 Kwok Shui Handicap (1200m) for David Hayes."
+        },
+        {
+          "id": "b011",
+          "text": "Chang said: “Today has been lucky on my side, as both my horses drew barrier one. This horse (Lady’s Love), Zac came back and said he does a few things wrong – he doesn’t fully concentrate. I think he still has a couple of lengths left to improve further.”"
+        },
+        {
+          "id": "b012",
+          "text": "Purton, a nine-time Hong Kong Champion Jockey, leads the 2026/27 standings with 14 wins – six clear of his nearest rivals. The winningest rider in Hong Kong racing history, 43-year-old Purton has notched 2,035 wins in the city since arriving in 2007/08."
+        },
+        {
+          "id": "b013",
+          "text": "Team Happy (124lb) began Chang’s double under Matthew Poon, taking out the Class 5 Lo Wai Handicap (1400m), while Hayes also trained two victors as All Round Winner (120lb) skimmed the inside rail to strike under Harry Bentley in the Class 3 Shek Wai Kok Handicap (1650m, dirt)."
+        },
+        {
+          "id": "b014",
+          "text": "Double Bingo (128lb) edged to Class 5 Chai Wan Kok Handicap (1650m, dirt) success under Nichola Yuen for trainer Ricky Yiu. Victory is the seven-pound apprentice’s sixth from the past four fixtures."
+        },
+        {
+          "id": "b015",
+          "text": "Big Return (120lb) made his first appearance over nine furlongs a winning one, taking the Class 3 Chinese Recreation Club Challenge Cup Handicap (1800m) under Alexis Badel for trainer Jamie Richards."
+        },
+        {
+          "id": "b016",
+          "text": "After interference from Firefoot (123lb), Supreme Agility (131lb) was declared the winner of the Class 4 Sha Tsui Handicap (1650m, dirt) following an inquiry and objection after initially finishing second with jockey James Orman for trainer Pierre Ng."
+        },
+        {
+          "id": "b017",
+          "text": "Ng said: “He’s quite a different horse this season. It took him a long while to build up this good form. He showed in a trial he’s much sharper now, so I’m looking forward to him running in Class 3 from a light weight.”"
+        },
+        {
+          "id": "b018",
+          "text": "Six-year-old Bunta Baby (127lb) and jockey Luke Ferraris denied Four-Year-Old Classic Series potential Solid State (135lb) in the Class 3 Yau Kom Tau Handicap (1200m). The gelding savoured a fourth career win for trainer Manfred Man at odds of 38/1."
+        },
+        {
+          "id": "b019",
+          "text": "Hong Kong racing continues at Happy Valley on Wednesday (7 October)."
+        }
+      ],
+      "clean_sha": "b498c3773dac3ebe83844c09ea4572892542ad5215093ede6067ce488ee8bed3",
+      "source_sha": "b498c3773dac3ebe83844c09ea4572892542ad5215093ede6067ce488ee8bed3"
+    },
+    "initial_response": {
+      "units": [
+        {
+          "unit_id": "title",
+          "coverage": "complete",
+          "entities": [
+            {
+              "text": "Definitive",
+              "type": "horse",
+              "context": "Definitive dominates in Class 2 as Purton reaches milestone at Sha Tin"
+            },
+            {
+              "text": "Purton",
+              "type": "person",
+              "context": "Definitive dominates in Class 2 as Purton reaches milestone at Sha Tin"
+            },
+            {
+              "text": "Sha Tin",
+              "type": "place",
+              "context": "at Sha Tin"
+            }
+          ]
+        },
+        {
+          "unit_id": "b000:0",
+          "coverage": "complete",
+          "entities": [
+            {
+              "text": "Definitive",
+              "type": "horse",
+              "context": "Definitive (115lb) left no room for doubt at Sha Tin this afternoon"
+            },
+            {
+              "text": "Sha Tin",
+              "type": "place",
+              "context": "at Sha Tin this afternoon"
+            },
+            {
+              "text": "Karis Teetan",
+              "type": "person",
+              "context": "pouncing under Karis Teetan"
+            },
+            {
+              "text": "Muk Min Ha Handicap",
+              "type": "race",
+              "context": "the HK$3.12 million Class 2 Muk Min Ha Handicap (1650m, dirt)"
+            },
+            {
+              "text": "David Eustace",
+              "type": "person",
+              "context": "trainer David Eustace’s form"
+            }
+          ]
+        },
+        {
+          "unit_id": "b001:0",
+          "coverage": "complete",
+          "entities": [
+            {
+              "text": "Eustace",
+              "type": "person",
+              "context": "Eustace celebrated a second Group 3 win"
+            },
+            {
+              "text": "Hong Kong",
+              "type": "place",
+              "context": "in Hong Kong"
+            },
+            {
+              "text": "Colourful King",
+              "type": "horse",
+              "context": "with Colourful King"
+            },
+            {
+              "text": "Definitive",
+              "type": "horse",
+              "context": "before Definitive secured"
+            },
+            {
+              "text": "Teetan",
+              "type": "person",
+              "context": "ride from Teetan"
+            },
+            {
+              "text": "War Decree",
+              "type": "horse",
+              "context": "the five-year-old War Decree gelding"
+            }
+          ]
+        },
+        {
+          "unit_id": "b002:0",
+          "coverage": "complete",
+          "entities": [
+            {
+              "text": "Definitive",
+              "type": "horse",
+              "context": "Definitive positioned behind leader"
+            },
+            {
+              "text": "Sing Dragon",
+              "type": "horse",
+              "context": "leader Sing Dragon (127lb)"
+            },
+            {
+              "text": "Sky Vino",
+              "type": "horse",
+              "context": "while Sky Vino (115lb) held third"
+            },
+            {
+              "text": "Teetan",
+              "type": "person",
+              "context": "Teetan pressured the leader"
+            }
+          ]
+        },
+        {
+          "unit_id": "b003:0",
+          "coverage": "complete",
+          "entities": [
+            {
+              "text": "Teetan",
+              "type": "person",
+              "context": "Teetan said:"
+            }
+          ]
+        },
+        {
+          "unit_id": "b004:0",
+          "coverage": "complete",
+          "entities": [
+            {
+              "text": "David",
+              "type": "person",
+              "context": "well done to David and his team"
+            }
+          ]
+        },
+        {
+          "unit_id": "b005:0",
+          "coverage": "complete",
+          "entities": [
+            {
+              "text": "Talents Ambition",
+              "type": "horse",
+              "context": "Talents Ambition (128lb) finished second"
+            },
+            {
+              "text": "Sky Vino",
+              "type": "horse",
+              "context": "with Sky Vino grabbing third"
+            },
+            {
+              "text": "Eustace",
+              "type": "person",
+              "context": "Eustace expects"
+            },
+            {
+              "text": "Definitive",
+              "type": "horse",
+              "context": "Definitive will seek a fourth"
+            },
+            {
+              "text": "Happy Valley",
+              "type": "place",
+              "context": "at Happy Valley"
+            }
+          ]
+        },
+        {
+          "unit_id": "b006:0",
+          "coverage": "complete",
+          "entities": [
+            {
+              "text": "Definitive",
+              "type": "horse",
+              "context": "Definitive defeats"
+            },
+            {
+              "text": "Talents Ambition",
+              "type": "horse",
+              "context": "defeats Talents Ambition"
+            },
+            {
+              "text": "Sky Vino",
+              "type": "horse",
+              "context": "and Sky Vino"
+            },
+            {
+              "text": "Sha Tin",
+              "type": "place",
+              "context": "at Sha Tin"
+            }
+          ]
+        },
+        {
+          "unit_id": "b007:0",
+          "coverage": "complete",
+          "entities": [
+            {
+              "text": "Happy Valley",
+              "type": "place",
+              "context": "record at Happy Valley"
+            },
+            {
+              "text": "Eustace",
+              "type": "person",
+              "context": "Eustace said"
+            }
+          ]
+        },
+        {
+          "unit_id": "b008:0",
+          "coverage": "complete",
+          "entities": [
+            {
+              "text": "Mr Stunning",
+              "type": "horse",
+              "context": "winner Mr Stunning"
+            },
+            {
+              "text": "Maurice Koo",
+              "type": "person",
+              "context": "owner Maurice Koo"
+            },
+            {
+              "text": "Frankie Lor",
+              "type": "person",
+              "context": "trainer Frankie Lor"
+            },
+            {
+              "text": "Mr Cool",
+              "type": "horse",
+              "context": "Mr Cool (126lb) dashed to victory"
+            },
+            {
+              "text": "Yan Chai Trophy Handicap",
+              "type": "race",
+              "context": "Class 4 Yan Chai Trophy Handicap (1400m)"
+            },
+            {
+              "text": "Teetan",
+              "type": "person",
+              "context": "double for Teetan"
+            }
+          ]
+        },
+        {
+          "unit_id": "b009:0",
+          "coverage": "complete",
+          "entities": [
+            {
+              "text": "Lor",
+              "type": "person",
+              "context": "Lor also grabbed"
+            },
+            {
+              "text": "Horsepower",
+              "type": "horse",
+              "context": "when Horsepower (135lb) nicked"
+            },
+            {
+              "text": "Shing Mun Handicap",
+              "type": "race",
+              "context": "Class 3 Shing Mun Handicap (1000m)"
+            },
+            {
+              "text": "Andrea Atzeni",
+              "type": "person",
+              "context": "under Andrea Atzeni"
+            },
+            {
+              "text": "Harry Angel",
+              "type": "horse",
+              "context": "The Harry Angel gelding"
+            },
+            {
+              "text": "Michael Lee",
+              "type": "person",
+              "context": "owned by Michael Lee"
+            },
+            {
+              "text": "The Hong Kong Jockey Club",
+              "type": "organization",
+              "context": "former Chairman of The Hong Kong Jockey Club"
+            }
+          ]
+        },
+        {
+          "unit_id": "b010:0",
+          "coverage": "complete",
+          "entities": [
+            {
+              "text": "Zac Purton",
+              "type": "person",
+              "context": "Zac Purton reached 1,100 wins"
+            },
+            {
+              "text": "Sha Tin",
+              "type": "place",
+              "context": "on the Sha Tin turf"
+            },
+            {
+              "text": "Michael Chang",
+              "type": "person",
+              "context": "Michael Chang’s Lady’s Love"
+            },
+            {
+              "text": "Lady’s Love",
+              "type": "horse",
+              "context": "Lady’s Love (129lb) claimed"
+            },
+            {
+              "text": "Sham Tseng Handicap",
+              "type": "race",
+              "context": "Class 4 Sham Tseng Handicap (1400m)"
+            },
+            {
+              "text": "Purton",
+              "type": "person",
+              "context": "Purton kicked off his double"
+            },
+            {
+              "text": "KOL",
+              "type": "horse",
+              "context": "aboard KOL (122lb)"
+            },
+            {
+              "text": "Kwok Shui Handicap",
+              "type": "race",
+              "context": "Class 4 Kwok Shui Handicap (1200m)"
+            },
+            {
+              "text": "David Hayes",
+              "type": "person",
+              "context": "for David Hayes"
+            }
+          ]
+        },
+        {
+          "unit_id": "b011:0",
+          "coverage": "complete",
+          "entities": [
+            {
+              "text": "Chang",
+              "type": "person",
+              "context": "Chang said:"
+            },
+            {
+              "text": "Lady’s Love",
+              "type": "horse",
+              "context": "This horse (Lady’s Love)"
+            },
+            {
+              "text": "Zac",
+              "type": "person",
+              "context": "Zac came back and said"
+            }
+          ]
+        },
+        {
+          "unit_id": "b012:0",
+          "coverage": "complete",
+          "entities": [
+            {
+              "text": "Purton",
+              "type": "person",
+              "context": "Purton, a nine-time Hong Kong Champion Jockey"
+            },
+            {
+              "text": "Hong Kong Champion Jockey",
+              "type": "racing_honor",
+              "context": "a nine-time Hong Kong Champion Jockey"
+            },
+            {
+              "text": "Hong Kong",
+              "type": "place",
+              "context": "in Hong Kong racing history"
+            },
+            {
+              "text": "Purton",
+              "type": "person",
+              "context": "43-year-old Purton has notched"
+            }
+          ]
+        },
+        {
+          "unit_id": "b013:0",
+          "coverage": "complete",
+          "entities": [
+            {
+              "text": "Team Happy",
+              "type": "horse",
+              "context": "Team Happy (124lb) began"
+            },
+            {
+              "text": "Chang",
+              "type": "person",
+              "context": "began Chang’s double"
+            },
+            {
+              "text": "Matthew Poon",
+              "type": "person",
+              "context": "under Matthew Poon"
+            },
+            {
+              "text": "Lo Wai Handicap",
+              "type": "race",
+              "context": "Class 5 Lo Wai Handicap (1400m)"
+            },
+            {
+              "text": "Hayes",
+              "type": "person",
+              "context": "while Hayes also trained"
+            },
+            {
+              "text": "All Round Winner",
+              "type": "horse",
+              "context": "All Round Winner (120lb) skimmed"
+            },
+            {
+              "text": "Harry Bentley",
+              "type": "person",
+              "context": "under Harry Bentley"
+            },
+            {
+              "text": "Shek Wai Kok Handicap",
+              "type": "race",
+              "context": "Class 3 Shek Wai Kok Handicap (1650m, dirt)"
+            }
+          ]
+        },
+        {
+          "unit_id": "b014:0",
+          "coverage": "complete",
+          "entities": [
+            {
+              "text": "Double Bingo",
+              "type": "horse",
+              "context": "Double Bingo (128lb) edged"
+            },
+            {
+              "text": "Chai Wan Kok Handicap",
+              "type": "race",
+              "context": "Class 5 Chai Wan Kok Handicap (1650m, dirt)"
+            },
+            {
+              "text": "Nichola Yuen",
+              "type": "person",
+              "context": "under Nichola Yuen"
+            },
+            {
+              "text": "Ricky Yiu",
+              "type": "person",
+              "context": "for trainer Ricky Yiu"
+            }
+          ]
+        },
+        {
+          "unit_id": "b015:0",
+          "coverage": "complete",
+          "entities": [
+            {
+              "text": "Big Return",
+              "type": "horse",
+              "context": "Big Return (120lb) made his first appearance"
+            },
+            {
+              "text": "Chinese Recreation Club Challenge Cup Handicap",
+              "type": "race",
+              "context": "the Class 3 Chinese Recreation Club Challenge Cup Handicap (1800m)"
+            },
+            {
+              "text": "Alexis Badel",
+              "type": "person",
+              "context": "under Alexis Badel"
+            },
+            {
+              "text": "Jamie Richards",
+              "type": "person",
+              "context": "for trainer Jamie Richards"
+            }
+          ]
+        },
+        {
+          "unit_id": "b016:0",
+          "coverage": "complete",
+          "entities": [
+            {
+              "text": "Firefoot",
+              "type": "horse",
+              "context": "interference from Firefoot (123lb)"
+            },
+            {
+              "text": "Supreme Agility",
+              "type": "horse",
+              "context": "Supreme Agility (131lb) was declared"
+            },
+            {
+              "text": "Sha Tsui Handicap",
+              "type": "race",
+              "context": "Class 4 Sha Tsui Handicap (1650m, dirt)"
+            },
+            {
+              "text": "James Orman",
+              "type": "person",
+              "context": "jockey James Orman"
+            },
+            {
+              "text": "Pierre Ng",
+              "type": "person",
+              "context": "for trainer Pierre Ng"
+            }
+          ]
+        },
+        {
+          "unit_id": "b017:0",
+          "coverage": "complete",
+          "entities": [
+            {
+              "text": "Ng",
+              "type": "person",
+              "context": "Ng said:"
+            }
+          ]
+        },
+        {
+          "unit_id": "b018:0",
+          "coverage": "complete",
+          "entities": [
+            {
+              "text": "Bunta Baby",
+              "type": "horse",
+              "context": "Six-year-old Bunta Baby (127lb)"
+            },
+            {
+              "text": "Luke Ferraris",
+              "type": "person",
+              "context": "jockey Luke Ferraris"
+            },
+            {
+              "text": "Four-Year-Old Classic Series",
+              "type": "race_related",
+              "context": "Four-Year-Old Classic Series potential"
+            },
+            {
+              "text": "Solid State",
+              "type": "horse",
+              "context": "Solid State (135lb)"
+            },
+            {
+              "text": "Yau Kom Tau Handicap",
+              "type": "race",
+              "context": "Class 3 Yau Kom Tau Handicap (1200m)"
+            },
+            {
+              "text": "Manfred Man",
+              "type": "person",
+              "context": "for trainer Manfred Man"
+            }
+          ]
+        },
+        {
+          "unit_id": "b019:0",
+          "coverage": "complete",
+          "entities": [
+            {
+              "text": "Hong Kong",
+              "type": "place",
+              "context": "Hong Kong racing continues"
+            },
+            {
+              "text": "Happy Valley",
+              "type": "place",
+              "context": "at Happy Valley"
+            }
+          ]
+        }
+      ]
+    },
+    "observed_repair_response": {
+      "units": [
+        {
+          "unit_id": "b005:0",
+          "coverage": "complete",
+          "entities": [
+            {
+              "text": "Talents Ambition",
+              "type": "horse",
+              "context": "Talents Ambition (128lb) finished second"
+            },
+            {
+              "text": "Sky Vino",
+              "type": "horse",
+              "context": "with Sky Vino grabbing third"
+            },
+            {
+              "text": "Eustace",
+              "type": "person",
+              "context": "Eustace expects Definitive"
+            },
+            {
+              "text": "Definitive",
+              "type": "horse",
+              "context": "expects Definitive will seek"
+            },
+            {
+              "text": "Happy Valley",
+              "type": "place",
+              "context": "a fourth Happy Valley win"
+            },
+            {
+              "text": "Class 2",
+              "type": "common_word",
+              "context": "breakthrough in Class 2."
+            }
+          ]
+        }
+      ],
+      "decisions": [
+        {
+          "issue_id": "24f00313280d42eee90a49f1",
+          "picks": [
+            {
+              "candidate_id": "24f00313280d42eee90a49f1_0",
+              "type": "place"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "numeric": {
+    "clean": {
+      "title": "Tim Easterby pays tribute as Copper Knight retires",
+      "blocks": [
+        {
+          "id": "b000",
+          "text": "Tim Easterby paid tribute to Copper Knight after the 12-year-old ran the final race of his remarkable career at York on Friday."
+        },
+        {
+          "id": "b001",
+          "text": "He was running for the 128th time when finishing seventh in the Copper Knight Winning-Most Horse Handicap, a race honouring his record-breaking success at the Knavesmire."
+        },
+        {
+          "id": "b002",
+          "text": "Copper Knight won 20 races in total, seven at York, more than any other horse in the track's history."
+        },
+        {
+          "id": "b003",
+          "text": "“He’s been fantastic. Every time he’s been out there he’s come and run his race. It takes a fair bit of doing what he’s done, to keep going and be sound, and want to go to the line is amazing. He ran a super race there,\" the trainer said."
+        },
+        {
+          "id": "b004",
+          "text": "“It’s been a brilliant time. When you need that speed at the three-furlong pole, he just doesn’t have that like he used to. You’ve got to remember he ran in a Nunthorpe here as well, which was fantastic, and he also loved going round Chester, too."
+        },
+        {
+          "id": "b005",
+          "text": "“We might find another one like him, but I don’t think we will. Everybody loves him in the yard and across Yorkshire. He’s been just wonderful.”"
+        },
+        {
+          "id": "b006",
+          "text": "Exciting Sharadd reamins unbeaten"
+        },
+        {
+          "id": "b007",
+          "text": "Sharadd retained his unbeaten record with a workmanlike success in the William Hill Epic Boosts EBF Novice Stakes at York."
+        },
+        {
+          "id": "b008",
+          "text": "William Haggas’ charge made a sparkling start to his career when winning on debut at Haydock last month but Our Son Oscar provided a much sterner test of his credentials on Friday."
+        },
+        {
+          "id": "b009",
+          "text": "Tom Marquand travelled strongly on the 4/9 winner throughout the contest but the runner-up, racing more towards the centre of the track, fought on bravely once the market leader had gone to the front."
+        },
+        {
+          "id": "b010",
+          "text": "However at the line Sharadd had put a length-and-a-half between himself and his rival on what is likely to be his final run of the campaign."
+        },
+        {
+          "id": "b011",
+          "text": "Maureen Haggas said: “He got the job done didn’t he and it’s just another step in the learning process. He probably doesn’t want the ground this soft and will have learned a lot today. This is such a different experience to Haydock where it was quiet and lovely, and he was having a look at what was going on here. It’s all education, that’s all we’re doing."
+        },
+        {
+          "id": "b012",
+          "text": "“It’s not my decision on whether that’s it for the year with him – but if it was mine it would be, yes. I think that’s enough – were’ in October now and what else is there from here? He’s not done much wrong. His brother is a sprinter, this fellow is a bit different to him, but I don’t know at the moment re trip but you’ll probably start at this distance I think."
+        },
+        {
+          "id": "b013",
+          "text": "“There’s a very good programme for three-year-old sprinters now if you’re good enough and he’s doing all the right things. At least he had a race today, he’ll have learned more and they have to learn how to race as well as being good. Talent is always enough. They have to become professional and cope with everything that is thrown at them and he’s learning.”"
+        }
+      ],
+      "clean_sha": "156ce74b1b76b1e52225536b41c181c61303b40d2ae2bc7051264bbf049fc0b6",
+      "source_sha": "156ce74b1b76b1e52225536b41c181c61303b40d2ae2bc7051264bbf049fc0b6"
+    },
+    "target": {
+      "title": "Tim Easterby致敬Copper Knight退役",
+      "summary": "训练师Tim Easterby在12岁赛驹Copper Knight于York完成职业生涯最后一战后向其致敬；这匹赛驹共赢得20场比赛，其中7场在York，为该赛场历史最多。另一方面，Sharadd在York举行的William Hill Epic Boosts EBF Novice Stakes中获胜，保持不败。",
+      "body": "Tim Easterby在12岁的Copper Knight于周五在York跑完其非凡职业生涯的最后一场比赛后，向这匹马致敬。\n\n这是它第128次出赛，最终在Copper Knight Winning-Most Horse Handicap中获得第七名；该赛事旨在纪念它在Knavesmire创纪录的成功。\n\nCopper Knight职业生涯共赢得20场比赛，其中7场在York，超过该赛马场历史上任何其他马匹。\n\n“它一直非常出色。每次出赛，它都会上场跑出自己的水平。它做到这些很不容易，能一直坚持、保持健康，还愿意拼到终点，真是了不起。它在那里跑了一场超级的比赛，”训练师说。\n\n“那是一段辉煌的时光。当你在三弗隆处需要那种速度时，它就是不再像以前那样拥有那种速度了。你得记住，它也曾在这里跑过Nunthorpe，那非常棒，而且它也很喜欢在Chester绕圈比赛。”\n\n“我们也许还能再找到一匹像它这样的马，但我觉得不会了。马房里每个人都爱它，整个Yorkshire也都爱它。它一直都很了不起。”\n\n令人兴奋的Sharadd保持不败\n\nSharadd在York举行的William Hill Epic Boosts EBF Novice Stakes中以一场扎实的胜利保住了不败纪录。\n\nWilliam Haggas麾下这匹马上月在于Haydock的首次出赛中获胜，职业生涯开局亮眼，但周五Our Son Oscar对其能力构成了更严峻的考验。\n\n马昆骑着这匹4/9的大热门全程行进强劲，但亚军更靠近赛道中央竞跑，在市场领先者取得领先之后仍勇敢地坚持拼搏。\n\n然而在终点线上，Sharadd在与对手之间拉开了1又1/2马位的距离；这很可能是它本赛季的最后一场比赛。\n\nMaureen Haggas说：“它把任务完成了，不是吗？这只是学习过程中的又一步。它大概不喜欢这么软的场地，今天会学到很多。这和Haydock是很不同的体验，那里安静又舒适，而它在这里还东看西看。这一切都是教育，我们所做的就是这个。\n\n“今年对它来说是否就到这里，不是我的决定——但如果由我决定，那就会是，是的。我觉得这就够了——现在已经十月了，从这儿往后还有什么呢？它没做错什么。它的兄弟是短途马，这家伙和它有点不同，但我目前还不知道途程方面怎样，不过我想你大概会从这个距离开始。\n\n“现在对三岁短途马来说有很好的赛事安排，如果你足够好，而它正在做所有正确的事情。至少它今天跑了一场，它会学到更多，而它们也必须学会比赛，同时还要表现出色。天赋总是足够的。它们必须变得职业化，应对一切抛向它们的东西，而它正在学习。”",
+      "blocks": [
+        {
+          "id": "b000",
+          "text": "Tim Easterby在12岁的Copper Knight于周五在York跑完其非凡职业生涯的最后一场比赛后，向这匹马致敬。"
+        },
+        {
+          "id": "b001",
+          "text": "这是它第128次出赛，最终在Copper Knight Winning-Most Horse Handicap中获得第七名；该赛事旨在纪念它在Knavesmire创纪录的成功。"
+        },
+        {
+          "id": "b002",
+          "text": "Copper Knight职业生涯共赢得20场比赛，其中7场在York，超过该赛马场历史上任何其他马匹。"
+        },
+        {
+          "id": "b003",
+          "text": "“它一直非常出色。每次出赛，它都会上场跑出自己的水平。它做到这些很不容易，能一直坚持、保持健康，还愿意拼到终点，真是了不起。它在那里跑了一场超级的比赛，”训练师说。"
+        },
+        {
+          "id": "b004",
+          "text": "“那是一段辉煌的时光。当你在三弗隆处需要那种速度时，它就是不再像以前那样拥有那种速度了。你得记住，它也曾在这里跑过Nunthorpe，那非常棒，而且它也很喜欢在Chester绕圈比赛。”"
+        },
+        {
+          "id": "b005",
+          "text": "“我们也许还能再找到一匹像它这样的马，但我觉得不会了。马房里每个人都爱它，整个Yorkshire也都爱它。它一直都很了不起。”"
+        },
+        {
+          "id": "b006",
+          "text": "令人兴奋的Sharadd保持不败"
+        },
+        {
+          "id": "b007",
+          "text": "Sharadd在York举行的William Hill Epic Boosts EBF Novice Stakes中以一场扎实的胜利保住了不败纪录。"
+        },
+        {
+          "id": "b008",
+          "text": "William Haggas麾下这匹马上月在于Haydock的首次出赛中获胜，职业生涯开局亮眼，但周五Our Son Oscar对其能力构成了更严峻的考验。"
+        },
+        {
+          "id": "b009",
+          "text": "马昆骑着这匹4/9的大热门全程行进强劲，但亚军更靠近赛道中央竞跑，在市场领先者取得领先之后仍勇敢地坚持拼搏。"
+        },
+        {
+          "id": "b010",
+          "text": "然而在终点线上，Sharadd在与对手之间拉开了1又1/2马位的距离；这很可能是它本赛季的最后一场比赛。"
+        },
+        {
+          "id": "b011",
+          "text": "Maureen Haggas说：“它把任务完成了，不是吗？这只是学习过程中的又一步。它大概不喜欢这么软的场地，今天会学到很多。这和Haydock是很不同的体验，那里安静又舒适，而它在这里还东看西看。这一切都是教育，我们所做的就是这个。"
+        },
+        {
+          "id": "b012",
+          "text": "“今年对它来说是否就到这里，不是我的决定——但如果由我决定，那就会是，是的。我觉得这就够了——现在已经十月了，从这儿往后还有什么呢？它没做错什么。它的兄弟是短途马，这家伙和它有点不同，但我目前还不知道途程方面怎样，不过我想你大概会从这个距离开始。"
+        },
+        {
+          "id": "b013",
+          "text": "“现在对三岁短途马来说有很好的赛事安排，如果你足够好，而它正在做所有正确的事情。至少它今天跑了一场，它会学到更多，而它们也必须学会比赛，同时还要表现出色。天赋总是足够的。它们必须变得职业化，应对一切抛向它们的东西，而它正在学习。”"
+        }
+      ]
+    }
+  }
+}

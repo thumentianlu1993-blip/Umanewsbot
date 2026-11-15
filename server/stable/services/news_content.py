@@ -6,7 +6,7 @@ from copy import deepcopy
 
 from bs4 import BeautifulSoup, NavigableString, Tag, Comment, CData
 from stable.services.article_content import _STRUCTURED_NOISE_SELECTORS, _SCMP_STRUCTURED_NOISE_SELECTORS, scmp_body_access_restricted
-from stable.services.news_numeric_equivalence import audit_equivalent_numbers, numeric_surface, numeric_tokens
+from stable.services.news_numeric_equivalence import audit_equivalent_numbers, numeric_surface, numeric_tokens, unparsed_numbers
 from stable.services.news_pipeline import digest
 
 BODY_SELECTORS = {
@@ -276,10 +276,10 @@ def validate_audit(clean, target, response, *, contract_version="legacy"):
             span = issue[field]
             if type(span) is not list or len(span) != 2 or any(type(i) is not int for i in span) or not 0 <= span[0] <= span[1] <= len(texts[target_block if field == "target_span" else block]):
                 return failed
-    numeric_ok = all(row["status"] != "surface_difference" for row in diagnostics.values())
+    numeric_ok = all(row["status"] not in {"surface_difference", "not_comparable"} for row in diagnostics.values())
     source_numbers = set(numeric_tokens("\n".join(sources.values())))
     summary_numbers = set(numeric_tokens(target["summary"], include_optional=False))
-    numeric_ok = numeric_ok and not (summary_numbers - source_numbers)
+    numeric_ok = numeric_ok and not (summary_numbers - source_numbers) and not unparsed_numbers(target['summary'])
     passed = response["verdict"] == "pass" and all(response["checks"].values()) and not response["issues"] and numeric_ok
     return {"passed": passed, "reason": "passed" if passed else "facts_or_numeric_difference", "source_sha": clean["source_sha"], "clean_sha": clean["clean_sha"], "target_sha": digest(target), "model": deepcopy(response), "numeric": diagnostics}
 
@@ -401,7 +401,11 @@ def hard_translation_checks(clean, target, entities=()):
             raise ContentBlocked("translation_block_coverage")
         pairs = {key: (value, targets[key]) for key, value in sources.items()}
     numeric = {key: audit_equivalent_numbers(*pair) for key, pair in pairs.items()}
+    unknown = [key for key, value in numeric.items() if value["status"] == "not_comparable"]
     bad = [key for key, value in numeric.items() if value["status"] == "surface_difference"]
+    if unparsed_numbers(target['summary']):
+        unknown.append('summary')
+    bad.extend(unknown)
     summary_extra = set(numeric_tokens(target["summary"], include_optional=False)) - set(numeric_tokens("\n".join(sources.values())))
     if summary_extra:
         bad.append("summary")
@@ -410,6 +414,7 @@ def hard_translation_checks(clean, target, entities=()):
     issues = translation_issues(clean, target, entities) if context_contract_version() == "context-v3" else []
     bad.extend(issue["block_id"] for issue in issues)
     return {"passed": not bad, "located_issues": issues, "numeric": numeric, "repair_block_ids": sorted(set(bad)),
+            "numeric_not_comparable": sorted(set(unknown)),
             "summary_difference": sorted(summary_extra), "target_sha": digest(target)}
 
 
@@ -459,8 +464,9 @@ def context_audit(clean, target, response, *, contract_version="context-v2"):
     hard = hard_translation_checks(clean, target)
     passed = response["verdict"] == "pass" and hard["passed"]
     return {**failed, "passed": passed, "evidence_valid": True, "verdict": response["verdict"],
-            "reason": "passed" if passed else "facts_or_numeric_difference", "clean_sha": clean["clean_sha"],
+            "reason": "numeric_not_comparable" if hard["numeric_not_comparable"] else "passed" if passed else "facts_or_numeric_difference", "clean_sha": clean["clean_sha"],
             "model": deepcopy(response), "located_issues": normalized, "numeric": hard["numeric"],
+            "numeric_not_comparable": hard["numeric_not_comparable"],
             "repair_block_ids": sorted(repair | set(hard["repair_block_ids"]))}
 
 

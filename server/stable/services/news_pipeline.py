@@ -710,7 +710,7 @@ def context_projection(run, attempt):
             target = manual_translation(run.manual_target)
             hard = hard_translation_checks(run.clean_snapshot, target, rows if attempt.stage == "entity_check" else run.entity_snapshot["occurrences"])
             return {**update, "translation_snapshot": target, "stage": "fact_audit",
-                    **({"state": "review", "reason": "manual_hard_check_failed"} if not hard["passed"] else {})}
+                    **({"state": "review", "reason": "numeric_not_comparable" if hard.get("numeric_not_comparable") else "manual_hard_check_failed"} if not hard["passed"] else {})}
         return {**update, "stage": "translate_full"}
     if attempt.stage == "translate_full":
         raw = deepcopy(attempt.result)
@@ -730,6 +730,9 @@ def context_projection(run, attempt):
         quality.update(target_sha=digest(target))
         if not hard["passed"]:
             quality.update(numeric=hard["numeric"], located_issues=hard["located_issues"], repair_block_ids=hard["repair_block_ids"])
+            if hard.get('numeric_not_comparable'):
+                return {"state": "review", "reason": "numeric_not_comparable", "lease_until": None,
+                        "quality_snapshot": quality, "translation_snapshot": target}
             return {**repair_projection(run, quality, hard["repair_block_ids"], "hard_translation_failed"),
                     "translation_snapshot": target}
         return {**update, "translation_snapshot": target, "quality_snapshot": quality, "stage": "fact_audit"}
@@ -743,6 +746,8 @@ def context_projection(run, attempt):
             return {**update, "quality_snapshot": quality, "state": "ready", "stage": "publish"}
         if not result["evidence_valid"]:
             return {**update, "quality_snapshot": quality, "state": "review", "reason": "audit_evidence_invalid"}
+        if result.get('numeric_not_comparable'):
+            return {**update, "quality_snapshot": quality, "state": "review", "reason": "numeric_not_comparable"}
         if result["verdict"] == "uncertain":
             if attempt.usage["price"]["profile"] == "base" and not quality.get("deep_required"):
                 quality.update(deep_required=True, upgrade_attempt_id=attempt.pk)

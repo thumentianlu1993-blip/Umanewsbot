@@ -140,12 +140,13 @@ RACING_PROMPTS = {
     'body_review': CONTEXT_PROMPTS['body_review'],
     'entity_check': CONTEXT_BASE + (
         'entity-units-v3：逐个处理units含标题，只抽核心text每次提及，window/context_units只读。'
-        'mode=initial仅返回{"units":[{"unit_id":"输入ID","coverage":"complete或uncertain",'
+        '顶层字段严格等于response_fields。units格式为{"units":[{"unit_id":"输入ID","coverage":"complete或uncertain",'
         '"entities":[{"text":"逐字原名","type":"以下枚举单选","context":"逐字定位上下文"}]}]}；'
-        'initial绝不返回decisions。每单元必须回执，无专名entities为空。'
-        'mode=repair必须额外返回decisions数组，每项仅{"issue_id":"输入ID","picks":['
-        '{"candidate_id":"已提供候选ID","type":"以下枚举单选"}]}；无歧义decisions为空。'
-        '每个ambiguous_occurrence必须一个decision，选所有确属实体的候选；仅非实体可picks为空。'
+        'mode=initial只返回units；每个请求单元必须回执，无专名entities为空。mode=repair只修请求单元。'
+        '只有response_fields含decisions时才返回该数组，每项仅{"issue_id":"输入ID","picks":['
+        '{"candidate_id":"已提供候选ID","type":"以下枚举单选"}]}。'
+        '每个ambiguous_occurrence必须一个decision，只选输入已提供且确属实体的候选；非实体用空picks。'
+        '其他问题直接在units中重写准确的text/context，不创建issue_id或candidate_id。'
         '不得选already_frozen/overlap_conflict；不重复accepted，不新增非请求units。'
         '累计含accepted最多256行；缺失/不确定coverage=uncertain，不能截断称complete。'
         'text/context不得改原文、空格、括号；不返回数字跨度、译名、真实身份ID或额外字段。'
@@ -183,8 +184,11 @@ RACING_PROMPTS = {
     'fact_audit': CONTEXT_BASE + (
         '全文核对source与target，包括标题、摘要、所有正文块及引语；不能以token齐全或数字相同代替语义核对。'
         '检查专名、数字单位、日期名次、否定、计划/发生、归属、遗漏、新增事实以及中文可读性。'
-        '返回且仅返回{"verdict":"pass或fail或uncertain","checks":' +
-        json.dumps(dict.fromkeys(audit_check_keys('context-v3'), True), separators=(',', ':')) + ',"issues":[]}。'
+        '先逐项核对摘要陈述的主体、动作、对象和原文依据，再逐块检查正文含义与中文表达。'
+        '先记录具体问题及两端引文，再据问题汇总checks，最后决定verdict；不能先假定通过。'
+        '返回且仅返回{"issues":[],"checks":' +
+        json.dumps(dict.fromkeys(audit_check_keys('context-v3'), 'boolean'), separators=(',', ':')) + ',"verdict":"pass或fail或uncertain"}。'
+        'boolean表示必须填JSON布尔值，不是字符串或默认true；issues按下述结构列出。'
         'fluency检查重复、句法残缺、主体指代不清及普通表达未中文化；明确的风格偏好本身不算错误，未知专名保留原名不判错。'
         '角色或引语关系错误用attribution，新增断言用unsupported_claims。'
         '全部检查确实通过且issues空才pass；fail/uncertain必须有证据，对应checks项为false，每个false项都有issue。'
@@ -196,5 +200,5 @@ RACING_PROMPTS = {
         '原文矛盾不得猜真值，返回uncertain及证据。'
         '若editorial含correction，另返回corrections数组，每项仅receipt_id、old_body_span、substantive(bool)、'
         'supported(bool)，与更正顺序一致，确认旧稿实质错误且新稿完整纠正；无更正省略该字段。'
-    ) + _TRANSLATION_PRINCIPLES,
+    ),
 }
